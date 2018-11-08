@@ -1,56 +1,44 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Thu, 8 Nov 2018 16:59:40 +0100
-Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
-In-Reply-To: <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-14-robh@kernel.org>
- <20181009115713.GE6248@arm.com>
- <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
- <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
-Message-ID: <20181108165940.64ad52f1@windsurf>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 8 Nov 2018 16:04:57 +0000
+Subject: [PATCH 3/4] Documentation: bindings: Add missing Amlogic SCPI
+ sensor bindings
+In-Reply-To: <20181108135352.8459-4-jbrunet@baylibre.com>
+References: <20181108135352.8459-1-jbrunet@baylibre.com>
+ <20181108135352.8459-4-jbrunet@baylibre.com>
+Message-ID: <20181108160457.GA10953@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-I'm jumping into the discussion, but I clearly don't have all the
-context of the discussion.
-
-On Thu, 8 Nov 2018 15:54:31 +0000, Robin Murphy wrote:
-
-> >> This seems like a semantic different between the two representations, or am
-> >> I missing something here? Specifically, both the introduction of
-> >> interrupts-extended and also dropping any mention of using a single per-cpu
-> >> interrupt (the single combined case is no longer support by Linux; not sure
-> >> if you want to keep it in the binding).  
-> > 
-> > In regards to no support for the single combined interrupt, it looks
-> > like Marvell Armada SoCs at least (armada-375 is what I'm looking at)
-> > have only a single interrupt. Though the interrupt gets routed to MPIC
-> > which then has a GIC PPI. So it isn't supported or happens to work
-> > still since it is a PPI?  
+On Thu, Nov 08, 2018 at 02:53:51PM +0100, Jerome Brunet wrote:
+> amlogic,meson-gxbb-scpi-sensors is both the driver and DT but is not
+> documented. Just add it to amlogic's scpi documentation
 > 
-> Well, the description of the MPIC in the Armada XP functional spec says:
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic,scpi.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> "Interrupt sources ID0?ID28 are private events per CPU. Thus, each 
-> processor has a different set of events map interrupts ID0?ID28."
-> 
-> Odd grammar aside, that would seem to imply that <&mpic 3> is a per-cpu 
-> interrupt itself, thus AFAICS so long as it's cascaded to a GIC PPI and 
-> not an SPI then there's no issue there.
+> diff --git a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> index 7b9a861e9306..5ab59da052df 100644
+> --- a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> +++ b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
+> @@ -17,4 +17,11 @@ Required sub-node properties:
+>  - compatible : should be "amlogic,meson-gxbb-scp-shmem" for SRAM based shared
+>  		memory on Amlogic GXBB SoC.
+>  
+> +Sensor bindings for the sensors based on SCPI Message Protocol
+> +--------------------------------------------------------------
+> +SCPI provides an API to access the various sensors on the SoC.
+> +
+> +Required properties:
+> +- compatible : should be "amlogic,meson-gxbb-scpi-sensors".
+> +
 
-The Armada XP does not have a GIC at all, but only a MPIC as the
-primary interrupt controller.
+Not sure if it's worth mentioning the reason for being able to identify
+amlogic,meson-gxbb sensors from generic scpi ones. IIRC it was for the
+unit values of these sensors are different ? But I will leave that to
+DT or platform maintainers' taste.
 
-However the Armada 38x has both a GIC and a MPIC, and indeed the parent
-interrupts of the MPIC towards the GIC is:
-
-	interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+--
+Regards,
+Sudeep
