@@ -1,81 +1,83 @@
-From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Thu, 08 Nov 2018 14:23:01 +0100
-Subject: [PATCH 7/9] arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
-In-Reply-To: <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
-References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
- <e6e0105f-3135-e5b7-8224-419c9f730a09@free.fr>
- <85a73243-0c53-43e5-5002-90631c0a8c90@free.fr>
- <VI1PR0402MB3485342DB8A0F5C5791E213798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
- <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
-Message-ID: <2ABE50FD-FF08-4E16-8D8F-A81A92722478@free.fr>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu,  8 Nov 2018 14:24:38 +0100
+Subject: [PATCH RESEND] arm64: dts: meson-gx: Add hdmi_5v regulator as hdmi tx
+ supply
+Message-ID: <1541683478-5173-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The hdmi_5v regulator must be enabled to provide power to the physical HDMI
+PHY and enables the HDMI 5V presence loopback for the monitor.
 
+Fixes: b409f625a6d5 ("ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   | 1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 1 +
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts         | 1 +
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 1 +
+ 5 files changed, 5 insertions(+)
 
-On November 8, 2018 12:38:10 PM GMT+01:00, Horia Geanta <horia.geanta@nxp.com> wrote:
->On 11/8/2018 1:23 PM, Horia Geanta wrote:
->> On 11/7/2018 10:49 PM, Marc Gonzalez wrote:
->>> [ Add interested parties ]
->>>
->>> On 07/11/2018 21:18, Marc Gonzalez wrote:
->>>
->>>> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2
->SoCs")
->>>> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
->>>> which is not set.
->>>>
->> Thanks Marc.
->> 
->> Though I would prefer enabling the dependencies:
->> dpaa2-caam driver -> dpio driver (FSL_MC_DPIO) -> fsl-mc driver
->(FSL_MC_BUS).
->> 
->Could you instead incorporate below patch in your series?
->(I am pretty sure it won't apply clean)
->
->Thanks,
->Horia
->
->-- >8 --
->
->Subject: [PATCH] arm64: defconfig: enable DPAA2 fsl-mc bus and DPIO
->driver
->
->Enable fsl-mc bus and DPIO (Datapath I/O) driver, which are needed on
->Layerscape SoCs with QorIQ Data Path Acceleration Architecture (DPAA)
->v2.
->
->Suggested-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
->Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
->---
-> arch/arm64/configs/defconfig | 2 ++
-> 1 file changed, 2 insertions(+)
->
->diff --git a/arch/arm64/configs/defconfig
->b/arch/arm64/configs/defconfig
->index c9a57d11330b..7c3785e61ef9 100644
->--- a/arch/arm64/configs/defconfig
->+++ b/arch/arm64/configs/defconfig
->@@ -181,6 +181,7 @@ CONFIG_DMA_CMA=y
-> CONFIG_CMA_SIZE_MBYTES=32
-> CONFIG_HISILICON_LPC=y
-> CONFIG_SIMPLE_PM_BUS=y
->+CONFIG_FSL_MC_BUS=y
-> CONFIG_MTD=y
-> CONFIG_MTD_BLOCK=y
-> CONFIG_MTD_M25P80=y
->@@ -615,6 +616,7 @@ CONFIG_QCOM_IOMMU=y
-> CONFIG_RPMSG_QCOM_GLINK_RPM=y
-> CONFIG_RPMSG_QCOM_SMD=y
-> CONFIG_RASPBERRYPI_POWER=y
->+CONFIG_FSL_MC_DPIO=y
-> CONFIG_QCOM_SMEM=y
-> CONFIG_QCOM_SMD_RPM=y
-> CONFIG_QCOM_SMP2P=y
->-- 
->2.16.2
-
-Are CRYPTO_DEV_FSL_DPAA2_CAAM and CONFIG_FSL_MC_DPIO required to boot the platform? If not, we will build them as modules. I can send a v3 tonight with that change, as well as the various Acks.
-
-Regards
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+index 765247b..e14e0ce 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
+@@ -125,6 +125,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+index d32cf38..ceb34af 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts
+@@ -78,6 +78,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+index 90a56af..a23252e 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts
+@@ -155,6 +155,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+index 5896e8a..2602940 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts
+@@ -51,6 +51,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+index 313f88f..782e9ed 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts
+@@ -271,6 +271,7 @@
+ 	status = "okay";
+ 	pinctrl-0 = <&hdmi_hpd_pins>, <&hdmi_i2c_pins>;
+ 	pinctrl-names = "default";
++	hdmi-supply = <&hdmi_5v>;
+ };
+ 
+ &hdmi_tx_tmds_port {
+-- 
+2.7.4
