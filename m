@@ -1,71 +1,118 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 8 Nov 2018 12:23:06 +0000
-Subject: [PATCH 5/7] arm64: Do not apply BP hardening for hyp entries from
- EL2
-In-Reply-To: <20181107215918.GG12248@brain-police>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <1537970184-44348-6-git-send-email-julien.thierry@arm.com>
- <20181107215918.GG12248@brain-police>
-Message-ID: <36b8c11d-345a-efd5-c3e0-9b6284c16e87@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 8 Nov 2018 13:25:45 +0100
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add I2C-DVFS device
+ node
+In-Reply-To: <20181108115219.47lf5iauoygomdbh@verge.net.au>
+References: <1540071349-27483-1-git-send-email-ykaneko0929@gmail.com>
+ <CAMuHMdV=ZinKOWZco9t4rGncYY5BqghXxGE6w9qCNW55UVSa+A@mail.gmail.com>
+ <20181107123002.t6xg4m4vbq7cuapb@verge.net.au>
+ <20181108102201.kuheale47tqygoe4@verge.net.au>
+ <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
+ <20181108115219.47lf5iauoygomdbh@verge.net.au>
+Message-ID: <CAMuHMdX=Gj1a5rjfRWSDKMbDuqyeztBCGb+9yam8w8UQMLkUPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Simon,
 
+On Thu, Nov 8, 2018 at 12:52 PM Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Nov 08, 2018 at 11:27:31AM +0100, Geert Uytterhoeven wrote:
+> > On Thu, Nov 8, 2018 at 11:22 AM Simon Horman <horms@verge.net.au> wrote:
+> > > On Wed, Nov 07, 2018 at 01:30:10PM +0100, Simon Horman wrote:
+> > > > On Mon, Nov 05, 2018 at 09:52:48AM +0100, Geert Uytterhoeven wrote:
+> > > > > On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
+> > > > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > > > >
+> > > > > > This patch adds I2C-DVFS device node for the R8A77990 SoC.
+> > > > > >
+> > > > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > > > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > > > >
+> > > > > Thanks for your patch!
+> > > > >
+> > > > > > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> > > > > > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> >
+> > > > > >         };
+> > > > > >
+> > > > > >         cpus {
+> > > > > > @@ -337,6 +338,22 @@
+> > > > > >                         reg = <0 0xe6060000 0 0x508>;
+> > > > > >                 };
+> > > > > >
+> > > > > > +               i2c_dvfs: i2c at e60b0000 {
+> > > > > > +                       #address-cells = <1>;
+> > > > > > +                       #size-cells = <0>;
+> > > > > > +                       compatible = "renesas,iic-r8a77990",
+> > > > >
+> > > > > "renesas,iic-r8a77990" is not yet documented.
+> > > >
+> > > > Thanks, as per my comment below I wonder if as well as documenting
+> > > > "renesas,iic-r8a77990" we also to teach the driver about it.
+> > > >
+> > > > >
+> > > > > > +                                    "renesas,rcar-gen3-iic",
+> > > > > > +                                    "renesas,rmobile-iic";
+> > > > >
+> > > > > Also, IIC on R-Car E3 does not have the automatic transmission registers.
+> > > > > Does this affect claiming compatibility with the family-specific or generic
+> > > > > compatible values?
+> > > >
+> > > > My cursory reading of the driver indicates that only register that is
+> > > > used by it but documented as not existing on E3 is ICSTART (offset 0x70).
+> > > >
+> > > > It seems to me that we should confirm with Renesas that the register does
+> > > > indeed not exist - as this patch comes from the BSP which implies it is
+> > > > being used there. And if it does not exist we should try teaching the
+> > > > driver not to use ICSTART via the "renesas,iic-r8a77990" compat string.
+> > > > What do you think?
+> > >
+> > > Further examination by Wolfram Sang has shown that the code in question is
+> > > only used on the r8a7740. I don't think there is any compatibility issue
+> > > for r8a77990 when using the current driver.
+> >
+> > "When using the current driver".
+> > Do we want to claim compatibility with "renesas,rcar-gen3-iic" and/or
+> > "renesas,rmobile-iic"?
+>
+> Thinking a bit more since I wrote my previous email.
+>
+> It seems that the r8a77990 has a different feature set to other R-Car Gen3
+> SoCs but that the current driver implementation "renesas,rcar-gen3-iic"
+> and "renesas,rmobile-iic" do not exceed that feature set.
+>
+> In future we could expand the features supported by the driver for other
+> Gen3 SoCs beyond what is supported for r8a77990. If we chose to describe
+> r8a77990 as compatible with renesas,rcar-gen3-iic then that implies those
+> new features would not be activated by matching on "renesas,rcar-gen3-iic",
+> though we could choose to control that using soc_match. Conversely if we
+> decide that r8a77990 is not compatible with renesas,rcar-gen3-iic then we
+> have more freedom to move with regards to adding features not supported by
+> r8a77990 to renesas,rcar-gen3-iic in future.
+>
+> So perhaps it would be wise to be conservative and, for now,
+> not document r8a77990 as being compatible with renesas,iic-r8a77990.
+>
+> I'm tempted to say that renesas,rmobile-iic is a lowest common denominator
+> and r8a77990 can be documented as being compatible with it. But we could
+> say the same of renesas,rcar-gen3-iic.
+>
+> What do you think?
 
-On 07/11/18 21:59, Will Deacon wrote:
-> On Wed, Sep 26, 2018 at 02:56:22PM +0100, Julien Thierry wrote:
->> When an EL2 entry of __kvm_hyp_vector is taken, it means an entry from a
->> lower EL was previously taken to exit the guest. Taking that lower EL entry
->> already applied BP hardening if it was needed, so there is no need to do
->> it again.
->>
->> Only apply BP hardening for exception coming from lower EL.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: kvmarm at lists.cs.columbia.edu
->> ---
->>   arch/arm64/kernel/cpu_errata.c | 10 ++++++++--
->>   1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index dec1089..9db5ecc 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -103,10 +103,16 @@ static void __copy_hyp_vect_bpi(int slot, const char *hyp_vecs_start,
->>   	void *dst = lm_alias(__bp_harden_hyp_vecs_start + slot * SZ_2K);
->>   	int i;
->>
->> -	for (i = 0; i < SZ_2K; i += 0x80)
->> +	/*
->> +	 * Only overwrite hyp entries for exceptions from lower EL.
->> +	 * Exception vection vector is 2K bytes, first 1K bytes concern
->> +	 * exception from EL2 (EL2t, EL2h), last 1K concert lower exception
->> +	 * levels (ELx-64bits, ELx-32bits).
->> +	 */
->> +	for (i = SZ_1K; i < SZ_2K; i += 0x80)
->>   		memcpy(dst + i, hyp_vecs_start, hyp_vecs_end - hyp_vecs_start);
->>
->> -	__flush_icache_range((uintptr_t)dst, (uintptr_t)dst + SZ_2K);
->> +	__flush_icache_range((uintptr_t)dst + SZ_1K, (uintptr_t)dst + SZ_2K);
->>   }
-> 
-> I'd personally find this clearer if you did:
-> 
-> 	dst += SZ_1K;
-> 
-> before the for loop and with your comment above it. Then the for loop
-> becomes:
-> 
-> 	for (i = 0; i < SZ_1K; i += 0x80)
-> 
-> and the range of the cache maintenance is [dst, dst + SZ_1K)
-> > But I'll leave it up to Marc.
-> 
+That matches my thoughts.
 
-I'd say I agree with your suggestion, so unless Marc finds it better in 
-the current state, I'll make the change.
+Given R-Mobile A1 does have the register, I think r8a77990 should not claim
+compatibility with it.
 
-Thanks,
+Of course all this assumes there's no bug in the datasheet w.r.t. r8a77990...
+
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-Julien Thierry
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
