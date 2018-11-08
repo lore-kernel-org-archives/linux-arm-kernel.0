@@ -1,103 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Nov 2018 15:10:32 +0100
-Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
-In-Reply-To: <8382cafd-9fb7-7121-0de2-5091ba079d31@arm.com>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <CAKv+Gu-jVTWyy61Q--HE_Hw+RZVxYcTypZmF+YUhmX1p_QkLKQ@mail.gmail.com>
- <8382cafd-9fb7-7121-0de2-5091ba079d31@arm.com>
-Message-ID: <CAKv+Gu_K9p5FvQGtvgzKmveiQvHQp1H1PxAzxqcFnJfDQt4huw@mail.gmail.com>
+From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
+Date: Thu,  8 Nov 2018 16:15:21 +0200
+Subject: [PATCH v5 00/17] Remove nested TPM operations
+Message-ID: <20181108141541.12832-1-jarkko.sakkinen@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Ramana)
+[was Detach TPM space code out of the tpm_transmit() flow but the scope
+ expanded a bit.]
 
-On 8 November 2018 at 14:27, Julien Thierry <julien.thierry@arm.com> wrote:
->
->
-> On 08/11/18 13:04, Ard Biesheuvel wrote:
->>
->> On 26 September 2018 at 15:56, Julien Thierry <julien.thierry@arm.com>
->> wrote:
->>>
->>> Hi,
->>>
->>> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
->>> using it to access memory. When taking an exception, it is possible that
->>> the context during which the exception occured had SP mis-aligned.
->>
->>
->> How is this possible? GCC clearly only manipulates the stack pointer
->> in 16 byte multiples, and so if we do the same in our asm code (which
->> I think we already do, given the lack of reports about this issue), is
->> this handling really necessary?
->>
->
-> Is there anything that actually gives us that guarantee from GCC? I agree
-> that currently it looks like aarch64-<...>-gcc only manipulates SP aligned
-> to 16 bytes, but I don't know whether that is certain.
->
+Make the changes necessary to detach TPM space code and TPM activation
+code out of the tpm_transmit() flow because of both of these can cause
+nested tpm_transmit() calls. The nesteds calls make the whole flow hard
+to maintain, and thus, it is better to just fix things now before this
+turns into a bigger mess.
 
-I think we should get that clarified then. I don't think it makes
-sense for GCC to have to reason about whether SP currently has a value
-that permits dereferencing.
+The commits are available in a branch called 'nested' in
 
-> The series can be dropped if there is enough confidence that this won't
-> happen.
->
-> Thanks,
->
->
->>
->>> The
->>> entry code needs to make sure that the stack is aligned before using it
->>> to
->>> save the context.
->>>
->>> This is only a concern when taking exception from an EL using the same
->>> SP_ELx as the handler. In other cases it can be assumed that the SP being
->>> picked up on exception entry is aligned under the condition that SP is
->>> always aligned when doing eret to an EL using a different SP.
->>>
->>> On Juno I see a runtime difference <1% for hackbench. If I do not include
->>> the fast path at EL1 (patch 4) I see a diff of 1-2%.
->>>
->>> For EL2 entries, a bit of clean up of stuff getting patched in the vector
->>> has been needed.
->>>
->>> Cheers,
->>>
->>> Julien
->>>
->>> -->
->>>
->>> Julien Thierry (7):
->>>    arm64: Add static check for pt_regs alignment
->>>    arm64: sdei: Always use sdei stack for sdei events
->>>    arm64: Align stack when taking exception from EL1
->>>    arm64: Add fast-path for stack alignment
->>>    arm64: Do not apply BP hardening for hyp entries from EL2
->>>    arm64: Do not apply vector harderning for hyp entries from EL2
->>>    arm64: kvm: Align stack for exception coming from EL2
->>>
->>>   arch/arm64/include/asm/assembler.h |  9 +++++
->>>   arch/arm64/include/asm/ptrace.h    |  2 +
->>>   arch/arm64/include/asm/sdei.h      |  2 -
->>>   arch/arm64/kernel/cpu_errata.c     | 10 ++++-
->>>   arch/arm64/kernel/entry.S          | 43 +++++++++++++++++++--
->>>   arch/arm64/kernel/sdei.c           | 23 ++++-------
->>>   arch/arm64/kvm/hyp/hyp-entry.S     | 78
->>> +++++++++++++++++++++++++++++++-------
->>>   drivers/firmware/Kconfig           |  1 +
->>>   8 files changed, 132 insertions(+), 36 deletions(-)
->>>
->>> --
->>> 1.9.1
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
-> --
-> Julien Thierry
+git://git.infradead.org/users/jjs/linux-tpmdd.git
+
+v5:
+* Add the missing rev's from Stefan Berger.
+
+v4:
+* Return 0 from pcrs_show() when tpm1_pcr_read() fails.
+* Fix error handling flow in tpm_try_transmit().
+* Replace struct tpm_input_header and struct tpm_output_header with
+  struct tpm_header.
+
+v3:
+* Encapsulate power gating code to tpm_chip_start() and tpm_chip_stop().
+* Move TPM power gating code and locking to tpm_try_get_ops() and
+  tpm_put_ops().
+* Call power gating code directly in tpm_chip_register() and
+  tpm2_del_space().
+
+v2:
+* Print tpm2_commit_space() error inside tpm2_commit_space()
+* Error code was not printed when recv() callback failed. It is
+  fixed in this version.
+* Added a patch that removes @space from tpm_transmit().
+* Fixed a regression in earlier series. Forgot to amend the change
+  from the staging area that renames NESTED to UNLOCKED in tpm2-space.c.
+
+Jarkko Sakkinen (17):
+  tpm: use tpm_buf in tpm_transmit_cmd() as the IO parameter
+  tpm: fix invalid return value in pubek_show()
+  tpm: return 0 from pcrs_show() when tpm1_pcr_read() fails
+  tpm: call tpm2_flush_space() on error in tpm_try_transmit()
+  tpm: print tpm2_commit_space() error inside tpm2_commit_space()
+  tpm: clean up tpm_try_transmit() error handling flow
+  tpm: declare struct tpm_header
+  tpm: access command header through struct in  tpm_try_transmit()
+  tpm: move tpm_validate_commmand() to tpm2-space.c
+  tpm: encapsulate tpm_dev_transmit()
+  tpm: move TPM space code out of tpm_transmit()
+  tpm: remove @space from tpm_transmit()
+  tpm: use tpm_try_get_ops() in tpm-sysfs.c.
+  tpm: remove TPM_TRANSMIT_UNLOCKED flag
+  tpm: introduce tpm_chip_start() and tpm_chip_stop()
+  tpm: take TPM chip power gating out of tpm_transmit()
+  tpm: remove @flags from tpm_transmit()
+
+ drivers/char/tpm/tpm-chip.c       | 105 +++++++++++-
+ drivers/char/tpm/tpm-dev-common.c |  45 ++++-
+ drivers/char/tpm/tpm-interface.c  | 267 ++++++------------------------
+ drivers/char/tpm/tpm-sysfs.c      | 138 +++++++++------
+ drivers/char/tpm/tpm.h            |  64 +++----
+ drivers/char/tpm/tpm1-cmd.c       |  28 +---
+ drivers/char/tpm/tpm2-cmd.c       |  72 +++-----
+ drivers/char/tpm/tpm2-space.c     |  93 ++++++++---
+ drivers/char/tpm/tpm_i2c_atmel.c  |   5 +-
+ drivers/char/tpm/tpm_vtpm_proxy.c |  12 +-
+ drivers/char/tpm/xen-tpmfront.c   |   2 +-
+ 11 files changed, 406 insertions(+), 425 deletions(-)
+
+-- 
+2.19.1
