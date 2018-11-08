@@ -1,51 +1,62 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 8 Nov 2018 01:24:51 +0000
-Subject: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
-In-Reply-To: <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
-References: <1541567625-11812-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
-Message-ID: <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Thu, 08 Nov 2018 12:15:56 +1030
+Subject: [PATCH v2 1/2] ARM: dts: Add Facebook BMC flash layout
+In-Reply-To: <c5e56fc4-397f-a38b-6378-99eecce1180b@fb.com>
+References: <20181106042829.2771226-1-taoren@fb.com>
+ <1541635320.1462459.1569430616.0F5E4C4D@webmail.messagingengine.com>
+ <c5e56fc4-397f-a38b-6378-99eecce1180b@fb.com>
+Message-ID: <1541641556.1495362.1569509568.7BE039CA@webmail.messagingengine.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
-
-Best Regards!
-Anson Huang
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: 2018?11?7? 18:03
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Shawn Guo <shawnguo@kernel.org>; Sascha
-> Hauer <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>;
-> Fabio Estevam <fabio.estevam@nxp.com>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>; moderated list:ARM/FREESCALE IMX / MXC
-> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; dl-linux-imx
-> <linux-imx@nxp.com>
-> Subject: Re: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
+On Thu, 8 Nov 2018, at 10:48, Tao Ren wrote:
+> On 11/7/18 4:02 PM, Andrew Jeffery wrote:
+> >> +partitions {
+> >> +	compatible = "fixed-partitions";
+> >> +	#address-cells = <1>;
+> >> +	#size-cells = <1>;
+> >> +
+> >> +	u-boot at 0 {
+> >> +		reg = <0x0 0x60000>;
+> >> +		label = "u-boot";
+> >> +	};
+> >> +
+> >> +	u-boot-env at 60000 {
+> >> +		reg = <0x60000 0x20000>;
+> >> +		label = "env";
+> >> +	};
+> >> +
+> >> +	fit at 80000 {
+> >> +		reg = <0x80000 0x1b80000>;
+> >> +		label = "fit";
+> >> +	};
+> >> +
+> >> +	data0 at 1c00000 {
+> >> +		reg = <0x1c00000 0x400000>;
+> >> +		label = "data0";
+> >> +	};
+> >> +
+> >> +	flash0 at 0 {
+> >> +		reg = <0x0 0x2000000>;
+> >> +		label = "flash0";
+> >> +	};
+> > 
+> > Is this necessary? Isn't the same thing achieved with the /dev/mtd0 device?
 > 
-> Hi Anson,
+> Hi Andrew,
 > 
-> On Wed, Nov 7, 2018 at 3:19 AM Anson Huang <anson.huang@nxp.com>
-> wrote:
+> Thank you for the review! The new layout file is needed mainly because 
+> of "data0" partition: several facebook platforms use the partition as 
+> "persistent" storage.
 > 
-> > +&fec2 {
-> > +       pinctrl-0 = <&pinctrl_enet2>;
-> > +       /delete-property/pinctrl-assert-gpios;
-> 
-> "pinctrl-assert-gpios" does not exist in mainline, so not sure why you are
-> deleting it.
+> As for "flash0", technically it's not needed (as you pointed out, /dev/
+> mtd0 covers the entire flash if master_partition is enabled). It's still 
+> here to avoid breaking some legacy applications.
 
-Regarding the fec2 settings in imx7d-sdb.dts, originally it uses Rev-A board (but some nodes are
-using Rev-B board), in this patch, I clean up all the settings in imx7d-sdb.dts using Rev-B board,
-so below is added to imx7d-sdb.dts for Rev-B board, and in imx7d-sdb-reva.dts I have to
-delete it, since Rev-A board has no this pin.
+This is what I expected. I think it might be worth adding a comment, given
+you are respinning the series to address my comments on the board
+devicetree patch.
 
--	pinctrl-0 = <&pinctrl_enet2>;
-+	pinctrl-0 = <&pinctrl_enet2 &pinctrl_enet2_epdc0_en>;
-+	pinctrl-assert-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 
-Anson.
+Anyway, thanks for the clarification.
+
+Andrew
