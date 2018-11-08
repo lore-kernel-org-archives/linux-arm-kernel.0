@@ -1,89 +1,70 @@
-From: horia.geanta@nxp.com (Horia Geanta)
-Date: Thu, 8 Nov 2018 15:51:56 +0000
-Subject: [PATCH 7/9] arm64: defconfig: Drop CRYPTO_DEV_FSL_DPAA2_CAAM
-References: <8b49a92b-ca92-1fca-cd09-3bcd7a3dcbb9@free.fr>
- <e6e0105f-3135-e5b7-8224-419c9f730a09@free.fr>
- <85a73243-0c53-43e5-5002-90631c0a8c90@free.fr>
- <VI1PR0402MB3485342DB8A0F5C5791E213798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
- <VI1PR0402MB348569B15DBAB6503303D41798C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
- <2ABE50FD-FF08-4E16-8D8F-A81A92722478@free.fr>
-Message-ID: <VI1PR0402MB3485E2C824DD151B8E482DDD98C50@VI1PR0402MB3485.eurprd04.prod.outlook.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 8 Nov 2018 15:54:31 +0000
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
+In-Reply-To: <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-14-robh@kernel.org> <20181009115713.GE6248@arm.com>
+ <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
+Message-ID: <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/8/2018 3:23 PM, Marc Gonzalez wrote:
-> 
-> 
-> On November 8, 2018 12:38:10 PM GMT+01:00, Horia Geanta <horia.geanta@nxp.com> wrote:
->> On 11/8/2018 1:23 PM, Horia Geanta wrote:
->>> On 11/7/2018 10:49 PM, Marc Gonzalez wrote:
->>>> [ Add interested parties ]
->>>>
->>>> On 07/11/2018 21:18, Marc Gonzalez wrote:
->>>>
->>>>> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2
->> SoCs")
->>>>> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
->>>>> which is not set.
->>>>>
->>> Thanks Marc.
+On 01/11/2018 19:32, Rob Herring wrote:
+> On Tue, Oct 9, 2018 at 6:57 AM Will Deacon <will.deacon@arm.com> wrote:
+>>
+>> Hi Rob,
+>>
+>> On Fri, Oct 05, 2018 at 11:58:25AM -0500, Rob Herring wrote:
+>>> Convert ARM PMU binding to DT schema format using json-schema.
 >>>
->>> Though I would prefer enabling the dependencies:
->>> dpaa2-caam driver -> dpio driver (FSL_MC_DPIO) -> fsl-mc driver
->> (FSL_MC_BUS).
->>>
->> Could you instead incorporate below patch in your series?
->> (I am pretty sure it won't apply clean)
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: devicetree at vger.kernel.org
+>>> Signed-off-by: Rob Herring <robh@kernel.org>
+>>> ---
+>>>   Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
+>>>   .../devicetree/bindings/arm/pmu.yaml          | 96 +++++++++++++++++++
+>>>   2 files changed, 96 insertions(+), 70 deletions(-)
+>>>   delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+>>>   create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
 >>
->> Thanks,
->> Horia
+>> [...]
 >>
->> -- >8 --
+>>> -- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
+>>> -               interrupt (PPI) then 1 interrupt should be specified.
 >>
->> Subject: [PATCH] arm64: defconfig: enable DPAA2 fsl-mc bus and DPIO
->> driver
+>> [...]
 >>
->> Enable fsl-mc bus and DPIO (Datapath I/O) driver, which are needed on
->> Layerscape SoCs with QorIQ Data Path Acceleration Architecture (DPAA)
->> v2.
+>>> +  interrupts:
+>>> +    oneOf:
+>>> +      - maxItems: 1
+>>> +      - minItems: 2
+>>> +        maxItems: 8
+>>> +        description: 1 interrupt per core.
+>>> +
+>>> +  interrupts-extended:
+>>> +    $ref: '#/properties/interrupts'
 >>
->> Suggested-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
->> Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
->> ---
->> arch/arm64/configs/defconfig | 2 ++
->> 1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm64/configs/defconfig
->> b/arch/arm64/configs/defconfig
->> index c9a57d11330b..7c3785e61ef9 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -181,6 +181,7 @@ CONFIG_DMA_CMA=y
->> CONFIG_CMA_SIZE_MBYTES=32
->> CONFIG_HISILICON_LPC=y
->> CONFIG_SIMPLE_PM_BUS=y
->> +CONFIG_FSL_MC_BUS=y
->> CONFIG_MTD=y
->> CONFIG_MTD_BLOCK=y
->> CONFIG_MTD_M25P80=y
->> @@ -615,6 +616,7 @@ CONFIG_QCOM_IOMMU=y
->> CONFIG_RPMSG_QCOM_GLINK_RPM=y
->> CONFIG_RPMSG_QCOM_SMD=y
->> CONFIG_RASPBERRYPI_POWER=y
->> +CONFIG_FSL_MC_DPIO=y
->> CONFIG_QCOM_SMEM=y
->> CONFIG_QCOM_SMD_RPM=y
->> CONFIG_QCOM_SMP2P=y
->> -- 
->> 2.16.2
+>> This seems like a semantic different between the two representations, or am
+>> I missing something here? Specifically, both the introduction of
+>> interrupts-extended and also dropping any mention of using a single per-cpu
+>> interrupt (the single combined case is no longer support by Linux; not sure
+>> if you want to keep it in the binding).
 > 
-> Are CRYPTO_DEV_FSL_DPAA2_CAAM and CONFIG_FSL_MC_DPIO required to boot the platform? If not, we will build them as modules. I can send a v3 tonight with that change, as well as the various Acks.
-> 
-No, the platform is able to boot without them, so I am ok with:
-+CONFIG_FSL_MC_BUS=y
-+CONFIG_FSL_MC_DPIO=m
--CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=y
-+CONFIG_CRYPTO_DEV_FSL_DPAA2_CAAM=m
+> In regards to no support for the single combined interrupt, it looks
+> like Marvell Armada SoCs at least (armada-375 is what I'm looking at)
+> have only a single interrupt. Though the interrupt gets routed to MPIC
+> which then has a GIC PPI. So it isn't supported or happens to work
+> still since it is a PPI?
 
-Thanks,
-Horia
+Well, the description of the MPIC in the Armada XP functional spec says:
+
+"Interrupt sources ID0?ID28 are private events per CPU. Thus, each 
+processor has a different set of events map interrupts ID0?ID28."
+
+Odd grammar aside, that would seem to imply that <&mpic 3> is a per-cpu 
+interrupt itself, thus AFAICS so long as it's cascaded to a GIC PPI and 
+not an SPI then there's no issue there.
+
+Robin.
