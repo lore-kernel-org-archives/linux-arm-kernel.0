@@ -1,57 +1,36 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Thu, 08 Nov 2018 17:29:47 +0100
-Subject: [PATCH 3/4] Documentation: bindings: Add missing Amlogic SCPI
- sensor bindings
-In-Reply-To: <20181108160457.GA10953@e107155-lin>
-References: <20181108135352.8459-1-jbrunet@baylibre.com>
- <20181108135352.8459-4-jbrunet@baylibre.com>
- <20181108160457.GA10953@e107155-lin>
-Message-ID: <a52c64d6159c73e1cb97089ed051321f121f0467.camel@baylibre.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu,  8 Nov 2018 08:52:21 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: Enable 8250-omap serial driver and
+ use it by default
+Message-ID: <20181108165221.22775-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-08 at 16:04 +0000, Sudeep Holla wrote:
-> On Thu, Nov 08, 2018 at 02:53:51PM +0100, Jerome Brunet wrote:
-> > amlogic,meson-gxbb-scpi-sensors is both the driver and DT but is not
-> > documented. Just add it to amlogic's scpi documentation
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/amlogic,scpi.txt | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-> > b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-> > index 7b9a861e9306..5ab59da052df 100644
-> > --- a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-> > +++ b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-> > @@ -17,4 +17,11 @@ Required sub-node properties:
-> >  - compatible : should be "amlogic,meson-gxbb-scp-shmem" for SRAM based
-> > shared
-> >  		memory on Amlogic GXBB SoC.
-> >  
-> > +Sensor bindings for the sensors based on SCPI Message Protocol
-> > +--------------------------------------------------------------
-> > +SCPI provides an API to access the various sensors on the SoC.
-> > +
-> > +Required properties:
-> > +- compatible : should be "amlogic,meson-gxbb-scpi-sensors".
-> > +
-> 
-> Not sure if it's worth mentioning the reason for being able to identify
-> amlogic,meson-gxbb sensors from generic scpi ones. IIRC it was for the
-> unit values of these sensors are different ? But I will leave that to
-> DT or platform maintainers' taste.
+We've already moved omap2plus_defconfig over to use 8250-omap instead of
+omap-serial driver. Let's update multi_v7_defconfig too.
 
-Yes Sudeep, the unit are different.
-If we probe on the generic one, it will "work" but the result is just not
-good. 
+By default we also enable SERIAL_8250_OMAP_TTYO_FIXUP that updates the
+kernel serial console to point to 8250 driver and warns about it during
+the boot.
 
-BTW, the point of this patch is merely to remove an existing issue.
-The scpi driver and meson-gx.dtsi are both refering to an undocumented
-compatible.
+Users with ttyO[0123] in their /etc/inittab should update inittab to
+to use ttyS[0123] instead.
 
-> 
-> --
-> Regards,
-> Sudeep
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -305,6 +305,7 @@ CONFIG_SERIAL_8250_SHARE_IRQ=y
+ CONFIG_SERIAL_8250_BCM2835AUX=y
+ CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_EM=y
++CONFIG_SERIAL_8250_OMAP=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_8250_UNIPHIER=y
+ CONFIG_SERIAL_OF_PLATFORM=y
+-- 
+2.19.1
