@@ -1,28 +1,50 @@
-From: brajeswar.linux@gmail.com (Brajeswar Ghosh)
-Date: Thu, 8 Nov 2018 20:14:54 +0530
-Subject: [PATCH] arm/mach-sa1100/hackkit.c: Remove duplicate header
-Message-ID: <20181108144454.GA3797@hp-pavilion-15-notebook-pc-brajeswar>
+From: lantianyu1986@gmail.com (lantianyu1986 at gmail.com)
+Date: Thu,  8 Nov 2018 22:46:30 +0800
+Subject: [Resend PATCH V5 1/10] KVM: Add tlb_remote_flush_with_range callback
+ in kvm_x86_ops
+Message-ID: <20181108144639.11206-1-Tianyu.Lan@microsoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove linux/tty.h which is included more than once
+From: Lan Tianyu <Tianyu.Lan@microsoft.com>
 
-Signed-off-by: Brajeswar Ghosh <brajeswar.linux@gmail.com>
+Add flush range call back in the kvm_x86_ops and platform can use it
+to register its associated function. The parameter "kvm_tlb_range"
+accepts a single range and flush list which contains a list of ranges.
+
+Signed-off-by: Lan Tianyu <Tianyu.Lan@microsoft.com>
 ---
- arch/arm/mach-sa1100/hackkit.c | 1 -
- 1 file changed, 1 deletion(-)
+Change since v1:
+       Change "end_gfn" to "pages" to aviod confusion as to whether
+"end_gfn" is inclusive or exlusive.
+---
+ arch/x86/include/asm/kvm_host.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
-index 643d5f2d9af9..0016d25e7deb 100644
---- a/arch/arm/mach-sa1100/hackkit.c
-+++ b/arch/arm/mach-sa1100/hackkit.c
-@@ -22,7 +22,6 @@
- #include <linux/serial_core.h>
- #include <linux/mtd/mtd.h>
- #include <linux/mtd/partitions.h>
--#include <linux/tty.h>
- #include <linux/gpio.h>
- #include <linux/leds.h>
- #include <linux/platform_device.h>
+diff --git a/arch/x86/include/asm/kvm_host.h b/arch/x86/include/asm/kvm_host.h
+index 55e51ff7e421..c8a65f0a7107 100644
+--- a/arch/x86/include/asm/kvm_host.h
++++ b/arch/x86/include/asm/kvm_host.h
+@@ -439,6 +439,11 @@ struct kvm_mmu {
+ 	u64 pdptrs[4]; /* pae */
+ };
+ 
++struct kvm_tlb_range {
++	u64 start_gfn;
++	u64 pages;
++};
++
+ enum pmc_type {
+ 	KVM_PMC_GP = 0,
+ 	KVM_PMC_FIXED,
+@@ -1042,6 +1047,8 @@ struct kvm_x86_ops {
+ 
+ 	void (*tlb_flush)(struct kvm_vcpu *vcpu, bool invalidate_gpa);
+ 	int  (*tlb_remote_flush)(struct kvm *kvm);
++	int  (*tlb_remote_flush_with_range)(struct kvm *kvm,
++			struct kvm_tlb_range *range);
+ 
+ 	/*
+ 	 * Flush any TLB entries associated with the given GVA.
 -- 
-2.17.1
+2.14.4
