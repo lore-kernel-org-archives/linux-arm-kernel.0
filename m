@@ -1,22 +1,27 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Thu, 08 Nov 2018 09:58:59 -0800
-Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
-In-Reply-To: <efa13e0b-0daf-3bf3-27ba-ed90f15c7dfe@gmail.com>
-References: <20181106183609.207702-1-sboyd@kernel.org>
- <20181106183609.207702-2-sboyd@kernel.org>
- <efa13e0b-0daf-3bf3-27ba-ed90f15c7dfe@gmail.com>
-Message-ID: <154169993998.88331.10494065577891939152@swboyd.mtv.corp.google.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 8 Nov 2018 18:00:42 +0000
+Subject: [PATCH] arm64: Build vDSO with -ffixed-x18
+In-Reply-To: <20181107003913.19061-1-pcc@google.com>
+References: <20181107003913.19061-1-pcc@google.com>
+Message-ID: <20181108180041.GG144107@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Matthias Brugger (2018-11-08 00:29:46)
-> On 06/11/2018 19:36, Stephen Boyd wrote:
-> > +int platform_driver_probe_by_of_match_data(struct platform_device *pdev)
-> > +{
-> > +     int (*probe_func)(struct platform_device *pdev);
-> > +
-> > +     probe_func = of_device_get_match_data(&pdev->dev);
+On Tue, Nov 06, 2018 at 04:39:13PM -0800, Peter Collingbourne wrote:
+> The vDSO needs to be build with x18 reserved in order to accommodate
+> userspace platform ABIs built on top of Linux that use the register
+> to carry inter-procedural state, as provided for by the AAPCS.
+> An example of such a platform ABI is the one that will be used by an
+> upcoming version of Android.
 > 
-> Shouldn't we check if probe_func is not NULL?
+> Although this change is currently a no-op due to the fact that the vDSO
+> is currently implemented in pure assembly on arm64, it is necessary
+> in order to prepare for another change [1] that will add C code to
+> the vDSO.
 
-Is the oops from the NULL pointer deref insufficient?
+Since this is a no-op for the current kernel, I guess Vincenzo (cc'ed)
+will pick it up as he's planning to post an update to the vDSO in C
+series soon.
+
+-- 
+Catalin
