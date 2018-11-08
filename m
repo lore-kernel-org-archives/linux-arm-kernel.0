@@ -1,70 +1,78 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Nov 2018 22:21:23 +0000
-Subject: [PATCH 4/5] phy: mvebu-cp110-comphy: convert to use eth phy mode
- and submode
-In-Reply-To: <20181108003617.10334-5-grygorii.strashko@ti.com>
-References: <20181108003617.10334-1-grygorii.strashko@ti.com>
- <20181108003617.10334-5-grygorii.strashko@ti.com>
-Message-ID: <20181108222123.GZ30658@n2100.armlinux.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 08 Nov 2018 14:34:51 -0800
+Subject: mainline/master boot bisection: v4.19-12838-g71e56028173b on
+ beagle-xm
+In-Reply-To: <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
+References: <5bdebe88.1c69fb81.3857a.05d1@mx.google.com>
+ <a4d3b4ea-fcc5-f65b-70e2-bd12f089d0e6@collabora.com>
+ <CAOesGMgcuGKgNiN44jOS_9qRo3es8W6kt5-o676ouwpcAZC6KQ@mail.gmail.com>
+ <0ca97dae-86ee-8b75-52be-09cdaea3999f@collabora.com>
+ <4b7922f2-6428-3011-0338-9c0662712b8a@collabora.com>
+Message-ID: <7hbm6z6vw4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:36:16PM -0600, Grygorii Strashko wrote:
-> diff --git a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-> index 7a37a37..fb28b71 100644
-> --- a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-> +++ b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
-> @@ -1165,28 +1165,17 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
->   */
->  static int mvpp22_comphy_init(struct mvpp2_port *port)
->  {
-> -	enum phy_mode mode;
-> +	int submode;
->  	int ret;
->  
->  	if (!port->comphy)
->  		return 0;
->  
-> -	switch (port->phy_interface) {
-> -	case PHY_INTERFACE_MODE_SGMII:
-> -	case PHY_INTERFACE_MODE_1000BASEX:
-> -		mode = PHY_MODE_SGMII;
-> -		break;
-> -	case PHY_INTERFACE_MODE_2500BASEX:
-> -		mode = PHY_MODE_2500SGMII;
-> -		break;
-> -	case PHY_INTERFACE_MODE_10GKR:
-> -		mode = PHY_MODE_10GKR;
-> -		break;
-> -	default:
-> -		return -EINVAL;
-> -	}
-> +	submode = port->phy_interface;
-> +	if (submode == PHY_INTERFACE_MODE_1000BASEX)
-> +		submode = PHY_INTERFACE_MODE_SGMII;
+Guillaume Tucker <guillaume.tucker@collabora.com> writes:
 
-If the intention is to move the ethernet PHY mode into the generic PHY
-layer, I'd suggest that the equivalence of 1000base-X and SGMII is
-handled in the generic PHY driver rather than ethernet drivers.  Just
-move this into this hunk of the comphy driver:
+> On 06/11/2018 10:54, Guillaume Tucker wrote:
+>> On 05/11/2018 14:33, Olof Johansson wrote:
+>>> On Mon, Nov 5, 2018 at 1:43 AM Guillaume Tucker
+>>> <guillaume.tucker@collabora.com> wrote:
+>>>>
+>>>> Hi Linus,
+>>>>
+>>>> Please see below, the kernelci.org automated boot bisection found
+>>>> that the OMAP3 BeagleBoard-xM is failing to boot with SMP
+>>>> disabled and PREEMPT enabled in multi_v7_defconfig.  There is no
+>>>> log output after the bootloader so the kernel seems to be
+>>>> crashing very early on.
+>>>
+>>> Can you enable DEBUG_LL to capture what goes wrong?
+>> 
+>> Yes I've scheduled a re-run of the automated bisection with
+>> DEBUG_LL turned on, but the beagle-xm board is currently offline
+>> in lab-baylibre.  I'll keep you posted when I get some results.
+>
+> Unfortunately, enabling the DEBUG_LL config didn't help.  There's
+> still no visible kernel log at all from the failing LAVA jobs:
+>
+>     http://lava.baylibre.com:10080/scheduler/alljobs?length=25&search=lava-bisect-9638#table
+>
+>
+> This might be a hard one to debug without physical access to the
+> board, but please let me know if you think there's anything else
+> I can try.  For example, if there's a known older kernel revision
+> where the combination of SMP=n and PREEMPT=y worked then I could
+> try to run an automated boot bisection based on that.
 
-> @@ -517,10 +519,14 @@ static int mvebu_comphy_set_mode(struct phy *phy,
->  {
->  	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
->  
-> -	if (mvebu_comphy_get_mux(lane->id, lane->port, mode) < 0)
-> +	if (mode != PHY_MODE_ETHERNET)
-> +		return -EINVAL;
-> +
-> +	if (mvebu_comphy_get_mux(lane->id, lane->port, mode, submode) < 0)
->  		return -EINVAL;
->  
->  	lane->mode = mode;
-> +	lane->submode = submode;
->  	return 0;
->  }
+The reason DEBUG_LL doesn't show anything is because it also needs
+a specific UART enabled for the output.  For the case of beagle-xm, it
+needs CONFIG_DEBUG_OMAP3UART3=y also.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+It did that locally, and the error on the console is this:
+
+   Error: invalid dtb and unrecognized/unsupported machine ID
+     r1=0x0000060a, r2=0x00000000
+   Available machine support:
+
+Upon closer inspection, the load addrs are such that it appears the DTB
+is getting overwritten during zImage compression.
+
+So bascially, it's just an (un)lucky fluke that CONFIG_PREEMPT=y changed
+the kernel size just enough to cause this problem.
+
+I did a local test (with pyboot, not LAVA) with all the same load
+addresses, but without initrd_high and fdt_high, and it boots fine[1]
+
+Guillaume, I think the proper solution is to fixup the LAVA device-type
+for beagle-xm.  In particular, it's setting the u-boot variables
+'initrd_high' and 'fdt_high' which means it's not letting uboot move
+them.
+
+Looks like that can be overridden in the device-dict using
+"set base_high_limits = false", so I've done that now to this device[2]
+
+Kevin
+
+[1] http://termbin.com/9mm6
+[2] http://lava.baylibre.com:10080/scheduler/device/omap3-beagle-xm-sea/devicedict
