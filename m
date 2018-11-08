@@ -1,52 +1,65 @@
-From: abel.vesa@nxp.com (Abel Vesa)
-Date: Thu, 8 Nov 2018 12:29:39 +0000
-Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
-In-Reply-To: <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
- <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
- <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
- <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
- <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
- <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
-Message-ID: <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 12:31:34 +0000
+Subject: [PATCH 6/7] arm64: Do not apply vector harderning for hyp entries
+ from EL2
+In-Reply-To: <20181107215926.GH12248@brain-police>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-7-git-send-email-julien.thierry@arm.com>
+ <20181107215926.GH12248@brain-police>
+Message-ID: <3da632e3-d6e2-7595-2c39-587b81852e89@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 04:18:35PM -0800, Stephen Boyd wrote:
-> Quoting Abel Vesa (2018-11-07 12:26:25)
-> > On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
-> > > 
-> > > 
-> > > What's the plan to clean it up?
-> > 
-> > So I'm doing this in our internal tree first to make sure I don't break the
-> > other (newer) socs.
-> > 
-> > I already have a prototype in testing but it's a long way to upstream it.
-> > 
-> > Basically, I'm replacing all of this with a single, more like a composite,
-> > more complex, clock type that does all the magic inside.
-> > 
-> > One of the problems is the fact that the bypasses can have the same sources
-> > and in my case, I'm implementing that as a list of parents name, but the
-> > parent names list doesn't work with duplicates, so I have to find some other
-> > way to do it.
-> > 
-> > Once I have something clean and tested enough I'll send it upstream.
+
+
+On 07/11/18 21:59, Will Deacon wrote:
+> On Wed, Sep 26, 2018 at 02:56:23PM +0100, Julien Thierry wrote:
+>> When an EL2 entry of __kvm_hyp_vector is taken, it means an entry from a
+>> lower EL was previously taken to exit the guest. Taking that lower EL entry
+>> already applied vector hardening if needed, so there is no need to do it
+>> again.
+>>
+>> Only apply vector hardening for exception coming from lower EL.
+>>
+>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>> Cc: kvmarm at lists.cs.columbia.edu
+>> ---
+>>   arch/arm64/kvm/hyp/hyp-entry.S | 17 ++++++++++++++---
+>>   1 file changed, 14 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+>> index 24b4fba..da31386 100644
+>> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+>> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+>> @@ -257,7 +257,15 @@ ENTRY(__kvm_hyp_vector)
+>>   ENDPROC(__kvm_hyp_vector)
+>>
+>>   #ifdef CONFIG_KVM_INDIRECT_VECTORS
+>> -.macro hyp_ventry
+>> +.macro hyp_el2_ventry
+>> +	.align 7
+>> +1:	b	__kvm_hyp_vector + (1b - 0b)
+>> +	.rept 31
+>> +	nop
+>> +	.endr
+>> +.endm
+>> +
+>> +.macro hyp_el1_ventry
+>>   	.align 7
+>>   1:	.rept 27
+>>   	nop
+>> @@ -290,8 +298,11 @@ alternative_cb_end
 > 
-> Ok. Thanks for the info.
-> 
+> I think it would be cleaner to take the EL as a macro parameter, but again,
+> I defer to Marc and Christoffer.
 
-Just to avoid any kind of confusion.
+I'd argue they don't have much in common here. Unless I put the branch 
+for the el2 ventry after 27 nops like for the el1, we wouldn't gain much 
+from putting the two in the same macro IMO.
 
-The whole refactoring of the SCCG clock will be done in a separate (later) change
-and will not be part of this patchset.
+I'll see what Marc and Christoffer think about it.
 
-I already sent the 12th version of this current patch series and I would really
-like to get this in ASAP so that the booting up of imx8mq will not be delayed.
-
-Thanks
-Abel
+Thanks,
 
 -- 
+Julien Thierry
