@@ -1,25 +1,29 @@
-From: martin@strongswan.org (Martin Willi)
-Date: Thu, 08 Nov 2018 07:47:23 +0100
-Subject: [RFC PATCH v3 00/15] crypto: Adiantum support
-In-Reply-To: <20181105232526.173947-1-ebiggers@kernel.org>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
-Message-ID: <757b2f06657d68929ce14d2bac3eb111bb06e6ab.camel@strongswan.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 8 Nov 2018 14:53:33 +0800
+Subject: [PATCH 11/15] Bluetooth: hci_bcm: Add BCM20702A1 variant
+In-Reply-To: <20181107203608.ff32gmb4u54kcvep@flea>
+References: <20181107101308.7626-1-wens@csie.org>
+ <20181107101308.7626-12-wens@csie.org>
+ <20181107203608.ff32gmb4u54kcvep@flea>
+Message-ID: <CAGb2v64asgNbYch6gwj0BTTz84=Jfbmu9th0Dyfdx_o8N5tNXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Thu, Nov 8, 2018 at 4:36 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Hi!
+>
+> On Wed, Nov 07, 2018 at 06:13:04PM +0800, Chen-Yu Tsai wrote:
+> > From: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >
+> > The BCM20702A1 chip is a single-chip Bluetooth 4.0 controller and
+> > transceiver. It is found in the AMPAK AP6210 WiFi+BT package.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>
+> if you resubmit it, could you do s/free-electrons/bootlin/ ?
 
-> This patchset adds Adiantum to Linux's crypto API, focusing on
-> generic and ARM32 implementations.  Patches 1-9 add support for
-> XChaCha20 and XChaCha12.  Patches 10-13 add NHPoly1305 support,
-> needed for Adiantum hashing. Patch 14 adds Adiantum support as a
-> skcipher template.
+OK. And for the author as well?
 
-Nice work. I did a quick review only, but you may add my
-
-  Acked-by: Martin Willi <martin@strongswan.org>
-
-for patches 1-5, 10 and 11.
-
-Thanks,
-Martin
+ChenYu
