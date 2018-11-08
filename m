@@ -1,36 +1,38 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu,  8 Nov 2018 14:53:51 +0100
-Subject: [PATCH 3/4] Documentation: bindings: Add missing Amlogic SCPI sensor
- bindings
+Date: Thu,  8 Nov 2018 14:53:50 +0100
+Subject: [PATCH 2/4] arm64: dts: meson-axg: correct sram shared mem
+ unit-address
 In-Reply-To: <20181108135352.8459-1-jbrunet@baylibre.com>
 References: <20181108135352.8459-1-jbrunet@baylibre.com>
-Message-ID: <20181108135352.8459-4-jbrunet@baylibre.com>
+Message-ID: <20181108135352.8459-3-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-amlogic,meson-gxbb-scpi-sensors is both the driver and DT but is not
-documented. Just add it to amlogic's scpi documentation
+Correct the unit-address in the node name of the SRAM shared memory
 
 Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- Documentation/devicetree/bindings/arm/amlogic,scpi.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-index 7b9a861e9306..5ab59da052df 100644
---- a/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-+++ b/Documentation/devicetree/bindings/arm/amlogic,scpi.txt
-@@ -17,4 +17,11 @@ Required sub-node properties:
- - compatible : should be "amlogic,meson-gxbb-scp-shmem" for SRAM based shared
- 		memory on Amlogic GXBB SoC.
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index ff8b3406aff6..b8893675e39c 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -1659,12 +1659,12 @@
+ 			#size-cells = <1>;
+ 			ranges = <0 0x0 0xfffc0000 0x20000>;
  
-+Sensor bindings for the sensors based on SCPI Message Protocol
-+--------------------------------------------------------------
-+SCPI provides an API to access the various sensors on the SoC.
-+
-+Required properties:
-+- compatible : should be "amlogic,meson-gxbb-scpi-sensors".
-+
- [0] Documentation/devicetree/bindings/arm/arm,scpi.txt
+-			cpu_scp_lpri: scp-shmem at 0 {
++			cpu_scp_lpri: scp-shmem at 13000 {
+ 				compatible = "amlogic,meson-axg-scp-shmem";
+ 				reg = <0x13000 0x400>;
+ 			};
+ 
+-			cpu_scp_hpri: scp-shmem at 200 {
++			cpu_scp_hpri: scp-shmem at 13400 {
+ 				compatible = "amlogic,meson-axg-scp-shmem";
+ 				reg = <0x13400 0x400>;
+ 			};
 -- 
 2.19.1
