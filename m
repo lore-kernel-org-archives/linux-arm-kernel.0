@@ -1,184 +1,44 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 8 Nov 2018 13:42:35 +0100
-Subject: [PATCH v4 2/3] arm64: implement live patching
-In-Reply-To: <20181026142152.5F0D868C95@newverein.lst.de>
-References: <20181026142008.D922868C94@newverein.lst.de>
- <20181026142152.5F0D868C95@newverein.lst.de>
-Message-ID: <CAKv+Gu_D2vzk-sBkufK7JvaPawC+QnpZwkC0+ikTb7A6qko8ng@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 12:43:23 +0000
+Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
+In-Reply-To: <20181107215854.GD12248@brain-police>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <20181107215854.GD12248@brain-police>
+Message-ID: <533eff05-4fb9-e8e7-553d-16979055e8f5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 October 2018 at 16:21, Torsten Duwe <duwe@lst.de> wrote:
-> Based on ftrace with regs, do the usual thing.
-> (see Documentation/livepatch/livepatch.txt)
->
-> Use task flag bit 6 to track patch transisiton state for the consistency
-> model. Add it to the work mask so it gets cleared on all kernel exits to
-> userland.
->
-> Tell livepatch regs->pc is the place to change the return address.
-> Make sure the graph tracer call hook is only called on the final function
-> entry in case regs->pc gets modified after an interception.
->
-> Signed-off-by: Torsten Duwe <duwe@suse.de>
->
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -120,6 +120,7 @@ config ARM64
->         select HAVE_GENERIC_DMA_COHERENT
->         select HAVE_HW_BREAKPOINT if PERF_EVENTS
->         select HAVE_IRQ_TIME_ACCOUNTING
-> +       select HAVE_LIVEPATCH
->         select HAVE_MEMBLOCK
->         select HAVE_MEMBLOCK_NODE_MAP if NUMA
->         select HAVE_NMI
-> @@ -1350,4 +1351,6 @@ if CRYPTO
->  source "arch/arm64/crypto/Kconfig"
->  endif
->
-> +source "kernel/livepatch/Kconfig"
-> +
->  source "lib/Kconfig"
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -76,6 +76,7 @@ void arch_release_task_struct(struct tas
->  #define TIF_FOREIGN_FPSTATE    3       /* CPU's FP state is not current's */
->  #define TIF_UPROBE             4       /* uprobe breakpoint or singlestep */
->  #define TIF_FSCHECK            5       /* Check FS is USER_DS on return */
-> +#define TIF_PATCH_PENDING      6
->  #define TIF_NOHZ               7
->  #define TIF_SYSCALL_TRACE      8
->  #define TIF_SYSCALL_AUDIT      9
-> @@ -94,6 +95,7 @@ void arch_release_task_struct(struct tas
->  #define _TIF_NEED_RESCHED      (1 << TIF_NEED_RESCHED)
->  #define _TIF_NOTIFY_RESUME     (1 << TIF_NOTIFY_RESUME)
->  #define _TIF_FOREIGN_FPSTATE   (1 << TIF_FOREIGN_FPSTATE)
-> +#define _TIF_PATCH_PENDING     (1 << TIF_PATCH_PENDING)
->  #define _TIF_NOHZ              (1 << TIF_NOHZ)
->  #define _TIF_SYSCALL_TRACE     (1 << TIF_SYSCALL_TRACE)
->  #define _TIF_SYSCALL_AUDIT     (1 << TIF_SYSCALL_AUDIT)
-> @@ -106,7 +108,8 @@ void arch_release_task_struct(struct tas
->
->  #define _TIF_WORK_MASK         (_TIF_NEED_RESCHED | _TIF_SIGPENDING | \
->                                  _TIF_NOTIFY_RESUME | _TIF_FOREIGN_FPSTATE | \
-> -                                _TIF_UPROBE | _TIF_FSCHECK)
-> +                                _TIF_UPROBE | _TIF_FSCHECK | \
-> +                                _TIF_PATCH_PENDING)
->
->  #define _TIF_SYSCALL_WORK      (_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
->                                  _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/livepatch.h
-> @@ -0,0 +1,35 @@
-> +/* SPDX-License-Identifier: GPL-2.0
-> + *
-> + * livepatch.h - arm64-specific Kernel Live Patching Core
-> + *
-> + * Copyright (C) 2016,2018 SUSE
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version 2
-> + * of the License, or (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef _ASM_ARM64_LIVEPATCH_H
-> +#define _ASM_ARM64_LIVEPATCH_H
-> +
-> +#include <asm/ptrace.h>
-> +
-> +static inline int klp_check_compiler_support(void)
-> +{
-> +       return 0;
-> +}
-> +
-> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
-> +{
-> +       regs->pc = ip;
-> +}
-> +
-> +#endif /* _ASM_ARM64_LIVEPATCH_H */
-> --- a/arch/arm64/kernel/entry-ftrace.S
-> +++ b/arch/arm64/kernel/entry-ftrace.S
-> @@ -226,6 +226,7 @@ ftrace_common:
->
->         /* The program counter just after the ftrace call site */
->         str     lr, [x9, #S_PC]
-> +
->         /* The stack pointer as it was on ftrace_caller entry... */
->         add     x28, fp, #16
->         str     x28, [x9, #S_SP]
+Hi Will,
 
-Please drop this hunk
+On 07/11/18 21:58, Will Deacon wrote:
+> Hi Julien,
+> 
+> On Wed, Sep 26, 2018 at 02:56:17PM +0100, Julien Thierry wrote:
+>> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
+>> using it to access memory. When taking an exception, it is possible that
+>> the context during which the exception occured had SP mis-aligned. The
+>> entry code needs to make sure that the stack is aligned before using it to
+>> save the context.
+> 
+> Do you know what we haven't had reports of this crashing? Is it because GCC
+> tends to keep the SP aligned anyway, so we're getting away with it for the
+> moment? Trying to work out whether this is a candidate for -stable.
+> 
 
-> @@ -233,6 +234,10 @@ ftrace_common:
->         ldr     x28, [fp, 8]
->         str     x28, [x9, #S_LR]        /* to pt_regs.r[30] */
->
-> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-> +       mov     x28, lr         /* remember old return address */
-> +#endif
-> +
->         ldr_l   x2, function_trace_op, x0
->         ldr     x1, [fp, #8]
->         sub     x0, lr, #8      /* function entry == IP */
-> @@ -245,6 +250,17 @@ ftrace_call:
->
->         bl      ftrace_stub
->
-> +#if defined(CONFIG_LIVEPATCH) && defined(CONFIG_FUNCTION_GRAPH_TRACER)
-> +       /* Is the trace function a live patcher an has messed with
-> +        * the return address?
-> +        */
-> +       add     x9, sp, #16     /* advance to pt_regs for restore */
-> +       ldr     x0, [x9, #S_PC]
-> +       cmp     x0, x28         /* compare with the value we remembered */
-> +       /* to not call graph tracer's "call" mechanism twice! */
-> +       b.ne    ftrace_common_return
+I think that GCC tends to keep the SP aligned anyway is the most likely 
+explanation, yes.
 
-Is ftrace_common_return guaranteed to be in range? Conditional
-branches have only -/+ 1 MB range IIRC.
+I tried looking for specific options that could make this more likely, 
+but all I could find was the option -mpreferred-stack-boundary only 
+available for x86 and -mstack-alignment only provided by clang.
 
-Better to do
+Couldn't find anything yet on the gcc arm64 side that would either 
+guarantee we'd have an aligned stack nor that GCC would make it very 
+very likely.
 
-b.eq ftrace_graph_call
-b   ftrace_common_return
+I can try to investigate a bit more.
 
-to be sure
+Thanks,
 
-> +#endif
-> +
->  #ifdef CONFIG_FUNCTION_GRAPH_TRACER
-
-Can we fold these #ifdef blocks together (i.e, incorporate the
-conditional livepatch sequence here)
-
->         .global ftrace_graph_call
->  ftrace_graph_call:                     // ftrace_graph_caller();
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -29,6 +29,7 @@
->  #include <linux/sizes.h>
->  #include <linux/string.h>
->  #include <linux/tracehook.h>
-> +#include <linux/livepatch.h>
->  #include <linux/ratelimit.h>
->  #include <linux/syscalls.h>
->
-> @@ -934,6 +935,9 @@ asmlinkage void do_notify_resume(struct
->                         if (thread_flags & _TIF_UPROBE)
->                                 uprobe_notify_resume(regs);
->
-> +                       if (thread_flags & _TIF_PATCH_PENDING)
-> +                               klp_update_patch_state(current);
-> +
->                         if (thread_flags & _TIF_SIGPENDING)
->                                 do_signal(regs);
->
+-- 
+Julien Thierry
