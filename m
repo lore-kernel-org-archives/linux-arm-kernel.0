@@ -1,34 +1,26 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Thu, 8 Nov 2018 10:11:12 +0800
-Subject: [PATCH v3 1/4] dt-bindings: pinctrl: Add devicetree bindings
- for MT6797 SoC Pinctrl
-In-Reply-To: <20181107174844.5381-2-manivannan.sadhasivam@linaro.org>
-References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
- <20181107174844.5381-2-manivannan.sadhasivam@linaro.org>
-Message-ID: <1541643072.23791.3.camel@mtksdaap41>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 8 Nov 2018 00:20:45 -0200
+Subject: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
+In-Reply-To: <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1541567625-11812-1-git-send-email-Anson.Huang@nxp.com>
+ <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
+ <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+Message-ID: <CAOMZO5DiTbEsVXTCfE8fJ=4+yU4oXR1gex7Bj-k=FowKHWJaxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-07 at 23:18 +0530, Manivannan Sadhasivam wrote:
-> Add devicetree bindings for Mediatek MT6797 SoC Pin Controller.
-> 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> ---
->  .../bindings/pinctrl/pinctrl-mt6797.txt       |   83 +
->  include/dt-bindings/pinctrl/mt6797-pinfunc.h  | 1368 +++++++++++++++++
->  2 files changed, 1451 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/pinctrl-mt6797.txt
->  create mode 100644 include/dt-bindings/pinctrl/mt6797-pinfunc.h
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-mt6797.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt6797.txt
-> new file mode 100644
-> index 000000000000..bd83401e6179
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-mt6797.txt
+Hi Anson,
 
-Sorry if this is discussed.
+On Wed, Nov 7, 2018 at 11:24 PM Anson Huang <anson.huang@nxp.com> wrote:
 
-What's the difference between this and
-Documentation/devicetree/bindings/pinctrl/pinctrl-mt65xx.txt?
-Should this be added to pinctrl-mt65xx.txt?
+> Regarding the fec2 settings in imx7d-sdb.dts, originally it uses Rev-A board (but some nodes are
+> using Rev-B board), in this patch, I clean up all the settings in imx7d-sdb.dts using Rev-B board,
+> so below is added to imx7d-sdb.dts for Rev-B board, and in imx7d-sdb-reva.dts I have to
+> delete it, since Rev-A board has no this pin.
+>
+> -       pinctrl-0 = <&pinctrl_enet2>;
+> +       pinctrl-0 = <&pinctrl_enet2 &pinctrl_enet2_epdc0_en>;
+> +       pinctrl-assert-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
 
-Joe.C
+"pinctrl-assert-gpios" only exists in the NXP vendor kernel, so you
+cannot use such property in mainline.
