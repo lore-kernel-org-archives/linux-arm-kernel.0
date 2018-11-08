@@ -1,90 +1,83 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Thu, 8 Nov 2018 08:01:16 -0700
-Subject: [PATCH] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <af717713-9e51-139d-1206-1682b83ae434@xilinx.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
- <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
- <20181107085503.GA31517@flashbox>
- <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
- <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
- <af717713-9e51-139d-1206-1682b83ae434@xilinx.com>
-Message-ID: <20181108150116.GA2830@flashbox>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 8 Nov 2018 15:01:54 +0000
+Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
+In-Reply-To: <cdae83fa-dc71-e635-acda-be363695bf0c@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <CAKv+Gu-jVTWyy61Q--HE_Hw+RZVxYcTypZmF+YUhmX1p_QkLKQ@mail.gmail.com>
+ <8382cafd-9fb7-7121-0de2-5091ba079d31@arm.com>
+ <CAKv+Gu_K9p5FvQGtvgzKmveiQvHQp1H1PxAzxqcFnJfDQt4huw@mail.gmail.com>
+ <cdae83fa-dc71-e635-acda-be363695bf0c@arm.com>
+Message-ID: <45592bdd-2f2f-211b-8d58-bcc2c651509e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 07:45:42AM +0100, Michal Simek wrote:
-> On 07. 11. 18 18:48, Nick Desaulniers wrote:
-> > On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
-> >>
-> >> On 07. 11. 18 9:55, Nathan Chancellor wrote:
-> >>> On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
-> >>>> On 01. 11. 18 1:57, Nathan Chancellor wrote:
-> >>>>> Clang warns when one enumerated type is implicitly converted to another:
-> >>>>>
-> >>>>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-> >>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>>>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-> >>>>>         ~               ^~~~~~~~~~~~~~~~~~~~~
-> >>>>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-> >>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>>>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-> >>>>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>>>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-> >>>>> macro 'PCONFDUMP'
-> >>>>>         .param = a, .display = b, .format = c, .has_arg = d     \
-> >>>>>                  ^
-> >>>>> 2 warnings generated.
-> >>>>
-> >>>> This is interesting. I have never tried to use llvm for building the
-> >>>> kernel. Do you have any description how this can be done?
-> >>>>
-> >>>
-> >>> Depending on what version of Clang you have access to, it is usually just as
-> >>> simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
-> >>>
-> >>> Clang 7.0+ is recommended but 6.0 might work too.
-> >>
-> >> TBH I would expect to download container and run this there to make sure
-> >> that I don't break anything else.
-> > 
-> > This is the first request we've had for a container in order to test a
-> > patch.  If it comes up again from other folks, I think it makes sense
-> > to create one.  Until then, its nice to have.  It's definitely
-> > overkill for this patch.
-> 
-> I have played with it to see that error and here are some steps I did.
-> 
-> docker run --name test-clang -it --rm debian:latest bash
-> apt-get update
-> apt-get install gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu clang git bc
-> build-essential bison flex make llvm vim libssl-dev sparse
-> 
-> git clone
-> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git --depth 1
-> cd linux
-> 
-> export ARCH=arm64
-> export CROSS_COMPILE=aarch64-linux-gnu-
-> 
-> make defconfig
 
-This should also have 'CC=clang' because compiler detection happens in
-Kconfig now so compiler flags get properly set. Other than that, looks
-good and I was able to build pinctrl-zynq.o without any issues with
-those commands.
 
-Cheers!
-Nathan
+On 08/11/18 14:19, Ramana Radhakrishnan wrote:
+> On 08/11/2018 14:10, Ard Biesheuvel wrote:
+>> (+ Ramana)
+>>
+>> On 8 November 2018 at 14:27, Julien Thierry <julien.thierry@arm.com> wrote:
+>>>
+>>>
+>>> On 08/11/18 13:04, Ard Biesheuvel wrote:
+>>>>
+>>>> On 26 September 2018 at 15:56, Julien Thierry <julien.thierry@arm.com>
+>>>> wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
+>>>>> using it to access memory. When taking an exception, it is possible that
+>>>>> the context during which the exception occured had SP mis-aligned.
+>>>>
+>>>>
+>>>> How is this possible? GCC clearly only manipulates the stack pointer
+>>>> in 16 byte multiples, and so if we do the same in our asm code (which
+>>>> I think we already do, given the lack of reports about this issue), is
+>>>> this handling really necessary?
+>>>>
+>>>
+>>> Is there anything that actually gives us that guarantee from GCC? I agree
+>>> that currently it looks like aarch64-<...>-gcc only manipulates SP aligned
+>>> to 16 bytes, but I don't know whether that is certain.
+>>>
+>>
+>> I think we should get that clarified then. I don't think it makes
+>> sense for GCC to have to reason about whether SP currently has a value
+>> that permits dereferencing.
+> 
+> The ABI gives that guarantee.
+> 
+> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
+> 
+> <quote>
+> 
+> 5.2.2.1 Universal stack constraints
+> 
+> <...>
+> 
+> Additionally, at any point at which memory is accessed
+> via SP, the hardware requires that SP mod 16 = 0.  The stack must be
+> quad-word aligned
+> 
+> </end quote>
+> 
 
-> make CC=clang drivers/pinctrl/pinctrl-zynq.o C=1 V=1
-> 
-> There was not a problem to run it for arm64 but I had issues to run this
-> for arm32.
-> Do you see any problem with above steps?
-> 
-> Thanks,
-> Michal
-> 
+Thanks Ramana. Sadly I don't think this clarifies things. The issue is 
+that the guarantee is only that SP is aligned when we will use it to 
+access memory, but still allows for a scenario like:
+
+-> Updating SP with non 16bytes-aligned value (it's fine as long as the 
+following code takes care to align it before accessing memory)
+-> IRQ is raised before SP gets aligned
+-> Vector entry starts saving context on misaligned stack
+-> Misaligned SP exception
+
+The only thing that would avoid us the trouble is a guarantee that GCC 
+never modifies SP in such a way that SP is not 16-bytes aligned.
+
+Thanks,
+
+-- 
+Julien Thierry
