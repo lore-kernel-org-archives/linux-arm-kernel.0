@@ -1,44 +1,31 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 8 Nov 2018 12:43:23 +0000
-Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
-In-Reply-To: <20181107215854.GD12248@brain-police>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <20181107215854.GD12248@brain-police>
-Message-ID: <533eff05-4fb9-e8e7-553d-16979055e8f5@arm.com>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 8 Nov 2018 13:43:27 +0100
+Subject: [PATCH v7 0/7] clocksource: rework Atmel TCB timer driver
+In-Reply-To: <20180925201456.GD3112@piout.net>
+References: <20180913113024.3571-1-alexandre.belloni@bootlin.com>
+ <5f19043a-3be3-e25a-849f-6ca610ed6da2@linaro.org>
+ <20180925201456.GD3112@piout.net>
+Message-ID: <20181108124327.iqdiif6atfrxdkef@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On 07/11/18 21:58, Will Deacon wrote:
-> Hi Julien,
+On 2018-09-25 22:14:56 [+0200], Alexandre Belloni wrote:
+> On 22/09/2018 13:29:48+0200, Daniel Lezcano wrote:
+> > You say for rt the PIT is not suitable because of the shared irq but in
+> > the driver, the interrupt is flagged as shared.
+> > 
 > 
-> On Wed, Sep 26, 2018 at 02:56:17PM +0100, Julien Thierry wrote:
->> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
->> using it to access memory. When taking an exception, it is possible that
->> the context during which the exception occured had SP mis-aligned. The
->> entry code needs to make sure that the stack is aligned before using it to
->> save the context.
-> 
-> Do you know what we haven't had reports of this crashing? Is it because GCC
-> tends to keep the SP aligned anyway, so we're getting away with it for the
-> moment? Trying to work out whether this is a candidate for -stable.
-> 
+> Well, it is not simply sharing the interrupt that is an issue, it is the
+> mismatch between the PIT and the UART interrupt flags and that only
+> happens when using preempt-rt.
 
-I think that GCC tends to keep the SP aligned anyway is the most likely 
-explanation, yes.
+This should also happen on !RT with the threadedirq command line switch.
+The UART will be threaded and the PIT will not, and this is the problem.
+So we need to split those or disable the UART. The other important thing
+for RT is the higher resolution of the clocksource/clockevents device (I
+don't know if this is part of the series or not?).
 
-I tried looking for specific options that could make this more likely, 
-but all I could find was the option -mpreferred-stack-boundary only 
-available for x86 and -mstack-alignment only provided by clang.
+I'm currently replacing the v6 with this v7 in my RT tree. What is the
+status of this series upstream wise?
 
-Couldn't find anything yet on the gcc arm64 side that would either 
-guarantee we'd have an aligned stack nor that GCC would make it very 
-very likely.
-
-I can try to investigate a bit more.
-
-Thanks,
-
--- 
-Julien Thierry
+Sebastian
