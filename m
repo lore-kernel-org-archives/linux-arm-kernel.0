@@ -1,44 +1,32 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Thu, 8 Nov 2018 09:50:22 +0100
-Subject: Applied "spi: Add QuadSPI driver for Atmel SAMA5D2" to the spi
- tree
-In-Reply-To: <20181107151836.GB6809@sirena.org.uk>
-References: <20181105103625.9644-6-bugalski.piotr@gmail.com>
- <20181107150327.B6DC41124E14@debutante.sirena.org.uk>
- <20181107151836.GB6809@sirena.org.uk>
-Message-ID: <20181108095022.66ad3ad1@bbrezillon>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu,  8 Nov 2018 10:04:58 +0100
+Subject: [PATCH v2 0/4] Add support of STM32 hwspinlock
+Message-ID: <20181108090502.14543-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This serie adds the support of the hardware semaphore block for stm32mp1 SoC.
 
-On Wed, 7 Nov 2018 15:18:36 +0000
-Mark Brown <broonie@kernel.org> wrote:
+version 2:
+- fix comments done by Bjorn about clock naming, license terms in header,
+  alphabetic ordering in Makefile and Kconfig and remove function
+- Do not push test module in this version while waiting for feedbacks about it
 
-> On Wed, Nov 07, 2018 at 03:03:27PM +0000, Mark Brown wrote:
-> > The patch
-> > 
-> >    spi: Add QuadSPI driver for Atmel SAMA5D2
-> > 
-> > has been applied to the spi tree at
-> > 
-> >    https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git   
-> 
-> Sorry, I got confused about which patch series Boris had asked me to
-> apply for him - it wasn't this one!  Since the review looked like it was
-> just one minor issue last time I'll just leave them for now, they were
-> applied on a separate branch for sharing with the MTD tree so it's easy
-> for me to drop them if that's required or if I should put together the
-> pull request for MTD.  Sorry for any confusion this ends up causing,
-> it's entirely my mistake.
+Benjamin Gaignard (4):
+  dt-bindings: hwlock: Document STM32 hwspinlock bindings
+  hwspinlock: add STM32 hwspinlock device
+  ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
+  ARM: dts: stm32: enable hwspinlock on stm32mp157c-ed1
 
-I'm probably missing something, but I don't see where you made a
-mistake :-). It's indeed the series I asked you to merge, the only
-comment I had was actually a suggestion to help Piotr solve his perf
-issue (which was already present in the old driver).
+ .../bindings/hwlock/st,stm32-hwspinlock.txt        |  23 ++++
+ arch/arm/boot/dts/stm32mp157c-ed1.dts              |   4 +
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |   9 ++
+ drivers/hwspinlock/Kconfig                         |   9 ++
+ drivers/hwspinlock/Makefile                        |   1 +
+ drivers/hwspinlock/stm32_hwspinlock.c              | 144 +++++++++++++++++++++
+ 6 files changed, 190 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+ create mode 100644 drivers/hwspinlock/stm32_hwspinlock.c
 
-And thanks for creating the mtd topic branch BTW.
-
-Regards,
-
-Boris
+-- 
+2.15.0
