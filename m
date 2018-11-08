@@ -1,56 +1,56 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Thu, 8 Nov 2018 12:14:11 -0600
-Subject: arm64 + ARM64_64K_PAGES=y
-In-Reply-To: <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
-References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
- <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
-Message-ID: <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Thu, 08 Nov 2018 10:28:47 -0800
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+ <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
+ <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
+ <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
+ <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+ <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
+ <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
+Message-ID: <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/8/18 6:00 AM, Sebastian Andrzej Siewior wrote:
-> On 2018-11-06 15:34:55 [-0600], Grygorii Strashko wrote:
->> Hi All,
-> Hi,
+Quoting Abel Vesa (2018-11-08 04:29:39)
+> On Wed, Nov 07, 2018 at 04:18:35PM -0800, Stephen Boyd wrote:
+> > Quoting Abel Vesa (2018-11-07 12:26:25)
+> > > On Wed, Nov 07, 2018 at 11:01:02AM -0800, Stephen Boyd wrote:
+> > > > 
+> > > > 
+> > > > What's the plan to clean it up?
+> > > 
+> > > So I'm doing this in our internal tree first to make sure I don't break the
+> > > other (newer) socs.
+> > > 
+> > > I already have a prototype in testing but it's a long way to upstream it.
+> > > 
+> > > Basically, I'm replacing all of this with a single, more like a composite,
+> > > more complex, clock type that does all the magic inside.
+> > > 
+> > > One of the problems is the fact that the bypasses can have the same sources
+> > > and in my case, I'm implementing that as a list of parents name, but the
+> > > parent names list doesn't work with duplicates, so I have to find some other
+> > > way to do it.
+> > > 
+> > > Once I have something clean and tested enough I'll send it upstream.
+> > 
+> > Ok. Thanks for the info.
+> > 
 > 
->> Do anybody tried to use ARM64 RT with 76K pages enabled?
+> Just to avoid any kind of confusion.
 > 
-> 75 would be an off by one but this :)
-
-Ops 8-). at least subj is correct.
-
+> The whole refactoring of the SCCG clock will be done in a separate (later) change
+> and will not be part of this patchset.
 > 
->> My attempt shows that enabling  CONFIG_ARM64_64K_PAGES=y increases latencies by ~30%
->>
->> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=y
->>
->>
->> T: 0 (  772) P:98 I:1000 C: 120000 Min:      7 Act:   13 Avg:   10 Max:      85
->> T: 1 (  773) P:98 I:1500 C:  79998 Min:      7 Act:   13 Avg:   10 Max:      71
->> T: 2 (  774) P:98 I:2000 C:  59997 Min:      7 Act:   11 Avg:   11 Max:      64
->> T: 3 (  775) P:98 I:2500 C:  47996 Min:      7 Act:   14 Avg:   12 Max:      66
->>
->>
->> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
->>
->>
->> T: 0 (  697) P:98 I:1000 C: 120000 Min:      7 Act:   10 Avg:    9 Max:      38
->> T: 1 (  698) P:98 I:1500 C:  79987 Min:      7 Act:   10 Avg:   10 Max:      32
->> T: 2 (  699) P:98 I:2000 C:  59981 Min:      7 Act:   14 Avg:   11 Max:      46
->> T: 3 (  700) P:98 I:2500 C:  47977 Min:      6 Act:   11 Avg:   10 Max:      45
+> I already sent the 12th version of this current patch series and I would really
+> like to get this in ASAP so that the booting up of imx8mq will not be delayed.
 > 
-> So this is an idle system?
 
-Yes (in general) - it's collected with systemd, so some daemons are active.
-
-> The Kconfig help says "faster TLB lookup". Interesting.
-> Are the 16k pages in between (latency wise) by any chance?
-
-I'll try it.
-
-
--- 
-regards,
--grygorii
+Ok. Well we're in rc1 right now, and so we're not merging new drivers
+into mainline. I can merge the clk driver into clk-next, but you'll have
+to wait for the stabilization period to end (approximately 6 or 7 weeks)
+before this can get into the next kernel version. It will be in
+linux-next much sooner of course.
