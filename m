@@ -1,39 +1,56 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 8 Nov 2018 15:59:39 +0000
-Subject: Please check linux-next boot results from tonight for next seven days
-Message-ID: <20181108155938.GY30658@n2100.armlinux.org.uk>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Thu, 8 Nov 2018 16:59:40 +0100
+Subject: [PATCH 13/36] dt-bindings: arm: Convert PMU binding to json-schema
+In-Reply-To: <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-14-robh@kernel.org>
+ <20181009115713.GE6248@arm.com>
+ <CAL_JsqJh08wZCyGxg7HMbtKjOJTZKMoQcNOB_hPuSfJKQQK8JA@mail.gmail.com>
+ <08738708-1c38-fab7-eb34-694e5f4d4b7e@arm.com>
+Message-ID: <20181108165940.64ad52f1@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For anyone running builds and boot tests of tonight's linux-next,
-I've pushed out the final bits of the Spectre big.Little fixes
-for sfr to pick up tonight.
+Hello,
 
-These were omitted from the last merge window because towards the
-end of the -rc cycle, it was belatedly reported that it was causing
-a regression on some platforms, so they had to be dropped out of
-that merge window.  I believe that this was discovered on some
-non-kernelci based test system.
+I'm jumping into the discussion, but I clearly don't have all the
+context of the discussion.
 
-However, they really need to go in before the end of the year, so
-I'm proposing to send them before 4.20-rc3.
+On Thu, 8 Nov 2018 15:54:31 +0000, Robin Murphy wrote:
 
-This means I need help to test them and make sure that they do not
-cause any other unknown regressions.  Please note that merely looking
-at kernelci and checking whether it says the boot test passed is
-_insufficient_ - the boot logs must be inspected becaues a "green"
-pass result does _not_ mean that there isn't some kind of warning.
-The same problem may also be present in other automated boot testing
-systems elsewhere.
+> >> This seems like a semantic different between the two representations, or am
+> >> I missing something here? Specifically, both the introduction of
+> >> interrupts-extended and also dropping any mention of using a single per-cpu
+> >> interrupt (the single combined case is no longer support by Linux; not sure
+> >> if you want to keep it in the binding).  
+> > 
+> > In regards to no support for the single combined interrupt, it looks
+> > like Marvell Armada SoCs at least (armada-375 is what I'm looking at)
+> > have only a single interrupt. Though the interrupt gets routed to MPIC
+> > which then has a GIC PPI. So it isn't supported or happens to work
+> > still since it is a PPI?  
+> 
+> Well, the description of the MPIC in the Armada XP functional spec says:
+> 
+> "Interrupt sources ID0?ID28 are private events per CPU. Thus, each 
+> processor has a different set of events map interrupts ID0?ID28."
+> 
+> Odd grammar aside, that would seem to imply that <&mpic 3> is a per-cpu 
+> interrupt itself, thus AFAICS so long as it's cascaded to a GIC PPI and 
+> not an SPI then there's no issue there.
 
-Please check your boot logs for tonight's linux-next over the next
-seven days and report ASAP if the Spectre fixes are causing a
-regression for your platform.  If I don't hear anything, I will be
-sending them for -rc3.
+The Armada XP does not have a GIC at all, but only a MPIC as the
+primary interrupt controller.
 
-Thanks.
+However the Armada 38x has both a GIC and a MPIC, and indeed the parent
+interrupts of the MPIC towards the GIC is:
 
+	interrupts = <GIC_PPI 15 IRQ_TYPE_LEVEL_HIGH>;
+
+Best regards,
+
+Thomas
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
