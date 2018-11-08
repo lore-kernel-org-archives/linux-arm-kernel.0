@@ -1,43 +1,87 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 8 Nov 2018 09:25:22 +0100
-Subject: [PATCH 15/15] arm64: dts: allwinner: a64: bananapi-m64: Add
- Bluetooth device node
-In-Reply-To: <20181107101308.7626-16-wens@csie.org>
-References: <20181107101308.7626-1-wens@csie.org>
- <20181107101308.7626-16-wens@csie.org>
-Message-ID: <20181108082522.va5c63sb6t7zphpm@flea>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 8 Nov 2018 09:29:46 +0100
+Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+In-Reply-To: <20181106183609.207702-2-sboyd@kernel.org>
+References: <20181106183609.207702-1-sboyd@kernel.org>
+ <20181106183609.207702-2-sboyd@kernel.org>
+Message-ID: <efa13e0b-0daf-3bf3-27ba-ed90f15c7dfe@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 06:13:08PM +0800, Chen-Yu Tsai wrote:
-> The AP6212 is based on the Broadcom BCM43430 or BCM43438. The WiFi side
-> identifies as BCM43430, while the Bluetooth side identifies as BCM43438.
+
+
+On 06/11/2018 19:36, Stephen Boyd wrote:
+> We have a handful of clk drivers that have a collection of slightly
+> variant device support keyed off of the compatible string. In each of
+> these drivers, we demux the variant and then call the "real" probe
+> function based on whatever is stored in the match data for that
+> compatible string. Let's generalize this function so that it can be
+> re-used as the platform_driver probe function directly.
 > 
-> The Bluetooth side is connected to UART1 in a 4 wire configuration. Same
-> as the WiFi side, due to being the same chip and package, DLDO2 provides
-> overall power via VBAT, and DLDO4 provides I/O power via VDDIO. The RTC
-> clock output provides the LPO low power clock at 32.768 kHz.
+> Cc: Ryder Lee <ryder.lee@mediatek.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Frank Rowand <frowand.list@gmail.com>
+> Signed-off-by: Stephen Boyd <sboyd@kernel.org>
+> ---
+>  drivers/of/device.c       | 31 +++++++++++++++++++++++++++++++
+>  include/linux/of_device.h |  1 +
+>  2 files changed, 32 insertions(+)
 > 
-> This patch enables Bluetooth on this board, and also adds the missing
-> LPO clock on the WiFi side. There is also a PCM connection for Bluetooth,
-> but this is not covered here.
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 0f27fad9fe94..8381f33ed2d8 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -195,6 +195,37 @@ const void *of_device_get_match_data(const struct device *dev)
+>  }
+>  EXPORT_SYMBOL(of_device_get_match_data);
+>  
+> +/**
+> + * platform_driver_probe_by_of_match_data - Probe a platform device using match data
+> + * @pdev: platform device to probe
+> + *
+> + * For use by device drivers that multiplex their probe function through DT
+> + * match data. Drivers can use this function to call their platform
+> + * device probe directly without having to implement a wrapper function.
+> + *
+> + * static const struct of_device_id probe_funcs[] = {
+> + *      { .compatible = "compat,foo", .data = foo_probe },
+> + *      {}
+> + * };
+> + *
+> + * struct platform_driver foo_driver = {
+> + *      .probe = platform_driver_probe_by_of_match_data,
+> + *      .driver = {
+> + *            of_match_table = probe_funcs,
+> + *      },
+> + * };
+> + *
+> + */
+> +int platform_driver_probe_by_of_match_data(struct platform_device *pdev)
+> +{
+> +	int (*probe_func)(struct platform_device *pdev);
+> +
+> +	probe_func = of_device_get_match_data(&pdev->dev);
+
+Shouldn't we check if probe_func is not NULL?
+
+> +
+> +	return probe_func(pdev);
+> +}
+> +EXPORT_SYMBOL_GPL(platform_driver_probe_by_of_match_data);
+> +
+>  static ssize_t of_device_get_modalias(struct device *dev, char *str, ssize_t len)
+>  {
+>  	const char *compat;
+> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
+> index 8d31e39dd564..4de84691d1c6 100644
+> --- a/include/linux/of_device.h
+> +++ b/include/linux/of_device.h
+> @@ -33,6 +33,7 @@ extern int of_device_add(struct platform_device *pdev);
+>  extern int of_device_register(struct platform_device *ofdev);
+>  extern void of_device_unregister(struct platform_device *ofdev);
+>  
+> +extern int platform_driver_probe_by_of_match_data(struct platform_device *pdev);
+>  extern const void *of_device_get_match_data(const struct device *dev);
+>  
+>  extern ssize_t of_device_modalias(struct device *dev, char *str, ssize_t len);
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
-Thanks for figuring this out!
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181108/d05e883b/attachment.sig>
