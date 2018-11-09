@@ -1,8 +1,10 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 9 Nov 2018 18:15:31 +0100
-Subject: [PATCH net-next v3 0/2] net: phy: replace PHY_HAS_INTERRUPT with a
+Date: Fri, 9 Nov 2018 18:16:28 +0100
+Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with a
  check for config_intr and ack_interrupt
-Message-ID: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+In-Reply-To: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+Message-ID: <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,51 +12,42 @@ Flag PHY_HAS_INTERRUPT is used only here for this small check. I think
 using interrupts isn't possible if a driver defines neither
 config_intr nor ack_interrupts callback. So we can replace checking
 flag PHY_HAS_INTERRUPT with checking for these callbacks.
-This allows to remove this flag from all driver configs.
 
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
 v2:
-- add helper for check in patch 1
-- remove PHY_HAS_INTERRUPT from all drivers, not only Realtek
-- remove flag PHY_HAS_INTERRUPT completely
-
+- add helper for the check
 v3:
-- rebase patch 2
+- no changes
+---
+ drivers/net/phy/phy_device.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Heiner Kallweit (2):
-  net: phy: replace PHY_HAS_INTERRUPT with a check for config_intr and ack_interrupt
-  net: phy: realtek: remove flag PHY_HAS_INTERRUPT from driver configs
-
- drivers/net/phy/amd.c          |  1 -
- drivers/net/phy/aquantia.c     |  6 ------
- drivers/net/phy/at803x.c       |  3 ---
- drivers/net/phy/bcm63xx.c      |  4 ++--
- drivers/net/phy/bcm87xx.c      |  2 --
- drivers/net/phy/broadcom.c     | 16 ----------------
- drivers/net/phy/cicada.c       |  2 --
- drivers/net/phy/davicom.c      |  4 ----
- drivers/net/phy/dp83640.c      |  1 -
- drivers/net/phy/dp83822.c      |  1 -
- drivers/net/phy/dp83848.c      |  1 -
- drivers/net/phy/dp83867.c      |  1 -
- drivers/net/phy/dp83tc811.c    |  1 -
- drivers/net/phy/icplus.c       |  1 -
- drivers/net/phy/intel-xway.c   | 10 ----------
- drivers/net/phy/lxt.c          |  2 --
- drivers/net/phy/marvell.c      | 15 ---------------
- drivers/net/phy/meson-gxl.c    |  2 +-
- drivers/net/phy/micrel.c       | 14 --------------
- drivers/net/phy/microchip.c    |  1 -
- drivers/net/phy/microchip_t1.c |  1 -
- drivers/net/phy/mscc.c         |  6 ------
- drivers/net/phy/national.c     |  1 -
- drivers/net/phy/phy_device.c   |  8 ++++++--
- drivers/net/phy/qsemi.c        |  1 -
- drivers/net/phy/realtek.c      |  7 -------
- drivers/net/phy/smsc.c         |  7 +------
- drivers/net/phy/ste10Xp.c      |  2 --
- drivers/net/phy/vitesse.c      |  9 ---------
- include/linux/phy.h            |  5 ++---
- 30 files changed, 12 insertions(+), 123 deletions(-)
-
+diff --git a/drivers/net/phy/phy_device.c b/drivers/net/phy/phy_device.c
+index ab33d1777..00a46218c 100644
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -2074,6 +2074,11 @@ static void of_set_phy_eee_broken(struct phy_device *phydev)
+ 	phydev->eee_broken_modes = broken;
+ }
+ 
++static bool phy_drv_supports_irq(struct phy_driver *phydrv)
++{
++	return phydrv->config_intr || phydrv->ack_interrupt;
++}
++
+ /**
+  * phy_probe - probe and init a PHY device
+  * @dev: device to probe and init
+@@ -2095,8 +2100,7 @@ static int phy_probe(struct device *dev)
+ 	/* Disable the interrupt if the PHY doesn't support it
+ 	 * but the interrupt is still a valid one
+ 	 */
+-	if (!(phydrv->flags & PHY_HAS_INTERRUPT) &&
+-	    phy_interrupt_is_valid(phydev))
++	 if (!phy_drv_supports_irq(phydrv) && phy_interrupt_is_valid(phydev))
+ 		phydev->irq = PHY_POLL;
+ 
+ 	if (phydrv->flags & PHY_IS_INTERNAL)
 -- 
 2.19.1
