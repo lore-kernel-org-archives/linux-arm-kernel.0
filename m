@@ -1,38 +1,30 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 9 Nov 2018 12:56:54 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
-References: <20181107171031.22573-1-alex.bennee@linaro.org>
- <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
- <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
- <87r2fv68us.fsf@linaro.org>
- <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
- <87pnvf63u2.fsf@linaro.org>
- <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
- <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
- <87lg625th2.fsf@linaro.org>
- <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
-Message-ID: <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
+From: yangxuan8282@gmail.com (He Yangxuan)
+Date: Fri, 9 Nov 2018 20:59:36 +0800
+Subject: [PATCH] ARM64: dts: meson: p230: disable advertisement EEE for GbE.
+Message-ID: <20181109125936.3siduqtjmj6vv5ur@raspberrypi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 November 2018 at 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> I'm not saying anything about *decisions*. I'm saying that we can make
-> the state consistent by advancing the singlestep state in the same way
-> that HW does, at the instant it advances the PC.
->
-> i.e. do that in kvm_skip_instr(), as I've done in my local tree.
->
-> That mirrors the HW, and we don't need to special-case any handling for
-> emulated vs non-emulated instructions.
+This patch disable EEE advertisement for P230 board (DWMAC + RTL8211F).
+If not disable it, the network connection is not stable, will got issues
+like throughput drop or broken link.
 
-You also need to do it in the "set PC because we're making the guest
-take an exception" code path, which doesn't go through kvm_skip_instr().
-This corresponds to the two kinds of "step completed" in hardware as
-noted in DDI0487D.a D2.12.3 fig D2-3 footnote b:
- * executing the instruction to be stepped without taking an exception
- * taking an exception to an exception level that debug exceptions
-   are enabled from [ie guest EL1 in our case]
+Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-thanks
--- PMM
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+index 15014faa2..0c8e8305b 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+@@ -86,6 +86,7 @@
+ 		max-speed = <1000>;
+ 		interrupt-parent = <&gpio_intc>;
+ 		interrupts = <29 IRQ_TYPE_LEVEL_LOW>;
++		eee-broken-1000t;
+ 	};
+ };
+ 
+-- 
+2.11.0
