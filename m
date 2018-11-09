@@ -1,76 +1,45 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Nov 2018 09:57:15 +0000
-Subject: [PATCH net] net: mvneta: Don't advertise 2.5G modes
-In-Reply-To: <20181109081733.24458-1-maxime.chevallier@bootlin.com>
-References: <20181109081733.24458-1-maxime.chevallier@bootlin.com>
-Message-ID: <20181109095715.GA30658@n2100.armlinux.org.uk>
+From: vkoul@kernel.org (Vinod Koul)
+Date: Fri,  9 Nov 2018 15:28:03 +0530
+Subject: [PATCH 2/2] arm64: defconfig: Enable some qcom remoteproc configs
+In-Reply-To: <20181109095803.16036-1-vkoul@kernel.org>
+References: <20181109095803.16036-1-vkoul@kernel.org>
+Message-ID: <20181109095803.16036-2-vkoul@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 09:17:33AM +0100, Maxime Chevallier wrote:
-> Using 2.5G speed relies on the SerDes lanes being configured
-> accordingly. The lanes have to be reconfigured to switch between
-> 1G and 2.5G, and for now only the bootloader does this configuration.
-> 
-> In the case we add a Comphy driver to handle switching the lanes
-> dynamically, it's better for now to stick with supporting only 1G and
-> add advertisement for 2.5G once we really are capable of handling both
-> speeds without problem.
-> 
-> Since the interface mode is initialy taken from the DT, we want to make
-> sure that adding comphy support won't break boards that don't update
-> their dtb.
-> 
-> Fixes: da58a931f248 ("net: mvneta: Add support for 2500Mbps SGMII")
-> Reported-by: Andrew Lunn <andrew@lunn.ch>
-> Reported-by: Russell King <linux@armlinux.org.uk>
-> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-As we discussed on IRC... however, please can we wait until Monday/
-Tuesday before merging this patch to allow for some further thought
-and discussion - by which time I expect to have a comphy driver.
+Enable remoteproc configs to boot the remoteprocs on QC chipsets. These
+are common configs and not specific to a specific SoC so should be enabled
+across the board.
 
-Thanks.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Signed-off-by: Vinod Koul <vkoul@kernel.org>
+---
+v2: fixed the change of config names
 
-> ---
->  drivers/net/ethernet/marvell/mvneta.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 5bfd349bf41a..c19ecd153499 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -3343,7 +3343,6 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->  	if (state->interface != PHY_INTERFACE_MODE_NA &&
->  	    state->interface != PHY_INTERFACE_MODE_QSGMII &&
->  	    state->interface != PHY_INTERFACE_MODE_SGMII &&
-> -	    state->interface != PHY_INTERFACE_MODE_2500BASEX &&
->  	    !phy_interface_mode_is_8023z(state->interface) &&
->  	    !phy_interface_mode_is_rgmii(state->interface)) {
->  		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
-> @@ -3357,14 +3356,9 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->  	/* Asymmetric pause is unsupported */
->  	phylink_set(mask, Pause);
->  
-> -	/* We cannot use 1Gbps when using the 2.5G interface. */
-> -	if (state->interface == PHY_INTERFACE_MODE_2500BASEX) {
-> -		phylink_set(mask, 2500baseT_Full);
-> -		phylink_set(mask, 2500baseX_Full);
-> -	} else {
-> -		phylink_set(mask, 1000baseT_Full);
-> -		phylink_set(mask, 1000baseX_Full);
-> -	}
-> +	/* Half-duplex at speeds higher than 100Mbit is unsupported */
-> +	phylink_set(mask, 1000baseT_Full);
-> +	phylink_set(mask, 1000baseX_Full);
->  
->  	if (!phy_interface_mode_is_8023z(state->interface)) {
->  		/* 10M and 100M are only supported in non-802.3z mode */
-> -- 
-> 2.11.0
-> 
+ arch/arm64/configs/defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index b02da2e7a39a..09732a9b46bb 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -614,9 +614,15 @@ CONFIG_TEGRA_IOMMU_SMMU=y
+ CONFIG_ARM_SMMU=y
+ CONFIG_ARM_SMMU_V3=y
+ CONFIG_QCOM_IOMMU=y
++CONFIG_REMOTEPROC=m
++CONFIG_QCOM_Q6V5_MSS=m
++CONFIG_QCOM_Q6V5_PAS=m
++CONFIG_QCOM_SYSMON=m
+ CONFIG_RPMSG_QCOM_GLINK_RPM=y
++CONFIG_RPMSG_QCOM_GLINK_SMEM=m
+ CONFIG_RPMSG_QCOM_SMD=y
+ CONFIG_RASPBERRYPI_POWER=y
++CONFIG_QCOM_GLINK_SSR=m
+ CONFIG_QCOM_SMEM=y
+ CONFIG_QCOM_SMD_RPM=y
+ CONFIG_QCOM_SMP2P=y
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.14.4
