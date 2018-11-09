@@ -1,22 +1,24 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 9 Nov 2018 21:13:07 +0100
-Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
- a check for config_intr and ack_interrupt
-In-Reply-To: <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
+Date: Fri, 9 Nov 2018 21:13:28 +0100
+Subject: [PATCH net-next v3 2/2] net: phy: remove flag PHY_HAS_INTERRUPT
+ from driver configs
+In-Reply-To: <15f15b61-1dc2-e204-0a08-f2d8f73c227d@gmail.com>
 References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
- <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
-Message-ID: <20181109201307.GV5259@lunn.ch>
+ <15f15b61-1dc2-e204-0a08-f2d8f73c227d@gmail.com>
+Message-ID: <20181109201328.GW5259@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiner
+On Fri, Nov 09, 2018 at 06:17:22PM +0100, Heiner Kallweit wrote:
+> Now that flag PHY_HAS_INTERRUPT has been replaced with a check for
+> callbacks config_intr and ack_interrupt, we can remove setting this
+> flag from all driver configs.
+> Last but not least remove flag PHY_HAS_INTERRUPT completely.
+> 
+> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 
-> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
-> +{
-> +	return phydrv->config_intr || phydrv->ack_interrupt;
-> +}
+Thanks for removing them all.
 
-Should this be && not || ? I thought both needed to be provided for
-interrupts to work. 
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-	   Andrew
+    Andrew
