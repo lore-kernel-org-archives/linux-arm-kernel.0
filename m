@@ -1,31 +1,40 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Fri, 9 Nov 2018 02:08:07 +0100
-Subject: [PATCH v3 8/9] arm64: defconfig: Change SCSI_UFS_HISI=m
+Date: Fri, 9 Nov 2018 02:08:41 +0100
+Subject: [PATCH v3 9/9] arm64: defconfig: Drop redundant sound codec options
 In-Reply-To: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
 References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
-Message-ID: <2f3fdfc8-24ef-734b-7c4a-76da9f7556be@free.fr>
+Message-ID: <a285bc62-bfaa-d53a-129b-165df255b3ed@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCSI_UFS_HISI depends on SCSI_UFSHCD_PLATFORM=m
+SND_SOC_RK3399_GRU_SOUND selects SND_SOC_DA7219, SND_SOC_MAX98357A,
+SND_SOC_RT5514, SND_SOC_RT5514_SPI.
+
+SND_SOC_ROCKCHIP_RT5645 selects SND_SOC_RT5645.
+
+SND_SOC_RL6231 is pulled in for SND_SOC_RT5514 and SND_SOC_RT5645.
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/configs/defconfig | 6 ------
+ 1 file changed, 6 deletions(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 2662f83c481c..2e173978eef8 100644
+index 2e173978eef8..0385a438ccff 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -223,7 +223,7 @@ CONFIG_SCSI_HISI_SAS_PCI=y
- CONFIG_SCSI_UFSHCD=m
- CONFIG_SCSI_UFSHCD_PLATFORM=m
- CONFIG_SCSI_UFS_QCOM=m
--CONFIG_SCSI_UFS_HISI=y
-+CONFIG_SCSI_UFS_HISI=m
- CONFIG_ATA=y
- CONFIG_SATA_AHCI=y
- CONFIG_SATA_AHCI_PLATFORM=y
+@@ -500,12 +500,6 @@ CONFIG_SND_SOC_RK3399_GRU_SOUND=m
+ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_AK4613=m
+-CONFIG_SND_SOC_DA7219=m
+-CONFIG_SND_SOC_MAX98357A=m
+-CONFIG_SND_SOC_RL6231=m
+-CONFIG_SND_SOC_RT5514=m
+-CONFIG_SND_SOC_RT5514_SPI=m
+-CONFIG_SND_SOC_RT5645=m
+ CONFIG_SND_SIMPLE_CARD=m
+ CONFIG_SND_AUDIO_GRAPH_CARD=m
+ CONFIG_I2C_HID=m
 -- 
 2.8.2
