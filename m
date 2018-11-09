@@ -1,39 +1,60 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 9 Nov 2018 11:48:19 +0000
-Subject: [PATCH v6 5/9] dt-bindings: ARM: document marvell,ecc-enable
- binding
-In-Reply-To: <CAK8P3a3PNvBhyQw0bfGxKmxj+KeJB2_TXtDx2R1BpjTCYNqVkA@mail.gmail.com>
-References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
- <20181109070349.20464-6-chris.packham@alliedtelesis.co.nz>
- <CAK8P3a3PNvBhyQw0bfGxKmxj+KeJB2_TXtDx2R1BpjTCYNqVkA@mail.gmail.com>
-Message-ID: <20181109114818.GB30658@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Nov 2018 11:56:44 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+ <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
+ <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+ <87r2fv68us.fsf@linaro.org>
+ <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+ <87pnvf63u2.fsf@linaro.org>
+ <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
+Message-ID: <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 12:40:06PM +0100, Arnd Bergmann wrote:
-> On Fri, Nov 9, 2018 at 8:04 AM Chris Packham
-> <chris.packham@alliedtelesis.co.nz> wrote:
+On Thu, Nov 08, 2018 at 02:38:43PM +0000, Peter Maydell wrote:
+> On 8 November 2018 at 14:28, Alex Benn?e <alex.bennee@linaro.org> wrote:
 > >
-> > Add documentation for the marvell,ecc-enable and marvell,ecc-disable
-> > properties which can be used to enable/disable ECC on the Marvell aurora
-> > cache.
+> > Mark Rutland <mark.rutland@arm.com> writes:
+> >> One problem is that I couldn't spot when we advance the PC for an MMIO
+> >> trap. I presume we do that in the kernel, *after* the MMIO trap, but I
+> >> can't see where that happens.
 > >
-> > Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> > ---
+> > Nope it gets done before during decode_hsr in mmio.c:
+> >
+> >         /*
+> >          * The MMIO instruction is emulated and should not be re-executed
+> >          * in the guest.
+> >          */
+> >         kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
 > 
-> Why do you need both enable and disable? Wouldn't one of them be enough here?
+> I think that this attempt to do the PC-advance early is
+> probably an underlying problem that is not helping the
+> code structure here.
+> 
+> An enhancement that's been floated previously is that the
+> MMIO emulation in userspace should be able to report back
+> to KVM "nope, that access should generate a guest synchronous
+> external abort (with ESR_EL1.EA = 0/1)".
+> If we have that, then we definitely need to not advance the
+> PC until after userspace has done the emulation and told
+> us whether the memory access succeeded or not...
 
-It isn't an "on when ecc-enable is present, off when not" because the
-current behaviour is to preserve these bits in the control register.
+Yup.
 
-If we were to implement it as "if no ecc-enable property, turn off
-ECC" then that would drastically change the behaviour - systems which
-were configured for ECC suddenly lose ECC support.
+I think that we absolutely want to do all the CPU state advancement (PC,
+SS bit, etc) at the point we apply the effects of the instruction. Not
+before we emulate the instruction, and not higher/lower in the call
+stack.
 
-Since we don't know which have it and which don't, we can't implement
-the option like that.
+We have a big problem in that guest-directed singlestep and
+host-directed singlestep don't compose, and given that host-directed
+singlestep doesn't work reliably today I'd be tempted to rip that out
+until we've fixed guest-directed singlestep.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+We should have a story for how host-directed debug is handled
+transparently from the PoV of a guest using guest-directed debug.
+
+Thanks,
+Mark.
