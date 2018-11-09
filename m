@@ -1,25 +1,43 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Fri, 09 Nov 2018 14:17:20 +0100
-Subject: [PATCH v3 3/3] ARM64: dts: meson-gxl: Add support for the
- Smartlabs SML-5442TW
-In-Reply-To: <1541706240-30036-4-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-4-git-send-email-christianshewitt@gmail.com>
-Message-ID: <d923e31b63a5d4c4d67a274b8ef9555cd25f8bff.camel@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 9 Nov 2018 13:29:56 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
+References: <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
+ <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+ <87r2fv68us.fsf@linaro.org>
+ <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+ <87pnvf63u2.fsf@linaro.org>
+ <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
+ <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
+ <87lg625th2.fsf@linaro.org>
+ <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
+ <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
+Message-ID: <20181109132955.kqfccmqrugfj5rkl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-08 at 23:43 +0400, Christian Hewitt wrote:
-> +/* This will enable the bluetooth module */
-> +&gpio {
-> +       bt-en {
-> +               gpio-hog;
-> +               gpios = <GPIOX_17 GPIO_ACTIVE_HIGH>;
-> +               output-high;
-> +               line-name = "bt-en";
-> +       };
-> +};
+On Fri, Nov 09, 2018 at 12:56:54PM +0000, Peter Maydell wrote:
+> On 9 November 2018 at 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> > I'm not saying anything about *decisions*. I'm saying that we can make
+> > the state consistent by advancing the singlestep state in the same way
+> > that HW does, at the instant it advances the PC.
+> >
+> > i.e. do that in kvm_skip_instr(), as I've done in my local tree.
+> >
+> > That mirrors the HW, and we don't need to special-case any handling for
+> > emulated vs non-emulated instructions.
+> 
+> You also need to do it in the "set PC because we're making the guest
+> take an exception" code path, which doesn't go through kvm_skip_instr().
 
-Instead of this, is it possible to use the driver provided by
-drivers/bluetooth/hci_qca.c ?
+Sure.
+
+> This corresponds to the two kinds of "step completed" in hardware as
+> noted in DDI0487D.a D2.12.3 fig D2-3 footnote b:
+>  * executing the instruction to be stepped without taking an exception
+>  * taking an exception to an exception level that debug exceptions
+>    are enabled from [ie guest EL1 in our case]
+
+Thanks for the pointer!
+
+Mark.
