@@ -1,51 +1,39 @@
 From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Fri,  9 Nov 2018 12:37:22 +0000
-Subject: [PATCH 19/27] arm64: elf: vDSO code page discovery
+Date: Fri,  9 Nov 2018 12:37:27 +0000
+Subject: [PATCH 24/27] mips: Introduce vdso_direct
 In-Reply-To: <20181109123730.8743-1-vincenzo.frascino@arm.com>
 References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
-Message-ID: <20181109123730.8743-20-vincenzo.frascino@arm.com>
+Message-ID: <20181109123730.8743-25-vincenzo.frascino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like in normal vDSOs, when compat vDSOs are enabled the auxiliary
-vector symbol AT_SYSINFO_EHDR needs to point at the address of the
-vDSO code, to allow the dynamic linker to find it.
+vdso_direct is an architectural clock configuration parameter that
+exposes the usage of not of the vDSO.
 
-This patch adds the necessary code to the elf arm64 module to make this
-possible.
+If vdso_direct is false, the time related syscalls will be used instead
+of the vDSO library.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+This patch introduces the parameter in the mips architecture to prepare
+the ground for the support of the generic vDSO library.
+
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Paul Burton <paul.burton@mips.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/elf.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/mips/include/asm/clocksource.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index f2b6b486deb7..3fb46968da6a 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -209,7 +209,21 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- ({									\
- 	set_thread_flag(TIF_32BIT);					\
-  })
-+#ifdef CONFIG_GENERIC_COMPAT_VDSO
-+#define COMPAT_ARCH_DLINFO						\
-+do {									\
-+	/*								\
-+	 * Note that we use Elf64_Off instead of elf_addr_t because	\
-+	 * elf_addr_t in compat is defined as Elf32_Addr and casting	\
-+	 * current->mm->context.vdso to it triggers a cast warning of	\
-+	 * cast from pointer to integer of different size.		\
-+	 */								\
-+	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-+			(Elf64_Off)current->mm->context.vdso);		\
-+} while (0)
-+#else
- #define COMPAT_ARCH_DLINFO
-+#endif
- extern int aarch32_setup_additional_pages(struct linux_binprm *bprm,
- 					  int uses_interp);
- #define compat_arch_setup_additional_pages \
+diff --git a/arch/mips/include/asm/clocksource.h b/arch/mips/include/asm/clocksource.h
+index 3deb1d0c1a94..eab11ee4871a 100644
+--- a/arch/mips/include/asm/clocksource.h
++++ b/arch/mips/include/asm/clocksource.h
+@@ -23,6 +23,7 @@
+  * @vdso_clock_mode: Method the VDSO should use to access the clocksource.
+  */
+ struct arch_clocksource_data {
++	bool vdso_direct;
+ 	u8 vdso_clock_mode;
+ };
+ 
 -- 
 2.19.1
