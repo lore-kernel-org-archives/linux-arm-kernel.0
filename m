@@ -1,68 +1,81 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 09 Nov 2018 15:43:11 +0000
-Subject: [PATCH 1/2] kvm/arm: skip MMIO insn after emulation
-In-Reply-To: <20181109150711.45864-2-mark.rutland@arm.com>
-References: <20181109150711.45864-1-mark.rutland@arm.com>
- <20181109150711.45864-2-mark.rutland@arm.com>
-Message-ID: <87h8gq5ka8.fsf@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri,  9 Nov 2018 15:58:16 +0000 (GMT)
+Subject: Applied "ASoC: sun8i-codec: fix crash on module removal" to the asoc
+ tree
+In-Reply-To: <20181109043135.26200-1-anarsoul@gmail.com>
+Message-ID: <20181109155816.C5B581124E6F@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The patch
 
-Mark Rutland <mark.rutland@arm.com> writes:
+   ASoC: sun8i-codec: fix crash on module removal
 
-> When we emulate an MMIO instruction, we advance the CPU state within
-> decode_hsr(), before emulating the instruction effects.
->
-> Having this logic in decode_hsr() is opaque, and advancing the state
-> before emulation is problematic. It gets in the way of applying
-> consistent single-step logic, and it prevents us from being able to fail
-> an MMIO instruction with a synchronous exception.
->
-> Clean this up by only advancing the CPU state *after* the effects of the
-> instruction are emulated.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Peter Maydell <peter.maydell@linaro.org>
+has been applied to the asoc tree at
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-> ---
->  virt/kvm/arm/mmio.c | 11 ++++++-----
->  1 file changed, 6 insertions(+), 5 deletions(-)
->
-> diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
-> index dac7ceb1a677..08443a15e6be 100644
-> --- a/virt/kvm/arm/mmio.c
-> +++ b/virt/kvm/arm/mmio.c
-> @@ -117,6 +117,12 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
->  	}
->
-> +	/*
-> +	 * The MMIO instruction is emulated and should not be re-executed
-> +	 * in the guest.
-> +	 */
-> +	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> +
->  	return 0;
->  }
->
-> @@ -144,11 +150,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
->  	vcpu->arch.mmio_decode.sign_extend = sign_extend;
->  	vcpu->arch.mmio_decode.rt = rt;
->
-> -	/*
-> -	 * The MMIO instruction is emulated and should not be re-executed
-> -	 * in the guest.
-> -	 */
-> -	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
->  	return 0;
->  }
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
---
-Alex Benn?e
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 278df5e5527b633f4882f1680ad58b62a7c07bfe Mon Sep 17 00:00:00 2001
+From: Vasily Khoruzhick <anarsoul@gmail.com>
+Date: Thu, 8 Nov 2018 20:31:35 -0800
+Subject: [PATCH] ASoC: sun8i-codec: fix crash on module removal
+
+drvdata is actually sun8i_codec, not snd_soc_card, so it crashes
+when calling snd_soc_card_get_drvdata().
+
+Drop card and scodec vars anyway since we don't need to
+disable/unprepare clocks - it's already done by calling
+runtime_suspend()
+
+Drop clk_disable_unprepare() calls for the same reason.
+
+Fixes: 36c684936fae7 ("ASoC: Add sun8i digital audio codec")
+Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ sound/soc/sunxi/sun8i-codec.c | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index 522a72fde78d..c4196d4e5915 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -605,16 +605,10 @@ static int sun8i_codec_probe(struct platform_device *pdev)
+ 
+ static int sun8i_codec_remove(struct platform_device *pdev)
+ {
+-	struct snd_soc_card *card = platform_get_drvdata(pdev);
+-	struct sun8i_codec *scodec = snd_soc_card_get_drvdata(card);
+-
+ 	pm_runtime_disable(&pdev->dev);
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		sun8i_codec_runtime_suspend(&pdev->dev);
+ 
+-	clk_disable_unprepare(scodec->clk_module);
+-	clk_disable_unprepare(scodec->clk_bus);
+-
+ 	return 0;
+ }
+ 
+-- 
+2.19.0.rc2
