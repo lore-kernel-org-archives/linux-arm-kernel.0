@@ -1,38 +1,26 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Fri, 9 Nov 2018 08:28:34 +0100
-Subject: [PATCH] ASoC: sun8i-codec: fix crash on module removal
-In-Reply-To: <20181109043135.26200-1-anarsoul@gmail.com>
-References: <20181109043135.26200-1-anarsoul@gmail.com>
-Message-ID: <20181109072834.qyjb5rqlepavemhz@flea>
+From: hch@lst.de (Christoph Hellwig)
+Date: Fri, 9 Nov 2018 08:49:55 +0100
+Subject: [PATCH 06/10] swiotlb: use swiotlb_map_page in
+ swiotlb_map_sg_attrs
+In-Reply-To: <CANcMJZAzrxA9LGNvP-epv2DwsUacEM_hcgA1n5gmaPuWRJG4iw@mail.gmail.com>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-7-hch@lst.de>
+ <CANcMJZAzrxA9LGNvP-epv2DwsUacEM_hcgA1n5gmaPuWRJG4iw@mail.gmail.com>
+Message-ID: <20181109074955.GA27489@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 08:31:35PM -0800, Vasily Khoruzhick wrote:
-> drvdata is actually sun8i_codec, not snd_soc_card, so it crashes
-> when calling snd_soc_card_get_drvdata().
+On Tue, Nov 06, 2018 at 05:27:14PM -0800, John Stultz wrote:
+> But at that point if I just re-apply "swiotlb: use swiotlb_map_page in
+> swiotlb_map_sg_attrs", I reproduce the hangs.
 > 
-> Drop card and scodec vars anyway since we don't need to
-> disable/unprepare clocks - it's already done by calling
-> runtime_suspend()
-> 
-> Drop clk_disable_unprepare() calls for the same reason.
-> 
-> Fixes: 36c684936fae7 ("ASoC: Add sun8i digital audio codec")
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Any suggestions for how to further debug what might be going wrong
+> would be appreciated!
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Very odd.  In the end map_sg and map_page are defined to do the same
+things to start with.  The only real issue we had in this area was:
 
-Thanks!
-Maxime
+"[PATCH v2] of/device: Really only set bus DMA mask when appropriate"
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/2ba2f054/attachment.sig>
+so with current mainline + that you still see a problem, and if you
+rever the commit we are replying to it still goes away?
