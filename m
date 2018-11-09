@@ -1,46 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 09 Nov 2018 16:01:03 +0100
-Subject: [PATCH 3/4] dt-bindings: reset: uniphier: Add AHCI core reset
- description
-In-Reply-To: <1541727727-10821-4-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1541727727-10821-4-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <1541775663.4112.48.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri,  9 Nov 2018 15:07:09 +0000
+Subject: [PATCH 0/2] kvm/arm: make singlestep behaviour consistent
+Message-ID: <20181109150711.45864-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kunihiko,
+We don't consistently advance the singlestep state machine when emulating
+instructions. We attempt to bodge around this when the host is stepping a
+guest, and fake a debug exception, but we don't always get this right.
+Additionally, we don't try to fix this up at all when a guest is stepping
+itself, so guests cannot single-step emulated instructions reliably.
 
-On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
-> Add compatible strings for reset control of AHCI core implemented in
-> UniPhier SoCs. The reset control belongs to AHCI glue layer.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  Documentation/devicetree/bindings/reset/uniphier-reset.txt | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> index f63c511..ea00517 100644
-> --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> @@ -133,6 +133,9 @@ Required properties:
->      "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
->      "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
->      "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
-> +    "socionext,uniphier-pro4-ahci-reset" - for Pro4 SoC AHCI
-> +    "socionext,uniphier-pxs2-ahci-reset" - for PXs2 SoC AHCI
-> +    "socionext,uniphier-pxs3-ahci-reset" - for PXs3 SoC AHCI
+In both cases we're usually reliant on the HW singlestep state machine, so
+let's have our instruction emulation consistently advance that. Thus, when we
+return to a guest after emulating an instruction, the HW will generate the step
+exception for us, routed to host or guest appropriately.
 
-Since the driver behaves identically for "socionext,uniphier-pro4-usb3-
-reset" and "socionext,uniphier-pro4-ahci-reset", would it make sense to
-add a common compatible?
-Something like:
-"socionext,uniphier-pro4-usb3-reset", "socionext,uniphier-pro4-glue-reset" - for USB3 SoC AHCI
-"socionext,uniphier-pro4-ahci-reset", "socionext,uniphier-pro4-glue-reset" - for Pro4 SoC AHCI
+So far I have only compile-tested these patches. YMMV.
 
-That way if more places turn up where the glue layer reset is used,
-you can add them without patching the driver every time.
+These patches do not ensure that guest-stepping is reliable in the presence of
+host-stepping. We might need to say that it's userspace's responsibility to
+virtualize the guest singlestep state machine when stepping the guest.
+Otherwise, it's not clear to me if we can shadow this correctly within the
+kernel.
 
-regards
-Philipp
+Thanks,
+Mark.
+
+Mark Rutland (2):
+  kvm/arm: skip MMIO insn after emulation
+  kvm/arm: consistently advance singlestep when emulating instructions
+
+ arch/arm/include/asm/kvm_host.h          |  5 ----
+ arch/arm64/include/asm/kvm_emulate.h     | 35 ++++++++++++++++++++------
+ arch/arm64/include/asm/kvm_host.h        |  1 -
+ arch/arm64/kvm/debug.c                   | 21 ----------------
+ arch/arm64/kvm/handle_exit.c             | 14 +----------
+ arch/arm64/kvm/hyp/switch.c              | 43 +++-----------------------------
+ arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c | 12 ++++++---
+ virt/kvm/arm/arm.c                       |  2 --
+ virt/kvm/arm/hyp/vgic-v3-sr.c            |  6 ++++-
+ virt/kvm/arm/mmio.c                      | 11 ++++----
+ 10 files changed, 52 insertions(+), 98 deletions(-)
+
+-- 
+2.11.0
