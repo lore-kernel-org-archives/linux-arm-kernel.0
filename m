@@ -1,21 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 9 Nov 2018 12:17:56 -0800
-Subject: [PATCH] ARM: brcmstb: Add entry for 7255
-In-Reply-To: <20181107004151.20370-1-f.fainelli@gmail.com>
-References: <20181107004151.20370-1-f.fainelli@gmail.com>
-Message-ID: <ca3ddaea-61fa-b7e6-b080-59b8ba92514f@gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 9 Nov 2018 21:22:55 +0100
+Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
+ a check for config_intr and ack_interrupt
+In-Reply-To: <20181109201307.GV5259@lunn.ch>
+References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+ <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
+ <20181109201307.GV5259@lunn.ch>
+Message-ID: <44b503b8-9f2a-50ac-c4c9-d25258d98ef5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/18 4:41 PM, Florian Fainelli wrote:
-> From: Justin Chen <justinpopo6@gmail.com>
+On 09.11.2018 21:13, Andrew Lunn wrote:
+> Hi Heiner
 > 
-> Add in BCM7255 entry and reorder entries to keep ascending order. Also
-> moved 7278 cause it was out of order.
+>> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
+>> +{
+>> +	return phydrv->config_intr || phydrv->ack_interrupt;
+>> +}
 > 
-> Signed-off-by: Justin Chen <justinpopo6@gmail.com>
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Should this be && not || ? I thought both needed to be provided for
+> interrupts to work. 
+> 
+> 	   Andrew
+> 
+I've seen at least one driver which configures interrupts in
+config_init and doesn't define a config_intr callback
+(ack_interrupt callback is there)
+Intention of this check is not to ensure that the driver defines
+everything to make interrupts work. All it states:
+If at least one of the irq-related callbacks is defined, then
+we interpret this as indicator that the PHY supports interrupts.
 
-Applied to soc/next, thanks!
--- 
-Florian
+Heiner
