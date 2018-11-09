@@ -1,71 +1,32 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 9 Nov 2018 17:47:50 -0600
-Subject: [PATCH v2 0/5] phy: core: rework phy_set_mode to accept phy mode and
- submode
-Message-ID: <20181109234755.21687-1-grygorii.strashko@ti.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri,  9 Nov 2018 17:51:31 -0600
+Subject: [GIT PULL] Qualcomm ARM64 DT Fixes for 4.20-rc1
+Message-ID: <1541807491-13259-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon, All,
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-As was discussed in [1] I'm posting series which introduces rework of
-phy_set_mode to accept phy mode and submode. I've dropped TI specific patches as
-this change is pretty big by itself.
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-Patch 1 is cumulative change which refactors PHY framework code to
-support dual level PHYs mode configuration - PHY mode and PHY submode. It
-extends .set_mode() callback to support additional parameter "int submode"
-and converts all corresponding PHY drivers to support new .set_mode()
-callback declaration.
-The new extended PHY API
- int phy_set_mode_ext(struct phy *phy, enum phy_mode mode, int submode)
-is introduced to support dual level PHYs mode configuration and existing
-phy_set_mode() API is converted to macros, so PHY framework consumers do
-not need to be changed (~21 matches).
+are available in the git repository at:
 
-Patches 2-4: Add new PHY's mode to be used by Ethernet PHY interface drivers or
-multipurpose PHYs like serdes and convert ocelot-serdes and mvebu-cp110-comphy
-PHY drivers to use recently introduced PHY_MODE_ETHERNET and phy_set_mode_ext().
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.20-rc1
 
-Patch 5 - removes unused, ethernet specific phy modes from enum phy_mode.
+for you to fetch changes up to 9134586715e389fe90d9d28cb37a668f374d686a:
 
-Testing:
- - series tested on TI am335x/am437x/am5(dra7) paltforms.
- - other driver build tested.
+  arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP (2018-11-09 17:17:53 -0600)
 
-changes in v2:
-- marvell PHY and net drivers updated as recommended by Russell King
+----------------------------------------------------------------
+Qualcomm ARM64 DT Fixes for 4.20-rc1
 
-v1: https://lkml.org/lkml/2018/11/8/260
+* Fix reserved gpio ranges for SDM845 and MSM8998
 
-[1] https://lkml.org/lkml/2018/10/25/366
+----------------------------------------------------------------
+Bjorn Andersson (2):
+      arm64: dts: sdm845-mtp: Reserve reserved gpios
+      arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP
 
-Grygorii Strashko (5):
-  phy: core: rework phy_set_mode to accept phy mode and submode
-  phy: core: add PHY_MODE_ETHERNET
-  phy: ocelot-serdes: convert to use eth phy mode and submode
-  phy: mvebu-cp110-comphy: convert to use eth phy mode and submode
-  phy: core: clean up unused ethernet specific phy modes
-
- drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c | 19 +-----
- drivers/net/ethernet/mscc/ocelot.c              |  9 +--
- drivers/phy/allwinner/phy-sun4i-usb.c           |  3 +-
- drivers/phy/amlogic/phy-meson-gxl-usb2.c        |  5 +-
- drivers/phy/amlogic/phy-meson-gxl-usb3.c        |  5 +-
- drivers/phy/marvell/phy-mvebu-cp110-comphy.c    | 86 ++++++++++++++-----------
- drivers/phy/mediatek/phy-mtk-tphy.c             |  2 +-
- drivers/phy/mediatek/phy-mtk-xsphy.c            |  2 +-
- drivers/phy/mscc/phy-ocelot-serdes.c            | 16 +++--
- drivers/phy/phy-core.c                          |  6 +-
- drivers/phy/qualcomm/phy-qcom-qmp.c             |  3 +-
- drivers/phy/qualcomm/phy-qcom-qusb2.c           |  3 +-
- drivers/phy/qualcomm/phy-qcom-ufs-qmp-14nm.c    |  3 +-
- drivers/phy/qualcomm/phy-qcom-ufs-qmp-20nm.c    |  3 +-
- drivers/phy/qualcomm/phy-qcom-usb-hs.c          |  3 +-
- drivers/phy/ti/phy-da8xx-usb.c                  |  3 +-
- drivers/phy/ti/phy-tusb1210.c                   |  2 +-
- include/linux/phy/phy.h                         | 18 ++++--
- 18 files changed, 100 insertions(+), 91 deletions(-)
-
--- 
-2.10.5
+ arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi | 4 ++++
+ arch/arm64/boot/dts/qcom/sdm845-mtp.dts   | 4 ++++
+ 2 files changed, 8 insertions(+)
