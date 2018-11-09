@@ -1,45 +1,54 @@
-From: steve@steve-m.de (Steve Markgraf)
-Date: Fri, 9 Nov 2018 21:58:12 +0100
-Subject: usbfs zerocopy broken on ARM/ARM64
-In-Reply-To: <20181107123111.GU30658@n2100.armlinux.org.uk>
-References: <efda634a-ead8-2dfd-ffa1-1c94f970a0a5@steve-m.de>
- <20181107123111.GU30658@n2100.armlinux.org.uk>
-Message-ID: <465978ed-6b26-d1cf-fb14-0cb7d5defcba@steve-m.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 9 Nov 2018 22:13:50 +0100
+Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
+In-Reply-To: <ef94c2cb-4573-211d-f69e-57bf90a80e6a@android.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-8-vincenzo.frascino@arm.com>
+ <CAK8P3a1w=GBcYk2OaVNzfagMMeD_zdBK3G16BSYjFANKdSAezQ@mail.gmail.com>
+ <ef94c2cb-4573-211d-f69e-57bf90a80e6a@android.com>
+Message-ID: <CAK8P3a0aPkbTUusK7=1Y49dSiM+X9hUkdbWZCTm3pmRx6N4rag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.11.18 13:31, Russell King - ARM Linux wrote:
->> From what I read so far I got the impression that the 'proper' way would
->> be to use dma_mmap_coherent() with dma_addr instead of
->> remap_pfn_range(), however, I did not get it to work. Can anyone help
->> out?
-> 
-> That is correct.  Please show what you tried.  Thanks.
+On Fri, Nov 9, 2018 at 6:23 PM Mark Salyzyn <salyzyn@android.com> wrote:
+> On 11/09/2018 08:13 AM, Arnd Bergmann wrote:
+> >> diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
+> >> index beca249bc2f3..9de0ffc369c5 100644
+> >> --- a/arch/arm64/kernel/vdso/vdso.lds.S
+> >> +++ b/arch/arm64/kernel/vdso/vdso.lds.S
+> >> @@ -88,6 +88,7 @@ VERSION
+> >>                  __kernel_gettimeofday;
+> >>                  __kernel_clock_gettime;
+> >>                  __kernel_clock_getres;
+> >> +               __kernel_time;
+> >>          local: *;
+> >>          };
+> >>   }
+> > I would  prefer to not add any deprecated interfaces in the VDSO. If we
+> > have the 64-bit version of clock_gettime, we don't need the 32-bit version
+> > of it, and we don't need gettimeofday() or time() either. The C library
+> > can easily implement those by calling into clock_gettime.
+>
+> Alas time() calls are simple and in the order of get_res, the cost of
+> which is a five fold improvement over the alternate higher resolution calls
+> (clock_gettime or up to 100 fold on some architectures over gettimeofday).
+>
+> We could measure a small improvement in cpu utilization (and thus
+>  battery life by extension) attributed to arm64 Android by calling
+> __kernel_time over __kernel_clock_gettime with coarse resolution.
+>
+> A game of inches admittedly, but super KISS to add, and it is not as-if
+> __kernel_time existence will cause an issue with deprecation of a system
+> call entry point.
 
-Thanks for the clarification. I now debugged it further and it turned
-out I was using the wrong device pointer. Now it is working for both ARM
-and x86 with:
+But wouldn't it be much better to fix the application in that case?
+I can't see any reason why a user would call time() so often that
+it shows up in CPU profiles, when the result only changes every
+few billion CPU cycles.
 
-> dma_mmap_coherent(ps->dev->bus->sysdev, vma, mem, dma_handle, size);
+Moreover, most architectures cannot return a time64_t from a
+system call today, so we'd have to change the system call
+entry points on all of those first to implement the slowpath
+for a new time64() system call.
 
-However, on x86 I get warnings in the Kernel log:
-
-> x86/PAT: rtl_test:4018 map pfn RAM range req uncached-minus for
-> [mem >0x34bc0000-0x34bfffff], got write-back
-
-Another user of dma_mmap_coherent(), sound/core/pcm_native.c, only uses
-it for arch != x86 for that reason:
-
-> #ifndef CONFIG_X86 /* for avoiding warnings arch/x86/mm/pat.c */
-
-Since the original code is working fine on x86, probably that would be
-the way to go for the usbfs code as well.
-And as the previous posters pointed out, hcd_buffer_alloc() can use
-kmalloc() for PIO-based USB controllers, but in this case sets the
-dma_handle to ~0, so we could check for this and only use
-dma_mmap_coherent() if that's not the case.
-
-If that's correct, I'll prepare a patch.
-
-Regards,
-Steve
+      Arnd
