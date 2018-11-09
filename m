@@ -1,25 +1,20 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Fri, 9 Nov 2018 10:12:37 +0530
-Subject: arm64 + ARM64_64K_PAGES=y
-In-Reply-To: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
-References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
-Message-ID: <5d7cde17-67c4-a222-bd66-b0e85a8725fe@arm.com>
+From: horia.geanta@nxp.com (Horia Geanta)
+Date: Fri, 9 Nov 2018 06:05:24 +0000
+Subject: [PATCH v3 7/9] arm64: defconfig: Enable FSL_MC_BUS and FSL_MC_DPIO
+References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
+ <beb32683-fbd0-fc17-8e71-4f4f51163223@free.fr>
+Message-ID: <VI1PR0402MB3485824A9FB3BC878E7B83D498C60@VI1PR0402MB3485.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/07/2018 03:04 AM, Grygorii Strashko wrote:
-> Hi All,
+On 11/9/2018 3:11 AM, Marc Gonzalez wrote:
+> Commit e8342cc7954e ("enable CAAM crypto engine on QorIQ DPAA2 SoCs")
+> enabled CRYPTO_DEV_FSL_DPAA2_CAAM, which depends on FSL_MC_DPIO,
+> which is not set. Enable FSL_MC_BUS, and build FSL_MC_DPIO and
+> CRYPTO_DEV_FSL_DPAA2_CAAM as modules.
 > 
-> Do anybody tried to use ARM64 RT with 76K pages enabled?
-> 
-> My attempt shows that enabling? CONFIG_ARM64_64K_PAGES=y increases latencies by ~30%
+> Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
+Reviewed-by: Horia Geant? <horia.geanta@nxp.com>
 
-Depends on what the workload is actually doing. 64K pages should help if
-the mapping is multiple of 64K, persistent and accesses patterns are more
-or less linear to be nice with the TLB. 64K can take bit more time if the
-memory requirement is way smaller than 64K in which case latency probably
-can increase just to zero out the single page allocated. Latency can add
-up if this happens on a regular basis. perf report can help find out more
-on this.
+Thanks,
+Horia
