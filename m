@@ -1,47 +1,51 @@
-From: vkoul@kernel.org (Vinod Koul)
-Date: Fri, 9 Nov 2018 12:06:21 +0530
-Subject: [PATCH 2/2] arm64: defconfig: Enable some qcom remoteproc configs
-In-Reply-To: <20181109062727.GB10915@tuxbook-pro>
-References: <20181109061631.8245-1-vkoul@kernel.org>
- <20181109061631.8245-2-vkoul@kernel.org>
- <20181109062727.GB10915@tuxbook-pro>
-Message-ID: <20181109063621.GM12092@vkoul-mobl>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Fri,  9 Nov 2018 20:03:42 +1300
+Subject: [PATCH v6 2/9] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
+In-Reply-To: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
+References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181109070349.20464-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-11-18, 22:27, Bjorn Andersson wrote:
-> On Thu 08 Nov 22:16 PST 2018, Vinod Koul wrote:
-> 
-> > From: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > 
-> > Enable remoteproc configs to boot the remoteprocs on QC chipsets. These
-> > are common configs and not specific to a specific SoC so should be enabled
-> > across the board.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > Signed-off-by: Vinod Koul <vkoul@kernel.org>
-> > ---
-> >  arch/arm64/configs/defconfig | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> > index b02da2e7a39a..b38d92c96c81 100644
-> > --- a/arch/arm64/configs/defconfig
-> > +++ b/arch/arm64/configs/defconfig
-> > @@ -614,9 +614,15 @@ CONFIG_TEGRA_IOMMU_SMMU=y
-> >  CONFIG_ARM_SMMU=y
-> >  CONFIG_ARM_SMMU_V3=y
-> >  CONFIG_QCOM_IOMMU=y
-> > +CONFIG_REMOTEPROC=m
-> > +CONFIG_QCOM_ADSP_PIL=m
-> 
-> This is now CONFIG_QCOM_Q6V5_PAS
-> 
-> > +CONFIG_QCOM_Q6V5_PIL=m
-> 
-> and CONFIG_QCOM_Q6V5_MSS
+From: Jan Luebbe <jlu@pengutronix.de>
 
-Sure I will update this
+The macro name is too generic, so add a AURORA_ prefix.
 
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+---
+ arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
+ arch/arm/mm/cache-l2x0.c                        | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+index c86124769831..dc5c479ec4c3 100644
+--- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
++++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+@@ -41,7 +41,7 @@
+ #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
+ 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+ 
+-#define MAX_RANGE_SIZE		1024
++#define AURORA_MAX_RANGE_SIZE	1024
+ 
+ #define AURORA_WAY_SIZE_SHIFT	2
+ 
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index a00d6f7fd34c..7d2d2a3c67d0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
+ 	 * since cache range operations stall the CPU pipeline
+ 	 * until completion.
+ 	 */
+-	if (end > start + MAX_RANGE_SIZE)
+-		end = start + MAX_RANGE_SIZE;
++	if (end > start + AURORA_MAX_RANGE_SIZE)
++		end = start + AURORA_MAX_RANGE_SIZE;
+ 
+ 	/*
+ 	 * Cache range operations can't straddle a page boundary.
 -- 
-~Vinod
+2.19.1
