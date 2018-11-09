@@ -1,90 +1,38 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Fri,  9 Nov 2018 20:03:43 +1300
-Subject: [PATCH v6 3/9] ARM: aurora-l2: add defines for parity and ECC
- registers
-In-Reply-To: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
-References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181109070349.20464-4-chris.packham@alliedtelesis.co.nz>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 9 Nov 2018 08:28:34 +0100
+Subject: [PATCH] ASoC: sun8i-codec: fix crash on module removal
+In-Reply-To: <20181109043135.26200-1-anarsoul@gmail.com>
+References: <20181109043135.26200-1-anarsoul@gmail.com>
+Message-ID: <20181109072834.qyjb5rqlepavemhz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Luebbe <jlu@pengutronix.de>
+On Thu, Nov 08, 2018 at 08:31:35PM -0800, Vasily Khoruzhick wrote:
+> drvdata is actually sun8i_codec, not snd_soc_card, so it crashes
+> when calling snd_soc_card_get_drvdata().
+> 
+> Drop card and scodec vars anyway since we don't need to
+> disable/unprepare clocks - it's already done by calling
+> runtime_suspend()
+> 
+> Drop clk_disable_unprepare() calls for the same reason.
+> 
+> Fixes: 36c684936fae7 ("ASoC: Add sun8i digital audio codec")
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-These defines will be used by subsequent patches to add support for the
-parity check and error correction functionality in the Aurora L2 cache
-controller.
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
- .../include/asm/hardware/cache-aurora-l2.h    | 48 +++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Thanks!
+Maxime
 
-diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-index dc5c479ec4c3..39769ffa0051 100644
---- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
-+++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-@@ -31,6 +31,9 @@
- #define AURORA_ACR_REPLACEMENT_TYPE_SEMIPLRU \
- 	(3 << AURORA_ACR_REPLACEMENT_OFFSET)
- 
-+#define AURORA_ACR_PARITY_EN	(1 << 21)
-+#define AURORA_ACR_ECC_EN	(1 << 20)
-+
- #define AURORA_ACR_FORCE_WRITE_POLICY_OFFSET	0
- #define AURORA_ACR_FORCE_WRITE_POLICY_MASK	\
- 	(0x3 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
-@@ -41,6 +44,51 @@
- #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
- 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
- 
-+#define AURORA_ERR_CNT_REG          0x600
-+#define AURORA_ERR_ATTR_CAP_REG     0x608
-+#define AURORA_ERR_ADDR_CAP_REG     0x60c
-+#define AURORA_ERR_WAY_CAP_REG      0x610
-+#define AURORA_ERR_INJECT_CTL_REG   0x614
-+#define AURORA_ERR_INJECT_MASK_REG  0x618
-+
-+#define AURORA_ERR_CNT_CLR_OFFSET         31
-+#define AURORA_ERR_CNT_CLR		   \
-+	(0x1 << AURORA_ERR_CNT_CLR_OFFSET)
-+#define AURORA_ERR_CNT_UE_OFFSET          16
-+#define AURORA_ERR_CNT_UE_MASK             \
-+	(0x7fff << AURORA_ERR_CNT_UE_OFFSET)
-+#define AURORA_ERR_CNT_CE_OFFSET           0
-+#define AURORA_ERR_CNT_CE_MASK             \
-+	(0xffff << AURORA_ERR_CNT_CE_OFFSET)
-+
-+#define AURORA_ERR_ATTR_SRC_OFF           16
-+#define AURORA_ERR_ATTR_SRC_MSK            \
-+	(0x7 << AURORA_ERR_ATTR_SRC_OFF)
-+#define AURORA_ERR_ATTR_TXN_OFF           12
-+#define AURORA_ERR_ATTR_TXN_MSK            \
-+	(0xf << AURORA_ERR_ATTR_TXN_OFF)
-+#define AURORA_ERR_ATTR_ERR_OFF            8
-+#define AURORA_ERR_ATTR_ERR_MSK            \
-+	(0x3 << AURORA_ERR_ATTR_ERR_OFF)
-+#define AURORA_ERR_ATTR_CAP_VALID_OFF      0
-+#define AURORA_ERR_ATTR_CAP_VALID          \
-+	(0x1 << AURORA_ERR_ATTR_CAP_VALID_OFF)
-+
-+#define AURORA_ERR_ADDR_CAP_ADDR_MASK 0xffffffe0
-+
-+#define AURORA_ERR_WAY_IDX_OFF             8
-+#define AURORA_ERR_WAY_IDX_MSK             \
-+	(0xfff << AURORA_ERR_WAY_IDX_OFF)
-+#define AURORA_ERR_WAY_CAP_WAY_OFFSET      1
-+#define AURORA_ERR_WAY_CAP_WAY_MASK        \
-+	(0xf << AURORA_ERR_WAY_CAP_WAY_OFFSET)
-+
-+#define AURORA_ERR_INJECT_CTL_ADDR_MASK 0xfffffff0
-+#define AURORA_ERR_ATTR_TXN_OFF   12
-+#define AURORA_ERR_INJECT_CTL_EN_MASK          0x3
-+#define AURORA_ERR_INJECT_CTL_EN_PARITY        0x2
-+#define AURORA_ERR_INJECT_CTL_EN_ECC           0x1
-+
- #define AURORA_MAX_RANGE_SIZE	1024
- 
- #define AURORA_WAY_SIZE_SHIFT	2
 -- 
-2.19.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/2ba2f054/attachment.sig>
