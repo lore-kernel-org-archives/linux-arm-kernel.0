@@ -1,125 +1,52 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Fri, 09 Nov 2018 22:04:47 +0800
-Subject: [PATCH v4 03/10] phy: sun4i-usb: add support for H6 USB2 PHY
-In-Reply-To: <bf2ec3ca-b823-4861-2d40-04227db61e49@ti.com>
-References: <20181004122855.22981-1-icenowy@aosc.io>
- <20181004122855.22981-4-icenowy@aosc.io>
- <9cca3453d646f38793df411c4471d062769b4f72.camel@aosc.io>
- <bf2ec3ca-b823-4861-2d40-04227db61e49@ti.com>
-Message-ID: <95bd076d865d046b6ba6a929eb7a5ade50c05417.camel@aosc.io>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Fri, 9 Nov 2018 14:53:01 +0100
+Subject: [PATCH v2] ARM: module: Fix function kallsyms on Thumb-2
+In-Reply-To: <20181102135322.GA5289@linux-8ccs>
+References: <20181031084253.9650-1-vincent.whitchurch@axis.com>
+ <20181031155341.GA27878@linux-8ccs>
+ <20181101152913.r2isskngiahi6o2u@axis.com>
+ <20181102135322.GA5289@linux-8ccs>
+Message-ID: <20181109135300.3tyord6amvd7wy54@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2018-11-02?? 14:13 +0530?Kishon Vijay Abraham I???
-> 
-> On 02/11/18 2:11 PM, Icenowy Zheng wrote:
-> > ? 2018-10-04?? 20:28 +0800?Icenowy Zheng???
-> > > The USB 2.0 PHY on Allwinner H6 SoC is similar to older Allwinner
-> > > SoCs,
-> > > with some USB0 quirk like A83T and PHY index 1/2 missing.
-> > > 
-> > > Add support for it.
-> > > 
-> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+On Fri, Nov 02, 2018 at 02:53:22PM +0100, Jessica Yu wrote:
+> +++ Vincent Whitchurch [01/11/18 16:29 +0100]:
+> > On Wed, Oct 31, 2018 at 04:53:41PM +0100, Jessica Yu wrote:
+> > > Could this be done in modpost? I'm guessing the answer is no as some
+> > > relocations may rely on that bit being set in st_value, right?
+> > > Therefore we can only clear the bit _after_ relocations to the module
+> > > are applied at runtime, correct?
 > > 
-> > Excuse me.
+> > Yes, that's correct, it needs to be done after the relocations.
 > > 
-> > Kishon, could you check PATCH 1~3 and queue them?
+> > > I'm not against having an arch-specific kallsyms fixup function, my
+> > > only concern would be if this would interfere with the delayed
+> > > relocations livepatching does, if there are plans in the future to
+> > > have livepatching on arm (IIRC there was an attempt at a port in
+> > > 2016). If there exists some Thumb-2 relocation types that rely on that
+> > > lowest bit in st_value being set in order to be applied, and we clear
+> > > it permanently from the symtab, then livepatching wouldn't be able to
+> > > apply those types of relocations anymore. If this is a legitimate
+> > > concern, then perhaps an alternative solution would be to have an
+> > > arch-specific kallsyms symbol-value-fixup function for accesses to
+> > > sym.st_value, without modifying the module symtab.
 > > 
-> > Even if USB3 support is pending, USB2 support will still be useful,
-> > and
-> > they're independent.
+> > I'm not familiar with livepatching, but yes, if it needs to do
+> > relocations later I guess we should preserve the original value.
 > 
-> I'll queue once -rc1 is tagged.
+> Yeah, I think the symtab needs to remain unmodified for livepatch to
+> be able to do delayed relocations after module load.
+> 
+> > I gave the alternative solution a go and it seems to work.
+> > add_kallsyms() currently overwrites st_info so I had to move the
+> > elf_type to the unused st_other field instead to preserve st_info:
+> 
+> I think that's fine, I think the only usages of st_other I've found
+> are during relocations, and the field is big enough for a char, so it
+> should be fine to reuse it afterwards.
 
-Ping.
-
-4.20-rc1 is out now.
-
-> 
-> Thanks
-> Kishon
-> 
-> > > ---
-> > > No changes in v4.
-> > > 
-> > > Changes in v3:
-> > > - Added Chen-Yu's Review tag.
-> > > 
-> > >  drivers/phy/allwinner/phy-sun4i-usb.c | 19 +++++++++++++++++--
-> > >  1 file changed, 17 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c
-> > > b/drivers/phy/allwinner/phy-sun4i-usb.c
-> > > index 881078ff73f6..ae16854a770a 100644
-> > > --- a/drivers/phy/allwinner/phy-sun4i-usb.c
-> > > +++ b/drivers/phy/allwinner/phy-sun4i-usb.c
-> > > @@ -115,6 +115,7 @@ enum sun4i_usb_phy_type {
-> > >  	sun8i_r40_phy,
-> > >  	sun8i_v3s_phy,
-> > >  	sun50i_a64_phy,
-> > > +	sun50i_h6_phy,
-> > >  };
-> > >  
-> > >  struct sun4i_usb_phy_cfg {
-> > > @@ -295,7 +296,8 @@ static int sun4i_usb_phy_init(struct phy
-> > > *_phy)
-> > >  		return ret;
-> > >  	}
-> > >  
-> > > -	if (data->cfg->type == sun8i_a83t_phy) {
-> > > +	if (data->cfg->type == sun8i_a83t_phy ||
-> > > +	    data->cfg->type == sun50i_h6_phy) {
-> > >  		if (phy->index == 0) {
-> > >  			val = readl(data->base + data->cfg-
-> > > > phyctl_offset);
-> > >  			val |= PHY_CTL_VBUSVLDEXT;
-> > > @@ -344,7 +346,8 @@ static int sun4i_usb_phy_exit(struct phy
-> > > *_phy)
-> > >  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
-> > >  
-> > >  	if (phy->index == 0) {
-> > > -		if (data->cfg->type == sun8i_a83t_phy) {
-> > > +		if (data->cfg->type == sun8i_a83t_phy ||
-> > > +		    data->cfg->type == sun50i_h6_phy) {
-> > >  			void __iomem *phyctl = data->base +
-> > >  				data->cfg->phyctl_offset;
-> > >  
-> > > @@ -959,6 +962,17 @@ static const struct sun4i_usb_phy_cfg
-> > > sun50i_a64_cfg = {
-> > >  	.phy0_dual_route = true,
-> > >  };
-> > >  
-> > > +static const struct sun4i_usb_phy_cfg sun50i_h6_cfg = {
-> > > +	.num_phys = 4,
-> > > +	.type = sun50i_h6_phy,
-> > > +	.disc_thresh = 3,
-> > > +	.phyctl_offset = REG_PHYCTL_A33,
-> > > +	.dedicated_clocks = true,
-> > > +	.enable_pmu_unk1 = true,
-> > > +	.phy0_dual_route = true,
-> > > +	.missing_phys = BIT(1) | BIT(2),
-> > > +};
-> > > +
-> > >  static const struct of_device_id sun4i_usb_phy_of_match[] = {
-> > >  	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data =
-> > > &sun4i_a10_cfg },
-> > >  	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data =
-> > > &sun5i_a13_cfg },
-> > > @@ -972,6 +986,7 @@ static const struct of_device_id
-> > > sun4i_usb_phy_of_match[] = {
-> > >  	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data =
-> > > &sun8i_v3s_cfg },
-> > >  	{ .compatible = "allwinner,sun50i-a64-usb-phy",
-> > >  	  .data = &sun50i_a64_cfg},
-> > > +	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data =
-> > > &sun50i_h6_cfg },
-> > >  	{ },
-> > >  };
-> > >  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+If livepatch can do relocations later, doesn't that mean that we _can't_
+reuse st_other for storing the elf_type?  OTOH, the current code
+overwrites st_info, and I see that used from various archs' relocation
+functions too, so perhaps I'm missing something.
