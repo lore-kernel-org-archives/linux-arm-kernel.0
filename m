@@ -1,49 +1,30 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Fri,  9 Nov 2018 16:24:48 +0800
-Subject: [PATCH RFC 3/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
- and improve debugging
-In-Reply-To: <20181109082448.150302-1-drinkcat@chromium.org>
-References: <20181109082448.150302-1-drinkcat@chromium.org>
-Message-ID: <20181109082448.150302-4-drinkcat@chromium.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 9 Nov 2018 09:46:02 +0100
+Subject: [PATCH v3 0/8] BL035-RGB-002 3.5" LCD sunxi DRM support
+In-Reply-To: <20181107181843.27628-1-contact@paulk.fr>
+References: <20181107181843.27628-1-contact@paulk.fr>
+Message-ID: <20181109084602.ujftkglypwk2tbsi@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For level 1 pages, use __get_dma32_pages to make sure physical
-memory address is 32-bit.
+On Wed, Nov 07, 2018 at 07:18:35PM +0100, Paul Kocialkowski wrote:
+> The series adds support for the BL035-RGB-002 LCD panel and the required
+> device-tree bindings for using it on the BananaPi M1.
+> 
+> Only the changes related to the DRM driver and the panel are submitted
+> for merge, which does not include the two final commits.
 
-For level 2 pages, kmem_cache_zalloc with GFP_DMA has been modified
-in a previous patch to be allocated in DMA32 zone.
+I pushed the first three patches, thanks!
+Maxime
 
-Also, print an error when the physical address does not fit in
-32-bit, to make debugging easier in the future.
-
-Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
- drivers/iommu/io-pgtable-arm-v7s.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-index 445c3bde04800c..862fd404de84d8 100644
---- a/drivers/iommu/io-pgtable-arm-v7s.c
-+++ b/drivers/iommu/io-pgtable-arm-v7s.c
-@@ -198,13 +198,15 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
- 	void *table = NULL;
- 
- 	if (lvl == 1)
--		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
-+		table = (void *)__get_dma32_pages(__GFP_ZERO, get_order(size));
- 	else if (lvl == 2)
- 		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
- 	phys = virt_to_phys(table);
--	if (phys != (arm_v7s_iopte)phys)
-+	if (phys != (arm_v7s_iopte)phys) {
- 		/* Doesn't fit in PTE */
-+		dev_err(dev, "Page table does not fit: %pa", &phys);
- 		goto out_free;
-+	}
- 	if (table && !(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
- 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, dma))
 -- 
-2.19.1.930.g4563a0d9d0-goog
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/7eb664b9/attachment.sig>
