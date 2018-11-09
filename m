@@ -1,37 +1,77 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu,  8 Nov 2018 20:24:19 -0800
-Subject: [PATCH v7 1/4] ASoC: sun8i-codec: add missing route for ADC
+Date: Thu,  8 Nov 2018 20:24:22 -0800
+Subject: [PATCH v7 4/4] arm64: dts: allwinner: a64: enable sound on Pinebook
 In-Reply-To: <20181109042422.25653-1-anarsoul@gmail.com>
 References: <20181109042422.25653-1-anarsoul@gmail.com>
-Message-ID: <20181109042422.25653-2-anarsoul@gmail.com>
+Message-ID: <20181109042422.25653-5-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun8i-codec misses a route from ADC to AIF1 Slot 0 ADC. Add it
-to the driver to avoid adding it to every dts.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pinebook
 
-Fixes: eda85d1fee05d ("ASoC: sun8i-codec: Add ADC support for a33")
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- sound/soc/sunxi/sun8i-codec.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 40 +++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index c4196d4e5915..92c5de026c43 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -481,7 +481,11 @@ static const struct snd_soc_dapm_route sun8i_codec_dapm_routes[] = {
- 	{ "Right Digital DAC Mixer", "AIF1 Slot 0 Digital DAC Playback Switch",
- 	  "AIF1 Slot 0 Right"},
- 
--	/* ADC routes */
-+	/* ADC Routes */
-+	{ "AIF1 Slot 0 Right ADC", NULL, "ADC" },
-+	{ "AIF1 Slot 0 Left ADC", NULL, "ADC" },
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 77fac84797e9..ec4dd9877355 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -64,6 +64,23 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+ 	};
 +
-+	/* ADC Mixer Routes */
- 	{ "Left Digital ADC Mixer", "AIF1 Data Digital ADC Capture Switch",
- 	  "AIF1 Slot 0 Left ADC" },
- 	{ "Right Digital ADC Mixer", "AIF1 Data Digital ADC Capture Switch",
++	speaker_amp: speaker_amp {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++	};
++};
++
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
+ };
+ 
+ &ehci0 {
+@@ -267,6 +284,29 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
+ };
+ 
++&sound {
++	status = "okay";
++	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
++				    "Microphone", "Internal Microphone Right",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"INL", "LINEOUT",
++			"INR", "LINEOUT",
++			"Internal Speaker", "OUTL",
++			"Internal Speaker", "OUTR",
++			"Headphone Jack", "HP",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Internal Microphone Left", "MBIAS",
++			"MIC1", "Internal Microphone Left",
++			"Internal Microphone Right", "HBIAS",
++			"MIC2", "Internal Microphone Right";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.19.1
