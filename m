@@ -1,37 +1,42 @@
-From: christianshewitt@gmail.com (Christian Hewitt)
-Date: Fri, 9 Nov 2018 13:44:01 -0500
-Subject: [PATCH v3 1/3] dt-bindings: Add vendor prefix for Smartlabs LLC
-In-Reply-To: <ae4a4f99-eecc-7a71-5007-d171449c8619@suse.de>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-2-git-send-email-christianshewitt@gmail.com>
- <ae4a4f99-eecc-7a71-5007-d171449c8619@suse.de>
-Message-ID: <5327F4D2-7348-4D5F-A077-D66D4ACB7553@gmail.com>
+From: florian.kauer@koalo.de (Florian Kauer)
+Date: Fri, 9 Nov 2018 19:48:02 +0100
+Subject: [PATCH 0/3] Fix MODULE_LICENSE of bcm2835 drivers
+In-Reply-To: <815844594.141792.1541616607053@email.ionos.de>
+References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
+ <815844594.141792.1541616607053@email.ionos.de>
+Message-ID: <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 Nov 2018, at 1:29 pm, Andreas F?rber <afaerber@suse.de> wrote:
-> 
->> Smartlabs LLC are a professional integrator of Interactive TV solutions
->> and IPTV/VOD devices (https://www.smartlabs.tv/en/about/).
->> 
->> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
->> ---
->> Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> index 4b1a2a8..c424fe0 100644
->> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
->> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
->> @@ -357,6 +357,7 @@ sirf	SiRF Technology, Inc.
->> sis	Silicon Integrated Systems Corp.
->> sitronix	Sitronix Technology Corporation
->> skyworks	Skyworks Solutions, Inc.
->> +smartlabs	Smartlabs LLC
-> 
-> You added the LLC but did not upper-case the L - intentional?
+Sorry for not replying in time. I became father recently ;-)
+So if it is still relevant:
+Acked-by: Florian Kauer <florian.kauer@koalo.de>
 
-Not intentional. I?ll correct this (and another mention in the dts) in v4.
-
-Christian
+On 07.11.2018 19:50, Stefan Wahren wrote:
+> Hi Mark,
+> hi Vinod,
+> 
+>> Stefan Wahren <stefan.wahren@i2se.com> hat am 23. Oktober 2018 um 13:06 geschrieben:
+>>
+>>
+>> In preparation of a treewide switch of all bcm2835 drivers to SPDX tags,
+>> we need to make sure that the license text and MODULE_LICENSE matches.
+>>
+>> This series starts sooner than usual to have more time to collect the authors
+>> ACK.
+>>
+>> Stefan Wahren (3):
+>>    clk: bcm2835: make license text and module license match
+>>    dma: bcm2835: make license text and module license match
+>>    spi: bcm2835: make license text and module license match
+>>
+>>   drivers/clk/bcm/clk-bcm2835-aux.c | 2 +-
+>>   drivers/clk/bcm/clk-bcm2835.c     | 2 +-
+>>   drivers/dma/bcm2835-dma.c         | 2 +-
+>>   drivers/spi/spi-bcm2835.c         | 2 +-
+>>   drivers/spi/spi-bcm2835aux.c      | 2 +-
+>>   5 files changed, 5 insertions(+), 5 deletions(-)
+>>
+> 
+> since i didn't receive any objections from the authors, could you please apply or should i resend with Eric's Reviewed-by?
+> 
