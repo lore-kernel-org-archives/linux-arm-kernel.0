@@ -1,44 +1,48 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Nov 2018 16:58:24 +0100
-Subject: [PATCH v6 5/9] dt-bindings: ARM: document marvell,
- ecc-enable binding
-In-Reply-To: <20181109114818.GB30658@n2100.armlinux.org.uk>
-References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
- <20181109070349.20464-6-chris.packham@alliedtelesis.co.nz>
- <CAK8P3a3PNvBhyQw0bfGxKmxj+KeJB2_TXtDx2R1BpjTCYNqVkA@mail.gmail.com>
- <20181109114818.GB30658@n2100.armlinux.org.uk>
-Message-ID: <CAK8P3a26XmBpG3VzwUgSdd_Xo_S2ezSvA9mjKckRFr9p38j-dg@mail.gmail.com>
+Date: Fri, 9 Nov 2018 17:05:31 +0100
+Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
+In-Reply-To: <20181109123730.8743-7-vincenzo.frascino@arm.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-7-vincenzo.frascino@arm.com>
+Message-ID: <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 9, 2018 at 12:48 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Fri, Nov 09, 2018 at 12:40:06PM +0100, Arnd Bergmann wrote:
-> > On Fri, Nov 9, 2018 at 8:04 AM Chris Packham
-> > <chris.packham@alliedtelesis.co.nz> wrote:
-> > >
-> > > Add documentation for the marvell,ecc-enable and marvell,ecc-disable
-> > > properties which can be used to enable/disable ECC on the Marvell aurora
-> > > cache.
-> > >
-> > > Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> > > ---
-> >
-> > Why do you need both enable and disable? Wouldn't one of them be enough here?
->
-> It isn't an "on when ecc-enable is present, off when not" because the
-> current behaviour is to preserve these bits in the control register.
->
-> If we were to implement it as "if no ecc-enable property, turn off
-> ECC" then that would drastically change the behaviour - systems which
-> were configured for ECC suddenly lose ECC support.
->
-> Since we don't know which have it and which don't, we can't implement
-> the option like that.
+On Fri, Nov 9, 2018 at 1:38 PM Vincenzo Frascino
+<vincenzo.frascino@arm.com> wrote:
+> +/*
+> + * To avoid performance issues __u_vdso (unsigned vdso type) depends
+> + * on the architecture:
+> + * 32 bit only __u_vdso is defined as __u32
+> + * 64 bit plus compat __u_vdso is defined as __u64
+> + */
+> +#ifdef CONFIG_GENERIC_VDSO_32
+> +typedef __u32 __u_vdso;
+> +#else
+> +typedef __u64 __u_vdso;
+> +#endif /* CONFIG_GENERIC_VDSO_32 */
+> +
+>  struct vdso_data {
+> -       __u64 cs_cycle_last;    /* Timebase at clocksource init */
+> -       __u64 raw_time_sec;     /* Raw time */
+> +       __u64 cs_cycle_last;            /* Timebase at clocksource init */
+> +       __u_vdso raw_time_sec;          /* Raw time */
+>         __u64 raw_time_nsec;
+> -       __u64 xtime_clock_sec;  /* Kernel time */
+> +       __u_vdso xtime_clock_sec;       /* Kernel time */
+>         __u64 xtime_clock_nsec;
+> -       __u64 xtime_coarse_sec; /* Coarse time */
+> +       __u_vdso xtime_coarse_sec;      /* Coarse time */
+>         __u64 xtime_coarse_nsec;
+> -       __u64 wtm_clock_sec;    /* Wall to monotonic time */
+> +       __u_vdso wtm_clock_sec;         /* Wall to monotonic time */
 
-What I meant was why we need support force-disabling it. I understand
-that we need to allow leaving it at the boot-time default as well as
-force-enabling it.
+It looks like you change the layout in a way that makes it incompatible between
+32-bit and 64-bit user space. Doesn't that break the compat-vdso code
+for 32-bit?
 
-       Arnd
+It also seems like we need the seconds to be 64-bit wide, at least
+for anything that counts in CLOCK_REALTIME or a related format,
+otherwise we have to change it back for y2038 support.
+
+      Arnd
