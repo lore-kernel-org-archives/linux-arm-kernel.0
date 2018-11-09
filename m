@@ -1,99 +1,20 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 9 Nov 2018 18:06:11 +0000
-Subject: [PATCH v2 3/4] coresight: etm3x: Deal with CLAIM tag before and
- after accessing HW
-In-Reply-To: <CANLsYkxbzk3=uA0Tx6HNNoXGBnDUPAhgnWZM9Q7jqLSzBhDr-g@mail.gmail.com>
-References: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
- <1541632132-1252-4-git-send-email-mathieu.poirier@linaro.org>
- <102c6181-189e-0ce4-02be-15c1a2744334@arm.com>
- <CANLsYkxbzk3=uA0Tx6HNNoXGBnDUPAhgnWZM9Q7jqLSzBhDr-g@mail.gmail.com>
-Message-ID: <0928085c-cf9c-5437-2806-1b027ea428ff@arm.com>
+From: pcc@google.com (Peter Collingbourne)
+Date: Fri, 9 Nov 2018 10:09:55 -0800
+Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
+In-Reply-To: <20181109123730.8743-8-vincenzo.frascino@arm.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-8-vincenzo.frascino@arm.com>
+Message-ID: <CAMn1gO5tmJDXEgAZefcOmp1E2LmG3uqbO7vFwZRxAy2Cny114g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2018 05:59 PM, Mathieu Poirier wrote:
-> On Thu, 8 Nov 2018 at 10:13, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->>
->> Hi,
->>
->> On 07/11/2018 23:08, Mathieu Poirier wrote:
->>> This patch moves access to the CLAIM tag so that no modification to the HW
->>> happens before and after the CLAIM operation has been carried.
->>>
->>> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> ---
->>>    drivers/hwtracing/coresight/coresight-etm3x.c | 16 ++++++++--------
->>>    1 file changed, 8 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
->>> index fd5c4cca7db5..4f638d81a66a 100644
->>> --- a/drivers/hwtracing/coresight/coresight-etm3x.c
->>> +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
->>> @@ -363,15 +363,16 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
->>>
->>>        CS_UNLOCK(drvdata->base);
->>>
->>> +     rc = coresight_claim_device_unlocked(drvdata->base);
->>> +     if (rc)
->>> +             goto done;
->>> +
->>>        /* Turn engine on */
->>>        etm_clr_pwrdwn(drvdata);
->>>        /* Apply power to trace registers */
->>>        etm_set_pwrup(drvdata);
->>>        /* Make sure all registers are accessible */
->>>        etm_os_unlock(drvdata);
->>> -     rc = coresight_claim_device_unlocked(drvdata->base);
->>> -     if (rc)
->>> -             goto done;
->>>
->>>        etm_set_prog(drvdata);
->>>
->>> @@ -422,12 +423,11 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
->>>        etm_clr_prog(drvdata);
->>>
->>>    done:
->>> -     if (rc)
->>> -             etm_set_pwrdwn(drvdata);
->>>        CS_LOCK(drvdata->base);
->>>
->>> -     dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
->>> -             drvdata->cpu, rc);
->>> +     if (!rc)
->>> +             dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
->>> +                     drvdata->cpu, rc);
->>
->> Isn't it good to report the failure case too ? Anyway it is dev_dbg and
->> will be a useful info when we debug issues. Otherwise,
-> 
-> Simply removing the "if (!rc)" will do the trick.  Can I do the
-> modification and add your tag or you prefer to see another revision?
+On Fri, Nov 9, 2018 at 4:38 AM Vincenzo Frascino
+<vincenzo.frascino@arm.com> wrote:
+> -ccflags-y := -shared -fno-common -fno-builtin
+> +ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector
 
-I am fine with that change folded in, no need to respin it.
+This either needs to include -ffixed-x18 or
+https://patchwork.kernel.org/patch/10671685/ needs to appear earlier
+in this series.
 
-> 
->>
->> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-
-Cheers
-Suzuki
-
-
->>
->>>        return rc;
->>>    }
->>>
->>> @@ -577,9 +577,9 @@ static void etm_disable_hw(void *info)
->>>        for (i = 0; i < drvdata->nr_cntr; i++)
->>>                config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
->>>
->>> +     etm_set_pwrdwn(drvdata);
->>>        coresight_disclaim_device_unlocked(drvdata->base);
->>>
->>> -     etm_set_pwrdwn(drvdata);
->>>        CS_LOCK(drvdata->base);
->>>
->>>        dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
->>>
->>
+Peter
