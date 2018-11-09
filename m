@@ -1,43 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Nov 2018 13:29:56 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
-References: <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
- <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
- <87r2fv68us.fsf@linaro.org>
- <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
- <87pnvf63u2.fsf@linaro.org>
- <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
- <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
- <87lg625th2.fsf@linaro.org>
- <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
- <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
-Message-ID: <20181109132955.kqfccmqrugfj5rkl@lakrids.cambridge.arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 09 Nov 2018 22:04:47 +0800
+Subject: [PATCH v4 03/10] phy: sun4i-usb: add support for H6 USB2 PHY
+In-Reply-To: <bf2ec3ca-b823-4861-2d40-04227db61e49@ti.com>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+ <20181004122855.22981-4-icenowy@aosc.io>
+ <9cca3453d646f38793df411c4471d062769b4f72.camel@aosc.io>
+ <bf2ec3ca-b823-4861-2d40-04227db61e49@ti.com>
+Message-ID: <95bd076d865d046b6ba6a929eb7a5ade50c05417.camel@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 12:56:54PM +0000, Peter Maydell wrote:
-> On 9 November 2018 at 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> > I'm not saying anything about *decisions*. I'm saying that we can make
-> > the state consistent by advancing the singlestep state in the same way
-> > that HW does, at the instant it advances the PC.
-> >
-> > i.e. do that in kvm_skip_instr(), as I've done in my local tree.
-> >
-> > That mirrors the HW, and we don't need to special-case any handling for
-> > emulated vs non-emulated instructions.
+? 2018-11-02?? 14:13 +0530?Kishon Vijay Abraham I???
 > 
-> You also need to do it in the "set PC because we're making the guest
-> take an exception" code path, which doesn't go through kvm_skip_instr().
+> On 02/11/18 2:11 PM, Icenowy Zheng wrote:
+> > ? 2018-10-04?? 20:28 +0800?Icenowy Zheng???
+> > > The USB 2.0 PHY on Allwinner H6 SoC is similar to older Allwinner
+> > > SoCs,
+> > > with some USB0 quirk like A83T and PHY index 1/2 missing.
+> > > 
+> > > Add support for it.
+> > > 
+> > > Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > 
+> > Excuse me.
+> > 
+> > Kishon, could you check PATCH 1~3 and queue them?
+> > 
+> > Even if USB3 support is pending, USB2 support will still be useful,
+> > and
+> > they're independent.
+> 
+> I'll queue once -rc1 is tagged.
 
-Sure.
+Ping.
 
-> This corresponds to the two kinds of "step completed" in hardware as
-> noted in DDI0487D.a D2.12.3 fig D2-3 footnote b:
->  * executing the instruction to be stepped without taking an exception
->  * taking an exception to an exception level that debug exceptions
->    are enabled from [ie guest EL1 in our case]
+4.20-rc1 is out now.
 
-Thanks for the pointer!
-
-Mark.
+> 
+> Thanks
+> Kishon
+> 
+> > > ---
+> > > No changes in v4.
+> > > 
+> > > Changes in v3:
+> > > - Added Chen-Yu's Review tag.
+> > > 
+> > >  drivers/phy/allwinner/phy-sun4i-usb.c | 19 +++++++++++++++++--
+> > >  1 file changed, 17 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/phy/allwinner/phy-sun4i-usb.c
+> > > b/drivers/phy/allwinner/phy-sun4i-usb.c
+> > > index 881078ff73f6..ae16854a770a 100644
+> > > --- a/drivers/phy/allwinner/phy-sun4i-usb.c
+> > > +++ b/drivers/phy/allwinner/phy-sun4i-usb.c
+> > > @@ -115,6 +115,7 @@ enum sun4i_usb_phy_type {
+> > >  	sun8i_r40_phy,
+> > >  	sun8i_v3s_phy,
+> > >  	sun50i_a64_phy,
+> > > +	sun50i_h6_phy,
+> > >  };
+> > >  
+> > >  struct sun4i_usb_phy_cfg {
+> > > @@ -295,7 +296,8 @@ static int sun4i_usb_phy_init(struct phy
+> > > *_phy)
+> > >  		return ret;
+> > >  	}
+> > >  
+> > > -	if (data->cfg->type == sun8i_a83t_phy) {
+> > > +	if (data->cfg->type == sun8i_a83t_phy ||
+> > > +	    data->cfg->type == sun50i_h6_phy) {
+> > >  		if (phy->index == 0) {
+> > >  			val = readl(data->base + data->cfg-
+> > > > phyctl_offset);
+> > >  			val |= PHY_CTL_VBUSVLDEXT;
+> > > @@ -344,7 +346,8 @@ static int sun4i_usb_phy_exit(struct phy
+> > > *_phy)
+> > >  	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
+> > >  
+> > >  	if (phy->index == 0) {
+> > > -		if (data->cfg->type == sun8i_a83t_phy) {
+> > > +		if (data->cfg->type == sun8i_a83t_phy ||
+> > > +		    data->cfg->type == sun50i_h6_phy) {
+> > >  			void __iomem *phyctl = data->base +
+> > >  				data->cfg->phyctl_offset;
+> > >  
+> > > @@ -959,6 +962,17 @@ static const struct sun4i_usb_phy_cfg
+> > > sun50i_a64_cfg = {
+> > >  	.phy0_dual_route = true,
+> > >  };
+> > >  
+> > > +static const struct sun4i_usb_phy_cfg sun50i_h6_cfg = {
+> > > +	.num_phys = 4,
+> > > +	.type = sun50i_h6_phy,
+> > > +	.disc_thresh = 3,
+> > > +	.phyctl_offset = REG_PHYCTL_A33,
+> > > +	.dedicated_clocks = true,
+> > > +	.enable_pmu_unk1 = true,
+> > > +	.phy0_dual_route = true,
+> > > +	.missing_phys = BIT(1) | BIT(2),
+> > > +};
+> > > +
+> > >  static const struct of_device_id sun4i_usb_phy_of_match[] = {
+> > >  	{ .compatible = "allwinner,sun4i-a10-usb-phy", .data =
+> > > &sun4i_a10_cfg },
+> > >  	{ .compatible = "allwinner,sun5i-a13-usb-phy", .data =
+> > > &sun5i_a13_cfg },
+> > > @@ -972,6 +986,7 @@ static const struct of_device_id
+> > > sun4i_usb_phy_of_match[] = {
+> > >  	{ .compatible = "allwinner,sun8i-v3s-usb-phy", .data =
+> > > &sun8i_v3s_cfg },
+> > >  	{ .compatible = "allwinner,sun50i-a64-usb-phy",
+> > >  	  .data = &sun50i_a64_cfg},
+> > > +	{ .compatible = "allwinner,sun50i-h6-usb-phy", .data =
+> > > &sun50i_h6_cfg },
+> > >  	{ },
+> > >  };
+> > >  MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
