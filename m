@@ -1,60 +1,99 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 9 Nov 2018 11:56:44 +0000
-Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
-In-Reply-To: <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
-References: <20181107171031.22573-1-alex.bennee@linaro.org>
- <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
- <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
- <87r2fv68us.fsf@linaro.org>
- <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
- <87pnvf63u2.fsf@linaro.org>
- <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
-Message-ID: <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Fri, 9 Nov 2018 19:57:50 +0800
+Subject: [PATCH RFC 1/3] mm: When CONFIG_ZONE_DMA32 is set,
+ use DMA32 for SLAB_CACHE_DMA
+In-Reply-To: <00afe803-22dd-5a75-70aa-dda0c7752470@suse.cz>
+References: <20181109082448.150302-1-drinkcat@chromium.org>
+ <20181109082448.150302-2-drinkcat@chromium.org>
+ <00afe803-22dd-5a75-70aa-dda0c7752470@suse.cz>
+Message-ID: <CANMq1KB84Lpe_QbiuaKaBOwSsYr9Cis-gv5xpXaV5qjU=ON=7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 02:38:43PM +0000, Peter Maydell wrote:
-> On 8 November 2018 at 14:28, Alex Benn?e <alex.bennee@linaro.org> wrote:
+On Fri, Nov 9, 2018 at 6:43 PM Vlastimil Babka <vbabka@suse.cz> wrote:
+>
+> On 11/9/18 9:24 AM, Nicolas Boichat wrote:
+> > Some callers, namely iommu/io-pgtable-arm-v7s, expect the physical
+> > address returned by kmem_cache_alloc with GFP_DMA parameter to be
+> > a 32-bit address.
 > >
-> > Mark Rutland <mark.rutland@arm.com> writes:
-> >> One problem is that I couldn't spot when we advance the PC for an MMIO
-> >> trap. I presume we do that in the kernel, *after* the MMIO trap, but I
-> >> can't see where that happens.
+> > Instead of adding a separate SLAB_CACHE_DMA32 (and then audit
+> > all the calls to check if they require memory from DMA or DMA32
+> > zone), we simply allocate SLAB_CACHE_DMA cache in DMA32 region,
+> > if CONFIG_ZONE_DMA32 is set.
 > >
-> > Nope it gets done before during decode_hsr in mmio.c:
+> > Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
+> > Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+> > ---
+> >  include/linux/slab.h | 13 ++++++++++++-
+> >  mm/slab.c            |  2 +-
+> >  mm/slub.c            |  2 +-
+> >  3 files changed, 14 insertions(+), 3 deletions(-)
 > >
-> >         /*
-> >          * The MMIO instruction is emulated and should not be re-executed
-> >          * in the guest.
-> >          */
-> >         kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
-> 
-> I think that this attempt to do the PC-advance early is
-> probably an underlying problem that is not helping the
-> code structure here.
-> 
-> An enhancement that's been floated previously is that the
-> MMIO emulation in userspace should be able to report back
-> to KVM "nope, that access should generate a guest synchronous
-> external abort (with ESR_EL1.EA = 0/1)".
-> If we have that, then we definitely need to not advance the
-> PC until after userspace has done the emulation and told
-> us whether the memory access succeeded or not...
+> > diff --git a/include/linux/slab.h b/include/linux/slab.h
+> > index 918f374e7156f4..390afe90c5dec0 100644
+> > --- a/include/linux/slab.h
+> > +++ b/include/linux/slab.h
+> > @@ -30,7 +30,7 @@
+> >  #define SLAB_POISON          ((slab_flags_t __force)0x00000800U)
+> >  /* Align objs on cache lines */
+> >  #define SLAB_HWCACHE_ALIGN   ((slab_flags_t __force)0x00002000U)
+> > -/* Use GFP_DMA memory */
+> > +/* Use GFP_DMA or GFP_DMA32 memory */
+> >  #define SLAB_CACHE_DMA               ((slab_flags_t __force)0x00004000U)
+> >  /* DEBUG: Store the last owner for bug hunting */
+> >  #define SLAB_STORE_USER              ((slab_flags_t __force)0x00010000U)
+> > @@ -126,6 +126,17 @@
+> >  #define ZERO_OR_NULL_PTR(x) ((unsigned long)(x) <= \
+> >                               (unsigned long)ZERO_SIZE_PTR)
+> >
+> > +/*
+> > + * When ZONE_DMA32 is defined, have SLAB_CACHE_DMA allocate memory with
+> > + * GFP_DMA32 instead of GFP_DMA, as this is what some of the callers
+> > + * require (instead of duplicating cache for DMA and DMA32 zones).
+> > + */
+> > +#ifdef CONFIG_ZONE_DMA32
+> > +#define SLAB_CACHE_DMA_GFP GFP_DMA32
+> > +#else
+> > +#define SLAB_CACHE_DMA_GFP GFP_DMA
+> > +#endif
+>
+> AFAICS this will break e.g. x86 which can have both ZONE_DMA and
+> ZONE_DMA32, and now you would make kmalloc(__GFP_DMA) return objects
+> from ZONE_DMA32 instead of __ZONE_DMA, which can break something.
 
-Yup.
+Oh, I was not aware that both ZONE_DMA and ZONE_DMA32 can be defined
+at the same time. I guess the test should be inverted, something like
+this (can be simplified...):
+#ifdef CONFIG_ZONE_DMA
+#define SLAB_CACHE_DMA_GFP GFP_DMA
+#elif defined(CONFIG_ZONE_DMA32)
+#define SLAB_CACHE_DMA_GFP GFP_DMA32
+#else
+#define SLAB_CACHE_DMA_GFP GFP_DMA // ?
+#endif
 
-I think that we absolutely want to do all the CPU state advancement (PC,
-SS bit, etc) at the point we apply the effects of the instruction. Not
-before we emulate the instruction, and not higher/lower in the call
-stack.
+> Also I'm probably missing the point of this all. In patch 3 you use
+> __get_dma32_pages() thus __get_free_pages(__GFP_DMA32), which uses
+> alloc_pages, thus the page allocator directly, and there's no slab
+> caches involved.
 
-We have a big problem in that guest-directed singlestep and
-host-directed singlestep don't compose, and given that host-directed
-singlestep doesn't work reliably today I'd be tempted to rip that out
-until we've fixed guest-directed singlestep.
+__get_dma32_pages fixes level 1 page allocations in the patch 3.
 
-We should have a story for how host-directed debug is handled
-transparently from the PoV of a guest using guest-directed debug.
+This change fixes level 2 page allocations
+(kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA)), by transparently
+remapping GFP_DMA to an underlying ZONE_DMA32.
+
+The alternative would be to create a new SLAB_CACHE_DMA32 when
+CONFIG_ZONE_DMA32 is defined, but then I'm concerned that the callers
+would need to choose between the 2 (GFP_DMA or GFP_DMA32...), and also
+need to use some ifdefs (but maybe that's not a valid concern?).
+
+> It makes little sense to involve slab for page table
+> allocations anyway, as those tend to be aligned to a page size (or
+> high-order page size). So what am I missing?
+
+Level 2 tables are ARM_V7S_TABLE_SIZE(2) => 1kb, so we'd waste 3kb if
+we allocated a full page.
 
 Thanks,
-Mark.
