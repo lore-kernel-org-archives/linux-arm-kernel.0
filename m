@@ -1,92 +1,97 @@
 From: vkoul@kernel.org (Vinod Koul)
-Date: Fri,  9 Nov 2018 15:14:01 +0530
-Subject: [PATCH v5 02/18] arm64: dts: qcom: qcs404-evb: add dts files for EVBs
+Date: Fri,  9 Nov 2018 15:14:03 +0530
+Subject: [PATCH v5 04/18] arm64: dts: qcom: qcs404: Add RPM GLINK related nodes
 In-Reply-To: <20181109094417.12109-1-vkoul@kernel.org>
 References: <20181109094417.12109-1-vkoul@kernel.org>
-Message-ID: <20181109094417.12109-3-vkoul@kernel.org>
+Message-ID: <20181109094417.12109-5-vkoul@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-QCS404 has two EVBs, EVB-1000 and EVB-4000. These boards are mostly
-similar with few differences in the peripherals used.
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-So use a common qcs404-evb.dtsi which contains the common parts and use
-qcs404-evb-1000.dts and qcs404-evb-4000.dts for diffs
+Add RPM GLINK node and the RPM message ram, hwspinlock, APCS apps global
+and smem nodes it depends on.
 
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Vinod Koul <vkoul@kernel.org>
 ---
- arch/arm64/boot/dts/qcom/Makefile            |  2 ++
- arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts | 11 +++++++++++
- arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts | 11 +++++++++++
- arch/arm64/boot/dts/qcom/qcs404-evb.dtsi     | 14 ++++++++++++++
- 4 files changed, 38 insertions(+)
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+ arch/arm64/boot/dts/qcom/qcs404.dtsi | 44 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
-index a658c07652a7..21d548f02d39 100644
---- a/arch/arm64/boot/dts/qcom/Makefile
-+++ b/arch/arm64/boot/dts/qcom/Makefile
-@@ -8,3 +8,5 @@ dtb-$(CONFIG_ARCH_QCOM)	+= msm8994-angler-rev-101.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= msm8996-mtp.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= msm8998-mtp.dtb
- dtb-$(CONFIG_ARCH_QCOM)	+= sdm845-mtp.dtb
-+dtb-$(CONFIG_ARCH_QCOM)	+= qcs404-evb-1000.dtb
-+dtb-$(CONFIG_ARCH_QCOM)	+= qcs404-evb-4000.dtb
-diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts b/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
-new file mode 100644
-index 000000000000..2c14903d808e
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
-@@ -0,0 +1,11 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, Linaro Limited
+diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+index d40f3923ed69..6bc0925acda9 100644
+--- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
++++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+@@ -114,12 +114,45 @@
+ 		};
+ 	};
+ 
++	rpm-glink {
++		compatible = "qcom,glink-rpm";
 +
-+/dts-v1/;
++		interrupts = <GIC_SPI 168 IRQ_TYPE_EDGE_RISING>;
++		qcom,rpm-msg-ram = <&rpm_msg_ram>;
++		mboxes = <&apcs_glb 0>;
 +
-+#include "qcs404-evb.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. QCS404 EVB 1000";
-+	compatible = "qcom,qcs404-evb";
-+};
-diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts b/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
-new file mode 100644
-index 000000000000..11269ad3de0d
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
-@@ -0,0 +1,11 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, Linaro Limited
-+
-+/dts-v1/;
-+
-+#include "qcs404-evb.dtsi"
-+
-+/ {
-+	model = "Qualcomm Technologies, Inc. QCS404 EVB 4000";
-+	compatible = "qcom,qcs404-evb";
-+};
-diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-new file mode 100644
-index 000000000000..91ecbdf0ecda
---- /dev/null
-+++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-@@ -0,0 +1,14 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (c) 2018, Linaro Limited
-+
-+#include "qcs404.dtsi"
-+
-+/ {
-+	aliases {
-+		serial0 = &blsp1_uart2;
++		rpm_requests: glink-channel {
++			compatible = "qcom,rpm-qcs404";
++			qcom,glink-channels = "rpm_requests";
++		};
 +	};
 +
-+	chosen {
-+		stdout-path = "serial0";
++	smem {
++		compatible = "qcom,smem";
++
++		memory-region = <&smem_region>;
++		qcom,rpm-msg-ram = <&rpm_msg_ram>;
++
++		hwlocks = <&tcsr_mutex 3>;
 +	};
-+};
++
++	tcsr_mutex: hwlock {
++		compatible = "qcom,tcsr-mutex";
++		syscon = <&tcsr_mutex_regs 0 0x1000>;
++		#hwlock-cells = <1>;
++	};
++
+ 	soc: soc at 0 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0xffffffff>;
+ 		compatible = "simple-bus";
+ 
++		rpm_msg_ram: memory at 60000 {
++			compatible = "qcom,rpm-msg-ram";
++			reg = <0x00060000 0x6000>;
++		};
++
+ 		gcc: clock-controller at 1800000 {
+ 			compatible = "qcom,gcc-qcs404";
+ 			reg = <0x01800000 0x80000>;
+@@ -129,6 +162,11 @@
+ 			assigned-clock-rates = <19200000>;
+ 		};
+ 
++		tcsr_mutex_regs: syscon at 1905000 {
++			compatible = "syscon";
++			reg = <0x01905000 0x20000>;
++		};
++
+ 		blsp1_uart2: serial at 78b1000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x078b1000 0x200>;
+@@ -146,6 +184,12 @@
+ 			      <0x0b002000 0x1000>;
+ 		};
+ 
++		apcs_glb: mailbox at b011000 {
++			compatible = "qcom,qcs404-apcs-apps-global", "syscon";
++			reg = <0x0b011000 0x1000>;
++			#mbox-cells = <1>;
++		};
++
+ 		timer at b120000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 2.14.4
