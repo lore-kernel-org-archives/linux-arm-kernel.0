@@ -1,65 +1,44 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 10 Nov 2018 01:27:29 +0900
-Subject: [PATCH v3 1/4] x86/mm: declare check_la57_support() as inline
-In-Reply-To: <20181102112728.GC14602@zn.tnic>
-References: <20181028130945.23581-1-changbin.du@gmail.com>
- <20181028130945.23581-2-changbin.du@gmail.com>
- <20181028140911.21d49629@vmware.local.home>
- <CAK7LNATixykqHqdu5W3NpfXqBXMNsP0OLKjNdsFc_EzJ_diOxA@mail.gmail.com>
- <20181102112728.GC14602@zn.tnic>
-Message-ID: <CAK7LNAQcdpU+_LOYQ8X+4K4sxd3D-+Z7k6BuBjUOJ9LR0j+zfA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 9 Nov 2018 10:30:11 -0600
+Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+In-Reply-To: <CAMuHMdWm2P8fa6d9vLhYtWHBe0uNPj9jfyL1rtmdLixPEi1rUg@mail.gmail.com>
+References: <20181106183609.207702-1-sboyd@kernel.org>
+ <20181106183609.207702-2-sboyd@kernel.org>
+ <efa13e0b-0daf-3bf3-27ba-ed90f15c7dfe@gmail.com>
+ <154169993998.88331.10494065577891939152@swboyd.mtv.corp.google.com>
+ <0f2bb386-ba92-544c-e980-c95309944b22@gmail.com>
+ <CAMuHMdWm2P8fa6d9vLhYtWHBe0uNPj9jfyL1rtmdLixPEi1rUg@mail.gmail.com>
+Message-ID: <CAL_Jsq+VuP6EkObw4wFeqOKoZEd9ktEErQaFfncz-2DfvNhp0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 2, 2018 at 8:28 PM Borislav Petkov <bp@alien8.de> wrote:
+On Fri, Nov 9, 2018 at 4:36 AM Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 >
-> On Mon, Oct 29, 2018 at 10:04:46PM +0900, Masahiro Yamada wrote:
-> > On Mon, Oct 29, 2018 at 3:09 AM Steven Rostedt <rostedt@goodmis.org> wrote:
+> Hi Matthias,
+>
+> On Fri, Nov 9, 2018 at 11:29 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+> > On 08/11/2018 18:58, Stephen Boyd wrote:
+> > > Quoting Matthias Brugger (2018-11-08 00:29:46)
+> > >> On 06/11/2018 19:36, Stephen Boyd wrote:
+> > >>> +int platform_driver_probe_by_of_match_data(struct platform_device *pdev)
+> > >>> +{
+> > >>> +     int (*probe_func)(struct platform_device *pdev);
+> > >>> +
+> > >>> +     probe_func = of_device_get_match_data(&pdev->dev);
+> > >>
+> > >> Shouldn't we check if probe_func is not NULL?
 > > >
-> > > On Sun, 28 Oct 2018 13:09:42 +0000
-> > > Changbin Du <changbin.du@gmail.com> wrote:
-> > >
-> > > > The level4_kernel_pgt is only defined when X86_5LEVEL is enabled.
-> > > > So declare check_la57_support() as inline to make sure the code
-> > > > referring to level4_kernel_pgt is optimized out. This is a preparation
-> > > > for CONFIG_CC_OPTIMIZE_FOR_DEBUGGING.
-> > > >
-> > > > Signed-off-by: Changbin Du <changbin.du@gmail.com>
-> > >
-> > > Reviewed-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> > >
-> > > -- Steve
-> > >
+> > > Is the oops from the NULL pointer deref insufficient?
 > >
-> > Applied to linux-kbuild.
+> > Do you think we should crash the machine if someone uses the call wrongly? Or
+> > should we provide the possibility to error out on the caller side?
 >
-> Next time, before you route a patch through your tree, please get an x86
-> maintainer's ACK first.
+> I believe that would be a bug in the driver, to be discovered ASAP.
+> So yes, please do crash ;-)
 
+Depends on the driver. If it's not needed to get a console out, then
+it should just WARN. Otherwise, you've got to go enable earlycon to
+see the crash. Of course, someone could just as easily stick data in
+here instead of a function ptr and we'll be back to a crash.
 
-I changed my mind, and did not include this in my previous pull request
-because this series is causing many warnings.
-
-Now, it is aiming for v5.0-rc1
-
-So, it is not too late.
-
-If x86 maintainers issue Acked-by,
-I am happy to add it.
-
-
-
-
-> Thx.
->
-> --
-> Regards/Gruss,
->     Boris.
->
-> Good mailing practices for 400: avoid top-posting and trim the reply.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Rob
