@@ -1,38 +1,150 @@
 From: vkoul@kernel.org (Vinod Koul)
-Date: Fri,  9 Nov 2018 15:14:14 +0530
-Subject: [PATCH v5 15/18] arm64: dts: qcom: qcs404: add prng-ee node
+Date: Fri,  9 Nov 2018 15:14:13 +0530
+Subject: [PATCH v5 14/18] arm64: dts: qcom: qcs404: Add remoteproc nodes
 In-Reply-To: <20181109094417.12109-1-vkoul@kernel.org>
 References: <20181109094417.12109-1-vkoul@kernel.org>
-Message-ID: <20181109094417.12109-16-vkoul@kernel.org>
+Message-ID: <20181109094417.12109-15-vkoul@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-RNG hardware in QCS404 features (Execution Environment) EE for
-HLOS to use, add the node for prng-ee for QCS404.
+From: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Add the TrustZone based remoteproc nodes and their glink edges for
+adsp, cdsp and wcss. Enable them for EVB common DTS.
+
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Vinod Koul <vkoul@kernel.org>
 ---
- arch/arm64/boot/dts/qcom/qcs404.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/qcom/qcs404-evb.dtsi | 12 +++++
+ arch/arm64/boot/dts/qcom/qcs404.dtsi     | 93 ++++++++++++++++++++++++++++++++
+ 2 files changed, 105 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+index db035fef67d9..a39924efebe4 100644
+--- a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
++++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+@@ -21,6 +21,18 @@
+ 	};
+ };
+ 
++&remoteproc_adsp {
++	status = "ok";
++};
++
++&remoteproc_cdsp {
++	status = "ok";
++};
++
++&remoteproc_wcss {
++	status = "ok";
++};
++
+ &rpm_requests {
+ 	pms405-regulators {
+ 		compatible = "qcom,rpm-pms405-regulators";
 diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-index 06607419c9d6..c58774bb9698 100644
+index 46fce264c8fe..06607419c9d6 100644
 --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
 +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-@@ -253,6 +253,13 @@
- 			reg = <0x00060000 0x6000>;
- 		};
+@@ -80,6 +80,99 @@
+ 		method = "smc";
+ 	};
  
-+		rng: rng at e3000 {
-+			compatible = "qcom,prng-ee";
-+			reg = <0x000e3000 0x1000>;
-+			clocks = <&gcc GCC_PRNG_AHB_CLK>;
-+			clock-names = "core";
-+		};
++	remoteproc_adsp: remoteproc-adsp {
++		compatible = "qcom,qcs404-adsp-pas";
 +
- 		tlmm: pinctrl at 1000000 {
- 			compatible = "qcom,qcs404-pinctrl";
- 			reg = <0x01000000 0x200000>,
++		interrupts-extended = <&intc GIC_SPI 293 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog", "fatal", "ready",
++				  "handover", "stop-ack";
++
++		clocks = <&xo_board>;
++		clock-names = "xo";
++
++		memory-region = <&adsp_fw_mem>;
++
++		qcom,smem-states = <&adsp_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
++
++		status = "disabled";
++
++		glink-edge {
++			interrupts = <GIC_SPI 289 IRQ_TYPE_EDGE_RISING>;
++
++			qcom,remote-pid = <2>;
++			mboxes = <&apcs_glb 8>;
++
++			label = "adsp";
++		};
++	};
++
++	remoteproc_cdsp: remoteproc-cdsp {
++		compatible = "qcom,qcs404-cdsp-pas";
++
++		interrupts-extended = <&intc GIC_SPI 229 IRQ_TYPE_EDGE_RISING>,
++				      <&cdsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&cdsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&cdsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&cdsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog", "fatal", "ready",
++				  "handover", "stop-ack";
++
++		clocks = <&xo_board>;
++		clock-names = "xo";
++
++		memory-region = <&cdsp_fw_mem>;
++
++		qcom,smem-states = <&cdsp_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
++
++		status = "disabled";
++
++		glink-edge {
++			interrupts = <GIC_SPI 141 IRQ_TYPE_EDGE_RISING>;
++
++			qcom,remote-pid = <5>;
++			mboxes = <&apcs_glb 12>;
++
++			label = "cdsp";
++		};
++	};
++
++	remoteproc_wcss: remoteproc-wcss {
++		compatible = "qcom,qcs404-wcss-pas";
++
++		interrupts-extended = <&intc GIC_SPI 153 IRQ_TYPE_EDGE_RISING>,
++				      <&wcss_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&wcss_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&wcss_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&wcss_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog", "fatal", "ready",
++				  "handover", "stop-ack";
++
++		clocks = <&xo_board>;
++		clock-names = "xo";
++
++		memory-region = <&wlan_fw_mem>;
++
++		qcom,smem-states = <&wcss_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
++
++		status = "disabled";
++
++		glink-edge {
++			interrupts = <GIC_SPI 156 IRQ_TYPE_EDGE_RISING>;
++
++			qcom,remote-pid = <1>;
++			mboxes = <&apcs_glb 16>;
++
++			label = "wcss";
++		};
++	};
++
+ 	reserved-memory {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.14.4
