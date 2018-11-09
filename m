@@ -1,24 +1,64 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 9 Nov 2018 10:43:09 +0100
-Subject: [PATCH v5 1/5] pinctrl: actions: define constructor generic to
- Actions Semi SoC's
-In-Reply-To: <72d4911a-588f-9bf3-4fad-a0b34692ecd4@denx.de>
-References: <20180829082413.2512005-1-sravanhome@gmail.com>
- <20180829082413.2512005-2-sravanhome@gmail.com>
- <20180829152049.GA21136@Mani-XPS-13-9360>
- <7fc376ac-5998-57b6-8989-908d7a0abfd0@gmail.com>
- <72d4911a-588f-9bf3-4fad-a0b34692ecd4@denx.de>
-Message-ID: <CACRpkdZK2No9sBRCwUWv=ieCund78hKvaL=oxmQzg5M-Bnhz0Q@mail.gmail.com>
+From: vkoul@kernel.org (Vinod Koul)
+Date: Fri,  9 Nov 2018 15:13:59 +0530
+Subject: [PATCH v5 00/18]  arm64: dts: qcom: qcs404: Add Device tree nodes
+Message-ID: <20181109094417.12109-1-vkoul@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2018 at 5:43 PM Parthiban Nallathambi <pn@denx.de> wrote:
+This series adds support for various nodes for QCS404-EVB.
 
-> ping on this patch series!
+Based on v4.20-rc1
 
-AFAICT there is some feedback with issues that need to be fixed,
-also the patch should probably need to be rebased on top of
-v4.20-rc1.
+Changes in v5:
+ - Fix warns reported with W=12
+ - Fix comments by Rob
 
-Yours,
-Linus Walleij
+Changes in v4:
+ - correct the v3 post (sent wrong branch)
+
+Changes in v3:
+ - Make the DTS files sorted alphabetcially and by node addresses
+ - Add reviewed by from Bjorn
+ - Split out the DTS files for EVB 1000 and EVB 4000 boards and add common
+   evb dts files for common part
+
+Changes in v2:
+ Fix cpu binding
+
+Bjorn Andersson (7):
+  arm64: dts: qcom: qcs404: Add reserved-memory regions
+  arm64: dts: qcom: qcs404: Add RPM GLINK related nodes
+  arm64: dts: qcom: qcs404: Add PMS405 RPM regulators
+  arm64: dts: qcom: qcs404: Add TLMM pinctrl node
+  arm64: dts: qcom: qcs404: Add sdcc1 node
+  arm64: dts: qcom: qcs404: Add scm firmware node
+  arm64: dts: qcom: qcs404: Add remoteproc nodes
+
+Vinod Koul (11):
+  arm64: dts: qcom: qcs404: add base dts files
+  arm64: dts: qcom: qcs404-evb: add dts files for EVBs
+  arm64: dts: qcom: qcs404: add smp2p nodes
+  arm64: dts: qcom: pms405: add spmi node
+  arm64: dts: qcom: qcs404: add spmi node
+  arm64: dts: qcom: pms405: add rtc node
+  arm64: dts: qcom: pms405: add gpios
+  arm64: dts: qcom: qcs404: add prng-ee node
+  arm64: dts: qcom: qcs404: Add BAM DMA node
+  arm64: dts: qcom: qcs404: Use BAM DMA for serial uart2
+  arm64: dts: qcom: pms405: Add pon and pwrkey nodes
+
+ arch/arm64/boot/dts/qcom/Makefile            |   2 +
+ arch/arm64/boot/dts/qcom/pms405.dtsi         |  55 +++
+ arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts |  11 +
+ arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts |  11 +
+ arch/arm64/boot/dts/qcom/qcs404-evb.dtsi     | 188 ++++++++++
+ arch/arm64/boot/dts/qcom/qcs404.dtsi         | 490 +++++++++++++++++++++++++++
+ 6 files changed, 757 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/pms405.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/qcs404.dtsi
+
+-- 
+2.14.4
