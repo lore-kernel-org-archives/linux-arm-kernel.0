@@ -1,45 +1,64 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 9 Nov 2018 09:31:15 +0800
-Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add support for the Smartlabs
- SML-5442TW
-In-Reply-To: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
-Message-ID: <201811090923.kiVN8vPL%fengguang.wu@intel.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Fri,  9 Nov 2018 10:42:04 +0900
+Subject: [PATCH 1/4] dt-bindings: reset: uniphier: Replace the expression of
+ USB3 with generic peripherals
+In-Reply-To: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1541727727-10821-2-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+Replace the expression of "USB3 glue layer" with the glue layer of the
+generic peripherals to allow other devices to use it. The reset control
+belongs to this glue layer.
 
-Thank you for the patch! Yet something to improve:
-
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.20-rc1 next-20181108]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Christian-Hewitt/dt-bindings-Add-vendor-prefix-for-Smartlabs/20181109-010512
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: arm64-allyesconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:172.1-7 Label or path audio not found
->> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:176.1-13 Label or path aiu_i2s_dma not found
->> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:180.1-9 Label or path i2s_dai not found
-   FATAL ERROR: Syntax error parsing input tree
-
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61776 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/ef520d27/attachment-0001.gz>
+ .../devicetree/bindings/reset/uniphier-reset.txt   | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+index 101743d..f63c511 100644
+--- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
++++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+@@ -120,27 +120,27 @@ Example:
+ 	};
+ 
+ 
+-USB3 core reset
+----------------
++Peripheral core reset in glue layer
++-----------------------------------
+ 
+-USB3 core reset belongs to USB3 glue layer. Before using the core reset,
+-it is necessary to control the clocks and resets to enable this layer.
+-These clocks and resets should be described in each property.
++Some peripheral core reset belongs to its own glue layer. Before using
++this core reset, it is necessary to control the clocks and resets to enable
++this layer. These clocks and resets should be described in each property.
+ 
+ Required properties:
+ - compatible: Should be
+-    "socionext,uniphier-pro4-usb3-reset" - for Pro4 SoC
+-    "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC
+-    "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC
+-    "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC
++    "socionext,uniphier-pro4-usb3-reset" - for Pro4 SoC USB3
++    "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
++    "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
++    "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
+ - #reset-cells: Should be 1.
+ - reg: Specifies offset and length of the register set for the device.
+-- clocks: A list of phandles to the clock gate for USB3 glue layer.
++- clocks: A list of phandles to the clock gate for the glue layer.
+ 	According to the clock-names, appropriate clocks are required.
+ - clock-names: Should contain
+     "gio", "link" - for Pro4 SoC
+     "link"        - for others
+-- resets: A list of phandles to the reset control for USB3 glue layer.
++- resets: A list of phandles to the reset control for the glue layer.
+ 	According to the reset-names, appropriate resets are required.
+ - reset-names: Should contain
+     "gio", "link" - for Pro4 SoC
+-- 
+2.7.4
