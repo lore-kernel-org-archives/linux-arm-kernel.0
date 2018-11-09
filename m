@@ -1,37 +1,32 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 08 Nov 2018 19:20:23 -0800 (PST)
-Subject: [PATCH 0/5] hy: core: rework phy_set_mode to accept phy mode
- and submode
-In-Reply-To: <20181108003617.10334-1-grygorii.strashko@ti.com>
-References: <20181108003617.10334-1-grygorii.strashko@ti.com>
-Message-ID: <20181108.192023.2260722462634716993.davem@davemloft.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 9 Nov 2018 03:35:17 +0000
+Subject: [PATCH V2] arm64/ptrace: add PTRACE_SYSEMU and
+ PTRACE_SYSEMU_SINGLESTEP support
+In-Reply-To: <20181109015320.GA29354@haibo-VirtualBox>
+References: <20181109015320.GA29354@haibo-VirtualBox>
+Message-ID: <20181109033516.GA22432@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Grygorii Strashko <grygorii.strashko@ti.com>
-Date: Wed, 7 Nov 2018 18:36:12 -0600
+On Fri, Nov 09, 2018 at 09:53:28AM +0800, Haibo.Xu wrote:
+> Add PTRACE_SYSEMU and PTRACE_SYSEMU_SINGLESTEP support on arm64.
+> This follows the x86 semantics for invoking ptrace hooks, and has
+> been verified on an arm64 test machine.
+> 
+> This functionality is used by the Gvisor project, for running in
+> ptrace mode. On arm64 we will need ptrace mode rather than kvm mode
+> for situations where we are already running inside a virtual machine
+> (as nested virtualisation will only be available in newer cores).
+> 
+> Signed-off-by: Haibo.Xu <haibo.xu@arm.com>
+> Signed-off-by: Bin.Lu <bin.lu@arm.com>
+> Reviewed-by: Steve Capper <Steve.Capper@arm.com>
+> ---
+>  arch/arm64/include/asm/thread_info.h |  5 ++++-
+>  arch/arm64/include/uapi/asm/ptrace.h |  2 ++
+>  arch/arm64/kernel/ptrace.c           | 17 +++++++++++++++++
+>  3 files changed, 23 insertions(+), 1 deletion(-)
 
-> As was discussed in [1] I'm posting series which introduces rework of
-> phy_set_mode to accept phy mode and submode. I've dropped TI specific patches as
-> this change is pretty big by itself.
-> 
-> Patch 1 is cumulative change which refactors PHY framework code to
-> support dual level PHYs mode configuration - PHY mode and PHY submode. It
-> extends .set_mode() callback to support additional parameter "int submode"
-> and converts all corresponding PHY drivers to support new .set_mode()
-> callback declaration.
-> The new extended PHY API
->  int phy_set_mode_ext(struct phy *phy, enum phy_mode mode, int submode)
-> is introduced to support dual level PHYs mode configuration and existing
-> phy_set_mode() API is converted to macros, so PHY framework consumers do
-> not need to be changed (~21 matches).
-> 
-> Patches 2-4: Add new PHY's mode to be used by Ethernet PHY interface drivers or
-> multipurpose PHYs like serdes and convert ocelot-serdes and mvebu-cp110-comphy
-> PHY drivers to use recently introduced PHY_MODE_ETHERNET and phy_set_mode_ext().
-> 
-> Patch 5 - removes unused, ethernet specific phy modes from enum phy_mode.
-> 
-> [1] https://lkml.org/lkml/2018/10/25/366
+Sorry, but I still don't think this belongs in the arch code.
 
-I guess this will go via Kishon's tree.
+Will
