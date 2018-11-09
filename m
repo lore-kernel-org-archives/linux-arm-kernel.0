@@ -1,107 +1,45 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu,  8 Nov 2018 20:24:21 -0800
-Subject: [PATCH v7 3/4] arm64: dts: allwinner: a64: enable sound on Pine64 and
- SoPine
-In-Reply-To: <20181109042422.25653-1-anarsoul@gmail.com>
-References: <20181109042422.25653-1-anarsoul@gmail.com>
-Message-ID: <20181109042422.25653-4-anarsoul@gmail.com>
+Date: Thu,  8 Nov 2018 20:31:35 -0800
+Subject: [PATCH] ASoC: sun8i-codec: fix crash on module removal
+Message-ID: <20181109043135.26200-1-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables I2S, digital and analog parts of audiocodec on
-Pine64 and SoPine boards.
+drvdata is actually sun8i_codec, not snd_soc_card, so it crashes
+when calling snd_soc_card_get_drvdata().
 
+Drop card and scodec vars anyway since we don't need to
+disable/unprepare clocks - it's already done by calling
+runtime_suspend()
+
+Drop clk_disable_unprepare() calls for the same reason.
+
+Fixes: 36c684936fae7 ("ASoC: Add sun8i digital audio codec")
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-pine64.dts  | 25 +++++++++++++++++++
- .../allwinner/sun50i-a64-sopine-baseboard.dts | 25 +++++++++++++++++++
- 2 files changed, 50 insertions(+)
+ sound/soc/sunxi/sun8i-codec.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index c077b6c1f458..aba40b4c5216 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -75,6 +75,18 @@
- 	};
- };
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index 522a72fde78d..c4196d4e5915 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -605,16 +605,10 @@ static int sun8i_codec_probe(struct platform_device *pdev)
  
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
- &de {
- 	status = "okay";
- };
-@@ -264,6 +276,19 @@
- 	status = "disabled";
- };
+ static int sun8i_codec_remove(struct platform_device *pdev)
+ {
+-	struct snd_soc_card *card = platform_get_drvdata(pdev);
+-	struct sun8i_codec *scodec = snd_soc_card_get_drvdata(card);
+-
+ 	pm_runtime_disable(&pdev->dev);
+ 	if (!pm_runtime_status_suspended(&pdev->dev))
+ 		sun8i_codec_runtime_suspend(&pdev->dev);
  
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"MIC2", "Microphone Jack";
-+};
-+
- /* On Exp and Euler connectors */
- &uart0 {
- 	pinctrl-names = "default";
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index 53fcc9098df3..be45e2a287e1 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -80,6 +80,18 @@
- 	};
- };
+-	clk_disable_unprepare(scodec->clk_module);
+-	clk_disable_unprepare(scodec->clk_bus);
+-
+ 	return 0;
+ }
  
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
-+};
-+
- &de {
- 	status = "okay";
- };
-@@ -164,6 +176,19 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&sound {
-+	status = "okay";
-+	simple-audio-card,widgets = "Microphone", "Microphone Jack",
-+				    "Headphone", "Headphone Jack";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"Headphone Jack", "HP",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"MIC2", "Microphone Jack";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.19.1
