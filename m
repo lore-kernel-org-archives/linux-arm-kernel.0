@@ -1,74 +1,60 @@
-From: Robert.Richter@cavium.com (Richter, Robert)
-Date: Fri, 9 Nov 2018 08:09:28 +0000
-Subject: [PATCH 08/10] irqchip/gic-v3-its: Decouple its initialization
- from gic
-In-Reply-To: <21a0183b-bf4b-1895-d10b-8287dbff930a@arm.com>
-References: <20181107220254.6116-1-rrichter@cavium.com>
- <20181107220254.6116-9-rrichter@cavium.com>
- <21a0183b-bf4b-1895-d10b-8287dbff930a@arm.com>
-Message-ID: <20181109080920.GE4064@rric.localdomain>
+From: maxime.chevallier@bootlin.com (Maxime Chevallier)
+Date: Fri,  9 Nov 2018 09:17:33 +0100
+Subject: [PATCH net] net: mvneta: Don't advertise 2.5G modes
+Message-ID: <20181109081733.24458-1-maxime.chevallier@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.11.18 11:26:02, Julien Thierry wrote:
-> On 07/11/18 22:03, Robert Richter wrote:
+Using 2.5G speed relies on the SerDes lanes being configured
+accordingly. The lanes have to be reconfigured to switch between
+1G and 2.5G, and for now only the bootloader does this configuration.
 
-> >-static int __init its_init(void)
-> >+int __init its_init(void)
-> >  {
-> >      struct its_node *its;
-> >      bool has_v4 = false;
-> >      int err;
-> >
-> >+     if (list_empty(&its_probed))
-> >+             return 0;
-> >+
-> >+     raw_spin_lock(&its_lock);
-> >+redo:
-> >+     list_for_each_entry(its, &its_probed, entry) {
-> >+             list_del_init(&its->entry);
-> >+
-> >+             raw_spin_unlock(&its_lock);
-> >+
-> >+             /* Needs to be called in non-atomic context */
-> >+             err = its_init_one(its);
-> >+             if (err)
-> >+                     its_free(its);
-> >+
-> >+             raw_spin_lock(&its_lock);
-> >+
-> >+             if (!err)
-> >+                     list_add_tail(&its->entry, &its_nodes);
-> >+
-> >+             goto redo;
-> 
-> Again, you're starting a loop only to work on the first element and then
-> restarting the loop.
-> 
-> Just do a while (!list_empty()), and without gotos...
+In the case we add a Comphy driver to handle switching the lanes
+dynamically, it's better for now to stick with supporting only 1G and
+add advertisement for 2.5G once we really are capable of handling both
+speeds without problem.
 
-When writing the code I have looked into an alternative to
-list_for_each_entry() and did not find a better way that works with
-proper locking. list_first_entry() requires the list being non-empty.
-If you set the lock after list_empty() it is not granted the list is
-actual empty. See also my other comment in an earlier mail.
+Since the interface mode is initialy taken from the DT, we want to make
+sure that adding comphy support won't break boards that don't update
+their dtb.
 
--Robert
+Fixes: da58a931f248 ("net: mvneta: Add support for 2500Mbps SGMII")
+Reported-by: Andrew Lunn <andrew@lunn.ch>
+Reported-by: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
+---
+ drivers/net/ethernet/marvell/mvneta.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-> 
-> >+     }
-> >+
-> >+     raw_spin_unlock(&its_lock);
-> >+
-> >      if (list_empty(&its_nodes)) {
-> >              pr_warn("ITS: No ITS available, not enabling LPIs\n");
-> >              return -ENXIO;
-> >      }
-> >
-> >      err = allocate_lpi_tables();
-> >-     if (err)
-> >+     if (err) {
-> >+             pr_warn("ITS: Failed to initialize (%d), not enabling LPIs\n",
-> >+                     err);
-> >              return err;
-> >+     }
+diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+index 5bfd349bf41a..c19ecd153499 100644
+--- a/drivers/net/ethernet/marvell/mvneta.c
++++ b/drivers/net/ethernet/marvell/mvneta.c
+@@ -3343,7 +3343,6 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
+ 	if (state->interface != PHY_INTERFACE_MODE_NA &&
+ 	    state->interface != PHY_INTERFACE_MODE_QSGMII &&
+ 	    state->interface != PHY_INTERFACE_MODE_SGMII &&
+-	    state->interface != PHY_INTERFACE_MODE_2500BASEX &&
+ 	    !phy_interface_mode_is_8023z(state->interface) &&
+ 	    !phy_interface_mode_is_rgmii(state->interface)) {
+ 		bitmap_zero(supported, __ETHTOOL_LINK_MODE_MASK_NBITS);
+@@ -3357,14 +3356,9 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
+ 	/* Asymmetric pause is unsupported */
+ 	phylink_set(mask, Pause);
+ 
+-	/* We cannot use 1Gbps when using the 2.5G interface. */
+-	if (state->interface == PHY_INTERFACE_MODE_2500BASEX) {
+-		phylink_set(mask, 2500baseT_Full);
+-		phylink_set(mask, 2500baseX_Full);
+-	} else {
+-		phylink_set(mask, 1000baseT_Full);
+-		phylink_set(mask, 1000baseX_Full);
+-	}
++	/* Half-duplex at speeds higher than 100Mbit is unsupported */
++	phylink_set(mask, 1000baseT_Full);
++	phylink_set(mask, 1000baseX_Full);
+ 
+ 	if (!phy_interface_mode_is_8023z(state->interface)) {
+ 		/* 10M and 100M are only supported in non-802.3z mode */
+-- 
+2.11.0
