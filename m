@@ -1,39 +1,38 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Fri,  9 Nov 2018 12:37:28 +0000
-Subject: [PATCH 25/27] clock: csrc-4k: Add support for vdso_direct
-In-Reply-To: <20181109123730.8743-1-vincenzo.frascino@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
-Message-ID: <20181109123730.8743-26-vincenzo.frascino@arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 9 Nov 2018 12:56:54 +0000
+Subject: [RFC PATCH] KVM: arm64: don't single-step for non-emulated faults
+In-Reply-To: <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
+References: <20181107171031.22573-1-alex.bennee@linaro.org>
+ <20181107180120.urnvkcrkh46ytsdb@lakrids.cambridge.arm.com>
+ <20181107180829.sex54bxhd5wyqvan@lakrids.cambridge.arm.com>
+ <87r2fv68us.fsf@linaro.org>
+ <20181108135122.llmfsel32dbe2q7o@lakrids.cambridge.arm.com>
+ <87pnvf63u2.fsf@linaro.org>
+ <CAFEAcA9v+XvAJBWpDMvEQPeJ7ALM15Yz5KY+wfGPmLG2a8yPRQ@mail.gmail.com>
+ <20181109115644.f4qjqnv2kogoke42@lakrids.cambridge.arm.com>
+ <87lg625th2.fsf@linaro.org>
+ <20181109124930.axelmyohmrcb63b4@lakrids.cambridge.arm.com>
+Message-ID: <CAFEAcA-xuUPukf9EPeetr_+RSU7FPDMXmyk3zbjY=FcV65CF=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a consequence of the introduction of vdso_direct on mips
-architectures.
+On 9 November 2018 at 12:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> I'm not saying anything about *decisions*. I'm saying that we can make
+> the state consistent by advancing the singlestep state in the same way
+> that HW does, at the instant it advances the PC.
+>
+> i.e. do that in kvm_skip_instr(), as I've done in my local tree.
+>
+> That mirrors the HW, and we don't need to special-case any handling for
+> emulated vs non-emulated instructions.
 
-If the clock source is selected, vdso_direct is set to true.
+You also need to do it in the "set PC because we're making the guest
+take an exception" code path, which doesn't go through kvm_skip_instr().
+This corresponds to the two kinds of "step completed" in hardware as
+noted in DDI0487D.a D2.12.3 fig D2-3 footnote b:
+ * executing the instruction to be stepped without taking an exception
+ * taking an exception to an exception level that debug exceptions
+   are enabled from [ie guest EL1 in our case]
 
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: Paul Burton <paul.burton@mips.com>
-Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
----
- arch/mips/kernel/csrc-r4k.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/mips/kernel/csrc-r4k.c b/arch/mips/kernel/csrc-r4k.c
-index eed099f35bf1..97e2a8aafdd6 100644
---- a/arch/mips/kernel/csrc-r4k.c
-+++ b/arch/mips/kernel/csrc-r4k.c
-@@ -77,8 +77,10 @@ int __init init_r4k_clocksource(void)
- 	 * R2 onwards makes the count accessible to user mode so it can be used
- 	 * by the VDSO (HWREna is configured by configure_hwrena()).
- 	 */
--	if (cpu_has_mips_r2_r6 && rdhwr_count_usable())
-+	if (cpu_has_mips_r2_r6 && rdhwr_count_usable()) {
-+		clocksource_mips.archdata.vdso_direct = true;
- 		clocksource_mips.archdata.vdso_clock_mode = VDSO_CLOCK_R4K;
-+	}
- 
- 	clocksource_register_hz(&clocksource_mips, mips_hpt_frequency);
- 
--- 
-2.19.1
+thanks
+-- PMM
