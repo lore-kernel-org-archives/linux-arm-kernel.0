@@ -1,38 +1,30 @@
 From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Fri, 9 Nov 2018 02:01:13 +0100
-Subject: [PATCH v3 3/9] arm64: defconfig: Drop NF_CONNTRACK_IPV{4,6}
+Date: Fri, 9 Nov 2018 02:03:55 +0100
+Subject: [PATCH v3 6/9] arm64: defconfig: Drop redundant SND_SOC_ROCKCHIP_I2S
 In-Reply-To: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
 References: <49a5d199-4eeb-a7c2-b539-13356162547f@free.fr>
-Message-ID: <189efc09-0863-11b5-2983-f27530176307@free.fr>
+Message-ID: <f893ee9c-210e-8dc2-8660-fc9a9b2a567a@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a0ae2562c6c4 ("netfilter: conntrack: remove l3proto abstraction")
-folded NF_CONNTRACK_IPV4 and NF_CONNTRACK_IPV6 into NF_CONNTRACK.
+SND_SOC_ROCKCHIP_RT5645 selects SND_SOC_ROCKCHIP_I2S
 
 Signed-off-by: Marc Gonzalez <marc.w.gonzalez@free.fr>
 ---
- arch/arm64/configs/defconfig | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/configs/defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 8d6878c1e794..58741c07a6ef 100644
+index 725b9471b21c..8e181cca0a05 100644
 --- a/arch/arm64/configs/defconfig
 +++ b/arch/arm64/configs/defconfig
-@@ -156,14 +156,12 @@ CONFIG_NETFILTER_XT_TARGET_CHECKSUM=m
- CONFIG_NETFILTER_XT_TARGET_LOG=m
- CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=m
- CONFIG_NETFILTER_XT_MATCH_CONNTRACK=m
--CONFIG_NF_CONNTRACK_IPV4=m
- CONFIG_IP_NF_IPTABLES=m
- CONFIG_IP_NF_FILTER=m
- CONFIG_IP_NF_TARGET_REJECT=m
- CONFIG_IP_NF_NAT=m
- CONFIG_IP_NF_TARGET_MASQUERADE=m
- CONFIG_IP_NF_MANGLE=m
--CONFIG_NF_CONNTRACK_IPV6=m
- CONFIG_IP6_NF_IPTABLES=m
- CONFIG_IP6_NF_FILTER=m
- CONFIG_IP6_NF_TARGET_REJECT=m
+@@ -493,7 +493,6 @@ CONFIG_SND=y
+ CONFIG_SND_SOC=y
+ CONFIG_SND_BCM2835_SOC_I2S=m
+ CONFIG_SND_SOC_ROCKCHIP=m
+-CONFIG_SND_SOC_ROCKCHIP_I2S=m
+ CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+ CONFIG_SND_SOC_ROCKCHIP_RT5645=m
+ CONFIG_SND_SOC_RK3399_GRU_SOUND=m
 -- 
 2.8.2
