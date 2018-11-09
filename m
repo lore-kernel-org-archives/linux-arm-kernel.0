@@ -1,71 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Nov 2018 17:13:29 +0100
-Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
-In-Reply-To: <20181109123730.8743-8-vincenzo.frascino@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-8-vincenzo.frascino@arm.com>
-Message-ID: <CAK8P3a1w=GBcYk2OaVNzfagMMeD_zdBK3G16BSYjFANKdSAezQ@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sat, 10 Nov 2018 01:14:06 +0900
+Subject: [PATCH 3/4] dt-bindings: reset: uniphier: Add AHCI core reset
+ description
+In-Reply-To: <1541775663.4112.48.camel@pengutronix.de>
+References: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1541727727-10821-4-git-send-email-hayashi.kunihiko@socionext.com>
+ <1541775663.4112.48.camel@pengutronix.de>
+Message-ID: <CAK7LNAQGftPMLkQk-tU4R6Jtw9W6npka+Br+2wyyZicAgwDvRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +
-> +extern struct vdso_data _vdso_data;
-> +
-> +static __always_inline notrace int gettimeofday_fallback(struct timeval *_tv,
-> +                                                        struct timezone *_tz)
+On Sat, Nov 10, 2018 at 12:02 AM Philipp Zabel <p.zabel@pengutronix.de> wrote:
+>
+> Hi Kunihiko,
+>
+> On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
+> > Add compatible strings for reset control of AHCI core implemented in
+> > UniPhier SoCs. The reset control belongs to AHCI glue layer.
+> >
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
+> >  Documentation/devicetree/bindings/reset/uniphier-reset.txt | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > index f63c511..ea00517 100644
+> > --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > @@ -133,6 +133,9 @@ Required properties:
+> >      "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
+> >      "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
+> >      "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
+> > +    "socionext,uniphier-pro4-ahci-reset" - for Pro4 SoC AHCI
+> > +    "socionext,uniphier-pxs2-ahci-reset" - for PXs2 SoC AHCI
+> > +    "socionext,uniphier-pxs3-ahci-reset" - for PXs3 SoC AHCI
+>
+> Since the driver behaves identically for "socionext,uniphier-pro4-usb3-
+> reset" and "socionext,uniphier-pro4-ahci-reset", would it make sense to
+> add a common compatible?
 
-I'm trying to get rid of the last users of 'struct timeval' in the kernel so
-we can remove the definition (it will clash with future glibc implementations
-in the uapi headers). Could you change this to use __kernel_old_timeval
-instead?
 
-> +static __always_inline notrace long clock_gettime_fallback(clockid_t _clkid,
-> +                                                          struct timespec *_ts)
+As far as I could guess, he just happened to find the same driver code
+could be reused for other hardware.
 
-And this should be __kernel_timespec respectively on the kernel-user interface,
-at least for 64-bit architectures.
+Theoretically, this can happen anywhere since
+a reset controller is just a set of registers
+each bit of which is connected to a reset line.
 
-On 32-bit, the corresponding type is 'struct old_timespec32'.
+If you added a super-generic compatible like "simple-reset",
+I would agree with
+"socionext,uniphier-pro4-usb3-reset", "simple-reset"
+since this is a pattern.
 
-> diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
-> index beca249bc2f3..9de0ffc369c5 100644
-> --- a/arch/arm64/kernel/vdso/vdso.lds.S
-> +++ b/arch/arm64/kernel/vdso/vdso.lds.S
-> @@ -88,6 +88,7 @@ VERSION
->                 __kernel_gettimeofday;
->                 __kernel_clock_gettime;
->                 __kernel_clock_getres;
-> +               __kernel_time;
->         local: *;
->         };
->  }
 
-I would  prefer to not add any deprecated interfaces in the VDSO. If we
-have the 64-bit version of clock_gettime, we don't need the 32-bit version
-of it, and we don't need gettimeofday() or time() either. The C library
-can easily implement those by calling into clock_gettime.
+However,
+"socionext,uniphier-pro4-glue-reset" is kind of a halfway house
+where it is SoC-specific, but still ambiguous.
 
-> +notrace int __kernel_clock_gettime(clockid_t clock, struct timespec *ts)
-> +{
-> +       return __cvdso_clock_gettime(clock, ts);
-> +}
-> +
-> +notrace int __kernel_gettimeofday(struct timeval *tv, struct timezone *tz)
-> +{
-> +       return __cvdso_gettimeofday(tv, tz);
-> +}
-> +
-> +notrace time_t __kernel_time(time_t *time)
-> +{
-> +       return __cvdso_time(time);
-> +}
-> +
-> +notrace int __kernel_clock_getres(clockid_t clock_id, struct timespec *res)
-> +{
-> +       return __cvdso_clock_getres(clock_id, res);
-> +}
-> +
 
-These should use __kernel_old_timeval and __kernel_timespec again.
+> Something like:
+> "socionext,uniphier-pro4-usb3-reset", "socionext,uniphier-pro4-glue-reset" - for USB3 SoC AHCI
+> "socionext,uniphier-pro4-ahci-reset", "socionext,uniphier-pro4-glue-reset" - for Pro4 SoC AHCI
+>
+> That way if more places turn up where the glue layer reset is used,
+> you can add them without patching the driver every time.
 
-        Arnd
+
+This is a trade-off between "patch the driver"
+and "potential change of the binding".
+
+There is no real hardware like pro4-glue-reset.
+
+
+
+I am guessing this is a part of syscon or something,
+but I cannot find any explanation in a bigger picture.
+
+So, I cannot judge this further more.
+
+
+
+
+> regards
+> Philipp
+
+
+
+--
+Best Regards
+Masahiro Yamada
