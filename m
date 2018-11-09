@@ -1,63 +1,57 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 9 Nov 2018 13:15:47 -0600
-Subject: arm64 + ARM64_64K_PAGES=y
-In-Reply-To: <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
-References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
- <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
- <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
-Message-ID: <274c9742-0aa9-b4a5-11cb-b506aeef7761@ti.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 9 Nov 2018 20:18:33 +0100
+Subject: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+In-Reply-To: <154178275324.88331.16237880990995819011@swboyd.mtv.corp.google.com>
+References: <20181106183609.207702-1-sboyd@kernel.org>
+ <20181106183609.207702-2-sboyd@kernel.org>
+ <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
+ <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
+ <CAMuHMdUTwUTdbKAWCNxH72-tvJuY-LtRO2Dh8izdEOKrFOSwLQ@mail.gmail.com>
+ <154178275324.88331.16237880990995819011@swboyd.mtv.corp.google.com>
+Message-ID: <CAMuHMdXTTCo6Fsr9eYstT6AFLOQ-_sKkhjw7cP8XdFabVqdJWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
+On Fri, Nov 9, 2018 at 5:59 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> Quoting Geert Uytterhoeven (2018-11-09 01:56:01)
+> > On Wed, Nov 7, 2018 at 7:37 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> > > Quoting Rob Herring (2018-11-06 12:44:52)
+> > > > On Tue, Nov 6, 2018 at 12:36 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> > >         int (*probe)(struct platform_device *pdev);
+> > >   };
+> > >
+> > >   struct of_platform_driver_probe_func mtk_probes[] = {
+> > >         mtk_probe1,
+> > >         mtk_probe2,
+> > >         mtk_probe3,
+> > >   };
+> > >
+> > >   struct platform_driver mtk_driver = {
+> > >         .of_probes = &mtk_probes;
+> > >         .driver = {
+> > >                 .name = "mtk-foo";
+> > >                 .of_match_table = mtk_match_table,
+> > >         },
+> > >   };
+> >
+> > This looks worse to me: people tend to be very good at keeping multiple
+> > arrays in sync :-(
+>
+> To be _not_ very good? Agreed, and so specifying the probe function as
+> another member in struct of_device_id seems to be the way to go.
 
-On 11/8/18 12:14 PM, Grygorii Strashko wrote:
-> 
-> 
-> On 11/8/18 6:00 AM, Sebastian Andrzej Siewior wrote:
->> On 2018-11-06 15:34:55 [-0600], Grygorii Strashko wrote:
->>> Hi All,
->> Hi,
->>
->>> Do anybody tried to use ARM64 RT with 76K pages enabled?
->>
->> 75 would be an off by one but this :)
-> 
-> Ops 8-). at least subj is correct.
-> 
->>
->>> My attempt shows that enabling? CONFIG_ARM64_64K_PAGES=y increases latencies by ~30%
->>>
->>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=y
->>>
->>>
->>> T: 0 (? 772) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 13 Avg:?? 10 Max:????? 85
->>> T: 1 (? 773) P:98 I:1500 C:? 79998 Min:????? 7 Act:?? 13 Avg:?? 10 Max:????? 71
->>> T: 2 (? 774) P:98 I:2000 C:? 59997 Min:????? 7 Act:?? 11 Avg:?? 11 Max:????? 64
->>> T: 3 (? 775) P:98 I:2500 C:? 47996 Min:????? 7 Act:?? 14 Avg:?? 12 Max:????? 66
->>>
->>>
->>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
->>>
->>>
->>> T: 0 (? 697) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 10 Avg:??? 9 Max:????? 38
->>> T: 1 (? 698) P:98 I:1500 C:? 79987 Min:????? 7 Act:?? 10 Avg:?? 10 Max:????? 32
->>> T: 2 (? 699) P:98 I:2000 C:? 59981 Min:????? 7 Act:?? 14 Avg:?? 11 Max:????? 46
->>> T: 3 (? 700) P:98 I:2500 C:? 47977 Min:????? 6 Act:?? 11 Avg:?? 10 Max:????? 45
->>
->> So this is an idle system?
-> 
-> Yes (in general) - it's collected with systemd, so some daemons are active.
-> 
->> The Kconfig help says "faster TLB lookup". Interesting.
->> Are the 16k pages in between (latency wise) by any chance?
-> 
-> I'll try it.
+Correct, sometimes sarcasm doesn't arrive well at the other end of the
+electronic tunnel...
 
-no i'll not, at least not fast. with 16k pages enabled I can't boot TI 4.14 kernel
--  4.14.71-rt44.
-No msg in log, just "Starting kernel ..."
+Gr{oetje,eeting}s,
+
+                        Geert
 
 -- 
-regards,
--grygorii
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
