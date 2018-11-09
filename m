@@ -1,48 +1,42 @@
 From: vkoul@kernel.org (Vinod Koul)
-Date: Fri,  9 Nov 2018 15:14:11 +0530
-Subject: [PATCH v5 12/18] arm64: dts: qcom: pms405: add gpios
+Date: Fri,  9 Nov 2018 15:14:15 +0530
+Subject: [PATCH v5 16/18] arm64: dts: qcom: qcs404: Add BAM DMA node
 In-Reply-To: <20181109094417.12109-1-vkoul@kernel.org>
 References: <20181109094417.12109-1-vkoul@kernel.org>
-Message-ID: <20181109094417.12109-13-vkoul@kernel.org>
+Message-ID: <20181109094417.12109-17-vkoul@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the GPIOs present on PMS405 chip.
+Add the BAM DMA instance found in BLSP1 node of the QCS404
 
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Vinod Koul <vkoul@kernel.org>
 ---
- arch/arm64/boot/dts/qcom/pms405.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/boot/dts/qcom/qcs404.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/pms405.dtsi b/arch/arm64/boot/dts/qcom/pms405.dtsi
-index 2b275bbdafa3..8e5a8573430e 100644
---- a/arch/arm64/boot/dts/qcom/pms405.dtsi
-+++ b/arch/arm64/boot/dts/qcom/pms405.dtsi
-@@ -10,6 +10,25 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+index c58774bb9698..ef2c4cdc6d27 100644
+--- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
++++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+@@ -323,6 +323,18 @@
+ 			status = "disabled";
+ 		};
  
-+		pms405_gpios: gpio at c000 {
-+			compatible = "qcom,pms405-gpio";
-+			reg = <0xc000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupts = <0 0xc0 0 IRQ_TYPE_NONE>,
-+				<0 0xc1 0 IRQ_TYPE_NONE>,
-+				<0 0xc2 0 IRQ_TYPE_NONE>,
-+				<0 0xc3 0 IRQ_TYPE_NONE>,
-+				<0 0xc4 0 IRQ_TYPE_NONE>,
-+				<0 0xc5 0 IRQ_TYPE_NONE>,
-+				<0 0xc6 0 IRQ_TYPE_NONE>,
-+				<0 0xc7 0 IRQ_TYPE_NONE>,
-+				<0 0xc8 0 IRQ_TYPE_NONE>,
-+				<0 0xc9 0 IRQ_TYPE_NONE>,
-+				<0 0xca 0 IRQ_TYPE_NONE>,
-+				<0 0xcb 0 IRQ_TYPE_NONE>;
++		blsp1_dma: dma at 7884000 {
++			compatible = "qcom,bam-v1.7.0";
++			reg = <0x07884000 0x25000>;
++			interrupts = <GIC_SPI 238 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "bam_clk";
++			#dma-cells = <1>;
++			qcom,controlled-remotely = <1>;
++			qcom,ee = <0>;
++			status = "okay";
 +		};
 +
- 		rtc at 6000 {
- 			compatible = "qcom,pm8941-rtc";
- 			reg = <0x6000>;
+ 		blsp1_uart2: serial at 78b1000 {
+ 			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
+ 			reg = <0x078b1000 0x200>;
 -- 
 2.14.4
