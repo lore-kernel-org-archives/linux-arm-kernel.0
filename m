@@ -1,16 +1,16 @@
 From: elder@linaro.org (Alex Elder)
-Date: Fri, 9 Nov 2018 16:38:30 -0600
+Date: Fri, 9 Nov 2018 16:38:37 -0600
 Subject: [RFC PATCH 01/12] dt-bindings: soc: qcom: add IPA bindings
-In-Reply-To: <CAK8P3a1rXwADsgVJ4EAtV3u_qg840tfGnbKcyxuBXDB10sYi3Q@mail.gmail.com>
+In-Reply-To: <CABGGiswmpmSUmg9jEW7GnNtL2uXAN7jJOqFO5kG8adq71GuZpw@mail.gmail.com>
 References: <20181107003250.5832-1-elder@linaro.org>
  <20181107003250.5832-2-elder@linaro.org>
- <CAK8P3a1rXwADsgVJ4EAtV3u_qg840tfGnbKcyxuBXDB10sYi3Q@mail.gmail.com>
-Message-ID: <d5c89037-f4fa-6ab7-dbca-d63f64c90fdc@linaro.org>
+ <CABGGiswmpmSUmg9jEW7GnNtL2uXAN7jJOqFO5kG8adq71GuZpw@mail.gmail.com>
+Message-ID: <a4c9f0f8-d7c7-2756-cfdf-b67ce9f1ca3b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/7/18 5:50 AM, Arnd Bergmann wrote:
-> On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+On 11/7/18 8:59 AM, Rob Herring wrote:
+> On Tue, Nov 6, 2018 at 6:33 PM Alex Elder <elder@linaro.org> wrote:
 >>
 >> Add the binding definitions for the "qcom,ipa" and "qcom,rmnet-ipa"
 >> device tree nodes.
@@ -22,13 +22,7 @@ On 11/7/18 5:50 AM, Arnd Bergmann wrote:
 >>  2 files changed, 151 insertions(+)
 >>  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
 >>  create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,rmnet-ipa.txt
-> 
-> I think this should go into bindings/net instead of bindings/soc, since it's
-> mostly about networking rather than a specific detail of managing the SoC
-> itself.
-
-Done (in my tree--and will be reflected next time I send something out).
-
+>>
 >> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
 >> new file mode 100644
 >> index 000000000000..d4d3d37df029
@@ -36,43 +30,232 @@ Done (in my tree--and will be reflected next time I send something out).
 >> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,ipa.txt
 >> @@ -0,0 +1,136 @@
 >> +Qualcomm IPA (IP Accelerator) Driver
+> 
+> Bindings are for h/w not drivers.
+
+OK.  I'll drop " Driver".
+
 >> +
 >> +This binding describes the Qualcomm IPA.  The IPA is capable of offloading
 >> +certain network processing tasks (e.g. filtering, routing, and NAT) from
 >> +the main processor.  The IPA currently serves only as a network interface,
 >> +providing access to an LTE network available via a modem.
+>> +
+>> +The IPA sits between multiple independent "execution environments,"
+>> +including the AP subsystem (APSS) and the modem.  The IPA presents
+>> +a Generic Software Interface (GSI) to each execution environment.
+>> +The GSI is an integral part of the IPA, but it is logically isolated
+>> +and has a distinct interrupt and a separately-defined address space.
+>> +
+>> +    ----------   -------------   ---------
+>> +    |        |   |G|       |G|   |       |
+>> +    |  APSS  |===|S|  IPA  |S|===| Modem |
+>> +    |        |   |I|       |I|   |       |
+>> +    ----------   -------------   ---------
+>> +
+>> +See also:
+>> +  bindings/interrupt-controller/interrupts.txt
+>> +  bindings/interconnect/interconnect.txt
+>> +  bindings/soc/qcom/qcom,smp2p.txt
+>> +  bindings/reserved-memory/reserved-memory.txt
+>> +  bindings/clock/clock-bindings.txt
+>> +
+>> +All properties defined below are required.
+>> +
+>> +- compatible:
+>> +       Must be one of the following compatible strings:
+>> +               "qcom,ipa-sdm845-modem_init"
+>> +               "qcom,ipa-sdm845-tz_init"
 > 
-> That doesn't belong into the binding. Say what the hardware can do here,
-> not what a specific implementation of the driver does at this moment.
-> The binding should be written in an OS independent way after all.
+> Normal order is <vendor>,<soc>-<ipblock>."
+
+I'll use "qcom,sdm845-ipa-modem-init" and "qcom,sdm845-ipa-tz-init".
+(Or just "qcom,sdm845-ipa", depending on the outcome of the discussion
+below.)
+
+> Don't use '_'.
 
 OK.
 
+> What's the difference between these 2? It can't be detected somehow?
+
+There is some early initialization, including loading some firmware,
+that must be done by trusted code.  That can be done by either Trust
+Zone or the modem.  If it's done by the modem, there is an additional
+step required during initialization so the modem can tell the AP
+that it has done its part, and the AP can finish IPA initialization.
+
+There  is no way of detecting (e.g. by probing hardware) which is
+in effect so we use DT.  I discussed this with Bjorn, who said that
+this was a situation seen elsewhere and that using compatible strings
+was the way he suggested to address it.
+
+> This might be better expressed as a property. Then if Trustzone
+> initializes things, it can just add a property.
+
+A Boolean property to distinguish them would be fine as well, but
+I would like to address this "common" problem consistently.
+
+Bjorn, would you please weigh in?
+
+>> +
+>> +-reg:
+>> +       Resources specyfing the physical address spaces of the IPA and GSI.
+> 
+> typo
+> 
+>> +
+>> +-reg-names:
+>> +       The names of the address space ranges defined by the "reg" property.
+>> +       Must be "ipa" and "gsi".
+>> +
 >> +- interrupts-extended:
+> 
+> Use 'interrupts' here and describe what they are and the order. What
+> they are connected to (and the need for interrupts-extended) is
+> outside the scope of this binding.
+
+I used interrupts-extended because there were two interrupt parents
+(a "normal" interrupt controller and the interrupt controller implemented
+for SMP2P input).  A paragraph here:
+    bindings/interrupt-controller/interrupts.txt
+recommends "interrupts-extended" in that case.
+
+I have no objection to using just "interrupts" but can you tell me what
+I misunderstood?  It seems like I need to do "interrupts-extended".
+
 >> +       Specifies the IRQs used by the IPA.  Four cells are required,
 >> +       specifying: the IPA IRQ; the GSI IRQ; the clock query interrupt
 >> +       from the modem; and the "ready for stage 2 initialization"
 >> +       interrupt from the modem.  The first two are hardware IRQs; the
 >> +       third and fourth are SMP2P input interrupts.
+>> +
+>> +- interrupt-names:
+>> +       The names of the interrupts defined by the "interrupts-extended"
+>> +       property.  Must be "ipa", "gsi", "ipa-clock-query", and
+>> +       "ipa-post-init".
 > 
-> You mean 'four interrupts', not 'four cells' -- each interrupt specifier
-> already consists of at least two cells (one for the phandle to the
-> irqchip, plus one or more cells to describe that interrupt).
+> Format as one per line.
 
-OK.
+Done.  And I did this throughout the file where there was more than
+one name.  One per line, no comma, no "and".
 
+>> +
+>> +- clocks:
+>> +       Resource that defines the IPA core clock.
+>> +
+>> +- clock-names:
+>> +       The name used for the IPA core clock.  Must be "core".
+>> +
 >> +- interconnects:
 >> +       Specifies the interconnects used by the IPA.  Three cells are
 >> +       required, specifying:  the path from the IPA to memory; from
 >> +       IPA to internal (SoC resident) memory; and between the AP
 >> +       subsystem and IPA for register access.
+>> +
+>> +- interconnect-names:
+>> +       The names of the interconnects defined by the "interconnects"
+>> +       property.  Must be "memory", "imem", and "config".
+>> +
+>> +- qcom,smem-states
+>> +       The state bits used for SMP2P output.  Two cells must be specified.
+>> +       The first indicates whether the value in the second bit is valid
+>> +       (1 means valid).  The second, if valid, defines whether the IPA
+>> +       clock is enabled (1 means enabled).
+>> +
+>> +- qcom,smem-state-names
+>> +       The names of the state bits used for SMP2P output.  These must be
+>> +       "ipa-clock-enabled-valid" and "ipa-clock-enabled".
+>> +
+>> +- memory-region
+>> +       A phandle for a reserved memory area that holds the firmware passed
+>> +       to Trust Zone for authentication.  (Note, this is required
+>> +       only for "qcom,ipa-sdm845-tz_init".)
+>> +
+>> += EXAMPLE
+>> +
+>> +The following example represents the IPA present in the SDM845 SoC.  It
+>> +shows portions of the "modem-smp2p" node to indicate its relationship
+>> +with the interrupts and SMEM states used by the IPA.
+>> +
+>> +       modem-smp2p {
+>> +               compatible = "qcom,smp2p";
+>> +               . . .
+>> +               ipa_smp2p_out: ipa-ap-to-modem {
+>> +                       qcom,entry-name = "ipa";
+>> +                       #qcom,smem-state-cells = <1>;
+>> +               };
+>> +
+>> +               ipa_smp2p_in: ipa-modem-to-ap {
+>> +                       qcom,entry-name = "ipa";
+>> +                       interrupt-controller;
+>> +                       #interrupt-cells = <2>;
+>> +               };
+>> +       };
+>> +
+>> +       ipa at 1e00000 {
 > 
-> Same here and in the rest.
+> ipa at 1e40000
 
-OK, I've fixed all of these.  Thank you.
+Oops.  Fixed.
+
+>> +               compatible = "qcom,ipa-sdm845-modem_init";
+>> +
+>> +               reg = <0x1e40000 0x34000>,
+>> +                     <0x1e04000 0x2c000>;
+>> +               reg-names = "ipa",
+>> +                           "gsi";
+>> +
+>> +               interrupts-extended = <&intc 0 311 IRQ_TYPE_LEVEL_HIGH>,
+>> +                                     <&intc 0 432 IRQ_TYPE_LEVEL_HIGH>,
+>> +                                     <&ipa_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
+>> +                                     <&ipa_smp2p_in 1 IRQ_TYPE_EDGE_RISING>;
+>> +               interrupt-names = "ipa",
+>> +                                 "gsi",
+>> +                                 "ipa-clock-query",
+>> +                                 "ipa-post-init";
+>> +
+>> +               clocks = <&rpmhcc RPMH_IPA_CLK>;
+>> +               clock-names = "core";
+>> +
+>> +               interconnects = <&qnoc MASTER_IPA &qnoc SLAVE_EBI1>,
+>> +                               <&qnoc MASTER_IPA &qnoc SLAVE_IMEM>,
+>> +                               <&qnoc MASTER_APPSS_PROC &qnoc SLAVE_IPA_CFG>;
+>> +               interconnect-names = "memory",
+>> +                                    "imem",
+>> +                                    "config";
+>> +
+>> +               qcom,smem-states = <&ipa_smp2p_out 0>,
+>> +                                  <&ipa_smp2p_out 1>;
+>> +               qcom,smem-state-names = "ipa-clock-enabled-valid",
+>> +                                       "ipa-clock-enabled";
+>> +       };
+>> diff --git a/Documentation/devicetree/bindings/soc/qcom/qcom,rmnet-ipa.txt b/Documentation/devicetree/bindings/soc/qcom/qcom,rmnet-ipa.txt
+>> new file mode 100644
+>> index 000000000000..3d0b2aabefc7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/soc/qcom/qcom,rmnet-ipa.txt
+>> @@ -0,0 +1,15 @@
+>> +Qualcomm IPA RMNet Driver
+>> +
+>> +This binding describes the IPA RMNet driver, which is used to
+>> +represent virtual interfaces available on the modem accessed via
+>> +the IPA.  Other than the compatible string there are no properties
+>> +associated with this device.
+> 
+> Only a compatible string is a sure sign this is not a h/w device and
+> you are just abusing DT to instantiate drivers. Make the IPA driver
+> instantiate any sub drivers it needs.
+
+Yeah I have been thinking this but hadn't followed through on
+doing anything about it yet.  I'll remove this node entirely.
+It's possible it had other properties at one time, but in the
+end this  represents a soft interface and can be implemented
+within the IPA driver.
+
+Thanks a lot for the review.
 
 					-Alex
-
 > 
->       Arnd
+> Rob
 > 
