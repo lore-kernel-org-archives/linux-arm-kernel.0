@@ -1,50 +1,45 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Fri, 9 Nov 2018 01:27:54 +0000
-Subject: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
-In-Reply-To: <CAOMZO5CPZKqJdTPzZDw=19HW_YCg_JGvLpw9i3iKsi+EJF-yNg@mail.gmail.com>
-References: <1541567625-11812-1-git-send-email-Anson.Huang@nxp.com>
- <CAOMZO5AL03yy6Vj_eC=h7scSDnuja1G8rsWER+r7w3FEVaceDg@mail.gmail.com>
- <DB3PR0402MB3916B318947B803BC5ADF4A6F5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <CAOMZO5DiTbEsVXTCfE8fJ=4+yU4oXR1gex7Bj-k=FowKHWJaxw@mail.gmail.com>
- <DB3PR0402MB3916B027A9C724D349C7969EF5C50@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <CAOMZO5CPZKqJdTPzZDw=19HW_YCg_JGvLpw9i3iKsi+EJF-yNg@mail.gmail.com>
-Message-ID: <DB3PR0402MB3916021FA80AE9C236537281F5C60@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 9 Nov 2018 09:31:15 +0800
+Subject: [PATCH 3/3] ARM64: dts: meson-gxl: Add support for the Smartlabs
+ SML-5442TW
+In-Reply-To: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
+References: <1541691207-24768-3-git-send-email-christianshewitt@gmail.com>
+Message-ID: <201811090923.kiVN8vPL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Fabio
+Hi Christian,
 
-Best Regards!
-Anson Huang
+Thank you for the patch! Yet something to improve:
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: 2018?11?8? 23:38
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland
-> <mark.rutland@arm.com>; Shawn Guo <shawnguo@kernel.org>; Sascha
-> Hauer <s.hauer@pengutronix.de>; Sascha Hauer <kernel@pengutronix.de>;
-> Fabio Estevam <fabio.estevam@nxp.com>; open list:OPEN FIRMWARE AND
-> FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-kernel
-> <linux-kernel@vger.kernel.org>; moderated list:ARM/FREESCALE IMX / MXC
-> ARM ARCHITECTURE <linux-arm-kernel@lists.infradead.org>; dl-linux-imx
-> <linux-imx@nxp.com>
-> Subject: Re: [PATCH] ARM: dts: imx7d-sdb: add rev-a board support
-> 
-> Hi Anson,
-> 
-> On Thu, Nov 8, 2018 at 12:30 AM Anson Huang <anson.huang@nxp.com>
-> wrote:
-> 
-> > Thanks for pointing out this issue, I made a mistake when doing the search in
-> git repo..
-> > So, if we have to assert a GPIO, there is no common way in pinctrl
-> > driver? Have to do it in driver itself? Like this case, we have to assert the
-> GPIO in fec driver?
-> 
-> You could pass "phy-supply" property  and model it as gpio controlled
-> regulator.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.20-rc1 next-20181108]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks for the suggestion, I tried it and it works, please help review V2 patch.
+url:    https://github.com/0day-ci/linux/commits/Christian-Hewitt/dt-bindings-Add-vendor-prefix-for-Smartlabs/20181109-010512
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
+config: arm64-allyesconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
-Anson.
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:172.1-7 Label or path audio not found
+>> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:176.1-13 Label or path aiu_i2s_dma not found
+>> Error: arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts:180.1-9 Label or path i2s_dai not found
+   FATAL ERROR: Syntax error parsing input tree
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61776 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/ef520d27/attachment-0001.gz>
