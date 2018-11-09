@@ -1,42 +1,63 @@
-From: florian.kauer@koalo.de (Florian Kauer)
-Date: Fri, 9 Nov 2018 19:48:02 +0100
-Subject: [PATCH 0/3] Fix MODULE_LICENSE of bcm2835 drivers
-In-Reply-To: <815844594.141792.1541616607053@email.ionos.de>
-References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
- <815844594.141792.1541616607053@email.ionos.de>
-Message-ID: <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 9 Nov 2018 13:15:47 -0600
+Subject: arm64 + ARM64_64K_PAGES=y
+In-Reply-To: <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
+References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
+ <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
+ <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
+Message-ID: <274c9742-0aa9-b4a5-11cb-b506aeef7761@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry for not replying in time. I became father recently ;-)
-So if it is still relevant:
-Acked-by: Florian Kauer <florian.kauer@koalo.de>
 
-On 07.11.2018 19:50, Stefan Wahren wrote:
-> Hi Mark,
-> hi Vinod,
+
+On 11/8/18 12:14 PM, Grygorii Strashko wrote:
 > 
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 23. Oktober 2018 um 13:06 geschrieben:
->>
->>
->> In preparation of a treewide switch of all bcm2835 drivers to SPDX tags,
->> we need to make sure that the license text and MODULE_LICENSE matches.
->>
->> This series starts sooner than usual to have more time to collect the authors
->> ACK.
->>
->> Stefan Wahren (3):
->>    clk: bcm2835: make license text and module license match
->>    dma: bcm2835: make license text and module license match
->>    spi: bcm2835: make license text and module license match
->>
->>   drivers/clk/bcm/clk-bcm2835-aux.c | 2 +-
->>   drivers/clk/bcm/clk-bcm2835.c     | 2 +-
->>   drivers/dma/bcm2835-dma.c         | 2 +-
->>   drivers/spi/spi-bcm2835.c         | 2 +-
->>   drivers/spi/spi-bcm2835aux.c      | 2 +-
->>   5 files changed, 5 insertions(+), 5 deletions(-)
->>
 > 
-> since i didn't receive any objections from the authors, could you please apply or should i resend with Eric's Reviewed-by?
+> On 11/8/18 6:00 AM, Sebastian Andrzej Siewior wrote:
+>> On 2018-11-06 15:34:55 [-0600], Grygorii Strashko wrote:
+>>> Hi All,
+>> Hi,
+>>
+>>> Do anybody tried to use ARM64 RT with 76K pages enabled?
+>>
+>> 75 would be an off by one but this :)
 > 
+> Ops 8-). at least subj is correct.
+> 
+>>
+>>> My attempt shows that enabling? CONFIG_ARM64_64K_PAGES=y increases latencies by ~30%
+>>>
+>>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=y
+>>>
+>>>
+>>> T: 0 (? 772) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 13 Avg:?? 10 Max:????? 85
+>>> T: 1 (? 773) P:98 I:1500 C:? 79998 Min:????? 7 Act:?? 13 Avg:?? 10 Max:????? 71
+>>> T: 2 (? 774) P:98 I:2000 C:? 59997 Min:????? 7 Act:?? 11 Avg:?? 11 Max:????? 64
+>>> T: 3 (? 775) P:98 I:2500 C:? 47996 Min:????? 7 Act:?? 14 Avg:?? 12 Max:????? 66
+>>>
+>>>
+>>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
+>>>
+>>>
+>>> T: 0 (? 697) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 10 Avg:??? 9 Max:????? 38
+>>> T: 1 (? 698) P:98 I:1500 C:? 79987 Min:????? 7 Act:?? 10 Avg:?? 10 Max:????? 32
+>>> T: 2 (? 699) P:98 I:2000 C:? 59981 Min:????? 7 Act:?? 14 Avg:?? 11 Max:????? 46
+>>> T: 3 (? 700) P:98 I:2500 C:? 47977 Min:????? 6 Act:?? 11 Avg:?? 10 Max:????? 45
+>>
+>> So this is an idle system?
+> 
+> Yes (in general) - it's collected with systemd, so some daemons are active.
+> 
+>> The Kconfig help says "faster TLB lookup". Interesting.
+>> Are the 16k pages in between (latency wise) by any chance?
+> 
+> I'll try it.
+
+no i'll not, at least not fast. with 16k pages enabled I can't boot TI 4.14 kernel
+-  4.14.71-rt44.
+No msg in log, just "Starting kernel ..."
+
+-- 
+regards,
+-grygorii
