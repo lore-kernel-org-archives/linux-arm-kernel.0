@@ -1,42 +1,55 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Fri,  9 Nov 2018 23:47:47 +0300
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-Message-ID: <20181109204747.10008-1-geomatsi@gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Fri, 9 Nov 2018 21:56:10 +0100
+Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
+ a check for config_intr and ack_interrupt
+In-Reply-To: <4330cb5b-b1a5-5004-af51-39199943639d@gmail.com>
+References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+ <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
+ <20181109201307.GV5259@lunn.ch>
+ <44b503b8-9f2a-50ac-c4c9-d25258d98ef5@gmail.com>
+ <4330cb5b-b1a5-5004-af51-39199943639d@gmail.com>
+Message-ID: <c067d321-c69e-706d-304a-04e1e477b47c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify correct type for the constants to avoid
-the following sparse complaints:
+On 09.11.2018 21:33, Florian Fainelli wrote:
+> On 11/9/18 12:22 PM, Heiner Kallweit wrote:
+>> On 09.11.2018 21:13, Andrew Lunn wrote:
+>>> Hi Heiner
+>>>
+>>>> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
+>>>> +{
+>>>> +	return phydrv->config_intr || phydrv->ack_interrupt;
+>>>> +}
+>>>
+>>> Should this be && not || ? I thought both needed to be provided for
+>>> interrupts to work. 
+>>>
+>>> 	   Andrew
+>>>
+>> I've seen at least one driver which configures interrupts in
+>> config_init and doesn't define a config_intr callback
+>> (ack_interrupt callback is there)
+> 
+> That driver should probably be fixed, while it most likely does not make
+> any significant difference during probe/connect, since config_init() and
+> config_intr() are virtually happening at the same time, this is not
+> necessarily true when disconnecting from the PHY where we really want
+> config_intr() to effectively disable the interrupts and not leaving
+> something enabled that would now become unmaskable, because no more
+> driver attached.
+> 
+Found the driver: It's the IP101A/G in icplus.c
+It should be easy to fix the behavior and move the interrupt config
+to a config_intr callback. But the last real changes to the driver
+have been done 6 years ago, so I'm not sure there's anybody out
+there who can test.
 
-./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-
-Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
----
- arch/arm64/include/asm/sysreg.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 0c909c4a932f..e025aaa35178 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -468,7 +468,7 @@
- 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
- 			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
- 
--#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
-+#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffULL
- #error "Inconsistent SCTLR_EL2 set/clear bits"
- #endif
- 
-@@ -509,7 +509,7 @@
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
- 			 SCTLR_ELx_DSSBS | SCTLR_EL1_NTWI  | SCTLR_EL1_RES0)
- 
--#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
-+#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffffULL
- #error "Inconsistent SCTLR_EL1 set/clear bits"
- #endif
- 
--- 
-2.11.0
+>> Intention of this check is not to ensure that the driver defines
+>> everything to make interrupts work. All it states:
+>> If at least one of the irq-related callbacks is defined, then
+>> we interpret this as indicator that the PHY supports interrupts.
+> 
+> I agree with Andrew here, that this should be an AND here, both
+> callbacks must be implemented for interrupts to work correctly.
+> 
