@@ -1,47 +1,60 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri,  9 Nov 2018 15:07:09 +0000
-Subject: [PATCH 0/2] kvm/arm: make singlestep behaviour consistent
-Message-ID: <20181109150711.45864-1-mark.rutland@arm.com>
+Date: Fri,  9 Nov 2018 15:07:10 +0000
+Subject: [PATCH 1/2] kvm/arm: skip MMIO insn after emulation
+In-Reply-To: <20181109150711.45864-1-mark.rutland@arm.com>
+References: <20181109150711.45864-1-mark.rutland@arm.com>
+Message-ID: <20181109150711.45864-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't consistently advance the singlestep state machine when emulating
-instructions. We attempt to bodge around this when the host is stepping a
-guest, and fake a debug exception, but we don't always get this right.
-Additionally, we don't try to fix this up at all when a guest is stepping
-itself, so guests cannot single-step emulated instructions reliably.
+When we emulate an MMIO instruction, we advance the CPU state within
+decode_hsr(), before emulating the instruction effects.
 
-In both cases we're usually reliant on the HW singlestep state machine, so
-let's have our instruction emulation consistently advance that. Thus, when we
-return to a guest after emulating an instruction, the HW will generate the step
-exception for us, routed to host or guest appropriately.
+Having this logic in decode_hsr() is opaque, and advancing the state
+before emulation is problematic. It gets in the way of applying
+consistent single-step logic, and it prevents us from being able to fail
+an MMIO instruction with a synchronous exception.
 
-So far I have only compile-tested these patches. YMMV.
+Clean this up by only advancing the CPU state *after* the effects of the
+instruction are emulated.
 
-These patches do not ensure that guest-stepping is reliable in the presence of
-host-stepping. We might need to say that it's userspace's responsibility to
-virtualize the guest singlestep state machine when stepping the guest.
-Otherwise, it's not clear to me if we can shadow this correctly within the
-kernel.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Alex Benn?e <alex.bennee@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Peter Maydell <peter.maydell@linaro.org>
+---
+ virt/kvm/arm/mmio.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Thanks,
-Mark.
-
-Mark Rutland (2):
-  kvm/arm: skip MMIO insn after emulation
-  kvm/arm: consistently advance singlestep when emulating instructions
-
- arch/arm/include/asm/kvm_host.h          |  5 ----
- arch/arm64/include/asm/kvm_emulate.h     | 35 ++++++++++++++++++++------
- arch/arm64/include/asm/kvm_host.h        |  1 -
- arch/arm64/kvm/debug.c                   | 21 ----------------
- arch/arm64/kvm/handle_exit.c             | 14 +----------
- arch/arm64/kvm/hyp/switch.c              | 43 +++-----------------------------
- arch/arm64/kvm/hyp/vgic-v2-cpuif-proxy.c | 12 ++++++---
- virt/kvm/arm/arm.c                       |  2 --
- virt/kvm/arm/hyp/vgic-v3-sr.c            |  6 ++++-
- virt/kvm/arm/mmio.c                      | 11 ++++----
- 10 files changed, 52 insertions(+), 98 deletions(-)
-
+diff --git a/virt/kvm/arm/mmio.c b/virt/kvm/arm/mmio.c
+index dac7ceb1a677..08443a15e6be 100644
+--- a/virt/kvm/arm/mmio.c
++++ b/virt/kvm/arm/mmio.c
+@@ -117,6 +117,12 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		vcpu_set_reg(vcpu, vcpu->arch.mmio_decode.rt, data);
+ 	}
+ 
++	/*
++	 * The MMIO instruction is emulated and should not be re-executed
++	 * in the guest.
++	 */
++	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++
+ 	return 0;
+ }
+ 
+@@ -144,11 +150,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, bool *is_write, int *len)
+ 	vcpu->arch.mmio_decode.sign_extend = sign_extend;
+ 	vcpu->arch.mmio_decode.rt = rt;
+ 
+-	/*
+-	 * The MMIO instruction is emulated and should not be re-executed
+-	 * in the guest.
+-	 */
+-	kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+ 	return 0;
+ }
+ 
 -- 
 2.11.0
