@@ -1,542 +1,264 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 9 Nov 2018 09:05:11 +0000
-Subject: [PATCH 01/10] irqdomain: Add interface to request an irq domain
-In-Reply-To: <20181108150355.GA4064@rric.localdomain>
-References: <20181107220254.6116-1-rrichter@cavium.com>
- <20181107220254.6116-2-rrichter@cavium.com>
- <e640a85d-6e2c-835b-d104-ef42eada8fde@arm.com>
- <20181108150355.GA4064@rric.localdomain>
-Message-ID: <efea8ead-6432-7cc4-fe54-034e34ce2f2d@arm.com>
+From: robert.walker@arm.com (Robert Walker)
+Date: Fri,  9 Nov 2018 09:11:26 +0000
+Subject: [PATCH v5] perf: Support for Arm A32/T32 instruction sets in
+ CoreSight trace
+Message-ID: <1541754686-19222-1-git-send-email-robert.walker@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+This patch adds support for generating instruction samples from trace of
+AArch32 programs using the A32 and T32 instruction sets.
 
-On 08/11/18 15:05, Richter, Robert wrote:
-> Julien,
-> 
-> thanks for your review. See my comments below.
-> 
-> On 08.11.18 10:19:52, Julien Thierry wrote:
->> On 07/11/18 22:03, Robert Richter wrote:
->>> This patch introduces a new interface to allow irq domain
->>> initialization regardless of order dependencies. This is done by
->>> requesting a domain and registering a callback function that is called
->>> as soon as a domain becomes available.
->>>
->>> A typical irq domain initialization code is the following:
->>>
->>> Parent initialization:
->>>
->>>       ...
->>>       domain = msi_create_irq_domain(fwnode, info, parent);
->>>       if (domain)
->>>               irq_domain_update_bus_token(domain, bus_token);
->>>       ...
->>>
->>> Child initialization:
->>>
->>>       ...
->>>       parent = irq_find_matching_fwnode(fwnode, bus_token);
->>>       if (!parent)
->>>               ...
->>>       create_irq_domain(parent, ...);
->>
->> What is that function?
-> 
-> This functions is just an example, all others are part of the api.  I
-> will rename it for more clarity, e.g. do_some_irq_domain_setup().
-> 
->>
->>>       ...
->>>
->>> In case the parent is not yet available, the child initialization
->>> fails. Thus, the current implementation requires the parent domain
->>> being initialized before the child domain. With a complex irq domain
->>> hierarchy it becomes more and more difficult to grant that order as
->>> irq domains are enabled in separate subsystems. Care must be taken
->>> when initializing parent and child domains in the same initcall
->>> level. E.g. Arm's gic-v3-its implementation might have the following
->>> tree and dependencies:
->>>
->>>       gic-v3
->>>       ??? its-node-0
->>>       ?   ??? pci-host-0
->>>       ?   ??? platform-bus
->>>       ?   ...
->>>       ??? its-node-1
->>>       ?   ??? pci-host-1
->>>       ...
->>>
->>> All domains must be initialized in top-down order of the tree.
->>>
->>> This patch introduces an interface that allows domain initialization
->>> without any order requirements, e.g. to be able to initialize the irq
->>> domains in the same initcall level. The following functions have been
->>> introduced to allow the registration of a callback handler:
->>>
->>>       irq_domain_request_fwnode()
->>>       irq_domain_request_host()
->>>
->>> Instead of using the irq_find_matching_fwnode() function and it's
->>> variants the child code replaces them with the new functions and
->>> looks e.g. like the following:
->>>
->>>       ...
->>>       irq_domain_request_fwnode(fwnode, bus_token,
->>>                               create_irq_domain, name, priv);
->>>       ...
->>>
->>> Here, the callback function create_irq_domain() is called as soon as
->>> the parent becomes available. All registered handlers are stored in a
->>> list. With each update of the bus token using irq_domain_update_bus_
->>> token(), the list is checked if that domain is requested by a handler
->>> and if that is the case it's callback function is called and the
->>> request removed from the list.
->>>
->>> With a late_initcall all requests from the list should already have
->>> been handled, otherwise all remaining requests are removed with an
->>> error reported.
->>>
->>> Signed-off-by: Robert Richter <rrichter@cavium.com>
->>> ---
->>>   include/linux/irqdomain.h |  15 +++++
->>>   kernel/irq/irqdomain.c    | 158 ++++++++++++++++++++++++++++++++++++++++++++++
->>>   2 files changed, 173 insertions(+)
->>>
->>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
->>> index 068aa46f0d55..27e83803627d 100644
->>> --- a/include/linux/irqdomain.h
->>> +++ b/include/linux/irqdomain.h
->>> @@ -311,6 +311,21 @@ static inline struct irq_domain *irq_find_host(struct device_node *node)
->>>       return d;
->>>   }
->>>
->>> +typedef int (*irq_domain_callback_t)(struct irq_domain *, void *);
->>> +int irq_domain_request_fwnode(struct fwnode_handle *fwnode,
->>> +                     enum irq_domain_bus_token bus_token,
->>> +                     irq_domain_callback_t callback,
->>> +                     const char *name, void *priv);
->>> +
->>> +static inline int irq_domain_request_host(struct device_node *node,
->>> +                                     enum irq_domain_bus_token bus_token,
->>> +                                     irq_domain_callback_t callback,
->>> +                                     void *priv)
->>> +{
->>> +     return irq_domain_request_fwnode(of_node_to_fwnode(node), bus_token,
->>> +                                     callback, node->full_name, priv);
->>> +}
->>> +
->>
->> A little documentation here? Why do we need both irq_domain_request_host
->> and irq_domain_request_fwnode?
-> 
-> irq_domain_request_fwnode() is documented in kernel/irq/irqdomain.c.
-> Functions are equivalent to it's irq_find_matching_*() counterparts.
-> *_host() is for devicetree only nodes.
-> 
->>
->> Also, you introduced this for domain creation, but the callback here is
->> very generic. Is it intended to allow any kind of action once a fwnode
->> is available?
-> 
-> Yes, it is generic, see patch #5 where it is used for late device
-> probing. Domain creation is the main use case to setup the irq domain
-> hierarchy. It can be used as a replacement for irq_find_matching_*().
-> Any users of that functions are suitable for being used with the new
-> interface.
-> 
->>
->>>   /**
->>>    * irq_domain_add_linear() - Allocate and register a linear revmap irq_domain.
->>>    * @of_node: pointer to interrupt controller's device tree node.
->>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->>> index 3366d11c3e02..9e33d873d8f6 100644
->>> --- a/kernel/irq/irqdomain.c
->>> +++ b/kernel/irq/irqdomain.c
->>> @@ -21,6 +21,7 @@
->>>   #include <linux/fs.h>
->>>
->>>   static LIST_HEAD(irq_domain_list);
->>> +static LIST_HEAD(irq_domain_requests);
->>>   static DEFINE_MUTEX(irq_domain_mutex);
->>>
->>>   static struct irq_domain *irq_default_domain;
->>> @@ -45,6 +46,106 @@ static inline void debugfs_remove_domain_dir(struct irq_domain *d) { }
->>>   const struct fwnode_operations irqchip_fwnode_ops;
->>>   EXPORT_SYMBOL_GPL(irqchip_fwnode_ops);
->>>
->>> +struct irq_domain_request {
->>> +     struct list_head                list;
->>> +     struct fwnode_handle            *fwnode;
->>> +     enum irq_domain_bus_token       bus_token;
->>> +     irq_domain_callback_t           callback;
->>> +     char                            *name;
->>> +     void                            *priv;
->>> +};
->>> +
->>> +static void irq_domain_call_handler(struct irq_domain *domain,
->>> +             irq_domain_callback_t callback, const char *name, void *priv)
->>> +{
->>> +     int ret;
->>> +
->>> +     ret = callback(domain, priv);
->>> +     if (ret)
->>> +             pr_err("%s: Domain request handler failed: %d\n",
->>> +                     name, ret);
->>> +
->>> +     of_node_put(irq_domain_get_of_node(domain));
->>> +}
->>> +
->>> +static void irq_domain_free_request(struct irq_domain_request *request)
->>> +{
->>> +     kfree(request->name);
->>> +     kfree(request);
->>> +}
->>> +
->>> +static void irq_domain_handle_requests(struct fwnode_handle *fwnode,
->>> +                        enum irq_domain_bus_token bus_token)
->>> +{
->>> +     struct irq_domain *domain;
->>> +     struct irq_domain_request *request;
->>> +
->>> +     if (!fwnode)
->>> +             return;
->>> +redo:
->>> +     domain = irq_find_matching_fwnode(fwnode, bus_token);
->>> +     if (!domain)
->>> +             return;
->>> +
->>> +     mutex_lock(&irq_domain_mutex);
->>> +
->>
->> Why do we need to take the mutex before checking the domain fields?
->> Can't we delay it?
-> 
-> The list is protected by the mutex. irq_find_matching_fwnode() also
-> accesses the list and must use the same mutex.
-> 
->>
->>> +     if ((domain->fwnode != fwnode) && (domain->bus_token != bus_token)) {
->>
->> Why do we even need that check?
-> 
-> The domain token might have changed after irq_find_matching_fwnode()
-> and before mutex_lock(), we do a recheck here. Some sort of try-lock.
-> 
-> Note: I found the check being wrong here, it needs to be corrected to:
-> 
-> 	if ((domain->fwnode != fwnode) || (domain->bus_token != bus_token)) {
-> 
->>
->> Isn't the point of passing fwnode and bus_token to
->> irq_find_matching_fwnode to find a domain with those properties?
-> 
-> Yes, but properties may change and also the list itself.
+T32 has variable 2 or 4 byte instruction size, so the conversion between
+addresses and instruction counts requires extra information from the trace
+decoder, requiring version 0.10.0 of OpenCSD.  A check for the OpenCSD
+library version has been added to the feature check for OpenCSD.
 
-Hmmm, that check is unrelated to the list, you're just checking the 
-domain you just retrieved.
+Signed-off-by: Robert Walker <robert.walker@arm.com>
+---
 
-Can you clarify which properties may change? If the irq_domain fields 
-can change (I guess if e.g. another cpu modifies the domain with 
-irq_domain_update_bus_token), they could still be changed between the 
-moment you retrieved the domain and the moment you call the handler. Why 
-is that not an issue if we worried about properties changing before 
-removing the request from the list?
+Changes since v4:
+ Formatting of comment block
 
-Maybe some comment would help here.
+ tools/build/feature/test-libopencsd.c           |  8 +++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 29 ++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 10 ++++
+ tools/perf/util/cs-etm.c                        | 70 +++++++++++--------------
+ 4 files changed, 78 insertions(+), 39 deletions(-)
 
-> 
->>
->>> +             mutex_unlock(&irq_domain_mutex);
->>> +             goto redo;
->>> +     }
->>> +
->>> +     list_for_each_entry(request, &irq_domain_requests, list) {
->>
->> Shouldn't you use list_for_each_safe if you want to remove elements of
->> the list inside the loop?
-> 
-> No, we do a complete redo again without further iterating the list. We
-> need to do this since the handler must be called with the mutex
-> unlocked (to be able to manipulate the irq domain list in the callback
-> and to be in non-atomic context). After we unlocked the mutex, we must
-> restart again as the list may have changed.
-> 
->>
->>> +             if (request->fwnode != fwnode ||
->>> +                 request->bus_token != bus_token)
->>> +                     continue;
->>> +
->>> +             list_del(&request->list);
->>> +             mutex_unlock(&irq_domain_mutex);
->>> +
->>> +             irq_domain_call_handler(domain, request->callback,
->>> +                                     request->name, request->priv);
->>> +             irq_domain_free_request(request);
->>> +
->>> +             goto redo;
->>> +     }
->>> +
->>> +     mutex_unlock(&irq_domain_mutex);
->>> +}
->>> +
->>> +static int __init irq_domain_drain_requests(void)
->>> +{
->>> +     struct irq_domain_request *request;
->>> +     struct irq_domain *domain;
->>> +     int ret = 0;
->>> +redo:
->>> +     mutex_lock(&irq_domain_mutex);
->>> +
->>> +     list_for_each_entry(request, &irq_domain_requests, list) {
->>
->> Same remark.
-> 
-> Same here, the difference is that we can directly operate with the
-> request, no need to check the domain.
-> 
->>
->>> +             list_del(&request->list);
->>> +             mutex_unlock(&irq_domain_mutex);
->>> +
->>> +             domain = irq_find_matching_fwnode(request->fwnode,
->>> +                                             request->bus_token);
->>> +             if (domain) {
->>> +                     irq_domain_call_handler(domain, request->callback,
->>> +                                             request->name, request->priv);
->>> +             } else {
->>> +                     ret = -ENODEV;
->>> +                     pr_err("%s-%d: Unhandled domain request\n",
->>> +                             request->name, request->bus_token);
->>> +             }
->>> +
->>> +             irq_domain_free_request(request);
->>> +
->>> +             goto redo;
->>
->> Hmmm, are you starting a loop to break out of it at each iteration?
-> 
-> We have to as the list lock was released which is needed for
-> irq_find_matching_fwnode() and the callback handler.
-> 
->>
->> Wouldn't it be much simpler to have something like the following?
->>
->>         while (!list_empty(&irq_domain_requests) {
->>                 mutex_lock(&irq_domain_mutex);
->>                 request = list_first_entry_or_null(&irq_domain_requests,
->>                                         struct irq_domain_request,
->>                                         list);
->>                 if (request)
->>                         list_del(&request->list);
->>                 mutex_unlock(&irq_domain_mutex);
-> 
-> At this point my implmentation has only 5 lines of code and uses one
-> list command less than your's. I am also not happy using list_empty()
-> without the lock hold (though it seems to be used that way elsewhere).
-
-I'm not sure why the number of list commands is relevant. 
-"list_for_each_entry" just already combines a bunch of operations, but 
-caries a completely different meaning (and probably expands code in the 
-function that is never used).
-
-For irq_domain_drain, you take the first element as long as there is one 
-and do stuff with it, so having something like:
-
-	mutex_lock();
-	while (!list_empty()) {
-		request = list_first_entry();
-		list_del(request->list);
-
-		// unlock and relock as you please
-		// and do stuff
-	}
-	mutex_unlock();
-
-Or if you are really concerned about the number of list commands:
-
-	mutex_lock();
-	while ((request = list_first_entry_or_null()) != NULL) {
-		list_del(request->list);
-
-		// unlock and relock as you please
-		// and do stuff
-	}
-	mutex_unlock();
-
-To me this makes it much easier to get what you are trying to do and I 
-don't think it is less efficient that your version (but I could be wrong).
-
-
-For irq_domain_handle_request, I think I agree that it is actually 
-different from irq_domain_drain, but it is hard to see in my opinion 
-because of how the functions are structured. So I would suggest 
-something like:
-
-	while ((domain = irq_domain_find(...)) != NULL) {
-		struct irq_domain_request *found = NULL;
-
-		mutex_lock();
-
-		// Do the check on domain if it is needed
-
-		list_for_each_entry(request, ..., list) {
-			if (request->fwnode != fwnode ||
-			    request->bus_token != bus_token)
-				continue;
-
-			list_del(request->list);
-			found = request;
-			break;
-		}
-		mutex_unlock();
-
-		if (found) {
-			// call handler, etc...
-		}
-	}
-
-
-Personally, I find those flow much easier to follow than when using 
-gotos to break out of loops.
-
-This is just my suggestion so feel free to disregard if the maintainers 
-agree with your current approach.
-
-Thanks,
-
-Julien
-
-> 
->>
->>                 <...>
->>         }
->>
->> If you really need to consider possible additions to the list while
->> draining it.
->>
->> Otherwise, just consider doing:
-> 
-> I let the callback handler run again which might change the list again
-> (e.g. by adding new handlers). Just using list_for_each_entry() looks
-> straight forward to me.
-> 
->>
->>         mutex_lock(&irq_domain_mutex);
->>         while (!list_empty(&irq_domain_requests)) {
->>                 request = list_first_entry(&irq_domain_requests,
->>                                         struct irq_domain_request,
->>                                         list);
->>                 list_del(&request->list);
->>         }
->>         mutex_unlock(&irq_domain_mutex);
->>
->>> +     }
->>> +
->>> +     mutex_unlock(&irq_domain_mutex);
->>> +
->>> +     return ret;
->>> +}
->>> +late_initcall(irq_domain_drain_requests);
->>
->> Overall the code for irq_domain_drain_requests and
->> irq_domain_handle_requests feels very similar.
->>
->> The only difference is that one filters the elements it processes based
->> on an irq_domain while the other just goes through all of them.
->>
->> You can probably factor that code.
-> 
-> Both functions serve different purposes and factoring the small set of
-> similarity out just adds more complexity.
-> 
-> Thanks,
-> 
-> -Robert
-> 
->>
->> Cheers,
->>
->>> +
->>>   /**
->>>    * irq_domain_alloc_fwnode - Allocate a fwnode_handle suitable for
->>>    *                           identifying an irq domain
->>> @@ -293,6 +394,8 @@ void irq_domain_update_bus_token(struct irq_domain *domain,
->>>       debugfs_add_domain_dir(domain);
->>>
->>>       mutex_unlock(&irq_domain_mutex);
->>> +
->>> +     irq_domain_handle_requests(domain->fwnode, bus_token);
->>>   }
->>>
->>>   /**
->>> @@ -417,6 +520,61 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
->>>   EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
->>>
->>>   /**
->>> + * irq_domain_request_fwnode() - Requests a domain for a given fwspec
->>> + * @fwspec: FW specifier for an interrupt
->>> + * @bus_token: domain-specific data
->>> + * @callback: function to be called once domain becomes available
->>> + * @name: name to be used for fwnode
->>> + * @priv: private data to be passed to callback
->>> + *
->>> + * The callback function is called as soon as the domain is available.
->>> + */
->>> +int irq_domain_request_fwnode(struct fwnode_handle *fwnode,
->>> +                     enum irq_domain_bus_token bus_token,
->>> +                     irq_domain_callback_t callback,
->>> +                     const char *name, void *priv)
->>> +{
->>> +     struct irq_domain *parent;
->>> +     struct irq_domain_request *request;
->>> +
->>> +     if (!fwnode || bus_token == DOMAIN_BUS_ANY || !callback || !name)
->>> +             return -EINVAL;
->>> +
->>> +     parent = irq_find_matching_fwnode(fwnode, bus_token);
->>> +     if (parent) {
->>> +             irq_domain_call_handler(parent, callback, name, priv);
->>> +             return 0;
->>> +     }
->>> +
->>> +     request = kzalloc(sizeof(*request), GFP_KERNEL);
->>> +     if (!request)
->>> +             return -ENOMEM;
->>> +
->>> +     request->fwnode = fwnode;
->>> +     request->bus_token = bus_token;
->>> +     request->callback = callback;
->>> +     request->name = kstrdup(name, GFP_KERNEL);
->>> +     request->priv = priv;
->>> +     INIT_LIST_HEAD(&request->list);
->>> +
->>> +     if (!request->name) {
->>> +             kfree(request);
->>> +             return -ENOMEM;
->>> +     }
->>> +
->>> +     of_node_get(to_of_node(fwnode));
->>> +
->>> +     mutex_lock(&irq_domain_mutex);
->>> +     list_add_tail(&request->list, &irq_domain_requests);
->>> +     mutex_unlock(&irq_domain_mutex);
->>> +
->>> +     /* recheck in case list changed */
->>> +     irq_domain_handle_requests(fwnode, bus_token);
->>> +
->>> +     return 0;
->>> +}
->>> +
->>> +/**
->>>    * irq_domain_check_msi_remap - Check whether all MSI irq domains implement
->>>    * IRQ remapping
->>>    *
->>>
->>
->> --
->> Julien Thierry
-
+diff --git a/tools/build/feature/test-libopencsd.c b/tools/build/feature/test-libopencsd.c
+index 5ff1246..d68eb4f 100644
+--- a/tools/build/feature/test-libopencsd.c
++++ b/tools/build/feature/test-libopencsd.c
+@@ -1,6 +1,14 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <opencsd/c_api/opencsd_c_api.h>
+ 
++/*
++ * Check OpenCSD library version is sufficient to provide required features
++ */
++#define OCSD_MIN_VER ((0 << 16) | (10 << 8) | (0))
++#if !defined(OCSD_VER_NUM) || (OCSD_VER_NUM < OCSD_MIN_VER)
++#error "OpenCSD >= 0.10.0 is required"
++#endif
++
+ int main(void)
+ {
+ 	(void)ocsd_get_version();
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 938def6..5efb616 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -263,9 +263,12 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+ 	decoder->tail = 0;
+ 	decoder->packet_count = 0;
+ 	for (i = 0; i < MAX_BUFFER; i++) {
++		decoder->packet_buffer[i].isa = CS_ETM_ISA_UNKNOWN;
+ 		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
+ 		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
++		decoder->packet_buffer[i].instr_count = 0;
+ 		decoder->packet_buffer[i].last_instr_taken_branch = false;
++		decoder->packet_buffer[i].last_instr_size = 0;
+ 		decoder->packet_buffer[i].exc = false;
+ 		decoder->packet_buffer[i].exc_ret = false;
+ 		decoder->packet_buffer[i].cpu = INT_MIN;
+@@ -294,11 +297,15 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+ 	decoder->packet_count++;
+ 
+ 	decoder->packet_buffer[et].sample_type = sample_type;
++	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
+ 	decoder->packet_buffer[et].exc = false;
+ 	decoder->packet_buffer[et].exc_ret = false;
+ 	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+ 	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
+ 	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
++	decoder->packet_buffer[et].instr_count = 0;
++	decoder->packet_buffer[et].last_instr_taken_branch = false;
++	decoder->packet_buffer[et].last_instr_size = 0;
+ 
+ 	if (decoder->packet_count == MAX_BUFFER - 1)
+ 		return OCSD_RESP_WAIT;
+@@ -321,8 +328,28 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+ 
+ 	packet = &decoder->packet_buffer[decoder->tail];
+ 
++	switch (elem->isa) {
++	case ocsd_isa_aarch64:
++		packet->isa = CS_ETM_ISA_A64;
++		break;
++	case ocsd_isa_arm:
++		packet->isa = CS_ETM_ISA_A32;
++		break;
++	case ocsd_isa_thumb2:
++		packet->isa = CS_ETM_ISA_T32;
++		break;
++	case ocsd_isa_tee:
++	case ocsd_isa_jazelle:
++	case ocsd_isa_custom:
++	case ocsd_isa_unknown:
++	default:
++		packet->isa = CS_ETM_ISA_UNKNOWN;
++	}
++
+ 	packet->start_addr = elem->st_addr;
+ 	packet->end_addr = elem->en_addr;
++	packet->instr_count = elem->num_instr_range;
++
+ 	switch (elem->last_i_type) {
+ 	case OCSD_INSTR_BR:
+ 	case OCSD_INSTR_BR_INDIRECT:
+@@ -336,6 +363,8 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+ 		break;
+ 	}
+ 
++	packet->last_instr_size = elem->last_instr_sz;
++
+ 	return ret;
+ }
+ 
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index 612b575..9351bd1 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -28,11 +28,21 @@ enum cs_etm_sample_type {
+ 	CS_ETM_TRACE_ON = 1 << 1,
+ };
+ 
++enum cs_etm_isa {
++	CS_ETM_ISA_UNKNOWN,
++	CS_ETM_ISA_A64,
++	CS_ETM_ISA_A32,
++	CS_ETM_ISA_T32,
++};
++
+ struct cs_etm_packet {
+ 	enum cs_etm_sample_type sample_type;
++	enum cs_etm_isa isa;
+ 	u64 start_addr;
+ 	u64 end_addr;
++	u32 instr_count;
+ 	u8 last_instr_taken_branch;
++	u8 last_instr_size;
+ 	u8 exc;
+ 	u8 exc_ret;
+ 	int cpu;
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 73430b7..48ad217 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -31,14 +31,6 @@
+ 
+ #define MAX_TIMESTAMP (~0ULL)
+ 
+-/*
+- * A64 instructions are always 4 bytes
+- *
+- * Only A64 is supported, so can use this constant for converting between
+- * addresses and instruction counts, calculting offsets etc
+- */
+-#define A64_INSTR_SIZE 4
+-
+ struct cs_etm_auxtrace {
+ 	struct auxtrace auxtrace;
+ 	struct auxtrace_queues queues;
+@@ -510,21 +502,17 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+ 	etmq->last_branch_rb->nr = 0;
+ }
+ 
+-static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+-{
+-	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+-	if (packet->sample_type == CS_ETM_TRACE_ON)
+-		return 0;
++static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
++					 u64 addr) {
++	u8 instrBytes[2];
+ 
++	cs_etm__mem_access(etmq, addr, ARRAY_SIZE(instrBytes), instrBytes);
+ 	/*
+-	 * The packet records the execution range with an exclusive end address
+-	 *
+-	 * A64 instructions are constant size, so the last executed
+-	 * instruction is A64_INSTR_SIZE before the end address
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
++	 * T32 instruction size is indicated by bits[15:11] of the first
++	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
++	 * denote a 32-bit instruction.
+ 	 */
+-	return packet->end_addr - A64_INSTR_SIZE;
++	return ((instrBytes[1] & 0xF8) >= 0xE8) ? 4 : 2;
+ }
+ 
+ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+@@ -536,27 +524,32 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+ 	return packet->start_addr;
+ }
+ 
+-static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
++static inline
++u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
+ {
+-	/*
+-	 * Only A64 instructions are currently supported, so can get
+-	 * instruction count by dividing.
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
+-	 */
+-	return (packet->end_addr - packet->start_addr) / A64_INSTR_SIZE;
++	/* Returns 0 for the CS_ETM_TRACE_ON packet */
++	if (packet->sample_type == CS_ETM_TRACE_ON)
++		return 0;
++
++	return packet->end_addr - packet->last_instr_size;
+ }
+ 
+-static inline u64 cs_etm__instr_addr(const struct cs_etm_packet *packet,
++static inline u64 cs_etm__instr_addr(struct cs_etm_queue *etmq,
++				     const struct cs_etm_packet *packet,
+ 				     u64 offset)
+ {
+-	/*
+-	 * Only A64 instructions are currently supported, so can get
+-	 * instruction address by muliplying.
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
+-	 */
+-	return packet->start_addr + offset * A64_INSTR_SIZE;
++	if (packet->isa == CS_ETM_ISA_T32) {
++		u64 addr = packet->start_addr;
++
++		while (offset > 0) {
++			addr += cs_etm__t32_instr_size(etmq, addr);
++			offset--;
++		}
++		return addr;
++	}
++
++	/* Assume a 4 byte instruction size (A32/A64) */
++	return packet->start_addr + offset * 4;
+ }
+ 
+ static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+@@ -888,9 +881,8 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+ 	struct cs_etm_packet *tmp;
+ 	int ret;
+-	u64 instrs_executed;
++	u64 instrs_executed = etmq->packet->instr_count;
+ 
+-	instrs_executed = cs_etm__instr_count(etmq->packet);
+ 	etmq->period_instructions += instrs_executed;
+ 
+ 	/*
+@@ -920,7 +912,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		 * executed, but PC has not advanced to next instruction)
+ 		 */
+ 		u64 offset = (instrs_executed - instrs_over - 1);
+-		u64 addr = cs_etm__instr_addr(etmq->packet, offset);
++		u64 addr = cs_etm__instr_addr(etmq, etmq->packet, offset);
+ 
+ 		ret = cs_etm__synth_instruction_sample(
+ 			etmq, addr, etm->instructions_sample_period);
 -- 
-Julien Thierry
+2.7.4
