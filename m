@@ -1,87 +1,72 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 9 Nov 2018 10:39:25 +0100
-Subject: [PATCH 4/4] arm64: dts: meson-axg: enable SCPI
-In-Reply-To: <20181108135352.8459-5-jbrunet@baylibre.com>
-References: <20181108135352.8459-1-jbrunet@baylibre.com>
- <20181108135352.8459-5-jbrunet@baylibre.com>
-Message-ID: <e7b4b5a6-717a-fb58-74a1-24d713193541@baylibre.com>
+Date: Fri, 9 Nov 2018 10:41:30 +0100
+Subject: [PATCH v3 3/3] ARM64: dts: meson-gxl: Add support for the
+ Smartlabs SML-5442TW
+In-Reply-To: <1541706240-30036-4-git-send-email-christianshewitt@gmail.com>
+References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
+ <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
+ <1541706240-30036-4-git-send-email-christianshewitt@gmail.com>
+Message-ID: <5118ab67-3856-90c2-300d-ab6ff73e7f71@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2018 14:53, Jerome Brunet wrote:
-> Enable SCPI on the axg platform, with cpu clock and hwmon
-> (core temperature) support
+Hi Christian,
+
+On 08/11/2018 20:43, Christian Hewitt wrote:
+> The Smartlabs SML-5442TW is broadly similar to the P231 reference design
+> but with the following differences:
 > 
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> - Yellow and Blue front-panel LEDs are available but disabled
+> - Red/Green LED is used to signal off/on status
+> - GPIOX_17 is set high to enable the QCA9377 wireless module
+> - uart_AO can be accessed after opening the case; soldered pins exist
+> 
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 26 ++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+>  arch/arm64/boot/dts/amlogic/Makefile               |   1 +
+>  .../boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts | 292 +++++++++++++++++++++
+>  2 files changed, 293 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index b8893675e39c..5f512c91471e 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -79,6 +79,7 @@
->  			reg = <0x0 0x0>;
->  			enable-method = "psci";
->  			next-level-cache = <&l2>;
-> +			clocks = <&scpi_dvfs 0>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -87,6 +88,7 @@
->  			reg = <0x0 0x1>;
->  			enable-method = "psci";
->  			next-level-cache = <&l2>;
-> +			clocks = <&scpi_dvfs 0>;
->  		};
->  
->  		cpu2: cpu at 2 {
-> @@ -95,6 +97,7 @@
->  			reg = <0x0 0x2>;
->  			enable-method = "psci";
->  			next-level-cache = <&l2>;
-> +			clocks = <&scpi_dvfs 0>;
->  		};
->  
->  		cpu3: cpu at 3 {
-> @@ -103,6 +106,7 @@
->  			reg = <0x0 0x3>;
->  			enable-method = "psci";
->  			next-level-cache = <&l2>;
-> +			clocks = <&scpi_dvfs 0>;
->  		};
->  
->  		l2: l2-cache0 {
-> @@ -137,6 +141,28 @@
->  		};
->  	};
->  
-> +	scpi {
-> +		compatible = "arm,scpi-pre-1.0";
-> +		mboxes = <&mailbox 1 &mailbox 2>;
-> +		shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> index c31f29d6..37d7dbd 100644
+> --- a/arch/arm64/boot/dts/amlogic/Makefile
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-sml5442tw.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
+> new file mode 100644
+> index 0000000..44d02c2
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-sml5442tw.dts
+> @@ -0,0 +1,292 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (c) 2016 Endless Computers, Inc.
+> + * Author: Carlo Caione <carlo@endlessm.com>
+> + * Copyright (c) 2018 BayLibre, SAS
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + */
 > +
-> +		scpi_clocks: clocks {
-> +			compatible = "arm,scpi-clocks";
+> +/dts-v1/;
 > +
-> +			scpi_dvfs: clock-controller {
-> +				compatible = "arm,scpi-dvfs-clocks";
-> +				#clock-cells = <1>;
-> +				clock-indices = <0>;
-> +				clock-output-names = "vcpu";
-> +			};
-> +		};
+
+[...]
+
 > +
-> +		scpi_sensors: sensors {
-> +			compatible = "amlogic,meson-gxbb-scpi-sensors";
-> +			#thermal-sensor-cells = <1>;
-> +		};
-> +	};
-> +
->  	soc {
->  		compatible = "simple-bus";
->  		#address-cells = <2>;
+> +&usb0 {
+> +	status = "okay";
+> +};
 > 
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+It's ok for me !
+
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Neil
