@@ -1,88 +1,96 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 9 Nov 2018 10:59:25 -0700
-Subject: [PATCH v2 3/4] coresight: etm3x: Deal with CLAIM tag before and
- after accessing HW
-In-Reply-To: <102c6181-189e-0ce4-02be-15c1a2744334@arm.com>
-References: <1541632132-1252-1-git-send-email-mathieu.poirier@linaro.org>
- <1541632132-1252-4-git-send-email-mathieu.poirier@linaro.org>
- <102c6181-189e-0ce4-02be-15c1a2744334@arm.com>
-Message-ID: <CANLsYkxbzk3=uA0Tx6HNNoXGBnDUPAhgnWZM9Q7jqLSzBhDr-g@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Fri, 9 Nov 2018 13:01:55 -0500
+Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
+In-Reply-To: <20181029191000.GD16739@arm.com>
+References: <20180927224609.19515-1-robdclark@gmail.com>
+ <20181029191000.GD16739@arm.com>
+Message-ID: <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Nov 2018 at 10:13, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+On Mon, Oct 29, 2018 at 3:09 PM Will Deacon <will.deacon@arm.com> wrote:
 >
-> Hi,
->
-> On 07/11/2018 23:08, Mathieu Poirier wrote:
-> > This patch moves access to the CLAIM tag so that no modification to the HW
-> > happens before and after the CLAIM operation has been carried.
+> On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
+> > We seem to need to set either this or CFCFG (stall), otherwise gpu
+> > faults trigger problems with other in-flight transactions from the
+> > GPU causing CP errors, etc.
 > >
-> > Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> > In the ARM SMMU spec, the 'Hit under previous context fault' bit is
+> > described as:
+> >
+> >  '0' - Stall or terminate subsequent transactions in the presence
+> >        of an outstanding context fault
+> >  '1' - Process all subsequent transactions independently of any
+> >        outstanding context fault.
+> >
+> > Since we don't enable CFCFG (stall) the behavior of terminating
+> > other transactions makes sense.  And is probably not what we want
+> > (and definately not what we want for GPU).
+> >
+> > Signed-off-by: Rob Clark <robdclark@gmail.com>
 > > ---
-> >   drivers/hwtracing/coresight/coresight-etm3x.c | 16 ++++++++--------
-> >   1 file changed, 8 insertions(+), 8 deletions(-)
+> > So I hit this issue a long time back on 820 (msm8996) and at the
+> > time I solved it with a patch that enabled CFCFG.  And it resurfaced
+> > more recently on sdm845.  But at the time CFCFG was rejected, iirc
+> > because of concern that it would cause problems on other non-qcom
+> > arm smmu implementations.  And I think I forgot to send this version
+> > of the solution.
 > >
-> > diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-> > index fd5c4cca7db5..4f638d81a66a 100644
-> > --- a/drivers/hwtracing/coresight/coresight-etm3x.c
-> > +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-> > @@ -363,15 +363,16 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
+> > If enabling HUPCF is anticipated to cause problems on other ARM
+> > SMMU implementations, I think I can come up with a variant of this
+> > patch which conditionally enables it for snapdragon.
 > >
-> >       CS_UNLOCK(drvdata->base);
-> >
-> > +     rc = coresight_claim_device_unlocked(drvdata->base);
-> > +     if (rc)
-> > +             goto done;
-> > +
-> >       /* Turn engine on */
-> >       etm_clr_pwrdwn(drvdata);
-> >       /* Apply power to trace registers */
-> >       etm_set_pwrup(drvdata);
-> >       /* Make sure all registers are accessible */
-> >       etm_os_unlock(drvdata);
-> > -     rc = coresight_claim_device_unlocked(drvdata->base);
-> > -     if (rc)
-> > -             goto done;
-> >
-> >       etm_set_prog(drvdata);
-> >
-> > @@ -422,12 +423,11 @@ static int etm_enable_hw(struct etm_drvdata *drvdata)
-> >       etm_clr_prog(drvdata);
-> >
-> >   done:
-> > -     if (rc)
-> > -             etm_set_pwrdwn(drvdata);
-> >       CS_LOCK(drvdata->base);
-> >
-> > -     dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
-> > -             drvdata->cpu, rc);
-> > +     if (!rc)
-> > +             dev_dbg(drvdata->dev, "cpu: %d enable smp call done: %d\n",
-> > +                     drvdata->cpu, rc);
+> > Either way, I'd really like to get some variant of this fix merged
+> > (and probably it would be a good idea for stable kernel branches
+> > too), since current behaviour with the GPU means faults turn into
+> > a fantastic cascade of fail.
 >
-> Isn't it good to report the failure case too ? Anyway it is dev_dbg and
-> will be a useful info when we debug issues. Otherwise,
+> Can you describe how this fantastic cascade of fail improves with this
+> patch, please? If you're getting context faults then something has already
+> gone horribly wrong, so I'm trying to work out how this improves things.
+>
 
-Simply removing the "if (!rc)" will do the trick.  Can I do the
-modification and add your tag or you prefer to see another revision?
+There are plenty of cases where getting iommu faults with a GPU is
+"normal", or at least not something the kernel or even GL driver can
+control.
 
+With this patch, you still get the iommu fault, but it doesn't cause
+the gpu to crash.  But without it, other memory accesses in flight
+while the fault occurs, like the GPU command-processor reading further
+ahead in the cmdstream to setup next draw, would return zero's,
+causing the GPU to crash or get into a bad state.
+
+BR,
+-R
+
+> > diff --git a/drivers/iommu/arm-smmu-regs.h b/drivers/iommu/arm-smmu-regs.h
+> > index a1226e4ab5f8..2291925eb800 100644
+> > --- a/drivers/iommu/arm-smmu-regs.h
+> > +++ b/drivers/iommu/arm-smmu-regs.h
+> > @@ -178,6 +178,7 @@ enum arm_smmu_s2cr_privcfg {
+> >  #define ARM_SMMU_CB_ATSR             0x8f0
+> >
+> >  #define SCTLR_S1_ASIDPNE             (1 << 12)
+> > +#define SCTLR_HUPCF                  (1 << 8)
+> >  #define SCTLR_CFCFG                  (1 << 7)
+> >  #define SCTLR_CFIE                   (1 << 6)
+> >  #define SCTLR_CFRE                   (1 << 5)
+> > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> > index f7a96bcf94a6..47ffc9aade72 100644
+> > --- a/drivers/iommu/arm-smmu.c
+> > +++ b/drivers/iommu/arm-smmu.c
+> > @@ -713,9 +713,9 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
+> >       reg = SCTLR_CFIE | SCTLR_CFRE | SCTLR_AFE | SCTLR_TRE | SCTLR_M;
+> >       if (stage1)
+> >               reg |= SCTLR_S1_ASIDPNE;
+> > +     reg |= SCTLR_HUPCF;
 >
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Maybe just throw this into the assignment a couple of lines above?
 >
-> >       return rc;
-> >   }
-> >
-> > @@ -577,9 +577,9 @@ static void etm_disable_hw(void *info)
-> >       for (i = 0; i < drvdata->nr_cntr; i++)
-> >               config->cntr_val[i] = etm_readl(drvdata, ETMCNTVRn(i));
-> >
-> > +     etm_set_pwrdwn(drvdata);
-> >       coresight_disclaim_device_unlocked(drvdata->base);
-> >
-> > -     etm_set_pwrdwn(drvdata);
-> >       CS_LOCK(drvdata->base);
-> >
-> >       dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
-> >
+> >       if (IS_ENABLED(CONFIG_CPU_BIG_ENDIAN))
+> >               reg |= SCTLR_E;
+> > -
 >
+> Random whitespace change.
+>
+> Will
