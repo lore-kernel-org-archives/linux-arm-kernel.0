@@ -1,48 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 9 Nov 2018 17:05:31 +0100
-Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
-In-Reply-To: <20181109123730.8743-7-vincenzo.frascino@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-7-vincenzo.frascino@arm.com>
-Message-ID: <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 9 Nov 2018 17:09:08 +0100
+Subject: [PATCH v2] i2c: rk3x: fix some typo
+In-Reply-To: <12637568.SqdzpTGmKQ@phil>
+References: <20181102124535.24331-1-tiny.windzz@gmail.com>
+ <19a28033-9241-1f4e-97cd-7c6648a73c6d@axentia.se>
+ <CAEExFWtQrPD8hUn15Add-EuueCL5=Crb+yvDckWejG75BExGug@mail.gmail.com>
+ <12637568.SqdzpTGmKQ@phil>
+Message-ID: <20181109160908.GJ1031@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 9, 2018 at 1:38 PM Vincenzo Frascino
-<vincenzo.frascino@arm.com> wrote:
-> +/*
-> + * To avoid performance issues __u_vdso (unsigned vdso type) depends
-> + * on the architecture:
-> + * 32 bit only __u_vdso is defined as __u32
-> + * 64 bit plus compat __u_vdso is defined as __u64
-> + */
-> +#ifdef CONFIG_GENERIC_VDSO_32
-> +typedef __u32 __u_vdso;
-> +#else
-> +typedef __u64 __u_vdso;
-> +#endif /* CONFIG_GENERIC_VDSO_32 */
-> +
->  struct vdso_data {
-> -       __u64 cs_cycle_last;    /* Timebase at clocksource init */
-> -       __u64 raw_time_sec;     /* Raw time */
-> +       __u64 cs_cycle_last;            /* Timebase at clocksource init */
-> +       __u_vdso raw_time_sec;          /* Raw time */
->         __u64 raw_time_nsec;
-> -       __u64 xtime_clock_sec;  /* Kernel time */
-> +       __u_vdso xtime_clock_sec;       /* Kernel time */
->         __u64 xtime_clock_nsec;
-> -       __u64 xtime_coarse_sec; /* Coarse time */
-> +       __u_vdso xtime_coarse_sec;      /* Coarse time */
->         __u64 xtime_coarse_nsec;
-> -       __u64 wtm_clock_sec;    /* Wall to monotonic time */
-> +       __u_vdso wtm_clock_sec;         /* Wall to monotonic time */
+On Tue, Nov 06, 2018 at 01:01:33PM +0100, Heiko Stuebner wrote:
+> Hi Yangtao, Peter,
+> 
+> Am Montag, 5. November 2018, 16:59:58 CET schrieb Frank Lee:
+> > I am sorry.
+> > -- Yangtao
+> 
+> If anything, it is me that should be sorry, as I did suggest the
+> patch description, including the new spelling error.
+> 
+> And it took me like the whole weekend to actually realize where the
+> Calculated / Calculates error was hiding ;-) .
 
-It looks like you change the layout in a way that makes it incompatible between
-32-bit and 64-bit user space. Doesn't that break the compat-vdso code
-for 32-bit?
+You guys are fun :) Anyhow, $subject is way too generic, that is the
+real culprit here. I don't mind empty descriptions, so you can basically
+move the message into the header.
 
-It also seems like we need the seconds to be 64-bit wide, at least
-for anything that counts in CLOCK_REALTIME or a related format,
-otherwise we have to change it back for y2038 support.
-
-      Arnd
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181109/391a2489/attachment.sig>
