@@ -1,27 +1,37 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 10 Nov 2018 22:18:08 +0100
-Subject: [PATCH 0/2] ARM: tegra: enable SMP boot with TF
-References: <cover.1541882833.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <cover.1541884486.git.mirq-linux@rere.qmqm.pl>
+Date: Sat, 10 Nov 2018 22:18:09 +0100
+Subject: [PATCH 2/2] ARM: tegra: avoid touching Secure registers in reset
+ handler
+In-Reply-To: <cover.1541884486.git.mirq-linux@rere.qmqm.pl>
+References: <cover.1541884486.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <c93b79b052370f4058033dae716225aec94c4991.1541884486.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables starting up all cores on Tegra3 with Trusted
-Foundations firmware. This is Tegra-specific part and depends on
-"ARM: enable cache via Trusted Foundations firmware" patchset sent
-earlier.
+This allows secondary CPUs to boot with Trusted Foundations firmware.
 
-Micha? Miros?aw (2):
-  ARM: tegra: enable cache via TF
-  ARM: tegra: avoid touching Secure registers in reset handler
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
+---
+ arch/arm/mach-tegra/reset-handler.S | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- arch/arm/firmware/trusted_foundations.c    |  6 +++--
- arch/arm/include/asm/trusted_foundations.h |  6 +++--
- arch/arm/mach-tegra/reset-handler.S        | 27 +++++++++++++++++++++-
- arch/arm/mach-tegra/reset.c                |  5 +++-
- arch/arm/mach-tegra/reset.h                |  5 ++--
- arch/arm/mach-tegra/tegra.c                |  6 +++--
- 6 files changed, 45 insertions(+), 10 deletions(-)
-
+diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+index fe4c568aeace..56300ec9f1a0 100644
+--- a/arch/arm/mach-tegra/reset-handler.S
++++ b/arch/arm/mach-tegra/reset-handler.S
+@@ -139,6 +139,13 @@ ENTRY(__tegra_cpu_reset_handler)
+ 	cpsid	aif, 0x13			@ SVC mode, interrupts disabled
+ 
+ 	tegra_get_soc_id TEGRA_APB_MISC_BASE, r6
++
++#ifdef CONFIG_TRUSTED_FOUNDATIONS
++	adr	r3, __tegra_cpu_reset_handler_data
++	ldr	r0, [r3, #RESET_DATA(TF_PRESENT)]
++	cmp	r0, #0
++	bne	after_errata
++#endif	/* CONFIG_TRUSTED_FOUNDATIONS */
+ #ifdef CONFIG_ARCH_TEGRA_2x_SOC
+ t20_check:
+ 	cmp	r6, #TEGRA20
 -- 
 2.19.1
