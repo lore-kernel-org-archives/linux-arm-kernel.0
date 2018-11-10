@@ -1,91 +1,60 @@
-From: cai@gmx.us (Qian Cai)
-Date: Sat, 10 Nov 2018 03:45:14 +0100
-Subject: [PATCH] efi: permit calling efi_mem_reserve_persistent from
- atomic context
-In-Reply-To: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
-References: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
-Message-ID: <trinity-d366cf7f-4a38-4193-a636-b695d34d6c47-1541817914119@msvc-mesg-gmx024>
+From: yangxuan8282@gmail.com (He Yangxuan)
+Date: Sat, 10 Nov 2018 11:39:02 +0800
+Subject: [PATCH v5 1/3] arm64: dts: meson-gxl: add support for phicomm n1
+In-Reply-To: <20181110033904.4207-1-yangxuan8282@gmail.com>
+References: <20181110033904.4207-1-yangxuan8282@gmail.com>
+Message-ID: <20181110033904.4207-2-yangxuan8282@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds support for the Phicomm N1. This device based on P230 reference design.
+And this box doesn't have cvbs, so disable related section in device tree.
 
-On 11/8/18 at 1:05 PM, Ard Biesheuvel wrote:
+Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
+---
+ arch/arm64/boot/dts/amlogic/Makefile                |  1 +
+ .../boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
 
-> Currently, efi_mem_reserve_persistent() may not be called from atomic
-> context, since both the kmalloc() call and the memremap() call may
-> sleep.
-> 
-> The kmalloc() call is easy enough to fix, but the memremap() call
-> needs to be moved into an init hook since we cannot control the
-> memory allocation behavior of memremap() at the call site.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/efi.c | 31 +++++++++++++++++++------------
->  1 file changed, 19 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index 249eb70691b0..cfc876e0b67b 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -963,36 +963,43 @@ bool efi_is_table_address(unsigned long phys_addr)
->  }
->  
->  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
-> +static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
->  
->  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->  {
-> -	struct linux_efi_memreserve *rsv, *parent;
-> +	struct linux_efi_memreserve *rsv;
->  
-> -	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-> +	if (!efi_memreserve_root)
->  		return -ENODEV;
->  
-> -	rsv = kmalloc(sizeof(*rsv), GFP_KERNEL);
-> +	rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
->  	if (!rsv)
->  		return -ENOMEM;
->  
-> -	parent = memremap(efi.mem_reserve, sizeof(*rsv), MEMREMAP_WB);
-> -	if (!parent) {
-> -		kfree(rsv);
-> -		return -ENOMEM;
-> -	}
-> -
->  	rsv->base = addr;
->  	rsv->size = size;
->  
->  	spin_lock(&efi_mem_reserve_persistent_lock);
-> -	rsv->next = parent->next;
-> -	parent->next = __pa(rsv);
-> +	rsv->next = efi_memreserve_root->next;
-> +	efi_memreserve_root->next = __pa(rsv);
->  	spin_unlock(&efi_mem_reserve_persistent_lock);
->  
-> -	memunmap(parent);
-> +	return 0;
-> +}
->  
-> +static int __init efi_memreserve_root_init(void)
-> +{
-> +	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-> +		return -ENODEV;
-> +
-> +	efi_memreserve_root = memremap(efi.mem_reserve,
-> +				       sizeof(*efi_memreserve_root),
-> +				       MEMREMAP_WB);
-> +	if (!efi_memreserve_root)
-> +		return -ENOMEM;
->  	return 0;
->  }
-> +early_initcall(efi_memreserve_root_init);
->  
->  #ifdef CONFIG_KEXEC
->  static int update_efi_random_seed(struct notifier_block *nb,
-> -- 
-> 2.19.1
-BTW, I won?t be able to apply this patch on top of this series [1]. After applied that series, the original BUG sleep from atomic is gone as well as two other GIC warnings. Do you think a new patch is needed here?
-
-[1] https://www.spinics.net/lists/arm-kernel/msg685751.html
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index c31f29d66..49f3ac5d8 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-phicomm-n1.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
+new file mode 100644
+index 000000000..9a8a8a7e4
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * Copyright (c) 2018 He Yangxuan
++ */
++
++/dts-v1/;
++
++#include "meson-gxl-s905d-p230.dts"
++
++/ {
++	compatible = "phicomm,n1", "amlogic,s905d", "amlogic,meson-gxl";
++	model = "Phicomm N1";
++
++	cvbs-connector {
++		status = "disabled";
++	};
++};
++
++&cvbs_vdac_port {
++	status = "disabled";
++};
+-- 
+2.11.0
