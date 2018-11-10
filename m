@@ -1,39 +1,45 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 10 Nov 2018 15:13:16 +0000
-Subject: [PATCH V5 6/6] ARM: imx_v6_v7_defconfig: add imx7ulp support
+Date: Sat, 10 Nov 2018 15:12:56 +0000
+Subject: [PATCH V5 1/6] dt-bindings: fsl: add compatible for imx7ulp evk
 In-Reply-To: <1541862478-7839-1-git-send-email-aisheng.dong@nxp.com>
 References: <1541862478-7839-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541862478-7839-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541862478-7839-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_SOC_IMX7ULP by default.
-Patch generated via make ARCH=arm savedefconfig
-
+Cc: devicetree at vger.kernel.org
 Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-v2->v3:
- * no changes
-v1->v2:
- * rebase to new version
----
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/arm/fsl.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 1ad5736..27ee422 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -38,6 +38,7 @@ CONFIG_SOC_IMX6SLL=y
- CONFIG_SOC_IMX6SX=y
- CONFIG_SOC_IMX6UL=y
- CONFIG_SOC_IMX7D=y
-+CONFIG_SOC_IMX7ULP=y
- CONFIG_SOC_VF610=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 7b964d8..9c7c788 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -101,6 +101,10 @@ i.MX7 SabreSD Board
+ Required root node properties:
+     - compatible = "fsl,imx7d-sdb", "fsl,imx7d";
+ 
++i.MX7ULP Evaluation Kit
++Required root node properties:
++    - compatible = "fsl,imx7ulp-evk", "fsl,imx7ulp";
++
+ Generic i.MX boards
+ -------------------
+ 
+@@ -123,6 +127,10 @@ i.MX6q generic board
+ Required root node properties:
+     - compatible = "fsl,imx6q";
+ 
++i.MX7ULP generic board
++Required root node properties:
++    - compatible = "fsl,imx7ulp";
++
+ Freescale Vybrid Platform Device Tree Bindings
+ ----------------------------------------------
+ 
 -- 
 2.7.4
