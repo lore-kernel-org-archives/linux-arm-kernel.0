@@ -1,47 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Nov 2018 09:32:55 -0800
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-In-Reply-To: <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
-References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
- <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
- <20181108093617.GB8433@e107155-lin>
- <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
- <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
- <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
-Message-ID: <CAOesGMgdYDZw0t=q0CmiG6x1a0agQdShrZrWxJMRXXsM4B8d2w@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 10 Nov 2018 15:45:02 -0200
+Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Remove EEPROM node
+Message-ID: <1541871902-31316-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 8:05 AM Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On 11/10/18, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
-> > On 10/11/2018 09:57, Arnd Bergmann wrote:
-> >
-> >> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com>
-> >> wrote:
-> >>>
-> >>> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
-> >>>> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
-> >>>> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
-> >>>>
-> >>>
-> >>> Looks good,
-> >>>
-> >>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>>
-> >>> But I left it intentionally to avoid churn assuming it will go away when
-> >>> ARM SoC team runs savedefconfig and sync the defconfig.
-> >>
-> >> I would never do that,
-> >
-> > Isn't that what commit c432c0880596 did? :-p
->
-> Olof did that one ;-)
+The EEPROM under I2C2 was put by mistake in the dts.
 
-Yeah, it was because of churn caused by things moving over many releases.
+Remove it as it is not really present on the real hardware.
 
-In the end, it's documenting what the kernel builds anyway. We don't
-do it often, I think this was the first time in recent memory.
+Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
+Reported-by: Chris Healy <cphealy@gmail.com>
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+---
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 ------
+ 1 file changed, 6 deletions(-)
 
-
--Olof
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index 3ca4f9b..28e9dca 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -493,12 +493,6 @@
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	eeprom at 50 {
+-		compatible = "atmel,24c04";
+-		pagesize = <16>;
+-		reg = <0x50>;
+-	};
+-
+ 	hpa1: amp at 60 {
+ 		compatible = "ti,tpa6130a2";
+ 		reg = <0x60>;
+-- 
+2.7.4
