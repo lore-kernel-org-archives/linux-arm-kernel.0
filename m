@@ -1,40 +1,31 @@
 From: yangxuan8282@gmail.com (He Yangxuan)
-Date: Sat, 10 Nov 2018 11:39:01 +0800
-Subject: [PATCH v5 0/3] arm64: dts: meson-gxl: add support for phicomm n1
-Message-ID: <20181110033904.4207-1-yangxuan8282@gmail.com>
+Date: Sat, 10 Nov 2018 11:39:03 +0800
+Subject: [PATCH v5 2/3] dt-bindings: Add vendor prefix for PHICOMM Co., Ltd.
+In-Reply-To: <20181110033904.4207-1-yangxuan8282@gmail.com>
+References: <20181110033904.4207-1-yangxuan8282@gmail.com>
+Message-ID: <20181110033904.4207-3-yangxuan8282@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Phicomm N1. This device based on P230 reference design.
-The phy is RTL8211F, need to disable Energy Efficient Ethernet (EEE) to make it stable.
-And this box doesn't have cvbs, so disable related section in device tree.
+PHICOMM Co., Ltd. is a hardware provider headquartered in Shanghai, it's
+product includes router and smart devices.
 
-Changes since v4:
- - include device tree
+Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v3:
- - remove external phy from device tree, will disable EEE in meson-gxl-s905d-p230.dts
-
-Changes since v2:
- - remove changes section in commit message
- - add commit message for patch of vendor prefix and bindings documentation
-
-Changes since v1:
- - rewrite external phy section
- - add phicomm vendor prefix
- - add phicomm n1 in Documentation/devicetree/bindings/arm/amlogic.txt
-
-He Yangxuan (3):
-  arm64: dts: meson-gxl: add support for phicomm n1
-  dt-bindings: Add vendor prefix for PHICOMM Co., Ltd.
-  dt-bindings: arm: amlogic: Add Phicomm N1
-
- Documentation/devicetree/bindings/arm/amlogic.txt   |  1 +
- .../devicetree/bindings/vendor-prefixes.txt         |  1 +
- arch/arm64/boot/dts/amlogic/Makefile                |  1 +
- .../boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts | 21 +++++++++++++++++++++
- 4 files changed, 24 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 4b1a2a8fc..8c413d8cc 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -296,6 +296,7 @@ panasonic	Panasonic Corporation
+ parade	Parade Technologies Inc.
+ pericom	Pericom Technology Inc.
+ pervasive	Pervasive Displays, Inc.
++phicomm PHICOMM Co., Ltd.
+ phytec	PHYTEC Messtechnik GmbH
+ picochip	Picochip Ltd
+ pine64	Pine64
 -- 
 2.11.0
