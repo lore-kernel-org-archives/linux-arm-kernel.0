@@ -1,74 +1,91 @@
-From: changbin.du@gmail.com (Changbin Du)
-Date: Sat, 10 Nov 2018 09:41:12 +0800
-Subject: [PATCH v3 1/4] x86/mm: declare check_la57_support() as inline
-In-Reply-To: <CAK7LNAQcdpU+_LOYQ8X+4K4sxd3D-+Z7k6BuBjUOJ9LR0j+zfA@mail.gmail.com>
-References: <20181028130945.23581-1-changbin.du@gmail.com>
- <20181028130945.23581-2-changbin.du@gmail.com>
- <20181028140911.21d49629@vmware.local.home>
- <CAK7LNATixykqHqdu5W3NpfXqBXMNsP0OLKjNdsFc_EzJ_diOxA@mail.gmail.com>
- <20181102112728.GC14602@zn.tnic>
- <CAK7LNAQcdpU+_LOYQ8X+4K4sxd3D-+Z7k6BuBjUOJ9LR0j+zfA@mail.gmail.com>
-Message-ID: <20181110010708.d3nayrzuy5d3lrkd@mail.google.com>
+From: cai@gmx.us (Qian Cai)
+Date: Sat, 10 Nov 2018 03:45:14 +0100
+Subject: [PATCH] efi: permit calling efi_mem_reserve_persistent from
+ atomic context
+In-Reply-To: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
+References: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
+Message-ID: <trinity-d366cf7f-4a38-4193-a636-b695d34d6c47-1541817914119@msvc-mesg-gmx024>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 01:27:29AM +0900, Masahiro Yamada wrote:
-> On Fri, Nov 2, 2018 at 8:28 PM Borislav Petkov <bp@alien8.de> wrote:
-> >
-> > On Mon, Oct 29, 2018 at 10:04:46PM +0900, Masahiro Yamada wrote:
-> > > On Mon, Oct 29, 2018 at 3:09 AM Steven Rostedt <rostedt@goodmis.org> wrote:
-> > > >
-> > > > On Sun, 28 Oct 2018 13:09:42 +0000
-> > > > Changbin Du <changbin.du@gmail.com> wrote:
-> > > >
-> > > > > The level4_kernel_pgt is only defined when X86_5LEVEL is enabled.
-> > > > > So declare check_la57_support() as inline to make sure the code
-> > > > > referring to level4_kernel_pgt is optimized out. This is a preparation
-> > > > > for CONFIG_CC_OPTIMIZE_FOR_DEBUGGING.
-> > > > >
-> > > > > Signed-off-by: Changbin Du <changbin.du@gmail.com>
-> > > >
-> > > > Reviewed-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> > > >
-> > > > -- Steve
-> > > >
-> > >
-> > > Applied to linux-kbuild.
-> >
-> > Next time, before you route a patch through your tree, please get an x86
-> > maintainer's ACK first.
-> 
-> 
-> I changed my mind, and did not include this in my previous pull request
-> because this series is causing many warnings.
->
-Most of the new warnings are false warnings. Since this series didn't change any
-code where the warnings happen. I'll make patches to make gcc happy.
 
-> Now, it is aiming for v5.0-rc1
+On 11/8/18 at 1:05 PM, Ard Biesheuvel wrote:
+
+> Currently, efi_mem_reserve_persistent() may not be called from atomic
+> context, since both the kmalloc() call and the memremap() call may
+> sleep.
 > 
-> So, it is not too late.
+> The kmalloc() call is easy enough to fix, but the memremap() call
+> needs to be moved into an init hook since we cannot control the
+> memory allocation behavior of memremap() at the call site.
 > 
-> If x86 maintainers issue Acked-by,
-> I am happy to add it.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/efi.c | 31 +++++++++++++++++++------------
+>  1 file changed, 19 insertions(+), 12 deletions(-)
 > 
-> 
-> 
-> 
-> > Thx.
-> >
-> > --
-> > Regards/Gruss,
-> >     Boris.
-> >
-> > Good mailing practices for 400: avoid top-posting and trim the reply.
-> 
-> 
-> 
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index 249eb70691b0..cfc876e0b67b 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -963,36 +963,43 @@ bool efi_is_table_address(unsigned long phys_addr)
+>  }
+>  
+>  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
+> +static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
+>  
+>  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+>  {
+> -	struct linux_efi_memreserve *rsv, *parent;
+> +	struct linux_efi_memreserve *rsv;
+>  
+> -	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+> +	if (!efi_memreserve_root)
+>  		return -ENODEV;
+>  
+> -	rsv = kmalloc(sizeof(*rsv), GFP_KERNEL);
+> +	rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
+>  	if (!rsv)
+>  		return -ENOMEM;
+>  
+> -	parent = memremap(efi.mem_reserve, sizeof(*rsv), MEMREMAP_WB);
+> -	if (!parent) {
+> -		kfree(rsv);
+> -		return -ENOMEM;
+> -	}
+> -
+>  	rsv->base = addr;
+>  	rsv->size = size;
+>  
+>  	spin_lock(&efi_mem_reserve_persistent_lock);
+> -	rsv->next = parent->next;
+> -	parent->next = __pa(rsv);
+> +	rsv->next = efi_memreserve_root->next;
+> +	efi_memreserve_root->next = __pa(rsv);
+>  	spin_unlock(&efi_mem_reserve_persistent_lock);
+>  
+> -	memunmap(parent);
+> +	return 0;
+> +}
+>  
+> +static int __init efi_memreserve_root_init(void)
+> +{
+> +	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+> +		return -ENODEV;
+> +
+> +	efi_memreserve_root = memremap(efi.mem_reserve,
+> +				       sizeof(*efi_memreserve_root),
+> +				       MEMREMAP_WB);
+> +	if (!efi_memreserve_root)
+> +		return -ENOMEM;
+>  	return 0;
+>  }
+> +early_initcall(efi_memreserve_root_init);
+>  
+>  #ifdef CONFIG_KEXEC
+>  static int update_efi_random_seed(struct notifier_block *nb,
 > -- 
-> Best Regards
-> Masahiro Yamada
+> 2.19.1
+BTW, I won?t be able to apply this patch on top of this series [1]. After applied that series, the original BUG sleep from atomic is gone as well as two other GIC warnings. Do you think a new patch is needed here?
 
--- 
-Thanks,
-Changbin Du
+[1] https://www.spinics.net/lists/arm-kernel/msg685751.html
