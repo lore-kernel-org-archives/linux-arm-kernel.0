@@ -1,32 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Nov 2018 17:18:03 +0100
-Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
-In-Reply-To: <20181109123730.8743-7-vincenzo.frascino@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-7-vincenzo.frascino@arm.com>
-Message-ID: <CAK8P3a0QSfzsM-h9Kf36Pzr2WvXbyi0_RQG0+Nsp+1RoTRq7Ww@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 10 Nov 2018 17:29:23 +0100
+Subject: [PATCH 14/17] soc: bcm: Switch raspberrypi-power to SPDX identifier
+Message-ID: <1541867363-8022-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/18, Vincenzo Frascino <vincenzo.frascino@arm.com> wrote:
-> In the last few years we assisted to an explosion of vdso
-> implementations that mostly share similar code.
->
-> This patch tries to unify the gettimeofday vdso implementation
-> introducing lib/vdso. The code contained in this library can
-> ideally be reused by all the architectures avoiding, where
-> possible, code duplication.
->
-> In doing so, tries to maintain the performances using inlining as much
-> as possible and consequently reduces the surface for ROP type of attacks.
->
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
-I just noticed that this new version misses some of the cleanups
-that Thomas recently did in the x86 version, e.g. f3e839384164
-("x86/vdso: Replace the clockid switch case").
+Cc: Alexander Aring <aring@mojatatu.com>
+Cc: Eric Anholt <eric@anholt.net>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/soc/bcm/raspberrypi-power.c           | 5 +----
+ include/dt-bindings/power/raspberrypi-power.h | 5 +----
+ 2 files changed, 2 insertions(+), 8 deletions(-)
 
-I haven't looked at all the details, but I'd suggest using the latest
-x86 code as a base.
-
-        Arnd
+diff --git a/drivers/soc/bcm/raspberrypi-power.c b/drivers/soc/bcm/raspberrypi-power.c
+index a78dfe0..5d1aacd 100644
+--- a/drivers/soc/bcm/raspberrypi-power.c
++++ b/drivers/soc/bcm/raspberrypi-power.c
+@@ -1,9 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0
+ /* (C) 2015 Pengutronix, Alexander Aring <aar@pengutronix.de>
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+  * Authors:
+  * Alexander Aring <aar@pengutronix.de>
+  * Eric Anholt <eric@anholt.net>
+diff --git a/include/dt-bindings/power/raspberrypi-power.h b/include/dt-bindings/power/raspberrypi-power.h
+index b3ff8e0..d6d58c98 100644
+--- a/include/dt-bindings/power/raspberrypi-power.h
++++ b/include/dt-bindings/power/raspberrypi-power.h
+@@ -1,9 +1,6 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  *  Copyright ?? 2015 Broadcom
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+  */
+ 
+ #ifndef _DT_BINDINGS_ARM_BCM2835_RPI_POWER_H
+-- 
+2.7.4
