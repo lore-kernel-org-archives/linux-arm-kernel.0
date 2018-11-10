@@ -1,31 +1,30 @@
 From: yangxuan8282@gmail.com (He Yangxuan)
-Date: Sat, 10 Nov 2018 11:39:03 +0800
-Subject: [PATCH v5 2/3] dt-bindings: Add vendor prefix for PHICOMM Co., Ltd.
+Date: Sat, 10 Nov 2018 11:39:04 +0800
+Subject: [PATCH v5 3/3] dt-bindings: arm: amlogic: Add Phicomm N1
 In-Reply-To: <20181110033904.4207-1-yangxuan8282@gmail.com>
 References: <20181110033904.4207-1-yangxuan8282@gmail.com>
-Message-ID: <20181110033904.4207-3-yangxuan8282@gmail.com>
+Message-ID: <20181110033904.4207-4-yangxuan8282@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PHICOMM Co., Ltd. is a hardware provider headquartered in Shanghai, it's
-product includes router and smart devices.
+Add bindings documentation for the Phicomm N1.
 
 Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 4b1a2a8fc..8c413d8cc 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -296,6 +296,7 @@ panasonic	Panasonic Corporation
- parade	Parade Technologies Inc.
- pericom	Pericom Technology Inc.
- pervasive	Pervasive Displays, Inc.
-+phicomm PHICOMM Co., Ltd.
- phytec	PHYTEC Messtechnik GmbH
- picochip	Picochip Ltd
- pine64	Pine64
+diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+index 4498292b8..93177f38e 100644
+--- a/Documentation/devicetree/bindings/arm/amlogic.txt
++++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+@@ -91,6 +91,7 @@ Board compatible values (alphabetically, grouped by SoC):
+ 
+   - "amlogic,p230" (Meson gxl s905d)
+   - "amlogic,p231" (Meson gxl s905d)
++  - "phicomm,n1" (Meson gxl s905d)
+ 
+   - "amlogic,p241" (Meson gxl s805x)
+ 
 -- 
 2.11.0
