@@ -1,35 +1,26 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Sat, 10 Nov 2018 14:16:47 +0300
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181110001615.GA5665@brain-police>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
-Message-ID: <20181110111647.GA3511@speedy.hunter>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 10 Nov 2018 12:37:15 +0100 (CET)
+Subject: [PATCH 0/3] Fix MODULE_LICENSE of bcm2835 drivers
+In-Reply-To: <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
+References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
+ <815844594.141792.1541616607053@email.ionos.de>
+ <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
+Message-ID: <1682361655.172416.1541849835591@email.ionos.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
-> On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
-> > Specify correct type for the constants to avoid
-> > the following sparse complaints:
-> > 
-> > ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > 
-> > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > ---
-> >  arch/arm64/include/asm/sysreg.h | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+Hi Florian,
+
+> Florian Kauer <florian.kauer@koalo.de> hat am 9. November 2018 um 19:48 geschrieben:
 > 
-> I thought this was fixed in newer versions of sparse so that it treats
-> AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
+> 
+> Sorry for not replying in time. I became father recently ;-)
 
-I am using up-to-date sparse. However this warning still appears,
-not sure why. Maybe sparse treats such constants as unsigned int ?
+no problem and congratulation.
 
-Meanwhile it looks like I chose wrong type: it is enough to use UL
-instead of ULL to make sparse happy. In fact warning is clear
-about it.
+> So if it is still relevant:
+> Acked-by: Florian Kauer <florian.kauer@koalo.de>
 
-Regards,
-Sergey
+Yes, thanks. I wasn't aware of your name change.
+
+Stefan
