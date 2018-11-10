@@ -1,57 +1,39 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Sat, 10 Nov 2018 18:54:05 +0100
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181110170311.GA7700@brain-police>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
- <20181110111647.GA3511@speedy.hunter>
- <20181110170311.GA7700@brain-police>
-Message-ID: <20181110175404.gnks6sj3zzlz2it7@ltop.local>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 10 Nov 2018 18:54:42 +0100
+Subject: linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576: possible cut'n'paste
+ error
+In-Reply-To: <20181106163724.GK30658@n2100.armlinux.org.uk> (Russell King's
+ message of "Tue, 6 Nov 2018 16:37:24 +0000")
+References: <VI1PR08MB3342D4ADBFBC43F2BE2FD34D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
+ <VI1PR08MB33420789A2AA1096D3F5FC9D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
+ <20181106162014.GH30658@n2100.armlinux.org.uk>
+ <VI1PR08MB33427CD1C653245DBB979B9B9CCB0@VI1PR08MB3342.eurprd08.prod.outlook.com>
+ <20181106163724.GK30658@n2100.armlinux.org.uk>
+Message-ID: <87r2fslswt.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 05:03:21PM +0000, Will Deacon wrote:
-> On Sat, Nov 10, 2018 at 02:16:47PM +0300, Sergey Matyukevich wrote:
-> > On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
-> > > On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
-> > > > Specify correct type for the constants to avoid
-> > > > the following sparse complaints:
-> > > > 
-> > > > ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > > > ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > > > 
-> > > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > > > ---
-> > > >  arch/arm64/include/asm/sysreg.h | 4 ++--
-> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > I thought this was fixed in newer versions of sparse so that it treats
-> > > AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
-> > 
-> > I am using up-to-date sparse. However this warning still appears,
-> > not sure why. Maybe sparse treats such constants as unsigned int ?
-> > 
-> > Meanwhile it looks like I chose wrong type: it is enough to use UL
-> > instead of ULL to make sparse happy. In fact warning is clear
-> > about it.
-> 
-> Ah yes, sorry. I misread the patch the first time around and thought you were
-> changing a UL suffix to a ULL suffix. So actually, I think this is just a
-> case of sparse getting confused about this constant because it's actually
-> going to get parsed by the pre-processor, which says:
-> 
->   | It [the preprocessor parsing #if] carries out all calculations in the
->   | widest integer type known to the compiler; on most machines supported by
->   | GCC this is 64 bits
-> 
-> so I still think this is a false positive. Adding Luc in case he has any
-> ideas.
+Russell King - ARM Linux <linux@armlinux.org.uk> writes:
 
-Well, I think the warning is 'correct' (and the message is quite
-clear about the 'possible' problem) but probably not useful enough.
-In fact, some months ago, it was agreed that sparse will only issue
-this warning when -Wpedantic is set but this flag is not yet handled.
+>> Interestingly, more of the same in file linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c
+>> 
+>> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:84]: (warning) Redundant assignment of 'ASCR' to itself.
+>> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:85]: (warning) Redundant assignment of 'ARSR' to itself.
+>> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:120]: (warning) Redundant assignment of 'ASCR' to itself.
+>> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:121]: (warning) Redundant assignment of 'ARSR' to itself.
+>> 
+>> I don't know if these four are also worth fixing.
+>
+> There are cases where this can be false positives.  In the case of a
+> status register with write-1-to-clear bits for example.  These ones
+> look very much like that.
+And indeed they are, for bits 2,1,0 for ASCR and 3,2,1,0 for ARSR, and you
+guessed correctly they are partly status registers.
 
-I'll look at this next week.
+If only your checker could filter out __iomem tagged pointers, you could have
+far less of these false positives ...
 
--- Luc
+Cheers.
+
+-- 
+Robert
