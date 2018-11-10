@@ -1,104 +1,47 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Sat, 10 Nov 2018 10:49:48 -0800
-Subject: Patch "perf evsel: Store ids for events with their own cpus
- perf_event__synthesize_event_update_cpus" has been added to the 4.18-stable
- tree
-Message-ID: <1541875788165243@kroah.com>
+From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
+Date: Sat, 10 Nov 2018 21:37:04 +0100
+Subject: [PATCH] ARM: init: update secondary_data register documentation
+Message-ID: <ef535e3fe77f209336dbcab060388f74536a79dc.1541882139.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Fix secondary_data pointer register and document other
+occurrences in SMP boot code.
 
-This is a note to let you know that I've just added the patch titled
-
-    perf evsel: Store ids for events with their own cpus perf_event__synthesize_event_update_cpus
-
-to the 4.18-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     perf-evsel-store-ids-for-events-with-their-own-cpus-perf_event__synthesize_event_update_cpus.patch
-and it can be found in the queue-4.18 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From foo at baz Sat Nov 10 10:48:43 PST 2018
-From: Jiri Olsa <jolsa@redhat.com>
-Date: Wed, 3 Oct 2018 23:20:52 +0200
-Subject: perf evsel: Store ids for events with their own cpus perf_event__synthesize_event_update_cpus
-
-From: Jiri Olsa <jolsa@redhat.com>
-
-[ Upstream commit 4ab8455f8bd83298bf7f67ab9357e3b1cc765c7d ]
-
-John reported crash when recording on an event under PMU with cpumask defined:
-
-  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-  perf: Segmentation fault
-  Obtained 9 stack frames.
-  ./perf_debug_() [0x4c5ef8]
-  [0xffff82ba267c]
-  ./perf_debug_() [0x4bc5a8]
-  ./perf_debug_() [0x419550]
-  ./perf_debug_() [0x41a928]
-  ./perf_debug_() [0x472f58]
-  ./perf_debug_() [0x473210]
-  ./perf_debug_() [0x4070f4]
-  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
-  Segmentation fault (core dumped)
-
-We synthesize an update event that needs to touch the evsel id array, which is
-not defined at that time. Fixing this by forcing the id allocation for events
-with their own cpus.
-
-Reported-by: John Garry <john.garry@huawei.com>
-Signed-off-by: Jiri Olsa <jolsa@kernel.org>
-Tested-by: John Garry <john.garry@huawei.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Andi Kleen <ak@linux.intel.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxarm at huawei.com
-Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
-Link: http://lkml.kernel.org/r/20181003212052.GA32371 at krava
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Fixes: 34d926266500 ("[ARM] Fix SMP booting")
+Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- tools/perf/builtin-report.c |    1 +
- tools/perf/util/evsel.c     |    3 +++
- 2 files changed, 4 insertions(+)
+ arch/arm/kernel/head.S | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
---- a/tools/perf/builtin-report.c
-+++ b/tools/perf/builtin-report.c
-@@ -981,6 +981,7 @@ int cmd_report(int argc, const char **ar
- 			.id_index	 = perf_event__process_id_index,
- 			.auxtrace_info	 = perf_event__process_auxtrace_info,
- 			.auxtrace	 = perf_event__process_auxtrace,
-+			.event_update	 = perf_event__process_event_update,
- 			.feature	 = process_feature_event,
- 			.ordered_events	 = true,
- 			.ordering_requires_timestamps = true,
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1078,6 +1078,9 @@ void perf_evsel__config(struct perf_evse
- 		attr->exclude_user   = 1;
- 	}
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index 6b1148cafffd..43d0ce070d29 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -413,7 +413,7 @@ ENDPROC(secondary_startup)
+ ENDPROC(secondary_startup_arm)
  
-+	if (evsel->own_cpus)
-+		evsel->attr.read_format |= PERF_FORMAT_ID;
-+
  	/*
- 	 * Apply event specific term settings,
- 	 * it overloads any global configuration.
-
-
-Patches currently in stable-queue which might be from jolsa at redhat.com are
-
-queue-4.18/perf-vendor-events-intel-fix-wrong-filter_band-values-for-uncore-events.patch
-queue-4.18/perf-tools-fix-use-of-alternatives-to-find-jdir.patch
-queue-4.18/perf-evsel-store-ids-for-events-with-their-own-cpus-perf_event__synthesize_event_update_cpus.patch
+-	 * r6  = &secondary_data
++	 * r7  = &secondary_data
+ 	 */
+ ENTRY(__secondary_switched)
+ 	ldr	sp, [r7, #12]			@ get secondary_data.stack
+@@ -443,6 +443,7 @@ __secondary_data:
+  *  r2  = atags or dtb pointer
+  *  r4  = TTBR pointer (low word)
+  *  r5  = TTBR pointer (high word if LPAE)
++ *  r7  = secondary_data pointer (SMP)
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  */
+@@ -480,6 +481,7 @@ ENDPROC(__enable_mmu)
+  *  r0  = cp#15 control register
+  *  r1  = machine ID
+  *  r2  = atags or dtb pointer
++ *  r7  = secondary_data pointer (SMP)
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  *
+-- 
+2.19.1
