@@ -1,352 +1,348 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 10 Nov 2018 15:20:08 +0000
-Subject: [PATCH V6 6/6] clk: imx: add imx8qxp lpcg driver
+Date: Sat, 10 Nov 2018 15:19:49 +0000
+Subject: [PATCH V6 1/6] clk: imx: add scu clock common part
 In-Reply-To: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
 References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541862894-8209-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541862894-8209-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx8qxp lpcg driver support
+Add scu clock common part which will be used by client clock drivers.
+SCU clocks are totally different from the legacy clocks (No much
+legacy things can be reused). So a new configuration option
+CONFIG_MXC_CLK_SCU is added.
 
-Cc: Stephen Boyd <sboyd@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Stephen Boyd <sboyd@kernel.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
- v6: new patch, separate from scu gate driver
+v5->v6:
+ * simply the whole clock driver a lot by re-orgnizing the driver into a
+   few clock types:: scu clock (merge scu divider/gate/mux) and scu gpr lock
+   which accessing is through SCU protocol and LPCG clock which is directly
+   accessible by CPU.
+ * LPCG clock support will be added in next patch, gpr clock is still not used
+   and will be added later.
+ * remove old year license as the code is totally rewritten
+ * scu mux support will be added later as it's also still not used.
+v4->v5:
+ * add more explanation in commit message on why put scu clocks
+in a deeper folder.
+ * move scu clk files into the top directory of imx folder
+v3->v4:
+ * scu headfile path change
+v2->v3:
+ * no changes
+v1->v2:
+ * update function call name
 ---
- drivers/clk/imx/Makefile           |   2 +-
- drivers/clk/imx/clk-imx8qxp-lpcg.c | 198 +++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk-imx8qxp-lpcg.h | 102 +++++++++++++++++++
- 3 files changed, 301 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.c
- create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.h
+ drivers/clk/imx/Kconfig   |   4 +
+ drivers/clk/imx/Makefile  |   3 +
+ drivers/clk/imx/clk-scu.c | 237 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk-scu.h |  21 ++++
+ 4 files changed, 265 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-scu.c
+ create mode 100644 drivers/clk/imx/clk-scu.h
 
+diff --git a/drivers/clk/imx/Kconfig b/drivers/clk/imx/Kconfig
+index 43a3ecc..63e7b01 100644
+--- a/drivers/clk/imx/Kconfig
++++ b/drivers/clk/imx/Kconfig
+@@ -3,3 +3,7 @@
+ config MXC_CLK
+ 	bool
+ 	depends on ARCH_MXC
++
++config MXC_CLK_SCU
++	bool
++	depends on ARCH_MXC && ARM64
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index cd2b6f0..96ab82b 100644
+index d447f8c..eec6d72 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -32,4 +32,4 @@ obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
- obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
- obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
+@@ -13,6 +13,9 @@ obj-$(CONFIG_MXC_CLK) += \
+ 	clk-pllv3.o \
+ 	clk-pfd.o
  
--obj-$(CONFIG_SOC_IMX8QXP)	+= clk-imx8qxp.o
-+obj-$(CONFIG_SOC_IMX8QXP) += clk-imx8qxp.o clk-imx8qxp-lpcg.o
-diff --git a/drivers/clk/imx/clk-imx8qxp-lpcg.c b/drivers/clk/imx/clk-imx8qxp-lpcg.c
++obj-$(CONFIG_MXC_CLK_SCU) += \
++	clk-scu.o
++
+ obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
+ obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
+ obj-$(CONFIG_SOC_IMX25)  += clk-imx25.o
+diff --git a/drivers/clk/imx/clk-scu.c b/drivers/clk/imx/clk-scu.c
 new file mode 100644
-index 0000000..7b318d7
+index 0000000..9fec574
 --- /dev/null
-+++ b/drivers/clk/imx/clk-imx8qxp-lpcg.c
-@@ -0,0 +1,198 @@
++++ b/drivers/clk/imx/clk-scu.c
+@@ -0,0 +1,237 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright 2018 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
++ *   Dong Aisheng <aisheng.dong@nxp.com>
 + */
 +
-+#include <dt-bindings/clock/imx8qxp-clock.h>
 +#include <linux/clk-provider.h>
 +#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
 +#include <linux/slab.h>
 +
 +#include "clk-scu.h"
-+#include "clk-imx8qxp-lpcg.h"
 +
-+struct imx8qxp_lpcg_data {
-+	int id;
-+	char *name;
-+	char *parent;
-+	unsigned long flags;
-+	u32 offset;
-+	u8 bit_idx;
-+	bool hw_gate;
++struct imx_sc_ipc *ccm_ipc_handle;
++
++struct clk_scu {
++	struct clk_hw hw;
++	u32 rsrc_id;
++	u8 clk_type;
 +};
 +
-+struct imx8qxp_ss_lpcg {
-+	const struct imx8qxp_lpcg_data *lpcg;
-+	u8 num_lpcg;
-+	u8 num_max;
++/* SCU Clock Protocol definitions */
++
++/* rate */
++struct imx_sc_msg_req_set_clock_rate {
++	struct imx_sc_rpc_msg hdr;
++	u32 rate;
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct req_get_clock_rate {
++	u16 resource;
++	u8 clk;
++} __packed;
++
++struct resp_get_clock_rate {
++	u32 rate;
 +};
 +
-+static const struct imx8qxp_lpcg_data imx8qxp_lpcg_adma[] = {
-+	{ IMX8QXP_ADMA_LPCG_UART0_IPG_CLK, "uart0_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_0_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART0_BAUD_CLK, "uart0_lpcg_baud_clk", "uart0_clk", 0, ADMA_LPUART_0_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART1_IPG_CLK, "uart1_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_1_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART1_BAUD_CLK, "uart1_lpcg_baud_clk", "uart1_clk", 0, ADMA_LPUART_1_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART2_IPG_CLK, "uart2_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_2_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART2_BAUD_CLK, "uart2_lpcg_baud_clk", "uart2_clk", 0, ADMA_LPUART_2_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART3_IPG_CLK, "uart3_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_3_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_UART3_BAUD_CLK, "uart3_lpcg_baud_clk", "uart3_clk", 0, ADMA_LPUART_3_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C0_IPG_CLK, "i2c0_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_0_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C0_CLK, "i2c0_lpcg_clk", "i2c0_clk", 0, ADMA_LPI2C_0_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C1_IPG_CLK, "i2c1_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_1_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C1_CLK, "i2c1_lpcg_clk", "i2c1_clk", 0, ADMA_LPI2C_1_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C2_IPG_CLK, "i2c2_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_2_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C2_CLK, "i2c2_lpcg_clk", "i2c2_clk", 0, ADMA_LPI2C_2_LPCG, 0, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C3_IPG_CLK, "i2c3_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_3_LPCG, 16, 0, },
-+	{ IMX8QXP_ADMA_LPCG_I2C3_CLK, "i2c3_lpcg_clk", "i2c3_clk", 0, ADMA_LPI2C_3_LPCG, 0, 0, },
-+};
++struct imx_sc_msg_get_clock_rate {
++	struct imx_sc_rpc_msg hdr;
++	union {
++		struct req_get_clock_rate req;
++		struct resp_get_clock_rate resp;
++	} data;
++} __packed;
 +
-+static const struct imx8qxp_ss_lpcg imx8qxp_ss_adma = {
-+	.lpcg = imx8qxp_lpcg_adma,
-+	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_adma),
-+	.num_max = IMX8QXP_ADMA_LPCG_CLK_END,
-+};
++/* gate */
++struct imx_sc_msg_req_clock_enable {
++	struct imx_sc_rpc_msg hdr;
++	u16 resource;
++	u8 clk;
++	u8 enable;
++	u8 autog;
++} __packed;
 +
-+static const struct imx8qxp_lpcg_data imx8qxp_lpcg_conn[] = {
-+	{ IMX8QXP_CONN_LPCG_SDHC0_PER_CLK, "sdhc0_lpcg_per_clk", "sdhc0_clk", 0, CONN_USDHC_0_LPCG, 0, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC0_IPG_CLK, "sdhc0_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_0_LPCG, 16, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC0_HCLK, "sdhc0_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_0_LPCG, 20, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC1_PER_CLK, "sdhc1_lpcg_per_clk", "sdhc1_clk", 0, CONN_USDHC_1_LPCG, 0, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC1_IPG_CLK, "sdhc1_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_1_LPCG, 16, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC1_HCLK, "sdhc1_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_1_LPCG, 20, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC2_PER_CLK, "sdhc2_lpcg_per_clk", "sdhc2_clk", 0, CONN_USDHC_2_LPCG, 0, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC2_IPG_CLK, "sdhc2_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_2_LPCG, 16, 0, },
-+	{ IMX8QXP_CONN_LPCG_SDHC2_HCLK, "sdhc2_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_2_LPCG, 20, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET0_ROOT_CLK, "enet0_ipg_root_clk", "enet0_clk", 0, CONN_ENET_0_LPCG, 0, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET0_TX_CLK, "enet0_tx_clk", "enet0_clk", 0, CONN_ENET_0_LPCG, 4, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET0_AHB_CLK, "enet0_ahb_clk", "conn_axi_clk_root", 0, CONN_ENET_0_LPCG, 8, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET0_IPG_S_CLK, "enet0_ipg_s_clk", "conn_ipg_clk_root", 0, CONN_ENET_0_LPCG, 20, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET0_IPG_CLK, "enet0_ipg_clk", "enet0_ipg_s_clk", 0, CONN_ENET_0_LPCG, 16, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET1_ROOT_CLK, "enet1_ipg_root_clk", "enet1_clk", 0, CONN_ENET_1_LPCG, 0, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET1_TX_CLK, "enet1_tx_clk", "enet1_clk", 0, CONN_ENET_1_LPCG, 4, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET1_AHB_CLK, "enet1_ahb_clk", "conn_axi_clk_root", 0, CONN_ENET_1_LPCG, 8, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET1_IPG_S_CLK, "enet1_ipg_s_clk", "conn_ipg_clk_root", 0, CONN_ENET_1_LPCG, 20, 0, },
-+	{ IMX8QXP_CONN_LPCG_ENET1_IPG_CLK, "enet1_ipg_clk", "enet0_ipg_s_clk", 0, CONN_ENET_1_LPCG, 16, 0, },
-+};
-+
-+static const struct imx8qxp_ss_lpcg imx8qxp_ss_conn = {
-+	.lpcg = imx8qxp_lpcg_conn,
-+	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_conn),
-+	.num_max = IMX8QXP_CONN_LPCG_CLK_END,
-+};
-+
-+static const struct imx8qxp_lpcg_data imx8qxp_lpcg_lsio[] = {
-+	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_CLK, "pwm0_lpcg_ipg_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_HF_CLK, "pwm0_lpcg_ipg_hf_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_S_CLK, "pwm0_lpcg_ipg_s_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_SLV_CLK, "pwm0_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_0_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_MSTR_CLK, "pwm0_lpcg_ipg_mstr_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_CLK, "pwm1_lpcg_ipg_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_HF_CLK, "pwm1_lpcg_ipg_hf_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_S_CLK, "pwm1_lpcg_ipg_s_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_SLV_CLK, "pwm1_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_1_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_MSTR_CLK, "pwm1_lpcg_ipg_mstr_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_CLK, "pwm2_lpcg_ipg_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_HF_CLK, "pwm2_lpcg_ipg_hf_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_S_CLK, "pwm2_lpcg_ipg_s_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_SLV_CLK, "pwm2_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_2_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_MSTR_CLK, "pwm2_lpcg_ipg_mstr_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_CLK, "pwm3_lpcg_ipg_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_HF_CLK, "pwm3_lpcg_ipg_hf_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_S_CLK, "pwm3_lpcg_ipg_s_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_SLV_CLK, "pwm3_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_3_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_MSTR_CLK, "pwm3_lpcg_ipg_mstr_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_CLK, "pwm4_lpcg_ipg_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_HF_CLK, "pwm4_lpcg_ipg_hf_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_S_CLK, "pwm4_lpcg_ipg_s_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_SLV_CLK, "pwm4_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_4_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_MSTR_CLK, "pwm4_lpcg_ipg_mstr_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_CLK, "pwm5_lpcg_ipg_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_HF_CLK, "pwm5_lpcg_ipg_hf_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_S_CLK, "pwm5_lpcg_ipg_s_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_SLV_CLK, "pwm5_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_5_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_MSTR_CLK, "pwm5_lpcg_ipg_mstr_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 24, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_CLK, "pwm6_lpcg_ipg_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 0, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_HF_CLK, "pwm6_lpcg_ipg_hf_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 4, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_S_CLK, "pwm6_lpcg_ipg_s_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 16, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_SLV_CLK, "pwm6_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_6_LPCG, 20, 0, },
-+	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_MSTR_CLK, "pwm6_lpcg_ipg_mstr_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 24, 0, },
-+};
-+
-+static const struct imx8qxp_ss_lpcg imx8qxp_ss_lsio = {
-+	.lpcg = imx8qxp_lpcg_lsio,
-+	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_lsio),
-+	.num_max = IMX8QXP_LSIO_LPCG_CLK_END,
-+};
-+
-+static int imx8qxp_lpcg_clk_probe(struct platform_device *pdev)
++static inline struct clk_scu *to_clk_scu(struct clk_hw *hw)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
-+	struct clk_hw_onecell_data *clk_data;
-+	const struct imx8qxp_ss_lpcg *ss_lpcg;
-+	const struct imx8qxp_lpcg_data *lpcg;
-+	struct resource *res;
-+	struct clk_hw **clks;
-+	void __iomem *base;
-+	int i;
-+
-+	ss_lpcg = of_device_get_match_data(dev);
-+	if (!ss_lpcg)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap(dev, res->start, resource_size(res));
-+	if (!base)
-+		return -ENOMEM;
-+
-+	clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data) +
-+				sizeof(*clk_data->hws) * ss_lpcg->num_max,
-+				GFP_KERNEL);
-+	if (!clk_data)
-+		return -ENOMEM;
-+
-+	clk_data->num = ss_lpcg->num_max;
-+	clks = clk_data->hws;
-+
-+	for (i = 0; i < ss_lpcg->num_lpcg; i++) {
-+		lpcg = ss_lpcg->lpcg + i;
-+		clks[lpcg->id] = imx_clk_lpcg_scu(lpcg->name, lpcg->parent,
-+						  lpcg->flags, base + lpcg->offset,
-+						  lpcg->bit_idx, lpcg->hw_gate);
-+	}
-+
-+	for (i = 0; i < clk_data->num; i++) {
-+		if (IS_ERR(clks[i]))
-+			pr_err("i.MX clk %u: register failed with %ld\n",
-+				i, PTR_ERR(clks[i]));
-+	}
-+
-+	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
++	return container_of(hw, struct clk_scu, hw);
 +}
 +
-+static const struct of_device_id imx8qxp_lpcg_match[] = {
-+	{ .compatible = "fsl,imx8qxp-lpcg-adma", &imx8qxp_ss_adma, },
-+	{ .compatible = "fsl,imx8qxp-lpcg-conn", &imx8qxp_ss_conn, },
-+	{ .compatible = "fsl,imx8qxp-lpcg-lsio", &imx8qxp_ss_lsio, },
-+	{ /* sentinel */ }
++/*
++ * clk_scu_recalc_rate - Get clock rate for a SCU clock
++ * @hw: clock to get rate for
++ * @parent_rate: parent rate provided by common clock framework, not used
++ *
++ * Gets the current clock rate of a SCU clock. Returns the current
++ * clock rate, or zero in failure.
++ */
++static unsigned long clk_scu_recalc_rate(struct clk_hw *hw,
++						 unsigned long parent_rate)
++{
++	struct clk_scu *clk = to_clk_scu(hw);
++	struct imx_sc_msg_get_clock_rate msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++	int ret;
++
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_GET_CLOCK_RATE;
++	hdr->size = 2;
++
++	msg.data.req.resource = clk->rsrc_id;
++	msg.data.req.clk = clk->clk_type;
++
++	ret = imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
++	if (ret) {
++		pr_err("%s: failed to get clock rate %d\n",
++			clk_hw_get_name(hw), ret);
++		return 0;
++	}
++
++	return msg.data.resp.rate;
++}
++
++/*
++ * clk_scu_round_rate - Round clock rate for a SCU clock
++ * @hw: clock to round rate for
++ * @rate: rate to round
++ * @parent_rate: parent rate provided by common clock framework, not used
++ *
++ * Gets the current clock rate of a SCU clock. Returns the current
++ * clock rate, or zero in failure.
++ */
++static long clk_scu_round_rate(struct clk_hw *hw, unsigned long rate,
++				       unsigned long *parent_rate)
++{
++	/*
++	 * Assume we support all the requested rate and let the SCU firmware
++	 * to handle the left work
++	 */
++	return rate;
++}
++
++/*
++ * clk_scu_set_rate - Set rate for a SCU clock
++ * @hw: clock to change rate for
++ * @rate: target rate for the clock
++ * @parent_rate: rate of the clock parent, not used for SCU clocks
++ *
++ * Sets a clock frequency for a SCU clock. Returns the SCU
++ * protocol status.
++ */
++static int clk_scu_set_rate(struct clk_hw *hw, unsigned long rate,
++				    unsigned long parent_rate)
++{
++	struct clk_scu *clk = to_clk_scu(hw);
++	struct imx_sc_msg_req_set_clock_rate msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_SET_CLOCK_RATE;
++	hdr->size = 3;
++
++	msg.rate = rate;
++	msg.resource = clk->rsrc_id;
++	msg.clk = clk->clk_type;
++
++	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
++}
++
++static int sc_pm_clock_enable(struct imx_sc_ipc *ipc, u32 resource,
++				   u8 clk, bool enable, bool autog)
++{
++	struct imx_sc_msg_req_clock_enable msg;
++	struct imx_sc_rpc_msg *hdr = &msg.hdr;
++
++	hdr->ver = IMX_SC_RPC_VERSION;
++	hdr->svc = IMX_SC_RPC_SVC_PM;
++	hdr->func = IMX_SC_PM_FUNC_CLOCK_ENABLE;
++	hdr->size = 3;
++
++	msg.resource = resource;
++	msg.clk = clk;
++	msg.enable = enable;
++	msg.autog = autog;
++
++	return imx_scu_call_rpc(ccm_ipc_handle, &msg, true);
++}
++
++/*
++ * clk_scu_prepare - Enable a SCU clock
++ * @hw: clock to enable
++ *
++ * Enable the clock at the DSC slice level
++ */
++static int clk_scu_prepare(struct clk_hw *hw)
++{
++	struct clk_scu *clk = to_clk_scu(hw);
++
++	return sc_pm_clock_enable(ccm_ipc_handle, clk->rsrc_id,
++				  clk->clk_type, true, false);
++}
++
++/*
++ * clk_scu_unprepare - Disable a SCU clock
++ * @hw: clock to enable
++ *
++ * Disable the clock at the DSC slice level
++ */
++static void clk_scu_unprepare(struct clk_hw *hw)
++{
++	struct clk_scu *clk = to_clk_scu(hw);
++	int ret;
++
++	ret = sc_pm_clock_enable(ccm_ipc_handle, clk->rsrc_id,
++				 clk->clk_type, false, false);
++	if (ret)
++		pr_warn("%s: clk unprepare failed %d\n", clk_hw_get_name(hw),
++			ret);
++}
++
++static const struct clk_ops clk_scu_ops = {
++	.recalc_rate = clk_scu_recalc_rate,
++	.round_rate = clk_scu_round_rate,
++	.set_rate = clk_scu_set_rate,
++	.prepare = clk_scu_prepare,
++	.unprepare = clk_scu_unprepare,
 +};
 +
-+static struct platform_driver imx8qxp_lpcg_clk_driver = {
-+	.driver = {
-+		.name = "imx8qxp-lpcg-clk",
-+		.of_match_table = imx8qxp_lpcg_match,
-+	},
-+	.probe = imx8qxp_lpcg_clk_probe,
-+};
++struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type)
++{
++	struct clk_init_data init;
++	struct clk_scu *clk;
++	struct clk_hw *hw;
++	int ret;
 +
-+builtin_platform_driver(imx8qxp_lpcg_clk_driver);
++	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
++	if (!clk)
++		return ERR_PTR(-ENOMEM);
 +
-+MODULE_AUTHOR("Dong Aisheng <aisheng.dong@nxp.com>");
-+MODULE_DESCRIPTION("IMX8QXP LPCG Clock driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/clk/imx/clk-imx8qxp-lpcg.h b/drivers/clk/imx/clk-imx8qxp-lpcg.h
++	clk->rsrc_id = rsrc_id;
++	clk->clk_type = clk_type;
++
++	init.name = name;
++	init.ops = &clk_scu_ops;
++	init.num_parents = 0;
++	/*
++	 * Note on MX8, the clocks are tightly coupled with power domain
++	 * that once the power domain is off, the clock status may be
++	 * lost. So we make it NOCACHE to let user to retrieve the real
++	 * clock status from HW instead of using the possible invalid
++	 * cached rate.
++	 */
++	init.flags = CLK_GET_RATE_NOCACHE;
++	clk->hw.init = &init;
++
++	hw = &clk->hw;
++	ret = clk_hw_register(NULL, hw);
++	if (ret) {
++		kfree(clk);
++		hw = ERR_PTR(ret);
++	}
++
++	return hw;
++}
+diff --git a/drivers/clk/imx/clk-scu.h b/drivers/clk/imx/clk-scu.h
 new file mode 100644
-index 0000000..2a37ce5
+index 0000000..09f381b
 --- /dev/null
-+++ b/drivers/clk/imx/clk-imx8qxp-lpcg.h
-@@ -0,0 +1,102 @@
++++ b/drivers/clk/imx/clk-scu.h
+@@ -0,0 +1,21 @@
 +/* SPDX-License-Identifier: GPL-2.0+ */
 +/*
 + * Copyright 2018 NXP
 + *   Dong Aisheng <aisheng.dong@nxp.com>
 + */
 +
-+#ifndef _IMX8QXP_LPCG_H
-+#define _IMX8QXP_LPCG_H
++#ifndef __IMX_CLK_SCU_H
++#define __IMX_CLK_SCU_H
 +
-+/*LSIO SS */
-+#define LSIO_PWM_0_LPCG			0x00000
-+#define LSIO_PWM_1_LPCG			0x10000
-+#define LSIO_PWM_2_LPCG			0x20000
-+#define LSIO_PWM_3_LPCG			0x30000
-+#define LSIO_PWM_4_LPCG			0x40000
-+#define LSIO_PWM_5_LPCG			0x50000
-+#define LSIO_PWM_6_LPCG			0x60000
-+#define LSIO_PWM_7_LPCG			0x70000
-+#define LSIO_GPIO_0_LPCG		0x80000
-+#define LSIO_GPIO_1_LPCG		0x90000
-+#define LSIO_GPIO_2_LPCG		0xa0000
-+#define LSIO_GPIO_3_LPCG		0xb0000
-+#define LSIO_GPIO_4_LPCG		0xc0000
-+#define LSIO_GPIO_5_LPCG		0xd0000
-+#define LSIO_GPIO_6_LPCG		0xe0000
-+#define LSIO_GPIO_7_LPCG		0xf0000
-+#define LSIO_FSPI_0_LPCG		0x120000
-+#define LSIO_FSPI_1_LPCG		0x130000
-+#define LSIO_GPT_0_LPCG			0x140000
-+#define LSIO_GPT_1_LPCG			0x150000
-+#define LSIO_GPT_2_LPCG			0x160000
-+#define LSIO_GPT_3_LPCG			0x170000
-+#define LSIO_GPT_4_LPCG			0x180000
-+#define LSIO_OCRAM_LPCG			0x190000
-+#define LSIO_KPP_LPCG			0x1a0000
-+#define LSIO_ROMCP_LPCG			0x100000
++#include <linux/firmware/imx/sci.h>
 +
-+/* Connectivity SS */
-+#define CONN_USDHC_0_LPCG		0x00000
-+#define CONN_USDHC_1_LPCG		0x10000
-+#define CONN_USDHC_2_LPCG		0x20000
-+#define CONN_ENET_0_LPCG		0x30000
-+#define CONN_ENET_1_LPCG		0x40000
-+#define CONN_DTCP_LPCG			0x50000
-+#define CONN_MLB_LPCG			0x60000
-+#define CONN_USB_2_LPCG			0x70000
-+#define CONN_USB_3_LPCG			0x80000
-+#define CONN_NAND_LPCG			0x90000
-+#define CONN_EDMA_LPCG			0xa0000
++extern struct imx_sc_ipc *ccm_ipc_handle;
 +
-+/* ADMA SS */
-+#define ADMA_ASRC_0_LPCG		0x400000
-+#define ADMA_ESAI_0_LPCG		0x410000
-+#define ADMA_SPDIF_0_LPCG		0x420000
-+#define ADMA_SAI_0_LPCG			0x440000
-+#define ADMA_SAI_1_LPCG			0x450000
-+#define ADMA_SAI_2_LPCG			0x460000
-+#define ADMA_SAI_3_LPCG			0x470000
-+#define ADMA_GPT_5_LPCG			0x4b0000
-+#define ADMA_GPT_6_LPCG			0x4c0000
-+#define ADMA_GPT_7_LPCG			0x4d0000
-+#define ADMA_GPT_8_LPCG			0x4e0000
-+#define ADMA_GPT_9_LPCG			0x4f0000
-+#define ADMA_GPT_10_LPCG		0x500000
-+#define ADMA_HIFI_LPCG			0x580000
-+#define ADMA_OCRAM_LPCG			0x590000
-+#define ADMA_EDMA_0_LPCG		0x5f0000
-+#define ADMA_ASRC_1_LPCG		0xc00000
-+#define ADMA_SAI_4_LPCG			0xc20000
-+#define ADMA_SAI_5_LPCG			0xc30000
-+#define ADMA_AMIX_LPCG			0xc40000
-+#define ADMA_MQS_LPCG			0xc50000
-+#define ADMA_ACM_LPCG			0xc60000
-+#define ADMA_REC_CLK0_LPCG		0xd00000
-+#define ADMA_REC_CLK1_LPCG		0xd10000
-+#define ADMA_PLL_CLK0_LPCG		0xd20000
-+#define ADMA_PLL_CLK1_LPCG		0xd30000
-+#define ADMA_MCLKOUT0_LPCG		0xd50000
-+#define ADMA_MCLKOUT1_LPCG		0xd60000
-+#define ADMA_EDMA_1_LPCG		0xdf0000
-+#define ADMA_LPSPI_0_LPCG		0x1400000
-+#define ADMA_LPSPI_1_LPCG		0x1410000
-+#define ADMA_LPSPI_2_LPCG		0x1420000
-+#define ADMA_LPSPI_3_LPCG		0x1430000
-+#define ADMA_LPUART_0_LPCG		0x1460000
-+#define ADMA_LPUART_1_LPCG		0x1470000
-+#define ADMA_LPUART_2_LPCG		0x1480000
-+#define ADMA_LPUART_3_LPCG		0x1490000
-+#define ADMA_LCD_LPCG			0x1580000
-+#define ADMA_PWM_LPCG			0x1590000
-+#define ADMA_LPI2C_0_LPCG		0x1c00000
-+#define ADMA_LPI2C_1_LPCG		0x1c10000
-+#define ADMA_LPI2C_2_LPCG		0x1c20000
-+#define ADMA_LPI2C_3_LPCG		0x1c30000
-+#define ADMA_ADC_0_LPCG			0x1c80000
-+#define ADMA_FTM_0_LPCG			0x1ca0000
-+#define ADMA_FTM_1_LPCG			0x1cb0000
-+#define ADMA_FLEXCAN_0_LPCG		0x1cd0000
-+#define ADMA_FLEXCAN_1_LPCG		0x1ce0000
-+#define ADMA_FLEXCAN_2_LPCG		0x1cf0000
++static inline int imx_clk_scu_init(void)
++{
++	return imx_scu_get_handle(&ccm_ipc_handle);
++}
 +
-+#endif /* _IMX8QXP_LPCG_H */
++struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type);
++
++#endif
 -- 
 2.7.4
