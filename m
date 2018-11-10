@@ -1,31 +1,66 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 10 Nov 2018 13:52:34 -0200
-Subject: [PATCH V5 4/6] dts: imx: add common imx7ulp dtsi support
-In-Reply-To: <1541862478-7839-5-git-send-email-aisheng.dong@nxp.com>
-References: <1541862478-7839-1-git-send-email-aisheng.dong@nxp.com>
- <1541862478-7839-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CAOMZO5DJgEfzrZQkY1czdrR_fxwdEP5JoTuWKBeS1v35mDA2KQ@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 10 Nov 2018 16:54:23 +0100
+Subject: [PATCH 09/17] irqchip: bcm283x: Switch to SPDX identifier
+Message-ID: <1541865263-7571-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 1:13 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
->
-> The i.MX 7ULP family of processors features NXP's advanced implementation
-> of the Arm Cortex-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D
-> Graphics Processing Units (GPUs).
->
-> This patch aims to add the initial support including:
-> 1) CLK
-> 2) GPIO PTC, PTD, PTE, PTF
-> 3) uSDHC 1/2
-> 4) LPUART 4/5/6/7
-> 5) LPI2C 6/7
->
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+Adopt the SPDX license identifier headers to ease license compliance
+management.
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Cc: Simon Arlott <simon@arlott.org>
+Cc: Eric Anholt <eric@anholt.net>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/irqchip/irq-bcm2835.c | 11 +----------
+ drivers/irqchip/irq-bcm2836.c | 11 +----------
+ 2 files changed, 2 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index d2da8a1..418245d 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -1,17 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0+
+ /*
+  * Copyright 2010 Broadcom
+  * Copyright 2012 Simon Arlott, Chris Boot, Stephen Warren
+  *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+  * Quirk 1: Shortcut interrupts don't set the bank 1/2 register pending bits
+  *
+  * If an interrupt fires on bank 1 that isn't in the shortcuts list, bit 8
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index dfe4a46..2038693 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -1,17 +1,8 @@
++// SPDX-License-Identifier: GPL-2.0+
+ /*
+  * Root interrupt controller for the BCM2836 (Raspberry Pi 2).
+  *
+  * Copyright 2015 Broadcom
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+  */
+ 
+ #include <linux/cpu.h>
+-- 
+2.7.4
