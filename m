@@ -1,124 +1,136 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
 Date: Sat, 10 Nov 2018 22:02:22 +0100
-Subject: [PATCH 1/3] ARM: cache-l2x0: share l2x0_base with PMU code
+Subject: [PATCH 2/3] ARM: trusted_foundations: enable L2x0 cache via
+ firmware_ops
 In-Reply-To: <cover.1541882833.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1541882833.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <bece26283d1a4f48c20b7e526332b4a696670fcb.1541882833.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <7124870dfcabaea33ca3d7623714887f65654646.1541882833.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid l2x0_base duplication with PMU driver by sharing it
-and using l2x0_name as the 'enabled' flag instead. Since l2x0_name is
-not used for anything else, mark it as __initdata.
+Use firmware_ops to provide hook for cache initialization through
+Trusted Foundations firmware, as some writes need Secure mode.
 
-This will also be needed for cache maintenance with Trusted Foundations
-firmware.
+Avoid l2x0_base conflict (duplication) with PMU driver by sharing
+l2x0_name and using l2x0_name as the enable flag there.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- arch/arm/include/asm/hardware/cache-l2x0.h | 6 ++++--
- arch/arm/mm/cache-l2x0-pmu.c               | 9 +++------
- arch/arm/mm/cache-l2x0.c                   | 6 +++---
- 3 files changed, 10 insertions(+), 11 deletions(-)
+ arch/arm/firmware/trusted_foundations.c | 46 +++++++++++++++++++++++++
+ arch/arm/mm/cache-l2x0.c                |  8 +++++
+ 2 files changed, 54 insertions(+)
 
-diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
-index 736292b42fca..665eb0758417 100644
---- a/arch/arm/include/asm/hardware/cache-l2x0.h
-+++ b/arch/arm/include/asm/hardware/cache-l2x0.h
-@@ -167,11 +167,11 @@ static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
- #endif
+diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
+index 689e6565abfc..135068119453 100644
+--- a/arch/arm/firmware/trusted_foundations.c
++++ b/arch/arm/firmware/trusted_foundations.c
+@@ -17,11 +17,19 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/of.h>
++#include <asm/io.h>
+ #include <asm/firmware.h>
++#include <asm/outercache.h>
++#include <asm/hardware/cache-l2x0.h>
+ #include <asm/trusted_foundations.h>
  
- #ifdef CONFIG_CACHE_L2X0_PMU
--void l2x0_pmu_register(void __iomem *base, u32 part);
-+void l2x0_pmu_register(u32 part);
- void l2x0_pmu_suspend(void);
- void l2x0_pmu_resume(void);
- #else
--static inline void l2x0_pmu_register(void __iomem *base, u32 part) {}
-+static inline void l2x0_pmu_register(u32 part) {}
- static inline void l2x0_pmu_suspend(void) {}
- static inline void l2x0_pmu_resume(void) {}
- #endif
-@@ -193,6 +193,8 @@ struct l2x0_regs {
- 	unsigned long aux2_ctrl;
- };
++#define TF_CACHE_MAINT           0xfffff100
+ #define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
  
-+extern void __iomem *l2x0_base;
-+extern u32 l2x0_way_mask;	/* Bitmask of active ways */
- extern struct l2x0_regs l2x0_saved_regs;
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm/mm/cache-l2x0-pmu.c b/arch/arm/mm/cache-l2x0-pmu.c
-index afe5b4c7b164..6be335ae4e2f 100644
---- a/arch/arm/mm/cache-l2x0-pmu.c
-+++ b/arch/arm/mm/cache-l2x0-pmu.c
-@@ -29,11 +29,10 @@
- 
- #define PMU_NR_COUNTERS 2
- 
--static void __iomem *l2x0_base;
- static struct pmu *l2x0_pmu;
- static cpumask_t pmu_cpu;
- 
--static const char *l2x0_name;
-+static const char *__initdata l2x0_name = NULL;
- 
- static ktime_t l2x0_pmu_poll_period;
- static struct hrtimer l2x0_pmu_hrtimer;
-@@ -491,7 +490,7 @@ void l2x0_pmu_resume(void)
- 	l2x0_pmu_enable(l2x0_pmu);
- }
- 
--void __init l2x0_pmu_register(void __iomem *base, u32 part)
-+void __init l2x0_pmu_register(u32 part)
- {
- 	/*
- 	 * Determine whether we support the PMU, and choose the name for sysfs.
-@@ -516,15 +515,13 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
- 	default:
- 		return;
- 	}
--
--	l2x0_base = base;
- }
- 
- static __init int l2x0_pmu_init(void)
- {
- 	int ret;
- 
--	if (!l2x0_base)
-+	if (!l2x0_name)
- 		return 0;
- 
- 	l2x0_pmu = kzalloc(sizeof(*l2x0_pmu), GFP_KERNEL);
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index ea1e70ff4568..2b6a023fea3f 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -48,13 +48,13 @@ struct l2c_init_data {
- 
- #define CACHE_LINE_SIZE		32
- 
--static void __iomem *l2x0_base;
- static const struct l2c_init_data *l2x0_data;
- static DEFINE_RAW_SPINLOCK(l2x0_lock);
--static u32 l2x0_way_mask;	/* Bitmask of active ways */
- static u32 l2x0_size;
- static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
- 
-+void __iomem *l2x0_base;
-+u32 l2x0_way_mask;	/* Bitmask of active ways */
- struct l2x0_regs l2x0_saved_regs;
- 
- static bool l2x0_bresp_disable;
-@@ -900,7 +900,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
- 		data->type, cache_id, aux);
- 
--	l2x0_pmu_register(l2x0_base, cache_id);
-+	l2x0_pmu_register(cache_id);
- 
++#define TF_CACHE_INIT		1
++#define TF_CACHE_FLUSH		2
++#define TF_CACHE_REENABLE	4
++
+ #define TF_CPU_PM		0xfffffffc
+ #define TF_CPU_PM_S3		0xffffffe3
+ #define TF_CPU_PM_S2		0xffffffe6
+@@ -67,9 +75,47 @@ static int tf_prepare_idle(void)
  	return 0;
  }
+ 
++#ifdef CONFIG_CACHE_L2X0
++static void tf_write_sec(unsigned long val, unsigned reg)
++{
++	unsigned long cur = readl_relaxed(l2x0_base + reg);
++
++	pr_warn("TF: ignoring write_sec[0x%x]: 0x%08lx -> 0x%08lx\n", reg, cur, val);
++}
++
++static void tf_disable_cache(void)
++{
++	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_FLUSH, l2x0_way_mask);
++}
++
++static void tf_resume_cache(void)
++{
++	unsigned long aux_val = readl_relaxed(l2x0_base + L2X0_AUX_CTRL);
++	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_REENABLE, aux_val);
++}
++
++static void tf_configure_cache(const struct l2x0_regs *regs)
++{
++	outer_cache.disable = tf_disable_cache;
++	outer_cache.resume = tf_resume_cache;
++}
++
++static int tf_init_cache(void)
++{
++	tf_generic_smc(TF_CACHE_MAINT, TF_CACHE_INIT, 0);
++
++	outer_cache.write_sec = tf_write_sec;
++	outer_cache.configure = tf_configure_cache;
++	return 0;
++}
++#endif /* CONFIG_CACHE_L2X0 */
++
+ static const struct firmware_ops trusted_foundations_ops = {
+ 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
+ 	.prepare_idle = tf_prepare_idle,
++#ifdef CONFIG_CACHE_L2X0
++	.l2x0_init = tf_init_cache,
++#endif
+ };
+ 
+ void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index 2b6a023fea3f..f1268e9b35f0 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -30,6 +30,7 @@
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/firmware.h>
+ #include "cache-tauros3.h"
+ #include "cache-aurora-l2.h"
+ 
+@@ -37,6 +38,7 @@ struct l2c_init_data {
+ 	const char *type;
+ 	unsigned way_size_0;
+ 	unsigned num_lock;
++	void (*init)(void __iomem *, u32 *, u32 *);
+ 	void (*of_parse)(const struct device_node *, u32 *, u32 *);
+ 	void (*enable)(void __iomem *, unsigned);
+ 	void (*fixup)(void __iomem *, u32, struct outer_cache_fns *);
+@@ -1760,6 +1762,7 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 	u32 cache_id;
+ 	u32 cache_level = 2;
+ 	bool nosync = false;
++	int err;
+ 
+ 	np = of_find_matching_node(NULL, l2x0_ids);
+ 	if (!np)
+@@ -1792,6 +1795,11 @@ int __init l2x0_of_init(u32 aux_val, u32 aux_mask)
+ 
+ 	nosync = of_property_read_bool(np, "arm,outer-sync-disable");
+ 
++	/* Call firmware init */
++	err = call_firmware_op(l2x0_init);
++	if (err && err != -ENOSYS)
++		return err;
++
+ 	/* Read back current (default) hardware configuration */
+ 	if (data->save)
+ 		data->save(l2x0_base);
 -- 
 2.19.1
