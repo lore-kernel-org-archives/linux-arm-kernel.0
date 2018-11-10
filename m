@@ -1,71 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Nov 2018 17:33:34 +0100
-Subject: [PATCH 00/27] Unify vDSOs across more architectures
-In-Reply-To: <20181109123730.8743-1-vincenzo.frascino@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
-Message-ID: <CAK8P3a1obPxkJROk5rN7OpL3AE-3Yifu-vUqepUUz+yO_HNd7g@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 10 Nov 2018 17:41:03 +0100 (CET)
+Subject: [PATCH v2] staging: vchiq_arm: fix compat
+ VCHIQ_IOC_AWAIT_COMPLETION
+In-Reply-To: <20181103233219.13685-1-benwolsieffer@gmail.com>
+References: <101171304.143617.1541286450992@email.ionos.de>
+ <20181103233219.13685-1-benwolsieffer@gmail.com>
+Message-ID: <1826039258.174149.1541868063434@email.ionos.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/18, Vincenzo Frascino <vincenzo.frascino@arm.com> wrote:
-> vDSO (virtual dynamic shared object) is a mechanism that the Linux
-> kernel provides as an alternative to system calls to reduce where
-> possible the costs in terms of cycles.
-> This is possible because certain syscalls like gettimeofday() do
-> not write any data and return one or more values that are stored
-> in the kernel, which makes relatively safe calling them directly
-> as a library function.
->
-> Even if the mechanism is pretty much standard, every architecture
-> in the last few years ended up implementing their own vDSO library
-> in the architectural code.
->
-> The purpose of this patch-set is to identify the commonalities in
-> between the architectures and try to consolidate the common code
-> paths, starting with gettimeofday().
 
-I'm very happy to see the generalization overall, as this is going
-to make it much easier to add the 64-bit time_t on the 32-bit
-vdso implementations, as well as other extensions we may want
-in the future.
+> Ben Wolsieffer <benwolsieffer@gmail.com> hat am 4. November 2018 um 00:32 geschrieben:
+> 
+> 
+> The compatibility ioctl wrapper for VCHIQ_IOC_AWAIT_COMPLETION assumes that
+> the native ioctl always uses a message buffer and decrements msgbufcount.
+> Certain message types do not use a message buffer and in this case
+> msgbufcount is not decremented, and completion->header for the message is
+> NULL. Because the wrapper unconditionally decrements msgbufcount, the
+> calling process may assume that a message buffer has been used even when
+> it has not.
+> 
+> This results in a memory leak in the userspace code that interfaces with
+> this driver. When msgbufcount is decremented, the userspace code assumes
+> that the buffer can be freed though the reference in completion->header,
+> which cannot happen when the reference is NULL.
+> 
+> This patch causes the wrapper to only decrement msgbufcount when the
+> native ioctl decrements it. Note that we cannot simply copy the native
+> ioctl's value of msgbufcount, because the wrapper only retrieves messages
+> from the native ioctl one at a time, while userspace may request multiple
+> messages.
+> 
+> See https://github.com/raspberrypi/linux/pull/2703 for more discussion of
+> this patch.
+> 
+> Fixes: 5569a12 ("staging: vchiq_arm: Add compatibility wrappers for ioctls")
+> 
+> Signed-off-by: Ben Wolsieffer <benwolsieffer@gmail.com>
 
-> This implementation contains the following design choices:
->  * Every architecture defines the arch specific code in an header in
->    "asm/vdso/".
->  * The generic implementation includes the arch specific one and lives
->    in "lib/vdso".
-
-Makes sense.
-
->  * The arch specific code for gettimeofday lives in
->    "<arch path>/vdso/gettimeofday.c" and includes the generic code only.
->  * This approach allows to consolidate the common code in a single place
->    with the benefit of avoiding code duplication.
-
-I would prefer to have that named clock_gettime.c and only implement
-that one system call there. We can easily have the gettimeofday(),
-time() and clock_getres() in the common code where that is needed
-for backwards compatibility. As I already mentioned in my comment
-for one of the patches, we won't have time() or gettimeofday() system
-calls on new architectures, and 32-bit architectures won't have them
-with 64-bit time_t.
-
-I suppose we can have the time() and gettimeofday() calls
-implemented in the generic vdso for everyone, but then
-only hook those up on architectures that already had
-them. The implementation of course is trivial based on
-clock_gettime() with CLOCK_REALTIME or CLOCK_REALTIME_COARSE
-respectively.
-
-> This implementation contains the portings to the common library for: arm64,
-> compat mode for arm64, arm and mips.
->
-> The mips porting has been tested on qemu for mips32el. A configuration to
-> repeat the tests can be found at [4].
-
-Ah, I missed the fact that you didn't do this for x86, so I assumed that
-this work was triggered by Thomas' recent cleanup of the x86 clock_gettime
-vdso code. I think it would be best to get x86 to use the same code and
-get the recent improvements ported to the others as well that way.
-
-      Arnd
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
