@@ -1,53 +1,38 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 10 Nov 2018 15:58:00 +0000
-Subject: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
-In-Reply-To: <AM0PR04MB42112BEEF4DB939F13D6AF1680F90@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
- <1539881347-20871-10-git-send-email-aisheng.dong@nxp.com>
- <153988429912.5275.13469659599335212731@swboyd.mtv.corp.google.com>
- <AM0PR04MB42112CB1324B0994A26AB15D80F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <153989556955.53599.9032716427049619310@swboyd.mtv.corp.google.com>
- <AM0PR04MB42112BEEF4DB939F13D6AF1680F90@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <AM0PR04MB42115A499619B6D650C9728480C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 10 Nov 2018 17:05:48 +0100
+Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+In-Reply-To: <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
+References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
+ <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+ <20181108093617.GB8433@e107155-lin>
+ <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
+ <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
+Message-ID: <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 11/10/18, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
+> On 10/11/2018 09:57, Arnd Bergmann wrote:
+>
+>> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com>
+>> wrote:
+>>>
+>>> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
+>>>> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+>>>> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
+>>>>
+>>>
+>>> Looks good,
+>>>
+>>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>
+>>> But I left it intentionally to avoid churn assuming it will go away when
+>>> ARM SoC team runs savedefconfig and sync the defconfig.
+>>
+>> I would never do that,
+>
+> Isn't that what commit c432c0880596 did? :-p
 
-[...]
-> > > > Where's the DT binding for this device?
-> > >
-> > > Sorry for missed to mention this.
-> > > It's been merged into scu binding doc per Rob's request which has
-> > > already been in Shawn's tree.
-> > >
-> > > Please take a look at here:
-> [...]
-> >
-> > Ok I ask because it's odd to hardcode physical addresses in a clk
-> > driver when those should come from DT in reg properties. Was Rob aware
-> > that this clk node was combining I/O memory and message passing?
-> 
-> Yes, I agree with you. That seems like a special to i.MX case.
-> The problem is not all clocks having a LPCG gate. And those LPCGs are also not
-> continuous and may be shared by many clocks which make things more
-> complicated.
-> I'm not sure parsing from device tree could be better way to do it.
-> Probably need huge changes.
-> 
+Olof did that one ;-)
 
-I reorganized the driver a lot to address this issue.
-See:
-https://patchwork.kernel.org/cover/10677275/
-We now have a new LPCG clock type and retrieve the LPCG physical
-address from device tree.
-
-Besides that, as LPCG is moved out from the original SCU gate clocks,
-We have a chance to merge all three type of SCU clocks (divider/gate/mux)
-together into a general SCU clock. (new API introduced imx_clk_scu()).
-Thus, the consumer driver is also simplied a lot which looks better than before.
-Hopefully this can make you happy.
-Please help review that new version.
-
-Regards
-Dong Aisheng
+        Arnd
