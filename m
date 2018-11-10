@@ -1,39 +1,61 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 10 Nov 2018 18:54:42 +0100
-Subject: linux-4.20-rc1/arch/arm/vfp/vfpmodule.c:576: possible cut'n'paste
- error
-In-Reply-To: <20181106163724.GK30658@n2100.armlinux.org.uk> (Russell King's
- message of "Tue, 6 Nov 2018 16:37:24 +0000")
-References: <VI1PR08MB3342D4ADBFBC43F2BE2FD34D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
- <VI1PR08MB33420789A2AA1096D3F5FC9D9CCA0@VI1PR08MB3342.eurprd08.prod.outlook.com>
- <20181106162014.GH30658@n2100.armlinux.org.uk>
- <VI1PR08MB33427CD1C653245DBB979B9B9CCB0@VI1PR08MB3342.eurprd08.prod.outlook.com>
- <20181106163724.GK30658@n2100.armlinux.org.uk>
-Message-ID: <87r2fslswt.fsf@belgarion.home>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Nov 2018 10:09:19 -0800
+Subject: [GIT PULL] ARM: SoC fixes
+In-Reply-To: <20181108154926.GI56134@atomide.com>
+References: <20181107171023.zoo6qox5eewy3pmk@localhost>
+ <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
+ <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
+ <20181108154926.GI56134@atomide.com>
+Message-ID: <CAOesGMje+-R4Qbtgtj2AvNK+=Q3Rqbo=n8Q2DV4SG9wOv3Kj_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@armlinux.org.uk> writes:
-
->> Interestingly, more of the same in file linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c
->> 
->> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:84]: (warning) Redundant assignment of 'ASCR' to itself.
->> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:85]: (warning) Redundant assignment of 'ARSR' to itself.
->> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:120]: (warning) Redundant assignment of 'ASCR' to itself.
->> [linux-4.20-rc1/arch/arm/mach-pxa/pxa3xx.c:121]: (warning) Redundant assignment of 'ARSR' to itself.
->> 
->> I don't know if these four are also worth fixing.
+On Thu, Nov 8, 2018 at 7:49 AM Tony Lindgren <tony@atomide.com> wrote:
 >
-> There are cases where this can be false positives.  In the case of a
-> status register with write-1-to-clear bits for example.  These ones
-> look very much like that.
-And indeed they are, for bits 2,1,0 for ASCR and 3,2,1,0 for ARSR, and you
-guessed correctly they are partly status registers.
+> * Olof Johansson <olof@lixom.net> [181107 09:28]:
+> > On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
+> > <torvalds@linux-foundation.org> wrote:
+> > >
+> > > On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
+> > > >
+> > > > ARM: SoC fixes
+> > >
+> > > Pulled.
+> > >
+> > > > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
+> > > > and it ended up regressing at least BeagleBone XM boards.
+> > >
+> > > Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
+> > > preempt being off? Otherwise I don't see how/why preempt should fail
+> > > in a board-specific manner..
+> >
+> > The board hangs early during boot and the usual way of collecting
+> > early console doesn't seem to work when attempted (I haven't tried
+> > personally).
+> >
+> > It's one of the major non-SMP platforms covered by tests. I'd be
+> > surprised if it turns out to be truly _board_ specific (and rather
+> > specific to OMAP3), but we don't have enough data yet. Chances are it
+> > either shuffles some timing around or indeed hits a may_sleep() test
+> > somewhere.
+> >
+> > (I just realized I might have missed to attribute Guillaume in the
+> > revert patch. Sorry about that).
+>
+> Looks like we're missing the stdout-path for earlycon, maybe try
+> with the following patch? I can't find my Beagleboard-xm right now,
+> time to clean-up a bit I guess.
+>
+> At least omap3-evm, logicpd-torpedo and n900 all boot with PREEMPT.
 
-If only your checker could filter out __iomem tagged pointers, you could have
-far less of these false positives ...
+To follow up on this, it turned out to be an issue where the kernel
+outgrew the location it was loaded to, and overwrite the device tree
+on decompression. So, not a code issue.
 
-Cheers.
+It's a known fragile aspect on some of the u-boot setups, and
+something I've been hit by myself on my farm a few times.
 
--- 
-Robert
+Still, for now we'll keep PREEMPT off until next merge window.
+
+
+-Olof
