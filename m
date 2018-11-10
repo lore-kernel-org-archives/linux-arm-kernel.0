@@ -1,56 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 10 Nov 2018 11:44:54 +0000
-Subject: [GIT PULL] arm64 fixes for 4.20-rc2
-Message-ID: <20181110114452.GA90619@arrakis.emea.arm.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Sat, 10 Nov 2018 12:45:09 +0100
+Subject: [PATCH 0/3] Fix MODULE_LICENSE of bcm2835 drivers
+In-Reply-To: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
+References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <B176A2C1-D221-4F36-9A61-571EF5AB6FEB@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
 
-Please pull the arm64 fixes below. Thanks.
+> On 23.10.2018, at 13:06, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> 
+> In preparation of a treewide switch of all bcm2835 drivers to SPDX tags,
+> we need to make sure that the license text and MODULE_LICENSE matches.
+> 
+> This series starts sooner than usual to have more time to collect the authors
+> ACK.
+> 
+> Stefan Wahren (3):
+>  clk: bcm2835: make license text and module license match
+>  dma: bcm2835: make license text and module license match
+>  spi: bcm2835: make license text and module license match
+> 
+> drivers/clk/bcm/clk-bcm2835-aux.c | 2 +-
+> drivers/clk/bcm/clk-bcm2835.c     | 2 +-
+> drivers/dma/bcm2835-dma.c         | 2 +-
+> drivers/spi/spi-bcm2835.c         | 2 +-
+> drivers/spi/spi-bcm2835aux.c      | 2 +-
+> 5 files changed, 5 insertions(+), 5 deletions(-)
+> 
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 24cc61d8cb5a9232fadf21a830061853c1268fdd:
-
-  arm64: memblock: don't permit memblock resizing until linear mapping is up (2018-11-08 17:54:03 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Fix occasional page fault during boot due to memblock resizing before
-  the linear map is up.
-
-- Define NET_IP_ALIGN to 0 to improve the DMA performance on some
-  platforms.
-
-- lib/raid6 test build fix.
-
-- .mailmap update for Punit Agrawal
-
-----------------------------------------------------------------
-Ard Biesheuvel (2):
-      arm64: mm: define NET_IP_ALIGN to 0
-      arm64: memblock: don't permit memblock resizing until linear mapping is up
-
-Jeremy Linton (1):
-      lib/raid6: Fix arm64 test build
-
-Punit Agrawal (1):
-      mailmap: Update email for Punit Agrawal
-
- .mailmap                           | 1 +
- arch/arm64/include/asm/processor.h | 8 ++++++++
- arch/arm64/mm/init.c               | 2 --
- arch/arm64/mm/mmu.c                | 2 ++
- lib/raid6/test/Makefile            | 4 ++--
- 5 files changed, 13 insertions(+), 4 deletions(-)
-
--- 
-Catalin
+Acked-by: Martin Sperl <kernel@martin.sperl.org>
