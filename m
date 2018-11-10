@@ -1,7 +1,7 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 10 Nov 2018 15:45:02 -0200
-Subject: [PATCH] ARM: dts: imx51-zii-rdu1: Remove EEPROM node
-Message-ID: <1541871902-31316-1-git-send-email-festevam@gmail.com>
+Date: Sat, 10 Nov 2018 15:53:59 -0200
+Subject: [PATCH v2] ARM: dts: imx51-zii-rdu1: Remove EEPROM node
+Message-ID: <1541872439-31531-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,6 +13,9 @@ Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
 Reported-by: Chris Healy <cphealy@gmail.com>
 Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
+Changes since v1:
+- None. Only added Chris on Cc
+
  arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 ------
  1 file changed, 6 deletions(-)
 
