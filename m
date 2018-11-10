@@ -1,30 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Nov 2018 09:57:27 +0100
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-In-Reply-To: <20181108093617.GB8433@e107155-lin>
-References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
- <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
- <20181108093617.GB8433@e107155-lin>
-Message-ID: <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Sat, 10 Nov 2018 14:16:47 +0300
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181110001615.GA5665@brain-police>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+ <20181110001615.GA5665@brain-police>
+Message-ID: <20181110111647.GA3511@speedy.hunter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
->
-> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
-> > Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
-> > dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
-> >
->
-> Looks good,
->
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> But I left it intentionally to avoid churn assuming it will go away when
-> ARM SoC team runs savedefconfig and sync the defconfig.
+On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
+> On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
+> > Specify correct type for the constants to avoid
+> > the following sparse complaints:
+> > 
+> > ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > 
+> > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> > ---
+> >  arch/arm64/include/asm/sysreg.h | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> I thought this was fixed in newer versions of sparse so that it treats
+> AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
 
-I would never do that, instead I want patches like the one that Marc sent
-in order to make sure we don't accidentally drop anything that is still
-required, e.g. when an option got renamed or gained a dependency.
+I am using up-to-date sparse. However this warning still appears,
+not sure why. Maybe sparse treats such constants as unsigned int ?
 
-       Arnd
+Meanwhile it looks like I chose wrong type: it is enough to use UL
+instead of ULL to make sparse happy. In fact warning is clear
+about it.
+
+Regards,
+Sergey
