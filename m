@@ -1,85 +1,124 @@
 From: mirq-linux@rere.qmqm.pl (=?UTF-8?q?Micha=C5=82=20Miros=C5=82aw?=)
-Date: Sat, 10 Nov 2018 22:02:23 +0100
-Subject: [PATCH 3/3] ARM: trusted_foundations: announce firmware version
+Date: Sat, 10 Nov 2018 22:02:22 +0100
+Subject: [PATCH 1/3] ARM: cache-l2x0: share l2x0_base with PMU code
 In-Reply-To: <cover.1541882833.git.mirq-linux@rere.qmqm.pl>
 References: <cover.1541882833.git.mirq-linux@rere.qmqm.pl>
-Message-ID: <86834d26d87aa31ccb48c49e932f01274f1d4058.1541882833.git.mirq-linux@rere.qmqm.pl>
+Message-ID: <bece26283d1a4f48c20b7e526332b4a696670fcb.1541882833.git.mirq-linux@rere.qmqm.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Announce Trusted Foundations version for debugging and documentation.
+Avoid l2x0_base duplication with PMU driver by sharing it
+and using l2x0_name as the 'enabled' flag instead. Since l2x0_name is
+not used for anything else, mark it as __initdata.
+
+This will also be needed for cache maintenance with Trusted Foundations
+firmware.
 
 Signed-off-by: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
 ---
- arch/arm/firmware/trusted_foundations.c | 21 ++++++++++++++++++---
- 1 file changed, 18 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/hardware/cache-l2x0.h | 6 ++++--
+ arch/arm/mm/cache-l2x0-pmu.c               | 9 +++------
+ arch/arm/mm/cache-l2x0.c                   | 6 +++---
+ 3 files changed, 10 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/firmware/trusted_foundations.c b/arch/arm/firmware/trusted_foundations.c
-index 135068119453..e59f44fcda35 100644
---- a/arch/arm/firmware/trusted_foundations.c
-+++ b/arch/arm/firmware/trusted_foundations.c
-@@ -30,6 +30,8 @@
- #define TF_CACHE_FLUSH		2
- #define TF_CACHE_REENABLE	4
+diff --git a/arch/arm/include/asm/hardware/cache-l2x0.h b/arch/arm/include/asm/hardware/cache-l2x0.h
+index 736292b42fca..665eb0758417 100644
+--- a/arch/arm/include/asm/hardware/cache-l2x0.h
++++ b/arch/arm/include/asm/hardware/cache-l2x0.h
+@@ -167,11 +167,11 @@ static inline int l2x0_of_init(u32 aux_val, u32 aux_mask)
+ #endif
  
-+#define TF_GET_PROTOCOL_VERSION	0xfffffffb
-+
- #define TF_CPU_PM		0xfffffffc
- #define TF_CPU_PM_S3		0xffffffe3
- #define TF_CPU_PM_S2		0xffffffe6
-@@ -39,7 +41,7 @@
+ #ifdef CONFIG_CACHE_L2X0_PMU
+-void l2x0_pmu_register(void __iomem *base, u32 part);
++void l2x0_pmu_register(u32 part);
+ void l2x0_pmu_suspend(void);
+ void l2x0_pmu_resume(void);
+ #else
+-static inline void l2x0_pmu_register(void __iomem *base, u32 part) {}
++static inline void l2x0_pmu_register(u32 part) {}
+ static inline void l2x0_pmu_suspend(void) {}
+ static inline void l2x0_pmu_resume(void) {}
+ #endif
+@@ -193,6 +193,8 @@ struct l2x0_regs {
+ 	unsigned long aux2_ctrl;
+ };
  
- static unsigned long cpu_boot_addr;
++extern void __iomem *l2x0_base;
++extern u32 l2x0_way_mask;	/* Bitmask of active ways */
+ extern struct l2x0_regs l2x0_saved_regs;
  
--static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
-+static u64 tf_generic_smc(u32 type, u32 arg1, u32 arg2)
- {
- 	register u32 r0 asm("r0") = type;
- 	register u32 r1 asm("r1") = arg1;
-@@ -55,9 +57,10 @@ static void tf_generic_smc(u32 type, u32 arg1, u32 arg2)
- 		"mov	r4, #0\n\t"
- 		"smc	#0\n\t"
- 		"ldmfd	sp!, {r4 - r11}\n\t"
--		:
--		: "r" (r0), "r" (r1), "r" (r2)
-+		: "+r" (r0), "+r" (r1)
-+		: "r" (r2)
- 		: "memory", "r3", "r12", "lr");
-+	return ((u64)r1 << 32) | r0;
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm/mm/cache-l2x0-pmu.c b/arch/arm/mm/cache-l2x0-pmu.c
+index afe5b4c7b164..6be335ae4e2f 100644
+--- a/arch/arm/mm/cache-l2x0-pmu.c
++++ b/arch/arm/mm/cache-l2x0-pmu.c
+@@ -29,11 +29,10 @@
+ 
+ #define PMU_NR_COUNTERS 2
+ 
+-static void __iomem *l2x0_base;
+ static struct pmu *l2x0_pmu;
+ static cpumask_t pmu_cpu;
+ 
+-static const char *l2x0_name;
++static const char *__initdata l2x0_name = NULL;
+ 
+ static ktime_t l2x0_pmu_poll_period;
+ static struct hrtimer l2x0_pmu_hrtimer;
+@@ -491,7 +490,7 @@ void l2x0_pmu_resume(void)
+ 	l2x0_pmu_enable(l2x0_pmu);
  }
  
- static int tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-@@ -110,6 +113,11 @@ static int tf_init_cache(void)
- }
- #endif /* CONFIG_CACHE_L2X0 */
- 
-+static u32 tf_get_protocol_version(void)
-+{
-+	return tf_generic_smc(TF_GET_PROTOCOL_VERSION, 0, 0) >> 48;
-+}
-+
- static const struct firmware_ops trusted_foundations_ops = {
- 	.set_cpu_boot_addr = tf_set_cpu_boot_addr,
- 	.prepare_idle = tf_prepare_idle,
-@@ -120,6 +128,12 @@ static const struct firmware_ops trusted_foundations_ops = {
- 
- void register_trusted_foundations(struct trusted_foundations_platform_data *pd)
+-void __init l2x0_pmu_register(void __iomem *base, u32 part)
++void __init l2x0_pmu_register(u32 part)
  {
-+	unsigned int protocol = tf_get_protocol_version();
-+
-+	pr_info("TF: version %u.%u, protocol %u.%u\n",
-+		pd->version_major, pd->version_minor,
-+		protocol >> 8, protocol & 0xFF);
-+
  	/*
- 	 * we are not using version information for now since currently
- 	 * supported SMCs are compatible with all TF releases
-@@ -145,5 +159,6 @@ void of_register_trusted_foundations(void)
- 				   &pdata.version_minor);
- 	if (err != 0)
- 		panic("Trusted Foundation: missing version-minor property\n");
-+
- 	register_trusted_foundations(&pdata);
+ 	 * Determine whether we support the PMU, and choose the name for sysfs.
+@@ -516,15 +515,13 @@ void __init l2x0_pmu_register(void __iomem *base, u32 part)
+ 	default:
+ 		return;
+ 	}
+-
+-	l2x0_base = base;
+ }
+ 
+ static __init int l2x0_pmu_init(void)
+ {
+ 	int ret;
+ 
+-	if (!l2x0_base)
++	if (!l2x0_name)
+ 		return 0;
+ 
+ 	l2x0_pmu = kzalloc(sizeof(*l2x0_pmu), GFP_KERNEL);
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index ea1e70ff4568..2b6a023fea3f 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -48,13 +48,13 @@ struct l2c_init_data {
+ 
+ #define CACHE_LINE_SIZE		32
+ 
+-static void __iomem *l2x0_base;
+ static const struct l2c_init_data *l2x0_data;
+ static DEFINE_RAW_SPINLOCK(l2x0_lock);
+-static u32 l2x0_way_mask;	/* Bitmask of active ways */
+ static u32 l2x0_size;
+ static unsigned long sync_reg_offset = L2X0_CACHE_SYNC;
+ 
++void __iomem *l2x0_base;
++u32 l2x0_way_mask;	/* Bitmask of active ways */
+ struct l2x0_regs l2x0_saved_regs;
+ 
+ static bool l2x0_bresp_disable;
+@@ -900,7 +900,7 @@ static int __init __l2c_init(const struct l2c_init_data *data,
+ 	pr_info("%s: CACHE_ID 0x%08x, AUX_CTRL 0x%08x\n",
+ 		data->type, cache_id, aux);
+ 
+-	l2x0_pmu_register(l2x0_base, cache_id);
++	l2x0_pmu_register(cache_id);
+ 
+ 	return 0;
  }
 -- 
 2.19.1
