@@ -1,39 +1,47 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 10 Nov 2018 18:12:32 +0100 (CET)
-Subject: [PATCH] Staging: vchi: Add license id and change int type
-In-Reply-To: <d6e6a908-8ef6-e2a5-0a78-7bc21be957e4@i2se.com>
-References: <20181107000738.26963-1-andrealmeid@riseup.net>
- <d6e6a908-8ef6-e2a5-0a78-7bc21be957e4@i2se.com>
-Message-ID: <779995221.314921.1541869952181@email.ionos.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 10 Nov 2018 09:32:55 -0800
+Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+In-Reply-To: <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
+References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
+ <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+ <20181108093617.GB8433@e107155-lin>
+ <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
+ <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
+ <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
+Message-ID: <CAOesGMgdYDZw0t=q0CmiG6x1a0agQdShrZrWxJMRXXsM4B8d2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+On Sat, Nov 10, 2018 at 8:05 AM Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On 11/10/18, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
+> > On 10/11/2018 09:57, Arnd Bergmann wrote:
+> >
+> >> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com>
+> >> wrote:
+> >>>
+> >>> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
+> >>>> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+> >>>> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
+> >>>>
+> >>>
+> >>> Looks good,
+> >>>
+> >>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> >>>
+> >>> But I left it intentionally to avoid churn assuming it will go away when
+> >>> ARM SoC team runs savedefconfig and sync the defconfig.
+> >>
+> >> I would never do that,
+> >
+> > Isn't that what commit c432c0880596 did? :-p
+>
+> Olof did that one ;-)
 
-> Stefan Wahren <stefan.wahren@i2se.com> hat am 7. November 2018 um 09:30 geschrieben:
-> 
-> 
-> >
-> > Signed-off-by: Andr? Almeida <andrealmeid@riseup.net>
-> >
-> > ---
-> >
-> > Hello! This is my first patch to Linux Kernel. Let me know any feedback
-> > ---
-> >  drivers/staging/vc04_services/interface/vchi/vchi_mh.h | 6 +++---
-> >  1 file changed, 3 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-> > index 198bd076b666..42fc0c693d43 100644
-> > --- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-> > +++ b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-> > @@ -1,5 +1,5 @@
-> > -/**
-> > - * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-> > +/* SPDX-License-Identifier: GPL-2.0 */
-> 
-> Please use the C++ style for the SPDX id.
+Yeah, it was because of churn caused by things moving over many releases.
 
-Apologies. Please ignore this suggestion. C style is correct for header files.
+In the end, it's documenting what the kernel builds anyway. We don't
+do it often, I think this was the first time in recent memory.
 
-Stefan
+
+-Olof
