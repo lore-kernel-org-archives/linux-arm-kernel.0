@@ -1,35 +1,21 @@
-From: marc.w.gonzalez@free.fr (Marc Gonzalez)
-Date: Sat, 10 Nov 2018 13:38:43 +0100
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-In-Reply-To: <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
-References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
- <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
- <20181108093617.GB8433@e107155-lin>
- <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
-Message-ID: <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
+From: pr-tracker-bot@kernel.org (pr-tracker-bot at kernel.org)
+Date: Sat, 10 Nov 2018 13:10:02 +0000
+Subject: [GIT PULL] arm64 fixes for 4.20-rc2
+In-Reply-To: <20181110114452.GA90619@arrakis.emea.arm.com>
+References: <20181110114452.GA90619@arrakis.emea.arm.com>
+Message-ID: <20181110131002.19012.77007.pr-tracker-bot-35c55685fc807fb536067602418f4a12dde23987@pdx-korg-gitolite-1.ci.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2018 09:57, Arnd Bergmann wrote:
+The pull request you sent on Sat, 10 Nov 2018 11:44:54 +0000:
 
-> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
->>
->> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
->>> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
->>> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
->>>
->>
->> Looks good,
->>
->> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->>
->> But I left it intentionally to avoid churn assuming it will go away when
->> ARM SoC team runs savedefconfig and sync the defconfig.
-> 
-> I would never do that,
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-Isn't that what commit c432c0880596 did? :-p
+has been merged into torvalds/linux.git:
+https://git.kernel.org/torvalds/c/35c55685fc807fb536067602418f4a12dde23987
 
-$ git show --stat c432c0880596 
- arch/arm64/configs/defconfig | 102 +++++++++++++++++++++++++++++++++++++++---------------------------------------------------------------
- 1 file changed, 39 insertions(+), 63 deletions(-)
+Thank you!
+
+-- 
+Deet-doot-dot, I am a bot.
+https://korg.wiki.kernel.org/userdoc/prtracker
