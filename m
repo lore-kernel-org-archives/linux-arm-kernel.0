@@ -1,81 +1,80 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 10 Nov 2018 15:42:54 +0100
-Subject: [PATCH 02/17] ARM: mach-bcm: Switch bcm2835 and platsmp to SPDX
- identifier
-Message-ID: <1541860974-6676-1-git-send-email-stefan.wahren@i2se.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Sat, 10 Nov 2018 15:12:52 +0000
+Subject: [PATCH V5 0/6] ARM: imx: add imx7ulp support
+Message-ID: <1541862478-7839-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adopt the SPDX license identifier headers to ease license compliance
-management.
+The i.MX 7ULP family of processors represents NXP?s latest achievement
+in ultra-low-power processing for use cases demanding long battery life.
+Targeted towards the growing market of portable devices, the i.MX 7ULP
+family of processors features NXP's advanced implementation of the Arm?
+Cortex-A7 core, the Arm Cortex-M4 core, as well as a 3D and 2D Graphics
+Processing Units (GPUs). The i.MX 7ULP family provides up to 32-bit
+LPDDR2/LPDDR3 memory interface and a number of other interfaces for
+connecting peripherals, such as WLAN, Bluetooth, GPS, displays, and
+camera sensors.
 
-Cc: Simon Arlott <simon@arlott.org>
-Cc: Kapil Hali <kapilh@broadcom.com>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/mach-bcm/board_bcm2835.c | 11 +----------
- arch/arm/mach-bcm/platsmp.c       | 10 +---------
- arch/arm/mach-bcm/platsmp.h       |  6 +-----
- 3 files changed, 3 insertions(+), 24 deletions(-)
+This patch series adds the basic support for imx7ulp. It includes machine
+level support code and device tree.
+Note: it depends on clk driver which is still under review.
 
-diff --git a/arch/arm/mach-bcm/board_bcm2835.c b/arch/arm/mach-bcm/board_bcm2835.c
-index 8cff865..bfc556f 100644
---- a/arch/arm/mach-bcm/board_bcm2835.c
-+++ b/arch/arm/mach-bcm/board_bcm2835.c
-@@ -1,15 +1,6 @@
-+// SPDX-License-Identifier: GPL-2.0+
- /*
-  * Copyright (C) 2010 Broadcom
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/init.h>
-diff --git a/arch/arm/mach-bcm/platsmp.c b/arch/arm/mach-bcm/platsmp.c
-index 7d95483..47f8053 100644
---- a/arch/arm/mach-bcm/platsmp.c
-+++ b/arch/arm/mach-bcm/platsmp.c
-@@ -1,15 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (C) 2014-2015 Broadcom Corporation
-  * Copyright 2014 Linaro Limited
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- 
- #include <linux/cpumask.h>
-diff --git a/arch/arm/mach-bcm/platsmp.h b/arch/arm/mach-bcm/platsmp.h
-index b8b8b3f..2af9773 100644
---- a/arch/arm/mach-bcm/platsmp.h
-+++ b/arch/arm/mach-bcm/platsmp.h
-@@ -1,10 +1,6 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (C) 2017 Stefan Wahren <stefan.wahren@i2se.com>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-  */
- 
- extern const struct smp_operations bcm2836_smp_ops;
+v4->v5:
+ * dts add input clocks for PCC module
+ * update pad setting due to missing pull up enabled
+   (formerly auto done by driver generic pinconfg)
+ * gpio and pinctrl patches were merged by Linus W, so dropped in this series
+  dt-bindings: gpio: vf610: add optional clocks property
+  gpio: vf610: add optional clock support
+  dt-bindings: pinctrl: imx7ulp: back to imx legacy binding for
+    consistency
+  pinctrl: fsl: imx7ulp: change to use imx legacy binding
+
+v3->v4:
+ * add comments about fixed soc version
+ * add iounmap
+v2->v3:
+ * back to old pinctrl binding according to SoC maintainer's suggestions
+ * use generic node name
+ * error checking updated according to Russell's suggestion:
+   ptr == ERR_PTR(-EPROBE_DEFER)
+
+v1->v2:
+ * switch to SPDX license
+ * rebase to latest tree
+ * pad name update
+ * add gpio clk support
+ * minor fix
+
+
+
+Dong Aisheng (6):
+  dt-bindings: fsl: add compatible for imx7ulp evk
+  dt-bindings: fsl: add imx7ulp pm related components bindings
+  ARM: imx: add initial support for imx7ulp
+  dts: imx: add common imx7ulp dtsi support
+  dts: fsl: add imx7ulp evk support
+  ARM: imx_v6_v7_defconfig: add imx7ulp support
+
+ .../bindings/arm/freescale/fsl,imx7ulp-pm.txt      |  23 ++
+ Documentation/devicetree/bindings/arm/fsl.txt      |   8 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx7ulp-evk.dts                  |  77 +++++
+ arch/arm/boot/dts/imx7ulp.dtsi                     | 346 +++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+ arch/arm/mach-imx/Kconfig                          |   9 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/common.h                         |   1 +
+ arch/arm/mach-imx/cpu.c                            |   3 +
+ arch/arm/mach-imx/mach-imx7ulp.c                   |  33 ++
+ arch/arm/mach-imx/mxc.h                            |   1 +
+ arch/arm/mach-imx/pm-imx7ulp.c                     |  29 ++
+ 13 files changed, 534 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,imx7ulp-pm.txt
+ create mode 100644 arch/arm/boot/dts/imx7ulp-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx7ulp.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx7ulp.c
+ create mode 100644 arch/arm/mach-imx/pm-imx7ulp.c
+
 -- 
 2.7.4
