@@ -1,48 +1,29 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sat, 10 Nov 2018 17:03:21 +0000
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181110111647.GA3511@speedy.hunter>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
- <20181110111647.GA3511@speedy.hunter>
-Message-ID: <20181110170311.GA7700@brain-police>
+From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
+Date: Sun, 11 Nov 2018 00:18:44 +0900
+Subject: [PATCH] ASoC: rockchip: add missing slave_config setting for I2S
+Message-ID: <20181110151844.21362-1-katsuhiro@katsuster.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 02:16:47PM +0300, Sergey Matyukevich wrote:
-> On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
-> > On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
-> > > Specify correct type for the constants to avoid
-> > > the following sparse complaints:
-> > > 
-> > > ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > > ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> > > 
-> > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > > ---
-> > >  arch/arm64/include/asm/sysreg.h | 4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > I thought this was fixed in newer versions of sparse so that it treats
-> > AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
-> 
-> I am using up-to-date sparse. However this warning still appears,
-> not sure why. Maybe sparse treats such constants as unsigned int ?
-> 
-> Meanwhile it looks like I chose wrong type: it is enough to use UL
-> instead of ULL to make sparse happy. In fact warning is clear
-> about it.
+This patch adds missing prepare_sleve_config that is needed for
+setup the DMA slave channel for I2S.
 
-Ah yes, sorry. I misread the patch the first time around and thought you were
-changing a UL suffix to a ULL suffix. So actually, I think this is just a
-case of sparse getting confused about this constant because it's actually
-going to get parsed by the pre-processor, which says:
+Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+---
+ sound/soc/rockchip/rockchip_pcm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-  | It [the preprocessor parsing #if] carries out all calculations in the
-  | widest integer type known to the compiler; on most machines supported by
-  | GCC this is 64 bits
-
-so I still think this is a false positive. Adding Luc in case he has any
-ideas.
-
-Will
+diff --git a/sound/soc/rockchip/rockchip_pcm.c b/sound/soc/rockchip/rockchip_pcm.c
+index 9e7b5fa4cf59..4ac78d7a4b2d 100644
+--- a/sound/soc/rockchip/rockchip_pcm.c
++++ b/sound/soc/rockchip/rockchip_pcm.c
+@@ -33,6 +33,7 @@ static const struct snd_pcm_hardware snd_rockchip_hardware = {
+ 
+ static const struct snd_dmaengine_pcm_config rk_dmaengine_pcm_config = {
+ 	.pcm_hardware = &snd_rockchip_hardware,
++	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
+ 	.prealloc_buffer_size = 32 * 1024,
+ };
+ 
+-- 
+2.19.1
