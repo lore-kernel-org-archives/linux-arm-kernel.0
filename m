@@ -1,61 +1,104 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 10 Nov 2018 10:09:19 -0800
-Subject: [GIT PULL] ARM: SoC fixes
-In-Reply-To: <20181108154926.GI56134@atomide.com>
-References: <20181107171023.zoo6qox5eewy3pmk@localhost>
- <CAHk-=whF7kBo49-BFTUc-by+HB_0qNw_=+d24TydO2mYwwsWMQ@mail.gmail.com>
- <CAOesGMg3uHJ7YB95skjcVK39kudAGGjKo6909d--LDZmqeE1HA@mail.gmail.com>
- <20181108154926.GI56134@atomide.com>
-Message-ID: <CAOesGMje+-R4Qbtgtj2AvNK+=Q3Rqbo=n8Q2DV4SG9wOv3Kj_w@mail.gmail.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Sat, 10 Nov 2018 10:49:48 -0800
+Subject: Patch "perf evsel: Store ids for events with their own cpus
+ perf_event__synthesize_event_update_cpus" has been added to the 4.18-stable
+ tree
+Message-ID: <1541875788165243@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2018 at 7:49 AM Tony Lindgren <tony@atomide.com> wrote:
->
-> * Olof Johansson <olof@lixom.net> [181107 09:28]:
-> > On Wed, Nov 7, 2018 at 9:17 AM Linus Torvalds
-> > <torvalds@linux-foundation.org> wrote:
-> > >
-> > > On Wed, Nov 7, 2018 at 9:10 AM Olof Johansson <olof@lixom.net> wrote:
-> > > >
-> > > > ARM: SoC fixes
-> > >
-> > > Pulled.
-> > >
-> > > > I was a bit too trigger happy to enable PREEMPT on multi_v7_defconfig,
-> > > > and it ended up regressing at least BeagleBone XM boards.
-> > >
-> > > Odd. Did it hit some "may_sleep()" test in a driver that is hidden by
-> > > preempt being off? Otherwise I don't see how/why preempt should fail
-> > > in a board-specific manner..
-> >
-> > The board hangs early during boot and the usual way of collecting
-> > early console doesn't seem to work when attempted (I haven't tried
-> > personally).
-> >
-> > It's one of the major non-SMP platforms covered by tests. I'd be
-> > surprised if it turns out to be truly _board_ specific (and rather
-> > specific to OMAP3), but we don't have enough data yet. Chances are it
-> > either shuffles some timing around or indeed hits a may_sleep() test
-> > somewhere.
-> >
-> > (I just realized I might have missed to attribute Guillaume in the
-> > revert patch. Sorry about that).
->
-> Looks like we're missing the stdout-path for earlycon, maybe try
-> with the following patch? I can't find my Beagleboard-xm right now,
-> time to clean-up a bit I guess.
->
-> At least omap3-evm, logicpd-torpedo and n900 all boot with PREEMPT.
 
-To follow up on this, it turned out to be an issue where the kernel
-outgrew the location it was loaded to, and overwrite the device tree
-on decompression. So, not a code issue.
+This is a note to let you know that I've just added the patch titled
 
-It's a known fragile aspect on some of the u-boot setups, and
-something I've been hit by myself on my farm a few times.
+    perf evsel: Store ids for events with their own cpus perf_event__synthesize_event_update_cpus
 
-Still, for now we'll keep PREEMPT off until next merge window.
+to the 4.18-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+
+The filename of the patch is:
+     perf-evsel-store-ids-for-events-with-their-own-cpus-perf_event__synthesize_event_update_cpus.patch
+and it can be found in the queue-4.18 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
 
 
--Olof
+>From foo at baz Sat Nov 10 10:48:43 PST 2018
+From: Jiri Olsa <jolsa@redhat.com>
+Date: Wed, 3 Oct 2018 23:20:52 +0200
+Subject: perf evsel: Store ids for events with their own cpus perf_event__synthesize_event_update_cpus
+
+From: Jiri Olsa <jolsa@redhat.com>
+
+[ Upstream commit 4ab8455f8bd83298bf7f67ab9357e3b1cc765c7d ]
+
+John reported crash when recording on an event under PMU with cpumask defined:
+
+  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
+  perf: Segmentation fault
+  Obtained 9 stack frames.
+  ./perf_debug_() [0x4c5ef8]
+  [0xffff82ba267c]
+  ./perf_debug_() [0x4bc5a8]
+  ./perf_debug_() [0x419550]
+  ./perf_debug_() [0x41a928]
+  ./perf_debug_() [0x472f58]
+  ./perf_debug_() [0x473210]
+  ./perf_debug_() [0x4070f4]
+  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
+  Segmentation fault (core dumped)
+
+We synthesize an update event that needs to touch the evsel id array, which is
+not defined at that time. Fixing this by forcing the id allocation for events
+with their own cpus.
+
+Reported-by: John Garry <john.garry@huawei.com>
+Signed-off-by: Jiri Olsa <jolsa@kernel.org>
+Tested-by: John Garry <john.garry@huawei.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Andi Kleen <ak@linux.intel.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linuxarm at huawei.com
+Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
+Link: http://lkml.kernel.org/r/20181003212052.GA32371 at krava
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Sasha Levin <sashal@kernel.org>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ tools/perf/builtin-report.c |    1 +
+ tools/perf/util/evsel.c     |    3 +++
+ 2 files changed, 4 insertions(+)
+
+--- a/tools/perf/builtin-report.c
++++ b/tools/perf/builtin-report.c
+@@ -981,6 +981,7 @@ int cmd_report(int argc, const char **ar
+ 			.id_index	 = perf_event__process_id_index,
+ 			.auxtrace_info	 = perf_event__process_auxtrace_info,
+ 			.auxtrace	 = perf_event__process_auxtrace,
++			.event_update	 = perf_event__process_event_update,
+ 			.feature	 = process_feature_event,
+ 			.ordered_events	 = true,
+ 			.ordering_requires_timestamps = true,
+--- a/tools/perf/util/evsel.c
++++ b/tools/perf/util/evsel.c
+@@ -1078,6 +1078,9 @@ void perf_evsel__config(struct perf_evse
+ 		attr->exclude_user   = 1;
+ 	}
+ 
++	if (evsel->own_cpus)
++		evsel->attr.read_format |= PERF_FORMAT_ID;
++
+ 	/*
+ 	 * Apply event specific term settings,
+ 	 * it overloads any global configuration.
+
+
+Patches currently in stable-queue which might be from jolsa at redhat.com are
+
+queue-4.18/perf-vendor-events-intel-fix-wrong-filter_band-values-for-uncore-events.patch
+queue-4.18/perf-tools-fix-use-of-alternatives-to-find-jdir.patch
+queue-4.18/perf-evsel-store-ids-for-events-with-their-own-cpus-perf_event__synthesize_event_update_cpus.patch
