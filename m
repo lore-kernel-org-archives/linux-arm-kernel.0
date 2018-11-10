@@ -1,40 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 10 Nov 2018 15:53:59 -0200
-Subject: [PATCH v2] ARM: dts: imx51-zii-rdu1: Remove EEPROM node
-Message-ID: <1541872439-31531-1-git-send-email-festevam@gmail.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Sat, 10 Nov 2018 18:54:05 +0100
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181110170311.GA7700@brain-police>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+ <20181110001615.GA5665@brain-police>
+ <20181110111647.GA3511@speedy.hunter>
+ <20181110170311.GA7700@brain-police>
+Message-ID: <20181110175404.gnks6sj3zzlz2it7@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The EEPROM under I2C2 was put by mistake in the dts.
+On Sat, Nov 10, 2018 at 05:03:21PM +0000, Will Deacon wrote:
+> On Sat, Nov 10, 2018 at 02:16:47PM +0300, Sergey Matyukevich wrote:
+> > On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
+> > > On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
+> > > > Specify correct type for the constants to avoid
+> > > > the following sparse complaints:
+> > > > 
+> > > > ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > > > ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > > > 
+> > > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> > > > ---
+> > > >  arch/arm64/include/asm/sysreg.h | 4 ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > I thought this was fixed in newer versions of sparse so that it treats
+> > > AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
+> > 
+> > I am using up-to-date sparse. However this warning still appears,
+> > not sure why. Maybe sparse treats such constants as unsigned int ?
+> > 
+> > Meanwhile it looks like I chose wrong type: it is enough to use UL
+> > instead of ULL to make sparse happy. In fact warning is clear
+> > about it.
+> 
+> Ah yes, sorry. I misread the patch the first time around and thought you were
+> changing a UL suffix to a ULL suffix. So actually, I think this is just a
+> case of sparse getting confused about this constant because it's actually
+> going to get parsed by the pre-processor, which says:
+> 
+>   | It [the preprocessor parsing #if] carries out all calculations in the
+>   | widest integer type known to the compiler; on most machines supported by
+>   | GCC this is 64 bits
+> 
+> so I still think this is a false positive. Adding Luc in case he has any
+> ideas.
 
-Remove it as it is not really present on the real hardware.
+Well, I think the warning is 'correct' (and the message is quite
+clear about the 'possible' problem) but probably not useful enough.
+In fact, some months ago, it was agreed that sparse will only issue
+this warning when -Wpedantic is set but this flag is not yet handled.
 
-Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
-Reported-by: Chris Healy <cphealy@gmail.com>
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
-Changes since v1:
-- None. Only added Chris on Cc
+I'll look at this next week.
 
- arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-index 3ca4f9b..28e9dca 100644
---- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-+++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-@@ -493,12 +493,6 @@
- 	pinctrl-0 = <&pinctrl_i2c2>;
- 	status = "okay";
- 
--	eeprom at 50 {
--		compatible = "atmel,24c04";
--		pagesize = <16>;
--		reg = <0x50>;
--	};
--
- 	hpa1: amp at 60 {
- 		compatible = "ti,tpa6130a2";
- 		reg = <0x60>;
--- 
-2.7.4
+-- Luc
