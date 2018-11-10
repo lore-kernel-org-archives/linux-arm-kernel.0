@@ -1,38 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 10 Nov 2018 17:05:48 +0100
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-In-Reply-To: <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
-References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
- <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
- <20181108093617.GB8433@e107155-lin>
- <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
- <3f5ff18e-a264-981d-505f-69636fcf4355@free.fr>
-Message-ID: <CAK8P3a3z_BWHgjvWFBEHLvOdbcGnh6NZ4eT9OtSqLGFHPGbigg@mail.gmail.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Sat, 10 Nov 2018 16:05:44 +0000
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+ <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
+ <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
+ <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
+ <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+ <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
+ <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
+ <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB42118C6960C39387051B57F280C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/18, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
-> On 10/11/2018 09:57, Arnd Bergmann wrote:
->
->> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com>
->> wrote:
->>>
->>> On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
->>>> Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
->>>> dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
->>>>
->>>
->>> Looks good,
->>>
->>> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
->>>
->>> But I left it intentionally to avoid churn assuming it will go away when
->>> ARM SoC team runs savedefconfig and sync the defconfig.
->>
->> I would never do that,
->
-> Isn't that what commit c432c0880596 did? :-p
+Hi Stephen,
 
-Olof did that one ;-)
+[...]
+> > I already sent the 12th version of this current patch series and I
+> > would really like to get this in ASAP so that the booting up of imx8mq will
+> not be delayed.
+> >
+> 
+> Ok. Well we're in rc1 right now, and so we're not merging new drivers into
+> mainline. I can merge the clk driver into clk-next, but you'll have to wait for the
+> stabilization period to end (approximately 6 or 7 weeks) before this can get
+> into the next kernel version. It will be in linux-next much sooner of course.
 
-        Arnd
+That would be great if you can help that.
+We're now working with SUSE to enable i.MX8 support.
+Their criteria is only backporting patches which must be at least in maintainer's
+next tree already. So either picked up by you or Shawn would help a lot on it.
+
+BTW, one simple question is that because MX8MQ DTS patches depends on
+this clock driver series. How would you suggest this series to go through
+your tree or Shawn's tree?
+
+Regards
+Dong Aisheng
