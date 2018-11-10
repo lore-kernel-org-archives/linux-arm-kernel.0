@@ -1,217 +1,252 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Sat, 10 Nov 2018 15:19:57 +0000
-Subject: [PATCH V6 3/6] clk: imx: add imx8qxp clk driver
+Date: Sat, 10 Nov 2018 15:20:01 +0000
+Subject: [PATCH V6 4/6] dt-bindings: clock: add imx8qxp lpcg clock binding
 In-Reply-To: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
 References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1541862894-8209-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1541862894-8209-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx8qxp clk driver which is based on SCU firmware clock service.
+The Low-Power Clock Gate (LPCG) modules contain a local programming
+model to control the clock gates for the peripherals. An LPCG module
+is used to locally gate the clocks for the associated peripheral.
 
+Note:
+This level of clock gating is provided after the clocks are generated
+by the SCU resources and clock controls. Thus even if the clock is
+enabled by these control bits, it might still not be running based
+on the base resource.
+
+Cc: Stephen Boyd <sboyd@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
 Cc: Sascha Hauer <kernel@pengutronix.de>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: Stephen Boyd <sboyd@kernel.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
-ChangeLog:
-v5->v6:
- * changed to new scu clock type imx_clk_scu
-   clk number is reduced signifcantly
- * moved lpcgs clock out into separate driver
-v4->v5:
- Address all comments from Stephen
- * more unique name for clk_data
- * remove void __iomem * cast for LPCG physical address
- * move out external fixed clk definition
- * drop using of imx_clk_hw_fixed and imx_check_clk_hws wrappers
- * remove i'm alive message
- * move scu clk files into imx top directory
-v3->v4:
- * scu headfile path update
-v2->v3:
- * enum name update
-v1->v2:
- * no changes except headfile name updated
----
- drivers/clk/imx/Makefile      |   2 +
- drivers/clk/imx/clk-imx8qxp.c | 156 ++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 158 insertions(+)
- create mode 100644 drivers/clk/imx/clk-imx8qxp.c
+ .../devicetree/bindings/clock/imx8qxp-lpcg.txt     |  51 +++++++
+ include/dt-bindings/clock/imx8qxp-clock.h          | 153 +++++++++++++++++++++
+ 2 files changed, 204 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
 
-diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index eec6d72..8369a34 100644
---- a/drivers/clk/imx/Makefile
-+++ b/drivers/clk/imx/Makefile
-@@ -30,3 +30,5 @@ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o
- obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
- obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
- obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
-+
-+obj-$(CONFIG_SOC_IMX8QXP)	+= clk-imx8qxp.o
-diff --git a/drivers/clk/imx/clk-imx8qxp.c b/drivers/clk/imx/clk-imx8qxp.c
+diff --git a/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt b/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
 new file mode 100644
-index 0000000..d1b288c
+index 0000000..965cfa4
 --- /dev/null
-+++ b/drivers/clk/imx/clk-imx8qxp.c
-@@ -0,0 +1,156 @@
-+// SPDX-License-Identifier: GPL-2.0+
-+/*
-+ * Copyright 2018 NXP
-+ *	Dong Aisheng <aisheng.dong@nxp.com>
-+ */
++++ b/Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
+@@ -0,0 +1,51 @@
++* NXP i.MX8QXP LPCG (Low-Power Clock Gating) Clock bindings
++
++The Low-Power Clock Gate (LPCG) modules contain a local programming
++model to control the clock gates for the peripherals. An LPCG module
++is used to locally gate the clocks for the associated peripheral.
++
++Note:
++This level of clock gating is provided after the clocks are generated
++by the SCU resources and clock controls. Thus even if the clock is
++enabled by these control bits, it might still not be running based
++on the base resource.
++
++Required properties:
++- compatible:	Should be one of:
++		  "fsl,imx8qxp-lpcg-adma",
++		  "fsl,imx8qxp-lpcg-conn",
++		  "fsl,imx8qxp-lpcg-dc",
++		  "fsl,imx8qxp-lpcg-dsp",
++		  "fsl,imx8qxp-lpcg-gpu",
++		  "fsl,imx8qxp-lpcg-hsio",
++		  "fsl,imx8qxp-lpcg-img",
++		  "fsl,imx8qxp-lpcg-lsio",
++		  "fsl,imx8qxp-lpcg-vpu"
++- reg:		Address and length of the register set
++- #clock-cells:	Should be <1>
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.
++See the full list of clock IDs from:
++include/dt-bindings/clock/imx8qxp-clock.h
++
++Examples:
 +
 +#include <dt-bindings/clock/imx8qxp-clock.h>
-+#include <dt-bindings/firmware/imx/rsrc.h>
-+#include <linux/clk-provider.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
 +
-+#include "clk-scu.h"
-+
-+static int imx8qxp_clk_probe(struct platform_device *pdev)
-+{
-+	struct device_node *ccm_node = pdev->dev.of_node;
-+	struct clk_hw_onecell_data *clk_data;
-+	struct clk_hw **clks;
-+	int ret, i;
-+
-+	ret = imx_clk_scu_init();
-+	if (ret)
-+		return ret;
-+
-+	clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data) +
-+				sizeof(*clk_data->hws) * IMX8QXP_SCU_CLK_END,
-+				GFP_KERNEL);
-+	if (!clk_data)
-+		return -ENOMEM;
-+
-+	clk_data->num = IMX8QXP_SCU_CLK_END;
-+	clks = clk_data->hws;
-+
-+	/* Fixed clocks */
-+	clks[IMX8QXP_CLK_DUMMY]			= clk_hw_register_fixed_rate(NULL, "dummy", NULL, 0, 0);
-+	clks[IMX8QXP_ADMA_IPG_CLK_ROOT] 	= clk_hw_register_fixed_rate(NULL, "dma_ipg_clk_root", NULL, 0, 120000000);
-+	clks[IMX8QXP_CONN_AXI_CLK_ROOT]		= clk_hw_register_fixed_rate(NULL, "conn_axi_clk_root", NULL, 0, 333333333);
-+	clks[IMX8QXP_CONN_AHB_CLK_ROOT]		= clk_hw_register_fixed_rate(NULL, "conn_ahb_clk_root", NULL, 0, 166666666);
-+	clks[IMX8QXP_CONN_IPG_CLK_ROOT]		= clk_hw_register_fixed_rate(NULL, "conn_ipg_clk_root", NULL, 0, 83333333);
-+	clks[IMX8QXP_DC_AXI_EXT_CLK]		= clk_hw_register_fixed_rate(NULL, "dc_axi_ext_clk_root", NULL, 0, 800000000);
-+	clks[IMX8QXP_DC_AXI_INT_CLK]		= clk_hw_register_fixed_rate(NULL, "dc_axi_int_clk_root", NULL, 0, 400000000);
-+	clks[IMX8QXP_DC_CFG_CLK]		= clk_hw_register_fixed_rate(NULL, "dc_cfg_clk_root", NULL, 0, 100000000);
-+	clks[IMX8QXP_MIPI_IPG_CLK]		= clk_hw_register_fixed_rate(NULL, "mipi_ipg_clk_root", NULL, 0, 120000000);
-+	clks[IMX8QXP_IMG_AXI_CLK]		= clk_hw_register_fixed_rate(NULL, "img_axi_clk_root", NULL, 0, 400000000);
-+	clks[IMX8QXP_IMG_IPG_CLK]		= clk_hw_register_fixed_rate(NULL, "img_ipg_clk_root", NULL, 0, 200000000);
-+	clks[IMX8QXP_IMG_PXL_CLK]		= clk_hw_register_fixed_rate(NULL, "img_pxl_clk_root", NULL, 0, 600000000);
-+	clks[IMX8QXP_HSIO_AXI_CLK]		= clk_hw_register_fixed_rate(NULL, "hsio_axi_clk_root", NULL, 0, 400000000);
-+	clks[IMX8QXP_HSIO_PER_CLK]		= clk_hw_register_fixed_rate(NULL, "hsio_per_clk_root", NULL, 0, 133333333);
-+	clks[IMX8QXP_LSIO_MEM_CLK]		= clk_hw_register_fixed_rate(NULL, "lsio_mem_clk_root", NULL, 0, 100000000);
-+	clks[IMX8QXP_LSIO_BUS_CLK]		= clk_hw_register_fixed_rate(NULL, "lsio_bus_clk_root", NULL, 0, 200000000);
-+
-+	/* ARM core */
-+	clks[IMX8QXP_A35_CLK]			= imx_clk_scu("a35_clk", IMX_SC_R_A35, IMX_SC_PM_CLK_CPU);
-+
-+	/* LSIO SS */
-+	clks[IMX8QXP_LSIO_PWM0_CLK]		= imx_clk_scu("pwm0_clk", IMX_SC_R_PWM_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM1_CLK]		= imx_clk_scu("pwm1_clk", IMX_SC_R_PWM_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM2_CLK]		= imx_clk_scu("pwm2_clk", IMX_SC_R_PWM_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM3_CLK]		= imx_clk_scu("pwm3_clk", IMX_SC_R_PWM_3, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM4_CLK]		= imx_clk_scu("pwm4_clk", IMX_SC_R_PWM_4, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM5_CLK]		= imx_clk_scu("pwm5_clk", IMX_SC_R_PWM_5, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM6_CLK]		= imx_clk_scu("pwm6_clk", IMX_SC_R_PWM_6, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_PWM7_CLK]		= imx_clk_scu("pwm7_clk", IMX_SC_R_PWM_7, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_GPT0_CLK]		= imx_clk_scu("gpt0_clk", IMX_SC_R_GPT_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_GPT1_CLK]		= imx_clk_scu("gpt1_clk", IMX_SC_R_GPT_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_GPT2_CLK]		= imx_clk_scu("gpt2_clk", IMX_SC_R_GPT_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_GPT3_CLK]		= imx_clk_scu("gpt3_clk", IMX_SC_R_GPT_3, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_GPT4_CLK]		= imx_clk_scu("gpt4_clk", IMX_SC_R_GPT_4, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_FSPI0_CLK]		= imx_clk_scu("fspi0_clk", IMX_SC_R_FSPI_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_LSIO_FSPI1_CLK]		= imx_clk_scu("fspi1_clk", IMX_SC_R_FSPI_1, IMX_SC_PM_CLK_PER);
-+
-+	/* ADMA SS */
-+	clks[IMX8QXP_ADMA_UART0_CLK]		= imx_clk_scu("uart0_clk", IMX_SC_R_UART_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_UART1_CLK]		= imx_clk_scu("uart1_clk", IMX_SC_R_UART_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_UART2_CLK]		= imx_clk_scu("uart2_clk", IMX_SC_R_UART_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_UART3_CLK]		= imx_clk_scu("uart3_clk", IMX_SC_R_UART_3, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_SPI0_CLK]		= imx_clk_scu("spi0_clk",  IMX_SC_R_SPI_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_SPI1_CLK]		= imx_clk_scu("spi1_clk",  IMX_SC_R_SPI_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_SPI2_CLK]		= imx_clk_scu("spi2_clk",  IMX_SC_R_SPI_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_SPI3_CLK]		= imx_clk_scu("spi3_clk",  IMX_SC_R_SPI_3, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_CAN0_CLK]		= imx_clk_scu("can0_clk",  IMX_SC_R_CAN_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_I2C0_CLK]		= imx_clk_scu("i2c0_clk",  IMX_SC_R_I2C_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_I2C1_CLK]		= imx_clk_scu("i2c1_clk",  IMX_SC_R_I2C_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_I2C2_CLK]		= imx_clk_scu("i2c2_clk",  IMX_SC_R_I2C_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_I2C3_CLK]		= imx_clk_scu("i2c3_clk",  IMX_SC_R_I2C_3, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_FTM0_CLK]		= imx_clk_scu("ftm0_clk",  IMX_SC_R_FTM_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_FTM1_CLK]		= imx_clk_scu("ftm1_clk",  IMX_SC_R_FTM_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_ADC0_CLK]		= imx_clk_scu("adc0_clk",  IMX_SC_R_ADC_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_PWM_CLK]		= imx_clk_scu("pwm_clk",   IMX_SC_R_LCD_0_PWM_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_ADMA_LCD_CLK]		= imx_clk_scu("lcd_clk",   IMX_SC_R_LCD_0, IMX_SC_PM_CLK_PER);
-+
-+	/* Connectivity */
-+	clks[IMX8QXP_CONN_SDHC0_CLK]		= imx_clk_scu("sdhc0_clk", IMX_SC_R_SDHC_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_SDHC1_CLK]		= imx_clk_scu("sdhc1_clk", IMX_SC_R_SDHC_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_SDHC2_CLK]		= imx_clk_scu("sdhc2_clk", IMX_SC_R_SDHC_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_ENET0_ROOT_CLK]	= imx_clk_scu("enet0_clk", IMX_SC_R_ENET_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_ENET0_BYPASS_CLK]	= imx_clk_scu("enet0_bypass_clk", IMX_SC_R_ENET_0, IMX_SC_PM_CLK_BYPASS);
-+	clks[IMX8QXP_CONN_ENET0_RGMII_CLK]	= imx_clk_scu("enet0_rgmii_clk", IMX_SC_R_ENET_0, IMX_SC_PM_CLK_MISC0);
-+	clks[IMX8QXP_CONN_ENET1_ROOT_CLK]	= imx_clk_scu("enet1_clk", IMX_SC_R_ENET_1, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_ENET1_BYPASS_CLK]	= imx_clk_scu("enet1_bypass_clk", IMX_SC_R_ENET_1, IMX_SC_PM_CLK_BYPASS);
-+	clks[IMX8QXP_CONN_ENET1_RGMII_CLK]	= imx_clk_scu("enet1_rgmii_clk", IMX_SC_R_ENET_1, IMX_SC_PM_CLK_MISC0);
-+	clks[IMX8QXP_CONN_GPMI_BCH_IO_CLK]	= imx_clk_scu("gpmi_io_clk", IMX_SC_R_NAND, IMX_SC_PM_CLK_MST_BUS);
-+	clks[IMX8QXP_CONN_GPMI_BCH_CLK]		= imx_clk_scu("gpmi_bch_clk", IMX_SC_R_NAND, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_USB2_ACLK]		= imx_clk_scu("usb3_aclk_div", IMX_SC_R_USB_2, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CONN_USB2_BUS_CLK]		= imx_clk_scu("usb3_bus_div", IMX_SC_R_USB_2, IMX_SC_PM_CLK_MST_BUS);
-+	clks[IMX8QXP_CONN_USB2_LPM_CLK]		= imx_clk_scu("usb3_lpm_div", IMX_SC_R_USB_2, IMX_SC_PM_CLK_MISC);
-+
-+	/* Display controller SS */
-+	clks[IMX8QXP_DC0_DISP0_CLK]		= imx_clk_scu("dc0_disp0_clk", IMX_SC_R_DC_0, IMX_SC_PM_CLK_MISC0);
-+	clks[IMX8QXP_DC0_DISP1_CLK]		= imx_clk_scu("dc0_disp1_clk", IMX_SC_R_DC_0, IMX_SC_PM_CLK_MISC1);
-+
-+	/* MIPI-LVDS SS */
-+	clks[IMX8QXP_MIPI0_I2C0_CLK]		= imx_clk_scu("mipi0_i2c0_clk", IMX_SC_R_MIPI_0_I2C_0, IMX_SC_PM_CLK_MISC2);
-+	clks[IMX8QXP_MIPI0_I2C1_CLK]		= imx_clk_scu("mipi0_i2c1_clk", IMX_SC_R_MIPI_0_I2C_1, IMX_SC_PM_CLK_MISC2);
-+
-+	/* MIPI CSI SS */
-+	clks[IMX8QXP_CSI0_CORE_CLK]		= imx_clk_scu("mipi_csi0_core_clk", IMX_SC_R_CSI_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CSI0_ESC_CLK]		= imx_clk_scu("mipi_csi0_esc_clk",  IMX_SC_R_CSI_0, IMX_SC_PM_CLK_MISC);
-+	clks[IMX8QXP_CSI0_I2C0_CLK]		= imx_clk_scu("mipi_csi0_i2c0_clk", IMX_SC_R_CSI_0_I2C_0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_CSI0_PWM0_CLK]		= imx_clk_scu("mipi_csi0_pwm0_clk", IMX_SC_R_CSI_0_PWM_0, IMX_SC_PM_CLK_PER);
-+
-+	/* GPU SS */
-+	clks[IMX8QXP_GPU0_CORE_CLK]		= imx_clk_scu("gpu_core0_clk",	 IMX_SC_R_GPU_0_PID0, IMX_SC_PM_CLK_PER);
-+	clks[IMX8QXP_GPU0_SHADER_CLK]		= imx_clk_scu("gpu_shader0_clk", IMX_SC_R_GPU_0_PID0, IMX_SC_PM_CLK_MISC);
-+
-+	for (i = 0; i < clk_data->num; i++) {
-+		if (IS_ERR(clks[i]))
-+			pr_err("i.MX clk %u: register failed with %ld\n",
-+				i, PTR_ERR(clks[i]));
-+	}
-+
-+	return of_clk_add_hw_provider(ccm_node, of_clk_hw_onecell_get, clk_data);
-+}
-+
-+static const struct of_device_id imx8qxp_match[] = {
-+	{ .compatible = "fsl,imx8qxp-clk", },
-+	{ /* sentinel */ }
++conn_lpcg: clock-controller at 5b200000 {
++	compatible = "fsl,imx8qxp-lpcg-conn";
++	reg = <0x5b200000 0xb0000>;
++	#clock-cells = <1>;
 +};
 +
-+static struct platform_driver imx8qxp_clk_driver = {
-+	.driver = {
-+		.name = "imx8qxp-clk",
-+		.of_match_table = imx8qxp_match,
-+	},
-+	.probe = imx8qxp_clk_probe,
++usdhc1: mmc at 5b010000 {
++	compatible = "fsl,imx8qxp-usdhc", "fsl,imx7d-usdhc";
++	interrupt-parent = <&gic>;
++	interrupts = <GIC_SPI 232 IRQ_TYPE_LEVEL_HIGH>;
++	reg = <0x5b010000 0x10000>;
++	clocks = <&conn_lpcg IMX8QXP_CONN_LPCG_SDHC0_IPG_CLK>,
++		 <&conn_lpcg IMX8QXP_CONN_LPCG_SDHC0_PER_CLK>,
++		 <&conn_lpcg IMX8QXP_CONN_LPCG_SDHC0_HCLK>;
++	clock-names = "ipg", "per", "ahb";
 +};
-+builtin_platform_driver(imx8qxp_clk_driver);
+diff --git a/include/dt-bindings/clock/imx8qxp-clock.h b/include/dt-bindings/clock/imx8qxp-clock.h
+index d72a39c..6fec368 100644
+--- a/include/dt-bindings/clock/imx8qxp-clock.h
++++ b/include/dt-bindings/clock/imx8qxp-clock.h
+@@ -133,4 +133,157 @@
+ 
+ #define IMX8QXP_SCU_CLK_END				190
+ 
++/* LPCG clocks */
 +
-+MODULE_AUTHOR("Dong Aisheng <aisheng.dong@nxp.com>");
-+MODULE_DESCRIPTION("IMX8QXP Clock driver");
-+MODULE_LICENSE("GPL v2");
++/* LSIO SS LPCG */
++#define IMX8QXP_LSIO_LPCG_PWM0_IPG_CLK			0
++#define IMX8QXP_LSIO_LPCG_PWM0_IPG_S_CLK		1
++#define IMX8QXP_LSIO_LPCG_PWM0_IPG_HF_CLK		2
++#define IMX8QXP_LSIO_LPCG_PWM0_IPG_SLV_CLK		3
++#define IMX8QXP_LSIO_LPCG_PWM0_IPG_MSTR_CLK		4
++#define IMX8QXP_LSIO_LPCG_PWM1_IPG_CLK			5
++#define IMX8QXP_LSIO_LPCG_PWM1_IPG_S_CLK		6
++#define IMX8QXP_LSIO_LPCG_PWM1_IPG_HF_CLK		7
++#define IMX8QXP_LSIO_LPCG_PWM1_IPG_SLV_CLK		8
++#define IMX8QXP_LSIO_LPCG_PWM1_IPG_MSTR_CLK		9
++#define IMX8QXP_LSIO_LPCG_PWM2_IPG_CLK			10
++#define IMX8QXP_LSIO_LPCG_PWM2_IPG_S_CLK		11
++#define IMX8QXP_LSIO_LPCG_PWM2_IPG_HF_CLK		12
++#define IMX8QXP_LSIO_LPCG_PWM2_IPG_SLV_CLK		13
++#define IMX8QXP_LSIO_LPCG_PWM2_IPG_MSTR_CLK		14
++#define IMX8QXP_LSIO_LPCG_PWM3_IPG_CLK			15
++#define IMX8QXP_LSIO_LPCG_PWM3_IPG_S_CLK		16
++#define IMX8QXP_LSIO_LPCG_PWM3_IPG_HF_CLK		17
++#define IMX8QXP_LSIO_LPCG_PWM3_IPG_SLV_CLK		18
++#define IMX8QXP_LSIO_LPCG_PWM3_IPG_MSTR_CLK		19
++#define IMX8QXP_LSIO_LPCG_PWM4_IPG_CLK			20
++#define IMX8QXP_LSIO_LPCG_PWM4_IPG_S_CLK		21
++#define IMX8QXP_LSIO_LPCG_PWM4_IPG_HF_CLK		22
++#define IMX8QXP_LSIO_LPCG_PWM4_IPG_SLV_CLK		23
++#define IMX8QXP_LSIO_LPCG_PWM4_IPG_MSTR_CLK		24
++#define IMX8QXP_LSIO_LPCG_PWM5_IPG_CLK			25
++#define IMX8QXP_LSIO_LPCG_PWM5_IPG_S_CLK		26
++#define IMX8QXP_LSIO_LPCG_PWM5_IPG_HF_CLK		27
++#define IMX8QXP_LSIO_LPCG_PWM5_IPG_SLV_CLK		28
++#define IMX8QXP_LSIO_LPCG_PWM5_IPG_MSTR_CLK		29
++#define IMX8QXP_LSIO_LPCG_PWM6_IPG_CLK			30
++#define IMX8QXP_LSIO_LPCG_PWM6_IPG_S_CLK		31
++#define IMX8QXP_LSIO_LPCG_PWM6_IPG_HF_CLK		32
++#define IMX8QXP_LSIO_LPCG_PWM6_IPG_SLV_CLK		33
++#define IMX8QXP_LSIO_LPCG_PWM6_IPG_MSTR_CLK		34
++#define IMX8QXP_LSIO_LPCG_PWM7_IPG_CLK			35
++#define IMX8QXP_LSIO_LPCG_PWM7_IPG_S_CLK		36
++#define IMX8QXP_LSIO_LPCG_PWM7_IPG_HF_CLK		37
++#define IMX8QXP_LSIO_LPCG_PWM7_IPG_SLV_CLK		38
++#define IMX8QXP_LSIO_LPCG_PWM7_IPG_MSTR_CLK		39
++#define IMX8QXP_LSIO_LPCG_GPT0_IPG_CLK			40
++#define IMX8QXP_LSIO_LPCG_GPT0_IPG_S_CLK		41
++#define IMX8QXP_LSIO_LPCG_GPT0_IPG_HF_CLK		42
++#define IMX8QXP_LSIO_LPCG_GPT0_IPG_SLV_CLK		43
++#define IMX8QXP_LSIO_LPCG_GPT0_IPG_MSTR_CLK		44
++#define IMX8QXP_LSIO_LPCG_GPT1_IPG_CLK			45
++#define IMX8QXP_LSIO_LPCG_GPT1_IPG_S_CLK		46
++#define IMX8QXP_LSIO_LPCG_GPT1_IPG_HF_CLK		47
++#define IMX8QXP_LSIO_LPCG_GPT1_IPG_SLV_CLK		48
++#define IMX8QXP_LSIO_LPCG_GPT1_IPG_MSTR_CLK		49
++#define IMX8QXP_LSIO_LPCG_GPT2_IPG_CLK			50
++#define IMX8QXP_LSIO_LPCG_GPT2_IPG_S_CLK		51
++#define IMX8QXP_LSIO_LPCG_GPT2_IPG_HF_CLK		52
++#define IMX8QXP_LSIO_LPCG_GPT2_IPG_SLV_CLK		53
++#define IMX8QXP_LSIO_LPCG_GPT2_IPG_MSTR_CLK		54
++#define IMX8QXP_LSIO_LPCG_GPT3_IPG_CLK			55
++#define IMX8QXP_LSIO_LPCG_GPT3_IPG_S_CLK		56
++#define IMX8QXP_LSIO_LPCG_GPT3_IPG_HF_CLK		57
++#define IMX8QXP_LSIO_LPCG_GPT3_IPG_SLV_CLK		58
++#define IMX8QXP_LSIO_LPCG_GPT3_IPG_MSTR_CLK		59
++#define IMX8QXP_LSIO_LPCG_GPT4_IPG_CLK			60
++#define IMX8QXP_LSIO_LPCG_GPT4_IPG_S_CLK		61
++#define IMX8QXP_LSIO_LPCG_GPT4_IPG_HF_CLK		62
++#define IMX8QXP_LSIO_LPCG_GPT4_IPG_SLV_CLK		63
++#define IMX8QXP_LSIO_LPCG_GPT4_IPG_MSTR_CLK		64
++#define IMX8QXP_LSIO_LPCG_FSPI0_HCLK			65
++#define IMX8QXP_LSIO_LPCG_FSPI0_IPG_CLK			66
++#define IMX8QXP_LSIO_LPCG_FSPI0_IPG_S_CLK		67
++#define IMX8QXP_LSIO_LPCG_FSPI0_IPG_SFCK		68
++#define IMX8QXP_LSIO_LPCG_FSPI1_HCLK			69
++#define IMX8QXP_LSIO_LPCG_FSPI1_IPG_CLK			70
++#define IMX8QXP_LSIO_LPCG_FSPI1_IPG_S_CLK		71
++#define IMX8QXP_LSIO_LPCG_FSPI1_IPG_SFCK		72
++
++#define IMX8QXP_LSIO_LPCG_CLK_END			73
++
++/* Connectivity SS LPCG */
++#define IMX8QXP_CONN_LPCG_SDHC0_IPG_CLK			0
++#define IMX8QXP_CONN_LPCG_SDHC0_PER_CLK			1
++#define IMX8QXP_CONN_LPCG_SDHC0_HCLK			2
++#define IMX8QXP_CONN_LPCG_SDHC1_IPG_CLK			3
++#define IMX8QXP_CONN_LPCG_SDHC1_PER_CLK			4
++#define IMX8QXP_CONN_LPCG_SDHC1_HCLK			5
++#define IMX8QXP_CONN_LPCG_SDHC2_IPG_CLK			6
++#define IMX8QXP_CONN_LPCG_SDHC2_PER_CLK			7
++#define IMX8QXP_CONN_LPCG_SDHC2_HCLK			8
++#define IMX8QXP_CONN_LPCG_GPMI_APB_CLK			9
++#define IMX8QXP_CONN_LPCG_GPMI_BCH_APB_CLK		10
++#define IMX8QXP_CONN_LPCG_GPMI_BCH_IO_CLK		11
++#define IMX8QXP_CONN_LPCG_GPMI_BCH_CLK			12
++#define IMX8QXP_CONN_LPCG_APBHDMA_CLK			13
++#define IMX8QXP_CONN_LPCG_ENET0_ROOT_CLK		14
++#define IMX8QXP_CONN_LPCG_ENET0_TX_CLK			15
++#define IMX8QXP_CONN_LPCG_ENET0_AHB_CLK			16
++#define IMX8QXP_CONN_LPCG_ENET0_IPG_S_CLK		17
++#define IMX8QXP_CONN_LPCG_ENET0_IPG_CLK			18
++
++#define IMX8QXP_CONN_LPCG_ENET1_ROOT_CLK		19
++#define IMX8QXP_CONN_LPCG_ENET1_TX_CLK			20
++#define IMX8QXP_CONN_LPCG_ENET1_AHB_CLK			21
++#define IMX8QXP_CONN_LPCG_ENET1_IPG_S_CLK		22
++#define IMX8QXP_CONN_LPCG_ENET1_IPG_CLK			23
++
++#define IMX8QXP_CONN_LPCG_CLK_END			24
++
++/* ADMA SS LPCG */
++#define IMX8QXP_ADMA_LPCG_UART0_IPG_CLK			0
++#define IMX8QXP_ADMA_LPCG_UART0_BAUD_CLK		1
++#define IMX8QXP_ADMA_LPCG_UART1_IPG_CLK			2
++#define IMX8QXP_ADMA_LPCG_UART1_BAUD_CLK		3
++#define IMX8QXP_ADMA_LPCG_UART2_IPG_CLK			4
++#define IMX8QXP_ADMA_LPCG_UART2_BAUD_CLK		5
++#define IMX8QXP_ADMA_LPCG_UART3_IPG_CLK			6
++#define IMX8QXP_ADMA_LPCG_UART3_BAUD_CLK		7
++#define IMX8QXP_ADMA_LPCG_SPI0_IPG_CLK			8
++#define IMX8QXP_ADMA_LPCG_SPI1_IPG_CLK			9
++#define IMX8QXP_ADMA_LPCG_SPI2_IPG_CLK			10
++#define IMX8QXP_ADMA_LPCG_SPI3_IPG_CLK			11
++#define IMX8QXP_ADMA_LPCG_SPI0_CLK			12
++#define IMX8QXP_ADMA_LPCG_SPI1_CLK			13
++#define IMX8QXP_ADMA_LPCG_SPI2_CLK			14
++#define IMX8QXP_ADMA_LPCG_SPI3_CLK			15
++#define IMX8QXP_ADMA_LPCG_CAN0_IPG_CLK			16
++#define IMX8QXP_ADMA_LPCG_CAN0_IPG_PE_CLK		17
++#define IMX8QXP_ADMA_LPCG_CAN0_IPG_CHI_CLK		18
++#define IMX8QXP_ADMA_LPCG_CAN1_IPG_CLK			19
++#define IMX8QXP_ADMA_LPCG_CAN1_IPG_PE_CLK		20
++#define IMX8QXP_ADMA_LPCG_CAN1_IPG_CHI_CLK		21
++#define IMX8QXP_ADMA_LPCG_CAN2_IPG_CLK			22
++#define IMX8QXP_ADMA_LPCG_CAN2_IPG_PE_CLK		23
++#define IMX8QXP_ADMA_LPCG_CAN2_IPG_CHI_CLK		24
++#define IMX8QXP_ADMA_LPCG_I2C0_CLK			25
++#define IMX8QXP_ADMA_LPCG_I2C1_CLK			26
++#define IMX8QXP_ADMA_LPCG_I2C2_CLK			27
++#define IMX8QXP_ADMA_LPCG_I2C3_CLK			28
++#define IMX8QXP_ADMA_LPCG_I2C0_IPG_CLK			29
++#define IMX8QXP_ADMA_LPCG_I2C1_IPG_CLK			30
++#define IMX8QXP_ADMA_LPCG_I2C2_IPG_CLK			31
++#define IMX8QXP_ADMA_LPCG_I2C3_IPG_CLK			32
++#define IMX8QXP_ADMA_LPCG_FTM0_CLK			33
++#define IMX8QXP_ADMA_LPCG_FTM1_CLK			34
++#define IMX8QXP_ADMA_LPCG_FTM0_IPG_CLK			35
++#define IMX8QXP_ADMA_LPCG_FTM1_IPG_CLK			36
++#define IMX8QXP_ADMA_LPCG_PWM_HI_CLK			37
++#define IMX8QXP_ADMA_LPCG_PWM_IPG_CLK			38
++#define IMX8QXP_ADMA_LPCG_LCD_PIX_CLK			39
++#define IMX8QXP_ADMA_LPCG_LCD_APB_CLK			40
++
++#define IMX8QXP_ADMA_LPCG_CLK_END			41
++
+ #endif /* __DT_BINDINGS_CLOCK_IMX8QXP_H */
 -- 
 2.7.4
