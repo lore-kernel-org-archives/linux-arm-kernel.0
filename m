@@ -1,32 +1,25 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  9 Nov 2018 17:51:31 -0600
-Subject: [GIT PULL] Qualcomm ARM64 DT Fixes for 4.20-rc1
-Message-ID: <1541807491-13259-1-git-send-email-andy.gross@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Sat, 10 Nov 2018 00:16:16 +0000
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181109204747.10008-1-geomatsi@gmail.com>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+Message-ID: <20181110001615.GA5665@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
+> Specify correct type for the constants to avoid
+> the following sparse complaints:
+> 
+> ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> 
+> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> ---
+>  arch/arm64/include/asm/sysreg.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+I thought this was fixed in newer versions of sparse so that it treats
+AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.20-rc1
-
-for you to fetch changes up to 9134586715e389fe90d9d28cb37a668f374d686a:
-
-  arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP (2018-11-09 17:17:53 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 DT Fixes for 4.20-rc1
-
-* Fix reserved gpio ranges for SDM845 and MSM8998
-
-----------------------------------------------------------------
-Bjorn Andersson (2):
-      arm64: dts: sdm845-mtp: Reserve reserved gpios
-      arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP
-
- arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi | 4 ++++
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts   | 4 ++++
- 2 files changed, 8 insertions(+)
+Will
