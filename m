@@ -1,26 +1,56 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 10 Nov 2018 12:37:15 +0100 (CET)
-Subject: [PATCH 0/3] Fix MODULE_LICENSE of bcm2835 drivers
-In-Reply-To: <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
-References: <1540292769-5905-1-git-send-email-stefan.wahren@i2se.com>
- <815844594.141792.1541616607053@email.ionos.de>
- <26a93a5d-0ed2-b82d-3a0b-ef2888c59af0@koalo.de>
-Message-ID: <1682361655.172416.1541849835591@email.ionos.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sat, 10 Nov 2018 11:44:54 +0000
+Subject: [GIT PULL] arm64 fixes for 4.20-rc2
+Message-ID: <20181110114452.GA90619@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Hi Linus,
 
-> Florian Kauer <florian.kauer@koalo.de> hat am 9. November 2018 um 19:48 geschrieben:
-> 
-> 
-> Sorry for not replying in time. I became father recently ;-)
+Please pull the arm64 fixes below. Thanks.
 
-no problem and congratulation.
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-> So if it is still relevant:
-> Acked-by: Florian Kauer <florian.kauer@koalo.de>
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-Yes, thanks. I wasn't aware of your name change.
+are available in the Git repository at:
 
-Stefan
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 24cc61d8cb5a9232fadf21a830061853c1268fdd:
+
+  arm64: memblock: don't permit memblock resizing until linear mapping is up (2018-11-08 17:54:03 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Fix occasional page fault during boot due to memblock resizing before
+  the linear map is up.
+
+- Define NET_IP_ALIGN to 0 to improve the DMA performance on some
+  platforms.
+
+- lib/raid6 test build fix.
+
+- .mailmap update for Punit Agrawal
+
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      arm64: mm: define NET_IP_ALIGN to 0
+      arm64: memblock: don't permit memblock resizing until linear mapping is up
+
+Jeremy Linton (1):
+      lib/raid6: Fix arm64 test build
+
+Punit Agrawal (1):
+      mailmap: Update email for Punit Agrawal
+
+ .mailmap                           | 1 +
+ arch/arm64/include/asm/processor.h | 8 ++++++++
+ arch/arm64/mm/init.c               | 2 --
+ arch/arm64/mm/mmu.c                | 2 ++
+ lib/raid6/test/Makefile            | 4 ++--
+ 5 files changed, 13 insertions(+), 4 deletions(-)
+
+-- 
+Catalin
