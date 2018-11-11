@@ -1,65 +1,72 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 11 Nov 2018 22:00:47 +0100
-Subject: [PATCH 2/2] pinctrl: rockchip: add rk3188 routes to switch between
- nand and emmc
-In-Reply-To: <20181111210047.30375-1-heiko@sntech.de>
-References: <20181111210047.30375-1-heiko@sntech.de>
-Message-ID: <20181111210047.30375-2-heiko@sntech.de>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Sun, 11 Nov 2018 22:15:14 +0000
+Subject: [PATCH] pinctrl: imx: Fix imx_dt_node_to_map handling of
+ IMX_NO_PAD_CTL
+Message-ID: <1547d44dba63cbfd1b813018866f8916013b3381.1541973902.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko Stuebner <heiko.stuebner@bq.com>
+After changes for SCU support the IMX_NO_PAD_CTL flag is not longer
+handled correctly in imx_dt_node_to_map. Pins with this flag are no
+longer skipped and the new_map array can overflow and corrupt memory.
 
-The rk3188 has pins that are not handled through the regular iomuxing
-for handling either nand-flash or an emmc and are set through only one
-specifal setting. So utilize the routing function to simply do that
-setting depending on one of the core nand/emmc signals that are actually
-regular pins handled through pinctrl.
+This fixes imx6-sabreauto boards failing to boot.
 
-Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
+Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+
 ---
- drivers/pinctrl/pinctrl-rockchip.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/pinctrl/freescale/pinctrl-imx.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-rockchip.c b/drivers/pinctrl/pinctrl-rockchip.c
-index 246bf14c7f72..16bf21bf69a2 100644
---- a/drivers/pinctrl/pinctrl-rockchip.c
-+++ b/drivers/pinctrl/pinctrl-rockchip.c
-@@ -822,6 +822,26 @@ static struct rockchip_mux_route_data rk3128_mux_route_data[] = {
- 	},
- };
+A different was posted earlier: https://lore.kernel.org/patchwork/patch/1009504/
+
+I don't think that's correct because it assumes num_configs is
+zero-initialized but new_map comes from kmalloc_array.
+
+Code is clearer if SCU and MMIO paths are separate.
+
+diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
+index 78d33dfb4d2d..51312e81eff7 100644
+--- a/drivers/pinctrl/freescale/pinctrl-imx.c
++++ b/drivers/pinctrl/freescale/pinctrl-imx.c
+@@ -106,29 +106,31 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
  
-+static struct rockchip_mux_route_data rk3188_mux_route_data[] = {
-+	{
-+		/* non-iomuxed emmc/flash pins on flash-dqs */
-+		.bank_num = 0,
-+		.pin = 24,
-+		.func = 1,
-+		.route_location = ROCKCHIP_ROUTE_GRF,
-+		.route_offset = 0xa0,
-+		.route_val = BIT(16 + 11),
-+	}, {
-+		/* non-iomuxed emmc/flash pins on emmc-clk */
-+		.bank_num = 0,
-+		.pin = 24,
-+		.func = 2,
-+		.route_location = ROCKCHIP_ROUTE_GRF,
-+		.route_offset = 0xa0,
-+		.route_val = BIT(16 + 11) | BIT(11),
-+	},
-+};
-+
- static struct rockchip_mux_route_data rk3228_mux_route_data[] = {
- 	{
- 		/* pwm0-0 */
-@@ -3626,6 +3646,8 @@ static struct rockchip_pin_ctrl rk3188_pin_ctrl = {
- 		.label			= "RK3188-GPIO",
- 		.type			= RK3188,
- 		.grf_mux_offset		= 0x60,
-+		.iomux_routes		= rk3188_mux_route_data,
-+		.niomux_routes		= ARRAY_SIZE(rk3188_mux_route_data),
- 		.pull_calc_reg		= rk3188_calc_pull_reg_and_bit,
- };
+ 	/* create config map */
+ 	new_map++;
+ 	for (i = j = 0; i < grp->num_pins; i++) {
+ 		pin = &((struct imx_pin *)(grp->data))[i];
+-		new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
+-		new_map[j].data.configs.group_or_pin =
+-					pin_get_name(pctldev, pin->pin);
+-
+ 		if (info->flags & IMX_USE_SCU) {
+ 			/*
+ 			 * For SCU case, we set mux and conf together
+ 			 * in one IPC call
+ 			 */
++			new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
++			new_map[j].data.configs.group_or_pin =
++					pin_get_name(pctldev, pin->pin);
+ 			new_map[j].data.configs.configs =
+ 					(unsigned long *)&pin->conf.scu;
+ 			new_map[j].data.configs.num_configs = 2;
++			++j;
+ 		} else if (!(pin->conf.mmio.config & IMX_NO_PAD_CTL)) {
++			new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
++			new_map[j].data.configs.group_or_pin =
++					pin_get_name(pctldev, pin->pin);
+ 			new_map[j].data.configs.configs =
+ 					&pin->conf.mmio.config;
+ 			new_map[j].data.configs.num_configs = 1;
++			++j;
+ 		}
+-
+-		j++;
+ 	}
+ 
+ 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
+ 		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
  
 -- 
-2.18.0
+2.17.1
