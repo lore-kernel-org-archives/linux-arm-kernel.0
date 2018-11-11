@@ -1,38 +1,82 @@
 From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Sun, 11 Nov 2018 17:03:38 +0800
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-Message-ID: <20181111090341.120786-1-drinkcat@chromium.org>
+Date: Sun, 11 Nov 2018 17:03:41 +0800
+Subject: [PATCH v2 3/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
+ and improve debugging
+In-Reply-To: <20181111090341.120786-1-drinkcat@chromium.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+Message-ID: <20181111090341.120786-4-drinkcat@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a follow-up to the discussion in [1], to make sure that the page
-tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
-physical address space.
+For level 1/2 pages, ensure GFP_DMA32 is used if CONFIG_ZONE_DMA32
+is defined (e.g. on arm64 platforms).
 
-[1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
+For level 2 pages, allocate a slab cache in SLAB_CACHE_DMA32.
 
-Fixes since v1:
- - Add support for SLAB_CACHE_DMA32 in slab and slub (patches 1/2)
- - iommu/io-pgtable-arm-v7s (patch 3):
-   - Changed approach to use SLAB_CACHE_DMA32 added by the previous
-     commit.
-   - Use DMA or DMA32 depending on the architecture (DMA for arm,
-     DMA32 for arm64).
+Also, print an error when the physical address does not fit in
+32-bit, to make debugging easier in the future.
 
-Nicolas Boichat (3):
-  mm: slab/slub: Add check_slab_flags function to check for valid flags
-  mm: Add support for SLAB_CACHE_DMA32
-  iommu/io-pgtable-arm-v7s: Request DMA32 memory, and improve debugging
+Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+---
 
- drivers/iommu/io-pgtable-arm-v7s.c | 20 ++++++++++++++++----
- include/linux/slab.h               |  2 ++
- mm/internal.h                      | 21 +++++++++++++++++++--
- mm/slab.c                          | 10 +++-------
- mm/slab.h                          |  3 ++-
- mm/slab_common.c                   |  2 +-
- mm/slub.c                          | 24 +++++++++++++++++-------
- 7 files changed, 60 insertions(+), 22 deletions(-)
+Changes since v1:
+ - Changed approach to use SLAB_CACHE_DMA32 added by the previous
+   commit.
+ - Use DMA or DMA32 depending on the architecture (DMA for arm,
+   DMA32 for arm64).
 
+drivers/iommu/io-pgtable-arm-v7s.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+index 445c3bde04800c..996f7b6d00b44a 100644
+--- a/drivers/iommu/io-pgtable-arm-v7s.c
++++ b/drivers/iommu/io-pgtable-arm-v7s.c
+@@ -161,6 +161,14 @@
+ 
+ #define ARM_V7S_TCR_PD1			BIT(5)
+ 
++#ifdef CONFIG_ZONE_DMA32
++#define ARM_V7S_TABLE_GFP_DMA GFP_DMA32
++#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA32
++#else
++#define ARM_V7S_TABLE_GFP_DMA GFP_DMA
++#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA
++#endif
++
+ typedef u32 arm_v7s_iopte;
+ 
+ static bool selftest_running;
+@@ -198,13 +206,17 @@ static void *__arm_v7s_alloc_table(int lvl, gfp_t gfp,
+ 	void *table = NULL;
+ 
+ 	if (lvl == 1)
+-		table = (void *)__get_dma_pages(__GFP_ZERO, get_order(size));
++		table = (void *)__get_free_pages(
++			__GFP_ZERO | ARM_V7S_TABLE_GFP_DMA, get_order(size));
+ 	else if (lvl == 2)
+-		table = kmem_cache_zalloc(data->l2_tables, gfp | GFP_DMA);
++		table = kmem_cache_zalloc(data->l2_tables,
++					  gfp | ARM_V7S_TABLE_GFP_DMA);
+ 	phys = virt_to_phys(table);
+-	if (phys != (arm_v7s_iopte)phys)
++	if (phys != (arm_v7s_iopte)phys) {
+ 		/* Doesn't fit in PTE */
++		dev_err(dev, "Page table does not fit in PTE: %pa", &phys);
+ 		goto out_free;
++	}
+ 	if (table && !(cfg->quirks & IO_PGTABLE_QUIRK_NO_DMA)) {
+ 		dma = dma_map_single(dev, table, size, DMA_TO_DEVICE);
+ 		if (dma_mapping_error(dev, dma))
+@@ -737,7 +749,7 @@ static struct io_pgtable *arm_v7s_alloc_pgtable(struct io_pgtable_cfg *cfg,
+ 	data->l2_tables = kmem_cache_create("io-pgtable_armv7s_l2",
+ 					    ARM_V7S_TABLE_SIZE(2),
+ 					    ARM_V7S_TABLE_SIZE(2),
+-					    SLAB_CACHE_DMA, NULL);
++					    ARM_V7S_TABLE_SLAB_CACHE, NULL);
+ 	if (!data->l2_tables)
+ 		goto out_free_data;
+ 
 -- 
 2.19.1.930.g4563a0d9d0-goog
