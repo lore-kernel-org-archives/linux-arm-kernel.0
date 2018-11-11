@@ -1,48 +1,32 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 21:23:53 +0100
-Subject: [PATCH V2 1/7] mmc: bcm2835: reset host on timeout
+Date: Sun, 11 Nov 2018 21:23:55 +0100
+Subject: [PATCH V2 3/7] mmc: bcm2835: Release DMA channel on driver unload
 In-Reply-To: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
 References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1541967839-2847-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1541967839-2847-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michal Suchanek <msuchanek@suse.de>
+We need to release the slave DMA channel during driver unload.
 
-The bcm2835 mmc host tends to lock up for unknown reason so reset it on
-timeout. The upper mmc block layer tries retransimitting with single
-blocks which tends to work out after a long wait.
-
-This is better than giving up and leaving the machine broken for no
-obvious reason.
-
-Fixes: 660fc733bd74 ("mmc: bcm2835: Add new driver for the sdhost controller.")
-Signed-off-by: Michal Suchanek <msuchanek@suse.de>
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
  drivers/mmc/host/bcm2835.c | 3 +++
  1 file changed, 3 insertions(+)
 
 diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index 768972a..f1712df 100644
+index a251be2..45724ef 100644
 --- a/drivers/mmc/host/bcm2835.c
 +++ b/drivers/mmc/host/bcm2835.c
-@@ -286,6 +286,7 @@ static void bcm2835_reset(struct mmc_host *mmc)
+@@ -1457,6 +1457,9 @@ static int bcm2835_remove(struct platform_device *pdev)
+ 	cancel_work_sync(&host->dma_work);
+ 	cancel_delayed_work_sync(&host->timeout_work);
  
- 	if (host->dma_chan)
- 		dmaengine_terminate_sync(host->dma_chan);
-+	host->dma_chan = NULL;
- 	bcm2835_reset_internal(host);
- }
- 
-@@ -837,6 +838,8 @@ static void bcm2835_timeout(struct work_struct *work)
- 		dev_err(dev, "timeout waiting for hardware interrupt.\n");
- 		bcm2835_dumpregs(host);
- 
-+		bcm2835_reset(host->mmc);
++	if (host->dma_chan_rxtx)
++		dma_release_channel(host->dma_chan_rxtx);
 +
- 		if (host->data) {
- 			host->data->error = -ETIMEDOUT;
- 			bcm2835_finish_data(host);
+ 	mmc_free_host(host->mmc);
+ 	platform_set_drvdata(pdev, NULL);
+ 
 -- 
 2.7.4
