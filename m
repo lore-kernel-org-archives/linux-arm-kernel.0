@@ -1,28 +1,32 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 14:45:23 +0100
-Subject: [PATCH 0/7] mmc: Several fixes for bcm2835 driver
-Message-ID: <1541943930-23873-1-git-send-email-stefan.wahren@i2se.com>
+Date: Sun, 11 Nov 2018 14:45:28 +0100
+Subject: [PATCH 5/7] mmc: bcm2835: Terminate timeout work synchronously
+In-Reply-To: <1541943930-23873-1-git-send-email-stefan.wahren@i2se.com>
+References: <1541943930-23873-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1541943930-23873-6-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes several issues which has been discovered after
-submission.
+It's better to make sure that the timeout work is really terminated
+before calling mmc_request_done.
 
-Michal Suchanek (1):
-  mmc: bcm2835: reset host on timeout
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/mmc/host/bcm2835.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Phil Elwell (1):
-  mmc: bcm2835: Recover from MMC_SEND_EXT_CSD
-
-Stefan Wahren (5):
-  mmc: bcm2835: Release DMA channel on driver unload
-  mmc: bcm2835: Avoid possible races on data requests
-  mmc: bcm2835: Terminate timeout work synchronously
-  mmc: bcm2835: Refactor dma_map_sg handling
-  mmc: bcm2835: Properly handle dmaengine_prep_slave_sg
-
- drivers/mmc/host/bcm2835.c | 58 ++++++++++++++++++++++++++++++----------------
- 1 file changed, 38 insertions(+), 20 deletions(-)
-
+diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+index 1c60798..2c7589f 100644
+--- a/drivers/mmc/host/bcm2835.c
++++ b/drivers/mmc/host/bcm2835.c
+@@ -608,7 +608,7 @@ static void bcm2835_finish_request(struct bcm2835_host *host)
+ 	struct dma_chan *terminate_chan = NULL;
+ 	struct mmc_request *mrq;
+ 
+-	cancel_delayed_work(&host->timeout_work);
++	cancel_delayed_work_sync(&host->timeout_work);
+ 
+ 	mrq = host->mrq;
+ 
 -- 
 2.7.4
