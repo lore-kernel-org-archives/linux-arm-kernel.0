@@ -1,81 +1,28 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 11 Nov 2018 14:18:38 -0800
-Subject: [PATCH 4.18 054/350] perf evsel: Store ids for events with their own
- cpus perf_event__synthesize_event_update_cpus
-In-Reply-To: <20181111221707.043394111@linuxfoundation.org>
-References: <20181111221707.043394111@linuxfoundation.org>
-Message-ID: <20181111221709.413446205@linuxfoundation.org>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 11 Nov 2018 16:35:39 -0600
+Subject: [PATCH v6 5/9] dt-bindings: ARM: document marvell,ecc-enable
+ binding
+In-Reply-To: <20181109070349.20464-6-chris.packham@alliedtelesis.co.nz>
+References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
+ <20181109070349.20464-6-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181111223539.GA27390@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.18-stable review patch.  If anyone has any objections, please let me know.
+On Fri,  9 Nov 2018 20:03:45 +1300, Chris Packham wrote:
+> Add documentation for the marvell,ecc-enable and marvell,ecc-disable
+> properties which can be used to enable/disable ECC on the Marvell aurora
+> cache.
+> 
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+> 
+> Notes:
+>     Changes in v6:
+>     - new (split binding doc from implementation).
+> 
+>  Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
 
-------------------
-
-From: Jiri Olsa <jolsa@redhat.com>
-
-[ Upstream commit 4ab8455f8bd83298bf7f67ab9357e3b1cc765c7d ]
-
-John reported crash when recording on an event under PMU with cpumask defined:
-
-  root at localhost:~# ./perf_debug_ record -e armv8_pmuv3_0/br_mis_pred/ sleep 1
-  perf: Segmentation fault
-  Obtained 9 stack frames.
-  ./perf_debug_() [0x4c5ef8]
-  [0xffff82ba267c]
-  ./perf_debug_() [0x4bc5a8]
-  ./perf_debug_() [0x419550]
-  ./perf_debug_() [0x41a928]
-  ./perf_debug_() [0x472f58]
-  ./perf_debug_() [0x473210]
-  ./perf_debug_() [0x4070f4]
-  /lib/aarch64-linux-gnu/libc.so.6(__libc_start_main+0xe0) [0xffff8294c8a0]
-  Segmentation fault (core dumped)
-
-We synthesize an update event that needs to touch the evsel id array, which is
-not defined at that time. Fixing this by forcing the id allocation for events
-with their own cpus.
-
-Reported-by: John Garry <john.garry@huawei.com>
-Signed-off-by: Jiri Olsa <jolsa@kernel.org>
-Tested-by: John Garry <john.garry@huawei.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Andi Kleen <ak@linux.intel.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linuxarm at huawei.com
-Fixes: bfd8f72c2778 ("perf record: Synthesize unit/scale/... in event update")
-Link: http://lkml.kernel.org/r/20181003212052.GA32371 at krava
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Signed-off-by: Sasha Levin <sashal@kernel.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
----
- tools/perf/builtin-report.c |    1 +
- tools/perf/util/evsel.c     |    3 +++
- 2 files changed, 4 insertions(+)
-
---- a/tools/perf/builtin-report.c
-+++ b/tools/perf/builtin-report.c
-@@ -981,6 +981,7 @@ int cmd_report(int argc, const char **ar
- 			.id_index	 = perf_event__process_id_index,
- 			.auxtrace_info	 = perf_event__process_auxtrace_info,
- 			.auxtrace	 = perf_event__process_auxtrace,
-+			.event_update	 = perf_event__process_event_update,
- 			.feature	 = process_feature_event,
- 			.ordered_events	 = true,
- 			.ordering_requires_timestamps = true,
---- a/tools/perf/util/evsel.c
-+++ b/tools/perf/util/evsel.c
-@@ -1078,6 +1078,9 @@ void perf_evsel__config(struct perf_evse
- 		attr->exclude_user   = 1;
- 	}
- 
-+	if (evsel->own_cpus)
-+		evsel->attr.read_format |= PERF_FORMAT_ID;
-+
- 	/*
- 	 * Apply event specific term settings,
- 	 * it overloads any global configuration.
+Reviewed-by: Rob Herring <robh@kernel.org>
