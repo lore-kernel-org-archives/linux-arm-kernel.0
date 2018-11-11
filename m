@@ -1,33 +1,49 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Sun, 11 Nov 2018 18:37:40 +0200
-Subject: [RFC 0/9] ASoC/ARM: Merge the davinci and omap audio directories
-In-Reply-To: <20181108083754.1746-1-peter.ujfalusi@ti.com>
-References: <20181108083754.1746-1-peter.ujfalusi@ti.com>
-Message-ID: <1065fb8a-a8ec-fbe3-83eb-a308072ef6d6@bitmer.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Sun, 11 Nov 2018 17:23:33 +0000
+Subject: [PATCH] arm64: disable KASAN for save_trace()
+In-Reply-To: <1541938036-29498-1-git-send-email-zhizhouzhang@asrmicro.com>
+References: <1541938036-29498-1-git-send-email-zhizhouzhang@asrmicro.com>
+Message-ID: <20181111172333.ov25gdmlsmhc6ysp@salmiak>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/8/18 10:37 AM, Peter Ujfalusi wrote:
-> The series also includes patches to updated the arch/arm/ files (defconfigs,
-> source files using audio Kconfig symbols).
-> 
-> I believe with v1 all of this can be merged via ASoC tree as the chances of
-> conflicts are low for the touched arch/arm files. But Sekhar and Tony can
-> correct me if I'm wrong.
-> 
-> I think I have catched all (I hope) issues regarding to Kconfig thanks to the
-> various autobuild machines out there kindly testing my linux-next-wip branch.
-> 
-> I would appreciate any testing comments before I send the v1!
-> 
-I applied on top of
-git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git commit
-abd97b7c53ac ("Merge branch 'asoc-4.21' into asoc-next").
+On Sun, Nov 11, 2018 at 08:07:16PM +0800, Zhizhou Zhang wrote:
+> save_trace() which is called from walk_stackframe() always try to
+> read/write caller's stack. This results KASAN stack-out-of-bounds
+> warning. So mute it.
 
-Patches 2 and 6 didn't apply and 7-8 I skipped. For my functional
-testing none of those were required.
+The save_trace() function should never perform an out-of-bounds access on the
+caller's stack, so this is papering over a bug elsewhere.
 
-For the sound/soc/{omap => ti} conversion you may add:
+Can you please given an example report from KASAN?
 
-Tested-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+Thanks,
+Mark.
+
+> 
+> Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
+> ---
+>  arch/arm64/kernel/stacktrace.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 4989f7e..e93ca67 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -107,7 +107,7 @@ struct stack_trace_data {
+>  	unsigned int skip;
+>  };
+>  
+> -static int save_trace(struct stackframe *frame, void *d)
+> +static int __no_sanitize_address save_trace(struct stackframe *frame, void *d)
+>  {
+>  	struct stack_trace_data *data = d;
+>  	struct stack_trace *trace = data->trace;
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
