@@ -1,45 +1,25 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 21:23:59 +0100
-Subject: [PATCH V2 7/7] mmc: bcm2835: Properly handle dmaengine_prep_slave_sg
-In-Reply-To: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
-References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1541967839-2847-8-git-send-email-stefan.wahren@i2se.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Sun, 11 Nov 2018 21:57:45 +0100
+Subject: [PATCH v6 0/2] mtd: rawnand: meson: add Amlogic NAND driver
+ support
+In-Reply-To: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+Message-ID: <20181111215745.07448b12@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case dmaengine_prep_slave_sg fails we need to call dma_unmap_sg.
+Hi Jianxin,
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/mmc/host/bcm2835.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+Jianxin Pan <jianxin.pan@amlogic.com> wrote on Fri, 2 Nov 2018 00:42:19
++0800:
 
-diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index c42bdaa..82e4b08 100644
---- a/drivers/mmc/host/bcm2835.c
-+++ b/drivers/mmc/host/bcm2835.c
-@@ -518,13 +518,16 @@ void bcm2835_prepare_dma(struct bcm2835_host *host, struct mmc_data *data)
- 	desc = dmaengine_prep_slave_sg(dma_chan, data->sg, sg_len, dir_slave,
- 				       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 
--	if (desc) {
--		desc->callback = bcm2835_dma_complete;
--		desc->callback_param = host;
--		host->dma_desc = desc;
--		host->dma_chan = dma_chan;
--		host->dma_dir = dir_data;
-+	if (!desc) {
-+		dma_unmap_sg(dma_chan->device->dev, data->sg, sg_len, dir_data);
-+		return;
- 	}
-+
-+	desc->callback = bcm2835_dma_complete;
-+	desc->callback_param = host;
-+	host->dma_desc = desc;
-+	host->dma_chan = dma_chan;
-+	host->dma_dir = dir_data;
- }
- 
- static void bcm2835_start_dma(struct bcm2835_host *host)
--- 
-2.7.4
+> These two patches try to add initial NAND driver support for Amlogic Meson
+> SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
+> 
+
+Would you mind Cc:'ing me when you send NAND related patches? Otherwise
+there is a chance that it will take ages before I notice your series
+in the middle of the MTD patches flow.
+
+Thanks,
+Miqu?l
