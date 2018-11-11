@@ -1,38 +1,56 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 21:18:12 +0100 (CET)
-Subject: [PATCH v2] ARM: staging: bcm2835-audio: interpolate audio delay
-In-Reply-To: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
-References: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
-Message-ID: <1197390391.186035.1541967492518@email.ionos.de>
+Date: Sun, 11 Nov 2018 21:23:54 +0100
+Subject: [PATCH V2 2/7] mmc: bcm2835: Recover from MMC_SEND_EXT_CSD
+In-Reply-To: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
+References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1541967839-2847-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+From: Phil Elwell <phil@raspberrypi.org>
 
-> Mike Brady <mikebrady@eircom.net> hat am 11. November 2018 um 19:21 geschrieben:
-> 
-> 
-> When the BCM2835 audio output is used, userspace sees a jitter up to 10ms
-> in the audio position, aka "delay" -- the number of frames that must
-> be output before a new frame would be played.
-> Make this a bit nicer for userspace by interpolating the position
-> using the CPU clock.
-> The overhead is small -- an extra ktime_get() every time a GPU message
-> is sent -- and another call and a few calculations whenever the delay
-> is sought from userland.
-> At 48,000 frames per second, i.e. approximately 20 microseconds per
-> frame, it would take a clock inaccuracy of
-> 20 microseconds in 10 milliseconds -- 2,000 parts per million --
-> to result in an inaccurate estimate, whereas
-> crystal- or resonator-based clocks typically have an
-> inaccuracy of 10s to 100s of parts per million.
-> 
-> Signed-off-by: Mike Brady <mikebrady@eircom.net>
+If the user issues an "mmc extcsd read", the SD controller receives
+what it thinks is a SEND_IF_COND command with an unexpected data block.
+The resulting operations leave the FSM stuck in READWAIT, a state which
+persists until the MMC framework resets the controller, by which point
+the root filesystem is likely to have been unmounted.
 
-the former version of your patch has already been applied to staging-next.
+A less heavyweight solution is to detect the condition and nudge the
+FSM by asserting the (self-clearing) FORCE_DATA_MODE bit.
 
-Didn't you received Greg's email?
+Link: https://github.com/raspberrypi/linux/issues/2728
+Signed-off-by: Phil Elwell <phil@raspberrypi.org>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/mmc/host/bcm2835.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-So please rebase your changes.
-
-Stefan
+diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+index f1712df..a251be2 100644
+--- a/drivers/mmc/host/bcm2835.c
++++ b/drivers/mmc/host/bcm2835.c
+@@ -773,6 +773,8 @@ static void bcm2835_finish_command(struct bcm2835_host *host)
+ 
+ 		if (!(sdhsts & SDHSTS_CRC7_ERROR) ||
+ 		    (host->cmd->opcode != MMC_SEND_OP_COND)) {
++			u32 edm, fsm;
++
+ 			if (sdhsts & SDHSTS_CMD_TIME_OUT) {
+ 				host->cmd->error = -ETIMEDOUT;
+ 			} else {
+@@ -781,6 +783,13 @@ static void bcm2835_finish_command(struct bcm2835_host *host)
+ 				bcm2835_dumpregs(host);
+ 				host->cmd->error = -EILSEQ;
+ 			}
++			edm = readl(host->ioaddr + SDEDM);
++			fsm = edm & SDEDM_FSM_MASK;
++			if (fsm == SDEDM_FSM_READWAIT ||
++			    fsm == SDEDM_FSM_WRITESTART1)
++				/* Kick the FSM out of its wait */
++				writel(edm | SDEDM_FORCE_DATA_MODE,
++				       host->ioaddr + SDEDM);
+ 			bcm2835_finish_request(host);
+ 			return;
+ 		}
+-- 
+2.7.4
