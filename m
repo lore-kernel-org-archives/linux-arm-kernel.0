@@ -1,29 +1,69 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 11 Nov 2018 12:29:50 +0100
-Subject: [PATCH] ARM: OMAP1: ams-delta: Provide GPIO lookup table for LED
- device
-In-Reply-To: <20181105232349.17351-1-jmkrzyszt@gmail.com>
-References: <20181105232349.17351-1-jmkrzyszt@gmail.com>
-Message-ID: <20181111112950.GB27666@amd>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 11 Nov 2018 11:36:44 +0000
+Subject: [RFC] [PATCH] kvm: arm: Introduce error code KVM_EINVARIANT
+In-Reply-To: <4bbb4e76-b714-eafe-f95b-aca1a258e9fe@caviumnetworks.com>
+References: <1540290099-146109-1-git-send-email-mjaggi@caviumnetworks.com>
+ <4bbb4e76-b714-eafe-f95b-aca1a258e9fe@caviumnetworks.com>
+Message-ID: <86o9avetgz.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2018-11-06 00:23:49, Janusz Krzysztofik wrote:
-> Global GPIO numbers no longer have to be passed to leds-gpio driver,
-> replace their assignment with a lookup table.
+On Sat, 10 Nov 2018 22:18:47 +0000,
+Manish Jaggi <mjaggi@caviumnetworks.com> wrote:
 > 
-> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> 
+> CCing a larger audience.
+> Please review.
+> 
+> On 10/23/2018 03:51 PM, Jaggi, Manish wrote:
+> > From: Manish Jaggi <manish.jaggi@cavium.com>
+> >
+> > This patch introduces an error code KVM_EINVARIANT which is returned
+> > by KVM when userland tries to set an invariant register.
+> >
+> > The need for this error code is in VM Migration for arm64.
+> > ARM64 systems use mainly -machine virt -cpu host as parameter to qemu.
+> > Migration requires both Source and destination machines to have same
+> > physical cpu. There are cases where the overall architecture of CPU is
+> > same but the next version of the chip with some bug fixes which have no
+> > effect on qemu operation. In such cases invariant registers like MIDR
+> > have a different value.
+> > Currently Migration fails in such cases.
+> >
+> > Rather than sending a EINVAL, a specifc error code will help
+> > userland program the guest invariant register by querying the migrated
+> > host machines invariant registers.
 
-Acked-by: Pavel Machek <pavel@ucw.cz>
+But failing migration is a good thing, right? How do you expect that
+the guest will be happy to see a new CPU revision right in the middle
+of its execution? Do you also propose that QEMU starts doing that for
+big-little systems? After all, if ignoring the differences in some
+registers is harmless for migration, surely that should be the case in
+a single system, right?
 
+> >
+> > Qemu will have a parameter -hostinvariant along with checking of this
+> > error code. So it can be safely assumed that the feature is opt-in
+
+You're changing the ABI without any buy in from userspace, which is
+not acceptable.
+
+As it stands, this patch creates a number of issues without solving
+any. Things to think about:
+
+- How does errata management works when migrating to a different
+  system?
+- big-little, as mentioned above
+- Are all invariant registers equal? A different MIDR has the same
+  effect as a different MMFR0?
+
+Instead of papering over architectural constants i a system, how about
+allowing the relevant ID registers to be overloaded when not
+incompatible?
+
+Thanks,
+
+	M.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181111/0ab2efb7/attachment.sig>
+Jazz is not dead, it just smell funny.
