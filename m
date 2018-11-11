@@ -1,47 +1,39 @@
-From: pbrobinson@gmail.com (Peter Robinson)
-Date: Sun, 11 Nov 2018 18:10:48 +0000
-Subject: [PATCH 2/2] arm64: defconfig: enable BPF related configs
-In-Reply-To: <20181111181048.10933-1-pbrobinson@gmail.com>
-References: <20181111181048.10933-1-pbrobinson@gmail.com>
-Message-ID: <20181111181048.10933-2-pbrobinson@gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sun, 11 Nov 2018 20:40:24 +0100
+Subject: [PATCH v6 8/9] EDAC: Add driver for the Marvell Armada XP SDRAM
+ and L2 cache ECC
+In-Reply-To: <20181109070349.20464-9-chris.packham@alliedtelesis.co.nz>
+References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
+ <20181109070349.20464-9-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181111194024.GC31937@zn.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BPF components are getting more widely used by various components
-so we should enable them in the ARMv7 multi config to ensure they
-get wider testing and don't regress.
+On Fri, Nov 09, 2018 at 08:03:48PM +1300, Chris Packham wrote:
+> From: Jan Luebbe <jlu@pengutronix.de>
+> 
+> Add support for the ECC functionality as found in the DDR RAM and L2
+> cache controllers on the MV78230/MV78x60 SoCs. This driver has been
+> tested on the MV78460 (on a custom board with a DDR3 ECC DIMM).
+> 
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> [cp use SPDX license]
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> ---
+>  MAINTAINERS                   |   6 +
+>  drivers/edac/Kconfig          |   7 +
+>  drivers/edac/Makefile         |   1 +
+>  drivers/edac/armada_xp_edac.c | 630 ++++++++++++++++++++++++++++++++++
+>  4 files changed, 644 insertions(+)
+>  create mode 100644 drivers/edac/armada_xp_edac.c
 
-Signed-off-by: Peter Robinson <pbrobinson@gmail.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
----
- arch/arm64/configs/defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Looks ok at a glance. Those overly long lines could use some macros or
+breaking but it is not a big deal:
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index c9a57d11330b..8748f6cf9fcd 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -19,6 +19,7 @@ CONFIG_BLK_CGROUP=y
- CONFIG_CGROUP_PIDS=y
- CONFIG_CGROUP_HUGETLB=y
- CONFIG_CPUSETS=y
-+CONFIG_CGROUP_BPF=y
- CONFIG_CGROUP_DEVICE=y
- CONFIG_CGROUP_CPUACCT=y
- CONFIG_CGROUP_PERF=y
-@@ -157,7 +158,10 @@ CONFIG_VLAN_8021Q_MVRP=y
- CONFIG_QRTR=m
- CONFIG_QRTR_SMD=m
- CONFIG_QRTR_TUN=m
-+CONFIG_BPF_SYSCALL=y
- CONFIG_BPF_JIT=y
-+CONFIG_BPF_JIT_ALWAYS_ON=y
-+CONFIG_BPF_STREAM_PARSER=y
- CONFIG_BT=m
- CONFIG_BT_HIDP=m
- # CONFIG_BT_HS is not set
+Reviewed-by: Borislav Petkov <bp@suse.de>
+
 -- 
-2.19.1
+Regards/Gruss,
+    Boris.
+
+Good mailing practices for 400: avoid top-posting and trim the reply.
