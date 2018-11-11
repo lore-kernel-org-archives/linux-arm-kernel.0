@@ -1,72 +1,25 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Sun, 11 Nov 2018 22:15:14 +0000
-Subject: [PATCH] pinctrl: imx: Fix imx_dt_node_to_map handling of
- IMX_NO_PAD_CTL
-Message-ID: <1547d44dba63cbfd1b813018866f8916013b3381.1541973902.git.leonard.crestez@nxp.com>
+From: marc.w.gonzalez@free.fr (Marc Gonzalez)
+Date: Sun, 11 Nov 2018 23:26:29 +0100
+Subject: PCIe support in APQ8098-based board
+Message-ID: <44260aa9-d01a-f9a5-a2e6-31f06de48d34@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After changes for SCU support the IMX_NO_PAD_CTL flag is not longer
-handled correctly in imx_dt_node_to_map. Pins with this flag are no
-longer skipped and the new_map array can overflow and corrupt memory.
+Hello,
 
-This fixes imx6-sabreauto boards failing to boot.
+I'm playing with an APQ8098-based board, which I got to boot an upstream
+v4.20-rc1 kernel to the command line, by reusing the msm8998-mtp.dts
+(IIUC apq8098 is the msm8998's "little brother", in that they are
+almost the same SoC, with some HW blocks missing in the apq8098).
 
-Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
-Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+I'm trying to get PCIe working on my eval board. I'm wondering if
+someone from qcom, codeaurora, or linaro has perhaps already done
+this work, and it's just not upstream yet?
 
----
- drivers/pinctrl/freescale/pinctrl-imx.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+There seem to be proper drivers for the RC and the PHY, but some
+low-level stuff are missing (clocks, regulator, power domain).
 
-A different was posted earlier: https://lore.kernel.org/patchwork/patch/1009504/
+drivers/pci/controller/dwc/pcie-qcom.c
+drivers/phy/qualcomm/phy-qcom-qmp.c
 
-I don't think that's correct because it assumes num_configs is
-zero-initialized but new_map comes from kmalloc_array.
-
-Code is clearer if SCU and MMIO paths are separate.
-
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 78d33dfb4d2d..51312e81eff7 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -106,29 +106,31 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
- 
- 	/* create config map */
- 	new_map++;
- 	for (i = j = 0; i < grp->num_pins; i++) {
- 		pin = &((struct imx_pin *)(grp->data))[i];
--		new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
--		new_map[j].data.configs.group_or_pin =
--					pin_get_name(pctldev, pin->pin);
--
- 		if (info->flags & IMX_USE_SCU) {
- 			/*
- 			 * For SCU case, we set mux and conf together
- 			 * in one IPC call
- 			 */
-+			new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
-+			new_map[j].data.configs.group_or_pin =
-+					pin_get_name(pctldev, pin->pin);
- 			new_map[j].data.configs.configs =
- 					(unsigned long *)&pin->conf.scu;
- 			new_map[j].data.configs.num_configs = 2;
-+			++j;
- 		} else if (!(pin->conf.mmio.config & IMX_NO_PAD_CTL)) {
-+			new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
-+			new_map[j].data.configs.group_or_pin =
-+					pin_get_name(pctldev, pin->pin);
- 			new_map[j].data.configs.configs =
- 					&pin->conf.mmio.config;
- 			new_map[j].data.configs.num_configs = 1;
-+			++j;
- 		}
--
--		j++;
- 	}
- 
- 	dev_dbg(pctldev->dev, "maps: function %s group %s num %d\n",
- 		(*map)->data.mux.function, (*map)->data.mux.group, map_num);
- 
--- 
-2.17.1
+Regards.
