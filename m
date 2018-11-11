@@ -1,31 +1,48 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 21:23:52 +0100
-Subject: [PATCH V2 0/7] mmc: Several fixes for bcm2835 driver
-Message-ID: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
+Date: Sun, 11 Nov 2018 21:23:53 +0100
+Subject: [PATCH V2 1/7] mmc: bcm2835: reset host on timeout
+In-Reply-To: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
+References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1541967839-2847-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series fixes several issues which has been discovered after
-submission.
+From: Michal Suchanek <msuchanek@suse.de>
 
-Changes in V2:
-- add my own signed-off-by to patches #1 and #2
+The bcm2835 mmc host tends to lock up for unknown reason so reset it on
+timeout. The upper mmc block layer tries retransimitting with single
+blocks which tends to work out after a long wait.
 
-Michal Suchanek (1):
-  mmc: bcm2835: reset host on timeout
+This is better than giving up and leaving the machine broken for no
+obvious reason.
 
-Phil Elwell (1):
-  mmc: bcm2835: Recover from MMC_SEND_EXT_CSD
+Fixes: 660fc733bd74 ("mmc: bcm2835: Add new driver for the sdhost controller.")
+Signed-off-by: Michal Suchanek <msuchanek@suse.de>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ drivers/mmc/host/bcm2835.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Stefan Wahren (5):
-  mmc: bcm2835: Release DMA channel on driver unload
-  mmc: bcm2835: Avoid possible races on data requests
-  mmc: bcm2835: Terminate timeout work synchronously
-  mmc: bcm2835: Refactor dma_map_sg handling
-  mmc: bcm2835: Properly handle dmaengine_prep_slave_sg
-
- drivers/mmc/host/bcm2835.c | 58 ++++++++++++++++++++++++++++++----------------
- 1 file changed, 38 insertions(+), 20 deletions(-)
-
+diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+index 768972a..f1712df 100644
+--- a/drivers/mmc/host/bcm2835.c
++++ b/drivers/mmc/host/bcm2835.c
+@@ -286,6 +286,7 @@ static void bcm2835_reset(struct mmc_host *mmc)
+ 
+ 	if (host->dma_chan)
+ 		dmaengine_terminate_sync(host->dma_chan);
++	host->dma_chan = NULL;
+ 	bcm2835_reset_internal(host);
+ }
+ 
+@@ -837,6 +838,8 @@ static void bcm2835_timeout(struct work_struct *work)
+ 		dev_err(dev, "timeout waiting for hardware interrupt.\n");
+ 		bcm2835_dumpregs(host);
+ 
++		bcm2835_reset(host->mmc);
++
+ 		if (host->data) {
+ 			host->data->error = -ETIMEDOUT;
+ 			bcm2835_finish_data(host);
 -- 
 2.7.4
