@@ -1,32 +1,36 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 11 Nov 2018 14:45:28 +0100
-Subject: [PATCH 5/7] mmc: bcm2835: Terminate timeout work synchronously
-In-Reply-To: <1541943930-23873-1-git-send-email-stefan.wahren@i2se.com>
-References: <1541943930-23873-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1541943930-23873-6-git-send-email-stefan.wahren@i2se.com>
+From: tali.perry1@gmail.com (tali.perry1 at gmail.com)
+Date: Sun, 11 Nov 2018 15:47:11 +0200
+Subject: [PATCH v1 0/1] clk: npcm7xx: fix base address and of_clk_get_by_name
+Message-ID: <20181111134712.318321-1-tali.perry1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's better to make sure that the timeout work is really terminated
-before calling mmc_request_done.
+From: Tali Perry <tali.perry1@gmail.com>
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Nuvoton NPCM7XX Clock Controller
+fix base address and of_clk_get_by_name error handling.
+    Also update error messages to be more informative.
+    
+    In case clk_base allocation is erronoeous the return value is null.
+    Also fix handling of of_clk_get_by_name returns an error. 
+    Print a better error message pointing to the dt-binding documention.
+
+This patch is re-submitted since it was already pushed to main 
+(just the diff, without the full driver which is already in 
+master branch.)
+
+
+Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+
 ---
- drivers/mmc/host/bcm2835.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index 1c60798..2c7589f 100644
---- a/drivers/mmc/host/bcm2835.c
-+++ b/drivers/mmc/host/bcm2835.c
-@@ -608,7 +608,7 @@ static void bcm2835_finish_request(struct bcm2835_host *host)
- 	struct dma_chan *terminate_chan = NULL;
- 	struct mmc_request *mrq;
- 
--	cancel_delayed_work(&host->timeout_work);
-+	cancel_delayed_work_sync(&host->timeout_work);
- 
- 	mrq = host->mrq;
- 
+Tali Perry (1):
+  clk: npcm7xx: get fixed clocks from DT
+
+ drivers/clk/clk-npcm7xx.c | 99 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 75 insertions(+), 24 deletions(-)
+
 -- 
-2.7.4
+2.14.1
