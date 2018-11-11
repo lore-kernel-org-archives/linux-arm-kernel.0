@@ -1,52 +1,88 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Sun, 11 Nov 2018 19:57:51 +0000
-Subject: [PATCH v6 5/9] dt-bindings: ARM: document marvell,ecc-enable
- binding
-References: <20181109070349.20464-1-chris.packham@alliedtelesis.co.nz>
- <20181109070349.20464-6-chris.packham@alliedtelesis.co.nz>
- <CAK8P3a3PNvBhyQw0bfGxKmxj+KeJB2_TXtDx2R1BpjTCYNqVkA@mail.gmail.com>
- <20181109114818.GB30658@n2100.armlinux.org.uk>
- <CAK8P3a26XmBpG3VzwUgSdd_Xo_S2ezSvA9mjKckRFr9p38j-dg@mail.gmail.com>
-Message-ID: <a07fead828b8452bb37708180dd721d4@svr-chch-ex1.atlnz.lc>
+From: paulmck@linux.ibm.com (Paul E. McKenney)
+Date: Sun, 11 Nov 2018 12:04:43 -0800
+Subject: [PATCH tip/core/rcu 7/7] KVM: arm/arm64: vgic: Replace
+ spin_is_locked() with lockdep
+In-Reply-To: <20181111200421.GA10551@linux.ibm.com>
+References: <20181111200421.GA10551@linux.ibm.com>
+Message-ID: <20181111200443.10772-7-paulmck@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/18 4:58 AM, Arnd Bergmann wrote:
-> On Fri, Nov 9, 2018 at 12:48 PM Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->>
->> On Fri, Nov 09, 2018 at 12:40:06PM +0100, Arnd Bergmann wrote:
->>> On Fri, Nov 9, 2018 at 8:04 AM Chris Packham
->>> <chris.packham@alliedtelesis.co.nz> wrote:
->>>>
->>>> Add documentation for the marvell,ecc-enable and marvell,ecc-disable
->>>> properties which can be used to enable/disable ECC on the Marvell aurora
->>>> cache.
->>>>
->>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>>> ---
->>>
->>> Why do you need both enable and disable? Wouldn't one of them be enough here?
->>
->> It isn't an "on when ecc-enable is present, off when not" because the
->> current behaviour is to preserve these bits in the control register.
->>
->> If we were to implement it as "if no ecc-enable property, turn off
->> ECC" then that would drastically change the behaviour - systems which
->> were configured for ECC suddenly lose ECC support.
->>
->> Since we don't know which have it and which don't, we can't implement
->> the option like that.
-> 
-> What I meant was why we need support force-disabling it. I understand
-> that we need to allow leaving it at the boot-time default as well as
-> force-enabling it.
+From: Lance Roy <ldr709@gmail.com>
 
-I added ecc-disable because I was modeling it after 
-arm,parity-enable/arm,parity-disable. The only reason I can imagine 
-wanting to force disable this would be some mis-behaving SoC which has 
-it enabled by default in hardware, to my knowledge no such system exists 
-(that would use this driver).
+lockdep_assert_held() is better suited to checking locking requirements,
+since it only checks if the current thread holds the lock regardless of
+whether someone else does. This is also a step towards possibly removing
+spin_is_locked().
 
-I'd be happy to drop the binding an implementation and send a v7 if you 
-feel strongly that it marvell,ecc-disable should be removed.
+Signed-off-by: Lance Roy <ldr709@gmail.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Eric Auger <eric.auger@redhat.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: <kvmarm@lists.cs.columbia.edu>
+Signed-off-by: Paul E. McKenney <paulmck@linux.ibm.com>
+Acked-by: Christoffer Dall <christoffer.dall@arm.com>
+---
+ virt/kvm/arm/vgic/vgic.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 7cfdfbc910e0..50e25438fb3c 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -196,7 +196,7 @@ void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active)
+  */
+ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+ {
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
+ 
+ 	/* If the interrupt is active, it must stay on the current vcpu */
+ 	if (irq->active)
+@@ -273,7 +273,7 @@ static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+ 
+ 	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
+ }
+@@ -311,7 +311,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
+ {
+ 	struct kvm_vcpu *vcpu;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
+ 
+ retry:
+ 	vcpu = vgic_target_oracle(irq);
+@@ -702,7 +702,7 @@ static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
+ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
+ 				    struct vgic_irq *irq, int lr)
+ {
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
++	lockdep_assert_held(&irq->irq_lock);
+ 
+ 	if (kvm_vgic_global_state.type == VGIC_V2)
+ 		vgic_v2_populate_lr(vcpu, irq, lr);
+@@ -736,7 +736,7 @@ static int compute_ap_list_depth(struct kvm_vcpu *vcpu,
+ 
+ 	*multi_sgi = false;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+ 
+ 	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+ 		int w;
+@@ -761,7 +761,7 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+ 	bool multi_sgi;
+ 	u8 prio = 0xff;
+ 
+-	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	lockdep_assert_held(&vgic_cpu->ap_list_lock);
+ 
+ 	count = compute_ap_list_depth(vcpu, &multi_sgi);
+ 	if (count > kvm_vgic_global_state.nr_lr || multi_sgi)
+-- 
+2.17.1
