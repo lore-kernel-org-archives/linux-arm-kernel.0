@@ -1,49 +1,108 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Sun, 11 Nov 2018 12:59:39 +0800
-Subject: [PATCH v1 1/5] perf cs-etm: Correct packets swapping in
- cs_etm__flush()
+Date: Sun, 11 Nov 2018 12:59:40 +0800
+Subject: [PATCH v1 2/5] perf cs-etm: Avoid stale branch samples when flush
+ packet
 In-Reply-To: <1541912383-19915-1-git-send-email-leo.yan@linaro.org>
 References: <1541912383-19915-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1541912383-19915-2-git-send-email-leo.yan@linaro.org>
+Message-ID: <1541912383-19915-3-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The structure cs_etm_queue uses 'prev_packet' to point to previous
-packet, this can be used to combine with new coming packet to generate
-samples.
+At the end of trace buffer handling, function cs_etm__flush() is invoked
+to flush any remaining branch stack entries.  As a side effect, it also
+generates branch sample, because the 'etmq->packet' doesn't contains any
+new coming packet but point to one stale packet after packets swapping,
+so it wrongly makes synthesize branch samples with stale packet info.
 
-In function cs_etm__flush() it swaps packets only when the flag
-'etm->synth_opts.last_branch' is true, this means that it will not
-swap packets if without option '--itrace=il' to generate last branch
-entries; thus for this case the 'prev_packet' doesn't point to the
-correct previous packet and the stale packet still will be used to
-generate sequential sample.  Thus if dump trace with 'perf script'
-command we can see the incorrect flow with the stale packet's address
-info.
+We could review below detailed flow which causes issue:
 
-This patch corrects packets swapping in cs_etm__flush(); except using
-the flag 'etm->synth_opts.last_branch' it also checks the another flag
-'etm->sample_branches', if any flag is true then it swaps packets so
-can save correct content to 'prev_packet'.  Finally this can fix the
-wrong program flow dumping issue.
+  Packet1: start_addr=0xffff000008b1fbf0 end_addr=0xffff000008b1fbfc
+  Packet2: start_addr=0xffff000008b1fb5c end_addr=0xffff000008b1fb6c
+
+  step 1: cs_etm__sample():
+	sample: ip=(0xffff000008b1fbfc-4) addr=0xffff000008b1fb5c
+
+  step 2: flush packet in cs_etm__run_decoder():
+	cs_etm__run_decoder()
+	  `-> err = cs_etm__flush(etmq, false);
+	sample: ip=(0xffff000008b1fb6c-4) addr=0xffff000008b1fbf0
+
+Packet1 and packet2 are two continuous packets, when packet2 is the new
+coming packet, cs_etm__sample() generates branch sample for these two
+packets and use [packet1::end_addr - 4 => packet2::start_addr] as branch
+jump flow, thus we can see the first generated branch sample in step 1.
+At the end of cs_etm__sample() it swaps packets so 'etm->prev_packet'=
+packet2 and 'etm->packet'=packet1, so far it's okay for branch sample.
+
+If packet2 is the last one packet in trace buffer, even there have no
+any new coming packet, cs_etm__run_decoder() invokes cs_etm__flush() to
+flush branch stack entries as expected, but it also generates branch
+samples by taking 'etm->packet' as a new coming packet, thus the branch
+jump flow is as [packet2::end_addr - 4 =>  packet1::start_addr]; this
+is the second sample which is generated in step 2.  So actually the
+second sample is a stale sample and we should not generate it.
+
+This patch is to add new argument 'new_packet' for cs_etm__flush(), we
+can pass 'true' for this argument if there have a new packet, otherwise
+it will pass 'false' for the purpose of only flushing branch stack
+entries and avoid to generate sample for stale packet.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- tools/perf/util/cs-etm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ tools/perf/util/cs-etm.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
 diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-index 48ad217..fe18d7b 100644
+index fe18d7b..f4fa877 100644
 --- a/tools/perf/util/cs-etm.c
 +++ b/tools/perf/util/cs-etm.c
-@@ -997,7 +997,7 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
+@@ -955,7 +955,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 	return 0;
+ }
+ 
+-static int cs_etm__flush(struct cs_etm_queue *etmq)
++static int cs_etm__flush(struct cs_etm_queue *etmq, bool new_packet)
+ {
+ 	int err = 0;
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+@@ -989,6 +989,20 @@ static int cs_etm__flush(struct cs_etm_queue *etmq)
+ 
  	}
  
- swap_packet:
--	if (etmq->etm->synth_opts.last_branch) {
-+	if (etm->sample_branches || etmq->etm->synth_opts.last_branch) {
- 		/*
- 		 * Swap PACKET with PREV_PACKET: PACKET becomes PREV_PACKET for
- 		 * the next incoming packet.
++	/*
++	 * If 'new_packet' is false, this time call has no a new packet
++	 * coming and 'etmq->packet' contains the stale packet which is
++	 * set at the previous time with packets swapping.  In this case
++	 * this function is invoked only for flushing branch stack at
++	 * the end of buffer handling.
++	 *
++	 * Simply to say, branch samples should be generated when every
++	 * time receive one new packet; otherwise, directly bail out to
++	 * avoid generate branch sample with stale packet.
++	 */
++	if (!new_packet)
++		return 0;
++
+ 	if (etm->sample_branches &&
+ 	    etmq->prev_packet->sample_type == CS_ETM_RANGE) {
+ 		err = cs_etm__synth_branch_sample(etmq);
+@@ -1075,7 +1089,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 					 * Discontinuity in trace, flush
+ 					 * previous branch stack
+ 					 */
+-					cs_etm__flush(etmq);
++					cs_etm__flush(etmq, true);
+ 					break;
+ 				case CS_ETM_EMPTY:
+ 					/*
+@@ -1092,7 +1106,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+ 
+ 		if (err == 0)
+ 			/* Flush any remaining branch stack entries */
+-			err = cs_etm__flush(etmq);
++			err = cs_etm__flush(etmq, false);
+ 	}
+ 
+ 	return err;
 -- 
 2.7.4
