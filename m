@@ -1,24 +1,31 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 17:37:13 -0600
-Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
-In-Reply-To: <20181105135802.30486-1-peron.clem@gmail.com>
-References: <20181105135802.30486-1-peron.clem@gmail.com>
-Message-ID: <5bea0eab.1c69fb81.c3d9.982d@mx.google.com>
+Date: Mon, 12 Nov 2018 11:21:07 -0600
+Subject: [PATCH 1/2] clk: mediatek: add clock support for MT7629 SoC
+In-Reply-To: <815e38d4d74689980cd73c86d9e80fd5854cfc94.1541143168.git.ryder.lee@mediatek.com>
+References: <815e38d4d74689980cd73c86d9e80fd5854cfc94.1541143168.git.ryder.lee@mediatek.com>
+Message-ID: <5bea0ea7.1c69fb81.7820a.2044@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon,  5 Nov 2018 14:58:02 +0100, =?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?= wrote:
-> From: Colin Didier <colin.didier@devialet.com>
+On Mon, Nov 05, 2018 at 04:43:55PM +0800, Ryder Lee wrote:
+> Add all supported clocks exported from every susbystem found on MT7629 SoC.
 > 
-> The MX6 Audmux differs from MX51.
-> 
-> This patch adds the audmux for i.MX6 family.
-> 
-> Signed-off-by: Colin Didier <colin.didier@devialet.com>
-> Signed-off-by: Cl??ment P??ron <peron.clem@gmail.com>
+> Signed-off-by: Wenzhen Yu <wenzhen.yu@mediatek.com>
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
->  include/dt-bindings/sound/fsl-imx-audmux.h | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
+>  drivers/clk/mediatek/Kconfig           |  23 ++
+>  drivers/clk/mediatek/Makefile          |   3 +
+>  drivers/clk/mediatek/clk-mt7629-eth.c  | 159 ++++++++
+>  drivers/clk/mediatek/clk-mt7629-hif.c  | 156 +++++++
+>  drivers/clk/mediatek/clk-mt7629.c      | 723 +++++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/mt7629-clk.h | 203 +++++++++
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
+
+In the future, the header goes with the binding patch.
+
+>  6 files changed, 1267 insertions(+)
+>  create mode 100644 drivers/clk/mediatek/clk-mt7629-eth.c
+>  create mode 100644 drivers/clk/mediatek/clk-mt7629-hif.c
+>  create mode 100644 drivers/clk/mediatek/clk-mt7629.c
+>  create mode 100644 include/dt-bindings/clock/mt7629-clk.h
