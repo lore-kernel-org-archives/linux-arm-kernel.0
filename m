@@ -1,197 +1,90 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 12 Nov 2018 11:57:04 +0000
-Subject: [PATCH v6 13/24] arm64: alternative: Apply alternatives early in boot
- process
+Date: Mon, 12 Nov 2018 11:57:09 +0000
+Subject: [PATCH v6 18/24] irqchip/gic-v3: Handle pseudo-NMIs
 In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
 References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1542023835-21446-14-git-send-email-julien.thierry@arm.com>
+Message-ID: <1542023835-21446-19-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Thompson <daniel.thompson@linaro.org>
+Provide a higher priority to be used for pseudo-NMIs. When such an
+interrupt is received, keep interrupts fully disabled at CPU level to
+prevent receiving other pseudo-NMIs while handling the current one.
 
-Currently alternatives are applied very late in the boot process (and
-a long time after we enable scheduling). Some alternative sequences,
-such as those that alter the way CPU context is stored, must be applied
-much earlier in the boot sequence.
-
-Introduce apply_boot_alternatives() to allow some alternatives to be
-applied immediately after we detect the CPU features of the boot CPU.
-
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-[julien.thierry at arm.com: rename to fit new cpufeature framework better,
-			 apply BOOT_SCOPE feature early in boot]
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/alternative.h |  1 +
- arch/arm64/include/asm/cpufeature.h  |  4 ++++
- arch/arm64/kernel/alternative.c      | 43 +++++++++++++++++++++++++++++++-----
- arch/arm64/kernel/cpufeature.c       |  6 +++++
- arch/arm64/kernel/smp.c              |  7 ++++++
- 5 files changed, 56 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 35 +++++++++++++++++++++++++++++------
+ 1 file changed, 29 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 9806a23..b9f8d78 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -25,6 +25,7 @@ struct alt_instr {
- typedef void (*alternative_cb_t)(struct alt_instr *alt,
- 				 __le32 *origptr, __le32 *updptr, int nr_inst);
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 5245791..c763f1a 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -41,6 +41,8 @@
  
-+void __init apply_boot_alternatives(void);
- void __init apply_alternatives_all(void);
- bool alternative_is_applied(u16 cpufeature);
+ #include "irq-gic-common.h"
  
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index a6e063f..2d5f18f 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -357,6 +357,10 @@ static inline int cpucap_default_scope(const struct arm64_cpu_capabilities *cap)
- extern struct static_key_false cpu_hwcap_keys[ARM64_NCAPS];
- extern struct static_key_false arm64_const_caps_ready;
- 
-+/* ARM64 CAPS + alternative_cb */
-+#define ARM64_NPATCHABLE (ARM64_NCAPS + 1)
-+extern DECLARE_BITMAP(boot_capabilities, ARM64_NPATCHABLE);
++#define GICD_INT_NMI_PRI		0xa0
 +
- bool this_cpu_has_cap(unsigned int cap);
- 
- static inline bool cpu_have_feature(unsigned int num)
-diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
-index c947d22..a9b4677 100644
---- a/arch/arm64/kernel/alternative.c
-+++ b/arch/arm64/kernel/alternative.c
-@@ -155,7 +155,8 @@ static void clean_dcache_range_nopatch(u64 start, u64 end)
- 	} while (cur += d_size, cur < end);
+ struct redist_region {
+ 	void __iomem		*redist_base;
+ 	phys_addr_t		phys_base;
+@@ -375,6 +377,16 @@ static u64 gic_mpidr_to_affinity(unsigned long mpidr)
+ 	return aff;
  }
  
--static void __apply_alternatives(void *alt_region, bool is_module)
-+static void __apply_alternatives(void *alt_region,  bool is_module,
-+				 unsigned long *feature_mask)
- {
- 	struct alt_instr *alt;
- 	struct alt_region *region = alt_region;
-@@ -165,6 +166,9 @@ static void __apply_alternatives(void *alt_region, bool is_module)
- 	for (alt = region->begin; alt < region->end; alt++) {
- 		int nr_inst;
- 
-+		if (!test_bit(alt->cpufeature, feature_mask))
-+			continue;
-+
- 		/* Use ARM64_CB_PATCH as an unconditional patch */
- 		if (alt->cpufeature < ARM64_CB_PATCH &&
- 		    !cpus_have_cap(alt->cpufeature))
-@@ -203,8 +207,11 @@ static void __apply_alternatives(void *alt_region, bool is_module)
- 		__flush_icache_all();
- 		isb();
- 
--		/* We applied all that was available */
--		bitmap_copy(applied_alternatives, cpu_hwcaps, ARM64_NCAPS);
-+		/* Ignore ARM64_CB bit from feature mask */
-+		bitmap_or(applied_alternatives, applied_alternatives,
-+			  feature_mask, ARM64_NCAPS);
-+		bitmap_and(applied_alternatives, applied_alternatives,
-+			   cpu_hwcaps, ARM64_NCAPS);
- 	}
- }
- 
-@@ -225,8 +232,13 @@ static int __apply_alternatives_multi_stop(void *unused)
- 			cpu_relax();
- 		isb();
- 	} else {
-+		DECLARE_BITMAP(remaining_capabilities, ARM64_NPATCHABLE);
-+
-+		bitmap_complement(remaining_capabilities, boot_capabilities,
-+				  ARM64_NPATCHABLE);
-+
- 		BUG_ON(all_alternatives_applied);
--		__apply_alternatives(&region, false);
-+		__apply_alternatives(&region, false, remaining_capabilities);
- 		/* Barriers provided by the cache flushing */
- 		WRITE_ONCE(all_alternatives_applied, 1);
- 	}
-@@ -240,6 +252,24 @@ void __init apply_alternatives_all(void)
- 	stop_machine(__apply_alternatives_multi_stop, NULL, cpu_online_mask);
- }
- 
-+/*
-+ * This is called very early in the boot process (directly after we run
-+ * a feature detect on the boot CPU). No need to worry about other CPUs
-+ * here.
-+ */
-+void __init apply_boot_alternatives(void)
++static inline void gic_deactivate_unexpected_irq(u32 irqnr)
 +{
-+	struct alt_region region = {
-+		.begin	= (struct alt_instr *)__alt_instructions,
-+		.end	= (struct alt_instr *)__alt_instructions_end,
-+	};
-+
-+	/* If called on non-boot cpu things could go wrong */
-+	WARN_ON(smp_processor_id() != 0);
-+
-+	__apply_alternatives(&region, false, &boot_capabilities[0]);
++	if (static_branch_likely(&supports_deactivate_key)) {
++		if (irqnr < 8192)
++			gic_write_dir(irqnr);
++	} else {
++		gic_write_eoir(irqnr);
++	}
 +}
 +
- #ifdef CONFIG_MODULES
- void apply_alternatives_module(void *start, size_t length)
+ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
  {
-@@ -247,7 +277,10 @@ void apply_alternatives_module(void *start, size_t length)
- 		.begin	= start,
- 		.end	= start + length,
- 	};
-+	DECLARE_BITMAP(all_capabilities, ARM64_NPATCHABLE);
-+
-+	bitmap_fill(all_capabilities, ARM64_NPATCHABLE);
+ 	u32 irqnr;
+@@ -384,6 +396,22 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+ 	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
+ 		int err;
  
--	__apply_alternatives(&region, true);
-+	__apply_alternatives(&region, true, &all_capabilities[0]);
- }
- #endif
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index dcf5d14..58a4978 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -53,6 +53,9 @@
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- EXPORT_SYMBOL(cpu_hwcaps);
- 
-+/* Need also bit for ARM64_CB_PATCH */
-+DECLARE_BITMAP(boot_capabilities, ARM64_NPATCHABLE);
++		if (gic_supports_nmi() &&
++		    unlikely(gic_read_rpr() == GICD_INT_NMI_PRI)) {
++			if (static_branch_likely(&supports_deactivate_key))
++				gic_write_eoir(irqnr);
++			/*
++			 * Leave the PSR.I bit set to prevent other NMIs to be
++			 * received while handling this one.
++			 * PSR.I will be restored when we ERET to the
++			 * interrupted context.
++			 */
++			err = handle_domain_nmi(gic_data.domain, irqnr, regs);
++			if (err)
++				gic_deactivate_unexpected_irq(irqnr);
++			return;
++		}
 +
- /*
-  * Flag to indicate if we have computed the system wide
-  * capabilities based on the boot time active CPUs. This
-@@ -1536,6 +1539,9 @@ static void __update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 		if (!cpus_have_cap(caps->capability) && caps->desc)
- 			pr_info("%s %s\n", info, caps->desc);
- 		cpus_set_cap(caps->capability);
-+
-+		if (caps->type & SCOPE_BOOT_CPU)
-+			set_bit(caps->capability, boot_capabilities);
+ 		if (gic_prio_masking_enabled()) {
+ 			gic_pmr_mask_irqs();
+ 			gic_arch_enable_irqs();
+@@ -397,12 +425,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
+ 		err = handle_domain_irq(gic_data.domain, irqnr, regs);
+ 		if (err) {
+ 			WARN_ONCE(true, "Unexpected interrupt received!\n");
+-			if (static_branch_likely(&supports_deactivate_key)) {
+-				if (irqnr < 8192)
+-					gic_write_dir(irqnr);
+-			} else {
+-				gic_write_eoir(irqnr);
+-			}
++			gic_deactivate_unexpected_irq(irqnr);
+ 		}
+ 		return;
  	}
- }
- 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 96b8f2f..8dc9dde 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -414,6 +414,13 @@ void __init smp_prepare_boot_cpu(void)
- 	 */
- 	jump_label_init();
- 	cpuinfo_store_boot_cpu();
-+
-+	/*
-+	 * We now know enough about the boot CPU to apply the
-+	 * alternatives that cannot wait until interrupt handling
-+	 * and/or scheduling is enabled.
-+	 */
-+	apply_boot_alternatives();
- }
- 
- static u64 __init of_get_cpu_mpidr(struct device_node *dn)
 -- 
 1.9.1
