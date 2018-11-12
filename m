@@ -1,164 +1,136 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 11:55:35 -0600
-Subject: [PATCH v5 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <1541457421-14820-3-git-send-email-wendy.liang@xilinx.com>
-References: <1541457421-14820-1-git-send-email-wendy.liang@xilinx.com>
- <1541457421-14820-3-git-send-email-wendy.liang@xilinx.com>
-Message-ID: <5bea0eb3.1c69fb81.20e73.a4f9@mx.google.com>
+Date: Mon, 12 Nov 2018 12:00:18 -0600
+Subject: [PATCH v3 06/13] dt-bindings: irqchip: Introduce TISCI Interrupt
+ router bindings
+In-Reply-To: <20181106084105.32483-7-lokeshvutla@ti.com>
+References: <20181106084105.32483-1-lokeshvutla@ti.com>
+ <20181106084105.32483-7-lokeshvutla@ti.com>
+Message-ID: <5bea0eb4.1c69fb81.843ed.0186@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 02:37:01PM -0800, Wendy Liang wrote:
-> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
-> in ZynqMP SoC used for the communication between various processor
-> systems.
+On Tue, Nov 06, 2018 at 02:10:58PM +0530, Lokesh Vutla wrote:
+> Add the DT binding documentation for Interrupt router driver.
 > 
-> Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 > ---
->  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 128 +++++++++++++++++++++
->  1 file changed, 128 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> Changes since v2:
+> - Dropped interrupt-parent from reqired properties description
+> - Updated the interrupt cells to 4.
 > 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+>  .../interrupt-controller/ti,sci-intr.txt      | 84 +++++++++++++++++++
+>  MAINTAINERS                                   |  1 +
+>  2 files changed, 85 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
 > new file mode 100644
-> index 0000000..18fd7b4
+> index 000000000000..06e69f8c812c
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> @@ -0,0 +1,128 @@
-> +Xilinx IPI Mailbox Controller
-> +========================================
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+> @@ -0,0 +1,84 @@
+> +Texas Instruments K3 Interrupt Router
+> +=====================================
 > +
-> +The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to manage
-> +messaging between two Xilinx Zynq UltraScale+ MPSoC IPI agents. Each IPI
-> +agent owns registers used for notification and buffers for message.
-> +
-> +               +-------------------------------------+
-> +               | Xilinx ZynqMP IPI Controller        |
-> +               +-------------------------------------+
-> +    +--------------------------------------------------+
-> +ATF                    |                     |
-> +                       |                     |
-> +                       |                     |
-> +    +--------------------------+             |
-> +                       |                     |
-> +                       |                     |
-> +    +--------------------------------------------------+
-> +            +------------------------------------------+
-> +            |  +----------------+   +----------------+ |
-> +Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
-> +            |  |  Registers     |   |                | |
-> +            |  |                |   |                | |
-> +            |  +----------------+   +----------------+ |
-> +            |                                          |
-> +            | Xilinx IPI Agent Block                   |
-> +            +------------------------------------------+
+> +The Interrupt Router (INTR) module provides a mechanism to mux M
+> +interrupt inputs to N interrupt outputs, where all M inputs are selectable
+> +to be driven per N output. There is one register per output (MUXCNTL_N) that
+> +controls the selection.
 > +
 > +
-> +Controller Device Node:
-> +===========================
-> +Required properties:
-> +--------------------
-> +IPI agent node:
-> +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
-> +- interrupt-parent:	Phandle for the interrupt controller
-> +- interrupts:		Interrupt information corresponding to the
-> +			interrupt-names property.
-> +- xlnx,ipi-id:		local Xilinx IPI agent ID
-> +- #address-cells:	number of address cells of internal IPI mailbox nodes
-> +- #size-cells:		number of size cells of internal IPI mailbox nodes
+> +                                 Interrupt Router
+> +                             +----------------------+
+> +                             |  Inputs     Outputs  |
+> +        +-------+            | +------+             |
+> +        | GPIO  |----------->| | irq0 |             |       Host IRQ
+> +        +-------+            | +------+             |      controller
+> +                             |    .        +-----+  |      +-------+
+> +        +-------+            |    .        |  0  |  |----->|  IRQ  |
+> +        | INTA  |----------->|    .        +-----+  |      +-------+
+> +        +-------+            |    .          .      |
+> +                             | +------+      .      |
+> +                             | | irqM |    +-----+  |
+> +                             | +------+    |  N  |  |
+> +                             |             +-----+  |
+> +                             +----------------------+
 > +
-> +Internal IPI mailbox node:
-> +- reg:			IPI buffers address ranges
-> +- reg-names:		Names of the reg resources. It should have:
-> +			* local_request_region
-> +			  - IPI request msg buffer written by local and read
-> +			    by remote
-> +			* local_response_region
-> +			  - IPI response msg buffer written by local and read
-> +			    by remote
-> +			* remote_request_region
-> +			  - IPI request msg buffer written by remote and read
-> +			    by local
-> +			* remote_response_region
-> +			  - IPI response msg buffer written by remote and read
-> +			    by local
-> +- #mbox-cells:		Shall be 1. It contains:
-> +			* tx(0) or rx(1) channel
-> +- xlnx,ipi-id:		remote Xilinx IPI agent ID of which the mailbox is
-> +			connected to.
+> +Configuration of these MUXCNTL_N registers is done by a system controller
+> +(like the Device Memory and Security Controller on K3 AM654 SoC). System
+> +controller will keep track of the used and unused registers within the Router.
+> +Driver should request the system controller to get the range of GIC IRQs
+> +assigned to the requesting hosts. It is the drivers responsibility to keep
+> +track of Host IRQs.
 > +
-> +Optional properties:
-> +--------------------
-> +- method:              The method of accessing the IPI agent registers.
-> +                       Permitted values are: "smc" and "hvc". Default is
-> +                       "smc".
+> +Communication between the host processor running an OS and the system
+> +controller happens through a protocol called TI System Control Interface
+> +(TISCI protocol). For more details refer:
+> +Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
 > +
-> +Client Device Node:
-> +===========================
-> +Required properties:
-> +--------------------
-> +- mboxes:		Standard property to specify a mailbox
-> +			(See ./mailbox.txt)
-> +- mbox-names:		List of identifier  strings for each mailbox
-> +			channel.
+> +TISCI Interrupt Router Node:
+> +----------------------------
+> +- compatible:		Must be "ti,sci-intr".
+> +- interrupt-controller:	Identifies the node as an interrupt controller
+> +- #interrupt-cells:	Specifies the number of cells needed to encode an
+> +			interrupt source. The value should be 4.
+> +			First cell should contain the TISCI device ID of source
+> +			Second cell should contain the interrupt source offset
+> +			within the device
+> +			Third cell specifies the trigger type as defined
+> +			in interrupts.txt in this directory.
+> +			Fourth cell should be 1 if the irq is coming from
+> +			interrupt aggregator else 0.
+> +- ti,sci:		Phandle to TI-SCI compatible System controller node.
+> +- ti,sci-dst-id:	TISCI device ID of the destination IRQ controller.
+> +- ti,sci-rm-range-girq:	TISCI subtype id representing the host irqs assigned
+> +			to this interrupt router.
+
+u32 or array?
+
+> +
+> +For more details on TISCI IRQ resource management refer:
+> +http://downloads.ti.com/tisci/esd/latest/2_tisci_msgs/rm/rm_irq.html
 > +
 > +Example:
-> +===========================
-> +	zynqmp_ipi {
-> +		compatible = "xlnx,zynqmp-ipi-mailbox";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <0 29 4>;
-> +		xlnx,ipi-id = <0>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-
-Both the parent and children are mailbox providers?
-
+> +--------
+> +The following example demonstrates both interrupt router node and the consumer
+> +node(main gpio) on the AM654 SoC:
 > +
-> +		/* APU<->RPU0 IPI mailbox controller */
-> +		ipi_mailbox_rpu0: mailbox at ff90400 {
-> +			compatible = "xlnx,zynqmp-ipi-mailbox";
+> +main_intr: interrupt-controller at 1 {
 
-You can't have the same compatible in the parent and here.
+Unit-address is not valid here without a reg property.
 
-> +			reg = <0xff990400 0x20>,
-> +			      <0xff990420 0x20>,
-> +			      <0xff990080 0x20>,
-> +			      <0xff9900a0 0x20>;
-> +			reg-names = "local_request_region",
-> +				    "local_response_region",
-> +				    "remote_request_region",
-> +				    "remote_response_region";
-> +			#mbox-cells = <1>;
-> +			xlnx,ipi-id = <1>;
-> +		};
-> +		/* APU<->RPU1 IPI mailbox controller */
-> +		ipi_mailbox_rpu1: mailbox at ff990440 {
-> +			compatible = "xlnx,zynqmp-ipi-mailbox";
-> +			reg = <0xff990440 0x20>,
-> +			      <0xff990460 0x20>,
-> +			      <0xff990280 0x20>,
-> +			      <0xff9902a0 0x20>;
-> +			reg-names = "local_request_region",
-> +				    "local_response_region",
-> +				    "remote_request_region",
-> +				    "remote_response_region";
-> +			#mbox-cells = <1>;
-> +			xlnx,ipi-id = <2>;
-> +		};
-> +	};
-> +	rpu0 {
-> +		...
-> +		mboxes = <&ipi_mailbox_rpu0 0>,
-> +			 <&ipi_mailbox_rpu0 1>;
-> +		mbox-names = "tx", "rx";
-> +	};
-> +	rpu1 {
-> +		...
-> +		mboxes = <&ipi_mailbox_rpu1 0>,
-> +			 <&ipi_mailbox_rpu1 1>;
-> +		mbox-names = "tx", "rx";
-> +	};
+> +	compatible = "ti,sci-intr";
+> +	interrupt-controller;
+> +	interrupt-parent = <&gic>;
+> +	#interrupt-cells = <4>;
+> +	ti,sci = <&dmsc>;
+> +	ti,sci-dst-id = <56>;
+> +	ti,sci-rm-range-girq = <0x1>;
+> +};
+> +
+> +main_gpio0: gpio at 600000 {
+> +	...
+> +	interrupt-parent = <&main_intr>;
+> +	interrupts = <57 256 IRQ_TYPE_EDGE_RISING 0>,
+> +			<57 257 IRQ_TYPE_EDGE_RISING 0>,
+> +			<57 258 IRQ_TYPE_EDGE_RISING 0>,
+> +			<57 259 IRQ_TYPE_EDGE_RISING 0>,
+> +			<57 260 IRQ_TYPE_EDGE_RISING 0>,
+> +			<57 261 IRQ_TYPE_EDGE_RISING 0>;
+> +	...
+> +};
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 88b28f6dec45..0e3aa3386287 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -14739,6 +14739,7 @@ F:	Documentation/devicetree/bindings/reset/ti,sci-reset.txt
+>  F:	Documentation/devicetree/bindings/clock/ti,sci-clk.txt
+>  F:	drivers/clk/keystone/sci-clk.c
+>  F:	drivers/reset/reset-ti-sci.c
+> +F:	Documentation/devicetree/bindings/interrupt-controller/ti,sci-intr.txt
+>  
+>  THANKO'S RAREMONO AM/FM/SW RADIO RECEIVER USB DRIVER
+>  M:	Hans Verkuil <hverkuil@xs4all.nl>
 > -- 
-> 2.7.4
+> 2.19.1
 > 
