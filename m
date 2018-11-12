@@ -1,97 +1,457 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 12 Nov 2018 13:16:50 +0000
-Subject: [RFC] arm64: Kconfig: Choose ARM64_64K_PAGES as default
-In-Reply-To: <B7BFB069F158834E98A0C5702FB1F2460391A5C9@dggemm511-mbx.china.huawei.com>
-References: <B7BFB069F158834E98A0C5702FB1F2460391A5C9@dggemm511-mbx.china.huawei.com>
-Message-ID: <60e93387-ecfe-f3c5-5e2a-6fde45d49c06@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Mon, 12 Nov 2018 14:31:05 +0100
+Subject: [PATCH v3 4/7] ARM: dts: at91: at91sam9261: switch to new clock
+ bindings
+In-Reply-To: <20181112133108.31021-1-alexandre.belloni@bootlin.com>
+References: <20181112133108.31021-1-alexandre.belloni@bootlin.com>
+Message-ID: <20181112133108.31021-5-alexandre.belloni@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+Switch at91sam9261 boards to the new PMC clock bindings.
 
-On 12/11/2018 11:24, Zhangkehong wrote:
-> Hi
->> On 05/11/18 12:33, Kehong Zhang wrote:
->>> For arm64 performance considerations, change default page size to 64K.
->>
->> defconfig never stands for performance. If that was the case, we must remove other options that could potentially slow down the performance.
->>
->> defconfig could be interpreted as more of a "standard" config which gives the best effort to make sure you get a usable system overall.
-> 
-> Ok, I got it.
-> 
->> With this change, a rootfs with AArch32 applications without 64K aligned segments would fail, and that breaks the assumption about defconfig.
->>
->> So, NAK from my side.
-> 
-> I understand the mismatch AArch32 applications with AArch64 systems, but if AArch32 applications can run on AArch64 systems, how can 64K
-> page affect it? Can you give me some examples?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
+---
+ arch/arm/boot/dts/at91sam9261.dtsi | 287 +++--------------------------
+ 1 file changed, 23 insertions(+), 264 deletions(-)
 
-The AArch32 applications must have 64K aligned sections in their
-binaries, which was not the case by default ( I guess it was 16K or
-32K). So, with that, we cannot reliably map different sections with
-appropriate permissions as we will be mapping something that is not
-within the "valid" sections (due to the alignment mismatch).
-
-So if you have a toolchain which aligns the AArch32 binaries to 64K
-sections, then you can definitely run those applications on a 64K
-page sized kernel. This is why the 32bit EL0 support is an "EXPERT"
-option unless you are using 4K page size (which works everywhere).
-See arch/arm64/Kconfig : config COMPAT help section.
-
-> 
->>
->> Btw, please could you share any performance numbers from the comparison with 4K kernel ?
->>
-> Most of the examples are high TLB miss rate scenarios. And you may need to change this config in some MySQL scenarios.
-
-Ok. But that doesn't justify breaking some of the existing users
-with changes to the defconfig.
-
-Cheers
-Suzuki
-
-
-> 
-> Thanks
-> Kehong Zhang
->> Suzuki
->>
-> 
->>>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>;
->>> Cc: Will Deacon <will.deacon@arm.com>;
->>> Signed-off-by: Kehong Zhang <zhangkehong@hisilicon.com>
->>> ---
->>>    arch/arm64/Kconfig | 10 +++++-----
->>>    1 file changed, 5 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig index
->>> 787d785..56f651f 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -620,7 +620,7 @@ endmenu
->>>    
->>>    choice
->>>    	prompt "Page size"
->>> -	default ARM64_4K_PAGES
->>> +	default ARM64_64K_PAGES
->>>    	help
->>>    	  Page size (translation granule) configuration.
->>>    
->>> @@ -639,10 +639,10 @@ config ARM64_16K_PAGES
->>>    config ARM64_64K_PAGES
->>>    	bool "64KB"
->>>    	help
->>> -	  This feature enables 64KB pages support (4KB by default)
->>> -	  allowing only two levels of page tables and faster TLB
->>> -	  look-up. AArch32 emulation requires applications compiled
->>> -	  with 64K aligned segments.
->>> +	  This feature enables 64KB pages support allowing only two
->>> +	  levels of page tables and faster TLB look-up. AArch32
->>> +	  emulation requires applications compiled with 64K aligned
->>> +	  segments.
->>>    
->>>    endchoice
->>>    
->>>
+diff --git a/arch/arm/boot/dts/at91sam9261.dtsi b/arch/arm/boot/dts/at91sam9261.dtsi
+index 33f09d5ea020..01d700b63b45 100644
+--- a/arch/arm/boot/dts/at91sam9261.dtsi
++++ b/arch/arm/boot/dts/at91sam9261.dtsi
+@@ -75,7 +75,7 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+-			clocks = <&ohci_clk>, <&hclk0>, <&uhpck>;
++			clocks = <&pmc PMC_TYPE_PERIPHERAL 20>, <&pmc PMC_TYPE_SYSTEM 16>, <&pmc PMC_TYPE_SYSTEM 6>;
+ 			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+@@ -86,7 +86,7 @@
+ 			interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&pinctrl_fb>;
+-			clocks = <&lcd_clk>, <&hclk1>;
++			clocks = <&pmc PMC_TYPE_PERIPHERAL 21>, <&pmc PMC_TYPE_SYSTEM 17>;
+ 			clock-names = "lcdc_clk", "hclk";
+ 			status = "disabled";
+ 		};
+@@ -106,7 +106,7 @@
+ 				  0x5 0x0 0x60000000 0x10000000
+ 				  0x6 0x0 0x70000000 0x10000000
+ 				  0x7 0x0 0x80000000 0x10000000>;
+-			clocks = <&mck>;
++			clocks = <&pmc PMC_TYPE_CORE PMC_MCK>;
+ 			status = "disabled";
+ 
+ 			nand_controller: nand-controller {
+@@ -132,7 +132,7 @@
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <18 IRQ_TYPE_LEVEL_HIGH 0>,
+ 					     <19 IRQ_TYPE_LEVEL_HIGH 0>;
+-				clocks = <&tc0_clk>, <&tc1_clk>, <&tc2_clk>, <&slow_xtal>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 17>, <&pmc PMC_TYPE_PERIPHERAL 18>, <&pmc PMC_TYPE_PERIPHERAL 19>, <&slow_xtal>;
+ 				clock-names = "t0_clk", "t1_clk", "t2_clk", "slow_clk";
+ 			};
+ 
+@@ -140,7 +140,7 @@
+ 				compatible = "atmel,at91sam9261-udc";
+ 				reg = <0xfffa4000 0x4000>;
+ 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
+-				clocks = <&udc_clk>, <&udpck>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 10>, <&pmc PMC_TYPE_SYSTEM 7>;
+ 				clock-names = "pclk", "hclk";
+ 				atmel,matrix = <&matrix>;
+ 				status = "disabled";
+@@ -154,7 +154,7 @@
+ 				pinctrl-0 = <&pinctrl_mmc0_clk>, <&pinctrl_mmc0_slot0_cmd_dat0>, <&pinctrl_mmc0_slot0_dat1_3>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				clocks = <&mci0_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 9>;
+ 				clock-names = "mci_clk";
+ 				status = "disabled";
+ 			};
+@@ -167,7 +167,7 @@
+ 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+-				clocks = <&twi0_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 11>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -179,7 +179,7 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
+-				clocks = <&usart0_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 6>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+@@ -192,7 +192,7 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
+-				clocks = <&usart1_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 7>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+@@ -205,7 +205,7 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
+-				clocks = <&usart2_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 8>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+@@ -216,7 +216,7 @@
+ 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
+-				clocks = <&ssc0_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 14>;
+ 				clock-names = "pclk";
+ 				status = "disabled";
+ 			};
+@@ -227,7 +227,7 @@
+ 				interrupts = <15 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc1_tx &pinctrl_ssc1_rx>;
+-				clocks = <&ssc1_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 15>;
+ 				clock-names = "pclk";
+ 				status = "disabled";
+ 			};
+@@ -238,7 +238,7 @@
+ 				interrupts = <16 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc2_tx &pinctrl_ssc2_rx>;
+-				clocks = <&ssc2_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 16>;
+ 				clock-names = "pclk";
+ 				status = "disabled";
+ 			};
+@@ -252,7 +252,7 @@
+ 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
+-				clocks = <&spi0_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 12>;
+ 				clock-names = "spi_clk";
+ 				status = "disabled";
+ 			};
+@@ -265,7 +265,7 @@
+ 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
+-				clocks = <&spi1_clk>;
++				clocks = <&pmc PMC_TYPE_PERIPHERAL 13>;
+ 				clock-names = "spi_clk";
+ 				status = "disabled";
+ 			};
+@@ -299,7 +299,7 @@
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
+-				clocks = <&mck>;
++				clocks = <&pmc PMC_TYPE_CORE PMC_MCK>;
+ 				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+@@ -563,7 +563,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
+-					clocks = <&pioA_clk>;
++					clocks = <&pmc PMC_TYPE_PERIPHERAL 2>;
+ 				};
+ 
+ 				pioB: gpio at fffff600 {
+@@ -574,7 +574,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
+-					clocks = <&pioB_clk>;
++					clocks = <&pmc PMC_TYPE_PERIPHERAL 3>;
+ 				};
+ 
+ 				pioC: gpio at fffff800 {
+@@ -585,7 +585,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
+-					clocks = <&pioC_clk>;
++					clocks = <&pmc PMC_TYPE_PERIPHERAL 4>;
+ 				};
+ 			};
+ 
+@@ -593,250 +593,9 @@
+ 				compatible = "atmel,at91sam9261-pmc", "syscon";
+ 				reg = <0xfffffc00 0x100>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+-				interrupt-controller;
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				#interrupt-cells = <1>;
+-
+-				main_osc: main_osc {
+-					compatible = "atmel,at91rm9200-clk-main-osc";
+-					#clock-cells = <0>;
+-					interrupts-extended = <&pmc AT91_PMC_MOSCS>;
+-					clocks = <&main_xtal>;
+-				};
+-
+-				main: mainck {
+-					compatible = "atmel,at91rm9200-clk-main";
+-					#clock-cells = <0>;
+-					clocks = <&main_osc>;
+-				};
+-
+-				plla: pllack {
+-					compatible = "atmel,at91rm9200-clk-pll";
+-					#clock-cells = <0>;
+-					interrupts-extended = <&pmc AT91_PMC_LOCKA>;
+-					clocks = <&main>;
+-					reg = <0>;
+-					atmel,clk-input-range = <1000000 32000000>;
+-					#atmel,pll-clk-output-range-cells = <4>;
+-					atmel,pll-clk-output-ranges = <80000000 200000000 0 1>,
+-								<190000000 240000000 2 1>;
+-				};
+-
+-				pllb: pllbck {
+-					compatible = "atmel,at91rm9200-clk-pll";
+-					#clock-cells = <0>;
+-					interrupts-extended = <&pmc AT91_PMC_LOCKB>;
+-					clocks = <&main>;
+-					reg = <1>;
+-					atmel,clk-input-range = <1000000 5000000>;
+-					#atmel,pll-clk-output-range-cells = <4>;
+-					atmel,pll-clk-output-ranges = <70000000 130000000 1 1>;
+-				};
+-
+-				mck: masterck {
+-					compatible = "atmel,at91rm9200-clk-master";
+-					#clock-cells = <0>;
+-					interrupts-extended = <&pmc AT91_PMC_MCKRDY>;
+-					clocks = <&slow_xtal>, <&main>, <&plla>, <&pllb>;
+-					atmel,clk-output-range = <0 94000000>;
+-					atmel,clk-divisors = <1 2 4 0>;
+-				};
+-
+-				usb: usbck {
+-					compatible = "atmel,at91rm9200-clk-usb";
+-					#clock-cells = <0>;
+-					atmel,clk-divisors = <1 2 4 0>;
+-					clocks = <&pllb>;
+-				};
+-
+-				prog: progck {
+-					compatible = "atmel,at91rm9200-clk-programmable";
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					interrupt-parent = <&pmc>;
+-					clocks = <&slow_xtal>, <&main>, <&plla>, <&pllb>;
+-
+-					prog0: prog0 {
+-						#clock-cells = <0>;
+-						reg = <0>;
+-						interrupts = <AT91_PMC_PCKRDY(0)>;
+-					};
+-
+-					prog1: prog1 {
+-						#clock-cells = <0>;
+-						reg = <1>;
+-						interrupts = <AT91_PMC_PCKRDY(1)>;
+-					};
+-
+-					prog2: prog2 {
+-						#clock-cells = <0>;
+-						reg = <2>;
+-						interrupts = <AT91_PMC_PCKRDY(2)>;
+-					};
+-
+-					prog3: prog3 {
+-						#clock-cells = <0>;
+-						reg = <3>;
+-						interrupts = <AT91_PMC_PCKRDY(3)>;
+-					};
+-				};
+-
+-				systemck {
+-					compatible = "atmel,at91rm9200-clk-system";
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-
+-					uhpck: uhpck {
+-						#clock-cells = <0>;
+-						reg = <6>;
+-						clocks = <&usb>;
+-					};
+-
+-					udpck: udpck {
+-						#clock-cells = <0>;
+-						reg = <7>;
+-						clocks = <&usb>;
+-					};
+-
+-					pck0: pck0 {
+-						#clock-cells = <0>;
+-						reg = <8>;
+-						clocks = <&prog0>;
+-					};
+-
+-					pck1: pck1 {
+-						#clock-cells = <0>;
+-						reg = <9>;
+-						clocks = <&prog1>;
+-					};
+-
+-					pck2: pck2 {
+-						#clock-cells = <0>;
+-						reg = <10>;
+-						clocks = <&prog2>;
+-					};
+-
+-					pck3: pck3 {
+-						#clock-cells = <0>;
+-						reg = <11>;
+-						clocks = <&prog3>;
+-					};
+-
+-					hclk0: hclk0 {
+-						#clock-cells = <0>;
+-						reg = <16>;
+-						clocks = <&mck>;
+-					};
+-
+-					hclk1: hclk1 {
+-						#clock-cells = <0>;
+-						reg = <17>;
+-						clocks = <&mck>;
+-					};
+-				};
+-
+-				periphck {
+-					compatible = "atmel,at91rm9200-clk-peripheral";
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					clocks = <&mck>;
+-
+-					pioA_clk: pioA_clk {
+-						#clock-cells = <0>;
+-						reg = <2>;
+-					};
+-
+-					pioB_clk: pioB_clk {
+-						#clock-cells = <0>;
+-						reg = <3>;
+-					};
+-
+-					pioC_clk: pioC_clk {
+-						#clock-cells = <0>;
+-						reg = <4>;
+-					};
+-
+-					usart0_clk: usart0_clk {
+-						#clock-cells = <0>;
+-						reg = <6>;
+-					};
+-
+-					usart1_clk: usart1_clk {
+-						#clock-cells = <0>;
+-						reg = <7>;
+-					};
+-
+-					usart2_clk: usart2_clk {
+-						#clock-cells = <0>;
+-						reg = <8>;
+-					};
+-
+-					mci0_clk: mci0_clk {
+-						#clock-cells = <0>;
+-						reg = <9>;
+-					};
+-
+-					udc_clk: udc_clk {
+-						#clock-cells = <0>;
+-						reg = <10>;
+-					};
+-
+-					twi0_clk: twi0_clk {
+-						reg = <11>;
+-						#clock-cells = <0>;
+-					};
+-
+-					spi0_clk: spi0_clk {
+-						#clock-cells = <0>;
+-						reg = <12>;
+-					};
+-
+-					spi1_clk: spi1_clk {
+-						#clock-cells = <0>;
+-						reg = <13>;
+-					};
+-
+-					ssc0_clk: ssc0_clk {
+-						#clock-cells = <0>;
+-						reg = <14>;
+-					};
+-
+-					ssc1_clk: ssc1_clk {
+-						#clock-cells = <0>;
+-						reg = <15>;
+-					};
+-
+-					ssc2_clk: ssc2_clk {
+-						#clock-cells = <0>;
+-						reg = <16>;
+-					};
+-
+-					tc0_clk: tc0_clk {
+-						#clock-cells = <0>;
+-						reg = <17>;
+-					};
+-
+-					tc1_clk: tc1_clk {
+-						#clock-cells = <0>;
+-						reg = <18>;
+-					};
+-
+-					tc2_clk: tc2_clk {
+-						#clock-cells = <0>;
+-						reg = <19>;
+-					};
+-
+-					ohci_clk: ohci_clk {
+-						#clock-cells = <0>;
+-						reg = <20>;
+-					};
+-
+-					lcd_clk: lcd_clk {
+-						#clock-cells = <0>;
+-						reg = <21>;
+-					};
+-				};
++				#clock-cells = <2>;
++				clocks = <&slow_xtal>, <&main_xtal>;
++				clock-names = "slow_xtal", "main_xtal";
+ 			};
+ 
+ 			rstc at fffffd00 {
+@@ -855,7 +614,7 @@
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+-				clocks = <&mck>;
++				clocks = <&pmc PMC_TYPE_CORE PMC_MCK>;
+ 			};
+ 
+ 			rtc at fffffd20 {
+-- 
+2.19.1
