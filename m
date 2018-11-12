@@ -1,24 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 17:37:05 -0600
-Subject: [PATCH 08/10] dt-bindings: panel: Add Feiyang FY07024DI26A30-D
- MIPI-DSI LCD panel
-In-Reply-To: <20181103100900.30313-9-jagan@amarulasolutions.com>
-References: <20181103100900.30313-1-jagan@amarulasolutions.com>
- <20181103100900.30313-9-jagan@amarulasolutions.com>
-Message-ID: <5bea0ea3.1c69fb81.3a69c.0f74@mx.google.com>
+Date: Mon, 12 Nov 2018 17:37:13 -0600
+Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
+In-Reply-To: <20181105135802.30486-1-peron.clem@gmail.com>
+References: <20181105135802.30486-1-peron.clem@gmail.com>
+Message-ID: <5bea0eab.1c69fb81.c3d9.982d@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat,  3 Nov 2018 15:38:58 +0530, Jagan Teki wrote:
-> Feiyang FY07024DI26A30-D is 1024x600, 4-lane MIPI-DSI LCD panel.
+On Mon,  5 Nov 2018 14:58:02 +0100, =?UTF-8?q?Cl=C3=A9ment=20P=C3=A9ron?= wrote:
+> From: Colin Didier <colin.didier@devialet.com>
 > 
-> Add dt-bingings for it.
+> The MX6 Audmux differs from MX51.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> This patch adds the audmux for i.MX6 family.
+> 
+> Signed-off-by: Colin Didier <colin.didier@devialet.com>
+> Signed-off-by: Cl??ment P??ron <peron.clem@gmail.com>
 > ---
->  .../display/panel/feiyang,fy07024di26a30d.txt | 20 +++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
+>  include/dt-bindings/sound/fsl-imx-audmux.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
