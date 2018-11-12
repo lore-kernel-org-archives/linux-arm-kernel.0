@@ -1,103 +1,123 @@
-From: frieder.schrempf@kontron.De (Schrempf Frieder)
-Date: Mon, 12 Nov 2018 11:24:22 +0000
-Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
- under the SPI framework
-In-Reply-To: <20181112115628.68a84b92@bbrezillon>
-References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
- <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
- <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
- <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
- <20181108093451.08dfe63e@bbrezillon>
- <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
- <20181112115628.68a84b92@bbrezillon>
-Message-ID: <7c379ee9-a9e7-e0a5-14a5-9074d6a964e7@kontron.de>
+From: duwe@lst.de (Torsten Duwe)
+Date: Mon, 12 Nov 2018 12:51:13 +0100
+Subject: [PATCH v4 1/3] arm64: implement ftrace with regs
+In-Reply-To: <CAKv+Gu-rNeCj5jySq4H5mRONtWfoLy7ADsowWNW+LUBLMWnV+A@mail.gmail.com>
+References: <20181026142008.D922868C94@newverein.lst.de>
+ <20181026142148.6353A68C94@newverein.lst.de>
+ <CAKv+Gu-rNeCj5jySq4H5mRONtWfoLy7ADsowWNW+LUBLMWnV+A@mail.gmail.com>
+Message-ID: <20181112115112.GB30967@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.11.18 11:56, Boris Brezillon wrote:
-> On Mon, 12 Nov 2018 10:46:45 +0000
-> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
+On Thu, Nov 08, 2018 at 01:12:42PM +0100, Ard Biesheuvel wrote:
 > 
->> On 08.11.18 09:34, Boris Brezillon wrote:
->>> On Wed, 7 Nov 2018 16:36:13 +0000
->>> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
->>>    
->>>> Hi Olof,
->>>>
->>>> On 07.11.18 17:20, Olof Johansson wrote:
->>>>> On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
->>>>> <frieder.schrempf@kontron.de> wrote:
->>>>>>
->>>>>> From: Frieder Schrempf <frieder.schrempf@exceet.de>
->>>>>>
->>>>>> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
->>>>>> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
->>>>>>
->>>>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
->>>>>
->>>>> Hi Frieder,
->>>>>
->>>>> This patch is part of a series that I didn't see the rest of, but in
->>>>> general we prefer to merge these through arm-soc even if the driver
->>>>> goes in through another tree. The way we'd prefer to handle it is that
->>>>> once the driver lands, we'll take the config option change to turn it
->>>>> on. To avoid our branches to break until both sides have landed, it
->>>>> might be a good idea to keep both drivers on for a short while (one
->>>>> release).
->>>>>
->>>>> So, I'm not going to ack this since we avoid taking defconfig changes
->>>>> through driver trees (these two defconfigs tend to churn a lot and we
->>>>> don't want to create merge conflicts where we don't have to), but
->>>>> we'll be happy to pick it up when the time comes.
->>>>
->>>> Ok, thank you for explaining the common practice. I will drop the config
->>>> changes for the next version and send it separately when the time is ready.
->>>>
->>>> Both the old driver and the new one use the same compatible strings for
->>>> probing. Wouldn't that cause problems if both drivers are enabled for a
->>>> while, or am I missing something?
->>>
->>> Or maybe we should not introduce a new Kconfig option and just reuse
->>> the old one. It probably requires re-ordering patches a bit (patch 1
->>> should be moved after patch 5). Then you have 2 choices:
->>>
->>> 1/ merge patch 1 and 6 so that the new driver effectively replaces the
->>>      old one but uses the same Kconfig option
->>> 2/ remove the ability to compile the old driver when the new one is
->>>      introduced: remove the line from drivers/mtd/spi-nor Makefile and
->>>      move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
->>>      drivers/spi/Kconfig. And remove the old code in a separate patch
->>>
->>> I'm fine either way, but option #2 will probably make the patch
->>> introducing the new driver bigger and hurt readability.
->>
->> I think having both drivers in the tree for a while wouldn't be so bad.
->> So if any compatibility issues come up with the new driver, people can
->> still use the old one.
+> On 26 October 2018 at 16:21, Torsten Duwe <duwe@lst.de> wrote:
+> > @@ -162,6 +165,114 @@ ftrace_graph_call:                        // ftrace_graph_cal
+> >
+> >         mcount_exit
+> >  ENDPROC(ftrace_caller)
+> > +#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
+> > +
+> > +/*
+> > + * Since no -pg or similar compiler flag is used, there should really be
+> > + * no reference to _mcount; so do not define one. Only some value for
+> > + * MCOUNT_ADDR is needed for comparison. Let it point here to have some
+> > + * sort of magic value that can be recognised when debugging.
+> > + */
+> > +       .global _mcount
+> > +_mcount:
+> > +       ret     /* make it differ from regs caller */
+> > +
+> > +ENTRY(ftrace_regs_caller)
+> > +       /* callee's preliminary stack frame: */
+> > +       stp     fp, x9, [sp, #-16]!
 > 
-> Except that's not what happens in practice. Believe me, I tried this
-> approach several times, and people keep using the old driver until
-> they're forced to switch to the new one. So you actually don't address
-> the problem, you just delay it a bit, and you'll have to fix
-> regressions anyway.
+> Does the 'fp' alias for x29 work with older assemblers? I guess it
+> does not matter gor GCC 8+ code, but be careful when you rewrite
+> existing stuff.
 
-Ok, I see.
+I had gotten the impression the fp alias was there ever since, so I used
+it for readability. Thanks for the notification, I'll double check.
 
->> Therefore I think I will drop the patches that change the defconfig and
->> remove the old driver code and keep the different Kconfig options. And
->> maybe add an exclusive dependency in Kconfig, so both drivers can not be
->> enabled at the same time.
->>
->> Does this make sense?
+> > +       mov     fp, sp
+> > +
+> > +       /* our stack frame: */
+> > +       stp     fp, lr, [sp, #-S_FRAME_SIZE]!
 > 
-> I'd really prefer to have the removal of the old driver in the same
-> release the new driver is introduced but if that's not possible, let's
-> have a clear plan, like "introduce new driver in release X, remove the
-> old one in release X+1".
+> If sizeof(struct pt_regs) == S_FRAME_SIZE), you should subtract 16
+> additional bytes here
 
-We can do it as you suggested. I will think about whether to use option 
-#1 or #2.
-With #1 we will have the removal of the old driver and adding the new 
-driver in one single patch.
-With #2 we will have the disabling of the old driver via Makefile in the 
-same patch thats adding the new driver.
+This is intentional :-]
+
+At the end of pt_regs there's a "stackframe", which now aligns with the
+"preliminary" frame I create for the callee. Please tell me what the struct
+member is good for if not for an actual callee stack frame...
+I thought it was a neat idea.
+
+> > +
+> > +ftrace_common:
+> > +       /*
+> > +        * At this point we have 2 new stack frames, and x9 pointing
+> > +        * at a pt_regs which we can populate as needed.
+> > +        */
+> > +
+> > +       /* save function arguments */
+> > +       stp     x0, x1, [x9]
+> > +       stp     x2, x3, [x9, #S_X2]
+> > +       stp     x4, x5, [x9, #S_X4]
+> > +       stp     x6, x7, [x9, #S_X6]
+> > +       stp     x8, x9, [x9, #S_X8]
+> > +
+> 
+> x9 is not a function argument, and if it were, you'd have clobbered it
+> by now. Please use a single 'str' and store x8 only
+
+This way the x9 slot in pt_regs will be undefined. Is that ok with everybody?
+
+> > +ftrace_common_return:
+> > +       add     x9, sp, #16     /* advance to pt_regs for restore */
+> > +
+> > +       ldp     x0, x1, [x9]
+> > +       ldp     x2, x3, [x9, #S_X2]
+> > +       ldp     x4, x5, [x9, #S_X4]
+> > +       ldp     x6, x7, [x9, #S_X6]
+> > +       ldp     x8, x9, [x9, #S_X8]
+> > +
+> 
+> Same as above. It also deserves a mention that you are relying on the
+> absence of IPA-RA, and so x9..x18 are guaranteed to be dead at
+> function entry, and so they don't need to be restored here.
+
+Sure, I can quote some ABI spec here :-/
+I just wish all arm code was such well documented.
+
+> > --- a/arch/arm64/kernel/ftrace.c
+> > +++ b/arch/arm64/kernel/ftrace.c
+> > @@ -65,18 +65,61 @@ int ftrace_update_ftrace_func(ftrace_fun
+> >         return ftrace_modify_code(pc, 0, new, false);
+> >  }
+> >
+> > +#ifdef CONFIG_ARM64_MODULE_PLTS
+> > +static int install_ftrace_trampoline(struct module *mod, unsigned long *addr)
+> > +{
+> > +       struct plt_entry trampoline, *mod_trampoline;
+> > +       trampoline = get_plt_entry(*addr);
+> > +
+> > +       if (*addr == FTRACE_ADDR)
+> > +               mod_trampoline = mod->arch.ftrace_trampoline;
+> > +       else if (*addr == FTRACE_REGS_ADDR)
+> > +               mod_trampoline = mod->arch.ftrace_regs_trampoline;
+> 
+> Could we do something like
+> 
+> if (*addr == FTRACE_ADDR)
+>     mod_trampoline = &mod->arch.ftrace_trampoline[0];
+> else if (*addr == FTRACE_REGS_ADDR)
+>     mod_trampoline = &mod->arch.ftrace_trampoline[1];
+> 
+> and get rid of the additional struct field and pointer?
+
+"0" and "1" won't make it obvious which one has the regs tracing, but besides
+that, I like the idea of making this a small array. Other opinions?
+
+	Torsten
