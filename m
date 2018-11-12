@@ -1,37 +1,38 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Mon, 12 Nov 2018 16:23:38 +0100
-Subject: [PATCH v3 0/4] Add support of STM32 hwspinlock
-Message-ID: <20181112152342.6561-1-benjamin.gaignard@st.com>
+Date: Mon, 12 Nov 2018 16:23:41 +0100
+Subject: [PATCH v3 3/4] ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
+In-Reply-To: <20181112152342.6561-1-benjamin.gaignard@st.com>
+References: <20181112152342.6561-1-benjamin.gaignard@st.com>
+Message-ID: <20181112152342.6561-4-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds the support of the hardware semaphore block for stm32mp1 SoC.
+Declare hwspinlock device for stm32mp157 SoC
 
-version 3:
-- fix clock name in properties description.
-- use postcore_initcall() instead of module_platform_driver()
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-version 2:
-- fix comments done by Bjorn about clock naming, license terms in header,
-  alphabetic ordering in Makefile and Kconfig and remove function
-- Do not push test module in this version while waiting for feedbacks about it
-
-
-Benjamin Gaignard (4):
-  dt-bindings: hwlock: Document STM32 hwspinlock bindings
-  hwspinlock: add STM32 hwspinlock device
-  ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
-  ARM: dts: stm32: enable hwspinlock on stm32mp157c-ed1
-
- .../bindings/hwlock/st,stm32-hwspinlock.txt        |  23 +++
- arch/arm/boot/dts/stm32mp157c-ed1.dts              |   4 +
- arch/arm/boot/dts/stm32mp157c.dtsi                 |   9 ++
- drivers/hwspinlock/Kconfig                         |   9 ++
- drivers/hwspinlock/Makefile                        |   1 +
- drivers/hwspinlock/stm32_hwspinlock.c              | 156 +++++++++++++++++++++
- 6 files changed, 202 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
- create mode 100644 drivers/hwspinlock/stm32_hwspinlock.c
-
+diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
+index 185541a5b69f..98f824d8b0f0 100644
+--- a/arch/arm/boot/dts/stm32mp157c.dtsi
++++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+@@ -803,6 +803,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		hsem: hwspinlock at 4c000000 {
++			compatible = "st,stm32-hwspinlock";
++			#hwlock-cells = <1>;
++			reg = <0x4c000000 0x400>;
++			clocks = <&rcc HSEM>;
++			clock-names = "hwsem";
++			status = "disabled";
++		};
++
+ 		rcc: rcc at 50000000 {
+ 			compatible = "st,stm32mp1-rcc", "syscon";
+ 			reg = <0x50000000 0x1000>;
 -- 
 2.15.0
