@@ -1,64 +1,60 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Mon, 12 Nov 2018 15:25:48 +0000
-Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
-Message-ID: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 12 Nov 2018 16:30:14 +0100
+Subject: [PATCH 7/9] serial: Add Tegra Combined UART driver
+In-Reply-To: <20181109170526.GB14151@kroah.com>
+References: <20181026111638.10759-1-thierry.reding@gmail.com>
+ <20181026111638.10759-8-thierry.reding@gmail.com>
+ <20181109170526.GB14151@kroah.com>
+Message-ID: <20181112153014.GA29481@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
-NO_PAD_CTL pads map are not skipped anymore which results in
-a possible memory corruption. As we actually only need to create config
-maps for SCU pads and MMIO pads which are not using the default config
-(a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
-the config maps. And during MMIO pads parsing, we also need update the
-list_p point as SCU case to ensure the pin data next parsed is correct.
+On Fri, Nov 09, 2018 at 09:05:26AM -0800, Greg Kroah-Hartman wrote:
+> On Fri, Oct 26, 2018 at 01:16:36PM +0200, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
+> > multiplexing multiple "virtual UARTs" into a single hardware serial
+> > port. The TCU is the primary serial port on Tegra194 devices.
+> > 
+> > Add a TCU driver utilizing the mailbox framework, as the used mailboxes
+> > are part of Tegra HSP blocks that are already controlled by the Tegra
+> > HSP mailbox driver.
+> > 
+> > Based on work by  Mikko Perttunen <mperttunen@nvidia.com>.
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
-Reported-by: Martin Kaiser <martin@kaiser.cx>
-Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/pinctrl/freescale/pinctrl-imx.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+Thanks. I just sent out v2 addressing Pekka's comments on the series.
+But I'm slightly confused now. Are you expecting anyone else to pick
+this up? There are technically no build time dependencies between any
+of these patches, so it should be fine to pick them all into the
+corresponding subsystem trees.
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx.c b/drivers/pinctrl/freescale/pinctrl-imx.c
-index 78d33df..188001b 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -108,6 +108,15 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
- 	new_map++;
- 	for (i = j = 0; i < grp->num_pins; i++) {
- 		pin = &((struct imx_pin *)(grp->data))[i];
-+
-+		/*
-+		 * We only create config maps for SCU pads or MMIO pads that
-+		 * are not using the default config(a.k.a IMX_NO_PAD_CTL)
-+		 */
-+		if (!(info->flags & IMX_USE_SCU) &&
-+		    (pin->conf.mmio.config & IMX_NO_PAD_CTL))
-+			continue;
-+
- 		new_map[j].type = PIN_MAP_TYPE_CONFIGS_PIN;
- 		new_map[j].data.configs.group_or_pin =
- 					pin_get_name(pctldev, pin->pin);
-@@ -120,7 +129,7 @@ static int imx_dt_node_to_map(struct pinctrl_dev *pctldev,
- 			new_map[j].data.configs.configs =
- 					(unsigned long *)&pin->conf.scu;
- 			new_map[j].data.configs.num_configs = 2;
--		} else if (!(pin->conf.mmio.config & IMX_NO_PAD_CTL)) {
-+		} else {
- 			new_map[j].data.configs.configs =
- 					&pin->conf.mmio.config;
- 			new_map[j].data.configs.num_configs = 1;
-@@ -549,6 +558,8 @@ static void imx_pinctrl_parse_pin_mmio(struct imx_pinctrl *ipctl,
- 		pin_mmio->config = config & ~IMX_PAD_SION;
- 	}
- 
-+	*list_p = list;
-+
- 	dev_dbg(ipctl->dev, "%s: 0x%x 0x%08lx", info->pins[*pin_id].name,
- 			     pin_mmio->mux_mode, pin_mmio->config);
- }
--- 
-2.7.4
+Perhaps the only thing to note is that there is a runtime dependency
+from this patch on patches 1 and 2 in the series. Patch 1 is required to
+make blocking a mailbox possible in interrupt context, which we need in
+the TCU driver because the TTY and console paths do end up calling the
+mbox_send_message() from interrupt context. Patch 2 is only required at
+runtime if the two mailboxes are provided by different instances of the
+HSP block (which they are for TCU on Tegra194).
+
+Would you prefer for Jassi to pick up the TCU patch along with the
+mailbox core and driver changes so that we deal with the runtime
+dependencies that way?
+
+Alternatively, if Jassi is okay with the mailbox changes, I can pick up
+all of the v2 series of the patches into stable branches for v4.21, deal
+with the dependencies there and send out pull requests for everyone to
+merge into their subsystem trees.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181112/e932ef52/attachment.sig>
