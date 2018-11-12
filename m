@@ -1,24 +1,26 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 17:37:52 -0600
-Subject: [PATCH v3 4/8] dt-bindings: Add vendor prefix for LeMaker
-In-Reply-To: <20181107181843.27628-5-contact@paulk.fr>
-References: <20181107181843.27628-1-contact@paulk.fr>
- <20181107181843.27628-5-contact@paulk.fr>
-Message-ID: <5bea0ed2.1c69fb81.5be5.adb5@mx.google.com>
+Date: Mon, 12 Nov 2018 17:37:59 -0600
+Subject: [PATCH v2 1/4] dt-bindings: hwlock: Document STM32 hwspinlock
+ bindings
+In-Reply-To: <20181108090502.14543-2-benjamin.gaignard@st.com>
+References: <20181108090502.14543-1-benjamin.gaignard@st.com>
+ <20181108090502.14543-2-benjamin.gaignard@st.com>
+Message-ID: <5bea0ed9.1c69fb81.bd59a.4fdc@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Nov 2018 19:18:39 +0100, Paul Kocialkowski wrote:
-> This introduces a new device-tree binding vendor prefix for Shenzhen
-> LeMaker Technology Co., Ltd.
+On Thu,  8 Nov 2018 10:04:59 +0100, Benjamin Gaignard wrote:
+> Add bindings for STM32 hardware spinlock device
 > 
-> This vendor was already in use but it was not documented until now.
-> 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> Reviewed-by: Rob Hering <robh@kernel.org>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> version 2 :
+> - change clock name from hwspinlock to hsem to be align with hardware
+>   documentation
+> 
+>  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
