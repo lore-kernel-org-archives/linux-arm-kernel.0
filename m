@@ -1,126 +1,83 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 12 Nov 2018 15:21:46 +0100
-Subject: [PATCH 3/4] dt-bindings: reset: uniphier: Add AHCI core reset
- description
-In-Reply-To: <20181112210215.2DB6.4A936039@socionext.com>
-References: <1541775663.4112.48.camel@pengutronix.de>
- <CAK7LNAQGftPMLkQk-tU4R6Jtw9W6npka+Br+2wyyZicAgwDvRg@mail.gmail.com>
- <20181112210215.2DB6.4A936039@socionext.com>
-Message-ID: <1542032506.3440.5.camel@pengutronix.de>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 12 Nov 2018 14:27:03 +0000
+Subject: arm64 + ARM64_64K_PAGES=y
+In-Reply-To: <274c9742-0aa9-b4a5-11cb-b506aeef7761@ti.com>
+References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
+ <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
+ <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
+ <274c9742-0aa9-b4a5-11cb-b506aeef7761@ti.com>
+Message-ID: <20181112142703.0d6ceb57@donnerap.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 9 Nov 2018 13:15:47 -0600
+Grygorii Strashko <grygorii.strashko@ti.com> wrote:
+
 Hi,
 
-On Mon, 2018-11-12 at 21:02 +0900, Kunihiko Hayashi wrote:
-> Hi,
-> 
-> Thank you for some comments and pointing out.
-> 
-> On Sat, 10 Nov 2018 01:14:06 +0900 <yamada.masahiro@socionext.com> wrote:
-> 
-> > On Sat, Nov 10, 2018 at 12:02 AM Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> > > 
-> > > Hi Kunihiko,
-> > > 
-> > > On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
-> > > > Add compatible strings for reset control of AHCI core implemented in
-> > > > UniPhier SoCs. The reset control belongs to AHCI glue layer.
-> > > > 
-> > > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/reset/uniphier-reset.txt | 3 +++
-> > > >  1 file changed, 3 insertions(+)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > > index f63c511..ea00517 100644
-> > > > --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > > +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > > @@ -133,6 +133,9 @@ Required properties:
-> > > >      "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
-> > > >      "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
-> > > >      "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
-> > > > +    "socionext,uniphier-pro4-ahci-reset" - for Pro4 SoC AHCI
-> > > > +    "socionext,uniphier-pxs2-ahci-reset" - for PXs2 SoC AHCI
-> > > > +    "socionext,uniphier-pxs3-ahci-reset" - for PXs3 SoC AHCI
-> > > 
-> > > Since the driver behaves identically for "socionext,uniphier-pro4-usb3-
-> > > reset" and "socionext,uniphier-pro4-ahci-reset", would it make sense to
-> > > add a common compatible?
-> > 
-> > As far as I could guess, he just happened to find the same driver code
-> > could be reused for other hardware.
-
-Ok, in that case never mind. I just assumed that this could be a case of
-glue layer building blocks being reused by the hardware engineers, since
-the driver reuses the same clock names for USB3 and AHCI both on Pro4
-and on PXs2.
-
-> > Theoretically, this can happen anywhere since
-> > a reset controller is just a set of registers
-> > each bit of which is connected to a reset line.
-> > 
-> > If you added a super-generic compatible like "simple-reset",
-> > I would agree with
-> > "socionext,uniphier-pro4-usb3-reset", "simple-reset"
-> > since this is a pattern.
-> 
-> I think it's more generic to define simple-reset with parent clock/reset
-> control without both SoC and device names.
-> 
-> However, such parent clocks/resets strongly depends on SoC, 
-> so I think it's difficut to lead generic definition in this case.
-> 
-> If we add generic compatible string, I also add "simple-reset".
-
-There is no "simple-reset" binding definition. As soon as there are SoC
-specific clocks, it's not really generic anymore.
-
-> > However,
-> > "socionext,uniphier-pro4-glue-reset" is kind of a halfway house
-> > where it is SoC-specific, but still ambiguous.
-> 
-> Surely, it might be hard to understand that pro4-glue-reset is SoC-specific
-> but for generic-device.
-
-I agree.
-
-> > > Something like:
-> > > "socionext,uniphier-pro4-usb3-reset", "socionext,uniphier-pro4-glue-reset" - for USB3 SoC AHCI
-> > > "socionext,uniphier-pro4-ahci-reset", "socionext,uniphier-pro4-glue-reset" - for Pro4 SoC AHCI
-> > > 
-> > > That way if more places turn up where the glue layer reset is used,
-> > > you can add them without patching the driver every time.
+> On 11/8/18 12:14 PM, Grygorii Strashko wrote:
 > > 
 > > 
-> > This is a trade-off between "patch the driver"
-> > and "potential change of the binding".
-> 
-> Adding "glue-reset" is usable for devices having same parent clocks/resets as
-> usb3/ahci, and we can add the devices without patches.
-> 
-> However, if the device needs other parent clocks/resets for the same SoC,
-> we can't add "glue-reset" and we might add patches for the device as a result.
-> In this case, the "glue-reset" will become difficult to understand.
-
-Then let's not bother with it.
-I made the suggestion without knowing the full picture.
-
-> > There is no real hardware like pro4-glue-reset.
+> > On 11/8/18 6:00 AM, Sebastian Andrzej Siewior wrote:  
+> >> On 2018-11-06 15:34:55 [-0600], Grygorii Strashko wrote:  
+> >>> Hi All,  
+> >> Hi,
+> >>  
+> >>> Do anybody tried to use ARM64 RT with 76K pages enabled?  
+> >>
+> >> 75 would be an off by one but this :)  
 > > 
-> > I am guessing this is a part of syscon or something,
-> > but I cannot find any explanation in a bigger picture.
+> > Ops 8-). at least subj is correct.
+> >   
+> >>  
+> >>> My attempt shows that enabling? CONFIG_ARM64_64K_PAGES=y
+> >>> increases latencies by ~30%
+
+That's not really surprising. Performance on systems using a bigger page
+size granules might have some trade-offs (bigger memory overhead, worse
+cache utilization), so 64K pages might not be really great for your
+particular workload. You would probably need a real performance
+analysis (using perf, for instance) to pinpoint TLB misses as your
+bottleneck.
+
+> >>> cyclictest -n -m -Sp98 -q -D2m with  =y
+> >>>
+> >>>
+> >>> T: 0 (? 772) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 13 Avg:
+> >>> 10 Max:????? 85 T: 1 (? 773) P:98 I:1500 C:? 79998 Min:????? 7
+> >>> Act:?? 13 Avg:?? 10 Max:????? 71 T: 2 (? 774) P:98 I:2000 C:
+> >>> 59997 Min:????? 7 Act:?? 11 Avg:?? 11 Max:????? 64 T: 3 (? 775)
+> >>> P:98 I:2500 C:? 47996 Min:????? 7 Act:?? 14 Avg:?? 12 Max:????? 66
+> >>>
+> >>>
+> >>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
+> >>>
+> >>>
+> >>> T: 0 (? 697) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 10 Avg:
+> >>> 9 Max:????? 38 T: 1 (? 698) P:98 I:1500 C:? 79987 Min:????? 7
+> >>> Act:?? 10 Avg:?? 10 Max:????? 32 T: 2 (? 699) P:98 I:2000 C:
+> >>> 59981 Min:????? 7 Act:?? 14 Avg:?? 11 Max:????? 46 T: 3 (? 700)
+> >>> P:98 I:2500 C:? 47977 Min:????? 6 Act:?? 11 Avg:?? 10 Max:
+> >>> 45  
+> >>
+> >> So this is an idle system?  
 > > 
-> > So, I cannot judge this further more.
+> > Yes (in general) - it's collected with systemd, so some daemons are
+> > active. 
+> >> The Kconfig help says "faster TLB lookup". Interesting.
+> >> Are the 16k pages in between (latency wise) by any chance?  
+> > 
+> > I'll try it.  
 > 
-> Since it's hard to lead the best result,
-> currently I'd like to suggest the current compatibles,
+> no i'll not, at least not fast. with 16k pages enabled I can't boot
+> TI 4.14 kernel
+> -  4.14.71-rt44.
+> No msg in log, just "Starting kernel ..."
 
-That is fine with me.
+You need a core that actually supports 16K pages (supporting
+certain page size granules is architecturally optional).
+>From the Arm Ltd. cores it's Cortex-A73, A75 or A55, possibly other
+newer ones as well. Cortex-A53, A57 and A72 do not support 16k pages.
 
-> with "simple-reset" if necessary.
-
-Not necessary.
-
-best regards
-Philipp
+Cheers,
+Andre.
