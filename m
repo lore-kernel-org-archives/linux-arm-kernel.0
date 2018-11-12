@@ -1,67 +1,76 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 12:57:33 -0600
-Subject: [PATCH 1/3] dt-bindings: gpio: add sama5d2 PIOBU support
-In-Reply-To: <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
-References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
- <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
-Message-ID: <5bea0ec9.1c69fb81.db750.9b4e@mx.google.com>
+Date: Mon, 12 Nov 2018 13:09:09 -0600
+Subject: [PATCH v2 05/11] Doc: DT: thermal: new irq-mode for trip point
+In-Reply-To: <1541610593-28542-6-git-send-email-l.luba@partner.samsung.com>
+References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181107171039eucas1p2227bd4bc573fd0d2a3a97986004be16b@eucas1p2.samsung.com>
+ <1541610593-28542-6-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <5bea0ecd.1c69fb81.d5613.1c9e@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 07, 2018 at 03:12:32PM +0000, Andrei.Stefanescu at microchip.com wrote:
-> This patch describes the compatible and the device tree
-> bindings necessary for the sama5d2 PIOBU GPIO
-> controller driver.
+On Wed, Nov 07, 2018 at 06:09:47PM +0100, Lukasz Luba wrote:
+> Thermal trip point gets new flag in DT: irq-mode.
+> Trip point may have a new explicit flag which indicate
+> IRQ support when the temperature is met (so the thermal framework
+> deos not need to set polling for it).
+> It is useful for 'passive' cooling trip point,
+> which now will not register for polling the temperature.
+> 
+> Update documentation about irq-mode for trip points.
 
-Bindings describe the h/w, not drivers.
+This patch should come before you use it.
 
 > 
-> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 > ---
->  .../bindings/gpio/gpio-sama5d2-piobu.txt           | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+>  Documentation/devicetree/bindings/thermal/thermal.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
-> new file mode 100644
-> index 0000000..791ac51
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
-> @@ -0,0 +1,23 @@
-> +GPIO controller for SAMA5D2 PIOBU pins.
-> +
-> +This pins have the property of not losing their voltage
-> +during Backup/Self-refresh mode.
-> +
-> +These bindings should be set to a node in the dtsi file.
-> +
-> +Required properties:
-> +- compatible:		"syscon", "microchip,sama5d2-piobu"
+> diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+> index ca14ba9..bee21e3 100644
+> --- a/Documentation/devicetree/bindings/thermal/thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+> @@ -90,6 +90,10 @@ Required properties:
+>  	"critical":	Hardware not reliable.
+>    Type: string
+>  
+> +- irq-mode:		A flag indicating that trip rises irq, so there is no
+> +  Type: bool		need of polling in thermal framework.
+> +  Size: one cell
 
-Why the syscon?
-
-syscon should be last if it remains.
-
-> +- #gpio-cells:		There are 2. The pin number is the
-> +			first, the second represents additional
-> +			parameters such as GPIO_ACTIVE_HIGH/LOW.
-> +- gpio-controller:	Marks the port as GPIO controller.
-
-No interrupt capability?
+Should be optional, right?
 
 > +
-> +Example:
-> +
-> +	secumod at fc040000 {
-
-gpio at ...
-
-> +		compatible = "syscon", "microchip,sama5d2-piobu";
-> +		reg = <0xfc040000 0x100>;
-> +
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +	};
+>  * Cooling device maps
+>  
+>  The cooling device maps node is a node to describe how cooling devices
+> @@ -256,16 +260,19 @@ thermal-zones {
+>  				temperature = <90000>; /* millicelsius */
+>  				hysteresis = <2000>; /* millicelsius */
+>  				type = "active";
+> +				irq-mode;
+>  			};
+>  			cpu_alert1: cpu-alert1 {
+>  				temperature = <100000>; /* millicelsius */
+>  				hysteresis = <2000>; /* millicelsius */
+>  				type = "passive";
+> +				irq-mode;
+>  			};
+>  			cpu_crit: cpu-crit {
+>  				temperature = <125000>; /* millicelsius */
+>  				hysteresis = <2000>; /* millicelsius */
+>  				type = "critical";
+> +				irq-mode;
+>  			};
+>  		};
+>  
 > -- 
 > 2.7.4
 > 
