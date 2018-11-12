@@ -1,124 +1,21 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 12 Nov 2018 08:32:54 +0000
-Subject: [PATCH] efi: permit calling efi_mem_reserve_persistent from
- atomic context
-In-Reply-To: <E591C777-E2A6-4624-ABCE-C08251F7484A@gmx.us>
-References: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
- <trinity-d366cf7f-4a38-4193-a636-b695d34d6c47-1541817914119@msvc-mesg-gmx024>
- <E591C777-E2A6-4624-ABCE-C08251F7484A@gmx.us>
-Message-ID: <86muqeelvt.wl-marc.zyngier@arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 12 Nov 2018 00:34:22 -0800
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+Message-ID: <20181112083422.GA19695@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Nov 2018 02:45:48 +0000,
-Qian Cai <cai@gmx.us> wrote:
+On Mon, Nov 12, 2018 at 03:12:39PM +1100, Finn Thain wrote:
+> Implementations of arch_gettimeoffset are generally not re-entrant
+> and assume that interrupts have been disabled. Unfortunately this
+> pre-condition got broken in v2.6.32.
 > 
-> 
-> 
-> > On Nov 9, 2018, at 9:45 PM, Qian Cai <cai@gmx.us> wrote:
-> > 
-> > 
-> > On 11/8/18 at 1:05 PM, Ard Biesheuvel wrote:
-> > 
-> >> Currently, efi_mem_reserve_persistent() may not be called from atomic
-> >> context, since both the kmalloc() call and the memremap() call may
-> >> sleep.
-> >> 
-> >> The kmalloc() call is easy enough to fix, but the memremap() call
-> >> needs to be moved into an init hook since we cannot control the
-> >> memory allocation behavior of memremap() at the call site.
-> >> 
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >> drivers/firmware/efi/efi.c | 31 +++++++++++++++++++------------
-> >> 1 file changed, 19 insertions(+), 12 deletions(-)
-> >> 
-> >> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> >> index 249eb70691b0..cfc876e0b67b 100644
-> >> --- a/drivers/firmware/efi/efi.c
-> >> +++ b/drivers/firmware/efi/efi.c
-> >> @@ -963,36 +963,43 @@ bool efi_is_table_address(unsigned long phys_addr)
-> >> }
-> >> 
-> >> static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
-> >> +static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
-> >> 
-> >> int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
-> >> {
-> >> -	struct linux_efi_memreserve *rsv, *parent;
-> >> +	struct linux_efi_memreserve *rsv;
-> >> 
-> >> -	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-> >> +	if (!efi_memreserve_root)
-> >> 		return -ENODEV;
-> >> 
-> >> -	rsv = kmalloc(sizeof(*rsv), GFP_KERNEL);
-> >> +	rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
-> >> 	if (!rsv)
-> >> 		return -ENOMEM;
-> >> 
-> >> -	parent = memremap(efi.mem_reserve, sizeof(*rsv), MEMREMAP_WB);
-> >> -	if (!parent) {
-> >> -		kfree(rsv);
-> >> -		return -ENOMEM;
-> >> -	}
-> >> -
-> >> 	rsv->base = addr;
-> >> 	rsv->size = size;
-> >> 
-> >> 	spin_lock(&efi_mem_reserve_persistent_lock);
-> >> -	rsv->next = parent->next;
-> >> -	parent->next = __pa(rsv);
-> >> +	rsv->next = efi_memreserve_root->next;
-> >> +	efi_memreserve_root->next = __pa(rsv);
-> >> 	spin_unlock(&efi_mem_reserve_persistent_lock);
-> >> 
-> >> -	memunmap(parent);
-> >> +	return 0;
-> >> +}
-> >> 
-> >> +static int __init efi_memreserve_root_init(void)
-> >> +{
-> >> +	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-> >> +		return -ENODEV;
-> >> +
-> >> +	efi_memreserve_root = memremap(efi.mem_reserve,
-> >> +				       sizeof(*efi_memreserve_root),
-> >> +				       MEMREMAP_WB);
-> >> +	if (!efi_memreserve_root)
-> >> +		return -ENOMEM;
-> >> 	return 0;
-> >> }
-> >> +early_initcall(efi_memreserve_root_init);
-> >> 
-> >> #ifdef CONFIG_KEXEC
-> >> static int update_efi_random_seed(struct notifier_block *nb,
-> >> -- 
-> >> 2.19.1
-> > BTW, I won?t be able to apply this patch on top of this series [1]. After applied that series, the original BUG sleep from atomic is gone as well as two other GIC warnings. Do you think a new patch is needed here?
-> > 
-> > [1] https://www.spinics.net/lists/arm-kernel/msg685751.html
-> OK, I was able to apply this patch on top of latest mainline (ccda4af0f4b9)
-> which also include one patch (1/6) from the above series,
-> 
-> However, the efi-related patches from the series (4/6, 5/6, and 6/6) are no
-> longer able to be cleanly applied. 
-> 
-> As the results, the above patch did fix the original BUG: sleep from atomic,
-> but it introduces 2 new warnings.
+> Fixes: 5cfc8ee0bb51 ("ARM: convert arm to arch_gettimeoffset()")
+> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
 
-[...]
-
-These are the warnings you've already reported, aren't they? And we've
-established that if you apply the whole series, everything work as
-intended at least on the GIC side (the timer issue is a different
-story altogether).
-
-Or am I missing something?
-
-Thanks,
-
-	M.
-
--- 
-Jazz is not dead, it just smell funny.
+This looks like a sensible fix for -stable backporting.  But with m68k
+converted over it might be time for these two arm platforms to either
+be converted to the clocksource API or to be dropped..
