@@ -1,217 +1,50 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 12 Nov 2018 12:00:11 +0000
-Subject: [PATCH v6 00/24] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <c0d5c4e8-a4cd-4289-24cc-31faf8efd0b6@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Nov 2018 12:29:33 +0000
+Subject: [RFC PATCH 0/6] Armada 38x comphy driver to support 2.5Gbps networking
+Message-ID: <20181112122933.GD30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-I currently have an issue with my public repository, I'll try to post a 
-branch to fetch this series from as soon as possible.
+This series adds support for dynamically switching between 1Gbps
+and 2.5Gbps networking for the Marvell Armada 38x SoCs, tested on
+Armada 388 on the Clearfog platform.
 
-Thanks,
+This is necessary to be able to connect (eg) a Clearfog platform
+with a Macchiatobin platform via the SFP sockets, as Clearfog
+currently only supports 1Gbps networking via the SFP socket and
+Macchiatobin defaults to 2.5Gbps when using Fiberchannel SFPs.
 
-Julien
+In order to allow dynamic switching, we need to implement a common
+phy driver to switch the ethernet serdes lane speed - 2.5Gbps is
+just 1Gbps up-clocked by 2.5x.  We implement a simple comphy
+driver to achieve this, which only supports networking.
 
-On 12/11/18 11:56, Julien Thierry wrote:
-> Hi,
-> 
-> This series is a continuation of the work started by Daniel [1]. The goal
-> is to use GICv3 interrupt priorities to simulate an NMI.
-> 
-> The patches depend on the core API for NMIs patches [2].
-> 
-> To achieve this, set two priorities, one for standard interrupts and
-> another, higher priority, for NMIs. Whenever we want to disable interrupts,
-> we mask the standard priority instead so NMIs can still be raised. Some
-> corner cases though still require to actually mask all interrupts
-> effectively disabling the NMI.
-> 
-> Daniel Thompson ran some benchmarks [3] on a previous version showing a
-> small (<1%) performance drop when using interrupt priorities on Cortex-A53
-> and GIC-500.
-> 
-> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
-> for now. LPIs being controlled by the ITS cannot be delivered as NMI.
-> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
-> 
-> Requirements to use this:
-> - Have GICv3
-> - SCR_EL3.FIQ is set to 1 when linux runs or have single security state
-> - Select Kernel Feature -> Use ICC system registers for IRQ masking
-> 
-> * Patches 1 and 2 are just a bit of cleanup
-> 
-> * Patch 3 introduces a CPU feature to check if priority masking should be
->    used
-> 
-> * Patches 4 and 5 add the support for priority masking in GICv3 driver
-> 
-> * Patches 6 to 11 add the support for priority masking the arch/arm64
->    code
-> 
-> * Patches 12 and 13 allow us to apply alternatives earlier in the boot
->    process
-> 
-> * Patches 14 to 16 starts the PMR masking on cpu startup and provides
->    primitives for arm64 GICv3 driver to perform priority masking
-> 
-> * Patches 17 to 20 Add support for pseudo-NMIs in GICv3 driver
-> 
-> * Patches 21 to 23 Add support for receiving NMIs in arch/arm64
-> 
-> * Patch 24 adds the build config and command line option to enable
->    pseudo-NMIs
-> 
-> Changes since v5[4]:
-> * Rebased on v4.20-rc2
-> * Reorganized patches again
-> * Renamed compile option + PMR values defines
-> * Write PMR enablement for cpu startup in C
-> * Fix wrong array size passed to __apply_alternatives
-> * Do not touch PMR in pt_regs when not using irq masking
-> * Remove ISB between PMR and IAR -> turns out it is not needed
-> * Simplify irqflags code after introducing PMR in it
-> * Use ref count API to track PPIs set as NMI
-> * Simplify NMI exit path
-> 
-> Changes since V4[5]:
-> * Rebased to v4.19-rc1
-> * Adapted GIC driver to the core NMI API
-> * Added option to disable priority masking on command line
-> * Added Daniel's Tested-by on patches related replacing PSR.I toggling with
->    PMR masking
-> * Fix scope matching for alternative features.
-> * Spotted some more places using PSR.I or daif and replaced with generic
->    interrupt functions
-> 
-> Changes since V3[6]:
-> * Big refactoring. As suggested by Marc Z., some of the bigger patches
->    needed to be split into smaller one.
-> * Try to reduce the amount of #ifdef for the new feature by introducing
->    an individual cpufeature for priority masking
-> * Do not track which alternatives have been applied (was a bit dodgy
->    anyway), and use an alternative for VHE cpu_enable callback
-> * Fix a build failure with arm by adding the correct RPR accessors
-> * Added Suggested-by tags for changes from comming or inspired by Daniel's
->    series. Do let me know if you feel I missed something and am not giving
->    you due credit.
-> 
-> Changes since V2[7]:
-> * Series rebase to v4.17-rc6
-> * Adapt pathces 1 and 2 to the rework of cpufeatures framework
-> * Use the group0 detection scheme in the GICv3 driver to identify
->    the priority view, and drop the use of a fake interrupt
-> * Add the case for a GIC configured in a single security state
-> * Use local_daif_restore instead of local_irq_enable the first time
->    we enable interrupts after a bp hardening in the handling of a kernel
->    entry. Otherwise PRS.I remains set...
-> 
-> Changes since V1[8]:
-> * Series rebased to v4.15-rc8.
-> * Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
-> * Fix issue where debug exception were not masked when enabling debug in
->    mdscr_el1.
-> 
-> Changes since RFC[9]:
-> * The series was rebased to v4.15-rc2 which implied some changes mainly
->    related to the work on exception entries and daif flags by James Morse.
->    - The first patch in the previous series was dropped because no longer
->      applicable.
->    - With the semantics James introduced of "inheriting" daif flags,
->      handling of PMR on exception entry is simplified as PMR is not altered
->      by taking an exception and already inherited from previous state.
->    - James pointed out that taking a PseudoNMI before reading the FAR_EL1
->      register should not be allowed as per the TRM (D10.2.29):
->      "FAR_EL1 is made UNKNOWN on an exception return from EL1."
->      So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
-> * For KVM, only deal with PMR unmasking/restoring in common code, and VHE
->    specific code makes sure PSR.I bit is set when necessary.
-> * When detecting the GIC priority view (patch 5), wait for an actual
->    interrupt instead of trying only once.
-> 
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
-> [2] https://lkml.org/lkml/2018/11/12/2113
-> [3] https://lkml.org/lkml/2018/7/20/803
-> [4] https://lkml.org/lkml/2018/8/28/693
-> [5] https://lkml.org/lkml/2018/7/24/321
-> [6] https://lkml.org/lkml/2018/5/21/276
-> [7] https://lkml.org/lkml/2018/1/17/335
-> [8] https://www.spinics.net/lists/arm-kernel/msg620763.html
-> [9] https://www.spinics.net/lists/arm-kernel/msg610736.html
-> 
-> Cheers,
-> 
-> Julien
-> 
-> -->
-> 
-> Daniel Thompson (1):
->    arm64: alternative: Apply alternatives early in boot process
-> 
-> Julien Thierry (23):
->    arm64: Remove unused daif related functions/macros
->    arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
->    arm64: cpufeature: Add cpufeature for IRQ priority masking
->    arm/arm64: gic-v3: Add PMR and RPR accessors
->    irqchip/gic-v3: Switch to PMR masking before calling IRQ handler
->    arm64: ptrace: Provide definitions for PMR values
->    arm64: Make PMR part of task context
->    arm64: Unmask PMR before going idle
->    arm64: kvm: Unmask PMR before entering guest
->    arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
->    arm64: daifflags: Include PMR in daifflags restore operations
->    arm64: alternative: Allow alternative status checking per cpufeature
->    irqchip/gic-v3: Factor group0 detection into functions
->    arm64: Switch to PMR masking when starting CPUs
->    arm64: gic-v3: Implement arch support for priority masking
->    irqchip/gic-v3: Detect if GIC can support pseudo-NMIs
->    irqchip/gic-v3: Handle pseudo-NMIs
->    irqchip/gic: Add functions to access irq priorities
->    irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
->    arm64: Handle serror in NMI context
->    arm64: Skip preemption when exiting an NMI
->    arm64: Skip irqflags tracing for NMI in IRQs disabled context
->    arm64: Enable the support of pseudo-NMIs
-> 
->   Documentation/admin-guide/kernel-parameters.txt |   6 +
->   Documentation/arm64/booting.txt                 |   5 +
->   arch/arm/include/asm/arch_gicv3.h               |  33 ++++
->   arch/arm64/Kconfig                              |  14 ++
->   arch/arm64/include/asm/alternative.h            |   4 +-
->   arch/arm64/include/asm/arch_gicv3.h             |  32 +++
->   arch/arm64/include/asm/assembler.h              |  10 +-
->   arch/arm64/include/asm/cpucaps.h                |   3 +-
->   arch/arm64/include/asm/cpufeature.h             |  10 +
->   arch/arm64/include/asm/daifflags.h              |  20 +-
->   arch/arm64/include/asm/efi.h                    |   3 +-
->   arch/arm64/include/asm/irqflags.h               | 132 ++++++++++---
->   arch/arm64/include/asm/kvm_host.h               |  12 ++
->   arch/arm64/include/asm/processor.h              |   3 +
->   arch/arm64/include/asm/ptrace.h                 |  20 +-
->   arch/arm64/kernel/alternative.c                 |  60 +++++-
->   arch/arm64/kernel/asm-offsets.c                 |   1 +
->   arch/arm64/kernel/cpufeature.c                  |  42 +++-
->   arch/arm64/kernel/entry.S                       |  40 ++++
->   arch/arm64/kernel/process.c                     |   6 +
->   arch/arm64/kernel/smp.c                         |  34 ++++
->   arch/arm64/kernel/traps.c                       |   8 +-
->   arch/arm64/kvm/hyp/switch.c                     |  16 ++
->   arch/arm64/mm/proc.S                            |  18 ++
->   drivers/irqchip/irq-gic-common.c                |  10 +
->   drivers/irqchip/irq-gic-common.h                |   2 +
->   drivers/irqchip/irq-gic-v3.c                    | 250 +++++++++++++++++++++---
->   include/linux/irqchip/arm-gic-common.h          |   2 +-
->   28 files changed, 695 insertions(+), 101 deletions(-)
-> 
-> --
-> 1.9.1
-> 
+With this, we are able to support both Fiberchannel SFPs operating
+at 2.5Gbps or 1Gbps, and 1G ethernet SFPs plugged into the Clearfog
+platform, dynamically selecting according to the SFPs abilities.
+
+I'm aware of the proposed changes to the PHY layer, changing
+phy_set_mode() to take the ethernet phy interface type, hence why
+this is RFC - there's also the question about how this will be
+merged.  This series is currently based on 4.20-rc1, but will
+likely need to be rebased when the PHY layer changes hit.
+
+ .../bindings/net/marvell-armada-370-neta.txt       |   2 +-
+ .../bindings/phy/phy-armada38x-comphy.txt          |  40 ++++
+ arch/arm/boot/dts/armada-388-clearfog.dtsi         |   2 +
+ arch/arm/boot/dts/armada-38x.dtsi                  |  37 ++++
+ drivers/net/ethernet/marvell/mvneta.c              |  58 ++++-
+ drivers/phy/marvell/Kconfig                        |  10 +
+ drivers/phy/marvell/Makefile                       |   1 +
+ drivers/phy/marvell/phy-armada38x-comphy.c         | 236 +++++++++++++++++++++
+ 8 files changed, 378 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-armada38x-comphy.txt
+ create mode 100644 drivers/phy/marvell/phy-armada38x-comphy.c
+
 
 -- 
-Julien Thierry
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
