@@ -1,90 +1,81 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 12 Nov 2018 15:22:24 -0600
-Subject: arm64 + ARM64_64K_PAGES=y
-In-Reply-To: <20181112142703.0d6ceb57@donnerap.cambridge.arm.com>
-References: <1ab7ee03-64fe-384a-c88f-f6d519b965db@ti.com>
- <20181108120040.pzupzyqnsxeuv5ne@linutronix.de>
- <99e0b883-cf9f-2ab9-5003-d4506bfa461d@ti.com>
- <274c9742-0aa9-b4a5-11cb-b506aeef7761@ti.com>
- <20181112142703.0d6ceb57@donnerap.cambridge.arm.com>
-Message-ID: <ff1646e5-4e38-3064-107b-63f294a49a4b@ti.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 12 Nov 2018 22:53:45 +0100
+Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
+ a check for config_intr and ack_interrupt
+In-Reply-To: <b6f0c1bb-9c0b-a02a-1571-b2804fcbcaa1@gmail.com>
+References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+ <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
+ <20181109201307.GV5259@lunn.ch>
+ <44b503b8-9f2a-50ac-c4c9-d25258d98ef5@gmail.com>
+ <4330cb5b-b1a5-5004-af51-39199943639d@gmail.com>
+ <c067d321-c69e-706d-304a-04e1e477b47c@gmail.com>
+ <CAFBinCCmNYGp8kzy45ojjr27tEaPVs-QwMsLRrfXHCvw_taDOw@mail.gmail.com>
+ <b6f0c1bb-9c0b-a02a-1571-b2804fcbcaa1@gmail.com>
+Message-ID: <CAFBinCB3v3tWb5YEjeMe=gHK5Dsu-0ONzn4PEx0s4Y9zrrLA4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 12, 2018 at 9:38 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
+>
+> On 12.11.2018 21:32, Martin Blumenstingl wrote:
+> > Hi Heiner,
+> >
+> > On Fri, Nov 9, 2018 at 9:56 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
+> >>
+> >> On 09.11.2018 21:33, Florian Fainelli wrote:
+> >>> On 11/9/18 12:22 PM, Heiner Kallweit wrote:
+> >>>> On 09.11.2018 21:13, Andrew Lunn wrote:
+> >>>>> Hi Heiner
+> >>>>>
+> >>>>>> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
+> >>>>>> +{
+> >>>>>> +  return phydrv->config_intr || phydrv->ack_interrupt;
+> >>>>>> +}
+> >>>>>
+> >>>>> Should this be && not || ? I thought both needed to be provided for
+> >>>>> interrupts to work.
+> >>>>>
+> >>>>>        Andrew
+> >>>>>
+> >>>> I've seen at least one driver which configures interrupts in
+> >>>> config_init and doesn't define a config_intr callback
+> >>>> (ack_interrupt callback is there)
+> >>>
+> >>> That driver should probably be fixed, while it most likely does not make
+> >>> any significant difference during probe/connect, since config_init() and
+> >>> config_intr() are virtually happening at the same time, this is not
+> >>> necessarily true when disconnecting from the PHY where we really want
+> >>> config_intr() to effectively disable the interrupts and not leaving
+> >>> something enabled that would now become unmaskable, because no more
+> >>> driver attached.
+> >>>
+> >> Found the driver: It's the IP101A/G in icplus.c
+> >> It should be easy to fix the behavior and move the interrupt config
+> >> to a config_intr callback. But the last real changes to the driver
+> >> have been done 6 years ago, so I'm not sure there's anybody out
+> >> there who can test.
+> > if you want I can take care of the IP101A/G code.
+> > I have at least one board with an IP101A/G (PHY ID: 0x02430c54,
+> > according to the schematics it's an IP101GR-GP) where the interrupt is
+> > routed to the SoC.
+> >
+> > please let me know whether you'd like to work on it or if I should
+> > give it a try.
+> >
+> I made the change already based on the datasheet of IP101A LF which
+> is supposed to be register-compatible with IP101A/G.
+> The patch is not applied yet, you can find it in the mailing
+> list archive or in patchwork. Would be great if you could test it
+> and report problems or add a Tested-by.
+I will test it but I doubt it works out-of-the-box in my setup:
+my board routes the RXER/INTR_32 pin of the IP101GR to the SoC. that
+pin defaults to "RXER" (receive error signal). so I need to come up
+with some extra patches which toggle the bit to output the interrupt
+signal on that pin
+
+in other words: I'll give your patches a try as soon as I have time
+and give my Tested-by along with my extra patches on top of yours.
 
 
-On 11/12/18 8:27 AM, Andre Przywara wrote:
-> On Fri, 9 Nov 2018 13:15:47 -0600
-> Grygorii Strashko <grygorii.strashko@ti.com> wrote:
-> 
-> Hi,
-> 
->> On 11/8/18 12:14 PM, Grygorii Strashko wrote:
->>>
->>>
->>> On 11/8/18 6:00 AM, Sebastian Andrzej Siewior wrote:
->>>> On 2018-11-06 15:34:55 [-0600], Grygorii Strashko wrote:
->>>>> Hi All,
->>>> Hi,
->>>>   
->>>>> Do anybody tried to use ARM64 RT with 76K pages enabled?
->>>>
->>>> 75 would be an off by one but this :)
->>>
->>> Ops 8-). at least subj is correct.
->>>    
->>>>   
->>>>> My attempt shows that enabling? CONFIG_ARM64_64K_PAGES=y
->>>>> increases latencies by ~30%
-> 
-> That's not really surprising. Performance on systems using a bigger page
-> size granules might have some trade-offs (bigger memory overhead, worse
-> cache utilization), so 64K pages might not be really great for your
-> particular workload. You would probably need a real performance
-> analysis (using perf, for instance) to pinpoint TLB misses as your
-> bottleneck.
-> 
->>>>> cyclictest -n -m -Sp98 -q -D2m with  =y
->>>>>
->>>>>
->>>>> T: 0 (? 772) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 13 Avg:
->>>>> 10 Max:????? 85 T: 1 (? 773) P:98 I:1500 C:? 79998 Min:????? 7
->>>>> Act:?? 13 Avg:?? 10 Max:????? 71 T: 2 (? 774) P:98 I:2000 C:
->>>>> 59997 Min:????? 7 Act:?? 11 Avg:?? 11 Max:????? 64 T: 3 (? 775)
->>>>> P:98 I:2500 C:? 47996 Min:????? 7 Act:?? 14 Avg:?? 12 Max:????? 66
->>>>>
->>>>>
->>>>> cyclictest -n -m -Sp98 -q -D2m with CONFIG_ARM64_64K_PAGES=n
->>>>>
->>>>>
->>>>> T: 0 (? 697) P:98 I:1000 C: 120000 Min:????? 7 Act:?? 10 Avg:
->>>>> 9 Max:????? 38 T: 1 (? 698) P:98 I:1500 C:? 79987 Min:????? 7
->>>>> Act:?? 10 Avg:?? 10 Max:????? 32 T: 2 (? 699) P:98 I:2000 C:
->>>>> 59981 Min:????? 7 Act:?? 14 Avg:?? 11 Max:????? 46 T: 3 (? 700)
->>>>> P:98 I:2500 C:? 47977 Min:????? 6 Act:?? 11 Avg:?? 10 Max:
->>>>> 45
->>>>
->>>> So this is an idle system?
->>>
->>> Yes (in general) - it's collected with systemd, so some daemons are
->>> active.
->>>> The Kconfig help says "faster TLB lookup". Interesting.
->>>> Are the 16k pages in between (latency wise) by any chance?
->>>
->>> I'll try it.
->>
->> no i'll not, at least not fast. with 16k pages enabled I can't boot
->> TI 4.14 kernel
->> -  4.14.71-rt44.
->> No msg in log, just "Starting kernel ..."
-> 
-> You need a core that actually supports 16K pages (supporting
-> certain page size granules is architecturally optional).
->  From the Arm Ltd. cores it's Cortex-A73, A75 or A55, possibly other
-> newer ones as well. Cortex-A53, A57 and A72 do not support 16k pages.
-
-Thank a lot for you reply.
-
--- 
-regards,
--grygorii
+Regards
+Martin
