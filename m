@@ -1,85 +1,103 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 12 Nov 2018 12:15:11 +0100
-Subject: [PATCH] arm64: acpi/pci: WARN() when ignoring _DSM request to
- preserve PCI resources
-Message-ID: <20181112111511.12091-1-ard.biesheuvel@linaro.org>
+From: frieder.schrempf@kontron.De (Schrempf Frieder)
+Date: Mon, 12 Nov 2018 11:24:22 +0000
+Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
+ under the SPI framework
+In-Reply-To: <20181112115628.68a84b92@bbrezillon>
+References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+ <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+ <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
+ <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
+ <20181108093451.08dfe63e@bbrezillon>
+ <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
+ <20181112115628.68a84b92@bbrezillon>
+Message-ID: <7c379ee9-a9e7-e0a5-14a5-9074d6a964e7@kontron.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 ACPI systems, we unconditionally reconfigure the entire PCI
-hierarchy at boot. This is a departure from what is customary on ACPI
-systems, and may break assumptions in some places (e.g., CCIX), that
-the OS will honour the PCI resource allocation as configured by the
-firmware.
+On 12.11.18 11:56, Boris Brezillon wrote:
+> On Mon, 12 Nov 2018 10:46:45 +0000
+> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
+> 
+>> On 08.11.18 09:34, Boris Brezillon wrote:
+>>> On Wed, 7 Nov 2018 16:36:13 +0000
+>>> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
+>>>    
+>>>> Hi Olof,
+>>>>
+>>>> On 07.11.18 17:20, Olof Johansson wrote:
+>>>>> On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
+>>>>> <frieder.schrempf@kontron.de> wrote:
+>>>>>>
+>>>>>> From: Frieder Schrempf <frieder.schrempf@exceet.de>
+>>>>>>
+>>>>>> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
+>>>>>> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
+>>>>>>
+>>>>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+>>>>>
+>>>>> Hi Frieder,
+>>>>>
+>>>>> This patch is part of a series that I didn't see the rest of, but in
+>>>>> general we prefer to merge these through arm-soc even if the driver
+>>>>> goes in through another tree. The way we'd prefer to handle it is that
+>>>>> once the driver lands, we'll take the config option change to turn it
+>>>>> on. To avoid our branches to break until both sides have landed, it
+>>>>> might be a good idea to keep both drivers on for a short while (one
+>>>>> release).
+>>>>>
+>>>>> So, I'm not going to ack this since we avoid taking defconfig changes
+>>>>> through driver trees (these two defconfigs tend to churn a lot and we
+>>>>> don't want to create merge conflicts where we don't have to), but
+>>>>> we'll be happy to pick it up when the time comes.
+>>>>
+>>>> Ok, thank you for explaining the common practice. I will drop the config
+>>>> changes for the next version and send it separately when the time is ready.
+>>>>
+>>>> Both the old driver and the new one use the same compatible strings for
+>>>> probing. Wouldn't that cause problems if both drivers are enabled for a
+>>>> while, or am I missing something?
+>>>
+>>> Or maybe we should not introduce a new Kconfig option and just reuse
+>>> the old one. It probably requires re-ordering patches a bit (patch 1
+>>> should be moved after patch 5). Then you have 2 choices:
+>>>
+>>> 1/ merge patch 1 and 6 so that the new driver effectively replaces the
+>>>      old one but uses the same Kconfig option
+>>> 2/ remove the ability to compile the old driver when the new one is
+>>>      introduced: remove the line from drivers/mtd/spi-nor Makefile and
+>>>      move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
+>>>      drivers/spi/Kconfig. And remove the old code in a separate patch
+>>>
+>>> I'm fine either way, but option #2 will probably make the patch
+>>> introducing the new driver bigger and hurt readability.
+>>
+>> I think having both drivers in the tree for a while wouldn't be so bad.
+>> So if any compatibility issues come up with the new driver, people can
+>> still use the old one.
+> 
+> Except that's not what happens in practice. Believe me, I tried this
+> approach several times, and people keep using the old driver until
+> they're forced to switch to the new one. So you actually don't address
+> the problem, you just delay it a bit, and you'll have to fix
+> regressions anyway.
 
-ACPI already specifies a device specific ACPI method (_DSM) for PCI
-root bridge nodes that tells us whether the firmware thinks the
-configuration should be ignored or preserved, but unfortunately, we
-cannot simply change the behavior of the OS and start honouring
-these requests unconditionally, given that firmware implementations
-in the field may issue the _DSM request inadvertently and still rely
-on the OS to create the resource allocation from scratch.
+Ok, I see.
 
-So as a preliminary step, let's issue a warning about this case,
-increasing the likelihood that we can fix this behavior at some
-point in the future.
+>> Therefore I think I will drop the patches that change the defconfig and
+>> remove the old driver code and keep the different Kconfig options. And
+>> maybe add an exclusive dependency in Kconfig, so both drivers can not be
+>> enabled at the same time.
+>>
+>> Does this make sense?
+> 
+> I'd really prefer to have the removal of the old driver in the same
+> release the new driver is introduced but if that's not possible, let's
+> have a clear plan, like "introduce new driver in release X, remove the
+> old one in release X+1".
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/pci.c  | 15 +++++++++++++++
- include/linux/pci-acpi.h |  7 ++++---
- 2 files changed, 19 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index bb85e2f4603f..318ca865c41f 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -168,6 +168,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	struct acpi_pci_generic_root_info *ri;
- 	struct pci_bus *bus, *child;
- 	struct acpi_pci_root_ops *root_ops;
-+	union acpi_object *obj;
- 
- 	ri = kzalloc(sizeof(*ri), GFP_KERNEL);
- 	if (!ri)
-@@ -193,6 +194,20 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- 	if (!bus)
- 		return NULL;
- 
-+	/*
-+	 * Invoke the PCI device specific method (_DSM) #5 'Ignore PCI Boot
-+	 * Configuration', which tells us whether the firmware wants us to
-+	 * preserve or ignore the firmware's configuration of the PCI resource
-+	 * tree for this root bridge.
-+	 */
-+	obj = acpi_evaluate_dsm(ACPI_HANDLE(bus->bridge), &pci_acpi_dsm_guid, 1,
-+				IGNORE_PCI_BOOT_CONFIG_DSM, NULL);
-+	if (obj && obj->type == ACPI_TYPE_INTEGER)
-+		WARN_ONCE(obj->integer.value == 0,
-+			  "Firmware did not request its PCI resource allocation to be ignored, but ignoring it anyway\n");
-+
-+	ACPI_FREE(obj);
-+
- 	pci_bus_size_bridges(bus);
- 	pci_bus_assign_resources(bus);
- 
-diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-index 8082b612f561..62b7fdcc661c 100644
---- a/include/linux/pci-acpi.h
-+++ b/include/linux/pci-acpi.h
-@@ -107,9 +107,10 @@ static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
- #endif
- 
- extern const guid_t pci_acpi_dsm_guid;
--#define DEVICE_LABEL_DSM	0x07
--#define RESET_DELAY_DSM		0x08
--#define FUNCTION_DELAY_DSM	0x09
-+#define IGNORE_PCI_BOOT_CONFIG_DSM	0x05
-+#define DEVICE_LABEL_DSM		0x07
-+#define RESET_DELAY_DSM			0x08
-+#define FUNCTION_DELAY_DSM		0x09
- 
- #else	/* CONFIG_ACPI */
- static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
--- 
-2.17.1
+We can do it as you suggested. I will think about whether to use option 
+#1 or #2.
+With #1 we will have the removal of the old driver and adding the new 
+driver in one single patch.
+With #2 we will have the disabling of the old driver via Makefile in the 
+same patch thats adding the new driver.
