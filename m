@@ -1,91 +1,57 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 12 Nov 2018 19:21:54 +0100
-Subject: [PATCH v10 05/22] kasan: add CONFIG_KASAN_GENERIC and
- CONFIG_KASAN_SW_TAGS
-In-Reply-To: <20181107170458.jirk2b3tszrcagbt@lakrids.cambridge.arm.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <ea8f0391d7befab4afec34d2a009028cd9e0f326.1541525354.git.andreyknvl@google.com>
- <20181107170458.jirk2b3tszrcagbt@lakrids.cambridge.arm.com>
-Message-ID: <CAAeHK+zgaNtWsGUF1h1zu9NpZBinyEKNuUUYe14TkMXWRRFhdQ@mail.gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 12 Nov 2018 10:26:54 -0800
+Subject: [PATCH v4 0/4] kgdb: Fix kgdb_roundup_cpus()
+Message-ID: <20181112182659.245726-1-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 6:04 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Nov 06, 2018 at 06:30:20PM +0100, Andrey Konovalov wrote:
->> This commit splits the current CONFIG_KASAN config option into two:
->> 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
->>    that exists now);
->> 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
->>
->> The name CONFIG_KASAN_SW_TAGS is chosen as in the future we will have
->> another hardware tag-based KASAN mode, that will rely on hardware memory
->> tagging support in arm64.
->>
->> With CONFIG_KASAN_SW_TAGS enabled, compiler options are changed to
->> instrument kernel files with -fsantize=kernel-hwaddress (except the ones
->> for which KASAN_SANITIZE := n is set).
->>
->> Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_SW_TAGS support both
->> CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
->>
->> This commit also adds empty placeholder (for now) implementation of
->> tag-based KASAN specific hooks inserted by the compiler and adjusts
->> common hooks implementation to compile correctly with each of the
->> config options.
->>
->> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
->> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
->> ---
->>  arch/arm64/Kconfig                  |  1 +
->>  include/linux/compiler-clang.h      |  5 +-
->>  include/linux/compiler-gcc.h        |  6 ++
->>  include/linux/compiler_attributes.h | 13 -----
->>  include/linux/kasan.h               | 16 ++++--
->>  lib/Kconfig.kasan                   | 87 +++++++++++++++++++++++------
->>  mm/kasan/Makefile                   |  6 +-
->>  mm/kasan/generic.c                  |  2 +-
->>  mm/kasan/kasan.h                    |  3 +-
->>  mm/kasan/tags.c                     | 75 +++++++++++++++++++++++++
->>  mm/slub.c                           |  2 +-
->>  scripts/Makefile.kasan              | 27 ++++++++-
->>  12 files changed, 201 insertions(+), 42 deletions(-)
->>  create mode 100644 mm/kasan/tags.c
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 787d7850e064..8b331dcfb48e 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -111,6 +111,7 @@ config ARM64
->>       select HAVE_ARCH_JUMP_LABEL
->>       select HAVE_ARCH_JUMP_LABEL_RELATIVE
->>       select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->> +     select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->
-> Given this relies on a compiler feature, can we please gate this on
-> compiler feature detection? e.g. in some common Kconfig have:
->
->         select CC_HAS_ASAN_HWADDRESS if $(cc-option -fsanitize=kernel-hwaddress)
->
-> ... and on arm64 we can do:
->
->         select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
->
-> ... and core KASAN Kconfig can have:
->
-> config KASAN_SW_TAGS
->         depends on HAVE_ARCH_KASAN_SW_TAGS
->         depends on CC_HAS_ASAN_HWADDRESS
->
-> [...]
->
->> +ifeq ($(call cc-option, $(CFLAGS_KASAN) -Werror),)
->> +    ifneq ($(CONFIG_COMPILE_TEST),y)
->> +        $(warning Cannot use CONFIG_KASAN_SW_TAGS: \
->> +            -fsanitize=hwaddress is not supported by compiler)
->> +    endif
->> +endif
->
-> ... and then this warning shouldn't be possible, and can go.
+This series was originally part of the series ("serial: Finish kgdb on
+qcom_geni; fix many lockdep splats w/ kgdb") but it made sense to
+split it up.
 
-Will do in v11, thanks!
+It's believed that dropping into kgdb should be more robust once these
+patches are applied.
+
+Changes in v4:
+- Removed smp_mb() calls.
+- Also clear out .debuggerinfo.
+- Also clear out .debuggerinfo and .task for the master.
+- Remove clearing out in kdb_stub for offline CPUs; it's now redundant.
+
+Changes in v3:
+- No separate init call.
+- Don't round up the CPU that is doing the rounding up.
+- Add "#ifdef CONFIG_SMP" to match the rest of the file.
+- Updated desc saying we don't solve the "failed to roundup" case.
+- Document the ignored parameter.
+- Don't round up a CPU that failed rounding up before new for v3.
+- Don't back trace on a cpu that didn't round up new for v3.
+
+Changes in v2:
+- Removing irq flags separated from fixing lockdep splat.
+- Don't use smp_call_function (Daniel).
+
+Douglas Anderson (4):
+  kgdb: Remove irq flags from roundup
+  kgdb: Fix kgdb_roundup_cpus() for arches who used smp_call_function()
+  kgdb: Don't round up a CPU that failed rounding up before
+  kdb: Don't back trace on a cpu that didn't round up
+
+ arch/arc/kernel/kgdb.c          | 10 ++----
+ arch/arm/kernel/kgdb.c          | 12 -------
+ arch/arm64/kernel/kgdb.c        | 12 -------
+ arch/hexagon/kernel/kgdb.c      | 32 -------------------
+ arch/mips/kernel/kgdb.c         |  9 +-----
+ arch/powerpc/kernel/kgdb.c      |  6 ++--
+ arch/sh/kernel/kgdb.c           | 12 -------
+ arch/sparc/kernel/smp_64.c      |  2 +-
+ arch/x86/kernel/kgdb.c          |  9 ++----
+ include/linux/kgdb.h            | 22 ++++++++-----
+ kernel/debug/debug_core.c       | 56 ++++++++++++++++++++++++++++++++-
+ kernel/debug/debug_core.h       |  1 +
+ kernel/debug/kdb/kdb_bt.c       | 11 ++++++-
+ kernel/debug/kdb/kdb_debugger.c |  7 -----
+ 14 files changed, 89 insertions(+), 112 deletions(-)
+
+-- 
+2.19.1.930.g4563a0d9d0-goog
