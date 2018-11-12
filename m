@@ -1,75 +1,117 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 12 Nov 2018 10:00:33 +0100
-Subject: [PATCH v2 06/11] arm64: dts: exynos5433: add support for thermal
- trip irq-mode
-In-Reply-To: <1541610593-28542-7-git-send-email-l.luba@partner.samsung.com>
-References: <CGME20181107171041eucas1p1a3cf91435b9071fd6e6f84101ebbcd9f@eucas1p1.samsung.com>
- <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <1541610593-28542-7-git-send-email-l.luba@partner.samsung.com>
-Message-ID: <CAJKOXPcGOiVwVuaT+2RHGs0VxA2XRjOd6efsDQaGrWWCJS7vNg@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Mon, 12 Nov 2018 10:06:35 +0100
+Subject: [RFC] [PATCH] kvm: arm: Introduce error code KVM_EINVARIANT
+In-Reply-To: <4bbb4e76-b714-eafe-f95b-aca1a258e9fe@caviumnetworks.com>
+References: <1540290099-146109-1-git-send-email-mjaggi@caviumnetworks.com>
+ <4bbb4e76-b714-eafe-f95b-aca1a258e9fe@caviumnetworks.com>
+Message-ID: <20181112090635.GA11669@C02W217FHV2R.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Lukasz for patches. I like your work!
+Hi Manish,
 
-I have few more comments which will probably apply for all the DTS commits.
+On Sat, Nov 10, 2018 at 10:18:47PM +0000, Manish Jaggi wrote:
+> 
+> CCing a larger audience.
+> Please review.
+> 
+> On 10/23/2018 03:51 PM, Jaggi, Manish wrote:
+> > From: Manish Jaggi <manish.jaggi@cavium.com>
+> >
+> > This patch introduces an error code KVM_EINVARIANT which is returned
+> > by KVM when userland tries to set an invariant register.
+> >
+> > The need for this error code is in VM Migration for arm64.
+> > ARM64 systems use mainly -machine virt -cpu host as parameter to qemu.
+> > Migration requires both Source and destination machines to have same
+> > physical cpu. There are cases where the overall architecture of CPU is
+> > same but the next version of the chip with some bug fixes which have no
+> > effect on qemu operation. In such cases invariant registers like MIDR
+> > have a different value.
+> > Currently Migration fails in such cases.
+> >
+> > Rather than sending a EINVAL, a specifc error code will help
+> > userland program the guest invariant register by querying the migrated
+> > host machines invariant registers.
+> >
+> > Qemu will have a parameter -hostinvariant along with checking of this
+> > error code. So it can be safely assumed that the feature is opt-in
+> >
+> > Corresponding Qemu patchset can be found at :
+> > https://lists.gnu.org/archive/html/qemu-devel/2018-10/msg05048.html
+> >
+> >
+> > Signed-off-by: Manish Jaggi <manish.jaggi@cavium.com>
+> > ---
+> >   arch/arm64/kvm/sys_regs.c     | 9 ++++-----
+> >   include/uapi/linux/kvm_para.h | 1 +
+> >   2 files changed, 5 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> > index 22fbbdb..78ffc02 100644
+> > --- a/arch/arm64/kvm/sys_regs.c
+> > +++ b/arch/arm64/kvm/sys_regs.c
+> > @@ -1111,7 +1111,7 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
+> >   
+> >   	/* This is what we mean by invariant: you can't change it. */
+> >   	if (val != read_id_reg(rd, raz))
+> > -		return -EINVAL;
+> > +		return -KVM_EINVARIANT;
+> >   
+> >   	return 0;
+> >   }
+> > @@ -2254,9 +2254,8 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
+> >   		return err;
+> >   
+> >   	/* This is what we mean by invariant: you can't change it. */
+> > -	if (r->val != val)
+> > -		return -EINVAL;
+> > -
+> > +	if (r->val != val)	
+> > +		return -KVM_EINVARIANT;
+> >   	return 0;
+> >   }
+> >   
+> > @@ -2335,7 +2334,7 @@ static int demux_c15_set(u64 id, void __user *uaddr)
+> >   
+> >   		/* This is also invariant: you can't change it. */
+> >   		if (newval != get_ccsidr(val))
+> > -			return -EINVAL;
+> > +			return -KVM_EINVARIANT;
+> >   		return 0;
+> >   	default:
+> >   		return -ENOENT;
+> > diff --git a/include/uapi/linux/kvm_para.h b/include/uapi/linux/kvm_para.h
+> > index 6c0ce49..4358669 100644
+> > --- a/include/uapi/linux/kvm_para.h
+> > +++ b/include/uapi/linux/kvm_para.h
+> > @@ -17,6 +17,7 @@
+> >   #define KVM_E2BIG		E2BIG
+> >   #define KVM_EPERM		EPERM
+> >   #define KVM_EOPNOTSUPP		95
+> > +#define KVM_EINVARIANT          96
+> >   
+> >   #define KVM_HC_VAPIC_POLL_IRQ		1
+> >   #define KVM_HC_MMU_OP			2
+> 
 
-On Wed, 7 Nov 2018 at 18:10, Lukasz Luba <l.luba@partner.samsung.com> wrote:
->
-> This patch adds support for new flag which indicates
+Eh, unless I'm severely missing something, I think you're confusing how
+these error codes are used.
 
-This patch does not add support. Support for flag was added in your
-first drivers/thermal patches in this set. This patch adds new flag.
-(and does something more, so read on)
+The error codes in include/uapi/linux/kvm_para.h are for hypercalls from
+guests, not return values to userspace.  For the latter, we don't
+have a habit of inventing new constants for something subsystem
+specific, but instead we use the existing error codes which can be
+understood by userspace software.
 
-> that trip point triggers IRQ when temperature is met.
-> Exynos5433 supports 8 trip point which will trigger IRQ.
+What's more, changing an error code is an ABI change and not something
+you can just do at will.  If we are overloading EINVAL with the
+KVM_SET_ONE_REG syscall (are we?), then you need to find some way to
+communicate the additional information you need to userspace without
+interfering with legacy userspace software's interaction with the
+kernel.
 
-/8 trip point/8 trip points/
 
-> Above that number other trip points should be registered
-> without 'irq-mode' flag.
+Thanks,
 
-Please fix the line-wrap.
-
->
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <krzk@kernel.org>
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 105 ++++++++++++++++---------
->  1 file changed, 70 insertions(+), 35 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> index fe3a0b1..c4330f6 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-> @@ -17,37 +17,44 @@ thermal-zones {
->                         atlas0_alert_0: atlas0-alert-0 {
->                                 temperature = <65000>;  /* millicelsius */
->                                 hysteresis = <1000>;    /* millicelsius */
-> -                               type = "active";
-> +                               type = "passive";
-
-This change is not explained in commit msg.
-
-Basically you are doing here two things (related to each other). You
-clearly define which trip points are IRQ-type and you correct the type
-of trip point. Active is incorrect. This second thing is missing in
-your commit msg and I believe it is main reason behind this patch. You
-should focus then on this reason - start from it. Subject could be
-like "Use proper passive type for thermal trip points".
-
-Without this explanation I don't see the strong reason behind that
-patch. IOW, everything was working fine before... so why adding this
-new flag? Or maybe something was not fine... and then it is real
-reason why you are sending the patch. Usually commit message should
-answer to the most important question "WHY". Now, it explains
-"WHAT"... but I can see it from the source code. However from the code
-it is not easy to guess WHY.
-
-Best regards,
-Krzysztof
+    Christoffer
