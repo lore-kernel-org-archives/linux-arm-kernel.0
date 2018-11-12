@@ -1,69 +1,50 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 12 Nov 2018 18:50:57 +0100
-Subject: [PATCH v10 06/22] kasan,
- arm64: adjust shadow size for tag-based mode
-In-Reply-To: <20181107165438.34kb5ufoe5ve2f6i@lakrids.cambridge.arm.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <86d1b17c755d8bfd6e44e6869a16f4a409e7bd06.1541525354.git.andreyknvl@google.com>
- <20181107165438.34kb5ufoe5ve2f6i@lakrids.cambridge.arm.com>
-Message-ID: <CAAeHK+zOk9SDzUE38d2dJBE+mbwPwYr2pawV1JYEZFUCmR=ViA@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 12 Nov 2018 18:00:55 +0000
+Subject: [PATCH v6 02/24] arm64: cpufeature: Set SYSREG_GIC_CPUIF as a
+ boot system feature
+In-Reply-To: <1542023835-21446-3-git-send-email-julien.thierry@arm.com>
+References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
+ <1542023835-21446-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <f2676179-f032-348f-1df1-4631d9cffd35@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 5:54 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-
-[...]
-
->> --- a/arch/arm64/Makefile
->> +++ b/arch/arm64/Makefile
->> @@ -94,7 +94,7 @@ endif
->>  # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
->>  #                             - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
->>  # in 32-bit arithmetic
->> -KASAN_SHADOW_SCALE_SHIFT := 3
->> +KASAN_SHADOW_SCALE_SHIFT := $(if $(CONFIG_KASAN_SW_TAGS), 4, 3)
->
->
-> We could make this something like:
->
-> ifeq ($(CONFIG_KASAN_SW_TAGS), y)
-> KASAN_SHADOW_SCALE_SHIFT := 4
-> else
-> KASAN_SHADOW_SCALE_SHIFT := 3
-> endif
->
-> KBUILD_CFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-
-Seems that we need the same for KBUILD_CPPFLAGS and KBUILD_AFLAGS.
 
 
->> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
->> index b96442960aea..0f1e024a951f 100644
->> --- a/arch/arm64/include/asm/memory.h
->> +++ b/arch/arm64/include/asm/memory.h
->> @@ -74,12 +74,17 @@
->>  #define KERNEL_END        _end
->>
->>  /*
->> - * KASAN requires 1/8th of the kernel virtual address space for the shadow
->> - * region. KASAN can bloat the stack significantly, so double the (minimum)
->> - * stack size when KASAN is in use.
->> + * Generic and tag-based KASAN require 1/8th and 1/16th of the kernel virtual
->> + * address space for the shadow region respectively. They can bloat the stack
->> + * significantly, so double the (minimum) stack size when they are in use.
->>   */
->> -#ifdef CONFIG_KASAN
->> +#ifdef CONFIG_KASAN_GENERIC
->>  #define KASAN_SHADOW_SCALE_SHIFT 3
->> +#endif
->> +#ifdef CONFIG_KASAN_SW_TAGS
->> +#define KASAN_SHADOW_SCALE_SHIFT 4
->> +#endif
->> +#ifdef CONFIG_KASAN
->
-> ... and remove the constant entirely here, avoiding duplication.
->
-> Maybe factor that into a Makefile.kasan if things are going to get much
-> more complicated.
+On 12/11/2018 11:56, Julien Thierry wrote:
+> It is not supported to have some CPUs using GICv3 sysreg CPU interface
+> while some others do not.
+> 
+> Once ICC_SRE_EL1.SRE is set on a CPU, the bit cannot be cleared. Since
+> matching this feature require setting ICC_SRE_EL1.SRE, it cannot be
+> turned off if found on a CPU.
+> 
+> Set the feature as STRICT_BOOT, if boot CPU has it, all other CPUs are
+> required to have it.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm64/kernel/cpufeature.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index af50064..03a9d96 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -1149,7 +1149,7 @@ static void cpu_clear_disr(const struct arm64_cpu_capabilities *__unused)
+>   	{
+>   		.desc = "GIC system register CPU interface",
+>   		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+> -		.type = ARM64_CPUCAP_SYSTEM_FEATURE,
+> +		.type = ARM64_CPUCAP_STRICT_BOOT_CPU_FEATURE,
+>   		.matches = has_useable_gicv3_cpuif,
+>   		.sys_reg = SYS_ID_AA64PFR0_EL1,
+>   		.field_pos = ID_AA64PFR0_GIC_SHIFT,
+> 
 
-Will do in v11, thanks!
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
