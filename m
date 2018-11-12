@@ -1,53 +1,63 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 12 Nov 2018 21:25:43 +0100
-Subject: [PATCH v3] ARM: SAMSUNG: limit SAMSUNG_PM_DEBUG config option to
- non-Exynos platforms
-In-Reply-To: <CAJKOXPcFnkwZfCg8q429L6HRfNxubTaoa+BRZ-1h3ti3Q2EAxw@mail.gmail.com>
-References: <CGME20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37@eucas1p2.samsung.com>
- <20181015155001eucas1p249f539be47eaff0d10ddc74e1f681b37~d0vYKtP7-2027420274eucas1p2g@eucas1p2.samsung.com>
- <CAJKOXPcFnkwZfCg8q429L6HRfNxubTaoa+BRZ-1h3ti3Q2EAxw@mail.gmail.com>
-Message-ID: <20181112202543.GB25275@kozik-lap>
+From: niklas.cassel@linaro.org (Niklas Cassel)
+Date: Mon, 12 Nov 2018 21:26:02 +0100
+Subject: PCIe support in APQ8098-based board
+In-Reply-To: <44260aa9-d01a-f9a5-a2e6-31f06de48d34@free.fr>
+References: <44260aa9-d01a-f9a5-a2e6-31f06de48d34@free.fr>
+Message-ID: <20181112202602.GA7649@centauri.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 03:04:52PM +0200, Krzysztof Kozlowski wrote:
-> On Mon, 15 Oct 2018 at 17:50, Bartlomiej Zolnierkiewicz
-> <b.zolnierkie@samsung.com> wrote:
-> >
-> > "Samsung PM Suspend debug" feature (controlled by SAMSUNG_PM_DEBUG
-> > config option) is not working properly (debug messages are not
-> > displayed after resume) on Exynos platforms because GPIOs restore
-> > code is not implemented.
-> >
-> > Add PLAT_S3C24XX, ARCH_S3C64XX and ARCH_S5PV210 dependencies to
-> > SAMSUNG_PM_DEBUG config option to hide it on Exynos platforms.
-> > Then convert Exynos code to not require <plat/pm-common.h>
-> > header (use pr_debug() directly instead of S3C_PMDBG() macro and
-> > remove redundant s3c_pm_*() calls).
-> >
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> > v3:
-> > - don't move PM to the line below in Kconfig
-> >
-> > v2:
-> > - convert Exynos code to not require <plat/pm-common.h> header
-> >
-> > Should by applied on top of "[PATCH] ARM: EXYNOS: remove no longer
-> > needed s3c_pm_check_*() calls".
-> >
-> >  arch/arm/mach-exynos/suspend.c |   14 ++++----------
-> >  arch/arm/plat-samsung/Kconfig  |    1 +
-> >  2 files changed, 5 insertions(+), 10 deletions(-)
+On Sun, Nov 11, 2018 at 11:26:29PM +0100, Marc Gonzalez wrote:
+> Hello,
+
+Hello Marc
+
 > 
-> Thanks. This and the other one (removing s3c_pm_check_*()) look OK
-> although it is too late for another pull so this will wait for next
-> cycle.
+> I'm playing with an APQ8098-based board, which I got to boot an upstream
+> v4.20-rc1 kernel to the command line, by reusing the msm8998-mtp.dts
+> (IIUC apq8098 is the msm8998's "little brother", in that they are
+> almost the same SoC, with some HW blocks missing in the apq8098).
 
-Hi,
+That is correct.
 
-This does not longer apply. Probably because of my changes around eint
-wakeup mask. Could you rebase?
+> 
+> I'm trying to get PCIe working on my eval board. I'm wondering if
+> someone from qcom, codeaurora, or linaro has perhaps already done
+> this work, and it's just not upstream yet?
 
-Best regards,
-Krzysztof
+Linaro will most likely look at this at some undefined time in the future.
+
+Here are some hints in case you need this urgently:
+
+msm8998 uses QCOM PCIe v2.3.3, which is supported by
+drivers/pci/controller/dwc/pcie-qcom.c
+
+I suggest that you look at:
+arch/arm64/boot/dts/qcom/ipq8074.dtsi
+
+However, note that the PCI ranges are different for this SoC compared to
+ipq8074.
+
+The correct ranges can be found here:
+https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/arch/arm/boot/dts/qcom/msm8998.dtsi?h=msm-4.4#n2538
+
+It also appears that drivers/clk/qcom/gcc-msm8998.c is missing some PCIe
+resets.
+The correct addresses for these clocks can be found here:
+https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/drivers/clk/msm/clock-gcc-8998.c?h=msm-4.4
+
+Note that the qcom_pcie_get_resources_2_3_3() will have to be modified
+slightly for msm8998, since msm8998 only has 3 PCIe resets.
+
+
+Kind regards,
+Niklas
+
+> 
+> There seem to be proper drivers for the RC and the PHY, but some
+> low-level stuff are missing (clocks, regulator, power domain).
+> 
+> drivers/pci/controller/dwc/pcie-qcom.c
+> drivers/phy/qualcomm/phy-qcom-qmp.c
+> 
+> Regards.
