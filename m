@@ -1,55 +1,64 @@
-From: vineet.gupta1@synopsys.com (Vineet Gupta)
-Date: Tue, 13 Nov 2018 00:57:54 +0000
-Subject: [PATCH v4 6/6] arch: Move initrd= parsing into do_mounts_initrd.c
-References: <20181105225431.24485-1-f.fainelli@gmail.com>
- <20181105225431.24485-7-f.fainelli@gmail.com>
- <C2D7FE5348E1B147BCA15975FBA23075013A5929ED@us01wembx1.internal.synopsys.com>
- <05f56763-1530-933d-2ce3-3653ad4c685f@gmail.com>
- <C2D7FE5348E1B147BCA15975FBA23075013A592A0B@us01wembx1.internal.synopsys.com>
- <04d6d0cb-8e60-88a0-061e-62c7c70024c5@gmail.com>
-Message-ID: <C2D7FE5348E1B147BCA15975FBA23075013A592A33@us01wembx1.internal.synopsys.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 12 Nov 2018 22:32:12 +0000
+Subject: [PATCH v3 2/7] arm64/kvm: context-switch ptrauth registers
+In-Reply-To: <20181102083725.GV12057@e113682-lin.lund.arm.com>
+References: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
+ <1539773280-4159-3-git-send-email-amit.kachhap@arm.com>
+ <20181102083725.GV12057@e113682-lin.lund.arm.com>
+Message-ID: <20181112223212.5o4ipc5kt5ziuupt@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/18 4:52 PM, Florian Fainelli wrote:
-> On 11/12/18 4:40 PM, Vineet Gupta wrote:
->> On 11/12/18 4:38 PM, Florian Fainelli wrote:
->>>>>  #ifdef CONFIG_BLK_DEV_INITRD
->>>>> -	if (initrd_start)
->>>>> -		memblock_reserve(__pa(initrd_start), initrd_end - initrd_start);
->>>>> +	if (phys_initrd_size) {
->>>>> +		memblock_reserve(phys_initrd_start, phys_initrd_size);
->>>>> +		initrd_start = (unsigned long)__va(phys_initrd_start);
->>>>> +		initrd_end = initrd_start + phys_initrd_size;
->>>>> +	}
->>>>>  #endif
->>>> The common code now uses phys_initrd*, and you also use the same in ARC code, do
->>>> we still need the initrd_* setting here ?
->>>> ARC semantics was using them as PA anyways.
->>> Yes, the generic initrd code expects initrd_start/end to be virtual
->>> addresses, which we now directly derive from phys_initrd_start, that
->>> should really be equivalent.
->> So we can skip this explicit setting above - ARC arch code doesn't access the virt
->> initrd_start
-> OK, you are saying we could just have the generic initrd code do this
-> assignment instead of having each architecture do it, is that a correct
-> understanding? 
+On Fri, Nov 02, 2018 at 09:37:25AM +0100, Christoffer Dall wrote:
+> On Wed, Oct 17, 2018 at 04:17:55PM +0530, Amit Daniel Kachhap wrote:
+> > From: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > When pointer authentication is supported, a guest may wish to use it.
+> > This patch adds the necessary KVM infrastructure for this to work.
+> > 
+> > When we schedule a vcpu, we enable guest usage of pointer
+> > authentication instructions and accesses to the keys. After these are
+> > enabled, we allow context-switching the keys.
+> > 
+> > Pointer authentication consists of address authentication and generic
+> > authentication, and CPUs in a system might have varied support for
+> > either. Where support for either feature is not uniform, it is hidden
+> > from guests via ID register emulation, as a result of the cpufeature
+> > framework in the host.
+> > 
+> > Unfortunately, address authentication and generic authentication cannot
+> > be trapped separately, as the architecture provides a single EL2 trap
+> > covering both. If we wish to expose one without the other, we cannot
+> > prevent a (badly-written) guest from intermittently using a feature
+> > which is not uniformly supported (when scheduled on a physical CPU which
+> > supports the relevant feature). When the guest is scheduled on a
+> > physical CPU lacking the feature, these attempts will result in an UNDEF
+> > being taken by the guest.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Christoffer Dall <christoffer.dall@arm.com>
+> > Cc: kvmarm at lists.cs.columbia.edu
+[...] 
+> Two questions:
+> 
+>  - Can we limit all ptrauth functionality to VHE systems so that we
+>    don't need to touch the non-VHE path and so that we don't need any of
+>    the __hyp_text stuff?
 
-Correct !
+I would say yes. ARMv8.3 implies v8.1, so can enable ptrauth only when
+VHE is built into the kernel and present in the CPU implementation.
 
-> If so, I suppose it could be done, whether as of this
-> patch series or as a follow-up, either way is fine with me.
+>  - Can we move all the save/restore logic to vcpu load/put as long as
+>    the host kernel itself isn't using ptrauth, and if the host kernel at
+>    some point begins to use ptrauth, can we have a hook to save/restore
+>    at that time (similar to what we do for FPSIMD) to avoid this
+>    overhead on every switch?
 
-If it is not too much trouble, I'd prefer this now. I should have chimed earlier.
+We will probably enable ptrauth for the kernel as well fairly soon, so I
+don't think we should base the KVM assumption on the no ptrauth in
+kernel use-case.
 
-> One possible caveat is if __va() and __phys_to_virt() behave differently
-> (e.g: because of CONFIG_DEBUG_VIRTUAL or other things).
-
-
-Thing is, after your patches, we don't use the vanilla initrd_xxx in arch code any
-longer. So this becomes just an implementation detail, which core code may or
-maynot need and if it does, this needs to work already w/o having to set anything
-in arch code. Agree ?
-
-Thx,
--Vineet
+-- 
+Catalin
