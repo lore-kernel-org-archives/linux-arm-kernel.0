@@ -1,29 +1,30 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:27 +0100
-Subject: [PATCH v3 18/18] USB: gadget: mv-udc: use phy-pxa-usb
+Date: Mon, 12 Nov 2018 04:20:26 +0100
+Subject: [PATCH v3 17/18] USB: phy-mv-usb: use phy-pxa-usb
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-19-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-18-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use a proper PHY driver, instead of hooks to a board support package.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Tested-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm/mach-mmp/devices.c          | 11 +-------
- drivers/usb/gadget/udc/mv_udc.h      |  7 ++++-
- drivers/usb/gadget/udc/mv_udc_core.c | 38 ++++++++--------------------
- 3 files changed, 17 insertions(+), 39 deletions(-)
+ arch/arm/mach-mmp/devices.c  |  11 +---
+ drivers/usb/phy/phy-mv-usb.c | 123 ++++++++++++++++-------------------
+ drivers/usb/phy/phy-mv-usb.h |   8 ++-
+ 3 files changed, 62 insertions(+), 80 deletions(-)
 
 diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-index eb9b3c34e90a..d925be9f14a9 100644
+index 822b8be042b9..eb9b3c34e90a 100644
 --- a/arch/arm/mach-mmp/devices.c
 +++ b/arch/arm/mach-mmp/devices.c
-@@ -263,21 +263,12 @@ struct platform_device pxa168_device_usb_phy = {
+@@ -325,21 +325,12 @@ struct platform_device pxa168_device_u2oehci = {
  
- #if IS_ENABLED(CONFIG_USB_MV_UDC)
- struct resource pxa168_u2o_resources[] = {
+ #if IS_ENABLED(CONFIG_USB_MV_OTG)
+ struct resource pxa168_u2ootg_resources[] = {
 -	/* regbase */
  	[0] = {
 -		.start	= PXA168_U2O_REGBASE + U2x_CAPREGS_OFFSET,
@@ -43,108 +44,373 @@ index eb9b3c34e90a..d925be9f14a9 100644
  		.start	= IRQ_PXA168_USB1,
  		.end	= IRQ_PXA168_USB1,
  		.flags	= IORESOURCE_IRQ,
-diff --git a/drivers/usb/gadget/udc/mv_udc.h b/drivers/usb/gadget/udc/mv_udc.h
-index b3f759c0962c..6f04f432964d 100644
---- a/drivers/usb/gadget/udc/mv_udc.h
-+++ b/drivers/usb/gadget/udc/mv_udc.h
-@@ -6,6 +6,9 @@
- #ifndef __MV_UDC_H
- #define __MV_UDC_H
+diff --git a/drivers/usb/phy/phy-mv-usb.c b/drivers/usb/phy/phy-mv-usb.c
+index cfd9add10bf4..0f67c5b65fe9 100644
+--- a/drivers/usb/phy/phy-mv-usb.c
++++ b/drivers/usb/phy/phy-mv-usb.c
+@@ -50,7 +50,7 @@ static char *state_string[] = {
  
-+/* registers */
-+#define U2x_CAPREGS_OFFSET	0x100
-+
- #define VUSBHS_MAX_PORTS	8
+ static int mv_otg_set_vbus(struct usb_otg *otg, bool on)
+ {
+-	struct mv_otg *mvotg = container_of(otg->usb_phy, struct mv_otg, phy);
++	struct mv_otg *mvotg = container_of(otg->usb_phy, struct mv_otg, usb_phy);
+ 	if (mvotg->pdata->set_vbus == NULL)
+ 		return -ENODEV;
  
- #define DQH_ALIGNMENT		2048
-@@ -174,9 +177,9 @@ struct mv_udc {
- 	struct platform_device		*dev;
- 	int				irq;
+@@ -193,7 +193,7 @@ static void mv_otg_init_irq(struct mv_otg *mvotg)
+ static void mv_otg_start_host(struct mv_otg *mvotg, int on)
+ {
+ #ifdef CONFIG_USB
+-	struct usb_otg *otg = mvotg->phy.otg;
++	struct usb_otg *otg = mvotg->usb_phy.otg;
+ 	struct usb_hcd *hcd;
  
-+	void __iomem                    *base;
- 	struct mv_cap_regs __iomem	*cap_regs;
- 	struct mv_op_regs __iomem	*op_regs;
--	void __iomem                    *phy_regs;
- 	unsigned int			max_eps;
- 	struct mv_dqh			*ep_dqh;
- 	size_t				ep_dqh_size;
-@@ -219,6 +222,8 @@ struct mv_udc {
+ 	if (!otg->host)
+@@ -214,12 +214,12 @@ static void mv_otg_start_host(struct mv_otg *mvotg, int on)
  
- 	/* some SOC has mutiple clock sources for USB*/
- 	struct clk      *clk;
-+
-+	struct phy	*phy;
- };
+ static void mv_otg_start_periphrals(struct mv_otg *mvotg, int on)
+ {
+-	struct usb_otg *otg = mvotg->phy.otg;
++	struct usb_otg *otg = mvotg->usb_phy.otg;
  
- /* endpoint data structure */
-diff --git a/drivers/usb/gadget/udc/mv_udc_core.c b/drivers/usb/gadget/udc/mv_udc_core.c
-index cafde053788b..35b0bde2d46f 100644
---- a/drivers/usb/gadget/udc/mv_udc_core.c
-+++ b/drivers/usb/gadget/udc/mv_udc_core.c
-@@ -1069,14 +1069,11 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
- 	if (retval)
- 		return retval;
+ 	if (!otg->gadget)
+ 		return;
  
--	if (udc->pdata->phy_init) {
--		retval = udc->pdata->phy_init(udc->phy_regs);
+-	dev_info(mvotg->phy.dev, "gadget %s\n", on ? "on" : "off");
++	dev_info(mvotg->usb_phy.dev, "gadget %s\n", on ? "on" : "off");
+ 
+ 	if (on)
+ 		usb_gadget_vbus_connect(otg->gadget);
+@@ -247,14 +247,11 @@ static int mv_otg_enable_internal(struct mv_otg *mvotg)
+ 	dev_dbg(&mvotg->pdev->dev, "otg enabled\n");
+ 
+ 	otg_clock_enable(mvotg);
+-	if (mvotg->pdata->phy_init) {
+-		retval = mvotg->pdata->phy_init(mvotg->phy_regs);
 -		if (retval) {
--			dev_err(&udc->dev->dev,
+-			dev_err(&mvotg->pdev->dev,
 -				"init phy error %d\n", retval);
--			udc_clock_disable(udc);
+-			otg_clock_disable(mvotg);
 -			return retval;
 -		}
-+	retval = phy_init(udc->phy);
++	retval = phy_init(mvotg->phy);
 +	if (retval) {
-+		dev_err(&udc->dev->dev, "init phy error %d\n", retval);
-+		udc_clock_disable(udc);
++		dev_err(&mvotg->pdev->dev, "init phy error %d\n", retval);
++		otg_clock_disable(mvotg);
 +		return retval;
  	}
- 	udc->active = 1;
+ 	mvotg->active = 1;
  
-@@ -1095,8 +1092,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
+@@ -274,8 +271,7 @@ static void mv_otg_disable_internal(struct mv_otg *mvotg)
  {
- 	if (udc->active) {
- 		dev_dbg(&udc->dev->dev, "disable udc\n");
--		if (udc->pdata->phy_deinit)
--			udc->pdata->phy_deinit(udc->phy_regs);
-+		phy_exit(udc->phy);
- 		udc_clock_disable(udc);
- 		udc->active = 0;
+ 	if (mvotg->active) {
+ 		dev_dbg(&mvotg->pdev->dev, "otg disabled\n");
+-		if (mvotg->pdata->phy_deinit)
+-			mvotg->pdata->phy_deinit(mvotg->phy_regs);
++		phy_exit(mvotg->phy);
+ 		otg_clock_disable(mvotg);
+ 		mvotg->active = 0;
  	}
-@@ -2147,30 +2143,16 @@ static int mv_udc_probe(struct platform_device *pdev)
- 	if (IS_ERR(udc->clk))
- 		return PTR_ERR(udc->clk);
+@@ -329,68 +325,68 @@ static void mv_otg_update_inputs(struct mv_otg *mvotg)
+ static void mv_otg_update_state(struct mv_otg *mvotg)
+ {
+ 	struct mv_otg_ctrl *otg_ctrl = &mvotg->otg_ctrl;
+-	int old_state = mvotg->phy.otg->state;
++	int old_state = mvotg->usb_phy.otg->state;
  
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
-+	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
- 	if (r == NULL) {
- 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
- 		return -ENODEV;
- 	}
+ 	switch (old_state) {
+ 	case OTG_STATE_UNDEFINED:
+-		mvotg->phy.otg->state = OTG_STATE_B_IDLE;
++		mvotg->usb_phy.otg->state = OTG_STATE_B_IDLE;
+ 		/* FALL THROUGH */
+ 	case OTG_STATE_B_IDLE:
+ 		if (otg_ctrl->id == 0)
+-			mvotg->phy.otg->state = OTG_STATE_A_IDLE;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_IDLE;
+ 		else if (otg_ctrl->b_sess_vld)
+-			mvotg->phy.otg->state = OTG_STATE_B_PERIPHERAL;
++			mvotg->usb_phy.otg->state = OTG_STATE_B_PERIPHERAL;
+ 		break;
+ 	case OTG_STATE_B_PERIPHERAL:
+ 		if (!otg_ctrl->b_sess_vld || otg_ctrl->id == 0)
+-			mvotg->phy.otg->state = OTG_STATE_B_IDLE;
++			mvotg->usb_phy.otg->state = OTG_STATE_B_IDLE;
+ 		break;
+ 	case OTG_STATE_A_IDLE:
+ 		if (otg_ctrl->id)
+-			mvotg->phy.otg->state = OTG_STATE_B_IDLE;
++			mvotg->usb_phy.otg->state = OTG_STATE_B_IDLE;
+ 		else if (!(otg_ctrl->a_bus_drop) &&
+ 			 (otg_ctrl->a_bus_req || otg_ctrl->a_srp_det))
+-			mvotg->phy.otg->state = OTG_STATE_A_WAIT_VRISE;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_WAIT_VRISE;
+ 		break;
+ 	case OTG_STATE_A_WAIT_VRISE:
+ 		if (otg_ctrl->a_vbus_vld)
+-			mvotg->phy.otg->state = OTG_STATE_A_WAIT_BCON;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_WAIT_BCON;
+ 		break;
+ 	case OTG_STATE_A_WAIT_BCON:
+ 		if (otg_ctrl->id || otg_ctrl->a_bus_drop
+ 		    || otg_ctrl->a_wait_bcon_timeout) {
+ 			mv_otg_cancel_timer(mvotg, A_WAIT_BCON_TIMER);
+ 			mvotg->otg_ctrl.a_wait_bcon_timeout = 0;
+-			mvotg->phy.otg->state = OTG_STATE_A_WAIT_VFALL;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_WAIT_VFALL;
+ 			otg_ctrl->a_bus_req = 0;
+ 		} else if (!otg_ctrl->a_vbus_vld) {
+ 			mv_otg_cancel_timer(mvotg, A_WAIT_BCON_TIMER);
+ 			mvotg->otg_ctrl.a_wait_bcon_timeout = 0;
+-			mvotg->phy.otg->state = OTG_STATE_A_VBUS_ERR;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_VBUS_ERR;
+ 		} else if (otg_ctrl->b_conn) {
+ 			mv_otg_cancel_timer(mvotg, A_WAIT_BCON_TIMER);
+ 			mvotg->otg_ctrl.a_wait_bcon_timeout = 0;
+-			mvotg->phy.otg->state = OTG_STATE_A_HOST;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_HOST;
+ 		}
+ 		break;
+ 	case OTG_STATE_A_HOST:
+ 		if (otg_ctrl->id || !otg_ctrl->b_conn
+ 		    || otg_ctrl->a_bus_drop)
+-			mvotg->phy.otg->state = OTG_STATE_A_WAIT_BCON;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_WAIT_BCON;
+ 		else if (!otg_ctrl->a_vbus_vld)
+-			mvotg->phy.otg->state = OTG_STATE_A_VBUS_ERR;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_VBUS_ERR;
+ 		break;
+ 	case OTG_STATE_A_WAIT_VFALL:
+ 		if (otg_ctrl->id
+ 		    || (!otg_ctrl->b_conn && otg_ctrl->a_sess_vld)
+ 		    || otg_ctrl->a_bus_req)
+-			mvotg->phy.otg->state = OTG_STATE_A_IDLE;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_IDLE;
+ 		break;
+ 	case OTG_STATE_A_VBUS_ERR:
+ 		if (otg_ctrl->id || otg_ctrl->a_clr_err
+ 		    || otg_ctrl->a_bus_drop) {
+ 			otg_ctrl->a_clr_err = 0;
+-			mvotg->phy.otg->state = OTG_STATE_A_WAIT_VFALL;
++			mvotg->usb_phy.otg->state = OTG_STATE_A_WAIT_VFALL;
+ 		}
+ 		break;
+ 	default:
+@@ -409,8 +405,8 @@ static void mv_otg_work(struct work_struct *work)
  
--	udc->cap_regs = (struct mv_cap_regs __iomem *)
--		devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (udc->cap_regs == NULL) {
--		dev_err(&pdev->dev, "failed to map I/O memory\n");
--		return -EBUSY;
--	}
--
--	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
+ run:
+ 	/* work queue is single thread, or we need spin_lock to protect */
+-	phy = &mvotg->phy;
+-	otg = mvotg->phy.otg;
++	phy = &mvotg->usb_phy;
++	otg = mvotg->usb_phy.otg;
+ 	old_state = otg->state;
+ 
+ 	if (!mvotg->active)
+@@ -419,24 +415,24 @@ static void mv_otg_work(struct work_struct *work)
+ 	mv_otg_update_inputs(mvotg);
+ 	mv_otg_update_state(mvotg);
+ 
+-	if (old_state != mvotg->phy.otg->state) {
++	if (old_state != mvotg->usb_phy.otg->state) {
+ 		dev_info(&mvotg->pdev->dev, "change from state %s to %s\n",
+ 			 state_string[old_state],
+-			 state_string[mvotg->phy.otg->state]);
++			 state_string[mvotg->usb_phy.otg->state]);
+ 
+-		switch (mvotg->phy.otg->state) {
++		switch (mvotg->usb_phy.otg->state) {
+ 		case OTG_STATE_B_IDLE:
+ 			otg->default_a = 0;
+ 			if (old_state == OTG_STATE_B_PERIPHERAL)
+ 				mv_otg_start_periphrals(mvotg, 0);
+ 			mv_otg_reset(mvotg);
+ 			mv_otg_disable(mvotg);
+-			usb_phy_set_event(&mvotg->phy, USB_EVENT_NONE);
++			usb_phy_set_event(&mvotg->usb_phy, USB_EVENT_NONE);
+ 			break;
+ 		case OTG_STATE_B_PERIPHERAL:
+ 			mv_otg_enable(mvotg);
+ 			mv_otg_start_periphrals(mvotg, 1);
+-			usb_phy_set_event(&mvotg->phy, USB_EVENT_ENUMERATED);
++			usb_phy_set_event(&mvotg->usb_phy, USB_EVENT_ENUMERATED);
+ 			break;
+ 		case OTG_STATE_A_IDLE:
+ 			otg->default_a = 1;
+@@ -536,8 +532,8 @@ a_bus_req_store(struct device *dev, struct device_attribute *attr,
+ 		return -1;
+ 
+ 	/* We will use this interface to change to A device */
+-	if (mvotg->phy.otg->state != OTG_STATE_B_IDLE
+-	    && mvotg->phy.otg->state != OTG_STATE_A_IDLE)
++	if (mvotg->usb_phy.otg->state != OTG_STATE_B_IDLE
++	    && mvotg->usb_phy.otg->state != OTG_STATE_A_IDLE)
+ 		return -1;
+ 
+ 	/* The clock may disabled and we need to set irq for ID detected */
+@@ -566,7 +562,7 @@ a_clr_err_store(struct device *dev, struct device_attribute *attr,
+ 	      const char *buf, size_t count)
+ {
+ 	struct mv_otg *mvotg = dev_get_drvdata(dev);
+-	if (!mvotg->phy.otg->default_a)
++	if (!mvotg->usb_phy.otg->default_a)
+ 		return -1;
+ 
+ 	if (count > 2)
+@@ -602,7 +598,7 @@ a_bus_drop_store(struct device *dev, struct device_attribute *attr,
+ 	       const char *buf, size_t count)
+ {
+ 	struct mv_otg *mvotg = dev_get_drvdata(dev);
+-	if (!mvotg->phy.otg->default_a)
++	if (!mvotg->usb_phy.otg->default_a)
+ 		return -1;
+ 
+ 	if (count > 2)
+@@ -656,7 +652,7 @@ static int mv_otg_remove(struct platform_device *pdev)
+ 
+ 	mv_otg_disable(mvotg);
+ 
+-	usb_remove_phy(&mvotg->phy);
++	usb_remove_phy(&mvotg->usb_phy);
+ 
+ 	return 0;
+ }
+@@ -687,6 +683,10 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	mvotg->pdev = pdev;
+ 	mvotg->pdata = pdata;
+ 
++	mvotg->phy = devm_phy_get(&pdev->dev, "usb");
++	if (IS_ERR(mvotg->phy))
++		return PTR_ERR(mvotg->phy);
++
+ 	mvotg->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(mvotg->clk))
+ 		return PTR_ERR(mvotg->clk);
+@@ -701,12 +701,12 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 
+ 	/* OTG common part */
+ 	mvotg->pdev = pdev;
+-	mvotg->phy.dev = &pdev->dev;
+-	mvotg->phy.otg = otg;
+-	mvotg->phy.label = driver_name;
++	mvotg->usb_phy.dev = &pdev->dev;
++	mvotg->usb_phy.otg = otg;
++	mvotg->usb_phy.label = driver_name;
+ 
+ 	otg->state = OTG_STATE_UNDEFINED;
+-	otg->usb_phy = &mvotg->phy;
++	otg->usb_phy = &mvotg->usb_phy;
+ 	otg->set_host = mv_otg_set_host;
+ 	otg->set_peripheral = mv_otg_set_peripheral;
+ 	otg->set_vbus = mv_otg_set_vbus;
+@@ -715,36 +715,23 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		timer_setup(&mvotg->otg_ctrl.timer[i],
+ 			    mv_otg_timer_await_bcon, 0);
+ 
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "phyregs");
 -	if (r == NULL) {
 -		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
--		return -ENODEV;
+-		retval = -ENODEV;
+-		goto err_destroy_workqueue;
 -	}
-+	udc->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
- 
--	udc->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
--	if (udc->phy_regs == NULL) {
+-
+-	mvotg->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (mvotg->phy_regs == NULL) {
 -		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
--		return -EBUSY;
+-		retval = -EFAULT;
+-		goto err_destroy_workqueue;
 -	}
-+	udc->cap_regs =
-+		(void __iomem *) ((unsigned long)udc->base + U2x_CAPREGS_OFFSET);
+-
+-	r = platform_get_resource_byname(mvotg->pdev,
+-					 IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(mvotg->pdev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		retval = -ENODEV;
+ 		goto err_destroy_workqueue;
+ 	}
  
- 	/* we will acces controller register, so enable the clk */
- 	retval = mv_udc_enable_internal(udc);
+-	mvotg->cap_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (mvotg->cap_regs == NULL) {
++	mvotg->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
++	if (mvotg->base == NULL) {
+ 		dev_err(&pdev->dev, "failed to map I/O memory\n");
+ 		retval = -EFAULT;
+ 		goto err_destroy_workqueue;
+ 	}
+ 
++	mvotg->cap_regs =
++		(void __iomem *) ((unsigned long)mvotg->base + U2x_CAPREGS_OFFSET);
++
+ 	/* we will acces controller register, so enable the udc controller */
+ 	retval = mv_otg_enable_internal(mvotg);
+ 	if (retval) {
+@@ -804,7 +791,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 		goto err_disable_clk;
+ 	}
+ 
+-	retval = usb_add_phy(&mvotg->phy, USB_PHY_TYPE_USB2);
++	retval = usb_add_phy(&mvotg->usb_phy, USB_PHY_TYPE_USB2);
+ 	if (retval < 0) {
+ 		dev_err(&pdev->dev, "can't register transceiver, %d\n",
+ 			retval);
+@@ -831,7 +818,7 @@ static int mv_otg_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_remove_phy:
+-	usb_remove_phy(&mvotg->phy);
++	usb_remove_phy(&mvotg->usb_phy);
+ err_disable_clk:
+ 	mv_otg_disable_internal(mvotg);
+ err_destroy_workqueue:
+@@ -846,10 +833,10 @@ static int mv_otg_suspend(struct platform_device *pdev, pm_message_t state)
+ {
+ 	struct mv_otg *mvotg = platform_get_drvdata(pdev);
+ 
+-	if (mvotg->phy.otg->state != OTG_STATE_B_IDLE) {
++	if (mvotg->usb_phy.otg->state != OTG_STATE_B_IDLE) {
+ 		dev_info(&pdev->dev,
+ 			 "OTG state is not B_IDLE, it is %d!\n",
+-			 mvotg->phy.otg->state);
++			 mvotg->usb_phy.otg->state);
+ 		return -EAGAIN;
+ 	}
+ 
+diff --git a/drivers/usb/phy/phy-mv-usb.h b/drivers/usb/phy/phy-mv-usb.h
+index 96701a1229ad..9b7bc6d958a8 100644
+--- a/drivers/usb/phy/phy-mv-usb.h
++++ b/drivers/usb/phy/phy-mv-usb.h
+@@ -8,6 +8,9 @@
+ 
+ #include <linux/types.h>
+ 
++/* registers */
++#define U2x_CAPREGS_OFFSET       0x100
++
+ /* Command Register Bit Masks */
+ #define USBCMD_RUN_STOP			(0x00000001)
+ #define USBCMD_CTRL_RESET		(0x00000002)
+@@ -132,11 +135,11 @@ struct mv_otg_regs {
+ };
+ 
+ struct mv_otg {
+-	struct usb_phy phy;
++	struct usb_phy usb_phy;
+ 	struct mv_otg_ctrl otg_ctrl;
+ 
+ 	/* base address */
+-	void __iomem *phy_regs;
++	void __iomem *base;
+ 	void __iomem *cap_regs;
+ 	struct mv_otg_regs __iomem *op_regs;
+ 
+@@ -155,6 +158,7 @@ struct mv_otg {
+ 	unsigned int active;
+ 	unsigned int clock_gating;
+ 	struct clk *clk;
++	struct phy *phy;
+ };
+ 
+ #endif
 -- 
 2.19.1
