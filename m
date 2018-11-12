@@ -1,34 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Nov 2018 10:22:36 -0800
-Subject: [PATCH] ARM: stm32: debug: add low-level debug support
-In-Reply-To: <1501174209-27550-2-git-send-email-bich.hemon@st.com>
-References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
- <1501174209-27550-2-git-send-email-bich.hemon@st.com>
-Message-ID: <20181112182236.s7cs6dol4dmxkp7u@localhost>
+Date: Mon, 12 Nov 2018 10:27:30 -0800
+Subject: [GIT PULL] arm64: dts: TI AM65x fixes for 4.20
+In-Reply-To: <1f8d9384-f002-d4a1-bd63-bb2ece27d922@ti.com>
+References: <1f8d9384-f002-d4a1-bd63-bb2ece27d922@ti.com>
+Message-ID: <20181112182730.y56gmdgzrrcgpyos@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
-> From: Gerald Baeza <gerald.baeza@st.com>
+On Fri, Nov 09, 2018 at 06:42:21PM +0200, Tero Kristo wrote:
+> Hi ARM-SoC team,
 > 
-> This adds low-level debug support on USART1 for STM32F4
-> and STM32F7.
-> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
-> Enabled via 'earlyprintk' in bootargs.
+> One simple fix for TI AM65x DTS towards 4.20.
 > 
-> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
-> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+> -Tero
+> 
+> ---
+> 
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> 
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kristo/linux
+> tags/am654-fixes-for-v4.20
+> 
+> for you to fetch changes up to 8588eac3ff66e77fb681591714fd76da3a4da80d:
+> 
+>   arm64: dts: ti: k3-am654: Fix wakeup_uart reg address (2018-11-09 18:26:52
+> +0200)
+> 
+> ----------------------------------------------------------------
+> Texas Instruments AM65x fixes for v4.20
+> 
+> - Fix the wkup uart instance addresses to use proper cell sizes, otherwise
+>   the uart fails to probe.
 
-Hi,
+Thanks, merged.
 
-This had fallen between the chairs it seems. I have applied it to arm-soc
-next/soc now, for 4.21 merge window.
-
-It ended up being patched up manually to consolidate the version in
-Russell's patch tracker with this posted version, and I tweaked whitespace
-a bit. Let me know if I missed something.
-
-
-Thanks,
 
 -Olof
