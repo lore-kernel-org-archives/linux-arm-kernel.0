@@ -1,159 +1,150 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:23 +0100
-Subject: [PATCH v3 14/18] ARM: mmp/mmp2: dt: enable the clock
+Date: Mon, 12 Nov 2018 04:20:27 +0100
+Subject: [PATCH v3 18/18] USB: gadget: mv-udc: use phy-pxa-usb
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-15-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-19-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device-tree booted MMP2 needs to enable the timer clock, otherwise
-it would stop ticking when the boot finishes.
-
-It can also use the clock rate from the clk, the non-DT boards need to
-keep using the hardcoded rates.
+Use a proper PHY driver, instead of hooks to a board support package.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-
 ---
-Changes since v2:
-- Wording improvement, whitespace fix and an ack from Pavel
+ arch/arm/mach-mmp/devices.c          | 11 +-------
+ drivers/usb/gadget/udc/mv_udc.h      |  7 ++++-
+ drivers/usb/gadget/udc/mv_udc_core.c | 38 ++++++++--------------------
+ 3 files changed, 17 insertions(+), 39 deletions(-)
 
-Changes since v1:
-- Made the clock optional, to keep compatibility with DTs without it
-
- arch/arm/mach-mmp/common.h |  2 +-
- arch/arm/mach-mmp/mmp2.c   |  2 +-
- arch/arm/mach-mmp/pxa168.c |  2 +-
- arch/arm/mach-mmp/time.c   | 32 ++++++++++++++++++++------------
- 4 files changed, 23 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index 7e284d9c429f..5ac2851ef5d3 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -2,7 +2,7 @@
- #include <linux/reboot.h>
- #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
+diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
+index eb9b3c34e90a..d925be9f14a9 100644
+--- a/arch/arm/mach-mmp/devices.c
++++ b/arch/arm/mach-mmp/devices.c
+@@ -263,21 +263,12 @@ struct platform_device pxa168_device_usb_phy = {
  
--extern void timer_init(int irq);
-+extern void timer_init(int irq, unsigned long rate);
+ #if IS_ENABLED(CONFIG_USB_MV_UDC)
+ struct resource pxa168_u2o_resources[] = {
+-	/* regbase */
+ 	[0] = {
+-		.start	= PXA168_U2O_REGBASE + U2x_CAPREGS_OFFSET,
++		.start	= PXA168_U2O_REGBASE,
+ 		.end	= PXA168_U2O_REGBASE + USB_REG_RANGE,
+ 		.flags	= IORESOURCE_MEM,
+-		.name	= "capregs",
+ 	},
+-	/* phybase */
+ 	[1] = {
+-		.start	= PXA168_U2O_PHYBASE,
+-		.end	= PXA168_U2O_PHYBASE + USB_PHY_RANGE,
+-		.flags	= IORESOURCE_MEM,
+-		.name	= "phyregs",
+-	},
+-	[2] = {
+ 		.start	= IRQ_PXA168_USB1,
+ 		.end	= IRQ_PXA168_USB1,
+ 		.flags	= IORESOURCE_IRQ,
+diff --git a/drivers/usb/gadget/udc/mv_udc.h b/drivers/usb/gadget/udc/mv_udc.h
+index b3f759c0962c..6f04f432964d 100644
+--- a/drivers/usb/gadget/udc/mv_udc.h
++++ b/drivers/usb/gadget/udc/mv_udc.h
+@@ -6,6 +6,9 @@
+ #ifndef __MV_UDC_H
+ #define __MV_UDC_H
  
- extern void __init mmp_map_io(void);
- extern void mmp_restart(enum reboot_mode, const char *);
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index b670fafedeac..8717de7d0757 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -134,7 +134,7 @@ void __init mmp2_timer_init(void)
- 	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
- 	__raw_writel(clk_rst, APBC_TIMERS);
++/* registers */
++#define U2x_CAPREGS_OFFSET	0x100
++
+ #define VUSBHS_MAX_PORTS	8
  
--	timer_init(IRQ_MMP2_TIMER1);
-+	timer_init(IRQ_MMP2_TIMER1, 6500000);
- }
+ #define DQH_ALIGNMENT		2048
+@@ -174,9 +177,9 @@ struct mv_udc {
+ 	struct platform_device		*dev;
+ 	int				irq;
  
- /* on-chip devices */
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 0f5f16fb8c66..77a358165a56 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -79,7 +79,7 @@ void __init pxa168_timer_init(void)
- 	/* 3.25MHz, bus/functional clock enabled, release reset */
- 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
++	void __iomem                    *base;
+ 	struct mv_cap_regs __iomem	*cap_regs;
+ 	struct mv_op_regs __iomem	*op_regs;
+-	void __iomem                    *phy_regs;
+ 	unsigned int			max_eps;
+ 	struct mv_dqh			*ep_dqh;
+ 	size_t				ep_dqh_size;
+@@ -219,6 +222,8 @@ struct mv_udc {
  
--	timer_init(IRQ_PXA168_TIMER1);
-+	timer_init(IRQ_PXA168_TIMER1, 6500000);
- }
- 
- void pxa168_clear_keypad_wakeup(void)
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 0f49ac579a17..007b94a92923 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
-+#include <linux/clk.h>
- 
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -38,12 +39,6 @@
- #include "cputype.h"
- #include "clock.h"
- 
--#ifdef CONFIG_CPU_MMP2
--#define MMP_CLOCK_FREQ		6500000
--#else
--#define MMP_CLOCK_FREQ		3250000
--#endif
--
- #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
- 
- #define MAX_DELTA		(0xfffffffe)
-@@ -189,19 +184,18 @@ static struct irqaction timer_irq = {
- 	.dev_id		= &ckevt,
+ 	/* some SOC has mutiple clock sources for USB*/
+ 	struct clk      *clk;
++
++	struct phy	*phy;
  };
  
--void __init timer_init(int irq)
-+void __init timer_init(int irq, unsigned long rate)
+ /* endpoint data structure */
+diff --git a/drivers/usb/gadget/udc/mv_udc_core.c b/drivers/usb/gadget/udc/mv_udc_core.c
+index cafde053788b..35b0bde2d46f 100644
+--- a/drivers/usb/gadget/udc/mv_udc_core.c
++++ b/drivers/usb/gadget/udc/mv_udc_core.c
+@@ -1069,14 +1069,11 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
+ 	if (retval)
+ 		return retval;
+ 
+-	if (udc->pdata->phy_init) {
+-		retval = udc->pdata->phy_init(udc->phy_regs);
+-		if (retval) {
+-			dev_err(&udc->dev->dev,
+-				"init phy error %d\n", retval);
+-			udc_clock_disable(udc);
+-			return retval;
+-		}
++	retval = phy_init(udc->phy);
++	if (retval) {
++		dev_err(&udc->dev->dev, "init phy error %d\n", retval);
++		udc_clock_disable(udc);
++		return retval;
+ 	}
+ 	udc->active = 1;
+ 
+@@ -1095,8 +1092,7 @@ static void mv_udc_disable_internal(struct mv_udc *udc)
  {
- 	timer_config();
+ 	if (udc->active) {
+ 		dev_dbg(&udc->dev->dev, "disable udc\n");
+-		if (udc->pdata->phy_deinit)
+-			udc->pdata->phy_deinit(udc->phy_regs);
++		phy_exit(udc->phy);
+ 		udc_clock_disable(udc);
+ 		udc->active = 0;
+ 	}
+@@ -2147,30 +2143,16 @@ static int mv_udc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(udc->clk))
+ 		return PTR_ERR(udc->clk);
  
--	sched_clock_register(mmp_read_sched_clock, 32, MMP_CLOCK_FREQ);
-+	sched_clock_register(mmp_read_sched_clock, 32, rate);
- 
- 	ckevt.cpumask = cpumask_of(0);
- 
- 	setup_irq(irq, &timer_irq);
- 
--	clocksource_register_hz(&cksrc, MMP_CLOCK_FREQ);
--	clockevents_config_and_register(&ckevt, MMP_CLOCK_FREQ,
--					MIN_DELTA, MAX_DELTA);
-+	clocksource_register_hz(&cksrc, rate);
-+	clockevents_config_and_register(&ckevt, rate, MIN_DELTA, MAX_DELTA);
- }
- 
- #ifdef CONFIG_OF
-@@ -213,7 +207,9 @@ static const struct of_device_id mmp_timer_dt_ids[] = {
- void __init mmp_dt_init_timer(void)
- {
- 	struct device_node *np;
-+	struct clk *clk;
- 	int irq, ret;
-+	unsigned long rate;
- 
- 	np = of_find_matching_node(NULL, mmp_timer_dt_ids);
- 	if (!np) {
-@@ -221,6 +217,18 @@ void __init mmp_dt_init_timer(void)
- 		goto out;
+-	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "capregs");
++	r = platform_get_resource(udc->dev, IORESOURCE_MEM, 0);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "no I/O memory resource defined\n");
+ 		return -ENODEV;
  	}
  
-+	clk = of_clk_get(np, 0);
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret)
-+			goto out;
-+		rate = clk_get_rate(clk) / 2;
-+	} else if (cpu_is_pj4()) {
-+		rate = 6500000;
-+	} else {
-+		rate = 3250000;
-+	}
-+
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		ret = -EINVAL;
-@@ -231,7 +239,7 @@ void __init mmp_dt_init_timer(void)
- 		ret = -ENOMEM;
- 		goto out;
- 	}
--	timer_init(irq);
-+	timer_init(irq, rate);
- 	return;
- out:
- 	pr_err("Failed to get timer from device tree with error:%d\n", ret);
+-	udc->cap_regs = (struct mv_cap_regs __iomem *)
+-		devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (udc->cap_regs == NULL) {
+-		dev_err(&pdev->dev, "failed to map I/O memory\n");
+-		return -EBUSY;
+-	}
+-
+-	r = platform_get_resource_byname(udc->dev, IORESOURCE_MEM, "phyregs");
+-	if (r == NULL) {
+-		dev_err(&pdev->dev, "no phy I/O memory resource defined\n");
+-		return -ENODEV;
+-	}
++	udc->base = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+ 
+-	udc->phy_regs = devm_ioremap(&pdev->dev, r->start, resource_size(r));
+-	if (udc->phy_regs == NULL) {
+-		dev_err(&pdev->dev, "failed to map phy I/O memory\n");
+-		return -EBUSY;
+-	}
++	udc->cap_regs =
++		(void __iomem *) ((unsigned long)udc->base + U2x_CAPREGS_OFFSET);
+ 
+ 	/* we will acces controller register, so enable the clk */
+ 	retval = mv_udc_enable_internal(udc);
 -- 
 2.19.1
