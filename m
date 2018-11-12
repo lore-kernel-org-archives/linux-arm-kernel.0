@@ -1,30 +1,22 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Mon, 12 Nov 2018 16:47:55 +0100
-Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
-In-Reply-To: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-References: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181112154755.msekhs5xg5ylopkz@viti.kaiser.cx>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Mon, 12 Nov 2018 16:03:08 +0000
+Subject: [PATCH 0/2] soc: fsl: dpio: cleanup on the remove path
+References: <1541410219-9943-1-git-send-email-ioana.ciornei@nxp.com>
+Message-ID: <DB6PR0402MB2727CB4ED8267C5CED85B65786C10@DB6PR0402MB2727.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dong,
-
-your patch looks good to me.
-
-Thus wrote A.s. Dong (aisheng.dong at nxp.com):
-
-> After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
-> NO_PAD_CTL pads map are not skipped anymore which results in
-> a possible memory corruption. As we actually only need to create config
-> maps for SCU pads and MMIO pads which are not using the default config
-> (a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
-> the config maps. And during MMIO pads parsing, we also need update the
-> list_p point as SCU case to ensure the pin data next parsed is correct.
-
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
-> Reported-by: Martin Kaiser <martin@kaiser.cx>
-> Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-
-Reviewed-by: Martin Kaiser <martin@kaiser.cx>
+On 11/5/2018 4:30 AM, Ioana Ciornei wrote:
+> This patch series cleans up the remove path in the dpio driver so that
+> successive bind/unbind commands behave properly.
+>
+> Ioana Ciornei (2):
+>   soc: fsl: dpio: cleanup the cpu array on dpaa2_io_down
+>   soc: fsl: dpio: use a cpumask to identify which cpus are unused
+>
+>  drivers/soc/fsl/dpio/dpio-driver.c  | 25 ++++++++++++++++---------
+>  drivers/soc/fsl/dpio/dpio-service.c | 11 +++++++++++
+>  include/soc/fsl/dpaa2-io.h          |  2 ++
+>  3 files changed, 29 insertions(+), 9 deletions(-)
+>
+Reviewed-by: Roy Pledge <roy.pledge@nxp.com>
