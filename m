@@ -1,64 +1,54 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:24 +0100
-Subject: [PATCH v3 15/18] ARM: mmp: add a pxa-usb-phy device
+Date: Mon, 12 Nov 2018 04:20:25 +0100
+Subject: [PATCH v3 16/18] ARM: mmp: add an instance of pxa-usb-phy to ttc_dkb
+ and aspenite
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-16-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-17-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to replace the USB PHY initialization code (pxa_usb_phy_init(),
-pxa_usb_phy_deinit()) with a proper PHY driver.
+This will replace the *_pdata.phy_{de,}init()
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
----
- arch/arm/mach-mmp/devices.c | 21 +++++++++++++++++++++
- arch/arm/mach-mmp/pxa910.h  |  1 +
- 2 files changed, 22 insertions(+)
 
-diff --git a/arch/arm/mach-mmp/devices.c b/arch/arm/mach-mmp/devices.c
-index 0fca63c80e1a..822b8be042b9 100644
---- a/arch/arm/mach-mmp/devices.c
-+++ b/arch/arm/mach-mmp/devices.c
-@@ -240,6 +240,27 @@ void pxa_usb_phy_deinit(void __iomem *phy_reg)
- #if IS_ENABLED(CONFIG_USB_SUPPORT)
- static u64 __maybe_unused usb_dma_mask = ~(u32)0;
+---
+Changes since v1:
+- Squashed patches with ttc_dkb and aspenite changes together.
+
+ arch/arm/mach-mmp/aspenite.c | 4 ++++
+ arch/arm/mach-mmp/ttc_dkb.c  | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
+index 6c2ebf01893a..23f99976b5f5 100644
+--- a/arch/arm/mach-mmp/aspenite.c
++++ b/arch/arm/mach-mmp/aspenite.c
+@@ -256,6 +256,10 @@ static void __init common_init(void)
+ 	/* off-chip devices */
+ 	platform_device_register(&smc91x_device);
  
 +#if IS_ENABLED(CONFIG_PHY_PXA_USB)
-+struct resource pxa168_usb_phy_resources[] = {
-+	[0] = {
-+		.start	= PXA168_U2O_PHYBASE,
-+		.end	= PXA168_U2O_PHYBASE + USB_PHY_RANGE,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+};
++	platform_device_register(&pxa168_device_usb_phy);
++#endif
 +
-+struct platform_device pxa168_device_usb_phy = {
-+	.name		= "pxa-usb-phy",
-+	.id		= -1,
-+	.resource	= pxa168_usb_phy_resources,
-+	.num_resources	= ARRAY_SIZE(pxa168_usb_phy_resources),
-+	.dev		=  {
-+		.dma_mask	= &usb_dma_mask,
-+		.coherent_dma_mask = 0xffffffff,
-+	}
-+};
-+#endif /* CONFIG_PHY_PXA_USB */
+ #if IS_ENABLED(CONFIG_USB_EHCI_MV)
+ 	pxa168_add_usb_host(&pxa168_sph_pdata);
+ #endif
+diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
+index c7897fb2b6da..767dcb23ee1c 100644
+--- a/arch/arm/mach-mmp/ttc_dkb.c
++++ b/arch/arm/mach-mmp/ttc_dkb.c
+@@ -282,6 +282,10 @@ static void __init ttc_dkb_init(void)
+ 				 sizeof(struct pxa_gpio_platform_data));
+ 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
+ 
++#if IS_ENABLED(CONFIG_PHY_PXA_USB)
++	platform_device_register(&pxa168_device_usb_phy);
++#endif
 +
  #if IS_ENABLED(CONFIG_USB_MV_UDC)
- struct resource pxa168_u2o_resources[] = {
- 	/* regbase */
-diff --git a/arch/arm/mach-mmp/pxa910.h b/arch/arm/mach-mmp/pxa910.h
-index 42009c349eae..2dfe38e4acc1 100644
---- a/arch/arm/mach-mmp/pxa910.h
-+++ b/arch/arm/mach-mmp/pxa910.h
-@@ -22,6 +22,7 @@ extern struct pxa_device_desc pxa910_device_pwm2;
- extern struct pxa_device_desc pxa910_device_pwm3;
- extern struct pxa_device_desc pxa910_device_pwm4;
- extern struct pxa_device_desc pxa910_device_nand;
-+extern struct platform_device pxa168_device_usb_phy;
- extern struct platform_device pxa168_device_u2o;
- extern struct platform_device pxa168_device_u2ootg;
- extern struct platform_device pxa168_device_u2oehci;
+ 	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
+ 	platform_device_register(&pxa168_device_u2o);
 -- 
 2.19.1
