@@ -1,67 +1,52 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 12 Nov 2018 11:57:14 +0000
-Subject: [PATCH v6 23/24] arm64: Skip irqflags tracing for NMI in IRQs
- disabled context
+Date: Mon, 12 Nov 2018 11:57:12 +0000
+Subject: [PATCH v6 21/24] arm64: Handle serror in NMI context
 In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
 References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1542023835-21446-24-git-send-email-julien.thierry@arm.com>
+Message-ID: <1542023835-21446-22-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When an NMI is raised while interrupts where disabled, the IRQ tracing
-already is in the correct state (i.e. hardirqs_off) and should be left
-as such when returning to the interrupted context.
+Per definition of the daifflags, Serrors can occur during any interrupt
+context, that includes NMI contexts. Trying to nmi_enter in an nmi context
+will crash.
 
-Check whether PMR was masking interrupts when the NMI was raised and
-skip IRQ tracing if necessary.
+Skip nmi_enter/nmi_exit when serror occurred during an NMI.
 
+Suggested-by: James Morse <james.morse@arm.com>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: James Morse <james.morse@arm.com>
 ---
- arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm64/kernel/traps.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index e02ee55..f175f18 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -629,7 +629,17 @@ el1_irq:
- 	kernel_entry 1
- 	enable_da_f
- #ifdef CONFIG_TRACE_IRQFLAGS
-+#ifdef CONFIG_ARM64_PSEUDO_NMI
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+alternative_else
-+	mov	x20, #GIC_PRIO_IRQON
-+alternative_endif
-+	/* Irqs were disabled, don't trace */
-+	tbz	x20, GIC_PRIO_STATUS_SHIFT, 1f
-+#endif
- 	bl	trace_hardirqs_off
-+1:
- #endif
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5f4d9ac..66344cd 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -897,13 +897,17 @@ bool arm64_is_fatal_ras_serror(struct pt_regs *regs, unsigned int esr)
  
- 	irq_handler
-@@ -651,8 +661,17 @@ alternative_else_nop_endif
- 1:
- #endif
- #ifdef CONFIG_TRACE_IRQFLAGS
-+#ifdef CONFIG_ARM64_PSEUDO_NMI
-+	/*
-+	 * if IRQs were disabled when we received the interrupt, we have an NMI
-+	 * and we are not re-enabling interrupt upon eret. Skip tracing.
-+	 */
-+	tbz	x20, GIC_PRIO_STATUS_SHIFT, 1f
-+#endif
- 	bl	trace_hardirqs_on
-+1:
- #endif
+ asmlinkage void do_serror(struct pt_regs *regs, unsigned int esr)
+ {
+-	nmi_enter();
++	const bool was_in_nmi = in_nmi();
 +
- 	kernel_exit 1
- ENDPROC(el1_irq)
++	if (!was_in_nmi)
++		nmi_enter();
  
+ 	/* non-RAS errors are not containable */
+ 	if (!arm64_is_ras_serror(esr) || arm64_is_fatal_ras_serror(regs, esr))
+ 		arm64_serror_panic(regs, esr);
+ 
+-	nmi_exit();
++	if (!was_in_nmi)
++		nmi_exit();
+ }
+ 
+ void __pte_error(const char *file, int line, unsigned long val)
 -- 
 1.9.1
