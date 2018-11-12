@@ -1,39 +1,42 @@
-From: leonard.crestez@nxp.com (Leonard Crestez)
-Date: Mon, 12 Nov 2018 00:46:43 +0000
-Subject: [PATCH] pinctrl: imx: Fix imx_dt_node_to_map handling of
- IMX_NO_PAD_CTL
-References: <1547d44dba63cbfd1b813018866f8916013b3381.1541973902.git.leonard.crestez@nxp.com>
-Message-ID: <AM0PR04MB4290A84F40154F18858D00C0EEC10@AM0PR04MB4290.eurprd04.prod.outlook.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Mon, 12 Nov 2018 09:28:06 +0800
+Subject: [PATCH v1 1/3] arm64: dts: mt7622: fix no more console output on rfb1
+Message-ID: <30f4a4110190a175307ac4dfebc98ffe96c44b90.1541643419.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2018 12:15 AM, Leonard Crestez wrote:
-> After changes for SCU support the IMX_NO_PAD_CTL flag is not longer
-> handled correctly in imx_dt_node_to_map. Pins with this flag are no
-> longer skipped and the new_map array can overflow and corrupt memory.
-> 
-> This fixes imx6-sabreauto boards failing to boot.
+The issue was found by Kernel CI:
+https://kernelci.org/boot/id/5bbdcbad59b5146fc5b43592/
 
-On a second look this is not sufficient; this just prevents a crash but 
-network boot is not successful. After some investigation it seems that 
-pin parsing also got broken. Here's a possible fix:
+Fix this by using a 'stdout-path' property that points to the device.
 
-diff --git drivers/pinctrl/freescale/pinctrl-imx.c 
-drivers/pinctrl/freescale/pinctrl-imx.c
-index 51312e81eff7..2005d31601f9 100644
---- drivers/pinctrl/freescale/pinctrl-imx.c
-+++ drivers/pinctrl/freescale/pinctrl-imx.c
-@@ -551,10 +551,11 @@ static void imx_pinctrl_parse_pin_mmio(struct 
-imx_pinctrl *ipctl,
-                 pin_mmio->config = config & ~IMX_PAD_SION;
-         }
+Fixes: c0d9f9ad4f76 ("arm64: dts: mt7622: add earlycon to mt7622-rfb1 board")
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+Tested-by: Kevin Hilman <khilman@baylibre.com>
+---
+Changes since v1: revise commit msg
+---
+ arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-         dev_dbg(ipctl->dev, "%s: 0x%x 0x%08lx", info->pins[*pin_id].name,
-                              pin_mmio->mux_mode, pin_mmio->config);
-+       *list_p = list;
-  }
-
-  static int imx_pinctrl_parse_groups(struct device_node *np,
-                                     struct group_desc *grp,
-                                     struct imx_pinctrl *ipctl
-It needs a bit more testing.
+diff --git a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+index dcad086..3f78334 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
++++ b/arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts
+@@ -17,8 +17,13 @@
+ 	model = "MediaTek MT7622 RFB1 board";
+ 	compatible = "mediatek,mt7622-rfb1", "mediatek,mt7622";
+ 
++	aliases {
++		serial0 = &uart0;
++	};
++
+ 	chosen {
+-		bootargs = "earlycon=uart8250,mmio32,0x11002000 console=ttyS0,115200n1 swiotlb=512";
++		stdout-path = "serial0:115200n8";
++		bootargs = "earlycon=uart8250,mmio32,0x11002000 swiotlb=512";
+ 	};
+ 
+ 	cpus {
+-- 
+1.9.1
