@@ -1,23 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 17:37:53 -0600
-Subject: [PATCH v3 5/8] dt-bindings: Add bindings for the LeMaker
- BL035-RGB-002 LCD panel
-In-Reply-To: <20181107181843.27628-6-contact@paulk.fr>
+Date: Mon, 12 Nov 2018 17:37:52 -0600
+Subject: [PATCH v3 4/8] dt-bindings: Add vendor prefix for LeMaker
+In-Reply-To: <20181107181843.27628-5-contact@paulk.fr>
 References: <20181107181843.27628-1-contact@paulk.fr>
- <20181107181843.27628-6-contact@paulk.fr>
-Message-ID: <5bea0ed3.1c69fb81.73f88.9823@mx.google.com>
+ <20181107181843.27628-5-contact@paulk.fr>
+Message-ID: <5bea0ed2.1c69fb81.5be5.adb5@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Nov 2018 19:18:40 +0100, Paul Kocialkowski wrote:
-> This adds the device-tree bindings for the LeMaker BL035-RGB-002 3.5"
-> QVGA TFT LCD panel, compatible with simple-panel.
+On Wed,  7 Nov 2018 19:18:39 +0100, Paul Kocialkowski wrote:
+> This introduces a new device-tree binding vendor prefix for Shenzhen
+> LeMaker Technology Co., Ltd.
+> 
+> This vendor was already in use but it was not documented until now.
 > 
 > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> Reviewed-by: Rob Hering <robh@kernel.org>
 > ---
->  .../bindings/display/panel/lemaker,bl035-rgb-002.txt | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/panel/lemaker,bl035-rgb-002.txt
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
