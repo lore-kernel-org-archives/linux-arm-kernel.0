@@ -1,77 +1,278 @@
-From: frieder.schrempf@kontron.De (Schrempf Frieder)
-Date: Mon, 12 Nov 2018 10:46:45 +0000
-Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
- under the SPI framework
-In-Reply-To: <20181108093451.08dfe63e@bbrezillon>
-References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
- <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
- <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
- <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
- <20181108093451.08dfe63e@bbrezillon>
-Message-ID: <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 12 Nov 2018 16:18:02 +0530
+Subject: [PATCH v2 4/5] phy: mvebu-cp110-comphy: convert to use eth phy
+ mode and submode
+In-Reply-To: <20181109234755.21687-5-grygorii.strashko@ti.com>
+References: <20181109234755.21687-1-grygorii.strashko@ti.com>
+ <20181109234755.21687-5-grygorii.strashko@ti.com>
+Message-ID: <13d935ae-131b-8555-242d-00f5a3e41c71@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.11.18 09:34, Boris Brezillon wrote:
-> On Wed, 7 Nov 2018 16:36:13 +0000
-> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
-> 
->> Hi Olof,
->>
->> On 07.11.18 17:20, Olof Johansson wrote:
->>> On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
->>> <frieder.schrempf@kontron.de> wrote:
->>>>
->>>> From: Frieder Schrempf <frieder.schrempf@exceet.de>
->>>>
->>>> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
->>>> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
->>>>
->>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
->>>
->>> Hi Frieder,
->>>
->>> This patch is part of a series that I didn't see the rest of, but in
->>> general we prefer to merge these through arm-soc even if the driver
->>> goes in through another tree. The way we'd prefer to handle it is that
->>> once the driver lands, we'll take the config option change to turn it
->>> on. To avoid our branches to break until both sides have landed, it
->>> might be a good idea to keep both drivers on for a short while (one
->>> release).
->>>
->>> So, I'm not going to ack this since we avoid taking defconfig changes
->>> through driver trees (these two defconfigs tend to churn a lot and we
->>> don't want to create merge conflicts where we don't have to), but
->>> we'll be happy to pick it up when the time comes.
->>
->> Ok, thank you for explaining the common practice. I will drop the config
->> changes for the next version and send it separately when the time is ready.
->>
->> Both the old driver and the new one use the same compatible strings for
->> probing. Wouldn't that cause problems if both drivers are enabled for a
->> while, or am I missing something?
-> 
-> Or maybe we should not introduce a new Kconfig option and just reuse
-> the old one. It probably requires re-ordering patches a bit (patch 1
-> should be moved after patch 5). Then you have 2 choices:
-> 
-> 1/ merge patch 1 and 6 so that the new driver effectively replaces the
->     old one but uses the same Kconfig option
-> 2/ remove the ability to compile the old driver when the new one is
->     introduced: remove the line from drivers/mtd/spi-nor Makefile and
->     move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
->     drivers/spi/Kconfig. And remove the old code in a separate patch
-> 
-> I'm fine either way, but option #2 will probably make the patch
-> introducing the new driver bigger and hurt readability.
+Hi Antoine, David Miller
 
-I think having both drivers in the tree for a while wouldn't be so bad. 
-So if any compatibility issues come up with the new driver, people can 
-still use the old one.
+Please ACK this patch if it looks okay.
 
-Therefore I think I will drop the patches that change the defconfig and 
-remove the old driver code and keep the different Kconfig options. And 
-maybe add an exclusive dependency in Kconfig, so both drivers can not be 
-enabled at the same time.
+Thanks
+Kishon
 
-Does this make sense?
+On 10/11/18 5:17 AM, Grygorii Strashko wrote:
+> Convert mvebu-cp110-comphy PHY driver to use recently introduced
+> PHY_MODE_ETHERNET and phy_set_mode_ext().
+> 
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c | 19 +-----
+>  drivers/phy/marvell/phy-mvebu-cp110-comphy.c    | 83 ++++++++++++++-----------
+>  2 files changed, 48 insertions(+), 54 deletions(-)
+> 
+> diff --git a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> index 7a37a37..731793a 100644
+> --- a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> +++ b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> @@ -1165,28 +1165,13 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
+>   */
+>  static int mvpp22_comphy_init(struct mvpp2_port *port)
+>  {
+> -	enum phy_mode mode;
+>  	int ret;
+>  
+>  	if (!port->comphy)
+>  		return 0;
+>  
+> -	switch (port->phy_interface) {
+> -	case PHY_INTERFACE_MODE_SGMII:
+> -	case PHY_INTERFACE_MODE_1000BASEX:
+> -		mode = PHY_MODE_SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_2500BASEX:
+> -		mode = PHY_MODE_2500SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_10GKR:
+> -		mode = PHY_MODE_10GKR;
+> -		break;
+> -	default:
+> -		return -EINVAL;
+> -	}
+> -
+> -	ret = phy_set_mode(port->comphy, mode);
+> +	ret = phy_set_mode_ext(port->comphy, PHY_MODE_ETHERNET,
+> +			       port->phy_interface);
+>  	if (ret)
+>  		return ret;
+>  
+> diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> index 79b52c3..7dee72b 100644
+> --- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> +++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> @@ -9,6 +9,7 @@
+>  #include <linux/iopoll.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+> +#include <linux/phy.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> @@ -131,26 +132,26 @@ struct mvebu_comhy_conf {
+>  
+>  static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
+>  	/* lane 0 */
+> -	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  	/* lane 1 */
+> -	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  	/* lane 2 */
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_10GKR, 0x1),
+>  	/* lane 3 */
+> -	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_2500BASEX, 0x2),
+>  	/* lane 4 */
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_2500BASEX, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_10GKR, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
+>  	/* lane 5 */
+> -	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  };
+>  
+>  struct mvebu_comphy_priv {
+> @@ -163,10 +164,12 @@ struct mvebu_comphy_lane {
+>  	struct mvebu_comphy_priv *priv;
+>  	unsigned id;
+>  	enum phy_mode mode;
+> +	int submode;
+>  	int port;
+>  };
+>  
+> -static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
+> +static int mvebu_comphy_get_mux(int lane, int port,
+> +				enum phy_mode mode, int submode)
+>  {
+>  	int i, n = ARRAY_SIZE(mvebu_comphy_cp110_modes);
+>  
+> @@ -177,7 +180,7 @@ static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
+>  	for (i = 0; i < n; i++) {
+>  		if (mvebu_comphy_cp110_modes[i].lane == lane &&
+>  		    mvebu_comphy_cp110_modes[i].port == port &&
+> -		    mvebu_comphy_cp110_modes[i].mode == mode)
+> +		    mvebu_comphy_cp110_modes[i].mode == submode)
+>  			break;
+>  	}
+>  
+> @@ -187,8 +190,7 @@ static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
+>  	return mvebu_comphy_cp110_modes[i].mux;
+>  }
+>  
+> -static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+> -					     enum phy_mode mode)
+> +static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane)
+>  {
+>  	struct mvebu_comphy_priv *priv = lane->priv;
+>  	u32 val;
+> @@ -206,14 +208,14 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+>  		 MVEBU_COMPHY_SERDES_CFG0_HALF_BUS |
+>  		 MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xf) |
+>  		 MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xf));
+> -	if (mode == PHY_MODE_10GKR)
+> +	if (lane->submode == PHY_INTERFACE_MODE_10GKR)
+>  		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0xe) |
+>  		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0xe);
+> -	else if (mode == PHY_MODE_2500SGMII)
+> +	else if (lane->submode == PHY_INTERFACE_MODE_2500BASEX)
+>  		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x8) |
+>  		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x8) |
+>  		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
+> -	else if (mode == PHY_MODE_SGMII)
+> +	else if (lane->submode == PHY_INTERFACE_MODE_SGMII)
+>  		val |= MVEBU_COMPHY_SERDES_CFG0_GEN_RX(0x6) |
+>  		       MVEBU_COMPHY_SERDES_CFG0_GEN_TX(0x6) |
+>  		       MVEBU_COMPHY_SERDES_CFG0_HALF_BUS;
+> @@ -243,7 +245,7 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+>  	/* refclk selection */
+>  	val = readl(priv->base + MVEBU_COMPHY_MISC_CTRL0(lane->id));
+>  	val &= ~MVEBU_COMPHY_MISC_CTRL0_REFCLK_SEL;
+> -	if (mode == PHY_MODE_10GKR)
+> +	if (lane->submode == PHY_INTERFACE_MODE_10GKR)
+>  		val |= MVEBU_COMPHY_MISC_CTRL0_ICP_FORCE;
+>  	writel(val, priv->base + MVEBU_COMPHY_MISC_CTRL0(lane->id));
+>  
+> @@ -261,8 +263,7 @@ static void mvebu_comphy_ethernet_init_reset(struct mvebu_comphy_lane *lane,
+>  	writel(val, priv->base + MVEBU_COMPHY_LOOPBACK(lane->id));
+>  }
+>  
+> -static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
+> -				  enum phy_mode mode)
+> +static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane)
+>  {
+>  	struct mvebu_comphy_priv *priv = lane->priv;
+>  	u32 val;
+> @@ -303,13 +304,13 @@ static int mvebu_comphy_init_plls(struct mvebu_comphy_lane *lane,
+>  	return 0;
+>  }
+>  
+> -static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
+> +static int mvebu_comphy_set_mode_sgmii(struct phy *phy)
+>  {
+>  	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+>  	struct mvebu_comphy_priv *priv = lane->priv;
+>  	u32 val;
+>  
+> -	mvebu_comphy_ethernet_init_reset(lane, mode);
+> +	mvebu_comphy_ethernet_init_reset(lane);
+>  
+>  	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
+>  	val &= ~MVEBU_COMPHY_RX_CTRL1_CLK8T_EN;
+> @@ -330,7 +331,7 @@ static int mvebu_comphy_set_mode_sgmii(struct phy *phy, enum phy_mode mode)
+>  	val |= MVEBU_COMPHY_GEN1_S0_TX_EMPH(0x1);
+>  	writel(val, priv->base + MVEBU_COMPHY_GEN1_S0(lane->id));
+>  
+> -	return mvebu_comphy_init_plls(lane, PHY_MODE_SGMII);
+> +	return mvebu_comphy_init_plls(lane);
+>  }
+>  
+>  static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
+> @@ -339,7 +340,7 @@ static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
+>  	struct mvebu_comphy_priv *priv = lane->priv;
+>  	u32 val;
+>  
+> -	mvebu_comphy_ethernet_init_reset(lane, PHY_MODE_10GKR);
+> +	mvebu_comphy_ethernet_init_reset(lane);
+>  
+>  	val = readl(priv->base + MVEBU_COMPHY_RX_CTRL1(lane->id));
+>  	val |= MVEBU_COMPHY_RX_CTRL1_RXCLK2X_SEL |
+> @@ -469,7 +470,7 @@ static int mvebu_comphy_set_mode_10gkr(struct phy *phy)
+>  	val |= MVEBU_COMPHY_EXT_SELV_RX_SAMPL(0x1a);
+>  	writel(val, priv->base + MVEBU_COMPHY_EXT_SELV(lane->id));
+>  
+> -	return mvebu_comphy_init_plls(lane, PHY_MODE_10GKR);
+> +	return mvebu_comphy_init_plls(lane);
+>  }
+>  
+>  static int mvebu_comphy_power_on(struct phy *phy)
+> @@ -479,7 +480,8 @@ static int mvebu_comphy_power_on(struct phy *phy)
+>  	int ret, mux;
+>  	u32 val;
+>  
+> -	mux = mvebu_comphy_get_mux(lane->id, lane->port, lane->mode);
+> +	mux = mvebu_comphy_get_mux(lane->id, lane->port,
+> +				   lane->mode, lane->submode);
+>  	if (mux < 0)
+>  		return -ENOTSUPP;
+>  
+> @@ -492,12 +494,12 @@ static int mvebu_comphy_power_on(struct phy *phy)
+>  	val |= mux << MVEBU_COMPHY_SELECTOR_PHY(lane->id);
+>  	regmap_write(priv->regmap, MVEBU_COMPHY_SELECTOR, val);
+>  
+> -	switch (lane->mode) {
+> -	case PHY_MODE_SGMII:
+> -	case PHY_MODE_2500SGMII:
+> -		ret = mvebu_comphy_set_mode_sgmii(phy, lane->mode);
+> +	switch (lane->submode) {
+> +	case PHY_INTERFACE_MODE_SGMII:
+> +	case PHY_INTERFACE_MODE_2500BASEX:
+> +		ret = mvebu_comphy_set_mode_sgmii(phy);
+>  		break;
+> -	case PHY_MODE_10GKR:
+> +	case PHY_INTERFACE_MODE_10GKR:
+>  		ret = mvebu_comphy_set_mode_10gkr(phy);
+>  		break;
+>  	default:
+> @@ -517,10 +519,17 @@ static int mvebu_comphy_set_mode(struct phy *phy,
+>  {
+>  	struct mvebu_comphy_lane *lane = phy_get_drvdata(phy);
+>  
+> -	if (mvebu_comphy_get_mux(lane->id, lane->port, mode) < 0)
+> +	if (mode != PHY_MODE_ETHERNET)
+> +		return -EINVAL;
+> +
+> +	if (submode == PHY_INTERFACE_MODE_1000BASEX)
+> +		submode = PHY_INTERFACE_MODE_SGMII;
+> +
+> +	if (mvebu_comphy_get_mux(lane->id, lane->port, mode, submode) < 0)
+>  		return -EINVAL;
+>  
+>  	lane->mode = mode;
+> +	lane->submode = submode;
+>  	return 0;
+>  }
+>  
+> 
