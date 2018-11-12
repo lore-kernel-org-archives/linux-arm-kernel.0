@@ -1,93 +1,113 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 12 Nov 2018 11:56:28 +0100
-Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
- under the SPI framework
-In-Reply-To: <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
-References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
- <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
- <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
- <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
- <20181108093451.08dfe63e@bbrezillon>
- <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
-Message-ID: <20181112115628.68a84b92@bbrezillon>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Mon, 12 Nov 2018 12:01:33 +0100
+Subject: [PATCH v2 1/3] dt-bindings: interrupt-controller: Actions
+ external interrupt controller
+In-Reply-To: <20180813194453.GA30702@rob-hp-laptop>
+References: <20180812122215.1079590-1-pn@denx.de>
+ <20180812122215.1079590-2-pn@denx.de> <20180813194453.GA30702@rob-hp-laptop>
+Message-ID: <728e5f10-e09f-3fb9-022b-1e74731f774f@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Nov 2018 10:46:45 +0000
-Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
 
-> On 08.11.18 09:34, Boris Brezillon wrote:
-> > On Wed, 7 Nov 2018 16:36:13 +0000
-> > Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
-> >   
-> >> Hi Olof,
-> >>
-> >> On 07.11.18 17:20, Olof Johansson wrote:  
-> >>> On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
-> >>> <frieder.schrempf@kontron.de> wrote:  
-> >>>>
-> >>>> From: Frieder Schrempf <frieder.schrempf@exceet.de>
-> >>>>
-> >>>> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
-> >>>> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
-> >>>>
-> >>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>  
-> >>>
-> >>> Hi Frieder,
-> >>>
-> >>> This patch is part of a series that I didn't see the rest of, but in
-> >>> general we prefer to merge these through arm-soc even if the driver
-> >>> goes in through another tree. The way we'd prefer to handle it is that
-> >>> once the driver lands, we'll take the config option change to turn it
-> >>> on. To avoid our branches to break until both sides have landed, it
-> >>> might be a good idea to keep both drivers on for a short while (one
-> >>> release).
-> >>>
-> >>> So, I'm not going to ack this since we avoid taking defconfig changes
-> >>> through driver trees (these two defconfigs tend to churn a lot and we
-> >>> don't want to create merge conflicts where we don't have to), but
-> >>> we'll be happy to pick it up when the time comes.  
-> >>
-> >> Ok, thank you for explaining the common practice. I will drop the config
-> >> changes for the next version and send it separately when the time is ready.
-> >>
-> >> Both the old driver and the new one use the same compatible strings for
-> >> probing. Wouldn't that cause problems if both drivers are enabled for a
-> >> while, or am I missing something?  
-> > 
-> > Or maybe we should not introduce a new Kconfig option and just reuse
-> > the old one. It probably requires re-ordering patches a bit (patch 1
-> > should be moved after patch 5). Then you have 2 choices:
-> > 
-> > 1/ merge patch 1 and 6 so that the new driver effectively replaces the
-> >     old one but uses the same Kconfig option
-> > 2/ remove the ability to compile the old driver when the new one is
-> >     introduced: remove the line from drivers/mtd/spi-nor Makefile and
-> >     move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
-> >     drivers/spi/Kconfig. And remove the old code in a separate patch
-> > 
-> > I'm fine either way, but option #2 will probably make the patch
-> > introducing the new driver bigger and hurt readability.  
+
+On 8/13/18 9:44 PM, Rob Herring wrote:
+> On Sun, Aug 12, 2018 at 02:22:13PM +0200, Parthiban Nallathambi wrote:
+>> Actions Semi OWL family SoC's provides support for external interrupt
+>> controller to be connected and controlled using SIRQ pins. S500, S700
+>> and S900 provides 3 SIRQ lines and works independently for 3 external
+>> interrupt controllers.
+>>
+>> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+>> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+>> ---
+>>   .../interrupt-controller/actions,owl-sirq.txt      | 46 ++++++++++++++++++++++
+>>   1 file changed, 46 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+>> new file mode 100644
+>> index 000000000000..4b8437751331
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+>> @@ -0,0 +1,46 @@
+>> +Actions Semi Owl SoCs SIRQ interrupt controller
+>> +
+>> +S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
+>> +in which external interrupt controller can be connected. 3 SPI's
+>> +45, 46, 47 from GIC are directly exposed as SIRQ. It has
+>> +the following properties:
+>> +
+>> +- inputs three interrupt signal from external interrupt controller
+>> +
+>> +Required properties:
+>> +
+>> +- compatible: should be "actions,owl-sirq"
+>> +- reg: physical base address of the controller and length of memory mapped.
+>> +- interrupt-controller: identifies the node as an interrupt controller
+>> +- #interrupt-cells: specifies the number of cells needed to encode an interrupt
+>> +  source, should be 2.
 > 
-> I think having both drivers in the tree for a while wouldn't be so bad. 
-> So if any compatibility issues come up with the new driver, people can 
-> still use the old one.
+>> +- actions,sirq-shared-reg: Applicable for S500 and S700 where SIRQ register
+>> +  details are maintained at same offset/register.
+>> +- actions,sirq-offset: register offset for SIRQ interrupts. When registers are
+>> +  shared, all the three offsets will be same (S500 and S700).
+> 
+> You should have more specific compatible strings if there are
+> differences and these settings can be implied by them.
 
-Except that's not what happens in practice. Believe me, I tried this
-approach several times, and people keep using the old driver until
-they're forced to switch to the new one. So you actually don't address
-the problem, you just delay it a bit, and you'll have to fix
-regressions anyway.
+This to meant to get the register offset because s500, s700 uses the
+same external interrupt controller register to provide three or more
+interrupt line. But this is not the case for s900.
+
+So should it be "actions,sirq-offset-reg"?
 
 > 
-> Therefore I think I will drop the patches that change the defconfig and 
-> remove the old driver code and keep the different Kconfig options. And 
-> maybe add an exclusive dependency in Kconfig, so both drivers can not be 
-> enabled at the same time.
+>> +- actions,sirq-clk-sel: external interrupt controller can be either
+>> +  connected to 32Khz or 24Mhz external/internal clock. This needs
+>> +  to be configured for per SIRQ line. Failing defaults to 32Khz clock.
 > 
-> Does this make sense?
+> What are the valid values?
+> 
+>> +
+>> +Example for S900:
+>> +
+>> +sirq: interrupt-controller at e01b0000 {
+>> +	compatible = "actions,owl-sirq";
+>> +	reg = <0 0xe01b0000 0 0x1000>;
+>> +	interrupt-controller;
+>> +	#interrupt-cells = <2>;
+>> +	actions,sirq-clk-sel = <0 0 0>;
+> 
+> If 0 is 32khz, then having this is pointless. But I can't tell what the
+> values correspond to.
 
-I'd really prefer to have the removal of the old driver in the same
-release the new driver is introduced but if that's not possible, let's
-have a clear plan, like "introduce new driver in release X, remove the
-old one in release X+1".
+Thanks, clock selection will be removed and defaults to 24MHz.
+
+> 
+>> +	actions,sirq-offset = <0x200 0x528 0x52c>;
+>> +};
+>> +
+>> +Example for S500 and S700:
+>> +
+>> +sirq: interrupt-controller at e01b0000 {
+>> +	compatible = "actions,owl-sirq";
+>> +	reg = <0 0xe01b0000 0 0x1000>;
+>> +	interrupt-controller;
+>> +	#interrupt-cells = <2>;
+>> +	actions,sirq-shared-reg;
+>> +	actions,sirq-clk-sel = <0 0 0>;
+>> +	actions,sirq-offset = <0x200 0x200 0x200>;
+>> +};
+>> -- 
+>> 2.14.4
+>>
+> 
+
+-- 
+Thanks,
+Parthiban N
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-22 Fax: (+49)-8142-66989-80 Email: pn at denx.de
