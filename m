@@ -1,32 +1,43 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:12 +0100
-Subject: [PATCH v3 03/18] DT: marvell,mmp2: give gpio node a name
+Date: Mon, 12 Nov 2018 04:20:10 +0100
+Subject: [PATCH v3 01/18] dt-bindings: mrvl,mmp-timer: add clock
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-4-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-2-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will be useful for boards that actually use GPIO pins.
+The timer needs the timer clock to be enabled, otherwise it stops
+ticking.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Reviewed-by: Rob Herring <robh@kernel.org>
 Acked-by: Pavel Machek <pavel@ucw.cz>
----
- arch/arm/boot/dts/mmp2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index db15d1186cd0..f2a18779de7c 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -168,7 +168,7 @@
- 				status = "disabled";
- 			};
+---
+Changes since v1:
+- Made the clock optional, to keep compatibility with DTs without it
+
+ Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+index 9a6e251462e7..b8f02c663521 100644
+--- a/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
++++ b/Documentation/devicetree/bindings/timer/mrvl,mmp-timer.txt
+@@ -5,9 +5,13 @@ Required properties:
+ - reg : Address and length of the register set of timer controller.
+ - interrupts : Should be the interrupt number.
  
--			gpio at d4019000 {
-+			gpio: gpio at d4019000 {
- 				compatible = "marvell,mmp2-gpio";
- 				#address-cells = <1>;
- 				#size-cells = <1>;
++Optional properties:
++- clocks : Should contain a single entry describing the clock input.
++
+ Example:
+ 	timer0: timer at d4014000 {
+ 		compatible = "mrvl,mmp-timer";
+ 		reg = <0xd4014000 0x100>;
+ 		interrupts = <13>;
++		clocks = <&coreclk 2>;
+ 	};
 -- 
 2.19.1
