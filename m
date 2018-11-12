@@ -1,56 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 12 Nov 2018 15:20:50 +0000
-Subject: Please check linux-next boot results from tonight for next seven
- days
-In-Reply-To: <20181108155938.GY30658@n2100.armlinux.org.uk>
-References: <20181108155938.GY30658@n2100.armlinux.org.uk>
-Message-ID: <20181112152050.GE30658@n2100.armlinux.org.uk>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 12 Nov 2018 16:23:38 +0100
+Subject: [PATCH v3 0/4] Add support of STM32 hwspinlock
+Message-ID: <20181112152342.6561-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A reminder that if I don't hear anything, I will assume that there is
-no problem, and will be sending a pull request to Linus this Friday.
+This serie adds the support of the hardware semaphore block for stm32mp1 SoC.
 
-On Thu, Nov 08, 2018 at 03:59:39PM +0000, Russell King - ARM Linux wrote:
-> For anyone running builds and boot tests of tonight's linux-next,
-> I've pushed out the final bits of the Spectre big.Little fixes
-> for sfr to pick up tonight.
-> 
-> These were omitted from the last merge window because towards the
-> end of the -rc cycle, it was belatedly reported that it was causing
-> a regression on some platforms, so they had to be dropped out of
-> that merge window.  I believe that this was discovered on some
-> non-kernelci based test system.
-> 
-> However, they really need to go in before the end of the year, so
-> I'm proposing to send them before 4.20-rc3.
-> 
-> This means I need help to test them and make sure that they do not
-> cause any other unknown regressions.  Please note that merely looking
-> at kernelci and checking whether it says the boot test passed is
-> _insufficient_ - the boot logs must be inspected becaues a "green"
-> pass result does _not_ mean that there isn't some kind of warning.
-> The same problem may also be present in other automated boot testing
-> systems elsewhere.
-> 
-> Please check your boot logs for tonight's linux-next over the next
-> seven days and report ASAP if the Spectre fixes are causing a
-> regression for your platform.  If I don't hear anything, I will be
-> sending them for -rc3.
-> 
-> Thanks.
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-> According to speedtest.net: 11.9Mbps down 500kbps up
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+version 3:
+- fix clock name in properties description.
+- use postcore_initcall() instead of module_platform_driver()
+
+version 2:
+- fix comments done by Bjorn about clock naming, license terms in header,
+  alphabetic ordering in Makefile and Kconfig and remove function
+- Do not push test module in this version while waiting for feedbacks about it
+
+
+Benjamin Gaignard (4):
+  dt-bindings: hwlock: Document STM32 hwspinlock bindings
+  hwspinlock: add STM32 hwspinlock device
+  ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
+  ARM: dts: stm32: enable hwspinlock on stm32mp157c-ed1
+
+ .../bindings/hwlock/st,stm32-hwspinlock.txt        |  23 +++
+ arch/arm/boot/dts/stm32mp157c-ed1.dts              |   4 +
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |   9 ++
+ drivers/hwspinlock/Kconfig                         |   9 ++
+ drivers/hwspinlock/Makefile                        |   1 +
+ drivers/hwspinlock/stm32_hwspinlock.c              | 156 +++++++++++++++++++++
+ 6 files changed, 202 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+ create mode 100644 drivers/hwspinlock/stm32_hwspinlock.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.15.0
