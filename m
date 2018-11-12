@@ -1,47 +1,70 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Mon, 12 Nov 2018 11:49:54 +0800
-Subject: [PATCH v1 3/3] arm64: dts: mt7622: Drop the general purpose
- timer node
-In-Reply-To: <1541993608.30437.3.camel@mtkswgap22>
-References: <30f4a4110190a175307ac4dfebc98ffe96c44b90.1541643419.git.ryder.lee@mediatek.com>
- <17fde639c7d37f9cfabab230379913e652cf869a.1541643419.git.ryder.lee@mediatek.com>
- <20181112024556.GI2642@sasha-vm> <1541993608.30437.3.camel@mtkswgap22>
-Message-ID: <1541994594.31175.4.camel@mtkswgap22>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Mon, 12 Nov 2018 15:12:39 +1100
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <cover.1541995959.git.fthain@telegraphics.com.au>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+Message-ID: <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-11-12 at 11:33 +0800, Ryder Lee wrote:
-> On Sun, 2018-11-11 at 21:45 -0500, Sasha Levin wrote:
-> > On Mon, Nov 12, 2018 at 09:28:08AM +0800, Ryder Lee wrote:
-> > >The crash http://termbin.com/zitb is caused by the timer register
-> > >into system in early pahse during kernel boot, but the clock
-> > >sources didn't get ready at that time.
-> > >
-> > >A better way is to switch to use CLK_OF_DECLARE() in driver for things
-> > >that need them early, but this node is actually useless in MT7622.
-> > >So we drop it.
-> > >
-> > >Fixes: 9cc7f0de9e67 ("arm64: dts: mt7622: add timer, CCI-400 and PMU nodes")
-> > >Cc: stable at vger.kernel.org
-> > >Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> > 
-> > To confirm: the patch this fixes was added in v4.20-rc1, which means
-> > that this current patch doesn't apply to any of the stable trees.
-> > 
-> > Did we miss something?
-> > 
-> 
-> I didn't see any fixup for this?
-> 
-> Ryder
+Implementations of arch_gettimeoffset are generally not re-entrant
+and assume that interrupts have been disabled. Unfortunately this
+pre-condition got broken in v2.6.32.
 
-Oh, I didn't get it right. Yes, there is no need to apply to the stable
-trees.
+Fixes: 5cfc8ee0bb51 ("ARM: convert arm to arch_gettimeoffset()")
+Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+---
+ arch/arm/mach-ebsa110/core.c | 5 +++++
+ arch/arm/mach-rpc/time.c     | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-@Matthias, could you help to drop the CC tag when you take this patch
-through your tree?
-
-Sorry for the inconvenience.
-
-Thanks
-Ryder
+diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
+index 688e5fed49a7..479f89a1accf 100644
+--- a/arch/arm/mach-ebsa110/core.c
++++ b/arch/arm/mach-ebsa110/core.c
+@@ -160,12 +160,17 @@ static void __init ebsa110_init_early(void)
+  */
+ static u32 ebsa110_gettimeoffset(void)
+ {
++	unsigned long flags;
+ 	unsigned long offset, count;
+ 
++	local_irq_save(flags);
++
+ 	__raw_writeb(0x40, PIT_CTRL);
+ 	count = __raw_readb(PIT_T1);
+ 	count |= __raw_readb(PIT_T1) << 8;
+ 
++	local_irq_restore(flags);
++
+ 	/*
+ 	 * If count > COUNT, make the number negative.
+ 	 */
+diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
+index 2689771c1d38..852bb3801638 100644
+--- a/arch/arm/mach-rpc/time.c
++++ b/arch/arm/mach-rpc/time.c
+@@ -29,9 +29,12 @@
+ 
+ static u32 ioc_timer_gettimeoffset(void)
+ {
++	unsigned long flags;
+ 	unsigned int count1, count2, status;
+ 	long offset;
+ 
++	local_irq_save(flags);
++
+ 	ioc_writeb (0, IOC_T0LATCH);
+ 	barrier ();
+ 	count1 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
+@@ -42,6 +45,8 @@ static u32 ioc_timer_gettimeoffset(void)
+ 	barrier ();
+ 	count2 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
+ 
++	local_irq_restore(flags);
++
+ 	offset = count2;
+ 	if (count2 < count1) {
+ 		/*
+-- 
+2.18.1
