@@ -1,21 +1,86 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Mon, 12 Nov 2018 00:34:22 -0800
-Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
-In-Reply-To: <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
-References: <cover.1541995959.git.fthain@telegraphics.com.au>
- <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
-Message-ID: <20181112083422.GA19695@infradead.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 12 Nov 2018 09:51:09 +0100
+Subject: [PATCH v2 05/11] Doc: DT: thermal: new irq-mode for trip point
+In-Reply-To: <1541610593-28542-6-git-send-email-l.luba@partner.samsung.com>
+References: <CGME20181107171039eucas1p2227bd4bc573fd0d2a3a97986004be16b@eucas1p2.samsung.com>
+ <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
+ <1541610593-28542-6-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <CAJKOXPedw6OD1fWWVkYozgR03AWKz5t_-vWw0MV1jVGVR_UGTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 03:12:39PM +1100, Finn Thain wrote:
-> Implementations of arch_gettimeoffset are generally not re-entrant
-> and assume that interrupts have been disabled. Unfortunately this
-> pre-condition got broken in v2.6.32.
-> 
-> Fixes: 5cfc8ee0bb51 ("ARM: convert arm to arch_gettimeoffset()")
-> Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+On Wed, 7 Nov 2018 at 18:10, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+>
 
-This looks like a sensible fix for -stable backporting.  But with m68k
-converted over it might be time for these two arm platforms to either
-be converted to the clocksource API or to be dropped..
+Subject prefix:
+dt-bindings: thermal:
+
+> Thermal trip point gets new flag in DT: irq-mode.
+> Trip point may have a new explicit flag which indicate
+> IRQ support when the temperature is met (so the thermal framework
+> deos not need to set polling for it).
+> It is useful for 'passive' cooling trip point,
+> which now will not register for polling the temperature.
+
+You wrap lines in weird way making it more difficult to read.
+I already asked about this while reviewing v1. Please fix it.
+https://elixir.bootlin.com/linux/latest/source/Documentation/process/submitting-patches.rst#L633
+
+>
+> Update documentation about irq-mode for trip points.
+>
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  Documentation/devicetree/bindings/thermal/thermal.txt | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+> index ca14ba9..bee21e3 100644
+> --- a/Documentation/devicetree/bindings/thermal/thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+> @@ -90,6 +90,10 @@ Required properties:
+>         "critical":     Hardware not reliable.
+>    Type: string
+>
+> +- irq-mode:            A flag indicating that trip rises irq, so there is no
+
+"rises IRQ" (it is an abbreviation).
+
+Best regards,
+Krzysztof
+
+> +  Type: bool           need of polling in thermal framework.
+> +  Size: one cell
+> +
+>  * Cooling device maps
+>
+>  The cooling device maps node is a node to describe how cooling devices
+> @@ -256,16 +260,19 @@ thermal-zones {
+>                                 temperature = <90000>; /* millicelsius */
+>                                 hysteresis = <2000>; /* millicelsius */
+>                                 type = "active";
+> +                               irq-mode;
+>                         };
+>                         cpu_alert1: cpu-alert1 {
+>                                 temperature = <100000>; /* millicelsius */
+>                                 hysteresis = <2000>; /* millicelsius */
+>                                 type = "passive";
+> +                               irq-mode;
+>                         };
+>                         cpu_crit: cpu-crit {
+>                                 temperature = <125000>; /* millicelsius */
+>                                 hysteresis = <2000>; /* millicelsius */
+>                                 type = "critical";
+> +                               irq-mode;
+>                         };
+>                 };
+>
+> --
+> 2.7.4
+>
