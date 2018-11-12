@@ -1,151 +1,225 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 12 Nov 2018 11:56:58 +0000
-Subject: [PATCH v6 07/24] arm64: Make PMR part of task context
+Date: Mon, 12 Nov 2018 11:57:01 +0000
+Subject: [PATCH v6 10/24] arm64: irqflags: Use ICC_PMR_EL1 for interrupt
+ masking
 In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
 References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1542023835-21446-8-git-send-email-julien.thierry@arm.com>
+Message-ID: <1542023835-21446-11-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If ICC_PMR_EL1 is used to mask interrupts, its value should be
-saved/restored whenever a task is context switched out/in or
-gets an exception.
+Instead disabling interrupts by setting the PSR.I bit, use a priority
+higher than the one used for interrupts to mask them via PMR.
 
-Add PMR to the registers to save in the pt_regs struct upon kernel entry,
-and restore it before ERET. Also, initialize it to a sane value when
-creating new tasks.
+The value chosen for PMR to enable/disable interrupts encodes the status
+of interrupts on a single bit. This information is stored in the irqflags
+values used when saving/restoring IRQ status.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: Dave Martin <Dave.Martin@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Oleg Nesterov <oleg@redhat.com>
 ---
- arch/arm64/include/asm/processor.h |  3 +++
- arch/arm64/include/asm/ptrace.h    | 14 +++++++++++---
- arch/arm64/kernel/asm-offsets.c    |  1 +
- arch/arm64/kernel/entry.S          | 13 +++++++++++++
- arch/arm64/kernel/process.c        |  6 ++++++
- 5 files changed, 34 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/efi.h      |   3 +-
+ arch/arm64/include/asm/irqflags.h | 132 +++++++++++++++++++++++++++++---------
+ 2 files changed, 105 insertions(+), 30 deletions(-)
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 6b0d4df..b2315ef 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -168,6 +168,9 @@ static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
- 	memset(regs, 0, sizeof(*regs));
- 	forget_syscall(regs);
- 	regs->pc = pc;
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 7ed3208..3e06891 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -42,7 +42,8 @@
+ 
+ efi_status_t __efi_rt_asm_wrapper(void *, const char *, ...);
+ 
+-#define ARCH_EFI_IRQ_FLAGS_MASK (PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT)
++#define ARCH_EFI_IRQ_FLAGS_MASK \
++	(PSR_D_BIT | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT | ARCH_FLAG_PMR_EN)
+ 
+ /* arch specific definitions used by the stub code */
+ 
+diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
+index 24692ed..e0a32e4 100644
+--- a/arch/arm64/include/asm/irqflags.h
++++ b/arch/arm64/include/asm/irqflags.h
+@@ -18,7 +18,27 @@
+ 
+ #ifdef __KERNEL__
+ 
++#include <asm/alternative.h>
++#include <asm/cpufeature.h>
+ #include <asm/ptrace.h>
++#include <asm/sysreg.h>
 +
-+	if (system_supports_irq_prio_masking())
-+		regs->pmr_save = GIC_PRIO_IRQON;
++
++/*
++ * When ICC_PMR_EL1 is used for interrupt masking, only the bit indicating
++ * whether the normal interrupts are masked is kept along with the daif
++ * flags.
++ */
++#define ARCH_FLAG_PMR_EN 0x1
++
++#define MAKE_ARCH_FLAGS(daif, pmr)					\
++	((daif) | (((pmr) >> GIC_PRIO_STATUS_SHIFT) & ARCH_FLAG_PMR_EN))
++
++#define ARCH_FLAGS_GET_PMR(flags)				 \
++	((((flags) & ARCH_FLAG_PMR_EN) << GIC_PRIO_STATUS_SHIFT) \
++		| GIC_PRIO_IRQOFF)
++
++#define ARCH_FLAGS_GET_DAIF(flags) ((flags) & ~ARCH_FLAG_PMR_EN)
+ 
+ /*
+  * Aarch64 has flags for masking: Debug, Asynchronous (serror), Interrupts and
+@@ -34,35 +54,62 @@
+  */
+ 
+ /*
+- * CPU interrupt mask handling.
++ * Local definitions to help us manage between PMR and daif
+  */
+-static inline unsigned long arch_local_irq_save(void)
+-{
+-	unsigned long flags;
+-	asm volatile(
+-		"mrs	%0, daif		// arch_local_irq_save\n"
+-		"msr	daifset, #2"
+-		: "=r" (flags)
+-		:
+-		: "memory");
+-	return flags;
+-}
++#define _save_daif(dest)						\
++	asm volatile("mrs	%0, daif" : "=&r" (dest) : : "memory")
++
++#define _restore_daif(daif)						\
++	asm volatile("msr	daif, %0" : : "r" (daif) : "memory")
+ 
++#define _save_pmr(dest)							\
++	asm volatile(ALTERNATIVE(					\
++		     "mov	%0, #" __stringify(GIC_PRIO_IRQON),	\
++		     "mrs_s	%0, " __stringify(SYS_ICC_PMR_EL1),	\
++		     ARM64_HAS_IRQ_PRIO_MASKING)			\
++		: "=&r" (dest)						\
++		:							\
++		: "memory")
++
++#define _restore_pmr(pmr)						\
++	asm volatile(ALTERNATIVE(					\
++		     "nop\n"						\
++		     "nop",						\
++		     "msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"	\
++		     "dsb	sy",					\
++		     ARM64_HAS_IRQ_PRIO_MASKING)			\
++		:							\
++		: "r" (pmr)						\
++		: "memory")
++
++/*
++ * CPU interrupt mask handling.
++ */
+ static inline void arch_local_irq_enable(void)
+ {
+-	asm volatile(
+-		"msr	daifclr, #2		// arch_local_irq_enable"
+-		:
++	unsigned long unmasked = GIC_PRIO_IRQON;
++
++	asm volatile(ALTERNATIVE(
++		"msr	daifclr, #2		// arch_local_irq_enable\n"
++		"nop",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0\n"
++		"dsb	sy",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (unmasked)
+ 		: "memory");
  }
  
- static inline void start_thread(struct pt_regs *regs, unsigned long pc,
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index ce6998c..0ad46f5 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -19,6 +19,8 @@
- #ifndef __ASM_PTRACE_H
- #define __ASM_PTRACE_H
- 
-+#include <asm/cpufeature.h>
+ static inline void arch_local_irq_disable(void)
+ {
+-	asm volatile(
+-		"msr	daifset, #2		// arch_local_irq_disable"
+-		:
++	unsigned long masked = GIC_PRIO_IRQOFF;
 +
- #include <uapi/asm/ptrace.h>
++	asm volatile(ALTERNATIVE(
++		"msr	daifset, #2		// arch_local_irq_disable",
++		"msr_s  " __stringify(SYS_ICC_PMR_EL1) ",%0",
++		ARM64_HAS_IRQ_PRIO_MASKING)
+ 		:
++		: "r" (masked)
+ 		: "memory");
+ }
  
- /* Current Exception Level values, as contained in CurrentEL */
-@@ -173,7 +175,8 @@ struct pt_regs {
+@@ -71,12 +118,24 @@ static inline void arch_local_irq_disable(void)
+  */
+ static inline unsigned long arch_local_save_flags(void)
+ {
++	unsigned long daif_flags;
++	unsigned long pmr;
++
++	_save_daif(daif_flags);
++
++	_save_pmr(pmr);
++
++	return MAKE_ARCH_FLAGS(daif_flags, pmr);
++}
++
++static inline unsigned long arch_local_irq_save(void)
++{
+ 	unsigned long flags;
+-	asm volatile(
+-		"mrs	%0, daif		// arch_local_save_flags"
+-		: "=r" (flags)
+-		:
+-		: "memory");
++
++	flags = arch_local_save_flags();
++
++	arch_local_irq_disable();
++
+ 	return flags;
+ }
+ 
+@@ -85,16 +144,31 @@ static inline unsigned long arch_local_save_flags(void)
+  */
+ static inline void arch_local_irq_restore(unsigned long flags)
+ {
+-	asm volatile(
+-		"msr	daif, %0		// arch_local_irq_restore"
+-	:
+-	: "r" (flags)
+-	: "memory");
++	unsigned long pmr = ARCH_FLAGS_GET_PMR(flags);
++
++	flags = ARCH_FLAGS_GET_DAIF(flags);
++
++	/*
++	 * Code switching from PSR.I interrupt disabling to PMR masking
++	 * should not lie between consecutive calls to local_irq_save()
++	 * and local_irq_restore() in the same context.
++	 * So restoring PMR and then the daif flags should be safe.
++	 */
++	_restore_pmr(pmr);
++
++	_restore_daif(flags);
+ }
+ 
+ static inline int arch_irqs_disabled_flags(unsigned long flags)
+ {
+-	return flags & PSR_I_BIT;
++	return (ARCH_FLAGS_GET_DAIF(flags) & (PSR_I_BIT)) |
++		!(ARCH_FLAGS_GET_PMR(flags) & GIC_PRIO_STATUS_BIT);
+ }
++
++#undef _save_daif
++#undef _restore_daif
++#undef _save_pmr
++#undef _restore_pmr
++
  #endif
- 
- 	u64 orig_addr_limit;
--	u64 unused;	// maintain 16 byte alignment
-+	/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */
-+	u64 pmr_save;
- 	u64 stackframe[2];
- };
- 
-@@ -208,8 +211,13 @@ static inline void forget_syscall(struct pt_regs *regs)
- #define processor_mode(regs) \
- 	((regs)->pstate & PSR_MODE_MASK)
- 
--#define interrupts_enabled(regs) \
--	(!((regs)->pstate & PSR_I_BIT))
-+#define irqs_priority_unmasked(regs)					\
-+	(system_supports_irq_prio_masking() ?				\
-+		(regs)->pmr_save & GIC_PRIO_STATUS_BIT :		\
-+		true)
-+
-+#define interrupts_enabled(regs)			\
-+	(!((regs)->pstate & PSR_I_BIT) && irqs_priority_unmasked(regs))
- 
- #define fast_interrupts_enabled(regs) \
- 	(!((regs)->pstate & PSR_F_BIT))
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 323aeb5..bab4122 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -78,6 +78,7 @@ int main(void)
-   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
-   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
-   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
-+  DEFINE(S_PMR_SAVE,		offsetof(struct pt_regs, pmr_save));
-   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
-   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
-   BLANK();
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 039144e..eb8120e 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -249,6 +249,12 @@ alternative_else_nop_endif
- 	msr	sp_el0, tsk
- 	.endif
- 
-+	/* Save pmr */
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	mrs_s	x20, SYS_ICC_PMR_EL1
-+	str	x20, [sp, #S_PMR_SAVE]
-+alternative_else_nop_endif
-+
- 	/*
- 	 * Registers that may be useful after this macro is invoked:
- 	 *
-@@ -269,6 +275,13 @@ alternative_else_nop_endif
- 	/* No need to restore UAO, it will be restored from SPSR_EL1 */
- 	.endif
- 
-+	/* Restore pmr */
-+alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-+	ldr	x20, [sp, #S_PMR_SAVE]
-+	msr_s	SYS_ICC_PMR_EL1, x20
-+	dsb	sy
-+alternative_else_nop_endif
-+
- 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
- 	.if	\el == 0
- 	ct_user_enter
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index d9a4c2d..71e8850 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -231,6 +231,9 @@ void __show_regs(struct pt_regs *regs)
- 
- 	printk("sp : %016llx\n", sp);
- 
-+	if (system_supports_irq_prio_masking())
-+		printk("pmr_save: %08llx\n", regs->pmr_save);
-+
- 	i = top_reg;
- 
- 	while (i >= 0) {
-@@ -362,6 +365,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE)
- 			childregs->pstate |= PSR_SSBS_BIT;
- 
-+		if (system_supports_irq_prio_masking())
-+			childregs->pmr_save = GIC_PRIO_IRQON;
-+
- 		p->thread.cpu_context.x19 = stack_start;
- 		p->thread.cpu_context.x20 = stk_sz;
- 	}
+ #endif
 -- 
 1.9.1
