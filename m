@@ -1,47 +1,30 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 12 Nov 2018 16:36:41 +0100
-Subject: [PATCH 2/2] drm/atomic: Create and use
- __drm_atomic_helper_crtc_reset() everywhere
-In-Reply-To: <20181112150114.18395-2-maarten.lankhorst@linux.intel.com>
-References: <20181112150114.18395-1-maarten.lankhorst@linux.intel.com>
- <20181112150114.18395-2-maarten.lankhorst@linux.intel.com>
-Message-ID: <2475529.N6HtQ5V54z@phil>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Mon, 12 Nov 2018 16:47:55 +0100
+Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
+In-Reply-To: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
+References: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20181112154755.msekhs5xg5ylopkz@viti.kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 12. November 2018, 16:01:14 CET schrieb Maarten Lankhorst:
-> We already have __drm_atomic_helper_connector_reset() and
-> __drm_atomic_helper_plane_reset(), extend this to crtc as well.
-> 
-> Most drivers already have a gpu reset hook, correct it.
-> Nouveau already implemented its own __drm_atomic_helper_crtc_reset(),
-> convert it to the common one.
-> 
-> Signed-off-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+Hi Dong,
 
+your patch looks good to me.
 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index fb70fb486fbf..d2d5aa676084 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -1071,13 +1071,14 @@ static void vop_crtc_destroy(struct drm_crtc *crtc)
->  
->  static void vop_crtc_reset(struct drm_crtc *crtc)
->  {
-> +	struct rockchip_crtc_state *crtc_state =
-> +		kzalloc(sizeof(*crtc_state), GFP_KERNEL);
-> +
->  	if (crtc->state)
->  		__drm_atomic_helper_crtc_destroy_state(crtc->state);
->  	kfree(crtc->state);
->  
-> -	crtc->state = kzalloc(sizeof(struct rockchip_crtc_state), GFP_KERNEL);
-> -	if (crtc->state)
-> -		crtc->state->crtc = crtc;
-> +	__drm_atomic_helper_crtc_reset(crtc, &crtc_state->base);
->  }
->  
->  static struct drm_crtc_state *vop_crtc_duplicate_state(struct drm_crtc *crtc)
+Thus wrote A.s. Dong (aisheng.dong at nxp.com):
 
-for the Rockchip-part
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+> After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
+> NO_PAD_CTL pads map are not skipped anymore which results in
+> a possible memory corruption. As we actually only need to create config
+> maps for SCU pads and MMIO pads which are not using the default config
+> (a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
+> the config maps. And during MMIO pads parsing, we also need update the
+> list_p point as SCU case to ensure the pin data next parsed is correct.
+
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
+> Reported-by: Martin Kaiser <martin@kaiser.cx>
+> Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+
+Reviewed-by: Martin Kaiser <martin@kaiser.cx>
