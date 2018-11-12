@@ -1,38 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 12 Nov 2018 10:15:24 -0800
-Subject: [GIT PULL] Qualcomm ARM64 DT Fixes for 4.20-rc1
-In-Reply-To: <1541807491-13259-1-git-send-email-andy.gross@linaro.org>
-References: <1541807491-13259-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20181112181524.5kri2mkxfqflm5pl@localhost>
+Date: Mon, 12 Nov 2018 10:22:36 -0800
+Subject: [PATCH] ARM: stm32: debug: add low-level debug support
+In-Reply-To: <1501174209-27550-2-git-send-email-bich.hemon@st.com>
+References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
+ <1501174209-27550-2-git-send-email-bich.hemon@st.com>
+Message-ID: <20181112182236.s7cs6dol4dmxkp7u@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 05:51:31PM -0600, Andy Gross wrote:
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
+> From: Gerald Baeza <gerald.baeza@st.com>
 > 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> This adds low-level debug support on USART1 for STM32F4
+> and STM32F7.
+> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
+> Enabled via 'earlyprintk' in bootargs.
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-fixes-for-4.20-rc1
-> 
-> for you to fetch changes up to 9134586715e389fe90d9d28cb37a668f374d686a:
-> 
->   arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP (2018-11-09 17:17:53 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM64 DT Fixes for 4.20-rc1
-> 
-> * Fix reserved gpio ranges for SDM845 and MSM8998
+> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+> Signed-off-by: Bich Hemon <bich.hemon@st.com>
 
-Could be good to find out in the tag text what problems this fixes.
+Hi,
 
-> ----------------------------------------------------------------
-> Bjorn Andersson (2):
->       arm64: dts: sdm845-mtp: Reserve reserved gpios
->       arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP
+This had fallen between the chairs it seems. I have applied it to arm-soc
+next/soc now, for 4.21 merge window.
 
-Merged, thanks!
+It ended up being patched up manually to consolidate the version in
+Russell's patch tracker with this posted version, and I tweaked whitespace
+a bit. Let me know if I missed something.
 
+
+Thanks,
 
 -Olof
