@@ -1,100 +1,65 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 12 Nov 2018 18:48:30 +0200
-Subject: [PATCH] mmc: core: Lower max_seg_size if too high for DMA
-In-Reply-To: <20181031155738.18367-1-tony@atomide.com>
-References: <20181031155738.18367-1-tony@atomide.com>
-Message-ID: <2099ae8d-ef53-ac6f-a25d-c1e1acc0d5f4@ti.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Mon, 12 Nov 2018 16:50:37 +0000
+Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
+In-Reply-To: <1ad8d087-40a8-7a00-31cf-c4d34a9a12fb@axentia.se>
+References: <20180730164137.GD17271@n2100.armlinux.org.uk>
+ <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
+ <20180731074114.GF17271@n2100.armlinux.org.uk>
+ <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
+ <20180731092343.GH17271@n2100.armlinux.org.uk>
+ <9bf5e0e9-c1e8-5af2-7fea-40f9618d4d52@axentia.se>
+ <20180731111537.GJ17271@n2100.armlinux.org.uk>
+ <59eeb1c4-163c-4fda-d51e-27f2f404fe3e@axentia.se>
+ <20180801093528.GC30658@n2100.armlinux.org.uk>
+ <1ad8d087-40a8-7a00-31cf-c4d34a9a12fb@axentia.se>
+Message-ID: <fd70023a-815b-697a-d01f-6ae9efb83653@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
-
-On 2018-10-31 17:57, Tony Lindgren wrote:
-> With CONFIG_DMA_API_DEBUG_SG a device may produce the following warning:
+On 2018-08-02 08:06, Peter Rosin wrote:
+> On 2018-08-01 11:35, Russell King - ARM Linux wrote:
+>> On Wed, Aug 01, 2018 at 11:01:12AM +0200, Peter Rosin wrote:
+>>> I don't think it's a problem with the atmel I2C driver. IIRC, the
+>>> tda998x driver issues the command a initiate the EDID read, but that
+>>> times out. So it appears to be the TDA19988 that fails to read the
+>>> EDID over the DDC bus? Which brings me to the double problem with the
+>>> scopes mentioned above...
+>>
+>> It sounds like it.
+>>
+>> It may be helpful to know that there are HDMI pass-through boards
+>> available that give access to all the HDMI signals:
+>>
+>> https://elabbay.myshopify.com/collections/camera
+>> https://elabbay.myshopify.com/collections/camera/products/hdmi-af-af-v1a-hdmi-type-a-female-to-hdmi-type-a-male-pass-through-adapter-breakout-board
+>>
+>> I've never bought from them, so please don't take this as a
+>> recommendation - the fact that there seems to be no company details
+>> on their site doesn't seem good, and as the whois for elabbay.com is
+>> obscured also doesn't give me any confidence to buy from them.
 > 
-> "DMA-API: mapping sg segment longer than device claims to support"
+> I still will not be able to inspect the DDC bus between the TDA19988
+> and the buffer circuit (IP4786), but the gadget seems useful enough and
+> it's not a shitload of money. We'll see how long it takes for it to get
+> here...
 > 
-> We default to 64KiB if a DMA engine driver does not initialize dma_parms
-> and call dma_set_max_seg_size(). This may be lower that what many MMC
-> drivers do with mmc->max_seg_size = mmc->max_blk_size * mmc->max_blk_count.
-> 
-> Let's do a sanity check for max_seg_size being higher than what DMA
-> supports in mmc_add_host() and lower it as needed.
+> Thanks for the pointer! Maybe :-)
 
-I tried to address it with:
+I got the pass-through board a while back, and that board works as expected
+and there was no problem with ordering etc. What I could see with that was
+that the TDA19988 was able to initiate a start condition (SDA -> low) but
+then nothing more happened.
 
-https://patchwork.kernel.org/patch/9948967/
-https://patchwork.kernel.org/patch/9948989/
-https://patchwork.kernel.org/patch/9948975/
+Then last week, someone noticed that even though the TDA19988 is driven by
+1.8V, it still needs the high signals of the DDC bus to be above 3V, which
+was unexpected and not catered for by the design. Changing VCC(SYS) of the
+buffer circuit in place (IP4786, pin 27) to 3.3V fixed the issue and EDID
+reading works, and this was confirmed earlier today.
 
-but it is back in the drawing board for now.
+So, the problem was that the TDA19988 only ever saw "low" DDC signals, and
+probably aborted when the bus appeared busy. Or something.
 
-The problem is that with eDMA/SDMA the size limit is not bytes, but the
-number of bursts. Different addr_width and burst combination would
-result different max_seg_size and I can not guess before the user
-provide the  dma_slave_config via dmaengine_slave_config().
+If anyone cares...
 
-I have experimental patches to modify the max_seg_size of the _channel_
-proactively in response slave_config and then we should have an API to
-query it from the DMA _channel_, not from the DMA device as each channel
-can have different limit on the max_seg_size.
-
-> 
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> ---
->  drivers/mmc/core/host.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include <linux/device.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/err.h>
->  #include <linux/idr.h>
->  #include <linux/of.h>
-> @@ -415,6 +416,19 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
->  
->  EXPORT_SYMBOL(mmc_alloc_host);
->  
-> +static void mmc_check_max_seg_size(struct mmc_host *host)
-> +{
-> +	unsigned int max_seg_size = dma_get_max_seg_size(mmc_dev(host));
-> +
-> +	if (host->max_seg_size <= max_seg_size)
-> +		return;
-> +
-> +	dev_info(mmc_dev(host), "Lowering max_seg_size for DMA: %u vs %u\n",
-> +		 host->max_seg_size, max_seg_size);
-> +
-> +	host->max_seg_size = max_seg_size;
-> +}
-> +
->  /**
->   *	mmc_add_host - initialise host hardware
->   *	@host: mmc host
-> @@ -430,6 +444,8 @@ int mmc_add_host(struct mmc_host *host)
->  	WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
->  		!host->ops->enable_sdio_irq);
->  
-> +	mmc_check_max_seg_size(host);
-> +
->  	err = device_add(&host->class_dev);
->  	if (err)
->  		return err;
-> 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Cheers,
+Peter
