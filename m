@@ -1,63 +1,62 @@
-From: niklas.cassel@linaro.org (Niklas Cassel)
-Date: Mon, 12 Nov 2018 21:26:02 +0100
-Subject: PCIe support in APQ8098-based board
-In-Reply-To: <44260aa9-d01a-f9a5-a2e6-31f06de48d34@free.fr>
-References: <44260aa9-d01a-f9a5-a2e6-31f06de48d34@free.fr>
-Message-ID: <20181112202602.GA7649@centauri.lan>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 12 Nov 2018 21:32:54 +0100
+Subject: [PATCH net-next v3 1/2] net: phy: replace PHY_HAS_INTERRUPT with
+ a check for config_intr and ack_interrupt
+In-Reply-To: <c067d321-c69e-706d-304a-04e1e477b47c@gmail.com>
+References: <203c4d9e-f39a-7a08-46c3-4ee6e61f181e@gmail.com>
+ <fd9674b3-4033-95c6-a93e-10c8b5ba2e6a@gmail.com>
+ <20181109201307.GV5259@lunn.ch>
+ <44b503b8-9f2a-50ac-c4c9-d25258d98ef5@gmail.com>
+ <4330cb5b-b1a5-5004-af51-39199943639d@gmail.com>
+ <c067d321-c69e-706d-304a-04e1e477b47c@gmail.com>
+Message-ID: <CAFBinCCmNYGp8kzy45ojjr27tEaPVs-QwMsLRrfXHCvw_taDOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 11, 2018 at 11:26:29PM +0100, Marc Gonzalez wrote:
-> Hello,
+Hi Heiner,
 
-Hello Marc
+On Fri, Nov 9, 2018 at 9:56 PM Heiner Kallweit <hkallweit1@gmail.com> wrote:
+>
+> On 09.11.2018 21:33, Florian Fainelli wrote:
+> > On 11/9/18 12:22 PM, Heiner Kallweit wrote:
+> >> On 09.11.2018 21:13, Andrew Lunn wrote:
+> >>> Hi Heiner
+> >>>
+> >>>> +static bool phy_drv_supports_irq(struct phy_driver *phydrv)
+> >>>> +{
+> >>>> +  return phydrv->config_intr || phydrv->ack_interrupt;
+> >>>> +}
+> >>>
+> >>> Should this be && not || ? I thought both needed to be provided for
+> >>> interrupts to work.
+> >>>
+> >>>        Andrew
+> >>>
+> >> I've seen at least one driver which configures interrupts in
+> >> config_init and doesn't define a config_intr callback
+> >> (ack_interrupt callback is there)
+> >
+> > That driver should probably be fixed, while it most likely does not make
+> > any significant difference during probe/connect, since config_init() and
+> > config_intr() are virtually happening at the same time, this is not
+> > necessarily true when disconnecting from the PHY where we really want
+> > config_intr() to effectively disable the interrupts and not leaving
+> > something enabled that would now become unmaskable, because no more
+> > driver attached.
+> >
+> Found the driver: It's the IP101A/G in icplus.c
+> It should be easy to fix the behavior and move the interrupt config
+> to a config_intr callback. But the last real changes to the driver
+> have been done 6 years ago, so I'm not sure there's anybody out
+> there who can test.
+if you want I can take care of the IP101A/G code.
+I have at least one board with an IP101A/G (PHY ID: 0x02430c54,
+according to the schematics it's an IP101GR-GP) where the interrupt is
+routed to the SoC.
 
-> 
-> I'm playing with an APQ8098-based board, which I got to boot an upstream
-> v4.20-rc1 kernel to the command line, by reusing the msm8998-mtp.dts
-> (IIUC apq8098 is the msm8998's "little brother", in that they are
-> almost the same SoC, with some HW blocks missing in the apq8098).
-
-That is correct.
-
-> 
-> I'm trying to get PCIe working on my eval board. I'm wondering if
-> someone from qcom, codeaurora, or linaro has perhaps already done
-> this work, and it's just not upstream yet?
-
-Linaro will most likely look at this at some undefined time in the future.
-
-Here are some hints in case you need this urgently:
-
-msm8998 uses QCOM PCIe v2.3.3, which is supported by
-drivers/pci/controller/dwc/pcie-qcom.c
-
-I suggest that you look at:
-arch/arm64/boot/dts/qcom/ipq8074.dtsi
-
-However, note that the PCI ranges are different for this SoC compared to
-ipq8074.
-
-The correct ranges can be found here:
-https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/arch/arm/boot/dts/qcom/msm8998.dtsi?h=msm-4.4#n2538
-
-It also appears that drivers/clk/qcom/gcc-msm8998.c is missing some PCIe
-resets.
-The correct addresses for these clocks can be found here:
-https://source.codeaurora.org/quic/la/kernel/msm-4.4/tree/drivers/clk/msm/clock-gcc-8998.c?h=msm-4.4
-
-Note that the qcom_pcie_get_resources_2_3_3() will have to be modified
-slightly for msm8998, since msm8998 only has 3 PCIe resets.
+please let me know whether you'd like to work on it or if I should
+give it a try.
 
 
-Kind regards,
-Niklas
-
-> 
-> There seem to be proper drivers for the RC and the PHY, but some
-> low-level stuff are missing (clocks, regulator, power domain).
-> 
-> drivers/pci/controller/dwc/pcie-qcom.c
-> drivers/phy/qualcomm/phy-qcom-qmp.c
-> 
-> Regards.
+Regards
+Martin
