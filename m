@@ -1,70 +1,28 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Mon, 12 Nov 2018 15:12:39 +1100
-Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
-In-Reply-To: <cover.1541995959.git.fthain@telegraphics.com.au>
-References: <cover.1541995959.git.fthain@telegraphics.com.au>
-Message-ID: <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 12 Nov 2018 10:47:40 +0530
+Subject: [PATCH] soc: ti: wkup_m3: Add PRCM int16 as the wake up source
+Message-ID: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implementations of arch_gettimeoffset are generally not re-entrant
-and assume that interrupts have been disabled. Unfortunately this
-pre-condition got broken in v2.6.32.
+Add PRCM int16 as the wake up source.
 
-Fixes: 5cfc8ee0bb51 ("ARM: convert arm to arch_gettimeoffset()")
-Signed-off-by: Finn Thain <fthain@telegraphics.com.au>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- arch/arm/mach-ebsa110/core.c | 5 +++++
- arch/arm/mach-rpc/time.c     | 5 +++++
- 2 files changed, 10 insertions(+)
+ drivers/soc/ti/wkup_m3_ipc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-ebsa110/core.c b/arch/arm/mach-ebsa110/core.c
-index 688e5fed49a7..479f89a1accf 100644
---- a/arch/arm/mach-ebsa110/core.c
-+++ b/arch/arm/mach-ebsa110/core.c
-@@ -160,12 +160,17 @@ static void __init ebsa110_init_early(void)
-  */
- static u32 ebsa110_gettimeoffset(void)
- {
-+	unsigned long flags;
- 	unsigned long offset, count;
+diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
+index f5cb8c0..d65e361 100644
+--- a/drivers/soc/ti/wkup_m3_ipc.c
++++ b/drivers/soc/ti/wkup_m3_ipc.c
+@@ -57,6 +57,7 @@
+ static struct wkup_m3_ipc *m3_ipc_state;
  
-+	local_irq_save(flags);
-+
- 	__raw_writeb(0x40, PIT_CTRL);
- 	count = __raw_readb(PIT_T1);
- 	count |= __raw_readb(PIT_T1) << 8;
- 
-+	local_irq_restore(flags);
-+
- 	/*
- 	 * If count > COUNT, make the number negative.
- 	 */
-diff --git a/arch/arm/mach-rpc/time.c b/arch/arm/mach-rpc/time.c
-index 2689771c1d38..852bb3801638 100644
---- a/arch/arm/mach-rpc/time.c
-+++ b/arch/arm/mach-rpc/time.c
-@@ -29,9 +29,12 @@
- 
- static u32 ioc_timer_gettimeoffset(void)
- {
-+	unsigned long flags;
- 	unsigned int count1, count2, status;
- 	long offset;
- 
-+	local_irq_save(flags);
-+
- 	ioc_writeb (0, IOC_T0LATCH);
- 	barrier ();
- 	count1 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
-@@ -42,6 +45,8 @@ static u32 ioc_timer_gettimeoffset(void)
- 	barrier ();
- 	count2 = ioc_readb(IOC_T0CNTL) | (ioc_readb(IOC_T0CNTH) << 8);
- 
-+	local_irq_restore(flags);
-+
- 	offset = count2;
- 	if (count2 < count1) {
- 		/*
+ static const struct wkup_m3_wakeup_src wakeups[] = {
++	{.irq_nr = 16,	.src = "PRCM"},
+ 	{.irq_nr = 35,	.src = "USB0_PHY"},
+ 	{.irq_nr = 36,	.src = "USB1_PHY"},
+ 	{.irq_nr = 40,	.src = "I2C0"},
 -- 
-2.18.1
+1.9.1
