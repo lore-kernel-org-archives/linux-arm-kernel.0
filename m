@@ -1,99 +1,151 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 12 Nov 2018 11:57:00 +0000
-Subject: [PATCH v6 09/24] arm64: kvm: Unmask PMR before entering guest
+Date: Mon, 12 Nov 2018 11:56:58 +0000
+Subject: [PATCH v6 07/24] arm64: Make PMR part of task context
 In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
 References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1542023835-21446-10-git-send-email-julien.thierry@arm.com>
+Message-ID: <1542023835-21446-8-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Interrupts masked by ICC_PMR_EL1 will not be signaled to the CPU. This
-means that hypervisor will not receive masked interrupts while running a
-guest.
+If ICC_PMR_EL1 is used to mask interrupts, its value should be
+saved/restored whenever a task is context switched out/in or
+gets an exception.
 
-Avoid this by making sure ICC_PMR_EL1 is unmasked when we enter a guest.
+Add PMR to the registers to save in the pt_regs struct upon kernel entry,
+and restore it before ERET. Also, initialize it to a sane value when
+creating new tasks.
 
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
+Cc: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h | 12 ++++++++++++
- arch/arm64/kvm/hyp/switch.c       | 16 ++++++++++++++++
- 2 files changed, 28 insertions(+)
+ arch/arm64/include/asm/processor.h |  3 +++
+ arch/arm64/include/asm/ptrace.h    | 14 +++++++++++---
+ arch/arm64/kernel/asm-offsets.c    |  1 +
+ arch/arm64/kernel/entry.S          | 13 +++++++++++++
+ arch/arm64/kernel/process.c        |  6 ++++++
+ 5 files changed, 34 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 52fbc82..31c7e9a 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -24,6 +24,7 @@
- 
- #include <linux/types.h>
- #include <linux/kvm_types.h>
-+#include <asm/arch_gicv3.h>
- #include <asm/cpufeature.h>
- #include <asm/daifflags.h>
- #include <asm/fpsimd.h>
-@@ -471,6 +472,17 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
- static inline void kvm_arm_vhe_guest_enter(void)
- {
- 	local_daif_mask();
+diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+index 6b0d4df..b2315ef 100644
+--- a/arch/arm64/include/asm/processor.h
++++ b/arch/arm64/include/asm/processor.h
+@@ -168,6 +168,9 @@ static inline void start_thread_common(struct pt_regs *regs, unsigned long pc)
+ 	memset(regs, 0, sizeof(*regs));
+ 	forget_syscall(regs);
+ 	regs->pc = pc;
 +
-+	/*
-+	 * Having IRQs masked via PMR when entering the guest means the GIC
-+	 * will not signal the CPU of interrupts of lower priority, and the
-+	 * only way to get out will be via guest exceptions.
-+	 * Naturally, we want to avoid this.
-+	 */
-+	if (system_supports_irq_prio_masking()) {
-+		gic_write_pmr(GIC_PRIO_IRQON);
-+		dsb(sy);
-+	}
- }
- 
- static inline void kvm_arm_vhe_guest_exit(void)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 7cc175c..e5ea193 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -22,6 +22,7 @@
- 
- #include <kvm/arm_psci.h>
- 
-+#include <asm/arch_gicv3.h>
- #include <asm/cpufeature.h>
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
-@@ -537,6 +538,17 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	struct kvm_cpu_context *guest_ctxt;
- 	u64 exit_code;
- 
-+	/*
-+	 * Having IRQs masked via PMR when entering the guest means the GIC
-+	 * will not signal the CPU of interrupts of lower priority, and the
-+	 * only way to get out will be via guest exceptions.
-+	 * Naturally, we want to avoid this.
-+	 */
-+	if (system_supports_irq_prio_masking()) {
-+		gic_write_pmr(GIC_PRIO_IRQON);
-+		dsb(sy);
-+	}
-+
- 	vcpu = kern_hyp_va(vcpu);
- 
- 	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-@@ -589,6 +601,10 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	 */
- 	__debug_switch_to_host(vcpu);
- 
-+	/* Returning to host will clear PSR.I, remask PMR if needed */
 +	if (system_supports_irq_prio_masking())
-+		gic_write_pmr(GIC_PRIO_IRQOFF);
-+
- 	return exit_code;
++		regs->pmr_save = GIC_PRIO_IRQON;
  }
  
+ static inline void start_thread(struct pt_regs *regs, unsigned long pc,
+diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+index ce6998c..0ad46f5 100644
+--- a/arch/arm64/include/asm/ptrace.h
++++ b/arch/arm64/include/asm/ptrace.h
+@@ -19,6 +19,8 @@
+ #ifndef __ASM_PTRACE_H
+ #define __ASM_PTRACE_H
+ 
++#include <asm/cpufeature.h>
++
+ #include <uapi/asm/ptrace.h>
+ 
+ /* Current Exception Level values, as contained in CurrentEL */
+@@ -173,7 +175,8 @@ struct pt_regs {
+ #endif
+ 
+ 	u64 orig_addr_limit;
+-	u64 unused;	// maintain 16 byte alignment
++	/* Only valid when ARM64_HAS_IRQ_PRIO_MASKING is enabled. */
++	u64 pmr_save;
+ 	u64 stackframe[2];
+ };
+ 
+@@ -208,8 +211,13 @@ static inline void forget_syscall(struct pt_regs *regs)
+ #define processor_mode(regs) \
+ 	((regs)->pstate & PSR_MODE_MASK)
+ 
+-#define interrupts_enabled(regs) \
+-	(!((regs)->pstate & PSR_I_BIT))
++#define irqs_priority_unmasked(regs)					\
++	(system_supports_irq_prio_masking() ?				\
++		(regs)->pmr_save & GIC_PRIO_STATUS_BIT :		\
++		true)
++
++#define interrupts_enabled(regs)			\
++	(!((regs)->pstate & PSR_I_BIT) && irqs_priority_unmasked(regs))
+ 
+ #define fast_interrupts_enabled(regs) \
+ 	(!((regs)->pstate & PSR_F_BIT))
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 323aeb5..bab4122 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -78,6 +78,7 @@ int main(void)
+   DEFINE(S_ORIG_X0,		offsetof(struct pt_regs, orig_x0));
+   DEFINE(S_SYSCALLNO,		offsetof(struct pt_regs, syscallno));
+   DEFINE(S_ORIG_ADDR_LIMIT,	offsetof(struct pt_regs, orig_addr_limit));
++  DEFINE(S_PMR_SAVE,		offsetof(struct pt_regs, pmr_save));
+   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 039144e..eb8120e 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -249,6 +249,12 @@ alternative_else_nop_endif
+ 	msr	sp_el0, tsk
+ 	.endif
+ 
++	/* Save pmr */
++alternative_if ARM64_HAS_IRQ_PRIO_MASKING
++	mrs_s	x20, SYS_ICC_PMR_EL1
++	str	x20, [sp, #S_PMR_SAVE]
++alternative_else_nop_endif
++
+ 	/*
+ 	 * Registers that may be useful after this macro is invoked:
+ 	 *
+@@ -269,6 +275,13 @@ alternative_else_nop_endif
+ 	/* No need to restore UAO, it will be restored from SPSR_EL1 */
+ 	.endif
+ 
++	/* Restore pmr */
++alternative_if ARM64_HAS_IRQ_PRIO_MASKING
++	ldr	x20, [sp, #S_PMR_SAVE]
++	msr_s	SYS_ICC_PMR_EL1, x20
++	dsb	sy
++alternative_else_nop_endif
++
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ct_user_enter
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index d9a4c2d..71e8850 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -231,6 +231,9 @@ void __show_regs(struct pt_regs *regs)
+ 
+ 	printk("sp : %016llx\n", sp);
+ 
++	if (system_supports_irq_prio_masking())
++		printk("pmr_save: %08llx\n", regs->pmr_save);
++
+ 	i = top_reg;
+ 
+ 	while (i >= 0) {
+@@ -362,6 +365,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 		if (arm64_get_ssbd_state() == ARM64_SSBD_FORCE_DISABLE)
+ 			childregs->pstate |= PSR_SSBS_BIT;
+ 
++		if (system_supports_irq_prio_masking())
++			childregs->pmr_save = GIC_PRIO_IRQON;
++
+ 		p->thread.cpu_context.x19 = stack_start;
+ 		p->thread.cpu_context.x20 = stk_sz;
+ 	}
 -- 
 1.9.1
