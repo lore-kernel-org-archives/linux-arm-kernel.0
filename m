@@ -1,212 +1,92 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 12 Nov 2018 15:32:25 +0530
-Subject: [PATCH v2 2/9] phy: Add configuration interface
-In-Reply-To: <4d0506aa0a61d234610b42a268a8326d9ea18466.1541516029.git-series.maxime.ripard@bootlin.com>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4d0506aa0a61d234610b42a268a8326d9ea18466.1541516029.git-series.maxime.ripard@bootlin.com>
-Message-ID: <3a9a28df-8139-1036-a884-0de64aa07df1@ti.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 12 Nov 2018 11:09:39 +0100
+Subject: [Qemu-devel] [RFC] [PATCH] kvm: arm: Introduce error code
+ KVM_EINVARIANT
+In-Reply-To: <86o9avetgz.wl-marc.zyngier@arm.com>
+References: <1540290099-146109-1-git-send-email-mjaggi@caviumnetworks.com>
+ <4bbb4e76-b714-eafe-f95b-aca1a258e9fe@caviumnetworks.com>
+ <86o9avetgz.wl-marc.zyngier@arm.com>
+Message-ID: <20181112100939.vro42goghcv7v6l2@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On Sun, Nov 11, 2018 at 11:36:44AM +0000, Marc Zyngier wrote:
+> On Sat, 10 Nov 2018 22:18:47 +0000,
+> Manish Jaggi <mjaggi@caviumnetworks.com> wrote:
+> > 
+> > 
+> > CCing a larger audience.
+> > Please review.
+> > 
+> > On 10/23/2018 03:51 PM, Jaggi, Manish wrote:
+> > > From: Manish Jaggi <manish.jaggi@cavium.com>
+> > >
+> > > This patch introduces an error code KVM_EINVARIANT which is returned
+> > > by KVM when userland tries to set an invariant register.
+> > >
+> > > The need for this error code is in VM Migration for arm64.
+> > > ARM64 systems use mainly -machine virt -cpu host as parameter to qemu.
+> > > Migration requires both Source and destination machines to have same
+> > > physical cpu. There are cases where the overall architecture of CPU is
+> > > same but the next version of the chip with some bug fixes which have no
+> > > effect on qemu operation. In such cases invariant registers like MIDR
+> > > have a different value.
+> > > Currently Migration fails in such cases.
+> > >
+> > > Rather than sending a EINVAL, a specifc error code will help
+> > > userland program the guest invariant register by querying the migrated
+> > > host machines invariant registers.
+> 
+> But failing migration is a good thing, right? How do you expect that
+> the guest will be happy to see a new CPU revision right in the middle
+> of its execution? Do you also propose that QEMU starts doing that for
+> big-little systems? After all, if ignoring the differences in some
+> registers is harmless for migration, surely that should be the case in
+> a single system, right?
+> 
+> > >
+> > > Qemu will have a parameter -hostinvariant along with checking of this
+> > > error code. So it can be safely assumed that the feature is opt-in
+> 
+> You're changing the ABI without any buy in from userspace, which is
+> not acceptable.
+> 
+> As it stands, this patch creates a number of issues without solving
+> any. Things to think about:
+> 
+> - How does errata management works when migrating to a different
+>   system?
+> - big-little, as mentioned above
+> - Are all invariant registers equal? A different MIDR has the same
+>   effect as a different MMFR0?
+> 
+> Instead of papering over architectural constants i a system, how about
+> allowing the relevant ID registers to be overloaded when not
+> incompatible?
+> 
 
-On 06/11/18 8:24 PM, Maxime Ripard wrote:
-> The phy framework is only allowing to configure the power state of the PHY
-> using the init and power_on hooks, and their power_off and exit
-> counterparts.
-> 
-> While it works for most, simple, PHYs supported so far, some more advanced
-> PHYs need some configuration depending on runtime parameters. These PHYs
-> have been supported by a number of means already, often by using ad-hoc
-> drivers in their consumer drivers.
-> 
-> That doesn't work too well however, when a consumer device needs to deal
-> with multiple PHYs, or when multiple consumers need to deal with the same
-> PHY (a DSI driver and a CSI driver for example).
-> 
-> So we'll add a new interface, through two funtions, phy_validate and
-> phy_configure. The first one will allow to check that a current
-> configuration, for a given mode, is applicable. It will also allow the PHY
-> driver to tune the settings given as parameters as it sees fit.
-> 
-> phy_configure will actually apply that configuration in the phy itself.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  drivers/phy/phy-core.c  | 61 ++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/phy/phy.h | 58 ++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 119 insertions(+)
-> 
-> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> index 35fd38c5a4a1..7bd3ed65c708 100644
-> --- a/drivers/phy/phy-core.c
-> +++ b/drivers/phy/phy-core.c
-> @@ -408,6 +408,67 @@ int phy_calibrate(struct phy *phy)
->  EXPORT_SYMBOL_GPL(phy_calibrate);
->  
->  /**
-> + * phy_configure() - Changes the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @opts: New configuration to apply
-> + *
-> + * Used to change the PHY parameters. phy_init() must have been called
-> + * on the phy. The configuration will be applied on the current phy
-> + * mode, that can be changed using phy_set_mode().
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
-> + */
-> +int phy_configure(struct phy *phy, union phy_configure_opts *opts)
-> +{
-> +	int ret;
-> +
-> +	if (!phy)
-> +		return -EINVAL;
-> +
-> +	if (!phy->ops->configure)
-> +		return -EOPNOTSUPP;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->configure(phy, opts);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
+In QEMU, I think we need nail down how we define '-cpu host' for kvmarm.
+IMO, '-cpu host' is what libvirt calls "host-passthrough"[*], and indeed
+migrating a guest using host-passthrough is super risky. You need to
+know what you're doing, and likely what you'll want to do is migrate to
+an _identical_ host. We should start looking at building cpu models to
+better support migration, but errata complicates that. However, for the
+sake of argument, let's assume we solved those problems and completed the
+implementation of cpu models - so we would no longer be using '-cpu host'
+for a "typical" config. So what would '-cpu host' mean? It appears the
+current semantics are "source host passthrough", similar to
+"host-model"[*]. Rather than "whatever host I'm running on host
+passthrough", which is what I think we want and what this patch and the
+QEMU counterpart changes seem to be aiming at implementing. Anyway,
+whichever of those two semantics we choose for '-cpu host', the user will
+still need to know what they're doing and to assume the risks. Without
+cpu models, I'm not even sure discussing migration safety makes sense.
 
-EXPORT_SYMBOL_GPL is missing here and below.
-> +
-> +/**
-> + * phy_validate() - Checks the phy parameters
-> + * @phy: the phy returned by phy_get()
-> + * @mode: phy_mode the configuration is applicable to.
-> + * @opts: Configuration to check
-> + *
-> + * Used to check that the current set of parameters can be handled by
-> + * the phy. Implementations are free to tune the parameters passed as
-> + * arguments if needed by some implementation detail or
-> + * constraints. It will not change any actual configuration of the
-> + * PHY, so calling it as many times as deemed fit will have no side
-> + * effect.
-> + *
-> + * Returns: 0 if successful, an negative error code otherwise
-> + */
-> +int phy_validate(struct phy *phy, enum phy_mode mode,
-> +		  union phy_configure_opts *opts)
+(Yeah, I know I ignored big-little. IMO, big-little is an upper layer
+problem, as it should just be a vcpu thread to cpu set affinity
+assignment issue.)
 
-We are planning to switch to mode/submode combination [1], so this might have
-to change.
+Thanks,
+drew
 
-Thanks
-Kishon
-
-[1] -> https://patchwork.kernel.org/cover/10673295/
-> +{
-> +	int ret;
-> +
-> +	if (!phy)
-> +		return -EINVAL;
-> +
-> +	if (!phy->ops->validate)
-> +		return -EOPNOTSUPP;
-> +
-> +	mutex_lock(&phy->mutex);
-> +	ret = phy->ops->validate(phy, mode, opts);
-> +	mutex_unlock(&phy->mutex);
-> +
-> +	return ret;
-> +}
-> +
-> +/**
->   * _of_phy_get() - lookup and obtain a reference to a phy by phandle
->   * @np: device_node for which to get the phy
->   * @index: the index of the phy
-> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
-> index d5c2ac7369f2..89cf8b685546 100644
-> --- a/include/linux/phy/phy.h
-> +++ b/include/linux/phy/phy.h
-> @@ -46,6 +46,12 @@ enum phy_mode {
->  };
->  
->  /**
-> + * union phy_configure_opts - Opaque generic phy configuration
-> + */
-> +union phy_configure_opts {
-> +};
-> +
-> +/**
->   * struct phy_ops - set of function pointers for performing phy operations
->   * @init: operation to be performed for initializing phy
->   * @exit: operation to be performed while exiting
-> @@ -62,6 +68,37 @@ struct phy_ops {
->  	int	(*power_on)(struct phy *phy);
->  	int	(*power_off)(struct phy *phy);
->  	int	(*set_mode)(struct phy *phy, enum phy_mode mode);
-> +
-> +	/**
-> +	 * @configure:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to change the PHY parameters. phy_init() must have
-> +	 * been called on the phy.
-> +	 *
-> +	 * Returns: 0 if successful, an negative error code otherwise
-> +	 */
-> +	int	(*configure)(struct phy *phy, union phy_configure_opts *opts);
-> +
-> +	/**
-> +	 * @validate:
-> +	 *
-> +	 * Optional.
-> +	 *
-> +	 * Used to check that the current set of parameters can be
-> +	 * handled by the phy. Implementations are free to tune the
-> +	 * parameters passed as arguments if needed by some
-> +	 * implementation detail or constraints. It must not change
-> +	 * any actual configuration of the PHY, so calling it as many
-> +	 * times as deemed fit by the consumer must have no side
-> +	 * effect.
-> +	 *
-> +	 * Returns: 0 if the configuration can be applied, an negative
-> +	 * error code otherwise
-> +	 */
-> +	int	(*validate)(struct phy *phy, enum phy_mode mode,
-> +			    union phy_configure_opts *opts);
->  	int	(*reset)(struct phy *phy);
->  	int	(*calibrate)(struct phy *phy);
->  	struct module *owner;
-> @@ -166,6 +203,9 @@ int phy_exit(struct phy *phy);
->  int phy_power_on(struct phy *phy);
->  int phy_power_off(struct phy *phy);
->  int phy_set_mode(struct phy *phy, enum phy_mode mode);
-> +int phy_configure(struct phy *phy, union phy_configure_opts *opts);
-> +int phy_validate(struct phy *phy, enum phy_mode mode,
-> +		 union phy_configure_opts *opts);
->  static inline enum phy_mode phy_get_mode(struct phy *phy)
->  {
->  	return phy->attrs.mode;
-> @@ -305,6 +345,24 @@ static inline int phy_calibrate(struct phy *phy)
->  	return -ENOSYS;
->  }
->  
-> +static inline int phy_configure(struct phy *phy,
-> +				union phy_configure_opts *opts)
-> +{
-> +	if (!phy)
-> +		return 0;
-> +
-> +	return -ENOSYS;
-> +}
-> +
-> +static inline int phy_validate(struct phy *phy, enum phy_mode mode,
-> +			       union phy_configure_opts *opts)
-> +{
-> +	if (!phy)
-> +		return 0;
-> +
-> +	return -ENOSYS;
-> +}
-> +
->  static inline int phy_get_bus_width(struct phy *phy)
->  {
->  	return -ENOSYS;
-> 
+[*] https://wiki.openstack.org/wiki/LibvirtXMLCPUModel
