@@ -1,55 +1,71 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:15 +0100
-Subject: [PATCH v3 06/18] DT: marvell,mmp2: fix TWSI2
+Date: Mon, 12 Nov 2018 04:20:14 +0100
+Subject: [PATCH v3 05/18] DT: marvell,mmp2: add MMC controllers
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-7-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-6-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell keeps their MMP2 datasheet secret, but there are good clues
-that TWSI2 is not on 0xd4025000 on that platform, not does it use
-IRQ 58. In fact, the IRQ 58 on MMP2 seems to be a signal processor:
-
-   arch/arm/mach-mmp/irqs.h:#define IRQ_MMP2_MSP  58
-
-I'm taking a somewhat educated guess that is probably a copy & paste
-error from PXA168 or PXA910 and that the real controller in fact hides
-at address 0xd4031000 and uses an interrupt line multiplexed via IRQ 17.
-
-I'm also copying some properties from TWSI1 that were missing or
-incorrect.
-
-Tested on a OLPC XO 1.75 machine, where the RTC is on TWSI2.
+There's apparently four of them on a MMP2.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Tested-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+
 ---
- arch/arm/boot/dts/mmp2.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+Changes since v1:
+- The controllers seem to be on AXI bus, not APB. Move them.
+- Remove aliases.
+
+ arch/arm/boot/dts/mmp2.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 063382b3eaca..63d49abf4e92 100644
+index 4743a1288280..063382b3eaca 100644
 --- a/arch/arm/boot/dts/mmp2.dtsi
 +++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -257,12 +257,15 @@
- 				status = "disabled";
+@@ -117,6 +117,42 @@
+ 				reg-names = "mux status", "mux mask";
+ 				mrvl,intc-nr-irqs = <2>;
  			};
++
++			mmc1: mmc at d4280000 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4280000 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH0>;
++				clock-names = "io";
++				interrupts = <39>;
++				status = "disabled";
++			};
++
++			mmc2: mmc at d4280800 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4280800 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH1>;
++				clock-names = "io";
++				interrupts = <52>;
++				status = "disabled";
++			};
++
++			mmc3: mmc at d4281000 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4281000 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH2>;
++				clock-names = "io";
++				interrupts = <53>;
++				status = "disabled";
++			};
++
++			mmc4: mmc at d4288000 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4281800 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH3>;
++				clock-names = "io";
++				interrupts = <54>;
++				status = "disabled";
++			};
+ 		};
  
--			twsi2: i2c at d4025000 {
-+			twsi2: i2c at d4031000 {
- 				compatible = "mrvl,mmp-twsi";
--				reg = <0xd4025000 0x1000>;
--				interrupts = <58>;
-+				reg = <0xd4031000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <0>;
- 				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
- 				resets = <&soc_clocks MMP2_CLK_TWSI1>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				status = "disabled";
- 			};
- 
+ 		apb at d4000000 {	/* APB */
 -- 
 2.19.1
