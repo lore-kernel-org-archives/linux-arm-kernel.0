@@ -1,46 +1,126 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 12 Nov 2018 15:38:17 +0200
-Subject: [RFC 0/9] ASoC/ARM: Merge the davinci and omap audio directories
-In-Reply-To: <1065fb8a-a8ec-fbe3-83eb-a308072ef6d6@bitmer.com>
-References: <20181108083754.1746-1-peter.ujfalusi@ti.com>
- <1065fb8a-a8ec-fbe3-83eb-a308072ef6d6@bitmer.com>
-Message-ID: <812b333e-cd01-ba32-8daa-7783072cb613@ti.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 12 Nov 2018 15:21:46 +0100
+Subject: [PATCH 3/4] dt-bindings: reset: uniphier: Add AHCI core reset
+ description
+In-Reply-To: <20181112210215.2DB6.4A936039@socionext.com>
+References: <1541775663.4112.48.camel@pengutronix.de>
+ <CAK7LNAQGftPMLkQk-tU4R6Jtw9W6npka+Br+2wyyZicAgwDvRg@mail.gmail.com>
+ <20181112210215.2DB6.4A936039@socionext.com>
+Message-ID: <1542032506.3440.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 2018-11-11 18:37, Jarkko Nikula wrote:
-> On 11/8/18 10:37 AM, Peter Ujfalusi wrote:
->> The series also includes patches to updated the arch/arm/ files (defconfigs,
->> source files using audio Kconfig symbols).
->>
->> I believe with v1 all of this can be merged via ASoC tree as the chances of
->> conflicts are low for the touched arch/arm files. But Sekhar and Tony can
->> correct me if I'm wrong.
->>
->> I think I have catched all (I hope) issues regarding to Kconfig thanks to the
->> various autobuild machines out there kindly testing my linux-next-wip branch.
->>
->> I would appreciate any testing comments before I send the v1!
->>
-> I applied on top of
-> git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git commit
-> abd97b7c53ac ("Merge branch 'asoc-4.21' into asoc-next").
+On Mon, 2018-11-12 at 21:02 +0900, Kunihiko Hayashi wrote:
+> Hi,
 > 
-> Patches 2 and 6 didn't apply and 7-8 I skipped. For my functional
-> testing none of those were required.
-
-Hrm, the series was based on next-20181019, but I will keep on eye on these!
-
-> For the sound/soc/{omap => ti} conversion you may add:
+> Thank you for some comments and pointing out.
 > 
-> Tested-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
-> Acked-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> On Sat, 10 Nov 2018 01:14:06 +0900 <yamada.masahiro@socionext.com> wrote:
+> 
+> > On Sat, Nov 10, 2018 at 12:02 AM Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> > > 
+> > > Hi Kunihiko,
+> > > 
+> > > On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
+> > > > Add compatible strings for reset control of AHCI core implemented in
+> > > > UniPhier SoCs. The reset control belongs to AHCI glue layer.
+> > > > 
+> > > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > > > ---
+> > > >  Documentation/devicetree/bindings/reset/uniphier-reset.txt | 3 +++
+> > > >  1 file changed, 3 insertions(+)
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > > > index f63c511..ea00517 100644
+> > > > --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > > > +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
+> > > > @@ -133,6 +133,9 @@ Required properties:
+> > > >      "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
+> > > >      "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
+> > > >      "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
+> > > > +    "socionext,uniphier-pro4-ahci-reset" - for Pro4 SoC AHCI
+> > > > +    "socionext,uniphier-pxs2-ahci-reset" - for PXs2 SoC AHCI
+> > > > +    "socionext,uniphier-pxs3-ahci-reset" - for PXs3 SoC AHCI
+> > > 
+> > > Since the driver behaves identically for "socionext,uniphier-pro4-usb3-
+> > > reset" and "socionext,uniphier-pro4-ahci-reset", would it make sense to
+> > > add a common compatible?
+> > 
+> > As far as I could guess, he just happened to find the same driver code
+> > could be reused for other hardware.
 
-Thank you!
+Ok, in that case never mind. I just assumed that this could be a case of
+glue layer building blocks being reused by the hardware engineers, since
+the driver reuses the same clock names for USB3 and AHCI both on Pro4
+and on PXs2.
 
-- P?ter
+> > Theoretically, this can happen anywhere since
+> > a reset controller is just a set of registers
+> > each bit of which is connected to a reset line.
+> > 
+> > If you added a super-generic compatible like "simple-reset",
+> > I would agree with
+> > "socionext,uniphier-pro4-usb3-reset", "simple-reset"
+> > since this is a pattern.
+> 
+> I think it's more generic to define simple-reset with parent clock/reset
+> control without both SoC and device names.
+> 
+> However, such parent clocks/resets strongly depends on SoC, 
+> so I think it's difficut to lead generic definition in this case.
+> 
+> If we add generic compatible string, I also add "simple-reset".
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+There is no "simple-reset" binding definition. As soon as there are SoC
+specific clocks, it's not really generic anymore.
+
+> > However,
+> > "socionext,uniphier-pro4-glue-reset" is kind of a halfway house
+> > where it is SoC-specific, but still ambiguous.
+> 
+> Surely, it might be hard to understand that pro4-glue-reset is SoC-specific
+> but for generic-device.
+
+I agree.
+
+> > > Something like:
+> > > "socionext,uniphier-pro4-usb3-reset", "socionext,uniphier-pro4-glue-reset" - for USB3 SoC AHCI
+> > > "socionext,uniphier-pro4-ahci-reset", "socionext,uniphier-pro4-glue-reset" - for Pro4 SoC AHCI
+> > > 
+> > > That way if more places turn up where the glue layer reset is used,
+> > > you can add them without patching the driver every time.
+> > 
+> > 
+> > This is a trade-off between "patch the driver"
+> > and "potential change of the binding".
+> 
+> Adding "glue-reset" is usable for devices having same parent clocks/resets as
+> usb3/ahci, and we can add the devices without patches.
+> 
+> However, if the device needs other parent clocks/resets for the same SoC,
+> we can't add "glue-reset" and we might add patches for the device as a result.
+> In this case, the "glue-reset" will become difficult to understand.
+
+Then let's not bother with it.
+I made the suggestion without knowing the full picture.
+
+> > There is no real hardware like pro4-glue-reset.
+> > 
+> > I am guessing this is a part of syscon or something,
+> > but I cannot find any explanation in a bigger picture.
+> > 
+> > So, I cannot judge this further more.
+> 
+> Since it's hard to lead the best result,
+> currently I'd like to suggest the current compatibles,
+
+That is fine with me.
+
+> with "simple-reset" if necessary.
+
+Not necessary.
+
+best regards
+Philipp
