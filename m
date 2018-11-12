@@ -1,33 +1,55 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 12 Nov 2018 04:20:11 +0100
-Subject: [PATCH v3 02/18] DT: marvell, mmp2: fix the gpio interrupt cell number
+Date: Mon, 12 Nov 2018 04:20:15 +0100
+Subject: [PATCH v3 06/18] DT: marvell,mmp2: fix TWSI2
 In-Reply-To: <20181112032027.653931-1-lkundrak@v3.sk>
 References: <20181112032027.653931-1-lkundrak@v3.sk>
-Message-ID: <20181112032027.653931-3-lkundrak@v3.sk>
+Message-ID: <20181112032027.653931-7-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-gpio-pxa uses two cell to encode the interrupt source: the pin number
-and the trigger type. Adjust the device node accordingly.
+Marvell keeps their MMP2 datasheet secret, but there are good clues
+that TWSI2 is not on 0xd4025000 on that platform, not does it use
+IRQ 58. In fact, the IRQ 58 on MMP2 seems to be a signal processor:
+
+   arch/arm/mach-mmp/irqs.h:#define IRQ_MMP2_MSP  58
+
+I'm taking a somewhat educated guess that is probably a copy & paste
+error from PXA168 or PXA910 and that the real controller in fact hides
+at address 0xd4031000 and uses an interrupt line multiplexed via IRQ 17.
+
+I'm also copying some properties from TWSI1 that were missing or
+incorrect.
+
+Tested on a OLPC XO 1.75 machine, where the RTC is on TWSI2.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm/boot/dts/mmp2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/mmp2.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 766bbb8495b6..db15d1186cd0 100644
+index 063382b3eaca..63d49abf4e92 100644
 --- a/arch/arm/boot/dts/mmp2.dtsi
 +++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -180,7 +180,7 @@
- 				clocks = <&soc_clocks MMP2_CLK_GPIO>;
- 				resets = <&soc_clocks MMP2_CLK_GPIO>;
- 				interrupt-controller;
--				#interrupt-cells = <1>;
-+				#interrupt-cells = <2>;
- 				ranges;
+@@ -257,12 +257,15 @@
+ 				status = "disabled";
+ 			};
  
- 				gcb0: gpio at d4019000 {
+-			twsi2: i2c at d4025000 {
++			twsi2: i2c at d4031000 {
+ 				compatible = "mrvl,mmp-twsi";
+-				reg = <0xd4025000 0x1000>;
+-				interrupts = <58>;
++				reg = <0xd4031000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <0>;
+ 				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
+ 				resets = <&soc_clocks MMP2_CLK_TWSI1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.19.1
