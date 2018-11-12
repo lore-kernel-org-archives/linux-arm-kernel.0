@@ -1,28 +1,67 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 17:37:37 -0600
-Subject: [PATCH 04/15] dt-bindings: net: broadcom-bluetooth: Add BCM4330
- compatible string
-In-Reply-To: <20181107101308.7626-5-wens@csie.org>
-References: <20181107101308.7626-1-wens@csie.org>
- <20181107101308.7626-5-wens@csie.org>
-Message-ID: <5bea0ec4.1c69fb81.45507.a045@mx.google.com>
+Date: Mon, 12 Nov 2018 12:57:33 -0600
+Subject: [PATCH 1/3] dt-bindings: gpio: add sama5d2 PIOBU support
+In-Reply-To: <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
+References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
+ <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <5bea0ec9.1c69fb81.db750.9b4e@mx.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed,  7 Nov 2018 18:12:57 +0800, Chen-Yu Tsai wrote:
-> The BCM4330 is a 802.11 a/b/g/n WiFi + Bluetooth 4.0 chip from Broadcom.
-> It is found in the Ampak AP6330 WiFi+BT module. The partiular one I have
-> identifies as BCM4330B1 for Bluetooth and BCM4330/4 for WiFi.
-> 
-> It is unclear if the AP6330 module uses this revision of the BCM4330, or
-> if there are multiple revisions. The module does not have revision
-> markings. This patch elects to use just BCM4330 for the compatible
-> string.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  Documentation/devicetree/bindings/net/broadcom-bluetooth.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
+On Wed, Nov 07, 2018 at 03:12:32PM +0000, Andrei.Stefanescu at microchip.com wrote:
+> This patch describes the compatible and the device tree
+> bindings necessary for the sama5d2 PIOBU GPIO
+> controller driver.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Bindings describe the h/w, not drivers.
+
+> 
+> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+> ---
+>  .../bindings/gpio/gpio-sama5d2-piobu.txt           | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+> new file mode 100644
+> index 0000000..791ac51
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
+> @@ -0,0 +1,23 @@
+> +GPIO controller for SAMA5D2 PIOBU pins.
+> +
+> +This pins have the property of not losing their voltage
+> +during Backup/Self-refresh mode.
+> +
+> +These bindings should be set to a node in the dtsi file.
+> +
+> +Required properties:
+> +- compatible:		"syscon", "microchip,sama5d2-piobu"
+
+Why the syscon?
+
+syscon should be last if it remains.
+
+> +- #gpio-cells:		There are 2. The pin number is the
+> +			first, the second represents additional
+> +			parameters such as GPIO_ACTIVE_HIGH/LOW.
+> +- gpio-controller:	Marks the port as GPIO controller.
+
+No interrupt capability?
+
+> +
+> +Example:
+> +
+> +	secumod at fc040000 {
+
+gpio at ...
+
+> +		compatible = "syscon", "microchip,sama5d2-piobu";
+> +		reg = <0xfc040000 0x100>;
+> +
+> +		gpio-controller;
+> +		#gpio-cells = <2>;
+> +	};
+> -- 
+> 2.7.4
+> 
