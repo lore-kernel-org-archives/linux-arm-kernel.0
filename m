@@ -1,59 +1,124 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 12 Nov 2018 09:18:10 +0100
-Subject: [PATCH v2 1/4] dt-bindings: hwlock: Document STM32 hwspinlock
- bindings
-In-Reply-To: <20181108090502.14543-2-benjamin.gaignard@st.com>
-References: <20181108090502.14543-1-benjamin.gaignard@st.com>
- <20181108090502.14543-2-benjamin.gaignard@st.com>
-Message-ID: <427f9053-22c2-92f7-c60a-d54505185068@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 12 Nov 2018 08:32:54 +0000
+Subject: [PATCH] efi: permit calling efi_mem_reserve_persistent from
+ atomic context
+In-Reply-To: <E591C777-E2A6-4624-ABCE-C08251F7484A@gmx.us>
+References: <20181108180511.30239-1-ard.biesheuvel@linaro.org>
+ <trinity-d366cf7f-4a38-4193-a636-b695d34d6c47-1541817914119@msvc-mesg-gmx024>
+ <E591C777-E2A6-4624-ABCE-C08251F7484A@gmx.us>
+Message-ID: <86muqeelvt.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benjamin
+On Mon, 12 Nov 2018 02:45:48 +0000,
+Qian Cai <cai@gmx.us> wrote:
+> 
+> 
+> 
+> > On Nov 9, 2018, at 9:45 PM, Qian Cai <cai@gmx.us> wrote:
+> > 
+> > 
+> > On 11/8/18 at 1:05 PM, Ard Biesheuvel wrote:
+> > 
+> >> Currently, efi_mem_reserve_persistent() may not be called from atomic
+> >> context, since both the kmalloc() call and the memremap() call may
+> >> sleep.
+> >> 
+> >> The kmalloc() call is easy enough to fix, but the memremap() call
+> >> needs to be moved into an init hook since we cannot control the
+> >> memory allocation behavior of memremap() at the call site.
+> >> 
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >> drivers/firmware/efi/efi.c | 31 +++++++++++++++++++------------
+> >> 1 file changed, 19 insertions(+), 12 deletions(-)
+> >> 
+> >> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> >> index 249eb70691b0..cfc876e0b67b 100644
+> >> --- a/drivers/firmware/efi/efi.c
+> >> +++ b/drivers/firmware/efi/efi.c
+> >> @@ -963,36 +963,43 @@ bool efi_is_table_address(unsigned long phys_addr)
+> >> }
+> >> 
+> >> static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
+> >> +static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
+> >> 
+> >> int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+> >> {
+> >> -	struct linux_efi_memreserve *rsv, *parent;
+> >> +	struct linux_efi_memreserve *rsv;
+> >> 
+> >> -	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+> >> +	if (!efi_memreserve_root)
+> >> 		return -ENODEV;
+> >> 
+> >> -	rsv = kmalloc(sizeof(*rsv), GFP_KERNEL);
+> >> +	rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
+> >> 	if (!rsv)
+> >> 		return -ENOMEM;
+> >> 
+> >> -	parent = memremap(efi.mem_reserve, sizeof(*rsv), MEMREMAP_WB);
+> >> -	if (!parent) {
+> >> -		kfree(rsv);
+> >> -		return -ENOMEM;
+> >> -	}
+> >> -
+> >> 	rsv->base = addr;
+> >> 	rsv->size = size;
+> >> 
+> >> 	spin_lock(&efi_mem_reserve_persistent_lock);
+> >> -	rsv->next = parent->next;
+> >> -	parent->next = __pa(rsv);
+> >> +	rsv->next = efi_memreserve_root->next;
+> >> +	efi_memreserve_root->next = __pa(rsv);
+> >> 	spin_unlock(&efi_mem_reserve_persistent_lock);
+> >> 
+> >> -	memunmap(parent);
+> >> +	return 0;
+> >> +}
+> >> 
+> >> +static int __init efi_memreserve_root_init(void)
+> >> +{
+> >> +	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+> >> +		return -ENODEV;
+> >> +
+> >> +	efi_memreserve_root = memremap(efi.mem_reserve,
+> >> +				       sizeof(*efi_memreserve_root),
+> >> +				       MEMREMAP_WB);
+> >> +	if (!efi_memreserve_root)
+> >> +		return -ENOMEM;
+> >> 	return 0;
+> >> }
+> >> +early_initcall(efi_memreserve_root_init);
+> >> 
+> >> #ifdef CONFIG_KEXEC
+> >> static int update_efi_random_seed(struct notifier_block *nb,
+> >> -- 
+> >> 2.19.1
+> > BTW, I won?t be able to apply this patch on top of this series [1]. After applied that series, the original BUG sleep from atomic is gone as well as two other GIC warnings. Do you think a new patch is needed here?
+> > 
+> > [1] https://www.spinics.net/lists/arm-kernel/msg685751.html
+> OK, I was able to apply this patch on top of latest mainline (ccda4af0f4b9)
+> which also include one patch (1/6) from the above series,
+> 
+> However, the efi-related patches from the series (4/6, 5/6, and 6/6) are no
+> longer able to be cleanly applied. 
+> 
+> As the results, the above patch did fix the original BUG: sleep from atomic,
+> but it introduces 2 new warnings.
 
-On 11/8/18 10:04 AM, Benjamin Gaignard wrote:
-> Add bindings for STM32 hardware spinlock device
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
-> version 2 :
-> - change clock name from hwspinlock to hsem to be align with hardware
->    documentation
-> 
->   .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
->   1 file changed, 23 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> new file mode 100644
-> index 000000000000..6e933b218574
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> @@ -0,0 +1,23 @@
-> +STM32 Hardware Spinlock Device Binding
-> +-------------------------------------
-> +
-> +Required properties :
-> +- compatible : should be "st,stm32-hwspinlock".
-> +- reg : the register address of hwspinlock.
-> +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
-> +	hwlock, so the number of cells should be <1> here.
-> +- clock-names : Must contain "hwspinlock".
+[...]
 
-"hwspinlock" --> "hsem" ?
+These are the warnings you've already reported, aren't they? And we've
+established that if you apply the whole series, everything work as
+intended at least on the GIC side (the timer issue is a different
+story altogether).
 
-> +- clocks : Must contain a phandle entry for the clock in clock-names, see the
-> +	common clock bindings.
-> +
-> +Please look at the generic hwlock binding for usage information for consumers,
-> +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
-> +
-> +Example of hwlock provider:
-> +	hwspinlock at 4c000000 {
-> +		compatible = "st,stm32-hwspinlock";
-> +		#hwlock-cells = <1>;
-> +		reg = <0x4c000000 0x400>;
-> +		clocks = <&rcc HSEM>;
-> +		clock-names = "hsem";
-> +	};
-> 
+Or am I missing something?
+
+Thanks,
+
+	M.
+
+-- 
+Jazz is not dead, it just smell funny.
