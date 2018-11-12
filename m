@@ -1,175 +1,72 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 12 Nov 2018 17:54:16 +0100
-Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <20181112171351.4ac3506b@xps13>
-References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
- <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
- <20181105165321.7ea2b45f@bbrezillon>
- <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
- <20181106102851.61deb97a@bbrezillon>
- <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
- <20181106112206.65a70a81@bbrezillon>
- <20181112171351.4ac3506b@xps13>
-Message-ID: <20181112175416.247e3203@bbrezillon>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Nov 2018 17:00:05 +0000
+Subject: [PATCH v2 0/7] tda998x: allow use with bridge based devices
+In-Reply-To: <fd70023a-815b-697a-d01f-6ae9efb83653@axentia.se>
+References: <73adc630-21cd-5b14-cb47-f1a58ee3bc83@axentia.se>
+ <20180731074114.GF17271@n2100.armlinux.org.uk>
+ <9d48e374-be2f-fbc0-ca92-1b7e1b68e358@axentia.se>
+ <20180731092343.GH17271@n2100.armlinux.org.uk>
+ <9bf5e0e9-c1e8-5af2-7fea-40f9618d4d52@axentia.se>
+ <20180731111537.GJ17271@n2100.armlinux.org.uk>
+ <59eeb1c4-163c-4fda-d51e-27f2f404fe3e@axentia.se>
+ <20180801093528.GC30658@n2100.armlinux.org.uk>
+ <1ad8d087-40a8-7a00-31cf-c4d34a9a12fb@axentia.se>
+ <fd70023a-815b-697a-d01f-6ae9efb83653@axentia.se>
+Message-ID: <20181112170005.GH30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Wolfram to give some inputs on the DMA issue.
-
-On Mon, 12 Nov 2018 17:13:51 +0100
-Miquel Raynal <miquel.raynal@bootlin.com> wrote:
-
-> Hello,
+On Mon, Nov 12, 2018 at 04:50:37PM +0000, Peter Rosin wrote:
+> On 2018-08-02 08:06, Peter Rosin wrote:
+> > On 2018-08-01 11:35, Russell King - ARM Linux wrote:
+> >> On Wed, Aug 01, 2018 at 11:01:12AM +0200, Peter Rosin wrote:
+> >>> I don't think it's a problem with the atmel I2C driver. IIRC, the
+> >>> tda998x driver issues the command a initiate the EDID read, but that
+> >>> times out. So it appears to be the TDA19988 that fails to read the
+> >>> EDID over the DDC bus? Which brings me to the double problem with the
+> >>> scopes mentioned above...
+> >>
+> >> It sounds like it.
+> >>
+> >> It may be helpful to know that there are HDMI pass-through boards
+> >> available that give access to all the HDMI signals:
+> >>
+> >> https://elabbay.myshopify.com/collections/camera
+> >> https://elabbay.myshopify.com/collections/camera/products/hdmi-af-af-v1a-hdmi-type-a-female-to-hdmi-type-a-male-pass-through-adapter-breakout-board
+> >>
+> >> I've never bought from them, so please don't take this as a
+> >> recommendation - the fact that there seems to be no company details
+> >> on their site doesn't seem good, and as the whois for elabbay.com is
+> >> obscured also doesn't give me any confidence to buy from them.
+> > 
+> > I still will not be able to inspect the DDC bus between the TDA19988
+> > and the buffer circuit (IP4786), but the gadget seems useful enough and
+> > it's not a shitload of money. We'll see how long it takes for it to get
+> > here...
+> > 
+> > Thanks for the pointer! Maybe :-)
 > 
-> Boris Brezillon <boris.brezillon@bootlin.com> wrote on Tue, 6 Nov 2018
-> 11:22:06 +0100:
+> I got the pass-through board a while back, and that board works as expected
+> and there was no problem with ordering etc. What I could see with that was
+> that the TDA19988 was able to initiate a start condition (SDA -> low) but
+> then nothing more happened.
 > 
-> > On Tue, 6 Nov 2018 18:00:37 +0800
-> > Liang Yang <liang.yang@amlogic.com> wrote:
-> >   
-> > > On 2018/11/6 17:28, Boris Brezillon wrote:    
-> > > > On Tue, 6 Nov 2018 17:08:00 +0800
-> > > > Liang Yang <liang.yang@amlogic.com> wrote:
-> > > >       
-> > > >> On 2018/11/5 23:53, Boris Brezillon wrote:      
-> > > >>> On Fri, 2 Nov 2018 00:42:21 +0800
-> > > >>> Jianxin Pan <jianxin.pan@amlogic.com> wrote:
-> > > >>>          
-> > > >>>> +
-> > > >>>> +static inline u8 meson_nfc_read_byte(struct mtd_info *mtd)
-> > > >>>> +{
-> > > >>>> +	struct nand_chip *nand = mtd_to_nand(mtd);
-> > > >>>> +	struct meson_nfc *nfc = nand_get_controller_data(nand);
-> > > >>>> +	u32 cmd;
-> > > >>>> +
-> > > >>>> +	cmd = nfc->param.chip_select | NFC_CMD_DRD | 0;
-> > > >>>> +	writel(cmd, nfc->reg_base + NFC_REG_CMD);
-> > > >>>> +
-> > > >>>> +	meson_nfc_drain_cmd(nfc);      
-> > > >>>
-> > > >>> You probably don't want to drain the FIFO every time you read a byte on
-> > > >>> the bus, and I guess the INPUT FIFO is at least as big as the CMD
-> > > >>> FIFO, right? If that's the case, you should queue as much DRD cmd as
-> > > >>> possible and only sync when the user explicitly requests it or when
-> > > >>> the INPUT/READ FIFO is full.
-> > > >>>          
-> > > >> Register 'NFC_REG_BUF' can holds only 4 bytes, also DRD sends only one
-> > > >> nand cycle to read one byte and covers the 1st byte every time reading.
-> > > >> i think nfc controller is faster than nand cycle, but really it is not
-> > > >> high efficiency when reading so many bytes once.
-> > > >> Or use dma command here like read_page and read_page_raw.      
-> > > > 
-> > > > Yep, that's also an alternative, though you'll have to make sure the
-> > > > buffer passed through the nand_op_inst is DMA-safe, and use a bounce
-> > > > buffer when that's not the case.
-> > > >       
-> > > ok, i will try dma here.    
-> > 
-> > We should probably expose the bounce buf handling as generic helpers at
-> > the rawnand level:
-> > 
-> > void *nand_op_get_dma_safe_input_buf(struct nand_op_instr *instr)
-> > {
-> > 	void *buf;
-> > 
-> > 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR))
-> > 		return NULL;
-> > 
-> > 	if (virt_addr_valid(instr->data.in) &&
-> > 	    !object_is_on_stack(instr->data.buf.in))
-> > 		return instr->data.buf.in;
-> > 
-> > 	return kzalloc(instr->data.len, GFP_KERNEL);
-> > }
-> > 
-> > void nand_op_put_dma_safe_input_buf(struct nand_op_instr *instr,
-> > 				    void *buf)
-> > {
-> > 	if (WARN_ON(instr->type != NAND_OP_DATA_IN_INSTR) ||
-> > 	    WARN_ON(!buf))
-> > 		return;
-> > 
-> > 	if (buf == instr->data.buf.in)
-> > 		return;
-> > 
-> > 	memcpy(instr->data.buf.in, buf, instr->data.len);
-> > 	kfree(buf);
-> > }
-> > 
-> > const void *nand_op_get_dma_safe_output_buf(struct nand_op_instr *instr)
-> > {
-> > 	void *buf;
-> > 
-> > 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR))
-> > 		return NULL;
-> > 
-> > 	if (virt_addr_valid(instr->data.out) &&
-> > 	    !object_is_on_stack(instr->data.buf.out))
-> > 		return instr->data.buf.out;
-> > 
-> > 	return kmemdup(instr->data.buf.out, GFP_KERNEL);
-> > }
-> > 
-> > void nand_op_put_dma_safe_output_buf(struct nand_op_instr *instr,
-> > 				    void *buf)
-> > {
-> > 	if (WARN_ON(instr->type != NAND_OP_DATA_OUT_INSTR) ||
-> > 	    WARN_ON(!buf))
-> > 		return;
-> > 
-> > 	if (buf != instr->data.buf.out)
-> > 		kfree(buf);
-> > }  
+> Then last week, someone noticed that even though the TDA19988 is driven by
+> 1.8V, it still needs the high signals of the DDC bus to be above 3V, which
+> was unexpected and not catered for by the design. Changing VCC(SYS) of the
+> buffer circuit in place (IP4786, pin 27) to 3.3V fixed the issue and EDID
+> reading works, and this was confirmed earlier today.
 > 
-> Not that I am against such function, but maybe they should come with
-> comments stating that there is no reliable way to find if a buffer is
-> DMA-able at runtime and these are just sanity checks (ie. required, but
-> probably not enough).
+> So, the problem was that the TDA19988 only ever saw "low" DDC signals, and
+> probably aborted when the bus appeared busy. Or something.
 
-It's not 100% reliable, but it should cover most cases. Note that the
-NAND framework already uses virt_addr_valid() to decide when to use its
-internal bounce buffer, so this should be fixed too if we want a fully
-reliable solution.
+Thanks for following up on this issue.
 
-> This is my understanding of Wolfram's recent talk
-> at ELCE [1].
+Normally, if a master device sees that the I2C clock is being held low,
+it assumes that a slave is "clock stretching" and it will wait until it
+is raised.  I wonder if that's what is causing this issue here.
 
-Yes, you're right, but the NAND framework does not provide any guarantee
-on the buf passed to ->exec_op() simply because the MTD layer does not
-provide such a guarantee. Reworking that to match how the i2c framework
-handles it is possible (with a flag set when the buffer is known to be
-DMA-safe), but it requires rewriting all MTD users if we want to keep
-decent perfs (the amount of data transfered to a flash is an order of
-magnitude bigger than what you usually receive/send from/to an I2C
-device). Also, I'm not even sure the DMA_SAFE flag covers all weird
-cases like the "DMA engine embedded in the controller is not able to
-access the whole physical memory range" one. So ideally we should have
-something that checks if a pointer is DMA-safe at the device level and
-then at the arch level.
-
-A temporary solution would be to add a hook at the nand_controller
-level:
-
-	bool (*buf_is_dma_safe)(struct nand_chip *chip, void *buf,
-				size_t len);
-
-And then fallback to the default implementation when it's not
-implemented:
-
-static bool nand_buf_is_dma_safe(struct nand_chip *chip, void *buf,
-				 size_t len)
-{
-	if (chip->controller->ops && chip->controller->ops->is_dma_safe)
-		return chip->controller->ops->is_dma_safe(chip, buf,
-							  len);
-
-	return virt_addr_valid(buf) && !object_is_on_stack(buf);
-}
-
-> I suppose using the CONFIG_DMA_API_DEBUG option could help
-> more reliably to find such issues.
-
-Actually, the problem is not only about detecting offenders but being
-able to detect when a buffer is not DMA-safe at runtime in order to
-allocate/use a bounce buffer.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
