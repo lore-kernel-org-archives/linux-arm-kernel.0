@@ -1,111 +1,217 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Mon, 12 Nov 2018 21:02:16 +0900
-Subject: [PATCH 3/4] dt-bindings: reset: uniphier: Add AHCI core reset
- description
-In-Reply-To: <CAK7LNAQGftPMLkQk-tU4R6Jtw9W6npka+Br+2wyyZicAgwDvRg@mail.gmail.com>
-References: <1541775663.4112.48.camel@pengutronix.de>
- <CAK7LNAQGftPMLkQk-tU4R6Jtw9W6npka+Br+2wyyZicAgwDvRg@mail.gmail.com>
-Message-ID: <20181112210215.2DB6.4A936039@socionext.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 12 Nov 2018 12:00:11 +0000
+Subject: [PATCH v6 00/24] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
+References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <c0d5c4e8-a4cd-4289-24cc-31faf8efd0b6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Thank you for some comments and pointing out.
+I currently have an issue with my public repository, I'll try to post a 
+branch to fetch this series from as soon as possible.
 
-On Sat, 10 Nov 2018 01:14:06 +0900 <yamada.masahiro@socionext.com> wrote:
+Thanks,
 
-> On Sat, Nov 10, 2018 at 12:02 AM Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> >
-> > Hi Kunihiko,
-> >
-> > On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
-> > > Add compatible strings for reset control of AHCI core implemented in
-> > > UniPhier SoCs. The reset control belongs to AHCI glue layer.
-> > >
-> > > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/reset/uniphier-reset.txt | 3 +++
-> > >  1 file changed, 3 insertions(+)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/reset/uniphier-reset.txt b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > index f63c511..ea00517 100644
-> > > --- a/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > +++ b/Documentation/devicetree/bindings/reset/uniphier-reset.txt
-> > > @@ -133,6 +133,9 @@ Required properties:
-> > >      "socionext,uniphier-pxs2-usb3-reset" - for PXs2 SoC USB3
-> > >      "socionext,uniphier-ld20-usb3-reset" - for LD20 SoC USB3
-> > >      "socionext,uniphier-pxs3-usb3-reset" - for PXs3 SoC USB3
-> > > +    "socionext,uniphier-pro4-ahci-reset" - for Pro4 SoC AHCI
-> > > +    "socionext,uniphier-pxs2-ahci-reset" - for PXs2 SoC AHCI
-> > > +    "socionext,uniphier-pxs3-ahci-reset" - for PXs3 SoC AHCI
-> >
-> > Since the driver behaves identically for "socionext,uniphier-pro4-usb3-
-> > reset" and "socionext,uniphier-pro4-ahci-reset", would it make sense to
-> > add a common compatible?
+Julien
+
+On 12/11/18 11:56, Julien Thierry wrote:
+> Hi,
+> 
+> This series is a continuation of the work started by Daniel [1]. The goal
+> is to use GICv3 interrupt priorities to simulate an NMI.
+> 
+> The patches depend on the core API for NMIs patches [2].
+> 
+> To achieve this, set two priorities, one for standard interrupts and
+> another, higher priority, for NMIs. Whenever we want to disable interrupts,
+> we mask the standard priority instead so NMIs can still be raised. Some
+> corner cases though still require to actually mask all interrupts
+> effectively disabling the NMI.
+> 
+> Daniel Thompson ran some benchmarks [3] on a previous version showing a
+> small (<1%) performance drop when using interrupt priorities on Cortex-A53
+> and GIC-500.
+> 
+> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+> for now. LPIs being controlled by the ITS cannot be delivered as NMI.
+> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+> 
+> Requirements to use this:
+> - Have GICv3
+> - SCR_EL3.FIQ is set to 1 when linux runs or have single security state
+> - Select Kernel Feature -> Use ICC system registers for IRQ masking
+> 
+> * Patches 1 and 2 are just a bit of cleanup
+> 
+> * Patch 3 introduces a CPU feature to check if priority masking should be
+>    used
+> 
+> * Patches 4 and 5 add the support for priority masking in GICv3 driver
+> 
+> * Patches 6 to 11 add the support for priority masking the arch/arm64
+>    code
+> 
+> * Patches 12 and 13 allow us to apply alternatives earlier in the boot
+>    process
+> 
+> * Patches 14 to 16 starts the PMR masking on cpu startup and provides
+>    primitives for arm64 GICv3 driver to perform priority masking
+> 
+> * Patches 17 to 20 Add support for pseudo-NMIs in GICv3 driver
+> 
+> * Patches 21 to 23 Add support for receiving NMIs in arch/arm64
+> 
+> * Patch 24 adds the build config and command line option to enable
+>    pseudo-NMIs
+> 
+> Changes since v5[4]:
+> * Rebased on v4.20-rc2
+> * Reorganized patches again
+> * Renamed compile option + PMR values defines
+> * Write PMR enablement for cpu startup in C
+> * Fix wrong array size passed to __apply_alternatives
+> * Do not touch PMR in pt_regs when not using irq masking
+> * Remove ISB between PMR and IAR -> turns out it is not needed
+> * Simplify irqflags code after introducing PMR in it
+> * Use ref count API to track PPIs set as NMI
+> * Simplify NMI exit path
+> 
+> Changes since V4[5]:
+> * Rebased to v4.19-rc1
+> * Adapted GIC driver to the core NMI API
+> * Added option to disable priority masking on command line
+> * Added Daniel's Tested-by on patches related replacing PSR.I toggling with
+>    PMR masking
+> * Fix scope matching for alternative features.
+> * Spotted some more places using PSR.I or daif and replaced with generic
+>    interrupt functions
+> 
+> Changes since V3[6]:
+> * Big refactoring. As suggested by Marc Z., some of the bigger patches
+>    needed to be split into smaller one.
+> * Try to reduce the amount of #ifdef for the new feature by introducing
+>    an individual cpufeature for priority masking
+> * Do not track which alternatives have been applied (was a bit dodgy
+>    anyway), and use an alternative for VHE cpu_enable callback
+> * Fix a build failure with arm by adding the correct RPR accessors
+> * Added Suggested-by tags for changes from comming or inspired by Daniel's
+>    series. Do let me know if you feel I missed something and am not giving
+>    you due credit.
+> 
+> Changes since V2[7]:
+> * Series rebase to v4.17-rc6
+> * Adapt pathces 1 and 2 to the rework of cpufeatures framework
+> * Use the group0 detection scheme in the GICv3 driver to identify
+>    the priority view, and drop the use of a fake interrupt
+> * Add the case for a GIC configured in a single security state
+> * Use local_daif_restore instead of local_irq_enable the first time
+>    we enable interrupts after a bp hardening in the handling of a kernel
+>    entry. Otherwise PRS.I remains set...
+> 
+> Changes since V1[8]:
+> * Series rebased to v4.15-rc8.
+> * Check for arm64_early_features in this_cpu_has_cap (spotted by Suzuki).
+> * Fix issue where debug exception were not masked when enabling debug in
+>    mdscr_el1.
+> 
+> Changes since RFC[9]:
+> * The series was rebased to v4.15-rc2 which implied some changes mainly
+>    related to the work on exception entries and daif flags by James Morse.
+>    - The first patch in the previous series was dropped because no longer
+>      applicable.
+>    - With the semantics James introduced of "inheriting" daif flags,
+>      handling of PMR on exception entry is simplified as PMR is not altered
+>      by taking an exception and already inherited from previous state.
+>    - James pointed out that taking a PseudoNMI before reading the FAR_EL1
+>      register should not be allowed as per the TRM (D10.2.29):
+>      "FAR_EL1 is made UNKNOWN on an exception return from EL1."
+>      So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
+> * For KVM, only deal with PMR unmasking/restoring in common code, and VHE
+>    specific code makes sure PSR.I bit is set when necessary.
+> * When detecting the GIC priority view (patch 5), wait for an actual
+>    interrupt instead of trying only once.
 > 
 > 
-> As far as I could guess, he just happened to find the same driver code
-> could be reused for other hardware.
+> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
+> [2] https://lkml.org/lkml/2018/11/12/2113
+> [3] https://lkml.org/lkml/2018/7/20/803
+> [4] https://lkml.org/lkml/2018/8/28/693
+> [5] https://lkml.org/lkml/2018/7/24/321
+> [6] https://lkml.org/lkml/2018/5/21/276
+> [7] https://lkml.org/lkml/2018/1/17/335
+> [8] https://www.spinics.net/lists/arm-kernel/msg620763.html
+> [9] https://www.spinics.net/lists/arm-kernel/msg610736.html
 > 
-> Theoretically, this can happen anywhere since
-> a reset controller is just a set of registers
-> each bit of which is connected to a reset line.
+> Cheers,
 > 
-> If you added a super-generic compatible like "simple-reset",
-> I would agree with
-> "socionext,uniphier-pro4-usb3-reset", "simple-reset"
-> since this is a pattern.
-
-I think it's more generic to define simple-reset with parent clock/reset
-control without both SoC and device names.
-
-However, such parent clocks/resets strongly depends on SoC, 
-so I think it's difficut to lead generic definition in this case.
-
-If we add generic compatible string, I also add "simple-reset".
-
-
-> However,
-> "socionext,uniphier-pro4-glue-reset" is kind of a halfway house
-> where it is SoC-specific, but still ambiguous.
-
-Surely, it might be hard to understand that pro4-glue-reset is SoC-specific
-but for generic-device.
-
-
-> > Something like:
-> > "socionext,uniphier-pro4-usb3-reset", "socionext,uniphier-pro4-glue-reset" - for USB3 SoC AHCI
-> > "socionext,uniphier-pro4-ahci-reset", "socionext,uniphier-pro4-glue-reset" - for Pro4 SoC AHCI
-> >
-> > That way if more places turn up where the glue layer reset is used,
-> > you can add them without patching the driver every time.
+> Julien
 > 
+> -->
 > 
-> This is a trade-off between "patch the driver"
-> and "potential change of the binding".
-
-Adding "glue-reset" is usable for devices having same parent clocks/resets as
-usb3/ahci, and we can add the devices without patches.
-
-However, if the device needs other parent clocks/resets for the same SoC,
-we can't add "glue-reset" and we might add patches for the device as a result.
-In this case, the "glue-reset" will become difficult to understand.
-
-
-> There is no real hardware like pro4-glue-reset.
->
-> I am guessing this is a part of syscon or something,
-> but I cannot find any explanation in a bigger picture.
+> Daniel Thompson (1):
+>    arm64: alternative: Apply alternatives early in boot process
 > 
-> So, I cannot judge this further more.
+> Julien Thierry (23):
+>    arm64: Remove unused daif related functions/macros
+>    arm64: cpufeature: Set SYSREG_GIC_CPUIF as a boot system feature
+>    arm64: cpufeature: Add cpufeature for IRQ priority masking
+>    arm/arm64: gic-v3: Add PMR and RPR accessors
+>    irqchip/gic-v3: Switch to PMR masking before calling IRQ handler
+>    arm64: ptrace: Provide definitions for PMR values
+>    arm64: Make PMR part of task context
+>    arm64: Unmask PMR before going idle
+>    arm64: kvm: Unmask PMR before entering guest
+>    arm64: irqflags: Use ICC_PMR_EL1 for interrupt masking
+>    arm64: daifflags: Include PMR in daifflags restore operations
+>    arm64: alternative: Allow alternative status checking per cpufeature
+>    irqchip/gic-v3: Factor group0 detection into functions
+>    arm64: Switch to PMR masking when starting CPUs
+>    arm64: gic-v3: Implement arch support for priority masking
+>    irqchip/gic-v3: Detect if GIC can support pseudo-NMIs
+>    irqchip/gic-v3: Handle pseudo-NMIs
+>    irqchip/gic: Add functions to access irq priorities
+>    irqchip/gic-v3: Allow interrupts to be set as pseudo-NMI
+>    arm64: Handle serror in NMI context
+>    arm64: Skip preemption when exiting an NMI
+>    arm64: Skip irqflags tracing for NMI in IRQs disabled context
+>    arm64: Enable the support of pseudo-NMIs
+> 
+>   Documentation/admin-guide/kernel-parameters.txt |   6 +
+>   Documentation/arm64/booting.txt                 |   5 +
+>   arch/arm/include/asm/arch_gicv3.h               |  33 ++++
+>   arch/arm64/Kconfig                              |  14 ++
+>   arch/arm64/include/asm/alternative.h            |   4 +-
+>   arch/arm64/include/asm/arch_gicv3.h             |  32 +++
+>   arch/arm64/include/asm/assembler.h              |  10 +-
+>   arch/arm64/include/asm/cpucaps.h                |   3 +-
+>   arch/arm64/include/asm/cpufeature.h             |  10 +
+>   arch/arm64/include/asm/daifflags.h              |  20 +-
+>   arch/arm64/include/asm/efi.h                    |   3 +-
+>   arch/arm64/include/asm/irqflags.h               | 132 ++++++++++---
+>   arch/arm64/include/asm/kvm_host.h               |  12 ++
+>   arch/arm64/include/asm/processor.h              |   3 +
+>   arch/arm64/include/asm/ptrace.h                 |  20 +-
+>   arch/arm64/kernel/alternative.c                 |  60 +++++-
+>   arch/arm64/kernel/asm-offsets.c                 |   1 +
+>   arch/arm64/kernel/cpufeature.c                  |  42 +++-
+>   arch/arm64/kernel/entry.S                       |  40 ++++
+>   arch/arm64/kernel/process.c                     |   6 +
+>   arch/arm64/kernel/smp.c                         |  34 ++++
+>   arch/arm64/kernel/traps.c                       |   8 +-
+>   arch/arm64/kvm/hyp/switch.c                     |  16 ++
+>   arch/arm64/mm/proc.S                            |  18 ++
+>   drivers/irqchip/irq-gic-common.c                |  10 +
+>   drivers/irqchip/irq-gic-common.h                |   2 +
+>   drivers/irqchip/irq-gic-v3.c                    | 250 +++++++++++++++++++++---
+>   include/linux/irqchip/arm-gic-common.h          |   2 +-
+>   28 files changed, 695 insertions(+), 101 deletions(-)
+> 
+> --
+> 1.9.1
+> 
 
-Since it's hard to lead the best result,
-currently I'd like to suggest the current compatibles, with "simple-reset"
-if necessary.
-
-Thank you,
-
----
-Best Regards,
-Kunihiko Hayashi
+-- 
+Julien Thierry
