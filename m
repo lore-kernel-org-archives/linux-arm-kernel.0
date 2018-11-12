@@ -1,62 +1,49 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 12 Nov 2018 10:03:01 -0800
-Subject: [PATCH 7/9] serial: Add Tegra Combined UART driver
-In-Reply-To: <20181112153014.GA29481@ulmo>
-References: <20181026111638.10759-1-thierry.reding@gmail.com>
- <20181026111638.10759-8-thierry.reding@gmail.com>
- <20181109170526.GB14151@kroah.com> <20181112153014.GA29481@ulmo>
-Message-ID: <20181112180301.GB28739@kroah.com>
+From: aisheng.dong@nxp.com (A.s. Dong)
+Date: Mon, 12 Nov 2018 18:06:13 +0000
+Subject: [PATCh v3 2/4] arm64: add basic DTS for i.MX8MQ
+In-Reply-To: <20180921125626.21971-2-l.stach@pengutronix.de>
+References: <20180921125626.21971-1-l.stach@pengutronix.de>
+ <20180921125626.21971-2-l.stach@pengutronix.de>
+Message-ID: <AM0PR04MB421192D863C2AE7C4CD35A1580C10@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 04:30:14PM +0100, Thierry Reding wrote:
-> On Fri, Nov 09, 2018 at 09:05:26AM -0800, Greg Kroah-Hartman wrote:
-> > On Fri, Oct 26, 2018 at 01:16:36PM +0200, Thierry Reding wrote:
-> > > From: Thierry Reding <treding@nvidia.com>
-> > > 
-> > > The Tegra Combined UART (TCU) is a mailbox-based mechanism that allows
-> > > multiplexing multiple "virtual UARTs" into a single hardware serial
-> > > port. The TCU is the primary serial port on Tegra194 devices.
-> > > 
-> > > Add a TCU driver utilizing the mailbox framework, as the used mailboxes
-> > > are part of Tegra HSP blocks that are already controlled by the Tegra
-> > > HSP mailbox driver.
-> > > 
-> > > Based on work by  Mikko Perttunen <mperttunen@nvidia.com>.
-> > > 
-> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > 
-> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Hi Lucas,
+
+> -----Original Message-----
+> From: Lucas Stach [mailto:l.stach at pengutronix.de]
+> Sent: Friday, September 21, 2018 8:56 PM
+> To: Shawn Guo <shawnguo@kernel.org>; Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>; Catalin Marinas
+> <catalin.marinas@arm.com>; Will Deacon <will.deacon@arm.com>;
+> Pengutronix Kernel Team <kernel@pengutronix.de>; Fabio Estevam
+> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> patchwork-lst at pengutronix.de; Abel Vesa <abel.vesa@nxp.com>
+> Subject: [PATCh v3 2/4] arm64: add basic DTS for i.MX8MQ
 > 
-> Thanks. I just sent out v2 addressing Pekka's comments on the series.
-> But I'm slightly confused now. Are you expecting anyone else to pick
-> this up? There are technically no build time dependencies between any
-> of these patches, so it should be fine to pick them all into the
-> corresponding subsystem trees.
-
-Ah, I thought there was a built-time dependancy, that's why I gave my
-ack.
-
-> Perhaps the only thing to note is that there is a runtime dependency
-> from this patch on patches 1 and 2 in the series. Patch 1 is required to
-> make blocking a mailbox possible in interrupt context, which we need in
-> the TCU driver because the TTY and console paths do end up calling the
-> mbox_send_message() from interrupt context. Patch 2 is only required at
-> runtime if the two mailboxes are provided by different instances of the
-> HSP block (which they are for TCU on Tegra194).
+> This adds the basic DTS for the i.MX8MQ.
+> For now only the following peripherals are supported:
+> - IOMUXC (pin controller)
+> - CCM (clock controller)
+> - GPIO
+> - UART
+> - uSDHC (SD/eMMC controller)
+> - FEC (ethernet controller)
+> - i2c
 > 
-> Would you prefer for Jassi to pick up the TCU patch along with the
-> mailbox core and driver changes so that we deal with the runtime
-> dependencies that way?
+> This is enough to get a very basic board support up and running.
 > 
-> Alternatively, if Jassi is okay with the mailbox changes, I can pick up
-> all of the v2 series of the patches into stable branches for v4.21, deal
-> with the dependencies there and send out pull requests for everyone to
-> merge into their subsystem trees.
+> One known limitation is that the driver for the GPC interrupt
+> controller is still missing, rendering the CPU sleep states unusable
+> as there is nothing waking them up anymore.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-I don't really care either way, whatever is easiest for you all is fine
-with me.
+Can you send a updated version of this patch series against the latest
+Composite clock drivers?
+Then we can get a ready to merge version and then can be easily applied
+once clock is merged.
 
-thanks,
-
-greg k-h
+Regards
+Dong Aisheng
