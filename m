@@ -1,99 +1,77 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 12 Nov 2018 16:12:38 +0530
-Subject: [PATCH v2 3/5] phy: ocelot-serdes: convert to use eth phy mode
- and submode
-In-Reply-To: <20181109234755.21687-4-grygorii.strashko@ti.com>
-References: <20181109234755.21687-1-grygorii.strashko@ti.com>
- <20181109234755.21687-4-grygorii.strashko@ti.com>
-Message-ID: <7fbbaae0-6c6d-a813-109c-15c45e20555e@ti.com>
+From: frieder.schrempf@kontron.De (Schrempf Frieder)
+Date: Mon, 12 Nov 2018 10:46:45 +0000
+Subject: [PATCH v4 06/10] ARM: defconfig: Use the new FSL QSPI driver
+ under the SPI framework
+In-Reply-To: <20181108093451.08dfe63e@bbrezillon>
+References: <1541601809-16950-1-git-send-email-frieder.schrempf@kontron.de>
+ <1541601809-16950-7-git-send-email-frieder.schrempf@kontron.de>
+ <CAOesGMgPwwwmizC+R4W1aLpvgcuVOYQr2qR2Vqb6171zGfarRw@mail.gmail.com>
+ <b12936f5-871d-a982-13c5-9d894f4a1521@kontron.de>
+ <20181108093451.08dfe63e@bbrezillon>
+Message-ID: <b01d70ae-9feb-985a-8001-dba54206662d@kontron.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin, David Miller
-
-Need your ACK on this patch.
-
-Thanks
-Kishon
-
-On 10/11/18 5:17 AM, Grygorii Strashko wrote:
-> Convert ocelot-serdes PHY driver to use recently introduced
-> PHY_MODE_ETHERNET and phy_set_mode_ext().
+On 08.11.18 09:34, Boris Brezillon wrote:
+> On Wed, 7 Nov 2018 16:36:13 +0000
+> Schrempf Frieder <frieder.schrempf@kontron.De> wrote:
 > 
-> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> ---
->  drivers/net/ethernet/mscc/ocelot.c   |  9 ++-------
->  drivers/phy/mscc/phy-ocelot-serdes.c | 14 ++++++++++----
->  2 files changed, 12 insertions(+), 11 deletions(-)
+>> Hi Olof,
+>>
+>> On 07.11.18 17:20, Olof Johansson wrote:
+>>> On Wed, Nov 7, 2018 at 6:44 AM Frieder Schrempf
+>>> <frieder.schrempf@kontron.de> wrote:
+>>>>
+>>>> From: Frieder Schrempf <frieder.schrempf@exceet.de>
+>>>>
+>>>> The new driver at spi/spi-fsl-qspi.c replaces the old SPI NOR driver
+>>>> at mtd/fsl-quadspi.c. Switch to the new driver in the defconfigs.
+>>>>
+>>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@exceet.de>
+>>>
+>>> Hi Frieder,
+>>>
+>>> This patch is part of a series that I didn't see the rest of, but in
+>>> general we prefer to merge these through arm-soc even if the driver
+>>> goes in through another tree. The way we'd prefer to handle it is that
+>>> once the driver lands, we'll take the config option change to turn it
+>>> on. To avoid our branches to break until both sides have landed, it
+>>> might be a good idea to keep both drivers on for a short while (one
+>>> release).
+>>>
+>>> So, I'm not going to ack this since we avoid taking defconfig changes
+>>> through driver trees (these two defconfigs tend to churn a lot and we
+>>> don't want to create merge conflicts where we don't have to), but
+>>> we'll be happy to pick it up when the time comes.
+>>
+>> Ok, thank you for explaining the common practice. I will drop the config
+>> changes for the next version and send it separately when the time is ready.
+>>
+>> Both the old driver and the new one use the same compatible strings for
+>> probing. Wouldn't that cause problems if both drivers are enabled for a
+>> while, or am I missing something?
 > 
-> diff --git a/drivers/net/ethernet/mscc/ocelot.c b/drivers/net/ethernet/mscc/ocelot.c
-> index 3238b9e..3edb608 100644
-> --- a/drivers/net/ethernet/mscc/ocelot.c
-> +++ b/drivers/net/ethernet/mscc/ocelot.c
-> @@ -472,7 +472,6 @@ static int ocelot_port_open(struct net_device *dev)
->  {
->  	struct ocelot_port *port = netdev_priv(dev);
->  	struct ocelot *ocelot = port->ocelot;
-> -	enum phy_mode phy_mode;
->  	int err;
->  
->  	/* Enable receiving frames on the port, and activate auto-learning of
-> @@ -484,12 +483,8 @@ static int ocelot_port_open(struct net_device *dev)
->  			 ANA_PORT_PORT_CFG, port->chip_port);
->  
->  	if (port->serdes) {
-> -		if (port->phy_mode == PHY_INTERFACE_MODE_SGMII)
-> -			phy_mode = PHY_MODE_SGMII;
-> -		else
-> -			phy_mode = PHY_MODE_QSGMII;
-> -
-> -		err = phy_set_mode(port->serdes, phy_mode);
-> +		err = phy_set_mode_ext(port->serdes, PHY_MODE_ETHERNET,
-> +				       port->phy_mode);
->  		if (err) {
->  			netdev_err(dev, "Could not set mode of SerDes\n");
->  			return err;
-> diff --git a/drivers/phy/mscc/phy-ocelot-serdes.c b/drivers/phy/mscc/phy-ocelot-serdes.c
-> index c61a9890..f525a21 100644
-> --- a/drivers/phy/mscc/phy-ocelot-serdes.c
-> +++ b/drivers/phy/mscc/phy-ocelot-serdes.c
-> @@ -11,6 +11,7 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/phy.h>
->  #include <linux/phy/phy.h>
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
-> @@ -116,8 +117,10 @@ struct serdes_mux {
->  	.mux = _mux,						\
->  }
->  
-> -#define SERDES_MUX_SGMII(i, p, m, c) SERDES_MUX(i, p, PHY_MODE_SGMII, m, c)
-> -#define SERDES_MUX_QSGMII(i, p, m, c) SERDES_MUX(i, p, PHY_MODE_QSGMII, m, c)
-> +#define SERDES_MUX_SGMII(i, p, m, c) \
-> +	SERDES_MUX(i, p, PHY_INTERFACE_MODE_SGMII, m, c)
-> +#define SERDES_MUX_QSGMII(i, p, m, c) \
-> +	SERDES_MUX(i, p, PHY_INTERFACE_MODE_QSGMII, m, c)
->  
->  static const struct serdes_mux ocelot_serdes_muxes[] = {
->  	SERDES_MUX_SGMII(SERDES1G(0), 0, 0, 0),
-> @@ -164,12 +167,15 @@ static int serdes_set_mode(struct phy *phy, enum phy_mode mode, int submode)
->  	unsigned int i;
->  	int ret;
->  
-> +	if (mode != PHY_MODE_ETHERNET)
-> +		return -EINVAL;
-> +
->  	for (i = 0; i < ARRAY_SIZE(ocelot_serdes_muxes); i++) {
->  		if (macro->idx != ocelot_serdes_muxes[i].idx ||
-> -		    mode != ocelot_serdes_muxes[i].mode)
-> +		    submode != ocelot_serdes_muxes[i].mode)
->  			continue;
->  
-> -		if (mode != PHY_MODE_QSGMII &&
-> +		if (submode != PHY_INTERFACE_MODE_QSGMII &&
->  		    macro->port != ocelot_serdes_muxes[i].port)
->  			continue;
->  
+> Or maybe we should not introduce a new Kconfig option and just reuse
+> the old one. It probably requires re-ordering patches a bit (patch 1
+> should be moved after patch 5). Then you have 2 choices:
 > 
+> 1/ merge patch 1 and 6 so that the new driver effectively replaces the
+>     old one but uses the same Kconfig option
+> 2/ remove the ability to compile the old driver when the new one is
+>     introduced: remove the line from drivers/mtd/spi-nor Makefile and
+>     move the Kconfig entry from drivers/mtd/spi-nor/Kconfig to
+>     drivers/spi/Kconfig. And remove the old code in a separate patch
+> 
+> I'm fine either way, but option #2 will probably make the patch
+> introducing the new driver bigger and hurt readability.
+
+I think having both drivers in the tree for a while wouldn't be so bad. 
+So if any compatibility issues come up with the new driver, people can 
+still use the old one.
+
+Therefore I think I will drop the patches that change the defconfig and 
+remove the old driver code and keep the different Kconfig options. And 
+maybe add an exclusive dependency in Kconfig, so both drivers can not be 
+enabled at the same time.
+
+Does this make sense?
