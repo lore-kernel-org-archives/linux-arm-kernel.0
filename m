@@ -1,37 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 12 Nov 2018 16:18:52 +0100
-Subject: [PATCH v2 09/10] arm64: tegra: Mark TCU as primary serial port on
- Tegra194 P2888
-In-Reply-To: <20181112151853.29289-1-thierry.reding@gmail.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
-Message-ID: <20181112151853.29289-10-thierry.reding@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 12 Nov 2018 15:20:50 +0000
+Subject: Please check linux-next boot results from tonight for next seven
+ days
+In-Reply-To: <20181108155938.GY30658@n2100.armlinux.org.uk>
+References: <20181108155938.GY30658@n2100.armlinux.org.uk>
+Message-ID: <20181112152050.GE30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mikko Perttunen <mperttunen@nvidia.com>
+A reminder that if I don't hear anything, I will assume that there is
+no problem, and will be sending a pull request to Linus this Friday.
 
-The Tegra Combined UART is the proper primary serial port on P2888,
-so use it.
+On Thu, Nov 08, 2018 at 03:59:39PM +0000, Russell King - ARM Linux wrote:
+> For anyone running builds and boot tests of tonight's linux-next,
+> I've pushed out the final bits of the Spectre big.Little fixes
+> for sfr to pick up tonight.
+> 
+> These were omitted from the last merge window because towards the
+> end of the -rc cycle, it was belatedly reported that it was causing
+> a regression on some platforms, so they had to be dropped out of
+> that merge window.  I believe that this was discovered on some
+> non-kernelci based test system.
+> 
+> However, they really need to go in before the end of the year, so
+> I'm proposing to send them before 4.20-rc3.
+> 
+> This means I need help to test them and make sure that they do not
+> cause any other unknown regressions.  Please note that merely looking
+> at kernelci and checking whether it says the boot test passed is
+> _insufficient_ - the boot logs must be inspected becaues a "green"
+> pass result does _not_ mean that there isn't some kind of warning.
+> The same problem may also be present in other automated boot testing
+> systems elsewhere.
+> 
+> Please check your boot logs for tonight's linux-next over the next
+> seven days and report ASAP if the Spectre fixes are causing a
+> regression for your platform.  If I don't hear anything, I will be
+> sending them for -rc3.
+> 
+> Thanks.
+> 
+> -- 
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+> According to speedtest.net: 11.9Mbps down 500kbps up
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-Signed-off-by: Thierry Reding <treding@nvidia.com>
----
- arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-index 57d3f00464ce..fcbe2a88f8db 100644
---- a/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra194-p2888.dtsi
-@@ -10,7 +10,7 @@
- 	aliases {
- 		sdhci0 = "/cbb/sdhci at 3460000";
- 		sdhci1 = "/cbb/sdhci at 3400000";
--		serial0 = &uartb;
-+		serial0 = &tcu;
- 		i2c0 = "/bpmp/i2c";
- 		i2c1 = "/cbb/i2c at 3160000";
- 		i2c2 = "/cbb/i2c at c240000";
 -- 
-2.19.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
