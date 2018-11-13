@@ -1,19 +1,19 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Nov 2018 18:28:18 +0000 (GMT)
-Subject: Applied "ASoC: rockchip: add missing slave_config setting for I2S" to
- the asoc tree
-In-Reply-To: <20181110151844.21362-1-katsuhiro@katsuster.net>
-Message-ID: <20181113182818.DDD95440078@finisterre.ee.mobilebroadband>
+Date: Tue, 13 Nov 2018 18:34:56 +0000 (GMT)
+Subject: Applied "spi: pxa2xx: dt-bindings: Add ready GPIO signal" to the spi
+ tree
+In-Reply-To: <20181113102228.820214-5-lkundrak@v3.sk>
+Message-ID: <20181113183456.EF1D144007A@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: rockchip: add missing slave_config setting for I2S
+   spi: pxa2xx: dt-bindings: Add ready GPIO signal
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,31 +34,37 @@ to this mail.
 Thanks,
 Mark
 
->From 16a8ee4c80b45984b6de1f90a49edcf336b7c621 Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <katsuhiro@katsuster.net>
-Date: Sun, 11 Nov 2018 00:18:44 +0900
-Subject: [PATCH] ASoC: rockchip: add missing slave_config setting for I2S
+>From 8ae13d0b0d4bb4af99bec8c50152f0c8f5cbcc06 Mon Sep 17 00:00:00 2001
+From: Lubomir Rintel <lkundrak@v3.sk>
+Date: Tue, 13 Nov 2018 11:22:26 +0100
+Subject: [PATCH] spi: pxa2xx: dt-bindings: Add ready GPIO signal
 
-This patch adds missing prepare_sleve_config that is needed for
-setup the DMA slave channel for I2S.
+This this is used to let the SPI master know that our FIFO is filled and
+we're ready to service a transfer. Only useful in slave mode.
 
-Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+A signal like this is used by an embedded controller on a OLPC XO 1.75
+machine, that happens to be a SPI master.
+
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Acked-by: Pavel Machek <pavel@ucw.cz>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/rockchip/rockchip_pcm.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/spi/spi-pxa2xx.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/sound/soc/rockchip/rockchip_pcm.c b/sound/soc/rockchip/rockchip_pcm.c
-index 9e7b5fa4cf59..4ac78d7a4b2d 100644
---- a/sound/soc/rockchip/rockchip_pcm.c
-+++ b/sound/soc/rockchip/rockchip_pcm.c
-@@ -33,6 +33,7 @@ static const struct snd_pcm_hardware snd_rockchip_hardware = {
+diff --git a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+index 89b2832283e3..e30e0c2a4bce 100644
+--- a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+@@ -12,6 +12,8 @@ Optional properties:
+ - cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
+   Documentation/devicetree/bindings/spi/spi-bus.txt
+ - spi-slave: Empty property indicating the SPI controller is used in slave mode.
++- ready-gpios: GPIO used to signal a SPI master that the FIFO is filled
++  and we're ready to service a transfer. Only useful in slave mode.
  
- static const struct snd_dmaengine_pcm_config rk_dmaengine_pcm_config = {
- 	.pcm_hardware = &snd_rockchip_hardware,
-+	.prepare_slave_config = snd_dmaengine_pcm_prepare_slave_config,
- 	.prealloc_buffer_size = 32 * 1024,
- };
- 
+ Child nodes represent devices on the SPI bus
+   See ../spi/spi-bus.txt
 -- 
 2.19.1
