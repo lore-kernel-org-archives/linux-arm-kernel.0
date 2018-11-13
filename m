@@ -1,73 +1,59 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 13 Nov 2018 10:11:40 +0000
-Subject: [PATCH v2 06/10] dt-bindings: serial: Add bindings for
- nvidia,tegra194-tcu
-In-Reply-To: <20181113100355.GA15642@ulmo>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-7-thierry.reding@gmail.com>
- <f7d19f6e-0dcd-753c-a407-fcec4fa1474b@nvidia.com>
- <20181113100355.GA15642@ulmo>
-Message-ID: <a3256616-b300-6be9-1250-b481d686431d@nvidia.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Tue, 13 Nov 2018 11:13:31 +0100
+Subject: [PATCH v2 05/11] Doc: DT: thermal: new irq-mode for trip point
+In-Reply-To: <5bea0ecd.1c69fb81.d5613.1c9e@mx.google.com>
+References: <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181107171039eucas1p2227bd4bc573fd0d2a3a97986004be16b@eucas1p2.samsung.com>
+ <1541610593-28542-6-git-send-email-l.luba@partner.samsung.com>
+ <5bea0ecd.1c69fb81.d5613.1c9e@mx.google.com>
+Message-ID: <64aaa2aa-00ad-643f-3b44-f505a31f2ee8@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-On 13/11/2018 10:03, Thierry Reding wrote:
-> On Tue, Nov 13, 2018 at 09:39:08AM +0000, Jon Hunter wrote:
+On 11/12/18 8:09 PM, Rob Herring wrote:
+> On Wed, Nov 07, 2018 at 06:09:47PM +0100, Lukasz Luba wrote:
+>> Thermal trip point gets new flag in DT: irq-mode.
+>> Trip point may have a new explicit flag which indicate
+>> IRQ support when the temperature is met (so the thermal framework
+>> deos not need to set polling for it).
+>> It is useful for 'passive' cooling trip point,
+>> which now will not register for polling the temperature.
 >>
->> On 12/11/2018 15:18, Thierry Reding wrote:
->>> From: Mikko Perttunen <mperttunen@nvidia.com>
->>>
->>> Add bindings for the Tegra Combined UART device used to talk to the
->>> UART console on Tegra194 systems.
->>>
->>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
->>> Reviewed-by: Rob Herring <robh@kernel.org>
->>> Acked-by: Jon Hunter <jonathanh@nvidia.com>
->>> Acked-by: Thierry Reding <treding@nvidia.com>
->>> Signed-off-by: Thierry Reding <treding@nvidia.com>
->>> ---
->>>  .../bindings/serial/nvidia,tegra194-tcu.txt   | 35 +++++++++++++++++++
->>>  1 file changed, 35 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
->>> new file mode 100644
->>> index 000000000000..085a8591accd
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
->>> @@ -0,0 +1,35 @@
->>> +NVIDIA Tegra Combined UART (TCU)
->>> +
->>> +The TCU is a system for sharing a hardware UART instance among multiple
->>> +systems within the Tegra SoC. It is implemented through a mailbox-
->>> +based protocol where each "virtual UART" has a pair of mailboxes, one
->>> +for transmitting and one for receiving, that is used to communicate
->>> +with the hardware implementing the TCU.
->>> +
->>> +Required properties:
->>> +- name : Should be tcu
->>> +- compatible
->>> +    Array of strings
->>> +    One of:
->>> +    - "nvidia,tegra194-tcu"
->>> +- mbox-names:
->>> +    "rx" - Mailbox for receiving data from hardware UART
->>> +    "tx" - Mailbox for transmitting data to hardware UART
->>> +- mboxes: Mailboxes corresponding to the mbox-names.
->>
->> Looks like there is some trailing white-space in the above line and git
->> warns after applying this patch.
+>> Update documentation about irq-mode for trip points.
 > 
-> I'm not seeing it. I remember seeing that trailing space in an earlier
-> version of this patch and fixing it up. Did you perhaps end up applying
-> the wrong version?
+> This patch should come before you use it.
+OK, I will re-order the patch set in v3.
+> 
+>>
+>> Cc: Zhang Rui <rui.zhang@intel.com>
+>> Cc: Eduardo Valentin <edubezval@gmail.com>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: devicetree at vger.kernel.org
+>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+>> ---
+>>   Documentation/devicetree/bindings/thermal/thermal.txt | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/thermal.txt b/Documentation/devicetree/bindings/thermal/thermal.txt
+>> index ca14ba9..bee21e3 100644
+>> --- a/Documentation/devicetree/bindings/thermal/thermal.txt
+>> +++ b/Documentation/devicetree/bindings/thermal/thermal.txt
+>> @@ -90,6 +90,10 @@ Required properties:
+>>   	"critical":	Hardware not reliable.
+>>     Type: string
+>>   
+>> +- irq-mode:		A flag indicating that trip rises irq, so there is no
+>> +  Type: bool		need of polling in thermal framework.
+>> +  Size: one cell
+> 
+> Should be optional, right?
+Yes, it is optional. I will mention about it in change v3.
 
-Yes you are right. This version does not have it. Seems that thunderbird
-does not correctly overwrite the previous mbox but once I deleted and
-saved again, I no longer see this.
+Thank you for the review.
 
-Sorry for the noise. Jon
-
--- 
-nvpublic
+Regards,
+Lukasz
