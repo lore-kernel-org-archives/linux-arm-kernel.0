@@ -1,38 +1,30 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 20:07:04 -0600
-Subject: [PATCH V4 4/5] arm64: dts: imx: add imx8qxp mek support
-In-Reply-To: <1541864596-15958-5-git-send-email-aisheng.dong@nxp.com>
-References: <1541864596-15958-1-git-send-email-aisheng.dong@nxp.com>
- <1541864596-15958-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20181113020704.GA31151@bogus>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Tue, 13 Nov 2018 10:08:24 +0800
+Subject: [resend PATCH 3/3] dt-bindings: pwm: update bindings for MT7629 SoC
+In-Reply-To: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+Message-ID: <630234ce3f13d93650c820be8f1724b84dd3c0ba.1542074855.git.ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 10 Nov 2018 15:48:23 +0000, "A.s. Dong" wrote:
-> i.MX 8QuadXPlus is a quad (4x) Cortex-A35 proccessor with powerful
-> graphic and multimedia features. This patch adds imx8qxp mek board
-> support.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: devicetree at vger.kernel.org
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> v3->v4:
->  * remove un-documented enet phy properties
-> v2->v3:
->  * Pad names update
->  * move memory node to here
->  * add no-sd and no-sdio under emmc node
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
->  arch/arm64/boot/dts/freescale/Makefile        |   1 +
->  arch/arm64/boot/dts/freescale/imx8qxp-mek.dts | 137 ++++++++++++++++++++++++++
->  3 files changed, 142 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/imx8qxp-mek.dts
-> 
+This updates bindings for MT7629 pwm controller.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+index 991728c..4a2885b 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+@@ -6,6 +6,7 @@ Required properties:
+    - "mediatek,mt7622-pwm": found on mt7622 SoC.
+    - "mediatek,mt7623-pwm": found on mt7623 SoC.
+    - "mediatek,mt7628-pwm": found on mt7628 SoC.
++   - "mediatek,mt7629-pwm": found on mt7629 SoC.
+  - reg: physical base address and length of the controller's registers.
+  - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+    the cell format.
+-- 
+1.9.1
