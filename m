@@ -1,17 +1,34 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 13 Nov 2018 10:50:56 -0800
-Subject: [PATCH] soc: ti: wkup_m3: Add PRCM int16 as the wake up source
-In-Reply-To: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
-References: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <99b2658c-2394-0660-6f63-0ef63a7c30f3@oracle.com>
+From: andrealmeid@riseup.net (andrealmeid at riseup.net)
+Date: Tue, 13 Nov 2018 16:58:33 -0200
+Subject: [PATCH v3 0/2] Staging: vchi: Add license id and change int type
+Message-ID: <20181113185835.14429-1-andrealmeid@riseup.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2018 9:17 PM, Keerthy wrote:
-> Add PRCM int16 as the wake up source.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-Looks good.
+From: Andr? Almeida <andrealmeid@riseup.net>
 
-Tony, Would you able to pick this up ?
+Fix the following checkpatch issues:
+
+WARNING: Missing or malformed SPDX-License-Identifier tag in line 1
+CHECK: Prefer kernel type 's32' over 'int32_t'
+
+Changes in v3:
+- Remove license text from header file
+- Modify commit message
+
+Changes in v2:
+- Splits commits in a patch set
+- Fixes licenses in SPDX identifier
+- Adds a more descriptive commit message
+
+v2: https://www.spinics.net/lists/arm-kernel/msg686817.html
+
+Andr? Almeida (2):
+  staging: vchi: change type 'int32_t' to 's32'
+  stagin: vchi: Add SPDX-License-Identifier
+
+ .../vc04_services/interface/vchi/vchi_mh.h    | 32 ++-----------------
+ 1 file changed, 2 insertions(+), 30 deletions(-)
+
+-- 
+2.19.1
