@@ -1,65 +1,45 @@
-From: jbrunet@baylibre.com (jbrunet at baylibre.com)
-Date: Tue, 13 Nov 2018 15:18:55 +0100
-Subject: [PATCH v2 0/4] clk: meson: Add video clocks path
-In-Reply-To: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
-References: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <f7679f4c93aca9a11b9078611b6c4952e83c9a9e.camel@baylibre.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 13 Nov 2018 22:25:36 +0800
+Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
+In-Reply-To: <AM0PR04MB42118C6960C39387051B57F280C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
+ <1537785597-26499-4-git-send-email-abel.vesa@nxp.com>
+ <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
+ <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
+ <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
+ <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
+ <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
+ <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
+ <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
+ <AM0PR04MB42118C6960C39387051B57F280C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <20181113142533.GA4557@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-11-06 at 15:57 +0100, Neil Armstrong wrote:
-> This patchset is an attempt to handle the Amlogic Meson GX Video clock
-> in the Common Clock Framework in order to move the video pipeline and
-> HDMI controller clock management out of the Meson DRM Driver.
+On Sat, Nov 10, 2018 at 04:05:44PM +0000, A.s. Dong wrote:
+> Hi Stephen,
 > 
-> In order :
-> - Add support the VID_PLL fully programmable divider used right after the
->   HDMI PLL clock source.
-> - Fix the GXL HDMI PLL DCO
-> - Add the video clock bindings covering all the video graphics pipeline
->   and the HDMI controller.
-> - Add the clocks entries used in the video clock path
+> [...]
+> > > I already sent the 12th version of this current patch series and I
+> > > would really like to get this in ASAP so that the booting up of imx8mq will
+> > not be delayed.
+> > >
+> > 
+> > Ok. Well we're in rc1 right now, and so we're not merging new drivers into
+> > mainline. I can merge the clk driver into clk-next, but you'll have to wait for the
+> > stabilization period to end (approximately 6 or 7 weeks) before this can get
+> > into the next kernel version. It will be in linux-next much sooner of course.
 > 
-> The vid_pll programmable divider is introduced in its R/O form right now,
-> but will be extended to be R/W in a next iteration.
+> That would be great if you can help that.
+> We're now working with SUSE to enable i.MX8 support.
+> Their criteria is only backporting patches which must be at least in maintainer's
+> next tree already. So either picked up by you or Shawn would help a lot on it.
 > 
-> All dividers are flagged with CLK_GET_RATE_NOCACHE, and all gates are
-> flagged
-> with CLK_IGNORE_UNUSED since they are currently directly handled by the
-> Meson DRM Driver.
-> 
-> Once the DRM Driver is fully migrated to using the Common Clock Framework
-> to handle the video clock tree, the CLK_GET_RATE_NOCACHE and
-> CLK_IGNORE_UNUSED
-> will be dropped.
-> 
-> Changes since v1 at [1]:
->  - Fixed comments from Martin
->  - Fixed GXL HDMI PLL DCO
->  - Added the missing HDMI controller clock
->  - Moved bindings to a separate patch
->  - Updated the commit logs
-> 
-> [1] 
-> https://lkml.kernel.org/r/1532079581-978-1-git-send-email-narmstrong at baylibre.com
-> 
-> Neil Armstrong (4):
->   clk: meson: Add vid_pll divider driver
->   clk: meson-gxbb: Fix HDMI PLL for GXL SoCs
->   dt-bindings: clk: meson-gxbb: Add Video clock bindings
->   clk: meson-gxbb: Add video clocks
-> 
->  drivers/clk/meson/Makefile            |   2 +-
->  drivers/clk/meson/clkc.h              |   6 +
->  drivers/clk/meson/gxbb.c              | 773
-> +++++++++++++++++++++++++++++++++-
->  drivers/clk/meson/gxbb.h              |  26 +-
->  drivers/clk/meson/vid-pll-div.c       |  91 ++++
->  include/dt-bindings/clock/gxbb-clkc.h |  18 +
->  6 files changed, 911 insertions(+), 5 deletions(-)
->  create mode 100644 drivers/clk/meson/vid-pll-div.c
-> 
+> BTW, one simple question is that because MX8MQ DTS patches depends on
+> this clock driver series. How would you suggest this series to go through
+> your tree or Shawn's tree?
 
-Looks sane enough ;)
+Once Stephen has a topic branch for the patches, I can pull it into my
+tree to resolve the DT dependency.
 
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+Shawn
