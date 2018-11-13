@@ -1,30 +1,116 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 13 Nov 2018 10:51:42 +0100
-Subject: [PATCH 3/3] ARM: dts: stm32: Add hwlock for pinctrl
-In-Reply-To: <20181113095142.32015-1-benjamin.gaignard@st.com>
-References: <20181113095142.32015-1-benjamin.gaignard@st.com>
-Message-ID: <20181113095142.32015-4-benjamin.gaignard@st.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 13 Nov 2018 10:52:10 +0100
+Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
+In-Reply-To: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+Message-ID: <20181113095210.mh3iy5tcsu6w6tem@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a hwspinlock to be used by pin-controller
+Hello,
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
+> The flag 'has_clks' and related checks are superfluous as the CCF
+> subsystem does this for you.
 
-diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-index c4851271e810..2886e5a6ac27 100644
---- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-@@ -14,6 +14,7 @@
- 			ranges = <0 0x50002000 0xa400>;
- 			interrupt-parent = <&exti>;
- 			st,syscfg = <&exti 0x60 0xff>;
-+			hwlocks = <&hsem 0>;
- 			pins-are-numbered;
- 
- 			gpioa: gpio at 50002000 {
+I'd write instead:
+
+	Handle optional clocks by using NULL as clk instead of a
+	separate bool field in the device's platform data.
+
+There is a semantic difference this patch introduces (i.e. if on mt2712
+there are no provided clocks, the driver now successfully binds while
+before it failed with -ENOENT. And for mt7628 it's the other way round). 
+IMHO this should be noted in the commit log, too. Otherwise it sounds as
+if this patch was just an optimisation without side effects.
+
+> ---
+>  drivers/pwm/pwm-mediatek.c | 20 +++++---------------
+>  1 file changed, 5 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
+> index eb6674c..9400c41 100644
+> --- a/drivers/pwm/pwm-mediatek.c
+> +++ b/drivers/pwm/pwm-mediatek.c
+> @@ -57,7 +57,6 @@ enum {
+>  struct mtk_pwm_platform_data {
+>  	unsigned int num_pwms;
+>  	bool pwm45_fixup;
+> -	bool has_clks;
+>  };
+>  
+>  /**
+> @@ -87,9 +86,6 @@ static int mtk_pwm_clk_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+>  	int ret;
+>  
+> -	if (!pc->soc->has_clks)
+> -		return 0;
+> -
+>  	ret = clk_prepare_enable(pc->clks[MTK_CLK_TOP]);
+>  	if (ret < 0)
+>  		return ret;
+> @@ -116,9 +112,6 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  {
+>  	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
+>  
+> -	if (!pc->soc->has_clks)
+> -		return;
+> -
+>  	clk_disable_unprepare(pc->clks[MTK_CLK_PWM1 + pwm->hwpwm]);
+>  	clk_disable_unprepare(pc->clks[MTK_CLK_MAIN]);
+>  	clk_disable_unprepare(pc->clks[MTK_CLK_TOP]);
+> @@ -246,12 +239,13 @@ static int mtk_pwm_probe(struct platform_device *pdev)
+>  	if (IS_ERR(pc->regs))
+>  		return PTR_ERR(pc->regs);
+>  
+> -	for (i = 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
+> +	for (i = 0; i < data->num_pwms + 2; i++) {
+>  		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
+>  		if (IS_ERR(pc->clks[i])) {
+> -			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
+> -				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
+> -			return PTR_ERR(pc->clks[i]);
+> +			if (PTR_ERR(pc->clks[i]) == -EPROBE_DEFER)
+> +				return -EPROBE_DEFER;
+> +
+> +			pc->clks[i] = NULL;
+
+I'd prefer the following instead:
+
+	pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
+	if (IS_ERR(pc->clks[i])) {
+		if (PTR_ERR(pc->clks[i]) == -ENODEV) {
+			pc->clks[i] = NULL;
+		} else {
+			if (PTR_ERR(pc->clks[i]) == -EPROBE_DEFER)
+				dev_err(...);
+			return PTR_ERR(pc->clks[i]);
+		}
+
+This way you only handle "There is no such clock" and are not ignoring
+say an IO error.
+
+I wonder if it would make sense to introduce functions like:
+
+	struct clk *clk_get_optional(struct device *dev, const char *id)
+
+that return NULL instead of ERR_PTR(-ENODEV).
+
+Then the above would simplify to:
+
+	pc->clks[i] = devm_clk_get_optional(&pdev->dev, mtk_pwm_clk_name[i]);
+	if (IS_ERR(pc->clks[i]) {
+		if (PTR_ERR(pc->clks[i]) == -EPROBE_DEFER)
+			dev_err(...);
+		return PTR_ERR(pc->clks[i]);
+	}
+
+(added the clk people to Cc for this question).
+
+Best regards
+Uwe
+
 -- 
-2.15.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
