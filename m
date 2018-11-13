@@ -1,46 +1,33 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 13 Nov 2018 18:58:53 +0100
-Subject: [PATCH v3] cpufreq: ti-cpufreq: Only register platform_device
- when supported
-In-Reply-To: <20181113173912.27643-1-d-gerlach@ti.com>
-References: <20181113173912.27643-1-d-gerlach@ti.com>
-Message-ID: <20181113175853.GN13311@localhost>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 13 Nov 2018 10:00:58 -0800
+Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
+In-Reply-To: <20181113095210.mh3iy5tcsu6w6tem@pengutronix.de>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+ <20181113095210.mh3iy5tcsu6w6tem@pengutronix.de>
+Message-ID: <154213205843.88331.7023190778461777093@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 11:39:12AM -0600, Dave Gerlach wrote:
-> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
-> the driver to probe on any platforms where the driver is built in.
-> However, this should only happen on platforms that actually can make use
-> of the driver. There is already functionality in place to match the
-> SoC compatible so let's factor this out into a separate call and
-> make sure we find a match before creating the ti-cpufreq platform device.
+Quoting Uwe Kleine-K?nig (2018-11-13 01:52:10)
 > 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v2->v3: Use platform_device_register_resndata to pass match data to probe to
-> 	to avoid matching again in probe.
+> I wonder if it would make sense to introduce functions like:
 > 
-> 	v2: https://patchwork.kernel.org/patch/10574535/
+>         struct clk *clk_get_optional(struct device *dev, const char *id)
+> 
+> that return NULL instead of ERR_PTR(-ENODEV).
+> 
+> Then the above would simplify to:
+> 
+>         pc->clks[i] = devm_clk_get_optional(&pdev->dev, mtk_pwm_clk_name[i]);
+>         if (IS_ERR(pc->clks[i]) {
+>                 if (PTR_ERR(pc->clks[i]) == -EPROBE_DEFER)
+>                         dev_err(...);
+>                 return PTR_ERR(pc->clks[i]);
+>         }
+> 
+> (added the clk people to Cc for this question).
 > 
 
->  static int ti_cpufreq_init(void)
->  {
-> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
-> +	const struct of_device_id *match;
-> +
-> +	/* Check to ensure we are on a compatible platform */
-> +	match = ti_cpufreq_match_node();
-> +	if (match)
-> +		platform_device_register_resndata(NULL, "ti-cpufreq", -1, NULL,
-> +						  0, match,
-> +						  sizeof(*match));
+Such a patch is already on the list and not getting much review.
 
-platform_device_register_data()?
-
->  	return 0;
->  }
->  module_init(ti_cpufreq_init);
-
-Johan
+http://lkml.kernel.org/r/1535724443-21150-1-git-send-email-phil.edworthy at renesas.com
