@@ -1,78 +1,38 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 13 Nov 2018 13:12:13 +0100
-Subject: [PATCH] ARM: dts: Provide support for reading ID code from MVB device
- (BK4)
-Message-ID: <20181113121213.14296-1-lukma@denx.de>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 13 Nov 2018 17:45:32 +0530
+Subject: [PATCH v6 1/4] clk: sunxi-ng: Enable DE2_CCU for SUN8I and SUN50I
+Message-ID: <20181113121535.24137-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The procedure to read this ID value is as follows:
+Allwinner SoC like SUN8I and SUN50I has DE2 CCU so enable them
+as default.
 
-rmmod spi_fsl_dspi
-insmod spi-gpio.ko
-
-echo 504 > /sys/class/gpio/export
-cat /sys/class/gpio/gpio504/value
-...
-echo 511 > /sys/class/gpio/export
-cat /sys/class/gpio/gpio511/value
-
-rmmod spi-gpio.ko
-insmod spi_fsl_dspi
-
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/vf610-bk4.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+Changes for v6:
+- droped "depends on" since the CCU select based on MACH defined. 
+Changes for v5:
+- remove DRM dependency
+Changes for v4, v3:
+- none
+Changes for v2:
+- Enable for MACH_SUN8I
 
-diff --git a/arch/arm/boot/dts/vf610-bk4.dts b/arch/arm/boot/dts/vf610-bk4.dts
-index cab95714c058..f01c735807ae 100644
---- a/arch/arm/boot/dts/vf610-bk4.dts
-+++ b/arch/arm/boot/dts/vf610-bk4.dts
-@@ -59,6 +59,29 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	spi_gpio {
-+		compatible = "spi-gpio";
-+		pinctrl-0 = <&pinctrl_gpio_spi>;
-+		pinctrl-names = "default";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		/* PTD12 ->RPIO[91] */
-+		sck-gpios  = <&gpio2 27 GPIO_ACTIVE_LOW>;
-+		/* PTD10 ->RPIO[89] */
-+		miso-gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>;
-+		num-chipselects = <0>;
-+
-+		72xx165 at 0 {
-+			compatible = "pisosr-gpio";
-+			reg = <0>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			/* PTB18 -> RGPIO[40] */
-+			load-gpios  = <&gpio1 8 GPIO_ACTIVE_LOW>;
-+			spi-max-frequency = <100000>;
-+		};
-+	};
- };
+ drivers/clk/sunxi-ng/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 826674d090fd..abbd518833b5 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -63,6 +63,7 @@ config SUN8I_V3S_CCU
  
- &adc0 {
-@@ -430,6 +453,14 @@
- 		>;
- 	};
+ config SUN8I_DE2_CCU
+ 	bool "Support for the Allwinner SoCs DE2 CCU"
++	default MACH_SUN8I || (ARM64 && ARCH_SUNXI)
  
-+	pinctrl_gpio_spi: pinctrl-gpio-spi {
-+		fsl,pins = <
-+			VF610_PAD_PTB18__GPIO_40        0x1183
-+			VF610_PAD_PTD10__GPIO_89        0x1183
-+			VF610_PAD_PTD12__GPIO_91        0x1183
-+		>;
-+	};
-+
- 	pinctrl_i2c2: i2c2grp {
- 		fsl,pins = <
- 			VF610_PAD_PTA22__I2C2_SCL               0x34df
+ config SUN8I_R40_CCU
+ 	bool "Support for the Allwinner R40 CCU"
 -- 
-2.11.0
+2.18.0.321.gffc6fa0e3
