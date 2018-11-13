@@ -1,23 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Nov 2018 14:46:40 -0800
-Subject: [RFC 0/9] ASoC/ARM: Merge the davinci and omap audio directories
-In-Reply-To: <20181108083754.1746-1-peter.ujfalusi@ti.com>
-References: <20181108083754.1746-1-peter.ujfalusi@ti.com>
-Message-ID: <20181113224640.GP2089@sirena.org.uk>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 13 Nov 2018 17:09:00 -0600
+Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
+In-Reply-To: <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
+ <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
+Message-ID: <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 10:37:45AM +0200, Peter Ujfalusi wrote:
-> Hi,
-> 
-> This RFC series is on top of the omap-mcbsp cleanup series:
-> http://mailman.alsa-project.org/pipermail/alsa-devel/2018-November/141604.html
+On Tue, Nov 13, 2018 at 10:17 AM, Kristina Martsenko
+<kristina.martsenko@arm.com> wrote:
+> When the PAC authentication fails, it doesn't actually generate an
+> exception, it just flips a bit in the high-order bits of the pointer,
+> making the pointer invalid. Then when the pointer is dereferenced (e.g.
+> as a function return address), it generates the usual type of exception
+> for an invalid address.
 
-This is all fine by me.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181113/885549fc/attachment.sig>
+Ah! Okay, thanks. I missed that detail. :)
+
+What area of memory ends up being addressable with such bit flips?
+(i.e. is the kernel making sure nothing executable ends up there?)
+
+> So when a function return fails in user mode, the exception is handled
+> in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
+> function return fails in kernel mode, the exception is handled in
+> __do_kernel_fault and the task is killed.
+>
+> This is different from stack protector as we don't panic the kernel, we
+> just kill the task. It would be difficult to panic as we don't have a
+> reliable way of knowing that the exception was caused by a PAC
+> authentication failure (we just have an invalid pointer with a specific
+> bit flipped). We also don't print out any PAC-related warning.
+
+There are other "guesses" in __do_kernel_fault(), I think? Could a
+"PAC mismatch?" warning be included in the Oops if execution fails in
+the address range that PAC failures would resolve into?
+
+-Kees
+
+-- 
+Kees Cook
