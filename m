@@ -1,33 +1,43 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 13 Nov 2018 17:30:53 +0530
-Subject: [PATCH v2 1/2] dt-bindings: gpu: mali-utgard: Add compatible for A64
- Mali
-Message-ID: <20181113120054.17639-1-jagan@amarulasolutions.com>
+From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
+Date: Tue, 13 Nov 2018 14:01:36 +0200
+Subject: [PATCH v4 6/8] clk: clk-twl6040: Free of_provider at remove
+In-Reply-To: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+Message-ID: <c7d4076e0786e233d0aec41e8d14702267688d1b.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has Mali-400MP2, so document the relevant compatible
-as "allwinner,sun50i-a64-mali"
+use devm variant for of_provider registration so provider is freed
+at exit.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
-Changes for v2:
-- New patch, separated from previous version patch.
+ drivers/clk/clk-twl6040.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index 63cd91176a68..a0ee62a5b221 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -11,6 +11,7 @@ Required properties:
-       + allwinner,sun4i-a10-mali
-       + allwinner,sun7i-a20-mali
-       + allwinner,sun8i-h3-mali
-+      + allwinner,sun50i-a64-mali
-       + allwinner,sun50i-h5-mali
-       + amlogic,meson-gxbb-mali
-       + amlogic,meson-gxl-mali
+diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
+index 25dfe050ae9f..e9da09453eb2 100644
+--- a/drivers/clk/clk-twl6040.c
++++ b/drivers/clk/clk-twl6040.c
+@@ -108,9 +108,8 @@ static int twl6040_pdmclk_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, clkdata);
+ 
+-	return of_clk_add_hw_provider(pdev->dev.parent->of_node,
+-				      of_clk_hw_simple_get,
+-				      &clkdata->pdmclk_hw);
++	return devm_of_clk_add_parent_hw_provider(&pdev->dev,
++			of_clk_hw_simple_get, &clkdata->pdmclk_hw);
+ }
+ 
+ static struct platform_driver twl6040_pdmclk_driver = {
 -- 
-2.18.0.321.gffc6fa0e3
+2.14.3
+
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
