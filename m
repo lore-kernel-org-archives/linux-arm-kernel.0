@@ -1,23 +1,17 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 13 Nov 2018 19:41:49 +0100 (CET)
-Subject: [PATCH 01/17] ARM: dts: bcm2835-rpi-zero: Switch to SPDX
- identifier
-In-Reply-To: <87muqgzxh2.fsf@anholt.net>
-References: <1541859873-6342-1-git-send-email-stefan.wahren@i2se.com>
- <87muqgzxh2.fsf@anholt.net>
-Message-ID: <1453446841.258790.1542134509066@email.ionos.de>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 13 Nov 2018 10:50:56 -0800
+Subject: [PATCH] soc: ti: wkup_m3: Add PRCM int16 as the wake up source
+In-Reply-To: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
+References: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <99b2658c-2394-0660-6f63-0ef63a7c30f3@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/11/2018 9:17 PM, Keerthy wrote:
+> Add PRCM int16 as the wake up source.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+Looks good.
 
-> Eric Anholt <eric@anholt.net> hat am 10. November 2018 um 17:52 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > Adopt the SPDX license identifier headers to ease license compliance
-> > management.
-> 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-
-Applied to bcm2835-dt-next
+Tony, Would you able to pick this up ?
