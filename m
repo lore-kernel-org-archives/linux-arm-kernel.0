@@ -1,93 +1,68 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 13 Nov 2018 15:01:20 +0100
-Subject: [PATCH v2 12/25] of: net: kill of_get_nvmem_mac_address()
+Date: Tue, 13 Nov 2018 15:01:26 +0100
+Subject: [PATCH v2 18/25] ARM: davinci: dm644x-evm: use device properties for
+ at24 eeprom
 In-Reply-To: <20181113140133.17385-1-brgl@bgdev.pl>
 References: <20181113140133.17385-1-brgl@bgdev.pl>
-Message-ID: <20181113140133.17385-13-brgl@bgdev.pl>
+Message-ID: <20181113140133.17385-19-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-We've switched all users to nvmem_get_mac_address(). Remove the now
-dead code.
+We want to work towards phasing out the at24_platform_data structure.
+There are few users and its contents can be represented using generic
+device properties. Using device properties only will allow us to
+significantly simplify the at24 configuration code.
+
+Remove the at24_platform_data structure and replace it with an array
+of property entries. Drop the byte_len/size property, as the model name
+already implies the EEPROM's size.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
 ---
- drivers/of/of_net.c    | 39 ---------------------------------------
- include/linux/of_net.h |  6 ------
- 2 files changed, 45 deletions(-)
+ arch/arm/mach-davinci/board-dm644x-evm.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/of/of_net.c b/drivers/of/of_net.c
-index 53189d4022a6..810ab0fbcccb 100644
---- a/drivers/of/of_net.c
-+++ b/drivers/of/of_net.c
-@@ -81,42 +81,3 @@ const void *of_get_mac_address(struct device_node *np)
- 	return of_get_mac_addr(np, "address");
- }
- EXPORT_SYMBOL(of_get_mac_address);
--
--/**
-- * Obtain the MAC address from an nvmem provider named 'mac-address' through
-- * device tree.
-- * On success, copies the new address into memory pointed to by addr and
-- * returns 0. Returns a negative error code otherwise.
-- * @np:		Device tree node containing the nvmem-cells phandle
-- * @addr:	Pointer to receive the MAC address using ether_addr_copy()
-- */
--int of_get_nvmem_mac_address(struct device_node *np, void *addr)
--{
--	struct nvmem_cell *cell;
--	const void *mac;
--	size_t len;
--	int ret;
--
--	cell = of_nvmem_cell_get(np, "mac-address");
--	if (IS_ERR(cell))
--		return PTR_ERR(cell);
--
--	mac = nvmem_cell_read(cell, &len);
--
--	nvmem_cell_put(cell);
--
--	if (IS_ERR(mac))
--		return PTR_ERR(mac);
--
--	if (len < ETH_ALEN || !is_valid_ether_addr(mac)) {
--		ret = -EINVAL;
--	} else {
--		ether_addr_copy(addr, mac);
--		ret = 0;
--	}
--
--	kfree(mac);
--
--	return ret;
--}
--EXPORT_SYMBOL(of_get_nvmem_mac_address);
-diff --git a/include/linux/of_net.h b/include/linux/of_net.h
-index 90d81ee9e6a0..9cd72aab76fe 100644
---- a/include/linux/of_net.h
-+++ b/include/linux/of_net.h
-@@ -13,7 +13,6 @@
- struct net_device;
- extern int of_get_phy_mode(struct device_node *np);
- extern const void *of_get_mac_address(struct device_node *np);
--extern int of_get_nvmem_mac_address(struct device_node *np, void *addr);
- extern struct net_device *of_find_net_device_by_node(struct device_node *np);
- #else
- static inline int of_get_phy_mode(struct device_node *np)
-@@ -26,11 +25,6 @@ static inline const void *of_get_mac_address(struct device_node *np)
- 	return NULL;
- }
+diff --git a/arch/arm/mach-davinci/board-dm644x-evm.c b/arch/arm/mach-davinci/board-dm644x-evm.c
+index e1428115067f..efe4e170e87d 100644
+--- a/arch/arm/mach-davinci/board-dm644x-evm.c
++++ b/arch/arm/mach-davinci/board-dm644x-evm.c
+@@ -16,8 +16,8 @@
+ #include <linux/gpio/machine.h>
+ #include <linux/i2c.h>
+ #include <linux/platform_data/pcf857x.h>
+-#include <linux/platform_data/at24.h>
+ #include <linux/platform_data/gpio-davinci.h>
++#include <linux/property.h>
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/rawnand.h>
+ #include <linux/mtd/partitions.h>
+@@ -532,12 +532,9 @@ static struct nvmem_cell_lookup dm644evm_nvmem_cell_lookup = {
+ 	.con_id		= "mac-address",
+ };
  
--static inline int of_get_nvmem_mac_address(struct device_node *np, void *addr)
--{
--	return -ENODEV;
--}
--
- static inline struct net_device *of_find_net_device_by_node(struct device_node *np)
- {
- 	return NULL;
+-static struct at24_platform_data eeprom_info = {
+-	.byte_len	= (256*1024) / 8,
+-	.page_size	= 64,
+-	.flags		= AT24_FLAG_ADDR16,
+-	.setup          = davinci_get_mac_addr,
+-	.context	= (void *)0x7f00,
++static const struct property_entry eeprom_properties[] = {
++	PROPERTY_ENTRY_U32("pagesize", 64),
++	{ }
+ };
+ 
+ /*
+@@ -647,7 +644,7 @@ static struct i2c_board_info __initdata i2c_info[] =  {
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("24c256", 0x50),
+-		.platform_data	= &eeprom_info,
++		.properties = eeprom_properties,
+ 	},
+ 	{
+ 		I2C_BOARD_INFO("tlv320aic33", 0x1b),
 -- 
 2.19.1
