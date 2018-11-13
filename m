@@ -1,147 +1,83 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Nov 2018 18:35:48 +0000 (GMT)
-Subject: Applied "spi: Deal with slaves that return from transfer_one()
- unfinished" to the spi tree
-In-Reply-To: <20181113102228.820214-3-lkundrak@v3.sk>
-Message-ID: <20181113183548.ECDDF440079@finisterre.ee.mobilebroadband>
+From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
+Date: Tue, 13 Nov 2018 20:35:59 +0200
+Subject: [PATCH v7 00/17] Removed nested TPM operations
+Message-ID: <20181113183620.27447-1-jarkko.sakkinen@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+[was Detach TPM space code out of the tpm_transmit() flow but the scope
+ expanded a bit.]
 
-   spi: Deal with slaves that return from transfer_one() unfinished
+Make the changes necessary to detach TPM space code and TPM activation
+code out of the tpm_transmit() flow because of both of these can cause
+nested tpm_transmit() calls. The nesteds calls make the whole flow hard
+to maintain, and thus, it is better to just fix things now before this
+turns into a bigger mess.
 
-has been applied to the spi tree at
+v7:
+*  Reorganize series so that more trivial and self-contained changes are
+   in the head.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+v6:
+* When tpm_validate_commmand() was moved to tpm2-space.c, the struct for
+  the TPM header was incorrectly declared as struct tpm_input_header.
+* Fix return value in tpm_validate_command().
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+v5:
+* Add the missing rev's from Stefan Berger.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+v4:
+* Return 0 from pcrs_show() when tpm1_pcr_read() fails.
+* Fix error handling flow in tpm_try_transmit().
+* Replace struct tpm_input_header and struct tpm_output_header with
+  struct tpm_header.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+v3:
+* Encapsulate power gating code to tpm_chip_start() and tpm_chip_stop().
+* Move TPM power gating code and locking to tpm_try_get_ops() and
+  tpm_put_ops().
+* Call power gating code directly in tpm_chip_register() and
+  tpm2_del_space().
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+v2:
+* Print tpm2_commit_space() error inside tpm2_commit_space()
+* Error code was not printed when recv() callback failed. It is
+  fixed in this version.
+* Added a patch that removes @space from tpm_transmit().
+* Fixed a regression in earlier series. Forgot to amend the change
+  from the staging area that renames NESTED to UNLOCKED in tpm2-space.c.
 
-Thanks,
-Mark
+Jarkko Sakkinen (17):
+  tpm: use tpm_buf in tpm_transmit_cmd() as the IO parameter
+  tpm: fix invalid return value in pubek_show()
+  tpm: return 0 from pcrs_show() when tpm1_pcr_read() fails
+  tpm: print tpm2_commit_space() error inside tpm2_commit_space()
+  tpm: declare struct tpm_header
+  tpm: access command header through struct in tpm_try_transmit()
+  tpm: encapsulate tpm_dev_transmit()
+  tpm: call tpm2_flush_space() on error in tpm_try_transmit()
+  tpm: clean up tpm_try_transmit() error handling flow
+  tpm: move tpm_validate_commmand() to tpm2-space.c
+  tpm: move TPM space code out of tpm_transmit()
+  tpm: remove @space from tpm_transmit()
+  tpm: use tpm_try_get_ops() in tpm-sysfs.c.
+  tpm: remove TPM_TRANSMIT_UNLOCKED flag
+  tpm: introduce tpm_chip_start() and tpm_chip_stop()
+  tpm: take TPM chip power gating out of tpm_transmit()
+  tpm: remove @flags from tpm_transmit()
 
->From 810923f3bf06c11022b7bb370dd3130a956a222e Mon Sep 17 00:00:00 2001
-From: Lubomir Rintel <lkundrak@v3.sk>
-Date: Tue, 13 Nov 2018 11:22:24 +0100
-Subject: [PATCH] spi: Deal with slaves that return from transfer_one()
- unfinished
+ drivers/char/tpm/tpm-chip.c       | 105 +++++++++++-
+ drivers/char/tpm/tpm-dev-common.c |  45 ++++-
+ drivers/char/tpm/tpm-interface.c  | 267 ++++++------------------------
+ drivers/char/tpm/tpm-sysfs.c      | 138 +++++++++------
+ drivers/char/tpm/tpm.h            |  64 +++----
+ drivers/char/tpm/tpm1-cmd.c       |  28 +---
+ drivers/char/tpm/tpm2-cmd.c       |  72 +++-----
+ drivers/char/tpm/tpm2-space.c     |  93 ++++++++---
+ drivers/char/tpm/tpm_i2c_atmel.c  |   5 +-
+ drivers/char/tpm/tpm_vtpm_proxy.c |  12 +-
+ drivers/char/tpm/xen-tpmfront.c   |   2 +-
+ 11 files changed, 406 insertions(+), 425 deletions(-)
 
-Some drivers, such as spi-pxa2xx return from the transfer_one callback
-immediately, idicating that the transfer will be finished asynchronously.
-
-Normally, spi_transfer_one_message() synchronously waits for the
-transfer to finish with wait_for_completion_timeout(). For slaves, we
-don't want the transaction to time out as it can complete in a long time
-in future. Use wait_for_completion_interruptible() instead.
-
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi.c | 62 +++++++++++++++++++++++++++++------------------
- 1 file changed, 39 insertions(+), 23 deletions(-)
-
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 6ca59406b0b7..498d3b9bf3ae 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -1037,6 +1037,42 @@ static int spi_map_msg(struct spi_controller *ctlr, struct spi_message *msg)
- 	return __spi_map_msg(ctlr, msg);
- }
- 
-+static int spi_transfer_wait(struct spi_controller *ctlr,
-+			     struct spi_message *msg,
-+			     struct spi_transfer *xfer)
-+{
-+	struct spi_statistics *statm = &ctlr->statistics;
-+	struct spi_statistics *stats = &msg->spi->statistics;
-+	unsigned long long ms = 1;
-+
-+	if (spi_controller_is_slave(ctlr)) {
-+		if (wait_for_completion_interruptible(&ctlr->xfer_completion)) {
-+			dev_dbg(&msg->spi->dev, "SPI transfer interrupted\n");
-+			return -EINTR;
-+		}
-+	} else {
-+		ms = 8LL * 1000LL * xfer->len;
-+		do_div(ms, xfer->speed_hz);
-+		ms += ms + 200; /* some tolerance */
-+
-+		if (ms > UINT_MAX)
-+			ms = UINT_MAX;
-+
-+		ms = wait_for_completion_timeout(&ctlr->xfer_completion,
-+						 msecs_to_jiffies(ms));
-+
-+		if (ms == 0) {
-+			SPI_STATISTICS_INCREMENT_FIELD(statm, timedout);
-+			SPI_STATISTICS_INCREMENT_FIELD(stats, timedout);
-+			dev_err(&msg->spi->dev,
-+				"SPI transfer timed out\n");
-+			return -ETIMEDOUT;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- /*
-  * spi_transfer_one_message - Default implementation of transfer_one_message()
-  *
-@@ -1050,7 +1086,6 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
- 	struct spi_transfer *xfer;
- 	bool keep_cs = false;
- 	int ret = 0;
--	unsigned long long ms = 1;
- 	struct spi_statistics *statm = &ctlr->statistics;
- 	struct spi_statistics *stats = &msg->spi->statistics;
- 
-@@ -1079,28 +1114,9 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
- 				goto out;
- 			}
- 
--			if (ret > 0) {
--				ret = 0;
--				ms = 8LL * 1000LL * xfer->len;
--				do_div(ms, xfer->speed_hz);
--				ms += ms + 200; /* some tolerance */
--
--				if (ms > UINT_MAX)
--					ms = UINT_MAX;
--
--				ms = wait_for_completion_timeout(&ctlr->xfer_completion,
--								 msecs_to_jiffies(ms));
--			}
--
--			if (ms == 0) {
--				SPI_STATISTICS_INCREMENT_FIELD(statm,
--							       timedout);
--				SPI_STATISTICS_INCREMENT_FIELD(stats,
--							       timedout);
--				dev_err(&msg->spi->dev,
--					"SPI transfer timed out\n");
--				msg->status = -ETIMEDOUT;
--			}
-+			ret = spi_transfer_wait(ctlr, msg, xfer);
-+			if (ret < 0)
-+				msg->status = ret;
- 		} else {
- 			if (xfer->len)
- 				dev_err(&msg->spi->dev,
 -- 
 2.19.1
