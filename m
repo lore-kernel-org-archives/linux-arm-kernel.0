@@ -1,37 +1,43 @@
-From: andrealmeid@riseup.net (andrealmeid at riseup.net)
-Date: Mon, 12 Nov 2018 22:37:32 -0200
-Subject: [PATCH v2 1/2] staging: vchi: change type 'int32_t' to 's32'
-In-Reply-To: <20181113003733.9615-1-andrealmeid@riseup.net>
-References: <20181113003733.9615-1-andrealmeid@riseup.net>
-Message-ID: <20181113003733.9615-2-andrealmeid@riseup.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 12 Nov 2018 16:52:37 -0800
+Subject: [PATCH v4 6/6] arch: Move initrd= parsing into do_mounts_initrd.c
+In-Reply-To: <C2D7FE5348E1B147BCA15975FBA23075013A592A0B@us01wembx1.internal.synopsys.com>
+References: <20181105225431.24485-1-f.fainelli@gmail.com>
+ <20181105225431.24485-7-f.fainelli@gmail.com>
+ <C2D7FE5348E1B147BCA15975FBA23075013A5929ED@us01wembx1.internal.synopsys.com>
+ <05f56763-1530-933d-2ce3-3653ad4c685f@gmail.com>
+ <C2D7FE5348E1B147BCA15975FBA23075013A592A0B@us01wembx1.internal.synopsys.com>
+Message-ID: <04d6d0cb-8e60-88a0-061e-62c7c70024c5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andr? Almeida <andrealmeid@riseup.net>
+On 11/12/18 4:40 PM, Vineet Gupta wrote:
+> On 11/12/18 4:38 PM, Florian Fainelli wrote:
+>>>>  #ifdef CONFIG_BLK_DEV_INITRD
+>>>> -	if (initrd_start)
+>>>> -		memblock_reserve(__pa(initrd_start), initrd_end - initrd_start);
+>>>> +	if (phys_initrd_size) {
+>>>> +		memblock_reserve(phys_initrd_start, phys_initrd_size);
+>>>> +		initrd_start = (unsigned long)__va(phys_initrd_start);
+>>>> +		initrd_end = initrd_start + phys_initrd_size;
+>>>> +	}
+>>>>  #endif
+>>> The common code now uses phys_initrd*, and you also use the same in ARC code, do
+>>> we still need the initrd_* setting here ?
+>>> ARC semantics was using them as PA anyways.
+>> Yes, the generic initrd code expects initrd_start/end to be virtual
+>> addresses, which we now directly derive from phys_initrd_start, that
+>> should really be equivalent.
+> 
+> So we can skip this explicit setting above - ARC arch code doesn't access the virt
+> initrd_start
 
-As one can see in a typedef at linux/types.h:103, s32 and int32_t are
-both a 32 bits signed integer. s32 is preferred because it is defined
-by the kernel maintainers and it prevents portability issues. Changed
-to meet checkpatch criteria.
+OK, you are saying we could just have the generic initrd code do this
+assignment instead of having each architecture do it, is that a correct
+understanding? If so, I suppose it could be done, whether as of this
+patch series or as a follow-up, either way is fine with me.
 
-Signed-off-by: Andr? Almeida <andrealmeid@riseup.net>
-
----
- drivers/staging/vc04_services/interface/vchi/vchi_mh.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-index 198bd076b666..40c760d493a1 100644
---- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-+++ b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-@@ -36,7 +36,7 @@
- 
- #include <linux/types.h>
- 
--typedef int32_t VCHI_MEM_HANDLE_T;
-+typedef s32 VCHI_MEM_HANDLE_T;
- #define VCHI_MEM_HANDLE_INVALID 0
- 
- #endif
+One possible caveat is if __va() and __phys_to_virt() behave differently
+(e.g: because of CONFIG_DEBUG_VIRTUAL or other things).
 -- 
-2.19.1
+Florian
