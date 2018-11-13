@@ -1,49 +1,152 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 13 Nov 2018 16:46:10 +0530
-Subject: [PATCH v4 03/26] clk: sunxi-ng: Add check for maximum rate to NKM PLLs
+Date: Tue, 13 Nov 2018 16:46:11 +0530
+Subject: [PATCH v4 04/26] drm/sun4i: sun6i_mipi_dsi: Add has_mod_clk quirk
 In-Reply-To: <20181113111633.20189-1-jagan@amarulasolutions.com>
 References: <20181113111633.20189-1-jagan@amarulasolutions.com>
-Message-ID: <20181113111633.20189-4-jagan@amarulasolutions.com>
+Message-ID: <20181113111633.20189-5-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some NKM PLLs, frequency can be set above PLL working range.
+Mod clock is not mandatory for all Allwinner MIPI DSI
+controllers, it is connected as CLK_DSI_SCLK for A31
+and not available in A64.
 
-Add a constraint for maximum supported rate. This way, drivers can
-specify which is maximum allowed rate for PLL.
+So add has_mod_clk quirk and process the clk accordingly.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
 ---
- drivers/clk/sunxi-ng/ccu_nkm.c | 3 +++
- drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
- 2 files changed, 4 insertions(+)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 39 ++++++++++++++++++--------
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |  5 ++++
+ 2 files changed, 33 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-index 6b5ad990f802..b8b66cdd30bf 100644
---- a/drivers/clk/sunxi-ng/ccu_nkm.c
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-@@ -128,6 +128,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
- 	if (rate < nkm->min_rate)
- 		return nkm->min_rate;
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index e3b34a345546..561de393ea23 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -10,6 +10,7 @@
+ #include <linux/component.h>
+ #include <linux/crc-ccitt.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+@@ -981,6 +982,8 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 	dsi->host.ops = &sun6i_dsi_host_ops;
+ 	dsi->host.dev = dev;
  
-+	if (nkm->max_rate && rate > nkm->max_rate)
-+		return nkm->max_rate;
++	dsi->variant = of_device_get_match_data(dev);
 +
- 	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(base)) {
+@@ -1001,17 +1004,20 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dsi->reset);
+ 	}
  
- 	rate = *parent_rate * _nkm.n * _nkm.k / _nkm.m;
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
-index ff5bd00f429f..c82590481188 100644
---- a/drivers/clk/sunxi-ng/ccu_nkm.h
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.h
-@@ -36,6 +36,7 @@ struct ccu_nkm {
+-	dsi->mod_clk = devm_clk_get(dev, "mod");
+-	if (IS_ERR(dsi->mod_clk)) {
+-		dev_err(dev, "Couldn't get the DSI mod clock\n");
+-		return PTR_ERR(dsi->mod_clk);
++	if (dsi->variant->has_mod_clk) {
++		dsi->mod_clk = devm_clk_get(dev, "mod");
++		if (IS_ERR(dsi->mod_clk)) {
++			dev_err(dev, "Couldn't get the DSI mod clock\n");
++			return PTR_ERR(dsi->mod_clk);
++		}
+ 	}
  
- 	unsigned int		fixed_post_div;
- 	unsigned int		min_rate;
-+	unsigned int		max_rate;
+ 	/*
+ 	 * In order to operate properly, that clock seems to be always
+ 	 * set to 297MHz.
+ 	 */
+-	clk_set_rate_exclusive(dsi->mod_clk, 297000000);
++	if (dsi->variant->has_mod_clk)
++		clk_set_rate_exclusive(dsi->mod_clk, 297000000);
  
- 	struct ccu_common	common;
+ 	dphy_node = of_parse_phandle(dev->of_node, "phys", 0);
+ 	ret = sun6i_dphy_probe(dsi, dphy_node);
+@@ -1043,7 +1049,8 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 	pm_runtime_disable(dev);
+ 	sun6i_dphy_remove(dsi);
+ err_unprotect_clk:
+-	clk_rate_exclusive_put(dsi->mod_clk);
++	if (dsi->variant->has_mod_clk)
++		clk_rate_exclusive_put(dsi->mod_clk);
+ 	return ret;
+ }
+ 
+@@ -1056,7 +1063,8 @@ static int sun6i_dsi_remove(struct platform_device *pdev)
+ 	mipi_dsi_host_unregister(&dsi->host);
+ 	pm_runtime_disable(dev);
+ 	sun6i_dphy_remove(dsi);
+-	clk_rate_exclusive_put(dsi->mod_clk);
++	if (dsi->variant->has_mod_clk)
++		clk_rate_exclusive_put(dsi->mod_clk);
+ 
+ 	return 0;
+ }
+@@ -1066,7 +1074,8 @@ static int __maybe_unused sun6i_dsi_runtime_resume(struct device *dev)
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
+ 
+ 	reset_control_deassert(dsi->reset);
+-	clk_prepare_enable(dsi->mod_clk);
++	if (dsi->variant->has_mod_clk)
++		clk_prepare_enable(dsi->mod_clk);
+ 
+ 	/*
+ 	 * Enable the DSI block.
+@@ -1094,7 +1103,8 @@ static int __maybe_unused sun6i_dsi_runtime_suspend(struct device *dev)
+ {
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
+ 
+-	clk_disable_unprepare(dsi->mod_clk);
++	if (dsi->variant->has_mod_clk)
++		clk_disable_unprepare(dsi->mod_clk);
+ 	reset_control_assert(dsi->reset);
+ 
+ 	return 0;
+@@ -1106,9 +1116,16 @@ static const struct dev_pm_ops sun6i_dsi_pm_ops = {
+ 			   NULL)
  };
+ 
++static const struct sun6i_dsi_variant sun6i_a31_dsi = {
++	.has_mod_clk = true,
++};
++
+ static const struct of_device_id sun6i_dsi_of_table[] = {
+-	{ .compatible = "allwinner,sun6i-a31-mipi-dsi" },
+-	{ }
++	{
++		.compatible = "allwinner,sun6i-a31-mipi-dsi",
++		.data = &sun6i_a31_dsi,
++	},
++	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sun6i_dsi_of_table);
+ 
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index dbbc5b3ecbda..597b62227019 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -20,6 +20,10 @@ struct sun6i_dphy {
+ 	struct reset_control	*reset;
+ };
+ 
++struct sun6i_dsi_variant {
++	bool			has_mod_clk;
++};
++
+ struct sun6i_dsi {
+ 	struct drm_connector	connector;
+ 	struct drm_encoder	encoder;
+@@ -35,6 +39,7 @@ struct sun6i_dsi {
+ 	struct sun4i_drv	*drv;
+ 	struct mipi_dsi_device	*device;
+ 	struct drm_panel	*panel;
++	const struct sun6i_dsi_variant	*variant;
+ };
+ 
+ static inline struct sun6i_dsi *host_to_sun6i_dsi(struct mipi_dsi_host *host)
 -- 
 2.18.0.321.gffc6fa0e3
