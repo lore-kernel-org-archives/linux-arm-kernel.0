@@ -1,74 +1,50 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 13 Nov 2018 09:13:11 -0800
-Subject: [PATCH v3 1/4] dt-bindings: hwlock: Document STM32 hwspinlock
- bindings
-In-Reply-To: <20181113021337.GA7237@bogus>
-References: <20181112152342.6561-1-benjamin.gaignard@st.com>
- <20181112152342.6561-2-benjamin.gaignard@st.com>
- <20181113021337.GA7237@bogus>
-Message-ID: <20181113171311.GE10915@tuxbook-pro>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 13 Nov 2018 18:15:49 +0100
+Subject: [PATCH 0/5] media: Allwinner A10 CSI support
+In-Reply-To: <20181113175558.3bfa3e8d@windsurf>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <df54f2e6-e207-92de-767a-e356345a1a56@xs4all.nl>
+ <20181113135259.onutfjtoi25afnfe@flea>
+ <f07a0460-cdba-c1a5-acfd-66a39f447a5a@cisco.com>
+ <20181113155227.62jjs3mpomwgr7xd@flea>
+ <cb504ffc-b74c-d6e3-7bde-6c5840c87997@cisco.com>
+ <20181113175558.3bfa3e8d@windsurf>
+Message-ID: <2d25e395-af73-e69b-dc8a-3d0956d668f9@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 12 Nov 18:13 PST 2018, Rob Herring wrote:
-
-> On Mon, Nov 12, 2018 at 04:23:39PM +0100, Benjamin Gaignard wrote:
-> > Add bindings for STM32 hardware spinlock device
-> > 
-> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+On 11/13/2018 05:55 PM, Thomas Petazzoni wrote:
+> Hello,
 > 
-> Linaro or ST? Please make the author email match.
+> On Tue, 13 Nov 2018 17:00:25 +0100, Hans Verkuil wrote:
 > 
+>> Weird, if I build directly from that tarball, then v4l2-compliance should say:
+>>
+>> v4l2-compliance SHA: not available, 64 bits
+>>
+>> So that's what I expect to see from buildroot as well.
+> 
+> Indeed, that's strange, I see that the v4l2-compliance Makefile does:
+> 
+> version.h:
+>         @if git -C $(srcdir) rev-parse HEAD >/dev/null 2>&1; then \
+>                 echo -n "#define SHA " >$@ ; \
+>                 git -C $(srcdir) rev-parse HEAD >>$@ ; \
+>         else \
+>                 touch $@ ; \
+>         fi
+> 
+> which correctly uses $(srcdir), so it shouldn't go "up" the libv4l
+> build folder and pick up the latest Buildroot commit SHA1. I'll have a
+> quick look.
 
-Thanks for the review Rob and thanks for spotting this.
+I think it does, actually. If the tar archive is unpacked inside the
+checked-out buildroot git tree, then it will pick up the buildroot SHA.
 
-@Benjamin, please resend the driver and dt-binding with matching author
-and sob - or if you wrote this as ST and want to send it upstream as
-Linaro add your new sob after the ST one.
+I fixed v4l-utils to be a bit smarter about this:
+
+https://git.linuxtv.org/v4l-utils.git/patch/?id=98b4c9f276a18535b5691e5f350f59ffbf5a9aa5
 
 Regards,
-Bjorn
 
-> > ---
-> > version 3 :
-> > - fix clock name in properties description
-> > version 2 :
-> > - change clock name from hwspinlock to hsem to be align with hardware
-> >   documentation
-> > 
-> >  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
-> >  1 file changed, 23 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> > new file mode 100644
-> > index 000000000000..adf4f000ea3d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
-> > @@ -0,0 +1,23 @@
-> > +STM32 Hardware Spinlock Device Binding
-> > +-------------------------------------
-> > +
-> > +Required properties :
-> > +- compatible : should be "st,stm32-hwspinlock".
-> > +- reg : the register address of hwspinlock.
-> > +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
-> > +	hwlock, so the number of cells should be <1> here.
-> > +- clock-names : Must contain "hsem".
-> > +- clocks : Must contain a phandle entry for the clock in clock-names, see the
-> > +	common clock bindings.
-> > +
-> > +Please look at the generic hwlock binding for usage information for consumers,
-> > +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
-> > +
-> > +Example of hwlock provider:
-> > +	hwspinlock at 4c000000 {
-> > +		compatible = "st,stm32-hwspinlock";
-> > +		#hwlock-cells = <1>;
-> > +		reg = <0x4c000000 0x400>;
-> > +		clocks = <&rcc HSEM>;
-> > +		clock-names = "hsem";
-> > +	};
-> > -- 
-> > 2.15.0
-> > 
+	Hans
