@@ -1,68 +1,44 @@
-From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Tue, 13 Nov 2018 02:18:20 +0000
-Subject: [PATCH V4 3/5] arm64: dts: imx: add imx8qxp support
-In-Reply-To: <20181113020625.GA29822@bogus>
-References: <1541864596-15958-1-git-send-email-aisheng.dong@nxp.com>
- <1541864596-15958-4-git-send-email-aisheng.dong@nxp.com>
- <20181113020625.GA29822@bogus>
-Message-ID: <AM0PR04MB4211E53C826A3CB4AF9042B980C20@AM0PR04MB4211.eurprd04.prod.outlook.com>
+From: cphealy@gmail.com (Chris Healy)
+Date: Mon, 12 Nov 2018 19:19:12 -0800
+Subject: [PATCH v2] ARM: dts: imx51-zii-rdu1: Remove EEPROM node
+In-Reply-To: <1541872439-31531-1-git-send-email-festevam@gmail.com>
+References: <1541872439-31531-1-git-send-email-festevam@gmail.com>
+Message-ID: <CAFXsbZqBzmYeWMbcu_32idkXJz8pFfaX-4z8WTMa0kV3qZ_b2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: Tuesday, November 13, 2018 10:06 AM
-[...]
-> 
-> On Sat, 10 Nov 2018 15:48:19 +0000, "A.s. Dong" wrote:
-> > i.MX 8QuadXPlus is a quad (4x) Cortex-A35 proccessor with powerful
-> > graphic and multimedia features. This patch adds the core SoC dtsi
-> > file support.
-> >
-> > Cc: Rob Herring <robh+dt@kernel.org>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: devicetree at vger.kernel.org
-> > Cc: Shawn Guo <shawnguo@kernel.org>
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> > v4->v5:
-> >  * update to new power domain binding
-> >    power domain subnodes removed from dts
-> >  * add LPCG clock nodes
-> >  * clock ID updated accordingly
-> > v2->v3:
-> >  * add more SoC specific compatible string to IP nodes
-> >  * move memory node into board dts
-> >  * change pd reg value into hex
-> >  * add more explanation about SoC in commit message
-> >  * add external clocks
-> >  * remove pmu compatible string which is not supported
-> > v1->v2:
-> >  * mu binding usage update
-> >  * no define for node address
-> >  * do not use '_' for node name
-> >  * drop 'fsl-' prefix for imx dtsi
-> >  * no defines for unit address
-> >  * generic node names
-> >  * range map for 32bit register
-> >  * separate board dts
-> >
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
-> >  arch/arm64/boot/dts/freescale/imx8-ca35.dtsi  |  61 ++++
-> >  arch/arm64/boot/dts/freescale/imx8qxp.dtsi    | 409
-> ++++++++++++++++++++++++++
-> >  3 files changed, 474 insertions(+)
-> >  create mode 100644 arch/arm64/boot/dts/freescale/imx8-ca35.dtsi
-> >  create mode 100644 arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-> >
-> 
-> Reviewed-by: Rob Herring <robh@kernel.org>
+>
+> The EEPROM under I2C2 was put by mistake in the dts.
+>
+> Remove it as it is not really present on the real hardware.
+>
+> Fixes: ceef0396f367 ("ARM: dts: imx: add ZII RDU1 board")
+> Reported-by: Chris Healy <cphealy@gmail.com>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> ---
+> Changes since v1:
+> - None. Only added Chris on Cc
+>
+>  arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index 3ca4f9b..28e9dca 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -493,12 +493,6 @@
+>         pinctrl-0 = <&pinctrl_i2c2>;
+>         status = "okay";
+>
+> -       eeprom at 50 {
+> -               compatible = "atmel,24c04";
+> -               pagesize = <16>;
+> -               reg = <0x50>;
+> -       };
+> -
+>         hpa1: amp at 60 {
+>                 compatible = "ti,tpa6130a2";
+>                 reg = <0x60>;
+> --
 
-Thanks a lot for your quick review. 
-
-Regards
-Dong Aisheng
+Reviewed-by: Chris Healy <cphealy@gmail.com>
