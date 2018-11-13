@@ -1,243 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 13 Nov 2018 15:39:23 -0800
-Subject: [PATCH 3/3] arm64/atomics: remove out of line LL/SC alternatives
-In-Reply-To: <20181113233923.20098-1-ard.biesheuvel@linaro.org>
-References: <20181113233923.20098-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181113233923.20098-4-ard.biesheuvel@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 13 Nov 2018 23:43:36 +0000
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+Message-ID: <20181113234336.GP30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we are no longer emitting calls to the out of line LL/SC
-alternatives from the LSE implementation, drop the exports, the
-prototype decorations and the Makefile rules that build the object
-file that contains them.
+On Wed, Nov 14, 2018 at 08:55:37AM +1100, Finn Thain wrote:
+> On Tue, 13 Nov 2018, Russell King - ARM Linux wrote:
+> 
+> > On Tue, Nov 13, 2018 at 02:39:00PM +1100, Finn Thain wrote:
+> > > 
+> > > You could remove the old arch_gettimeoffset API without dropping any 
+> > > platforms.
+> > > 
+> > > If no-one converts a given platform to the clocksource API it would mean 
+> > > that the default 'jiffies' clocksource will get used on that platform.
+> > > 
+> > > Clock resolution and timer precision would be degraded, but that might not 
+> > > matter.
+> > > 
+> > > Anyway, if someone who has this hardware is willing to test a clocksource 
+> > > API conversion, they can let me know and I'll attempt that patch.
+> > 
+> > There's reasons why that's not appropriate - such as not having two
+> > separate timers in order to supply a clocksource and separate clock
+> > event.
+> > 
+> > Not all hardware is suited to the clocksource + clockevent idea.
+> > 
+> 
+> Sorry, I don't follow.
+> 
+> AFAIK, clocksources and clock event devices are orthogonal concepts. There 
+> are platforms with !ARCH_USES_GETTIMEOFFSET && !GENERIC_CLOCKEVENTS (and 
+> every other combination).
+> 
+> A clocksource read method just provides a cycle count, and in this sense 
+> arch_gettimeoffset() is equivalent to a clocksource.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/atomic_ll_sc.h | 48 ++++++--------------
- arch/arm64/include/asm/lse.h          |  9 ----
- arch/arm64/lib/Makefile               | 19 --------
- arch/arm64/lib/atomic_ll_sc.c         |  3 --
- 4 files changed, 15 insertions(+), 64 deletions(-)
+A clocksource provides a cycle counter that monotonically changes and
+does not wrap between clockevent events.
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index 10d0b7360747..0aa65d7a9f27 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -85,8 +85,7 @@
- #if !(defined(CONFIG_ARM64_LSE_ATOMICS) && defined(CONFIG_AS_LSE))
- 
- #define ATOMIC_OP(op, asm_op)						\
--__LL_SC_INLINE void							\
--__LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
-+static inline void atomic_##op(int i, atomic_t *v))			\
- {									\
- 	unsigned long tmp;						\
- 	int result;							\
-@@ -96,11 +95,9 @@ __LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
- 	: [res]"=&r" (result), [tmp]"=&r" (tmp), [v]"+Q" (v->counter)	\
- 	: [i]"Ir" (i));							\
- }									\
--__LL_SC_EXPORT(atomic_##op);
- 
- #define ATOMIC_OP_RETURN(name, mb, acq, rel, cl, op, asm_op)		\
--__LL_SC_INLINE int							\
--__LL_SC_PREFIX(atomic_##op##_return##name(int i, atomic_t *v))		\
-+static inline int atomic_##op##_return##name(int i, atomic_t *v)	\
- {									\
- 	unsigned long tmp;						\
- 	int result;							\
-@@ -113,11 +110,9 @@ __LL_SC_PREFIX(atomic_##op##_return##name(int i, atomic_t *v))		\
- 									\
- 	return result;							\
- }									\
--__LL_SC_EXPORT(atomic_##op##_return##name);
- 
- #define ATOMIC_FETCH_OP(name, mb, acq, rel, cl, op, asm_op)		\
--__LL_SC_INLINE int							\
--__LL_SC_PREFIX(atomic_fetch_##op##name(int i, atomic_t *v))		\
-+static inline int atomic_fetch_##op##name(int i, atomic_t *v)		\
- {									\
- 	unsigned long tmp;						\
- 	int val, result;						\
-@@ -131,7 +126,6 @@ __LL_SC_PREFIX(atomic_fetch_##op##name(int i, atomic_t *v))		\
- 									\
- 	return result;							\
- }									\
--__LL_SC_EXPORT(atomic_fetch_##op##name);
- 
- #define ATOMIC_OPS(...)							\
- 	ATOMIC_OP(__VA_ARGS__)						\
-@@ -166,8 +160,7 @@ ATOMIC_OPS(xor, eor)
- #undef ATOMIC_OP
- 
- #define ATOMIC64_OP(op, asm_op)						\
--__LL_SC_INLINE void							\
--__LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
-+static inline void atomic64_##op(long i, atomic64_t *v)			\
- {									\
- 	long result;							\
- 	unsigned long tmp;						\
-@@ -177,11 +170,9 @@ __LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
- 	: [res]"=&r" (result), [tmp]"=&r" (tmp), [v]"+Q" (v->counter)	\
- 	: [i]"Ir" (i));							\
- }									\
--__LL_SC_EXPORT(atomic64_##op);
- 
- #define ATOMIC64_OP_RETURN(name, mb, acq, rel, cl, op, asm_op)		\
--__LL_SC_INLINE long							\
--__LL_SC_PREFIX(atomic64_##op##_return##name(long i, atomic64_t *v))	\
-+static inline long atomic64_##op##_return##name(long i, atomic64_t *v)	\
- {									\
- 	long result;							\
- 	unsigned long tmp;						\
-@@ -194,11 +185,9 @@ __LL_SC_PREFIX(atomic64_##op##_return##name(long i, atomic64_t *v))	\
- 									\
- 	return result;							\
- }									\
--__LL_SC_EXPORT(atomic64_##op##_return##name);
- 
- #define ATOMIC64_FETCH_OP(name, mb, acq, rel, cl, op, asm_op)		\
--__LL_SC_INLINE long							\
--__LL_SC_PREFIX(atomic64_fetch_##op##name(long i, atomic64_t *v))	\
-+static inline long atomic64_fetch_##op##name(long i, atomic64_t *v)	\
- {									\
- 	long result, val;						\
- 	unsigned long tmp;						\
-@@ -212,7 +201,6 @@ __LL_SC_PREFIX(atomic64_fetch_##op##name(long i, atomic64_t *v))	\
- 									\
- 	return result;							\
- }									\
--__LL_SC_EXPORT(atomic64_fetch_##op##name);
- 
- #define ATOMIC64_OPS(...)						\
- 	ATOMIC64_OP(__VA_ARGS__)					\
-@@ -246,8 +234,7 @@ ATOMIC64_OPS(xor, eor)
- #undef ATOMIC64_OP_RETURN
- #undef ATOMIC64_OP
- 
--__LL_SC_INLINE long
--__LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
-+static inline long atomic64_dec_if_positive(atomic64_t *v)
- {
- 	long result;
- 	unsigned long tmp;
-@@ -267,13 +254,11 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
- 
- 	return result;
- }
--__LL_SC_EXPORT(atomic64_dec_if_positive);
- 
- #define __CMPXCHG_CASE(w, sz, name, mb, acq, rel, cl)			\
--__LL_SC_INLINE unsigned long						\
--__LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
--				     unsigned long old,			\
--				     unsigned long new))		\
-+static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
-+						  unsigned long old,	\
-+						  unsigned long new)	\
- {									\
- 	unsigned long tmp, oldval;					\
- 									\
-@@ -286,7 +271,6 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- 									\
- 	return oldval;							\
- }									\
--__LL_SC_EXPORT(__cmpxchg_case_##name);
- 
- __CMPXCHG_CASE(w, b,     1,        ,  ,  ,         )
- __CMPXCHG_CASE(w, h,     2,        ,  ,  ,         )
-@@ -308,12 +292,11 @@ __CMPXCHG_CASE( ,  ,  mb_8, dmb ish,  , l, "memory")
- #undef __CMPXCHG_CASE
- 
- #define __CMPXCHG_DBL(name, mb, rel, cl)				\
--__LL_SC_INLINE long							\
--__LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
--				      unsigned long old2,		\
--				      unsigned long new1,		\
--				      unsigned long new2,		\
--				      volatile void *ptr))		\
-+static inline long __cmpxchg_double##name(unsigned long old1,		\
-+					  unsigned long old2,		\
-+					  unsigned long new1,		\
-+					  unsigned long new2,		\
-+					  volatile void *ptr)		\
- {									\
- 	unsigned long tmp, ret;						\
- 									\
-@@ -327,7 +310,6 @@ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- 									\
- 	return ret;							\
- }									\
--__LL_SC_EXPORT(__cmpxchg_double##name);
- 
- __CMPXCHG_DBL(   ,        ,  ,         )
- __CMPXCHG_DBL(_mb, dmb ish, l, "memory")
-diff --git a/arch/arm64/include/asm/lse.h b/arch/arm64/include/asm/lse.h
-index ef70f62ea25e..3ae4f9a6c207 100644
---- a/arch/arm64/include/asm/lse.h
-+++ b/arch/arm64/include/asm/lse.h
-@@ -22,11 +22,6 @@
- 
- __asm__(".arch_extension	lse");
- 
--/* Move the ll/sc atomics out-of-line */
--#define __LL_SC_INLINE		notrace
--#define __LL_SC_PREFIX(x)	__ll_sc_##x
--#define __LL_SC_EXPORT(x)	EXPORT_SYMBOL(__LL_SC_PREFIX(x))
--
- /* In-line patching at runtime */
- #define ARM64_LSE_ATOMIC_INSN(llsc, lse)				\
- 	ALTERNATIVE(llsc, lse, ARM64_HAS_LSE_ATOMICS)
-@@ -42,10 +37,6 @@ __asm__(".arch_extension	lse");
- 
- #else	/* __ASSEMBLER__ */
- 
--#define __LL_SC_INLINE		static inline
--#define __LL_SC_PREFIX(x)	x
--#define __LL_SC_EXPORT(x)
--
- #define ARM64_LSE_ATOMIC_INSN(llsc, lse)	llsc
- 
- #endif	/* __ASSEMBLER__ */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 69ff9887f724..39be2f7f0084 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -5,25 +5,6 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
- 		   strchr.o strrchr.o tishift.o
- 
--# Tell the compiler to treat all general purpose registers (with the
--# exception of the IP registers, which are already handled by the caller
--# in case of a PLT) as callee-saved, which allows for efficient runtime
--# patching of the bl instruction in the caller with an atomic instruction
--# when supported by the CPU. Result and argument registers are handled
--# correctly, based on the function prototype.
--lib-$(CONFIG_ARM64_LSE_ATOMICS) += atomic_ll_sc.o
--CFLAGS_atomic_ll_sc.o	:= -ffixed-x1 -ffixed-x2        		\
--		   -ffixed-x3 -ffixed-x4 -ffixed-x5 -ffixed-x6		\
--		   -ffixed-x7 -fcall-saved-x8 -fcall-saved-x9		\
--		   -fcall-saved-x10 -fcall-saved-x11 -fcall-saved-x12	\
--		   -fcall-saved-x13 -fcall-saved-x14 -fcall-saved-x15	\
--		   -fcall-saved-x18 -fomit-frame-pointer
--CFLAGS_REMOVE_atomic_ll_sc.o := -pg
--GCOV_PROFILE_atomic_ll_sc.o	:= n
--KASAN_SANITIZE_atomic_ll_sc.o	:= n
--KCOV_INSTRUMENT_atomic_ll_sc.o	:= n
--UBSAN_SANITIZE_atomic_ll_sc.o	:= n
--
- lib-$(CONFIG_ARCH_HAS_UACCESS_FLUSHCACHE) += uaccess_flushcache.o
- 
- obj-$(CONFIG_CRC32) += crc32.o
-diff --git a/arch/arm64/lib/atomic_ll_sc.c b/arch/arm64/lib/atomic_ll_sc.c
-deleted file mode 100644
-index b0c538b0da28..000000000000
---- a/arch/arm64/lib/atomic_ll_sc.c
-+++ /dev/null
-@@ -1,3 +0,0 @@
--#include <asm/atomic.h>
--#define __ARM64_IN_ATOMIC_IMPL
--#include <asm/atomic_ll_sc.h>
+A clock event is responsible for providing events to the system when
+some work is needing to be done, limited by the wrap interval of the
+clocksource.
+
+Each time the clock event triggers an interrupt, the clocksource is
+read to determine how much time has passed, using:
+
+	count = (new_value - old_value) & available_bits
+	nanosecs = count * scale >> shift;
+
+If you try to combine the clocksource and clockevent because you only
+have a single counter, and the counter has the behaviour of:
+- counting down towards zero
+- when reaching zero, triggers an interrupt, and reloads with N
+
+then this provides your clockevent, but you can't use this as a clock
+source, because each time you receive an interrupt and try to read the
+counter value, it will be approximately the same value.  This means
+that the above calculation fails to register the correct number of
+nanoseconds passing.  Hence, this does not work.
+
+Also note where I said above that the clock event device must be able
+to provide an interrupt _before_ the clocksource wraps - clearly with
+such a timer, that is utterly impossible.
+
+The simple solution is to not use such a counter as the clocksource,
+which means you fall back to using the jiffies clocksource, and your
+timekeeping has jiffy resolution - so 10ms, or possibly 1ms if you
+want a 1kHz timer interval.  For most applications, that's simply way
+to coarse, as was realised in the very early days of Linux.
+
+If only there was a way to interpolate between timer interrupts...
+which is exactly what arch_gettimeoffset() does, and is a historical
+reminant of the pre-clocksource/clockevent days of the kernel - but
+it is the only way to get better resolution from this sort of setup.
+
 -- 
-2.17.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
