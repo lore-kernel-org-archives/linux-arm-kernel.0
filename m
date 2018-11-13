@@ -1,14 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 13 Nov 2018 18:34:53 +0000 (GMT)
-Subject: Applied "spi: pxa2xx: Add ready signal" to the spi tree
-In-Reply-To: <20181113102228.820214-6-lkundrak@v3.sk>
-Message-ID: <20181113183454.099FD440079@finisterre.ee.mobilebroadband>
+Date: Tue, 13 Nov 2018 18:35:48 +0000 (GMT)
+Subject: Applied "spi: Deal with slaves that return from transfer_one()
+ unfinished" to the spi tree
+In-Reply-To: <20181113102228.820214-3-lkundrak@v3.sk>
+Message-ID: <20181113183548.ECDDF440079@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   spi: pxa2xx: Add ready signal
+   spi: Deal with slaves that return from transfer_one() unfinished
 
 has been applied to the spi tree at
 
@@ -33,78 +34,114 @@ to this mail.
 Thanks,
 Mark
 
->From 77d33897c68d56797a3201e06bdf10e2094a96d6 Mon Sep 17 00:00:00 2001
+>From 810923f3bf06c11022b7bb370dd3130a956a222e Mon Sep 17 00:00:00 2001
 From: Lubomir Rintel <lkundrak@v3.sk>
-Date: Tue, 13 Nov 2018 11:22:27 +0100
-Subject: [PATCH] spi: pxa2xx: Add ready signal
+Date: Tue, 13 Nov 2018 11:22:24 +0100
+Subject: [PATCH] spi: Deal with slaves that return from transfer_one()
+ unfinished
 
-Strobe a GPIO line when the slave TX FIFO is filled. This is how the
-Embedded Controller on an OLPC XO-1.75 machine, that happens to be a SPI
-master, learns that it can initiate a transaction.
+Some drivers, such as spi-pxa2xx return from the transfer_one callback
+immediately, idicating that the transfer will be finished asynchronously.
+
+Normally, spi_transfer_one_message() synchronously waits for the
+transfer to finish with wait_for_completion_timeout(). For slaves, we
+don't want the transaction to time out as it can complete in a long time
+in future. Use wait_for_completion_interruptible() instead.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Tested-by: Pavel Machek <pavel@ucw.cz>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/spi/spi-pxa2xx.c | 16 +++++++++++++++-
- drivers/spi/spi-pxa2xx.h |  3 +++
- 2 files changed, 18 insertions(+), 1 deletion(-)
+ drivers/spi/spi.c | 62 +++++++++++++++++++++++++++++------------------
+ 1 file changed, 39 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index a057c3be7e3b..69b221e34b2d 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -1081,6 +1081,11 @@ static int pxa2xx_spi_transfer_one(struct spi_controller *master,
- 	if (spi_controller_is_slave(master)) {
- 		while (drv_data->write(drv_data))
- 			;
-+		if (drv_data->gpiod_ready) {
-+			gpiod_set_value(drv_data->gpiod_ready, 1);
-+			udelay(1);
-+			gpiod_set_value(drv_data->gpiod_ready, 0);
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 6ca59406b0b7..498d3b9bf3ae 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1037,6 +1037,42 @@ static int spi_map_msg(struct spi_controller *ctlr, struct spi_message *msg)
+ 	return __spi_map_msg(ctlr, msg);
+ }
+ 
++static int spi_transfer_wait(struct spi_controller *ctlr,
++			     struct spi_message *msg,
++			     struct spi_transfer *xfer)
++{
++	struct spi_statistics *statm = &ctlr->statistics;
++	struct spi_statistics *stats = &msg->spi->statistics;
++	unsigned long long ms = 1;
++
++	if (spi_controller_is_slave(ctlr)) {
++		if (wait_for_completion_interruptible(&ctlr->xfer_completion)) {
++			dev_dbg(&msg->spi->dev, "SPI transfer interrupted\n");
++			return -EINTR;
 +		}
- 	}
- 
- 	/*
-@@ -1778,7 +1783,7 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
- 				if (PTR_ERR(gpiod) == -ENOENT)
- 					continue;
- 
--				status = (int)PTR_ERR(gpiod);
-+				status = PTR_ERR(gpiod);
- 				goto out_error_clock_enabled;
- 			} else {
- 				drv_data->cs_gpiods[i] = gpiod;
-@@ -1786,6 +1791,15 @@ static int pxa2xx_spi_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	if (platform_info->is_slave) {
-+		drv_data->gpiod_ready = devm_gpiod_get_optional(dev,
-+						"ready", GPIOD_OUT_LOW);
-+		if (IS_ERR(drv_data->gpiod_ready)) {
-+			status = PTR_ERR(drv_data->gpiod_ready);
-+			goto out_error_clock_enabled;
++	} else {
++		ms = 8LL * 1000LL * xfer->len;
++		do_div(ms, xfer->speed_hz);
++		ms += ms + 200; /* some tolerance */
++
++		if (ms > UINT_MAX)
++			ms = UINT_MAX;
++
++		ms = wait_for_completion_timeout(&ctlr->xfer_completion,
++						 msecs_to_jiffies(ms));
++
++		if (ms == 0) {
++			SPI_STATISTICS_INCREMENT_FIELD(statm, timedout);
++			SPI_STATISTICS_INCREMENT_FIELD(stats, timedout);
++			dev_err(&msg->spi->dev,
++				"SPI transfer timed out\n");
++			return -ETIMEDOUT;
 +		}
 +	}
 +
- 	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_active(&pdev->dev);
-diff --git a/drivers/spi/spi-pxa2xx.h b/drivers/spi/spi-pxa2xx.h
-index 513c53aaeab2..4e324da66ef7 100644
---- a/drivers/spi/spi-pxa2xx.h
-+++ b/drivers/spi/spi-pxa2xx.h
-@@ -64,6 +64,9 @@ struct driver_data {
- 
- 	/* GPIOs for chip selects */
- 	struct gpio_desc **cs_gpiods;
++	return 0;
++}
 +
-+	/* Optional slave FIFO ready signal */
-+	struct gpio_desc *gpiod_ready;
- };
+ /*
+  * spi_transfer_one_message - Default implementation of transfer_one_message()
+  *
+@@ -1050,7 +1086,6 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+ 	struct spi_transfer *xfer;
+ 	bool keep_cs = false;
+ 	int ret = 0;
+-	unsigned long long ms = 1;
+ 	struct spi_statistics *statm = &ctlr->statistics;
+ 	struct spi_statistics *stats = &msg->spi->statistics;
  
- struct chip_data {
+@@ -1079,28 +1114,9 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
+ 				goto out;
+ 			}
+ 
+-			if (ret > 0) {
+-				ret = 0;
+-				ms = 8LL * 1000LL * xfer->len;
+-				do_div(ms, xfer->speed_hz);
+-				ms += ms + 200; /* some tolerance */
+-
+-				if (ms > UINT_MAX)
+-					ms = UINT_MAX;
+-
+-				ms = wait_for_completion_timeout(&ctlr->xfer_completion,
+-								 msecs_to_jiffies(ms));
+-			}
+-
+-			if (ms == 0) {
+-				SPI_STATISTICS_INCREMENT_FIELD(statm,
+-							       timedout);
+-				SPI_STATISTICS_INCREMENT_FIELD(stats,
+-							       timedout);
+-				dev_err(&msg->spi->dev,
+-					"SPI transfer timed out\n");
+-				msg->status = -ETIMEDOUT;
+-			}
++			ret = spi_transfer_wait(ctlr, msg, xfer);
++			if (ret < 0)
++				msg->status = ret;
+ 		} else {
+ 			if (xfer->len)
+ 				dev_err(&msg->spi->dev,
 -- 
 2.19.1
