@@ -1,45 +1,83 @@
-From: elder@linaro.org (Alex Elder)
-Date: Tue, 13 Nov 2018 10:33:29 -0600
-Subject: [RFC PATCH 02/12] soc: qcom: ipa: DMA helpers
-In-Reply-To: <CAK8P3a3Hur9Kn=QLrn7XDn-Kpgfta1xTxvuwcBze4n2v7fsULw@mail.gmail.com>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-3-elder@linaro.org>
- <CAK8P3a3Hur9Kn=QLrn7XDn-Kpgfta1xTxvuwcBze4n2v7fsULw@mail.gmail.com>
-Message-ID: <7eaef6a8-9d12-31bb-43fb-e710ad171c0f@linaro.org>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Tue, 13 Nov 2018 17:50:37 +0100
+Subject: [PATCH v2] ARM: staging: bcm2835-audio: interpolate audio delay
+In-Reply-To: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
+References: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
+Message-ID: <s5h7ehgdiqq.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/7/18 6:17 AM, Arnd Bergmann wrote:
-> On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
->>
->> This patch includes code implementing the IPA DMA module, which
->> defines a structure to represent a DMA allocation for the IPA device.
->> It's used throughout the IPA code.
->>
->> Signed-off-by: Alex Elder <elder@linaro.org>
+On Sun, 11 Nov 2018 19:21:29 +0100,
+Mike Brady wrote:
 > 
-> I looked through all the users of this and couldn't fine one that actually
-> benefits from it. I'd say better drop this patch entirely and open-code
-> the contents in the callers. That will help readability since the dma
-> API is well understood by many people.
+>  /* hardware definition */
+>  static const struct snd_pcm_hardware snd_bcm2835_playback_hw = {
+>  	.info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
+>  		 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
+> -		 SNDRV_PCM_INFO_DRAIN_TRIGGER | SNDRV_PCM_INFO_SYNC_APPLPTR),
+> +		 SNDRV_PCM_INFO_BATCH | SNDRV_PCM_INFO_DRAIN_TRIGGER |
+> +		 SNDRV_PCM_INFO_SYNC_APPLPTR),
 
-Originally this was done to make it more obvious that all DMA allocations
-were done with the same device pointer.  Previously there were several
-separate devices, and it wasn't very obvious that only one was used (and
-required).  Now that we're past that it's not difficult to do as you suggest.
+As already mentioned, the addition of SNDRV_PCM_INFO_BATCH should be
+irrelevant with this change.  Please create another patch to add this
+and clarify it in the changelog.
 
-I have now done that, and in the process identified a few more ways to
-improve/simplify the code.  The net result is that more lines of code
-were removed than were present in "ipa_dma.[ch]".  I see that as a
-win (aside from your point below).
+> diff --git a/sound/core/pcm_lib.c b/sound/core/pcm_lib.c
+> index 4e6110d778bd..574df7d7a1fa 100644
+> --- a/sound/core/pcm_lib.c
+> +++ b/sound/core/pcm_lib.c
+> @@ -229,19 +229,38 @@ static void update_audio_tstamp(struct snd_pcm_substream *substream,
+>  		(runtime->audio_tstamp_report.actual_type ==
+>  			SNDRV_PCM_AUDIO_TSTAMP_TYPE_DEFAULT)) {
+>  
+> -		/*
+> -		 * provide audio timestamp derived from pointer position
+> -		 * add delay only if requested
+> -		 */
+> +		// provide audio timestamp derived from pointer position
+>  
+>  		audio_frames = runtime->hw_ptr_wrap + runtime->status->hw_ptr;
+>  
+> -		if (runtime->audio_tstamp_config.report_delay) {
+> +		/*
+> +		 * If the runtime->delay is greater than zero, it's a
+> +		 * genuine delay, e.g. a delay due to a hardware fifo.
+> +		 *
+> +		 * But if the runtime->delay is less than zero, it's an
+> +		 * interpolated estimate of the number of frames output
+> +		 * since the hardware pointer was last updated.
+> +		 *
+> +		 * It would be calculated in the pointer callback.
+> +		 * For example, for the bcm_2835 driver, it is calculated in
+> +		 * snd_bcm2835_pcm_pointer().
+> +		 */
+> +
+> +		if (runtime->delay < 0) {
+> +			// The delay is an interpolated estimate...
+>  			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+> -				audio_frames -=  runtime->delay;
+> -			else
+> -				audio_frames +=  runtime->delay;
+> +				audio_frames += runtime->delay;
+> +		} else {
+> +			// The delay is a real delay. Add it if requested.
+> +			if (runtime->audio_tstamp_config.report_delay) {
+> +				if (substream->stream ==
+> +				    SNDRV_PCM_STREAM_PLAYBACK)
+> +					audio_frames -=  runtime->delay;
+> +				else
+> +					audio_frames +=  runtime->delay;
+> +			}
+>  		}
 
-> Generally speaking, try not to wrap Linux interfaces into driver specific
-> helper functions.
+Well, honestly speaking, I'm really not fond of changing the PCM core
+just for this.
 
-Agreed.  Thanks a lot for your review.
+Can we make bcm audio driver providing the finer pointer update
+instead?  If we have a module option to disable that behavior, it's an
+enough excuse in case anyone really cares about the accuracy.
 
-					-Alex
 
-> 
->       Arnd
-> 
+thanks,
+
+Takashi
