@@ -1,46 +1,73 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 13 Nov 2018 14:05:53 +0100
-Subject: [PATCH 0/6] ARM: dts: rockchip: Add BQ Edison2 QuadCore tablet
-Message-ID: <20181113130559.31221-1-heiko@sntech.de>
+Date: Tue, 13 Nov 2018 14:05:58 +0100
+Subject: [PATCH 5/6] ARM: dts: rockchip: update cpu supplies on rk3188
+In-Reply-To: <20181113130559.31221-1-heiko@sntech.de>
+References: <20181113130559.31221-1-heiko@sntech.de>
+Message-ID: <20181113130559.31221-6-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a devicetree for the BQ Edison2 tablet from MundoReader.
-Incidentially this is the device I wanted to run mainline Linux
-on when starting the Rockchip port - thinking, "this can't take
-thaaat long" ;-) - so I've come somewhat full-circle now.
+From: Heiko Stuebner <heiko.stuebner@bq.com>
 
-With Lima it can also use gpu acceleration for gles2.
+cpu0-supply in cpu0 is deprecated, instead each cpu-core is supposed to
+list its supply separately. With the added cpu core phandles, update
+existing rk3188 boards accordingly.
 
-Notable absent peripherals are the touchscreen (ft5606),
-IT66121 hdmi bridge (internal panel is working nicely) and sound.
-All areas I'm still trying to get working.
+Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
+---
+ arch/arm/boot/dts/rk3188-px3-evb.dts   | 14 +++++++++++++-
+ arch/arm/boot/dts/rk3188-radxarock.dts | 14 +++++++++++++-
+ 2 files changed, 26 insertions(+), 2 deletions(-)
 
-The series includes some smallish cleanups before the board
-with cleaning up the cpu-core nodes being a big part.
-
-And there are a number of driver-side additions pending that
-should get accepted before the board itself can go in.
-(bq24196, Innolux panel, tmp108-interrupt).
-
-
-Heiko Stuebner (6):
-  ARM: dts: rockchip: add #sound-dai-cells to Cortex-A9 i2s
-  ARM: dts: rockchip: convert rk3188 to opp-v2
-  ARM: dts: rockchip: add cpu-core resets for rk3188
-  ARM: dts: rockchip: add phandles to secondary cpu cores
-  ARM: dts: rockchip: update cpu supplies on rk3188
-  ARM: dts: rockchip: add BQ Edison 2 QC devicetree
-
- .../devicetree/bindings/arm/rockchip.txt      |   4 +
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/rk3066a.dtsi                |   3 +
- arch/arm/boot/dts/rk3188-bqedison2qc.dts      | 711 ++++++++++++++++++
- arch/arm/boot/dts/rk3188-px3-evb.dts          |  14 +-
- arch/arm/boot/dts/rk3188-radxarock.dts        |  14 +-
- arch/arm/boot/dts/rk3188.dtsi                 |  66 +-
- 7 files changed, 797 insertions(+), 16 deletions(-)
- create mode 100644 arch/arm/boot/dts/rk3188-bqedison2qc.dts
-
+diff --git a/arch/arm/boot/dts/rk3188-px3-evb.dts b/arch/arm/boot/dts/rk3188-px3-evb.dts
+index 375129b62102..9ae65c767c90 100644
+--- a/arch/arm/boot/dts/rk3188-px3-evb.dts
++++ b/arch/arm/boot/dts/rk3188-px3-evb.dts
+@@ -44,7 +44,19 @@
+ };
+ 
+ &cpu0 {
+-	cpu0-supply = <&vdd_cpu>;
++	cpu-supply = <&vdd_cpu>;
++};
++
++&cpu1 {
++	cpu-supply = <&vdd_cpu>;
++};
++
++&cpu2 {
++	cpu-supply = <&vdd_cpu>;
++};
++
++&cpu3 {
++	cpu-supply = <&vdd_cpu>;
+ };
+ 
+ &emmc {
+diff --git a/arch/arm/boot/dts/rk3188-radxarock.dts b/arch/arm/boot/dts/rk3188-radxarock.dts
+index 0e5e4cf3d84c..9175b58c244a 100644
+--- a/arch/arm/boot/dts/rk3188-radxarock.dts
++++ b/arch/arm/boot/dts/rk3188-radxarock.dts
+@@ -153,7 +153,19 @@
+ };
+ 
+ &cpu0 {
+-	cpu0-supply = <&vdd_arm>;
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu1 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu2 {
++	cpu-supply = <&vdd_arm>;
++};
++
++&cpu3 {
++	cpu-supply = <&vdd_arm>;
+ };
+ 
+ &gpu {
 -- 
 2.18.0
