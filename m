@@ -1,48 +1,57 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 13 Nov 2018 16:46:20 +0530
-Subject: [PATCH v4 13/26] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
- overhead
+Date: Tue, 13 Nov 2018 16:46:17 +0530
+Subject: [PATCH v4 10/26] drm/sun4i: sun6i_mipi_dsi: Refactor vertical video
+ start delay
 In-Reply-To: <20181113111633.20189-1-jagan@amarulasolutions.com>
 References: <20181113111633.20189-1-jagan@amarulasolutions.com>
-Message-ID: <20181113111633.20189-14-jagan@amarulasolutions.com>
+Message-ID: <20181113111633.20189-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 10 bytes packet overhead for hblk where blank is set using
-a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
+Video start delay can be computed by subtracting total vertical
+timing with front porch timing and with adding 1 delay line for TCON.
 
-This is according to BSP code from BPI-M64-bsp (from linux-sunxi/
+BSP code form BPI-M64-bsp is computing video start delay as
+(from linux-sunxi/
 drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 
-dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
+u32 vfp = panel->lcd_vt - panel->lcd_y - panel->lcd_vbp;
+=> (panel->lcd_vt) - panel->lcd_y - (panel->lcd_vbp)
+=> (timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y)
+   - panel->lcd_y - (panel->lcd_vbp)
+=> timmings->ver_front_porch + panel->lcd_vbp + panel->lcd_y
+  			     - panel->lcd_y - panel->lcd_vbp
+=> timmings->ver_front_porch
 
-So, add 10 bytes packet overhead for DSI hblk.
-
-Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+So, update the start delay computation accordingly.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index cd657ac4bdae..1a3cdd5b72a0 100644
+index fc4252d96c38..f6e3df8d2490 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+@@ -358,7 +358,17 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ 					   struct drm_display_mode *mode)
+ {
+-	return mode->vtotal - (mode->vsync_end - mode->vdisplay) + 1;
++	u32 vfp = mode->vsync_start - mode->vdisplay;
++	u32 start_delay;
++
++	start_delay = mode->vtotal - vfp + 1;
++	if (start_delay > mode->vtotal)
++		start_delay -= mode->vtotal;
++
++	if (!start_delay)
++		start_delay = 1;
++
++	return start_delay;
+ }
  
- 	/*
- 	 * hblk seems to be the line + porches length.
-+	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
-+	 * payload + 2 bytes). So minimal size is 10 bytes
- 	 */
--	hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
-+#define HBLK_PACKET_OVERHEAD	10
-+	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
-+		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) *
-+		   Bpp - HBLK_PACKET_OVERHEAD);
- 
- 	/*
- 	 * And I'm not entirely sure what vblk is about. The driver in
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
