@@ -1,164 +1,153 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Nov 2018 09:24:12 +0100
-Subject: [PATCH 0/5] media: Allwinner A10 CSI support
-Message-ID: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+Date: Tue, 13 Nov 2018 09:24:17 +0100
+Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+In-Reply-To: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+Message-ID: <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 98 +++++++++++++++++++++++++-
+ 1 file changed, 98 insertions(+)
 
-Here is a series introducing the support for the A10 (and SoCs of the same
-generation) CMOS Sensor Interface (called CSI, not to be confused with
-MIPI-CSI, which isn't support by that IP).
-
-That interface is pretty straightforward, but the driver has a few issues
-that I wanted to bring up:
-
-  * The only board I've been testing this with has an ov5640 sensor
-    attached, which doesn't work with the upstream driver. Copying the
-    Allwinner init sequence works though, and this is how it has been
-    tested. Testing with a second sensor would allow to see if it's an
-    issue on the CSI side or the sensor side.
-  * When starting a capture, the last buffer to capture will fail due to
-    double buffering being used, and we don't have a next buffer for the
-    last frame. I'm not sure how to deal with that though. It seems like
-    some drivers use a scratch buffer in such a case, some don't care, so
-    I'm not sure which solution should be preferred.
-  * We don't have support for the ISP at the moment, but this can be added
-    eventually.
-
-  * How to model the CSI module clock isn't really clear to me. It looks
-    like it goes through the CSI controller and then is muxed to one of the
-    CSI pin so that it can clock the sensor. I'm not quite sure how to
-    model it, if it should be a clock, the CSI driver being a clock
-    provider, or if the sensor should just use the module clock directly.
-
-Here is the v4l2-compliance output:
-v4l2-compliance SHA   : 339d550e92ac15de8668f32d66d16f198137006c
-
-Driver Info:
-	Driver name   : sun4i_csi
-	Card type     : sun4i-csi
-	Bus info      : platform:1c09000.csi
-	Driver version: 4.19.0
-	Capabilities  : 0x84201000
-		Video Capture Multiplanar
-		Streaming
-		Extended Pix Format
-		Device Capabilities
-	Device Caps   : 0x04201000
-		Video Capture Multiplanar
-		Streaming
-		Extended Pix Format
-
-Compliance test for device /dev/video0 (not using libv4l2):
-
-Required ioctls:
-	test VIDIOC_QUERYCAP: OK
-
-Allow for multiple opens:
-	test second video open: OK
-	test VIDIOC_QUERYCAP: OK
-	test VIDIOC_G/S_PRIORITY: OK
-	test for unlimited opens: OK
-
-Debug ioctls:
-	test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
-	test VIDIOC_LOG_STATUS: OK (Not Supported)
-
-Input ioctls:
-	test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
-	test VIDIOC_ENUMAUDIO: OK (Not Supported)
-	test VIDIOC_G/S/ENUMINPUT: OK
-	test VIDIOC_G/S_AUDIO: OK (Not Supported)
-	Inputs: 1 Audio Inputs: 0 Tuners: 0
-
-Output ioctls:
-	test VIDIOC_G/S_MODULATOR: OK (Not Supported)
-	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
-	test VIDIOC_ENUMAUDOUT: OK (Not Supported)
-	test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
-	test VIDIOC_G/S_AUDOUT: OK (Not Supported)
-	Outputs: 0 Audio Outputs: 0 Modulators: 0
-
-Input/Output configuration ioctls:
-	test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
-	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
-	test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
-	test VIDIOC_G/S_EDID: OK (Not Supported)
-
-Test input 0:
-
-	Control ioctls:
-		test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
-		test VIDIOC_QUERYCTRL: OK (Not Supported)
-		test VIDIOC_G/S_CTRL: OK (Not Supported)
-		test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
-		test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
-		test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
-		Standard Controls: 0 Private Controls: 0
-
-	Format ioctls:
-		test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
-		test VIDIOC_G/S_PARM: OK (Not Supported)
-		test VIDIOC_G_FBUF: OK (Not Supported)
-		test VIDIOC_G_FMT: OK
-		test VIDIOC_TRY_FMT: OK
-		test VIDIOC_S_FMT: OK
-		test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
-		test Cropping: OK (Not Supported)
-		test Composing: OK (Not Supported)
-		test Scaling: OK
-
-	Codec ioctls:
-		test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
-		test VIDIOC_G_ENC_INDEX: OK (Not Supported)
-		test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
-
-	Buffer ioctls:
-		test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
-		test VIDIOC_EXPBUF: OK
-
-Test input 0:
-
-Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (5):
-  dt-bindings: media: Add Allwinner A10 CSI binding
-  media: sunxi: Refactor the Makefile and Kconfig
-  media: sunxi: Add A10 CSI driver
-  ARM: dts: sun7i: Add CSI0 controller
-  DO NOT MERGE: ARM: dts: bananapi: Add Camera support
-
- Documentation/devicetree/bindings/media/sun4i-csi.txt |  71 ++-
- arch/arm/boot/dts/sun7i-a20-bananapi.dts              |  98 +++-
- arch/arm/boot/dts/sun7i-a20.dtsi                      |  13 +-
- drivers/media/platform/Kconfig                        |   2 +-
- drivers/media/platform/Makefile                       |   2 +-
- drivers/media/platform/sunxi/Kconfig                  |   2 +-
- drivers/media/platform/sunxi/Makefile                 |   2 +-
- drivers/media/platform/sunxi/sun4i-csi/Kconfig        |  12 +-
- drivers/media/platform/sunxi/sun4i-csi/Makefile       |   5 +-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c    | 275 ++++++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h    | 137 ++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c    | 383 +++++++++++-
- drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c   | 287 ++++++++-
- 13 files changed, 1287 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/media/sun4i-csi.txt
- create mode 100644 drivers/media/platform/sunxi/Kconfig
- create mode 100644 drivers/media/platform/sunxi/Makefile
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Kconfig
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Makefile
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c
- create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c
-
-base-commit: 94517eaa3d43005472864615dfd17f1ef6ca3935
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index 70dfc4ac0bb5..18dbff9f1ce9 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -54,6 +54,9 @@
+ 	compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
+ 
+ 	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
+ 		serial0 = &uart0;
+ 		serial1 = &uart3;
+ 		serial2 = &uart7;
+@@ -63,6 +66,41 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	reg_cam: cam {
++		compatible = "regulator-fixed";
++		regulator-name = "cam";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		vin-supply = <&reg_vcc5v0>;
++		gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		regulator-always-on;
++	};
++
++        reg_cam_avdd: cam-avdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-avdd";
++                regulator-min-microvolt = <2800000>;
++                regulator-max-microvolt = <2800000>;
++                vin-supply = <&reg_cam>;
++        };
++
++        reg_cam_dovdd: cam-dovdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-dovdd";
++                regulator-min-microvolt = <1800000>;
++                regulator-max-microvolt = <1800000>;
++                vin-supply = <&reg_cam>;
++        };
++
++        reg_cam_dvdd: cam-dvdd {
++                compatible = "regulator-fixed";
++                regulator-name = "cam500b-dvdd";
++                regulator-min-microvolt = <1500000>;
++                regulator-max-microvolt = <1500000>;
++                vin-supply = <&reg_cam>;
++        };
++
+ 	hdmi-connector {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -120,6 +158,27 @@
+ 		>;
+ };
+ 
++&csi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&csi0_pins_a>;
++	status = "okay";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		csi_from_ov5640: endpoint {
++                        remote-endpoint = <&ov5640_to_csi>;
++                        bus-width = <8>;
++                        data-shift = <2>;
++                        hsync-active = <1>; /* Active high */
++                        vsync-active = <0>; /* Active low */
++                        data-active = <1>;  /* Active high */
++                        pclk-sample = <1>;  /* Rising */
++                };
++	};
++};
++
+ &de {
+ 	status = "okay";
+ };
+@@ -167,6 +226,39 @@
+ 	};
+ };
+ 
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++
++	camera: camera at 21 {
++		compatible = "ovti,ov5640";
++		reg = <0x21>;
++                clocks = <&ccu CLK_CSI0>;
++                clock-names = "xclk";
++		assigned-clocks = <&ccu CLK_CSI0>;
++		assigned-clock-rates = <24000000>;
++
++                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
++                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
++                AVDD-supply = <&reg_cam_avdd>;
++                DOVDD-supply = <&reg_cam_dovdd>;
++                DVDD-supply = <&reg_cam_dvdd>;
++
++                port {
++                        ov5640_to_csi: endpoint {
++                                remote-endpoint = <&csi_from_ov5640>;
++                                bus-width = <8>;
++                                data-shift = <2>;
++                                hsync-active = <1>; /* Active high */
++                                vsync-active = <0>; /* Active low */
++                                data-active = <1>;  /* Active high */
++                                pclk-sample = <1>;  /* Rising */
++                        };
++                };
++	};
++};
++
+ &i2c2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c2_pins_a>;
+@@ -252,6 +344,12 @@
+ 		"IO-6", "IO-3", "IO-2", "IO-0", "", "", "", "",
+ 		"", "", "", "", "", "", "", "";
+ 
++	csi0_pins_a: csi_pins_a at 0 {
++		pins = "PE0", "PE1", "PE2", "PE3", "PE4", "PE5",
++		       "PE6", "PE7", "PE8", "PE9", "PE10", "PE11";
++		function = "csi0";
++	};
++
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		pins = "PH4";
+ 		function = "gpio_in";
 -- 
 git-series 0.9.1
