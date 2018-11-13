@@ -1,84 +1,55 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Nov 2018 11:02:30 -0800
-Subject: [PATCH] ARM: stm32: debug: add low-level debug support
-In-Reply-To: <94666165-f206-5472-c848-499ba52cd354@st.com>
-References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
- <1501174209-27550-2-git-send-email-bich.hemon@st.com>
- <20181112182236.s7cs6dol4dmxkp7u@localhost>
- <f244c67b-de86-b0e7-7283-7b27f9591cf9@st.com>
- <20181113092422.GJ30658@n2100.armlinux.org.uk>
- <94666165-f206-5472-c848-499ba52cd354@st.com>
-Message-ID: <CAOesGMgBdzYthdoWzzSFqOHOfCyY_9jZBkDSpLtkWeVdOkLkTQ@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 13 Nov 2018 13:14:15 -0600
+Subject: [PATCH v3] cpufreq: ti-cpufreq: Only register platform_device
+ when supported
+In-Reply-To: <20181113175853.GN13311@localhost>
+References: <20181113173912.27643-1-d-gerlach@ti.com>
+ <20181113175853.GN13311@localhost>
+Message-ID: <c93fb7a9-88ad-d634-18ff-088d146637ce@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take a look at the patch I merged, and please follow up with any patch
-to fixup any issue you find with it.
+On 11/13/2018 11:58 AM, Johan Hovold wrote:
+> On Tue, Nov 13, 2018 at 11:39:12AM -0600, Dave Gerlach wrote:
+>> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+>> the driver to probe on any platforms where the driver is built in.
+>> However, this should only happen on platforms that actually can make use
+>> of the driver. There is already functionality in place to match the
+>> SoC compatible so let's factor this out into a separate call and
+>> make sure we find a match before creating the ti-cpufreq platform device.
+>>
+>> Reviewed-by: Johan Hovold <johan@kernel.org>
+>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+>> ---
+>> v2->v3: Use platform_device_register_resndata to pass match data to probe to
+>> 	to avoid matching again in probe.
+>>
+>> 	v2: https://patchwork.kernel.org/patch/10574535/
+>>
+> 
+>>  static int ti_cpufreq_init(void)
+>>  {
+>> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
+>> +	const struct of_device_id *match;
+>> +
+>> +	/* Check to ensure we are on a compatible platform */
+>> +	match = ti_cpufreq_match_node();
+>> +	if (match)
+>> +		platform_device_register_resndata(NULL, "ti-cpufreq", -1, NULL,
+>> +						  0, match,
+>> +						  sizeof(*match));
+> 
+> platform_device_register_data()?
 
-As mentioned in my original email, I tried to consolidate the two
-versions, so a look-through and follow up with fixes would be
-appreciated. Thanks!
+Whoops yeah that's a bit more concise, v4 incoming.
 
+Regards,
+Dave
 
--Olof
-
-On Tue, Nov 13, 2018 at 2:17 AM Bich HEMON <bich.hemon@st.com> wrote:
->
->
->
-> On 11/13/18 10:24 AM, Russell King - ARM Linux wrote:
-> > On Tue, Nov 13, 2018 at 09:16:16AM +0000, Bich HEMON wrote:
-> >>
-> >> On 11/12/18 7:22 PM, Olof Johansson wrote:
-> >>> On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
-> >>>> From: Gerald Baeza <gerald.baeza@st.com>
-> >>>>
-> >>>> This adds low-level debug support on USART1 for STM32F4
-> >>>> and STM32F7.
-> >>>> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
-> >>>> Enabled via 'earlyprintk' in bootargs.
-> >>>>
-> >>>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
-> >>>> Signed-off-by: Bich Hemon <bich.hemon@st.com>
-> >>>
-> >>> Hi,
-> >>>
-> >>> This had fallen between the chairs it seems. I have applied it to arm-soc
-> >>> next/soc now, for 4.21 merge window.
-> >>>
-> >>> It ended up being patched up manually to consolidate the version in
-> >>> Russell's patch tracker with this posted version, and I tweaked whitespace
-> >>> a bit. Let me know if I missed something.
-> >>>
-> >>>
-> >>> Thanks,
-> >>>
-> >>> -Olof
-> >>>
-> >>
-> >> Hi Olof,
-> >>
-> >> Please note that this patch has to be abandoned as Ludovic BARRE pushed
-> >> a new version of this change:
-> >> https://patchwork.codeaurora.org/patch/400563/
-> >>
-> >> You can find it in Russell's tracker here:
-> >> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8803/1
-> >
-> > And I'm not going to merge that because:
-> >
-> > 1) it's not for me to merge - it doesn't go through my tree, but through
-> >     arm-soc, which Olof and Arnd manage.
-> > 2) it's not been on the mailing list as per normal submission process.
-> >
-> > Sorry.
-> >
->
-> Ok, thank you for the feedback.
->
-> So Olof, can you please ignore my previous email and merge my patch as
-> you proposed it for 4.21. Ludovic's patch will be abandoned instead.
->
-> Thanks,
->
-> Bich
+> 
+>>  	return 0;
+>>  }
+>>  module_init(ti_cpufreq_init);
+> 
+> Johan
+> 
