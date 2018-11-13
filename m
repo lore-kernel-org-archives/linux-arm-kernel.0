@@ -1,104 +1,55 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 13 Nov 2018 08:12:35 -0500
-Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
-In-Reply-To: <20181113063225.GA3109@brain-police>
-References: <20180927224609.19515-1-robdclark@gmail.com>
- <20181029191000.GD16739@arm.com>
- <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
- <20181113063225.GA3109@brain-police>
-Message-ID: <CAF6AEGuV2zh97iq+TgkRw0bK3VNSxJieD1N2KMW3N28h07M+0w@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 13 Nov 2018 14:26:58 +0100
+Subject: [PATCH v4 03/26] clk: sunxi-ng: Add check for maximum rate to
+ NKM PLLs
+In-Reply-To: <20181113111633.20189-4-jagan@amarulasolutions.com>
+References: <20181113111633.20189-1-jagan@amarulasolutions.com>
+ <20181113111633.20189-4-jagan@amarulasolutions.com>
+Message-ID: <20181113132658.niwy6bqdqzaeqpv2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 1:32 AM Will Deacon <will.deacon@arm.com> wrote:
->
-> On Fri, Nov 09, 2018 at 01:01:55PM -0500, Rob Clark wrote:
-> > On Mon, Oct 29, 2018 at 3:09 PM Will Deacon <will.deacon@arm.com> wrote:
-> > > On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
-> > > > We seem to need to set either this or CFCFG (stall), otherwise gpu
-> > > > faults trigger problems with other in-flight transactions from the
-> > > > GPU causing CP errors, etc.
-> > > >
-> > > > In the ARM SMMU spec, the 'Hit under previous context fault' bit is
-> > > > described as:
-> > > >
-> > > >  '0' - Stall or terminate subsequent transactions in the presence
-> > > >        of an outstanding context fault
-> > > >  '1' - Process all subsequent transactions independently of any
-> > > >        outstanding context fault.
-> > > >
-> > > > Since we don't enable CFCFG (stall) the behavior of terminating
-> > > > other transactions makes sense.  And is probably not what we want
-> > > > (and definately not what we want for GPU).
-> > > >
-> > > > Signed-off-by: Rob Clark <robdclark@gmail.com>
-> > > > ---
-> > > > So I hit this issue a long time back on 820 (msm8996) and at the
-> > > > time I solved it with a patch that enabled CFCFG.  And it resurfaced
-> > > > more recently on sdm845.  But at the time CFCFG was rejected, iirc
-> > > > because of concern that it would cause problems on other non-qcom
-> > > > arm smmu implementations.  And I think I forgot to send this version
-> > > > of the solution.
-> > > >
-> > > > If enabling HUPCF is anticipated to cause problems on other ARM
-> > > > SMMU implementations, I think I can come up with a variant of this
-> > > > patch which conditionally enables it for snapdragon.
-> > > >
-> > > > Either way, I'd really like to get some variant of this fix merged
-> > > > (and probably it would be a good idea for stable kernel branches
-> > > > too), since current behaviour with the GPU means faults turn into
-> > > > a fantastic cascade of fail.
-> > >
-> > > Can you describe how this fantastic cascade of fail improves with this
-> > > patch, please? If you're getting context faults then something has already
-> > > gone horribly wrong, so I'm trying to work out how this improves things.
-> > >
-> >
-> > There are plenty of cases where getting iommu faults with a GPU is
-> > "normal", or at least not something the kernel or even GL driver can
-> > control.
->
-> Such as? All the mainline driver does is print a diagnostic and clear the
-> fault, which doesn't seem generally useful.
+On Tue, Nov 13, 2018 at 04:46:10PM +0530, Jagan Teki wrote:
+> Some NKM PLLs, frequency can be set above PLL working range.
+> 
+> Add a constraint for maximum supported rate. This way, drivers can
+> specify which is maximum allowed rate for PLL.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Acked-by: Stephen Boyd <sboyd@kernel.org>
 
-it is useful to debug the fault ;-)
+As Vasily reported on a previous version, this should be squashed with
+the patch 2.
 
-Although eventually we'll want to be able to do more than that, like
-have the fault trigger bringing in pages of a mmap'd file and that
-sort of thing.
+> ---
+>  drivers/clk/sunxi-ng/ccu_nkm.c | 3 +++
+>  drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
+>  2 files changed, 4 insertions(+)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+> index 6b5ad990f802..b8b66cdd30bf 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+> @@ -128,6 +128,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+>  	if (rate < nkm->min_rate)
+>  		return nkm->min_rate;
+>  
+> +	if (nkm->max_rate && rate > nkm->max_rate)
+> +		return nkm->max_rate;
+> +
 
-> > With this patch, you still get the iommu fault, but it doesn't cause
-> > the gpu to crash.  But without it, other memory accesses in flight
-> > while the fault occurs, like the GPU command-processor reading further
-> > ahead in the cmdstream to setup next draw, would return zero's,
-> > causing the GPU to crash or get into a bad state.
->
-> I get that part, but I don't understand why we're seeing faults in the first
-> place and I worry that this patch is just the tip of the iceberg. It's also
-> not clear that processing subsequent transactions is always the right thing
-> to do in a world where we actually want to report (and handle) synchronous
-> faults from devices.
+I would expect the test to be the same for the minimum and maximum cases.
 
-Sure, it is a bug.. but it can be an application bug that is not
-something the userspace GL driver or kernel could do anything about.
-We shouldn't let this kill the GPU.  If the application didn't have
-this much control, we wouldn't need an IOMMU in the first place[1].
-With opencl compute, the userspace controlled shader has full blown
-pointers to GPU memory.
+Maxime
 
-And even in cases where it is a userspace GL driver bug, having some
-robustness to not completely kill the GPU makes debugging much easier.
-Something I do a lot when bringing up support for a new generation of
-GPU.
-
-I'm having a hard time understanding your objection to this.
-Returning zero's for non-faulting transactions is a *really bad idea*.
-
-BR,
--R
-
-
-[1] yes, vc4 did without an IOMMU.. but it also had to do some fairly
-complex shader analysis in the kernel, and it was restricted to gles2
-feature set, so no real flow control, and no memory access beyond
-texture fetch.
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181113/1217c715/attachment.sig>
