@@ -1,53 +1,37 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Nov 2018 14:35:18 +0100
-Subject: [PATCH v12 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <1540886988-27696-1-git-send-email-yong.deng@magewell.com>
-References: <1540886988-27696-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <20181113133518.6nnh4m37s6awfw6d@flea>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Tue, 13 Nov 2018 14:37:08 +0100
+Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
+In-Reply-To: <CAOMZO5CjFt1dyu8KOK+jKd88x8hwGNy9aJ-sGgooS9970TGTVQ@mail.gmail.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+ <CAOMZO5CjFt1dyu8KOK+jKd88x8hwGNy9aJ-sGgooS9970TGTVQ@mail.gmail.com>
+Message-ID: <9a9616d2-a189-bd0e-e2e6-f84bdcb1dfd1@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
-
-On Tue, Oct 30, 2018 at 04:09:48PM +0800, Yong Deng wrote:
-> I can't make v4l2-compliance always happy.
-> The V3s CSI support many pixformats. But they are not always available.
-> It's dependent on the input bus format (MEDIA_BUS_FMT_*). 
-> Example:
-> V4L2_PIX_FMT_SBGGR8: MEDIA_BUS_FMT_SBGGR8_1X8
-> V4L2_PIX_FMT_YUYV: MEDIA_BUS_FMT_YUYV8_2X8
-> But I can't get the subdev's format code before starting stream as the
-> subdev may change it. So I can't know which pixformats are available.
-> So I exports all the pixformats supported by SoC.
-> The result is the app (v4l2-compliance) is likely to fail on streamon.
+On 11/13/18 13:48, Fabio Estevam wrote:
+> On Tue, Nov 13, 2018 at 6:25 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 > 
-> This patchset add initial support for Allwinner V3s CSI.
+>> --- /dev/null
+>> +++ b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
+>> @@ -0,0 +1,275 @@
+>> +// SPDX-License-Identifier: GPL-2.0-or-later
 > 
-> Allwinner V3s SoC features a CSI module with parallel interface.
+> According to Documentation/process/license-rules.rst this should be:
 > 
-> This patchset implement a v4l2 framework driver and add a binding 
-> documentation for it. 
+> +// SPDX-License-Identifier: GPL-2.0+
+> 
+> Same applies to other places in this patch.
+> 
 
-I've tested this version today, and I needed this patch to make it
-work on top of v4.20:
-http://code.bulix.org/9o8fw5-503690?raw
+Actually, LICENSES/preferred/GPL-2.0 has GPL-2.0-or-later
+as a valid license:
 
-Once that patch applied, my tests were working as expected.
+Valid-License-Identifier: GPL-2.0-or-later
 
-If that make sense, could you resubmit a new version with these merged
-so that we can try to target 4.21?
+Personally I very much prefer GPL-2.0-or-later since I think it is
+much clearer.
 
-Thanks!
-Maxime
+Regards,
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181113/4cf77f66/attachment.sig>
+	Hans
