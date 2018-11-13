@@ -1,32 +1,85 @@
-From: joe@perches.com (Joe Perches)
-Date: Tue, 13 Nov 2018 07:19:37 -0800
-Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
-In-Reply-To: <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
- <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
-Message-ID: <71d315a34e4b12b0eb1d4c9003b297e46695f9cf.camel@perches.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 13 Nov 2018 16:20:46 +0100
+Subject: [PATCH] arm64: Make kpti command line options x86 compatible
+Message-ID: <20181113152046.22389-1-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-11-13 at 13:24 +0100, Hans Verkuil wrote:
-> On 11/13/18 09:24, Maxime Ripard wrote:
-> > The older CSI drivers have camera capture interface different from the one
-> > in the newer ones.
-[]
-> > diff --git a/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
-[]
-> > +	// Videobuf2
-> 
-> Doesn't checkpatch.pl --strict complain about the use of '//'?
+I've already stumbled over 2 cases where people got confused about how to
+disable kpti on AArch64. In both cases, they used existing x86_64 options
+and just applied that to an AArch64 system, expecting it to work.
 
-No, not since
+I think it makes a lot of sense to have compatible kernel command line
+parameters whenever we can have them be compatible.
 
-commit dadf680de3c2eb4cba9840619991eda0cfe98778
-Author: Joe Perches <joe@perches.com>
-Date:   Tue Aug 2 14:04:33 2016 -0700
+So this patch adds the pti= and no_pti kernel command line options, mapping
+them into the existing kpti= command line framework. It preserves the old
+syntax to maintain compatibility with older command lines.
 
-    checkpatch: allow c99 style // comments
-    
-    Sanitise the lines that contain c99 comments so that the error doesn't
-    get emitted.
+While at it, the patch also marks the respective options as dual-arch.
+
+Reported-by: Richard Brown <rbrown@suse.de>
+Signed-off-by: Alexander Graf <agraf@suse.de>
+---
+ Documentation/admin-guide/kernel-parameters.txt |  6 +++---
+ arch/arm64/kernel/cpufeature.c                  | 15 ++++++++++++++-
+ 2 files changed, 17 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 81d1d5a74728..4a1c6bcfcdb5 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -3522,8 +3522,8 @@
+ 	pt.		[PARIDE]
+ 			See Documentation/blockdev/paride.txt.
+ 
+-	pti=		[X86_64] Control Page Table Isolation of user and
+-			kernel address spaces.  Disabling this feature
++	pti=		[X86_64,ARM64] Control Page Table Isolation of user
++			and kernel address spaces.  Disabling this feature
+ 			removes hardening, but improves performance of
+ 			system calls and interrupts.
+ 
+@@ -3534,7 +3534,7 @@
+ 
+ 			Not specifying this option is equivalent to pti=auto.
+ 
+-	nopti		[X86_64]
++	nopti		[X86_64,ARM64]
+ 			Equivalent to pti=off
+ 
+ 	pty.legacy_count=
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index af50064dea51..12bb3b0470dd 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -978,13 +978,26 @@ static int __init parse_kpti(char *str)
+ 	bool enabled;
+ 	int ret = strtobool(str, &enabled);
+ 
+-	if (ret)
++	if (ret) {
++		if (!strncmp(str, "auto", 4)) {
++			__kpti_forced = 0;
++			return 0;
++		}
+ 		return ret;
++	}
+ 
+ 	__kpti_forced = enabled ? 1 : -1;
+ 	return 0;
+ }
+ early_param("kpti", parse_kpti);
++early_param("pti", parse_kpti);
++
++static int __init handle_no_pti(char *p)
++{
++	__kpti_forced = -1;
++	return 0;
++}
++early_param("nopti", parse_no_pti);
+ #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
+-- 
+2.12.3
