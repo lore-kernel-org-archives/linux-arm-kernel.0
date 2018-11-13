@@ -1,39 +1,82 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 13 Nov 2018 17:33:00 +0000
-Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
-In-Reply-To: <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
-References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
- <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
- <20181108093617.GB8433@e107155-lin>
- <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
-Message-ID: <20181113173300.GA8432@e107533-lin>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Tue, 13 Nov 2018 11:39:12 -0600
+Subject: [PATCH v3] cpufreq: ti-cpufreq: Only register platform_device when
+ supported
+Message-ID: <20181113173912.27643-1-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 09:57:27AM +0100, Arnd Bergmann wrote:
-> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >
-> > On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
-> > > Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
-> > > dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
-> > >
-> >
-> > Looks good,
-> >
-> > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> >
-> > But I left it intentionally to avoid churn assuming it will go away when
-> > ARM SoC team runs savedefconfig and sync the defconfig.
->
-> I would never do that, instead I want patches like the one that Marc sent
-> in order to make sure we don't accidentally drop anything that is still
-> required, e.g. when an option got renamed or gained a dependency.
->
-Thanks for the clarification. I must have misunderstood what's done in
-Commit c432c0880596 ("arm64: defconfig: renormalize based on recent additions")
-I assume it was just the reordering rather than addition/removal of entries.
-It's not so clear from the log message.
+Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+the driver to probe on any platforms where the driver is built in.
+However, this should only happen on platforms that actually can make use
+of the driver. There is already functionality in place to match the
+SoC compatible so let's factor this out into a separate call and
+make sure we find a match before creating the ti-cpufreq platform device.
 
---
-Regards,
-Sudeep
+Reviewed-by: Johan Hovold <johan@kernel.org>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+v2->v3: Use platform_device_register_resndata to pass match data to probe to
+	to avoid matching again in probe.
+
+	v2: https://patchwork.kernel.org/patch/10574535/
+
+ drivers/cpufreq/ti-cpufreq.c | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+index 3f0e2a14895a..2f97a4b38bad 100644
+--- a/drivers/cpufreq/ti-cpufreq.c
++++ b/drivers/cpufreq/ti-cpufreq.c
+@@ -201,19 +201,28 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+ 	{},
+ };
+ 
++static const struct of_device_id *ti_cpufreq_match_node(void)
++{
++	struct device_node *np;
++	const struct of_device_id *match;
++
++	np = of_find_node_by_path("/");
++	match = of_match_node(ti_cpufreq_of_match, np);
++	of_node_put(np);
++
++	return match;
++}
++
+ static int ti_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	u32 version[VERSION_COUNT];
+-	struct device_node *np;
+ 	const struct of_device_id *match;
+ 	struct opp_table *ti_opp_table;
+ 	struct ti_cpufreq_data *opp_data;
+ 	const char * const reg_names[] = {"vdd", "vbb"};
+ 	int ret;
+ 
+-	np = of_find_node_by_path("/");
+-	match = of_match_node(ti_cpufreq_of_match, np);
+-	of_node_put(np);
++	match = dev_get_platdata(&pdev->dev);
+ 	if (!match)
+ 		return -ENODEV;
+ 
+@@ -290,7 +299,15 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+ 
+ static int ti_cpufreq_init(void)
+ {
+-	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
++	const struct of_device_id *match;
++
++	/* Check to ensure we are on a compatible platform */
++	match = ti_cpufreq_match_node();
++	if (match)
++		platform_device_register_resndata(NULL, "ti-cpufreq", -1, NULL,
++						  0, match,
++						  sizeof(*match));
++
+ 	return 0;
+ }
+ module_init(ti_cpufreq_init);
+-- 
+2.19.0
