@@ -1,37 +1,74 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 14 Nov 2018 01:04:25 +0800
-Subject: [PATCH] arm64: sunxi: Enable REGMAP_MMIO to fix linker error
-Message-ID: <1542128665-78302-1-git-send-email-john.garry@huawei.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 13 Nov 2018 09:13:11 -0800
+Subject: [PATCH v3 1/4] dt-bindings: hwlock: Document STM32 hwspinlock
+ bindings
+In-Reply-To: <20181113021337.GA7237@bogus>
+References: <20181112152342.6561-1-benjamin.gaignard@st.com>
+ <20181112152342.6561-2-benjamin.gaignard@st.com>
+ <20181113021337.GA7237@bogus>
+Message-ID: <20181113171311.GE10915@tuxbook-pro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following linker failure can be seen for a certain heavily reduced
-defconfig:
-drivers/soc/sunxi/sunxi_sram.o: In function `sunxi_sram_probe':
-drivers/soc/sunxi/sunxi_sram.c:353: undefined reference to `__devm_regmap_init_mmio_clk'
-drivers/soc/sunxi/sunxi_sram.c:353:(.text+0x3c4): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `__devm_regmap_init_mmio_clk'
+On Mon 12 Nov 18:13 PST 2018, Rob Herring wrote:
 
-It would seem that the sunxi sram driver implicitly depended on config
-REGMAP_MMIO.
+> On Mon, Nov 12, 2018 at 04:23:39PM +0100, Benjamin Gaignard wrote:
+> > Add bindings for STM32 hardware spinlock device
+> > 
+> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> 
+> Linaro or ST? Please make the author email match.
+> 
 
-To solve, select config REGMAP_MMIO for ARCH_SUNXI. This seems a better
-option than selecting from the respective driver config as this just
-defaults to ARCH_SUNXI.
+Thanks for the review Rob and thanks for spotting this.
 
-Fixes: 5828729bebbb ("soc: sunxi: export a regmap for EMAC clock reg on A64")
-Signed-off-by: John Garry <john.garry@huawei.com>
+@Benjamin, please resend the driver and dt-binding with matching author
+and sob - or if you wrote this as ST and want to send it upstream as
+Linaro add your new sob after the ST one.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 51bc479..c8a6ad3 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -12,6 +12,7 @@ config ARCH_SUNXI
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select GENERIC_IRQ_CHIP
- 	select PINCTRL
-+	select REGMAP_MMIO
- 	select RESET_CONTROLLER
- 	help
- 	  This enables support for Allwinner sunxi based SoCs like the A64.
--- 
-1.9.1
+Regards,
+Bjorn
+
+> > ---
+> > version 3 :
+> > - fix clock name in properties description
+> > version 2 :
+> > - change clock name from hwspinlock to hsem to be align with hardware
+> >   documentation
+> > 
+> >  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
+> >  1 file changed, 23 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> > new file mode 100644
+> > index 000000000000..adf4f000ea3d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> > @@ -0,0 +1,23 @@
+> > +STM32 Hardware Spinlock Device Binding
+> > +-------------------------------------
+> > +
+> > +Required properties :
+> > +- compatible : should be "st,stm32-hwspinlock".
+> > +- reg : the register address of hwspinlock.
+> > +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
+> > +	hwlock, so the number of cells should be <1> here.
+> > +- clock-names : Must contain "hsem".
+> > +- clocks : Must contain a phandle entry for the clock in clock-names, see the
+> > +	common clock bindings.
+> > +
+> > +Please look at the generic hwlock binding for usage information for consumers,
+> > +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
+> > +
+> > +Example of hwlock provider:
+> > +	hwspinlock at 4c000000 {
+> > +		compatible = "st,stm32-hwspinlock";
+> > +		#hwlock-cells = <1>;
+> > +		reg = <0x4c000000 0x400>;
+> > +		clocks = <&rcc HSEM>;
+> > +		clock-names = "hsem";
+> > +	};
+> > -- 
+> > 2.15.0
+> > 
