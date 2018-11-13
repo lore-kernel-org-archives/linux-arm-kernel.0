@@ -1,300 +1,133 @@
-From: matti.vaittinen@fi.rohmeurope.com (Matti Vaittinen)
-Date: Tue, 13 Nov 2018 13:55:58 +0200
-Subject: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and provider
- registrations
-In-Reply-To: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
-Message-ID: <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
+Date: Tue, 13 Nov 2018 11:29:24 +0000
+Subject: [PATCH 1/3] regulator: dt-bindings: add MCP16502 regulator bindings
+In-Reply-To: <1542108563-10108-1-git-send-email-andrei.stefanescu@microchip.com>
+References: <1542108563-10108-1-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <1542108563-10108-2-git-send-email-andrei.stefanescu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With MFD devices the clk properties may be contained in MFD (parent) DT
-node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
-subdevice not to MFD device (parent). Add
-devm_of_clk_add_hw_provider_parent to tackle this issue.
+This patch describes the compatible and the device tree
+bindings necessary for the MCP16502 PMIC.
 
-Also clkdev registration lacks of managed registration functions and it
-seems few drivers do not drop clkdev lookups at exit. Add
-devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
-releasing at exit.
-
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
 ---
- Documentation/driver-model/devres.txt |   3 +
- drivers/clk/clk.c                     |  28 ++++++--
- drivers/clk/clkdev.c                  | 122 ++++++++++++++++++++++++++--------
- include/linux/clk-provider.h          |  11 +++
- include/linux/clkdev.h                |   4 ++
- 5 files changed, 136 insertions(+), 32 deletions(-)
+ .../bindings/regulator/mcp16502-regulator.txt      | 107 +++++++++++++++++++++
+ 1 file changed, 107 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index 43681ca0837f..fac63760b01c 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -238,6 +238,9 @@ CLOCK
-   devm_clk_put()
-   devm_clk_hw_register()
-   devm_of_clk_add_hw_provider()
-+  devm_of_clk_add_parent_hw_provider()
-+  devm_clk_hw_register_clkdev()
-+  devm_clk_release_clkdev()
- 
- DMA
-   dmaenginem_async_device_register()
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index af011974d4ec..9bb921eb90f6 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
- 	of_clk_del_provider(*(struct device_node **)res);
- }
- 
--int devm_of_clk_add_hw_provider(struct device *dev,
-+static int __devm_of_clk_add_hw_provider(struct device *dev,
- 			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
- 					      void *data),
--			void *data)
-+			struct device_node *of_node, void *data)
- {
--	struct device_node **ptr, *np;
-+	struct device_node **ptr;
- 	int ret;
- 
- 	ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
-@@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
- 	if (!ptr)
- 		return -ENOMEM;
- 
--	np = dev->of_node;
--	ret = of_clk_add_hw_provider(np, get, data);
-+	*ptr = of_node;
-+	ret = of_clk_add_hw_provider(of_node, get, data);
- 	if (!ret) {
--		*ptr = np;
- 		devres_add(dev, ptr);
- 	} else {
- 		devres_free(ptr);
-@@ -3917,8 +3916,25 @@ int devm_of_clk_add_hw_provider(struct device *dev,
- 
- 	return ret;
- }
-+int devm_of_clk_add_hw_provider(struct device *dev,
-+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+					      void *data),
-+			void *data)
-+{
-+	return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
-+}
- EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
- 
-+int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+					      void *data),
-+			void *data)
-+{
-+	return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
-+					     data);
-+}
-+EXPORT_SYMBOL_GPL(devm_of_clk_add_parent_hw_provider);
+diff --git a/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+new file mode 100644
+index 0000000..bb3d787
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+@@ -0,0 +1,107 @@
++MCP16502 PMIC
 +
- /**
-  * of_clk_del_provider() - Remove a previously registered clock provider
-  * @np: Device node pointer associated with clock provider
-diff --git a/drivers/clk/clkdev.c b/drivers/clk/clkdev.c
-index 9ab3db8b3988..f6100b6e06fd 100644
---- a/drivers/clk/clkdev.c
-+++ b/drivers/clk/clkdev.c
-@@ -401,6 +401,25 @@ static struct clk_lookup *__clk_register_clkdev(struct clk_hw *hw,
- 	return cl;
- }
- 
-+static int do_clk_register_clkdev(struct clk_hw *hw,
-+	struct clk_lookup **cl, const char *con_id, const char *dev_id)
-+{
++Required properties:
++- compatible: "microchip,mcp16502"
++- reg: I2C slave address
++- lpm-gpio: GPIO for LPM pin. Note that this GPIO *must* remain high during
++	     suspend-to-ram, keeping the PMIC into HIBERNATE mode.
++- regulators: A node that houses a sub-node for each regulator within
++              the device. Each sub-node is identified using the node's
++              name. The content of each sub-node is defined by the
++              standard binding for regulators; see regulator.txt.
 +
-+	if (IS_ERR(hw))
-+		return PTR_ERR(hw);
-+	/*
-+	 * Since dev_id can be NULL, and NULL is handled specially, we must
-+	 * pass it as either a NULL format string, or with "%s".
-+	 */
-+	if (dev_id)
-+		*cl = __clk_register_clkdev(hw, con_id, "%s",
-+					   dev_id);
-+	else
-+		*cl = __clk_register_clkdev(hw, con_id, NULL);
++Regulator modes:
++2 - FPWM: higher precision, higher consumption
++4 - AutoPFM: lower precision, lower consumption
 +
-+	return *cl ? 0 : -ENOMEM;
-+}
++Each regulator is defined using the standard binding for regulators.
 +
- /**
-  * clk_register_clkdev - register one clock lookup for a struct clk
-  * @clk: struct clk to associate with all clk_lookups
-@@ -420,20 +439,10 @@ int clk_register_clkdev(struct clk *clk, const char *con_id,
- {
- 	struct clk_lookup *cl;
- 
--	if (IS_ERR(clk))
--		return PTR_ERR(clk);
--
--	/*
--	 * Since dev_id can be NULL, and NULL is handled specially, we must
--	 * pass it as either a NULL format string, or with "%s".
--	 */
--	if (dev_id)
--		cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, "%s",
--					   dev_id);
--	else
--		cl = __clk_register_clkdev(__clk_get_hw(clk), con_id, NULL);
--
--	return cl ? 0 : -ENOMEM;
-+	if (!IS_ERR(clk))
-+		return do_clk_register_clkdev(__clk_get_hw(clk), &cl, con_id,
-+					      dev_id);
-+	return PTR_ERR(clk);
- }
- EXPORT_SYMBOL(clk_register_clkdev);
- 
-@@ -456,18 +465,79 @@ int clk_hw_register_clkdev(struct clk_hw *hw, const char *con_id,
- {
- 	struct clk_lookup *cl;
- 
--	if (IS_ERR(hw))
--		return PTR_ERR(hw);
-+	return do_clk_register_clkdev(hw, &cl, con_id, dev_id);
-+}
-+EXPORT_SYMBOL(clk_hw_register_clkdev);
- 
--	/*
--	 * Since dev_id can be NULL, and NULL is handled specially, we must
--	 * pass it as either a NULL format string, or with "%s".
--	 */
--	if (dev_id)
--		cl = __clk_register_clkdev(hw, con_id, "%s", dev_id);
--	else
--		cl = __clk_register_clkdev(hw, con_id, NULL);
-+static void devm_clkdev_release(struct device *dev, void *res)
-+{
-+	clkdev_drop(*(struct clk_lookup **)res);
-+}
- 
--	return cl ? 0 : -ENOMEM;
-+static int devm_clk_match_clkdev(struct device *dev, void *res, void *data)
-+{
-+	struct clk_lookup **l = res;
++Example:
 +
-+	if (!l || !*l) {
-+		WARN_ON(!l || !*l);
-+		return 0;
-+	}
-+	return *l == data;
- }
--EXPORT_SYMBOL(clk_hw_register_clkdev);
++mcp16502 at 5b {
++	compatible = "microchip,mcp16502";
++	reg = <0x5b>;
++	status = "okay";
++	lpm-gpios = <&pioBU 7 GPIO_ACTIVE_HIGH>;
 +
-+/**
-+ * devm_clk_release_clkdev - Resource managed clkdev lookup release
-+ * @dev: device this lookup is bound
-+ * @con_id: connection ID string on device
-+ * @dev_id: format string describing device name
-+ *
-+ * Drop the clkdev lookup created with devm_clk_hw_register_clkdev.
-+ * Normally this function will not need to be called and the resource
-+ * management code will ensure that the resource is freed.
-+ */
-+void devm_clk_release_clkdev(struct device *dev, const char *con_id,
-+			     const char *dev_id)
-+{
-+	struct clk_lookup *cl;
-+	int rval;
++	regulators {
++		VDD_IO {
++			regulator-name = "VDD_IO";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
 +
-+	cl = clk_find(dev_id, con_id);
-+	WARN_ON(!cl);
-+	rval = devres_release(dev, devm_clkdev_release,
-+			      &devm_clk_match_clkdev, cl);
-+	WARN_ON(rval);
-+}
-+EXPORT_SYMBOL(devm_clk_release_clkdev);
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
 +
-+/**
-+ * devm_clk_hw_register_clkdev - managed clk lookup registration for clk_hw
-+ * @dev: device this lookup is bound
-+ * @hw: struct clk_hw to associate with all clk_lookups
-+ * @con_id: connection ID string on device
-+ * @dev_id: format string describing device name
-+ *
-+ * con_id or dev_id may be NULL as a wildcard, just as in the rest of
-+ * clkdev.
-+ *
-+ * To make things easier for mass registration, we detect error clk_hws
-+ * from a previous clk_hw_register_*() call, and return the error code for
-+ * those.  This is to permit this function to be called immediately
-+ * after clk_hw_register_*().
-+ */
-+int devm_clk_hw_register_clkdev(struct device *dev, struct clk_hw *hw,
-+				const char *con_id, const char *dev_id)
-+{
-+	int rval = -ENOMEM;
-+	struct clk_lookup **cl;
++		VDD_DDR {
++			regulator-name = "VDD_DDR";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
 +
-+	cl = devres_alloc(devm_clkdev_release, sizeof(*cl), GFP_KERNEL);
-+	if (cl) {
-+		rval = do_clk_register_clkdev(hw, cl, con_id, dev_id);
-+		if (!rval)
-+			devres_add(dev, cl);
-+		else
-+			devres_free(cl);
-+	}
-+	return rval;
-+}
-+EXPORT_SYMBOL(devm_clk_hw_register_clkdev);
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 60c51871b04b..a6663f084cf1 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -916,6 +916,10 @@ int devm_of_clk_add_hw_provider(struct device *dev,
- 			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
- 						 void *data),
- 			   void *data);
-+int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data);
- void of_clk_del_provider(struct device_node *np);
- void devm_of_clk_del_provider(struct device *dev);
- struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
-@@ -953,6 +957,13 @@ static inline int devm_of_clk_add_hw_provider(struct device *dev,
- {
- 	return 0;
- }
-+static inline int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data)
-+{
-+	return 0;
-+}
- static inline void of_clk_del_provider(struct device_node *np) {}
- static inline void devm_of_clk_del_provider(struct device *dev) {}
- static inline struct clk *of_clk_src_simple_get(
-diff --git a/include/linux/clkdev.h b/include/linux/clkdev.h
-index 4890ff033220..ccb32af5848b 100644
---- a/include/linux/clkdev.h
-+++ b/include/linux/clkdev.h
-@@ -52,4 +52,8 @@ int clk_add_alias(const char *, const char *, const char *, struct device *);
- int clk_register_clkdev(struct clk *, const char *, const char *);
- int clk_hw_register_clkdev(struct clk_hw *, const char *, const char *);
- 
-+int devm_clk_hw_register_clkdev(struct device *dev, struct clk_hw *hw,
-+				const char *con_id, const char *dev_id);
-+void devm_clk_release_clkdev(struct device *dev, const char *con_id,
-+			     const char *dev_id);
- #endif
++			regulator-state-mem {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_CORE {
++			regulator-name = "VDD_CORE";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_OTHER {
++			regulator-name = "VDD_OTHER";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		LDO1 {
++			regulator-name = "LDO1";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++		LDO2 {
++			regulator-name = "LDO2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++	};
++};
 -- 
-2.14.3
-
-
--- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+2.7.4
