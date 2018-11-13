@@ -1,83 +1,45 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Tue, 13 Nov 2018 17:50:37 +0100
-Subject: [PATCH v2] ARM: staging: bcm2835-audio: interpolate audio delay
-In-Reply-To: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
-References: <B1CDD261-AB22-43CE-AF46-DFB5460B5D50@eircom.net>
-Message-ID: <s5h7ehgdiqq.wl-tiwai@suse.de>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Tue, 13 Nov 2018 17:55:58 +0100
+Subject: [PATCH 0/5] media: Allwinner A10 CSI support
+In-Reply-To: <cb504ffc-b74c-d6e3-7bde-6c5840c87997@cisco.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <df54f2e6-e207-92de-767a-e356345a1a56@xs4all.nl>
+ <20181113135259.onutfjtoi25afnfe@flea>
+ <f07a0460-cdba-c1a5-acfd-66a39f447a5a@cisco.com>
+ <20181113155227.62jjs3mpomwgr7xd@flea>
+ <cb504ffc-b74c-d6e3-7bde-6c5840c87997@cisco.com>
+Message-ID: <20181113175558.3bfa3e8d@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Nov 2018 19:21:29 +0100,
-Mike Brady wrote:
+Hello,
+
+On Tue, 13 Nov 2018 17:00:25 +0100, Hans Verkuil wrote:
+
+> Weird, if I build directly from that tarball, then v4l2-compliance should say:
 > 
->  /* hardware definition */
->  static const struct snd_pcm_hardware snd_bcm2835_playback_hw = {
->  	.info = (SNDRV_PCM_INFO_INTERLEAVED | SNDRV_PCM_INFO_BLOCK_TRANSFER |
->  		 SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_MMAP_VALID |
-> -		 SNDRV_PCM_INFO_DRAIN_TRIGGER | SNDRV_PCM_INFO_SYNC_APPLPTR),
-> +		 SNDRV_PCM_INFO_BATCH | SNDRV_PCM_INFO_DRAIN_TRIGGER |
-> +		 SNDRV_PCM_INFO_SYNC_APPLPTR),
+> v4l2-compliance SHA: not available, 64 bits
+> 
+> So that's what I expect to see from buildroot as well.
 
-As already mentioned, the addition of SNDRV_PCM_INFO_BATCH should be
-irrelevant with this change.  Please create another patch to add this
-and clarify it in the changelog.
+Indeed, that's strange, I see that the v4l2-compliance Makefile does:
 
-> diff --git a/sound/core/pcm_lib.c b/sound/core/pcm_lib.c
-> index 4e6110d778bd..574df7d7a1fa 100644
-> --- a/sound/core/pcm_lib.c
-> +++ b/sound/core/pcm_lib.c
-> @@ -229,19 +229,38 @@ static void update_audio_tstamp(struct snd_pcm_substream *substream,
->  		(runtime->audio_tstamp_report.actual_type ==
->  			SNDRV_PCM_AUDIO_TSTAMP_TYPE_DEFAULT)) {
->  
-> -		/*
-> -		 * provide audio timestamp derived from pointer position
-> -		 * add delay only if requested
-> -		 */
-> +		// provide audio timestamp derived from pointer position
->  
->  		audio_frames = runtime->hw_ptr_wrap + runtime->status->hw_ptr;
->  
-> -		if (runtime->audio_tstamp_config.report_delay) {
-> +		/*
-> +		 * If the runtime->delay is greater than zero, it's a
-> +		 * genuine delay, e.g. a delay due to a hardware fifo.
-> +		 *
-> +		 * But if the runtime->delay is less than zero, it's an
-> +		 * interpolated estimate of the number of frames output
-> +		 * since the hardware pointer was last updated.
-> +		 *
-> +		 * It would be calculated in the pointer callback.
-> +		 * For example, for the bcm_2835 driver, it is calculated in
-> +		 * snd_bcm2835_pcm_pointer().
-> +		 */
-> +
-> +		if (runtime->delay < 0) {
-> +			// The delay is an interpolated estimate...
->  			if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-> -				audio_frames -=  runtime->delay;
-> -			else
-> -				audio_frames +=  runtime->delay;
-> +				audio_frames += runtime->delay;
-> +		} else {
-> +			// The delay is a real delay. Add it if requested.
-> +			if (runtime->audio_tstamp_config.report_delay) {
-> +				if (substream->stream ==
-> +				    SNDRV_PCM_STREAM_PLAYBACK)
-> +					audio_frames -=  runtime->delay;
-> +				else
-> +					audio_frames +=  runtime->delay;
-> +			}
->  		}
+version.h:
+        @if git -C $(srcdir) rev-parse HEAD >/dev/null 2>&1; then \
+                echo -n "#define SHA " >$@ ; \
+                git -C $(srcdir) rev-parse HEAD >>$@ ; \
+        else \
+                touch $@ ; \
+        fi
 
-Well, honestly speaking, I'm really not fond of changing the PCM core
-just for this.
+which correctly uses $(srcdir), so it shouldn't go "up" the libv4l
+build folder and pick up the latest Buildroot commit SHA1. I'll have a
+quick look.
 
-Can we make bcm audio driver providing the finer pointer update
-instead?  If we have a module option to disable that behavior, it's an
-enough excuse in case anyone really cares about the accuracy.
+Best regards,
 
-
-thanks,
-
-Takashi
+Thomas
+-- 
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
