@@ -1,44 +1,96 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Tue, 13 Nov 2018 16:17:07 +0000
-Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
-In-Reply-To: <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
-Message-ID: <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Tue, 13 Nov 2018 08:18:52 -0800
+Subject: [PATCH v1 02/11] clk: mediatek: add new member to mtk_pll_data
+In-Reply-To: <20181106064206.17535-4-weiyi.lu@mediatek.com>
+References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
+ <20181106064206.17535-4-weiyi.lu@mediatek.com>
+Message-ID: <CANMq1KBjtyQFyJ-mZBndPDSfSDnD0K8izy39jp9zKE4xfiCiog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Sorry for the really late response!)
+On Mon, Nov 5, 2018 at 10:43 PM Weiyi Lu <weiyi.lu@mediatek.com> wrote:
+>
+> From: Owen Chen <owen.chen@mediatek.com>
+>
+> 1. pcwibits: The integer bits of pcw for plls is extend to 8 bits,
+>    add a variable to indicate this change and
+>    backward-compatible.
+> 2. fmin: The pll freqency lower-bound is vary from 1GMhz to
+>    1.5Ghz, add a variable to indicate platform-dependent.
+>
+> Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> ---
+>  drivers/clk/mediatek/clk-mtk.h |  2 ++
+>  drivers/clk/mediatek/clk-pll.c | 10 +++++++---
+>  2 files changed, 9 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> index f83c2bbb677e..1882221fe994 100644
+> --- a/drivers/clk/mediatek/clk-mtk.h
+> +++ b/drivers/clk/mediatek/clk-mtk.h
+> @@ -215,7 +215,9 @@ struct mtk_pll_data {
+>         const struct clk_ops *ops;
+>         u32 rst_bar_mask;
+>         unsigned long fmax;
+> +       unsigned long fmin;
 
-On 15/10/2018 23:42, Kees Cook wrote:
-> On Fri, Oct 5, 2018 at 1:47 AM, Kristina Martsenko
-> <kristina.martsenko@arm.com> wrote:
->> This series adds support for the ARMv8.3 pointer authentication
->> extension. The series contains Mark's original patches to enable pointer
->> authentication for userspace [1], followed by early RFC patches using
->> pointer authentication in the kernel.
-> 
-> It wasn't obvious to me where the PAC mismatch exceptions will be
-> caught. I'm mainly curious to compare the PAC exception handling to
-> the existing stack-protector panic(). Can you point me to which
-> routines manage that? (Perhaps I just missed it in the series...)
+Minor nit: I'd put fmin before fmax in the structure.
 
-When the PAC authentication fails, it doesn't actually generate an
-exception, it just flips a bit in the high-order bits of the pointer,
-making the pointer invalid. Then when the pointer is dereferenced (e.g.
-as a function return address), it generates the usual type of exception
-for an invalid address.
+>         int pcwbits;
+> +       int pcwibits;
+>         uint32_t pcw_reg;
+>         int pcw_shift;
+>         const struct mtk_pll_div_table *div_table;
+> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> index f54e4015b0b1..0ec2c62d9383 100644
+> --- a/drivers/clk/mediatek/clk-pll.c
+> +++ b/drivers/clk/mediatek/clk-pll.c
 
-So when a function return fails in user mode, the exception is handled
-in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
-function return fails in kernel mode, the exception is handled in
-__do_kernel_fault and the task is killed.
+I'd add a note next to:
+#define INTEGER_BITS            7
+to say that this is the default, and can be overridden with pcwibits.
 
-This is different from stack protector as we don't panic the kernel, we
-just kill the task. It would be difficult to panic as we don't have a
-reliable way of knowing that the exception was caused by a PAC
-authentication failure (we just have an invalid pointer with a specific
-bit flipped). We also don't print out any PAC-related warning.
+> @@ -69,11 +69,13 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
+>  {
+>         int pcwbits = pll->data->pcwbits;
+>         int pcwfbits;
+> +       int ibits;
+>         u64 vco;
+>         u8 c = 0;
+>
+>         /* The fractional part of the PLL divider. */
+> -       pcwfbits = pcwbits > INTEGER_BITS ? pcwbits - INTEGER_BITS : 0;
+> +       ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
+> +       pcwfbits = pcwbits > ibits ? pcwbits - ibits : 0;
+>
+>         vco = (u64)fin * pcw;
+>
+> @@ -138,9 +140,10 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+>  static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+>                 u32 freq, u32 fin)
+>  {
+> -       unsigned long fmin = 1000 * MHZ;
+> +       unsigned long fmin = pll->data->fmin ? pll->data->fmin : 1000 * MHZ;
 
-Thanks,
-Kristina
+I'd put parentheses around (1000 * MHZ), to avoid the need to think
+about precedence...
+
+>         const struct mtk_pll_div_table *div_table = pll->data->div_table;
+>         u64 _pcw;
+> +       int ibits;
+>         u32 val;
+>
+>         if (freq > pll->data->fmax)
+> @@ -164,7 +167,8 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+>         }
+>
+>         /* _pcw = freq * postdiv / fin * 2^pcwfbits */
+> -       _pcw = ((u64)freq << val) << (pll->data->pcwbits - INTEGER_BITS);
+> +       ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
+> +       _pcw = ((u64)freq << val) << (pll->data->pcwbits - ibits);
+>         do_div(_pcw, fin);
+>
+>         *pcw = (u32)_pcw;
+> --
+> 2.18.0
+>
