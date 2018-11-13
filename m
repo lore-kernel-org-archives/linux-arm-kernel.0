@@ -1,41 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Nov 2018 11:25:58 -0800
-Subject: [GIT PULL 1/2] Broadcom drivers changes for 4.20 part 2
-In-Reply-To: <20181105234831.30526-1-f.fainelli@gmail.com>
-References: <20181105234831.30526-1-f.fainelli@gmail.com>
-Message-ID: <20181113192558.yswpk2l65t2cp4cb@localhost>
+Date: Tue, 13 Nov 2018 11:29:01 -0800
+Subject: [GIT PULL 0/3] arm64: tegra: Updates for v4.20-rc2
+In-Reply-To: <20181108121627.GA1340@ulmo>
+References: <20181107145350.29127-1-thierry.reding@gmail.com>
+ <CAOesGMjcOQif8H6b5afKBwYstkbzGC7wuUcN2Srz=vJz11qSnA@mail.gmail.com>
+ <20181108121627.GA1340@ulmo>
+Message-ID: <20181113192901.wbug3ylflhz4z2kv@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 03:48:30PM -0800, Florian Fainelli wrote:
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+On Thu, Nov 08, 2018 at 01:16:27PM +0100, Thierry Reding wrote:
+> On Wed, Nov 07, 2018 at 08:31:55AM -0800, Olof Johansson wrote:
+> > Hi Thierry,
+> > 
+> > On Wed, Nov 7, 2018 at 6:53 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > >
+> > > Hi ARM SoC maintainers,
+> > >
+> > > These pull requests are some follow-up changes to finally enable the
+> > > generic power domains for the Tegra XUSB block. This builds on top of
+> > > changes that were merged into v4.20-rc1, but because of some non-
+> > > trivial runtime dependencies I decided to hold back on these until
+> > > after the dust had settled.
+> > >
+> > > Do you think it would be possible to merge these in for v4.20-rc2? I
+> > > realize that they are not actually fixes, but they merely add a couple
+> > > of lines to enable the power domains for XUSB as well as the
+> > > corresponding DT bindings.
+> > 
+> > Is anything broken without these changes, or is it more that the
+> > dependency have landed and you're itching to get things enabled?
+> > 
+> > If it's the former we should chat (since it's an unfortunate
+> > situation). If it's the latter I'm happy to queue them up for the next
+> > merge window.
 > 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> Nothing's broken without these changes, but I figured that these two
+> dozen lines could still make it into v4.20. I know that this has
+> occasionally been done in the past for very small enablement patches
+> if they were small enough. I could've communicated this a little
+> earlier, so that this wouldn't have come as a bit of a surprise.
 > 
-> are available in the Git repository at:
-> 
->   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.20/drivers-part2
-> 
-> for you to fetch changes up to 0810d5cc29a1e4bb9e738a478b746aebf8dc1931:
-> 
->   bus: brcmstb_gisb: simplify getting .driver_data (2018-11-05 12:37:22 -0800)
-> 
-> ----------------------------------------------------------------
-> This pull request contains Broadcom ARM/ARM64/MIPS SoCs drivers changes
-> for 4.20:
-> 
-> - Wolfram converts the Broadcom STB GISB bus arbiter driver to use
->   dev_get_drvdata()
-> 
-> - Florian fixes the kernel's re-entry point function when the kernel is
->   built with CONFIG_THUMB2_KERNEL
+> If you prefer to defer this to v4.21 that's totally fine. I can queue
+> them up in my tree for the next merge window, no need for you to pick
+> this up in pieces.
 
-Hi Florian,
-
-Not sure if you inteded this for 4.20 or to queue for next merge window? Right
-now we're in bugfixes/regressions only for 4.20, and the GISB patch seems to be
-a cleanup/refactor.
-
+Ok, let's queue them for 4.21 at this point. Thanks!
 
 
 -Olof
