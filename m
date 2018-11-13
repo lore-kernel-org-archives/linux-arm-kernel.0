@@ -1,24 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 18:24:04 -0600
-Subject: [PATCH v4 1/2] dt-bindings: clk: meson-g12a: Add G12A EE Clock
- Bindings
-In-Reply-To: <1541682912-120480-2-git-send-email-jian.hu@amlogic.com>
-References: <1541682912-120480-1-git-send-email-jian.hu@amlogic.com>
- <1541682912-120480-2-git-send-email-jian.hu@amlogic.com>
-Message-ID: <20181113002404.GA31672@bogus>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 12 Nov 2018 16:26:19 -0800
+Subject: [PATCH 06/10] swiotlb: use swiotlb_map_page in
+ swiotlb_map_sg_attrs
+In-Reply-To: <CALAqxLVSDkv4faF3ta_ue9AA9s8B=-8cAMxC_sow+wZYtrfxeQ@mail.gmail.com>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-7-hch@lst.de>
+ <CANcMJZAzrxA9LGNvP-epv2DwsUacEM_hcgA1n5gmaPuWRJG4iw@mail.gmail.com>
+ <20181109074955.GA27489@lst.de>
+ <CALAqxLVSDkv4faF3ta_ue9AA9s8B=-8cAMxC_sow+wZYtrfxeQ@mail.gmail.com>
+Message-ID: <CALAqxLV8u7rFKRc19J7z_TKLbkG4YbAfj8HjOnPeDH3-uYXPDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 8 Nov 2018 21:15:10 +0800, Jian Hu wrote:
-> Add new clock controller compatible and dt-bingdings headers
-> for the Everything-Else domain of the g12a SoC
-> 
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-> ---
->  .../bindings/clock/amlogic,gxbb-clkc.txt           |  1 +
->  include/dt-bindings/clock/g12a-clkc.h              | 93 ++++++++++++++++++++++
->  2 files changed, 94 insertions(+)
->  create mode 100644 include/dt-bindings/clock/g12a-clkc.h
-> 
+On Mon, Nov 12, 2018 at 4:07 PM, John Stultz <john.stultz@linaro.org> wrote:
+> On Thu, Nov 8, 2018 at 11:49 PM, Christoph Hellwig <hch@lst.de> wrote:
+>> On Tue, Nov 06, 2018 at 05:27:14PM -0800, John Stultz wrote:
+>>> But at that point if I just re-apply "swiotlb: use swiotlb_map_page in
+>>> swiotlb_map_sg_attrs", I reproduce the hangs.
+>>>
+>>> Any suggestions for how to further debug what might be going wrong
+>>> would be appreciated!
+>>
+>> Very odd.  In the end map_sg and map_page are defined to do the same
+>> things to start with.  The only real issue we had in this area was:
+>>
+>> "[PATCH v2] of/device: Really only set bus DMA mask when appropriate"
+>>
+>> so with current mainline + that you still see a problem, and if you
+>> rever the commit we are replying to it still goes away?
+>
+> Just to confirm, as of 4.20-rc2 (which includes the of/device patch
+> above), I'm still seeing this issue, but it isn't as reliable to
+> reproduce as before.
+>
+> With "swiotlb: use swiotlb_map_page in swiotlb_map_sg_attrs" reverted
+> (along with the dependent swiotlb patches) it doesn't seem to trigger
+> (no matter what I try).  But re-applying that patch it tends to
+> trigger by itself at boot up, but sometimes I have to run "find /" to
+> trigger the io hang/stall.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Also, I wanted to mention I've not seen this issue on the original
+hikey board. So far only on the hikey960, which might mean this is
+tied to something in the hisi UFS driver?
+
+thanks
+-john
