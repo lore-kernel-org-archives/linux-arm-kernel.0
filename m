@@ -1,66 +1,84 @@
-From: andrealmeid@riseup.net (andrealmeid at riseup.net)
-Date: Tue, 13 Nov 2018 16:58:35 -0200
-Subject: [PATCH v3 2/2] stagin: vchi: Add SPDX-License-Identifier
-In-Reply-To: <20181113185835.14429-1-andrealmeid@riseup.net>
-References: <20181113185835.14429-1-andrealmeid@riseup.net>
-Message-ID: <20181113185835.14429-3-andrealmeid@riseup.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 13 Nov 2018 11:02:30 -0800
+Subject: [PATCH] ARM: stm32: debug: add low-level debug support
+In-Reply-To: <94666165-f206-5472-c848-499ba52cd354@st.com>
+References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
+ <1501174209-27550-2-git-send-email-bich.hemon@st.com>
+ <20181112182236.s7cs6dol4dmxkp7u@localhost>
+ <f244c67b-de86-b0e7-7283-7b27f9591cf9@st.com>
+ <20181113092422.GJ30658@n2100.armlinux.org.uk>
+ <94666165-f206-5472-c848-499ba52cd354@st.com>
+Message-ID: <CAOesGMgBdzYthdoWzzSFqOHOfCyY_9jZBkDSpLtkWeVdOkLkTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andr? Almeida <andrealmeid@riseup.net>
+Take a look at the patch I merged, and please follow up with any patch
+to fixup any issue you find with it.
 
-Using multiple license representation as shown here [1].
-[1] https://spdx.org/sites/cpstandard/files/pages/files/using_spdx_license_list_short_identifiers.pdf
+As mentioned in my original email, I tried to consolidate the two
+versions, so a look-through and follow up with fixes would be
+appreciated. Thanks!
 
-Signed-off-by: Andr? Almeida <andrealmeid@riseup.net>
 
----
+-Olof
 
-Thanks for the feedback Stefan. I've tried to make the code similar
-to your example. Let me know if it's still wrong.
----
- .../vc04_services/interface/vchi/vchi_mh.h    | 30 +------------------
- 1 file changed, 1 insertion(+), 29 deletions(-)
-
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-index 40c760d493a1..bbf227e4f21a 100644
---- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-+++ b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-@@ -1,34 +1,6 @@
-+/* SPDX-License-Identifier: (BSD-3-Clause OR GPL-2.0) */
- /**
-  * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- * 1. Redistributions of source code must retain the above copyright
-- *    notice, this list of conditions, and the following disclaimer,
-- *    without modification.
-- * 2. Redistributions in binary form must reproduce the above copyright
-- *    notice, this list of conditions and the following disclaimer in the
-- *    documentation and/or other materials provided with the distribution.
-- * 3. The names of the above-listed copyright holders may not be used
-- *    to endorse or promote products derived from this software without
-- *    specific prior written permission.
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") version 2, as published by the Free
-- * Software Foundation.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-  */
- 
- #ifndef VCHI_MH_H_
--- 
-2.19.1
+On Tue, Nov 13, 2018 at 2:17 AM Bich HEMON <bich.hemon@st.com> wrote:
+>
+>
+>
+> On 11/13/18 10:24 AM, Russell King - ARM Linux wrote:
+> > On Tue, Nov 13, 2018 at 09:16:16AM +0000, Bich HEMON wrote:
+> >>
+> >> On 11/12/18 7:22 PM, Olof Johansson wrote:
+> >>> On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
+> >>>> From: Gerald Baeza <gerald.baeza@st.com>
+> >>>>
+> >>>> This adds low-level debug support on USART1 for STM32F4
+> >>>> and STM32F7.
+> >>>> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
+> >>>> Enabled via 'earlyprintk' in bootargs.
+> >>>>
+> >>>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
+> >>>> Signed-off-by: Bich Hemon <bich.hemon@st.com>
+> >>>
+> >>> Hi,
+> >>>
+> >>> This had fallen between the chairs it seems. I have applied it to arm-soc
+> >>> next/soc now, for 4.21 merge window.
+> >>>
+> >>> It ended up being patched up manually to consolidate the version in
+> >>> Russell's patch tracker with this posted version, and I tweaked whitespace
+> >>> a bit. Let me know if I missed something.
+> >>>
+> >>>
+> >>> Thanks,
+> >>>
+> >>> -Olof
+> >>>
+> >>
+> >> Hi Olof,
+> >>
+> >> Please note that this patch has to be abandoned as Ludovic BARRE pushed
+> >> a new version of this change:
+> >> https://patchwork.codeaurora.org/patch/400563/
+> >>
+> >> You can find it in Russell's tracker here:
+> >> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8803/1
+> >
+> > And I'm not going to merge that because:
+> >
+> > 1) it's not for me to merge - it doesn't go through my tree, but through
+> >     arm-soc, which Olof and Arnd manage.
+> > 2) it's not been on the mailing list as per normal submission process.
+> >
+> > Sorry.
+> >
+>
+> Ok, thank you for the feedback.
+>
+> So Olof, can you please ignore my previous email and merge my patch as
+> you proposed it for 4.21. Ludovic's patch will be abandoned instead.
+>
+> Thanks,
+>
+> Bich
