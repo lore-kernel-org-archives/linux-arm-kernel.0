@@ -1,59 +1,119 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Tue, 13 Nov 2018 14:59:18 +0100
-Subject: [PATCH 04/15] Platform: OLPC: Remove an unused include
-In-Reply-To: <CAHp75Veb++-F3yd9r5h305UQFvBFosRQvmPDfTTMFak9ZNVc7g@mail.gmail.com>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-5-lkundrak@v3.sk>
- <CAHp75Veb++-F3yd9r5h305UQFvBFosRQvmPDfTTMFak9ZNVc7g@mail.gmail.com>
-Message-ID: <5a4c548be4cf9fb3fb6ce5128d6780eea3005215.camel@v3.sk>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 13 Nov 2018 15:01:08 +0100
+Subject: [PATCH v2 00/25] at24: remove
+Message-ID: <20181113140133.17385-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-thank you for the response.
+Now that nvmem has gained support for defining cells from board files and
+looking them up from relevant drivers[1], it's time for a respin of the
+previous series[2] that aims at removing struct at24_platform_data from
+the tree.
 
-On Fri, 2018-10-19 at 16:05 +0300, Andy Shevchenko wrote:
-> On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk>
-> wrote:
-> > Also, the header is x86 specific, while there are non-x86 OLPC
-> > machines.
-> 
-> Same concern. as per patch 2.
+Since I took over maintainership of the at24 driver I've been working
+towards removing at24_platform_data in favor for device properties.
 
-Which concern? If it's that it doesn't make sense in that particular
-place in the patch set, then I don't think so; this header is
-unnecessary and the patch has no other dependencies. But the changes
-that enable the OLPC EC platform code depend on this.
+DaVinci is the only platform that's still using it - all other users
+have already been converted.
 
-> Also, you might want to sort headers in alphabetical order.
+One of the obstacles in case of DaVinci is removing the setup() callback
+from the pdata struct, the only user of which are some davinci boards.
 
-But should I? Doing so in the same commit would obscure the actual
-change, and a separate commit would needlessly clobber git annotate.
+First we add support for nvmem to MTD in a way previously discussed with
+Boris Brezillon and Srinivas Kandagatla.
 
-Thank you
-Lubo
+Then, since most boards use the EEPROM to store the MAC address, we register
+relevant cells for all users, implement a function that allows to read
+the MAC address from nvmem (and also replaces the previous DT-specific
+variant) and make davinci_emac aware of it.
 
-> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> > ---
-> >  drivers/platform/olpc/olpc-ec.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> > 
-> > diff --git a/drivers/platform/olpc/olpc-ec.c
-> > b/drivers/platform/olpc/olpc-ec.c
-> > index f99b183d5296..35a21c66cd0d 100644
-> > --- a/drivers/platform/olpc/olpc-ec.c
-> > +++ b/drivers/platform/olpc/olpc-ec.c
-> > @@ -15,7 +15,6 @@
-> >  #include <linux/module.h>
-> >  #include <linux/list.h>
-> >  #include <linux/olpc-ec.h>
-> > -#include <asm/olpc.h>
-> > 
-> >  struct ec_cmd_desc {
-> >         u8 cmd;
-> > --
-> > 2.19.0
-> > 
-> 
-> 
+Next we switch all davinci users to using at24 device properties instead
+of platform data. While we're at it: we remove all other traces of the
+setup callback and platform data from davinci.
+
+Finally we remove the at24 platform data structure.
+
+I kept the review tags in patches that haven't changed from the last
+submission.
+
+As far as merging of this series goes: I'd like to avoid dragging it over
+four releases. The series is logically split into five groups:
+
+patches 1-2: nvmem and mtd changes
+patches 3-9: davinci arch-specific changes
+patches 10-13: networking changes
+patches 14-24: davinci specific again
+patch 25: final at24 change
+
+With that I believe we can do the following: Greg KH could pick up the
+first two patches into his char-misc tree. Sekhar would take the second
+group and the third would go through the networking tree since the first
+three sets are not linked in any way. This would be merged for 4.21. Then
+for the next release Sekhar would pick up 14-24, provide an immutable
+branch for me and I'd merge the final patch for at24 and send it upstream
+through Wolfram's i2c tree (maybe we could even delay the i2c PR in the
+merge window to avoid the immutable branch altogether).
+
+[1] https://lkml.org/lkml/2018/9/21/293
+[2] https://lkml.org/lkml/2018/8/8/528
+
+Alban Bedel (1):
+  mtd: add support for reading MTD devices via the nvmem API
+
+Bartosz Golaszewski (24):
+  nvmem: add new config option
+  ARM: davinci: dm365-evm: use cell nvmem lookup for mac address
+  ARM: davinci: dm644x-evm: use cell nvmem lookup for mac address
+  ARM: davinci: dm646x-evm: use cell nvmem lookup for mac address
+  ARM: davinci: da830-evm: use cell nvmem lookup for mac address
+  ARM: davinci: mityomapl138: use cell nvmem lookup for mac address
+  ARM: davinci: dm850-evm: use cell nvmem lookup for mac address
+  ARM: davinci: da850-evm: remove unnecessary include
+  net: ethernet: provide nvmem_get_mac_address()
+  net: cadence: switch to using nvmem_get_mac_address()
+  of: net: kill of_get_nvmem_mac_address()
+  net: davinci_emac: use nvmem_get_mac_address()
+  ARM: davinci: da850-evm: remove dead MTD code
+  ARM: davinci: mityomapl138: don't read the MAC address from machine
+    code
+  ARM: davinci: dm365-evm: use device properties for at24 eeprom
+  ARM: davinci: da830-evm: use device properties for at24 eeprom
+  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
+  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
+  ARM: davinci: sffsdr: fix the at24 eeprom device name
+  ARM: davinci: sffsdr: use device properties for at24 eeprom
+  ARM: davinci: remove dead code related to MAC address reading
+  ARM: davinci: mityomapl138: use nvmem notifiers
+  ARM: davinci: mityomapl138: use device properties for at24 eeprom
+  eeprom: at24: remove at24_platform_data
+
+ MAINTAINERS                                |   1 -
+ arch/arm/mach-davinci/board-da830-evm.c    |  39 ++++-
+ arch/arm/mach-davinci/board-da850-evm.c    |  58 ++++----
+ arch/arm/mach-davinci/board-dm365-evm.c    |  38 ++++-
+ arch/arm/mach-davinci/board-dm644x-evm.c   |  37 ++++-
+ arch/arm/mach-davinci/board-dm646x-evm.c   |  37 ++++-
+ arch/arm/mach-davinci/board-mityomapl138.c |  67 ++++++---
+ arch/arm/mach-davinci/board-sffsdr.c       |  13 +-
+ arch/arm/mach-davinci/common.c             |  15 --
+ drivers/misc/eeprom/at24.c                 | 162 ++++++++++-----------
+ drivers/mtd/Kconfig                        |   1 +
+ drivers/mtd/mtdcore.c                      |  56 +++++++
+ drivers/net/ethernet/cadence/macb_main.c   |   2 +-
+ drivers/net/ethernet/ti/davinci_emac.c     |  14 +-
+ drivers/nvmem/core.c                       |   3 +-
+ drivers/of/of_net.c                        |  39 -----
+ include/linux/davinci_emac.h               |   1 -
+ include/linux/etherdevice.h                |   1 +
+ include/linux/mtd/mtd.h                    |   2 +
+ include/linux/nvmem-provider.h             |   2 +
+ include/linux/of_net.h                     |   6 -
+ include/linux/platform_data/at24.h         |  60 --------
+ net/ethernet/eth.c                         |  38 +++++
+ 23 files changed, 391 insertions(+), 301 deletions(-)
+ delete mode 100644 include/linux/platform_data/at24.h
+
+-- 
+2.19.1
