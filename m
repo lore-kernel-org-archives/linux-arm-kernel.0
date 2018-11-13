@@ -1,32 +1,30 @@
-From: christoph.muellner@theobroma-systems.com (Christoph Muellner)
-Date: Tue, 13 Nov 2018 11:25:35 +0100
-Subject: [PATCH] arm64: dts: rockchip: Fix PCIe reset polarity for
- rk3399-puma-haikou.
-Message-ID: <20181113102535.444-1-christoph.muellner@theobroma-systems.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 13 Nov 2018 11:28:01 +0100
+Subject: [PATCH v3 1/6] spi: pxa2xx: dt-bindings: Add spi-slave property
+In-Reply-To: <20181113102228.820214-2-lkundrak@v3.sk>
+References: <20181113102228.820214-1-lkundrak@v3.sk>
+ <20181113102228.820214-2-lkundrak@v3.sk>
+Message-ID: <CAMuHMdW6+LLM+Xf8cqgGcz5a3GZQDTba2bXS=qCC5eu2uwFEHA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the wrong polarity setting for the PCIe host driver's
-pre-reset pin for rk3399-puma-haikou. Without this patch link training
-will most likely fail.
+On Tue, Nov 13, 2018 at 11:23 AM Lubomir Rintel <lkundrak@v3.sk> wrote:
+> This is used to indicate that the chip attached to this controller is a SPI
+> master.
+>
+> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Acked-by: Pavel Machek <pavel@ucw.cz>
 
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
----
- arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-index 2dceeea29b83..1e6a71066c16 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
-@@ -153,7 +153,7 @@
- };
- 
- &pcie0 {
--	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
-+	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_HIGH>;
- 	num-lanes = <4>;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pcie_clkreqn_cpm>;
+Gr{oetje,eeting}s,
+
+                        Geert
+
 -- 
-2.11.0
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
