@@ -1,85 +1,32 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 13 Nov 2018 16:01:27 +0100
-Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
-In-Reply-To: <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
- <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
-Message-ID: <CAAeHK+xPkbg_9P9oCkS-iB8S81vTxD3p5SbyWHy-vrp2ybkKmg@mail.gmail.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 13 Nov 2018 07:19:37 -0800
+Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
+In-Reply-To: <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+ <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
+Message-ID: <71d315a34e4b12b0eb1d4c9003b297e46695f9cf.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 8, 2018 at 1:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Nov 06, 2018 at 06:30:27PM +0100, Andrey Konovalov wrote:
->> show_pte in arm64 fault handling relies on the fact that the top byte of
->> a kernel pointer is 0xff, which isn't always the case with tag-based
->> KASAN.
->
-> That's for the TTBR1 check, right?
->
-> i.e. for the following to work:
->
->         if (addr >= VA_START)
->
-> ... we need the tag bits to be an extension of bit 55...
->
->>
->> This patch resets the top byte in show_pte.
->>
->> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
->> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
->> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
->> ---
->>  arch/arm64/mm/fault.c | 3 +++
->>  1 file changed, 3 insertions(+)
->>
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 7d9571f4ae3d..d9a84d6f3343 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -32,6 +32,7 @@
->>  #include <linux/perf_event.h>
->>  #include <linux/preempt.h>
->>  #include <linux/hugetlb.h>
->> +#include <linux/kasan.h>
->>
->>  #include <asm/bug.h>
->>  #include <asm/cmpxchg.h>
->> @@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
->>       pgd_t *pgdp;
->>       pgd_t pgd;
->>
->> +     addr = (unsigned long)kasan_reset_tag((void *)addr);
->
-> ... but this ORs in (0xffUL << 56), which is not correct for addresses
-> which aren't TTBR1 addresses to begin with, where bit 55 is clear, and
-> throws away useful information.
->
-> We could use untagged_addr() here, but that wouldn't be right for
-> kernels which don't use TBI1, and we'd erroneously report addresses
-> under the TTBR1 range as being in the TTBR1 range.
->
-> I also see that the entry assembly for el{1,0}_{da,ia} clears the tag
-> for EL0 addresses.
->
-> So we could have:
->
-> static inline bool is_ttbr0_addr(unsigned long addr)
-> {
->         /* entry assembly clears tags for TTBR0 addrs */
->         return addr < TASK_SIZE_64;
-> }
->
-> static inline bool is_ttbr1_addr(unsigned long addr)
-> {
->         /* TTBR1 addresses may have a tag if HWKASAN is in use */
->         return arch_kasan_reset_tag(addr) >= VA_START;
-> }
->
-> ... and use those in the conditionals, leaving the addr as-is for
-> reporting purposes.
+On Tue, 2018-11-13 at 13:24 +0100, Hans Verkuil wrote:
+> On 11/13/18 09:24, Maxime Ripard wrote:
+> > The older CSI drivers have camera capture interface different from the one
+> > in the newer ones.
+[]
+> > diff --git a/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
+[]
+> > +	// Videobuf2
+> 
+> Doesn't checkpatch.pl --strict complain about the use of '//'?
 
-Actually it looks like 276e9327 ("arm64: entry: improve data abort
-handling of tagged pointers") already takes care of both user and
-kernel fault addresses and correctly removes tags from them. So I
-think we need to drop this patch.
+No, not since
+
+commit dadf680de3c2eb4cba9840619991eda0cfe98778
+Author: Joe Perches <joe@perches.com>
+Date:   Tue Aug 2 14:04:33 2016 -0700
+
+    checkpatch: allow c99 style // comments
+    
+    Sanitise the lines that contain c99 comments so that the error doesn't
+    get emitted.
