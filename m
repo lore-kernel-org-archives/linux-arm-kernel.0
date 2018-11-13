@@ -1,83 +1,255 @@
 From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Tue, 13 Nov 2018 20:35:59 +0200
-Subject: [PATCH v7 00/17] Removed nested TPM operations
-Message-ID: <20181113183620.27447-1-jarkko.sakkinen@linux.intel.com>
+Date: Tue, 13 Nov 2018 20:36:04 +0200
+Subject: [PATCH v7 05/17] tpm: declare struct tpm_header
+In-Reply-To: <20181113183620.27447-1-jarkko.sakkinen@linux.intel.com>
+References: <20181113183620.27447-1-jarkko.sakkinen@linux.intel.com>
+Message-ID: <20181113183620.27447-6-jarkko.sakkinen@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[was Detach TPM space code out of the tpm_transmit() flow but the scope
- expanded a bit.]
+Decleare struct tpm_header that replaces struct tpm_input_header and
+struct tpm_output_header.
 
-Make the changes necessary to detach TPM space code and TPM activation
-code out of the tpm_transmit() flow because of both of these can cause
-nested tpm_transmit() calls. The nesteds calls make the whole flow hard
-to maintain, and thus, it is better to just fix things now before this
-turns into a bigger mess.
+Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
+Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
+---
+ drivers/char/tpm/tpm-interface.c  |  9 ++++-----
+ drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
+ drivers/char/tpm/tpm2-cmd.c       |  4 ++--
+ drivers/char/tpm/tpm2-space.c     |  6 +++---
+ drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
+ drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
+ drivers/char/tpm/xen-tpmfront.c   |  2 +-
+ 7 files changed, 28 insertions(+), 33 deletions(-)
 
-v7:
-*  Reorganize series so that more trivial and self-contained changes are
-   in the head.
-
-v6:
-* When tpm_validate_commmand() was moved to tpm2-space.c, the struct for
-  the TPM header was incorrectly declared as struct tpm_input_header.
-* Fix return value in tpm_validate_command().
-
-v5:
-* Add the missing rev's from Stefan Berger.
-
-v4:
-* Return 0 from pcrs_show() when tpm1_pcr_read() fails.
-* Fix error handling flow in tpm_try_transmit().
-* Replace struct tpm_input_header and struct tpm_output_header with
-  struct tpm_header.
-
-v3:
-* Encapsulate power gating code to tpm_chip_start() and tpm_chip_stop().
-* Move TPM power gating code and locking to tpm_try_get_ops() and
-  tpm_put_ops().
-* Call power gating code directly in tpm_chip_register() and
-  tpm2_del_space().
-
-v2:
-* Print tpm2_commit_space() error inside tpm2_commit_space()
-* Error code was not printed when recv() callback failed. It is
-  fixed in this version.
-* Added a patch that removes @space from tpm_transmit().
-* Fixed a regression in earlier series. Forgot to amend the change
-  from the staging area that renames NESTED to UNLOCKED in tpm2-space.c.
-
-Jarkko Sakkinen (17):
-  tpm: use tpm_buf in tpm_transmit_cmd() as the IO parameter
-  tpm: fix invalid return value in pubek_show()
-  tpm: return 0 from pcrs_show() when tpm1_pcr_read() fails
-  tpm: print tpm2_commit_space() error inside tpm2_commit_space()
-  tpm: declare struct tpm_header
-  tpm: access command header through struct in tpm_try_transmit()
-  tpm: encapsulate tpm_dev_transmit()
-  tpm: call tpm2_flush_space() on error in tpm_try_transmit()
-  tpm: clean up tpm_try_transmit() error handling flow
-  tpm: move tpm_validate_commmand() to tpm2-space.c
-  tpm: move TPM space code out of tpm_transmit()
-  tpm: remove @space from tpm_transmit()
-  tpm: use tpm_try_get_ops() in tpm-sysfs.c.
-  tpm: remove TPM_TRANSMIT_UNLOCKED flag
-  tpm: introduce tpm_chip_start() and tpm_chip_stop()
-  tpm: take TPM chip power gating out of tpm_transmit()
-  tpm: remove @flags from tpm_transmit()
-
- drivers/char/tpm/tpm-chip.c       | 105 +++++++++++-
- drivers/char/tpm/tpm-dev-common.c |  45 ++++-
- drivers/char/tpm/tpm-interface.c  | 267 ++++++------------------------
- drivers/char/tpm/tpm-sysfs.c      | 138 +++++++++------
- drivers/char/tpm/tpm.h            |  64 +++----
- drivers/char/tpm/tpm1-cmd.c       |  28 +---
- drivers/char/tpm/tpm2-cmd.c       |  72 +++-----
- drivers/char/tpm/tpm2-space.c     |  93 ++++++++---
- drivers/char/tpm/tpm_i2c_atmel.c  |   5 +-
- drivers/char/tpm/tpm_vtpm_proxy.c |  12 +-
- drivers/char/tpm/xen-tpmfront.c   |   2 +-
- 11 files changed, 406 insertions(+), 425 deletions(-)
-
+diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-interface.c
+index 7ac6ada8428c..cb0d44c158ae 100644
+--- a/drivers/char/tpm/tpm-interface.c
++++ b/drivers/char/tpm/tpm-interface.c
+@@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip *chip,
+ 				 const u8 *cmd,
+ 				 size_t len)
+ {
+-	const struct tpm_input_header *header = (const void *)cmd;
++	const struct tpm_header *header = (const void *)cmd;
+ 	int i;
+ 	u32 cc;
+ 	u32 attrs;
+@@ -166,7 +166,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
+ 				u8 *buf, size_t bufsiz,
+ 				unsigned int flags)
+ {
+-	struct tpm_output_header *header = (void *)buf;
++	struct tpm_header *header = (void *)buf;
+ 	int rc;
+ 	ssize_t len = 0;
+ 	u32 count, ordinal;
+@@ -316,7 +316,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
+ ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
+ 		     u8 *buf, size_t bufsiz, unsigned int flags)
+ {
+-	struct tpm_output_header *header = (struct tpm_output_header *)buf;
++	struct tpm_header *header = (struct tpm_header *)buf;
+ 	/* space for header and handles */
+ 	u8 save[TPM_HEADER_SIZE + 3*sizeof(u32)];
+ 	unsigned int delay_msec = TPM2_DURATION_SHORT;
+@@ -381,8 +381,7 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, struct tpm_space *space,
+ 			 struct tpm_buf *buf, size_t min_rsp_body_length,
+ 			 unsigned int flags, const char *desc)
+ {
+-	const struct tpm_output_header *header =
+-		(struct tpm_output_header *)buf->data;
++	const struct tpm_header *header = (struct tpm_header *)buf->data;
+ 	int err;
+ 	ssize_t len;
+ 
+diff --git a/drivers/char/tpm/tpm.h b/drivers/char/tpm/tpm.h
+index 49bca4d1e786..86fa8ac0ae20 100644
+--- a/drivers/char/tpm/tpm.h
++++ b/drivers/char/tpm/tpm.h
+@@ -273,16 +273,13 @@ struct tpm_chip {
+ 
+ #define to_tpm_chip(d) container_of(d, struct tpm_chip, dev)
+ 
+-struct tpm_input_header {
+-	__be16	tag;
+-	__be32	length;
+-	__be32	ordinal;
+-} __packed;
+-
+-struct tpm_output_header {
+-	__be16	tag;
+-	__be32	length;
+-	__be32	return_code;
++struct tpm_header {
++	__be16 tag;
++	__be32 length;
++	union {
++		__be32 ordinal;
++		__be32 return_code;
++	};
+ } __packed;
+ 
+ #define TPM_TAG_RQU_COMMAND 193
+@@ -401,8 +398,8 @@ struct tpm_buf {
+ 
+ static inline void tpm_buf_reset(struct tpm_buf *buf, u16 tag, u32 ordinal)
+ {
+-	struct tpm_input_header *head;
+-	head = (struct tpm_input_header *)buf->data;
++	struct tpm_header *head = (struct tpm_header *)buf->data;
++
+ 	head->tag = cpu_to_be16(tag);
+ 	head->length = cpu_to_be32(sizeof(*head));
+ 	head->ordinal = cpu_to_be32(ordinal);
+@@ -428,14 +425,14 @@ static inline void tpm_buf_destroy(struct tpm_buf *buf)
+ 
+ static inline u32 tpm_buf_length(struct tpm_buf *buf)
+ {
+-	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
++	struct tpm_header *head = (struct tpm_header *) buf->data;
+ 
+ 	return be32_to_cpu(head->length);
+ }
+ 
+ static inline u16 tpm_buf_tag(struct tpm_buf *buf)
+ {
+-	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
++	struct tpm_header *head = (struct tpm_header *) buf->data;
+ 
+ 	return be16_to_cpu(head->tag);
+ }
+@@ -444,7 +441,7 @@ static inline void tpm_buf_append(struct tpm_buf *buf,
+ 				  const unsigned char *new_data,
+ 				  unsigned int new_len)
+ {
+-	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
++	struct tpm_header *head = (struct tpm_header *) buf->data;
+ 	u32 len = tpm_buf_length(buf);
+ 
+ 	/* Return silently if overflow has already happened. */
+diff --git a/drivers/char/tpm/tpm2-cmd.c b/drivers/char/tpm/tpm2-cmd.c
+index 2bcf470c8e5d..ab03f8600f89 100644
+--- a/drivers/char/tpm/tpm2-cmd.c
++++ b/drivers/char/tpm/tpm2-cmd.c
+@@ -784,7 +784,7 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
+  */
+ int tpm2_probe(struct tpm_chip *chip)
+ {
+-	struct tpm_output_header *out;
++	struct tpm_header *out;
+ 	struct tpm_buf buf;
+ 	int rc;
+ 
+@@ -797,7 +797,7 @@ int tpm2_probe(struct tpm_chip *chip)
+ 	rc = tpm_transmit_cmd(chip, NULL, &buf, 0, 0, NULL);
+ 	/* We ignore TPM return codes on purpose. */
+ 	if (rc >=  0) {
+-		out = (struct tpm_output_header *)buf.data;
++		out = (struct tpm_header *)buf.data;
+ 		if (be16_to_cpu(out->tag) == TPM2_ST_NO_SESSIONS)
+ 			chip->flags |= TPM_CHIP_FLAG_TPM2;
+ 	}
+diff --git a/drivers/char/tpm/tpm2-space.c b/drivers/char/tpm/tpm2-space.c
+index 5ecc73988f7c..862ee1ce1755 100644
+--- a/drivers/char/tpm/tpm2-space.c
++++ b/drivers/char/tpm/tpm2-space.c
+@@ -334,7 +334,7 @@ static int tpm2_map_response_header(struct tpm_chip *chip, u32 cc, u8 *rsp,
+ 				    size_t len)
+ {
+ 	struct tpm_space *space = &chip->work_space;
+-	struct tpm_output_header *header = (void *)rsp;
++	struct tpm_header *header = (void *)rsp;
+ 	u32 phandle;
+ 	u32 phandle_type;
+ 	u32 vhandle;
+@@ -394,7 +394,7 @@ static int tpm2_map_response_body(struct tpm_chip *chip, u32 cc, u8 *rsp,
+ 				  size_t len)
+ {
+ 	struct tpm_space *space = &chip->work_space;
+-	struct tpm_output_header *header = (void *)rsp;
++	struct tpm_header *header = (void *)rsp;
+ 	struct tpm2_cap_handles *data;
+ 	u32 phandle;
+ 	u32 phandle_type;
+@@ -492,7 +492,7 @@ static int tpm2_save_space(struct tpm_chip *chip)
+ int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
+ 		      u32 cc, u8 *buf, size_t *bufsiz)
+ {
+-	struct tpm_output_header *header = (void *)buf;
++	struct tpm_header *header = (void *)buf;
+ 	int rc;
+ 
+ 	if (!space)
+diff --git a/drivers/char/tpm/tpm_i2c_atmel.c b/drivers/char/tpm/tpm_i2c_atmel.c
+index 95ce2e9ccdc6..4720b2442ffe 100644
+--- a/drivers/char/tpm/tpm_i2c_atmel.c
++++ b/drivers/char/tpm/tpm_i2c_atmel.c
+@@ -46,7 +46,7 @@ struct priv_data {
+ 	/* This is the amount we read on the first try. 25 was chosen to fit a
+ 	 * fair number of read responses in the buffer so a 2nd retry can be
+ 	 * avoided in small message cases. */
+-	u8 buffer[sizeof(struct tpm_output_header) + 25];
++	u8 buffer[sizeof(struct tpm_header) + 25];
+ };
+ 
+ static int i2c_atmel_send(struct tpm_chip *chip, u8 *buf, size_t len)
+@@ -72,8 +72,7 @@ static int i2c_atmel_recv(struct tpm_chip *chip, u8 *buf, size_t count)
+ {
+ 	struct priv_data *priv = dev_get_drvdata(&chip->dev);
+ 	struct i2c_client *client = to_i2c_client(chip->dev.parent);
+-	struct tpm_output_header *hdr =
+-		(struct tpm_output_header *)priv->buffer;
++	struct tpm_header *hdr = (struct tpm_header *)priv->buffer;
+ 	u32 expected_len;
+ 	int rc;
+ 
+diff --git a/drivers/char/tpm/tpm_vtpm_proxy.c b/drivers/char/tpm/tpm_vtpm_proxy.c
+index 5f95fbfb7f6b..28eb5ab15b99 100644
+--- a/drivers/char/tpm/tpm_vtpm_proxy.c
++++ b/drivers/char/tpm/tpm_vtpm_proxy.c
+@@ -303,9 +303,9 @@ static int vtpm_proxy_tpm_op_recv(struct tpm_chip *chip, u8 *buf, size_t count)
+ static int vtpm_proxy_is_driver_command(struct tpm_chip *chip,
+ 					u8 *buf, size_t count)
+ {
+-	struct tpm_input_header *hdr = (struct tpm_input_header *)buf;
++	struct tpm_header *hdr = (struct tpm_header *)buf;
+ 
+-	if (count < sizeof(struct tpm_input_header))
++	if (count < sizeof(struct tpm_header))
+ 		return 0;
+ 
+ 	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
+@@ -402,7 +402,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
+ {
+ 	struct tpm_buf buf;
+ 	int rc;
+-	const struct tpm_output_header *header;
++	const struct tpm_header *header;
+ 	struct proxy_dev *proxy_dev = dev_get_drvdata(&chip->dev);
+ 
+ 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
+@@ -427,7 +427,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
+ 		goto out;
+ 	}
+ 
+-	header = (const struct tpm_output_header *)buf.data;
++	header = (const struct tpm_header *)buf.data;
+ 	rc = be32_to_cpu(header->return_code);
+ 	if (rc)
+ 		locality = -1;
+diff --git a/drivers/char/tpm/xen-tpmfront.c b/drivers/char/tpm/xen-tpmfront.c
+index b150f87f38f5..1259e935fd58 100644
+--- a/drivers/char/tpm/xen-tpmfront.c
++++ b/drivers/char/tpm/xen-tpmfront.c
+@@ -163,7 +163,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
+ 	wmb();
+ 	notify_remote_via_evtchn(priv->evtchn);
+ 
+-	ordinal = be32_to_cpu(((struct tpm_input_header*)buf)->ordinal);
++	ordinal = be32_to_cpu(((struct tpm_header *)buf)->ordinal);
+ 	duration = tpm_calc_ordinal_duration(chip, ordinal);
+ 
+ 	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
 -- 
 2.19.1
