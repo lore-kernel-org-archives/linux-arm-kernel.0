@@ -1,73 +1,108 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 13 Nov 2018 06:32:26 +0000
-Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
-In-Reply-To: <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
-References: <20180927224609.19515-1-robdclark@gmail.com>
- <20181029191000.GD16739@arm.com>
- <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
-Message-ID: <20181113063225.GA3109@brain-police>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 13 Nov 2018 06:39:13 +0000
+Subject: [PATCH 0/4] Add SOCFPGA System Manager
+In-Reply-To: <c08bf646-bf9f-5dad-acc8-6975acd6cff3@linux.intel.com>
+References: <1537826946-18942-1-git-send-email-thor.thayer@linux.intel.com>
+ <021aaa02-1138-e538-3d02-ff639541d0f3@linux.intel.com>
+ <a095071e-bd46-e440-fc01-7e2bbaf5964a@linux.intel.com>
+ <20181019061635.GH4939@dell>
+ <c08bf646-bf9f-5dad-acc8-6975acd6cff3@linux.intel.com>
+Message-ID: <20181113063913.GB5342@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 01:01:55PM -0500, Rob Clark wrote:
-> On Mon, Oct 29, 2018 at 3:09 PM Will Deacon <will.deacon@arm.com> wrote:
-> > On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
-> > > We seem to need to set either this or CFCFG (stall), otherwise gpu
-> > > faults trigger problems with other in-flight transactions from the
-> > > GPU causing CP errors, etc.
-> > >
-> > > In the ARM SMMU spec, the 'Hit under previous context fault' bit is
-> > > described as:
-> > >
-> > >  '0' - Stall or terminate subsequent transactions in the presence
-> > >        of an outstanding context fault
-> > >  '1' - Process all subsequent transactions independently of any
-> > >        outstanding context fault.
-> > >
-> > > Since we don't enable CFCFG (stall) the behavior of terminating
-> > > other transactions makes sense.  And is probably not what we want
-> > > (and definately not what we want for GPU).
-> > >
-> > > Signed-off-by: Rob Clark <robdclark@gmail.com>
-> > > ---
-> > > So I hit this issue a long time back on 820 (msm8996) and at the
-> > > time I solved it with a patch that enabled CFCFG.  And it resurfaced
-> > > more recently on sdm845.  But at the time CFCFG was rejected, iirc
-> > > because of concern that it would cause problems on other non-qcom
-> > > arm smmu implementations.  And I think I forgot to send this version
-> > > of the solution.
-> > >
-> > > If enabling HUPCF is anticipated to cause problems on other ARM
-> > > SMMU implementations, I think I can come up with a variant of this
-> > > patch which conditionally enables it for snapdragon.
-> > >
-> > > Either way, I'd really like to get some variant of this fix merged
-> > > (and probably it would be a good idea for stable kernel branches
-> > > too), since current behaviour with the GPU means faults turn into
-> > > a fantastic cascade of fail.
-> >
-> > Can you describe how this fantastic cascade of fail improves with this
-> > patch, please? If you're getting context faults then something has already
-> > gone horribly wrong, so I'm trying to work out how this improves things.
-> >
+On Fri, 09 Nov 2018, Thor Thayer wrote:
+
+> Hi
 > 
-> There are plenty of cases where getting iommu faults with a GPU is
-> "normal", or at least not something the kernel or even GL driver can
-> control.
+> On 10/19/18 1:16 AM, Lee Jones wrote:
+> > On Wed, 17 Oct 2018, Thor Thayer wrote:
+> > 
+> > 
+> > > On 10/10/2018 09:42 AM, Thor Thayer wrote:
+> > > > Hi
+> > > > On 09/24/2018 05:09 PM, thor.thayer at linux.intel.com wrote:
+> > > > > From: Thor Thayer <thor.thayer@linux.intel.com>
+> > > > > 
+> > > > > Add MFD driver for ARM64 SOCFPGA System Manager to steer
+> > > > > System Manager calls appropriately.
+> > > > > The SOCFPGA System Manager includes registers from several
+> > > > > SOC peripherals.
+> > > > > 
+> > > > > On ARM32, syscon handles this aggregated register grouping.
+> > > > > Redirect System Manager calls to syscon for ARM32 SOCFPGA
+> > > > > systems.
+> > > > > 
+> > > > > The ARM64 System Manager can only be accessed from priority
+> > > > > level EL3 so this new MFD driver handles the calls to EL3.
+> > > > > 
+> > > > > Thor Thayer (4):
+> > > > >  ?? mfd: altera-sysmgr: Add SOCFPGA System Manager abstraction
+> > > > >  ?? ARM: socfpga_defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+> > > > >  ?? arm64: defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+> > > > >  ?? net: stmmac: socfpga: Convert to shared System Manager driver
+> > > > > 
+> > > > >  ? MAINTAINERS??????????????????????????????????????? |?? 6 +
+> > > > >  ? arch/arm/configs/socfpga_defconfig???????????????? |?? 1 +
+> > > > >  ? arch/arm64/configs/defconfig?????????????????????? |?? 1 +
+> > > > >  ? drivers/mfd/Kconfig??????????????????????????????? |?? 9 +
+> > > > >  ? drivers/mfd/Makefile?????????????????????????????? |?? 1 +
+> > > > >  ? drivers/mfd/altera-sysmgr.c??????????????????????? | 310
+> > > > > +++++++++++++++++++++
+> > > > >  ? .../net/ethernet/stmicro/stmmac/dwmac-socfpga.c??? |?? 4 +-
+> > > > >  ? include/linux/mfd/altera-sysmgr.h????????????????? | 113 ++++++++
+> > > > >  ? 8 files changed, 444 insertions(+), 1 deletion(-)
+> > > > >  ? create mode 100644 drivers/mfd/altera-sysmgr.c
+> > > > >  ? create mode 100644 include/linux/mfd/altera-sysmgr.h
+> > > > > 
+> > > > Gentle ping.
+> > > 
+> > > Gentle ping again...
+> > > 
+> > > Any comments on this patch series?
+> > 
+> > "Please don't send content free pings and please allow a reasonable time
+> > for review.  People get busy, go on holiday, attend conferences and so
+> > on so unless there is some reason for urgency (like critical bug fixes)
+> > please allow at least a couple of weeks for review.  If there have been
+> > review comments then people may be waiting for those to be addressed.
+> > Sending content free pings just adds to the mail volume (if they are
+> > seen at all) and if something has gone wrong you'll have to resend the
+> > patches anyway so resending with any comments addressed is generally a
+> > much better approach."
+> > 
+> > In this case, the we are too late in the series to have these
+> > applied.  Maintainers are generally preparing their submissions for
+> > the merge-window.  The MFD component of this set is marked as "To
+> > Review" and I will get around to it when time is more abundant.
+> > 
+> 
+> Gentle ping now that the merge window is over.
+> 
+> I'm not clear on the scolding for content free pings.
+> 
+> Other pings I've seen just reference the patch series summary instead of
+> each patch individually. It seems like pings for each patch would add more
+> to the mail volume than the summary but perhaps I'm misunderstanding
+> something.  I'm happy to ping each patch separately if that is preferable.
 
-Such as? All the mainline driver does is print a diagnostic and clear the
-fault, which doesn't seem generally useful.
+Please don't ping at all.  If you would like to attract attention,
+please resend your patch-set with s/[PATCH]/[RESEND]/.
 
-> With this patch, you still get the iommu fault, but it doesn't cause
-> the gpu to crash.  But without it, other memory accesses in flight
-> while the fault occurs, like the GPU command-processor reading further
-> ahead in the cmdstream to setup next draw, would return zero's,
-> causing the GPU to crash or get into a bad state.
+> Series can be found here:
+> https://patchwork.kernel.org/cover/10612891/
+> 
+> [PATCH 1/4] mfd: altera-sysmgr: Add SOCFPGA System Manager
+> [PATCH 2/4] ARM: socfpga_defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+> [PATCH 3/4] arm64: defconfig: Enable CONFIG_MTD_ALTERA_SYSMGR
+> [PATCH 4/4] net: stmmac: socfpga: Use shared System Manager driver
+> 
+> Thanks,
+> 
+> Thor
 
-I get that part, but I don't understand why we're seeing faults in the first
-place and I worry that this patch is just the tip of the iceberg. It's also
-not clear that processing subsequent transactions is always the right thing
-to do in a world where we actually want to report (and handle) synchronous
-faults from devices.
-
-Will
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
