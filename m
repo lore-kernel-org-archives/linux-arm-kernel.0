@@ -1,31 +1,96 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 13 Nov 2018 15:24:13 +0000
-Subject: [PATCH] ARM: dts: rockchip: Fix Rock2 vcc_flash name
-Message-ID: <20181113152413.11386-1-john@metanate.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 13 Nov 2018 16:29:06 +0100
+Subject: [PATCH v2] arm64: Make kpti command line options x86 compatible
+Message-ID: <20181113152906.55802-1-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no functional change from this, but it is confusing to find two
-copies of vcc_sys and no vcc_flash when looking in
-/sys/class/regulator/*/name.
+I've already stumbled over 2 cases where people got confused about how to
+disable kpti on AArch64. In both cases, they used existing x86_64 options
+and just applied that to an AArch64 system, expecting it to work.
 
-Signed-off-by: John Keeping <john@metanate.com>
+I think it makes a lot of sense to have compatible kernel command line
+parameters whenever we can have them be compatible.
+
+So this patch adds the pti= and no_pti kernel command line options, mapping
+them into the existing kpti= command line framework. It preserves the old
+syntax to maintain compatibility with older command lines.
+
+While at it, the patch also marks the respective options as dual-arch.
+
+Reported-by: Richard Brown <rbrown@suse.de>
+Signed-off-by: Alexander Graf <agraf@suse.de>
+
 ---
- arch/arm/boot/dts/rk3288-rock2-som.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/rk3288-rock2-som.dtsi b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-index a610e592c148..b6bb58d9ff91 100644
---- a/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-+++ b/arch/arm/boot/dts/rk3288-rock2-som.dtsi
-@@ -25,7 +25,7 @@
+v1 -> v2:
+
+  - Actually make it compile. Sorry for the sloppy v1.
+---
+ Documentation/admin-guide/kernel-parameters.txt |  6 +++---
+ arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
+ 2 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 81d1d5a74728..4a1c6bcfcdb5 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -3522,8 +3522,8 @@
+ 	pt.		[PARIDE]
+ 			See Documentation/blockdev/paride.txt.
  
- 	vcc_flash: flash-regulator {
- 		compatible = "regulator-fixed";
--		regulator-name = "vcc_sys";
-+		regulator-name = "vcc_flash";
- 		regulator-min-microvolt = <1800000>;
- 		regulator-max-microvolt = <1800000>;
- 		startup-delay-us = <150>;
+-	pti=		[X86_64] Control Page Table Isolation of user and
+-			kernel address spaces.  Disabling this feature
++	pti=		[X86_64,ARM64] Control Page Table Isolation of user
++			and kernel address spaces.  Disabling this feature
+ 			removes hardening, but improves performance of
+ 			system calls and interrupts.
+ 
+@@ -3534,7 +3534,7 @@
+ 
+ 			Not specifying this option is equivalent to pti=auto.
+ 
+-	nopti		[X86_64]
++	nopti		[X86_64,ARM64]
+ 			Equivalent to pti=off
+ 
+ 	pty.legacy_count=
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index af50064dea51..a67b4b563a7c 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -978,13 +978,31 @@ static int __init parse_kpti(char *str)
+ 	bool enabled;
+ 	int ret = strtobool(str, &enabled);
+ 
+-	if (ret)
++	if (ret) {
++		if (!strncmp(str, "auto", 4)) {
++			__kpti_forced = 0;
++			return 0;
++		}
+ 		return ret;
++	}
+ 
+ 	__kpti_forced = enabled ? 1 : -1;
+ 	return 0;
+ }
+ early_param("kpti", parse_kpti);
++
++static int __init parse_pti(char *str)
++{
++	return parse_kpti(str);
++}
++early_param("pti", parse_pti);
++
++static int __init parse_no_pti(char *p)
++{
++	__kpti_forced = -1;
++	return 0;
++}
++early_param("nopti", parse_no_pti);
+ #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ #ifdef CONFIG_ARM64_HW_AFDBM
 -- 
-2.19.1
+2.12.3
