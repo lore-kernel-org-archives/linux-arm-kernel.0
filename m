@@ -1,35 +1,46 @@
-From: frieder.schrempf@kontron.De (Schrempf Frieder)
-Date: Tue, 13 Nov 2018 13:47:44 +0000
-Subject: [PATCH v5 7/9] ARM: dts: ls1021a: Remove fsl, qspi-has-second-chip as
- it is not used
-In-Reply-To: <1542116782-13118-1-git-send-email-frieder.schrempf@kontron.de>
-References: <1542116782-13118-1-git-send-email-frieder.schrempf@kontron.de>
-Message-ID: <1542116782-13118-8-git-send-email-frieder.schrempf@kontron.de>
+From: manu@freebsd.org (Emmanuel Vadot)
+Date: Tue, 13 Nov 2018 14:48:07 +0100
+Subject: [PATCH] arm64: dts: marvell: armada_8k: reserve memory for ATF
+Message-ID: <20181113134807.53292-1-manu@freebsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After switching to the new FSL QSPI driver the property
-'fsl,qspi-has-second-chip' is not needed anymore.
+Like 4436a371 for 37xx, reserve the PSCI area memory region so kernels
+can call the code there.
+Region address is taken from the ATF code [1] and is 2MiB aligned.
 
-The driver now uses the 'reg' property to determine the bus and
-the chipselect.
+[1] plat/marvell/a8k/common/include/platform_def.h
 
-Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
 ---
- arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-index 6a83f30..d3a1a73 100644
---- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-+++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-@@ -203,7 +203,6 @@
- };
+diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+index 073610ac0a53..d8a79bb69de1 100644
+--- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
+@@ -23,6 +23,21 @@
+ 		spi0 = &spi0;
+ 	};
  
- &qspi {
--	fsl,qspi-has-second-chip;
- 	status = "okay";
- 
- 	flash: flash at 0 {
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/*
++		 * The PSCI firmware region depicted below is the default one
++		 * and should be updated by the bootloader.
++		 */
++		psci-area at 4000000 {
++			reg = <0 0x4000000 0 0x200000>;
++			no-map;
++		};
++	};
++
+ 	psci {
+ 		compatible = "arm,psci-0.2";
+ 		method = "smc";
 -- 
-2.7.4
+2.19.0
