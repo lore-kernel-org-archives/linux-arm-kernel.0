@@ -1,49 +1,85 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Tue, 13 Nov 2018 15:59:09 +0100
-Subject: [PATCH] ARM: dts: i.MX25: add the clocks for the EPIT blocks
-In-Reply-To: <20181113144209.GB4557@dragon>
-References: <1541093567-29205-1-git-send-email-martin@kaiser.cx>
- <20181104144614.GJ26016@tiger>
- <20181105091230.z2ooz7olbdpopxyd@viti.kaiser.cx>
- <20181113144209.GB4557@dragon>
-Message-ID: <CAJiuCcc1dh9CYO1QcTUOfUPZdjZng80GX=0PiX+cQQ-m4=vq_g@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 13 Nov 2018 16:01:27 +0100
+Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
+In-Reply-To: <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
+ <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
+Message-ID: <CAAeHK+xPkbg_9P9oCkS-iB8S81vTxD3p5SbyWHy-vrp2ybkKmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Tue, 13 Nov 2018 at 15:42, Shawn Guo <shawnguo@kernel.org> wrote:
+On Thu, Nov 8, 2018 at 1:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 06, 2018 at 06:30:27PM +0100, Andrey Konovalov wrote:
+>> show_pte in arm64 fault handling relies on the fact that the top byte of
+>> a kernel pointer is 0xff, which isn't always the case with tag-based
+>> KASAN.
 >
-> On Mon, Nov 05, 2018 at 10:12:30AM +0100, Martin Kaiser wrote:
-> > Hi,
-> >
-> > Thus wrote Shawn Guo (shawnguo at kernel.org):
-> >
-> > > On Thu, Nov 01, 2018 at 06:32:47PM +0100, Martin Kaiser wrote:
-> > > > The i.MX25 contains two EPIT (Enhanced Periodic Interrupt Timer)
-> > > > function blocks. Add their ipg and per clocks to the device tree.
-> >
-> > > > Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-Acked-by: Cl?ment P?ron <peron.clem@gmail.com>
-> >
-> > > Are these EPIT devices actually used in upstream kernel, or just
-> > > somewhere else?
-> >
-> > Until I saw Vladimir's mail this morning, I wasn't aware of any mainline
-> > driver that's using the EPIT devices. I found that the clocks are
-> > missing when I tried to use EPIT with a company-internal driver that's
-> > not suitable for mainline integration.
-> >
-> > Still, I think that merging this patch does no harm. If the EPIT devices
-> > are present in the DT, we should add all resources they're using.
+> That's for the TTBR1 check, right?
 >
-> Agreed.  I will be happy to apply the patch if I can get an ACK from
-> Cl?ment saying this works with his driver in upstreaming.
-
-I have paused the dev of this driver for now, but this is fine for me.
-
-Regards,
-Clement
-
+> i.e. for the following to work:
 >
-> Shawn
+>         if (addr >= VA_START)
+>
+> ... we need the tag bits to be an extension of bit 55...
+>
+>>
+>> This patch resets the top byte in show_pte.
+>>
+>> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>> ---
+>>  arch/arm64/mm/fault.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 7d9571f4ae3d..d9a84d6f3343 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -32,6 +32,7 @@
+>>  #include <linux/perf_event.h>
+>>  #include <linux/preempt.h>
+>>  #include <linux/hugetlb.h>
+>> +#include <linux/kasan.h>
+>>
+>>  #include <asm/bug.h>
+>>  #include <asm/cmpxchg.h>
+>> @@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
+>>       pgd_t *pgdp;
+>>       pgd_t pgd;
+>>
+>> +     addr = (unsigned long)kasan_reset_tag((void *)addr);
+>
+> ... but this ORs in (0xffUL << 56), which is not correct for addresses
+> which aren't TTBR1 addresses to begin with, where bit 55 is clear, and
+> throws away useful information.
+>
+> We could use untagged_addr() here, but that wouldn't be right for
+> kernels which don't use TBI1, and we'd erroneously report addresses
+> under the TTBR1 range as being in the TTBR1 range.
+>
+> I also see that the entry assembly for el{1,0}_{da,ia} clears the tag
+> for EL0 addresses.
+>
+> So we could have:
+>
+> static inline bool is_ttbr0_addr(unsigned long addr)
+> {
+>         /* entry assembly clears tags for TTBR0 addrs */
+>         return addr < TASK_SIZE_64;
+> }
+>
+> static inline bool is_ttbr1_addr(unsigned long addr)
+> {
+>         /* TTBR1 addresses may have a tag if HWKASAN is in use */
+>         return arch_kasan_reset_tag(addr) >= VA_START;
+> }
+>
+> ... and use those in the conditionals, leaving the addr as-is for
+> reporting purposes.
+
+Actually it looks like 276e9327 ("arm64: entry: improve data abort
+handling of tagged pointers") already takes care of both user and
+kernel fault addresses and correctly removes tags from them. So I
+think we need to drop this patch.
