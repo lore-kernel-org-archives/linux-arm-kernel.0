@@ -1,18 +1,22 @@
-From: tomas.winkler@intel.com (Winkler, Tomas)
-Date: Tue, 13 Nov 2018 12:30:55 +0000
-Subject: [PATCH v6 00/17] Removed nested TPM operations
-In-Reply-To: <20181113122609.21643-1-jarkko.sakkinen@linux.intel.com>
-References: <20181113122609.21643-1-jarkko.sakkinen@linux.intel.com>
-Message-ID: <5B8DA87D05A7694D9FA63FD143655C1B9DA1CD09@hasmsx108.ger.corp.intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 13 Nov 2018 10:48:51 -0200
+Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
+In-Reply-To: <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAOMZO5CjFt1dyu8KOK+jKd88x8hwGNy9aJ-sGgooS9970TGTVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 13, 2018 at 6:25 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 
-> 
-> [was Detach TPM space code out of the tpm_transmit() flow but the scope
-> expanded a bit.]
+> --- /dev/null
+> +++ b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
+> @@ -0,0 +1,275 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later
 
-I believe you making this series artificially large we can merge the first 4 patches and leave the rest for further discussion.
+According to Documentation/process/license-rules.rst this should be:
 
-Thanks
-Tomas
++// SPDX-License-Identifier: GPL-2.0+
+
+Same applies to other places in this patch.
