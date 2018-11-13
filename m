@@ -1,55 +1,66 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Nov 2018 14:26:58 +0100
-Subject: [PATCH v4 03/26] clk: sunxi-ng: Add check for maximum rate to
- NKM PLLs
-In-Reply-To: <20181113111633.20189-4-jagan@amarulasolutions.com>
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-4-jagan@amarulasolutions.com>
-Message-ID: <20181113132658.niwy6bqdqzaeqpv2@flea>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 13 Nov 2018 14:32:22 +0100
+Subject: [PATCH] drm/meson: venc: dmt mode must use encp
+In-Reply-To: <9f20e9d1-2e15-c087-db52-674300d7581d@baylibre.com>
+References: <1542048069-22603-1-git-send-email-jramirez@baylibre.com>
+ <9f20e9d1-2e15-c087-db52-674300d7581d@baylibre.com>
+Message-ID: <ffe5e73a-c685-0a51-5038-1ede0e249b38@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 04:46:10PM +0530, Jagan Teki wrote:
-> Some NKM PLLs, frequency can be set above PLL working range.
+On 13/11/2018 09:35, Neil Armstrong wrote:
+> On 12/11/2018 19:41, Jorge Ramirez-Ortiz wrote:
+>> From: Jorge Ramirez-Ortiz <jorge.ramirez.ortiz@gmail.com>
+>>
+>> The video mode for DMT is only populated to support encp.
+>>
+>> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez.ortiz@gmail.com>
+>> ---
+>>  drivers/gpu/drm/meson/meson_venc.c | 15 ++++++++-------
+>>  1 file changed, 8 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+>> index 514245e..acbbad3 100644
+>> --- a/drivers/gpu/drm/meson/meson_venc.c
+>> +++ b/drivers/gpu/drm/meson/meson_venc.c
+>> @@ -854,6 +854,13 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
+>>  	unsigned int sof_lines;
+>>  	unsigned int vsync_lines;
+>>  
+>> +	/* Use VENCI for 480i and 576i and double HDMI pixels */
+>> +	if (mode->flags & DRM_MODE_FLAG_DBLCLK) {
+>> +		hdmi_repeat = true;
+>> +		use_enci = true;
+>> +		venc_hdmi_latency = 1;
+>> +	}
+>> +
+>>  	if (meson_venc_hdmi_supported_vic(vic)) {
+>>  		vmode = meson_venc_hdmi_get_vic_vmode(vic);
+>>  		if (!vmode) {
+>> @@ -865,13 +872,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
+>>  	} else {
+>>  		meson_venc_hdmi_get_dmt_vmode(mode, &vmode_dmt);
+>>  		vmode = &vmode_dmt;
+>> -	}
+>> -
+>> -	/* Use VENCI for 480i and 576i and double HDMI pixels */
+>> -	if (mode->flags & DRM_MODE_FLAG_DBLCLK) {
+>> -		hdmi_repeat = true;
+>> -		use_enci = true;
+>> -		venc_hdmi_latency = 1;
+>> +		use_enci = false;
+>>  	}
+>>  
+>>  	/* Repeat VENC pixels for 480/576i/p, 720p50/60 and 1080p50/60 */
+>>
 > 
-> Add a constraint for maximum supported rate. This way, drivers can
-> specify which is maximum allowed rate for PLL.
+> Thanks !
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> Acked-by: Stephen Boyd <sboyd@kernel.org>
-
-As Vasily reported on a previous version, this should be squashed with
-the patch 2.
-
-> ---
->  drivers/clk/sunxi-ng/ccu_nkm.c | 3 +++
->  drivers/clk/sunxi-ng/ccu_nkm.h | 1 +
->  2 files changed, 4 insertions(+)
+> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> index 6b5ad990f802..b8b66cdd30bf 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> @@ -128,6 +128,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
->  	if (rate < nkm->min_rate)
->  		return nkm->min_rate;
->  
-> +	if (nkm->max_rate && rate > nkm->max_rate)
-> +		return nkm->max_rate;
-> +
+> I'll apply to drm-misc-fixes !
+> 
+> Neil
+> 
 
-I would expect the test to be the same for the minimum and maximum cases.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181113/1217c715/attachment.sig>
+Applied.
