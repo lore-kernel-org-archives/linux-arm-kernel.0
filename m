@@ -1,53 +1,30 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 13 Nov 2018 11:22:21 +0100
-Subject: [PATCH] config: arm: omap2: remove PROVE_LOCKING from defconfig
-In-Reply-To: <20181108165958.GK56134@atomide.com>
-References: <CGME20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af@eucas1p2.samsung.com>
- <20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af~b_rxQW8J90311703117eucas1p2U@eucas1p2.samsung.com>
- <20181108165958.GK56134@atomide.com>
-Message-ID: <21ce2c61-0b20-41f2-4d12-3c5b1c4b7925@partner.samsung.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 13 Nov 2018 11:22:22 +0100
+Subject: [PATCH v3 0/6] spi: pxa2xx: add slave mode support
+Message-ID: <20181113102228.820214-1-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hello,
 
-On 11/8/18 5:59 PM, Tony Lindgren wrote:
-> Hi,
-> 
-> * Lukasz Luba <l.luba@partner.samsung.com> [181009 08:36]:
->> PROVE_LOCKING enables LOCKDEP, which causes big overhead on cache and
->> bus transactions.
->>
->> On some ARM big.LITTLE architecutres (Exynos 5433) the overhead is really big.
->> The overhead can be measures using hackbench which will speed up
->> by x3 times (11sec -> 3.4sec).
->> When you check transaction on cache or buses, the results are way higher
->> than normal for the same hackbench test:
->> L1d cache invalidations: 26mln vs 4mln
->> L2u cache invalidations: 42mln vs 12mln
->> bus cyc/access: 30cyc/access vs. 20cyc/access
->> context switch is x3 times cheaper
->>
->> Enable this option only when you have some locking issue to investigate.
-> 
-> I'm all for this, but this disables also other less intrusive
-> debug options. It used to be that we'd get locking issues merged
-> into drivers and I think that's how it originally got enabled.
-That's common reason for a few defconfigs in mainline.
-> 
-> So we should take a look which ones we can or want to keep.
-> Or just disable CONFIG_DEBUG completely.
-Ideally, the CI should try a few 'types' of configs,
-generated based on the 'defconfig'. Some 'smart' script might
-cut the debug options for an image for performance regression tests.
-> 
-> For distros, that's multi_v7_defconfig nowadays for most part
-> so I think most people using omap2plus_defconfig are developers
-> working on various devices.
-> 
-> Regards,
-> 
-> Tony
+this patch set adds slave mode support to pxa2xx.
 
-Regards,
-Lukasz
+The objective is that it will be able to support the OLPC XO 1.75 embedded
+controller that is a SPI master talking to a MMP2 SOC with an extra
+"ready" signal for handshaking.
+
+The patches have been submitted previously along with DT support for the
+controller which has already been accepted, hence the "v3". These are
+the remaining ones. Reviewed/Ack-ed by tags have been collected. Other
+changes to the pataches are described in the respective messages.
+
+The EC driver itself is being reviewed in a separate patch set.
+ 
+Verified on a OLPC XO 1.75 machine.
+
+Thanks to everyone who kindly provided feedback to make the patch set
+better.
+
+Thank you,
+Lubo
+   
