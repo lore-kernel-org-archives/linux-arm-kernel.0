@@ -1,118 +1,41 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Tue, 13 Nov 2018 11:22:24 +0100
-Subject: [PATCH v3 2/6] spi: Deal with slaves that return from transfer_one()
- unfinished
+Date: Tue, 13 Nov 2018 11:22:26 +0100
+Subject: [PATCH v3 4/6] spi: pxa2xx: dt-bindings: Add ready GPIO signal
 In-Reply-To: <20181113102228.820214-1-lkundrak@v3.sk>
 References: <20181113102228.820214-1-lkundrak@v3.sk>
-Message-ID: <20181113102228.820214-3-lkundrak@v3.sk>
+Message-ID: <20181113102228.820214-5-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some drivers, such as spi-pxa2xx return from the transfer_one callback
-immediately, idicating that the transfer will be finished asynchronously.
+This this is used to let the SPI master know that our FIFO is filled and
+we're ready to service a transfer. Only useful in slave mode.
 
-Normally, spi_transfer_one_message() synchronously waits for the
-transfer to finish with wait_for_completion_timeout(). For slaves, we
-don't want the transaction to time out as it can complete in a long time
-in future. Use wait_for_completion_interruptible() instead.
+A signal like this is used by an embedded controller on a OLPC XO 1.75
+machine, that happens to be a SPI master.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 
 ---
-Changed since v2:
-- Corrected the spi_transfer_wait() return value handling to avoid early
-  bail out without the necessary cleanup (thanks Geert Uytterhoeven)
+Changes since v2:
+- s/ready-gpio/ready-gpios/
+- Updated the subject line to conform with subsystem customs
 
- drivers/spi/spi.c | 62 +++++++++++++++++++++++++++++------------------
- 1 file changed, 39 insertions(+), 23 deletions(-)
+ Documentation/devicetree/bindings/spi/spi-pxa2xx.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-index 6ca59406b0b7..498d3b9bf3ae 100644
---- a/drivers/spi/spi.c
-+++ b/drivers/spi/spi.c
-@@ -1037,6 +1037,42 @@ static int spi_map_msg(struct spi_controller *ctlr, struct spi_message *msg)
- 	return __spi_map_msg(ctlr, msg);
- }
+diff --git a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+index 89b2832283e3..e30e0c2a4bce 100644
+--- a/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-pxa2xx.txt
+@@ -12,6 +12,8 @@ Optional properties:
+ - cs-gpios: list of GPIO chip selects. See the SPI bus bindings,
+   Documentation/devicetree/bindings/spi/spi-bus.txt
+ - spi-slave: Empty property indicating the SPI controller is used in slave mode.
++- ready-gpios: GPIO used to signal a SPI master that the FIFO is filled
++  and we're ready to service a transfer. Only useful in slave mode.
  
-+static int spi_transfer_wait(struct spi_controller *ctlr,
-+			     struct spi_message *msg,
-+			     struct spi_transfer *xfer)
-+{
-+	struct spi_statistics *statm = &ctlr->statistics;
-+	struct spi_statistics *stats = &msg->spi->statistics;
-+	unsigned long long ms = 1;
-+
-+	if (spi_controller_is_slave(ctlr)) {
-+		if (wait_for_completion_interruptible(&ctlr->xfer_completion)) {
-+			dev_dbg(&msg->spi->dev, "SPI transfer interrupted\n");
-+			return -EINTR;
-+		}
-+	} else {
-+		ms = 8LL * 1000LL * xfer->len;
-+		do_div(ms, xfer->speed_hz);
-+		ms += ms + 200; /* some tolerance */
-+
-+		if (ms > UINT_MAX)
-+			ms = UINT_MAX;
-+
-+		ms = wait_for_completion_timeout(&ctlr->xfer_completion,
-+						 msecs_to_jiffies(ms));
-+
-+		if (ms == 0) {
-+			SPI_STATISTICS_INCREMENT_FIELD(statm, timedout);
-+			SPI_STATISTICS_INCREMENT_FIELD(stats, timedout);
-+			dev_err(&msg->spi->dev,
-+				"SPI transfer timed out\n");
-+			return -ETIMEDOUT;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- /*
-  * spi_transfer_one_message - Default implementation of transfer_one_message()
-  *
-@@ -1050,7 +1086,6 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
- 	struct spi_transfer *xfer;
- 	bool keep_cs = false;
- 	int ret = 0;
--	unsigned long long ms = 1;
- 	struct spi_statistics *statm = &ctlr->statistics;
- 	struct spi_statistics *stats = &msg->spi->statistics;
- 
-@@ -1079,28 +1114,9 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
- 				goto out;
- 			}
- 
--			if (ret > 0) {
--				ret = 0;
--				ms = 8LL * 1000LL * xfer->len;
--				do_div(ms, xfer->speed_hz);
--				ms += ms + 200; /* some tolerance */
--
--				if (ms > UINT_MAX)
--					ms = UINT_MAX;
--
--				ms = wait_for_completion_timeout(&ctlr->xfer_completion,
--								 msecs_to_jiffies(ms));
--			}
--
--			if (ms == 0) {
--				SPI_STATISTICS_INCREMENT_FIELD(statm,
--							       timedout);
--				SPI_STATISTICS_INCREMENT_FIELD(stats,
--							       timedout);
--				dev_err(&msg->spi->dev,
--					"SPI transfer timed out\n");
--				msg->status = -ETIMEDOUT;
--			}
-+			ret = spi_transfer_wait(ctlr, msg, xfer);
-+			if (ret < 0)
-+				msg->status = ret;
- 		} else {
- 			if (xfer->len)
- 				dev_err(&msg->spi->dev,
+ Child nodes represent devices on the SPI bus
+   See ../spi/spi-bus.txt
 -- 
 2.19.1
