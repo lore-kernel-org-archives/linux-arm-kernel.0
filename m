@@ -1,29 +1,48 @@
-From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
-Date: Tue, 13 Nov 2018 11:29:15 +0000
-Subject: [PATCH 0/3] add support for MCP16502 PMIC
-Message-ID: <1542108563-10108-1-git-send-email-andrei.stefanescu@microchip.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 13 Nov 2018 16:46:20 +0530
+Subject: [PATCH v4 13/26] drm/sun4i: sun6i_mipi_dsi: Add DSI hblk packet
+ overhead
+In-Reply-To: <20181113111633.20189-1-jagan@amarulasolutions.com>
+References: <20181113111633.20189-1-jagan@amarulasolutions.com>
+Message-ID: <20181113111633.20189-14-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MCP16502 is a Power Management IC from Microchip.
-It has 4 Buck outputs and 2 LDOs. The buck regulators
-can be used in two modes: normal(FPWM) and low-power(Auto PFM).
+Add 10 bytes packet overhead for hblk where blank is set using
+a blanking packet like (4 bytes + 4 bytes + payload + 2 bytes)
 
-This patch series adds support for the MCP16502 PMIC.
+This is according to BSP code from BPI-M64-bsp (from linux-sunxi/
+drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 
-Andrei Stefanescu (3):
-  regulator: dt-bindings: add MCP16502 regulator bindings
-  MAINTAINERS: add maintainer for MCP16502 PMIC driver
-  regulator: mcp16502: add regulator driver for MCP16502
+dsi_hblk = (ht-hspw)*dsi_pixel_bits[format]/8-(4+4+2);
 
- .../bindings/regulator/mcp16502-regulator.txt      | 107 +++++
- MAINTAINERS                                        |   7 +
- drivers/regulator/Kconfig                          |   9 +
- drivers/regulator/Makefile                         |   1 +
- drivers/regulator/mcp16502.c                       | 524 +++++++++++++++++++++
- 5 files changed, 648 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
- create mode 100644 drivers/regulator/mcp16502.c
+So, add 10 bytes packet overhead for DSI hblk.
 
+Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index cd657ac4bdae..1a3cdd5b72a0 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -494,8 +494,13 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+ 
+ 	/*
+ 	 * hblk seems to be the line + porches length.
++	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
++	 * payload + 2 bytes). So minimal size is 10 bytes
+ 	 */
+-	hblk = (mode->htotal - (mode->hsync_end - mode->hsync_start)) * Bpp;
++#define HBLK_PACKET_OVERHEAD	10
++	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
++		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) *
++		   Bpp - HBLK_PACKET_OVERHEAD);
+ 
+ 	/*
+ 	 * And I'm not entirely sure what vblk is about. The driver in
 -- 
-2.7.4
+2.18.0.321.gffc6fa0e3
