@@ -1,71 +1,70 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Tue, 13 Nov 2018 10:16:57 +0000
-Subject: [PATCH] ARM: stm32: debug: add low-level debug support
-In-Reply-To: <20181113092422.GJ30658@n2100.armlinux.org.uk>
-References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
- <1501174209-27550-2-git-send-email-bich.hemon@st.com>
- <20181112182236.s7cs6dol4dmxkp7u@localhost>
- <f244c67b-de86-b0e7-7283-7b27f9591cf9@st.com>
- <20181113092422.GJ30658@n2100.armlinux.org.uk>
-Message-ID: <94666165-f206-5472-c848-499ba52cd354@st.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Tue, 13 Nov 2018 10:21:28 +0000
+Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
+In-Reply-To: <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-7-vincenzo.frascino@arm.com>
+ <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
+Message-ID: <c75dc535-7910-f3cb-4c63-802f18f70208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd,
 
+thank you for reviewing my patches.
 
-On 11/13/18 10:24 AM, Russell King - ARM Linux wrote:
-> On Tue, Nov 13, 2018 at 09:16:16AM +0000, Bich HEMON wrote:
->>
->> On 11/12/18 7:22 PM, Olof Johansson wrote:
->>> On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
->>>> From: Gerald Baeza <gerald.baeza@st.com>
->>>>
->>>> This adds low-level debug support on USART1 for STM32F4
->>>> and STM32F7.
->>>> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
->>>> Enabled via 'earlyprintk' in bootargs.
->>>>
->>>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
->>>> Signed-off-by: Bich Hemon <bich.hemon@st.com>
->>>
->>> Hi,
->>>
->>> This had fallen between the chairs it seems. I have applied it to arm-soc
->>> next/soc now, for 4.21 merge window.
->>>
->>> It ended up being patched up manually to consolidate the version in
->>> Russell's patch tracker with this posted version, and I tweaked whitespace
->>> a bit. Let me know if I missed something.
->>>
->>>
->>> Thanks,
->>>
->>> -Olof
->>>
->>
->> Hi Olof,
->>
->> Please note that this patch has to be abandoned as Ludovic BARRE pushed
->> a new version of this change:
->> https://patchwork.codeaurora.org/patch/400563/
->>
->> You can find it in Russell's tracker here:
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8803/1
+On 09/11/2018 16:05, Arnd Bergmann wrote:
+> On Fri, Nov 9, 2018 at 1:38 PM Vincenzo Frascino
+> <vincenzo.frascino@arm.com> wrote:
+>> +/*
+>> + * To avoid performance issues __u_vdso (unsigned vdso type) depends
+>> + * on the architecture:
+>> + * 32 bit only __u_vdso is defined as __u32
+>> + * 64 bit plus compat __u_vdso is defined as __u64
+>> + */
+>> +#ifdef CONFIG_GENERIC_VDSO_32
+>> +typedef __u32 __u_vdso;
+>> +#else
+>> +typedef __u64 __u_vdso;
+>> +#endif /* CONFIG_GENERIC_VDSO_32 */
+>> +
+>>  struct vdso_data {
+>> -       __u64 cs_cycle_last;    /* Timebase at clocksource init */
+>> -       __u64 raw_time_sec;     /* Raw time */
+>> +       __u64 cs_cycle_last;            /* Timebase at clocksource init */
+>> +       __u_vdso raw_time_sec;          /* Raw time */
+>>         __u64 raw_time_nsec;
+>> -       __u64 xtime_clock_sec;  /* Kernel time */
+>> +       __u_vdso xtime_clock_sec;       /* Kernel time */
+>>         __u64 xtime_clock_nsec;
+>> -       __u64 xtime_coarse_sec; /* Coarse time */
+>> +       __u_vdso xtime_coarse_sec;      /* Coarse time */
+>>         __u64 xtime_coarse_nsec;
+>> -       __u64 wtm_clock_sec;    /* Wall to monotonic time */
+>> +       __u_vdso wtm_clock_sec;         /* Wall to monotonic time */
 > 
-> And I'm not going to merge that because:
-> 
-> 1) it's not for me to merge - it doesn't go through my tree, but through
->     arm-soc, which Olof and Arnd manage.
-> 2) it's not been on the mailing list as per normal submission process.
-> 
-> Sorry.
+> It looks like you change the layout in a way that makes it incompatible between
+> 32-bit and 64-bit user space. Doesn't that break the compat-vdso code
+> for 32-bit?
 > 
 
-Ok, thank you for the feedback.
+No, it does not since vdso_data structure is not part of the ABI and the userspace can access the vdso library only via function symbols. There was a proposal some time ago to introduce ABI data structures in the vdso data page but it was rejected [1] and [2].
 
-So Olof, can you please ignore my previous email and merge my patch as 
-you proposed it for 4.21. Ludovic's patch will be abandoned instead.
+CONFIG_GENERIC_VDSO_32 is meant to be used in 32 bit only platforms and the rationale behind it is to preserve performances were possible.
 
-Thanks,
+[1] https://lkml.org/lkml/2015/9/2/460
+[2] https://lkml.org/lkml/2015/9/2/534
 
-Bich
+> It also seems like we need the seconds to be 64-bit wide, at least
+> for anything that counts in CLOCK_REALTIME or a related format,
+> otherwise we have to change it back for y2038 support.
+> 
+
+I agree with you, we should address the y2038 support here, even if there are some architectures that currently use u32 for CLOCK_REALTIME sec.
+
+>       Arnd
+> 
+
+-- 
+Regards,
+Vincenzo
