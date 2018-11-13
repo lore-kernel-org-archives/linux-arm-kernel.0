@@ -1,61 +1,30 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 13 Nov 2018 09:39:08 +0000
-Subject: [PATCH v2 06/10] dt-bindings: serial: Add bindings for
- nvidia,tegra194-tcu
-In-Reply-To: <20181112151853.29289-7-thierry.reding@gmail.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-7-thierry.reding@gmail.com>
-Message-ID: <f7d19f6e-0dcd-753c-a407-fcec4fa1474b@nvidia.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 13 Nov 2018 10:51:40 +0100
+Subject: [PATCH 1/3] dt-bindings: pinctrl: stm32: Document hwlocks properties
+In-Reply-To: <20181113095142.32015-1-benjamin.gaignard@st.com>
+References: <20181113095142.32015-1-benjamin.gaignard@st.com>
+Message-ID: <20181113095142.32015-2-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add hwlocks as optional property
 
-On 12/11/2018 15:18, Thierry Reding wrote:
-> From: Mikko Perttunen <mperttunen@nvidia.com>
-> 
-> Add bindings for the Tegra Combined UART device used to talk to the
-> UART console on Tegra194 systems.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Acked-by: Jon Hunter <jonathanh@nvidia.com>
-> Acked-by: Thierry Reding <treding@nvidia.com>
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
-> ---
->  .../bindings/serial/nvidia,tegra194-tcu.txt   | 35 +++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-> new file mode 100644
-> index 000000000000..085a8591accd
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
-> @@ -0,0 +1,35 @@
-> +NVIDIA Tegra Combined UART (TCU)
-> +
-> +The TCU is a system for sharing a hardware UART instance among multiple
-> +systems within the Tegra SoC. It is implemented through a mailbox-
-> +based protocol where each "virtual UART" has a pair of mailboxes, one
-> +for transmitting and one for receiving, that is used to communicate
-> +with the hardware implementing the TCU.
-> +
-> +Required properties:
-> +- name : Should be tcu
-> +- compatible
-> +    Array of strings
-> +    One of:
-> +    - "nvidia,tegra194-tcu"
-> +- mbox-names:
-> +    "rx" - Mailbox for receiving data from hardware UART
-> +    "tx" - Mailbox for transmitting data to hardware UART
-> +- mboxes: Mailboxes corresponding to the mbox-names.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Looks like there is some trailing white-space in the above line and git
-warns after applying this patch.
-
-Cheers
-Jon
-
+diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+index ef4f2ff4a1aa..48df30a36b01 100644
+--- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
+@@ -56,6 +56,7 @@ Optional properties:
+    More details in Documentation/devicetree/bindings/gpio/gpio.txt.
+  - st,bank-ioport: should correspond to the EXTI IOport selection (EXTI line
+    used to select GPIOs as interrupts).
++ - hwlocks: reference to a phandle of a hardware spinlock provider node.
+ 
+ Example 1:
+ #include <dt-bindings/pinctrl/stm32f429-pinfunc.h>
 -- 
-nvpublic
+2.15.0
