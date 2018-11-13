@@ -1,46 +1,27 @@
-From: manu@freebsd.org (Emmanuel Vadot)
-Date: Tue, 13 Nov 2018 14:48:07 +0100
-Subject: [PATCH] arm64: dts: marvell: armada_8k: reserve memory for ATF
-Message-ID: <20181113134807.53292-1-manu@freebsd.org>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 13 Nov 2018 14:50:48 +0100
+Subject: [PATCH 0/3] ARM: davinci: fix ethernet support on da850-evm
+Message-ID: <20181113135051.15308-1-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like 4436a371 for 37xx, reserve the PSCI area memory region so kernels
-can call the code there.
-Region address is taken from the ATF code [1] and is 2MiB aligned.
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-[1] plat/marvell/a8k/common/include/platform_def.h
+Ethernet doesn't work on da850-evm in legacy boot mode since v4.19. This
+series addresses two problems I've found. I guess with this kind of
+intrusive changes in the GPIO driver, other boards may be broken at the
+moment too.
 
-Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Bartosz Golaszewski (3):
+  ARM: davinci: define gpio interrupts as separate resources
+  gpio: davinci: restore a way to manually specify the GPIO base
+  ARM: davinci: fix da850-evm boot in legacy mode
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-index 073610ac0a53..d8a79bb69de1 100644
---- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-@@ -23,6 +23,21 @@
- 		spi0 = &spi0;
- 	};
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/*
-+		 * The PSCI firmware region depicted below is the default one
-+		 * and should be updated by the bootloader.
-+		 */
-+		psci-area at 4000000 {
-+			reg = <0 0x4000000 0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-0.2";
- 		method = "smc";
+ arch/arm/mach-davinci/da850.c              |  4 ++-
+ arch/arm/mach-davinci/devices-da8xx.c      | 42 +++++++++++++++++++++-
+ drivers/gpio/gpio-davinci.c                |  2 +-
+ include/linux/platform_data/gpio-davinci.h |  2 ++
+ 4 files changed, 47 insertions(+), 3 deletions(-)
+
 -- 
-2.19.0
+2.19.1
