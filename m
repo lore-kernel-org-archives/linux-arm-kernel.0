@@ -1,70 +1,53 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Tue, 13 Nov 2018 10:21:28 +0000
-Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
-In-Reply-To: <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-7-vincenzo.frascino@arm.com>
- <CAK8P3a3yu_ZOCxDhGvPnff45jEkEMcQ-KuX5Otqfzfi52kd+tA@mail.gmail.com>
-Message-ID: <c75dc535-7910-f3cb-4c63-802f18f70208@arm.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Tue, 13 Nov 2018 11:22:21 +0100
+Subject: [PATCH] config: arm: omap2: remove PROVE_LOCKING from defconfig
+In-Reply-To: <20181108165958.GK56134@atomide.com>
+References: <CGME20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af@eucas1p2.samsung.com>
+ <20181009153624eucas1p2ad30aea33ad1c869f11bd9ca1156d9af~b_rxQW8J90311703117eucas1p2U@eucas1p2.samsung.com>
+ <20181108165958.GK56134@atomide.com>
+Message-ID: <21ce2c61-0b20-41f2-4d12-3c5b1c4b7925@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Tony,
 
-thank you for reviewing my patches.
-
-On 09/11/2018 16:05, Arnd Bergmann wrote:
-> On Fri, Nov 9, 2018 at 1:38 PM Vincenzo Frascino
-> <vincenzo.frascino@arm.com> wrote:
->> +/*
->> + * To avoid performance issues __u_vdso (unsigned vdso type) depends
->> + * on the architecture:
->> + * 32 bit only __u_vdso is defined as __u32
->> + * 64 bit plus compat __u_vdso is defined as __u64
->> + */
->> +#ifdef CONFIG_GENERIC_VDSO_32
->> +typedef __u32 __u_vdso;
->> +#else
->> +typedef __u64 __u_vdso;
->> +#endif /* CONFIG_GENERIC_VDSO_32 */
->> +
->>  struct vdso_data {
->> -       __u64 cs_cycle_last;    /* Timebase at clocksource init */
->> -       __u64 raw_time_sec;     /* Raw time */
->> +       __u64 cs_cycle_last;            /* Timebase at clocksource init */
->> +       __u_vdso raw_time_sec;          /* Raw time */
->>         __u64 raw_time_nsec;
->> -       __u64 xtime_clock_sec;  /* Kernel time */
->> +       __u_vdso xtime_clock_sec;       /* Kernel time */
->>         __u64 xtime_clock_nsec;
->> -       __u64 xtime_coarse_sec; /* Coarse time */
->> +       __u_vdso xtime_coarse_sec;      /* Coarse time */
->>         __u64 xtime_coarse_nsec;
->> -       __u64 wtm_clock_sec;    /* Wall to monotonic time */
->> +       __u_vdso wtm_clock_sec;         /* Wall to monotonic time */
+On 11/8/18 5:59 PM, Tony Lindgren wrote:
+> Hi,
 > 
-> It looks like you change the layout in a way that makes it incompatible between
-> 32-bit and 64-bit user space. Doesn't that break the compat-vdso code
-> for 32-bit?
+> * Lukasz Luba <l.luba@partner.samsung.com> [181009 08:36]:
+>> PROVE_LOCKING enables LOCKDEP, which causes big overhead on cache and
+>> bus transactions.
+>>
+>> On some ARM big.LITTLE architecutres (Exynos 5433) the overhead is really big.
+>> The overhead can be measures using hackbench which will speed up
+>> by x3 times (11sec -> 3.4sec).
+>> When you check transaction on cache or buses, the results are way higher
+>> than normal for the same hackbench test:
+>> L1d cache invalidations: 26mln vs 4mln
+>> L2u cache invalidations: 42mln vs 12mln
+>> bus cyc/access: 30cyc/access vs. 20cyc/access
+>> context switch is x3 times cheaper
+>>
+>> Enable this option only when you have some locking issue to investigate.
 > 
-
-No, it does not since vdso_data structure is not part of the ABI and the userspace can access the vdso library only via function symbols. There was a proposal some time ago to introduce ABI data structures in the vdso data page but it was rejected [1] and [2].
-
-CONFIG_GENERIC_VDSO_32 is meant to be used in 32 bit only platforms and the rationale behind it is to preserve performances were possible.
-
-[1] https://lkml.org/lkml/2015/9/2/460
-[2] https://lkml.org/lkml/2015/9/2/534
-
-> It also seems like we need the seconds to be 64-bit wide, at least
-> for anything that counts in CLOCK_REALTIME or a related format,
-> otherwise we have to change it back for y2038 support.
+> I'm all for this, but this disables also other less intrusive
+> debug options. It used to be that we'd get locking issues merged
+> into drivers and I think that's how it originally got enabled.
+That's common reason for a few defconfigs in mainline.
 > 
-
-I agree with you, we should address the y2038 support here, even if there are some architectures that currently use u32 for CLOCK_REALTIME sec.
-
->       Arnd
+> So we should take a look which ones we can or want to keep.
+> Or just disable CONFIG_DEBUG completely.
+Ideally, the CI should try a few 'types' of configs,
+generated based on the 'defconfig'. Some 'smart' script might
+cut the debug options for an image for performance regression tests.
 > 
+> For distros, that's multi_v7_defconfig nowadays for most part
+> so I think most people using omap2plus_defconfig are developers
+> working on various devices.
+> 
+> Regards,
+> 
+> Tony
 
--- 
 Regards,
-Vincenzo
+Lukasz
