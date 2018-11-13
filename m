@@ -1,68 +1,67 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 13 Nov 2018 14:32:36 +0100
-Subject: [PATCH 0/2] drm/meson: Allow using optional canvas provider
-In-Reply-To: <CAMO6nax_Q4kbDkeBmYQezo9dpMztD4DMFh+1dewax4p6d_S7mw@mail.gmail.com>
-References: <20181105104508.23090-1-mjourdan@baylibre.com>
- <1a3d3b7a-5050-7b4c-bda6-8ef532403d01@baylibre.com>
- <CAMO6nax_Q4kbDkeBmYQezo9dpMztD4DMFh+1dewax4p6d_S7mw@mail.gmail.com>
-Message-ID: <ec49e7c1-8ca6-b442-10dc-1f15a15917bc@baylibre.com>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Tue, 13 Nov 2018 14:32:35 +0100
+Subject: [PATCH] arm64: dts: actions: s700: Add I2C controller nodes
+Message-ID: <20181113133235.37754-1-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2018 15:02, Maxime Jourdan wrote:
-> Hi Neil,
-> 
-> On Mon, Nov 5, 2018 at 1:51 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->> Hi Maxime,
->>
->> On 05/11/2018 11:45, Maxime Jourdan wrote:
->>> The meson DRM driver currently uses constant, static canvas indexes.
->>>
->>> This is not optimal and could conflict with other drivers also using
->>> canvases.
->>
->> Indeed, it's now time to use the canvas provider merged in 4.20-rc1 !
->>
->>>
->>> This patch series allows the driver to optionnally use a canvas provider
->>> module that is able to dispatch canvases, on demand and free of conflict.
->>>
->>> In the future, the current way of doing things will be deprecated.
->>
->> Do you confirm you will send a patch to remove the legacy canvas code when
->> everything is merged (including DT changes) ?
->>
->> I'll wait until the bindings are reviewed, then I'll push the serie to drm-misc-next.
->>
-> 
-> Yes, ultimately it will be removed.
-> 
-> The plan is:
-> 
-> 4.21: allow using both modes, add the "amlogic,canvas" property to the dts files
-> 4.22: remove the old way and change the amlogic,canvas property to mandatory
-> 
-> This should allow for a nice transition.
-> 
-> Maxime
-> 
->> Thanks,
->> Neil
->>
->>>
->>> Maxime Jourdan (2):
->>>   dt-bindings: display: amlogic, meson-vpu: Add optional canvas provider
->>>     node
->>>   drm/meson: Use optional canvas provider
->>>
->>>  .../bindings/display/amlogic,meson-vpu.txt    |  2 +
->>>  drivers/gpu/drm/meson/Kconfig                 |  1 +
->>>  drivers/gpu/drm/meson/meson_crtc.c            | 14 ++++--
->>>  drivers/gpu/drm/meson/meson_drv.c             | 46 ++++++++++++-------
->>>  drivers/gpu/drm/meson/meson_drv.h             |  4 ++
->>>  drivers/gpu/drm/meson/meson_plane.c           |  8 +++-
->>>  6 files changed, 53 insertions(+), 22 deletions(-)
->>>
+Add I2C controller nodes for Actions Semiconductor S700 SoC.
 
-Applied
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+---
+ arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index 192c7b39c8c1..573c844d7afe 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -174,6 +174,46 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		i2c0: i2c at e0170000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0170000 0 0x1000>;
++			clocks = <&cmu CLK_I2C0>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at e0174000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0174000 0 0x1000>;
++			clocks = <&cmu CLK_I2C1>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at e0178000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe0178000 0 0x1000>;
++			clocks = <&cmu CLK_I2C2>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c3: i2c at e017c000 {
++			compatible = "actions,s900-i2c";
++			reg = <0 0xe017c000 0 0x1000>;
++			clocks = <&cmu CLK_I2C3>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		sps: power-controller at e01b0100 {
+ 			compatible = "actions,s700-sps";
+ 			reg = <0x0 0xe01b0100 0x0 0x100>;
+-- 
+2.17.2
