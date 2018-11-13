@@ -1,79 +1,82 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 13 Nov 2018 14:52:59 +0100
-Subject: [PATCH 0/5] media: Allwinner A10 CSI support
-In-Reply-To: <df54f2e6-e207-92de-767a-e356345a1a56@xs4all.nl>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <df54f2e6-e207-92de-767a-e356345a1a56@xs4all.nl>
-Message-ID: <20181113135259.onutfjtoi25afnfe@flea>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 13 Nov 2018 14:50:49 +0100
+Subject: [PATCH 1/3] ARM: davinci: define gpio interrupts as separate resources
+In-Reply-To: <20181113135051.15308-1-brgl@bgdev.pl>
+References: <20181113135051.15308-1-brgl@bgdev.pl>
+Message-ID: <20181113135051.15308-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-On Tue, Nov 13, 2018 at 01:30:49PM +0100, Hans Verkuil wrote:
-> On 11/13/18 09:24, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > Here is a series introducing the support for the A10 (and SoCs of the same
-> > generation) CMOS Sensor Interface (called CSI, not to be confused with
-> > MIPI-CSI, which isn't support by that IP).
-> > 
-> > That interface is pretty straightforward, but the driver has a few issues
-> > that I wanted to bring up:
-> > 
-> >   * The only board I've been testing this with has an ov5640 sensor
-> >     attached, which doesn't work with the upstream driver. Copying the
-> >     Allwinner init sequence works though, and this is how it has been
-> >     tested. Testing with a second sensor would allow to see if it's an
-> >     issue on the CSI side or the sensor side.
-> >   * When starting a capture, the last buffer to capture will fail due to
-> >     double buffering being used, and we don't have a next buffer for the
-> >     last frame. I'm not sure how to deal with that though. It seems like
-> >     some drivers use a scratch buffer in such a case, some don't care, so
-> >     I'm not sure which solution should be preferred.
-> >   * We don't have support for the ISP at the moment, but this can be added
-> >     eventually.
-> > 
-> >   * How to model the CSI module clock isn't really clear to me. It looks
-> >     like it goes through the CSI controller and then is muxed to one of the
-> >     CSI pin so that it can clock the sensor. I'm not quite sure how to
-> >     model it, if it should be a clock, the CSI driver being a clock
-> >     provider, or if the sensor should just use the module clock directly.
-> > 
-> > Here is the v4l2-compliance output:
-> 
-> Test v4l2-compliance with the -s option so you test streaming as well.
-> Even better is -f where it tests streaming with all available formats.
+Since commit eb3744a2dd01 ("gpio: davinci: Do not assume continuous
+IRQ numbering") the davinci GPIO driver fails to probe if we boot
+in legacy mode from any of the board files. Since the driver now
+expects every interrupt to be defined as a separate resource, split
+the definition in devices-da8xx.c instead of having a single continuous
+interrupt range.
 
-I will, thanks for the tip!
+Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ numbering")
+Cc: stable at vger.kernel.org
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/devices-da8xx.c | 42 ++++++++++++++++++++++++++-
+ 1 file changed, 41 insertions(+), 1 deletion(-)
 
-> > v4l2-compliance SHA   : 339d550e92ac15de8668f32d66d16f198137006c
-> 
-> Hmm, I can't find this SHA. Was this built from the main v4l-utils repo?
-
-It was, but using Buildroot. The version packaged in the latest stable
-version I was using (2018.08) is 1.14.2.
-
-Looking at the Makefile from v4l2-compliance, it looks like it just
-invokes git to retrieve the git commit and uses that as the hash. In
-Buildroot's case, since buildroot will download the tarball, this will
-end up returning the SHA commit of the buildroot repo building the
-sources, not the version of the sources themselves.
-
-I'm not sure how to address that properly though. Thomas, how do you
-usually deal with this?
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index 1fd3619f6a09..8c4ae9866e3c 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -701,9 +701,49 @@ static struct resource da8xx_gpio_resources[] = {
+ 	},
+ 	{ /* interrupt */
+ 		.start	= IRQ_DA8XX_GPIO0,
+-		.end	= IRQ_DA8XX_GPIO8,
++		.end	= IRQ_DA8XX_GPIO0,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
++	{
++		.start	= IRQ_DA8XX_GPIO1,
++		.end	= IRQ_DA8XX_GPIO1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO2,
++		.end    = IRQ_DA8XX_GPIO2,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO3,
++		.end    = IRQ_DA8XX_GPIO3,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO4,
++		.end    = IRQ_DA8XX_GPIO4,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO5,
++		.end    = IRQ_DA8XX_GPIO5,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO6,
++		.end    = IRQ_DA8XX_GPIO6,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO7,
++		.end    = IRQ_DA8XX_GPIO7,
++		.flags  = IORESOURCE_IRQ,
++	},
++	{
++		.start  = IRQ_DA8XX_GPIO8,
++		.end    = IRQ_DA8XX_GPIO8,
++		.flags  = IORESOURCE_IRQ,
++	}
+ };
+ 
+ static struct platform_device da8xx_gpio_device = {
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181113/e7462626/attachment.sig>
+2.19.1
