@@ -1,255 +1,177 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Tue, 13 Nov 2018 14:25:56 +0200
-Subject: [PATCH v6 07/17] tpm: declare struct tpm_header
-In-Reply-To: <20181113122609.21643-1-jarkko.sakkinen@linux.intel.com>
-References: <20181113122609.21643-1-jarkko.sakkinen@linux.intel.com>
-Message-ID: <20181113122609.21643-8-jarkko.sakkinen@linux.intel.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Tue, 13 Nov 2018 13:30:49 +0100
+Subject: [PATCH 0/5] media: Allwinner A10 CSI support
+In-Reply-To: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+Message-ID: <df54f2e6-e207-92de-767a-e356345a1a56@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Decleare struct tpm_header that replaces struct tpm_input_header and
-struct tpm_output_header.
+On 11/13/18 09:24, Maxime Ripard wrote:
+> Hi,
+> 
+> Here is a series introducing the support for the A10 (and SoCs of the same
+> generation) CMOS Sensor Interface (called CSI, not to be confused with
+> MIPI-CSI, which isn't support by that IP).
+> 
+> That interface is pretty straightforward, but the driver has a few issues
+> that I wanted to bring up:
+> 
+>   * The only board I've been testing this with has an ov5640 sensor
+>     attached, which doesn't work with the upstream driver. Copying the
+>     Allwinner init sequence works though, and this is how it has been
+>     tested. Testing with a second sensor would allow to see if it's an
+>     issue on the CSI side or the sensor side.
+>   * When starting a capture, the last buffer to capture will fail due to
+>     double buffering being used, and we don't have a next buffer for the
+>     last frame. I'm not sure how to deal with that though. It seems like
+>     some drivers use a scratch buffer in such a case, some don't care, so
+>     I'm not sure which solution should be preferred.
+>   * We don't have support for the ISP at the moment, but this can be added
+>     eventually.
+> 
+>   * How to model the CSI module clock isn't really clear to me. It looks
+>     like it goes through the CSI controller and then is muxed to one of the
+>     CSI pin so that it can clock the sensor. I'm not quite sure how to
+>     model it, if it should be a clock, the CSI driver being a clock
+>     provider, or if the sensor should just use the module clock directly.
+> 
+> Here is the v4l2-compliance output:
 
-Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
-Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
----
- drivers/char/tpm/tpm-interface.c  |  9 ++++-----
- drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
- drivers/char/tpm/tpm2-cmd.c       |  4 ++--
- drivers/char/tpm/tpm2-space.c     |  6 +++---
- drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
- drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
- drivers/char/tpm/xen-tpmfront.c   |  2 +-
- 7 files changed, 28 insertions(+), 33 deletions(-)
+Test v4l2-compliance with the -s option so you test streaming as well.
+Even better is -f where it tests streaming with all available formats.
 
-diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-interface.c
-index 28d48799b044..6abbcedc87a3 100644
---- a/drivers/char/tpm/tpm-interface.c
-+++ b/drivers/char/tpm/tpm-interface.c
-@@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip *chip,
- 				 const u8 *cmd,
- 				 size_t len)
- {
--	const struct tpm_input_header *header = (const void *)cmd;
-+	const struct tpm_header *header = (const void *)cmd;
- 	int i;
- 	u32 cc;
- 	u32 attrs;
-@@ -166,7 +166,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
- 				u8 *buf, size_t bufsiz,
- 				unsigned int flags)
- {
--	struct tpm_output_header *header = (void *)buf;
-+	struct tpm_header *header = (void *)buf;
- 	int rc;
- 	ssize_t len = 0;
- 	u32 count, ordinal;
-@@ -276,7 +276,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
- ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
- 		     u8 *buf, size_t bufsiz, unsigned int flags)
- {
--	struct tpm_output_header *header = (struct tpm_output_header *)buf;
-+	struct tpm_header *header = (struct tpm_header *)buf;
- 	/* space for header and handles */
- 	u8 save[TPM_HEADER_SIZE + 3*sizeof(u32)];
- 	unsigned int delay_msec = TPM2_DURATION_SHORT;
-@@ -375,8 +375,7 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, struct tpm_space *space,
- 			 struct tpm_buf *buf, size_t min_rsp_body_length,
- 			 unsigned int flags, const char *desc)
- {
--	const struct tpm_output_header *header =
--		(struct tpm_output_header *)buf->data;
-+	const struct tpm_header *header = (struct tpm_header *)buf->data;
- 	int err;
- 	ssize_t len;
- 
-diff --git a/drivers/char/tpm/tpm.h b/drivers/char/tpm/tpm.h
-index 229ac42b644e..92638ec6ec97 100644
---- a/drivers/char/tpm/tpm.h
-+++ b/drivers/char/tpm/tpm.h
-@@ -273,16 +273,13 @@ struct tpm_chip {
- 
- #define to_tpm_chip(d) container_of(d, struct tpm_chip, dev)
- 
--struct tpm_input_header {
--	__be16	tag;
--	__be32	length;
--	__be32	ordinal;
--} __packed;
--
--struct tpm_output_header {
--	__be16	tag;
--	__be32	length;
--	__be32	return_code;
-+struct tpm_header {
-+	__be16 tag;
-+	__be32 length;
-+	union {
-+		__be32 ordinal;
-+		__be32 return_code;
-+	};
- } __packed;
- 
- #define TPM_TAG_RQU_COMMAND 193
-@@ -401,8 +398,8 @@ struct tpm_buf {
- 
- static inline void tpm_buf_reset(struct tpm_buf *buf, u16 tag, u32 ordinal)
- {
--	struct tpm_input_header *head;
--	head = (struct tpm_input_header *)buf->data;
-+	struct tpm_header *head = (struct tpm_header *)buf->data;
-+
- 	head->tag = cpu_to_be16(tag);
- 	head->length = cpu_to_be32(sizeof(*head));
- 	head->ordinal = cpu_to_be32(ordinal);
-@@ -428,14 +425,14 @@ static inline void tpm_buf_destroy(struct tpm_buf *buf)
- 
- static inline u32 tpm_buf_length(struct tpm_buf *buf)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 
- 	return be32_to_cpu(head->length);
- }
- 
- static inline u16 tpm_buf_tag(struct tpm_buf *buf)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 
- 	return be16_to_cpu(head->tag);
- }
-@@ -444,7 +441,7 @@ static inline void tpm_buf_append(struct tpm_buf *buf,
- 				  const unsigned char *new_data,
- 				  unsigned int new_len)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 	u32 len = tpm_buf_length(buf);
- 
- 	/* Return silently if overflow has already happened. */
-diff --git a/drivers/char/tpm/tpm2-cmd.c b/drivers/char/tpm/tpm2-cmd.c
-index 2bcf470c8e5d..ab03f8600f89 100644
---- a/drivers/char/tpm/tpm2-cmd.c
-+++ b/drivers/char/tpm/tpm2-cmd.c
-@@ -784,7 +784,7 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
-  */
- int tpm2_probe(struct tpm_chip *chip)
- {
--	struct tpm_output_header *out;
-+	struct tpm_header *out;
- 	struct tpm_buf buf;
- 	int rc;
- 
-@@ -797,7 +797,7 @@ int tpm2_probe(struct tpm_chip *chip)
- 	rc = tpm_transmit_cmd(chip, NULL, &buf, 0, 0, NULL);
- 	/* We ignore TPM return codes on purpose. */
- 	if (rc >=  0) {
--		out = (struct tpm_output_header *)buf.data;
-+		out = (struct tpm_header *)buf.data;
- 		if (be16_to_cpu(out->tag) == TPM2_ST_NO_SESSIONS)
- 			chip->flags |= TPM_CHIP_FLAG_TPM2;
- 	}
-diff --git a/drivers/char/tpm/tpm2-space.c b/drivers/char/tpm/tpm2-space.c
-index 3d5f9577e5de..393d9aadadce 100644
---- a/drivers/char/tpm/tpm2-space.c
-+++ b/drivers/char/tpm/tpm2-space.c
-@@ -334,7 +334,7 @@ static int tpm2_map_response_header(struct tpm_chip *chip, u32 cc, u8 *rsp,
- 				    size_t len)
- {
- 	struct tpm_space *space = &chip->work_space;
--	struct tpm_output_header *header = (void *)rsp;
-+	struct tpm_header *header = (void *)rsp;
- 	u32 phandle;
- 	u32 phandle_type;
- 	u32 vhandle;
-@@ -394,7 +394,7 @@ static int tpm2_map_response_body(struct tpm_chip *chip, u32 cc, u8 *rsp,
- 				  size_t len)
- {
- 	struct tpm_space *space = &chip->work_space;
--	struct tpm_output_header *header = (void *)rsp;
-+	struct tpm_header *header = (void *)rsp;
- 	struct tpm2_cap_handles *data;
- 	u32 phandle;
- 	u32 phandle_type;
-@@ -492,7 +492,7 @@ static int tpm2_save_space(struct tpm_chip *chip)
- int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
- 		      u32 cc, u8 *buf, size_t *bufsiz)
- {
--	struct tpm_output_header *header = (void *)buf;
-+	struct tpm_header *header = (void *)buf;
- 	int rc;
- 
- 	if (!space)
-diff --git a/drivers/char/tpm/tpm_i2c_atmel.c b/drivers/char/tpm/tpm_i2c_atmel.c
-index 95ce2e9ccdc6..4720b2442ffe 100644
---- a/drivers/char/tpm/tpm_i2c_atmel.c
-+++ b/drivers/char/tpm/tpm_i2c_atmel.c
-@@ -46,7 +46,7 @@ struct priv_data {
- 	/* This is the amount we read on the first try. 25 was chosen to fit a
- 	 * fair number of read responses in the buffer so a 2nd retry can be
- 	 * avoided in small message cases. */
--	u8 buffer[sizeof(struct tpm_output_header) + 25];
-+	u8 buffer[sizeof(struct tpm_header) + 25];
- };
- 
- static int i2c_atmel_send(struct tpm_chip *chip, u8 *buf, size_t len)
-@@ -72,8 +72,7 @@ static int i2c_atmel_recv(struct tpm_chip *chip, u8 *buf, size_t count)
- {
- 	struct priv_data *priv = dev_get_drvdata(&chip->dev);
- 	struct i2c_client *client = to_i2c_client(chip->dev.parent);
--	struct tpm_output_header *hdr =
--		(struct tpm_output_header *)priv->buffer;
-+	struct tpm_header *hdr = (struct tpm_header *)priv->buffer;
- 	u32 expected_len;
- 	int rc;
- 
-diff --git a/drivers/char/tpm/tpm_vtpm_proxy.c b/drivers/char/tpm/tpm_vtpm_proxy.c
-index 5f95fbfb7f6b..28eb5ab15b99 100644
---- a/drivers/char/tpm/tpm_vtpm_proxy.c
-+++ b/drivers/char/tpm/tpm_vtpm_proxy.c
-@@ -303,9 +303,9 @@ static int vtpm_proxy_tpm_op_recv(struct tpm_chip *chip, u8 *buf, size_t count)
- static int vtpm_proxy_is_driver_command(struct tpm_chip *chip,
- 					u8 *buf, size_t count)
- {
--	struct tpm_input_header *hdr = (struct tpm_input_header *)buf;
-+	struct tpm_header *hdr = (struct tpm_header *)buf;
- 
--	if (count < sizeof(struct tpm_input_header))
-+	if (count < sizeof(struct tpm_header))
- 		return 0;
- 
- 	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
-@@ -402,7 +402,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
- {
- 	struct tpm_buf buf;
- 	int rc;
--	const struct tpm_output_header *header;
-+	const struct tpm_header *header;
- 	struct proxy_dev *proxy_dev = dev_get_drvdata(&chip->dev);
- 
- 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-@@ -427,7 +427,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
- 		goto out;
- 	}
- 
--	header = (const struct tpm_output_header *)buf.data;
-+	header = (const struct tpm_header *)buf.data;
- 	rc = be32_to_cpu(header->return_code);
- 	if (rc)
- 		locality = -1;
-diff --git a/drivers/char/tpm/xen-tpmfront.c b/drivers/char/tpm/xen-tpmfront.c
-index b150f87f38f5..1259e935fd58 100644
---- a/drivers/char/tpm/xen-tpmfront.c
-+++ b/drivers/char/tpm/xen-tpmfront.c
-@@ -163,7 +163,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
- 	wmb();
- 	notify_remote_via_evtchn(priv->evtchn);
- 
--	ordinal = be32_to_cpu(((struct tpm_input_header*)buf)->ordinal);
-+	ordinal = be32_to_cpu(((struct tpm_header *)buf)->ordinal);
- 	duration = tpm_calc_ordinal_duration(chip, ordinal);
- 
- 	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
--- 
-2.19.1
+> v4l2-compliance SHA   : 339d550e92ac15de8668f32d66d16f198137006c
+
+Hmm, I can't find this SHA. Was this built from the main v4l-utils repo?
+
+Regards,
+
+	Hans
+
+> 
+> Driver Info:
+> 	Driver name   : sun4i_csi
+> 	Card type     : sun4i-csi
+> 	Bus info      : platform:1c09000.csi
+> 	Driver version: 4.19.0
+> 	Capabilities  : 0x84201000
+> 		Video Capture Multiplanar
+> 		Streaming
+> 		Extended Pix Format
+> 		Device Capabilities
+> 	Device Caps   : 0x04201000
+> 		Video Capture Multiplanar
+> 		Streaming
+> 		Extended Pix Format
+> 
+> Compliance test for device /dev/video0 (not using libv4l2):
+> 
+> Required ioctls:
+> 	test VIDIOC_QUERYCAP: OK
+> 
+> Allow for multiple opens:
+> 	test second video open: OK
+> 	test VIDIOC_QUERYCAP: OK
+> 	test VIDIOC_G/S_PRIORITY: OK
+> 	test for unlimited opens: OK
+> 
+> Debug ioctls:
+> 	test VIDIOC_DBG_G/S_REGISTER: OK (Not Supported)
+> 	test VIDIOC_LOG_STATUS: OK (Not Supported)
+> 
+> Input ioctls:
+> 	test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+> 	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> 	test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+> 	test VIDIOC_ENUMAUDIO: OK (Not Supported)
+> 	test VIDIOC_G/S/ENUMINPUT: OK
+> 	test VIDIOC_G/S_AUDIO: OK (Not Supported)
+> 	Inputs: 1 Audio Inputs: 0 Tuners: 0
+> 
+> Output ioctls:
+> 	test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+> 	test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+> 	test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+> 	test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+> 	test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+> 	Outputs: 0 Audio Outputs: 0 Modulators: 0
+> 
+> Input/Output configuration ioctls:
+> 	test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+> 	test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+> 	test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+> 	test VIDIOC_G/S_EDID: OK (Not Supported)
+> 
+> Test input 0:
+> 
+> 	Control ioctls:
+> 		test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK (Not Supported)
+> 		test VIDIOC_QUERYCTRL: OK (Not Supported)
+> 		test VIDIOC_G/S_CTRL: OK (Not Supported)
+> 		test VIDIOC_G/S/TRY_EXT_CTRLS: OK (Not Supported)
+> 		test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: OK (Not Supported)
+> 		test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+> 		Standard Controls: 0 Private Controls: 0
+> 
+> 	Format ioctls:
+> 		test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+> 		test VIDIOC_G/S_PARM: OK (Not Supported)
+> 		test VIDIOC_G_FBUF: OK (Not Supported)
+> 		test VIDIOC_G_FMT: OK
+> 		test VIDIOC_TRY_FMT: OK
+> 		test VIDIOC_S_FMT: OK
+> 		test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
+> 		test Cropping: OK (Not Supported)
+> 		test Composing: OK (Not Supported)
+> 		test Scaling: OK
+> 
+> 	Codec ioctls:
+> 		test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+> 		test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+> 		test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+> 
+> 	Buffer ioctls:
+> 		test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+> 		test VIDIOC_EXPBUF: OK
+> 
+> Test input 0:
+> 
+> Total: 43, Succeeded: 43, Failed: 0, Warnings: 0
+> 
+> Let me know what you think,
+> Maxime
+> 
+> Maxime Ripard (5):
+>   dt-bindings: media: Add Allwinner A10 CSI binding
+>   media: sunxi: Refactor the Makefile and Kconfig
+>   media: sunxi: Add A10 CSI driver
+>   ARM: dts: sun7i: Add CSI0 controller
+>   DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+> 
+>  Documentation/devicetree/bindings/media/sun4i-csi.txt |  71 ++-
+>  arch/arm/boot/dts/sun7i-a20-bananapi.dts              |  98 +++-
+>  arch/arm/boot/dts/sun7i-a20.dtsi                      |  13 +-
+>  drivers/media/platform/Kconfig                        |   2 +-
+>  drivers/media/platform/Makefile                       |   2 +-
+>  drivers/media/platform/sunxi/Kconfig                  |   2 +-
+>  drivers/media/platform/sunxi/Makefile                 |   2 +-
+>  drivers/media/platform/sunxi/sun4i-csi/Kconfig        |  12 +-
+>  drivers/media/platform/sunxi/sun4i-csi/Makefile       |   5 +-
+>  drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c    | 275 ++++++++-
+>  drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h    | 137 ++++-
+>  drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c    | 383 +++++++++++-
+>  drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c   | 287 ++++++++-
+>  13 files changed, 1287 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/media/sun4i-csi.txt
+>  create mode 100644 drivers/media/platform/sunxi/Kconfig
+>  create mode 100644 drivers/media/platform/sunxi/Makefile
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Kconfig
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/Makefile
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_dma.c
+>  create mode 100644 drivers/media/platform/sunxi/sun4i-csi/sun4i_v4l2.c
+> 
+> base-commit: 94517eaa3d43005472864615dfd17f1ef6ca3935
+> 
