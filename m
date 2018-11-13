@@ -1,96 +1,43 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 13 Nov 2018 16:29:06 +0100
-Subject: [PATCH v2] arm64: Make kpti command line options x86 compatible
-Message-ID: <20181113152906.55802-1-agraf@suse.de>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Tue, 13 Nov 2018 16:39:42 +0100
+Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
+In-Reply-To: <71d315a34e4b12b0eb1d4c9003b297e46695f9cf.camel@perches.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+ <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
+ <71d315a34e4b12b0eb1d4c9003b297e46695f9cf.camel@perches.com>
+Message-ID: <6153b08e-b81d-8e4a-9fd2-0f593523d8da@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've already stumbled over 2 cases where people got confused about how to
-disable kpti on AArch64. In both cases, they used existing x86_64 options
-and just applied that to an AArch64 system, expecting it to work.
+On 11/13/18 16:19, Joe Perches wrote:
+> On Tue, 2018-11-13 at 13:24 +0100, Hans Verkuil wrote:
+>> On 11/13/18 09:24, Maxime Ripard wrote:
+>>> The older CSI drivers have camera capture interface different from the one
+>>> in the newer ones.
+> []
+>>> diff --git a/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.h
+> []
+>>> +	// Videobuf2
+>>
+>> Doesn't checkpatch.pl --strict complain about the use of '//'?
+> 
+> No, not since
+> 
+> commit dadf680de3c2eb4cba9840619991eda0cfe98778
+> Author: Joe Perches <joe@perches.com>
+> Date:   Tue Aug 2 14:04:33 2016 -0700
+> 
+>     checkpatch: allow c99 style // comments
+>     
+>     Sanitise the lines that contain c99 comments so that the error doesn't
+>     get emitted.
+> 
+> 
 
-I think it makes a lot of sense to have compatible kernel command line
-parameters whenever we can have them be compatible.
+Huh, I'm really out of date. But the good news is that I learned something
+new today!
 
-So this patch adds the pti= and no_pti kernel command line options, mapping
-them into the existing kpti= command line framework. It preserves the old
-syntax to maintain compatibility with older command lines.
+Thank you,
 
-While at it, the patch also marks the respective options as dual-arch.
-
-Reported-by: Richard Brown <rbrown@suse.de>
-Signed-off-by: Alexander Graf <agraf@suse.de>
-
----
-
-v1 -> v2:
-
-  - Actually make it compile. Sorry for the sloppy v1.
----
- Documentation/admin-guide/kernel-parameters.txt |  6 +++---
- arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
- 2 files changed, 22 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 81d1d5a74728..4a1c6bcfcdb5 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -3522,8 +3522,8 @@
- 	pt.		[PARIDE]
- 			See Documentation/blockdev/paride.txt.
- 
--	pti=		[X86_64] Control Page Table Isolation of user and
--			kernel address spaces.  Disabling this feature
-+	pti=		[X86_64,ARM64] Control Page Table Isolation of user
-+			and kernel address spaces.  Disabling this feature
- 			removes hardening, but improves performance of
- 			system calls and interrupts.
- 
-@@ -3534,7 +3534,7 @@
- 
- 			Not specifying this option is equivalent to pti=auto.
- 
--	nopti		[X86_64]
-+	nopti		[X86_64,ARM64]
- 			Equivalent to pti=off
- 
- 	pty.legacy_count=
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index af50064dea51..a67b4b563a7c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -978,13 +978,31 @@ static int __init parse_kpti(char *str)
- 	bool enabled;
- 	int ret = strtobool(str, &enabled);
- 
--	if (ret)
-+	if (ret) {
-+		if (!strncmp(str, "auto", 4)) {
-+			__kpti_forced = 0;
-+			return 0;
-+		}
- 		return ret;
-+	}
- 
- 	__kpti_forced = enabled ? 1 : -1;
- 	return 0;
- }
- early_param("kpti", parse_kpti);
-+
-+static int __init parse_pti(char *str)
-+{
-+	return parse_kpti(str);
-+}
-+early_param("pti", parse_pti);
-+
-+static int __init parse_no_pti(char *p)
-+{
-+	__kpti_forced = -1;
-+	return 0;
-+}
-+early_param("nopti", parse_no_pti);
- #endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- #ifdef CONFIG_ARM64_HW_AFDBM
--- 
-2.12.3
+	Hans
