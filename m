@@ -1,248 +1,452 @@
 From: abel.vesa@nxp.com (Abel Vesa)
-Date: Tue, 13 Nov 2018 16:20:00 +0000
-Subject: [PATCH v13 4/5] clk: imx: Add imx composite clock
+Date: Tue, 13 Nov 2018 16:19:57 +0000
+Subject: [PATCH v13 1/5] dt-bindings: add binding for i.MX8MQ CCM
 In-Reply-To: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
 References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <1542125975-8448-5-git-send-email-abel.vesa@nxp.com>
+Message-ID: <1542125975-8448-2-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since a lot of clocks on imx8m are formed by a mux, gate, predivider and
-divider, the idea here is to combine all of those into one composite clock,
-but we need to deal with both predivider and divider at the same time and
-therefore we add the imx8m_clk_composite_divider_ops and register
-the composite clock with those.
+From: Lucas Stach <l.stach@pengutronix.de>
 
+This adds the binding for the i.MX8MQ Clock Controller Module.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
-Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/imx/Makefile           |   1 +
- drivers/clk/imx/clk-composite-8m.c | 178 +++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk.h              |  16 ++++
- 3 files changed, 195 insertions(+)
- create mode 100644 drivers/clk/imx/clk-composite-8m.c
+ .../devicetree/bindings/clock/imx8mq-clock.txt     |  20 ++
+ include/dt-bindings/clock/imx8mq-clock.h           | 395 +++++++++++++++++++++
+ 2 files changed, 415 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+ create mode 100644 include/dt-bindings/clock/imx8mq-clock.h
 
-diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index b87513c..237444b 100644
---- a/drivers/clk/imx/Makefile
-+++ b/drivers/clk/imx/Makefile
-@@ -3,6 +3,7 @@
- obj-y += \
- 	clk.o \
- 	clk-busy.o \
-+	clk-composite-8m.o \
- 	clk-cpu.o \
- 	clk-fixup-div.o \
- 	clk-fixup-mux.o \
-diff --git a/drivers/clk/imx/clk-composite-8m.c b/drivers/clk/imx/clk-composite-8m.c
+diff --git a/Documentation/devicetree/bindings/clock/imx8mq-clock.txt b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
 new file mode 100644
-index 0000000..bcd31d8
+index 0000000..52de826
 --- /dev/null
-+++ b/drivers/clk/imx/clk-composite-8m.c
-@@ -0,0 +1,178 @@
-+// SPDX-License-Identifier: GPL-2.0
++++ b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+@@ -0,0 +1,20 @@
++* Clock bindings for NXP i.MX8M Quad
++
++Required properties:
++- compatible: Should be "fsl,imx8mq-ccm"
++- reg: Address and length of the register set
++- #clock-cells: Should be <1>
++- clocks: list of clock specifiers, must contain an entry for each required
++          entry in clock-names
++- clock-names: should include the following entries:
++    - "ckil"
++    - "osc_25m"
++    - "osc_27m"
++    - "clk_ext1"
++    - "clk_ext2"
++    - "clk_ext3"
++    - "clk_ext4"
++
++The clock consumer should specify the desired clock by having the clock
++ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx8mq-clock.h
++for the full list of i.MX8M Quad clock IDs.
+diff --git a/include/dt-bindings/clock/imx8mq-clock.h b/include/dt-bindings/clock/imx8mq-clock.h
+new file mode 100644
+index 0000000..b53be41
+--- /dev/null
++++ b/include/dt-bindings/clock/imx8mq-clock.h
+@@ -0,0 +1,395 @@
++/* SPDX-License-Identifier: GPL-2.0 */
 +/*
-+ * Copyright 2018 NXP
++ * Copyright 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017 NXP
 + */
 +
-+#include <linux/errno.h>
-+#include <linux/slab.h>
-+#include <linux/clk-provider.h>
++#ifndef __DT_BINDINGS_CLOCK_IMX8MQ_H
++#define __DT_BINDINGS_CLOCK_IMX8MQ_H
 +
-+#include "clk.h"
++#define IMX8MQ_CLK_DUMMY		0
++#define IMX8MQ_CLK_32K			1
++#define IMX8MQ_CLK_25M			2
++#define IMX8MQ_CLK_27M			3
++#define IMX8MQ_CLK_EXT1			4
++#define IMX8MQ_CLK_EXT2			5
++#define IMX8MQ_CLK_EXT3			6
++#define IMX8MQ_CLK_EXT4			7
 +
-+#define PCG_PREDIV_SHIFT	16
-+#define PCG_PREDIV_WIDTH	3
-+#define PCG_PREDIV_MAX		8
++/* ANAMIX PLL clocks */
++/* FRAC PLLs */
++/* ARM PLL */
++#define IMX8MQ_ARM_PLL_REF_SEL		8
++#define IMX8MQ_ARM_PLL_REF_DIV		9
++#define IMX8MQ_ARM_PLL			10
++#define IMX8MQ_ARM_PLL_BYPASS		11
++#define IMX8MQ_ARM_PLL_OUT		12
 +
-+#define PCG_DIV_SHIFT		0
-+#define PCG_DIV_WIDTH		6
-+#define PCG_DIV_MAX		64
++/* GPU PLL */
++#define IMX8MQ_GPU_PLL_REF_SEL		13
++#define IMX8MQ_GPU_PLL_REF_DIV		14
++#define IMX8MQ_GPU_PLL			15
++#define IMX8MQ_GPU_PLL_BYPASS		16
++#define IMX8MQ_GPU_PLL_OUT		17
 +
-+#define PCG_PCS_SHIFT		24
-+#define PCG_PCS_MASK		0x7
++/* VPU PLL */
++#define IMX8MQ_VPU_PLL_REF_SEL		18
++#define IMX8MQ_VPU_PLL_REF_DIV		19
++#define IMX8MQ_VPU_PLL			20
++#define IMX8MQ_VPU_PLL_BYPASS		21
++#define IMX8MQ_VPU_PLL_OUT		22
 +
-+#define PCG_CGC_SHIFT		28
++/* AUDIO PLL1 */
++#define IMX8MQ_AUDIO_PLL1_REF_SEL	23
++#define IMX8MQ_AUDIO_PLL1_REF_DIV	24
++#define IMX8MQ_AUDIO_PLL1		25
++#define IMX8MQ_AUDIO_PLL1_BYPASS	26
++#define IMX8MQ_AUDIO_PLL1_OUT		27
 +
-+static unsigned long imx8m_clk_composite_divider_recalc_rate(struct clk_hw *hw,
-+						unsigned long parent_rate)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long prediv_rate;
-+	unsigned int prediv_value;
-+	unsigned int div_value;
++/* AUDIO PLL2 */
++#define IMX8MQ_AUDIO_PLL2_REF_SEL	28
++#define IMX8MQ_AUDIO_PLL2_REF_DIV	29
++#define IMX8MQ_AUDIO_PLL2		30
++#define IMX8MQ_AUDIO_PLL2_BYPASS	31
++#define IMX8MQ_AUDIO_PLL2_OUT		32
 +
-+	prediv_value = readl(divider->reg) >> divider->shift;
-+	prediv_value &= clk_div_mask(divider->width);
++/* VIDEO PLL1 */
++#define IMX8MQ_VIDEO_PLL1_REF_SEL	33
++#define IMX8MQ_VIDEO_PLL1_REF_DIV	34
++#define IMX8MQ_VIDEO_PLL1		35
++#define IMX8MQ_VIDEO_PLL1_BYPASS	36
++#define IMX8MQ_VIDEO_PLL1_OUT		37
 +
-+	prediv_rate = divider_recalc_rate(hw, parent_rate, prediv_value,
-+						NULL, divider->flags,
-+						divider->width);
++/* SYS1 PLL */
++#define IMX8MQ_SYS1_PLL1_REF_SEL	38
++#define IMX8MQ_SYS1_PLL1_REF_DIV	39
++#define IMX8MQ_SYS1_PLL1		40
++#define IMX8MQ_SYS1_PLL1_OUT		41
++#define IMX8MQ_SYS1_PLL1_OUT_DIV	42
++#define IMX8MQ_SYS1_PLL2		43
++#define IMX8MQ_SYS1_PLL2_DIV		44
++#define IMX8MQ_SYS1_PLL2_OUT		45
 +
-+	div_value = readl(divider->reg) >> PCG_DIV_SHIFT;
-+	div_value &= clk_div_mask(PCG_DIV_WIDTH);
++/* SYS2 PLL */
++#define IMX8MQ_SYS2_PLL1_REF_SEL	46
++#define IMX8MQ_SYS2_PLL1_REF_DIV	47
++#define IMX8MQ_SYS2_PLL1		48
++#define IMX8MQ_SYS2_PLL1_OUT		49
++#define IMX8MQ_SYS2_PLL1_OUT_DIV	50
++#define IMX8MQ_SYS2_PLL2		51
++#define IMX8MQ_SYS2_PLL2_DIV		52
++#define IMX8MQ_SYS2_PLL2_OUT		53
 +
-+	return divider_recalc_rate(hw, prediv_rate, div_value, NULL,
-+				   divider->flags, PCG_DIV_WIDTH);
-+}
++/* SYS3 PLL */
++#define IMX8MQ_SYS3_PLL1_REF_SEL	54
++#define IMX8MQ_SYS3_PLL1_REF_DIV	55
++#define IMX8MQ_SYS3_PLL1		56
++#define IMX8MQ_SYS3_PLL1_OUT		57
++#define IMX8MQ_SYS3_PLL1_OUT_DIV	58
++#define IMX8MQ_SYS3_PLL2		59
++#define IMX8MQ_SYS3_PLL2_DIV		60
++#define IMX8MQ_SYS3_PLL2_OUT		61
 +
-+static int imx8m_clk_composite_compute_dividers(unsigned long rate,
-+						unsigned long parent_rate,
-+						int *prediv, int *postdiv)
-+{
-+	int div1, div2;
-+	int error = INT_MAX;
-+	int ret = -EINVAL;
++/* DRAM PLL */
++#define IMX8MQ_DRAM_PLL1_REF_SEL	62
++#define IMX8MQ_DRAM_PLL1_REF_DIV	63
++#define IMX8MQ_DRAM_PLL1		64
++#define IMX8MQ_DRAM_PLL1_OUT		65
++#define IMX8MQ_DRAM_PLL1_OUT_DIV	66
++#define IMX8MQ_DRAM_PLL2		67
++#define IMX8MQ_DRAM_PLL2_DIV		68
++#define IMX8MQ_DRAM_PLL2_OUT		69
 +
-+	*prediv = 1;
-+	*postdiv = 1;
++/* SYS PLL DIV */
++#define IMX8MQ_SYS1_PLL_40M		70
++#define IMX8MQ_SYS1_PLL_80M		71
++#define IMX8MQ_SYS1_PLL_100M		72
++#define IMX8MQ_SYS1_PLL_133M		73
++#define IMX8MQ_SYS1_PLL_160M		74
++#define IMX8MQ_SYS1_PLL_200M		75
++#define IMX8MQ_SYS1_PLL_266M		76
++#define IMX8MQ_SYS1_PLL_400M		77
++#define IMX8MQ_SYS1_PLL_800M		78
 +
-+	for (div1 = 1; div1 <= PCG_PREDIV_MAX; div1++) {
-+		for (div2 = 1; div2 <= PCG_DIV_MAX; div2++) {
-+			int new_error = ((parent_rate / div1) / div2) - rate;
++#define IMX8MQ_SYS2_PLL_50M		79
++#define IMX8MQ_SYS2_PLL_100M		80
++#define IMX8MQ_SYS2_PLL_125M		81
++#define IMX8MQ_SYS2_PLL_166M		82
++#define IMX8MQ_SYS2_PLL_200M		83
++#define IMX8MQ_SYS2_PLL_250M		84
++#define IMX8MQ_SYS2_PLL_333M		85
++#define IMX8MQ_SYS2_PLL_500M		86
++#define IMX8MQ_SYS2_PLL_1000M		87
 +
-+			if (abs(new_error) < abs(error)) {
-+				*prediv = div1;
-+				*postdiv = div2;
-+				error = new_error;
-+				ret = 0;
-+			}
-+		}
-+	}
-+	return ret;
-+}
++/* CCM ROOT clocks */
++/* A53 */
++#define IMX8MQ_CLK_A53_SRC		88
++#define IMX8MQ_CLK_A53_CG		89
++#define IMX8MQ_CLK_A53_DIV		90
++/* M4 */
++#define IMX8MQ_CLK_M4_SRC		91
++#define IMX8MQ_CLK_M4_CG		92
++#define IMX8MQ_CLK_M4_DIV		93
++/* VPU */
++#define IMX8MQ_CLK_VPU_SRC		94
++#define IMX8MQ_CLK_VPU_CG		95
++#define IMX8MQ_CLK_VPU_DIV		96
++/* GPU CORE */
++#define IMX8MQ_CLK_GPU_CORE_SRC		97
++#define IMX8MQ_CLK_GPU_CORE_CG		98
++#define IMX8MQ_CLK_GPU_CORE_DIV		99
++/* GPU SHADER */
++#define IMX8MQ_CLK_GPU_SHADER_SRC	100
++#define IMX8MQ_CLK_GPU_SHADER_CG	101
++#define IMX8MQ_CLK_GPU_SHADER_DIV	102
 +
-+static long imx8m_clk_composite_divider_round_rate(struct clk_hw *hw,
-+						unsigned long rate,
-+						unsigned long *prate)
-+{
-+	int prediv_value;
-+	int div_value;
++/* BUS TYPE */
++/* MAIN AXI */
++#define IMX8MQ_CLK_MAIN_AXI		103
++/* ENET AXI */
++#define IMX8MQ_CLK_ENET_AXI		104
++/* NAND_USDHC_BUS */
++#define IMX8MQ_CLK_NAND_USDHC_BUS	105
++/* VPU BUS */
++#define IMX8MQ_CLK_VPU_BUS		106
++/* DISP_AXI */
++#define IMX8MQ_CLK_DISP_AXI		107
++/* DISP APB */
++#define IMX8MQ_CLK_DISP_APB		108
++/* DISP RTRM */
++#define IMX8MQ_CLK_DISP_RTRM		109
++/* USB_BUS */
++#define IMX8MQ_CLK_USB_BUS		110
++/* GPU_AXI */
++#define IMX8MQ_CLK_GPU_AXI		111
++/* GPU_AHB */
++#define IMX8MQ_CLK_GPU_AHB		112
++/* NOC */
++#define IMX8MQ_CLK_NOC			113
++/* NOC_APB */
++#define IMX8MQ_CLK_NOC_APB		115
 +
-+	imx8m_clk_composite_compute_dividers(rate, *prate,
-+						&prediv_value, &div_value);
-+	rate = DIV_ROUND_UP(*prate, prediv_value);
++/* AHB */
++#define IMX8MQ_CLK_AHB			116
++/* AUDIO AHB */
++#define IMX8MQ_CLK_AUDIO_AHB		117
 +
-+	return DIV_ROUND_UP(rate, div_value);
++/* DRAM_ALT */
++#define IMX8MQ_CLK_DRAM_ALT		118
++/* DRAM APB */
++#define IMX8MQ_CLK_DRAM_APB		119
++/* VPU_G1 */
++#define IMX8MQ_CLK_VPU_G1		120
++/* VPU_G2 */
++#define IMX8MQ_CLK_VPU_G2		121
++/* DISP_DTRC */
++#define IMX8MQ_CLK_DISP_DTRC		122
++/* DISP_DC8000 */
++#define IMX8MQ_CLK_DISP_DC8000		123
++/* PCIE_CTRL */
++#define IMX8MQ_CLK_PCIE1_CTRL		124
++/* PCIE_PHY */
++#define IMX8MQ_CLK_PCIE1_PHY		125
++/* PCIE_AUX */
++#define IMX8MQ_CLK_PCIE1_AUX		126
++/* DC_PIXEL */
++#define IMX8MQ_CLK_DC_PIXEL		127
++/* LCDIF_PIXEL */
++#define IMX8MQ_CLK_LCDIF_PIXEL		128
++/* SAI1~6 */
++#define IMX8MQ_CLK_SAI1			129
 +
-+}
++#define IMX8MQ_CLK_SAI2			130
 +
-+static int imx8m_clk_composite_divider_set_rate(struct clk_hw *hw,
-+					unsigned long rate,
-+					unsigned long parent_rate)
-+{
-+	struct clk_divider *divider = to_clk_divider(hw);
-+	unsigned long flags = 0;
-+	int prediv_value;
-+	int div_value;
-+	int ret = 0;
-+	u32 val;
++#define IMX8MQ_CLK_SAI3			131
 +
-+	ret = imx8m_clk_composite_compute_dividers(rate, parent_rate,
-+						&prediv_value, &div_value);
-+	if (ret)
-+		return -EINVAL;
++#define IMX8MQ_CLK_SAI4			132
 +
-+	spin_lock_irqsave(divider->lock, flags);
++#define IMX8MQ_CLK_SAI5			133
 +
-+	val = readl(divider->reg);
-+	val &= ~((clk_div_mask(divider->width) << divider->shift) |
-+			(clk_div_mask(PCG_DIV_WIDTH) << PCG_DIV_SHIFT));
++#define IMX8MQ_CLK_SAI6			134
++/* SPDIF1 */
++#define IMX8MQ_CLK_SPDIF1		135
++/* SPDIF2 */
++#define IMX8MQ_CLK_SPDIF2		136
++/* ENET_REF */
++#define IMX8MQ_CLK_ENET_REF		137
++/* ENET_TIMER */
++#define IMX8MQ_CLK_ENET_TIMER		138
++/* ENET_PHY */
++#define IMX8MQ_CLK_ENET_PHY_REF		139
++/* NAND */
++#define IMX8MQ_CLK_NAND			140
++/* QSPI */
++#define IMX8MQ_CLK_QSPI			141
++/* USDHC1 */
++#define IMX8MQ_CLK_USDHC1		142
++/* USDHC2 */
++#define IMX8MQ_CLK_USDHC2		143
++/* I2C1 */
++#define IMX8MQ_CLK_I2C1			144
++/* I2C2 */
++#define IMX8MQ_CLK_I2C2			145
++/* I2C3 */
++#define IMX8MQ_CLK_I2C3			146
++/* I2C4 */
++#define IMX8MQ_CLK_I2C4			147
++/* UART1 */
++#define IMX8MQ_CLK_UART1		148
++/* UART2 */
++#define IMX8MQ_CLK_UART2		149
++/* UART3 */
++#define IMX8MQ_CLK_UART3		150
++/* UART4 */
++#define IMX8MQ_CLK_UART4		151
++/* USB_CORE_REF */
++#define IMX8MQ_CLK_USB_CORE_REF		152
++/* USB_PHY_REF */
++#define IMX8MQ_CLK_USB_PHY_REF		163
++/* ECSPI1 */
++#define IMX8MQ_CLK_ECSPI1		164
++/* ECSPI2 */
++#define IMX8MQ_CLK_ECSPI2		165
++/* PWM1 */
++#define IMX8MQ_CLK_PWM1			166
++/* PWM2 */
++#define IMX8MQ_CLK_PWM2			167
++/* PWM3 */
++#define IMX8MQ_CLK_PWM3			168
++/* PWM4 */
++#define IMX8MQ_CLK_PWM4			169
++/* GPT1 */
++#define IMX8MQ_CLK_GPT1			170
++/* WDOG */
++#define IMX8MQ_CLK_WDOG			171
++/* WRCLK */
++#define IMX8MQ_CLK_WRCLK		172
++/* DSI_CORE */
++#define IMX8MQ_CLK_DSI_CORE		173
++/* DSI_PHY */
++#define IMX8MQ_CLK_DSI_PHY_REF		174
++/* DSI_DBI */
++#define IMX8MQ_CLK_DSI_DBI		175
++/*DSI_ESC */
++#define IMX8MQ_CLK_DSI_ESC		176
++/* CSI1_CORE */
++#define IMX8MQ_CLK_CSI1_CORE		177
++/* CSI1_PHY */
++#define IMX8MQ_CLK_CSI1_PHY_REF		178
++/* CSI_ESC */
++#define IMX8MQ_CLK_CSI1_ESC		179
++/* CSI2_CORE */
++#define IMX8MQ_CLK_CSI2_CORE		170
++/* CSI2_PHY */
++#define IMX8MQ_CLK_CSI2_PHY_REF		181
++/* CSI2_ESC */
++#define IMX8MQ_CLK_CSI2_ESC		182
++/* PCIE2_CTRL */
++#define IMX8MQ_CLK_PCIE2_CTRL		183
++/* PCIE2_PHY */
++#define IMX8MQ_CLK_PCIE2_PHY		184
++/* PCIE2_AUX */
++#define IMX8MQ_CLK_PCIE2_AUX		185
++/* ECSPI3 */
++#define IMX8MQ_CLK_ECSPI3		186
 +
-+	val |= (u32)(prediv_value  - 1) << divider->shift;
-+	val |= (u32)(div_value - 1) << PCG_DIV_SHIFT;
-+	writel(val, divider->reg);
++/* CCGR clocks */
++#define IMX8MQ_CLK_A53_ROOT			187
++#define IMX8MQ_CLK_DRAM_ROOT			188
++#define IMX8MQ_CLK_ECSPI1_ROOT			189
++#define IMX8MQ_CLK_ECSPI2_ROOT			180
++#define IMX8MQ_CLK_ECSPI3_ROOT			181
++#define IMX8MQ_CLK_ENET1_ROOT			182
++#define IMX8MQ_CLK_GPT1_ROOT			193
++#define IMX8MQ_CLK_I2C1_ROOT			194
++#define IMX8MQ_CLK_I2C2_ROOT			195
++#define IMX8MQ_CLK_I2C3_ROOT			196
++#define IMX8MQ_CLK_I2C4_ROOT			197
++#define IMX8MQ_CLK_M4_ROOT			198
++#define IMX8MQ_CLK_PCIE1_ROOT			199
++#define IMX8MQ_CLK_PCIE2_ROOT			200
++#define IMX8MQ_CLK_PWM1_ROOT			201
++#define IMX8MQ_CLK_PWM2_ROOT			202
++#define IMX8MQ_CLK_PWM3_ROOT			203
++#define IMX8MQ_CLK_PWM4_ROOT			204
++#define IMX8MQ_CLK_QSPI_ROOT			205
++#define IMX8MQ_CLK_SAI1_ROOT			206
++#define IMX8MQ_CLK_SAI2_ROOT			207
++#define IMX8MQ_CLK_SAI3_ROOT			208
++#define IMX8MQ_CLK_SAI4_ROOT			209
++#define IMX8MQ_CLK_SAI5_ROOT			210
++#define IMX8MQ_CLK_SAI6_ROOT			212
++#define IMX8MQ_CLK_UART1_ROOT			213
++#define IMX8MQ_CLK_UART2_ROOT			214
++#define IMX8MQ_CLK_UART3_ROOT			215
++#define IMX8MQ_CLK_UART4_ROOT			216
++#define IMX8MQ_CLK_USB1_CTRL_ROOT		217
++#define IMX8MQ_CLK_USB2_CTRL_ROOT		218
++#define IMX8MQ_CLK_USB1_PHY_ROOT		219
++#define IMX8MQ_CLK_USB2_PHY_ROOT		220
++#define IMX8MQ_CLK_USDHC1_ROOT			221
++#define IMX8MQ_CLK_USDHC2_ROOT			222
++#define IMX8MQ_CLK_WDOG1_ROOT			223
++#define IMX8MQ_CLK_WDOG2_ROOT			224
++#define IMX8MQ_CLK_WDOG3_ROOT			225
++#define IMX8MQ_CLK_GPU_ROOT			226
++#define IMX8MQ_CLK_HEVC_ROOT			227
++#define IMX8MQ_CLK_AVC_ROOT			228
++#define IMX8MQ_CLK_VP9_ROOT			229
++#define IMX8MQ_CLK_HEVC_INTER_ROOT		230
++#define IMX8MQ_CLK_DISP_ROOT			231
++#define IMX8MQ_CLK_HDMI_ROOT			232
++#define IMX8MQ_CLK_HDMI_PHY_ROOT		233
++#define IMX8MQ_CLK_VPU_DEC_ROOT			234
++#define IMX8MQ_CLK_CSI1_ROOT			235
++#define IMX8MQ_CLK_CSI2_ROOT			236
++#define IMX8MQ_CLK_RAWNAND_ROOT			237
++#define IMX8MQ_CLK_SDMA1_ROOT			238
++#define IMX8MQ_CLK_SDMA2_ROOT			239
++#define IMX8MQ_CLK_VPU_G1_ROOT			240
++#define IMX8MQ_CLK_VPU_G2_ROOT			241
 +
-+	spin_unlock_irqrestore(divider->lock, flags);
++/* SCCG PLL GATE */
++#define IMX8MQ_SYS1_PLL_OUT			232
++#define IMX8MQ_SYS2_PLL_OUT			243
++#define IMX8MQ_SYS3_PLL_OUT			244
++#define IMX8MQ_DRAM_PLL_OUT			245
 +
-+	return ret;
-+}
++#define IMX8MQ_GPT_3M_CLK			246
 +
-+static const struct clk_ops imx8m_clk_composite_divider_ops = {
-+	.recalc_rate = imx8m_clk_composite_divider_recalc_rate,
-+	.round_rate = imx8m_clk_composite_divider_round_rate,
-+	.set_rate = imx8m_clk_composite_divider_set_rate,
-+};
++#define IMX8MQ_CLK_IPG_ROOT			247
++#define IMX8MQ_CLK_IPG_AUDIO_ROOT		248
++#define IMX8MQ_CLK_SAI1_IPG			249
++#define IMX8MQ_CLK_SAI2_IPG			250
++#define IMX8MQ_CLK_SAI3_IPG			251
++#define IMX8MQ_CLK_SAI4_IPG			252
++#define IMX8MQ_CLK_SAI5_IPG			253
++#define IMX8MQ_CLK_SAI6_IPG			254
 +
-+struct clk *imx8m_clk_composite_flags(const char *name,
-+					const char **parent_names,
-+					int num_parents, void __iomem *reg,
-+					unsigned long flags)
-+{
-+	struct clk_hw *hw = NULL, *mux_hw = NULL;
-+	struct clk_hw *div_hw = NULL, *gate_hw = NULL;
-+	struct clk_divider *div = NULL;
-+	struct clk_gate *gate = NULL;
-+	struct clk_mux *mux = NULL;
++/* DSI AHB/IPG clocks */
++/* rxesc clock */
++#define IMX8MQ_CLK_DSI_AHB			255
++/* txesc clock */
++#define IMX8MQ_CLK_DSI_IPG_DIV                  256
 +
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		goto fail;
++#define IMX8MQ_CLK_TMU_ROOT			265
 +
-+	mux_hw = &mux->hw;
-+	mux->reg = reg;
-+	mux->shift = PCG_PCS_SHIFT;
-+	mux->mask = PCG_PCS_MASK;
++/* Display root clocks */
++#define IMX8MQ_CLK_DISP_AXI_ROOT		266
++#define IMX8MQ_CLK_DISP_APB_ROOT		267
++#define IMX8MQ_CLK_DISP_RTRM_ROOT		268
 +
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
-+		goto fail;
++#define IMX8MQ_CLK_OCOTP_ROOT			269
 +
-+	div_hw = &div->hw;
-+	div->reg = reg;
-+	div->shift = PCG_PREDIV_SHIFT;
-+	div->width = PCG_PREDIV_WIDTH;
-+	div->lock = &imx_ccm_lock;
-+	div->flags = CLK_DIVIDER_ROUND_CLOSEST;
++#define IMX8MQ_CLK_DRAM_ALT_ROOT		270
++#define IMX8MQ_CLK_DRAM_CORE			271
 +
-+	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
-+	if (!gate)
-+		goto fail;
++#define IMX8MQ_CLK_MU_ROOT			272
++#define IMX8MQ_VIDEO2_PLL_OUT			273
 +
-+	gate_hw = &gate->hw;
-+	gate->reg = reg;
-+	gate->bit_idx = PCG_CGC_SHIFT;
++#define IMX8MQ_CLK_CLKO2			274
 +
-+	hw = clk_hw_register_composite(NULL, name, parent_names, num_parents,
-+			mux_hw, &clk_mux_ops, div_hw,
-+			&imx8m_clk_composite_divider_ops,
-+			gate_hw, &clk_gate_ops, flags);
-+	if (IS_ERR(hw))
-+		goto fail;
++#define IMX8MQ_CLK_NAND_USDHC_BUS_RAWNAND_CLK	275
 +
-+	return hw->clk;
-+
-+fail:
-+	kfree(gate);
-+	kfree(div);
-+	kfree(mux);
-+	return ERR_CAST(hw);
-+}
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 864cd8a..cb3e92c 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -239,4 +239,20 @@ struct clk *imx_clk_cpu(const char *name, const char *parent_name,
- 		struct clk *div, struct clk *mux, struct clk *pll,
- 		struct clk *step);
- 
-+struct clk *imx8m_clk_composite_flags(const char *name,
-+					const char **parent_names,
-+					int num_parents, void __iomem *reg,
-+					unsigned long flags);
-+
-+#define __imx8m_clk_composite(name, parent_names, reg, flags) \
-+	imx8m_clk_composite_flags(name, parent_names, \
-+		ARRAY_SIZE(parent_names), reg, \
-+		flags | CLK_SET_RATE_NO_REPARENT | CLK_OPS_PARENT_ENABLE)
-+
-+#define imx8m_clk_composite(name, parent_names, reg) \
-+	__imx8m_clk_composite(name, parent_names, reg, 0)
-+
-+#define imx8m_clk_composite_critical(name, parent_names, reg) \
-+	__imx8m_clk_composite(name, parent_names, reg, CLK_IS_CRITICAL)
-+
- #endif
++#define IMX8MQ_CLK_END				276
++#endif /* __DT_BINDINGS_CLOCK_IMX8MQ_H */
 -- 
 2.7.4
