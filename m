@@ -1,43 +1,32 @@
-From: vincenzo.frascino@arm.com (Vincenzo Frascino)
-Date: Tue, 13 Nov 2018 10:24:22 +0000
-Subject: [PATCH 06/27] kernel: Define gettimeofday vdso common code
-In-Reply-To: <CAK8P3a0QSfzsM-h9Kf36Pzr2WvXbyi0_RQG0+Nsp+1RoTRq7Ww@mail.gmail.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-7-vincenzo.frascino@arm.com>
- <CAK8P3a0QSfzsM-h9Kf36Pzr2WvXbyi0_RQG0+Nsp+1RoTRq7Ww@mail.gmail.com>
-Message-ID: <61f77f06-396e-9293-c8cc-28fe7ea32af5@arm.com>
+From: christoph.muellner@theobroma-systems.com (Christoph Muellner)
+Date: Tue, 13 Nov 2018 11:25:35 +0100
+Subject: [PATCH] arm64: dts: rockchip: Fix PCIe reset polarity for
+ rk3399-puma-haikou.
+Message-ID: <20181113102535.444-1-christoph.muellner@theobroma-systems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch fixes the wrong polarity setting for the PCIe host driver's
+pre-reset pin for rk3399-puma-haikou. Without this patch link training
+will most likely fail.
 
-On 10/11/2018 16:18, Arnd Bergmann wrote:
-> On 11/9/18, Vincenzo Frascino <vincenzo.frascino@arm.com> wrote:
->> In the last few years we assisted to an explosion of vdso
->> implementations that mostly share similar code.
->>
->> This patch tries to unify the gettimeofday vdso implementation
->> introducing lib/vdso. The code contained in this library can
->> ideally be reused by all the architectures avoiding, where
->> possible, code duplication.
->>
->> In doing so, tries to maintain the performances using inlining as much
->> as possible and consequently reduces the surface for ROP type of attacks.
->>
->> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
-> 
-> I just noticed that this new version misses some of the cleanups
-> that Thomas recently did in the x86 version, e.g. f3e839384164
-> ("x86/vdso: Replace the clockid switch case").
-> 
-> I haven't looked at all the details, but I'd suggest using the latest
-> x86 code as a base.
-> 
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+---
+ arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ok, I will have a look at Thomas' work. Thanks for pointing this out. 
-
->         Arnd
-> 
-
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
+index 2dceeea29b83..1e6a71066c16 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-puma-haikou.dts
+@@ -153,7 +153,7 @@
+ };
+ 
+ &pcie0 {
+-	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
++	ep-gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_HIGH>;
+ 	num-lanes = <4>;
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pcie_clkreqn_cpm>;
 -- 
-Regards,
-Vincenzo
+2.11.0
