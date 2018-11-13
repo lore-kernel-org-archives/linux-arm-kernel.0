@@ -1,55 +1,285 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 13 Nov 2018 11:34:17 -0800
-Subject: [GIT PULL 1/2] Broadcom drivers changes for 4.20 part 2
-In-Reply-To: <b84f1fd9-7e45-bd72-c3cd-2ac2836e94cc@gmail.com>
-References: <20181105234831.30526-1-f.fainelli@gmail.com>
- <20181113192558.yswpk2l65t2cp4cb@localhost>
- <b84f1fd9-7e45-bd72-c3cd-2ac2836e94cc@gmail.com>
-Message-ID: <CAOesGMj2hXsVgj_dSuro9N=++VXWr4KGjTY7hjO1pEAo+OuDww@mail.gmail.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Tue, 13 Nov 2018 11:35:30 -0800
+Subject: [PATCH v1 11/11] soc: mediatek: Add MT8183 scpsys support
+In-Reply-To: <20181106064206.17535-13-weiyi.lu@mediatek.com>
+References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
+ <20181106064206.17535-13-weiyi.lu@mediatek.com>
+Message-ID: <CANMq1KBoCScwixLoB0oEtbavLW8b_NjufAjbPKJLcLgj=vHC9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 11:32 AM Florian Fainelli <f.fainelli@gmail.com> wrote:
+On Mon, Nov 5, 2018 at 10:43 PM Weiyi Lu <weiyi.lu@mediatek.com> wrote:
 >
-> On 11/13/18 11:25 AM, Olof Johansson wrote:
-> > On Mon, Nov 05, 2018 at 03:48:30PM -0800, Florian Fainelli wrote:
-> >> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-> >>
-> >>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> >>
-> >> are available in the Git repository at:
-> >>
-> >>   https://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.20/drivers-part2
-> >>
-> >> for you to fetch changes up to 0810d5cc29a1e4bb9e738a478b746aebf8dc1931:
-> >>
-> >>   bus: brcmstb_gisb: simplify getting .driver_data (2018-11-05 12:37:22 -0800)
-> >>
-> >> ----------------------------------------------------------------
-> >> This pull request contains Broadcom ARM/ARM64/MIPS SoCs drivers changes
-> >> for 4.20:
-> >>
-> >> - Wolfram converts the Broadcom STB GISB bus arbiter driver to use
-> >>   dev_get_drvdata()
-> >>
-> >> - Florian fixes the kernel's re-entry point function when the kernel is
-> >>   built with CONFIG_THUMB2_KERNEL
-> >
-> > Hi Florian,
-> >
-> > Not sure if you inteded this for 4.20 or to queue for next merge window? Right
-> > now we're in bugfixes/regressions only for 4.20, and the GISB patch seems to be
-> > a cleanup/refactor.
+> Add scpsys driver for MT8183
 >
-> This is intended for 4.20 and the GISB patch is pretty low risk, which
-> is why I had included it, but I can resubmit without it if you think
-> this is not appropriate.
+> Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+> ---
+>  drivers/soc/mediatek/mtk-scpsys.c | 226 ++++++++++++++++++++++++++++++
+>  1 file changed, 226 insertions(+)
+>
+> diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+> index 80be2e05e4e0..57b9f04a69de 100644
+> --- a/drivers/soc/mediatek/mtk-scpsys.c
+> +++ b/drivers/soc/mediatek/mtk-scpsys.c
+> @@ -29,6 +29,7 @@
+>  #include <dt-bindings/power/mt7622-power.h>
+>  #include <dt-bindings/power/mt7623a-power.h>
+>  #include <dt-bindings/power/mt8173-power.h>
+> +#include <dt-bindings/power/mt8183-power.h>
+>
+>  #define MTK_POLL_DELAY_US   10
+>  #define MTK_POLL_TIMEOUT    (jiffies_to_usecs(HZ))
+> @@ -1179,6 +1180,217 @@ static const struct scp_subdomain scp_subdomain_mt8173[] = {
+>         {MT8173_POWER_DOMAIN_MFG_2D, MT8173_POWER_DOMAIN_MFG},
+>  };
+>
+> +/*
+> + * MT8183 power domain support
+> + */
+> +
+> +static const struct scp_domain_data scp_domain_data_mt8183[] = {
+> +       [MT8183_POWER_DOMAIN_AUDIO] = {
+> +               .name = "audio",
+> +               .sta_mask = PWR_STATUS_AUDIO,
+> +               .ctl_offs = 0x0314,
+> +               .sram_pdn_bits = GENMASK(11, 8),
+> +               .sram_pdn_ack_bits = GENMASK(15, 12),
+> +               .basic_clk_name = {"audio"},
+> +       },
+> +       [MT8183_POWER_DOMAIN_CONN] = {
+> +               .name = "conn",
+> +               .sta_mask = PWR_STATUS_CONN,
+> +               .ctl_offs = 0x032c,
+> +               .sram_pdn_bits = 0,
+> +               .sram_pdn_ack_bits = 0,
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2a0, 0x2a4, 0, 0x228,
+> +                               BIT(13) | BIT(14), BIT(13) | BIT(14)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_MFG_ASYNC] = {
+> +               .name = "mfg_async",
+> +               .sta_mask = PWR_STATUS_MFG_ASYNC,
+> +               .ctl_offs = 0x0334,
+> +               .sram_pdn_bits = 0,
+> +               .sram_pdn_ack_bits = 0,
+> +               .basic_clk_name = {"mfg"},
+> +       },
+> +       [MT8183_POWER_DOMAIN_MFG] = {
+> +               .name = "mfg",
+> +               .sta_mask = PWR_STATUS_MFG,
+> +               .ctl_offs = 0x0338,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +       },
+> +       [MT8183_POWER_DOMAIN_MFG_CORE0] = {
+> +               .name = "mfg_core0",
+> +               .sta_mask = BIT(7),
+> +               .ctl_offs = 0x034c,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +       },
+> +       [MT8183_POWER_DOMAIN_MFG_CORE1] = {
+> +               .name = "mfg_core1",
+> +               .sta_mask = BIT(20),
+> +               .ctl_offs = 0x0310,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +       },
+> +       [MT8183_POWER_DOMAIN_MFG_2D] = {
+> +               .name = "mfg_2d",
+> +               .sta_mask = PWR_STATUS_MFG_2D,
+> +               .ctl_offs = 0x0348,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2a8, 0x2ac, 0, 0x258,
+> +                               BIT(19) | BIT(20) | BIT(21),
+> +                               BIT(19) | BIT(20) | BIT(21)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2a0, 0x2a4, 0, 0x228,
+> +                               BIT(21) | BIT(22), BIT(21) | BIT(22)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_DISP] = {
+> +               .name = "disp",
+> +               .sta_mask = PWR_STATUS_DISP,
+> +               .ctl_offs = 0x030c,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +               .basic_clk_name = {"mm"},
+> +               .subsys_clk_prefix = "mm",
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2a8, 0x2ac, 0, 0x258,
+> +                               BIT(16) | BIT(17), BIT(16) | BIT(17)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2a0, 0x2a4, 0, 0x228,
+> +                               BIT(10) | BIT(11), BIT(10) | BIT(11)),
+> +                       [2] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               GENMASK(7, 0), GENMASK(7, 0)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_CAM] = {
+> +               .name = "cam",
+> +               .sta_mask = BIT(25),
+> +               .ctl_offs = 0x0344,
+> +               .sram_pdn_bits = GENMASK(9, 8),
+> +               .sram_pdn_ack_bits = GENMASK(13, 12),
+> +               .basic_clk_name = {"cam"},
+> +               .subsys_clk_prefix = "cam",
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               BIT(4) | BIT(5) | BIT(9) | BIT(13),
+> +                               BIT(4) | BIT(5) | BIT(9) | BIT(13)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2a0, 0x2a4, 0, 0x228,
+> +                               BIT(28), BIT(28)),
+> +                       [2] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               BIT(11), 0),
+> +                       [3] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               BIT(3) | BIT(4), BIT(3) | BIT(4)),
 
-Yeah, let's try to steer away from doing non-fixes post merge window
-unless there are strong reasons to do it, even if they might be low
-risk.
+Why do you need to specify the indexes ([0], [1], ...)? Can you just
+use automatic indexes? (especially considering that your code assumes
+there is no gap in the bp_table entries.
 
-
-Thanks!
-
--Olof
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_ISP] = {
+> +               .name = "isp",
+> +               .sta_mask = PWR_STATUS_ISP,
+> +               .ctl_offs = 0x0308,
+> +               .sram_pdn_bits = GENMASK(9, 8),
+> +               .sram_pdn_ack_bits = GENMASK(13, 12),
+> +               .basic_clk_name = {"isp"},
+> +               .subsys_clk_prefix = "isp",
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               BIT(3) | BIT(8), BIT(3) | BIT(8)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               BIT(10), 0),
+> +                       [2] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               BIT(2), BIT(2)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_VDEC] = {
+> +               .name = "vdec",
+> +               .sta_mask = BIT(31),
+> +               .ctl_offs = 0x0300,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               BIT(7), BIT(7)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_VENC] = {
+> +               .name = "venc",
+> +               .sta_mask = PWR_STATUS_VENC,
+> +               .ctl_offs = 0x0304,
+> +               .sram_pdn_bits = GENMASK(11, 8),
+> +               .sram_pdn_ack_bits = GENMASK(15, 12),
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               BIT(1), BIT(1)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_VPU_TOP] = {
+> +               .name = "vpu_top",
+> +               .sta_mask = BIT(26),
+> +               .ctl_offs = 0x0324,
+> +               .sram_pdn_bits = GENMASK(8, 8),
+> +               .sram_pdn_ack_bits = GENMASK(12, 12),
+> +               .basic_clk_name = {"vpu", "vpu1"},
+> +               .subsys_clk_prefix = "vpu",
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               GENMASK(9, 6) | BIT(12),
+> +                               GENMASK(9, 6) | BIT(12)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2a0, 0x2a4, 0, 0x228,
+> +                               BIT(27), BIT(27)),
+> +                       [2] = BUS_PROT(IFR_TYPE, 0x2d4, 0x2d8, 0, 0x2ec,
+> +                               BIT(10) | BIT(11), BIT(10) | BIT(11)),
+> +                       [3] = BUS_PROT(SMI_TYPE, 0x3c4, 0x3c8, 0, 0x3c0,
+> +                               BIT(5) | BIT(6), BIT(5) | BIT(6)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_VPU_CORE0] = {
+> +               .name = "vpu_core0",
+> +               .sta_mask = BIT(27),
+> +               .ctl_offs = 0x33c,
+> +               .sram_iso_ctrl = true,
+> +               .sram_pdn_bits = GENMASK(11, 8),
+> +               .sram_pdn_ack_bits = GENMASK(13, 12),
+> +               .basic_clk_name = {"vpu2"},
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2c4, 0x2c8, 0, 0x2e4,
+> +                               BIT(6), BIT(6)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2c4, 0x2c8, 0, 0x2e4,
+> +                               BIT(0) | BIT(2) | BIT(4),
+> +                               BIT(0) | BIT(2) | BIT(4)),
+> +               },
+> +       },
+> +       [MT8183_POWER_DOMAIN_VPU_CORE1] = {
+> +               .name = "vpu_core1",
+> +               .sta_mask = BIT(28),
+> +               .ctl_offs = 0x0340,
+> +               .sram_iso_ctrl = true,
+> +               .sram_pdn_bits = GENMASK(11, 8),
+> +               .sram_pdn_ack_bits = GENMASK(13, 12),
+> +               .basic_clk_name = {"vpu3"},
+> +               .bp_table = {
+> +                       [0] = BUS_PROT(IFR_TYPE, 0x2c4, 0x2c8, 0, 0x2e4,
+> +                               BIT(7), BIT(7)),
+> +                       [1] = BUS_PROT(IFR_TYPE, 0x2c4, 0x2c8, 0, 0x2e4,
+> +                               BIT(1) | BIT(3) | BIT(5),
+> +                               BIT(1) | BIT(3) | BIT(5)),
+> +               },
+> +       },
+> +};
+> +
+> +static const struct scp_subdomain scp_subdomain_mt8183[] = {
+> +       {MT8183_POWER_DOMAIN_MFG_ASYNC, MT8183_POWER_DOMAIN_MFG},
+> +       {MT8183_POWER_DOMAIN_MFG, MT8183_POWER_DOMAIN_MFG_2D},
+> +       {MT8183_POWER_DOMAIN_MFG, MT8183_POWER_DOMAIN_MFG_CORE0},
+> +       {MT8183_POWER_DOMAIN_MFG, MT8183_POWER_DOMAIN_MFG_CORE1},
+> +       {MT8183_POWER_DOMAIN_DISP, MT8183_POWER_DOMAIN_CAM},
+> +       {MT8183_POWER_DOMAIN_DISP, MT8183_POWER_DOMAIN_ISP},
+> +       {MT8183_POWER_DOMAIN_DISP, MT8183_POWER_DOMAIN_VDEC},
+> +       {MT8183_POWER_DOMAIN_DISP, MT8183_POWER_DOMAIN_VENC},
+> +       {MT8183_POWER_DOMAIN_DISP, MT8183_POWER_DOMAIN_VPU_TOP},
+> +       {MT8183_POWER_DOMAIN_VPU_TOP, MT8183_POWER_DOMAIN_VPU_CORE0},
+> +       {MT8183_POWER_DOMAIN_VPU_TOP, MT8183_POWER_DOMAIN_VPU_CORE1},
+> +};
+> +
+>  static const struct scp_soc_data mt2701_data = {
+>         .domains = scp_domain_data_mt2701,
+>         .num_domains = ARRAY_SIZE(scp_domain_data_mt2701),
+> @@ -1245,6 +1457,17 @@ static const struct scp_soc_data mt8173_data = {
+>         .bus_prot_reg_update = true,
+>  };
+>
+> +static const struct scp_soc_data mt8183_data = {
+> +       .domains = scp_domain_data_mt8183,
+> +       .num_domains = ARRAY_SIZE(scp_domain_data_mt8183),
+> +       .subdomains = scp_subdomain_mt8183,
+> +       .num_subdomains = ARRAY_SIZE(scp_subdomain_mt8183),
+> +       .regs = {
+> +               .pwr_sta_offs = 0x0180,
+> +               .pwr_sta2nd_offs = 0x0184
+> +       }
+> +};
+> +
+>  /*
+>   * scpsys driver init
+>   */
+> @@ -1268,6 +1491,9 @@ static const struct of_device_id of_scpsys_match_tbl[] = {
+>         }, {
+>                 .compatible = "mediatek,mt8173-scpsys",
+>                 .data = &mt8173_data,
+> +       }, {
+> +               .compatible = "mediatek,mt8183-scpsys",
+> +               .data = &mt8183_data,
+>         }, {
+>                 /* sentinel */
+>         }
+> --
+> 2.18.0
+>
