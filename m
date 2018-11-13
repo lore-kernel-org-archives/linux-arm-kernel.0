@@ -1,94 +1,37 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Tue, 13 Nov 2018 10:08:22 +0800
-Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
-Message-ID: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 12 Nov 2018 20:12:05 -0600
+Subject: [PATCH v3 2/3] dt-bindings: arm: amlogic: Add support for the
+ Smartlabs SML-5442TW
+In-Reply-To: <1541706240-30036-3-git-send-email-christianshewitt@gmail.com>
+References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
+ <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
+ <1541706240-30036-3-git-send-email-christianshewitt@gmail.com>
+Message-ID: <20181113021205.GA6962@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The flag 'has_clks' and related checks are superfluous as the CCF
-subsystem does this for you.
+On Thu,  8 Nov 2018 23:43:52 +0400, Christian Hewitt wrote:
+> The SML-5442TW is an STB for O2 Czech IPTV/VOD and DVB-S based on the
+> Amlogic P231 reference design using the S905D chipset. Specs:
+> 
+> 2GB DDR3 RAM
+> 8GB eMMC storage
+> 10/100 Base-T Ethernet
+> 802.11 a/b/g/n/ac + BT 4.1 HS sdio wireless module (QCA9377)
+> 2x single colour and 1x dual colour LEDs on the front panel
+> 1x reset button on the front panel
+> HDMI 2.0 (4k at 60p) video
+> Composite video + 2-channel audio output on 3.5mm jack
+> S/PDIF audio output
+> Single DVB-S tuner (AVL6762/MxL608)
+> 2x USB 2.0 ports
+> 1x micro SD card slot
+> UART pins (internal)
+> 
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
 
-Cc: John Crispin <john@phrozen.org>
-Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
----
- drivers/pwm/pwm-mediatek.c | 20 +++++---------------
- 1 file changed, 5 insertions(+), 15 deletions(-)
-
-diff --git a/drivers/pwm/pwm-mediatek.c b/drivers/pwm/pwm-mediatek.c
-index eb6674c..9400c41 100644
---- a/drivers/pwm/pwm-mediatek.c
-+++ b/drivers/pwm/pwm-mediatek.c
-@@ -57,7 +57,6 @@ enum {
- struct mtk_pwm_platform_data {
- 	unsigned int num_pwms;
- 	bool pwm45_fixup;
--	bool has_clks;
- };
- 
- /**
-@@ -87,9 +86,6 @@ static int mtk_pwm_clk_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
- 	int ret;
- 
--	if (!pc->soc->has_clks)
--		return 0;
--
- 	ret = clk_prepare_enable(pc->clks[MTK_CLK_TOP]);
- 	if (ret < 0)
- 		return ret;
-@@ -116,9 +112,6 @@ static void mtk_pwm_clk_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- {
- 	struct mtk_pwm_chip *pc = to_mtk_pwm_chip(chip);
- 
--	if (!pc->soc->has_clks)
--		return;
--
- 	clk_disable_unprepare(pc->clks[MTK_CLK_PWM1 + pwm->hwpwm]);
- 	clk_disable_unprepare(pc->clks[MTK_CLK_MAIN]);
- 	clk_disable_unprepare(pc->clks[MTK_CLK_TOP]);
-@@ -246,12 +239,13 @@ static int mtk_pwm_probe(struct platform_device *pdev)
- 	if (IS_ERR(pc->regs))
- 		return PTR_ERR(pc->regs);
- 
--	for (i = 0; i < data->num_pwms + 2 && pc->soc->has_clks; i++) {
-+	for (i = 0; i < data->num_pwms + 2; i++) {
- 		pc->clks[i] = devm_clk_get(&pdev->dev, mtk_pwm_clk_name[i]);
- 		if (IS_ERR(pc->clks[i])) {
--			dev_err(&pdev->dev, "clock: %s fail: %ld\n",
--				mtk_pwm_clk_name[i], PTR_ERR(pc->clks[i]));
--			return PTR_ERR(pc->clks[i]);
-+			if (PTR_ERR(pc->clks[i]) == -EPROBE_DEFER)
-+				return -EPROBE_DEFER;
-+
-+			pc->clks[i] = NULL;
- 		}
- 	}
- 
-@@ -281,25 +275,21 @@ static int mtk_pwm_remove(struct platform_device *pdev)
- static const struct mtk_pwm_platform_data mt2712_pwm_data = {
- 	.num_pwms = 8,
- 	.pwm45_fixup = false,
--	.has_clks = true,
- };
- 
- static const struct mtk_pwm_platform_data mt7622_pwm_data = {
- 	.num_pwms = 6,
- 	.pwm45_fixup = false,
--	.has_clks = true,
- };
- 
- static const struct mtk_pwm_platform_data mt7623_pwm_data = {
- 	.num_pwms = 5,
- 	.pwm45_fixup = true,
--	.has_clks = true,
- };
- 
- static const struct mtk_pwm_platform_data mt7628_pwm_data = {
- 	.num_pwms = 4,
- 	.pwm45_fixup = true,
--	.has_clks = false,
- };
- 
- static const struct of_device_id mtk_pwm_of_match[] = {
--- 
-1.9.1
+Reviewed-by: Rob Herring <robh@kernel.org>
