@@ -1,66 +1,68 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 13 Nov 2018 14:32:22 +0100
-Subject: [PATCH] drm/meson: venc: dmt mode must use encp
-In-Reply-To: <9f20e9d1-2e15-c087-db52-674300d7581d@baylibre.com>
-References: <1542048069-22603-1-git-send-email-jramirez@baylibre.com>
- <9f20e9d1-2e15-c087-db52-674300d7581d@baylibre.com>
-Message-ID: <ffe5e73a-c685-0a51-5038-1ede0e249b38@baylibre.com>
+Date: Tue, 13 Nov 2018 14:32:36 +0100
+Subject: [PATCH 0/2] drm/meson: Allow using optional canvas provider
+In-Reply-To: <CAMO6nax_Q4kbDkeBmYQezo9dpMztD4DMFh+1dewax4p6d_S7mw@mail.gmail.com>
+References: <20181105104508.23090-1-mjourdan@baylibre.com>
+ <1a3d3b7a-5050-7b4c-bda6-8ef532403d01@baylibre.com>
+ <CAMO6nax_Q4kbDkeBmYQezo9dpMztD4DMFh+1dewax4p6d_S7mw@mail.gmail.com>
+Message-ID: <ec49e7c1-8ca6-b442-10dc-1f15a15917bc@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/2018 09:35, Neil Armstrong wrote:
-> On 12/11/2018 19:41, Jorge Ramirez-Ortiz wrote:
->> From: Jorge Ramirez-Ortiz <jorge.ramirez.ortiz@gmail.com>
+On 05/11/2018 15:02, Maxime Jourdan wrote:
+> Hi Neil,
+> 
+> On Mon, Nov 5, 2018 at 1:51 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
 >>
->> The video mode for DMT is only populated to support encp.
+>> Hi Maxime,
 >>
->> Signed-off-by: Jorge Ramirez-Ortiz <jorge.ramirez.ortiz@gmail.com>
->> ---
->>  drivers/gpu/drm/meson/meson_venc.c | 15 ++++++++-------
->>  1 file changed, 8 insertions(+), 7 deletions(-)
+>> On 05/11/2018 11:45, Maxime Jourdan wrote:
+>>> The meson DRM driver currently uses constant, static canvas indexes.
+>>>
+>>> This is not optimal and could conflict with other drivers also using
+>>> canvases.
 >>
->> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
->> index 514245e..acbbad3 100644
->> --- a/drivers/gpu/drm/meson/meson_venc.c
->> +++ b/drivers/gpu/drm/meson/meson_venc.c
->> @@ -854,6 +854,13 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
->>  	unsigned int sof_lines;
->>  	unsigned int vsync_lines;
->>  
->> +	/* Use VENCI for 480i and 576i and double HDMI pixels */
->> +	if (mode->flags & DRM_MODE_FLAG_DBLCLK) {
->> +		hdmi_repeat = true;
->> +		use_enci = true;
->> +		venc_hdmi_latency = 1;
->> +	}
->> +
->>  	if (meson_venc_hdmi_supported_vic(vic)) {
->>  		vmode = meson_venc_hdmi_get_vic_vmode(vic);
->>  		if (!vmode) {
->> @@ -865,13 +872,7 @@ void meson_venc_hdmi_mode_set(struct meson_drm *priv, int vic,
->>  	} else {
->>  		meson_venc_hdmi_get_dmt_vmode(mode, &vmode_dmt);
->>  		vmode = &vmode_dmt;
->> -	}
->> -
->> -	/* Use VENCI for 480i and 576i and double HDMI pixels */
->> -	if (mode->flags & DRM_MODE_FLAG_DBLCLK) {
->> -		hdmi_repeat = true;
->> -		use_enci = true;
->> -		venc_hdmi_latency = 1;
->> +		use_enci = false;
->>  	}
->>  
->>  	/* Repeat VENC pixels for 480/576i/p, 720p50/60 and 1080p50/60 */
+>> Indeed, it's now time to use the canvas provider merged in 4.20-rc1 !
+>>
+>>>
+>>> This patch series allows the driver to optionnally use a canvas provider
+>>> module that is able to dispatch canvases, on demand and free of conflict.
+>>>
+>>> In the future, the current way of doing things will be deprecated.
+>>
+>> Do you confirm you will send a patch to remove the legacy canvas code when
+>> everything is merged (including DT changes) ?
+>>
+>> I'll wait until the bindings are reviewed, then I'll push the serie to drm-misc-next.
 >>
 > 
-> Thanks !
+> Yes, ultimately it will be removed.
 > 
-> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+> The plan is:
 > 
-> I'll apply to drm-misc-fixes !
+> 4.21: allow using both modes, add the "amlogic,canvas" property to the dts files
+> 4.22: remove the old way and change the amlogic,canvas property to mandatory
 > 
-> Neil
+> This should allow for a nice transition.
 > 
+> Maxime
+> 
+>> Thanks,
+>> Neil
+>>
+>>>
+>>> Maxime Jourdan (2):
+>>>   dt-bindings: display: amlogic, meson-vpu: Add optional canvas provider
+>>>     node
+>>>   drm/meson: Use optional canvas provider
+>>>
+>>>  .../bindings/display/amlogic,meson-vpu.txt    |  2 +
+>>>  drivers/gpu/drm/meson/Kconfig                 |  1 +
+>>>  drivers/gpu/drm/meson/meson_crtc.c            | 14 ++++--
+>>>  drivers/gpu/drm/meson/meson_drv.c             | 46 ++++++++++++-------
+>>>  drivers/gpu/drm/meson/meson_drv.h             |  4 ++
+>>>  drivers/gpu/drm/meson/meson_plane.c           |  8 +++-
+>>>  6 files changed, 53 insertions(+), 22 deletions(-)
+>>>
 
-Applied.
+Applied
