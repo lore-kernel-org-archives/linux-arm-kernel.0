@@ -1,37 +1,61 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 12 Nov 2018 20:12:05 -0600
-Subject: [PATCH v3 2/3] dt-bindings: arm: amlogic: Add support for the
- Smartlabs SML-5442TW
-In-Reply-To: <1541706240-30036-3-git-send-email-christianshewitt@gmail.com>
-References: <1541691207-24768-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-1-git-send-email-christianshewitt@gmail.com>
- <1541706240-30036-3-git-send-email-christianshewitt@gmail.com>
-Message-ID: <20181113021205.GA6962@bogus>
+Date: Mon, 12 Nov 2018 20:13:37 -0600
+Subject: [PATCH v3 1/4] dt-bindings: hwlock: Document STM32 hwspinlock
+ bindings
+In-Reply-To: <20181112152342.6561-2-benjamin.gaignard@st.com>
+References: <20181112152342.6561-1-benjamin.gaignard@st.com>
+ <20181112152342.6561-2-benjamin.gaignard@st.com>
+Message-ID: <20181113021337.GA7237@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  8 Nov 2018 23:43:52 +0400, Christian Hewitt wrote:
-> The SML-5442TW is an STB for O2 Czech IPTV/VOD and DVB-S based on the
-> Amlogic P231 reference design using the S905D chipset. Specs:
+On Mon, Nov 12, 2018 at 04:23:39PM +0100, Benjamin Gaignard wrote:
+> Add bindings for STM32 hardware spinlock device
 > 
-> 2GB DDR3 RAM
-> 8GB eMMC storage
-> 10/100 Base-T Ethernet
-> 802.11 a/b/g/n/ac + BT 4.1 HS sdio wireless module (QCA9377)
-> 2x single colour and 1x dual colour LEDs on the front panel
-> 1x reset button on the front panel
-> HDMI 2.0 (4k at 60p) video
-> Composite video + 2-channel audio output on 3.5mm jack
-> S/PDIF audio output
-> Single DVB-S tuner (AVL6762/MxL608)
-> 2x USB 2.0 ports
-> 1x micro SD card slot
-> UART pins (internal)
-> 
-> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
-> ---
->  Documentation/devicetree/bindings/arm/amlogic.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Linaro or ST? Please make the author email match.
+
+> ---
+> version 3 :
+> - fix clock name in properties description
+> version 2 :
+> - change clock name from hwspinlock to hsem to be align with hardware
+>   documentation
+> 
+>  .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> new file mode 100644
+> index 000000000000..adf4f000ea3d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+> @@ -0,0 +1,23 @@
+> +STM32 Hardware Spinlock Device Binding
+> +-------------------------------------
+> +
+> +Required properties :
+> +- compatible : should be "st,stm32-hwspinlock".
+> +- reg : the register address of hwspinlock.
+> +- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
+> +	hwlock, so the number of cells should be <1> here.
+> +- clock-names : Must contain "hsem".
+> +- clocks : Must contain a phandle entry for the clock in clock-names, see the
+> +	common clock bindings.
+> +
+> +Please look at the generic hwlock binding for usage information for consumers,
+> +"Documentation/devicetree/bindings/hwlock/hwlock.txt"
+> +
+> +Example of hwlock provider:
+> +	hwspinlock at 4c000000 {
+> +		compatible = "st,stm32-hwspinlock";
+> +		#hwlock-cells = <1>;
+> +		reg = <0x4c000000 0x400>;
+> +		clocks = <&rcc HSEM>;
+> +		clock-names = "hsem";
+> +	};
+> -- 
+> 2.15.0
+> 
