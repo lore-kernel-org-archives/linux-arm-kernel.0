@@ -1,42 +1,41 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 13 Nov 2018 10:55:39 +0100
-Subject: [resend PATCH 3/3] dt-bindings: pwm: update bindings for MT7629
- SoC
-In-Reply-To: <630234ce3f13d93650c820be8f1724b84dd3c0ba.1542074855.git.ryder.lee@mediatek.com>
-References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
- <630234ce3f13d93650c820be8f1724b84dd3c0ba.1542074855.git.ryder.lee@mediatek.com>
-Message-ID: <20181113095539.frqnvdfts632k3os@pengutronix.de>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 13 Nov 2018 10:58:06 +0100
+Subject: [PATCH 3/3] ARM: dts: stm32: Add hwlock for pinctrl
+In-Reply-To: <20181113095142.32015-4-benjamin.gaignard@st.com>
+References: <20181113095142.32015-1-benjamin.gaignard@st.com>
+ <20181113095142.32015-4-benjamin.gaignard@st.com>
+Message-ID: <2e76818f-28a0-1151-11f0-a9e8d3b5fd09@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 10:08:24AM +0800, Ryder Lee wrote:
-> This updates bindings for MT7629 pwm controller.
+Hi Benjamin
+
+On 11/13/18 10:51 AM, Benjamin Gaignard wrote:
+> Define a hwspinlock to be used by pin-controller
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 1 +
->  1 file changed, 1 insertion(+)
+>   arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> index 991728c..4a2885b 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> @@ -6,6 +6,7 @@ Required properties:
->     - "mediatek,mt7622-pwm": found on mt7622 SoC.
->     - "mediatek,mt7623-pwm": found on mt7623 SoC.
->     - "mediatek,mt7628-pwm": found on mt7628 SoC.
-> +   - "mediatek,mt7629-pwm": found on mt7629 SoC.
->   - reg: physical base address and length of the controller's registers.
->   - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
->     the cell format.
 
-Does the mt7629 need clocks? I'd suggest to move the clocks and
-clock-names description to a section "Optional properties" to match what
-is implemented in patch 1 of this series.
+In commit title please add for which SoC it is targeted. If you don't 
+have to send new version for driver or dt-bindings, I will do it when 
+I'll apply.
 
-Best regards
-Uwe
+regards
+Alex
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> index c4851271e810..2886e5a6ac27 100644
+> --- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
+> @@ -14,6 +14,7 @@
+>   			ranges = <0 0x50002000 0xa400>;
+>   			interrupt-parent = <&exti>;
+>   			st,syscfg = <&exti 0x60 0xff>;
+> +			hwlocks = <&hsem 0>;
+>   			pins-are-numbered;
+>   
+>   			gpioa: gpio at 50002000 {
+> 
