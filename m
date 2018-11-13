@@ -1,76 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 13 Nov 2018 17:29:50 +0000
-Subject: [PATCH] arm64: dts: marvell: armada_8k: reserve memory for ATF
-In-Reply-To: <20181113134807.53292-1-manu@freebsd.org>
-References: <20181113134807.53292-1-manu@freebsd.org>
-Message-ID: <20181113172950.GL30658@n2100.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 13 Nov 2018 17:33:00 +0000
+Subject: [PATCH v2 2/9] arm64: defconfig: Drop ARM_BIG_LITTLE_CPUFREQ
+In-Reply-To: <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
+References: <898e79a6-092c-d013-d2bb-f6260e761379@free.fr>
+ <03f41ca8-68c6-f075-cb1e-c7f630a3b128@free.fr>
+ <20181108093617.GB8433@e107155-lin>
+ <CAK8P3a1129B-u60sjHCvLuE8i6OCJRDSe-JFy3S-JJWFGbHCPQ@mail.gmail.com>
+Message-ID: <20181113173300.GA8432@e107533-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 02:48:07PM +0100, Emmanuel Vadot wrote:
-> Like 4436a371 for 37xx, reserve the PSCI area memory region so kernels
-> can call the code there.
-> Region address is taken from the ATF code [1] and is 2MiB aligned.
-> 
-> [1] plat/marvell/a8k/common/include/platform_def.h
-> 
-> Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
-> ---
->  arch/arm64/boot/dts/marvell/armada-ap806.dtsi | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> index 073610ac0a53..d8a79bb69de1 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
-> @@ -23,6 +23,21 @@
->  		spi0 = &spi0;
->  	};
->  
-> +	reserved-memory {
-> +		#address-cells = <2>;
-> +		#size-cells = <2>;
-> +		ranges;
-> +
-> +		/*
-> +		 * The PSCI firmware region depicted below is the default one
-> +		 * and should be updated by the bootloader.
-> +		 */
-> +		psci-area at 4000000 {
-> +			reg = <0 0x4000000 0 0x200000>;
-> +			no-map;
-> +		};
-> +	};
+On Sat, Nov 10, 2018 at 09:57:27AM +0100, Arnd Bergmann wrote:
+> On Thu, Nov 8, 2018 at 10:36 AM Sudeep Holla <sudeep.holla@arm.com> wrote:
+> >
+> > On Wed, Nov 07, 2018 at 11:39:42PM +0100, Marc Gonzalez wrote:
+> > > Commit a7314405d83c ("drop ARM_BIG_LITTLE_CPUFREQ support for ARM64")
+> > > dropped ARM_BIG_LITTLE_CPUFREQ support for ARM64.
+> > >
+> >
+> > Looks good,
+> >
+> > Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+> >
+> > But I left it intentionally to avoid churn assuming it will go away when
+> > ARM SoC team runs savedefconfig and sync the defconfig.
+>
+> I would never do that, instead I want patches like the one that Marc sent
+> in order to make sure we don't accidentally drop anything that is still
+> required, e.g. when an option got renamed or gained a dependency.
+>
+Thanks for the clarification. I must have misunderstood what's done in
+Commit c432c0880596 ("arm64: defconfig: renormalize based on recent additions")
+I assume it was just the reordering rather than addition/removal of entries.
+It's not so clear from the log message.
 
-Does this really apply to everything?  I'm not sure it does.
-If I look at a memory dump from the Macchiatobin, I see:
-
- 04000000  00000000 00000007 00000005 00000040
- 04000010  00000001 00001000 00000007 00000001
- 04000020  00000008 00000000 00000009 00000000
- 04000030  0000000a 00000000 fff7ffff ffffffff
- 04000040  fbf7dfc7 fffffdff f2fffffe fbfdfffb
- 04000050  af7ffefb fbfff7ff efbfffe3 5efdbf4d
- 04000060  ff7effff fdffedff ff9f8fff ef9ffffd
- 04000070  bffcffff ff7fff7a eff7ff7d 7fffbfff
- 04000080  ffefefff fedfff7f ffdfffff ffbdff7f
- 04000090  f3ff7fdb ffff76ff ffeffefe ffffff7f
- 040000a0  9fffffff fff7ffdf edffffff fcffdfff
- 040000b0  fffbefff fefffffb ffeffff7 6fffffff
- 040000c0  ffdffdfb fd7fff9e fbefefbf eeefdfeb
- 040000d0  bbdfbda3 9dfdef92 7b6ffaee fffde3fc
- 040000e0  ff9efffd ff79ffdb ffaef57f ffaec1fe
- 040000f0  bff7ffff fffeffdb effffb3f eaedffee
- 04000100  fffffffb ffffffdf ffdffebf bfefbff3
- 04000110  ffffffff fffffeff f7ffffff ffeeefff
- 04000120  f7ffff7f fedfffff fffffffe fffefefe
- 04000130  fbffff7d fffdffff fdffffff b7ffffff
- 04000140  6fffffff ffee7fed fffffeff fffbfe6d
- 04000150  fd5ff7ff f7bfffdc fdfff3c7 f7ff6f1d
-
-Doesn't look like firmware to me.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+--
+Regards,
+Sudeep
