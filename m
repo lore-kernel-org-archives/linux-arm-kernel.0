@@ -1,84 +1,45 @@
-From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Tue, 13 Nov 2018 18:29:51 +0200
-Subject: [PATCH v2 2/2] dpaa_eth: add ethtool coalesce control
-In-Reply-To: <1542126591-5114-1-git-send-email-madalin.bucur@nxp.com>
-References: <1542126591-5114-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1542126591-5114-3-git-send-email-madalin.bucur@nxp.com>
+From: elder@linaro.org (Alex Elder)
+Date: Tue, 13 Nov 2018 10:33:29 -0600
+Subject: [RFC PATCH 02/12] soc: qcom: ipa: DMA helpers
+In-Reply-To: <CAK8P3a3Hur9Kn=QLrn7XDn-Kpgfta1xTxvuwcBze4n2v7fsULw@mail.gmail.com>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-3-elder@linaro.org>
+ <CAK8P3a3Hur9Kn=QLrn7XDn-Kpgfta1xTxvuwcBze4n2v7fsULw@mail.gmail.com>
+Message-ID: <7eaef6a8-9d12-31bb-43fb-e710ad171c0f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow ethtool control of the DPAA QMan portal interrupt coalescing
-settings.
+On 11/7/18 6:17 AM, Arnd Bergmann wrote:
+> On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+>>
+>> This patch includes code implementing the IPA DMA module, which
+>> defines a structure to represent a DMA allocation for the IPA device.
+>> It's used throughout the IPA code.
+>>
+>> Signed-off-by: Alex Elder <elder@linaro.org>
+> 
+> I looked through all the users of this and couldn't fine one that actually
+> benefits from it. I'd say better drop this patch entirely and open-code
+> the contents in the callers. That will help readability since the dma
+> API is well understood by many people.
 
-Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
----
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c | 49 ++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+Originally this was done to make it more obvious that all DMA allocations
+were done with the same device pointer.  Previously there were several
+separate devices, and it wasn't very obvious that only one was used (and
+required).  Now that we're past that it's not difficult to do as you suggest.
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 13d6e2272ece..4df366b05976 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -529,6 +529,53 @@ static int dpaa_get_ts_info(struct net_device *net_dev,
- 	return 0;
- }
- 
-+static int dpaa_get_coalesce(struct net_device *dev,
-+			     struct ethtool_coalesce *c)
-+{
-+	struct qman_portal *portal;
-+	u32 period;
-+	u8 thresh;
-+
-+	portal = qman_get_affine_portal(smp_processor_id());
-+	qman_portal_get_iperiod(portal, &period);
-+	qman_dqrr_get_ithresh(portal, &thresh);
-+
-+	c->rx_coalesce_usecs = period;
-+	c->rx_max_coalesced_frames = thresh;
-+	c->use_adaptive_rx_coalesce = false;
-+
-+	return 0;
-+}
-+
-+static int dpaa_set_coalesce(struct net_device *dev,
-+			     struct ethtool_coalesce *c)
-+{
-+	const cpumask_t *cpus = qman_affine_cpus();
-+	struct qman_portal *portal;
-+	u32 period;
-+	u8 thresh;
-+	int cpu;
-+	int res;
-+
-+	if (c->use_adaptive_rx_coalesce)
-+		return -EINVAL;
-+
-+	period = c->rx_coalesce_usecs;
-+	thresh = c->rx_max_coalesced_frames;
-+
-+	for_each_cpu(cpu, cpus) {
-+		portal = qman_get_affine_portal(cpu);
-+		res = qman_portal_set_iperiod(portal, period);
-+		if (res)
-+			return res;
-+		res = qman_dqrr_set_ithresh(portal, thresh);
-+		if (res)
-+			return res;
-+	}
-+
-+	return 0;
-+}
-+
- const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_drvinfo = dpaa_get_drvinfo,
- 	.get_msglevel = dpaa_get_msglevel,
-@@ -545,4 +592,6 @@ const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_rxnfc = dpaa_get_rxnfc,
- 	.set_rxnfc = dpaa_set_rxnfc,
- 	.get_ts_info = dpaa_get_ts_info,
-+	.get_coalesce = dpaa_get_coalesce,
-+	.set_coalesce = dpaa_set_coalesce,
- };
--- 
-2.1.0
+I have now done that, and in the process identified a few more ways to
+improve/simplify the code.  The net result is that more lines of code
+were removed than were present in "ipa_dma.[ch]".  I see that as a
+win (aside from your point below).
+
+> Generally speaking, try not to wrap Linux interfaces into driver specific
+> helper functions.
+
+Agreed.  Thanks a lot for your review.
+
+					-Alex
+
+> 
+>       Arnd
+> 
