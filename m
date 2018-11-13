@@ -1,29 +1,24 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Tue, 13 Nov 2018 18:55:19 +0200
-Subject: [PATCH v6 00/17] Removed nested TPM operations
-In-Reply-To: <5B8DA87D05A7694D9FA63FD143655C1B9DA1CD09@hasmsx108.ger.corp.intel.com>
-References: <20181113122609.21643-1-jarkko.sakkinen@linux.intel.com>
- <5B8DA87D05A7694D9FA63FD143655C1B9DA1CD09@hasmsx108.ger.corp.intel.com>
-Message-ID: <20181113165519.GA4752@linux.intel.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 13 Nov 2018 18:02:09 +0100
+Subject: [PATCH v3 17/18] USB: phy-mv-usb: use phy-pxa-usb
+In-Reply-To: <20181112032027.653931-18-lkundrak@v3.sk> (Lubomir Rintel's
+ message of "Mon, 12 Nov 2018 04:20:26 +0100")
+References: <20181112032027.653931-1-lkundrak@v3.sk>
+ <20181112032027.653931-18-lkundrak@v3.sk>
+Message-ID: <87tvkkkj1q.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 12:30:55PM +0000, Winkler, Tomas wrote:
-> > 
-> > [was Detach TPM space code out of the tpm_transmit() flow but the scope
-> > expanded a bit.]
-> 
-> I believe you making this series artificially large we can merge the
-> first 4 patches and leave the rest for further discussion.
+Lubomir Rintel <lkundrak@v3.sk> writes:
 
-1/17, 2/17 and 3/17 are fairly obvious changes but they still should
-have tested-by's. For 4/17 I need a sanity check from James Bottomley
-that I'm not forgetting some tidbit of TPM space implementation (has
-been while since I've worked on it so better to have 2nd eyes there).
+> Use a proper PHY driver, instead of hooks to a board support package.
+Hi Lubomir,
 
-I think also 5/17, 7/17 and 10/17 could be merged.
+This specific patch caught my attention, because of its title : I don't see what
+phy-pxa-usb stands for, is it a typo ? I don't think anybody implemented so far
+a proper phy support for pxa based boards (pxa27x actually), hence my question.
 
-I can reposition forementioned patches so that they are in the head of
-the series.
+Cheers.
 
-/Jarkko
+--
+Robert
