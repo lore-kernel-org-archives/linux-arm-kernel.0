@@ -1,92 +1,73 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Tue, 13 Nov 2018 11:10:23 +0100
-Subject: [PATCH v2 06/11] arm64: dts: exynos5433: add support for
- thermal trip irq-mode
-In-Reply-To: <CAJKOXPcGOiVwVuaT+2RHGs0VxA2XRjOd6efsDQaGrWWCJS7vNg@mail.gmail.com>
-References: <CGME20181107171041eucas1p1a3cf91435b9071fd6e6f84101ebbcd9f@eucas1p1.samsung.com>
- <1541610593-28542-1-git-send-email-l.luba@partner.samsung.com>
- <1541610593-28542-7-git-send-email-l.luba@partner.samsung.com>
- <CAJKOXPcGOiVwVuaT+2RHGs0VxA2XRjOd6efsDQaGrWWCJS7vNg@mail.gmail.com>
-Message-ID: <616778d8-387f-dbc9-6523-289058b22577@partner.samsung.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 13 Nov 2018 10:11:40 +0000
+Subject: [PATCH v2 06/10] dt-bindings: serial: Add bindings for
+ nvidia,tegra194-tcu
+In-Reply-To: <20181113100355.GA15642@ulmo>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-7-thierry.reding@gmail.com>
+ <f7d19f6e-0dcd-753c-a407-fcec4fa1474b@nvidia.com>
+ <20181113100355.GA15642@ulmo>
+Message-ID: <a3256616-b300-6be9-1250-b481d686431d@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
 
-On 11/12/18 10:00 AM, Krzysztof Kozlowski wrote:
-> Thanks Lukasz for patches. I like your work!
-> 
-> I have few more comments which will probably apply for all the DTS commits.
-> 
-> On Wed, 7 Nov 2018 at 18:10, Lukasz Luba <l.luba@partner.samsung.com> wrote:
+On 13/11/2018 10:03, Thierry Reding wrote:
+> On Tue, Nov 13, 2018 at 09:39:08AM +0000, Jon Hunter wrote:
 >>
->> This patch adds support for new flag which indicates
-> 
-> This patch does not add support. Support for flag was added in your
-> first drivers/thermal patches in this set. This patch adds new flag.
-> (and does something more, so read on)
-Got it, will change the commit message.
-> 
->> that trip point triggers IRQ when temperature is met.
->> Exynos5433 supports 8 trip point which will trigger IRQ.
-> 
-> /8 trip point/8 trip points/
-> 
->> Above that number other trip points should be registered
->> without 'irq-mode' flag.
-> 
-> Please fix the line-wrap.
-OK
-> 
+>> On 12/11/2018 15:18, Thierry Reding wrote:
+>>> From: Mikko Perttunen <mperttunen@nvidia.com>
+>>>
+>>> Add bindings for the Tegra Combined UART device used to talk to the
+>>> UART console on Tegra194 systems.
+>>>
+>>> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>>> Reviewed-by: Rob Herring <robh@kernel.org>
+>>> Acked-by: Jon Hunter <jonathanh@nvidia.com>
+>>> Acked-by: Thierry Reding <treding@nvidia.com>
+>>> Signed-off-by: Thierry Reding <treding@nvidia.com>
+>>> ---
+>>>  .../bindings/serial/nvidia,tegra194-tcu.txt   | 35 +++++++++++++++++++
+>>>  1 file changed, 35 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+>>> new file mode 100644
+>>> index 000000000000..085a8591accd
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/serial/nvidia,tegra194-tcu.txt
+>>> @@ -0,0 +1,35 @@
+>>> +NVIDIA Tegra Combined UART (TCU)
+>>> +
+>>> +The TCU is a system for sharing a hardware UART instance among multiple
+>>> +systems within the Tegra SoC. It is implemented through a mailbox-
+>>> +based protocol where each "virtual UART" has a pair of mailboxes, one
+>>> +for transmitting and one for receiving, that is used to communicate
+>>> +with the hardware implementing the TCU.
+>>> +
+>>> +Required properties:
+>>> +- name : Should be tcu
+>>> +- compatible
+>>> +    Array of strings
+>>> +    One of:
+>>> +    - "nvidia,tegra194-tcu"
+>>> +- mbox-names:
+>>> +    "rx" - Mailbox for receiving data from hardware UART
+>>> +    "tx" - Mailbox for transmitting data to hardware UART
+>>> +- mboxes: Mailboxes corresponding to the mbox-names.
 >>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <krzk@kernel.org>
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 105 ++++++++++++++++---------
->>   1 file changed, 70 insertions(+), 35 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
->> index fe3a0b1..c4330f6 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
->> @@ -17,37 +17,44 @@ thermal-zones {
->>                          atlas0_alert_0: atlas0-alert-0 {
->>                                  temperature = <65000>;  /* millicelsius */
->>                                  hysteresis = <1000>;    /* millicelsius */
->> -                               type = "active";
->> +                               type = "passive";
+>> Looks like there is some trailing white-space in the above line and git
+>> warns after applying this patch.
 > 
-> This change is not explained in commit msg.
-> 
-> Basically you are doing here two things (related to each other). You
-> clearly define which trip points are IRQ-type and you correct the type
-> of trip point. Active is incorrect. This second thing is missing in
-> your commit msg and I believe it is main reason behind this patch. You
-> should focus then on this reason - start from it. Subject could be
-> like "Use proper passive type for thermal trip points".
-> 
-> Without this explanation I don't see the strong reason behind that
-> patch. IOW, everything was working fine before... so why adding this
-> new flag? Or maybe something was not fine... and then it is real
-> reason why you are sending the patch. Usually commit message should
-> answer to the most important question "WHY". Now, it explains
-> "WHAT"... but I can see it from the source code. However from the code
-> it is not easy to guess WHY.
+> I'm not seeing it. I remember seeing that trailing space in an earlier
+> version of this patch and fixing it up. Did you perhaps end up applying
+> the wrong version?
 
-OK, I will add the explanation 'why' similar to description from the
-cover-letter to all the patches which add this flag in DT files.
+Yes you are right. This version does not have it. Seems that thunderbird
+does not correctly overwrite the previous mbox but once I deleted and
+saved again, I no longer see this.
 
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
+Sorry for the noise. Jon
 
-Thank you for the review.
-
-Regards,
-Lukasz
+-- 
+nvpublic
