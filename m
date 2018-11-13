@@ -1,81 +1,84 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 13 Nov 2018 16:46:22 +0530
-Subject: [PATCH v4 15/26] drm/sun4i: sun6i_mipi_dsi: Set proper vblk timing
- calculation
+Date: Tue, 13 Nov 2018 16:46:23 +0530
+Subject: [PATCH v4 16/26] drm/sun4i: sun6i_mipi_dsi: Add support for VCC-DSI
+ voltage regulator
 In-Reply-To: <20181113111633.20189-1-jagan@amarulasolutions.com>
 References: <20181113111633.20189-1-jagan@amarulasolutions.com>
-Message-ID: <20181113111633.20189-16-jagan@amarulasolutions.com>
+Message-ID: <20181113111633.20189-17-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike hblk, the vblk timings should follow an equation to compute
-the desired value for lane 4 devices and rest of devices it would be 0.
+Some boards have VCC-DSI pin connected to voltage regulator which may
+not be turned on by default.
 
-BSP code from BPI-M64-bsp is computing vblk as for 4-lane devices
-(from linux-sunxi
-drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-
-tmp = (ht*dsi_pixel_bits[format]/8)*vt-(4+dsi_hblk+2);
-dsi_vblk = (lane-tmp%lane);
-
-So, update the vblk timing calculation accordingly.
-
-Tested on 2-lane, 4-lane MIPI-DSI LCD panels.
+Add support for such boards by adding voltage regulator handling code to
+MIPI DSI driver.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 32 ++++++++++++++++++++------
- 1 file changed, 25 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 14 ++++++++++++++
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h |  3 +++
+ 2 files changed, 17 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 63b924b89bd7..703722f7c81b 100644
+index 703722f7c81b..2ea33db61ae1 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -355,6 +355,30 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
- 		     SUN6I_DSI_INST_JUMP_CFG_NUM(1));
- };
+@@ -1026,6 +1026,12 @@ static int sun6i_dsi_probe(struct platform_device *pdev)
+ 		return PTR_ERR(base);
+ 	}
  
-+static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
-+				      struct drm_display_mode *mode, u16 hblk)
-+{
-+	struct mipi_dsi_device *device = dsi->device;
-+	u16 vblk = 0;
-+
-+	/*
-+	 * The vertical blank is set using a blanking packet (4 bytes +
-+	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
-+	 */
-+#define VBLK_PACKET_OVERHEAD	6
-+	if (device->lanes == 4) {
-+		unsigned int Bpp;
-+		int tmp;
-+
-+		Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-+		tmp = (mode->htotal * Bpp) * mode->vtotal -
-+		      (hblk + VBLK_PACKET_OVERHEAD);
-+		vblk = (device->lanes - tmp % device->lanes);
++	dsi->regulator = devm_regulator_get(dev, "vcc-dsi");
++	if (IS_ERR(dsi->regulator)) {
++		dev_err(dev, "Couldn't get VCC-DSI supply\n");
++		return PTR_ERR(dsi->regulator);
 +	}
 +
-+	return vblk;
-+}
-+
- static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
- 					   struct drm_display_mode *mode)
+ 	dsi->regs = devm_regmap_init_mmio_clk(dev, "bus", base,
+ 					      &sun6i_dsi_regmap_config);
+ 	if (IS_ERR(dsi->regs)) {
+@@ -1107,6 +1113,13 @@ static int sun6i_dsi_remove(struct platform_device *pdev)
+ static int __maybe_unused sun6i_dsi_runtime_resume(struct device *dev)
  {
-@@ -503,13 +527,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) *
- 		   Bpp - HBLK_PACKET_OVERHEAD);
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
++	int err;
++
++	err = regulator_enable(dsi->regulator);
++	if (err) {
++		dev_err(dsi->dev, "failed to enable VCC-DSI supply: %d\n", err);
++		return err;
++	}
  
--	/*
--	 * And I'm not entirely sure what vblk is about. The driver in
--	 * Allwinner BSP is using a rather convoluted calculation
--	 * there only for 4 lanes. However, using 0 (the !4 lanes
--	 * case) even with a 4 lanes screen seems to work...
--	 */
--	vblk = 0;
-+	vblk = sun6i_dsi_get_timings_vblk(dsi, mode, hblk);
+ 	reset_control_deassert(dsi->reset);
+ 	if (dsi->variant->has_mod_clk)
+@@ -1141,6 +1154,7 @@ static int __maybe_unused sun6i_dsi_runtime_suspend(struct device *dev)
+ 	if (dsi->variant->has_mod_clk)
+ 		clk_disable_unprepare(dsi->mod_clk);
+ 	reset_control_assert(dsi->reset);
++	regulator_disable(dsi->regulator);
  
- 	/* How many bytes do we need to send all payloads? */
- 	bytes = max_t(size_t, max(max(hfp, hblk), max(hsa, hbp)), vblk);
+ 	return 0;
+ }
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index 597b62227019..0df60f84bab3 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -13,6 +13,8 @@
+ #include <drm/drm_encoder.h>
+ #include <drm/drm_mipi_dsi.h>
+ 
++#include <linux/regulator/consumer.h>
++
+ struct sun6i_dphy {
+ 	struct clk		*bus_clk;
+ 	struct clk		*mod_clk;
+@@ -32,6 +34,7 @@ struct sun6i_dsi {
+ 	struct clk		*bus_clk;
+ 	struct clk		*mod_clk;
+ 	struct regmap		*regs;
++	struct regulator	*regulator;
+ 	struct reset_control	*reset;
+ 	struct sun6i_dphy	*dphy;
+ 
 -- 
 2.18.0.321.gffc6fa0e3
