@@ -1,119 +1,66 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 13 Nov 2018 15:01:08 +0100
-Subject: [PATCH v2 00/25] at24: remove
-Message-ID: <20181113140133.17385-1-brgl@bgdev.pl>
+Date: Tue, 13 Nov 2018 15:01:09 +0100
+Subject: [PATCH v2 01/25] nvmem: add new config option
+In-Reply-To: <20181113140133.17385-1-brgl@bgdev.pl>
+References: <20181113140133.17385-1-brgl@bgdev.pl>
+Message-ID: <20181113140133.17385-2-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Now that nvmem has gained support for defining cells from board files and
-looking them up from relevant drivers[1], it's time for a respin of the
-previous series[2] that aims at removing struct at24_platform_data from
-the tree.
+We want to add nvmem support for MTD. TI DaVinci is the first platform
+that will be using it, but only in non-DT mode. In order not to
+introduce any new interface to supporting of which we would have to
+commit - add a new config option that tells nvmem not to use the DT
+node of the parent device.
 
-Since I took over maintainership of the at24 driver I've been working
-towards removing at24_platform_data in favor for device properties.
+This way we won't be creating nvmem devices corresponding with MTD
+partitions defined in device tree. By default MTD will set this new
+field to true.
 
-DaVinci is the only platform that's still using it - all other users
-have already been converted.
+Once a set of bindings for MTD nvmem cells is agreed upon, we'll be
+able to remove this option.
 
-One of the obstacles in case of DaVinci is removing the setup() callback
-from the pdata struct, the only user of which are some davinci boards.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ drivers/nvmem/core.c           | 3 ++-
+ include/linux/nvmem-provider.h | 2 ++
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-First we add support for nvmem to MTD in a way previously discussed with
-Boris Brezillon and Srinivas Kandagatla.
-
-Then, since most boards use the EEPROM to store the MAC address, we register
-relevant cells for all users, implement a function that allows to read
-the MAC address from nvmem (and also replaces the previous DT-specific
-variant) and make davinci_emac aware of it.
-
-Next we switch all davinci users to using at24 device properties instead
-of platform data. While we're at it: we remove all other traces of the
-setup callback and platform data from davinci.
-
-Finally we remove the at24 platform data structure.
-
-I kept the review tags in patches that haven't changed from the last
-submission.
-
-As far as merging of this series goes: I'd like to avoid dragging it over
-four releases. The series is logically split into five groups:
-
-patches 1-2: nvmem and mtd changes
-patches 3-9: davinci arch-specific changes
-patches 10-13: networking changes
-patches 14-24: davinci specific again
-patch 25: final at24 change
-
-With that I believe we can do the following: Greg KH could pick up the
-first two patches into his char-misc tree. Sekhar would take the second
-group and the third would go through the networking tree since the first
-three sets are not linked in any way. This would be merged for 4.21. Then
-for the next release Sekhar would pick up 14-24, provide an immutable
-branch for me and I'd merge the final patch for at24 and send it upstream
-through Wolfram's i2c tree (maybe we could even delay the i2c PR in the
-merge window to avoid the immutable branch altogether).
-
-[1] https://lkml.org/lkml/2018/9/21/293
-[2] https://lkml.org/lkml/2018/8/8/528
-
-Alban Bedel (1):
-  mtd: add support for reading MTD devices via the nvmem API
-
-Bartosz Golaszewski (24):
-  nvmem: add new config option
-  ARM: davinci: dm365-evm: use cell nvmem lookup for mac address
-  ARM: davinci: dm644x-evm: use cell nvmem lookup for mac address
-  ARM: davinci: dm646x-evm: use cell nvmem lookup for mac address
-  ARM: davinci: da830-evm: use cell nvmem lookup for mac address
-  ARM: davinci: mityomapl138: use cell nvmem lookup for mac address
-  ARM: davinci: dm850-evm: use cell nvmem lookup for mac address
-  ARM: davinci: da850-evm: remove unnecessary include
-  net: ethernet: provide nvmem_get_mac_address()
-  net: cadence: switch to using nvmem_get_mac_address()
-  of: net: kill of_get_nvmem_mac_address()
-  net: davinci_emac: use nvmem_get_mac_address()
-  ARM: davinci: da850-evm: remove dead MTD code
-  ARM: davinci: mityomapl138: don't read the MAC address from machine
-    code
-  ARM: davinci: dm365-evm: use device properties for at24 eeprom
-  ARM: davinci: da830-evm: use device properties for at24 eeprom
-  ARM: davinci: dm644x-evm: use device properties for at24 eeprom
-  ARM: davinci: dm646x-evm: use device properties for at24 eeprom
-  ARM: davinci: sffsdr: fix the at24 eeprom device name
-  ARM: davinci: sffsdr: use device properties for at24 eeprom
-  ARM: davinci: remove dead code related to MAC address reading
-  ARM: davinci: mityomapl138: use nvmem notifiers
-  ARM: davinci: mityomapl138: use device properties for at24 eeprom
-  eeprom: at24: remove at24_platform_data
-
- MAINTAINERS                                |   1 -
- arch/arm/mach-davinci/board-da830-evm.c    |  39 ++++-
- arch/arm/mach-davinci/board-da850-evm.c    |  58 ++++----
- arch/arm/mach-davinci/board-dm365-evm.c    |  38 ++++-
- arch/arm/mach-davinci/board-dm644x-evm.c   |  37 ++++-
- arch/arm/mach-davinci/board-dm646x-evm.c   |  37 ++++-
- arch/arm/mach-davinci/board-mityomapl138.c |  67 ++++++---
- arch/arm/mach-davinci/board-sffsdr.c       |  13 +-
- arch/arm/mach-davinci/common.c             |  15 --
- drivers/misc/eeprom/at24.c                 | 162 ++++++++++-----------
- drivers/mtd/Kconfig                        |   1 +
- drivers/mtd/mtdcore.c                      |  56 +++++++
- drivers/net/ethernet/cadence/macb_main.c   |   2 +-
- drivers/net/ethernet/ti/davinci_emac.c     |  14 +-
- drivers/nvmem/core.c                       |   3 +-
- drivers/of/of_net.c                        |  39 -----
- include/linux/davinci_emac.h               |   1 -
- include/linux/etherdevice.h                |   1 +
- include/linux/mtd/mtd.h                    |   2 +
- include/linux/nvmem-provider.h             |   2 +
- include/linux/of_net.h                     |   6 -
- include/linux/platform_data/at24.h         |  60 --------
- net/ethernet/eth.c                         |  38 +++++
- 23 files changed, 391 insertions(+), 301 deletions(-)
- delete mode 100644 include/linux/platform_data/at24.h
-
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 9b18ce90f907..ac7971e8154e 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -604,7 +604,8 @@ struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+ 	nvmem->priv = config->priv;
+ 	nvmem->reg_read = config->reg_read;
+ 	nvmem->reg_write = config->reg_write;
+-	nvmem->dev.of_node = config->dev->of_node;
++	if (!config->no_of_node)
++		nvmem->dev.of_node = config->dev->of_node;
+ 
+ 	if (config->id == -1 && config->name) {
+ 		dev_set_name(&nvmem->dev, "%s", config->name);
+diff --git a/include/linux/nvmem-provider.h b/include/linux/nvmem-provider.h
+index 1e3283c2af77..e53545e9852b 100644
+--- a/include/linux/nvmem-provider.h
++++ b/include/linux/nvmem-provider.h
+@@ -30,6 +30,7 @@ typedef int (*nvmem_reg_write_t)(void *priv, unsigned int offset,
+  * @ncells:	Number of elements in cells.
+  * @read_only:	Device is read-only.
+  * @root_only:	Device is accessibly to root only.
++ * @no_of_node:	Device should not use the parent's of_node even if it's !NULL.
+  * @reg_read:	Callback to read data.
+  * @reg_write:	Callback to write data.
+  * @size:	Device size.
+@@ -53,6 +54,7 @@ struct nvmem_config {
+ 	int			ncells;
+ 	bool			read_only;
+ 	bool			root_only;
++	bool			no_of_node;
+ 	nvmem_reg_read_t	reg_read;
+ 	nvmem_reg_write_t	reg_write;
+ 	int	size;
 -- 
 2.19.1
