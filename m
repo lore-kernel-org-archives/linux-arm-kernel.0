@@ -1,44 +1,84 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 13 Nov 2018 12:13:09 -0200
-Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
-In-Reply-To: <9a9616d2-a189-bd0e-e2e6-f84bdcb1dfd1@cisco.com>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
- <CAOMZO5CjFt1dyu8KOK+jKd88x8hwGNy9aJ-sGgooS9970TGTVQ@mail.gmail.com>
- <9a9616d2-a189-bd0e-e2e6-f84bdcb1dfd1@cisco.com>
-Message-ID: <CAOMZO5DHfgV+iDo4ye7DV9CAA0QjSVXsYH1nbD2+5d9iE-uTCg@mail.gmail.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 13 Nov 2018 15:13:22 +0100
+Subject: [PATCH v10 07/22] kasan: initialize shadow to 0xff for tag-based
+ mode
+In-Reply-To: <20181107170855.n4ertf5qv7ff5btl@lakrids.cambridge.arm.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <9405f32797b52616cd0746bcea37df94e8e4256a.1541525354.git.andreyknvl@google.com>
+ <20181107170855.n4ertf5qv7ff5btl@lakrids.cambridge.arm.com>
+Message-ID: <CAAeHK+wDTDiwT_vcu8tTZyNkqHDdgAtSWF4pp=2mngMaJt44bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
+On Wed, Nov 7, 2018 at 6:08 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 06, 2018 at 06:30:22PM +0100, Andrey Konovalov wrote:
+>> A tag-based KASAN shadow memory cell contains a memory tag, that
+>> corresponds to the tag in the top byte of the pointer, that points to that
+>> memory. The native top byte value of kernel pointers is 0xff, so with
+>> tag-based KASAN we need to initialize shadow memory to 0xff.
+>>
+>> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>> ---
+>>  arch/arm64/mm/kasan_init.c | 16 ++++++++++++++--
+>>  include/linux/kasan.h      |  8 ++++++++
+>>  mm/kasan/common.c          |  3 ++-
+>>  3 files changed, 24 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+>> index 63527e585aac..18ebc8994a7b 100644
+>> --- a/arch/arm64/mm/kasan_init.c
+>> +++ b/arch/arm64/mm/kasan_init.c
+>> @@ -43,6 +43,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
+>>       return __pa(p);
+>>  }
+>>
+>> +static phys_addr_t __init kasan_alloc_raw_page(int node)
+>> +{
+>> +     void *p = memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
+>> +                                             __pa(MAX_DMA_ADDRESS),
+>> +                                             MEMBLOCK_ALLOC_ACCESSIBLE,
+>> +                                             node);
+>> +     return __pa(p);
+>> +}
+>> +
+>>  static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
+>>                                     bool early)
+>>  {
+>> @@ -88,7 +97,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
+>>
+>>       do {
+>>               phys_addr_t page_phys = early ? __pa_symbol(kasan_zero_page)
+>> -                                           : kasan_alloc_zeroed_page(node);
+>> +                                           : kasan_alloc_raw_page(node);
+>> +             if (!early)
+>> +                     memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
+>>               next = addr + PAGE_SIZE;
+>>               set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
+>>       } while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
+>> @@ -138,6 +149,7 @@ asmlinkage void __init kasan_early_init(void)
+>>               KASAN_SHADOW_END - (1UL << (64 - KASAN_SHADOW_SCALE_SHIFT)));
+>>       BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_START, PGDIR_SIZE));
+>>       BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
+>> +
+>>       kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
+>>                          true);
+>>  }
+>> @@ -234,7 +246,7 @@ void __init kasan_init(void)
+>>               set_pte(&kasan_zero_pte[i],
+>>                       pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
+>>
+>> -     memset(kasan_zero_page, 0, PAGE_SIZE);
+>> +     memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+>
+> If this isn't going to contain zero, can we please have a preparatory
+> patch renaming this to something which isn't misleading?
+>
+> Perhaps kasan_common_shadow_page?
 
-On Tue, Nov 13, 2018 at 11:37 AM Hans Verkuil <hansverk@cisco.com> wrote:
->
-> On 11/13/18 13:48, Fabio Estevam wrote:
-> > On Tue, Nov 13, 2018 at 6:25 AM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> >> --- /dev/null
-> >> +++ b/drivers/media/platform/sunxi/sun4i-csi/sun4i_csi.c
-> >> @@ -0,0 +1,275 @@
-> >> +// SPDX-License-Identifier: GPL-2.0-or-later
-> >
-> > According to Documentation/process/license-rules.rst this should be:
-> >
-> > +// SPDX-License-Identifier: GPL-2.0+
-> >
-> > Same applies to other places in this patch.
-> >
->
-> Actually, LICENSES/preferred/GPL-2.0 has GPL-2.0-or-later
-> as a valid license:
->
-> Valid-License-Identifier: GPL-2.0-or-later
->
-> Personally I very much prefer GPL-2.0-or-later since I think it is
-> much clearer.
+Will rename to kasan_early_shadow_page in v11, thanks!
 
-I saw feedback from Greg to use the SPDX style from
-Documentation/process/license-rules.rst.
-
-Please check:
-https://lkml.org/lkml/2018/11/10/232
+>
+> Thanks,
+> Mark.
