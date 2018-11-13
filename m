@@ -1,24 +1,37 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 13 Nov 2018 18:02:09 +0100
-Subject: [PATCH v3 17/18] USB: phy-mv-usb: use phy-pxa-usb
-In-Reply-To: <20181112032027.653931-18-lkundrak@v3.sk> (Lubomir Rintel's
- message of "Mon, 12 Nov 2018 04:20:26 +0100")
-References: <20181112032027.653931-1-lkundrak@v3.sk>
- <20181112032027.653931-18-lkundrak@v3.sk>
-Message-ID: <87tvkkkj1q.fsf@belgarion.home>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 14 Nov 2018 01:04:25 +0800
+Subject: [PATCH] arm64: sunxi: Enable REGMAP_MMIO to fix linker error
+Message-ID: <1542128665-78302-1-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lubomir Rintel <lkundrak@v3.sk> writes:
+The following linker failure can be seen for a certain heavily reduced
+defconfig:
+drivers/soc/sunxi/sunxi_sram.o: In function `sunxi_sram_probe':
+drivers/soc/sunxi/sunxi_sram.c:353: undefined reference to `__devm_regmap_init_mmio_clk'
+drivers/soc/sunxi/sunxi_sram.c:353:(.text+0x3c4): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `__devm_regmap_init_mmio_clk'
 
-> Use a proper PHY driver, instead of hooks to a board support package.
-Hi Lubomir,
+It would seem that the sunxi sram driver implicitly depended on config
+REGMAP_MMIO.
 
-This specific patch caught my attention, because of its title : I don't see what
-phy-pxa-usb stands for, is it a typo ? I don't think anybody implemented so far
-a proper phy support for pxa based boards (pxa27x actually), hence my question.
+To solve, select config REGMAP_MMIO for ARCH_SUNXI. This seems a better
+option than selecting from the respective driver config as this just
+defaults to ARCH_SUNXI.
 
-Cheers.
+Fixes: 5828729bebbb ("soc: sunxi: export a regmap for EMAC clock reg on A64")
+Signed-off-by: John Garry <john.garry@huawei.com>
 
---
-Robert
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 51bc479..c8a6ad3 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -12,6 +12,7 @@ config ARCH_SUNXI
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select GENERIC_IRQ_CHIP
+ 	select PINCTRL
++	select REGMAP_MMIO
+ 	select RESET_CONTROLLER
+ 	help
+ 	  This enables support for Allwinner sunxi based SoCs like the A64.
+-- 
+1.9.1
