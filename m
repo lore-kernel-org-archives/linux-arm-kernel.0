@@ -1,67 +1,44 @@
-From: pn@denx.de (Parthiban Nallathambi)
-Date: Tue, 13 Nov 2018 14:32:35 +0100
-Subject: [PATCH] arm64: dts: actions: s700: Add I2C controller nodes
-Message-ID: <20181113133235.37754-1-pn@denx.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 13 Nov 2018 14:33:09 +0100
+Subject: [PATCH 0/3] drm/meson: Add support for Overlay and OSD Plane
+ scaling
+In-Reply-To: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+References: <1541497202-20570-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <66e1a959-3809-8ee1-9eab-d4409b340a85@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C controller nodes for Actions Semiconductor S700 SoC.
+On 06/11/2018 10:39, Neil Armstrong wrote:
+> This serie adds support for :
+> - Overlay Plane blended with the primary plane, we can describe as "behind"
+> - Primary Plane up-scaling up to 5x factor to support the OSD plane being
+>   upscaled from 1920x1080 when the display mode is set as 3840x2160.
+> 
+> These patches depends on the "drm/meson: Allow using optional canvas provider"
+> patchset from Maxime Jourdan at [1]
+> 
+> [1] https://patchwork.kernel.org/project/linux-amlogic/list/?series=38355
+> 
+> Neil Armstrong (3):
+>   drm/meson: Support Overlay plane for video rendering
+>   drm/meson: move OSD scaler management into plane atomic update
+>   drm/meson: Add primary plane scaling
+> 
+>  drivers/gpu/drm/meson/Makefile          |   2 +-
+>  drivers/gpu/drm/meson/meson_canvas.c    |   7 +-
+>  drivers/gpu/drm/meson/meson_canvas.h    |  11 +-
+>  drivers/gpu/drm/meson/meson_crtc.c      | 251 +++++++++++++-
+>  drivers/gpu/drm/meson/meson_drv.c       |  29 +-
+>  drivers/gpu/drm/meson/meson_drv.h       |  62 ++++
+>  drivers/gpu/drm/meson/meson_overlay.c   | 586 ++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/meson/meson_overlay.h   |  14 +
+>  drivers/gpu/drm/meson/meson_plane.c     | 177 ++++++++--
+>  drivers/gpu/drm/meson/meson_registers.h |   3 +
+>  drivers/gpu/drm/meson/meson_viu.c       |  15 +
+>  drivers/gpu/drm/meson/meson_vpp.c       |  90 +++--
+>  12 files changed, 1156 insertions(+), 91 deletions(-)
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.c
+>  create mode 100644 drivers/gpu/drm/meson/meson_overlay.h
+> 
 
-Signed-off-by: Parthiban Nallathambi <pn@denx.de>
----
- arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index 192c7b39c8c1..573c844d7afe 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -174,6 +174,46 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		i2c0: i2c at e0170000 {
-+			compatible = "actions,s900-i2c";
-+			reg = <0 0xe0170000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C0>;
-+			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at e0174000 {
-+			compatible = "actions,s900-i2c";
-+			reg = <0 0xe0174000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C1>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at e0178000 {
-+			compatible = "actions,s900-i2c";
-+			reg = <0 0xe0178000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C2>;
-+			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at e017c000 {
-+			compatible = "actions,s900-i2c";
-+			reg = <0 0xe017c000 0 0x1000>;
-+			clocks = <&cmu CLK_I2C3>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+		};
-+
- 		sps: power-controller at e01b0100 {
- 			compatible = "actions,s700-sps";
- 			reg = <0x0 0xe01b0100 0x0 0x100>;
--- 
-2.17.2
+Applied
