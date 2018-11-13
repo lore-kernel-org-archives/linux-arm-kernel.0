@@ -1,43 +1,22 @@
-From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
-Date: Tue, 13 Nov 2018 15:46:47 +0100
-Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
-In-Reply-To: <CAOMZO5DHfgV+iDo4ye7DV9CAA0QjSVXsYH1nbD2+5d9iE-uTCg@mail.gmail.com>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
- <CAOMZO5CjFt1dyu8KOK+jKd88x8hwGNy9aJ-sGgooS9970TGTVQ@mail.gmail.com>
- <9a9616d2-a189-bd0e-e2e6-f84bdcb1dfd1@cisco.com>
- <CAOMZO5DHfgV+iDo4ye7DV9CAA0QjSVXsYH1nbD2+5d9iE-uTCg@mail.gmail.com>
-Message-ID: <20181113154647.06900549@windsurf>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 13 Nov 2018 15:48:02 +0100
+Subject: [PATCH 0/3] Make STM32 interrupt controller use hwspinlock
+Message-ID: <20181113144805.1054-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This series allow to protect STM32 interrupt controller configuration registers
+with a hwspinlock to avoid conflicting accesses between processors. 
 
-On Tue, 13 Nov 2018 12:13:09 -0200, Fabio Estevam wrote:
+Benjamin Gaignard (3):
+  dt-bindings: interrupt-controller: stm32: Document hwlock properties
+  irqchip: stm32: protect configuration registers with hwspinlock
+  ARM: dts: stm32: Add hwlock for irqchip on stm32mp157
 
-> > Actually, LICENSES/preferred/GPL-2.0 has GPL-2.0-or-later
-> > as a valid license:
-> >
-> > Valid-License-Identifier: GPL-2.0-or-later
-> >
-> > Personally I very much prefer GPL-2.0-or-later since I think it is
-> > much clearer.  
-> 
-> I saw feedback from Greg to use the SPDX style from
-> Documentation/process/license-rules.rst.
-> 
-> Please check:
-> https://lkml.org/lkml/2018/11/10/232
+ .../interrupt-controller/st,stm32-exti.txt         |  4 +++
+ arch/arm/boot/dts/stm32mp157c.dtsi                 |  1 +
+ drivers/irqchip/irq-stm32-exti.c                   | 36 ++++++++++++++++++----
+ 3 files changed, 35 insertions(+), 6 deletions(-)
 
-According to https://spdx.org/licenses/, i.e the reference SPDX site,
-GPL-2.0-or-later is the right thing to use, and GPL-2.0+ is
-"deprecated". But apparently Greg's feedback is "let's not used the
-SDPX style, as we don't want to change this all over".
-
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.15.0
