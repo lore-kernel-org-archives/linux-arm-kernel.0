@@ -1,35 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 13 Nov 2018 11:33:43 +0100
-Subject: [PATCH v3 2/6] spi: Deal with slaves that return from
- transfer_one() unfinished
-In-Reply-To: <20181113102228.820214-3-lkundrak@v3.sk>
-References: <20181113102228.820214-1-lkundrak@v3.sk>
- <20181113102228.820214-3-lkundrak@v3.sk>
-Message-ID: <CAMuHMdU0_CnXGzWNkb4q1dm1yoVOkG=Hhr0BnS3dYdjd-7A-+Q@mail.gmail.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Tue, 13 Nov 2018 10:36:49 +0000
+Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
+In-Reply-To: <CAMn1gO5tmJDXEgAZefcOmp1E2LmG3uqbO7vFwZRxAy2Cny114g@mail.gmail.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-8-vincenzo.frascino@arm.com>
+ <CAMn1gO5tmJDXEgAZefcOmp1E2LmG3uqbO7vFwZRxAy2Cny114g@mail.gmail.com>
+Message-ID: <a9726884-70e5-bff4-555d-cd870a5bd6db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 11:23 AM Lubomir Rintel <lkundrak@v3.sk> wrote:
-> Some drivers, such as spi-pxa2xx return from the transfer_one callback
-> immediately, idicating that the transfer will be finished asynchronously.
->
-> Normally, spi_transfer_one_message() synchronously waits for the
-> transfer to finish with wait_for_completion_timeout(). For slaves, we
-> don't want the transaction to time out as it can complete in a long time
-> in future. Use wait_for_completion_interruptible() instead.
->
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
+Hi Peter,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+thank you for your review.
 
-Gr{oetje,eeting}s,
+On 09/11/2018 18:09, Peter Collingbourne wrote:
+> On Fri, Nov 9, 2018 at 4:38 AM Vincenzo Frascino
+> <vincenzo.frascino@arm.com> wrote:
+>> -ccflags-y := -shared -fno-common -fno-builtin
+>> +ccflags-y := -shared -fno-common -fno-builtin -fno-stack-protector
+> 
+> This either needs to include -ffixed-x18 or
+> https://patchwork.kernel.org/patch/10671685/ needs to appear earlier
+> in this series.
+> 
 
-                        Geert
+I did not add -ffixed-x18 to my flags because I was planning to cherry-pick your patch. It will be in v2.
+
+> Peter
+> 
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Vincenzo
