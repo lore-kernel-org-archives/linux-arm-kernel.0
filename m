@@ -1,37 +1,26 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 13 Nov 2018 16:46:15 +0530
-Subject: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix VBP size calculation
+Date: Tue, 13 Nov 2018 16:46:16 +0530
+Subject: [PATCH v4 09/26] drm/sun4i: sun6i_mipi_dsi: Fix TCON DRQ set bits
 In-Reply-To: <20181113111633.20189-1-jagan@amarulasolutions.com>
 References: <20181113111633.20189-1-jagan@amarulasolutions.com>
-Message-ID: <20181113111633.20189-9-jagan@amarulasolutions.com>
+Message-ID: <20181113111633.20189-10-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The horizontal and vertical back porch calculation in BSP
-code is simply following the Linux drm comment diagram, in
-include/drm/drm_modes.h which is
+TCON DRQ set bits for non-burst DSI mode can computed via
+horizontal front porch instead of front porch + sync timings.
 
-[hv]back porch = [hv]total - [hv]sync_end
+BSP code form BPI-M64-bsp is computing TCON DRQ set bits
+for non-burts as (from linux-sunxi/
+drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
 
-BSP code form BPI-M64-bsp is calculating vertical back porch as
-(from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
+=> panel->lcd_ht -    panel->lcd_x - panel->lcd_hbp
+=> (timmings->hor_front_porch + panel->lcd_hbp + panel->lcd_x)
+   - panel->lcd_x - panel->hbp
+=> timmings->hor_front_porch
+=> mode->hsync_start - mode->hdisplay
 
-timmings->ver_sync_time= panel_info->lcd_vspw;
-timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
-
-vbp = panel->lcd_vbp;
-vspw = panel->lcd_vspw;
-dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
-dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
-=>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
-=>  timmings->ver_back_porch
-=>  mode->vtotal - mode->end
-
-Which evatually same as mode->vtotal - mode->vsync_end so update the
-same in SUN6I_DSI_BASIC_SIZE0_VBP
-
-On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
-value.
+So, update the DRQ set bits accordingly.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
@@ -39,19 +28,20 @@ Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index cdd44a1307b3..eeea977604ac 100644
+index eeea977604ac..fc4252d96c38 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -526,8 +526,8 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE0_REG,
- 		     SUN6I_DSI_BASIC_SIZE0_VSA(mode->vsync_end -
- 					       mode->vsync_start) |
--		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vsync_start -
--					       mode->vdisplay));
-+		     SUN6I_DSI_BASIC_SIZE0_VBP(mode->vtotal -
-+					       mode->vsync_end));
+@@ -367,9 +367,9 @@ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ 	struct mipi_dsi_device *device = dsi->device;
+ 	u32 val = 0;
  
- 	regmap_write(dsi->regs, SUN6I_DSI_BASIC_SIZE1_REG,
- 		     SUN6I_DSI_BASIC_SIZE1_VACT(mode->vdisplay) |
+-	if ((mode->hsync_end - mode->hdisplay) > 20) {
++	if ((mode->hsync_start - mode->hdisplay) > 20) {
+ 		/* Maaaaaagic */
+-		u16 drq = (mode->hsync_end - mode->hdisplay) - 20;
++		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+ 
+ 		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+ 		drq /= 32;
 -- 
 2.18.0.321.gffc6fa0e3
