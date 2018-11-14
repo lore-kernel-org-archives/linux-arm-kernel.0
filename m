@@ -1,101 +1,76 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Wed, 14 Nov 2018 23:25:41 +0100
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
- <20181110111647.GA3511@speedy.hunter>
- <20181110170311.GA7700@brain-police>
- <20181110175404.gnks6sj3zzlz2it7@ltop.local>
- <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
-Message-ID: <20181114222540.fgddrx4xxsne5pdq@ltop.local>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 14 Nov 2018 22:27:06 +0000 (GMT)
+Subject: Applied "spi: bcm2835: make license text and module license match" to
+ the spi tree
+In-Reply-To: <1540292769-5905-4-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20181114222706.EDCDD440078@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 04:32:31PM +0000, Ramsay Jones wrote:
-> 
-> 
-> On 10/11/2018 17:54, Luc Van Oostenryck wrote:
-> > On Sat, Nov 10, 2018 at 05:03:21PM +0000, Will Deacon wrote:
-> >> On Sat, Nov 10, 2018 at 02:16:47PM +0300, Sergey Matyukevich wrote:
-> >>> On Sat, Nov 10, 2018 at 12:16:16AM +0000, Will Deacon wrote:
-> >>>> On Fri, Nov 09, 2018 at 11:47:47PM +0300, Sergey Matyukevich wrote:
-> >>>>> Specify correct type for the constants to avoid
-> >>>>> the following sparse complaints:
-> >>>>>
-> >>>>> ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> >>>>> ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> >>>>>
-> >>>>> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> >>>>> ---
-> >>>>>  arch/arm64/include/asm/sysreg.h | 4 ++--
-> >>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
-> >>>>
-> >>>> I thought this was fixed in newer versions of sparse so that it treats
-> >>>> AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
-> >>>
-> >>> I am using up-to-date sparse. However this warning still appears,
-> >>> not sure why. Maybe sparse treats such constants as unsigned int ?
-> >>>
-> >>> Meanwhile it looks like I chose wrong type: it is enough to use UL
-> >>> instead of ULL to make sparse happy. In fact warning is clear
-> >>> about it.
-> >>
-> >> Ah yes, sorry. I misread the patch the first time around and thought you were
-> >> changing a UL suffix to a ULL suffix. So actually, I think this is just a
-> >> case of sparse getting confused about this constant because it's actually
-> >> going to get parsed by the pre-processor, which says:
-> >>
-> >>   | It [the preprocessor parsing #if] carries out all calculations in the
-> >>   | widest integer type known to the compiler; on most machines supported by
-> >>   | GCC this is 64 bits
-> >>
-> >> so I still think this is a false positive. Adding Luc in case he has any
-> >> ideas.
-> > 
-> > Well, I think the warning is 'correct' (and the message is quite
-> > clear about the 'possible' problem) but probably not useful enough.
-> 
-> yes, the warning is correct. I think the message is quite clear, so
-> would be happy to hear any possible improvements! ;-)
+The patch
 
-Oh, I was not talking about the message but, like Linus explained, that
-since no bits are lost here (and sparse has another warning in case some
-bits would be lost) and nothing is incorrect, the warning is not really
-interesting.
+   spi: bcm2835: make license text and module license match
+
+has been applied to the spi tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 22bf6cd2ca4df283812a521d3cb534993072cd44 Mon Sep 17 00:00:00 2001
+From: Stefan Wahren <stefan.wahren@i2se.com>
+Date: Tue, 23 Oct 2018 13:06:08 +0200
+Subject: [PATCH] spi: bcm2835: make license text and module license match
+
+The license text is specifying GPL v2 or later but the MODULE_LICENSE
+is set to GPL v2 which means GNU Public License v2 only. So choose the
+license text as the correct one.
+
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Acked-by: Florian Kauer <florian.kauer@koalo.de>
+Acked-by: Martin Sperl <kernel@martin.sperl.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-bcm2835.c    | 2 +-
+ drivers/spi/spi-bcm2835aux.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-bcm2835.c b/drivers/spi/spi-bcm2835.c
+index f35cc10772f6..b0b87ff936c7 100644
+--- a/drivers/spi/spi-bcm2835.c
++++ b/drivers/spi/spi-bcm2835.c
+@@ -843,4 +843,4 @@ module_platform_driver(bcm2835_spi_driver);
  
-> (Also, correcting the source, in order to suppress these warnings,
-> should take mere seconds - for each such warning, of course).
-
-Yes, sure, it was even the origin of the thread.
+ MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835");
+ MODULE_AUTHOR("Chris Boot <bootc@bootc.net>");
+-MODULE_LICENSE("GPL v2");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/spi/spi-bcm2835aux.c b/drivers/spi/spi-bcm2835aux.c
+index 3094d818cf06..671e374e1b01 100644
+--- a/drivers/spi/spi-bcm2835aux.c
++++ b/drivers/spi/spi-bcm2835aux.c
+@@ -542,4 +542,4 @@ module_platform_driver(bcm2835aux_spi_driver);
  
-> > In fact, some months ago, it was agreed that sparse will only issue
-> > this warning when -Wpedantic is set but this flag is not yet handled.
-> 
-> I have patches, but I have been waiting for the 'official repo' issue
-> to get resolved. (If you remember, I was building on top of the current
-> official repo and continually merging to the master branch of your
-> github sparse.git - but I got bored of doing that!).
-
-Yes, I understand. This should be solved now.
-
-> > I'll look at this next week.
-> 
-> I stopped work on my patches months ago, after doing just enough to
-> enable me to work on git without tearing my hair out on Linux Mint 19
-> (or Ubuntu 18.04, Fedora 27+ etc.). ;-)
-> 
-> I was working on -Wsystem-headers, so this warning (along with some
-> other __extension__ warnings in the system headers) do not cause me
-
-Interesting. I'll be glad to review them.
-
-> any further issues on git. (that would not help on the kernel, of course).
-> 
-> [BTW, I have been building/testing/running the master branch of
-> git://github.com/lucvoo/sparse.git for months now, without seeing
-> any regressions.]
-
-That's always good to know. Thank you.
-
--- Luc 
+ MODULE_DESCRIPTION("SPI controller driver for Broadcom BCM2835 aux");
+ MODULE_AUTHOR("Martin Sperl <kernel@martin.sperl.org>");
+-MODULE_LICENSE("GPL v2");
++MODULE_LICENSE("GPL");
+-- 
+2.19.1
