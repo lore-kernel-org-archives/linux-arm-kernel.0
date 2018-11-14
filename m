@@ -1,47 +1,55 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 14 Nov 2018 15:21:17 -0800
-Subject: [PATCH v9 3/5] clk: imx: add SCCG PLL type
-In-Reply-To: <20181113142533.GA4557@dragon>
-References: <1537785597-26499-1-git-send-email-abel.vesa@nxp.com>
- <153980615257.5275.13866740376184829057@swboyd.mtv.corp.google.com>
- <20181107115444.gscxwud7e57nx3c7@fsr-ub1664-175>
- <154161726247.88331.15629902810537417880@swboyd.mtv.corp.google.com>
- <20181107202624.oya2runvbbwcilzu@fsr-ub1664-175>
- <154163631513.88331.1765456171211364913@swboyd.mtv.corp.google.com>
- <20181108122938.mnhu3ttnlztfeyot@fsr-ub1664-175>
- <154170172752.88331.2213352243956732809@swboyd.mtv.corp.google.com>
- <AM0PR04MB42118C6960C39387051B57F280C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <20181113142533.GA4557@dragon>
-Message-ID: <154223767765.88331.8896059926353279805@swboyd.mtv.corp.google.com>
+Date: Wed, 14 Nov 2018 15:23:46 -0800
+Subject: [PATCH V5 9/9] clk: imx: add imx8qxp clk driver
+In-Reply-To: <AM0PR04MB42115A499619B6D650C9728480C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1539881347-20871-1-git-send-email-aisheng.dong@nxp.com>
+ <1539881347-20871-10-git-send-email-aisheng.dong@nxp.com>
+ <153988429912.5275.13469659599335212731@swboyd.mtv.corp.google.com>
+ <AM0PR04MB42112CB1324B0994A26AB15D80F80@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <153989556955.53599.9032716427049619310@swboyd.mtv.corp.google.com>
+ <AM0PR04MB42112BEEF4DB939F13D6AF1680F90@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <AM0PR04MB42115A499619B6D650C9728480C70@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <154223782682.88331.13160210691831603996@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Shawn Guo (2018-11-13 06:25:36)
-> On Sat, Nov 10, 2018 at 04:05:44PM +0000, A.s. Dong wrote:
-> > Hi Stephen,
-> > 
-> > [...]
-> > > > I already sent the 12th version of this current patch series and I
-> > > > would really like to get this in ASAP so that the booting up of imx8mq will
-> > > not be delayed.
-> > > >
-> > > 
-> > > Ok. Well we're in rc1 right now, and so we're not merging new drivers into
-> > > mainline. I can merge the clk driver into clk-next, but you'll have to wait for the
-> > > stabilization period to end (approximately 6 or 7 weeks) before this can get
-> > > into the next kernel version. It will be in linux-next much sooner of course.
-> > 
-> > That would be great if you can help that.
-> > We're now working with SUSE to enable i.MX8 support.
-> > Their criteria is only backporting patches which must be at least in maintainer's
-> > next tree already. So either picked up by you or Shawn would help a lot on it.
-> > 
-> > BTW, one simple question is that because MX8MQ DTS patches depends on
-> > this clock driver series. How would you suggest this series to go through
-> > your tree or Shawn's tree?
+Quoting A.s. Dong (2018-11-10 07:58:00)
+> Hi Stephen,
 > 
-> Once Stephen has a topic branch for the patches, I can pull it into my
-> tree to resolve the DT dependency.
+> [...]
+> > > > > Where's the DT binding for this device?
+> > > >
+> > > > Sorry for missed to mention this.
+> > > > It's been merged into scu binding doc per Rob's request which has
+> > > > already been in Shawn's tree.
+> > > >
+> > > > Please take a look at here:
+> > [...]
+> > >
+> > > Ok I ask because it's odd to hardcode physical addresses in a clk
+> > > driver when those should come from DT in reg properties. Was Rob aware
+> > > that this clk node was combining I/O memory and message passing?
+> > 
+> > Yes, I agree with you. That seems like a special to i.MX case.
+> > The problem is not all clocks having a LPCG gate. And those LPCGs are also not
+> > continuous and may be shared by many clocks which make things more
+> > complicated.
+> > I'm not sure parsing from device tree could be better way to do it.
+> > Probably need huge changes.
+> > 
+> 
+> I reorganized the driver a lot to address this issue.
+> See:
+> https://patchwork.kernel.org/cover/10677275/
+> We now have a new LPCG clock type and retrieve the LPCG physical
+> address from device tree.
+> 
+> Besides that, as LPCG is moved out from the original SCU gate clocks,
+> We have a chance to merge all three type of SCU clocks (divider/gate/mux)
+> together into a general SCU clock. (new API introduced imx_clk_scu()).
+> Thus, the consumer driver is also simplied a lot which looks better than before.
+> Hopefully this can make you happy.
+> Please help review that new version.
 > 
 
-Sounds like a plan. Expect something next week.
+Ok I'll take a look at the new patch series.
