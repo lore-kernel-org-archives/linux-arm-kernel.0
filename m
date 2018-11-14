@@ -1,73 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Nov 2018 11:15:06 +0800
-Subject: [PATCH 01/15] dt-bindings: net: broadcom-bluetooth: Fix external
- clock names
-In-Reply-To: <5bea0ebe.1c69fb81.e15d7.98e1@mx.google.com>
-References: <20181107101308.7626-1-wens@csie.org>
- <20181107101308.7626-2-wens@csie.org>
- <5bea0ebe.1c69fb81.e15d7.98e1@mx.google.com>
-Message-ID: <CAGb2v65PqwKrRdh2_Y48zYnmJa0=hv3Bd4UdvdWvBBMfT2BfSw@mail.gmail.com>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Wed, 14 Nov 2018 14:17:09 +1100 (AEDT)
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <20181113234336.GP30658@n2100.armlinux.org.uk>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+ <20181113234336.GP30658@n2100.armlinux.org.uk>
+Message-ID: <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 7:37 AM Rob Herring <robh@kernel.org> wrote:
->
-> On Wed, Nov 07, 2018 at 06:12:54PM +0800, Chen-Yu Tsai wrote:
-> > The Broadcom Bluetooth controllers can take up to two external clocks:
-> > an external frequency reference, substituting the main crystal, and a
-> > LPO clock at 32.768 kHz substituting the internal LPO clock.
-> >
-> > In particular, the external LPO clock must be used when the controller
-> > does not have NVRAM connected, and the main reference frequency is not
-> > the default 20 MHz. This is described in detail in the datasheet.
-> >
-> > The original "extclk" clock name is ambiguous as to which of these it
-> > refers to, and some designs might even require both.
-> >
-> > This patch deprecates the existing name, and adds "txco" and "lpo".
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > ---
-> >  Documentation/devicetree/bindings/net/broadcom-bluetooth.txt | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > index 4194ff7e6ee6..2535e54219af 100644
-> > --- a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > +++ b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > @@ -18,7 +18,10 @@ Optional properties:
-> >   - shutdown-gpios: GPIO specifier, used to enable the BT module
-> >   - device-wakeup-gpios: GPIO specifier, used to wakeup the controller
-> >   - host-wakeup-gpios: GPIO specifier, used to wakeup the host processor
-> > - - clocks: clock specifier if external clock provided to the controller
-> > + - clocks and clock-names: clock specifier if external clocks are provided
-> > +   - "txco": external reference clock
-> > +   - "extclk": deprecated, replaced by "txco"
-> > +   - "lpo": external low power 32.768 kHz clock
-> >   - clock-names: should be "extclk"
->
-> This line should change?
+On Tue, 13 Nov 2018, Russell King - ARM Linux wrote:
 
-Yes. Missed that.
+> 
+> A clocksource provides a cycle counter that monotonically changes and 
+> does not wrap between clockevent events.
+> 
+> A clock event is responsible for providing events to the system when 
+> some work is needing to be done, limited by the wrap interval of the 
+> clocksource.
+> 
+> Each time the clock event triggers an interrupt, the clocksource is
+> read to determine how much time has passed, using:
+> 
+> 	count = (new_value - old_value) & available_bits
+> 	nanosecs = count * scale >> shift;
+> 
+> If you try to combine the clocksource and clockevent because you only
+> have a single counter, and the counter has the behaviour of:
+> - counting down towards zero
+> - when reaching zero, triggers an interrupt, and reloads with N
+> 
+> then this provides your clockevent, but you can't use this as a clock
+> source, because each time you receive an interrupt and try to read the
+> counter value, it will be approximately the same value.  This means
+> that the above calculation fails to register the correct number of
+> nanoseconds passing.  Hence, this does not work.
+> 
+> Also note where I said above that the clock event device must be able
+> to provide an interrupt _before_ the clocksource wraps - clearly with
+> such a timer, that is utterly impossible.
+> 
+> The simple solution is to not use such a counter as the clocksource,
+> which means you fall back to using the jiffies clocksource, and your
+> timekeeping has jiffy resolution - so 10ms, or possibly 1ms if you
+> want a 1kHz timer interval.  For most applications, that's simply way
+> to coarse, as was realised in the very early days of Linux.
+> 
+> If only there was a way to interpolate between timer interrupts...
+> which is exactly what arch_gettimeoffset() does, and is a historical
+> reminant of the pre-clocksource/clockevent days of the kernel - but
+> it is the only way to get better resolution from this sort of setup.
+> 
 
->
-> 'clocks' needs to describe how many clocks and the order of them.
->
-> 'clock-names' needs to list the names. Keep them separate.
+Both of the platforms in question (RPC and EBSA110) have not 
+defined(CONFIG_GENERIC_CLOCKEVENTS) and have not defined any struct 
+clock_event_device, AFAICT.
 
-I was under the impression that when clock-names was used, the
-order of clocks shouldn't matter.
+So, even assuming that you're right about the limitations of single-timer 
+platforms in general, removal of arch_gettimeoffset wouldn't require the 
+removal of any platforms, AFAICT.
 
-Also, both clocks are optional. The controller can use a standalone
-crystal instead of an external TXCO, which would not get described in
-the device tree, and/or not use an LPO clock. How would one describe
-a device that has an LPO clock input but not a TXCO clock input?
-
-Last, IMHO listing them with name + description, one item per line
-is more readable then having the items on one line, then having the
-next line list all their respective names. If ordering and number of
-items is important, I could add the requirements to the description
-of "clocks and clock-names"?
-
-Thanks
-ChenYu
+-- 
