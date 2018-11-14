@@ -1,100 +1,168 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Nov 2018 14:43:39 -0800
-Subject: ARM builtin perf tests for breakpoint failures
-In-Reply-To: <20181114223442.GA4399@brain-police>
-References: <2433ea10-8bdc-f9bc-8d53-f6bda4018564@gmail.com>
- <20181114223442.GA4399@brain-police>
-Message-ID: <20b6b6f6-0c1f-e31d-a425-e84c11995185@gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Wed, 14 Nov 2018 14:47:37 -0800
+Subject: [PATCH v2] PCI: imx: Add imx6sx suspend/resume support
+In-Reply-To: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
+References: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
+Message-ID: <CAHQ1cqFx+5otBNGA1Cx1s=HuCLgOi9yM9z=qwrP=OASUcH21=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Nov 7, 2018 at 5:57 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+>
+> Enable PCI suspend/resume support on imx6sx socs. This is similar to
+> imx7d with a few differences:
+>
+> * The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
+> pcie control bits on 6sx.
+> * The pcie_inbound_axi clk needs to be turned off in suspend. On resume
+> it is restored via resume -> deassert_core_reset -> enable_ref_clk.
+>
+> Most of the resume logic is shared with the initial reset after probe.
+>
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+>
+> ---
+> Changes since v1:
+> * Use a switch statement in imx6_pcie_pm_turnoff. The DT-based turnoff
+> path is still an if statement.
+> * Did not split imx6_pcie_clk_disable or call it from other paths, this
+> would bring complications and is somewhat unrelated.
+> * See v1 comments: https://lore.kernel.org/patchwork/patch/996806/
+>
+>  drivers/pci/controller/dwc/pci-imx6.c       | 44 ++++++++++++++++++---
+>  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
+>  2 files changed, 40 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 2cbef2d7c207..54625569d0bc 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -771,41 +771,75 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
+>         }
+>  }
+>
+>  static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
+>  {
+> -       reset_control_assert(imx6_pcie->turnoff_reset);
+> -       reset_control_deassert(imx6_pcie->turnoff_reset);
+> +       struct device *dev = imx6_pcie->pci->dev;
+> +
+> +       /* Some variants have a turnoff reset in DT */
+> +       if (imx6_pcie->turnoff_reset) {
+> +               reset_control_assert(imx6_pcie->turnoff_reset);
+> +               reset_control_deassert(imx6_pcie->turnoff_reset);
+> +               goto pm_turnoff_sleep;
+> +       }
+> +
+> +       /* Others poke directly at IOMUXC registers */
+> +       switch (imx6_pcie->variant) {
+> +       case IMX6SX:
+> +               regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF,
+> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF);
+> +               regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
+> +               break;
+> +       default:
+> +               dev_err(dev, "PME_Turn_Off not implemented\n");
+> +               return;
 
-On 11/14/18 2:34 PM, Will Deacon wrote:
-> Hi Florian,
-> 
-> On Wed, Nov 14, 2018 at 12:21:12PM -0800, Florian Fainelli wrote:
->> I have been trying to debug some perf builtin tests on ARM 32-bit and
->> found that "Breakpoint overflow signal handler" and "Breakpoint overflow
->> sampling" were failing, but there are a number of reasons for that and
->> they may fail in seemingly unexpected ways.
->>
->> My perf binary is built in Thumb2 because that is what the toolchain
->> produces by default. Going through the rabbit hole, I found the
->> following failure scenarios.
->>
->> 1) If __test_function()'s addresss has the Thumb bit set, then we set a
->> breakpoint length (bp_len = sizeof(long)) which makes us fail to
->> validate the event in hw_breakpoint_arch_parse() and we return -EINVAL
->> from SYS_perf_event_open(). This is because the offset computed has a
->> value of 1 (function address is e.g:  0x0004c169), but we requested a
->> bp_len of 4. The test fails right away.
->>
->> 2) If we correct the test such that if addr & 1 == true then we set
->> bp_len = 2, then we can see that the test runs to completion, but the
->> perf breakpoint event count returns 0 and indeed, no SIGIO is ever
->> delivered. This is presumably because of the alignment_mask value of 0x3
->> in hw_breakpoint_arch_parse() which would strip the Thumb bit and not
->> allow matching it when set assign info->address &= ~alignment_mask. We
->> would indeed not have the HW hit that breakpoint at all.
->>
->> 3) If we keep the fix from 2) and also change the the alignment_mask to
->> 0x2 to preserve the Thumb bit, then we can run into what is described as
->> 4) below.
->>
->> 4) if __test_function()'s address does not have the Thumb bit set (which
->> surprisingly can happen even if test_function does, go figure), then we
->> will set a bp_len = 4, and then we are just stuck in an infinite SIGIO
->> delivery that looks like this:
->>
->> [pid  1859] perf_event_open(0xbebee790, 0, -1, -1, 0x8 /* PERF_FLAG_???
->> */) = 3
->> [pid  1859] fcntl64(3, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC) = 0
->> [pid  1859] fcntl64(3, F_SETSIG, 0x1d)  = 0
->> [pid  1859] fcntl64(3, F_SETOWN, 1859)  = 0
->> [pid  1859] ioctl(3, PERF_EVENT_IOC_RESET, 0) = 0
->> [pid  1859] ioctl(3, PERF_EVENT_IOC_ENABLE, 0) = 0
->> [pid  1859] --- SIGIO {si_signo=SIGIO, si_code=POLL_IN, si_band=65} ---
->> [pid  1859] rt_sigreturn()
->>
->> and on and on, we can't even see gettimeofday() begin called in that case.
->>
->> This is observable on both 4.9.135 and 4.19 on ARMv7 and ARMv8 CPUs
->> running in AArch32.
->>
->> I am not clear how to fix that properly, since there appears to be a
->> nesting of problems here.
-> 
-> This came up a few years ago iirc and I think most of this boils down to the
-> fact that we require the overflow handler to do the stepping on arm/arm64,
-> which is relied upon by GDB/ptrace. The hw_breakpoint code is a complete
-> disaster so my preference would be to rip out the perf part and just
-> implement something directly in ptrace, but it's a pretty horrible job.
-> 
-> Are you actually using the perf interface to hw_breakpoint for something
-> useful?
+Purely optionally, if you feel like avoiding goto you can change this to:
 
-In fact, not really, I was just looking at why these tests were failing
-and was wondering what the reasoning behind could be and if it was
-worth/possible fixing them. I was a bit worried because on 4.19, the
-overflow test can lead to a RCU stall.
+default:
+    if (!imx6_pcie->turnoff_reset) {
+        dev_err(dev, "PME_Turn_Off not implemented\n");
+        return;
+    }
 
-Maybe this will be good enough as a "solution" for now?
+    reset_control_assert(imx6_pcie->turnoff_reset);
+    reset_control_deassert(imx6_pcie->turnoff_reset);
+    break;
 
-diff --git a/tools/perf/tests/bp_signal.c b/tools/perf/tests/bp_signal.c
-index a467615c5a0e..3b5471ea2331 100644
---- a/tools/perf/tests/bp_signal.c
-+++ b/tools/perf/tests/bp_signal.c
-@@ -296,7 +296,7 @@ bool test__bp_signal_is_supported(void)
-  * instruction breakpoint using the perf event interface.
-  * Once it's there we can release this.
-  */
--#if defined(__powerpc__) || defined(__s390x__)
-+#if defined(__powerpc__) || defined(__s390x__) || defined(__arm__)
-        return false;
- #else
-        return true;
+but that's up to you. FWIW, patch looks reasonable:
 
+Reviewed-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
--- 
-Florian
+> +       }
+>
+>         /*
+>          * Components with an upstream port must respond to
+>          * PME_Turn_Off with PME_TO_Ack but we can't check.
+>          *
+>          * The standard recommends a 1-10ms timeout after which to
+>          * proceed anyway as if acks were received.
+>          */
+> +pm_turnoff_sleep:
+>         usleep_range(1000, 10000);
+>  }
+>
+>  static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
+>  {
+>         clk_disable_unprepare(imx6_pcie->pcie);
+>         clk_disable_unprepare(imx6_pcie->pcie_phy);
+>         clk_disable_unprepare(imx6_pcie->pcie_bus);
+>
+> -       if (imx6_pcie->variant == IMX7D) {
+> +       switch (imx6_pcie->variant) {
+> +       case IMX6SX:
+> +               clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
+> +               break;
+> +       case IMX7D:
+>                 regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>                                    IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
+>                                    IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
+> +               break;
+> +       default:
+> +               break;
+>         }
+>  }
+>
+> +static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
+> +{
+> +       return (imx6_pcie->variant == IMX7D ||
+> +               imx6_pcie->variant == IMX6SX);
+> +}
+> +
+>  static int imx6_pcie_suspend_noirq(struct device *dev)
+>  {
+>         struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+>
+> -       if (imx6_pcie->variant != IMX7D)
+> +       if (!imx6_pcie_supports_suspend(imx6_pcie))
+>                 return 0;
+>
+>         imx6_pcie_pm_turnoff(imx6_pcie);
+>         imx6_pcie_clk_disable(imx6_pcie);
+>         imx6_pcie_ltssm_disable(dev);
+> @@ -817,11 +851,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
+>  {
+>         int ret;
+>         struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+>         struct pcie_port *pp = &imx6_pcie->pci->pp;
+>
+> -       if (imx6_pcie->variant != IMX7D)
+> +       if (!imx6_pcie_supports_suspend(imx6_pcie))
+>                 return 0;
+>
+>         imx6_pcie_assert_core_reset(imx6_pcie);
+>         imx6_pcie_init_phy(imx6_pcie);
+>         imx6_pcie_deassert_core_reset(imx6_pcie);
+> diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> index 6c1ad160ed87..c1b25f5e386d 100644
+> --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+> @@ -438,10 +438,11 @@
+>  #define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1              (0x0 << 1)
+>  #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS                        (0x1 << 1)
+>  #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK                        (0x1 << 1)
+>
+>  #define IMX6SX_GPR12_PCIE_TEST_POWERDOWN               BIT(30)
+> +#define IMX6SX_GPR12_PCIE_PM_TURN_OFF                  BIT(16)
+>  #define IMX6SX_GPR12_PCIE_RX_EQ_MASK                   (0x7 << 0)
+>  #define IMX6SX_GPR12_PCIE_RX_EQ_2                      (0x2 << 0)
+>
+>  /* For imx6ul iomux gpr register field define */
+>  #define IMX6UL_GPR1_ENET1_CLK_DIR              (0x1 << 17)
+> --
+> 2.17.1
+>
