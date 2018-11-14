@@ -1,54 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Nov 2018 21:47:02 +0000
-Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
-In-Reply-To: <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
- <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
- <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
-Message-ID: <20181114214701.gdnrznakwtm76jlt@blommer>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Nov 2018 21:51:13 +0000
+Subject: [PATCH v4 1/4] kgdb: Remove irq flags from roundup
+In-Reply-To: <20181112182659.245726-2-dianders@chromium.org>
+References: <20181112182659.245726-1-dianders@chromium.org>
+ <20181112182659.245726-2-dianders@chromium.org>
+Message-ID: <20181114215112.GA4044@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 05:09:00PM -0600, Kees Cook wrote:
-> On Tue, Nov 13, 2018 at 10:17 AM, Kristina Martsenko
-> <kristina.martsenko@arm.com> wrote:
-> > When the PAC authentication fails, it doesn't actually generate an
-> > exception, it just flips a bit in the high-order bits of the pointer,
-> > making the pointer invalid. Then when the pointer is dereferenced (e.g.
-> > as a function return address), it generates the usual type of exception
-> > for an invalid address.
+On Mon, Nov 12, 2018 at 10:26:55AM -0800, Douglas Anderson wrote:
+> The function kgdb_roundup_cpus() was passed a parameter that was
+> documented as:
 > 
-> Ah! Okay, thanks. I missed that detail. :)
+> > the flags that will be used when restoring the interrupts. There is
+> > local_irq_save() call before kgdb_roundup_cpus().
 > 
-> What area of memory ends up being addressable with such bit flips?
-> (i.e. is the kernel making sure nothing executable ends up there?)
+> Nobody used those flags.  Anyone who wanted to temporarily turn on
+> interrupts just did local_irq_enable() and local_irq_disable() without
+> looking at them.  So we can definitely remove the flags.
 > 
-> > So when a function return fails in user mode, the exception is handled
-> > in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
-> > function return fails in kernel mode, the exception is handled in
-> > __do_kernel_fault and the task is killed.
-> >
-> > This is different from stack protector as we don't panic the kernel, we
-> > just kill the task. It would be difficult to panic as we don't have a
-> > reliable way of knowing that the exception was caused by a PAC
-> > authentication failure (we just have an invalid pointer with a specific
-> > bit flipped). We also don't print out any PAC-related warning.
-> 
-> There are other "guesses" in __do_kernel_fault(), I think? Could a
-> "PAC mismatch?" warning be included in the Oops if execution fails in
-> the address range that PAC failures would resolve into?
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> ---
 
-I'd personally prefer that we didn't try to guess if a fault is due to a failed
-AUT*, even for logging.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Presently, it's not possible to distinguish between a fault resulting from a
-failed AUT* and a fault which happens to have hte same bits/clear, so there are
-false positives. The architecture may also change the precise details of the
-faulting address, and we'd have false negatives in that case.
+I'm hopeful that you'll keep hacking on kgdb, because it definitely needs
+some love in its current state.
 
-Given that, I think suggesting that a fault is due to a failed AUT* is liable
-to make things more confusing.
-
-Thanks,
-Mark.
+Will
