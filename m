@@ -1,16 +1,31 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 14 Nov 2018 13:01:47 +0000
-Subject: [PATCH V6 4/9] clk: imx: add pfdv2 support
+Date: Wed, 14 Nov 2018 13:02:08 +0000
+Subject: [PATCH V6 9/9] clk: imx: add imx7ulp clk driver
 In-Reply-To: <1542200198-3017-1-git-send-email-aisheng.dong@nxp.com>
 References: <1542200198-3017-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1542200198-3017-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1542200198-3017-10-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pfdv2 is designed for PLL Fractional Divide (PFD) observed in System
-Clock Generation (SCG) module in IMX ULP SoC series. e.g. i.MX7ULP.
+i.MX7ULP Clock functions are under joint control of the System
+Clock Generation (SCG) modules, Peripheral Clock Control (PCC)
+modules, and Core Mode Controller (CMC)1 blocks
 
-NOTE pfdv2 can only be operated when clk is gated.
+The clocking scheme provides clear separation between M4 domain
+and A7 domain. Except for a few clock sources shared between two
+domains, such as the System Oscillator clock, the Slow IRC (SIRC),
+and and the Fast IRC clock (FIRCLK), clock sources and clock
+management are separated and contained within each domain.
+
+M4 clock management consists of SCG0, PCC0, PCC1, and CMC0 modules.
+A7 clock management consists of SCG1, PCC2, PCC3, and CMC1 modules.
+
+This driver only adds clock support in A7 domain.
+
+Note that most clocks required to be operated when gated, e.g. pll,
+pfd, pcc. And more special cases that scs/ddr/nic mux selecting
+different clock source requires that clock to be enabled first,
+then we need set CLK_OPS_PARENT_ENABLE flag for them properly.
 
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
@@ -21,42 +36,42 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
+v5->v6:
+ * sosc/firc/dpll/ddr clock should use divider table as they're not 1:1
+v4->v5:
+ * clk-composite API name changed accordingly
 v3->v4:
- * no changes
+ * update after changing scg and pcc into separete nodes according to
+   Rob's suggestion
 v2->v3:
  * no changes
 v1->v2:
- * change to readl_poll_timeout
- * add pfd lock to protect share reg access between rate and enable/disable
-   operations and multiple pfd instances.
- * use clk_hw_register
+ * use of_clk_add_hw_provider instead
+ * split the clocks register process into two parts: early part for possible
+   timers clocks registered by CLK_OF_DECLARE_DRIVER and the later part for
+   the left normal peripheral clocks registered by a platform driver.
 ---
- drivers/clk/imx/Makefile    |   3 +-
- drivers/clk/imx/clk-pfdv2.c | 201 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk.h       |   3 +
- 3 files changed, 206 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-pfdv2.c
+ drivers/clk/imx/Makefile      |   1 +
+ drivers/clk/imx/clk-imx7ulp.c | 220 ++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 221 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-imx7ulp.c
 
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index 4cac28b..e7248de 100644
+index a5cab3e..615b413 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -13,7 +13,8 @@ obj-y += \
- 	clk-pllv2.o \
- 	clk-pllv3.o \
- 	clk-pllv4.o \
--	clk-pfd.o
-+	clk-pfd.o \
-+	clk-pfdv2.o
- 
- obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
- obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
-diff --git a/drivers/clk/imx/clk-pfdv2.c b/drivers/clk/imx/clk-pfdv2.c
+@@ -30,4 +30,5 @@ obj-$(CONFIG_SOC_IMX6SLL) += clk-imx6sll.o
+ obj-$(CONFIG_SOC_IMX6SX) += clk-imx6sx.o
+ obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
++obj-$(CONFIG_SOC_IMX7ULP) += clk-imx7ulp.o
+ obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
+diff --git a/drivers/clk/imx/clk-imx7ulp.c b/drivers/clk/imx/clk-imx7ulp.c
 new file mode 100644
-index 0000000..afb2904
+index 0000000..3b7507f
 --- /dev/null
-+++ b/drivers/clk/imx/clk-pfdv2.c
-@@ -0,0 +1,201 @@
++++ b/drivers/clk/imx/clk-imx7ulp.c
+@@ -0,0 +1,220 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright (C) 2016 Freescale Semiconductor, Inc.
@@ -66,211 +81,216 @@ index 0000000..afb2904
 + *
 + */
 +
-+#include <linux/clk-provider.h>
++#include <dt-bindings/clock/imx7ulp-clock.h>
++#include <linux/clk.h>
 +#include <linux/err.h>
-+#include <linux/iopoll.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
 +#include <linux/slab.h>
 +
-+/**
-+ * struct clk_pfdv2 - IMX PFD clock
-+ * @clk_hw:	clock source
-+ * @reg:	PFD register address
-+ * @gate_bit:	Gate bit offset
-+ * @vld_bit:	Valid bit offset
-+ * @frac_off:	PLL Fractional Divider offset
-+ */
++#include "clk.h"
 +
-+struct clk_pfdv2 {
-+	struct clk_hw	hw;
-+	void __iomem	*reg;
-+	u8		gate_bit;
-+	u8		vld_bit;
-+	u8		frac_off;
++static const char * const pll_pre_sels[]	= { "sosc", "firc", };
++static const char * const spll_pfd_sels[]	= { "spll_pfd0", "spll_pfd1", "spll_pfd2", "spll_pfd3", };
++static const char * const spll_sels[]		= { "spll", "spll_pfd_sel", };
++static const char * const apll_pfd_sels[]	= { "apll_pfd0", "apll_pfd1", "apll_pfd2", "apll_pfd3", };
++static const char * const apll_sels[]		= { "apll", "apll_pfd_sel", };
++static const char * const scs_sels[]		= { "dummy", "sosc", "sirc", "firc", "dummy", "apll_sel", "spll_sel", "upll", };
++static const char * const ddr_sels[]		= { "apll_pfd_sel", "upll", };
++static const char * const nic_sels[]		= { "firc", "ddr_clk", };
++static const char * const periph_plat_sels[]	= { "dummy", "nic1_bus_clk", "nic1_clk", "ddr_clk", "apll_pfd2", "apll_pfd1", "apll_pfd0", "upll", };
++static const char * const periph_bus_sels[]	= { "dummy", "sosc_bus_clk", "mpll", "firc_bus_clk", "rosc", "nic1_bus_clk", "nic1_clk", "spll_bus_clk", };
++
++/* used by sosc/sirc/firc/ddr/spll/apll dividers */
++static const struct clk_div_table ulp_div_table[] = {
++	{ .val = 1, .div = 1, },
++	{ .val = 2, .div = 2, },
++	{ .val = 3, .div = 4, },
++	{ .val = 4, .div = 8, },
++	{ .val = 5, .div = 16, },
++	{ .val = 6, .div = 32, },
++	{ .val = 7, .div = 64, },
 +};
 +
-+#define to_clk_pfdv2(_hw) container_of(_hw, struct clk_pfdv2, hw)
-+
-+#define CLK_PFDV2_FRAC_MASK 0x3f
-+
-+#define LOCK_TIMEOUT_US		USEC_PER_MSEC
-+
-+static DEFINE_SPINLOCK(pfd_lock);
-+
-+static int clk_pfdv2_wait(struct clk_pfdv2 *pfd)
++static void __init imx7ulp_clk_scg1_init(struct device_node *np)
 +{
-+	u32 val;
++	struct clk_hw_onecell_data *clk_data;
++	struct clk_hw **clks;
++	void __iomem *base;
 +
-+	return readl_poll_timeout(pfd->reg, val, val & pfd->vld_bit,
-+				  0, LOCK_TIMEOUT_US);
++	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws) *
++			   IMX7ULP_CLK_SCG1_END, GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	clk_data->num = IMX7ULP_CLK_SCG1_END;
++	clks = clk_data->hws;
++
++	clks[IMX7ULP_CLK_DUMMY]		= imx_clk_hw_fixed("dummy", 0);
++
++	clks[IMX7ULP_CLK_ROSC]		= imx_obtain_fixed_clk_hw(np, "rosc");
++	clks[IMX7ULP_CLK_SOSC]		= imx_obtain_fixed_clk_hw(np, "sosc");
++	clks[IMX7ULP_CLK_SIRC]		= imx_obtain_fixed_clk_hw(np, "sirc");
++	clks[IMX7ULP_CLK_FIRC]		= imx_obtain_fixed_clk_hw(np, "firc");
++	clks[IMX7ULP_CLK_MIPI_PLL]	= imx_obtain_fixed_clk_hw(np, "mpll");
++	clks[IMX7ULP_CLK_UPLL]		= imx_obtain_fixed_clk_hw(np, "upll");
++
++	/* SCG1 */
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++
++	/* NOTE: xPLL config can't be changed when xPLL is enabled */
++	clks[IMX7ULP_CLK_APLL_PRE_SEL]	= imx_clk_hw_mux_flags("apll_pre_sel", base + 0x508, 0, 1, pll_pre_sels, ARRAY_SIZE(pll_pre_sels), CLK_SET_PARENT_GATE);
++	clks[IMX7ULP_CLK_SPLL_PRE_SEL]	= imx_clk_hw_mux_flags("spll_pre_sel", base + 0x608, 0, 1, pll_pre_sels, ARRAY_SIZE(pll_pre_sels), CLK_SET_PARENT_GATE);
++
++	/*							   name		    parent_name	   reg			shift	width	flags */
++	clks[IMX7ULP_CLK_APLL_PRE_DIV]	= imx_clk_hw_divider_flags("apll_pre_div", "apll_pre_sel", base + 0x508,	8,	3,	CLK_SET_RATE_GATE);
++	clks[IMX7ULP_CLK_SPLL_PRE_DIV]	= imx_clk_hw_divider_flags("spll_pre_div", "spll_pre_sel", base + 0x608,	8,	3,	CLK_SET_RATE_GATE);
++
++	/*						name	 parent_name	 base */
++	clks[IMX7ULP_CLK_APLL]		= imx_clk_pllv4("apll",  "apll_pre_div", base + 0x500);
++	clks[IMX7ULP_CLK_SPLL]		= imx_clk_pllv4("spll",  "spll_pre_div", base + 0x600);
++
++	/* APLL PFDs */
++	clks[IMX7ULP_CLK_APLL_PFD0]	= imx_clk_pfdv2("apll_pfd0", "apll", base + 0x50c, 0);
++	clks[IMX7ULP_CLK_APLL_PFD1]	= imx_clk_pfdv2("apll_pfd1", "apll", base + 0x50c, 1);
++	clks[IMX7ULP_CLK_APLL_PFD2]	= imx_clk_pfdv2("apll_pfd2", "apll", base + 0x50c, 2);
++	clks[IMX7ULP_CLK_APLL_PFD3]	= imx_clk_pfdv2("apll_pfd3", "apll", base + 0x50c, 3);
++
++	/* SPLL PFDs */
++	clks[IMX7ULP_CLK_SPLL_PFD0]	= imx_clk_pfdv2("spll_pfd0", "spll", base + 0x60C, 0);
++	clks[IMX7ULP_CLK_SPLL_PFD1]	= imx_clk_pfdv2("spll_pfd1", "spll", base + 0x60C, 1);
++	clks[IMX7ULP_CLK_SPLL_PFD2]	= imx_clk_pfdv2("spll_pfd2", "spll", base + 0x60C, 2);
++	clks[IMX7ULP_CLK_SPLL_PFD3]	= imx_clk_pfdv2("spll_pfd3", "spll", base + 0x60C, 3);
++
++	/* PLL Mux */
++	clks[IMX7ULP_CLK_APLL_PFD_SEL]	= imx_clk_hw_mux_flags("apll_pfd_sel", base + 0x508, 14, 2, apll_pfd_sels, ARRAY_SIZE(apll_pfd_sels), CLK_SET_RATE_PARENT | CLK_SET_PARENT_GATE);
++	clks[IMX7ULP_CLK_SPLL_PFD_SEL]	= imx_clk_hw_mux_flags("spll_pfd_sel", base + 0x608, 14, 2, spll_pfd_sels, ARRAY_SIZE(spll_pfd_sels), CLK_SET_RATE_PARENT | CLK_SET_PARENT_GATE);
++	clks[IMX7ULP_CLK_APLL_SEL]	= imx_clk_hw_mux_flags("apll_sel", base + 0x508, 1, 1, apll_sels, ARRAY_SIZE(apll_sels), CLK_SET_RATE_PARENT | CLK_SET_PARENT_GATE);
++	clks[IMX7ULP_CLK_SPLL_SEL]	= imx_clk_hw_mux_flags("spll_sel", base + 0x608, 1, 1, spll_sels, ARRAY_SIZE(spll_sels), CLK_SET_RATE_PARENT | CLK_SET_PARENT_GATE);
++
++	clks[IMX7ULP_CLK_SPLL_BUS_CLK]	= imx_clk_divider_gate("spll_bus_clk", "spll_sel", CLK_SET_RATE_GATE, base + 0x604, 8, 3, 0, ulp_div_table, &imx_ccm_lock);
++
++	/* scs/ddr/nic select different clock source requires that clock to be enabled first */
++	clks[IMX7ULP_CLK_SYS_SEL]	= imx_clk_hw_mux2("scs_sel", base + 0x14, 24, 4, scs_sels, ARRAY_SIZE(scs_sels));
++	clks[IMX7ULP_CLK_NIC_SEL]	= imx_clk_hw_mux2("nic_sel", base + 0x40, 28, 1, nic_sels, ARRAY_SIZE(nic_sels));
++	clks[IMX7ULP_CLK_DDR_SEL]	= imx_clk_hw_mux_flags("ddr_sel", base + 0x30, 24, 1, ddr_sels, ARRAY_SIZE(ddr_sels), CLK_SET_RATE_PARENT | CLK_OPS_PARENT_ENABLE);
++
++	clks[IMX7ULP_CLK_CORE_DIV]	= imx_clk_hw_divider_flags("divcore",	"scs_sel",  base + 0x14, 16, 4, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
++
++	clks[IMX7ULP_CLK_DDR_DIV]	= imx_clk_divider_gate("ddr_clk", "ddr_sel", CLK_SET_RATE_PARENT | CLK_IS_CRITICAL, base + 0x30, 0, 3,
++							       0, ulp_div_table, &imx_ccm_lock);
++
++	clks[IMX7ULP_CLK_NIC0_DIV]	= imx_clk_hw_divider_flags("nic0_clk",		"nic_sel",  base + 0x40, 24, 4, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
++	clks[IMX7ULP_CLK_NIC1_DIV]	= imx_clk_hw_divider_flags("nic1_clk",		"nic0_clk", base + 0x40, 16, 4, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
++	clks[IMX7ULP_CLK_NIC1_BUS_DIV]	= imx_clk_hw_divider_flags("nic1_bus_clk",	"nic1_clk", base + 0x40, 4,  4, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
++
++	clks[IMX7ULP_CLK_GPU_DIV]	= imx_clk_hw_divider("gpu_clk", "nic0_clk", base + 0x40, 20, 4);
++
++	clks[IMX7ULP_CLK_SOSC_BUS_CLK]	= imx_clk_divider_gate("sosc_bus_clk", "sosc", 0, base + 0x104, 8, 3,
++							       CLK_DIVIDER_READ_ONLY, ulp_div_table, &imx_ccm_lock);
++	clks[IMX7ULP_CLK_FIRC_BUS_CLK]	= imx_clk_divider_gate("firc_bus_clk", "firc", 0, base + 0x304, 8, 3,
++							       CLK_DIVIDER_READ_ONLY, ulp_div_table, &imx_ccm_lock);
++
++	imx_check_clk_hws(clks, clk_data->num);
++
++	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 +}
++CLK_OF_DECLARE(imx7ulp_clk_scg1, "fsl,imx7ulp-scg1", imx7ulp_clk_scg1_init);
 +
-+static int clk_pfdv2_enable(struct clk_hw *hw)
++static void __init imx7ulp_clk_pcc2_init(struct device_node *np)
 +{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u32 val;
++	struct clk_hw_onecell_data *clk_data;
++	struct clk_hw **clks;
++	void __iomem *base;
 +
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val &= ~pfd->gate_bit;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
++	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws) *
++			   IMX7ULP_CLK_PCC2_END, GFP_KERNEL);
++	if (!clk_data)
++		return;
 +
-+	return clk_pfdv2_wait(pfd);
++	clk_data->num = IMX7ULP_CLK_PCC2_END;
++	clks = clk_data->hws;
++
++	/* PCC2 */
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++
++	clks[IMX7ULP_CLK_DMA1]		= imx_clk_hw_gate("dma1", "nic1_clk", base + 0x20, 30);
++	clks[IMX7ULP_CLK_RGPIO2P1]	= imx_clk_hw_gate("rgpio2p1", "nic1_bus_clk", base + 0x3c, 30);
++	clks[IMX7ULP_CLK_DMA_MUX1]	= imx_clk_hw_gate("dma_mux1", "nic1_bus_clk", base + 0x84, 30);
++	clks[IMX7ULP_CLK_SNVS]		= imx_clk_hw_gate("snvs", "nic1_bus_clk", base + 0x8c, 30);
++	clks[IMX7ULP_CLK_CAAM]		= imx_clk_hw_gate("caam", "nic1_clk", base + 0x90, 30);
++	clks[IMX7ULP_CLK_LPTPM4]	= imx7ulp_clk_composite("lptpm4",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x94);
++	clks[IMX7ULP_CLK_LPTPM5]	= imx7ulp_clk_composite("lptpm5",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x98);
++	clks[IMX7ULP_CLK_LPIT1]		= imx7ulp_clk_composite("lpit1",   periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x9c);
++	clks[IMX7ULP_CLK_LPSPI2]	= imx7ulp_clk_composite("lpspi2",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xa4);
++	clks[IMX7ULP_CLK_LPSPI3]	= imx7ulp_clk_composite("lpspi3",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xa8);
++	clks[IMX7ULP_CLK_LPI2C4]	= imx7ulp_clk_composite("lpi2c4",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xac);
++	clks[IMX7ULP_CLK_LPI2C5]	= imx7ulp_clk_composite("lpi2c5",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xb0);
++	clks[IMX7ULP_CLK_LPUART4]	= imx7ulp_clk_composite("lpuart4", periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xb4);
++	clks[IMX7ULP_CLK_LPUART5]	= imx7ulp_clk_composite("lpuart5", periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xb8);
++	clks[IMX7ULP_CLK_FLEXIO1]	= imx7ulp_clk_composite("flexio1", periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0xc4);
++	clks[IMX7ULP_CLK_USB0]		= imx7ulp_clk_composite("usb0",    periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, true,  true, base + 0xcc);
++	clks[IMX7ULP_CLK_USB1]		= imx7ulp_clk_composite("usb1",    periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, true,  true, base + 0xd0);
++	clks[IMX7ULP_CLK_USB_PHY]	= imx_clk_hw_gate("usb_phy", "nic1_bus_clk", base + 0xd4, 30);
++	clks[IMX7ULP_CLK_USDHC0]	= imx7ulp_clk_composite("usdhc0",  periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, true,  true, base + 0xdc);
++	clks[IMX7ULP_CLK_USDHC1]	= imx7ulp_clk_composite("usdhc1",  periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, true,  true, base + 0xe0);
++	clks[IMX7ULP_CLK_WDG1]		= imx7ulp_clk_composite("wdg1",    periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, true,  true, base + 0xf4);
++	clks[IMX7ULP_CLK_WDG2]		= imx7ulp_clk_composite("sdg2",    periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, true,  true, base + 0x10c);
++
++	imx_check_clk_hws(clks, clk_data->num);
++
++	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 +}
++CLK_OF_DECLARE(imx7ulp_clk_pcc2, "fsl,imx7ulp-pcc2", imx7ulp_clk_pcc2_init);
 +
-+static void clk_pfdv2_disable(struct clk_hw *hw)
++static void __init imx7ulp_clk_pcc3_init(struct device_node *np)
 +{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u32 val;
++	struct clk_hw_onecell_data *clk_data;
++	struct clk_hw **clks;
++	void __iomem *base;
 +
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val |= pfd->gate_bit;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
++	clk_data = kzalloc(sizeof(*clk_data) + sizeof(*clk_data->hws) *
++			   IMX7ULP_CLK_PCC3_END, GFP_KERNEL);
++	if (!clk_data)
++		return;
++
++	clk_data->num = IMX7ULP_CLK_PCC3_END;
++	clks = clk_data->hws;
++
++	/* PCC3 */
++	base = of_iomap(np, 0);
++	WARN_ON(!base);
++
++	clks[IMX7ULP_CLK_LPTPM6]	= imx7ulp_clk_composite("lptpm6",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x84);
++	clks[IMX7ULP_CLK_LPTPM7]	= imx7ulp_clk_composite("lptpm7",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x88);
++
++	clks[IMX7ULP_CLK_MMDC]		= clk_hw_register_gate(NULL, "mmdc", "nic1_clk", CLK_SET_RATE_PARENT | CLK_IS_CRITICAL,
++							       base + 0xac, 30, 0, &imx_ccm_lock);
++	clks[IMX7ULP_CLK_LPI2C6]	= imx7ulp_clk_composite("lpi2c6",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x90);
++	clks[IMX7ULP_CLK_LPI2C7]	= imx7ulp_clk_composite("lpi2c7",  periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x94);
++	clks[IMX7ULP_CLK_LPUART6]	= imx7ulp_clk_composite("lpuart6", periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x98);
++	clks[IMX7ULP_CLK_LPUART7]	= imx7ulp_clk_composite("lpuart7", periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, false, true, base + 0x9c);
++	clks[IMX7ULP_CLK_DSI]		= imx7ulp_clk_composite("dsi",     periph_bus_sels, ARRAY_SIZE(periph_bus_sels), true, true,  true, base + 0xa4);
++	clks[IMX7ULP_CLK_LCDIF]		= imx7ulp_clk_composite("lcdif",   periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, true,  true, base + 0xa8);
++
++	clks[IMX7ULP_CLK_VIU]		= imx_clk_hw_gate("viu",   "nic1_clk",	   base + 0xa0, 30);
++	clks[IMX7ULP_CLK_PCTLC]		= imx_clk_hw_gate("pctlc", "nic1_bus_clk", base + 0xb8, 30);
++	clks[IMX7ULP_CLK_PCTLD]		= imx_clk_hw_gate("pctld", "nic1_bus_clk", base + 0xbc, 30);
++	clks[IMX7ULP_CLK_PCTLE]		= imx_clk_hw_gate("pctle", "nic1_bus_clk", base + 0xc0, 30);
++	clks[IMX7ULP_CLK_PCTLF]		= imx_clk_hw_gate("pctlf", "nic1_bus_clk", base + 0xc4, 30);
++
++	clks[IMX7ULP_CLK_GPU3D]		= imx7ulp_clk_composite("gpu3d",   periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, false, true, base + 0x140);
++	clks[IMX7ULP_CLK_GPU2D]		= imx7ulp_clk_composite("gpu2d",   periph_plat_sels, ARRAY_SIZE(periph_plat_sels), true, false, true, base + 0x144);
++
++	imx_check_clk_hws(clks, clk_data->num);
++
++	of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 +}
-+
-+static unsigned long clk_pfdv2_recalc_rate(struct clk_hw *hw,
-+					   unsigned long parent_rate)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	u64 tmp = parent_rate;
-+	u8 frac;
-+
-+	frac = (readl_relaxed(pfd->reg) >> pfd->frac_off)
-+		& CLK_PFDV2_FRAC_MASK;
-+
-+	if (!frac) {
-+		pr_debug("clk_pfdv2: %s invalid pfd frac value 0\n",
-+			 clk_hw_get_name(hw));
-+		return 0;
-+	}
-+
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static long clk_pfdv2_round_rate(struct clk_hw *hw, unsigned long rate,
-+				 unsigned long *prate)
-+{
-+	u64 tmp = *prate;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+
-+	tmp = *prate;
-+	tmp *= 18;
-+	do_div(tmp, frac);
-+
-+	return tmp;
-+}
-+
-+static int clk_pfdv2_is_enabled(struct clk_hw *hw)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+
-+	if (readl_relaxed(pfd->reg) & pfd->gate_bit)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static int clk_pfdv2_set_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long parent_rate)
-+{
-+	struct clk_pfdv2 *pfd = to_clk_pfdv2(hw);
-+	unsigned long flags;
-+	u64 tmp = parent_rate;
-+	u32 val;
-+	u8 frac;
-+
-+	tmp = tmp * 18 + rate / 2;
-+	do_div(tmp, rate);
-+	frac = tmp;
-+	if (frac < 12)
-+		frac = 12;
-+	else if (frac > 35)
-+		frac = 35;
-+
-+	spin_lock_irqsave(&pfd_lock, flags);
-+	val = readl_relaxed(pfd->reg);
-+	val &= ~(CLK_PFDV2_FRAC_MASK << pfd->frac_off);
-+	val |= frac << pfd->frac_off;
-+	writel_relaxed(val, pfd->reg);
-+	spin_unlock_irqrestore(&pfd_lock, flags);
-+
-+	return 0;
-+}
-+
-+static const struct clk_ops clk_pfdv2_ops = {
-+	.enable		= clk_pfdv2_enable,
-+	.disable	= clk_pfdv2_disable,
-+	.recalc_rate	= clk_pfdv2_recalc_rate,
-+	.round_rate	= clk_pfdv2_round_rate,
-+	.set_rate	= clk_pfdv2_set_rate,
-+	.is_enabled     = clk_pfdv2_is_enabled,
-+};
-+
-+struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
-+			     void __iomem *reg, u8 idx)
-+{
-+	struct clk_init_data init;
-+	struct clk_pfdv2 *pfd;
-+	struct clk_hw *hw;
-+	int ret;
-+
-+	WARN_ON(idx > 3);
-+
-+	pfd = kzalloc(sizeof(*pfd), GFP_KERNEL);
-+	if (!pfd)
-+		return ERR_PTR(-ENOMEM);
-+
-+	pfd->reg = reg;
-+	pfd->gate_bit = 1 << ((idx + 1) * 8 - 1);
-+	pfd->vld_bit = pfd->gate_bit - 1;
-+	pfd->frac_off = idx * 8;
-+
-+	init.name = name;
-+	init.ops = &clk_pfdv2_ops;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+	init.flags = CLK_SET_RATE_GATE;
-+
-+	pfd->hw.init = &init;
-+
-+	hw = &pfd->hw;
-+	ret = clk_hw_register(NULL, hw);
-+	if (ret) {
-+		kfree(pfd);
-+		hw = ERR_PTR(ret);
-+	}
-+
-+	return hw;
-+}
-diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
-index 1e11eb7..ebeb754 100644
---- a/drivers/clk/imx/clk.h
-+++ b/drivers/clk/imx/clk.h
-@@ -60,6 +60,9 @@ struct clk *imx_clk_gate_exclusive(const char *name, const char *parent,
- struct clk *imx_clk_pfd(const char *name, const char *parent_name,
- 		void __iomem *reg, u8 idx);
- 
-+struct clk_hw *imx_clk_pfdv2(const char *name, const char *parent_name,
-+			     void __iomem *reg, u8 idx);
-+
- struct clk *imx_clk_busy_divider(const char *name, const char *parent_name,
- 				 void __iomem *reg, u8 shift, u8 width,
- 				 void __iomem *busy_reg, u8 busy_shift);
++CLK_OF_DECLARE(imx7ulp_clk_pcc3, "fsl,imx7ulp-pcc3", imx7ulp_clk_pcc3_init);
 -- 
 2.7.4
