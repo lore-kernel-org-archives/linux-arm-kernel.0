@@ -1,99 +1,68 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Wed, 14 Nov 2018 13:59:27 +0100
-Subject: [PATCH 01/16] staging: vchiq_core: rework vchiq_get_config
-In-Reply-To: <20181114125942.25163-1-nsaenzjulienne@suse.de>
-References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
-Message-ID: <20181114125942.25163-2-nsaenzjulienne@suse.de>
+Date: Wed, 14 Nov 2018 13:59:26 +0100
+Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
+Message-ID: <20181114125942.25163-1-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function is overly complicated for what it's ultimately achieving.
-It's simply filling up a structure.
+Hi All,
 
-Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- .../interface/vchiq_arm/vchiq_arm.c           | 12 ++++----
- .../interface/vchiq_arm/vchiq_core.c          | 30 +++++--------------
- .../interface/vchiq_arm/vchiq_if.h            |  3 +-
- 3 files changed, 14 insertions(+), 31 deletions(-)
+This series was written in parallel with reading and understanding the
+vchiq code. So excuse me for the lack of logic in the sequence of
+patches.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index ea789376de0f..6d503392341e 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -1480,13 +1480,11 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 			ret = -EINVAL;
- 			break;
- 		}
--		status = vchiq_get_config(instance, args.config_size, &config);
--		if (status == VCHIQ_SUCCESS) {
--			if (copy_to_user((void __user *)args.pconfig,
--				    &config, args.config_size) != 0) {
--				ret = -EFAULT;
--				break;
--			}
-+
-+		vchiq_get_config(&config);
-+		if (copy_to_user(args.pconfig, &config, args.config_size)) {
-+			ret = -EFAULT;
-+			break;
- 		}
- 	} break;
- 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 7642ced31436..89f1ccdc3b98 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -3583,28 +3583,14 @@ vchiq_get_peer_version(VCHIQ_SERVICE_HANDLE_T handle, short *peer_version)
- 	return status;
- }
- 
--VCHIQ_STATUS_T
--vchiq_get_config(VCHIQ_INSTANCE_T instance,
--	int config_size, VCHIQ_CONFIG_T *pconfig)
--{
--	VCHIQ_CONFIG_T config;
--
--	(void)instance;
--
--	config.max_msg_size           = VCHIQ_MAX_MSG_SIZE;
--	config.bulk_threshold         = VCHIQ_MAX_MSG_SIZE;
--	config.max_outstanding_bulks  = VCHIQ_NUM_SERVICE_BULKS;
--	config.max_services           = VCHIQ_MAX_SERVICES;
--	config.version                = VCHIQ_VERSION;
--	config.version_min            = VCHIQ_VERSION_MIN;
--
--	if (config_size > sizeof(VCHIQ_CONFIG_T))
--		return VCHIQ_ERROR;
--
--	memcpy(pconfig, &config,
--		min(config_size, (int)(sizeof(VCHIQ_CONFIG_T))));
--
--	return VCHIQ_SUCCESS;
-+void vchiq_get_config(VCHIQ_CONFIG_T *config)
-+{
-+	config->max_msg_size           = VCHIQ_MAX_MSG_SIZE;
-+	config->bulk_threshold         = VCHIQ_MAX_MSG_SIZE;
-+	config->max_outstanding_bulks  = VCHIQ_NUM_SERVICE_BULKS;
-+	config->max_services           = VCHIQ_MAX_SERVICES;
-+	config->version                = VCHIQ_VERSION;
-+	config->version_min            = VCHIQ_VERSION_MIN;
- }
- 
- VCHIQ_STATUS_T
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-index e4109a83e628..87829a244465 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-@@ -164,8 +164,7 @@ extern VCHIQ_STATUS_T vchiq_bulk_receive_handle(VCHIQ_SERVICE_HANDLE_T service,
- extern int   vchiq_get_client_id(VCHIQ_SERVICE_HANDLE_T service);
- extern void *vchiq_get_service_userdata(VCHIQ_SERVICE_HANDLE_T service);
- extern int   vchiq_get_service_fourcc(VCHIQ_SERVICE_HANDLE_T service);
--extern VCHIQ_STATUS_T vchiq_get_config(VCHIQ_INSTANCE_T instance,
--	int config_size, VCHIQ_CONFIG_T *pconfig);
-+extern void vchiq_get_config(VCHIQ_CONFIG_T *config);
- extern VCHIQ_STATUS_T vchiq_set_service_option(VCHIQ_SERVICE_HANDLE_T service,
- 	VCHIQ_SERVICE_OPTION_T option, int value);
- 
+The main focus was to delete as much code as possible, I've counted
+around 550 lines, which is not bad. Apart from that there are some
+patches enforcing proper kernel APIs usage.
+
+The only patch that really changes code is the
+vchiq_ioc_copy_element_data() rewrite.
+
+The last commit updates the TODO list with some of my observations, I
+realise some of the might be a little opinionated. If anything it's
+going to force a discussion on the topic, which is nice.
+
+It was developed on top of the latest linux-next, and was tested on a
+RPIv3B+ with audio, video and running vchiq_test.
+
+Regards,
+Nicolas
+
+===
+
+Nicolas Saenz Julienne (16):
+  staging: vchiq_core: rework vchiq_get_config
+  staging: vchiq_arm: rework close/remove_service IOCTLS
+  staging: vchiq_shim: delete vchi_service_create
+  staging: vchiq_arm: use list_for_each_entry when accessing
+    bulk_waiter_list
+  staging: vchiq_arm: get rid of vchi_mh.h
+  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
+  staging: vchiq-core: get rid of is_master distinction
+  staging: vchiq_core: remove unnecessary safety checks in
+    vchiq_init_state
+  staging: vchiq_core: do not initialize semaphores twice
+  staging: vchiq_core: don't add a wmb() before remote_event_signal()
+  staging: vchiq: use completions instead of semaphores
+  staging: vchiq_util: get rid of unneeded memory barriers
+  staging: vchiq_core: fix logic redundancy in parse_open
+  staging: vchiq_arm: rework probe and init functions
+  staging: vchiq_arm: fix open/release cdev functions
+  staging: vchiq: add more tasks to the TODO list
+
+ .../staging/vc04_services/interface/vchi/TODO |  42 ++
+ .../vc04_services/interface/vchi/vchi.h       |   8 -
+ .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
+ .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
+ .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
+ .../interface/vchiq_arm/vchiq_core.c          | 523 ++++-----------
+ .../interface/vchiq_arm/vchiq_core.h          |  47 +-
+ .../interface/vchiq_arm/vchiq_if.h            |  11 +-
+ .../interface/vchiq_arm/vchiq_shim.c          |  32 -
+ .../interface/vchiq_arm/vchiq_util.c          |  48 +-
+ .../interface/vchiq_arm/vchiq_util.h          |   6 +-
+ 11 files changed, 435 insertions(+), 940 deletions(-)
+ delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+
 -- 
 2.19.1
