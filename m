@@ -1,152 +1,79 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Wed, 14 Nov 2018 13:59:32 +0100
-Subject: [PATCH 06/16] staging: vchiq_arm: rework vchiq_ioc_copy_element_data
+Date: Wed, 14 Nov 2018 13:59:38 +0100
+Subject: [PATCH 12/16] staging: vchiq_util: get rid of unneeded memory barriers
 In-Reply-To: <20181114125942.25163-1-nsaenzjulienne@suse.de>
 References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
-Message-ID: <20181114125942.25163-7-nsaenzjulienne@suse.de>
+Message-ID: <20181114125942.25163-13-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function is passed to vchiq_core.c for it to go trough all the
-transfer elements (an array of pointers to data) and copy them into the
-actual transfer memory (contiguous memory).
-
-The logic in the function was "copy an element and return, except when
-the element is empty, in which case look for the next non-empty element
-and copy it. The function will be called as many times as necessary until
-all the elements are copied".
-
-Now, this approach already forces the function to loop around elements
-and felt convoluted, so it was changed to a more straightforward "Copy
-all the elements into memory as long as they fit".
-
-The resulting function is shorter and simpler.
+All the memory operations featured in this file modify/access memory
+that is only accessed by the CPU. So we can assume that all the memory
+barrier handling done by the completion routines is good enough for us.
 
 Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../interface/vchiq_arm/vchiq_arm.c           | 89 +++++++------------
- 1 file changed, 31 insertions(+), 58 deletions(-)
+ .../interface/vchiq_arm/vchiq_util.c          | 32 -------------------
+ 1 file changed, 32 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 34160cc3b8bd..1cdfdb714abc 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -752,74 +752,48 @@ static void close_delivered(USER_SERVICE_T *user_service)
- }
- 
- struct vchiq_io_copy_callback_context {
--	struct vchiq_element *current_element;
--	size_t current_element_offset;
-+	struct vchiq_element *element;
-+	size_t element_offset;
- 	unsigned long elements_to_go;
--	size_t current_offset;
- };
- 
--static ssize_t
--vchiq_ioc_copy_element_data(
--	void *context,
--	void *dest,
--	size_t offset,
--	size_t maxsize)
-+static ssize_t vchiq_ioc_copy_element_data(void *context, void *dest,
-+					   size_t offset, size_t maxsize)
- {
--	long res;
-+	struct vchiq_io_copy_callback_context *cc = context;
-+	size_t total_bytes_copied = 0;
- 	size_t bytes_this_round;
--	struct vchiq_io_copy_callback_context *copy_context =
--		(struct vchiq_io_copy_callback_context *)context;
--
--	if (offset != copy_context->current_offset)
--		return 0;
--
--	if (!copy_context->elements_to_go)
--		return 0;
--
--	/*
--	 * Complex logic here to handle the case of 0 size elements
--	 * in the middle of the array of elements.
--	 *
--	 * Need to skip over these 0 size elements.
--	 */
--	while (1) {
--		bytes_this_round = min(copy_context->current_element->size -
--				       copy_context->current_element_offset,
--				       maxsize);
--
--		if (bytes_this_round)
--			break;
- 
--		copy_context->elements_to_go--;
--		copy_context->current_element++;
--		copy_context->current_element_offset = 0;
-+	while (total_bytes_copied < maxsize) {
-+		if (!cc->elements_to_go)
-+			return total_bytes_copied;
- 
--		if (!copy_context->elements_to_go)
--			return 0;
--	}
-+		if (!cc->element->size) {
-+			cc->elements_to_go--;
-+			cc->element++;
-+			cc->element_offset = 0;
-+			continue;
-+		}
- 
--	res = copy_from_user(dest,
--			     copy_context->current_element->data +
--			     copy_context->current_element_offset,
--			     bytes_this_round);
-+		bytes_this_round = min(cc->element->size - cc->element_offset,
-+				       maxsize - total_bytes_copied);
- 
--	if (res != 0)
--		return -EFAULT;
-+		if (copy_from_user(dest + total_bytes_copied,
-+				  cc->element->data + cc->element_offset,
-+				  bytes_this_round))
-+			return -EFAULT;
- 
--	copy_context->current_element_offset += bytes_this_round;
--	copy_context->current_offset += bytes_this_round;
-+		cc->element_offset += bytes_this_round;
-+		total_bytes_copied += bytes_this_round;
- 
--	/*
--	 * Check if done with current element, and if so advance to the next.
--	 */
--	if (copy_context->current_element_offset ==
--	    copy_context->current_element->size) {
--		copy_context->elements_to_go--;
--		copy_context->current_element++;
--		copy_context->current_element_offset = 0;
-+		if (cc->element_offset == cc->element->size) {
-+			cc->elements_to_go--;
-+			cc->element++;
-+			cc->element_offset = 0;
-+		}
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+index 44b954daa74a..4b8554bc647e 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_util.c
+@@ -84,20 +84,7 @@ void vchiu_queue_push(VCHIU_QUEUE_T *queue, VCHIQ_HEADER_T *header)
+ 			flush_signals(current);
  	}
  
--	return bytes_this_round;
-+	return maxsize;
+-	/*
+-	 * Write to queue->storage must be visible after read from
+-	 * queue->read
+-	 */
+-	smp_mb();
+-
+ 	queue->storage[queue->write & (queue->size - 1)] = header;
+-
+-	/*
+-	 * Write to queue->storage must be visible before write to
+-	 * queue->write
+-	 */
+-	smp_wmb();
+-
+ 	queue->write++;
+ 
+ 	complete(&queue->push);
+@@ -112,12 +99,6 @@ VCHIQ_HEADER_T *vchiu_queue_peek(VCHIU_QUEUE_T *queue)
+ 
+ 	complete(&queue->push); // We haven't removed anything from the queue.
+ 
+-	/*
+-	 * Read from queue->storage must be visible after read from
+-	 * queue->write
+-	 */
+-	smp_rmb();
+-
+ 	return queue->storage[queue->read & (queue->size - 1)];
  }
  
- /**************************************************************************
-@@ -836,10 +810,9 @@ vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
- 	unsigned long i;
- 	size_t total_size = 0;
+@@ -130,20 +111,7 @@ VCHIQ_HEADER_T *vchiu_queue_pop(VCHIU_QUEUE_T *queue)
+ 			flush_signals(current);
+ 	}
  
--	context.current_element = elements;
--	context.current_element_offset = 0;
-+	context.element = elements;
-+	context.element_offset = 0;
- 	context.elements_to_go = count;
--	context.current_offset = 0;
+-	/*
+-	 * Read from queue->storage must be visible after read from
+-	 * queue->write
+-	 */
+-	smp_rmb();
+-
+ 	header = queue->storage[queue->read & (queue->size - 1)];
+-
+-	/*
+-	 * Read from queue->storage must be visible before write to
+-	 * queue->read
+-	 */
+-	smp_mb();
+-
+ 	queue->read++;
  
- 	for (i = 0; i < count; i++) {
- 		if (!elements[i].data && elements[i].size != 0)
+ 	complete(&queue->pop);
 -- 
 2.19.1
