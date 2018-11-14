@@ -1,79 +1,34 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 14 Nov 2018 13:15:04 +0100
-Subject: [PATCH 3/4] bus: ts-nbus: convert to atomic PWM API
-In-Reply-To: <20181026184157.16371-3-u.kleine-koenig@pengutronix.de>
-References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
- <20181026184157.16371-3-u.kleine-koenig@pengutronix.de>
-Message-ID: <20181114121504.GE2620@ulmo>
+From: david.wu@rock-chips.com (David Wu)
+Date: Wed, 14 Nov 2018 20:15:06 +0800
+Subject: [PATCH 1/2] pinctrl: rockchip: allow specifying the regmap
+ location for pin-routes
+In-Reply-To: <20181111210047.30375-1-heiko@sntech.de>
+References: <20181111210047.30375-1-heiko@sntech.de>
+Message-ID: <62b7937e-0d7e-d142-285e-6dc15e6f5822@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:41:57PM +0200, Uwe Kleine-K?nig wrote:
-> The legacy PWM API should be removed in the long run, so convert a user
-> to the atomic PWM API.
+Hi Heiko,
+
+? 2018/11/12 ??5:00, Heiko Stuebner ??:
+> From: Heiko Stuebner<heiko.stuebner@bq.com>
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/bus/ts-nbus.c | 20 +++++++-------------
->  1 file changed, 7 insertions(+), 13 deletions(-)
+> Right now we expect the pin-rounting settings to be in the same area
+> as the iomux setting itself. And while that seems to be true for all
+> newer Rockchip socs, back in the wild west days of old this wasn't true.
 > 
-> diff --git a/drivers/bus/ts-nbus.c b/drivers/bus/ts-nbus.c
-> index 073fd9011154..51f5ed870ad1 100644
-> --- a/drivers/bus/ts-nbus.c
-> +++ b/drivers/bus/ts-nbus.c
-> @@ -282,7 +282,7 @@ EXPORT_SYMBOL_GPL(ts_nbus_write);
->  static int ts_nbus_probe(struct platform_device *pdev)
->  {
->  	struct pwm_device *pwm;
-> -	struct pwm_args pargs;
-> +	struct pwm_state pstate;
->  	struct device *dev = &pdev->dev;
->  	struct ts_nbus *ts_nbus;
->  	int ret;
-> @@ -305,25 +305,19 @@ static int ts_nbus_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	pwm_get_args(pwm, &pargs);
-> -	if (!pargs.period) {
-> +	pwm_get_state_default(pwm, &pstate);
-> +	if (!pstate.period) {
->  		dev_err(&pdev->dev, "invalid PWM period\n");
->  		return -EINVAL;
->  	}
->  
-> -	/*
-> -	 * FIXME: pwm_apply_args() should be removed when switching to
-> -	 * the atomic PWM API.
-> -	 */
-> -	pwm_apply_args(pwm);
-> -	ret = pwm_config(pwm, pargs.period, pargs.period);
-> +	/* We can start the FPGA and populate the peripherals now. */
-> +	pstate.enabled = true;
-> +	pstate.duty_cycle = pstate.period;
-> +	ret = pwm_apply_state(pwm, &pstate);
->  	if (ret < 0)
->  		return ret;
->  
-> -	/*
-> -	 * we can now start the FPGA and populate the peripherals.
-> -	 */
-> -	pwm_enable(pwm);
->  	ts_nbus->pwm = pwm;
->  
->  	/*
+> Nowadays pin settings in the GRF normally stay in the GRF and the same
+> is true for pins configured from PMU registers. But old socs like the
+> rk3188 really sprinkle pin settings somewhat randomly through both
+> for its bank0.
+> 
+> Therefore add the option to specify a location for the route setting,
+> so that we can map older socs correctly. We'll keep "same" as the
+> default, so that we only need to specify a location in the corner-cases
+> described above.
+> 
+> Signed-off-by: Heiko Stuebner<heiko.stuebner@bq.com>
 
-This looks suspiciously like the PWM is actually powering this bus. It
-would've been better to model that as a PWM driven regulator rather than
-an PWM consumer.
+Very good, for the mixed case, really need to do the supplement.
 
-Either way I don't see why pwm_get_state_default() would be useful here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181114/6e41b905/attachment.sig>
+Reviewed-by: David Wu <david.wu@rock-chips.com>
