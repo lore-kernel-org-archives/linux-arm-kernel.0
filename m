@@ -1,54 +1,90 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Wed, 14 Nov 2018 15:54:43 +0000
-Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
-In-Reply-To: <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
- <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
- <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
-Message-ID: <bcfe9fd2-8832-f975-8462-18e6645ffec6@arm.com>
+From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
+Date: Thu, 15 Nov 2018 00:01:20 +0800
+Subject: [PATCH V3 0/7] net: lorawan: Add LoRaWAN soft MAC module
+In-Reply-To: <20181105.101610.1437737564548154497.davem@davemloft.net>
+References: <20181105.101610.1437737564548154497.davem@davemloft.net>
+Message-ID: <20181114160126.4445-1-starnight@g.ncu.edu.tw>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/2018 23:09, Kees Cook wrote:
-> On Tue, Nov 13, 2018 at 10:17 AM, Kristina Martsenko
-> <kristina.martsenko@arm.com> wrote:
->> When the PAC authentication fails, it doesn't actually generate an
->> exception, it just flips a bit in the high-order bits of the pointer,
->> making the pointer invalid. Then when the pointer is dereferenced (e.g.
->> as a function return address), it generates the usual type of exception
->> for an invalid address.
-> 
-> Ah! Okay, thanks. I missed that detail. :)
-> 
-> What area of memory ends up being addressable with such bit flips?
-> (i.e. is the kernel making sure nothing executable ends up there?)
+LoRaWAN(TM) is the MAC layer defined by LoRa Alliance(TM) over LoRa
+devices.  LoRa is one of Low-Power Wide-Area Network (LPWAN) technology.
 
-The address will be in between the user and kernel address ranges, so
-it's guaranteed to be invalid and not address any memory.
+LoRaWAN networks typically are laid out in a star-of-stars topology in
+which gateways relay messages between end-devices and a central network
+server at the backend.  Gateways are connected to the network server via
+standard IP connections while end-devices use single hop LoRa(TM) or FSK
+communication to one or many gateways.
 
-Specifically, assuming a 48-bit VA configuration, user addresses must
-have bits [55:48] clear and kernel addresses must have bits [63:48] set.
-When authentication fails it will set two bits in those ranges to "10"
-or "01", ensuring that the address is no longer a valid user or kernel
-address.
+A LoRa network distinguishes between a basic LoRaWAN (named Class A) and
+optional features (Class B, Class C ...):
+* Bi-directional end-devices (Class A)
+* Bi-directional end-devices with scheduled receive slots (Class B)
+* Bi-directional end-devices with maximal receive slots (Class C)
 
->> So when a function return fails in user mode, the exception is handled
->> in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
->> function return fails in kernel mode, the exception is handled in
->> __do_kernel_fault and the task is killed.
->>
->> This is different from stack protector as we don't panic the kernel, we
->> just kill the task. It would be difficult to panic as we don't have a
->> reliable way of knowing that the exception was caused by a PAC
->> authentication failure (we just have an invalid pointer with a specific
->> bit flipped). We also don't print out any PAC-related warning.
-> 
-> There are other "guesses" in __do_kernel_fault(), I think? Could a
-> "PAC mismatch?" warning be included in the Oops if execution fails in
-> the address range that PAC failures would resolve into?
+This patch set add LoRaWAN class module implementing the stack,
+especially the soft MAC, between socket APIs and LoRa device drivers.
 
-Sounds reasonable to me, I'll add a warning.
+socket APIs:
+send and receive the data
+------------------------------------------------------------------------
+LoRaWAN class module implements soft MAC:
+append the header/footer, encryption/decryption, timing slot and MAC
+commands
+------------------------------------------------------------------------
+LoRa device drivers:
+send and receive the messages for MAC layer
+------------------------------------------------------------------------
+LoRa devices
 
-Thanks,
-Kristina
+This module starts from simple and implements partial Class A
+end-devices features defined in LoRaWAN(TM) Specification Ver. 1.0.2.
+More features and complexity, for example regional parameters, confirmed
+data messages, join request/accept messages for Over-The-Air Activation,
+MAC commands ... will be added in the future.
+
+Jian-Hong Pan (7):
+  net: lorawan: Add macro and definition for LoRaWAN
+  net: lorawan: Add LoRaWAN socket module
+  net: lorawan: Add LoRaWAN API declaration for LoRa devices
+  net: maclorawan: Add maclorawan module declaration
+  net: maclorawan: Implement the crypto of maclorawan module
+  net: maclorawan: Implement maclorawan class module
+  net: lorawan: List LORAWAN in menuconfig
+
+ include/linux/lora/lorawan.h        | 131 ++++++
+ include/linux/lora/lorawan_netdev.h |  49 ++
+ include/linux/socket.h              |   5 +-
+ include/uapi/linux/if_arp.h         |   1 +
+ include/uapi/linux/if_ether.h       |   1 +
+ net/Kconfig                         |   2 +
+ net/Makefile                        |   2 +
+ net/core/dev.c                      |   4 +-
+ net/lorawan/Kconfig                 |  10 +
+ net/lorawan/Makefile                |   2 +
+ net/lorawan/socket.c                | 688 ++++++++++++++++++++++++++++
+ net/maclorawan/Kconfig              |  14 +
+ net/maclorawan/Makefile             |   2 +
+ net/maclorawan/crypto.c             | 209 +++++++++
+ net/maclorawan/crypto.h             |  27 ++
+ net/maclorawan/mac.c                | 520 +++++++++++++++++++++
+ net/maclorawan/maclorawan.h         | 199 ++++++++
+ net/maclorawan/main.c               | 605 ++++++++++++++++++++++++
+ security/selinux/hooks.c            |   4 +-
+ security/selinux/include/classmap.h |   4 +-
+ 20 files changed, 2474 insertions(+), 5 deletions(-)
+ create mode 100644 include/linux/lora/lorawan.h
+ create mode 100644 include/linux/lora/lorawan_netdev.h
+ create mode 100644 net/lorawan/Kconfig
+ create mode 100644 net/lorawan/Makefile
+ create mode 100644 net/lorawan/socket.c
+ create mode 100644 net/maclorawan/Kconfig
+ create mode 100644 net/maclorawan/Makefile
+ create mode 100644 net/maclorawan/crypto.c
+ create mode 100644 net/maclorawan/crypto.h
+ create mode 100644 net/maclorawan/mac.c
+ create mode 100644 net/maclorawan/maclorawan.h
+ create mode 100644 net/maclorawan/main.c
+
+-- 
+2.19.1
