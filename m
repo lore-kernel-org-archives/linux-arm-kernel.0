@@ -1,48 +1,80 @@
-From: RAJANV@xilinx.com (Rajan Vaja)
-Date: Wed, 14 Nov 2018 07:47:44 +0000
-Subject: [PATCH] clk: zynqmp: handle fixed factor param query error
-In-Reply-To: <26e50d25-a02b-5ece-d12d-8c6ee208a845@xilinx.com>
-References: <1539762392-12512-1-git-send-email-rajan.vaja@xilinx.com>
- <153978972088.5275.4505414322881956934@swboyd.mtv.corp.google.com>
- <26e50d25-a02b-5ece-d12d-8c6ee208a845@xilinx.com>
-Message-ID: <BYAPR02MB40555A10B3551DB5C29E9B7FB7C30@BYAPR02MB4055.namprd02.prod.outlook.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2018 07:58:17 +0000
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <d9be7418-cc4a-f92f-1aa8-d92a58cd68a4@gmail.com>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+ <20181113234336.GP30658@n2100.armlinux.org.uk>
+ <d9be7418-cc4a-f92f-1aa8-d92a58cd68a4@gmail.com>
+Message-ID: <20181114075817.GQ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal, Stephen,
+On Wed, Nov 14, 2018 at 02:35:29PM +1300, Michael Schmitz wrote:
+> So we'd still have to use jiffies + interpolation from the current timer
+> rundown counter as clocksource (since that will be monotonous and won't
+> wrap)?
+> 
+> The way Finn did the clocksource for m68k, the clocksource counter does
+> behave as it should (monotonous, doesn't wrap) at least so far as I've
+> tested. Using the same timer for clocksource and clock events will degrade
+> timekeeping based on timer events to jiffies resolution, as you point out.
+> That would already have been the case before, so no gain in resolution.
 
-> -----Original Message-----
-> From: Michal Simek [mailto:michal.simek at xilinx.com]
-> Sent: 05 November 2018 01:09 PM
-> To: Stephen Boyd <sboyd@kernel.org>; Rajan Vaja <RAJANV@xilinx.com>; Michal
-> Simek <michals@xilinx.com>; mturquette at baylibre.com; olof at lixom.net;
-> Shubhrajyoti Datta <shubhraj@xilinx.com>
-> Cc: Jolly Shah <JOLLYS@xilinx.com>; linux-clk at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH] clk: zynqmp: handle fixed factor param query error
-> 
-> On 17. 10. 18 17:22, Stephen Boyd wrote:
-> > Quoting Rajan Vaja (2018-10-17 00:46:32)
-> >> Return proper error code in case query for fixed factor
-> >> parameter fails. This also fixes build warning for set
-> >> but not used variable 'ret'.
-> >>
-> >> Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-> >
-> > Fixes tag? And I think this is going through arm-soc already? If so,
-> >
-> > Acked-by: Stephen Boyd <sboyd@kernel.org>
-> >
-> > with the appropriate fixes tag added.
-> 
-> It was really just about to merge this via arm-soc tree because of
-> dependency on firmware itself.
-> It is the part of v4.20-rc1 now and it can go via your tree.
-> 
-> Anyway v2 is required with Fixed tag anyway.
-> Rajan: Please send it v2 with Acked above.
-[Rajan] I have submitted v2 with Fixes tag and Ack.
+... and that is where you are wrong.
 
+RPC, for example, has gettimeofday() resolution of 500ns.  Removing
+gettimeoffset() will result in a resolution of 1/HZ since there is
+no longer any interpolation between interrupts.
+
+> Other timekeeping would have worked at higher resolution before
+> (interpolating through arch_gettimeoffset) just the same as now
+> (interpolating through clocksource reads). Finn's clocksource read code
+> essentially is arch_gettimeoffset under a new name.
+
+Where is this code - all I've seen is code adding IRQ exclusion in
+the gettimeoffset method.  If some other solution is being proposed,
+then it's no good beating about the bush - show the damn code, and
+then that can be considered.
+
+However, what has been said in this thread is basically "remove the
+gettimeoffset method", which is _not_ acceptable, it will cause
+gettimeofday() on these platforms to lose resolution, which is a
+user visible REGRESSION, plain and simple.
+
+If what is actually meant is "we have a replacement for gettimeoffset"
+then, and I'm sure we all know this, there needs to be a patch
+proposed showing what is being proposed, rather than waffling around
+the issue.
+
+> Are you saying that's not possible on arm, because the current timer rundown
+> counter can't be read while the timer is running?
 > 
-> Thanks,
-> Michal
+> If I were to run a second timer at higher rate for clocksource, but keeping
+> the 10 ms timer as clock event (could easily do that by using timer D on
+> Atari Falcon) - how would that improve my timekeeping? Clock events still
+> only happen 10 ms apart ...
+
+Ah, I think you're talking about something else.
+
+You seem to be talking about what happens when time keeping interrupts
+happen.
+
+I'm talking about the resolution of gettimeofday() and the other
+interfaces that are used (eg) for packet capture timestamping and
+the like - the _user_ visible effects of the timekeeping system.
+
+With the existing implementation, all these have better-than-jiffy
+resolution - in the case of RPC, that's 500ns, rather than 10ms
+which would be the case without gettimeoffset().  Removing
+gettimeoffset() as Finn has proposed without preserving that
+resolution is simply completely unacceptable.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
