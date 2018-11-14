@@ -1,78 +1,81 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 14 Nov 2018 18:11:39 +0000
-Subject: [PATCH v5 07/17] arm64: add basic pointer authentication support
-In-Reply-To: <20181019112404.GD14246@arm.com>
-References: <20181005084754.20950-1-kristina.martsenko@arm.com>
- <20181005084754.20950-8-kristina.martsenko@arm.com>
- <20181019111542.6wrvjguirglzg7vg@mbp>
- <20181019112404.GD14246@arm.com>
-Message-ID: <20181114181138.GB2580@brain-police>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2018 18:11:35 +0000
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <CAMuHMdWwknYYEYpU4ogVAbpWtrF9aG=4vrh505dM2Btp8KjKMg@mail.gmail.com>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+ <20181113234336.GP30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
+ <20181114141632.GT30658@n2100.armlinux.org.uk>
+ <CAMuHMdWwknYYEYpU4ogVAbpWtrF9aG=4vrh505dM2Btp8KjKMg@mail.gmail.com>
+Message-ID: <20181114181135.GU30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Wed, Nov 14, 2018 at 03:58:36PM +0100, Geert Uytterhoeven wrote:
+> Hi Russell,
+> 
+> On Wed, Nov 14, 2018 at 3:16 PM Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Wed, Nov 14, 2018 at 02:17:09PM +1100, Finn Thain wrote:
+> > > So, even assuming that you're right about the limitations of single-timer
+> > > platforms in general, removal of arch_gettimeoffset wouldn't require the
+> > > removal of any platforms, AFAICT.
+> >
+> > I haven't proposed removing platforms.
+> >
+> > I'm just objecting to the idea of removing arch_gettimeoffset(),
+> > thereby causing a regression by changing the resolution of
+> > gettimeofday() without any sign of equivalent functionality.
+> >
+> > However, I now see (having searched mailing lists) what you are
+> > trying to do - you have _not_ copied me or the mailing lists I'm
+> > on with your cover message, so I'm *totally* lacking in the context
+> > of your patch series, particularly where you are converting m68k
+> > to use clocksources without needing the gettimeoffset() stuff.
+> >
+> > You have failed to explain that in this thread - probably assuming
+> > that I've read your cover message.  I haven't until now, because
+> > you never sent it to me or the linux-arm-kernel mailing list.
+> >
+> > I have found this thread _very_ frustrating, and frankly a waste of
+> > my time discussing the finer points because of this lack of context.
+> > Please ensure that if you're going to be sending a patch series,
+> > that the cover message at least finds its way to the intended
+> > audience of your patches, so that everyone has the context they
+> > need when looking at (eg) the single patch they may receive.
+> >
+> > Alternatively, if someone raises a problem with the patch, and you
+> > _know_ you haven't done that, then please consider informing them
+> > where they can get more context, eg, by providing a link to your
+> > archived cover message.  It would help avoid misunderstandings.
+> 
+> Sorry for the lack of context.
+> The real trigger was also not explained in the cover message, and was a
+> the threat to remove platforms not using modern timekeeping APIs, cfr.
+>  "Removing support for old hardware from the kernel"
+> (https://lwn.net/Articles/769468/).
 
-On Fri, Oct 19, 2018 at 12:24:04PM +0100, Will Deacon wrote:
-> On Fri, Oct 19, 2018 at 12:15:43PM +0100, Catalin Marinas wrote:
-> > On Fri, Oct 05, 2018 at 09:47:44AM +0100, Kristina Martsenko wrote:
-> > > diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-> > > new file mode 100644
-> > > index 000000000000..2aefedc31d9e
-> > > --- /dev/null
-> > > +++ b/arch/arm64/include/asm/pointer_auth.h
-> > > @@ -0,0 +1,63 @@
-> > > +// SPDX-License-Identifier: GPL-2.0
-> > > +#ifndef __ASM_POINTER_AUTH_H
-> > > +#define __ASM_POINTER_AUTH_H
-> > > +
-> > > +#include <linux/random.h>
-> > > +
-> > > +#include <asm/cpufeature.h>
-> > > +#include <asm/sysreg.h>
-> > > +
-> > > +#ifdef CONFIG_ARM64_PTR_AUTH
-> > > +/*
-> > > + * Each key is a 128-bit quantity which is split across a pair of 64-bit
-> > > + * registers (Lo and Hi).
-> > > + */
-> > > +struct ptrauth_key {
-> > > +	unsigned long lo, hi;
-> > > +};
-> > > +
-> > > +/*
-> > > + * We give each process its own instruction A key (APIAKey), which is shared by
-> > > + * all threads. This is inherited upon fork(), and reinitialised upon exec*().
-> > > + * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
-> > > + * instructions behaving as NOPs.
-> > > + */
-> > 
-> > I don't remember the past discussions but I assume the tools guys are ok
-> > with a single key shared by multiple threads. Ramana, could you ack this
-> > part, FTR?
-> > 
-> > (and it would help if someone from the Android and Chrome camps can
-> > confirm)
-> 
-> FWIW: I think we should be entertaining a prctl() interface to use a new
-> key on a per-thread basis. Obviously, this would need to be used with care
-> (e.g. you'd fork(); use the prctl() and then you'd better not return from
-> the calling function!).
-> 
-> Assuming we want this (Kees -- I was under the impression that everything in
-> Android would end up with the same key otherwise?), then the question is
-> do we want:
-> 
->   - prctl() get/set operations for the key, or
->   - prctl() set_random_key operation, or
->   - both of the above?
-> 
-> Part of the answer to that may lie in the requirements of CRIU, where I
-> strongly suspect they need explicit get/set operations, although these
-> could be gated on CONFIG_CHECKPOINT_RESTORE=y.
+And naturally, because kernel developers are oh so great at
+communication, that decision has been communicated to those
+affected by it. *NOT*.
 
-I managed to speak to the CRIU developers at LPC. The good news is that
-their preference is for a ptrace()-based interface for getting and setting
-the keys, so the only prctl() operation we need is to set a random key
-(separately for A and B).
+Clearly there is a need for much better communication.  We're
+better at it when dealing with patches, but not when it comes to
+physical meetings.
 
-Will
+Maybe when some decision like "we're going to kill stuff still
+using the old gettimeoffset API" then _someone_ needs to identify
+which platforms are using that and make sure that those maintainers
+know about that decision, much the same way that if a patch were
+to touch the gettimeoffset API, we'd make damn sure that such a
+patch went to those affected by the change.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
