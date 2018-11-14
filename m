@@ -1,46 +1,60 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 14 Nov 2018 09:58:36 +0530
-Subject: [PATCH v3 1/2] dt-bindings: gpu: mali-utgard: Add compatible for A64
- Mali
-Message-ID: <20181114042837.15149-1-jagan@amarulasolutions.com>
+Date: Wed, 14 Nov 2018 09:58:37 +0530
+Subject: [PATCH v3 2/2] arm64: dts: allwinner: a64: Add device node for
+ Mali-400 GPU
+In-Reply-To: <20181114042837.15149-1-jagan@amarulasolutions.com>
+References: <20181114042837.15149-1-jagan@amarulasolutions.com>
+Message-ID: <20181114042837.15149-2-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner A64 has Mali-400MP2, so document the relevant compatible
-as "allwinner,sun50i-a64-mali" along with reset line.
+Add support for Allwinner A64 has Mali-400MP2.
+
+All interrupt lines are mentioned in the manual so used the same.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
 Changes for v3:
-- document reset line
+- Clean commit message 
 Changes for v2:
-- New patch, separated from previous version patch.
+- Drop assigned clock properties
+- Separate dt-bindings as separate patch.
 
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 22 +++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-index 63cd91176a68..3f128e4f95c6 100644
---- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -11,6 +11,7 @@ Required properties:
-       + allwinner,sun4i-a10-mali
-       + allwinner,sun7i-a20-mali
-       + allwinner,sun8i-h3-mali
-+      + allwinner,sun50i-a64-mali
-       + allwinner,sun50i-h5-mali
-       + amlogic,meson-gxbb-mali
-       + amlogic,meson-gxl-mali
-@@ -73,6 +74,10 @@ to specify one more vendor-specific compatible, among:
-     Required properties:
-       * resets: phandle to the reset line for the GPU
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index d6f269883759..d507be9879d8 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -813,6 +813,28 @@
+ 			};
+ 		};
  
-+  - allwinner,sun50i-a64-mali
-+    Required properties:
-+      * resets: phandle to the reset line for the GPU
++		mali: gpu at 1c40000 {
++			compatible = "allwinner,sun50i-a64-mali", "arm,mali-400";
++			reg = <0x01c40000 0x10000>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gp",
++					  "gpmmu",
++					  "pp0",
++					  "ppmmu0",
++					  "pp1",
++					  "ppmmu1",
++					  "pmu";
++			clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
++			clock-names = "bus", "core";
++			resets = <&ccu RST_BUS_GPU>;
++		};
 +
-   - allwinner,sun50i-h5-mali
-     Required properties:
-       * resets: phandle to the reset line for the GPU
+ 		gic: interrupt-controller at 1c81000 {
+ 			compatible = "arm,gic-400";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.18.0.321.gffc6fa0e3
