@@ -1,46 +1,73 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 14 Nov 2018 23:33:52 +0100
-Subject: [PATCH 0/2] clocksource/meson6_timer: implement ARM delay timer
-In-Reply-To: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
-References: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
-Message-ID: <CAFBinCDUYwDn8e4wOKzRCeKMgE0Ey8e_RhmPKim60sbrHBq_Xw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 14 Nov 2018 22:34:43 +0000
+Subject: ARM builtin perf tests for breakpoint failures
+In-Reply-To: <2433ea10-8bdc-f9bc-8d53-f6bda4018564@gmail.com>
+References: <2433ea10-8bdc-f9bc-8d53-f6bda4018564@gmail.com>
+Message-ID: <20181114223442.GA4399@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel, Hi Thomas,
+Hi Florian,
 
-On Sun, Oct 28, 2018 at 1:55 PM Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
->
-> While trying to add support for the ARM TWD Timer and the ARM Global
-> Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
-> I did a review of the existing driver.
-> Unfortunately I found it hard to review because the pre-processor
-> #defines did not match the names from the public S805 datasheet. Thus
-> patch #1 adjusts these. No functional changes here, this is just
-> preparation work for patch #2.
->
-> Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
-> would have given us a timer-based delay implementation (so udelay() and
-> friends would use the timer instead of using a loop-based delay
-> implementation). Unfortunately we can't use the ARM Global Timer yet
-> because it's input clock is derived from the CPU clock (which can change
-> once we enable CPU frequency scaling on these SoCs, for which I will be
-> sending patches in the near future).
-> Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
-> current configuration) has a resolution of 1us. So patch #2 uses
-> register_current_timer_delay() to register Timer E as ARM delay timer
-> (which will be especially useful as we have to use udelay() when
-> changing the CPU clocks during DVFS).
->
->
-> Martin Blumenstingl (2):
->   clocksource: meson6_timer: use register names from the datasheet
->   clocksource: meson6_timer: implement ARM delay timer
-(gentle ping) can you please queue these two patches for v4.21?
-if not: please let me know what I can improve, then I'll fix that and send a v2
+On Wed, Nov 14, 2018 at 12:21:12PM -0800, Florian Fainelli wrote:
+> I have been trying to debug some perf builtin tests on ARM 32-bit and
+> found that "Breakpoint overflow signal handler" and "Breakpoint overflow
+> sampling" were failing, but there are a number of reasons for that and
+> they may fail in seemingly unexpected ways.
+> 
+> My perf binary is built in Thumb2 because that is what the toolchain
+> produces by default. Going through the rabbit hole, I found the
+> following failure scenarios.
+> 
+> 1) If __test_function()'s addresss has the Thumb bit set, then we set a
+> breakpoint length (bp_len = sizeof(long)) which makes us fail to
+> validate the event in hw_breakpoint_arch_parse() and we return -EINVAL
+> from SYS_perf_event_open(). This is because the offset computed has a
+> value of 1 (function address is e.g:  0x0004c169), but we requested a
+> bp_len of 4. The test fails right away.
+> 
+> 2) If we correct the test such that if addr & 1 == true then we set
+> bp_len = 2, then we can see that the test runs to completion, but the
+> perf breakpoint event count returns 0 and indeed, no SIGIO is ever
+> delivered. This is presumably because of the alignment_mask value of 0x3
+> in hw_breakpoint_arch_parse() which would strip the Thumb bit and not
+> allow matching it when set assign info->address &= ~alignment_mask. We
+> would indeed not have the HW hit that breakpoint at all.
+> 
+> 3) If we keep the fix from 2) and also change the the alignment_mask to
+> 0x2 to preserve the Thumb bit, then we can run into what is described as
+> 4) below.
+> 
+> 4) if __test_function()'s address does not have the Thumb bit set (which
+> surprisingly can happen even if test_function does, go figure), then we
+> will set a bp_len = 4, and then we are just stuck in an infinite SIGIO
+> delivery that looks like this:
+> 
+> [pid  1859] perf_event_open(0xbebee790, 0, -1, -1, 0x8 /* PERF_FLAG_???
+> */) = 3
+> [pid  1859] fcntl64(3, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC) = 0
+> [pid  1859] fcntl64(3, F_SETSIG, 0x1d)  = 0
+> [pid  1859] fcntl64(3, F_SETOWN, 1859)  = 0
+> [pid  1859] ioctl(3, PERF_EVENT_IOC_RESET, 0) = 0
+> [pid  1859] ioctl(3, PERF_EVENT_IOC_ENABLE, 0) = 0
+> [pid  1859] --- SIGIO {si_signo=SIGIO, si_code=POLL_IN, si_band=65} ---
+> [pid  1859] rt_sigreturn()
+> 
+> and on and on, we can't even see gettimeofday() begin called in that case.
+> 
+> This is observable on both 4.9.135 and 4.19 on ARMv7 and ARMv8 CPUs
+> running in AArch32.
+> 
+> I am not clear how to fix that properly, since there appears to be a
+> nesting of problems here.
 
+This came up a few years ago iirc and I think most of this boils down to the
+fact that we require the overflow handler to do the stepping on arm/arm64,
+which is relied upon by GDB/ptrace. The hw_breakpoint code is a complete
+disaster so my preference would be to rip out the perf part and just
+implement something directly in ptrace, but it's a pretty horrible job.
 
-thank you!
-Regards
-Martin
+Are you actually using the perf interface to hw_breakpoint for something
+useful?
+
+Will
