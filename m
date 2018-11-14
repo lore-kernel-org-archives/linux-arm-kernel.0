@@ -1,101 +1,57 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Wed, 14 Nov 2018 16:48:39 +0530
-Subject: [PATCH v4 25/26] [DO NOT MERGE] arm64: dts: allwinner:
- bananapi-m64: Bananapi S070WV20-CT16 DSI panel
-In-Reply-To: <CAGb2v64YOV48UwHc8-=jDt2Bp_4mNb3iuyEzj0d+GOQE_oT-Xg@mail.gmail.com>
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-26-jagan@amarulasolutions.com>
- <20181113122204.337db8b1@donnerap.cambridge.arm.com>
- <CAMty3ZBQXcnU=490KREa=F-qctMtRep9-rrhrPd1UZStnV=hqw@mail.gmail.com>
- <CAGb2v669dkf2qaUDaosJEKSRKpPRVKWszb6BLL2NrAjWwp3t2Q@mail.gmail.com>
- <CAGb2v64YOV48UwHc8-=jDt2Bp_4mNb3iuyEzj0d+GOQE_oT-Xg@mail.gmail.com>
-Message-ID: <CAMty3ZAa97_zHTyxfbV+8d7fUMaEuvB_Kg-SYLY42kMEoiJLyA@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2018 12:05:00 +0000
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+Message-ID: <20181114120500.GE6567@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 2:52 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Wed, Nov 14, 2018 at 2:58 PM Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> > On Wed, Nov 14, 2018 at 2:31 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > >
-> > > On Tue, Nov 13, 2018 at 5:52 PM Andre Przywara <andre.przywara@arm.com> wrote:
-> > > >
-> > > > On Tue, 13 Nov 2018 16:46:32 +0530
-> > > > Jagan Teki <jagan@amarulasolutions.com> wrote:
-> > > >
-> > > > Hi,
-> > > >
-> > > > > This patch add support for Bananapi S070WV20-CT16 DSI panel to
-> > > > > BPI-M64 board.
-> > > > >
-> > > > > DSI panel connected via board DSI port with,
-> > > > > - DC1SW as AVDD supply
-> > > >
-> > > > Are you sure of that? I don't see anything in the schematic to support
-> > > > this. The only power lines that go to the DSI connector are DCDC1 and
-> > > > PS. DC1SW is only connected to PortD on the SoC and to the Ethernet PHY.
-> > > > Is there anything I miss?
-> > >
-> > > Thanks for the comment, yes dc1sw is connected in ephy. I have reused
-> > > dc1, BSP is attached lcd_power1 to axp81x_dc1sw [1]. I just looking
-> > > for someone to comment, may be we can skip this regulator attachment.
-> >
-> > That seems sketchy. The schematics show the connector has feeds from both
-> > the unregulated output IPSOUT (PS) and DCDC1. For designs with RGB LCD
-> > panels, we only see the PS feed. Since the LCD panel can be used in either
-> > RGB or MIPI DSI mode, I highly suspect the DCDC1 supply feeds the bridge
-> > IC.
-> >
-> > As for DC1SW, this is likely referenced because it provides power to the
-> > GPIO lines that are used to control the LCD panel. If you don't provide
-> > power, you can't pull them up.
-> >
-> > While many of us dislike FEX and the new FEX-derived device tree, they
-> > do provide some information, such as regulator usage. Note that each
-> > regulator output has multiple names, which likely denote specific
-> > usages.
-> >
-> > I've asked BPI for schematics on the bridge board. Hopefully we'll
-> > have something in more detail. In the meantime, I suggest leaving
-> > this panel out of your next submission, and focus on getting the bulk
-> > of the dsi driver and dts changes in first.
->
-> I got the schematics, but unfortunately I can't share them publicly.
->
-> It looks like VCC-MIPI on the connector is not connected to anything.
-> All power is provided from IPSOUT, first through a current limiter IC
-> turned on and off by LCD_PWR_EN, and then through some voltage regulators
-> to provide the voltages for various parts of the panel, including LCD,
-> capacitive touch, and the MIPI-DSI bridge. There's even an onboard EEPROM,
-> though I'm not sure what that's for.
+On Mon, Nov 12, 2018 at 03:12:39PM +1100, Finn Thain wrote:
+> Implementations of arch_gettimeoffset are generally not re-entrant
+> and assume that interrupts have been disabled. Unfortunately this
+> pre-condition got broken in v2.6.32.
 
-So there is no concern supply regulators on panel side, only VCC-DSI.
+To me, it looks way worse than what you think.
 
->
-> > >
-> > > >
-> > > > > - DCDC1 as DVDD supply
-> > > >
-> > > > That seems right, but doesn't match with what you write below.
-> > >
-> > > Commit need to fix s/DCDC1/DLDO1
-> > >
-> > > >
-> > > > > - PD6 gpio for reset pin
->
-> This toggles reset for both the panel itself and for the MIPI-DSI bridge.
->
-> > > > > - PD5 gpio for backlight enable pin
->
-> This enables the backlight's regulator.
->
-> > > > > - PD7 gpio for backlight vdd supply
->
-> This enables power to the whole panel module.
->
-> Then you also have the two GPIOs for the capacitive touch controller.
-> And also the I2C bus for the controller, and the EEPROM.
+The original code sequence before conversion to arch_gettimeoffset()
+was:
 
-Thanks, for the details. I have verified w/ vcc-dsi-supply attached to
-dldo1 and the panel with reset w/o any supply regulators.
+1. lock (inc. disabling IRQs)
+2. read gettimeoffset correction
+3. add offset to current xtime
+4. unlock
+
+This means there is no chance for a timer interrupt to happen between
+reading the current offset and adding it to the current kernel time.
+If the timer does roll over, then the interrupt will remain pending,
+so the whole "read offset and add to xtime" is one atomic block and
+we can use the pending interrupt to indicate whether the timer has
+rolled over and apply the appropriate offset correction.
+
+With the arch_gettimeoffset() code, that changes:
+
+1. read clocksource (which will be jiffies)
+2. compute clocksource delta
+3. increment nanoseconds
+4. add gettimeoffset correction
+
+If we receive a timer interrupt part-way through this, for example,
+between 2 and 3, then jiffies will increment (via do_timer()) and the
+interrupt will be cleared.  This means that the check in
+ioc_timer_gettimeoffset() for a pending interrupt, for example, will
+be false, and we will not know that an interrupt has happened.
+
+So, unless I'm missing something, commit 5cfc8ee0bb51 well and truely
+broke the accuracy of timekeeping on these platforms, and will result
+in timekeeping spontaneously jumping backwards.  I had been wondering
+why NTP had become less stable on EBSA110, but never investigated.
+
+However, that still does not justify blowing away this functionality
+without replacement, as Finn has been proposing.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
