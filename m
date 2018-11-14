@@ -1,42 +1,54 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 14 Nov 2018 22:11:04 +0100
-Subject: [PATCH] ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2 camera
- driver
-Message-ID: <1542229864-27695-1-git-send-email-stefan.wahren@i2se.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 14 Nov 2018 21:47:02 +0000
+Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
+In-Reply-To: <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
+ <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
+ <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
+Message-ID: <20181114214701.gdnrznakwtm76jlt@blommer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables the bcm2835-camera driver, which depends on bcm2835-vchiq.
-After that we gain more test coverage (e.g. Kernel CI).
+On Tue, Nov 13, 2018 at 05:09:00PM -0600, Kees Cook wrote:
+> On Tue, Nov 13, 2018 at 10:17 AM, Kristina Martsenko
+> <kristina.martsenko@arm.com> wrote:
+> > When the PAC authentication fails, it doesn't actually generate an
+> > exception, it just flips a bit in the high-order bits of the pointer,
+> > making the pointer invalid. Then when the pointer is dereferenced (e.g.
+> > as a function return address), it generates the usual type of exception
+> > for an invalid address.
+> 
+> Ah! Okay, thanks. I missed that detail. :)
+> 
+> What area of memory ends up being addressable with such bit flips?
+> (i.e. is the kernel making sure nothing executable ends up there?)
+> 
+> > So when a function return fails in user mode, the exception is handled
+> > in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
+> > function return fails in kernel mode, the exception is handled in
+> > __do_kernel_fault and the task is killed.
+> >
+> > This is different from stack protector as we don't panic the kernel, we
+> > just kill the task. It would be difficult to panic as we don't have a
+> > reliable way of knowing that the exception was caused by a PAC
+> > authentication failure (we just have an invalid pointer with a specific
+> > bit flipped). We also don't print out any PAC-related warning.
+> 
+> There are other "guesses" in __do_kernel_fault(), I think? Could a
+> "PAC mismatch?" warning be included in the Oops if execution fails in
+> the address range that PAC failures would resolve into?
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/configs/bcm2835_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+I'd personally prefer that we didn't try to guess if a fault is due to a failed
+AUT*, even for logging.
 
-Hi, i will submit a patch series to address those probing issues. But this is
-independent from this patch.
+Presently, it's not possible to distinguish between a fault resulting from a
+failed AUT* and a fault which happens to have hte same bits/clear, so there are
+false positives. The architecture may also change the precise details of the
+faulting address, and we'd have false negatives in that case.
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index bb6a35f..bd55a2b 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -91,6 +91,8 @@ CONFIG_THERMAL=y
- CONFIG_BCM2835_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_BCM2835_WDT=y
-+CONFIG_MEDIA_SUPPORT=y
-+CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_DRM=y
- CONFIG_DRM_VC4=y
- CONFIG_FB_SIMPLE=y
-@@ -129,6 +131,7 @@ CONFIG_DMADEVICES=y
- CONFIG_DMA_BCM2835=y
- CONFIG_STAGING=y
- CONFIG_SND_BCM2835=m
-+CONFIG_VIDEO_BCM2835=m
- CONFIG_MAILBOX=y
- CONFIG_BCM2835_MBOX=y
- # CONFIG_IOMMU_SUPPORT is not set
--- 
-2.7.4
+Given that, I think suggesting that a fault is due to a failed AUT* is liable
+to make things more confusing.
+
+Thanks,
+Mark.
