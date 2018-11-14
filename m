@@ -1,68 +1,118 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Wed, 14 Nov 2018 13:59:26 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-Message-ID: <20181114125942.25163-1-nsaenzjulienne@suse.de>
+Date: Wed, 14 Nov 2018 13:59:30 +0100
+Subject: [PATCH 04/16] staging: vchiq_arm: use list_for_each_entry when
+ accessing bulk_waiter_list
+In-Reply-To: <20181114125942.25163-1-nsaenzjulienne@suse.de>
+References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
+Message-ID: <20181114125942.25163-5-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The resulting code is way more readeable and intuitive compared to plain
+list_for_each.
 
-This series was written in parallel with reading and understanding the
-vchiq code. So excuse me for the lack of logic in the sequence of
-patches.
+Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+---
+ .../interface/vchiq_arm/vchiq_arm.c           | 52 ++++++-------------
+ 1 file changed, 16 insertions(+), 36 deletions(-)
 
-The main focus was to delete as much code as possible, I've counted
-around 550 lines, which is not bad. Apart from that there are some
-patches enforcing proper kernel APIs usage.
-
-The only patch that really changes code is the
-vchiq_ioc_copy_element_data() rewrite.
-
-The last commit updates the TODO list with some of my observations, I
-realise some of the might be a little opinionated. If anything it's
-going to force a discussion on the topic, which is nice.
-
-It was developed on top of the latest linux-next, and was tested on a
-RPIv3B+ with audio, video and running vchiq_test.
-
-Regards,
-Nicolas
-
-===
-
-Nicolas Saenz Julienne (16):
-  staging: vchiq_core: rework vchiq_get_config
-  staging: vchiq_arm: rework close/remove_service IOCTLS
-  staging: vchiq_shim: delete vchi_service_create
-  staging: vchiq_arm: use list_for_each_entry when accessing
-    bulk_waiter_list
-  staging: vchiq_arm: get rid of vchi_mh.h
-  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
-  staging: vchiq-core: get rid of is_master distinction
-  staging: vchiq_core: remove unnecessary safety checks in
-    vchiq_init_state
-  staging: vchiq_core: do not initialize semaphores twice
-  staging: vchiq_core: don't add a wmb() before remote_event_signal()
-  staging: vchiq: use completions instead of semaphores
-  staging: vchiq_util: get rid of unneeded memory barriers
-  staging: vchiq_core: fix logic redundancy in parse_open
-  staging: vchiq_arm: rework probe and init functions
-  staging: vchiq_arm: fix open/release cdev functions
-  staging: vchiq: add more tasks to the TODO list
-
- .../staging/vc04_services/interface/vchi/TODO |  42 ++
- .../vc04_services/interface/vchi/vchi.h       |   8 -
- .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
- .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
- .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
- .../interface/vchiq_arm/vchiq_core.c          | 523 ++++-----------
- .../interface/vchiq_arm/vchiq_core.h          |  47 +-
- .../interface/vchiq_arm/vchiq_if.h            |  11 +-
- .../interface/vchiq_arm/vchiq_shim.c          |  32 -
- .../interface/vchiq_arm/vchiq_util.c          |  48 +-
- .../interface/vchiq_arm/vchiq_util.h          |   6 +-
- 11 files changed, 435 insertions(+), 940 deletions(-)
- delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index d88dd7415e1e..5f55c708ade8 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -280,16 +280,11 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
+ 		"%s(%p): returning %d", __func__, instance, status);
+ 
+ 	if (status == VCHIQ_SUCCESS) {
+-		struct list_head *pos, *next;
++		struct bulk_waiter_node *waiter, *next;
+ 
+-		list_for_each_safe(pos, next,
+-				&instance->bulk_waiter_list) {
+-			struct bulk_waiter_node *waiter;
+-
+-			waiter = list_entry(pos,
+-					struct bulk_waiter_node,
+-					list);
+-			list_del(pos);
++		list_for_each_entry_safe(waiter, next,
++					 &instance->bulk_waiter_list, list) {
++			list_del(&waiter->list);
+ 			vchiq_log_info(vchiq_arm_log_level,
+ 					"bulk_waiter - cleaned up %pK for pid %d",
+ 					waiter, waiter->pid);
+@@ -473,7 +468,6 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+ 	VCHIQ_SERVICE_T *service;
+ 	VCHIQ_STATUS_T status;
+ 	struct bulk_waiter_node *waiter = NULL;
+-	struct list_head *pos;
+ 
+ 	service = find_service_by_handle(handle);
+ 	if (!service)
+@@ -484,13 +478,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+ 	unlock_service(service);
+ 
+ 	mutex_lock(&instance->bulk_waiter_list_mutex);
+-	list_for_each(pos, &instance->bulk_waiter_list) {
+-		if (list_entry(pos, struct bulk_waiter_node,
+-				list)->pid == current->pid) {
+-			waiter = list_entry(pos,
+-				struct bulk_waiter_node,
+-				list);
+-			list_del(pos);
++	list_for_each_entry(waiter, &instance->bulk_waiter_list, list) {
++		if (waiter->pid == current->pid) {
++			list_del(&waiter->list);
+ 			break;
+ 		}
+ 	}
+@@ -1135,21 +1125,16 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 				ret = -ENOMEM;
+ 				break;
+ 			}
++
+ 			args.userdata = &waiter->bulk_waiter;
+ 		} else if (args.mode == VCHIQ_BULK_MODE_WAITING) {
+-			struct list_head *pos;
+-
+ 			mutex_lock(&instance->bulk_waiter_list_mutex);
+-			list_for_each(pos, &instance->bulk_waiter_list) {
+-				if (list_entry(pos, struct bulk_waiter_node,
+-					list)->pid == current->pid) {
+-					waiter = list_entry(pos,
+-						struct bulk_waiter_node,
+-						list);
+-					list_del(pos);
++			list_for_each_entry(waiter, &instance->bulk_waiter_list,
++					    list) {
++				if (waiter->pid == current->pid) {
++					list_del(&waiter->list);
+ 					break;
+ 				}
+-
+ 			}
+ 			mutex_unlock(&instance->bulk_waiter_list_mutex);
+ 			if (!waiter) {
+@@ -2158,16 +2143,11 @@ vchiq_release(struct inode *inode, struct file *file)
+ 		vchiq_release_internal(instance->state, NULL);
+ 
+ 		{
+-			struct list_head *pos, *next;
+-
+-			list_for_each_safe(pos, next,
+-				&instance->bulk_waiter_list) {
+-				struct bulk_waiter_node *waiter;
++			struct bulk_waiter_node *waiter, *next;
+ 
+-				waiter = list_entry(pos,
+-					struct bulk_waiter_node,
+-					list);
+-				list_del(pos);
++			list_for_each_entry_safe(waiter, next,
++					&instance->bulk_waiter_list, list) {
++				list_del(&waiter->list);
+ 				vchiq_log_info(vchiq_arm_log_level,
+ 					"bulk_waiter - cleaned up %pK for pid %d",
+ 					waiter, waiter->pid);
 -- 
 2.19.1
