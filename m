@@ -1,173 +1,305 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 Nov 2018 14:18:14 +0530
-Subject: [RFC PATCH 5/6] net: marvell: neta: add support for 2500base-X
-In-Reply-To: <E1gMBMx-0008A9-Jb@rmk-PC.armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMx-0008A9-Jb@rmk-PC.armlinux.org.uk>
-Message-ID: <acc97e5e-efa9-a44c-ea87-09135c6c12b6@ti.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 14 Nov 2018 17:49:34 +0900
+Subject: [PATCH v2] drm/rockchip: update cursors asynchronously through
+ atomic.
+In-Reply-To: <20180928082722.26951-1-enric.balletbo@collabora.com>
+References: <20180928082722.26951-1-enric.balletbo@collabora.com>
+Message-ID: <CAAFQd5BXOmCmwL1i=aBCy5rZn37e-9pYg_WXkgrCG9emV+zKtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Enric,
 
-On 12/11/18 6:01 PM, Russell King wrote:
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On Fri, Sep 28, 2018 at 5:27 PM Enric Balletbo i Serra
+<enric.balletbo@collabora.com> wrote:
+>
+> Add support to async updates of cursors by using the new atomic
+> interface for that.
+>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 > ---
->  drivers/net/ethernet/marvell/mvneta.c | 58 ++++++++++++++++++++++++++++++-----
->  1 file changed, 51 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index 5bfd349bf41a..7305d4cc0630 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -27,6 +27,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_mdio.h>
->  #include <linux/of_net.h>
-> +#include <linux/phy/phy.h>
->  #include <linux/phy.h>
->  #include <linux/phylink.h>
->  #include <linux/platform_device.h>
-> @@ -437,6 +438,7 @@ struct mvneta_port {
->  	struct device_node *dn;
->  	unsigned int tx_csum_limit;
->  	struct phylink *phylink;
-> +	struct phy *comphy;
->  
->  	struct mvneta_bm *bm_priv;
->  	struct mvneta_bm_pool *pool_long;
-> @@ -3150,6 +3152,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
->  {
->  	int cpu;
->  
-> +	WARN_ON(phy_power_on(pp->comphy));
-> +
->  	mvneta_max_rx_size_set(pp, pp->pkt_size);
->  	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
->  
-> @@ -3212,6 +3216,8 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
->  
->  	mvneta_tx_reset(pp);
->  	mvneta_rx_reset(pp);
-> +
-> +	WARN_ON(phy_power_off(pp->comphy));
->  }
->  
->  static void mvneta_percpu_enable(void *arg)
-> @@ -3337,6 +3343,7 @@ static int mvneta_set_mac_addr(struct net_device *dev, void *addr)
->  static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->  			    struct phylink_link_state *state)
->  {
-> +	struct mvneta_port *pp = netdev_priv(ndev);
->  	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
->  
->  	/* We only support QSGMII, SGMII, 802.3z and RGMII modes */
-> @@ -3357,14 +3364,14 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->  	/* Asymmetric pause is unsupported */
->  	phylink_set(mask, Pause);
->  
-> -	/* We cannot use 1Gbps when using the 2.5G interface. */
-> -	if (state->interface == PHY_INTERFACE_MODE_2500BASEX) {
-> -		phylink_set(mask, 2500baseT_Full);
-> -		phylink_set(mask, 2500baseX_Full);
-> -	} else {
-> +	/* Half-duplex at speeds higher than 100Mbit is unsupported */
-> +	if (pp->comphy || state->interface != PHY_INTERFACE_MODE_2500BASEX) {
->  		phylink_set(mask, 1000baseT_Full);
->  		phylink_set(mask, 1000baseX_Full);
->  	}
-> +	if (pp->comphy || state->interface == PHY_INTERFACE_MODE_2500BASEX) {
-> +		phylink_set(mask, 2500baseX_Full);
-> +	}
->  
->  	if (!phy_interface_mode_is_8023z(state->interface)) {
->  		/* 10M and 100M are only supported in non-802.3z mode */
-> @@ -3378,6 +3385,11 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->  		   __ETHTOOL_LINK_MODE_MASK_NBITS);
->  	bitmap_and(state->advertising, state->advertising, mask,
->  		   __ETHTOOL_LINK_MODE_MASK_NBITS);
-> +
-> +	/* We can only operate at 2500BaseX or 1000BaseX.  If requested
-> +	 * to advertise both, only report advertising at 2500BaseX.
-> +	 */
-> +	phylink_helper_basex_speed(state);
->  }
->  
->  static int mvneta_mac_link_state(struct net_device *ndev,
-> @@ -3389,7 +3401,9 @@ static int mvneta_mac_link_state(struct net_device *ndev,
->  	gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
->  
->  	if (gmac_stat & MVNETA_GMAC_SPEED_1000)
-> -		state->speed = SPEED_1000;
-> +		state->speed =
-> +			state->interface == PHY_INTERFACE_MODE_2500BASEX ?
-> +			SPEED_2500 : SPEED_1000;
->  	else if (gmac_stat & MVNETA_GMAC_SPEED_100)
->  		state->speed = SPEED_100;
->  	else
-> @@ -3504,12 +3518,32 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
->  			    MVNETA_GMAC_FORCE_LINK_DOWN);
->  	}
->  
-> +
->  	/* When at 2.5G, the link partner can send frames with shortened
->  	 * preambles.
->  	 */
->  	if (state->speed == SPEED_2500)
->  		new_ctrl4 |= MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE;
->  
-> +	if (pp->comphy) {
-> +		enum phy_mode mode = PHY_MODE_INVALID;
-> +
-> +		switch (state->interface) {
-> +		case PHY_INTERFACE_MODE_SGMII:
-> +		case PHY_INTERFACE_MODE_1000BASEX:
-> +			mode = PHY_MODE_SGMII;
-> +			break;
-> +		case PHY_INTERFACE_MODE_2500BASEX:
-> +			mode = PHY_MODE_2500SGMII;
-> +			break;
-> +		default:
-> +			break;
-> +		}
-> +
-> +		if (mode != PHY_MODE_INVALID)
-> +			WARN_ON(phy_set_mode(pp->comphy, mode));
-> +	}
-> +
->  	if (new_ctrl0 != gmac_ctrl0)
->  		mvreg_write(pp, MVNETA_GMAC_CTRL_0, new_ctrl0);
->  	if (new_ctrl2 != gmac_ctrl2)
-> @@ -4411,7 +4445,7 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
->  	if (phy_mode == PHY_INTERFACE_MODE_QSGMII)
->  		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_QSGMII_SERDES_PROTO);
->  	else if (phy_mode == PHY_INTERFACE_MODE_SGMII ||
-> -		 phy_mode == PHY_INTERFACE_MODE_1000BASEX)
-> +		 phy_interface_mode_is_8023z(phy_mode))
->  		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
->  	else if (!phy_interface_mode_is_rgmii(phy_mode))
->  		return -EINVAL;
-> @@ -4428,6 +4462,7 @@ static int mvneta_probe(struct platform_device *pdev)
->  	struct mvneta_port *pp;
->  	struct net_device *dev;
->  	struct phylink *phylink;
-> +	struct phy *comphy;
->  	const char *dt_mac_addr;
->  	char hw_mac_addr[ETH_ALEN];
->  	const char *mac_from;
-> @@ -4453,6 +4488,14 @@ static int mvneta_probe(struct platform_device *pdev)
->  		goto err_free_irq;
->  	}
->  
-> +	comphy = devm_of_phy_get(&pdev->dev, dn, NULL);
-> +	if (comphy == ERR_PTR(-EPROBE_DEFER)) {
-> +		err = -EPROBE_DEFER;
-> +		goto err_free_irq;
-> +	} else if (IS_ERR(comphy)) {
-> +		comphy = NULL;
-> +	}
+> Hi,
+>
+> This is a second version of the patch to add async-plane update support
+> to the Rockchip driver.
+>
 
-devm_phy_optional_get can be used here instead.
+I'm really sorry for the super late reply. I couldn't get cycles to
+look at this earlier. :(
 
-Thanks
-Kishon
+> The patch was tested on a Samsung Chromebook Plus in two ways.
+>
+>  1. Running all igt kms_cursor_legacy and kms_atomic tests and see that
+> there is no regression after the patch.
+>     Note that before the patch, the following igt tests failed:
+>     - basic-flip-before-cursor-legacy
+>     - basic-flip-before-cursor-atomic
+>     - cursor-vs-flip-legacy
+>     - cursor-vs-flip-toggle
+>     - flip-vs-cursor-atomic
+>     - flip-vs-cursor-crc-atomic
+>     - flip-vs-cursor-crc-legacy
+>     - flip-vs-cursor-legacy
+>     - flip-vs-cursor-crc-atomic
+>     - flip-vs-cursor-crc-legacy
+
+Are the last 2 tests repeated?
+
+>
+>     With the patch applied only two tests don't fail (these two are
+> expexted to not pass right now):
+>     - flip-vs-cursor-crc-atomic
+>     - flip-vs-cursor-crc-legac
+
+Did you mean "don't pass"?
+
+>
+>     You can check full IGT test report here:
+>     - Before the patch:
+>         https://people.collabora.com/~eballetbo/tests/igt/samsung-chromebook-plus/igt-1.23/4.19-rc5/index.html
+>     - With the patch applied:
+>         https://people.collabora.com/~eballetbo/tests/igt/samsung-chromebook-plus/igt-1.23/4.19-rc5-async-update/index.html
+>
+>  2. Running weston using the atomic API.
+>
+> Best regards,
+>   Enric
+>
+> Changes in v2:
+> - Change the framebuffer as well to cover jumpy cursor when hovering
+>   text boxes or hyperlink. (Tomasz)
+> - Use the PSR inhibit mechanism when accessing VOP hardware instead of
+>   PSR flushing (Tomasz)
+>
+> Changes in v1:
+> - Rebased on top of drm-misc
+> - In async_check call drm_atomic_helper_check_plane_state to check that
+>   the desired plane is valid and update various bits of derived state
+>   (clipped coordinates etc.)
+> - In async_check allow to configure new scaling in the fast path.
+> - In async_update force to flush all registered PSR encoders.
+> - In async_update call atomic_update directly.
+> - In async_update call vop_cfg_done needed to set the vop registers and take effect.
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 36 ------------
+>  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 37 ++++++++++++
+>  drivers/gpu/drm/rockchip/rockchip_drm_psr.h |  3 +
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 62 +++++++++++++++++++++
+>  4 files changed, 102 insertions(+), 36 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> index 7b6f7227d476..aec9a997de13 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> @@ -128,24 +128,6 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+>         return ERR_PTR(ret);
+>  }
+>
+> -static void
+> -rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+> -{
+> -       struct drm_crtc *crtc;
+> -       struct drm_crtc_state *crtc_state;
+> -       struct drm_encoder *encoder;
+> -       u32 encoder_mask = 0;
+> -       int i;
+> -
+> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> -               encoder_mask |= crtc_state->encoder_mask;
+> -               encoder_mask |= crtc->state->encoder_mask;
+> -       }
+> -
+> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> -               rockchip_drm_psr_inhibit_get(encoder);
+> -}
+> -
+>  uint32_t rockchip_drm_get_vblank_ns(struct drm_display_mode *mode)
+>  {
+>         uint64_t vblank_time = mode->vtotal - mode->vdisplay;
+> @@ -156,24 +138,6 @@ uint32_t rockchip_drm_get_vblank_ns(struct drm_display_mode *mode)
+>         return vblank_time;
+>  }
+>
+> -static void
+> -rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+> -{
+> -       struct drm_crtc *crtc;
+> -       struct drm_crtc_state *crtc_state;
+> -       struct drm_encoder *encoder;
+> -       u32 encoder_mask = 0;
+> -       int i;
+> -
+> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> -               encoder_mask |= crtc_state->encoder_mask;
+> -               encoder_mask |= crtc->state->encoder_mask;
+> -       }
+> -
+> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> -               rockchip_drm_psr_inhibit_put(encoder);
+> -}
+> -
+>  static void
+>  rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
+>  {
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> index 79d00d861a31..1635485955d3 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> @@ -13,6 +13,7 @@
+>   */
+>
+>  #include <drm/drmP.h>
+> +#include <drm/drm_atomic.h>
+>  #include <drm/drm_crtc_helper.h>
+>
+>  #include "rockchip_drm_drv.h"
+> @@ -109,6 +110,42 @@ int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder)
+>  }
+>  EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put);
+>
+> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+> +{
+> +       struct drm_crtc *crtc;
+> +       struct drm_crtc_state *crtc_state;
+> +       struct drm_encoder *encoder;
+> +       u32 encoder_mask = 0;
+> +       int i;
+> +
+> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> +               encoder_mask |= crtc_state->encoder_mask;
+> +               encoder_mask |= crtc->state->encoder_mask;
+> +       }
+> +
+> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> +               rockchip_drm_psr_inhibit_get(encoder);
+> +}
+> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_get_state);
+> +
+> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+> +{
+> +       struct drm_crtc *crtc;
+> +       struct drm_crtc_state *crtc_state;
+> +       struct drm_encoder *encoder;
+> +       u32 encoder_mask = 0;
+> +       int i;
+> +
+> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> +               encoder_mask |= crtc_state->encoder_mask;
+> +               encoder_mask |= crtc->state->encoder_mask;
+> +       }
+> +
+> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> +               rockchip_drm_psr_inhibit_put(encoder);
+> +}
+> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put_state);
+> +
+>  /**
+>   * rockchip_drm_psr_inhibit_get - acquire PSR inhibit on given encoder
+>   * @encoder: encoder to obtain the PSR encoder
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> index 860c62494496..25350ba3237b 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> @@ -20,6 +20,9 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev);
+>  int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
+>  int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
+>
+> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state);
+> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state);
+> +
+>  int rockchip_drm_psr_register(struct drm_encoder *encoder,
+>                         int (*psr_set)(struct drm_encoder *, bool enable));
+>  void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 6642c2b9bb3c..682ce40166f7 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -819,10 +819,72 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>         spin_unlock(&vop->reg_lock);
+>  }
+>
+> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+> +                                       struct drm_plane_state *state)
+> +{
+> +       struct vop_win *vop_win = to_vop_win(plane);
+> +       const struct vop_win_data *win = vop_win->data;
+> +       int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
+> +                                       DRM_PLANE_HELPER_NO_SCALING;
+> +       int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
+> +                                       DRM_PLANE_HELPER_NO_SCALING;
+> +       struct drm_crtc_state *crtc_state;
+> +       int ret;
+> +
+> +       if (plane != state->crtc->cursor)
+> +               return -EINVAL;
+> +
+> +       if (!plane->state)
+> +               return -EINVAL;
+> +
+> +       if (!plane->state->fb)
+> +               return -EINVAL;
+> +
+> +       if (state->state)
+> +               crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+> +                                                               state->crtc);
+> +       else /* Special case for asynchronous cursor updates. */
+> +               crtc_state = plane->crtc->state;
+> +
+> +       ret = drm_atomic_helper_check_plane_state(plane->state,
+> +                                                 crtc_state,
+> +                                                 min_scale, max_scale,
+> +                                                 true, true);
+> +       return ret;
+> +}
+> +
+> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+> +                                         struct drm_plane_state *new_state)
+> +{
+> +       struct vop *vop = to_vop(plane->state->crtc);
+> +
+> +       plane->state->crtc_x = new_state->crtc_x;
+> +       plane->state->crtc_y = new_state->crtc_y;
+> +       plane->state->crtc_h = new_state->crtc_h;
+> +       plane->state->crtc_w = new_state->crtc_w;
+> +       plane->state->src_x = new_state->src_x;
+> +       plane->state->src_y = new_state->src_y;
+> +       plane->state->src_h = new_state->src_h;
+> +       plane->state->src_w = new_state->src_w;
+> +
+> +       drm_atomic_set_fb_for_plane(plane->state, new_state->fb);
+
+Isn't this going to drop the old fb reference on the floor without
+waiting for the hardware to actually stop scanning out from it?
+
+I believe we need to do something similar to what's already in
+vop_crtc_commit_flush(), but not called on this async path
+https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/gpu/drm/rockchip/rockchip_drm_vop.c?h=next-20181114#n1045
+
+Perhaps it would be an option to call vop_crtc_commit_flush() from here?
+
+Best regards,
+Tomasz
+
+> +
+> +       if (vop->is_enabled) {
+> +               rockchip_drm_psr_inhibit_get_state(new_state->state);
+> +               vop_plane_atomic_update(plane, plane->state);
+> +               spin_lock(&vop->reg_lock);
+> +               vop_cfg_done(vop);
+> +               spin_unlock(&vop->reg_lock);
+> +               rockchip_drm_psr_inhibit_put_state(new_state->state);
+> +       }
+> +}
+> +
+>  static const struct drm_plane_helper_funcs plane_helper_funcs = {
+>         .atomic_check = vop_plane_atomic_check,
+>         .atomic_update = vop_plane_atomic_update,
+>         .atomic_disable = vop_plane_atomic_disable,
+> +       .atomic_async_check = vop_plane_atomic_async_check,
+> +       .atomic_async_update = vop_plane_atomic_async_update,
+>  };
+>
+>  static const struct drm_plane_funcs vop_plane_funcs = {
+> --
+> 2.19.0
+>
