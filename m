@@ -1,195 +1,129 @@
-From: leoyang.li@nxp.com (Leo Li)
-Date: Wed, 14 Nov 2018 18:51:43 +0000
-Subject: [PATCH 21/23] dt-bindings: pci: Add NXP LX SoCs PCIe controller
-In-Reply-To: <AM6PR04MB57816EE50C61E064E6DC73A684C10@AM6PR04MB5781.eurprd04.prod.outlook.com>
-References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
- <20181106131807.29951-22-Zhiqiang.Hou@nxp.com>
- <AM6PR04MB58639AF03E732FCF491113728FC50@AM6PR04MB5863.eurprd04.prod.outlook.com>
- <AM6PR04MB57816EE50C61E064E6DC73A684C10@AM6PR04MB5781.eurprd04.prod.outlook.com>
-Message-ID: <AM6PR04MB5863192E246F3ED6F5812E4F8FC30@AM6PR04MB5863.eurprd04.prod.outlook.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 14 Nov 2018 20:19:57 +0100
+Subject: [PATCH v10 09/22] kasan: add tag related helper functions
+In-Reply-To: <20181107172306.3w2pjecaggsvl5z2@lakrids.cambridge.arm.com>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <b8c56d36b79eecf0c331a0a7a2df12632aefccc9.1541525354.git.andreyknvl@google.com>
+ <20181107172306.3w2pjecaggsvl5z2@lakrids.cambridge.arm.com>
+Message-ID: <CAAeHK+wDCtL4PGmE4-XJj=wqpSHsuemKABYwpuU-=DpULtJvzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 7, 2018 at 6:23 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 06, 2018 at 06:30:24PM +0100, Andrey Konovalov wrote:
+>> This commit adds a few helper functions, that are meant to be used to
+>> work with tags embedded in the top byte of kernel pointers: to set, to
+>> get or to reset (set to 0xff) the top byte.
+>>
+>> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>> ---
+>>  arch/arm64/mm/kasan_init.c |  2 ++
+>>  include/linux/kasan.h      | 13 +++++++++
+>>  mm/kasan/kasan.h           | 55 ++++++++++++++++++++++++++++++++++++++
+>>  mm/kasan/tags.c            | 37 +++++++++++++++++++++++++
+>>  4 files changed, 107 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+>> index 18ebc8994a7b..370b19d0e2fb 100644
+>> --- a/arch/arm64/mm/kasan_init.c
+>> +++ b/arch/arm64/mm/kasan_init.c
+>> @@ -249,6 +249,8 @@ void __init kasan_init(void)
+>>       memset(kasan_zero_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+>>       cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+>>
+>> +     kasan_init_tags();
+>> +
+>>       /* At this point kasan is fully initialized. Enable error messages */
+>>       init_task.kasan_depth = 0;
+>>       pr_info("KernelAddressSanitizer initialized\n");
+>> diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+>> index 7f6574c35c62..4c9d6f9029f2 100644
+>> --- a/include/linux/kasan.h
+>> +++ b/include/linux/kasan.h
+>> @@ -169,6 +169,19 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+>>
+>>  #define KASAN_SHADOW_INIT 0xFF
+>>
+>> +void kasan_init_tags(void);
+>> +
+>> +void *kasan_reset_tag(const void *addr);
+>> +
+>> +#else /* CONFIG_KASAN_SW_TAGS */
+>> +
+>> +static inline void kasan_init_tags(void) { }
+>> +
+>> +static inline void *kasan_reset_tag(const void *addr)
+>> +{
+>> +     return (void *)addr;
+>> +}
+>> +
+>
+>> +#ifdef CONFIG_KASAN_SW_TAGS
+>> +
+>> +#define KASAN_PTR_TAG_SHIFT 56
+>> +#define KASAN_PTR_TAG_MASK (0xFFUL << KASAN_PTR_TAG_SHIFT)
+>> +
+>> +u8 random_tag(void);
+>> +
+>> +static inline void *set_tag(const void *addr, u8 tag)
+>> +{
+>> +     u64 a = (u64)addr;
+>> +
+>> +     a &= ~KASAN_PTR_TAG_MASK;
+>> +     a |= ((u64)tag << KASAN_PTR_TAG_SHIFT);
+>> +
+>> +     return (void *)a;
+>> +}
+>> +
+>> +static inline u8 get_tag(const void *addr)
+>> +{
+>> +     return (u8)((u64)addr >> KASAN_PTR_TAG_SHIFT);
+>> +}
+>> +
+>> +static inline void *reset_tag(const void *addr)
+>> +{
+>> +     return set_tag(addr, KASAN_TAG_KERNEL);
+>> +}
+>
+> We seem to be duplicating this functionality in several places.
+>
+> Could we please make it so that the arch code defines macros:
+>
+> arch_kasan_set_tag(addr, tag)
+> arch_kasan_get_tag(addr)
+> arch_kasan_reset_tag(addr)
+>
+> ... and use thoses consistently rather than open-coding them?
+>
+>> +
+>> +#else /* CONFIG_KASAN_SW_TAGS */
+>> +
+>> +static inline u8 random_tag(void)
+>> +{
+>> +     return 0;
+>> +}
+>> +
+>> +static inline void *set_tag(const void *addr, u8 tag)
+>> +{
+>> +     return (void *)addr;
+>> +}
+>> +
+>> +static inline u8 get_tag(const void *addr)
+>> +{
+>> +     return 0;
+>> +}
+>> +
+>> +static inline void *reset_tag(const void *addr)
+>> +{
+>> +     return (void *)addr;
+>> +}
+>
+> ... these can be defined in linux/kasan.h as:
+>
+> #define arch_kasan_set_tag(addr, tag)   (addr)
+> #define arch_kasan_get_tag(addr)        0
+> #define arch_kasan_reset_tag(addr)      (addr)
 
-
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Sunday, November 11, 2018 5:48 PM
-> To: Leo Li <leoyang.li@nxp.com>; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; bhelgaas at google.com; robh+dt at kernel.org;
-> mark.rutland at arm.com; l.subrahmanya at mobiveil.co.in;
-> shawnguo at kernel.org; lorenzo.pieralisi at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>
-> Subject: RE: [PATCH 21/23] dt-bindings: pci: Add NXP LX SoCs PCIe controller
-> 
-> Hi Leo,
-> 
-> Thanks a lot for your comments!
-> 
-> > -----Original Message-----
-> > From: Leo Li
-> > Sent: 2018?11?9? 5:29
-> > To: Z.q. Hou <zhiqiang.hou@nxp.com>; linux-pci at vger.kernel.org;
-> > linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; bhelgaas at google.com; robh+dt at kernel.org;
-> > mark.rutland at arm.com; l.subrahmanya at mobiveil.co.in;
-> > shawnguo at kernel.org; lorenzo.pieralisi at arm.com
-> > Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> > <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>
-> > Subject: RE: [PATCH 21/23] dt-bindings: pci: Add NXP LX SoCs PCIe
-> > controller
-> >
-> >
-> >
-> > > -----Original Message-----
-> > > From: Z.q. Hou
-> > > Sent: Tuesday, November 6, 2018 7:21 AM
-> > > To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> > > bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> > > l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> > > <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com
-> > > Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> > > <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q.
-> > Hou
-> > > <zhiqiang.hou@nxp.com>
-> > > Subject: [PATCH 21/23] dt-bindings: pci: Add NXP LX SoCs PCIe
-> > > controller
-> > >
-> > > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > >
-> > > Add PCIe controller DT bindings of NXP LX series SoCs.
-> >
-> > I'm not sure if this is a good idea to name this controller LX PCIe controller.
-> > Right now, it could be true that it is only used on LX series SoCs.
-> > But I'm not sure if the LS series will not use this controller or LX
-> > series will only use this controller in the future.
-> >
-> > Since the LX series is still using the layerscape branding, so
-> > probably we should keep using the layerscape-pci.txt and define the PCIe
-> Gen4 variant?
-> 
-> Yes, will add the new PCIe IP bindings to Layerscape-pci.txt.
-> 
-> >
-> > Same comment for other places using the LX naming in this driver.
-> 
-> Do you have any suggestion about how to name the driver and prefix of
-> structures in the driver?
-
-Probably something like pcie-layerscape-gen4?
-
-> 
-> >
-> > >
-> > > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > > ---
-> > >  .../devicetree/bindings/pci/lx-pci.txt        | 52
-> > +++++++++++++++++++
-> > >  MAINTAINERS                                   |  8 +++
-> > >  2 files changed, 60 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/pci/lx-pci.txt
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/pci/lx-pci.txt
-> > > b/Documentation/devicetree/bindings/pci/lx-pci.txt
-> > > new file mode 100644
-> > > index 000000000000..dc602fef93b0
-> > > --- /dev/null
-> > > +++ b/Documentation/devicetree/bindings/pci/lx-pci.txt
-> > > @@ -0,0 +1,52 @@
-> > > +NXP LX PCIe controller
-> > > +
-> > > +This PCIe controller is based on the Mobiveil PCIe IP and thus
-> > > +inherits all the common properties defined in mobiveil-pcie.txt.
-> > > +
-> > > +Required properties:
-> > > +- compatible: should contain the platform identifier such as:
-> > > +  "fsl,lx2160a-pcie"
-> > > +- reg: base addresses and lengths of the PCIe controller register blocks.
-> > > +  "config_axi_slave": PCIe controller registers
-> > > +  "csr_axi_slave": Bridge config registers
-> > > +- interrupts: A list of interrupt outputs of the controller. Must
-> > > +contain an
-> > > +  entry for each entry in the interrupt-names property.
-> > > +- interrupt-names: It could include the following entries:
-> > > +  "intr": The interrupt that is asserted for controller interrupts
-> > > +  "aer": Asserted for aer interrupt when chip support the aer
-> > > +interrupt
-> > with
-> > > +		 none MSI/MSI-X/INTx mode,but there is interrupt line for
-> > > aer.
-> > > +  "pme": Asserted for pme interrupt when chip support the pme
-> > > + interrupt
-> > > with
-> > > +		 none MSI/MSI-X/INTx mode,but there is interrupt line for
-> > > pme.
-> > > +- dma-coherent: Indicates that the hardware IP block can ensure the
-> > > +coherency
-> > > +  of the data transferred from/to the IP block. This can avoid the
-> > > +software
-> > > +  cache flush/invalid actions, and improve the performance significantly.
-> > > +- msi-parent : See the generic MSI binding described in
-> > > +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-> > > +
-> > > +Example:
-> > > +
-> > > +	pcie at 3400000 {
-> > > +		compatible = "fsl,lx2160a-pcie";
-> > > +		reg = <0x00 0x03400000 0x0 0x00100000   /* controller
-> > > registers */
-> > > +		       0x80 0x00000000 0x0 0x00001000>; /* configuration
-> > > space */
-> > > +		reg-names = "csr_axi_slave", "config_axi_slave";
-> > > +		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER
-> > > interrupt */
-> > > +			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME
-> > > interrupt */
-> > > +			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /*
-> > > controller interrupt */
-> > > +		interrupt-names = "aer", "pme", "intr";
-> > > +		#address-cells = <3>;
-> > > +		#size-cells = <2>;
-> > > +		device_type = "pci";
-> > > +		apio-wins = <8>;
-> > > +		ppio-wins = <8>;
-> > > +		dma-coherent;
-> > > +		bus-range = <0x0 0xff>;
-> > > +		msi-parent = <&its>;
-> > > +		ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0
-> > > 0x40000000>;
-> > > +		#interrupt-cells = <1>;
-> > > +		interrupt-map-mask = <0 0 0 7>;
-> > > +		interrupt-map = <0000 0 0 1 &gic GIC_SPI 109
-> > > IRQ_TYPE_LEVEL_HIGH>,
-> > > +				<0000 0 0 2 &gic GIC_SPI 110
-> > > IRQ_TYPE_LEVEL_HIGH>,
-> > > +				<0000 0 0 3 &gic GIC_SPI 111
-> > > IRQ_TYPE_LEVEL_HIGH>,
-> > > +				<0000 0 0 4 &gic GIC_SPI 112
-> > > IRQ_TYPE_LEVEL_HIGH>;
-> > > +	};
-> > > diff --git a/MAINTAINERS b/MAINTAINERS index
-> > > 0c57ccff3188..7da555c8e2f5 100644
-> > > --- a/MAINTAINERS
-> > > +++ b/MAINTAINERS
-> > > @@ -11252,6 +11252,14 @@ L:	linux-arm-kernel at lists.infradead.org
-> > >  S:	Maintained
-> > >  F:	drivers/pci/controller/dwc/*layerscape*
-> > >
-> > > +PCI DRIVER FOR NXP LX
-> > > +M:	Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > > +L:	linux-pci at vger.kernel.org
-> > > +L:	linux-arm-kernel at lists.infradead.org
-> > > +S:	Maintained
-> > > +F:	Documentation/devicetree/bindings/pci/lx-pci.txt
-> > > +F:	drivers/pci/controller/mobibeil/pci-lx.c
-> > > +
-> > >  PCI DRIVER FOR GENERIC OF HOSTS
-> > >  M:	Will Deacon <will.deacon@arm.com>
-> > >  L:	linux-pci at vger.kernel.org
-> > > --
-> > > 2.17.1
-> Thanks,
-> Zhiqiang
+Will do in v11, thanks!
