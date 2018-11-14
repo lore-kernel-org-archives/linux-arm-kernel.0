@@ -1,61 +1,93 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Wed, 14 Nov 2018 13:59:35 +0100
-Subject: [PATCH 09/16] staging: vchiq_core: do not initialize semaphores twice
+Date: Wed, 14 Nov 2018 13:59:34 +0100
+Subject: [PATCH 08/16] staging: vchiq_core: remove unnecessary safety checks
+ in vchiq_init_state
 In-Reply-To: <20181114125942.25163-1-nsaenzjulienne@suse.de>
 References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
-Message-ID: <20181114125942.25163-10-nsaenzjulienne@suse.de>
+Message-ID: <20181114125942.25163-9-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vchiq_init_state() initialises a series of semaphores to then call
-remote_event_create() on the same semaphores, which initializes them
-again. We get rid of the second initialization.
+vchiq_init_state() checks the initial contents of slot_zero are correct.
+These are set in vchiq_init_slots(), using the same hard-coded defaults
+as the checks. Both functions are called sequentially and Video Core
+isn't yet aware of the slot's address. There is no way the contents of
+slot_zero changed in between functions, making the checks useless.
 
 Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../vc04_services/interface/vchiq_arm/vchiq_core.c    | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ .../interface/vchiq_arm/vchiq_core.c          | 59 -------------------
+ 1 file changed, 59 deletions(-)
 
 diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index dee5ea7bfe4f..8b23ea5322e8 100644
+index 34a892011296..dee5ea7bfe4f 100644
 --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
 +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -418,12 +418,11 @@ vchiq_set_conn_state(VCHIQ_STATE_T *state, VCHIQ_CONNSTATE_T newstate)
- }
+@@ -2170,65 +2170,6 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero)
+ 		return VCHIQ_ERROR;
+ 	}
  
- static inline void
--remote_event_create(VCHIQ_STATE_T *state, REMOTE_EVENT_T *event)
-+remote_event_create(REMOTE_EVENT_T *event)
- {
- 	event->armed = 0;
- 	/* Don't clear the 'fired' flag because it may already have been set
- 	** by the other side. */
--	sema_init((struct semaphore *)((char *)state + event->event), 0);
- }
+-	/* Check the input configuration */
+-
+-	if (slot_zero->magic != VCHIQ_MAGIC) {
+-		vchiq_loud_error_header();
+-		vchiq_loud_error("Invalid VCHIQ magic value found.");
+-		vchiq_loud_error("slot_zero=%pK: magic=%x (expected %x)",
+-			slot_zero, slot_zero->magic, VCHIQ_MAGIC);
+-		vchiq_loud_error_footer();
+-		return VCHIQ_ERROR;
+-	}
+-
+-	if (slot_zero->version < VCHIQ_VERSION_MIN) {
+-		vchiq_loud_error_header();
+-		vchiq_loud_error("Incompatible VCHIQ versions found.");
+-		vchiq_loud_error("slot_zero=%pK: VideoCore version=%d (minimum %d)",
+-			slot_zero, slot_zero->version, VCHIQ_VERSION_MIN);
+-		vchiq_loud_error("Restart with a newer VideoCore image.");
+-		vchiq_loud_error_footer();
+-		return VCHIQ_ERROR;
+-	}
+-
+-	if (VCHIQ_VERSION < slot_zero->version_min) {
+-		vchiq_loud_error_header();
+-		vchiq_loud_error("Incompatible VCHIQ versions found.");
+-		vchiq_loud_error("slot_zero=%pK: version=%d (VideoCore minimum %d)",
+-			slot_zero, VCHIQ_VERSION, slot_zero->version_min);
+-		vchiq_loud_error("Restart with a newer kernel.");
+-		vchiq_loud_error_footer();
+-		return VCHIQ_ERROR;
+-	}
+-
+-	if ((slot_zero->slot_zero_size != sizeof(VCHIQ_SLOT_ZERO_T)) ||
+-		 (slot_zero->slot_size != VCHIQ_SLOT_SIZE) ||
+-		 (slot_zero->max_slots != VCHIQ_MAX_SLOTS) ||
+-		 (slot_zero->max_slots_per_side != VCHIQ_MAX_SLOTS_PER_SIDE)) {
+-		vchiq_loud_error_header();
+-		if (slot_zero->slot_zero_size != sizeof(VCHIQ_SLOT_ZERO_T))
+-			vchiq_loud_error("slot_zero=%pK: slot_zero_size=%d (expected %d)",
+-				slot_zero, slot_zero->slot_zero_size,
+-				(int)sizeof(VCHIQ_SLOT_ZERO_T));
+-		if (slot_zero->slot_size != VCHIQ_SLOT_SIZE)
+-			vchiq_loud_error("slot_zero=%pK: slot_size=%d (expected %d)",
+-				slot_zero, slot_zero->slot_size,
+-				VCHIQ_SLOT_SIZE);
+-		if (slot_zero->max_slots != VCHIQ_MAX_SLOTS)
+-			vchiq_loud_error("slot_zero=%pK: max_slots=%d (expected %d)",
+-				slot_zero, slot_zero->max_slots,
+-				VCHIQ_MAX_SLOTS);
+-		if (slot_zero->max_slots_per_side != VCHIQ_MAX_SLOTS_PER_SIDE)
+-			vchiq_loud_error("slot_zero=%pK: max_slots_per_side=%d (expected %d)",
+-				slot_zero, slot_zero->max_slots_per_side,
+-				VCHIQ_MAX_SLOTS_PER_SIDE);
+-		vchiq_loud_error_footer();
+-		return VCHIQ_ERROR;
+-	}
+-
+-	if (VCHIQ_VERSION < slot_zero->version)
+-		slot_zero->version = VCHIQ_VERSION;
+-
+ 	local = &slot_zero->slave;
+ 	remote = &slot_zero->master;
  
- static inline int
-@@ -2237,18 +2236,18 @@ vchiq_init_state(VCHIQ_STATE_T *state, VCHIQ_SLOT_ZERO_T *slot_zero)
- 	state->data_quota = state->slot_queue_available - 1;
- 
- 	local->trigger.event = offsetof(VCHIQ_STATE_T, trigger_event);
--	remote_event_create(state, &local->trigger);
-+	remote_event_create(&local->trigger);
- 	local->tx_pos = 0;
- 
- 	local->recycle.event = offsetof(VCHIQ_STATE_T, recycle_event);
--	remote_event_create(state, &local->recycle);
-+	remote_event_create(&local->recycle);
- 	local->slot_queue_recycle = state->slot_queue_available;
- 
- 	local->sync_trigger.event = offsetof(VCHIQ_STATE_T, sync_trigger_event);
--	remote_event_create(state, &local->sync_trigger);
-+	remote_event_create(&local->sync_trigger);
- 
- 	local->sync_release.event = offsetof(VCHIQ_STATE_T, sync_release_event);
--	remote_event_create(state, &local->sync_release);
-+	remote_event_create(&local->sync_release);
- 
- 	/* At start-of-day, the slot is empty and available */
- 	((VCHIQ_HEADER_T *)SLOT_DATA_FROM_INDEX(state, local->slot_sync))->msgid
 -- 
 2.19.1
