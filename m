@@ -1,129 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 14 Nov 2018 20:17:39 +0000
-Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
-In-Reply-To: <CAAeHK+xe5LqbyWnYSDv2+QrLR=GK0JMzniAZBfL8kjXRwJravA@mail.gmail.com>
-References: <cover.1541525354.git.andreyknvl@google.com>
- <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
- <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
- <CAAeHK+xPkbg_9P9oCkS-iB8S81vTxD3p5SbyWHy-vrp2ybkKmg@mail.gmail.com>
- <20181113220728.2h3kz67b2bz36wty@blommer>
- <CAAeHK+xe5LqbyWnYSDv2+QrLR=GK0JMzniAZBfL8kjXRwJravA@mail.gmail.com>
-Message-ID: <20181114201738.sb2lla7umljsx3qx@blommer>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 14 Nov 2018 12:21:12 -0800
+Subject: ARM builtin perf tests for breakpoint failures
+Message-ID: <2433ea10-8bdc-f9bc-8d53-f6bda4018564@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 09:06:23PM +0100, Andrey Konovalov wrote:
-> On Tue, Nov 13, 2018 at 11:07 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Tue, Nov 13, 2018 at 04:01:27PM +0100, Andrey Konovalov wrote:
-> >> On Thu, Nov 8, 2018 at 1:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Tue, Nov 06, 2018 at 06:30:27PM +0100, Andrey Konovalov wrote:
-> >> >> show_pte in arm64 fault handling relies on the fact that the top byte of
-> >> >> a kernel pointer is 0xff, which isn't always the case with tag-based
-> >> >> KASAN.
-> >> >
-> >> > That's for the TTBR1 check, right?
-> >> >
-> >> > i.e. for the following to work:
-> >> >
-> >> >         if (addr >= VA_START)
-> >> >
-> >> > ... we need the tag bits to be an extension of bit 55...
-> >> >
-> >> >>
-> >> >> This patch resets the top byte in show_pte.
-> >> >>
-> >> >> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> >> >> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> >> >> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> >> >> ---
-> >> >>  arch/arm64/mm/fault.c | 3 +++
-> >> >>  1 file changed, 3 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> >> >> index 7d9571f4ae3d..d9a84d6f3343 100644
-> >> >> --- a/arch/arm64/mm/fault.c
-> >> >> +++ b/arch/arm64/mm/fault.c
-> >> >> @@ -32,6 +32,7 @@
-> >> >>  #include <linux/perf_event.h>
-> >> >>  #include <linux/preempt.h>
-> >> >>  #include <linux/hugetlb.h>
-> >> >> +#include <linux/kasan.h>
-> >> >>
-> >> >>  #include <asm/bug.h>
-> >> >>  #include <asm/cmpxchg.h>
-> >> >> @@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
-> >> >>       pgd_t *pgdp;
-> >> >>       pgd_t pgd;
-> >> >>
-> >> >> +     addr = (unsigned long)kasan_reset_tag((void *)addr);
-> >> >
-> >> > ... but this ORs in (0xffUL << 56), which is not correct for addresses
-> >> > which aren't TTBR1 addresses to begin with, where bit 55 is clear, and
-> >> > throws away useful information.
-> >> >
-> >> > We could use untagged_addr() here, but that wouldn't be right for
-> >> > kernels which don't use TBI1, and we'd erroneously report addresses
-> >> > under the TTBR1 range as being in the TTBR1 range.
-> >> >
-> >> > I also see that the entry assembly for el{1,0}_{da,ia} clears the tag
-> >> > for EL0 addresses.
-> >> >
-> >> > So we could have:
-> >> >
-> >> > static inline bool is_ttbr0_addr(unsigned long addr)
-> >> > {
-> >> >         /* entry assembly clears tags for TTBR0 addrs */
-> >> >         return addr < TASK_SIZE_64;
-> >> > }
-> >> >
-> >> > static inline bool is_ttbr1_addr(unsigned long addr)
-> >> > {
-> >> >         /* TTBR1 addresses may have a tag if HWKASAN is in use */
-> >> >         return arch_kasan_reset_tag(addr) >= VA_START;
-> >> > }
-> >> >
-> >> > ... and use those in the conditionals, leaving the addr as-is for
-> >> > reporting purposes.
-> >>
-> >> Actually it looks like 276e9327 ("arm64: entry: improve data abort
-> >> handling of tagged pointers") already takes care of both user and
-> >> kernel fault addresses and correctly removes tags from them. So I
-> >> think we need to drop this patch.
-> >
-> > The clear_address_tag macro added in that commit only removes tags from TTBR0
-> > addresses, so that's not sufficient if the kernel is used tagged addresses
-> > (which will be in the TTBR1 range).
-> 
-> Do I understand correctly that TTBR0 means user space addresses and
-> TTBR1 means kernel addresses? 
+Hi Mark, Will,
 
-Effectively, yes. The address space is split into two halves (with a gap in the
-middle). The high half (where we map the kernel) is covered by TTBR1, and the
-low half (where we map userspace) is covered by TTBR0.
+I have been trying to debug some perf builtin tests on ARM 32-bit and
+found that "Breakpoint overflow signal handler" and "Breakpoint overflow
+sampling" were failing, but there are a number of reasons for that and
+they may fail in seemingly unexpected ways.
 
-The TTBRs are the Translation Table Base Registers -- the two halves have
-separate page tables.
+My perf binary is built in Thumb2 because that is what the toolchain
+produces by default. Going through the rabbit hole, I found the
+following failure scenarios.
 
-> In that commit I see that the clear_address_tag() macro is used in el0_da and
-> in el1_da, which means that it untags both user and kernel addresses (on data
-> aborts). Do I misunderstand something?
+1) If __test_function()'s addresss has the Thumb bit set, then we set a
+breakpoint length (bp_len = sizeof(long)) which makes us fail to
+validate the event in hw_breakpoint_arch_parse() and we return -EINVAL
+from SYS_perf_event_open(). This is because the offset computed has a
+value of 1 (function address is e.g:  0x0004c169), but we requested a
+bp_len of 4. The test fails right away.
 
-It's called for faults taken from EL0 and EL1, but it only removes the tags
-from addresses covered by TTBR0. The logic is:
+2) If we correct the test such that if addr & 1 == true then we set
+bp_len = 2, then we can see that the test runs to completion, but the
+perf breakpoint event count returns 0 and indeed, no SIGIO is ever
+delivered. This is presumably because of the alignment_mask value of 0x3
+in hw_breakpoint_arch_parse() which would strip the Thumb bit and not
+allow matching it when set assign info->address &= ~alignment_mask. We
+would indeed not have the HW hit that breakpoint at all.
 
-	.macro  clear_address_tag, dst, addr
-	tst     \addr, #(1 << 55)
-	bic     \dst, \addr, #(0xff << 56)
-	csel    \dst, \dst, \addr, eq
-	.endm
+3) If we keep the fix from 2) and also change the the alignment_mask to
+0x2 to preserve the Thumb bit, then we can run into what is described as
+4) below.
 
-... which in C would be:
+4) if __test_function()'s address does not have the Thumb bit set (which
+surprisingly can happen even if test_function does, go figure), then we
+will set a bp_len = 4, and then we are just stuck in an infinite SIGIO
+delivery that looks like this:
 
-	if (!(addr & (1UL << 55))) {
-		addr &= ~(0xffUL << 56);
-	}
+[pid  1859] perf_event_open(0xbebee790, 0, -1, -1, 0x8 /* PERF_FLAG_???
+*/) = 3
+[pid  1859] fcntl64(3, F_SETFL, O_RDWR|O_NONBLOCK|O_ASYNC) = 0
+[pid  1859] fcntl64(3, F_SETSIG, 0x1d)  = 0
+[pid  1859] fcntl64(3, F_SETOWN, 1859)  = 0
+[pid  1859] ioctl(3, PERF_EVENT_IOC_RESET, 0) = 0
+[pid  1859] ioctl(3, PERF_EVENT_IOC_ENABLE, 0) = 0
+[pid  1859] --- SIGIO {si_signo=SIGIO, si_code=POLL_IN, si_band=65} ---
+[pid  1859] rt_sigreturn()
 
-... and therefore does not affect TTBR1 addresses.
+and on and on, we can't even see gettimeofday() begin called in that case.
 
-Thanks,
-Mark.
+This is observable on both 4.9.135 and 4.19 on ARMv7 and ARMv8 CPUs
+running in AArch32.
+
+I am not clear how to fix that properly, since there appears to be a
+nesting of problems here.
+
+Thanks!
+-- 
+Florian
