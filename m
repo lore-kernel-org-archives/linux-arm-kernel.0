@@ -1,68 +1,34 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 14 Nov 2018 23:57:24 +0100
-Subject: [RFC v1 6/7] clk: meson: meson8b: add support for more M/N values in
- sys_pll
-In-Reply-To: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
-References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181114225725.2821-7-martin.blumenstingl@googlemail.com>
+Date: Thu, 15 Nov 2018 00:05:54 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: switch CONFIG_PWM_MESON to built-in
+Message-ID: <20181114230554.4968-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sys_pll on the EC-100 board is configured to 1584MHz at boot
-(either by u-boot, firmware or chip defaults). This is achieved by using
-M = 66, N = 1 (24MHz * 66 / 1).
-At boot the CPU clock is running off sys_pll divided by 2 which results
-in 792MHz. Thus M = 66 is considered to be a "safe" value for Meson8b.
-
-To achieve 1608MHz (one of the CPU OPPs on Meson8 and Meson8m2) we need
-M = 67, N = 1. I ran "stress --cpu 4" while infinitely cycling through
-all available frequencies on my Meson8m2 board and could not spot any
-issues with this setting (after ~12 hours of running this).
-
-On Meson8, Meson8b and Meson8m2 we also want to be able to use 408MHz
-and 816MHz CPU frequencies. These can be achieved by dividing sys_pll by
-4 (for 408MHz) or 2 (for 816MHz). That means that sys_pll has to run at
-1632MHz which can be generated using M = 68, N = 1.
-Similarily we also want to be able to use 1008MHz as CPU frequency. This
-means that sys_pll has to run either at 1008MHz or 2016MHz. The former
-would result in an M value of 42, which is lower than the smallest value
-used by the 3.10 GPL kernel sources from Amlogic (50 is the lower limit
-there). Thus we need to run sys_pll at 2016MHz which can ge generated
-using M = 84, N = 1.
-I tested M = 68 and M = 84 on my Meson8b Odroid-C1 and my Meson8m2 board
-by running "stress --cpu 4" while infinitely cycling thorugh all
-available frequencies. I could not spot any issues after ~12 hours of
-running this.
-
-Amlogic's 3.10 GPL kernel sources have more M/N combinations. I did not
-add them yet because M = 74 (to achieve close to 1800MHz on Meson8) and
-M = 82 (to achieve close to 1992MHz on Meson8 as well) caused my
-Meson8m2 board to hang randomly. It's not clear why this is (for example
-because the board's voltage regulator design is bad, some missing bits
-for these values in our clk-pll driver, etc.). Thus the following M
-values from the Amlogic 3.10 GPL kernel sources are skipped as of now:
-69, 70, 71, 72, 73, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98
+Some Meson8b boards (Odroid-C1, EC-100) use a PWM regulator which is the
+voltage supply of the CPU cores (this regulator is typically called
+"VCCK").
+Now that we are preparing support for CPU frequency scaling on Meson8,
+Meson8b and Meson8m2 we should build the pwm-meson driver into the
+kernel so we can configure the CPU voltage early in the boot process.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/clk/meson/meson8b.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index d566dd5bc567..c06a1a7faa4c 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -43,6 +43,11 @@ static const struct pll_params_table sys_pll_params_table[] = {
- 	PLL_PARAMS(62, 1),
- 	PLL_PARAMS(63, 1),
- 	PLL_PARAMS(64, 1),
-+	PLL_PARAMS(65, 1),
-+	PLL_PARAMS(66, 1),
-+	PLL_PARAMS(67, 1),
-+	PLL_PARAMS(68, 1),
-+	PLL_PARAMS(84, 1),
- 	{ /* sentinel */ },
- };
- 
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 63af6234c1b6..525316285570 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -928,7 +928,7 @@ CONFIG_PWM_ATMEL_TCB=m
+ CONFIG_PWM_BCM2835=y
+ CONFIG_PWM_BRCMSTB=m
+ CONFIG_PWM_FSL_FTM=m
+-CONFIG_PWM_MESON=m
++CONFIG_PWM_MESON=y
+ CONFIG_PWM_RCAR=m
+ CONFIG_PWM_RENESAS_TPU=y
+ CONFIG_PWM_ROCKCHIP=m
 -- 
 2.19.1
