@@ -1,41 +1,58 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 14 Nov 2018 11:34:27 +0100
-Subject: PCMCIA / PXA27X / CPUFREQ
-In-Reply-To: <CAJD+NwpE+uS99fe2uXM0X6WwRyegTm3wXNHWPM_xM0r3+nrhBw@mail.gmail.com>
- (Greg's message of "Tue, 6 Nov 2018 18:00:49 +1300")
-References: <CAJD+NwqUdDRFisnPtj9QCm=F2bHMSMfRkK1UWedJcS6_UmLhYg@mail.gmail.com>
- <87efc0oatr.fsf@belgarion.home>
- <CAJD+NwpE+uS99fe2uXM0X6WwRyegTm3wXNHWPM_xM0r3+nrhBw@mail.gmail.com>
-Message-ID: <87pnv8j6bw.fsf@belgarion.home>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Wed, 14 Nov 2018 10:22:52 +0000
+Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
+In-Reply-To: <20181109.162920.1263908485037438031.davem@davemloft.net>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-8-vincenzo.frascino@arm.com>
+ <20181109.162920.1263908485037438031.davem@davemloft.net>
+Message-ID: <b455064b-4ffe-3ed3-6fa1-ee65e78f054b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg <greguu@null.net> writes:
+Hi David,
 
-> On Mon, 5 Nov 2018 at 09:18, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->>
->> Greg <greguu@null.net> writes:
->>
->> > Hi Robert,
->>
->> Hi Greg,
->>
->> I will make some tests next week to confirm your status, I don't seem to
->> remember any specific issue on PCMCIA lately, but that was before v4.19 so one
->> might have sneaked it.
->>
-> It sneaked in a some time ago, I think with 4.8 or so but it took us a
-> while to find out what is causing it and report it.
-Ok Greg, I made some preliminary tests.
+thank you for reviewing my code.
 
-On my side, the PCMCIA insertion is not detected as well. I'm pretty sure though
-it was working April 21st, 2018, as I have evidence in my git trees I made the
-test.
+On 10/11/2018 00:29, David Miller wrote:
+> From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+> Date: Fri,  9 Nov 2018 12:37:10 +0000
+> 
+>> To take advantage of the commonly defined vdso interface for
+>> gettimeofday the architectural code requires an adaptation.
+>>
+>> This patch re-implements the gettimeofday vdso in C in order to use
+>> lib/vdso.
+>>
+>> With the new implementation arm64 gains support for CLOCK_BOOTTIME,
+>> CLOCK_TAI and __kernel_time.
+>>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+> 
+> What is the performance penalty for going to C from ASM like this?
+> 
+> I like the vDSO consolidation, but actually I think it makes a lot of
+> sense to implement these things in assembler with some C implementation
+> as guidance or for architectures that haven't optimized into an ASM
+> version yet.
+> 
+> I'd also like to see if we can somehow make PowerPC's optimizations in
+> this area usable in more places.
+> 
+> It defines a reciprocal in order to use a multiply instead of a divide
+> after capturing the time values.
+> > I say all of this because I want to do something similar on sparc, and
+> having a generic implementation of all of the math would make that easier
+> for me and other architecture maintainers who might want to do the same.
+> 
 
-I will investigate on my side now I know the problem can be reproduced, even if
-my case could be some issue on the test platform ...
+I did run some benchmarks on arm64 with both vdsotest-bench (I added a
+script to the vdsotest implementation that can be used to replicate the
+results) and an ad-hoc test that stresses the vdso library and the
+differences in terms of performance penalty are very little (~1%) to
+none in some cases.  
 
-Cheers.
-
---
-Robert
+-- 
+Regards,
+Vincenzo
