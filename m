@@ -1,31 +1,61 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 14 Nov 2018 10:00:27 +0100
-Subject: [PATCH v4 4/4] ARM: dts: stm32: enable hwspinlock on stm32mp157c-ed1
+Date: Wed, 14 Nov 2018 10:00:24 +0100
+Subject: [PATCH v4 1/4] dt-bindings: hwlock: Document STM32 hwspinlock bindings
 In-Reply-To: <20181114090027.7580-1-benjamin.gaignard@linaro.org>
 References: <20181114090027.7580-1-benjamin.gaignard@linaro.org>
-Message-ID: <20181114090027.7580-5-benjamin.gaignard@linaro.org>
+Message-ID: <20181114090027.7580-2-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Benjamin Gaignard <benjamin.gaignard@st.com>
 
+Add bindings for STM32 hardware spinlock device
+
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/stm32mp157c-ed1.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+version 4:
+- add Linaro SoB
 
-diff --git a/arch/arm/boot/dts/stm32mp157c-ed1.dts b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-index f77bea49c079..158a337b3129 100644
---- a/arch/arm/boot/dts/stm32mp157c-ed1.dts
-+++ b/arch/arm/boot/dts/stm32mp157c-ed1.dts
-@@ -94,3 +94,7 @@
- 	vdda1v1-supply = <&reg11>;
- 	vdda1v8-supply = <&reg18>;
- };
+version 3 :
+- fix clock name in properties description
+version 2 :
+- change clock name from hwspinlock to hsem to be align with hardware
+  documentation
+
+ .../bindings/hwlock/st,stm32-hwspinlock.txt        | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+
+diff --git a/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+new file mode 100644
+index 000000000000..adf4f000ea3d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwlock/st,stm32-hwspinlock.txt
+@@ -0,0 +1,23 @@
++STM32 Hardware Spinlock Device Binding
++-------------------------------------
 +
-+&hsem {
-+	status = "okay";
-+};
++Required properties :
++- compatible : should be "st,stm32-hwspinlock".
++- reg : the register address of hwspinlock.
++- #hwlock-cells : hwlock users only use the hwlock id to represent a specific
++	hwlock, so the number of cells should be <1> here.
++- clock-names : Must contain "hsem".
++- clocks : Must contain a phandle entry for the clock in clock-names, see the
++	common clock bindings.
++
++Please look at the generic hwlock binding for usage information for consumers,
++"Documentation/devicetree/bindings/hwlock/hwlock.txt"
++
++Example of hwlock provider:
++	hwspinlock at 4c000000 {
++		compatible = "st,stm32-hwspinlock";
++		#hwlock-cells = <1>;
++		reg = <0x4c000000 0x400>;
++		clocks = <&rcc HSEM>;
++		clock-names = "hsem";
++	};
 -- 
 2.15.0
