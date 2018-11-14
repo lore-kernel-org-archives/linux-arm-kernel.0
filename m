@@ -1,42 +1,38 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 14 Nov 2018 14:16:25 +0100
-Subject: [PATCH v2 1/3] dt-bindings: amlogic: Add Internal Clock Measurer
- bindings
-In-Reply-To: <20181114131627.17766-1-narmstrong@baylibre.com>
-References: <20181114131627.17766-1-narmstrong@baylibre.com>
-Message-ID: <20181114131627.17766-2-narmstrong@baylibre.com>
+Date: Wed, 14 Nov 2018 14:16:24 +0100
+Subject: [PATCH v2 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
+Message-ID: <20181114131627.17766-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
-clock paths frequencies.
+clocks frequencyies.
+The precision is determined by stepping into the divider until the counter
+overflows.
+The debugfs slows a pretty summary and each clock can be measured
+individually aswell.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../bindings/soc/amlogic/clk-measure.txt          | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Thsi patchset includes the dt-bindings, driver and the DT node added to the
+meson-gx dtsi.
+
+Changes since v1 at [1]:
+- fixed clock names
+- added summary in debugfs and moved indivudual clocks into a subdirectory
+- added the GX table to the match data
+
+Neil Armstrong (3):
+  dt-bindings: amlogic: Add Internal Clock Measurer bindings
+  soc: amlogic: Add Meson GX Clock Measure driver
+  ARM64: dts: meson-gx: Add Internal Clock Measurer node
+
+ .../bindings/soc/amlogic/clk-measure.txt      |  15 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |   5 +
+ drivers/soc/amlogic/Kconfig                   |   8 +
+ drivers/soc/amlogic/Makefile                  |   1 +
+ drivers/soc/amlogic/meson-gx-clk-measure.c    | 293 ++++++++++++++++++
+ 5 files changed, 322 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+ create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
 
-diff --git a/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
-new file mode 100644
-index 000000000000..ba9183a42032
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
-@@ -0,0 +1,15 @@
-+Amlogic Internal Clock Measurer
-+===============================
-+
-+The Amlogic SoCs contains an IP to measure the internal clocks.
-+The precision is multiple of MHz, useful to debug the clock states.
-+
-+Required properties:
-+- compatible: Shall contain "amlogic,meson-gx-clk-measure"
-+- reg: base address and size of the Clock Measurer register space.
-+
-+Example:
-+	clock-measure at 8758 {
-+		compatible = "amlogic,meson-gx-clk-measure";
-+		reg = <0x0 0x8758 0x0 0x10>;
-+	};
 -- 
 2.19.1
