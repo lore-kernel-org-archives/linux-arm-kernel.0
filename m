@@ -1,168 +1,63 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed, 14 Nov 2018 14:47:37 -0800
-Subject: [PATCH v2] PCI: imx: Add imx6sx suspend/resume support
-In-Reply-To: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
-References: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
-Message-ID: <CAHQ1cqFx+5otBNGA1Cx1s=HuCLgOi9yM9z=qwrP=OASUcH21=A@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 14 Nov 2018 16:48:11 -0600
+Subject: [PATCH 00/17] ARMv8.3 pointer authentication support
+In-Reply-To: <20181114214701.gdnrznakwtm76jlt@blommer>
+References: <20181005084754.20950-1-kristina.martsenko@arm.com>
+ <CAGXu5jLtxRitee143FE37PYkPCs0UArGgNEsiU8fzsQL9N8S-Q@mail.gmail.com>
+ <df3e029b-51b3-51a0-70f7-3239234373e2@arm.com>
+ <CAGXu5jJMfCz4qFY8y1Uf7BdP961ZeBotFVUb5owaksxnz26akg@mail.gmail.com>
+ <20181114214701.gdnrznakwtm76jlt@blommer>
+Message-ID: <CAGXu5jJun3CuUa12aQpy+m7Op-g9XwPv3CygwqYX2dy0A4qt5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 5:57 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+On Wed, Nov 14, 2018 at 3:47 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 13, 2018 at 05:09:00PM -0600, Kees Cook wrote:
+>> On Tue, Nov 13, 2018 at 10:17 AM, Kristina Martsenko
+>> <kristina.martsenko@arm.com> wrote:
+>> > When the PAC authentication fails, it doesn't actually generate an
+>> > exception, it just flips a bit in the high-order bits of the pointer,
+>> > making the pointer invalid. Then when the pointer is dereferenced (e.g.
+>> > as a function return address), it generates the usual type of exception
+>> > for an invalid address.
+>>
+>> Ah! Okay, thanks. I missed that detail. :)
+>>
+>> What area of memory ends up being addressable with such bit flips?
+>> (i.e. is the kernel making sure nothing executable ends up there?)
+>>
+>> > So when a function return fails in user mode, the exception is handled
+>> > in __do_user_fault and a forced SIGSEGV is delivered to the task. When a
+>> > function return fails in kernel mode, the exception is handled in
+>> > __do_kernel_fault and the task is killed.
+>> >
+>> > This is different from stack protector as we don't panic the kernel, we
+>> > just kill the task. It would be difficult to panic as we don't have a
+>> > reliable way of knowing that the exception was caused by a PAC
+>> > authentication failure (we just have an invalid pointer with a specific
+>> > bit flipped). We also don't print out any PAC-related warning.
+>>
+>> There are other "guesses" in __do_kernel_fault(), I think? Could a
+>> "PAC mismatch?" warning be included in the Oops if execution fails in
+>> the address range that PAC failures would resolve into?
 >
-> Enable PCI suspend/resume support on imx6sx socs. This is similar to
-> imx7d with a few differences:
+> I'd personally prefer that we didn't try to guess if a fault is due to a failed
+> AUT*, even for logging.
 >
-> * The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
-> pcie control bits on 6sx.
-> * The pcie_inbound_axi clk needs to be turned off in suspend. On resume
-> it is restored via resume -> deassert_core_reset -> enable_ref_clk.
+> Presently, it's not possible to distinguish between a fault resulting from a
+> failed AUT* and a fault which happens to have hte same bits/clear, so there are
+> false positives. The architecture may also change the precise details of the
+> faulting address, and we'd have false negatives in that case.
 >
-> Most of the resume logic is shared with the initial reset after probe.
->
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
->
-> ---
-> Changes since v1:
-> * Use a switch statement in imx6_pcie_pm_turnoff. The DT-based turnoff
-> path is still an if statement.
-> * Did not split imx6_pcie_clk_disable or call it from other paths, this
-> would bring complications and is somewhat unrelated.
-> * See v1 comments: https://lore.kernel.org/patchwork/patch/996806/
->
->  drivers/pci/controller/dwc/pci-imx6.c       | 44 ++++++++++++++++++---
->  include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  1 +
->  2 files changed, 40 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-> index 2cbef2d7c207..54625569d0bc 100644
-> --- a/drivers/pci/controller/dwc/pci-imx6.c
-> +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> @@ -771,41 +771,75 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
->         }
->  }
->
->  static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
->  {
-> -       reset_control_assert(imx6_pcie->turnoff_reset);
-> -       reset_control_deassert(imx6_pcie->turnoff_reset);
-> +       struct device *dev = imx6_pcie->pci->dev;
-> +
-> +       /* Some variants have a turnoff reset in DT */
-> +       if (imx6_pcie->turnoff_reset) {
-> +               reset_control_assert(imx6_pcie->turnoff_reset);
-> +               reset_control_deassert(imx6_pcie->turnoff_reset);
-> +               goto pm_turnoff_sleep;
-> +       }
-> +
-> +       /* Others poke directly at IOMUXC registers */
-> +       switch (imx6_pcie->variant) {
-> +       case IMX6SX:
-> +               regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF,
-> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF);
-> +               regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> +                               IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
-> +               break;
-> +       default:
-> +               dev_err(dev, "PME_Turn_Off not implemented\n");
-> +               return;
+> Given that, I think suggesting that a fault is due to a failed AUT* is liable
+> to make things more confusing.
 
-Purely optionally, if you feel like avoiding goto you can change this to:
+Okay, no worries. It should be pretty clear from the back trace anyway. :)
 
-default:
-    if (!imx6_pcie->turnoff_reset) {
-        dev_err(dev, "PME_Turn_Off not implemented\n");
-        return;
-    }
+As long as there isn't any way for the pointer bit flips to result in
+an addressable range, I'm happy. :)
 
-    reset_control_assert(imx6_pcie->turnoff_reset);
-    reset_control_deassert(imx6_pcie->turnoff_reset);
-    break;
+-Kees
 
-but that's up to you. FWIW, patch looks reasonable:
-
-Reviewed-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-
-> +       }
->
->         /*
->          * Components with an upstream port must respond to
->          * PME_Turn_Off with PME_TO_Ack but we can't check.
->          *
->          * The standard recommends a 1-10ms timeout after which to
->          * proceed anyway as if acks were received.
->          */
-> +pm_turnoff_sleep:
->         usleep_range(1000, 10000);
->  }
->
->  static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
->  {
->         clk_disable_unprepare(imx6_pcie->pcie);
->         clk_disable_unprepare(imx6_pcie->pcie_phy);
->         clk_disable_unprepare(imx6_pcie->pcie_bus);
->
-> -       if (imx6_pcie->variant == IMX7D) {
-> +       switch (imx6_pcie->variant) {
-> +       case IMX6SX:
-> +               clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
-> +               break;
-> +       case IMX7D:
->                 regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
->                                    IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
->                                    IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-> +               break;
-> +       default:
-> +               break;
->         }
->  }
->
-> +static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
-> +{
-> +       return (imx6_pcie->variant == IMX7D ||
-> +               imx6_pcie->variant == IMX6SX);
-> +}
-> +
->  static int imx6_pcie_suspend_noirq(struct device *dev)
->  {
->         struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
->
-> -       if (imx6_pcie->variant != IMX7D)
-> +       if (!imx6_pcie_supports_suspend(imx6_pcie))
->                 return 0;
->
->         imx6_pcie_pm_turnoff(imx6_pcie);
->         imx6_pcie_clk_disable(imx6_pcie);
->         imx6_pcie_ltssm_disable(dev);
-> @@ -817,11 +851,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
->  {
->         int ret;
->         struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
->         struct pcie_port *pp = &imx6_pcie->pci->pp;
->
-> -       if (imx6_pcie->variant != IMX7D)
-> +       if (!imx6_pcie_supports_suspend(imx6_pcie))
->                 return 0;
->
->         imx6_pcie_assert_core_reset(imx6_pcie);
->         imx6_pcie_init_phy(imx6_pcie);
->         imx6_pcie_deassert_core_reset(imx6_pcie);
-> diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> index 6c1ad160ed87..c1b25f5e386d 100644
-> --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> @@ -438,10 +438,11 @@
->  #define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1              (0x0 << 1)
->  #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS                        (0x1 << 1)
->  #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK                        (0x1 << 1)
->
->  #define IMX6SX_GPR12_PCIE_TEST_POWERDOWN               BIT(30)
-> +#define IMX6SX_GPR12_PCIE_PM_TURN_OFF                  BIT(16)
->  #define IMX6SX_GPR12_PCIE_RX_EQ_MASK                   (0x7 << 0)
->  #define IMX6SX_GPR12_PCIE_RX_EQ_2                      (0x2 << 0)
->
->  /* For imx6ul iomux gpr register field define */
->  #define IMX6UL_GPR1_ENET1_CLK_DIR              (0x1 << 17)
-> --
-> 2.17.1
->
+-- 
+Kees Cook
