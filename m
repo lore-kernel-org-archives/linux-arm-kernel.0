@@ -1,38 +1,31 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 14 Nov 2018 15:59:31 +0100
-Subject: [PATCH v2 1/4] dt-bindings: media: sun6i: Add A31 and H3 compatibles
+Date: Wed, 14 Nov 2018 15:59:32 +0100
+Subject: [PATCH v2 2/4] media: sun6i: Add A31 compatible
 In-Reply-To: <20181114145934.26855-1-maxime.ripard@bootlin.com>
 References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
-Message-ID: <20181114145934.26855-2-maxime.ripard@bootlin.com>
+Message-ID: <20181114145934.26855-3-maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 has a slightly different CSI controller (no BT656, no CCI) which
-looks a lot like the original A31 controller. Add a compatible for the A31,
-and more specific compatible the for the H3 to be used in combination for
-the A31.
+The first device that used that IP was the A31. Add it to our list of
+compatibles.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- Documentation/devicetree/bindings/media/sun6i-csi.txt | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-index 2ff47a9507a6..3f8eb0296382 100644
---- a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -5,7 +5,10 @@ Allwinner V3s SoC features two CSI module. CSI0 is used for MIPI CSI-2
- interface and CSI1 is used for parallel interface.
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+index 7af55ad142dc..9813bca38939 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+@@ -892,6 +892,7 @@ static int sun6i_csi_remove(struct platform_device *pdev)
+ }
  
- Required properties:
--  - compatible: value must be "allwinner,sun8i-v3s-csi"
-+  - compatible: value must be one of:
-+    * "allwinner,sun6i-a31-csi"
-+    * "allwinner,sun8i-h3-csi", "allwinner,sun6i-a31-csi"
-+    * "allwinner,sun8i-v3s-csi"
-   - reg: base address and size of the memory-mapped region.
-   - interrupts: interrupt associated to this IP
-   - clocks: phandles to the clocks feeding the CSI
+ static const struct of_device_id sun6i_csi_of_match[] = {
++	{ .compatible = "allwinner,sun6i-a31-csi", },
+ 	{ .compatible = "allwinner,sun8i-v3s-csi", },
+ 	{},
+ };
 -- 
 2.19.1
