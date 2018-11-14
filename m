@@ -1,41 +1,70 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 14 Nov 2018 10:00:26 +0100
-Subject: [PATCH v4 3/4] ARM: dts: stm32: Add hwspinlock node for stm32mp157 SoC
-In-Reply-To: <20181114090027.7580-1-benjamin.gaignard@linaro.org>
-References: <20181114090027.7580-1-benjamin.gaignard@linaro.org>
-Message-ID: <20181114090027.7580-4-benjamin.gaignard@linaro.org>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 14 Nov 2018 10:11:01 +0100
+Subject: [PATCH v2 0/4] clk: meson: Add video clocks path
+In-Reply-To: <f7679f4c93aca9a11b9078611b6c4952e83c9a9e.camel@baylibre.com>
+References: <1541516257-16157-1-git-send-email-narmstrong@baylibre.com>
+ <f7679f4c93aca9a11b9078611b6c4952e83c9a9e.camel@baylibre.com>
+Message-ID: <5137a72c-e5fa-6fad-f1b6-e64968e78391@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@st.com>
+On 13/11/2018 15:18, jbrunet at baylibre.com wrote:
+> On Tue, 2018-11-06 at 15:57 +0100, Neil Armstrong wrote:
+>> This patchset is an attempt to handle the Amlogic Meson GX Video clock
+>> in the Common Clock Framework in order to move the video pipeline and
+>> HDMI controller clock management out of the Meson DRM Driver.
+>>
+>> In order :
+>> - Add support the VID_PLL fully programmable divider used right after the
+>>   HDMI PLL clock source.
+>> - Fix the GXL HDMI PLL DCO
+>> - Add the video clock bindings covering all the video graphics pipeline
+>>   and the HDMI controller.
+>> - Add the clocks entries used in the video clock path
+>>
+>> The vid_pll programmable divider is introduced in its R/O form right now,
+>> but will be extended to be R/W in a next iteration.
+>>
+>> All dividers are flagged with CLK_GET_RATE_NOCACHE, and all gates are
+>> flagged
+>> with CLK_IGNORE_UNUSED since they are currently directly handled by the
+>> Meson DRM Driver.
+>>
+>> Once the DRM Driver is fully migrated to using the Common Clock Framework
+>> to handle the video clock tree, the CLK_GET_RATE_NOCACHE and
+>> CLK_IGNORE_UNUSED
+>> will be dropped.
+>>
+>> Changes since v1 at [1]:
+>>  - Fixed comments from Martin
+>>  - Fixed GXL HDMI PLL DCO
+>>  - Added the missing HDMI controller clock
+>>  - Moved bindings to a separate patch
+>>  - Updated the commit logs
+>>
+>> [1] 
+>> https://lkml.kernel.org/r/1532079581-978-1-git-send-email-narmstrong at baylibre.com
+>>
+>> Neil Armstrong (4):
+>>   clk: meson: Add vid_pll divider driver
+>>   clk: meson-gxbb: Fix HDMI PLL for GXL SoCs
+>>   dt-bindings: clk: meson-gxbb: Add Video clock bindings
+>>   clk: meson-gxbb: Add video clocks
+>>
+>>  drivers/clk/meson/Makefile            |   2 +-
+>>  drivers/clk/meson/clkc.h              |   6 +
+>>  drivers/clk/meson/gxbb.c              | 773
+>> +++++++++++++++++++++++++++++++++-
+>>  drivers/clk/meson/gxbb.h              |  26 +-
+>>  drivers/clk/meson/vid-pll-div.c       |  91 ++++
+>>  include/dt-bindings/clock/gxbb-clkc.h |  18 +
+>>  6 files changed, 911 insertions(+), 5 deletions(-)
+>>  create mode 100644 drivers/clk/meson/vid-pll-div.c
+>>
+> 
+> Looks sane enough ;)
+> 
+> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+> 
 
-Declare hwspinlock device for stm32mp157 SoC
-
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
----
- arch/arm/boot/dts/stm32mp157c.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi b/arch/arm/boot/dts/stm32mp157c.dtsi
-index 185541a5b69f..98f824d8b0f0 100644
---- a/arch/arm/boot/dts/stm32mp157c.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157c.dtsi
-@@ -803,6 +803,15 @@
- 			status = "disabled";
- 		};
- 
-+		hsem: hwspinlock at 4c000000 {
-+			compatible = "st,stm32-hwspinlock";
-+			#hwlock-cells = <1>;
-+			reg = <0x4c000000 0x400>;
-+			clocks = <&rcc HSEM>;
-+			clock-names = "hwsem";
-+			status = "disabled";
-+		};
-+
- 		rcc: rcc at 50000000 {
- 			compatible = "st,stm32mp1-rcc", "syscon";
- 			reg = <0x50000000 0x1000>;
--- 
-2.15.0
+Thanks, applied on next/drivers !
