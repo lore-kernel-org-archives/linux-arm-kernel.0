@@ -1,59 +1,70 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 14 Nov 2018 23:57:18 +0100
-Subject: [RFC v1 0/7] Meson8b: make the CPU clock mutable
-Message-ID: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
+Date: Wed, 14 Nov 2018 23:57:21 +0100
+Subject: [RFC v1 3/7] clk: meson: clk-pll: check if the clock is already
+ enabled
+In-Reply-To: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
+References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20181114225725.2821-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows changing the CPU clock on the 32-bit Amlogic Meson SoCs
-(Meson8, Meson8b and Meson8m2).
-CPU frequency scaling will be enabled with a separate series by adding
-the CPU clock and the OPP tables to meson8.dtsi and meson8b.dtsi.
+Since commit 6f888e7bc7bd58 ("clk: meson: clk-pll: add enable bit") our
+PLLs also support the "enable" bit. Currently meson_clk_pll_enable
+unconditionally resets the PLL, enables it, takes it out of reset and
+waits until it is locked.
 
-While changing the CPU frequency (sys_pll or any of it's post-dividers)
-we need to run the CPU clock off the XTAL clock. Otherwise the system
-will lock up because we need to disable the sys_pll to change it's
-rate.
+This works fine for our current clock trees. However, there will be a
+problem once we allow modifications to sys_pll on Meson8, Meson8b and
+Meson8m2 (which will be required for CPU frequency scaling):
+the CPU clock is derived from the sys_pll clock. Once clk_enable is
+called on the CPU clock this will be propagated by the common clock
+framework up until the sys_pll clock. If we reset the PLL
+unconditionally in meson_clk_pll_enable the CPU will be stopped (on
+Meson8, Meson8b and Meson8m2).
+To prevent this we simply check if the PLL is already enabled and do
+reset the PLL if it's already enabled and locked.
 
-This also makes the clk-pll's .enable hook a no-op if the clock is
-already enabled. Otherwise we're getting lockups when calling the
-first clk_{prepare_}enable on the sys_pll or any of it's children (as
-the CCF propagates the enable event up to the sys_pll). This is because
-the .enable hook unconditionally disables and enables the clock.
-However, we can't disable that clock (not even temporarily) if the CPU
-is running off sys_pll.
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/clk/meson/clk-pll.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Additionally this adds support for more M/N combinations in sys_pll to
-achieve all of the OPPs on Meson8b and all OPPs <= 1608 MHz on Meson8
-and Meson8m2.
-
-Compared to Amlogic's 3.10 kernel there's one notable difference: we
-are actually allowing changes to the sys_pll. Amlogic's kernel sets
-sys_pll to a fixed rate during boot and then uses a timer generate a
-"virtual clock rate" by toggling between various dividers (for example:
-sys_pll is set to 1536MHz. to achieve 1008MHz they are toggling every
-2500us between 1536MHZ and 768MHz so the average over <period, for
-example one second> is 1008MHz).
-I could reproduce any situation where changing sys_pll failed (for
-example due to high temperature). To prove that I ran "stress --cpu 4"
-for multiple hours and then cycled through all available CPU
-frequencies (while keeping "stress" running in the background). This
-worked fine on my Meson8b Odroid-C1 and EC-100 boards as well as my
-Meson8m2 board.
-
-
-Martin Blumenstingl (7):
-  clk: meson: meson8b: run from the XTAL when changing the CPU frequency
-  clk: meson: meson8b: do not use cpu_div3 for cpu_scale_out_sel
-  clk: meson: clk-pll: check if the clock is already enabled
-  clk: meson: clk-pll: add the is_enabled function in the clk_ops
-  clk: meson: meson8b: mark the CPU clock as CLK_IS_CRITICAL
-  clk: meson: meson8b: add support for more M/N values in sys_pll
-  clk: meson: meson8b: allow changing the CPU clock tree
-
- drivers/clk/meson/clk-pll.c | 23 +++++++++
- drivers/clk/meson/meson8b.c | 94 +++++++++++++++++++++++++++++++++----
- 2 files changed, 108 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
+index f5b5b3fabe3c..b46cca953f4f 100644
+--- a/drivers/clk/meson/clk-pll.c
++++ b/drivers/clk/meson/clk-pll.c
+@@ -200,11 +200,32 @@ static void meson_clk_pll_init(struct clk_hw *hw)
+ 	}
+ }
+ 
++static int meson_clk_pll_is_enabled(struct clk_hw *hw)
++{
++	struct clk_regmap *clk = to_clk_regmap(hw);
++	struct meson_clk_pll_data *pll = meson_clk_pll_data(clk);
++
++	if (meson_parm_read(clk->map, &pll->rst))
++		return 0;
++
++	if (!meson_parm_read(clk->map, &pll->en))
++		return 0;
++
++	if (!meson_parm_read(clk->map, &pll->l))
++		return 0;
++
++	return 1;
++}
++
+ static int meson_clk_pll_enable(struct clk_hw *hw)
+ {
+ 	struct clk_regmap *clk = to_clk_regmap(hw);
+ 	struct meson_clk_pll_data *pll = meson_clk_pll_data(clk);
+ 
++	/* do nothing if the PLL is already enabled */
++	if (meson_clk_pll_is_enabled(hw))
++		return 0;
++
+ 	/* Make sure the pll is in reset */
+ 	meson_parm_write(clk->map, &pll->rst, 1);
+ 
 -- 
 2.19.1
