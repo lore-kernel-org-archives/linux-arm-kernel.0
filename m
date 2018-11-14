@@ -1,30 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 14 Nov 2018 09:48:29 -0800
-Subject: [PATCH 02/17] ARM: mach-bcm: Switch bcm2835 and platsmp to SPDX
- identifier
-In-Reply-To: <3ed08f5a-090a-f468-2cfa-59b88a6afd2b@i2se.com>
-References: <1541860974-6676-1-git-send-email-stefan.wahren@i2se.com>
- <87k1lkzxg3.fsf@anholt.net> <3ed08f5a-090a-f468-2cfa-59b88a6afd2b@i2se.com>
-Message-ID: <23e35441-0fdd-6c9f-8ad6-d3929ac8a599@gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 14 Nov 2018 18:52:40 +0100
+Subject: [PATCH v4 4/6] MAINTAINERS: add i.MX8 DT path to i.MX architecture
+In-Reply-To: <20181114175242.12468-1-l.stach@pengutronix.de>
+References: <20181114175242.12468-1-l.stach@pengutronix.de>
+Message-ID: <20181114175242.12468-4-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/18 8:38 AM, Stefan Wahren wrote:
-> Hi Florian,
-> 
-> Am 10.11.18 um 17:53 schrieb Eric Anholt:
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->>
->>> Adopt the SPDX license identifier headers to ease license compliance
->>> management.
->> Reviewed-by: Eric Anholt <eric@anholt.net>
-> 
-> are you okay with this patch?
-> 
-> Should we place in our pull request?
+Shawn agreed to take patches for the i.MX8 parts through his tree.
 
-Sounds good to me:
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f4855974f325..c491b90392b4 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1521,6 +1521,7 @@ F:	arch/arm/mach-imx/
+ F:	arch/arm/mach-mxs/
+ F:	arch/arm/boot/dts/imx*
+ F:	arch/arm/configs/imx*_defconfig
++F:	arch/arm64/boot/dts/freescale/imx*
+ F:	drivers/clk/imx/
+ F:	drivers/firmware/imx/
+ F:	drivers/soc/imx/
 -- 
-Florian
+2.19.1
