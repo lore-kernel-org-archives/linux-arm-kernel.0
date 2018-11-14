@@ -1,67 +1,47 @@
-From: fthain@telegraphics.com.au (Finn Thain)
-Date: Wed, 14 Nov 2018 14:17:09 +1100 (AEDT)
-Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
-In-Reply-To: <20181113234336.GP30658@n2100.armlinux.org.uk>
-References: <cover.1541995959.git.fthain@telegraphics.com.au>
- <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
- <20181112083422.GA19695@infradead.org>
- <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
- <20181113092012.GI30658@n2100.armlinux.org.uk>
- <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
- <20181113234336.GP30658@n2100.armlinux.org.uk>
-Message-ID: <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Nov 2018 11:24:48 +0800
+Subject: [PATCH 0/5] media: Allwinner A10 CSI support
+In-Reply-To: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v66ygbcomUMkcv8qMCAs_qviFMPzpxj-F4=YBrpuLrdSUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Nov 2018, Russell King - ARM Linux wrote:
+On Tue, Nov 13, 2018 at 4:24 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Hi,
+>
+> Here is a series introducing the support for the A10 (and SoCs of the same
+> generation) CMOS Sensor Interface (called CSI, not to be confused with
+> MIPI-CSI, which isn't support by that IP).
+>
+> That interface is pretty straightforward, but the driver has a few issues
+> that I wanted to bring up:
+>
+>   * The only board I've been testing this with has an ov5640 sensor
+>     attached, which doesn't work with the upstream driver. Copying the
+>     Allwinner init sequence works though, and this is how it has been
+>     tested. Testing with a second sensor would allow to see if it's an
+>     issue on the CSI side or the sensor side.
+>   * When starting a capture, the last buffer to capture will fail due to
+>     double buffering being used, and we don't have a next buffer for the
+>     last frame. I'm not sure how to deal with that though. It seems like
+>     some drivers use a scratch buffer in such a case, some don't care, so
+>     I'm not sure which solution should be preferred.
+>   * We don't have support for the ISP at the moment, but this can be added
+>     eventually.
+>
+>   * How to model the CSI module clock isn't really clear to me. It looks
+>     like it goes through the CSI controller and then is muxed to one of the
+>     CSI pin so that it can clock the sensor. I'm not quite sure how to
+>     model it, if it should be a clock, the CSI driver being a clock
+>     provider, or if the sensor should just use the module clock directly.
 
-> 
-> A clocksource provides a cycle counter that monotonically changes and 
-> does not wrap between clockevent events.
-> 
-> A clock event is responsible for providing events to the system when 
-> some work is needing to be done, limited by the wrap interval of the 
-> clocksource.
-> 
-> Each time the clock event triggers an interrupt, the clocksource is
-> read to determine how much time has passed, using:
-> 
-> 	count = (new_value - old_value) & available_bits
-> 	nanosecs = count * scale >> shift;
-> 
-> If you try to combine the clocksource and clockevent because you only
-> have a single counter, and the counter has the behaviour of:
-> - counting down towards zero
-> - when reaching zero, triggers an interrupt, and reloads with N
-> 
-> then this provides your clockevent, but you can't use this as a clock
-> source, because each time you receive an interrupt and try to read the
-> counter value, it will be approximately the same value.  This means
-> that the above calculation fails to register the correct number of
-> nanoseconds passing.  Hence, this does not work.
-> 
-> Also note where I said above that the clock event device must be able
-> to provide an interrupt _before_ the clocksource wraps - clearly with
-> such a timer, that is utterly impossible.
-> 
-> The simple solution is to not use such a counter as the clocksource,
-> which means you fall back to using the jiffies clocksource, and your
-> timekeeping has jiffy resolution - so 10ms, or possibly 1ms if you
-> want a 1kHz timer interval.  For most applications, that's simply way
-> to coarse, as was realised in the very early days of Linux.
-> 
-> If only there was a way to interpolate between timer interrupts...
-> which is exactly what arch_gettimeoffset() does, and is a historical
-> reminant of the pre-clocksource/clockevent days of the kernel - but
-> it is the only way to get better resolution from this sort of setup.
-> 
+Which clock are you talking about? MCLK? This seems to be fed directly from
+the CCU, as there doesn't seem to be controls for it within the CSI hardware
+block, and the diagram doesn't list it either. IMO you don't have to model it.
+The camera sensor device node would just take a reference to it directly. You
+would probably enable the (separate) pinmux setting in the CSI controller node.
 
-Both of the platforms in question (RPC and EBSA110) have not 
-defined(CONFIG_GENERIC_CLOCKEVENTS) and have not defined any struct 
-clock_event_device, AFAICT.
 
-So, even assuming that you're right about the limitations of single-timer 
-platforms in general, removal of arch_gettimeoffset wouldn't require the 
-removal of any platforms, AFAICT.
-
--- 
+ChenYu
