@@ -1,39 +1,50 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 14 Nov 2018 12:54:13 +0200
-Subject: [PATCH v12 0/2] Initial Allwinner V3s CSI Support
-In-Reply-To: <1540886988-27696-1-git-send-email-yong.deng@magewell.com>
-References: <1540886988-27696-1-git-send-email-yong.deng@magewell.com>
-Message-ID: <20181114105413.4gcfwt4cmchh6zsf@valkosipuli.retiisi.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 14 Nov 2018 10:56:06 +0000
+Subject: [RFC PATCH 0/6] Armada 38x comphy driver to support 2.5Gbps
+ networking
+In-Reply-To: <f0e71064-6919-6f7f-d605-671a1c662a33@ti.com>
+References: <20181112122933.GD30658@n2100.armlinux.org.uk>
+ <f0e71064-6919-6f7f-d605-671a1c662a33@ti.com>
+Message-ID: <20181114105606.GR30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 30, 2018 at 04:09:48PM +0800, Yong Deng wrote:
-> I can't make v4l2-compliance always happy.
-> The V3s CSI support many pixformats. But they are not always available.
-> It's dependent on the input bus format (MEDIA_BUS_FMT_*). 
-> Example:
-> V4L2_PIX_FMT_SBGGR8: MEDIA_BUS_FMT_SBGGR8_1X8
-> V4L2_PIX_FMT_YUYV: MEDIA_BUS_FMT_YUYV8_2X8
-> But I can't get the subdev's format code before starting stream as the
-> subdev may change it. So I can't know which pixformats are available.
-> So I exports all the pixformats supported by SoC.
-> The result is the app (v4l2-compliance) is likely to fail on streamon.
+On Wed, Nov 14, 2018 at 01:39:29PM +0530, Kishon Vijay Abraham I wrote:
+> Hi,
 > 
-> This patchset add initial support for Allwinner V3s CSI.
+> On 12/11/18 5:59 PM, Russell King - ARM Linux wrote:
+> > Hi,
+> > 
+> > This series adds support for dynamically switching between 1Gbps
+> > and 2.5Gbps networking for the Marvell Armada 38x SoCs, tested on
+> > Armada 388 on the Clearfog platform.
+> > 
+> > This is necessary to be able to connect (eg) a Clearfog platform
+> > with a Macchiatobin platform via the SFP sockets, as Clearfog
+> > currently only supports 1Gbps networking via the SFP socket and
+> > Macchiatobin defaults to 2.5Gbps when using Fiberchannel SFPs.
+> > 
+> > In order to allow dynamic switching, we need to implement a common
+> > phy driver to switch the ethernet serdes lane speed - 2.5Gbps is
+> > just 1Gbps up-clocked by 2.5x.  We implement a simple comphy
+> > driver to achieve this, which only supports networking.
+> > 
+> > With this, we are able to support both Fiberchannel SFPs operating
+> > at 2.5Gbps or 1Gbps, and 1G ethernet SFPs plugged into the Clearfog
+> > platform, dynamically selecting according to the SFPs abilities.
+> > 
+> > I'm aware of the proposed changes to the PHY layer, changing
+> > phy_set_mode() to take the ethernet phy interface type, hence why
+> > this is RFC - there's also the question about how this will be
+> > merged.  This series is currently based on 4.20-rc1, but will
+> > likely need to be rebased when the PHY layer changes hit.
 > 
-> Allwinner V3s SoC features a CSI module with parallel interface.
-> 
-> This patchset implement a v4l2 framework driver and add a binding 
-> documentation for it. 
+> For this case, I'd prefer the phy_set_mode series and the phy and net changes
+> here (after rebasing) go via linux-phy tree.
 
-Applied with this diff from Maxime:
-
-<URL:http://code.bulix.org/vf7b6g-504515?raw>
-
-The MAINTAINERS entry was also moved to the first patch.
-
-Thanks!
+Please let me know when they've hit, thanks.
 
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
