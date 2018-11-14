@@ -1,41 +1,152 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Wed, 14 Nov 2018 13:59:36 +0100
-Subject: [PATCH 10/16] staging: vchiq_core: don't add a wmb() before
- remote_event_signal()
+Date: Wed, 14 Nov 2018 13:59:32 +0100
+Subject: [PATCH 06/16] staging: vchiq_arm: rework vchiq_ioc_copy_element_data
 In-Reply-To: <20181114125942.25163-1-nsaenzjulienne@suse.de>
 References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
-Message-ID: <20181114125942.25163-11-nsaenzjulienne@suse.de>
+Message-ID: <20181114125942.25163-7-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's the first thing remote_event_signal() does.
+The function is passed to vchiq_core.c for it to go trough all the
+transfer elements (an array of pointers to data) and copy them into the
+actual transfer memory (contiguous memory).
+
+The logic in the function was "copy an element and return, except when
+the element is empty, in which case look for the next non-empty element
+and copy it. The function will be called as many times as necessary until
+all the elements are copied".
+
+Now, this approach already forces the function to loop around elements
+and felt convoluted, so it was changed to a more straightforward "Copy
+all the elements into memory as long as they fit".
+
+The resulting function is shorter and simpler.
 
 Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
 ---
- .../staging/vc04_services/interface/vchiq_arm/vchiq_core.c    | 4 ----
- 1 file changed, 4 deletions(-)
+ .../interface/vchiq_arm/vchiq_arm.c           | 89 +++++++------------
+ 1 file changed, 31 insertions(+), 58 deletions(-)
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 8b23ea5322e8..5791c2b670fa 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -1137,9 +1137,6 @@ queue_message_sync(VCHIQ_STATE_T *state, VCHIQ_SERVICE_T *service,
- 			size);
- 	}
- 
--	/* Make sure the new header is visible to the peer. */
--	wmb();
--
- 	remote_event_signal(&state->remote->sync_trigger);
- 
- 	if (VCHIQ_MSG_TYPE(msgid) != VCHIQ_MSG_PAUSE)
-@@ -3269,7 +3266,6 @@ static void
- release_message_sync(VCHIQ_STATE_T *state, VCHIQ_HEADER_T *header)
- {
- 	header->msgid = VCHIQ_MSGID_PADDING;
--	wmb();
- 	remote_event_signal(&state->remote->sync_release);
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 34160cc3b8bd..1cdfdb714abc 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -752,74 +752,48 @@ static void close_delivered(USER_SERVICE_T *user_service)
  }
  
+ struct vchiq_io_copy_callback_context {
+-	struct vchiq_element *current_element;
+-	size_t current_element_offset;
++	struct vchiq_element *element;
++	size_t element_offset;
+ 	unsigned long elements_to_go;
+-	size_t current_offset;
+ };
+ 
+-static ssize_t
+-vchiq_ioc_copy_element_data(
+-	void *context,
+-	void *dest,
+-	size_t offset,
+-	size_t maxsize)
++static ssize_t vchiq_ioc_copy_element_data(void *context, void *dest,
++					   size_t offset, size_t maxsize)
+ {
+-	long res;
++	struct vchiq_io_copy_callback_context *cc = context;
++	size_t total_bytes_copied = 0;
+ 	size_t bytes_this_round;
+-	struct vchiq_io_copy_callback_context *copy_context =
+-		(struct vchiq_io_copy_callback_context *)context;
+-
+-	if (offset != copy_context->current_offset)
+-		return 0;
+-
+-	if (!copy_context->elements_to_go)
+-		return 0;
+-
+-	/*
+-	 * Complex logic here to handle the case of 0 size elements
+-	 * in the middle of the array of elements.
+-	 *
+-	 * Need to skip over these 0 size elements.
+-	 */
+-	while (1) {
+-		bytes_this_round = min(copy_context->current_element->size -
+-				       copy_context->current_element_offset,
+-				       maxsize);
+-
+-		if (bytes_this_round)
+-			break;
+ 
+-		copy_context->elements_to_go--;
+-		copy_context->current_element++;
+-		copy_context->current_element_offset = 0;
++	while (total_bytes_copied < maxsize) {
++		if (!cc->elements_to_go)
++			return total_bytes_copied;
+ 
+-		if (!copy_context->elements_to_go)
+-			return 0;
+-	}
++		if (!cc->element->size) {
++			cc->elements_to_go--;
++			cc->element++;
++			cc->element_offset = 0;
++			continue;
++		}
+ 
+-	res = copy_from_user(dest,
+-			     copy_context->current_element->data +
+-			     copy_context->current_element_offset,
+-			     bytes_this_round);
++		bytes_this_round = min(cc->element->size - cc->element_offset,
++				       maxsize - total_bytes_copied);
+ 
+-	if (res != 0)
+-		return -EFAULT;
++		if (copy_from_user(dest + total_bytes_copied,
++				  cc->element->data + cc->element_offset,
++				  bytes_this_round))
++			return -EFAULT;
+ 
+-	copy_context->current_element_offset += bytes_this_round;
+-	copy_context->current_offset += bytes_this_round;
++		cc->element_offset += bytes_this_round;
++		total_bytes_copied += bytes_this_round;
+ 
+-	/*
+-	 * Check if done with current element, and if so advance to the next.
+-	 */
+-	if (copy_context->current_element_offset ==
+-	    copy_context->current_element->size) {
+-		copy_context->elements_to_go--;
+-		copy_context->current_element++;
+-		copy_context->current_element_offset = 0;
++		if (cc->element_offset == cc->element->size) {
++			cc->elements_to_go--;
++			cc->element++;
++			cc->element_offset = 0;
++		}
+ 	}
+ 
+-	return bytes_this_round;
++	return maxsize;
+ }
+ 
+ /**************************************************************************
+@@ -836,10 +810,9 @@ vchiq_ioc_queue_message(VCHIQ_SERVICE_HANDLE_T handle,
+ 	unsigned long i;
+ 	size_t total_size = 0;
+ 
+-	context.current_element = elements;
+-	context.current_element_offset = 0;
++	context.element = elements;
++	context.element_offset = 0;
+ 	context.elements_to_go = count;
+-	context.current_offset = 0;
+ 
+ 	for (i = 0; i < count; i++) {
+ 		if (!elements[i].data && elements[i].size != 0)
 -- 
 2.19.1
