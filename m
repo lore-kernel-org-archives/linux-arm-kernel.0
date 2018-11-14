@@ -1,142 +1,117 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Nov 2018 18:21:33 +0800
-Subject: [linux-sunxi] [PATCH v4 04/10] arm64: allwinner: dts: h6: add
- USB2-related device nodes
-In-Reply-To: <20181004122855.22981-5-icenowy@aosc.io>
-References: <20181004122855.22981-1-icenowy@aosc.io>
- <20181004122855.22981-5-icenowy@aosc.io>
-Message-ID: <CAGb2v668dozjLm9mWUw_Y12AZ6DM2ku9dgQ8B8feABNeFf3QSw@mail.gmail.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 14 Nov 2018 11:51:52 +0100
+Subject: [PATCH v2 2/9] phy: Add configuration interface
+In-Reply-To: <3a9a28df-8139-1036-a884-0de64aa07df1@ti.com>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4d0506aa0a61d234610b42a268a8326d9ea18466.1541516029.git-series.maxime.ripard@bootlin.com>
+ <3a9a28df-8139-1036-a884-0de64aa07df1@ti.com>
+Message-ID: <20181114105152.sgk454t34hmzstkn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Kishon
 
-On Thu, Oct 4, 2018 at 8:30 PM Icenowy Zheng <icenowy@aosc.io> wrote:
->
-> Allwinner H6 has two USB2 ports, one OTG and one host-only.
->
-> Add device tree nodes related to them.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> ---
-> No changes in v4.
->
-> Changes in v3:
-> - Removed the wrongly introduced usb3phy node.
-> - Added Chen-Yu's Review tag.
->
->  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 81 ++++++++++++++++++++
->  1 file changed, 81 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> index 040828d2e2c0..3d60af6cb3ae 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> @@ -258,6 +258,87 @@
->                         status = "disabled";
->                 };
->
-> +               usb2otg: usb at 5100000 {
-> +                       compatible = "allwinner,sun8i-a33-musb";
+On Mon, Nov 12, 2018 at 03:32:25PM +0530, Kishon Vijay Abraham I wrote:
+> On 06/11/18 8:24 PM, Maxime Ripard wrote:
+> > The phy framework is only allowing to configure the power state of the PHY
+> > using the init and power_on hooks, and their power_off and exit
+> > counterparts.
+> > 
+> > While it works for most, simple, PHYs supported so far, some more advanced
+> > PHYs need some configuration depending on runtime parameters. These PHYs
+> > have been supported by a number of means already, often by using ad-hoc
+> > drivers in their consumer drivers.
+> > 
+> > That doesn't work too well however, when a consumer device needs to deal
+> > with multiple PHYs, or when multiple consumers need to deal with the same
+> > PHY (a DSI driver and a CSI driver for example).
+> > 
+> > So we'll add a new interface, through two funtions, phy_validate and
+> > phy_configure. The first one will allow to check that a current
+> > configuration, for a given mode, is applicable. It will also allow the PHY
+> > driver to tune the settings given as parameters as it sees fit.
+> > 
+> > phy_configure will actually apply that configuration in the phy itself.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  drivers/phy/phy-core.c  | 61 ++++++++++++++++++++++++++++++++++++++++++-
+> >  include/linux/phy/phy.h | 58 ++++++++++++++++++++++++++++++++++++++++-
+> >  2 files changed, 119 insertions(+)
+> > 
+> > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > index 35fd38c5a4a1..7bd3ed65c708 100644
+> > --- a/drivers/phy/phy-core.c
+> > +++ b/drivers/phy/phy-core.c
+> > @@ -408,6 +408,67 @@ int phy_calibrate(struct phy *phy)
+> >  EXPORT_SYMBOL_GPL(phy_calibrate);
+> >  
+> >  /**
+> > + * phy_configure() - Changes the phy parameters
+> > + * @phy: the phy returned by phy_get()
+> > + * @opts: New configuration to apply
+> > + *
+> > + * Used to change the PHY parameters. phy_init() must have been called
+> > + * on the phy. The configuration will be applied on the current phy
+> > + * mode, that can be changed using phy_set_mode().
+> > + *
+> > + * Returns: 0 if successful, an negative error code otherwise
+> > + */
+> > +int phy_configure(struct phy *phy, union phy_configure_opts *opts)
+> > +{
+> > +	int ret;
+> > +
+> > +	if (!phy)
+> > +		return -EINVAL;
+> > +
+> > +	if (!phy->ops->configure)
+> > +		return -EOPNOTSUPP;
+> > +
+> > +	mutex_lock(&phy->mutex);
+> > +	ret = phy->ops->configure(phy, opts);
+> > +	mutex_unlock(&phy->mutex);
+> > +
+> > +	return ret;
+> > +}
+> 
+> EXPORT_SYMBOL_GPL is missing here and below.
 
-I added an SoC-specific compatible: "allwinner,sun50i-h6-musb".
+Consider it done.
 
-I'm also curious as to whether the MUSB controller was tested or not,
-since Allwinner now has EHCI/OHCI host pairs for host mode, and the Pine H64
-only does host mode.
+> > +
+> > +/**
+> > + * phy_validate() - Checks the phy parameters
+> > + * @phy: the phy returned by phy_get()
+> > + * @mode: phy_mode the configuration is applicable to.
+> > + * @opts: Configuration to check
+> > + *
+> > + * Used to check that the current set of parameters can be handled by
+> > + * the phy. Implementations are free to tune the parameters passed as
+> > + * arguments if needed by some implementation detail or
+> > + * constraints. It will not change any actual configuration of the
+> > + * PHY, so calling it as many times as deemed fit will have no side
+> > + * effect.
+> > + *
+> > + * Returns: 0 if successful, an negative error code otherwise
+> > + */
+> > +int phy_validate(struct phy *phy, enum phy_mode mode,
+> > +		  union phy_configure_opts *opts)
+> 
+> We are planning to switch to mode/submode combination [1], so this might have
+> to change.
 
-> +                       reg = <0x05100000 0x0400>;
-> +                       clocks = <&ccu CLK_BUS_OTG>;
-> +                       resets = <&ccu RST_BUS_OTG>;
-> +                       interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "mc";
-> +                       phys = <&usb2phy 0>;
-> +                       phy-names = "usb";
-> +                       extcon = <&usb2phy 0>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               usb2phy: phy at 5100400 {
-> +                       compatible = "allwinner,sun50i-h6-usb-phy";
-> +                       reg = <0x05100400 0x14>,
-> +                             <0x05101800 0x4>,
-> +                             <0x05311800 0x4>;
-> +                       reg-names = "phy_ctrl",
-> +                                   "pmu0",
-> +                                   "pmu3";
-> +                       clocks = <&ccu CLK_USB_PHY0>,
-> +                                <&ccu CLK_USB_PHY3>;
-> +                       clock-names = "usb0_phy",
-> +                                     "usb3_phy";
-> +                       resets = <&ccu RST_USB_PHY0>,
-> +                                <&ccu RST_USB_PHY3>;
-> +                       reset-names = "usb0_reset",
-> +                                     "usb3_reset";
-> +                       status = "disabled";
-> +                       #phy-cells = <1>;
-> +               };
-> +
-> +               ehci0: usb at 5101000 {
-> +                       compatible = "allwinner,sun50i-h6-ehci", "generic-ehci";
-> +                       reg = <0x05101000 0x100>;
-> +                       interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_OHCI0>,
-> +                                <&ccu CLK_BUS_EHCI0>,
-> +                                <&ccu CLK_USB_OHCI0>;
-> +                       resets = <&ccu RST_BUS_OHCI0>,
-> +                                <&ccu RST_BUS_EHCI0>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               ohci0: usb at 5101400 {
-> +                       compatible = "allwinner,sun50i-h6-ohci", "generic-ohci";
-> +                       reg = <0x05101400 0x100>;
-> +                       interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_OHCI0>,
-> +                                <&ccu CLK_USB_OHCI0>;
-> +                       resets = <&ccu RST_BUS_OHCI0>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               ehci3: usb at 5311000 {
-> +                       compatible = "allwinner,sun50i-h6-ehci", "generic-ehci";
-> +                       reg = <0x05311000 0x100>;
-> +                       interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_OHCI3>,
-> +                                <&ccu CLK_BUS_EHCI3>,
-> +                                <&ccu CLK_USB_OHCI3>;
-> +                       resets = <&ccu RST_BUS_OHCI3>,
-> +                                <&ccu RST_BUS_EHCI3>;
-> +                       phys = <&usb2phy 3>;
-> +                       phy-names = "usb";
-> +                       status = "disabled";
-> +               };
-> +
-> +               ohci3: usb at 5311400 {
-> +                       compatible = "allwinner,sun50i-h6-ohci", "generic-ohci";
-> +                       reg = <0x05311400 0x100>;
-> +                       interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_OHCI3>,
-> +                                <&ccu CLK_USB_OHCI3>;
-> +                       resets = <&ccu RST_BUS_OHCI3>;
-> +                       phys = <&usb2phy 3>;
-> +                       phy-names = "usb";
-> +                       status = "disabled";
-> +               };
-> +
+Yes, I'm aware of that. If needed, it shouldn't be too hard to rework.
 
-This didn't apply cleanly due to the new HDMI nodes. I fixed it up locally.
+Maxime
 
-ChenYu
-
->                 r_ccu: clock at 7010000 {
->                         compatible = "allwinner,sun50i-h6-r-ccu";
->                         reg = <0x07010000 0x400>;
-> --
-> 2.18.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181114/a55e0a4a/attachment.sig>
