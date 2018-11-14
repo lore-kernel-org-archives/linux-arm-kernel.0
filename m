@@ -1,106 +1,50 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Wed, 14 Nov 2018 13:39:20 +0000
-Subject: [PATCH V3 5/5] arm64: mm: Allow forcing all userspace addresses to
- 52-bit
-In-Reply-To: <20181114133920.7134-1-steve.capper@arm.com>
-References: <20181114133920.7134-1-steve.capper@arm.com>
-Message-ID: <20181114133920.7134-6-steve.capper@arm.com>
+From: Tudor.Ambarus@microchip.com (Tudor.Ambarus at microchip.com)
+Date: Wed, 14 Nov 2018 13:45:29 +0000
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+Message-ID: <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64 52-bit VAs are provided to userspace when a hint is supplied to
-mmap. This helps maintain compatibility with software that expects at
-most 48-bit VAs to be returned.
+Hi, Romain,
 
-In order to help identify software that has 48-bit VA assumptions, this
-patch allows one to compile a kernel where 52-bit VAs are returned by
-default on HW that supports it.
+On 10/10/2018 08:05 PM, Romain Izard wrote:
+> Hello,
+> 
+> While evaluating a new flash memory chip for my product based on a SAMA5D2
+> chip, I tried to update my software to use the latest device tree bindings.
+> 
+> Until now, I was using the legacy bindings for the NAND controller, that
+> preserved the timings configured by the bootloader in the EBI registers. The
+> bindings introduced in Linux 4.13 are used together with the NAND driver to
+> reconfigure the timings of the memory interface to match the speed profile
+> declared by some NAND components.
+> 
+> However, when comparing the timings in the registers, there was a large
+> difference between what I calculated by hand in the past and the values
+> configured by the drivers. The difference was in fact a 2 factor.
+> 
+> For me, the issue is due to the clock configuration declared in the SAMA5D2
+> device tree: The reference clock used by the nand-controller driver is the
+> clock for its parent node, which is directly the Master Clock. And on my
+> end, what I understood when writing the clock settings for my bootloader was
+> that the reference clock was the HSMC clock, which derives from the H32MX
+> clock, which runs at half the rate of the Master Clock.
+> 
+> The documentation for the SAMA5D2 is not very precise on this topic, so I
+> would like to have some feedback. Is the clock used as a reference for the
+> chip select configuration registers the Master Clock itself, or is it the
+> peripheral clock for the HSMC module ?
+> 
 
-This feature is intended to be for development systems only.
+I would say that it's the HSMC peripheral clock because it's the only clock that
+we describe for HSMC. If this is the case, then we will need to know the
+derivation formula used by the Peripheral Clock Controller to derive the MCK2
+(AHB 32-bit MATRIX system) clock to Periph_clk[17] HCLOCK_LS (HSMC), in order to
+correctly configure the timings to match flashes capabilities.
 
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
-Patch added in V3 to allow for testing/preparation for 52-bit support.
----
- arch/arm64/Kconfig                 | 14 ++++++++++++++
- arch/arm64/include/asm/elf.h       |  4 ++++
- arch/arm64/include/asm/processor.h |  9 ++++++++-
- 3 files changed, 26 insertions(+), 1 deletion(-)
+I asked the hardware team for a clarification, will get back to you soon.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index eab02d24f5d1..17d363e40c4d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -1165,6 +1165,20 @@ config ARM64_CNP
- 	  at runtime, and does not affect PEs that do not implement
- 	  this feature.
- 
-+config ARM64_FORCE_52BIT
-+	bool "Force 52-bit virtual addresses for userspace"
-+	default n
-+	depends on ARM64_52BIT_VA && EXPERT
-+	help
-+	  For systems with 52-bit userspace VAs enabled, the kernel will attempt
-+	  to maintain compatibility with older software by providing 48-bit VAs
-+	  unless a hint is supplied to mmap.
-+
-+	  This configuration option disables the 48-bit compatibility logic, and
-+	  forces all userspace addresses to be 52-bit on HW that supports it. One
-+	  should only enable this configuration option for stress testing userspace
-+	  memory management code. If unsure say N here.
-+
- endmenu
- 
- config ARM64_SVE
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index bc9bd9e77d9d..6adc1a90e7e6 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -117,7 +117,11 @@
-  * 64-bit, this is above 4GB to leave the entire 32-bit address
-  * space open for things that want to use the area for 32-bit pointers.
-  */
-+#ifdef CONFIG_ARM64_FORCE_52BIT
-+#define ELF_ET_DYN_BASE		(2 * TASK_SIZE_64 / 3)
-+#else
- #define ELF_ET_DYN_BASE		(2 * DEFAULT_MAP_WINDOW_64 / 3)
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 403c3c106d24..1415de41d836 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -64,8 +64,13 @@ extern u64 vabits_user;
- #define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
- #endif /* CONFIG_COMPAT */
- 
--#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-+#ifdef CONFIG_ARM64_FORCE_52BIT
-+#define STACK_TOP_MAX		TASK_SIZE_64
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
-+#else
- #define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
-+#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
- 
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
-@@ -75,12 +80,14 @@ extern u64 vabits_user;
- #define STACK_TOP		STACK_TOP_MAX
- #endif /* CONFIG_COMPAT */
- 
-+#ifndef CONFIG_ARM64_FORCE_52BIT
- #define arch_get_mmap_end(addr) ((addr > DEFAULT_MAP_WINDOW) ? TASK_SIZE :\
- 				DEFAULT_MAP_WINDOW)
- 
- #define arch_get_mmap_base(addr, base) ((addr > DEFAULT_MAP_WINDOW) ? \
- 					base + TASK_SIZE - DEFAULT_MAP_WINDOW :\
- 					base)
-+#endif /* CONFIG_ARM64_FORCE_52BIT */
- 
- extern phys_addr_t arm64_dma_phys_limit;
- #define ARCH_LOW_ADDRESS_LIMIT	(arm64_dma_phys_limit - 1)
--- 
-2.11.0
+Thanks for your patience,
+ta
