@@ -1,132 +1,107 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 14 Nov 2018 17:20:53 +0100
-Subject: [PATCH 08/15] Platform: OLPC: Move EC-specific functionality
- out from x86
-In-Reply-To: <CAHp75VfVYUyurEkrCuRsuC_jk94e3CqsxPket+DZqNk0VNMPFA@mail.gmail.com>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-9-lkundrak@v3.sk>
- <CAHp75VfVYUyurEkrCuRsuC_jk94e3CqsxPket+DZqNk0VNMPFA@mail.gmail.com>
-Message-ID: <df41a91f83387770de53bde204365ae85f2137dc.camel@v3.sk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 14 Nov 2018 16:37:59 +0000
+Subject: [PATCH] arm64: acpi/pci: WARN() when ignoring _DSM request to
+ preserve PCI resources
+In-Reply-To: <20181112111511.12091-1-ard.biesheuvel@linaro.org>
+References: <20181112111511.12091-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181114163747.GA15275@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Nov 12, 2018 at 12:15:11PM +0100, Ard Biesheuvel wrote:
+> On arm64 ACPI systems, we unconditionally reconfigure the entire PCI
+> hierarchy at boot. This is a departure from what is customary on ACPI
+> systems, and may break assumptions in some places (e.g., CCIX), that
+> the OS will honour the PCI resource allocation as configured by the
+> firmware.
 
-On Fri, 2018-10-19 at 16:36 +0300, Andy Shevchenko wrote:
-> On Wed, Oct 10, 2018 at 8:24 PM Lubomir Rintel <lkundrak@v3.sk>
-> wrote:
-> > It is actually plaform independent. Move it to the olpc-ec driver
-> > from
-> > the X86 OLPC platform, so that it could be used by the ARM based
-> > laptops
-> > too.
+Hi Ard,
+
+actually that's partially true, ie on arm64 ACPI we do not reassign bus
+numbers if firmware values are set-up with "valid" values, ie
+PCI_REASSIGN_ALL_BUS flag isn't set.
+
+Whether that's supposed to be part of the "resources" this _DSM affect I
+do not know, what I know is that if we change the default behaviour
+we seriously risk running into regressions, however we slice it.
+
+> ACPI already specifies a device specific ACPI method (_DSM) for PCI
+> root bridge nodes that tells us whether the firmware thinks the
+> configuration should be ignored or preserved, but unfortunately, we
+> cannot simply change the behavior of the OS and start honouring
+> these requests unconditionally, given that firmware implementations
+> in the field may issue the _DSM request inadvertently and still rely
+> on the OS to create the resource allocation from scratch.
 > 
-> What is platform independent exactly?
+> So as a preliminary step, let's issue a warning about this case,
+> increasing the likelihood that we can fix this behavior at some
+> point in the future.
 
-The commands with their argument and responses are mostly the same, but
-the delivery mechanism is different (SPI on ARM vs. LPC on x86).
+I see what you want to achieve and that's reasonable, minus my
+remark above, we should decide what we do on that because that's
+inconsistent with the warning produced if the _DSM is present
+and returns 0.
 
-Notably, the driver for the OLPC battery (which is the same on all XO
-generations) builds on the API provided by the olpc-ec driver.
+Thanks,
+Lorenzo
 
-I'll try to extend the commit message to make this clear.
-
-> >  #define OLPC_F_PRESENT         0x01
-> >  #define OLPC_F_DCON            0x02
-> > -#define OLPC_F_EC_WIDE_SCI     0x04
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/pci.c  | 15 +++++++++++++++
+>  include/linux/pci-acpi.h |  7 ++++---
+>  2 files changed, 19 insertions(+), 3 deletions(-)
 > 
-> I think these lines grouped on purpose. Thus, I don't like this.
-> Either move either all or none.
-
-I'm not moving this -- I'm removing it and using the EC version
-instead.
-
-This flag doesn't make sense for non-x86 ECs -- they don't use SCIs to
-deliver EC-to-CPU communication, but initiate SPI transactions instead.
-
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index bb85e2f4603f..318ca865c41f 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -168,6 +168,7 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	struct acpi_pci_generic_root_info *ri;
+>  	struct pci_bus *bus, *child;
+>  	struct acpi_pci_root_ops *root_ops;
+> +	union acpi_object *obj;
+>  
+>  	ri = kzalloc(sizeof(*ri), GFP_KERNEL);
+>  	if (!ri)
+> @@ -193,6 +194,20 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	if (!bus)
+>  		return NULL;
+>  
+> +	/*
+> +	 * Invoke the PCI device specific method (_DSM) #5 'Ignore PCI Boot
+> +	 * Configuration', which tells us whether the firmware wants us to
+> +	 * preserve or ignore the firmware's configuration of the PCI resource
+> +	 * tree for this root bridge.
+> +	 */
+> +	obj = acpi_evaluate_dsm(ACPI_HANDLE(bus->bridge), &pci_acpi_dsm_guid, 1,
+> +				IGNORE_PCI_BOOT_CONFIG_DSM, NULL);
+> +	if (obj && obj->type == ACPI_TYPE_INTEGER)
+> +		WARN_ONCE(obj->integer.value == 0,
+> +			  "Firmware did not request its PCI resource allocation to be ignored, but ignoring it anyway\n");
+> +
+> +	ACPI_FREE(obj);
+> +
+>  	pci_bus_size_bridges(bus);
+>  	pci_bus_assign_resources(bus);
+>  
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 8082b612f561..62b7fdcc661c 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -107,9 +107,10 @@ static inline void acpiphp_check_host_bridge(struct acpi_device *adev) { }
+>  #endif
+>  
+>  extern const guid_t pci_acpi_dsm_guid;
+> -#define DEVICE_LABEL_DSM	0x07
+> -#define RESET_DELAY_DSM		0x08
+> -#define FUNCTION_DELAY_DSM	0x09
+> +#define IGNORE_PCI_BOOT_CONFIG_DSM	0x05
+> +#define DEVICE_LABEL_DSM		0x07
+> +#define RESET_DELAY_DSM			0x08
+> +#define FUNCTION_DELAY_DSM		0x09
+>  
+>  #else	/* CONFIG_ACPI */
+>  static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+> -- 
+> 2.17.1
 > 
-> > +int olpc_ec_mask_write(u16 bits)
-> > +{
-> >  #ifdef CONFIG_DEBUG_FS
-> > 
-> >  /*
-> > @@ -277,14 +369,17 @@ static int olpc_ec_probe(struct
-> > platform_device *pdev)
-> >         ec_priv = ec;
-> >         platform_set_drvdata(pdev, ec);
-> > 
-> > +       /* EC version 0x5f adds support for wide SCI mask */
-> > +       if (ec->version >= 0x5f) {
-> > +               __be16 ec_word = cpu_to_be16(bits);
-> > +
-> > +               return olpc_ec_cmd(EC_WRITE_EXT_SCI_MASK, (void *)
-> > &ec_word, 2,
-> > +                                  NULL, 0);
-> 
-> I would leave it on one line.
-
-Okay. I do agree this looks better, but was not sure how seriously to
-take checkpatch.pl's warnings.
-
-> 
-> > +       } else {
-> > +               unsigned char ec_byte = bits & 0xff;
-> 
-> You may noticed that the parameter is of type u8, which clearly makes
-> & 0xff part redundant.
-
-At least for me, the explicit mask makes this easier for me to read.
-
-But I don't mind really. If you'd really like to see this changes I can
-follow up with such change (or am happy to ack such change from you).
-
-> 
-> > +               return olpc_ec_cmd(EC_WRITE_SCI_MASK, &ec_byte, 1,
-> > NULL, 0);
-> > +       }
-> > +}
-> > +EXPORT_SYMBOL_GPL(olpc_ec_mask_write);
-> 
-> I see that the above is inherited from older code, so, no need to
-> address those comments in here, but consider a follow up fix.
-> 
-> 
-> > +int olpc_ec_sci_query(u16 *sci_value)
-> > +{
-> > +}
-> > +EXPORT_SYMBOL_GPL(olpc_ec_sci_query);
-> 
-> Similar comments are applied here.
-> 
-> > +
-> > -       err = ec_driver->probe ? ec_driver->probe(pdev) : 0;
-> > +       /* get the EC revision */
-> > +       err = olpc_ec_cmd(EC_FIRMWARE_REV, NULL, 0,
-> > +               (unsigned char *) &ec->version, 1);
-> 
-> Perhaps version should be defined as u8.
-
-Yes.
-
-> > +/* SCI source values */
-> > +#define EC_SCI_SRC_EMPTY        0x00
-> > +#define EC_SCI_SRC_GAME         0x01
-> > +#define EC_SCI_SRC_BATTERY      0x02
-> > +#define EC_SCI_SRC_BATSOC       0x04
-> > +#define EC_SCI_SRC_BATERR       0x08
-> > +#define EC_SCI_SRC_EBOOK        0x10    /* XO-1 only */
-> > +#define EC_SCI_SRC_WLAN         0x20    /* XO-1 only */
-> > +#define EC_SCI_SRC_ACPWR        0x40
-> > +#define EC_SCI_SRC_BATCRIT      0x80
-> > +#define EC_SCI_SRC_GPWAKE       0x100   /* XO-1.5 only */
-> 
-> BIT() ?
-> 
-> > +#define EC_SCI_SRC_ALL          0x1FF
-> 
-> GENMASK()?
-
-Yes. I meant to move this, but it turns out I've left the original ones
-in place. Will fix them in a follow-up commit also.
-
-Lubo
