@@ -1,32 +1,99 @@
-From: daniel@zonque.org (Daniel Mack)
-Date: Wed, 14 Nov 2018 20:58:00 +0100
-Subject: [PATCH] ARM: dts: pxa3xx: add gcu node
-In-Reply-To: <87muqgll3u.fsf@belgarion.home>
-References: <20181105191827.3860-1-daniel@zonque.org>
- <87muqgll3u.fsf@belgarion.home>
-Message-ID: <c4ea09bc-93b5-49f6-9059-a74dcdbc59a6@zonque.org>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Wed, 14 Nov 2018 21:06:23 +0100
+Subject: [PATCH v10 12/22] kasan, arm64: fix up fault handling logic
+In-Reply-To: <20181113220728.2h3kz67b2bz36wty@blommer>
+References: <cover.1541525354.git.andreyknvl@google.com>
+ <4891a504adf61c0daf1e83642b6f7519328dfd5f.1541525354.git.andreyknvl@google.com>
+ <20181108122228.xqwhpkjritrvqneq@lakrids.cambridge.arm.com>
+ <CAAeHK+xPkbg_9P9oCkS-iB8S81vTxD3p5SbyWHy-vrp2ybkKmg@mail.gmail.com>
+ <20181113220728.2h3kz67b2bz36wty@blommer>
+Message-ID: <CAAeHK+xe5LqbyWnYSDv2+QrLR=GK0JMzniAZBfL8kjXRwJravA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On 10/11/2018 9:43 PM, Robert Jarzmik wrote:
-> Daniel Mack <daniel@zonque.org> writes:
-> 
->> Add a device node for hardware graphic acceleration.
+On Tue, Nov 13, 2018 at 11:07 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 13, 2018 at 04:01:27PM +0100, Andrey Konovalov wrote:
+>> On Thu, Nov 8, 2018 at 1:22 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Tue, Nov 06, 2018 at 06:30:27PM +0100, Andrey Konovalov wrote:
+>> >> show_pte in arm64 fault handling relies on the fact that the top byte of
+>> >> a kernel pointer is 0xff, which isn't always the case with tag-based
+>> >> KASAN.
+>> >
+>> > That's for the TTBR1 check, right?
+>> >
+>> > i.e. for the following to work:
+>> >
+>> >         if (addr >= VA_START)
+>> >
+>> > ... we need the tag bits to be an extension of bit 55...
+>> >
+>> >>
+>> >> This patch resets the top byte in show_pte.
+>> >>
+>> >> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+>> >> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+>> >> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+>> >> ---
+>> >>  arch/arm64/mm/fault.c | 3 +++
+>> >>  1 file changed, 3 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> >> index 7d9571f4ae3d..d9a84d6f3343 100644
+>> >> --- a/arch/arm64/mm/fault.c
+>> >> +++ b/arch/arm64/mm/fault.c
+>> >> @@ -32,6 +32,7 @@
+>> >>  #include <linux/perf_event.h>
+>> >>  #include <linux/preempt.h>
+>> >>  #include <linux/hugetlb.h>
+>> >> +#include <linux/kasan.h>
+>> >>
+>> >>  #include <asm/bug.h>
+>> >>  #include <asm/cmpxchg.h>
+>> >> @@ -141,6 +142,8 @@ void show_pte(unsigned long addr)
+>> >>       pgd_t *pgdp;
+>> >>       pgd_t pgd;
+>> >>
+>> >> +     addr = (unsigned long)kasan_reset_tag((void *)addr);
+>> >
+>> > ... but this ORs in (0xffUL << 56), which is not correct for addresses
+>> > which aren't TTBR1 addresses to begin with, where bit 55 is clear, and
+>> > throws away useful information.
+>> >
+>> > We could use untagged_addr() here, but that wouldn't be right for
+>> > kernels which don't use TBI1, and we'd erroneously report addresses
+>> > under the TTBR1 range as being in the TTBR1 range.
+>> >
+>> > I also see that the entry assembly for el{1,0}_{da,ia} clears the tag
+>> > for EL0 addresses.
+>> >
+>> > So we could have:
+>> >
+>> > static inline bool is_ttbr0_addr(unsigned long addr)
+>> > {
+>> >         /* entry assembly clears tags for TTBR0 addrs */
+>> >         return addr < TASK_SIZE_64;
+>> > }
+>> >
+>> > static inline bool is_ttbr1_addr(unsigned long addr)
+>> > {
+>> >         /* TTBR1 addresses may have a tag if HWKASAN is in use */
+>> >         return arch_kasan_reset_tag(addr) >= VA_START;
+>> > }
+>> >
+>> > ... and use those in the conditionals, leaving the addr as-is for
+>> > reporting purposes.
 >>
->> Signed-off-by: Daniel Mack <daniel@zonque.org>
-> Hi Daniel,
-> 
->> +	gcu: display-controller at 54000000 {
->> +		compatible = "marvell,pxa300-gcu";
-> Isn't every IP devicetree entry supposed to have a documentation in
-> Documentation/devicetree going along a definition in the .dtsi files ?
+>> Actually it looks like 276e9327 ("arm64: entry: improve data abort
+>> handling of tagged pointers") already takes care of both user and
+>> kernel fault addresses and correctly removes tags from them. So I
+>> think we need to drop this patch.
+>
+> The clear_address_tag macro added in that commit only removes tags from TTBR0
+> addresses, so that's not sufficient if the kernel is used tagged addresses
+> (which will be in the TTBR1 range).
 
-Ah, that's already there, see cf925575d292b.
-
-I did that when I taught the driver DT probing.
-
-
-Thanks,
-Daniel
+Do I understand correctly that TTBR0 means user space addresses and
+TTBR1 means kernel addresses? In that commit I see that the
+clear_address_tag() macro is used in el0_da and in el1_da, which means
+that it untags both user and kernel addresses (on data aborts). Do I
+misunderstand something?
