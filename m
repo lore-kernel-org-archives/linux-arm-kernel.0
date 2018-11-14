@@ -1,38 +1,35 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 14 Nov 2018 13:32:36 +0100
-Subject: [PATCH 1/4] pwm: Add new helper to initialize a pwm_state
- variable with defaults
-In-Reply-To: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
-References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20181114123236.GG2620@ulmo>
+Date: Wed, 14 Nov 2018 13:47:52 +0100
+Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
+In-Reply-To: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+Message-ID: <20181114124752.GI2620@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 26, 2018 at 08:41:55PM +0200, Uwe Kleine-K?nig wrote:
-> This helps to convert drivers from the legacy API to pwm_apply_state without
-> having to make the aware of the configured polarity (and in some cases even
-> period).
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  include/linux/pwm.h | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
+On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
+> The flag 'has_clks' and related checks are superfluous as the CCF
+> subsystem does this for you.
 
-So if I understand your intention correctly here you want consumers to
-be able to get at the default state, which would be the state as it was
-"configured" in DT or the PWM lookup table so that you can modify that
-state (well, really just setting the duty-cycle) before you actually
-send the state to the hardware.
+Both of these mechanisms aren't equivalent. While CCF can deal with
+optional clocks, what the has_clks flag actually means is that the
+device doesn't need a clock (or doesn't have a clock input) on the
+devices where it is cleared.
 
-So the difference to pwm_apply_args() is that you don't want the driver
-to specifically program a duty cycle of 0 before setting the actual duty
-cycle that you want to set.
+So I'd actually be in favor of keeping the has_clks property because it
+serves as an additional sanity check. For example if you run this driver
+on an SoC that "has clocks" but if you don't list them in DT, then after
+this patch the driver will happily continue without clocks, even though
+it may break completely without those clocks. I've seen SoCs respond to
+disabled clocks for a hardware block in different ways, in many cases an
+access to any of the registers will completely hang the CPU. In other
+cases it may just crash in some other way or give you some sort of
+machine exception. None of those are good, and make the tiny bit of
+additional code required to support the has_clks flag very attractive.
 
-Is that about right?
-
-Isn't that exactly what pwm_init_state() already does? pwm-backlight
-uses it for exactly the same purpose that you seem to be using it in
-RX1950 backlight control.
+But that's just my opinion. If you prefer to throw away that safety
+barrier, be my guest. But if you do, please move this functionality into
+the clock framework first and then make the driver use it.
 
 Thierry
 -------------- next part --------------
@@ -41,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181114/493f7c6e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181114/ec0f0a69/attachment.sig>
