@@ -1,93 +1,162 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Wed, 14 Nov 2018 13:01:39 +0000
-Subject: [PATCH V6 2/9] clk: fractional-divider: add
- CLK_FRAC_DIVIDER_ZERO_BASED flag support
+Date: Wed, 14 Nov 2018 13:01:51 +0000
+Subject: [PATCH V6 5/9] clk: imx: add imx7ulp composite clk support
 In-Reply-To: <1542200198-3017-1-git-send-email-aisheng.dong@nxp.com>
 References: <1542200198-3017-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1542200198-3017-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1542200198-3017-6-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding CLK_FRAC_DIVIDER_ZERO_BASED flag to indicate the numerator and
-denominator value in register are start from 0.
+The imx composite clk is designed for Peripheral Clock Control (PCC)
+module observed in IMX ULP SoC series.
 
-This can be used to support frac dividers like below:
-Divider output clock = Divider input clock x [(frac +1) / (div +1)]
-where frac/div in register is:
-000b - Divide by 1.
-001b - Divide by 2.
-010b - Divide by 3.
+NOTE pcc can only be operated when clk is gated.
 
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Anson Huang <Anson.Huang@nxp.com>
+Cc: Bai Ping <ping.bai@nxp.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
 ---
 ChangeLog:
+v4->v5:
+ * rename to clk-composite-7ulp.c as we have another
+   clk-composite-8m.c, function name also changed accordingly
 v3->v4:
  * no changes
 v2->v3:
  * no changes
 v1->v2:
- * improve comments suggested by Stephen
+ * remove an unneeded blank line change
+ * use clk_hw_register
 ---
- drivers/clk/clk-fractional-divider.c | 10 ++++++++++
- include/linux/clk-provider.h         |  8 ++++++++
- 2 files changed, 18 insertions(+)
+ drivers/clk/imx/Makefile             |  1 +
+ drivers/clk/imx/clk-composite-7ulp.c | 85 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h                |  6 +++
+ 3 files changed, 92 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-composite-7ulp.c
 
-diff --git a/drivers/clk/clk-fractional-divider.c b/drivers/clk/clk-fractional-divider.c
-index fdf625f..7ccde6b 100644
---- a/drivers/clk/clk-fractional-divider.c
-+++ b/drivers/clk/clk-fractional-divider.c
-@@ -40,6 +40,11 @@ static unsigned long clk_fd_recalc_rate(struct clk_hw *hw,
- 	m = (val & fd->mmask) >> fd->mshift;
- 	n = (val & fd->nmask) >> fd->nshift;
- 
-+	if (fd->flags & CLK_FRAC_DIVIDER_ZERO_BASED) {
-+		m++;
-+		n++;
-+	}
-+
- 	if (!n || !m)
- 		return parent_rate;
- 
-@@ -103,6 +108,11 @@ static int clk_fd_set_rate(struct clk_hw *hw, unsigned long rate,
- 			GENMASK(fd->mwidth - 1, 0), GENMASK(fd->nwidth - 1, 0),
- 			&m, &n);
- 
-+	if (fd->flags & CLK_FRAC_DIVIDER_ZERO_BASED) {
-+		m--;
-+		n--;
-+	}
-+
- 	if (fd->lock)
- 		spin_lock_irqsave(fd->lock, flags);
- 	else
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 08b1aa7..bee6453 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -594,6 +594,12 @@ void clk_hw_unregister_fixed_factor(struct clk_hw *hw);
-  * @lock:	register lock
-  *
-  * Clock with adjustable fractional divider affecting its output frequency.
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index e7248de..a5cab3e 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -4,6 +4,7 @@ obj-y += \
+ 	clk.o \
+ 	clk-busy.o \
+ 	clk-cpu.o \
++	clk-composite-7ulp.o \
+ 	clk-divider-gate.o \
+ 	clk-fixup-div.o \
+ 	clk-fixup-mux.o \
+diff --git a/drivers/clk/imx/clk-composite-7ulp.c b/drivers/clk/imx/clk-composite-7ulp.c
+new file mode 100644
+index 0000000..22f679c
+--- /dev/null
++++ b/drivers/clk/imx/clk-composite-7ulp.c
+@@ -0,0 +1,85 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * Copyright (C) 2016 Freescale Semiconductor, Inc.
++ * Copyright 2017~2018 NXP
 + *
-+ * Flags:
-+ * CLK_FRAC_DIVIDER_ZERO_BASED - by default the numerator and denominator
-+ *	is the value read from the register. If CLK_FRAC_DIVIDER_ZERO_BASED
-+ *	is set then the numerator and denominator are both the value read
-+ *	plus one.
-  */
- struct clk_fractional_divider {
- 	struct clk_hw	hw;
-@@ -613,6 +619,8 @@ struct clk_fractional_divider {
- 
- #define to_clk_fd(_hw) container_of(_hw, struct clk_fractional_divider, hw)
- 
-+#define CLK_FRAC_DIVIDER_ZERO_BASED		BIT(0)
++ */
 +
- extern const struct clk_ops clk_fractional_divider_ops;
- struct clk *clk_register_fractional_divider(struct device *dev,
- 		const char *name, const char *parent_name, unsigned long flags,
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/slab.h>
++
++#define PCG_PCS_SHIFT	24
++#define PCG_PCS_MASK	0x7
++#define PCG_CGC_SHIFT	30
++#define PCG_FRAC_SHIFT	3
++#define PCG_FRAC_WIDTH	1
++#define PCG_FRAC_MASK	BIT(3)
++#define PCG_PCD_SHIFT	0
++#define PCG_PCD_WIDTH	3
++#define PCG_PCD_MASK	0x7
++
++struct clk_hw *imx7ulp_clk_composite(const char *name,
++				     const char * const *parent_names,
++				     int num_parents, bool mux_present,
++				     bool rate_present, bool gate_present,
++				     void __iomem *reg)
++{
++	struct clk_hw *mux_hw = NULL, *fd_hw = NULL, *gate_hw = NULL;
++	struct clk_fractional_divider *fd = NULL;
++	struct clk_gate *gate = NULL;
++	struct clk_mux *mux = NULL;
++	struct clk_hw *hw;
++
++	if (mux_present) {
++		mux = kzalloc(sizeof(*mux), GFP_KERNEL);
++		if (!mux)
++			return ERR_PTR(-ENOMEM);
++		mux_hw = &mux->hw;
++		mux->reg = reg;
++		mux->shift = PCG_PCS_SHIFT;
++		mux->mask = PCG_PCS_MASK;
++	}
++
++	if (rate_present) {
++		fd = kzalloc(sizeof(*fd), GFP_KERNEL);
++		if (!fd) {
++			kfree(mux);
++			return ERR_PTR(-ENOMEM);
++		}
++		fd_hw = &fd->hw;
++		fd->reg = reg;
++		fd->mshift = PCG_FRAC_SHIFT;
++		fd->mwidth = PCG_FRAC_WIDTH;
++		fd->mmask  = PCG_FRAC_MASK;
++		fd->nshift = PCG_PCD_SHIFT;
++		fd->nwidth = PCG_PCD_WIDTH;
++		fd->nmask = PCG_PCD_MASK;
++		fd->flags = CLK_FRAC_DIVIDER_ZERO_BASED;
++	}
++
++	if (gate_present) {
++		gate = kzalloc(sizeof(*gate), GFP_KERNEL);
++		if (!gate) {
++			kfree(mux);
++			kfree(fd);
++			return ERR_PTR(-ENOMEM);
++		}
++		gate_hw = &gate->hw;
++		gate->reg = reg;
++		gate->bit_idx = PCG_CGC_SHIFT;
++	}
++
++	hw = clk_hw_register_composite(NULL, name, parent_names, num_parents,
++				       mux_hw, &clk_mux_ops, fd_hw,
++				       &clk_fractional_divider_ops, gate_hw,
++				       &clk_gate_ops, CLK_SET_RATE_GATE |
++				       CLK_SET_PARENT_GATE);
++	if (IS_ERR(hw)) {
++		kfree(mux);
++		kfree(fd);
++		kfree(gate);
++	}
++
++	return hw;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index ebeb754..2e3bcfa 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -71,6 +71,12 @@ struct clk *imx_clk_busy_mux(const char *name, void __iomem *reg, u8 shift,
+ 			     u8 width, void __iomem *busy_reg, u8 busy_shift,
+ 			     const char **parent_names, int num_parents);
+ 
++struct clk_hw *imx7ulp_clk_composite(const char *name,
++				     const char * const *parent_names,
++				     int num_parents, bool mux_present,
++				     bool rate_present, bool gate_present,
++				     void __iomem *reg);
++
+ struct clk *imx_clk_fixup_divider(const char *name, const char *parent,
+ 				  void __iomem *reg, u8 shift, u8 width,
+ 				  void (*fixup)(u32 *val));
 -- 
 2.7.4
