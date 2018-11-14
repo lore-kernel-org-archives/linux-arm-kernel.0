@@ -1,87 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 14 Nov 2018 09:32:42 +0530
-Subject: [PATCH v4] cpufreq: ti-cpufreq: Only register platform_device
- when supported
-In-Reply-To: <20181113193040.15181-1-d-gerlach@ti.com>
-References: <20181113193040.15181-1-d-gerlach@ti.com>
-Message-ID: <20181114040242.wfpvazl62g6phy3o@vireshk-i7>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Wed, 14 Nov 2018 09:58:36 +0530
+Subject: [PATCH v3 1/2] dt-bindings: gpu: mali-utgard: Add compatible for A64
+ Mali
+Message-ID: <20181114042837.15149-1-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-11-18, 13:30, Dave Gerlach wrote:
-> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
-> the driver to probe on any platforms where the driver is built in.
-> However, this should only happen on platforms that actually can make use
-> of the driver. There is already functionality in place to match the
-> SoC compatible so let's factor this out into a separate call and
-> make sure we find a match before creating the ti-cpufreq platform device.
-> 
-> Reviewed-by: Johan Hovold <johan@kernel.org>
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v3->v4: Use platform_device_register_data rather than
-> 	platform_device_register_resndata as we are only passing data.
-> 
-> 	v3: https://patchwork.kernel.org/patch/10681161/
-> 
->  drivers/cpufreq/ti-cpufreq.c | 26 +++++++++++++++++++++-----
->  1 file changed, 21 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
-> index 3f0e2a14895a..22b53bf26817 100644
-> --- a/drivers/cpufreq/ti-cpufreq.c
-> +++ b/drivers/cpufreq/ti-cpufreq.c
-> @@ -201,19 +201,28 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
->  	{},
->  };
->  
-> +static const struct of_device_id *ti_cpufreq_match_node(void)
-> +{
-> +	struct device_node *np;
-> +	const struct of_device_id *match;
-> +
-> +	np = of_find_node_by_path("/");
-> +	match = of_match_node(ti_cpufreq_of_match, np);
-> +	of_node_put(np);
-> +
-> +	return match;
-> +}
-> +
->  static int ti_cpufreq_probe(struct platform_device *pdev)
->  {
->  	u32 version[VERSION_COUNT];
-> -	struct device_node *np;
->  	const struct of_device_id *match;
->  	struct opp_table *ti_opp_table;
->  	struct ti_cpufreq_data *opp_data;
->  	const char * const reg_names[] = {"vdd", "vbb"};
->  	int ret;
->  
-> -	np = of_find_node_by_path("/");
-> -	match = of_match_node(ti_cpufreq_of_match, np);
-> -	of_node_put(np);
-> +	match = dev_get_platdata(&pdev->dev);
->  	if (!match)
->  		return -ENODEV;
->  
-> @@ -290,7 +299,14 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
->  
->  static int ti_cpufreq_init(void)
->  {
-> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
-> +	const struct of_device_id *match;
-> +
-> +	/* Check to ensure we are on a compatible platform */
-> +	match = ti_cpufreq_match_node();
-> +	if (match)
-> +		platform_device_register_data(NULL, "ti-cpufreq", -1, match,
-> +					      sizeof(*match));
-> +
->  	return 0;
->  }
->  module_init(ti_cpufreq_init);
+Allwinner A64 has Mali-400MP2, so document the relevant compatible
+as "allwinner,sun50i-a64-mali" along with reset line.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v3:
+- document reset line
+Changes for v2:
+- New patch, separated from previous version patch.
 
+ Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+index 63cd91176a68..3f128e4f95c6 100644
+--- a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
++++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+@@ -11,6 +11,7 @@ Required properties:
+       + allwinner,sun4i-a10-mali
+       + allwinner,sun7i-a20-mali
+       + allwinner,sun8i-h3-mali
++      + allwinner,sun50i-a64-mali
+       + allwinner,sun50i-h5-mali
+       + amlogic,meson-gxbb-mali
+       + amlogic,meson-gxl-mali
+@@ -73,6 +74,10 @@ to specify one more vendor-specific compatible, among:
+     Required properties:
+       * resets: phandle to the reset line for the GPU
+ 
++  - allwinner,sun50i-a64-mali
++    Required properties:
++      * resets: phandle to the reset line for the GPU
++
+   - allwinner,sun50i-h5-mali
+     Required properties:
+       * resets: phandle to the reset line for the GPU
 -- 
-viresh
+2.18.0.321.gffc6fa0e3
