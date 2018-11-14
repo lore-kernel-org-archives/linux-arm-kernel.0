@@ -1,164 +1,41 @@
-From: icenowy@aosc.io (Icenowy Zheng)
-Date: Wed, 14 Nov 2018 18:30:24 +0800
-Subject: [linux-sunxi] [PATCH v4 04/10] arm64: allwinner: dts: h6: add
- USB2-related device nodes
-In-Reply-To: <CAGb2v668dozjLm9mWUw_Y12AZ6DM2ku9dgQ8B8feABNeFf3QSw@mail.gmail.com>
-References: <20181004122855.22981-1-icenowy@aosc.io>
- <20181004122855.22981-5-icenowy@aosc.io>
- <CAGb2v668dozjLm9mWUw_Y12AZ6DM2ku9dgQ8B8feABNeFf3QSw@mail.gmail.com>
-Message-ID: <4B5BD39B-22E2-4DEA-A199-29094DB8C317@aosc.io>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Wed, 14 Nov 2018 11:34:27 +0100
+Subject: PCMCIA / PXA27X / CPUFREQ
+In-Reply-To: <CAJD+NwpE+uS99fe2uXM0X6WwRyegTm3wXNHWPM_xM0r3+nrhBw@mail.gmail.com>
+ (Greg's message of "Tue, 6 Nov 2018 18:00:49 +1300")
+References: <CAJD+NwqUdDRFisnPtj9QCm=F2bHMSMfRkK1UWedJcS6_UmLhYg@mail.gmail.com>
+ <87efc0oatr.fsf@belgarion.home>
+ <CAJD+NwpE+uS99fe2uXM0X6WwRyegTm3wXNHWPM_xM0r3+nrhBw@mail.gmail.com>
+Message-ID: <87pnv8j6bw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Greg <greguu@null.net> writes:
 
+> On Mon, 5 Nov 2018 at 09:18, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>
+>> Greg <greguu@null.net> writes:
+>>
+>> > Hi Robert,
+>>
+>> Hi Greg,
+>>
+>> I will make some tests next week to confirm your status, I don't seem to
+>> remember any specific issue on PCMCIA lately, but that was before v4.19 so one
+>> might have sneaked it.
+>>
+> It sneaked in a some time ago, I think with 4.8 or so but it took us a
+> while to find out what is causing it and report it.
+Ok Greg, I made some preliminary tests.
 
-? 2018?11?14? GMT+08:00 ??6:21:33, Chen-Yu Tsai <wens@csie.org> ??:
->Hi,
->
->On Thu, Oct 4, 2018 at 8:30 PM Icenowy Zheng <icenowy@aosc.io> wrote:
->>
->> Allwinner H6 has two USB2 ports, one OTG and one host-only.
->>
->> Add device tree nodes related to them.
->>
->> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
->> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->> No changes in v4.
->>
->> Changes in v3:
->> - Removed the wrongly introduced usb3phy node.
->> - Added Chen-Yu's Review tag.
->>
->>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 81
->++++++++++++++++++++
->>  1 file changed, 81 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> index 040828d2e2c0..3d60af6cb3ae 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
->> @@ -258,6 +258,87 @@
->>                         status = "disabled";
->>                 };
->>
->> +               usb2otg: usb at 5100000 {
->> +                       compatible = "allwinner,sun8i-a33-musb";
->
->I added an SoC-specific compatible: "allwinner,sun50i-h6-musb".
->
->I'm also curious as to whether the MUSB controller was tested or not,
->since Allwinner now has EHCI/OHCI host pairs for host mode, and the
->Pine H64
->only does host mode.
+On my side, the PCMCIA insertion is not detected as well. I'm pretty sure though
+it was working April 21st, 2018, as I have evidence in my git trees I made the
+test.
 
-USB plug-in detection relays on MUSB if it's enabled.
+I will investigate on my side now I know the problem can be reproduced, even if
+my case could be some issue on the test platform ...
 
->
->> +                       reg = <0x05100000 0x0400>;
->> +                       clocks = <&ccu CLK_BUS_OTG>;
->> +                       resets = <&ccu RST_BUS_OTG>;
->> +                       interrupts = <GIC_SPI 23
->IRQ_TYPE_LEVEL_HIGH>;
->> +                       interrupt-names = "mc";
->> +                       phys = <&usb2phy 0>;
->> +                       phy-names = "usb";
->> +                       extcon = <&usb2phy 0>;
->> +                       status = "disabled";
->> +               };
->> +
->> +               usb2phy: phy at 5100400 {
->> +                       compatible = "allwinner,sun50i-h6-usb-phy";
->> +                       reg = <0x05100400 0x14>,
->> +                             <0x05101800 0x4>,
->> +                             <0x05311800 0x4>;
->> +                       reg-names = "phy_ctrl",
->> +                                   "pmu0",
->> +                                   "pmu3";
->> +                       clocks = <&ccu CLK_USB_PHY0>,
->> +                                <&ccu CLK_USB_PHY3>;
->> +                       clock-names = "usb0_phy",
->> +                                     "usb3_phy";
->> +                       resets = <&ccu RST_USB_PHY0>,
->> +                                <&ccu RST_USB_PHY3>;
->> +                       reset-names = "usb0_reset",
->> +                                     "usb3_reset";
->> +                       status = "disabled";
->> +                       #phy-cells = <1>;
->> +               };
->> +
->> +               ehci0: usb at 5101000 {
->> +                       compatible = "allwinner,sun50i-h6-ehci",
->"generic-ehci";
->> +                       reg = <0x05101000 0x100>;
->> +                       interrupts = <GIC_SPI 24
->IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ccu CLK_BUS_OHCI0>,
->> +                                <&ccu CLK_BUS_EHCI0>,
->> +                                <&ccu CLK_USB_OHCI0>;
->> +                       resets = <&ccu RST_BUS_OHCI0>,
->> +                                <&ccu RST_BUS_EHCI0>;
->> +                       status = "disabled";
->> +               };
->> +
->> +               ohci0: usb at 5101400 {
->> +                       compatible = "allwinner,sun50i-h6-ohci",
->"generic-ohci";
->> +                       reg = <0x05101400 0x100>;
->> +                       interrupts = <GIC_SPI 25
->IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ccu CLK_BUS_OHCI0>,
->> +                                <&ccu CLK_USB_OHCI0>;
->> +                       resets = <&ccu RST_BUS_OHCI0>;
->> +                       status = "disabled";
->> +               };
->> +
->> +               ehci3: usb at 5311000 {
->> +                       compatible = "allwinner,sun50i-h6-ehci",
->"generic-ehci";
->> +                       reg = <0x05311000 0x100>;
->> +                       interrupts = <GIC_SPI 28
->IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ccu CLK_BUS_OHCI3>,
->> +                                <&ccu CLK_BUS_EHCI3>,
->> +                                <&ccu CLK_USB_OHCI3>;
->> +                       resets = <&ccu RST_BUS_OHCI3>,
->> +                                <&ccu RST_BUS_EHCI3>;
->> +                       phys = <&usb2phy 3>;
->> +                       phy-names = "usb";
->> +                       status = "disabled";
->> +               };
->> +
->> +               ohci3: usb at 5311400 {
->> +                       compatible = "allwinner,sun50i-h6-ohci",
->"generic-ohci";
->> +                       reg = <0x05311400 0x100>;
->> +                       interrupts = <GIC_SPI 29
->IRQ_TYPE_LEVEL_HIGH>;
->> +                       clocks = <&ccu CLK_BUS_OHCI3>,
->> +                                <&ccu CLK_USB_OHCI3>;
->> +                       resets = <&ccu RST_BUS_OHCI3>;
->> +                       phys = <&usb2phy 3>;
->> +                       phy-names = "usb";
->> +                       status = "disabled";
->> +               };
->> +
->
->This didn't apply cleanly due to the new HDMI nodes. I fixed it up
->locally.
->
->ChenYu
->
->>                 r_ccu: clock at 7010000 {
->>                         compatible = "allwinner,sun50i-h6-r-ccu";
->>                         reg = <0x07010000 0x400>;
->> --
->> 2.18.0
->>
->> --
->> You received this message because you are subscribed to the Google
->Groups "linux-sunxi" group.
->> To unsubscribe from this group and stop receiving emails from it,
->send an email to linux-sunxi+unsubscribe at googlegroups.com.
->> For more options, visit https://groups.google.com/d/optout.
+Cheers.
+
+--
+Robert
