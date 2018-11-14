@@ -1,105 +1,132 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Nov 2018 00:13:40 +0800
-Subject: [PATCH 01/15] dt-bindings: net: broadcom-bluetooth: Fix external
- clock names
-In-Reply-To: <CAL_JsqJrJHatiYB=Vaakbi1UUGOkqvAkZnZRG=zz5Ae_RzxGgg@mail.gmail.com>
-References: <20181107101308.7626-1-wens@csie.org>
- <20181107101308.7626-2-wens@csie.org>
- <5bea0ebe.1c69fb81.e15d7.98e1@mx.google.com>
- <CAGb2v65PqwKrRdh2_Y48zYnmJa0=hv3Bd4UdvdWvBBMfT2BfSw@mail.gmail.com>
- <CAL_JsqJrJHatiYB=Vaakbi1UUGOkqvAkZnZRG=zz5Ae_RzxGgg@mail.gmail.com>
-Message-ID: <CAGb2v651WWMJigwLFneg6wXcwUeZKF0CooWe5bFpROMcjfn91A@mail.gmail.com>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Wed, 14 Nov 2018 17:20:53 +0100
+Subject: [PATCH 08/15] Platform: OLPC: Move EC-specific functionality
+ out from x86
+In-Reply-To: <CAHp75VfVYUyurEkrCuRsuC_jk94e3CqsxPket+DZqNk0VNMPFA@mail.gmail.com>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-9-lkundrak@v3.sk>
+ <CAHp75VfVYUyurEkrCuRsuC_jk94e3CqsxPket+DZqNk0VNMPFA@mail.gmail.com>
+Message-ID: <df41a91f83387770de53bde204365ae85f2137dc.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 11:51 PM Rob Herring <robh@kernel.org> wrote:
->
-> On Tue, Nov 13, 2018 at 9:15 PM Chen-Yu Tsai <wens@csie.org> wrote:
-> >
-> > On Tue, Nov 13, 2018 at 7:37 AM Rob Herring <robh@kernel.org> wrote:
-> > >
-> > > On Wed, Nov 07, 2018 at 06:12:54PM +0800, Chen-Yu Tsai wrote:
-> > > > The Broadcom Bluetooth controllers can take up to two external clocks:
-> > > > an external frequency reference, substituting the main crystal, and a
-> > > > LPO clock at 32.768 kHz substituting the internal LPO clock.
-> > > >
-> > > > In particular, the external LPO clock must be used when the controller
-> > > > does not have NVRAM connected, and the main reference frequency is not
-> > > > the default 20 MHz. This is described in detail in the datasheet.
-> > > >
-> > > > The original "extclk" clock name is ambiguous as to which of these it
-> > > > refers to, and some designs might even require both.
-> > > >
-> > > > This patch deprecates the existing name, and adds "txco" and "lpo".
-> > > >
-> > > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > > ---
-> > > >  Documentation/devicetree/bindings/net/broadcom-bluetooth.txt | 5 ++++-
-> > > >  1 file changed, 4 insertions(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > > > index 4194ff7e6ee6..2535e54219af 100644
-> > > > --- a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > > > +++ b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-> > > > @@ -18,7 +18,10 @@ Optional properties:
-> > > >   - shutdown-gpios: GPIO specifier, used to enable the BT module
-> > > >   - device-wakeup-gpios: GPIO specifier, used to wakeup the controller
-> > > >   - host-wakeup-gpios: GPIO specifier, used to wakeup the host processor
-> > > > - - clocks: clock specifier if external clock provided to the controller
-> > > > + - clocks and clock-names: clock specifier if external clocks are provided
-> > > > +   - "txco": external reference clock
-> > > > +   - "extclk": deprecated, replaced by "txco"
-> > > > +   - "lpo": external low power 32.768 kHz clock
-> > > >   - clock-names: should be "extclk"
-> > >
-> > > This line should change?
-> >
-> > Yes. Missed that.
-> >
-> > >
-> > > 'clocks' needs to describe how many clocks and the order of them.
-> > >
-> > > 'clock-names' needs to list the names. Keep them separate.
-> >
-> > I was under the impression that when clock-names was used, the
-> > order of clocks shouldn't matter.
->
-> Generally, no. The order should be defined still.
->
-> > Also, both clocks are optional. The controller can use a standalone
-> > crystal instead of an external TXCO, which would not get described in
-> > the device tree, and/or not use an LPO clock. How would one describe
-> > a device that has an LPO clock input but not a TXCO clock input?
->
-> A crystal would still be a fixed-clock. Does s/w need to know which one it is?
+Hello,
 
-The datasheet doesn't mention anything s/w related. It does provide
-a CLK_REQ signal that the application can use to determine if the
-TXCO signal is required or not, but then again one can just enable
-it as part of the power sequencing. TXCO is general connected to the
-same pin as an XTAL input, so nothing s/w related there.
+On Fri, 2018-10-19 at 16:36 +0300, Andy Shevchenko wrote:
+> On Wed, Oct 10, 2018 at 8:24 PM Lubomir Rintel <lkundrak@v3.sk>
+> wrote:
+> > It is actually plaform independent. Move it to the olpc-ec driver
+> > from
+> > the X86 OLPC platform, so that it could be used by the ARM based
+> > laptops
+> > too.
+> 
+> What is platform independent exactly?
 
-As for the clock rate, the hardware detects it via some measuring
-mechanism that requires the LPO clock be provided. Or the clock rate
-is provided through NVRAM, or if it's one of the two standard rates,
-using a latched pin. Hence I think if a crystal is used, it doesn't
-need to go into the device tree.
+The commands with their argument and responses are mostly the same, but
+the delivery mechanism is different (SPI on ARM vs. LPC on x86).
 
-> Your's is a case where index alone doesn't work and you need
-> clock-names. But still, you should define the order for when both
-> clocks are present so we don't end with both orders for no good
-> reason.
+Notably, the driver for the OLPC battery (which is the same on all XO
+generations) builds on the API provided by the olpc-ec driver.
 
-I see. That makes sense.
+I'll try to extend the commit message to make this clear.
 
-> > Last, IMHO listing them with name + description, one item per line
-> > is more readable then having the items on one line, then having the
-> > next line list all their respective names. If ordering and number of
-> > items is important, I could add the requirements to the description
-> > of "clocks and clock-names"?
->
-> clocks can just say something like "1 or 2 clocks as defined in clock-names".
+> >  #define OLPC_F_PRESENT         0x01
+> >  #define OLPC_F_DCON            0x02
+> > -#define OLPC_F_EC_WIDE_SCI     0x04
+> 
+> I think these lines grouped on purpose. Thus, I don't like this.
+> Either move either all or none.
 
-OK. I'll rework this.
+I'm not moving this -- I'm removing it and using the EC version
+instead.
 
-ChenYu
+This flag doesn't make sense for non-x86 ECs -- they don't use SCIs to
+deliver EC-to-CPU communication, but initiate SPI transactions instead.
+
+> 
+> > +int olpc_ec_mask_write(u16 bits)
+> > +{
+> >  #ifdef CONFIG_DEBUG_FS
+> > 
+> >  /*
+> > @@ -277,14 +369,17 @@ static int olpc_ec_probe(struct
+> > platform_device *pdev)
+> >         ec_priv = ec;
+> >         platform_set_drvdata(pdev, ec);
+> > 
+> > +       /* EC version 0x5f adds support for wide SCI mask */
+> > +       if (ec->version >= 0x5f) {
+> > +               __be16 ec_word = cpu_to_be16(bits);
+> > +
+> > +               return olpc_ec_cmd(EC_WRITE_EXT_SCI_MASK, (void *)
+> > &ec_word, 2,
+> > +                                  NULL, 0);
+> 
+> I would leave it on one line.
+
+Okay. I do agree this looks better, but was not sure how seriously to
+take checkpatch.pl's warnings.
+
+> 
+> > +       } else {
+> > +               unsigned char ec_byte = bits & 0xff;
+> 
+> You may noticed that the parameter is of type u8, which clearly makes
+> & 0xff part redundant.
+
+At least for me, the explicit mask makes this easier for me to read.
+
+But I don't mind really. If you'd really like to see this changes I can
+follow up with such change (or am happy to ack such change from you).
+
+> 
+> > +               return olpc_ec_cmd(EC_WRITE_SCI_MASK, &ec_byte, 1,
+> > NULL, 0);
+> > +       }
+> > +}
+> > +EXPORT_SYMBOL_GPL(olpc_ec_mask_write);
+> 
+> I see that the above is inherited from older code, so, no need to
+> address those comments in here, but consider a follow up fix.
+> 
+> 
+> > +int olpc_ec_sci_query(u16 *sci_value)
+> > +{
+> > +}
+> > +EXPORT_SYMBOL_GPL(olpc_ec_sci_query);
+> 
+> Similar comments are applied here.
+> 
+> > +
+> > -       err = ec_driver->probe ? ec_driver->probe(pdev) : 0;
+> > +       /* get the EC revision */
+> > +       err = olpc_ec_cmd(EC_FIRMWARE_REV, NULL, 0,
+> > +               (unsigned char *) &ec->version, 1);
+> 
+> Perhaps version should be defined as u8.
+
+Yes.
+
+> > +/* SCI source values */
+> > +#define EC_SCI_SRC_EMPTY        0x00
+> > +#define EC_SCI_SRC_GAME         0x01
+> > +#define EC_SCI_SRC_BATTERY      0x02
+> > +#define EC_SCI_SRC_BATSOC       0x04
+> > +#define EC_SCI_SRC_BATERR       0x08
+> > +#define EC_SCI_SRC_EBOOK        0x10    /* XO-1 only */
+> > +#define EC_SCI_SRC_WLAN         0x20    /* XO-1 only */
+> > +#define EC_SCI_SRC_ACPWR        0x40
+> > +#define EC_SCI_SRC_BATCRIT      0x80
+> > +#define EC_SCI_SRC_GPWAKE       0x100   /* XO-1.5 only */
+> 
+> BIT() ?
+> 
+> > +#define EC_SCI_SRC_ALL          0x1FF
+> 
+> GENMASK()?
+
+Yes. I meant to move this, but it turns out I've left the original ones
+in place. Will fix them in a follow-up commit also.
+
+Lubo
