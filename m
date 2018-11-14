@@ -1,66 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 14 Nov 2018 09:47:24 -0800
-Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
-In-Reply-To: <8e306faf-6261-8363-3f18-70e754fa3a9d@arm.com>
-References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
- <20181109123730.8743-8-vincenzo.frascino@arm.com>
- <CAK8P3a1w=GBcYk2OaVNzfagMMeD_zdBK3G16BSYjFANKdSAezQ@mail.gmail.com>
- <8e306faf-6261-8363-3f18-70e754fa3a9d@arm.com>
-Message-ID: <CAK8P3a0ht6TjXubYiWaLh96hOGy3FH_K=JJVhQrYV3D+z-JqBA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 14 Nov 2018 09:48:29 -0800
+Subject: [PATCH 02/17] ARM: mach-bcm: Switch bcm2835 and platsmp to SPDX
+ identifier
+In-Reply-To: <3ed08f5a-090a-f468-2cfa-59b88a6afd2b@i2se.com>
+References: <1541860974-6676-1-git-send-email-stefan.wahren@i2se.com>
+ <87k1lkzxg3.fsf@anholt.net> <3ed08f5a-090a-f468-2cfa-59b88a6afd2b@i2se.com>
+Message-ID: <23e35441-0fdd-6c9f-8ad6-d3929ac8a599@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 2:58 AM Vincenzo Frascino
-<vincenzo.frascino@arm.com> wrote:
->
-> On 09/11/2018 16:13, Arnd Bergmann wrote:
+On 11/14/18 8:38 AM, Stefan Wahren wrote:
+> Hi Florian,
+> 
+> Am 10.11.18 um 17:53 schrieb Eric Anholt:
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>>
+>>> Adopt the SPDX license identifier headers to ease license compliance
+>>> management.
+>> Reviewed-by: Eric Anholt <eric@anholt.net>
+> 
+> are you okay with this patch?
+> 
+> Should we place in our pull request?
 
-> >> diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
-> >> index beca249bc2f3..9de0ffc369c5 100644
-> >> --- a/arch/arm64/kernel/vdso/vdso.lds.S
-> >> +++ b/arch/arm64/kernel/vdso/vdso.lds.S
-> >> @@ -88,6 +88,7 @@ VERSION
-> >>                 __kernel_gettimeofday;
-> >>                 __kernel_clock_gettime;
-> >>                 __kernel_clock_getres;
-> >> +               __kernel_time;
-> >>         local: *;
-> >>         };
-> >>  }
-> >
-> > I would  prefer to not add any deprecated interfaces in the VDSO. If we
-> > have the 64-bit version of clock_gettime, we don't need the 32-bit version
-> > of it, and we don't need gettimeofday() or time() either. The C library
-> > can easily implement those by calling into clock_gettime.
-> >
->
-> I like the idea, this would make the vdso lib code more simple and more maintainable.
->
-> In this patchset I tried to cover the widest possible scenario making things configurable: each architecture can select and enable exactly what it needs from the vdso common code.
->
-> Based on what you are proposing, once the C library will implement things in this way, it will be easy to deprecate and remove the unused code.
+Sounds good to me:
 
-Just to clarify: we can never remove interfaces that an older version of the
-C library was using. What I'm asking is that we don't introduce any of the
-unnecessary ones for architectures that don't already have them.
-
-> I am not familiar with the development plans of the various C libraries, but looking at
-> bionic libc currently seems using all the vdso exposed functions [1].
->
-> [1] https://github.com/aosp-mirror/platform_bionic/blob/master/libc/bionic/vdso.cpp
-
-It looks like this implementation checks for each one of them to be present
-first and then uses a fallback implementation if it does not exist. This would
-clearly let us remove the handlers we don't want to support, but there
-are two possible downsides:
-
-- some other libc might be lacking that fallback path
-- the fallback might be much slower, e.g. time() should fallback to
-  the vdso version of clock_gettime(CLOCK_REALTIME_COARSE) for
-  best performance, rather than the time() syscall or CLOCK_REALTIME.
-
-So I'd argue that if an architecture already has a time() vdso implementation,
-we probably want to keep that entry point but make it point to the best
-generic implementation (i.e. clock_gettime CLOCK_REALTIME_COARSE).
-
-      Arnd
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
+Florian
