@@ -1,48 +1,67 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 14 Nov 2018 23:57:23 +0100
-Subject: [RFC v1 5/7] clk: meson: meson8b: mark the CPU clock as
- CLK_IS_CRITICAL
+Date: Wed, 14 Nov 2018 23:57:24 +0100
+Subject: [RFC v1 6/7] clk: meson: meson8b: add support for more M/N values in
+ sys_pll
 In-Reply-To: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
 References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181114225725.2821-6-martin.blumenstingl@googlemail.com>
+Message-ID: <20181114225725.2821-7-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't want the common clock framework to disable the "cpu_clk" if
-it's not used by any device. The cpufreq-dt driver does not enable the
-CPU clocks. However, even if it would we would still want the CPU clock
-to be enabled at all times because the CPU clock is also required even
-if we disable CPU frequency scaling on a specific board.
+The sys_pll on the EC-100 board is configured to 1584MHz at boot
+(either by u-boot, firmware or chip defaults). This is achieved by using
+M = 66, N = 1 (24MHz * 66 / 1).
+At boot the CPU clock is running off sys_pll divided by 2 which results
+in 792MHz. Thus M = 66 is considered to be a "safe" value for Meson8b.
 
-The reason why we want the CPU clock to be enabled is a clock further up
-in the tree:
-Since commit 6f888e7bc7bd58 ("clk: meson: clk-pll: add enable bit") the
-sys_pll can be disabled. However, since the CPU clock is derived from
-sys_pll we don't want sys_pll to get disabled. The common clock
-framework takes care of that for us by enabling all parent clocks of our
-CPU clock when we mark the CPU clock with CLK_IS_CRITICAL.
+To achieve 1608MHz (one of the CPU OPPs on Meson8 and Meson8m2) we need
+M = 67, N = 1. I ran "stress --cpu 4" while infinitely cycling through
+all available frequencies on my Meson8m2 board and could not spot any
+issues with this setting (after ~12 hours of running this).
 
-Until now this is not a problem yet because all clocks in the CPU
-clock's tree (including sys_pll) are read-only. However, once we allow
-modifications to the clocks in that tree we will need this.
+On Meson8, Meson8b and Meson8m2 we also want to be able to use 408MHz
+and 816MHz CPU frequencies. These can be achieved by dividing sys_pll by
+4 (for 408MHz) or 2 (for 816MHz). That means that sys_pll has to run at
+1632MHz which can be generated using M = 68, N = 1.
+Similarily we also want to be able to use 1008MHz as CPU frequency. This
+means that sys_pll has to run either at 1008MHz or 2016MHz. The former
+would result in an M value of 42, which is lower than the smallest value
+used by the 3.10 GPL kernel sources from Amlogic (50 is the lower limit
+there). Thus we need to run sys_pll at 2016MHz which can ge generated
+using M = 84, N = 1.
+I tested M = 68 and M = 84 on my Meson8b Odroid-C1 and my Meson8m2 board
+by running "stress --cpu 4" while infinitely cycling thorugh all
+available frequencies. I could not spot any issues after ~12 hours of
+running this.
+
+Amlogic's 3.10 GPL kernel sources have more M/N combinations. I did not
+add them yet because M = 74 (to achieve close to 1800MHz on Meson8) and
+M = 82 (to achieve close to 1992MHz on Meson8 as well) caused my
+Meson8m2 board to hang randomly. It's not clear why this is (for example
+because the board's voltage regulator design is bad, some missing bits
+for these values in our clk-pll driver, etc.). Thus the following M
+values from the Amlogic 3.10 GPL kernel sources are skipped as of now:
+69, 70, 71, 72, 73, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- drivers/clk/meson/meson8b.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/clk/meson/meson8b.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index 8a3c346e110d..d566dd5bc567 100644
+index d566dd5bc567..c06a1a7faa4c 100644
 --- a/drivers/clk/meson/meson8b.c
 +++ b/drivers/clk/meson/meson8b.c
-@@ -646,7 +646,8 @@ static struct clk_regmap meson8b_cpu_clk = {
- 						  "cpu_scale_out_sel" },
- 		.num_parents = 2,
- 		.flags = (CLK_SET_RATE_PARENT |
--			  CLK_SET_RATE_NO_REPARENT),
-+			  CLK_SET_RATE_NO_REPARENT |
-+			  CLK_IS_CRITICAL),
- 	},
+@@ -43,6 +43,11 @@ static const struct pll_params_table sys_pll_params_table[] = {
+ 	PLL_PARAMS(62, 1),
+ 	PLL_PARAMS(63, 1),
+ 	PLL_PARAMS(64, 1),
++	PLL_PARAMS(65, 1),
++	PLL_PARAMS(66, 1),
++	PLL_PARAMS(67, 1),
++	PLL_PARAMS(68, 1),
++	PLL_PARAMS(84, 1),
+ 	{ /* sentinel */ },
  };
  
 -- 
