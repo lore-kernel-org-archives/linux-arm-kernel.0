@@ -1,49 +1,26 @@
-From: john@phrozen.org (John Crispin)
-Date: Wed, 14 Nov 2018 14:27:25 +0100
-Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
-In-Reply-To: <20181114124752.GI2620@ulmo>
-References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
- <20181114124752.GI2620@ulmo>
-Message-ID: <2fc9dbac-4919-4ceb-49ac-67ddd7f203b5@phrozen.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 14 Nov 2018 14:36:55 +0100
+Subject: [PATCH] dma: coh901318: Fix a double-lock bug
+In-Reply-To: <20181106033348.27361-1-baijiaju1990@gmail.com>
+References: <20181106033348.27361-1-baijiaju1990@gmail.com>
+Message-ID: <CACRpkdZRRqa6L9wws_5t7WC5Ekdx1NbWUbXdiM7rnHeZpb7Wrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 6, 2018 at 4:33 AM Jia-Ju Bai <baijiaju1990@gmail.com> wrote:
 
-On 14/11/2018 13:47, Thierry Reding wrote:
-> On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
->> The flag 'has_clks' and related checks are superfluous as the CCF
->> subsystem does this for you.
-> Both of these mechanisms aren't equivalent. While CCF can deal with
-> optional clocks, what the has_clks flag actually means is that the
-> device doesn't need a clock (or doesn't have a clock input) on the
-> devices where it is cleared.
+> The function coh901318_alloc_chan_resources() calls spin_lock_irqsave()
+> before calling coh901318_config().
+> But coh901318_config() calls spin_lock_irqsave() again in its
+> definition, which may cause a double-lock bug.
 >
-> So I'd actually be in favor of keeping the has_clks property because it
-> serves as an additional sanity check. For example if you run this driver
-> on an SoC that "has clocks" but if you don't list them in DT, then after
-> this patch the driver will happily continue without clocks, even though
-> it may break completely without those clocks. I've seen SoCs respond to
-> disabled clocks for a hardware block in different ways, in many cases an
-> access to any of the registers will completely hang the CPU. In other
-> cases it may just crash in some other way or give you some sort of
-> machine exception. None of those are good, and make the tiny bit of
-> additional code required to support the has_clks flag very attractive.
+> Because coh901318_config() is only called by
+> coh901318_alloc_chan_resources(), the bug fix is to remove the
+> calls to spin-lock and -unlock functions in coh901318_config().
 >
-> But that's just my opinion. If you prefer to throw away that safety
-> barrier, be my guest. But if you do, please move this functionality into
-> the clock framework first and then make the driver use it.
->
-> Thierry
+> Signed-off-by: Jia-Ju Bai <baijiaju1990@gmail.com>
 
-Hi,
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-sorry for my late response. I added the flag for the legacy MIPS 
-silicon. These SoCs only have a single clock register with a few on/off 
-bits. there is no complex clocktree or scaling. Hence COMMON_CLK is not 
-supported by those SoCs. I fully agree with Thierry, that the flag makes 
-this explicit and the intent was indeed to make sure that on silicon 
-where clocks are required, that they really are listed in OF. This is 
-indeed an extra sanity check and hiding it in an implicit check inside 
-CCF does not feel right.
-
- ??? John
+Yours,
+Linus Walleij
