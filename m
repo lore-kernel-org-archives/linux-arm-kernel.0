@@ -1,112 +1,80 @@
-From: jeyu@kernel.org (Jessica Yu)
-Date: Wed, 14 Nov 2018 16:15:37 +0100
-Subject: [PATCH v3] ARM: module: Fix function kallsyms on Thumb-2
-In-Reply-To: <20181113135705.GI3505@e103592.cambridge.arm.com>
-References: <20181113112745.15945-1-vincent.whitchurch@axis.com>
- <20181113135705.GI3505@e103592.cambridge.arm.com>
-Message-ID: <20181114151537.GA13928@linux-8ccs>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Nov 2018 23:26:55 +0800
+Subject: [PATCH v2 3/4] ARM: dts: sun8i: Add the H3/H5 CSI controller
+In-Reply-To: <20181114145934.26855-4-maxime.ripard@bootlin.com>
+References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
+ <20181114145934.26855-4-maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v67Vdp4STzRqrvqWGLVjfa_W-e6RXu1oEAX_8T_FNbGABA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Dave Martin [13/11/18 13:57 +0000]:
->On Tue, Nov 13, 2018 at 12:27:45PM +0100, Vincent Whitchurch wrote:
->> Thumb-2 functions have the lowest bit set in the symbol value in the
->> symtab.  When kallsyms are generated for the vmlinux, the kallsyms are
->> generated from the output of nm, and nm clears the lowest bit.
->>
->>  $ arm-linux-gnueabihf-readelf -a vmlinux | grep show_interrupts
->>   95947: 8015dc89   686 FUNC    GLOBAL DEFAULT    2 show_interrupts
->>  $ arm-linux-gnueabihf-nm vmlinux | grep show_interrupts
->>  8015dc88 T show_interrupts
->>  $ cat /proc/kallsyms | grep show_interrupts
->>  8015dc88 T show_interrupts
->>
->> However, for modules, the kallsyms uses the values in the symbol table
->> without modification, so for functions in modules, the lowest bit is set
->> in kallsyms.
->>
->>  $ arm-linux-gnueabihf-readelf -a drivers/net/tun.ko | grep tun_get_socket
->>     268: 000000e1    44 FUNC    GLOBAL DEFAULT    2 tun_get_socket
->>  $ arm-linux-gnueabihf-nm drivers/net/tun.ko | grep tun_get_socket
->>  000000e0 T tun_get_socket
->>  $ cat /proc/kallsyms | grep tun_get_socket
->>  7fcd30e1 t tun_get_socket  [tun]
->>
->> Because of this, the offset of the crashing instruction shown in oopses
->> is incorrect when the crash is in a module.  For example, given a
->> tun_get_socket which starts like this,
->>
->>  000000e0 <tun_get_socket>:
->>        e0:       b500            push    {lr}
->>        e2:       f7ff fffe       bl      0 <__gnu_mcount_nc>
->>        e6:       4b08            ldr     r3, [pc, #32]
->>        e8:       6942            ldr     r2, [r0, #20]
->>        ea:       429a            cmp     r2, r3
->>        ec:       d002            beq.n   f4 <tun_get_socket+0x14>
->>
->> a crash when tun_get_socket is called with NULL results in:
->>
->>  PC is at tun_get_socket+0x7/0x2c [tun]
->>  pc : [<7fcdb0e8>]
->>
->> which can result in the incorrect line being reported by gdb if this
->> symbol+offset is used there.  If the crash is on the first instruction
->> of a function, the "PC is at" line would also report the symbol name of
->> the preceding function.
->>
->> To solve this, introduce a weak module_kallsyms_symbol_value() function
->> which arches can override to fix up these symbol values, and implement
->
->(Jumping into this patch without having reviewed previous versions in
->detail, so I may have misunderstood some things...)
->
->
->Anyway:
->
->I prefer this to the previous approach of directly hacking the symbol
->values in the module kallsyms table.
->
->> this for Thumb-2.  We need to move elf_type() to st_other so that the
->> original value of st_info is preserved.
->
->Are you sure modifying st_other won't break anything?
->
->It's hard to imagine how ELF symbol visibility would be relevant in the
->kernel, but some arches put other stuff in st_other.  See alpha,
->powerpc, sh for example.  I haven't attempted to understand whether any
->of those uses matters here.
+Hi,
 
-Yeah, the st_other field is used to apply relocations in those arches
-you mention. Overwriting st_info/st_other only "works" here in the
-sense that that field is no longer needed after applying relocations
-(add_kallsyms() is called in post_relocation() in the module loader).
-I agree it's hacky to reuse the field in that way, though.
+On Wed, Nov 14, 2018 at 10:59 PM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> From: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>
+> The H3 and H5 features the same CSI controller that was initially found on
+> the A31.
+>
+> Add a DT node for it.
+>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> index 4b1530ebe427..8779ee750bd8 100644
+> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> @@ -393,6 +393,13 @@
+>                         interrupt-controller;
+>                         #interrupt-cells = <3>;
+>
+> +                       csi_pins: csi {
+> +                               pins = "PE0", "PE1", "PE2", "PE3", "PE4",
 
->Ideally, we wouldn't abuse st_info to store elf_type() in the first
->place, but that may be messier to solve.  kallsyms could wrap the
->ElfXX_Sym in another struct to store extra metadata for example, but it
->would increase runtime memory consumption.
+You should separate out PE1, which provides the MCLK. Not all camera modules
+need it. Some might have a standalone crystal to provide the reference clock.
+Designs could then use that pin for other purposes.
 
-Yeah, I've always thought that was ugly. I think it was done as a
-small optimization for kallsyms, so that we're not looking up what
-char to print for every symbol, so the st_info field was repurposed
-for this.
+Otherwise,
 
->Another option would be wedge STT_FUNC in bit 7 of st_info, say.
->Since elf_type() always yields an ASCII char, that bit shouldn't be
->used for anything today.  We would of course need to wrap further
->access to st_info to mask that bit off as appropriate.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-Hm, actually on second thought, I don't think the st_size field is
-used *anywhere* in the module loader, not in the arch-specific
-relocation code nor in kallsyms. Perhaps that field could be used to
-store the output of elf_type instead. Then we won't run into any
-issues with delayed relocations with livepatch, as the st_size field
-isn't used at all for applying relocs anyway. Since this field is not
-used at runtime, I think we can use st_size instead of st_other or
-st_info, which are two fields that some arches do use to apply relocs.
-Would be great if someone could confirm/fact-check me on this.
-
-Thanks!
-
-Jessica
+> +                                      "PE5", "PE6", "PE7", "PE8", "PE9",
+> +                                      "PE10", "PE11";
+> +                               function = "csi";
+> +                       };
+> +
+>                         emac_rgmii_pins: emac0 {
+>                                 pins = "PD0", "PD1", "PD2", "PD3", "PD4",
+>                                        "PD5", "PD7", "PD8", "PD9", "PD10",
+> @@ -744,6 +751,21 @@
+>                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+>                 };
+>
+> +               csi: camera at 1cb0000 {
+> +                       compatible = "allwinner,sun8i-h3-csi",
+> +                                    "allwinner,sun6i-a31-csi";
+> +                       reg = <0x01cb0000 0x1000>;
+> +                       interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&ccu CLK_BUS_CSI>,
+> +                                <&ccu CLK_CSI_SCLK>,
+> +                                <&ccu CLK_DRAM_CSI>;
+> +                       clock-names = "bus", "mod", "ram";
+> +                       resets = <&ccu RST_BUS_CSI>;
+> +                       pinctrl-names = "default";
+> +                       pinctrl-0 = <&csi_pins>;
+> +                       status = "disabled";
+> +               };
+> +
+>                 hdmi: hdmi at 1ee0000 {
+>                         compatible = "allwinner,sun8i-h3-dw-hdmi",
+>                                      "allwinner,sun8i-a83t-dw-hdmi";
+> --
+> 2.19.1
+>
