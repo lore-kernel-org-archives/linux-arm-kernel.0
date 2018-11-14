@@ -1,95 +1,84 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Wed, 14 Nov 2018 10:20:55 +0000
-Subject: [PATCH] ARM: stm32: debug: add low-level debug support
-In-Reply-To: <CAOesGMgBdzYthdoWzzSFqOHOfCyY_9jZBkDSpLtkWeVdOkLkTQ@mail.gmail.com>
-References: <1501174209-27550-1-git-send-email-bich.hemon@st.com>
- <1501174209-27550-2-git-send-email-bich.hemon@st.com>
- <20181112182236.s7cs6dol4dmxkp7u@localhost>
- <f244c67b-de86-b0e7-7283-7b27f9591cf9@st.com>
- <20181113092422.GJ30658@n2100.armlinux.org.uk>
- <94666165-f206-5472-c848-499ba52cd354@st.com>
- <CAOesGMgBdzYthdoWzzSFqOHOfCyY_9jZBkDSpLtkWeVdOkLkTQ@mail.gmail.com>
-Message-ID: <c836343d-7a22-7cb9-e635-29d301ab8387@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 14 Nov 2018 18:30:24 +0800
+Subject: [linux-sunxi] [PATCH v2 2/3] arm64: allwinner: h6: add EMAC
+ device nodes
+In-Reply-To: <20181103123238.4665-3-icenowy@aosc.io>
+References: <20181103123238.4665-1-icenowy@aosc.io>
+ <20181103123238.4665-3-icenowy@aosc.io>
+Message-ID: <CAGb2v64nj45kYCdn94eEvk+yQZSh5zy8m3=65q1WRR=d1j_Tgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Sat, Nov 3, 2018 at 8:33 PM Icenowy Zheng <icenowy@aosc.io> wrote:
+>
+> Allwinner H6 SoC has an EMAC like the one in A64.
+>
+> Add device tree nodes for the H6 DTSI file.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> ---
+> Changes in v2:
+> - Dropped unneeded cells property.
+>
+>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 28 ++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> index 040828d2e2c0..11f7ce7d1876 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
+> @@ -149,6 +149,14 @@
+>                         interrupt-controller;
+>                         #interrupt-cells = <3>;
+>
+> +                       ext_rgmii_pins: rgmii_pins {
+> +                               pins = "PD0", "PD1", "PD2", "PD3", "PD4",
+> +                                      "PD5", "PD7", "PD8", "PD9", "PD10",
+> +                                      "PD11", "PD12", "PD13", "PD19", "PD20";
+> +                               function = "emac";
+> +                               drive-strength = <40>;
+> +                       };
+> +
+>                         mmc0_pins: mmc0-pins {
+>                                 pins = "PF0", "PF1", "PF2", "PF3",
+>                                        "PF4", "PF5";
+> @@ -258,6 +266,26 @@
+>                         status = "disabled";
+>                 };
+>
+> +               emac: ethernet at 5020000 {
+> +                       compatible = "allwinner,sun50i-a64-emac",
+> +                                    "allwinner,sun50i-h6-emac";
 
-I had a look at your next branch and no fix is required as you corrected 
-it all by consolidating Ludovic's version with mine.
+These are in the wrong order. Since this is already merged, please send
+a fix for it.
 
-Thanks a lot!
+ChenYu
 
-Bich
-
-On 11/13/18 8:02 PM, Olof Johansson wrote:
-> Take a look at the patch I merged, and please follow up with any patch
-> to fixup any issue you find with it.
-> 
-> As mentioned in my original email, I tried to consolidate the two
-> versions, so a look-through and follow up with fixes would be
-> appreciated. Thanks!
-> 
-> 
-> -Olof
-> 
-> On Tue, Nov 13, 2018 at 2:17 AM Bich HEMON <bich.hemon@st.com> wrote:
->>
->>
->>
->> On 11/13/18 10:24 AM, Russell King - ARM Linux wrote:
->>> On Tue, Nov 13, 2018 at 09:16:16AM +0000, Bich HEMON wrote:
->>>>
->>>> On 11/12/18 7:22 PM, Olof Johansson wrote:
->>>>> On Thu, Jul 27, 2017 at 04:50:20PM +0000, Bich HEMON wrote:
->>>>>> From: Gerald Baeza <gerald.baeza@st.com>
->>>>>>
->>>>>> This adds low-level debug support on USART1 for STM32F4
->>>>>> and STM32F7.
->>>>>> Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
->>>>>> Enabled via 'earlyprintk' in bootargs.
->>>>>>
->>>>>> Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
->>>>>> Signed-off-by: Bich Hemon <bich.hemon@st.com>
->>>>>
->>>>> Hi,
->>>>>
->>>>> This had fallen between the chairs it seems. I have applied it to arm-soc
->>>>> next/soc now, for 4.21 merge window.
->>>>>
->>>>> It ended up being patched up manually to consolidate the version in
->>>>> Russell's patch tracker with this posted version, and I tweaked whitespace
->>>>> a bit. Let me know if I missed something.
->>>>>
->>>>>
->>>>> Thanks,
->>>>>
->>>>> -Olof
->>>>>
->>>>
->>>> Hi Olof,
->>>>
->>>> Please note that this patch has to be abandoned as Ludovic BARRE pushed
->>>> a new version of this change:
->>>> https://patchwork.codeaurora.org/patch/400563/
->>>>
->>>> You can find it in Russell's tracker here:
->>>> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=8803/1
->>>
->>> And I'm not going to merge that because:
->>>
->>> 1) it's not for me to merge - it doesn't go through my tree, but through
->>>      arm-soc, which Olof and Arnd manage.
->>> 2) it's not been on the mailing list as per normal submission process.
->>>
->>> Sorry.
->>>
->>
->> Ok, thank you for the feedback.
->>
->> So Olof, can you please ignore my previous email and merge my patch as
->> you proposed it for 4.21. Ludovic's patch will be abandoned instead.
->>
->> Thanks,
->>
->> Bich
+> +                       syscon = <&syscon>;
+> +                       reg = <0x05020000 0x10000>;
+> +                       interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupt-names = "macirq";
+> +                       resets = <&ccu RST_BUS_EMAC>;
+> +                       reset-names = "stmmaceth";
+> +                       clocks = <&ccu CLK_BUS_EMAC>;
+> +                       clock-names = "stmmaceth";
+> +                       status = "disabled";
+> +
+> +                       mdio: mdio {
+> +                               compatible = "snps,dwmac-mdio";
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                       };
+> +               };
+> +
+>                 r_ccu: clock at 7010000 {
+>                         compatible = "allwinner,sun50i-h6-r-ccu";
+>                         reg = <0x07010000 0x400>;
+> --
+> 2.18.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
