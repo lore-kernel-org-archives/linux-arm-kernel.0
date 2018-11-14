@@ -1,47 +1,87 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 14 Nov 2018 11:24:48 +0800
-Subject: [PATCH 0/5] media: Allwinner A10 CSI support
-In-Reply-To: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v66ygbcomUMkcv8qMCAs_qviFMPzpxj-F4=YBrpuLrdSUw@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 14 Nov 2018 09:32:42 +0530
+Subject: [PATCH v4] cpufreq: ti-cpufreq: Only register platform_device
+ when supported
+In-Reply-To: <20181113193040.15181-1-d-gerlach@ti.com>
+References: <20181113193040.15181-1-d-gerlach@ti.com>
+Message-ID: <20181114040242.wfpvazl62g6phy3o@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 4:24 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> Hi,
->
-> Here is a series introducing the support for the A10 (and SoCs of the same
-> generation) CMOS Sensor Interface (called CSI, not to be confused with
-> MIPI-CSI, which isn't support by that IP).
->
-> That interface is pretty straightforward, but the driver has a few issues
-> that I wanted to bring up:
->
->   * The only board I've been testing this with has an ov5640 sensor
->     attached, which doesn't work with the upstream driver. Copying the
->     Allwinner init sequence works though, and this is how it has been
->     tested. Testing with a second sensor would allow to see if it's an
->     issue on the CSI side or the sensor side.
->   * When starting a capture, the last buffer to capture will fail due to
->     double buffering being used, and we don't have a next buffer for the
->     last frame. I'm not sure how to deal with that though. It seems like
->     some drivers use a scratch buffer in such a case, some don't care, so
->     I'm not sure which solution should be preferred.
->   * We don't have support for the ISP at the moment, but this can be added
->     eventually.
->
->   * How to model the CSI module clock isn't really clear to me. It looks
->     like it goes through the CSI controller and then is muxed to one of the
->     CSI pin so that it can clock the sensor. I'm not quite sure how to
->     model it, if it should be a clock, the CSI driver being a clock
->     provider, or if the sensor should just use the module clock directly.
+On 13-11-18, 13:30, Dave Gerlach wrote:
+> Currently the ti-cpufreq driver blindly registers a 'ti-cpufreq' to force
+> the driver to probe on any platforms where the driver is built in.
+> However, this should only happen on platforms that actually can make use
+> of the driver. There is already functionality in place to match the
+> SoC compatible so let's factor this out into a separate call and
+> make sure we find a match before creating the ti-cpufreq platform device.
+> 
+> Reviewed-by: Johan Hovold <johan@kernel.org>
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+> v3->v4: Use platform_device_register_data rather than
+> 	platform_device_register_resndata as we are only passing data.
+> 
+> 	v3: https://patchwork.kernel.org/patch/10681161/
+> 
+>  drivers/cpufreq/ti-cpufreq.c | 26 +++++++++++++++++++++-----
+>  1 file changed, 21 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/cpufreq/ti-cpufreq.c b/drivers/cpufreq/ti-cpufreq.c
+> index 3f0e2a14895a..22b53bf26817 100644
+> --- a/drivers/cpufreq/ti-cpufreq.c
+> +++ b/drivers/cpufreq/ti-cpufreq.c
+> @@ -201,19 +201,28 @@ static const struct of_device_id ti_cpufreq_of_match[] = {
+>  	{},
+>  };
+>  
+> +static const struct of_device_id *ti_cpufreq_match_node(void)
+> +{
+> +	struct device_node *np;
+> +	const struct of_device_id *match;
+> +
+> +	np = of_find_node_by_path("/");
+> +	match = of_match_node(ti_cpufreq_of_match, np);
+> +	of_node_put(np);
+> +
+> +	return match;
+> +}
+> +
+>  static int ti_cpufreq_probe(struct platform_device *pdev)
+>  {
+>  	u32 version[VERSION_COUNT];
+> -	struct device_node *np;
+>  	const struct of_device_id *match;
+>  	struct opp_table *ti_opp_table;
+>  	struct ti_cpufreq_data *opp_data;
+>  	const char * const reg_names[] = {"vdd", "vbb"};
+>  	int ret;
+>  
+> -	np = of_find_node_by_path("/");
+> -	match = of_match_node(ti_cpufreq_of_match, np);
+> -	of_node_put(np);
+> +	match = dev_get_platdata(&pdev->dev);
+>  	if (!match)
+>  		return -ENODEV;
+>  
+> @@ -290,7 +299,14 @@ static int ti_cpufreq_probe(struct platform_device *pdev)
+>  
+>  static int ti_cpufreq_init(void)
+>  {
+> -	platform_device_register_simple("ti-cpufreq", -1, NULL, 0);
+> +	const struct of_device_id *match;
+> +
+> +	/* Check to ensure we are on a compatible platform */
+> +	match = ti_cpufreq_match_node();
+> +	if (match)
+> +		platform_device_register_data(NULL, "ti-cpufreq", -1, match,
+> +					      sizeof(*match));
+> +
+>  	return 0;
+>  }
+>  module_init(ti_cpufreq_init);
 
-Which clock are you talking about? MCLK? This seems to be fed directly from
-the CCU, as there doesn't seem to be controls for it within the CSI hardware
-block, and the diagram doesn't list it either. IMO you don't have to model it.
-The camera sensor device node would just take a reference to it directly. You
-would probably enable the (separate) pinmux setting in the CSI controller node.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-
-ChenYu
+-- 
+viresh
