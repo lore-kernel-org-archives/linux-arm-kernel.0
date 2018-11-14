@@ -1,44 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 14 Nov 2018 13:39:29 +0530
-Subject: [RFC PATCH 0/6] Armada 38x comphy driver to support 2.5Gbps
- networking
-In-Reply-To: <20181112122933.GD30658@n2100.armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
-Message-ID: <f0e71064-6919-6f7f-d605-671a1c662a33@ti.com>
+From: ravi.bangoria@linux.ibm.com (Ravi Bangoria)
+Date: Wed, 14 Nov 2018 13:49:21 +0530
+Subject: [PATCH] Uprobes: Fix kernel oops with delayed_uprobe_remove()
+Message-ID: <20181114081921.26484-1-ravi.bangoria@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+syzbot reported a kernel crash with delayed_uprobe_remove():
+  https://lkml.org/lkml/2018/11/1/1244
 
-On 12/11/18 5:59 PM, Russell King - ARM Linux wrote:
-> Hi,
-> 
-> This series adds support for dynamically switching between 1Gbps
-> and 2.5Gbps networking for the Marvell Armada 38x SoCs, tested on
-> Armada 388 on the Clearfog platform.
-> 
-> This is necessary to be able to connect (eg) a Clearfog platform
-> with a Macchiatobin platform via the SFP sockets, as Clearfog
-> currently only supports 1Gbps networking via the SFP socket and
-> Macchiatobin defaults to 2.5Gbps when using Fiberchannel SFPs.
-> 
-> In order to allow dynamic switching, we need to implement a common
-> phy driver to switch the ethernet serdes lane speed - 2.5Gbps is
-> just 1Gbps up-clocked by 2.5x.  We implement a simple comphy
-> driver to achieve this, which only supports networking.
-> 
-> With this, we are able to support both Fiberchannel SFPs operating
-> at 2.5Gbps or 1Gbps, and 1G ethernet SFPs plugged into the Clearfog
-> platform, dynamically selecting according to the SFPs abilities.
-> 
-> I'm aware of the proposed changes to the PHY layer, changing
-> phy_set_mode() to take the ethernet phy interface type, hence why
-> this is RFC - there's also the question about how this will be
-> merged.  This series is currently based on 4.20-rc1, but will
-> likely need to be rebased when the PHY layer changes hit.
+Backtrace mentioned in the link points to a race between process
+exit and uprobe_unregister(). Fix it by locking delayed_uprobe_lock
+before calling delayed_uprobe_remove() from put_uprobe().
 
-For this case, I'd prefer the phy_set_mode series and the phy and net changes
-here (after rebasing) go via linux-phy tree.
+Reported-by: syzbot+cb1fb754b771caca0a88 at syzkaller.appspotmail.com
+Signed-off-by: Ravi Bangoria <ravi.bangoria@linux.ibm.com>
+---
+ kernel/events/uprobes.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Thanks
-Kishon
+diff --git a/kernel/events/uprobes.c b/kernel/events/uprobes.c
+index 96fb51f3994f..e527c4753d4f 100644
+--- a/kernel/events/uprobes.c
++++ b/kernel/events/uprobes.c
+@@ -572,7 +572,9 @@ static void put_uprobe(struct uprobe *uprobe)
+ 		 * gets called, we don't get a chance to remove uprobe from
+ 		 * delayed_uprobe_list from remove_breakpoint(). Do it here.
+ 		 */
++		mutex_lock(&delayed_uprobe_lock);
+ 		delayed_uprobe_remove(uprobe, NULL);
++		mutex_unlock(&delayed_uprobe_lock);
+ 		kfree(uprobe);
+ 	}
+ }
+-- 
+2.19.1
