@@ -1,49 +1,43 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 15 Nov 2018 10:56:39 +0100
-Subject: [PATCH 2/2] ARM: shmobile: Restrict TWD support to SoCs that have it
-In-Reply-To: <20181115095639.17206-1-geert+renesas@glider.be>
-References: <20181115095639.17206-1-geert+renesas@glider.be>
-Message-ID: <20181115095639.17206-3-geert+renesas@glider.be>
+Date: Thu, 15 Nov 2018 10:56:37 +0100
+Subject: [PATCH 0/2] ARM: shmobile: Restrict SCU/TWD support to SoCs that have
+ it
+Message-ID: <20181115095639.17206-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently support for the ARM Timer and Watchdog Unit is included
-unconditionally, while only some Renesas multicore Cortex-A9 SoCs have
-a TWD.
+	Hi Simon, Magnus,
 
-This decreases kernel image size by ca. 2 KiB on SoCs without a TWD.
+When Renesas ARM multi-platform support was conceived in commit
+efacfce5f8a52345 ("ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI"),
+support for the ARM Cortex-A9 Snoop Control Unit and the Timer and
+Watchdog Unit was enabled unconditionally.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+However, only some Renesas multicore Cortex-A9 SoCs have these units,
+and in the modern world, the share of Cortex-A9 SoCs is decreasing.
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 32f8297d993ac10e..a35eb5913dfdf4ba 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -30,7 +30,6 @@ menuconfig ARCH_RENESAS
- 	depends on ARCH_MULTI_V7 && MMU
- 	select ARM_GIC
- 	select GPIOLIB
--	select HAVE_ARM_TWD if SMP
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select SOC_BUS
-@@ -95,6 +94,7 @@ config ARCH_R8A7778
- config ARCH_R8A7779
- 	bool "R-Car H1 (R8A77790)"
- 	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
- 	select ARCH_RCAR_GEN1
- 
- config ARCH_R8A7790
-@@ -137,5 +137,6 @@ config ARCH_SH73A0
- 	bool "SH-Mobile AG5 (R8A73A00)"
- 	select ARCH_RMOBILE
- 	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
- 	select RENESAS_INTC_IRQPIN
- endif
+Hence only enable support for the SCU and TWD when building a kernel
+that includes support for SoCs that have these units.
+
+Thanks!
+
+Geert Uytterhoeven (2):
+  ARM: shmobile: Restrict SCU support to SoCs that have it
+  ARM: shmobile: Restrict TWD support to SoCs that have it
+
+ arch/arm/mach-shmobile/Kconfig | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
 -- 
 2.17.1
+
+Gr{oetje,eeting}s,
+
+						Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+							    -- Linus Torvalds
