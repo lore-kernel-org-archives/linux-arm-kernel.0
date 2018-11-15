@@ -1,36 +1,25 @@
-From: bich.hemon@st.com (Bich HEMON)
-Date: Thu, 15 Nov 2018 08:52:29 +0000
-Subject: [PATCH 2/3] ARM: dts: stm32: add can1 sleep pins muxing
-In-Reply-To: <1542271942-28130-1-git-send-email-bich.hemon@st.com>
-References: <1542271942-28130-1-git-send-email-bich.hemon@st.com>
-Message-ID: <1542271942-28130-3-git-send-email-bich.hemon@st.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 15 Nov 2018 09:54:44 +0100
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181115005109.73ll47dfwk4uc63r@localhost> (Catalin Marinas's
+ message of "Thu, 15 Nov 2018 00:51:09 +0000")
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad> <mvmbm6tgunu.fsf@suse.de>
+ <20181113105717.GA5664@yury-thinkpad>
+ <20181115005109.73ll47dfwk4uc63r@localhost>
+Message-ID: <mvm8t1ug1pn.fsf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add can1 pinctrl definition for low-power mode
+On Nov 15 2018, Catalin Marinas <catalin.marinas@arm.com> wrote:
 
-Signed-off-by: Bich Hemon <bich.hemon@st.com>
----
- arch/arm/boot/dts/stm32mp157-pinctrl.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+> Hopefully the changes between 4.18 and 4.19 are smaller than .17->.18.
 
-diff --git a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-index c485127..9ec4694 100644
---- a/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stm32mp157-pinctrl.dtsi
-@@ -246,6 +246,13 @@
- 				};
- 			};
- 
-+			m_can1_sleep_pins_a: m_can1-sleep at 0 {
-+				pins {
-+					pinmux = <STM32_PINMUX('H', 13, ANALOG)>, /* CAN1_TX */
-+						 <STM32_PINMUX('I', 9, ANALOG)>; /* CAN1_RX */
-+				};
-+			};
-+
- 			pwm2_pins_a: pwm2-0 {
- 				pins {
- 					pinmux = <STM32_PINMUX('A', 3, AF1)>; /* TIM2_CH4 */
+It's the other way round, unfortunately.
+
+Andreas.
+
 -- 
-1.9.1
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
