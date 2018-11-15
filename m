@@ -1,24 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2018 10:28:49 +0100
-Subject: [PATCH] pinctrl: meson-gxl: remove invalid GPIOX tsin_a pins
-In-Reply-To: <1541587358-17654-1-git-send-email-narmstrong@baylibre.com>
-References: <1541587358-17654-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CACRpkdYpk1Mts9SxQq5nAdBBcWyZJouYgwR6uQaKMOe8o6u=OA@mail.gmail.com>
+From: clabbe@baylibre.com (LABBE Corentin)
+Date: Thu, 15 Nov 2018 10:30:34 +0100
+Subject: [PATCH v3 0/7] include: add
+ setbits32/clrbits32/clrsetbits32/setbits64/clrbits64/clrsetbits64
+In-Reply-To: <20181024085700.GR30658@n2100.armlinux.org.uk>
+References: <1540366553-18541-1-git-send-email-clabbe@baylibre.com>
+ <20181024085700.GR30658@n2100.armlinux.org.uk>
+Message-ID: <20181115093034.GB23965@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 11:42 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+On Wed, Oct 24, 2018 at 09:57:00AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Oct 24, 2018 at 07:35:46AM +0000, Corentin Labbe wrote:
+> > This patchset adds a new set of functions which are open-coded in lot of
+> > place.
+> > Basicly the pattern is always the same, "read, modify a bit, write"
+> > some driver and the powerpc arch already have thoses pattern them as functions. (like ahci_sunxi.c or dwmac-meson8b)
+> 
+> The advantage of them being open-coded is that it's _obvious_ to the
+> reviewer that there is a read-modify-write going on which, in a multi-
+> threaded environment, may need some locking (so it should trigger a
+> review of the locking around that code.)
+> 
+> With it hidden inside a helper which has no locking itself, it becomes
+> much easier to pass over in review, which means that races are much
+> more likely to go unspotted - and that is bad news.
+> 
 
-> The GPIOX tsin_a pins wrongly uses the SDCard pinctrl bits, this
-> patch completely removes these pins entries until we find out what
-> are the correct bits and registers to be used instead.
->
-> Fixes: 5a6ae9b80139 ("pinctrl: meson-gxl: add tsin_a pins")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Hello
 
-Patch applied.
-It doesn't look like a regression so I only applied it for
-next (v4.21).
+I understand your fear, but I think the benefit overhaul thoses.
+Furthermore, drivers which I have converted does not need such locking.
 
-Yours,
-Linus Walleij
+If you want I can rename the header to linux/setbits-non-atomic.h for making obvious the lack of locking.
+
+Regards
