@@ -1,19 +1,37 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 14 Nov 2018 23:38:32 +0000
-Subject: [PATCH 1/2] arm64: Refresh defconfig
-In-Reply-To: <4a7518d9-2a56-2890-ceb5-791c40f00504@infradead.org>
-References: <4a7518d9-2a56-2890-ceb5-791c40f00504@infradead.org>
-Message-ID: <20181114233832.GA9436@e107533-lin>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 14 Nov 2018 16:26:51 -0800
+Subject: [PATCH RESEND V3 1/2] pinctrl: fsl: add scu based pinctrl support
+In-Reply-To: <1540908354-26809-2-git-send-email-aisheng.dong@nxp.com>
+References: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
+ <1540908354-26809-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <7hin0zgp84.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 12:40:31PM -0800, Geoff Levand wrote:
-> This just refreshes the arm64 defconfig to match the
-> config options of the v4.19 kernel.
+"A.s. Dong" <aisheng.dong@nxp.com> writes:
 
-Check out alternative series:
-https://lore.kernel.org/patchwork/cover/1008080/
+> Some i.MX SoCs (e.g. MX8QXP and MX8QM) contain a system controller
+> that is responsible for controlling the pad setting of the IPs that
+> are present. Communication between the host processor running an OS
+> and the system controller happens through a SCU protocol.
+>
+> This patch classifies the pad settings into two categories: MMIO and SCU.
+> For the original MMIO method, no functional changes except organize them
+> into a few imx_*_mmio() functions. Besides that, we add the SCU based
+> Pad Mux and Pinconf setting support which are implemented in pinctrl-scu.c.
 
---
-Regards,
-Sudeep
+kernelCI found boot failure caused by this patch.
+
+imx6 started failing in kernelCI in next-20181114 on several wand
+boards[1].  There was no kernel output, after uboot started the kernel.
+
+Using the imx6q-wandboard, I bisected it down to this commit.
+
+I verified that reverting this commit on top of next-20181114 fixes the
+problem.
+
+Kevin
+
+[1]
+https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20181114/
+        
