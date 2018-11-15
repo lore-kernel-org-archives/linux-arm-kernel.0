@@ -1,30 +1,23 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Nov 2018 22:42:01 +0000
-Subject: [PATCH 4/6] arm64: ftrace: don't adjust the LR value
+Date: Thu, 15 Nov 2018 22:41:58 +0000
+Subject: [PATCH 1/6] linkage: add generic GLOBAL() macro
 In-Reply-To: <20181115224203.24847-1-mark.rutland@arm.com>
 References: <20181115224203.24847-1-mark.rutland@arm.com>
-Message-ID: <20181115224203.24847-5-mark.rutland@arm.com>
+Message-ID: <20181115224203.24847-2-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core ftrace code requires that when it is handed the PC of an
-instrumented function, this PC is the address of the instrumented
-instruction. This is necessary so that the core ftrace code can identify
-the specific instrumentation site. Since the instrumented function will
-be a BL, the address of the instrumented function is LR - 4 at entry to
-the ftrace code.
+Declaring a global symbol in assembly is tedious, error-prone, and
+painful to read. While ENTRY() exists, this is supposed to be used for
+function entry points, and this affects alignment in a potentially
+undesireable manner.
 
-This fixup is applied in the mcount_get_pc and mcount_get_pc0 helpers,
-which acquire the PC of the instrumented function.
+Instead, let's add a generic GLOBAL() macro for this, as x86 added
+locally in commit:
 
-The mcount_get_lr helper is used to acquire the LR of the instrumented
-function, whose value does not require this adjustment, and cannot be
-adjusted to anything meaningful. No adjustment of this value is made on
-other architectures, including arm. However, arm64 adjusts this value by
-4.
+  95695547a7db44b8 ("x86: asm linkage - introduce GLOBAL macro")
 
-This patch brings arm64 in line with other architectures and removes the
-adjustment of the LR value.
+... thus allowing us to use this more freely in the kernel.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
@@ -33,20 +26,25 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Torsten Duwe <duwe@suse.de>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry-ftrace.S | 1 -
- 1 file changed, 1 deletion(-)
+ include/linux/linkage.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 7d74b2af6d3b..a74d2ff49192 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -81,7 +81,6 @@
- 	.macro mcount_get_lr reg
- 	ldr	\reg, [x29]
- 	ldr	\reg, [\reg, #8]
--	mcount_adjust_addr	\reg, \reg
- 	.endm
+diff --git a/include/linux/linkage.h b/include/linux/linkage.h
+index 7c47b1a471d4..7e020782ade2 100644
+--- a/include/linux/linkage.h
++++ b/include/linux/linkage.h
+@@ -79,6 +79,12 @@
+ #define ALIGN __ALIGN
+ #define ALIGN_STR __ALIGN_STR
  
- 	.macro mcount_get_lr_addr reg
++#ifndef GLOBAL
++#define GLOBAL(name) \
++	.globl name ASM_NL \
++	name:
++#endif
++
+ #ifndef ENTRY
+ #define ENTRY(name) \
+ 	.globl name ASM_NL \
 -- 
 2.11.0
