@@ -1,28 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2018 17:45:33 +0000
-Subject: [PATCH v4 4/6] arm64: Utilize phys_initrd_start/phys_initrd_size
-In-Reply-To: <20181105225431.24485-5-f.fainelli@gmail.com>
-References: <20181105225431.24485-1-f.fainelli@gmail.com>
- <20181105225431.24485-5-f.fainelli@gmail.com>
-Message-ID: <20181115174532.GA3087@brain-police>
+Date: Thu, 15 Nov 2018 17:48:03 +0000
+Subject: [PATCH v1] arch: arm64: add ARM64 specific fucntions required
+ for ehci fsl driver
+In-Reply-To: <20181115092357.1556-1-yinbo.zhu@nxp.com>
+References: <20181115092357.1556-1-yinbo.zhu@nxp.com>
+Message-ID: <20181115174802.GB3087@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 02:54:29PM -0800, Florian Fainelli wrote:
-> ARM64 is the only architecture that re-defines
-> __early_init_dt_declare_initrd() in order for that function to populate
-> initrd_start/initrd_end with physical addresses instead of virtual
-> addresses. Instead of having an override we can leverage
-> drivers/of/fdt.c populating phys_initrd_start/phys_initrd_size to
-> populate those variables for us.
+On Thu, Nov 15, 2018 at 05:23:57PM +0800, Yinbo Zhu wrote:
+> From: Rajesh Bhagat <rajesh.bhagat@nxp.com>
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Add set/clear bits functions for ARM platform which are used by ehci fsl
+> driver
+> 
+> Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
+> Signed-off-by: Yinbo Zhu <yinbo.zhu@nxp.com>
 > ---
->  arch/arm64/mm/init.c | 20 ++++++++------------
->  1 file changed, 8 insertions(+), 12 deletions(-)
+>  arch/arm64/include/asm/io.h |   29 +++++++++++++++++++++++++++++
+>  1 files changed, 29 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index e97b861..0dc4334 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -185,6 +185,35 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+>  #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+>  #define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+>  
+> +/* access ports */
+> +#define setbits32(_addr, _v) iowrite32be(ioread32be(_addr) |  (_v), (_addr))
+> +#define clrbits32(_addr, _v) iowrite32be(ioread32be(_addr) & ~(_v), (_addr))
+> +
+> +#define setbits16(_addr, _v) iowrite16be(ioread16be(_addr) |  (_v), (_addr))
+> +#define clrbits16(_addr, _v) iowrite16be(ioread16be(_addr) & ~(_v), (_addr))
+> +
+> +#define setbits8(_addr, _v) iowrite8(ioread8(_addr) |  (_v), (_addr))
+> +#define clrbits8(_addr, _v) iowrite8(ioread8(_addr) & ~(_v), (_addr))
 
-Looks ok to me:
+Why isn't this defined in the driver? Adding it to the arch-code leads to
+duplication of the definitions and encourages other drivers to start using
+this weird interface.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+So no, I don't want this in the arch code.
 
 Will
