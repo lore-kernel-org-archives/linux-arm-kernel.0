@@ -1,40 +1,45 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 15 Nov 2018 20:27:36 +0000
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <mvm8t1ug1pn.fsf@suse.de>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad> <mvmbm6tgunu.fsf@suse.de>
- <20181113105717.GA5664@yury-thinkpad>
- <20181115005109.73ll47dfwk4uc63r@localhost> <mvm8t1ug1pn.fsf@suse.de>
-Message-ID: <20181115202727.GA25470@yury-thinkpad>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Nov 2018 21:51:06 +0100
+Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
+In-Reply-To: <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
+ <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
+Message-ID: <20181115205106.thbkojnzdwmaeui3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 09:54:44AM +0100, Andreas Schwab wrote:
-> On Nov 15 2018, Catalin Marinas <catalin.marinas@arm.com> wrote:
+Hi Hans,
+
+Thanks for your review! I'll address the other comments you made.
+
+On Tue, Nov 13, 2018 at 01:24:47PM +0100, Hans Verkuil wrote:
+> > +static int csi_probe(struct platform_device *pdev)
+> > +{
+> > +	struct sun4i_csi *csi;
+> > +	struct resource *res;
+> > +	int ret;
+> > +	int irq;
+> > +
+> > +	csi = devm_kzalloc(&pdev->dev, sizeof(*csi), GFP_KERNEL);
 > 
-> > Hopefully the changes between 4.18 and 4.19 are smaller than .17->.18.
-> 
-> It's the other way round, unfortunately.
+> devm_kzalloc is not recommended: all devm_ memory is freed when the driver
+> is unbound, but a filehandle might still have a reference open.
 
-Hi Catalin, Andreas,
+How would a !devm variant with a kfree in the remove help? We would
+still fall in the same case, right?
 
-This is the 4.19-based series with fixes to regressions I mentioned above: 
-https://github.com/norov/linux/commits/ilp32-4.19.2
+Thanks!
+Maxime
 
-Syscall machinery is rewritten in C in mainline kernel, so I aligned ILP32
-with it. I think it's worth to revisit all the series with careful review, but
-the following patches look the most affected:
-
-73eb215286f0 arm64: ilp32: introduce ilp32-specific sigframe and ucontext
-5a8f18457b58 arm64: signal32: move ilp32 and aarch32 common code to separated file
-561dd666d5b4 arm64: signal: share lp64 signal structures and routines to ilp32
-cd7dc1d3377a arm64: ilp32: introduce syscall table for ILP32
-68ff08f76bf0 arm64: ilp32: share aarch32 syscall handlers
-
-Next week, I'll finish all my testing and make a more 'official' announcement.
-But I think that everything is generally fine, so please take an early
-look, if you're interested in.
-
-Thanks,
-Yury
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/f7c42dde/attachment-0001.sig>
