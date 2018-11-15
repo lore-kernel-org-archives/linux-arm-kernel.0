@@ -1,125 +1,48 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Nov 2018 17:35:48 +0800
-Subject: [PATCH v2 00/15] ARM: sunxi: Enable Broadcom-based Bluetooth
- controllers
-Message-ID: <20181115093603.26729-1-wens@csie.org>
+Date: Thu, 15 Nov 2018 17:35:58 +0800
+Subject: [PATCH v2 10/15] Bluetooth: hci_bcm: Wait for device to come out of
+ reset after power on
+In-Reply-To: <20181115093603.26729-1-wens@csie.org>
+References: <20181115093603.26729-1-wens@csie.org>
+Message-ID: <20181115093603.26729-11-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The datasheets for BCM20702 and BCM43438 both have power up time
+sequence graphs, however they are slightly different. Both chips
+also have an internal power-on-reset, which holds the chip in reset
+for a short time after the regulators are enabled.
 
-This is v2 of my Broadcom-based Bluetooth controllers on Allwinner SoC-
-based SBCs series.
+For the BCM20702, the time period from when the regulators are enabled,
+until the chip settles and comes out of sleep state, is 6564 ~ 8171 us.
 
-Changes since v1:
+For the BCM43438, the graph only shows the time period from when the
+regulators are enabled until the chip responds by driving the host's
+CTS line low, assuming the host has already driven its RTS line low.
+This is shown to be 6.5 sleep cycles, with the sleep clock at 32.768
+kHz. This is around 2 ms.
 
-  - Collected tags
-  - Re-organize dt binding clocks and clock-names properties
-  - Simplify check for deferred probe when getting clocks
-  - Add explanation of Cubietruck's clk_out_a pinmux setting placement
-    to commit message.
-  - Add missing "uart-has-rtscts" property to Cubietruck device tree
+Wait a full 10 ms after the regulators are enabled to account for signal
+rising times.
 
-Original cover letter follows.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/bluetooth/hci_bcm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-
-On many Allwinner SBCs / developer boards, there is a WiFi+BT combo
-module from AMPAK. Inside is either one or two Broadcom chips, depending
-on the model. This series enables the Bluetooth controllers for AMPAK
-AP6210, AP6212, and AP6330 found on several boards. More will come later
-as other SoCs require changes to some other parts. I did not cover the
-SCO PCM connections from the controller to the SoC's I2S interface. It
-seems no one is actually doing this, so I was not sure how to proceed.
-Any suggestions?
-
-I deliberately left out the netdev mailing list and Dave Miller, as the
-only thing that is under net is the binding document. Maybe we should
-move that out of Documentation/devicetree/bindings/net/ ?
-
-Also, I'm not subscribed to the linux-bluetooth ML, so please CC me for
-any discussions.
-
-Patches 1 through 4 are device tree binding changes:
-
-1 - Make the external clock name unambiguous, and add a second entry for
-    the LPO clock.
-
-2 - Add regulator supply properties for the VBAT and VDDIO power pins.
-
-3 - Add a compatible string for BCM20702A1.
-
-4 - Add a compatible string for BCM4330.
-
-Patches 5 through 13 are changes to the driver, either improvements,
-or updates to handle the updated device tree binding.
-
-5 - Make the driver handle deferred probing for the external clock.
-
-6 - Simplify clock error checking for subsequent clk API calls.
-
-7 - Handle clock-names for the main external clock.
-
-8 - Support a new external clock, the LPO.
-
-9 - Support regulator supplies.
-
-10 - Wait a small amount of time after toggling the GPIO for the device
-     to settle.
-
-11 - Add support for BCM20702A1, including its default address.
-
-12 - Add BCM4330 compatible string to the driver.
-
-13 - Handle default address for BCM43430A0.
-
-14 - Enable Broadcom-based serdev Bluetooth for multiple Allwinner ARMv7
-     boards.
-
-15 - Enable Broadcom-based serdev Bluetooth for the Bananapi M64.
-
-checkpatch reports an error for both patch 11 and patch 13:
-
-    ERROR: space required after that close brace '}'
-
-I followed the existing code's style. If this is undesirable, I can send
-a follow-up patch fixing the entire code block.
-
-The first 13 patches should go through the Bluetooth tree, while we, the
-sunxi maintainers, will take the last 2.
-
-
-Thanks
-ChenYu
-
-Chen-Yu Tsai (14):
-  dt-bindings: net: broadcom-bluetooth: Fix external clock names
-  dt-bindings: net: broadcom-bluetooth: Add VBAT and VDDIO supplies
-  dt-bindings: net: broadcom-bluetooth: Add BCM20702A1 compatible string
-  dt-bindings: net: broadcom-bluetooth: Add BCM4330 compatible string
-  Bluetooth: hci_bcm: Handle deferred probing for the clock supply
-  Bluetooth: hci_bcm: Simplify clk_get error handling
-  Bluetooth: hci_bcm: Use "txco" and "extclk" to get clock reference
-  Bluetooth: hci_bcm: Add support for LPO clock
-  Bluetooth: hci_bcm: Add support for regulator supplies
-  Bluetooth: hci_bcm: Wait for device to come out of reset after power
-    on
-  Bluetooth: hci_bcm: Add compatible string for BCM4330
-  Bluetooth: btbcm: Add default address for BCM43430A0
-  ARM: dts: sunxi: Enable Broadcom-based Bluetooth for multiple boards
-  arm64: dts: allwinner: a64: bananapi-m64: Add Bluetooth device node
-
-Maxime Ripard (1):
-  Bluetooth: hci_bcm: Add BCM20702A1 variant
-
- .../bindings/net/broadcom-bluetooth.txt       |  11 +-
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts    |  23 ++++
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  |  18 +++
- .../boot/dts/sun8i-a83t-cubietruck-plus.dts   |  18 +++
- arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  |  14 +++
- .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  14 +++
- drivers/bluetooth/btbcm.c                     |  13 +-
- drivers/bluetooth/hci_bcm.c                   | 112 +++++++++++++++---
- 8 files changed, 206 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
+index f2101038284e..538ce8059bff 100644
+--- a/drivers/bluetooth/hci_bcm.c
++++ b/drivers/bluetooth/hci_bcm.c
+@@ -256,6 +256,9 @@ static int bcm_gpio_set_power(struct bcm_device *dev, bool powered)
+ 		regulator_bulk_disable(BCM_NUM_SUPPLIES, dev->supplies);
+ 	}
+ 
++	/* wait for device to power on and come out of reset */
++	usleep_range(10000, 20000);
++
+ 	dev->res_enabled = powered;
+ 
+ 	return 0;
 -- 
 2.19.1
