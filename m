@@ -1,30 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 15 Nov 2018 23:41:46 +0100 (CET)
-Subject: [PATCH] ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2
- camera driver
-In-Reply-To: <8736s3xmrc.fsf@anholt.net>
-References: <1542229864-27695-1-git-send-email-stefan.wahren@i2se.com>
- <8736s3xmrc.fsf@anholt.net>
-Message-ID: <957710337.11499.1542321706456@email.ionos.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 15 Nov 2018 22:41:57 +0000
+Subject: [PATCH 0/6] arm64: ftrace fixes/cleanup
+Message-ID: <20181115224203.24847-1-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Eric Anholt <eric@anholt.net> hat am 15. November 2018 um 00:28 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > This enables the bcm2835-camera driver, which depends on bcm2835-vchiq.
-> > After that we gain more test coverage (e.g. Kernel CI).
-> >
-> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > ---
-> >  arch/arm/configs/bcm2835_defconfig | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > Hi, i will submit a patch series to address those probing issues. But this is
-> > independent from this patch.
-> 
-> Reviewed-by: Eric Anholt <eric@anholt.net>
+Hi,
 
-Applied to bcm2835-defconfig-next
+These patches clean up some issues I spotted while looking at Torsten's
+FTRACE_WITH_REGS patches. I've pushed these to my arm64/ftrace-cleanup [1]
+branch, based on my export cleanup patches.
+
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ftrace-cleanup
+
+Mark Rutland (6):
+  linkage: add generic GLOBAL() macro
+  arm64: ftrace: use GLOBAL()
+  arm64: ftrace: enable graph FP test
+  arm64: ftrace: don't adjust the LR value
+  arm64: ftrace: remove return_regs macros
+  arm64: ftrace: always pass instrumented pc in x0
+
+ arch/arm64/include/asm/ftrace.h  |  1 +
+ arch/arm64/kernel/entry-ftrace.S | 51 +++++++++++++++++-----------------------
+ arch/arm64/kernel/ftrace.c       |  2 +-
+ include/linux/linkage.h          |  6 +++++
+ 4 files changed, 29 insertions(+), 31 deletions(-)
+
+-- 
+2.11.0
