@@ -1,50 +1,60 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 15 Nov 2018 10:16:04 +0100
-Subject: [RFC v1 4/7] clk: meson: clk-pll: add the is_enabled function
- in the clk_ops
-In-Reply-To: <20181114225725.2821-5-martin.blumenstingl@googlemail.com>
-References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
- <20181114225725.2821-5-martin.blumenstingl@googlemail.com>
-Message-ID: <3741d17870e51342e7251118f73845667c0f7e14.camel@baylibre.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 15 Nov 2018 10:16:44 +0100
+Subject: [PATCH 1/4] pwm: Add new helper to initialize a pwm_state
+ variable with defaults
+In-Reply-To: <20181114123236.GG2620@ulmo>
+References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
+ <20181114123236.GG2620@ulmo>
+Message-ID: <20181115091644.d5hdk5vao6x74zwp@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-14 at 23:57 +0100, Martin Blumenstingl wrote:
-> Now that we have a utility function to check whether the PLL is enabled
-> we can also pass that to our clk_ops to let the common clock framework
-> know about the status of the hardware clock.
-> For now this is of limited use since the only common clock framework's
+Hello Thierry,
 
-Still, it is nice to have ;)
-
-> internal "disabled unused clocks" mechanism checks for this. Everything
-> else still uses the ref-counting (internal to the common clock
-> framework) when clk_enable is called.
+On Wed, Nov 14, 2018 at 01:32:36PM +0100, Thierry Reding wrote:
+> On Fri, Oct 26, 2018 at 08:41:55PM +0200, Uwe Kleine-K?nig wrote:
+> > This helps to convert drivers from the legacy API to pwm_apply_state without
+> > having to make the aware of the configured polarity (and in some cases even
+> > period).
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > ---
+> >  include/linux/pwm.h | 13 ++++++++++---
+> >  1 file changed, 10 insertions(+), 3 deletions(-)
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  drivers/clk/meson/clk-pll.c | 2 ++
->  1 file changed, 2 insertions(+)
+> So if I understand your intention correctly here you want consumers to
+> be able to get at the default state, which would be the state as it was
+> "configured" in DT or the PWM lookup table so that you can modify that
+> state (well, really just setting the duty-cycle) before you actually
+> send the state to the hardware.
 > 
-> diff --git a/drivers/clk/meson/clk-pll.c b/drivers/clk/meson/clk-pll.c
-> index b46cca953f4f..65eeae0989d9 100644
-> --- a/drivers/clk/meson/clk-pll.c
-> +++ b/drivers/clk/meson/clk-pll.c
-> @@ -309,10 +309,12 @@ const struct clk_ops meson_clk_pll_ops = {
->  	.recalc_rate	= meson_clk_pll_recalc_rate,
->  	.round_rate	= meson_clk_pll_round_rate,
->  	.set_rate	= meson_clk_pll_set_rate,
-> +	.is_enabled	= meson_clk_pll_is_enabled,
->  	.enable		= meson_clk_pll_enable,
->  	.disable	= meson_clk_pll_disable
->  };
->  
->  const struct clk_ops meson_clk_pll_ro_ops = {
->  	.recalc_rate	= meson_clk_pll_recalc_rate,
-> +	.is_enabled	= meson_clk_pll_is_enabled,
->  };
+> So the difference to pwm_apply_args() is that you don't want the driver
+> to specifically program a duty cycle of 0 before setting the actual duty
+> cycle that you want to set.
+> 
+> Is that about right?
 
-Looks good to me
-Feel free to squash this with patch 3.
+Yes, and a resulting advantage is that the apply callback is only called
+once.
+ 
+> Isn't that exactly what pwm_init_state() already does? pwm-backlight
+> uses it for exactly the same purpose that you seem to be using it in
+> RX1950 backlight control.
 
-Jerome
+I didn't use pwm_init_state because that doesn't give a helpful value
+for state->enabled. (I think it is: if the driver provides a get_state
+callback it is whatever that one set, otherwise it's off.)
+Also the name pwm_init_state isn't that good IMHO. Just from the name
+I'd expect it to be something like
+
+	memset(state, 0, sizeof(&state));
+
+instead of something more informed that depends on hardware state and/or
+data provided by a device tree.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
