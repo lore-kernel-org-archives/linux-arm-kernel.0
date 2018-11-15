@@ -1,38 +1,81 @@
-From: peng.hao2@zte.com.cn (Peng Hao)
-Date: Thu, 15 Nov 2018 23:14:08 +0800
-Subject: [PATCH]  kvm: arm/arm64 : fix vm's hanging at startup time
-Message-ID: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Thu, 15 Nov 2018 11:35:35 +0300
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181114222540.fgddrx4xxsne5pdq@ltop.local>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+ <20181110001615.GA5665@brain-police>
+ <20181110111647.GA3511@speedy.hunter>
+ <20181110170311.GA7700@brain-police>
+ <20181110175404.gnks6sj3zzlz2it7@ltop.local>
+ <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
+ <20181114222540.fgddrx4xxsne5pdq@ltop.local>
+Message-ID: <20181115083535.usyjcdoz2f6zmssq@bars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When virtual machine starts, hang up. The kernel version of guest
-is 4.16. Host support vgic_v3.
-It was mainly due to the incorrect vgic_irq's(intid=27) group value
-during injection interruption. when kvm_vgic_vcpu_init is called,
-dist is not initialized at this time. Unable to get vgic V3 or V2
-correctly, so group is not set.
-group is setted to 1 when vgic_mmio_write_group is invoked at some
-time.
-when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-interrupt injection failed.
-
-Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
----
- virt/kvm/arm/vgic/vgic-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 9c0dd23..d101000 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
- 	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
- 		irq->line_level = false;
+> > >>>>> the following sparse complaints:
+> > >>>>>
+> > >>>>> ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > >>>>> ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> > >>>>>
+> > >>>>> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> > >>>>> ---
+> > >>>>>  arch/arm64/include/asm/sysreg.h | 4 ++--
+> > >>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+> > >>>>
+> > >>>> I thought this was fixed in newer versions of sparse so that it treats
+> > >>>> AArch64 as 64-bit? [see sparse commit 49d56b6969d2f]
+> > >>>
+> > >>> I am using up-to-date sparse. However this warning still appears,
+> > >>> not sure why. Maybe sparse treats such constants as unsigned int ?
+> > >>>
+> > >>> Meanwhile it looks like I chose wrong type: it is enough to use UL
+> > >>> instead of ULL to make sparse happy. In fact warning is clear
+> > >>> about it.
+> > >>
+> > >> Ah yes, sorry. I misread the patch the first time around and thought you were
+> > >> changing a UL suffix to a ULL suffix. So actually, I think this is just a
+> > >> case of sparse getting confused about this constant because it's actually
+> > >> going to get parsed by the pre-processor, which says:
+> > >>
+> > >>   | It [the preprocessor parsing #if] carries out all calculations in the
+> > >>   | widest integer type known to the compiler; on most machines supported by
+> > >>   | GCC this is 64 bits
+> > >>
+> > >> so I still think this is a false positive. Adding Luc in case he has any
+> > >> ideas.
+> > > 
+> > > Well, I think the warning is 'correct' (and the message is quite
+> > > clear about the 'possible' problem) but probably not useful enough.
+> > 
+> > yes, the warning is correct. I think the message is quite clear, so
+> > would be happy to hear any possible improvements! ;-)
+> 
+> Oh, I was not talking about the message but, like Linus explained, that
+> since no bits are lost here (and sparse has another warning in case some
+> bits would be lost) and nothing is incorrect, the warning is not really
+> interesting.
+>  
+> > (Also, correcting the source, in order to suppress these warnings,
+> > should take mere seconds - for each such warning, of course).
+> 
+> Yes, sure, it was even the origin of the thread.
+>  
+> > > In fact, some months ago, it was agreed that sparse will only issue
+> > > this warning when -Wpedantic is set but this flag is not yet handled.
+> > 
+> > I have patches, but I have been waiting for the 'official repo' issue
+> > to get resolved. (If you remember, I was building on top of the current
+> > official repo and continually merging to the master branch of your
+> > github sparse.git - but I got bored of doing that!).
+> 
+> Yes, I understand. This should be solved now.
  
--	if (irq->group)
-+	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
- 		val |= ICH_LR_GROUP;
- 
- 	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
--- 
-1.8.3.1
+Hi,
+
+Could you please clarify what is your resolution regarding that warning.
+I pulled all the changes from sparse repository on kernel.org. However
+the same warning is still here when building modules with C=2 option.
+
+Regards,
+Sergey
