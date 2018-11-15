@@ -1,113 +1,71 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Nov 2018 15:56:48 +0100
-Subject: [PATCH v2 0/2] media: cedrus: Add H264 decoding support
-Message-ID: <20181115145650.9827-1-maxime.ripard@bootlin.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 15 Nov 2018 16:11:29 +0100
+Subject: [PATCH 0/9] ARM: SAMSUNG: add Exynos chipid driver
+References: <CGME20181115151207epcas1p45adfa96d5b52e10fbb5ace76ebae5e3e@epcas1p4.samsung.com>
+Message-ID: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-Here is a new version of the H264 decoding support in the cedrus
-driver.
+This patchset adds Exynos chipid driver and converts Exynos platform
+code to use it. It is heavily based on "[PATCH v9 00/12] Introducing
+Exynos ChipId driver" patchset [1] so most credits go to Pankaj Dubey.
+The main difference in the current patchset is in taking simpler
+approach to converting existing Exynos platform code to use the new
+chipid driver. This results in much less code duplication.
 
-As you might already know, the cedrus driver relies on the Request
-API, and is a reverse engineered driver for the video decoding engine
-found on the Allwinner SoCs.
+The diffstat for "[PATCH v9 00/12] Introducing Exynos ChipId driver":
 
-This work has been possible thanks to the work done by the people
-behind libvdpau-sunxi found here:
-https://github.com/linux-sunxi/libvdpau-sunxi/
+ 14 files changed, 587 insertions(+), 255 deletions(-)
 
-It's based on v4.20-rc1, plus the tag patches sent this week by Hans
-Verkuil.
+for the current patchset it is:
 
-I've been using the controls currently integrated into ChromeOS that
-have a working version of this particular setup. However, these
-controls have a number of shortcomings and inconsistencies with other
-decoding API. I've worked with libva so far, but I've noticed already
-that:
-  - The kernel UAPI expects to have the nal_ref_idc variable, while
-    libva only exposes whether that frame is a reference frame or
-    not. I've looked at the rockchip driver in the ChromeOS tree, and
-    our own driver, and they both need only the information about
-    whether the frame is a reference one or not, so maybe we should
-    change this?
-  - The H264 bitstream exposes the picture default reference list (for
-    both list 0 and list 1), the slice reference list and an override
-    flag. The libva will only pass the reference list to be used (so
-    either the picture default's or the slice's) depending on the
-    override flag. The kernel UAPI wants the picture default reference
-    list and the slice reference list, but doesn't expose the override
-    flag, which prevents us from configuring properly the
-    hardware. Our video decoding engine needs the three information,
-    but we can easily adapt to having only one. However, having two
-    doesn't really work for us.
+ 14 files changed, 193 insertions(+), 195 deletions(-)
 
-It's pretty much the only one I've noticed so far, but we should
-probably fix them already. And there's probably other, feel free to
-step in.
+This patchset has been tested on Exynos4210 (including rev0),
+Exynos3250, Exynos4412 & Exynos5422 SoCs.
 
-I've tested the various ABI using this gdb script:
-http://code.bulix.org/jl4se4-505620?raw
+[1] https://marc.info/?l=linux-arm-kernel&m=149087972213359&w=2
 
-And this test script:
-http://code.bulix.org/8zle4s-505623?raw
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
 
-The application compiled is quite trivial:
-http://code.bulix.org/e34zp8-505624?raw
 
-The output is:
-arm:	builds/arm-test-v4l2-h264-structures
-	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-x86:	builds/x86-test-v4l2-h264-structures
-	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-x64:	builds/x64-test-v4l2-h264-structures
-	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
-arm64:	builds/arm64-test-v4l2-h264-structures
-	SHA1: 88cbf7485ba81831fc3b93772b215599b3b38318
+Bartlomiej Zolnierkiewicz (5):
+  ARM: EXYNOS: use chipid driver
+  ARM: EXYNOS: remove soc_is_exynos*() macros
+  ARM: SAMSUNG: remove samsung_rev()
+  ARM: SAMSUNG: remove s5p_init_cpu()
+  ARM: EXYNOS: remove <mach/map.h> include
 
-Let me know if there's any flaw using that test setup, or if you have
-any comments on the patches.
+Pankaj Dubey (4):
+  ARM: EXYNOS: remove secondary startup initialization from
+    smp_prepare_cpus
+  soc: samsung: add exynos chipid driver support
+  ARM: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
+  ARM64: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
 
-Maxime
-
-Changes from v1:
-  - Rebased on 4.20
-  - Did the documentation for the userspace API
-  - Used the tags instead of buffer IDs
-  - Added a comment to explain why we still needed the swdec trigger
-  - Reworked the MV col buffer in order to have one slot per frame
-  - Removed the unused neighbor info buffer
-  - Made sure to have the same structure offset and alignments across
-    32 bits and 64 bits architecture
-
-Maxime Ripard (1):
-  media: cedrus: Add H264 decoding support
-
-Pawel Osciak (1):
-  media: uapi: Add H264 low-level decoder API compound controls.
-
- Documentation/media/uapi/v4l/biblio.rst       |   9 +
- .../media/uapi/v4l/extended-controls.rst      | 364 ++++++++++++++
- .../media/uapi/v4l/pixfmt-compressed.rst      |  20 +
- .../media/uapi/v4l/vidioc-queryctrl.rst       |  30 ++
- .../media/videodev2.h.rst.exceptions          |   5 +
- drivers/media/v4l2-core/v4l2-ctrls.c          |  42 ++
- drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
- drivers/staging/media/sunxi/cedrus/Makefile   |   3 +-
- drivers/staging/media/sunxi/cedrus/cedrus.c   |  25 +
- drivers/staging/media/sunxi/cedrus/cedrus.h   |  35 +-
- .../staging/media/sunxi/cedrus/cedrus_dec.c   |  11 +
- .../staging/media/sunxi/cedrus/cedrus_h264.c  | 470 ++++++++++++++++++
- .../staging/media/sunxi/cedrus/cedrus_hw.c    |   4 +
- .../staging/media/sunxi/cedrus/cedrus_regs.h  |  63 +++
- .../staging/media/sunxi/cedrus/cedrus_video.c |   9 +
- include/media/v4l2-ctrls.h                    |  10 +
- include/uapi/linux/v4l2-controls.h            | 166 +++++++
- include/uapi/linux/videodev2.h                |  11 +
- 18 files changed, 1276 insertions(+), 2 deletions(-)
- create mode 100644 drivers/staging/media/sunxi/cedrus/cedrus_h264.c
+ arch/arm/mach-exynos/Kconfig                 |   1 +
+ arch/arm/mach-exynos/common.h                |  81 ++-----------------
+ arch/arm/mach-exynos/exynos.c                |  75 ++++++++++--------
+ arch/arm/mach-exynos/firmware.c              |   8 +-
+ arch/arm/mach-exynos/include/mach/map.h      |  18 -----
+ arch/arm/mach-exynos/platsmp.c               |  40 ++--------
+ arch/arm/mach-exynos/pm.c                    |  25 +++---
+ arch/arm/plat-samsung/cpu.c                  |  17 ----
+ arch/arm/plat-samsung/include/plat/cpu.h     |   3 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h |   2 -
+ arch/arm64/Kconfig.platforms                 |   1 +
+ drivers/soc/samsung/Kconfig                  |   5 ++
+ drivers/soc/samsung/Makefile                 |   1 +
+ drivers/soc/samsung/exynos-chipid.c          | 111 +++++++++++++++++++++++++++
+ 14 files changed, 193 insertions(+), 195 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/map.h
+ create mode 100644 drivers/soc/samsung/exynos-chipid.c
 
 -- 
-2.19.1
+1.9.1
