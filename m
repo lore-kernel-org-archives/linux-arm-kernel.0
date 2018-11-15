@@ -1,109 +1,81 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 15 Nov 2018 11:10:30 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <201811151822532422079@zte.com.cn>
-References: <201811151822532422079@zte.com.cn>
-Message-ID: <8a602e2d-54bb-6c47-fcb0-4a7f750d9fcf@arm.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Thu, 15 Nov 2018 16:42:25 +0530
+Subject: [PATCH] arm64: dts: actions: s700: Add I2C controller nodes
+In-Reply-To: <20181113133235.37754-1-pn@denx.de>
+References: <20181113133235.37754-1-pn@denx.de>
+Message-ID: <20181115111217.GC15537@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Parthiban,
 
-
-On 15/11/18 10:22, peng.hao2 at zte.com.cn wrote:
->> Hi Peng,
->>
->> On 15/11/18 15:14, Peng Hao wrote:
->>> When virtual machine starts, hang up. The kernel version of guest
->>> is 4.16. Host support vgic_v3.
->>
->> I don't understand the issue here. the vgic_irq->group field does not
->> exist in 4.16 (neither in the first nor the last version). Nor does the
->> line you are modifying.
-> Guest's kernel version is 4.16 and Host's kernel version is mainline.
-> vgic_irq is a structure of Host's kvm.
->>
->> Both exist in mainline, but what you are mentioning shouldn't be an
->> issue in mainline since vgic_irq->group gets initialized in
->> kvm_vgic_vcpu_init for SGIs and PPIs (i.e. intid < 32) which includes
->> your interrupt.
-> Initialization sequence of several components is like this;
-> 1.       kvm_vgic_vcpu_init ---- here, dist is not initialized at this time.
->                                               and the value of irq->group depends on
->                                                dist->vgic_model. but now dist->vgic_model = 0
->                                                 and irq->group=0.
->   2.      vgic_create         -----  assign to dist->vgic_model.
->   3.     kvm_vgic_dist_init
+On Tue, Nov 13, 2018 at 02:32:35PM +0100, Parthiban Nallathambi wrote:
+> Add I2C controller nodes for Actions Semiconductor S700 SoC.
 > 
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> ---
+>  arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+> index 192c7b39c8c1..573c844d7afe 100644
+> --- a/arch/arm64/boot/dts/actions/s700.dtsi
+> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
+> @@ -174,6 +174,46 @@
+>  			#clock-cells = <1>;
+>  		};
+>  
+> +		i2c0: i2c at e0170000 {
+> +			compatible = "actions,s900-i2c";
 
-I see, thanks for explaining.
-
-This means the initialization in kvm_vgic_vcpu_init depends on whether 
-userland creates the GIC device first or the vcpus first...
-
-I don't think the issue lies in vgic_v3_populate_lr, but in 
-kvm_vgic_vcpu_init which clearly expects dist->vgic_model to be 
-initialized in two places. However, the comment at the top of 
-vgic-init.c states:
-
-  * CPU Interface: 
- 
- 
-
-  * 
- 
- 
-
-  * - kvm_vgic_vcpu_init(): initialization of static data that 
- 
- 
-
-  *   doesn't depend on any sizing information or emulation type. No 
- 
- 
-
-  *   allocation is allowed there.
-
-So I don't think we're supposed to check for dist->vgic_model here. 
-Those two checks should probably be moved elsewhere (maybe in 
-kvm_vgic_vcpu_enable?) once the gic type has been set.
+Why don't you add a compatible for S700? Also, please add the pinctrl
+nodes for these busses and enable the ones exposed on board. These could
+go in a separate patch.
 
 Thanks,
+Mani
 
-> thanks.
->>
->> Cheers,
->>
->>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
->>> during injection interruption. when kvm_vgic_vcpu_init is called,
->>> dist is not initialized at this time. Unable to get vgic V3 or V2
->>> correctly, so group is not set.
->>> group is setted to 1 when vgic_mmio_write_group is invoked at some
->>> time.
->>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
->>> interrupt injection failed.
->>>
->>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->>> ---
->>>    virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>> index 9c0dd23..d101000 100644
->>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->>>        if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
->>>            irq->line_level = false;
->>>
->>> -    if (irq->group)
->>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->>>            val |= ICH_LR_GROUP;
->>>
->>>        val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
->>>
->>
->> --
->> Julien Thierry
-
--- 
-Julien Thierry
+> +			reg = <0 0xe0170000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C0>;
+> +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c1: i2c at e0174000 {
+> +			compatible = "actions,s900-i2c";
+> +			reg = <0 0xe0174000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C1>;
+> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c2: i2c at e0178000 {
+> +			compatible = "actions,s900-i2c";
+> +			reg = <0 0xe0178000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C2>;
+> +			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+> +		i2c3: i2c at e017c000 {
+> +			compatible = "actions,s900-i2c";
+> +			reg = <0 0xe017c000 0 0x1000>;
+> +			clocks = <&cmu CLK_I2C3>;
+> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+>  		sps: power-controller at e01b0100 {
+>  			compatible = "actions,s700-sps";
+>  			reg = <0x0 0xe01b0100 0x0 0x100>;
+> -- 
+> 2.17.2
+> 
