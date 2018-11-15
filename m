@@ -1,16 +1,13 @@
 From: aisheng.dong@nxp.com (A.s. Dong)
-Date: Thu, 15 Nov 2018 08:56:34 +0000
-Subject: [PATCH V7 6/7] clk: imx: add lpcg clock support
+Date: Thu, 15 Nov 2018 08:56:38 +0000
+Subject: [PATCH V7 7/7] clk: imx: add imx8qxp lpcg driver
 In-Reply-To: <1542271869-18600-1-git-send-email-aisheng.dong@nxp.com>
 References: <1542271869-18600-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1542271869-18600-7-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1542271869-18600-8-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Low-Power Clock Gate (LPCG) modules contain a local programming
-model to control the clock gates for the peripherals. An LPCG module
-is used to locally gate the clocks for the associated peripheral.
-And they're bedind the SCU clock.
+Add imx8qxp lpcg driver support
 
 Cc: Stephen Boyd <sboyd@kernel.org>
 Cc: Shawn Guo <shawnguo@kernel.org>
@@ -20,34 +17,38 @@ Cc: Michael Turquette <mturquette@baylibre.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
 ChangeLog:
- v6: separate from [PATCH V5 5/9] clk: imx: scu: add scu clock gate
+v6->v7:
+ * use struct_size()
+ * add kernel doc for structs
+ * Include this after <linux/*> and before locals
+ * remove MODULE_ macros
+ * add suppress_bind_attrs
+v6:
+ * new patch, separate from scu gate driver
 ---
- drivers/clk/imx/Makefile       |   3 +-
- drivers/clk/imx/clk-lpcg-scu.c | 108 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/imx/clk-scu.h      |   3 ++
- 3 files changed, 113 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/imx/clk-lpcg-scu.c
+ drivers/clk/imx/Makefile           |   2 +-
+ drivers/clk/imx/clk-imx8qxp-lpcg.c | 216 +++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk-imx8qxp-lpcg.h | 102 ++++++++++++++++++
+ 3 files changed, 319 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.c
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.h
 
 diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
-index 8369a34..cd2b6f0 100644
+index cd2b6f0..96ab82b 100644
 --- a/drivers/clk/imx/Makefile
 +++ b/drivers/clk/imx/Makefile
-@@ -14,7 +14,8 @@ obj-$(CONFIG_MXC_CLK) += \
- 	clk-pfd.o
+@@ -32,4 +32,4 @@ obj-$(CONFIG_SOC_IMX6UL) += clk-imx6ul.o
+ obj-$(CONFIG_SOC_IMX7D)  += clk-imx7d.o
+ obj-$(CONFIG_SOC_VF610)  += clk-vf610.o
  
- obj-$(CONFIG_MXC_CLK_SCU) += \
--	clk-scu.o
-+	clk-scu.o \
-+	clk-lpcg-scu.o
- 
- obj-$(CONFIG_SOC_IMX1)   += clk-imx1.o
- obj-$(CONFIG_SOC_IMX21)  += clk-imx21.o
-diff --git a/drivers/clk/imx/clk-lpcg-scu.c b/drivers/clk/imx/clk-lpcg-scu.c
+-obj-$(CONFIG_SOC_IMX8QXP)	+= clk-imx8qxp.o
++obj-$(CONFIG_SOC_IMX8QXP) += clk-imx8qxp.o clk-imx8qxp-lpcg.o
+diff --git a/drivers/clk/imx/clk-imx8qxp-lpcg.c b/drivers/clk/imx/clk-imx8qxp-lpcg.c
 new file mode 100644
-index 0000000..54a1cb3
+index 0000000..dcae1dd
 --- /dev/null
-+++ b/drivers/clk/imx/clk-lpcg-scu.c
-@@ -0,0 +1,108 @@
++++ b/drivers/clk/imx/clk-imx8qxp-lpcg.c
+@@ -0,0 +1,216 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Copyright 2018 NXP
@@ -57,116 +58,320 @@ index 0000000..54a1cb3
 +#include <linux/clk-provider.h>
 +#include <linux/err.h>
 +#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
 +#include <linux/slab.h>
-+#include <linux/spinlock.h>
 +
-+static DEFINE_SPINLOCK(imx_lpcg_scu_lock);
++#include "clk-scu.h"
++#include "clk-imx8qxp-lpcg.h"
 +
-+#define CLK_GATE_SCU_LPCG_MASK		0x3
-+#define CLK_GATE_SCU_LPCG_HW_SEL	BIT(0)
-+#define CLK_GATE_SCU_LPCG_SW_SEL	BIT(1)
++#include <dt-bindings/clock/imx8qxp-clock.h>
 +
-+struct clk_lpcg_scu {
-+	struct clk_hw hw;
-+	void __iomem *reg;
++/*
++ * struct imx8qxp_lpcg_data - Description of one LPCG clock
++ * @id: clock ID
++ * @name: clock name
++ * @parent: parent clock name
++ * @flags: common clock flags
++ * @offset: offset of this LPCG clock
++ * @bit_idx: bit index of this LPCG clock
++ * @hw_gate: whether supports HW autogate
++ *
++ * This structure describes one LPCG clock
++ */
++struct imx8qxp_lpcg_data {
++	int id;
++	char *name;
++	char *parent;
++	unsigned long flags;
++	u32 offset;
 +	u8 bit_idx;
 +	bool hw_gate;
 +};
 +
-+#define to_clk_lpcg_scu(_hw) container_of(_hw, struct clk_lpcg_scu, hw)
-+
-+/* Write to the LPCG bits. */
-+static int clk_lpcg_scu_enable(struct clk_hw *hw)
-+{
-+	struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
-+	unsigned long flags = 0;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
-+
-+	if (clk->reg) {
-+		reg = readl(clk->reg);
-+		reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
-+		if (clk->hw_gate)
-+			reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
-+				CLK_GATE_SCU_LPCG_SW_SEL) << clk->bit_idx;
-+		else
-+			reg |= (CLK_GATE_SCU_LPCG_SW_SEL << clk->bit_idx);
-+		writel(reg, clk->reg);
-+	}
-+
-+	spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags);
-+
-+	return 0;
-+}
-+
-+static void clk_lpcg_scu_disable(struct clk_hw *hw)
-+{
-+	struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
-+	unsigned long flags = 0;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
-+
-+	if (clk->reg) {
-+		reg = readl(clk->reg);
-+		reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
-+		writel(reg, clk->reg);
-+	}
-+
-+	spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags);
-+}
-+
-+static const struct clk_ops clk_lpcg_scu_ops = {
-+	.enable = clk_lpcg_scu_enable,
-+	.disable = clk_lpcg_scu_disable,
++/*
++ * struct imx8qxp_ss_lpcg - Description of one subsystem LPCG clocks
++ * @lpcg: LPCG clocks array of one subsystem
++ * @num_lpcg: the number of LPCG clocks
++ * @num_max: the maximum number of LPCG clocks
++ *
++ * This structure describes each subsystem LPCG clocks information
++ * which then will be used to create respective LPCGs clocks
++ */
++struct imx8qxp_ss_lpcg {
++	const struct imx8qxp_lpcg_data *lpcg;
++	u8 num_lpcg;
++	u8 num_max;
 +};
 +
-+struct clk_hw *imx_clk_lpcg_scu(const char *name, const char *parent_name,
-+				unsigned long flags, void __iomem *reg,
-+				u8 bit_idx, bool hw_gate)
++static const struct imx8qxp_lpcg_data imx8qxp_lpcg_adma[] = {
++	{ IMX8QXP_ADMA_LPCG_UART0_IPG_CLK, "uart0_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_0_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART0_BAUD_CLK, "uart0_lpcg_baud_clk", "uart0_clk", 0, ADMA_LPUART_0_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART1_IPG_CLK, "uart1_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_1_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART1_BAUD_CLK, "uart1_lpcg_baud_clk", "uart1_clk", 0, ADMA_LPUART_1_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART2_IPG_CLK, "uart2_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_2_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART2_BAUD_CLK, "uart2_lpcg_baud_clk", "uart2_clk", 0, ADMA_LPUART_2_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART3_IPG_CLK, "uart3_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPUART_3_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_UART3_BAUD_CLK, "uart3_lpcg_baud_clk", "uart3_clk", 0, ADMA_LPUART_3_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C0_IPG_CLK, "i2c0_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_0_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C0_CLK, "i2c0_lpcg_clk", "i2c0_clk", 0, ADMA_LPI2C_0_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C1_IPG_CLK, "i2c1_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_1_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C1_CLK, "i2c1_lpcg_clk", "i2c1_clk", 0, ADMA_LPI2C_1_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C2_IPG_CLK, "i2c2_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_2_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C2_CLK, "i2c2_lpcg_clk", "i2c2_clk", 0, ADMA_LPI2C_2_LPCG, 0, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C3_IPG_CLK, "i2c3_lpcg_ipg_clk", "dma_ipg_clk_root", 0, ADMA_LPI2C_3_LPCG, 16, 0, },
++	{ IMX8QXP_ADMA_LPCG_I2C3_CLK, "i2c3_lpcg_clk", "i2c3_clk", 0, ADMA_LPI2C_3_LPCG, 0, 0, },
++};
++
++static const struct imx8qxp_ss_lpcg imx8qxp_ss_adma = {
++	.lpcg = imx8qxp_lpcg_adma,
++	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_adma),
++	.num_max = IMX8QXP_ADMA_LPCG_CLK_END,
++};
++
++static const struct imx8qxp_lpcg_data imx8qxp_lpcg_conn[] = {
++	{ IMX8QXP_CONN_LPCG_SDHC0_PER_CLK, "sdhc0_lpcg_per_clk", "sdhc0_clk", 0, CONN_USDHC_0_LPCG, 0, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC0_IPG_CLK, "sdhc0_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_0_LPCG, 16, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC0_HCLK, "sdhc0_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_0_LPCG, 20, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC1_PER_CLK, "sdhc1_lpcg_per_clk", "sdhc1_clk", 0, CONN_USDHC_1_LPCG, 0, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC1_IPG_CLK, "sdhc1_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_1_LPCG, 16, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC1_HCLK, "sdhc1_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_1_LPCG, 20, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC2_PER_CLK, "sdhc2_lpcg_per_clk", "sdhc2_clk", 0, CONN_USDHC_2_LPCG, 0, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC2_IPG_CLK, "sdhc2_lpcg_ipg_clk", "conn_ipg_clk_root", 0, CONN_USDHC_2_LPCG, 16, 0, },
++	{ IMX8QXP_CONN_LPCG_SDHC2_HCLK, "sdhc2_lpcg_ahb_clk", "conn_axi_clk_root", 0, CONN_USDHC_2_LPCG, 20, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET0_ROOT_CLK, "enet0_ipg_root_clk", "enet0_clk", 0, CONN_ENET_0_LPCG, 0, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET0_TX_CLK, "enet0_tx_clk", "enet0_clk", 0, CONN_ENET_0_LPCG, 4, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET0_AHB_CLK, "enet0_ahb_clk", "conn_axi_clk_root", 0, CONN_ENET_0_LPCG, 8, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET0_IPG_S_CLK, "enet0_ipg_s_clk", "conn_ipg_clk_root", 0, CONN_ENET_0_LPCG, 20, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET0_IPG_CLK, "enet0_ipg_clk", "enet0_ipg_s_clk", 0, CONN_ENET_0_LPCG, 16, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET1_ROOT_CLK, "enet1_ipg_root_clk", "enet1_clk", 0, CONN_ENET_1_LPCG, 0, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET1_TX_CLK, "enet1_tx_clk", "enet1_clk", 0, CONN_ENET_1_LPCG, 4, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET1_AHB_CLK, "enet1_ahb_clk", "conn_axi_clk_root", 0, CONN_ENET_1_LPCG, 8, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET1_IPG_S_CLK, "enet1_ipg_s_clk", "conn_ipg_clk_root", 0, CONN_ENET_1_LPCG, 20, 0, },
++	{ IMX8QXP_CONN_LPCG_ENET1_IPG_CLK, "enet1_ipg_clk", "enet0_ipg_s_clk", 0, CONN_ENET_1_LPCG, 16, 0, },
++};
++
++static const struct imx8qxp_ss_lpcg imx8qxp_ss_conn = {
++	.lpcg = imx8qxp_lpcg_conn,
++	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_conn),
++	.num_max = IMX8QXP_CONN_LPCG_CLK_END,
++};
++
++static const struct imx8qxp_lpcg_data imx8qxp_lpcg_lsio[] = {
++	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_CLK, "pwm0_lpcg_ipg_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_HF_CLK, "pwm0_lpcg_ipg_hf_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_S_CLK, "pwm0_lpcg_ipg_s_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_SLV_CLK, "pwm0_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_0_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM0_IPG_MSTR_CLK, "pwm0_lpcg_ipg_mstr_clk", "pwm0_clk", 0, LSIO_PWM_0_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_CLK, "pwm1_lpcg_ipg_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_HF_CLK, "pwm1_lpcg_ipg_hf_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_S_CLK, "pwm1_lpcg_ipg_s_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_SLV_CLK, "pwm1_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_1_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM1_IPG_MSTR_CLK, "pwm1_lpcg_ipg_mstr_clk", "pwm1_clk", 0, LSIO_PWM_1_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_CLK, "pwm2_lpcg_ipg_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_HF_CLK, "pwm2_lpcg_ipg_hf_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_S_CLK, "pwm2_lpcg_ipg_s_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_SLV_CLK, "pwm2_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_2_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM2_IPG_MSTR_CLK, "pwm2_lpcg_ipg_mstr_clk", "pwm2_clk", 0, LSIO_PWM_2_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_CLK, "pwm3_lpcg_ipg_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_HF_CLK, "pwm3_lpcg_ipg_hf_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_S_CLK, "pwm3_lpcg_ipg_s_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_SLV_CLK, "pwm3_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_3_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM3_IPG_MSTR_CLK, "pwm3_lpcg_ipg_mstr_clk", "pwm3_clk", 0, LSIO_PWM_3_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_CLK, "pwm4_lpcg_ipg_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_HF_CLK, "pwm4_lpcg_ipg_hf_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_S_CLK, "pwm4_lpcg_ipg_s_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_SLV_CLK, "pwm4_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_4_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM4_IPG_MSTR_CLK, "pwm4_lpcg_ipg_mstr_clk", "pwm4_clk", 0, LSIO_PWM_4_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_CLK, "pwm5_lpcg_ipg_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_HF_CLK, "pwm5_lpcg_ipg_hf_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_S_CLK, "pwm5_lpcg_ipg_s_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_SLV_CLK, "pwm5_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_5_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM5_IPG_MSTR_CLK, "pwm5_lpcg_ipg_mstr_clk", "pwm5_clk", 0, LSIO_PWM_5_LPCG, 24, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_CLK, "pwm6_lpcg_ipg_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 0, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_HF_CLK, "pwm6_lpcg_ipg_hf_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 4, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_S_CLK, "pwm6_lpcg_ipg_s_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 16, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_SLV_CLK, "pwm6_lpcg_ipg_slv_clk", "lsio_bus_clk_root", 0, LSIO_PWM_6_LPCG, 20, 0, },
++	{ IMX8QXP_LSIO_LPCG_PWM6_IPG_MSTR_CLK, "pwm6_lpcg_ipg_mstr_clk", "pwm6_clk", 0, LSIO_PWM_6_LPCG, 24, 0, },
++};
++
++static const struct imx8qxp_ss_lpcg imx8qxp_ss_lsio = {
++	.lpcg = imx8qxp_lpcg_lsio,
++	.num_lpcg = ARRAY_SIZE(imx8qxp_lpcg_lsio),
++	.num_max = IMX8QXP_LSIO_LPCG_CLK_END,
++};
++
++static int imx8qxp_lpcg_clk_probe(struct platform_device *pdev)
 +{
-+	struct clk_lpcg_scu *clk;
-+	struct clk_init_data init;
-+	struct clk_hw *hw;
-+	int ret;
++	struct device *dev = &pdev->dev;
++	struct device_node *np = dev->of_node;
++	struct clk_hw_onecell_data *clk_data;
++	const struct imx8qxp_ss_lpcg *ss_lpcg;
++	const struct imx8qxp_lpcg_data *lpcg;
++	struct resource *res;
++	struct clk_hw **clks;
++	void __iomem *base;
++	int i;
 +
-+	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-+	if (!clk)
-+		return ERR_PTR(-ENOMEM);
++	ss_lpcg = of_device_get_match_data(dev);
++	if (!ss_lpcg)
++		return -ENODEV;
 +
-+	clk->reg = reg;
-+	clk->bit_idx = bit_idx;
-+	clk->hw_gate = hw_gate;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	base = devm_ioremap(dev, res->start, resource_size(res));
++	if (!base)
++		return -ENOMEM;
 +
-+	init.name = name;
-+	init.ops = &clk_lpcg_scu_ops;
-+	init.flags = CLK_SET_RATE_PARENT | flags;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
++	clk_data = devm_kzalloc(&pdev->dev, struct_size(clk_data, hws,
++				ss_lpcg->num_max), GFP_KERNEL);
++	if (!clk_data)
++		return -ENOMEM;
 +
-+	clk->hw.init = &init;
++	clk_data->num = ss_lpcg->num_max;
++	clks = clk_data->hws;
 +
-+	hw = &clk->hw;
-+	ret = clk_hw_register(NULL, hw);
-+	if (ret) {
-+		kfree(clk);
-+		hw = ERR_PTR(ret);
++	for (i = 0; i < ss_lpcg->num_lpcg; i++) {
++		lpcg = ss_lpcg->lpcg + i;
++		clks[lpcg->id] = imx_clk_lpcg_scu(lpcg->name, lpcg->parent,
++						  lpcg->flags, base + lpcg->offset,
++						  lpcg->bit_idx, lpcg->hw_gate);
 +	}
 +
-+	return hw;
++	for (i = 0; i < clk_data->num; i++) {
++		if (IS_ERR(clks[i]))
++			pr_warn("i.MX clk %u: register failed with %ld\n",
++				i, PTR_ERR(clks[i]));
++	}
++
++	return of_clk_add_hw_provider(np, of_clk_hw_onecell_get, clk_data);
 +}
-diff --git a/drivers/clk/imx/clk-scu.h b/drivers/clk/imx/clk-scu.h
-index 09f381b..b8e91b1 100644
---- a/drivers/clk/imx/clk-scu.h
-+++ b/drivers/clk/imx/clk-scu.h
-@@ -18,4 +18,7 @@ static inline int imx_clk_scu_init(void)
- 
- struct clk_hw *imx_clk_scu(const char *name, u32 rsrc_id, u8 clk_type);
- 
-+struct clk_hw *imx_clk_lpcg_scu(const char *name, const char *parent_name,
-+				unsigned long flags, void __iomem *reg,
-+				u8 bit_idx, bool hw_gate);
- #endif
++
++static const struct of_device_id imx8qxp_lpcg_match[] = {
++	{ .compatible = "fsl,imx8qxp-lpcg-adma", &imx8qxp_ss_adma, },
++	{ .compatible = "fsl,imx8qxp-lpcg-conn", &imx8qxp_ss_conn, },
++	{ .compatible = "fsl,imx8qxp-lpcg-lsio", &imx8qxp_ss_lsio, },
++	{ /* sentinel */ }
++};
++
++static struct platform_driver imx8qxp_lpcg_clk_driver = {
++	.driver = {
++		.name = "imx8qxp-lpcg-clk",
++		.of_match_table = imx8qxp_lpcg_match,
++		.suppress_bind_attrs = true,
++	},
++	.probe = imx8qxp_lpcg_clk_probe,
++};
++
++builtin_platform_driver(imx8qxp_lpcg_clk_driver);
+diff --git a/drivers/clk/imx/clk-imx8qxp-lpcg.h b/drivers/clk/imx/clk-imx8qxp-lpcg.h
+new file mode 100644
+index 0000000..2a37ce5
+--- /dev/null
++++ b/drivers/clk/imx/clk-imx8qxp-lpcg.h
+@@ -0,0 +1,102 @@
++/* SPDX-License-Identifier: GPL-2.0+ */
++/*
++ * Copyright 2018 NXP
++ *   Dong Aisheng <aisheng.dong@nxp.com>
++ */
++
++#ifndef _IMX8QXP_LPCG_H
++#define _IMX8QXP_LPCG_H
++
++/*LSIO SS */
++#define LSIO_PWM_0_LPCG			0x00000
++#define LSIO_PWM_1_LPCG			0x10000
++#define LSIO_PWM_2_LPCG			0x20000
++#define LSIO_PWM_3_LPCG			0x30000
++#define LSIO_PWM_4_LPCG			0x40000
++#define LSIO_PWM_5_LPCG			0x50000
++#define LSIO_PWM_6_LPCG			0x60000
++#define LSIO_PWM_7_LPCG			0x70000
++#define LSIO_GPIO_0_LPCG		0x80000
++#define LSIO_GPIO_1_LPCG		0x90000
++#define LSIO_GPIO_2_LPCG		0xa0000
++#define LSIO_GPIO_3_LPCG		0xb0000
++#define LSIO_GPIO_4_LPCG		0xc0000
++#define LSIO_GPIO_5_LPCG		0xd0000
++#define LSIO_GPIO_6_LPCG		0xe0000
++#define LSIO_GPIO_7_LPCG		0xf0000
++#define LSIO_FSPI_0_LPCG		0x120000
++#define LSIO_FSPI_1_LPCG		0x130000
++#define LSIO_GPT_0_LPCG			0x140000
++#define LSIO_GPT_1_LPCG			0x150000
++#define LSIO_GPT_2_LPCG			0x160000
++#define LSIO_GPT_3_LPCG			0x170000
++#define LSIO_GPT_4_LPCG			0x180000
++#define LSIO_OCRAM_LPCG			0x190000
++#define LSIO_KPP_LPCG			0x1a0000
++#define LSIO_ROMCP_LPCG			0x100000
++
++/* Connectivity SS */
++#define CONN_USDHC_0_LPCG		0x00000
++#define CONN_USDHC_1_LPCG		0x10000
++#define CONN_USDHC_2_LPCG		0x20000
++#define CONN_ENET_0_LPCG		0x30000
++#define CONN_ENET_1_LPCG		0x40000
++#define CONN_DTCP_LPCG			0x50000
++#define CONN_MLB_LPCG			0x60000
++#define CONN_USB_2_LPCG			0x70000
++#define CONN_USB_3_LPCG			0x80000
++#define CONN_NAND_LPCG			0x90000
++#define CONN_EDMA_LPCG			0xa0000
++
++/* ADMA SS */
++#define ADMA_ASRC_0_LPCG		0x400000
++#define ADMA_ESAI_0_LPCG		0x410000
++#define ADMA_SPDIF_0_LPCG		0x420000
++#define ADMA_SAI_0_LPCG			0x440000
++#define ADMA_SAI_1_LPCG			0x450000
++#define ADMA_SAI_2_LPCG			0x460000
++#define ADMA_SAI_3_LPCG			0x470000
++#define ADMA_GPT_5_LPCG			0x4b0000
++#define ADMA_GPT_6_LPCG			0x4c0000
++#define ADMA_GPT_7_LPCG			0x4d0000
++#define ADMA_GPT_8_LPCG			0x4e0000
++#define ADMA_GPT_9_LPCG			0x4f0000
++#define ADMA_GPT_10_LPCG		0x500000
++#define ADMA_HIFI_LPCG			0x580000
++#define ADMA_OCRAM_LPCG			0x590000
++#define ADMA_EDMA_0_LPCG		0x5f0000
++#define ADMA_ASRC_1_LPCG		0xc00000
++#define ADMA_SAI_4_LPCG			0xc20000
++#define ADMA_SAI_5_LPCG			0xc30000
++#define ADMA_AMIX_LPCG			0xc40000
++#define ADMA_MQS_LPCG			0xc50000
++#define ADMA_ACM_LPCG			0xc60000
++#define ADMA_REC_CLK0_LPCG		0xd00000
++#define ADMA_REC_CLK1_LPCG		0xd10000
++#define ADMA_PLL_CLK0_LPCG		0xd20000
++#define ADMA_PLL_CLK1_LPCG		0xd30000
++#define ADMA_MCLKOUT0_LPCG		0xd50000
++#define ADMA_MCLKOUT1_LPCG		0xd60000
++#define ADMA_EDMA_1_LPCG		0xdf0000
++#define ADMA_LPSPI_0_LPCG		0x1400000
++#define ADMA_LPSPI_1_LPCG		0x1410000
++#define ADMA_LPSPI_2_LPCG		0x1420000
++#define ADMA_LPSPI_3_LPCG		0x1430000
++#define ADMA_LPUART_0_LPCG		0x1460000
++#define ADMA_LPUART_1_LPCG		0x1470000
++#define ADMA_LPUART_2_LPCG		0x1480000
++#define ADMA_LPUART_3_LPCG		0x1490000
++#define ADMA_LCD_LPCG			0x1580000
++#define ADMA_PWM_LPCG			0x1590000
++#define ADMA_LPI2C_0_LPCG		0x1c00000
++#define ADMA_LPI2C_1_LPCG		0x1c10000
++#define ADMA_LPI2C_2_LPCG		0x1c20000
++#define ADMA_LPI2C_3_LPCG		0x1c30000
++#define ADMA_ADC_0_LPCG			0x1c80000
++#define ADMA_FTM_0_LPCG			0x1ca0000
++#define ADMA_FTM_1_LPCG			0x1cb0000
++#define ADMA_FLEXCAN_0_LPCG		0x1cd0000
++#define ADMA_FLEXCAN_1_LPCG		0x1ce0000
++#define ADMA_FLEXCAN_2_LPCG		0x1cf0000
++
++#endif /* _IMX8QXP_LPCG_H */
 -- 
 2.7.4
