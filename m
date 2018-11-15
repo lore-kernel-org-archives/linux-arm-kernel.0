@@ -1,46 +1,72 @@
-From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Thu, 15 Nov 2018 14:04:00 +0100
-Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic
- NAND flash controller
-In-Reply-To: <27769252-ac5e-e787-6792-d6a06e7af0e4@amlogic.com>
-References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
- <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
- <20181105165321.7ea2b45f@bbrezillon>
- <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
- <20181106102851.61deb97a@bbrezillon>
- <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
- <20181106112206.65a70a81@bbrezillon>
- <20181112171351.4ac3506b@xps13>
- <20181112175416.247e3203@bbrezillon>
- <20181112184518.6c02ac6d@bbrezillon>
- <27769252-ac5e-e787-6792-d6a06e7af0e4@amlogic.com>
-Message-ID: <20181115140400.3934effe@xps13>
+From: pintu.ping@gmail.com (Pintu Agarwal)
+Date: Thu, 15 Nov 2018 18:52:39 +0530
+Subject: [ARM64] Printing IRQ stack usage information
+Message-ID: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liang,
+Hi All,
 
-Liang Yang <liang.yang@amlogic.com> wrote on Thu, 15 Nov 2018 19:25:07
-+0800:
+I have a requirement in printing irq stack usage information for each cpu.
+I am using the following:
+Linux Kernel: 4.9.x
+Board: hikey620 (arm64, armv8 with 8 cores)
+Platform: Ubuntu 14 debian
 
-> Hi Boris,
-> 
-> I have implemented dma access base on these helpers you provided below.
-> we prepare to send v7 version now, so when will these helpers be pushed?
+As a vague idea, I tried to implement like this:
+-------------------------------------------------------------
+static int dump_irq_stack_info(void)
+{
+        int cpu, actual;
+        unsigned long irq_stack_ptr;
+        //unsigned long sp, sp1;
+        unsigned long stack_start;
+        unsigned long used;
 
-Thanks for your work. You can send the v7 so we will have a look at the
-overall driver; but since we raised the DMA buffers issue we had a
-discussion with Boris about how to handle them and I think we are going
-to adopt the same solution as Wolfram in the I2C subsystem: manual
-flagging. Sadly, this is probably the best we can do to ensure proper
-DMA support.
+        actual = IRQ_STACK_SIZE;
+        used = 0;
+        pr_info("CPU UNUSED-STACK ACTUAL-STACK\n");
+        //seq_printf(m, "CPU UNUSED-STACK ACTUAL-STACK\n");
+        for_each_present_cpu(cpu) {
+                irq_stack_ptr = IRQ_STACK_PTR(cpu);
+                //sp1 = current_stack_pointer;
+                //sp = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
+                stack_start = (unsigned long)per_cpu(irq_stack, cpu);
+                used = irq_stack_ptr - stack_start;
+                pr_info("%2d %10lu %10d\n", cpu, used, actual);
+                //seq_printf(m, "%2d %10lu %10d\n", cpu, used, actual);
+        }
 
-There is nothing set is stone yet but I started a small rework to
-handle MTD operations differently (and add a DMA_SAFE flag), you can
-have a look there [1]. Don't base your work on it for now as it is just
-a preliminary version, subject to big changes.
+        return 0;
+}
+-------------------------------------------------------------
+Currently, when I tested this (as a proc interface), I got the below output:
+CPU    UNUSED-STACK    ACTUAL-STACK
+ 0         16368                     16384
+ 1         16368                     16384
+ 2         16368                     16384
+ 3         16368                     16384
+ 4         16368                     16384
+ 5         16368                     16384
+ 6         16368                     16384
+ 7         16368                     16384
+-------------------------------------------------------------
 
-[1] https://github.com/miquelraynal/linux/commits/dma-safe-buffers
+But, I have some doubts:
+1) I am not sure if my implementation is in right direction, or the
+logic is totally wrong.
+2) Is there better way to perform the similar objective?
+3) How should I test it to get the different usage values for unused stack ?
+    Can I get these values by implementing a sample interrupt handler,
+and printing information from there?
 
-Thanks,
-Miqu?l
+If this works, then I want to use it as part of dump_backtrace() function.
+
+If anybody have done a similar thing in past, or have some ideas to
+share, please help me.
+
+Note: This is required only for our internal debugging purpose.
+
+
+Regards,
+Pintu
