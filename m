@@ -1,99 +1,59 @@
-From: pn@denx.de (Parthiban Nallathambi)
-Date: Thu, 15 Nov 2018 13:51:59 +0100
-Subject: [PATCH] arm64: dts: actions: s700: Add I2C controller nodes
-In-Reply-To: <20181115111217.GC15537@Mani-XPS-13-9360>
-References: <20181113133235.37754-1-pn@denx.de>
- <20181115111217.GC15537@Mani-XPS-13-9360>
-Message-ID: <f3364954-d1af-af41-2619-449b401140b8@denx.de>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 15 Nov 2018 12:55:46 +0000
+Subject: [PATCH 1/4] arm64: KVM: add accessors to track guest/host only
+ counters
+In-Reply-To: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
+References: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542286549-4501-2-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In order to effeciently enable/disable guest/host only perf counters
+at guest entry/exit we add bitfields to kvm_cpu_context for guest and
+host only events as well as accessors for updating them.
 
+Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+---
+ arch/arm64/include/asm/kvm_host.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-On 11/15/18 12:12 PM, Manivannan Sadhasivam wrote:
-> Hi Parthiban,
-> 
-> On Tue, Nov 13, 2018 at 02:32:35PM +0100, Parthiban Nallathambi wrote:
->> Add I2C controller nodes for Actions Semiconductor S700 SoC.
->>
->> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
->> ---
->>   arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
->>   1 file changed, 40 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
->> index 192c7b39c8c1..573c844d7afe 100644
->> --- a/arch/arm64/boot/dts/actions/s700.dtsi
->> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
->> @@ -174,6 +174,46 @@
->>   			#clock-cells = <1>;
->>   		};
->>   
->> +		i2c0: i2c at e0170000 {
->> +			compatible = "actions,s900-i2c";
-> 
-> Why don't you add a compatible for S700? Also, please add the pinctrl
-> nodes for these busses and enable the ones exposed on board. These could
-> go in a separate patch.
-
-Makes sense as pinctrl is already fine. Will do in v2 as series!
-
-Thanks,
-Parthi
-> 
-> Thanks,
-> Mani
-> 
->> +			reg = <0 0xe0170000 0 0x1000>;
->> +			clocks = <&cmu CLK_I2C0>;
->> +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c1: i2c at e0174000 {
->> +			compatible = "actions,s900-i2c";
->> +			reg = <0 0xe0174000 0 0x1000>;
->> +			clocks = <&cmu CLK_I2C1>;
->> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c2: i2c at e0178000 {
->> +			compatible = "actions,s900-i2c";
->> +			reg = <0 0xe0178000 0 0x1000>;
->> +			clocks = <&cmu CLK_I2C2>;
->> +			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			status = "disabled";
->> +		};
->> +
->> +		i2c3: i2c at e017c000 {
->> +			compatible = "actions,s900-i2c";
->> +			reg = <0 0xe017c000 0 0x1000>;
->> +			clocks = <&cmu CLK_I2C3>;
->> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
->> +			#address-cells = <1>;
->> +			#size-cells = <0>;
->> +			status = "disabled";
->> +		};
->> +
->>   		sps: power-controller at e01b0100 {
->>   			compatible = "actions,s700-sps";
->>   			reg = <0x0 0xe01b0100 0x0 0x100>;
->> -- 
->> 2.17.2
->>
-> 
-
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 1550192..b6f998b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -203,6 +203,8 @@ struct kvm_cpu_context {
+ 	};
+ 
+ 	struct kvm_vcpu *__hyp_running_vcpu;
++	u32 events_host_only;
++	u32 events_guest_only;
+ };
+ 
+ typedef struct kvm_cpu_context kvm_cpu_context_t;
+@@ -472,6 +474,24 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+ {
+ 	return kvm_arch_vcpu_run_map_fp(vcpu);
+ }
++static inline void kvm_set_clr_host_pmu_events(u32 clr, u32 set)
++{
++	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
++
++	ctx->events_host_only &= ~clr;
++	ctx->events_host_only |= set;
++}
++
++static inline void kvm_set_clr_guest_pmu_events(u32 clr, u32 set)
++{
++	kvm_cpu_context_t *ctx = this_cpu_ptr(&kvm_host_cpu_state);
++
++	ctx->events_guest_only &= ~clr;
++	ctx->events_guest_only |= set;
++}
++#else
++static inline void kvm_set_clr_host_pmu_events(u32 clr, u32 set) {}
++static inline void kvm_set_clr_guest_pmu_events(u32 clr, u32 set) {}
+ #endif
+ 
+ static inline void kvm_arm_vhe_guest_enter(void)
 -- 
-Thanks,
-Parthiban N
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-22 Fax: (+49)-8142-66989-80 Email: pn at denx.de
+2.7.4
