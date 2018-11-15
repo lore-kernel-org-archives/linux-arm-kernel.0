@@ -1,110 +1,113 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 15 Nov 2018 14:52:54 +0900
-Subject: [PATCH v16 15/16] arm64: kexec_file: add kernel signature
- verification support
+Date: Thu, 15 Nov 2018 14:52:55 +0900
+Subject: [PATCH v16 16/16] arm64: kexec_file: add kaslr support
 In-Reply-To: <20181115055254.2812-1-takahiro.akashi@linaro.org>
 References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
-Message-ID: <20181115055254.2812-16-takahiro.akashi@linaro.org>
+Message-ID: <20181115055254.2812-17-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With this patch, kernel verification can be done without IMA security
-subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
+Adding "kaslr-seed" to dtb enables triggering kaslr, or kernel virtual
+address randomization, at secondary kernel boot. We always do this as
+it will have no harm on kaslr-incapable kernel.
 
-On x86, a signature is embedded into a PE file (Microsoft's format) header
-of binary. Since arm64's "Image" can also be seen as a PE file as far as
-CONFIG_EFI is enabled, we adopt this format for kernel signing.
-
-You can create a signed kernel image with:
-    $ sbsign --key ${KEY} --cert ${CERT} Image
+We don't have any "switch" to turn off this feature directly, but still
+can suppress it by passing "nokaslr" as a kernel boot argument.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
-Reviewed-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/Kconfig              | 24 ++++++++++++++++++++++++
- arch/arm64/kernel/kexec_image.c | 17 +++++++++++++++++
- 2 files changed, 41 insertions(+)
+ arch/arm64/kernel/machine_kexec_file.c | 46 +++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 93dc4d36d6db..11f3e1a00588 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -867,6 +867,30 @@ config KEXEC_FILE
- 	  for kernel and initramfs as opposed to list of segments as
- 	  accepted by previous system call.
- 
-+config KEXEC_VERIFY_SIG
-+	bool "Verify kernel signature during kexec_file_load() syscall"
-+	depends on KEXEC_FILE
-+	help
-+	  Select this option to verify a signature with loaded kernel
-+	  image. If configured, any attempt of loading a image without
-+	  valid signature will fail.
-+
-+	  In addition to that option, you need to enable signature
-+	  verification for the corresponding kernel image type being
-+	  loaded in order for this to work.
-+
-+config KEXEC_IMAGE_VERIFY_SIG
-+	bool "Enable Image signature verification support"
-+	default y
-+	depends on KEXEC_VERIFY_SIG
-+	depends on EFI && SIGNED_PE_FILE_VERIFICATION
-+	help
-+	  Enable Image signature verification support.
-+
-+comment "Support for PE file signature verification disabled"
-+	depends on KEXEC_VERIFY_SIG
-+	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
-+
- config CRASH_DUMP
- 	bool "Build kdump crash kernel"
- 	help
-diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-index 9f0d8b5d62d3..d1c6c54c22e3 100644
---- a/arch/arm64/kernel/kexec_image.c
-+++ b/arch/arm64/kernel/kexec_image.c
-@@ -12,7 +12,9 @@
- #include <linux/errno.h>
- #include <linux/kernel.h>
- #include <linux/kexec.h>
-+#include <linux/pe.h>
+diff --git a/arch/arm64/kernel/machine_kexec_file.c b/arch/arm64/kernel/machine_kexec_file.c
+index ab296b98d633..a0a730bd9be6 100644
+--- a/arch/arm64/kernel/machine_kexec_file.c
++++ b/arch/arm64/kernel/machine_kexec_file.c
+@@ -16,6 +16,7 @@
+ #include <linux/libfdt.h>
+ #include <linux/memblock.h>
+ #include <linux/of_fdt.h>
++#include <linux/random.h>
+ #include <linux/slab.h>
  #include <linux/string.h>
-+#include <linux/verification.h>
- #include <asm/byteorder.h>
- #include <asm/cpufeature.h>
- #include <asm/image.h>
-@@ -29,6 +31,10 @@ static int image_probe(const char *kernel_buf, unsigned long kernel_len)
- 				sizeof(h->magic)))
- 		return -EINVAL;
+ #include <linux/types.h>
+@@ -28,6 +29,7 @@
+ #define FDT_PSTR_INITRD_STA	"linux,initrd-start"
+ #define FDT_PSTR_INITRD_END	"linux,initrd-end"
+ #define FDT_PSTR_BOOTARGS	"bootargs"
++#define FDT_PSTR_KASLR_SEED	"kaslr-seed"
  
-+	pr_debug("PE format: %s\n",
-+			memcmp(&((struct mz_hdr *)h)->magic, "MZ", 2) ?
-+							"no" : "yes");
+ const struct kexec_file_ops * const kexec_file_loaders[] = {
+ 	&kexec_image_ops,
+@@ -46,11 +48,38 @@ int arch_kimage_file_post_load_cleanup(struct kimage *image)
+ 	return kexec_image_post_load_cleanup_default(image);
+ }
+ 
++/* crng needs to have been initialized for providing kaslr-seed */
++static int random_ready;
++
++static void random_ready_notified(struct random_ready_callback *unused)
++{
++	random_ready = 1;
++}
++
++static struct random_ready_callback random_ready_cb = {
++	.func = random_ready_notified,
++};
++
++static __init int init_random_ready_cb(void)
++{
++	int ret;
++
++	ret = add_random_ready_callback(&random_ready_cb);
++	if (ret == -EALREADY)
++		random_ready = 1;
++	else if (ret)
++		pr_warn("failed to add a callback for random_ready\n");
++
++	return 0;
++}
++late_initcall(init_random_ready_cb)
++
+ static int setup_dtb(struct kimage *image,
+ 		     unsigned long initrd_load_addr, unsigned long initrd_len,
+ 		     char *cmdline, void *dtb)
+ {
+ 	int nodeoffset;
++	u64 value;
+ 	int ret;
+ 
+ 	nodeoffset = fdt_path_offset(dtb, "/chosen");
+@@ -106,12 +135,27 @@ static int setup_dtb(struct kimage *image,
+ 			return -EINVAL;
+ 	}
+ 
++	/* add kaslr-seed */
++	ret = fdt_delprop(dtb, nodeoffset, FDT_PSTR_KASLR_SEED);
++	if (ret && (ret != -FDT_ERR_NOTFOUND))
++		return -EINVAL;
++
++	if (random_ready) {
++		get_random_bytes(&value, sizeof(value));
++		ret = fdt_setprop_u64(dtb, nodeoffset, FDT_PSTR_KASLR_SEED,
++							value);
++		if (ret)
++			return (ret == -FDT_ERR_NOSPACE ? -ENOMEM : -EINVAL);
++	} else {
++		pr_notice("kaslr-seed won't be fed\n");
++	}
 +
  	return 0;
  }
  
-@@ -107,7 +113,18 @@ static void *image_load(struct kimage *image,
- 	return ERR_PTR(ret);
- }
+ /*
+  * More space needed so that we can add initrd, bootargs,
+- * userable-memory-range and elfcorehdr.
++ * userable-memory-range, elfcorehdr and kaslr-seed.
+  */
+ #define DTB_EXTRA_SPACE 0x1000
  
-+#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-+static int image_verify_sig(const char *kernel, unsigned long kernel_len)
-+{
-+	return verify_pefile_signature(kernel, kernel_len, NULL,
-+				       VERIFYING_KEXEC_PE_SIGNATURE);
-+}
-+#endif
-+
- const struct kexec_file_ops kexec_image_ops = {
- 	.probe = image_probe,
- 	.load = image_load,
-+#ifdef CONFIG_KEXEC_IMAGE_VERIFY_SIG
-+	.verify_sig = image_verify_sig,
-+#endif
- };
 -- 
 2.19.0
