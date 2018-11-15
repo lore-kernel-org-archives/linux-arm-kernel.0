@@ -1,33 +1,32 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 15 Nov 2018 15:50:09 +0100
-Subject: [PATCH 11/15] dt-bindings: media: cedrus: Add compatibles for the A64
- and H5
+Date: Thu, 15 Nov 2018 15:50:07 +0100
+Subject: [PATCH 09/15] dt-bindings: sram: sunxi: Add compatible for the A64
+ SRAM C1
 In-Reply-To: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
 References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181115145013.3378-12-paul.kocialkowski@bootlin.com>
+Message-ID: <20181115145013.3378-10-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces two new compatibles for the cedrus driver, for the
-A64 and H5 platforms.
+This introduces a new compatible for the A64 SRAM C1 section, that is
+compatible with the SRAM C1 section as found on the A10.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- Documentation/devicetree/bindings/media/cedrus.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/sram/sunxi-sram.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/media/cedrus.txt b/Documentation/devicetree/bindings/media/cedrus.txt
-index a089a0c1ff05..b3c0635dcd0e 100644
---- a/Documentation/devicetree/bindings/media/cedrus.txt
-+++ b/Documentation/devicetree/bindings/media/cedrus.txt
-@@ -11,6 +11,8 @@ Required properties:
- 			- "allwinner,sun7i-a20-video-engine"
- 			- "allwinner,sun8i-a33-video-engine"
- 			- "allwinner,sun8i-h3-video-engine"
-+			- "allwinner,sun50i-a64-video-engine"
-+			- "allwinner,sun50i-h5-video-engine"
- - reg			: register base and length of VE;
- - clocks		: list of clock specifiers, corresponding to entries in
- 			  the clock-names property;
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index c043a6a4011e..cf221d299a8f 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -55,6 +55,7 @@ The valid sections compatible for H3 are:
+ 
+ The valid sections compatible for A64 are:
+     - allwinner,sun50i-a64-sram-c
++    - allwinner,sun50i-a64-sram-c1, allwinner,sun4i-a10-sram-c1
+ 
+ The valid sections compatible for H5 are:
+     - allwinner,sun50i-h5-sram-c1, allwinner,sun4i-a10-sram-c1
 -- 
 2.19.1
