@@ -1,67 +1,38 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 15 Nov 2018 14:39:06 +0000
-Subject: [PATCH]  kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
-References: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
-Message-ID: <20181115143906.5c2302d5@donnerap.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 15 Nov 2018 06:42:45 -0800
+Subject: [RFC PATCH 07/12] soc: qcom: ipa: IPA register abstraction
+In-Reply-To: <e9114caf-0c92-7cac-33cd-6bea548b0375@linaro.org>
+References: <20181107003250.5832-1-elder@linaro.org>
+ <20181107003250.5832-8-elder@linaro.org>
+ <CAK8P3a2FsgR=SYAWsgFURVni1ReiCugKs1iUAfQzZhPkbW8aOA@mail.gmail.com>
+ <e9114caf-0c92-7cac-33cd-6bea548b0375@linaro.org>
+Message-ID: <CAK8P3a1RKVYRhM7OtUK3BhPj=jip2-j_8ziW_6Z5rnhFCTOOUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2018 23:14:08 +0800
-Peng Hao <peng.hao2@zte.com.cn> wrote:
+On Wed, Nov 14, 2018 at 6:48 PM Alex Elder <elder@linaro.org> wrote:
+>
+> On 11/7/18 9:00 AM, Arnd Bergmann wrote:
+> > On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
+> >> diff --git a/drivers/net/ipa/ipa_reg.c b/drivers/net/ipa/ipa_reg.c
+> >> new file mode 100644
+> >> index 000000000000..5e0aa6163235
+> >> --- /dev/null
+> >> +++ b/drivers/net/ipa/ipa_reg.c
+> >> @@ -0,0 +1,972 @@
 
-Hi,
+> It may be that this parse/construct mechanism isn't justified
+> at this point.  I thought the way it presented a generic
+> interface was useful, but with just one (initial) hardware
+> target we don't (yet) realize its potential benefit.  It could
+> be added back later, as support for new versions is added.
+>
+> As of now I don't plan to change this, but if you or someone
+> else feels it would be better without it I can do that.
 
-> When virtual machine starts, hang up.
+Fair enough. I do think that it would be better to avoid this, but
+it's much less important than the other issues I mentioned,
+so please put this on the bottom of your priorities list, we
+can talk about it again when we get closer to merging the driver.
 
-I take it you mean the *guest* hangs? Because it doesn't get a timer
-interrupt?
-
-> The kernel version of guest
-> is 4.16. Host support vgic_v3.
-
-Your host kernel is something recent, I guess?
-
-> It was mainly due to the incorrect vgic_irq's(intid=27) group value
-> during injection interruption. when kvm_vgic_vcpu_init is called,
-> dist is not initialized at this time. Unable to get vgic V3 or V2
-> correctly, so group is not set.
-
-Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
-version?) or some other userland tool?
-
-> group is setted to 1 when vgic_mmio_write_group is invoked at some
-> time.
-> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-> interrupt injection failed.
-> 
-> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> ---
->  virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 9c0dd23..d101000 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
-> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
-> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
->  
-> -	if (irq->group)
-> +	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-
-This is not the right fix, not only because it basically reverts the
-GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
-their configured group).
-
-Can you try to work out why kvm_vgic_vcpu_init() is apparently called
-before dist->vgic_model is set, also what value it has?
-If I understand the code correctly, that shouldn't happen for a GICv3.
-
-Cheers,
-Andre.
-
->  		val |= ICH_LR_GROUP;
->  
->  	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
+     Arnd
