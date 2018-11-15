@@ -1,33 +1,55 @@
 From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:25 +0100
-Subject: [PATCH 5/9] drm: replace "drm_connector_unreference" with
- "drm_connector_put"
+Date: Thu, 15 Nov 2018 23:16:26 +0100
+Subject: [PATCH 6/9] drm: remove deprecated "drm_connector_[un]reference"
+ functions
 In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
 References: <20181115221634.22715-1-greenfoo@gluegarage.com>
-Message-ID: <20181115221634.22715-6-greenfoo@gluegarage.com>
+Message-ID: <20181115221634.22715-7-greenfoo@gluegarage.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch unifies the naming of DRM functions for reference counting as
-requested on Documentation/gpu/todo.rst
+There are no more places where this (deprecated) function is being
+used from, thus it can now be removed.
 
 Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
 ---
- drivers/gpu/drm/bridge/tc358764.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/drm/drm_connector.h | 24 ------------------------
+ 1 file changed, 24 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/tc358764.c b/drivers/gpu/drm/bridge/tc358764.c
-index ee6b98efa9c2..afd491018bfc 100644
---- a/drivers/gpu/drm/bridge/tc358764.c
-+++ b/drivers/gpu/drm/bridge/tc358764.c
-@@ -379,7 +379,7 @@ static void tc358764_detach(struct drm_bridge *bridge)
- 	drm_fb_helper_remove_one_connector(drm->fb_helper, &ctx->connector);
- 	drm_panel_detach(ctx->panel);
- 	ctx->panel = NULL;
--	drm_connector_unreference(&ctx->connector);
-+	drm_connector_put(&ctx->connector);
+diff --git a/include/drm/drm_connector.h b/include/drm/drm_connector.h
+index 9ccad6b062f2..b91b206f1665 100644
+--- a/include/drm/drm_connector.h
++++ b/include/drm/drm_connector.h
+@@ -1191,30 +1191,6 @@ static inline void drm_connector_put(struct drm_connector *connector)
+ 	drm_mode_object_put(&connector->base);
  }
  
- static const struct drm_bridge_funcs tc358764_bridge_funcs = {
+-/**
+- * drm_connector_reference - acquire a connector reference
+- * @connector: DRM connector
+- *
+- * This is a compatibility alias for drm_connector_get() and should not be
+- * used by new code.
+- */
+-static inline void drm_connector_reference(struct drm_connector *connector)
+-{
+-	drm_connector_get(connector);
+-}
+-
+-/**
+- * drm_connector_unreference - release a connector reference
+- * @connector: DRM connector
+- *
+- * This is a compatibility alias for drm_connector_put() and should not be
+- * used by new code.
+- */
+-static inline void drm_connector_unreference(struct drm_connector *connector)
+-{
+-	drm_connector_put(connector);
+-}
+-
+ /**
+  * drm_connector_is_unregistered - has the connector been unregistered from
+  * userspace?
 -- 
 2.19.1
