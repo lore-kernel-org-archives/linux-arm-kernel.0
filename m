@@ -1,23 +1,22 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Nov 2018 22:41:58 +0000
-Subject: [PATCH 1/6] linkage: add generic GLOBAL() macro
+Date: Thu, 15 Nov 2018 22:42:02 +0000
+Subject: [PATCH 5/6] arm64: ftrace: remove return_regs macros
 In-Reply-To: <20181115224203.24847-1-mark.rutland@arm.com>
 References: <20181115224203.24847-1-mark.rutland@arm.com>
-Message-ID: <20181115224203.24847-2-mark.rutland@arm.com>
+Message-ID: <20181115224203.24847-6-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declaring a global symbol in assembly is tedious, error-prone, and
-painful to read. While ENTRY() exists, this is supposed to be used for
-function entry points, and this affects alignment in a potentially
-undesireable manner.
+The save_return_regs and restore_return_regs macros are only used by
+return_to_handler, and having them defined out-of-line only serves to
+obscure the logic.
 
-Instead, let's add a generic GLOBAL() macro for this, as x86 added
-locally in commit:
+Before we complicate, let's clean this up and fold the logic directly
+into return_to_handler, saving a few lines of macro boilerplate in the
+process. At the same time, a missing trailing space is added to the
+comments, fixing a code style violation.
 
-  95695547a7db44b8 ("x86: asm linkage - introduce GLOBAL macro")
-
-... thus allowing us to use this more freely in the kernel.
+There should be no functional change as a result of this patch.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
@@ -26,25 +25,64 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Torsten Duwe <duwe@suse.de>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/linkage.h | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm64/kernel/entry-ftrace.S | 35 +++++++++++++++--------------------
+ 1 file changed, 15 insertions(+), 20 deletions(-)
 
-diff --git a/include/linux/linkage.h b/include/linux/linkage.h
-index 7c47b1a471d4..7e020782ade2 100644
---- a/include/linux/linkage.h
-+++ b/include/linux/linkage.h
-@@ -79,6 +79,12 @@
- #define ALIGN __ALIGN
- #define ALIGN_STR __ALIGN_STR
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index a74d2ff49192..6b8230f79a67 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -172,24 +172,6 @@ ENTRY(ftrace_stub)
+ ENDPROC(ftrace_stub)
  
-+#ifndef GLOBAL
-+#define GLOBAL(name) \
-+	.globl name ASM_NL \
-+	name:
-+#endif
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+-	/* save return value regs*/
+-	.macro save_return_regs
+-	sub sp, sp, #64
+-	stp x0, x1, [sp]
+-	stp x2, x3, [sp, #16]
+-	stp x4, x5, [sp, #32]
+-	stp x6, x7, [sp, #48]
+-	.endm
+-
+-	/* restore return value regs*/
+-	.macro restore_return_regs
+-	ldp x0, x1, [sp]
+-	ldp x2, x3, [sp, #16]
+-	ldp x4, x5, [sp, #32]
+-	ldp x6, x7, [sp, #48]
+-	add sp, sp, #64
+-	.endm
+-
+ /*
+  * void ftrace_graph_caller(void)
+  *
+@@ -215,11 +197,24 @@ ENDPROC(ftrace_graph_caller)
+  * @fp is checked against the value passed by ftrace_graph_caller().
+  */
+ ENTRY(return_to_handler)
+-	save_return_regs
++	/* save return value regs */
++	sub sp, sp, #64
++	stp x0, x1, [sp]
++	stp x2, x3, [sp, #16]
++	stp x4, x5, [sp, #32]
++	stp x6, x7, [sp, #48]
 +
- #ifndef ENTRY
- #define ENTRY(name) \
- 	.globl name ASM_NL \
+ 	mov	x0, x29			//     parent's fp
+ 	bl	ftrace_return_to_handler// addr = ftrace_return_to_hander(fp);
+ 	mov	x30, x0			// restore the original return address
+-	restore_return_regs
++
++	/* restore return value regs */
++	ldp x0, x1, [sp]
++	ldp x2, x3, [sp, #16]
++	ldp x4, x5, [sp, #32]
++	ldp x6, x7, [sp, #48]
++	add sp, sp, #64
++
+ 	ret
+ END(return_to_handler)
+ #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 -- 
 2.11.0
