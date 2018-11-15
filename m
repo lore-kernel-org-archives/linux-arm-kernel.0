@@ -1,120 +1,88 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 15 Nov 2018 15:56:21 +0000
-Subject: [RFC PATCH v2 09/23] KVM: arm64: Propagate vcpu into read_id_reg()
-In-Reply-To: <1538141967-15375-10-git-send-email-Dave.Martin@arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-10-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87ftw2cp22.fsf@linaro.org>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 15 Nov 2018 15:57:43 +0000
+Subject: [PATCH 4/4] arm64: KVM: Enable support for :G/:H perf event
+ modifiers
+In-Reply-To: <79000795-971d-22fa-6264-f85f2d528477@arm.com>
+References: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
+ <1542286549-4501-5-git-send-email-andrew.murray@arm.com>
+ <79000795-971d-22fa-6264-f85f2d528477@arm.com>
+Message-ID: <20181115155742.GA19420@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 15, 2018 at 02:00:39PM +0000, Julien Thierry wrote:
+> Hi Andrew,
+> 
+> On 15/11/18 12:55, Andrew Murray wrote:
+> > Enable/disable event counters as appropriate when entering and exiting
+> > the guest to enable support for guest or host only event counting.
+> > 
+> > For both VHE and non-VHE we switch the counters between host/guest at
+> > EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >   arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
+> >   1 file changed, 38 insertions(+)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index d496ef5..ebf0aac 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >   	return true;
+> >   }
+> > +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
+> > +{
+> > +	u32 host_only = host_ctxt->events_host_only;
+> > +	u32 guest_only = host_ctxt->events_guest_only;
+> > +
+> > +	if (host_only)
+> > +		write_sysreg(host_only, pmcntenclr_el0);
+> > +
+> > +	if (guest_only)
+> > +		write_sysreg(guest_only, pmcntenset_el0);
+> > +
+> > +	return (host_only || guest_only);
+> > +}
+> > +
+> > +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
+> > +{
+> > +	u32 host_only = host_ctxt->events_host_only;
+> > +	u32 guest_only = host_ctxt->events_guest_only;
+> > +
+> > +	if (guest_only)
+> > +		write_sysreg(guest_only, pmcntenclr_el0);
+> > +
+> > +	if (host_only)
+> > +		write_sysreg(host_only, pmcntenset_el0);
+> 
+> In the perf_event code, there is an ISB after enabling an event. I guess we
+> don't need it when setting the guest events since I believe the eret to the
+> guess give us the context synchronization. But don't we need one here when
+> restoring host only events?
 
-Dave Martin <Dave.Martin@arm.com> writes:
+It's not really clear to me why the isb is present in the existing code,
+this was only recently introduced when adding the chained events support.
 
-> Architecture features that are conditionally visible to the guest
-> will require run-time checks in the ID register accessor functions.
-> In particular, read_id_reg() will need to perform checks in order
-> to generate the correct emulated value for certain ID register
-> fields such as ID_AA64PFR0_EL1.SVE for example.
->
-> This patch propagates vcpu into read_id_reg() so that future
-> patches can add run-time checks on the guest configuration here.
->
-> For now, there is no functional change.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Ideally for chained events you'd want to start the overflow counter first
+(idx) followed by the low counter second (idx-1) as to not miss overflows
+so an isb inbetween may be helpful. Though the isb is after both enables, this
+sets a clear line of where event counting starts - but ideally this would be
+symmetrical with an isb after the disable.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+At present chained counters aren't supported in the guest but in any case
+we turn them all on/off atomically rather than individually.
 
-> ---
->  arch/arm64/kvm/sys_regs.c | 23 +++++++++++++----------
->  1 file changed, 13 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 22fbbdb..0dfd064 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -1029,7 +1029,8 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
->  }
->
->  /* Read a sanitised cpufeature ID register by sys_reg_desc */
-> -static u64 read_id_reg(struct sys_reg_desc const *r, bool raz)
-> +static u64 read_id_reg(const struct kvm_vcpu *vcpu,
-> +		struct sys_reg_desc const *r, bool raz)
->  {
->  	u32 id = sys_reg((u32)r->Op0, (u32)r->Op1,
->  			 (u32)r->CRn, (u32)r->CRm, (u32)r->Op2);
-> @@ -1060,7 +1061,7 @@ static bool __access_id_reg(struct kvm_vcpu *vcpu,
->  	if (p->is_write)
->  		return write_to_read_only(vcpu, p, r);
->
-> -	p->regval = read_id_reg(r, raz);
-> +	p->regval = read_id_reg(vcpu, r, raz);
->  	return true;
->  }
->
-> @@ -1089,16 +1090,18 @@ static u64 sys_reg_to_index(const struct sys_reg_desc *reg);
->   * are stored, and for set_id_reg() we don't allow the effective value
->   * to be changed.
->   */
-> -static int __get_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-> +static int __get_id_reg(const struct kvm_vcpu *vcpu,
-> +			const struct sys_reg_desc *rd, void __user *uaddr,
->  			bool raz)
->  {
->  	const u64 id = sys_reg_to_index(rd);
-> -	const u64 val = read_id_reg(rd, raz);
-> +	const u64 val = read_id_reg(vcpu, rd, raz);
->
->  	return reg_to_user(uaddr, &val, id);
->  }
->
-> -static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
-> +static int __set_id_reg(const struct kvm_vcpu *vcpu,
-> +			const struct sys_reg_desc *rd, void __user *uaddr,
->  			bool raz)
->  {
->  	const u64 id = sys_reg_to_index(rd);
-> @@ -1110,7 +1113,7 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
->  		return err;
->
->  	/* This is what we mean by invariant: you can't change it. */
-> -	if (val != read_id_reg(rd, raz))
-> +	if (val != read_id_reg(vcpu, rd, raz))
->  		return -EINVAL;
->
->  	return 0;
-> @@ -1119,25 +1122,25 @@ static int __set_id_reg(const struct sys_reg_desc *rd, void __user *uaddr,
->  static int get_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  		      const struct kvm_one_reg *reg, void __user *uaddr)
->  {
-> -	return __get_id_reg(rd, uaddr, false);
-> +	return __get_id_reg(vcpu, rd, uaddr, false);
->  }
->
->  static int set_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  		      const struct kvm_one_reg *reg, void __user *uaddr)
->  {
-> -	return __set_id_reg(rd, uaddr, false);
-> +	return __set_id_reg(vcpu, rd, uaddr, false);
->  }
->
->  static int get_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  			  const struct kvm_one_reg *reg, void __user *uaddr)
->  {
-> -	return __get_id_reg(rd, uaddr, true);
-> +	return __get_id_reg(vcpu, rd, uaddr, true);
->  }
->
->  static int set_raz_id_reg(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
->  			  const struct kvm_one_reg *reg, void __user *uaddr)
->  {
-> -	return __set_id_reg(rd, uaddr, true);
-> +	return __set_id_reg(vcpu, rd, uaddr, true);
->  }
->
->  /* sys_reg_desc initialiser for known cpufeature ID registers */
+I guess we get a trivial gain in accuracy by adding ISB's at some performance
+cost - I'm not sure I see the benefit - unless I'm missing something?
 
+Thanks,
 
---
-Alex Benn?e
+Andrew Murray
+
+> 
+> Thanks,
+> 
+> -- 
+> Julien Thierry
