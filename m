@@ -1,44 +1,65 @@
-From: valdis.kletnieks@vt.edu (valdis.kletnieks at vt.edu)
-Date: Thu, 15 Nov 2018 11:49:09 -0500
-Subject: [ARM64] Printing IRQ stack usage information
-In-Reply-To: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
-References: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
-Message-ID: <28496.1542300549@turing-police.cc.vt.edu>
+From: agraf@suse.de (Alexander Graf)
+Date: Thu, 15 Nov 2018 17:49:31 +0100
+Subject: [PATCH v2] arm64: Make kpti command line options x86 compatible
+In-Reply-To: <20181115154738.GB2062@brain-police>
+References: <20181113152906.55802-1-agraf@suse.de>
+ <20181115154738.GB2062@brain-police>
+Message-ID: <215607E6-DF71-436C-92FA-AC4716777CA9@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Nov 2018 18:52:39 +0530, Pintu Agarwal said:
-
-> Currently, when I tested this (as a proc interface), I got the below output:
-> CPU    UNUSED-STACK    ACTUAL-STACK
->  0         16368                     16384
-
-> 3) How should I test it to get the different usage values for unused stack ?
->     Can I get these values by implementing a sample interrupt handler,
-> and printing information from there?
-
-Hint 1:  If you're in a state where seq_printf() is legal, how many IRQ's are
-on this processor's IRQ stack?
-
-Hint 2:  What are the chances that some other CPU is currently in an IRQ?
-(run 'top' and look for what percent of time that's happening)
-
-Hint 3: what are the chances that the value of irq_stack_ptr is already stale
-by the time seq_printf() finishes running?
-
-Hint 4: what happens to the validity of your output if you get rescheduled
-in the middle of that for_each loop?
-
-(In other words, this code is terribly racy and is probably not going to answer
-whatever debugging question you were working on..  If your question is "Did one
-of the CPUs blow out its IRQ stack (or come close to doing so)?" there's better
-approaches.
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 486 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/96cbc85a/attachment.sig>
+> Am 15.11.2018 um 16:47 schrieb Will Deacon <will.deacon@arm.com>:
+> 
+>> On Tue, Nov 13, 2018 at 04:29:06PM +0100, Alexander Graf wrote:
+>> I've already stumbled over 2 cases where people got confused about how to
+>> disable kpti on AArch64. In both cases, they used existing x86_64 options
+>> and just applied that to an AArch64 system, expecting it to work.
+>> 
+>> I think it makes a lot of sense to have compatible kernel command line
+>> parameters whenever we can have them be compatible.
+>> 
+>> So this patch adds the pti= and no_pti kernel command line options, mapping
+>> them into the existing kpti= command line framework. It preserves the old
+>> syntax to maintain compatibility with older command lines.
+>> 
+>> While at it, the patch also marks the respective options as dual-arch.
+>> 
+>> Reported-by: Richard Brown <rbrown@suse.de>
+>> Signed-off-by: Alexander Graf <agraf@suse.de>
+>> 
+>> ---
+>> 
+>> v1 -> v2:
+>> 
+>>  - Actually make it compile. Sorry for the sloppy v1.
+>> ---
+>> Documentation/admin-guide/kernel-parameters.txt |  6 +++---
+>> arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
+>> 2 files changed, 22 insertions(+), 4 deletions(-)
+> 
+> This patch doesn't help though, right, because kpti= has already been
+> included with backports etc so the ship has sailed?
+
+Not necessarily. We can always mark this as stable and have distros pull it in. Consistency is definitely useful for everyone.
+
+> Yeah, it's not ideal,
+> but we went over this before:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-August/598395.html
+
+Ah, I mist havd missed that. But if you already have 2 people sending very similar patches, there is probably something to it :).
+
+> 
+> The thing we really need is the sysfs interface hooking up so you can easily
+> check the state of the mitigation. Still waiting for a follow-up on that ;)
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/603412.html
+
+That one is very much needed as well, yes.
+
+Alex
+
+> 
+> Will
