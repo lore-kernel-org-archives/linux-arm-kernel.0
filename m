@@ -1,81 +1,30 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Thu, 15 Nov 2018 16:42:25 +0530
-Subject: [PATCH] arm64: dts: actions: s700: Add I2C controller nodes
-In-Reply-To: <20181113133235.37754-1-pn@denx.de>
-References: <20181113133235.37754-1-pn@denx.de>
-Message-ID: <20181115111217.GC15537@Mani-XPS-13-9360>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 15 Nov 2018 11:03:30 +0100
+Subject: [PATCH] ARM: Correct meaning of SCU in HAVE_ARM_SCU help txt
+Message-ID: <20181115100330.17943-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Parthiban,
+According to the ARM Cortex-A5 and Cortex-A9 Technical Reference
+Manuals, SCU stands for "Snoop Control Unit".
 
-On Tue, Nov 13, 2018 at 02:32:35PM +0100, Parthiban Nallathambi wrote:
-> Add I2C controller nodes for Actions Semiconductor S700 SoC.
-> 
-> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-> ---
->  arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-> index 192c7b39c8c1..573c844d7afe 100644
-> --- a/arch/arm64/boot/dts/actions/s700.dtsi
-> +++ b/arch/arm64/boot/dts/actions/s700.dtsi
-> @@ -174,6 +174,46 @@
->  			#clock-cells = <1>;
->  		};
->  
-> +		i2c0: i2c at e0170000 {
-> +			compatible = "actions,s900-i2c";
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Why don't you add a compatible for S700? Also, please add the pinctrl
-nodes for these busses and enable the ones exposed on board. These could
-go in a separate patch.
-
-Thanks,
-Mani
-
-> +			reg = <0 0xe0170000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C0>;
-> +			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c1: i2c at e0174000 {
-> +			compatible = "actions,s900-i2c";
-> +			reg = <0 0xe0174000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C1>;
-> +			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c2: i2c at e0178000 {
-> +			compatible = "actions,s900-i2c";
-> +			reg = <0 0xe0178000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C2>;
-> +			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
-> +		i2c3: i2c at e017c000 {
-> +			compatible = "actions,s900-i2c";
-> +			reg = <0 0xe017c000 0 0x1000>;
-> +			clocks = <&cmu CLK_I2C3>;
-> +			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		sps: power-controller at e01b0100 {
->  			compatible = "actions,s700-sps";
->  			reg = <0x0 0xe01b0100 0x0 0x100>;
-> -- 
-> 2.17.2
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 91be74d8df658ccd..1b7c73facaed9849 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1347,7 +1347,7 @@ config SCHED_SMT
+ config HAVE_ARM_SCU
+ 	bool
+ 	help
+-	  This option enables support for the ARM system coherency unit
++	  This option enables support for the ARM snoop control unit
+ 
+ config HAVE_ARM_ARCH_TIMER
+ 	bool "Architected timer support"
+-- 
+2.17.1
