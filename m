@@ -1,48 +1,93 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Nov 2018 06:33:48 -0800
-Subject: [PATCH] arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE
-In-Reply-To: <cb6b55cc-c91b-b3e2-bc04-d7dfb80cfa98@gmail.com>
-References: <20181113152201.24476-1-geert+renesas@glider.be>
- <cb6b55cc-c91b-b3e2-bc04-d7dfb80cfa98@gmail.com>
-Message-ID: <20181115143347.f4wtdipdhhyooatu@verge.net.au>
+From: amit.kachhap@arm.com (Amit Daniel Kachhap)
+Date: Thu, 15 Nov 2018 20:03:49 +0530
+Subject: [PATCH v3 2/7] arm64/kvm: context-switch ptrauth registers
+In-Reply-To: <20181113134438.GH3835@e113682-lin.lund.arm.com>
+References: <1539773280-4159-1-git-send-email-amit.kachhap@arm.com>
+ <1539773280-4159-3-git-send-email-amit.kachhap@arm.com>
+ <20181102083725.GV12057@e113682-lin.lund.arm.com>
+ <20181112223212.5o4ipc5kt5ziuupt@localhost>
+ <20181113134438.GH3835@e113682-lin.lund.arm.com>
+Message-ID: <CADGdYn7Jha7b3qx-Thow-dvHZKHdn93eJE-CzC395OBZkPvAjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 04:32:05PM +0100, Marek Vasut wrote:
-> On 11/13/2018 04:22 PM, Geert Uytterhoeven wrote:
-> > Enable R-Car Gen3 PCIe PHY support, which is needed for PCIe to function
-> > on the Renesas Condor board.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> This helps
-> 
-> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+On Tue, Nov 13, 2018 at 7:16 PM Christoffer Dall
+<christoffer.dall@arm.com> wrote:
+>
+> On Mon, Nov 12, 2018 at 10:32:12PM +0000, Catalin Marinas wrote:
+> > On Fri, Nov 02, 2018 at 09:37:25AM +0100, Christoffer Dall wrote:
+> > > On Wed, Oct 17, 2018 at 04:17:55PM +0530, Amit Daniel Kachhap wrote:
+> > > > From: Mark Rutland <mark.rutland@arm.com>
+> > > >
+> > > > When pointer authentication is supported, a guest may wish to use it.
+> > > > This patch adds the necessary KVM infrastructure for this to work.
+> > > >
+> > > > When we schedule a vcpu, we enable guest usage of pointer
+> > > > authentication instructions and accesses to the keys. After these are
+> > > > enabled, we allow context-switching the keys.
+> > > >
+> > > > Pointer authentication consists of address authentication and generic
+> > > > authentication, and CPUs in a system might have varied support for
+> > > > either. Where support for either feature is not uniform, it is hidden
+> > > > from guests via ID register emulation, as a result of the cpufeature
+> > > > framework in the host.
+> > > >
+> > > > Unfortunately, address authentication and generic authentication cannot
+> > > > be trapped separately, as the architecture provides a single EL2 trap
+> > > > covering both. If we wish to expose one without the other, we cannot
+> > > > prevent a (badly-written) guest from intermittently using a feature
+> > > > which is not uniformly supported (when scheduled on a physical CPU which
+> > > > supports the relevant feature). When the guest is scheduled on a
+> > > > physical CPU lacking the feature, these attempts will result in an UNDEF
+> > > > being taken by the guest.
+> > > >
+> > > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > > > Signed-off-by: Amit Daniel Kachhap <amit.kachhap@arm.com>
+> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > > Cc: Christoffer Dall <christoffer.dall@arm.com>
+> > > > Cc: kvmarm at lists.cs.columbia.edu
+> > [...]
+> > > Two questions:
+> > >
+> > >  - Can we limit all ptrauth functionality to VHE systems so that we
+> > >    don't need to touch the non-VHE path and so that we don't need any of
+> > >    the __hyp_text stuff?
+> >
+> > I would say yes. ARMv8.3 implies v8.1, so can enable ptrauth only when
+> > VHE is built into the kernel and present in the CPU implementation.
+> >
+>
+> Sounds good.
+>
+> > >  - Can we move all the save/restore logic to vcpu load/put as long as
+> > >    the host kernel itself isn't using ptrauth, and if the host kernel at
+> > >    some point begins to use ptrauth, can we have a hook to save/restore
+> > >    at that time (similar to what we do for FPSIMD) to avoid this
+> > >    overhead on every switch?
+> >
+> > We will probably enable ptrauth for the kernel as well fairly soon, so I
+> > don't think we should base the KVM assumption on the no ptrauth in
+> > kernel use-case.
+> >
+>
+> I assume in this case ptrauth will be used for all of the kernel,
+> including most of the KVM code?
+>
+> In that case, I wonder if we always need to context-switch ptrauth
+> configruation state or if we can be lazy until the guest actually uses
+> the feature?
 
-Thanks, would it be better to use enable this driver as a module rather
-than a built-in?
+Sorry for the delayed reply. Lazy switching is possible and was
+present in earlier Mark's Rutland v2 version.
+However  removed it from v3 version as a mandatory user option to
+enable ptrauth is added and to make it look
+simpler. But yes both can exist together but with 1 trap cost if guest
+always uses ptrauth.
 
-> 
-> > ---
-> >  arch/arm64/configs/defconfig | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> > index 9d0b42d96f03156e..77f98a7e860b8850 100644
-> > --- a/arch/arm64/configs/defconfig
-> > +++ b/arch/arm64/configs/defconfig
-> > @@ -657,6 +657,7 @@ CONFIG_PHY_HISI_INNO_USB2=y
-> >  CONFIG_PHY_MVEBU_CP110_COMPHY=y
-> >  CONFIG_PHY_QCOM_QMP=m
-> >  CONFIG_PHY_QCOM_USB_HS=y
-> > +CONFIG_PHY_RCAR_GEN3_PCIE=y
-> >  CONFIG_PHY_RCAR_GEN3_USB2=y
-> >  CONFIG_PHY_RCAR_GEN3_USB3=m
-> >  CONFIG_PHY_ROCKCHIP_EMMC=y
-> > 
-> 
-> 
-> -- 
-> Best regards,
-> Marek Vasut
-> 
+Thanks,
+Amit
+>
+>
+> Thanks,
+>
+>     Christoffer
