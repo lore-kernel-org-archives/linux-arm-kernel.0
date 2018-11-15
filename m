@@ -1,63 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 16 Nov 2018 00:39:59 +0800
-Subject: [PATCH 10/15] arm64: dts: allwinner: a64: Add support for the
- SRAM C1 section
-In-Reply-To: <20181115145013.3378-11-paul.kocialkowski@bootlin.com>
-References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
- <20181115145013.3378-11-paul.kocialkowski@bootlin.com>
-Message-ID: <CAGb2v66twfxzMzO-E1WH78N6O9N1J_AcPQcKp3FApE1gTKmn3Q@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 15 Nov 2018 16:40:31 +0000
+Subject: [RFC PATCH v2 05/23] KVM: arm: Add arch vcpu uninit hook
+In-Reply-To: <20181102080536.GQ12057@e113682-lin.lund.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-6-git-send-email-Dave.Martin@arm.com>
+ <20181102080536.GQ12057@e113682-lin.lund.arm.com>
+Message-ID: <20181115164031.GN3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 10:50 PM Paul Kocialkowski
-<paul.kocialkowski@bootlin.com> wrote:
->
-> Add the description for the SRAM C1 section to the A64 device-tree.
->
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> index f3a66f888205..88b3e9110833 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> @@ -277,6 +277,20 @@
->                                         reg = <0x0000 0x28000>;
->                                 };
->                         };
-> +
-> +                       sram_c1: sram at 1d00000 {
-> +                               compatible = "mmio-sram";
-> +                               reg = <0x01d00000 0x80000>;
+On Fri, Nov 02, 2018 at 09:05:36AM +0100, Christoffer Dall wrote:
+> On Fri, Sep 28, 2018 at 02:39:09PM +0100, Dave Martin wrote:
+> > In preparation for adding support for SVE in guests on arm64, a
+> > hook is needed for freeing additional per-vcpu memory when a vcpu
+> > is freed.
+> 
+> Can this commit motivate why we can't do the work in kvm_arch_vcpu_free,
+> which we use for freeing other data structures?
+> 
+> (Presumably, uninit is needed when you need to do something at the very
+> last step after releasing the struct pid.
 
-I can confirm that this SRAM region is indeed at this address. However the
-size is only 0x40000, not 0x80000. The address ranges should be fixed.
+It wasn't to do with that.
 
-One hiccup is that the VE reset has to be de-asserted and the VE bus clock
-has to be ungated for the CPU to access this region when it's mapped to the
-CPU.
+Rather, the division of responsibility between the vcpu_uninit and
+vcpu_free paths is not very clear.
 
-One other thing I find interesting is that in the previous SoCs, the bits
-that control this mapping says 50K, but in reality it is 512K for the older
-SoCs, and 256K for this one.
+In the earlier version of the series, I think SVE state may have been
+allocated rather early and we may have needed to free it in the failure
+path of kvm_arch_vcpu_create() (which just calls kvm_vcpu_uninit()).
+(Alternatively, I may just have been wrong.)
 
-ChenYu
+Now, the vcpu must be fully created before the KVM_ARM_SVE_CONFIG ioctl
+on it (which is what allocates sve_state) can succeed anyway.
 
-> +                               #address-cells = <1>;
-> +                               #size-cells = <1>;
-> +                               ranges = <0 0x01d00000 0x80000>;
-> +
-> +                               ve_sram: sram-section at 0 {
-> +                                       compatible = "allwinner,sun50i-a64-sram-c1",
-> +                                                    "allwinner,sun4i-a10-sram-c1";
-> +                                       reg = <0x000000 0x80000>;
-> +                               };
-> +                       };
->                 };
->
->                 dma: dma-controller at 1c02000 {
-> --
-> 2.19.1
->
+So the distinction between these two teardown phases is probably no
+longer important.
+
+I'll see whether I can get rid of this hook and free the SVE state in
+kvm_arch_vcpu_free() instead.
+
+Does that make sense?
+
+Cheers
+---Dave
