@@ -1,38 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 15 Nov 2018 06:42:45 -0800
-Subject: [RFC PATCH 07/12] soc: qcom: ipa: IPA register abstraction
-In-Reply-To: <e9114caf-0c92-7cac-33cd-6bea548b0375@linaro.org>
-References: <20181107003250.5832-1-elder@linaro.org>
- <20181107003250.5832-8-elder@linaro.org>
- <CAK8P3a2FsgR=SYAWsgFURVni1ReiCugKs1iUAfQzZhPkbW8aOA@mail.gmail.com>
- <e9114caf-0c92-7cac-33cd-6bea548b0375@linaro.org>
-Message-ID: <CAK8P3a1RKVYRhM7OtUK3BhPj=jip2-j_8ziW_6Z5rnhFCTOOUw@mail.gmail.com>
+From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
+Date: Thu, 15 Nov 2018 12:46:06 -0200
+Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
+ eMMC.
+In-Reply-To: <20181005154844.234g5k3fw5txqxsl@flea>
+References: <20180921142811.h5jraemk565alh3i@flea>
+ <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
+ <20180925090139.qbu6tqav5oth7zkw@flea>
+ <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
+ <20180927081711.llmwnvpu73loe5iv@flea>
+ <CAG7TQgGMkvBnNE_WEth8gscKxN3qN8a44mNMWz3QP-2+JKfOzg@mail.gmail.com>
+ <20180929154754.abz3byvrufvnf4dq@flea>
+ <CAG7TQgGS7DkLpNVYqfCD-9vMZkeY6r+L-5oXKWef3x-OVbqjtw@mail.gmail.com>
+ <20181002131312.soqwybsohdifvso3@flea>
+ <CAG7TQgHWCJTaM+pFYFq0_8nWg7sA+d0huqu96sjhqZfeHwqbGQ@mail.gmail.com>
+ <20181005154844.234g5k3fw5txqxsl@flea>
+Message-ID: <CAG7TQgGO-CjPE6SAUa53GYhMr5-yVe0YaAL3UV15E+f9kKZVwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 6:48 PM Alex Elder <elder@linaro.org> wrote:
+On Fri, Oct 5, 2018 at 12:48 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > What about the idea of keeping the current dt for the most featureful
+> > variant and creating new dts for the other two?
+> >
+> > That would make it so that no one's device stops working and would
+> > have mailine support for all three devices.
 >
-> On 11/7/18 9:00 AM, Arnd Bergmann wrote:
-> > On Wed, Nov 7, 2018 at 1:33 AM Alex Elder <elder@linaro.org> wrote:
-> >> diff --git a/drivers/net/ipa/ipa_reg.c b/drivers/net/ipa/ipa_reg.c
-> >> new file mode 100644
-> >> index 000000000000..5e0aa6163235
-> >> --- /dev/null
-> >> +++ b/drivers/net/ipa/ipa_reg.c
-> >> @@ -0,0 +1,972 @@
-
-> It may be that this parse/construct mechanism isn't justified
-> at this point.  I thought the way it presented a generic
-> interface was useful, but with just one (initial) hardware
-> target we don't (yet) realize its potential benefit.  It could
-> be added back later, as support for new versions is added.
+> IIRC that has been the first introduced version, so that would make
+> sense. Chen-Yu, any opinion?
 >
-> As of now I don't plan to change this, but if you or someone
-> else feels it would be better without it I can do that.
+> > Also, the current device tree doesn't represent any existing device:
+> > it has wifi on but no emmc. That variation does not exist.
+>
+> Most of our device tree are far from complete, so you shouldn't treat
+> them as such.
 
-Fair enough. I do think that it would be better to avoid this, but
-it's much less important than the other issues I mentioned,
-so please put this on the bottom of your priorities list, we
-can talk about it again when we get closer to merging the driver.
+So, any agreement on what is to be done about the devices tree for the
+A64-OLinuXino devices?
 
-     Arnd
+In my opinion the best path would be keeping the current dt for the
+most featureful variant and creating new dts for the other two.
