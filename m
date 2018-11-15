@@ -1,75 +1,58 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 15 Nov 2018 23:46:57 +0100
-Subject: [PATCH v2 2/2] clocksource: meson6_timer: implement ARM delay timer
-In-Reply-To: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
-References: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181115224657.14736-3-martin.blumenstingl@googlemail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2018 23:59:09 +0100
+Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
+In-Reply-To: <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
+References: <20180823103332.32047-1-linus.walleij@linaro.org>
+ <cd3100ee-03a0-9218-b166-14f15d7669f6@gmail.com>
+ <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
+Message-ID: <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement an ARM delay timer to be used for udelay(). This allows us to
-skip the delay loop calibration at boot.
+On Thu, Nov 15, 2018 at 5:27 PM Frank Rowand <frowand.list@gmail.com> wrote:
+> On 8/23/18 4:06 PM, Frank Rowand wrote:
+> > On 08/23/18 03:33, Linus Walleij wrote:
+> >> I have been a bit hesitant to reiterate the series, but this is
+> >> anyways a v1 of the 96Boards Mezzanine Low Speed connector
+> >> driver framework.
+>
+> < snip >
+>
+> > I will read through the rest of the series and revisit my
+> > previous conclusions, but most likely not for a few days.
+> >
+> > -Frank
+>
+> < snip >
+>
+> My apologies for continuing to not getting to this task.  It
+> has been in the top grouping of my todo list but has been
+> pushed aside by a rather busy schedule of conferences and
+> company internal work.  It remains up at the top of my todo
+> list, but most likely will still be shunted aside for three
+> more weeks of other pressing work.
+>
+> I will get to it, I definitely have not forgotten it.
 
-With this patch udelay() is now independent of CPU frequency changes.
-This is a good thing on Meson8, Meson8b and Meson8m2 because changing
-the CPU frequency requires running the CPU clock off the XTAL while
-changing the PLL or it's dividers. After changing the CPU clocks we need
-to wait a few usecs for the clock to become stable. So having an
-udelay() implementation that doesn't depend on the CPU frequency is
-beneficial.
+It's OK, I might get to rebasing the series even.
 
-Suggested-by: Jianxin Pan <jianxin.pan@amlogic.com>
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/clocksource/meson6_timer.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+We discussed it in a session with Linaro in Vancouver
+recently (some month ago). What we took away from it
+is that there are many precedents of populating devices
+ad hoc, what really makes this one special is that it takes
+something device tree and ad hoc populates something
+on top of it, not defined in the device tree itself.
 
-diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
-index 23c7638e2bb3..84bd9479c3f8 100644
---- a/drivers/clocksource/meson6_timer.c
-+++ b/drivers/clocksource/meson6_timer.c
-@@ -22,6 +22,10 @@
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
- 
-+#ifdef CONFIG_ARM
-+#include <linux/delay.h>
-+#endif
-+
- #define MESON_ISA_TIMER_MUX					0x00
- #define MESON_ISA_TIMER_MUX_TIMERD_EN				BIT(19)
- #define MESON_ISA_TIMER_MUX_TIMERC_EN				BIT(18)
-@@ -54,6 +58,18 @@
- 
- static void __iomem *timer_base;
- 
-+#ifdef CONFIG_ARM
-+static unsigned long meson6_read_current_timer(void)
-+{
-+	return readl_relaxed(timer_base + MESON_ISA_TIMERE);
-+}
-+
-+static struct delay_timer meson6_delay_timer = {
-+	.read_current_timer = meson6_read_current_timer,
-+	.freq = 1000 * 1000,
-+};
-+#endif
-+
- static u64 notrace meson6_timer_sched_read(void)
- {
- 	return (u64)readl(timer_base + MESON_ISA_TIMERE);
-@@ -192,6 +208,12 @@ static int __init meson6_timer_init(struct device_node *node)
- 
- 	clockevents_config_and_register(&meson6_clockevent, USEC_PER_SEC,
- 					1, 0xfffe);
-+
-+#ifdef CONFIG_ARM
-+	/* Also use MESON_ISA_TIMERE for delays */
-+	register_current_timer_delay(&meson6_delay_timer);
-+#endif
-+
- 	return 0;
- }
- TIMER_OF_DECLARE(meson6, "amlogic,meson6-timer",
--- 
-2.19.1
+On a related note, Heikki Krogerus is making a software
+FWnode population series. I ran into this when converting
+board files to use more abstract descriptions. Check it out:
+https://marc.info/?l=linux-kernel&m=154177331200561&w=2
+
+The idea with the series is to expand FWnode so that it
+doesn't only populate Linux devices from device tree
+or ACPI but also by software, where needed, further
+expanding the fwnode abstraction. I will probably look
+into using that.
+
+Yours,
+Linus Walleij
