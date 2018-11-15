@@ -1,42 +1,51 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 15 Nov 2018 10:46:43 +0100
-Subject: [PATCH] arm64: Make kpti command line options x86 compatible
-In-Reply-To: <20181115094116.GA18154@infradead.org>
-References: <20181113152046.22389-1-agraf@suse.de>
- <20181115094116.GA18154@infradead.org>
-Message-ID: <7af8ab89-6c55-3e54-e81c-4b5397cf0904@suse.de>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 15 Nov 2018 10:46:46 +0100
+Subject: [RFC v1 5/7] clk: meson: meson8b: mark the CPU clock as
+ CLK_IS_CRITICAL
+In-Reply-To: <20181114225725.2821-6-martin.blumenstingl@googlemail.com>
+References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
+ <20181114225725.2821-6-martin.blumenstingl@googlemail.com>
+Message-ID: <533bd2bd4dced1610a803e7b2d51995e5577ba1d.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 15.11.18 10:41, Christoph Hellwig wrote:
-> On Tue, Nov 13, 2018 at 04:20:46PM +0100, Alexander Graf wrote:
->> I've already stumbled over 2 cases where people got confused about how to
->> disable kpti on AArch64. In both cases, they used existing x86_64 options
->> and just applied that to an AArch64 system, expecting it to work.
->>
->> I think it makes a lot of sense to have compatible kernel command line
->> parameters whenever we can have them be compatible.
->>
->> So this patch adds the pti= and no_pti kernel command line options, mapping
->> them into the existing kpti= command line framework. It preserves the old
->> syntax to maintain compatibility with older command lines.
->>
->> While at it, the patch also marks the respective options as dual-arch.
+On Wed, 2018-11-14 at 23:57 +0100, Martin Blumenstingl wrote:
+> We don't want the common clock framework to disable the "cpu_clk" if
+> it's not used by any device. The cpufreq-dt driver does not enable the
+> CPU clocks. However, even if it would we would still want the CPU clock
+> to be enabled at all times because the CPU clock is also required even
+> if we disable CPU frequency scaling on a specific board.
 > 
-> Thanks.  Which also brings up my old complain? that arm64 and x86 should
-> use the same config option.  Bonus points for moving the parsing code
-> to a common file..
+> The reason why we want the CPU clock to be enabled is a clock further up
+> in the tree:
+> Since commit 6f888e7bc7bd58 ("clk: meson: clk-pll: add enable bit") the
+> sys_pll can be disabled. However, since the CPU clock is derived from
+> sys_pll we don't want sys_pll to get disabled. The common clock
+> framework takes care of that for us by enabling all parent clocks of our
+> CPU clock when we mark the CPU clock with CLK_IS_CRITICAL.
+> 
+> Until now this is not a problem yet because all clocks in the CPU
+> clock's tree (including sys_pll) are read-only. However, once we allow
+> modifications to the clocks in that tree we will need this.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/clk/meson/meson8b.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+> index 8a3c346e110d..d566dd5bc567 100644
+> --- a/drivers/clk/meson/meson8b.c
+> +++ b/drivers/clk/meson/meson8b.c
+> @@ -646,7 +646,8 @@ static struct clk_regmap meson8b_cpu_clk = {
+>  						  "cpu_scale_out_sel" },
+>  		.num_parents = 2,
+>  		.flags = (CLK_SET_RATE_PARENT |
+> -			  CLK_SET_RATE_NO_REPARENT),
+> +			  CLK_SET_RATE_NO_REPARENT |
+> +			  CLK_IS_CRITICAL),
+>  	},
+>  };
+>  
 
-Both archs handle the parameters in completely different code paths
-(probably due to arch constraints), so I'm not sure how doable it would
-be to combine the parsing.
-
-I'm also quite sure that we have more parameters like this around,
-especially with the other spectre mitigations. So if you see any, please
-feel free to send patches like this one to at least synchronize the user
-view.
-
-
-Alex
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
