@@ -1,197 +1,32 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Nov 2018 17:36:02 +0800
-Subject: [PATCH v2 14/15] ARM: dts: sunxi: Enable Broadcom-based Bluetooth for
- multiple boards
+Date: Thu, 15 Nov 2018 17:36:00 +0800
+Subject: [PATCH v2 12/15] Bluetooth: hci_bcm: Add compatible string for BCM4330
 In-Reply-To: <20181115093603.26729-1-wens@csie.org>
 References: <20181115093603.26729-1-wens@csie.org>
-Message-ID: <20181115093603.26729-15-wens@csie.org>
+Message-ID: <20181115093603.26729-13-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Bluetooth node, and the underlying UART node if it's
-missing, to the board device tree file for several boards. The LPO clock
-is also added to the WiFi side's power sequencing node if it's missing,
-to correctly represent the shared connections. There is also a PCM
-connection for Bluetooth, but this is not covered in this patch.
-
-These boards all have a WiFi+BT module from AMPAK, which contains one or
-two Broadcom chips, depending on the model. The older AP6210 contains
-two, while the newer AP6212 and AP6330 contain just one, as they use
-two-in-one combo chips.
-
-The Bluetooth side of the module is always connected to a UART on the
-same pingroup as the SDIO pins for the WiFi side, in a 4 wire
-configuration. Power to the VBAT and VDDIO pins are provided either by
-the PMIC, using one or several of its regulator outputs, or other fixed
-regulators on the board. The VBAT and VDDIO pins are shared with the
-WiFi side, which would correspond to vmmc-supply and vqmmc-supply in the
-mmc host node. A clock output from the SoC or the external X-Powers RTC
-provides the LPO low power clock at 32.768 kHz.
-
-All the boards covered in this patch are ones that do not require extra
-changes to the SoC's dtsi file. For the remaining boards that I have
-worked on, properties or device nodes for the LPO clock's source are
-missing.
-
-For the Cubietruck, the LPO clock is fed from CLK_OUT_A, which needs to
-be muxed on pin PI12. This can be represented in multiple ways. This
-patch puts the pinctrl property in the pin controller node. This is due
-to limitations in Linux, where pinmux settings, even the same one, can
-not be shared by multiple devices. Thus we cannot put it in both the
-WiFi and Bluetooth device nodes. Putting it the CCU node is another
-option, but Linux's CCU driver does not handle pinctrl. Also the pin
-controller is guaranteed to be initialized after the CCU, when clocks
-are available. And any other devices that use muxed pins are guaranteed
-to be initialized after the pin controller. Thus having the CLK_OUT_A
-pinmux reference be in the pin controller node is a good choice without
-having to deal with implementation issues.
+The BCM4330 chip is a 802.11 a/b/g/n + Bluetooth 4.0 + HS controller.
+This patch adds a compatible string match to the serdev driver for the
+Bluetooth part of the chip.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun7i-a20-cubietruck.dts    | 23 +++++++++++++++++++
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  | 18 +++++++++++++++
- .../boot/dts/sun8i-a83t-cubietruck-plus.dts   | 18 +++++++++++++++
- arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  | 14 +++++++++++
- 4 files changed, 73 insertions(+)
+ drivers/bluetooth/hci_bcm.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-index 5649161de1d7..be112c7b64cb 100644
---- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
-@@ -103,6 +103,8 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&mmc3_pwrseq_pin_cubietruck>;
- 		reset-gpios = <&pio 7 9 GPIO_ACTIVE_LOW>; /* PH9 WIFI_EN */
-+		clocks = <&ccu CLK_OUT_A>;
-+		clock-names = "ext_clock";
- 	};
- 
- 	sound {
-@@ -246,6 +248,10 @@
+diff --git a/drivers/bluetooth/hci_bcm.c b/drivers/bluetooth/hci_bcm.c
+index 8c75e7a67379..a5cb580a07de 100644
+--- a/drivers/bluetooth/hci_bcm.c
++++ b/drivers/bluetooth/hci_bcm.c
+@@ -1397,6 +1397,7 @@ static void bcm_serdev_remove(struct serdev_device *serdev)
+ #ifdef CONFIG_OF
+ static const struct of_device_id bcm_bluetooth_of_match[] = {
+ 	{ .compatible = "brcm,bcm20702a1" },
++	{ .compatible = "brcm,bcm4330-bt" },
+ 	{ .compatible = "brcm,bcm43438-bt" },
+ 	{ },
  };
- 
- &pio {
-+	/* Pin outputs low power clock for WiFi and BT */
-+	pinctrl-0 = <&clk_out_a_pins_a>;
-+	pinctrl-names = "default";
-+
- 	ahci_pwr_pin_cubietruck: ahci_pwr_pin at 1 {
- 		pins = "PH12";
- 		function = "gpio_out";
-@@ -350,6 +356,23 @@
- 	status = "okay";
- };
- 
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins_a>;
-+	uart-has-rtscts;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm20702a1";
-+		clocks = <&ccu CLK_OUT_A>;
-+		clock-names = "lpo";
-+		device-wakeup-gpios = <&pio 7 24 GPIO_ACTIVE_LOW>; /* PH24 */
-+		host-wakeup-gpios = <&pio 7 25 GPIO_ACTIVE_LOW>; /* PH25 */
-+		shutdown-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH18 */
-+		max-speed = <1500000>;
-+	};
-+};
-+
- &usb_otg {
- 	dr_mode = "otg";
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index 583a5a01642f..7d30d3e530fb 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -363,6 +363,24 @@
- 	status = "okay";
- };
- 
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	uart-has-rtscts;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		clocks = <&ac100_rtc 1>;
-+		clock-names = "lpo";
-+		vbat-supply = <&reg_dldo1>;
-+		vddio-supply = <&reg_dldo1>;
-+		device-wakeup-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+		host-wakeup-gpios = <&r_pio 0 5 GPIO_ACTIVE_HIGH>; /* PL5 */
-+		shutdown-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
-+	};
-+};
-+
- &usbphy {
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-index e5f0645e53a7..a5a9f5a0603e 100644
---- a/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-cubietruck-plus.dts
-@@ -394,6 +394,24 @@
- 	status = "okay";
- };
- 
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	uart-has-rtscts;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm4330-bt";
-+		clocks = <&ac100_rtc 1>;
-+		clock-names = "lpo";
-+		vbat-supply = <&reg_dcdc1>;
-+		vddio-supply = <&reg_sw>;
-+		device-wakeup-gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
-+		host-wakeup-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
-+		shutdown-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
-+	};
-+};
-+
- &usbphy {
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
- 	usb2_vbus-supply = <&reg_usb2_vbus>;
-diff --git a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-index 0dbdb29a8fff..b85acca94441 100644
---- a/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-+++ b/arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts
-@@ -91,6 +91,8 @@
- 	wifi_pwrseq: wifi_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 6 GPIO_ACTIVE_LOW>; /* PL06 */
-+		clocks = <&rtc 1>;
-+		clock-names = "ext_clock";
- 	};
- };
- 
-@@ -299,7 +301,19 @@
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_a>, <&uart1_pins_cts_rts_a>;
-+	uart-has-rtscts;
- 	status = "okay";
-+
-+	bluetooth {
-+		compatible = "brcm,bcm43438-bt";
-+		clocks = <&rtc 1>;
-+		clock-names = "lpo";
-+		vbat-supply = <&reg_dldo1>;
-+		vddio-supply = <&reg_aldo3>;
-+		device-wakeup-gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
-+		host-wakeup-gpios = <&r_pio 0 9 GPIO_ACTIVE_HIGH>; /* PL9 */
-+		shutdown-gpios = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
-+	};
- };
- 
- &usb_otg {
 -- 
 2.19.1
