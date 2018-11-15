@@ -1,58 +1,41 @@
 From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:20 +0100
-Subject: [PATCH 0/9] drm: remove deprecated functions
-Message-ID: <20181115221634.22715-1-greenfoo@gluegarage.com>
+Date: Thu, 15 Nov 2018 23:16:21 +0100
+Subject: [PATCH 1/9] drm: replace "drm_gem_object_unreference_unlocked"
+ function with "*put_unlocked"
+In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+Message-ID: <20181115221634.22715-2-greenfoo@gluegarage.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+This patch unifies the naming of DRM functions for reference counting as
+requested on Documentation/gpu/todo.rst
 
-One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
-"switch from reference/unreference to get/put". That's what this patch series is
-about.
+Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+---
+ drivers/gpu/drm/bochs/bochs_mm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-In the past year or so most of the functions had already been renamed and only a
-few remained, which are the ones I fix here.
-
-In addition, now that all calls to these deprecated functions are gone, this
-patch also removes their implementation and the coccinelle script that takes
-care of them (which is no longer needed).
-
-Anyway, this is my first patch and I'm sure I've done something wrong. Please
-let me know :)
-
-Fernando Ramos (9):
-  drm: replace "drm_gem_object_unreference_unlocked" function with
-    "*put_unlocked"
-  drm: remove deprecated "[__]drm_gem_object_[un]reference[_locked]"
-    functions
-  drm: replace "drm_dev_unref" function with "drm_dev_put"
-  drm: remove deprecated "drm_dev_unref" function
-  drm: replace "drm_connector_unreference" with "drm_connector_put"
-  drm: remove deprecated "drm_connector_[un]reference" functions
-  drm: remove deprecated "drm_framebuffer_[un]reference" functions
-  drm: remove no longer needed drm-get-put coccinelle script
-  docs: drm: remove no longer relevant TODO entry
-
- Documentation/gpu/todo.rst                   | 17 -----
- drivers/gpu/drm/arc/arcpgu_drv.c             |  4 +-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c |  4 +-
- drivers/gpu/drm/bochs/bochs_mm.c             |  4 +-
- drivers/gpu/drm/bridge/tc358764.c            |  2 +-
- drivers/gpu/drm/drm_drv.c                    | 13 ----
- drivers/gpu/drm/etnaviv/etnaviv_drv.c        |  4 +-
- drivers/gpu/drm/mxsfb/mxsfb_drv.c            |  4 +-
- drivers/gpu/drm/rcar-du/rcar_du_drv.c        |  2 +-
- drivers/gpu/drm/shmobile/shmob_drm_drv.c     |  4 +-
- drivers/gpu/drm/tve200/tve200_drv.c          |  4 +-
- drivers/gpu/drm/zte/zx_drm_drv.c             |  4 +-
- include/drm/drm_connector.h                  | 24 ------
- include/drm/drm_drv.h                        |  1 -
- include/drm/drm_framebuffer.h                | 24 ------
- include/drm/drm_gem.h                        | 50 -------------
- scripts/coccinelle/api/drm-get-put.cocci     | 78 --------------------
- 17 files changed, 18 insertions(+), 225 deletions(-)
- delete mode 100644 scripts/coccinelle/api/drm-get-put.cocci
-
+diff --git a/drivers/gpu/drm/bochs/bochs_mm.c b/drivers/gpu/drm/bochs/bochs_mm.c
+index a61c1ecb2bdc..e6ccf7fa92d4 100644
+--- a/drivers/gpu/drm/bochs/bochs_mm.c
++++ b/drivers/gpu/drm/bochs/bochs_mm.c
+@@ -414,7 +414,7 @@ int bochs_dumb_create(struct drm_file *file, struct drm_device *dev,
+ 		return ret;
+ 
+ 	ret = drm_gem_handle_create(file, gobj, &handle);
+-	drm_gem_object_unreference_unlocked(gobj);
++	drm_gem_object_put_unlocked(gobj);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -454,6 +454,6 @@ int bochs_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
+ 	bo = gem_to_bochs_bo(obj);
+ 	*offset = bochs_bo_mmap_offset(bo);
+ 
+-	drm_gem_object_unreference_unlocked(obj);
++	drm_gem_object_put_unlocked(obj);
+ 	return 0;
+ }
 -- 
 2.19.1
