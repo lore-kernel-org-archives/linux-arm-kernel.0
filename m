@@ -1,65 +1,77 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Thu, 15 Nov 2018 17:49:31 +0100
-Subject: [PATCH v2] arm64: Make kpti command line options x86 compatible
-In-Reply-To: <20181115154738.GB2062@brain-police>
-References: <20181113152906.55802-1-agraf@suse.de>
- <20181115154738.GB2062@brain-police>
-Message-ID: <215607E6-DF71-436C-92FA-AC4716777CA9@suse.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 16 Nov 2018 00:52:28 +0800
+Subject: [PATCH 07/15] arm64: dts: allwinner: h5: Add system-control node
+ with SRAM C1
+In-Reply-To: <20181115145013.3378-8-paul.kocialkowski@bootlin.com>
+References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
+ <20181115145013.3378-8-paul.kocialkowski@bootlin.com>
+Message-ID: <CAGb2v64t6t3Bwf4nc8gQWRDkdv4zGRF1-+Q7snqX6bkEVqirvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 15, 2018 at 10:50 PM Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+>
+> Add the H5-specific system control node description to its device-tree
+> with support for the SRAM C1 section, that will be used by the video
+> codec node later on.
+>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 22 ++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> index b41dc1aab67d..c2d14b22b8c1 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+> @@ -94,6 +94,28 @@
+>         };
+>
+>         soc {
+> +               system-control at 1c00000 {
+> +                       compatible = "allwinner,sun50i-h5-system-control";
+> +                       reg = <0x01c00000 0x1000>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <1>;
+> +                       ranges;
+> +
+> +                       sram_c1: sram at 1d00000 {
+> +                               compatible = "mmio-sram";
+> +                               reg = <0x01d00000 0x80000>;
 
+I'll try to check this one tomorrow.
 
-> Am 15.11.2018 um 16:47 schrieb Will Deacon <will.deacon@arm.com>:
-> 
->> On Tue, Nov 13, 2018 at 04:29:06PM +0100, Alexander Graf wrote:
->> I've already stumbled over 2 cases where people got confused about how to
->> disable kpti on AArch64. In both cases, they used existing x86_64 options
->> and just applied that to an AArch64 system, expecting it to work.
->> 
->> I think it makes a lot of sense to have compatible kernel command line
->> parameters whenever we can have them be compatible.
->> 
->> So this patch adds the pti= and no_pti kernel command line options, mapping
->> them into the existing kpti= command line framework. It preserves the old
->> syntax to maintain compatibility with older command lines.
->> 
->> While at it, the patch also marks the respective options as dual-arch.
->> 
->> Reported-by: Richard Brown <rbrown@suse.de>
->> Signed-off-by: Alexander Graf <agraf@suse.de>
->> 
->> ---
->> 
->> v1 -> v2:
->> 
->>  - Actually make it compile. Sorry for the sloppy v1.
->> ---
->> Documentation/admin-guide/kernel-parameters.txt |  6 +++---
->> arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
->> 2 files changed, 22 insertions(+), 4 deletions(-)
-> 
-> This patch doesn't help though, right, because kpti= has already been
-> included with backports etc so the ship has sailed?
+I did find something interesting on the H3: there also seems to be SRAM at
+0x01dc0000 to 0x01dcfeff , again mapped by the same bits as SRAM C1.
 
-Not necessarily. We can always mark this as stable and have distros pull it in. Consistency is definitely useful for everyone.
+And on the A33, the SRAM C1 range is 0x01d00000 to 0x01d478ff.
 
-> Yeah, it's not ideal,
-> but we went over this before:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-August/598395.html
+This was found by mapping the SRAM to the CPU, then using devmem to poke
+around the register range. If there's SRAM, the first read would typically
+return random data, and a subsequent write to it would set some value that
+would be read back correctly. If there's no SRAM, a read either returns 0x0
+or some random data that can't be overwritten.
 
-Ah, I mist havd missed that. But if you already have 2 people sending very similar patches, there is probably something to it :).
+You might want to check the other SoCs.
 
-> 
-> The thing we really need is the sysfs interface hooking up so you can easily
-> check the state of the mitigation. Still waiting for a follow-up on that ;)
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/603412.html
+ChenYu
 
-That one is very much needed as well, yes.
-
-Alex
-
-> 
-> Will
+> +                               #address-cells = <1>;
+> +                               #size-cells = <1>;
+> +                               ranges = <0 0x01d00000 0x80000>;
+> +
+> +                               ve_sram: sram-section at 0 {
+> +                                       compatible = "allwinner,sun50i-h5-sram-c1",
+> +                                                    "allwinner,sun4i-a10-sram-c1";
+> +                                       reg = <0x000000 0x80000>;
+> +                               };
+> +                       };
+> +               };
+> +
+>                 mali: gpu at 1e80000 {
+>                         compatible = "allwinner,sun50i-h5-mali", "arm,mali-450";
+>                         reg = <0x01e80000 0x30000>;
+> --
+> 2.19.1
+>
