@@ -1,58 +1,146 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2018 23:59:09 +0100
-Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
-In-Reply-To: <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
-References: <20180823103332.32047-1-linus.walleij@linaro.org>
- <cd3100ee-03a0-9218-b166-14f15d7669f6@gmail.com>
- <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
-Message-ID: <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 16 Nov 2018 00:00:03 +0100
+Subject: [PATCH V2 2/3] ARM: dts: add Raspberry Pi 3 A+
+In-Reply-To: <1542322805-6211-1-git-send-email-stefan.wahren@i2se.com>
+References: <1542322805-6211-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1542322805-6211-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 5:27 PM Frank Rowand <frowand.list@gmail.com> wrote:
-> On 8/23/18 4:06 PM, Frank Rowand wrote:
-> > On 08/23/18 03:33, Linus Walleij wrote:
-> >> I have been a bit hesitant to reiterate the series, but this is
-> >> anyways a v1 of the 96Boards Mezzanine Low Speed connector
-> >> driver framework.
->
-> < snip >
->
-> > I will read through the rest of the series and revisit my
-> > previous conclusions, but most likely not for a few days.
-> >
-> > -Frank
->
-> < snip >
->
-> My apologies for continuing to not getting to this task.  It
-> has been in the top grouping of my todo list but has been
-> pushed aside by a rather busy schedule of conferences and
-> company internal work.  It remains up at the top of my todo
-> list, but most likely will still be shunted aside for three
-> more weeks of other pressing work.
->
-> I will get to it, I definitely have not forgotten it.
+The Raspberry Pi 3 A+ is similar to the Pi 3 B+ but has only 512 MB RAM,
+1 USB 2.0 port and no Ethernet.
 
-It's OK, I might get to rebasing the series even.
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts | 107 +++++++++++++++++++++++++++++
+ 2 files changed, 108 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
 
-We discussed it in a session with Linaro in Vancouver
-recently (some month ago). What we took away from it
-is that there are many precedents of populating devices
-ad hoc, what really makes this one special is that it takes
-something device tree and ad hoc populates something
-on top of it, not defined in the device tree itself.
-
-On a related note, Heikki Krogerus is making a software
-FWnode population series. I ran into this when converting
-board files to use more abstract descriptions. Check it out:
-https://marc.info/?l=linux-kernel&m=154177331200561&w=2
-
-The idea with the series is to expand FWnode so that it
-doesn't only populate Linux devices from device tree
-or ACPI but also by software, where needed, further
-expanding the fwnode abstraction. I will probably look
-into using that.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b0e966d..15bbd0d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -79,6 +79,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-a-plus.dtb \
+ 	bcm2835-rpi-cm1-io1.dtb \
+ 	bcm2836-rpi-2-b.dtb \
++	bcm2837-rpi-3-a-plus.dtb \
+ 	bcm2837-rpi-3-b.dtb \
+ 	bcm2837-rpi-3-b-plus.dtb \
+ 	bcm2837-rpi-cm3-io3.dtb \
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
+new file mode 100644
+index 0000000..75785dd
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-a-plus.dts
+@@ -0,0 +1,107 @@
++// SPDX-License-Identifier: GPL-2.0
++/dts-v1/;
++#include "bcm2837.dtsi"
++#include "bcm2836-rpi.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
++
++/ {
++	compatible = "raspberrypi,3-model-a-plus", "brcm,bcm2837";
++	model = "Raspberry Pi 3 Model A+";
++
++	chosen {
++		/* 8250 auxiliary UART instead of pl011 */
++		stdout-path = "serial1:115200n8";
++	};
++
++	memory {
++		reg = <0 0x20000000>;
++	};
++
++	leds {
++		act {
++			gpios = <&gpio 29 GPIO_ACTIVE_HIGH>;
++		};
++
++		pwr {
++			label = "PWR";
++			gpios = <&expgpio 2 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	wifi_pwrseq: wifi-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&expgpio 1 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++&firmware {
++	expgpio: gpio {
++		compatible = "raspberrypi,firmware-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++		gpio-line-names = "BT_ON",
++				  "WL_ON",
++				  "STATUS_LED",
++				  "",
++				  "",
++				  "CAM_GPIO0",
++				  "CAM_GPIO1",
++				  "";
++		status = "okay";
++	};
++};
++
++&hdmi {
++	hpd-gpios = <&gpio 28 GPIO_ACTIVE_LOW>;
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio41>;
++	status = "okay";
++};
++
++/* SDHCI is used to control the SDIO for wireless */
++&sdhci {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_gpio34>;
++	status = "okay";
++	bus-width = <4>;
++	non-removable;
++	mmc-pwrseq = <&wifi_pwrseq>;
++
++	brcmf: wifi at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++	};
++};
++
++/* SDHOST is used to drive the SD card */
++&sdhost {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdhost_gpio48>;
++	status = "okay";
++	bus-width = <4>;
++};
++
++/* uart0 communicates with the BT module */
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_ctsrts_gpio30 &uart0_gpio32 &gpclk2_gpio43>;
++	status = "okay";
++
++	bluetooth {
++		compatible = "brcm,bcm43438-bt";
++		max-speed = <2000000>;
++		shutdown-gpios = <&expgpio 0 GPIO_ACTIVE_HIGH>;
++	};
++};
++
++/* uart1 is mapped to the pin header */
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_gpio14>;
++	status = "okay";
++};
+-- 
+2.7.4
