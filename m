@@ -1,80 +1,20 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Nov 2018 22:05:35 +0100
-Subject: [PATCH 1/4] pwm: Add new helper to initialize a pwm_state
- variable with defaults
-In-Reply-To: <20181115162159.GD8611@ulmo>
-References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
- <20181114123236.GG2620@ulmo>
- <20181115091644.d5hdk5vao6x74zwp@pengutronix.de>
- <20181115162159.GD8611@ulmo>
-Message-ID: <20181115210535.mxmyjjbpzrjdufsr@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Nov 2018 13:14:51 -0800
+Subject: Regression in next with spi return from transfer_one()
+Message-ID: <20181115211451.GH53235@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry,
+Hi,
 
-On Thu, Nov 15, 2018 at 05:21:59PM +0100, Thierry Reding wrote:
-> On Thu, Nov 15, 2018 at 10:16:44AM +0100, Uwe Kleine-K?nig wrote:
-> > On Wed, Nov 14, 2018 at 01:32:36PM +0100, Thierry Reding wrote:
-> > > On Fri, Oct 26, 2018 at 08:41:55PM +0200, Uwe Kleine-K?nig wrote:
-> > > > This helps to convert drivers from the legacy API to pwm_apply_state without
-> > > > having to make the aware of the configured polarity (and in some cases even
-> > > > period).
-> > > > 
-> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > > ---
-> > > >  include/linux/pwm.h | 13 ++++++++++---
-> > > >  1 file changed, 10 insertions(+), 3 deletions(-)
-> > > 
-> > > So if I understand your intention correctly here you want consumers to
-> > > be able to get at the default state, which would be the state as it was
-> > > "configured" in DT or the PWM lookup table so that you can modify that
-> > > state (well, really just setting the duty-cycle) before you actually
-> > > send the state to the hardware.
-> > > 
-> > > So the difference to pwm_apply_args() is that you don't want the driver
-> > > to specifically program a duty cycle of 0 before setting the actual duty
-> > > cycle that you want to set.
-> > > 
-> > > Is that about right?
-> > 
-> > Yes, and a resulting advantage is that the apply callback is only called
-> > once.
-> >  
-> > > Isn't that exactly what pwm_init_state() already does? pwm-backlight
-> > > uses it for exactly the same purpose that you seem to be using it in
-> > > RX1950 backlight control.
-> > 
-> > I didn't use pwm_init_state because that doesn't give a helpful value
-> > for state->enabled. (I think it is: if the driver provides a get_state
-> > callback it is whatever that one set, otherwise it's off.)
-> 
-> That's correct. It's pretty much the same thing that you have, except
-> you explicitly set enable = false. But that's not really important
-> because consumers are supposed to explicitly override that anyway.
+Commit 810923f3bf06 ("spi: Deal with slaves that return from
+transfer_one() unfinished") causes a regression at least on
+droid 4 with SPI PMIC and regulators on the PMIC. During boot
+the device just hangs there waiting for rootfs to appear on
+MMC. Reverting 810923f3bf06 makes things work again.
 
-If we hardcode to enable=false the call to pwm_get_state could be
-dropped, too. Then the two functions are really semantically identical.
-> 
-> > Also the name pwm_init_state isn't that good IMHO. Just from the name
-> > I'd expect it to be something like
-> > 
-> > 	memset(state, 0, sizeof(&state));
-> > 
-> > instead of something more informed that depends on hardware state and/or
-> > data provided by a device tree.
-> 
-> Be that as it may, the kerneldoc is pretty explicit about what it does
-> and so is the code. Not liking the name shouldn't be an excuse for
-> duplicating functionality.
+Any ideas why this might be?
 
-With your suggestion to move the initialisation of ->state into the
-core, maybe this function can go away from the public API such that the
-naming doesn't really matter (and can be adapted easily).
+Regards,
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Tony
