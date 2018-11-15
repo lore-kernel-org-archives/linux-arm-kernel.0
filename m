@@ -1,41 +1,81 @@
 From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:21 +0100
-Subject: [PATCH 1/9] drm: replace "drm_gem_object_unreference_unlocked"
- function with "*put_unlocked"
+Date: Thu, 15 Nov 2018 23:16:22 +0100
+Subject: [PATCH 2/9] drm: remove deprecated
+ "[__]drm_gem_object_[un]reference[_locked]" functions
 In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
 References: <20181115221634.22715-1-greenfoo@gluegarage.com>
-Message-ID: <20181115221634.22715-2-greenfoo@gluegarage.com>
+Message-ID: <20181115221634.22715-3-greenfoo@gluegarage.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch unifies the naming of DRM functions for reference counting as
-requested on Documentation/gpu/todo.rst
+There are no more places where these (deprecated) functions are being
+used from, thus they can now be removed.
 
 Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
 ---
- drivers/gpu/drm/bochs/bochs_mm.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/drm/drm_gem.h | 50 -------------------------------------------
+ 1 file changed, 50 deletions(-)
 
-diff --git a/drivers/gpu/drm/bochs/bochs_mm.c b/drivers/gpu/drm/bochs/bochs_mm.c
-index a61c1ecb2bdc..e6ccf7fa92d4 100644
---- a/drivers/gpu/drm/bochs/bochs_mm.c
-+++ b/drivers/gpu/drm/bochs/bochs_mm.c
-@@ -414,7 +414,7 @@ int bochs_dumb_create(struct drm_file *file, struct drm_device *dev,
- 		return ret;
+diff --git a/include/drm/drm_gem.h b/include/drm/drm_gem.h
+index 3583b98a1718..daa34328b5be 100644
+--- a/include/drm/drm_gem.h
++++ b/include/drm/drm_gem.h
+@@ -222,56 +222,6 @@ __drm_gem_object_put(struct drm_gem_object *obj)
+ void drm_gem_object_put_unlocked(struct drm_gem_object *obj);
+ void drm_gem_object_put(struct drm_gem_object *obj);
  
- 	ret = drm_gem_handle_create(file, gobj, &handle);
--	drm_gem_object_unreference_unlocked(gobj);
-+	drm_gem_object_put_unlocked(gobj);
- 	if (ret)
- 		return ret;
- 
-@@ -454,6 +454,6 @@ int bochs_dumb_mmap_offset(struct drm_file *file, struct drm_device *dev,
- 	bo = gem_to_bochs_bo(obj);
- 	*offset = bochs_bo_mmap_offset(bo);
- 
--	drm_gem_object_unreference_unlocked(obj);
-+	drm_gem_object_put_unlocked(obj);
- 	return 0;
- }
+-/**
+- * drm_gem_object_reference - acquire a GEM buffer object reference
+- * @obj: GEM buffer object
+- *
+- * This is a compatibility alias for drm_gem_object_get() and should not be
+- * used by new code.
+- */
+-static inline void drm_gem_object_reference(struct drm_gem_object *obj)
+-{
+-	drm_gem_object_get(obj);
+-}
+-
+-/**
+- * __drm_gem_object_unreference - raw function to release a GEM buffer object
+- *                                reference
+- * @obj: GEM buffer object
+- *
+- * This is a compatibility alias for __drm_gem_object_put() and should not be
+- * used by new code.
+- */
+-static inline void __drm_gem_object_unreference(struct drm_gem_object *obj)
+-{
+-	__drm_gem_object_put(obj);
+-}
+-
+-/**
+- * drm_gem_object_unreference_unlocked - release a GEM buffer object reference
+- * @obj: GEM buffer object
+- *
+- * This is a compatibility alias for drm_gem_object_put_unlocked() and should
+- * not be used by new code.
+- */
+-static inline void
+-drm_gem_object_unreference_unlocked(struct drm_gem_object *obj)
+-{
+-	drm_gem_object_put_unlocked(obj);
+-}
+-
+-/**
+- * drm_gem_object_unreference - release a GEM buffer object reference
+- * @obj: GEM buffer object
+- *
+- * This is a compatibility alias for drm_gem_object_put() and should not be
+- * used by new code.
+- */
+-static inline void drm_gem_object_unreference(struct drm_gem_object *obj)
+-{
+-	drm_gem_object_put(obj);
+-}
+-
+ int drm_gem_handle_create(struct drm_file *file_priv,
+ 			  struct drm_gem_object *obj,
+ 			  u32 *handlep);
 -- 
 2.19.1
