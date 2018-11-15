@@ -1,33 +1,38 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 15 Nov 2018 14:35:04 +0800
-Subject: [PATCH 1/4] dt-bindings: pwm: update bindings for MT7629 SoC
-In-Reply-To: <1dc7b27cbad59c413d7076ff7d16b6757014d727.1542262833.git.ryder.lee@mediatek.com>
-References: <1dc7b27cbad59c413d7076ff7d16b6757014d727.1542262833.git.ryder.lee@mediatek.com>
-Message-ID: <1542263704.7928.2.camel@mtkswgap22>
+From: peng.hao2@zte.com.cn (Peng Hao)
+Date: Thu, 15 Nov 2018 23:14:08 +0800
+Subject: [PATCH]  kvm: arm/arm64 : fix vm's hanging at startup time
+Message-ID: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-15 at 14:26 +0800, Ryder Lee wrote:
-> This updates bindings for MT7629 pwm controller.
-> 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> index 991728c..4a2885b 100644
-> --- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
-> @@ -6,6 +6,7 @@ Required properties:
->     - "mediatek,mt7622-pwm": found on mt7622 SoC.
->     - "mediatek,mt7623-pwm": found on mt7623 SoC.
->     - "mediatek,mt7628-pwm": found on mt7628 SoC.
-> +   - "mediatek,mt7629-pwm": found on mt7629 SoC.
->   - reg: physical base address and length of the controller's registers.
->   - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
->     the cell format.
+When virtual machine starts, hang up. The kernel version of guest
+is 4.16. Host support vgic_v3.
+It was mainly due to the incorrect vgic_irq's(intid=27) group value
+during injection interruption. when kvm_vgic_vcpu_init is called,
+dist is not initialized at this time. Unable to get vgic V3 or V2
+correctly, so group is not set.
+group is setted to 1 when vgic_mmio_write_group is invoked at some
+time.
+when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+interrupt injection failed.
 
-Please ignore this PWM patch. Sorry for the inconvenience :(
+Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+---
+ virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ryder
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 9c0dd23..d101000 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+ 	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
+ 		irq->line_level = false;
+ 
+-	if (irq->group)
++	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+ 		val |= ICH_LR_GROUP;
+ 
+ 	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
+-- 
+1.8.3.1
