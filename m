@@ -1,18 +1,19 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2018 19:50:41 +0000
-Subject: move the arm arch_dma_alloc implementation to common code
-In-Reply-To: <20181109075238.GA27578@lst.de>
-References: <20181105121931.13481-1-hch@lst.de> <20181109075238.GA27578@lst.de>
-Message-ID: <20181115195041.GC4535@brain-police>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 15 Nov 2018 11:54:05 -0800
+Subject: [PATCH 0/4] arm64: dts: meson-gx: fix GPIO lines names
+In-Reply-To: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
+References: <1541587550-17842-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hwopedsma.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 09, 2018 at 08:52:38AM +0100, Christoph Hellwig wrote:
-> Can I get a quick review from the arm64 folks?  I think it should
-> be fine there as it basically is a code move, but an additional pair
-> or two of eyes always helps to weed out bugs.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-I reviewed the arm64 parts, but it would be ideal if Robin could have a look
-as well.
+> The gpio line names were set in the pinctrl node instead of the gpio node,
+> at the time it was merged, it worked, but was obviously wrong.
+> This patches moves the properties to the gpio nodes for the board DT having
+> the GPIO lines names.
 
-Will
+Queued for v4.21 (branch: v4.21/dt64)
+
+Kevin
