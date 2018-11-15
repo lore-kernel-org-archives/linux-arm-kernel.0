@@ -1,165 +1,76 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 15 Nov 2018 22:00:17 +0100
-Subject: [PATCH 2/4] ARM: S3C24XX: rx1950: make use of atomic PWM API
-In-Reply-To: <20181115161516.GC8611@ulmo>
+Date: Thu, 15 Nov 2018 22:05:35 +0100
+Subject: [PATCH 1/4] pwm: Add new helper to initialize a pwm_state
+ variable with defaults
+In-Reply-To: <20181115162159.GD8611@ulmo>
 References: <20181026184157.16371-1-u.kleine-koenig@pengutronix.de>
- <20181026184157.16371-2-u.kleine-koenig@pengutronix.de>
- <20181114120814.GD2620@ulmo>
- <20181115085808.ihg4of72forhulzc@pengutronix.de>
- <20181115161516.GC8611@ulmo>
-Message-ID: <20181115210017.cvpyicjuw5vjpcwl@pengutronix.de>
+ <20181114123236.GG2620@ulmo>
+ <20181115091644.d5hdk5vao6x74zwp@pengutronix.de>
+ <20181115162159.GD8611@ulmo>
+Message-ID: <20181115210535.mxmyjjbpzrjdufsr@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello Thierry,
 
-On Thu, Nov 15, 2018 at 05:15:16PM +0100, Thierry Reding wrote:
-> On Thu, Nov 15, 2018 at 09:58:08AM +0100, Uwe Kleine-K?nig wrote:
-> > On Wed, Nov 14, 2018 at 01:08:14PM +0100, Thierry Reding wrote:
-> > > On Fri, Oct 26, 2018 at 08:41:56PM +0200, Uwe Kleine-K?nig wrote:
-> > > > +static struct pwm_state lcd_pwm_state;
-> > > >  static struct pwm_device *lcd_pwm;
-> > > >  
-> > > >  static void rx1950_lcd_power(int enable)
-> > > > @@ -428,15 +429,17 @@ static void rx1950_lcd_power(int enable)
-> > > >  
-> > > >  		/* GPB1->OUTPUT, GPB1->0 */
-> > > >  		gpio_direction_output(S3C2410_GPB(1), 0);
-> > > > -		pwm_config(lcd_pwm, 0, LCD_PWM_PERIOD);
-> > > > -		pwm_disable(lcd_pwm);
-> > > > +		lcd_pwm_state.duty_cycle = 0;
-> > > > +		lcd_pwm_state.enabled = false;
-> > > > +		pwm_apply_state(lcd_pwm, &lcd_pwm_state);
+On Thu, Nov 15, 2018 at 05:21:59PM +0100, Thierry Reding wrote:
+> On Thu, Nov 15, 2018 at 10:16:44AM +0100, Uwe Kleine-K?nig wrote:
+> > On Wed, Nov 14, 2018 at 01:32:36PM +0100, Thierry Reding wrote:
+> > > On Fri, Oct 26, 2018 at 08:41:55PM +0200, Uwe Kleine-K?nig wrote:
+> > > > This helps to convert drivers from the legacy API to pwm_apply_state without
+> > > > having to make the aware of the configured polarity (and in some cases even
+> > > > period).
+> > > > 
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > >  include/linux/pwm.h | 13 ++++++++++---
+> > > >  1 file changed, 10 insertions(+), 3 deletions(-)
 > > > 
-> > > The correct way to do this would be:
+> > > So if I understand your intention correctly here you want consumers to
+> > > be able to get at the default state, which would be the state as it was
+> > > "configured" in DT or the PWM lookup table so that you can modify that
+> > > state (well, really just setting the duty-cycle) before you actually
+> > > send the state to the hardware.
 > > > 
-> > > 	struct pwm_state state;
+> > > So the difference to pwm_apply_args() is that you don't want the driver
+> > > to specifically program a duty cycle of 0 before setting the actual duty
+> > > cycle that you want to set.
 > > > 
-> > > 	pwm_get_state(lcd_pwm, &state);
-> > > 	state.enabled = false;
-> > > 	state.duty_cycle = 0;
-> > > 	pwm_apply_state(lcd_pwm, &state);
+> > > Is that about right?
 > > 
-> > The difference here is that with my approach the rx1950 driver caches
-> > the intended pwm_state saving a few cycles for repeatedly copying the
-> > pwm cache to a stack variable at the cost of some memory. I like my
-> > approach a little better but I'm not willing to argue about that one and
-> > can give in.
-> 
-> It's a redundant copy of the PWM's internal state
-
-That the pwm keeps a copy of this is an implementation detail of the pwm
-framework that shouldn't matter to its consumers.
-
-> and not guaranteed to remain in sync with the PWM hardware state.
-
-What should happen that the driver's pwm_state and the hardware state
-diverge?
-
-> You also require a global variable, which is usually a bad idea.
-
-Right, but that's attributable to the fact, that the struct pwm_device
-is a global variable, too.
-
-> And we're not repeatedly copying data. We occasionally do. These
-> operations are typically only executed once or twice per boot, so
-> hardly anything that needs to be optimized for speed.
-> 
-> > > >  		gpio_direction_output(S3C2410_GPC(0), 1);
-> > > >  		gpio_direction_output(S3C2410_GPC(5), 1);
-> > > > @@ -491,11 +494,8 @@ static int rx1950_backlight_init(struct device *dev)
-> > > >  		return PTR_ERR(lcd_pwm);
-> > > >  	}
-> > > >  
-> > > > -	/*
-> > > > -	 * FIXME: pwm_apply_args() should be removed when switching to
-> > > > -	 * the atomic PWM API.
-> > > > -	 */
-> > > > -	pwm_apply_args(lcd_pwm);
-> > > > +	pwm_get_state_default(lcd_pwm, &lcd_pwm_state);
-> > > > +	lcd_pwm_state.period = LCD_PWM_PERIOD;
-> > > 
-> > > This is wrong, though it's probably because the comment is also
-> > > confusing. There should be nothing wrong with using pwm_apply_args() in
-> > > this case.
+> > Yes, and a resulting advantage is that the apply callback is only called
+> > once.
+> >  
+> > > Isn't that exactly what pwm_init_state() already does? pwm-backlight
+> > > uses it for exactly the same purpose that you seem to be using it in
+> > > RX1950 backlight control.
 > > 
-> > In my eyes it is wrong because it results in a call to the backend
-> > driver's apply callback to get the default setting just to fix the
-> > configuration and apply that in the code to follow.
+> > I didn't use pwm_init_state because that doesn't give a helpful value
+> > for state->enabled. (I think it is: if the driver provides a get_state
+> > callback it is whatever that one set, otherwise it's off.)
 > 
-> Okay, I see. But there's already pwm_init_state() which pretty much does
-> what you do here, right?
-> 
-> Thinking about it some more, I wonder if we shouldn't be more consistent
-> about state handling here. So the reason why pwm_apply_args() exists is
-> to program the PWM with a known state if the PWM doesn't support
-> hardware readout. Since most drivers don't support hardware readout, we
-> need this to at some specific point synchronize the hardware and
-> internal states.
-> 
-> In retrospect I'm not sure that's necessary, because there's more and
-> more evidence that we don't want to touch a PWM configuration until a
-> consumer explicitly says so. There's also the slight problem that the
-> pwm_apply_args() is really only necessary if the PWM driver doesn't
-> support hardware readout, but that's not something that consumers are
-> aware of or should worry about.
+> That's correct. It's pretty much the same thing that you have, except
+> you explicitly set enable = false. But that's not really important
+> because consumers are supposed to explicitly override that anyway.
 
-I consider your words as a light in the tunnel. Maybe we will reach a
-conclusion eventually.
-
-> In light of that I think perhaps a better solution would be to basically
-> apply the PWM arguments to the internal state at request time. We can't
-> do it earlier because we don't know the arguments before the PWM is
-> requested. So I think at request time we could do something like this:
+If we hardcode to enable=false the call to pwm_get_state could be
+dropped, too. Then the two functions are really semantically identical.
 > 
-> 	if (chip->ops->get_state)
-> 		chip->ops->get_state(chip, pwm, &pwm->state);
-> 	else
-> 		pwm_init_state(pwm, &pwm->state);
-> 
-> That way drivers always get either the current state or the "default"
-> state that was configured via platform-specific means (DT or lookup).
-
-I think a gap in this reasoning is that if the DT dictates a period of
-say 1 ms and the hardware is configured to something else, the consumer
-should still work with the 1 ms value.
-
-> > > While at it, I think the conversion should also be include replacing the
-> > > call to pwm_request() by pwm_get(). There's already a PWM lookup table
-> > > in the RX1950 board code, so pwm_get() would be able to use that. Note
-> > > that for some reason that table contains a period that is different from
-> > > LCD_PWM_PERIOD, so I think that should also be addressed. Basically all
-> > > the information other than duty cycle should be coming from either DT or
-> > > a lookup table.
+> > Also the name pwm_init_state isn't that good IMHO. Just from the name
+> > I'd expect it to be something like
 > > 
-> > Yeah, I noticed that, too. It's not entirely clear to me how to do that
-> > yet. So I thought to care about getting rid of the legacy usage of
-> > pwm_config and pwm_apply_args first.
+> > 	memset(state, 0, sizeof(&state));
+> > 
+> > instead of something more informed that depends on hardware state and/or
+> > data provided by a device tree.
 > 
-> So I think I got the backlight PWM confused with the LCD PWM. The former
-> is what we have in the PWM lookup table and which controls the backlight
-> brightness. The latter is what we don't have in the table and which is
-> requested using the legacy pwm_request() function. That also explains
-> why there's a difference between the period in the PWM lookup table for
-> the backlight PWM and the LCD_PWM_PERIOD macro.
-> 
-> Adding support for pwm_get() should be as simple ad adding an entry to
-> rx1950_pwm_lookup[], such as this:
-> 
-> 	PWM_LOOKUP("samsung-pwm", 1, "pwm-backlight.0", "lcd", 192960,
-> 		   PWM_POLARITY_NORMAL),
-> 
-> Then in rx1950_backlight_init(), which is passed the device structure
-> that represents the backlight (i.e. "pwm-backlight.0"), pwm_get() can
-> be called like this:
-> 
-> 	lcd_pwm = pwm_get(dev, "lcd");
-> 
-> The matching code should then be able to find the second entry as the
-> best match and return the correct one.
+> Be that as it may, the kerneldoc is pretty explicit about what it does
+> and so is the code. Not liking the name shouldn't be an excuse for
+> duplicating functionality.
 
-Does this lookup belong to the board file or to a more general place
-near the provider of the "samsung-pwm" devices?
+With your suggestion to move the initialisation of ->state into the
+core, maybe this function can go away from the public API such that the
+naming doesn't really matter (and can be adapted easily).
 
 Best regards
 Uwe
