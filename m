@@ -1,20 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2018 11:10:06 +0100
-Subject: [PATCH v6 0/5] Add Actions Semi S700 pinctrl support
-In-Reply-To: <20181113100709.5615-1-pn@denx.de>
-References: <20181113100709.5615-1-pn@denx.de>
-Message-ID: <CACRpkdbpgjPEbur76BPjkXUN01zcUENcAyp=NsH4Bh_PiFBssw@mail.gmail.com>
+From: fweimer@redhat.com (Florian Weimer)
+Date: Thu, 15 Nov 2018 11:24:27 +0100
+Subject: Investigating a stack state mismatch in Linux kernel
+In-Reply-To: <b7aad232-76e1-241f-00e2-77783ce30f87@linux.com> (Alexander
+ Popov's message of "Wed, 14 Nov 2018 21:24:28 +0300")
+References: <b7aad232-76e1-241f-00e2-77783ce30f87@linux.com>
+Message-ID: <875zwyabac.fsf@oldenburg.str.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 11:07 AM Parthiban Nallathambi <pn@denx.de> wrote:
+* Alexander Popov:
 
-> This patchset adds pinctrl support for Actions Semi S700 SoC.
-> Pinmux functions are only accessible for pin groups while pinconf
-> parameters are available for both pin groups and individual pins.
+> Of course, there is a naive solution for this issue -- just skip stackleak
+> instrumentation for acpi_duplicate_processor_id(). But it would be great to find
+> out the reasons behind this compiler behavior. It might help to create a better
+> solution.
 
-This looks good to me, just waiting for Manivannan to look it
-over and ACK.
+Please show us the RTL dumps with both compilers, both before and after
+the plugin pass.
 
-Yours,
-Linus Walleij
+Thanks,
+Florian
