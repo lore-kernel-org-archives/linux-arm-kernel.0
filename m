@@ -1,63 +1,69 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 15 Nov 2018 23:40:44 +0100
-Subject: [PATCH v2 2/6] clk: meson: meson8b: do not use cpu_div3 for
- cpu_scale_out_sel
+Date: Thu, 15 Nov 2018 23:40:46 +0100
+Subject: [PATCH v2 4/6] clk: meson: meson8b: add support for more M/N values
+ in sys_pll
 In-Reply-To: <20181115224048.13511-1-martin.blumenstingl@googlemail.com>
 References: <20181115224048.13511-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181115224048.13511-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20181115224048.13511-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpu_div3 clock (cpu_in divided by 3) generates a signal with a duty
-cycle of 33%. The CPU clock however requires a clock signal with a duty
-cycle of 50% to run stable.
-cpu_div3 was observed to be problematic when cycling through all
-available CPU frequencies (with additional patches on top of this one)
-while running "stress --cpu 4" in the background. This caused sporadic
-hangs where the whole system would fully lock up.
+The sys_pll on the EC-100 board is configured to 1584MHz at boot
+(either by u-boot, firmware or chip defaults). This is achieved by using
+M = 66, N = 1 (24MHz * 66 / 1).
+At boot the CPU clock is running off sys_pll divided by 2 which results
+in 792MHz. Thus M = 66 is considered to be a "safe" value for Meson8b.
 
-Amlogic's 3.10 kernel code also does not use the cpu_div3 clock either
-when changing the CPU clock.
+To achieve 1608MHz (one of the CPU OPPs on Meson8 and Meson8m2) we need
+M = 67, N = 1. I ran "stress --cpu 4" while infinitely cycling through
+all available frequencies on my Meson8m2 board and could not spot any
+issues with this setting (after ~12 hours of running this).
+
+On Meson8, Meson8b and Meson8m2 we also want to be able to use 408MHz
+and 816MHz CPU frequencies. These can be achieved by dividing sys_pll by
+4 (for 408MHz) or 2 (for 816MHz). That means that sys_pll has to run at
+1632MHz which can be generated using M = 68, N = 1.
+Similarily we also want to be able to use 1008MHz as CPU frequency. This
+means that sys_pll has to run either at 1008MHz or 2016MHz. The former
+would result in an M value of 42, which is lower than the smallest value
+used by the 3.10 GPL kernel sources from Amlogic (50 is the lower limit
+there). Thus we need to run sys_pll at 2016MHz which can ge generated
+using M = 84, N = 1.
+I tested M = 68 and M = 84 on my Meson8b Odroid-C1 and my Meson8m2 board
+by running "stress --cpu 4" while infinitely cycling thorugh all
+available frequencies. I could not spot any issues after ~12 hours of
+running this.
+
+Amlogic's 3.10 GPL kernel sources have more M/N combinations. I did not
+add them yet because M = 74 (to achieve close to 1800MHz on Meson8) and
+M = 82 (to achieve close to 1992MHz on Meson8 as well) caused my
+Meson8m2 board to hang randomly. It's not clear why this is (for example
+because the board's voltage regulator design is bad, some missing bits
+for these values in our clk-pll driver, etc.). Thus the following M
+values from the Amlogic 3.10 GPL kernel sources are skipped as of now:
+69, 70, 71, 72, 73, 74, 76, 78, 80, 82, 84, 86, 88, 90, 92, 94, 96, 98
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- drivers/clk/meson/meson8b.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ drivers/clk/meson/meson8b.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index 9bd5920da0ff..a96bfee58a61 100644
+index 41a5025364f9..b07a92ed7de3 100644
 --- a/drivers/clk/meson/meson8b.c
 +++ b/drivers/clk/meson/meson8b.c
-@@ -608,20 +608,27 @@ static struct clk_regmap meson8b_cpu_scale_div = {
- 	},
+@@ -43,6 +43,11 @@ static const struct pll_params_table sys_pll_params_table[] = {
+ 	PLL_PARAMS(62, 1),
+ 	PLL_PARAMS(63, 1),
+ 	PLL_PARAMS(64, 1),
++	PLL_PARAMS(65, 1),
++	PLL_PARAMS(66, 1),
++	PLL_PARAMS(67, 1),
++	PLL_PARAMS(68, 1),
++	PLL_PARAMS(84, 1),
+ 	{ /* sentinel */ },
  };
  
-+static u32 mux_table_cpu_scale_out_sel[] = { 0, 1, 3 };
- static struct clk_regmap meson8b_cpu_scale_out_sel = {
- 	.data = &(struct clk_regmap_mux_data){
- 		.offset = HHI_SYS_CPU_CLK_CNTL0,
- 		.mask = 0x3,
- 		.shift = 2,
-+		.table = mux_table_cpu_scale_out_sel,
- 	},
- 	.hw.init = &(struct clk_init_data){
- 		.name = "cpu_scale_out_sel",
- 		.ops = &clk_regmap_mux_ro_ops,
-+		/*
-+		 * NOTE: We are skipping the parent with value 0x2 (which is
-+		 * "cpu_div3") because it results in a duty cycle of 33% which
-+		 * makes the system unstable and can result in a lockup of the
-+		 * whole system.
-+		 */
- 		.parent_names = (const char *[]) { "cpu_in_sel",
- 						   "cpu_div2",
--						   "cpu_div3",
- 						   "cpu_scale_div" },
--		.num_parents = 4,
-+		.num_parents = 3,
- 		.flags = CLK_SET_RATE_PARENT,
- 	},
- };
 -- 
 2.19.1
