@@ -1,61 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Nov 2018 22:42:03 +0000
-Subject: [PATCH 6/6] arm64: ftrace: always pass instrumented pc in x0
-In-Reply-To: <20181115224203.24847-1-mark.rutland@arm.com>
-References: <20181115224203.24847-1-mark.rutland@arm.com>
-Message-ID: <20181115224203.24847-7-mark.rutland@arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 15 Nov 2018 23:46:55 +0100
+Subject: [PATCH v2 0/2] clocksource/meson6_timer: implement ARM delay timer
+Message-ID: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core ftrace hooks take the instrumented PC in x0, but for some
-reason arm64's prepare_ftrace_return() takes this in x1.
+While trying to add support for the ARM TWD Timer and the ARM Global
+Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
+I did a review of the existing driver.
+Unfortunately I found it hard to review because the pre-processor
+#defines did not match the names from the public S805 datasheet. Thus
+patch #1 adjusts these. No functional changes here, this is just
+preparation work for patch #2.
 
-For consistency, let's flip the argument order and always pass the
-instrumented PC in x0.
+Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
+would have given us a timer-based delay implementation (so udelay() and
+friends would use the timer instead of using a loop-based delay
+implementation). Unfortunately we can't use the ARM Global Timer yet
+because it's input clock is derived from the CPU clock (which can change
+once we enable CPU frequency scaling on these SoCs, for which I will be
+sending patches in the near future).
+Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
+current configuration) has a resolution of 1us. So patch #2 uses
+register_current_timer_delay() to register Timer E as ARM delay timer
+(which will be especially useful as we have to use udelay() when
+changing the CPU clocks during DVFS).
 
-There should be no functional change as a result of this patch.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Torsten Duwe <duwe@suse.de>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/entry-ftrace.S | 6 +++---
- arch/arm64/kernel/ftrace.c       | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+Changes since v1 at [0]:
+- convert the enums for the input clock (meson6_timera_input_clock and
+  meson6_timere_input_clock) to simple #defines as these are register
+  values and not something driver-internal. All other register values
+  are #defines so it makes sense that these are #defines as well.
 
-diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index 6b8230f79a67..7981f18bfe5f 100644
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -182,10 +182,10 @@ ENDPROC(ftrace_stub)
-  * and run return_to_handler() later on its exit.
-  */
- ENTRY(ftrace_graph_caller)
--	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
--	mcount_get_pc		  x1	//     function's pc
-+	mcount_get_pc		  x0	//     function's pc
-+	mcount_get_lr_addr	  x1	//     pointer to function's saved lr
- 	mcount_get_parent_fp	  x2	//     parent's fp
--	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
-+	bl	prepare_ftrace_return	// prepare_ftrace_return(pc, &lr, fp)
- 
- 	mcount_exit
- ENDPROC(ftrace_graph_caller)
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index 50986e388d2b..34a80bf0b2ef 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -211,7 +211,7 @@ int __init ftrace_dyn_arch_init(void)
-  *
-  * Note that @frame_pointer is used only for sanity check later.
-  */
--void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
-+void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
- 			   unsigned long frame_pointer)
- {
- 	unsigned long return_hooker = (unsigned long)&return_to_handler;
+
+[0] https://patchwork.kernel.org/cover/10658591/
+
+
+Martin Blumenstingl (2):
+  clocksource: meson6_timer: use register names from the datasheet
+  clocksource: meson6_timer: implement ARM delay timer
+
+ drivers/clocksource/meson6_timer.c | 128 +++++++++++++++++++----------
+ 1 file changed, 85 insertions(+), 43 deletions(-)
+
 -- 
-2.11.0
+2.19.1
