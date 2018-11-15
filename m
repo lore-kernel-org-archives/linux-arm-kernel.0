@@ -1,22 +1,40 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Thu, 15 Nov 2018 19:33:05 +0100
+Date: Thu, 15 Nov 2018 19:36:41 +0100
 Subject: [PATCH 12/15] power: supply: olpc_battery: Use DT to get
  battery version
-In-Reply-To: <CAHp75VeEFK+47pz+he6Su630jnoGKPamhatuoXopS5Ee=LZtTg@mail.gmail.com>
+In-Reply-To: <20181104123710.GE23864@amd>
 References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-13-lkundrak@v3.sk>
- <CAHp75VeEFK+47pz+he6Su630jnoGKPamhatuoXopS5Ee=LZtTg@mail.gmail.com>
-Message-ID: <320e92fd7d942f364c83a1e8411629c1f8979d5f.camel@v3.sk>
+ <20181010172300.317643-13-lkundrak@v3.sk> <20181104123710.GE23864@amd>
+Message-ID: <e1de44148e06379b04c72f925a30fb0e346536eb.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-10-19 at 16:45 +0300, Andy Shevchenko wrote:
-> On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk>
-> wrote:
+On Sun, 2018-11-04 at 13:37 +0100, Pavel Machek wrote:
+> On Wed 2018-10-10 19:22:57, Lubomir Rintel wrote:
 > > Avoid using the x86 OLPC platform specific call to get the board
 > > version. It won't work on FDT-based ARM MMP2 platform.
 > > 
 > > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> > Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> 
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+> 
+> AFAICT, this should go earlier in the series; first, add support in
+> the code, then switch to new name in DTS.
+
+I think it's all right this way: I'm not removing the old compatible
+string -- functionality provided by one version of the battery is a
+superset of the another.
+
+Also, the older version of the driver with only the XO-1 compatible
+string guesses the actual battery version by querying the board version
+directly, so up to this patch things keep working the way they used to
+regardless of the new compatible string.
+
+Lubo
+
+> 								Pavel
+> 
 > > ---
 > >  drivers/power/supply/olpc_battery.c | 10 +++++++---
 > >  1 file changed, 7 insertions(+), 3 deletions(-)
@@ -32,53 +50,35 @@ On Fri, 2018-10-19 at 16:45 +0300, Andy Shevchenko wrote:
 > >  #include <linux/olpc-ec.h>
 > > +#include <linux/of.h>
 > >  #include <asm/olpc.h>
-> 
-> Keep it sorted, otherwise the change is good!
-
-Yes, but... the headers are not sorted at the moment. I'll sort the new
-include before <linux/platform_device.h> so that I don't mess it up
-even more, but I don't feel like just sorting everything so that I
-don't obscure the actual change.
-
-
-> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> 
-> > 
+> >  
+> >  
 > > @@ -622,11 +623,13 @@ static int olpc_battery_probe(struct
 > > platform_device *pdev)
-> >         olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc,
+> >  	olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc,
 > > NULL);
-> >         if (IS_ERR(olpc_ac))
-> >                 return PTR_ERR(olpc_ac);
+> >  	if (IS_ERR(olpc_ac))
+> >  		return PTR_ERR(olpc_ac);
 > > -
-> > -       if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5
-> > */
-> > +       if (of_property_match_string(pdev->dev.of_node,
-> > "compatible",
-> > +                                       "olpc,xo1.5-battery") >= 0)
-> > {
-> > +               /* XO-1.5 */
-> >                 olpc_bat_desc.properties = olpc_xo15_bat_props;
-> >                 olpc_bat_desc.num_properties =
+> > -	if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5 */
+> > +	if (of_property_match_string(pdev->dev.of_node, "compatible",
+> > +					"olpc,xo1.5-battery") >= 0) {
+> > +		/* XO-1.5 */
+> >  		olpc_bat_desc.properties = olpc_xo15_bat_props;
+> >  		olpc_bat_desc.num_properties =
 > > ARRAY_SIZE(olpc_xo15_bat_props);
-> > -       } else { /* XO-1 */
-> > +       } else {
-> > +               /* XO-1 */
-> >                 olpc_bat_desc.properties = olpc_xo1_bat_props;
-> >                 olpc_bat_desc.num_properties =
+> > -	} else { /* XO-1 */
+> > +	} else {
+> > +		/* XO-1 */
+> >  		olpc_bat_desc.properties = olpc_xo1_bat_props;
+> >  		olpc_bat_desc.num_properties =
 > > ARRAY_SIZE(olpc_xo1_bat_props);
-> >         }
+> >  	}
 > > @@ -672,6 +675,7 @@ static int olpc_battery_remove(struct
 > > platform_device *pdev)
-> > 
+> >  
 > >  static const struct of_device_id olpc_battery_ids[] = {
-> >         { .compatible = "olpc,xo1-battery" },
-> > +       { .compatible = "olpc,xo1.5-battery" },
-> >         {}
+> >  	{ .compatible = "olpc,xo1-battery" },
+> > +	{ .compatible = "olpc,xo1.5-battery" },
+> >  	{}
 > >  };
 > >  MODULE_DEVICE_TABLE(of, olpc_battery_ids);
-> > --
-> > 2.19.0
-> > 
-
-Lubo
