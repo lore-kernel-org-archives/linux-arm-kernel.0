@@ -1,20 +1,69 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 15 Nov 2018 15:57:53 +0100
-Subject: [PATCH] ARM: dts: rockchip: Fix Rock2 vcc_flash name
-In-Reply-To: <20181113152413.11386-1-john@metanate.com>
-References: <20181113152413.11386-1-john@metanate.com>
-Message-ID: <4092354.udJuV4aAHT@phil>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 15 Nov 2018 14:57:59 +0000
+Subject: [PATCH 3/4] arm64: arm_pmu: Exclude EL1,2 with :G :H perf
+ attributes
+In-Reply-To: <1542286549-4501-4-git-send-email-andrew.murray@arm.com>
+References: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
+ <1542286549-4501-4-git-send-email-andrew.murray@arm.com>
+Message-ID: <2b4efe9a-4f2b-961f-c841-6378dbb4bbd3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 13. November 2018, 16:24:13 CET schrieb John Keeping:
-> There is no functional change from this, but it is confusing to find two
-> copies of vcc_sys and no vcc_flash when looking in
-> /sys/class/regulator/*/name.
+Hi Andrew,
+
+On 15/11/2018 12:55, Andrew Murray wrote:
+> When using VHE, EL1 is unused by the host and EL2 is unused by the
+> guest - therefore we can filter out these events with the PMU as per
+> the 'exclude_host' and 'exclude_guest' attributes.
 > 
-> Signed-off-by: John Keeping <john@metanate.com>
+> With both VHE and non-VHE we switch the counters between host/guest
+> at EL2. With non-VHE when using 'exclude_host' we filter out EL2.
+> 
+> These changes eliminate counters counting host events on the
+> boundaries of guest entry/exit when using :G. However when using :H
+> unless exclude_hv is set on non-VHE then there is a small blackout
+> window at the guest entry/exit where host events are not captured.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>   arch/arm64/kernel/perf_event.c | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 89d444f..c079c1f 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -971,12 +971,14 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+>   	 * with other architectures (x86 and Power).
+>   	 */
+>   	if (is_kernel_in_hyp_mode()) {
+> -		if (!attr->exclude_kernel)
+> +		if (!attr->exclude_kernel && !attr->exclude_host)
+>   			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> +		if (attr->exclude_guest)
+> +			config_base |= ARMV8_PMU_EXCLUDE_EL1;
 
-applied for 4.21, thanks for catching that typo
+Do we really need this ? exclude_guest also implies you need to
+exclude guest EL0. We anyway disable the events when we enter the
+guest. So the above is not necessary and could possibly create
+confusion.
+
+>   	} else {
+>   		if (attr->exclude_kernel)
+>   			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> -		if (!attr->exclude_hv)
+> +		if (!attr->exclude_hv && !attr->exclude_host)
+>   			config_base |= ARMV8_PMU_INCLUDE_EL2;
+>   	}
+>   	if (attr->exclude_user)
+> 
 
 
-Heiko
+I think this can be folded into the previous patch, which adds the
+support for exclude_host/guest support. :G, :H are nothing but
+the those exclude_ flags.
+
+Otherwise looks good to me.
+
+Cheers
+Suzuki
