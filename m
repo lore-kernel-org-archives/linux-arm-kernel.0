@@ -1,19 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 15 Nov 2018 06:25:44 -0800
-Subject: [PATCH] ARM: shmobile: sh73a0: Remove obsolete inclusion of
- <asm/smp_twd.h>
-In-Reply-To: <20181115095731.17362-1-geert+renesas@glider.be>
-References: <20181115095731.17362-1-geert+renesas@glider.be>
-Message-ID: <20181115142543.do5lfjolppnzspin@verge.net.au>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 15 Nov 2018 15:30:26 +0100
+Subject: [PATCH v2 1/3] clk: imx6q: reset exclusive gates on init
+Message-ID: <20181115143028.19087-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 10:57:31AM +0100, Geert Uytterhoeven wrote:
-> As of commit 9a9863987bf7307f ("ARM: shmobile: Remove legacy SoC code
-> for SH-Mobile AG5"), this header file is no longer used.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The exclusive gates may be set up in the wrong way by software running
+before the clock driver comes up. In that case the exclusive setup is
+locked in its initial state, as the complementary function can't be
+activated without disabling the initial setup first.
 
-Thanks Geert,
+To avoid this lock situation, reset the exclusive gates to the off
+state and allow the kernel to provide the proper setup.
 
-applied for v4.21.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Reviewed-by: Dong Aisheng <Aisheng.dong@nxp.com>
+---
+ drivers/clk/imx/clk-imx6q.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
+index bbe0c60f4d09..59f6a3e087db 100644
+--- a/drivers/clk/imx/clk-imx6q.c
++++ b/drivers/clk/imx/clk-imx6q.c
+@@ -508,8 +508,12 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
+ 	 * lvds1_gate and lvds2_gate are pseudo-gates.  Both can be
+ 	 * independently configured as clock inputs or outputs.  We treat
+ 	 * the "output_enable" bit as a gate, even though it's really just
+-	 * enabling clock output.
++	 * enabling clock output. Initially the gate bits are cleared, as
++	 * otherwise the exclusive configuration gets locked in the setup done
++	 * by software running before the clock driver, with no way to change
++	 * it.
+ 	 */
++	writel(readl(base + 0x160) & ~0x3c00, base + 0x160);
+ 	clk[IMX6QDL_CLK_LVDS1_GATE] = imx_clk_gate_exclusive("lvds1_gate", "lvds1_sel", base + 0x160, 10, BIT(12));
+ 	clk[IMX6QDL_CLK_LVDS2_GATE] = imx_clk_gate_exclusive("lvds2_gate", "lvds2_sel", base + 0x160, 11, BIT(13));
+ 
+-- 
+2.19.1
