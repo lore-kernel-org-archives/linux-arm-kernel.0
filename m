@@ -1,46 +1,37 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 15 Nov 2018 15:50:11 +0100
-Subject: [PATCH 13/15] media: cedrus: Add device-tree compatible and variant
- for A64 support
+Date: Thu, 15 Nov 2018 15:50:01 +0100
+Subject: [PATCH 03/15] ARM: dts: sun8i-h3: Fix the system-control register
+ range
 In-Reply-To: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
 References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181115145013.3378-14-paul.kocialkowski@bootlin.com>
+Message-ID: <20181115145013.3378-4-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the necessary compatible for supporting the A64 SoC along with a
-description of the capabilities of this variant.
+Unlike in previous generations, the system-control register range is not
+limited to a size of 0x30 on the H3. In particular, the EMAC clock
+configuration register (accessed through syscon) is at offset 0x30 in
+that range.
+
+Extend the register size to its full range (0x1000) as a result.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/staging/media/sunxi/cedrus/cedrus.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
-index f04b9bf23774..a71d8b659f8d 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
-@@ -388,6 +388,10 @@ static const struct cedrus_variant sun8i_h3_cedrus_variant = {
- 	.capabilities	= CEDRUS_CAPABILITY_UNTILED,
- };
- 
-+static const struct cedrus_variant sun50i_a64_cedrus_variant = {
-+	.capabilities	= CEDRUS_CAPABILITY_UNTILED,
-+};
-+
- static const struct cedrus_variant sun50i_h5_cedrus_variant = {
- 	.capabilities	= CEDRUS_CAPABILITY_UNTILED,
- };
-@@ -413,6 +417,10 @@ static const struct of_device_id cedrus_dt_match[] = {
- 		.compatible = "allwinner,sun8i-h3-video-engine",
- 		.data = &sun8i_h3_cedrus_variant,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-video-engine",
-+		.data = &sun50i_a64_cedrus_variant,
-+	},
- 	{
- 		.compatible = "allwinner,sun50i-h5-video-engine",
- 		.data = &sun50i_h5_cedrus_variant,
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 35d025af7deb..7157d954fb8c 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -136,7 +136,7 @@
+ 	soc {
+ 		system-control at 1c00000 {
+ 			compatible = "allwinner,sun8i-h3-system-control";
+-			reg = <0x01c00000 0x30>;
++			reg = <0x01c00000 0x1000>;
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges;
 -- 
 2.19.1
