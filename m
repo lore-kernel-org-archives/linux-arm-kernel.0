@@ -1,23 +1,24 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Nov 2018 16:06:10 +0100
-Subject: [PATCH v3 2/2] arm64: dts: allwinner: a64: Add device node for
- Mali-400 GPU
-In-Reply-To: <20181114042837.15149-2-jagan@amarulasolutions.com>
-References: <20181114042837.15149-1-jagan@amarulasolutions.com>
- <20181114042837.15149-2-jagan@amarulasolutions.com>
-Message-ID: <20181115150610.5vmfa66u6tx4s3ig@flea>
+Date: Thu, 15 Nov 2018 16:06:58 +0100
+Subject: [PATCH] arm64: dts: allwinner: h6: fix EMAC compatible string
+ sequence
+In-Reply-To: <20181115031551.11756-1-icenowy@aosc.io>
+References: <20181115031551.11756-1-icenowy@aosc.io>
+Message-ID: <20181115150658.ctlapreik2alvmwl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 09:58:37AM +0530, Jagan Teki wrote:
-> Add support for Allwinner A64 has Mali-400MP2.
+On Thu, Nov 15, 2018 at 11:15:51AM +0800, Icenowy Zheng wrote:
+> The SoC-specific compatible should come before the fallback compatible
+> string when multiple compatible strings are present, but the sequence is
+> wrong currently on H6 EMAC node (A64 fallback before H6 compatible).
 > 
-> All interrupt lines are mentioned in the manual so used the same.
+> Fix the sequence.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> Fixes: c8ced5516d23 ("arm64: allwinner: h6: add EMAC device nodes")
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 
-Applied both, thanks
-
+Applied, thanks!
 Maxime
 
 -- 
@@ -30,4 +31,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/2ca9f30b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/aa81c0f8/attachment.sig>
