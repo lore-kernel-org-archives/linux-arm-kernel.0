@@ -1,66 +1,515 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Nov 2018 20:10:31 +0100
-Subject: [PATCH 0/5] media: Allwinner A10 CSI support
-In-Reply-To: <CAGb2v66ygbcomUMkcv8qMCAs_qviFMPzpxj-F4=YBrpuLrdSUw@mail.gmail.com>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <CAGb2v66ygbcomUMkcv8qMCAs_qviFMPzpxj-F4=YBrpuLrdSUw@mail.gmail.com>
-Message-ID: <20181115191031.7jpb2g23fksof625@flea>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 15 Nov 2018 11:35:10 -0800
+Subject: [PATCH] ARM: dts: qcom: Remove Arrow SD600 eval board
+Message-ID: <1542310510-21964-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch removes support for the APQ8064 based Arrow SD600 eval
+board.  This board was never sold publicly and had very limited
+distribution.  As such, we are removing this board and no longer
+going to support it.
 
-On Wed, Nov 14, 2018 at 11:24:48AM +0800, Chen-Yu Tsai wrote:
-> On Tue, Nov 13, 2018 at 4:24 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > Here is a series introducing the support for the A10 (and SoCs of the same
-> > generation) CMOS Sensor Interface (called CSI, not to be confused with
-> > MIPI-CSI, which isn't support by that IP).
-> >
-> > That interface is pretty straightforward, but the driver has a few issues
-> > that I wanted to bring up:
-> >
-> >   * The only board I've been testing this with has an ov5640 sensor
-> >     attached, which doesn't work with the upstream driver. Copying the
-> >     Allwinner init sequence works though, and this is how it has been
-> >     tested. Testing with a second sensor would allow to see if it's an
-> >     issue on the CSI side or the sensor side.
-> >   * When starting a capture, the last buffer to capture will fail due to
-> >     double buffering being used, and we don't have a next buffer for the
-> >     last frame. I'm not sure how to deal with that though. It seems like
-> >     some drivers use a scratch buffer in such a case, some don't care, so
-> >     I'm not sure which solution should be preferred.
-> >   * We don't have support for the ISP at the moment, but this can be added
-> >     eventually.
-> >
-> >   * How to model the CSI module clock isn't really clear to me. It looks
-> >     like it goes through the CSI controller and then is muxed to one of the
-> >     CSI pin so that it can clock the sensor. I'm not quite sure how to
-> >     model it, if it should be a clock, the CSI driver being a clock
-> >     provider, or if the sensor should just use the module clock directly.
-> 
-> Which clock are you talking about? MCLK? This seems to be fed directly from
-> the CCU, as there doesn't seem to be controls for it within the CSI hardware
-> block, and the diagram doesn't list it either. IMO you don't have to model it.
-> The camera sensor device node would just take a reference to it directly.
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
+---
+ arch/arm/boot/dts/Makefile                         |   1 -
+ .../dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi    |  53 ---
+ .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 415 ---------------------
+ 3 files changed, 469 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi
+ delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
 
-Yeah, that what I went for, I guess we agree :)
-
-> You would probably enable the (separate) pinmux setting in the CSI
-> controller node.
-
-I'll change that.
-
-Thanks!
-Maxime
-
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b0e966d..00d6e65 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -783,7 +783,6 @@ dtb-$(CONFIG_ARCH_OXNAS) += \
+ 	ox820-cloudengines-pogoplug-series-3.dtb
+ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8060-dragonboard.dtb \
+-	qcom-apq8064-arrow-sd-600eval.dtb \
+ 	qcom-apq8064-cm-qs600.dtb \
+ 	qcom-apq8064-ifc6410.dtb \
+ 	qcom-apq8064-sony-xperia-yuga.dtb \
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi
+deleted file mode 100644
+index 8df7315..0000000
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi
++++ /dev/null
+@@ -1,53 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-&tlmm_pinmux {
+-	card_detect: card-detect {
+-		mux {
+-			pins = "gpio26";
+-			function = "gpio";
+-			bias-disable;
+-		};
+-	};
+-
+-	pcie_pins: pcie-pinmux {
+-		mux {
+-			pins = "gpio27";
+-			function = "gpio";
+-		};
+-		conf {
+-			pins = "gpio27";
+-			drive-strength = <12>;
+-			bias-disable;
+-		};
+-	};
+-
+-	user_leds: user-leds {
+-		mux {
+-			pins = "gpio3", "gpio7", "gpio10", "gpio11";
+-			function = "gpio";
+-		};
+-
+-		conf {
+-			pins = "gpio3", "gpio7", "gpio10", "gpio11";
+-			function = "gpio";
+-			output-low;
+-		};
+-	};
+-
+-	magneto_pins: magneto-pins {
+-		mux {
+-			pins = "gpio31", "gpio48";
+-			function = "gpio";
+-			bias-disable;
+-		};
+-	};
+-};
+-
+-&pm8921_mpps {
+-	mpp_leds: mpp-leds {
+-		pinconf {
+-			pins = "mpp7", "mpp8";
+-			function = "digital";
+-			output-low;
+-		};
+-	};
+-};
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+deleted file mode 100644
+index 76b56ea..0000000
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
++++ /dev/null
+@@ -1,415 +0,0 @@
+-// SPDX-License-Identifier: GPL-2.0
+-#include "qcom-apq8064-v2.0.dtsi"
+-#include "qcom-apq8064-arrow-sd-600eval-pins.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-#include <dt-bindings/mfd/qcom-rpm.h>
+-
+-/ {
+-	model = "Arrow Electronics, APQ8064 SD_600eval";
+-	compatible = "arrow,sd_600eval", "qcom,apq8064";
+-
+-	aliases {
+-		serial0 = &gsbi7_serial;
+-		serial1 = &gsbi1_serial;
+-		i2c0 = &gsbi2_i2c;
+-		i2c1 = &gsbi3_i2c;
+-		i2c2 = &gsbi4_i2c;
+-		i2c3 = &gsbi7_i2c;
+-		spi0 = &gsbi5_spi;
+-	};
+-
+-	regulators {
+-		compatible = "simple-bus";
+-		vph: regulator-fixed at 1 {
+-			compatible = "regulator-fixed";
+-			regulator-min-microvolt = <4500000>;
+-			regulator-max-microvolt = <4500000>;
+-			regulator-name = "VPH";
+-			regulator-type = "voltage";
+-			regulator-boot-on;
+-		};
+-
+-		/* on board fixed 3.3v supply */
+-		vcc3v3: vcc3v3 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "VCC3V3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-
+-	};
+-
+-	hdmi-out {
+-		compatible = "hdmi-connector";
+-		type = "a";
+-
+-		port {
+-			hdmi_con: endpoint {
+-				remote-endpoint = <&hdmi_out>;
+-			};
+-		};
+-	};
+-
+-	soc {
+-		rpm at 108000 {
+-			regulators {
+-				vdd_s1-supply = <&vph>;
+-				vdd_s2-supply = <&vph>;
+-				vdd_s3-supply = <&vph>;
+-				vdd_s4-supply = <&vph>;
+-				vdd_s5-supply = <&vph>;
+-				vdd_s6-supply = <&vph>;
+-				vdd_s7-supply = <&vph>;
+-				vdd_l1_l2_l12_l18-supply = <&pm8921_s4>;
+-				vdd_l3_l15_l17-supply = <&vph>;
+-				vdd_l4_l14-supply = <&vph>;
+-				vdd_l5_l8_l16-supply = <&vph>;
+-				vdd_l6_l7-supply = <&vph>;
+-				vdd_l9_l11-supply = <&vph>;
+-				vdd_l10_l22-supply = <&vph>;
+-				vdd_l21_l23_l29-supply = <&vph>;
+-				vdd_l24-supply = <&pm8921_s1>;
+-				vdd_l25-supply = <&pm8921_s1>;
+-				vdd_l26-supply = <&pm8921_s7>;
+-				vdd_l27-supply = <&pm8921_s7>;
+-				vdd_l28-supply = <&pm8921_s7>;
+-				vin_lvs1_3_6-supply = <&pm8921_s4>;
+-				vin_lvs2-supply = <&pm8921_s1>;
+-				vin_lvs4_5_7-supply = <&pm8921_s4>;
+-
+-				s1 {
+-					regulator-always-on;
+-					regulator-min-microvolt = <1225000>;
+-					regulator-max-microvolt = <1225000>;
+-					qcom,switch-mode-frequency = <3200000>;
+-					bias-pull-down;
+-				};
+-
+-				s2 {
+-					regulator-min-microvolt = <1300000>;
+-					regulator-max-microvolt = <1300000>;
+-					qcom,switch-mode-frequency = <1600000>;
+-					bias-pull-down;
+-					regulator-always-on;
+-				};
+-
+-				s3 {
+-					regulator-min-microvolt = <1000000>;
+-					regulator-max-microvolt = <1400000>;
+-					qcom,switch-mode-frequency = <4800000>;
+-				};
+-
+-				s4 {
+-					regulator-min-microvolt	= <1800000>;
+-					regulator-max-microvolt	= <1800000>;
+-					qcom,switch-mode-frequency = <1600000>;
+-					qcom,force-mode = <QCOM_RPM_FORCE_MODE_AUTO>;
+-					bias-pull-down;
+-					regulator-always-on;
+-				};
+-
+-				s7 {
+-					regulator-min-microvolt = <1300000>;
+-					regulator-max-microvolt = <1300000>;
+-					qcom,switch-mode-frequency = <3200000>;
+-				 };
+-
+-				l3 {
+-					regulator-min-microvolt = <3050000>;
+-					regulator-max-microvolt = <3300000>;
+-					bias-pull-down;
+-				};
+-
+-				l4 {
+-					regulator-min-microvolt = <1000000>;
+-					regulator-max-microvolt = <1800000>;
+-					bias-pull-down;
+-				};
+-
+-				l5 {
+-					regulator-min-microvolt = <2750000>;
+-					regulator-max-microvolt = <3000000>;
+-					bias-pull-down;
+-					regulator-boot-on;
+-					regulator-always-on;
+-				};
+-
+-				l6 {
+-					regulator-min-microvolt = <2950000>;
+-					regulator-max-microvolt = <2950000>;
+-					bias-pull-down;
+-				};
+-
+-				/**
+-				 * 1.8v required on LS expansion
+-				 * for mezzanine boards
+-				 */
+-				l15 {
+-					regulator-min-microvolt = <1800000>;
+-					regulator-max-microvolt = <1800000>;
+-					regulator-always-on;
+-				};
+-
+-				l23 {
+-					regulator-min-microvolt = <1700000>;
+-					regulator-max-microvolt = <1900000>;
+-					bias-pull-down;
+-				};
+-
+-				lvs6 {
+-					bias-pull-down;
+-				};
+-
+-				lvs7 {
+-					bias-pull-down;
+-				};
+-			};
+-		};
+-
+-		gsbi at 12440000 {
+-			status = "okay";
+-			qcom,mode = <GSBI_PROT_UART_W_FC>;
+-			serial at 12450000 {
+-				label = "LS-UART1";
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&gsbi1_uart_4pins>;
+-			};
+-		};
+-
+-		gsbi at 12480000 {
+-			status = "okay";
+-			qcom,mode = <GSBI_PROT_I2C>;
+-			i2c at 124a0000 {
+-				/* On Low speed expansion and Sensors */
+-				label = "LS-I2C0";
+-				status = "okay";
+-				lis3mdl_mag at 1e {
+-					compatible = "st,lis3mdl-magn";
+-					reg = <0x1e>;
+-					vdd-supply = <&vcc3v3>;
+-					vddio-supply = <&pm8921_s4>;
+-					pinctrl-names = "default";
+-					pinctrl-0 = <&magneto_pins>;
+-					interrupt-parent = <&tlmm_pinmux>;
+-
+-					st,drdy-int-pin = <2>;
+-					interrupts = <48 IRQ_TYPE_EDGE_RISING>, /* DRDY line */
+-						     <31 IRQ_TYPE_EDGE_RISING>; /* INT */
+-				};
+-			};
+-		};
+-
+-		gsbi at 16200000 {
+-			status = "okay";
+-			qcom,mode = <GSBI_PROT_I2C>;
+-			i2c at 16280000 {
+-			/* On Low speed expansion */
+-				status = "okay";
+-				label = "LS-I2C1";
+-				clock-frequency = <200000>;
+-				eeprom at 52 {
+-					compatible = "atmel,24c128";
+-					reg = <0x52>;
+-					pagesize = <64>;
+-				};
+-			};
+-		};
+-
+-		gsbi at 16300000 {
+-			status = "okay";
+-			qcom,mode = <GSBI_PROT_I2C>;
+-			i2c at 16380000 {
+-				/* On High speed expansion */
+-				label = "HS-CAM-I2C3";
+-				status = "okay";
+-			};
+-		};
+-
+-		gsbi at 1a200000 {
+-			status = "okay";
+-			spi at 1a280000 {
+-				/* On Low speed expansion */
+-				label = "LS-SPI0";
+-				status = "okay";
+-			};
+-		};
+-
+-		/* DEBUG UART  */
+-		gsbi at 16600000 {
+-			status = "okay";
+-			qcom,mode = <GSBI_PROT_I2C_UART>;
+-			serial at 16640000 {
+-				label = "LS-UART0";
+-				status = "okay";
+-				pinctrl-names = "default";
+-				pinctrl-0 = <&gsbi7_uart_2pins>;
+-			};
+-
+-			i2c at 16680000 {
+-				/* On High speed expansion */
+-				status = "okay";
+-				label = "HS-CAM-I2C2";
+-			};
+-		};
+-
+-		leds {
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&user_leds>, <&mpp_leds>;
+-
+-			compatible = "gpio-leds";
+-
+-			user-led0 {
+-				label = "user0-led";
+-				gpios = <&tlmm_pinmux 3 GPIO_ACTIVE_HIGH>;
+-				linux,default-trigger = "heartbeat";
+-				default-state = "off";
+-			};
+-
+-			user-led1 {
+-				label = "user1-led";
+-				gpios = <&tlmm_pinmux 7 GPIO_ACTIVE_HIGH>;
+-				linux,default-trigger = "mmc0";
+-				default-state = "off";
+-			};
+-
+-			user-led2 {
+-				label = "user2-led";
+-				gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
+-				linux,default-trigger = "mmc1";
+-				default-state = "off";
+-			};
+-
+-			user-led3 {
+-				label = "user3-led";
+-				gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
+-				linux,default-trigger = "none";
+-				default-state = "off";
+-			};
+-
+-			wifi-led {
+-				label = "WiFi-led";
+-				gpios = <&pm8921_mpps 7 GPIO_ACTIVE_HIGH>;
+-				default-state = "off";
+-			};
+-
+-			bt-led {
+-				label = "BT-led";
+-				gpios = <&pm8921_mpps 8 GPIO_ACTIVE_HIGH>;
+-				default-state = "off";
+-			};
+-		};
+-
+-		pci at 1b500000 {
+-			status = "okay";
+-			vdda-supply = <&pm8921_s3>;
+-			vdda_phy-supply = <&pm8921_lvs6>;
+-			vdda_refclk-supply = <&vcc3v3>;
+-			pinctrl-0 = <&pcie_pins>;
+-			pinctrl-names = "default";
+-			perst-gpio = <&tlmm_pinmux 27 GPIO_ACTIVE_LOW>;
+-		};
+-
+-		phy at 1b400000 {
+-			status = "okay";
+-		};
+-
+-		sata at 29000000 {
+-			status	= "okay";
+-			target-supply	= <&pm8921_lvs7>;
+-		};
+-
+-		/* OTG */
+-		usb at 12500000 {
+-			status = "okay";
+-			dr_mode = "peripheral";
+-			ulpi {
+-				phy {
+-					v3p3-supply = <&pm8921_l3>;
+-					v1p8-supply = <&pm8921_l4>;
+-				};
+-			};
+-		};
+-
+-		usb at 12520000 {
+-			status = "okay";
+-			dr_mode = "otg";
+-			ulpi {
+-				phy {
+-					v3p3-supply = <&pm8921_l3>;
+-					v1p8-supply = <&pm8921_l23>;
+-				};
+-			};
+-		};
+-
+-		usb at 12530000 {
+-			status = "okay";
+-			dr_mode = "otg";
+-			ulpi {
+-				phy {
+-					v3p3-supply = <&pm8921_l3>;
+-					v1p8-supply = <&pm8921_l23>;
+-				};
+-			};
+-		};
+-
+-		amba {
+-			/* eMMC */
+-			sdcc at 12400000 {
+-				status = "okay";
+-				vmmc-supply = <&pm8921_l5>;
+-				vqmmc-supply = <&pm8921_s4>;
+-			};
+-
+-			/* External micro SD card */
+-			sdcc at 12180000 {
+-				status = "okay";
+-				vmmc-supply = <&pm8921_l6>;
+-				pinctrl-names	= "default";
+-				pinctrl-0	= <&card_detect>;
+-				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_HIGH>;
+-			};
+-		};
+-
+-		riva-pil at 3204000 {
+-			status = "okay";
+-
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&riva_wlan_pin_a>, <&riva_bt_pin_a>, <&riva_fm_pin_a>;
+-		};
+-
+-		hdmi-tx at 4a00000 {
+-			status = "okay";
+-			core-vdda-supply = <&pm8921_hdmi_switch>;
+-			hdmi-mux-supply = <&vcc3v3>;
+-
+-			hpd-gpio = <&tlmm_pinmux 72 GPIO_ACTIVE_HIGH>;
+-
+-			ports {
+-				port at 1 {
+-					endpoint {
+-						remote-endpoint = <&hdmi_con>;
+-					};
+-				};
+-			};
+-		};
+-
+-		hdmi-phy at 4a00400 {
+-			status = "okay";
+-			core-vdda-supply = <&pm8921_hdmi_switch>;
+-		};
+-
+-		mdp at 5100000 {
+-			status = "okay";
+-
+-			ports {
+-				port at 3 {
+-					endpoint {
+-						remote-endpoint = <&hdmi_in>;
+-					};
+-				};
+-			};
+-		};
+-	};
+-};
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/e842349d/attachment.sig>
+2.7.4
