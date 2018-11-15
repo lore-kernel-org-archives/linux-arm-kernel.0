@@ -1,193 +1,56 @@
 From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:23 +0100
-Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with "drm_dev_put"
+Date: Thu, 15 Nov 2018 23:16:24 +0100
+Subject: [PATCH 4/9] drm: remove deprecated "drm_dev_unref" function
 In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
 References: <20181115221634.22715-1-greenfoo@gluegarage.com>
-Message-ID: <20181115221634.22715-4-greenfoo@gluegarage.com>
+Message-ID: <20181115221634.22715-5-greenfoo@gluegarage.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch unifies the naming of DRM functions for reference counting as
-requested on Documentation/gpu/todo.rst
+There are no more places where this (deprecated) function is being used
+from, thus it can now be removed.
 
 Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
 ---
- drivers/gpu/drm/arc/arcpgu_drv.c             | 4 ++--
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
- drivers/gpu/drm/etnaviv/etnaviv_drv.c        | 4 ++--
- drivers/gpu/drm/mxsfb/mxsfb_drv.c            | 4 ++--
- drivers/gpu/drm/rcar-du/rcar_du_drv.c        | 2 +-
- drivers/gpu/drm/shmobile/shmob_drm_drv.c     | 4 ++--
- drivers/gpu/drm/tve200/tve200_drv.c          | 4 ++--
- drivers/gpu/drm/zte/zx_drm_drv.c             | 4 ++--
- 8 files changed, 15 insertions(+), 15 deletions(-)
+ drivers/gpu/drm/drm_drv.c | 13 -------------
+ include/drm/drm_drv.h     |  1 -
+ 2 files changed, 14 deletions(-)
 
-diff --git a/drivers/gpu/drm/arc/arcpgu_drv.c b/drivers/gpu/drm/arc/arcpgu_drv.c
-index f067de4e1e82..dcb06d4e9135 100644
---- a/drivers/gpu/drm/arc/arcpgu_drv.c
-+++ b/drivers/gpu/drm/arc/arcpgu_drv.c
-@@ -216,7 +216,7 @@ static int arcpgu_probe(struct platform_device *pdev)
- 	arcpgu_unload(drm);
- 
- err_unref:
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 
- 	return ret;
+diff --git a/drivers/gpu/drm/drm_drv.c b/drivers/gpu/drm/drm_drv.c
+index 36e8e9cbec52..22c8f8252207 100644
+--- a/drivers/gpu/drm/drm_drv.c
++++ b/drivers/gpu/drm/drm_drv.c
+@@ -706,19 +706,6 @@ void drm_dev_put(struct drm_device *dev)
  }
-@@ -227,7 +227,7 @@ static int arcpgu_remove(struct platform_device *pdev)
+ EXPORT_SYMBOL(drm_dev_put);
  
- 	drm_dev_unregister(drm);
- 	arcpgu_unload(drm);
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
+-/**
+- * drm_dev_unref - Drop reference of a DRM device
+- * @dev: device to drop reference of or NULL
+- *
+- * This is a compatibility alias for drm_dev_put() and should not be used by new
+- * code.
+- */
+-void drm_dev_unref(struct drm_device *dev)
+-{
+-	drm_dev_put(dev);
+-}
+-EXPORT_SYMBOL(drm_dev_unref);
+-
+ static int create_compat_control_link(struct drm_device *dev)
+ {
+ 	struct drm_minor *minor;
+diff --git a/include/drm/drm_drv.h b/include/drm/drm_drv.h
+index 3199ef70c007..abac47c10f1d 100644
+--- a/include/drm/drm_drv.h
++++ b/include/drm/drm_drv.h
+@@ -621,7 +621,6 @@ void drm_dev_unregister(struct drm_device *dev);
  
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-index 843cac222e60..f8da51a63e2f 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-@@ -775,7 +775,7 @@ static int atmel_hlcdc_dc_drm_probe(struct platform_device *pdev)
- 	atmel_hlcdc_dc_unload(ddev);
- 
- err_unref:
--	drm_dev_unref(ddev);
-+	drm_dev_put(ddev);
- 
- 	return ret;
- }
-@@ -786,7 +786,7 @@ static int atmel_hlcdc_dc_drm_remove(struct platform_device *pdev)
- 
- 	drm_dev_unregister(ddev);
- 	atmel_hlcdc_dc_unload(ddev);
--	drm_dev_unref(ddev);
-+	drm_dev_put(ddev);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-index 83c1f46670bf..52802e6049e0 100644
---- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-+++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-@@ -550,7 +550,7 @@ static int etnaviv_bind(struct device *dev)
- out_bind:
- 	kfree(priv);
- out_unref:
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 
- 	return ret;
- }
-@@ -567,7 +567,7 @@ static void etnaviv_unbind(struct device *dev)
- 	drm->dev_private = NULL;
- 	kfree(priv);
- 
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- }
- 
- static const struct component_master_ops etnaviv_master_ops = {
-diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-index 2393e6d16ffd..88ba003979e6 100644
---- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-+++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-@@ -417,7 +417,7 @@ static int mxsfb_probe(struct platform_device *pdev)
- err_unload:
- 	mxsfb_unload(drm);
- err_free:
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 
- 	return ret;
- }
-@@ -428,7 +428,7 @@ static int mxsfb_remove(struct platform_device *pdev)
- 
- 	drm_dev_unregister(drm);
- 	mxsfb_unload(drm);
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-index 084f58df4a8c..c7fe2433ab9e 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-@@ -454,7 +454,7 @@ static int rcar_du_remove(struct platform_device *pdev)
- 	drm_kms_helper_poll_fini(ddev);
- 	drm_mode_config_cleanup(ddev);
- 
--	drm_dev_unref(ddev);
-+	drm_dev_put(ddev);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/shmobile/shmob_drm_drv.c b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-index 6ececad6f845..8554102a6ead 100644
---- a/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-+++ b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-@@ -194,7 +194,7 @@ static int shmob_drm_remove(struct platform_device *pdev)
- 	drm_kms_helper_poll_fini(ddev);
- 	drm_mode_config_cleanup(ddev);
- 	drm_irq_uninstall(ddev);
--	drm_dev_unref(ddev);
-+	drm_dev_put(ddev);
- 
- 	return 0;
- }
-@@ -290,7 +290,7 @@ static int shmob_drm_probe(struct platform_device *pdev)
- 	drm_kms_helper_poll_fini(ddev);
- 	drm_mode_config_cleanup(ddev);
- err_free_drm_dev:
--	drm_dev_unref(ddev);
-+	drm_dev_put(ddev);
- 
- 	return ret;
- }
-diff --git a/drivers/gpu/drm/tve200/tve200_drv.c b/drivers/gpu/drm/tve200/tve200_drv.c
-index 72efcecb44f7..28e2d03c0ccf 100644
---- a/drivers/gpu/drm/tve200/tve200_drv.c
-+++ b/drivers/gpu/drm/tve200/tve200_drv.c
-@@ -249,7 +249,7 @@ static int tve200_probe(struct platform_device *pdev)
- clk_disable:
- 	clk_disable_unprepare(priv->pclk);
- dev_unref:
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 	return ret;
- }
- 
-@@ -263,7 +263,7 @@ static int tve200_remove(struct platform_device *pdev)
- 		drm_panel_bridge_remove(priv->bridge);
- 	drm_mode_config_cleanup(drm);
- 	clk_disable_unprepare(priv->pclk);
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/drm/zte/zx_drm_drv.c b/drivers/gpu/drm/zte/zx_drm_drv.c
-index 11ef17c2d1c1..5b6f1eda52e0 100644
---- a/drivers/gpu/drm/zte/zx_drm_drv.c
-+++ b/drivers/gpu/drm/zte/zx_drm_drv.c
-@@ -114,7 +114,7 @@ static int zx_drm_bind(struct device *dev)
- 	component_unbind_all(dev, drm);
- out_unregister:
- 	dev_set_drvdata(dev, NULL);
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- 	return ret;
- }
- 
-@@ -127,7 +127,7 @@ static void zx_drm_unbind(struct device *dev)
- 	drm_mode_config_cleanup(drm);
- 	component_unbind_all(dev, drm);
- 	dev_set_drvdata(dev, NULL);
--	drm_dev_unref(drm);
-+	drm_dev_put(drm);
- }
- 
- static const struct component_master_ops zx_drm_master_ops = {
+ void drm_dev_get(struct drm_device *dev);
+ void drm_dev_put(struct drm_device *dev);
+-void drm_dev_unref(struct drm_device *dev);
+ void drm_put_dev(struct drm_device *dev);
+ bool drm_dev_enter(struct drm_device *dev, int *idx);
+ void drm_dev_exit(int idx);
 -- 
 2.19.1
