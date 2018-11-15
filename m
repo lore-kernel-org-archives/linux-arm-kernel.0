@@ -1,41 +1,57 @@
-From: rodrigo@tjader.xyz (=?UTF-8?Q?Rodrigo_Exterck=C3=B6tter_Tj=C3=A4der?=)
-Date: Thu, 15 Nov 2018 12:46:06 -0200
-Subject: [PATCH 1/2] arm64: dts: allwinner: Olimex A64-OLinuXino: enable
- eMMC.
-In-Reply-To: <20181005154844.234g5k3fw5txqxsl@flea>
-References: <20180921142811.h5jraemk565alh3i@flea>
- <CAG7TQgE_KU_cK_4E+NG8Qcw-QB2=C6YoqBYR2svmWxywFyySCw@mail.gmail.com>
- <20180925090139.qbu6tqav5oth7zkw@flea>
- <CAG7TQgFTsR4pf4jAcWMFoOmiP7AXYqjts60RP2kuJGU44AcQJQ@mail.gmail.com>
- <20180927081711.llmwnvpu73loe5iv@flea>
- <CAG7TQgGMkvBnNE_WEth8gscKxN3qN8a44mNMWz3QP-2+JKfOzg@mail.gmail.com>
- <20180929154754.abz3byvrufvnf4dq@flea>
- <CAG7TQgGS7DkLpNVYqfCD-9vMZkeY6r+L-5oXKWef3x-OVbqjtw@mail.gmail.com>
- <20181002131312.soqwybsohdifvso3@flea>
- <CAG7TQgHWCJTaM+pFYFq0_8nWg7sA+d0huqu96sjhqZfeHwqbGQ@mail.gmail.com>
- <20181005154844.234g5k3fw5txqxsl@flea>
-Message-ID: <CAG7TQgGO-CjPE6SAUa53GYhMr5-yVe0YaAL3UV15E+f9kKZVwA@mail.gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 15 Nov 2018 15:47:10 +0100
+Subject: [PATCH] arm64: defconfig: Enable CONFIG_PHY_RCAR_GEN3_PCIE
+In-Reply-To: <20181115143347.f4wtdipdhhyooatu@verge.net.au>
+References: <20181113152201.24476-1-geert+renesas@glider.be>
+ <cb6b55cc-c91b-b3e2-bc04-d7dfb80cfa98@gmail.com>
+ <20181115143347.f4wtdipdhhyooatu@verge.net.au>
+Message-ID: <9f303eb5-31a1-a3dc-66e9-645b46c5983c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 5, 2018 at 12:48 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > What about the idea of keeping the current dt for the most featureful
-> > variant and creating new dts for the other two?
-> >
-> > That would make it so that no one's device stops working and would
-> > have mailine support for all three devices.
->
-> IIRC that has been the first introduced version, so that would make
-> sense. Chen-Yu, any opinion?
->
-> > Also, the current device tree doesn't represent any existing device:
-> > it has wifi on but no emmc. That variation does not exist.
->
-> Most of our device tree are far from complete, so you shouldn't treat
-> them as such.
+On 11/15/2018 03:33 PM, Simon Horman wrote:
+> On Wed, Nov 14, 2018 at 04:32:05PM +0100, Marek Vasut wrote:
+>> On 11/13/2018 04:22 PM, Geert Uytterhoeven wrote:
+>>> Enable R-Car Gen3 PCIe PHY support, which is needed for PCIe to function
+>>> on the Renesas Condor board.
+>>>
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> This helps
+>>
+>> Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+> 
+> Thanks, would it be better to use enable this driver as a module rather
+> than a built-in?
 
-So, any agreement on what is to be done about the devices tree for the
-A64-OLinuXino devices?
+I think not, since the pcie-rcar cannot be compiled in as module, so the
+associated phy driver shouldn't be compiled in as module either.
 
-In my opinion the best path would be keeping the current dt for the
-most featureful variant and creating new dts for the other two.
+>>> ---
+>>>  arch/arm64/configs/defconfig | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>>
+>>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+>>> index 9d0b42d96f03156e..77f98a7e860b8850 100644
+>>> --- a/arch/arm64/configs/defconfig
+>>> +++ b/arch/arm64/configs/defconfig
+>>> @@ -657,6 +657,7 @@ CONFIG_PHY_HISI_INNO_USB2=y
+>>>  CONFIG_PHY_MVEBU_CP110_COMPHY=y
+>>>  CONFIG_PHY_QCOM_QMP=m
+>>>  CONFIG_PHY_QCOM_USB_HS=y
+>>> +CONFIG_PHY_RCAR_GEN3_PCIE=y
+>>>  CONFIG_PHY_RCAR_GEN3_USB2=y
+>>>  CONFIG_PHY_RCAR_GEN3_USB3=m
+>>>  CONFIG_PHY_ROCKCHIP_EMMC=y
+>>>
+>>
+>>
+>> -- 
+>> Best regards,
+>> Marek Vasut
+>>
+
+
+-- 
+Best regards,
+Marek Vasut
