@@ -1,55 +1,33 @@
-From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:27 +0100
-Subject: [PATCH 7/9] drm: remove deprecated "drm_framebuffer_[un]reference"
- functions
-In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
-Message-ID: <20181115221634.22715-8-greenfoo@gluegarage.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 15 Nov 2018 23:29:38 +0100
+Subject: [PATCH 1/3] dt-bindings: bcm: Add Raspberry Pi 3 A+
+In-Reply-To: <1542320980-2842-1-git-send-email-stefan.wahren@i2se.com>
+References: <1542320980-2842-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1542320980-2842-2-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no more places where this (deprecated) function is being used
-from, thus it can now be removed.
+This adds the root properties for the Raspberry Pi 3 A+ .
 
-Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- include/drm/drm_framebuffer.h | 24 ------------------------
- 1 file changed, 24 deletions(-)
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/include/drm/drm_framebuffer.h b/include/drm/drm_framebuffer.h
-index c50502c656e5..c94acedfb08e 100644
---- a/include/drm/drm_framebuffer.h
-+++ b/include/drm/drm_framebuffer.h
-@@ -240,30 +240,6 @@ static inline void drm_framebuffer_put(struct drm_framebuffer *fb)
- 	drm_mode_object_put(&fb->base);
- }
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 0dcc3ea..245328f 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -30,6 +30,10 @@ Raspberry Pi 2 Model B
+ Required root node properties:
+ compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
  
--/**
-- * drm_framebuffer_reference - acquire a framebuffer reference
-- * @fb: DRM framebuffer
-- *
-- * This is a compatibility alias for drm_framebuffer_get() and should not be
-- * used by new code.
-- */
--static inline void drm_framebuffer_reference(struct drm_framebuffer *fb)
--{
--	drm_framebuffer_get(fb);
--}
--
--/**
-- * drm_framebuffer_unreference - release a framebuffer reference
-- * @fb: DRM framebuffer
-- *
-- * This is a compatibility alias for drm_framebuffer_put() and should not be
-- * used by new code.
-- */
--static inline void drm_framebuffer_unreference(struct drm_framebuffer *fb)
--{
--	drm_framebuffer_put(fb);
--}
--
- /**
-  * drm_framebuffer_read_refcount - read the framebuffer reference count.
-  * @fb: framebuffer
++Raspberry Pi 3 Model A+
++Required root node properties:
++compatible = "raspberrypi,3-model-a-plus", "brcm,bcm2837";
++
+ Raspberry Pi 3 Model B
+ Required root node properties:
+ compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
 -- 
-2.19.1
+2.7.4
