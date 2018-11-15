@@ -1,33 +1,52 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Nov 2018 22:41:57 +0000
-Subject: [PATCH 0/6] arm64: ftrace fixes/cleanup
-Message-ID: <20181115224203.24847-1-mark.rutland@arm.com>
+Date: Thu, 15 Nov 2018 22:42:01 +0000
+Subject: [PATCH 4/6] arm64: ftrace: don't adjust the LR value
+In-Reply-To: <20181115224203.24847-1-mark.rutland@arm.com>
+References: <20181115224203.24847-1-mark.rutland@arm.com>
+Message-ID: <20181115224203.24847-5-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The core ftrace code requires that when it is handed the PC of an
+instrumented function, this PC is the address of the instrumented
+instruction. This is necessary so that the core ftrace code can identify
+the specific instrumentation site. Since the instrumented function will
+be a BL, the address of the instrumented function is LR - 4 at entry to
+the ftrace code.
 
-These patches clean up some issues I spotted while looking at Torsten's
-FTRACE_WITH_REGS patches. I've pushed these to my arm64/ftrace-cleanup [1]
-branch, based on my export cleanup patches.
+This fixup is applied in the mcount_get_pc and mcount_get_pc0 helpers,
+which acquire the PC of the instrumented function.
 
-Mark.
+The mcount_get_lr helper is used to acquire the LR of the instrumented
+function, whose value does not require this adjustment, and cannot be
+adjusted to anything meaningful. No adjustment of this value is made on
+other architectures, including arm. However, arm64 adjusts this value by
+4.
 
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/ftrace-cleanup
+This patch brings arm64 in line with other architectures and removes the
+adjustment of the LR value.
 
-Mark Rutland (6):
-  linkage: add generic GLOBAL() macro
-  arm64: ftrace: use GLOBAL()
-  arm64: ftrace: enable graph FP test
-  arm64: ftrace: don't adjust the LR value
-  arm64: ftrace: remove return_regs macros
-  arm64: ftrace: always pass instrumented pc in x0
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Torsten Duwe <duwe@suse.de>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/entry-ftrace.S | 1 -
+ 1 file changed, 1 deletion(-)
 
- arch/arm64/include/asm/ftrace.h  |  1 +
- arch/arm64/kernel/entry-ftrace.S | 51 +++++++++++++++++-----------------------
- arch/arm64/kernel/ftrace.c       |  2 +-
- include/linux/linkage.h          |  6 +++++
- 4 files changed, 29 insertions(+), 31 deletions(-)
-
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index 7d74b2af6d3b..a74d2ff49192 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -81,7 +81,6 @@
+ 	.macro mcount_get_lr reg
+ 	ldr	\reg, [x29]
+ 	ldr	\reg, [\reg, #8]
+-	mcount_adjust_addr	\reg, \reg
+ 	.endm
+ 
+ 	.macro mcount_get_lr_addr reg
 -- 
 2.11.0
