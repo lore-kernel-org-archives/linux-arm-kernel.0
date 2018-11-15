@@ -1,72 +1,46 @@
-From: pintu.ping@gmail.com (Pintu Agarwal)
-Date: Thu, 15 Nov 2018 18:52:39 +0530
-Subject: [ARM64] Printing IRQ stack usage information
-Message-ID: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2018 14:32:02 +0100
+Subject: [PATCH 1/2] clocksource: Demote dbx500 PRCMU clocksource
+Message-ID: <20181115133203.28567-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Demote the DBx500 PRCMU clocksource to quality 100 and
+mark it as NONSTOP so it will still be used for
+timekeeping across suspend/resume.
 
-I have a requirement in printing irq stack usage information for each cpu.
-I am using the following:
-Linux Kernel: 4.9.x
-Board: hikey620 (arm64, armv8 with 8 cores)
-Platform: Ubuntu 14 debian
+The Nomadik MTU timer which has higher precision will
+be used when the system is up and running, thanks to
+the recent changes properly utilizing the suspend
+clocksources.
 
-As a vague idea, I tried to implement like this:
--------------------------------------------------------------
-static int dump_irq_stack_info(void)
-{
-        int cpu, actual;
-        unsigned long irq_stack_ptr;
-        //unsigned long sp, sp1;
-        unsigned long stack_start;
-        unsigned long used;
+This was discussed back in 2011 when the driver was
+written, but the infrastructure was not available
+upstream to use this timer properly. Now the
+infrastructure is there, so let's finalize the work.
 
-        actual = IRQ_STACK_SIZE;
-        used = 0;
-        pr_info("CPU UNUSED-STACK ACTUAL-STACK\n");
-        //seq_printf(m, "CPU UNUSED-STACK ACTUAL-STACK\n");
-        for_each_present_cpu(cpu) {
-                irq_stack_ptr = IRQ_STACK_PTR(cpu);
-                //sp1 = current_stack_pointer;
-                //sp = IRQ_STACK_TO_TASK_STACK(irq_stack_ptr);
-                stack_start = (unsigned long)per_cpu(irq_stack, cpu);
-                used = irq_stack_ptr - stack_start;
-                pr_info("%2d %10lu %10d\n", cpu, used, actual);
-                //seq_printf(m, "%2d %10lu %10d\n", cpu, used, actual);
-        }
+Cc: Baolin Wang <baolin.wang@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-        return 0;
-}
--------------------------------------------------------------
-Currently, when I tested this (as a proc interface), I got the below output:
-CPU    UNUSED-STACK    ACTUAL-STACK
- 0         16368                     16384
- 1         16368                     16384
- 2         16368                     16384
- 3         16368                     16384
- 4         16368                     16384
- 5         16368                     16384
- 6         16368                     16384
- 7         16368                     16384
--------------------------------------------------------------
-
-But, I have some doubts:
-1) I am not sure if my implementation is in right direction, or the
-logic is totally wrong.
-2) Is there better way to perform the similar objective?
-3) How should I test it to get the different usage values for unused stack ?
-    Can I get these values by implementing a sample interrupt handler,
-and printing information from there?
-
-If this works, then I want to use it as part of dump_backtrace() function.
-
-If anybody have done a similar thing in past, or have some ideas to
-share, please help me.
-
-Note: This is required only for our internal debugging purpose.
-
-
-Regards,
-Pintu
+diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+index c1b96dc5f444..4054539fe066 100644
+--- a/drivers/clocksource/clksrc-dbx500-prcmu.c
++++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+@@ -46,10 +46,10 @@ static u64 notrace clksrc_dbx500_prcmu_read(struct clocksource *cs)
+ 
+ static struct clocksource clocksource_dbx500_prcmu = {
+ 	.name		= "dbx500-prcmu-timer",
+-	.rating		= 300,
++	.rating		= 100,
+ 	.read		= clksrc_dbx500_prcmu_read,
+ 	.mask		= CLOCKSOURCE_MASK(32),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
+ };
+ 
+ #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+-- 
+2.17.2
