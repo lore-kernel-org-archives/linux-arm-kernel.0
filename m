@@ -1,87 +1,74 @@
-From: rdunlap@infradead.org (Randy Dunlap)
-Date: Thu, 15 Nov 2018 10:13:36 -0800
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
-Message-ID: <9655a12e-bd3d-aca2-6155-38924028eb5d@infradead.org>
+From: jhugo@codeaurora.org (Jeffrey Hugo)
+Date: Thu, 15 Nov 2018 11:31:33 -0700
+Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
+In-Reply-To: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
+References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
+Message-ID: <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/18 7:45 AM, Souptick Joarder wrote:
-> Previouly drivers have their own way of mapping range of
-> kernel pages/memory into user vma and this was done by
-> invoking vm_insert_page() within a loop.
+On 11/8/2018 6:50 PM, Atish Patra wrote:
+> The cpu-map DT entry in ARM64 can describe the CPU topology in
+> much better way compared to other existing approaches. RISC-V can
+> easily adopt this binding to represent it's own CPU topology.
+> Thus, both cpu-map DT binding and topology parsing code can be
+> moved to a common location so that RISC-V or any other
+> architecture can leverage that.
 > 
-> As this pattern is common across different drivers, it can
-> be generalized by creating a new function and use it across
-> the drivers.
+> The relevant discussion regarding unifying cpu topology can be
+> found in [1].
 > 
-> vm_insert_range is the new API which will be used to map a
-> range of kernel memory/pages to user vma.
+> arch_topology seems to be a perfect place to move the common
+> code. I have not introduced any functional changes in the moved
+> to code. The only downside in this approach is that the capacity
+> code will be executed for RISC-V as well. But, it will exit
+> immediately after not able to find the appropriate DT node. If
+> the overhead is considered too much, we can always compile out
+> capacity related functions under a different config for the
+> architectures that do not support them.
 > 
-> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> Reviewed-by: Matthew Wilcox <willy@infradead.org>
-> ---
->  include/linux/mm_types.h |  3 +++
->  mm/memory.c              | 28 ++++++++++++++++++++++++++++
->  mm/nommu.c               |  7 +++++++
->  3 files changed, 38 insertions(+)
+> The patches have been tested for RISC-V and compile tested for
+> ARM64.
+> 
+> The socket changes[2] can be merged on top of this series or vice
+> versa.
+> 
+> [1] https://lkml.org/lkml/2018/11/6/19
+> [2] https://lkml.org/lkml/2018/11/7/918
+> 
+> Atish Patra (3):
+>    dt-binding: cpu-topology: Move cpu-map to a common binding.
+>    cpu-topology: Move cpu topology code to common code.
+>    RISC-V: Parse cpu topology during boot.
+> 
+>   Documentation/devicetree/bindings/arm/topology.txt | 475 -------------------
+>   .../devicetree/bindings/cpu/cpu-topology.txt       | 526 +++++++++++++++++++++
+>   arch/arm64/include/asm/topology.h                  |  23 +-
+>   arch/arm64/kernel/topology.c                       | 305 +-----------
+>   arch/riscv/Kconfig                                 |   1 +
+>   arch/riscv/kernel/smpboot.c                        |   6 +-
+>   drivers/base/arch_topology.c                       | 303 ++++++++++++
+>   include/linux/arch_topology.h                      |  23 +
+>   include/linux/topology.h                           |   1 +
+>   9 files changed, 864 insertions(+), 799 deletions(-)
+>   delete mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+>   create mode 100644 Documentation/devicetree/bindings/cpu/cpu-topology.txt
+> 
 
-Hi,
+I was interested in testing these on QDF2400, an ARM64 platform, since 
+this series touches core ARM64 code and I'd hate to see a regression. 
+However, I can't figure out what baseline to use to apply these. 
+Different patches cause different conflicts of a variety of baselines I 
+attempted.
 
-What is the opposite of vm_insert_range() or even of vm_insert_page()?
-or is there no need for that?
+What are these intended to apply to?
 
+Also, you might want to run them through checkpatch next time.  There 
+are several whitespace errors.
 
-> diff --git a/mm/memory.c b/mm/memory.c
-> index 15c417e..da904ed 100644
-> --- a/mm/memory.c
-> +++ b/mm/memory.c
-> @@ -1478,6 +1478,34 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
->  }
->  
->  /**
-> + * vm_insert_range - insert range of kernel pages into user vma
-> + * @vma: user vma to map to
-> + * @addr: target user address of this page
-> + * @pages: pointer to array of source kernel pages
-> + * @page_count: no. of pages need to insert into user vma
-
-s/no./number/
-
-> + *
-> + * This allows drivers to insert range of kernel pages they've allocated
-> + * into a user vma. This is a generic function which drivers can use
-> + * rather than using their own way of mapping range of kernel pages into
-> + * user vma.
-> + */
-> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> +			struct page **pages, unsigned long page_count)
-> +{
-> +	unsigned long uaddr = addr;
-> +	int ret = 0, i;
-> +
-> +	for (i = 0; i < page_count; i++) {
-> +		ret = vm_insert_page(vma, uaddr, pages[i]);
-> +		if (ret < 0)
-> +			return ret;
-
-For a non-trivial value of page_count:
-Is it a problem if vm_insert_page() succeeds for several pages
-and then fails?
-
-> +		uaddr += PAGE_SIZE;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
-> +/**
->   * vm_insert_page - insert single page into user vma
->   * @vma: user vma to map to
->   * @addr: target user address of this page
-
-
-thanks.
 -- 
-~Randy
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
