@@ -1,27 +1,28 @@
 From: maxime.chevallier@bootlin.com (Maxime Chevallier)
-Date: Thu, 15 Nov 2018 11:02:20 +0100
-Subject: [RFC PATCH 0/6] Armada 38x comphy driver to support 2.5Gbps
- networking
-In-Reply-To: <20181112122933.GD30658@n2100.armlinux.org.uk>
+Date: Thu, 15 Nov 2018 11:02:29 +0100
+Subject: [RFC PATCH 2/6] phy: armada38x: add common phy support
+In-Reply-To: <E1gMBMi-00089Q-7S@rmk-PC.armlinux.org.uk>
 References: <20181112122933.GD30658@n2100.armlinux.org.uk>
-Message-ID: <20181115110220.77cff36d@bootlin.com>
+ <E1gMBMi-00089Q-7S@rmk-PC.armlinux.org.uk>
+Message-ID: <20181115110229.45bcf903@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+Hi Russell,
 
-On Mon, 12 Nov 2018 12:29:33 +0000
-Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+On Mon, 12 Nov 2018 12:30:52 +0000
+Russell King <rmk+kernel@armlinux.org.uk> wrote:
 
->Hi,
->
->This series adds support for dynamically switching between 1Gbps
->and 2.5Gbps networking for the Marvell Armada 38x SoCs, tested on
->Armada 388 on the Clearfog platform.
+>Add support for the Armada 38x common phy to allow us to change the
+>speed of the Ethernet serdes lane.  This driver only supports
+>manipulation of the speed, it does not support configuration of the
+>common phy.
 
-I've performed some tests on my side on a Clearfog too, and also on an
-Armada 385 board. It works fine on both setups.
+Tested-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 
-Thanks for implementing this,
+>Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Maxime
+-- 
+Maxime Chevallier, Bootlin
+Embedded Linux and kernel engineering
+https://bootlin.com
