@@ -1,66 +1,43 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Thu, 15 Nov 2018 02:27:48 +0000
-Subject: [PATCH 15/23] dt-bindings: pci: mobiveil: change gpio_slave and
- apb_csr to optional
-In-Reply-To: <CAFZiPx270bWemYRekvk1BZ23RW3ecK+znEc6C1Dix_U-2y+cnA@mail.gmail.com>
-References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
- <20181106131807.29951-16-Zhiqiang.Hou@nxp.com>
- <CAFZiPx270bWemYRekvk1BZ23RW3ecK+znEc6C1Dix_U-2y+cnA@mail.gmail.com>
-Message-ID: <AM6PR04MB57819B50E52512EF10B26CC984DC0@AM6PR04MB5781.eurprd04.prod.outlook.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 15 Nov 2018 03:28:50 +0100
+Subject: [PATCH] PM / AVS: SmartReflex: remove unused function
+In-Reply-To: <20181114094253.v45kxd2efgwhuh42@pengutronix.de>
+References: <20181006164059.16106-1-u.kleine-koenig@pengutronix.de>
+ <10339961.29dihbgRqp@aspire.rjw.lan>
+ <20181114094253.v45kxd2efgwhuh42@pengutronix.de>
+Message-ID: <CAJZ5v0g8Y+KTHmMfbzfhhRqs6MM9kq3p3J7R2tNvPZZs2iKhpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subrahmanya,
+On Wed, Nov 14, 2018 at 10:42 AM Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+>
+> Hello,
+>
+> On Tue, Oct 16, 2018 at 11:09:11AM +0200, Rafael J. Wysocki wrote:
+> > On Saturday, October 6, 2018 6:40:59 PM CEST Uwe Kleine-K?nig wrote:
+> > > From: Uwe Kleine-K?nig <uwe@kleine-koenig.org>
+> > >
+> > > omap_sr_register_pmic() was introduced in 2010 in commit
+> > >
+> > >     984aa6dbf4ca ("OMAP3: PM: Adding smartreflex driver support.")
+> > >
+> > > . There was never any caller of this function in mainline resulting in a
+> > > warning
+> > >
+> > >     sr_init: No PMIC hook to init smartreflex
+> > >
+> > > for each machine where this driver is enabled. So remove the unused
+> > > function and the pr_warn.
+> >
+> > Applied, thanks!
+>
+> This patch didn't make it into next yet, is this expected?
 
-Thanks a lot for your ACK!
+It did some time ago, but then the branch it's on was neglected by
+mistake.  Sorry about that.
 
-Regards,
-Zhiqiang
+I will merge it into my linux-next branch next week.
 
-> -----Original Message-----
-> From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-> Sent: 2018?11?14? 17:33
-> To: Z.q. Hou <zhiqiang.hou@nxp.com>
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Bjorn Helgaas
-> <bhelgaas@google.com>; robh+dt at kernel.org; mark.rutland at arm.com;
-> shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>
-> Subject: Re: [PATCH 15/23] dt-bindings: pci: mobiveil: change gpio_slave and
-> apb_csr to optional
-> 
-> Acked-by: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-> 
-> On Tue, Nov 6, 2018 at 6:50 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
-> >
-> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> >
-> > Change the "gpio_slave" and "apb_csr" to optional, the "gpio_slave"
-> > is not used in current code, and "apb_csr" is not used by some
-> > platorms.
-> >
-> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> > ---
-> >  Documentation/devicetree/bindings/pci/mobiveil-pcie.txt | 2 ++
-> >  1 file changed, 2 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-> > b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-> > index a618d4787dd7..64156993e052 100644
-> > --- a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-> > @@ -10,8 +10,10 @@ Required properties:
-> >         interrupt source. The value must be 1.
-> >  - compatible: Should contain "mbvl,gpex40-pcie"
-> >  - reg: Should contain PCIe registers location and length
-> > +       Mandatory:
-> >         "config_axi_slave": PCIe controller registers
-> >         "csr_axi_slave"   : Bridge config registers
-> > +       Optional:
-> >         "gpio_slave"      : GPIO registers to control slot power
-> >         "apb_csr"         : MSI registers
-> >
-> > --
-> > 2.17.1
-> >
+Thanks,
+Rafael
