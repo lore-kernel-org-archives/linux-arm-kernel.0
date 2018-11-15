@@ -1,60 +1,45 @@
 From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 15 Nov 2018 21:16:46 +0530
-Subject: [PATCH 2/9] arch/arm/mm/dma-mapping.c: Convert to use vm_insert_range
-Message-ID: <20181115154645.GA27912@jordon-HP-15-Notebook-PC>
+Date: Thu, 15 Nov 2018 21:17:38 +0530
+Subject: [PATCH 3/9] drivers/firewire/core-iso.c: Convert to use
+ vm_insert_range
+Message-ID: <20181115154738.GA27932@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert to use vm_insert_range() to map range of kernel
-memory to user vma.
+Convert to use vm_insert_range to map range of kernel memory
+to user vma.
 
 Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+Reviewed-by: Matthew Wilcox <willy@infradead.org>
 ---
- arch/arm/mm/dma-mapping.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ drivers/firewire/core-iso.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 661fe48..4eec323 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
- 		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		    unsigned long attrs)
+diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
+index 35e784c..7bf28bb 100644
+--- a/drivers/firewire/core-iso.c
++++ b/drivers/firewire/core-iso.c
+@@ -107,19 +107,8 @@ int fw_iso_buffer_init(struct fw_iso_buffer *buffer, struct fw_card *card,
+ int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
+ 			  struct vm_area_struct *vma)
  {
--	unsigned long uaddr = vma->vm_start;
--	unsigned long usize = vma->vm_end - vma->vm_start;
-+	unsigned long page_count = vma_pages(vma);
- 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long off = vma->vm_pgoff;
-+	int err;
- 
- 	if (!pages)
- 		return -ENXIO;
- 
--	if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
-+	if (off >= nr_pages || page_count > nr_pages - off)
- 		return -ENXIO;
- 
- 	pages += off;
-+	err = vm_insert_range(vma, vma->vm_start, pages, page_count);
-+	if (err)
-+		pr_err("Remapping memory failed: %d\n", err);
- 
--	do {
--		int ret = vm_insert_page(vma, uaddr, *pages++);
--		if (ret) {
--			pr_err("Remapping memory failed: %d\n", ret);
--			return ret;
--		}
+-	unsigned long uaddr;
+-	int i, err;
+-
+-	uaddr = vma->vm_start;
+-	for (i = 0; i < buffer->page_count; i++) {
+-		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
+-		if (err)
+-			return err;
+-
 -		uaddr += PAGE_SIZE;
--		usize -= PAGE_SIZE;
--	} while (usize > 0);
+-	}
 -
 -	return 0;
-+	return err;
++	return vm_insert_range(vma, vma->vm_start, buffer->pages,
++				buffer->page_count);
  }
- static int arm_iommu_mmap_attrs(struct device *dev,
- 		struct vm_area_struct *vma, void *cpu_addr,
+ 
+ void fw_iso_buffer_destroy(struct fw_iso_buffer *buffer,
 -- 
 1.9.1
