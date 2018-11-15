@@ -1,64 +1,57 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 15 Nov 2018 10:42:42 +0100
-Subject: [RFC v1 2/7] clk: meson: meson8b: do not use cpu_div3 for
- cpu_scale_out_sel
-In-Reply-To: <20181114225725.2821-3-martin.blumenstingl@googlemail.com>
-References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
- <20181114225725.2821-3-martin.blumenstingl@googlemail.com>
-Message-ID: <3f1c522adc74bbc9debd9830a694038c437f54bd.camel@baylibre.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 15 Nov 2018 09:42:55 +0000
+Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
+In-Reply-To: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
+References: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
+Message-ID: <63a0ea72-e0ce-b3e4-4fda-f1a359754cc5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-14 at 23:57 +0100, Martin Blumenstingl wrote:
-> The cpu_div3 clock (cpu_in divided by 3) generates a signal with a duty
-> cycle of 33%. The CPU clock however requires a clock signal with a duty
-> cycle of 50% to run stable.
-> cpu_div3 was observed to be problematic when cycling through all
-> available CPU frequencies (with additional patches on top of this one)
-> while running "stress --cpu 4" in the background. This caused sporadic
-> hangs where the whole system would fully lock up.
-> 
-> Amlogic's 3.10 kernel code also does not use the cpu_div3 clock either
-> when changing the CPU clock.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  drivers/clk/meson/meson8b.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-> index 40e77fe4ba7c..8a3c346e110d 100644
-> --- a/drivers/clk/meson/meson8b.c
-> +++ b/drivers/clk/meson/meson8b.c
-> @@ -608,20 +608,27 @@ static struct clk_regmap meson8b_cpu_scale_div = {
->  	},
->  };
->  
-> +static u32 mux_table_cpu_scale_out_sel[] = { 0, 1, 3 };
->  static struct clk_regmap meson8b_cpu_scale_out_sel = {
->  	.data = &(struct clk_regmap_mux_data){
->  		.offset = HHI_SYS_CPU_CLK_CNTL0,
->  		.mask = 0x3,
->  		.shift = 2,
-> +		.table = mux_table_cpu_scale_out_sel,
->  	},
->  	.hw.init = &(struct clk_init_data){
->  		.name = "cpu_scale_out_sel",
->  		.ops = &clk_regmap_mux_ro_ops,
-> +		/*
-> +		 * NOTE: We are skipping the parent with value 0x2 (which is
-> +		 * "cpu_div3") because it results in a duty cycle of 33% which
-> +		 * makes the system unstable and can result in a lockup of the
-> +		 * whole system.
-> +		 */
->  		.parent_names = (const char *[]) { "cpu_in_sel",
->  						   "cpu_div2",
-> -						   "cpu_div3",
->  						   "cpu_scale_div" },
-> -		.num_parents = 4,
-> +		.num_parents = 3,
->  		.flags = CLK_SET_RATE_PARENT,
->  	},
->  };
+Hi Peng,
 
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+On 15/11/18 15:14, Peng Hao wrote:
+> When virtual machine starts, hang up. The kernel version of guest
+> is 4.16. Host support vgic_v3.
+
+I don't understand the issue here. the vgic_irq->group field does not 
+exist in 4.16 (neither in the first nor the last version). Nor does the 
+line you are modifying.
+
+Both exist in mainline, but what you are mentioning shouldn't be an 
+issue in mainline since vgic_irq->group gets initialized in 
+kvm_vgic_vcpu_init for SGIs and PPIs (i.e. intid < 32) which includes 
+your interrupt.
+
+Cheers,
+
+> It was mainly due to the incorrect vgic_irq's(intid=27) group value
+> during injection interruption. when kvm_vgic_vcpu_init is called,
+> dist is not initialized at this time. Unable to get vgic V3 or V2
+> correctly, so group is not set.
+> group is setted to 1 when vgic_mmio_write_group is invoked at some
+> time.
+> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+> interrupt injection failed.
+> 
+> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> ---
+>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 9c0dd23..d101000 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+>   	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
+>   		irq->line_level = false;
+>   
+> -	if (irq->group)
+> +	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>   		val |= ICH_LR_GROUP;
+>   
+>   	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
+> 
+
+-- 
+Julien Thierry
