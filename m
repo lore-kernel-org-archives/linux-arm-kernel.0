@@ -1,105 +1,111 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 15 Nov 2018 16:11:35 +0100
-Subject: [PATCH 6/9] ARM: EXYNOS: remove soc_is_exynos*() macros
+Date: Thu, 15 Nov 2018 16:11:37 +0100
+Subject: [PATCH 8/9] ARM: SAMSUNG: remove s5p_init_cpu()
 In-Reply-To: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
 References: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20181115151234epcas1p2006b64ae88567526c855869758ff8b9c@epcas1p2.samsung.com>
-Message-ID: <1542294698-17470-7-git-send-email-b.zolnierkie@samsung.com>
+ <CGME20181115151243epcas1p382a3d1704a8ee0d1b0e0b7d214d11ec4@epcas1p3.samsung.com>
+Message-ID: <1542294698-17470-9-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove no longer needed soc_is_exynos*() macros & co.
+Remove no longer needed s5p_init_cpu() & co.
 
 Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 ---
- arch/arm/mach-exynos/common.h | 71 -------------------------------------------
- 1 file changed, 71 deletions(-)
+ arch/arm/mach-exynos/exynos.c                | 28 ----------------------------
+ arch/arm/plat-samsung/cpu.c                  |  7 -------
+ arch/arm/plat-samsung/include/plat/cpu.h     |  1 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h |  2 --
+ 4 files changed, 38 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 20d205e..1dfd434 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -17,81 +17,10 @@
- extern bool soc_dev_is_exynos4412(void);
- extern bool soc_dev_is_exynos542x(void);
+diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+index ca367b7..d98574c 100644
+--- a/arch/arm/mach-exynos/exynos.c
++++ b/arch/arm/mach-exynos/exynos.c
+@@ -20,7 +20,6 @@
+ #include <asm/mach/map.h>
  
--#define EXYNOS3250_SOC_ID	0xE3472000
--#define EXYNOS3_SOC_MASK	0xFFFFF000
+ #include <mach/map.h>
+-#include <plat/cpu.h>
+ 
+ #include "common.h"
+ 
+@@ -99,36 +98,9 @@ void __init exynos_sysram_init(void)
+ 	}
+ }
+ 
+-static int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+-					int depth, void *data)
+-{
+-	struct map_desc iodesc;
+-	const __be32 *reg;
+-	int len;
 -
--#define EXYNOS4210_CPU_ID	0x43210000
--#define EXYNOS4412_CPU_ID	0xE4412200
--#define EXYNOS4_CPU_MASK	0xFFFE0000
+-	if (!of_flat_dt_is_compatible(node, "samsung,exynos4210-chipid"))
+-		return 0;
 -
--#define EXYNOS5250_SOC_ID	0x43520000
--#define EXYNOS5410_SOC_ID	0xE5410000
--#define EXYNOS5420_SOC_ID	0xE5420000
--#define EXYNOS5800_SOC_ID	0xE5422000
--#define EXYNOS5_SOC_MASK	0xFFFFF000
+-	reg = of_get_flat_dt_prop(node, "reg", &len);
+-	if (reg == NULL || len != (sizeof(unsigned long) * 2))
+-		return 0;
 -
--extern unsigned long samsung_cpu_id;
--
--#define IS_SAMSUNG_CPU(name, id, mask)		\
--static inline int is_samsung_##name(void)	\
--{						\
--	return ((samsung_cpu_id & mask) == (id & mask));	\
+-	iodesc.pfn = __phys_to_pfn(be32_to_cpu(reg[0]));
+-	iodesc.length = be32_to_cpu(reg[1]) - 1;
+-	iodesc.virtual = (unsigned long)S5P_VA_CHIPID;
+-	iodesc.type = MT_DEVICE;
+-	iotable_init(&iodesc, 1);
+-	return 1;
 -}
 -
--IS_SAMSUNG_CPU(exynos3250, EXYNOS3250_SOC_ID, EXYNOS3_SOC_MASK)
--IS_SAMSUNG_CPU(exynos4210, EXYNOS4210_CPU_ID, EXYNOS4_CPU_MASK)
--IS_SAMSUNG_CPU(exynos4412, EXYNOS4412_CPU_ID, EXYNOS4_CPU_MASK)
--IS_SAMSUNG_CPU(exynos5250, EXYNOS5250_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5410, EXYNOS5410_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5420, EXYNOS5420_SOC_ID, EXYNOS5_SOC_MASK)
--IS_SAMSUNG_CPU(exynos5800, EXYNOS5800_SOC_ID, EXYNOS5_SOC_MASK)
+ static void __init exynos_init_io(void)
+ {
+ 	debug_ll_io_init();
 -
--#if defined(CONFIG_SOC_EXYNOS3250)
--# define soc_is_exynos3250()	is_samsung_exynos3250()
--#else
--# define soc_is_exynos3250()	0
--#endif
+-	of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
 -
--#if defined(CONFIG_CPU_EXYNOS4210)
--# define soc_is_exynos4210()	is_samsung_exynos4210()
--#else
--# define soc_is_exynos4210()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS4412)
--# define soc_is_exynos4412()	is_samsung_exynos4412()
--#else
--# define soc_is_exynos4412()	0
--#endif
--
- #define EXYNOS4210_REV_0	(0x0)
- #define EXYNOS4210_REV_1_0	(0x10)
- #define EXYNOS4210_REV_1_1	(0x11)
+-	/* detect cpu id and rev. */
+-	s5p_init_cpu(S5P_VA_CHIPID);
+ }
  
--#if defined(CONFIG_SOC_EXYNOS5250)
--# define soc_is_exynos5250()	is_samsung_exynos5250()
--#else
--# define soc_is_exynos5250()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS5410)
--# define soc_is_exynos5410()	is_samsung_exynos5410()
--#else
--# define soc_is_exynos5410()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS5420)
--# define soc_is_exynos5420()	is_samsung_exynos5420()
--#else
--# define soc_is_exynos5420()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS5800)
--# define soc_is_exynos5800()	is_samsung_exynos5800()
--#else
--# define soc_is_exynos5800()	0
--#endif
--
- extern u32 cp15_save_diag;
- extern u32 cp15_save_power;
+ /*
+diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
+index c633a24..8acba21 100644
+--- a/arch/arm/plat-samsung/cpu.c
++++ b/arch/arm/plat-samsung/cpu.c
+@@ -29,10 +29,3 @@ void __init s3c64xx_init_cpu(void)
  
+ 	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
+ }
+-
+-void __init s5p_init_cpu(const void __iomem *cpuid_addr)
+-{
+-	samsung_cpu_id = readl_relaxed(cpuid_addr);
+-
+-	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
+-}
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 02d7f99..93ecd71 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -109,7 +109,6 @@ extern void s3c_init_cpu(unsigned long idcode,
+ extern void s3c24xx_init_io(struct map_desc *mach_desc, int size);
+ 
+ extern void s3c64xx_init_cpu(void);
+-extern void s5p_init_cpu(const void __iomem *cpuid_addr);
+ 
+ extern void s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no);
+ 
+diff --git a/arch/arm/plat-samsung/include/plat/map-s5p.h b/arch/arm/plat-samsung/include/plat/map-s5p.h
+index d69a0ca..3812085 100644
+--- a/arch/arm/plat-samsung/include/plat/map-s5p.h
++++ b/arch/arm/plat-samsung/include/plat/map-s5p.h
+@@ -9,8 +9,6 @@
+ #ifndef __ASM_PLAT_MAP_S5P_H
+ #define __ASM_PLAT_MAP_S5P_H __FILE__
+ 
+-#define S5P_VA_CHIPID		S3C_ADDR(0x02000000)
+-
+ #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+ #define VA_VIC0			VA_VIC(0)
+ #define VA_VIC1			VA_VIC(1)
 -- 
 1.9.1
