@@ -1,54 +1,137 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 15 Nov 2018 14:52:44 +0900
-Subject: [PATCH v16 05/16] kexec_file: kexec_walk_memblock() only walks a
- dedicated region at kdump
+Date: Thu, 15 Nov 2018 14:52:45 +0900
+Subject: [PATCH v16 06/16] lib: fdt: add a helper function for handling memory
+ range property
 In-Reply-To: <20181115055254.2812-1-takahiro.akashi@linaro.org>
 References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
-Message-ID: <20181115055254.2812-6-takahiro.akashi@linaro.org>
+Message-ID: <20181115055254.2812-7-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In kdump case, there exists only one dedicated memblock region as usable
-memory (crashk_res). With this patch, kexec_walk_memblock() runs a given
-callback function on this region.
-
-Cosmetic change: 0 to MEMBLOCK_NONE at for_each_free_mem_range*()
+Added function, fdt_setprop_reg(), will be used later to handle
+kexec-specific property in arm64's kexec_file implementation.
+It will possibly be merged into libfdt in the future.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Acked-by: Dave Young <dyoung@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Baoquan He <bhe@redhat.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: devicetree at vger.kernel.org
 ---
- kernel/kexec_file.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ include/linux/libfdt.h | 26 ++++++++++++++++++++
+ lib/Makefile           |  2 +-
+ lib/fdt_addresses.c    | 56 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 83 insertions(+), 1 deletion(-)
+ create mode 100644 lib/fdt_addresses.c
 
-diff --git a/kernel/kexec_file.c b/kernel/kexec_file.c
-index d03195a8cb6e..f1d0e00a3971 100644
---- a/kernel/kexec_file.c
-+++ b/kernel/kexec_file.c
-@@ -515,8 +515,11 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 	phys_addr_t mstart, mend;
- 	struct resource res = { };
+diff --git a/include/linux/libfdt.h b/include/linux/libfdt.h
+index 90ed4ebfa692..47c4dc9e135c 100644
+--- a/include/linux/libfdt.h
++++ b/include/linux/libfdt.h
+@@ -5,4 +5,30 @@
+ #include <linux/libfdt_env.h>
+ #include "../../scripts/dtc/libfdt/libfdt.h"
  
-+	if (kbuf->image->type == KEXEC_TYPE_CRASH)
-+		return func(&crashk_res, kbuf);
++/**
++ * fdt_setprop_reg - add/set a memory region property
++ * @fdt: pointer to the device tree blob
++ * @nodeoffset: offset of the node to add a property at
++ * @name: name of property
++ * @addr: physical start address
++ * @size: size of region
++ *
++ * returns:
++ *	0, on success
++ *      -FDT_ERR_BADLAYOUT,
++ *	-FDT_ERR_BADMAGIC,
++ *	-FDT_ERR_BADNCELLS, if the node has a badly formatted or invalid
++ *		#address-cells property
++ *      -FDT_ERR_BADOFFSET, nodeoffset did not point to FDT_BEGIN_NODE tag
++ *	-FDT_ERR_BADSTATE,
++ *	-FDT_ERR_BADSTRUCTURE,
++ *	-FDT_ERR_BADVERSION,
++ *	-FDT_ERR_BADVALUE, addr or size doesn't fit to respective cells size
++ *      -FDT_ERR_NOSPACE, there is insufficient free space in the blob to
++ *              contain a new property
++ *	-FDT_ERR_TRUNCATED, standard meanings
++ */
++int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
++					       u64 addr, u64 size);
 +
- 	if (kbuf->top_down) {
--		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, 0,
-+		for_each_free_mem_range_reverse(i, NUMA_NO_NODE, MEMBLOCK_NONE,
- 						&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
-@@ -530,8 +533,8 @@ static int kexec_walk_memblock(struct kexec_buf *kbuf,
- 				break;
- 		}
- 	} else {
--		for_each_free_mem_range(i, NUMA_NO_NODE, 0, &mstart, &mend,
--					NULL) {
-+		for_each_free_mem_range(i, NUMA_NO_NODE, MEMBLOCK_NONE,
-+					&mstart, &mend, NULL) {
- 			/*
- 			 * In memblock, end points to the first byte after the
- 			 * range while in kexec, end points to the last byte
+ #endif /* _INCLUDE_LIBFDT_H_ */
+diff --git a/lib/Makefile b/lib/Makefile
+index db06d1237898..2a96cb05e15d 100644
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -205,7 +205,7 @@ KASAN_SANITIZE_stackdepot.o := n
+ KCOV_INSTRUMENT_stackdepot.o := n
+ 
+ libfdt_files = fdt.o fdt_ro.o fdt_wip.o fdt_rw.o fdt_sw.o fdt_strerror.o \
+-	       fdt_empty_tree.o
++	       fdt_empty_tree.o fdt_addresses.o
+ $(foreach file, $(libfdt_files), \
+ 	$(eval CFLAGS_$(file) = -I$(src)/../scripts/dtc/libfdt))
+ lib-$(CONFIG_LIBFDT) += $(libfdt_files)
+diff --git a/lib/fdt_addresses.c b/lib/fdt_addresses.c
+new file mode 100644
+index 000000000000..97ddd5a5cc10
+--- /dev/null
++++ b/lib/fdt_addresses.c
+@@ -0,0 +1,56 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/libfdt_env.h>
++#include <linux/types.h>
++#include "../scripts/dtc/libfdt/fdt_addresses.c"
++
++/*
++ * helper functions for arm64 kexec
++ * Those functions may be merged into libfdt in the future.
++ */
++
++/* This function assumes that cells is 1 or 2 */
++static void cpu64_to_fdt_cells(void *buf, u64 val64, int cells)
++{
++	__be32 val32;
++
++	while (cells) {
++		val32 = cpu_to_fdt32(val64 >> (32 * (--cells)));
++		memcpy(buf, &val32, sizeof(val32));
++		buf += sizeof(val32);
++	}
++}
++
++int fdt_setprop_reg(void *fdt, int nodeoffset, const char *name,
++						u64 addr, u64 size)
++{
++	int addr_cells, size_cells;
++	char buf[sizeof(__be32) * 2 * 2];
++		/* assume dt_root_[addr|size]_cells <= 2 */
++	void *prop;
++	size_t buf_size;
++
++	addr_cells = fdt_address_cells(fdt, 0);
++	if (addr_cells < 0)
++		return addr_cells;
++	size_cells = fdt_size_cells(fdt, 0);
++	if (size_cells < 0)
++		return size_cells;
++
++	/* if *_cells >= 2, cells can hold 64-bit values anyway */
++	if ((addr_cells == 1) && ((addr > U32_MAX) ||
++				  ((addr + size) > U32_MAX)))
++		return -FDT_ERR_BADVALUE;
++
++	if ((size_cells == 1) && (size > U32_MAX))
++		return -FDT_ERR_BADVALUE;
++
++	buf_size = (addr_cells + size_cells) * sizeof(u32);
++	prop = buf;
++
++	cpu64_to_fdt_cells(prop, addr, addr_cells);
++	prop += addr_cells * sizeof(u32);
++
++	cpu64_to_fdt_cells(prop, size, size_cells);
++
++	return fdt_setprop(fdt, nodeoffset, name, buf, buf_size);
++}
 -- 
 2.19.0
