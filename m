@@ -1,17 +1,19 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 15 Nov 2018 22:42:00 +0000
-Subject: [PATCH 3/6] arm64: ftrace: enable graph FP test
+Date: Thu, 15 Nov 2018 22:42:03 +0000
+Subject: [PATCH 6/6] arm64: ftrace: always pass instrumented pc in x0
 In-Reply-To: <20181115224203.24847-1-mark.rutland@arm.com>
 References: <20181115224203.24847-1-mark.rutland@arm.com>
-Message-ID: <20181115224203.24847-4-mark.rutland@arm.com>
+Message-ID: <20181115224203.24847-7-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core frace code has an optional sanity check on the frame pointer
-passed by ftrace_graph_caller and return_to_handler. This is cheap,
-useful, and enabled unconditionally on x86, sparc, and riscv.
+The core ftrace hooks take the instrumented PC in x0, but for some
+reason arm64's prepare_ftrace_return() takes this in x1.
 
-Let's do the same on arm64, so that we can catch any problems early.
+For consistency, let's flip the argument order and always pass the
+instrumented PC in x0.
+
+There should be no functional change as a result of this patch.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
@@ -20,35 +22,40 @@ Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Torsten Duwe <duwe@suse.de>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/ftrace.h  | 1 +
- arch/arm64/kernel/entry-ftrace.S | 3 +--
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/entry-ftrace.S | 6 +++---
+ arch/arm64/kernel/ftrace.c       | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index caa955f10e19..6795c147cbcc 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -13,6 +13,7 @@
- 
- #include <asm/insn.h>
- 
-+#define HAVE_FUNCTION_GRAPH_FP_TEST
- #define MCOUNT_ADDR		((unsigned long)_mcount)
- #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
- 
 diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
-index eb4e50d9f75d..7d74b2af6d3b 100644
+index 6b8230f79a67..7981f18bfe5f 100644
 --- a/arch/arm64/kernel/entry-ftrace.S
 +++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -213,8 +213,7 @@ ENDPROC(ftrace_graph_caller)
-  * void return_to_handler(void)
-  *
-  * Run ftrace_return_to_handler() before going back to parent.
-- * @fp is checked against the value passed by ftrace_graph_caller()
-- * only when HAVE_FUNCTION_GRAPH_FP_TEST is enabled.
-+ * @fp is checked against the value passed by ftrace_graph_caller().
+@@ -182,10 +182,10 @@ ENDPROC(ftrace_stub)
+  * and run return_to_handler() later on its exit.
   */
- ENTRY(return_to_handler)
- 	save_return_regs
+ ENTRY(ftrace_graph_caller)
+-	mcount_get_lr_addr	  x0	//     pointer to function's saved lr
+-	mcount_get_pc		  x1	//     function's pc
++	mcount_get_pc		  x0	//     function's pc
++	mcount_get_lr_addr	  x1	//     pointer to function's saved lr
+ 	mcount_get_parent_fp	  x2	//     parent's fp
+-	bl	prepare_ftrace_return	// prepare_ftrace_return(&lr, pc, fp)
++	bl	prepare_ftrace_return	// prepare_ftrace_return(pc, &lr, fp)
+ 
+ 	mcount_exit
+ ENDPROC(ftrace_graph_caller)
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index 50986e388d2b..34a80bf0b2ef 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -211,7 +211,7 @@ int __init ftrace_dyn_arch_init(void)
+  *
+  * Note that @frame_pointer is used only for sanity check later.
+  */
+-void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
++void prepare_ftrace_return(unsigned long self_addr, unsigned long *parent,
+ 			   unsigned long frame_pointer)
+ {
+ 	unsigned long return_hooker = (unsigned long)&return_to_handler;
 -- 
 2.11.0
