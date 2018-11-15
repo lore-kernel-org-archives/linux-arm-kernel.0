@@ -1,48 +1,125 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Nov 2018 17:35:49 +0800
-Subject: [PATCH v2 01/15] dt-bindings: net: broadcom-bluetooth: Fix external
- clock names
-In-Reply-To: <20181115093603.26729-1-wens@csie.org>
-References: <20181115093603.26729-1-wens@csie.org>
-Message-ID: <20181115093603.26729-2-wens@csie.org>
+Date: Thu, 15 Nov 2018 17:35:48 +0800
+Subject: [PATCH v2 00/15] ARM: sunxi: Enable Broadcom-based Bluetooth
+ controllers
+Message-ID: <20181115093603.26729-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Broadcom Bluetooth controllers can take up to two external clocks:
-an external frequency reference, substituting the main crystal, and a
-LPO clock at 32.768 kHz substituting the internal LPO clock.
+Hi everyone,
 
-In particular, the external LPO clock must be used when the controller
-does not have NVRAM connected, and the main reference frequency is not
-the default 20 MHz. This is described in detail in the datasheet.
+This is v2 of my Broadcom-based Bluetooth controllers on Allwinner SoC-
+based SBCs series.
 
-The original "extclk" clock name is ambiguous as to which of these it
-refers to, and some designs might even require both.
+Changes since v1:
 
-This patch deprecates the existing name, and adds "txco" and "lpo".
+  - Collected tags
+  - Re-organize dt binding clocks and clock-names properties
+  - Simplify check for deferred probe when getting clocks
+  - Add explanation of Cubietruck's clk_out_a pinmux setting placement
+    to commit message.
+  - Add missing "uart-has-rtscts" property to Cubietruck device tree
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../devicetree/bindings/net/broadcom-bluetooth.txt         | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Original cover letter follows.
 
-diff --git a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-index 4194ff7e6ee6..711c75ac2bb5 100644
---- a/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-+++ b/Documentation/devicetree/bindings/net/broadcom-bluetooth.txt
-@@ -18,8 +18,11 @@ Optional properties:
-  - shutdown-gpios: GPIO specifier, used to enable the BT module
-  - device-wakeup-gpios: GPIO specifier, used to wakeup the controller
-  - host-wakeup-gpios: GPIO specifier, used to wakeup the host processor
-- - clocks: clock specifier if external clock provided to the controller
-- - clock-names: should be "extclk"
-+ - clocks: 1 or 2 clocks as defined in clock-names below, in that order
-+ - clock-names: names for clock inputs, matching the clocks given
-+   - "extclk": deprecated, replaced by "txco"
-+   - "txco": external reference clock (not a standalone crystal)
-+   - "lpo": external low power 32.768 kHz clock
- 
- 
- Example:
+
+On many Allwinner SBCs / developer boards, there is a WiFi+BT combo
+module from AMPAK. Inside is either one or two Broadcom chips, depending
+on the model. This series enables the Bluetooth controllers for AMPAK
+AP6210, AP6212, and AP6330 found on several boards. More will come later
+as other SoCs require changes to some other parts. I did not cover the
+SCO PCM connections from the controller to the SoC's I2S interface. It
+seems no one is actually doing this, so I was not sure how to proceed.
+Any suggestions?
+
+I deliberately left out the netdev mailing list and Dave Miller, as the
+only thing that is under net is the binding document. Maybe we should
+move that out of Documentation/devicetree/bindings/net/ ?
+
+Also, I'm not subscribed to the linux-bluetooth ML, so please CC me for
+any discussions.
+
+Patches 1 through 4 are device tree binding changes:
+
+1 - Make the external clock name unambiguous, and add a second entry for
+    the LPO clock.
+
+2 - Add regulator supply properties for the VBAT and VDDIO power pins.
+
+3 - Add a compatible string for BCM20702A1.
+
+4 - Add a compatible string for BCM4330.
+
+Patches 5 through 13 are changes to the driver, either improvements,
+or updates to handle the updated device tree binding.
+
+5 - Make the driver handle deferred probing for the external clock.
+
+6 - Simplify clock error checking for subsequent clk API calls.
+
+7 - Handle clock-names for the main external clock.
+
+8 - Support a new external clock, the LPO.
+
+9 - Support regulator supplies.
+
+10 - Wait a small amount of time after toggling the GPIO for the device
+     to settle.
+
+11 - Add support for BCM20702A1, including its default address.
+
+12 - Add BCM4330 compatible string to the driver.
+
+13 - Handle default address for BCM43430A0.
+
+14 - Enable Broadcom-based serdev Bluetooth for multiple Allwinner ARMv7
+     boards.
+
+15 - Enable Broadcom-based serdev Bluetooth for the Bananapi M64.
+
+checkpatch reports an error for both patch 11 and patch 13:
+
+    ERROR: space required after that close brace '}'
+
+I followed the existing code's style. If this is undesirable, I can send
+a follow-up patch fixing the entire code block.
+
+The first 13 patches should go through the Bluetooth tree, while we, the
+sunxi maintainers, will take the last 2.
+
+
+Thanks
+ChenYu
+
+Chen-Yu Tsai (14):
+  dt-bindings: net: broadcom-bluetooth: Fix external clock names
+  dt-bindings: net: broadcom-bluetooth: Add VBAT and VDDIO supplies
+  dt-bindings: net: broadcom-bluetooth: Add BCM20702A1 compatible string
+  dt-bindings: net: broadcom-bluetooth: Add BCM4330 compatible string
+  Bluetooth: hci_bcm: Handle deferred probing for the clock supply
+  Bluetooth: hci_bcm: Simplify clk_get error handling
+  Bluetooth: hci_bcm: Use "txco" and "extclk" to get clock reference
+  Bluetooth: hci_bcm: Add support for LPO clock
+  Bluetooth: hci_bcm: Add support for regulator supplies
+  Bluetooth: hci_bcm: Wait for device to come out of reset after power
+    on
+  Bluetooth: hci_bcm: Add compatible string for BCM4330
+  Bluetooth: btbcm: Add default address for BCM43430A0
+  ARM: dts: sunxi: Enable Broadcom-based Bluetooth for multiple boards
+  arm64: dts: allwinner: a64: bananapi-m64: Add Bluetooth device node
+
+Maxime Ripard (1):
+  Bluetooth: hci_bcm: Add BCM20702A1 variant
+
+ .../bindings/net/broadcom-bluetooth.txt       |  11 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts    |  23 ++++
+ arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts  |  18 +++
+ .../boot/dts/sun8i-a83t-cubietruck-plus.dts   |  18 +++
+ arch/arm/boot/dts/sun8i-r16-bananapi-m2m.dts  |  14 +++
+ .../dts/allwinner/sun50i-a64-bananapi-m64.dts |  14 +++
+ drivers/bluetooth/btbcm.c                     |  13 +-
+ drivers/bluetooth/hci_bcm.c                   | 112 +++++++++++++++---
+ 8 files changed, 206 insertions(+), 17 deletions(-)
+
 -- 
 2.19.1
