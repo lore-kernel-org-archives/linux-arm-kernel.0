@@ -1,67 +1,83 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 15 Nov 2018 14:00:39 +0000
-Subject: [PATCH 4/4] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-In-Reply-To: <1542286549-4501-5-git-send-email-andrew.murray@arm.com>
-References: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
- <1542286549-4501-5-git-send-email-andrew.murray@arm.com>
-Message-ID: <79000795-971d-22fa-6264-f85f2d528477@arm.com>
+From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
+Date: Thu, 15 Nov 2018 14:18:28 +0000
+Subject: [PATCH] i2c: at91: switched to resume/suspend callbacks.
+In-Reply-To: <20181107083928.vqgnpw3mmczjn4el@M43218.corp.atmel.com>
+References: <1540203006-805-1-git-send-email-andrei.stefanescu@microchip.com>
+ <20181107083928.vqgnpw3mmczjn4el@M43218.corp.atmel.com>
+Message-ID: <e5210bfd-0ce6-0a15-299f-32e04521667d@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hello Wolfram,
 
-On 15/11/18 12:55, Andrew Murray wrote:
-> Enable/disable event counters as appropriate when entering and exiting
-> the guest to enable support for guest or host only event counting.
-> 
-> For both VHE and non-VHE we switch the counters between host/guest at
-> EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->   arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
->   1 file changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index d496ef5..ebf0aac 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->   	return true;
->   }
->   
-> +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
-> +{
-> +	u32 host_only = host_ctxt->events_host_only;
-> +	u32 guest_only = host_ctxt->events_guest_only;
-> +
-> +	if (host_only)
-> +		write_sysreg(host_only, pmcntenclr_el0);
-> +
-> +	if (guest_only)
-> +		write_sysreg(guest_only, pmcntenset_el0);
-> +
-> +	return (host_only || guest_only);
-> +}
-> +
-> +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
-> +{
-> +	u32 host_only = host_ctxt->events_host_only;
-> +	u32 guest_only = host_ctxt->events_guest_only;
-> +
-> +	if (guest_only)
-> +		write_sysreg(guest_only, pmcntenclr_el0);
-> +
-> +	if (host_only)
-> +		write_sysreg(host_only, pmcntenset_el0);
+Could you please tell me if there are any changes that I should make
+to the patch?
 
-In the perf_event code, there is an ISB after enabling an event. I guess 
-we don't need it when setting the guest events since I believe the eret 
-to the guess give us the context synchronization. But don't we need one 
-here when restoring host only events?
+Thank you,
+Andrei Stefanescu
 
-Thanks,
-
--- 
-Julien Thierry
+On 07.11.2018 10:39, Ludovic Desroches wrote:
+> On Mon, Oct 22, 2018 at 12:17:47PM +0200, Andrei Stefanescu - M50506 wrote:
+>> In the previous version of the driver resume/suspend_noirq callbacks
+>> were used. Because of this, when resuming from suspend-to-ram,
+>> an I2C (belonging to a FLEXCOM) would resume before FLEXCOM.
+>> The first read on the I2C bus would then result in a timeout.
+>>
+>> This patch switches to resume/suspend callbacks which are
+>> called after FLEXCOM resumes. FLEXCOM, SPI and USART drivers use
+>> resume/suspend callbacks.
+>>
+>> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
+> I can't figure out why we use the _noirq variant. When patches for PM
+> stuff were sent, suspend/resume callbacks were used but in the latest
+> version it moved to the _noirq variant without explanation.
+>
+> Excepting if someone has an argument to keep the _noirq variant,
+> Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+>
+> Thanks
+>
+> Regards
+>
+> Ludovic
+>
+>> ---
+>>   drivers/i2c/busses/i2c-at91.c | 8 ++++----
+>>   1 file changed, 4 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+>> index bfd1fdf..81f7b94 100644
+>> --- a/drivers/i2c/busses/i2c-at91.c
+>> +++ b/drivers/i2c/busses/i2c-at91.c
+>> @@ -1174,7 +1174,7 @@ static int at91_twi_runtime_resume(struct device *dev)
+>>   	return clk_prepare_enable(twi_dev->clk);
+>>   }
+>>   
+>> -static int at91_twi_suspend_noirq(struct device *dev)
+>> +static int at91_twi_suspend(struct device *dev)
+>>   {
+>>   	if (!pm_runtime_status_suspended(dev))
+>>   		at91_twi_runtime_suspend(dev);
+>> @@ -1182,7 +1182,7 @@ static int at91_twi_suspend_noirq(struct device *dev)
+>>   	return 0;
+>>   }
+>>   
+>> -static int at91_twi_resume_noirq(struct device *dev)
+>> +static int at91_twi_resume(struct device *dev)
+>>   {
+>>   	struct at91_twi_dev *twi_dev = dev_get_drvdata(dev);
+>>   	int ret;
+>> @@ -1202,8 +1202,8 @@ static int at91_twi_resume_noirq(struct device *dev)
+>>   }
+>>   
+>>   static const struct dev_pm_ops at91_twi_pm = {
+>> -	.suspend_noirq	= at91_twi_suspend_noirq,
+>> -	.resume_noirq	= at91_twi_resume_noirq,
+>> +	.suspend	= at91_twi_suspend,
+>> +	.resume		= at91_twi_resume,
+>>   	.runtime_suspend	= at91_twi_runtime_suspend,
+>>   	.runtime_resume		= at91_twi_runtime_resume,
+>>   };
+>> -- 
+>> 2.7.4
+>>
