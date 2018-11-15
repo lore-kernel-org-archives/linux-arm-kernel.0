@@ -1,34 +1,31 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 15 Nov 2018 00:51:09 +0000
-Subject: [PATCH v9 00/24] ILP32 for ARM64
-In-Reply-To: <20181113105717.GA5664@yury-thinkpad>
-References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
- <20180724173957.GA22106@yury-thinkpad> <mvmbm6tgunu.fsf@suse.de>
- <20181113105717.GA5664@yury-thinkpad>
-Message-ID: <20181115005109.73ll47dfwk4uc63r@localhost>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 14 Nov 2018 17:01:08 -0800
+Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
+In-Reply-To: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
+References: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <7hd0r7gnmz.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 10:57:26AM +0000, Yury Norov wrote:
-> On Tue, Nov 13, 2018 at 11:04:53AM +0100, Andreas Schwab wrote:
-> > On Jul 24 2018, Yury Norov <ynorov@caviumnetworks.com> wrote:
-> > 
-> > > This is the update of the series based on 4.17 kernel
-> > > https://github.com/norov/linux/tree/ilp32-4.17
-> > 
-> > Do you aleady have an update for 4.19?
-> 
-> I've started this work.
-> 
-> Comparing to 4.17, there are major changes in syscall handling -
-> such routines are rewritten in C, and in signals. At now, basic tests
-> work, but signal delivering causes illegal instruction abort.
+"A.s. Dong" <aisheng.dong@nxp.com> writes:
 
-If it helps, I have a 4.18 branch here:
+> After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
+> NO_PAD_CTL pads map are not skipped anymore which results in
+> a possible memory corruption. As we actually only need to create config
+> maps for SCU pads and MMIO pads which are not using the default config
+> (a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
+> the config maps. And during MMIO pads parsing, we also need update the
+> list_p point as SCU case to ensure the pin data next parsed is correct.
+>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
+> Reported-by: Martin Kaiser <martin@kaiser.cx>
+> Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 
-https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.18
+After kernelCI found a similar failure, I verified that this patch gets
+things booting again in today's linux-next.
 
-Hopefully the changes between 4.18 and 4.19 are smaller than .17->.18.
+Tested-by: Kevin Hilman <khilman@baylibre.com>
 
--- 
-Catalin
+Kevin
