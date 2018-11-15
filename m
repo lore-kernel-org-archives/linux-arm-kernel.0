@@ -1,197 +1,102 @@
-From: pankaj.bansal@nxp.com (Pankaj Bansal)
-Date: Thu, 15 Nov 2018 12:12:05 +0000
-Subject: [PATCH] arm64: dts: lx2160aqds: Add mdio mux nodes
-Message-ID: <20181115173752.22482-1-pankaj.bansal@nxp.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 15 Nov 2018 13:15:00 +0100
+Subject: [PATCH 1/2] clocksource: meson6_timer: use register names from
+ the datasheet
+In-Reply-To: <CAFBinCBueqknBzV6PJnuSzd09=dd06gkjZG+ykr5qKLf=uRT2A@mail.gmail.com>
+References: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
+ <20181028125501.17336-2-martin.blumenstingl@googlemail.com>
+ <6793aba9-87fc-6cf8-cada-f1fa6a1e0040@linaro.org>
+ <CAFBinCBueqknBzV6PJnuSzd09=dd06gkjZG+ykr5qKLf=uRT2A@mail.gmail.com>
+Message-ID: <036e5c1e-7e02-9691-3c36-4ebdc4cce727@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two external MDIO buses used to communicate with phy devices that
-are external to SOC are muxed in LX2160AQDS board.
+On 15/11/2018 07:23, Martin Blumenstingl wrote:
+> Hi Daniel,
+> 
+> thanks for your feedback!
+> 
+> On Thu, Nov 15, 2018 at 2:35 AM Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>>
+>> On 28/10/2018 13:55, Martin Blumenstingl wrote:
+>>> This makes the driver use the names from S805 datasheet for the
+>>> preprocessor #defines. This makes it easier to spot that the driver
+>>> currently only supports Timer A (as clockevent with interrupt support)
+>>> and Timer E (as clocksource without interrupts). Timer B, C and D (which
+>>> are similar to Timer A) are currently not supported by the driver.
+>>>
+>>> While here, this also removes the internal "CED_ID" and "CSD_ID" defines
+>>> which are used to identify the timer. These IDs are not described in the
+>>> datasheet and thus make it harder to compare the code to what's written
+>>> in the datasheet.
+>>>
+>>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>>> ---
+>>>  drivers/clocksource/meson6_timer.c | 110 ++++++++++++++++++-----------
+>>>  1 file changed, 68 insertions(+), 42 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+>>> index 92f20991a937..c622135bee9d 100644
+>>> --- a/drivers/clocksource/meson6_timer.c
+>>> +++ b/drivers/clocksource/meson6_timer.c
+>>> @@ -10,6 +10,8 @@
+>>>   * warranty of any kind, whether express or implied.
+>>>   */
+>>>
+>>> +#include <linux/bitfield.h>
+>>> +#include <linux/bitops.h>
+>>>  #include <linux/clk.h>
+>>>  #include <linux/clockchips.h>
+>>>  #include <linux/interrupt.h>
+>>> @@ -20,80 +22,102 @@
+>>>  #include <linux/of_address.h>
+>>>  #include <linux/of_irq.h>
+>>>
+>>> -#define CED_ID                       0
+>>> -#define CSD_ID                       4
+>>> -
+>>> -#define TIMER_ISA_MUX                0
+>>> -#define TIMER_ISA_VAL(t)     (((t) + 1) << 2)
+>>> -
+>>> -#define TIMER_INPUT_BIT(t)   (2 * (t))
+>>> -#define TIMER_ENABLE_BIT(t)  (16 + (t))
+>>> -#define TIMER_PERIODIC_BIT(t)        (12 + (t))
+>>> +enum meson6_timera_input_clock {
+>>> +     MESON_TIMERA_CLOCK_1US = 0x0,
+>>> +     MESON_TIMERA_CLOCK_10US = 0x1,
+>>> +     MESON_TIMERA_CLOCK_100US = 0x2,
+>>> +     MESON_TIMERA_CLOCK_1MS = 0x3,
+>>> +};
+>>>
+>>> -#define TIMER_CED_INPUT_MASK (3UL << TIMER_INPUT_BIT(CED_ID))
+>>> -#define TIMER_CSD_INPUT_MASK (7UL << TIMER_INPUT_BIT(CSD_ID))
+>>> +enum meson6_timere_input_clock {
+>>> +     MESON_TIMERE_CLOCK_SYSTEM_CLOCK = 0x0,
+>>> +     MESON_TIMERE_CLOCK_1US = 0x1,
+>>> +     MESON_TIMERE_CLOCK_10US = 0x2,
+>>> +     MESON_TIMERE_CLOCK_100US = 0x3,
+>>> +     MESON_TIMERE_CLOCK_1MS = 0x4,
+>>> +};
+>>
+>> It is not required to specify the values. The standard defines the
+>> default first value is zero, and each enum has the value which is +1 of
+>> the previous one.
+> the idea behind this is: these are values from the datasheet so I
+> wanted to make them easy to find when comparing the datasheet with the
+> driver.
+> I will replace the enums with simple #defines if there are no
+> objections (that also makes it consistent with the other register
+> values in the driver).
 
-These buses can be routed to any one of the eight IO slots on
-LX2160AQDS board depending on value in fpga register 0x54.
+No objection to change them to macros :)
 
-Additionally the external MDIO1 is used to communicate to the onboard
-RGMII phy devices.
+  -- Daniel
 
-The mdio1 is controlled by bits 4-7 of fpga register and mdio2 is
-controlled by bits 0-3 of fpga register.
 
-Signed-off-by: Pankaj Bansal <pankaj.bansal@nxp.com>
----
-
-Notes:
-    This patch depends on following patches:
-    [1]https://patchwork.kernel.org/cover/10658863/
-    [2]https://patchwork.codeaurora.org/patch/637861/
-
- .../boot/dts/freescale/fsl-lx2160a-qds.dts   | 116 +++++++++++++++++
- .../boot/dts/freescale/fsl-lx2160a.dtsi      |  23 ++++
- 2 files changed, 139 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-index 8a0305a2b778..39aa2731ddfa 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-qds.dts
-@@ -54,6 +54,121 @@
- &i2c0 {
- 	status = "okay";
- 
-+	fpga at 66 {
-+		compatible = "fsl,lx2160aqds-fpga", "fsl,fpga-qixis-i2c";
-+		reg = <0x66>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		mdio-mux-1 at 54 {
-+			mdio-parent-bus = <&emdio1>;
-+			reg = <0x54>;		 /* BRDCFG4 */
-+			mux-mask = <0xf8>;      /* EMI1_MDIO */
-+			#address-cells=<1>;
-+			#size-cells = <0>;
-+
-+			mdio at 0 {
-+				reg = <0x00>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 40 {
-+				reg = <0x40>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at c0 {
-+				reg = <0xc0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at c8 {
-+				reg = <0xc8>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at d0 {
-+				reg = <0xd0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at d8 {
-+				reg = <0xd8>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at e0 {
-+				reg = <0xe0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at e8 {
-+				reg = <0xe8>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at f0 {
-+				reg = <0xf0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at f8 {
-+				reg = <0xf8>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
-+		mdio-mux-2 at 54 {
-+			mdio-parent-bus = <&emdio2>;
-+			reg = <0x54>;		 /* BRDCFG4 */
-+			mux-mask = <0x07>;      /* EMI2_MDIO */
-+			#address-cells=<1>;
-+			#size-cells = <0>;
-+
-+			mdio at 0 {
-+				reg = <0x00>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 1 {
-+				reg = <0x01>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 2 {
-+				reg = <0x02>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 3 {
-+				reg = <0x03>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 4 {
-+				reg = <0x04>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 5 {
-+				reg = <0x05>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 6 {
-+				reg = <0x06>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+			mdio at 7 {
-+				reg = <0x07>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+	};
-+
- 	i2c-mux at 77 {
- 		compatible = "nxp,pca9547";
- 		reg = <0x77>;
-@@ -118,3 +233,4 @@
- &usb1 {
- 	status = "okay";
- };
-+
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-index 6ce0677c3096..518882b05f03 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
-@@ -780,5 +780,28 @@
- 				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
- 			dma-coherent;
- 		};
-+		/* TODO: WRIOP (CCSR?) */
-+		/* WRIOP0: 0x8B8_0000, E-MDIO1: 0x1_6000 */
-+		emdio1: mdio at 0x8B96000 {
-+			compatible = "fsl,fman-memac-mdio";
-+			reg = <0x0 0x8B96000 0x0 0x1000>;
-+			device_type = "mdio";	/* TODO: is this necessary? */
-+			little-endian;	/* force the driver in LE mode */
-+
-+			/* Not necessary on the QDS, but needed on the RDB*/
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+		/* WRIOP0: 0x8B8_0000, E-MDIO2: 0x1_7000 */
-+		emdio2: mdio at 0x8B97000 {
-+			compatible = "fsl,fman-memac-mdio";
-+			reg = <0x0 0x8B97000 0x0 0x1000>;
-+			device_type = "mdio";	/* TODO: is this necessary? */
-+			little-endian;	/* force the driver in LE mode */
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
- 	};
- };
-+
 -- 
-2.17.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
