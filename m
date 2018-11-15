@@ -1,181 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 15 Nov 2018 10:16:12 +0800
-Subject: [linux-sunxi] [PATCH v4 04/10] arm64: allwinner: dts: h6: add
- USB2-related device nodes
-In-Reply-To: <4B5BD39B-22E2-4DEA-A199-29094DB8C317@aosc.io>
-References: <20181004122855.22981-1-icenowy@aosc.io>
- <20181004122855.22981-5-icenowy@aosc.io>
- <CAGb2v668dozjLm9mWUw_Y12AZ6DM2ku9dgQ8B8feABNeFf3QSw@mail.gmail.com>
- <4B5BD39B-22E2-4DEA-A199-29094DB8C317@aosc.io>
-Message-ID: <CAGb2v66Lndq1GMRDda3+2go1snGVS1fKTJTrHpP-B20FtG6VZA@mail.gmail.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Thu, 15 Nov 2018 10:16:16 +0800
+Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
+In-Reply-To: <2fc9dbac-4919-4ceb-49ac-67ddd7f203b5@phrozen.org>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+ <20181114124752.GI2620@ulmo>
+ <2fc9dbac-4919-4ceb-49ac-67ddd7f203b5@phrozen.org>
+Message-ID: <1542248176.30611.4.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 6:31 PM Icenowy Zheng <icenowy@aosc.io> wrote:
-> ? 2018?11?14? GMT+08:00 ??6:21:33, Chen-Yu Tsai <wens@csie.org> ??:
-> >Hi,
+On Wed, 2018-11-14 at 14:27 +0100, John Crispin wrote:
+> On 14/11/2018 13:47, Thierry Reding wrote:
+> > On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
+> >> The flag 'has_clks' and related checks are superfluous as the CCF
+> >> subsystem does this for you.
+> > Both of these mechanisms aren't equivalent. While CCF can deal with
+> > optional clocks, what the has_clks flag actually means is that the
+> > device doesn't need a clock (or doesn't have a clock input) on the
+> > devices where it is cleared.
 > >
-> >On Thu, Oct 4, 2018 at 8:30 PM Icenowy Zheng <icenowy@aosc.io> wrote:
-> >>
-> >> Allwinner H6 has two USB2 ports, one OTG and one host-only.
-> >>
-> >> Add device tree nodes related to them.
-> >>
-> >> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> >> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >> No changes in v4.
-> >>
-> >> Changes in v3:
-> >> - Removed the wrongly introduced usb3phy node.
-> >> - Added Chen-Yu's Review tag.
-> >>
-> >>  arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi | 81
-> >++++++++++++++++++++
-> >>  1 file changed, 81 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> >b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> >> index 040828d2e2c0..3d60af6cb3ae 100644
-> >> --- a/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> >> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h6.dtsi
-> >> @@ -258,6 +258,87 @@
-> >>                         status = "disabled";
-> >>                 };
-> >>
-> >> +               usb2otg: usb at 5100000 {
-> >> +                       compatible = "allwinner,sun8i-a33-musb";
+> > So I'd actually be in favor of keeping the has_clks property because it
+> > serves as an additional sanity check. For example if you run this driver
+> > on an SoC that "has clocks" but if you don't list them in DT, then after
+> > this patch the driver will happily continue without clocks, even though
+> > it may break completely without those clocks. I've seen SoCs respond to
+> > disabled clocks for a hardware block in different ways, in many cases an
+> > access to any of the registers will completely hang the CPU. In other
+> > cases it may just crash in some other way or give you some sort of
+> > machine exception. None of those are good, and make the tiny bit of
+> > additional code required to support the has_clks flag very attractive.
 > >
-> >I added an SoC-specific compatible: "allwinner,sun50i-h6-musb".
+> > But that's just my opinion. If you prefer to throw away that safety
+> > barrier, be my guest. But if you do, please move this functionality into
+> > the clock framework first and then make the driver use it.
 > >
-> >I'm also curious as to whether the MUSB controller was tested or not,
-> >since Allwinner now has EHCI/OHCI host pairs for host mode, and the
-> >Pine H64
-> >only does host mode.
->
-> USB plug-in detection relays on MUSB if it's enabled.
+> > Thierry
+> 
+> Hi,
+> 
+> sorry for my late response. I added the flag for the legacy MIPS 
+> silicon. These SoCs only have a single clock register with a few on/off 
+> bits. there is no complex clocktree or scaling. Hence COMMON_CLK is not 
+> supported by those SoCs. I fully agree with Thierry, that the flag makes 
+> this explicit and the intent was indeed to make sure that on silicon 
+> where clocks are required, that they really are listed in OF. This is 
+> indeed an extra sanity check and hiding it in an implicit check inside 
+> CCF does not feel right.
+> 
+>      John
+> 
 
-That's not what I meant. Have you actually used the MUSB core in either
-device or host mode to know that it is compatible with the A33? And
-that it works correctly?
+Thanks for the detailed information:)  I will drop this patch in v1.
 
-IIRC ID detection is done by the PHY driver, using the GPIO lines.
-In host mode, since it's already directly routed to the host pair,
-it's the host pair that does plug-in detection. The MUSB core is
-completely unused. It should be quite clear if you look at the times
-each interrupt line fired.
-
-ChenYu
-
-> >
-> >> +                       reg = <0x05100000 0x0400>;
-> >> +                       clocks = <&ccu CLK_BUS_OTG>;
-> >> +                       resets = <&ccu RST_BUS_OTG>;
-> >> +                       interrupts = <GIC_SPI 23
-> >IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       interrupt-names = "mc";
-> >> +                       phys = <&usb2phy 0>;
-> >> +                       phy-names = "usb";
-> >> +                       extcon = <&usb2phy 0>;
-> >> +                       status = "disabled";
-> >> +               };
-> >> +
-> >> +               usb2phy: phy at 5100400 {
-> >> +                       compatible = "allwinner,sun50i-h6-usb-phy";
-> >> +                       reg = <0x05100400 0x14>,
-> >> +                             <0x05101800 0x4>,
-> >> +                             <0x05311800 0x4>;
-> >> +                       reg-names = "phy_ctrl",
-> >> +                                   "pmu0",
-> >> +                                   "pmu3";
-> >> +                       clocks = <&ccu CLK_USB_PHY0>,
-> >> +                                <&ccu CLK_USB_PHY3>;
-> >> +                       clock-names = "usb0_phy",
-> >> +                                     "usb3_phy";
-> >> +                       resets = <&ccu RST_USB_PHY0>,
-> >> +                                <&ccu RST_USB_PHY3>;
-> >> +                       reset-names = "usb0_reset",
-> >> +                                     "usb3_reset";
-> >> +                       status = "disabled";
-> >> +                       #phy-cells = <1>;
-> >> +               };
-> >> +
-> >> +               ehci0: usb at 5101000 {
-> >> +                       compatible = "allwinner,sun50i-h6-ehci",
-> >"generic-ehci";
-> >> +                       reg = <0x05101000 0x100>;
-> >> +                       interrupts = <GIC_SPI 24
-> >IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&ccu CLK_BUS_OHCI0>,
-> >> +                                <&ccu CLK_BUS_EHCI0>,
-> >> +                                <&ccu CLK_USB_OHCI0>;
-> >> +                       resets = <&ccu RST_BUS_OHCI0>,
-> >> +                                <&ccu RST_BUS_EHCI0>;
-> >> +                       status = "disabled";
-> >> +               };
-> >> +
-> >> +               ohci0: usb at 5101400 {
-> >> +                       compatible = "allwinner,sun50i-h6-ohci",
-> >"generic-ohci";
-> >> +                       reg = <0x05101400 0x100>;
-> >> +                       interrupts = <GIC_SPI 25
-> >IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&ccu CLK_BUS_OHCI0>,
-> >> +                                <&ccu CLK_USB_OHCI0>;
-> >> +                       resets = <&ccu RST_BUS_OHCI0>;
-> >> +                       status = "disabled";
-> >> +               };
-> >> +
-> >> +               ehci3: usb at 5311000 {
-> >> +                       compatible = "allwinner,sun50i-h6-ehci",
-> >"generic-ehci";
-> >> +                       reg = <0x05311000 0x100>;
-> >> +                       interrupts = <GIC_SPI 28
-> >IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&ccu CLK_BUS_OHCI3>,
-> >> +                                <&ccu CLK_BUS_EHCI3>,
-> >> +                                <&ccu CLK_USB_OHCI3>;
-> >> +                       resets = <&ccu RST_BUS_OHCI3>,
-> >> +                                <&ccu RST_BUS_EHCI3>;
-> >> +                       phys = <&usb2phy 3>;
-> >> +                       phy-names = "usb";
-> >> +                       status = "disabled";
-> >> +               };
-> >> +
-> >> +               ohci3: usb at 5311400 {
-> >> +                       compatible = "allwinner,sun50i-h6-ohci",
-> >"generic-ohci";
-> >> +                       reg = <0x05311400 0x100>;
-> >> +                       interrupts = <GIC_SPI 29
-> >IRQ_TYPE_LEVEL_HIGH>;
-> >> +                       clocks = <&ccu CLK_BUS_OHCI3>,
-> >> +                                <&ccu CLK_USB_OHCI3>;
-> >> +                       resets = <&ccu RST_BUS_OHCI3>;
-> >> +                       phys = <&usb2phy 3>;
-> >> +                       phy-names = "usb";
-> >> +                       status = "disabled";
-> >> +               };
-> >> +
-> >
-> >This didn't apply cleanly due to the new HDMI nodes. I fixed it up
-> >locally.
-> >
-> >ChenYu
-> >
-> >>                 r_ccu: clock at 7010000 {
-> >>                         compatible = "allwinner,sun50i-h6-r-ccu";
-> >>                         reg = <0x07010000 0x400>;
-> >> --
-> >> 2.18.0
-> >>
-> >> --
-> >> You received this message because you are subscribed to the Google
-> >Groups "linux-sunxi" group.
-> >> To unsubscribe from this group and stop receiving emails from it,
-> >send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> >> For more options, visit https://groups.google.com/d/optout.
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Ryder
