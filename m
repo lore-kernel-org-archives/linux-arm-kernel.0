@@ -1,55 +1,66 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Thu, 15 Nov 2018 10:16:16 +0800
-Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
-In-Reply-To: <2fc9dbac-4919-4ceb-49ac-67ddd7f203b5@phrozen.org>
-References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
- <20181114124752.GI2620@ulmo>
- <2fc9dbac-4919-4ceb-49ac-67ddd7f203b5@phrozen.org>
-Message-ID: <1542248176.30611.4.camel@mtkswgap22>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Thu, 15 Nov 2018 02:27:48 +0000
+Subject: [PATCH 15/23] dt-bindings: pci: mobiveil: change gpio_slave and
+ apb_csr to optional
+In-Reply-To: <CAFZiPx270bWemYRekvk1BZ23RW3ecK+znEc6C1Dix_U-2y+cnA@mail.gmail.com>
+References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
+ <20181106131807.29951-16-Zhiqiang.Hou@nxp.com>
+ <CAFZiPx270bWemYRekvk1BZ23RW3ecK+znEc6C1Dix_U-2y+cnA@mail.gmail.com>
+Message-ID: <AM6PR04MB57819B50E52512EF10B26CC984DC0@AM6PR04MB5781.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-14 at 14:27 +0100, John Crispin wrote:
-> On 14/11/2018 13:47, Thierry Reding wrote:
-> > On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
-> >> The flag 'has_clks' and related checks are superfluous as the CCF
-> >> subsystem does this for you.
-> > Both of these mechanisms aren't equivalent. While CCF can deal with
-> > optional clocks, what the has_clks flag actually means is that the
-> > device doesn't need a clock (or doesn't have a clock input) on the
-> > devices where it is cleared.
-> >
-> > So I'd actually be in favor of keeping the has_clks property because it
-> > serves as an additional sanity check. For example if you run this driver
-> > on an SoC that "has clocks" but if you don't list them in DT, then after
-> > this patch the driver will happily continue without clocks, even though
-> > it may break completely without those clocks. I've seen SoCs respond to
-> > disabled clocks for a hardware block in different ways, in many cases an
-> > access to any of the registers will completely hang the CPU. In other
-> > cases it may just crash in some other way or give you some sort of
-> > machine exception. None of those are good, and make the tiny bit of
-> > additional code required to support the has_clks flag very attractive.
-> >
-> > But that's just my opinion. If you prefer to throw away that safety
-> > barrier, be my guest. But if you do, please move this functionality into
-> > the clock framework first and then make the driver use it.
-> >
-> > Thierry
-> 
-> Hi,
-> 
-> sorry for my late response. I added the flag for the legacy MIPS 
-> silicon. These SoCs only have a single clock register with a few on/off 
-> bits. there is no complex clocktree or scaling. Hence COMMON_CLK is not 
-> supported by those SoCs. I fully agree with Thierry, that the flag makes 
-> this explicit and the intent was indeed to make sure that on silicon 
-> where clocks are required, that they really are listed in OF. This is 
-> indeed an extra sanity check and hiding it in an implicit check inside 
-> CCF does not feel right.
-> 
->      John
-> 
+Hi Subrahmanya,
 
-Thanks for the detailed information:)  I will drop this patch in v1.
+Thanks a lot for your ACK!
 
-Ryder
+Regards,
+Zhiqiang
+
+> -----Original Message-----
+> From: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+> Sent: 2018?11?14? 17:33
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; Bjorn Helgaas
+> <bhelgaas@google.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> shawnguo at kernel.org; Leo Li <leoyang.li@nxp.com>; Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>
+> Subject: Re: [PATCH 15/23] dt-bindings: pci: mobiveil: change gpio_slave and
+> apb_csr to optional
+> 
+> Acked-by: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+> 
+> On Tue, Nov 6, 2018 at 6:50 PM Z.q. Hou <zhiqiang.hou@nxp.com> wrote:
+> >
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > Change the "gpio_slave" and "apb_csr" to optional, the "gpio_slave"
+> > is not used in current code, and "apb_csr" is not used by some
+> > platorms.
+> >
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/pci/mobiveil-pcie.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
+> > b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
+> > index a618d4787dd7..64156993e052 100644
+> > --- a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
+> > +++ b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
+> > @@ -10,8 +10,10 @@ Required properties:
+> >         interrupt source. The value must be 1.
+> >  - compatible: Should contain "mbvl,gpex40-pcie"
+> >  - reg: Should contain PCIe registers location and length
+> > +       Mandatory:
+> >         "config_axi_slave": PCIe controller registers
+> >         "csr_axi_slave"   : Bridge config registers
+> > +       Optional:
+> >         "gpio_slave"      : GPIO registers to control slot power
+> >         "apb_csr"         : MSI registers
+> >
+> > --
+> > 2.17.1
+> >
