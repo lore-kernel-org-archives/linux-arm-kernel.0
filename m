@@ -1,31 +1,38 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 14 Nov 2018 17:01:08 -0800
-Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
-In-Reply-To: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-References: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <7hd0r7gnmz.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
+Date: Wed, 14 Nov 2018 17:02:16 -0800
+Subject: [PATCH RESEND V3 1/2] pinctrl: fsl: add scu based pinctrl support
+In-Reply-To: <CAOMZO5DU6ATmJkXrDd7XJ2_xwjWOa+o1LOdCb_Y0DDdLJAB1nw@mail.gmail.com>
+References: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
+ <1540908354-26809-2-git-send-email-aisheng.dong@nxp.com>
+ <7hin0zgp84.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
+ <CAOMZO5DU6ATmJkXrDd7XJ2_xwjWOa+o1LOdCb_Y0DDdLJAB1nw@mail.gmail.com>
+Message-ID: <7h8t1vgnl3.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"A.s. Dong" <aisheng.dong@nxp.com> writes:
+Fabio Estevam <festevam@gmail.com> writes:
 
-> After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
-> NO_PAD_CTL pads map are not skipped anymore which results in
-> a possible memory corruption. As we actually only need to create config
-> maps for SCU pads and MMIO pads which are not using the default config
-> (a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
-> the config maps. And during MMIO pads parsing, we also need update the
-> list_p point as SCU case to ensure the pin data next parsed is correct.
+> Hi Kevin,
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
-> Reported-by: Martin Kaiser <martin@kaiser.cx>
-> Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> On Wed, Nov 14, 2018 at 10:26 PM Kevin Hilman <khilman@baylibre.com> wrote:
+>
+>> kernelCI found boot failure caused by this patch.
+>>
+>> imx6 started failing in kernelCI in next-20181114 on several wand
+>> boards[1].  There was no kernel output, after uboot started the kernel.
+>>
+>> Using the imx6q-wandboard, I bisected it down to this commit.
+>>
+>> I verified that reverting this commit on top of next-20181114 fixes the
+>> problem.
+>
+> Thanks for the report.
+>
+> Dong has sent a fix for this issue:
+> https://www.spinics.net/lists/arm-kernel/msg686738.html
 
-After kernelCI found a similar failure, I verified that this patch gets
-things booting again in today's linux-next.
+Ah, I was too slow. ;)
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Anyways, I tested/validated that patch and replied on list.
 
 Kevin
