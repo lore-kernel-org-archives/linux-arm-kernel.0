@@ -1,47 +1,30 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 15 Nov 2018 20:05:29 +0100
-Subject: [PATCH 1/9] arm: remove EISA kconfig option
+Date: Thu, 15 Nov 2018 20:05:30 +0100
+Subject: [PATCH 2/9] alpha: force PCI on for non-jensen configs
 In-Reply-To: <20181115190538.17016-1-hch@lst.de>
 References: <20181115190538.17016-1-hch@lst.de>
-Message-ID: <20181115190538.17016-2-hch@lst.de>
+Message-ID: <20181115190538.17016-3-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No arm config enables EISA, and arm does not include drivers/eisa/Kconfig
-which provides support for things like PCI to EISA bridges, so it is most
-likely dead.
+Without PCI support the kernel won't even compile, so force it on.
 
-Suggested-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm/Kconfig | 15 ---------------
- 1 file changed, 15 deletions(-)
+ arch/alpha/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 91be74d8df65..f24a7435d19a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -163,21 +163,6 @@ config HAVE_PROC_CPU
- config NO_IOPORT_MAP
- 	bool
- 
--config EISA
--	bool
--	---help---
--	  The Extended Industry Standard Architecture (EISA) bus was
--	  developed as an open alternative to the IBM MicroChannel bus.
--
--	  The EISA bus provided some of the features of the IBM MicroChannel
--	  bus while maintaining backward compatibility with cards made for
--	  the older ISA bus.  The EISA bus saw limited use between 1988 and
--	  1995 when it was made obsolete by the PCI bus.
--
--	  Say Y here if you are building a kernel for an EISA-based machine.
--
--	  Otherwise, say N.
--
- config SBUS
- 	bool
- 
+diff --git a/arch/alpha/Kconfig b/arch/alpha/Kconfig
+index 5b4f88363453..65f6d0bf69d4 100644
+--- a/arch/alpha/Kconfig
++++ b/arch/alpha/Kconfig
+@@ -6,6 +6,7 @@ config ALPHA
+ 	select ARCH_MIGHT_HAVE_PC_SERIO
+ 	select ARCH_NO_PREEMPT
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select PCI if !ALPHA_JENSEN
+ 	select HAVE_AOUT
+ 	select HAVE_IDE
+ 	select HAVE_OPROFILE
 -- 
 2.19.1
