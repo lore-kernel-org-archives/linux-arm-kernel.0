@@ -1,62 +1,85 @@
-From: schmitzmic@gmail.com (Michael Schmitz)
-Date: Thu, 15 Nov 2018 14:34:22 +1300
-Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
-In-Reply-To: <20181114075817.GQ30658@n2100.armlinux.org.uk>
-References: <cover.1541995959.git.fthain@telegraphics.com.au>
- <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
- <20181112083422.GA19695@infradead.org>
- <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
- <20181113092012.GI30658@n2100.armlinux.org.uk>
- <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
- <20181113234336.GP30658@n2100.armlinux.org.uk>
- <d9be7418-cc4a-f92f-1aa8-d92a58cd68a4@gmail.com>
- <20181114075817.GQ30658@n2100.armlinux.org.uk>
-Message-ID: <b70ae231-19f2-ef7c-f7ca-0a6486d2cb6b@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 15 Nov 2018 02:35:56 +0100
+Subject: [PATCH 1/2] clocksource: meson6_timer: use register names from
+ the datasheet
+In-Reply-To: <20181028125501.17336-2-martin.blumenstingl@googlemail.com>
+References: <20181028125501.17336-1-martin.blumenstingl@googlemail.com>
+ <20181028125501.17336-2-martin.blumenstingl@googlemail.com>
+Message-ID: <6793aba9-87fc-6cf8-cada-f1fa6a1e0040@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28/10/2018 13:55, Martin Blumenstingl wrote:
+> This makes the driver use the names from S805 datasheet for the
+> preprocessor #defines. This makes it easier to spot that the driver
+> currently only supports Timer A (as clockevent with interrupt support)
+> and Timer E (as clocksource without interrupts). Timer B, C and D (which
+> are similar to Timer A) are currently not supported by the driver.
+> 
+> While here, this also removes the internal "CED_ID" and "CSD_ID" defines
+> which are used to identify the timer. These IDs are not described in the
+> datasheet and thus make it harder to compare the code to what's written
+> in the datasheet.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/clocksource/meson6_timer.c | 110 ++++++++++++++++++-----------
+>  1 file changed, 68 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/clocksource/meson6_timer.c b/drivers/clocksource/meson6_timer.c
+> index 92f20991a937..c622135bee9d 100644
+> --- a/drivers/clocksource/meson6_timer.c
+> +++ b/drivers/clocksource/meson6_timer.c
+> @@ -10,6 +10,8 @@
+>   * warranty of any kind, whether express or implied.
+>   */
+>  
+> +#include <linux/bitfield.h>
+> +#include <linux/bitops.h>
+>  #include <linux/clk.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/interrupt.h>
+> @@ -20,80 +22,102 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  
+> -#define CED_ID			0
+> -#define CSD_ID			4
+> -
+> -#define TIMER_ISA_MUX		0
+> -#define TIMER_ISA_VAL(t)	(((t) + 1) << 2)
+> -
+> -#define TIMER_INPUT_BIT(t)	(2 * (t))
+> -#define TIMER_ENABLE_BIT(t)	(16 + (t))
+> -#define TIMER_PERIODIC_BIT(t)	(12 + (t))
+> +enum meson6_timera_input_clock {
+> +	MESON_TIMERA_CLOCK_1US = 0x0,
+> +	MESON_TIMERA_CLOCK_10US = 0x1,
+> +	MESON_TIMERA_CLOCK_100US = 0x2,
+> +	MESON_TIMERA_CLOCK_1MS = 0x3,
+> +};
+>  
+> -#define TIMER_CED_INPUT_MASK	(3UL << TIMER_INPUT_BIT(CED_ID))
+> -#define TIMER_CSD_INPUT_MASK	(7UL << TIMER_INPUT_BIT(CSD_ID))
+> +enum meson6_timere_input_clock {
+> +	MESON_TIMERE_CLOCK_SYSTEM_CLOCK = 0x0,
+> +	MESON_TIMERE_CLOCK_1US = 0x1,
+> +	MESON_TIMERE_CLOCK_10US = 0x2,
+> +	MESON_TIMERE_CLOCK_100US = 0x3,
+> +	MESON_TIMERE_CLOCK_1MS = 0x4,
+> +};
 
-On 14/11/18 8:58 PM, Russell King - ARM Linux wrote:
->
->> Are you saying that's not possible on arm, because the current timer rundown
->> counter can't be read while the timer is running?
->>
->> If I were to run a second timer at higher rate for clocksource, but keeping
->> the 10 ms timer as clock event (could easily do that by using timer D on
->> Atari Falcon) - how would that improve my timekeeping? Clock events still
->> only happen 10 ms apart ...
-> Ah, I think you're talking about something else.
->
-> You seem to be talking about what happens when time keeping interrupts
-> happen.
-That's what I understood your comment was about.
-> I'm talking about the resolution of gettimeofday() and the other
-> interfaces that are used (eg) for packet capture timestamping and
-> the like - the _user_ visible effects of the timekeeping system.
->
-> With the existing implementation, all these have better-than-jiffy
-> resolution - in the case of RPC, that's 500ns, rather than 10ms
-> which would be the case without gettimeoffset().  Removing
-> gettimeoffset() as Finn has proposed without preserving that
-> resolution is simply completely unacceptable.
+It is not required to specify the values. The standard defines the
+default first value is zero, and each enum has the value which is +1 of
+the previous one.
 
-I agree - but Finn had also offered to supply patches to arm that would 
-have added a clocksource_read() function very much like for those m68k 
-platforms that had used gettimeoffset(). I wondered what reason there 
-was for these not to work on arm
+Other than that, the changes look ok.
 
-I now realize you'd never seen that offer.
 
-The proposal to drop architectures still relying on arch_gettimeoffset() 
-had been raising enough of a response on linux-m68k to make me conclude 
-that same proposal had been kicked on to other arch MLs affected as 
-well. I'm a bit naive that way.
 
-Now your criticism of arch_gettimeoffset() (missing timer rollover 
-because the timer interrupt has been cleared by the interrupt handler) 
-still stands. I just can't find the offset() functions shown in the 
-5cfc8ee0bb51 patch. Any hints?
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Cheers,
-
- ??? Michael
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
