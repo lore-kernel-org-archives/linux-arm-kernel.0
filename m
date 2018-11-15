@@ -1,48 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2018 15:47:39 +0000
-Subject: [PATCH v2] arm64: Make kpti command line options x86 compatible
-In-Reply-To: <20181113152906.55802-1-agraf@suse.de>
-References: <20181113152906.55802-1-agraf@suse.de>
-Message-ID: <20181115154738.GB2062@brain-police>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 15 Nov 2018 23:50:09 +0800
+Subject: [PATCH 01/15] ARM: dts: sun8i-a33: Remove heading 0 in
+ video-codec unit address
+In-Reply-To: <20181115145013.3378-2-paul.kocialkowski@bootlin.com>
+References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
+ <20181115145013.3378-2-paul.kocialkowski@bootlin.com>
+Message-ID: <CAGb2v679sG+KqmkGway8E-CdgQa8ybBv8K2RdNwfB7zWAJkaXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 04:29:06PM +0100, Alexander Graf wrote:
-> I've already stumbled over 2 cases where people got confused about how to
-> disable kpti on AArch64. In both cases, they used existing x86_64 options
-> and just applied that to an AArch64 system, expecting it to work.
-> 
-> I think it makes a lot of sense to have compatible kernel command line
-> parameters whenever we can have them be compatible.
-> 
-> So this patch adds the pti= and no_pti kernel command line options, mapping
-> them into the existing kpti= command line framework. It preserves the old
-> syntax to maintain compatibility with older command lines.
-> 
-> While at it, the patch also marks the respective options as dual-arch.
-> 
-> Reported-by: Richard Brown <rbrown@suse.de>
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> 
-> ---
-> 
-> v1 -> v2:
-> 
->   - Actually make it compile. Sorry for the sloppy v1.
-> ---
->  Documentation/admin-guide/kernel-parameters.txt |  6 +++---
->  arch/arm64/kernel/cpufeature.c                  | 20 +++++++++++++++++++-
->  2 files changed, 22 insertions(+), 4 deletions(-)
+On Thu, Nov 15, 2018 at 10:50 PM Paul Kocialkowski
+<paul.kocialkowski@bootlin.com> wrote:
+>
+> This cosmetic change removes the heading 0 in the video-codec unit
+> address, as it's done for other nodes.
+>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-This patch doesn't help though, right, because kpti= has already been
-included with backports etc so the ship has sailed? Yeah, it's not ideal,
-but we went over this before:
+Nit: I'd prefer the subject prefix format be "<family>: <soc>: ... ",
+or "sun8i: a33:" in this case. This format seems to be used more often
+than your alternative format.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-August/598395.html
+I can fix it up when applying.
 
-The thing we really need is the sysfs interface hooking up so you can easily
-check the state of the mitigation. Still waiting for a follow-up on that ;)
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-September/603412.html
-
-Will
+ChenYu
