@@ -1,71 +1,131 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 15 Nov 2018 10:55:51 +0100
-Subject: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix VBP size
- calculation
-In-Reply-To: <20181113111633.20189-9-jagan@amarulasolutions.com>
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-9-jagan@amarulasolutions.com>
-Message-ID: <20181115095551.uctdkfmuwlnzhjnn@flea>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2018 10:56:22 +0100
+Subject: [PATCH 3/3] gpio: add driver for sama5d2 PIOBU pins
+In-Reply-To: <1541603580-17448-4-git-send-email-andrei.stefanescu@microchip.com>
+References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
+ <1541603580-17448-4-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <CACRpkda6NLv_HrzygJ5J082jrWwVH3Ljt-5bqJv1kvoax5wWWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrei,
 
-On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
-> The horizontal and vertical back porch calculation in BSP
-> code is simply following the Linux drm comment diagram, in
-> include/drm/drm_modes.h which is
-> 
-> [hv]back porch = [hv]total - [hv]sync_end
-> 
-> BSP code form BPI-M64-bsp is calculating vertical back porch as
-> (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
-> 
-> timmings->ver_sync_time= panel_info->lcd_vspw;
-> timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
-> 
-> vbp = panel->lcd_vbp;
-> vspw = panel->lcd_vspw;
-> dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
-> dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
-> =>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
-> =>  timmings->ver_back_porch
-> =>  mode->vtotal - mode->end
-> 
-> Which evatually same as mode->vtotal - mode->vsync_end so update the
-> same in SUN6I_DSI_BASIC_SIZE0_VBP
-> 
-> On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
-> value.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+thanks for your patch!
 
-I've tested your changes on my A33 board, and this commit will break
-it.
+On Wed, Nov 7, 2018 at 4:12 PM <Andrei.Stefanescu@microchip.com> wrote:
 
-It creates vblank timeouts, and visual artifacts at the bottom of the
-display.
+> PIOBU pins do not lose their voltage during Backup/Self-refresh.
+> This patch adds a simple GPIO controller for them.
+>
+> This driver adds support for using the pins as GPIO
+> offering the possibility to read/set the voltage.
+>
+> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
 
-Later commits seem to fix the issue, but will create some blanking on
-the upper third of the display.
+(...)
+> +config GPIO_SAMA5D2_PIOBU
+> +       tristate "SAMA5D2 PIOBU GPIO support"
+> +       depends on GPIO_SYSCON
 
-Since the documentation is quite sparse, and a MIPI-DSI analyzer is
-way too expensive, I'd really like to have at least what each of these
-commits are actually fixing, and what symptoms each of these were
-causing, and not just "the BSP does it".
+Should it not be:
+depends on MFD_SYSCON
+select GPIO_SYSCON
 
-Having some datasheet for the panels you had working would help too.
+> +#include <linux/gpio.h>
 
-Maxime
+Drivers should only
+#include <linux/gpio/driver.h>
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/4721cf66/attachment.sig>
+Also add:
+#include <linux/bits.h>
+because you use BIT() macros.
+
+> +#define PIOBU_NUM 8
+> +#define PIOBU_REG_SIZE 4
+
+Isnt register size 4 implied by syscon, I think it is hardwired
+to 32 bits.
+
+> +/*
+> + * sama5d2_piobu_setup_pin - prepares a pin for sama5d2_piobu_set_direction call
+> + *
+> + * Do not consider pin for intrusion detection (normal and backup modes)
+> + * Do not consider pin as intrusion wakeup interrupt source
+
+Intrusion ... sounds like some burglar alarm :D
+
+> +/*
+> + * sama5d2_piobu_get_direction - gpiochip get_direction
+> + */
+
+Check all your kerneldoc comments please,
+
+/**
+ * this_is_a_function() - This is a function
+ */
+
+See
+Documentation/doc-guide/kernel-doc.rst
+
+> +static int sama5d2_piobu_get_direction(struct gpio_chip *chip,
+> +                                      unsigned int pin)
+> +{
+> +       int ret = sama5d2_piobu_read_value(chip, pin, PIOBU_DIRECTION);
+> +
+> +       if (ret < 0)
+> +               return ret;
+> +
+> +       return (ret == PIOBU_IN) ? GPIOF_DIR_IN : GPIOF_DIR_OUT;
+
+Please do not use these flags in drivers: they are for consumers.
+Just return 0/1.
+
+> +static int sama5d2_piobu_get(struct gpio_chip *chip, unsigned int pin)
+> +{
+> +       /* if pin is input, read value from PDS else read from SOD */
+> +       int ret = sama5d2_piobu_get_direction(chip, pin);
+> +
+> +       if (ret == GPIOF_DIR_IN)
+> +               ret = sama5d2_piobu_read_value(chip, pin, PIOBU_PDS);
+> +       else if (ret == GPIOF_DIR_OUT)
+> +               ret = sama5d2_piobu_read_value(chip, pin, PIOBU_SOD);
+
+Dito.
+
+> +static void sama5d2_piobu_set(struct gpio_chip *chip, unsigned int pin,
+> +                             int value)
+> +{
+> +       value = (value == 0) ? PIOBU_LOW : PIOBU_HIGH;
+
+That looks unorthodox. Just use an if() statement.
+
+> +const struct gpio_chip sama5d2_piobu_template_chip = {
+> +       .owner = THIS_MODULE,
+> +       .get_direction = sama5d2_piobu_get_direction,
+> +       .direction_input = sama5d2_piobu_direction_input,
+> +       .direction_output = sama5d2_piobu_direction_output,
+> +       .get = sama5d2_piobu_get,
+> +       .set = sama5d2_piobu_set,
+> +       .base = -1,
+> +       .ngpio = PIOBU_NUM,
+> +       .can_sleep = 0,
+(...)
+> +       piobu->chip = sama5d2_piobu_template_chip;
+> +       piobu->chip.label = pdev->name;
+> +       piobu->chip.parent = &pdev->dev;
+> +       piobu->chip.of_node = pdev->dev.of_node;
+
+This is just overcomplicating things. Instead of assigning the template
+just assign all function here in the probe() code, get rid of the
+templaye. It's easier to follow.
+
+> +       piobu->regmap =
+> +               syscon_regmap_lookup_by_compatible("microchip,sama5d2-piobu");
+
+So maybe just put this inside your syscon node and use:
+syscon_node_to_regmap(pdev->dev.parent->of_node);
+
+I might have more comments on the next version, but keep at it!
+
+Yours,
+Linus Walleij
