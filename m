@@ -1,37 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Nov 2018 14:38:26 -0800
-Subject: [PATCH] bus: ti-sysc: Detect devices for debug on omap5
-Message-ID: <20181115223826.60477-1-tony@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 15 Nov 2018 23:29:40 +0100
+Subject: [PATCH 3/3] arm64: dts: broadcom: Add reference to RPi 3 A+
+In-Reply-To: <1542320980-2842-1-git-send-email-stefan.wahren@i2se.com>
+References: <1542320980-2842-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1542320980-2842-4-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to see the names of detected devices when DEBUG is enabled.
+This adds a reference to the dts of the Raspberry Pi 3 A+,
+so we don't need to maintain the content in arm64.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- drivers/bus/ti-sysc.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-a-plus.dts | 2 ++
+ 1 file changed, 2 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-a-plus.dts
 
-diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
---- a/drivers/bus/ti-sysc.c
-+++ b/drivers/bus/ti-sysc.c
-@@ -820,6 +820,7 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
- 	SYSC_QUIRK("ocp2scp", 0, 0, 0x10, 0x14, 0x50060005, 0xfffffff0, 0),
- 	SYSC_QUIRK("ocp2scp", 0, 0, -1, -1, 0x50060007, 0xffffffff, 0),
- 	SYSC_QUIRK("padconf", 0, 0, 0x10, -1, 0x4fff0800, 0xffffffff, 0),
-+	SYSC_QUIRK("padconf", 0, 0, -1, -1, 0x40001100, 0xffffffff, 0),
- 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000100, 0xffffffff, 0),
- 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x00004102, 0xffffffff, 0),
- 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000400, 0xffffffff, 0),
-@@ -838,7 +839,9 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
- 	SYSC_QUIRK("rtc", 0, 0x74, 0x78, -1, 0x4eb01908, 0xffff00f0, 0),
- 	SYSC_QUIRK("timer32k", 0, 0, 0x4, -1, 0x00000060, 0xffffffff, 0),
- 	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000004, 0xffffffff, 0),
-+	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000008, 0xffffffff, 0),
- 	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, 0x14, 0x50700100, 0xffffffff, 0),
-+	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, -1, 0x50700101, 0xffffffff, 0),
- 	SYSC_QUIRK("usb_otg_hs", 0, 0x400, 0x404, 0x408, 0x00000050,
- 		   0xffffffff, 0),
- 	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0500, 0xfffff0f0, 0),
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-a-plus.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-a-plus.dts
+new file mode 100644
+index 0000000..f0ec56a
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-a-plus.dts
+@@ -0,0 +1,2 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "arm/bcm2837-rpi-3-a-plus.dts"
 -- 
-2.19.1
+2.7.4
