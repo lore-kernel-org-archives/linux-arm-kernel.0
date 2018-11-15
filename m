@@ -1,46 +1,18 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 15 Nov 2018 19:50:04 +0000
-Subject: [PATCH 4/9] dma-mapping: move the arm64 ncoherent alloc/free
- support to common code
-In-Reply-To: <20181105121931.13481-5-hch@lst.de>
-References: <20181105121931.13481-1-hch@lst.de>
- <20181105121931.13481-5-hch@lst.de>
-Message-ID: <20181115195004.GB4535@brain-police>
+Date: Thu, 15 Nov 2018 19:50:41 +0000
+Subject: move the arm arch_dma_alloc implementation to common code
+In-Reply-To: <20181109075238.GA27578@lst.de>
+References: <20181105121931.13481-1-hch@lst.de> <20181109075238.GA27578@lst.de>
+Message-ID: <20181115195041.GC4535@brain-police>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+On Fri, Nov 09, 2018 at 08:52:38AM +0100, Christoph Hellwig wrote:
+> Can I get a quick review from the arm64 folks?  I think it should
+> be fine there as it basically is a code move, but an additional pair
+> or two of eyes always helps to weed out bugs.
 
-Minor nit: typo in the subject "ncoherent".
-
-On Mon, Nov 05, 2018 at 01:19:26PM +0100, Christoph Hellwig wrote:
-> The arm64 codebase to implement coherent dma allocation for architectures
-> with non-coherent DMA is a good start for a generic implementation, given
-> that is uses the generic remap helpers, provides the atomic pool for
-> allocations that can't sleep and still is realtively simple and well
-> tested.  Move it to kernel/dma and allow architectures to opt into it
-> using a config symbol.  Architectures just need to provide a new
-> arch_dma_prep_coherent helper to writeback an invalidate the caches
-> for any memory that gets remapped for uncached access.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> ---
->  arch/arm64/Kconfig              |   2 +-
->  arch/arm64/mm/dma-mapping.c     | 184 ++------------------------------
->  include/linux/dma-mapping.h     |   5 +
->  include/linux/dma-noncoherent.h |   2 +
->  kernel/dma/Kconfig              |   6 ++
->  kernel/dma/remap.c              | 158 ++++++++++++++++++++++++++-
->  6 files changed, 181 insertions(+), 176 deletions(-)
-
-I'm currently at LPC, so I've not been able to test this, but I've been
-through the changes this morning and they look fine to me, so:
-
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-Hopefully we'll get the fallout from the previous changes addressed next
-week.
-
-Cheers,
+I reviewed the arm64 parts, but it would be ideal if Robin could have a look
+as well.
 
 Will
