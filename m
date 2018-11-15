@@ -1,74 +1,84 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Thu, 15 Nov 2018 11:31:33 -0700
-Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
-In-Reply-To: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
-References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
-Message-ID: <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Thu, 15 Nov 2018 19:33:05 +0100
+Subject: [PATCH 12/15] power: supply: olpc_battery: Use DT to get
+ battery version
+In-Reply-To: <CAHp75VeEFK+47pz+he6Su630jnoGKPamhatuoXopS5Ee=LZtTg@mail.gmail.com>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-13-lkundrak@v3.sk>
+ <CAHp75VeEFK+47pz+he6Su630jnoGKPamhatuoXopS5Ee=LZtTg@mail.gmail.com>
+Message-ID: <320e92fd7d942f364c83a1e8411629c1f8979d5f.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/8/2018 6:50 PM, Atish Patra wrote:
-> The cpu-map DT entry in ARM64 can describe the CPU topology in
-> much better way compared to other existing approaches. RISC-V can
-> easily adopt this binding to represent it's own CPU topology.
-> Thus, both cpu-map DT binding and topology parsing code can be
-> moved to a common location so that RISC-V or any other
-> architecture can leverage that.
+On Fri, 2018-10-19 at 16:45 +0300, Andy Shevchenko wrote:
+> On Wed, Oct 10, 2018 at 8:23 PM Lubomir Rintel <lkundrak@v3.sk>
+> wrote:
+> > Avoid using the x86 OLPC platform specific call to get the board
+> > version. It won't work on FDT-based ARM MMP2 platform.
+> > 
+> > Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+> > ---
+> >  drivers/power/supply/olpc_battery.c | 10 +++++++---
+> >  1 file changed, 7 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/power/supply/olpc_battery.c
+> > b/drivers/power/supply/olpc_battery.c
+> > index 5a97e42a3547..540d44bf536f 100644
+> > --- a/drivers/power/supply/olpc_battery.c
+> > +++ b/drivers/power/supply/olpc_battery.c
+> > @@ -19,6 +19,7 @@
+> >  #include <linux/jiffies.h>
+> >  #include <linux/sched.h>
+> >  #include <linux/olpc-ec.h>
+> > +#include <linux/of.h>
+> >  #include <asm/olpc.h>
 > 
-> The relevant discussion regarding unifying cpu topology can be
-> found in [1].
-> 
-> arch_topology seems to be a perfect place to move the common
-> code. I have not introduced any functional changes in the moved
-> to code. The only downside in this approach is that the capacity
-> code will be executed for RISC-V as well. But, it will exit
-> immediately after not able to find the appropriate DT node. If
-> the overhead is considered too much, we can always compile out
-> capacity related functions under a different config for the
-> architectures that do not support them.
-> 
-> The patches have been tested for RISC-V and compile tested for
-> ARM64.
-> 
-> The socket changes[2] can be merged on top of this series or vice
-> versa.
-> 
-> [1] https://lkml.org/lkml/2018/11/6/19
-> [2] https://lkml.org/lkml/2018/11/7/918
-> 
-> Atish Patra (3):
->    dt-binding: cpu-topology: Move cpu-map to a common binding.
->    cpu-topology: Move cpu topology code to common code.
->    RISC-V: Parse cpu topology during boot.
-> 
->   Documentation/devicetree/bindings/arm/topology.txt | 475 -------------------
->   .../devicetree/bindings/cpu/cpu-topology.txt       | 526 +++++++++++++++++++++
->   arch/arm64/include/asm/topology.h                  |  23 +-
->   arch/arm64/kernel/topology.c                       | 305 +-----------
->   arch/riscv/Kconfig                                 |   1 +
->   arch/riscv/kernel/smpboot.c                        |   6 +-
->   drivers/base/arch_topology.c                       | 303 ++++++++++++
->   include/linux/arch_topology.h                      |  23 +
->   include/linux/topology.h                           |   1 +
->   9 files changed, 864 insertions(+), 799 deletions(-)
->   delete mode 100644 Documentation/devicetree/bindings/arm/topology.txt
->   create mode 100644 Documentation/devicetree/bindings/cpu/cpu-topology.txt
-> 
+> Keep it sorted, otherwise the change is good!
 
-I was interested in testing these on QDF2400, an ARM64 platform, since 
-this series touches core ARM64 code and I'd hate to see a regression. 
-However, I can't figure out what baseline to use to apply these. 
-Different patches cause different conflicts of a variety of baselines I 
-attempted.
+Yes, but... the headers are not sorted at the moment. I'll sort the new
+include before <linux/platform_device.h> so that I don't mess it up
+even more, but I don't feel like just sorting everything so that I
+don't obscure the actual change.
 
-What are these intended to apply to?
 
-Also, you might want to run them through checkpatch next time.  There 
-are several whitespace errors.
+> Reviewed-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> 
+> > 
+> > @@ -622,11 +623,13 @@ static int olpc_battery_probe(struct
+> > platform_device *pdev)
+> >         olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc,
+> > NULL);
+> >         if (IS_ERR(olpc_ac))
+> >                 return PTR_ERR(olpc_ac);
+> > -
+> > -       if (olpc_board_at_least(olpc_board_pre(0xd0))) { /* XO-1.5
+> > */
+> > +       if (of_property_match_string(pdev->dev.of_node,
+> > "compatible",
+> > +                                       "olpc,xo1.5-battery") >= 0)
+> > {
+> > +               /* XO-1.5 */
+> >                 olpc_bat_desc.properties = olpc_xo15_bat_props;
+> >                 olpc_bat_desc.num_properties =
+> > ARRAY_SIZE(olpc_xo15_bat_props);
+> > -       } else { /* XO-1 */
+> > +       } else {
+> > +               /* XO-1 */
+> >                 olpc_bat_desc.properties = olpc_xo1_bat_props;
+> >                 olpc_bat_desc.num_properties =
+> > ARRAY_SIZE(olpc_xo1_bat_props);
+> >         }
+> > @@ -672,6 +675,7 @@ static int olpc_battery_remove(struct
+> > platform_device *pdev)
+> > 
+> >  static const struct of_device_id olpc_battery_ids[] = {
+> >         { .compatible = "olpc,xo1-battery" },
+> > +       { .compatible = "olpc,xo1.5-battery" },
+> >         {}
+> >  };
+> >  MODULE_DEVICE_TABLE(of, olpc_battery_ids);
+> > --
+> > 2.19.0
+> > 
 
--- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Lubo
