@@ -1,128 +1,71 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 15 Nov 2018 10:53:30 +0100
-Subject: [RFC v1 1/7] clk: meson: meson8b: run from the XTAL when
- changing the CPU frequency
-In-Reply-To: <20181114225725.2821-2-martin.blumenstingl@googlemail.com>
-References: <20181114225725.2821-1-martin.blumenstingl@googlemail.com>
- <20181114225725.2821-2-martin.blumenstingl@googlemail.com>
-Message-ID: <a27625d70e7061e0ee380230755449a1d34c55fb.camel@baylibre.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Nov 2018 10:55:51 +0100
+Subject: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix VBP size
+ calculation
+In-Reply-To: <20181113111633.20189-9-jagan@amarulasolutions.com>
+References: <20181113111633.20189-1-jagan@amarulasolutions.com>
+ <20181113111633.20189-9-jagan@amarulasolutions.com>
+Message-ID: <20181115095551.uctdkfmuwlnzhjnn@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-14 at 23:57 +0100, Martin Blumenstingl wrote:
-> Changing the CPU clock requires changing various clocks including the
-> SYS PLL. The existing meson clk-pll and clk-regmap drivers can change
-> all of the relevant clocks already.
-> However, changing for exampe the SYS PLL is problematic because as long
-> as the CPU is running off a clock derived from SYS PLL changing the
-> latter results in a full system lockup.
-> Fix this system lockup by switching the CPU clock to run off the XTAL
-> while we are changing the any of the clocks in the CPU clock tree.
+Hi,
+
+On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
+> The horizontal and vertical back porch calculation in BSP
+> code is simply following the Linux drm comment diagram, in
+> include/drm/drm_modes.h which is
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-
-Original submission wasn't that far off after all ;)
-
-Thanks for digging and fixing all the bugs around it ! It must have been quite
-a challenge !
-
-If you don't mind, I would prefer if your series put all the clock fixes
-first, and this particular change just before the last one allowing RW ops.
-
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
-
-> ---
->  drivers/clk/meson/meson8b.c | 63 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 63 insertions(+)
+> [hv]back porch = [hv]total - [hv]sync_end
 > 
-> diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-> index 9bd5920da0ff..40e77fe4ba7c 100644
-> --- a/drivers/clk/meson/meson8b.c
-> +++ b/drivers/clk/meson/meson8b.c
-> @@ -1103,6 +1103,53 @@ static const struct reset_control_ops
-> meson8b_clk_reset_ops = {
->  	.deassert = meson8b_clk_reset_deassert,
->  };
->  
-> +struct meson8b_nb_data {
-> +	struct notifier_block nb;
-> +	struct clk_hw_onecell_data *onecell_data;
-> +};
-> +
-> +static int meson8b_cpu_clk_notifier_cb(struct notifier_block *nb,
-> +				       unsigned long event, void *data)
-> +{
-> +	struct meson8b_nb_data *nb_data =
-> +		container_of(nb, struct meson8b_nb_data, nb);
-> +	struct clk_hw **hws = nb_data->onecell_data->hws;
-> +	struct clk_hw *cpu_clk_hw, *parent_clk_hw;
-> +	struct clk *cpu_clk, *parent_clk;
-> +	int ret;
-> +
-> +	switch (event) {
-> +	case PRE_RATE_CHANGE:
-> +		parent_clk_hw = hws[CLKID_XTAL];
-> +		break;
-> +
-> +	case POST_RATE_CHANGE:
-> +		parent_clk_hw = hws[CLKID_CPU_SCALE_OUT_SEL];
-> +		break;
-> +
-> +	default:
-> +		return NOTIFY_DONE;
-> +	}
-> +
-> +	cpu_clk_hw = hws[CLKID_CPUCLK];
-> +	cpu_clk = __clk_lookup(clk_hw_get_name(cpu_clk_hw));
-> +
-> +	parent_clk = __clk_lookup(clk_hw_get_name(parent_clk_hw));
-> +
-> +	ret = clk_set_parent(cpu_clk, parent_clk);
-> +	if (ret)
-> +		return notifier_from_errno(ret);
-> +
-> +	udelay(100);
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct meson8b_nb_data meson8b_cpu_nb_data = {
-> +	.nb.notifier_call = meson8b_cpu_clk_notifier_cb,
-> +	.onecell_data = &meson8b_hw_onecell_data,
-> +};
-> +
->  static const struct regmap_config clkc_regmap_config = {
->  	.reg_bits       = 32,
->  	.val_bits       = 32,
-> @@ -1112,6 +1159,8 @@ static const struct regmap_config clkc_regmap_config =
-> {
->  static void __init meson8b_clkc_init(struct device_node *np)
->  {
->  	struct meson8b_clk_reset *rstc;
-> +	const char *notifier_clk_name;
-> +	struct clk *notifier_clk;
->  	void __iomem *clk_base;
->  	struct regmap *map;
->  	int i, ret;
-> @@ -1166,6 +1215,20 @@ static void __init meson8b_clkc_init(struct
-> device_node *np)
->  			return;
->  	}
->  
-> +	/*
-> +	 * FIXME we shouldn't program the muxes in notifier handlers. The
-> +	 * tricky programming sequence will be handled by the forthcoming
-> +	 * coordinated clock rates mechanism once that feature is released.
-> +	 */
-> +	notifier_clk_name = clk_hw_get_name(&meson8b_cpu_scale_out_sel.hw);
-> +	notifier_clk = __clk_lookup(notifier_clk_name);
-> +	ret = clk_notifier_register(notifier_clk, &meson8b_cpu_nb_data.nb);
-> +	if (ret) {
-> +		pr_err("%s: failed to register the CPU clock notifier\n",
-> +		       __func__);
-> +		return;
-> +	}
-> +
->  	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
->  				     &meson8b_hw_onecell_data);
->  	if (ret)
+> BSP code form BPI-M64-bsp is calculating vertical back porch as
+> (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
+> 
+> timmings->ver_sync_time= panel_info->lcd_vspw;
+> timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
+> 
+> vbp = panel->lcd_vbp;
+> vspw = panel->lcd_vspw;
+> dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
+> dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
+> =>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
+> =>  timmings->ver_back_porch
+> =>  mode->vtotal - mode->end
+> 
+> Which evatually same as mode->vtotal - mode->vsync_end so update the
+> same in SUN6I_DSI_BASIC_SIZE0_VBP
+> 
+> On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
+> value.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+
+I've tested your changes on my A33 board, and this commit will break
+it.
+
+It creates vblank timeouts, and visual artifacts at the bottom of the
+display.
+
+Later commits seem to fix the issue, but will create some blanking on
+the upper third of the display.
+
+Since the documentation is quite sparse, and a MIPI-DSI analyzer is
+way too expensive, I'd really like to have at least what each of these
+commits are actually fixing, and what symptoms each of these were
+causing, and not just "the BSP does it".
+
+Having some datasheet for the panels you had working would help too.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/4721cf66/attachment.sig>
