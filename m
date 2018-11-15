@@ -1,54 +1,51 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 15 Nov 2018 15:44:18 +0000
-Subject: [RFC PATCH v2 08/23] KVM: arm64: Add a vcpu flag to control SVE
- visibility for the guest
-In-Reply-To: <1538141967-15375-9-git-send-email-Dave.Martin@arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87h8gicpm5.fsf@linaro.org>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 15 Nov 2018 21:18:26 +0530
+Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+Message-ID: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Convert to use vm_insert_range() to map range of kernel
+memory to user vma.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 20 ++------------------
+ 1 file changed, 2 insertions(+), 18 deletions(-)
 
-> Since SVE will be enabled or disabled on a per-vcpu basis, a flag
-> is needed in order to track which vcpus have it enabled.
->
-> This patch adds a suitable flag and a helper for checking it.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-> ---
->
-> Changes since RFCv1:
->
->  * Convert vcpu_has_sve() to a macro so that it can operate on a vcpu
->    without circular header dependency problems.
->
->    This avoids the helper requiring a vcpu_arch argument, which was
->    a little ugly.
-> ---
->  arch/arm64/include/asm/kvm_host.h | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index d4b65414..20baf4a 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -307,6 +307,10 @@ struct kvm_vcpu_arch {
->  #define KVM_ARM64_FP_HOST		(1 << 2) /* host FP regs loaded */
->  #define KVM_ARM64_HOST_SVE_IN_USE	(1 << 3) /* backup for host TIF_SVE */
->  #define KVM_ARM64_HOST_SVE_ENABLED	(1 << 4) /* SVE enabled for EL0 */
-> +#define KVM_ARM64_GUEST_HAS_SVE		(1 << 5) /* SVE exposed to guest */
-> +
-> +#define vcpu_has_sve(vcpu) (system_supports_sve() && \
-> +			    ((vcpu)->arch.flags & KVM_ARM64_GUEST_HAS_SVE))
->
->  #define vcpu_gp_regs(v)		(&(v)->arch.ctxt.gp_regs)
-
-
---
-Alex Benn?e
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index a8db758..2cb83bb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -221,26 +221,10 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+ 					      struct vm_area_struct *vma)
+ {
+ 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+-	unsigned int i, count = obj->size >> PAGE_SHIFT;
+ 	unsigned long user_count = vma_pages(vma);
+-	unsigned long uaddr = vma->vm_start;
+-	unsigned long offset = vma->vm_pgoff;
+-	unsigned long end = user_count + offset;
+-	int ret;
+-
+-	if (user_count == 0)
+-		return -ENXIO;
+-	if (end > count)
+-		return -ENXIO;
+ 
+-	for (i = offset; i < end; i++) {
+-		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
+-		if (ret)
+-			return ret;
+-		uaddr += PAGE_SIZE;
+-	}
+-
+-	return 0;
++	return vm_insert_range(vma, vma->vm_start, rk_obj->pages,
++				user_count);
+ }
+ 
+ static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
+-- 
+1.9.1
