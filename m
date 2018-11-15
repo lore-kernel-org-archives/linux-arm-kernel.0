@@ -1,31 +1,58 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 15 Nov 2018 14:12:41 -0800
-Subject: Regression in next with spi return from transfer_one()
-In-Reply-To: <20181115211451.GH53235@atomide.com>
-References: <20181115211451.GH53235@atomide.com>
-Message-ID: <20181115221241.GQ2089@sirena.org.uk>
+From: greenfoo@gluegarage.com (Fernando Ramos)
+Date: Thu, 15 Nov 2018 23:16:20 +0100
+Subject: [PATCH 0/9] drm: remove deprecated functions
+Message-ID: <20181115221634.22715-1-greenfoo@gluegarage.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 01:14:51PM -0800, Tony Lindgren wrote:
+Hi all,
 
-> Commit 810923f3bf06 ("spi: Deal with slaves that return from
-> transfer_one() unfinished") causes a regression at least on
-> droid 4 with SPI PMIC and regulators on the PMIC. During boot
-> the device just hangs there waiting for rootfs to appear on
-> MMC. Reverting 810923f3bf06 makes things work again.
+One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
+"switch from reference/unreference to get/put". That's what this patch series is
+about.
 
-> Any ideas why this might be?
+In the past year or so most of the functions had already been renamed and only a
+few remained, which are the ones I fix here.
 
-Wow, that's not obvious...  as far as I can tell the code in the !slave
-case is identical so unless the controller is somehow getting mistakenly
-flagged as a slave it looks like it should be something to do with it
-being pushed into a function.  Could you try logging what the timeout
-ends up getting set to?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/dbd71646/attachment.sig>
+In addition, now that all calls to these deprecated functions are gone, this
+patch also removes their implementation and the coccinelle script that takes
+care of them (which is no longer needed).
+
+Anyway, this is my first patch and I'm sure I've done something wrong. Please
+let me know :)
+
+Fernando Ramos (9):
+  drm: replace "drm_gem_object_unreference_unlocked" function with
+    "*put_unlocked"
+  drm: remove deprecated "[__]drm_gem_object_[un]reference[_locked]"
+    functions
+  drm: replace "drm_dev_unref" function with "drm_dev_put"
+  drm: remove deprecated "drm_dev_unref" function
+  drm: replace "drm_connector_unreference" with "drm_connector_put"
+  drm: remove deprecated "drm_connector_[un]reference" functions
+  drm: remove deprecated "drm_framebuffer_[un]reference" functions
+  drm: remove no longer needed drm-get-put coccinelle script
+  docs: drm: remove no longer relevant TODO entry
+
+ Documentation/gpu/todo.rst                   | 17 -----
+ drivers/gpu/drm/arc/arcpgu_drv.c             |  4 +-
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c |  4 +-
+ drivers/gpu/drm/bochs/bochs_mm.c             |  4 +-
+ drivers/gpu/drm/bridge/tc358764.c            |  2 +-
+ drivers/gpu/drm/drm_drv.c                    | 13 ----
+ drivers/gpu/drm/etnaviv/etnaviv_drv.c        |  4 +-
+ drivers/gpu/drm/mxsfb/mxsfb_drv.c            |  4 +-
+ drivers/gpu/drm/rcar-du/rcar_du_drv.c        |  2 +-
+ drivers/gpu/drm/shmobile/shmob_drm_drv.c     |  4 +-
+ drivers/gpu/drm/tve200/tve200_drv.c          |  4 +-
+ drivers/gpu/drm/zte/zx_drm_drv.c             |  4 +-
+ include/drm/drm_connector.h                  | 24 ------
+ include/drm/drm_drv.h                        |  1 -
+ include/drm/drm_framebuffer.h                | 24 ------
+ include/drm/drm_gem.h                        | 50 -------------
+ scripts/coccinelle/api/drm-get-put.cocci     | 78 --------------------
+ 17 files changed, 18 insertions(+), 225 deletions(-)
+ delete mode 100644 scripts/coccinelle/api/drm-get-put.cocci
+
+-- 
+2.19.1
