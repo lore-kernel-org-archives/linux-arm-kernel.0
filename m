@@ -1,43 +1,30 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 15 Nov 2018 10:56:37 +0100
-Subject: [PATCH 0/2] ARM: shmobile: Restrict SCU/TWD support to SoCs that have
- it
-Message-ID: <20181115095639.17206-1-geert+renesas@glider.be>
+Date: Thu, 15 Nov 2018 11:00:37 +0100
+Subject: [PATCH] clockevents/drivers/tegra20: Remove obsolete inclusion of
+ <asm/smp_twd.h>
+Message-ID: <20181115100037.17706-1-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi Simon, Magnus,
+As of commit da4a686a2cfb077a ("ARM: smp_twd: convert to use CLKSRC_OF
+init"), this header file is no longer used.
 
-When Renesas ARM multi-platform support was conceived in commit
-efacfce5f8a52345 ("ARM: shmobile: Introduce ARCH_SHMOBILE_MULTI"),
-support for the ARM Cortex-A9 Snoop Control Unit and the Timer and
-Watchdog Unit was enabled unconditionally.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ drivers/clocksource/tegra20_timer.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-However, only some Renesas multicore Cortex-A9 SoCs have these units,
-and in the modern world, the share of Cortex-A9 SoCs is decreasing.
-
-Hence only enable support for the SCU and TWD when building a kernel
-that includes support for SoCs that have these units.
-
-Thanks!
-
-Geert Uytterhoeven (2):
-  ARM: shmobile: Restrict SCU support to SoCs that have it
-  ARM: shmobile: Restrict TWD support to SoCs that have it
-
- arch/arm/mach-shmobile/Kconfig | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clocksource/tegra20_timer.c b/drivers/clocksource/tegra20_timer.c
+index aa624885e0e239df..4293943f4e2b471e 100644
+--- a/drivers/clocksource/tegra20_timer.c
++++ b/drivers/clocksource/tegra20_timer.c
+@@ -30,7 +30,6 @@
+ #include <linux/delay.h>
+ 
+ #include <asm/mach/time.h>
+-#include <asm/smp_twd.h>
+ 
+ #define RTC_SECONDS            0x08
+ #define RTC_SHADOW_SECONDS     0x0c
 -- 
 2.17.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
