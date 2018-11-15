@@ -1,22 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 15 Nov 2018 10:40:19 +0100
-Subject: [PATCH 2/3] MAINTAINERS: add maintainer for sama5d2 PIOBU GPIO
- driver
-In-Reply-To: <1541603580-17448-3-git-send-email-andrei.stefanescu@microchip.com>
-References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
- <1541603580-17448-3-git-send-email-andrei.stefanescu@microchip.com>
-Message-ID: <CACRpkdbg5LTYAkSZTmLvfjWyhOrOFw9xEQKB_WgVOMULAii_yQ@mail.gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Thu, 15 Nov 2018 01:41:16 -0800
+Subject: [PATCH] arm64: Make kpti command line options x86 compatible
+In-Reply-To: <20181113152046.22389-1-agraf@suse.de>
+References: <20181113152046.22389-1-agraf@suse.de>
+Message-ID: <20181115094116.GA18154@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 7, 2018 at 4:12 PM <Andrei.Stefanescu@microchip.com> wrote:
+On Tue, Nov 13, 2018 at 04:20:46PM +0100, Alexander Graf wrote:
+> I've already stumbled over 2 cases where people got confused about how to
+> disable kpti on AArch64. In both cases, they used existing x86_64 options
+> and just applied that to an AArch64 system, expecting it to work.
+> 
+> I think it makes a lot of sense to have compatible kernel command line
+> parameters whenever we can have them be compatible.
+> 
+> So this patch adds the pti= and no_pti kernel command line options, mapping
+> them into the existing kpti= command line framework. It preserves the old
+> syntax to maintain compatibility with older command lines.
+> 
+> While at it, the patch also marks the respective options as dual-arch.
 
-> This patch adds a maintainer for the sama5d2 GPIO controller
-> driver.
->
-> Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
-
-Just merge this in with the driver patch, thanks!
-
-Yours,
-Linus Walleij
+Thanks.  Which also brings up my old complain? that arm64 and x86 should
+use the same config option.  Bonus points for moving the parsing code
+to a common file..
