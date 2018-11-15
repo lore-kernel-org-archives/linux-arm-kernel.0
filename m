@@ -1,72 +1,37 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 15 Nov 2018 16:11:38 +0100
-Subject: [PATCH 9/9] ARM: EXYNOS: remove <mach/map.h> include
-In-Reply-To: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
- <CGME20181115151247epcas2p4053da2cb28b2414156d2fd0530059c0d@epcas2p4.samsung.com>
-Message-ID: <1542294698-17470-10-git-send-email-b.zolnierkie@samsung.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 15 Nov 2018 16:18:13 +0100
+Subject: [PATCH v0 0/2] Initial Allwinner T3 support.
+In-Reply-To: <20181114082033.GA20712@arx-s1>
+References: <20181114082033.GA20712@arx-s1>
+Message-ID: <20181115151813.a27uov3zmgzjcerf@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove no longer needed <mach/map.h> include.
+Hi!
 
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
----
- arch/arm/mach-exynos/exynos.c           |  2 --
- arch/arm/mach-exynos/include/mach/map.h | 18 ------------------
- arch/arm/mach-exynos/platsmp.c          |  2 --
- 3 files changed, 22 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/map.h
+On Wed, Nov 14, 2018 at 04:20:33PM +0800, hao_zhang wrote:
+> Initial Allwinner T3 support.
+> 
+> Allwinner T3 (sun8i) SoC features a Quad-Core Cortex-A7 ARM CPU, and a
+> Mali400 MP2 GPU from ARM. It is a not-pin-compatible quad core sucessor
+> of the A20). It's also known as the Allwinner R40 for In-Car
+> Entertainment usage.
 
-diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-index d98574c..d29f241 100644
---- a/arch/arm/mach-exynos/exynos.c
-+++ b/arch/arm/mach-exynos/exynos.c
-@@ -19,8 +19,6 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- 
--#include <mach/map.h>
--
- #include "common.h"
- 
- static const struct soc_device_attribute exynos3250_soc_id[] = {
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-deleted file mode 100644
-index 22ebe36..0000000
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/* SPDX-License-Identifier: GPL-2.0 */
--/*
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * EXYNOS - Memory map definitions
-- */
--
--#ifndef __ASM_ARCH_MAP_H
--#define __ASM_ARCH_MAP_H __FILE__
--
--#include <plat/map-base.h>
--
--#include <plat/map-s5p.h>
--
--#define EXYNOS_PA_CHIPID		0x10000000
--
--#endif /* __ASM_ARCH_MAP_H */
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index e2ba70f..56e2554 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -22,8 +22,6 @@
- #include <asm/smp_scu.h>
- #include <asm/firmware.h>
- 
--#include <mach/map.h>
--
- #include "common.h"
- 
- extern void exynos4_secondary_startup(void);
+That series looks good, thanks!  The only thing that would need to be
+reworked is your Signed-off-by name, which (I guess?) should be
+written the same way than in your Copyright info.
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181115/a7e33085/attachment.sig>
