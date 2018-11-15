@@ -1,57 +1,35 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 15 Nov 2018 09:42:55 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
-References: <1542294848-73839-1-git-send-email-peng.hao2@zte.com.cn>
-Message-ID: <63a0ea72-e0ce-b3e4-4fda-f1a359754cc5@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 15 Nov 2018 10:43:05 +0100
+Subject: [PATCH 1/3] dt-bindings: gpio: add sama5d2 PIOBU support
+In-Reply-To: <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
+References: <1541603580-17448-1-git-send-email-andrei.stefanescu@microchip.com>
+ <1541603580-17448-2-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <CACRpkdZvJmH61C8Rd3TeTioag+11GHPGdCDwRHxx3UAzB-rUHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peng,
+On Wed, Nov 7, 2018 at 4:12 PM <Andrei.Stefanescu@microchip.com> wrote:
 
-On 15/11/18 15:14, Peng Hao wrote:
-> When virtual machine starts, hang up. The kernel version of guest
-> is 4.16. Host support vgic_v3.
+> +Required properties:
+> +- compatible:          "syscon", "microchip,sama5d2-piobu"
 
-I don't understand the issue here. the vgic_irq->group field does not 
-exist in 4.16 (neither in the first nor the last version). Nor does the 
-line you are modifying.
+Looks like "syscon" should be dropped, it is using a syscon,
+but it is no syscon.
 
-Both exist in mainline, but what you are mentioning shouldn't be an 
-issue in mainline since vgic_irq->group gets initialized in 
-kvm_vgic_vcpu_init for SGIs and PPIs (i.e. intid < 32) which includes 
-your interrupt.
+> +       secumod at fc040000 {
+> +               compatible = "syscon", "microchip,sama5d2-piobu";
+> +               reg = <0xfc040000 0x100>;
+> +
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
+> +       };
 
-Cheers,
+Isn't it easiest to just make this driver be a subnode of the
+syscon so it can just refer to its parent to find the
+syscon it needs?
 
-> It was mainly due to the incorrect vgic_irq's(intid=27) group value
-> during injection interruption. when kvm_vgic_vcpu_init is called,
-> dist is not initialized at this time. Unable to get vgic V3 or V2
-> correctly, so group is not set.
-> group is setted to 1 when vgic_mmio_write_group is invoked at some
-> time.
-> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-> interrupt injection failed.
-> 
-> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> ---
->   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 9c0dd23..d101000 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
->   	if (vgic_irq_is_mapped_level(irq) && (val & ICH_LR_PENDING_BIT))
->   		irq->line_level = false;
->   
-> -	if (irq->group)
-> +	if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->   		val |= ICH_LR_GROUP;
->   
->   	val |= (u64)irq->priority << ICH_LR_PRIORITY_SHIFT;
-> 
+Just state that in the bindings and make an example where
+it is inside the syscon.
 
--- 
-Julien Thierry
+Yours,
+Linus Walleij
