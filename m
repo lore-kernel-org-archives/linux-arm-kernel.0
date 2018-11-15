@@ -1,46 +1,41 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 15 Nov 2018 16:40:31 +0000
-Subject: [RFC PATCH v2 05/23] KVM: arm: Add arch vcpu uninit hook
-In-Reply-To: <20181102080536.GQ12057@e113682-lin.lund.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-6-git-send-email-Dave.Martin@arm.com>
- <20181102080536.GQ12057@e113682-lin.lund.arm.com>
-Message-ID: <20181115164031.GN3505@e103592.cambridge.arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 15 Nov 2018 17:43:10 +0100
+Subject: [PATCH 1/4] dt-bindings: pwm: update bindings for MT7629 SoC
+In-Reply-To: <1542263704.7928.2.camel@mtkswgap22>
+References: <1dc7b27cbad59c413d7076ff7d16b6757014d727.1542262833.git.ryder.lee@mediatek.com>
+ <1542263704.7928.2.camel@mtkswgap22>
+Message-ID: <b96ef8a5-ea09-2d24-23a1-ca9192e29ab5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 02, 2018 at 09:05:36AM +0100, Christoffer Dall wrote:
-> On Fri, Sep 28, 2018 at 02:39:09PM +0100, Dave Martin wrote:
-> > In preparation for adding support for SVE in guests on arm64, a
-> > hook is needed for freeing additional per-vcpu memory when a vcpu
-> > is freed.
+
+
+On 15/11/2018 07:35, Ryder Lee wrote:
+> On Thu, 2018-11-15 at 14:26 +0800, Ryder Lee wrote:
+>> This updates bindings for MT7629 pwm controller.
+>>
+>> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+>> ---
+>>  Documentation/devicetree/bindings/pwm/pwm-mediatek.txt | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+>> index 991728c..4a2885b 100644
+>> --- a/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-mediatek.txt
+>> @@ -6,6 +6,7 @@ Required properties:
+>>     - "mediatek,mt7622-pwm": found on mt7622 SoC.
+>>     - "mediatek,mt7623-pwm": found on mt7623 SoC.
+>>     - "mediatek,mt7628-pwm": found on mt7628 SoC.
+>> +   - "mediatek,mt7629-pwm": found on mt7629 SoC.
+>>   - reg: physical base address and length of the controller's registers.
+>>   - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+>>     the cell format.
 > 
-> Can this commit motivate why we can't do the work in kvm_arch_vcpu_free,
-> which we use for freeing other data structures?
+> Please ignore this PWM patch. Sorry for the inconvenience :(
 > 
-> (Presumably, uninit is needed when you need to do something at the very
-> last step after releasing the struct pid.
 
-It wasn't to do with that.
+Right, this would at least need a fallback compatible :)
 
-Rather, the division of responsibility between the vcpu_uninit and
-vcpu_free paths is not very clear.
-
-In the earlier version of the series, I think SVE state may have been
-allocated rather early and we may have needed to free it in the failure
-path of kvm_arch_vcpu_create() (which just calls kvm_vcpu_uninit()).
-(Alternatively, I may just have been wrong.)
-
-Now, the vcpu must be fully created before the KVM_ARM_SVE_CONFIG ioctl
-on it (which is what allocates sve_state) can succeed anyway.
-
-So the distinction between these two teardown phases is probably no
-longer important.
-
-I'll see whether I can get rid of this hook and free the SVE state in
-kvm_arch_vcpu_free() instead.
-
-Does that make sense?
-
-Cheers
----Dave
+Regards,
+Matthias
