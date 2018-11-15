@@ -1,50 +1,37 @@
-From: greenfoo@gluegarage.com (Fernando Ramos)
-Date: Thu, 15 Nov 2018 23:16:29 +0100
-Subject: [PATCH 9/9] docs: drm: remove no longer relevant TODO entry
-In-Reply-To: <20181115221634.22715-1-greenfoo@gluegarage.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
-Message-ID: <20181115221634.22715-10-greenfoo@gluegarage.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 15 Nov 2018 14:38:26 -0800
+Subject: [PATCH] bus: ti-sysc: Detect devices for debug on omap5
+Message-ID: <20181115223826.60477-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This entry asked to rename all drm core "*_reference/_unrefence"
-functions to "*_get/_put".
+We want to see the names of detected devices when DEBUG is enabled.
 
-Now that this task is complete, we can remove this entry from the TODO
-list.
-
-Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- Documentation/gpu/todo.rst | 17 -----------------
- 1 file changed, 17 deletions(-)
+ drivers/bus/ti-sysc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/gpu/todo.rst b/Documentation/gpu/todo.rst
-index 77c2b3c25565..85433af65442 100644
---- a/Documentation/gpu/todo.rst
-+++ b/Documentation/gpu/todo.rst
-@@ -28,23 +28,6 @@ them, but also all the virtual ones used by KVM, so everyone qualifies).
- 
- Contact: Daniel Vetter, Thierry Reding, respective driver maintainers
- 
--Switch from reference/unreference to get/put
----------------------------------------------
--
--For some reason DRM core uses ``reference``/``unreference`` suffixes for
--refcounting functions, but kernel uses ``get``/``put`` (e.g.
--``kref_get``/``put()``). It would be good to switch over for consistency, and
--it's shorter. Needs to be done in 3 steps for each pair of functions:
--
--* Create new ``get``/``put`` functions, define the old names as compatibility
--  wrappers
--* Switch over each file/driver using a cocci-generated spatch.
--* Once all users of the old names are gone, remove them.
--
--This way drivers/patches in the progress of getting merged won't break.
--
--Contact: Daniel Vetter
--
- Convert existing KMS drivers to atomic modesetting
- --------------------------------------------------
- 
+diff --git a/drivers/bus/ti-sysc.c b/drivers/bus/ti-sysc.c
+--- a/drivers/bus/ti-sysc.c
++++ b/drivers/bus/ti-sysc.c
+@@ -820,6 +820,7 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("ocp2scp", 0, 0, 0x10, 0x14, 0x50060005, 0xfffffff0, 0),
+ 	SYSC_QUIRK("ocp2scp", 0, 0, -1, -1, 0x50060007, 0xffffffff, 0),
+ 	SYSC_QUIRK("padconf", 0, 0, 0x10, -1, 0x4fff0800, 0xffffffff, 0),
++	SYSC_QUIRK("padconf", 0, 0, -1, -1, 0x40001100, 0xffffffff, 0),
+ 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000100, 0xffffffff, 0),
+ 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x00004102, 0xffffffff, 0),
+ 	SYSC_QUIRK("prcm", 0, 0, -1, -1, 0x40000400, 0xffffffff, 0),
+@@ -838,7 +839,9 @@ static const struct sysc_revision_quirk sysc_revision_quirks[] = {
+ 	SYSC_QUIRK("rtc", 0, 0x74, 0x78, -1, 0x4eb01908, 0xffff00f0, 0),
+ 	SYSC_QUIRK("timer32k", 0, 0, 0x4, -1, 0x00000060, 0xffffffff, 0),
+ 	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000004, 0xffffffff, 0),
++	SYSC_QUIRK("usbhstll", 0, 0, 0x10, 0x14, 0x00000008, 0xffffffff, 0),
+ 	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, 0x14, 0x50700100, 0xffffffff, 0),
++	SYSC_QUIRK("usb_host_hs", 0, 0, 0x10, -1, 0x50700101, 0xffffffff, 0),
+ 	SYSC_QUIRK("usb_otg_hs", 0, 0x400, 0x404, 0x408, 0x00000050,
+ 		   0xffffffff, 0),
+ 	SYSC_QUIRK("wdt", 0, 0, 0x10, 0x14, 0x502a0500, 0xfffff0f0, 0),
 -- 
 2.19.1
