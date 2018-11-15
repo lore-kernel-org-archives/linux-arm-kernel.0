@@ -1,29 +1,34 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 14 Nov 2018 22:32:59 -0200
-Subject: [PATCH RESEND V3 1/2] pinctrl: fsl: add scu based pinctrl support
-In-Reply-To: <7hin0zgp84.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
-References: <1540908354-26809-1-git-send-email-aisheng.dong@nxp.com>
- <1540908354-26809-2-git-send-email-aisheng.dong@nxp.com>
- <7hin0zgp84.fsf@eze.i-did-not-set--mail-host-address--so-tickle-me>
-Message-ID: <CAOMZO5DU6ATmJkXrDd7XJ2_xwjWOa+o1LOdCb_Y0DDdLJAB1nw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 15 Nov 2018 00:51:09 +0000
+Subject: [PATCH v9 00/24] ILP32 for ARM64
+In-Reply-To: <20181113105717.GA5664@yury-thinkpad>
+References: <20180516081910.10067-1-ynorov@caviumnetworks.com>
+ <20180724173957.GA22106@yury-thinkpad> <mvmbm6tgunu.fsf@suse.de>
+ <20181113105717.GA5664@yury-thinkpad>
+Message-ID: <20181115005109.73ll47dfwk4uc63r@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Tue, Nov 13, 2018 at 10:57:26AM +0000, Yury Norov wrote:
+> On Tue, Nov 13, 2018 at 11:04:53AM +0100, Andreas Schwab wrote:
+> > On Jul 24 2018, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> > 
+> > > This is the update of the series based on 4.17 kernel
+> > > https://github.com/norov/linux/tree/ilp32-4.17
+> > 
+> > Do you aleady have an update for 4.19?
+> 
+> I've started this work.
+> 
+> Comparing to 4.17, there are major changes in syscall handling -
+> such routines are rewritten in C, and in signals. At now, basic tests
+> work, but signal delivering causes illegal instruction abort.
 
-On Wed, Nov 14, 2018 at 10:26 PM Kevin Hilman <khilman@baylibre.com> wrote:
+If it helps, I have a 4.18 branch here:
 
-> kernelCI found boot failure caused by this patch.
->
-> imx6 started failing in kernelCI in next-20181114 on several wand
-> boards[1].  There was no kernel output, after uboot started the kernel.
->
-> Using the imx6q-wandboard, I bisected it down to this commit.
->
-> I verified that reverting this commit on top of next-20181114 fixes the
-> problem.
+https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git/log/?h=staging/ilp32-4.18
 
-Thanks for the report.
+Hopefully the changes between 4.18 and 4.19 are smaller than .17->.18.
 
-Dong has sent a fix for this issue:
-https://www.spinics.net/lists/arm-kernel/msg686738.html
+-- 
+Catalin
