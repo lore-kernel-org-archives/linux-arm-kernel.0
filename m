@@ -1,40 +1,30 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Fri, 16 Nov 2018 16:54:24 +0300
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181116103359.wywpaeanhoceqhgb@ltop.local>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
- <20181110111647.GA3511@speedy.hunter>
- <20181110170311.GA7700@brain-police>
- <20181110175404.gnks6sj3zzlz2it7@ltop.local>
- <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
- <20181114222540.fgddrx4xxsne5pdq@ltop.local>
- <20181115083535.usyjcdoz2f6zmssq@bars>
- <20181116103359.wywpaeanhoceqhgb@ltop.local>
-Message-ID: <20181116135424.pbwns66phknezmfa@bars>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Nov 2018 14:06:27 +0000
+Subject: [BUG] Is "mem=" kernel command line parameter broken on ARM?
+In-Reply-To: <20181116133236.GA27819@picapica.im>
+References: <20181116133236.GA27819@picapica.im>
+Message-ID: <20181116140627.GW30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 11:34:00AM +0100, Luc Van Oostenryck wrote:
-> > Hi,
-> > 
-> > Could you please clarify what is your resolution regarding that warning.
-> > I pulled all the changes from sparse repository on kernel.org. However
-> > the same warning is still here when building modules with C=2 option.
+On Fri, Nov 16, 2018 at 02:32:36PM +0100, Anton wrote:
+> Hello
 > 
-> Hi,
 > 
-> Yes, the warning is still there since it's maybe not desired but
-> is at least legit. For the short term, I think the best is your
-> original patch (but using UL as the prefix). I would be glad to
-> ack such a patch (I tried to answer in the original thread but
-> I never found it although I should be subscribed to the
-> linux-arm-kernel mailing list).
-> 
-> For the slightly longer term, I'll need to see how Ramsay's
-> patches can also be used for kernel code.
+> I am trying to boot Linux on a custom board having SAMA5D21 chip.
+> It has 64MiB of DRAM. So I thought it was a good idea to pass amount
+> of physical memory available through command line parameter "mem=64M".
 
-Thanks for clarifiation! I will send v2. 
+mem specifies not only the amount of memory, but also its location.
+mem=64M tells the kernel that there is 64M at physical address zero.
+Your device may not have memory at physical address zero, so that
+will cause the kernel to try to use something that isn't RAM as
+memory.
 
-Regards,
-Sergey
+My guess is that memory starts at 0x20000000 on your platform based
+on what you've provided in uboot, but I can't be certain.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
