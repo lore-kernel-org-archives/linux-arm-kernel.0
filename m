@@ -1,48 +1,95 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Fri, 16 Nov 2018 15:46:19 -0800
-Subject: [PATCH] pinctrl: mediatek: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20181116220540.17222-4-robh@kernel.org>
-References: <20181116220540.17222-1-robh@kernel.org>
- <20181116220540.17222-4-robh@kernel.org>
-Message-ID: <CAGp9LzpgZsj79Tf5Hee45Wt6ag+WHV0SMWd6qvvtj4G3pzAZKQ@mail.gmail.com>
+From: jolly.shah@xilinx.com (Jolly Shah)
+Date: Fri, 16 Nov 2018 15:56:59 -0800
+Subject: [PATCH 9/9] dt-bindings: fpga: Add binding doc for the afi config
+ driver
+In-Reply-To: <1542412619-387-1-git-send-email-jollys@xilinx.com>
+References: <1542412619-387-1-git-send-email-jollys@xilinx.com>
+Message-ID: <1542412619-387-10-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 2:06 PM Rob Herring <robh@kernel.org> wrote:
->
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
->
-> Cc: Sean Wang <sean.wang@kernel.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Add the binding document for the afi config driver.
 
-Acked-by: Sean Wang <sean.wang@kernel.org>
+Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Signed-off-by: Jolly Shah <jollys@xilinx.com>
+---
+ .../devicetree/bindings/fpga/xlnx,afi-fpga.txt     | 67 ++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
 
-> ---
->  drivers/pinctrl/mediatek/pinctrl-paris.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-paris.c b/drivers/pinctrl/mediatek/pinctrl-paris.c
-> index d2179028f134..7ff5ffa88198 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-paris.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-paris.c
-> @@ -419,8 +419,8 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->
->         pins = of_find_property(node, "pinmux", NULL);
->         if (!pins) {
-> -               dev_err(hw->dev, "missing pins property in node %s .\n",
-> -                       node->name);
-> +               dev_err(hw->dev, "missing pins property in node %pOFn .\n",
-> +                       node);
->                 return -EINVAL;
->         }
->
-> --
-> 2.19.1
->
+diff --git a/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
+new file mode 100644
+index 0000000..9006e72
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
+@@ -0,0 +1,67 @@
++Xilinx ZynqMp AFI interface Manager
++
++The Zynq UltraScale+ MPSoC Processing System core provides access from PL
++masters to PS internal peripherals, and memory through AXI FIFO interface
++(AFI) interfaces.
++
++Required properties:
++-compatible:		Should contain "xlnx,afi-fpga"
++-config-afi:		Pairs of  <regid value >
++
++The possible values of regid and values are
++ regid:		Regids of the register to be written possible values
++		0- AFIFM0_RDCTRL
++		1- AFIFM0_WRCTRL
++		2- AFIFM1_RDCTRL
++		3- AFIFM1_WRCTRL
++		4- AFIFM2_RDCTRL
++		5- AFIFM2_WRCTRL
++		6- AFIFM3_RDCTRL
++		7- AFIFM3_WRCTRL
++		8- AFIFM4_RDCTRL
++		9- AFIFM4_WRCTRL
++		10- AFIFM5_RDCTRL
++		11- AFIFM5_WRCTRL
++		12- AFIFM6_RDCTRL
++		13- AFIFM6_WRCTRL
++		14- AFIFS
++		15- AFIFS_SS2
++- value:	Array of values to be written.
++		for FM0_RDCTRL(0) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM0_WRCTRL(1) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM1_RDCTRL(2) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM1_WRCTRL(3) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM2_RDCTRL(4) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM2_WRCTRL(5) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM3_RDCTRL(6) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM3_WRCTRL(7) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM4_RDCTRL(8) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM4_WRCTRL(9) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM5_RDCTRL(10) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM5_WRCTRL(11) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM6_RDCTRL(12) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for FM6_WRCTRL(13) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
++		for AFI_FA(14)
++			dw_ss1_sel	bits (11:10)
++			dw_ss0_sel	bits (9:8)
++				0x0: 32-bit AXI data width),
++				0x1: 64-bit AXI data width,
++				0x2: 128-bit AXI data
++		All other bits are 0 write ignored.
++
++		for AFI_FA(15)  selects for ss2AXI data width valid values
++					0x000: 32-bit AXI data width),
++					0x100: 64-bit AXI data width,
++					0x200: 128-bit AXI data
++
++Example:
++firmware {
++	zynqmp_firmware: zynqmp-firmware {
++		compatible = "xlnx,zynqmp-firmware";
++		method = "smc";
++		afi0: afi0 {
++			compatible = "xlnx,afi-fpga";
++			config-afi = <0 2>, <1 1>, <2 1>;
++		};
++	};
++};
+-- 
+2.7.4
