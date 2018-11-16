@@ -1,36 +1,51 @@
-From: greenfoo@gluegarage.com (Fernando)
-Date: Fri, 16 Nov 2018 18:04:44 +0100
-Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
- "drm_dev_put"
-In-Reply-To: <1542363310.23489.22.camel@pengutronix.de>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <20181115221634.22715-4-greenfoo@gluegarage.com>
- <1542363310.23489.22.camel@pengutronix.de>
-Message-ID: <1542387884.1134874.1579436592.07F916C5@webmail.messagingengine.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Fri, 16 Nov 2018 19:18:29 +0200
+Subject: [PATCH] drm/sun4i: hdmi: Improve compatibility with non-hotplug
+ capable connectors
+Message-ID: <20181116171830.23465-1-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018, at 11:15 AM, Lucas Stach wrote:
-> Am Donnerstag, den 15.11.2018, 23:16 +0100 schrieb Fernando Ramos:
-> > This patch unifies the naming of DRM functions for reference counting as
-> > requested on Documentation/gpu/todo.rst
-> > 
-> > > Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
-> > ---
-> > ?drivers/gpu/drm/arc/arcpgu_drv.c?????????????| 4 ++--
-> > ?drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
-> > ?drivers/gpu/drm/etnaviv/etnaviv_drv.c????????| 4 ++--
-> 
-> At least the etnaviv part of the patch is already fixed in linux-next.
-> 
-> Regards,
-> Lucas
+From: Priit Laes <priit.laes@paf.com>
+
+Even though HDMI connector features hotplug detect pin (HPD), there are
+devices that which do not support it. For these devices fall back to
+additional check on I2C bus. Of course, there might be also devices
+that do not wire DDC pins too, so we don't really know whether cable
+has been connected.
+
+Signed-off-by: Priit Laes <plaes@plaes.org>
+Signed-off-by: Priit Laes <priit.laes@paf.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+index 061d2e0d9011..bded09af1340 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
++++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+@@ -238,14 +238,18 @@ sun4i_hdmi_connector_detect(struct drm_connector *connector, bool force)
+ 	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
+ 	unsigned long reg;
  
-
-Thanks for the notice.
-
-I'm new on this, how should I proceed? Should I create a new (V2) patch series with these changes reverted? Or will the maintainer automatically take care of this when merging?
-
-And, related to this, what is the "good" branch to start developing new drm patches? Is is "drm-next" or "linux-next"? Or does it change depending on how much time until the merge window closes?
-
-Thanks!
+-	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
++	if (!readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
+ 			       reg & SUN4I_HDMI_HPD_HIGH,
+ 			       0, 500000)) {
+-		cec_phys_addr_invalidate(hdmi->cec_adap);
+-		return connector_status_disconnected;
++		return connector_status_connected;
+ 	}
+ 
+-	return connector_status_connected;
++	if (!IS_ERR(hdmi->i2c) && drm_probe_ddc(hdmi->i2c))
++		return connector_status_connected;
++
++	cec_phys_addr_invalidate(hdmi->cec_adap);
++
++	return connector_status_unknown;
+ }
+ 
+ static const struct drm_connector_funcs sun4i_hdmi_connector_funcs = {
+-- 
+2.19.1
