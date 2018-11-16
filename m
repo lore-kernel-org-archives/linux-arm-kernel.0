@@ -1,46 +1,64 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Fri, 16 Nov 2018 21:21:30 +0300
-Subject: [PATCH v2] arm64: sysreg: fix sparse warnings
-Message-ID: <20181116182130.4327-1-geomatsi@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 16 Nov 2018 19:23:53 +0100
+Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
+In-Reply-To: <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
+References: <20181116051719.23376-1-dbasehore@chromium.org>
+ <CAD=FV=W7sYY5n609erPpTxux+0Efad_0YpPkoVZB14Kqm=baXA@mail.gmail.com>
+ <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
+Message-ID: <1698950.cgYuLubFel@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify correct type for the constants to avoid
-the following sparse complaints:
+Hi Derek,
 
-./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+Am Freitag, 16. November 2018, 18:39:09 CET schrieb dbasehore .:
+> On Fri, Nov 16, 2018 at 8:01 AM Doug Anderson <dianders@chromium.org> wrote:
+> > Hi,
+> > 
+> > On Thu, Nov 15, 2018 at 9:17 PM Derek Basehore <dbasehore@chromium.org> wrote:
+> > > This adds the xin32k clock to the RK3399 CPU. Even though it's not
+> > > directly used, muxes will end up traversing the entire clk tree on
+> > > calls to determine_rate if it doesn't exist.
+> > > 
+> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> > > ---
+> > > 
+> > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
+> > >  1 file changed, 7 insertions(+)
+> > 
+> > nit: I would have expected ${SUBJECT} to have v2 in it somewhere.
+> > 
+> > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
+> > > 99e7f65c1779..3d09472978f8 100644
+> > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > 
+> > Aww crud.  I was at the airport yesterday and so I didn't notice that
+> > you were touching rk3399, not rk3399-gru.  This belongs in the gru
+> > device tree file, not in the top level rk3399.  As you have written
+> 
+> > this it will break rk3399 boards that have an rk808 on them, AKA:
+> Should this be moved to the rk3399.dtsi file? The RK3399 assumes that
+> this clk exists (same as the 24MHz clk which is in rk3399.dtsi). While
+> it can function without it defined, it really shouldn't. We can just
+> assign the existing labels in the dts files you pointed out.
 
-Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
----
+Right now this patch puts your clock into the rk3399.dtsi, which is the
+wrong place. On most Rockchip systems, the xin32k clock is created
+by the pmic (rk808 in a lot of cases) and the clock-tree gets amended
+once the pmic has probed. See for example [0].
 
-Changes v1 -> v2
-  - use proper type: UL rather than ULL
+While I don't know where your xin32k really comes from (cros-ec maybe)
+it is definitly a board-specific source for the clock and should thus
+live in the rk3399-gru.dtsi.
 
- arch/arm64/include/asm/sysreg.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+And we really expect each board to actually make sure its xin32k is
+properly defined as for example on the rk808 and act8846 pmics it could
+also very well be turned off at boot and also does support multiple rates,
+thus needing proper clock handling.
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 0c909c4a932f..842fb9572661 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -468,7 +468,7 @@
- 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
- 			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
- 
--#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
-+#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
- #error "Inconsistent SCTLR_EL2 set/clear bits"
- #endif
- 
-@@ -509,7 +509,7 @@
- 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
- 			 SCTLR_ELx_DSSBS | SCTLR_EL1_NTWI  | SCTLR_EL1_RES0)
- 
--#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
-+#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffffUL
- #error "Inconsistent SCTLR_EL1 set/clear bits"
- #endif
- 
--- 
-2.11.0
+
+Heiko
+
+[0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi#n159
