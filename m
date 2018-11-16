@@ -1,56 +1,65 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 16 Nov 2018 22:09:09 +0530
-Subject: [PATCH v2 05/12] drm/sun4i: tcon: Export get tcon0 routine
+Date: Fri, 16 Nov 2018 22:09:10 +0530
+Subject: [PATCH v2 06/12] drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during
+ dsi_bind
 In-Reply-To: <20181116163916.29621-1-jagan@amarulasolutions.com>
 References: <20181116163916.29621-1-jagan@amarulasolutions.com>
-Message-ID: <20181116163916.29621-6-jagan@amarulasolutions.com>
+Message-ID: <20181116163916.29621-7-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sometimes tcon attributes like tcon divider, clock rate etc are
-needed in interface drivers like DSI. So for such cases interface
-driver must probe the respective tcon and get the attributes.
-Instead of probing tcon explictly, better export the existing
-sun5i_get_tcon0 so-that the relevant interface can reuse.
+Probe tcon0 during dsi_bind, so-that the tcon attributes like
+divider value, clock rate can get whenever it need.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 3 ++-
- drivers/gpu/drm/sun4i/sun4i_tcon.h | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 +++++++
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 1 +
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index c78cd35a1294..6e85a33c6828 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -221,7 +221,7 @@ EXPORT_SYMBOL(sun4i_tcon_enable_vblank);
-  * are located in TCON0. This helper returns a pointer to TCON0's
-  * sun4i_tcon structure, or NULL if not found.
-  */
--static struct sun4i_tcon *sun4i_get_tcon0(struct drm_device *drm)
-+struct sun4i_tcon *sun4i_get_tcon0(struct drm_device *drm)
- {
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+index d60955880c43..66a01061e51d 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+@@ -25,6 +25,7 @@
+ #include <drm/drm_panel.h>
+ 
+ #include "sun4i_drv.h"
++#include "sun4i_tcon.h"
+ #include "sun6i_mipi_dsi.h"
+ 
+ #include <video/mipi_display.h>
+@@ -1007,6 +1008,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
+ 	struct drm_device *drm = data;
  	struct sun4i_drv *drv = drm->dev_private;
- 	struct sun4i_tcon *tcon;
-@@ -235,6 +235,7 @@ static struct sun4i_tcon *sun4i_get_tcon0(struct drm_device *drm)
+ 	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
++	struct sun4i_tcon *tcon0 = sun4i_get_tcon0(drm);
+ 	int ret;
  
- 	return NULL;
- }
-+EXPORT_SYMBOL(sun4i_get_tcon0);
+ 	if (!dsi->panel)
+@@ -1014,6 +1016,11 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
  
- void sun4i_tcon_set_mux(struct sun4i_tcon *tcon, int channel,
- 			const struct drm_encoder *encoder)
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 3d492c8be1fc..195deb9db57a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -273,6 +273,7 @@ struct sun4i_tcon {
- struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node);
- struct drm_panel *sun4i_tcon_find_panel(struct device_node *node);
+ 	dsi->drv = drv;
  
-+struct sun4i_tcon *sun4i_get_tcon0(struct drm_device *drm);
- void sun4i_tcon_enable_vblank(struct sun4i_tcon *tcon, bool enable);
- void sun4i_tcon_mode_set(struct sun4i_tcon *tcon,
- 			 const struct drm_encoder *encoder,
++	if (!tcon0)
++		return -EPROBE_DEFER;
++
++	dsi->tcon = tcon0;
++
+ 	drm_encoder_helper_add(&dsi->encoder,
+ 			       &sun6i_dsi_enc_helper_funcs);
+ 	ret = drm_encoder_init(drm,
+diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+index 0df60f84bab3..3c532e83958d 100644
+--- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
++++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h
+@@ -40,6 +40,7 @@ struct sun6i_dsi {
+ 
+ 	struct device		*dev;
+ 	struct sun4i_drv	*drv;
++	struct sun4i_tcon	*tcon;
+ 	struct mipi_dsi_device	*device;
+ 	struct drm_panel	*panel;
+ 	const struct sun6i_dsi_variant	*variant;
 -- 
 2.18.0.321.gffc6fa0e3
