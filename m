@@ -1,30 +1,96 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Nov 2018 14:06:27 +0000
-Subject: [BUG] Is "mem=" kernel command line parameter broken on ARM?
-In-Reply-To: <20181116133236.GA27819@picapica.im>
-References: <20181116133236.GA27819@picapica.im>
-Message-ID: <20181116140627.GW30658@n2100.armlinux.org.uk>
+From: james.hughes@raspberrypi.org (James Hughes)
+Date: Fri, 16 Nov 2018 14:07:22 +0000
+Subject: [PATCH] firmware: raspberrypi: Fix firmware calls with large buffers
+Message-ID: <20181116140722.1203-1-james.hughes@raspberrypi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 02:32:36PM +0100, Anton wrote:
-> Hello
-> 
-> 
-> I am trying to boot Linux on a custom board having SAMA5D21 chip.
-> It has 64MiB of DRAM. So I thought it was a good idea to pass amount
-> of physical memory available through command line parameter "mem=64M".
+Commit a1547e0bca51 ("firmware: raspberrypi: Remove VLA usage")
+moved away from VLA's to a fixed maximum size for mailbox data.
+However, some mailbox calls use larger data buffers
+than the maximum allowed in that change. This fix therefor
+moves from using fixed buffers to kmalloc to ensure all sizes
+are catered for.
 
-mem specifies not only the amount of memory, but also its location.
-mem=64M tells the kernel that there is 64M at physical address zero.
-Your device may not have memory at physical address zero, so that
-will cause the kernel to try to use something that isn't RAM as
-memory.
+There is some documentation, which is somewhat out of date,
+on the mailbox calls here :
+https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 
-My guess is that memory starts at 0x20000000 on your platform based
-on what you've provided in uboot, but I can't be certain.
+v2: Changes to commit message and format only. No code change.
 
+Fixes: a1547e0bca51 ("firmware: raspberrypi: Remove VLA usage")
+
+Signed-off-by: James Hughes <james.hughes@raspberrypi.org>
+---
+ drivers/firmware/raspberrypi.c | 35 +++++++++++++++++-----------------
+ 1 file changed, 18 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
+index a200a2174611..9257bee7860f 100644
+--- a/drivers/firmware/raspberrypi.c
++++ b/drivers/firmware/raspberrypi.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/slab.h>
+ #include <soc/bcm2835/raspberrypi-firmware.h>
+ 
+ #define MBOX_MSG(chan, data28)		(((data28) & ~0xf) | ((chan) & 0xf))
+@@ -21,8 +22,6 @@
+ #define MBOX_DATA28(msg)		((msg) & ~0xf)
+ #define MBOX_CHAN_PROPERTY		8
+ 
+-#define MAX_RPI_FW_PROP_BUF_SIZE	32
+-
+ static struct platform_device *rpi_hwmon;
+ 
+ struct rpi_firmware {
+@@ -144,28 +143,30 @@ EXPORT_SYMBOL_GPL(rpi_firmware_property_list);
+ int rpi_firmware_property(struct rpi_firmware *fw,
+ 			  u32 tag, void *tag_data, size_t buf_size)
+ {
+-	/* Single tags are very small (generally 8 bytes), so the
+-	 * stack should be safe.
+-	 */
+-	u8 data[sizeof(struct rpi_firmware_property_tag_header) +
+-		MAX_RPI_FW_PROP_BUF_SIZE];
+-	struct rpi_firmware_property_tag_header *header =
+-		(struct rpi_firmware_property_tag_header *)data;
+ 	int ret;
++	struct rpi_firmware_property_tag_header *header;
+ 
+-	if (WARN_ON(buf_size > sizeof(data) - sizeof(*header)))
+-		return -EINVAL;
++	/* Some mailboxes can use over 1k bytes. Rather than checking
++	 * size and using stack or kmalloc depending on requirements,
++	 * just use kmalloc. Mailboxes don't get called enough to worry
++	 * too much about the time taken in the allocation.
++	 */
++	void *data = kmalloc(sizeof(*header) + buf_size, GFP_KERNEL);
+ 
++	if (!data)
++		return -ENOMEM;
++
++	header = data;
+ 	header->tag = tag;
+ 	header->buf_size = buf_size;
+ 	header->req_resp_size = 0;
+-	memcpy(data + sizeof(struct rpi_firmware_property_tag_header),
+-	       tag_data, buf_size);
++	memcpy(data + sizeof(*header), tag_data, buf_size);
++
++	ret = rpi_firmware_property_list(fw, data, buf_size + sizeof(*header));
++
++	memcpy(tag_data, data + sizeof(*header), buf_size);
+ 
+-	ret = rpi_firmware_property_list(fw, &data, buf_size + sizeof(*header));
+-	memcpy(tag_data,
+-	       data + sizeof(struct rpi_firmware_property_tag_header),
+-	       buf_size);
++	kfree(data);
+ 
+ 	return ret;
+ }
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.17.1
