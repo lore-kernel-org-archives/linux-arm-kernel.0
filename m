@@ -1,89 +1,63 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 16 Nov 2018 09:49:18 +0100
-Subject: [PATCH v2 0/6] Meson8b: make the CPU clock mutable
-In-Reply-To: <20181115224048.13511-1-martin.blumenstingl@googlemail.com>
-References: <20181115224048.13511-1-martin.blumenstingl@googlemail.com>
-Message-ID: <a942be34-9a17-13b1-5ceb-19777bebe335@baylibre.com>
+Date: Fri, 16 Nov 2018 09:53:42 +0100
+Subject: [PATCH v5 1/3] arm64: dts: meson-gxl: add support for phicomm n1
+In-Reply-To: <20181110033904.4207-2-yangxuan8282@gmail.com>
+References: <20181110033904.4207-1-yangxuan8282@gmail.com>
+ <20181110033904.4207-2-yangxuan8282@gmail.com>
+Message-ID: <5974964f-e81a-8edd-23d1-f6a80185f9cc@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/2018 23:40, Martin Blumenstingl wrote:
-> This allows changing the CPU clock on the 32-bit Amlogic Meson SoCs
-> (Meson8, Meson8b and Meson8m2).
-> CPU frequency scaling will be enabled with a separate series by adding
-> the CPU clock and the OPP tables to meson8.dtsi and meson8b.dtsi.
+On 10/11/2018 04:39, He Yangxuan wrote:
+> This patch adds support for the Phicomm N1. This device based on P230 reference design.
+> And this box doesn't have cvbs, so disable related section in device tree.
 > 
-> While changing the CPU frequency (sys_pll or any of it's post-dividers)
-> we need to run the CPU clock off the XTAL clock. Otherwise the system
-> will lock up because we need to disable the sys_pll to change it's
-> rate.
+> Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/Makefile                |  1 +
+>  .../boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts | 21 +++++++++++++++++++++
+>  2 files changed, 22 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
 > 
-> This also makes the clk-pll's .enable hook a no-op if the clock is
-> already enabled. Otherwise we're getting lockups when calling the
-> first clk_{prepare_}enable on the sys_pll or any of it's children (as
-> the CCF propagates the enable event up to the sys_pll). This is because
-> the .enable hook unconditionally disables and enables the clock.
-> However, we can't disable that clock (not even temporarily) if the CPU
-> is running off sys_pll.
-> 
-> Additionally this adds support for more M/N combinations in sys_pll to
-> achieve all of the OPPs on Meson8b and all OPPs <= 1608 MHz on Meson8
-> and Meson8m2.
-> 
-> Compared to Amlogic's 3.10 kernel there's one notable difference: we
-> are actually allowing changes to the sys_pll. Amlogic's kernel sets
-> sys_pll to a fixed rate during boot and then uses a timer generate a
-> "virtual clock rate" by toggling between various dividers (for example:
-> sys_pll is set to 1536MHz. to achieve 1008MHz they are toggling every
-> 2500us between 1536MHZ and 768MHz so the average over <period, for
-> example one second> is 1008MHz).
-> I could reproduce any situation where changing sys_pll failed (for
-> example due to high temperature). To prove that I ran "stress --cpu 4"
-> for multiple hours and then cycled through all available CPU
-> frequencies (while keeping "stress" running in the background). This
-> worked fine on my Meson8b Odroid-C1 and EC-100 boards as well as my
-> Meson8m2 board.
-> 
-> 
-> Dependencies:
-> This series is built on top of the latest clk-meson.git tree and the
-> patches from my other series [1] "Meson8b: fixes for the cpu_scale_div
-> clock".
-> 
-> 
-> Changes since v1 at [0]:
-> - re-ordered patches as suggested by Jerome: keep all fixes first, then
->   the new "features"
-> - squashed patches "clk-pll: check if the clock is already enabled" and
->   "clk-pll: add the is_enabled function in the clk_ops". This also
->   allows calling clk_hw_is_enabled() from meson_clk_pll_enable()
->   instead of calling meson_clk_pll_is_enabled() directly (this matches
->   the implementation of sclk-div.c)
-> - documented the dependencies of this series in the cover-letter
-> - dropped "RFC" prefix
-> - collected Jerome's Acked-/Reviewed-by's (thanks for the quick
->   response!)
-> 
-> 
-> [0] https://patchwork.kernel.org/cover/10683317/
-> [1] https://patchwork.kernel.org/cover/10617617/
-> 
-> 
-> Martin Blumenstingl (6):
->   clk: meson: clk-pll: check if the clock is already enabled
->   clk: meson: meson8b: do not use cpu_div3 for cpu_scale_out_sel
->   clk: meson: meson8b: mark the CPU clock as CLK_IS_CRITICAL
->   clk: meson: meson8b: add support for more M/N values in sys_pll
->   clk: meson: meson8b: run from the XTAL when changing the CPU frequency
->   clk: meson: meson8b: allow changing the CPU clock tree
-> 
->  drivers/clk/meson/clk-pll.c | 19 ++++++++
->  drivers/clk/meson/meson8b.c | 94 +++++++++++++++++++++++++++++++++----
->  2 files changed, 104 insertions(+), 9 deletions(-)
+> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+> index c31f29d66..49f3ac5d8 100644
+> --- a/arch/arm64/boot/dts/amlogic/Makefile
+> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+> @@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-phicomm-n1.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
+>  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
+> new file mode 100644
+> index 000000000..9a8a8a7e4
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
+> @@ -0,0 +1,21 @@
+> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> +/*
+> + * Copyright (c) 2018 He Yangxuan
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "meson-gxl-s905d-p230.dts"
+> +
+> +/ {
+> +	compatible = "phicomm,n1", "amlogic,s905d", "amlogic,meson-gxl";
+> +	model = "Phicomm N1";
+> +
+> +	cvbs-connector {
+> +		status = "disabled";
+> +	};
+> +};
+> +
+> +&cvbs_vdac_port {
+> +	status = "disabled";
+> +};
 > 
 
-Applied to next/drivers !
-
-Thanks for your work on meson8* SoCs !
-
-Neil
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
