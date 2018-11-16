@@ -1,47 +1,44 @@
-From: pintu.ping@gmail.com (Pintu Agarwal)
-Date: Fri, 16 Nov 2018 23:13:48 +0530
-Subject: [ARM64] Printing IRQ stack usage information
-In-Reply-To: <5997.1542386778@turing-police.cc.vt.edu>
-References: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
- <28496.1542300549@turing-police.cc.vt.edu>
- <CAOuPNLj8wj=tPJo8L3oS7o8iTQcyhZ0W-GH6xmP_GsG4r7YdAQ@mail.gmail.com>
- <49219.1542367988@turing-police.cc.vt.edu>
- <CAOuPNLg4tM6Cw8Yf9rdpkBOU=+Fh654yFQeAhJf1y88Gb3MAew@mail.gmail.com>
- <5997.1542386778@turing-police.cc.vt.edu>
-Message-ID: <CAOuPNLiX0zhxiRAx03YjVU6cocwWbgY9naxeYPRKmT+3PoGhRw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 16 Nov 2018 17:47:06 +0000
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <alpine.LNX.2.21.1811151427210.19@nippy.intranet>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+ <20181113234336.GP30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
+ <20181114141632.GT30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811151427210.19@nippy.intranet>
+Message-ID: <20181116174705.GY30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:16 PM <valdis.kletnieks@vt.edu> wrote:
->
-> On Fri, 16 Nov 2018 20:10:28 +0530, Pintu Agarwal said:
->
-> > > Look at the code controlled by '#ifdef CONFIG_DEBUG_STACK_USAGE'
->
-> > For example: is it possible to keep storing the irq_stack_usage (for
-> > each cpu in a variable) information from boot time, and then use this
-> > variable to dump the irq_stack information, after the system booted,
-> > may be from proc entry ?
->
-> Congrats. You just re-invented DEBUG_STACK_USAGE, which just keeps a high-water mark
-> for stack usage.
+On Thu, Nov 15, 2018 at 03:12:17PM +1100, Finn Thain wrote:
+> The thread went way off-topic when Christoph took the opportunity to 
+> suggest the removal of RPC and EBSA110. That doesn't interest me.
 
-So, you mean to say, my implementation is good enough to get the
-irq_stack usage, from the interrupt handler ?
-But my concern is that if I dump it from irq handler, I will get
-information only for the current cpu.
-How do I store and get the information for all the cpu from the boot time ?
->From where do I call my dump_irq_stack_info() [some where during the
-entry/exit part of the irq handler], so that I could dump information
-for all the handler at boot time itself ?
-Like I would to capture these information:
-- What was the name of the handler ?
-- Which cpu was executing it ?
-- How much irq stack (max value, same like high water mark) were used
-at that time ?
+I suspect that is the right solution - I've been trying to get 4.19
+to boot on my RPC and it's proving very difficult for several reasons,
+not limited to the HDD seeming to be throwing the odd disk error, as
+well as the kernel being rather large (a 4.19 kernel is 2.7M compressed
+as opposed to 2.6.29 being 1.2M compressed for the equivalent
+configuration.)
 
-Where can I collect these information from the boot time ?
+Given that memory on the RPC is not contiguous, that probably means
+an uncompressed kernel overflows the size of the first memory bank,
+so there's probably no hope for modern kernels to boot on the machine.
 
+The EBSA110 is probably in a similar boat - I don't remember whether it
+had 16MB or 32MB as the maximal amount of memory, but memory was getting
+tight with some kernels even running a minimalist userspace.
 
-Thanks,
-Pintu
+So, it's probably time to say goodbyte to the kernel support for these
+platforms.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
