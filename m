@@ -1,31 +1,60 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Fri, 16 Nov 2018 17:23:46 +0100
-Subject: [PATCH v2 0/17] Add support for OLPC XO 1.75 Embedded Controller
-Message-ID: <20181116162403.49854-1-lkundrak@v3.sk>
+Date: Fri, 16 Nov 2018 17:23:50 +0100
+Subject: [PATCH v2 04/17] Revert "platform/olpc: Make ec explicitly
+ non-modular"
+In-Reply-To: <20181116162403.49854-1-lkundrak@v3.sk>
+References: <20181116162403.49854-1-lkundrak@v3.sk>
+Message-ID: <20181116162403.49854-5-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone!
+It doesn't make sense to always have this built-in, e.g. on ARM
+multiplatform kernels.
 
-This is a second spin of the patch set that adds support for the Embedded
-Controller on an OLPC XO 1.75 machine.
+A better way to address the problem the original commit aimed to solve is
+to fix Kconfig. That is what the next commit in the series does.
 
-OLPC XO 1.75 is a MMP2 based ARM laptop. It plugs into the existing OLPC
-platform infrastructure, currently used by the x86 based models.
-The slave mode support for MMP2's SPI controller that the EC is hooked to
-is now in spi.git's for-4.21 branch.
+This reverts commit f48d1496b8537d75776478c6942dd87f34d7f270.
 
-The v1 received a fair number of comments. I've attempted to address all of
-them, either by fixing things or responding to the v1 review.  See the
-change logs in the individual patches for details.
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 
-If I've overlooked something then I apologize -- I haven't dealt with
-a patch set as big as this and I'm struggling to incorporate the
-feedback in an organized manner. Advice from the more experienced folks
-around here are welcome.
+---
+Changes since v1:
+- Sort it later in the patch set
 
-Tested to work on an OLPC XO 1.75 and also tested not to break x86
-support with an OLPC XO 1 machine. I don't have a XO 1.5, but it's
-unlikely this breaks it when XO 1 works.
+ drivers/platform/olpc/olpc-ec.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Lubo
+diff --git a/drivers/platform/olpc/olpc-ec.c b/drivers/platform/olpc/olpc-ec.c
+index 981955dce926..35a21c66cd0d 100644
+--- a/drivers/platform/olpc/olpc-ec.c
++++ b/drivers/platform/olpc/olpc-ec.c
+@@ -1,8 +1,6 @@
+ /*
+  * Generic driver for the OLPC Embedded Controller.
+  *
+- * Author: Andres Salomon <dilinger@queued.net>
+- *
+  * Copyright (C) 2011-2012 One Laptop per Child Foundation.
+  *
+  * Licensed under the GPL v2 or later.
+@@ -14,7 +12,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ #include <linux/workqueue.h>
+-#include <linux/init.h>
++#include <linux/module.h>
+ #include <linux/list.h>
+ #include <linux/olpc-ec.h>
+ 
+@@ -327,4 +325,8 @@ static int __init olpc_ec_init_module(void)
+ {
+ 	return platform_driver_register(&olpc_ec_plat_driver);
+ }
++
+ arch_initcall(olpc_ec_init_module);
++
++MODULE_AUTHOR("Andres Salomon <dilinger@queued.net>");
++MODULE_LICENSE("GPL");
+-- 
+2.19.1
