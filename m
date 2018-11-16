@@ -1,55 +1,41 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Fri, 16 Nov 2018 23:44:07 +0100
-Subject: [PATCH v2] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181116182130.4327-1-geomatsi@gmail.com>
-References: <20181116182130.4327-1-geomatsi@gmail.com>
-Message-ID: <20181116224406.3i6qmzknda7rml2l@ltop.local>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 16 Nov 2018 16:44:41 -0600
+Subject: [PATCH v4 3/6] arm64: add support for i.MX8M EVK board
+In-Reply-To: <20181114175242.12468-3-l.stach@pengutronix.de>
+References: <20181114175242.12468-1-l.stach@pengutronix.de>
+ <20181114175242.12468-3-l.stach@pengutronix.de>
+Message-ID: <20181116224441.GA8002@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 09:21:30PM +0300, Sergey Matyukevich wrote:
-> Specify correct type for the constants to avoid
-> the following sparse complaints:
+On Wed, Nov 14, 2018 at 06:52:39PM +0100, Lucas Stach wrote:
+> This is the evaluation kit board for the i.MX8M. The current level of
+> support yields a working console and is able to boot userspace from
+> SD card or Network.
 > 
-> ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-> 
-> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com> (v1)
+> Tested-by: Tested-by: Baruch Siach <baruch@tkos.co.il> (v1)
+> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
 > ---
-> 
-> Changes v1 -> v2
->   - use proper type: UL rather than ULL
-> 
->  arch/arm64/include/asm/sysreg.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 0c909c4a932f..842fb9572661 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -468,7 +468,7 @@
->  			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
->  			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
->  
-> -#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
-> +#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
->  #error "Inconsistent SCTLR_EL2 set/clear bits"
->  #endif
->  
-> @@ -509,7 +509,7 @@
->  			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
->  			 SCTLR_ELx_DSSBS | SCTLR_EL1_NTWI  | SCTLR_EL1_RES0)
->  
-> -#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
-> +#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffffUL
->  #error "Inconsistent SCTLR_EL1 set/clear bits"
->  #endif
+> v2:
+> - move to freescale folder
+> - fix indentation
+> - fix typo in Makefile
+> - document compatible
+> - switch to generic pinconf
+> v3:
+> - rebase to v4.19-rc1 and already merged pinctrl driver and pending
+>   clk driver
+> v4:
+> - rebased to 4.10-rc1
+> ---
+>  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
+>  arch/arm64/boot/dts/freescale/Makefile        |   2 +
+>  arch/arm64/boot/dts/freescale/imx8mq-evk.dts  | 290 ++++++++++++++++++
+>  3 files changed, 296 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-evk.dts
 
-Acked-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
+You missed my R-by on v3.
 
-I would also be fine with '!= ~0UL' which is, to me, slightly more
-readeable (must not count the fs to know if it's all bits or not).
-
-
-Regards,
--- Luc
+Rob
