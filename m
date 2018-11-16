@@ -1,63 +1,92 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 16 Nov 2018 09:53:42 +0100
-Subject: [PATCH v5 1/3] arm64: dts: meson-gxl: add support for phicomm n1
-In-Reply-To: <20181110033904.4207-2-yangxuan8282@gmail.com>
-References: <20181110033904.4207-1-yangxuan8282@gmail.com>
- <20181110033904.4207-2-yangxuan8282@gmail.com>
-Message-ID: <5974964f-e81a-8edd-23d1-f6a80185f9cc@baylibre.com>
+From: m.reichl@fivetechno.de (Markus Reichl)
+Date: Fri, 16 Nov 2018 09:58:28 +0100
+Subject: [PATCH 0/9] ARM: SAMSUNG: add Exynos chipid driver
+In-Reply-To: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
+References: <CGME20181115151207epcas1p45adfa96d5b52e10fbb5ace76ebae5e3e@epcas1p4.samsung.com>
+ <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <60d56be0-5333-2bff-3576-ff1fcd74d40a@fivetechno.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2018 04:39, He Yangxuan wrote:
-> This patch adds support for the Phicomm N1. This device based on P230 reference design.
-> And this box doesn't have cvbs, so disable related section in device tree.
+Hi Bartlomiej,
+
+
+Am 15.11.18 um 16:11 schrieb Bartlomiej Zolnierkiewicz:
+> Hi,
 > 
-> Signed-off-by: He Yangxuan <yangxuan8282@gmail.com>
-> ---
->  arch/arm64/boot/dts/amlogic/Makefile                |  1 +
->  .../boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts | 21 +++++++++++++++++++++
->  2 files changed, 22 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
+> This patchset adds Exynos chipid driver and converts Exynos platform
+> code to use it. It is heavily based on "[PATCH v9 00/12] Introducing
+> Exynos ChipId driver" patchset [1] so most credits go to Pankaj Dubey.
+> The main difference in the current patchset is in taking simpler
+> approach to converting existing Exynos platform code to use the new
+> chipid driver. This results in much less code duplication.
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index c31f29d66..49f3ac5d8 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -18,6 +18,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-phicomm-n1.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s805x-p241.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-p281.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905w-tx3-mini.dtb
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
-> new file mode 100644
-> index 000000000..9a8a8a7e4
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-phicomm-n1.dts
-> @@ -0,0 +1,21 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * Copyright (c) 2018 He Yangxuan
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "meson-gxl-s905d-p230.dts"
-> +
-> +/ {
-> +	compatible = "phicomm,n1", "amlogic,s905d", "amlogic,meson-gxl";
-> +	model = "Phicomm N1";
-> +
-> +	cvbs-connector {
-> +		status = "disabled";
-> +	};
-> +};
-> +
-> +&cvbs_vdac_port {
-> +	status = "disabled";
-> +};
+> The diffstat for "[PATCH v9 00/12] Introducing Exynos ChipId driver":
+> 
+>  14 files changed, 587 insertions(+), 255 deletions(-)
+> 
+> for the current patchset it is:
+> 
+>  14 files changed, 193 insertions(+), 195 deletions(-)
+> 
+> This patchset has been tested on Exynos4210 (including rev0),
+> Exynos3250, Exynos4412 & Exynos5422 SoCs.
+> 
+> [1] https://marc.info/?l=linux-arm-kernel&m=149087972213359&w=2
+> 
+> Best regards,
+> --
+> Bartlomiej Zolnierkiewicz
+> Samsung R&D Institute Poland
+> Samsung Electronics
 > 
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+tested on Odroid-XU4:
+[    0.022888] soc soc0: Exynos: CPU[EXYNOS5800] PRO_ID[0xe5422001] REV[0x1] Detected
+
+Tested-by: Markus Reichl <m.reichl@fivetechno.de>
+
+Gru?,
+-- 
+Markus Reichl
+> 
+> Bartlomiej Zolnierkiewicz (5):
+>   ARM: EXYNOS: use chipid driver
+>   ARM: EXYNOS: remove soc_is_exynos*() macros
+>   ARM: SAMSUNG: remove samsung_rev()
+>   ARM: SAMSUNG: remove s5p_init_cpu()
+>   ARM: EXYNOS: remove <mach/map.h> include
+> 
+> Pankaj Dubey (4):
+>   ARM: EXYNOS: remove secondary startup initialization from
+>     smp_prepare_cpus
+>   soc: samsung: add exynos chipid driver support
+>   ARM: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
+>   ARM64: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
+> 
+>  arch/arm/mach-exynos/Kconfig                 |   1 +
+>  arch/arm/mach-exynos/common.h                |  81 ++-----------------
+>  arch/arm/mach-exynos/exynos.c                |  75 ++++++++++--------
+>  arch/arm/mach-exynos/firmware.c              |   8 +-
+>  arch/arm/mach-exynos/include/mach/map.h      |  18 -----
+>  arch/arm/mach-exynos/platsmp.c               |  40 ++--------
+>  arch/arm/mach-exynos/pm.c                    |  25 +++---
+>  arch/arm/plat-samsung/cpu.c                  |  17 ----
+>  arch/arm/plat-samsung/include/plat/cpu.h     |   3 -
+>  arch/arm/plat-samsung/include/plat/map-s5p.h |   2 -
+>  arch/arm64/Kconfig.platforms                 |   1 +
+>  drivers/soc/samsung/Kconfig                  |   5 ++
+>  drivers/soc/samsung/Makefile                 |   1 +
+>  drivers/soc/samsung/exynos-chipid.c          | 111 +++++++++++++++++++++++++++
+>  14 files changed, 193 insertions(+), 195 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/map.h
+>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
+> 
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 659 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181116/5ac768e9/attachment.sig>
