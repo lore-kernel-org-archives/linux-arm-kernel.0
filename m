@@ -1,94 +1,176 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 16 Nov 2018 15:56:59 -0800
-Subject: [PATCH 9/9] dt-bindings: fpga: Add binding doc for the afi config
- driver
+Date: Fri, 16 Nov 2018 15:56:53 -0800
+Subject: [PATCH 3/9] dt-bindings: reset: Add bindings for ZynqMP reset driver
 In-Reply-To: <1542412619-387-1-git-send-email-jollys@xilinx.com>
 References: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1542412619-387-10-git-send-email-jollys@xilinx.com>
+Message-ID: <1542412619-387-4-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding document for the afi config driver.
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-Signed-off-by: Shubhrajyoti Datta <shubhrajyoti.datta@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+Add documentation to describe Xilinx ZynqMP reset driver
+bindings.
+
+Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
 ---
- .../devicetree/bindings/fpga/xlnx,afi-fpga.txt     | 67 ++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
+ .../bindings/reset/xlnx,zynqmp-reset.txt           | 148 +++++++++++++++++++++
+ 1 file changed, 148 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
 
-diff --git a/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt b/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
+diff --git a/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt b/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
 new file mode 100644
-index 0000000..9006e72
+index 0000000..e9c1af8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
-@@ -0,0 +1,67 @@
-+Xilinx ZynqMp AFI interface Manager
++++ b/Documentation/devicetree/bindings/reset/xlnx,zynqmp-reset.txt
+@@ -0,0 +1,148 @@
++--------------------------------------------------------------------------
++ =  Zynq UltraScale+ MPSoC reset driver binding =
++--------------------------------------------------------------------------
++The Zynq UltraScale+ MPSoC has several different resets.
 +
-+The Zynq UltraScale+ MPSoC Processing System core provides access from PL
-+masters to PS internal peripherals, and memory through AXI FIFO interface
-+(AFI) interfaces.
++See Chapter 36 of the Zynq UltraScale+ MPSoC TRM (UG) for more information
++about zynqmp resets.
 +
-+Required properties:
-+-compatible:		Should contain "xlnx,afi-fpga"
-+-config-afi:		Pairs of  <regid value >
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
 +
-+The possible values of regid and values are
-+ regid:		Regids of the register to be written possible values
-+		0- AFIFM0_RDCTRL
-+		1- AFIFM0_WRCTRL
-+		2- AFIFM1_RDCTRL
-+		3- AFIFM1_WRCTRL
-+		4- AFIFM2_RDCTRL
-+		5- AFIFM2_WRCTRL
-+		6- AFIFM3_RDCTRL
-+		7- AFIFM3_WRCTRL
-+		8- AFIFM4_RDCTRL
-+		9- AFIFM4_WRCTRL
-+		10- AFIFM5_RDCTRL
-+		11- AFIFM5_WRCTRL
-+		12- AFIFM6_RDCTRL
-+		13- AFIFM6_WRCTRL
-+		14- AFIFS
-+		15- AFIFS_SS2
-+- value:	Array of values to be written.
-+		for FM0_RDCTRL(0) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM0_WRCTRL(1) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM1_RDCTRL(2) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM1_WRCTRL(3) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM2_RDCTRL(4) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM2_WRCTRL(5) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM3_RDCTRL(6) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM3_WRCTRL(7) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM4_RDCTRL(8) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM4_WRCTRL(9) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM5_RDCTRL(10) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM5_WRCTRL(11) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM6_RDCTRL(12) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for FM6_WRCTRL(13) the valid values-fabric width   2: 32-bit,1 : 64-bit ,0: 128-bit enabled
-+		for AFI_FA(14)
-+			dw_ss1_sel	bits (11:10)
-+			dw_ss0_sel	bits (9:8)
-+				0x0: 32-bit AXI data width),
-+				0x1: 64-bit AXI data width,
-+				0x2: 128-bit AXI data
-+		All other bits are 0 write ignored.
++Required Properties:
++- #reset-cells:	Specifies the number of cells needed to encode reset
++		line, should be 1
 +
-+		for AFI_FA(15)  selects for ss2AXI data width valid values
-+					0x000: 32-bit AXI data width),
-+					0x100: 64-bit AXI data width,
-+					0x200: 128-bit AXI data
++Reset outputs:
++	0   :PCIE config reset.
++	1   :PCIE bridge block level reset (AXI interface).
++	2   :PCIE control block level,reset.
++	3   :Display Port block level reset (includes DPDMA).
++	4   :FPD WDT reset.
++	5   :AF_FM5 block level reset.
++	6   :AF_FM4 block level reset.
++	7   :AF_FM3 block level reset.
++	8   :AF_FM2 block level reset.
++	9   :AF_FM1 block level reset.
++	10  :AF_FM0 block level reset.
++	11  :GDMA block level reset.
++	12  :Pixel Processor (GPU_PP1) block level reset.
++	13  :Pixel Processor (GPU_PP0) block level reset.
++	14  :GPU block level reset.
++	15  :GT block level reset.
++	16  :Sata block level reset.
++	17  :ACPU3 power on reset.
++	18  :ACPU2 power on reset.
++	19  :ACPU1 power on reset.
++	20  :ACPU0 power on reset.
++	21  :APU L2 reset.
++	22  :ACPU3 reset.
++	23  :ACPU2 reset.
++	24  :ACPU1 reset.
++	25  :ACPU0 reset.
++	26  :DDR block level reset inside of the DDR Sub System.
++	27  :APM block level reset inside of the DDR Sub System.
++	28  :soft reset.
++	29  :GEM 0 reset.
++	30  :GEM 1 reset.
++	31  :GEM 2 reset.
++	32  :GEM 3 reset.
++	33  :qspi reset.
++	34  :uart0 reset.
++	35  :uart1 reset.
++	36  :spi0 reset.
++	37  :spi1 reset.
++	38  :sdio0 reset.
++	39  :sdio1 reset.
++	40  :can0 reset.
++	41  :can1 reset.
++	42  :i2c0 reset.
++	43  :i2c1 reset.
++	44  :ttc0 reset.
++	45  :ttc1 reset.
++	46  :ttc2 reset.
++	47  :ttc3 reset.
++	48  :swdt reset.
++	49  :nand reset.
++	50  :adma reset.
++	51  :gpio reset.
++	52  :iou_cc reset.
++	53  :timestamp reset.
++	54  :rpu_r50 reset.
++	55  :rpu r51 reset.
++	56  :rpu_amba reset.
++	57  :ocm reset.
++	58  :rpu_pge reset.
++	59  :usb0_core reset.
++	60  :usb1_core reset.
++	61  :usb0_hiber reset.
++	62  :usb1_hiber reset.
++	63  :usb0_apb reset.
++	64  :usb1_apb reset.
++	65  :ipi reset.
++	66  :apm reset.
++	67  :rtc reset.
++	68  :sysmon reset.
++	69  :afi_fm6 reset.
++	70  :lpd_swdt reset.
++	71  :fpd_reset.
++	72  :rpu_dbg1 reset.
++	73  :rpu_dbg0 reset.
++	74  :dbg_lpd reset.
++	75  :dbg_fpd reset.
++	76  :apll reset.
++	77  :dpll reset.
++	78  :vpll reset.
++	79  :iopll reset.
++	80  :rpll reset.
++	81  :gpio_pl_0 reset.
++	82  :gpio_pl_1 reset.
++	83  :gpio_pl_2 reset.
++	84  :gpio_pl_3 reset.
++	85  :gpio_pl_4 reset.
++	86  :gpio_pl_5 reset.
++	87  :gpio_pl_6 reset.
++	88  :gpio_pl_7 reset.
++	89  :gpio_pl_8 reset.
++	90  :gpio_pl_9 reset.
++	91  :gpio_pl_10 reset.
++	92  :gpio_pl_11 reset.
++	93  :gpio_pl_12 reset.
++	94  :gpio_pl_13 reset.
++	95  :gpio_pl_14 reset.
++	96  :gpio_pl_15 reset.
++	97  :gpio_pl_16 reset.
++	98  :gpio_pl_17 reset.
++	99  :gpio_pl_18 reset.
++	100 :gpio_pl_19 reset.
++	101 :gpio_pl_20 reset.
++	102 :gpio_pl_21 reset.
++	103 :gpio_pl_22 reset.
++	104 :gpio_pl_23 reset.
++	105 :gpio_pl_24 reset.
++	106 :gpio_pl_25 reset.
++	107 :gpio_pl_26 reset.
++	108 :gpio_pl_27 reset.
++	109 :gpio_pl_28 reset.
++	110 :gpio_pl_29 reset.
++	111 :gpio_pl_30 reset.
++	112 :gpio_pl_31 reset.
++	113 :rpu_ls reset.
++	114 :ps_only reset.
++	115 :pl reset.
++	116 :ps_pl0 reset
++	117 :ps_pl1 reset
++	118 :ps_pl2 reset
++	119 :ps_pl3 reset
 +
-+Example:
++-------
++Example
++-------
++
 +firmware {
 +	zynqmp_firmware: zynqmp-firmware {
-+		compatible = "xlnx,zynqmp-firmware";
-+		method = "smc";
-+		afi0: afi0 {
-+			compatible = "xlnx,afi-fpga";
-+			config-afi = <0 2>, <1 1>, <2 1>;
-+		};
++		...
++		#reset-cells = <1>;
++		...
 +	};
 +};
 -- 
