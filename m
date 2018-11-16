@@ -1,60 +1,91 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Fri, 16 Nov 2018 11:24:42 +0800
-Subject: [PATCH 1/2] clocksource: Demote dbx500 PRCMU clocksource
-In-Reply-To: <20181115133203.28567-1-linus.walleij@linaro.org>
-References: <20181115133203.28567-1-linus.walleij@linaro.org>
-Message-ID: <CAMz4kuKvqX7B1tundeLTHvttTvE7kv3unLiu-G5z9w5zpQpf8g@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Nov 2018 10:00:33 +0530
+Subject: [PATCH 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
+In-Reply-To: <87o9aqwrtj.fsf@bootlin.com>
+References: <20180924151249.32328-1-gregory.clement@bootlin.com>
+ <20180924151249.32328-3-gregory.clement@bootlin.com>
+ <20181004050624.ecjl3ouczm7huqgg@vireshk-i7>
+ <87o9aqwrtj.fsf@bootlin.com>
+Message-ID: <20181116043033.75q3e6wsfi2juryf@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2018 at 21:32, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Demote the DBx500 PRCMU clocksource to quality 100 and
-> mark it as NONSTOP so it will still be used for
-> timekeeping across suspend/resume.
->
-> The Nomadik MTU timer which has higher precision will
-> be used when the system is up and running, thanks to
-> the recent changes properly utilizing the suspend
-> clocksources.
->
-> This was discussed back in 2011 when the driver was
-> written, but the infrastructure was not available
-> upstream to use this timer properly. Now the
-> infrastructure is there, so let's finalize the work.
->
-> Cc: Baolin Wang <baolin.wang@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
+On 15-11-18, 11:36, Gregory CLEMENT wrote:
+>  On jeu., oct. 04 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> 
+> > On 24-09-18, 17:12, Gregory CLEMENT wrote:
+> >> Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
+> >> The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
+> >> clock domain for two clusters, so this driver will directly
+> >> use generic cpufreq-dt driver as backend.
+> >> 
+> >> Based on the work of Omri Itach <omrii@marvell.com>.
+> >> 
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
+> >> ---
+> >>  drivers/cpufreq/Kconfig.arm         |  11 +++
+> >>  drivers/cpufreq/Makefile            |   1 +
+> >>  drivers/cpufreq/armada-8k-cpufreq.c | 148 ++++++++++++++++++++++++++++
+> >>  3 files changed, 160 insertions(+)
+> >>  create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
+> >> 
+> >> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> >> index 0cd8eb76ad59..fd34095743a7 100644
+> >> --- a/drivers/cpufreq/Kconfig.arm
+> >> +++ b/drivers/cpufreq/Kconfig.arm
+> >> @@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
+> >>  	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
+> >>  	  The Armada 37xx PMU supports 4 frequency and VDD levels.
+> >>  
+> >> +config ARM_ARMADA_8K_CPUFREQ
+> >> +	tristate "Armada 8K CPUFreq driver"
+> >
+> > Since you wanted this to be tristate, have you tried
+> >
+> > insmod armada-8k-cpufreq.ko
+> > rmmod armada-8k-cpufreq.ko
+> > insmod armada-8k-cpufreq.ko
+> > ?
+> 
+> Actually the purpose of it is to be able to have the driver available as
+> a module. Thanks to this the size kernel image is not increased. Once
+> the system is running then we can load the module and have the feature
+> but it is true that is no more possible to unload it. However, except
+> for developing or debugging, I don't see the real interest to unload
+> the driver.
 
-Glad to see new driver uses the suspend clocksource.
-Reviewed-by: Baolin Wang <baolin.wang@linaro.org>
+Sure, probably it will never get used that way but I see that as
+broken. If you want to have the driver as module, better support
+unloading of it as well.
 
->  drivers/clocksource/clksrc-dbx500-prcmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> index c1b96dc5f444..4054539fe066 100644
-> --- a/drivers/clocksource/clksrc-dbx500-prcmu.c
-> +++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
-> @@ -46,10 +46,10 @@ static u64 notrace clksrc_dbx500_prcmu_read(struct clocksource *cs)
->
->  static struct clocksource clocksource_dbx500_prcmu = {
->         .name           = "dbx500-prcmu-timer",
-> -       .rating         = 300,
-> +       .rating         = 100,
->         .read           = clksrc_dbx500_prcmu_read,
->         .mask           = CLOCKSOURCE_MASK(32),
-> -       .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
-> +       .flags          = CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
->  };
->
->  #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
-> --
-> 2.17.2
->
+> >> +++ b/drivers/cpufreq/armada-8k-cpufreq.c
 
+> >> +/*
+> >> + * Setup the opps list with the divider for the max frequency, that
+> >> + * will be filled at runtime, 0 meaning 100Mhz
+> >
+> > Add a full-stop at the end please.
+> 
+> I am not sure to understand what you means by a "full-stop": a 0Hz
+> frequency?
+> 
+> But this case should be handle by the CPU idle driver.
 
+I meant '.' by full-stop. I wanted you to add . at the end of the
+line, like this:
+
+Setup the opps list with the divider for the max frequency, that
+will be filled at runtime, 0 meaning 100Mhz.
+
+> > I am not sure why will you want to support 100 MHz as the CPUs may end
+> > up running on that a lot :)
+> 
+> It should depend of the policy, or am I missing something.
+
+Sure, but with any of the general governors like
+ondemand/conservative/schedutil, you will end up running at 100 MHz
+when the system doesn't have high load. And 100MHz may be way too
+slow.
 
 -- 
-Baolin Wang
-Best Regards
+viresh
