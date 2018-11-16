@@ -1,64 +1,110 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 16 Nov 2018 19:23:53 +0100
-Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
-In-Reply-To: <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
-References: <20181116051719.23376-1-dbasehore@chromium.org>
- <CAD=FV=W7sYY5n609erPpTxux+0Efad_0YpPkoVZB14Kqm=baXA@mail.gmail.com>
- <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
-Message-ID: <1698950.cgYuLubFel@diego>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Fri, 16 Nov 2018 10:28:37 -0800
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+Message-ID: <20181116182836.GB17088@rapoport-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Derek,
-
-Am Freitag, 16. November 2018, 18:39:09 CET schrieb dbasehore .:
-> On Fri, Nov 16, 2018 at 8:01 AM Doug Anderson <dianders@chromium.org> wrote:
-> > Hi,
-> > 
-> > On Thu, Nov 15, 2018 at 9:17 PM Derek Basehore <dbasehore@chromium.org> wrote:
-> > > This adds the xin32k clock to the RK3399 CPU. Even though it's not
-> > > directly used, muxes will end up traversing the entire clk tree on
-> > > calls to determine_rate if it doesn't exist.
-> > > 
-> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> > > ---
-> > > 
-> > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
-> > >  1 file changed, 7 insertions(+)
-> > 
-> > nit: I would have expected ${SUBJECT} to have v2 in it somewhere.
-> > 
-> > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
-> > > 99e7f65c1779..3d09472978f8 100644
-> > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > 
-> > Aww crud.  I was at the airport yesterday and so I didn't notice that
-> > you were touching rk3399, not rk3399-gru.  This belongs in the gru
-> > device tree file, not in the top level rk3399.  As you have written
+On Thu, Nov 15, 2018 at 09:15:30PM +0530, Souptick Joarder wrote:
+> Previouly drivers have their own way of mapping range of
+> kernel pages/memory into user vma and this was done by
+> invoking vm_insert_page() within a loop.
 > 
-> > this it will break rk3399 boards that have an rk808 on them, AKA:
-> Should this be moved to the rk3399.dtsi file? The RK3399 assumes that
-> this clk exists (same as the 24MHz clk which is in rk3399.dtsi). While
-> it can function without it defined, it really shouldn't. We can just
-> assign the existing labels in the dts files you pointed out.
+> As this pattern is common across different drivers, it can
+> be generalized by creating a new function and use it across
+> the drivers.
+> 
+> vm_insert_range is the new API which will be used to map a
+> range of kernel memory/pages to user vma.
+> 
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Reviewed-by: Matthew Wilcox <willy@infradead.org>
+> ---
+>  include/linux/mm_types.h |  3 +++
+>  mm/memory.c              | 28 ++++++++++++++++++++++++++++
+>  mm/nommu.c               |  7 +++++++
+>  3 files changed, 38 insertions(+)
+> 
+> diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> index 5ed8f62..15ae24f 100644
+> --- a/include/linux/mm_types.h
+> +++ b/include/linux/mm_types.h
+> @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
+>  extern void tlb_finish_mmu(struct mmu_gather *tlb,
+>  				unsigned long start, unsigned long end);
+> 
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count);
+> +
+>  static inline void init_tlb_flush_pending(struct mm_struct *mm)
+>  {
+>  	atomic_set(&mm->tlb_flush_pending, 0);
+> diff --git a/mm/memory.c b/mm/memory.c
+> index 15c417e..da904ed 100644
+> --- a/mm/memory.c
+> +++ b/mm/memory.c
+> @@ -1478,6 +1478,34 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+> 
+>  /**
+> + * vm_insert_range - insert range of kernel pages into user vma
+> + * @vma: user vma to map to
+> + * @addr: target user address of this page
+> + * @pages: pointer to array of source kernel pages
+> + * @page_count: no. of pages need to insert into user vma
+> + *
+> + * This allows drivers to insert range of kernel pages they've allocated
+> + * into a user vma. This is a generic function which drivers can use
+> + * rather than using their own way of mapping range of kernel pages into
+> + * user vma.
 
-Right now this patch puts your clock into the rk3399.dtsi, which is the
-wrong place. On most Rockchip systems, the xin32k clock is created
-by the pmic (rk808 in a lot of cases) and the clock-tree gets amended
-once the pmic has probed. See for example [0].
+Please add the return value and context descriptions.
 
-While I don't know where your xin32k really comes from (cros-ec maybe)
-it is definitly a board-specific source for the clock and should thus
-live in the rk3399-gru.dtsi.
+> + */
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count)
+> +{
+> +	unsigned long uaddr = addr;
+> +	int ret = 0, i;
+> +
+> +	for (i = 0; i < page_count; i++) {
+> +		ret = vm_insert_page(vma, uaddr, pages[i]);
+> +		if (ret < 0)
+> +			return ret;
+> +		uaddr += PAGE_SIZE;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+>   * vm_insert_page - insert single page into user vma
+>   * @vma: user vma to map to
+>   * @addr: target user address of this page
+> diff --git a/mm/nommu.c b/mm/nommu.c
+> index 749276b..d6ef5c7 100644
+> --- a/mm/nommu.c
+> +++ b/mm/nommu.c
+> @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+>  EXPORT_SYMBOL(vm_insert_page);
+> 
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +			struct page **pages, unsigned long page_count)
+> +{
+> +	return -EINVAL;
+> +}
+> +EXPORT_SYMBOL(vm_insert_range);
+> +
+>  /*
+>   *  sys_brk() for the most part doesn't need the global kernel
+>   *  lock, except when an application is doing something nasty
+> -- 
+> 1.9.1
+> 
 
-And we really expect each board to actually make sure its xin32k is
-properly defined as for example on the rk808 and act8846 pmics it could
-also very well be turned off at boot and also does support multiple rates,
-thus needing proper clock handling.
-
-
-Heiko
-
-[0] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/boot/dts/rockchip/rk3399-rock960.dtsi#n159
+-- 
+Sincerely yours,
+Mike.
