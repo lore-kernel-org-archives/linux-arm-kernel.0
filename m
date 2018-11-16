@@ -1,37 +1,42 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 16 Nov 2018 10:59:43 +0100
-Subject: [PATCH 01/15] ARM: dts: sun8i-a33: Remove heading 0 in
- video-codec unit address
-In-Reply-To: <CAGb2v679sG+KqmkGway8E-CdgQa8ybBv8K2RdNwfB7zWAJkaXQ@mail.gmail.com>
-References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
- <20181115145013.3378-2-paul.kocialkowski@bootlin.com>
- <CAGb2v679sG+KqmkGway8E-CdgQa8ybBv8K2RdNwfB7zWAJkaXQ@mail.gmail.com>
-Message-ID: <2866553ef5e5bb293e099ec7c281111e0a6f86dc.camel@bootlin.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 16 Nov 2018 11:01:14 +0100
+Subject: [PATCH] pwm: lpc18xx-sct: don't reconfigure PWM in .request and
+ .free
+In-Reply-To: <1391bbe1-75b5-c86e-ed3a-1e1afb393917@mleia.com>
+References: <20181114115025.GC2620@ulmo>
+ <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
+ <1391bbe1-75b5-c86e-ed3a-1e1afb393917@mleia.com>
+Message-ID: <20181116100114.GB28631@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Le jeudi 15 novembre 2018 ? 23:50 +0800, Chen-Yu Tsai a ?crit :
-> On Thu, Nov 15, 2018 at 10:50 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > This cosmetic change removes the heading 0 in the video-codec unit
-> > address, as it's done for other nodes.
+On Fri, Nov 16, 2018 at 11:22:49AM +0200, Vladimir Zapolskiy wrote:
+> Hello Uwe,
+> 
+> On 11/16/2018 08:52 AM, Uwe Kleine-K?nig wrote:
+> > Regarding the .request case: The consumer might be interested in taking
+> > over the configured state from the boot loader. So the initially
+> > configured state should be retained.
 > > 
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > For the free case the PWM consumer is responsible to disable the PWM
+> > before calling pwm_release and there are three subcases to consider:
+> > 
 > 
-> Nit: I'd prefer the subject prefix format be "<family>: <soc>: ... ",
-> or "sun8i: a33:" in this case. This format seems to be used more often
-> than your alternative format.
+> the changes are fine per se, but please split them into two.
 > 
-> I can fix it up when applying.
+> Probably pwm_disable() misusage began spreading from commit 54b2a999a1675.
 
-Understood, I will make sure to follow this convention next time.
+It's not really misusage to call pwm_disable(). It's basically just a
+shortcut for ->disable() or the atomic equivalent for it. So I think the
+commit that you point to is doing exactly the right thing. Also note
+that that commit was made 6 years ago, and a lot of things have changed
+since then.
 
-Cheers,
-
-Paul
-
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> ChenYu
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181116/94ce7e09/attachment.sig>
