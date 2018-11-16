@@ -1,92 +1,83 @@
-From: jianxin.pan@amlogic.com (Jianxin Pan)
-Date: Sat, 17 Nov 2018 00:40:37 +0800
-Subject: [PATCH v7 1/2] dt-bindings: nand: meson: add Amlogic NAND controller
- driver
-In-Reply-To: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <1542386439-30166-2-git-send-email-jianxin.pan@amlogic.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Fri, 16 Nov 2018 17:39:35 +0100
+Subject: [PATCH 08/15] ARM/arm64: sunxi: Move H3/H5 syscon label over to
+ soc-specific nodes
+In-Reply-To: <CAGb2v65EckX0CDbZ5K9VmmayOe3eisOYgUxmPomPgp2_jE5Vww@mail.gmail.com>
+References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
+ <20181115145013.3378-9-paul.kocialkowski@bootlin.com>
+ <20181116093904.4ikn7ldksrm3mp5d@flea>
+ <CAGb2v65EckX0CDbZ5K9VmmayOe3eisOYgUxmPomPgp2_jE5Vww@mail.gmail.com>
+Message-ID: <20181116163935.b4wsf3sfi4arwrtz@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Liang Yang <liang.yang@amlogic.com>
+Hi,
 
-Add Amlogic NAND controller dt-bindings for Meson SoC,
-Current this driver support GXBB/GXL/AXG platform.
+On Fri, Nov 16, 2018 at 05:47:50PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Nov 16, 2018 at 5:39 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Thu, Nov 15, 2018 at 03:50:06PM +0100, Paul Kocialkowski wrote:
+> > > Now that we have specific nodes for the H3 and H5 system-controller
+> > > that allow proper access to the EMAC clock configuration register,
+> > > we no longer need a common dummy syscon node.
+> > >
+> > > Switch the syscon label over to each platform's dtsi file.
+> > >
+> > > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > > ---
+> > >  arch/arm/boot/dts/sun8i-h3.dtsi              | 2 +-
+> > >  arch/arm/boot/dts/sunxi-h3-h5.dtsi           | 6 ------
+> > >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 2 +-
+> > >  3 files changed, 2 insertions(+), 8 deletions(-)
+> > >
+> > > diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > index 7157d954fb8c..b337a9282783 100644
+> > > --- a/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+> > > @@ -134,7 +134,7 @@
+> > >       };
+> > >
+> > >       soc {
+> > > -             system-control at 1c00000 {
+> > > +             syscon: system-control at 1c00000 {
+> > >                       compatible = "allwinner,sun8i-h3-system-control";
+> > >                       reg = <0x01c00000 0x1000>;
+> > >                       #address-cells = <1>;
+> > > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > > index 4b1530ebe427..9175ff0fb59a 100644
+> > > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
+> > > @@ -152,12 +152,6 @@
+> > >                       };
+> > >               };
+> > >
+> > > -             syscon: syscon at 1c00000 {
+> > > -                     compatible = "allwinner,sun8i-h3-system-controller",
+> > > -                             "syscon";
+> > > -                     reg = <0x01c00000 0x1000>;
+> > > -             };
+> > > -
+> >
+> > You're also dropping the syscon compatible there. But I'm not sure how
+> > it could work with the H3 EMAC driver that would overwrite the
+> > compatible already.
+> 
+> I assume you are referring to the previous patch? The node names are not
+> the same, hence the previous patch is adding another node for the system
+> controller, and this patch removes the old one with the "syscon" compatible.
+> 
+> We already patched the EMAC driver to support the new SRAM controller based
+> regmap, so other than making people unhappy about having to update their
+> DT, I don't think there would be any problems. This also means H3 in -next
+> currently has _two_ syscon nodes.
 
-Signed-off-by: Liang Yang <liang.yang@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/mtd/amlogic,meson-nand.txt | 60 ++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
+Ah, indeed, I missed that. Pointing that out in the commit log could
+be nice though.
 
-diff --git a/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
-new file mode 100644
-index 0000000..3983c11
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/amlogic,meson-nand.txt
-@@ -0,0 +1,60 @@
-+Amlogic NAND Flash Controller (NFC) for GXBB/GXL/AXG family SoCs
-+
-+This file documents the properties in addition to those available in
-+the MTD NAND bindings.
-+
-+Required properties:
-+- compatible : contains one of:
-+  - "amlogic,meson-gxl-nfc"
-+  - "amlogic,meson-axg-nfc"
-+- clocks     :
-+	A list of phandle + clock-specifier pairs for the clocks listed
-+	in clock-names.
-+
-+- clock-names: Should contain the following:
-+	"core" - NFC module gate clock
-+	"device" - device clock from eMMC sub clock controller
-+	"rx" - rx clock phase
-+	"tx" - tx clock phase
-+
-+- amlogic,mmc-syscon	: Required for NAND clocks, it's shared with SD/eMMC
-+				controller port C
-+
-+Optional children nodes:
-+Children nodes represent the available nand chips.
-+
-+Other properties:
-+see Documentation/devicetree/bindings/mtd/nand.txt for generic bindings.
-+
-+Example demonstrate on AXG SoC:
-+
-+	sd_emmc_c_clkc: mmc at 7000 {
-+		compatible = "amlogic,meson-axg-mmc-clkc", "syscon";
-+		reg = <0x0 0x7000 0x0 0x800>;
-+	};
-+
-+	nand-controller at 7800 {
-+		compatible = "amlogic,meson-axg-nfc";
-+		reg = <0x0 0x7800 0x0 0x100>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		interrupts = <GIC_SPI 34 IRQ_TYPE_EDGE_RISING>;
-+
-+		clocks = <&clkc CLKID_SD_EMMC_C>,
-+			<&sd_emmc_c_clkc CLKID_MMC_DIV>,
-+			<&sd_emmc_c_clkc CLKID_MMC_PHASE_RX>,
-+			<&sd_emmc_c_clkc CLKID_MMC_PHASE_TX>;
-+		clock-names = "core", "device", "rx", "tx";
-+		amlogic,mmc-syscon = <&sd_emmc_c_clkc>;
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&nand_pins>;
-+
-+		nand at 0 {
-+			reg = <0>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			nand-on-flash-bbt;
-+		};
-+	};
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
