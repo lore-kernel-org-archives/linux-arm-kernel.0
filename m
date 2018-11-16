@@ -1,48 +1,56 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 16 Nov 2018 07:47:48 +0100
-Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
-In-Reply-To: <20181114124752.GI2620@ulmo>
-References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
- <20181114124752.GI2620@ulmo>
-Message-ID: <20181116064748.6c7shn3am4wejrnj@pengutronix.de>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri, 16 Nov 2018 07:52:08 +0100
+Subject: [PATCH] pwm: lpc18xx-sct: don't reconfigure PWM in .request and .free
+In-Reply-To: <20181114115025.GC2620@ulmo>
+References: <20181114115025.GC2620@ulmo>
+Message-ID: <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 01:47:52PM +0100, Thierry Reding wrote:
-> On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
-> > The flag 'has_clks' and related checks are superfluous as the CCF
-> > subsystem does this for you.
-> 
-> Both of these mechanisms aren't equivalent. While CCF can deal with
-> optional clocks, what the has_clks flag actually means is that the
-> device doesn't need a clock (or doesn't have a clock input) on the
-> devices where it is cleared.
-> 
-> So I'd actually be in favor of keeping the has_clks property because it
-> serves as an additional sanity check. For example if you run this driver
-> on an SoC that "has clocks" but if you don't list them in DT, then after
-> this patch the driver will happily continue without clocks, even though
-> it may break completely without those clocks. I've seen SoCs respond to
-> disabled clocks for a hardware block in different ways, in many cases an
-> access to any of the registers will completely hang the CPU. In other
-> cases it may just crash in some other way or give you some sort of
-> machine exception. None of those are good, and make the tiny bit of
-> additional code required to support the has_clks flag very attractive.
-> 
-> But that's just my opinion. If you prefer to throw away that safety
-> barrier, be my guest. But if you do, please move this functionality into
-> the clock framework first and then make the driver use it.
+Regarding the .request case: The consumer might be interested in taking
+over the configured state from the boot loader. So the initially
+configured state should be retained.
 
-The usual policy is: If the things specified in the dt are
-wrong or incomplete, it's ok to fail however you like. So from a
-correctness POV I think the change is fine.
+For the free case the PWM consumer is responsible to disable the PWM
+before calling pwm_release and there are three subcases to consider:
 
-I don't know about the mips details that John pointed out in a followup
-to this mail though.
+ a) The pwm is already off. Then there is no gain in disabling the PWM
+    once more.
+ b) The pwm is still running and there is a good reason for that. (Not
+    sure this is a valid case, I cannot imagine such a good reason.)
+    Then it is contra productive to disable the pwm.
+ c) The pwm is still running because the consumer failed to disable the
+    PWM. Then the consumer needs fixing and there is little incentive to
+    paper over the problem in the backend driver.
 
-Best regards
-Uwe
+This aligns the lpc18xx-sct driver to the other PWM drivers that also
+don't reconfigure the hardware in .request and .free.
 
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/pwm/pwm-lpc18xx-sct.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+index d7f5f7de030d..475918d9f543 100644
+--- a/drivers/pwm/pwm-lpc18xx-sct.c
++++ b/drivers/pwm/pwm-lpc18xx-sct.c
+@@ -296,7 +296,6 @@ static int lpc18xx_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+ 
+ 	set_bit(event, &lpc18xx_pwm->event_map);
+ 	lpc18xx_data->duty_event = event;
+-	lpc18xx_pwm_config_duty(chip, pwm, pwm_get_duty_cycle(pwm));
+ 
+ 	return 0;
+ }
+@@ -306,8 +305,6 @@ static void lpc18xx_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	struct lpc18xx_pwm_chip *lpc18xx_pwm = to_lpc18xx_pwm_chip(chip);
+ 	struct lpc18xx_pwm_data *lpc18xx_data = pwm_get_chip_data(pwm);
+ 
+-	pwm_disable(pwm);
+-	pwm_set_duty_cycle(pwm, 0);
+ 	clear_bit(lpc18xx_data->duty_event, &lpc18xx_pwm->event_map);
+ }
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.19.1
