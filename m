@@ -1,59 +1,49 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 16 Nov 2018 22:09:13 +0530
-Subject: [PATCH v2 09/12] drm/sun4i: sun6i_mipi_dsi: Enable burst mode HBP,
- HSA_HSE
+Date: Fri, 16 Nov 2018 22:09:14 +0530
+Subject: [PATCH v2 10/12] dt-bindings: panel: Add Feiyang FY07024DI26A30-D
+ MIPI-DSI LCD panel
 In-Reply-To: <20181116163916.29621-1-jagan@amarulasolutions.com>
 References: <20181116163916.29621-1-jagan@amarulasolutions.com>
-Message-ID: <20181116163916.29621-10-jagan@amarulasolutions.com>
+Message-ID: <20181116163916.29621-11-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Horizontal back porch, sync active and sync end bits are
-needed to disable for burst mode panel operations.
+Feiyang FY07024DI26A30-D is 1024x600, 4-lane MIPI-DSI LCD panel.
 
-So, disable them via dsi base control register.
+Add dt-bingings for it.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ .../display/panel/feiyang,fy07024di26a30d.txt | 20 +++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
 
-diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 22d2987c3298..20a1de8493e0 100644
---- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-+++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -644,15 +644,21 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	struct sun6i_dsi_timings timings;
- 	size_t bytes;
- 	u8 *buffer;
-+	u32 val = 0;
- 
- 	/* Do all timing calculations up front to allocate buffer space */
- 
- 	memset(&timings, 0, sizeof(timings));
- 
--	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) {
- 		timings.hblk = (mode->hdisplay * Bpp);
--	else
+diff --git a/Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt b/Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
+new file mode 100644
+index 000000000000..82caa7b65ae8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/feiyang,fy07024di26a30d.txt
+@@ -0,0 +1,20 @@
++Feiyang FY07024DI26A30-D 7" MIPI-DSI LCD Panel
 +
-+		regmap_read(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, &val);
-+		val |= SUN6I_DSI_BASIC_CTL_HBP_DIS;
-+		val |= SUN6I_DSI_BASIC_CTL_HSA_HSE_DIS;
-+	} else {
- 		sun6i_dsi_get_timings(dsi, mode, &timings);
-+	}
- 
- 	/* How many bytes do we need to send all payloads? */
- 	bytes = max_t(size_t, max(max(timings.hfp, timings.hblk),
-@@ -661,7 +667,7 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 	if (WARN_ON(!buffer))
- 		return;
- 
--	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, 0);
-+	regmap_write(dsi->regs, SUN6I_DSI_BASIC_CTL_REG, val);
- 
- 	regmap_write(dsi->regs, SUN6I_DSI_SYNC_HSS_REG,
- 		     sun6i_dsi_build_sync_pkt(MIPI_DSI_H_SYNC_START,
++Required properties:
++- compatible: must be "feiyang,fy07024di26a30d"
++- reg: DSI virtual channel used by that screen
++- avdd-supply: analog regulator dc1 switch
++- dvdd-supply: 3v3 digital regulator
++- reset-gpios: a GPIO phandle for the reset pin
++
++Optional properties:
++- backlight: phandle for the backlight control.
++
++panel at 0 {
++	compatible = "feiyang,fy07024di26a30d";
++	reg = <0>;
++	avdd-supply = <&reg_dc1sw>;
++	dvdd-supply = <&reg_dldo2>;
++	reset-gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* LCD-RST: PD24 */
++	backlight = <&backlight>;
++};
 -- 
 2.18.0.321.gffc6fa0e3
