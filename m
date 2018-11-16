@@ -1,11 +1,20 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Nov 2018 15:34:25 +0530
-Subject: [PATCH 02/10] ARM64: dts: exynos: Add all CPUs in cooling maps
-In-Reply-To: <cover.1542362530.git.viresh.kumar@linaro.org>
-References: <cover.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
+Date: Fri, 16 Nov 2018 15:34:23 +0530
+Subject: [PATCH 00/10] ARM64: dts: Fix incomplete cooling-maps
+Message-ID: <cover.1542362530.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hello,
+
+Now that the below commit are merged in mainline, we can start fixing
+the ARM64 platform specific DT files:
+    
+commit d7a4303b8d1f ("dt-bindings: thermal: Allow multiple devices to
+share cooling map")
+
+commit a92bab8919e3 ("of: thermal: Allow multiple devices to share
+cooling map")
 
 Each CPU can (and does) participate in cooling down the system but the
 DT only captures a handful of them, normally CPU0, in the cooling maps.
@@ -21,104 +30,42 @@ cooling maps, as the hardware doesn't have any such limitations.
 Update cooling maps to include all devices affected by individual trip
 points.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- .../arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 ++++++++++++-------
- 1 file changed, 24 insertions(+), 12 deletions(-)
+Individual maintainers can take the patches through their tree.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-index fe3a0b14bee6..81b72393dd0d 100644
---- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
-@@ -55,37 +55,44 @@ thermal-zones {
- 			map0 {
- 				/* Set maximum frequency as 1800MHz  */
- 				trip = <&atlas0_alert_0>;
--				cooling-device = <&cpu4 1 2>;
-+				cooling-device = <&cpu4 1 2>, <&cpu5 1 2>,
-+						 <&cpu6 1 2>, <&cpu7 1 2>;
- 			};
- 			map1 {
- 				/* Set maximum frequency as 1700MHz  */
- 				trip = <&atlas0_alert_1>;
--				cooling-device = <&cpu4 2 3>;
-+				cooling-device = <&cpu4 2 3>, <&cpu5 2 3>,
-+						 <&cpu6 2 3>, <&cpu7 2 3>;
- 			};
- 			map2 {
- 				/* Set maximum frequency as 1600MHz  */
- 				trip = <&atlas0_alert_2>;
--				cooling-device = <&cpu4 3 4>;
-+				cooling-device = <&cpu4 3 4>, <&cpu5 3 4>,
-+						 <&cpu6 3 4>, <&cpu7 3 4>;
- 			};
- 			map3 {
- 				/* Set maximum frequency as 1500MHz  */
- 				trip = <&atlas0_alert_3>;
--				cooling-device = <&cpu4 4 5>;
-+				cooling-device = <&cpu4 4 5>, <&cpu5 4 5>,
-+						 <&cpu6 4 5>, <&cpu7 4 5>;
- 			};
- 			map4 {
- 				/* Set maximum frequency as 1400MHz  */
- 				trip = <&atlas0_alert_4>;
--				cooling-device = <&cpu4 5 7>;
-+				cooling-device = <&cpu4 5 7>, <&cpu5 5 7>,
-+						 <&cpu6 5 7>, <&cpu7 5 7>;
- 			};
- 			map5 {
- 				/* Set maximum frequencyas 1200MHz  */
- 				trip = <&atlas0_alert_5>;
--				cooling-device = <&cpu4 7 9>;
-+				cooling-device = <&cpu4 7 9>, <&cpu5 7 9>,
-+						 <&cpu6 7 9>, <&cpu7 7 9>;
- 			};
- 			map6 {
- 				/* Set maximum frequency as 1000MHz  */
- 				trip = <&atlas0_alert_6>;
--				cooling-device = <&cpu4 9 14>;
-+				cooling-device = <&cpu4 9 14>, <&cpu5 9 14>,
-+						 <&cpu6 9 14>, <&cpu7 9 14>;
- 			};
- 		};
- 	};
-@@ -222,27 +229,32 @@ thermal-zones {
- 			map0 {
- 				/* Set maximum frequency as 1200MHz  */
- 				trip = <&apollo_alert_2>;
--				cooling-device = <&cpu0 1 2>;
-+				cooling-device = <&cpu0 1 2>, <&cpu1 1 2>,
-+						 <&cpu2 1 2>, <&cpu3 1 2>;
- 			};
- 			map1 {
- 				/* Set maximum frequency as 1100MHz  */
- 				trip = <&apollo_alert_3>;
--				cooling-device = <&cpu0 2 3>;
-+				cooling-device = <&cpu0 2 3>, <&cpu1 2 3>,
-+						 <&cpu2 2 3>, <&cpu3 2 3>;
- 			};
- 			map2 {
- 				/* Set maximum frequency as 1000MHz  */
- 				trip = <&apollo_alert_4>;
--				cooling-device = <&cpu0 3 4>;
-+				cooling-device = <&cpu0 3 4>, <&cpu1 3 4>,
-+						 <&cpu2 3 4>, <&cpu3 3 4>;
- 			};
- 			map3 {
- 				/* Set maximum frequency as 900MHz  */
- 				trip = <&apollo_alert_5>;
--				cooling-device = <&cpu0 4 5>;
-+				cooling-device = <&cpu0 4 5>, <&cpu1 4 5>,
-+						 <&cpu2 4 5>, <&cpu3 4 5>;
- 			};
- 			map4 {
- 				/* Set maximum frequency as 800MHz  */
- 				trip = <&apollo_alert_6>;
--				cooling-device = <&cpu0 5 9>;
-+				cooling-device = <&cpu0 5 9>, <&cpu1 5 9>,
-+						 <&cpu2 5 9>, <&cpu3 5 9>;
- 			};
- 		};
- 	};
+--
+viresh
+
+Viresh Kumar (10):
+  ARM64: dts: amlogic: Add all CPUs in cooling maps
+  ARM64: dts: exynos: Add all CPUs in cooling maps
+  ARM64: dts: fsl: Add all CPUs in cooling maps
+  arm64: dts: hi3660: Add missing cooling device properties for CPUs
+  ARM64: dts: hisilicon: Add all CPUs in cooling maps
+  ARM64: dts: mediatek: Add all CPUs in cooling maps
+  ARM64: dts: msm8916: Add all CPUs in cooling maps
+  ARM64: dts: renesas: Add all CPUs in cooling maps
+  ARM64: dts: rockchip: Add all CPUs in cooling maps
+  ARM64: dts: uniphier: Add all CPUs in cooling maps
+
+ .../dts/amlogic/meson-gxm-khadas-vim2.dts     | 22 +++++-------
+ .../arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 ++++++++++++-------
+ .../arm64/boot/dts/freescale/fsl-ls1043a.dtsi |  6 ++--
+ .../arm64/boot/dts/freescale/fsl-ls1046a.dtsi |  6 ++--
+ .../arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 17 +++++----
+ .../arm64/boot/dts/freescale/fsl-ls208xa.dtsi | 28 +++++----------
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi     | 16 +++++++--
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi     |  9 ++++-
+ arch/arm64/boot/dts/mediatek/mt7622.dtsi      |  9 +++--
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi      |  6 ++--
+ arch/arm64/boot/dts/qcom/msm8916.dtsi         | 10 ++++--
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi      | 15 ++++++--
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi      |  6 ++--
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi      |  5 ++-
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi      | 15 ++++++--
+ .../boot/dts/rockchip/rk3399-gru-kevin.dts    |  8 +++--
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 12 +++++--
+ .../boot/dts/socionext/uniphier-ld20.dtsi     | 11 +++---
+ 18 files changed, 147 insertions(+), 90 deletions(-)
+
 -- 
 2.19.1.568.g152ad8e3369a
