@@ -1,106 +1,72 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Fri, 16 Nov 2018 17:24:03 +0100
-Subject: [PATCH v2 17/17] power: supply: olpc_battery: Add OLPC XO 1.75 support
-In-Reply-To: <20181116162403.49854-1-lkundrak@v3.sk>
-References: <20181116162403.49854-1-lkundrak@v3.sk>
-Message-ID: <20181116162403.49854-18-lkundrak@v3.sk>
+From: rdunlap@infradead.org (Randy Dunlap)
+Date: Fri, 16 Nov 2018 08:59:28 -0800
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <CAFqt6zbL1tu4VWtZ5Wz-BgbOS+M2GJziMj958_h_ri4Th3n9bQ@mail.gmail.com>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+ <9655a12e-bd3d-aca2-6155-38924028eb5d@infradead.org>
+ <CAFqt6zbLjtDab3Bz67trbnQRQdutvgA=YvAFhoW4bxsg657mGQ@mail.gmail.com>
+ <20181116064049.GA5320@bombadil.infradead.org>
+ <CAFqt6zbL1tu4VWtZ5Wz-BgbOS+M2GJziMj958_h_ri4Th3n9bQ@mail.gmail.com>
+Message-ID: <b54491c4-c119-6e83-93ae-d0df7fc165a1@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The battery and the protocol are essentially the same as OLPC XO 1.5,
-but the responses from the EC are LSB first.
+On 11/16/18 12:15 AM, Souptick Joarder wrote:
+> On Fri, Nov 16, 2018 at 12:11 PM Matthew Wilcox <willy@infradead.org> wrote:
+>>
+>> On Fri, Nov 16, 2018 at 11:00:30AM +0530, Souptick Joarder wrote:
+>>> On Thu, Nov 15, 2018 at 11:44 PM Randy Dunlap <rdunlap@infradead.org> wrote:
+>>>> On 11/15/18 7:45 AM, Souptick Joarder wrote:
+>>>> What is the opposite of vm_insert_range() or even of vm_insert_page()?
+>>>> or is there no need for that?
+>>>
+>>> There is no opposite function of vm_insert_range() / vm_insert_page().
+>>> My understanding is, in case of any error, mmap handlers will return the
+>>> err to user process and user space will decide the next action. So next
+>>> time when mmap handler is getting invoked it will map from the beginning.
+>>> Correct me if I am wrong.
+>>
+>> The opposite function, I suppose, is unmap_region().
+>>
+>>>> s/no./number/
+>>>
+>>> I didn't get it ??
+>>
+>> This is a 'sed' expression.  's' is the 'substitute' command; the /
+>> is a separator, 'no.' is what you wrote, and 'number' is what Randy
+>> is recommending instead.
+> 
+> Ok. Will change it in v2.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Thanks.
 
----
-Changes since v1:
-- s/s16 ecword_to_cpu/u16 ecword_to_cpu/
-- s/u16 ec_byte/u16 ec_word/
+>>>>> +     for (i = 0; i < page_count; i++) {
+>>>>> +             ret = vm_insert_page(vma, uaddr, pages[i]);
+>>>>> +             if (ret < 0)
+>>>>> +                     return ret;
+>>>>
+>>>> For a non-trivial value of page_count:
+>>>> Is it a problem if vm_insert_page() succeeds for several pages
+>>>> and then fails?
+>>>
+>>> No, it will be considered as total failure and mmap handler will return
+>>> the err to user space.
+>>
+>> I think what Randy means is "What happens to the inserted pages?" and
+>> the answer is that mmap_region() jumps to the 'unmap_and_free_vma'
+>> label, which is an accurate name.
 
- drivers/power/supply/olpc_battery.c | 23 ++++++++++++++++++-----
- 1 file changed, 18 insertions(+), 5 deletions(-)
+which says:
 
-diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
-index ec5dfb8fcb8a..898e8a6128bb 100644
---- a/drivers/power/supply/olpc_battery.c
-+++ b/drivers/power/supply/olpc_battery.c
-@@ -56,6 +56,7 @@ struct olpc_battery_data {
- 	struct power_supply *olpc_bat;
- 	char bat_serial[17];
- 	int new_proto;
-+	int little_endian;
- };
- 
- /*********************************************************************
-@@ -321,6 +322,14 @@ static int olpc_bat_get_voltage_max_design(union power_supply_propval *val)
- 	return ret;
- }
- 
-+static u16 ecword_to_cpu(struct olpc_battery_data *data, u16 ec_word)
-+{
-+	if (data->little_endian)
-+		return le16_to_cpu(ec_word);
-+	else
-+		return be16_to_cpu(ec_word);
-+}
-+
- /*********************************************************************
-  *		Battery properties
-  *********************************************************************/
-@@ -393,7 +402,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
- 		if (ret)
- 			return ret;
- 
--		val->intval = (s16)be16_to_cpu(ec_word) * 9760L / 32;
-+		val->intval = ecword_to_cpu(data, ec_word) * 9760L / 32;
- 		break;
- 	case POWER_SUPPLY_PROP_CURRENT_AVG:
- 	case POWER_SUPPLY_PROP_CURRENT_NOW:
-@@ -401,7 +410,7 @@ static int olpc_bat_get_property(struct power_supply *psy,
- 		if (ret)
- 			return ret;
- 
--		val->intval = (s16)be16_to_cpu(ec_word) * 15625L / 120;
-+		val->intval = ecword_to_cpu(data, ec_word) * 15625L / 120;
- 		break;
- 	case POWER_SUPPLY_PROP_CAPACITY:
- 		ret = olpc_ec_cmd(EC_BAT_SOC, NULL, 0, &ec_byte, 1);
-@@ -432,21 +441,21 @@ static int olpc_bat_get_property(struct power_supply *psy,
- 		if (ret)
- 			return ret;
- 
--		val->intval = (s16)be16_to_cpu(ec_word) * 10 / 256;
-+		val->intval = ecword_to_cpu(data, ec_word) * 10 / 256;
- 		break;
- 	case POWER_SUPPLY_PROP_TEMP_AMBIENT:
- 		ret = olpc_ec_cmd(EC_AMB_TEMP, NULL, 0, (void *)&ec_word, 2);
- 		if (ret)
- 			return ret;
- 
--		val->intval = (int)be16_to_cpu(ec_word) * 10 / 256;
-+		val->intval = (int)ecword_to_cpu(data, ec_word) * 10 / 256;
- 		break;
- 	case POWER_SUPPLY_PROP_CHARGE_COUNTER:
- 		ret = olpc_ec_cmd(EC_BAT_ACR, NULL, 0, (void *)&ec_word, 2);
- 		if (ret)
- 			return ret;
- 
--		val->intval = (s16)be16_to_cpu(ec_word) * 6250 / 15;
-+		val->intval = ecword_to_cpu(data, ec_word) * 6250 / 15;
- 		break;
- 	case POWER_SUPPLY_PROP_SERIAL_NUMBER:
- 		ret = olpc_ec_cmd(EC_BAT_SERIAL, NULL, 0, (void *)&ser_buf, 8);
-@@ -626,6 +635,10 @@ static int olpc_battery_probe(struct platform_device *pdev)
- 	if (ecver > 0x44) {
- 		/* XO 1 or 1.5 with a new EC firmware. */
- 		data->new_proto = 1;
-+	} else if (of_find_compatible_node(NULL, NULL, "olpc,xo1.75-ec")) {
-+		/* XO 1.75 */
-+		data->new_proto = 1;
-+		data->little_endian = 1;
- 	} else if (ecver < 0x44) {
- 		/*
- 		 * We've seen a number of EC protocol changes; this driver
+	/* Undo any partial mapping done by a device driver. */
+	unmap_region(mm, vma, prev, vma->vm_start, vma->vm_end);
+
+and that is what I was missing.  Thanks.
+
+> Sorry for incorrect understanding of the question.
+
+No problem.
+
+
 -- 
-2.19.1
+~Randy
