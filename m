@@ -1,68 +1,36 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Thu, 15 Nov 2018 16:16:29 -0800
-Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
-In-Reply-To: <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
-References: <20180823103332.32047-1-linus.walleij@linaro.org>
- <cd3100ee-03a0-9218-b166-14f15d7669f6@gmail.com>
- <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
- <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
-Message-ID: <93d1f00a-2a86-bed0-6bbf-a6f86550b59a@gmail.com>
+From: dbasehore@chromium.org (Derek Basehore)
+Date: Thu, 15 Nov 2018 16:42:47 -0800
+Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
+Message-ID: <20181116004247.172977-1-dbasehore@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/18 2:59 PM, Linus Walleij wrote:
-> On Thu, Nov 15, 2018 at 5:27 PM Frank Rowand <frowand.list@gmail.com> wrote:
->> On 8/23/18 4:06 PM, Frank Rowand wrote:
->>> On 08/23/18 03:33, Linus Walleij wrote:
->>>> I have been a bit hesitant to reiterate the series, but this is
->>>> anyways a v1 of the 96Boards Mezzanine Low Speed connector
->>>> driver framework.
->>
->> < snip >
->>
->>> I will read through the rest of the series and revisit my
->>> previous conclusions, but most likely not for a few days.
->>>
->>> -Frank
->>
->> < snip >
->>
->> My apologies for continuing to not getting to this task.  It
->> has been in the top grouping of my todo list but has been
->> pushed aside by a rather busy schedule of conferences and
->> company internal work.  It remains up at the top of my todo
->> list, but most likely will still be shunted aside for three
->> more weeks of other pressing work.
->>
->> I will get to it, I definitely have not forgotten it.
-> 
-> It's OK, I might get to rebasing the series even.
-> 
-> We discussed it in a session with Linaro in Vancouver
-> recently (some month ago). What we took away from it
+This adds the xin32k clock to the RK3399 CPU. Even though it's not
+directly used, muxes will end up traversing the entire clk tree on
+calls to determine_rate if it doesn't exist.
 
-It would be helpful for me to look at that.  What was the
-title of the session, or a pointer to the resource page
-for it?
+Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
--Frank
-
-> is that there are many precedents of populating devices
-> ad hoc, what really makes this one special is that it takes
-> something device tree and ad hoc populates something
-> on top of it, not defined in the device tree itself.
-> 
-> On a related note, Heikki Krogerus is making a software
-> FWnode population series. I ran into this when converting
-> board files to use more abstract descriptions. Check it out:
-> https://marc.info/?l=linux-kernel&m=154177331200561&w=2
-> 
-> The idea with the series is to expand FWnode so that it
-> doesn't only populate Linux devices from device tree
-> or ACPI but also by software, where needed, further
-> expanding the fwnode abstraction. I will probably look
-> into using that.
-> 
-> Yours,
-> Linus Walleij
-> 
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 99e7f65c1779..6a32293982d0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -191,6 +191,13 @@
+ 		#clock-cells = <0>;
+ 	};
+ 
++	xin32k: xin32k {
++		compatible = "fixed-clock";
++		clock-frequency = <32000>;
++		clock-output-names = "xin32k";
++		#clock-cells = <0>;
++	};
++
+ 	amba {
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+-- 
+2.19.1.1215.g8438c0b245-goog
