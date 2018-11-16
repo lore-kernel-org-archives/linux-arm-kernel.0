@@ -1,50 +1,109 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 16 Nov 2018 11:45:03 +0100
-Subject: [PATCH] pwm: lpc18xx-sct: don't reconfigure PWM in .request and
- .free
-In-Reply-To: <20181116100114.GB28631@ulmo>
-References: <20181114115025.GC2620@ulmo>
- <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
- <1391bbe1-75b5-c86e-ed3a-1e1afb393917@mleia.com>
- <20181116100114.GB28631@ulmo>
-Message-ID: <20181116104503.he6rykrsqt4whacs@pengutronix.de>
+From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
+Date: Fri, 16 Nov 2018 16:16:07 +0530
+Subject: [PATCH] boot_constraint: Add constraints for earlycon on dragonboard
+ 410c
+Message-ID: <20181116104607.26671-1-saiprakash.ranjan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry,
+iface clock is shared with other drivers, which may reconfigure
+this before the serial driver comes up. This may lead to
+crashes like the one below where GCC_BLSP1_AHB_CLK is same across
+multiple drivers like bam dma.
 
-On Fri, Nov 16, 2018 at 11:01:14AM +0100, Thierry Reding wrote:
-> On Fri, Nov 16, 2018 at 11:22:49AM +0200, Vladimir Zapolskiy wrote:
-> > On 11/16/2018 08:52 AM, Uwe Kleine-K?nig wrote:
-> > > Regarding the .request case: The consumer might be interested in taking
-> > > over the configured state from the boot loader. So the initially
-> > > configured state should be retained.
-> > > 
-> > > For the free case the PWM consumer is responsible to disable the PWM
-> > > before calling pwm_release and there are three subcases to consider:
-> > > 
-> > 
-> > the changes are fine per se, but please split them into two.
-> > 
-> > Probably pwm_disable() misusage began spreading from commit 54b2a999a1675.
-> 
-> It's not really misusage to call pwm_disable(). It's basically just a
-> shortcut for ->disable() or the atomic equivalent for it.
+<0>[    3.164471] Internal error: synchronous external abort: 96000010 [#1] PREEMPT SMP
+<4>[    3.164479] Modules linked in:
+<4>[    3.164495] CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc8-00008-ge033b9909fff-dirty #175
+<4>[    3.164501] Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+<4>[    3.164508] pstate: 40000085 (nZcv daIf -PAN -UAO)
+<4>[    3.164514] pc : msm_read.isra.2+0x20/0x50
+<4>[    3.164520] lr : msm_read.isra.2+0x1c/0x50
+<4>[    3.164526] sp : ffff000008033a50
+<4>[    3.164531] x29: ffff000008033a50 x28: ffff000009486018
+<4>[    3.164548] x27: 0000000000000001 x26: ffff7dfffe7ff070
+<4>[    3.164565] x25: 0000000000000034 x24: ffff000009486000
+<4>[    3.164582] x23: 0000000000000000 x22: ffff00000978e190
+<4>[    3.164599] x21: ffff0000095e8228 x20: 0000000000000034
+<4>[    3.164616] x19: ffff7dfffe7ff008 x18: ffffffffffffffff
+<4>[    3.164632] x17: 0000000000000000 x16: 0000000000000000
+<4>[    3.164649] x15: ffff0000094a96c8 x14: ffff00008978e6bf
+<4>[    3.164666] x13: ffff00000978e6cd x12: 0000000000000038
+<4>[    3.164683] x11: ffff0000094c6000 x10: 0000000000000c24
+<4>[    3.164699] x9 : ffff80003c89b400 x8 : ffff000008033970
+<4>[    3.164716] x7 : ffff80000eb04100 x6 : 00000000000af304
+<4>[    3.164732] x5 : 0000000000000c40 x4 : ffff80003c06f000
+<4>[    3.164750] x3 : ffff80003c89b498 x2 : 0000000000000000
+<4>[    3.164766] x1 : ffff80003ca68000 x0 : 0000000000000800
+<0>[    3.164785] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
+<4>[    3.164791] Call trace:
+<4>[    3.164797]  msm_read.isra.2+0x20/0x50
+<4>[    3.164804]  msm_reset_dm_count+0x44/0x80
+<4>[    3.164810]  __msm_console_write+0x1c8/0x1d0
+<4>[    3.164816]  msm_serial_early_write_dm+0x3c/0x50
+<4>[    3.164823]  console_unlock.part.6+0x468/0x528
+<4>[    3.164829]  vprintk_emit+0x210/0x218
+<4>[    3.164835]  vprintk_default+0x48/0x58
+<4>[    3.164841]  vprintk_func+0xf0/0x1c0
+<4>[    3.164847]  printk+0x74/0x94
+<4>[    3.164853]  sci_init+0x24/0x3c
+<4>[    3.164859]  do_one_initcall+0x54/0x248
+<4>[    3.164866]  kernel_init_freeable+0x210/0x378
+<4>[    3.164872]  kernel_init+0x18/0x118
+<4>[    3.164878]  ret_from_fork+0x10/0x1c
+<0>[    3.164884] Code: aa1e03e0 8b214273 97e616f7 d503201f (b9400260)
 
-I'd say that pwm_disable() is not a shortcut but the long way round to
-.disable() at best.
+Link: https://lore.kernel.org/lkml/1cae8f10-55f5-20ce-9105-30af6f88bd6e at codeaurora.org/
+Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
 
-And that calling pwm_disable() from the low level driver doesn't result
-in problems is just luck because the pwm framework is such a thin
-wrapper. If it would do locking, .free might already hold the lock and
-pwm_disable might try to grab it again. If it would do more checking
-that only a caller of pwm_get calls pwm_disable, the check would trigger
-because the consumer already called pwm_put and the lowlevel driver
-didn't use pwm_get.
+---
 
-Best regards
-Uwe
+This is purely dependent on boot constraint subsystem by Viresh.
 
+Link: https://lore.kernel.org/lkml/cover.1519380923.git.viresh.kumar at linaro.org/
+---
+ drivers/soc/qcom/boot_constraint.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/drivers/soc/qcom/boot_constraint.c b/drivers/soc/qcom/boot_constraint.c
+index ca01eb50d9a9..c4e580a118f0 100644
+--- a/drivers/soc/qcom/boot_constraint.c
++++ b/drivers/soc/qcom/boot_constraint.c
+@@ -49,6 +49,10 @@ static struct dev_boot_constraint_supply_info vddio_info = {
+ 	.name = "vddio"
+ };
+ 
++static struct dev_boot_constraint_clk_info uart_iface_clk_info = {
++	.name = "iface",
++};
++
+ static struct dev_boot_constraint constraints_mdss[] = {
+ 	{
+ 		.type = DEV_BOOT_CONSTRAINT_PM,
+@@ -92,6 +96,13 @@ static struct dev_boot_constraint constraints_dsi[] = {
+ 	},
+ };
+ 
++static struct dev_boot_constraint constraints_uart[] = {
++	{
++		.type = DEV_BOOT_CONSTRAINT_CLK,
++		.data = &uart_iface_clk_info,
++	},
++};
++
+ static struct dev_boot_constraint_of constraints[] = {
+ 	{
+ 		.compat = "qcom,mdss",
+@@ -105,6 +116,10 @@ static struct dev_boot_constraint_of constraints[] = {
+ 		.compat = "qcom,mdss-dsi-ctrl",
+ 		.constraints = constraints_dsi,
+ 		.count = ARRAY_SIZE(constraints_dsi),
++	}, {
++		.compat = "qcom,msm-uartdm-v1.4",
++		.constraints = constraints_uart,
++		.count = ARRAY_SIZE(constraints_uart),
+ 	},
+ };
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
