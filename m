@@ -1,38 +1,41 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 16 Nov 2018 13:54:44 +0100
-Subject: [PATCH v5 07/12] dt-bindings: clock: mediatek: delete mmsys clocks
+Date: Fri, 16 Nov 2018 13:54:47 +0100
+Subject: [PATCH v5 10/12] arm64: dts: mt6797: Use the new mmsys clock
+ compatible
 In-Reply-To: <20181116125449.23581-1-matthias.bgg@kernel.org>
 References: <20181116125449.23581-1-matthias.bgg@kernel.org>
-Message-ID: <20181116125449.23581-8-matthias.bgg@kernel.org>
+Message-ID: <20181116125449.23581-11-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-Some SoCs will now load the clock part of mmsys via
-a platform device from the dsiplay driver.
-Remove the compatible from the clock bindings description.
+Move the clock part of mmsys in a child node.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- .../devicetree/bindings/arm/mediatek/mediatek,mmsys.txt        | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt6797.dtsi | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-index 15d977afad31..4468345f8b1a 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
-@@ -6,11 +6,8 @@ The Mediatek mmsys controller provides various clocks to the system.
- Required Properties:
+diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+index 4beaa71107d7..3ca635c81de1 100644
+--- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
+@@ -206,9 +206,13 @@
+ 	};
  
- - compatible: Should be one of:
--	- "mediatek,mt2701-mmsys", "syscon"
- 	- "mediatek,mt2712-mmsys", "syscon"
- 	- "mediatek,mt6797-mmsys", "syscon"
--	- "mediatek,mt7623-mmsys", "mediatek,mt2701-mmsys", "syscon"
--	- "mediatek,mt8173-mmsys", "syscon"
- - #clock-cells: Must be 1
+ 	mmsys: mmsys_config at 14000000 {
+-		compatible = "mediatek,mt6797-mmsys", "syscon";
++		compatible = "mediatek,mt6797-mmsys", "syscon", "simple-mfd";
+ 		reg = <0 0x14000000 0 0x1000>;
+-		#clock-cells = <1>;
++
++		mmsys_clk: clock-controller at 14000000 {
++			compatible = "mediatek,mt6797-mmsys-clk";
++			#clock-cells = <1>;
++		};
+ 	};
  
- The mmsys controller uses the common clk binding from
+ 	imgsys: imgsys_config at 15000000  {
 -- 
 2.19.1
