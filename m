@@ -1,50 +1,48 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Thu, 15 Nov 2018 22:40:49 -0800
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <CAFqt6zbLjtDab3Bz67trbnQRQdutvgA=YvAFhoW4bxsg657mGQ@mail.gmail.com>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
- <9655a12e-bd3d-aca2-6155-38924028eb5d@infradead.org>
- <CAFqt6zbLjtDab3Bz67trbnQRQdutvgA=YvAFhoW4bxsg657mGQ@mail.gmail.com>
-Message-ID: <20181116064049.GA5320@bombadil.infradead.org>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 16 Nov 2018 07:47:48 +0100
+Subject: [resend PATCH 1/3] pwm: mediatek: drop flag 'has_clks'
+In-Reply-To: <20181114124752.GI2620@ulmo>
+References: <4c9044427b1aab373acd6ac76f0c905e2be79784.1542074855.git.ryder.lee@mediatek.com>
+ <20181114124752.GI2620@ulmo>
+Message-ID: <20181116064748.6c7shn3am4wejrnj@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 11:00:30AM +0530, Souptick Joarder wrote:
-> On Thu, Nov 15, 2018 at 11:44 PM Randy Dunlap <rdunlap@infradead.org> wrote:
-> > On 11/15/18 7:45 AM, Souptick Joarder wrote:
-> > What is the opposite of vm_insert_range() or even of vm_insert_page()?
-> > or is there no need for that?
+On Wed, Nov 14, 2018 at 01:47:52PM +0100, Thierry Reding wrote:
+> On Tue, Nov 13, 2018 at 10:08:22AM +0800, Ryder Lee wrote:
+> > The flag 'has_clks' and related checks are superfluous as the CCF
+> > subsystem does this for you.
 > 
-> There is no opposite function of vm_insert_range() / vm_insert_page().
-> My understanding is, in case of any error, mmap handlers will return the
-> err to user process and user space will decide the next action. So next
-> time when mmap handler is getting invoked it will map from the beginning.
-> Correct me if I am wrong.
-
-The opposite function, I suppose, is unmap_region().
-
-> > s/no./number/
+> Both of these mechanisms aren't equivalent. While CCF can deal with
+> optional clocks, what the has_clks flag actually means is that the
+> device doesn't need a clock (or doesn't have a clock input) on the
+> devices where it is cleared.
 > 
-> I didn't get it ??
-
-This is a 'sed' expression.  's' is the 'substitute' command; the /
-is a separator, 'no.' is what you wrote, and 'number' is what Randy
-is recommending instead.
-
-> > > +     for (i = 0; i < page_count; i++) {
-> > > +             ret = vm_insert_page(vma, uaddr, pages[i]);
-> > > +             if (ret < 0)
-> > > +                     return ret;
-> >
-> > For a non-trivial value of page_count:
-> > Is it a problem if vm_insert_page() succeeds for several pages
-> > and then fails?
+> So I'd actually be in favor of keeping the has_clks property because it
+> serves as an additional sanity check. For example if you run this driver
+> on an SoC that "has clocks" but if you don't list them in DT, then after
+> this patch the driver will happily continue without clocks, even though
+> it may break completely without those clocks. I've seen SoCs respond to
+> disabled clocks for a hardware block in different ways, in many cases an
+> access to any of the registers will completely hang the CPU. In other
+> cases it may just crash in some other way or give you some sort of
+> machine exception. None of those are good, and make the tiny bit of
+> additional code required to support the has_clks flag very attractive.
 > 
-> No, it will be considered as total failure and mmap handler will return
-> the err to user space.
+> But that's just my opinion. If you prefer to throw away that safety
+> barrier, be my guest. But if you do, please move this functionality into
+> the clock framework first and then make the driver use it.
 
-I think what Randy means is "What happens to the inserted pages?" and
-the answer is that mmap_region() jumps to the 'unmap_and_free_vma'
-label, which is an accurate name.
+The usual policy is: If the things specified in the dt are
+wrong or incomplete, it's ok to fail however you like. So from a
+correctness POV I think the change is fine.
 
-Thanks for looking, Randy.
+I don't know about the mips details that John pointed out in a followup
+to this mail though.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
