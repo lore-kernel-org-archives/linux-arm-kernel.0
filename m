@@ -1,77 +1,36 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Fri, 16 Nov 2018 11:25:07 +0100
-Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
-In-Reply-To: <20181116025938.GH5829@dragon>
-References: <20181105135802.30486-1-peron.clem@gmail.com>
- <20181116025938.GH5829@dragon>
-Message-ID: <CAJiuCcerEanEobbi8zPb1-eb=zCJsDAbM=p6T64+wtuXjtaMTA@mail.gmail.com>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Fri, 16 Nov 2018 11:34:00 +0100
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181115083535.usyjcdoz2f6zmssq@bars>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+ <20181110001615.GA5665@brain-police>
+ <20181110111647.GA3511@speedy.hunter>
+ <20181110170311.GA7700@brain-police>
+ <20181110175404.gnks6sj3zzlz2it7@ltop.local>
+ <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
+ <20181114222540.fgddrx4xxsne5pdq@ltop.local>
+ <20181115083535.usyjcdoz2f6zmssq@bars>
+Message-ID: <20181116103359.wywpaeanhoceqhgb@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+> Hi,
+> 
+> Could you please clarify what is your resolution regarding that warning.
+> I pulled all the changes from sparse repository on kernel.org. However
+> the same warning is still here when building modules with C=2 option.
 
-On Fri, 16 Nov 2018 at 03:59, Shawn Guo <shawnguo@kernel.org> wrote:
->
-> On Mon, Nov 05, 2018 at 02:58:02PM +0100, Cl?ment P?ron wrote:
-> > From: Colin Didier <colin.didier@devialet.com>
-> >
-> > The MX6 Audmux differs from MX51.
-> >
-> > This patch adds the audmux for i.MX6 family.
-> >
-> > Signed-off-by: Colin Didier <colin.didier@devialet.com>
-> > Signed-off-by: Cl?ment P?ron <peron.clem@gmail.com>
->
-> I think you should send it to ASoC maintainer and list for applying.
+Hi,
 
-It's still quite new for me to submit patch, but if this patch should
-be sent to ASoC maintainer maybe there is a line missing in the
-MAINTAINERS file no ?
+Yes, the warning is still there since it's maybe not desired but
+is at least legit. For the short term, I think the best is your
+original patch (but using UL as the prefix). I would be glad to
+ack such a patch (I tried to answer in the original thread but
+I never found it although I should be subscribed to the
+linux-arm-kernel mailing list).
 
-SOUND
-M:      Jaroslav Kysela <perex@perex.cz>
-M:      Takashi Iwai <tiwai@suse.com>
-L:      alsa-devel at alsa-project.org (moderated for non-subscribers)
-W:      http://www.alsa-project.org/
-T:      git git://git.kernel.org/pub/scm/linux/kernel/git/tiwai/sound.git
-T:      git git://git.alsa-project.org/alsa-kernel.git
-Q:      http://patchwork.kernel.org/project/alsa-devel/list/
-S:      Maintained
-F:      Documentation/sound/
-+ F:      include/dt-bindings/sound/
-F:      include/sound/
-F:      include/uapi/sound/
-F:      sound/
+For the slightly longer term, I'll need to see how Ramsay's
+patches can also be used for kernel code.
 
-Regards,
-Clement
-
->
-> Shawn
->
-> > ---
-> >  include/dt-bindings/sound/fsl-imx-audmux.h | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> >
-> > diff --git a/include/dt-bindings/sound/fsl-imx-audmux.h b/include/dt-bindings/sound/fsl-imx-audmux.h
-> > index 15f138bebe16..a1d0741d9ed1 100644
-> > --- a/include/dt-bindings/sound/fsl-imx-audmux.h
-> > +++ b/include/dt-bindings/sound/fsl-imx-audmux.h
-> > @@ -25,6 +25,14 @@
-> >  #define MX51_AUDMUX_PORT6            5
-> >  #define MX51_AUDMUX_PORT7            6
-> >
-> > +#define MX6_AUDMUX_PORT1_SSI1                0
-> > +#define MX6_AUDMUX_PORT2_SSI2                1
-> > +#define MX6_AUDMUX_PORT3             2
-> > +#define MX6_AUDMUX_PORT4             3
-> > +#define MX6_AUDMUX_PORT5             4
-> > +#define MX6_AUDMUX_PORT6             5
-> > +#define MX6_AUDMUX_PORT7_SSI3                6
-> > +
-> >  /*
-> >   * TFCSEL/RFCSEL (i.MX27) or TFSEL/TCSEL/RFSEL/RCSEL (i.MX31/51/53/6Q)
-> >   * can be sourced from Rx/Tx.
-> > --
-> > 2.19.1
-> >
+Best regards,
+-- Luc
