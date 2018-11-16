@@ -1,24 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Nov 2018 23:10:06 +0100
-Subject: [PATCH RESEND V5 1/1] gpio: vf610: add optional clock support
-In-Reply-To: <1541859384-32301-1-git-send-email-aisheng.dong@nxp.com>
-References: <1541859384-32301-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdb=B2RRTb1J9s=es3nGGUPM5rhugMPWe5Jc761teyOPVw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 16 Nov 2018 16:31:10 -0600
+Subject: [PATCH] dt-bindings: rng: update bindings for MT7629 SoC
+In-Reply-To: <20181116061854.ahs6jz7bmztoi3w7@gondor.apana.org.au>
+References: <0f5fe0d5b6a9c81b3f4395a1007ed0ba2239ae45.1541574485.git.ryder.lee@mediatek.com>
+ <20181116061854.ahs6jz7bmztoi3w7@gondor.apana.org.au>
+Message-ID: <20181116223110.GA19271@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 10, 2018 at 3:21 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+On Fri, Nov 16, 2018 at 02:18:54PM +0800, Herbert Xu wrote:
+> On Wed, Nov 07, 2018 at 03:10:16PM +0800, Ryder Lee wrote:
+> > This updates bindings for MT7629 RNG driver.
+> > 
+> > Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> 
+> Who is meant to take this patch?
 
-> Some SoCs need the gpio clock to be enabled before accessing
-> HW registers. This patch add the optional clock handling.
->
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Stefan Agner <stefan@agner.ch>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: linux-gpio at vger.kernel.org
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+I've applied it.
 
-Patch applied.
-
-Yours,
-Linus Walleij
+Rob
