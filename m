@@ -1,74 +1,168 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Nov 2018 15:08:06 +0000
-Subject: [BUG] Is "mem=" kernel command line parameter broken on ARM?
-In-Reply-To: <20181116145216.GA3365@picapica.im>
-References: <20181116133236.GA27819@picapica.im>
- <20181116140627.GW30658@n2100.armlinux.org.uk>
- <20181116145216.GA3365@picapica.im>
-Message-ID: <20181116150806.GX30658@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 16 Nov 2018 15:09:47 +0000
+Subject: [RFC PATCH v2 06/23] arm64/sve: Check SVE virtualisability
+In-Reply-To: <87bm6pciel.fsf@linaro.org>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-7-git-send-email-Dave.Martin@arm.com>
+ <87in0ycpuy.fsf@linaro.org>
+ <20181115170904.GO3505@e103592.cambridge.arm.com>
+ <87bm6pciel.fsf@linaro.org>
+Message-ID: <20181116150947.GV3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 03:52:16PM +0100, Anton wrote:
-> On Fri, Nov 16, 2018 at 02:06:27PM +0000, Russell King - ARM Linux wrote:
-> > On Fri, Nov 16, 2018 at 02:32:36PM +0100, Anton wrote:
-> > > Hello
-> > > 
-> > > 
-> > > I am trying to boot Linux on a custom board having SAMA5D21 chip.
-> > > It has 64MiB of DRAM. So I thought it was a good idea to pass amount
-> > > of physical memory available through command line parameter "mem=64M".
-> > 
-> > mem specifies not only the amount of memory, but also its location.
-> > mem=64M tells the kernel that there is 64M at physical address zero.
-> > Your device may not have memory at physical address zero, so that
-> > will cause the kernel to try to use something that isn't RAM as
-> > memory.
-> > 
-> > My guess is that memory starts at 0x20000000 on your platform based
-> > on what you've provided in uboot, but I can't be certain.
-> > 
+On Fri, Nov 16, 2018 at 12:32:18PM +0000, Alex Benn?e wrote:
 > 
-> But this does not explain successful boot with mem=512M.
-> Yes, physical memory (DRAM mapping) starts at physical address 0x20000000.
-> 0x20000000 = 512M so in this case kernel should try to use address range
-> from 0 to 0x20000000 and fail, because DRAM is mapped above that range.
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> mem=64M at 0x20000000 crashes in a same way:
-> 
-> => setenv bootargs console=ttyS0,115200 earlyprintk root=/dev/mmcblk1p2 rw rootwait mem=64M at 0x20000000
-> => boot
-> reading at91-sama5d2_xplained_at86rf230.dtb
-> 29351 bytes read in 22 ms (1.3 MiB/s)
-> reading zImage
-> 4320368 bytes read in 277 ms (14.9 MiB/s)
-> ## Flattened Device Tree blob at 21000000
->    Booting using the fdt blob at 0x21000000
->    Loading Device Tree to 3fb57000, end 3fb612a6 ... OK
-> 
-> Starting kernel ...
-> 
-> Booting Linux on physical CPU 0x0
-> Linux version 4.19.2 (user at gentoo) (gcc version 7.3.0 (Buildroot 2018.02-rc1-00043-g06197ed294)) #1 Wed Nov 14 22:29:10 +04 2018
-> CPU: ARMv7 Processor [410fc051] revision 1 (ARMv7), cr=10c53c7d
-> CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-> OF: fdt: Machine model: Atmel SAMA5D2 Xplained
-> bootconsole [earlycon0] enabled
-> Memory policy: Data cache writeback
-> Unable to handle kernel paging request at virtual address dfb57000
+> > On Thu, Nov 15, 2018 at 03:39:01PM +0000, Alex Benn?e wrote:
+> >>
+> >> Dave Martin <Dave.Martin@arm.com> writes:
+> >>
+> >> > Due to the way the effective SVE vector length is controlled and
+> >> > trapped at different exception levels, certain mismatches in the
+> >> > sets of vector lengths supported by different physical CPUs in the
+> >> > system may prevent straightforward virtualisation of SVE at parity
+> >> > with the host.
+> >> >
+> >> > This patch analyses the extent to which SVE can be virtualised
+> >> > safely without interfering with migration of vcpus between physical
+> >> > CPUs, and rejects late secondary CPUs that would erode the
+> >> > situation further.
+> >> >
+> >> > It is left up to KVM to decide what to do with this information.
+> >> >
+> >> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> >> > ---
+> >> >
+> >> > Changes since RFCv1:
+> >> >
+> >> >  * The analysis done by this patch is the same as in the previous
+> >> >    version, but the commit message the printks etc. have been reworded
+> >> >    to avoid the suggestion that KVM is expected to work on a system with
+> >> >    mismatched SVE implementations.
+> >> > ---
+> >> >  arch/arm64/include/asm/fpsimd.h |  1 +
+> >> >  arch/arm64/kernel/cpufeature.c  |  2 +-
+> >> >  arch/arm64/kernel/fpsimd.c      | 87 +++++++++++++++++++++++++++++++++++------
+> >> >  3 files changed, 76 insertions(+), 14 deletions(-)
+> >> >
+> >
+> > [...]
+> >
+> >> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
 
-This is the address at which fdt_check_header() is trying to access the
-device tree.  It is 0xdfb57000 - 0xc000000 into memory, which is almost
-512MB.
+[...]
 
-When you specify your mem=64M parameter, it restricts the amount of
-memory available, and the requirement that the DT is in the RAM
-availble to the kernel is violated.  That causes the oops.
+> >> > @@ -658,24 +662,60 @@ void __init sve_init_vq_map(void)
+> >> >   */
+> >> >  void sve_update_vq_map(void)
+> >> >  {
+> >> > -	sve_probe_vqs(sve_secondary_vq_map);
+> >> > -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
+> >> > +	sve_probe_vqs(sve_tmp_vq_map);
+> >> > +	bitmap_and(sve_vq_map, sve_vq_map, sve_tmp_vq_map,
+> >> > +		   SVE_VQ_MAX);
+> >> > +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, sve_tmp_vq_map,
+> >> > +		  SVE_VQ_MAX);
+> >> >  }
+> >>
+> >> I'm not quite following what's going on here. This is tracking both the
+> >> vector lengths available on all CPUs and the ones available on at least
+> >> one CPU? This raises a some questions:
+> >>
+> >>   - do such franken-machines exist or are expected to exit?
+> >
+> > no, and yes respectively (Linux does not endorse the latter for now,
+> > since it results in a non-SMP system: we hide the asymmetries where
+> > possible by clamping the set of available vector lengths, but for
+> > KVM it's too hard and we don't aim to support it at all).
+> >
+> > Even if we don't recommend deploying a general-purpose OS on such a
+> > system, people will eventually try it.  So it's better to fail safe
+> > rather than silently doing the wrong thing.
+> >
+> >>   - how do we ensure this is always upto date?
+> >
+> > This gets updated for each early secondary CPU that comes up.  (Early
+> > secondaries' boot is serialised, so we shouldn't have to worry about
+> > races here.)
+> >
+> > The configuration is frozen by the time we enter userspace (hence
+> > __ro_after_init).
+> >
+> > Once all the early secondaries have come up, we commit to the best
+> > possible set of vector lengths for the CPUs that we know about, and we
+> > don't call this path any more: instead, each late secondary goes into
+> > sve_verify_vq_map() instead to check that those CPUs are compatible
+> > with the configuration we committed to.
+> >
+> > For context, take a look at
+> > arch/arm64/kernel/cpufeature.c:check_local_cpu_capabilities(), which is
+> > the common entry point for all secondary CPUs: that splits into
+> > update_cpu_capabilities() and verify_local_cpu_capabilities() paths for
+> > the two cases described above, calling down into sve_update_vq_map()
+> > and sve_verify_vq_map() as appropriate.
+> >
+> >>   - what happens when we hotplug a new CPU with less available VQ?
+> >
+> > We reject the CPU and throw it back to the firmware (see
+> > cpufeature.c:verify_sve_features()).
+> >
+> > This follows the precedent already set in verify_local_cpu_capabilities()
+> > etc.
+> 
+> I think a few words to that effect in the function comments would be
+> helpful:
+> 
+>   /*
+>    * sve_update_vq_map only cares about CPUs at boot time and is called
+>    * serially for each one. Any CPUs added later via hotplug will fail
+>    * at sve_verify_vq_map if they don't match what is detected here.
+>    */
 
-The only solution to this is to lower the point where the DT is loaded
-when you restrict the amount of available memory.
+Ack.  I might tweak the wording, but adding brief comments explaining
+when these functions are called is a good idea.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> 
+> >
+> >>
+> >> >
+> >> >  /* Check whether the current CPU supports all VQs in the committed set */
+> >> >  int sve_verify_vq_map(void)
+> >> >  {
+> >> > -	int ret = 0;
+> >> > +	int ret = -EINVAL;
+> >> > +	unsigned long b;
+> >> >
+> >> > -	sve_probe_vqs(sve_secondary_vq_map);
+> >> > -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
+> >> > -		      SVE_VQ_MAX);
+> >> > -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
+> >> > +	sve_probe_vqs(sve_tmp_vq_map);
+> >> > +
+> >> > +	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
+> >> > +	if (bitmap_intersects(sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX)) {
+> >> >  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
+> >> >  			smp_processor_id());
+> >> > -		ret = -EINVAL;
+> >> > +		goto error;
+> >>
+> >> The use of goto seems a little premature considering we don't have any
+> >> clean-up to do.
+> >
+> > Hmm, this does look a little overengineered.  I think it may have been
+> > more complex during development (making the gotos less redundant), but
+> > to be honest I don't remember now.
+> >
+> > I'm happy to get rid of the rather pointless ret variable and replace
+> > all the gotos with returns if that works for you.
+> >
+> > What do you think?
+> 
+> Yes please, that would be cleaner.
+
+OK, good.
+
+Cheers
+---Dave
