@@ -1,214 +1,84 @@
 From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 16 Nov 2018 22:09:07 +0530
-Subject: [PATCH v2 03/12] drm/sun4i: sun6i_mipi_dsi: Setup burst mode timings
+Date: Fri, 16 Nov 2018 22:09:08 +0530
+Subject: [PATCH v2 04/12] drm/sun4i: sun6i_mipi_dsi: Simplify drq set to
+ support all modes
 In-Reply-To: <20181116163916.29621-1-jagan@amarulasolutions.com>
 References: <20181116163916.29621-1-jagan@amarulasolutions.com>
-Message-ID: <20181116163916.29621-4-jagan@amarulasolutions.com>
+Message-ID: <20181116163916.29621-5-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Burst mode display timings are different from convectional
-video mode so update the horizontal and vertical timings.
+Allwinner MIPI DSI DRQ set value can be varied with respective
+video modes.
+- burst mode the set value is always 0
+- video modes whose front porch greater than 20, the set value
+  can be computed based front porch and bpp.
+- video modes whose front porch is not greater than 20, the set value
+  is simply 0
 
-Reference code taken from BSP (from linux-sunxi/
-drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-
-dsi_hsa  = 0;
-dsi_hbp  = 0;
-dsi_hact = x*dsi_pixel_bits[format]/8;
-dsi_hblk = dsi_hact;
-dsi_hfp  = 0;
-dsi_vblk = 0;
+This patch simplifies existing drq set value code by grouping
+into sun6i_dsi_get_drq and support all video modes.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 128 +++++++++++++++----------
- 1 file changed, 80 insertions(+), 48 deletions(-)
+ drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 38 ++++++++++++++++----------
+ 1 file changed, 23 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-index 3ac002c4d8b3..efd08bfd0cb8 100644
+index efd08bfd0cb8..d60955880c43 100644
 --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
 +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-@@ -153,6 +153,14 @@
+@@ -363,6 +363,26 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+ 		     SUN6I_DSI_INST_JUMP_CFG_NUM(1));
+ };
  
- #define SUN6I_DSI_CMD_TX_REG(n)		(0x300 + (n) * 0x04)
- 
-+struct sun6i_dsi_timings {
-+	u16 hsa;
-+	u16 hbp;
-+	u16 hblk;
-+	u16 hfp;
-+	u16 vblk;
-+};
-+
- enum sun6i_dsi_start_inst {
- 	DSI_START_LPRX,
- 	DSI_START_LPTX,
-@@ -379,6 +387,60 @@ static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
- 	return vblk;
- }
- 
-+static void sun6i_dsi_get_timings(struct sun6i_dsi *dsi,
-+				  struct drm_display_mode *mode,
-+				  struct sun6i_dsi_timings *timings)
++static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
++			      struct drm_display_mode *mode)
 +{
 +	struct mipi_dsi_device *device = dsi->device;
-+	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
-+	u16 hsa, hbp, hblk, hfp, vblk;
++	int drq = 0;
 +
-+	/*
-+	 * A sync period is composed of a blanking packet (4 bytes +
-+	 * payload + 2 bytes) and a sync event packet (4 bytes).
-+	 * Its minimal size is therefore 10 bytes
-+	 */
-+#define HSA_PACKET_OVERHEAD	10
-+	hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
-+		  (mode->hsync_end - mode->hsync_start) * Bpp -
-+		  HSA_PACKET_OVERHEAD);
++	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		return drq;
 +
-+	/*
-+	 * The backporch is set using a blanking packet (4 bytes +
-+	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
-+	 */
-+#define HBP_PACKET_OVERHEAD	6
-+	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
-+		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
++	if ((mode->hsync_start - mode->hdisplay) > 20) {
++		/* Maaaaaagic */
++		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
 +
-+	/*
-+	 * hblk seems to be the line + porches length.
-+	 * The blank is set using a blanking packet (4 bytes + 4 bytes
-+	 * + payload + 2 bytes). So minimal size is 10 bytes
-+	 */
-+#define HBLK_PACKET_OVERHEAD	10
-+	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
-+		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) *
-+		   Bpp - HBLK_PACKET_OVERHEAD);
++		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
++		drq /= 32;
++	}
 +
-+	/*
-+	 * The frontporch is set using a blanking packet (4 bytes +
-+	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
-+	 */
-+#define HFP_PACKET_OVERHEAD	6
-+	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
-+		  (mode->hsync_start - mode->hdisplay) * Bpp -
-+		  HFP_PACKET_OVERHEAD);
-+
-+	vblk = sun6i_dsi_get_timings_vblk(dsi, mode, hblk);
-+
-+	timings->hsa = hsa;
-+	timings->hbp = hbp;
-+	timings->hblk = hblk;
-+	timings->hfp = hfp;
-+	timings->vblk = vblk;
++	return drq;
 +}
 +
- static u16 sun6i_dsi_setup_inst_delay(struct sun6i_dsi *dsi,
- 				      struct drm_display_mode *mode)
+ static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
+ 				      struct drm_display_mode *mode, u16 hblk)
  {
-@@ -506,52 +568,22 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
+@@ -478,21 +498,9 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+ static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+ 				  struct drm_display_mode *mode)
  {
- 	struct mipi_dsi_device *device = dsi->device;
- 	unsigned int Bpp = mipi_dsi_pixel_format_to_bpp(device->format) / 8;
--	u16 hbp, hfp, hsa, hblk, vblk;
-+	struct sun6i_dsi_timings timings;
- 	size_t bytes;
- 	u8 *buffer;
- 
- 	/* Do all timing calculations up front to allocate buffer space */
- 
--	/*
--	 * A sync period is composed of a blanking packet (4 bytes +
--	 * payload + 2 bytes) and a sync event packet (4 bytes). Its
--	 * minimal size is therefore 10 bytes
--	 */
--#define HSA_PACKET_OVERHEAD	10
--	hsa = max((unsigned int)HSA_PACKET_OVERHEAD,
--		  (mode->hsync_end - mode->hsync_start) * Bpp - HSA_PACKET_OVERHEAD);
-+	memset(&timings, 0, sizeof(timings));
- 
--	/*
--	 * The backporch is set using a blanking packet (4 bytes +
--	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
--	 */
--#define HBP_PACKET_OVERHEAD	6
--	hbp = max((unsigned int)HBP_PACKET_OVERHEAD,
--		  (mode->htotal - mode->hsync_end) * Bpp - HBP_PACKET_OVERHEAD);
+-	struct mipi_dsi_device *device = dsi->device;
+-	u32 val = 0;
 -
--	/*
--	 * The frontporch is set using a blanking packet (4 bytes +
--	 * payload + 2 bytes). Its minimal size is therefore 6 bytes
--	 */
--#define HFP_PACKET_OVERHEAD	6
--	hfp = max((unsigned int)HFP_PACKET_OVERHEAD,
--		  (mode->hsync_start - mode->hdisplay) * Bpp -
--		  HFP_PACKET_OVERHEAD);
+-	if ((mode->hsync_start - mode->hdisplay) > 20) {
+-		/* Maaaaaagic */
+-		u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
 -
--	/*
--	 * hblk seems to be the line + porches length.
--	 * The blank is set using a blanking packet (4 bytes + 4 bytes +
--	 * payload + 2 bytes). So minimal size is 10 bytes
--	 */
--#define HBLK_PACKET_OVERHEAD	10
--	hblk = max((unsigned int)HBLK_PACKET_OVERHEAD,
--		   (mode->htotal - (mode->hsync_end - mode->hsync_start)) *
--		   Bpp - HBLK_PACKET_OVERHEAD);
+-		drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+-		drq /= 32;
 -
--	vblk = sun6i_dsi_get_timings_vblk(dsi, mode, hblk);
-+	if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+		timings.hblk = (mode->hdisplay * Bpp);
-+	else
-+		sun6i_dsi_get_timings(dsi, mode, &timings);
- 
- 	/* How many bytes do we need to send all payloads? */
--	bytes = max_t(size_t, max(max(hfp, hblk), max(hsa, hbp)), vblk);
-+	bytes = max_t(size_t, max(max(timings.hfp, timings.hblk),
-+		      max(timings.hsa, timings.hbp)), timings.vblk);
- 	buffer = kmalloc(bytes, GFP_KERNEL);
- 	if (WARN_ON(!buffer))
- 		return;
-@@ -590,33 +622,33 @@ static void sun6i_dsi_setup_timings(struct sun6i_dsi *dsi,
- 
- 	/* sync */
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HSA0_REG,
--		     sun6i_dsi_build_blk0_pkt(device->channel, hsa));
-+		     sun6i_dsi_build_blk0_pkt(device->channel, timings.hsa));
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HSA1_REG,
--		     sun6i_dsi_build_blk1_pkt(0, buffer, hsa));
-+		     sun6i_dsi_build_blk1_pkt(0, buffer, timings.hsa));
- 
- 	/* backporch */
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HBP0_REG,
--		     sun6i_dsi_build_blk0_pkt(device->channel, hbp));
-+		     sun6i_dsi_build_blk0_pkt(device->channel, timings.hbp));
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HBP1_REG,
--		     sun6i_dsi_build_blk1_pkt(0, buffer, hbp));
-+		     sun6i_dsi_build_blk1_pkt(0, buffer, timings.hbp));
- 
- 	/* frontporch */
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HFP0_REG,
--		     sun6i_dsi_build_blk0_pkt(device->channel, hfp));
-+		     sun6i_dsi_build_blk0_pkt(device->channel, timings.hfp));
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HFP1_REG,
--		     sun6i_dsi_build_blk1_pkt(0, buffer, hfp));
-+		     sun6i_dsi_build_blk1_pkt(0, buffer, timings.hfp));
- 
- 	/* hblk */
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HBLK0_REG,
--		     sun6i_dsi_build_blk0_pkt(device->channel, hblk));
-+		     sun6i_dsi_build_blk0_pkt(device->channel, timings.hblk));
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_HBLK1_REG,
--		     sun6i_dsi_build_blk1_pkt(0, buffer, hblk));
-+		     sun6i_dsi_build_blk1_pkt(0, buffer, timings.hblk));
- 
- 	/* vblk */
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_VBLK0_REG,
--		     sun6i_dsi_build_blk0_pkt(device->channel, vblk));
-+		     sun6i_dsi_build_blk0_pkt(device->channel, timings.vblk));
- 	regmap_write(dsi->regs, SUN6I_DSI_BLK_VBLK1_REG,
--		     sun6i_dsi_build_blk1_pkt(0, buffer, vblk));
-+		     sun6i_dsi_build_blk1_pkt(0, buffer, timings.vblk));
- 
- 	kfree(buffer);
+-		val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+-		       SUN6I_DSI_TCON_DRQ_SET(drq));
+-	}
+-
+-	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
++	regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
++		     SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
++		     SUN6I_DSI_TCON_DRQ_SET(sun6i_dsi_get_drq(dsi, mode)));
  }
+ 
+ static void sun6i_dsi_setup_inst_loop(struct sun6i_dsi *dsi,
 -- 
 2.18.0.321.gffc6fa0e3
