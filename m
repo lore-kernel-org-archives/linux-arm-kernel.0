@@ -1,109 +1,320 @@
-From: saiprakash.ranjan@codeaurora.org (Sai Prakash Ranjan)
-Date: Fri, 16 Nov 2018 16:16:07 +0530
-Subject: [PATCH] boot_constraint: Add constraints for earlycon on dragonboard
- 410c
-Message-ID: <20181116104607.26671-1-saiprakash.ranjan@codeaurora.org>
+From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
+Date: Fri, 16 Nov 2018 11:49:56 +0100
+Subject: [PATCH v1] i2c: i2c-stm32f7: add PM Runtime support
+Message-ID: <1542365396-9959-1-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iface clock is shared with other drivers, which may reconfigure
-this before the serial driver comes up. This may lead to
-crashes like the one below where GCC_BLSP1_AHB_CLK is same across
-multiple drivers like bam dma.
+Use PM Runtime API to enable/disable clock
 
-<0>[    3.164471] Internal error: synchronous external abort: 96000010 [#1] PREEMPT SMP
-<4>[    3.164479] Modules linked in:
-<4>[    3.164495] CPU: 2 PID: 1 Comm: swapper/0 Not tainted 4.19.0-rc8-00008-ge033b9909fff-dirty #175
-<4>[    3.164501] Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
-<4>[    3.164508] pstate: 40000085 (nZcv daIf -PAN -UAO)
-<4>[    3.164514] pc : msm_read.isra.2+0x20/0x50
-<4>[    3.164520] lr : msm_read.isra.2+0x1c/0x50
-<4>[    3.164526] sp : ffff000008033a50
-<4>[    3.164531] x29: ffff000008033a50 x28: ffff000009486018
-<4>[    3.164548] x27: 0000000000000001 x26: ffff7dfffe7ff070
-<4>[    3.164565] x25: 0000000000000034 x24: ffff000009486000
-<4>[    3.164582] x23: 0000000000000000 x22: ffff00000978e190
-<4>[    3.164599] x21: ffff0000095e8228 x20: 0000000000000034
-<4>[    3.164616] x19: ffff7dfffe7ff008 x18: ffffffffffffffff
-<4>[    3.164632] x17: 0000000000000000 x16: 0000000000000000
-<4>[    3.164649] x15: ffff0000094a96c8 x14: ffff00008978e6bf
-<4>[    3.164666] x13: ffff00000978e6cd x12: 0000000000000038
-<4>[    3.164683] x11: ffff0000094c6000 x10: 0000000000000c24
-<4>[    3.164699] x9 : ffff80003c89b400 x8 : ffff000008033970
-<4>[    3.164716] x7 : ffff80000eb04100 x6 : 00000000000af304
-<4>[    3.164732] x5 : 0000000000000c40 x4 : ffff80003c06f000
-<4>[    3.164750] x3 : ffff80003c89b498 x2 : 0000000000000000
-<4>[    3.164766] x1 : ffff80003ca68000 x0 : 0000000000000800
-<0>[    3.164785] Process swapper/0 (pid: 1, stack limit = 0x(____ptrval____))
-<4>[    3.164791] Call trace:
-<4>[    3.164797]  msm_read.isra.2+0x20/0x50
-<4>[    3.164804]  msm_reset_dm_count+0x44/0x80
-<4>[    3.164810]  __msm_console_write+0x1c8/0x1d0
-<4>[    3.164816]  msm_serial_early_write_dm+0x3c/0x50
-<4>[    3.164823]  console_unlock.part.6+0x468/0x528
-<4>[    3.164829]  vprintk_emit+0x210/0x218
-<4>[    3.164835]  vprintk_default+0x48/0x58
-<4>[    3.164841]  vprintk_func+0xf0/0x1c0
-<4>[    3.164847]  printk+0x74/0x94
-<4>[    3.164853]  sci_init+0x24/0x3c
-<4>[    3.164859]  do_one_initcall+0x54/0x248
-<4>[    3.164866]  kernel_init_freeable+0x210/0x378
-<4>[    3.164872]  kernel_init+0x18/0x118
-<4>[    3.164878]  ret_from_fork+0x10/0x1c
-<0>[    3.164884] Code: aa1e03e0 8b214273 97e616f7 d503201f (b9400260)
-
-Link: https://lore.kernel.org/lkml/1cae8f10-55f5-20ce-9105-30af6f88bd6e at codeaurora.org/
-Signed-off-by: Sai Prakash Ranjan <saiprakash.ranjan@codeaurora.org>
-
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
-
-This is purely dependent on boot constraint subsystem by Viresh.
-
-Link: https://lore.kernel.org/lkml/cover.1519380923.git.viresh.kumar at linaro.org/
+  Version history:
+    v1:
+       * Initial
 ---
- drivers/soc/qcom/boot_constraint.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+---
+ drivers/i2c/busses/i2c-stm32f7.c | 142 +++++++++++++++++++++++++++------------
+ 1 file changed, 99 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/soc/qcom/boot_constraint.c b/drivers/soc/qcom/boot_constraint.c
-index ca01eb50d9a9..c4e580a118f0 100644
---- a/drivers/soc/qcom/boot_constraint.c
-+++ b/drivers/soc/qcom/boot_constraint.c
-@@ -49,6 +49,10 @@ static struct dev_boot_constraint_supply_info vddio_info = {
- 	.name = "vddio"
- };
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index 62d023e..4623b82 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -27,6 +27,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ #include <linux/slab.h>
  
-+static struct dev_boot_constraint_clk_info uart_iface_clk_info = {
-+	.name = "iface",
+@@ -1545,15 +1547,13 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 	i2c_dev->msg_id = 0;
+ 	f7_msg->smbus = false;
+ 
+-	ret = clk_enable(i2c_dev->clk);
+-	if (ret) {
+-		dev_err(i2c_dev->dev, "Failed to enable clock\n");
++	ret = pm_runtime_get_sync(i2c_dev->dev);
++	if (ret < 0)
+ 		return ret;
+-	}
+ 
+ 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
+ 	if (ret)
+-		goto clk_free;
++		goto pm_free;
+ 
+ 	stm32f7_i2c_xfer_msg(i2c_dev, msgs);
+ 
+@@ -1569,8 +1569,9 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
+ 		ret = -ETIMEDOUT;
+ 	}
+ 
+-clk_free:
+-	clk_disable(i2c_dev->clk);
++pm_free:
++	pm_runtime_mark_last_busy(i2c_dev->dev);
++	pm_runtime_put_autosuspend(i2c_dev->dev);
+ 
+ 	return (ret < 0) ? ret : num;
+ }
+@@ -1592,39 +1593,37 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
+ 	f7_msg->read_write = read_write;
+ 	f7_msg->smbus = true;
+ 
+-	ret = clk_enable(i2c_dev->clk);
+-	if (ret) {
+-		dev_err(i2c_dev->dev, "Failed to enable clock\n");
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0)
+ 		return ret;
+-	}
+ 
+ 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
+ 	if (ret)
+-		goto clk_free;
++		goto pm_free;
+ 
+ 	ret = stm32f7_i2c_smbus_xfer_msg(i2c_dev, flags, command, data);
+ 	if (ret)
+-		goto clk_free;
++		goto pm_free;
+ 
+ 	timeout = wait_for_completion_timeout(&i2c_dev->complete,
+ 					      i2c_dev->adap.timeout);
+ 	ret = f7_msg->result;
+ 	if (ret)
+-		goto clk_free;
++		goto pm_free;
+ 
+ 	if (!timeout) {
+ 		dev_dbg(dev, "Access to slave 0x%x timed out\n", f7_msg->addr);
+ 		if (i2c_dev->use_dma)
+ 			dmaengine_terminate_all(dma->chan_using);
+ 		ret = -ETIMEDOUT;
+-		goto clk_free;
++		goto pm_free;
+ 	}
+ 
+ 	/* Check PEC */
+ 	if ((flags & I2C_CLIENT_PEC) && size != I2C_SMBUS_QUICK && read_write) {
+ 		ret = stm32f7_i2c_smbus_check_pec(i2c_dev);
+ 		if (ret)
+-			goto clk_free;
++			goto pm_free;
+ 	}
+ 
+ 	if (read_write && size != I2C_SMBUS_QUICK) {
+@@ -1649,8 +1648,9 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
+ 		}
+ 	}
+ 
+-clk_free:
+-	clk_disable(i2c_dev->clk);
++pm_free:
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
+ 	return ret;
+ }
+ 
+@@ -1676,13 +1676,9 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
+ 	if (ret)
+ 		return ret;
+ 
+-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
+-		ret = clk_enable(i2c_dev->clk);
+-		if (ret) {
+-			dev_err(dev, "Failed to enable clock\n");
+-			return ret;
+-		}
+-	}
++	ret = pm_runtime_get_sync(dev);
++	if (ret < 0)
++		return ret;
+ 
+ 	if (id == 0) {
+ 		/* Configure Own Address 1 */
+@@ -1703,7 +1699,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
+ 		oar2 &= ~STM32F7_I2C_OAR2_MASK;
+ 		if (slave->flags & I2C_CLIENT_TEN) {
+ 			ret = -EOPNOTSUPP;
+-			goto exit;
++			goto pm_free;
+ 		}
+ 
+ 		oar2 |= STM32F7_I2C_OAR2_OA2_7(slave->addr);
+@@ -1712,7 +1708,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
+ 		writel_relaxed(oar2, i2c_dev->base + STM32F7_I2C_OAR2);
+ 	} else {
+ 		ret = -ENODEV;
+-		goto exit;
++		goto pm_free;
+ 	}
+ 
+ 	/* Enable ACK */
+@@ -1723,11 +1719,10 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
+ 		STM32F7_I2C_CR1_PE;
+ 	stm32f7_i2c_set_bits(base + STM32F7_I2C_CR1, mask);
+ 
+-	return 0;
+-
+-exit:
+-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
+-		clk_disable(i2c_dev->clk);
++	ret = 0;
++pm_free:
++	pm_runtime_mark_last_busy(dev);
++	pm_runtime_put_autosuspend(dev);
+ 
+ 	return ret;
+ }
+@@ -1745,6 +1740,10 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
+ 
+ 	WARN_ON(!i2c_dev->slave[id]);
+ 
++	ret = pm_runtime_get_sync(i2c_dev->dev);
++	if (ret < 0)
++		return ret;
++
+ 	if (id == 0) {
+ 		mask = STM32F7_I2C_OAR1_OA1EN;
+ 		stm32f7_i2c_clr_bits(base + STM32F7_I2C_OAR1, mask);
+@@ -1755,10 +1754,11 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
+ 
+ 	i2c_dev->slave[id] = NULL;
+ 
+-	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
++	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
+ 		stm32f7_i2c_disable_irq(i2c_dev, STM32F7_I2C_ALL_IRQ_MASK);
+-		clk_disable(i2c_dev->clk);
+-	}
++
++	pm_runtime_mark_last_busy(i2c_dev->dev);
++	pm_runtime_put_autosuspend(i2c_dev->dev);
+ 
+ 	return 0;
+ }
+@@ -1819,6 +1819,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "Error: Missing controller clock\n");
+ 		return PTR_ERR(i2c_dev->clk);
+ 	}
++
+ 	ret = clk_prepare_enable(i2c_dev->clk);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to prepare_enable clock\n");
+@@ -1888,8 +1889,6 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto clk_free;
+ 
+-	stm32f7_i2c_hw_config(i2c_dev);
+-
+ 	adap = &i2c_dev->adap;
+ 	i2c_set_adapdata(adap, i2c_dev);
+ 	snprintf(adap->name, sizeof(adap->name), "STM32F7 I2C(%pa)",
+@@ -1908,18 +1907,35 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 					     STM32F7_I2C_TXDR,
+ 					     STM32F7_I2C_RXDR);
+ 
+-	ret = i2c_add_adapter(adap);
+-	if (ret)
+-		goto clk_free;
+-
+ 	platform_set_drvdata(pdev, i2c_dev);
+ 
+-	clk_disable(i2c_dev->clk);
++	pm_runtime_set_autosuspend_delay(i2c_dev->dev,
++					 STM32F7_AUTOSUSPEND_DELAY);
++	pm_runtime_use_autosuspend(i2c_dev->dev);
++	pm_runtime_set_active(i2c_dev->dev);
++	pm_runtime_enable(i2c_dev->dev);
++
++	pm_runtime_get_noresume(&pdev->dev);
++
++	stm32f7_i2c_hw_config(i2c_dev);
++
++	ret = i2c_add_adapter(adap);
++	if (ret)
++		goto pm_disable;
+ 
+ 	dev_info(i2c_dev->dev, "STM32F7 I2C-%d bus adapter\n", adap->nr);
+ 
++	pm_runtime_mark_last_busy(i2c_dev->dev);
++	pm_runtime_put_autosuspend(i2c_dev->dev);
++
+ 	return 0;
+ 
++pm_disable:
++	pm_runtime_put_noidle(i2c_dev->dev);
++	pm_runtime_disable(i2c_dev->dev);
++	pm_runtime_set_suspended(i2c_dev->dev);
++	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
++
+ clk_free:
+ 	clk_disable_unprepare(i2c_dev->clk);
+ 
+@@ -1936,12 +1952,51 @@ static int stm32f7_i2c_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	i2c_del_adapter(&i2c_dev->adap);
++	pm_runtime_get_sync(i2c_dev->dev);
++
++	clk_disable_unprepare(i2c_dev->clk);
+ 
+-	clk_unprepare(i2c_dev->clk);
++	pm_runtime_put_noidle(i2c_dev->dev);
++	pm_runtime_disable(i2c_dev->dev);
++	pm_runtime_set_suspended(i2c_dev->dev);
++	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
+ 
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int stm32f7_i2c_runtime_suspend(struct device *dev)
++{
++	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
++
++	if (!stm32f7_i2c_is_slave_registered(i2c_dev))
++		clk_disable_unprepare(i2c_dev->clk);
++
++	return 0;
++}
++
++static int stm32f7_i2c_runtime_resume(struct device *dev)
++{
++	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
++	int ret;
++
++	if (!stm32f7_i2c_is_slave_registered(i2c_dev)) {
++		ret = clk_prepare_enable(i2c_dev->clk);
++		if (ret) {
++			dev_err(dev, "failed to prepare_enable clock\n");
++			return ret;
++		}
++	}
++
++	return 0;
++}
++#endif
++
++static const struct dev_pm_ops stm32f7_i2c_pm_ops = {
++	SET_RUNTIME_PM_OPS(stm32f7_i2c_runtime_suspend,
++			   stm32f7_i2c_runtime_resume, NULL)
 +};
 +
- static struct dev_boot_constraint constraints_mdss[] = {
- 	{
- 		.type = DEV_BOOT_CONSTRAINT_PM,
-@@ -92,6 +96,13 @@ static struct dev_boot_constraint constraints_dsi[] = {
+ static const struct of_device_id stm32f7_i2c_match[] = {
+ 	{ .compatible = "st,stm32f7-i2c", .data = &stm32f7_setup},
+ 	{},
+@@ -1952,6 +2007,7 @@ static struct platform_driver stm32f7_i2c_driver = {
+ 	.driver = {
+ 		.name = "stm32f7-i2c",
+ 		.of_match_table = stm32f7_i2c_match,
++		.pm = &stm32f7_i2c_pm_ops,
  	},
- };
- 
-+static struct dev_boot_constraint constraints_uart[] = {
-+	{
-+		.type = DEV_BOOT_CONSTRAINT_CLK,
-+		.data = &uart_iface_clk_info,
-+	},
-+};
-+
- static struct dev_boot_constraint_of constraints[] = {
- 	{
- 		.compat = "qcom,mdss",
-@@ -105,6 +116,10 @@ static struct dev_boot_constraint_of constraints[] = {
- 		.compat = "qcom,mdss-dsi-ctrl",
- 		.constraints = constraints_dsi,
- 		.count = ARRAY_SIZE(constraints_dsi),
-+	}, {
-+		.compat = "qcom,msm-uartdm-v1.4",
-+		.constraints = constraints_uart,
-+		.count = ARRAY_SIZE(constraints_uart),
- 	},
- };
- 
+ 	.probe = stm32f7_i2c_probe,
+ 	.remove = stm32f7_i2c_remove,
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+2.7.4
