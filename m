@@ -1,9 +1,9 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Nov 2018 15:34:31 +0530
-Subject: [PATCH 08/10] ARM64: dts: renesas: Add all CPUs in cooling maps
+Date: Fri, 16 Nov 2018 15:34:33 +0530
+Subject: [PATCH 10/10] ARM64: dts: uniphier: Add all CPUs in cooling maps
 In-Reply-To: <cover.1542362530.git.viresh.kumar@linaro.org>
 References: <cover.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <f2116377ab65e4b3ece39c32f54ac3eec2fb7d8c.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <c759699a44189aed078186fd19089d2f44d988e3.1542362530.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,78 +23,28 @@ points.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 15 ++++++++++++---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi |  6 +++---
- 2 files changed, 15 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index a79c8d369e0b..3a662df32143 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -2878,7 +2878,10 @@
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index d7e2d8969601..4a0c46cb11cd 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -206,13 +206,10 @@
  			cooling-maps {
  				map0 {
- 					trip = <&sensor1_passive>;
--					cooling-device = <&a57_0 4 4>;
-+					cooling-device = <&a57_0 4 4>,
-+							 <&a57_1 4 4>,
-+							 <&a57_2 4 4>,
-+							 <&a57_3 4 4>;
- 				};
- 			};
- 		};
-@@ -2904,7 +2907,10 @@
- 			cooling-maps {
- 				map0 {
- 					trip = <&sensor2_passive>;
--					cooling-device = <&a57_0 4 4>;
-+					cooling-device = <&a57_0 4 4>,
-+							 <&a57_1 4 4>,
-+							 <&a57_2 4 4>,
-+							 <&a57_3 4 4>;
- 				};
- 			};
- 		};
-@@ -2930,7 +2936,10 @@
- 			cooling-maps {
- 				map0 {
- 					trip = <&sensor3_passive>;
--					cooling-device = <&a57_0 4 4>;
-+					cooling-device = <&a57_0 4 4>,
-+							 <&a57_1 4 4>,
-+							 <&a57_2 4 4>,
-+							 <&a57_3 4 4>;
- 				};
- 			};
- 		};
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 1ec6aaa520c1..dd95e937f87a 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -2526,7 +2526,7 @@
- 			cooling-maps {
- 				map0 {
- 					trip = <&sensor1_passive>;
--					cooling-device = <&a57_0 5 5>;
-+					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
- 				};
- 			};
- 		};
-@@ -2552,7 +2552,7 @@
- 			cooling-maps {
- 				map0 {
- 					trip = <&sensor2_passive>;
--					cooling-device = <&a57_0 5 5>;
-+					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
- 				};
- 			};
- 		};
-@@ -2578,7 +2578,7 @@
- 			cooling-maps {
- 				map0 {
- 					trip = <&sensor3_passive>;
--					cooling-device = <&a57_0 5 5>;
-+					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
+ 					trip = <&cpu_alert>;
+-					cooling-device = <&cpu0
+-					    THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+-				};
+-				map1 {
+-					trip = <&cpu_alert>;
+-					cooling-device = <&cpu2
+-					    THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++							 <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++							 <&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++							 <&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
  				};
  			};
  		};
