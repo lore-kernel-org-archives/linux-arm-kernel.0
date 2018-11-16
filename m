@@ -1,78 +1,139 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Fri, 16 Nov 2018 17:24:01 +0100
-Subject: [PATCH v2 15/17] power: supply: olpc_battery: Use
- devm_power_supply_register()
+Date: Fri, 16 Nov 2018 17:23:56 +0100
+Subject: [PATCH v2 10/17] Platform: OLPC: add a regulator for the DCON
 In-Reply-To: <20181116162403.49854-1-lkundrak@v3.sk>
 References: <20181116162403.49854-1-lkundrak@v3.sk>
-Message-ID: <20181116162403.49854-16-lkundrak@v3.sk>
+Message-ID: <20181116162403.49854-11-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This simplifies the error handling.
+All OLPC ECs are able to turn the power to the DCON on an off. Use the
+regulator framework to expose the functionality.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 
 ---
 Changes since v1:
-- This was split off the "power: supply: olpc_battery: Move priv data to
-  a struct" patch.
+- Use idiomatic form of return on error
+- Avoid mixing bool and int
 
- drivers/power/supply/olpc_battery.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+ drivers/platform/olpc/Kconfig   |  1 +
+ drivers/platform/olpc/olpc-ec.c | 67 +++++++++++++++++++++++++++++++++
+ 2 files changed, 68 insertions(+)
 
-diff --git a/drivers/power/supply/olpc_battery.c b/drivers/power/supply/olpc_battery.c
-index b091f897c1d4..4433eb10a23d 100644
---- a/drivers/power/supply/olpc_battery.c
-+++ b/drivers/power/supply/olpc_battery.c
-@@ -628,7 +628,7 @@ static int olpc_battery_probe(struct platform_device *pdev)
- 	psy_cfg.of_node = pdev->dev.of_node;
- 	psy_cfg.drv_data = data;
+diff --git a/drivers/platform/olpc/Kconfig b/drivers/platform/olpc/Kconfig
+index 7c643d24ad0f..c5a872fb286f 100644
+--- a/drivers/platform/olpc/Kconfig
++++ b/drivers/platform/olpc/Kconfig
+@@ -6,6 +6,7 @@ config OLPC
+ 	select OF
+ 	select OF_PROMTREE if X86
+ 	select IRQ_DOMAIN
++	select REGULATOR
+ 	help
+ 	  Add support for detecting the unique features of the OLPC
+ 	  XO hardware.
+diff --git a/drivers/platform/olpc/olpc-ec.c b/drivers/platform/olpc/olpc-ec.c
+index 2b80174b8f4b..f725ab2a2db9 100644
+--- a/drivers/platform/olpc/olpc-ec.c
++++ b/drivers/platform/olpc/olpc-ec.c
+@@ -14,6 +14,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/module.h>
+ #include <linux/list.h>
++#include <linux/regulator/driver.h>
+ #include <linux/olpc-ec.h>
  
--	data->olpc_ac = power_supply_register(&pdev->dev, &olpc_ac_desc, &psy_cfg);
-+	data->olpc_ac = devm_power_supply_register(&pdev->dev, &olpc_ac_desc, &psy_cfg);
- 	if (IS_ERR(data->olpc_ac))
- 		return PTR_ERR(data->olpc_ac);
+ struct ec_cmd_desc {
+@@ -34,6 +35,10 @@ struct olpc_ec_priv {
+ 	struct work_struct worker;
+ 	struct mutex cmd_lock;
  
-@@ -643,15 +643,13 @@ static int olpc_battery_probe(struct platform_device *pdev)
- 		olpc_bat_desc.num_properties = ARRAY_SIZE(olpc_xo1_bat_props);
++	/* DCON regulator */
++	struct regulator_dev *dcon_rdev;
++	bool dcon_enabled;
++
+ 	/* Pending EC commands */
+ 	struct list_head cmd_q;
+ 	spinlock_t cmd_q_lock;
+@@ -344,9 +349,61 @@ static struct dentry *olpc_ec_setup_debugfs(void)
+ 
+ #endif /* CONFIG_DEBUG_FS */
+ 
++static int olpc_ec_set_dcon_power(struct olpc_ec_priv *ec, bool state)
++{
++	unsigned char ec_byte = state;
++	int ret;
++
++	if (ec->dcon_enabled == state)
++		return 0;
++
++	ret = olpc_ec_cmd(EC_DCON_POWER_MODE, &ec_byte, 1, NULL, 0);
++	if (ret)
++		return ret;
++
++	ec->dcon_enabled = state;
++	return 0;
++}
++
++static int dcon_regulator_enable(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return olpc_ec_set_dcon_power(ec, true);
++}
++
++static int dcon_regulator_disable(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return olpc_ec_set_dcon_power(ec, false);
++}
++
++static int dcon_regulator_is_enabled(struct regulator_dev *rdev)
++{
++	struct olpc_ec_priv *ec = rdev_get_drvdata(rdev);
++
++	return ec->dcon_enabled ? 1 : 0;
++}
++
++static struct regulator_ops dcon_regulator_ops = {
++	.enable		= dcon_regulator_enable,
++	.disable	= dcon_regulator_disable,
++	.is_enabled	= dcon_regulator_is_enabled,
++};
++
++static const struct regulator_desc dcon_desc = {
++	.name	= "dcon",
++	.id	= 0,
++	.ops	= &dcon_regulator_ops,
++	.type	= REGULATOR_VOLTAGE,
++	.owner	= THIS_MODULE,
++};
++
+ static int olpc_ec_probe(struct platform_device *pdev)
+ {
+ 	struct olpc_ec_priv *ec;
++	struct regulator_config config = { };
+ 	int err;
+ 
+ 	if (!ec_driver)
+@@ -374,6 +431,16 @@ static int olpc_ec_probe(struct platform_device *pdev)
+ 		return err;
  	}
  
--	data->olpc_bat = power_supply_register(&pdev->dev, &olpc_bat_desc, &psy_cfg);
--	if (IS_ERR(olpc_bat)) {
--		ret = PTR_ERR(olpc_bat);
--		goto battery_failed;
--	}
-+	data->olpc_bat = devm_power_supply_register(&pdev->dev, &olpc_bat_desc, &psy_cfg);
-+	if (IS_ERR(data->olpc_bat))
-+		return PTR_ERR(data->olpc_bat);
++	config.dev = pdev->dev.parent;
++	config.driver_data = ec;
++	ec->dcon_enabled = true;
++	ec->dcon_rdev = devm_regulator_register(&pdev->dev, &dcon_desc,
++								&config);
++	if (IS_ERR(ec->dcon_rdev)) {
++		dev_err(&pdev->dev, "failed to register DCON regulator\n");
++		return PTR_ERR(ec->dcon_rdev);
++	}
++
+ 	ec->dbgfs_dir = olpc_ec_setup_debugfs();
  
- 	ret = device_create_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
- 	if (ret)
--		goto eeprom_failed;
-+		return ret;
- 
- 	ret = device_create_file(&data->olpc_bat->dev, &olpc_bat_error);
- 	if (ret)
-@@ -666,10 +664,6 @@ static int olpc_battery_probe(struct platform_device *pdev)
- 
- error_failed:
- 	device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
--eeprom_failed:
--	power_supply_unregister(data->olpc_bat);
--battery_failed:
--	power_supply_unregister(data->olpc_ac);
- 	return ret;
- }
- 
-@@ -679,9 +673,6 @@ static int olpc_battery_remove(struct platform_device *pdev)
- 
- 	device_remove_file(&data->olpc_bat->dev, &olpc_bat_error);
- 	device_remove_bin_file(&data->olpc_bat->dev, &olpc_bat_eeprom);
--	power_supply_unregister(data->olpc_bat);
--	power_supply_unregister(data->olpc_ac);
--
- 	return 0;
- }
- 
+ 	return err;
 -- 
 2.19.1
