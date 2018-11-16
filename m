@@ -1,39 +1,115 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 16 Nov 2018 12:10:43 +0000
-Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
- signal
-In-Reply-To: <20181003133543.t7laclm5wbj2olhq@sapphire.tkos.co.il>
-References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
- <20181003132811.GC427@lunn.ch>
- <20181003133543.t7laclm5wbj2olhq@sapphire.tkos.co.il>
-Message-ID: <20181116121043.GC3228@e107981-ln.cambridge.arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Fri, 16 Nov 2018 12:12:52 +0000
+Subject: [PATCH 4/4] arm64: KVM: Enable support for :G/:H perf event
+ modifiers
+In-Reply-To: <29cd37da-5ee9-545e-a456-b8811b0e063a@arm.com>
+References: <1542286549-4501-1-git-send-email-andrew.murray@arm.com>
+ <1542286549-4501-5-git-send-email-andrew.murray@arm.com>
+ <79000795-971d-22fa-6264-f85f2d528477@arm.com>
+ <20181115155742.GA19420@e119886-lin.cambridge.arm.com>
+ <29cd37da-5ee9-545e-a456-b8811b0e063a@arm.com>
+Message-ID: <20181116121251.GE19420@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 04:35:43PM +0300, Baruch Siach wrote:
-> Hi Andrew,
+On Thu, Nov 15, 2018 at 05:40:24PM +0000, Suzuki K Poulose wrote:
 > 
-> On Wed, Oct 03, 2018 at 03:28:11PM +0200, Andrew Lunn wrote:
-> > On Wed, Oct 03, 2018 at 03:49:43PM +0300, Baruch Siach wrote:
-> > > This commit adds support for the gpio reset signal binding as described
-> > > in the designware-pcie.txt DT binding document. Both the documented
-> > > 'reset-gpio' property name, and the more standard 'reset-gpios' name are
-> > > supported.
+> 
+> On 15/11/2018 15:57, Andrew Murray wrote:
+> > On Thu, Nov 15, 2018 at 02:00:39PM +0000, Julien Thierry wrote:
+> > > Hi Andrew,
+> > > 
+> > > On 15/11/18 12:55, Andrew Murray wrote:
+> > > > Enable/disable event counters as appropriate when entering and exiting
+> > > > the guest to enable support for guest or host only event counting.
+> > > > 
+> > > > For both VHE and non-VHE we switch the counters between host/guest at
+> > > > EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
+> > > > 
+> > > > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > > > ---
+> > > >    arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
+> > > >    1 file changed, 38 insertions(+)
+> > > > 
+> > > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > > > index d496ef5..ebf0aac 100644
+> > > > --- a/arch/arm64/kvm/hyp/switch.c
+> > > > +++ b/arch/arm64/kvm/hyp/switch.c
+> > > > @@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> > > >    	return true;
+> > > >    }
+> > > > +static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
+> > > > +{
+> > > > +	u32 host_only = host_ctxt->events_host_only;
+> > > > +	u32 guest_only = host_ctxt->events_guest_only;
+> > > > +
+> > > > +	if (host_only)
+> > > > +		write_sysreg(host_only, pmcntenclr_el0);
+> > > > +
+> > > > +	if (guest_only)
+> > > > +		write_sysreg(guest_only, pmcntenset_el0);
+> > > > +
+> > > > +	return (host_only || guest_only);
+> > > > +}
+> > > > +
+> > > > +static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
+> > > > +{
+> > > > +	u32 host_only = host_ctxt->events_host_only;
+> > > > +	u32 guest_only = host_ctxt->events_guest_only;
+> > > > +
+> > > > +	if (guest_only)
+> > > > +		write_sysreg(guest_only, pmcntenclr_el0);
+> > > > +
+> > > > +	if (host_only)
+> > > > +		write_sysreg(host_only, pmcntenset_el0);
+> > > 
+> > > In the perf_event code, there is an ISB after enabling an event. I guess we
+> > > don't need it when setting the guest events since I believe the eret to the
+> > > guess give us the context synchronization. But don't we need one here when
+> > > restoring host only events?
 > > 
-> > I don't know this code at all, so maybe a dumb question. Why support
-> > the old none-standard binding of reset-gpio on new hardware? I'm
-> > assuming reset-gpio is marked a deprecated and reset-gpios is
-> > recommended?
+> > It's not really clear to me why the isb is present in the existing code,
+> > this was only recently introduced when adding the chained events support.
+> > 
+> > Ideally for chained events you'd want to start the overflow counter first
+> > (idx) followed by the low counter second (idx-1) as to not miss overflows
+> > so an isb inbetween may be helpful. Though the isb is after both enables, this
+> > sets a clear line of where event counting starts - but ideally this would be
+> > symmetrical with an isb after the disable.
 > 
-> This is all hidden behind the devm_gpiod_get_optional() call that only sees 
-> the "reset" string. The generic code supports both the new property name and 
-> also the older one for backward compatibility. This patch changes nothing in 
-> this regard.
-> 
-> The designware-pcie.txt document mentions the older 'reset-gpio' name. So I 
-> mentioned that name as well in the commit log.
+> I think the isb() in the armv8_pmu_enable_event_counter() is
+> unnecessary, and might have been a left over from earlier versions
+> of the series. Please feel free to remove it.
 
-I need Thomas' ACK to proceed with this patch.
+OK I'll do that.
+
+> 
+> > 
+> > At present chained counters aren't supported in the guest but in any case
+> > we turn them all on/off atomically rather than individually.
+> > 
+> > I guess we get a trivial gain in accuracy by adding ISB's at some performance
+> > cost - I'm not sure I see the benefit - unless I'm missing something?
+> 
+> But, I think Julien has a valid point here. When we modify the
+> pmcnten{set/clr} registers, the PMU could be enabled. (i.e, PMCR_E set).
+> 
+> So in order to synchronize the changes to the counters, we need an isb()
+> in the switch to host case to take immediate effect of the counter
+> changes.
+
+For VHE we already do an isb in kvm_arm_vhe_guest_exit (next line of code
+to kvm_arm_vhe_guest_exit).
+
+For !VHE as I understand we will eret from EL2 (due to kvm_call_hyp call
+completing) and thus also implicitly isb.
+
+If that's correct we don't need to add any isb's right?
 
 Thanks,
-Lorenzo
+
+Andrew Murray
+
+> 
+> Cheers
+> Suzuki
