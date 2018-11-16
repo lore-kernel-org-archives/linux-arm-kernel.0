@@ -1,27 +1,60 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Fri, 16 Nov 2018 11:03:51 +0800
-Subject: [PATCH] x86_64, vmcoreinfo: Append 'page_offset_base' to
- vmcoreinfo
-In-Reply-To: <CACi5LpPrYgiy--FRgN4549cxLPMrtx6mY9_QRggKNo7gK3WxYw@mail.gmail.com>
-References: <1540593788-28181-1-git-send-email-bhsharma@redhat.com>
- <20181027100241.GB1884@MiWiFi-R3L-srv>
- <CACi5LpPf9Zr1beowRNGmLZY7DtS3JDt8D=FONjqas9yo7TyCjg@mail.gmail.com>
- <20181030020752.GB11408@MiWiFi-R3L-srv>
- <CACi5LpP0_s9zAF+QfKpU+kG6BKqqkiwQhcW-WFZ0=SnBeX7ZXA@mail.gmail.com>
- <20181030085917.GC11408@MiWiFi-R3L-srv>
- <CACi5LpPrYgiy--FRgN4549cxLPMrtx6mY9_QRggKNo7gK3WxYw@mail.gmail.com>
-Message-ID: <20181116030351.GA18471@MiWiFi-R3L-srv>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Fri, 16 Nov 2018 11:24:42 +0800
+Subject: [PATCH 1/2] clocksource: Demote dbx500 PRCMU clocksource
+In-Reply-To: <20181115133203.28567-1-linus.walleij@linaro.org>
+References: <20181115133203.28567-1-linus.walleij@linaro.org>
+Message-ID: <CAMz4kuKvqX7B1tundeLTHvttTvE7kv3unLiu-G5z9w5zpQpf8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/18 at 03:20am, Bhupesh Sharma wrote:
-> I have sent a v2 patch with a much simpler git log message. Hopefully
-> that should clarify the intent behind the patch.
-> Also lets see what views the x86 maintainers have on the v2 patch.
+On 15 November 2018 at 21:32, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Demote the DBx500 PRCMU clocksource to quality 100 and
+> mark it as NONSTOP so it will still be used for
+> timekeeping across suspend/resume.
+>
+> The Nomadik MTU timer which has higher precision will
+> be used when the system is up and running, thanks to
+> the recent changes properly utilizing the suspend
+> clocksources.
+>
+> This was discussed back in 2011 when the driver was
+> written, but the infrastructure was not available
+> upstream to use this timer properly. Now the
+> infrastructure is there, so let's finalize the work.
+>
+> Cc: Baolin Wang <baolin.wang@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
 
-Thanks, Bhupesh. That's great. Believe other people will help review and
-give advice or ACK. I am busying on other issue and have no time to
-review it for now. Thanks for the effort.
+Glad to see new driver uses the suspend clocksource.
+Reviewed-by: Baolin Wang <baolin.wang@linaro.org>
 
-Thanks
-Baoquan
+>  drivers/clocksource/clksrc-dbx500-prcmu.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/clksrc-dbx500-prcmu.c b/drivers/clocksource/clksrc-dbx500-prcmu.c
+> index c1b96dc5f444..4054539fe066 100644
+> --- a/drivers/clocksource/clksrc-dbx500-prcmu.c
+> +++ b/drivers/clocksource/clksrc-dbx500-prcmu.c
+> @@ -46,10 +46,10 @@ static u64 notrace clksrc_dbx500_prcmu_read(struct clocksource *cs)
+>
+>  static struct clocksource clocksource_dbx500_prcmu = {
+>         .name           = "dbx500-prcmu-timer",
+> -       .rating         = 300,
+> +       .rating         = 100,
+>         .read           = clksrc_dbx500_prcmu_read,
+>         .mask           = CLOCKSOURCE_MASK(32),
+> -       .flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+> +       .flags          = CLOCK_SOURCE_IS_CONTINUOUS | CLOCK_SOURCE_SUSPEND_NONSTOP,
+>  };
+>
+>  #ifdef CONFIG_CLKSRC_DBX500_PRCMU_SCHED_CLOCK
+> --
+> 2.17.2
+>
+
+
+
+-- 
+Baolin Wang
+Best Regards
