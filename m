@@ -1,62 +1,70 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 16 Nov 2018 10:23:59 -0800
-Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
-In-Reply-To: <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
-References: <20181116051719.23376-1-dbasehore@chromium.org>
- <CAD=FV=W7sYY5n609erPpTxux+0Efad_0YpPkoVZB14Kqm=baXA@mail.gmail.com>
- <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
-Message-ID: <CAD=FV=XVDAjLt+VtxedHEma1FRrG0LuFZ2c7L5-MsdCZkgEcsw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 16 Nov 2018 11:42:29 -0700
+Subject: [PATCH 0/3] perf tools: Add support for ETMv3/PTM1.1 decoding 
+Message-ID: <1542393752-10196-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This set adds support for ETMv3/PTM1.1 trace decoding.  The work has been
+tested on TC2 and ST-Microelectronics' mp157c-ev1 board and applies cleanly
+on 4.20-rc2 and Acme's perf/core branch [1].
 
-On Fri, Nov 16, 2018 at 9:39 AM dbasehore . <dbasehore@chromium.org> wrote:
->
-> On Fri, Nov 16, 2018 at 8:01 AM Doug Anderson <dianders@chromium.org> wrote:
-> >
-> > Hi,
-> >
-> > On Thu, Nov 15, 2018 at 9:17 PM Derek Basehore <dbasehore@chromium.org> wrote:
-> > >
-> > > This adds the xin32k clock to the RK3399 CPU. Even though it's not
-> > > directly used, muxes will end up traversing the entire clk tree on
-> > > calls to determine_rate if it doesn't exist.
-> > >
-> > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> > > ---
-> > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
-> > >  1 file changed, 7 insertions(+)
-> >
-> > nit: I would have expected ${SUBJECT} to have v2 in it somewhere.
-> >
-> >
-> > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > index 99e7f65c1779..3d09472978f8 100644
-> > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> >
-> > Aww crud.  I was at the airport yesterday and so I didn't notice that
-> > you were touching rk3399, not rk3399-gru.  This belongs in the gru
-> > device tree file, not in the top level rk3399.  As you have written
-> > this it will break rk3399 boards that have an rk808 on them, AKA:
->
-> Should this be moved to the rk3399.dtsi file? The RK3399 assumes that
-> this clk exists (same as the 24MHz clk which is in rk3399.dtsi). While
-> it can function without it defined, it really shouldn't. We can just
-> assign the existing labels in the dts files you pointed out.
+*** Before this set ***
 
-No, it should be in the board files.  Each board may produce the 32k
-clock through a different component.  On gru-based devices we produce
-the 32k clock through a silego part.  On some other ones we produce it
-from rk808.
+$ perf report --stdio
+# To display the perf.data header info, please use --header/--header-only options.
+#
+        DCD_ETMV4_0020 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+        DCD_ETMV4_0022 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+        DCD_ETMV4_0024 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+        DCD_ETMV4_0020 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+        DCD_ETMV4_0022 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+        DCD_ETMV4_0024 : 0x0003 (OCSD_ERR_NOT_INIT) [Component not initialised.]; No decoder configuration information
+Warning:
+AUX data lost 2 times out of 2!
 
-Technically you could say that we don't _truly_ need to model this
-clock and we could have just inserted a dummy/fixed 32k clock in the
-clk-rk3399.c file.  ...but we did model it so that means we should
-probably model it semi-properly.
+Error:
+The perf.data file has no samples!
 
-If a given board forgets to provide a 32k clock then that's a bug for
-them like it was for us.
+*** After this set ***
 
--Doug
+[...]
+
+# Samples: 12K of event 'branches'
+# Event count (approx.): 12049
+#
+# Children      Self  Command  Shared Object     Symbol                 
+# ........  ........  .......  ................  .......................
+#
+    28.18%    28.18%  uname    libc-2.19.so      [.] strcmp
+     9.13%     9.13%  uname    libc-2.19.so      [.] strcpy
+     7.87%     7.87%  uname    libc-2.19.so      [.] strnlen
+     5.58%     5.58%  uname    libc-2.19.so      [.] strlen
+     2.24%     2.24%  uname    libc-2.19.so      [.] __rawmemchr
+     1.91%     1.91%  uname    ld-2.19.so        [.] 0x000000000001156a
+     1.49%     1.49%  uname    libc-2.19.so      [.] __argz_stringify
+     1.46%     1.46%  uname    libc-2.19.so      [.] malloc
+     0.96%     0.96%  uname    libc-2.19.so      [.] 0x0000000000054770
+     0.91%     0.91%  uname    libc-2.19.so      [.] 0x000000000002430a
+     0.85%     0.85%  uname    ld-2.19.so        [.] 0x0000000000007244
+     0.83%     0.83%  uname    libc-2.19.so      [.] __stpcpy
+
+[...]
+
+Regards,
+Mathieu
+
+[1]. "6909b0a13389 perf stat: Use perf_evsel__is_clocki() for clock events"
+
+Mathieu Poirier (3):
+  perf tools: Add configuration for ETMv3 trace protocol
+  perf tools: Add support for ETMv3 trace decoding
+  perf tools: Add support for PTMv1.1 decoding
+
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 31 +++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  9 +++
+ tools/perf/util/cs-etm.c                        | 73 ++++++++++++++++++++-----
+ 3 files changed, 99 insertions(+), 14 deletions(-)
+
+-- 
+2.7.4
