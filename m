@@ -1,45 +1,38 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Fri, 16 Nov 2018 10:24:11 +0000
-Subject: [PATCH 08/10] perf/core: Remove unused perf_flags
+Date: Fri, 16 Nov 2018 10:24:09 +0000
+Subject: [PATCH 06/10] alpha: perf/core: generalise event exclusion checking
+ with perf macro
 In-Reply-To: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
 References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1542363853-13849-9-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542363853-13849-7-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that perf_flags is not used we remove it.
+Replace checking of perf event exclusion flags with perf macro.
+
+This is a functional change as __hw_perf_event_init will now indicate
+that it doesn't support exclude_host and exclude_guest event flags.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- include/uapi/linux/perf_event.h       | 2 --
- tools/include/uapi/linux/perf_event.h | 2 --
- 2 files changed, 4 deletions(-)
+ arch/alpha/kernel/perf_event.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index f35eb72..ba89bd3 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
- };
+diff --git a/arch/alpha/kernel/perf_event.c b/arch/alpha/kernel/perf_event.c
+index 5613aa37..36f98ee 100644
+--- a/arch/alpha/kernel/perf_event.c
++++ b/arch/alpha/kernel/perf_event.c
+@@ -631,10 +631,8 @@ static int __hw_perf_event_init(struct perf_event *event)
+ 	}
  
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
-diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-index f35eb72..ba89bd3 100644
---- a/tools/include/uapi/linux/perf_event.h
-+++ b/tools/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
- };
+ 	/* The EV67 does not support mode exclusion */
+-	if (attr->exclude_kernel || attr->exclude_user
+-			|| attr->exclude_hv || attr->exclude_idle) {
++	if (event_has_exclude_flags(event))
+ 		return -EPERM;
+-	}
  
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
+ 	/*
+ 	 * We place the event type in event_base here and leave calculation
 -- 
 2.7.4
