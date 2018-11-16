@@ -1,44 +1,107 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 16 Nov 2018 17:47:06 +0000
-Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
-In-Reply-To: <alpine.LNX.2.21.1811151427210.19@nippy.intranet>
-References: <cover.1541995959.git.fthain@telegraphics.com.au>
- <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
- <20181112083422.GA19695@infradead.org>
- <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
- <20181113092012.GI30658@n2100.armlinux.org.uk>
- <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
- <20181113234336.GP30658@n2100.armlinux.org.uk>
- <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
- <20181114141632.GT30658@n2100.armlinux.org.uk>
- <alpine.LNX.2.21.1811151427210.19@nippy.intranet>
-Message-ID: <20181116174705.GY30658@n2100.armlinux.org.uk>
+From: kaslevs@vmware.com (Slavomir Kaslev)
+Date: Fri, 16 Nov 2018 17:48:09 +0000
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+Message-ID: <CAE0o1NuTR1x2u9aJVo3-u9yPAESQqLRZNrjxDJSugTF6qo+pbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 03:12:17PM +1100, Finn Thain wrote:
-> The thread went way off-topic when Christoph took the opportunity to 
-> suggest the removal of RPC and EBSA110. That doesn't interest me.
+On Thu, Nov 15, 2018 at 5:42 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+>
+> Previouly drivers have their own way of mapping range of
+> kernel pages/memory into user vma and this was done by
+> invoking vm_insert_page() within a loop.
+>
+> As this pattern is common across different drivers, it can
+> be generalized by creating a new function and use it across
+> the drivers.
+>
+> vm_insert_range is the new API which will be used to map a
+> range of kernel memory/pages to user vma.
+>
+> Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> Reviewed-by: Matthew Wilcox <willy@infradead.org>
+> ---
+>  include/linux/mm_types.h |  3 +++
+>  mm/memory.c              | 28 ++++++++++++++++++++++++++++
+>  mm/nommu.c               |  7 +++++++
+>  3 files changed, 38 insertions(+)
+>
+> diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> index 5ed8f62..15ae24f 100644
+> --- a/include/linux/mm_types.h
+> +++ b/include/linux/mm_types.h
+> @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
+>  extern void tlb_finish_mmu(struct mmu_gather *tlb,
+>                                 unsigned long start, unsigned long end);
+>
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +                       struct page **pages, unsigned long page_count);
+> +
+>  static inline void init_tlb_flush_pending(struct mm_struct *mm)
+>  {
+>         atomic_set(&mm->tlb_flush_pending, 0);
+> diff --git a/mm/memory.c b/mm/memory.c
+> index 15c417e..da904ed 100644
+> --- a/mm/memory.c
+> +++ b/mm/memory.c
+> @@ -1478,6 +1478,34 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+>
+>  /**
+> + * vm_insert_range - insert range of kernel pages into user vma
+> + * @vma: user vma to map to
+> + * @addr: target user address of this page
+> + * @pages: pointer to array of source kernel pages
+> + * @page_count: no. of pages need to insert into user vma
+> + *
+> + * This allows drivers to insert range of kernel pages they've allocated
+> + * into a user vma. This is a generic function which drivers can use
+> + * rather than using their own way of mapping range of kernel pages into
+> + * user vma.
+> + */
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +                       struct page **pages, unsigned long page_count)
+> +{
+> +       unsigned long uaddr = addr;
+> +       int ret = 0, i;
+> +
+> +       for (i = 0; i < page_count; i++) {
+> +               ret = vm_insert_page(vma, uaddr, pages[i]);
+> +               if (ret < 0)
+> +                       return ret;
+> +               uaddr += PAGE_SIZE;
+> +       }
+> +
+> +       return ret;
+> +}
 
-I suspect that is the right solution - I've been trying to get 4.19
-to boot on my RPC and it's proving very difficult for several reasons,
-not limited to the HDD seeming to be throwing the odd disk error, as
-well as the kernel being rather large (a 4.19 kernel is 2.7M compressed
-as opposed to 2.6.29 being 1.2M compressed for the equivalent
-configuration.)
++ EXPORT_SYMBOL(vm_insert_range);
 
-Given that memory on the RPC is not contiguous, that probably means
-an uncompressed kernel overflows the size of the first memory bank,
-so there's probably no hope for modern kernels to boot on the machine.
-
-The EBSA110 is probably in a similar boat - I don't remember whether it
-had 16MB or 32MB as the maximal amount of memory, but memory was getting
-tight with some kernels even running a minimalist userspace.
-
-So, it's probably time to say goodbyte to the kernel support for these
-platforms.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> +
+> +/**
+>   * vm_insert_page - insert single page into user vma
+>   * @vma: user vma to map to
+>   * @addr: target user address of this page
+> diff --git a/mm/nommu.c b/mm/nommu.c
+> index 749276b..d6ef5c7 100644
+> --- a/mm/nommu.c
+> +++ b/mm/nommu.c
+> @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+>  }
+>  EXPORT_SYMBOL(vm_insert_page);
+>
+> +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> +                       struct page **pages, unsigned long page_count)
+> +{
+> +       return -EINVAL;
+> +}
+> +EXPORT_SYMBOL(vm_insert_range);
+> +
+>  /*
+>   *  sys_brk() for the most part doesn't need the global kernel
+>   *  lock, except when an application is doing something nasty
+> --
+> 1.9.1
+>
