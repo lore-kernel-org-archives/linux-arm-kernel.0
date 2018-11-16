@@ -1,168 +1,37 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 16 Nov 2018 15:09:47 +0000
-Subject: [RFC PATCH v2 06/23] arm64/sve: Check SVE virtualisability
-In-Reply-To: <87bm6pciel.fsf@linaro.org>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-7-git-send-email-Dave.Martin@arm.com>
- <87in0ycpuy.fsf@linaro.org>
- <20181115170904.GO3505@e103592.cambridge.arm.com>
- <87bm6pciel.fsf@linaro.org>
-Message-ID: <20181116150947.GV3505@e103592.cambridge.arm.com>
+From: brajeswar.linux@gmail.com (Brajeswar Ghosh)
+Date: Fri, 16 Nov 2018 20:45:11 +0530
+Subject: [PATCH] arm/mach-sa1100/hackkit.c: Remove duplicate header
+In-Reply-To: <20181108144454.GA3797@hp-pavilion-15-notebook-pc-brajeswar>
+References: <20181108144454.GA3797@hp-pavilion-15-notebook-pc-brajeswar>
+Message-ID: <CAFqtX7kba2UBiNoMhG79joLL2N1_Hup7y+xrKrYsesXwj6-grA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 12:32:18PM +0000, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > On Thu, Nov 15, 2018 at 03:39:01PM +0000, Alex Benn?e wrote:
-> >>
-> >> Dave Martin <Dave.Martin@arm.com> writes:
-> >>
-> >> > Due to the way the effective SVE vector length is controlled and
-> >> > trapped at different exception levels, certain mismatches in the
-> >> > sets of vector lengths supported by different physical CPUs in the
-> >> > system may prevent straightforward virtualisation of SVE at parity
-> >> > with the host.
-> >> >
-> >> > This patch analyses the extent to which SVE can be virtualised
-> >> > safely without interfering with migration of vcpus between physical
-> >> > CPUs, and rejects late secondary CPUs that would erode the
-> >> > situation further.
-> >> >
-> >> > It is left up to KVM to decide what to do with this information.
-> >> >
-> >> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> >> > ---
-> >> >
-> >> > Changes since RFCv1:
-> >> >
-> >> >  * The analysis done by this patch is the same as in the previous
-> >> >    version, but the commit message the printks etc. have been reworded
-> >> >    to avoid the suggestion that KVM is expected to work on a system with
-> >> >    mismatched SVE implementations.
-> >> > ---
-> >> >  arch/arm64/include/asm/fpsimd.h |  1 +
-> >> >  arch/arm64/kernel/cpufeature.c  |  2 +-
-> >> >  arch/arm64/kernel/fpsimd.c      | 87 +++++++++++++++++++++++++++++++++++------
-> >> >  3 files changed, 76 insertions(+), 14 deletions(-)
-> >> >
-> >
-> > [...]
-> >
-> >> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+On Thu, Nov 8, 2018 at 8:14 PM Brajeswar Ghosh
+<brajeswar.linux@gmail.com> wrote:
+>
+> Remove linux/tty.h which is included more than once
+>
+> Signed-off-by: Brajeswar Ghosh <brajeswar.linux@gmail.com>
 
-[...]
+Any comment on this patch?
 
-> >> > @@ -658,24 +662,60 @@ void __init sve_init_vq_map(void)
-> >> >   */
-> >> >  void sve_update_vq_map(void)
-> >> >  {
-> >> > -	sve_probe_vqs(sve_secondary_vq_map);
-> >> > -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
-> >> > +	sve_probe_vqs(sve_tmp_vq_map);
-> >> > +	bitmap_and(sve_vq_map, sve_vq_map, sve_tmp_vq_map,
-> >> > +		   SVE_VQ_MAX);
-> >> > +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, sve_tmp_vq_map,
-> >> > +		  SVE_VQ_MAX);
-> >> >  }
-> >>
-> >> I'm not quite following what's going on here. This is tracking both the
-> >> vector lengths available on all CPUs and the ones available on at least
-> >> one CPU? This raises a some questions:
-> >>
-> >>   - do such franken-machines exist or are expected to exit?
-> >
-> > no, and yes respectively (Linux does not endorse the latter for now,
-> > since it results in a non-SMP system: we hide the asymmetries where
-> > possible by clamping the set of available vector lengths, but for
-> > KVM it's too hard and we don't aim to support it at all).
-> >
-> > Even if we don't recommend deploying a general-purpose OS on such a
-> > system, people will eventually try it.  So it's better to fail safe
-> > rather than silently doing the wrong thing.
-> >
-> >>   - how do we ensure this is always upto date?
-> >
-> > This gets updated for each early secondary CPU that comes up.  (Early
-> > secondaries' boot is serialised, so we shouldn't have to worry about
-> > races here.)
-> >
-> > The configuration is frozen by the time we enter userspace (hence
-> > __ro_after_init).
-> >
-> > Once all the early secondaries have come up, we commit to the best
-> > possible set of vector lengths for the CPUs that we know about, and we
-> > don't call this path any more: instead, each late secondary goes into
-> > sve_verify_vq_map() instead to check that those CPUs are compatible
-> > with the configuration we committed to.
-> >
-> > For context, take a look at
-> > arch/arm64/kernel/cpufeature.c:check_local_cpu_capabilities(), which is
-> > the common entry point for all secondary CPUs: that splits into
-> > update_cpu_capabilities() and verify_local_cpu_capabilities() paths for
-> > the two cases described above, calling down into sve_update_vq_map()
-> > and sve_verify_vq_map() as appropriate.
-> >
-> >>   - what happens when we hotplug a new CPU with less available VQ?
-> >
-> > We reject the CPU and throw it back to the firmware (see
-> > cpufeature.c:verify_sve_features()).
-> >
-> > This follows the precedent already set in verify_local_cpu_capabilities()
-> > etc.
-> 
-> I think a few words to that effect in the function comments would be
-> helpful:
-> 
->   /*
->    * sve_update_vq_map only cares about CPUs at boot time and is called
->    * serially for each one. Any CPUs added later via hotplug will fail
->    * at sve_verify_vq_map if they don't match what is detected here.
->    */
-
-Ack.  I might tweak the wording, but adding brief comments explaining
-when these functions are called is a good idea.
-
-> 
-> >
-> >>
-> >> >
-> >> >  /* Check whether the current CPU supports all VQs in the committed set */
-> >> >  int sve_verify_vq_map(void)
-> >> >  {
-> >> > -	int ret = 0;
-> >> > +	int ret = -EINVAL;
-> >> > +	unsigned long b;
-> >> >
-> >> > -	sve_probe_vqs(sve_secondary_vq_map);
-> >> > -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
-> >> > -		      SVE_VQ_MAX);
-> >> > -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
-> >> > +	sve_probe_vqs(sve_tmp_vq_map);
-> >> > +
-> >> > +	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
-> >> > +	if (bitmap_intersects(sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX)) {
-> >> >  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
-> >> >  			smp_processor_id());
-> >> > -		ret = -EINVAL;
-> >> > +		goto error;
-> >>
-> >> The use of goto seems a little premature considering we don't have any
-> >> clean-up to do.
-> >
-> > Hmm, this does look a little overengineered.  I think it may have been
-> > more complex during development (making the gotos less redundant), but
-> > to be honest I don't remember now.
-> >
-> > I'm happy to get rid of the rather pointless ret variable and replace
-> > all the gotos with returns if that works for you.
-> >
-> > What do you think?
-> 
-> Yes please, that would be cleaner.
-
-OK, good.
-
-Cheers
----Dave
+> ---
+>  arch/arm/mach-sa1100/hackkit.c | 1 -
+>  1 file changed, 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
+> index 643d5f2d9af9..0016d25e7deb 100644
+> --- a/arch/arm/mach-sa1100/hackkit.c
+> +++ b/arch/arm/mach-sa1100/hackkit.c
+> @@ -22,7 +22,6 @@
+>  #include <linux/serial_core.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/partitions.h>
+> -#include <linux/tty.h>
+>  #include <linux/gpio.h>
+>  #include <linux/leds.h>
+>  #include <linux/platform_device.h>
+> --
+> 2.17.1
+>
