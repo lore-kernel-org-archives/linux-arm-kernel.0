@@ -1,53 +1,48 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 16 Nov 2018 19:08:58 +0100
-Subject: [PATCH v2 0/3] Mark clocks as critical for MT6797
-Message-ID: <20181116180901.17737-1-matthias.bgg@kernel.org>
+Date: Fri, 16 Nov 2018 19:08:59 +0100
+Subject: [PATCH v2 1/3] clk: mediatek: Add MUX_FLAGS macro
+In-Reply-To: <20181116180901.17737-1-matthias.bgg@kernel.org>
+References: <20181116180901.17737-1-matthias.bgg@kernel.org>
+Message-ID: <20181116180901.17737-2-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthias Brugger <mbrugger@suse.com>
+From: Jasper Mattsson <jasu@njomotys.info>
 
-Jasper send this series some month ago. As there was no reaction from
-his side, I'll do a friendly take-over.
-I tested the patches on my Helios X20 boards and they fix the issue.
-I didn't add a Tested-by tag as I added my Signed-off-by.
+This is required to mark outputs of certain MUXes as CLK_IS_CRITICAL.
 
-Changes since v1:
-- add a fixes tag.
-
+Fixes: 96596aa06628 ("clk: mediatek: add clk support for MT6797")
+Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
+ drivers/clk/mediatek/clk-mtk.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Currently, DRAM-related clocks and the axi_sel MUX are not marked with
-CLK_IS_CRITICAL for MT6797. This causes memory corruption when the
-system is booted without clk_ignore_unused.
-
-This patchset
-
-1. Makes it possible to mark outputs of MUXes as critical by introducing
-   a new macro, MUX_FLAGS,
-2. Makes it possible to mark gates as critical by adding flags to
-   mtk_gate, and
-3. Marks axi_sel, ddrphycfg_sel, infra_dramc_f26m and infra_dramc_b_f26m
-   as critical.
-
-The addition of flags to mtk_gate also exists in the patch series "Add
-basic and clock support for Mediatek MT8183 SoC" [1].  The type of
-flags is unsigned int in that series, but the real type is unsigned
-long, so my patch differs from that patch.
-
-[1] https://patchwork.kernel.org/patch/10549953/
-
-Jasper Mattsson (3):
-  clk: mediatek: Add MUX_FLAGS macro
-  clk: mediatek: Add flags to mtk_gate
-  clk: mediatek: Mark bus and DRAM related clocks as critical
-
- drivers/clk/mediatek/clk-gate.c   |  4 +-
- drivers/clk/mediatek/clk-gate.h   |  3 +-
- drivers/clk/mediatek/clk-mt6797.c | 64 ++++++++++++++++++-------------
- drivers/clk/mediatek/clk-mtk.c    |  2 +-
- drivers/clk/mediatek/clk-mtk.h    |  9 ++++-
- 5 files changed, 50 insertions(+), 32 deletions(-)
-
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index f83c2bbb677e..daab6ee94788 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -111,7 +111,11 @@ struct mtk_composite {
+ 	MUX_GATE_FLAGS(_id, _name, _parents, _reg, _shift, _width,	\
+ 		_gate, CLK_SET_RATE_PARENT)
+ 
+-#define MUX(_id, _name, _parents, _reg, _shift, _width) {		\
++#define MUX(_id, _name, _parents, _reg, _shift, _width)			\
++	MUX_FLAGS(_id, _name, _parents, _reg,				\
++		  _shift, _width, CLK_SET_RATE_PARENT)
++
++#define MUX_FLAGS(_id, _name, _parents, _reg, _shift, _width, _flags) {	\
+ 		.id = _id,						\
+ 		.name = _name,						\
+ 		.mux_reg = _reg,					\
+@@ -121,7 +125,7 @@ struct mtk_composite {
+ 		.divider_shift = -1,					\
+ 		.parent_names = _parents,				\
+ 		.num_parents = ARRAY_SIZE(_parents),			\
+-		.flags = CLK_SET_RATE_PARENT,				\
++		.flags = _flags,				\
+ 	}
+ 
+ #define DIV_GATE(_id, _name, _parent, _gate_reg, _gate_shift, _div_reg,	\
 -- 
 2.19.1
