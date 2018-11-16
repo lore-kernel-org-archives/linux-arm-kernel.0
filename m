@@ -1,16 +1,16 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 16 Nov 2018 11:02:14 +0800
-Subject: [PATCH] ARM: dts: imx6: RDU2: fix eGalax touchscreen node
-In-Reply-To: <20181105173156.3519-1-l.stach@pengutronix.de>
-References: <20181105173156.3519-1-l.stach@pengutronix.de>
-Message-ID: <20181116030212.GI5829@dragon>
+Date: Fri, 16 Nov 2018 11:03:59 +0800
+Subject: [PATCH] ARM: dts: imx6: add thermal sensor and cooling cells
+In-Reply-To: <20181105173402.30431-1-l.stach@pengutronix.de>
+References: <20181105173402.30431-1-l.stach@pengutronix.de>
+Message-ID: <20181116030358.GJ5829@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 05, 2018 at 06:31:56PM +0100, Lucas Stach wrote:
-> Use the correct compatible for the new protocol used by the firmware
-> on the touch controller, the GPIO wakeup isn't used in that case.
-> Also eGalax touch needs axis swapping, just as with the RMI4 touch.
+On Mon, Nov 05, 2018 at 06:34:02PM +0100, Lucas Stach wrote:
+> This allows a board to specify a custom thermal zone configuration
+> involving the SoC internal sensor, CPU and GPU nodes without having
+> to change those nodes.
 > 
 > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
