@@ -1,24 +1,24 @@
-From: valdis.kletnieks@vt.edu (valdis.kletnieks at vt.edu)
-Date: Fri, 16 Nov 2018 06:33:08 -0500
-Subject: [ARM64] Printing IRQ stack usage information
-In-Reply-To: <CAOuPNLj8wj=tPJo8L3oS7o8iTQcyhZ0W-GH6xmP_GsG4r7YdAQ@mail.gmail.com>
-References: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
- <28496.1542300549@turing-police.cc.vt.edu>
- <CAOuPNLj8wj=tPJo8L3oS7o8iTQcyhZ0W-GH6xmP_GsG4r7YdAQ@mail.gmail.com>
-Message-ID: <49219.1542367988@turing-police.cc.vt.edu>
+From: alexey.brodkin@synopsys.com (Alexey Brodkin)
+Date: Fri, 16 Nov 2018 11:41:18 +0000
+Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
+ "drm_dev_put"
+In-Reply-To: <20181115221634.22715-4-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <20181115221634.22715-4-greenfoo@gluegarage.com>
+Message-ID: <32f96995d5abf3844975a156dee38d21ea666c52.camel@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2018 11:44:36 +0530, Pintu Agarwal said:
+Hi Fernando,
 
-> > If your question is "Did one
-> > of the CPUs blow out its IRQ stack (or come close to doing so)?" there's better
-> > approaches.
-> >
-> Yes, exactly, this is what the main intention.
-> If you have any better idea about this approach, please refer me.
-> It will be of great help.
+On Thu, 2018-11-15 at 23:16 +0100, Fernando Ramos wrote:
+> This patch unifies the naming of DRM functions for reference counting as
+> requested on Documentation/gpu/todo.rst
+> 
+> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+> ---
+>  drivers/gpu/drm/arc/arcpgu_drv.c             | 4 ++--
 
-Look at the code controlled by '#ifdef CONFIG_DEBUG_STACK_USAGE'
-which does the same thing for process stacks, or CONFIG_SCHED_STACK_END_CHECK
-or the use of guard pages for detecting stack overrun....
+For ARCPGU
+
+Acked-by: Alexey Brodkin <abrodkin@synopsys.com>
