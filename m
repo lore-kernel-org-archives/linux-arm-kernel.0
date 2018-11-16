@@ -1,55 +1,55 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Fri, 16 Nov 2018 13:45:48 +0530
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <20181116064049.GA5320@bombadil.infradead.org>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
- <9655a12e-bd3d-aca2-6155-38924028eb5d@infradead.org>
- <CAFqt6zbLjtDab3Bz67trbnQRQdutvgA=YvAFhoW4bxsg657mGQ@mail.gmail.com>
- <20181116064049.GA5320@bombadil.infradead.org>
-Message-ID: <CAFqt6zbL1tu4VWtZ5Wz-BgbOS+M2GJziMj958_h_ri4Th3n9bQ@mail.gmail.com>
+From: liang.yang@amlogic.com (Liang Yang)
+Date: Fri, 16 Nov 2018 16:29:07 +0800
+Subject: [PATCH v6 2/2] mtd: rawnand: meson: add support for Amlogic NAND
+ flash controller
+In-Reply-To: <20181115140905.40011b4b@bbrezillon>
+References: <1541090542-19618-1-git-send-email-jianxin.pan@amlogic.com>
+ <1541090542-19618-3-git-send-email-jianxin.pan@amlogic.com>
+ <20181105165321.7ea2b45f@bbrezillon>
+ <a571904e-6296-bf62-e1fe-e25bf90040bb@amlogic.com>
+ <20181106102851.61deb97a@bbrezillon>
+ <ff02373e-c97b-182d-5b43-83d1e8f6d51a@amlogic.com>
+ <20181106112206.65a70a81@bbrezillon> <20181112171351.4ac3506b@xps13>
+ <20181112175416.247e3203@bbrezillon> <20181112184518.6c02ac6d@bbrezillon>
+ <27769252-ac5e-e787-6792-d6a06e7af0e4@amlogic.com>
+ <20181115140400.3934effe@xps13> <20181115140905.40011b4b@bbrezillon>
+Message-ID: <7e36bf4c-69a1-a570-f086-75f8ad53d518@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 12:11 PM Matthew Wilcox <willy@infradead.org> wrote:
->
-> On Fri, Nov 16, 2018 at 11:00:30AM +0530, Souptick Joarder wrote:
-> > On Thu, Nov 15, 2018 at 11:44 PM Randy Dunlap <rdunlap@infradead.org> wrote:
-> > > On 11/15/18 7:45 AM, Souptick Joarder wrote:
-> > > What is the opposite of vm_insert_range() or even of vm_insert_page()?
-> > > or is there no need for that?
-> >
-> > There is no opposite function of vm_insert_range() / vm_insert_page().
-> > My understanding is, in case of any error, mmap handlers will return the
-> > err to user process and user space will decide the next action. So next
-> > time when mmap handler is getting invoked it will map from the beginning.
-> > Correct me if I am wrong.
->
-> The opposite function, I suppose, is unmap_region().
->
-> > > s/no./number/
-> >
-> > I didn't get it ??
->
-> This is a 'sed' expression.  's' is the 'substitute' command; the /
-> is a separator, 'no.' is what you wrote, and 'number' is what Randy
-> is recommending instead.
+Hi Boris and Miquel,
 
-Ok. Will change it in v2.
->
-> > > > +     for (i = 0; i < page_count; i++) {
-> > > > +             ret = vm_insert_page(vma, uaddr, pages[i]);
-> > > > +             if (ret < 0)
-> > > > +                     return ret;
-> > >
-> > > For a non-trivial value of page_count:
-> > > Is it a problem if vm_insert_page() succeeds for several pages
-> > > and then fails?
-> >
-> > No, it will be considered as total failure and mmap handler will return
-> > the err to user space.
->
-> I think what Randy means is "What happens to the inserted pages?" and
-> the answer is that mmap_region() jumps to the 'unmap_and_free_vma'
-> label, which is an accurate name.
+understand. i will move helpers into nfc driver to avoid some errors 
+when sending the patch.
 
-Sorry for incorrect understanding of the question.
+On 2018/11/15 21:09, Boris Brezillon wrote:
+> On Thu, 15 Nov 2018 14:04:00 +0100
+> Miquel Raynal <miquel.raynal@bootlin.com> wrote:
+> 
+>> Hi Liang,
+>>
+>> Liang Yang <liang.yang@amlogic.com> wrote on Thu, 15 Nov 2018 19:25:07
+>> +0800:
+>>
+>>> Hi Boris,
+>>>
+>>> I have implemented dma access base on these helpers you provided below.
+>>> we prepare to send v7 version now, so when will these helpers be pushed?
+>>
+>> Thanks for your work. You can send the v7 so we will have a look at the
+>> overall driver; but since we raised the DMA buffers issue we had a
+>> discussion with Boris about how to handle them and I think we are going
+>> to adopt the same solution as Wolfram in the I2C subsystem: manual
+>> flagging. Sadly, this is probably the best we can do to ensure proper
+>> DMA support.
+>>
+>> There is nothing set is stone yet but I started a small rework to
+>> handle MTD operations differently (and add a DMA_SAFE flag), you can
+>> have a look there [1]. Don't base your work on it for now as it is just
+>> a preliminary version, subject to big changes.
+> 
+> In order to not block the driver, I'd suggest that you move the helper
+> I proposed directly into your driver and prefix them with 'meson_'.
+> 
+> .
+> 
