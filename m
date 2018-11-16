@@ -1,36 +1,50 @@
-From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
-Date: Fri, 16 Nov 2018 11:34:00 +0100
-Subject: [PATCH] arm64: sysreg: fix sparse warnings
-In-Reply-To: <20181115083535.usyjcdoz2f6zmssq@bars>
-References: <20181109204747.10008-1-geomatsi@gmail.com>
- <20181110001615.GA5665@brain-police>
- <20181110111647.GA3511@speedy.hunter>
- <20181110170311.GA7700@brain-police>
- <20181110175404.gnks6sj3zzlz2it7@ltop.local>
- <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
- <20181114222540.fgddrx4xxsne5pdq@ltop.local>
- <20181115083535.usyjcdoz2f6zmssq@bars>
-Message-ID: <20181116103359.wywpaeanhoceqhgb@ltop.local>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 16 Nov 2018 11:45:03 +0100
+Subject: [PATCH] pwm: lpc18xx-sct: don't reconfigure PWM in .request and
+ .free
+In-Reply-To: <20181116100114.GB28631@ulmo>
+References: <20181114115025.GC2620@ulmo>
+ <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
+ <1391bbe1-75b5-c86e-ed3a-1e1afb393917@mleia.com>
+ <20181116100114.GB28631@ulmo>
+Message-ID: <20181116104503.he6rykrsqt4whacs@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Hi,
+Hello Thierry,
+
+On Fri, Nov 16, 2018 at 11:01:14AM +0100, Thierry Reding wrote:
+> On Fri, Nov 16, 2018 at 11:22:49AM +0200, Vladimir Zapolskiy wrote:
+> > On 11/16/2018 08:52 AM, Uwe Kleine-K?nig wrote:
+> > > Regarding the .request case: The consumer might be interested in taking
+> > > over the configured state from the boot loader. So the initially
+> > > configured state should be retained.
+> > > 
+> > > For the free case the PWM consumer is responsible to disable the PWM
+> > > before calling pwm_release and there are three subcases to consider:
+> > > 
+> > 
+> > the changes are fine per se, but please split them into two.
+> > 
+> > Probably pwm_disable() misusage began spreading from commit 54b2a999a1675.
 > 
-> Could you please clarify what is your resolution regarding that warning.
-> I pulled all the changes from sparse repository on kernel.org. However
-> the same warning is still here when building modules with C=2 option.
+> It's not really misusage to call pwm_disable(). It's basically just a
+> shortcut for ->disable() or the atomic equivalent for it.
 
-Hi,
+I'd say that pwm_disable() is not a shortcut but the long way round to
+.disable() at best.
 
-Yes, the warning is still there since it's maybe not desired but
-is at least legit. For the short term, I think the best is your
-original patch (but using UL as the prefix). I would be glad to
-ack such a patch (I tried to answer in the original thread but
-I never found it although I should be subscribed to the
-linux-arm-kernel mailing list).
+And that calling pwm_disable() from the low level driver doesn't result
+in problems is just luck because the pwm framework is such a thin
+wrapper. If it would do locking, .free might already hold the lock and
+pwm_disable might try to grab it again. If it would do more checking
+that only a caller of pwm_get calls pwm_disable, the check would trigger
+because the consumer already called pwm_put and the lowlevel driver
+didn't use pwm_get.
 
-For the slightly longer term, I'll need to see how Ramsay's
-patches can also be used for kernel code.
+Best regards
+Uwe
 
-Best regards,
--- Luc
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
