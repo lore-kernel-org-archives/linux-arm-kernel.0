@@ -1,33 +1,45 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Fri, 16 Nov 2018 10:24:08 +0000
-Subject: [PATCH 05/10] powerpc/pmu/fsl: add additional validation to event_init
+Date: Fri, 16 Nov 2018 10:24:11 +0000
+Subject: [PATCH 08/10] perf/core: Remove unused perf_flags
 In-Reply-To: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
 References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1542363853-13849-6-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542363853-13849-9-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fsl PMU driver doesn't support host/guest mode exclusion so
-let's report this when event_init is called with these exclusion
-flags set.
+Now that perf_flags is not used we remove it.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/powerpc/perf/core-fsl-emb.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/uapi/linux/perf_event.h       | 2 --
+ tools/include/uapi/linux/perf_event.h | 2 --
+ 2 files changed, 4 deletions(-)
 
-diff --git a/arch/powerpc/perf/core-fsl-emb.c b/arch/powerpc/perf/core-fsl-emb.c
-index ba48584..b1cc9d1 100644
---- a/arch/powerpc/perf/core-fsl-emb.c
-+++ b/arch/powerpc/perf/core-fsl-emb.c
-@@ -559,6 +559,8 @@ static int fsl_emb_pmu_event_init(struct perf_event *event)
- 		event->hw.config_base |= PMLCA_FCS;
- 	if (event->attr.exclude_idle)
- 		return -ENOTSUPP;
-+	if (event->attr.exclude_host || event->attr.exclude_guest)
-+		return -ENOTSUPP;
+diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
+index f35eb72..ba89bd3 100644
+--- a/include/uapi/linux/perf_event.h
++++ b/include/uapi/linux/perf_event.h
+@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
+ 	__u32	ids[0];
+ };
  
- 	event->hw.last_period = event->hw.sample_period;
- 	local64_set(&event->hw.period_left, event->hw.last_period);
+-#define perf_flags(attr)	(*(&(attr)->read_format + 1))
+-
+ /*
+  * Ioctls that can be done on a perf event fd:
+  */
+diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
+index f35eb72..ba89bd3 100644
+--- a/tools/include/uapi/linux/perf_event.h
++++ b/tools/include/uapi/linux/perf_event.h
+@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
+ 	__u32	ids[0];
+ };
+ 
+-#define perf_flags(attr)	(*(&(attr)->read_format + 1))
+-
+ /*
+  * Ioctls that can be done on a perf event fd:
+  */
 -- 
 2.7.4
