@@ -1,255 +1,200 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Fri, 16 Nov 2018 14:38:29 +0200
-Subject: [PATCH v8 05/17] tpm: declare struct tpm_header
-In-Reply-To: <20181116123845.15705-1-jarkko.sakkinen@linux.intel.com>
-References: <20181116123845.15705-1-jarkko.sakkinen@linux.intel.com>
-Message-ID: <20181116123845.15705-6-jarkko.sakkinen@linux.intel.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 16 Nov 2018 13:40:56 +0100
+Subject: [PATCH 2/9] soc: samsung: add exynos chipid driver support
+In-Reply-To: <1542294698-17470-3-git-send-email-b.zolnierkie@samsung.com>
+References: <CGME20181115151216epcas1p3413d9586bf941aa086bfc5cd620d45d9@epcas1p3.samsung.com>
+ <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
+ <1542294698-17470-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <CAJKOXPf4DC9NaAHOcM2iW8mf622uucJ7OBjQsrR6P0rtqgJ7rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Decleare struct tpm_header that replaces struct tpm_input_header and
-struct tpm_output_header.
+On Thu, 15 Nov 2018 at 16:12, Bartlomiej Zolnierkiewicz
+<b.zolnierkie@samsung.com> wrote:
+>
+> From: Pankaj Dubey <pankaj.dubey@samsung.com>
+>
+> Exynos SoCs have Chipid, for identification of product IDs and SoC
+> revisions. This patch intends to provide initialization code for all
+> these functionalities, at the same time it provides some sysfs entries
+> for accessing these information to user-space.
+>
+> This driver uses existing binding for exynos-chipid.
+>
+> Changes by Bartlomiej:
+> - fixed return values on errors
+> - removed bogus kfree_const()
+> - added missing Exynos4210 EVT0 id
+> - converted code to use EXYNOS_MASK define
+> - fixed np use after of_node_put()
+> - fixed too early use of dev_info()
+> - made driver fail for unknown SoC-s
+> - added SPDX tag
+> - updated Copyrights
+>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> [m.szyprowski: for suggestion and code snippet of product_id_to_soc_id]
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/soc/samsung/Kconfig         |   5 ++
+>  drivers/soc/samsung/Makefile        |   1 +
+>  drivers/soc/samsung/exynos-chipid.c | 111 ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 117 insertions(+)
+>  create mode 100644 drivers/soc/samsung/exynos-chipid.c
+>
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> index 2186285..2905f52 100644
+> --- a/drivers/soc/samsung/Kconfig
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -7,6 +7,11 @@ menuconfig SOC_SAMSUNG
+>
+>  if SOC_SAMSUNG
+>
+> +config EXYNOS_CHIPID
+> +       bool "Exynos Chipid controller driver" if COMPILE_TEST
+> +       depends on ARCH_EXYNOS || COMPILE_TEST
+> +       select SOC_BUS
+> +
+>  config EXYNOS_PMU
+>         bool "Exynos PMU controller driver" if COMPILE_TEST
+>         depends on ARCH_EXYNOS || ((ARM || ARM64) && COMPILE_TEST)
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> index 29f294b..c2a8fbc 100644
+> --- a/drivers/soc/samsung/Makefile
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -1,4 +1,5 @@
+>  # SPDX-License-Identifier: GPL-2.0
+> +obj-$(CONFIG_EXYNOS_CHIPID)    += exynos-chipid.o
+>  obj-$(CONFIG_EXYNOS_PMU)       += exynos-pmu.o
+>
+>  obj-$(CONFIG_EXYNOS_PMU_ARM_DRIVERS)   += exynos3250-pmu.o exynos4-pmu.o \
+> diff --git a/drivers/soc/samsung/exynos-chipid.c b/drivers/soc/samsung/exynos-chipid.c
+> new file mode 100644
+> index 0000000..5cb0188
+> --- /dev/null
+> +++ b/drivers/soc/samsung/exynos-chipid.c
+> @@ -0,0 +1,111 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2018 Samsung Electronics Co., Ltd.
+> + *           http://www.samsung.com/
+> + *
+> + * EXYNOS - CHIP ID support
+> + * Author: Pankaj Dubey <pankaj.dubey@samsung.com>
+> + * Author: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
 
-Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
-Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
----
- drivers/char/tpm/tpm-interface.c  |  9 ++++-----
- drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
- drivers/char/tpm/tpm2-cmd.c       |  4 ++--
- drivers/char/tpm/tpm2-space.c     |  6 +++---
- drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
- drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
- drivers/char/tpm/xen-tpmfront.c   |  2 +-
- 7 files changed, 28 insertions(+), 33 deletions(-)
+I think both platform headers are not used here.
 
-diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-interface.c
-index 7ac6ada8428c..cb0d44c158ae 100644
---- a/drivers/char/tpm/tpm-interface.c
-+++ b/drivers/char/tpm/tpm-interface.c
-@@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip *chip,
- 				 const u8 *cmd,
- 				 size_t len)
- {
--	const struct tpm_input_header *header = (const void *)cmd;
-+	const struct tpm_header *header = (const void *)cmd;
- 	int i;
- 	u32 cc;
- 	u32 attrs;
-@@ -166,7 +166,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
- 				u8 *buf, size_t bufsiz,
- 				unsigned int flags)
- {
--	struct tpm_output_header *header = (void *)buf;
-+	struct tpm_header *header = (void *)buf;
- 	int rc;
- 	ssize_t len = 0;
- 	u32 count, ordinal;
-@@ -316,7 +316,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip *chip,
- ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
- 		     u8 *buf, size_t bufsiz, unsigned int flags)
- {
--	struct tpm_output_header *header = (struct tpm_output_header *)buf;
-+	struct tpm_header *header = (struct tpm_header *)buf;
- 	/* space for header and handles */
- 	u8 save[TPM_HEADER_SIZE + 3*sizeof(u32)];
- 	unsigned int delay_msec = TPM2_DURATION_SHORT;
-@@ -381,8 +381,7 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, struct tpm_space *space,
- 			 struct tpm_buf *buf, size_t min_rsp_body_length,
- 			 unsigned int flags, const char *desc)
- {
--	const struct tpm_output_header *header =
--		(struct tpm_output_header *)buf->data;
-+	const struct tpm_header *header = (struct tpm_header *)buf->data;
- 	int err;
- 	ssize_t len;
- 
-diff --git a/drivers/char/tpm/tpm.h b/drivers/char/tpm/tpm.h
-index 49bca4d1e786..86fa8ac0ae20 100644
---- a/drivers/char/tpm/tpm.h
-+++ b/drivers/char/tpm/tpm.h
-@@ -273,16 +273,13 @@ struct tpm_chip {
- 
- #define to_tpm_chip(d) container_of(d, struct tpm_chip, dev)
- 
--struct tpm_input_header {
--	__be16	tag;
--	__be32	length;
--	__be32	ordinal;
--} __packed;
--
--struct tpm_output_header {
--	__be16	tag;
--	__be32	length;
--	__be32	return_code;
-+struct tpm_header {
-+	__be16 tag;
-+	__be32 length;
-+	union {
-+		__be32 ordinal;
-+		__be32 return_code;
-+	};
- } __packed;
- 
- #define TPM_TAG_RQU_COMMAND 193
-@@ -401,8 +398,8 @@ struct tpm_buf {
- 
- static inline void tpm_buf_reset(struct tpm_buf *buf, u16 tag, u32 ordinal)
- {
--	struct tpm_input_header *head;
--	head = (struct tpm_input_header *)buf->data;
-+	struct tpm_header *head = (struct tpm_header *)buf->data;
-+
- 	head->tag = cpu_to_be16(tag);
- 	head->length = cpu_to_be32(sizeof(*head));
- 	head->ordinal = cpu_to_be32(ordinal);
-@@ -428,14 +425,14 @@ static inline void tpm_buf_destroy(struct tpm_buf *buf)
- 
- static inline u32 tpm_buf_length(struct tpm_buf *buf)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 
- 	return be32_to_cpu(head->length);
- }
- 
- static inline u16 tpm_buf_tag(struct tpm_buf *buf)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 
- 	return be16_to_cpu(head->tag);
- }
-@@ -444,7 +441,7 @@ static inline void tpm_buf_append(struct tpm_buf *buf,
- 				  const unsigned char *new_data,
- 				  unsigned int new_len)
- {
--	struct tpm_input_header *head = (struct tpm_input_header *) buf->data;
-+	struct tpm_header *head = (struct tpm_header *) buf->data;
- 	u32 len = tpm_buf_length(buf);
- 
- 	/* Return silently if overflow has already happened. */
-diff --git a/drivers/char/tpm/tpm2-cmd.c b/drivers/char/tpm/tpm2-cmd.c
-index 2bcf470c8e5d..ab03f8600f89 100644
---- a/drivers/char/tpm/tpm2-cmd.c
-+++ b/drivers/char/tpm/tpm2-cmd.c
-@@ -784,7 +784,7 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
-  */
- int tpm2_probe(struct tpm_chip *chip)
- {
--	struct tpm_output_header *out;
-+	struct tpm_header *out;
- 	struct tpm_buf buf;
- 	int rc;
- 
-@@ -797,7 +797,7 @@ int tpm2_probe(struct tpm_chip *chip)
- 	rc = tpm_transmit_cmd(chip, NULL, &buf, 0, 0, NULL);
- 	/* We ignore TPM return codes on purpose. */
- 	if (rc >=  0) {
--		out = (struct tpm_output_header *)buf.data;
-+		out = (struct tpm_header *)buf.data;
- 		if (be16_to_cpu(out->tag) == TPM2_ST_NO_SESSIONS)
- 			chip->flags |= TPM_CHIP_FLAG_TPM2;
- 	}
-diff --git a/drivers/char/tpm/tpm2-space.c b/drivers/char/tpm/tpm2-space.c
-index 5ecc73988f7c..862ee1ce1755 100644
---- a/drivers/char/tpm/tpm2-space.c
-+++ b/drivers/char/tpm/tpm2-space.c
-@@ -334,7 +334,7 @@ static int tpm2_map_response_header(struct tpm_chip *chip, u32 cc, u8 *rsp,
- 				    size_t len)
- {
- 	struct tpm_space *space = &chip->work_space;
--	struct tpm_output_header *header = (void *)rsp;
-+	struct tpm_header *header = (void *)rsp;
- 	u32 phandle;
- 	u32 phandle_type;
- 	u32 vhandle;
-@@ -394,7 +394,7 @@ static int tpm2_map_response_body(struct tpm_chip *chip, u32 cc, u8 *rsp,
- 				  size_t len)
- {
- 	struct tpm_space *space = &chip->work_space;
--	struct tpm_output_header *header = (void *)rsp;
-+	struct tpm_header *header = (void *)rsp;
- 	struct tpm2_cap_handles *data;
- 	u32 phandle;
- 	u32 phandle_type;
-@@ -492,7 +492,7 @@ static int tpm2_save_space(struct tpm_chip *chip)
- int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
- 		      u32 cc, u8 *buf, size_t *bufsiz)
- {
--	struct tpm_output_header *header = (void *)buf;
-+	struct tpm_header *header = (void *)buf;
- 	int rc;
- 
- 	if (!space)
-diff --git a/drivers/char/tpm/tpm_i2c_atmel.c b/drivers/char/tpm/tpm_i2c_atmel.c
-index 95ce2e9ccdc6..4720b2442ffe 100644
---- a/drivers/char/tpm/tpm_i2c_atmel.c
-+++ b/drivers/char/tpm/tpm_i2c_atmel.c
-@@ -46,7 +46,7 @@ struct priv_data {
- 	/* This is the amount we read on the first try. 25 was chosen to fit a
- 	 * fair number of read responses in the buffer so a 2nd retry can be
- 	 * avoided in small message cases. */
--	u8 buffer[sizeof(struct tpm_output_header) + 25];
-+	u8 buffer[sizeof(struct tpm_header) + 25];
- };
- 
- static int i2c_atmel_send(struct tpm_chip *chip, u8 *buf, size_t len)
-@@ -72,8 +72,7 @@ static int i2c_atmel_recv(struct tpm_chip *chip, u8 *buf, size_t count)
- {
- 	struct priv_data *priv = dev_get_drvdata(&chip->dev);
- 	struct i2c_client *client = to_i2c_client(chip->dev.parent);
--	struct tpm_output_header *hdr =
--		(struct tpm_output_header *)priv->buffer;
-+	struct tpm_header *hdr = (struct tpm_header *)priv->buffer;
- 	u32 expected_len;
- 	int rc;
- 
-diff --git a/drivers/char/tpm/tpm_vtpm_proxy.c b/drivers/char/tpm/tpm_vtpm_proxy.c
-index 5f95fbfb7f6b..28eb5ab15b99 100644
---- a/drivers/char/tpm/tpm_vtpm_proxy.c
-+++ b/drivers/char/tpm/tpm_vtpm_proxy.c
-@@ -303,9 +303,9 @@ static int vtpm_proxy_tpm_op_recv(struct tpm_chip *chip, u8 *buf, size_t count)
- static int vtpm_proxy_is_driver_command(struct tpm_chip *chip,
- 					u8 *buf, size_t count)
- {
--	struct tpm_input_header *hdr = (struct tpm_input_header *)buf;
-+	struct tpm_header *hdr = (struct tpm_header *)buf;
- 
--	if (count < sizeof(struct tpm_input_header))
-+	if (count < sizeof(struct tpm_header))
- 		return 0;
- 
- 	if (chip->flags & TPM_CHIP_FLAG_TPM2) {
-@@ -402,7 +402,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
- {
- 	struct tpm_buf buf;
- 	int rc;
--	const struct tpm_output_header *header;
-+	const struct tpm_header *header;
- 	struct proxy_dev *proxy_dev = dev_get_drvdata(&chip->dev);
- 
- 	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-@@ -427,7 +427,7 @@ static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)
- 		goto out;
- 	}
- 
--	header = (const struct tpm_output_header *)buf.data;
-+	header = (const struct tpm_header *)buf.data;
- 	rc = be32_to_cpu(header->return_code);
- 	if (rc)
- 		locality = -1;
-diff --git a/drivers/char/tpm/xen-tpmfront.c b/drivers/char/tpm/xen-tpmfront.c
-index b150f87f38f5..1259e935fd58 100644
---- a/drivers/char/tpm/xen-tpmfront.c
-+++ b/drivers/char/tpm/xen-tpmfront.c
-@@ -163,7 +163,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf, size_t count)
- 	wmb();
- 	notify_remote_via_evtchn(priv->evtchn);
- 
--	ordinal = be32_to_cpu(((struct tpm_input_header*)buf)->ordinal);
-+	ordinal = be32_to_cpu(((struct tpm_header *)buf)->ordinal);
- 	duration = tpm_calc_ordinal_duration(chip, ordinal);
- 
- 	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
--- 
-2.19.1
+Best regards,
+Krzysztof
+
+> +#include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+> +
+> +#define EXYNOS_SUBREV_MASK     (0xF << 4)
+> +#define EXYNOS_MAINREV_MASK    (0xF << 0)
+> +#define EXYNOS_REV_MASK                (EXYNOS_SUBREV_MASK | EXYNOS_MAINREV_MASK)
+> +#define EXYNOS_MASK            0xFFFFF000
+> +
+> +static const struct exynos_soc_id {
+> +       const char *name;
+> +       unsigned int id;
+> +} soc_ids[] = {
+> +       { "EXYNOS3250", 0xE3472000 },
+> +       { "EXYNOS4210", 0x43200000 },   /* EVT0 revision */
+> +       { "EXYNOS4210", 0x43210000 },
+> +       { "EXYNOS4212", 0x43220000 },
+> +       { "EXYNOS4412", 0xE4412000 },
+> +       { "EXYNOS5250", 0x43520000 },
+> +       { "EXYNOS5260", 0xE5260000 },
+> +       { "EXYNOS5410", 0xE5410000 },
+> +       { "EXYNOS5420", 0xE5420000 },
+> +       { "EXYNOS5440", 0xE5440000 },
+> +       { "EXYNOS5800", 0xE5422000 },
+> +       { "EXYNOS7420", 0xE7420000 },
+> +       { "EXYNOS5433", 0xE5433000 },
+> +};
+> +
+> +static const char * __init product_id_to_soc_id(unsigned int product_id)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(soc_ids); i++)
+> +               if ((product_id & EXYNOS_MASK) == soc_ids[i].id)
+> +                       return soc_ids[i].name;
+> +       return NULL;
+> +}
+> +
+> +int __init exynos_chipid_early_init(void)
+> +{
+> +       struct soc_device_attribute *soc_dev_attr;
+> +       void __iomem *exynos_chipid_base;
+> +       struct soc_device *soc_dev;
+> +       struct device_node *root;
+> +       struct device_node *np;
+> +       u32 product_id;
+> +       u32 revision;
+> +
+> +       /* look up for chipid node */
+> +       np = of_find_compatible_node(NULL, NULL, "samsung,exynos4210-chipid");
+> +       if (!np)
+> +               return -ENODEV;
+> +
+> +       exynos_chipid_base = of_iomap(np, 0);
+> +       of_node_put(np);
+> +
+> +       if (!exynos_chipid_base) {
+> +               pr_err("Failed to map SoC chipid\n");
+> +               return -ENXIO;
+> +       }
+> +
+> +       product_id = readl_relaxed(exynos_chipid_base);
+> +       revision = product_id & EXYNOS_REV_MASK;
+> +       iounmap(exynos_chipid_base);
+> +
+> +       soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+> +       if (!soc_dev_attr)
+> +               return -ENOMEM;
+> +
+> +       soc_dev_attr->family = "Samsung Exynos";
+> +
+> +       root = of_find_node_by_path("/");
+> +       of_property_read_string(root, "model", &soc_dev_attr->machine);
+> +       of_node_put(root);
+> +
+> +       soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%x", revision);
+> +       soc_dev_attr->soc_id = product_id_to_soc_id(product_id);
+> +       if (!soc_dev_attr->soc_id) {
+> +               pr_err("Unknown SoC\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +       /* please note that the actual registration will be deferred */
+> +       soc_dev = soc_device_register(soc_dev_attr);
+> +       if (IS_ERR(soc_dev)) {
+> +               kfree(soc_dev_attr->revision);
+> +               kfree(soc_dev_attr);
+> +               return PTR_ERR(soc_dev);
+> +       }
+> +
+> +       /* it is too early to use dev_info() here (soc_dev is NULL) */
+> +       pr_info("soc soc0: Exynos: CPU[%s] PRO_ID[0x%x] REV[0x%x] Detected\n",
+> +               soc_dev_attr->soc_id, product_id, revision);
+> +
+> +       return 0;
+> +}
+> +early_initcall(exynos_chipid_early_init);
+> --
+> 1.9.1
+>
