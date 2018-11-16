@@ -1,13 +1,13 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 16 Nov 2018 13:48:39 +0100
-Subject: [PATCH v1 1/3] dmaengine: stm32-dma: Add PM Runtime support
+Date: Fri, 16 Nov 2018 13:48:41 +0100
+Subject: [PATCH v1 3/3] dmaengine: stm32-mdma: Add PM Runtime support
 In-Reply-To: <1542372521-18073-1-git-send-email-pierre-yves.mordret@st.com>
 References: <1542372521-18073-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <1542372521-18073-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1542372521-18073-4-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pm_runtime engine for clock management purpose.
+Use pm_runtime engine for clock management purpose
 
 Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
@@ -16,52 +16,51 @@ Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
        * Initial
 ---
 ---
- drivers/dma/stm32-dma.c | 58 +++++++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 51 insertions(+), 7 deletions(-)
+ drivers/dma/stm32-mdma.c | 52 ++++++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 46 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 48f7c0f..ba239b5 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -23,6 +23,7 @@
+diff --git a/drivers/dma/stm32-mdma.c b/drivers/dma/stm32-mdma.c
+index 390e4ca..ac0301b 100644
+--- a/drivers/dma/stm32-mdma.c
++++ b/drivers/dma/stm32-mdma.c
+@@ -37,6 +37,7 @@
  #include <linux/of_device.h>
  #include <linux/of_dma.h>
  #include <linux/platform_device.h>
 +#include <linux/pm_runtime.h>
  #include <linux/reset.h>
- #include <linux/sched.h>
  #include <linux/slab.h>
-@@ -1115,15 +1116,14 @@ static int stm32_dma_alloc_chan_resources(struct dma_chan *c)
- 	int ret;
  
- 	chan->config_init = false;
+@@ -1456,15 +1457,13 @@ static int stm32_mdma_alloc_chan_resources(struct dma_chan *c)
+ 		return -ENOMEM;
+ 	}
+ 
 -	ret = clk_prepare_enable(dmadev->clk);
 -	if (ret < 0) {
 -		dev_err(chan2dev(chan), "clk_prepare_enable failed: %d\n", ret);
-+
 +	ret = pm_runtime_get_sync(dmadev->ddev.dev);
 +	if (ret < 0)
  		return ret;
 -	}
  
- 	ret = stm32_dma_disable_chan(chan);
+ 	ret = stm32_mdma_disable_chan(chan);
  	if (ret < 0)
 -		clk_disable_unprepare(dmadev->clk);
 +		pm_runtime_put(dmadev->ddev.dev);
  
  	return ret;
  }
-@@ -1143,7 +1143,7 @@ static void stm32_dma_free_chan_resources(struct dma_chan *c)
+@@ -1484,7 +1483,7 @@ static void stm32_mdma_free_chan_resources(struct dma_chan *c)
  		spin_unlock_irqrestore(&chan->vchan.lock, flags);
  	}
  
 -	clk_disable_unprepare(dmadev->clk);
 +	pm_runtime_put(dmadev->ddev.dev);
- 
  	vchan_free_chan_resources(to_virt_chan(c));
- }
-@@ -1243,6 +1243,12 @@ static int stm32_dma_probe(struct platform_device *pdev)
- 		return PTR_ERR(dmadev->clk);
+ 	dmam_pool_destroy(chan->desc_pool);
+ 	chan->desc_pool = NULL;
+@@ -1597,6 +1596,12 @@ static int stm32_mdma_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
 +	ret = clk_prepare_enable(dmadev->clk);
@@ -70,52 +69,37 @@ index 48f7c0f..ba239b5 100644
 +		return ret;
 +	}
 +
- 	dmadev->mem2mem = of_property_read_bool(pdev->dev.of_node,
- 						"st,mem2mem");
- 
-@@ -1292,7 +1298,7 @@ static int stm32_dma_probe(struct platform_device *pdev)
- 
- 	ret = dma_async_device_register(dd);
- 	if (ret)
--		return ret;
-+		goto clk_free;
- 
- 	for (i = 0; i < STM32_DMA_MAX_CHANNELS; i++) {
- 		chan = &dmadev->chan[i];
-@@ -1324,20 +1330,58 @@ static int stm32_dma_probe(struct platform_device *pdev)
+ 	dmadev->rst = devm_reset_control_get(&pdev->dev, NULL);
+ 	if (!IS_ERR(dmadev->rst)) {
+ 		reset_control_assert(dmadev->rst);
+@@ -1668,6 +1673,10 @@ static int stm32_mdma_probe(struct platform_device *pdev)
+ 	}
  
  	platform_set_drvdata(pdev, dmadev);
- 
 +	pm_runtime_set_active(&pdev->dev);
 +	pm_runtime_enable(&pdev->dev);
 +	pm_runtime_get_noresume(&pdev->dev);
 +	pm_runtime_put(&pdev->dev);
-+
- 	dev_info(&pdev->dev, "STM32 DMA driver registered\n");
  
- 	return 0;
+ 	dev_info(&pdev->dev, "STM32 MDMA driver registered\n");
  
- err_unregister:
- 	dma_async_device_unregister(dd);
-+clk_free:
-+	clk_disable_unprepare(dmadev->clk);
- 
+@@ -1677,11 +1686,42 @@ static int stm32_mdma_probe(struct platform_device *pdev)
  	return ret;
  }
  
 +#ifdef CONFIG_PM
-+static int stm32_dma_runtime_suspend(struct device *dev)
++static int stm32_mdma_runtime_suspend(struct device *dev)
 +{
-+	struct stm32_dma_device *dmadev = dev_get_drvdata(dev);
++	struct stm32_mdma_device *dmadev = dev_get_drvdata(dev);
 +
 +	clk_disable_unprepare(dmadev->clk);
 +
 +	return 0;
 +}
 +
-+static int stm32_dma_runtime_resume(struct device *dev)
++static int stm32_mdma_runtime_resume(struct device *dev)
 +{
-+	struct stm32_dma_device *dmadev = dev_get_drvdata(dev);
++	struct stm32_mdma_device *dmadev = dev_get_drvdata(dev);
 +	int ret;
 +
 +	ret = clk_prepare_enable(dmadev->clk);
@@ -128,16 +112,17 @@ index 48f7c0f..ba239b5 100644
 +}
 +#endif
 +
-+static const struct dev_pm_ops stm32_dma_pm_ops = {
-+	SET_RUNTIME_PM_OPS(stm32_dma_runtime_suspend,
-+			   stm32_dma_runtime_resume, NULL)
++static const struct dev_pm_ops stm32_mdma_pm_ops = {
++	SET_RUNTIME_PM_OPS(stm32_mdma_runtime_suspend,
++			   stm32_mdma_runtime_resume, NULL)
 +};
 +
- static struct platform_driver stm32_dma_driver = {
+ static struct platform_driver stm32_mdma_driver = {
+ 	.probe = stm32_mdma_probe,
  	.driver = {
- 		.name = "stm32-dma",
- 		.of_match_table = stm32_dma_of_match,
-+		.pm = &stm32_dma_pm_ops,
+ 		.name = "stm32-mdma",
+ 		.of_match_table = stm32_mdma_of_match,
++		.pm = &stm32_mdma_pm_ops,
  	},
  };
  
