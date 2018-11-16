@@ -1,41 +1,54 @@
 From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 16 Nov 2018 13:54:47 +0100
-Subject: [PATCH v5 10/12] arm64: dts: mt6797: Use the new mmsys clock
- compatible
+Date: Fri, 16 Nov 2018 13:54:48 +0100
+Subject: [PATCH v5 11/12] clk: mediatek: mt2712e: Probe with new compatible
 In-Reply-To: <20181116125449.23581-1-matthias.bgg@kernel.org>
 References: <20181116125449.23581-1-matthias.bgg@kernel.org>
-Message-ID: <20181116125449.23581-11-matthias.bgg@kernel.org>
+Message-ID: <20181116125449.23581-12-matthias.bgg@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matthias Brugger <mbrugger@suse.com>
 
-Move the clock part of mmsys in a child node.
+The clock node is now a child of the mmsys node.
+Update the driver to support this and thenew compatible
+in the driver.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- arch/arm64/boot/dts/mediatek/mt6797.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/clk/mediatek/clk-mt2712-mm.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt6797.dtsi b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-index 4beaa71107d7..3ca635c81de1 100644
---- a/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt6797.dtsi
-@@ -206,9 +206,13 @@
- 	};
+diff --git a/drivers/clk/mediatek/clk-mt2712-mm.c b/drivers/clk/mediatek/clk-mt2712-mm.c
+index a8b4b6d42488..5f4ee8f0deaa 100644
+--- a/drivers/clk/mediatek/clk-mt2712-mm.c
++++ b/drivers/clk/mediatek/clk-mt2712-mm.c
+@@ -138,14 +138,15 @@ static int clk_mt2712_mm_probe(struct platform_device *pdev)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 	int r;
+-	struct device_node *node = pdev->dev.of_node;
++	struct device	parent = pdev->dev.parent;
  
- 	mmsys: mmsys_config at 14000000 {
--		compatible = "mediatek,mt6797-mmsys", "syscon";
-+		compatible = "mediatek,mt6797-mmsys", "syscon", "simple-mfd";
- 		reg = <0 0x14000000 0 0x1000>;
--		#clock-cells = <1>;
-+
-+		mmsys_clk: clock-controller at 14000000 {
-+			compatible = "mediatek,mt6797-mmsys-clk";
-+			#clock-cells = <1>;
-+		};
- 	};
+ 	clk_data = mtk_alloc_clk_data(CLK_MM_NR_CLK);
  
- 	imgsys: imgsys_config at 15000000  {
+-	mtk_clk_register_gates(node, mm_clks, ARRAY_SIZE(mm_clks),
++	mtk_clk_register_gates(parent->of_node, mm_clks, ARRAY_SIZE(mm_clks),
+ 			clk_data);
+ 
+-	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
++	r = of_clk_add_provider(parent->of_node, of_clk_src_onecell_get,
++			clk_data);
+ 
+ 	if (r != 0)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+@@ -155,7 +156,7 @@ static int clk_mt2712_mm_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id of_match_clk_mt2712_mm[] = {
+-	{ .compatible = "mediatek,mt2712-mmsys", },
++	{ .compatible = "mediatek,mt2712-mmsys-clk", },
+ 	{}
+ };
+ 
 -- 
 2.19.1
