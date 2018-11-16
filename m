@@ -1,124 +1,46 @@
-From: matthias.bgg@kernel.org (matthias.bgg at kernel.org)
-Date: Fri, 16 Nov 2018 19:09:01 +0100
-Subject: [PATCH v2 3/3] clk: mediatek: Mark bus and DRAM related clocks as
- critical
-In-Reply-To: <20181116180901.17737-1-matthias.bgg@kernel.org>
-References: <20181116180901.17737-1-matthias.bgg@kernel.org>
-Message-ID: <20181116180901.17737-4-matthias.bgg@kernel.org>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Fri, 16 Nov 2018 21:21:30 +0300
+Subject: [PATCH v2] arm64: sysreg: fix sparse warnings
+Message-ID: <20181116182130.4327-1-geomatsi@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jasper Mattsson <jasu@njomotys.info>
+Specify correct type for the constants to avoid
+the following sparse complaints:
 
-This marks MUXes axi_sel and ddrphycfg_sel as well as gates
-infra_dramc_f26m and infra_dramc_b_f26m as with CLK_IS_CRITICAL.
+./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
 
-Fixes: 96596aa06628 ("clk: mediatek: add clk support for MT6797")
-Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
 ---
- drivers/clk/mediatek/clk-mt6797.c | 64 ++++++++++++++++++-------------
- 1 file changed, 37 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-mt6797.c b/drivers/clk/mediatek/clk-mt6797.c
-index 5702bc974ed9..20b106764423 100644
---- a/drivers/clk/mediatek/clk-mt6797.c
-+++ b/drivers/clk/mediatek/clk-mt6797.c
-@@ -329,10 +329,10 @@ static const struct mtk_composite top_muxes[] = {
- 	    ulposc_axi_ck_mux_pre_parents, 0x0040, 3, 1),
- 	MUX(CLK_TOP_MUX_ULPOSC_AXI_CK_MUX, "ulposc_axi_ck_mux",
- 	    ulposc_axi_ck_mux_parents, 0x0040, 2, 1),
--	MUX(CLK_TOP_MUX_AXI, "axi_sel", axi_parents,
--	    0x0040, 0, 2),
--	MUX(CLK_TOP_MUX_DDRPHYCFG, "ddrphycfg_sel", ddrphycfg_parents,
--	    0x0040, 16, 2),
-+	MUX_FLAGS(CLK_TOP_MUX_AXI, "axi_sel", axi_parents,
-+		  0x0040, 0, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT),
-+	MUX_FLAGS(CLK_TOP_MUX_DDRPHYCFG, "ddrphycfg_sel", ddrphycfg_parents,
-+		  0x0040, 16, 2, CLK_IS_CRITICAL | CLK_SET_RATE_PARENT),
- 	MUX(CLK_TOP_MUX_MM, "mm_sel", mm_parents,
- 	    0x0040, 24, 2),
- 	MUX_GATE(CLK_TOP_MUX_PWM, "pwm_sel", pwm_parents, 0x0050, 0, 3, 7),
-@@ -424,31 +424,39 @@ static const struct mtk_gate_regs infra2_cg_regs = {
- 	.sta_ofs = 0x00b0,
- };
+Changes v1 -> v2
+  - use proper type: UL rather than ULL
+
+ arch/arm64/include/asm/sysreg.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 0c909c4a932f..842fb9572661 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -468,7 +468,7 @@
+ 			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
+ 			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
  
--#define GATE_ICG0(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra0_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG0(_id, _name, _parent, _shift) {		\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra0_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
- }
+-#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
++#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
+ #error "Inconsistent SCTLR_EL2 set/clear bits"
+ #endif
  
--#define GATE_ICG1(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra1_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG1(_id, _name, _parent, _shift)			\
-+	GATE_ICG1_FLAGS(_id, _name, _parent, _shift, 0)
-+
-+#define GATE_ICG1_FLAGS(_id, _name, _parent, _shift, _flags) {	\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra1_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
-+	.flags = _flags,					\
- }
+@@ -509,7 +509,7 @@
+ 			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+ 			 SCTLR_ELx_DSSBS | SCTLR_EL1_NTWI  | SCTLR_EL1_RES0)
  
--#define GATE_ICG2(_id, _name, _parent, _shift) {	\
--	.id = _id,					\
--	.name = _name,					\
--	.parent_name = _parent,				\
--	.regs = &infra2_cg_regs,			\
--	.shift = _shift,				\
--	.ops = &mtk_clk_gate_ops_setclr,		\
-+#define GATE_ICG2(_id, _name, _parent, _shift)			\
-+	GATE_ICG2_FLAGS(_id, _name, _parent, _shift, 0)
-+
-+#define GATE_ICG2_FLAGS(_id, _name, _parent, _shift, _flags) {	\
-+	.id = _id,						\
-+	.name = _name,						\
-+	.parent_name = _parent,					\
-+	.regs = &infra2_cg_regs,				\
-+	.shift = _shift,					\
-+	.ops = &mtk_clk_gate_ops_setclr,			\
-+	.flags = _flags,					\
- }
+-#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
++#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffffUL
+ #error "Inconsistent SCTLR_EL1 set/clear bits"
+ #endif
  
- static const struct mtk_gate infra_clks[] = {
-@@ -505,7 +513,8 @@ static const struct mtk_gate infra_clks[] = {
- 	GATE_ICG1(CLK_INFRA_CCIF_AP, "infra_ccif_ap", "axi_sel", 23),
- 	GATE_ICG1(CLK_INFRA_AUDIO, "infra_audio", "axi_sel", 25),
- 	GATE_ICG1(CLK_INFRA_CCIF_MD, "infra_ccif_md", "axi_sel", 26),
--	GATE_ICG1(CLK_INFRA_DRAMC_F26M, "infra_dramc_f26m", "clk26m", 31),
-+	GATE_ICG1_FLAGS(CLK_INFRA_DRAMC_F26M, "infra_dramc_f26m",
-+			"clk26m", 31, CLK_IS_CRITICAL),
- 	GATE_ICG2(CLK_INFRA_I2C4, "infra_i2c4", "axi_sel", 0),
- 	GATE_ICG2(CLK_INFRA_I2C_APPM, "infra_i2c_appm", "axi_sel", 1),
- 	GATE_ICG2(CLK_INFRA_I2C_GPUPM, "infra_i2c_gpupm", "axi_sel", 2),
-@@ -516,7 +525,8 @@ static const struct mtk_gate infra_clks[] = {
- 	GATE_ICG2(CLK_INFRA_I2C5, "infra_i2c5", "axi_sel", 7),
- 	GATE_ICG2(CLK_INFRA_SYS_CIRQ, "infra_sys_cirq", "axi_sel", 8),
- 	GATE_ICG2(CLK_INFRA_SPI1, "infra_spi1", "spi_sel", 10),
--	GATE_ICG2(CLK_INFRA_DRAMC_B_F26M, "infra_dramc_b_f26m", "clk26m", 11),
-+	GATE_ICG2_FLAGS(CLK_INFRA_DRAMC_B_F26M, "infra_dramc_b_f26m",
-+			"clk26m", 11, CLK_IS_CRITICAL),
- 	GATE_ICG2(CLK_INFRA_ANC_MD32, "infra_anc_md32", "anc_md32_sel", 12),
- 	GATE_ICG2(CLK_INFRA_ANC_MD32_32K, "infra_anc_md32_32k", "clk26m", 13),
- 	GATE_ICG2(CLK_INFRA_DVFS_SPM1, "infra_dvfs_spm1", "axi_sel", 15),
 -- 
-2.19.1
+2.11.0
