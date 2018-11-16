@@ -1,50 +1,68 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 15 Nov 2018 16:07:09 -0800
-Subject: Regression in next with spi return from transfer_one()
-In-Reply-To: <20181116000154.GS2089@sirena.org.uk>
-References: <20181115211451.GH53235@atomide.com>
- <20181115221241.GQ2089@sirena.org.uk>
- <20181115234359.GJ53235@atomide.com>
- <20181116000154.GS2089@sirena.org.uk>
-Message-ID: <20181116000709.GK53235@atomide.com>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Thu, 15 Nov 2018 16:16:29 -0800
+Subject: [PATCH 0/4 v1] Mezzanine Low Speed connector bus
+In-Reply-To: <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
+References: <20180823103332.32047-1-linus.walleij@linaro.org>
+ <cd3100ee-03a0-9218-b166-14f15d7669f6@gmail.com>
+ <1eaeec41-782d-63fa-b555-f7580ec8812f@gmail.com>
+ <CACRpkdZsJZDFeera-H2dAV_BJP=94L3gmezmLjDb6hSDubZ_Og@mail.gmail.com>
+Message-ID: <93d1f00a-2a86-bed0-6bbf-a6f86550b59a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Brown <broonie@kernel.org> [181116 00:02]:
-> On Thu, Nov 15, 2018 at 03:44:00PM -0800, Tony Lindgren wrote:
+On 11/15/18 2:59 PM, Linus Walleij wrote:
+> On Thu, Nov 15, 2018 at 5:27 PM Frank Rowand <frowand.list@gmail.com> wrote:
+>> On 8/23/18 4:06 PM, Frank Rowand wrote:
+>>> On 08/23/18 03:33, Linus Walleij wrote:
+>>>> I have been a bit hesitant to reiterate the series, but this is
+>>>> anyways a v1 of the 96Boards Mezzanine Low Speed connector
+>>>> driver framework.
+>>
+>> < snip >
+>>
+>>> I will read through the rest of the series and revisit my
+>>> previous conclusions, but most likely not for a few days.
+>>>
+>>> -Frank
+>>
+>> < snip >
+>>
+>> My apologies for continuing to not getting to this task.  It
+>> has been in the top grouping of my todo list but has been
+>> pushed aside by a rather busy schedule of conferences and
+>> company internal work.  It remains up at the top of my todo
+>> list, but most likely will still be shunted aside for three
+>> more weeks of other pressing work.
+>>
+>> I will get to it, I definitely have not forgotten it.
 > 
-> > It seems to be caused because of the now missing "if (ret > 0) {"
-> > line somehow that was there earlier. New code sets ms to 200 it
-> > seems, then dmesg shows:
+> It's OK, I might get to rebasing the series even.
 > 
-> Doh, of course :(  Sorry I missed that.
-> 
-> > The old code is not updating ms and it's set to 1.
-> 
-> Right, and not waiting either which should be the issue.  Does the
-> following work:
+> We discussed it in a session with Linaro in Vancouver
+> recently (some month ago). What we took away from it
 
-And it's recalculating the timeout every time now too :) Yup that
-fix works and the problem makes sense now:
+It would be helpful for me to look at that.  What was the
+title of the session, or a pointer to the resource page
+for it?
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+-Frank
 
-> diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
-> index 498d3b9bf3ae..430ad637c643 100644
-> --- a/drivers/spi/spi.c
-> +++ b/drivers/spi/spi.c
-> @@ -1114,9 +1114,11 @@ static int spi_transfer_one_message(struct spi_controller *ctlr,
->  				goto out;
->  			}
->  
-> -			ret = spi_transfer_wait(ctlr, msg, xfer);
-> -			if (ret < 0)
-> -				msg->status = ret;
-> +			if (ret > 0) {
-> +				ret = spi_transfer_wait(ctlr, msg, xfer);
-> +				if (ret < 0)
-> +					msg->status = ret;
-> +			}
->  		} else {
->  			if (xfer->len)
->  				dev_err(&msg->spi->dev,
+> is that there are many precedents of populating devices
+> ad hoc, what really makes this one special is that it takes
+> something device tree and ad hoc populates something
+> on top of it, not defined in the device tree itself.
+> 
+> On a related note, Heikki Krogerus is making a software
+> FWnode population series. I ran into this when converting
+> board files to use more abstract descriptions. Check it out:
+> https://marc.info/?l=linux-kernel&m=154177331200561&w=2
+> 
+> The idea with the series is to expand FWnode so that it
+> doesn't only populate Linux devices from device tree
+> or ACPI but also by software, where needed, further
+> expanding the fwnode abstraction. I will probably look
+> into using that.
+> 
+> Yours,
+> Linus Walleij
+> 
