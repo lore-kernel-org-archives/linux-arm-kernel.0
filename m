@@ -1,33 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 16 Nov 2018 22:51:08 +0100
-Subject: [PATCH 0/3] ARM: davinci: fix ethernet support on da850-evm
-In-Reply-To: <20181113135051.15308-1-brgl@bgdev.pl>
-References: <20181113135051.15308-1-brgl@bgdev.pl>
-Message-ID: <CACRpkda4aarCn=PHPSWfMgtOZhcGA2ifcA7_ujYgmj+do2+N+Q@mail.gmail.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Fri, 16 Nov 2018 13:52:50 -0800
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+ <20181019190411.GB246441@gmail.com>
+ <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
+Message-ID: <20181116215249.GA27149@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 2:51 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+Hi Milan,
 
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->
-> Ethernet doesn't work on da850-evm in legacy boot mode since v4.19. This
-> series addresses two problems I've found. I guess with this kind of
-> intrusive changes in the GPIO driver, other boards may be broken at the
-> moment too.
->
-> Bartosz Golaszewski (3):
->   ARM: davinci: define gpio interrupts as separate resources
->   gpio: davinci: restore a way to manually specify the GPIO base
->   ARM: davinci: fix da850-evm boot in legacy mode
+On Sat, Oct 20, 2018 at 12:26:20PM +0200, Milan Broz wrote:
+> 
+> Adiantum (as in your current git branches on kernel.org) can be used for dm-crypt
+> without any changes (yes, I played with it :) and with some easy tricks directly
+> through cryptsetup/LUKS as well.
+> 
+> I think we should have this as an alternative to length-preserving wide-block
+> cipher modes for FDE.
+> 
 
-I have some patches starting to move DaVinci over to using only
-descriptor tables, but that's not somthing we can pull off overnight
-so I guess we have to go for this solution.
+Yes, dm-crypt can use Adiantum by specifying the cipher as
+"capi:adiantum(xchacha12,aes)-plain64".
 
-Can we have ACKs from the DaVinci maintainers so I can merge
-all three patches through the GPIO tree fixes? Else I'm fine
-with merging through ARM SoC.
+But, I'm having trouble getting cryptsetup/LUKS to use Adiantum.
+Using LUKS1, the following works:
 
-Yours,
-Linus Walleij
+    cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256
+
+However, when possible we'd like people to use 4K sectors for better
+performance, which I understand requires using the LUKS2 format along with
+cryptsetup v2.0.0+ and Linux v4.12+.  But the following does *not* work:
+
+    cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256 --type luks2 --sector-size 4096
+
+The problem seems to be that when cryptsetup tries to encrypt the keyslot in
+luks2_encrypt_to_storage(), it tries to use the algorithm via AF_ALG, but it
+incorrectly requests "plain64(capi:adiantum(xchacha12,aes))" which fails.
+It should request just "adiantum(xchacha12,aes)".
+
+What are the "easy tricks" you had in mind -- do you mean there's already a way
+to use Adiantum with cryptsetup, or do you mean that cryptsetup still needs to
+be updated to fully support algorithms using the crypto API syntax?
+
+Thanks,
+
+- Eric
