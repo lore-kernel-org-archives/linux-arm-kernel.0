@@ -1,40 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 16 Nov 2018 23:43:31 +0100 (CET)
-Subject: [PATCH V2 0/3] ARM: dts: add Raspberry Pi 3 A+
-In-Reply-To: <87a7m8d8e6.fsf@anholt.net>
-References: <1542322805-6211-1-git-send-email-stefan.wahren@i2se.com>
- <87a7m8d8e6.fsf@anholt.net>
-Message-ID: <284795801.25939.1542408211398@email.ionos.de>
+From: luc.vanoostenryck@gmail.com (Luc Van Oostenryck)
+Date: Fri, 16 Nov 2018 23:44:07 +0100
+Subject: [PATCH v2] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181116182130.4327-1-geomatsi@gmail.com>
+References: <20181116182130.4327-1-geomatsi@gmail.com>
+Message-ID: <20181116224406.3i6qmzknda7rml2l@ltop.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
-
-> Eric Anholt <eric@anholt.net> hat am 16. November 2018 um 22:23 geschrieben:
+On Fri, Nov 16, 2018 at 09:21:30PM +0300, Sergey Matyukevich wrote:
+> Specify correct type for the constants to avoid
+> the following sparse complaints:
 > 
+> ./arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
+> ./arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
 > 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
+> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> ---
 > 
-> > This patch series adds support for the brand new Raspberry Pi 3 A+ .
-> >
-> > Changes in V2:
-> > - add missing Makefile change for arm64
-> >
-> > Stefan Wahren (3):
-> >   dt-bindings: bcm: Add Raspberry Pi 3 A+
-> >   ARM: dts: add Raspberry Pi 3 A+
-> >   arm64: dts: broadcom: Add reference to RPi 3 A+
+> Changes v1 -> v2
+>   - use proper type: UL rather than ULL
 > 
-> Looks pretty reasonable, but I couldn't verify any of the contents --
-> the firmware repo doesn't have a DT file for it, and the published
-> schematics don't show most of the GPIO connections (sigh).  How did you
-> write/test this?
+>  arch/arm64/include/asm/sysreg.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 0c909c4a932f..842fb9572661 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -468,7 +468,7 @@
+>  			 SCTLR_ELx_SA     | SCTLR_ELx_I    | SCTLR_ELx_WXN | \
+>  			 SCTLR_ELx_DSSBS | ENDIAN_CLEAR_EL2 | SCTLR_EL2_RES0)
+>  
+> -#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffff
+> +#if (SCTLR_EL2_SET ^ SCTLR_EL2_CLEAR) != 0xffffffffffffffffUL
+>  #error "Inconsistent SCTLR_EL2 set/clear bits"
+>  #endif
+>  
+> @@ -509,7 +509,7 @@
+>  			 SCTLR_EL1_UMA | SCTLR_ELx_WXN     | ENDIAN_CLEAR_EL1 |\
+>  			 SCTLR_ELx_DSSBS | SCTLR_EL1_NTWI  | SCTLR_EL1_RES0)
+>  
+> -#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffff
+> +#if (SCTLR_EL1_SET ^ SCTLR_EL1_CLEAR) != 0xffffffffffffffffUL
+>  #error "Inconsistent SCTLR_EL1 set/clear bits"
+>  #endif
 
-i have a Raspberry Pi 3 A+ and the firmware seems to use a runtime generated DT. So i dumped the DTS of a 3 A+ and a 3 B+ from procfs. Based on the procfs diff i modified the upstream 3B+ source to get a 3A+ .
+Acked-by: Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 
-Please consider this series as optional for 5.0. I won't submit any further patch for the next release cycle.
+I would also be fine with '!= ~0UL' which is, to me, slightly more
+readeable (must not count the fs to know if it's all bits or not).
 
-But maybe Phil can provide some feedback.
 
-Regards
-Stefan
+Regards,
+-- Luc
