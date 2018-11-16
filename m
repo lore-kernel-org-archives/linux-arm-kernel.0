@@ -1,156 +1,73 @@
 From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 16 Nov 2018 15:56:57 -0800
-Subject: [PATCH 7/9] dt-bindings: phy: Add dt bindings for ZynqMP PHY
+Date: Fri, 16 Nov 2018 15:56:54 -0800
+Subject: [PATCH 4/9] dt-bindings: nvmem: Add bindings for ZynqMP nvmem driver
 In-Reply-To: <1542412619-387-1-git-send-email-jollys@xilinx.com>
 References: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1542412619-387-8-git-send-email-jollys@xilinx.com>
+Message-ID: <1542412619-387-5-git-send-email-jollys@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the document describing dt bindings for ZynqMP
-PHY. ZynqMP SOC has a High Speed Processing System Gigabit
-Transceiver which provides PHY capabilties to USB, SATA,
-PCIE, Display Port and Ehernet SGMII controllers.
+From: Nava kishore Manne <nava.manne@xilinx.com>
 
-Signed-off-by: Anurag Kumar Vulisha <anuragku@xilinx.com>
+Add documentation to describe Xilinx ZynqMP nvmem driver
+bindings.
+
+Signed-off-by: Nava kishore Manne <nava.manne@xilinx.com>
 Signed-off-by: Jolly Shah <jollys@xilinx.com>
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- .../devicetree/bindings/phy/phy-zynqmp.txt         | 126 +++++++++++++++++++++
- 1 file changed, 126 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+ .../bindings/nvmem/xlnx,zynqmp-nvmem.txt           | 44 ++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
 
-diff --git a/Documentation/devicetree/bindings/phy/phy-zynqmp.txt b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
+diff --git a/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt b/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
 new file mode 100644
-index 0000000..21cb722
+index 0000000..090ba08
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/phy-zynqmp.txt
-@@ -0,0 +1,126 @@
-+Xilinx ZynqMP PHY binding
++++ b/Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-nvmem.txt
+@@ -0,0 +1,44 @@
++--------------------------------------------------------------------------
++=  Zynq UltraScale+ MPSoC nvmem firmware driver binding =
++--------------------------------------------------------------------------
++The nvmem_firmware node provides access to the hardware related data
++like soc revision, IDCODE... etc, By using the firmware interface.
 +
-+This binding describes a ZynqMP PHY device that is used to control ZynqMP
-+High Speed Gigabit Transceiver(GT). ZynqMP PS GTR provides four lanes
-+and are used by USB, SATA, PCIE, Display port and Ethernet SGMMI controllers.
++Required properties:
++- compatible: should be "xlnx,zynqmp-nvmem-fw"
 +
-+Required properties (controller (parent) node):
-+- compatible	: Can be "xlnx,zynqmp-psgtr-v1.1" or "xlnx,zynqmp-psgtr"
-+		  "xlnx,zynqmp-psgtr-v1.1" has the lpd address mapping removed
++= Data cells =
++Are child nodes of silicon id, bindings of which as described in
++bindings/nvmem/nvmem.txt
 +
-+- reg           : Address and length of register sets for each device in
-+                  "reg-names"
-+- reg-names     : The names of the register addresses corresponding to the
-+		  registers filled in "reg":
-+			- serdes: SERDES block register set
-+			- siou: SIOU block register set
-+			- lpd: Low power domain peripherals reset control
-+
-+Required nodes	:  A sub-node is required for each lane the controller
-+		   provides.
-+
-+Required properties (port (child) nodes):
-+lane0:
-+- #phy-cells	: Should be 4
-+		  Cell after port phandle is device type from:
-+			- <PHY_TYPE_PCIE 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SATA 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_USB3 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_DP 1 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SGMII 0 LANE_NUM FREQUENCY>
-+lane1:
-+- #phy-cells	: Should be 4
-+		  Cell after port phandle is device type from:
-+			- <PHY_TYPE_PCIE 1 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SATA 1 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_USB3 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_DP 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SGMII 1 LANE_NUM FREQUENCY>
-+lane2:
-+- #phy-cells	: Should be 4
-+		  Cell after port phandle is device type from:
-+			- <PHY_TYPE_PCIE 2 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SATA 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_USB3 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_DP 1 LANE_NUM FREQUENC>
-+			- <PHY_TYPE_SGMII 2 LANE_NUM FREQUENCY>
-+lane3:
-+- #phy-cells	: Should be 4
-+		  Cell after port phandle is device type from:
-+			- <PHY_TYPE_PCIE 3 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SATA 1 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_USB3 1 LANE_NUM FREQUENCY >
-+			- <PHY_TYPE_DP 0 LANE_NUM FREQUENCY>
-+			- <PHY_TYPE_SGMII 3 LANE_NUM FREQUENCY>
-+
-+Note:	LANE_NUM : This determines which lane's reference clock is shared by controller.
-+	FREQUENCY: This the clock frequency at which controller wants to operate.
-+
-+
-+Example:
++-------
++ Example
++-------
 +firmware {
 +	zynqmp_firmware: zynqmp-firmware {
 +		compatible = "xlnx,zynqmp-firmware";
 +		method = "smc";
 +
-+		serdes: zynqmp_phy at fd400000 {
-+			compatible = "xlnx,zynqmp-psgtr";
-+			status = "okay";
-+			reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000 0x0 0x1000>,
-+				<0x0 0xff5e0000 0x0 0x1000>;
-+			reg-names = "serdes", "siou", "lpd";
++		nvmem_firmware {
++			compatible = "xlnx,zynqmp-nvmem-fw";
++			#address-cells = <1>;
++			#size-cells = <1>;
 +
-+			lane0: lane at 0 {
-+				#phy-cells = <4>;
-+			};
-+			lane1: lane at 1 {
-+				#phy-cells = <4>;
-+			};
-+			lane2: lane at 2 {
-+				#phy-cells = <4>;
-+			};
-+			lane3: lane at 3 {
-+				#phy-cells = <4>;
++			/* Data cells */
++			soc_revision: soc_revision {
++				reg = <0x0 0x4>;
 +			};
 +		};
 +	};
 +};
 +
-+Specifying phy control of devices
-+=================================
++= Data consumers =
++Are device nodes which consume nvmem data cells.
 +
-+Device nodes should specify the configuration required in their "phys"
-+property, containing a phandle to the phy port node and a device type.
-+
-+phys = <PHANDLE CONTROLLER_TYPE CONTROLLER_INSTANCE LANE_NUM LANE_FREQ>;
-+
-+PHANDLE                 = &lane0 or &lane1 or &lane2 or &lane3
-+CONTROLLER_TYPE         = PHY_TYPE_PCIE or PHY_TYPE_SATA or PHY_TYPE_USB
-+			  or PHY_TYPE_DP or PHY_TYPE_SGMII
-+CONTROLLER_INSTANCE     = Depends on controller type used, can be any of
-+				PHY_TYPE_PCIE : 0 or 1 or 2 or 3
-+				PHY_TYPE_SATA : 0 or 1
-+				PHY_TYPE_USB  : 0 or 1
-+				PHY_TYPE_DP   : 0 or 1
-+				PHY_TYPE_SGMII: 0 or 1 or 2 or 3
-+LANE_NUM                = Depends on which lane clock is used as ref clk, can be
-+			  0 or 1 or 2 or 3
-+LANE_FREQ               = Frequency that controller can operate, can be any of
-+			  19.2Mhz,20Mhz,24Mhz,26Mhz,27Mhz,28.4Mhz,40Mhz,52Mhz,
-+			  100Mhz,108Mhz,125Mhz,135Mhz,150Mhz
-+
-+Example:
-+
-+#include <dt-bindings/phy/phy.h>
-+
-+	usb at fe200000 {
++For example:
++	pcap {
 +		...
-+		phys	  = <&lane2 PHY_TYPE_USB3 0 2 2600000>;
-+		...
++		nvmem-cells = <&soc_revision>;
++		nvmem-cell-names = "soc_revision";
 +	};
 +
-+	ahci at fd0c0000 {
-+		...
-+		phys	  = <&lane3 PHY_TYPE_SATA 1 1 125000000>;
-+		...
-+	};
 -- 
 2.7.4
