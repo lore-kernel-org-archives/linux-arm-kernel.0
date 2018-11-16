@@ -1,91 +1,48 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 16 Nov 2018 10:00:33 +0530
-Subject: [PATCH 2/2] cpufreq: ap806: add cpufreq driver for Armada 8K
-In-Reply-To: <87o9aqwrtj.fsf@bootlin.com>
-References: <20180924151249.32328-1-gregory.clement@bootlin.com>
- <20180924151249.32328-3-gregory.clement@bootlin.com>
- <20181004050624.ecjl3ouczm7huqgg@vireshk-i7>
- <87o9aqwrtj.fsf@bootlin.com>
-Message-ID: <20181116043033.75q3e6wsfi2juryf@vireshk-i7>
+From: dianders@chromium.org (Doug Anderson)
+Date: Thu, 15 Nov 2018 21:03:24 -0800
+Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
+In-Reply-To: <20181116004247.172977-1-dbasehore@chromium.org>
+References: <20181116004247.172977-1-dbasehore@chromium.org>
+Message-ID: <CAD=FV=VjN3J66wv2LGhQYD+-_W1q+KCzvo3V_1F9ktAb-T-i4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15-11-18, 11:36, Gregory CLEMENT wrote:
->  On jeu., oct. 04 2018, Viresh Kumar <viresh.kumar@linaro.org> wrote:
-> 
-> > On 24-09-18, 17:12, Gregory CLEMENT wrote:
-> >> Add cpufreq driver for Marvell AP-806 found on Aramda 8K.
-> >> The AP-806 has DFS (Dynamic Frequency Scaling) with coupled
-> >> clock domain for two clusters, so this driver will directly
-> >> use generic cpufreq-dt driver as backend.
-> >> 
-> >> Based on the work of Omri Itach <omrii@marvell.com>.
-> >> 
-> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
-> >> ---
-> >>  drivers/cpufreq/Kconfig.arm         |  11 +++
-> >>  drivers/cpufreq/Makefile            |   1 +
-> >>  drivers/cpufreq/armada-8k-cpufreq.c | 148 ++++++++++++++++++++++++++++
-> >>  3 files changed, 160 insertions(+)
-> >>  create mode 100644 drivers/cpufreq/armada-8k-cpufreq.c
-> >> 
-> >> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> >> index 0cd8eb76ad59..fd34095743a7 100644
-> >> --- a/drivers/cpufreq/Kconfig.arm
-> >> +++ b/drivers/cpufreq/Kconfig.arm
-> >> @@ -25,6 +25,17 @@ config ARM_ARMADA_37XX_CPUFREQ
-> >>  	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
-> >>  	  The Armada 37xx PMU supports 4 frequency and VDD levels.
-> >>  
-> >> +config ARM_ARMADA_8K_CPUFREQ
-> >> +	tristate "Armada 8K CPUFreq driver"
-> >
-> > Since you wanted this to be tristate, have you tried
-> >
-> > insmod armada-8k-cpufreq.ko
-> > rmmod armada-8k-cpufreq.ko
-> > insmod armada-8k-cpufreq.ko
-> > ?
-> 
-> Actually the purpose of it is to be able to have the driver available as
-> a module. Thanks to this the size kernel image is not increased. Once
-> the system is running then we can load the module and have the feature
-> but it is true that is no more possible to unload it. However, except
-> for developing or debugging, I don't see the real interest to unload
-> the driver.
+Hi,
 
-Sure, probably it will never get used that way but I see that as
-broken. If you want to have the driver as module, better support
-unloading of it as well.
+On Thu, Nov 15, 2018 at 4:42 PM Derek Basehore <dbasehore@chromium.org> wrote:
+>
+> This adds the xin32k clock to the RK3399 CPU. Even though it's not
+> directly used, muxes will end up traversing the entire clk tree on
+> calls to determine_rate if it doesn't exist.
+>
+> Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 99e7f65c1779..6a32293982d0 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -191,6 +191,13 @@
+>                 #clock-cells = <0>;
+>         };
+>
+> +       xin32k: xin32k {
 
-> >> +++ b/drivers/cpufreq/armada-8k-cpufreq.c
+nit: xin32k is the name of the clock that rk3399 consumes.  It seems a
+little weird to name this node with that name.  Can you call this:
 
-> >> +/*
-> >> + * Setup the opps list with the divider for the max frequency, that
-> >> + * will be filled at runtime, 0 meaning 100Mhz
-> >
-> > Add a full-stop at the end please.
-> 
-> I am not sure to understand what you means by a "full-stop": a 0Hz
-> frequency?
-> 
-> But this case should be handle by the CPU idle driver.
+ap_rtc_clk: ap-rtc-clk
 
-I meant '.' by full-stop. I wanted you to add . at the end of the
-line, like this:
+...after the gru schematic?  You wouldn't change the
+clock-output-names, just the node name / label.
 
-Setup the opps list with the divider for the max frequency, that
-will be filled at runtime, 0 meaning 100Mhz.
 
-> > I am not sure why will you want to support 100 MHz as the CPUs may end
-> > up running on that a lot :)
-> 
-> It should depend of the policy, or am I missing something.
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <32000>;
 
-Sure, but with any of the general governors like
-ondemand/conservative/schedutil, you will end up running at 100 MHz
-when the system doesn't have high load. And 100MHz may be way too
-slow.
-
--- 
-viresh
+I checked the datasheet for the 32K clock and it shows that this is a
+32768 Hz clock, not a 32000 Hz one.  I also checked the rk808 clock
+driver (which is supposed to be compatible with rk3399) and it
+produces a 32768 clock.
