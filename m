@@ -1,73 +1,124 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 16 Nov 2018 10:03:11 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <201811160823399069106@zte.com.cn>
-References: <201811160823399069106@zte.com.cn>
-Message-ID: <851b61b1-786b-ef64-b8c4-fe6926bdf9f9@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Nov 2018 15:34:25 +0530
+Subject: [PATCH 02/10] ARM64: dts: exynos: Add all CPUs in cooling maps
+In-Reply-To: <cover.1542362530.git.viresh.kumar@linaro.org>
+References: <cover.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Each CPU can (and does) participate in cooling down the system but the
+DT only captures a handful of them, normally CPU0, in the cooling maps.
+Things work by chance currently as under normal circumstances its the
+first CPU of each cluster which is used by the operating systems to
+probe the cooling devices. But as soon as this CPU ordering changes and
+any other CPU is used to bring up the cooling device, we will start
+seeing failures.
 
+Also the DT is rather incomplete when we list only one CPU in the
+cooling maps, as the hardware doesn't have any such limitations.
 
-On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
->> Hi,
->>> When virtual machine starts, hang up.
->>
->> I take it you mean the *guest* hangs? Because it doesn't get a timer
->> interrupt?
->>
->>> The kernel version of guest
->>> is 4.16. Host support vgic_v3.
->>
->> Your host kernel is something recent, I guess?
->>
->>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
->>> during injection interruption. when kvm_vgic_vcpu_init is called,
->>> dist is not initialized at this time. Unable to get vgic V3 or V2
->>> correctly, so group is not set.
->>
->> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
->> version?) or some other userland tool?
->>
-> 
-> QEMU emulator version 3.0.50 .
-> 
->>> group is setted to 1 when vgic_mmio_write_group is invoked at some
->>> time.
->>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
->>> interrupt injection failed.
->>>
->>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->>> ---
->>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>> index 9c0dd23..d101000 100644
->>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
->>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
->>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
->>>
->>> -    if (irq->group)
->>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->>
->> This is not the right fix, not only because it basically reverts the
->> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
->> their configured group).
->>
->> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
->> before dist->vgic_model is set, also what value it has?
->> If I understand the code correctly, that shouldn't happen for a GICv3.
->>
-> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
->   If the interrupt comes at this time, the interrupt injection fails.
-> 
+Update cooling maps to include all devices affected by individual trip
+points.
 
-Does that mean that the guest is configuring its interrupts as Group0? 
-That sounds wrong, Linux should configure all it's interrupts as 
-non-secure group1.
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ .../arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 ++++++++++++-------
+ 1 file changed, 24 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+index fe3a0b14bee6..81b72393dd0d 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433-tmu.dtsi
+@@ -55,37 +55,44 @@ thermal-zones {
+ 			map0 {
+ 				/* Set maximum frequency as 1800MHz  */
+ 				trip = <&atlas0_alert_0>;
+-				cooling-device = <&cpu4 1 2>;
++				cooling-device = <&cpu4 1 2>, <&cpu5 1 2>,
++						 <&cpu6 1 2>, <&cpu7 1 2>;
+ 			};
+ 			map1 {
+ 				/* Set maximum frequency as 1700MHz  */
+ 				trip = <&atlas0_alert_1>;
+-				cooling-device = <&cpu4 2 3>;
++				cooling-device = <&cpu4 2 3>, <&cpu5 2 3>,
++						 <&cpu6 2 3>, <&cpu7 2 3>;
+ 			};
+ 			map2 {
+ 				/* Set maximum frequency as 1600MHz  */
+ 				trip = <&atlas0_alert_2>;
+-				cooling-device = <&cpu4 3 4>;
++				cooling-device = <&cpu4 3 4>, <&cpu5 3 4>,
++						 <&cpu6 3 4>, <&cpu7 3 4>;
+ 			};
+ 			map3 {
+ 				/* Set maximum frequency as 1500MHz  */
+ 				trip = <&atlas0_alert_3>;
+-				cooling-device = <&cpu4 4 5>;
++				cooling-device = <&cpu4 4 5>, <&cpu5 4 5>,
++						 <&cpu6 4 5>, <&cpu7 4 5>;
+ 			};
+ 			map4 {
+ 				/* Set maximum frequency as 1400MHz  */
+ 				trip = <&atlas0_alert_4>;
+-				cooling-device = <&cpu4 5 7>;
++				cooling-device = <&cpu4 5 7>, <&cpu5 5 7>,
++						 <&cpu6 5 7>, <&cpu7 5 7>;
+ 			};
+ 			map5 {
+ 				/* Set maximum frequencyas 1200MHz  */
+ 				trip = <&atlas0_alert_5>;
+-				cooling-device = <&cpu4 7 9>;
++				cooling-device = <&cpu4 7 9>, <&cpu5 7 9>,
++						 <&cpu6 7 9>, <&cpu7 7 9>;
+ 			};
+ 			map6 {
+ 				/* Set maximum frequency as 1000MHz  */
+ 				trip = <&atlas0_alert_6>;
+-				cooling-device = <&cpu4 9 14>;
++				cooling-device = <&cpu4 9 14>, <&cpu5 9 14>,
++						 <&cpu6 9 14>, <&cpu7 9 14>;
+ 			};
+ 		};
+ 	};
+@@ -222,27 +229,32 @@ thermal-zones {
+ 			map0 {
+ 				/* Set maximum frequency as 1200MHz  */
+ 				trip = <&apollo_alert_2>;
+-				cooling-device = <&cpu0 1 2>;
++				cooling-device = <&cpu0 1 2>, <&cpu1 1 2>,
++						 <&cpu2 1 2>, <&cpu3 1 2>;
+ 			};
+ 			map1 {
+ 				/* Set maximum frequency as 1100MHz  */
+ 				trip = <&apollo_alert_3>;
+-				cooling-device = <&cpu0 2 3>;
++				cooling-device = <&cpu0 2 3>, <&cpu1 2 3>,
++						 <&cpu2 2 3>, <&cpu3 2 3>;
+ 			};
+ 			map2 {
+ 				/* Set maximum frequency as 1000MHz  */
+ 				trip = <&apollo_alert_4>;
+-				cooling-device = <&cpu0 3 4>;
++				cooling-device = <&cpu0 3 4>, <&cpu1 3 4>,
++						 <&cpu2 3 4>, <&cpu3 3 4>;
+ 			};
+ 			map3 {
+ 				/* Set maximum frequency as 900MHz  */
+ 				trip = <&apollo_alert_5>;
+-				cooling-device = <&cpu0 4 5>;
++				cooling-device = <&cpu0 4 5>, <&cpu1 4 5>,
++						 <&cpu2 4 5>, <&cpu3 4 5>;
+ 			};
+ 			map4 {
+ 				/* Set maximum frequency as 800MHz  */
+ 				trip = <&apollo_alert_6>;
+-				cooling-device = <&cpu0 5 9>;
++				cooling-device = <&cpu0 5 9>, <&cpu1 5 9>,
++						 <&cpu2 5 9>, <&cpu3 5 9>;
+ 			};
+ 		};
+ 	};
 -- 
-Julien Thierry
+2.19.1.568.g152ad8e3369a
