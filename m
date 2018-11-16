@@ -1,92 +1,35 @@
-From: m.reichl@fivetechno.de (Markus Reichl)
-Date: Fri, 16 Nov 2018 09:58:28 +0100
-Subject: [PATCH 0/9] ARM: SAMSUNG: add Exynos chipid driver
-In-Reply-To: <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
-References: <CGME20181115151207epcas1p45adfa96d5b52e10fbb5ace76ebae5e3e@epcas1p4.samsung.com>
- <1542294698-17470-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <60d56be0-5333-2bff-3576-ff1fcd74d40a@fivetechno.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 16 Nov 2018 10:10:00 +0100
+Subject: [PATCH 4/9] PCI: consolidate PCI config entry in drivers/pci
+In-Reply-To: <20181115190538.17016-5-hch@lst.de>
+References: <20181115190538.17016-1-hch@lst.de>
+ <20181115190538.17016-5-hch@lst.de>
+Message-ID: <CAMuHMdUSr6uxXUv8HtWZihFVj9zR8SJoFByLJ=J+_Lj-Mmgagg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartlomiej,
+On Thu, Nov 15, 2018 at 8:06 PM Christoph Hellwig <hch@lst.de> wrote:
+> There is no good reason to duplicate the PCI menu in every architecture.
+> Instead provide a selectable HAVE_PCI symbol that indicates availability
+> of PCI support, and a FORCE_PCI symbol to for PCI on and the handle the
+> rest in drivers/pci.
+>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
+> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
+For m68k:
+Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
-Am 15.11.18 um 16:11 schrieb Bartlomiej Zolnierkiewicz:
-> Hi,
-> 
-> This patchset adds Exynos chipid driver and converts Exynos platform
-> code to use it. It is heavily based on "[PATCH v9 00/12] Introducing
-> Exynos ChipId driver" patchset [1] so most credits go to Pankaj Dubey.
-> The main difference in the current patchset is in taking simpler
-> approach to converting existing Exynos platform code to use the new
-> chipid driver. This results in much less code duplication.
-> 
-> The diffstat for "[PATCH v9 00/12] Introducing Exynos ChipId driver":
-> 
->  14 files changed, 587 insertions(+), 255 deletions(-)
-> 
-> for the current patchset it is:
-> 
->  14 files changed, 193 insertions(+), 195 deletions(-)
-> 
-> This patchset has been tested on Exynos4210 (including rev0),
-> Exynos3250, Exynos4412 & Exynos5422 SoCs.
-> 
-> [1] https://marc.info/?l=linux-arm-kernel&m=149087972213359&w=2
-> 
-> Best regards,
-> --
-> Bartlomiej Zolnierkiewicz
-> Samsung R&D Institute Poland
-> Samsung Electronics
-> 
+Gr{oetje,eeting}s,
 
-tested on Odroid-XU4:
-[    0.022888] soc soc0: Exynos: CPU[EXYNOS5800] PRO_ID[0xe5422001] REV[0x1] Detected
+                        Geert
 
-Tested-by: Markus Reichl <m.reichl@fivetechno.de>
-
-Gru?,
 -- 
-Markus Reichl
-> 
-> Bartlomiej Zolnierkiewicz (5):
->   ARM: EXYNOS: use chipid driver
->   ARM: EXYNOS: remove soc_is_exynos*() macros
->   ARM: SAMSUNG: remove samsung_rev()
->   ARM: SAMSUNG: remove s5p_init_cpu()
->   ARM: EXYNOS: remove <mach/map.h> include
-> 
-> Pankaj Dubey (4):
->   ARM: EXYNOS: remove secondary startup initialization from
->     smp_prepare_cpus
->   soc: samsung: add exynos chipid driver support
->   ARM: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
->   ARM64: EXYNOS: enable exynos_chipid for ARCH_EXYNOS
-> 
->  arch/arm/mach-exynos/Kconfig                 |   1 +
->  arch/arm/mach-exynos/common.h                |  81 ++-----------------
->  arch/arm/mach-exynos/exynos.c                |  75 ++++++++++--------
->  arch/arm/mach-exynos/firmware.c              |   8 +-
->  arch/arm/mach-exynos/include/mach/map.h      |  18 -----
->  arch/arm/mach-exynos/platsmp.c               |  40 ++--------
->  arch/arm/mach-exynos/pm.c                    |  25 +++---
->  arch/arm/plat-samsung/cpu.c                  |  17 ----
->  arch/arm/plat-samsung/include/plat/cpu.h     |   3 -
->  arch/arm/plat-samsung/include/plat/map-s5p.h |   2 -
->  arch/arm64/Kconfig.platforms                 |   1 +
->  drivers/soc/samsung/Kconfig                  |   5 ++
->  drivers/soc/samsung/Makefile                 |   1 +
->  drivers/soc/samsung/exynos-chipid.c          | 111 +++++++++++++++++++++++++++
->  14 files changed, 193 insertions(+), 195 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/include/mach/map.h
->  create mode 100644 drivers/soc/samsung/exynos-chipid.c
-> 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 659 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181116/5ac768e9/attachment.sig>
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
