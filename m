@@ -1,48 +1,79 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 16 Nov 2018 11:05:00 +0100
-Subject: [PATCH] pwm: lpc18xx-sct: don't reconfigure PWM in .request and
- .free
-In-Reply-To: <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
-References: <20181114115025.GC2620@ulmo>
- <20181116065208.3920-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20181116100500.GC28631@ulmo>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 16 Nov 2018 15:34:27 +0530
+Subject: [PATCH 04/10] arm64: dts: hi3660: Add missing cooling device
+ properties for CPUs
+In-Reply-To: <cover.1542362530.git.viresh.kumar@linaro.org>
+References: <cover.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <042e5e647a7b54f4322024f1b3e286b6b6d69175.1542362530.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 07:52:08AM +0100, Uwe Kleine-K?nig wrote:
-> Regarding the .request case: The consumer might be interested in taking
-> over the configured state from the boot loader. So the initially
-> configured state should be retained.
-> 
-> For the free case the PWM consumer is responsible to disable the PWM
-> before calling pwm_release and there are three subcases to consider:
-> 
->  a) The pwm is already off. Then there is no gain in disabling the PWM
->     once more.
->  b) The pwm is still running and there is a good reason for that. (Not
->     sure this is a valid case, I cannot imagine such a good reason.)
->     Then it is contra productive to disable the pwm.
->  c) The pwm is still running because the consumer failed to disable the
->     PWM. Then the consumer needs fixing and there is little incentive to
->     paper over the problem in the backend driver.
-> 
-> This aligns the lpc18xx-sct driver to the other PWM drivers that also
-> don't reconfigure the hardware in .request and .free.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  drivers/pwm/pwm-lpc18xx-sct.c | 3 ---
->  1 file changed, 3 deletions(-)
+The cooling device properties, like "#cooling-cells" and
+"dynamic-power-coefficient", should either be present for all the CPUs
+of a cluster or none. If these are present only for a subset of CPUs of
+a cluster then things will start falling apart as soon as the CPUs are
+brought online in a different order. For example, this will happen
+because the operating system looks for such properties in the CPU node
+it is trying to bring up, so that it can register a cooling device.
 
-Applied, with some minor fixes to the commit message (pwm -> PWM,
-pwm_release -> pwm_put(), ...).
+Add such missing properties.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181116/3730d634/attachment.sig>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index f432b0a88c65..d943a96eedee 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -79,6 +79,7 @@
+ 			capacity-dmips-mhz = <592>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu2: cpu at 2 {
+@@ -91,6 +92,7 @@
+ 			capacity-dmips-mhz = <592>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu3: cpu at 3 {
+@@ -103,6 +105,7 @@
+ 			capacity-dmips-mhz = <592>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER0>;
+ 			operating-points-v2 = <&cluster0_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu4: cpu at 100 {
+@@ -129,6 +132,7 @@
+ 			capacity-dmips-mhz = <1024>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+ 			operating-points-v2 = <&cluster1_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu6: cpu at 102 {
+@@ -141,6 +145,7 @@
+ 			capacity-dmips-mhz = <1024>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+ 			operating-points-v2 = <&cluster1_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		cpu7: cpu at 103 {
+@@ -153,6 +158,7 @@
+ 			capacity-dmips-mhz = <1024>;
+ 			clocks = <&stub_clock HI3660_CLK_STUB_CLUSTER1>;
+ 			operating-points-v2 = <&cluster1_opp>;
++			#cooling-cells = <2>;
+ 		};
+ 
+ 		idle-states {
+-- 
+2.19.1.568.g152ad8e3369a
