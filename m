@@ -1,38 +1,35 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Fri, 16 Nov 2018 10:24:09 +0000
-Subject: [PATCH 06/10] alpha: perf/core: generalise event exclusion checking
- with perf macro
+Date: Fri, 16 Nov 2018 10:24:13 +0000
+Subject: [PATCH 10/10] perf/doc: update design.txt for exclude_{host|guest}
+ flags
 In-Reply-To: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
 References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1542363853-13849-7-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace checking of perf event exclusion flags with perf macro.
-
-This is a functional change as __hw_perf_event_init will now indicate
-that it doesn't support exclude_host and exclude_guest event flags.
+Update design.txt to reflect the presence of the exclude_host
+and exclude_guest perf flags.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/alpha/kernel/perf_event.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ tools/perf/design.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/alpha/kernel/perf_event.c b/arch/alpha/kernel/perf_event.c
-index 5613aa37..36f98ee 100644
---- a/arch/alpha/kernel/perf_event.c
-+++ b/arch/alpha/kernel/perf_event.c
-@@ -631,10 +631,8 @@ static int __hw_perf_event_init(struct perf_event *event)
- 	}
+diff --git a/tools/perf/design.txt b/tools/perf/design.txt
+index a28dca2..7de7d83 100644
+--- a/tools/perf/design.txt
++++ b/tools/perf/design.txt
+@@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
+ way to request that counting of events be restricted to times when the
+ CPU is in user, kernel and/or hypervisor mode.
  
- 	/* The EV67 does not support mode exclusion */
--	if (attr->exclude_kernel || attr->exclude_user
--			|| attr->exclude_hv || attr->exclude_idle) {
-+	if (event_has_exclude_flags(event))
- 		return -EPERM;
--	}
- 
- 	/*
- 	 * We place the event type in event_base here and leave calculation
++Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
++to request counting of events restricted to guest and host contexts when
++using virtualisation.
++
+ The 'mmap' and 'munmap' bits allow recording of PROT_EXEC mmap/munmap
+ operations, these can be used to relate userspace IP addresses to actual
+ code, even after the mapping (or even the whole process) is gone,
 -- 
 2.7.4
