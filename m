@@ -1,41 +1,48 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 16 Nov 2018 16:44:41 -0600
-Subject: [PATCH v4 3/6] arm64: add support for i.MX8M EVK board
-In-Reply-To: <20181114175242.12468-3-l.stach@pengutronix.de>
-References: <20181114175242.12468-1-l.stach@pengutronix.de>
- <20181114175242.12468-3-l.stach@pengutronix.de>
-Message-ID: <20181116224441.GA8002@bogus>
+From: fthain@telegraphics.com.au (Finn Thain)
+Date: Sat, 17 Nov 2018 09:49:48 +1100 (AEDT)
+Subject: [RFC PATCH 01/13] arm: Fix mutual exclusion in arch_gettimeoffset
+In-Reply-To: <20181116174705.GY30658@n2100.armlinux.org.uk>
+References: <cover.1541995959.git.fthain@telegraphics.com.au>
+ <d1559db8eddb5b06747b152ae69b63c3aa66ed09.1541995959.git.fthain@telegraphics.com.au>
+ <20181112083422.GA19695@infradead.org>
+ <alpine.LNX.2.21.1811131420150.362@nippy.intranet>
+ <20181113092012.GI30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811140854280.371@nippy.intranet>
+ <20181113234336.GP30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811141142490.8@nippy.intranet>
+ <20181114141632.GT30658@n2100.armlinux.org.uk>
+ <alpine.LNX.2.21.1811151427210.19@nippy.intranet>
+ <20181116174705.GY30658@n2100.armlinux.org.uk>
+Message-ID: <alpine.LNX.2.21.1811170934300.45@nippy.intranet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 06:52:39PM +0100, Lucas Stach wrote:
-> This is the evaluation kit board for the i.MX8M. The current level of
-> support yields a working console and is able to boot userspace from
-> SD card or Network.
+On Fri, 16 Nov 2018, Russell King - ARM Linux wrote:
+
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com> (v1)
-> Tested-by: Tested-by: Baruch Siach <baruch@tkos.co.il> (v1)
-> Reviewed-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> v2:
-> - move to freescale folder
-> - fix indentation
-> - fix typo in Makefile
-> - document compatible
-> - switch to generic pinconf
-> v3:
-> - rebase to v4.19-rc1 and already merged pinctrl driver and pending
->   clk driver
-> v4:
-> - rebased to 4.10-rc1
-> ---
->  Documentation/devicetree/bindings/arm/fsl.txt |   4 +
->  arch/arm64/boot/dts/freescale/Makefile        |   2 +
->  arch/arm64/boot/dts/freescale/imx8mq-evk.dts  | 290 ++++++++++++++++++
->  3 files changed, 296 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/freescale/imx8mq-evk.dts
+> The EBSA110 is probably in a similar boat - I don't remember whether it 
+> had 16MB or 32MB as the maximal amount of memory, but memory was getting 
+> tight with some kernels even running a minimalist userspace.
+> 
+> So, it's probably time to say goodbyte to the kernel support for these 
+> platforms.
+> 
 
-You missed my R-by on v3.
+Your call.
 
-Rob
+Note that removing code from mainline won't help users obtain older, 
+smaller, -stable kernel releases, free from the bug we were discussing. 
+(The bug appeared in Linux v2.6.32.)
+
+BTW, if you did want to boot Linux on a 16 MB system, you do have some 
+options.
+
+https://lwn.net/Articles/741494/
+https://lwn.net/Articles/608945/
+https://tiny.wiki.kernel.org/
+
+Contributing to this kind of effort probably has value for IoT 
+deployments. I suspect it also cuts a small amount of bloat from a large 
+number of other Linux systems.
+
+-- 
