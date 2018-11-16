@@ -1,26 +1,104 @@
 From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Fri, 16 Nov 2018 13:20:20 +0100
-Subject: [PATCH v1 0/2] SYSCFG Fast Mode Plus support for I2C STM32F7
-Message-ID: <1542370822-14721-1-git-send-email-pierre-yves.mordret@st.com>
+Date: Fri, 16 Nov 2018 13:20:22 +0100
+Subject: [PATCH v1 2/2] i2c: i2c-stm32f7: SYSCFG Fast Mode Plus support for
+ I2C STM32F7
+In-Reply-To: <1542370822-14721-1-git-send-email-pierre-yves.mordret@st.com>
+References: <1542370822-14721-1-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <1542370822-14721-3-git-send-email-pierre-yves.mordret@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Append optional bindings to update SYSCFG Fast Mode Plus bits if
-Fast Mode Plus speed is selected.
+Read SYSCFG bindings to set Fast Mode Plus bits if Fast Mode Plus
+speed is selected.
 
+Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 ---
   Version history:
     v1:
        * Initial
 ---
+---
+ drivers/i2c/busses/i2c-stm32f7.c | 37 ++++++++++++++++++++++++++++++++++---
+ 1 file changed, 34 insertions(+), 3 deletions(-)
 
-Pierre-Yves MORDRET (2):
-  dt-bindings: i2c-stm32: SYSCFG Fast Mode Plus support for I2C STM32F7
-  i2c: i2c-stm32f7: SYSCFG Fast Mode Plus support for I2C STM32F7
-
- .../devicetree/bindings/i2c/i2c-stm32.txt          |  6 ++++
- drivers/i2c/busses/i2c-stm32f7.c                   | 37 ++++++++++++++++++++--
- 2 files changed, 40 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
+index 62d023e..8e381b7 100644
+--- a/drivers/i2c/busses/i2c-stm32f7.c
++++ b/drivers/i2c/busses/i2c-stm32f7.c
+@@ -21,6 +21,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
+ #include <linux/iopoll.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -276,6 +277,7 @@ struct stm32f7_i2c_msg {
+  * slave)
+  * @dma: dma data
+  * @use_dma: boolean to know if dma is used in the current transfer
++ * @regmap: holds SYSCFG phandle for Fast Mode Plus bits
+  */
+ struct stm32f7_i2c_dev {
+ 	struct i2c_adapter adap;
+@@ -296,6 +298,7 @@ struct stm32f7_i2c_dev {
+ 	bool master_mode;
+ 	struct stm32_i2c_dma *dma;
+ 	bool use_dma;
++	struct regmap *regmap;
+ };
+ 
+ /**
+@@ -1763,6 +1766,30 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
+ 	return 0;
+ }
+ 
++static int stm32f7_i2c_setup_fm_plus_bits(struct platform_device *pdev,
++					  struct stm32f7_i2c_dev *i2c_dev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	int ret;
++	u32 reg, mask;
++
++	i2c_dev->regmap = syscon_regmap_lookup_by_phandle(np, "st,syscfg-fmp");
++	if (IS_ERR(i2c_dev->regmap)) {
++		/* Optional */
++		return 0;
++	}
++
++	ret = of_property_read_u32_index(np, "st,syscfg-fmp", 1, &reg);
++	if (ret)
++		return ret;
++
++	ret = of_property_read_u32_index(np, "st,syscfg-fmp", 2, &mask);
++	if (ret)
++		return ret;
++
++	return regmap_update_bits(i2c_dev->regmap, reg, mask, mask);
++}
++
+ static u32 stm32f7_i2c_func(struct i2c_adapter *adap)
+ {
+ 	return I2C_FUNC_I2C | I2C_FUNC_10BIT_ADDR | I2C_FUNC_SLAVE |
+@@ -1828,12 +1855,16 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
+ 	i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
+ 	ret = device_property_read_u32(&pdev->dev, "clock-frequency",
+ 				       &clk_rate);
+-	if (!ret && clk_rate >= 1000000)
++	if (!ret && clk_rate >= 1000000) {
+ 		i2c_dev->speed = STM32_I2C_SPEED_FAST_PLUS;
+-	else if (!ret && clk_rate >= 400000)
++		ret = stm32f7_i2c_setup_fm_plus_bits(pdev, i2c_dev);
++		if (ret)
++			goto clk_free;
++	} else if (!ret && clk_rate >= 400000) {
+ 		i2c_dev->speed = STM32_I2C_SPEED_FAST;
+-	else if (!ret && clk_rate >= 100000)
++	} else if (!ret && clk_rate >= 100000) {
+ 		i2c_dev->speed = STM32_I2C_SPEED_STANDARD;
++	}
+ 
+ 	rst = devm_reset_control_get(&pdev->dev, NULL);
+ 	if (IS_ERR(rst)) {
 -- 
 2.7.4
