@@ -1,88 +1,47 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 16 Nov 2018 21:42:35 +0100
-Subject: [PATCH 2/2] ARM: dts: meson: add the clock inputs for the Meson timer
-In-Reply-To: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
-References: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181116204235.3925-3-martin.blumenstingl@googlemail.com>
+Date: Fri, 16 Nov 2018 21:53:00 +0100
+Subject: [PATCH 0/3] Meson8b: add the CPU clock post-dividers
+Message-ID: <20181116205303.6354-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Meson Timer IP block has two clock inputs:
-- clk81 for using the system clock as timebase
-- xtal for a timebase with 1us, 10us, 100us and 1ms resolution
+This is the successor to my previous series "meson8b: add the CPU_DIV16
+clock for the ARM TWD" from [0]. I decided to not send this as v2 of
+the original series because the PERIPH clock is not the CPU_DIV16 clock.
+It's not clear whether a CPU_DIV16 clock exists.
 
-The clocksource driver does not use these yet, but it's still a good
-idea to add them as this describes how the hardware actually works
-internally.
+With this series we get all the CPU_CLK post-dividers as listed in the
+public S805 datasheet [1] on pages 31 and 32:
+- ABP
+- PERIPH (used as input for the ARM global timer and ARM TWD timer)
+- AXI
+- L2 DRAM
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson.dtsi   | 2 +-
- arch/arm/boot/dts/meson6.dtsi  | 5 +++++
- arch/arm/boot/dts/meson8.dtsi  | 5 +++++
- arch/arm/boot/dts/meson8b.dtsi | 5 +++++
- 4 files changed, 16 insertions(+), 1 deletion(-)
+Each of these clocks has a register called "..._CLK_DIS" which is
+documented as a "just in case" bit:
+"Set to 1 to manually disable the [...] clock when changing the mux
+selection. Typically this bit is set to 0 since the clock muxes can
+switch without glitches."
+Since we're not supposed to touch that register we're setting
+CLK_IS_CRITICAL for these clocks in the driver.
 
-diff --git a/arch/arm/boot/dts/meson.dtsi b/arch/arm/boot/dts/meson.dtsi
-index f0255450bcb2..0839da07a75c 100644
---- a/arch/arm/boot/dts/meson.dtsi
-+++ b/arch/arm/boot/dts/meson.dtsi
-@@ -197,7 +197,7 @@
- 				interrupts = <GIC_SPI 0 IRQ_TYPE_EDGE_RISING>;
- 			};
- 
--			timer at 9940 {
-+			timer_abcde: timer at 9940 {
- 				compatible = "amlogic,meson6-timer";
- 				reg = <0x9940 0x18>;
- 				interrupts = <GIC_SPI 10 IRQ_TYPE_EDGE_RISING>,
-diff --git a/arch/arm/boot/dts/meson6.dtsi b/arch/arm/boot/dts/meson6.dtsi
-index 9b463211339f..ca978ab952cd 100644
---- a/arch/arm/boot/dts/meson6.dtsi
-+++ b/arch/arm/boot/dts/meson6.dtsi
-@@ -88,6 +88,11 @@
- 	status = "disabled";
- };
- 
-+&timer_abcde {
-+	clocks = <&xtal>, <&clk81>;
-+	clock-names = "xtal", "pclk";
-+};
-+
- &uart_AO {
- 	clocks = <&xtal>, <&clk81>, <&clk81>;
- 	clock-names = "xtal", "pclk", "baud";
-diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-index 08c54cf5420a..3be5fbd07997 100644
---- a/arch/arm/boot/dts/meson8.dtsi
-+++ b/arch/arm/boot/dts/meson8.dtsi
-@@ -387,6 +387,11 @@
- 	clocks = <&clkc CLKID_CLK81>;
- };
- 
-+&timer_abcde {
-+	clocks = <&clkc CLKID_XTAL>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk";
-+};
-+
- &uart_AO {
- 	compatible = "amlogic,meson8-uart", "amlogic,meson-uart";
- 	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_XTAL>, <&clkc CLKID_CLK81>;
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 46b3564a6536..587a855f872b 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -370,6 +370,11 @@
- 	clock-names = "core", "clkin";
- };
- 
-+&timer_abcde {
-+	clocks = <&clkc CLKID_XTAL>, <&clkc CLKID_CLK81>;
-+	clock-names = "xtal", "pclk";
-+};
-+
- &uart_AO {
- 	compatible = "amlogic,meson8b-uart", "amlogic,meson-uart";
- 	clocks = <&clkc CLKID_CLK81>, <&clkc CLKID_XTAL>, <&clkc CLKID_CLK81>;
+The result of this is that we can use the PERIPH clock which clocks
+the ARM TWD timer. I will send a separate series to add the TWD timer.
+
+
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
+[1] https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
+
+Martin Blumenstingl (3):
+  dt-bindings: clock: meson8b: export the CPU post dividers
+  clk: meson: meson8b: rename cpu_div2/cpu_div3 to
+    cpu_in_div2/cpu_in_div3
+  clk: meson: meson8b: add the CPU clock post divider clocks
+
+ drivers/clk/meson/meson8b.c              | 268 ++++++++++++++++++++++-
+ drivers/clk/meson/meson8b.h              |  17 +-
+ include/dt-bindings/clock/meson8b-clkc.h |   4 +
+ 3 files changed, 276 insertions(+), 13 deletions(-)
+
 -- 
 2.19.1
