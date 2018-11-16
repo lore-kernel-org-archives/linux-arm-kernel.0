@@ -1,63 +1,40 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 16 Nov 2018 14:48:40 +0100
-Subject: [PATCH v2 0/2] arm: renesas: Move SoC Kconfig symbols to
- drivers/soc/renesas/
-Message-ID: <20181116134842.26488-1-geert+renesas@glider.be>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Fri, 16 Nov 2018 16:54:24 +0300
+Subject: [PATCH] arm64: sysreg: fix sparse warnings
+In-Reply-To: <20181116103359.wywpaeanhoceqhgb@ltop.local>
+References: <20181109204747.10008-1-geomatsi@gmail.com>
+ <20181110001615.GA5665@brain-police>
+ <20181110111647.GA3511@speedy.hunter>
+ <20181110170311.GA7700@brain-police>
+ <20181110175404.gnks6sj3zzlz2it7@ltop.local>
+ <2bb3e247-3b6f-adc6-6d6f-1e62f48a43e6@ramsayjones.plus.com>
+ <20181114222540.fgddrx4xxsne5pdq@ltop.local>
+ <20181115083535.usyjcdoz2f6zmssq@bars>
+ <20181116103359.wywpaeanhoceqhgb@ltop.local>
+Message-ID: <20181116135424.pbwns66phknezmfa@bars>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	Hi all,
+On Fri, Nov 16, 2018 at 11:34:00AM +0100, Luc Van Oostenryck wrote:
+> > Hi,
+> > 
+> > Could you please clarify what is your resolution regarding that warning.
+> > I pulled all the changes from sparse repository on kernel.org. However
+> > the same warning is still here when building modules with C=2 option.
+> 
+> Hi,
+> 
+> Yes, the warning is still there since it's maybe not desired but
+> is at least legit. For the short term, I think the best is your
+> original patch (but using UL as the prefix). I would be glad to
+> ack such a patch (I tried to answer in the original thread but
+> I never found it although I should be subscribed to the
+> linux-arm-kernel mailing list).
+> 
+> For the slightly longer term, I'll need to see how Ramsay's
+> patches can also be used for kernel code.
 
-As pointed out by Arnd[*], there are lots of SoC-specific Kconfig
-symbols in the Renesas section of arch/arm64/Kconfig.platforms, while
-other vendors expose a single Kconfig symbol there.
+Thanks for clarifiation! I will send v2. 
 
-Hence this patch series moves them to drivers/soc/renesas/Kconfig,
-reducing the footprint and associated amount of churn in
-arch/arm64/Kconfig.platforms, while preserving the benefits for users of
-automatic selection of e.g. clock and pinctrl drivers.
-
-As my OCD just loves consistency, the second patch does the same for
-arm32 SoCs.
-
-Note that e.g. drivers/clk/ is included before drivers/soc/.  Hence when
-COMPILE_TEST=y and ARCH_RENESAS=n, questions will be asked about clock
-drivers before they can be auto-selected by the corresponding
-SoC-specific Kconfig symbols.
-
-Of course this will trigger some defconfig updates later...
-
-Changes compared to v1/RFC:
-  - Introduce a family-specific Kconfig symbol for R-Car Gen3,
-  - Move arm32 family-specific Kconfig symbols, too.
-
-This depends on Simon's devel branch, and "ARM: shmobile: Hide ARCH_RZN1
-to improve consistency".
-
-Thanks!
-
-[*] https://www.spinics.net/lists/arm-kernel/msg679390.html
-
-
-Geert Uytterhoeven (2):
-  arm64: renesas: Move SoC Kconfig symbols to drivers/soc/renesas/
-  ARM: shmobile: Move SoC Kconfig symbols to drivers/soc/renesas/
-
- arch/arm/mach-shmobile/Kconfig | 126 ------------------
- arch/arm64/Kconfig.platforms   |  59 ---------
- drivers/soc/renesas/Kconfig    | 236 ++++++++++++++++++++++++++++++---
- 3 files changed, 215 insertions(+), 206 deletions(-)
-
--- 
-2.17.1
-
-Gr{oetje,eeting}s,
-
-						Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-							    -- Linus Torvalds
+Regards,
+Sergey
