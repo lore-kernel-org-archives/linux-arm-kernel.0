@@ -1,180 +1,90 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 16 Nov 2018 12:32:18 +0000
-Subject: [RFC PATCH v2 06/23] arm64/sve: Check SVE virtualisability
-In-Reply-To: <20181115170904.GO3505@e103592.cambridge.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-7-git-send-email-Dave.Martin@arm.com>
- <87in0ycpuy.fsf@linaro.org> <20181115170904.GO3505@e103592.cambridge.arm.com>
-Message-ID: <87bm6pciel.fsf@linaro.org>
+From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
+Date: Fri, 16 Nov 2018 14:38:24 +0200
+Subject: [PATCH v8 00/17] Removed nested TPM operations
+Message-ID: <20181116123845.15705-1-jarkko.sakkinen@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+[was Detach TPM space code out of the tpm_transmit() flow but the scope
+ expanded a bit.]
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Make the changes necessary to detach TPM space code and TPM activation
+code out of the tpm_transmit() flow because of both of these can cause
+nested tpm_transmit() calls. The nesteds calls make the whole flow hard
+to maintain, and thus, it is better to just fix things now before this
+turns into a bigger mess.
 
-> On Thu, Nov 15, 2018 at 03:39:01PM +0000, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > Due to the way the effective SVE vector length is controlled and
->> > trapped at different exception levels, certain mismatches in the
->> > sets of vector lengths supported by different physical CPUs in the
->> > system may prevent straightforward virtualisation of SVE at parity
->> > with the host.
->> >
->> > This patch analyses the extent to which SVE can be virtualised
->> > safely without interfering with migration of vcpus between physical
->> > CPUs, and rejects late secondary CPUs that would erode the
->> > situation further.
->> >
->> > It is left up to KVM to decide what to do with this information.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > ---
->> >
->> > Changes since RFCv1:
->> >
->> >  * The analysis done by this patch is the same as in the previous
->> >    version, but the commit message the printks etc. have been reworded
->> >    to avoid the suggestion that KVM is expected to work on a system with
->> >    mismatched SVE implementations.
->> > ---
->> >  arch/arm64/include/asm/fpsimd.h |  1 +
->> >  arch/arm64/kernel/cpufeature.c  |  2 +-
->> >  arch/arm64/kernel/fpsimd.c      | 87 +++++++++++++++++++++++++++++++++++------
->> >  3 files changed, 76 insertions(+), 14 deletions(-)
->> >
->
-> [...]
->
->> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
->
-> [...]
->
->> > @@ -623,11 +629,8 @@ int sve_get_current_vl(void)
->
-> [...]
->
->> > +/* Bitmaps for temporary storage during manipulation of vector length sets */
->> > +static DECLARE_BITMAP(sve_tmp_vq_map, SVE_VQ_MAX);
->>
->> This seems odd as a local global, why not declared locally when used?
->
-> Could do.
->
-> My original concern was that this is "big" and therefore it's impolite
-> to allocate it on the stack.
->
-> But on reflection, 64 bytes of stack is no big deal for a 64-bit
-> architecture.  The affected functions probably spill more than than
-> already, and these functions are called on well-defined paths which
-> shouldn't have super-deep stacks already.
->
-> [...]
->
->> > @@ -658,24 +662,60 @@ void __init sve_init_vq_map(void)
->> >   */
->> >  void sve_update_vq_map(void)
->> >  {
->> > -	sve_probe_vqs(sve_secondary_vq_map);
->> > -	bitmap_and(sve_vq_map, sve_vq_map, sve_secondary_vq_map, SVE_VQ_MAX);
->> > +	sve_probe_vqs(sve_tmp_vq_map);
->> > +	bitmap_and(sve_vq_map, sve_vq_map, sve_tmp_vq_map,
->> > +		   SVE_VQ_MAX);
->> > +	bitmap_or(sve_vq_partial_map, sve_vq_partial_map, sve_tmp_vq_map,
->> > +		  SVE_VQ_MAX);
->> >  }
->>
->> I'm not quite following what's going on here. This is tracking both the
->> vector lengths available on all CPUs and the ones available on at least
->> one CPU? This raises a some questions:
->>
->>   - do such franken-machines exist or are expected to exit?
->
-> no, and yes respectively (Linux does not endorse the latter for now,
-> since it results in a non-SMP system: we hide the asymmetries where
-> possible by clamping the set of available vector lengths, but for
-> KVM it's too hard and we don't aim to support it at all).
->
-> Even if we don't recommend deploying a general-purpose OS on such a
-> system, people will eventually try it.  So it's better to fail safe
-> rather than silently doing the wrong thing.
->
->>   - how do we ensure this is always upto date?
->
-> This gets updated for each early secondary CPU that comes up.  (Early
-> secondaries' boot is serialised, so we shouldn't have to worry about
-> races here.)
->
-> The configuration is frozen by the time we enter userspace (hence
-> __ro_after_init).
->
-> Once all the early secondaries have come up, we commit to the best
-> possible set of vector lengths for the CPUs that we know about, and we
-> don't call this path any more: instead, each late secondary goes into
-> sve_verify_vq_map() instead to check that those CPUs are compatible
-> with the configuration we committed to.
->
-> For context, take a look at
-> arch/arm64/kernel/cpufeature.c:check_local_cpu_capabilities(), which is
-> the common entry point for all secondary CPUs: that splits into
-> update_cpu_capabilities() and verify_local_cpu_capabilities() paths for
-> the two cases described above, calling down into sve_update_vq_map()
-> and sve_verify_vq_map() as appropriate.
->
->>   - what happens when we hotplug a new CPU with less available VQ?
->
-> We reject the CPU and throw it back to the firmware (see
-> cpufeature.c:verify_sve_features()).
->
-> This follows the precedent already set in verify_local_cpu_capabilities()
-> etc.
+v8:
+* Re-add the check for ret < 0 after calling tpm_try_transmit() that
+  was dropped by mistake while moving code.
+* Fix error fallback for tpm_try_get_ops() when tpm_chip_start()
+  fails.
 
-I think a few words to that effect in the function comments would be
-helpful:
+v7:
+*  Reorganize series so that more trivial and self-contained changes are
+   in the head.
 
-  /*
-   * sve_update_vq_map only cares about CPUs at boot time and is called
-   * serially for each one. Any CPUs added later via hotplug will fail
-   * at sve_verify_vq_map if they don't match what is detected here.
-   */
+v6:
+* When tpm_validate_commmand() was moved to tpm2-space.c, the struct for
+  the TPM header was incorrectly declared as struct tpm_input_header.
+* Fix return value in tpm_validate_command().
 
->
->>
->> >
->> >  /* Check whether the current CPU supports all VQs in the committed set */
->> >  int sve_verify_vq_map(void)
->> >  {
->> > -	int ret = 0;
->> > +	int ret = -EINVAL;
->> > +	unsigned long b;
->> >
->> > -	sve_probe_vqs(sve_secondary_vq_map);
->> > -	bitmap_andnot(sve_secondary_vq_map, sve_vq_map, sve_secondary_vq_map,
->> > -		      SVE_VQ_MAX);
->> > -	if (!bitmap_empty(sve_secondary_vq_map, SVE_VQ_MAX)) {
->> > +	sve_probe_vqs(sve_tmp_vq_map);
->> > +
->> > +	bitmap_complement(sve_tmp_vq_map, sve_tmp_vq_map, SVE_VQ_MAX);
->> > +	if (bitmap_intersects(sve_tmp_vq_map, sve_vq_map, SVE_VQ_MAX)) {
->> >  		pr_warn("SVE: cpu%d: Required vector length(s) missing\n",
->> >  			smp_processor_id());
->> > -		ret = -EINVAL;
->> > +		goto error;
->>
->> The use of goto seems a little premature considering we don't have any
->> clean-up to do.
->
-> Hmm, this does look a little overengineered.  I think it may have been
-> more complex during development (making the gotos less redundant), but
-> to be honest I don't remember now.
->
-> I'm happy to get rid of the rather pointless ret variable and replace
-> all the gotos with returns if that works for you.
->
-> What do you think?
+v5:
+* Add the missing rev's from Stefan Berger.
 
-Yes please, that would be cleaner.
+v4:
+* Return 0 from pcrs_show() when tpm1_pcr_read() fails.
+* Fix error handling flow in tpm_try_transmit().
+* Replace struct tpm_input_header and struct tpm_output_header with
+  struct tpm_header.
 
---
-Alex Benn?e
+v3:
+* Encapsulate power gating code to tpm_chip_start() and tpm_chip_stop().
+* Move TPM power gating code and locking to tpm_try_get_ops() and
+  tpm_put_ops().
+* Call power gating code directly in tpm_chip_register() and
+  tpm2_del_space().
+
+v2:
+* Print tpm2_commit_space() error inside tpm2_commit_space()
+* Error code was not printed when recv() callback failed. It is
+  fixed in this version.
+* Added a patch that removes @space from tpm_transmit().
+* Fixed a regression in earlier series. Forgot to amend the change
+  from the staging area that renames NESTED to UNLOCKED in tpm2-space.c.
+
+
+Jarkko Sakkinen (17):
+  tpm: use tpm_buf in tpm_transmit_cmd() as the IO parameter
+  tpm: fix invalid return value in pubek_show()
+  tpm: return 0 from pcrs_show() when tpm1_pcr_read() fails
+  tpm: print tpm2_commit_space() error inside tpm2_commit_space()
+  tpm: declare struct tpm_header
+  tpm: access command header through struct in tpm_try_transmit()
+  tpm: encapsulate tpm_dev_transmit()
+  tpm: call tpm2_flush_space() on error in tpm_try_transmit()
+  tpm: clean up tpm_try_transmit() error handling flow
+  tpm: move tpm_validate_commmand() to tpm2-space.c
+  tpm: move TPM space code out of tpm_transmit()
+  tpm: remove @space from tpm_transmit()
+  tpm: use tpm_try_get_ops() in tpm-sysfs.c.
+  tpm: remove TPM_TRANSMIT_UNLOCKED flag
+  tpm: introduce tpm_chip_start() and tpm_chip_stop()
+  tpm: take TPM chip power gating out of tpm_transmit()
+  tpm: remove @flags from tpm_transmit()
+
+ drivers/char/tpm/tpm-chip.c       | 107 +++++++++++-
+ drivers/char/tpm/tpm-dev-common.c |  45 ++++-
+ drivers/char/tpm/tpm-interface.c  | 264 ++++++------------------------
+ drivers/char/tpm/tpm-sysfs.c      | 138 ++++++++++------
+ drivers/char/tpm/tpm.h            |  64 +++-----
+ drivers/char/tpm/tpm1-cmd.c       |  28 +---
+ drivers/char/tpm/tpm2-cmd.c       |  72 +++-----
+ drivers/char/tpm/tpm2-space.c     |  93 ++++++++---
+ drivers/char/tpm/tpm_i2c_atmel.c  |   5 +-
+ drivers/char/tpm/tpm_vtpm_proxy.c |  12 +-
+ drivers/char/tpm/xen-tpmfront.c   |   2 +-
+ 11 files changed, 407 insertions(+), 423 deletions(-)
+
+-- 
+2.19.1
