@@ -1,54 +1,58 @@
-From: jolly.shah@xilinx.com (Jolly Shah)
-Date: Fri, 16 Nov 2018 15:56:52 -0800
-Subject: [PATCH 2/9] dt-bindings: soc: Add ZynqMP PM bindings
-In-Reply-To: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-References: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-Message-ID: <1542412619-387-3-git-send-email-jollys@xilinx.com>
+From: ebiggers@kernel.org (Eric Biggers)
+Date: Fri, 16 Nov 2018 16:17:19 -0800
+Subject: [RFC PATCH v3 10/15] crypto: poly1305 - use structures for key
+ and accumulator
+In-Reply-To: <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
+References: <20181105232526.173947-1-ebiggers@kernel.org>
+ <20181105232526.173947-11-ebiggers@kernel.org>
+ <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
+ <20181112185816.GA8663@gmail.com>
+ <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
+Message-ID: <20181117001718.GA175522@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rajan Vaja <rajan.vaja@xilinx.com>
+Hi Herbert,
 
-Add documentation to describe Xilinx ZynqMP power management
-bindings.
+On Fri, Nov 16, 2018 at 02:02:27PM +0800, Herbert Xu wrote:
+> Hi Eric:
+> 
+> On Mon, Nov 12, 2018 at 10:58:17AM -0800, Eric Biggers wrote:
+> >
+> > I prefer separate types so that the type system enforces that a key is never
+> > accidentally used as an accumulator, and vice versa.  Then the poly1305_core_*
+> > functions will be harder to misuse, and the Poly1305 MAC implementations harder
+> > to get wrong.
+> > 
+> > The key also has certain bits clear whereas the accumulator does not.  In the
+> > future, the Poly1305 C implementation might use base 2^32 and take advantage of
+> > this.  In that case, the two inputs to each multiplication won't be
+> > interchangeable, so using the same type for both would be extra confusing.
+> > 
+> > Having a poly1305_val nested inside poly1305_key and poly1305_state would work,
+> > but seemed excessive.
+> 
+> So it looks like there are no more unresolved issues with this
+> patch series.  Please let me know when you want it to go in.
+> 
 
-Signed-off-by: Rajan Vaja <rajan.vaja@xilinx.com>
-Signed-off-by: Jolly Shah <jollys@xilinx.com>
----
- .../bindings/power/reset/xlnx,zynqmp-power.txt     | 25 ++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
+I believe it's ready to go in.  I'll need to rebase it onto cryptodev, to
+resolve some small conflicts with the recent ChaCha20-related changes.  Also
+I'll probably omit the fscrypt patch (patch 15/15) so that that patch can be
+taken through the fscrypt tree instead.
 
-diff --git a/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
-new file mode 100644
-index 0000000..d366f1e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
-@@ -0,0 +1,25 @@
-+--------------------------------------------------------------------
-+Device Tree Bindings for the Xilinx Zynq MPSoC Power Management
-+--------------------------------------------------------------------
-+The zynqmp-power node describes the power management configurations.
-+It will control remote suspend/shutdown interfaces.
-+
-+Required properties:
-+ - compatible:		Must contain:	"xlnx,zynqmp-power"
-+ - interrupts:		Interrupt specifier
-+
-+-------
-+Example
-+-------
-+
-+firmware {
-+	zynqmp_firmware: zynqmp-firmware {
-+		compatible = "xlnx,zynqmp-firmware";
-+		method = "smc";
-+
-+		zynqmp_power: zynqmp-power {
-+			compatible = "xlnx,zynqmp-power";
-+			interrupts = <0 35 4>;
-+		};
-+	};
-+};
--- 
-2.7.4
+Do you prefer that this be merged before or after Zinc?  It seems it may still
+be a while before the community is satisfied with Zinc (and Wireguard which is
+in the same patchset), and I don't want this blocked unnecessarily...  So on my
+part I'd prefer to just have this merged as-is.
+
+Of course, it's always possible to change the xchacha12 and xchacha20
+implementations later, whether that's to use "Zinc" or otherwise.  And
+NHPoly1305 and Adiantum itself will be the same either way, except that the
+Poly1305 helpers may change slightly.
+
+What do you think?
+
+Thanks!
+
+- Eric
