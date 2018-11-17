@@ -1,29 +1,119 @@
-From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Sat, 17 Nov 2018 14:47:15 +0800
-Subject: [PATCH V3 1/7] net: lorawan: Add macro and definition for LoRaWAN
-In-Reply-To: <aaee242e-a287-9db6-4374-73f2ee9fc9d2@suse.de>
-References: <20181105.101610.1437737564548154497.davem@davemloft.net>
- <20181114160126.4445-2-starnight@g.ncu.edu.tw>
- <aaee242e-a287-9db6-4374-73f2ee9fc9d2@suse.de>
-Message-ID: <CAC=mGzh=caPcg-98vCUx+tEsb482cWtw3TonXS=ARhssj3Tcaw@mail.gmail.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Sat, 17 Nov 2018 12:26:38 +0530
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <20181116182836.GB17088@rapoport-lnx>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+ <20181116182836.GB17088@rapoport-lnx>
+Message-ID: <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> ? 2018?11?15? ?? ??12:12???
+On Fri, Nov 16, 2018 at 11:59 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
 >
-> Am 14.11.18 um 17:01 schrieb Jian-Hong Pan:
-> > This patch adds the macro and definition for the implementation of
-> > LoRaWAN protocol.
+> On Thu, Nov 15, 2018 at 09:15:30PM +0530, Souptick Joarder wrote:
+> > Previouly drivers have their own way of mapping range of
+> > kernel pages/memory into user vma and this was done by
+> > invoking vm_insert_page() within a loop.
 > >
-> > Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+> > As this pattern is common across different drivers, it can
+> > be generalized by creating a new function and use it across
+> > the drivers.
+> >
+> > vm_insert_range is the new API which will be used to map a
+> > range of kernel memory/pages to user vma.
+> >
+> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> > Reviewed-by: Matthew Wilcox <willy@infradead.org>
 > > ---
-> > V2:
-> > - Modify the commit message
+> >  include/linux/mm_types.h |  3 +++
+> >  mm/memory.c              | 28 ++++++++++++++++++++++++++++
+> >  mm/nommu.c               |  7 +++++++
+> >  3 files changed, 38 insertions(+)
+> >
+> > diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> > index 5ed8f62..15ae24f 100644
+> > --- a/include/linux/mm_types.h
+> > +++ b/include/linux/mm_types.h
+> > @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
+> >  extern void tlb_finish_mmu(struct mmu_gather *tlb,
+> >                               unsigned long start, unsigned long end);
+> >
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count);
+> > +
+> >  static inline void init_tlb_flush_pending(struct mm_struct *mm)
+> >  {
+> >       atomic_set(&mm->tlb_flush_pending, 0);
+> > diff --git a/mm/memory.c b/mm/memory.c
+> > index 15c417e..da904ed 100644
+> > --- a/mm/memory.c
+> > +++ b/mm/memory.c
+> > @@ -1478,6 +1478,34 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+> >  }
+> >
+> >  /**
+> > + * vm_insert_range - insert range of kernel pages into user vma
+> > + * @vma: user vma to map to
+> > + * @addr: target user address of this page
+> > + * @pages: pointer to array of source kernel pages
+> > + * @page_count: no. of pages need to insert into user vma
+> > + *
+> > + * This allows drivers to insert range of kernel pages they've allocated
+> > + * into a user vma. This is a generic function which drivers can use
+> > + * rather than using their own way of mapping range of kernel pages into
+> > + * user vma.
 >
-> Note that both v2 and v3 don't seem to be based on the latest lora-next
-> branch, as your constants are already queued and used there.
+> Please add the return value and context descriptions.
+>
+> > + */
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count)
+> > +{
+> > +     unsigned long uaddr = addr;
+> > +     int ret = 0, i;
+> > +
+> > +     for (i = 0; i < page_count; i++) {
+> > +             ret = vm_insert_page(vma, uaddr, pages[i]);
+> > +             if (ret < 0)
+> > +                     return ret;
+> > +             uaddr += PAGE_SIZE;
+> > +     }
+> > +
+> > +     return ret;
+> > +}
+> > +
+> > +/**
+> >   * vm_insert_page - insert single page into user vma
+> >   * @vma: user vma to map to
+> >   * @addr: target user address of this page
+> > diff --git a/mm/nommu.c b/mm/nommu.c
+> > index 749276b..d6ef5c7 100644
+> > --- a/mm/nommu.c
+> > +++ b/mm/nommu.c
+> > @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+> >  }
+> >  EXPORT_SYMBOL(vm_insert_page);
+> >
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count)
+> > +{
+> > +     return -EINVAL;
+> > +}
+> > +EXPORT_SYMBOL(vm_insert_range);
+> > +
+> >  /*
+> >   *  sys_brk() for the most part doesn't need the global kernel
+> >   *  lock, except when an application is doing something nasty
+> > --
+> > 1.9.1
+> >
+>
+> --
+> Sincerely yours,
+> Mike.
+>
 
-Oh!  I see the commits now.  V4 patch set will follow the latest branch.
+Sure I will wait for some time to get additional review comments and
+add all of those requested changes in v2.
 
-Thanks,
-Jian-Hong Pan
+Any further feedback on driver changes as part of this patch series ?
