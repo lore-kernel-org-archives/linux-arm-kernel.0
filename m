@@ -1,88 +1,77 @@
-From: gmazyland@gmail.com (Milan Broz)
-Date: Sat, 17 Nov 2018 11:29:23 +0100
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <20181116215249.GA27149@gmail.com>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
- <20181019190411.GB246441@gmail.com>
- <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
- <20181116215249.GA27149@gmail.com>
-Message-ID: <56883f08-26cb-ecef-5698-1c2948714773@gmail.com>
+From: abailon@baylibre.com (abailon at baylibre.com)
+Date: Sat, 17 Nov 2018 12:19:03 +0100
+Subject: [RFC PATCH 0/2] iMX7ULP interconnect framework
+Message-ID: <20181117111905.29091-1-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/2018 22:52, Eric Biggers wrote:
-> Hi Milan,
-> 
-> On Sat, Oct 20, 2018 at 12:26:20PM +0200, Milan Broz wrote:
->>
->> Adiantum (as in your current git branches on kernel.org) can be used for dm-crypt
->> without any changes (yes, I played with it :) and with some easy tricks directly
->> through cryptsetup/LUKS as well.
->>
->> I think we should have this as an alternative to length-preserving wide-block
->> cipher modes for FDE.
->>
-> 
-> Yes, dm-crypt can use Adiantum by specifying the cipher as
-> "capi:adiantum(xchacha12,aes)-plain64".
-> 
-> But, I'm having trouble getting cryptsetup/LUKS to use Adiantum.
-> Using LUKS1, the following works:
-> 
->     cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256
-> 
-> However, when possible we'd like people to use 4K sectors for better
-> performance, which I understand requires using the LUKS2 format along with
-> cryptsetup v2.0.0+ and Linux v4.12+.  But the following does *not* work:
-> 
->     cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256 --type luks2 --sector-size 4096
+From: Alexandre Bailon <abailon@abailon.com>
 
-Hi Eric,
+The goal of this patchset is to use the interconnect framework
+for iMX7ULP SoC.
+This is sent as a RFC because I think the driver could be more generic,
+and, I had some issues with the clocks and I know the way I dealt with
+it is probably not the best one.
+In addition, this patchset has been written and tested on older kernel
+(4.9), and I don't expect it to applies / works on upstream kernel
+(the support of SoC itself is still not there).
 
-actually I planned to test it and then reply to these patches with example cryptsetup
-commands, but did not have time for it yet.
-So thanks for a reminder ;-)
+There are two interconnects, NIC0 and NIC1:
 
-Recent cryptsetup supports sector-size even for plain device.
+     //==============================\\
+     || --------------------          ||
+     \\=|m0              s0|=         ||
+       =|m1              s1|===\\     ||
+       =|m2     NIC0     s2|=   ||    ||
+       =|m3                |    ||    ||
+       =|m4                |    ||    ||
+        --------------------    ||    ||
+            //=================//     ||      
+            ||  --------------------  ||
+            \\==|m0              s0|=//
+               =|m1              s1|=
+               =|m2    NIC1      s2|=
+               =|m3              s4|=
+               =|m4              s5|=
+               =|m5                |
+                --------------------
 
-You actually do not need to use capi: prefix, Adiantum is a composition,
-so "xchacha20,aes-adiantum-plain64" works as well (and it should work even for old cryptsetup).
-(It is ugly, but it should be compatible.)
+     -------          -------          
+NIC0 | DIV | NIC0 DIV | DIV | NIC1 DIV 
+-----|     |----------|     |---------
+     -------          -------
 
-# cryptsetup open --type plain -c xchacha20,aes-adiantum-plain64 -s 256 --sector-size 4096 /dev/sdb test
+Although NIC0 and NIC1 are interconnected, some requests could apply to
+only one of them. This could cause some issues with clock.
+Basically, scaling the frequency of NIC0 will also scale the frequency of
+NIC1, so we have to update both of them.
+Simillarly, updating the frequency of NIC1 may also require to change NIC0
+frequency.
+In order to easily deal with it, the driver create only one device for the
+two interconnects, and update clock frequency of both interconnects at same
+time, when the last node is reached.
 
-For LUKS and benchmark, Adiantum need to use 32 bytes IV. And we have these parameter,
-unfortunately, hardcoded...
-(I guess there is already a way how to get this dynamically from userspace crypto API now.)
+Ideally, we would have two device, which would make the driver more
+generic, but currently, I'm not sure how to make sure that the clocks are
+always at the expected frequency. Doing that would give us the possiblity to
+use the driver for other iMX SoC (would just require to add the bus topology 
+for that SoC).
 
-So, I already added patch to devel branch patch for benchmark to support Adiantum few days ago
-https://gitlab.com/cryptsetup/cryptsetup/commit/bce567db461e558af7d735c694a50146db899709
+Alexandre Bailon (2):
+  Add support of imx7ulp to interconnect framework
+  dt-bindings: interconnect: Document imx7ulp interconnect bindings
 
-This allows trivial benchmark (but it just encrypts one big blob of data):
+ .../bindings/interconnect/imx7ulp.txt         |  17 +
+ drivers/interconnect/Kconfig                  |   1 +
+ drivers/interconnect/Makefile                 |   1 +
+ drivers/interconnect/imx/Kconfig              |   9 +
+ drivers/interconnect/imx/Makefile             |   1 +
+ drivers/interconnect/imx/imx7ulp.c            | 369 ++++++++++++++++++
+ 6 files changed, 398 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interconnect/imx7ulp.txt
+ create mode 100644 drivers/interconnect/imx/Kconfig
+ create mode 100644 drivers/interconnect/imx/Makefile
+ create mode 100644 drivers/interconnect/imx/imx7ulp.c
 
-#  cryptsetup benchmark -c xchacha20,aes-adiantum -s 256
-# Tests are approximate using memory only (no storage IO).
-#            Algorithm |       Key |      Encryption |      Decryption
-xchacha20,aes-adiantum        256b       146.6 MiB/s       148.0 MiB/s
-...
-
-# ./cryptsetup benchmark -c xchacha12,aes-adiantum -s 256
-xchacha12,aes-adiantum        256b       181.7 MiB/s       184.6 MiB/s
-
-For LUKS2, we need a similar change to cryptoAPI IV size (unfortunately it does not
-fallback to old keyslot handling, so LUKS2 does not work currently now).
-
-I quickly added a workaround that fallbacks to default keyslot encryption for keyslots
-in this case
-https://gitlab.com/cryptsetup/cryptsetup/commit/29e87add5aac9d5eb0087881146988d9c4280915
-
-then you can use LUKS2
-# cryptsetup luksFormat --type luks2 --sector-size 4096 -c xchacha20,aes-adiantum-plain64 -s 256 /dev/sdb
-
-(Example above will encrypt keyslots with AES-XTS and use Aviantum for data only.)
-
-So, unfortunately yes, we need some small changes in cryptsetup for LUKS;
-plain mode should work out of the box (with the syntax above).
-
-Milan
+-- 
+2.18.1
