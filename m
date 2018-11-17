@@ -1,33 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 17 Nov 2018 10:03:05 -0600
-Subject: [PATCH v2 02/17] dt-bindings: olpc,xo1.75-ec: Add OLPC XO-1.75
- EC bindings
-In-Reply-To: <20181116162403.49854-3-lkundrak@v3.sk>
-References: <20181116162403.49854-1-lkundrak@v3.sk>
- <20181116162403.49854-3-lkundrak@v3.sk>
-Message-ID: <20181117160305.GA31494@bogus>
+Date: Sat, 17 Nov 2018 10:04:43 -0600
+Subject: [PATCH v1 2/2] dt-bindings: pinctrl: update bindings for MT7629
+ SoC
+In-Reply-To: <46ee25bb5ac7a7aa0245e2b02e9a0e870ff09551.1541986223.git.ryder.lee@mediatek.com>
+References: <5d63d26156d2972b7e9f55c9743b66d7c6dac2ec.1541986223.git.ryder.lee@mediatek.com>
+ <46ee25bb5ac7a7aa0245e2b02e9a0e870ff09551.1541986223.git.ryder.lee@mediatek.com>
+Message-ID: <20181117160443.GA1462@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2018 17:23:48 +0100, Lubomir Rintel wrote:
-> The OLPC XO-1.75 Embedded Controller is a SPI master that uses extra
-> signals for handshaking. It needs to know when is the slave (Linux)
-> side's TX FIFO ready for transfer (the ready-gpio signal on the SPI
-> controller node) and when does it wish to respond with a command (the
-> cmd-gpio property).
+On Mon, 12 Nov 2018 09:45:06 +0800, Ryder Lee wrote:
+> This updates bindings for MT7629 pinctrl driver.
 > 
-> Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> 
+> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
 > ---
 > Changes since v1:
-> - s/cmd-gpio/cmd-gpios/
-> - s/ready-gpio/ready-gpios/ in the documentation paragraph
-> - Remove status = "okay" from the example
-> 
->  .../bindings/misc/olpc,xo1.75-ec.txt          | 23 +++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/misc/olpc,xo1.75-ec.txt
+> -add new function for wifi.
+> -add more descriptions.
+> ---
+>  .../devicetree/bindings/pinctrl/pinctrl-mt7622.txt | 131 +++++++++++++++++++++
+>  1 file changed, 131 insertions(+)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
