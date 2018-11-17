@@ -1,27 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 17 Nov 2018 13:19:16 +0100
-Subject: [PATCH 2/2] pinctrl: rockchip: add rk3188 routes to switch
- between nand and emmc
-In-Reply-To: <20181111210047.30375-2-heiko@sntech.de>
-References: <20181111210047.30375-1-heiko@sntech.de>
- <20181111210047.30375-2-heiko@sntech.de>
-Message-ID: <CACRpkdZO852hScSgCGQVspcLSCK99B5ofM9mNkGUj-uQHwfS+g@mail.gmail.com>
+Date: Sat, 17 Nov 2018 13:27:05 +0100
+Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
+ definitions
+In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
+References: <20181113060111.16374-1-vigneshr@ti.com>
+ <20181113060111.16374-2-vigneshr@ti.com>
+Message-ID: <CACRpkdYtvD+unm9sCRxJ1DYWM1viC8Pc6ge2TpRHYko4u0Ah3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 11, 2018 at 10:01 PM Heiko Stuebner <heiko@sntech.de> wrote:
+On Tue, Nov 13, 2018 at 7:00 AM Vignesh R <vigneshr@ti.com> wrote:
 
-> From: Heiko Stuebner <heiko.stuebner@bq.com>
+> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
+> defining pinmux configs in human readable form, instead of raw-coded
+> hex values.
 >
-> The rk3188 has pins that are not handled through the regular iomuxing
-> for handling either nand-flash or an emmc and are set through only one
-> specifal setting. So utilize the routing function to simply do that
-> setting depending on one of the core nand/emmc signals that are actually
-> regular pins handled through pinctrl.
->
-> Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-Patch applied.
+I guess you want to merge this through ARM SoC along witg the other
+patches so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
