@@ -1,83 +1,27 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 17 Nov 2018 10:05:02 -0600
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
-Message-ID: <20181117160502.dhlqbx5qnmdp5iog@kahuna>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 17 Nov 2018 10:06:03 -0600
+Subject: [PATCH v1 1/2] dt-bindings: i2c-stm32: SYSCFG Fast Mode Plus
+ support for I2C STM32F7
+In-Reply-To: <1542370822-14721-2-git-send-email-pierre-yves.mordret@st.com>
+References: <1542370822-14721-1-git-send-email-pierre-yves.mordret@st.com>
+ <1542370822-14721-2-git-send-email-pierre-yves.mordret@st.com>
+Message-ID: <20181117160603.GA3681@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:31-20181113, Vignesh R wrote:
-> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
-> defining pinmux configs in human readable form, instead of raw-coded
-> hex values.
+On Fri, 16 Nov 2018 13:20:21 +0100, Pierre-Yves MORDRET wrote:
+> Append optional bindings to update SYSCFG Fast Mode Plus bits if
+> Fast Mode Plus speed is selected.
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
 > ---
->  MAINTAINERS                      |  1 +
->  include/dt-bindings/pinctrl/k3.h | 35 ++++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+)
->  create mode 100644 include/dt-bindings/pinctrl/k3.h
+>   Version history:
+>     v1:
+>        * Initial
+> ---
+> ---
+>  Documentation/devicetree/bindings/i2c/i2c-stm32.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index fa45ff36fde9..1574ad6d7ead 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -2204,6 +2204,7 @@ S:	Supported
->  F:	Documentation/devicetree/bindings/arm/ti/k3.txt
->  F:	arch/arm64/boot/dts/ti/Makefile
->  F:	arch/arm64/boot/dts/ti/k3-*
-> +F:	include/dt-bindings/pinctrl/k3.h
->  
->  ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
->  M:	Santosh Shilimkar <ssantosh@kernel.org>
-> diff --git a/include/dt-bindings/pinctrl/k3.h b/include/dt-bindings/pinctrl/k3.h
-> new file mode 100644
-> index 000000000000..463d845a9b36
-> --- /dev/null
-> +++ b/include/dt-bindings/pinctrl/k3.h
-> @@ -0,0 +1,35 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * This header provides constants for pinctrl bindings for TI's K3 SoC
-> + * family.
-> + *
-> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
-> + */
-> +#ifndef _DT_BINDINGS_PINCTRL_TI_K3_H
-> +#define _DT_BINDINGS_PINCTRL_TI_K3_H
-> +
-> +#define PULLUDEN_SHIFT		(16)
-> +#define PULLTYPESEL_SHIFT	(17)
-> +#define RXACTIVE_SHIFT		(18)
-> +
-> +#define PULL_DISABLE		(1 << PULLUDEN_SHIFT)
-> +#define PULL_ENABLE		(0 << PULLUDEN_SHIFT)
-> +
-> +#define PULL_UP			(1 << PULLTYPESEL_SHIFT | PULL_ENABLE)
-> +#define PULL_DOWN		(0 << PULLTYPESEL_SHIFT | PULL_ENABLE)
-> +
-> +#define INPUT_EN		(1 << RXACTIVE_SHIFT)
-> +#define INPUT_DISABLE		(0 << RXACTIVE_SHIFT)
-> +
-> +/* Only these macros are expected be used directly in device tree files */
-> +#define PIN_OUTPUT		(INPUT_DISABLE | PULL_DISABLE)
-> +#define PIN_OUTPUT_PULLUP	(INPUT_DISABLE | PULL_UP)
-> +#define PIN_OUTPUT_PULLDOWN	(INPUT_DISABLE | PULL_DOWN)
-> +#define PIN_INPUT		(INPUT_EN | PULL_DISABLE)
-> +#define PIN_INPUT_PULLUP	(INPUT_EN | PULL_UP)
-> +#define PIN_INPUT_PULLDOWN	(INPUT_EN | PULL_DOWN)
 
-
-Thanks for reducing the combinations down to the minimum needed. We can
-worry about the DS and isolation bits when we have a real user for them.
-
-Acked-by: Nishanth Menon <nm@ti.com>
-
-Tero: v4.21-rc1 perhaps ?
-
--- 
-Regards,
-Nishanth Menon
+Reviewed-by: Rob Herring <robh@kernel.org>
