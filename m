@@ -1,40 +1,123 @@
-From: starnight@g.ncu.edu.tw (Jian-Hong Pan)
-Date: Sat, 17 Nov 2018 22:54:08 +0800
-Subject: [PATCH V3 2/7] net: lorawan: Add LoRaWAN socket module
-In-Reply-To: <20181116.203200.1638720313402188457.davem@davemloft.net>
-References: <20181105.101610.1437737564548154497.davem@davemloft.net>
- <20181114160126.4445-3-starnight@g.ncu.edu.tw>
- <20181116.203200.1638720313402188457.davem@davemloft.net>
-Message-ID: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Sat, 17 Nov 2018 08:56:11 -0600
+Subject: [v3, PATCH 2/2] dt-binding: mediatek-dwmac: add binding document
+ for MediaTek MT2712 DWMAC
+In-Reply-To: <1542359926-28800-2-git-send-email-biao.huang@mediatek.com>
+References: <1542359926-28800-1-git-send-email-biao.huang@mediatek.com>
+ <1542359926-28800-2-git-send-email-biao.huang@mediatek.com>
+Message-ID: <20181117145611.GA26013@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David Miller <davem@davemloft.net> ? 2018?11?17? ?? ??12:32???
->
-> From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-> Date: Thu, 15 Nov 2018 00:01:23 +0800
->
-> > +#define      lrw_get_mac_cb(skb)     ((struct lrw_mac_cb *)skb->cb)
->
-> Please make this a static inline function.  If the identifier is all lowercase
-> programmers expect it to be real code not a CPP macro.
+On Fri, Nov 16, 2018 at 05:18:46PM +0800, Biao Huang wrote:
+> The commit adds the device tree binding documentation for the MediaTek DWMAC
+> found on MediaTek MT2712.
+> 
+> Change-Id: I3728666bf65927164bd82fa8dddb90df8270bd44
+> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> ---
+>  .../devicetree/bindings/net/mediatek-dwmac.txt     |   77 ++++++++++++++++++++
+>  1 file changed, 77 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/mediatek-dwmac.txt b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+> new file mode 100644
+> index 0000000..7fd56e0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+> @@ -0,0 +1,77 @@
+> +MediaTek DWMAC glue layer controller
+> +
+> +This file documents platform glue layer for stmmac.
+> +Please see stmmac.txt for the other unchanged properties.
+> +
+> +The device node has following properties.
+> +
+> +Required properties:
+> +- compatible:  Should be "mediatek,mt2712-gmac" for MT2712 SoC
+> +- reg:  Address and length of the register set for the device
+> +- interrupts:  Should contain the MAC interrupts
 
-Okay!  Sure
+How many?
 
-> > +#define      LORAWAN_MODULE_NAME     "lorawan"
-> > +
-> > +#define      LRW_DBG_STR(fmt)        LORAWAN_MODULE_NAME": "fmt
-> > +#define      lrw_info(fmt, ...)      (pr_info(LRW_DBG_STR(fmt), ##__VA_ARGS__))
-> > +#define      lrw_dbg(fmt, ...)       (pr_debug(LRW_DBG_STR(fmt), ##__VA_ARGS__))
->
-> Just define "pr_fmt()" appropriately and you don't need to play these kinds
-> of games.
->
-> Set pr_fmt() and call pr_info() and pr_debug() directly.
+> +- interrupt-names: Should contain a list of interrupt names corresponding to
+> +	the interrupts in the interrupts property, if available.
+> +	Should be "macirq" for the main MAC IRQ
+> +- clocks: Must contain a phandle for each entry in clock-names.
+> +- clock-names: The name of the clock listed in the clocks property. These are
+> +	"axi", "apb", "mac_ext", "mac_parent", "ptp_ref", "ptp_parent", "ptp_top"
+> +	for MT2712 SoC
 
-After checking printk.h again, I get the idea of the comment.
-"pr_fmt()" is more convenient!
+Clocks should represent the physical clocks connected to a block. Parent 
+clocks are not in that category.
 
-Thanks for the reviewing.  I will make new patches.
+> +- mac-address: See ethernet.txt in the same directory
+> +- phy-mode: See ethernet.txt in the same directory
+> +
+> +Optional properties:
+> +- tx-delay: TX clock delay macro value. Range is 0~31. Default is 0.
+> +	It should be defined for rgmii/rgmii-rxid/mii interface.
+> +- rx-delay: RX clock delay macro value. Range is 0~31. Default is 0.
+> +	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
+> +- fine-tune: This property will select coarse-tune delay or fine delay
+> +	for rgmii interface.
+> +	If fine-tune delay is enabled, tx-delay/rx-delay is 170+/-50ps
+> +	per stage.
+> +	Else coarse-tune delay is enabled, tx-delay/rx-delay is 0.55+/-0.2ns
+> +	per stage.
+> +	This property do not apply to non-rgmii PHYs.
+> +	Only coarse-tune delay is supported for mii/rmii PHYs.
 
-Jian-Hong Pan
+Perhaps the delays should be in ps and the driver can figure out 
+fine-tune or not based on the value.
+
+> +- rmii-rxc: Reference clock of rmii is from external PHYs,
+> +	and it can be connected to TXC or RXC pin on MT2712 SoC.
+> +	If ref_clk <--> TXC, disable it.
+> +	Else ref_clk <--> RXC, enable it.
+> +- txc-inverse: Inverse tx clock for mii/rgmii.
+> +	Inverse tx clock inside MAC relative to reference clock for rmii,
+> +	and it rarely happen.
+> +- rxc-inverse: Inverse rx clock for mii/rgmii interfaces.
+> +	Inverse reference clock for rmii.
+
+These should all have vendor prefixes. 'snps' if these are all standard 
+GMAC controls or 'mediatek' if Mediatek specific.
+
+> +
+> +Example:
+> +	eth: ethernet at 1101c000 {
+> +		compatible = "mediatek,mt2712-gmac";
+> +		reg = <0 0x1101c000 0 0x1300>;
+> +		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
+> +		interrupt-names = "macirq";
+> +		phy-mode ="rgmii-id";
+> +		mac-address = [00 55 7b b5 7d f7];
+> +		clock-names = "axi",
+> +			      "apb",
+> +			      "mac_ext",
+> +			      "mac_parent",
+> +			      "ptp_ref",
+> +			      "ptp_parent",
+> +			      "ptp_top";
+> +		clocks = <&pericfg CLK_PERI_GMAC>,
+> +			 <&pericfg CLK_PERI_GMAC_PCLK>,
+> +			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
+> +			 <&topckgen CLK_TOP_ETHERPLL_125M>,
+> +			 <&topckgen CLK_TOP_ETHER_50M_SEL>,
+> +			 <&topckgen CLK_TOP_APLL1_D3>,
+> +			 <&topckgen CLK_TOP_APLL1>;
+> +		snps,txpbl = <32>;
+> +		snps,rxpbl = <32>;
+> +		snps,reset-gpio = <&pio 87 GPIO_ACTIVE_LOW>;
+> +		snps,reset-active-low;
+> +		tx-delay = <9>;
+> +		rx-delay = <9>;
+> +		fine-tune;
+> +		rmii-rxc;
+> +		txc-inverse;
+> +		rxc-inverse;
+> +	};
+> -- 
+> 1.7.9.5
+> 
