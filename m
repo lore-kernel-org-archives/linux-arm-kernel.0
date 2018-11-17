@@ -1,175 +1,121 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Sat, 17 Nov 2018 10:35:42 +0800
-Subject: [PATCH v3 15/15] iommu/mediatek: Switch to SPDX license identifier
+Date: Sat, 17 Nov 2018 10:35:29 +0800
+Subject: [PATCH v3 02/15] iommu/mediatek: Use a struct as the platform data
 In-Reply-To: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
 References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1542422142-30688-16-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1542422142-30688-3-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to SPDX license identifier for MediaTek iommu/smi and their
-header files.
+Use a struct as the platform special data instead of the enumeration.
+This is a prepare patch for adding mt8183 iommu support.
 
 Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- drivers/iommu/mtk_iommu.c                     |  9 +--------
- drivers/iommu/mtk_iommu.h                     | 10 +---------
- drivers/iommu/mtk_iommu_v1.c                  | 10 +---------
- drivers/memory/mtk-smi.c                      | 10 +---------
- include/dt-bindings/memory/mt2701-larb-port.h | 10 +---------
- include/dt-bindings/memory/mt8173-larb-port.h | 10 +---------
- include/soc/mediatek/smi.h                    | 10 +---------
- 7 files changed, 7 insertions(+), 62 deletions(-)
+ drivers/iommu/mtk_iommu.c | 24 ++++++++++++++++--------
+ drivers/iommu/mtk_iommu.h |  6 +++++-
+ 2 files changed, 21 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index 5775e8f..01fe39f 100644
+index 44bd5b9..a8d85c8 100644
 --- a/drivers/iommu/mtk_iommu.c
 +++ b/drivers/iommu/mtk_iommu.c
-@@ -1,15 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/memblock.h>
- #include <linux/bug.h>
+@@ -54,7 +54,7 @@
+ #define REG_MMU_CTRL_REG			0x110
+ #define F_MMU_PREFETCH_RT_REPLACE_MOD		BIT(4)
+ #define F_MMU_TF_PROTECT_SEL_SHIFT(data) \
+-	((data)->m4u_plat == M4U_MT2712 ? 4 : 5)
++	((data)->plat_data->m4u_plat == M4U_MT2712 ? 4 : 5)
+ /* It's named by F_MMU_TF_PROT_SEL in mt2712. */
+ #define F_MMU_TF_PROTECT_SEL(prot, data) \
+ 	(((prot) & 0x3) << F_MMU_TF_PROTECT_SEL_SHIFT(data))
+@@ -517,7 +517,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	}
+ 
+ 	regval = F_MMU_TF_PROTECT_SEL(2, data);
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		regval |= F_MMU_PREFETCH_RT_REPLACE_MOD;
+ 	writel_relaxed(regval, data->base + REG_MMU_CTRL_REG);
+ 
+@@ -538,14 +538,14 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 		F_INT_PRETETCH_TRANSATION_FIFO_FAULT;
+ 	writel_relaxed(regval, data->base + REG_MMU_INT_MAIN_CONTROL);
+ 
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		regval = (data->protect_base >> 1) | (data->enable_4GB << 31);
+ 	else
+ 		regval = lower_32_bits(data->protect_base) |
+ 			 upper_32_bits(data->protect_base);
+ 	writel_relaxed(regval, data->base + REG_MMU_IVRP_PADDR);
+ 
+-	if (data->enable_4GB && data->m4u_plat != M4U_MT8173) {
++	if (data->enable_4GB && data->plat_data->m4u_plat != M4U_MT8173) {
+ 		/*
+ 		 * If 4GB mode is enabled, the validate PA range is from
+ 		 * 0x1_0000_0000 to 0x1_ffff_ffff. here record bit[32:30].
+@@ -556,7 +556,7 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	writel_relaxed(0, data->base + REG_MMU_DCM_DIS);
+ 
+ 	/* It's MISC control register whose default value is ok except mt8173.*/
+-	if (data->m4u_plat == M4U_MT8173)
++	if (data->plat_data->m4u_plat == M4U_MT8173)
+ 		writel_relaxed(0, data->base + REG_MMU_STANDARD_AXI_MODE);
+ 
+ 	if (devm_request_irq(data->dev, data->irq, mtk_iommu_isr, 0,
+@@ -589,7 +589,7 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+ 	if (!data)
+ 		return -ENOMEM;
+ 	data->dev = dev;
+-	data->m4u_plat = (enum mtk_iommu_plat)of_device_get_match_data(dev);
++	data->plat_data = of_device_get_match_data(dev);
+ 
+ 	/* Protect memory. HW will access here while translation fault.*/
+ 	protect = devm_kzalloc(dev, MTK_PROTECT_PA_ALIGN * 2, GFP_KERNEL);
+@@ -733,9 +733,17 @@ static int __maybe_unused mtk_iommu_resume(struct device *dev)
+ 	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(mtk_iommu_suspend, mtk_iommu_resume)
+ };
+ 
++static const struct mtk_iommu_plat_data mt2712_data = {
++	.m4u_plat = M4U_MT2712,
++};
++
++static const struct mtk_iommu_plat_data mt8173_data = {
++	.m4u_plat = M4U_MT8173,
++};
++
+ static const struct of_device_id mtk_iommu_of_ids[] = {
+-	{ .compatible = "mediatek,mt2712-m4u", .data = (void *)M4U_MT2712},
+-	{ .compatible = "mediatek,mt8173-m4u", .data = (void *)M4U_MT8173},
++	{ .compatible = "mediatek,mt2712-m4u", .data = &mt2712_data},
++	{ .compatible = "mediatek,mt8173-m4u", .data = &mt8173_data},
+ 	{}
+ };
+ 
 diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
-index dfe9a07..d8bfba5 100644
+index 778498b..333a0ef 100644
 --- a/drivers/iommu/mtk_iommu.h
 +++ b/drivers/iommu/mtk_iommu.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
+@@ -41,6 +41,10 @@ enum mtk_iommu_plat {
+ 	M4U_MT8173,
+ };
  
- #ifndef _MTK_IOMMU_H_
-diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-index 27867b8..6571e5c 100644
---- a/drivers/iommu/mtk_iommu_v1.c
-+++ b/drivers/iommu/mtk_iommu_v1.c
-@@ -1,17 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-  *
-  * Based on driver/iommu/mtk_iommu.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/memblock.h>
- #include <linux/bug.h>
-diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-index e0265fe..30a3e00 100644
---- a/drivers/memory/mtk-smi.c
-+++ b/drivers/memory/mtk-smi.c
-@@ -1,15 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #include <linux/clk.h>
- #include <linux/component.h>
-diff --git a/include/dt-bindings/memory/mt2701-larb-port.h b/include/dt-bindings/memory/mt2701-larb-port.h
-index 6764d74..c511f0f 100644
---- a/include/dt-bindings/memory/mt2701-larb-port.h
-+++ b/include/dt-bindings/memory/mt2701-larb-port.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015 MediaTek Inc.
-  * Author: Honghui Zhang <honghui.zhang@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
++struct mtk_iommu_plat_data {
++	enum mtk_iommu_plat m4u_plat;
++};
++
+ struct mtk_iommu_domain;
  
- #ifndef _MT2701_LARB_PORT_H_
-diff --git a/include/dt-bindings/memory/mt8173-larb-port.h b/include/dt-bindings/memory/mt8173-larb-port.h
-index 111b4b0..a62bfeb 100644
---- a/include/dt-bindings/memory/mt8173-larb-port.h
-+++ b/include/dt-bindings/memory/mt8173-larb-port.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #ifndef __DTS_IOMMU_PORT_MT8173_H
- #define __DTS_IOMMU_PORT_MT8173_H
-diff --git a/include/soc/mediatek/smi.h b/include/soc/mediatek/smi.h
-index 5201e90..2b410d2 100644
---- a/include/soc/mediatek/smi.h
-+++ b/include/soc/mediatek/smi.h
-@@ -1,15 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (c) 2015-2016 MediaTek Inc.
-  * Author: Yong Wu <yong.wu@mediatek.com>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-  */
- #ifndef MTK_IOMMU_SMI_H
- #define MTK_IOMMU_SMI_H
+ struct mtk_iommu_data {
+@@ -57,7 +61,7 @@ struct mtk_iommu_data {
+ 	bool				tlb_flush_active;
+ 
+ 	struct iommu_device		iommu;
+-	enum mtk_iommu_plat		m4u_plat;
++	const struct mtk_iommu_plat_data *plat_data;
+ 
+ 	struct list_head		list;
+ };
 -- 
 1.9.1
