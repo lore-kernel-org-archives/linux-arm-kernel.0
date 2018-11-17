@@ -1,119 +1,88 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Sat, 17 Nov 2018 12:26:38 +0530
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <20181116182836.GB17088@rapoport-lnx>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
- <20181116182836.GB17088@rapoport-lnx>
-Message-ID: <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
+From: gmazyland@gmail.com (Milan Broz)
+Date: Sat, 17 Nov 2018 11:29:23 +0100
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <20181116215249.GA27149@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+ <20181019190411.GB246441@gmail.com>
+ <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
+ <20181116215249.GA27149@gmail.com>
+Message-ID: <56883f08-26cb-ecef-5698-1c2948714773@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 11:59 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
->
-> On Thu, Nov 15, 2018 at 09:15:30PM +0530, Souptick Joarder wrote:
-> > Previouly drivers have their own way of mapping range of
-> > kernel pages/memory into user vma and this was done by
-> > invoking vm_insert_page() within a loop.
-> >
-> > As this pattern is common across different drivers, it can
-> > be generalized by creating a new function and use it across
-> > the drivers.
-> >
-> > vm_insert_range is the new API which will be used to map a
-> > range of kernel memory/pages to user vma.
-> >
-> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> > Reviewed-by: Matthew Wilcox <willy@infradead.org>
-> > ---
-> >  include/linux/mm_types.h |  3 +++
-> >  mm/memory.c              | 28 ++++++++++++++++++++++++++++
-> >  mm/nommu.c               |  7 +++++++
-> >  3 files changed, 38 insertions(+)
-> >
-> > diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-> > index 5ed8f62..15ae24f 100644
-> > --- a/include/linux/mm_types.h
-> > +++ b/include/linux/mm_types.h
-> > @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
-> >  extern void tlb_finish_mmu(struct mmu_gather *tlb,
-> >                               unsigned long start, unsigned long end);
-> >
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count);
-> > +
-> >  static inline void init_tlb_flush_pending(struct mm_struct *mm)
-> >  {
-> >       atomic_set(&mm->tlb_flush_pending, 0);
-> > diff --git a/mm/memory.c b/mm/memory.c
-> > index 15c417e..da904ed 100644
-> > --- a/mm/memory.c
-> > +++ b/mm/memory.c
-> > @@ -1478,6 +1478,34 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
-> >  }
-> >
-> >  /**
-> > + * vm_insert_range - insert range of kernel pages into user vma
-> > + * @vma: user vma to map to
-> > + * @addr: target user address of this page
-> > + * @pages: pointer to array of source kernel pages
-> > + * @page_count: no. of pages need to insert into user vma
-> > + *
-> > + * This allows drivers to insert range of kernel pages they've allocated
-> > + * into a user vma. This is a generic function which drivers can use
-> > + * rather than using their own way of mapping range of kernel pages into
-> > + * user vma.
->
-> Please add the return value and context descriptions.
->
-> > + */
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count)
-> > +{
-> > +     unsigned long uaddr = addr;
-> > +     int ret = 0, i;
-> > +
-> > +     for (i = 0; i < page_count; i++) {
-> > +             ret = vm_insert_page(vma, uaddr, pages[i]);
-> > +             if (ret < 0)
-> > +                     return ret;
-> > +             uaddr += PAGE_SIZE;
-> > +     }
-> > +
-> > +     return ret;
-> > +}
-> > +
-> > +/**
-> >   * vm_insert_page - insert single page into user vma
-> >   * @vma: user vma to map to
-> >   * @addr: target user address of this page
-> > diff --git a/mm/nommu.c b/mm/nommu.c
-> > index 749276b..d6ef5c7 100644
-> > --- a/mm/nommu.c
-> > +++ b/mm/nommu.c
-> > @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
-> >  }
-> >  EXPORT_SYMBOL(vm_insert_page);
-> >
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count)
-> > +{
-> > +     return -EINVAL;
-> > +}
-> > +EXPORT_SYMBOL(vm_insert_range);
-> > +
-> >  /*
-> >   *  sys_brk() for the most part doesn't need the global kernel
-> >   *  lock, except when an application is doing something nasty
-> > --
-> > 1.9.1
-> >
->
-> --
-> Sincerely yours,
-> Mike.
->
+On 16/11/2018 22:52, Eric Biggers wrote:
+> Hi Milan,
+> 
+> On Sat, Oct 20, 2018 at 12:26:20PM +0200, Milan Broz wrote:
+>>
+>> Adiantum (as in your current git branches on kernel.org) can be used for dm-crypt
+>> without any changes (yes, I played with it :) and with some easy tricks directly
+>> through cryptsetup/LUKS as well.
+>>
+>> I think we should have this as an alternative to length-preserving wide-block
+>> cipher modes for FDE.
+>>
+> 
+> Yes, dm-crypt can use Adiantum by specifying the cipher as
+> "capi:adiantum(xchacha12,aes)-plain64".
+> 
+> But, I'm having trouble getting cryptsetup/LUKS to use Adiantum.
+> Using LUKS1, the following works:
+> 
+>     cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256
+> 
+> However, when possible we'd like people to use 4K sectors for better
+> performance, which I understand requires using the LUKS2 format along with
+> cryptsetup v2.0.0+ and Linux v4.12+.  But the following does *not* work:
+> 
+>     cryptsetup luksFormat /dev/$partition --cipher='capi:adiantum(xchacha12,aes)-plain64' --key-size 256 --type luks2 --sector-size 4096
 
-Sure I will wait for some time to get additional review comments and
-add all of those requested changes in v2.
+Hi Eric,
 
-Any further feedback on driver changes as part of this patch series ?
+actually I planned to test it and then reply to these patches with example cryptsetup
+commands, but did not have time for it yet.
+So thanks for a reminder ;-)
+
+Recent cryptsetup supports sector-size even for plain device.
+
+You actually do not need to use capi: prefix, Adiantum is a composition,
+so "xchacha20,aes-adiantum-plain64" works as well (and it should work even for old cryptsetup).
+(It is ugly, but it should be compatible.)
+
+# cryptsetup open --type plain -c xchacha20,aes-adiantum-plain64 -s 256 --sector-size 4096 /dev/sdb test
+
+For LUKS and benchmark, Adiantum need to use 32 bytes IV. And we have these parameter,
+unfortunately, hardcoded...
+(I guess there is already a way how to get this dynamically from userspace crypto API now.)
+
+So, I already added patch to devel branch patch for benchmark to support Adiantum few days ago
+https://gitlab.com/cryptsetup/cryptsetup/commit/bce567db461e558af7d735c694a50146db899709
+
+This allows trivial benchmark (but it just encrypts one big blob of data):
+
+#  cryptsetup benchmark -c xchacha20,aes-adiantum -s 256
+# Tests are approximate using memory only (no storage IO).
+#            Algorithm |       Key |      Encryption |      Decryption
+xchacha20,aes-adiantum        256b       146.6 MiB/s       148.0 MiB/s
+...
+
+# ./cryptsetup benchmark -c xchacha12,aes-adiantum -s 256
+xchacha12,aes-adiantum        256b       181.7 MiB/s       184.6 MiB/s
+
+For LUKS2, we need a similar change to cryptoAPI IV size (unfortunately it does not
+fallback to old keyslot handling, so LUKS2 does not work currently now).
+
+I quickly added a workaround that fallbacks to default keyslot encryption for keyslots
+in this case
+https://gitlab.com/cryptsetup/cryptsetup/commit/29e87add5aac9d5eb0087881146988d9c4280915
+
+then you can use LUKS2
+# cryptsetup luksFormat --type luks2 --sector-size 4096 -c xchacha20,aes-adiantum-plain64 -s 256 /dev/sdb
+
+(Example above will encrypt keyslots with AES-XTS and use Aviantum for data only.)
+
+So, unfortunately yes, we need some small changes in cryptsetup for LUKS;
+plain mode should work out of the box (with the syntax above).
+
+Milan
