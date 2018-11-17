@@ -1,29 +1,28 @@
 From: davem@davemloft.net (David Miller)
-Date: Fri, 16 Nov 2018 19:42:19 -0800 (PST)
-Subject: [PATCH v2 2/2] dpaa_eth: add ethtool coalesce control
-In-Reply-To: <1542126591-5114-3-git-send-email-madalin.bucur@nxp.com>
-References: <1542126591-5114-1-git-send-email-madalin.bucur@nxp.com>
- <1542126591-5114-3-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <20181116.194219.2027125174407236599.davem@davemloft.net>
+Date: Fri, 16 Nov 2018 20:32:00 -0800 (PST)
+Subject: [PATCH V3 2/7] net: lorawan: Add LoRaWAN socket module
+In-Reply-To: <20181114160126.4445-3-starnight@g.ncu.edu.tw>
+References: <20181105.101610.1437737564548154497.davem@davemloft.net>
+ <20181114160126.4445-3-starnight@g.ncu.edu.tw>
+Message-ID: <20181116.203200.1638720313402188457.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madalin Bucur <madalin.bucur@nxp.com>
-Date: Tue, 13 Nov 2018 18:29:51 +0200
+From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
+Date: Thu, 15 Nov 2018 00:01:23 +0800
 
-> +	for_each_cpu(cpu, cpus) {
-> +		portal = qman_get_affine_portal(cpu);
-> +		res = qman_portal_set_iperiod(portal, period);
-> +		if (res)
-> +			return res;
-> +		res = qman_dqrr_set_ithresh(portal, thresh);
-> +		if (res)
-> +			return res;
+> +#define	lrw_get_mac_cb(skb)	((struct lrw_mac_cb *)skb->cb)
 
-Nope, you can't do it like this.
+Please make this a static inline function.  If the identifier is all lowercase
+programmers expect it to be real code not a CPP macro.
 
-If any intermediate change fails, you have to unwind all of the
-changes made up until that point.
+> +#define	LORAWAN_MODULE_NAME	"lorawan"
+> +
+> +#define	LRW_DBG_STR(fmt)	LORAWAN_MODULE_NAME": "fmt
+> +#define	lrw_info(fmt, ...)	(pr_info(LRW_DBG_STR(fmt), ##__VA_ARGS__))
+> +#define	lrw_dbg(fmt, ...)	(pr_debug(LRW_DBG_STR(fmt), ##__VA_ARGS__))
 
-Which means you'll have to store the previous setting somewhere
-and reinstall those saved values in the error path.
+Just define "pr_fmt()" appropriately and you don't need to play these kinds
+of games.
+
+Set pr_fmt() and call pr_info() and pr_debug() directly.
