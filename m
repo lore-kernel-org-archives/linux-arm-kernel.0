@@ -1,25 +1,83 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 17 Nov 2018 10:04:43 -0600
-Subject: [PATCH v1 2/2] dt-bindings: pinctrl: update bindings for MT7629
- SoC
-In-Reply-To: <46ee25bb5ac7a7aa0245e2b02e9a0e870ff09551.1541986223.git.ryder.lee@mediatek.com>
-References: <5d63d26156d2972b7e9f55c9743b66d7c6dac2ec.1541986223.git.ryder.lee@mediatek.com>
- <46ee25bb5ac7a7aa0245e2b02e9a0e870ff09551.1541986223.git.ryder.lee@mediatek.com>
-Message-ID: <20181117160443.GA1462@bogus>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat, 17 Nov 2018 10:05:02 -0600
+Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
+ definitions
+In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
+References: <20181113060111.16374-1-vigneshr@ti.com>
+ <20181113060111.16374-2-vigneshr@ti.com>
+Message-ID: <20181117160502.dhlqbx5qnmdp5iog@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 12 Nov 2018 09:45:06 +0800, Ryder Lee wrote:
-> This updates bindings for MT7629 pinctrl driver.
+On 11:31-20181113, Vignesh R wrote:
+> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
+> defining pinmux configs in human readable form, instead of raw-coded
+> hex values.
 > 
-> Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
-> Changes since v1:
-> -add new function for wifi.
-> -add more descriptions.
-> ---
->  .../devicetree/bindings/pinctrl/pinctrl-mt7622.txt | 131 +++++++++++++++++++++
->  1 file changed, 131 insertions(+)
+>  MAINTAINERS                      |  1 +
+>  include/dt-bindings/pinctrl/k3.h | 35 ++++++++++++++++++++++++++++++++
+>  2 files changed, 36 insertions(+)
+>  create mode 100644 include/dt-bindings/pinctrl/k3.h
 > 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index fa45ff36fde9..1574ad6d7ead 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2204,6 +2204,7 @@ S:	Supported
+>  F:	Documentation/devicetree/bindings/arm/ti/k3.txt
+>  F:	arch/arm64/boot/dts/ti/Makefile
+>  F:	arch/arm64/boot/dts/ti/k3-*
+> +F:	include/dt-bindings/pinctrl/k3.h
+>  
+>  ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
+>  M:	Santosh Shilimkar <ssantosh@kernel.org>
+> diff --git a/include/dt-bindings/pinctrl/k3.h b/include/dt-bindings/pinctrl/k3.h
+> new file mode 100644
+> index 000000000000..463d845a9b36
+> --- /dev/null
+> +++ b/include/dt-bindings/pinctrl/k3.h
+> @@ -0,0 +1,35 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * This header provides constants for pinctrl bindings for TI's K3 SoC
+> + * family.
+> + *
+> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
+> + */
+> +#ifndef _DT_BINDINGS_PINCTRL_TI_K3_H
+> +#define _DT_BINDINGS_PINCTRL_TI_K3_H
+> +
+> +#define PULLUDEN_SHIFT		(16)
+> +#define PULLTYPESEL_SHIFT	(17)
+> +#define RXACTIVE_SHIFT		(18)
+> +
+> +#define PULL_DISABLE		(1 << PULLUDEN_SHIFT)
+> +#define PULL_ENABLE		(0 << PULLUDEN_SHIFT)
+> +
+> +#define PULL_UP			(1 << PULLTYPESEL_SHIFT | PULL_ENABLE)
+> +#define PULL_DOWN		(0 << PULLTYPESEL_SHIFT | PULL_ENABLE)
+> +
+> +#define INPUT_EN		(1 << RXACTIVE_SHIFT)
+> +#define INPUT_DISABLE		(0 << RXACTIVE_SHIFT)
+> +
+> +/* Only these macros are expected be used directly in device tree files */
+> +#define PIN_OUTPUT		(INPUT_DISABLE | PULL_DISABLE)
+> +#define PIN_OUTPUT_PULLUP	(INPUT_DISABLE | PULL_UP)
+> +#define PIN_OUTPUT_PULLDOWN	(INPUT_DISABLE | PULL_DOWN)
+> +#define PIN_INPUT		(INPUT_EN | PULL_DISABLE)
+> +#define PIN_INPUT_PULLUP	(INPUT_EN | PULL_UP)
+> +#define PIN_INPUT_PULLDOWN	(INPUT_EN | PULL_DOWN)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+
+Thanks for reducing the combinations down to the minimum needed. We can
+worry about the DS and isolation bits when we have a real user for them.
+
+Acked-by: Nishanth Menon <nm@ti.com>
+
+Tero: v4.21-rc1 perhaps ?
+
+-- 
+Regards,
+Nishanth Menon
