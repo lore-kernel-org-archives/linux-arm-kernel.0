@@ -1,346 +1,275 @@
-From: natechancellor@gmail.com (Nathan Chancellor)
-Date: Fri, 16 Nov 2018 18:56:51 -0700
-Subject: [PATCH] pinctrl: zynq: Use define directive for
- PIN_CONFIG_IO_STANDARD
-In-Reply-To: <fd608da5-c1fb-ed55-bf74-7ed476d58c12@xilinx.com>
-References: <20181101005724.9622-1-natechancellor@gmail.com>
- <68ae935a-aec3-915c-bfe6-d69bfb93d702@xilinx.com>
- <20181107085503.GA31517@flashbox>
- <9d52cd84-440f-9a40-d0ec-1397abb24c98@xilinx.com>
- <CAKwvOdmkC1LqMokhQUebpEZRoWWWwtQnbm8xGwiwdBy9UOMT5Q@mail.gmail.com>
- <af717713-9e51-139d-1206-1682b83ae434@xilinx.com>
- <20181108150116.GA2830@flashbox>
- <40a17c3e-6c81-6f59-cff6-003a91e10b29@xilinx.com>
- <20181109153626.GA6494@flashbox>
- <fd608da5-c1fb-ed55-bf74-7ed476d58c12@xilinx.com>
-Message-ID: <20181117015651.GA28503@flashbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 16 Nov 2018 18:00:49 -0800
+Subject: [PATCH v4 13/14] crypto: arm/nhpoly1305 - add NEON-accelerated
+ NHPoly1305
+In-Reply-To: <20181117012631.23528-14-ebiggers@kernel.org>
+References: <20181117012631.23528-1-ebiggers@kernel.org>
+ <20181117012631.23528-14-ebiggers@kernel.org>
+Message-ID: <CAKv+Gu92imD=X-4ExxQH-KOkitUr04GGenYb59yDwBPRhLf3dw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 09:40:45AM +0100, Michal Simek wrote:
-> On 09. 11. 18 16:36, Nathan Chancellor wrote:
-> > On Fri, Nov 09, 2018 at 10:33:00AM +0100, Michal Simek wrote:
-> >> On 08. 11. 18 16:01, Nathan Chancellor wrote:
-> >>> On Thu, Nov 08, 2018 at 07:45:42AM +0100, Michal Simek wrote:
-> >>>> On 07. 11. 18 18:48, Nick Desaulniers wrote:
-> >>>>> On Wed, Nov 7, 2018 at 1:01 AM Michal Simek <michal.simek@xilinx.com> wrote:
-> >>>>>>
-> >>>>>> On 07. 11. 18 9:55, Nathan Chancellor wrote:
-> >>>>>>> On Wed, Nov 07, 2018 at 09:46:12AM +0100, Michal Simek wrote:
-> >>>>>>>> On 01. 11. 18 1:57, Nathan Chancellor wrote:
-> >>>>>>>>> Clang warns when one enumerated type is implicitly converted to another:
-> >>>>>>>>>
-> >>>>>>>>> drivers/pinctrl/pinctrl-zynq.c:985:18: warning: implicit conversion from
-> >>>>>>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>>>>>>>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>>>>>>>         {"io-standard", PIN_CONFIG_IOSTANDARD, zynq_iostd_lvcmos18},
-> >>>>>>>>>         ~               ^~~~~~~~~~~~~~~~~~~~~
-> >>>>>>>>> drivers/pinctrl/pinctrl-zynq.c:990:16: warning: implicit conversion from
-> >>>>>>>>> enumeration type 'enum zynq_pin_config_param' to different enumeration
-> >>>>>>>>> type 'enum pin_config_param' [-Wenum-conversion]
-> >>>>>>>>>         = { PCONFDUMP(PIN_CONFIG_IOSTANDARD, "IO-standard", NULL, true),
-> >>>>>>>>>             ~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> >>>>>>>>> ./include/linux/pinctrl/pinconf-generic.h:163:11: note: expanded from
-> >>>>>>>>> macro 'PCONFDUMP'
-> >>>>>>>>>         .param = a, .display = b, .format = c, .has_arg = d     \
-> >>>>>>>>>                  ^
-> >>>>>>>>> 2 warnings generated.
-> >>>>>>>>
-> >>>>>>>> This is interesting. I have never tried to use llvm for building the
-> >>>>>>>> kernel. Do you have any description how this can be done?
-> >>>>>>>>
-> >>>>>>>
-> >>>>>>> Depending on what version of Clang you have access to, it is usually just as
-> >>>>>>> simple as running 'make ARCH=arm CC=clang CROSS_COMPILE=arm-linux-gnueabi-'.
-> >>>>>>>
-> >>>>>>> Clang 7.0+ is recommended but 6.0 might work too.
-> >>>>>>
-> >>>>>> TBH I would expect to download container and run this there to make sure
-> >>>>>> that I don't break anything else.
-> >>>>>
-> >>>>> This is the first request we've had for a container in order to test a
-> >>>>> patch.  If it comes up again from other folks, I think it makes sense
-> >>>>> to create one.  Until then, its nice to have.  It's definitely
-> >>>>> overkill for this patch.
-> >>>>
-> >>>> I have played with it to see that error and here are some steps I did.
-> >>>>
-> >>>> docker run --name test-clang -it --rm debian:latest bash
-> >>>> apt-get update
-> >>>> apt-get install gcc-arm-linux-gnueabi gcc-aarch64-linux-gnu clang git bc
-> >>>> build-essential bison flex make llvm vim libssl-dev sparse
-> >>>>
-> >>>> git clone
-> >>>> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git --depth 1
-> >>>> cd linux
-> >>>>
-> >>>> export ARCH=arm64
-> >>>> export CROSS_COMPILE=aarch64-linux-gnu-
-> >>>>
-> >>>> make defconfig
-> >>>
-> >>> This should also have 'CC=clang' because compiler detection happens in
-> >>> Kconfig now so compiler flags get properly set. Other than that, looks
-> >>> good and I was able to build pinctrl-zynq.o without any issues with
-> >>> those commands.
-> >>
-> >> For arm32 I am still getting compilation issue (arm64 is fine)
-> >> Below are my steps and version I use. Do you know what could be the
-> >> problem?
-> >>
-> >> Thanks,
-> >> Michal
-> >>
-> >> root at 1e15921e6d15:~/linux# arm-linux-gnueabi-gcc --version
-> >> arm-linux-gnueabi-gcc (Debian 6.3.0-18) 6.3.0 20170516
-> >> Copyright (C) 2016 Free Software Foundation, Inc.
-> >> This is free software; see the source for copying conditions.  There is NO
-> >> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> >>
-> >> root at 1e15921e6d15:~/linux# clang --version
-> >> clang version 3.8.1-24 (tags/RELEASE_381/final)
-> >> Target: x86_64-pc-linux-gnu
-> >> Thread model: posix
-> >> InstalledDir: /usr/bin
-> >>
-> >>
-> >> export ARCH=arm
-> >> export CROSS_COMPILE=arm-linux-gnuaebi-
-> >> make CC=clang defconfig
-> >> make CC=clang drivers/pinctrl/pinctrl-zynq.o
-> >>
-> >> and I get
-> >> clang: error: unsupported argument '-W' to option 'Wa,'
-> >> scripts/Makefile.build:305: recipe for target 'scripts/mod/empty.o' failed
-> >> make[2]: *** [scripts/mod/empty.o] Error 1
-> >> scripts/Makefile.build:546: recipe for target 'scripts/mod' failed
-> >>
-> > 
-> > Ah because Debian's regular Clang is ancient.
-> > 
-> > For testing, we use the builds from apt.llvm.org. Commands assuming
-> > you're using the normal Debian image:
-> > 
-> > curl https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-> > echo "deb http://apt.llvm.org/stretch/ llvm-toolchain-stretch main" | tee -a /etc/apt/sources.list
-> > apt-get update -qq && apt-get install -y clang-8
-> > 
-> > Then use `CC=clang-8' instead of 'CC=clang' for all make invocations.
-> > 
-> 
-> Still I see some issues. Log below.
-> 
-> Thanks,
-> Michal
-> 
-> root at 1e15921e6d15:~/linux# git reset --hard v4.20-rc2
-> HEAD is now at ccda4af0f4b9 Linux 4.20-rc2
-> root at 1e15921e6d15:~/linux#
-> root at 1e15921e6d15:~/linux#
-> root at 1e15921e6d15:~/linux# export ARCH=arm
-> root at 1e15921e6d15:~/linux# export CROSS_COMPILE=arm-linux-gnuaebi-
-> root at 1e15921e6d15:~/linux# export CC=clang-8
-> root at 1e15921e6d15:~/linux# make CC=clang-8 defconfig
->   HOSTCC  scripts/kconfig/conf.o
->   HOSTLD  scripts/kconfig/conf
-> *** Default configuration is based on 'multi_v7_defconfig'
-> #
-> # configuration written to .config
-> #
-> root at 1e15921e6d15:~/linux# make CC=clang-8
-> scripts/kconfig/conf  --syncconfig Kconfig
->   SYSHDR  arch/arm/include/generated/uapi/asm/unistd-common.h
->   SYSHDR  arch/arm/include/generated/uapi/asm/unistd-oabi.h
->   SYSHDR  arch/arm/include/generated/uapi/asm/unistd-eabi.h
->   UPD     include/config/kernel.release
->   UPD     include/generated/uapi/linux/version.h
->   UPD     include/generated/utsrelease.h
->   SYSNR   arch/arm/include/generated/asm/unistd-nr.h
->   SYSTBL  arch/arm/include/generated/calls-oabi.S
->   SYSTBL  arch/arm/include/generated/calls-eabi.S
->   CC      kernel/bounds.s
-> clang: warning: argument unused during compilation: '-Wa,-W'
-> [-Wunused-command-line-argument]
-> clang: warning: argument unused during compilation: '-Wa,-march=armv7-a'
-> [-Wunused-command-line-argument]
->   UPD     include/generated/bounds.h
->   CC      arch/arm/kernel/asm-offsets.s
-> clang: warning: argument unused during compilation: '-Wa,-W'
-> [-Wunused-command-line-argument]
-> clang: warning: argument unused during compilation: '-Wa,-march=armv7-a'
-> [-Wunused-command-line-argument]
->   UPD     include/generated/asm-offsets.h
->   CALL    scripts/checksyscalls.sh
-> clang: warning: argument unused during compilation: '-Wa,-W'
-> [-Wunused-command-line-argument]
-> clang: warning: argument unused during compilation: '-Wa,-march=armv7-a'
-> [-Wunused-command-line-argument]
->   CC      scripts/mod/empty.o
-> clang: error: unsupported argument '-W' to option 'Wa,'
-> scripts/Makefile.build:293: recipe for target 'scripts/mod/empty.o' failed
-> make[2]: *** [scripts/mod/empty.o] Error 1
-> scripts/Makefile.build:518: recipe for target 'scripts/mod' failed
-> make[1]: *** [scripts/mod] Error 2
-> Makefile:1075: recipe for target 'scripts' failed
-> make: *** [scripts] Error 2
-> root at 1e15921e6d15:~/linux# clang-8 --version
-> clang version 8.0.0-svn345496-1~exp1+0~20181029105533.852~1.gbpf10f36
-> (trunk)
-> Target: x86_64-pc-linux-gnu
-> Thread model: posix
-> InstalledDir: /usr/bin
-> root at 1e15921e6d15:~/linux# arm-linux-gnueabi-gcc --version
-> arm-linux-gnueabi-gcc (Debian 6.3.0-18) 6.3.0 20170516
-> Copyright (C) 2016 Free Software Foundation, Inc.
-> This is free software; see the source for copying conditions.  There is NO
-> warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-> 
-> 
+On Fri, 16 Nov 2018 at 17:29, Eric Biggers <ebiggers@kernel.org> wrote:
+>
+> From: Eric Biggers <ebiggers@google.com>
+>
+> Add an ARM NEON implementation of NHPoly1305, an ?-almost-?-universal
+> hash function used in the Adiantum encryption mode.  For now, only the
+> NH portion is actually NEON-accelerated; the Poly1305 part is less
+> performance-critical so is just implemented in C.
+>
+> Signed-off-by: Eric Biggers <ebiggers@google.com>
 
-I think it's the 'export CC=clang-8'; without it, I can get past that
-point without any issues. Our continuous integration setup provides CC
-to make on the same line, without an export.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-https://github.com/ClangBuiltLinux/continuous-integration/blob/master/driver.sh
-
-https://travis-ci.com/ClangBuiltLinux/continuous-integration/jobs/159007956
-
-root at faf632577e0d:/# git clone --depth=1 git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git /root/linux
-Cloning into '/root/linux'...
-remote: Counting objects: 66322, done.
-remote: Compressing objects: 100% (63190/63190), done.
-remote: Total 66322 (delta 5162), reused 31233 (delta 2202)
-Receiving objects: 100% (66322/66322), 177.05 MiB | 10.66 MiB/s, done.
-Resolving deltas: 100% (5162/5162), done.
-Checking out files: 100% (62467/62467), done.
-root at faf632577e0d:/# cd /root/linux
-root at faf632577e0d:~/linux# export ARCH=arm
-root at faf632577e0d:~/linux# export CROSS_COMPILE=arm-linux-gnueabi-
-root at faf632577e0d:~/linux# make CC=clang-8 defconfig
-  HOSTCC  scripts/basic/fixdep
-  HOSTCC  scripts/kconfig/conf.o
-  YACC    scripts/kconfig/zconf.tab.c
-  LEX     scripts/kconfig/zconf.lex.c
-  HOSTCC  scripts/kconfig/zconf.tab.o
-  HOSTLD  scripts/kconfig/conf
-*** Default configuration is based on 'multi_v7_defconfig'
-#
-# configuration written to .config
-#
-root at faf632577e0d:~/linux# make CC=clang-8
-  SYSHDR  arch/arm/include/generated/uapi/asm/unistd-common.h
-  SYSHDR  arch/arm/include/generated/uapi/asm/unistd-oabi.h
-  SYSHDR  arch/arm/include/generated/uapi/asm/unistd-eabi.h
-  UPD     include/config/kernel.release
-  WRAP    arch/arm/include/generated/uapi/asm/bitsperlong.h
-  WRAP    arch/arm/include/generated/uapi/asm/bpf_perf_event.h
-  WRAP    arch/arm/include/generated/uapi/asm/errno.h
-  WRAP    arch/arm/include/generated/uapi/asm/ioctl.h
-  WRAP    arch/arm/include/generated/uapi/asm/ipcbuf.h
-  WRAP    arch/arm/include/generated/uapi/asm/msgbuf.h
-  WRAP    arch/arm/include/generated/uapi/asm/param.h
-  WRAP    arch/arm/include/generated/uapi/asm/poll.h
-  WRAP    arch/arm/include/generated/uapi/asm/resource.h
-  WRAP    arch/arm/include/generated/uapi/asm/sembuf.h
-  WRAP    arch/arm/include/generated/uapi/asm/shmbuf.h
-  WRAP    arch/arm/include/generated/uapi/asm/siginfo.h
-  WRAP    arch/arm/include/generated/uapi/asm/socket.h
-  WRAP    arch/arm/include/generated/uapi/asm/sockios.h
-  WRAP    arch/arm/include/generated/uapi/asm/termbits.h
-  WRAP    arch/arm/include/generated/uapi/asm/termios.h
-  WRAP    arch/arm/include/generated/asm/compat.h
-  WRAP    arch/arm/include/generated/asm/current.h
-  WRAP    arch/arm/include/generated/asm/early_ioremap.h
-  WRAP    arch/arm/include/generated/asm/emergency-restart.h
-  WRAP    arch/arm/include/generated/asm/exec.h
-  WRAP    arch/arm/include/generated/asm/extable.h
-  WRAP    arch/arm/include/generated/asm/irq_regs.h
-  WRAP    arch/arm/include/generated/asm/kdebug.h
-  WRAP    arch/arm/include/generated/asm/local.h
-  WRAP    arch/arm/include/generated/asm/local64.h
-  WRAP    arch/arm/include/generated/asm/mm-arch-hooks.h
-  WRAP    arch/arm/include/generated/asm/msi.h
-  WRAP    arch/arm/include/generated/asm/parport.h
-  WRAP    arch/arm/include/generated/asm/preempt.h
-  WRAP    arch/arm/include/generated/asm/rwsem.h
-  WRAP    arch/arm/include/generated/asm/seccomp.h
-  WRAP    arch/arm/include/generated/asm/segment.h
-  WRAP    arch/arm/include/generated/asm/serial.h
-  WRAP    arch/arm/include/generated/asm/simd.h
-  WRAP    arch/arm/include/generated/asm/sizes.h
-  WRAP    arch/arm/include/generated/asm/timex.h
-  WRAP    arch/arm/include/generated/asm/trace_clock.h
-  UPD     include/generated/uapi/linux/version.h
-  UPD     include/generated/utsrelease.h
-  SYSNR   arch/arm/include/generated/asm/unistd-nr.h
-  GEN     arch/arm/include/generated/asm/mach-types.h
-  SYSTBL  arch/arm/include/generated/calls-oabi.S
-  SYSTBL  arch/arm/include/generated/calls-eabi.S
-  CC      kernel/bounds.s
-  UPD     include/generated/bounds.h
-  UPD     include/generated/timeconst.h
-  CC      arch/arm/kernel/asm-offsets.s
-  UPD     include/generated/asm-offsets.h
-  CALL    scripts/checksyscalls.sh
-  HOSTCC  scripts/dtc/dtc.o
-  HOSTCC  scripts/dtc/flattree.o
-  HOSTCC  scripts/dtc/fstree.o
-  HOSTCC  scripts/dtc/data.o
-  HOSTCC  scripts/dtc/livetree.o
-  HOSTCC  scripts/dtc/treesource.o
-  HOSTCC  scripts/dtc/srcpos.o
-  HOSTCC  scripts/dtc/checks.o
-  HOSTCC  scripts/dtc/util.o
-  LEX     scripts/dtc/dtc-lexer.lex.c
-  YACC    scripts/dtc/dtc-parser.tab.h
-  HOSTCC  scripts/dtc/dtc-lexer.lex.o
-  YACC    scripts/dtc/dtc-parser.tab.c
-  HOSTCC  scripts/dtc/dtc-parser.tab.o
-  HOSTLD  scripts/dtc/dtc
-  CC      scripts/mod/empty.o
-  HOSTCC  scripts/mod/mk_elfconfig
-  MKELF   scripts/mod/elfconfig.h
-  HOSTCC  scripts/mod/modpost.o
-  CC      scripts/mod/devicetable-offsets.s
-  UPD     scripts/mod/devicetable-offsets.h
-  HOSTCC  scripts/mod/file2alias.o
-  HOSTCC  scripts/mod/sumversion.o
-  HOSTLD  scripts/mod/modpost
-  HOSTCC  scripts/kallsyms
-  HOSTCC  scripts/conmakehash
-  HOSTCC  scripts/sortextable
-  HOSTCC  scripts/asn1_compiler
-  HOSTCC  scripts/extract-cert
-  CHK     include/generated/compile.h
-  UPD     include/generated/compile.h
-  CC      init/main.o
-  CC      init/version.o
-  CC      init/do_mounts.o
-  CC      init/do_mounts_rd.o
-  CC      init/do_mounts_initrd.o
-  CC      init/initramfs.o
-  CC      init/calibrate.o
-  CC      init/init_task.o
-  AR      init/built-in.a
-  HOSTCC  usr/gen_init_cpio
-  GEN     usr/initramfs_data.cpio
-  AS      usr/initramfs_data.o
-  AR      usr/built-in.a
-  CC      arch/arm/vfp/vfpmodule.o
-  AS      arch/arm/vfp/entry.o
-  AS      arch/arm/vfp/vfphw.o
-  CC      arch/arm/vfp/vfpsingle.o
-  CC      arch/arm/vfp/vfpdouble.o
-  AR      arch/arm/vfp/built-in.a
-  LDS     arch/arm/vdso/vdso.lds
-  CC      arch/arm/vdso/vgettimeofday.o
-  AS      arch/arm/vdso/datapage.o
-  VDSO    arch/arm/vdso/vdso.so.raw
-  HOSTCC  arch/arm/vdso/vdsomunge
-  MUNGE   arch/arm/vdso/vdso.so.dbg
-  OBJCOPY arch/arm/vdso/vdso.so
-  AS      arch/arm/vdso/vdso.o
-  AR      arch/arm/vdso/built-in.a
-  CC      arch/arm/kernel/elf.o
-  AS      arch/arm/kernel/entry-common.o
-  CC      arch/arm/kernel/irq.o
+> ---
+>  arch/arm/crypto/Kconfig                |   5 ++
+>  arch/arm/crypto/Makefile               |   2 +
+>  arch/arm/crypto/nh-neon-core.S         | 116 +++++++++++++++++++++++++
+>  arch/arm/crypto/nhpoly1305-neon-glue.c |  77 ++++++++++++++++
+>  4 files changed, 200 insertions(+)
+>  create mode 100644 arch/arm/crypto/nh-neon-core.S
+>  create mode 100644 arch/arm/crypto/nhpoly1305-neon-glue.c
+>
+> diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
+> index 59c674cf08ef..a95322b59799 100644
+> --- a/arch/arm/crypto/Kconfig
+> +++ b/arch/arm/crypto/Kconfig
+> @@ -131,4 +131,9 @@ config CRYPTO_CHACHA20_NEON
+>         select CRYPTO_BLKCIPHER
+>         select CRYPTO_CHACHA20
+>
+> +config CRYPTO_NHPOLY1305_NEON
+> +       tristate "NEON accelerated NHPoly1305 hash function (for Adiantum)"
+> +       depends on KERNEL_MODE_NEON
+> +       select CRYPTO_NHPOLY1305
+> +
+>  endif
+> diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+> index 005482ff9504..b65d6bfab8e6 100644
+> --- a/arch/arm/crypto/Makefile
+> +++ b/arch/arm/crypto/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_CRYPTO_SHA1_ARM_NEON) += sha1-arm-neon.o
+>  obj-$(CONFIG_CRYPTO_SHA256_ARM) += sha256-arm.o
+>  obj-$(CONFIG_CRYPTO_SHA512_ARM) += sha512-arm.o
+>  obj-$(CONFIG_CRYPTO_CHACHA20_NEON) += chacha-neon.o
+> +obj-$(CONFIG_CRYPTO_NHPOLY1305_NEON) += nhpoly1305-neon.o
+>
+>  ce-obj-$(CONFIG_CRYPTO_AES_ARM_CE) += aes-arm-ce.o
+>  ce-obj-$(CONFIG_CRYPTO_SHA1_ARM_CE) += sha1-arm-ce.o
+> @@ -53,6 +54,7 @@ ghash-arm-ce-y        := ghash-ce-core.o ghash-ce-glue.o
+>  crct10dif-arm-ce-y     := crct10dif-ce-core.o crct10dif-ce-glue.o
+>  crc32-arm-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+>  chacha-neon-y := chacha-neon-core.o chacha-neon-glue.o
+> +nhpoly1305-neon-y := nh-neon-core.o nhpoly1305-neon-glue.o
+>
+>  ifdef REGENERATE_ARM_CRYPTO
+>  quiet_cmd_perl = PERL    $@
+> diff --git a/arch/arm/crypto/nh-neon-core.S b/arch/arm/crypto/nh-neon-core.S
+> new file mode 100644
+> index 000000000000..434d80ab531c
+> --- /dev/null
+> +++ b/arch/arm/crypto/nh-neon-core.S
+> @@ -0,0 +1,116 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * NH - ?-almost-universal hash function, NEON accelerated version
+> + *
+> + * Copyright 2018 Google LLC
+> + *
+> + * Author: Eric Biggers <ebiggers@google.com>
+> + */
+> +
+> +#include <linux/linkage.h>
+> +
+> +       .text
+> +       .fpu            neon
+> +
+> +       KEY             .req    r0
+> +       MESSAGE         .req    r1
+> +       MESSAGE_LEN     .req    r2
+> +       HASH            .req    r3
+> +
+> +       PASS0_SUMS      .req    q0
+> +       PASS0_SUM_A     .req    d0
+> +       PASS0_SUM_B     .req    d1
+> +       PASS1_SUMS      .req    q1
+> +       PASS1_SUM_A     .req    d2
+> +       PASS1_SUM_B     .req    d3
+> +       PASS2_SUMS      .req    q2
+> +       PASS2_SUM_A     .req    d4
+> +       PASS2_SUM_B     .req    d5
+> +       PASS3_SUMS      .req    q3
+> +       PASS3_SUM_A     .req    d6
+> +       PASS3_SUM_B     .req    d7
+> +       K0              .req    q4
+> +       K1              .req    q5
+> +       K2              .req    q6
+> +       K3              .req    q7
+> +       T0              .req    q8
+> +       T0_L            .req    d16
+> +       T0_H            .req    d17
+> +       T1              .req    q9
+> +       T1_L            .req    d18
+> +       T1_H            .req    d19
+> +       T2              .req    q10
+> +       T2_L            .req    d20
+> +       T2_H            .req    d21
+> +       T3              .req    q11
+> +       T3_L            .req    d22
+> +       T3_H            .req    d23
+> +
+> +.macro _nh_stride      k0, k1, k2, k3
+> +
+> +       // Load next message stride
+> +       vld1.8          {T3}, [MESSAGE]!
+> +
+> +       // Load next key stride
+> +       vld1.32         {\k3}, [KEY]!
+> +
+> +       // Add message words to key words
+> +       vadd.u32        T0, T3, \k0
+> +       vadd.u32        T1, T3, \k1
+> +       vadd.u32        T2, T3, \k2
+> +       vadd.u32        T3, T3, \k3
+> +
+> +       // Multiply 32x32 => 64 and accumulate
+> +       vmlal.u32       PASS0_SUMS, T0_L, T0_H
+> +       vmlal.u32       PASS1_SUMS, T1_L, T1_H
+> +       vmlal.u32       PASS2_SUMS, T2_L, T2_H
+> +       vmlal.u32       PASS3_SUMS, T3_L, T3_H
+> +.endm
+> +
+> +/*
+> + * void nh_neon(const u32 *key, const u8 *message, size_t message_len,
+> + *             u8 hash[NH_HASH_BYTES])
+> + *
+> + * It's guaranteed that message_len % 16 == 0.
+> + */
+> +ENTRY(nh_neon)
+> +
+> +       vld1.32         {K0,K1}, [KEY]!
+> +         vmov.u64      PASS0_SUMS, #0
+> +         vmov.u64      PASS1_SUMS, #0
+> +       vld1.32         {K2}, [KEY]!
+> +         vmov.u64      PASS2_SUMS, #0
+> +         vmov.u64      PASS3_SUMS, #0
+> +
+> +       subs            MESSAGE_LEN, MESSAGE_LEN, #64
+> +       blt             .Lloop4_done
+> +.Lloop4:
+> +       _nh_stride      K0, K1, K2, K3
+> +       _nh_stride      K1, K2, K3, K0
+> +       _nh_stride      K2, K3, K0, K1
+> +       _nh_stride      K3, K0, K1, K2
+> +       subs            MESSAGE_LEN, MESSAGE_LEN, #64
+> +       bge             .Lloop4
+> +
+> +.Lloop4_done:
+> +       ands            MESSAGE_LEN, MESSAGE_LEN, #63
+> +       beq             .Ldone
+> +       _nh_stride      K0, K1, K2, K3
+> +
+> +       subs            MESSAGE_LEN, MESSAGE_LEN, #16
+> +       beq             .Ldone
+> +       _nh_stride      K1, K2, K3, K0
+> +
+> +       subs            MESSAGE_LEN, MESSAGE_LEN, #16
+> +       beq             .Ldone
+> +       _nh_stride      K2, K3, K0, K1
+> +
+> +.Ldone:
+> +       // Sum the accumulators for each pass, then store the sums to 'hash'
+> +       vadd.u64        T0_L, PASS0_SUM_A, PASS0_SUM_B
+> +       vadd.u64        T0_H, PASS1_SUM_A, PASS1_SUM_B
+> +       vadd.u64        T1_L, PASS2_SUM_A, PASS2_SUM_B
+> +       vadd.u64        T1_H, PASS3_SUM_A, PASS3_SUM_B
+> +       vst1.8          {T0-T1}, [HASH]
+> +       bx              lr
+> +ENDPROC(nh_neon)
+> diff --git a/arch/arm/crypto/nhpoly1305-neon-glue.c b/arch/arm/crypto/nhpoly1305-neon-glue.c
+> new file mode 100644
+> index 000000000000..49aae87cb2bc
+> --- /dev/null
+> +++ b/arch/arm/crypto/nhpoly1305-neon-glue.c
+> @@ -0,0 +1,77 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * NHPoly1305 - ?-almost-?-universal hash function for Adiantum
+> + * (NEON accelerated version)
+> + *
+> + * Copyright 2018 Google LLC
+> + */
+> +
+> +#include <asm/neon.h>
+> +#include <asm/simd.h>
+> +#include <crypto/internal/hash.h>
+> +#include <crypto/nhpoly1305.h>
+> +#include <linux/module.h>
+> +
+> +asmlinkage void nh_neon(const u32 *key, const u8 *message, size_t message_len,
+> +                       u8 hash[NH_HASH_BYTES]);
+> +
+> +/* wrapper to avoid indirect call to assembly, which doesn't work with CFI */
+> +static void _nh_neon(const u32 *key, const u8 *message, size_t message_len,
+> +                    __le64 hash[NH_NUM_PASSES])
+> +{
+> +       nh_neon(key, message, message_len, (u8 *)hash);
+> +}
+> +
+> +static int nhpoly1305_neon_update(struct shash_desc *desc,
+> +                                 const u8 *src, unsigned int srclen)
+> +{
+> +       if (srclen < 64 || !may_use_simd())
+> +               return crypto_nhpoly1305_update(desc, src, srclen);
+> +
+> +       do {
+> +               unsigned int n = min_t(unsigned int, srclen, PAGE_SIZE);
+> +
+> +               kernel_neon_begin();
+> +               crypto_nhpoly1305_update_helper(desc, src, n, _nh_neon);
+> +               kernel_neon_end();
+> +               src += n;
+> +               srclen -= n;
+> +       } while (srclen);
+> +       return 0;
+> +}
+> +
+> +static struct shash_alg nhpoly1305_alg = {
+> +       .base.cra_name          = "nhpoly1305",
+> +       .base.cra_driver_name   = "nhpoly1305-neon",
+> +       .base.cra_priority      = 200,
+> +       .base.cra_ctxsize       = sizeof(struct nhpoly1305_key),
+> +       .base.cra_module        = THIS_MODULE,
+> +       .digestsize             = POLY1305_DIGEST_SIZE,
+> +       .init                   = crypto_nhpoly1305_init,
+> +       .update                 = nhpoly1305_neon_update,
+> +       .final                  = crypto_nhpoly1305_final,
+> +       .setkey                 = crypto_nhpoly1305_setkey,
+> +       .descsize               = sizeof(struct nhpoly1305_state),
+> +};
+> +
+> +static int __init nhpoly1305_mod_init(void)
+> +{
+> +       if (!(elf_hwcap & HWCAP_NEON))
+> +               return -ENODEV;
+> +
+> +       return crypto_register_shash(&nhpoly1305_alg);
+> +}
+> +
+> +static void __exit nhpoly1305_mod_exit(void)
+> +{
+> +       crypto_unregister_shash(&nhpoly1305_alg);
+> +}
+> +
+> +module_init(nhpoly1305_mod_init);
+> +module_exit(nhpoly1305_mod_exit);
+> +
+> +MODULE_DESCRIPTION("NHPoly1305 ?-almost-?-universal hash function (NEON-accelerated)");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Eric Biggers <ebiggers@google.com>");
+> +MODULE_ALIAS_CRYPTO("nhpoly1305");
+> +MODULE_ALIAS_CRYPTO("nhpoly1305-neon");
+> --
+> 2.19.1.1215.g8438c0b245-goog
+>
