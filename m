@@ -1,32 +1,34 @@
-From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
-Date: Sat, 17 Nov 2018 13:15:55 +0100
-Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
-In-Reply-To: <20181117030947.GX2089@sirena.org.uk>
-References: <20181105135802.30486-1-peron.clem@gmail.com>
- <20181116025938.GH5829@dragon>
- <CAJiuCcerEanEobbi8zPb1-eb=zCJsDAbM=p6T64+wtuXjtaMTA@mail.gmail.com>
- <20181116144520.GO5829@dragon> <20181117030947.GX2089@sirena.org.uk>
-Message-ID: <CAJiuCccLyd0wBdCyOfjW41i1EQ7Uuj2ZpdR0cSz3Oirdd8n3Ug@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 17 Nov 2018 13:18:23 +0100
+Subject: [PATCH 1/2] pinctrl: rockchip: allow specifying the regmap
+ location for pin-routes
+In-Reply-To: <20181111210047.30375-1-heiko@sntech.de>
+References: <20181111210047.30375-1-heiko@sntech.de>
+Message-ID: <CACRpkdbakPGfHap+WcuJ_TVn861zqQDxW-on4q9Wx+-QQb0ESw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Sun, Nov 11, 2018 at 10:01 PM Heiko Stuebner <heiko@sntech.de> wrote:
 
-On Sat, 17 Nov 2018 at 04:09, Mark Brown <broonie@kernel.org> wrote:
+> From: Heiko Stuebner <heiko.stuebner@bq.com>
 >
-> On Fri, Nov 16, 2018 at 10:45:22PM +0800, Shawn Guo wrote:
-> > On Fri, Nov 16, 2018 at 11:25:07AM +0100, Cl?ment P?ron wrote:
+> Right now we expect the pin-rounting settings to be in the same area
+> as the iomux setting itself. And while that seems to be true for all
+> newer Rockchip socs, back in the wild west days of old this wasn't true.
 >
-> > > It's still quite new for me to submit patch, but if this patch should
-> > > be sent to ASoC maintainer maybe there is a line missing in the
-> > > MAINTAINERS file no ?
+> Nowadays pin settings in the GRF normally stay in the GRF and the same
+> is true for pins configured from PMU registers. But old socs like the
+> rk3188 really sprinkle pin settings somewhat randomly through both
+> for its bank0.
 >
-> > @Mark, comment?
+> Therefore add the option to specify a location for the route setting,
+> so that we can map older socs correctly. We'll keep "same" as the
+> default, so that we only need to specify a location in the corner-cases
+> described above.
 >
-> Adding a file pattern for this seems sensible, yes.
-OK,
+> Signed-off-by: Heiko Stuebner <heiko.stuebner@bq.com>
 
-I will send a v2 for the IMX6 Audmux bindings with ASoC List and Maintainers.
+Patch applied with David's review tag.
 
-Thanks,
-Clement
+Yours,
+Linus Walleij
