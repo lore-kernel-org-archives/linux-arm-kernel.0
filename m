@@ -1,25 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 17 Nov 2018 09:43:28 -0600
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
-Message-ID: <20181117154328.GA4095@bogus>
+Date: Sat, 17 Nov 2018 09:45:31 -0600
+Subject: [PATCH v2 12/25] of: net: kill of_get_nvmem_mac_address()
+In-Reply-To: <20181113140133.17385-13-brgl@bgdev.pl>
+References: <20181113140133.17385-1-brgl@bgdev.pl>
+ <20181113140133.17385-13-brgl@bgdev.pl>
+Message-ID: <20181117154531.GA7306@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 13 Nov 2018 11:31:08 +0530, Vignesh R wrote:
-> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
-> defining pinmux configs in human readable form, instead of raw-coded
-> hex values.
+On Tue, 13 Nov 2018 15:01:20 +0100, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> We've switched all users to nvmem_get_mac_address(). Remove the now
+> dead code.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > ---
->  MAINTAINERS                      |  1 +
->  include/dt-bindings/pinctrl/k3.h | 35 ++++++++++++++++++++++++++++++++
->  2 files changed, 36 insertions(+)
->  create mode 100644 include/dt-bindings/pinctrl/k3.h
+>  drivers/of/of_net.c    | 39 ---------------------------------------
+>  include/linux/of_net.h |  6 ------
+>  2 files changed, 45 deletions(-)
 > 
 
 Reviewed-by: Rob Herring <robh@kernel.org>
