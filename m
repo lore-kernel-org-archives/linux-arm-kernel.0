@@ -1,48 +1,72 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Nov 2018 10:57:14 -0800
-Subject: [PATCH 3/4] bpf: add __weak hook for allocating executable memory
-In-Reply-To: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
-References: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181117185715.25198-4-ard.biesheuvel@linaro.org>
+Date: Sat, 17 Nov 2018 10:57:11 -0800
+Subject: [PATCH 0/4] bpf: permit JIT allocations to be served outside the
+ module region
+Message-ID: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By default, BPF uses module_alloc() to allocate executable memory,
-but this is not necessary on all arches and potentially undesirable
-on some of them.
+On arm64, modules are allocated from a 128 MB window which is close to
+the core kernel, so that relative direct branches are guaranteed to be
+in range (except in some KASLR configurations). Also, module_alloc()
+is in charge of allocating KASAN shadow memory when running with KASAN
+enabled.
 
-So break out the module_alloc() call into a __weak function to allow
-it to be overridden in arch code.
+This means that the way BPF reuses module_alloc()/module_memfree() is
+undesirable on arm64 (and potentially other architectures as well),
+and so this series refactors BPF's use of those functions to permit
+architectures to change this behavior.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- kernel/bpf/core.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+Patch #1 fixes a bug introduced during the merge window, where the new
+alloc/free tracking does not account for memory that is freed by some
+arch code.
 
-diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
-index 29f766dac203..156d6b96ac6c 100644
---- a/kernel/bpf/core.c
-+++ b/kernel/bpf/core.c
-@@ -609,6 +609,11 @@ static void bpf_jit_uncharge_modmem(u32 pages)
- 	atomic_long_sub(pages, &bpf_jit_current);
- }
- 
-+void *__weak bpf_jit_alloc_exec(unsigned long size)
-+{
-+	return module_alloc(size);
-+}
-+
- struct bpf_binary_header *
- bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
- 		     unsigned int alignment,
-@@ -626,7 +631,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
- 
- 	if (bpf_jit_charge_modmem(pages))
- 		return NULL;
--	hdr = module_alloc(size);
-+	hdr = bpf_jit_alloc_exec(size);
- 	if (!hdr) {
- 		bpf_jit_uncharge_modmem(pages);
- 		return NULL;
+Patch #2 refactors the freeing path so that architectures can switch to
+something other than module_memfree().
+
+Patch #3 does the same for module_alloc().
+
+Patch #4 implements the new alloc/free overrides for arm64
+
+Cc: Daniel Borkmann <daniel@iogearbox.net>
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Rick Edgecombe <rick.p.edgecombe@intel.com>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Jann Horn <jannh@google.com>
+Cc: Kees Cook <keescook@chromium.org>
+
+Cc: Jessica Yu <jeyu@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Paul Burton <paul.burton@mips.com>
+Cc: James Hogan <jhogan@kernel.org>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-mips at linux-mips.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: sparclinux at vger.kernel.org
+Cc: netdev at vger.kernel.org
+
+Ard Biesheuvel (4):
+  bpf: account for freed JIT allocations in arch code
+  net/bpf: refactor freeing of executable allocations
+  bpf: add __weak hook for allocating executable memory
+  arm64/bpf: don't allocate BPF JIT programs in module memory
+
+ arch/arm64/net/bpf_jit_comp.c     | 11 ++++++++++
+ arch/mips/net/bpf_jit.c           |  7 ++-----
+ arch/powerpc/net/bpf_jit_comp.c   |  7 ++-----
+ arch/powerpc/net/bpf_jit_comp64.c | 12 +++--------
+ arch/sparc/net/bpf_jit_comp_32.c  |  7 ++-----
+ kernel/bpf/core.c                 | 22 ++++++++++----------
+ 6 files changed, 31 insertions(+), 35 deletions(-)
+
 -- 
 2.17.1
