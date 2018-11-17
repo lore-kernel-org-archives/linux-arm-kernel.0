@@ -1,46 +1,32 @@
-From: abailon@baylibre.com (abailon at baylibre.com)
-Date: Sat, 17 Nov 2018 12:19:05 +0100
-Subject: [RFC PATCH 2/2] dt-bindings: interconnect: Document imx7ulp
- interconnect bindings
-In-Reply-To: <20181117111905.29091-1-abailon@baylibre.com>
-References: <20181117111905.29091-1-abailon@baylibre.com>
-Message-ID: <20181117111905.29091-3-abailon@baylibre.com>
+From: peron.clem@gmail.com (=?UTF-8?B?Q2zDqW1lbnQgUMOpcm9u?=)
+Date: Sat, 17 Nov 2018 13:15:55 +0100
+Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
+In-Reply-To: <20181117030947.GX2089@sirena.org.uk>
+References: <20181105135802.30486-1-peron.clem@gmail.com>
+ <20181116025938.GH5829@dragon>
+ <CAJiuCcerEanEobbi8zPb1-eb=zCJsDAbM=p6T64+wtuXjtaMTA@mail.gmail.com>
+ <20181116144520.GO5829@dragon> <20181117030947.GX2089@sirena.org.uk>
+Message-ID: <CAJiuCccLyd0wBdCyOfjW41i1EQ7Uuj2ZpdR0cSz3Oirdd8n3Ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Bailon <abailon@baylibre.com>
+Hi Mark,
 
-This documents the device tree bindings for the interconnects
-present in the imx7ulp SoC.
+On Sat, 17 Nov 2018 at 04:09, Mark Brown <broonie@kernel.org> wrote:
+>
+> On Fri, Nov 16, 2018 at 10:45:22PM +0800, Shawn Guo wrote:
+> > On Fri, Nov 16, 2018 at 11:25:07AM +0100, Cl?ment P?ron wrote:
+>
+> > > It's still quite new for me to submit patch, but if this patch should
+> > > be sent to ASoC maintainer maybe there is a line missing in the
+> > > MAINTAINERS file no ?
+>
+> > @Mark, comment?
+>
+> Adding a file pattern for this seems sensible, yes.
+OK,
 
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- .../bindings/interconnect/imx7ulp.txt           | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interconnect/imx7ulp.txt
+I will send a v2 for the IMX6 Audmux bindings with ASoC List and Maintainers.
 
-diff --git a/Documentation/devicetree/bindings/interconnect/imx7ulp.txt b/Documentation/devicetree/bindings/interconnect/imx7ulp.txt
-new file mode 100644
-index 000000000000..c32b7becdca7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interconnect/imx7ulp.txt
-@@ -0,0 +1,17 @@
-+iMX7ULP interconnect driver binding
-+----------------------------------------------------
-+
-+Required properties :
-+- compatible : should be "fsl,imx7ulp-icc";
-+- #interconnect-cells : should contain 1
-+- clocks : list of phandles and specifiers to all interconnect bus clocks
-+- clock-names : clock names should include both "nic0_div" and "nic1_div"
-+
-+Examples:
-+	icc0: icc {
-+		compatible = "fsl,imx7ulp-icc";
-+		clocks = <&clks IMX7ULP_CLK_NIC0_DIV>,
-+			 <&clks IMX7ULP_CLK_NIC1_DIV>;
-+		clock-names = "nic0_div", "nic1_div";
-+		#interconnect-cells = <1>;
-+	};
--- 
-2.18.1
+Thanks,
+Clement
