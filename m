@@ -1,295 +1,207 @@
 From: ebiggers@kernel.org (Eric Biggers)
-Date: Fri, 16 Nov 2018 17:26:24 -0800
-Subject: [PATCH v4 07/14] crypto: arm/chacha20 - add XChaCha20 support
+Date: Fri, 16 Nov 2018 17:26:27 -0800
+Subject: [PATCH v4 10/14] crypto: poly1305 - use structures for key and
+ accumulator
 In-Reply-To: <20181117012631.23528-1-ebiggers@kernel.org>
 References: <20181117012631.23528-1-ebiggers@kernel.org>
-Message-ID: <20181117012631.23528-8-ebiggers@kernel.org>
+Message-ID: <20181117012631.23528-11-ebiggers@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Biggers <ebiggers@google.com>
 
-Add an XChaCha20 implementation that is hooked up to the ARM NEON
-implementation of ChaCha20.  This is needed for use in the Adiantum
-encryption mode; see the generic code patch,
-"crypto: chacha20-generic - add XChaCha20 support", for more details.
+In preparation for exposing a low-level Poly1305 API which implements
+the ?-almost-?-universal (?A?U) hash function underlying the Poly1305
+MAC and supports block-aligned inputs only, create structures
+poly1305_key and poly1305_state which hold the limbs of the Poly1305
+"r" key and accumulator, respectively.
 
-We also update the NEON code to support HChaCha20 on one block, so we
-can use that in XChaCha20 rather than calling the generic HChaCha20.
-This required factoring the permutation out into its own macro.
+These structures could actually have the same type (e.g. poly1305_val),
+but different types are preferable, to prevent misuse.
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Martin Willi <martin@strongswan.org>
 Signed-off-by: Eric Biggers <ebiggers@google.com>
 ---
- arch/arm/crypto/Kconfig              |   2 +-
- arch/arm/crypto/chacha20-neon-core.S |  70 ++++++++++++------
- arch/arm/crypto/chacha20-neon-glue.c | 103 ++++++++++++++++++++-------
- 3 files changed, 126 insertions(+), 49 deletions(-)
+ arch/x86/crypto/poly1305_glue.c | 20 +++++++------
+ crypto/poly1305_generic.c       | 52 ++++++++++++++++-----------------
+ include/crypto/poly1305.h       | 12 ++++++--
+ 3 files changed, 47 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/crypto/Kconfig b/arch/arm/crypto/Kconfig
-index 0473a8f68389..a08759c32cb9 100644
---- a/arch/arm/crypto/Kconfig
-+++ b/arch/arm/crypto/Kconfig
-@@ -126,7 +126,7 @@ config CRYPTO_CRC32_ARM_CE
- 	select CRYPTO_HASH
- 
- config CRYPTO_CHACHA20_NEON
--	tristate "NEON accelerated ChaCha20 symmetric cipher"
-+	tristate "NEON accelerated ChaCha20 stream cipher algorithms"
- 	depends on KERNEL_MODE_NEON
- 	select CRYPTO_BLKCIPHER
- 	select CRYPTO_CHACHA20
-diff --git a/arch/arm/crypto/chacha20-neon-core.S b/arch/arm/crypto/chacha20-neon-core.S
-index 50e7b9896818..2335e5055d2b 100644
---- a/arch/arm/crypto/chacha20-neon-core.S
-+++ b/arch/arm/crypto/chacha20-neon-core.S
-@@ -52,27 +52,16 @@
- 	.fpu		neon
- 	.align		5
- 
--ENTRY(chacha20_block_xor_neon)
--	// r0: Input state matrix, s
--	// r1: 1 data block output, o
--	// r2: 1 data block input, i
--
--	//
--	// This function encrypts one ChaCha20 block by loading the state matrix
--	// in four NEON registers. It performs matrix operation on four words in
--	// parallel, but requireds shuffling to rearrange the words after each
--	// round.
--	//
--
--	// x0..3 = s0..3
--	add		ip, r0, #0x20
--	vld1.32		{q0-q1}, [r0]
--	vld1.32		{q2-q3}, [ip]
--
--	vmov		q8, q0
--	vmov		q9, q1
--	vmov		q10, q2
--	vmov		q11, q3
-+/*
-+ * chacha20_permute - permute one block
-+ *
-+ * Permute one 64-byte block where the state matrix is stored in the four NEON
-+ * registers q0-q3.  It performs matrix operations on four words in parallel,
-+ * but requires shuffling to rearrange the words after each round.
-+ *
-+ * Clobbers: r3, ip, q4-q5
-+ */
-+chacha20_permute:
- 
- 	adr		ip, .Lrol8_table
- 	mov		r3, #10
-@@ -142,6 +131,27 @@ ENTRY(chacha20_block_xor_neon)
- 	subs		r3, r3, #1
- 	bne		.Ldoubleround
- 
-+	bx		lr
-+ENDPROC(chacha20_permute)
-+
-+ENTRY(chacha20_block_xor_neon)
-+	// r0: Input state matrix, s
-+	// r1: 1 data block output, o
-+	// r2: 1 data block input, i
-+	push		{lr}
-+
-+	// x0..3 = s0..3
-+	add		ip, r0, #0x20
-+	vld1.32		{q0-q1}, [r0]
-+	vld1.32		{q2-q3}, [ip]
-+
-+	vmov		q8, q0
-+	vmov		q9, q1
-+	vmov		q10, q2
-+	vmov		q11, q3
-+
-+	bl		chacha20_permute
-+
- 	add		ip, r2, #0x20
- 	vld1.8		{q4-q5}, [r2]
- 	vld1.8		{q6-q7}, [ip]
-@@ -166,9 +176,25 @@ ENTRY(chacha20_block_xor_neon)
- 	vst1.8		{q0-q1}, [r1]
- 	vst1.8		{q2-q3}, [ip]
- 
--	bx		lr
-+	pop		{pc}
- ENDPROC(chacha20_block_xor_neon)
- 
-+ENTRY(hchacha20_block_neon)
-+	// r0: Input state matrix, s
-+	// r1: output (8 32-bit words)
-+	push		{lr}
-+
-+	vld1.32		{q0-q1}, [r0]!
-+	vld1.32		{q2-q3}, [r0]
-+
-+	bl		chacha20_permute
-+
-+	vst1.32		{q0}, [r1]!
-+	vst1.32		{q3}, [r1]
-+
-+	pop		{pc}
-+ENDPROC(hchacha20_block_neon)
-+
- 	.align		4
- .Lctrinc:	.word	0, 1, 2, 3
- .Lrol8_table:	.byte	3, 0, 1, 2, 7, 4, 5, 6
-diff --git a/arch/arm/crypto/chacha20-neon-glue.c b/arch/arm/crypto/chacha20-neon-glue.c
-index 2bc035cb8f23..f2d3b0f70a8d 100644
---- a/arch/arm/crypto/chacha20-neon-glue.c
-+++ b/arch/arm/crypto/chacha20-neon-glue.c
-@@ -1,5 +1,5 @@
- /*
-- * ChaCha20 256-bit cipher algorithm, RFC7539, ARM NEON functions
-+ * ChaCha20 (RFC7539) and XChaCha20 stream ciphers, NEON accelerated
-  *
-  * Copyright (C) 2016 Linaro, Ltd. <ard.biesheuvel@linaro.org>
-  *
-@@ -30,6 +30,7 @@
- 
- asmlinkage void chacha20_block_xor_neon(u32 *state, u8 *dst, const u8 *src);
- asmlinkage void chacha20_4block_xor_neon(u32 *state, u8 *dst, const u8 *src);
-+asmlinkage void hchacha20_block_neon(const u32 *state, u32 *out);
- 
- static void chacha20_doneon(u32 *state, u8 *dst, const u8 *src,
- 			    unsigned int bytes)
-@@ -57,20 +58,16 @@ static void chacha20_doneon(u32 *state, u8 *dst, const u8 *src,
+diff --git a/arch/x86/crypto/poly1305_glue.c b/arch/x86/crypto/poly1305_glue.c
+index f012b7e28ad1..88cc01506c84 100644
+--- a/arch/x86/crypto/poly1305_glue.c
++++ b/arch/x86/crypto/poly1305_glue.c
+@@ -83,35 +83,37 @@ static unsigned int poly1305_simd_blocks(struct poly1305_desc_ctx *dctx,
+ 	if (poly1305_use_avx2 && srclen >= POLY1305_BLOCK_SIZE * 4) {
+ 		if (unlikely(!sctx->wset)) {
+ 			if (!sctx->uset) {
+-				memcpy(sctx->u, dctx->r, sizeof(sctx->u));
+-				poly1305_simd_mult(sctx->u, dctx->r);
++				memcpy(sctx->u, dctx->r.r, sizeof(sctx->u));
++				poly1305_simd_mult(sctx->u, dctx->r.r);
+ 				sctx->uset = true;
+ 			}
+ 			memcpy(sctx->u + 5, sctx->u, sizeof(sctx->u));
+-			poly1305_simd_mult(sctx->u + 5, dctx->r);
++			poly1305_simd_mult(sctx->u + 5, dctx->r.r);
+ 			memcpy(sctx->u + 10, sctx->u + 5, sizeof(sctx->u));
+-			poly1305_simd_mult(sctx->u + 10, dctx->r);
++			poly1305_simd_mult(sctx->u + 10, dctx->r.r);
+ 			sctx->wset = true;
+ 		}
+ 		blocks = srclen / (POLY1305_BLOCK_SIZE * 4);
+-		poly1305_4block_avx2(dctx->h, src, dctx->r, blocks, sctx->u);
++		poly1305_4block_avx2(dctx->h.h, src, dctx->r.r, blocks,
++				     sctx->u);
+ 		src += POLY1305_BLOCK_SIZE * 4 * blocks;
+ 		srclen -= POLY1305_BLOCK_SIZE * 4 * blocks;
  	}
- }
- 
--static int chacha20_neon(struct skcipher_request *req)
-+static int chacha20_neon_stream_xor(struct skcipher_request *req,
-+				    struct chacha_ctx *ctx, u8 *iv)
+ #endif
+ 	if (likely(srclen >= POLY1305_BLOCK_SIZE * 2)) {
+ 		if (unlikely(!sctx->uset)) {
+-			memcpy(sctx->u, dctx->r, sizeof(sctx->u));
+-			poly1305_simd_mult(sctx->u, dctx->r);
++			memcpy(sctx->u, dctx->r.r, sizeof(sctx->u));
++			poly1305_simd_mult(sctx->u, dctx->r.r);
+ 			sctx->uset = true;
+ 		}
+ 		blocks = srclen / (POLY1305_BLOCK_SIZE * 2);
+-		poly1305_2block_sse2(dctx->h, src, dctx->r, blocks, sctx->u);
++		poly1305_2block_sse2(dctx->h.h, src, dctx->r.r, blocks,
++				     sctx->u);
+ 		src += POLY1305_BLOCK_SIZE * 2 * blocks;
+ 		srclen -= POLY1305_BLOCK_SIZE * 2 * blocks;
+ 	}
+ 	if (srclen >= POLY1305_BLOCK_SIZE) {
+-		poly1305_block_sse2(dctx->h, src, dctx->r, 1);
++		poly1305_block_sse2(dctx->h.h, src, dctx->r.r, 1);
+ 		srclen -= POLY1305_BLOCK_SIZE;
+ 	}
+ 	return srclen;
+diff --git a/crypto/poly1305_generic.c b/crypto/poly1305_generic.c
+index 47d3a6b83931..a23173f351b7 100644
+--- a/crypto/poly1305_generic.c
++++ b/crypto/poly1305_generic.c
+@@ -38,7 +38,7 @@ int crypto_poly1305_init(struct shash_desc *desc)
  {
--	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
--	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
- 	struct skcipher_walk walk;
- 	u32 state[16];
- 	int err;
+ 	struct poly1305_desc_ctx *dctx = shash_desc_ctx(desc);
  
--	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
--		return crypto_chacha_crypt(req);
--
- 	err = skcipher_walk_virt(&walk, req, false);
- 
--	crypto_chacha_init(state, ctx, walk.iv);
-+	crypto_chacha_init(state, ctx, iv);
- 
- 	while (walk.nbytes > 0) {
- 		unsigned int nbytes = walk.nbytes;
-@@ -88,22 +85,73 @@ static int chacha20_neon(struct skcipher_request *req)
- 	return err;
- }
- 
--static struct skcipher_alg alg = {
--	.base.cra_name		= "chacha20",
--	.base.cra_driver_name	= "chacha20-neon",
--	.base.cra_priority	= 300,
--	.base.cra_blocksize	= 1,
--	.base.cra_ctxsize	= sizeof(struct chacha_ctx),
--	.base.cra_module	= THIS_MODULE,
--
--	.min_keysize		= CHACHA_KEY_SIZE,
--	.max_keysize		= CHACHA_KEY_SIZE,
--	.ivsize			= CHACHA_IV_SIZE,
--	.chunksize		= CHACHA_BLOCK_SIZE,
--	.walksize		= 4 * CHACHA_BLOCK_SIZE,
--	.setkey			= crypto_chacha20_setkey,
--	.encrypt		= chacha20_neon,
--	.decrypt		= chacha20_neon,
-+static int chacha20_neon(struct skcipher_request *req)
-+{
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-+	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
-+
-+	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
-+		return crypto_chacha_crypt(req);
-+
-+	return chacha20_neon_stream_xor(req, ctx, req->iv);
-+}
-+
-+static int xchacha20_neon(struct skcipher_request *req)
-+{
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
-+	struct chacha_ctx *ctx = crypto_skcipher_ctx(tfm);
-+	struct chacha_ctx subctx;
-+	u32 state[16];
-+	u8 real_iv[16];
-+
-+	if (req->cryptlen <= CHACHA_BLOCK_SIZE || !may_use_simd())
-+		return crypto_xchacha_crypt(req);
-+
-+	crypto_chacha_init(state, ctx, req->iv);
-+
-+	kernel_neon_begin();
-+	hchacha20_block_neon(state, subctx.key);
-+	kernel_neon_end();
-+
-+	memcpy(&real_iv[0], req->iv + 24, 8);
-+	memcpy(&real_iv[8], req->iv + 16, 8);
-+	return chacha20_neon_stream_xor(req, &subctx, real_iv);
-+}
-+
-+static struct skcipher_alg algs[] = {
-+	{
-+		.base.cra_name		= "chacha20",
-+		.base.cra_driver_name	= "chacha20-neon",
-+		.base.cra_priority	= 300,
-+		.base.cra_blocksize	= 1,
-+		.base.cra_ctxsize	= sizeof(struct chacha_ctx),
-+		.base.cra_module	= THIS_MODULE,
-+
-+		.min_keysize		= CHACHA_KEY_SIZE,
-+		.max_keysize		= CHACHA_KEY_SIZE,
-+		.ivsize			= CHACHA_IV_SIZE,
-+		.chunksize		= CHACHA_BLOCK_SIZE,
-+		.walksize		= 4 * CHACHA_BLOCK_SIZE,
-+		.setkey			= crypto_chacha20_setkey,
-+		.encrypt		= chacha20_neon,
-+		.decrypt		= chacha20_neon,
-+	}, {
-+		.base.cra_name		= "xchacha20",
-+		.base.cra_driver_name	= "xchacha20-neon",
-+		.base.cra_priority	= 300,
-+		.base.cra_blocksize	= 1,
-+		.base.cra_ctxsize	= sizeof(struct chacha_ctx),
-+		.base.cra_module	= THIS_MODULE,
-+
-+		.min_keysize		= CHACHA_KEY_SIZE,
-+		.max_keysize		= CHACHA_KEY_SIZE,
-+		.ivsize			= XCHACHA_IV_SIZE,
-+		.chunksize		= CHACHA_BLOCK_SIZE,
-+		.walksize		= 4 * CHACHA_BLOCK_SIZE,
-+		.setkey			= crypto_chacha20_setkey,
-+		.encrypt		= xchacha20_neon,
-+		.decrypt		= xchacha20_neon,
-+	}
- };
- 
- static int __init chacha20_simd_mod_init(void)
-@@ -111,12 +159,12 @@ static int __init chacha20_simd_mod_init(void)
- 	if (!(elf_hwcap & HWCAP_NEON))
- 		return -ENODEV;
- 
--	return crypto_register_skcipher(&alg);
-+	return crypto_register_skciphers(algs, ARRAY_SIZE(algs));
- }
- 
- static void __exit chacha20_simd_mod_fini(void)
+-	memset(dctx->h, 0, sizeof(dctx->h));
++	memset(dctx->h.h, 0, sizeof(dctx->h.h));
+ 	dctx->buflen = 0;
+ 	dctx->rset = false;
+ 	dctx->sset = false;
+@@ -50,11 +50,11 @@ EXPORT_SYMBOL_GPL(crypto_poly1305_init);
+ static void poly1305_setrkey(struct poly1305_desc_ctx *dctx, const u8 *key)
  {
--	crypto_unregister_skcipher(&alg);
-+	crypto_unregister_skciphers(algs, ARRAY_SIZE(algs));
+ 	/* r &= 0xffffffc0ffffffc0ffffffc0fffffff */
+-	dctx->r[0] = (get_unaligned_le32(key +  0) >> 0) & 0x3ffffff;
+-	dctx->r[1] = (get_unaligned_le32(key +  3) >> 2) & 0x3ffff03;
+-	dctx->r[2] = (get_unaligned_le32(key +  6) >> 4) & 0x3ffc0ff;
+-	dctx->r[3] = (get_unaligned_le32(key +  9) >> 6) & 0x3f03fff;
+-	dctx->r[4] = (get_unaligned_le32(key + 12) >> 8) & 0x00fffff;
++	dctx->r.r[0] = (get_unaligned_le32(key +  0) >> 0) & 0x3ffffff;
++	dctx->r.r[1] = (get_unaligned_le32(key +  3) >> 2) & 0x3ffff03;
++	dctx->r.r[2] = (get_unaligned_le32(key +  6) >> 4) & 0x3ffc0ff;
++	dctx->r.r[3] = (get_unaligned_le32(key +  9) >> 6) & 0x3f03fff;
++	dctx->r.r[4] = (get_unaligned_le32(key + 12) >> 8) & 0x00fffff;
  }
  
- module_init(chacha20_simd_mod_init);
-@@ -125,3 +173,6 @@ module_exit(chacha20_simd_mod_fini);
- MODULE_AUTHOR("Ard Biesheuvel <ard.biesheuvel@linaro.org>");
- MODULE_LICENSE("GPL v2");
- MODULE_ALIAS_CRYPTO("chacha20");
-+MODULE_ALIAS_CRYPTO("chacha20-neon");
-+MODULE_ALIAS_CRYPTO("xchacha20");
-+MODULE_ALIAS_CRYPTO("xchacha20-neon");
+ static void poly1305_setskey(struct poly1305_desc_ctx *dctx, const u8 *key)
+@@ -107,22 +107,22 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
+ 		srclen = datalen;
+ 	}
+ 
+-	r0 = dctx->r[0];
+-	r1 = dctx->r[1];
+-	r2 = dctx->r[2];
+-	r3 = dctx->r[3];
+-	r4 = dctx->r[4];
++	r0 = dctx->r.r[0];
++	r1 = dctx->r.r[1];
++	r2 = dctx->r.r[2];
++	r3 = dctx->r.r[3];
++	r4 = dctx->r.r[4];
+ 
+ 	s1 = r1 * 5;
+ 	s2 = r2 * 5;
+ 	s3 = r3 * 5;
+ 	s4 = r4 * 5;
+ 
+-	h0 = dctx->h[0];
+-	h1 = dctx->h[1];
+-	h2 = dctx->h[2];
+-	h3 = dctx->h[3];
+-	h4 = dctx->h[4];
++	h0 = dctx->h.h[0];
++	h1 = dctx->h.h[1];
++	h2 = dctx->h.h[2];
++	h3 = dctx->h.h[3];
++	h4 = dctx->h.h[4];
+ 
+ 	while (likely(srclen >= POLY1305_BLOCK_SIZE)) {
+ 
+@@ -157,11 +157,11 @@ static unsigned int poly1305_blocks(struct poly1305_desc_ctx *dctx,
+ 		srclen -= POLY1305_BLOCK_SIZE;
+ 	}
+ 
+-	dctx->h[0] = h0;
+-	dctx->h[1] = h1;
+-	dctx->h[2] = h2;
+-	dctx->h[3] = h3;
+-	dctx->h[4] = h4;
++	dctx->h.h[0] = h0;
++	dctx->h.h[1] = h1;
++	dctx->h.h[2] = h2;
++	dctx->h.h[3] = h3;
++	dctx->h.h[4] = h4;
+ 
+ 	return srclen;
+ }
+@@ -220,11 +220,11 @@ int crypto_poly1305_final(struct shash_desc *desc, u8 *dst)
+ 	}
+ 
+ 	/* fully carry h */
+-	h0 = dctx->h[0];
+-	h1 = dctx->h[1];
+-	h2 = dctx->h[2];
+-	h3 = dctx->h[3];
+-	h4 = dctx->h[4];
++	h0 = dctx->h.h[0];
++	h1 = dctx->h.h[1];
++	h2 = dctx->h.h[2];
++	h3 = dctx->h.h[3];
++	h4 = dctx->h.h[4];
+ 
+ 	h2 += (h1 >> 26);     h1 = h1 & 0x3ffffff;
+ 	h3 += (h2 >> 26);     h2 = h2 & 0x3ffffff;
+diff --git a/include/crypto/poly1305.h b/include/crypto/poly1305.h
+index f718a19da82f..493244c46664 100644
+--- a/include/crypto/poly1305.h
++++ b/include/crypto/poly1305.h
+@@ -13,13 +13,21 @@
+ #define POLY1305_KEY_SIZE	32
+ #define POLY1305_DIGEST_SIZE	16
+ 
++struct poly1305_key {
++	u32 r[5];	/* key, base 2^26 */
++};
++
++struct poly1305_state {
++	u32 h[5];	/* accumulator, base 2^26 */
++};
++
+ struct poly1305_desc_ctx {
+ 	/* key */
+-	u32 r[5];
++	struct poly1305_key r;
+ 	/* finalize key */
+ 	u32 s[4];
+ 	/* accumulator */
+-	u32 h[5];
++	struct poly1305_state h;
+ 	/* partial buffer */
+ 	u8 buf[POLY1305_BLOCK_SIZE];
+ 	/* bytes used in partial buffer */
 -- 
 2.19.1.1215.g8438c0b245-goog
