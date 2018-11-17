@@ -1,86 +1,134 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 17 Nov 2018 10:57:12 -0800
-Subject: [PATCH 1/4] bpf: account for freed JIT allocations in arch code
+Date: Sat, 17 Nov 2018 10:57:13 -0800
+Subject: [PATCH 2/4] net/bpf: refactor freeing of executable allocations
 In-Reply-To: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
 References: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181117185715.25198-2-ard.biesheuvel@linaro.org>
+Message-ID: <20181117185715.25198-3-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit ede95a63b5e84 ("bpf: add bpf_jit_limit knob to restrict unpriv
-allocations") added a call to bpf_jit_uncharge_modmem() to the routine
-bpf_jit_binary_free() which is called from the __weak bpf_jit_free().
-This function is overridden by arches, some of which do not call
-bpf_jit_binary_free() to release the memory, and so the released
-memory is not accounted for, potentially leading to spurious allocation
-failures.
+All arch overrides of the __weak bpf_jit_free() amount to the same
+thing: the allocated memory was never mapped read-only, and so
+it does not have to be remapped to read-write before being freed.
 
-So replace the direct calls to module_memfree() in the arch code with
-calls to bpf_jit_binary_free().
+So in preparation of permitting arches to serve allocations for BPF
+JIT programs from other regions than the module region, refactor
+the existing bpf_jit_free() implementations to use the shared code
+where possible, and only specialize the remap and free operations.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/mips/net/bpf_jit.c           | 2 +-
- arch/powerpc/net/bpf_jit_comp.c   | 2 +-
- arch/powerpc/net/bpf_jit_comp64.c | 5 +----
- arch/sparc/net/bpf_jit_comp_32.c  | 2 +-
- 4 files changed, 4 insertions(+), 7 deletions(-)
+ arch/mips/net/bpf_jit.c           |  7 ++-----
+ arch/powerpc/net/bpf_jit_comp.c   |  7 ++-----
+ arch/powerpc/net/bpf_jit_comp64.c |  9 +++------
+ arch/sparc/net/bpf_jit_comp_32.c  |  7 ++-----
+ kernel/bpf/core.c                 | 15 +++++----------
+ 5 files changed, 14 insertions(+), 31 deletions(-)
 
 diff --git a/arch/mips/net/bpf_jit.c b/arch/mips/net/bpf_jit.c
-index 4d8cb9bb8365..1b69897274a1 100644
+index 1b69897274a1..5696bd7dccc7 100644
 --- a/arch/mips/net/bpf_jit.c
 +++ b/arch/mips/net/bpf_jit.c
-@@ -1264,7 +1264,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
- void bpf_jit_free(struct bpf_prog *fp)
- {
- 	if (fp->jited)
--		module_memfree(fp->bpf_func);
-+		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+@@ -1261,10 +1261,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
+ 	kfree(ctx.offsets);
+ }
  
- 	bpf_prog_unlock_free(fp);
+-void bpf_jit_free(struct bpf_prog *fp)
++void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+-	if (fp->jited)
+-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+-
+-	bpf_prog_unlock_free(fp);
++	module_memfree(hdr);
  }
 diff --git a/arch/powerpc/net/bpf_jit_comp.c b/arch/powerpc/net/bpf_jit_comp.c
-index d5bfe24bb3b5..a1ea1ea6b40d 100644
+index a1ea1ea6b40d..5b5ce4a1b44b 100644
 --- a/arch/powerpc/net/bpf_jit_comp.c
 +++ b/arch/powerpc/net/bpf_jit_comp.c
-@@ -683,7 +683,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
- void bpf_jit_free(struct bpf_prog *fp)
- {
- 	if (fp->jited)
--		module_memfree(fp->bpf_func);
-+		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+@@ -680,10 +680,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
+ 	return;
+ }
  
- 	bpf_prog_unlock_free(fp);
+-void bpf_jit_free(struct bpf_prog *fp)
++void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+-	if (fp->jited)
+-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+-
+-	bpf_prog_unlock_free(fp);
++	module_memfree(hdr);
  }
 diff --git a/arch/powerpc/net/bpf_jit_comp64.c b/arch/powerpc/net/bpf_jit_comp64.c
-index 50b129785aee..84c8f013a6c6 100644
+index 84c8f013a6c6..f64f1294bd62 100644
 --- a/arch/powerpc/net/bpf_jit_comp64.c
 +++ b/arch/powerpc/net/bpf_jit_comp64.c
-@@ -1024,11 +1024,8 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
- /* Overriding bpf_jit_free() as we don't set images read-only. */
- void bpf_jit_free(struct bpf_prog *fp)
- {
--	unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
--	struct bpf_binary_header *bpf_hdr = (void *)addr;
--
- 	if (fp->jited)
--		bpf_jit_binary_free(bpf_hdr);
-+		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+@@ -1021,11 +1021,8 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
+ 	return fp;
+ }
  
- 	bpf_prog_unlock_free(fp);
+-/* Overriding bpf_jit_free() as we don't set images read-only. */
+-void bpf_jit_free(struct bpf_prog *fp)
++/* Overriding bpf_jit_binary_free() as we don't set images read-only. */
++void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+-	if (fp->jited)
+-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+-
+-	bpf_prog_unlock_free(fp);
++	module_memfree(hdr);
  }
 diff --git a/arch/sparc/net/bpf_jit_comp_32.c b/arch/sparc/net/bpf_jit_comp_32.c
-index a5ff88643d5c..01bda6bc9e7f 100644
+index 01bda6bc9e7f..589950d152cc 100644
 --- a/arch/sparc/net/bpf_jit_comp_32.c
 +++ b/arch/sparc/net/bpf_jit_comp_32.c
-@@ -759,7 +759,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
- void bpf_jit_free(struct bpf_prog *fp)
- {
- 	if (fp->jited)
--		module_memfree(fp->bpf_func);
-+		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
- 
- 	bpf_prog_unlock_free(fp);
+@@ -756,10 +756,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
+ 	return;
  }
+ 
+-void bpf_jit_free(struct bpf_prog *fp)
++void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+-	if (fp->jited)
+-		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
+-
+-	bpf_prog_unlock_free(fp);
++	module_memfree(hdr);
+ }
+diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
+index 1a796e0799ec..29f766dac203 100644
+--- a/kernel/bpf/core.c
++++ b/kernel/bpf/core.c
+@@ -646,25 +646,20 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+ 	return hdr;
+ }
+ 
+-void bpf_jit_binary_free(struct bpf_binary_header *hdr)
++void __weak bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+-	u32 pages = hdr->pages;
+-
++	bpf_jit_binary_unlock_ro(hdr);
+ 	module_memfree(hdr);
+-	bpf_jit_uncharge_modmem(pages);
+ }
+ 
+-/* This symbol is only overridden by archs that have different
+- * requirements than the usual eBPF JITs, f.e. when they only
+- * implement cBPF JIT, do not set images read-only, etc.
+- */
+-void __weak bpf_jit_free(struct bpf_prog *fp)
++void bpf_jit_free(struct bpf_prog *fp)
+ {
+ 	if (fp->jited) {
+ 		struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
++		u32 pages = hdr->pages;
+ 
+-		bpf_jit_binary_unlock_ro(hdr);
+ 		bpf_jit_binary_free(hdr);
++		bpf_jit_uncharge_modmem(pages);
+ 
+ 		WARN_ON_ONCE(!bpf_prog_kallsyms_verify_off(fp));
+ 	}
 -- 
 2.17.1
