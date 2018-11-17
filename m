@@ -1,29 +1,31 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 16 Nov 2018 19:09:47 -0800
-Subject: [PATCH] ASoC: imx-audmux: complete dt-bindings for imx6
-In-Reply-To: <20181116144520.GO5829@dragon>
-References: <20181105135802.30486-1-peron.clem@gmail.com>
- <20181116025938.GH5829@dragon>
- <CAJiuCcerEanEobbi8zPb1-eb=zCJsDAbM=p6T64+wtuXjtaMTA@mail.gmail.com>
- <20181116144520.GO5829@dragon>
-Message-ID: <20181117030947.GX2089@sirena.org.uk>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 16 Nov 2018 19:23:59 -0800 (PST)
+Subject: [PATCH net] net: mvneta: Don't advertise 2.5G modes
+In-Reply-To: <20181109081733.24458-1-maxime.chevallier@bootlin.com>
+References: <20181109081733.24458-1-maxime.chevallier@bootlin.com>
+Message-ID: <20181116.192359.2155059571366826538.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:45:22PM +0800, Shawn Guo wrote:
-> On Fri, Nov 16, 2018 at 11:25:07AM +0100, Cl?ment P?ron wrote:
+From: Maxime Chevallier <maxime.chevallier@bootlin.com>
+Date: Fri,  9 Nov 2018 09:17:33 +0100
 
-> > It's still quite new for me to submit patch, but if this patch should
-> > be sent to ASoC maintainer maybe there is a line missing in the
-> > MAINTAINERS file no ?
+> Using 2.5G speed relies on the SerDes lanes being configured
+> accordingly. The lanes have to be reconfigured to switch between
+> 1G and 2.5G, and for now only the bootloader does this configuration.
+> 
+> In the case we add a Comphy driver to handle switching the lanes
+> dynamically, it's better for now to stick with supporting only 1G and
+> add advertisement for 2.5G once we really are capable of handling both
+> speeds without problem.
+> 
+> Since the interface mode is initialy taken from the DT, we want to make
+> sure that adding comphy support won't break boards that don't update
+> their dtb.
+> 
+> Fixes: da58a931f248 ("net: mvneta: Add support for 2500Mbps SGMII")
+> Reported-by: Andrew Lunn <andrew@lunn.ch>
+> Reported-by: Russell King <linux@armlinux.org.uk>
+> Signed-off-by: Maxime Chevallier <maxime.chevallier@bootlin.com>
 
-> @Mark, comment?
-
-Adding a file pattern for this seems sensible, yes.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181116/6452e180/attachment.sig>
+Applied.
