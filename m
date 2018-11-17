@@ -1,25 +1,70 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 17 Nov 2018 13:27:05 +0100
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
-Message-ID: <CACRpkdYtvD+unm9sCRxJ1DYWM1viC8Pc6ge2TpRHYko4u0Ah3g@mail.gmail.com>
+From: pintu.ping@gmail.com (Pintu Agarwal)
+Date: Sat, 17 Nov 2018 18:36:12 +0530
+Subject: [ARM64] Printing IRQ stack usage information
+In-Reply-To: <15703.1542393111@turing-police.cc.vt.edu>
+References: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
+ <28496.1542300549@turing-police.cc.vt.edu>
+ <CAOuPNLj8wj=tPJo8L3oS7o8iTQcyhZ0W-GH6xmP_GsG4r7YdAQ@mail.gmail.com>
+ <49219.1542367988@turing-police.cc.vt.edu>
+ <CAOuPNLg4tM6Cw8Yf9rdpkBOU=+Fh654yFQeAhJf1y88Gb3MAew@mail.gmail.com>
+ <5997.1542386778@turing-police.cc.vt.edu>
+ <CAOuPNLiX0zhxiRAx03YjVU6cocwWbgY9naxeYPRKmT+3PoGhRw@mail.gmail.com>
+ <15703.1542393111@turing-police.cc.vt.edu>
+Message-ID: <CAOuPNLiJmtXft6g63oATMrrrcd3jQGCfxsAzXLx8Kz=_zsR4Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 7:00 AM Vignesh R <vigneshr@ti.com> wrote:
-
-> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
-> defining pinmux configs in human readable form, instead of raw-coded
-> hex values.
+On Sat, Nov 17, 2018 at 12:02 AM <valdis.kletnieks@vt.edu> wrote:
 >
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> On Fri, 16 Nov 2018 23:13:48 +0530, Pintu Agarwal said:
+> > On Fri, Nov 16, 2018 at 10:16 PM <valdis.kletnieks@vt.edu> wrote:
+>
+> > > Congrats. You just re-invented DEBUG_STACK_USAGE, which just keeps a high-water mark
+> > > for stack usage.
+> >
+> > So, you mean to say, my implementation is good enough to get the
+> > irq_stack usage, from the interrupt handler ?
+>
+> No - your code doesn't keep a high-water mark (which should probably be
+> hooked into the IRQ exit code.
+>
+> > But my concern is that if I dump it from irq handler, I will get
+> > information only for the current cpu.
+> > How do I store and get the information for all the cpu from the boot time ?
+>
+> Make the high-water mark a per-cpu variable.
+>
+> > From where do I call my dump_irq_stack_info() [some where during the
+> > entry/exit part of the irq handler], so that I could dump information
+> > for all the handler at boot time itself ?
+>
+> No, you don't do a dump-stack during entry/exit.  You just maintain a high-water
+> value in the exit,
 
-I guess you want to merge this through ARM SoC along witg the other
-patches so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Which is the right place to keep track of this
+high-water-irq-stack-usage (per_cpu)
+in arch/arm64/* ?
 
-Yours,
-Linus Walleij
+> and then you create a /proc/something or similar that when
+> read does a 'foreach CPU do print_high_water_irq'.
+>
+Ok got it.
+
+> > Like I would to capture these information:
+> > - What was the name of the handler ?
+> > - Which cpu was executing it ?
+> > - How much irq stack (max value, same like high water mark) were used
+> > at that time ?
+>
+> First, do the easy part and find out if you even *care* once you see actual
+> numbers.  If your IRQ stack is 8K but you never use more than 2500 bytes,
+> do you *really* care about the name of the handler anymore?
+>
+
+Hmm, yes, getting the name of the handler is not so important in the first run.
+
+> Also, see the code for /proc/interrupts to see how it keeps track of the
+> interrupts per CPU - maybe all you need to do is change each entry from
+> a 'count' to 'count, highwater'.
+
+Ok thanks, thats a good pointer.
