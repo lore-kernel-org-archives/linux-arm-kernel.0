@@ -1,27 +1,19 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 17 Nov 2018 10:06:03 -0600
-Subject: [PATCH v1 1/2] dt-bindings: i2c-stm32: SYSCFG Fast Mode Plus
- support for I2C STM32F7
-In-Reply-To: <1542370822-14721-2-git-send-email-pierre-yves.mordret@st.com>
-References: <1542370822-14721-1-git-send-email-pierre-yves.mordret@st.com>
- <1542370822-14721-2-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20181117160603.GA3681@bogus>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 17 Nov 2018 08:08:50 -0800
+Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
+ definitions
+In-Reply-To: <20181113060111.16374-2-vigneshr@ti.com>
+References: <20181113060111.16374-1-vigneshr@ti.com>
+ <20181113060111.16374-2-vigneshr@ti.com>
+Message-ID: <20181117160850.GN53235@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2018 13:20:21 +0100, Pierre-Yves MORDRET wrote:
-> Append optional bindings to update SYSCFG Fast Mode Plus bits if
-> Fast Mode Plus speed is selected.
-> 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> ---
->   Version history:
->     v1:
->        * Initial
-> ---
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-stm32.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
+* Vignesh R <vigneshr@ti.com> [181113 06:00]:
+> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
+> defining pinmux configs in human readable form, instead of raw-coded
+> hex values.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Looks good to me now too thanks:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
