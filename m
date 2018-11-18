@@ -1,33 +1,49 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 18 Nov 2018 02:28:28 +0100
-Subject: [PATCH 1/2] clocksource: Demote dbx500 PRCMU clocksource
-In-Reply-To: <20181115133203.28567-1-linus.walleij@linaro.org>
-References: <20181115133203.28567-1-linus.walleij@linaro.org>
-Message-ID: <ef535f28-04e3-d638-22da-7e0b64f367da@linaro.org>
+Date: Sun, 18 Nov 2018 02:48:32 +0100
+Subject: [PATCH] arm/twd: avoid waking deeply sleeping CPUs for rate
+ change notifier
+In-Reply-To: <1540812888.2582.4.camel@pengutronix.de>
+References: <20180417104627.29643-1-l.stach@pengutronix.de>
+ <1528733761.2842.8.camel@pengutronix.de>
+ <1540812888.2582.4.camel@pengutronix.de>
+Message-ID: <b488e260-515e-b257-01e9-39c517dee886@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/2018 14:32, Linus Walleij wrote:
-> Demote the DBx500 PRCMU clocksource to quality 100 and
-> mark it as NONSTOP so it will still be used for
-> timekeeping across suspend/resume.
+On 29/10/2018 12:34, Lucas Stach wrote:
+> Hi again,
 > 
-> The Nomadik MTU timer which has higher precision will
-> be used when the system is up and running, thanks to
-> the recent changes properly utilizing the suspend
-> clocksources.
+> Am Montag, den 11.06.2018, 18:16 +0200 schrieb Lucas Stach:
+>> Hi all,
+>>
+>> Am Dienstag, den 17.04.2018, 12:46 +0200 schrieb Lucas Stach:
+>>> The current clock notifier sends an IPI to all CPUs, even if they are in
+>>> deep sleep state with the local timer disabled and switched to tick
+>>> broadcast. This needlessly cuts the CPU sleep times, as nothing is gained
+>>> from updating a disabled TWDs rate.
+>>>
+>>> Keep track of the enabled TWDs and only send an IPI to those CPUs with an
+>>> active local timer. As disabled TWDs may now miss a CPU frequency update
+>>> we need to make sure to refresh the rate on re-enabling of the timer.
+>>>
+>>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+>>
+>> I would appreciate some feedback to this patch.
+>> FWIW, I've been running some systems with this patch applied for quite
+>> some time now with no issues spotted so far.
 > 
-> This was discussed back in 2011 when the driver was
-> written, but the infrastructure was not available
-> upstream to use this timer properly. Now the
-> infrastructure is there, so let's finalize the work.
-> 
-> Cc: Baolin Wang <baolin.wang@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
+> Can I persuade anyone to take a look at this?
+> It's been some months since I've posted this and haven't got any
+> feedback so far. I'm running this patch on a bunch of devices ever
+> since posting it and could not spot any adverse effects.
 
-Both applied, thanks!
+Hi Lucas,
 
+can you resend this patch (keeping the current recipient) but adding
+Thomas Gleixner and John Stultz, the maintainer of the time core framework.
+
+Thanks
+  -- Daniel
 
 -- 
  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
