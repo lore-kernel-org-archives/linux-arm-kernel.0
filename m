@@ -1,107 +1,31 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 18 Nov 2018 17:17:00 +0300
-Subject: [RFC PATCH v2 01/14] ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate
- ARMv5/v7 Allwinner SoCs
+Date: Sun, 18 Nov 2018 17:17:01 +0300
+Subject: [RFC PATCH v2 02/14] dt-bindings: arm: Add new Allwinner ARMv5
+ F1C100s SoC
 In-Reply-To: <cover.1542546735.git.mesihkilinc@gmail.com>
 References: <cover.1542546735.git.mesihkilinc@gmail.com>
-Message-ID: <abbb75165c8ef41da6963d72f4155ad6ae79140c.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <5ef0af61c17ae1fd523f15673042f63461e57cff.1542546735.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner also has some ARMv5 SoCs.
+Add new Allwinner ARMv5 F1C100s SoC's compatible string
 
-In order to add support for them, add a CONFIG_ARCH_SUNXI_V7 bool config
-which is selected when a ARMv7 soc is selected, and make CONFIG_ARCH_SUNXI
-a common option which is selected by both V7 and V5 sunxi option.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- arch/arm/mach-sunxi/Kconfig  | 25 +++++++++++++++++--------
- arch/arm/mach-sunxi/Makefile |  2 +-
- 2 files changed, 18 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index d9c8ecf..5db17ec 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -6,31 +6,38 @@ menuconfig ARCH_SUNXI
- 	select GENERIC_IRQ_CHIP
- 	select GPIOLIB
- 	select PINCTRL
--	select PM_OPP
--	select SUN4I_TIMER
- 	select RESET_CONTROLLER
-+	help
-+	  Support for Allwinner ARM-based family of processors
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index e4beec3..12f1b00 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -3,6 +3,7 @@ Allwinner sunXi Platforms Device Tree Bindings
+ Each device tree must specify which Allwinner SoC it uses,
+ using one of the following compatible strings:
  
- if ARCH_SUNXI
- 
-+if ARCH_MULTI_V7
-+
-+config ARCH_SUNXI_V7
-+	bool
-+	select PM_OPP
-+	select SUN4I_TIMER
-+
- config MACH_SUN4I
- 	bool "Allwinner A10 (sun4i) SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 
- config MACH_SUN5I
- 	bool "Allwinner A10s / A13 (sun5i) SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 	select SUN5I_HSTIMER
- 
- config MACH_SUN6I
- 	bool "Allwinner A31 (sun6i) SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
- 	select SUN5I_HSTIMER
- 
- config MACH_SUN7I
- 	bool "Allwinner A20 (sun7i) SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 	select ARM_GIC
- 	select ARM_PSCI
- 	select ARCH_SUPPORTS_BIG_ENDIAN
-@@ -39,13 +46,13 @@ config MACH_SUN7I
- 
- config MACH_SUN8I
- 	bool "Allwinner sun8i Family SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 	select ARM_GIC
- 	select MFD_SUN6I_PRCM
- 
- config MACH_SUN9I
- 	bool "Allwinner (sun9i) SoCs support"
--	default ARCH_SUNXI
-+	select ARCH_SUNXI_V7
- 	select ARM_GIC
- 
- config ARCH_SUNXI_MC_SMP
-@@ -56,3 +63,5 @@ config ARCH_SUNXI_MC_SMP
- 	select ARM_CPU_SUSPEND
- 
- endif
-+
-+endif
-diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
-index 71429aa..c9a83ab 100644
---- a/arch/arm/mach-sunxi/Makefile
-+++ b/arch/arm/mach-sunxi/Makefile
-@@ -1,5 +1,5 @@
- CFLAGS_mc_smp.o	+= -march=armv7-a
- 
--obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
-+obj-$(CONFIG_ARCH_SUNXI_V7) += sunxi.o
- obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o headsmp.o
- obj-$(CONFIG_SMP) += platsmp.o
++  allwinner,suniv-f1c100s
+   allwinner,sun4i-a10
+   allwinner,sun5i-a10s
+   allwinner,sun5i-a13
 -- 
 2.7.4
