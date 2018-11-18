@@ -1,31 +1,36 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 18 Nov 2018 17:17:01 +0300
-Subject: [RFC PATCH v2 02/14] dt-bindings: arm: Add new Allwinner ARMv5
- F1C100s SoC
+Date: Sun, 18 Nov 2018 17:17:03 +0300
+Subject: [RFC PATCH v2 04/14] dt-bindings: interrupt-controller: Add suniv
+ interrupt-controller
 In-Reply-To: <cover.1542546735.git.mesihkilinc@gmail.com>
 References: <cover.1542546735.git.mesihkilinc@gmail.com>
-Message-ID: <5ef0af61c17ae1fd523f15673042f63461e57cff.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <e51824832fac0b981cf886f25efc25056d573da4.1542546735.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add new Allwinner ARMv5 F1C100s SoC's compatible string
+Add compatible string for Alwinner suniv F1C100s SoC interrupt
+controller which is stripped version of sun4i
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
- 1 file changed, 1 insertion(+)
+ .../devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt  | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
-index e4beec3..12f1b00 100644
---- a/Documentation/devicetree/bindings/arm/sunxi.txt
-+++ b/Documentation/devicetree/bindings/arm/sunxi.txt
-@@ -3,6 +3,7 @@ Allwinner sunXi Platforms Device Tree Bindings
- Each device tree must specify which Allwinner SoC it uses,
- using one of the following compatible strings:
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+index b290ca1..e04ddb4 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/allwinner,sun4i-ic.txt
+@@ -2,7 +2,10 @@ Allwinner Sunxi Interrupt Controller
  
-+  allwinner,suniv-f1c100s
-   allwinner,sun4i-a10
-   allwinner,sun5i-a10s
-   allwinner,sun5i-a13
+ Required properties:
+ 
+-- compatible : should be "allwinner,sun4i-a10-ic"
++- compatible: should be "allwinner,<soc-familiy>-<soc-name>-ic" to identify
++	      Allwinner IRQ chip such as:
++              "allwinner,sun4i-a10-ic"
++              "allwinner,suniv-f1c100s-ic"
+ - reg : Specifies base physical address and size of the registers.
+ - interrupt-controller : Identifies the node as an interrupt controller
+ - #interrupt-cells : Specifies the number of cells needed to encode an
 -- 
 2.7.4
