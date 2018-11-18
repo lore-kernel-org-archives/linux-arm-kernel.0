@@ -1,82 +1,124 @@
-From: ys114321@gmail.com (Y Song)
-Date: Sun, 18 Nov 2018 07:48:59 +0000
-Subject: [PATCH 0/4] bpf: permit JIT allocations to be served outside the
- module region
-In-Reply-To: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
-References: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
-Message-ID: <CAH3MdRX5MYv-QQGj25APd4-17syF3Vc_f0AWpEgUoL46qbHrGQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sun, 18 Nov 2018 10:32:51 +0100
+Subject: [PATCH v2 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
+In-Reply-To: <75ca31ca-82f4-c9e9-0d73-29fde405c47c@baylibre.com>
+References: <20181114131627.17766-1-narmstrong@baylibre.com>
+ <75ca31ca-82f4-c9e9-0d73-29fde405c47c@baylibre.com>
+Message-ID: <5BF131C3.9040808@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2018 at 6:58 PM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> On arm64, modules are allocated from a 128 MB window which is close to
-> the core kernel, so that relative direct branches are guaranteed to be
-> in range (except in some KASLR configurations). Also, module_alloc()
-> is in charge of allocating KASAN shadow memory when running with KASAN
-> enabled.
->
-> This means that the way BPF reuses module_alloc()/module_memfree() is
-> undesirable on arm64 (and potentially other architectures as well),
-> and so this series refactors BPF's use of those functions to permit
-> architectures to change this behavior.
->
-> Patch #1 fixes a bug introduced during the merge window, where the new
-> alloc/free tracking does not account for memory that is freed by some
-> arch code.
->
-> Patch #2 refactors the freeing path so that architectures can switch to
-> something other than module_memfree().
->
-> Patch #3 does the same for module_alloc().
->
-> Patch #4 implements the new alloc/free overrides for arm64
+Le 14/11/2018 14:17, Neil Armstrong a ?crit :
+> On 14/11/2018 14:16, Neil Armstrong wrote:
+>> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
+>> clocks frequencyies.
+>> The precision is determined by stepping into the divider until the counter
+>> overflows.
+>> The debugfs slows a pretty summary and each clock can be measured
+>> individually aswell.
+>>
+>> Thsi patchset includes the dt-bindings, driver and the DT node added to the
+>> meson-gx dtsi.
 
-Except a minor comment, the whole patch set looks good to me.
-Acked-by: Yonghong Song <yhs@fb.com>
+I'll respin a v3 with the comments from Martin and Meson8 & Meson8b support !
 
->
-> Cc: Daniel Borkmann <daniel@iogearbox.net>
-> Cc: Alexei Starovoitov <ast@kernel.org>
-> Cc: Rick Edgecombe <rick.p.edgecombe@intel.com>
-> Cc: Eric Dumazet <eric.dumazet@gmail.com>
-> Cc: Jann Horn <jannh@google.com>
-> Cc: Kees Cook <keescook@chromium.org>
->
-> Cc: Jessica Yu <jeyu@kernel.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ralf Baechle <ralf@linux-mips.org>
-> Cc: Paul Burton <paul.burton@mips.com>
-> Cc: James Hogan <jhogan@kernel.org>
-> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> Cc: Paul Mackerras <paulus@samba.org>
-> Cc: Michael Ellerman <mpe@ellerman.id.au>
-> Cc: "David S. Miller" <davem@davemloft.net>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: sparclinux at vger.kernel.org
-> Cc: netdev at vger.kernel.org
->
-> Ard Biesheuvel (4):
->   bpf: account for freed JIT allocations in arch code
->   net/bpf: refactor freeing of executable allocations
->   bpf: add __weak hook for allocating executable memory
->   arm64/bpf: don't allocate BPF JIT programs in module memory
->
->  arch/arm64/net/bpf_jit_comp.c     | 11 ++++++++++
->  arch/mips/net/bpf_jit.c           |  7 ++-----
->  arch/powerpc/net/bpf_jit_comp.c   |  7 ++-----
->  arch/powerpc/net/bpf_jit_comp64.c | 12 +++--------
->  arch/sparc/net/bpf_jit_comp_32.c  |  7 ++-----
->  kernel/bpf/core.c                 | 22 ++++++++++----------
->  6 files changed, 31 insertions(+), 35 deletions(-)
->
-> --
-> 2.17.1
->
+Neil
+
+>>
+>> Changes since v1 at [1]:
+>> - fixed clock names
+>> - added summary in debugfs and moved indivudual clocks into a subdirectory
+>> - added the GX table to the match data
+>>
+>> Neil Armstrong (3):
+>>   dt-bindings: amlogic: Add Internal Clock Measurer bindings
+>>   soc: amlogic: Add Meson GX Clock Measure driver
+>>   ARM64: dts: meson-gx: Add Internal Clock Measurer node
+>>
+>>  .../bindings/soc/amlogic/clk-measure.txt      |  15 +
+>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |   5 +
+>>  drivers/soc/amlogic/Kconfig                   |   8 +
+>>  drivers/soc/amlogic/Makefile                  |   1 +
+>>  drivers/soc/amlogic/meson-gx-clk-measure.c    | 293 ++++++++++++++++++
+>>  5 files changed, 322 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+>>  create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
+>>
+> 
+> For example, the debugfs summary looks like :
+> 
+> # cat /sys/kernel/debug/meson-clk-msr/measure_summary
+>   clock                     rate    precision
+> ---------------------------------------------
+>  ring_osc_out_ee_0             0    +/-3125Hz
+>  ring_osc_out_ee_1             0    +/-3125Hz
+>  ring_osc_out_ee_2             0    +/-3125Hz
+>  a53_ring_osc                  0    +/-3125Hz
+>  gp0_pll                       0    +/-3125Hz
+>  enci                   26998438    +/-3125Hz
+>  clk81                 166661458    +/-5208Hz
+>  encp                          0    +/-3125Hz
+>  encl                          0    +/-3125Hz
+>  vdac                   26998438    +/-3125Hz
+>  rgmii_tx                      0    +/-3125Hz
+>  pdm                           0    +/-3125Hz
+>  amclk                         0    +/-3125Hz
+>  fec_0                         0    +/-3125Hz
+>  fec_1                         0    +/-3125Hz
+>  fec_2                         0    +/-3125Hz
+>  sys_pll_div16                 0    +/-3125Hz
+>  sys_cpu_div16                 0    +/-3125Hz
+>  hdmitx_sys             24000000    +/-3125Hz
+>  rtc_osc_out               32813    +/-3125Hz
+>  i2s_in_src0                   0    +/-3125Hz
+>  eth_phy_ref                   0    +/-3125Hz
+>  hdmi_todig                    0    +/-3125Hz
+>  sc_int                        0    +/-3125Hz
+>  sar_adc                 1195313    +/-3125Hz
+>  mpll_test_out                 0    +/-3125Hz
+>  vdec                          0    +/-3125Hz
+>  mali                          0    +/-3125Hz
+>  hdmi_tx_pixel                 0    +/-3125Hz
+>  i958                          0    +/-3125Hz
+>  vdin_meas            1484656250    +/-62500Hz
+>  pcm_sclk                      0    +/-3125Hz
+>  pcm_mclk                      0    +/-3125Hz
+>  eth_rx_or_rmii         50000000    +/-3125Hz
+>  mp0_out                       0    +/-3125Hz
+>  fclk_div5                     0    +/-3125Hz
+>  pwm_b                  24000000    +/-3125Hz
+>  pwm_a                         0    +/-3125Hz
+>  vpu                   666625000    +/-20833Hz
+>  ddr_dpll_pt                   0    +/-3125Hz
+>  mp1_out                       0    +/-3125Hz
+>  mp2_out                       0    +/-3125Hz
+>  mp3_out                       0    +/-3125Hz
+>  nand_core              24000000    +/-3125Hz
+>  sd_emmc_b                     0    +/-3125Hz
+>  sd_emmc_a                     0    +/-3125Hz
+>  vid_pll_div_out      1484843750    +/-62500Hz
+>  cci                           0    +/-3125Hz
+>  wave420l_c                    0    +/-3125Hz
+>  wave420l_b                    0    +/-3125Hz
+>  hcodec                        0    +/-3125Hz
+>  alt_32k                       0    +/-3125Hz
+>  gpio_msr                      0    +/-3125Hz
+>  hevc                          0    +/-3125Hz
+>  vid_lock                      0    +/-3125Hz
+>  pwm_f                         0    +/-3125Hz
+>  pwm_e                         0    +/-3125Hz
+>  pwm_d                  23984375    +/-3125Hz
+>  pwm_c                         0    +/-3125Hz
+>  aoclkx2_int                   0    +/-3125Hz
+>  aoclk_int                     0    +/-3125Hz
+>  rng_ring_osc_0         66746875    +/-3125Hz
+>  rng_ring_osc_1         58442188    +/-3125Hz
+>  rng_ring_osc_2         52098438    +/-3125Hz
+>  rng_ring_osc_3         46662500    +/-3125Hz
+>  vapb                  249996094    +/-7812Hz
+>  ge2d                  249992188    +/-7812Hz
+> 
+> On the AML-S905X-CC board.
+> 
+> Neil
+> 
