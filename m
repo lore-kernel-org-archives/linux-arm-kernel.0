@@ -1,69 +1,33 @@
-From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 18 Nov 2018 17:17:13 +0300
-Subject: [RFC PATCH v2 14/14] ARM: suniv: f1c100s: add device tree for Lichee
- Pi Nano
-In-Reply-To: <cover.1542546735.git.mesihkilinc@gmail.com>
-References: <cover.1542546735.git.mesihkilinc@gmail.com>
-Message-ID: <b0e8e28b5da944e2891e569fe122e1e097a11fd7.1542546735.git.mesihkilinc@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sun, 18 Nov 2018 15:20:17 +0100
+Subject: [PATCH 02/10] ARM64: dts: exynos: Add all CPUs in cooling maps
+In-Reply-To: <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
+References: <cover.1542362530.git.viresh.kumar@linaro.org>
+ <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <20181118142017.GB11419@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Nano is a F1C100s board by Lichee Pi.
+On Fri, Nov 16, 2018 at 03:34:25PM +0530, Viresh Kumar wrote:
+> Each CPU can (and does) participate in cooling down the system but the
+> DT only captures a handful of them, normally CPU0, in the cooling maps.
+> Things work by chance currently as under normal circumstances its the
+> first CPU of each cluster which is used by the operating systems to
+> probe the cooling devices. But as soon as this CPU ordering changes and
+> any other CPU is used to bring up the cooling device, we will start
+> seeing failures.
+> 
+> Also the DT is rather incomplete when we list only one CPU in the
+> cooling maps, as the hardware doesn't have any such limitations.
+> 
+> Update cooling maps to include all devices affected by individual trip
+> points.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  .../arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 ++++++++++++-------
 
-Add initial device tree for it.
+Thanks, applied.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
----
- arch/arm/boot/dts/Makefile                        |  2 ++
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 26 +++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d..2b96a5b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1066,6 +1066,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-+dtb-$(CONFIG_MACH_SUNIV) += \
-+	suniv-f1c100s-licheepi-nano.dtb
- dtb-$(CONFIG_ARCH_TANGO) += \
- 	tango4-vantage-1172.dtb
- dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
-diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-new file mode 100644
-index 0000000..6ae5ccc
---- /dev/null
-+++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-+/*
-+ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
-+ */
-+
-+/dts-v1/;
-+#include "suniv-f1c100s.dtsi"
-+
-+/ {
-+	model = "Lichee Pi Nano";
-+	compatible = "licheepi,licheepi-nano", "allwinner,suniv-f1c100s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
--- 
-2.7.4
+Best regards,
+Krzysztof
