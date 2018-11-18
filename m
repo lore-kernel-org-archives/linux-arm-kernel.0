@@ -1,36 +1,25 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 19 Nov 2018 00:10:53 +0100
-Subject: [PATCH 2/2] arm64: dts: renesas: r8a77965: Add CAN FD controller
- node
-In-Reply-To: <20181118173327.4704-2-marek.vasut+renesas@gmail.com>
-References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
- <20181118173327.4704-2-marek.vasut+renesas@gmail.com>
-Message-ID: <20181118231053.GC2553@kunai>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 18 Nov 2018 15:29:53 -0800
+Subject: [PATCH] ARM: dts: qcom: Remove Arrow SD600 eval board
+In-Reply-To: <1542310510-21964-1-git-send-email-andy.gross@linaro.org>
+References: <1542310510-21964-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAOesGMhGYyCT0Tyz7ajOeY-QBM5DMAWt8qzEeJ7N8s+_24cxmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2018 at 06:33:27PM +0100, Marek Vasut wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> 
-> This patch adds CAN FD controller nodes for the R8A77965 SoC.
-> 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+On Thu, Nov 15, 2018 at 11:35 AM Andy Gross <andy.gross@linaro.org> wrote:
+>
+> This patch removes support for the APQ8064 based Arrow SD600 eval
+> board.  This board was never sold publicly and had very limited
+> distribution.  As such, we are removing this board and no longer
+> going to support it.
+>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
 
-Why seperate patches for CAN and CANFD here while they are merged for
-r8a77990 into one patch?
+It's currently throwing DTS warnings as well, so if nobody's
+interested in keeping it around, this seems OK with me.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181119/4c3d1f32/attachment.sig>
+Acked-by: Olof Johansson <olof@lixom.net>
+
+
+-Olof
