@@ -1,53 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sun, 18 Nov 2018 02:48:32 +0100
-Subject: [PATCH] arm/twd: avoid waking deeply sleeping CPUs for rate
- change notifier
-In-Reply-To: <1540812888.2582.4.camel@pengutronix.de>
-References: <20180417104627.29643-1-l.stach@pengutronix.de>
- <1528733761.2842.8.camel@pengutronix.de>
- <1540812888.2582.4.camel@pengutronix.de>
-Message-ID: <b488e260-515e-b257-01e9-39c517dee886@linaro.org>
+From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
+Date: Sun, 18 Nov 2018 13:16:12 +0900
+Subject: [PATCH] clk: rockchip: fix I2S1 clock gate register for rk3328
+Message-ID: <20181118041612.2773-1-katsuhiro@katsuster.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/10/2018 12:34, Lucas Stach wrote:
-> Hi again,
-> 
-> Am Montag, den 11.06.2018, 18:16 +0200 schrieb Lucas Stach:
->> Hi all,
->>
->> Am Dienstag, den 17.04.2018, 12:46 +0200 schrieb Lucas Stach:
->>> The current clock notifier sends an IPI to all CPUs, even if they are in
->>> deep sleep state with the local timer disabled and switched to tick
->>> broadcast. This needlessly cuts the CPU sleep times, as nothing is gained
->>> from updating a disabled TWDs rate.
->>>
->>> Keep track of the enabled TWDs and only send an IPI to those CPUs with an
->>> active local timer. As disabled TWDs may now miss a CPU frequency update
->>> we need to make sure to refresh the rate on re-enabling of the timer.
->>>
->>> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
->>
->> I would appreciate some feedback to this patch.
->> FWIW, I've been running some systems with this patch applied for quite
->> some time now with no issues spotted so far.
-> 
-> Can I persuade anyone to take a look at this?
-> It's been some months since I've posted this and haven't got any
-> feedback so far. I'm running this patch on a bunch of devices ever
-> since posting it and could not spot any adverse effects.
+This patch fixes definition of I2S1 clock gate register for rk3328.
+Current setting is not related I2S clocks.
+  - bit6 of CRU_CLKGATE_CON0 means clk_ddrmon_en
+  - bit6 of CRU_CLKGATE_CON1 means clk_i2s1_en
 
-Hi Lucas,
+Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+---
+ drivers/clk/rockchip/clk-rk3328.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-can you resend this patch (keeping the current recipient) but adding
-Thomas Gleixner and John Stultz, the maintainer of the time core framework.
-
-Thanks
-  -- Daniel
-
+diff --git a/drivers/clk/rockchip/clk-rk3328.c b/drivers/clk/rockchip/clk-rk3328.c
+index 2c5426607790..1eb46aa8b2fa 100644
+--- a/drivers/clk/rockchip/clk-rk3328.c
++++ b/drivers/clk/rockchip/clk-rk3328.c
+@@ -392,7 +392,7 @@ static struct rockchip_clk_branch rk3328_clk_branches[] __initdata = {
+ 			RK3328_CLKGATE_CON(1), 5, GFLAGS,
+ 			&rk3328_i2s1_fracmux),
+ 	GATE(SCLK_I2S1, "clk_i2s1", "i2s1_pre", CLK_SET_RATE_PARENT,
+-			RK3328_CLKGATE_CON(0), 6, GFLAGS),
++			RK3328_CLKGATE_CON(1), 6, GFLAGS),
+ 	COMPOSITE_NODIV(SCLK_I2S1_OUT, "i2s1_out", mux_i2s1out_p, 0,
+ 			RK3328_CLKSEL_CON(8), 12, 1, MFLAGS,
+ 			RK3328_CLKGATE_CON(1), 7, GFLAGS),
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.19.1
