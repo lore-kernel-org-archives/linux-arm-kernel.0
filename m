@@ -1,36 +1,48 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sun, 18 Nov 2018 14:50:24 +0100
-Subject: [PATCH v3 3/3] ARM64: dts: meson-gx: Add Internal Clock Measurer node
-In-Reply-To: <20181118135024.30720-1-narmstrong@baylibre.com>
-References: <20181118135024.30720-1-narmstrong@baylibre.com>
-Message-ID: <20181118135024.30720-4-narmstrong@baylibre.com>
+Date: Sun, 18 Nov 2018 14:50:21 +0100
+Subject: [PATCH v3 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
+Message-ID: <20181118135024.30720-1-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
-clock paths frequencies.
-This patch adds the node in the top-level meson-gx dtsi.
+clocks frequencies.
+The precision is determined by stepping into the duration until the counter
+overflows.
+The debugfs shows a pretty summary and each clock can be measured
+individually aswell.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+This patchset includes the dt-bindings, driver and the DT node added to the
+meson-gx dtsi.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index f1e5cdbade5e..ed336c7a98a7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -262,6 +262,11 @@
- 				status = "disabled";
- 			};
- 
-+			clock-measure at 8758 {
-+				compatible = "amlogic,meson-gx-clk-measure";
-+				reg = <0x0 0x8758 0x0 0x10>;
-+			};
-+
- 			i2c_B: i2c at 87c0 {
- 				compatible = "amlogic,meson-gx-i2c", "amlogic,meson-gxbb-i2c";
- 				reg = <0x0 0x087c0 0x0 0x20>;
+Changes since v2 at [2]:
+- Removed all reference to GX
+- Added compatibles for meson8/meson8b
+- Used Martin's suggestions on the divider naming
+- Added Martin's meson8/meson8b clk id table
+- Added Martin's fixes to support 32bit SoCs
+
+Changes since v1 at [1]:
+- fixed clock names
+- added summary in debugfs and moved indivudual clocks into a subdirectory
+- added the GX table to the match data
+
+[1] https://lkml.kernel.org/r/1530624110-4687-1-git-send-email-narmstrong at baylibre.com
+[2] https://lkml.kernel.org/r/20181114131627.17766-1-narmstrong at baylibre.com
+
+Neil Armstrong (3):
+  dt-bindings: amlogic: Add Internal Clock Measurer bindings
+  soc: amlogic: Add Meson Clock Measure driver
+  ARM64: dts: meson-gx: Add Internal Clock Measurer node
+
+ .../bindings/soc/amlogic/clk-measure.txt      |  18 +
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |   5 +
+ drivers/soc/amlogic/Kconfig                   |   8 +
+ drivers/soc/amlogic/Makefile                  |   1 +
+ drivers/soc/amlogic/meson-clk-measure.c       | 350 ++++++++++++++++++
+ 5 files changed, 382 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+ create mode 100644 drivers/soc/amlogic/meson-clk-measure.c
+
 -- 
 2.19.1
