@@ -1,103 +1,90 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 19 Nov 2018 01:00:04 +0800
-Subject: [PATCH 2/3] soc: imx: gpcv2: Make regmap access table variant
- specific.
-In-Reply-To: <20181117181206.10267-3-andrew.smirnov@gmail.com>
-References: <20181117181206.10267-3-andrew.smirnov@gmail.com>
-Message-ID: <201811190031.DIN4VacD%fengguang.wu@intel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sun, 18 Nov 2018 18:12:15 +0100
+Subject: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
+ mmsys clocks
+In-Reply-To: <20181116231522.GA18006@bogus>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-9-matthias.bgg@kernel.org>
+ <20181116231522.GA18006@bogus>
+Message-ID: <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
 
-Thank you for the patch! Yet something to improve:
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.20-rc2 next-20181116]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 11/17/18 12:15 AM, Rob Herring wrote:
+> On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg at kernel.org wrote:
+>> From: Matthias Brugger <mbrugger@suse.com>
+>>
+>> On SoCs with no publical available HW or no working graphic stack
+>> we change the devicetree binding for the mmsys clock part. This
+>> way we don't need to register a platform device explicitly in the
+>> drm driver. Instead we can create a mmsys child which invokes the
+>> clock driver.
+>>
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  .../bindings/arm/mediatek/mediatek,mmsys.txt  | 21 ++++++++++++-------
+>>  .../display/mediatek/mediatek,disp.txt        |  4 ++++
+>>  2 files changed, 18 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+>> index 4468345f8b1a..d4e205981363 100644
+>> --- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+>> +++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+>> @@ -1,4 +1,4 @@
+>> -Mediatek mmsys controller
+>> +Mediatek mmsys clock controller
+>>  ============================
+>>  
+>>  The Mediatek mmsys controller provides various clocks to the system.
+>> @@ -6,18 +6,25 @@ The Mediatek mmsys controller provides various clocks to the system.
+>>  Required Properties:
+>>  
+>>  - compatible: Should be one of:
+>> -	- "mediatek,mt2712-mmsys", "syscon"
+>> -	- "mediatek,mt6797-mmsys", "syscon"
+>> +	- "mediatek,mt2712-mmsys-clk", "syscon"
+>> +	- "mediatek,mt6797-mmsys-clk", "syscon"
+> 
+> Doesn't match the example.>
+>>  - #clock-cells: Must be 1
+>>  
+>> -The mmsys controller uses the common clk binding from
+>> +The mmsys clock controller uses the common clk binding from
+>>  Documentation/devicetree/bindings/clock/clock-bindings.txt
+>>  The available clocks are defined in dt-bindings/clock/mt*-clk.h.
+>> +It is a child of the mmsys block, see binding at:
+>> +Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+>>  
+>>  Example:
+>>  
+>> -mmsys: clock-controller at 14000000 {
+>> -	compatible = "mediatek,mt8173-mmsys", "syscon";
+>> +mmsys: syscon at 14000000 {
+>> +	compatible = "mediatek,mt2712-mmsys", "syscon", "simple-mfd";
+>>  	reg = <0 0x14000000 0 0x1000>;
+>> -	#clock-cells = <1>;
+>> +
+>> +	mmsys_clk: clock-controller at 14000000 {
+>> +		compatible = "mediatek,mt2712-mmsys-clk";
+>> +		#clock-cells = <1>;
+> 
+> This goes against the general direction of not defining separate nodes 
+> for providers with no resources.
+> 
+> Why do you need this and what does it buy if you have to continue to 
+> support the existing chips?
+> 
 
-url:    https://github.com/0day-ci/linux/commits/Andrey-Smirnov/soc-imx-gpcv2-Remove-static-qualifier-from-domain_data/20181118-213909
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-multi_v7_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm 
-
-All error/warnings (new ones prefixed by >>):
-
->> drivers/soc/imx/gpcv2.c:217:17: error: 'yes_ranges' undeclared here (not in a function); did you mean 'imx7_yes_ranges'?
-      .yes_ranges = yes_ranges,
-                    ^~~~~~~~~~
-                    imx7_yes_ranges
-   In file included from include/linux/kernel.h:15:0,
-                    from include/linux/list.h:9,
-                    from include/linux/kobject.h:19,
-                    from include/linux/device.h:16,
-                    from include/linux/node.h:18,
-                    from include/linux/cpu.h:17,
-                    from include/linux/of_device.h:5,
-                    from drivers/soc/imx/gpcv2.c:11:
-   include/linux/build_bug.h:29:45: error: bit-field '<anonymous>' width not an integer constant
-    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
-                                                ^
->> include/linux/compiler.h:379:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
-    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
-                               ^~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
-    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
-                                                              ^~~~~~~~~~~~~~~
->> drivers/soc/imx/gpcv2.c:218:19: note: in expansion of macro 'ARRAY_SIZE'
-      .n_yes_ranges = ARRAY_SIZE(yes_ranges),
-                      ^~~~~~~~~~
---
-   drivers/soc//imx/gpcv2.c:217:17: error: 'yes_ranges' undeclared here (not in a function); did you mean 'imx7_yes_ranges'?
-      .yes_ranges = yes_ranges,
-                    ^~~~~~~~~~
-                    imx7_yes_ranges
-   In file included from include/linux/kernel.h:15:0,
-                    from include/linux/list.h:9,
-                    from include/linux/kobject.h:19,
-                    from include/linux/device.h:16,
-                    from include/linux/node.h:18,
-                    from include/linux/cpu.h:17,
-                    from include/linux/of_device.h:5,
-                    from drivers/soc//imx/gpcv2.c:11:
-   include/linux/build_bug.h:29:45: error: bit-field '<anonymous>' width not an integer constant
-    #define BUILD_BUG_ON_ZERO(e) (sizeof(struct { int:(-!!(e)); }))
-                                                ^
->> include/linux/compiler.h:379:28: note: in expansion of macro 'BUILD_BUG_ON_ZERO'
-    #define __must_be_array(a) BUILD_BUG_ON_ZERO(__same_type((a), &(a)[0]))
-                               ^~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:72:59: note: in expansion of macro '__must_be_array'
-    #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]) + __must_be_array(arr))
-                                                              ^~~~~~~~~~~~~~~
-   drivers/soc//imx/gpcv2.c:218:19: note: in expansion of macro 'ARRAY_SIZE'
-      .n_yes_ranges = ARRAY_SIZE(yes_ranges),
-                      ^~~~~~~~~~
-
-vim +217 drivers/soc/imx/gpcv2.c
-
-   212	
-   213	static const struct imx_pgc_domain_data imx7_pgc_domain_data = {
-   214		.domains = imx7_pgc_domains,
-   215		.domains_num = ARRAY_SIZE(imx7_pgc_domains),
-   216		.access_table = {
- > 217			.yes_ranges	= yes_ranges,
- > 218			.n_yes_ranges	= ARRAY_SIZE(yes_ranges),
-   219		},
-   220	};
-   221	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+It would show explicitly that the mmsys block is used to probe two
+drivers, one for the gpu and one for the clocks. Otherwise that is
+hidden in the drm driver code. I think it is cleaner to describe that in
+the device tree.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 44774 bytes
+Name: pEpkey.asc
+Type: application/pgp-keys
+Size: 1774 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181119/256642d2/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181118/5b4f0374/attachment.bin>
