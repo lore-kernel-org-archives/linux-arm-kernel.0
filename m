@@ -1,41 +1,40 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 19 Nov 2018 00:45:16 +0100
-Subject: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Add and enable
- CAN,FD device nodes
-In-Reply-To: <20181118230313.GB2553@kunai>
-References: <20181118173424.4807-1-marek.vasut+renesas@gmail.com>
- <20181118230313.GB2553@kunai>
-Message-ID: <63e27a31-d599-4672-87b9-48b0f542313d@gmail.com>
+Date: Mon, 19 Nov 2018 00:46:02 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77965: Add CAN controller
+ nodes
+In-Reply-To: <20181118230250.GA2553@kunai>
+References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
+ <20181118230250.GA2553@kunai>
+Message-ID: <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2018 12:03 AM, Wolfram Sang wrote:
-> On Sun, Nov 18, 2018 at 06:34:24PM +0100, Marek Vasut wrote:
->> This patch adds CAN0,1 and CANFD device nodes for the r8a77990 SoC
->> and enables CANFD connected to CN10 on the E3 Ebisu board using the
->> R8A77990 SoC.
+On 11/19/2018 12:02 AM, Wolfram Sang wrote:
+> On Sun, Nov 18, 2018 at 06:33:26PM +0100, Marek Vasut wrote:
+>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >>
+>> This patch adds CAN{0,1} controller nodes for the R8A77965 SoC.
+>>
+>> Based on several similar patches of the R8A7795 device tree
+>> by Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+>> and Geert Uytterhoeven <geert+renesas@glider.be>.
+>>
+>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
 >> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
 >> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
 >> Cc: Rob Herring <robh@kernel.org>
 >> Cc: Simon Horman <horms+renesas@verge.net.au>
 >> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
->> Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
->> Cc: linux-arm-kernel at lists.infradead.org
 >> Cc: linux-renesas-soc at vger.kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
 > 
-> Same here, what was tested?
+> Were you able to do some testing using EXIO connectors? Would be nice to
+> know what was tested.
 
-I connected the CN10 to Peak CANFD, brought both interfaces up at
-125kBd/250kBd for FD
-$ ip link set canX up type can bitrate 125000 dbitrate 250000 fd on
-
-And ran on either side:
-$ cangen -m canX
-and
-$ candump -t d -dex canX
-This should give a good mix of CAN messages.
+Not on the M3N, since I don't see it broken out on the EXIO ; is it
+really there ? It'd be easy to test on M3NSK with KF, but I don't have
+either KF or M3NSK.
 
 -- 
 Best regards,
