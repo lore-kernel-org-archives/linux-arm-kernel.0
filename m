@@ -1,154 +1,477 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 18 Nov 2018 17:17:10 +0300
-Subject: [RFC PATCH v2 11/14] dt-bindings: clock: Add Allwinner suniv F1C100s
- CCU
+Date: Sun, 18 Nov 2018 17:17:09 +0300
+Subject: [RFC PATCH v2 10/14] pinctrl: sunxi: add support for suniv F1C100s
+ (newer F-series SoCs)
 In-Reply-To: <cover.1542546735.git.mesihkilinc@gmail.com>
 References: <cover.1542546735.git.mesihkilinc@gmail.com>
-Message-ID: <5f0322d5e37726f0c597b919f59e121f0b2855c3.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <706ba2bf049396c1aa99b8a47260f451935d2dc2.1542546735.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatiple string for Allwinner suniv F1C100s CCU.
-Add clock and reset definitions.
+The suniv F1C100s chip (several new F-series SoCs) of Allwinner has a
+pin
+controller like other SoCs from Allwinner.
 
+Add support for it.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- .../devicetree/bindings/clock/sunxi-ccu.txt        |  1 +
- include/dt-bindings/clock/suniv-ccu-f1c100s.h      | 69 ++++++++++++++++++++++
- include/dt-bindings/reset/suniv-ccu-f1c100s.h      | 37 ++++++++++++
- 3 files changed, 107 insertions(+)
- create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
- create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
+ drivers/pinctrl/sunxi/Kconfig                 |   4 +
+ drivers/pinctrl/sunxi/Makefile                |   1 +
+ drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c | 417 ++++++++++++++++++++++++++
+ 3 files changed, 422 insertions(+)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-index 47d2e90..92c16eb 100644
---- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-@@ -3,6 +3,7 @@ Allwinner Clock Control Unit Binding
+diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
+index 95282cd..a731fc9 100644
+--- a/drivers/pinctrl/sunxi/Kconfig
++++ b/drivers/pinctrl/sunxi/Kconfig
+@@ -6,6 +6,10 @@ config PINCTRL_SUNXI
+ 	select GENERIC_PINCONF
+ 	select GPIOLIB
  
- Required properties :
- - compatible: must contain one of the following compatibles:
-+		- "allwinner,suniv-f1c100s-ccu"
- 		- "allwinner,sun4i-a10-ccu"
- 		- "allwinner,sun5i-a10s-ccu"
- 		- "allwinner,sun5i-a13-ccu"
-diff --git a/include/dt-bindings/clock/suniv-ccu-f1c100s.h b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
++config PINCTRL_SUNIV_F1C100S
++	def_bool MACH_SUNIV
++	select PINCTRL_SUNXI
++
+ config PINCTRL_SUN4I_A10
+ 	def_bool MACH_SUN4I || MACH_SUN7I || MACH_SUN8I
+ 	select PINCTRL_SUNXI
+diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
+index adb8443..fafcdae 100644
+--- a/drivers/pinctrl/sunxi/Makefile
++++ b/drivers/pinctrl/sunxi/Makefile
+@@ -3,6 +3,7 @@
+ obj-y					+= pinctrl-sunxi.o
+ 
+ # SoC Drivers
++obj-$(CONFIG_PINCTRL_SUNIV_F1C100S)	+= pinctrl-suniv-f1c100s.o
+ obj-$(CONFIG_PINCTRL_SUN4I_A10)		+= pinctrl-sun4i-a10.o
+ obj-$(CONFIG_PINCTRL_SUN5I)		+= pinctrl-sun5i.o
+ obj-$(CONFIG_PINCTRL_SUN6I_A31)		+= pinctrl-sun6i-a31.o
+diff --git a/drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c b/drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
 new file mode 100644
-index 0000000..56f6d0d
+index 0000000..46d5667
 --- /dev/null
-+++ b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
-@@ -0,0 +1,69 @@
++++ b/drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
+@@ -0,0 +1,417 @@
 +/*
-+ * Copyright (c) 2018 Icenowy Zheng <icenowy@aosc.xyz>
++ * Allwinner new F-series F1C100s SoC (suniv) pinctrl driver.
 + *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ * Copyright (C) 2018 Icenowy Zheng
++ *
++ * Icenowy Zheng <icenowy@aosc.io>
++ *
++ * Copyright (C) 2014 Jackie Hwang
++ *
++ * Jackie Hwang <huangshr@allwinnertech.com>
++ *
++ * Copyright (C) 2014 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * Copyright (C) 2014 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
-+#define _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/pinctrl/pinctrl.h>
 +
-+#define CLK_CPU			11
++#include "pinctrl-sunxi.h"
++static const struct sunxi_desc_pin suniv_f1c100s_pins[] = {
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "rtp"),		/* X1 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* BCLK */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* RTS */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* CS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "rtp"),		/* X2 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* LRCK */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* CTS */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* MOSI */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "rtp"),		/* Y1 */
++		  SUNXI_FUNCTION(0x3, "pwm0"),		/* PWM0 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* IN */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* RX */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* MOSI */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "rtp"),		/* Y2 */
++		  SUNXI_FUNCTION(0x3, "ir0"),		/* RX */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* OUT */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* TX */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* MISO */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "dram"),		/* DQS0 */
++		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SCK */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* BCLK */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* RTS */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* CS */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "dram"),		/* DQS1 */
++		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SDA */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* LRCK */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* CTS */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* MOSI */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "dram"),		/* CKE */
++		  SUNXI_FUNCTION(0x3, "pwm0"),		/* PWM0 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* IN */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* RX */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* CLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(B, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "dram"),		/* DDR_REF_D */
++		  SUNXI_FUNCTION(0x3, "ir0"),		/* RX */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* OUT */
++		  SUNXI_FUNCTION(0x5, "uart1"),		/* TX */
++		  SUNXI_FUNCTION(0x6, "spi1")),		/* MISO */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 0),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi0"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "mmc1")),		/* CLK */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi0"),		/* CS */
++		  SUNXI_FUNCTION(0x3, "mmc1")),		/* CMD */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi0"),		/* MISO */
++		  SUNXI_FUNCTION(0x3, "mmc1")),		/* D0 */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "spi0"),		/* MOSI */
++		  SUNXI_FUNCTION(0x3, "uart0")),	/* TX */
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D2 */
++		  SUNXI_FUNCTION(0x3, "i2c0"),		/* SDA */
++		  SUNXI_FUNCTION(0x4, "rsb"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D3 */
++		  SUNXI_FUNCTION(0x3, "uart1"),		/* RTS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D4*/
++		  SUNXI_FUNCTION(0x3, "uart1"),		/* CTS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D5 */
++		  SUNXI_FUNCTION(0x3, "uart1"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D6 */
++		  SUNXI_FUNCTION(0x3, "uart1"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D7 */
++		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D10 */
++		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D11 */
++		  SUNXI_FUNCTION(0x3, "i2s"),		/* MCLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D12 */
++		  SUNXI_FUNCTION(0x3, "i2s"),		/* BCLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D13 */
++		  SUNXI_FUNCTION(0x3, "i2s"),		/* LRCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D14 */
++		  SUNXI_FUNCTION(0x3, "i2s"),		/* IN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D15 */
++		  SUNXI_FUNCTION(0x3, "i2s"),		/* OUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D18 */
++		  SUNXI_FUNCTION(0x3, "i2c0"),		/* SCK */
++		  SUNXI_FUNCTION(0x4, "rsb"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 13),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D19 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 13)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 14),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D20 */
++		  SUNXI_FUNCTION(0x3, "lvds1"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 14)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 15),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D21 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
++		  SUNXI_FUNCTION(0x4, "i2c2"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 16),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D22 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
++		  SUNXI_FUNCTION(0x4, "i2c2"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 17),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* D23 */
++		  SUNXI_FUNCTION(0x3, "spdif"),		/* OUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 18),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "spi0"),		/* CS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 19),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* DE */
++		  SUNXI_FUNCTION(0x3, "spi0"),		/* MOSI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 19)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 20),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* HYSNC */
++		  SUNXI_FUNCTION(0x3, "spi0"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 20)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 21),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "lcd"),		/* VSYNC */
++		  SUNXI_FUNCTION(0x3, "spi0"),		/* MISO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 21)),
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* HSYNC */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D0 */
++		  SUNXI_FUNCTION(0x4, "i2c2"),		/* SCK */
++		  SUNXI_FUNCTION(0x5, "uart0"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* VSYNC */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D1 */
++		  SUNXI_FUNCTION(0x4, "i2c2"),		/* SDA */
++		  SUNXI_FUNCTION(0x5, "uart0"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* PCLK */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D8 */
++		  SUNXI_FUNCTION(0x4, "clk"),		/* OUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D0 */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D9 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* BCLK */
++		  SUNXI_FUNCTION(0x5, "rsb"),		/* SCK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D1 */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D16 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* LRCK */
++		  SUNXI_FUNCTION(0x5, "rsb"),		/* SDA */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D2 */
++		  SUNXI_FUNCTION(0x3, "lcd"),		/* D17 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* IN */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 6),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D3 */
++		  SUNXI_FUNCTION(0x3, "pwm1"),		/* PWM1 */
++		  SUNXI_FUNCTION(0x4, "i2s"),		/* OUT */
++		  SUNXI_FUNCTION(0x5, "spdif"),		/* OUT */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 6)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 7),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D4 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* TX */
++		  SUNXI_FUNCTION(0x4, "spi1"),		/* CS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 7)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 8),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D5 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* RX */
++		  SUNXI_FUNCTION(0x4, "spi1"),		/* MOSI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 8)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 9),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D6 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* RTS */
++		  SUNXI_FUNCTION(0x4, "spi1"),		/* CLK */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 9)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 10),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "csi"),		/* D7 */
++		  SUNXI_FUNCTION(0x3, "uart2"),		/* CTS */
++		  SUNXI_FUNCTION(0x4, "spi1"),		/* MISO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 10)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 11),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "clk0"),		/* OUT */
++		  SUNXI_FUNCTION(0x3, "i2c0"),		/* SCK */
++		  SUNXI_FUNCTION(0x4, "ir"),		/* RX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 11)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 12),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "i2s"),		/* MCLK */
++		  SUNXI_FUNCTION(0x3, "i2c0"),		/* SDA */
++		  SUNXI_FUNCTION(0x4, "pwm0"),		/* PWM0 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 12)),
 +
-+#define CLK_BUS_MMC0		14
-+#define CLK_BUS_MMC1		15
-+#define CLK_BUS_DRAM		16
-+#define CLK_BUS_SPI0		17
-+#define CLK_BUS_SPI1		18
-+#define CLK_BUS_OTG		19
-+#define CLK_BUS_VE		20
-+#define CLK_BUS_LCD		21
-+#define CLK_BUS_DEINTERLACE	22
-+#define CLK_BUS_CSI		23
-+#define CLK_BUS_TVD		24
-+#define CLK_BUS_TVE		25
-+#define CLK_BUS_DE_BE		26
-+#define CLK_BUS_DE_FE		27
-+#define CLK_BUS_CODEC		28
-+#define CLK_BUS_SPDIF		29
-+#define CLK_BUS_IR		30
-+#define CLK_BUS_RSB		31
-+#define CLK_BUS_I2S0		32
-+#define CLK_BUS_I2C0		33
-+#define CLK_BUS_I2C1		34
-+#define CLK_BUS_I2C2		35
-+#define CLK_BUS_PIO		36
-+#define CLK_BUS_UART0		37
-+#define CLK_BUS_UART1		38
-+#define CLK_BUS_UART2		39
++	/* Hole */
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 0),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D1 */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* MS */
++		  SUNXI_FUNCTION(0x4, "ir0"),		/* MS */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 0)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 1),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D0 */
++		  SUNXI_FUNCTION(0x3, "dgb0"),		/* DI */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 1)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 2),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CLK */
++		  SUNXI_FUNCTION(0x3, "uart0"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 2)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 3),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CMD */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* DO */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 3)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 4),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D3 */
++		  SUNXI_FUNCTION(0x3, "uart0"),		/* TX */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 4)),
++	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 5),
++		  SUNXI_FUNCTION(0x0, "gpio_in"),
++		  SUNXI_FUNCTION(0x1, "gpio_out"),
++		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D2 */
++		  SUNXI_FUNCTION(0x3, "jtag"),		/* CK */
++		  SUNXI_FUNCTION(0x4, "pwm1"),		/* PWM1 */
++		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 5)),
++};
 +
-+#define CLK_MMC0		40
-+#define CLK_MMC0_SAMPLE		41
-+#define CLK_MMC0_OUTPUT		42
-+#define CLK_MMC1		43
-+#define CLK_MMC1_SAMPLE		44
-+#define CLK_MMC1_OUTPUT		45
-+#define CLK_I2S			46
-+#define CLK_SPDIF		47
++static const struct sunxi_pinctrl_desc suniv_f1c100s_pinctrl_data = {
++	.pins = suniv_f1c100s_pins,
++	.npins = ARRAY_SIZE(suniv_f1c100s_pins),
++	.irq_banks = 3,
++	.disable_strict_mode = true,
++};
 +
-+#define CLK_USB_PHY0		48
++static int suniv_pinctrl_probe(struct platform_device *pdev)
++{
++	return sunxi_pinctrl_init(pdev,
++				  &suniv_f1c100s_pinctrl_data);
++}
 +
-+#define CLK_DRAM_VE		49
-+#define CLK_DRAM_CSI		50
-+#define CLK_DRAM_DEINTERLACE	51
-+#define CLK_DRAM_TVD		52
-+#define CLK_DRAM_DE_FE		53
-+#define CLK_DRAM_DE_BE		54
++static const struct of_device_id suniv_f1c100s_pinctrl_match[] = {
++	{ .compatible = "allwinner,suniv-f1c100s-pinctrl", },
++	{}
++};
 +
-+#define CLK_DE_BE		55
-+#define CLK_DE_FE		56
-+#define CLK_TCON		57
-+#define CLK_DEINTERLACE		58
-+#define CLK_TVE2_CLK		59
-+#define CLK_TVE1_CLK		60
-+#define CLK_TVD			61
-+#define CLK_CSI			62
-+#define CLK_VE			63
-+#define CLK_CODEC		64
-+#define CLK_AVS			65
-+
-+#endif
-diff --git a/include/dt-bindings/reset/suniv-ccu-f1c100s.h b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-new file mode 100644
-index 0000000..95f1ed0
---- /dev/null
-+++ b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-@@ -0,0 +1,37 @@
-+/*
-+ * Copyright (C) 2018 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#ifndef _DT_BINDINGS_RST_SUNIV_F1C100S_H_
-+#define _DT_BINDINGS_RST_SUNIV_F1C100S_H_
-+
-+#define RST_USB_PHY0		0
-+#define RST_BUS_MMC0		1
-+#define RST_BUS_MMC1		2
-+#define RST_BUS_DRAM		3
-+#define RST_BUS_SPI0		4
-+#define RST_BUS_SPI1		5
-+#define RST_BUS_OTG		6
-+#define RST_BUS_VE		7
-+#define RST_BUS_LCD		8
-+#define RST_BUS_DEINTERLACE		9
-+#define RST_BUS_CSI		10
-+#define RST_BUS_TVD		11
-+#define RST_BUS_TVE		12
-+#define RST_BUS_DE_BE		13
-+#define RST_BUS_DE_FE		14
-+#define RST_BUS_CODEC		15
-+#define RST_BUS_SPDIF		16
-+#define RST_BUS_IR		17
-+#define RST_BUS_RSB		18
-+#define RST_BUS_I2S0		19
-+#define RST_BUS_I2C0		20
-+#define RST_BUS_I2C1		21
-+#define RST_BUS_I2C2		22
-+#define RST_BUS_UART0		23
-+#define RST_BUS_UART1		24
-+#define RST_BUS_UART2		25
-+
-+#endif /* _DT_BINDINGS_RST_SUNIV_F1C100S_H_ */
++static struct platform_driver suniv_f1c100s_pinctrl_driver = {
++	.probe	= suniv_pinctrl_probe,
++	.driver	= {
++		.name		= "suniv-f1c100s-pinctrl",
++		.of_match_table	= suniv_f1c100s_pinctrl_match,
++	},
++};
++builtin_platform_driver(suniv_f1c100s_pinctrl_driver);
 -- 
 2.7.4
