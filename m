@@ -1,33 +1,44 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 18 Nov 2018 15:20:17 +0100
-Subject: [PATCH 02/10] ARM64: dts: exynos: Add all CPUs in cooling maps
-In-Reply-To: <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
-References: <cover.1542362530.git.viresh.kumar@linaro.org>
- <74e23257aece9ceef48b1c1cf6c9bafcce3c6fbd.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <20181118142017.GB11419@kozik-lap>
+From: Nicolas.Ferre@microchip.com (Nicolas.Ferre at microchip.com)
+Date: Sun, 18 Nov 2018 15:42:34 +0000
+Subject: [PATCH v2 11/25] net: cadence: switch to using
+ nvmem_get_mac_address()
+In-Reply-To: <20181113140133.17385-12-brgl@bgdev.pl>
+References: <20181113140133.17385-1-brgl@bgdev.pl>
+ <20181113140133.17385-12-brgl@bgdev.pl>
+Message-ID: <bd51c2fb-9f86-450a-74d1-0cba5c9e9cee@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 03:34:25PM +0530, Viresh Kumar wrote:
-> Each CPU can (and does) participate in cooling down the system but the
-> DT only captures a handful of them, normally CPU0, in the cooling maps.
-> Things work by chance currently as under normal circumstances its the
-> first CPU of each cluster which is used by the operating systems to
-> probe the cooling devices. But as soon as this CPU ordering changes and
-> any other CPU is used to bring up the cooling device, we will start
-> seeing failures.
+On 13/11/2018 at 15:01, Bartosz Golaszewski wrote:
+> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> Also the DT is rather incomplete when we list only one CPU in the
-> cooling maps, as the hardware doesn't have any such limitations.
+> We now have a generalized helper routine to read the MAC address from
+> nvmem which takes struct device as argument. The nvmem subsystem will
+> then try device tree first before all other potential providers.
 > 
-> Update cooling maps to include all devices affected by individual trip
-> points.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
 > ---
->  .../arm64/boot/dts/exynos/exynos5433-tmu.dtsi | 36 ++++++++++++-------
+>   drivers/net/ethernet/cadence/macb_main.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/cadence/macb_main.c b/drivers/net/ethernet/cadence/macb_main.c
+> index 1d86b4d5645a..d9a208f7bb40 100644
+> --- a/drivers/net/ethernet/cadence/macb_main.c
+> +++ b/drivers/net/ethernet/cadence/macb_main.c
+> @@ -4055,7 +4055,7 @@ static int macb_probe(struct platform_device *pdev)
+>   	if (mac) {
+>   		ether_addr_copy(bp->dev->dev_addr, mac);
+>   	} else {
+> -		err = of_get_nvmem_mac_address(np, bp->dev->dev_addr);
+> +		err = nvmem_get_mac_address(&pdev->dev, bp->dev->dev_addr);
+>   		if (err) {
+>   			if (err == -EPROBE_DEFER)
+>   				goto err_out_free_netdev;
+> 
 
-Thanks, applied.
 
-Best regards,
-Krzysztof
+-- 
+Nicolas Ferre
