@@ -1,124 +1,116 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Sun, 18 Nov 2018 10:32:51 +0100
-Subject: [PATCH v2 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
-In-Reply-To: <75ca31ca-82f4-c9e9-0d73-29fde405c47c@baylibre.com>
-References: <20181114131627.17766-1-narmstrong@baylibre.com>
- <75ca31ca-82f4-c9e9-0d73-29fde405c47c@baylibre.com>
-Message-ID: <5BF131C3.9040808@baylibre.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Sun, 18 Nov 2018 12:04:04 +0100 (CET)
+Subject: [PATCH 8/9] drm: remove no longer needed drm-get-put coccinelle
+ script
+In-Reply-To: <20181115221634.22715-9-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <20181115221634.22715-9-greenfoo@gluegarage.com>
+Message-ID: <alpine.DEB.2.21.1811181203410.3530@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 14/11/2018 14:17, Neil Armstrong a ?crit :
-> On 14/11/2018 14:16, Neil Armstrong wrote:
->> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
->> clocks frequencyies.
->> The precision is determined by stepping into the divider until the counter
->> overflows.
->> The debugfs slows a pretty summary and each clock can be measured
->> individually aswell.
->>
->> Thsi patchset includes the dt-bindings, driver and the DT node added to the
->> meson-gx dtsi.
 
-I'll respin a v3 with the comments from Martin and Meson8 & Meson8b support !
 
-Neil
+On Thu, 15 Nov 2018, Fernando Ramos wrote:
 
->>
->> Changes since v1 at [1]:
->> - fixed clock names
->> - added summary in debugfs and moved indivudual clocks into a subdirectory
->> - added the GX table to the match data
->>
->> Neil Armstrong (3):
->>   dt-bindings: amlogic: Add Internal Clock Measurer bindings
->>   soc: amlogic: Add Meson GX Clock Measure driver
->>   ARM64: dts: meson-gx: Add Internal Clock Measurer node
->>
->>  .../bindings/soc/amlogic/clk-measure.txt      |  15 +
->>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi     |   5 +
->>  drivers/soc/amlogic/Kconfig                   |   8 +
->>  drivers/soc/amlogic/Makefile                  |   1 +
->>  drivers/soc/amlogic/meson-gx-clk-measure.c    | 293 ++++++++++++++++++
->>  5 files changed, 322 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
->>  create mode 100644 drivers/soc/amlogic/meson-gx-clk-measure.c
->>
-> 
-> For example, the debugfs summary looks like :
-> 
-> # cat /sys/kernel/debug/meson-clk-msr/measure_summary
->   clock                     rate    precision
-> ---------------------------------------------
->  ring_osc_out_ee_0             0    +/-3125Hz
->  ring_osc_out_ee_1             0    +/-3125Hz
->  ring_osc_out_ee_2             0    +/-3125Hz
->  a53_ring_osc                  0    +/-3125Hz
->  gp0_pll                       0    +/-3125Hz
->  enci                   26998438    +/-3125Hz
->  clk81                 166661458    +/-5208Hz
->  encp                          0    +/-3125Hz
->  encl                          0    +/-3125Hz
->  vdac                   26998438    +/-3125Hz
->  rgmii_tx                      0    +/-3125Hz
->  pdm                           0    +/-3125Hz
->  amclk                         0    +/-3125Hz
->  fec_0                         0    +/-3125Hz
->  fec_1                         0    +/-3125Hz
->  fec_2                         0    +/-3125Hz
->  sys_pll_div16                 0    +/-3125Hz
->  sys_cpu_div16                 0    +/-3125Hz
->  hdmitx_sys             24000000    +/-3125Hz
->  rtc_osc_out               32813    +/-3125Hz
->  i2s_in_src0                   0    +/-3125Hz
->  eth_phy_ref                   0    +/-3125Hz
->  hdmi_todig                    0    +/-3125Hz
->  sc_int                        0    +/-3125Hz
->  sar_adc                 1195313    +/-3125Hz
->  mpll_test_out                 0    +/-3125Hz
->  vdec                          0    +/-3125Hz
->  mali                          0    +/-3125Hz
->  hdmi_tx_pixel                 0    +/-3125Hz
->  i958                          0    +/-3125Hz
->  vdin_meas            1484656250    +/-62500Hz
->  pcm_sclk                      0    +/-3125Hz
->  pcm_mclk                      0    +/-3125Hz
->  eth_rx_or_rmii         50000000    +/-3125Hz
->  mp0_out                       0    +/-3125Hz
->  fclk_div5                     0    +/-3125Hz
->  pwm_b                  24000000    +/-3125Hz
->  pwm_a                         0    +/-3125Hz
->  vpu                   666625000    +/-20833Hz
->  ddr_dpll_pt                   0    +/-3125Hz
->  mp1_out                       0    +/-3125Hz
->  mp2_out                       0    +/-3125Hz
->  mp3_out                       0    +/-3125Hz
->  nand_core              24000000    +/-3125Hz
->  sd_emmc_b                     0    +/-3125Hz
->  sd_emmc_a                     0    +/-3125Hz
->  vid_pll_div_out      1484843750    +/-62500Hz
->  cci                           0    +/-3125Hz
->  wave420l_c                    0    +/-3125Hz
->  wave420l_b                    0    +/-3125Hz
->  hcodec                        0    +/-3125Hz
->  alt_32k                       0    +/-3125Hz
->  gpio_msr                      0    +/-3125Hz
->  hevc                          0    +/-3125Hz
->  vid_lock                      0    +/-3125Hz
->  pwm_f                         0    +/-3125Hz
->  pwm_e                         0    +/-3125Hz
->  pwm_d                  23984375    +/-3125Hz
->  pwm_c                         0    +/-3125Hz
->  aoclkx2_int                   0    +/-3125Hz
->  aoclk_int                     0    +/-3125Hz
->  rng_ring_osc_0         66746875    +/-3125Hz
->  rng_ring_osc_1         58442188    +/-3125Hz
->  rng_ring_osc_2         52098438    +/-3125Hz
->  rng_ring_osc_3         46662500    +/-3125Hz
->  vapb                  249996094    +/-7812Hz
->  ge2d                  249992188    +/-7812Hz
-> 
-> On the AML-S905X-CC board.
-> 
-> Neil
-> 
+> The coccinelle script was used to rename some (deprecated) functions
+> which no longer exist now.
+>
+> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+
+Acked-by: Julia Lawall <julia.lawall@lip6.fr>
+
+
+> ---
+>  scripts/coccinelle/api/drm-get-put.cocci | 78 ------------------------
+>  1 file changed, 78 deletions(-)
+>  delete mode 100644 scripts/coccinelle/api/drm-get-put.cocci
+>
+> diff --git a/scripts/coccinelle/api/drm-get-put.cocci b/scripts/coccinelle/api/drm-get-put.cocci
+> deleted file mode 100644
+> index 3a09c97ad87d..000000000000
+> --- a/scripts/coccinelle/api/drm-get-put.cocci
+> +++ /dev/null
+> @@ -1,78 +0,0 @@
+> -// SPDX-License-Identifier: GPL-2.0
+> -///
+> -/// Use drm_*_get() and drm_*_put() helpers instead of drm_*_reference() and
+> -/// drm_*_unreference() helpers.
+> -///
+> -// Confidence: High
+> -// Copyright: (C) 2017 NVIDIA Corporation
+> -// Options: --no-includes --include-headers
+> -//
+> -
+> -virtual patch
+> -virtual report
+> -
+> - at depends on patch@
+> -expression object;
+> -@@
+> -
+> -(
+> -- drm_connector_reference(object)
+> -+ drm_connector_get(object)
+> -|
+> -- drm_connector_unreference(object)
+> -+ drm_connector_put(object)
+> -|
+> -- drm_framebuffer_reference(object)
+> -+ drm_framebuffer_get(object)
+> -|
+> -- drm_framebuffer_unreference(object)
+> -+ drm_framebuffer_put(object)
+> -|
+> -- drm_gem_object_reference(object)
+> -+ drm_gem_object_get(object)
+> -|
+> -- drm_gem_object_unreference(object)
+> -+ drm_gem_object_put(object)
+> -|
+> -- __drm_gem_object_unreference(object)
+> -+ __drm_gem_object_put(object)
+> -|
+> -- drm_gem_object_unreference_unlocked(object)
+> -+ drm_gem_object_put_unlocked(object)
+> -|
+> -- drm_dev_unref(object)
+> -+ drm_dev_put(object)
+> -)
+> -
+> - at r depends on report@
+> -expression object;
+> -position p;
+> -@@
+> -
+> -(
+> -drm_connector_unreference at p(object)
+> -|
+> -drm_connector_reference at p(object)
+> -|
+> -drm_framebuffer_unreference at p(object)
+> -|
+> -drm_framebuffer_reference at p(object)
+> -|
+> -drm_gem_object_unreference at p(object)
+> -|
+> -drm_gem_object_reference at p(object)
+> -|
+> -__drm_gem_object_unreference(object)
+> -|
+> -drm_gem_object_unreference_unlocked(object)
+> -|
+> -drm_dev_unref at p(object)
+> -)
+> -
+> - at script:python depends on report@
+> -object << r.object;
+> -p << r.p;
+> -@@
+> -
+> -msg="WARNING: use get/put helpers to reference and dereference %s" % (object)
+> -coccilib.report.print_report(p[0], msg)
+> --
+> 2.19.1
+>
+>
