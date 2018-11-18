@@ -1,143 +1,82 @@
 From: ys114321@gmail.com (Y Song)
-Date: Sun, 18 Nov 2018 07:47:27 +0000
-Subject: [PATCH 2/4] net/bpf: refactor freeing of executable allocations
-In-Reply-To: <20181117185715.25198-3-ard.biesheuvel@linaro.org>
+Date: Sun, 18 Nov 2018 07:48:59 +0000
+Subject: [PATCH 0/4] bpf: permit JIT allocations to be served outside the
+ module region
+In-Reply-To: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
 References: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
- <20181117185715.25198-3-ard.biesheuvel@linaro.org>
-Message-ID: <CAH3MdRV85imzia+=irgbjL48wqFdorB-F1=BkwBgJgi3Z-XAKA@mail.gmail.com>
+Message-ID: <CAH3MdRX5MYv-QQGj25APd4-17syF3Vc_f0AWpEgUoL46qbHrGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sat, Nov 17, 2018 at 6:58 PM Ard Biesheuvel
 <ard.biesheuvel@linaro.org> wrote:
 >
-> All arch overrides of the __weak bpf_jit_free() amount to the same
-> thing: the allocated memory was never mapped read-only, and so
-> it does not have to be remapped to read-write before being freed.
+> On arm64, modules are allocated from a 128 MB window which is close to
+> the core kernel, so that relative direct branches are guaranteed to be
+> in range (except in some KASLR configurations). Also, module_alloc()
+> is in charge of allocating KASAN shadow memory when running with KASAN
+> enabled.
 >
-> So in preparation of permitting arches to serve allocations for BPF
-> JIT programs from other regions than the module region, refactor
-> the existing bpf_jit_free() implementations to use the shared code
-> where possible, and only specialize the remap and free operations.
+> This means that the way BPF reuses module_alloc()/module_memfree() is
+> undesirable on arm64 (and potentially other architectures as well),
+> and so this series refactors BPF's use of those functions to permit
+> architectures to change this behavior.
 >
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
+> Patch #1 fixes a bug introduced during the merge window, where the new
+> alloc/free tracking does not account for memory that is freed by some
+> arch code.
+>
+> Patch #2 refactors the freeing path so that architectures can switch to
+> something other than module_memfree().
+>
+> Patch #3 does the same for module_alloc().
+>
+> Patch #4 implements the new alloc/free overrides for arm64
+
+Except a minor comment, the whole patch set looks good to me.
+Acked-by: Yonghong Song <yhs@fb.com>
+
+>
+> Cc: Daniel Borkmann <daniel@iogearbox.net>
+> Cc: Alexei Starovoitov <ast@kernel.org>
+> Cc: Rick Edgecombe <rick.p.edgecombe@intel.com>
+> Cc: Eric Dumazet <eric.dumazet@gmail.com>
+> Cc: Jann Horn <jannh@google.com>
+> Cc: Kees Cook <keescook@chromium.org>
+>
+> Cc: Jessica Yu <jeyu@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ralf Baechle <ralf@linux-mips.org>
+> Cc: Paul Burton <paul.burton@mips.com>
+> Cc: James Hogan <jhogan@kernel.org>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-mips at linux-mips.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: sparclinux at vger.kernel.org
+> Cc: netdev at vger.kernel.org
+>
+> Ard Biesheuvel (4):
+>   bpf: account for freed JIT allocations in arch code
+>   net/bpf: refactor freeing of executable allocations
+>   bpf: add __weak hook for allocating executable memory
+>   arm64/bpf: don't allocate BPF JIT programs in module memory
+>
+>  arch/arm64/net/bpf_jit_comp.c     | 11 ++++++++++
 >  arch/mips/net/bpf_jit.c           |  7 ++-----
 >  arch/powerpc/net/bpf_jit_comp.c   |  7 ++-----
->  arch/powerpc/net/bpf_jit_comp64.c |  9 +++------
+>  arch/powerpc/net/bpf_jit_comp64.c | 12 +++--------
 >  arch/sparc/net/bpf_jit_comp_32.c  |  7 ++-----
->  kernel/bpf/core.c                 | 15 +++++----------
->  5 files changed, 14 insertions(+), 31 deletions(-)
+>  kernel/bpf/core.c                 | 22 ++++++++++----------
+>  6 files changed, 31 insertions(+), 35 deletions(-)
 >
-> diff --git a/arch/mips/net/bpf_jit.c b/arch/mips/net/bpf_jit.c
-> index 1b69897274a1..5696bd7dccc7 100644
-> --- a/arch/mips/net/bpf_jit.c
-> +++ b/arch/mips/net/bpf_jit.c
-> @@ -1261,10 +1261,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
->         kfree(ctx.offsets);
->  }
->
-> -void bpf_jit_free(struct bpf_prog *fp)
-> +void bpf_jit_binary_free(struct bpf_binary_header *hdr)
->  {
-> -       if (fp->jited)
-> -               bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-> -
-> -       bpf_prog_unlock_free(fp);
-> +       module_memfree(hdr);
->  }
-> diff --git a/arch/powerpc/net/bpf_jit_comp.c b/arch/powerpc/net/bpf_jit_comp.c
-> index a1ea1ea6b40d..5b5ce4a1b44b 100644
-> --- a/arch/powerpc/net/bpf_jit_comp.c
-> +++ b/arch/powerpc/net/bpf_jit_comp.c
-> @@ -680,10 +680,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
->         return;
->  }
->
-> -void bpf_jit_free(struct bpf_prog *fp)
-> +void bpf_jit_binary_free(struct bpf_binary_header *hdr)
->  {
-> -       if (fp->jited)
-> -               bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-> -
-> -       bpf_prog_unlock_free(fp);
-> +       module_memfree(hdr);
->  }
-> diff --git a/arch/powerpc/net/bpf_jit_comp64.c b/arch/powerpc/net/bpf_jit_comp64.c
-> index 84c8f013a6c6..f64f1294bd62 100644
-> --- a/arch/powerpc/net/bpf_jit_comp64.c
-> +++ b/arch/powerpc/net/bpf_jit_comp64.c
-> @@ -1021,11 +1021,8 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
->         return fp;
->  }
->
-> -/* Overriding bpf_jit_free() as we don't set images read-only. */
-> -void bpf_jit_free(struct bpf_prog *fp)
-> +/* Overriding bpf_jit_binary_free() as we don't set images read-only. */
-> +void bpf_jit_binary_free(struct bpf_binary_header *hdr)
->  {
-> -       if (fp->jited)
-> -               bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-> -
-> -       bpf_prog_unlock_free(fp);
-> +       module_memfree(hdr);
->  }
-> diff --git a/arch/sparc/net/bpf_jit_comp_32.c b/arch/sparc/net/bpf_jit_comp_32.c
-> index 01bda6bc9e7f..589950d152cc 100644
-> --- a/arch/sparc/net/bpf_jit_comp_32.c
-> +++ b/arch/sparc/net/bpf_jit_comp_32.c
-> @@ -756,10 +756,7 @@ cond_branch:                       f_offset = addrs[i + filter[i].jf];
->         return;
->  }
->
-> -void bpf_jit_free(struct bpf_prog *fp)
-> +void bpf_jit_binary_free(struct bpf_binary_header *hdr)
->  {
-> -       if (fp->jited)
-> -               bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
-> -
-> -       bpf_prog_unlock_free(fp);
-> +       module_memfree(hdr);
->  }
-> diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
-> index 1a796e0799ec..29f766dac203 100644
-> --- a/kernel/bpf/core.c
-> +++ b/kernel/bpf/core.c
-> @@ -646,25 +646,20 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
->         return hdr;
->  }
->
-> -void bpf_jit_binary_free(struct bpf_binary_header *hdr)
-> +void __weak bpf_jit_binary_free(struct bpf_binary_header *hdr)
->  {
-> -       u32 pages = hdr->pages;
-> -
-> +       bpf_jit_binary_unlock_ro(hdr);
->         module_memfree(hdr);
-> -       bpf_jit_uncharge_modmem(pages);
->  }
->
-> -/* This symbol is only overridden by archs that have different
-> - * requirements than the usual eBPF JITs, f.e. when they only
-> - * implement cBPF JIT, do not set images read-only, etc.
-> - */
-
-Do you want to move the above comments to
-new weak function bpf_jit_binary_free?
-
-> -void __weak bpf_jit_free(struct bpf_prog *fp)
-> +void bpf_jit_free(struct bpf_prog *fp)
->  {
->         if (fp->jited) {
->                 struct bpf_binary_header *hdr = bpf_jit_binary_hdr(fp);
-> +               u32 pages = hdr->pages;
->
-> -               bpf_jit_binary_unlock_ro(hdr);
->                 bpf_jit_binary_free(hdr);
-> +               bpf_jit_uncharge_modmem(pages);
->
->                 WARN_ON_ONCE(!bpf_prog_kallsyms_verify_off(fp));
->         }
 > --
 > 2.17.1
 >
