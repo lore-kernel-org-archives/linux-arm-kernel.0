@@ -1,10 +1,10 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sun, 18 Nov 2018 15:05:43 +0800
+Date: Sun, 18 Nov 2018 15:08:10 +0800
 Subject: [PATCH v1 2/2] i2c: i2c-stm32f7: SYSCFG Fast Mode Plus support
  for I2C STM32F7
 In-Reply-To: <1542370822-14721-3-git-send-email-pierre-yves.mordret@st.com>
 References: <1542370822-14721-3-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <201811181524.WpzzWNmB%fengguang.wu@intel.com>
+Message-ID: <201811181519.N8nCRaVi%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,24 +18,24 @@ I love your patch! Yet something to improve:
 
 url:    https://github.com/0day-ci/linux/commits/Pierre-Yves-MORDRET/SYSCFG-Fast-Mode-Plus-support-for-I2C-STM32F7/20181118-135056
 base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux.git i2c/for-next
-config: s390-allmodconfig (attached as .config)
-compiler: s390x-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 8.1.0
 reproduce:
         wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=s390 
+        GCC_VERSION=8.1.0 make.cross ARCH=xtensa 
 
 All errors (new ones prefixed by >>):
 
-   drivers/i2c/busses/i2c-stm32f7.c: In function 'stm32f7_i2c_setup_fm_plus_bits':
->> drivers/i2c/busses/i2c-stm32f7.c:1790:9: error: implicit declaration of function 'regmap_update_bits'; did you mean 'set_pgste_bits'? [-Werror=implicit-function-declaration]
+   drivers/i2c//busses/i2c-stm32f7.c: In function 'stm32f7_i2c_setup_fm_plus_bits':
+>> drivers/i2c//busses/i2c-stm32f7.c:1790:9: error: implicit declaration of function 'regmap_update_bits'; did you mean 'file_update_time'? [-Werror=implicit-function-declaration]
      return regmap_update_bits(i2c_dev->regmap, reg, mask, mask);
             ^~~~~~~~~~~~~~~~~~
-            set_pgste_bits
+            file_update_time
    cc1: some warnings being treated as errors
 
-vim +1790 drivers/i2c/busses/i2c-stm32f7.c
+vim +1790 drivers/i2c//busses/i2c-stm32f7.c
 
   1768	
   1769	static int stm32f7_i2c_setup_fm_plus_bits(struct platform_device *pdev,
@@ -70,6 +70,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 52103 bytes
+Size: 55652 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181118/0e97a6da/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181118/608c3092/attachment-0001.gz>
