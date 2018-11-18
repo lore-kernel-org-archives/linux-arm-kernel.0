@@ -1,119 +1,107 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 18 Nov 2018 17:16:59 +0300
-Subject: [RFC PATCH v2 00/14] initial support for "suniv" Allwinner new ARM9
- SoC
-Message-ID: <cover.1542546735.git.mesihkilinc@gmail.com>
+Date: Sun, 18 Nov 2018 17:17:00 +0300
+Subject: [RFC PATCH v2 01/14] ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate
+ ARMv5/v7 Allwinner SoCs
+In-Reply-To: <cover.1542546735.git.mesihkilinc@gmail.com>
+References: <cover.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <abbb75165c8ef41da6963d72f4155ad6ae79140c.1542546735.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the second version of RFC patchset for Allwinner ARMv5 F1C100s
-SoC. Icenowy (author of the initial patchset) allowed me to continue.
-For patch 1~3 which introduces first ARMv5 Allwinner SoC I looked 
-freescale,imx configs and tried to organize patches better. 
-Addressed comment from Maxime Ripard and added SoC name to
-compatibles and filenames. 
-Addressed comment from Rob Herring and added dt-bindings.
+Allwinner also has some ARMv5 SoCs.
 
-This is my first patch. Sorry for any inconvenience :-)
+In order to add support for them, add a CONFIG_ARCH_SUNXI_V7 bool config
+which is selected when a ARMv7 soc is selected, and make CONFIG_ARCH_SUNXI
+a common option which is selected by both V7 and V5 sunxi option.
 
-Original cover later:
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+---
+ arch/arm/mach-sunxi/Kconfig  | 25 +++++++++++++++++--------
+ arch/arm/mach-sunxi/Makefile |  2 +-
+ 2 files changed, 18 insertions(+), 9 deletions(-)
 
-This is the RFC initial patchset for the "new" Allwinner SUNIV ARM9 SoC.
-
-The same die is packaged differently, come with different co-packaged
-DRAM or shipped with different SDK; and then made many model names: F23,
-F25, F1C100A, F1C100S, F1C200S, F1C500, F1C600, R6, etc. These SoCs all
-share a common feature set and are packaged similarly (eLQFP128 for SoCs
-without co-packaged DRAM, QFN88 for with DRAM). As their's no
-functionality hidden on the QFN88 models (except DRAM interface not
-exported), it's not clever to differentiate them. So I will use suniv as
-common name of all these SoCs.
-
-As it's the first not ARMv7+ Allwinner SoC to get supported, this
-patchset firstly made CONFIG_ARCH_SUNXI a common config item, and let
-selectable CONFIG_ARCH_SUNXI_V{5,7} to internally select it. This makes
-reusing most work possible. This is PATCH 1~2.
-
-The ARM9 has neither GIC nor arch_timer, like the sun4i/5i Cortex-A8
-SoCs. So adapt the IRQ and timer driver used by sun4i/5i to support
-suniv. This is PATCH 3~5.
-
-Then it's the common way to support a new SoC -- pinctrl, CCU and
-initial DT.
-
-Changes since v1:
-- Patch "ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate ARMv5/v7
-  Allwinner SoCs"
-  - Instead of using a common bool config use a common menuconfig. 
-  - Use ARCH_MULTI_V7 to differentiate V7 SoCs.
-  - Addressed comment from Julian Calaby
-- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
-  - Use ARCH_MULTI_V5 to differentiate V5 SoCs.
-  - removed "allwinner,suniv" board compatible string
-  - Added dt-bindings
-- Patch "irqchip/sun4i: add support for suniv interrupt controller"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-ic" to "allwinner,suniv-f1c100s-ic"
-- Patch "clocksource: sun4i: add a compatible for suniv"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-timer" to "allwinner,suniv-f1c100s-timer"
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - Added dt-bindings
-  - Renamed suniv-pinctrl to suniv-f1c100s-pinctrl
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Added dt-bindings
-  - Renamed suniv-ccu to suniv-f1c100s-ccu
-- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
-  - Addressed comment from Rask Ingemann Lambertsen
-
-Mesih Kilinc (14):
-  ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate ARMv5/v7 Allwinner
-    SoCs
-  dt-bindings: arm: Add new Allwinner ARMv5 F1C100s SoC
-  ARM: sunxi: add Allwinner ARMv5 SoCs
-  dt-bindings: interrupt-controller: Add suniv interrupt-controller
-  irqchip/sun4i: add support for suniv interrupt controller
-  dt-bindings: timer: Add Allwinner suniv timer
-  clocksource: sun4i: add a compatible for suniv
-  clocksource/drivers/sun4i: register as sched_clock on suniv
-  dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl
-  pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)
-  dt-bindings: clock: Add Allwinner suniv F1C100s CCU
-  clk: sunxi-ng: add support for suniv F1C100s SoC
-  ARM: dts: suniv: add initial DTSI file for F1C100s
-  ARM: suniv: f1c100s: add device tree for Lichee Pi Nano
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- .../interrupt-controller/allwinner,sun4i-ic.txt    |   5 +-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- .../bindings/timer/allwinner,sun4i-timer.txt       |   5 +-
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |  26 +
- arch/arm/boot/dts/suniv-f1c100s.dtsi               | 158 ++++++
- arch/arm/mach-sunxi/Kconfig                        |  39 +-
- arch/arm/mach-sunxi/Makefile                       |   3 +-
- arch/arm/mach-sunxi/sunxi_v5.c                     |  22 +
- drivers/clk/sunxi-ng/Kconfig                       |   5 +
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c           | 536 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h           |  34 ++
- drivers/clocksource/sun4i_timer.c                  |   5 +-
- drivers/irqchip/irq-sun4i.c                        |  47 +-
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c      | 417 ++++++++++++++++
- include/dt-bindings/clock/suniv-ccu-f1c100s.h      |  69 +++
- include/dt-bindings/reset/suniv-ccu-f1c100s.h      |  37 ++
- 22 files changed, 1401 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
- create mode 100644 arch/arm/mach-sunxi/sunxi_v5.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
- create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
- create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
-
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index d9c8ecf..5db17ec 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -6,31 +6,38 @@ menuconfig ARCH_SUNXI
+ 	select GENERIC_IRQ_CHIP
+ 	select GPIOLIB
+ 	select PINCTRL
+-	select PM_OPP
+-	select SUN4I_TIMER
+ 	select RESET_CONTROLLER
++	help
++	  Support for Allwinner ARM-based family of processors
+ 
+ if ARCH_SUNXI
+ 
++if ARCH_MULTI_V7
++
++config ARCH_SUNXI_V7
++	bool
++	select PM_OPP
++	select SUN4I_TIMER
++
+ config MACH_SUN4I
+ 	bool "Allwinner A10 (sun4i) SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 
+ config MACH_SUN5I
+ 	bool "Allwinner A10s / A13 (sun5i) SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 	select SUN5I_HSTIMER
+ 
+ config MACH_SUN6I
+ 	bool "Allwinner A31 (sun6i) SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+ 	select SUN5I_HSTIMER
+ 
+ config MACH_SUN7I
+ 	bool "Allwinner A20 (sun7i) SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 	select ARM_GIC
+ 	select ARM_PSCI
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
+@@ -39,13 +46,13 @@ config MACH_SUN7I
+ 
+ config MACH_SUN8I
+ 	bool "Allwinner sun8i Family SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 	select ARM_GIC
+ 	select MFD_SUN6I_PRCM
+ 
+ config MACH_SUN9I
+ 	bool "Allwinner (sun9i) SoCs support"
+-	default ARCH_SUNXI
++	select ARCH_SUNXI_V7
+ 	select ARM_GIC
+ 
+ config ARCH_SUNXI_MC_SMP
+@@ -56,3 +63,5 @@ config ARCH_SUNXI_MC_SMP
+ 	select ARM_CPU_SUSPEND
+ 
+ endif
++
++endif
+diff --git a/arch/arm/mach-sunxi/Makefile b/arch/arm/mach-sunxi/Makefile
+index 71429aa..c9a83ab 100644
+--- a/arch/arm/mach-sunxi/Makefile
++++ b/arch/arm/mach-sunxi/Makefile
+@@ -1,5 +1,5 @@
+ CFLAGS_mc_smp.o	+= -march=armv7-a
+ 
+-obj-$(CONFIG_ARCH_SUNXI) += sunxi.o
++obj-$(CONFIG_ARCH_SUNXI_V7) += sunxi.o
+ obj-$(CONFIG_ARCH_SUNXI_MC_SMP) += mc_smp.o headsmp.o
+ obj-$(CONFIG_SMP) += platsmp.o
 -- 
 2.7.4
