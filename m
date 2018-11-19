@@ -1,99 +1,140 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Nov 2018 09:26:03 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <20181119091020.ejplmzkzo4jd72md@salmiak>
-References: <851b61b1-786b-ef64-b8c4-fe6926bdf9f9@arm.com>
- <201811171058376326562@zte.com.cn> <20181119091020.ejplmzkzo4jd72md@salmiak>
-Message-ID: <c259e853-3d0c-1046-f576-fe28ead58ee8@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Mon, 19 Nov 2018 10:26:48 +0100
+Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
+In-Reply-To: <1542605939.32082.12.camel@mtksdaap41>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-6-matthias.bgg@kernel.org>
+ <1542605939.32082.12.camel@mtksdaap41>
+Message-ID: <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2018 09:10, Mark Rutland wrote:
-> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
->>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
->>>>> Hi,
->>>>>> When virtual machine starts, hang up.
->>>>>
->>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
->>>>> interrupt?
->>>>>
->>>>>> The kernel version of guest
->>>>>> is 4.16. Host support vgic_v3.
->>>>>
->>>>> Your host kernel is something recent, I guess?
->>>>>
->>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
->>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
->>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
->>>>>> correctly, so group is not set.
->>>>>
->>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
->>>>> version?) or some other userland tool?
->>>>>
->>>>
->>>> QEMU emulator version 3.0.50 .
->>>>
->>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
->>>>>> time.
->>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
->>>>>> interrupt injection failed.
->>>>>>
->>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->>>>>> ---
->>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> index 9c0dd23..d101000 100644
->>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
->>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
->>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
->>>>>>
->>>>>> -    if (irq->group)
->>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->>>>>
->>>>> This is not the right fix, not only because it basically reverts the
->>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
->>>>> their configured group).
->>>>>
->>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
->>>>> before dist->vgic_model is set, also what value it has?
->>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
->>>>>
->>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
->>>>   If the interrupt comes at this time, the interrupt injection fails.
->>>
->>> Does that mean that the guest is configuring its interrupts as Group0?
->>> That sounds wrong, Linux should configure all it's interrupts as
->>> non-secure group1.
+
+
+On 19/11/2018 06:38, CK Hu wrote:
+> Hi, Matthias:
+> 
+> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
+>> From: Matthias Brugger <mbrugger@suse.com>
 >>
->> no, I think that uefi dose this, not linux.
->> 1. kvm_vgic_vcpu_init 
->> 2. vgic_create 
->> 3. kvm_vgic_dist_init 
->> 4.vgic_mmio_write_group: uefi as guest, write group=0
->> 5.vgic_mmio_write_group: linux as guest, write group=1
+>> It can happen that the mmsys clock drivers aren't probed before the
+>> platform driver gets invoked. The platform driver used to print a warning
+>> that the driver failed to get the clocks. Omit this error on
+>> the defered probe path.
 > 
-> Is this the same issue fixed by EDK2 commit:
+> This patch looks good to me, but you have not modified the sub driver in
+> HDMI path. We could let HDMI path print the warning and someone send
+> another patch later, or you modify for HDMI path in this patch.
+
+Sure, I'll add this in v6. After inspecting the code, I think we will need to
+also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
+now does not even check if the clocks are present. What do you think?
+
+I'll address the coding style issue you metioned below as well.
+
+Regards,
+Matthias
+
+>>
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_disp_color.c | 4 +++-
+>>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c   | 4 +++-
+>>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c  | 4 +++-
+>>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c    | 3 ++-
+>>  drivers/gpu/drm/mediatek/mtk_dsi.c        | 6 ++++--
+>>  5 files changed, 15 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+>> index f609b62b8be6..1ea3178d4c18 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_disp_color.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+>> @@ -126,7 +126,9 @@ static int mtk_disp_color_probe(struct platform_device *pdev)
+>>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>>  				&mtk_disp_color_funcs);
+>>  	if (ret) {
+>> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to initialize component: %d\n",
+>> +					ret);
 > 
-> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+> I would like one more blank line here.
 > 
-> ... where EDK2 would try to use IAR0 rather than IAR1?
+>>  		return ret;
+>>  	}
+>>  
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+>> index 28d191192945..5ebbcaa4e70e 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+>> @@ -293,7 +293,9 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
+>>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>>  				&mtk_disp_ovl_funcs);
+>>  	if (ret) {
+>> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to initialize component: %d\n",
+>> +					ret);
 > 
-> The commit messages notes this lead to a boot-time hang.
-
-I doubt it. The EDK2 bug resulted in no interrupt being delivered due to
-the group being set to 1, and the interrupt being acknowledged through
-the Group0 accessor. Also, this was a 32bit special, and 64bit EDK2 was
-just fine.
-
-What Peng describes here is the guest writing the group as 0, which
-doesn't make much sense (I certainly don't see EDK2 doing that).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> I would like to align to the right of '('.
+> 
+> Regards,
+> CK
+> 
+>>  		return ret;
+>>  	}
+>>  
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+>> index b0a5cffe345a..59a08ed5fea5 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+>> @@ -295,7 +295,9 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
+>>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>>  				&mtk_disp_rdma_funcs);
+>>  	if (ret) {
+>> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to initialize component: %d\n",
+>> +					ret);
+>>  		return ret;
+>>  	}
+>>  
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+>> index b06cd9d4b525..b76a2d071a97 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+>> @@ -566,7 +566,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+>>  
+>>  	ddp->clk = devm_clk_get(dev, NULL);
+>>  	if (IS_ERR(ddp->clk)) {
+>> -		dev_err(dev, "Failed to get clock\n");
+>> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to get clock\n");
+>>  		return PTR_ERR(ddp->clk);
+>>  	}
+>>  
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+>> index 90109a0d6fff..cc6de75636c3 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+>> @@ -1103,14 +1103,16 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+>>  	dsi->engine_clk = devm_clk_get(dev, "engine");
+>>  	if (IS_ERR(dsi->engine_clk)) {
+>>  		ret = PTR_ERR(dsi->engine_clk);
+>> -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to get engine clock: %d\n", ret);
+>>  		return ret;
+>>  	}
+>>  
+>>  	dsi->digital_clk = devm_clk_get(dev, "digital");
+>>  	if (IS_ERR(dsi->digital_clk)) {
+>>  		ret = PTR_ERR(dsi->digital_clk);
+>> -		dev_err(dev, "Failed to get digital clock: %d\n", ret);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(dev, "Failed to get digital clock: %d\n", ret);
+>>  		return ret;
+>>  	}
+>>  
+> 
+> 
