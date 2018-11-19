@@ -1,45 +1,42 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 19 Nov 2018 13:58:07 +0100
-Subject: [PATCH 01/10] perf/core: Add macro to test for event exclusion
- flags
-In-Reply-To: <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
-Message-ID: <20181119125807.GD9761@hirez.programming.kicks-ass.net>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 19 Nov 2018 13:58:11 +0100
+Subject: [PATCH v6 1/6] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <TY1PR01MB17695E8ED56BBC03AAA7FD8FF5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+References: <20181116145937.27660-1-phil.edworthy@renesas.com>
+ <20181116145937.27660-2-phil.edworthy@renesas.com>
+ <20181116160128.pkuya6rwqm4schdn@pengutronix.de>
+ <20181116161122.hhvslbzdujxpk3up@pengutronix.de>
+ <TY1PR01MB17697C2C8BCE98009EBDECF7F5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+ <20181119104603.qzuvpoha622l4xvy@pengutronix.de>
+ <TY1PR01MB17695E8ED56BBC03AAA7FD8FF5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+Message-ID: <20181119125811.6bujcow5wf4hvfz4@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:24:04AM +0000, Andrew Murray wrote:
-> Add a macro that tests if any of the perf event exclusion flags
-> are set on a given event.
+Hello Phil,
 
-It is in fact an inline function, not a CPP macro.
+On Mon, Nov 19, 2018 at 12:53:46PM +0000, Phil Edworthy wrote:
+> On 19 November 2018 10:46 Uwe Kleine-K?nig wrote:
+> > On Mon, Nov 19, 2018 at 10:41:42AM +0000, Phil Edworthy wrote:
+> > > btw, do we need to add of_clk_get_by_name_optional()? I only added it
+> > > as a counterpart to of_clk_get_by_name(), but it may not be needed.
+> > 
+> > I don't need it. Given that it is easy to add when someone has a need, I'd say,
+> > skip it for now.
+> 
+> I'm wondering if we actually need clk_get_optional(). For me at least, I just
+> want devm_clk_get_optional(). That would get rid of the arch patches.
 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  include/linux/perf_event.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 53c500f..89ee7fa 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
->  extern void
->  perf_log_lost_samples(struct perf_event *event, u64 lost);
->  
-> +static inline bool event_has_exclude_flags(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
-> +
-> +	return attr->exclude_idle || attr->exclude_user ||
-> +	       attr->exclude_kernel || attr->exclude_hv ||
-> +	       attr->exclude_guest || attr->exclude_host;
-> +}
-> +
->  static inline bool is_sampling_event(struct perf_event *event)
->  {
->  	return event->attr.sample_period != 0;
-> -- 
-> 2.7.4
-> 
+Given that clk_get_optional will be that simple, it can live in
+linux/clk.h for all implementors of the clk API, then you don't have to
+care about different archs. (Unless I'm missing something.)
+
+I don't think it's a good idea to drop clk_get_optional even if you'd
+have to provide arch-specific stuff.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
