@@ -1,66 +1,96 @@
-From: gmazyland@gmail.com (Milan Broz)
-Date: Mon, 19 Nov 2018 21:05:18 +0100
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <20181119192821.GA258711@gmail.com>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
- <20181019190411.GB246441@gmail.com>
- <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
- <20181116215249.GA27149@gmail.com>
- <56883f08-26cb-ecef-5698-1c2948714773@gmail.com>
- <20181119192821.GA258711@gmail.com>
-Message-ID: <1e9ec59a-6a2c-3536-0722-c6d96d6714b2@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Mon, 19 Nov 2018 21:12:26 +0100
+Subject: [PATCH v5 1/2] dt-bindings: PCI: meson: add DT bindings for
+ Amlogic Meson PCIe controller
+In-Reply-To: <1539049990-30810-2-git-send-email-hanjie.lin@amlogic.com>
+References: <1539049990-30810-1-git-send-email-hanjie.lin@amlogic.com>
+ <1539049990-30810-2-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <CAFBinCCChD-phwyb3hSzAjBmy09g35ijQa_chJX5HufuVnPjaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Hanjie, Hello Yue,
 
-On 19/11/2018 20:28, Eric Biggers wrote:
-> Note that Adiantum benchmarks on x86 are misleading at the moment, since the
-> initial kernel patchset doesn't include SSE2 and AVX2 optimized XChaCha and
-> NHPoly1305.  To start, only C and arm32 NEON implementations are included.
-> Hence, on x86 Adiantum will appear much slower than it should be.  But I'm
-> planning to add the x86 and arm64 implementations, so it will get much faster.
+sorry for being late with my comment
 
-The posted benchmark was just an example (it was 32bit virtual machine on my
-old laptop so numbers are misleading).
+On Tue, Oct 9, 2018 at 3:53 AM Hanjie Lin <hanjie.lin@amlogic.com> wrote:
+>
+> From: Yue Wang <yue.wang@amlogic.com>
+>
+> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
+> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
+> controller.
+>
+> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
+> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
+>  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+> new file mode 100644
+> index 0000000..12b18f8
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
+> @@ -0,0 +1,70 @@
+> +Amlogic Meson AXG DWC PCIE SoC controller
+> +
+> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
+> +It shares common functions with the PCIe DesignWare core driver and
+> +inherits common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pci.txt.
+> +
+> +Additional properties are described here:
+> +
+> +Required properties:
+> +- compatible:
+> +       should contain "amlogic,axg-pcie" to identify the core.
+> +- reg:
+> +       should contain the configuration address space.
+> +- reg-names: Must be
+> +       - "elbi"        External local bus interface registers
+> +       - "cfg"         Meson specific registers
+> +       - "phy"         Meson PCIE PHY registers
+is this only the PCIe PHY registers or is it the registers of the PHY
+which supports USB3.0 and PCIe?
+buildroot_openlinux_kernel_4.9_fbdev_20180706 uses the following
+registers in the pcie_A node for the "phy" registers:
+0x0 0xff646000 0x0 0x2000
+while the usb3_phy_v2 node uses:
+phy-reg = <0xff646000>;
 
-If Adiantum is going to be merged, I expect it can be used as an alternative
-even on x86, so I expect more optimizations.
+> +       - "config"      PCIe configuration space
+> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +- clock-names: Must include the following entries:
+> +       - "pclk"       PCIe GEN 100M PLL clock
+> +       - "port"       PCIe_x(A or B) RC clock gate
+> +       - "general"    PCIe Phy clock
+> +       - "mipi"       PCIe_x(A or B) 100M ref clock gate
+> +- resets: phandle to the reset lines.
+> +- reset-names: must contain "phy" "port" and "apb"
+> +       - "phy"         Share PHY reset
+> +       - "port"        Port A or B reset
+> +       - "apb"         Share APB reset
+> +- device_type:
+> +       should be "pci". As specified in designware-pcie.txt
+> +
+> +
+> +Example configuration:
+> +
+> +       pcie: pcie at f9800000 {
+> +                       compatible = "amlogic,axg-pcie", "snps,dw-pcie";
+> +                       reg = <0x0 0xf9800000 0x0 0x400000
+> +                                       0x0 0xff646000 0x0 0x2000
+> +                                       0x0 0xff644000 0x0 0x2000
+> +                                       0x0 0xf9f00000 0x0 0x100000>;
+> +                       reg-names = "elbi", "cfg", "phy", "config";
+is the order of the reg-names correct?
+buildroot_openlinux_kernel_4.9_fbdev_20180706 uses 0xff646000 for the
+PHY (instead of 0xff646000) in mesong12a.dtsi and mesong12b.dtsi
 
-...
-> I think that when using AF_ALG, cryptsetup should get the IV size from
-> /proc/crypto, or else have it hardcoded that "adiantum" uses 32-byte IVs.
-> (Actually Adiantum can formally can use any size IV, but we had to choose a
-> fixed size for Linux's crypto API.)
 
-I do not want to parse /proc/crypto (it needs to load the module first anyway)
-and proper API was not yet here when I wrote this code (I think we were the first
-real user of userspace crypto api...)
-
-> Getting the IV size via CRYPTO_MSG_GETALG via NETLINK_CRYPTO is also an option,
-> but that requires the kconfig option CONFIG_CRYPTO_USER which isn't guaranteed
-> to be enabled even if CONFIG_CRYPTO_USER_API_SKCIPHER is.
-
-Yes. For now, I hardcode Adiantum IV size in cryptsetup and later we will try to
-find a more generic way.
-
-> Also: why is cryptsetup's default keyslot encryption AES-128-XTS instead of
-> AES-256-XTS?  People can choose a cipher with a 256-bit key strength such as
-> AES-256-XTS or Adiantum, so the keyslots should use at least that strength too.
-
-It was inherited from 256bit default key (so 2xAES-128 in XTS).
-It is still the default for LUKS1, but we should perhaps change it to double key
-it for XTS mode (at least for fallback keyslot encryption).
-
-Anyway, we will release cryptsetup 2.0.6 very soon to fix one problem
-in LUKS2, so I'll add the Adiantum IV size there as well so people can play with it.
-
-Thanks,
-Milan
-
-p.s.
-Reading the discussion about Zinc/Adiantum - I would perhaps prefer to merge
-Adiantum first (if it is ready).
-It is a new feature, I see it as useful cipher alternative for dm-crypt and it can be
-esily backported without Zinc to older kernels (I am testing it actually this way).
+Regards
+Martin
