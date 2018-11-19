@@ -1,84 +1,110 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Nov 2018 15:12:37 +0100
-Subject: [PATCH v2 0/2] media: cedrus: Add H264 decoding support
-In-Reply-To: <CAAFQd5DmcC23ZSktBXo=Sz-6G76oaJywha9mXtaPFSx08eV_nA@mail.gmail.com>
-References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
- <CAAFQd5DmcC23ZSktBXo=Sz-6G76oaJywha9mXtaPFSx08eV_nA@mail.gmail.com>
-Message-ID: <20181119141237.qwwdn27e6jwjvhmz@flea>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Mon, 19 Nov 2018 14:12:59 +0000
+Subject: [PATCH] clk: Add (devm_)clk_get_optional() functions
+Message-ID: <20181119141259.11992-1-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+This adds clk_get_optional() and devm_clk_get_optional() functions to get
+optional clocks.
+They behave the same as (devm_)clk_get except where there is no clock
+producer. In this case, instead of returning -ENOENT, the function
+returns NULL. This makes error checking simpler and allows
+clk_prepare_enable, etc to be called on the returned reference
+without additional checks.
 
-On Fri, Nov 16, 2018 at 04:04:40PM +0900, Tomasz Figa wrote:
-> > I've been using the controls currently integrated into ChromeOS that
-> > have a working version of this particular setup. However, these
-> > controls have a number of shortcomings and inconsistencies with other
-> > decoding API. I've worked with libva so far, but I've noticed already
-> > that:
-> >   - The kernel UAPI expects to have the nal_ref_idc variable, while
-> >     libva only exposes whether that frame is a reference frame or
-> >     not. I've looked at the rockchip driver in the ChromeOS tree, and
-> >     our own driver, and they both need only the information about
-> >     whether the frame is a reference one or not, so maybe we should
-> >     change this?
-> 
-> Since this is something that is actually present in the stream and the
-> problem is that libva doesn't convey the information properly, I
-> believe you can workaround it in the libva backend using this API by
-> just setting it to 0 and some arbitrary non-zero value in a binary
-> fashion.
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+---
+v7:
+ - Instead of messing with the core functions, simply wrap them for the
+   _optional() versions. By putting clk_get_optional() inline in the header
+   file, we can get rid of the arch specific patches as well.
+v6:
+ - Add doxygen style comment for devm_clk_get_optional() args
+v5:
+ - No changes.
+v4:
+ - No changes.
+v3:
+ - No changes.
+---
+ drivers/clk/clk-devres.c | 11 +++++++++++
+ include/linux/clk.h      | 27 +++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-That could work yes, thanks for the suggestion!
-
-> >   - The H264 bitstream exposes the picture default reference list (for
-> >     both list 0 and list 1), the slice reference list and an override
-> >     flag. The libva will only pass the reference list to be used (so
-> >     either the picture default's or the slice's) depending on the
-> >     override flag. The kernel UAPI wants the picture default reference
-> >     list and the slice reference list, but doesn't expose the override
-> >     flag, which prevents us from configuring properly the
-> >     hardware. Our video decoding engine needs the three information,
-> >     but we can easily adapt to having only one. However, having two
-> >     doesn't really work for us.
-> >
-> 
-> From what I can see in the H.264 Slice header, there are 3 related data:
->  - num_ref_idx_active_override_flag - affects the number of reference
-> indices for the slice,
->  - ref_list_l{0,1}_modifications - modifications for the reference lists,
->  - ref_pic_list_modification_flag_l{0,1} - selects whether the
-> modifications are applied.
-> 
-> The reference lists inside the v4l2_ctrl_h264_slice_param are expected
-> to already take all the above into account and be the final reference
-> lists to be used for the slice. For reference, the H.264 specification
-> refers to those final reference lists as RefPicList0 and RefPicList1
-> and so the names of the fields in the struct.
-> 
-> There is some interesting background here, though. The Rockchip VPU
-> parses the slice headers itself and handles the above data on its own.
-> This means that it needs to be programmed with the unmodified
-> reference lists, as in v4l2_ctrl_h264_decode_param.
-> 
-> Given that, it sounds like we need to have both. Your driver would
-> always use the lists in v4l2_ctrl_h264_slice_param, while the Rockchip
-> VPU would ignore them, use the ones in v4l2_ctrl_h264_decode_param and
-> perform the per-slice modifications on its own.
-
-I guess that would work, yep
-
-Thanks!
-Maxime
-
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index 12c87457eca1..f0033d937c39 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -34,6 +34,17 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
+ }
+ EXPORT_SYMBOL(devm_clk_get);
+ 
++struct clk *devm_clk_get_optional(struct device *dev, const char *id)
++{
++	struct clk *clk = devm_clk_get(dev, id);
++
++	if (clk == ERR_PTR(-ENOENT))
++		return NULL;
++	else
++		return clk;
++}
++EXPORT_SYMBOL(devm_clk_get_optional);
++
+ struct clk_bulk_devres {
+ 	struct clk_bulk_data *clks;
+ 	int num_clks;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index a7773b5c0b9f..c7bbb0678057 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -383,6 +383,17 @@ int __must_check devm_clk_bulk_get_all(struct device *dev,
+  */
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
++/**
++ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
++ *			   clock producer.
++ * @dev: device for clock "consumer"
++ * @id: clock consumer ID
++ *
++ * Behaves the same as devm_clk_get except where there is no clock producer. In
++ * this case, instead of returning -ENOENT, the function returns NULL.
++ */
++struct clk *devm_clk_get_optional(struct device *dev, const char *id);
++
+ /**
+  * devm_get_clk_from_child - lookup and obtain a managed reference to a
+  *			     clock producer from child node.
+@@ -718,6 +729,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return NULL;
+ }
+ 
++static inline struct clk *devm_clk_get_optional(struct device *dev,
++						const char *id)
++{
++	return NULL;
++}
++
+ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ 						 struct clk_bulk_data *clks)
+ {
+@@ -862,6 +879,16 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+ 	clk_bulk_unprepare(num_clks, clks);
+ }
+ 
++static inline struct clk *clk_get_optional(struct device *dev, const char *id)
++{
++	struct clk *clk = clk_get(dev, id);
++
++	if (clk == ERR_PTR(-ENOENT))
++		return NULL;
++	else
++		return clk;
++}
++
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181119/a4288677/attachment.sig>
+2.17.1
