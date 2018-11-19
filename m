@@ -1,42 +1,26 @@
-From: aford173@gmail.com (Adam Ford)
-Date: Mon, 19 Nov 2018 14:29:15 -0600
-Subject: [PATCH] Support RTC charging on PFUZE100
-In-Reply-To: <20181114222528.GE2089@sirena.org.uk>
-References: <20181030143718.10027-1-aford173@gmail.com>
- <20181114222528.GE2089@sirena.org.uk>
-Message-ID: <CAHCN7xJMu0nwCKfRMVEQTkYRRx6z9h44-NdAgeD403D195SuaQ@mail.gmail.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Mon, 19 Nov 2018 21:30:05 +0100
+Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
+In-Reply-To: <1e9ec59a-6a2c-3536-0722-c6d96d6714b2@gmail.com>
+References: <20181015175424.97147-1-ebiggers@kernel.org>
+ <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
+ <20181019190411.GB246441@gmail.com>
+ <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
+ <20181116215249.GA27149@gmail.com>
+ <56883f08-26cb-ecef-5698-1c2948714773@gmail.com>
+ <20181119192821.GA258711@gmail.com>
+ <1e9ec59a-6a2c-3536-0722-c6d96d6714b2@gmail.com>
+Message-ID: <CAHmME9pU79WRKWd32ihp2aQgQ1D6Kh+jh2e2sETm8tqjNxgdvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 4:25 PM Mark Brown <broonie@kernel.org> wrote:
->
-> On Tue, Oct 30, 2018 at 09:37:18AM -0500, Adam Ford wrote:
-> >
-> > diff --git a/arch/arm/boot/dts/imx6-logicpd-som.dtsi b/arch/arm/boot/dts/imx6-logicpd-som.dtsi
-> > index 1e5dcac70045..74ab5d65106b 100755
-> > --- a/arch/arm/boot/dts/imx6-logicpd-som.dtsi
-> > +++ b/arch/arm/boot/dts/imx6-logicpd-som.dtsi
->
-> > diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-> > index 659e516455be..bdef74077d1c 100644
-> > --- a/drivers/regulator/pfuze100-regulator.c
-> > +++ b/drivers/regulator/pfuze100-regulator.c
->
-> Please follow the patch submission process covered in
-> submitting-patchest.rst.  You've not included a Signed-off-by which is
-> essential for legal reasons as covered in there and this is a single
-> patch which mixes a DT change and a regulator driver change which should
-> be in separate patches.
+On Mon, Nov 19, 2018 at 9:05 PM Milan Broz <gmazyland@gmail.com> wrote:
+> p.s.
+> Reading the discussion about Zinc/Adiantum - I would perhaps prefer to merge
+> Adiantum first (if it is ready).
+> It is a new feature, I see it as useful cipher alternative for dm-crypt and it can be
+> esily backported without Zinc to older kernels (I am testing it actually this way).
 
-Mark,
+Seems reasonable to me.
 
-I think you're looking at the V1 patch.  This was replaced by a V2
-patch:  https://patchwork.kernel.org/patch/10661227/
-
-It should have a S-o-b line.  I know I sent it to the wrong mailing
-list (per your other e-mail to me) , so if you want it re-mailed, I
-can do that.
-
-thank you,
-
-adam
+Jason
