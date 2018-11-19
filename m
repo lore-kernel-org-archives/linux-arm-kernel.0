@@ -1,75 +1,87 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 19 Nov 2018 22:39:28 +0530
-Subject: [PATCH 05/16] arm: dts: Add devicetree for OrangePi 2G IoT board
+Date: Mon, 19 Nov 2018 22:39:30 +0530
+Subject: [PATCH 07/16] dt-bindings: interrupt-controller: Document RDA8810PL
+ intc
 In-Reply-To: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
 References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181119170939.19153-6-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181119170939.19153-8-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial devicetree support for OrangePi 2G IoT board from Xunlong.
+Document interrupt controller in RDA Micro RDA8810PL SoC.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm/boot/dts/Makefile                    |  2 ++
- .../boot/dts/rda8810pl-orangepi-2g-iot.dts    | 35 +++++++++++++++++++
- 2 files changed, 37 insertions(+)
- create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
+ .../interrupt-controller/rda,8810pl-intc.txt  | 61 +++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d625b9..a0fdad8f10dd 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -806,6 +806,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8974-sony-xperia-castor.dtb \
- 	qcom-msm8974-sony-xperia-honami.dtb \
- 	qcom-mdm9615-wp8548-mangoh-green.dtb
-+dtb-$(CONFIG_ARCH_RDA) += \
-+	rda8810pl-orangepi-2g-iot.dtb
- dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb \
- 	arm-realview-pb11mp.dtb \
-diff --git a/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts b/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
 new file mode 100644
-index 000000000000..4b49a7424b6a
+index 000000000000..ed53ad0574a7
 --- /dev/null
-+++ b/arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
-@@ -0,0 +1,35 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ * Copyright (c) 2018 Manivannan Sadhasivam
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
++++ b/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
+@@ -0,0 +1,61 @@
++RDA Micro RDA8810PL Interrupt Controller
 +
-+/dts-v1/;
++The interrupt controller in RDA8810PL SoC is a custom interrupt controller
++which supports up to 32 interrupts.
 +
-+#include "rda8810pl.dtsi"
++Required properties:
 +
-+/ {
-+	compatible = "xunlong,orangepi-2g-iot", "rda,8810pl";
-+	model = "Orange Pi 2G-IoT";
++- compatible: Should be "rda,8810pl-intc".
++- reg: Specifies base physical address of the registers set.
++- interrupt-controller: Identifies the node as an interrupt controller.
++- #interrupt-cells: Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 2.
 +
-+	chosen {
-+		stdout-path = "serial2:921600n8";
-+	};
++The interrupt sources are as follows:
 +
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>;
-+	};
++ID	Name
++------------
++0:	PULSE_DUMMY
++1:	I2C
++2:	NAND_NFSC
++3:	SDMMC1
++4:	SDMMC2
++5:	SDMMC3
++6:	SPI1
++7:	SPI2
++8:	SPI3
++9:	UART1
++10:	UART2
++11:	UART3
++12:	GPIO1
++13:	GPIO2
++14:	GPIO3
++15:	KEYPAD
++16:	TIMER
++17:	TIMEROS
++18:	COMREG0
++19:	COMREG1
++20:	USB
++21:	DMC
++22:	DMA
++23:	CAMERA
++24:	GOUDA
++25:	GPU
++26:	VPU_JPG
++27:	VPU_HOST
++28:	VOC
++29:	AUIFC0
++30:	AUIFC1
++31:	L2CC
 +
-+	uart2_clk: uart2-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <921600>;
-+		#clock-cells = <0>;
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+	clocks = <&uart2_clk>;
-+};
++Example:
++		apb at 20800000 {
++			compatible = "simple-bus";
++			...
++			intc: interrupt-controller {
++				compatible = "rda,8810pl-intc";
++				reg = <0x0 0x1000>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++		};
 -- 
 2.17.1
