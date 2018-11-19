@@ -1,26 +1,181 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Mon, 19 Nov 2018 21:30:05 +0100
-Subject: [RFC PATCH v2 00/12] crypto: Adiantum support
-In-Reply-To: <1e9ec59a-6a2c-3536-0722-c6d96d6714b2@gmail.com>
-References: <20181015175424.97147-1-ebiggers@kernel.org>
- <CAHmME9p1aiqWZ4+viaLscO8+qmixdVhMA1MAtMAFEHPG36DcPg@mail.gmail.com>
- <20181019190411.GB246441@gmail.com>
- <1f65ce09-93b3-f43e-49d5-9d9d6c0bb9e0@gmail.com>
- <20181116215249.GA27149@gmail.com>
- <56883f08-26cb-ecef-5698-1c2948714773@gmail.com>
- <20181119192821.GA258711@gmail.com>
- <1e9ec59a-6a2c-3536-0722-c6d96d6714b2@gmail.com>
-Message-ID: <CAHmME9pU79WRKWd32ihp2aQgQ1D6Kh+jh2e2sETm8tqjNxgdvg@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 19 Nov 2018 13:47:49 -0700
+Subject: [PATCH v1 5/5] perf cs-etm: Track exception number
+In-Reply-To: <1541912383-19915-6-git-send-email-leo.yan@linaro.org>
+References: <1541912383-19915-1-git-send-email-leo.yan@linaro.org>
+ <1541912383-19915-6-git-send-email-leo.yan@linaro.org>
+Message-ID: <20181119204749.GB608@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 9:05 PM Milan Broz <gmazyland@gmail.com> wrote:
-> p.s.
-> Reading the discussion about Zinc/Adiantum - I would perhaps prefer to merge
-> Adiantum first (if it is ready).
-> It is a new feature, I see it as useful cipher alternative for dm-crypt and it can be
-> esily backported without Zinc to older kernels (I am testing it actually this way).
+On Sun, Nov 11, 2018 at 12:59:43PM +0800, Leo Yan wrote:
+> When an exception packet comes, it contains the info for exception
+> number; the exception number indicates the exception types, so from it
+> we can know if the exception is taken for interrupt, system call or
+> other traps, etc.  But because the exception return packet cannot
+> delivery exception number correctly by decoder thus when prepare sample
+> flags we cannot know what's type for exception return.
+> 
+> This patch adds a new 'exc_num' array in decoder structure to record
+> exception number per CPU, the exception number is recorded in the array
+> when the exception packet comes and this exception number can be used by
+> exception return packet.  If detect there have discontinuous trace with
+> TRACE_ON or TRACE_OFF packet, the exception number is set to invalid
+> value.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 67 ++++++++++++++++++++++---
+>  1 file changed, 59 insertions(+), 8 deletions(-)
+> 
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index b8cb7a3e..d1a6cbc 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -43,6 +43,7 @@ struct cs_etm_decoder {
+>  	u32 packet_count;
+>  	u32 head;
+>  	u32 tail;
+> +	u32 *exc_num;
+>  	struct cs_etm_packet packet_buffer[MAX_BUFFER];
+>  };
+>  
+> @@ -368,24 +369,64 @@ static ocsd_datapath_resp_t
+>  cs_etm_decoder__buffer_trace_off(struct cs_etm_decoder *decoder,
+>  				 const uint8_t trace_chan_id)
+>  {
+> -	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> -					     CS_ETM_TRACE_OFF);
+> +	int ret;
+> +	struct cs_etm_packet *packet;
+> +
+> +	ret = cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> +					    CS_ETM_TRACE_OFF);
+> +	if (ret != OCSD_RESP_CONT && ret != OCSD_RESP_WAIT)
+> +		return ret;
+> +
+> +	packet = &decoder->packet_buffer[decoder->tail];
+> +
+> +	/* Clear execption number for discontinuous trace */
+> +	decoder->exc_num[packet->cpu] = UINT32_MAX;
+> +
+> +	return ret;
+>  }
+>  
+>  static ocsd_datapath_resp_t
+>  cs_etm_decoder__buffer_trace_on(struct cs_etm_decoder *decoder,
+>  				const uint8_t trace_chan_id)
+>  {
+> -	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> -					     CS_ETM_TRACE_ON);
+> +	int ret;
+> +	struct cs_etm_packet *packet;
+> +
+> +	ret = cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> +					    CS_ETM_TRACE_ON);
+> +	if (ret != OCSD_RESP_CONT && ret != OCSD_RESP_WAIT)
+> +		return ret;
+> +
+> +	packet = &decoder->packet_buffer[decoder->tail];
+> +
+> +	/* Clear execption number for discontinuous trace */
+> +	decoder->exc_num[packet->cpu] = UINT32_MAX;
+> +
+> +	return ret;
+>  }
+>  
+>  static ocsd_datapath_resp_t
+>  cs_etm_decoder__buffer_exception(struct cs_etm_decoder *decoder,
+> +				 const ocsd_generic_trace_elem *elem,
+>  				 const uint8_t trace_chan_id)
+>  {
+> -	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> -					     CS_ETM_EXCEPTION);
+> +	int ret;
+> +	struct cs_etm_packet *packet;
+> +
+> +	ret = cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> +					    CS_ETM_EXCEPTION);
+> +	if (ret != OCSD_RESP_CONT && ret != OCSD_RESP_WAIT)
+> +		return ret;
+> +
+> +	packet = &decoder->packet_buffer[decoder->tail];
+> +
+> +	/*
+> +	 * Exception number is recorded per CPU and later can be used
+> +	 * for exception return instruction analysis.
+> +	 */
+> +	decoder->exc_num[packet->cpu] = elem->exception_number;
 
-Seems reasonable to me.
+Am I missing something or the information about the exception number that is
+recorded here isn't used anywhere?  If you want to use this in perf report/script,
+the exception number will have to be added to the cs_etm_packet struct.
 
-Jason
+I am done with the revision of this set.
+
+Thanks,
+Mathieu
+
+> +
+> +	return ret;
+>  }
+>  
+>  static ocsd_datapath_resp_t
+> @@ -423,7 +464,7 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+>  						    trace_chan_id);
+>  		break;
+>  	case OCSD_GEN_TRC_ELEM_EXCEPTION:
+> -		resp = cs_etm_decoder__buffer_exception(decoder,
+> +		resp = cs_etm_decoder__buffer_exception(decoder, elem,
+>  							trace_chan_id);
+>  		break;
+>  	case OCSD_GEN_TRC_ELEM_EXCEPTION_RET:
+> @@ -511,6 +552,10 @@ cs_etm_decoder__new(int num_cpu, struct cs_etm_decoder_params *d_params,
+>  	if (!decoder)
+>  		return NULL;
+>  
+> +	decoder->exc_num = zalloc(sizeof(*decoder->exc_num) * num_cpu);
+> +	if (!decoder->exc_num)
+> +		goto err_free_decoder;
+> +
+>  	decoder->data = d_params->data;
+>  	decoder->prev_return = OCSD_RESP_CONT;
+>  	cs_etm_decoder__clear_buffer(decoder);
+> @@ -531,7 +576,7 @@ cs_etm_decoder__new(int num_cpu, struct cs_etm_decoder_params *d_params,
+>  	decoder->dcd_tree = ocsd_create_dcd_tree(format, flags);
+>  
+>  	if (decoder->dcd_tree == 0)
+> -		goto err_free_decoder;
+> +		goto err_free_decoder_exc_num;
+>  
+>  	/* init library print logging support */
+>  	ret = cs_etm_decoder__init_def_logger_printing(d_params, decoder);
+> @@ -542,6 +587,9 @@ cs_etm_decoder__new(int num_cpu, struct cs_etm_decoder_params *d_params,
+>  	cs_etm_decoder__init_raw_frame_logging(d_params, decoder);
+>  
+>  	for (i = 0; i < num_cpu; i++) {
+> +		/* init expcetion number to an invalid value */
+> +		decoder->exc_num[i] = UINT32_MAX;
+> +
+>  		ret = cs_etm_decoder__create_etm_decoder(d_params,
+>  							 &t_params[i],
+>  							 decoder);
+> @@ -553,6 +601,8 @@ cs_etm_decoder__new(int num_cpu, struct cs_etm_decoder_params *d_params,
+>  
+>  err_free_decoder_tree:
+>  	ocsd_destroy_dcd_tree(decoder->dcd_tree);
+> +err_free_decoder_exc_num:
+> +	free(decoder->exc_num);
+>  err_free_decoder:
+>  	free(decoder);
+>  	return NULL;
+> @@ -613,5 +663,6 @@ void cs_etm_decoder__free(struct cs_etm_decoder *decoder)
+>  
+>  	ocsd_destroy_dcd_tree(decoder->dcd_tree);
+>  	decoder->dcd_tree = NULL;
+> +	free(decoder->exc_num);
+>  	free(decoder);
+>  }
+> -- 
+> 2.7.4
+> 
