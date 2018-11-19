@@ -1,33 +1,22 @@
-From: dkos@cadence.com (Damian Kos)
-Date: Mon, 19 Nov 2018 15:14:14 +0000
-Subject: [PATCH] drm/rockchip: fix for mailbox read validation.
-Message-ID: <1542640463-18332-1-git-send-email-dkos@cadence.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 19 Nov 2018 09:21:24 -0600
+Subject: [PATCH 03/14] ARM: milbeaut: Add Milbeaut M10V early printk
+In-Reply-To: <1542589274-13878-4-git-send-email-sugaya.taichi@socionext.com>
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-4-git-send-email-sugaya.taichi@socionext.com>
+Message-ID: <CAL_JsqKMK7nMUxZLu9eV8tpnCXsAr2F4j=xTO8UL0g8V30kYZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is basically the same fix as in
-commit fa68d4f8476b ("drm/rockchip: fix for mailbox read size")
-but for cdn_dp_mailbox_validate_receive function.
+On Sun, Nov 18, 2018 at 7:00 PM Sugaya Taichi
+<sugaya.taichi@socionext.com> wrote:
+>
+> Add Milbeaut M10V earlyprintk.
 
-See patchwork.kernel.org/patch/10671981/ for details.
+Do you really need earlyprintk? earlycon is preferred instead. It's
+not quite as early, but doesn't require rebuilding the kernel and
+supports more than 1 fixed device. If you crash before earlycon is
+enabled, that pretty much means either a bad dtb memory node or just
+flaky memory.
 
-Signed-off-by: Damian Kos <dkos@cadence.com>
----
- drivers/gpu/drm/rockchip/cdn-dp-reg.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpu/drm/rockchip/cdn-dp-reg.c b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-index 5a485489a1e2..6c8b14fb1d2f 100644
---- a/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-+++ b/drivers/gpu/drm/rockchip/cdn-dp-reg.c
-@@ -113,7 +113,7 @@ static int cdp_dp_mailbox_write(struct cdn_dp_device *dp, u8 val)
- 
- static int cdn_dp_mailbox_validate_receive(struct cdn_dp_device *dp,
- 					   u8 module_id, u8 opcode,
--					   u8 req_size)
-+					   u16 req_size)
- {
- 	u32 mbox_size, i;
- 	u8 header[4];
--- 
-2.17.1
+Rob
