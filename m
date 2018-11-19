@@ -1,297 +1,119 @@
 From: sugaya.taichi@socionext.com (Sugaya Taichi)
-Date: Mon, 19 Nov 2018 10:01:06 +0900
-Subject: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut m10v SoC
+Date: Mon, 19 Nov 2018 10:01:11 +0900
+Subject: [PATCH 06/14] dt-bindings: clock: milbeaut: add Milbeaut clock
+ description
 In-Reply-To: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
 References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
-Message-ID: <1542589274-13878-2-git-send-email-sugaya.taichi@socionext.com>
+Message-ID: <1542589274-13878-7-git-send-email-sugaya.taichi@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the basic M10V SoC support under arch/arm.
-Since all cores are activated in the custom bootloader before booting
-linux, it is necessary to wait for sub-cores using the trampoline area.
+Add DT bindings document for Milbeaut clock.
 
 Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
 ---
- arch/arm/Kconfig                  |   2 +
- arch/arm/Makefile                 |   1 +
- arch/arm/mach-milbeaut/Kconfig    |  28 +++++++
- arch/arm/mach-milbeaut/Makefile   |   3 +
- arch/arm/mach-milbeaut/m10v_evb.c |  31 ++++++++
- arch/arm/mach-milbeaut/platsmp.c  | 157 ++++++++++++++++++++++++++++++++++++++
- 6 files changed, 222 insertions(+)
- create mode 100644 arch/arm/mach-milbeaut/Kconfig
- create mode 100644 arch/arm/mach-milbeaut/Makefile
- create mode 100644 arch/arm/mach-milbeaut/m10v_evb.c
- create mode 100644 arch/arm/mach-milbeaut/platsmp.c
+ .../devicetree/bindings/clock/milbeaut-clock.txt   | 93 ++++++++++++++++++++++
+ 1 file changed, 93 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/milbeaut-clock.txt
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 91be74d..0b8a1af 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -767,6 +767,8 @@ source "arch/arm/mach-mediatek/Kconfig"
- 
- source "arch/arm/mach-meson/Kconfig"
- 
-+source "arch/arm/mach-milbeaut/Kconfig"
-+
- source "arch/arm/mach-mmp/Kconfig"
- 
- source "arch/arm/mach-moxart/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 05a91d8..627853c 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
- machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
- machine-$(CONFIG_ARCH_MXC)		+= imx
- machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
-+machine-$(CONFIG_ARCH_MILBEAUT)		+= milbeaut
- machine-$(CONFIG_ARCH_MXS)		+= mxs
- machine-$(CONFIG_ARCH_NETX)		+= netx
- machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
-diff --git a/arch/arm/mach-milbeaut/Kconfig b/arch/arm/mach-milbeaut/Kconfig
+diff --git a/Documentation/devicetree/bindings/clock/milbeaut-clock.txt b/Documentation/devicetree/bindings/clock/milbeaut-clock.txt
 new file mode 100644
-index 0000000..63b6f69
+index 0000000..5c093c8
 --- /dev/null
-+++ b/arch/arm/mach-milbeaut/Kconfig
-@@ -0,0 +1,28 @@
-+# SPDX-License-Identifier: GPL-2.0
-+menuconfig ARCH_MILBEAUT
-+	bool "Socionext Milbeaut SoCs"
-+	depends on ARCH_MULTI_V7
-+	select ARM_GIC
-+	select CLKDEV_LOOKUP
-+	select GENERIC_CLOCKEVENTS
-+	select CLKSRC_MMIO
-+	select ZONE_DMA
-+	help
-+		This enables support for Socionext Milbeaut SoCs
++++ b/Documentation/devicetree/bindings/clock/milbeaut-clock.txt
+@@ -0,0 +1,93 @@
++Milbeaut M10V Clock Controller Binding
++----------------------------------------
++Milbeaut clock controller is consists of few oscillators, PLL, multiplexer
++and few divider modules
 +
-+if ARCH_MILBEAUT
++This binding uses common clock bindings
++[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
 +
-+config ARCH_MILBEAUT_M10V
-+	bool "Milbeaut SC2000/M10V platform"
-+	select ARM_ARCH_TIMER
-+	select M10V_TIMER
-+	select PINCTRL
-+	select PINCTRL_M10V
-+	help
-+	  Support for Socionext's MILBEAUT M10V based systems
++Required properties:
++- compatible: shall be "socionext,milbeaut-m10v-clk-regs"
++- reg: shall contain base address and length of clock registers
++- #clock-cells: shall be 0
 +
-+config MACH_M10V_EVB
-+	bool "Support for Milbeaut Evaluation boards"
-+	default y
++Example:
++	m10v-clk-tree@ {
++		compatible = "socionext,milbeaut-m10v-clk-regs";
++		reg = <0x1d021000 0x4000>;
 +
-+endif
-diff --git a/arch/arm/mach-milbeaut/Makefile b/arch/arm/mach-milbeaut/Makefile
-new file mode 100644
-index 0000000..64f6f52
---- /dev/null
-+++ b/arch/arm/mach-milbeaut/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_SMP) += platsmp.o
-+obj-$(CONFIG_MACH_M10V_EVB) += m10v_evb.o
++		clocks {
++			#address-cells = <0>;
++			#size-cells = <0>;
 +
-diff --git a/arch/arm/mach-milbeaut/m10v_evb.c b/arch/arm/mach-milbeaut/m10v_evb.c
-new file mode 100644
-index 0000000..a1fa7c3
---- /dev/null
-+++ b/arch/arm/mach-milbeaut/m10v_evb.c
-@@ -0,0 +1,31 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 Socionext Inc.
-+ * Copyright:   (C) 2015 Linaro Ltd.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+static struct map_desc m10v_io_desc[] __initdata = {
-+};
-+
-+void __init m10v_map_io(void)
-+{
-+	debug_ll_io_init();
-+	iotable_init(m10v_io_desc, ARRAY_SIZE(m10v_io_desc));
-+}
-+
-+static const char * const m10v_compat[] = {
-+	"socionext,milbeaut-m10v-evb",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(M10V_REB, "Socionext Milbeaut")
-+	.dt_compat	= m10v_compat,
-+	.l2c_aux_mask	= 0xffffffff,
-+	.map_io		= m10v_map_io,
-+MACHINE_END
-diff --git a/arch/arm/mach-milbeaut/platsmp.c b/arch/arm/mach-milbeaut/platsmp.c
-new file mode 100644
-index 0000000..b706851
---- /dev/null
-+++ b/arch/arm/mach-milbeaut/platsmp.c
-@@ -0,0 +1,157 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2018 Socionext Inc.
-+ * Copyright:	(C) 2015 Linaro Ltd.
-+ */
-+
-+#include <linux/cpu_pm.h>
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/of_device.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/suspend.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/cp15.h>
-+#include <asm/idmap.h>
-+#include <asm/smp_plat.h>
-+#include <asm/suspend.h>
-+
-+#define M10V_MAX_CPU	4
-+
-+#define KERNEL_UNBOOT_FLAG	0x12345678
-+#define CPU_FINISH_SUSPEND_FLAG 0x56784321
-+
-+static void __iomem *trampoline;
-+
-+static int m10v_boot_secondary(unsigned int l_cpu, struct task_struct *idle)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+
-+	mpidr = cpu_logical_map(l_cpu);
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	if (cpu >= M10V_MAX_CPU)
-+		return -EINVAL;
-+
-+	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-+
-+	writel(virt_to_phys(secondary_startup), trampoline + cpu * 4);
-+	arch_send_wakeup_ipi_mask(cpumask_of(l_cpu));
-+
-+	return 0;
-+}
-+
-+static void m10v_cpu_die(unsigned int l_cpu)
-+{
-+	gic_cpu_if_down(0);
-+
-+	v7_exit_coherency_flush(louis);
-+
-+	/* Now we are prepared for power-down, do it: */
-+	wfi();
-+}
-+
-+static int m10v_cpu_kill(unsigned int l_cpu)
-+{
-+	unsigned int mpidr, cpu;
-+
-+	mpidr = cpu_logical_map(l_cpu);
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+
-+	writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
-+
-+	return 1;
-+}
-+
-+static struct smp_operations m10v_smp_ops __initdata = {
-+	.smp_boot_secondary	= m10v_boot_secondary,
-+	.cpu_die		= m10v_cpu_die,
-+	.cpu_kill		= m10v_cpu_kill,
-+};
-+
-+static int __init m10v_smp_init(void)
-+{
-+	unsigned int mpidr, cpu, cluster;
-+	struct device_node *np;
-+
-+	np = of_find_compatible_node(NULL, NULL, "socionext,milbeaut-m10v-evb");
-+	if (!np || !of_device_is_available(np))
-+		return -ENODEV;
-+	of_node_put(np);
-+
-+	np = of_find_compatible_node(NULL, NULL, "socionext,smp-trampoline");
-+	if (!np)
-+		return -ENODEV;
-+
-+	trampoline = of_iomap(np, 0);
-+	if (!trampoline)
-+		return -ENODEV;
-+	of_node_put(np);
-+
-+	mpidr = read_cpuid_mpidr();
-+	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-+	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-+
-+	pr_info("MCPM boot on cpu_%u cluster_%u\n", cpu, cluster);
-+
-+	for (cpu = 0; cpu < M10V_MAX_CPU; cpu++)
-+		writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
-+
-+	smp_set_ops(&m10v_smp_ops);
-+
-+	return 0;
-+}
-+early_initcall(m10v_smp_init);
-+
-+static int m10v_pm_valid(suspend_state_t state)
-+{
-+	return (state == PM_SUSPEND_STANDBY) || (state == PM_SUSPEND_MEM);
-+}
-+
-+typedef void (*phys_reset_t)(unsigned long);
-+static phys_reset_t phys_reset;
-+
-+static int m10v_die(unsigned long arg)
-+{
-+	setup_mm_for_reboot();
-+	asm("wfi");
-+	/* Boot just like a secondary */
-+	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
-+	phys_reset(virt_to_phys(cpu_resume));
-+
-+	return 0;
-+}
-+
-+static int m10v_pm_enter(suspend_state_t state)
-+{
-+	switch (state) {
-+	case PM_SUSPEND_STANDBY:
-+		pr_err("STANDBY\n");
-+		asm("wfi");
-+		break;
-+	case PM_SUSPEND_MEM:
-+		pr_err("SUSPEND\n");
-+		cpu_pm_enter();
-+		cpu_suspend(0, m10v_die);
-+		cpu_pm_exit();
-+		break;
++			uclk40xi: uclk40xi {
++				compatible = "fixed-clock";
++				#clock-cells = <0>;
++				clock-frequency = <40000000>;
++			};
++		};
 +	}
-+	return 0;
-+}
 +
-+static const struct platform_suspend_ops m10v_pm_ops = {
-+	.valid		= m10v_pm_valid,
-+	.enter		= m10v_pm_enter,
-+};
++The clock consumer shall specify the desired clock-output of the clock
++controller (as defined in [2]) by specifying output-id in its "clock"
++phandle cell
++[2] arch/arm/boot/dts/milbeaut-m10v-clk.h
 +
-+struct clk *m10v_clclk_register(struct device *cpu_dev);
++For example for UART1:
++	usio1:  usio_uart at 1e700010 {
++		index = <0>;
++		compatible = "socionext,milbeaut-m10v-usio-uart";
++		reg = <0x1e700010 0x10>;
++		interrupts = <0 141 0x4>, <0 149 0x4>;
++		interrupt-names = "rx", "tx";
++		clocks = <&hclk>;
++	};
 +
-+static int __init m10v_pm_init(void)
-+{
-+	suspend_set_ops(&m10v_pm_ops);
 +
-+	return 0;
-+}
-+late_initcall(m10v_pm_init);
++
++
++Required properties:
++- compatible:
++	"socionext,milbeaut-m10v-clk-mux"
++		-clock-cells: should be 0
++		-clocks: should be two factor
++	"socionext,milbeaut-m10v-pll-fixed-factor"
++		-clock-cells: should be 0
++		-clocks: should be one factor
++		-offset: offset
++		-clock-div: div number
++		-clock-mult: multiple number
++	"socionext,milbeaut-m10v-clk-div"
++		-clock-cells: should be 0
++		-clocks: should be one factor
++		-offset: offset
++		-mask: mask bit
++		-ratios: div ratio
++
++Example
++	piclk_mux_0: spiclk_mux_0 {
++		compatible = "socionext,m10v-clk-div";
++		#clock-cells = <0>;
++		clocks = <&pll10_div_1_2>;
++		offset = <bSPICLK>;
++		mask = <0x3>;
++		ratios = <4 0x5 2 0x4>;
++	};
++
++	pll10: pll10 {
++		compatible = "socionext,m10v-pll-fixed-factor";
++		#clock-cells = <0>;
++		clocks = <&uclk40xi>;
++		offset = <10>;
++		clock-div = <5>;
++		clock-mult = <108>;
++	};
++
++	emmcclk: emmcclk {
++		compatible = "socionext,m10v-clk-div";
++		#clock-cells = <0>;
++		clocks = <&pll11>;
++		offset = <bEMMCCLK>;
++		mask = <0x3>;
++		ratios = <15 0x7 10 0x6 9 0x5 8 0x4>;
++	};
 -- 
 1.9.1
