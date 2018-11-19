@@ -1,331 +1,174 @@
-From: pierre-yves.mordret@st.com (Pierre-Yves MORDRET)
-Date: Mon, 19 Nov 2018 12:04:24 +0100
-Subject: [PATCH v2] i2c: i2c-stm32f7: add PM Runtime support
-Message-ID: <1542625464-4704-1-git-send-email-pierre-yves.mordret@st.com>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 19 Nov 2018 12:05:35 +0100
+Subject: Patch "perf cs-etm: Correct CPU mode for samples" has been added to
+ the 4.19-stable tree
+Message-ID: <1542625535250192@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use PM Runtime API to enable/disable clock
 
-Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
----
-  Version history:
-    v2:
-       * missing define
-    v1:
-       * Initial
----
----
- drivers/i2c/busses/i2c-stm32f7.c | 144 +++++++++++++++++++++++++++------------
- 1 file changed, 101 insertions(+), 43 deletions(-)
+This is a note to let you know that I've just added the patch titled
 
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index 62d023e..3b98b68 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -27,6 +27,8 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/pinctrl/consumer.h>
-+#include <linux/pm_runtime.h>
- #include <linux/reset.h>
- #include <linux/slab.h>
- 
-@@ -163,6 +165,8 @@
- #define STM32F7_SCLH_MAX			BIT(8)
- #define STM32F7_SCLL_MAX			BIT(8)
- 
-+#define STM32F7_AUTOSUSPEND_DELAY		(HZ / 100)
-+
- /**
-  * struct stm32f7_i2c_spec - private i2c specification timing
-  * @rate: I2C bus speed (Hz)
-@@ -1545,15 +1549,13 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
- 	i2c_dev->msg_id = 0;
- 	f7_msg->smbus = false;
- 
--	ret = clk_enable(i2c_dev->clk);
--	if (ret) {
--		dev_err(i2c_dev->dev, "Failed to enable clock\n");
-+	ret = pm_runtime_get_sync(i2c_dev->dev);
-+	if (ret < 0)
- 		return ret;
--	}
- 
- 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
- 	if (ret)
--		goto clk_free;
-+		goto pm_free;
- 
- 	stm32f7_i2c_xfer_msg(i2c_dev, msgs);
- 
-@@ -1569,8 +1571,9 @@ static int stm32f7_i2c_xfer(struct i2c_adapter *i2c_adap,
- 		ret = -ETIMEDOUT;
- 	}
- 
--clk_free:
--	clk_disable(i2c_dev->clk);
-+pm_free:
-+	pm_runtime_mark_last_busy(i2c_dev->dev);
-+	pm_runtime_put_autosuspend(i2c_dev->dev);
- 
- 	return (ret < 0) ? ret : num;
- }
-@@ -1592,39 +1595,37 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
- 	f7_msg->read_write = read_write;
- 	f7_msg->smbus = true;
- 
--	ret = clk_enable(i2c_dev->clk);
--	if (ret) {
--		dev_err(i2c_dev->dev, "Failed to enable clock\n");
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0)
- 		return ret;
--	}
- 
- 	ret = stm32f7_i2c_wait_free_bus(i2c_dev);
- 	if (ret)
--		goto clk_free;
-+		goto pm_free;
- 
- 	ret = stm32f7_i2c_smbus_xfer_msg(i2c_dev, flags, command, data);
- 	if (ret)
--		goto clk_free;
-+		goto pm_free;
- 
- 	timeout = wait_for_completion_timeout(&i2c_dev->complete,
- 					      i2c_dev->adap.timeout);
- 	ret = f7_msg->result;
- 	if (ret)
--		goto clk_free;
-+		goto pm_free;
- 
- 	if (!timeout) {
- 		dev_dbg(dev, "Access to slave 0x%x timed out\n", f7_msg->addr);
- 		if (i2c_dev->use_dma)
- 			dmaengine_terminate_all(dma->chan_using);
- 		ret = -ETIMEDOUT;
--		goto clk_free;
-+		goto pm_free;
- 	}
- 
- 	/* Check PEC */
- 	if ((flags & I2C_CLIENT_PEC) && size != I2C_SMBUS_QUICK && read_write) {
- 		ret = stm32f7_i2c_smbus_check_pec(i2c_dev);
- 		if (ret)
--			goto clk_free;
-+			goto pm_free;
- 	}
- 
- 	if (read_write && size != I2C_SMBUS_QUICK) {
-@@ -1649,8 +1650,9 @@ static int stm32f7_i2c_smbus_xfer(struct i2c_adapter *adapter, u16 addr,
- 		}
- 	}
- 
--clk_free:
--	clk_disable(i2c_dev->clk);
-+pm_free:
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 	return ret;
+    perf cs-etm: Correct CPU mode for samples
+
+to the 4.19-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+
+The filename of the patch is:
+     perf-cs-etm-correct-cpu-mode-for-samples.patch
+and it can be found in the queue-4.19 subdirectory.
+
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
+
+
+>From d6c9c05fe1eb4b213b183d8a1e79416256dc833a Mon Sep 17 00:00:00 2001
+From: Leo Yan <leo.yan@linaro.org>
+Date: Tue, 30 Oct 2018 15:18:28 +0800
+Subject: perf cs-etm: Correct CPU mode for samples
+
+From: Leo Yan <leo.yan@linaro.org>
+
+commit d6c9c05fe1eb4b213b183d8a1e79416256dc833a upstream.
+
+Since commit edeb0c90df35 ("perf tools: Stop fallbacking to kallsyms for
+vdso symbols lookup"), the kernel address cannot be properly parsed to
+kernel symbol with command 'perf script -k vmlinux'.  The reason is
+CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
+thus it fails to find corresponding map/dso in below flows:
+
+  process_sample_event()
+    `-> machine__resolve()
+	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
+
+In this flow it needs to pass argument 'sample->cpumode' to tell what's
+the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
+any failure until the commit edeb0c90df35 ("perf tools: Stop fallbacking
+to kallsyms for vdso symbols lookup") has been merged.  The reason is
+even with the wrong CPU mode the function thread__find_map() firstly
+fails to find map but it will rollback to find kernel map for vdso
+symbols lookup.  In the latest code it has removed the fallback code,
+thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
+anymore with kernel address.
+
+This patch is to correct samples CPU mode setting, it creates a new
+helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
+the address with the info from machine structure; this patch has a bit
+extension to check not only kernel and user mode, but also check for
+host/guest and hypervisor mode.  Finally this patch uses the function in
+instruction and branch samples and also apply in cs_etm__mem_access()
+for a minor polishing.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: coresight at lists.linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at kernel.org # v4.19
+Link: http://lkml.kernel.org/r/1540883908-17018-1-git-send-email-leo.yan at linaro.org
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ tools/perf/util/cs-etm.c |   39 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 30 insertions(+), 9 deletions(-)
+
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_ses
+ 	zfree(&aux);
  }
  
-@@ -1676,13 +1678,9 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
- 	if (ret)
- 		return ret;
- 
--	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
--		ret = clk_enable(i2c_dev->clk);
--		if (ret) {
--			dev_err(dev, "Failed to enable clock\n");
--			return ret;
--		}
--	}
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0)
-+		return ret;
- 
- 	if (id == 0) {
- 		/* Configure Own Address 1 */
-@@ -1703,7 +1701,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
- 		oar2 &= ~STM32F7_I2C_OAR2_MASK;
- 		if (slave->flags & I2C_CLIENT_TEN) {
- 			ret = -EOPNOTSUPP;
--			goto exit;
-+			goto pm_free;
- 		}
- 
- 		oar2 |= STM32F7_I2C_OAR2_OA2_7(slave->addr);
-@@ -1712,7 +1710,7 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
- 		writel_relaxed(oar2, i2c_dev->base + STM32F7_I2C_OAR2);
- 	} else {
- 		ret = -ENODEV;
--		goto exit;
-+		goto pm_free;
- 	}
- 
- 	/* Enable ACK */
-@@ -1723,11 +1721,10 @@ static int stm32f7_i2c_reg_slave(struct i2c_client *slave)
- 		STM32F7_I2C_CR1_PE;
- 	stm32f7_i2c_set_bits(base + STM32F7_I2C_CR1, mask);
- 
--	return 0;
--
--exit:
--	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
--		clk_disable(i2c_dev->clk);
-+	ret = 0;
-+pm_free:
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
- 	return ret;
- }
-@@ -1745,6 +1742,10 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
- 
- 	WARN_ON(!i2c_dev->slave[id]);
- 
-+	ret = pm_runtime_get_sync(i2c_dev->dev);
-+	if (ret < 0)
-+		return ret;
-+
- 	if (id == 0) {
- 		mask = STM32F7_I2C_OAR1_OA1EN;
- 		stm32f7_i2c_clr_bits(base + STM32F7_I2C_OAR1, mask);
-@@ -1755,10 +1756,11 @@ static int stm32f7_i2c_unreg_slave(struct i2c_client *slave)
- 
- 	i2c_dev->slave[id] = NULL;
- 
--	if (!(stm32f7_i2c_is_slave_registered(i2c_dev))) {
-+	if (!(stm32f7_i2c_is_slave_registered(i2c_dev)))
- 		stm32f7_i2c_disable_irq(i2c_dev, STM32F7_I2C_ALL_IRQ_MASK);
--		clk_disable(i2c_dev->clk);
--	}
-+
-+	pm_runtime_mark_last_busy(i2c_dev->dev);
-+	pm_runtime_put_autosuspend(i2c_dev->dev);
- 
- 	return 0;
- }
-@@ -1819,6 +1821,7 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "Error: Missing controller clock\n");
- 		return PTR_ERR(i2c_dev->clk);
- 	}
-+
- 	ret = clk_prepare_enable(i2c_dev->clk);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to prepare_enable clock\n");
-@@ -1888,8 +1891,6 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto clk_free;
- 
--	stm32f7_i2c_hw_config(i2c_dev);
--
- 	adap = &i2c_dev->adap;
- 	i2c_set_adapdata(adap, i2c_dev);
- 	snprintf(adap->name, sizeof(adap->name), "STM32F7 I2C(%pa)",
-@@ -1908,18 +1909,35 @@ static int stm32f7_i2c_probe(struct platform_device *pdev)
- 					     STM32F7_I2C_TXDR,
- 					     STM32F7_I2C_RXDR);
- 
--	ret = i2c_add_adapter(adap);
--	if (ret)
--		goto clk_free;
--
- 	platform_set_drvdata(pdev, i2c_dev);
- 
--	clk_disable(i2c_dev->clk);
-+	pm_runtime_set_autosuspend_delay(i2c_dev->dev,
-+					 STM32F7_AUTOSUSPEND_DELAY);
-+	pm_runtime_use_autosuspend(i2c_dev->dev);
-+	pm_runtime_set_active(i2c_dev->dev);
-+	pm_runtime_enable(i2c_dev->dev);
-+
-+	pm_runtime_get_noresume(&pdev->dev);
-+
-+	stm32f7_i2c_hw_config(i2c_dev);
-+
-+	ret = i2c_add_adapter(adap);
-+	if (ret)
-+		goto pm_disable;
- 
- 	dev_info(i2c_dev->dev, "STM32F7 I2C-%d bus adapter\n", adap->nr);
- 
-+	pm_runtime_mark_last_busy(i2c_dev->dev);
-+	pm_runtime_put_autosuspend(i2c_dev->dev);
-+
- 	return 0;
- 
-+pm_disable:
-+	pm_runtime_put_noidle(i2c_dev->dev);
-+	pm_runtime_disable(i2c_dev->dev);
-+	pm_runtime_set_suspended(i2c_dev->dev);
-+	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
-+
- clk_free:
- 	clk_disable_unprepare(i2c_dev->clk);
- 
-@@ -1936,12 +1954,51 @@ static int stm32f7_i2c_remove(struct platform_device *pdev)
- 	}
- 
- 	i2c_del_adapter(&i2c_dev->adap);
-+	pm_runtime_get_sync(i2c_dev->dev);
-+
-+	clk_disable_unprepare(i2c_dev->clk);
- 
--	clk_unprepare(i2c_dev->clk);
-+	pm_runtime_put_noidle(i2c_dev->dev);
-+	pm_runtime_disable(i2c_dev->dev);
-+	pm_runtime_set_suspended(i2c_dev->dev);
-+	pm_runtime_dont_use_autosuspend(i2c_dev->dev);
- 
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int stm32f7_i2c_runtime_suspend(struct device *dev)
++static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
 +{
-+	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
++	struct machine *machine;
 +
-+	if (!stm32f7_i2c_is_slave_registered(i2c_dev))
-+		clk_disable_unprepare(i2c_dev->clk);
++	machine = etmq->etm->machine;
 +
-+	return 0;
-+}
-+
-+static int stm32f7_i2c_runtime_resume(struct device *dev)
-+{
-+	struct stm32f7_i2c_dev *i2c_dev = dev_get_drvdata(dev);
-+	int ret;
-+
-+	if (!stm32f7_i2c_is_slave_registered(i2c_dev)) {
-+		ret = clk_prepare_enable(i2c_dev->clk);
-+		if (ret) {
-+			dev_err(dev, "failed to prepare_enable clock\n");
-+			return ret;
-+		}
++	if (address >= etmq->etm->kernel_start) {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_KERNEL;
++		else
++			return PERF_RECORD_MISC_GUEST_KERNEL;
++	} else {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_USER;
++		else if (perf_guest)
++			return PERF_RECORD_MISC_GUEST_USER;
++		else
++			return PERF_RECORD_MISC_HYPERVISOR;
 +	}
-+
-+	return 0;
 +}
-+#endif
 +
-+static const struct dev_pm_ops stm32f7_i2c_pm_ops = {
-+	SET_RUNTIME_PM_OPS(stm32f7_i2c_runtime_suspend,
-+			   stm32f7_i2c_runtime_resume, NULL)
-+};
+ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+ 			      size_t size, u8 *buffer)
+ {
+@@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_
+ 		return -1;
+ 
+ 	machine = etmq->etm->machine;
+-	if (address >= etmq->etm->kernel_start)
+-		cpumode = PERF_RECORD_MISC_KERNEL;
+-	else
+-		cpumode = PERF_RECORD_MISC_USER;
++	cpumode = cs_etm__cpu_mode(etmq, address);
+ 
+ 	thread = etmq->thread;
+ 	if (!thread) {
+@@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sam
+ 	struct perf_sample sample = {.ip = 0,};
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+ 	sample.ip = addr;
+@@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sam
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+ 	sample.insn_len = 1;
+-	sample.cpumode = event->header.misc;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	if (etm->synth_opts.last_branch) {
+ 		cs_etm__copy_last_branch_rb(etmq);
+@@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(s
+ 		u64			nr;
+ 		struct branch_entry	entries;
+ 	} dummy_bs;
++	u64 ip;
 +
- static const struct of_device_id stm32f7_i2c_match[] = {
- 	{ .compatible = "st,stm32f7-i2c", .data = &stm32f7_setup},
- 	{},
-@@ -1952,6 +2009,7 @@ static struct platform_driver stm32f7_i2c_driver = {
- 	.driver = {
- 		.name = "stm32f7-i2c",
- 		.of_match_table = stm32f7_i2c_match,
-+		.pm = &stm32f7_i2c_pm_ops,
- 	},
- 	.probe = stm32f7_i2c_probe,
- 	.remove = stm32f7_i2c_remove,
--- 
-2.7.4
++	ip = cs_etm__last_executed_instr(etmq->prev_packet);
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+-	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
++	sample.ip = ip;
+ 	sample.pid = etmq->pid;
+ 	sample.tid = etmq->tid;
+ 	sample.addr = cs_etm__first_executed_instr(etmq->packet);
+@@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(s
+ 	sample.period = 1;
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+-	sample.cpumode = PERF_RECORD_MISC_USER;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	/*
+ 	 * perf report cannot handle events without a branch stack
+
+
+Patches currently in stable-queue which might be from leo.yan at linaro.org are
+
+queue-4.19/perf-cs-etm-correct-cpu-mode-for-samples.patch
+queue-4.19/perf-intel-pt-bts-calculate-cpumode-for-synthesized-samples.patch
+queue-4.19/perf-intel-pt-insert-callchain-context-into-synthesized-callchains.patch
