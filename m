@@ -1,140 +1,72 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 19 Nov 2018 10:26:48 +0100
-Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <1542605939.32082.12.camel@mtksdaap41>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-6-matthias.bgg@kernel.org>
- <1542605939.32082.12.camel@mtksdaap41>
-Message-ID: <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 19 Nov 2018 10:41:47 +0100
+Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
+In-Reply-To: <CAD=FV=XVDAjLt+VtxedHEma1FRrG0LuFZ2c7L5-MsdCZkgEcsw@mail.gmail.com>
+References: <20181116051719.23376-1-dbasehore@chromium.org>
+ <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
+ <CAD=FV=XVDAjLt+VtxedHEma1FRrG0LuFZ2c7L5-MsdCZkgEcsw@mail.gmail.com>
+Message-ID: <11718017.ngvMPIPJQJ@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Freitag, 16. November 2018, 19:23:59 CET schrieb Doug Anderson:
+> Hi,
+> 
+> On Fri, Nov 16, 2018 at 9:39 AM dbasehore . <dbasehore@chromium.org> wrote:
+> > On Fri, Nov 16, 2018 at 8:01 AM Doug Anderson <dianders@chromium.org> 
+wrote:
+> > > Hi,
+> > > 
+> > > On Thu, Nov 15, 2018 at 9:17 PM Derek Basehore <dbasehore@chromium.org> 
+wrote:
+> > > > This adds the xin32k clock to the RK3399 CPU. Even though it's not
+> > > > directly used, muxes will end up traversing the entire clk tree on
+> > > > calls to determine_rate if it doesn't exist.
+> > > > 
+> > > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> > > > ---
+> > > > 
+> > > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
+> > > >  1 file changed, 7 insertions(+)
+> > > 
+> > > nit: I would have expected ${SUBJECT} to have v2 in it somewhere.
+> > > 
+> > > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
+> > > > 99e7f65c1779..3d09472978f8 100644
+> > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > 
+> > > Aww crud.  I was at the airport yesterday and so I didn't notice that
+> > > you were touching rk3399, not rk3399-gru.  This belongs in the gru
+> > > device tree file, not in the top level rk3399.  As you have written
+> > 
+> > > this it will break rk3399 boards that have an rk808 on them, AKA:
+> > Should this be moved to the rk3399.dtsi file? The RK3399 assumes that
+> > this clk exists (same as the 24MHz clk which is in rk3399.dtsi). While
+> > it can function without it defined, it really shouldn't. We can just
+> > assign the existing labels in the dts files you pointed out.
+> 
+> No, it should be in the board files.  Each board may produce the 32k
+> clock through a different component.  On gru-based devices we produce
+> the 32k clock through a silego part.
+
+That would also be a great part of the commit message, like
+"...on Gru boards the 32kHz clock gets produced by a Silego oscillator"
+or so when you move it over to rk3399-gru.dtsi .
 
 
-On 19/11/2018 06:38, CK Hu wrote:
-> Hi, Matthias:
-> 
-> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
->> From: Matthias Brugger <mbrugger@suse.com>
->>
->> It can happen that the mmsys clock drivers aren't probed before the
->> platform driver gets invoked. The platform driver used to print a warning
->> that the driver failed to get the clocks. Omit this error on
->> the defered probe path.
-> 
-> This patch looks good to me, but you have not modified the sub driver in
-> HDMI path. We could let HDMI path print the warning and someone send
-> another patch later, or you modify for HDMI path in this patch.
+> Technically you could say that we don't _truly_ need to model this
+> clock and we could have just inserted a dummy/fixed 32k clock in the
+> clk-rk3399.c file.  ...but we did model it so that means we should
+> probably model it semi-properly.
+>
+> If a given board forgets to provide a 32k clock then that's a bug for
+> them like it was for us.
 
-Sure, I'll add this in v6. After inspecting the code, I think we will need to
-also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
-now does not even check if the clocks are present. What do you think?
+Yep and as I said in my other mail, on these pmic generated clocks
+the clock generation often even is configurable (rate, on/off), so it
+should really be a real clock not some hack ;-) .
 
-I'll address the coding style issue you metioned below as well.
 
-Regards,
-Matthias
-
->>
->> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->> ---
->>  drivers/gpu/drm/mediatek/mtk_disp_color.c | 4 +++-
->>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c   | 4 +++-
->>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c  | 4 +++-
->>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c    | 3 ++-
->>  drivers/gpu/drm/mediatek/mtk_dsi.c        | 6 ++++--
->>  5 files changed, 15 insertions(+), 6 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
->> index f609b62b8be6..1ea3178d4c18 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_disp_color.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
->> @@ -126,7 +126,9 @@ static int mtk_disp_color_probe(struct platform_device *pdev)
->>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
->>  				&mtk_disp_color_funcs);
->>  	if (ret) {
->> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
->> +		if (ret != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to initialize component: %d\n",
->> +					ret);
-> 
-> I would like one more blank line here.
-> 
->>  		return ret;
->>  	}
->>  
->> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
->> index 28d191192945..5ebbcaa4e70e 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
->> @@ -293,7 +293,9 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
->>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
->>  				&mtk_disp_ovl_funcs);
->>  	if (ret) {
->> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
->> +		if (ret != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to initialize component: %d\n",
->> +					ret);
-> 
-> I would like to align to the right of '('.
-> 
-> Regards,
-> CK
-> 
->>  		return ret;
->>  	}
->>  
->> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
->> index b0a5cffe345a..59a08ed5fea5 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
->> @@ -295,7 +295,9 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
->>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
->>  				&mtk_disp_rdma_funcs);
->>  	if (ret) {
->> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
->> +		if (ret != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to initialize component: %d\n",
->> +					ret);
->>  		return ret;
->>  	}
->>  
->> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
->> index b06cd9d4b525..b76a2d071a97 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
->> @@ -566,7 +566,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
->>  
->>  	ddp->clk = devm_clk_get(dev, NULL);
->>  	if (IS_ERR(ddp->clk)) {
->> -		dev_err(dev, "Failed to get clock\n");
->> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to get clock\n");
->>  		return PTR_ERR(ddp->clk);
->>  	}
->>  
->> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
->> index 90109a0d6fff..cc6de75636c3 100644
->> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
->> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
->> @@ -1103,14 +1103,16 @@ static int mtk_dsi_probe(struct platform_device *pdev)
->>  	dsi->engine_clk = devm_clk_get(dev, "engine");
->>  	if (IS_ERR(dsi->engine_clk)) {
->>  		ret = PTR_ERR(dsi->engine_clk);
->> -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
->> +		if (ret != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to get engine clock: %d\n", ret);
->>  		return ret;
->>  	}
->>  
->>  	dsi->digital_clk = devm_clk_get(dev, "digital");
->>  	if (IS_ERR(dsi->digital_clk)) {
->>  		ret = PTR_ERR(dsi->digital_clk);
->> -		dev_err(dev, "Failed to get digital clock: %d\n", ret);
->> +		if (ret != -EPROBE_DEFER)
->> +			dev_err(dev, "Failed to get digital clock: %d\n", ret);
->>  		return ret;
->>  	}
->>  
-> 
-> 
+Heiko
