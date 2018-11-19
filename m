@@ -1,28 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Nov 2018 15:14:19 +0100
-Subject: [PATCH] pinctrl: mediatek: Convert to using %pOFn instead of
- device_node.name
-In-Reply-To: <20181116220540.17222-4-robh@kernel.org>
-References: <20181116220540.17222-1-robh@kernel.org>
- <20181116220540.17222-4-robh@kernel.org>
-Message-ID: <CACRpkdZnS4BkUJN_rjjPcCQAMDd0_4KZ_LgmYYtmuuBuRg6jgw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 19 Nov 2018 14:16:07 +0000
+Subject: [PATCH] ARM: smp_twd: Remove legacy TWD registration
+In-Reply-To: <20181115100659.18256-1-geert+renesas@glider.be>
+References: <20181115100659.18256-1-geert+renesas@glider.be>
+Message-ID: <450874f4-59b8-dc70-a19b-550c6c6391a9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 11:06 PM Rob Herring <robh@kernel.org> wrote:
+On 15/11/2018 10:06, Geert Uytterhoeven wrote:
+> As of commit 7484c727b636a838 ("ARM: realview: delete the RealView board
+> files"), the ARM Timer and Watchdog Unit is instantiated from DT only.
+> Moreover, the driver is selected from ARCH_MULTIPLATFORM platforms only,
+> which implies OF, TIMER_OF, and COMMON_CLK.
+> 
+> Hence remove all unused legacy infrastructure from the driver.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> In preparation to remove the node name pointer from struct device_node,
-> convert printf users to use the %pOFn format specifier.
->
-> Cc: Sean Wang <sean.wang@kernel.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+Good cleanup!
 
-Patch applied with Sean's ACK.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Yours,
-Linus Walleij
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
