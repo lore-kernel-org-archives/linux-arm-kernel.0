@@ -1,174 +1,106 @@
-From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
-Date: Mon, 19 Nov 2018 12:05:35 +0100
-Subject: Patch "perf cs-etm: Correct CPU mode for samples" has been added to
- the 4.19-stable tree
-Message-ID: <1542625535250192@kroah.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Mon, 19 Nov 2018 16:52:17 +0530
+Subject: [PATCH v2 04/12] drm/sun4i: sun6i_mipi_dsi: Simplify drq set to
+ support all modes
+In-Reply-To: <20181119083243.4njj2p2sy2xf2zyf@flea>
+References: <20181116163916.29621-1-jagan@amarulasolutions.com>
+ <20181116163916.29621-5-jagan@amarulasolutions.com>
+ <20181119083243.4njj2p2sy2xf2zyf@flea>
+Message-ID: <CAMty3ZAKL2fZqwLwd_WiQpzz+cOETMR7ES7HQsBo3PsAvjM+6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 19, 2018 at 2:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Fri, Nov 16, 2018 at 10:09:08PM +0530, Jagan Teki wrote:
+> > Allwinner MIPI DSI DRQ set value can be varied with respective
+> > video modes.
+> > - burst mode the set value is always 0
+> > - video modes whose front porch greater than 20, the set value
+> >   can be computed based front porch and bpp.
+> > - video modes whose front porch is not greater than 20, the set value
+> >   is simply 0
+> >
+> > This patch simplifies existing drq set value code by grouping
+> > into sun6i_dsi_get_drq and support all video modes.
+> >
+> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 38 ++++++++++++++++----------
+> >  1 file changed, 23 insertions(+), 15 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > index efd08bfd0cb8..d60955880c43 100644
+> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > @@ -363,6 +363,26 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+> >                    SUN6I_DSI_INST_JUMP_CFG_NUM(1));
+> >  };
+> >
+> > +static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
+> > +                           struct drm_display_mode *mode)
+> > +{
+> > +     struct mipi_dsi_device *device = dsi->device;
+> > +     int drq = 0;
+>
+> So, here, you declaring a variable called drq, set to 0.
+>
+> > +     if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> > +             return drq;
+>
+> That you return here. You could just return 0, to be clearer.
+>
+> > +     if ((mode->hsync_start - mode->hdisplay) > 20) {
+> > +             /* Maaaaaagic */
+> > +             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+>
+> You re-declare a variable with the same name here, but a different
+> type....
+>
+> > +             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+> > +             drq /= 32;
+> > +     }
+> > +
+> > +     return drq;
+>
+> And then return the first one? How is that even working?
 
-This is a note to let you know that I've just added the patch titled
+Will fix this.
 
-    perf cs-etm: Correct CPU mode for samples
+>
+> > +
+> >  static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
+> >                                     struct drm_display_mode *mode, u16 hblk)
+> >  {
+> > @@ -478,21 +498,9 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+> >  static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+> >                                 struct drm_display_mode *mode)
+> >  {
+> > -     struct mipi_dsi_device *device = dsi->device;
+> > -     u32 val = 0;
+> > -
+> > -     if ((mode->hsync_start - mode->hdisplay) > 20) {
+> > -             /* Maaaaaagic */
+> > -             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+> > -
+> > -             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+> > -             drq /= 32;
+> > -
+> > -             val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+> > -                    SUN6I_DSI_TCON_DRQ_SET(drq));
+> > -     }
+> > -
+> > -     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
+> > +     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
+> > +                  SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+> > +                  SUN6I_DSI_TCON_DRQ_SET(sun6i_dsi_get_drq(dsi, mode)));
+>
+> On top of that, you now enable the DRQ stuff all the time, while it
 
-to the 4.19-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
+Earlier the val value is ENABLE_MODE ORed with drq value. for the
+condition drq is computed in if block otherwise the val is 0.
+So as I explained in commit message the drq value is 0
+- for video modes whose front porch is not greater than 20 and
+- for burst mode the val
 
-The filename of the patch is:
-     perf-cs-etm-correct-cpu-mode-for-samples.patch
-and it can be found in the queue-4.19 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
->From d6c9c05fe1eb4b213b183d8a1e79416256dc833a Mon Sep 17 00:00:00 2001
-From: Leo Yan <leo.yan@linaro.org>
-Date: Tue, 30 Oct 2018 15:18:28 +0800
-Subject: perf cs-etm: Correct CPU mode for samples
-
-From: Leo Yan <leo.yan@linaro.org>
-
-commit d6c9c05fe1eb4b213b183d8a1e79416256dc833a upstream.
-
-Since commit edeb0c90df35 ("perf tools: Stop fallbacking to kallsyms for
-vdso symbols lookup"), the kernel address cannot be properly parsed to
-kernel symbol with command 'perf script -k vmlinux'.  The reason is
-CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
-thus it fails to find corresponding map/dso in below flows:
-
-  process_sample_event()
-    `-> machine__resolve()
-	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
-
-In this flow it needs to pass argument 'sample->cpumode' to tell what's
-the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
-any failure until the commit edeb0c90df35 ("perf tools: Stop fallbacking
-to kallsyms for vdso symbols lookup") has been merged.  The reason is
-even with the wrong CPU mode the function thread__find_map() firstly
-fails to find map but it will rollback to find kernel map for vdso
-symbols lookup.  In the latest code it has removed the fallback code,
-thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
-anymore with kernel address.
-
-This patch is to correct samples CPU mode setting, it creates a new
-helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
-the address with the info from machine structure; this patch has a bit
-extension to check not only kernel and user mode, but also check for
-host/guest and hypervisor mode.  Finally this patch uses the function in
-instruction and branch samples and also apply in cs_etm__mem_access()
-for a minor polishing.
-
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
-Cc: Adrian Hunter <adrian.hunter@intel.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: David Miller <davem@davemloft.net>
-Cc: Jiri Olsa <jolsa@redhat.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Namhyung Kim <namhyung@kernel.org>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: coresight at lists.linaro.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at kernel.org # v4.19
-Link: http://lkml.kernel.org/r/1540883908-17018-1-git-send-email-leo.yan at linaro.org
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- tools/perf/util/cs-etm.c |   39 ++++++++++++++++++++++++++++++---------
- 1 file changed, 30 insertions(+), 9 deletions(-)
-
---- a/tools/perf/util/cs-etm.c
-+++ b/tools/perf/util/cs-etm.c
-@@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_ses
- 	zfree(&aux);
- }
- 
-+static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
-+{
-+	struct machine *machine;
-+
-+	machine = etmq->etm->machine;
-+
-+	if (address >= etmq->etm->kernel_start) {
-+		if (machine__is_host(machine))
-+			return PERF_RECORD_MISC_KERNEL;
-+		else
-+			return PERF_RECORD_MISC_GUEST_KERNEL;
-+	} else {
-+		if (machine__is_host(machine))
-+			return PERF_RECORD_MISC_USER;
-+		else if (perf_guest)
-+			return PERF_RECORD_MISC_GUEST_USER;
-+		else
-+			return PERF_RECORD_MISC_HYPERVISOR;
-+	}
-+}
-+
- static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
- 			      size_t size, u8 *buffer)
- {
-@@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_
- 		return -1;
- 
- 	machine = etmq->etm->machine;
--	if (address >= etmq->etm->kernel_start)
--		cpumode = PERF_RECORD_MISC_KERNEL;
--	else
--		cpumode = PERF_RECORD_MISC_USER;
-+	cpumode = cs_etm__cpu_mode(etmq, address);
- 
- 	thread = etmq->thread;
- 	if (!thread) {
-@@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sam
- 	struct perf_sample sample = {.ip = 0,};
- 
- 	event->sample.header.type = PERF_RECORD_SAMPLE;
--	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
- 	event->sample.header.size = sizeof(struct perf_event_header);
- 
- 	sample.ip = addr;
-@@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sam
- 	sample.cpu = etmq->packet->cpu;
- 	sample.flags = 0;
- 	sample.insn_len = 1;
--	sample.cpumode = event->header.misc;
-+	sample.cpumode = event->sample.header.misc;
- 
- 	if (etm->synth_opts.last_branch) {
- 		cs_etm__copy_last_branch_rb(etmq);
-@@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(s
- 		u64			nr;
- 		struct branch_entry	entries;
- 	} dummy_bs;
-+	u64 ip;
-+
-+	ip = cs_etm__last_executed_instr(etmq->prev_packet);
- 
- 	event->sample.header.type = PERF_RECORD_SAMPLE;
--	event->sample.header.misc = PERF_RECORD_MISC_USER;
-+	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
- 	event->sample.header.size = sizeof(struct perf_event_header);
- 
--	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
-+	sample.ip = ip;
- 	sample.pid = etmq->pid;
- 	sample.tid = etmq->tid;
- 	sample.addr = cs_etm__first_executed_instr(etmq->packet);
-@@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(s
- 	sample.period = 1;
- 	sample.cpu = etmq->packet->cpu;
- 	sample.flags = 0;
--	sample.cpumode = PERF_RECORD_MISC_USER;
-+	sample.cpumode = event->sample.header.misc;
- 
- 	/*
- 	 * perf report cannot handle events without a branch stack
-
-
-Patches currently in stable-queue which might be from leo.yan at linaro.org are
-
-queue-4.19/perf-cs-etm-correct-cpu-mode-for-samples.patch
-queue-4.19/perf-intel-pt-bts-calculate-cpumode-for-synthesized-samples.patch
-queue-4.19/perf-intel-pt-insert-callchain-context-into-synthesized-callchains.patch
+ie reason I mode it common.
