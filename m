@@ -1,39 +1,67 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 19 Nov 2018 09:58:46 +0100
-Subject: [PATCH v2 00/25] at24: remove
-In-Reply-To: <20181118170329.788778a8@bbrezillon>
-References: <20181113140133.17385-1-brgl@bgdev.pl>
- <20181118170329.788778a8@bbrezillon>
-Message-ID: <CAMRc=MfXWW9siNZNkocxmTU7mnoQO0KpeHQ3JmLcEfNscqCbDQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 19 Nov 2018 09:59:07 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-wetek: fix hwmon temperature
+ sensor output
+In-Reply-To: <1542601348-3469-1-git-send-email-christianshewitt@gmail.com>
+References: <1542601348-3469-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <d4baee43-d666-0268-30e9-694a8355d5b9@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-niedz., 18 lis 2018 o 17:03 Boris Brezillon
-<boris.brezillon@bootlin.com> napisa?(a):
->
-> On Tue, 13 Nov 2018 15:01:08 +0100
-> Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->
-> > As far as merging of this series goes: I'd like to avoid dragging it over
-> > four releases. The series is logically split into five groups:
-> >
-> > patches 1-2: nvmem and mtd changes
-> > patches 3-9: davinci arch-specific changes
-> > patches 10-13: networking changes
-> > patches 14-24: davinci specific again
-> > patch 25: final at24 change
-> >
-> > With that I believe we can do the following: Greg KH could pick up the
-> > first two patches into his char-misc tree.
->
-> The char-misc tree? Why not the MTD or NVMEM tree?
->
+Hi,
 
-There is no NVMEM tree - Srinivas sends his patches to Greg to be
-applied to char-misc.
 
-The second patch depends on the first one so in order to avoid more
-merging problems I suggested that the MTD patch go through char-misc
-as well. If you see a better solution, please let me know.
+On 19/11/2018 05:22, Christian Hewitt wrote:
+> Add &saradc and supporting vddio_ao18 nodes to fix hwmon temperature
+> readings on the WeTek Hub and Play2 devices. Without these nodes the
+> temp is reported as 4294967295 degrees C.
+> 
+> Thanks to Martin Blumenstingl for assisting debug and the winning
+> guess at what was missing.
 
-Bart
+It's a good workaround, but the real solution is that we should instead
+add the CLKID_SAR_ADC* clock in the scpi_sensors node and update
+the driver to keep these clocks enabled.
+
+We hit the same issue as the clk_div2/3 which should be kept enabled
+by the SCPI scpi_dvfs driver.
+
+Neil
+
+> 
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> index 70325b2..dd12e02 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek.dtsi
+> @@ -59,6 +59,13 @@
+>  		regulator-max-microvolt = <3300000>;
+>  	};
+>  
+> +	vddio_ao18: regulator-vddio_ao18 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "VDDIO_AO18";
+> +		regulator-min-microvolt = <1800000>;
+> +		regulator-max-microvolt = <1800000>;
+> +	};
+> +
+>  	vcc_3v3: regulator-vcc_3v3 {
+>  		compatible = "regulator-fixed";
+>  		regulator-name = "VCC_3V3";
+> @@ -173,6 +180,11 @@
+>  	clock-names = "clkin0";
+>  };
+>  
+> +&saradc {
+> +	status = "okay";
+> +	vref-supply = <&vddio_ao18>;
+> +};
+> +
+>  /* Wireless SDIO Module */
+>  &sd_emmc_a {
+>  	status = "okay";
+> 
