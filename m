@@ -1,130 +1,130 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 19 Nov 2018 11:14:39 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Add I2C-DVFS device
- node
-In-Reply-To: <20181108131815.5jebwxqbaldofk6d@verge.net.au>
-References: <1540071349-27483-1-git-send-email-ykaneko0929@gmail.com>
- <CAMuHMdV=ZinKOWZco9t4rGncYY5BqghXxGE6w9qCNW55UVSa+A@mail.gmail.com>
- <20181107123002.t6xg4m4vbq7cuapb@verge.net.au>
- <20181108102201.kuheale47tqygoe4@verge.net.au>
- <CAMuHMdW=f77EafYXSzD3BiuMLirm+gjMnQZ7WzE0kX-TjXwkdg@mail.gmail.com>
- <20181108115219.47lf5iauoygomdbh@verge.net.au>
- <CAMuHMdX=Gj1a5rjfRWSDKMbDuqyeztBCGb+9yam8w8UQMLkUPg@mail.gmail.com>
- <20181108131815.5jebwxqbaldofk6d@verge.net.au>
-Message-ID: <20181119101438.flbtwyslfdgumkhf@verge.net.au>
+From: dev@pschenker.ch (Philippe Schenker)
+Date: Mon, 19 Nov 2018 11:25:25 +0100
+Subject: [PATCH v2 1/4] mfd: stmpe: Move ADC related defines to header of mfd
+Message-ID: <20181119102528.2830-1-dev@pschenker.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 08, 2018 at 02:18:16PM +0100, Simon Horman wrote:
-> On Thu, Nov 08, 2018 at 01:25:45PM +0100, Geert Uytterhoeven wrote:
-> > Hi Simon,
-> > 
-> > On Thu, Nov 8, 2018 at 12:52 PM Simon Horman <horms@verge.net.au> wrote:
-> > > On Thu, Nov 08, 2018 at 11:27:31AM +0100, Geert Uytterhoeven wrote:
-> > > > On Thu, Nov 8, 2018 at 11:22 AM Simon Horman <horms@verge.net.au> wrote:
-> > > > > On Wed, Nov 07, 2018 at 01:30:10PM +0100, Simon Horman wrote:
-> > > > > > On Mon, Nov 05, 2018 at 09:52:48AM +0100, Geert Uytterhoeven wrote:
-> > > > > > > On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> > > > > > > > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > > > >
-> > > > > > > > This patch adds I2C-DVFS device node for the R8A77990 SoC.
-> > > > > > > >
-> > > > > > > > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> > > > > > > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> > > > > > >
-> > > > > > > Thanks for your patch!
-> > > > > > >
-> > > > > > > > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > > > > > > > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-> > > >
-> > > > > > > >         };
-> > > > > > > >
-> > > > > > > >         cpus {
-> > > > > > > > @@ -337,6 +338,22 @@
-> > > > > > > >                         reg = <0 0xe6060000 0 0x508>;
-> > > > > > > >                 };
-> > > > > > > >
-> > > > > > > > +               i2c_dvfs: i2c at e60b0000 {
-> > > > > > > > +                       #address-cells = <1>;
-> > > > > > > > +                       #size-cells = <0>;
-> > > > > > > > +                       compatible = "renesas,iic-r8a77990",
-> > > > > > >
-> > > > > > > "renesas,iic-r8a77990" is not yet documented.
-> > > > > >
-> > > > > > Thanks, as per my comment below I wonder if as well as documenting
-> > > > > > "renesas,iic-r8a77990" we also to teach the driver about it.
-> > > > > >
-> > > > > > >
-> > > > > > > > +                                    "renesas,rcar-gen3-iic",
-> > > > > > > > +                                    "renesas,rmobile-iic";
-> > > > > > >
-> > > > > > > Also, IIC on R-Car E3 does not have the automatic transmission registers.
-> > > > > > > Does this affect claiming compatibility with the family-specific or generic
-> > > > > > > compatible values?
-> > > > > >
-> > > > > > My cursory reading of the driver indicates that only register that is
-> > > > > > used by it but documented as not existing on E3 is ICSTART (offset 0x70).
-> > > > > >
-> > > > > > It seems to me that we should confirm with Renesas that the register does
-> > > > > > indeed not exist - as this patch comes from the BSP which implies it is
-> > > > > > being used there. And if it does not exist we should try teaching the
-> > > > > > driver not to use ICSTART via the "renesas,iic-r8a77990" compat string.
-> > > > > > What do you think?
-> > > > >
-> > > > > Further examination by Wolfram Sang has shown that the code in question is
-> > > > > only used on the r8a7740. I don't think there is any compatibility issue
-> > > > > for r8a77990 when using the current driver.
-> > > >
-> > > > "When using the current driver".
-> > > > Do we want to claim compatibility with "renesas,rcar-gen3-iic" and/or
-> > > > "renesas,rmobile-iic"?
-> > >
-> > > Thinking a bit more since I wrote my previous email.
-> > >
-> > > It seems that the r8a77990 has a different feature set to other R-Car Gen3
-> > > SoCs but that the current driver implementation "renesas,rcar-gen3-iic"
-> > > and "renesas,rmobile-iic" do not exceed that feature set.
-> > >
-> > > In future we could expand the features supported by the driver for other
-> > > Gen3 SoCs beyond what is supported for r8a77990. If we chose to describe
-> > > r8a77990 as compatible with renesas,rcar-gen3-iic then that implies those
-> > > new features would not be activated by matching on "renesas,rcar-gen3-iic",
-> > > though we could choose to control that using soc_match. Conversely if we
-> > > decide that r8a77990 is not compatible with renesas,rcar-gen3-iic then we
-> > > have more freedom to move with regards to adding features not supported by
-> > > r8a77990 to renesas,rcar-gen3-iic in future.
-> > >
-> > > So perhaps it would be wise to be conservative and, for now,
-> > > not document r8a77990 as being compatible with renesas,iic-r8a77990.
-> > >
-> > > I'm tempted to say that renesas,rmobile-iic is a lowest common denominator
-> > > and r8a77990 can be documented as being compatible with it. But we could
-> > > say the same of renesas,rcar-gen3-iic.
-> > >
-> > > What do you think?
-> > 
-> > That matches my thoughts.
-> > 
-> > Given R-Mobile A1 does have the register, I think r8a77990 should not claim
-> > compatibility with it.
-> 
-> Right, but the ICSTART register is only used on R-Mobile A1
-> (r8a7740) via the "renesas,iic-r8a7740" compat string. Never, in my reading
-> of the driver, via more generic compat strings.
-> 
-> Also, fwiw, the function the ICSTART register is called
-> sh_mobile_i2c_r8a7740_workaround. Note the use of workaround.
-> 
-> > Of course all this assumes there's no bug in the datasheet w.r.t. r8a77990...
-> 
-> The safest approach would be not to declare r8a77990 as being compatible
-> with the more generic compat strings. We can reverse that decision in
-> future.  The converse is not, strictly speaking, true.
+Move defines that are ADC related to the header of the overlying mfd,
+so they can be used from multiple sub-devices.
 
-Could we revive this conversation?
+Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+---
 
-I propose that we document the r8a77990 compat string but rely on driver
-initialisation via the more generic compat strings for now. If the driver
-is enhanced in future then the generic compat strings will need to preserve
-that compatibility. But new features for any SoC can be enabled via
-SoC-specific compat strings.
+Changes in v2:
+ - This is a new added commit. Separate commit for moving the defines out of
+   drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device drivers/mfd/stmpe.c
+ - Pre-fix defines with STMPE_
+
+ drivers/input/touchscreen/stmpe-ts.c | 34 +++++++++++-----------------
+ include/linux/mfd/stmpe.h            | 11 +++++++++
+ 2 files changed, 24 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
+index 2a78e27b4495..c5d9006588a2 100644
+--- a/drivers/input/touchscreen/stmpe-ts.c
++++ b/drivers/input/touchscreen/stmpe-ts.c
+@@ -49,17 +49,6 @@
+ 
+ #define STMPE_IRQ_TOUCH_DET		0
+ 
+-#define SAMPLE_TIME(x)			((x & 0xf) << 4)
+-#define MOD_12B(x)			((x & 0x1) << 3)
+-#define REF_SEL(x)			((x & 0x1) << 1)
+-#define ADC_FREQ(x)			(x & 0x3)
+-#define AVE_CTRL(x)			((x & 0x3) << 6)
+-#define DET_DELAY(x)			((x & 0x7) << 3)
+-#define SETTLING(x)			(x & 0x7)
+-#define FRACTION_Z(x)			(x & 0x7)
+-#define I_DRIVE(x)			(x & 0x1)
+-#define OP_MODE(x)			((x & 0x7) << 1)
+-
+ #define STMPE_TS_NAME			"stmpe-ts"
+ #define XY_MASK				0xfff
+ 
+@@ -213,9 +202,10 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+ 		return ret;
+ 	}
+ 
+-	adc_ctrl1 = SAMPLE_TIME(ts->sample_time) | MOD_12B(ts->mod_12b) |
+-		REF_SEL(ts->ref_sel);
+-	adc_ctrl1_mask = SAMPLE_TIME(0xff) | MOD_12B(0xff) | REF_SEL(0xff);
++	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
++		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
++	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
++			 STMPE_REF_SEL(0xff);
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
+ 			adc_ctrl1_mask, adc_ctrl1);
+@@ -225,15 +215,17 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+ 	}
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
+-			ADC_FREQ(0xff), ADC_FREQ(ts->adc_freq));
++			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
+ 	if (ret) {
+ 		dev_err(dev, "Could not setup ADC\n");
+ 		return ret;
+ 	}
+ 
+-	tsc_cfg = AVE_CTRL(ts->ave_ctrl) | DET_DELAY(ts->touch_det_delay) |
+-			SETTLING(ts->settling);
+-	tsc_cfg_mask = AVE_CTRL(0xff) | DET_DELAY(0xff) | SETTLING(0xff);
++	tsc_cfg = STMPE_AVE_CTRL(ts->ave_ctrl) |
++		  STMPE_DET_DELAY(ts->touch_det_delay) |
++		  STMPE_SETTLING(ts->settling);
++	tsc_cfg_mask = STMPE_AVE_CTRL(0xff) | STMPE_DET_DELAY(0xff) |
++		       STMPE_SETTLING(0xff);
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CFG, tsc_cfg_mask, tsc_cfg);
+ 	if (ret) {
+@@ -242,14 +234,14 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+ 	}
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_FRACTION_Z,
+-			FRACTION_Z(0xff), FRACTION_Z(ts->fraction_z));
++			STMPE_FRACTION_Z(0xff), STMPE_FRACTION_Z(ts->fraction_z));
+ 	if (ret) {
+ 		dev_err(dev, "Could not config touch\n");
+ 		return ret;
+ 	}
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_I_DRIVE,
+-			I_DRIVE(0xff), I_DRIVE(ts->i_drive));
++			STMPE_I_DRIVE(0xff), STMPE_I_DRIVE(ts->i_drive));
+ 	if (ret) {
+ 		dev_err(dev, "Could not config touch\n");
+ 		return ret;
+@@ -263,7 +255,7 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+ 	}
+ 
+ 	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CTRL,
+-			OP_MODE(0xff), OP_MODE(OP_MOD_XYZ));
++			STMPE_OP_MODE(0xff), STMPE_OP_MODE(OP_MOD_XYZ));
+ 	if (ret) {
+ 		dev_err(dev, "Could not set mode\n");
+ 		return ret;
+diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+index 4a827af17e59..c0353f6431f9 100644
+--- a/include/linux/mfd/stmpe.h
++++ b/include/linux/mfd/stmpe.h
+@@ -10,6 +10,17 @@
+ 
+ #include <linux/mutex.h>
+ 
++#define STMPE_SAMPLE_TIME(x)	((x & 0xf) << 4)
++#define STMPE_MOD_12B(x)	((x & 0x1) << 3)
++#define STMPE_REF_SEL(x)	((x & 0x1) << 1)
++#define STMPE_ADC_FREQ(x)	(x & 0x3)
++#define STMPE_AVE_CTRL(x)	((x & 0x3) << 6)
++#define STMPE_DET_DELAY(x)	((x & 0x7) << 3)
++#define STMPE_SETTLING(x)	(x & 0x7)
++#define STMPE_FRACTION_Z(x)	(x & 0x7)
++#define STMPE_I_DRIVE(x)	(x & 0x1)
++#define STMPE_OP_MODE(x)	((x & 0x7) << 1)
++
+ struct device;
+ struct regulator;
+ 
+-- 
+2.19.1
