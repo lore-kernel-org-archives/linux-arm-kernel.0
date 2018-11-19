@@ -1,167 +1,124 @@
-From: sibis@codeaurora.org (Sibi Sankar)
-Date: Mon, 19 Nov 2018 11:01:41 +0530
-Subject: [PATCH v5 14/18] arm64: dts: qcom: qcs404: Add remoteproc nodes
-In-Reply-To: <20181109094417.12109-15-vkoul@kernel.org>
-References: <20181109094417.12109-1-vkoul@kernel.org>
- <20181109094417.12109-15-vkoul@kernel.org>
-Message-ID: <718e105af9caeba834281dcab4aed499@codeaurora.org>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 19 Nov 2018 13:38:59 +0800
+Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
+In-Reply-To: <20181116125449.23581-6-matthias.bgg@kernel.org>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-6-matthias.bgg@kernel.org>
+Message-ID: <1542605939.32082.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn/Vinod,
+Hi, Matthias:
 
-On 2018-11-09 15:14, Vinod Koul wrote:
-> From: Bjorn Andersson <bjorn.andersson@linaro.org>
+On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
+> From: Matthias Brugger <mbrugger@suse.com>
 > 
-> Add the TrustZone based remoteproc nodes and their glink edges for
-> adsp, cdsp and wcss. Enable them for EVB common DTS.
+> It can happen that the mmsys clock drivers aren't probed before the
+> platform driver gets invoked. The platform driver used to print a warning
+> that the driver failed to get the clocks. Omit this error on
+> the defered probe path.
+
+This patch looks good to me, but you have not modified the sub driver in
+HDMI path. We could let HDMI path print the warning and someone send
+another patch later, or you modify for HDMI path in this patch.
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Signed-off-by: Vinod Koul <vkoul@kernel.org>
+> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 > ---
->  arch/arm64/boot/dts/qcom/qcs404-evb.dtsi | 12 +++++
->  arch/arm64/boot/dts/qcom/qcs404.dtsi     | 93 
-> ++++++++++++++++++++++++++++++++
->  2 files changed, 105 insertions(+)
+>  drivers/gpu/drm/mediatek/mtk_disp_color.c | 4 +++-
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c   | 4 +++-
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c  | 4 +++-
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c    | 3 ++-
+>  drivers/gpu/drm/mediatek/mtk_dsi.c        | 6 ++++--
+>  5 files changed, 15 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> index db035fef67d9..a39924efebe4 100644
-> --- a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> @@ -21,6 +21,18 @@
->  	};
->  };
-> 
-> +&remoteproc_adsp {
-> +	status = "ok";
-> +};
-> +
-> +&remoteproc_cdsp {
-> +	status = "ok";
-> +};
-> +
-> +&remoteproc_wcss {
-> +	status = "ok";
-> +};
-> +
->  &rpm_requests {
->  	pms405-regulators {
->  		compatible = "qcom,rpm-pms405-regulators";
-> diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> index 46fce264c8fe..06607419c9d6 100644
-> --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-> @@ -80,6 +80,99 @@
->  		method = "smc";
->  	};
-> 
-> +	remoteproc_adsp: remoteproc-adsp {
-> +		compatible = "qcom,qcs404-adsp-pas";
-> +
-> +		interrupts-extended = <&intc GIC_SPI 293 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
-> +				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
-> +		interrupt-names = "wdog", "fatal", "ready",
-> +				  "handover", "stop-ack";
-> +
-> +		clocks = <&xo_board>;
-> +		clock-names = "xo";
-> +
-> +		memory-region = <&adsp_fw_mem>;
-> +
-> +		qcom,smem-states = <&adsp_smp2p_out 0>;
-> +		qcom,smem-state-names = "stop";
-> +
-> +		status = "disabled";
-> +
-> +		glink-edge {
-> +			interrupts = <GIC_SPI 289 IRQ_TYPE_EDGE_RISING>;
-> +
-> +			qcom,remote-pid = <2>;
-> +			mboxes = <&apcs_glb 8>;
-> +
-> +			label = "adsp";
-> +		};
-> +	};
-> +
-> +	remoteproc_cdsp: remoteproc-cdsp {
-> +		compatible = "qcom,qcs404-cdsp-pas";
-> +
-> +		interrupts-extended = <&intc GIC_SPI 229 IRQ_TYPE_EDGE_RISING>,
-> +				      <&cdsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
-> +				      <&cdsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
-> +				      <&cdsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
-> +				      <&cdsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
-> +		interrupt-names = "wdog", "fatal", "ready",
-> +				  "handover", "stop-ack";
-> +
-> +		clocks = <&xo_board>;
-> +		clock-names = "xo";
-> +
-> +		memory-region = <&cdsp_fw_mem>;
-> +
-> +		qcom,smem-states = <&cdsp_smp2p_out 0>;
-> +		qcom,smem-state-names = "stop";
-> +
-> +		status = "disabled";
-> +
-> +		glink-edge {
-> +			interrupts = <GIC_SPI 141 IRQ_TYPE_EDGE_RISING>;
-> +
-> +			qcom,remote-pid = <5>;
-> +			mboxes = <&apcs_glb 12>;
-> +
-> +			label = "cdsp";
-> +		};
-> +	};
-> +
-> +	remoteproc_wcss: remoteproc-wcss {
-> +		compatible = "qcom,qcs404-wcss-pas";
-> +
-> +		interrupts-extended = <&intc GIC_SPI 153 IRQ_TYPE_EDGE_RISING>,
-> +				      <&wcss_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
-> +				      <&wcss_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
-> +				      <&wcss_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
-> +				      <&wcss_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
-> +		interrupt-names = "wdog", "fatal", "ready",
-> +				  "handover", "stop-ack";
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+> index f609b62b8be6..1ea3178d4c18 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_color.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
+> @@ -126,7 +126,9 @@ static int mtk_disp_color_probe(struct platform_device *pdev)
+>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>  				&mtk_disp_color_funcs);
+>  	if (ret) {
+> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to initialize component: %d\n",
+> +					ret);
 
-I can see that wcss remoteproc uses an additional smp2p interrupt called 
-shutdown-ack
-downstream you may want to skip wcss entry for now till the shutdown-ack 
-gets posted,
-reviewed and merged.
+I would like one more blank line here.
 
-> +
-> +		clocks = <&xo_board>;
-> +		clock-names = "xo";
-> +
-> +		memory-region = <&wlan_fw_mem>;
-> +
-> +		qcom,smem-states = <&wcss_smp2p_out 0>;
-> +		qcom,smem-state-names = "stop";
-> +
-> +		status = "disabled";
-> +
-> +		glink-edge {
-> +			interrupts = <GIC_SPI 156 IRQ_TYPE_EDGE_RISING>;
-> +
-> +			qcom,remote-pid = <1>;
-> +			mboxes = <&apcs_glb 16>;
-> +
-> +			label = "wcss";
-> +		};
-> +	};
-> +
->  	reserved-memory {
->  		#address-cells = <2>;
->  		#size-cells = <2>;
+>  		return ret;
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> index 28d191192945..5ebbcaa4e70e 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> @@ -293,7 +293,9 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
+>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>  				&mtk_disp_ovl_funcs);
+>  	if (ret) {
+> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to initialize component: %d\n",
+> +					ret);
 
--- 
--- Sibi Sankar --
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+I would like to align to the right of '('.
+
+Regards,
+CK
+
+>  		return ret;
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index b0a5cffe345a..59a08ed5fea5 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -295,7 +295,9 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
+>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
+>  				&mtk_disp_rdma_funcs);
+>  	if (ret) {
+> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to initialize component: %d\n",
+> +					ret);
+>  		return ret;
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index b06cd9d4b525..b76a2d071a97 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -566,7 +566,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
+>  
+>  	ddp->clk = devm_clk_get(dev, NULL);
+>  	if (IS_ERR(ddp->clk)) {
+> -		dev_err(dev, "Failed to get clock\n");
+> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get clock\n");
+>  		return PTR_ERR(ddp->clk);
+>  	}
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index 90109a0d6fff..cc6de75636c3 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -1103,14 +1103,16 @@ static int mtk_dsi_probe(struct platform_device *pdev)
+>  	dsi->engine_clk = devm_clk_get(dev, "engine");
+>  	if (IS_ERR(dsi->engine_clk)) {
+>  		ret = PTR_ERR(dsi->engine_clk);
+> -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get engine clock: %d\n", ret);
+>  		return ret;
+>  	}
+>  
+>  	dsi->digital_clk = devm_clk_get(dev, "digital");
+>  	if (IS_ERR(dsi->digital_clk)) {
+>  		ret = PTR_ERR(dsi->digital_clk);
+> -		dev_err(dev, "Failed to get digital clock: %d\n", ret);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(dev, "Failed to get digital clock: %d\n", ret);
+>  		return ret;
+>  	}
+>  
