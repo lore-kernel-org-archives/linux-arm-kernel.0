@@ -1,30 +1,43 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 19 Nov 2018 15:18:33 +0100
-Subject: [PATCH] drm/rockchip: fix for mailbox read size
-In-Reply-To: <1541518625-25984-1-git-send-email-dkos@cadence.com>
-References: <1541518625-25984-1-git-send-email-dkos@cadence.com>
-Message-ID: <7088529.fTnRXqZmiP@phil>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 19 Nov 2018 15:20:07 +0100
+Subject: [PATCH 2/3] gpio: davinci: restore a way to manually specify the
+ GPIO base
+In-Reply-To: <CACRpkdZkZeVSi3O1AR-uZFcBEwp6BN95UxkgKHZz3FJbOHS3mw@mail.gmail.com>
+References: <20181113135051.15308-1-brgl@bgdev.pl>
+ <20181113135051.15308-3-brgl@bgdev.pl>
+ <CACRpkdZkZeVSi3O1AR-uZFcBEwp6BN95UxkgKHZz3FJbOHS3mw@mail.gmail.com>
+Message-ID: <CAMRc=MfxjhRB5mYcqB82aJfP0+qXNGqBsa8bzV6eCKfGggcpZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 6. November 2018, 16:37:05 CET schrieb Damian Kos:
-> Some of the functions (like cdn_dp_dpcd_read, cdn_dp_get_edid_block)
-> allow to read 64KiB, but the cdn_dp_mailbox_read_receive, that is
-> used by them, can read only up to 255 bytes at once. Normally, it's
-> not a big issue as DPCD or EDID reads won't (hopefully) exceed that
-> value.
-> The real issue here is the revocation list read during the HDCP
-> authentication process. (problematic use case:
-> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4/drivers/gpu/drm/rockchip/cdn-dp-reg.c#1152)
-> The list can reach 127*5+4 bytes (num devs * 5 bytes per ID/Bksv +
-> 4 bytes of an additional info).
-> In other words - CTSes with HDCP Repeater won't pass without this
-> fix. Oh, and the driver will most likely stop working (best case
-> scenario).
-> 
-> Signed-off-by: Damian Kos <dkos@cadence.com>
+pon., 19 lis 2018 o 14:19 Linus Walleij <linus.walleij@linaro.org> napisa?(a):
+>
+> On Tue, Nov 13, 2018 at 2:51 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>
+> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> >
+> > Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
+> > automatic base selection") broke the network support in legacy boot
+> > mode for da850-evm since we can no longer request the MDIO clock GPIO.
+> >
+> > Other boards may be broken too, which I haven't tested.
+> >
+> > The problem is in the fact that most board files still use the legacy
+> > GPIO API where lines are requested by numbers rather than descriptors.
+> >
+> > While this should be fixed eventually, in order to unbreak the board
+> > for now - provide a way to manually specify the GPIO base in platform
+> > data.
+> >
+> > Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
+> > Cc: stable at vger.kernel.org
+> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> I guess this will be merged throug ARM SoC?
+>
 
-applied to drm-misc-next
+Yes, if Sekhar's fine with that.
 
-Thanks
-Heiko
+Bart
