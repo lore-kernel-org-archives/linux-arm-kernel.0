@@ -1,37 +1,31 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2018 02:37:41 +0530
-Subject: [PATCH 3/3] ARM: davinci: fix da850-evm boot in legacy mode
-In-Reply-To: <20181113135051.15308-4-brgl@bgdev.pl>
-References: <20181113135051.15308-1-brgl@bgdev.pl>
- <20181113135051.15308-4-brgl@bgdev.pl>
-Message-ID: <fc80e910-40fa-bb9c-e3ea-f53387bc055a@ti.com>
+From: paul.burton@mips.com (Paul Burton)
+Date: Mon, 19 Nov 2018 21:13:29 +0000
+Subject: [PATCH 4/9] PCI: consolidate PCI config entry in drivers/pci
+In-Reply-To: <20181115190538.17016-5-hch@lst.de>
+References: <20181115190538.17016-1-hch@lst.de>
+ <20181115190538.17016-5-hch@lst.de>
+Message-ID: <20181119211327.h2lugf2ttuiz3fp6@pburton-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bartosz,
+Hi Christoph,
 
-
-On 13/11/18 7:20 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Thu, Nov 15, 2018 at 08:05:32PM +0100, Christoph Hellwig wrote:
+> There is no good reason to duplicate the PCI menu in every architecture.
+> Instead provide a selectable HAVE_PCI symbol that indicates availability
+> of PCI support, and a FORCE_PCI symbol to for PCI on and the handle the
+> rest in drivers/pci.
 > 
-> Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
-> automatic base selection") broke the network support in legacy boot
-> mode for da850-evm since we can no longer request the MDIO clock GPIO.
-> 
-> We now have the option to specify the GPIO base manually for davinci,
-> so add the relevant fields to platform data.
-> 
-> Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
+> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
+> Acked-by: Thomas Gleixner <tglx@linutronix.de>
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
 
+For patches 4, 5, 7, 8 & 9:
 
-> ---
->  arch/arm/mach-davinci/da850.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-
-Similar changes are needed for other 5 DaVinci SoCs too. Can you do
-those in this patch itself?
+    Acked-by: Paul Burton <paul.burton@mips.com> # MIPS parts
 
 Thanks,
-Sekhar
+    Paul
