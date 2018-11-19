@@ -1,94 +1,118 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Mon, 19 Nov 2018 11:37:49 +0100
-Subject: [PATCH 1/4] bpf: account for freed JIT allocations in arch code
-In-Reply-To: <20181117185715.25198-2-ard.biesheuvel@linaro.org>
-References: <20181117185715.25198-1-ard.biesheuvel@linaro.org>
- <20181117185715.25198-2-ard.biesheuvel@linaro.org>
-Message-ID: <b37c3411-7950-dcb3-f0c3-6d9f589d36ab@iogearbox.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 19 Nov 2018 11:40:46 +0100
+Subject: [PATCH 06/15] Platform: OLPC: Add XO-1.75 EC driver
+In-Reply-To: <8881f5e48613c9d9d133e3964031fe2ab57f4801.camel@v3.sk>
+References: <20181010172300.317643-1-lkundrak@v3.sk>
+ <20181010172300.317643-7-lkundrak@v3.sk>
+ <CAHp75VcefOJHZ3WdZYrGEJFjqg2s1oJ75Jg9gKmQFre_ScAPZg@mail.gmail.com>
+ <8881f5e48613c9d9d133e3964031fe2ab57f4801.camel@v3.sk>
+Message-ID: <20181119104046.GC28607@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2018 07:57 PM, Ard Biesheuvel wrote:
-> Commit ede95a63b5e84 ("bpf: add bpf_jit_limit knob to restrict unpriv
-> allocations") added a call to bpf_jit_uncharge_modmem() to the routine
-> bpf_jit_binary_free() which is called from the __weak bpf_jit_free().
-> This function is overridden by arches, some of which do not call
-> bpf_jit_binary_free() to release the memory, and so the released
-> memory is not accounted for, potentially leading to spurious allocation
-> failures.
-> 
-> So replace the direct calls to module_memfree() in the arch code with
-> calls to bpf_jit_binary_free().
+Hi!
 
-Sorry but this patch is completely buggy, and above description on the
-accounting incorrect as well. Looks like this patch was not tested at all.
+> > > +#include <linux/delay.h>
+> > > +#include <linux/gpio/consumer.h>
+> > > +#include <linux/spinlock.h>
+> > > +#include <linux/completion.h>
+> > > +#include <linux/slab.h>
+> > > +#include <linux/platform_device.h>
+> > > +#include <linux/ctype.h>
+> > > +#include <linux/olpc-ec.h>
+> > > +#include <linux/spi/spi.h>
+> > > +#include <linux/reboot.h>
+> > > +#include <linux/input.h>
+> > > +#include <linux/kfifo.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/power_supply.h>
+> > 
+> > Easy to maintain when it's sorted.
 
-The below cBPF JITs that use module_memfree() which you replace with
-bpf_jit_binary_free() are using module_alloc() internally to get the JIT
-image buffer ...
+No / it depends.
 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/mips/net/bpf_jit.c           | 2 +-
->  arch/powerpc/net/bpf_jit_comp.c   | 2 +-
->  arch/powerpc/net/bpf_jit_comp64.c | 5 +----
->  arch/sparc/net/bpf_jit_comp_32.c  | 2 +-
->  4 files changed, 4 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/mips/net/bpf_jit.c b/arch/mips/net/bpf_jit.c
-> index 4d8cb9bb8365..1b69897274a1 100644
-> --- a/arch/mips/net/bpf_jit.c
-> +++ b/arch/mips/net/bpf_jit.c
-> @@ -1264,7 +1264,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
->  void bpf_jit_free(struct bpf_prog *fp)
->  {
->  	if (fp->jited)
-> -		module_memfree(fp->bpf_func);
-> +		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
->  
->  	bpf_prog_unlock_free(fp);
->  }
-> diff --git a/arch/powerpc/net/bpf_jit_comp.c b/arch/powerpc/net/bpf_jit_comp.c
-> index d5bfe24bb3b5..a1ea1ea6b40d 100644
-> --- a/arch/powerpc/net/bpf_jit_comp.c
-> +++ b/arch/powerpc/net/bpf_jit_comp.c
-> @@ -683,7 +683,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
->  void bpf_jit_free(struct bpf_prog *fp)
->  {
->  	if (fp->jited)
-> -		module_memfree(fp->bpf_func);
-> +		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
->  
->  	bpf_prog_unlock_free(fp);
->  }
-> diff --git a/arch/powerpc/net/bpf_jit_comp64.c b/arch/powerpc/net/bpf_jit_comp64.c
-> index 50b129785aee..84c8f013a6c6 100644
-> --- a/arch/powerpc/net/bpf_jit_comp64.c
-> +++ b/arch/powerpc/net/bpf_jit_comp64.c
-> @@ -1024,11 +1024,8 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *fp)
->  /* Overriding bpf_jit_free() as we don't set images read-only. */
->  void bpf_jit_free(struct bpf_prog *fp)
->  {
-> -	unsigned long addr = (unsigned long)fp->bpf_func & PAGE_MASK;
-> -	struct bpf_binary_header *bpf_hdr = (void *)addr;
-> -
->  	if (fp->jited)
-> -		bpf_jit_binary_free(bpf_hdr);
-> +		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
->  
->  	bpf_prog_unlock_free(fp);
->  }
-> diff --git a/arch/sparc/net/bpf_jit_comp_32.c b/arch/sparc/net/bpf_jit_comp_32.c
-> index a5ff88643d5c..01bda6bc9e7f 100644
-> --- a/arch/sparc/net/bpf_jit_comp_32.c
-> +++ b/arch/sparc/net/bpf_jit_comp_32.c
-> @@ -759,7 +759,7 @@ cond_branch:			f_offset = addrs[i + filter[i].jf];
->  void bpf_jit_free(struct bpf_prog *fp)
->  {
->  	if (fp->jited)
-> -		module_memfree(fp->bpf_func);
-> +		bpf_jit_binary_free(bpf_jit_binary_hdr(fp));
->  
->  	bpf_prog_unlock_free(fp);
->  }
-> 
+> > > +       channel = priv->rx_buf[0];
+> > > +       byte = priv->rx_buf[1];
+> > 
+> > Maybe specific structures would fit better?
+> > 
+> > Like
+> > 
+> > struct olpc_ec_resp_hdr {
+> >  u8 channel;
+> >  u8 byte;
+> > ...
+> > }
+
+Structures have padding and other nastyness...
+
+> > > +                       pm_wakeup_event(priv->pwrbtn->dev.parent,
+> > > 1000);
+> > 
+> > Magic number.
+
+Nothing wrong with magic numbers.
+
+> > > +       args[0] = mask & 0xff;
+> > > +       args[1] = (mask >> 8) & 0xff;
+> > 
+> > ...mask >> 0;
+> > ...mask >> 8;
+
+No, please.
+
+> > __maybe_unused  instead of ugly #ifdef?
+> > 
+> > > +{
+> > > +       struct platform_device *pdev = to_platform_device(dev);
+> > > +       struct olpc_xo175_ec *priv = platform_get_drvdata(pdev);
+> > 
+> > dev_get_drvdata() or how is it called?
+> > 
+> > > +       unsigned char hintargs[5];
+> > 
+> > struct olpc_ec_hint_cmd {
+> > u8 ...
+> > u32 ...
+> > };
+> > 
+> > ?
+
+No, unless you want to break the code. Or add __attribute__ packed and
+deal with endianness.
+
+Just no.
+
+> > > +       static unsigned int suspend_count;
+> > 
+> > u32 I suppose.
+
+You know, there's semantic difference between unsigned int and
+u32. And this sounds like candidate for unsigned int.
+
+> > > +       /* Enable all EC events while we're awake */
+> > > +       olpc_xo175_ec_set_event_mask(0xffff);
+> > 
+> > #define EC_ALL_EVENTS GENMASK(15, 0)
+
+Actually that's less readable. Just don't.
+
+> > > +static const struct of_device_id olpc_xo175_ec_of_match[] = {
+> > > +       { .compatible = "olpc,xo1.75-ec" },
+> > > +       { },
+> > 
+> > No comma for terminators.
+
+Comma is fine.
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181119/3c171663/attachment-0001.sig>
