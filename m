@@ -1,23 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 19 Nov 2018 10:36:41 -0800
-Subject: [PATCH] soc: ti: wkup_m3: Add PRCM int16 as the wake up source
-In-Reply-To: <99b2658c-2394-0660-6f63-0ef63a7c30f3@oracle.com>
-References: <1541999860-14550-1-git-send-email-j-keerthy@ti.com>
- <99b2658c-2394-0660-6f63-0ef63a7c30f3@oracle.com>
-Message-ID: <20181119183641.GY53235@atomide.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 19 Nov 2018 13:07:41 -0600
+Subject: [PATCH] pinctrl: mediatek: Convert to using %pOFn instead of
+ device_node.name
+In-Reply-To: <CAGp9LzpgZsj79Tf5Hee45Wt6ag+WHV0SMWd6qvvtj4G3pzAZKQ@mail.gmail.com>
+References: <20181116220540.17222-1-robh@kernel.org>
+ <20181116220540.17222-4-robh@kernel.org>
+ <CAGp9LzpgZsj79Tf5Hee45Wt6ag+WHV0SMWd6qvvtj4G3pzAZKQ@mail.gmail.com>
+Message-ID: <CAL_Jsq+r6JrKKcHnmBSncdEaw=7Jhobv_w8PJrH=sbY2qtxOTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@oracle.com> [181113 18:51]:
-> On 11/11/2018 9:17 PM, Keerthy wrote:
-> > Add PRCM int16 as the wake up source.
-> > 
-> > Signed-off-by: Keerthy <j-keerthy@ti.com>
-> > ---
-> Looks good.
-> 
-> Tony, Would you able to pick this up ?
+On Fri, Nov 16, 2018 at 5:46 PM Sean Wang <sean.wang@kernel.org> wrote:
+>
+> On Fri, Nov 16, 2018 at 2:06 PM Rob Herring <robh@kernel.org> wrote:
+> >
+> > In preparation to remove the node name pointer from struct device_node,
+> > convert printf users to use the %pOFn format specifier.
+> >
+> > Cc: Sean Wang <sean.wang@kernel.org>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: linux-mediatek at lists.infradead.org
+> > Cc: linux-gpio at vger.kernel.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> Acked-by: Sean Wang <sean.wang@kernel.org>
 
-Sure, aplying into omap-for-v4.21/driver thanks.
+BTW, messages to you bounce:
 
-Tony
+<sean.wang@mediatek.com> (expanded from <sean.wang@kernel.org>): host
+    mailgw01.mediatek.com[216.200.240.184] said: 550 Relaying mail to
+    sean.wang at mediatek.com is not allowed (in reply to RCPT TO command)
+
+Perhaps you need your kernel.org account to route somewhere else.
+
+Rob
