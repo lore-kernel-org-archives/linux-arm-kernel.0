@@ -1,81 +1,176 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Mon, 19 Nov 2018 18:26:34 +0100
-Subject: [PATCH v11 18/24] mm: move obj_to_index to include/linux/slab_def.h
+Date: Mon, 19 Nov 2018 18:26:36 +0100
+Subject: [PATCH v11 20/24] kasan,
+ arm64: add brk handler for inline instrumentation
 In-Reply-To: <cover.1542648335.git.andreyknvl@google.com>
 References: <cover.1542648335.git.andreyknvl@google.com>
-Message-ID: <10ca1e57fe2d5dc835e88fb9dc9ab6855ae618dc.1542648335.git.andreyknvl@google.com>
+Message-ID: <33d91a4f2ea70b7c58cdfbedb8042118b05eca30.1542648335.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While with SLUB we can actually preassign tags for caches with contructors
-and store them in pointers in the freelist, SLAB doesn't allow that since
-the freelist is stored as an array of indexes, so there are no pointers to
-store the tags.
+Tag-based KASAN inline instrumentation mode (which embeds checks of shadow
+memory into the generated code, instead of inserting a callback) generates
+a brk instruction when a tag mismatch is detected.
 
-Instead we compute the tag twice, once when a slab is created before
-calling the constructor and then again each time when an object is
-allocated with kmalloc. Tag is computed simply by taking the lowest byte of
-the index that corresponds to the object. However in kasan_kmalloc we only
-have access to the objects pointer, so we need a way to find out which
-index this object corresponds to.
+This commit adds a tag-based KASAN specific brk handler, that decodes the
+immediate value passed to the brk instructions (to extract information
+about the memory access that triggered the mismatch), reads the register
+values (x0 contains the guilty address) and reports the bug.
 
-This patch moves obj_to_index from slab.c to include/linux/slab_def.h to
-be reused by KASAN.
-
-Acked-by: Christoph Lameter <cl@linux.com>
 Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- include/linux/slab_def.h | 13 +++++++++++++
- mm/slab.c                | 13 -------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/brk-imm.h |  2 +
+ arch/arm64/kernel/traps.c        | 68 +++++++++++++++++++++++++++++++-
+ include/linux/kasan.h            |  3 ++
+ 3 files changed, 71 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/slab_def.h b/include/linux/slab_def.h
-index 3485c58cfd1c..9a5eafb7145b 100644
---- a/include/linux/slab_def.h
-+++ b/include/linux/slab_def.h
-@@ -104,4 +104,17 @@ static inline void *nearest_obj(struct kmem_cache *cache, struct page *page,
- 		return object;
+diff --git a/arch/arm64/include/asm/brk-imm.h b/arch/arm64/include/asm/brk-imm.h
+index ed693c5bcec0..2945fe6cd863 100644
+--- a/arch/arm64/include/asm/brk-imm.h
++++ b/arch/arm64/include/asm/brk-imm.h
+@@ -16,10 +16,12 @@
+  * 0x400: for dynamic BRK instruction
+  * 0x401: for compile time BRK instruction
+  * 0x800: kernel-mode BUG() and WARN() traps
++ * 0x9xx: tag-based KASAN trap (allowed values 0x900 - 0x9ff)
+  */
+ #define FAULT_BRK_IMM			0x100
+ #define KGDB_DYN_DBG_BRK_IMM		0x400
+ #define KGDB_COMPILED_DBG_BRK_IMM	0x401
+ #define BUG_BRK_IMM			0x800
++#define KASAN_BRK_IMM			0x900
+ 
+ #endif
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index 5f4d9acb32f5..04bdc53716ef 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -35,6 +35,7 @@
+ #include <linux/sizes.h>
+ #include <linux/syscalls.h>
+ #include <linux/mm_types.h>
++#include <linux/kasan.h>
+ 
+ #include <asm/atomic.h>
+ #include <asm/bug.h>
+@@ -284,10 +285,14 @@ void arm64_notify_die(const char *str, struct pt_regs *regs,
+ 	}
  }
  
-+/*
-+ * We want to avoid an expensive divide : (offset / cache->size)
-+ *   Using the fact that size is a constant for a particular cache,
-+ *   we can replace (offset / cache->size) by
-+ *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-+ */
-+static inline unsigned int obj_to_index(const struct kmem_cache *cache,
-+					const struct page *page, void *obj)
+-void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
++void __arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
+ {
+ 	regs->pc += size;
++}
+ 
++void arm64_skip_faulting_instruction(struct pt_regs *regs, unsigned long size)
 +{
-+	u32 offset = (obj - page->s_mem);
-+	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
++	__arm64_skip_faulting_instruction(regs, size);
+ 	/*
+ 	 * If we were single stepping, we want to get the step exception after
+ 	 * we return from the trap.
+@@ -959,7 +964,7 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
+ 	}
+ 
+ 	/* If thread survives, skip over the BUG instruction and continue: */
+-	arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
++	__arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
+ 	return DBG_HOOK_HANDLED;
+ }
+ 
+@@ -969,6 +974,58 @@ static struct break_hook bug_break_hook = {
+ 	.fn = bug_handler,
+ };
+ 
++#ifdef CONFIG_KASAN_SW_TAGS
++
++#define KASAN_ESR_RECOVER	0x20
++#define KASAN_ESR_WRITE	0x10
++#define KASAN_ESR_SIZE_MASK	0x0f
++#define KASAN_ESR_SIZE(esr)	(1 << ((esr) & KASAN_ESR_SIZE_MASK))
++
++static int kasan_handler(struct pt_regs *regs, unsigned int esr)
++{
++	bool recover = esr & KASAN_ESR_RECOVER;
++	bool write = esr & KASAN_ESR_WRITE;
++	size_t size = KASAN_ESR_SIZE(esr);
++	u64 addr = regs->regs[0];
++	u64 pc = regs->pc;
++
++	if (user_mode(regs))
++		return DBG_HOOK_ERROR;
++
++	kasan_report(addr, size, write, pc);
++
++	/*
++	 * The instrumentation allows to control whether we can proceed after
++	 * a crash was detected. This is done by passing the -recover flag to
++	 * the compiler. Disabling recovery allows to generate more compact
++	 * code.
++	 *
++	 * Unfortunately disabling recovery doesn't work for the kernel right
++	 * now. KASAN reporting is disabled in some contexts (for example when
++	 * the allocator accesses slab object metadata; this is controlled by
++	 * current->kasan_depth). All these accesses are detected by the tool,
++	 * even though the reports for them are not printed.
++	 *
++	 * This is something that might be fixed at some point in the future.
++	 */
++	if (!recover)
++		die("Oops - KASAN", regs, 0);
++
++	/* If thread survives, skip over the brk instruction and continue: */
++	__arm64_skip_faulting_instruction(regs, AARCH64_INSN_SIZE);
++	return DBG_HOOK_HANDLED;
 +}
 +
- #endif	/* _LINUX_SLAB_DEF_H */
-diff --git a/mm/slab.c b/mm/slab.c
-index 27859fb39889..d2f827316dfc 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -406,19 +406,6 @@ static inline void *index_to_obj(struct kmem_cache *cache, struct page *page,
- 	return page->s_mem + cache->size * idx;
++#define KASAN_ESR_VAL (0xf2000000 | KASAN_BRK_IMM)
++#define KASAN_ESR_MASK 0xffffff00
++
++static struct break_hook kasan_break_hook = {
++	.esr_val = KASAN_ESR_VAL,
++	.esr_mask = KASAN_ESR_MASK,
++	.fn = kasan_handler,
++};
++#endif
++
+ /*
+  * Initial handler for AArch64 BRK exceptions
+  * This handler only used until debug_traps_init().
+@@ -976,6 +1033,10 @@ static struct break_hook bug_break_hook = {
+ int __init early_brk64(unsigned long addr, unsigned int esr,
+ 		struct pt_regs *regs)
+ {
++#ifdef CONFIG_KASAN_SW_TAGS
++	if ((esr & KASAN_ESR_MASK) == KASAN_ESR_VAL)
++		return kasan_handler(regs, esr) != DBG_HOOK_HANDLED;
++#endif
+ 	return bug_handler(regs, esr) != DBG_HOOK_HANDLED;
  }
  
--/*
-- * We want to avoid an expensive divide : (offset / cache->size)
-- *   Using the fact that size is a constant for a particular cache,
-- *   we can replace (offset / cache->size) by
-- *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
-- */
--static inline unsigned int obj_to_index(const struct kmem_cache *cache,
--					const struct page *page, void *obj)
--{
--	u32 offset = (obj - page->s_mem);
--	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
--}
--
- #define BOOT_CPUCACHE_ENTRIES	1
- /* internal cache of cache description objs */
- static struct kmem_cache kmem_cache_boot = {
+@@ -983,4 +1044,7 @@ int __init early_brk64(unsigned long addr, unsigned int esr,
+ void __init trap_init(void)
+ {
+ 	register_break_hook(&bug_break_hook);
++#ifdef CONFIG_KASAN_SW_TAGS
++	register_break_hook(&kasan_break_hook);
++#endif
+ }
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index a477ce2abdc9..8da7b7a4397a 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -173,6 +173,9 @@ void kasan_init_tags(void);
+ 
+ void *kasan_reset_tag(const void *addr);
+ 
++void kasan_report(unsigned long addr, size_t size,
++		bool is_write, unsigned long ip);
++
+ #else /* CONFIG_KASAN_SW_TAGS */
+ 
+ static inline void kasan_init_tags(void) { }
 -- 
 2.19.1.1215.g8438c0b245-goog
