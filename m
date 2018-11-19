@@ -1,28 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Nov 2018 14:16:07 +0000
-Subject: [PATCH] ARM: smp_twd: Remove legacy TWD registration
-In-Reply-To: <20181115100659.18256-1-geert+renesas@glider.be>
-References: <20181115100659.18256-1-geert+renesas@glider.be>
-Message-ID: <450874f4-59b8-dc70-a19b-550c6c6391a9@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 19 Nov 2018 15:18:33 +0100
+Subject: [PATCH] drm/rockchip: fix for mailbox read size
+In-Reply-To: <1541518625-25984-1-git-send-email-dkos@cadence.com>
+References: <1541518625-25984-1-git-send-email-dkos@cadence.com>
+Message-ID: <7088529.fTnRXqZmiP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/2018 10:06, Geert Uytterhoeven wrote:
-> As of commit 7484c727b636a838 ("ARM: realview: delete the RealView board
-> files"), the ARM Timer and Watchdog Unit is instantiated from DT only.
-> Moreover, the driver is selected from ARCH_MULTIPLATFORM platforms only,
-> which implies OF, TIMER_OF, and COMMON_CLK.
+Am Dienstag, 6. November 2018, 16:37:05 CET schrieb Damian Kos:
+> Some of the functions (like cdn_dp_dpcd_read, cdn_dp_get_edid_block)
+> allow to read 64KiB, but the cdn_dp_mailbox_read_receive, that is
+> used by them, can read only up to 255 bytes at once. Normally, it's
+> not a big issue as DPCD or EDID reads won't (hopefully) exceed that
+> value.
+> The real issue here is the revocation list read during the HDCP
+> authentication process. (problematic use case:
+> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4/drivers/gpu/drm/rockchip/cdn-dp-reg.c#1152)
+> The list can reach 127*5+4 bytes (num devs * 5 bytes per ID/Bksv +
+> 4 bytes of an additional info).
+> In other words - CTSes with HDCP Repeater won't pass without this
+> fix. Oh, and the driver will most likely stop working (best case
+> scenario).
 > 
-> Hence remove all unused legacy infrastructure from the driver.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Damian Kos <dkos@cadence.com>
 
-Good cleanup!
+applied to drm-misc-next
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Heiko
