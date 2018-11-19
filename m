@@ -1,343 +1,844 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 19 Nov 2018 15:32:30 +0100
-Subject: [PATCH 1/1] reset: imx7: Add support for i.MX8MQ
-In-Reply-To: <20181117181131.9330-2-andrew.smirnov@gmail.com>
-References: <20181117181131.9330-1-andrew.smirnov@gmail.com>
- <20181117181131.9330-2-andrew.smirnov@gmail.com>
-Message-ID: <1542637950.5139.12.camel@pengutronix.de>
+From: Michal.Vokac@ysoft.com (=?utf-8?B?Vm9rw6HEjSBNaWNoYWw=?=)
+Date: Mon, 19 Nov 2018 14:35:26 +0000
+Subject: [PATCH] ARM: dts: imx: Add Y Soft IOTA Draco, Hydra and Ursa
+ boards
+In-Reply-To: <5bea0e99.1c69fb81.18be0.5162@mx.google.com>
+References: <1541086962-52626-1-git-send-email-michal.vokac@ysoft.com>
+ <5bea0e99.1c69fb81.18be0.5162@mx.google.com>
+Message-ID: <42ffee3e-7c2a-aab9-547f-2064a77339a8@ysoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
-
-thank you for the patch.
-
-In general, sharing the lookup table with i.MX7 is fine iff it is a
-strict superset. But I don't think that is the case (see below).
-Even so, this will change if there ever is another i.MX7 or i.MX8M
-variant that is also a superset of i.MX7, but not a superset of
-i.MX8M.?Also, just listing all resets in order of appearance would make
-review a bit easier.
-
-I don't like increasing IMX7_RESET_NUM though, i.MX8M should have its
-own nr_resets.
-
-On Sat, 2018-11-17 at 10:11 -0800, Andrey Smirnov wrote:
-> SRC IP block used in i.MX8MQ is a superset of what is found in i.MX7D,
-
-Is this true, though?
-
-i.MX7 has SRC_ERCR at offset 0x14 and HSICPHY_RCR at offset 0x1c.
-According to documentation, i.MX8M is missing those at least.
-
-> so add all of the definitions necessary to support both.
->
-> Cc: p.zabel at pengutronix.de
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: cphealy at gmail.com
-> Cc: l.stach at pengutronix.de
-> Cc: Leonard Crestez <leonard.crestez@nxp.com>
-> Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: linux-imx at nxp.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  drivers/reset/Kconfig                   |  2 +-
->  drivers/reset/reset-imx7.c              | 66 ++++++++++++++++++++++++-
->  include/dt-bindings/reset/imx7-reset.h  | 15 +++++-
->  include/dt-bindings/reset/imx8m-reset.h | 47 ++++++++++++++++++
->  4 files changed, 127 insertions(+), 3 deletions(-)
->  create mode 100644 include/dt-bindings/reset/imx8m-reset.h
+On 12.11.2018 17:41, Rob Herring wrote:
+> On Thu, Nov 01, 2018 at 03:43:26PM +0000, Vok?? Michal wrote:
+>> These are i.MX6S/DL based SBCs embedded in various Y Soft products.
+>> All share the same board design but have slightly different HW
+>> configuration.
+>>
+>> Ursa
+>> - i.MX6S SoC, 512MB RAM DDR3, 4GB eMMC, microSD
+>> - parallel WVGA 7" LCD with touch panel
+>> - 1x Eth (QCA8334 switch)
+>> - USB OTG
+>> - USB host (micro-B)
+>>
+>> Draco
+>> - i.MX6S SoC, 512MB RAM DDR3, 4GB eMMC, microSD
+>> - parallel WVGA 7" LCD with touch panel
+>> - 2x Eth (QCA8334 switch)
+>> - USB OTG
+>> - USB host (micro-B)
+>> - RGB LED (I2C LP5562)
+>> - 3.5mm audio jack + codec (LM49350)
+>>
+>> Hydra
+>> - i.MX6DL SoC, 2GB RAM DDR3, 4GB eMMC, microSD
+>> - I2C OLED display, capacitive matrix keys
+>> - 2x Eth (QCA8334 switch)
+>> - USB OTG
+>> - RGB LED (I2C LP5562)
+>> - 3.5mm audio jack + codec (LM49350)
+>> - HDMI
+>> - miniPCIe slot
+>>
+>> Cc: Andrew Lunn <andrew@lunn.ch>
+>> Signed-off-by: Michal Vok?? <michal.vokac@ysoft.com>
+>> ---
+>>
+>> All the boards are booting fine but not everything is enabled/supported
+>> yet though. There is few things that will need some effort to get them
+>> fully working.
+>>
+>>   - HDMI: nothing specific, it just does not have the priority
+>>   - OLED display: reset signal inversion, wrong display resolution,...
+>>   - capacitive keys: polled driver for MPR121 needed as we do not have
+>>     the interrupt line
+>>   - Eth switch: need tweaks in i.MX RGMII pin group control registers
+>>   - audio codec: no existing driver yet (in mainline)
+>>
+>> So expect patches targeting the mentioned issues and updates to the dts
+>> files enabling additional HW.
+>>   
+>> CC-ing Andrew since he was interested in this board as it has a DSA
+>> Ethernet switch populated.
+>>
+>> Thanks,
+>> Michal
+>>
+>>   arch/arm/boot/dts/Makefile                 |   3 +
+>>   arch/arm/boot/dts/imx6dl-yapp4-common.dtsi | 535 +++++++++++++++++++++++++++++
+>>   arch/arm/boot/dts/imx6dl-yapp4-draco.dts   |  57 +++
+>>   arch/arm/boot/dts/imx6dl-yapp4-hydra.dts   |  33 ++
+>>   arch/arm/boot/dts/imx6dl-yapp4-ursa.dts    |  53 +++
+>>   5 files changed, 681 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/imx6dl-yapp4-common.dtsi
+>>   create mode 100644 arch/arm/boot/dts/imx6dl-yapp4-draco.dts
+>>   create mode 100644 arch/arm/boot/dts/imx6dl-yapp4-hydra.dts
+>>   create mode 100644 arch/arm/boot/dts/imx6dl-yapp4-ursa.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index b5bd3de..cf24410 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -441,6 +441,9 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+>>   	imx6dl-wandboard.dtb \
+>>   	imx6dl-wandboard-revb1.dtb \
+>>   	imx6dl-wandboard-revd1.dtb \
+>> +	imx6dl-yapp4-draco.dtb \
+>> +	imx6dl-yapp4-hydra.dtb \
+>> +	imx6dl-yapp4-ursa.dtb \
+>>   	imx6q-apalis-eval.dtb \
+>>   	imx6q-apalis-ixora.dtb \
+>>   	imx6q-apalis-ixora-v1.1.dtb \
+>> diff --git a/arch/arm/boot/dts/imx6dl-yapp4-common.dtsi b/arch/arm/boot/dts/imx6dl-yapp4-common.dtsi
+>> new file mode 100644
+>> index 0000000..9925523
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-yapp4-common.dtsi
+>> @@ -0,0 +1,535 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (C) 2015-2018 Y Soft Corporation, a.s.
+>> +
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/pwm/pwm.h>
+>> +
+>> +/ {
+>> +	backlight: backlight {
+>> +		compatible = "pwm-backlight";
+>> +		pwms = <&pwm1 0 500000 PWM_POLARITY_INVERTED>;
+>> +		brightness-levels = <0 32 64 128 255>;
+>> +		default-brightness-level = <32>;
+>> +		num-interpolated-steps = <8>;
+>> +		power-supply = <&sw2_reg>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>> +	lcd_display: display {
+>> +		compatible = "fsl,imx-parallel-display";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		interface-pix-fmt = "rgb24";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_ipu1>;
+>> +		status = "disabled";
+>> +
+>> +		port at 0 {
+>> +			reg = <0>;
+>> +
+>> +			lcd_display_in: endpoint {
+>> +				remote-endpoint = <&ipu1_di0_disp0>;
+>> +			};
+>> +		};
+>> +
+>> +		port at 1 {
+>> +			reg = <1>;
+>> +
+>> +			lcd_display_out: endpoint {
+>> +				remote-endpoint = <&lcd_panel_in>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	panel: panel {
+>> +		compatible = "dataimage,scf0700c48ggu18";
+>> +		power-supply = <&sw2_reg>;
+>> +		status = "disabled";
+>> +
+>> +		port {
+>> +			lcd_panel_in: endpoint {
+>> +				remote-endpoint = <&lcd_display_out>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
 > 
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index c21da9fe51ec..4909aab7401b 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -50,7 +50,7 @@ config RESET_HSDK
->  config RESET_IMX7
->  	bool "i.MX7 Reset Driver" if COMPILE_TEST
->  	depends on HAS_IOMEM
-> -	default SOC_IMX7D
-> +	default SOC_IMX7D || SOC_IMX8MQ
->  	select MFD_SYSCON
->  	help
->  	  This enables the reset controller driver for i.MX7 SoCs.
-> diff --git a/drivers/reset/reset-imx7.c b/drivers/reset/reset-imx7.c
-> index 77911fa8f31d..dffad618f805 100644
-> --- a/drivers/reset/reset-imx7.c
-> +++ b/drivers/reset/reset-imx7.c
-> @@ -21,14 +21,16 @@
->  #include <linux/reset-controller.h>
->  #include <linux/regmap.h>
->  #include <dt-bindings/reset/imx7-reset.h>
-> +#include <dt-bindings/reset/imx8m-reset.h>
->  
->  struct imx7_src {
->  	struct reset_controller_dev rcdev;
->  	struct regmap *regmap;
->  };
->  
-> -enum imx7_src_registers {
-> +enum imx_src_registers {
->  	SRC_A7RCR0		= 0x0004,
-> +	SRC_A53RCR0		= 0x0004,
->  	SRC_M4RCR		= 0x000c,
->  	SRC_ERCR		= 0x0014,
->  	SRC_HSICPHY_RCR		= 0x001c,
-> @@ -36,7 +38,9 @@ enum imx7_src_registers {
->  	SRC_USBOPHY2_RCR	= 0x0024,
->  	SRC_MIPIPHY_RCR		= 0x0028,
->  	SRC_PCIEPHY_RCR		= 0x002c,
+> These are all just individual board level regulators? If so, drop the
+> simple-bus and move these up to the top-level.
 
-These aren't complete. I see at least SRC_HDMI_RCR, SRC_DISP_RCR,
-SRC_GPU_RCR, and SRC_VPU_RCR missing.
+Yes, individual regulators. I will move it.
 
-> +	SRC_PCIE2PHY_RCR	= 0x0048,
-
-And SRC_MIPIPHY1_RCR, SRC_MIPIPHY2_RCR. Please check the reference
-manual and complete the list of registers that contain resets.
-
->  	SRC_DDRC_RCR		= 0x1000,
-> +
-
-Whitespace.
-
->  };
->  
->  struct imx7_src_signal {
-> @@ -67,11 +71,67 @@ static const struct imx7_src_signal imx7_src_signals[IMX7_RESET_NUM] = {
->  	[IMX7_RESET_PCIEPHY]		= { SRC_PCIEPHY_RCR, BIT(2) | BIT(1) },
->  	[IMX7_RESET_PCIEPHY_PERST]	= { SRC_PCIEPHY_RCR, BIT(3) },
->  	[IMX7_RESET_PCIE_CTRL_APPS_EN]	= { SRC_PCIEPHY_RCR, BIT(6) },
-> +	[IMX7_RESET_PCIE_CTRL_APPS_CLK_REQ] = { SRC_PCIEPHY_RCR, BIT(4) },
-
-Now I feel like CTRL_APPS_EN shouldn't have been added here either. But
-while there I wasn't really sure about whether that is actually a valid
-reset, I'm pretty sure that this one isn't.
-I think that i.MX8M either needs a clock driver to control this bit and
-the corresponding IOMUXC GPR bit to enable the PCIe refclk, or the PCIe
-driver has to access this register via syscon. I really don't want to
-see a clock enable signal described in the device tree as a reset.
-
->  	[IMX7_RESET_PCIE_CTRL_APPS_TURNOFF] = { SRC_PCIEPHY_RCR, BIT(11) },
->  	[IMX7_RESET_DDRC_PRST]		= { SRC_DDRC_RCR, BIT(0) },
->  	[IMX7_RESET_DDRC_CORE_RST]	= { SRC_DDRC_RCR, BIT(1) },
-> +
-> +	[IMX8M_RESET_A53_CORE_POR_RESET2] = { SRC_A53RCR0, BIT(2) },
-> +	[IMX8M_RESET_A53_CORE_POR_RESET3] = { SRC_A53RCR0, BIT(3) },
-> +	[IMX8M_RESET_A53_CORE_RESET2]     = { SRC_A53RCR0, BIT(6) },
-> +	[IMX8M_RESET_A53_CORE_RESET3]     = { SRC_A53RCR0, BIT(7) },
-
-Missing IMX8M_RESET_A53_DBG_RESET2,3.
-
-> +	[IMX8M_RESET_A53_ETM_RESET2]      = { SRC_A53RCR0, BIT(14) },
-> +	[IMX8M_RESET_A53_ETM_RESET3]      = { SRC_A53RCR0, BIT(15) },
-
-Missing some reset registers here.
-
-> +	[IMX8M_RESET_PCIE2PHY]		= { SRC_PCIEPHY_RCR, BIT(2) | BIT(1) },
-> +	[IMX8M_RESET_PCIE2PHY_PERST]      = { SRC_PCIE2PHY_RCR, BIT(3) },
-> +	[IMX8M_RESET_PCIE2_CTRL_APPS_EN]  = { SRC_PCIE2PHY_RCR, BIT(6) },
-> +	[IMX8M_RESET_PCIE2_CTRL_APPS_CLK_REQ] = { SRC_PCIE2PHY_RCR, BIT(4) },
-
-See above.
-
-> +	[IMX8M_RESET_PCIE2_CTRL_APPS_TURNOFF] = { SRC_PCIE2PHY_RCR, BIT(11) },
-
-Missing some reset registers here.
-
->  };
->  
-> +static inline void imx7_src_check_definitions(void)
-> +{
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_CORE_POR_RESET0 !=
-> +		     IMX7_RESET_A7_CORE_POR_RESET0);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_CORE_POR_RESET1 !=
-> +		     IMX7_RESET_A7_CORE_POR_RESET1);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_CORE_RESET0 !=
-> +		     IMX7_RESET_A7_CORE_RESET0);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_CORE_RESET1 !=
-> +		     IMX7_RESET_A7_CORE_RESET1);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_DBG_RESET0 !=
-> +		     IMX7_RESET_A7_DBG_RESET0);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_DBG_RESET1 !=
-> +		     IMX7_RESET_A7_DBG_RESET1);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_ETM_RESET0 !=
-> +		     IMX7_RESET_A7_ETM_RESET0);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_ETM_RESET1 !=
-> +		     IMX7_RESET_A7_ETM_RESET1);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_SOC_DBG_RESET !=
-> +		     IMX7_RESET_A7_SOC_DBG_RESET);
-> +	BUILD_BUG_ON(IMX8M_RESET_A53_L2RESET != IMX7_RESET_A7_L2RESET);
-> +	BUILD_BUG_ON(IMX8M_RESET_SW_M4C_RST != IMX7_RESET_SW_M4C_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_SW_M4P_RST != IMX7_RESET_SW_M4P_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_EIM_RST != IMX7_RESET_EIM_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_HSICPHY_PORT_RST !=
-> +		     IMX7_RESET_HSICPHY_PORT_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_USBPHY1_POR != IMX7_RESET_USBPHY1_POR);
-> +	BUILD_BUG_ON(IMX8M_RESET_USBPHY1_PORT_RST !=
-> +		     IMX7_RESET_USBPHY1_PORT_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_USBPHY2_POR != IMX7_RESET_USBPHY2_POR);
-> +	BUILD_BUG_ON(IMX8M_RESET_USBPHY2_PORT_RST !=
-> +		     IMX7_RESET_USBPHY2_PORT_RST);
-> +	BUILD_BUG_ON(IMX8M_RESET_MIPI_PHY_MRST != IMX7_RESET_MIPI_PHY_MRST);
-> +	BUILD_BUG_ON(IMX8M_RESET_MIPI_PHY_SRST != IMX7_RESET_MIPI_PHY_SRST);
-> +	BUILD_BUG_ON(IMX8M_RESET_PCIEPHY != IMX7_RESET_PCIEPHY);
-> +	BUILD_BUG_ON(IMX8M_RESET_PCIE_CTRL_APPS_EN !=
-> +		     IMX7_RESET_PCIE_CTRL_APPS_EN);
-> +	BUILD_BUG_ON(IMX8M_RESET_PCIE_CTRL_APPS_TURNOFF !=
-> +		     IMX7_RESET_PCIE_CTRL_APPS_TURNOFF);
-> +	BUILD_BUG_ON(IMX8M_RESET_DDRC_PRST != IMX7_RESET_DDRC_PRST);
-> +	BUILD_BUG_ON(IMX8M_RESET_DDRC_CORE_RST != IMX7_RESET_DDRC_CORE_RST);
-> +}
-
-This won't be necessary with a separate lookup table.
-
->  static struct imx7_src *to_imx7_src(struct reset_controller_dev *rcdev)
->  {
->  	return container_of(rcdev, struct imx7_src, rcdev);
-> @@ -85,6 +145,7 @@ static int imx7_reset_set(struct reset_controller_dev *rcdev,
->  	unsigned int value = assert ? signal->bit : 0;
->  
->  	switch (id) {
-> +	case IMX8M_RESET_PCIE2PHY: /* FALLTHROUGH */
-
-I'd prefer lowercase /* fallthrough */.
-
->  	case IMX7_RESET_PCIEPHY:
->  		/*
->  		 * wait for more than 10us to release phy g_rst and
-> @@ -94,6 +155,7 @@ static int imx7_reset_set(struct reset_controller_dev *rcdev,
->  			udelay(10);
->  		break;
->  
-> +	case IMX8M_RESET_PCIE2_CTRL_APPS_EN: /* FALLTHROUGH */
-
-And here.
-
->  	case IMX7_RESET_PCIE_CTRL_APPS_EN:
->  		value = (assert) ? 0 : signal->bit;
->  		break;
-> @@ -126,6 +188,8 @@ static int imx7_reset_probe(struct platform_device *pdev)
->  	struct device *dev = &pdev->dev;
->  	struct regmap_config config = { .name = "src" };
->  
-> +	imx7_src_check_definitions();
-> +
->  	imx7src = devm_kzalloc(dev, sizeof(*imx7src), GFP_KERNEL);
->  	if (!imx7src)
->  		return -ENOMEM;
-> diff --git a/include/dt-bindings/reset/imx7-reset.h b/include/dt-bindings/reset/imx7-reset.h
-> index 31b3f87dde9a..8fefd694d481 100644
-> --- a/include/dt-bindings/reset/imx7-reset.h
-> +++ b/include/dt-bindings/reset/imx7-reset.h
-> @@ -57,8 +57,21 @@
->  #define IMX7_RESET_DDRC_CORE_RST	24
->  
->  #define IMX7_RESET_PCIE_CTRL_APPS_TURNOFF 25
-> +#define IMX7_RESET_PCIE_CTRL_APPS_CLK_REQ 26
-
-See above.
-
-> -#define IMX7_RESET_NUM			26
-
-Please leave this at 26.
-
-> +#define	IMX8M_RESET_A53_CORE_POR_RESET2	27
-> +#define IMX8M_RESET_A53_CORE_POR_RESET3	28
-> +#define IMX8M_RESET_A53_CORE_RESET2	29
-> +#define	IMX8M_RESET_A53_CORE_RESET3	30
-> +#define IMX8M_RESET_A53_ETM_RESET2	31
-> +#define IMX8M_RESET_A53_ETM_RESET3	32
-> +#define IMX8M_RESET_PCIE2PHY		33
-> +#define IMX8M_RESET_PCIE2PHY_PERST	34
-> +#define IMX8M_RESET_PCIE2_CTRL_APPS_EN	35
-> +#define IMX8M_RESET_PCIE2_CTRL_APPS_CLK_REQ 36
-
-See above.
-
-> +#define IMX8M_RESET_PCIE2_CTRL_APPS_TURNOFF 37
-
-Move these into imx8m-reset.h
-
-> +
-> +#define IMX7_RESET_NUM			38
-
-And add a separate IMX8M_RESET_NUM.
-
+>> +
+>> +		reg_usb_otg_vbus: regulator at 0 {
+>> +			compatible = "regulator-fixed";
+>> +			reg = <0>;
 > 
->  #endif
->  
-> diff --git a/include/dt-bindings/reset/imx8m-reset.h b/include/dt-bindings/reset/imx8m-reset.h
-> new file mode 100644
-> index 000000000000..8fa840354723
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/imx8m-reset.h
-> @@ -0,0 +1,47 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (C) 2018 Zodiac Inflight Innovations
-> + *
-> + * Author: Andrey Smirnov <andrew.smirnov@gmail.com>
-> + */
-> +
-> +#ifndef DT_BINDING_RESET_IMX8M_H
-> +#define DT_BINDING_RESET_IMX8M_H
-> +
-> +#include "imx7-reset.h"
-> +
-> +#define IMX8M_RESET_A53_CORE_POR_RESET0 IMX7_RESET_A7_CORE_POR_RESET0
-> +#define IMX8M_RESET_A53_CORE_POR_RESET1 IMX7_RESET_A7_CORE_POR_RESET1
-> +
-> +#define IMX8M_RESET_A53_CORE_RESET0     IMX7_RESET_A7_CORE_RESET0
-> +#define IMX8M_RESET_A53_CORE_RESET1     IMX7_RESET_A7_CORE_RESET1
-> +
-> +#define IMX8M_RESET_A53_DBG_RESET0	IMX7_RESET_A7_DBG_RESET0
-> +#define IMX8M_RESET_A53_DBG_RESET1	IMX7_RESET_A7_DBG_RESET1
-> +
-> +#define IMX8M_RESET_A53_ETM_RESET0	IMX7_RESET_A7_ETM_RESET0
-> +#define IMX8M_RESET_A53_ETM_RESET1	IMX7_RESET_A7_ETM_RESET1
-> +
-> +#define IMX8M_RESET_A53_SOC_DBG_RESET   IMX7_RESET_A7_SOC_DBG_RESET
-> +#define IMX8M_RESET_A53_L2RESET         IMX7_RESET_A7_L2RESET
-> +#define IMX8M_RESET_SW_M4C_RST          IMX7_RESET_SW_M4C_RST
-> +#define IMX8M_RESET_SW_M4P_RST          IMX7_RESET_SW_M4P_RST
+> Dropping reg and unit-address in the process.
 
-> +#define IMX8M_RESET_EIM_RST             IMX7_RESET_EIM_RST
-> +#define IMX8M_RESET_HSICPHY_PORT_RST    IMX7_RESET_HSICPHY_PORT_RST
+OK, I will remove it.
 
-These two don't exist according to the reference manual.
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_usbotg_vbus>;
+>> +			regulator-name = "usb_otg_vbus";
+>> +			regulator-min-microvolt = <5000000>;
+>> +			regulator-max-microvolt = <5000000>;
+>> +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+>> +			enable-active-high;
+>> +			status = "okay";
+>> +		};
+>> +
+>> +		reg_usb_h1_vbus: regulator at 1 {
+>> +			compatible = "regulator-fixed";
+>> +			reg = <1>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_usbh1_vbus>;
+>> +			regulator-name = "usb_h1_vbus";
+>> +			regulator-min-microvolt = <5000000>;
+>> +			regulator-max-microvolt = <5000000>;
+>> +			gpio = <&gpio1 29 GPIO_ACTIVE_HIGH>;
+>> +			enable-active-high;
+>> +			status = "disabled";
+>> +		};
+>> +
+>> +		reg_pcie: regulator at 2 {
+>> +			compatible = "regulator-fixed";
+>> +			reg = <2>;
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&pinctrl_pcie_reg>;
+>> +			regulator-name = "MPCIE_3V3";
+>> +			regulator-min-microvolt = <3300000>;
+>> +			regulator-max-microvolt = <3300000>;
+>> +			gpio = <&gpio3 19 GPIO_ACTIVE_HIGH>;
+>> +			enable-active-high;
+>> +			status = "disabled";
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&fec {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_enet>;
+>> +	phy-mode = "rgmii-id";
+>> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_HIGH>;
+>> +	phy-reset-duration = <20>;
+>> +	phy-supply = <&sw2_reg>;
+>> +	phy-handle = <&ethphy0>;
+>> +	status = "okay";
+>> +
+>> +	mdio {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		phy_port2: phy at 1 {
+>> +			reg = <1>;
+>> +		};
+>> +
+>> +		phy_port3: phy at 2 {
+>> +			reg = <2>;
+>> +		};
+>> +
+>> +		switch at 0 {
+>> +			compatible = "qca,qca8334";
+>> +			reg = <0>;
+>> +
+>> +			switch_ports: ports {
+>> +				#address-cells = <1>;
+>> +				#size-cells = <0>;
+>> +
+>> +				ethphy0: port at 0 {
+>> +					reg = <0>;
+>> +					label = "cpu";
+>> +					phy-mode = "rgmii";
+>> +					ethernet = <&fec>;
+>> +					fixed-link {
+>> +						speed = <1000>;
+>> +						full-duplex;
+>> +					};
+>> +				};
+>> +
+>> +				port at 2 {
+>> +					reg = <2>;
+>> +					label = "eth2";
+>> +					phy-handle = <&phy_port2>;
+>> +				};
+>> +
+>> +				port at 3 {
+>> +					reg = <3>;
+>> +					label = "eth1";
+>> +					phy-handle = <&phy_port3>;
+>> +				};
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&i2c2 {
+>> +	clock-frequency = <100000>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c2>;
+>> +	status = "okay";
+>> +
+>> +	eeprom at 57 {
+>> +		compatible = "atmel,24c128";
+>> +		reg = <0x57>;
+>> +		pagesize = <64>;
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	leds: leds at 30 {
+> 
+> led-controller at ...
 
-> +#define IMX8M_RESET_USBPHY1_POR         IMX7_RESET_USBPHY1_POR
-> +#define IMX8M_RESET_USBPHY1_PORT_RST    IMX7_RESET_USBPHY1_PORT_RST
+OK.
 
-These two don't seem to exist either. I only see a single OTG1_PHY_RESET
-bit in that register.
+>> +		compatible = "ti,lp5562";
+>> +		label = "lp5562_leds";
+>> +		reg = <0x30>;
+>> +		clock-mode = /bits/ 8 <1>;
+>> +		status = "disabled";
+> 
+> Kind of strange to have these disables. I think disabled should mean
+> present in the h/w, but not used/enabled. Either this should be present
+> on all boards and enabled or be moved to the per board dts.
 
-> +#define IMX8M_RESET_USBPHY2_POR         IMX7_RESET_USBPHY2_POR
-> +#define IMX8M_RESET_USBPHY2_PORT_RST    IMX7_RESET_USBPHY2_PORT_RST
+Parts that are populated on all boards are enabled here. Parts that are
+populated only on some subset are disabled here and enabled in their
+appropriate dts files. I took this approach to avoid duplication and to
+make the maintenance easier.
 
-Same here.
+My rough guess is that at least 50% of the device nodes would be removed
+from this common file and put into each of the board files.
 
-> +#define IMX8M_RESET_MIPI_PHY_MRST       IMX7_RESET_MIPI_PHY_MRST
-> +#define IMX8M_RESET_MIPI_PHY_SRST       IMX7_RESET_MIPI_PHY_SRST
+Sure I can do it but it seems very prone to mistakes to me.
 
-These don't exist either. The MIPIPHY_RCR register instead has 5
-different _RESET_N bits.
+>> +
+>> +		chan0 {
+>> +			chan-name = "R";
+>> +			led-cur = /bits/ 8 <0x20>;
+>> +			max-cur = /bits/ 8 <0x60>;
+>> +		};
+>> +
+>> +		chan1 {
+>> +			chan-name = "G";
+>> +			led-cur = /bits/ 8 <0x20>;
+>> +			max-cur = /bits/ 8 <0x60>;
+>> +		};
+>> +
+>> +		chan2 {
+>> +			chan-name = "B";
+>> +			led-cur = /bits/ 8 <0x20>;
+>> +			max-cur = /bits/ 8 <0x60>;
+>> +		};
+>> +
+>> +		chan3 {
+>> +			chan-name = "W";
+>> +			led-cur = /bits/ 8 <0x0>;
+>> +			max-cur = /bits/ 8 <0x0>;
+>> +		};
+>> +	};
+>> +
+>> +	pfuze200 at 8 {
+> 
+> pmic at 8
 
-> +#define IMX8M_RESET_PCIEPHY             IMX7_RESET_PCIEPHY
-> +#define IMX8M_RESET_PCIEPHY_PERST	IMX7_RESET_PCIEPHY_PERST
-> +#define IMX8M_RESET_PCIE_CTRL_APPS_EN   IMX7_RESET_PCIE_CTRL_APPS_EN
-> +#define IMX8M_RESET_DDRC_PRST           IMX7_RESET_DDRC_PRST
-> +#define IMX8M_RESET_DDRC_CORE_RST       IMX7_RESET_DDRC_CORE_RST
-> +
-> +#define IMX8M_RESET_PCIE_CTRL_APPS_TURNOFF IMX7_RESET_PCIE_CTRL_APPS_TURNOFF
-> +#define IMX8M_RESET_PCIE_CTRL_APPS_CLK_REQ IMX7_RESET_PCIE_CTRL_APPS_CLK_REQ
-> +
-> +#endif
+OK.
 
+>> +		compatible = "fsl,pfuze200";
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_pmic>;
+>> +		reg = <0x8>;
+>> +
+>> +		regulators {
+>> +			sw1a_reg: sw1ab {
+>> +				regulator-min-microvolt = <300000>;
+>> +				regulator-max-microvolt = <1875000>;
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +				regulator-ramp-delay = <6250>;
+>> +			};
+>> +
+>> +			sw2_reg: sw2 {
+>> +				regulator-min-microvolt = <800000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			sw3a_reg: sw3a {
+>> +				regulator-min-microvolt = <400000>;
+>> +				regulator-max-microvolt = <1975000>;
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			sw3b_reg: sw3b {
+>> +				regulator-min-microvolt = <400000>;
+>> +				regulator-max-microvolt = <1975000>;
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			swbst_reg: swbst {
+>> +				regulator-min-microvolt = <5000000>;
+>> +				regulator-max-microvolt = <5150000>;
+>> +			};
+>> +
+>> +			snvs_reg: vsnvs {
+>> +				regulator-min-microvolt = <1000000>;
+>> +				regulator-max-microvolt = <3000000>;
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			vref_reg: vrefddr {
+>> +				regulator-boot-on;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			vgen1_reg: vgen1 {
+>> +				regulator-min-microvolt = <800000>;
+>> +				regulator-max-microvolt = <1550000>;
+>> +			};
+>> +
+>> +			vgen2_reg: vgen2 {
+>> +				regulator-min-microvolt = <800000>;
+>> +				regulator-max-microvolt = <1550000>;
+>> +			};
+>> +
+>> +			vgen3_reg: vgen3 {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			vgen4_reg: vgen4 {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			vgen5_reg: vgen5 {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-always-on;
+>> +			};
+>> +
+>> +			vgen6_reg: vgen6 {
+>> +				regulator-min-microvolt = <1800000>;
+>> +				regulator-max-microvolt = <3300000>;
+>> +				regulator-always-on;
+>> +			};
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&iomuxc {
+>> +	pinctrl_enet: enetgrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1B020
+>> +			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1B020
+>> +			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1B020
+>> +			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1B020
+>> +			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1B020
+>> +			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1B020
+>> +			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1B020
+>> +			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1B020
+>> +			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1B020
+>> +			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1B020
+>> +			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1B020
+>> +			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1B020
+>> +			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1B020
+>> +			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1B020
+>> +			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1B010
+>> +			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x1B010
+>> +			MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x1B098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_i2c2: i2c2grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_KEY_COL3__I2C2_SCL	0x4001b899
+>> +			MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b899
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_ipu1: ipu1grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK	0x10
+>> +			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02		0x10
+>> +			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03		0x10
+>> +			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00	0x10
+>> +			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01	0x10
+>> +			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02	0x10
+>> +			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03	0x10
+>> +			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04	0x10
+>> +			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05	0x10
+>> +			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06	0x10
+>> +			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07	0x10
+>> +			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08	0x10
+>> +			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09	0x10
+>> +			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10	0x10
+>> +			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11	0x10
+>> +			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12	0x10
+>> +			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13	0x10
+>> +			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14	0x10
+>> +			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15	0x10
+>> +			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16	0x10
+>> +			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17	0x10
+>> +			MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18	0x10
+>> +			MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19	0x10
+>> +			MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20	0x10
+>> +			MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21	0x10
+>> +			MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22	0x10
+>> +			MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23	0x10
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_pcie: pciegrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_GPIO_17__GPIO7_IO12		0x1b098
+>> +			MX6QDL_PAD_KEY_COL4__GPIO4_IO14		0x1b098
+>> +			MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x1b098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_pcie_reg: pciereggrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x1b098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_pmic: pmicgrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_GPIO_18__GPIO7_IO13		0x1b098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_backlight_pwm: pwm1grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_GPIO_9__PWM1_OUT	0x8
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_uart1: uart1grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0a8
+>> +			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0a8
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usbh1: usbh1grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_EIM_D30__USB_H1_OC		0x1b098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usbh1_vbus: usbh1-vbus {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_ENET_TXD1__GPIO1_IO29	0x98
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usbotg: usbotggrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x1b098
+>> +			MX6QDL_PAD_EIM_D21__USB_OTG_OC		0x1b098
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usbotg_vbus: usbotg-vbus {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x98
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usdhc3: usdhc3grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_EIM_A16__GPIO2_IO22	0x1b018
+>> +			MX6QDL_PAD_SD3_RST__GPIO7_IO08	0x1b018
+>> +			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
+>> +			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
+>> +			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
+>> +			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
+>> +			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
+>> +			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_usdhc4: usdhc4grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_SD4_CMD__SD4_CMD	0x1f069
+>> +			MX6QDL_PAD_SD4_CLK__SD4_CLK	0x10069
+>> +			MX6QDL_PAD_SD4_DAT0__SD4_DATA0	0x17069
+>> +			MX6QDL_PAD_SD4_DAT1__SD4_DATA1	0x17069
+>> +			MX6QDL_PAD_SD4_DAT2__SD4_DATA2	0x17069
+>> +			MX6QDL_PAD_SD4_DAT3__SD4_DATA3	0x17069
+>> +			MX6QDL_PAD_SD4_DAT4__SD4_DATA4	0x17069
+>> +			MX6QDL_PAD_SD4_DAT5__SD4_DATA5	0x17069
+>> +			MX6QDL_PAD_SD4_DAT6__SD4_DATA6	0x17069
+>> +			MX6QDL_PAD_SD4_DAT7__SD4_DATA7	0x17069
+>> +		>;
+>> +	};
+>> +
+>> +	pinctrl_wdog: wdoggrp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_GPIO_1__WDOG2_B	0x1b0b0
+>> +		>;
+>> +	};
+>> +};
+>> +
+>> +&ipu1_di0_disp0 {
+>> +	remote-endpoint = <&lcd_display_in>;
+>> +};
+>> +
+>> +&pcie {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pcie>;
+>> +	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
+>> +	vpcie-supply = <&reg_pcie>;
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&pwm1 {
+>> +	#pwm-cells = <3>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_backlight_pwm>;
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&uart1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_uart1>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbh1 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbh1>;
+>> +	vbus-supply = <&reg_usb_h1_vbus>;
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&usbotg {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbotg>;
+>> +	vbus-supply = <&reg_usb_otg_vbus>;
+>> +	srp-disable;
+>> +	hnp-disable;
+>> +	adp-disable;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbphy1 {
+>> +	fsl,tx-d-cal = <106>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbphy2 {
+>> +	fsl,tx-d-cal = <109>;
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&usdhc3 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc3>;
+>> +	bus-width = <4>;
+>> +	cd-gpios = <&gpio7 8 GPIO_ACTIVE_LOW>;
+>> +	wp-gpios = <&gpio2 22 GPIO_ACTIVE_HIGH>;
+>> +	no-1-8-v;
+>> +	keep-power-in-suspend;
+>> +	enable-sdio-wakeup;
+>> +	vmmc-supply = <&sw2_reg>;
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&usdhc4 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usdhc4>;
+>> +	bus-width = <8>;
+>> +	non-removable;
+>> +	no-1-8-v;
+>> +	keep-power-in-suspend;
+>> +	vmmc-supply = <&sw2_reg>;
+>> +	status = "okay";
+>> +};
+>> +
+>> +&wdog1 {
+>> +	status = "disabled";
+>> +};
+>> +
+>> +&wdog2 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_wdog>;
+>> +	fsl,ext-reset-output;
+>> +	status = "okay";
+>> +};
+>> diff --git a/arch/arm/boot/dts/imx6dl-yapp4-draco.dts b/arch/arm/boot/dts/imx6dl-yapp4-draco.dts
+>> new file mode 100644
+>> index 0000000..fb62f31
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-yapp4-draco.dts
+>> @@ -0,0 +1,57 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (C) 2015-2018 Y Soft Corporation, a.s.
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "imx6dl.dtsi"
+>> +#include "imx6dl-yapp4-common.dtsi"
+>> +
+>> +/ {
+>> +	model = "Y Soft IOTA Draco i.MX6Solo board";
+>> +	compatible = "ysoft,imx6dl-yapp4-draco", "fsl,imx6dl";
+> 
+> Is this documented?
 
-regards
-Philipp
+Just the vendor prefix, not the board names. If I am supposed to add
+those as well I would appreciate a hint what is the correct place to
+add it. My impression is that only evaluation boards from SoC vendors
+are documented.
+
+Thank you,
+Michal
+
+>> +
+>> +	cpus {
+>> +		/delete-node/ cpu at 1;
+>> +	};
+>> +
+>> +	memory at 10000000 {
+>> +		reg = <0x10000000 0x20000000>;
+>> +	};
+>> +};
+>> +
+>> +&backlight {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&lcd_display {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&leds {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&panel {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pwm1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_usb_h1_vbus {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbh1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbphy2 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usdhc3 {
+>> +	status = "okay";
+>> +};
+>> diff --git a/arch/arm/boot/dts/imx6dl-yapp4-hydra.dts b/arch/arm/boot/dts/imx6dl-yapp4-hydra.dts
+>> new file mode 100644
+>> index 0000000..799fb4c
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-yapp4-hydra.dts
+>> @@ -0,0 +1,33 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (C) 2015-2018 Y Soft Corporation, a.s.
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "imx6dl.dtsi"
+>> +#include "imx6dl-yapp4-common.dtsi"
+>> +
+>> +/ {
+>> +	model = "Y Soft IOTA Hydra i.MX6DualLite board";
+>> +	compatible = "ysoft,imx6dl-yapp4-hydra", "fsl,imx6dl";
+>> +
+>> +	memory at 10000000 {
+>> +		reg = <0x10000000 0x80000000>;
+>> +	};
+>> +};
+>> +
+>> +&leds {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pcie {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_pcie {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usdhc3 {
+>> +	status = "okay";
+>> +};
+>> diff --git a/arch/arm/boot/dts/imx6dl-yapp4-ursa.dts b/arch/arm/boot/dts/imx6dl-yapp4-ursa.dts
+>> new file mode 100644
+>> index 0000000..23af972
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/imx6dl-yapp4-ursa.dts
+>> @@ -0,0 +1,53 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +//
+>> +// Copyright (C) 2015-2018 Y Soft Corporation, a.s.
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "imx6dl.dtsi"
+>> +#include "imx6dl-yapp4-common.dtsi"
+>> +
+>> +/ {
+>> +	model = "Y Soft IOTA Ursa i.MX6Solo board";
+>> +	compatible = "ysoft,imx6dl-yapp4-ursa", "fsl,imx6dl";
+>> +
+>> +	cpus {
+>> +		/delete-node/ cpu at 1;
+>> +	};
+>> +
+>> +	memory at 10000000 {
+>> +		reg = <0x10000000 0x20000000>;
+>> +	};
+>> +};
+>> +
+>> +&backlight {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&lcd_display {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&panel {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&pwm1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&reg_usb_h1_vbus {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&switch_ports {
+>> +	/delete-node/ port at 2;
+>> +};
+>> +
+>> +&usbh1 {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbphy2 {
+>> +	status = "okay";
+>> +};
+>> -- 
+>> 2.1.4
+>>
