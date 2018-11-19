@@ -1,40 +1,38 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 19 Nov 2018 22:39:33 +0530
-Subject: [PATCH 10/16] dt-bindings: timer: Document RDA8810PL SoC timer
+Date: Mon, 19 Nov 2018 22:39:34 +0530
+Subject: [PATCH 11/16] arm: dts: rda8810pl: Add timer support
 In-Reply-To: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
 References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181119170939.19153-11-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181119170939.19153-12-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document RDA Micro RDA8810PL SoC timer.
+Add timer support for RDA Micro RDA8810PL SoC.
 
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- .../bindings/timer/rda,8810pl-timer.txt       | 21 +++++++++++++++++++
- 1 file changed, 21 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
+ arch/arm/boot/dts/rda8810pl.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt b/Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
-new file mode 100644
-index 000000000000..06cc2b00be12
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
-@@ -0,0 +1,21 @@
-+RDA Micro RDA8810PL Timer
+diff --git a/arch/arm/boot/dts/rda8810pl.dtsi b/arch/arm/boot/dts/rda8810pl.dtsi
+index 093d6980bfbd..470a18585deb 100644
+--- a/arch/arm/boot/dts/rda8810pl.dtsi
++++ b/arch/arm/boot/dts/rda8810pl.dtsi
+@@ -7,6 +7,8 @@
+  * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ 
++#include <dt-bindings/interrupt-controller/irq.h>
 +
-+Required properties:
-+- compatible      :  "rda,8810pl-timer"
-+- reg             :  Offset and length of the register set for the device.
-+- interrupts      :  Should contain the interrupts.
-+- interrupt-names :  Valid names are: "hwtimer", "ostimer".
-+                     See ../resource-names.txt
+ / {
+ 	compatible = "rda,8810pl";
+ 	interrupt-parent = <&intc>;
+@@ -65,6 +67,14 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			ranges = <0x0 0x20900000 0x100000>;
 +
-+Example:
-+
-+		apb at 20900000 {
-+			compatible = "simple-bus";
-+			...
 +			timer at 10000 {
 +				compatible = "rda,8810pl-timer";
 +				reg = <0x10000 0x1000>;
@@ -42,5 +40,8 @@ index 000000000000..06cc2b00be12
 +					     <17 IRQ_TYPE_LEVEL_HIGH>;
 +				interrupt-names = "hwtimer", "ostimer";
 +			};
+ 		};
+ 
+ 		apb at 20a00000 {
 -- 
 2.17.1
