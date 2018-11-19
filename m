@@ -1,56 +1,133 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 20 Nov 2018 00:15:17 +0100
-Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto API
- code
-In-Reply-To: <20181119225414.GB258711@gmail.com>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
- <20181119225414.GB258711@gmail.com>
-Message-ID: <CAHmME9okRjuYUiL0D=6ZmtMX6rvxU+0xvy2tva+LetjU9itx8Q@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 19 Nov 2018 16:22:02 -0700
+Subject: [PATCH v2 2/2] perf cs-etm: Add support sample flags
+In-Reply-To: <1541912876-20967-3-git-send-email-leo.yan@linaro.org>
+References: <1541912876-20967-1-git-send-email-leo.yan@linaro.org>
+ <1541912876-20967-3-git-send-email-leo.yan@linaro.org>
+Message-ID: <20181119232202.GA7001@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Sun, Nov 11, 2018 at 01:07:56PM +0800, Leo Yan wrote:
+> We have prepared the flags in the packet structure, so need to copy
+> the related value into sample structure thus perf tool can facilitate
+> sample flags.
+> 
+> The PREV_PACKET contains the branch instruction flags and PACKET
+> actually contains the flags for next branch instruction.  So this patch
+> is to set sample flags with 'etmq->prev_packet->flags'.
+> 
+> This patch includes three fixing up for sample flags based on the
+> packets context:
+> 
+> - If the packet is exception packet or exception return packet, update
+>   the previous packet for exception specific flags;
+> - If there has TRACE_ON or TRACE_OFF packet in the middle of instruction
+>   packets, this indicates the trace is discontinuous, so append the flag
+>   PERF_IP_FLAG_TRACE_END to the previous packet to indicate the trace
+>   has been ended;
+> - If one instruction packet is behind TRACE_OFF packet, this instruction
+>   is restarting trace packet.  So set flag PERF_IP_FLAG_TRACE_START to
+>   TRACE_OFF packet if one, this flag isn't used by TRACE_OFF packet but
+>   used to indicate trace restarting when generate sample.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  tools/perf/util/cs-etm.c | 43 +++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 41 insertions(+), 2 deletions(-)
+> 
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index 455f132..afca6f3 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -676,7 +676,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
+>  	sample.stream_id = etmq->etm->instructions_id;
+>  	sample.period = period;
+>  	sample.cpu = etmq->packet->cpu;
+> -	sample.flags = 0;
+> +	sample.flags = etmq->prev_packet->flags;
+>  	sample.insn_len = 1;
+>  	sample.cpumode = event->sample.header.misc;
+>  
+> @@ -735,7 +735,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
+>  	sample.stream_id = etmq->etm->branches_id;
+>  	sample.period = 1;
+>  	sample.cpu = etmq->packet->cpu;
+> -	sample.flags = 0;
+> +	sample.flags = etmq->prev_packet->flags;
+>  	sample.cpumode = event->sample.header.misc;
+>  
+>  	/*
+> @@ -878,6 +878,43 @@ static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
+>  	return 0;
+>  }
+>  
+> +static void cs_etm__fixup_flags(struct cs_etm_queue *etmq)
+> +{
+> +	/*
+> +	 * Decoding stream might insert one TRACE_OFF packet in the
+> +	 * middle of instruction packets, this means it doesn't
+> +	 * contain the pair packets with TRACE_OFF and TRACE_ON.
+> +	 * For this case, the instruction packet follows with
+> +	 * TRACE_OFF packet so we need to fixup prev_packet with flag
+> +	 * PERF_IP_FLAG_TRACE_BEGIN, this flag finally is used by the
+> +	 * instruction packet to generate samples.
+> +	 */
+> +	if (etmq->prev_packet->sample_type == CS_ETM_TRACE_OFF &&
+> +	    etmq->packet->sample_type == CS_ETM_RANGE)
+> +		etmq->prev_packet->flags = PERF_IP_FLAG_BRANCH |
+> +					   PERF_IP_FLAG_TRACE_BEGIN;
+> +
+> +	if (etmq->prev_packet->sample_type == CS_ETM_RANGE) {
+> +		/*
+> +		 * When the exception packet is inserted, update flags
+> +		 * so tell perf it is exception related branches.
+> +		 */
+> +		if (etmq->packet->sample_type == CS_ETM_EXCEPTION ||
+> +		    etmq->packet->sample_type == CS_ETM_EXCEPTION_RET)
+> +			etmq->prev_packet->flags = etmq->packet->flags;
+> +
+> +		/*
+> +		 * The trace is discontinuous, weather this is caused by
+> +		 * TRACE_ON packet or TRACE_OFF packet is coming, if the
+> +		 * previous packet is instruction packet, simply set flag
+> +		 * PERF_IP_FLAG_TRACE_END for previous packet.
+> +		 */
+> +		if (etmq->packet->sample_type == CS_ETM_TRACE_ON ||
+> +		    etmq->packet->sample_type == CS_ETM_TRACE_OFF)
+> +			etmq->prev_packet->flags |= PERF_IP_FLAG_TRACE_END;
+> +	}
+> +}
+> +
 
-On Mon, Nov 19, 2018 at 11:54 PM Eric Biggers <ebiggers@kernel.org> wrote:
-> Will v9 include a documentation file for Zinc in Documentation/crypto/?
-> That's been suggested several times.
+I think it would be better to keep all the flag related processing in
+cs-etm-decoder.c so that things in cs-etm.c are only concered with dealing with
+perf.
 
-I had started writing that there, but then thought that the requested
-information could go in the commit message instead. But I'm guessing
-you're asking again now because you poked into the repo and didn't
-find the Documentation/, so presumably you still want it. I can
-reorganize the presentation of that to be more suitable for
-Documentation/, and I'll have that for v9.
+Look at function cs_etm__alloc_queue(), there you'll find "d_params.data = etmq".
 
-> I'd still prefer to see the conversion patches included.  Skipping them would be
-> kicking the can down the road and avoiding issues that will need to be addressed
-> anyway.  Like you, I don't want a "half-baked concoction that will be maybe
-> possibly be replaced 'later'" :-)
+In function cs_etm_decoder__new(), decoder->data = d_params->data;
 
-Okay, fair enough. Will do.
-
-> Either way though, it would make things much easier if you at least named the
-> files, structures, constants, etc. "ChaCha" rather than "ChaCha20" from the
-> start where appropriate.  For an example, see the commit "crypto: chacha -
-> prepare for supporting non-20-round variants" on my "adiantum-zinc" branch:
-> https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git/commit/?h=adiantum-zinc&id=754af8d7d39f31238114426e39786c84d7cc0f98
-> Then the actual introduction of the 12-round variant is much less noisy.
-
-That's a good idea. I'll do it like that. I'll likely order it as what
-we have now (renamed to omit the 20), and then put the 12 stuff on top
-of that, so it's easier to see what's changed in the process. I
-noticed in that branch, you didn't port the assembly to support fewer
-rounds. Shall I follow suite, and then expect patches from you later
-doing that? Or were you expecting me to also port the architecture
-implementations to chacha12 as well?
+This means that anywhere you have a decoder, decoder->data is an etmq.  I've
+used this profusely in my work on CPU-wide trace scenarios.  Because you're
+getting there ahead of me you'll need to fix the declaration of struct
+cs_etm_queue but that's easy.
 
 Regards,
-Jason
+Mathieu 
+
+>  static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  {
+>  	struct cs_etm_auxtrace *etm = etmq->etm;
+> @@ -1100,6 +1137,8 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+>  					 */
+>  					break;
+>  
+> +				cs_etm__fixup_flags(etmq);
+> +
+>  				switch (etmq->packet->sample_type) {
+>  				case CS_ETM_RANGE:
+>  					/*
+> -- 
+> 2.7.4
+> 
