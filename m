@@ -1,135 +1,47 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 19 Nov 2018 17:07:58 +0000
-Subject: [PATCH 3/4] KVM: arm/arm64: vgic: Make vgic_dist->lpi_list_lock a
- raw_spinlock
-In-Reply-To: <1542647279-46609-1-git-send-email-julien.thierry@arm.com>
-References: <1542647279-46609-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1542647279-46609-4-git-send-email-julien.thierry@arm.com>
+Date: Mon, 19 Nov 2018 17:07:55 +0000
+Subject: [PATCH 0/4] KVM: arm/arm64: vgic: Use raw_spinlock for locks taken in
+ IRQ context
+Message-ID: <1542647279-46609-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic_dist->lpi_list_lock must always be taken with interrupts disabled as
-it is used in interrupt context.
+While testing KVM running on PREEMPT_RT, starting guest could simply
+freeze the machine. This is because we are using spinlocks for VGIC
+locks, which is invalid in the VGIC case since the locks must be take
+with interrupts disabled.
 
-For configurations such as PREEMPT_RT_FULL, this means that it should
-be a raw_spinlock since RT spinlocks are interruptible.
+The solution is to use raw_spinlock instead of spinlocks.
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Christoffer Dall <christoffer.dall@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h        |  2 +-
- virt/kvm/arm/vgic/vgic-init.c |  2 +-
- virt/kvm/arm/vgic/vgic-its.c  |  8 ++++----
- virt/kvm/arm/vgic/vgic.c      | 10 +++++-----
- 4 files changed, 11 insertions(+), 11 deletions(-)
+Replacing those locks also highlighted an issue where we attempt to
+cond_resched with interrupts disabled.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index b542605..32954e1 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -256,7 +256,7 @@ struct vgic_dist {
- 	u64			propbaser;
+Patch 1 fixes the cond_resched issue.
+Patch 2-4 replace the VGIC spinlocks with raw_spinlocks
 
- 	/* Protects the lpi_list and the count value below. */
--	spinlock_t		lpi_list_lock;
-+	raw_spinlock_t		lpi_list_lock;
- 	struct list_head	lpi_list_head;
- 	int			lpi_list_count;
+Cheers,
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 1128e97..330c1ad 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -64,7 +64,7 @@ void kvm_vgic_early_init(struct kvm *kvm)
- 	struct vgic_dist *dist = &kvm->arch.vgic;
+Julien
 
- 	INIT_LIST_HEAD(&dist->lpi_list_head);
--	spin_lock_init(&dist->lpi_list_lock);
-+	raw_spin_lock_init(&dist->lpi_list_lock);
- }
+-->
 
- /* CREATION */
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 911ba61..ab3f477 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -73,7 +73,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	irq->target_vcpu = vcpu;
- 	irq->group = 1;
+Julien Thierry (4):
+  KVM: arm/arm64: vgic: Do not cond_resched_lock() with IRQs disabled
+  KVM: arm/arm64: vgic: Make vgic_irq->irq_lock a raw_spinlock
+  KVM: arm/arm64: vgic: Make vgic_dist->lpi_list_lock a raw_spinlock
+  KVM: arm/arm64: vgic: Make vgic_cpu->ap_list_lock a raw_spinlock
 
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
+ include/kvm/arm_vgic.h           |   6 +-
+ virt/kvm/arm/vgic/vgic-debug.c   |   4 +-
+ virt/kvm/arm/vgic/vgic-init.c    |   8 +--
+ virt/kvm/arm/vgic/vgic-its.c     |  22 +++----
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  14 ++---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |  12 ++--
+ virt/kvm/arm/vgic/vgic-mmio.c    |  67 +++++++++-----------
+ virt/kvm/arm/vgic/vgic-v2.c      |   4 +-
+ virt/kvm/arm/vgic/vgic-v3.c      |   8 +--
+ virt/kvm/arm/vgic/vgic.c         | 130 +++++++++++++++++++--------------------
+ 10 files changed, 132 insertions(+), 143 deletions(-)
 
- 	/*
- 	 * There could be a race with another vgic_add_lpi(), so we need to
-@@ -101,7 +101,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	dist->lpi_list_count++;
-
- out_unlock:
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-
- 	/*
- 	 * We "cache" the configuration table entries in our struct vgic_irq's.
-@@ -332,7 +332,7 @@ int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 	if (!intids)
- 		return -ENOMEM;
-
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
- 		if (i == irq_count)
- 			break;
-@@ -341,7 +341,7 @@ int vgic_copy_lpi_list(struct kvm *kvm, struct kvm_vcpu *vcpu, u32 **intid_ptr)
- 			continue;
- 		intids[i++] = irq->intid;
- 	}
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-
- 	*intid_ptr = intids;
- 	return i;
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index aab8dba..01bd18c 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -72,7 +72,7 @@ static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
- 	struct vgic_irq *irq = NULL;
- 	unsigned long flags;
-
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
-
- 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
- 		if (irq->intid != intid)
-@@ -88,7 +88,7 @@ static struct vgic_irq *vgic_get_lpi(struct kvm *kvm, u32 intid)
- 	irq = NULL;
-
- out_unlock:
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-
- 	return irq;
- }
-@@ -138,15 +138,15 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- 	if (irq->intid < VGIC_MIN_LPI)
- 		return;
-
--	spin_lock_irqsave(&dist->lpi_list_lock, flags);
-+	raw_spin_lock_irqsave(&dist->lpi_list_lock, flags);
- 	if (!kref_put(&irq->refcount, vgic_irq_release)) {
--		spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+		raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
- 		return;
- 	};
-
- 	list_del(&irq->lpi_list);
- 	dist->lpi_list_count--;
--	spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-+	raw_spin_unlock_irqrestore(&dist->lpi_list_lock, flags);
-
- 	kfree(irq);
- }
 --
 1.9.1
