@@ -1,96 +1,42 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 19 Nov 2018 21:12:26 +0100
-Subject: [PATCH v5 1/2] dt-bindings: PCI: meson: add DT bindings for
- Amlogic Meson PCIe controller
-In-Reply-To: <1539049990-30810-2-git-send-email-hanjie.lin@amlogic.com>
-References: <1539049990-30810-1-git-send-email-hanjie.lin@amlogic.com>
- <1539049990-30810-2-git-send-email-hanjie.lin@amlogic.com>
-Message-ID: <CAFBinCCChD-phwyb3hSzAjBmy09g35ijQa_chJX5HufuVnPjaw@mail.gmail.com>
+From: aford173@gmail.com (Adam Ford)
+Date: Mon, 19 Nov 2018 14:29:15 -0600
+Subject: [PATCH] Support RTC charging on PFUZE100
+In-Reply-To: <20181114222528.GE2089@sirena.org.uk>
+References: <20181030143718.10027-1-aford173@gmail.com>
+ <20181114222528.GE2089@sirena.org.uk>
+Message-ID: <CAHCN7xJMu0nwCKfRMVEQTkYRRx6z9h44-NdAgeD403D195SuaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hanjie, Hello Yue,
-
-sorry for being late with my comment
-
-On Tue, Oct 9, 2018 at 3:53 AM Hanjie Lin <hanjie.lin@amlogic.com> wrote:
+On Wed, Nov 14, 2018 at 4:25 PM Mark Brown <broonie@kernel.org> wrote:
 >
-> From: Yue Wang <yue.wang@amlogic.com>
+> On Tue, Oct 30, 2018 at 09:37:18AM -0500, Adam Ford wrote:
+> >
+> > diff --git a/arch/arm/boot/dts/imx6-logicpd-som.dtsi b/arch/arm/boot/dts/imx6-logicpd-som.dtsi
+> > index 1e5dcac70045..74ab5d65106b 100755
+> > --- a/arch/arm/boot/dts/imx6-logicpd-som.dtsi
+> > +++ b/arch/arm/boot/dts/imx6-logicpd-som.dtsi
 >
-> The Amlogic Meson PCIe host controller is based on the Synopsys DesignWare
-> PCI core. This patch adds documentation for the DT bindings in Meson PCIe
-> controller.
+> > diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
+> > index 659e516455be..bdef74077d1c 100644
+> > --- a/drivers/regulator/pfuze100-regulator.c
+> > +++ b/drivers/regulator/pfuze100-regulator.c
 >
-> Signed-off-by: Yue Wang <yue.wang@amlogic.com>
-> Signed-off-by: Hanjie Lin <hanjie.lin@amlogic.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/pci/amlogic,meson-pcie.txt | 70 ++++++++++++++++++++++
->  1 file changed, 70 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
->
-> diff --git a/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
-> new file mode 100644
-> index 0000000..12b18f8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/amlogic,meson-pcie.txt
-> @@ -0,0 +1,70 @@
-> +Amlogic Meson AXG DWC PCIE SoC controller
-> +
-> +Amlogic Meson PCIe host controller is based on the Synopsys DesignWare PCI core.
-> +It shares common functions with the PCIe DesignWare core driver and
-> +inherits common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pci.txt.
-> +
-> +Additional properties are described here:
-> +
-> +Required properties:
-> +- compatible:
-> +       should contain "amlogic,axg-pcie" to identify the core.
-> +- reg:
-> +       should contain the configuration address space.
-> +- reg-names: Must be
-> +       - "elbi"        External local bus interface registers
-> +       - "cfg"         Meson specific registers
-> +       - "phy"         Meson PCIE PHY registers
-is this only the PCIe PHY registers or is it the registers of the PHY
-which supports USB3.0 and PCIe?
-buildroot_openlinux_kernel_4.9_fbdev_20180706 uses the following
-registers in the pcie_A node for the "phy" registers:
-0x0 0xff646000 0x0 0x2000
-while the usb3_phy_v2 node uses:
-phy-reg = <0xff646000>;
+> Please follow the patch submission process covered in
+> submitting-patchest.rst.  You've not included a Signed-off-by which is
+> essential for legal reasons as covered in there and this is a single
+> patch which mixes a DT change and a regulator driver change which should
+> be in separate patches.
 
-> +       - "config"      PCIe configuration space
-> +- reset-gpios: The GPIO to generate PCIe PERST# assert and deassert signal.
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +- clock-names: Must include the following entries:
-> +       - "pclk"       PCIe GEN 100M PLL clock
-> +       - "port"       PCIe_x(A or B) RC clock gate
-> +       - "general"    PCIe Phy clock
-> +       - "mipi"       PCIe_x(A or B) 100M ref clock gate
-> +- resets: phandle to the reset lines.
-> +- reset-names: must contain "phy" "port" and "apb"
-> +       - "phy"         Share PHY reset
-> +       - "port"        Port A or B reset
-> +       - "apb"         Share APB reset
-> +- device_type:
-> +       should be "pci". As specified in designware-pcie.txt
-> +
-> +
-> +Example configuration:
-> +
-> +       pcie: pcie at f9800000 {
-> +                       compatible = "amlogic,axg-pcie", "snps,dw-pcie";
-> +                       reg = <0x0 0xf9800000 0x0 0x400000
-> +                                       0x0 0xff646000 0x0 0x2000
-> +                                       0x0 0xff644000 0x0 0x2000
-> +                                       0x0 0xf9f00000 0x0 0x100000>;
-> +                       reg-names = "elbi", "cfg", "phy", "config";
-is the order of the reg-names correct?
-buildroot_openlinux_kernel_4.9_fbdev_20180706 uses 0xff646000 for the
-PHY (instead of 0xff646000) in mesong12a.dtsi and mesong12b.dtsi
+Mark,
 
+I think you're looking at the V1 patch.  This was replaced by a V2
+patch:  https://patchwork.kernel.org/patch/10661227/
 
-Regards
-Martin
+It should have a S-o-b line.  I know I sent it to the wrong mailing
+list (per your other e-mail to me) , so if you want it re-mailed, I
+can do that.
+
+thank you,
+
+adam
