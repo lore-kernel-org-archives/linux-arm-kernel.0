@@ -1,87 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Nov 2018 09:10:20 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <201811171058376326562@zte.com.cn>
-References: <851b61b1-786b-ef64-b8c4-fe6926bdf9f9@arm.com>
- <201811171058376326562@zte.com.cn>
-Message-ID: <20181119091020.ejplmzkzo4jd72md@salmiak>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Mon, 19 Nov 2018 10:11:23 +0100
+Subject: [PATCH 0/3] ARM: davinci: fix ethernet support on da850-evm
+In-Reply-To: <CACRpkda4aarCn=PHPSWfMgtOZhcGA2ifcA7_ujYgmj+do2+N+Q@mail.gmail.com>
+References: <20181113135051.15308-1-brgl@bgdev.pl>
+ <CACRpkda4aarCn=PHPSWfMgtOZhcGA2ifcA7_ujYgmj+do2+N+Q@mail.gmail.com>
+Message-ID: <CAMRc=MeAR=aW0FKNyRm0xy075BkF=cpDJyJDiwtWpWcmkdmF2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
-> >On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
-> >>> Hi,
-> >>>> When virtual machine starts, hang up.
-> >>>
-> >>> I take it you mean the *guest* hangs? Because it doesn't get a timer
-> >>> interrupt?
-> >>>
-> >>>> The kernel version of guest
-> >>>> is 4.16. Host support vgic_v3.
-> >>>
-> >>> Your host kernel is something recent, I guess?
-> >>>
-> >>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
-> >>>> during injection interruption. when kvm_vgic_vcpu_init is called,
-> >>>> dist is not initialized at this time. Unable to get vgic V3 or V2
-> >>>> correctly, so group is not set.
-> >>>
-> >>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
-> >>> version?) or some other userland tool?
-> >>>
-> >>
-> >> QEMU emulator version 3.0.50 .
-> >>
-> >>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
-> >>>> time.
-> >>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-> >>>> interrupt injection failed.
-> >>>>
-> >>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> >>>> ---
-> >>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
-> >>>>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> >>>> index 9c0dd23..d101000 100644
-> >>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> >>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> >>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
-> >>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
-> >>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
-> >>>>
-> >>>> -    if (irq->group)
-> >>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> >>>
-> >>> This is not the right fix, not only because it basically reverts the
-> >>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
-> >>> their configured group).
-> >>>
-> >>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
-> >>> before dist->vgic_model is set, also what value it has?
-> >>> If I understand the code correctly, that shouldn't happen for a GICv3.
-> >>>
-> >> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
-> >>   If the interrupt comes at this time, the interrupt injection fails.
+pt., 16 lis 2018 o 22:51 Linus Walleij <linus.walleij@linaro.org> napisa?(a):
+>
+> On Tue, Nov 13, 2018 at 2:51 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
+>
+> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > >
-> >Does that mean that the guest is configuring its interrupts as Group0?
-> >That sounds wrong, Linux should configure all it's interrupts as
-> >non-secure group1.
-> 
-> no, I think that uefi dose this, not linux.
-> 1. kvm_vgic_vcpu_init 
-> 2. vgic_create 
-> 3. kvm_vgic_dist_init 
-> 4.vgic_mmio_write_group: uefi as guest, write group=0
-> 5.vgic_mmio_write_group: linux as guest, write group=1
+> > Ethernet doesn't work on da850-evm in legacy boot mode since v4.19. This
+> > series addresses two problems I've found. I guess with this kind of
+> > intrusive changes in the GPIO driver, other boards may be broken at the
+> > moment too.
+> >
+> > Bartosz Golaszewski (3):
+> >   ARM: davinci: define gpio interrupts as separate resources
+> >   gpio: davinci: restore a way to manually specify the GPIO base
+> >   ARM: davinci: fix da850-evm boot in legacy mode
+>
+> I have some patches starting to move DaVinci over to using only
+> descriptor tables, but that's not somthing we can pull off overnight
+> so I guess we have to go for this solution.
+>
 
-Is this the same issue fixed by EDK2 commit:
+Nice, would you mind sharing the development branch? I'm interested in
+it as well and may be doing some work on that early 2019 so let's sync
+to avoid duplicating the effort.
 
-66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+Bart
 
-... where EDK2 would try to use IAR0 rather than IAR1?
-
-The commit messages notes this lead to a boot-time hang.
-
-Thanks,
-Mark.
+> Can we have ACKs from the DaVinci maintainers so I can merge
+> all three patches through the GPIO tree fixes? Else I'm fine
+> with merging through ARM SoC.
+>
+> Yours,
+> Linus Walleij
