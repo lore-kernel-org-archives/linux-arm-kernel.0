@@ -1,142 +1,158 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 19 Nov 2018 12:25:58 -0600
-Subject: [PATCH 04/16] arm: dts: Add devicetree for RDA8810PL SoC
-In-Reply-To: <20181119170939.19153-5-manivannan.sadhasivam@linaro.org>
-References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
- <20181119170939.19153-5-manivannan.sadhasivam@linaro.org>
-Message-ID: <CAL_JsqLf_9ryCUtUkkE6P4GS8tC7nQ0pLHwLCQzy_HLJNTNMrw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 19 Nov 2018 11:27:59 -0700
+Subject: [PATCH v1 3/5] perf cs-etm: Support for NO_SYNC packet
+In-Reply-To: <1541912383-19915-4-git-send-email-leo.yan@linaro.org>
+References: <1541912383-19915-1-git-send-email-leo.yan@linaro.org>
+ <1541912383-19915-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <20181119182759.GA608@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 11:11 AM Manivannan Sadhasivam
-<manivannan.sadhasivam@linaro.org> wrote:
->
-> Add initial device tree for RDA8810PL SoC from RDA Microelectronics.
->
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+On Sun, Nov 11, 2018 at 12:59:41PM +0800, Leo Yan wrote:
+> As described in OpenCSD (CoreSight decoder lib), in the decoding stream
+> it includes one trace element with type OCSD_GEN_TRC_ELEM_NO_SYNC; the
+> element indicates 'either at start of decode, or after overflow / bad
+> packet', we should take it as a signal for the tracing off and this will
+> cause tracing discontinuity.  From the trace dump with 'perf script',
+> sometimes the element OCSD_GEN_TRC_ELEM_NO_SYNC collaborates with
+> element OCSD_GEN_TRC_ELEM_TRACE_ON to show the tracing flow have been
+> turned off and on, in this case the cs-etm code has handled TRACE_ON
+> packet well so we observe the tracing discontinuity; but in another case
+> it only inserts the element OCSD_GEN_TRC_ELEM_NO_SYNC into instructions
+> packets, we miss to handle the case if has only standalone NO_SYNC
+> element and users cannot receive the info for tracing discontinuity.
+> 
+> This patch introduces new type CS_ETM_TRACE_OFF to generate packet for
+> receiving element OCSD_GEN_TRC_ELEM_NO_SYNC from decoder; when generate
+> sample, CS_ETM_TRACE_OFF packet has almost the same behaviour with
+
+Here you have used the word "almost", leading me to beleive there are cases
+where the handling of TRACE_ON and NO_SYNC packets differ, but the
+implementation enacts the same behavior for both.
+
+Mike or Robert, can you confirm that TRACE_ON and NO_SYNC packets should be
+treated the same way?
+
+Leo, if handling of the TRACE_ON and NO_SYNC packets is the same then we should
+treat them the same way in cs_etm_decoder__gen_trace_elem_printer(), i.e simply
+call cs_etm_decoder__buffer_trace_on().  That way packet handling in cs-etm.c
+doesn't change.  Otherwise see my comments below.
+
+> CS_ETM_TRACE_ON packet: both of them invokes cs_etm__flush() to generate
+> samples for the previous instructions packet, and in cs_etm__sample() it
+> also needs to generate samples if TRACE_OFF packet is followed by one
+> sequential instructions packet.  This patch also converts the address to
+> 0 for TRACE_OFF packet, this is same with TRACE_ON packet as well.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
 > ---
->  arch/arm/boot/dts/rda8810pl.dtsi | 95 ++++++++++++++++++++++++++++++++
->  1 file changed, 95 insertions(+)
->  create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
->
-> diff --git a/arch/arm/boot/dts/rda8810pl.dtsi b/arch/arm/boot/dts/rda8810pl.dtsi
-> new file mode 100644
-> index 000000000000..7f1ff2021eff
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rda8810pl.dtsi
-> @@ -0,0 +1,95 @@
-> +/*
-> + * RDA8810PL SoC
-> + *
-> + * Copyright (c) 2017 Andreas F?rber
-> + * Copyright (c) 2018 Manivannan Sadhasivam
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 10 ++++++++++
+>  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h |  7 ++++---
+>  tools/perf/util/cs-etm.c                        | 15 +++++++++++----
+>  3 files changed, 25 insertions(+), 7 deletions(-)
+> 
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> index 5efb616..9d52727 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+> @@ -369,6 +369,14 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+>  }
+>  
+>  static ocsd_datapath_resp_t
+> +cs_etm_decoder__buffer_trace_off(struct cs_etm_decoder *decoder,
+> +				 const uint8_t trace_chan_id)
+> +{
+> +	return cs_etm_decoder__buffer_packet(decoder, trace_chan_id,
+> +					     CS_ETM_TRACE_OFF);
+> +}
+> +
+> +static ocsd_datapath_resp_t
+>  cs_etm_decoder__buffer_trace_on(struct cs_etm_decoder *decoder,
+>  				const uint8_t trace_chan_id)
+>  {
+> @@ -389,6 +397,8 @@ static ocsd_datapath_resp_t cs_etm_decoder__gen_trace_elem_printer(
+>  	case OCSD_GEN_TRC_ELEM_UNKNOWN:
+>  		break;
+>  	case OCSD_GEN_TRC_ELEM_NO_SYNC:
+> +		resp = cs_etm_decoder__buffer_trace_off(decoder,
+> +							trace_chan_id);
 
-Goes on 1st line. checkpatch.pl will tell you this.
+If we want to handle NO_SYNC element types, why introduce a "trace_off"
+function?  Wouldn't it make more sense to call it
+cs_etm_decoder__buffer_no_sync() ?
 
-> + */
-> +
-> +/ {
-> +       compatible = "rda,8810pl";
-> +       #address-cells = <1>;
-> +       #size-cells = <1>;
-> +
-> +       aliases {
-> +               serial0 = &uart0;
-> +               serial1 = &uart1;
-> +               serial2 = &uart2;
-> +       };
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               cpu at 0 {
-> +                       device_type = "cpu";
-> +                       compatible = "arm,cortex-a5";
-> +                       reg = <0x0>;
-> +               };
-> +       };
-> +
-> +       soc {
+>  		decoder->trace_on = false;
+>  		break;
+>  	case OCSD_GEN_TRC_ELEM_TRACE_ON:
+> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> index 9351bd1..a38c97c 100644
+> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+> @@ -23,9 +23,10 @@ struct cs_etm_buffer {
+>  };
+>  
+>  enum cs_etm_sample_type {
+> -	CS_ETM_EMPTY = 0,
+> -	CS_ETM_RANGE = 1 << 0,
+> -	CS_ETM_TRACE_ON = 1 << 1,
+> +	CS_ETM_EMPTY		= 0,
+> +	CS_ETM_RANGE		= 1 << 0,
+> +	CS_ETM_TRACE_ON		= 1 << 1,
+> +	CS_ETM_TRACE_OFF	= 1 << 2,
 
-soc at 0
+CS_ETM_NO_SYNC, see above comment.  And please don't use indentation.
 
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <1>;
-> +               ranges = <0x0 0x0 0x80000000>;
-> +
-> +               sram at 100000 {
-> +                       compatible = "mmio-sram";
-> +                       reg = <0x100000 0x10000>;
 
-Based on the address of this and everything else, perhaps you should
-move this to the top-level (or another bus node) and then either get
-rid of the soc node level or make it start at 0x20000000. Kind of
-depends on what the rest of the memory map looks like.
-
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ranges;
-> +               };
+>  };
+>  
+>  enum cs_etm_isa {
+> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+> index f4fa877..2a0cef9 100644
+> --- a/tools/perf/util/cs-etm.c
+> +++ b/tools/perf/util/cs-etm.c
+> @@ -517,8 +517,9 @@ static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
+>  
+>  static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+>  {
+> -	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> -	if (packet->sample_type == CS_ETM_TRACE_ON)
+> +	/* Returns 0 for TRACE_ON and TRACE_OFF packets */
+> +	if (packet->sample_type == CS_ETM_TRACE_ON ||
+> +	    packet->sample_type == CS_ETM_TRACE_OFF)
+>  		return 0;
+>  
+>  	return packet->start_addr;
+> @@ -527,8 +528,9 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+>  static inline
+>  u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
+>  {
+> -	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+> -	if (packet->sample_type == CS_ETM_TRACE_ON)
+> +	/* Returns 0 for TRACE_ON and TRACE_OFF packets */
+> +	if (packet->sample_type == CS_ETM_TRACE_ON ||
+> +	    packet->sample_type == CS_ETM_TRACE_OFF)
+>  		return 0;
+>  
+>  	return packet->end_addr - packet->last_instr_size;
+> @@ -930,6 +932,10 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+>  		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_ON)
+>  			generate_sample = true;
+>  
+> +		/* Generate sample for tracing off packet */
+> +		if (etmq->prev_packet->sample_type == CS_ETM_TRACE_OFF)
+> +			generate_sample = true;
 > +
-> +               apb at 20800000 {
-> +                       compatible = "simple-bus";
-> +                       reg = <0x20800000 0x100000>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ranges = <0x0 0x20800000 0x100000>;
-> +               };
-> +
-> +               apb at 20900000 {
-> +                       compatible = "simple-bus";
-> +                       reg = <0x20900000 0x100000>;
-
-By definition of a simple-bus, it should not have any registers. Or
-you should also have a specific compatible.
-
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ranges = <0x0 0x20900000 0x100000>;
-> +               };
-> +
-> +               apb at 20a00000 {
-> +                       compatible = "simple-bus";
-> +                       reg = <0x20a00000 0x100000>;
-> +                       #address-cells = <1>;
-> +                       #size-cells = <1>;
-> +                       ranges = <0x0 0x20a00000 0x100000>;
-> +
-> +                       uart0: serial at 0 {
-> +                               compatible = "rda,8810pl-uart";
-> +                               reg = <0x0 0x1000>;
-> +                               status = "disabled";
-> +                       };
-> +
-> +                       uart1: serial at 10000 {
-> +                               compatible = "rda,8810pl-uart";
-> +                               reg = <0x10000 0x1000>;
-> +                               status = "disabled";
-> +                       };
-> +
-> +                       uart2: serial at 90000 {
-> +                               compatible = "rda,8810pl-uart";
-> +                               reg = <0x90000 0x1000>;
-> +                               status = "disabled";
-> +                       };
-> +               };
-> +
-> +               l2: cache-controller at 21100000 {
-> +                       compatible = "arm,pl310-cache";
-> +                       reg = <0x21100000 0x1000>;
-> +                       cache-unified;
-> +                       cache-level = <2>;
-> +               };
-> +       };
-> +};
-> --
-> 2.17.1
->
+>  		/* Generate sample for branch taken packet */
+>  		if (etmq->prev_packet->sample_type == CS_ETM_RANGE &&
+>  		    etmq->prev_packet->last_instr_taken_branch)
+> @@ -1085,6 +1091,7 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
+>  					cs_etm__sample(etmq);
+>  					break;
+>  				case CS_ETM_TRACE_ON:
+> +				case CS_ETM_TRACE_OFF:
+>  					/*
+>  					 * Discontinuity in trace, flush
+>  					 * previous branch stack
+> -- 
+> 2.7.4
+> 
