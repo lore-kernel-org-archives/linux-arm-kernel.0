@@ -1,42 +1,70 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 19 Nov 2018 13:58:11 +0100
-Subject: [PATCH v6 1/6] clk: Add of_clk_get_by_name_optional() function
-In-Reply-To: <TY1PR01MB17695E8ED56BBC03AAA7FD8FF5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-References: <20181116145937.27660-1-phil.edworthy@renesas.com>
- <20181116145937.27660-2-phil.edworthy@renesas.com>
- <20181116160128.pkuya6rwqm4schdn@pengutronix.de>
- <20181116161122.hhvslbzdujxpk3up@pengutronix.de>
- <TY1PR01MB17697C2C8BCE98009EBDECF7F5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
- <20181119104603.qzuvpoha622l4xvy@pengutronix.de>
- <TY1PR01MB17695E8ED56BBC03AAA7FD8FF5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-Message-ID: <20181119125811.6bujcow5wf4hvfz4@pengutronix.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 19 Nov 2018 14:08:00 +0100
+Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
+In-Reply-To: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+Message-ID: <20181119130800.GE9761@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Phil,
-
-On Mon, Nov 19, 2018 at 12:53:46PM +0000, Phil Edworthy wrote:
-> On 19 November 2018 10:46 Uwe Kleine-K?nig wrote:
-> > On Mon, Nov 19, 2018 at 10:41:42AM +0000, Phil Edworthy wrote:
-> > > btw, do we need to add of_clk_get_by_name_optional()? I only added it
-> > > as a counterpart to of_clk_get_by_name(), but it may not be needed.
-> > 
-> > I don't need it. Given that it is easy to add when someone has a need, I'd say,
-> > skip it for now.
+On Fri, Nov 16, 2018 at 10:24:03AM +0000, Andrew Murray wrote:
+> Many PMU drivers do not have the capability to exclude counting events
+> that occur in specific contexts such as idle, kernel, guest, etc. These
+> drivers indicate this by returning an error in their event_init upon
+> testing the events attribute flags.
 > 
-> I'm wondering if we actually need clk_get_optional(). For me at least, I just
-> want devm_clk_get_optional(). That would get rid of the arch patches.
+> However this approach requires that each time a new event modifier is
+> added to perf, all the perf drivers need to be modified to indicate that
+> they don't support the attribute. This results in additional boiler-plate
+> code common to many drivers that needs to be maintained. An example of
+> this is the addition of exclude_host and exclude_guest in 2011 yet many
+> PMU drivers do not support this or indicate an error on events that make
+> use of it.
+> 
+> This patch generalises the test for exclusion and updates PMU drivers to
+> use it. This is a functional change as some PMU drivers will now correctly
+> report that they don't support certain events whereas they previously did.
 
-Given that clk_get_optional will be that simple, it can live in
-linux/clk.h for all implementors of the clk API, then you don't have to
-care about different archs. (Unless I'm missing something.)
+Right, I like that idea, and yes, there's a lot of fail around there :/
 
-I don't think it's a good idea to drop clk_get_optional even if you'd
-have to provide arch-specific stuff.
+> A longer term approach may instead be for PMU's to advertise their
+> capabilities on registration.
 
-Best regards
-Uwe
+This I think is the better approach. We already have the
+PERF_PMU_CAP_flags that can be used to advertise various PMU
+capabilities.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Something along these lines I suppose; then every PMU that actually
+checks the flags, needs to set the flag, otherwise it'll fail.
+
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 53c500f0ca79..de15723ea52a 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -244,6 +244,7 @@ struct perf_event;
+ #define PERF_PMU_CAP_EXCLUSIVE			0x10
+ #define PERF_PMU_CAP_ITRACE			0x20
+ #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
++#define PERF_PMU_CAP_EXCLUDE			0x80
+ 
+ /**
+  * struct pmu - generic performance monitoring unit
+diff --git a/kernel/events/core.c b/kernel/events/core.c
+index 84530ab358c3..d76b724177b9 100644
+--- a/kernel/events/core.c
++++ b/kernel/events/core.c
+@@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
+ 	if (ctx)
+ 		perf_event_ctx_unlock(event->group_leader, ctx);
+ 
++	if (!ret) {
++		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
++		    event_has_exclude_flags(event)) {
++			event->destroy(event);
++			ret = -EINVAL;
++		}
++	}
++
+ 	if (ret)
+ 		module_put(pmu->module);
+ 
