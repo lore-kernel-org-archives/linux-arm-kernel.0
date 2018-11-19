@@ -1,166 +1,138 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Mon, 19 Nov 2018 14:25:17 +0100
-Subject: [PATCH 06/15] Platform: OLPC: Add XO-1.75 EC driver
-In-Reply-To: <20181119104046.GC28607@amd>
-References: <20181010172300.317643-1-lkundrak@v3.sk>
- <20181010172300.317643-7-lkundrak@v3.sk>
- <CAHp75VcefOJHZ3WdZYrGEJFjqg2s1oJ75Jg9gKmQFre_ScAPZg@mail.gmail.com>
- <8881f5e48613c9d9d133e3964031fe2ab57f4801.camel@v3.sk>
- <20181119104046.GC28607@amd>
-Message-ID: <26d225cd1ed93faff6e0a0513680fa5385f05f2d.camel@v3.sk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 19 Nov 2018 14:32:27 +0100
+Subject: [PATCH v2 1/4] mfd: stmpe: Move ADC related defines to header of
+ mfd
+In-Reply-To: <20181119102528.2830-1-dev@pschenker.ch>
+References: <20181119102528.2830-1-dev@pschenker.ch>
+Message-ID: <f603bcb612866bf68fa8ad00ad70a4df@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On 19.11.2018 11:25, Philippe Schenker wrote:
+> Move defines that are ADC related to the header of the overlying mfd,
+> so they can be used from multiple sub-devices.
 
-I've addressed some of Andy's concerns you're replying to below in a
-follow-up version of the patch. To many points I'm generally
-indifferent and prefer to lean towards making things easy for whoever
-may be likely to deal with the code in past. It's not clear to me who
-that might be, or how important either of you consider your remarks to
-be. I'll be thankful if anyone makes this clearer to me.
+Looks good to me:
 
-(I hoped that you're in the Cc list; thought git send-mail will see
-your address in the Acked-by tags and add you. I failed to notice that
-it's not the case. I apologize. Here's the v2 posting: [1].)
+Reviewed-by: Stefan Agner <stefan@agner.ch>
 
-[1] https://lore.kernel.org/lkml/20181116162403.49854-1-lkundrak at v3.sk/
-
-
-On Mon, 2018-11-19 at 11:40 +0100, Pavel Machek wrote:
-> Hi!
 > 
-> > > > +#include <linux/delay.h>
-> > > > +#include <linux/gpio/consumer.h>
-> > > > +#include <linux/spinlock.h>
-> > > > +#include <linux/completion.h>
-> > > > +#include <linux/slab.h>
-> > > > +#include <linux/platform_device.h>
-> > > > +#include <linux/ctype.h>
-> > > > +#include <linux/olpc-ec.h>
-> > > > +#include <linux/spi/spi.h>
-> > > > +#include <linux/reboot.h>
-> > > > +#include <linux/input.h>
-> > > > +#include <linux/kfifo.h>
-> > > > +#include <linux/module.h>
-> > > > +#include <linux/power_supply.h>
-> > > 
-> > > Easy to maintain when it's sorted.
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> ---
 > 
-> No / it depends.
-
-I've sorted it in the new files; following a rule of keeping things
-sorted at the very least has an advantage of being unambiguous.
-
-I'm not sorting things where they currently are not in order, since it
-would obscure real changes.
-
-> > > > +       channel = priv->rx_buf[0];
-> > > > +       byte = priv->rx_buf[1];
-> > > 
-> > > Maybe specific structures would fit better?
-> > > 
-> > > Like
-> > > 
-> > > struct olpc_ec_resp_hdr {
-> > >  u8 channel;
-> > >  u8 byte;
-> > > ...
-> > > }
+> Changes in v2:
+>  - This is a new added commit. Separate commit for moving the defines out of
+>    drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device
+> drivers/mfd/stmpe.c
+>  - Pre-fix defines with STMPE_
 > 
-> Structures have padding and other nastyness...
-
-I've turned them into structs. It perhaps looks a bit better -- the
-structure members serving as a documentation for the protocol.
-
-> > > > +                       pm_wakeup_event(priv->pwrbtn-
-> > > > >dev.parent,
-> > > > 1000);
-> > > 
-> > > Magic number.
+>  drivers/input/touchscreen/stmpe-ts.c | 34 +++++++++++-----------------
+>  include/linux/mfd/stmpe.h            | 11 +++++++++
+>  2 files changed, 24 insertions(+), 21 deletions(-)
 > 
-> Nothing wrong with magic numbers.
-
-Turned it into a define, but it's not like it's any clearer why that
-particular value works...
-
-I actually have little idea. I've copied this from the vendor's
-original driver.
-
-> > > > +       args[0] = mask & 0xff;
-> > > > +       args[1] = (mask >> 8) & 0xff;
-> > > 
-> > > ...mask >> 0;
-> > > ...mask >> 8;
-> 
-> No, please.
-
-I've done this too, but I don't see much point either. Perhaps those
-within the OCD spectrum may appreciate :)
-
-> > > __maybe_unused  instead of ugly #ifdef?
-> > > 
-> > > > +{
-> > > > +       struct platform_device *pdev = to_platform_device(dev);
-> > > > +       struct olpc_xo175_ec *priv =
-> > > > platform_get_drvdata(pdev);
-> > > 
-> > > dev_get_drvdata() or how is it called?
-> > > 
-> > > > +       unsigned char hintargs[5];
-> > > 
-> > > struct olpc_ec_hint_cmd {
-> > > u8 ...
-> > > u32 ...
-> > > };
-> > > 
-> > > ?
-> 
-> No, unless you want to break the code. Or add __attribute__ packed
-> and
-> deal with endianness.
-> 
-> Just no.
-
-Turned it into a packed struct too for the same reasons as above.
-
-The endianness of the hints argument doesn't actually matter, since the
-EC firmware actually uses this in a debugging printf. It's not even
-cleat what endianness did EC expect initially.
-
-> > > > +       static unsigned int suspend_count;
-> > > 
-> > > u32 I suppose.
-> 
-> You know, there's semantic difference between unsigned int and
-> u32. And this sounds like candidate for unsigned int.
-> 
-> > > > +       /* Enable all EC events while we're awake */
-> > > > +       olpc_xo175_ec_set_event_mask(0xffff);
-> > > 
-> > > #define EC_ALL_EVENTS GENMASK(15, 0)
-> 
-> Actually that's less readable. Just don't.
-
-Done this too, and, like the points above, I am indifferent too. Both
-seem equal to me.
-
-> > > > +static const struct of_device_id olpc_xo175_ec_of_match[] = {
-> > > > +       { .compatible = "olpc,xo1.75-ec" },
-> > > > +       { },
-> > > 
-> > > No comma for terminators.
-> 
-> Comma is fine.
-
-Removed it. Perhaps the lack of a comma could be understood as an
-indication that no further initializers shall follow.
-
-> 	Pavel
-
-Just in case I didn't stress that enough: I'm much more interested in
-things working well than style issues that too often are just matter of
-tast. I happily accept advice on those though.
-
-Take care,
-Lubo
+> diff --git a/drivers/input/touchscreen/stmpe-ts.c
+> b/drivers/input/touchscreen/stmpe-ts.c
+> index 2a78e27b4495..c5d9006588a2 100644
+> --- a/drivers/input/touchscreen/stmpe-ts.c
+> +++ b/drivers/input/touchscreen/stmpe-ts.c
+> @@ -49,17 +49,6 @@
+>  
+>  #define STMPE_IRQ_TOUCH_DET		0
+>  
+> -#define SAMPLE_TIME(x)			((x & 0xf) << 4)
+> -#define MOD_12B(x)			((x & 0x1) << 3)
+> -#define REF_SEL(x)			((x & 0x1) << 1)
+> -#define ADC_FREQ(x)			(x & 0x3)
+> -#define AVE_CTRL(x)			((x & 0x3) << 6)
+> -#define DET_DELAY(x)			((x & 0x7) << 3)
+> -#define SETTLING(x)			(x & 0x7)
+> -#define FRACTION_Z(x)			(x & 0x7)
+> -#define I_DRIVE(x)			(x & 0x1)
+> -#define OP_MODE(x)			((x & 0x7) << 1)
+> -
+>  #define STMPE_TS_NAME			"stmpe-ts"
+>  #define XY_MASK				0xfff
+>  
+> @@ -213,9 +202,10 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+>  		return ret;
+>  	}
+>  
+> -	adc_ctrl1 = SAMPLE_TIME(ts->sample_time) | MOD_12B(ts->mod_12b) |
+> -		REF_SEL(ts->ref_sel);
+> -	adc_ctrl1_mask = SAMPLE_TIME(0xff) | MOD_12B(0xff) | REF_SEL(0xff);
+> +	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
+> +		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
+> +	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
+> +			 STMPE_REF_SEL(0xff);
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
+>  			adc_ctrl1_mask, adc_ctrl1);
+> @@ -225,15 +215,17 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+>  	}
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
+> -			ADC_FREQ(0xff), ADC_FREQ(ts->adc_freq));
+> +			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
+>  	if (ret) {
+>  		dev_err(dev, "Could not setup ADC\n");
+>  		return ret;
+>  	}
+>  
+> -	tsc_cfg = AVE_CTRL(ts->ave_ctrl) | DET_DELAY(ts->touch_det_delay) |
+> -			SETTLING(ts->settling);
+> -	tsc_cfg_mask = AVE_CTRL(0xff) | DET_DELAY(0xff) | SETTLING(0xff);
+> +	tsc_cfg = STMPE_AVE_CTRL(ts->ave_ctrl) |
+> +		  STMPE_DET_DELAY(ts->touch_det_delay) |
+> +		  STMPE_SETTLING(ts->settling);
+> +	tsc_cfg_mask = STMPE_AVE_CTRL(0xff) | STMPE_DET_DELAY(0xff) |
+> +		       STMPE_SETTLING(0xff);
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CFG, tsc_cfg_mask, tsc_cfg);
+>  	if (ret) {
+> @@ -242,14 +234,14 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+>  	}
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_FRACTION_Z,
+> -			FRACTION_Z(0xff), FRACTION_Z(ts->fraction_z));
+> +			STMPE_FRACTION_Z(0xff), STMPE_FRACTION_Z(ts->fraction_z));
+>  	if (ret) {
+>  		dev_err(dev, "Could not config touch\n");
+>  		return ret;
+>  	}
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_I_DRIVE,
+> -			I_DRIVE(0xff), I_DRIVE(ts->i_drive));
+> +			STMPE_I_DRIVE(0xff), STMPE_I_DRIVE(ts->i_drive));
+>  	if (ret) {
+>  		dev_err(dev, "Could not config touch\n");
+>  		return ret;
+> @@ -263,7 +255,7 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+>  	}
+>  
+>  	ret = stmpe_set_bits(stmpe, STMPE_REG_TSC_CTRL,
+> -			OP_MODE(0xff), OP_MODE(OP_MOD_XYZ));
+> +			STMPE_OP_MODE(0xff), STMPE_OP_MODE(OP_MOD_XYZ));
+>  	if (ret) {
+>  		dev_err(dev, "Could not set mode\n");
+>  		return ret;
+> diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+> index 4a827af17e59..c0353f6431f9 100644
+> --- a/include/linux/mfd/stmpe.h
+> +++ b/include/linux/mfd/stmpe.h
+> @@ -10,6 +10,17 @@
+>  
+>  #include <linux/mutex.h>
+>  
+> +#define STMPE_SAMPLE_TIME(x)	((x & 0xf) << 4)
+> +#define STMPE_MOD_12B(x)	((x & 0x1) << 3)
+> +#define STMPE_REF_SEL(x)	((x & 0x1) << 1)
+> +#define STMPE_ADC_FREQ(x)	(x & 0x3)
+> +#define STMPE_AVE_CTRL(x)	((x & 0x3) << 6)
+> +#define STMPE_DET_DELAY(x)	((x & 0x7) << 3)
+> +#define STMPE_SETTLING(x)	(x & 0x7)
+> +#define STMPE_FRACTION_Z(x)	(x & 0x7)
+> +#define STMPE_I_DRIVE(x)	(x & 0x1)
+> +#define STMPE_OP_MODE(x)	((x & 0x7) << 1)
+> +
+>  struct device;
+>  struct regulator;
