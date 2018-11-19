@@ -1,55 +1,102 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Mon, 19 Nov 2018 17:06:32 +0530
-Subject: [PATCH v2 06/12] drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during
- dsi_bind
-In-Reply-To: <20181119083833.d7ysiv3tenabtrdj@flea>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-7-jagan@amarulasolutions.com>
- <20181119083833.d7ysiv3tenabtrdj@flea>
-Message-ID: <CAMty3ZCsEYFJOQAFTf3FspQWMzD-tiW_njuyCJ950RZ=Y6apEw@mail.gmail.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 19 Nov 2018 11:37:57 +0000
+Subject: [RFC PATCH] ARM: NOMMU: Toggle only bits in EXC_RETURN we are
+ really care of
+In-Reply-To: <1541591310-31799-1-git-send-email-vladimir.murzin@arm.com>
+References: <1541591310-31799-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <a4be606f-bc3c-4b5c-84e6-dfdfc8ab5d0a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 2:08 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Fri, Nov 16, 2018 at 10:09:10PM +0530, Jagan Teki wrote:
-> > Probe tcon0 during dsi_bind, so-that the tcon attributes like
-> > divider value, clock rate can get whenever it need.
-> >
-> > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > ---
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 +++++++
-> >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 1 +
-> >  2 files changed, 8 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > index d60955880c43..66a01061e51d 100644
-> > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > @@ -25,6 +25,7 @@
-> >  #include <drm/drm_panel.h>
-> >
-> >  #include "sun4i_drv.h"
-> > +#include "sun4i_tcon.h"
-> >  #include "sun6i_mipi_dsi.h"
-> >
-> >  #include <video/mipi_display.h>
-> > @@ -1007,6 +1008,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
-> >       struct drm_device *drm = data;
-> >       struct sun4i_drv *drv = drm->dev_private;
-> >       struct sun6i_dsi *dsi = dev_get_drvdata(dev);
-> > +     struct sun4i_tcon *tcon0 = sun4i_get_tcon0(drm);
-> >       int ret;
-> >
-> >       if (!dsi->panel)
-> > @@ -1014,6 +1016,11 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
-> >
-> >       dsi->drv = drv;
-> >
-> > +     if (!tcon0)
-> > +             return -EPROBE_DEFER;
->
-> You can't fall in that condition. The component framework won't call
-> bind unless every components have been probed.
+Gentle ping!
 
-Since tcon0 is already probed is it? if so I can return -EINVAL is it ok?
+On 07/11/18 11:48, Vladimir Murzin wrote:
+> ARMv8M introduces support for Security extension to M class, among
+> other things it affects exception handling, especially, encoding of
+> EXC_RETURN.
+> 
+> The new bits have been added:
+> 
+> Bit [6]	Secure or Non-secure stack
+> Bit [5]	Default callee register stacking
+> Bit [0]	Exception Secure
+> 
+> which conflicts with hard-coded value of EXC_RETURN:
+> 
+> In fact, we only care of few bits:
+> 
+> Bit [3]	 Mode (0 - Handler, 1 - Thread)
+> Bit [2]	 Stack pointer selection (0 - Main, 1 - Process)
+> 
+> We can toggle only those bits and left other bits as they were on
+> exception entry.
+> 
+> It is basically, what patch does - saves EXC_RETURN when we do
+> transition form Thread to Handler mode (it is first svc), so later
+> saved value is used instead of EXC_RET_THREADMODE_PROCESSSTACK.
+> 
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+> 
+> Kernel Version: v4.20-rc1
+> 
+>  arch/arm/include/asm/v7m.h     | 2 +-
+>  arch/arm/kernel/entry-header.S | 3 ++-
+>  arch/arm/kernel/entry-v7m.S    | 4 ++++
+>  arch/arm/mm/proc-v7m.S         | 3 +++
+>  4 files changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
+> index 187ccf6..2cb00d1 100644
+> --- a/arch/arm/include/asm/v7m.h
+> +++ b/arch/arm/include/asm/v7m.h
+> @@ -49,7 +49,7 @@
+>   * (0 -> msp; 1 -> psp). Bits [1:0] are fixed to 0b01.
+>   */
+>  #define EXC_RET_STACK_MASK			0x00000004
+> -#define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
+> +#define EXC_RET_THREADMODE_PROCESSSTACK		(3 << 2)
+>  
+>  /* Cache related definitions */
+>  
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index 7734248..62db1c9 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -127,7 +127,8 @@
+>           */
+>  	.macro	v7m_exception_slow_exit ret_r0
+>  	cpsid	i
+> -	ldr	lr, =EXC_RET_THREADMODE_PROCESSSTACK
+> +	ldr	lr, =exc_ret
+> +	ldr	lr, [lr]
+>  
+>  	@ read original r12, sp, lr, pc and xPSR
+>  	add	r12, sp, #S_IP
+> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+> index abcf478..19d2dcd 100644
+> --- a/arch/arm/kernel/entry-v7m.S
+> +++ b/arch/arm/kernel/entry-v7m.S
+> @@ -146,3 +146,7 @@ ENTRY(vector_table)
+>  	.rept	CONFIG_CPU_V7M_NUM_IRQ
+>  	.long	__irq_entry		@ External Interrupts
+>  	.endr
+> +	.align	2
+> +	.globl	exc_ret
+> +exc_ret:
+> +	.space	4
+> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+> index 47a5acc..92e8418 100644
+> --- a/arch/arm/mm/proc-v7m.S
+> +++ b/arch/arm/mm/proc-v7m.S
+> @@ -139,6 +139,9 @@ __v7m_setup_cont:
+>  	cpsie	i
+>  	svc	#0
+>  1:	cpsid	i
+> +	ldr	r0, =exc_ret
+> +	orr	lr, lr, #EXC_RET_THREADMODE_PROCESSSTACK
+> +	str	lr, [r0]
+>  	ldmia	sp, {r0-r3, r12}
+>  	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
+>  	mov	lr, r6			@ restore LR
+> 
