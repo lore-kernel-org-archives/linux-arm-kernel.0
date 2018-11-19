@@ -1,47 +1,66 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 20 Nov 2018 02:22:02 +0530
-Subject: [PATCH 1/3] ARM: davinci: define gpio interrupts as separate
- resources
-In-Reply-To: <20181113135051.15308-2-brgl@bgdev.pl>
-References: <20181113135051.15308-1-brgl@bgdev.pl>
- <20181113135051.15308-2-brgl@bgdev.pl>
-Message-ID: <c092b014-d5cf-f1ad-de91-6696b05cdf17@ti.com>
+From: paul.burton@mips.com (Paul Burton)
+Date: Mon, 19 Nov 2018 21:01:42 +0000
+Subject: [PATCH 3/9] MIPS: remove the HT_PCI config option
+In-Reply-To: <20181115190538.17016-4-hch@lst.de>
+References: <20181115190538.17016-1-hch@lst.de>
+ <20181115190538.17016-4-hch@lst.de>
+Message-ID: <20181119210141.nissqr6zaldt23xg@pburton-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/18 7:20 PM, Bartosz Golaszewski wrote:
-> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Hi Christoph,
+
+On Thu, Nov 15, 2018 at 08:05:31PM +0100, Christoph Hellwig wrote:
+> This option is always selected from LOONGSON_MACH3X.  Switch to just
+> seleting PCI from that option and definining LOONGSON_PCIIO_BASE based
+> on CONFIG_LOONGSON_MACH3X.
 > 
-> Since commit eb3744a2dd01 ("gpio: davinci: Do not assume continuous
-> IRQ numbering") the davinci GPIO driver fails to probe if we boot
-> in legacy mode from any of the board files. Since the driver now
-> expects every interrupt to be defined as a separate resource, split
-> the definition in devices-da8xx.c instead of having a single continuous
-> interrupt range.
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
+> ---
+>  arch/mips/Kconfig                                | 11 -----------
+>  arch/mips/include/asm/mach-loongson64/loongson.h |  2 +-
+>  arch/mips/loongson64/Kconfig                     |  2 +-
+>  3 files changed, 2 insertions(+), 13 deletions(-)
 > 
-> Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ numbering")
-> Cc: stable at vger.kernel.org
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+> index 8272ea4c7264..7d28c9dd75d0 100644
+> --- a/arch/mips/Kconfig
+> +++ b/arch/mips/Kconfig
+> @@ -3040,17 +3040,6 @@ config PCI
+>  	  your box. Other bus systems are ISA, EISA, or VESA. If you have PCI,
+>  	  say Y, otherwise N.
+>  
+> -config HT_PCI
+> -	bool "Support for HT-linked PCI"
+> -	default y
+> -	depends on CPU_LOONGSON3
+> -	select PCI
+> -	select PCI_DOMAINS
+> -	help
+> -	  Loongson family machines use Hyper-Transport bus for inter-core
+> -	  connection and device connection. The PCI bus is a subordinate
+> -	  linked at HT. Choose Y for Loongson-3 based machines.
+> -
+>  config PCI_DOMAINS
+>  	bool
+>  
+> diff --git a/arch/mips/loongson64/Kconfig b/arch/mips/loongson64/Kconfig
+> index c865b4b9b775..781a5156ab21 100644
+> --- a/arch/mips/loongson64/Kconfig
+> +++ b/arch/mips/loongson64/Kconfig
+> @@ -76,7 +76,7 @@ config LOONGSON_MACH3X
+>  	select CPU_HAS_WB
+>  	select HW_HAS_PCI
+>  	select ISA
+> -	select HT_PCI
+> +	select PCI
+>  	select I8259
+>  	select IRQ_MIPS_CPU
+>  	select NR_CPUS_DEFAULT_4
 
-There are a number of other boards that need such fixing too. And the
-commit in question does not do a good job of explaining why it was
-needed in the first place. The description  just repeats what can be
-inferred by reading the patch.
+Should this also select PCI_DOMAINS to preserve the existing behavior?
 
-
-    gpio: davinci: Do not assume continuous IRQ numbering
-
-    Currently the driver assumes that the interrupts are continuous
-    and does platform_get_irq only once and assumes the rest are continuous,
-    instead call platform_get_irq for all the interrupts and store them
-    in an array for later use.
-
-    Signed-off-by: Keerthy <j-keerthy@ti.com>
-    Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-
-Can we revert the offending commit instead?
+If not, could you explain why in the commit message?
 
 Thanks,
-Sekhar
+    Paul
