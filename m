@@ -1,65 +1,139 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 19 Nov 2018 17:07:27 +0000
-Subject: [RFC PATCH v2 14/23] KVM: Allow 2048-bit register access via
- ioctl interface
-In-Reply-To: <87r2fhhv2z.fsf@linaro.org>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-15-git-send-email-Dave.Martin@arm.com>
- <87r2fhhv2z.fsf@linaro.org>
-Message-ID: <20181119170727.GY3505@e103592.cambridge.arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 19 Nov 2018 17:07:32 +0000
+Subject: [PATCH v2 4/5] phy: mvebu-cp110-comphy: convert to use eth phy
+ mode and submode
+In-Reply-To: <20181109234755.21687-5-grygorii.strashko@ti.com>
+References: <20181109234755.21687-1-grygorii.strashko@ti.com>
+ <20181109234755.21687-5-grygorii.strashko@ti.com>
+Message-ID: <20181119170732.GB30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 04:48:36PM +0000, Alex Benn?e wrote:
+On Fri, Nov 09, 2018 at 05:47:54PM -0600, Grygorii Strashko wrote:
+> Convert mvebu-cp110-comphy PHY driver to use recently introduced
+> PHY_MODE_ETHERNET and phy_set_mode_ext().
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
+> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> ---
+>  drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c | 19 +-----
+>  drivers/phy/marvell/phy-mvebu-cp110-comphy.c    | 83 ++++++++++++++-----------
+>  2 files changed, 48 insertions(+), 54 deletions(-)
 > 
-> > The Arm SVE architecture defines registers that are up to 2048 bits
-> > in size (with some possibility of further future expansion).
-> >
-> > In order to avoid the need for an excessively large number of
-> > ioctls when saving and restoring a vcpu's registers, this patch
-> > adds a #define to make support for individual 2048-bit registers
-> > through the KVM_{GET,SET}_ONE_REG ioctl interface official.  This
-> > will allow each SVE register to be accessed in a single call.
-> >
-> > There are sufficient spare bits in the register id size field for
-> > this change, so there is no ABI impact providing that
-> > KVM_GET_REG_LIST does not enumerate any 2048-bit register unless
-> > userspace explicitly opts in to the relevant architecture-specific
-> > features.
-> >
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  include/uapi/linux/kvm.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> > index 251be35..7c3c5cc 100644
-> > --- a/include/uapi/linux/kvm.h
-> > +++ b/include/uapi/linux/kvm.h
-> > @@ -1110,6 +1110,7 @@ struct kvm_dirty_tlb {
-> >  #define KVM_REG_SIZE_U256	0x0050000000000000ULL
-> >  #define KVM_REG_SIZE_U512	0x0060000000000000ULL
-> >  #define KVM_REG_SIZE_U1024	0x0070000000000000ULL
-> > +#define KVM_REG_SIZE_U2048	0x0080000000000000ULL
-> 
-> Yeah OK I guess - but it does make me question if KVM_REG_SIZE_MASK is
-> part of the ABI because although we have space for another few bits that
-> is the last one without changing the mask.
+> diff --git a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> index 7a37a37..731793a 100644
+> --- a/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> +++ b/drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c
+> @@ -1165,28 +1165,13 @@ static void mvpp22_gop_setup_irq(struct mvpp2_port *port)
+>   */
+>  static int mvpp22_comphy_init(struct mvpp2_port *port)
+>  {
+> -	enum phy_mode mode;
+>  	int ret;
+>  
+>  	if (!port->comphy)
+>  		return 0;
+>  
+> -	switch (port->phy_interface) {
+> -	case PHY_INTERFACE_MODE_SGMII:
+> -	case PHY_INTERFACE_MODE_1000BASEX:
+> -		mode = PHY_MODE_SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_2500BASEX:
+> -		mode = PHY_MODE_2500SGMII;
+> -		break;
+> -	case PHY_INTERFACE_MODE_10GKR:
+> -		mode = PHY_MODE_10GKR;
+> -		break;
+> -	default:
+> -		return -EINVAL;
+> -	}
+> -
+> -	ret = phy_set_mode(port->comphy, mode);
+> +	ret = phy_set_mode_ext(port->comphy, PHY_MODE_ETHERNET,
+> +			       port->phy_interface);
+>  	if (ret)
+>  		return ret;
+>  
+> diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> index 79b52c3..7dee72b 100644
+> --- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> +++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> @@ -9,6 +9,7 @@
+>  #include <linux/iopoll.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/module.h>
+> +#include <linux/phy.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> @@ -131,26 +132,26 @@ struct mvebu_comhy_conf {
+>  
+>  static const struct mvebu_comhy_conf mvebu_comphy_cp110_modes[] = {
+>  	/* lane 0 */
+> -	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(0, 1, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(0, 1, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  	/* lane 1 */
+> -	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(1, 2, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(1, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  	/* lane 2 */
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_2500SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(2, 0, PHY_MODE_10GKR, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+> +	MVEBU_COMPHY_CONF(2, 0, PHY_INTERFACE_MODE_10GKR, 0x1),
+>  	/* lane 3 */
+> -	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(3, 1, PHY_MODE_2500SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(3, 1, PHY_INTERFACE_MODE_2500BASEX, 0x2),
+>  	/* lane 4 */
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_2500SGMII, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 0, PHY_MODE_10GKR, 0x2),
+> -	MVEBU_COMPHY_CONF(4, 1, PHY_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_SGMII, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_2500BASEX, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 0, PHY_INTERFACE_MODE_10GKR, 0x2),
+> +	MVEBU_COMPHY_CONF(4, 1, PHY_INTERFACE_MODE_SGMII, 0x1),
+>  	/* lane 5 */
+> -	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_SGMII, 0x1),
+> -	MVEBU_COMPHY_CONF(5, 2, PHY_MODE_2500SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_SGMII, 0x1),
+> +	MVEBU_COMPHY_CONF(5, 2, PHY_INTERFACE_MODE_2500BASEX, 0x1),
+>  };
+>  
+>  struct mvebu_comphy_priv {
+> @@ -163,10 +164,12 @@ struct mvebu_comphy_lane {
+>  	struct mvebu_comphy_priv *priv;
+>  	unsigned id;
+>  	enum phy_mode mode;
+> +	int submode;
+>  	int port;
+>  };
+>  
+> -static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
+> +static int mvebu_comphy_get_mux(int lane, int port,
+> +				enum phy_mode mode, int submode)
+>  {
+>  	int i, n = ARRAY_SIZE(mvebu_comphy_cp110_modes);
+>  
+> @@ -177,7 +180,7 @@ static int mvebu_comphy_get_mux(int lane, int port, enum phy_mode mode)
+>  	for (i = 0; i < n; i++) {
+>  		if (mvebu_comphy_cp110_modes[i].lane == lane &&
+>  		    mvebu_comphy_cp110_modes[i].port == port &&
+> -		    mvebu_comphy_cp110_modes[i].mode == mode)
+> +		    mvebu_comphy_cp110_modes[i].mode == submode)
 
-Debatable, but KVM_REG_SIZE_MASK is UAPI and suggests a clear intent not
-to recycle bit 55 for another purpose.  This allows for reg sizes up to
-262144 bits which is hopefully more than enough for the foreseeable
-future.
+This looks like it could be a future source of problems, since we
+have both a "mode" and a "submode".  Is there any reason not to
+rename mvebu_comphy_cp110_modes's .mode member to be .submode ?
 
-Even if bits 56-59 are currently always 0, KVM_REG_ARCH_MASK suggests
-that these bits aren't going to be used for size field bits.
-
-
-Or am I missing something?
-
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-Thanks
----Dave
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
