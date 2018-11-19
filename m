@@ -1,82 +1,32 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 19 Nov 2018 13:08:20 +0100
-Subject: [PATCH] mmc: core: Lower max_seg_size if too high for DMA
-In-Reply-To: <20181031155738.18367-1-tony@atomide.com>
-References: <20181031155738.18367-1-tony@atomide.com>
-Message-ID: <CAPDyKFqtMHRjHsJXcKTTzGYSsyab=2SfWdYiETS4Bo2f7Zw2CQ@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 19 Nov 2018 20:13:28 +0800
+Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
+ "drm_dev_put"
+In-Reply-To: <20181115221634.22715-4-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <20181115221634.22715-4-greenfoo@gluegarage.com>
+Message-ID: <20181119121327.GS5829@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2018 at 16:57, Tony Lindgren <tony@atomide.com> wrote:
-> With CONFIG_DMA_API_DEBUG_SG a device may produce the following warning:
->
-> "DMA-API: mapping sg segment longer than device claims to support"
->
-> We default to 64KiB if a DMA engine driver does not initialize dma_parms
-> and call dma_set_max_seg_size(). This may be lower that what many MMC
-> drivers do with mmc->max_seg_size = mmc->max_blk_size * mmc->max_blk_count.
->
-> Let's do a sanity check for max_seg_size being higher than what DMA
-> supports in mmc_add_host() and lower it as needed.
->
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+On Thu, Nov 15, 2018 at 11:16:23PM +0100, Fernando Ramos wrote:
+> This patch unifies the naming of DRM functions for reference counting as
+> requested on Documentation/gpu/todo.rst
+> 
+> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
 > ---
->  drivers/mmc/core/host.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
->
-> diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-> --- a/drivers/mmc/core/host.c
-> +++ b/drivers/mmc/core/host.c
-> @@ -13,6 +13,7 @@
->   */
->
->  #include <linux/device.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/err.h>
->  #include <linux/idr.h>
->  #include <linux/of.h>
-> @@ -415,6 +416,19 @@ struct mmc_host *mmc_alloc_host(int extra, struct device *dev)
->
->  EXPORT_SYMBOL(mmc_alloc_host);
->
-> +static void mmc_check_max_seg_size(struct mmc_host *host)
-> +{
-> +       unsigned int max_seg_size = dma_get_max_seg_size(mmc_dev(host));
+>  drivers/gpu/drm/arc/arcpgu_drv.c             | 4 ++--
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
+>  drivers/gpu/drm/etnaviv/etnaviv_drv.c        | 4 ++--
+>  drivers/gpu/drm/mxsfb/mxsfb_drv.c            | 4 ++--
+>  drivers/gpu/drm/rcar-du/rcar_du_drv.c        | 2 +-
+>  drivers/gpu/drm/shmobile/shmob_drm_drv.c     | 4 ++--
+>  drivers/gpu/drm/tve200/tve200_drv.c          | 4 ++--
+>  drivers/gpu/drm/zte/zx_drm_drv.c             | 4 ++--
 
-Is dma_get_max_seg_size() really intended to be called for any struct
-device (representing the mmc controller) like this?
+We have already queued a patch [1] from Thomas Zimmermann for
+zx_drm_drv.
 
-My understanding is that the dma_get_max_seg_size() is supposed to be
-called by using the DMA engine device, no?
+Shawn
 
-> +
-> +       if (host->max_seg_size <= max_seg_size)
-> +               return;
-> +
-> +       dev_info(mmc_dev(host), "Lowering max_seg_size for DMA: %u vs %u\n",
-> +                host->max_seg_size, max_seg_size);
-> +
-> +       host->max_seg_size = max_seg_size;
-> +}
-> +
->  /**
->   *     mmc_add_host - initialise host hardware
->   *     @host: mmc host
-> @@ -430,6 +444,8 @@ int mmc_add_host(struct mmc_host *host)
->         WARN_ON((host->caps & MMC_CAP_SDIO_IRQ) &&
->                 !host->ops->enable_sdio_irq);
->
-> +       mmc_check_max_seg_size(host);
-> +
->         err = device_add(&host->class_dev);
->         if (err)
->                 return err;
-> --
-> 2.19.1
-
-Kind regards
-Uffe
+[1] https://patchwork.kernel.org/patch/10615837/
