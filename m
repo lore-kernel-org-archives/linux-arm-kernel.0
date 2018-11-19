@@ -1,91 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 19 Nov 2018 10:26:38 +0000
-Subject: [PATCH] drm/sun4i: hdmi: Improve compatibility with non-hotplug
- capable connectors
-In-Reply-To: <20181119081934.ohjg36zjcb52nrrq@flea>
-References: <20181116171830.23465-1-plaes@plaes.org>
- <20181119081934.ohjg36zjcb52nrrq@flea>
-Message-ID: <20181119102638.GZ30658@n2100.armlinux.org.uk>
+From: zhizhouzhang@asrmicro.com (=?utf-8?B?WmhhbmcgWmhpemhvdSjlvKDmsrvmtLIp?=)
+Date: Mon, 19 Nov 2018 10:32:29 +0000
+Subject: [PATCH] tee: optee: avoid possible double list_del()
+In-Reply-To: <20181119100845.GA26837@jax.urgonet>
+References: <20181119064139.24659-1-zhizhouzhang@asrmicro.com>
+ <20181119100845.GA26837@jax.urgonet>
+Message-ID: <10ab2d334e5b43558ed0a7a922a038f6@mail2012.asrmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 09:19:34AM +0100, Maxime Ripard wrote:
-> Hi,
+
+
+> -----Original Message-----
+> From: Jens Wiklander [mailto:jens.wiklander at linaro.org]
+> Sent: Monday, November 19, 2018 6:09 PM
+> To: Zhang Zhizhou(???) <zhizhouzhang@asrmicro.com>
+> Cc: tee-dev at lists.linaro.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] tee: optee: avoid possible double list_del()
 > 
-> On Fri, Nov 16, 2018 at 07:18:29PM +0200, Priit Laes wrote:
-> > From: Priit Laes <priit.laes@paf.com>
-> > 
-> > Even though HDMI connector features hotplug detect pin (HPD), there are
-> > devices that which do not support it.
+> Hi Zhizhou,
 > 
-> Which devices?
-> 
-> > For these devices fall back to additional check on I2C bus. Of
-> > course, there might be also devices that do not wire DDC pins too,
-> > so we don't really know whether cable has been connected.
-> 
-> Again, which devices?
-> 
-> > 
-> > Signed-off-by: Priit Laes <plaes@plaes.org>
-> > Signed-off-by: Priit Laes <priit.laes@paf.com>
-> 
-> You only need one :)
-> 
+> On Mon, Nov 19, 2018 at 02:41:39PM +0800, Zhizhou Zhang wrote:
+> > This bug occurs when:
+> >
+> > - a new request arrives, one thread(let's call it A) is pending in
+> >   optee_supp_req() with req->busy is initial value false.
+> >
+> > - tee-supplicant is killed, then optee_supp_release() is called, this
+> >   function calls list_del(&req->link), and set supp->ctx to NULL. And
+> >   it also wake up process A.
+> >
+> > - process A continues, it firstly checks supp->ctx which is NULL,
+> >   then checks req->busy which is false, at last run list_del(&req->link).
+> >   This triggers double list_del() and results kernel panic.
+> >
+> > So let's set req->busy to true if optee_supp_release() has already
+> > called list_del(&req->link).
+> >
+> > Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 12 ++++++++----
-> >  1 file changed, 8 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> > index 061d2e0d9011..bded09af1340 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
-> > @@ -238,14 +238,18 @@ sun4i_hdmi_connector_detect(struct drm_connector *connector, bool force)
-> >  	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
-> >  	unsigned long reg;
-> >  
-> > -	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
-> > +	if (!readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
-> >  			       reg & SUN4I_HDMI_HPD_HIGH,
-> >  			       0, 500000)) {
-> > -		cec_phys_addr_invalidate(hdmi->cec_adap);
-> > -		return connector_status_disconnected;
-> > +		return connector_status_connected;
-> >  	}
-> >  
-> > -	return connector_status_connected;
-> > +	if (!IS_ERR(hdmi->i2c) && drm_probe_ddc(hdmi->i2c))
-> > +		return connector_status_connected;
-> > +
-> > +	cec_phys_addr_invalidate(hdmi->cec_adap);
-> > +
-> > +	return connector_status_unknown;
+> >  drivers/tee/optee/supp.c | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+> > index df35fc01fd3e..c8ac6636520a 100644
+> > --- a/drivers/tee/optee/supp.c
+> > +++ b/drivers/tee/optee/supp.c
+> > @@ -62,6 +62,7 @@ void optee_supp_release(struct optee_supp *supp)
+> >
+> >  	/* Abort all queued requests */
+> >  	list_for_each_entry_safe(req, req_tmp, &supp->reqs, link) {
+> > +		req->busy = true;
+> >  		list_del(&req->link);
+> >  		req->ret = TEEC_ERROR_COMMUNICATION;
+> >  		complete(&req->c);
+> > --
+> > 2.17.1
 > 
-> You're doing basically two things in that patch, first adding the
-> fallback to the DDC probe if the hotplug mechanism couldn't detect the
-> display, and then returning a status unknown if both fail.
+> This seems to work, but is a bit confusing. It turns out the busy flag
+> will only used to tell if the request is in the queue (and may need to be
+> dequeued) or not.
 > 
-> While I don't really have an opinion on the first one, it's mandatory
-> for every HDMI device to be able to retrieve the EDID through the
-> DDC. If a device was to disallow that, it would violate the HDMI, and
-> I'm not sure we want to start supporting those devices.
+> How about renaming the flag to "in_queue" and update the assignments and
+> tests appropriately to only indicate if it's in the queue or not?
 
-There is also the problem that HDMI uses the HPD signal to indicate
-that the source should re-read the EDID due to the EDID changing.
-In HDMI, you don't necessarily have a fixed-for-all-time EDID, but
-one which can change depending on what devices are in the HDMI path.
+You're right. I will send you a V2 patch later. Thanks!
+> 
+> That should work as well and be more clear on what's going on, or am I
+> missing something?
 
-Consider, for example, an AV amplifier which needs to subsitute the
-audio capabilities when it is turned on, but when in standby needs
-to pass through the TVs audio capabilities.  It informs the source
-by momentarily deasserting the HDMI HPD signal, which is the HDMI
-way to inform the source that the EDID should be re-read.
-
-If you're going to use "read EDID" as the hotplug method, I think
-you need to keep track of when it changes so that EDID updates are
-correctly handled.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+When I was making this patch, I also had the same concern. This patch make busy doesn't mean busy any more. But I'm afraid of changing too much, so I sent you a only one line changed patch. ;-)
+> 
+> Thanks,
+> Jens
