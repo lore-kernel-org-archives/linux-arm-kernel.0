@@ -1,38 +1,42 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 19 Nov 2018 14:22:08 +0800
-Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto
- API code
-In-Reply-To: <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
-Message-ID: <20181119062208.jbd3nl2c6jkicyxl@gondor.apana.org.au>
+From: zhizhouzhang@asrmicro.com (Zhizhou Zhang)
+Date: Mon, 19 Nov 2018 14:41:39 +0800
+Subject: [PATCH] tee: optee: avoid possible double list_del()
+Message-ID: <20181119064139.24659-1-zhizhouzhang@asrmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason:
+This bug occurs when:
 
-On Mon, Nov 19, 2018 at 07:13:07AM +0100, Jason A. Donenfeld wrote:
->
-> Sorry, but there isn't a chance I'll agree to this. The whole idea is
-> to have a clean place to focus on synchronous software
-> implementations, and not keep it tangled up with the asynchronous API.
+- a new request arrives, one thread(let's call it A) is pending in
+  optee_supp_req() with req->busy is initial value false.
 
-There is nothing asynchronous in the relevant crypto code at all.
-The underlying CPU-based software implementations are all completely
-synchronous, including the architecture-specific ones such as
-x86/arm.
+- tee-supplicant is killed, then optee_supp_release() is called, this
+  function calls list_del(&req->link), and set supp->ctx to NULL. And
+  it also wake up process A.
 
-So I don't understand why you are rejecting it.
+- process A continues, it firstly checks supp->ctx which is NULL,
+  then checks req->busy which is false, at last run list_del(&req->link).
+  This triggers double list_del() and results kernel panic.
 
-Cheers,
+So let's set req->busy to true if optee_supp_release() has already
+called list_del(&req->link).
+
+Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
+---
+ drivers/tee/optee/supp.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+index df35fc01fd3e..c8ac6636520a 100644
+--- a/drivers/tee/optee/supp.c
++++ b/drivers/tee/optee/supp.c
+@@ -62,6 +62,7 @@ void optee_supp_release(struct optee_supp *supp)
+ 
+ 	/* Abort all queued requests */
+ 	list_for_each_entry_safe(req, req_tmp, &supp->reqs, link) {
++		req->busy = true;
+ 		list_del(&req->link);
+ 		req->ret = TEEC_ERROR_COMMUNICATION;
+ 		complete(&req->c);
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.17.1
