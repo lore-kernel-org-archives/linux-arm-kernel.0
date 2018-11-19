@@ -1,127 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 19 Nov 2018 11:40:36 +0000
-Subject: [RESEND PATCH v3 1/2] dt-bindings: PCI: Add UniPhier PCIe host
- controller description
-In-Reply-To: <1539667641-26024-2-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1539667641-26024-1-git-send-email-hayashi.kunihiko@socionext.com>
- <1539667641-26024-2-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <20181119114028.GA30042@e107981-ln.cambridge.arm.com>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Mon, 19 Nov 2018 17:31:08 +0530
+Subject: [PATCH v5 02/18] arm64: dts: qcom: qcs404-evb: add dts files for
+ EVBs
+In-Reply-To: <20181109094417.12109-3-vkoul@kernel.org>
+References: <20181109094417.12109-1-vkoul@kernel.org>
+ <20181109094417.12109-3-vkoul@kernel.org>
+Message-ID: <CAHLCerMiJMsRh20S3KPqgT6XKFLyZF0jG5HVVVW4e8b-RkfSzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 16, 2018 at 02:27:20PM +0900, Kunihiko Hayashi wrote:
-> Add DT bindings for PCIe controller implemented in UniPhier SoCs when
-> configured in Root Complex (host) mode. This controller is based on
-> the DesignWare PCIe core.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+On Fri, Nov 9, 2018 at 3:15 PM Vinod Koul <vkoul@kernel.org> wrote:
+>
+> QCS404 has two EVBs, EVB-1000 and EVB-4000. These boards are mostly
+> similar with few differences in the peripherals used.
+>
+> So use a common qcs404-evb.dtsi which contains the common parts and use
+> qcs404-evb-1000.dts and qcs404-evb-4000.dts for diffs
+>
+> Signed-off-by: Vinod Koul <vkoul@kernel.org>
+Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Tested-by: Amit Kucheria <amit.kucheria@linaro.org>
+
 > ---
->  .../devicetree/bindings/pci/uniphier-pcie.txt      | 81 ++++++++++++++++++++++
->  1 file changed, 81 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+>  arch/arm64/boot/dts/qcom/Makefile            |  2 ++
+>  arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts | 11 +++++++++++
+>  arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts | 11 +++++++++++
+>  arch/arm64/boot/dts/qcom/qcs404-evb.dtsi     | 14 ++++++++++++++
+>  4 files changed, 38 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
+>  create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
+>  create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/qcom/Makefile b/arch/arm64/boot/dts/qcom/Makefile
+> index a658c07652a7..21d548f02d39 100644
+> --- a/arch/arm64/boot/dts/qcom/Makefile
+> +++ b/arch/arm64/boot/dts/qcom/Makefile
+> @@ -8,3 +8,5 @@ dtb-$(CONFIG_ARCH_QCOM) += msm8994-angler-rev-101.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)        += msm8996-mtp.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)        += msm8998-mtp.dtb
+>  dtb-$(CONFIG_ARCH_QCOM)        += sdm845-mtp.dtb
+> +dtb-$(CONFIG_ARCH_QCOM)        += qcs404-evb-1000.dtb
+> +dtb-$(CONFIG_ARCH_QCOM)        += qcs404-evb-4000.dtb
+> diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts b/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
 > new file mode 100644
-> index 0000000..46a2754
+> index 000000000000..2c14903d808e
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
-> @@ -0,0 +1,81 @@
-> +Socionext UniPhier PCIe host controller bindings
+> +++ b/arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
+> @@ -0,0 +1,11 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, Linaro Limited
 > +
-> +This describes the devicetree bindings for PCIe host controller implemented
-> +on Socionext UniPhier SoCs.
+> +/dts-v1/;
 > +
-> +UniPhier PCIe host controller is based on the Synopsys DesignWare PCI core.
-> +It shares common functions with the PCIe DesignWare core driver and inherits
-> +common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
+> +#include "qcs404-evb.dtsi"
 > +
-> +Required properties:
-> +- compatible: Should be "socionext,uniphier-pcie".
-> +- reg: Specifies offset and length of the register set for the device.
-> +	According to the reg-names, appropriate register sets are required.
-> +- reg-names: Must include the following entries:
-> +    "dbi"    - controller configuration registers
-> +    "link"   - SoC-specific glue layer registers
-> +    "config" - PCIe configuration space
-> +- clocks: A phandle to the clock gate for PCIe glue layer including
-> +	the host controller.
-> +- resets: A phandle to the reset line for PCIe glue layer including
-> +	the host controller.
-> +- interrupts: A list of interrupt specifiers. According to the
-> +	interrupt-names, appropriate interrupts are required.
-> +- interrupt-names: Must include the following entries:
-> +    "dma" - DMA interrupt
-> +    "msi" - MSI interrupt
+> +/ {
+> +       model = "Qualcomm Technologies, Inc. QCS404 EVB 1000";
+> +       compatible = "qcom,qcs404-evb";
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts b/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
+> new file mode 100644
+> index 000000000000..11269ad3de0d
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
+> @@ -0,0 +1,11 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, Linaro Limited
 > +
-> +Optional properties:
-> +- phys: A phandle to generic PCIe PHY. According to the phy-names, appropriate
-> +	phys are required.
-> +- phy-names: Must be "pcie-phy".
+> +/dts-v1/;
 > +
-> +Required sub-node:
-> +- legacy-interrupt-controller: Specifies interrupt controller for legacy PCI
-> +	interrupts.
+> +#include "qcs404-evb.dtsi"
 > +
-> +Required properties for legacy-interrupt-controller:
-> +- interrupt-controller: identifies the node as an interrupt controller.
-> +- #interrupt-cells: specifies the number of cells needed to encode an
-> +	interrupt source. The value must be 1.
-> +- interrupt-parent: Phandle to the parent interrupt controller.
-> +- interrupts: An interrupt specifier for legacy interrupt.
+> +/ {
+> +       model = "Qualcomm Technologies, Inc. QCS404 EVB 4000";
+> +       compatible = "qcom,qcs404-evb";
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+> new file mode 100644
+> index 000000000000..91ecbdf0ecda
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
+> @@ -0,0 +1,14 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (c) 2018, Linaro Limited
 > +
-> +Example:
+> +#include "qcs404.dtsi"
 > +
-> +	pcie: pcie at 66000000 {
-> +		compatible = "socionext,uniphier-pcie", "snps,dw-pcie";
-> +		status = "disabled";
-> +		reg-names = "dbi", "link", "config";
-> +		reg = <0x66000000 0x1000>, <0x66010000 0x10000>,
-> +		      <0x2fff0000 0x10000>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		clocks = <&sys_clk 24>;
-> +		resets = <&sys_rst 24>;
-> +		num-lanes = <1>;
-> +		num-viewport = <1>;
-> +		bus-range = <0x0 0xff>;
-> +		device_type = "pci";
-> +		ranges =
-> +		/* downstream I/O */
-> +			<0x81000000 0 0x00000000  0x2ffe0000  0 0x00010000
-> +		/* non-prefetchable memory */
-> +			 0x82000000 0 0x00000000  0x20000000  0 0x0ffe0000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-names = "dma", "msi";
-> +		interrupts = <0 224 4>, <0 225 4>;
-> +		interrupt-map-mask = <0 0 0  7>;
-> +		interrupt-map = <0 0 0  1  &pcie_intc 1>,	/* INTA */
-> +				<0 0 0  2  &pcie_intc 2>,	/* INTB */
-> +				<0 0 0  3  &pcie_intc 3>,	/* INTC */
-> +				<0 0 0  4  &pcie_intc 4>;	/* INTD */
-
-This is not correct and we must fix this concept for all DWC based host
-bridges bindings. We are mapping INTX to inputs [0,1,2,3] of the host
-bridge interrupt controllers and the binding should reflect that.
-
-This should be the correct mapping:
-
-		interrupt-map = <0 0 0  1  &pcie_intc 0>,	/* INTA */
-				<0 0 0  2  &pcie_intc 1>,	/* INTB */
-				<0 0 0  3  &pcie_intc 2>,	/* INTC */
-				<0 0 0  4  &pcie_intc 3>;	/* INTD */
-
-Lorenzo
-
+> +/ {
+> +       aliases {
+> +               serial0 = &blsp1_uart2;
+> +       };
 > +
-> +		pcie_intc: legacy-interrupt-controller {
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +			interrupt-parent = <&gic>;
-> +			interrupts = <0 226 4>;
-> +		};
-> +	};
-> -- 
-> 2.7.4
-> 
+> +       chosen {
+> +               stdout-path = "serial0";
+> +       };
+> +};
+> --
+> 2.14.4
+>
