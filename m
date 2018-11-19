@@ -1,29 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 19 Nov 2018 14:52:50 +0100
-Subject: [PATCH 1/1] pinctrl: imx: fix NO_PAD_CTL setting for MMIO pads
-In-Reply-To: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-References: <1542036051-23840-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <CACRpkdajsAde9YL6G+2WZi+TUXd4QH5TfmwMcXCg=nL4eUJGLA@mail.gmail.com>
+Date: Mon, 19 Nov 2018 14:56:26 +0100
+Subject: [PATCH] ARM: smp_twd: Remove legacy TWD registration
+In-Reply-To: <20181115100659.18256-1-geert+renesas@glider.be>
+References: <20181115100659.18256-1-geert+renesas@glider.be>
+Message-ID: <CACRpkdY9ZPj0h5ZHnZsdMBe4o4aQ7dRanU=m6Q+r=5tP-oqYgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 4:25 PM A.s. Dong <aisheng.dong@nxp.com> wrote:
+On Thu, Nov 15, 2018 at 12:24 PM Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
 
-> After patch b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support"),
-> NO_PAD_CTL pads map are not skipped anymore which results in
-> a possible memory corruption. As we actually only need to create config
-> maps for SCU pads and MMIO pads which are not using the default config
-> (a.k.a IMX_NO_PAD_CTL), so let's add a proper check before creating
-> the config maps. And during MMIO pads parsing, we also need update the
-> list_p point as SCU case to ensure the pin data next parsed is correct.
+> As of commit 7484c727b636a838 ("ARM: realview: delete the RealView board
+> files"), the ARM Timer and Watchdog Unit is instantiated from DT only.
+> Moreover, the driver is selected from ARCH_MULTIPLATFORM platforms only,
+> which implies OF, TIMER_OF, and COMMON_CLK.
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Fixes: b96eea718bf6 ("pinctrl: fsl: add scu based pinctrl support")
-> Reported-by: Martin Kaiser <martin@kaiser.cx>
-> Suggested-by: Leonard Crestez <leonard.crestez@nxp.com>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> Hence remove all unused legacy infrastructure from the driver.
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Patch applied with all the test tags!
+Good riddance.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+>  arch/arm/kernel/smp_twd.c      | 66 ----------------------------------
+
+Does this driver have some intimate relationship to the arch
+or can we move it to drivers/clocksource?
 
 Yours,
 Linus Walleij
