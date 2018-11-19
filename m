@@ -1,37 +1,79 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Nov 2018 17:32:02 +0000
-Subject: [PATCH v11 00/24] kasan: add software tag-based mode for arm64
-In-Reply-To: <CAAeHK+xr04YNUY21osduxrVzxNEpiXZamSsFCGquvBD6JV6Lbw@mail.gmail.com>
-References: <cover.1542648335.git.andreyknvl@google.com>
- <CAAeHK+xr04YNUY21osduxrVzxNEpiXZamSsFCGquvBD6JV6Lbw@mail.gmail.com>
-Message-ID: <20181119173202.7pcxp5osupdw4t5t@lakrids.cambridge.arm.com>
+From: atish.patra@wdc.com (Atish Patra)
+Date: Mon, 19 Nov 2018 09:46:44 -0800
+Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
+In-Reply-To: <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
+References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
+ <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
+Message-ID: <40f24d50-eb1b-cef6-81e2-1bc9930bcbf5@wdc.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 06:28:57PM +0100, Andrey Konovalov wrote:
-> On Mon, Nov 19, 2018 at 6:26 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
-> > Changes in v11:
-> > - Rebased onto 9ff01193 (4.20-rc3).
-> > - Moved KASAN_SHADOW_SCALE_SHIFT definition to arch/arm64/Makefile.
-> > - Added and used CC_HAS_KASAN_GENERIC and CC_HAS_KASAN_SW_TAGS configs to
-> >   detect compiler support.
-> > - New patch: "kasan: rename kasan_zero_page to kasan_early_shadow_page".
-> > - New patch: "arm64: move untagged_addr macro from uaccess.h to memory.h".
-> > - Renamed KASAN_SET_TAG/... macros in arch/arm64/include/asm/memory.h to
-> >   __tag_set/... and reused them later in KASAN core code instead of
-> >   redefining.
-> > - Removed tag reset from the __kimg_to_phys() macro.
-> > - Fixed tagged pointer handling in arm64 fault handling logic.
+On 11/15/18 10:31 AM, Jeffrey Hugo wrote:
+> On 11/8/2018 6:50 PM, Atish Patra wrote:
+>> The cpu-map DT entry in ARM64 can describe the CPU topology in
+>> much better way compared to other existing approaches. RISC-V can
+>> easily adopt this binding to represent it's own CPU topology.
+>> Thus, both cpu-map DT binding and topology parsing code can be
+>> moved to a common location so that RISC-V or any other
+>> architecture can leverage that.
+>>
+>> The relevant discussion regarding unifying cpu topology can be
+>> found in [1].
+>>
+>> arch_topology seems to be a perfect place to move the common
+>> code. I have not introduced any functional changes in the moved
+>> to code. The only downside in this approach is that the capacity
+>> code will be executed for RISC-V as well. But, it will exit
+>> immediately after not able to find the appropriate DT node. If
+>> the overhead is considered too much, we can always compile out
+>> capacity related functions under a different config for the
+>> architectures that do not support them.
+>>
+>> The patches have been tested for RISC-V and compile tested for
+>> ARM64.
+>>
+>> The socket changes[2] can be merged on top of this series or vice
+>> versa.
+>>
+>> [1] https://lkml.org/lkml/2018/11/6/19
+>> [2] https://lkml.org/lkml/2018/11/7/918
+>>
+>> Atish Patra (3):
+>>     dt-binding: cpu-topology: Move cpu-map to a common binding.
+>>     cpu-topology: Move cpu topology code to common code.
+>>     RISC-V: Parse cpu topology during boot.
+>>
+>>    Documentation/devicetree/bindings/arm/topology.txt | 475 -------------------
+>>    .../devicetree/bindings/cpu/cpu-topology.txt       | 526 +++++++++++++++++++++
+>>    arch/arm64/include/asm/topology.h                  |  23 +-
+>>    arch/arm64/kernel/topology.c                       | 305 +-----------
+>>    arch/riscv/Kconfig                                 |   1 +
+>>    arch/riscv/kernel/smpboot.c                        |   6 +-
+>>    drivers/base/arch_topology.c                       | 303 ++++++++++++
+>>    include/linux/arch_topology.h                      |  23 +
+>>    include/linux/topology.h                           |   1 +
+>>    9 files changed, 864 insertions(+), 799 deletions(-)
+>>    delete mode 100644 Documentation/devicetree/bindings/arm/topology.txt
+>>    create mode 100644 Documentation/devicetree/bindings/cpu/cpu-topology.txt
+>>
 > 
-> Hi Mark and Catalin,
+> I was interested in testing these on QDF2400, an ARM64 platform, since
+> this series touches core ARM64 code and I'd hate to see a regression.
+> However, I can't figure out what baseline to use to apply these.
+> Different patches cause different conflicts of a variety of baselines I
+> attempted.
+> 
+> What are these intended to apply to?
+> 
+I had rebased them on top of 4.20-rc1.
 
-Hi Andrey,
+> Also, you might want to run them through checkpatch next time.  There
+> are several whitespace errors.
+> 
+Sorry I missed couple of them.
+Thanks for trying to test the patches. I will send a next version as Rob 
+suggested. Please test that.
 
-> I've addressed your comments, please take a look.
 
-Catalin and I have just returned from Linux Plumbers and are ctaching up
-with things. I do intend to look at this, but it may take me a short
-while before I can.
-
-Thanks,
-Mark.
+Regards,
+Atish
