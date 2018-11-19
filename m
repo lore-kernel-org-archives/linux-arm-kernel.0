@@ -1,53 +1,331 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 19 Nov 2018 10:00:02 +0100
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77965: Add CAN controller
- nodes
-In-Reply-To: <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
-References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
- <20181118230250.GA2553@kunai> <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
-Message-ID: <CAMuHMdUjONJYypV0a5wnxyBx+sUMHzRwZObQ=d7xFG2ZSCM3Ag@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Mon, 19 Nov 2018 10:01:19 +0100
+Subject: [PATCH v2] drm/rockchip: update cursors asynchronously through
+ atomic.
+In-Reply-To: <CAAFQd5BXOmCmwL1i=aBCy5rZn37e-9pYg_WXkgrCG9emV+zKtA@mail.gmail.com>
+References: <20180928082722.26951-1-enric.balletbo@collabora.com>
+ <CAAFQd5BXOmCmwL1i=aBCy5rZn37e-9pYg_WXkgrCG9emV+zKtA@mail.gmail.com>
+Message-ID: <CAFqH_53_p8C_K8hXPLFCX-GedaVQY4xXD5FGjYr=vCHe--2RnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Tomasz,
 
-On Mon, Nov 19, 2018 at 12:46 AM Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 11/19/2018 12:02 AM, Wolfram Sang wrote:
-> > On Sun, Nov 18, 2018 at 06:33:26PM +0100, Marek Vasut wrote:
-> >> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >>
-> >> This patch adds CAN{0,1} controller nodes for the R8A77965 SoC.
-> >>
-> >> Based on several similar patches of the R8A7795 device tree
-> >> by Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> >> and Geert Uytterhoeven <geert+renesas@glider.be>.
-> >>
-> >> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> >> Cc: Rob Herring <robh@kernel.org>
-> >> Cc: Simon Horman <horms+renesas@verge.net.au>
-> >> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >> Cc: linux-renesas-soc at vger.kernel.org
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >
-> > Were you able to do some testing using EXIO connectors? Would be nice to
-> > know what was tested.
+cc'ing Helen as she will continue the work.
+
+Missatge de Tomasz Figa <tfiga@chromium.org> del dia dc., 14 de nov.
+2018 a les 9:49:
 >
-> Not on the M3N, since I don't see it broken out on the EXIO ; is it
-> really there ? It'd be easy to test on M3NSK with KF, but I don't have
-> either KF or M3NSK.
+> Hi Enric,
+>
+> On Fri, Sep 28, 2018 at 5:27 PM Enric Balletbo i Serra
+> <enric.balletbo@collabora.com> wrote:
+> >
+> > Add support to async updates of cursors by using the new atomic
+> > interface for that.
+> >
+> > Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > ---
+> > Hi,
+> >
+> > This is a second version of the patch to add async-plane update support
+> > to the Rockchip driver.
+> >
+>
+> I'm really sorry for the super late reply. I couldn't get cycles to
+> look at this earlier. :(
+>
 
-Please have a look at EXIO Connector D, pins 13/14/15.
+No problem, many thanks for looking at it.
 
-Gr{oetje,eeting}s,
+> > The patch was tested on a Samsung Chromebook Plus in two ways.
+> >
+> >  1. Running all igt kms_cursor_legacy and kms_atomic tests and see that
+> > there is no regression after the patch.
+> >     Note that before the patch, the following igt tests failed:
+> >     - basic-flip-before-cursor-legacy
+> >     - basic-flip-before-cursor-atomic
+> >     - cursor-vs-flip-legacy
+> >     - cursor-vs-flip-toggle
+> >     - flip-vs-cursor-atomic
+> >     - flip-vs-cursor-crc-atomic
+> >     - flip-vs-cursor-crc-legacy
+> >     - flip-vs-cursor-legacy
+> >     - flip-vs-cursor-crc-atomic
+> >     - flip-vs-cursor-crc-legacy
+>
+> Are the last 2 tests repeated?
+>
+Right, are repeated sorry.
 
-                        Geert
+> >
+> >     With the patch applied only two tests don't fail (these two are
+> > expexted to not pass right now):
+> >     - flip-vs-cursor-crc-atomic
+> >     - flip-vs-cursor-crc-legac
+>
+> Did you mean "don't pass"?
+>
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Yes, the only two tests that don't pass are the cursor-crc ones.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> >
+> >     You can check full IGT test report here:
+> >     - Before the patch:
+> >         https://people.collabora.com/~eballetbo/tests/igt/samsung-chromebook-plus/igt-1.23/4.19-rc5/index.html
+> >     - With the patch applied:
+> >         https://people.collabora.com/~eballetbo/tests/igt/samsung-chromebook-plus/igt-1.23/4.19-rc5-async-update/index.html
+> >
+> >  2. Running weston using the atomic API.
+> >
+> > Best regards,
+> >   Enric
+> >
+> > Changes in v2:
+> > - Change the framebuffer as well to cover jumpy cursor when hovering
+> >   text boxes or hyperlink. (Tomasz)
+> > - Use the PSR inhibit mechanism when accessing VOP hardware instead of
+> >   PSR flushing (Tomasz)
+> >
+> > Changes in v1:
+> > - Rebased on top of drm-misc
+> > - In async_check call drm_atomic_helper_check_plane_state to check that
+> >   the desired plane is valid and update various bits of derived state
+> >   (clipped coordinates etc.)
+> > - In async_check allow to configure new scaling in the fast path.
+> > - In async_update force to flush all registered PSR encoders.
+> > - In async_update call atomic_update directly.
+> > - In async_update call vop_cfg_done needed to set the vop registers and take effect.
+> >
+> >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 36 ------------
+> >  drivers/gpu/drm/rockchip/rockchip_drm_psr.c | 37 ++++++++++++
+> >  drivers/gpu/drm/rockchip/rockchip_drm_psr.h |  3 +
+> >  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 62 +++++++++++++++++++++
+> >  4 files changed, 102 insertions(+), 36 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > index 7b6f7227d476..aec9a997de13 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+> > @@ -128,24 +128,6 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+> >         return ERR_PTR(ret);
+> >  }
+> >
+> > -static void
+> > -rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+> > -{
+> > -       struct drm_crtc *crtc;
+> > -       struct drm_crtc_state *crtc_state;
+> > -       struct drm_encoder *encoder;
+> > -       u32 encoder_mask = 0;
+> > -       int i;
+> > -
+> > -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> > -               encoder_mask |= crtc_state->encoder_mask;
+> > -               encoder_mask |= crtc->state->encoder_mask;
+> > -       }
+> > -
+> > -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> > -               rockchip_drm_psr_inhibit_get(encoder);
+> > -}
+> > -
+> >  uint32_t rockchip_drm_get_vblank_ns(struct drm_display_mode *mode)
+> >  {
+> >         uint64_t vblank_time = mode->vtotal - mode->vdisplay;
+> > @@ -156,24 +138,6 @@ uint32_t rockchip_drm_get_vblank_ns(struct drm_display_mode *mode)
+> >         return vblank_time;
+> >  }
+> >
+> > -static void
+> > -rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+> > -{
+> > -       struct drm_crtc *crtc;
+> > -       struct drm_crtc_state *crtc_state;
+> > -       struct drm_encoder *encoder;
+> > -       u32 encoder_mask = 0;
+> > -       int i;
+> > -
+> > -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> > -               encoder_mask |= crtc_state->encoder_mask;
+> > -               encoder_mask |= crtc->state->encoder_mask;
+> > -       }
+> > -
+> > -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> > -               rockchip_drm_psr_inhibit_put(encoder);
+> > -}
+> > -
+> >  static void
+> >  rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
+> >  {
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> > index 79d00d861a31..1635485955d3 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+> > @@ -13,6 +13,7 @@
+> >   */
+> >
+> >  #include <drm/drmP.h>
+> > +#include <drm/drm_atomic.h>
+> >  #include <drm/drm_crtc_helper.h>
+> >
+> >  #include "rockchip_drm_drv.h"
+> > @@ -109,6 +110,42 @@ int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder)
+> >  }
+> >  EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put);
+> >
+> > +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+> > +{
+> > +       struct drm_crtc *crtc;
+> > +       struct drm_crtc_state *crtc_state;
+> > +       struct drm_encoder *encoder;
+> > +       u32 encoder_mask = 0;
+> > +       int i;
+> > +
+> > +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> > +               encoder_mask |= crtc_state->encoder_mask;
+> > +               encoder_mask |= crtc->state->encoder_mask;
+> > +       }
+> > +
+> > +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> > +               rockchip_drm_psr_inhibit_get(encoder);
+> > +}
+> > +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_get_state);
+> > +
+> > +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+> > +{
+> > +       struct drm_crtc *crtc;
+> > +       struct drm_crtc_state *crtc_state;
+> > +       struct drm_encoder *encoder;
+> > +       u32 encoder_mask = 0;
+> > +       int i;
+> > +
+> > +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+> > +               encoder_mask |= crtc_state->encoder_mask;
+> > +               encoder_mask |= crtc->state->encoder_mask;
+> > +       }
+> > +
+> > +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+> > +               rockchip_drm_psr_inhibit_put(encoder);
+> > +}
+> > +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put_state);
+> > +
+> >  /**
+> >   * rockchip_drm_psr_inhibit_get - acquire PSR inhibit on given encoder
+> >   * @encoder: encoder to obtain the PSR encoder
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> > index 860c62494496..25350ba3237b 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+> > @@ -20,6 +20,9 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev);
+> >  int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
+> >  int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
+> >
+> > +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state);
+> > +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state);
+> > +
+> >  int rockchip_drm_psr_register(struct drm_encoder *encoder,
+> >                         int (*psr_set)(struct drm_encoder *, bool enable));
+> >  void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > index 6642c2b9bb3c..682ce40166f7 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> > @@ -819,10 +819,72 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+> >         spin_unlock(&vop->reg_lock);
+> >  }
+> >
+> > +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+> > +                                       struct drm_plane_state *state)
+> > +{
+> > +       struct vop_win *vop_win = to_vop_win(plane);
+> > +       const struct vop_win_data *win = vop_win->data;
+> > +       int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
+> > +                                       DRM_PLANE_HELPER_NO_SCALING;
+> > +       int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
+> > +                                       DRM_PLANE_HELPER_NO_SCALING;
+> > +       struct drm_crtc_state *crtc_state;
+> > +       int ret;
+> > +
+> > +       if (plane != state->crtc->cursor)
+> > +               return -EINVAL;
+> > +
+> > +       if (!plane->state)
+> > +               return -EINVAL;
+> > +
+> > +       if (!plane->state->fb)
+> > +               return -EINVAL;
+> > +
+> > +       if (state->state)
+> > +               crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+> > +                                                               state->crtc);
+> > +       else /* Special case for asynchronous cursor updates. */
+> > +               crtc_state = plane->crtc->state;
+> > +
+> > +       ret = drm_atomic_helper_check_plane_state(plane->state,
+> > +                                                 crtc_state,
+> > +                                                 min_scale, max_scale,
+> > +                                                 true, true);
+> > +       return ret;
+> > +}
+> > +
+> > +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+> > +                                         struct drm_plane_state *new_state)
+> > +{
+> > +       struct vop *vop = to_vop(plane->state->crtc);
+> > +
+> > +       plane->state->crtc_x = new_state->crtc_x;
+> > +       plane->state->crtc_y = new_state->crtc_y;
+> > +       plane->state->crtc_h = new_state->crtc_h;
+> > +       plane->state->crtc_w = new_state->crtc_w;
+> > +       plane->state->src_x = new_state->src_x;
+> > +       plane->state->src_y = new_state->src_y;
+> > +       plane->state->src_h = new_state->src_h;
+> > +       plane->state->src_w = new_state->src_w;
+> > +
+> > +       drm_atomic_set_fb_for_plane(plane->state, new_state->fb);
+>
+> Isn't this going to drop the old fb reference on the floor without
+> waiting for the hardware to actually stop scanning out from it?
+>
+
+Hmm, yes you've reason. Thanks for pointing it.
+
+> I believe we need to do something similar to what's already in
+> vop_crtc_commit_flush(), but not called on this async path
+> https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/tree/drivers/gpu/drm/rockchip/rockchip_drm_vop.c?h=next-20181114#n1045
+>
+> Perhaps it would be an option to call vop_crtc_commit_flush() from here?
+>
+
+We'll look at this for the third version, thanks!
+
+> Best regards,
+> Tomasz
+>
+> > +
+> > +       if (vop->is_enabled) {
+> > +               rockchip_drm_psr_inhibit_get_state(new_state->state);
+> > +               vop_plane_atomic_update(plane, plane->state);
+> > +               spin_lock(&vop->reg_lock);
+> > +               vop_cfg_done(vop);
+> > +               spin_unlock(&vop->reg_lock);
+> > +               rockchip_drm_psr_inhibit_put_state(new_state->state);
+> > +       }
+> > +}
+> > +
+> >  static const struct drm_plane_helper_funcs plane_helper_funcs = {
+> >         .atomic_check = vop_plane_atomic_check,
+> >         .atomic_update = vop_plane_atomic_update,
+> >         .atomic_disable = vop_plane_atomic_disable,
+> > +       .atomic_async_check = vop_plane_atomic_async_check,
+> > +       .atomic_async_update = vop_plane_atomic_async_update,
+> >  };
+> >
+> >  static const struct drm_plane_funcs vop_plane_funcs = {
+> > --
+> > 2.19.0
+> >
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
