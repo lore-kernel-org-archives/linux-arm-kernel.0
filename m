@@ -1,62 +1,93 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Mon, 19 Nov 2018 09:38:33 +0100
-Subject: [PATCH v2 06/12] drm/sun4i: sun6i_mipi_dsi: Probe tcon0 during
- dsi_bind
-In-Reply-To: <20181116163916.29621-7-jagan@amarulasolutions.com>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-7-jagan@amarulasolutions.com>
-Message-ID: <20181119083833.d7ysiv3tenabtrdj@flea>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 19 Nov 2018 08:50:43 +0000
+Subject: [PATCH] drm/sun4i: hdmi: Improve compatibility with non-hotplug
+ capable connectors
+In-Reply-To: <20181119081934.ohjg36zjcb52nrrq@flea>
+References: <20181116171830.23465-1-plaes@plaes.org>
+ <20181119081934.ohjg36zjcb52nrrq@flea>
+Message-ID: <20181119085043.ptypvtr2wybqcjxi@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:09:10PM +0530, Jagan Teki wrote:
-> Probe tcon0 during dsi_bind, so-that the tcon attributes like
-> divider value, clock rate can get whenever it need.
+On Mon, Nov 19, 2018 at 09:19:34AM +0100, Maxime Ripard wrote:
+> Hi,
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 7 +++++++
->  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.h | 1 +
->  2 files changed, 8 insertions(+)
+> On Fri, Nov 16, 2018 at 07:18:29PM +0200, Priit Laes wrote:
+> > From: Priit Laes <priit.laes@paf.com>
+> > 
+> > Even though HDMI connector features hotplug detect pin (HPD), there are
+> > devices that which do not support it.
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> index d60955880c43..66a01061e51d 100644
-> --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> @@ -25,6 +25,7 @@
->  #include <drm/drm_panel.h>
->  
->  #include "sun4i_drv.h"
-> +#include "sun4i_tcon.h"
->  #include "sun6i_mipi_dsi.h"
->  
->  #include <video/mipi_display.h>
-> @@ -1007,6 +1008,7 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
->  	struct drm_device *drm = data;
->  	struct sun4i_drv *drv = drm->dev_private;
->  	struct sun6i_dsi *dsi = dev_get_drvdata(dev);
-> +	struct sun4i_tcon *tcon0 = sun4i_get_tcon0(drm);
->  	int ret;
->  
->  	if (!dsi->panel)
-> @@ -1014,6 +1016,11 @@ static int sun6i_dsi_bind(struct device *dev, struct device *master,
->  
->  	dsi->drv = drv;
->  
-> +	if (!tcon0)
-> +		return -EPROBE_DEFER;
+> Which devices?
 
-You can't fall in that condition. The component framework won't call
-bind unless every components have been probed.
+Device I have here is labelled "AMATIC INDUSTRIES PT-MULTI-1" and
+based on the TFP401APZP chip.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181119/da3b971c/attachment.sig>
+> 
+> > For these devices fall back to additional check on I2C bus. Of
+> > course, there might be also devices that do not wire DDC pins too,
+> > so we don't really know whether cable has been connected.
+> 
+> Again, which devices?
+
+OK, let's skip the part without DDC. I was probably thinking about
+VGA cables when I was writing that..
+
+> > 
+> > Signed-off-by: Priit Laes <plaes@plaes.org>
+> > Signed-off-by: Priit Laes <priit.laes@paf.com>
+> 
+> You only need one :)
+> 
+> > ---
+> >  drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c | 12 ++++++++----
+> >  1 file changed, 8 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > index 061d2e0d9011..bded09af1340 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_hdmi_enc.c
+> > @@ -238,14 +238,18 @@ sun4i_hdmi_connector_detect(struct drm_connector *connector, bool force)
+> >  	struct sun4i_hdmi *hdmi = drm_connector_to_sun4i_hdmi(connector);
+> >  	unsigned long reg;
+> >  
+> > -	if (readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
+> > +	if (!readl_poll_timeout(hdmi->base + SUN4I_HDMI_HPD_REG, reg,
+> >  			       reg & SUN4I_HDMI_HPD_HIGH,
+> >  			       0, 500000)) {
+> > -		cec_phys_addr_invalidate(hdmi->cec_adap);
+> > -		return connector_status_disconnected;
+> > +		return connector_status_connected;
+> >  	}
+> >  
+> > -	return connector_status_connected;
+> > +	if (!IS_ERR(hdmi->i2c) && drm_probe_ddc(hdmi->i2c))
+> > +		return connector_status_connected;
+> > +
+> > +	cec_phys_addr_invalidate(hdmi->cec_adap);
+> > +
+> > +	return connector_status_unknown;
+> 
+> You're doing basically two things in that patch, first adding the
+> fallback to the DDC probe if the hotplug mechanism couldn't detect the
+> display, and then returning a status unknown if both fail.
+
+Agreed. 'connector_status_disconnected' is the way to go.
+
+> While I don't really have an opinion on the first one, it's mandatory
+> for every HDMI device to be able to retrieve the EDID through the
+> DDC. If a device was to disallow that, it would violate the HDMI, and
+> I'm not sure we want to start supporting those devices.
+
+Yes, Even if someone runs into those non-spec devices, then there's
+also possibility to use the force argument.
+
+Thanks for review!
+
+> 
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Bootlin
+> Embedded Linux and Kernel engineering
+> https://bootlin.com
