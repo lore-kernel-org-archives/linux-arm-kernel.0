@@ -1,77 +1,151 @@
-From: rppt@linux.ibm.com (Mike Rapoport)
-Date: Mon, 19 Nov 2018 08:26:24 -0800
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
- <20181116182836.GB17088@rapoport-lnx>
- <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
- <20181117143742.GB7861@bombadil.infradead.org>
- <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
-Message-ID: <20181119162623.GA13200@rapoport-lnx>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 19 Nov 2018 17:26:59 +0100
+Subject: [PATCH 4.19 112/205] perf cs-etm: Correct CPU mode for samples
+In-Reply-To: <20181119162616.586062722@linuxfoundation.org>
+References: <20181119162616.586062722@linuxfoundation.org>
+Message-ID: <20181119162634.771580711@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 08:43:09PM +0530, Souptick Joarder wrote:
-> Hi Mike,
-> 
-> On Sat, Nov 17, 2018 at 8:07 PM Matthew Wilcox <willy@infradead.org> wrote:
-> >
-> > On Sat, Nov 17, 2018 at 12:26:38PM +0530, Souptick Joarder wrote:
-> > > On Fri, Nov 16, 2018 at 11:59 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
-> > > > > + * vm_insert_range - insert range of kernel pages into user vma
-> > > > > + * @vma: user vma to map to
-> > > > > + * @addr: target user address of this page
-> > > > > + * @pages: pointer to array of source kernel pages
-> > > > > + * @page_count: no. of pages need to insert into user vma
-> > > > > + *
-> > > > > + * This allows drivers to insert range of kernel pages they've allocated
-> > > > > + * into a user vma. This is a generic function which drivers can use
-> > > > > + * rather than using their own way of mapping range of kernel pages into
-> > > > > + * user vma.
-> > > >
-> > > > Please add the return value and context descriptions.
-> > > >
-> > >
-> > > Sure I will wait for some time to get additional review comments and
-> > > add all of those requested changes in v2.
-> >
-> > You could send your proposed wording now which might remove the need
-> > for a v3 if we end up arguing about the wording.
-> 
-> Does this description looks good ?
-> 
-> /**
->  * vm_insert_range - insert range of kernel pages into user vma
->  * @vma: user vma to map to
->  * @addr: target user address of this page
->  * @pages: pointer to array of source kernel pages
->  * @page_count: number of pages need to insert into user vma
->  *
->  * This allows drivers to insert range of kernel pages they've allocated
->  * into a user vma. This is a generic function which drivers can use
->  * rather than using their own way of mapping range of kernel pages into
->  * user vma.
->  *
->  * Context - Process context. Called by mmap handlers.
+4.19-stable review patch.  If anyone has any objections, please let me know.
 
-Context:
+------------------
 
->  * Return - int error value
+From: Leo Yan <leo.yan@linaro.org>
 
-Return:
+commit d6c9c05fe1eb4b213b183d8a1e79416256dc833a upstream.
 
->  * 0                    - OK
->  * -EINVAL              - Invalid argument
->  * -ENOMEM              - No memory
->  * -EFAULT              - Bad address
->  * -EBUSY               - Device or resource busy
+Since commit edeb0c90df35 ("perf tools: Stop fallbacking to kallsyms for
+vdso symbols lookup"), the kernel address cannot be properly parsed to
+kernel symbol with command 'perf script -k vmlinux'.  The reason is
+CoreSight samples is always to set CPU mode as PERF_RECORD_MISC_USER,
+thus it fails to find corresponding map/dso in below flows:
 
-I don't think that elaborate description of error values is needed, just "0
-on success and error code otherwise" would be sufficient.
+  process_sample_event()
+    `-> machine__resolve()
+	  `-> thread__find_map(thread, sample->cpumode, sample->ip, al);
 
->  */
-> 
+In this flow it needs to pass argument 'sample->cpumode' to tell what's
+the CPU mode, before it always passed PERF_RECORD_MISC_USER but without
+any failure until the commit edeb0c90df35 ("perf tools: Stop fallbacking
+to kallsyms for vdso symbols lookup") has been merged.  The reason is
+even with the wrong CPU mode the function thread__find_map() firstly
+fails to find map but it will rollback to find kernel map for vdso
+symbols lookup.  In the latest code it has removed the fallback code,
+thus if CPU mode is PERF_RECORD_MISC_USER then it cannot find map
+anymore with kernel address.
 
--- 
-Sincerely yours,
-Mike.
+This patch is to correct samples CPU mode setting, it creates a new
+helper function cs_etm__cpu_mode() to tell what's the CPU mode based on
+the address with the info from machine structure; this patch has a bit
+extension to check not only kernel and user mode, but also check for
+host/guest and hypervisor mode.  Finally this patch uses the function in
+instruction and branch samples and also apply in cs_etm__mem_access()
+for a minor polishing.
+
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+Cc: Adrian Hunter <adrian.hunter@intel.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: David Miller <davem@davemloft.net>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Namhyung Kim <namhyung@kernel.org>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: coresight at lists.linaro.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: stable at kernel.org # v4.19
+Link: http://lkml.kernel.org/r/1540883908-17018-1-git-send-email-leo.yan at linaro.org
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ tools/perf/util/cs-etm.c |   39 ++++++++++++++++++++++++++++++---------
+ 1 file changed, 30 insertions(+), 9 deletions(-)
+
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -244,6 +244,27 @@ static void cs_etm__free(struct perf_ses
+ 	zfree(&aux);
+ }
+ 
++static u8 cs_etm__cpu_mode(struct cs_etm_queue *etmq, u64 address)
++{
++	struct machine *machine;
++
++	machine = etmq->etm->machine;
++
++	if (address >= etmq->etm->kernel_start) {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_KERNEL;
++		else
++			return PERF_RECORD_MISC_GUEST_KERNEL;
++	} else {
++		if (machine__is_host(machine))
++			return PERF_RECORD_MISC_USER;
++		else if (perf_guest)
++			return PERF_RECORD_MISC_GUEST_USER;
++		else
++			return PERF_RECORD_MISC_HYPERVISOR;
++	}
++}
++
+ static u32 cs_etm__mem_access(struct cs_etm_queue *etmq, u64 address,
+ 			      size_t size, u8 *buffer)
+ {
+@@ -258,10 +279,7 @@ static u32 cs_etm__mem_access(struct cs_
+ 		return -1;
+ 
+ 	machine = etmq->etm->machine;
+-	if (address >= etmq->etm->kernel_start)
+-		cpumode = PERF_RECORD_MISC_KERNEL;
+-	else
+-		cpumode = PERF_RECORD_MISC_USER;
++	cpumode = cs_etm__cpu_mode(etmq, address);
+ 
+ 	thread = etmq->thread;
+ 	if (!thread) {
+@@ -653,7 +671,7 @@ static int cs_etm__synth_instruction_sam
+ 	struct perf_sample sample = {.ip = 0,};
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, addr);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+ 	sample.ip = addr;
+@@ -665,7 +683,7 @@ static int cs_etm__synth_instruction_sam
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+ 	sample.insn_len = 1;
+-	sample.cpumode = event->header.misc;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	if (etm->synth_opts.last_branch) {
+ 		cs_etm__copy_last_branch_rb(etmq);
+@@ -706,12 +724,15 @@ static int cs_etm__synth_branch_sample(s
+ 		u64			nr;
+ 		struct branch_entry	entries;
+ 	} dummy_bs;
++	u64 ip;
++
++	ip = cs_etm__last_executed_instr(etmq->prev_packet);
+ 
+ 	event->sample.header.type = PERF_RECORD_SAMPLE;
+-	event->sample.header.misc = PERF_RECORD_MISC_USER;
++	event->sample.header.misc = cs_etm__cpu_mode(etmq, ip);
+ 	event->sample.header.size = sizeof(struct perf_event_header);
+ 
+-	sample.ip = cs_etm__last_executed_instr(etmq->prev_packet);
++	sample.ip = ip;
+ 	sample.pid = etmq->pid;
+ 	sample.tid = etmq->tid;
+ 	sample.addr = cs_etm__first_executed_instr(etmq->packet);
+@@ -720,7 +741,7 @@ static int cs_etm__synth_branch_sample(s
+ 	sample.period = 1;
+ 	sample.cpu = etmq->packet->cpu;
+ 	sample.flags = 0;
+-	sample.cpumode = PERF_RECORD_MISC_USER;
++	sample.cpumode = event->sample.header.misc;
+ 
+ 	/*
+ 	 * perf report cannot handle events without a branch stack
