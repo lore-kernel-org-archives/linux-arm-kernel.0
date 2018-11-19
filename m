@@ -1,43 +1,28 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Mon, 19 Nov 2018 10:11:23 +0100
-Subject: [PATCH 0/3] ARM: davinci: fix ethernet support on da850-evm
-In-Reply-To: <CACRpkda4aarCn=PHPSWfMgtOZhcGA2ifcA7_ujYgmj+do2+N+Q@mail.gmail.com>
-References: <20181113135051.15308-1-brgl@bgdev.pl>
- <CACRpkda4aarCn=PHPSWfMgtOZhcGA2ifcA7_ujYgmj+do2+N+Q@mail.gmail.com>
-Message-ID: <CAMRc=MeAR=aW0FKNyRm0xy075BkF=cpDJyJDiwtWpWcmkdmF2A@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 19 Nov 2018 10:25:53 +0100
+Subject: [PATCH 0/4] reset: uniphier: Rename from USB3 reset to glue
+ reset and add AHCI reset support
+In-Reply-To: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1541727727-10821-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <1542619553.5139.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pt., 16 lis 2018 o 22:51 Linus Walleij <linus.walleij@linaro.org> napisa?(a):
->
-> On Tue, Nov 13, 2018 at 2:51 PM Bartosz Golaszewski <brgl@bgdev.pl> wrote:
->
-> > From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> >
-> > Ethernet doesn't work on da850-evm in legacy boot mode since v4.19. This
-> > series addresses two problems I've found. I guess with this kind of
-> > intrusive changes in the GPIO driver, other boards may be broken at the
-> > moment too.
-> >
-> > Bartosz Golaszewski (3):
-> >   ARM: davinci: define gpio interrupts as separate resources
-> >   gpio: davinci: restore a way to manually specify the GPIO base
-> >   ARM: davinci: fix da850-evm boot in legacy mode
->
-> I have some patches starting to move DaVinci over to using only
-> descriptor tables, but that's not somthing we can pull off overnight
-> so I guess we have to go for this solution.
->
+On Fri, 2018-11-09 at 10:42 +0900, Kunihiko Hayashi wrote:
+> This series renames the reset control of core reset included in USB3 glue
+> layer with in the glue layer for generic peripherals to allow other devices
+> to use it.
+> 
+> And this series adds support for the core reset included in AHCI glue layer.
+> 
+> Kunihiko Hayashi (4):
+>   dt-bindings: reset: uniphier: Replace the expression of USB3 with
+>     generic peripherals
+>   reset: uniphier-usb3: Rename to reset-uniphier-glue
+>   dt-bindings: reset: uniphier: Add AHCI core reset description
+>   reset: uniphier-glue: Add AHCI reset control support in glue layer
 
-Nice, would you mind sharing the development branch? I'm interested in
-it as well and may be doing some work on that early 2019 so let's sync
-to avoid duplicating the effort.
+Thank you, applied to reset/next.
 
-Bart
-
-> Can we have ACKs from the DaVinci maintainers so I can merge
-> all three patches through the GPIO tree fixes? Else I'm fine
-> with merging through ARM SoC.
->
-> Yours,
-> Linus Walleij
+regards
+Philipp
