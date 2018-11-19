@@ -1,111 +1,55 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Mon, 19 Nov 2018 13:54:59 +0800
-Subject: [PATCH v5 04/12] drm/mediatek: Add support for mmsys through a
- pdev
-In-Reply-To: <20181116125449.23581-5-matthias.bgg@kernel.org>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-5-matthias.bgg@kernel.org>
-Message-ID: <1542606899.32082.15.camel@mtksdaap41>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Mon, 19 Nov 2018 07:13:07 +0100
+Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto API
+ code
+In-Reply-To: <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
+References: <20181105232526.173947-1-ebiggers@kernel.org>
+ <20181105232526.173947-11-ebiggers@kernel.org>
+ <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
+ <20181112185816.GA8663@gmail.com>
+ <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
+ <20181117001718.GA175522@gmail.com>
+ <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
+ <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
+Message-ID: <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
+Hi Herbert,
 
-On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
-> From: Matthias Brugger <mbrugger@suse.com>
-> 
-> The MMSYS subsystem includes clocks and drm components.
-> This patch adds an initailization path through a platform device
-> for the clock part, so that both drivers get probed from the same
-> device tree compatible.
+On Mon, Nov 19, 2018 at 6:25 AM Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> My proposal is to merge the zinc interface as is, but to invert
+> how we place the algorithm implementations.  IOW the implementations
+> should stay where they are now, with in the crypto API.  However,
+> we will provide direct access to them for zinc without going through
+> the crypto API.  IOW we'll just export the functions directly.
 
-Looks good to me except one coding style preference.
+Sorry, but there isn't a chance I'll agree to this. The whole idea is
+to have a clean place to focus on synchronous software
+implementations, and not keep it tangled up with the asynchronous API.
+If WireGuard and Zinc go in, it's going to be done right, not in a way
+that introduces more problems and organizational complexity. Avoiding
+the solution proposed here is kind of the point. And given that
+cryptographic code is so security sensitive, I want to make sure this
+is done right, as opposed to rushing it with some half-baked
+concoction that will be maybe possibly be replaced "later". From
+talking to folks at Plumbers, I believe most of the remaining issues
+are taken care of by the upcoming v9, and that you're overstating the
+status of discussions regarding that.
 
-Reviewed-by: CK Hu <ck.hu@mediatek.com>
+I think the remaining issue right now is how to order my series and
+Eric's series. If Eric's goes in first, it means that I can either a)
+spend some time developing Zinc further _now_ to support chacha12 and
+keep the top two conversion patches, or b) just drop the top two
+conversion patches and work that out carefully with Eric after. I
+think (b) would be better, but I'm happy to do (a) if you disagree.
+And as I mentioned in the last email, I'd prefer Eric's work to go in
+after Zinc, but I don't think the reasoning for that is particularly
+strong, so it seems fine to merge Eric's work first.
 
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 23 +++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h |  2 ++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 99dd612a6683..18fc761ba94f 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -199,6 +199,7 @@ static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
->  	.ext_path = mt2701_mtk_ddp_ext,
->  	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
->  	.shadow_register = true,
-> +	.clk_drv_name = "clk-mt2701-mm",
->  };
->  
->  static const struct mtk_mmsys_driver_data mt2712_mmsys_driver_data = {
-> @@ -215,6 +216,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
->  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
->  	.ext_path = mt8173_mtk_ddp_ext,
->  	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
-> +	.clk_drv_name = "clk-mt8173-mm",
->  };
->  
->  static int mtk_drm_kms_init(struct drm_device *drm)
-> @@ -473,6 +475,24 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  	if (IS_ERR(private->config_regs))
->  		return PTR_ERR(private->config_regs);
->  
-> +	/*
-> +	 * For legacy reasons we need to probe the clock driver via
-> +	 * a platfomr device. This is outdated and should not be used
-> +	 * in newer SoCs.
-> +	 */
-> +	if (private->data->clk_drv_name) {
-> +		private->clk_dev = platform_device_register_data(dev,
-> +						private->data->clk_drv_name, -1,
-> +						NULL, 0);
-> +
-> +		if (IS_ERR(private->clk_dev)) {
-> +			pr_err("failed to register %s platform device\n",
-> +						private->data->clk_drv_name);
-
-I would like to align to the right of '('.
+I'll post v9 pretty soon and you can see how things are shaping up.
+Hopefully before then Eric/Ard/you can provide some feedback on
+whether you'd prefer (a) or (b) above.
 
 Regards,
-CK
-
-> +
-> +			return PTR_ERR(private->clk_dev);
-> +		}
-> +	}
-> +
->  	/* Iterate over sibling DISP function blocks */
->  	for_each_child_of_node(dev->of_node->parent, node) {
->  		const struct of_device_id *of_id;
-> @@ -577,6 +597,9 @@ static int mtk_drm_remove(struct platform_device *pdev)
->  	for (i = 0; i < DDP_COMPONENT_ID_MAX; i++)
->  		of_node_put(private->comp_node[i]);
->  
-> +	if (private->clk_dev)
-> +		platform_device_unregister(private->clk_dev);
-> +
->  	return 0;
->  }
->  
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index ab0adbd7d4ee..515ac4cae922 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -37,11 +37,13 @@ struct mtk_mmsys_driver_data {
->  	unsigned int third_len;
->  
->  	bool shadow_register;
-> +	const char *clk_drv_name;
->  };
->  
->  struct mtk_drm_private {
->  	struct drm_device *drm;
->  	struct device *dma_dev;
-> +	struct platform_device *clk_dev;
->  
->  	unsigned int num_pipes;
->  
+Jason
