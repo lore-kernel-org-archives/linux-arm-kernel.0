@@ -1,709 +1,297 @@
 From: sugaya.taichi@socionext.com (Sugaya Taichi)
-Date: Mon, 19 Nov 2018 10:01:12 +0900
-Subject: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
+Date: Mon, 19 Nov 2018 10:01:06 +0900
+Subject: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut m10v SoC
 In-Reply-To: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
 References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
-Message-ID: <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
+Message-ID: <1542589274-13878-2-git-send-email-sugaya.taichi@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Milbeaut M10V clock ( including PLL ) control.
+This adds the basic M10V SoC support under arch/arm.
+Since all cores are activated in the custom bootloader before booting
+linux, it is necessary to wait for sub-cores using the trampoline area.
 
 Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
 ---
- drivers/clk/Makefile   |   1 +
- drivers/clk/clk-m10v.c | 671 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 672 insertions(+)
- create mode 100644 drivers/clk/clk-m10v.c
+ arch/arm/Kconfig                  |   2 +
+ arch/arm/Makefile                 |   1 +
+ arch/arm/mach-milbeaut/Kconfig    |  28 +++++++
+ arch/arm/mach-milbeaut/Makefile   |   3 +
+ arch/arm/mach-milbeaut/m10v_evb.c |  31 ++++++++
+ arch/arm/mach-milbeaut/platsmp.c  | 157 ++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 222 insertions(+)
+ create mode 100644 arch/arm/mach-milbeaut/Kconfig
+ create mode 100644 arch/arm/mach-milbeaut/Makefile
+ create mode 100644 arch/arm/mach-milbeaut/m10v_evb.c
+ create mode 100644 arch/arm/mach-milbeaut/platsmp.c
 
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 72be7a3..da5b282 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -30,6 +30,7 @@ obj-$(CONFIG_COMMON_CLK_GEMINI)		+= clk-gemini.o
- obj-$(CONFIG_COMMON_CLK_ASPEED)		+= clk-aspeed.o
- obj-$(CONFIG_ARCH_HIGHBANK)		+= clk-highbank.o
- obj-$(CONFIG_CLK_HSDK)			+= clk-hsdk-pll.o
-+obj-$(CONFIG_ARCH_MILBEAUT_M10V)	+= clk-m10v.o
- obj-$(CONFIG_COMMON_CLK_MAX77686)	+= clk-max77686.o
- obj-$(CONFIG_COMMON_CLK_MAX9485)	+= clk-max9485.o
- obj-$(CONFIG_ARCH_MOXART)		+= clk-moxart.o
-diff --git a/drivers/clk/clk-m10v.c b/drivers/clk/clk-m10v.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 91be74d..0b8a1af 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -767,6 +767,8 @@ source "arch/arm/mach-mediatek/Kconfig"
+ 
+ source "arch/arm/mach-meson/Kconfig"
+ 
++source "arch/arm/mach-milbeaut/Kconfig"
++
+ source "arch/arm/mach-mmp/Kconfig"
+ 
+ source "arch/arm/mach-moxart/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 05a91d8..627853c 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_MV78XX0)		+= mv78xx0
+ machine-$(CONFIG_ARCH_MVEBU)		+= mvebu
+ machine-$(CONFIG_ARCH_MXC)		+= imx
+ machine-$(CONFIG_ARCH_MEDIATEK)		+= mediatek
++machine-$(CONFIG_ARCH_MILBEAUT)		+= milbeaut
+ machine-$(CONFIG_ARCH_MXS)		+= mxs
+ machine-$(CONFIG_ARCH_NETX)		+= netx
+ machine-$(CONFIG_ARCH_NOMADIK)		+= nomadik
+diff --git a/arch/arm/mach-milbeaut/Kconfig b/arch/arm/mach-milbeaut/Kconfig
 new file mode 100644
-index 0000000..aa92a69
+index 0000000..63b6f69
 --- /dev/null
-+++ b/drivers/clk/clk-m10v.c
-@@ -0,0 +1,671 @@
++++ b/arch/arm/mach-milbeaut/Kconfig
+@@ -0,0 +1,28 @@
++# SPDX-License-Identifier: GPL-2.0
++menuconfig ARCH_MILBEAUT
++	bool "Socionext Milbeaut SoCs"
++	depends on ARCH_MULTI_V7
++	select ARM_GIC
++	select CLKDEV_LOOKUP
++	select GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
++	select ZONE_DMA
++	help
++		This enables support for Socionext Milbeaut SoCs
++
++if ARCH_MILBEAUT
++
++config ARCH_MILBEAUT_M10V
++	bool "Milbeaut SC2000/M10V platform"
++	select ARM_ARCH_TIMER
++	select M10V_TIMER
++	select PINCTRL
++	select PINCTRL_M10V
++	help
++	  Support for Socionext's MILBEAUT M10V based systems
++
++config MACH_M10V_EVB
++	bool "Support for Milbeaut Evaluation boards"
++	default y
++
++endif
+diff --git a/arch/arm/mach-milbeaut/Makefile b/arch/arm/mach-milbeaut/Makefile
+new file mode 100644
+index 0000000..64f6f52
+--- /dev/null
++++ b/arch/arm/mach-milbeaut/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_SMP) += platsmp.o
++obj-$(CONFIG_MACH_M10V_EVB) += m10v_evb.o
++
+diff --git a/arch/arm/mach-milbeaut/m10v_evb.c b/arch/arm/mach-milbeaut/m10v_evb.c
+new file mode 100644
+index 0000000..a1fa7c3
+--- /dev/null
++++ b/arch/arm/mach-milbeaut/m10v_evb.c
+@@ -0,0 +1,31 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * Copyright (C) 2018 Socionext Inc.
-+ * Copyright (C) 2016 Linaro Ltd.
-+ *
++ * Copyright:   (C) 2015 Linaro Ltd.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/of_address.h>
 +#include <linux/of.h>
-+#include <linux/spinlock.h>
++#include <linux/platform_device.h>
 +
-+#define CLKSEL1		0x0
-+#define CLKSEL(n)	(((n) - 1) * 4 + CLKSEL1)
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
 +
-+#define PLLCNT1		0x30
-+#define PLLCNT(n)	(((n) - 1) * 4 + PLLCNT1)
-+
-+#define CLKSTOP1	0x54
-+#define CLKSTOP(n)	(((n) - 1) * 4 + CLKSTOP1)
-+
-+#define CRSWR		0x8c
-+#define CRRRS		0x90
-+#define CRRSM		0x94
-+
-+#define to_m10v_mux(_hw)	container_of(_hw, struct m10v_mux, hw)
-+#define to_m10v_gate(_hw)	container_of(_hw, struct m10v_gate, hw)
-+#define to_m10v_div(_hw)	container_of(_hw, struct m10v_div, hw)
-+#define to_m10v_pll(_hw)	container_of(_hw, struct m10v_pll, hw)
-+
-+static void __iomem *clk_base;
-+static struct device_node *np_top;
-+static DEFINE_SPINLOCK(crglock);
-+
-+static __init void __iomem *m10v_clk_iomap(void)
-+{
-+	if (clk_base)
-+		return clk_base;
-+
-+	np_top = of_find_compatible_node(NULL, NULL,
-+			"socionext,milbeaut-m10v-clk-regs");
-+	if (!np_top) {
-+		pr_err("%s: CLK iomap failed!\n", __func__);
-+		return NULL;
-+	}
-+
-+	clk_base = of_iomap(np_top, 0);
-+	of_node_put(np_top);
-+
-+	return clk_base;
-+}
-+
-+struct m10v_mux {
-+	struct clk_hw hw;
-+	const char *cname;
-+	u32 parent;
++static struct map_desc m10v_io_desc[] __initdata = {
 +};
 +
-+static u8 m10v_mux_get_parent(struct clk_hw *hw)
++void __init m10v_map_io(void)
 +{
-+	struct m10v_mux *mcm = to_m10v_mux(hw);
-+	struct clk_hw *parent;
-+	int i;
-+
-+	i = clk_hw_get_num_parents(hw);
-+	while (i--) {
-+		parent = clk_hw_get_parent_by_index(hw, i);
-+		if (clk_hw_get_rate(parent))
-+			break;
-+	}
-+
-+	if (i < 0) {
-+		pr_info("%s:%s no parent?!\n",
-+			__func__, mcm->cname);
-+		i = 0;
-+	}
-+
-+	return i;
++	debug_ll_io_init();
++	iotable_init(m10v_io_desc, ARRAY_SIZE(m10v_io_desc));
 +}
 +
-+static int m10v_mux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct m10v_mux *mcm = to_m10v_mux(hw);
-+
-+	mcm->parent = index;
-+	return 0;
-+}
-+
-+static const struct clk_ops m10v_mux_ops = {
-+	.get_parent = m10v_mux_get_parent,
-+	.set_parent = m10v_mux_set_parent,
-+	.determine_rate = __clk_mux_determine_rate,
++static const char * const m10v_compat[] = {
++	"socionext,milbeaut-m10v-evb",
++	NULL,
 +};
 +
-+void __init m10v_clk_mux_setup(struct device_node *node)
++DT_MACHINE_START(M10V_REB, "Socionext Milbeaut")
++	.dt_compat	= m10v_compat,
++	.l2c_aux_mask	= 0xffffffff,
++	.map_io		= m10v_map_io,
++MACHINE_END
+diff --git a/arch/arm/mach-milbeaut/platsmp.c b/arch/arm/mach-milbeaut/platsmp.c
+new file mode 100644
+index 0000000..b706851
+--- /dev/null
++++ b/arch/arm/mach-milbeaut/platsmp.c
+@@ -0,0 +1,157 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2018 Socionext Inc.
++ * Copyright:	(C) 2015 Linaro Ltd.
++ */
++
++#include <linux/cpu_pm.h>
++#include <linux/irqchip/arm-gic.h>
++#include <linux/of_device.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/suspend.h>
++
++#include <asm/cacheflush.h>
++#include <asm/cp15.h>
++#include <asm/idmap.h>
++#include <asm/smp_plat.h>
++#include <asm/suspend.h>
++
++#define M10V_MAX_CPU	4
++
++#define KERNEL_UNBOOT_FLAG	0x12345678
++#define CPU_FINISH_SUSPEND_FLAG 0x56784321
++
++static void __iomem *trampoline;
++
++static int m10v_boot_secondary(unsigned int l_cpu, struct task_struct *idle)
 +{
-+	const char *clk_name = node->name;
-+	struct clk_init_data init;
-+	const char **parent_names;
-+	struct m10v_mux *mcm;
-+	struct clk *clk;
-+	int i, parents;
++	unsigned int mpidr, cpu, cluster;
 +
-+	if (!m10v_clk_iomap())
-+		return;
++	mpidr = cpu_logical_map(l_cpu);
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
 +
-+	of_property_read_string(node, "clock-output-names", &clk_name);
++	if (cpu >= M10V_MAX_CPU)
++		return -EINVAL;
 +
-+	parents = of_clk_get_parent_count(node);
-+	if (parents < 2) {
-+		pr_err("%s: not a mux\n", clk_name);
-+		return;
-+	}
++	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
 +
-+	parent_names = kzalloc((sizeof(char *) * parents), GFP_KERNEL);
-+	if (!parent_names)
-+		return;
-+
-+	for (i = 0; i < parents; i++)
-+		parent_names[i] = of_clk_get_parent_name(node, i);
-+
-+	mcm = kzalloc(sizeof(*mcm), GFP_KERNEL);
-+	if (!mcm)
-+		goto err_mcm;
-+
-+	init.name = clk_name;
-+	init.ops = &m10v_mux_ops;
-+	init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
-+	init.num_parents = parents;
-+	init.parent_names = parent_names;
-+
-+	mcm->cname = clk_name;
-+	mcm->parent = 0;
-+	mcm->hw.init = &init;
-+
-+	clk = clk_register(NULL, &mcm->hw);
-+	if (IS_ERR(clk))
-+		goto err_clk;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	return;
-+
-+err_clk:
-+	kfree(mcm);
-+err_mcm:
-+	kfree(parent_names);
-+}
-+CLK_OF_DECLARE(m10v_clk_mux, "socionext,milbeaut-m10v-clk-mux",
-+			m10v_clk_mux_setup);
-+
-+struct m10v_pll {
-+	struct clk_hw hw;
-+	const char *cname;
-+	const struct clk_ops ops;
-+	u32 offset;
-+	u32 div, mult;
-+	bool ro;
-+};
-+
-+#define ST	1
-+#define SEL	2
-+
-+static void _mpg_enable(struct clk_hw *hw, unsigned int enable)
-+{
-+	struct m10v_pll *mpg = to_m10v_pll(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	if (mpg->ro) {
-+		pr_debug("%s:%d %s: read-only\n",
-+			 __func__, __LINE__, mpg->cname);
-+		return;
-+	}
-+
-+	spin_lock_irqsave(&crglock, flags);
-+
-+	val = readl(clk_base + PLLCNT(SEL));
-+	if (enable)
-+		val |= BIT(mpg->offset);
-+	else
-+		val &= ~BIT(mpg->offset);
-+	writel(val, clk_base + PLLCNT(SEL));
-+
-+	spin_unlock_irqrestore(&crglock, flags);
-+}
-+
-+static int mpg_enable(struct clk_hw *hw)
-+{
-+	_mpg_enable(hw, 1);
-+	return 0;
-+}
-+
-+static void mpg_disable(struct clk_hw *hw)
-+{
-+	_mpg_enable(hw, 0);
-+}
-+
-+static int mpg_is_enabled(struct clk_hw *hw)
-+{
-+	struct m10v_pll *mpg = to_m10v_pll(hw);
-+
-+	return readl(clk_base + PLLCNT(SEL)) & (1 << mpg->offset);
-+}
-+
-+static void _mpg_prepare(struct clk_hw *hw, unsigned int on)
-+{
-+	struct m10v_pll *mpg = to_m10v_pll(hw);
-+	unsigned long flags;
-+	u32 val;
-+
-+	if (mpg->ro) {
-+		pr_debug("%s:%d %s: read-only\n",
-+			 __func__, __LINE__, mpg->cname);
-+		return;
-+	}
-+
-+	val = readl(clk_base + PLLCNT(ST));
-+	if (!on == !(val & BIT(mpg->offset)))
-+		return;
-+
-+	/* disable */
-+	mpg_disable(hw);
-+
-+	spin_lock_irqsave(&crglock, flags);
-+
-+	val = readl(clk_base + PLLCNT(ST));
-+	if (on)
-+		val |= BIT(mpg->offset);
-+	else
-+		val &= ~BIT(mpg->offset);
-+	writel(val, clk_base + PLLCNT(ST));
-+
-+	spin_unlock_irqrestore(&crglock, flags);
-+
-+	udelay(on ? 200 : 10);
-+}
-+
-+static int mpg_prepare(struct clk_hw *hw)
-+{
-+	_mpg_prepare(hw, 1);
-+	return 0;
-+}
-+
-+static void mpg_unprepare(struct clk_hw *hw)
-+{
-+	_mpg_prepare(hw, 0);
-+}
-+
-+static int mpg_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long prate)
-+{
-+	return 0;
-+}
-+
-+static unsigned long mpg_recalc_rate(struct clk_hw *hw,
-+		unsigned long prate)
-+{
-+	struct m10v_pll *mpg = to_m10v_pll(hw);
-+	unsigned long long rate = prate;
-+
-+	if (mpg_is_enabled(hw)) {
-+		rate = (unsigned long long)prate * mpg->mult;
-+		do_div(rate, mpg->div);
-+	}
-+
-+	return (unsigned long)rate;
-+}
-+
-+static long mpg_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *prate)
-+{
-+	struct m10v_pll *mpg = to_m10v_pll(hw);
-+	unsigned long long temp_rate = (unsigned long long)*prate * mpg->mult;
-+
-+	if (mpg->ro)
-+		return mpg_recalc_rate(hw, *prate);
-+
-+	return do_div(temp_rate, mpg->div);
-+}
-+
-+static const struct clk_ops m10v_pll_ops = {
-+	.prepare = mpg_prepare,
-+	.enable = mpg_enable,
-+	.is_enabled = mpg_is_enabled,
-+	.disable = mpg_disable,
-+	.unprepare = mpg_unprepare,
-+	.round_rate = mpg_round_rate,
-+	.set_rate = mpg_set_rate,
-+	.recalc_rate = mpg_recalc_rate,
-+};
-+
-+void __init m10v_pll_setup(struct device_node *node)
-+{
-+	const char *clk_name = node->name;
-+	struct clk_init_data init;
-+	const char *parent_name;
-+	u32 offset, div, mult;
-+	struct m10v_pll *mpg;
-+	struct clk *clk;
-+	int ret;
-+
-+	if (!m10v_clk_iomap())
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	ret = of_property_read_u32(node, "offset", &offset);
-+	if (ret) {
-+		pr_err("%s: missing 'offset' property\n", clk_name);
-+		return;
-+	}
-+
-+	div = mult = 1;
-+	of_property_read_u32(node, "clock-div", &div);
-+	of_property_read_u32(node, "clock-mult", &mult);
-+
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	mpg = kzalloc(sizeof(*mpg), GFP_KERNEL);
-+	if (!mpg)
-+		return;
-+
-+	init.name = clk_name;
-+	init.ops = &m10v_pll_ops;
-+	init.flags = CLK_IS_BASIC | CLK_SET_RATE_GATE;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	mpg->cname = clk_name;
-+	mpg->offset = offset;
-+	mpg->div = div;
-+	mpg->mult = mult;
-+	mpg->hw.init = &init;
-+	if (of_get_property(node, "read-only", NULL))
-+		mpg->ro = true;
-+
-+	clk = clk_register(NULL, &mpg->hw);
-+	if (IS_ERR(clk))
-+		kfree(mpg);
-+	else
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+}
-+CLK_OF_DECLARE(m10v_clk_pll_gate, "socionext,milbeaut-m10v-pll-fixed-factor",
-+		m10v_pll_setup);
-+
-+struct m10v_div {
-+	struct clk_hw hw;
-+	const char *cname;
-+	bool waitdchreq;
-+	u32 offset;
-+	u32 mask;
-+	u32 *table;
-+	u32 tlen;
-+	bool ro;
-+};
-+
-+static void mdc_set_div(struct m10v_div *mdc, u32 div)
-+{
-+	u32 off, shift, val;
-+
-+	off = mdc->offset / 32 * 4;
-+	shift = mdc->offset % 32;
-+
-+	val = readl(clk_base + CLKSEL1 + off);
-+	val &= ~(mdc->mask << shift);
-+	val |= (div << shift);
-+	writel(val, clk_base + CLKSEL1 + off);
-+
-+	if (mdc->waitdchreq) {
-+		unsigned int count = 250;
-+
-+		writel(1, clk_base + CLKSEL(11));
-+
-+		do {
-+			udelay(1);
-+		} while (--count && readl(clk_base + CLKSEL(11)) & 1);
-+
-+		if (!count)
-+			pr_err("%s:%s CLK(%d) couldn't stabilize\n",
-+				__func__, mdc->cname, mdc->offset);
-+	}
-+}
-+
-+static u32 mdc_get_div(struct m10v_div *mdc)
-+{
-+	u32 off, shift, div;
-+
-+	off = mdc->offset / 32 * 4;
-+	shift = mdc->offset % 32;
-+
-+	div = readl(clk_base + CLKSEL1 + off);
-+	div >>= shift;
-+	div &= mdc->mask;
-+
-+	return div;
-+}
-+
-+static int mdc_div_set_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long prate)
-+{
-+	struct m10v_div *mdc = to_m10v_div(hw);
-+	u64 pr;
-+	int i;
-+
-+	if (mdc->ro) {
-+		pr_debug("%s:%d %s: read-only\n",
-+			 __func__, __LINE__, mdc->cname);
-+		return 0;
-+	}
-+
-+	/* divisors are already in descending order in DT */
-+	for (i = mdc->tlen - 2; i >= 0; i -= 2) {
-+		pr = prate;
-+		do_div(pr, mdc->table[i]);
-+
-+		if (rate >= pr)
-+			break;
-+	}
-+	if (i < 0)
-+		i = 0;
-+
-+	mdc_set_div(mdc, mdc->table[i + 1]);
++	writel(virt_to_phys(secondary_startup), trampoline + cpu * 4);
++	arch_send_wakeup_ipi_mask(cpumask_of(l_cpu));
 +
 +	return 0;
 +}
 +
-+static unsigned long mdc_div_recalc_rate(struct clk_hw *hw,
-+		unsigned long prate)
++static void m10v_cpu_die(unsigned int l_cpu)
 +{
-+	struct m10v_div *mdc = to_m10v_div(hw);
-+	u64 prate64 = prate;
-+	u32 div;
-+	int i;
++	gic_cpu_if_down(0);
 +
-+	div = mdc_get_div(mdc);
++	v7_exit_coherency_flush(louis);
 +
-+	for (i = 1; i < mdc->tlen && div != mdc->table[i]; i += 2)
-+		if (div == (mdc->table[i] & mdc->mask))
-+			break; /* the MSB is already read back as 0 */
-+
-+	if (i > mdc->tlen) /* some other is enabled in the mux */
-+		prate64 = 0;
-+	else
-+		do_div(prate64, mdc->table[i - 1]);
-+
-+	return (unsigned long)prate64;
++	/* Now we are prepared for power-down, do it: */
++	wfi();
 +}
 +
-+static long mdc_div_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *parent)
++static int m10v_cpu_kill(unsigned int l_cpu)
 +{
-+	struct m10v_div *mdc = to_m10v_div(hw);
-+	u64 prate;
-+	int i;
++	unsigned int mpidr, cpu;
 +
-+	if (mdc->ro)
-+		return mdc_div_recalc_rate(hw, *parent);
++	mpidr = cpu_logical_map(l_cpu);
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
 +
-+	/* divisors are already in descending order in DT */
-+	for (i = mdc->tlen - 2; i >= 0; i -= 2) {
-+		prate = *parent;
-+		do_div(prate, mdc->table[i]);
++	writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
 +
-+		if (rate >= prate)
-+			break;
-+	}
-+
-+	return (unsigned long)prate;
++	return 1;
 +}
 +
-+static const struct clk_ops m10v_div_ops = {
-+	.round_rate = mdc_div_round_rate,
-+	.set_rate = mdc_div_set_rate,
-+	.recalc_rate = mdc_div_recalc_rate,
++static struct smp_operations m10v_smp_ops __initdata = {
++	.smp_boot_secondary	= m10v_boot_secondary,
++	.cpu_die		= m10v_cpu_die,
++	.cpu_kill		= m10v_cpu_kill,
 +};
 +
-+void __init m10v_clk_div_setup(struct device_node *node)
++static int __init m10v_smp_init(void)
 +{
-+	const char *clk_name = node->name;
-+	struct clk_init_data init;
-+	const char *parent_name;
-+	struct m10v_div *mdc;
-+	struct clk *clk;
-+	u32 *table, mask;
-+	u32 offset;
-+	int count, ret;
++	unsigned int mpidr, cpu, cluster;
++	struct device_node *np;
 +
-+	if (!m10v_clk_iomap())
-+		return;
++	np = of_find_compatible_node(NULL, NULL, "socionext,milbeaut-m10v-evb");
++	if (!np || !of_device_is_available(np))
++		return -ENODEV;
++	of_node_put(np);
 +
-+	of_property_read_string(node, "clock-output-names", &clk_name);
++	np = of_find_compatible_node(NULL, NULL, "socionext,smp-trampoline");
++	if (!np)
++		return -ENODEV;
 +
-+	parent_name = of_clk_get_parent_name(node, 0);
-+	if (!parent_name) {
-+		pr_err("%s: no parent specified\n", clk_name);
-+		return;
-+	}
++	trampoline = of_iomap(np, 0);
++	if (!trampoline)
++		return -ENODEV;
++	of_node_put(np);
 +
-+	ret = of_property_read_u32(node, "offset", &offset);
-+	if (ret) {
-+		pr_err("%s: missing 'offset' property\n", clk_name);
-+		return;
-+	}
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
 +
-+	ret = of_property_read_u32(node, "mask", &mask);
-+	if (ret) {
-+		pr_err("%s: missing 'mask' property\n", clk_name);
-+		return;
-+	}
++	pr_info("MCPM boot on cpu_%u cluster_%u\n", cpu, cluster);
 +
-+	count = of_property_count_u32_elems(node, "ratios");
-+	if (count < 2 || count%2) {
-+		pr_err("%s: invalid 'ratios' property\n", clk_name);
-+		return;
-+	}
++	for (cpu = 0; cpu < M10V_MAX_CPU; cpu++)
++		writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
 +
-+	table = kzalloc(sizeof(*table) * count, GFP_KERNEL);
-+	if (!table)
-+		return;
++	smp_set_ops(&m10v_smp_ops);
 +
-+	/*
-+	 * The 'ratios' must be in descending order, we park at
-+	 * first ratio (biggest divider) when disabled.
-+	 */
-+	ret = of_property_read_u32_array(node, "ratios", table, count);
-+	if (ret) {
-+		pr_err("%s: 'ratios' property read fail\n", clk_name);
-+		goto err_mdc;
-+	}
-+
-+	mdc = kzalloc(sizeof(*mdc), GFP_KERNEL);
-+	if (!mdc)
-+		goto err_mdc;
-+
-+	if (of_get_property(node, "wait-on-dchreq", NULL))
-+		mdc->waitdchreq = true;
-+
-+	init.name = clk_name;
-+	init.ops = &m10v_div_ops;
-+	init.flags = CLK_IS_BASIC;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	mdc->cname = clk_name;
-+	mdc->offset = offset;
-+	mdc->mask = mask;
-+	mdc->table = table;
-+	mdc->tlen = count;
-+	mdc->hw.init = &init;
-+	if (of_get_property(node, "read-only", NULL))
-+		mdc->ro = true;
-+
-+	clk = clk_register(NULL, &mdc->hw);
-+	if (IS_ERR(clk))
-+		goto err_clk;
-+
-+	of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	return;
-+
-+err_clk:
-+	kfree(mdc);
-+err_mdc:
-+	kfree(table);
++	return 0;
 +}
-+CLK_OF_DECLARE(m10v_clk_div, "socionext,milbeaut-m10v-clk-div",
-+			m10v_clk_div_setup);
++early_initcall(m10v_smp_init);
 +
-+struct m10v_gate {
-+	struct clk_hw hw;
-+	const char *cname;
-+	u32 offset;
-+	bool ro;
-+};
-+
-+static void _mgc_enable(struct clk_hw *hw, bool en)
++static int m10v_pm_valid(suspend_state_t state)
 +{
-+	struct m10v_gate *mgc = to_m10v_gate(hw);
-+	u32 off, mask;
-+
-+	if (mgc->ro) {
-+		pr_debug("%s:%d %s: read-only\n",
-+			 __func__, __LINE__, mgc->cname);
-+		return;
-+	}
-+
-+	off = CLKSTOP1 + (mgc->offset / 32) * 4;
-+
-+	mask = (en ? 2 : 3) << (mgc->offset % 32);
-+
-+	writel(mask, clk_base + off);
++	return (state == PM_SUSPEND_STANDBY) || (state == PM_SUSPEND_MEM);
 +}
 +
-+static int mgc_enable(struct clk_hw *hw)
++typedef void (*phys_reset_t)(unsigned long);
++static phys_reset_t phys_reset;
++
++static int m10v_die(unsigned long arg)
 +{
-+	_mgc_enable(hw, true);
++	setup_mm_for_reboot();
++	asm("wfi");
++	/* Boot just like a secondary */
++	phys_reset = (phys_reset_t)(unsigned long)virt_to_phys(cpu_reset);
++	phys_reset(virt_to_phys(cpu_resume));
++
 +	return 0;
 +}
 +
-+static void mgc_disable(struct clk_hw *hw)
++static int m10v_pm_enter(suspend_state_t state)
 +{
-+	_mgc_enable(hw, false);
++	switch (state) {
++	case PM_SUSPEND_STANDBY:
++		pr_err("STANDBY\n");
++		asm("wfi");
++		break;
++	case PM_SUSPEND_MEM:
++		pr_err("SUSPEND\n");
++		cpu_pm_enter();
++		cpu_suspend(0, m10v_die);
++		cpu_pm_exit();
++		break;
++	}
++	return 0;
 +}
 +
-+static int mgc_is_enabled(struct clk_hw *hw)
-+{
-+	struct m10v_gate *mgc = to_m10v_gate(hw);
-+	u32 off, val, mask = 1 << (mgc->offset % 32);
-+
-+	off = CLKSTOP1 + (mgc->offset / 32) * 4;
-+	val = readl(clk_base + off);
-+
-+	return !(val & mask);
-+}
-+
-+static const struct clk_ops m10v_gate_ops = {
-+	.enable = mgc_enable,
-+	.disable = mgc_disable,
-+	.is_enabled = mgc_is_enabled,
++static const struct platform_suspend_ops m10v_pm_ops = {
++	.valid		= m10v_pm_valid,
++	.enter		= m10v_pm_enter,
 +};
 +
-+void __init m10v_clk_gate_setup(struct device_node *node)
++struct clk *m10v_clclk_register(struct device *cpu_dev);
++
++static int __init m10v_pm_init(void)
 +{
-+	const char *clk_name = node->name;
-+	struct clk_init_data init;
-+	const char *parent_name;
-+	struct m10v_gate *mgc;
-+	struct clk *clk;
-+	u32 offset;
-+	int ret;
++	suspend_set_ops(&m10v_pm_ops);
 +
-+	if (!m10v_clk_iomap())
-+		return;
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	ret = of_property_read_u32(node, "offset", &offset);
-+	if (ret) {
-+		pr_err("%s: missing 'offset' property\n", clk_name);
-+		return;
-+	}
-+
-+	parent_name = of_clk_get_parent_name(node, 0);
-+
-+	mgc = kzalloc(sizeof(*mgc), GFP_KERNEL);
-+	if (!mgc)
-+		return;
-+
-+	init.name = clk_name;
-+	init.ops = &m10v_gate_ops;
-+	init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
-+	init.parent_names = &parent_name;
-+	init.num_parents = 1;
-+
-+	mgc->cname = clk_name;
-+	mgc->offset = offset;
-+	mgc->hw.init = &init;
-+	if (of_get_property(node, "read-only", NULL))
-+		mgc->ro = true;
-+
-+	clk = clk_register(NULL, &mgc->hw);
-+	if (IS_ERR(clk))
-+		kfree(mgc);
-+	else
-+		of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	return 0;
 +}
-+CLK_OF_DECLARE(m10v_clk_gate, "socionext,milbeaut-m10v-clk-gate",
-+		m10v_clk_gate_setup);
++late_initcall(m10v_pm_init);
 -- 
 1.9.1
