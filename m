@@ -1,210 +1,127 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 19 Nov 2018 12:39:36 +0100
-Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
- "drm_dev_put"
-In-Reply-To: <20181115221634.22715-4-greenfoo@gluegarage.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <20181115221634.22715-4-greenfoo@gluegarage.com>
-Message-ID: <767d6ca7f54331876cbbbe0cca4b14bd@agner.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 19 Nov 2018 11:40:36 +0000
+Subject: [RESEND PATCH v3 1/2] dt-bindings: PCI: Add UniPhier PCIe host
+ controller description
+In-Reply-To: <1539667641-26024-2-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1539667641-26024-1-git-send-email-hayashi.kunihiko@socionext.com>
+ <1539667641-26024-2-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <20181119114028.GA30042@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.11.2018 23:16, Fernando Ramos wrote:
-> This patch unifies the naming of DRM functions for reference counting as
-> requested on Documentation/gpu/todo.rst
+On Tue, Oct 16, 2018 at 02:27:20PM +0900, Kunihiko Hayashi wrote:
+> Add DT bindings for PCIe controller implemented in UniPhier SoCs when
+> configured in Root Complex (host) mode. This controller is based on
+> the DesignWare PCIe core.
 > 
-> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
 > ---
->  drivers/gpu/drm/arc/arcpgu_drv.c             | 4 ++--
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
->  drivers/gpu/drm/etnaviv/etnaviv_drv.c        | 4 ++--
->  drivers/gpu/drm/mxsfb/mxsfb_drv.c            | 4 ++--
-
-For mxsfb:
-
-Acked-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
->  drivers/gpu/drm/rcar-du/rcar_du_drv.c        | 2 +-
->  drivers/gpu/drm/shmobile/shmob_drm_drv.c     | 4 ++--
->  drivers/gpu/drm/tve200/tve200_drv.c          | 4 ++--
->  drivers/gpu/drm/zte/zx_drm_drv.c             | 4 ++--
->  8 files changed, 15 insertions(+), 15 deletions(-)
+>  .../devicetree/bindings/pci/uniphier-pcie.txt      | 81 ++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/uniphier-pcie.txt
 > 
-> diff --git a/drivers/gpu/drm/arc/arcpgu_drv.c b/drivers/gpu/drm/arc/arcpgu_drv.c
-> index f067de4e1e82..dcb06d4e9135 100644
-> --- a/drivers/gpu/drm/arc/arcpgu_drv.c
-> +++ b/drivers/gpu/drm/arc/arcpgu_drv.c
-> @@ -216,7 +216,7 @@ static int arcpgu_probe(struct platform_device *pdev)
->  	arcpgu_unload(drm);
->  
->  err_unref:
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return ret;
->  }
-> @@ -227,7 +227,7 @@ static int arcpgu_remove(struct platform_device *pdev)
->  
->  	drm_dev_unregister(drm);
->  	arcpgu_unload(drm);
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> index 843cac222e60..f8da51a63e2f 100644
-> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
-> @@ -775,7 +775,7 @@ static int atmel_hlcdc_dc_drm_probe(struct
-> platform_device *pdev)
->  	atmel_hlcdc_dc_unload(ddev);
->  
->  err_unref:
-> -	drm_dev_unref(ddev);
-> +	drm_dev_put(ddev);
->  
->  	return ret;
->  }
-> @@ -786,7 +786,7 @@ static int atmel_hlcdc_dc_drm_remove(struct
-> platform_device *pdev)
->  
->  	drm_dev_unregister(ddev);
->  	atmel_hlcdc_dc_unload(ddev);
-> -	drm_dev_unref(ddev);
-> +	drm_dev_put(ddev);
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> index 83c1f46670bf..52802e6049e0 100644
-> --- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> +++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
-> @@ -550,7 +550,7 @@ static int etnaviv_bind(struct device *dev)
->  out_bind:
->  	kfree(priv);
->  out_unref:
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return ret;
->  }
-> @@ -567,7 +567,7 @@ static void etnaviv_unbind(struct device *dev)
->  	drm->dev_private = NULL;
->  	kfree(priv);
->  
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  }
->  
->  static const struct component_master_ops etnaviv_master_ops = {
-> diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> index 2393e6d16ffd..88ba003979e6 100644
-> --- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> +++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
-> @@ -417,7 +417,7 @@ static int mxsfb_probe(struct platform_device *pdev)
->  err_unload:
->  	mxsfb_unload(drm);
->  err_free:
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return ret;
->  }
-> @@ -428,7 +428,7 @@ static int mxsfb_remove(struct platform_device *pdev)
->  
->  	drm_dev_unregister(drm);
->  	mxsfb_unload(drm);
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> index 084f58df4a8c..c7fe2433ab9e 100644
-> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> @@ -454,7 +454,7 @@ static int rcar_du_remove(struct platform_device *pdev)
->  	drm_kms_helper_poll_fini(ddev);
->  	drm_mode_config_cleanup(ddev);
->  
-> -	drm_dev_unref(ddev);
-> +	drm_dev_put(ddev);
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-> b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-> index 6ececad6f845..8554102a6ead 100644
-> --- a/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-> +++ b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
-> @@ -194,7 +194,7 @@ static int shmob_drm_remove(struct platform_device *pdev)
->  	drm_kms_helper_poll_fini(ddev);
->  	drm_mode_config_cleanup(ddev);
->  	drm_irq_uninstall(ddev);
-> -	drm_dev_unref(ddev);
-> +	drm_dev_put(ddev);
->  
->  	return 0;
->  }
-> @@ -290,7 +290,7 @@ static int shmob_drm_probe(struct platform_device *pdev)
->  	drm_kms_helper_poll_fini(ddev);
->  	drm_mode_config_cleanup(ddev);
->  err_free_drm_dev:
-> -	drm_dev_unref(ddev);
-> +	drm_dev_put(ddev);
->  
->  	return ret;
->  }
-> diff --git a/drivers/gpu/drm/tve200/tve200_drv.c
-> b/drivers/gpu/drm/tve200/tve200_drv.c
-> index 72efcecb44f7..28e2d03c0ccf 100644
-> --- a/drivers/gpu/drm/tve200/tve200_drv.c
-> +++ b/drivers/gpu/drm/tve200/tve200_drv.c
-> @@ -249,7 +249,7 @@ static int tve200_probe(struct platform_device *pdev)
->  clk_disable:
->  	clk_disable_unprepare(priv->pclk);
->  dev_unref:
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  	return ret;
->  }
->  
-> @@ -263,7 +263,7 @@ static int tve200_remove(struct platform_device *pdev)
->  		drm_panel_bridge_remove(priv->bridge);
->  	drm_mode_config_cleanup(drm);
->  	clk_disable_unprepare(priv->pclk);
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  
->  	return 0;
->  }
-> diff --git a/drivers/gpu/drm/zte/zx_drm_drv.c b/drivers/gpu/drm/zte/zx_drm_drv.c
-> index 11ef17c2d1c1..5b6f1eda52e0 100644
-> --- a/drivers/gpu/drm/zte/zx_drm_drv.c
-> +++ b/drivers/gpu/drm/zte/zx_drm_drv.c
-> @@ -114,7 +114,7 @@ static int zx_drm_bind(struct device *dev)
->  	component_unbind_all(dev, drm);
->  out_unregister:
->  	dev_set_drvdata(dev, NULL);
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  	return ret;
->  }
->  
-> @@ -127,7 +127,7 @@ static void zx_drm_unbind(struct device *dev)
->  	drm_mode_config_cleanup(drm);
->  	component_unbind_all(dev, drm);
->  	dev_set_drvdata(dev, NULL);
-> -	drm_dev_unref(drm);
-> +	drm_dev_put(drm);
->  }
->  
->  static const struct component_master_ops zx_drm_master_ops = {
+> diff --git a/Documentation/devicetree/bindings/pci/uniphier-pcie.txt b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> new file mode 100644
+> index 0000000..46a2754
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/uniphier-pcie.txt
+> @@ -0,0 +1,81 @@
+> +Socionext UniPhier PCIe host controller bindings
+> +
+> +This describes the devicetree bindings for PCIe host controller implemented
+> +on Socionext UniPhier SoCs.
+> +
+> +UniPhier PCIe host controller is based on the Synopsys DesignWare PCI core.
+> +It shares common functions with the PCIe DesignWare core driver and inherits
+> +common properties defined in
+> +Documentation/devicetree/bindings/pci/designware-pcie.txt.
+> +
+> +Required properties:
+> +- compatible: Should be "socionext,uniphier-pcie".
+> +- reg: Specifies offset and length of the register set for the device.
+> +	According to the reg-names, appropriate register sets are required.
+> +- reg-names: Must include the following entries:
+> +    "dbi"    - controller configuration registers
+> +    "link"   - SoC-specific glue layer registers
+> +    "config" - PCIe configuration space
+> +- clocks: A phandle to the clock gate for PCIe glue layer including
+> +	the host controller.
+> +- resets: A phandle to the reset line for PCIe glue layer including
+> +	the host controller.
+> +- interrupts: A list of interrupt specifiers. According to the
+> +	interrupt-names, appropriate interrupts are required.
+> +- interrupt-names: Must include the following entries:
+> +    "dma" - DMA interrupt
+> +    "msi" - MSI interrupt
+> +
+> +Optional properties:
+> +- phys: A phandle to generic PCIe PHY. According to the phy-names, appropriate
+> +	phys are required.
+> +- phy-names: Must be "pcie-phy".
+> +
+> +Required sub-node:
+> +- legacy-interrupt-controller: Specifies interrupt controller for legacy PCI
+> +	interrupts.
+> +
+> +Required properties for legacy-interrupt-controller:
+> +- interrupt-controller: identifies the node as an interrupt controller.
+> +- #interrupt-cells: specifies the number of cells needed to encode an
+> +	interrupt source. The value must be 1.
+> +- interrupt-parent: Phandle to the parent interrupt controller.
+> +- interrupts: An interrupt specifier for legacy interrupt.
+> +
+> +Example:
+> +
+> +	pcie: pcie at 66000000 {
+> +		compatible = "socionext,uniphier-pcie", "snps,dw-pcie";
+> +		status = "disabled";
+> +		reg-names = "dbi", "link", "config";
+> +		reg = <0x66000000 0x1000>, <0x66010000 0x10000>,
+> +		      <0x2fff0000 0x10000>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +		clocks = <&sys_clk 24>;
+> +		resets = <&sys_rst 24>;
+> +		num-lanes = <1>;
+> +		num-viewport = <1>;
+> +		bus-range = <0x0 0xff>;
+> +		device_type = "pci";
+> +		ranges =
+> +		/* downstream I/O */
+> +			<0x81000000 0 0x00000000  0x2ffe0000  0 0x00010000
+> +		/* non-prefetchable memory */
+> +			 0x82000000 0 0x00000000  0x20000000  0 0x0ffe0000>;
+> +		#interrupt-cells = <1>;
+> +		interrupt-names = "dma", "msi";
+> +		interrupts = <0 224 4>, <0 225 4>;
+> +		interrupt-map-mask = <0 0 0  7>;
+> +		interrupt-map = <0 0 0  1  &pcie_intc 1>,	/* INTA */
+> +				<0 0 0  2  &pcie_intc 2>,	/* INTB */
+> +				<0 0 0  3  &pcie_intc 3>,	/* INTC */
+> +				<0 0 0  4  &pcie_intc 4>;	/* INTD */
+
+This is not correct and we must fix this concept for all DWC based host
+bridges bindings. We are mapping INTX to inputs [0,1,2,3] of the host
+bridge interrupt controllers and the binding should reflect that.
+
+This should be the correct mapping:
+
+		interrupt-map = <0 0 0  1  &pcie_intc 0>,	/* INTA */
+				<0 0 0  2  &pcie_intc 1>,	/* INTB */
+				<0 0 0  3  &pcie_intc 2>,	/* INTC */
+				<0 0 0  4  &pcie_intc 3>;	/* INTD */
+
+Lorenzo
+
+> +
+> +		pcie_intc: legacy-interrupt-controller {
+> +			interrupt-controller;
+> +			#interrupt-cells = <1>;
+> +			interrupt-parent = <&gic>;
+> +			interrupts = <0 226 4>;
+> +		};
+> +	};
+> -- 
+> 2.7.4
+> 
