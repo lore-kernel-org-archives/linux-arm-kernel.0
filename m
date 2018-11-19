@@ -1,102 +1,210 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 19 Nov 2018 11:37:57 +0000
-Subject: [RFC PATCH] ARM: NOMMU: Toggle only bits in EXC_RETURN we are
- really care of
-In-Reply-To: <1541591310-31799-1-git-send-email-vladimir.murzin@arm.com>
-References: <1541591310-31799-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <a4be606f-bc3c-4b5c-84e6-dfdfc8ab5d0a@arm.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 19 Nov 2018 12:39:36 +0100
+Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
+ "drm_dev_put"
+In-Reply-To: <20181115221634.22715-4-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <20181115221634.22715-4-greenfoo@gluegarage.com>
+Message-ID: <767d6ca7f54331876cbbbe0cca4b14bd@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping!
-
-On 07/11/18 11:48, Vladimir Murzin wrote:
-> ARMv8M introduces support for Security extension to M class, among
-> other things it affects exception handling, especially, encoding of
-> EXC_RETURN.
+On 15.11.2018 23:16, Fernando Ramos wrote:
+> This patch unifies the naming of DRM functions for reference counting as
+> requested on Documentation/gpu/todo.rst
 > 
-> The new bits have been added:
-> 
-> Bit [6]	Secure or Non-secure stack
-> Bit [5]	Default callee register stacking
-> Bit [0]	Exception Secure
-> 
-> which conflicts with hard-coded value of EXC_RETURN:
-> 
-> In fact, we only care of few bits:
-> 
-> Bit [3]	 Mode (0 - Handler, 1 - Thread)
-> Bit [2]	 Stack pointer selection (0 - Main, 1 - Process)
-> 
-> We can toggle only those bits and left other bits as they were on
-> exception entry.
-> 
-> It is basically, what patch does - saves EXC_RETURN when we do
-> transition form Thread to Handler mode (it is first svc), so later
-> saved value is used instead of EXC_RET_THREADMODE_PROCESSSTACK.
-> 
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
 > ---
+>  drivers/gpu/drm/arc/arcpgu_drv.c             | 4 ++--
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c | 4 ++--
+>  drivers/gpu/drm/etnaviv/etnaviv_drv.c        | 4 ++--
+>  drivers/gpu/drm/mxsfb/mxsfb_drv.c            | 4 ++--
+
+For mxsfb:
+
+Acked-by: Stefan Agner <stefan@agner.ch>
+
+--
+Stefan
+
+>  drivers/gpu/drm/rcar-du/rcar_du_drv.c        | 2 +-
+>  drivers/gpu/drm/shmobile/shmob_drm_drv.c     | 4 ++--
+>  drivers/gpu/drm/tve200/tve200_drv.c          | 4 ++--
+>  drivers/gpu/drm/zte/zx_drm_drv.c             | 4 ++--
+>  8 files changed, 15 insertions(+), 15 deletions(-)
 > 
-> Kernel Version: v4.20-rc1
-> 
->  arch/arm/include/asm/v7m.h     | 2 +-
->  arch/arm/kernel/entry-header.S | 3 ++-
->  arch/arm/kernel/entry-v7m.S    | 4 ++++
->  arch/arm/mm/proc-v7m.S         | 3 +++
->  4 files changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/v7m.h b/arch/arm/include/asm/v7m.h
-> index 187ccf6..2cb00d1 100644
-> --- a/arch/arm/include/asm/v7m.h
-> +++ b/arch/arm/include/asm/v7m.h
-> @@ -49,7 +49,7 @@
->   * (0 -> msp; 1 -> psp). Bits [1:0] are fixed to 0b01.
->   */
->  #define EXC_RET_STACK_MASK			0x00000004
-> -#define EXC_RET_THREADMODE_PROCESSSTACK		0xfffffffd
-> +#define EXC_RET_THREADMODE_PROCESSSTACK		(3 << 2)
+> diff --git a/drivers/gpu/drm/arc/arcpgu_drv.c b/drivers/gpu/drm/arc/arcpgu_drv.c
+> index f067de4e1e82..dcb06d4e9135 100644
+> --- a/drivers/gpu/drm/arc/arcpgu_drv.c
+> +++ b/drivers/gpu/drm/arc/arcpgu_drv.c
+> @@ -216,7 +216,7 @@ static int arcpgu_probe(struct platform_device *pdev)
+>  	arcpgu_unload(drm);
 >  
->  /* Cache related definitions */
+>  err_unref:
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
 >  
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index 7734248..62db1c9 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -127,7 +127,8 @@
->           */
->  	.macro	v7m_exception_slow_exit ret_r0
->  	cpsid	i
-> -	ldr	lr, =EXC_RET_THREADMODE_PROCESSSTACK
-> +	ldr	lr, =exc_ret
-> +	ldr	lr, [lr]
+>  	return ret;
+>  }
+> @@ -227,7 +227,7 @@ static int arcpgu_remove(struct platform_device *pdev)
 >  
->  	@ read original r12, sp, lr, pc and xPSR
->  	add	r12, sp, #S_IP
-> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-> index abcf478..19d2dcd 100644
-> --- a/arch/arm/kernel/entry-v7m.S
-> +++ b/arch/arm/kernel/entry-v7m.S
-> @@ -146,3 +146,7 @@ ENTRY(vector_table)
->  	.rept	CONFIG_CPU_V7M_NUM_IRQ
->  	.long	__irq_entry		@ External Interrupts
->  	.endr
-> +	.align	2
-> +	.globl	exc_ret
-> +exc_ret:
-> +	.space	4
-> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> index 47a5acc..92e8418 100644
-> --- a/arch/arm/mm/proc-v7m.S
-> +++ b/arch/arm/mm/proc-v7m.S
-> @@ -139,6 +139,9 @@ __v7m_setup_cont:
->  	cpsie	i
->  	svc	#0
->  1:	cpsid	i
-> +	ldr	r0, =exc_ret
-> +	orr	lr, lr, #EXC_RET_THREADMODE_PROCESSSTACK
-> +	str	lr, [r0]
->  	ldmia	sp, {r0-r3, r12}
->  	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
->  	mov	lr, r6			@ restore LR
-> 
+>  	drm_dev_unregister(drm);
+>  	arcpgu_unload(drm);
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> index 843cac222e60..f8da51a63e2f 100644
+> --- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> +++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_dc.c
+> @@ -775,7 +775,7 @@ static int atmel_hlcdc_dc_drm_probe(struct
+> platform_device *pdev)
+>  	atmel_hlcdc_dc_unload(ddev);
+>  
+>  err_unref:
+> -	drm_dev_unref(ddev);
+> +	drm_dev_put(ddev);
+>  
+>  	return ret;
+>  }
+> @@ -786,7 +786,7 @@ static int atmel_hlcdc_dc_drm_remove(struct
+> platform_device *pdev)
+>  
+>  	drm_dev_unregister(ddev);
+>  	atmel_hlcdc_dc_unload(ddev);
+> -	drm_dev_unref(ddev);
+> +	drm_dev_put(ddev);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> index 83c1f46670bf..52802e6049e0 100644
+> --- a/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> +++ b/drivers/gpu/drm/etnaviv/etnaviv_drv.c
+> @@ -550,7 +550,7 @@ static int etnaviv_bind(struct device *dev)
+>  out_bind:
+>  	kfree(priv);
+>  out_unref:
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  
+>  	return ret;
+>  }
+> @@ -567,7 +567,7 @@ static void etnaviv_unbind(struct device *dev)
+>  	drm->dev_private = NULL;
+>  	kfree(priv);
+>  
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  }
+>  
+>  static const struct component_master_ops etnaviv_master_ops = {
+> diff --git a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> index 2393e6d16ffd..88ba003979e6 100644
+> --- a/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> +++ b/drivers/gpu/drm/mxsfb/mxsfb_drv.c
+> @@ -417,7 +417,7 @@ static int mxsfb_probe(struct platform_device *pdev)
+>  err_unload:
+>  	mxsfb_unload(drm);
+>  err_free:
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  
+>  	return ret;
+>  }
+> @@ -428,7 +428,7 @@ static int mxsfb_remove(struct platform_device *pdev)
+>  
+>  	drm_dev_unregister(drm);
+>  	mxsfb_unload(drm);
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> index 084f58df4a8c..c7fe2433ab9e 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> @@ -454,7 +454,7 @@ static int rcar_du_remove(struct platform_device *pdev)
+>  	drm_kms_helper_poll_fini(ddev);
+>  	drm_mode_config_cleanup(ddev);
+>  
+> -	drm_dev_unref(ddev);
+> +	drm_dev_put(ddev);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/shmobile/shmob_drm_drv.c
+> b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
+> index 6ececad6f845..8554102a6ead 100644
+> --- a/drivers/gpu/drm/shmobile/shmob_drm_drv.c
+> +++ b/drivers/gpu/drm/shmobile/shmob_drm_drv.c
+> @@ -194,7 +194,7 @@ static int shmob_drm_remove(struct platform_device *pdev)
+>  	drm_kms_helper_poll_fini(ddev);
+>  	drm_mode_config_cleanup(ddev);
+>  	drm_irq_uninstall(ddev);
+> -	drm_dev_unref(ddev);
+> +	drm_dev_put(ddev);
+>  
+>  	return 0;
+>  }
+> @@ -290,7 +290,7 @@ static int shmob_drm_probe(struct platform_device *pdev)
+>  	drm_kms_helper_poll_fini(ddev);
+>  	drm_mode_config_cleanup(ddev);
+>  err_free_drm_dev:
+> -	drm_dev_unref(ddev);
+> +	drm_dev_put(ddev);
+>  
+>  	return ret;
+>  }
+> diff --git a/drivers/gpu/drm/tve200/tve200_drv.c
+> b/drivers/gpu/drm/tve200/tve200_drv.c
+> index 72efcecb44f7..28e2d03c0ccf 100644
+> --- a/drivers/gpu/drm/tve200/tve200_drv.c
+> +++ b/drivers/gpu/drm/tve200/tve200_drv.c
+> @@ -249,7 +249,7 @@ static int tve200_probe(struct platform_device *pdev)
+>  clk_disable:
+>  	clk_disable_unprepare(priv->pclk);
+>  dev_unref:
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  	return ret;
+>  }
+>  
+> @@ -263,7 +263,7 @@ static int tve200_remove(struct platform_device *pdev)
+>  		drm_panel_bridge_remove(priv->bridge);
+>  	drm_mode_config_cleanup(drm);
+>  	clk_disable_unprepare(priv->pclk);
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  
+>  	return 0;
+>  }
+> diff --git a/drivers/gpu/drm/zte/zx_drm_drv.c b/drivers/gpu/drm/zte/zx_drm_drv.c
+> index 11ef17c2d1c1..5b6f1eda52e0 100644
+> --- a/drivers/gpu/drm/zte/zx_drm_drv.c
+> +++ b/drivers/gpu/drm/zte/zx_drm_drv.c
+> @@ -114,7 +114,7 @@ static int zx_drm_bind(struct device *dev)
+>  	component_unbind_all(dev, drm);
+>  out_unregister:
+>  	dev_set_drvdata(dev, NULL);
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  	return ret;
+>  }
+>  
+> @@ -127,7 +127,7 @@ static void zx_drm_unbind(struct device *dev)
+>  	drm_mode_config_cleanup(drm);
+>  	component_unbind_all(dev, drm);
+>  	dev_set_drvdata(dev, NULL);
+> -	drm_dev_unref(drm);
+> +	drm_dev_put(drm);
+>  }
+>  
+>  static const struct component_master_ops zx_drm_master_ops = {
