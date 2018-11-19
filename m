@@ -1,41 +1,54 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 20 Nov 2018 00:31:02 +0100
-Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto API
- code
-In-Reply-To: <20181119232345.GC258711@gmail.com>
-References: <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
- <20181119225414.GB258711@gmail.com>
- <CAHmME9okRjuYUiL0D=6ZmtMX6rvxU+0xvy2tva+LetjU9itx8Q@mail.gmail.com>
- <20181119232345.GC258711@gmail.com>
-Message-ID: <CAHmME9o9N0r55i4zHu5p-9wcKPsfVVhRC+kbzx0TYxSTZG5kbQ@mail.gmail.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 19 Nov 2018 15:54:25 -0800
+Subject: compiler code model for the kernel
+In-Reply-To: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+Message-ID: <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
++ some more folks to take a look
 
-On Tue, Nov 20, 2018 at 12:23 AM Eric Biggers <ebiggers@kernel.org> wrote:
-> It's much better to have the documentation in a permanent location.
+On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> Hello all,
+>
+> Some of us (on cc) have discussed this a bit on various occasions, so
+> perhaps it's time to sit down and do something about it :-)
+>
+> The Clang work that Nick is involved in has made explicit some
+> assumptions that we are currently making in the kernel with respect to
+> the behavior of GCC, and it would be good to formalise this so we can
+> keep relying on it in the future, and to clarify to other compiler
+> developers what is needed.
+>
+> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> introduce the same for AArch64. Under this model, we should be able to
+> make the following assumptions:
+> - symbol references are emitted as ADRP/ADD pairs
+> -  no absolute references in generated code like jump tables etc (like
+> -fpic/-fpie) [*]
+> - no shared library semantics (no GOT indirections to support symbol
+> preemption, or to reduce the CoW footprint and/or avoid text
+> relocations)
+> - resulting objects can be linked in -pie mode by ld.bfd
+>
+> Another thing that came up is that we currently rely on the stack
+> pointer never to assume a value that is not 16-byte aligned, even
+> transiently.
+>
+> Other things I've missed?
+>
+> [*] This is only strictly required in parts of the code that may
+> execute at a different offset than the linked offset, even after
+> processing dynamic relocations at boot time (e.g., KVM hyp code
+> running in a different exception level) but avoiding those altogether
+> is reasonable. Note that GCC does the right thing for us here already,
+> but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
 
-Agreed.
 
-> I actually did add ChaCha12 support to most of the Zinc assembly in
-> "[WIP] crypto: assembly support for ChaCha12"
-> (https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git/commit/?h=adiantum-zinc&id=0a7787a515a977e11b680f1752b430ca1744e399).
-> But I skipped AVX-512 and MIPS since I didn't have a way to test those yet,
-> and I haven't ported the changes to your new perl scripts yet.
 
-Oh, great. If you're playing with this in the context of the WireGuard
-repo, you can run `ARCH=mips make test-qemu -j$(nproc)` (which is
-what's running on https://www.wireguard.com/build-status/ ). For
-AVX-512 testing, I've got a box I'm happy to give you access to, if
-you want to send an SSH key and your employer allows for that kind of
-thing etc. I can have a stab at all of this too if you like.
-
-Jason
+-- 
+Thanks,
+~Nick Desaulniers
