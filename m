@@ -1,88 +1,86 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 19 Nov 2018 09:19:38 +0200
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <20181117160502.dhlqbx5qnmdp5iog@kahuna>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
- <20181117160502.dhlqbx5qnmdp5iog@kahuna>
-Message-ID: <b8c1d975-2b4f-5530-2089-dc04c04f8d86@ti.com>
+From: sunrui26@huawei.com (Rui Sun)
+Date: Mon, 19 Nov 2018 15:29:20 +0800
+Subject: [PATCH] arm64:crc:accelerated-crc32-by-64bytes
+Message-ID: <1542612560-10089-1-git-send-email-sunrui26@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/2018 18:05, Nishanth Menon wrote:
-> On 11:31-20181113, Vignesh R wrote:
->> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
->> defining pinmux configs in human readable form, instead of raw-coded
->> hex values.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>   MAINTAINERS                      |  1 +
->>   include/dt-bindings/pinctrl/k3.h | 35 ++++++++++++++++++++++++++++++++
->>   2 files changed, 36 insertions(+)
->>   create mode 100644 include/dt-bindings/pinctrl/k3.h
->>
->> diff --git a/MAINTAINERS b/MAINTAINERS
->> index fa45ff36fde9..1574ad6d7ead 100644
->> --- a/MAINTAINERS
->> +++ b/MAINTAINERS
->> @@ -2204,6 +2204,7 @@ S:	Supported
->>   F:	Documentation/devicetree/bindings/arm/ti/k3.txt
->>   F:	arch/arm64/boot/dts/ti/Makefile
->>   F:	arch/arm64/boot/dts/ti/k3-*
->> +F:	include/dt-bindings/pinctrl/k3.h
->>   
->>   ARM/TEXAS INSTRUMENT KEYSTONE ARCHITECTURE
->>   M:	Santosh Shilimkar <ssantosh@kernel.org>
->> diff --git a/include/dt-bindings/pinctrl/k3.h b/include/dt-bindings/pinctrl/k3.h
->> new file mode 100644
->> index 000000000000..463d845a9b36
->> --- /dev/null
->> +++ b/include/dt-bindings/pinctrl/k3.h
->> @@ -0,0 +1,35 @@
->> +/* SPDX-License-Identifier: GPL-2.0 */
->> +/*
->> + * This header provides constants for pinctrl bindings for TI's K3 SoC
->> + * family.
->> + *
->> + * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com/
->> + */
->> +#ifndef _DT_BINDINGS_PINCTRL_TI_K3_H
->> +#define _DT_BINDINGS_PINCTRL_TI_K3_H
->> +
->> +#define PULLUDEN_SHIFT		(16)
->> +#define PULLTYPESEL_SHIFT	(17)
->> +#define RXACTIVE_SHIFT		(18)
->> +
->> +#define PULL_DISABLE		(1 << PULLUDEN_SHIFT)
->> +#define PULL_ENABLE		(0 << PULLUDEN_SHIFT)
->> +
->> +#define PULL_UP			(1 << PULLTYPESEL_SHIFT | PULL_ENABLE)
->> +#define PULL_DOWN		(0 << PULLTYPESEL_SHIFT | PULL_ENABLE)
->> +
->> +#define INPUT_EN		(1 << RXACTIVE_SHIFT)
->> +#define INPUT_DISABLE		(0 << RXACTIVE_SHIFT)
->> +
->> +/* Only these macros are expected be used directly in device tree files */
->> +#define PIN_OUTPUT		(INPUT_DISABLE | PULL_DISABLE)
->> +#define PIN_OUTPUT_PULLUP	(INPUT_DISABLE | PULL_UP)
->> +#define PIN_OUTPUT_PULLDOWN	(INPUT_DISABLE | PULL_DOWN)
->> +#define PIN_INPUT		(INPUT_EN | PULL_DISABLE)
->> +#define PIN_INPUT_PULLUP	(INPUT_EN | PULL_UP)
->> +#define PIN_INPUT_PULLDOWN	(INPUT_EN | PULL_DOWN)
-> 
-> 
-> Thanks for reducing the combinations down to the minimum needed. We can
-> worry about the DS and isolation bits when we have a real user for them.
-> 
-> Acked-by: Nishanth Menon <nm@ti.com>
-> 
-> Tero: v4.21-rc1 perhaps ?
-> 
+add 64 bytes loop to acceleration calculation
 
-Yeah, looks fine, queueing up for 4.21.
+Signed-off-by: Rui Sun <sunrui26@huawei.com>
+---
+ arch/arm64/lib/crc32.S | 54 ++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 50 insertions(+), 4 deletions(-)
 
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/arch/arm64/lib/crc32.S b/arch/arm64/lib/crc32.S
+index 5bc1e85..2b37009 100644
+--- a/arch/arm64/lib/crc32.S
++++ b/arch/arm64/lib/crc32.S
+@@ -15,15 +15,61 @@
+ 	.cpu		generic+crc
+ 
+ 	.macro		__crc32, c
+-0:	subs		x2, x2, #16
+-	b.mi		8f
++
++64: cmp     x2, #64
++    b.lt    32f
++
++    adds    x11, x1, #16
++    adds    x12, x1, #32
++    adds    x13, x1, #48
++
++0 : subs    x2, x2, #64
++    b.mi    32f
++
++    ldp     x3, x4, [x1], #64
++    ldp     x5, x6, [x11], #64
++    ldp     x7, x8, [x12], #64
++    ldp     x9, x10,[x13], #64
++
++ CPU_BE( rev     x3, x3      )
++ CPU_BE( rev     x4, x4      )
++ CPU_BE( rev     x5, x5      )
++ CPU_BE( rev     x6, x6      )
++ CPU_BE( rev     x7, x7      )
++ CPU_BE( rev     x8, x8      )
++ CPU_BE( rev     x9, x9      )
++ CPU_BE( rev     x10,x10     )
++
++    crc32\c\()x w0, w0, x3
++    crc32\c\()x w0, w0, x4
++    crc32\c\()x w0, w0, x5
++    crc32\c\()x w0, w0, x6
++    crc32\c\()x w0, w0, x7
++    crc32\c\()x w0, w0, x8
++    crc32\c\()x w0, w0, x9
++    crc32\c\()x w0, w0, x10
++
++    b.ne       0b
++    ret
++
++32: tbz     x2, #5, 16f
++    ldp     x3, x4, [x1], #16
++    ldp     x5, x6, [x1], #16
++CPU_BE( rev     x3, x3      )
++CPU_BE( rev     x4, x4      )
++CPU_BE( rev     x5, x5      )
++CPU_BE( rev     x6, x6      )
++    crc32\c\()x w0, w0, x3
++    crc32\c\()x w0, w0, x4
++    crc32\c\()x w0, w0, x5
++    crc32\c\()x w0, w0, x6
++
++16: tbz     x2, #4, 8f
+ 	ldp		x3, x4, [x1], #16
+ CPU_BE(	rev		x3, x3		)
+ CPU_BE(	rev		x4, x4		)
+ 	crc32\c\()x	w0, w0, x3
+ 	crc32\c\()x	w0, w0, x4
+-	b.ne		0b
+-	ret
+ 
+ 8:	tbz		x2, #3, 4f
+ 	ldr		x3, [x1], #8
+-- 
+1.8.3.1
