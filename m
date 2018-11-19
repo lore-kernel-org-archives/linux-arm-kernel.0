@@ -1,31 +1,38 @@
-From: paul.burton@mips.com (Paul Burton)
-Date: Mon, 19 Nov 2018 21:13:29 +0000
-Subject: [PATCH 4/9] PCI: consolidate PCI config entry in drivers/pci
-In-Reply-To: <20181115190538.17016-5-hch@lst.de>
-References: <20181115190538.17016-1-hch@lst.de>
- <20181115190538.17016-5-hch@lst.de>
-Message-ID: <20181119211327.h2lugf2ttuiz3fp6@pburton-laptop>
+From: k-hagio@ab.jp.nec.com (Kazuhito Hagio)
+Date: Mon, 19 Nov 2018 21:07:27 +0000
+Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
+ vmcoreinfo
+In-Reply-To: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+Message-ID: <4AE2DC15AC0B8543882A74EA0D43DBEC03560F84@BPXM09GP.gisp.nec.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoph,
+On 11/15/2018 4:47 PM, Bhupesh Sharma wrote:
+> Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
+> live-debugging of a running kernel via user-space utilities
+> like makedumpfile (see [1]).
 
-On Thu, Nov 15, 2018 at 08:05:32PM +0100, Christoph Hellwig wrote:
-> There is no good reason to duplicate the PCI menu in every architecture.
-> Instead provide a selectable HAVE_PCI symbol that indicates availability
-> of PCI support, and a FORCE_PCI symbol to for PCI on and the handle the
-> rest in drivers/pci.
-> 
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> Reviewed-by: Palmer Dabbelt <palmer@sifive.com>
-> Acked-by: Max Filippov <jcmvbkbc@gmail.com>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+I agree.
 
-For patches 4, 5, 7, 8 & 9:
+> Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
+> details), whose live debugging feature is broken with newer kernels
+> (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
+> added to kcore, thus leading to an additional sections in the same, and
+> makedumpfile is not longer able to determine the start of direct
+> mapping of all physical memory, as it relies on traversing the PT_LOAD
+> segments inside kcore and using the last PT_LOAD segment
+> to determine the start of direct mapping.
 
-    Acked-by: Paul Burton <paul.burton@mips.com> # MIPS parts
+Actually, the KCORE_REMAP segments were already removed from kcore by
+commit bf904d2762ee ("x86/pti/64: Remove the SYSCALL64 entry trampoline")
+and kcore's program headers got back to the previous ones, but this
+fact shows that they are changeable.
+
+So I think that if we have this NUMBER(page_offset_base) in vmcoreinfo
+for x86_64, user-space tools (especially makedumpfile) would become
+more stable against changes in kcore and vmcore, rather than depending
+on their PT_LOAD values.
 
 Thanks,
-    Paul
+Kazu
