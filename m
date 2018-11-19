@@ -1,70 +1,27 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 19 Nov 2018 14:08:00 +0100
-Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
-In-Reply-To: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <20181119130800.GE9761@hirez.programming.kicks-ass.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 19 Nov 2018 14:13:25 +0100
+Subject: [PATCH v7 5/5] arm64: dts: actions: Add pinctrl node for Actions
+ Semi S700
+In-Reply-To: <20181115124748.268286-6-pn@denx.de>
+References: <20181115124748.268286-1-pn@denx.de>
+ <20181115124748.268286-6-pn@denx.de>
+Message-ID: <CACRpkdZqvnmzzAn4SRWuchniMn7K6GrxUXynW=Hf5zrgDH11JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:24:03AM +0000, Andrew Murray wrote:
-> Many PMU drivers do not have the capability to exclude counting events
-> that occur in specific contexts such as idle, kernel, guest, etc. These
-> drivers indicate this by returning an error in their event_init upon
-> testing the events attribute flags.
-> 
-> However this approach requires that each time a new event modifier is
-> added to perf, all the perf drivers need to be modified to indicate that
-> they don't support the attribute. This results in additional boiler-plate
-> code common to many drivers that needs to be maintained. An example of
-> this is the addition of exclude_host and exclude_guest in 2011 yet many
-> PMU drivers do not support this or indicate an error on events that make
-> use of it.
-> 
-> This patch generalises the test for exclusion and updates PMU drivers to
-> use it. This is a functional change as some PMU drivers will now correctly
-> report that they don't support certain events whereas they previously did.
+On Thu, Nov 15, 2018 at 1:48 PM Parthiban Nallathambi <pn@denx.de> wrote:
 
-Right, I like that idea, and yes, there's a lot of fail around there :/
+> From: Saravanan Sekar <sravanhome@gmail.com>
+>
+> Add pinctrl nodes for Actions Semi S700 SoC
+>
+> Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+> Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
+> Acked-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 
-> A longer term approach may instead be for PMU's to advertise their
-> capabilities on registration.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-This I think is the better approach. We already have the
-PERF_PMU_CAP_flags that can be used to advertise various PMU
-capabilities.
+Please merge this through the ARM SoC tree.
 
-Something along these lines I suppose; then every PMU that actually
-checks the flags, needs to set the flag, otherwise it'll fail.
-
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 53c500f0ca79..de15723ea52a 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -244,6 +244,7 @@ struct perf_event;
- #define PERF_PMU_CAP_EXCLUSIVE			0x10
- #define PERF_PMU_CAP_ITRACE			0x20
- #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
-+#define PERF_PMU_CAP_EXCLUDE			0x80
- 
- /**
-  * struct pmu - generic performance monitoring unit
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 84530ab358c3..d76b724177b9 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
- 	if (ctx)
- 		perf_event_ctx_unlock(event->group_leader, ctx);
- 
-+	if (!ret) {
-+		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
-+		    event_has_exclude_flags(event)) {
-+			event->destroy(event);
-+			ret = -EINVAL;
-+		}
-+	}
-+
- 	if (ret)
- 		module_put(pmu->module);
- 
+Yours,
+Linus Walleij
