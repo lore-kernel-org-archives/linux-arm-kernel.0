@@ -1,190 +1,106 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 19 Nov 2018 16:03:52 +0000
-Subject: [PATCH 09/10] drivers/perf: perf/core: generalise event
- exclusion checking with perf macro
-In-Reply-To: <1542363853-13849-10-git-send-email-andrew.murray@arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <1542363853-13849-10-git-send-email-andrew.murray@arm.com>
-Message-ID: <20181119160352.ua2lx72l754imiek@lakrids.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 19 Nov 2018 08:11:38 -0800
+Subject: [PATCH] arm64:crc:accelerated-crc32-by-64bytes
+In-Reply-To: <1542612560-10089-1-git-send-email-sunrui26@huawei.com>
+References: <1542612560-10089-1-git-send-email-sunrui26@huawei.com>
+Message-ID: <CAKv+Gu_=e70fzmVRuo7A4ObdNfWt=mQSU+n7E_HkRuqLV0fnMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 10:24:12AM +0000, Andrew Murray wrote:
-> Replace checking of perf event exclusion flags with perf macro.
-> 
-> This is a functional change as exclude_host and exclude_guest are added
-> in the following files:
-> 
->  - drivers/perf/qcom_l2_pmu.c
->  - drivers/perf/qcom_l3_pmu.c
->  - drivers/perf/arm_pmu.c
-> 
-> And exclude_idle and exclude_hv are added in these files:
-> 
->  - drivers/perf/xgene_pmu.c
+On Sun, 18 Nov 2018 at 23:30, Rui Sun <sunrui26@huawei.com> wrote:
+>
+> add 64 bytes loop to acceleration calculation
+>
 
-FWIW, that all sounds fine to me.
+Can you share some performance numbers please?
 
-Assuming you fix up the 'macro' nit:
+Also, we don't need 64 byte, 32 byte and 16 byte code paths: just make
+the 8 byte one a loop as well, and drop the 32 byte and 16 byte ones.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-... unless we go for Peter's core cap for this.
-
-Thanks,
-Mark.
-
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> Signed-off-by: Rui Sun <sunrui26@huawei.com>
 > ---
->  drivers/perf/arm-cci.c                   | 7 +------
->  drivers/perf/arm-ccn.c                   | 5 +----
->  drivers/perf/arm_dsu_pmu.c               | 7 +------
->  drivers/perf/arm_pmu.c                   | 9 +--------
->  drivers/perf/hisilicon/hisi_uncore_pmu.c | 7 +------
->  drivers/perf/qcom_l2_pmu.c               | 3 +--
->  drivers/perf/qcom_l3_pmu.c               | 3 +--
->  drivers/perf/xgene_pmu.c                 | 3 +--
->  8 files changed, 8 insertions(+), 36 deletions(-)
-> 
-> diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
-> index 1bfeb16..d749f19 100644
-> --- a/drivers/perf/arm-cci.c
-> +++ b/drivers/perf/arm-cci.c
-> @@ -1328,12 +1328,7 @@ static int cci_pmu_event_init(struct perf_event *event)
->  		return -EOPNOTSUPP;
->  
->  	/* We have no filtering of any kind */
-> -	if (event->attr.exclude_user	||
-> -	    event->attr.exclude_kernel	||
-> -	    event->attr.exclude_hv	||
-> -	    event->attr.exclude_idle	||
-> -	    event->attr.exclude_host	||
-> -	    event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	/*
-> diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
-> index 7dd850e..9a22a95 100644
-> --- a/drivers/perf/arm-ccn.c
-> +++ b/drivers/perf/arm-ccn.c
-> @@ -741,10 +741,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
->  		return -EOPNOTSUPP;
->  	}
->  
-> -	if (has_branch_stack(event) || event->attr.exclude_user ||
-> -			event->attr.exclude_kernel || event->attr.exclude_hv ||
-> -			event->attr.exclude_idle || event->attr.exclude_host ||
-> -			event->attr.exclude_guest) {
-> +	if (has_branch_stack(event) || event_has_exclude_flags(event)) {
->  		dev_dbg(ccn->dev, "Can't exclude execution levels!\n");
->  		return -EINVAL;
->  	}
-> diff --git a/drivers/perf/arm_dsu_pmu.c b/drivers/perf/arm_dsu_pmu.c
-> index 660cb8a..300ff3d 100644
-> --- a/drivers/perf/arm_dsu_pmu.c
-> +++ b/drivers/perf/arm_dsu_pmu.c
-> @@ -563,12 +563,7 @@ static int dsu_pmu_event_init(struct perf_event *event)
->  	}
->  
->  	if (has_branch_stack(event) ||
-> -	    event->attr.exclude_user ||
-> -	    event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv ||
-> -	    event->attr.exclude_idle ||
-> -	    event->attr.exclude_host ||
-> -	    event->attr.exclude_guest) {
-> +	    event_has_exclude_flags(event)) {
->  		dev_dbg(dsu_pmu->pmu.dev, "Can't support filtering\n");
->  		return -EINVAL;
->  	}
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 7f01f6f..a03634f 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -357,13 +357,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
->  }
->  
->  static int
-> -event_requires_mode_exclusion(struct perf_event_attr *attr)
-> -{
-> -	return attr->exclude_idle || attr->exclude_user ||
-> -	       attr->exclude_kernel || attr->exclude_hv;
-> -}
-> -
-> -static int
->  __hw_perf_event_init(struct perf_event *event)
->  {
->  	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
-> @@ -395,7 +388,7 @@ __hw_perf_event_init(struct perf_event *event)
->  	 */
->  	if ((!armpmu->set_event_filter ||
->  	     armpmu->set_event_filter(hwc, &event->attr)) &&
-> -	     event_requires_mode_exclusion(&event->attr)) {
-> +	     event_has_exclude_flags(event)) {
->  		pr_debug("ARM performance counters do not support "
->  			 "mode exclusion\n");
->  		return -EOPNOTSUPP;
-> diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> index 9efd241..d3edff9 100644
-> --- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
-> @@ -143,12 +143,7 @@ int hisi_uncore_pmu_event_init(struct perf_event *event)
->  		return -EOPNOTSUPP;
->  
->  	/* counters do not have these bits */
-> -	if (event->attr.exclude_user	||
-> -	    event->attr.exclude_kernel	||
-> -	    event->attr.exclude_host	||
-> -	    event->attr.exclude_guest	||
-> -	    event->attr.exclude_hv	||
-> -	    event->attr.exclude_idle)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	/*
-> diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
-> index 842135c..d7d85a2 100644
-> --- a/drivers/perf/qcom_l2_pmu.c
-> +++ b/drivers/perf/qcom_l2_pmu.c
-> @@ -510,8 +510,7 @@ static int l2_cache_event_init(struct perf_event *event)
->  	}
->  
->  	/* We cannot filter accurately so we just don't allow it. */
-> -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv || event->attr.exclude_idle) {
-> +	if (event_has_exclude_flags(event)) {
->  		dev_dbg_ratelimited(&l2cache_pmu->pdev->dev,
->  				    "Can't exclude execution levels\n");
->  		return -EOPNOTSUPP;
-> diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
-> index 2dc63d6..f27af67 100644
-> --- a/drivers/perf/qcom_l3_pmu.c
-> +++ b/drivers/perf/qcom_l3_pmu.c
-> @@ -497,8 +497,7 @@ static int qcom_l3_cache__event_init(struct perf_event *event)
->  	/*
->  	 * There are no per-counter mode filters in the PMU.
->  	 */
-> -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv || event->attr.exclude_idle)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	/*
-> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-> index 0e31f13..1fcd5a0 100644
-> --- a/drivers/perf/xgene_pmu.c
-> +++ b/drivers/perf/xgene_pmu.c
-> @@ -915,8 +915,7 @@ static int xgene_perf_event_init(struct perf_event *event)
->  		return -EINVAL;
->  
->  	/* SOC counters do not have usr/os/guest/host bits */
-> -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
-> -	    event->attr.exclude_host || event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	if (event->cpu < 0)
-> -- 
-> 2.7.4
-> 
+>  arch/arm64/lib/crc32.S | 54 ++++++++++++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 50 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/lib/crc32.S b/arch/arm64/lib/crc32.S
+> index 5bc1e85..2b37009 100644
+> --- a/arch/arm64/lib/crc32.S
+> +++ b/arch/arm64/lib/crc32.S
+> @@ -15,15 +15,61 @@
+>         .cpu            generic+crc
+>
+>         .macro          __crc32, c
+> -0:     subs            x2, x2, #16
+> -       b.mi            8f
+> +
+> +64: cmp     x2, #64
+> +    b.lt    32f
+> +
+> +    adds    x11, x1, #16
+> +    adds    x12, x1, #32
+> +    adds    x13, x1, #48
+> +
+> +0 : subs    x2, x2, #64
+> +    b.mi    32f
+> +
+> +    ldp     x3, x4, [x1], #64
+> +    ldp     x5, x6, [x11], #64
+> +    ldp     x7, x8, [x12], #64
+> +    ldp     x9, x10,[x13], #64
+> +
+
+Can we do this instead, and get rid of the temp variables?
+
+    ldp     x3, x4, [x1], #64
+    ldp     x5, x6, [x1, #-48]
+    ldp     x7, x8, [x1, #-32]
+    ldp     x9, x10,[x1, #-16]
+
+> + CPU_BE( rev     x3, x3      )
+> + CPU_BE( rev     x4, x4      )
+> + CPU_BE( rev     x5, x5      )
+> + CPU_BE( rev     x6, x6      )
+> + CPU_BE( rev     x7, x7      )
+> + CPU_BE( rev     x8, x8      )
+> + CPU_BE( rev     x9, x9      )
+> + CPU_BE( rev     x10,x10     )
+> +
+> +    crc32\c\()x w0, w0, x3
+> +    crc32\c\()x w0, w0, x4
+> +    crc32\c\()x w0, w0, x5
+> +    crc32\c\()x w0, w0, x6
+> +    crc32\c\()x w0, w0, x7
+> +    crc32\c\()x w0, w0, x8
+> +    crc32\c\()x w0, w0, x9
+> +    crc32\c\()x w0, w0, x10
+> +
+> +    b.ne       0b
+> +    ret
+> +
+> +32: tbz     x2, #5, 16f
+> +    ldp     x3, x4, [x1], #16
+> +    ldp     x5, x6, [x1], #16
+> +CPU_BE( rev     x3, x3      )
+> +CPU_BE( rev     x4, x4      )
+> +CPU_BE( rev     x5, x5      )
+> +CPU_BE( rev     x6, x6      )
+> +    crc32\c\()x w0, w0, x3
+> +    crc32\c\()x w0, w0, x4
+> +    crc32\c\()x w0, w0, x5
+> +    crc32\c\()x w0, w0, x6
+> +
+> +16: tbz     x2, #4, 8f
+>         ldp             x3, x4, [x1], #16
+>  CPU_BE(        rev             x3, x3          )
+>  CPU_BE(        rev             x4, x4          )
+>         crc32\c\()x     w0, w0, x3
+>         crc32\c\()x     w0, w0, x4
+> -       b.ne            0b
+> -       ret
+>
+>  8:     tbz             x2, #3, 4f
+>         ldr             x3, [x1], #8
+> --
+> 1.8.3.1
+>
