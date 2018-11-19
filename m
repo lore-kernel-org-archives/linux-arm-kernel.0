@@ -1,8 +1,8 @@
-From: ebiggers@kernel.org (Eric Biggers)
-Date: Mon, 19 Nov 2018 14:54:15 -0800
-Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto
- API code
-In-Reply-To: <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Tue, 20 Nov 2018 00:15:17 +0100
+Subject: [RFC PATCH] zinc chacha20 generic implementation using crypto API
+ code
+In-Reply-To: <20181119225414.GB258711@gmail.com>
 References: <20181105232526.173947-1-ebiggers@kernel.org>
  <20181105232526.173947-11-ebiggers@kernel.org>
  <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
@@ -12,62 +12,45 @@ References: <20181105232526.173947-1-ebiggers@kernel.org>
  <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
  <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
  <CAHmME9oXAnD0sbO2cKeTtotCMohX2Hu6P=uzA_6u0EWECU9Bpg@mail.gmail.com>
-Message-ID: <20181119225414.GB258711@gmail.com>
+ <20181119225414.GB258711@gmail.com>
+Message-ID: <CAHmME9okRjuYUiL0D=6ZmtMX6rvxU+0xvy2tva+LetjU9itx8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 07:13:07AM +0100, Jason A. Donenfeld wrote:
-> Hi Herbert,
-> 
-> On Mon, Nov 19, 2018 at 6:25 AM Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > My proposal is to merge the zinc interface as is, but to invert
-> > how we place the algorithm implementations.  IOW the implementations
-> > should stay where they are now, with in the crypto API.  However,
-> > we will provide direct access to them for zinc without going through
-> > the crypto API.  IOW we'll just export the functions directly.
-> 
-> Sorry, but there isn't a chance I'll agree to this. The whole idea is
-> to have a clean place to focus on synchronous software
-> implementations, and not keep it tangled up with the asynchronous API.
-> If WireGuard and Zinc go in, it's going to be done right, not in a way
-> that introduces more problems and organizational complexity. Avoiding
-> the solution proposed here is kind of the point. And given that
-> cryptographic code is so security sensitive, I want to make sure this
-> is done right, as opposed to rushing it with some half-baked
-> concoction that will be maybe possibly be replaced "later". From
-> talking to folks at Plumbers, I believe most of the remaining issues
-> are taken care of by the upcoming v9, and that you're overstating the
-> status of discussions regarding that.
+Hi Eric,
 
-Will v9 include a documentation file for Zinc in Documentation/crypto/?
-That's been suggested several times.
+On Mon, Nov 19, 2018 at 11:54 PM Eric Biggers <ebiggers@kernel.org> wrote:
+> Will v9 include a documentation file for Zinc in Documentation/crypto/?
+> That's been suggested several times.
 
-> 
-> I think the remaining issue right now is how to order my series and
-> Eric's series. If Eric's goes in first, it means that I can either a)
-> spend some time developing Zinc further _now_ to support chacha12 and
-> keep the top two conversion patches, or b) just drop the top two
-> conversion patches and work that out carefully with Eric after. I
-> think (b) would be better, but I'm happy to do (a) if you disagree.
-> And as I mentioned in the last email, I'd prefer Eric's work to go in
-> after Zinc, but I don't think the reasoning for that is particularly
-> strong, so it seems fine to merge Eric's work first.
-> 
-> I'll post v9 pretty soon and you can see how things are shaping up.
-> Hopefully before then Eric/Ard/you can provide some feedback on
-> whether you'd prefer (a) or (b) above.
-> 
+I had started writing that there, but then thought that the requested
+information could go in the commit message instead. But I'm guessing
+you're asking again now because you poked into the repo and didn't
+find the Documentation/, so presumably you still want it. I can
+reorganize the presentation of that to be more suitable for
+Documentation/, and I'll have that for v9.
 
-I'd still prefer to see the conversion patches included.  Skipping them would be
-kicking the can down the road and avoiding issues that will need to be addressed
-anyway.  Like you, I don't want a "half-baked concoction that will be maybe
-possibly be replaced 'later'" :-)
+> I'd still prefer to see the conversion patches included.  Skipping them would be
+> kicking the can down the road and avoiding issues that will need to be addressed
+> anyway.  Like you, I don't want a "half-baked concoction that will be maybe
+> possibly be replaced 'later'" :-)
 
-Either way though, it would make things much easier if you at least named the
-files, structures, constants, etc. "ChaCha" rather than "ChaCha20" from the
-start where appropriate.  For an example, see the commit "crypto: chacha -
-prepare for supporting non-20-round variants" on my "adiantum-zinc" branch:
-https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git/commit/?h=adiantum-zinc&id=754af8d7d39f31238114426e39786c84d7cc0f98
-Then the actual introduction of the 12-round variant is much less noisy.
+Okay, fair enough. Will do.
 
-- Eric
+> Either way though, it would make things much easier if you at least named the
+> files, structures, constants, etc. "ChaCha" rather than "ChaCha20" from the
+> start where appropriate.  For an example, see the commit "crypto: chacha -
+> prepare for supporting non-20-round variants" on my "adiantum-zinc" branch:
+> https://git.kernel.org/pub/scm/linux/kernel/git/ebiggers/linux.git/commit/?h=adiantum-zinc&id=754af8d7d39f31238114426e39786c84d7cc0f98
+> Then the actual introduction of the 12-round variant is much less noisy.
+
+That's a good idea. I'll do it like that. I'll likely order it as what
+we have now (renamed to omit the 20), and then put the 12 stuff on top
+of that, so it's easier to see what's changed in the process. I
+noticed in that branch, you didn't port the assembly to support fewer
+rounds. Shall I follow suite, and then expect patches from you later
+doing that? Or were you expecting me to also port the architecture
+implementations to chacha12 as well?
+
+Regards,
+Jason
