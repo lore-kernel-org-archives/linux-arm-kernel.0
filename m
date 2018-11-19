@@ -1,71 +1,121 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Mon, 19 Nov 2018 22:39:26 +0530
-Subject: [PATCH 03/16] ARM: Prepare RDA8810PL SoC
+Date: Mon, 19 Nov 2018 22:39:27 +0530
+Subject: [PATCH 04/16] arm: dts: Add devicetree for RDA8810PL SoC
 In-Reply-To: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
 References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181119170939.19153-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181119170939.19153-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andreas F?rber <afaerber@suse.de>
-
-Introduce ARCH_RDA and mach-rda for RDA Micro SoCs.
+Add initial device tree for RDA8810PL SoC from RDA Microelectronics.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm/Kconfig           | 2 ++
- arch/arm/Makefile          | 1 +
- arch/arm/mach-rda/Kconfig  | 7 +++++++
- arch/arm/mach-rda/Makefile | 1 +
- 4 files changed, 11 insertions(+)
- create mode 100644 arch/arm/mach-rda/Kconfig
- create mode 100644 arch/arm/mach-rda/Makefile
+ arch/arm/boot/dts/rda8810pl.dtsi | 95 ++++++++++++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 91be74d8df65..084f0983e6b2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -804,6 +804,8 @@ source "arch/arm/plat-pxa/Kconfig"
- 
- source "arch/arm/mach-qcom/Kconfig"
- 
-+source "arch/arm/mach-rda/Kconfig"
+diff --git a/arch/arm/boot/dts/rda8810pl.dtsi b/arch/arm/boot/dts/rda8810pl.dtsi
+new file mode 100644
+index 000000000000..7f1ff2021eff
+--- /dev/null
++++ b/arch/arm/boot/dts/rda8810pl.dtsi
+@@ -0,0 +1,95 @@
++/*
++ * RDA8810PL SoC
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ * Copyright (c) 2018 Manivannan Sadhasivam
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
 +
- source "arch/arm/mach-realview/Kconfig"
- 
- source "arch/arm/mach-rockchip/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 05a91d8b89f3..10056ccdb8be 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -202,6 +202,7 @@ machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_QCOM)		+= qcom
-+machine-$(CONFIG_ARCH_RDA)		+= rda
- machine-$(CONFIG_ARCH_REALVIEW)		+= realview
- machine-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip
- machine-$(CONFIG_ARCH_RPC)		+= rpc
-diff --git a/arch/arm/mach-rda/Kconfig b/arch/arm/mach-rda/Kconfig
-new file mode 100644
-index 000000000000..dafab78d7aab
---- /dev/null
-+++ b/arch/arm/mach-rda/Kconfig
-@@ -0,0 +1,7 @@
-+menuconfig ARCH_RDA
-+	bool "RDA Micro SoCs"
-+	depends on ARCH_MULTI_V7
-+	select COMMON_CLK
-+	select GENERIC_IRQ_CHIP
-+	help
-+	  This enables support for the RDA Micro 8810PL SoC family.
-diff --git a/arch/arm/mach-rda/Makefile b/arch/arm/mach-rda/Makefile
-new file mode 100644
-index 000000000000..6bea3d3a2dd7
---- /dev/null
-+++ b/arch/arm/mach-rda/Makefile
-@@ -0,0 +1 @@
-+obj- += dummy.o
++/ {
++	compatible = "rda,8810pl";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0x0>;
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x0 0x80000000>;
++
++		sram at 100000 {
++			compatible = "mmio-sram";
++			reg = <0x100000 0x10000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++		};
++
++		apb at 20800000 {
++			compatible = "simple-bus";
++			reg = <0x20800000 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x20800000 0x100000>;
++		};
++
++		apb at 20900000 {
++			compatible = "simple-bus";
++			reg = <0x20900000 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x20900000 0x100000>;
++		};
++
++		apb at 20a00000 {
++			compatible = "simple-bus";
++			reg = <0x20a00000 0x100000>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0x0 0x20a00000 0x100000>;
++
++			uart0: serial at 0 {
++				compatible = "rda,8810pl-uart";
++				reg = <0x0 0x1000>;
++				status = "disabled";
++			};
++
++			uart1: serial at 10000 {
++				compatible = "rda,8810pl-uart";
++				reg = <0x10000 0x1000>;
++				status = "disabled";
++			};
++
++			uart2: serial at 90000 {
++				compatible = "rda,8810pl-uart";
++				reg = <0x90000 0x1000>;
++				status = "disabled";
++			};
++		};
++
++		l2: cache-controller at 21100000 {
++			compatible = "arm,pl310-cache";
++			reg = <0x21100000 0x1000>;
++			cache-unified;
++			cache-level = <2>;
++		};
++	};
++};
 -- 
 2.17.1
