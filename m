@@ -1,79 +1,58 @@
-From: atish.patra@wdc.com (Atish Patra)
-Date: Mon, 19 Nov 2018 09:46:44 -0800
-Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
-In-Reply-To: <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
-References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
- <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
-Message-ID: <40f24d50-eb1b-cef6-81e2-1bc9930bcbf5@wdc.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 19 Nov 2018 09:48:16 -0800
+Subject: compiler code model for the kernel
+In-Reply-To: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+Message-ID: <CAKwvOdmOUHH9BbRV=zfx9LKyfwL41NPDke_uqD_4ZwyGqxJGKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/18 10:31 AM, Jeffrey Hugo wrote:
-> On 11/8/2018 6:50 PM, Atish Patra wrote:
->> The cpu-map DT entry in ARM64 can describe the CPU topology in
->> much better way compared to other existing approaches. RISC-V can
->> easily adopt this binding to represent it's own CPU topology.
->> Thus, both cpu-map DT binding and topology parsing code can be
->> moved to a common location so that RISC-V or any other
->> architecture can leverage that.
->>
->> The relevant discussion regarding unifying cpu topology can be
->> found in [1].
->>
->> arch_topology seems to be a perfect place to move the common
->> code. I have not introduced any functional changes in the moved
->> to code. The only downside in this approach is that the capacity
->> code will be executed for RISC-V as well. But, it will exit
->> immediately after not able to find the appropriate DT node. If
->> the overhead is considered too much, we can always compile out
->> capacity related functions under a different config for the
->> architectures that do not support them.
->>
->> The patches have been tested for RISC-V and compile tested for
->> ARM64.
->>
->> The socket changes[2] can be merged on top of this series or vice
->> versa.
->>
->> [1] https://lkml.org/lkml/2018/11/6/19
->> [2] https://lkml.org/lkml/2018/11/7/918
->>
->> Atish Patra (3):
->>     dt-binding: cpu-topology: Move cpu-map to a common binding.
->>     cpu-topology: Move cpu topology code to common code.
->>     RISC-V: Parse cpu topology during boot.
->>
->>    Documentation/devicetree/bindings/arm/topology.txt | 475 -------------------
->>    .../devicetree/bindings/cpu/cpu-topology.txt       | 526 +++++++++++++++++++++
->>    arch/arm64/include/asm/topology.h                  |  23 +-
->>    arch/arm64/kernel/topology.c                       | 305 +-----------
->>    arch/riscv/Kconfig                                 |   1 +
->>    arch/riscv/kernel/smpboot.c                        |   6 +-
->>    drivers/base/arch_topology.c                       | 303 ++++++++++++
->>    include/linux/arch_topology.h                      |  23 +
->>    include/linux/topology.h                           |   1 +
->>    9 files changed, 864 insertions(+), 799 deletions(-)
->>    delete mode 100644 Documentation/devicetree/bindings/arm/topology.txt
->>    create mode 100644 Documentation/devicetree/bindings/cpu/cpu-topology.txt
->>
-> 
-> I was interested in testing these on QDF2400, an ARM64 platform, since
-> this series touches core ARM64 code and I'd hate to see a regression.
-> However, I can't figure out what baseline to use to apply these.
-> Different patches cause different conflicts of a variety of baselines I
-> attempted.
-> 
-> What are these intended to apply to?
-> 
-I had rebased them on top of 4.20-rc1.
+On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> Hello all,
+>
+> Some of us (on cc) have discussed this a bit on various occasions, so
+> perhaps it's time to sit down and do something about it :-)
+>
+> The Clang work that Nick is involved in has made explicit some
+> assumptions that we are currently making in the kernel with respect to
+> the behavior of GCC, and it would be good to formalise this so we can
+> keep relying on it in the future, and to clarify to other compiler
+> developers what is needed.
+>
+> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> introduce the same for AArch64. Under this model, we should be able to
+> make the following assumptions:
+> - symbol references are emitted as ADRP/ADD pairs
+> -  no absolute references in generated code like jump tables etc (like
+> -fpic/-fpie) [*]
+> - no shared library semantics (no GOT indirections to support symbol
+> preemption, or to reduce the CoW footprint and/or avoid text
+> relocations)
+> - resulting objects can be linked in -pie mode by ld.bfd
+>
+> Another thing that came up is that we currently rely on the stack
+> pointer never to assume a value that is not 16-byte aligned, even
+> transiently.
+>
+> Other things I've missed?
+>
+> [*] This is only strictly required in parts of the code that may
+> execute at a different offset than the linked offset, even after
+> processing dynamic relocations at boot time (e.g., KVM hyp code
+> running in a different exception level) but avoiding those altogether
+> is reasonable. Note that GCC does the right thing for us here already,
+> but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
 
-> Also, you might want to run them through checkpatch next time.  There
-> are several whitespace errors.
-> 
-Sorry I missed couple of them.
-Thanks for trying to test the patches. I will send a next version as Rob 
-suggested. Please test that.
+Just following up on the KVM hyp code. At plumbers Mark and I took a
+look at that case and were no longer able to reproduce.  Mark was able
+to boot a Clang compiled kernel at EL2.  IIRC, the code in question
+had been changed.  Note: Clang still probably does the wrong thing for
+jump tables, so we should pursue this code model, I just don't think
+this previous example is still the case.  Since it could always come
+back, we should fix the issue on the compiler side though.
 
-
-Regards,
-Atish
+-- 
+Thanks,
+~Nick Desaulniers
