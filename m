@@ -1,104 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 19 Nov 2018 12:49:34 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <20181119091020.ejplmzkzo4jd72md@salmiak>
-References: <851b61b1-786b-ef64-b8c4-fe6926bdf9f9@arm.com>
- <201811171058376326562@zte.com.cn> <20181119091020.ejplmzkzo4jd72md@salmiak>
-Message-ID: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Mon, 19 Nov 2018 12:53:46 +0000
+Subject: [PATCH v6 1/6] clk: Add of_clk_get_by_name_optional() function
+In-Reply-To: <20181119104603.qzuvpoha622l4xvy@pengutronix.de>
+References: <20181116145937.27660-1-phil.edworthy@renesas.com>
+ <20181116145937.27660-2-phil.edworthy@renesas.com>
+ <20181116160128.pkuya6rwqm4schdn@pengutronix.de>
+ <20181116161122.hhvslbzdujxpk3up@pengutronix.de>
+ <TY1PR01MB17697C2C8BCE98009EBDECF7F5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+ <20181119104603.qzuvpoha622l4xvy@pengutronix.de>
+Message-ID: <TY1PR01MB17695E8ED56BBC03AAA7FD8FF5D80@TY1PR01MB1769.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2018 09:10, Mark Rutland wrote:
-> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
->>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
->>>>> Hi,
->>>>>> When virtual machine starts, hang up.
->>>>>
->>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
->>>>> interrupt?
->>>>>
->>>>>> The kernel version of guest
->>>>>> is 4.16. Host support vgic_v3.
->>>>>
->>>>> Your host kernel is something recent, I guess?
->>>>>
->>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
->>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
->>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
->>>>>> correctly, so group is not set.
->>>>>
->>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
->>>>> version?) or some other userland tool?
->>>>>
->>>>
->>>> QEMU emulator version 3.0.50 .
->>>>
->>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
->>>>>> time.
->>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
->>>>>> interrupt injection failed.
->>>>>>
->>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->>>>>> ---
->>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>>
->>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> index 9c0dd23..d101000 100644
->>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
->>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
->>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
->>>>>>
->>>>>> -    if (irq->group)
->>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->>>>>
->>>>> This is not the right fix, not only because it basically reverts the
->>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
->>>>> their configured group).
->>>>>
->>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
->>>>> before dist->vgic_model is set, also what value it has?
->>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
->>>>>
->>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
->>>>   If the interrupt comes at this time, the interrupt injection fails.
->>>
->>> Does that mean that the guest is configuring its interrupts as Group0?
->>> That sounds wrong, Linux should configure all it's interrupts as
->>> non-secure group1.
->>
->> no, I think that uefi dose this, not linux.
->> 1. kvm_vgic_vcpu_init 
->> 2. vgic_create 
->> 3. kvm_vgic_dist_init 
->> 4.vgic_mmio_write_group: uefi as guest, write group=0
->> 5.vgic_mmio_write_group: linux as guest, write group=1
+Hi Uwe,
+
+On 19 November 2018 10:46 Uwe Kleine-K?nig wrote:
+> On Mon, Nov 19, 2018 at 10:41:42AM +0000, Phil Edworthy wrote:
+> > On 16 November 2018 16:11 Uwe Kleine-K?nig wrote:
+> > > On Fri, Nov 16, 2018 at 05:01:28PM +0100, Uwe Kleine-K?nig wrote:
+> > > > Other than that I think the patch is fine
+> > >
+> > > Thinking again, I wonder why not just do:
+> > >
+> > > static inline struct clk *clk_get_optional(struct device *dev, const char
+> *id) {
+> > > 	struct clk *c = clk_get(dev, id);
+> > >
+> > > 	if (c == ERR_PTR(-ENOENT))
+> > > 		return NULL;
+> > > 	else
+> > > 		return c;
+> > > }
+> >
+> > Unfortunately, underneath this __of_clk_get_by_name() returns -EINVAL
+> > when looking for a named clock, and the "clock-names" OF property
+> > can't be found or the name is not in that prop. This is because the
+> > index returned by of_property_match_string() will be an error code and
+> > is then currently always passed to __of_clk_get().
+> >
+> > If, as you said, I split the patches into one that fixes the error
+> > code, and then adds clk_get_optional() like above, it will make more sense.
 > 
-> Is this the same issue fixed by EDK2 commit:
+> Sounds like a good plan.
+Now that I have removed of_clk_get_by_name_optional(), I see that clk_get()
+deals with __of_clk_get_by_name() returning -EINVAL and -ENOENT the same
+way. In both cases, clk_get_sys() will return -ENOENT... i.e. I no longer need to
+modify __of_clk_get_by_name().
+All I need is a simple wrapper just as you have outlined above.
+
+> > btw, do we need to add of_clk_get_by_name_optional()? I only added it
+> > as a counterpart to of_clk_get_by_name(), but it may not be needed.
 > 
-> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
-> 
-> ... where EDK2 would try to use IAR0 rather than IAR1?
-> 
-> The commit messages notes this lead to a boot-time hang.
+> I don't need it. Given that it is easy to add when someone has a need, I'd say,
+> skip it for now.
+I'm wondering if we actually need clk_get_optional(). For me at least, I just
+want devm_clk_get_optional(). That would get rid of the arch patches.
 
-I managed to trigger an issue with a really old EFI implementation that
-doesn't configure its interrupts as Group1, and yet tries to ACK its
-interrupts using the Group1 accessor. Guess what? It is not going to work.
-
-Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
-to be the fix (I only assume it does, I haven't actually checked). A
-recent build, as found in Debian Buster, works perfectly (tested with
-both QEMU v2.12 and tip of tree).
-
-Now, I really don't get what you're saying about Linux not getting
-interrupts. How do you get to booting Linux if EFI is not making any
-forward progress? Are you trying them independently?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks
+Phil
