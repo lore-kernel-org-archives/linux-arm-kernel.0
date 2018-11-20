@@ -1,82 +1,37 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Nov 2018 20:16:34 +0100
-Subject: [RFT PATCH v2] efi: map memreserve table before first use
-Message-ID: <20181120191634.7376-1-ard.biesheuvel@linaro.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 20 Nov 2018 11:24:18 -0800
+Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
+In-Reply-To: <cover.1542722463.git.robin.murphy@arm.com>
+References: <cover.1542722463.git.robin.murphy@arm.com>
+Message-ID: <CALAqxLX5GPwce=oWh5nf2w8pjoCJUVkxCr7_hrqVVfYVHzx-fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mapping the MEMRESERVE EFI configuration table from an early initcall
-is too late: the GICv3 ITS code that creates persistent reservations
-for the boot CPU's LPI tables is invoked from init_IRQ(), which runs
-much earlier than the handling of the initcalls.
+On Tue, Nov 20, 2018 at 6:10 AM Robin Murphy <robin.murphy@arm.com> wrote:
+>
+> This is what I have so far, which at least resolves the most ovbious
+> problems. I still haven't got very far with the USB corruption issue
+> I see on Juno with -rc1, but I'm yet to confirm whether that's actually
+> attributable to the SWIOTLB changes or something else entirely.
+>
+> Robin.
+>
+> Robin Murphy (2):
+>   swiotlb: Make DIRECT_MAPPING_ERROR viable
+>   swiotlb: Skip cache maintenance on map error
+>
+>  include/linux/dma-direct.h | 2 +-
+>  kernel/dma/swiotlb.c       | 3 ++-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 
-So instead, move the initialization performed by the initcall into
-efi_mem_reserve_persistent() itself, but keep the initcall as well
-so that the init is guaranteed to have been called before SMP boot.
+Thanks so much for chasing this down!
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- drivers/firmware/efi/efi.c | 34 ++++++++++++++++++++++++++--------
- 1 file changed, 26 insertions(+), 8 deletions(-)
+Unfortunately AOSP is giving me grief this week, so I've not been able
+to test the full environment, but I don't seem to be hitting the io
+hangs I was seeing earlier with this patch set.
 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index fad7c62cfc0e..0e2d52a0c50e 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -969,13 +969,33 @@ bool efi_is_table_address(unsigned long phys_addr)
- static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
- static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
- 
--int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
-+static int __init efi_memreserve_map_root(void)
-+{
-+	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-+		return -ENODEV;
-+
-+	efi_memreserve_root = memremap(efi.mem_reserve,
-+				       sizeof(*efi_memreserve_root),
-+				       MEMREMAP_WB);
-+	if (WARN_ON_ONCE(!efi_memreserve_root))
-+		return -ENOMEM;
-+	return 0;
-+}
-+
-+int __ref efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
- {
- 	struct linux_efi_memreserve *rsv;
-+	int rc;
- 
--	if (!efi_memreserve_root)
-+	if (efi_memreserve_root == (void *)ULONG_MAX)
- 		return -ENODEV;
- 
-+	if (!efi_memreserve_root) {
-+		rc = efi_memreserve_map_root();
-+		if (rc)
-+			return rc;
-+	}
-+
- 	rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
- 	if (!rsv)
- 		return -ENOMEM;
-@@ -993,14 +1013,12 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
- 
- static int __init efi_memreserve_root_init(void)
- {
--	if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
--		return -ENODEV;
-+	if (efi_memreserve_root)
-+		return 0;
- 
--	efi_memreserve_root = memremap(efi.mem_reserve,
--				       sizeof(*efi_memreserve_root),
--				       MEMREMAP_WB);
-+	efi_memreserve_map_root();
- 	if (!efi_memreserve_root)
--		return -ENOMEM;
-+		efi_memreserve_root = (void *)ULONG_MAX;
- 	return 0;
- }
- early_initcall(efi_memreserve_root_init);
--- 
-2.17.1
+For both:
+  Tested-by: John Stultz <john.stultz@linaro.org>
+
+thanks
+-john
