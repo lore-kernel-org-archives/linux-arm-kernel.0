@@ -1,50 +1,84 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 20 Nov 2018 10:57:51 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-In-Reply-To: <1128999886.40745.1542556549581@email.ionos.de>
-References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
- <1128999886.40745.1542556549581@email.ionos.de>
-Message-ID: <20181120095751.GB17738@kroah.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 20 Nov 2018 17:41:39 +0530
+Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
+In-Reply-To: <0df98ec5-1189-7297-b58d-8c0f5cbfa2ac@linaro.org>
+References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
+ <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
+ <0df98ec5-1189-7297-b58d-8c0f5cbfa2ac@linaro.org>
+Message-ID: <20181120121139.GB13485@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2018 at 04:55:49PM +0100, Stefan Wahren wrote:
-> Hi Nicolas,
+Hi Daniel,
+
+On Tue, Nov 20, 2018 at 11:32:52AM +0100, Daniel Lezcano wrote:
 > 
-> > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 14. November 2018 um 13:59 geschrieben:
-> > 
-> > 
-> > Hi All,
-> > 
-> > This series was written in parallel with reading and understanding the
-> > vchiq code. So excuse me for the lack of logic in the sequence of
-> > patches.
-> > 
-> > The main focus was to delete as much code as possible, I've counted
-> > around 550 lines, which is not bad. Apart from that there are some
-> > patches enforcing proper kernel APIs usage.
-> > 
-> > The only patch that really changes code is the
-> > vchiq_ioc_copy_element_data() rewrite.
-> > 
-> > The last commit updates the TODO list with some of my observations, I
-> > realise some of the might be a little opinionated. If anything it's
-> > going to force a discussion on the topic, which is nice.
-> > 
-> > It was developed on top of the latest linux-next, and was tested on a
-> > RPIv3B+ with audio, video and running vchiq_test.
-> > 
-> > Regards,
-> > Nicolas
-> > 
+> Hi Manivannan,
 > 
-> without a changelog i won't start a review.
+> 
+> On 19/11/2018 18:09, Manivannan Sadhasivam wrote:
+> > Add clock driver for RDA Micro RDA8810PL SoC supporting OSTIMER
+> > and HWTIMER.
+> 
+> As it is a new driver, can you elaborate the log and describe the timer.
+>
 
-What do you mean by this?  The individual patches have a "changelog" in
-them, this is just a summary of the overall changes.
+Sure, will add the brief in commit description and also in driver.
+ 
+> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> 
+> [ ... ]
+> 
+> > +static int __init rda_timer_init(struct device_node *node)
+> > +{
+> > +	unsigned long rate = 2000000;
+> > +	int ostimer_irq, ret;
+> > +
+> > +	rda_timer_base = of_io_request_and_map(node, 0, "rda-timer");
+> > +	if (IS_ERR(rda_timer_base)) {
+> > +		pr_err("Can't map timer registers");
+> > +		return PTR_ERR(rda_timer_base);
+> > +	}
+> > +
+> > +	ostimer_irq = of_irq_get_byname(node, "ostimer");
+> > +	if (ostimer_irq <= 0) {
+> > +		pr_err("Can't parse ostimer IRQ");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	clocksource_register_hz(&rda_clocksource, rate);
+> > +
+> > +	ret = request_irq(ostimer_irq, rda_ostimer_interrupt, IRQF_TIMER,
+> > +			  "rda-ostimer", &rda_clockevent);
+> > +	if (ret) {
+> > +		pr_err("failed to request irq %d\n", ostimer_irq);
+> > +		return ret;
+> > +	}
+> > +
+> 
+> Use the timer-of API.
+> 
 
-What do you feel is missing here?
+Okay, will use it for both IO and IRQ requests.
 
-thanks,
+Thanks,
+Mani
 
-greg k-h
+> > +
+> > +TIMER_OF_DECLARE(rda8810pl, "rda,8810pl-timer", rda_timer_init);
+> 
+> 
+> Thanks
+> 
+>   -- Daniel
+> 
+> 
+> -- 
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+> 
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+> 
