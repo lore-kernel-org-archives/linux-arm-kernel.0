@@ -1,78 +1,65 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Tue, 20 Nov 2018 11:04:26 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-In-Reply-To: <20181120095751.GB17738@kroah.com>
-References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
- <1128999886.40745.1542556549581@email.ionos.de>
- <20181120095751.GB17738@kroah.com>
-Message-ID: <17a08397268fddb774ca0d1620d67ca38633a284.camel@suse.de>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 20 Nov 2018 18:23:23 +0800
+Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
+In-Reply-To: <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-6-matthias.bgg@kernel.org>
+ <1542605939.32082.12.camel@mtksdaap41>
+ <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
+ <1542686700.9073.15.camel@mtksdaap41>
+ <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
+Message-ID: <1542709403.13494.0.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2018-11-20 at 10:57 +0100, Greg KH wrote:
-> On Sun, Nov 18, 2018 at 04:55:49PM +0100, Stefan Wahren wrote:
-> > Hi Nicolas,
-> > 
-> > > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 14.
-> > > November 2018 um 13:59 geschrieben:
-> > > 
-> > > 
-> > > Hi All,
-> > > 
-> > > This series was written in parallel with reading and
-> > > understanding the
-> > > vchiq code. So excuse me for the lack of logic in the sequence of
-> > > patches.
-> > > 
-> > > The main focus was to delete as much code as possible, I've
-> > > counted
-> > > around 550 lines, which is not bad. Apart from that there are
-> > > some
-> > > patches enforcing proper kernel APIs usage.
-> > > 
-> > > The only patch that really changes code is the
-> > > vchiq_ioc_copy_element_data() rewrite.
-> > > 
-> > > The last commit updates the TODO list with some of my
-> > > observations, I
-> > > realise some of the might be a little opinionated. If anything
-> > > it's
-> > > going to force a discussion on the topic, which is nice.
-> > > 
-> > > It was developed on top of the latest linux-next, and was tested
-> > > on a
-> > > RPIv3B+ with audio, video and running vchiq_test.
-> > > 
-> > > Regards,
-> > > Nicolas
-> > > 
-> > 
-> > without a changelog i won't start a review.
-> 
-> What do you mean by this?  The individual patches have a "changelog"
-> in
-> them, this is just a summary of the overall changes.
-> 
-> What do you feel is missing here?
+Hi, Matthias:
 
-Hi Greg,
-I did send an RFC version of this, to which Stephan made several
-comments. I should have added the changelog to the proper series
-submission. I've been busy with work, but I'll send the updated version
-during the day.
+On Tue, 2018-11-20 at 11:19 +0100, Matthias Brugger wrote:
+> 
+> On 20/11/2018 05:05, CK Hu wrote:
+> > Hi, Matthias:
+> > 
+> > On Mon, 2018-11-19 at 10:26 +0100, Matthias Brugger wrote:
+> >>
+> >> On 19/11/2018 06:38, CK Hu wrote:
+> >>> Hi, Matthias:
+> >>>
+> >>> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
+> >>>> From: Matthias Brugger <mbrugger@suse.com>
+> >>>>
+> >>>> It can happen that the mmsys clock drivers aren't probed before the
+> >>>> platform driver gets invoked. The platform driver used to print a warning
+> >>>> that the driver failed to get the clocks. Omit this error on
+> >>>> the defered probe path.
+> >>>
+> >>> This patch looks good to me, but you have not modified the sub driver in
+> >>> HDMI path. We could let HDMI path print the warning and someone send
+> >>> another patch later, or you modify for HDMI path in this patch.
+> >>
+> >> Sure, I'll add this in v6. After inspecting the code, I think we will need to
+> >> also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
+> >> now does not even check if the clocks are present. What do you think?
+> > 
+> > Yes, we do really need to consider mdp driver because mmsys clock
+> > include mdp clock. You remind me that mmsys control 4 major function:
+> > drm routing, drm clock, mdp routing, and mdp clock. Your design let the
+> > mmsys device as drm device (control drm routing) and create a sub device
+> > as clock device (control drm clock, mdp clock). If one day mdp device
+> > (may need control drm routing) need to control the register of mdp
+> > routing, would mdp device be a sub device? Or we need not to consider
+> > this because it need not to access mmsys register now?
+> > 
+> 
+> I think we should for now concentrate to fix the clock probing issue. If in the
+> future we will need to access drm routing from the mdp device, we can have a
+> look into this.
+> 
+> Sounds good?
+
+Sounds good to me.
 
 Regards,
-Nicolas
+CK
 
-> 
-> thanks,
-> 
-> greg k-h
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/9c2d971a/attachment-0001.sig>
+> Regards,
+> Matthias
