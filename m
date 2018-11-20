@@ -1,67 +1,41 @@
-From: pintu.ping@gmail.com (Pintu Agarwal)
-Date: Tue, 20 Nov 2018 18:21:33 +0530
-Subject: [ARM64] Printing IRQ stack usage information
-In-Reply-To: <CAOuPNLiJmtXft6g63oATMrrrcd3jQGCfxsAzXLx8Kz=_zsR4Kg@mail.gmail.com>
-References: <CAOuPNLiLj9be5iUdpUiLqiTge-xYY_v4_VLs-ah2_PygG7vxdg@mail.gmail.com>
- <28496.1542300549@turing-police.cc.vt.edu>
- <CAOuPNLj8wj=tPJo8L3oS7o8iTQcyhZ0W-GH6xmP_GsG4r7YdAQ@mail.gmail.com>
- <49219.1542367988@turing-police.cc.vt.edu>
- <CAOuPNLg4tM6Cw8Yf9rdpkBOU=+Fh654yFQeAhJf1y88Gb3MAew@mail.gmail.com>
- <5997.1542386778@turing-police.cc.vt.edu>
- <CAOuPNLiX0zhxiRAx03YjVU6cocwWbgY9naxeYPRKmT+3PoGhRw@mail.gmail.com>
- <15703.1542393111@turing-police.cc.vt.edu>
- <CAOuPNLiJmtXft6g63oATMrrrcd3jQGCfxsAzXLx8Kz=_zsR4Kg@mail.gmail.com>
-Message-ID: <CAOuPNLgGuomqaQVtj=1O8tYV_Bq8cqf5HqCxJ-LSGeQOVffnzw@mail.gmail.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 20 Nov 2018 13:31:22 +0100
+Subject: [PATCH 2/5] ARM: davinci: dm646x: set the GPIO base to 0
+In-Reply-To: <20181120123125.24938-1-brgl@bgdev.pl>
+References: <20181120123125.24938-1-brgl@bgdev.pl>
+Message-ID: <20181120123125.24938-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2018 at 6:36 PM Pintu Agarwal <pintu.ping@gmail.com> wrote:
->
-> On Sat, Nov 17, 2018 at 12:02 AM <valdis.kletnieks@vt.edu> wrote:
-> >
-> > > But my concern is that if I dump it from irq handler, I will get
-> > > information only for the current cpu.
-> > > How do I store and get the information for all the cpu from the boot time ?
-> >
-> > Make the high-water mark a per-cpu variable.
-> >
-> > > From where do I call my dump_irq_stack_info() [some where during the
-> > > entry/exit part of the irq handler], so that I could dump information
-> > > for all the handler at boot time itself ?
-> >
-> > No, you don't do a dump-stack during entry/exit.  You just maintain a high-water
-> > value in the exit,
->
-> Which is the right place to keep track of this
-> high-water-irq-stack-usage (per_cpu)
-> in arch/arm64/* ?
->
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-I tried to create a per-cpu irq_stack_usage variable like this in :
-arch/arm64/include/asm/hardirq.h
-+DECLARE_PER_CPU(unsigned int, irq_stack_usage);
+Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
+automatic base selection") broke the GPIO support on DaVinci boards
+in legacy mode by allowing gpiolib to set the GPIO base automatically.
 
-But, I could not figure out, from where to fill these variable for irq
-stack usage.
-+ sp = current_stack_pointer;
-+ if (on_irq_stack(sp, cpu)) {
-+         stack_start = (unsigned long)per_cpu(irq_stack, cpu);
-+         last_usage = per_cpu(irq_stack_usage, cpu);
-+         curr_usage = sp - stack_start;
-+         pr_info("cpu:%d : sp: %lu, stack_start: %lu, usage: %lu\n",
-cpu, sp, stack_start, (sp - stack_start));
-+         if (curr_usage > last_usage)
-+                 per_cpu(irq_stack_usage, cpu) = curr_usage;
-+ }
+DaVinci board files use the legacy GPIO API with hard-coded GPIO line
+numbers. Use the new fields in struct davinci_gpio_platform_data to
+manually set the GPIO base to 0.
 
-Which is the best place to invoke this ?
-I have the following option:
-1. kernel/softirq.c => __do_softirq()
-2. arch/arm64/kernel/smp.c => handle_IPI()
-3. kernel/softirq.c => irq_exit()
-4. ???
+Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
+Cc: stable at vger.kernel.org
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/dm646x.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Please let me know.
-
-Thank You!
-Pintu
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 6bd2ed069d0d..158f5908a0f0 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -448,6 +448,8 @@ static struct resource dm646x_gpio_resources[] = {
+ };
+ 
+ static struct davinci_gpio_platform_data dm646x_gpio_platform_data = {
++	.no_auto_base	= true,
++	.base		= 0,
+ 	.ngpio		= 43,
+ };
+ 
+-- 
+2.19.1
