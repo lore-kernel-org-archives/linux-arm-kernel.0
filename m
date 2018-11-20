@@ -1,62 +1,75 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:13:19 +0000
-Subject: [PATCHv2 14/25] PCI: mobiveil: initialize
- Primary/Secondary/Subordinate bus number
-In-Reply-To: <20181120092615.11680-15-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-15-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB22353520967DE24454F733FDE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 20 Nov 2018 14:53:10 +0800
+Subject: [PATCH 2/3] arm64: dts: allwinner: h6: orangepi: Enable USB 2.0 host
+ and OTG ports
+In-Reply-To: <20181120065311.30009-1-wens@csie.org>
+References: <20181120065311.30009-1-wens@csie.org>
+Message-ID: <20181120065311.30009-3-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+The Orange Pi Lite 2 and Orange Pi One Plus share the same design for
+their USB 2.0 ports. VBUS is directly tied to the board wide 5V rail,
+which is also directly tied to the DC jack. There is no current limiting
+in this design.
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:27 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 14/25] PCI: mobiveil: initialize
-> Primary/Secondary/Subordinate bus number
-> 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> The reset value is all zero, so set a workable value for Primary, Secondary
-> and Subordinate bus numbers.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
-> V2:
->  - no change
-> 
->  drivers/pci/controller/pcie-mobiveil.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c
-> b/drivers/pci/controller/pcie-mobiveil.c
-> index db7ecb021c63..9210165fe8c0 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -582,6 +582,12 @@ static int mobiveil_host_init(struct mobiveil_pcie
-> *pcie)
->  	u32 value, pab_ctrl, type;
->  	struct resource_entry *win;
-> 
-> +	/* setup bus numbers */
-> +	value = csr_readl(pcie, PCI_PRIMARY_BUS);
-> +	value &= 0xff000000;
-> +	value |= 0x00ff0100;
-> +	csr_writel(pcie, value, PCI_PRIMARY_BUS);
-> +
->  	/*
->  	 * program Bus Master Enable Bit in Command Register in PAB Config
->  	 * Space
-> --
-> 2.17.1
+This patch enables all the USB 2.0 related device nodes, and sets the
+VBUS regulator supplies and OTG ID detection GPIO.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ .../dts/allwinner/sun50i-h6-orangepi.dtsi     | 28 +++++++++++++++++++
+ 1 file changed, 28 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
+index f910d5eb9267..f16b7ffbe797 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
+@@ -32,6 +32,14 @@
+ 	};
+ };
+ 
++&ehci0 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins>;
+@@ -41,6 +49,14 @@
+ 	status = "okay";
+ };
+ 
++&ohci0 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
+ &r_i2c {
+ 	status = "okay";
+ 
+@@ -165,3 +181,15 @@
+ 	pinctrl-0 = <&uart0_ph_pins>;
+ 	status = "okay";
+ };
++
++&usb2otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb2phy {
++	usb0_id_det-gpios = <&pio 2 6 GPIO_ACTIVE_HIGH>; /* PC6 */
++	usb0_vbus-supply = <&reg_vcc5v>;
++	usb3_vbus-supply = <&reg_vcc5v>;
++	status = "okay";
++};
+-- 
+2.19.1
