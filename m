@@ -1,76 +1,79 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:27:24 +0000
-Subject: [PATCHv2 20/25] PCI: mobiveil: add Byte and Half-Word width
- register accessors
-In-Reply-To: <20181120092615.11680-21-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-21-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB22354FEF2BDCCF9725FD81C5E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 20 Nov 2018 14:16:07 +0100
+Subject: compiler code model for the kernel
+In-Reply-To: <AM0PR08MB3538CEF9CBAB3C49BAABD455F8D90@AM0PR08MB3538.eurprd08.prod.outlook.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+ <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
+ <AM0PR08MB3538CEF9CBAB3C49BAABD455F8D90@AM0PR08MB3538.eurprd08.prod.outlook.com>
+Message-ID: <CAKv+Gu-Y+B7Et4N5EU_TEGJH8tULXr91paNxVW0jYpgwAjTp-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+On Tue, 20 Nov 2018 at 12:20, Peter Smith <Peter.Smith@arm.com> wrote:
+>
+>
+> ________________________________________
+> From: Nick Desaulniers <ndesaulniers@google.com>
+> Sent: 19 November 2018 23:54
+> To: Ard Biesheuvel
+> Cc: Will Deacon; Catalin Marinas; Ramana Radhakrishnan; Linux ARM; Mark Rutland; Arnd Bergmann; Marc Zyngier; Peter Smith; Kristof Beyls; Stephen Hines
+> Subject: Re: compiler code model for the kernel
+>
+> + some more folks to take a look
+>
+> On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> >
+> > Hello all,
+> >
+> > Some of us (on cc) have discussed this a bit on various occasions, so
+> > perhaps it's time to sit down and do something about it :-)
+> >
+> > The Clang work that Nick is involved in has made explicit some
+> > assumptions that we are currently making in the kernel with respect to
+> > the behavior of GCC, and it would be good to formalise this so we can
+> > keep relying on it in the future, and to clarify to other compiler
+> > developers what is needed.
+> >
+> > GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> > introduce the same for AArch64. Under this model, we should be able to
+> > make the following assumptions:
+> > - symbol references are emitted as ADRP/ADD pairs
+> > -  no absolute references in generated code like jump tables etc (like
+> > -fpic/-fpie) [*]
+> > - no shared library semantics (no GOT indirections to support symbol
+> > preemption, or to reduce the CoW footprint and/or avoid text
+> > relocations)
+> > - resulting objects can be linked in -pie mode by ld.bfd
+> >
+> > Another thing that came up is that we currently rely on the stack
+> > pointer never to assume a value that is not 16-byte aligned, even
+> > transiently.
+> >
+> > Other things I've missed?
+> >
+> > [*] This is only strictly required in parts of the code that may
+> > execute at a different offset than the linked offset, even after
+> > processing dynamic relocations at boot time (e.g., KVM hyp code
+> > running in a different exception level) but avoiding those altogether
+> > is reasonable. Note that GCC does the right thing for us here already,
+> > but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
+>
+> Not got a lot to add at the moment. Some observations from the clang/llvm side.
+>
+> Clang already has -mcmodel=kernel for fuchsia targets so there is some prior art. My understanding is that it uses the small code-model with some small tweaks. There will probably need to be some renaming in the back-end to distinguish between fuchsia kernel code model and linux kernel code model.
+>
+> I think that the assumptions above should be describable without too much difficulty. ADRP/ADD is covered by the small code model. I think the existing -fpie where every global has hidden visibility and hence cannot be found in a shared object will produce code with no GOT indirections.
+>
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:28 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 20/25] PCI: mobiveil: add Byte and Half-Word width
-> register accessors
-> 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> As there are some Byte and Half-Work width registers in PCIe configuration
-> space, add Byte and Half-Word width register accessors.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
-> V2:
->  - no change
-> 
->  .../pci/controller/mobiveil/pcie-mobiveil.h   | 20 +++++++++++++++++++
->  1 file changed, 20 insertions(+)
-> 
-> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> index 81685840b378..933c2f34bc52 100644
-> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-> @@ -181,9 +181,29 @@ static inline u32 csr_readl(struct mobiveil_pcie *pcie,
-> u32 off)
->  	return csr_read(pcie, off, 0x4);
->  }
-> 
-> +static inline u32 csr_readw(struct mobiveil_pcie *pcie, u32 off) {
-> +	return csr_read(pcie, off, 0x2);
-> +}
-> +
-> +static inline u32 csr_readb(struct mobiveil_pcie *pcie, u32 off) {
-> +	return csr_read(pcie, off, 0x1);
-> +}
-> +
->  static inline void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off)  {
->  	csr_write(pcie, val, off, 0x4);
->  }
-> 
-> +static inline void csr_writew(struct mobiveil_pcie *pcie, u32 val, u32
-> +off) {
-> +	csr_write(pcie, val, off, 0x2);
-> +}
-> +
-> +static inline void csr_writeb(struct mobiveil_pcie *pcie, u32 val, u32
-> +off) {
-> +	csr_write(pcie, val, off, 0x1);
-> +}
-> +
->  #endif /* _PCIE_MOBIVEIL_H */
-> --
-> 2.17.1
+Indeed. On GCC, using the visibility 'hidden' pragma (which affects
+extern declarations as well as definitions, unlike the -fvisibility
+command line option) with -fpie results in a working kernel image
+without any artificial absolute references like GOT entries.
+
+> My limited understanding of the frame lowering code suggests that clang maintains a minimum 16-byte alignment of the stack pointer at all times. It would need to be looked over by an expert to make sure though.
+>
+
+Excellent. That is basically the same situation as GCC: the backend
+only ever adjusts the stack pointer in 16 byte increments, but it
+would be good to have agreement that it should remain that way.
