@@ -1,44 +1,66 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 20 Nov 2018 14:18:39 -0800
-Subject: [PATCH RESEND 07/17] firmware: raspberrypi: Switch to SPDX
- identifier
-In-Reply-To: <2094654733.102339.1542751718184@email.ionos.de>
-References: <1542546604-27728-1-git-send-email-stefan.wahren@i2se.com>
- <2094654733.102339.1542751718184@email.ionos.de>
-Message-ID: <87ftvv75q8.fsf@anholt.net>
+From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
+Date: Wed, 21 Nov 2018 00:50:22 +0200
+Subject: [PATCH v9 05/17] tpm: declare struct tpm_header
+In-Reply-To: <20181120160111.GA22023@ziepe.ca>
+References: <20181118124753.18613-1-jarkko.sakkinen@linux.intel.com>
+ <20181118124753.18613-6-jarkko.sakkinen@linux.intel.com>
+ <5B8DA87D05A7694D9FA63FD143655C1B9DA235BB@hasmsx108.ger.corp.intel.com>
+ <20181120130805.GD8813@linux.intel.com>
+ <20181120160111.GA22023@ziepe.ca>
+Message-ID: <20181120225022.GD8391@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Tue, Nov 20, 2018 at 09:01:11AM -0700, Jason Gunthorpe wrote:
+> On Tue, Nov 20, 2018 at 03:08:05PM +0200, Jarkko Sakkinen wrote:
+> > On Mon, Nov 19, 2018 at 09:33:31PM +0000, Winkler, Tomas wrote:
+> > > 
+> > > > 
+> > > > Decleare struct tpm_header that replaces struct tpm_input_header and
+> > > Typo 
+> > 
+> > Thanks, will fix for the next version.
+> > 
+> > > > struct tpm_output_header.
+> > > > 
+> > > > Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
+> > > > Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
+> > > >  drivers/char/tpm/tpm-interface.c  |  9 ++++-----
+> > > >  drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
+> > > >  drivers/char/tpm/tpm2-cmd.c       |  4 ++--
+> > > >  drivers/char/tpm/tpm2-space.c     |  6 +++---
+> > > >  drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
+> > > > drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
+> > > >  drivers/char/tpm/xen-tpmfront.c   |  2 +-
+> > > >  7 files changed, 28 insertions(+), 33 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-
+> > > > interface.c
+> > > > index 7ac6ada8428c..cb0d44c158ae 100644
+> > > > +++ b/drivers/char/tpm/tpm-interface.c
+> > > > @@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip
+> > > > *chip,
+> > > >  				 const u8 *cmd,
+> > > >  				 size_t len)
+> > > >  {
+> > > > -	const struct tpm_input_header *header = (const void *)cmd;
+> > > > +	const struct tpm_header *header = (const void *)cmd;
+> > > 
+> > > 
+> > > Sometimes it is casted (void *), sometimes (struct tpm_header *)
+> > > Better to use one convention 
+> > 
+> > I would prefer (const void *) because it is shorter form, and no
+> > need to duplicate the type name two times, that way also more
+> > readable. Anyway, agreed that we do have inconsistency with these.
+> 
+> It is better to pass in 'const void *cmd' than to explicitly cast like
+> this.
+> 
+> I generally discourage casts to voids to save typing, just creates
+> confusion what is going on. Better to try to avoid casts by
+> constructing the code properly.
 
-> Hi Eric,
->
->> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. November 2018 um 14:10 geschrieben:
->> 
->> 
->> Adopt the SPDX license identifier headers to ease license compliance
->> management.
->> 
->> Cc: Eric Anholt <eric@anholt.net>
->> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
->> Reviewed-by: Eric Anholt <eric@anholt.net>
->> ---
->>  drivers/firmware/raspberrypi.c             | 5 +----
->>  include/soc/bcm2835/raspberrypi-firmware.h | 5 +----
->>  2 files changed, 2 insertions(+), 8 deletions(-)
->> 
->> Hi, it seems that i forgot to send this patch last week.
->
-> i accidently added your Reviewed-by which wasn't the case for this
-> particular patch. In case your fine with this patch i would apply it
-> and then from my point of view the pull request would be ready to
-> send.
+Definitely. Will change in the next version.
 
-I've reviewed it now, you're good to go :)
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/b28c5372/attachment.sig>
+/Jarkko
