@@ -1,70 +1,98 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:26:13 +0000
-Subject: [PATCHv2 17/25] PCI: mobiveil: fix the checking of valid device
-In-Reply-To: <20181120092615.11680-18-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-18-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB22354A5A97A9E871B99FD42AE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 20 Nov 2018 22:21:37 +1100
+Subject: [PATCH 04/10] powerpc: perf/core: generalise event exclusion
+ checking with perf macro
+In-Reply-To: <1542363853-13849-5-git-send-email-andrew.murray@arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-5-git-send-email-andrew.murray@arm.com>
+Message-ID: <87va4s0zb2.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Andrew Murray <andrew.murray@arm.com> writes:
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:27 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 17/25] PCI: mobiveil: fix the checking of valid device
-> 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> Avoid to issue CFG transactions to link partner when the PCIe link is not up.
-> And allow CFG transactions to all functions of Endpoint implemented
-> multiple functions.
-> 
-> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver")
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> Replace checking of perf event exclusion flags with perf macro.
+>
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 > ---
-> V2:
->  - New patch
-> 
->  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> index dc5324d94466..1ae82e790562 100644
-> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> @@ -29,6 +29,10 @@ static bool mobiveil_pcie_valid_device(struct pci_bus
-> *bus, unsigned int devfn)  {
->  	struct mobiveil_pcie *pcie = bus->sysdata;
-> 
-> +	/* If there is no link, then there is no device */
-> +	if (bus->number > pcie->rp.root_bus_nr
-> && !mobiveil_pcie_link_up(pcie))
-> +		return false;
-> +
->  	/* Only one device down on each root port */
->  	if ((bus->number == pcie->rp.root_bus_nr) && (devfn > 0))
->  		return false;
-> @@ -37,7 +41,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus
-> *bus, unsigned int devfn)
->  	 * Do not read more than one device on the bus directly
->  	 * attached to RC
->  	 */
-> -	if ((bus->primary == pcie->rp.root_bus_nr) && (devfn > 0))
-> +	if ((bus->primary == pcie->rp.root_bus_nr) && (PCI_SLOT(devfn) > 0))
->  		return false;
-> 
->  	return true;
-> --
-> 2.17.1
+>  arch/powerpc/perf/hv-24x7.c |  7 +------
+>  arch/powerpc/perf/hv-gpci.c |  7 +------
+>  arch/powerpc/perf/imc-pmu.c | 14 ++------------
+>  3 files changed, 4 insertions(+), 24 deletions(-)
+
+These conversions look fine, thanks.
+
+Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+
+cheers
+
+> diff --git a/arch/powerpc/perf/hv-24x7.c b/arch/powerpc/perf/hv-24x7.c
+> index 72238ee..60db22d 100644
+> --- a/arch/powerpc/perf/hv-24x7.c
+> +++ b/arch/powerpc/perf/hv-24x7.c
+> @@ -1307,12 +1307,7 @@ static int h_24x7_event_init(struct perf_event *event)
+>  	}
+>  
+>  	/* unsupported modes and filters */
+> -	if (event->attr.exclude_user   ||
+> -	    event->attr.exclude_kernel ||
+> -	    event->attr.exclude_hv     ||
+> -	    event->attr.exclude_idle   ||
+> -	    event->attr.exclude_host   ||
+> -	    event->attr.exclude_guest)
+> +	if (event_has_exclude_flags(event))
+>  		return -EINVAL;
+>  
+>  	/* no branch sampling */
+> diff --git a/arch/powerpc/perf/hv-gpci.c b/arch/powerpc/perf/hv-gpci.c
+> index 43fabb3..2d2b5c0 100644
+> --- a/arch/powerpc/perf/hv-gpci.c
+> +++ b/arch/powerpc/perf/hv-gpci.c
+> @@ -233,12 +233,7 @@ static int h_gpci_event_init(struct perf_event *event)
+>  	}
+>  
+>  	/* unsupported modes and filters */
+> -	if (event->attr.exclude_user   ||
+> -	    event->attr.exclude_kernel ||
+> -	    event->attr.exclude_hv     ||
+> -	    event->attr.exclude_idle   ||
+> -	    event->attr.exclude_host   ||
+> -	    event->attr.exclude_guest)
+> +	if (event_has_exclude_flags(event))
+>  		return -EINVAL;
+>  
+>  	/* no branch sampling */
+> diff --git a/arch/powerpc/perf/imc-pmu.c b/arch/powerpc/perf/imc-pmu.c
+> index 1fafc32b..1ae1d3f 100644
+> --- a/arch/powerpc/perf/imc-pmu.c
+> +++ b/arch/powerpc/perf/imc-pmu.c
+> @@ -474,12 +474,7 @@ static int nest_imc_event_init(struct perf_event *event)
+>  		return -EINVAL;
+>  
+>  	/* unsupported modes and filters */
+> -	if (event->attr.exclude_user   ||
+> -	    event->attr.exclude_kernel ||
+> -	    event->attr.exclude_hv     ||
+> -	    event->attr.exclude_idle   ||
+> -	    event->attr.exclude_host   ||
+> -	    event->attr.exclude_guest)
+> +	if (event_has_exclude_flags(event))
+>  		return -EINVAL;
+>  
+>  	if (event->cpu < 0)
+> @@ -749,12 +744,7 @@ static int core_imc_event_init(struct perf_event *event)
+>  		return -EINVAL;
+>  
+>  	/* unsupported modes and filters */
+> -	if (event->attr.exclude_user   ||
+> -	    event->attr.exclude_kernel ||
+> -	    event->attr.exclude_hv     ||
+> -	    event->attr.exclude_idle   ||
+> -	    event->attr.exclude_host   ||
+> -	    event->attr.exclude_guest)
+> +	if (event_has_exclude_flags(event))
+>  		return -EINVAL;
+>  
+>  	if (event->cpu < 0)
+> -- 
+> 2.7.4
