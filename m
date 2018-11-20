@@ -1,194 +1,61 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 20 Nov 2018 12:25:12 +0000
-Subject: [RFC PATCH v2 13/23] KVM: arm64/sve: Context switch the SVE
- registers
-In-Reply-To: <20181119170303.GX3505@e103592.cambridge.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-14-git-send-email-Dave.Martin@arm.com>
- <87sgzxhvny.fsf@linaro.org> <20181119170303.GX3505@e103592.cambridge.arm.com>
-Message-ID: <87o9akhr6f.fsf@linaro.org>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 20 Nov 2018 17:39:10 +0530
+Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
+In-Reply-To: <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
+References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
+ <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
+ <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
+ <20181120050650.GC5885@Mani-XPS-13-9360>
+ <86pnv0rwna.wl-marc.zyngier@arm.com>
+ <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
+ <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
+Message-ID: <20181120120910.GA13485@mani>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 20, 2018 at 11:05:41AM +0000, Marc Zyngier wrote:
+> On 20/11/2018 08:56, Linus Walleij wrote:
+> > On Tue, Nov 20, 2018 at 9:17 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > 
+> >> How does this change anything with the fact that the above code is
+> >> broken? 56 or 64 bit, you cannot read this counter with a single
+> >> access, or two. The canonical way of reading such a counter is
+> >> something like this:
+> >>
+> >>         do {
+> >>                 lo = readl_relaxed(LO);
+> >>                 hi = readl_relaxed(HI);
+> >>         } while (hi != read_relaxed(HI));
+> > 
+> > To be fair, I have seen hardware that employ a logic latch
+> > such that when a read access is done to the LO register,
+> > the value of the whole counter is latched, also for the HI
+> > register, so when you read the HI register in the second
+> > step, it is never subject to wrapping. (Conversely reading
+> > the HI before the LO will always give you insane values
+> > :D)
+> 
+> I've seen such HW indeed, and I've also seen it being broken... ;-)
+> 
+> It this timer is built around such a (non-broken) logic, I'd really like
+> to see it spelled out. It will otherwise be a real pain to debug...
+>
 
-Dave Martin <Dave.Martin@arm.com> writes:
+There is no information about HW latch in datasheet and vendor code. But the
+vendor driver doesn't use any logic to prevent wrapping. However, this doesn't
+mean that we can assume that the hardware is capable of preventing overrun.
+So I guess it is best to go with Marc's suggestion here.
 
-> On Mon, Nov 19, 2018 at 04:36:01PM +0000, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > In order to give each vcpu its own view of the SVE registers, this
->> > patch adds context storage via a new sve_state pointer in struct
->> > vcpu_arch.  An additional member sve_max_vl is also added for each
->> > vcpu, to determine the maximum vector length visible to the guest
->> > and thus the value to be configured in ZCR_EL2.LEN while the is
->> > active.  This also determines the layout and size of the storage in
->> > sve_state, which is read and written by the same backend functions
->> > that are used for context-switching the SVE state for host tasks.
->> >
->> > On SVE-enabled vcpus, SVE access traps are now handled by switching
->> > in the vcpu's SVE context and disabling the trap before returning
->> > to the guest.  On other vcpus, the trap is not handled and an exit
->> > back to the host occurs, where the handle_sve() fallback path
->> > reflects an undefined instruction exception back to the guest,
->> > consistently with the behaviour of non-SVE-capable hardware (as was
->> > done unconditionally prior to this patch).
->> >
->> > No SVE handling is added on non-VHE-only paths, since VHE is an
->> > architectural and Kconfig prerequisite of SVE.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->
-> [...]
->
->> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> > index 085ed06..9941349 100644
->> > --- a/arch/arm64/kvm/hyp/switch.c
->> > +++ b/arch/arm64/kvm/hyp/switch.c
->
-> [...]
->
->> > @@ -380,6 +398,26 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->> >  	return true;
->> >  }
->> >
->> > +static inline bool __hyp_text __hyp_trap_is_fpsimd(struct kvm_vcpu *vcpu,
->> > +						   bool guest_has_sve)
->> > +{
->> > +
->> > +	u8 trap_class;
->> > +
->> > +	if (!system_supports_fpsimd())
->> > +		return false;
->> > +
->> > +	trap_class = kvm_vcpu_trap_get_class(vcpu);
->> > +
->> > +	if (trap_class == ESR_ELx_EC_FP_ASIMD)
->> > +		return true;
->> > +
->> > +	if_sve (guest_has_sve && trap_class == ESR_ELx_EC_SVE)
->> > +		return true;
->>
->> Do we really need to check the guest has SVE before believing what the
->> hardware is telling us? According to the ARM ARM:
->>
->> For ESR_ELx_EC_FP_ASIMD
->>
->>   Excludes exceptions resulting from CPACR_EL1 when the value of HCR_EL2.TGE is
->>   1, or because SVE or Advanced SIMD and floating-point are not implemented. These
->>   are reported with EC value 0b000000
->>
->> But also for ESR_ELx_EC_SVE
->>
->>   Access to SVE functionality trapped as a result of CPACR_EL1.ZEN,
->>   CPTR_EL2.ZEN, CPTR_EL2.TZ, or CPTR_EL3.EZ, that is not reported using EC
->>   0b000000. This EC is defined only if SVE is implemented
->>
->> Given I got confused maybe we need a comment for clarity?
->
-> This is not about not trusting the value ESR_ELx_EC_SVE on older
-> hardware: in effect it is retrospectively reserved for this purpose on
-> all older arch versions, so there is no ambiguity about what it means.
-> It should never be observed on hardware that doesn't have SVE.
->
-> Rather, how we handle this trap differs depending on whether the guest
-> is SVE-enabled or not.  If not, then this trap is handled by the generic
-> fallback path for unhandled guest traps, so we don't check for this
-> particular EC value explicitly in that case.
->
->>   /* Catch guests without SVE enabled running on SVE capable hardware */
->
-> I might write something like:
->
-> 	/*
-> 	 * For sve-enmabled guests only, handle SVE access via FPSIMD
-> 	 * context handling code.
-> 	 */
->
-> Does that make sense?  I may have misunderstood your concern here.
+Thanks,
+Mani
 
-s/enmabled/enabled/ but yeah that's fine.
-
->
-> [...]
->
->> > @@ -387,6 +425,8 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
->> >   */
->> >  static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->> >  {
->> > +	bool guest_has_sve;
->> > +
->> >  	if (ARM_EXCEPTION_CODE(*exit_code) != ARM_EXCEPTION_IRQ)
->> >  		vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
->> >
->> > @@ -404,10 +444,11 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->> >  	 * and restore the guest context lazily.
->> >  	 * If FP/SIMD is not implemented, handle the trap and inject an
->> >  	 * undefined instruction exception to the guest.
->> > +	 * Similarly for trapped SVE accesses.
->> >  	 */
->> > -	if (system_supports_fpsimd() &&
->> > -	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
->> > -		return __hyp_switch_fpsimd(vcpu);
->> > +	guest_has_sve = vcpu_has_sve(vcpu);
->>
->> I'm not sure if it's worth fishing this out here given you are already
->> passing vcpu down the chain.
->
-> I wanted to discourage GCC from recomputing this.  If you're in a
-> position to do so, can you look at the disassembly with/without this
-> factored out and see whether it makes a difference?
-
-Hmm it is hard to tell. There is code motion but for some reason I'm
-seeing the static jump code unrolled, for example (original on left):
-
-__hyp_switch_fpsimd():                                                                  __hyp_switch_fpsimd():
-/home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
-                                                                                      >  ----:  tst     w0, #0x400000
-                                                                                      >  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
-                                                                                      > arch_static_branch_jump():
-                                                                                      > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:45
-                                                                                      >  ----:  b       38c <fixup_guest_exit+0x304>
-                                                                                      > arch_static_branch():
-                                                                                      > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:31
-                                                                                      >  ----:  nop
-                                                                                      >  ----:  b       22c <fixup_guest_exit+0x1a4>
-                                                                                      > test_bit():
-                                                                                      > /home/alex/lsrc/kvm/linux.git/include/asm-generic/bitops/non-atomic.h:106
-                                                                                      >  ----:  adrp    x0, 0 <cpu_hwcaps>
-                                                                                      >  ----:  ldr     x0, [x0]
-                                                                                      > __hyp_switch_fpsimd():
-                                                                                      > /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
- ----:  tst     w0, #0x400000                                                            ----:  tst     w0, #0x400000
- ----:  b.eq    238 <fixup_guest_exit+0x1b0>  // b.none                               |  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
- ----:  cbz     w21, 238 <fixup_guest_exit+0x1b0>                                     |  ----:  tbz     w2, #5, 22c <fixup_guest_exit+0x1a4>
-/home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:383                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382
- ----:  ldr     w2, [x19, #2040]                                                      |  ----:  ldr     w2, [x20, #2040]
- ----:  add     x1, x19, #0x4b0                                                       |  ----:  add     x1, x20, #0x4b0
- ----:  ldr     x0, [x19, #2032]                                                      |  ----:  ldr     x0, [x20, #2032]
-sve_ffr_offset():                                                                       sve_ffr_offset():
-
-Put calculating guest_has_sve at the top of __hyp_switch_fpsimd make
-most of that go away and just moves things around a little bit. So I
-guess it could makes sense for the fast(ish) path although I'd be
-interested in knowing if it made any real difference to the numbers.
-After all the first read should be well cached and moving it through the
-stack is just additional memory and register pressure.
-
->>
->> > +	if (__hyp_trap_is_fpsimd(vcpu, guest_has_sve))
->> > +		return __hyp_switch_fpsimd(vcpu, guest_has_sve);
->> >
->> >  	if (!__populate_fault_info(vcpu))
->> >  		return true;
->>
->> Otherwise:
->>
->> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> Thanks
-> ---Dave
-
-
---
-Alex Benn?e
+> > However the above code should be fine unless you know
+> > for sure the hardware was constructed with a clever latch.
+> 
+> Let's find out!
+> 
+> Thanks,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
