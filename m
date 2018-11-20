@@ -1,74 +1,30 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 20 Nov 2018 09:40:16 +0100
-Subject: [RFC PATCH v2 01/14] ARM: add CONFIG_ARCH_SUNXI_V7 for
- differentiate ARMv5/v7 Allwinner SoCs
-In-Reply-To: <abbb75165c8ef41da6963d72f4155ad6ae79140c.1542546735.git.mesihkilinc@gmail.com>
-References: <cover.1542546735.git.mesihkilinc@gmail.com>
- <abbb75165c8ef41da6963d72f4155ad6ae79140c.1542546735.git.mesihkilinc@gmail.com>
-Message-ID: <20181120084016.nrvpylj64ok3d5ch@flea>
+From: frank-w@public-files.de (Frank Wunderlich)
+Date: Tue, 20 Nov 2018 09:26:23 +0100
+Subject: Aw: Re: [PATCH v5 05/12] drm: mediatek
+In-Reply-To: <1542686982.26483.1.camel@mtksdaap41>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-6-matthias.bgg@kernel.org>
+ <1542605939.32082.12.camel@mtksdaap41>
+ <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
+ <1542686700.9073.15.camel@mtksdaap41> <1542686982.26483.1.camel@mtksdaap41>
+Message-ID: <trinity-8f0fde8e-5ef3-4272-b009-49e180c934eb-1542702383860@3c-app-gmx-bs39>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Sun, Nov 18, 2018 at 05:17:00PM +0300, Mesih Kilinc wrote:
-> Allwinner also has some ARMv5 SoCs.
-> 
-> In order to add support for them, add a CONFIG_ARCH_SUNXI_V7 bool config
-> which is selected when a ARMv7 soc is selected, and make CONFIG_ARCH_SUNXI
-> a common option which is selected by both V7 and V5 sunxi option.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+i got v5-patches working on bpi-r2 (mt7623) with a Patch from Ryder.lee and 2 from Bibby Hsieh on 4.19-rc1
 
-I'm not sure why Icenowy has her SoB here?
+https://github.com/frank-w/BPI-R2-4.14/commits/4.19-hdmiv5
 
-> ---
->  arch/arm/mach-sunxi/Kconfig  | 25 +++++++++++++++++--------
->  arch/arm/mach-sunxi/Makefile |  2 +-
->  2 files changed, 18 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-> index d9c8ecf..5db17ec 100644
-> --- a/arch/arm/mach-sunxi/Kconfig
-> +++ b/arch/arm/mach-sunxi/Kconfig
-> @@ -6,31 +6,38 @@ menuconfig ARCH_SUNXI
->  	select GENERIC_IRQ_CHIP
->  	select GPIOLIB
->  	select PINCTRL
-> -	select PM_OPP
-> -	select SUN4I_TIMER
->  	select RESET_CONTROLLER
-> +	help
-> +	  Support for Allwinner ARM-based family of processors
->  
->  if ARCH_SUNXI
->  
-> +if ARCH_MULTI_V7
-> +
-> +config ARCH_SUNXI_V7
-> +	bool
-> +	select PM_OPP
-> +	select SUN4I_TIMER
-> +
->  config MACH_SUN4I
->  	bool "Allwinner A10 (sun4i) SoCs support"
-> -	default ARCH_SUNXI
-> +	select ARCH_SUNXI_V7
+but after i tried to include them on 4.19.2, i got a strange behaviour (stretched and pink font instead of white/grey)
 
-It changes the behaviour a bit. It used to be enabled by default, it
-doesn't anymore.
+see here for detailed info:
 
-Maxime
+http://forum.banana-pi.org/t/kernel-4-19-rc1-for-testers/6618/75
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/c4cd052e/attachment-0001.sig>
+there are some patches between rc1 and final which i tried to revert, but no luck till now (cannot revert, no effect on the issue or no output). Had informed Bibby Hsieh...
+
+is there any idea, why this happen?
+
+regards Frank
