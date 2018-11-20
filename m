@@ -1,64 +1,68 @@
-From: Tudor.Ambarus@microchip.com (Tudor.Ambarus at microchip.com)
-Date: Tue, 20 Nov 2018 11:28:14 +0000
-Subject: Clock configuration for the SAMA5D2 NAND controller
-In-Reply-To: <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
-References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
- <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
-Message-ID: <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 10:35:01 +0000
+Subject: [PATCHv2 06/25] PCI: mobiveil: replace the resource list
+ iteration function
+In-Reply-To: <20181120092615.11680-7-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-7-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB2235225683B36894815AA75DE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Romain,
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-On 11/14/2018 03:45 PM, Tudor Ambarus wrote:
-> Hi, Romain,
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:26 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 06/25] PCI: mobiveil: replace the resource list iteration
+> function
 > 
-> On 10/10/2018 08:05 PM, Romain Izard wrote:
->> Hello,
->>
->> While evaluating a new flash memory chip for my product based on a SAMA5D2
->> chip, I tried to update my software to use the latest device tree bindings.
->>
->> Until now, I was using the legacy bindings for the NAND controller, that
->> preserved the timings configured by the bootloader in the EBI registers. The
->> bindings introduced in Linux 4.13 are used together with the NAND driver to
->> reconfigure the timings of the memory interface to match the speed profile
->> declared by some NAND components.
->>
->> However, when comparing the timings in the registers, there was a large
->> difference between what I calculated by hand in the past and the values
->> configured by the drivers. The difference was in fact a 2 factor.
->>
->> For me, the issue is due to the clock configuration declared in the SAMA5D2
->> device tree: The reference clock used by the nand-controller driver is the
->> clock for its parent node, which is directly the Master Clock. And on my
->> end, what I understood when writing the clock settings for my bootloader was
->> that the reference clock was the HSMC clock, which derives from the H32MX
->> clock, which runs at half the rate of the Master Clock.
->>
->> The documentation for the SAMA5D2 is not very precise on this topic, so I
->> would like to have some feedback. Is the clock used as a reference for the
->> chip select configuration registers the Master Clock itself, or is it the
->> peripheral clock for the HSMC module ?
->>
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> I would say that it's the HSMC peripheral clock because it's the only clock that
-
-The hardware team confirmed that the timings are based on MCK which is MCK/2.
-The periph_clk is MCK/2 as well, but used to clock the logic of the IP.
-
-The HSMC receives a AHB clock HCLOCK_LS (MCK/2) used to generate the timings and
-a PCLOCK_LS used to clock the HSMC/NFC logic.
-
-
-> we describe for HSMC. If this is the case, then we will need to know the
-> derivation formula used by the Peripheral Clock Controller to derive the MCK2
-> (AHB 32-bit MATRIX system) clock to Periph_clk[17] HCLOCK_LS (HSMC), in order to
-> correctly configure the timings to match flashes capabilities.
-
-I assumed that the on/off box from the Peripheral Clock Controller described at
-33.3 Block Diagram implies some derivation formula. I was wrong, the on/off box
-is there just to gate the clocks going to the peripherals.
-
-Cheers,
-ta
+> As it won't delete any node in this iteration, replaced the function
+> resource_list_for_each_entry_safe() with the resource_list_for_each_entry().
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - no change
+> 
+>  drivers/pci/controller/pcie-mobiveil.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index 8ff873023b5f..b2cc9c097fc9 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -569,7 +569,7 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> *pcie)  {
+>  	u32 value, pab_ctrl, type;
+>  	int err;
+> -	struct resource_entry *win, *tmp;
+> +	struct resource_entry *win;
+> 
+>  	err = mobiveil_bringup_link(pcie);
+>  	if (err) {
+> @@ -620,7 +620,7 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> *pcie)
+>  	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE,
+> IB_WIN_SIZE);
+> 
+>  	/* Get the I/O and memory ranges from DT */
+> -	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
+> +	resource_list_for_each_entry(win, &pcie->resources) {
+>  		if (resource_type(win->res) == IORESOURCE_MEM)
+>  			type = MEM_WINDOW_TYPE;
+>  		else if (resource_type(win->res) == IORESOURCE_IO)
+> --
+> 2.17.1
