@@ -1,263 +1,78 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:25:41 +0000
-Subject: [PATCHv2 01/25] PCI: mobiveil: uniform the register accessors
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-2-Zhiqiang.Hou@nxp.com>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Tue, 20 Nov 2018 11:04:26 +0100
+Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
+In-Reply-To: <20181120095751.GB17738@kroah.com>
+References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
+ <1128999886.40745.1542556549581@email.ionos.de>
+ <20181120095751.GB17738@kroah.com>
+Message-ID: <17a08397268fddb774ca0d1620d67ca38633a284.camel@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Tue, 2018-11-20 at 10:57 +0100, Greg KH wrote:
+> On Sun, Nov 18, 2018 at 04:55:49PM +0100, Stefan Wahren wrote:
+> > Hi Nicolas,
+> > 
+> > > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 14.
+> > > November 2018 um 13:59 geschrieben:
+> > > 
+> > > 
+> > > Hi All,
+> > > 
+> > > This series was written in parallel with reading and
+> > > understanding the
+> > > vchiq code. So excuse me for the lack of logic in the sequence of
+> > > patches.
+> > > 
+> > > The main focus was to delete as much code as possible, I've
+> > > counted
+> > > around 550 lines, which is not bad. Apart from that there are
+> > > some
+> > > patches enforcing proper kernel APIs usage.
+> > > 
+> > > The only patch that really changes code is the
+> > > vchiq_ioc_copy_element_data() rewrite.
+> > > 
+> > > The last commit updates the TODO list with some of my
+> > > observations, I
+> > > realise some of the might be a little opinionated. If anything
+> > > it's
+> > > going to force a discussion on the topic, which is nice.
+> > > 
+> > > It was developed on top of the latest linux-next, and was tested
+> > > on a
+> > > RPIv3B+ with audio, video and running vchiq_test.
+> > > 
+> > > Regards,
+> > > Nicolas
+> > > 
+> > 
+> > without a changelog i won't start a review.
+> 
+> What do you mean by this?  The individual patches have a "changelog"
+> in
+> them, this is just a summary of the overall changes.
+> 
+> What do you feel is missing here?
 
-It's confused that R/W some registers by csr_readl()/csr_writel(),
-while others by read_paged_register()/write_paged_register().
-Actually the low 3KB of 4KB PCIe configure space can be accessed
-directly and high 1KB is paging area. So this patch uniformed the
-register accessors to csr_readl() and csr_writel() by comparing
-the register offset with page access boundary 3KB in the accessor
-internal.
+Hi Greg,
+I did send an RFC version of this, to which Stephan made several
+comments. I should have added the changelog to the proper series
+submission. I've been busy with work, but I'll send the updated version
+during the day.
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - no change
+Regards,
+Nicolas
 
- drivers/pci/controller/pcie-mobiveil.c | 179 +++++++++++++++++--------
- 1 file changed, 124 insertions(+), 55 deletions(-)
+> 
+> thanks,
+> 
+> greg k-h
 
-diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 77052a0712d0..d55c7e780c6e 100644
---- a/drivers/pci/controller/pcie-mobiveil.c
-+++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -47,7 +47,6 @@
- #define  PAGE_SEL_SHIFT	13
- #define  PAGE_SEL_MASK		0x3f
- #define  PAGE_LO_MASK		0x3ff
--#define  PAGE_SEL_EN		0xc00
- #define  PAGE_SEL_OFFSET_SHIFT	10
- 
- #define PAB_AXI_PIO_CTRL	0x0840
-@@ -117,6 +116,12 @@
- #define LINK_WAIT_MIN	90000
- #define LINK_WAIT_MAX	100000
- 
-+#define PAGED_ADDR_BNDRY			0xc00
-+#define OFFSET_TO_PAGE_ADDR(off)		\
-+	((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
-+#define OFFSET_TO_PAGE_IDX(off)			\
-+	((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
-+
- struct mobiveil_msi {			/* MSI information */
- 	struct mutex lock;		/* protect bitmap variable */
- 	struct irq_domain *msi_domain;
-@@ -145,15 +150,119 @@ struct mobiveil_pcie {
- 	struct mobiveil_msi msi;
- };
- 
--static inline void csr_writel(struct mobiveil_pcie *pcie, const u32 value,
--		const u32 reg)
-+/*
-+ * mobiveil_pcie_sel_page - routine to access paged register
-+ *
-+ * Registers whose address greater than PAGED_ADDR_BNDRY (0xc00) are paged,
-+ * for this scheme to work extracted higher 6 bits of the offset will be
-+ * written to pg_sel field of PAB_CTRL register and rest of the lower 10
-+ * bits enabled with PAGED_ADDR_BNDRY are used as offset of the register.
-+ */
-+static void mobiveil_pcie_sel_page(struct mobiveil_pcie *pcie, u8 pg_idx)
- {
--	writel_relaxed(value, pcie->csr_axi_slave_base + reg);
-+	u32 val;
-+
-+	val = readl(pcie->csr_axi_slave_base + PAB_CTRL);
-+	val &= ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT);
-+	val |= (pg_idx & PAGE_SEL_MASK) << PAGE_SEL_SHIFT;
-+
-+	writel(val, pcie->csr_axi_slave_base + PAB_CTRL);
- }
- 
--static inline u32 csr_readl(struct mobiveil_pcie *pcie, const u32 reg)
-+static void *mobiveil_pcie_comp_addr(struct mobiveil_pcie *pcie, u32 off)
- {
--	return readl_relaxed(pcie->csr_axi_slave_base + reg);
-+	if (off < PAGED_ADDR_BNDRY) {
-+		/* For directly accessed registers, clear the pg_sel field */
-+		mobiveil_pcie_sel_page(pcie, 0);
-+		return pcie->csr_axi_slave_base + off;
-+	}
-+
-+	mobiveil_pcie_sel_page(pcie, OFFSET_TO_PAGE_IDX(off));
-+	return pcie->csr_axi_slave_base + OFFSET_TO_PAGE_ADDR(off);
-+}
-+
-+static int mobiveil_pcie_read(void __iomem *addr, int size, u32 *val)
-+{
-+	if ((uintptr_t)addr & (size - 1)) {
-+		*val = 0;
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+	}
-+
-+	switch (size) {
-+	case 4:
-+		*val = readl(addr);
-+		break;
-+	case 2:
-+		*val = readw(addr);
-+		break;
-+	case 1:
-+		*val = readb(addr);
-+		break;
-+	default:
-+		*val = 0;
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static int mobiveil_pcie_write(void __iomem *addr, int size, u32 val)
-+{
-+	if ((uintptr_t)addr & (size - 1))
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+
-+	switch (size) {
-+	case 4:
-+		writel(val, addr);
-+		break;
-+	case 2:
-+		writew(val, addr);
-+		break;
-+	case 1:
-+		writeb(val, addr);
-+		break;
-+	default:
-+		return PCIBIOS_BAD_REGISTER_NUMBER;
-+	}
-+
-+	return PCIBIOS_SUCCESSFUL;
-+}
-+
-+static u32 csr_read(struct mobiveil_pcie *pcie, u32 off, size_t size)
-+{
-+	void *addr;
-+	u32 val;
-+	int ret;
-+
-+	addr = mobiveil_pcie_comp_addr(pcie, off);
-+
-+	ret = mobiveil_pcie_read(addr, size, &val);
-+	if (ret)
-+		dev_err(&pcie->pdev->dev, "read CSR address failed\n");
-+
-+	return val;
-+}
-+
-+static void csr_write(struct mobiveil_pcie *pcie, u32 val, u32 off, size_t size)
-+{
-+	void *addr;
-+	int ret;
-+
-+	addr = mobiveil_pcie_comp_addr(pcie, off);
-+
-+	ret = mobiveil_pcie_write(addr, size, val);
-+	if (ret)
-+		dev_err(&pcie->pdev->dev, "write CSR address failed\n");
-+}
-+
-+static u32 csr_readl(struct mobiveil_pcie *pcie, u32 off)
-+{
-+	return csr_read(pcie, off, 0x4);
-+}
-+
-+static void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off)
-+{
-+	csr_write(pcie, val, off, 0x4);
- }
- 
- static bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie)
-@@ -342,45 +451,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
- 	return 0;
- }
- 
--/*
-- * select_paged_register - routine to access paged register of root complex
-- *
-- * registers of RC are paged, for this scheme to work
-- * extracted higher 6 bits of the offset will be written to pg_sel
-- * field of PAB_CTRL register and rest of the lower 10 bits enabled with
-- * PAGE_SEL_EN are used as offset of the register.
-- */
--static void select_paged_register(struct mobiveil_pcie *pcie, u32 offset)
--{
--	int pab_ctrl_dw, pg_sel;
--
--	/* clear pg_sel field */
--	pab_ctrl_dw = csr_readl(pcie, PAB_CTRL);
--	pab_ctrl_dw = (pab_ctrl_dw & ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT));
--
--	/* set pg_sel field */
--	pg_sel = (offset >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK;
--	pab_ctrl_dw |= ((pg_sel << PAGE_SEL_SHIFT));
--	csr_writel(pcie, pab_ctrl_dw, PAB_CTRL);
--}
--
--static void write_paged_register(struct mobiveil_pcie *pcie,
--		u32 val, u32 offset)
--{
--	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
--
--	select_paged_register(pcie, offset);
--	csr_writel(pcie, val, off);
--}
--
--static u32 read_paged_register(struct mobiveil_pcie *pcie, u32 offset)
--{
--	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
--
--	select_paged_register(pcie, offset);
--	return csr_readl(pcie, off);
--}
--
- static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
- 		int pci_addr, u32 type, u64 size)
- {
-@@ -397,19 +467,19 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
- 	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
- 	csr_writel(pcie,
- 		pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
--	amap_ctrl_dw = read_paged_register(pcie, PAB_PEX_AMAP_CTRL(win_num));
-+	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
- 	amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
- 	amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
- 
--	write_paged_register(pcie, amap_ctrl_dw | lower_32_bits(size64),
--				PAB_PEX_AMAP_CTRL(win_num));
-+	csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
-+		   PAB_PEX_AMAP_CTRL(win_num));
- 
--	write_paged_register(pcie, upper_32_bits(size64),
--				PAB_EXT_PEX_AMAP_SIZEN(win_num));
-+	csr_writel(pcie, upper_32_bits(size64),
-+		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
- 
--	write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
--	write_paged_register(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
--	write_paged_register(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
-+	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
-+	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
-+	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
- }
- 
- /*
-@@ -437,8 +507,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
- 	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
- 			lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
- 
--	write_paged_register(pcie, upper_32_bits(size64),
--				PAB_EXT_AXI_AMAP_SIZE(win_num));
-+	csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
- 
- 	/*
- 	 * program AXI window base with appropriate value in
--- 
-2.17.1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/9c2d971a/attachment-0001.sig>
