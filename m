@@ -1,40 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 20 Nov 2018 12:53:14 +0000
-Subject: [PATCH 0/4] dts/layerscape-pci: removed unsuitable compatible
- string
-In-Reply-To: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
-References: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120125314.GA23472@e107981-ln.cambridge.arm.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 20 Nov 2018 13:31:23 +0100
+Subject: [PATCH 3/5] ARM: davinci: dm355: set the GPIO base to 0
+In-Reply-To: <20181120123125.24938-1-brgl@bgdev.pl>
+References: <20181120123125.24938-1-brgl@bgdev.pl>
+Message-ID: <20181120123125.24938-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 08, 2018 at 11:14:24AM +0800, Zhiqiang Hou wrote:
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> Removed the compatible string "snps,dw-pcie" from FSL layerscape-pci compatible
-> string list.
-> 
-> Hou Zhiqiang (4):
->   doc/layerscape-pci: update the PCIe compatible strings
->   doc/layerscape-pci: removed unsuitable compatible string
->   dts/arm/ls1021a: Clean PCIe controller compatible strings
->   dts/arm64/layerscape: Clean PCIe controller compatible strings
-> 
->  .../devicetree/bindings/pci/layerscape-pci.txt       |  7 ++++---
->  arch/arm/boot/dts/ls1021a.dtsi                       |  4 ++--
->  arch/arm64/boot/dts/freescale/fsl-ls1012a.dtsi       |  2 +-
->  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       |  6 +++---
->  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi       |  6 +++---
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi       |  6 +++---
->  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi       |  8 ++++----
->  arch/arm64/boot/dts/freescale/fsl-ls208xa.dtsi       | 12 ++++--------
->  8 files changed, 24 insertions(+), 27 deletions(-)
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Hi Rob,
+Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
+automatic base selection") broke the GPIO support on DaVinci boards
+in legacy mode by allowing gpiolib to set the GPIO base automatically.
 
-I assume the dts changes in this series are OK so I am going to
-pull them in the PCI tree, please let me know if you see any
-problem with that.
+DaVinci board files use the legacy GPIO API with hard-coded GPIO line
+numbers. Use the new fields in struct davinci_gpio_platform_data to
+manually set the GPIO base to 0.
 
-Thanks,
-Lorenzo
+Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
+Cc: stable at vger.kernel.org
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/dm355.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 9f7d38d12c88..73f2f70ce729 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -554,6 +554,8 @@ static struct resource dm355_gpio_resources[] = {
+ };
+ 
+ static struct davinci_gpio_platform_data dm355_gpio_platform_data = {
++	.no_auto_base	= true,
++	.base		= 0,
+ 	.ngpio		= 104,
+ };
+ 
+-- 
+2.19.1
