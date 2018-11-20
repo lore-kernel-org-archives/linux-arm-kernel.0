@@ -1,49 +1,56 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Nov 2018 11:05:41 +0000
-Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
-In-Reply-To: <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
-References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
- <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
- <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
- <20181120050650.GC5885@Mani-XPS-13-9360> <86pnv0rwna.wl-marc.zyngier@arm.com>
- <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
-Message-ID: <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Tue, 20 Nov 2018 11:58:52 +0100
+Subject: [RFC PATCH v2 20/23] KVM: arm64: Add arch vm ioctl hook
+In-Reply-To: <20181115180421.GS3505@e103592.cambridge.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-21-git-send-email-Dave.Martin@arm.com>
+ <20181102083227.GU12057@e113682-lin.lund.arm.com>
+ <20181115180421.GS3505@e103592.cambridge.arm.com>
+Message-ID: <20181120105852.GJ3835@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2018 08:56, Linus Walleij wrote:
-> On Tue, Nov 20, 2018 at 9:17 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+On Thu, Nov 15, 2018 at 06:04:22PM +0000, Dave Martin wrote:
+> On Fri, Nov 02, 2018 at 09:32:27AM +0100, Christoffer Dall wrote:
+> > On Fri, Sep 28, 2018 at 02:39:24PM +0100, Dave Martin wrote:
+> > > To enable arm64-specific vm ioctls to be added cleanly, this patch
+> > > adds a kvm_arm_arch_vm_ioctl() hook so that these don't pollute the
+> > > common code.
+> > 
+> > Hmmm, I don't really see the strenght of that argument, and have the
+> > same concern as before.  I'd like to avoid the additional indirection
+> > and instead just follow the existing pattern with a dummy implementation
+> > on the 32-bit side that returns an error.
 > 
->> How does this change anything with the fact that the above code is
->> broken? 56 or 64 bit, you cannot read this counter with a single
->> access, or two. The canonical way of reading such a counter is
->> something like this:
->>
->>         do {
->>                 lo = readl_relaxed(LO);
->>                 hi = readl_relaxed(HI);
->>         } while (hi != read_relaxed(HI));
+> So for this and the similar comment on patch 18, this was premature (or
+> at least, overzealous) factoring on my part.
 > 
-> To be fair, I have seen hardware that employ a logic latch
-> such that when a read access is done to the LO register,
-> the value of the whole counter is latched, also for the HI
-> register, so when you read the HI register in the second
-> step, it is never subject to wrapping. (Conversely reading
-> the HI before the LO will always give you insane values
-> :D)
+> I'm happy to merge this back together for arm and arm64 as you prefer.
+> 
+> Do we have a nice way of writing the arch check, e.g.
+> 
+> 	case KVM_ARM_SVE_CONFIG:
+> 		if (!IS_ENABLED(ARM64))
+> 			return -EINVAL;
+> 		else
+> 			return kvm_vcpu_sve_config(NULL, userp);
+> 
+> should work, but looks a bit strange.  Maybe I'm just being fussy.
 
-I've seen such HW indeed, and I've also seen it being broken... ;-)
+I prefer just doing:
 
-It this timer is built around such a (non-broken) logic, I'd really like
-to see it spelled out. It will otherwise be a real pain to debug...
+	case KVM_ARM_SVE_CONFIG:
+		return kvm_vcpu_sve_config(NULL, userp);
 
-> However the above code should be fine unless you know
-> for sure the hardware was constructed with a clever latch.
 
-Let's find out!
+And having this in arch/arm/include/asm/kvm_foo.h:
+
+static inline int kvm_vcpu_sve_config(...)
+{
+	return -EINVAL;
+}
+
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+    Christoffer
