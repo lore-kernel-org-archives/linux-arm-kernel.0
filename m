@@ -1,35 +1,76 @@
 From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Tue, 20 Nov 2018 15:53:48 +0100
-Subject: [PATCH 13/16] staging: vchiq_core: fix logic redundancy in parse_open
-In-Reply-To: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-Message-ID: <20181120145351.30390-14-nsaenzjulienne@suse.de>
+Date: Tue, 20 Nov 2018 15:53:35 +0100
+Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
+Message-ID: <20181120145351.30390-1-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We update sync to reflect that the firmware version is compatible with
-that option. We don't need to check both of them again further down the
-code.
+Hi All,
 
-Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- .../staging/vc04_services/interface/vchiq_arm/vchiq_core.c    | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+This series was written in parallel with reading and understanding the
+vchiq code. So excuse me for the lack of logic in the sequence of
+patches.
 
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index a45cdd08e209..5ee667d46eb5 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -1461,9 +1461,7 @@ parse_open(VCHIQ_STATE_T *state, VCHIQ_HEADER_T *header)
- 					service->sync = 0;
- 
- 				/* Acknowledge the OPEN */
--				if (service->sync &&
--				    (state->version_common >=
--				     VCHIQ_VERSION_SYNCHRONOUS_MODE)) {
-+				if (service->sync) {
- 					if (queue_message_sync(
- 						state,
- 						NULL,
+The main focus was to delete as much code as possible, I've counted
+around 550 lines, which is not bad. Apart from that there are some
+patches enforcing proper kernel APIs usage.
+
+The only patch that really changes code is the
+vchiq_ioc_copy_element_data() rewrite.
+
+The last commit updates the TODO list with some of my observations, I
+realise some of the might be a little opinionated. If anything it's
+going to force a discussion on the topic, which is nice.
+
+It was developed on top of the latest linux-next, and was tested on a
+RPIv3B+ with audio, video and running vchiq_test.
+
+Regards,
+Nicolas
+
+RFC -> PATCH, as per Stefan's comments:
+  - Remove semaphore initialization from remove_event_create()
+    (commit 9)
+  - Join all three semaphore to completion patches (commit 11)
+  - Update probe/init commit message (commit 14)
+  - Update TODO commit message and clean up (commit 16)
+  - Fix spelling on some of the patches
+
+===
+
+Nicolas Saenz Julienne (16):
+  staging: vchiq_core: rework vchiq_get_config
+  staging: vchiq_arm: rework close/remove_service IOCTLS
+  staging: vchiq_shim: delete vchi_service_create
+  staging: vchiq_arm: use list_for_each_entry when accessing
+    bulk_waiter_list
+  staging: vchiq_arm: get rid of vchi_mh.h
+  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
+  staging: vchiq-core: get rid of is_master distinction
+  staging: vchiq_core: remove unnecessary safety checks in
+    vchiq_init_state
+  staging: vchiq_core: do not initialize semaphores twice
+  staging: vchiq_core: don't add a wmb() before remote_event_signal()
+  staging: vchiq: use completions instead of semaphores
+  staging: vchiq_util: get rid of unneeded memory barriers
+  staging: vchiq_core: fix logic redundancy in parse_open
+  staging: vchiq_arm: rework probe and init functions
+  staging: vchiq_arm: fix open/release cdev functions
+  staging: vchiq: add more tasks to the TODO list
+
+ .../staging/vc04_services/interface/vchi/TODO |  42 ++
+ .../vc04_services/interface/vchi/vchi.h       |   8 -
+ .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
+ .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
+ .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
+ .../interface/vchiq_arm/vchiq_core.c          | 523 ++++-----------
+ .../interface/vchiq_arm/vchiq_core.h          |  47 +-
+ .../interface/vchiq_arm/vchiq_if.h            |  11 +-
+ .../interface/vchiq_arm/vchiq_shim.c          |  32 -
+ .../interface/vchiq_arm/vchiq_util.c          |  48 +-
+ .../interface/vchiq_arm/vchiq_util.h          |   6 +-
+ 11 files changed, 435 insertions(+), 940 deletions(-)
+ delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+
 -- 
 2.19.1
