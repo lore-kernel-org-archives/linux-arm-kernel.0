@@ -1,54 +1,47 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Mon, 19 Nov 2018 15:54:25 -0800
-Subject: compiler code model for the kernel
-In-Reply-To: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
-References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
-Message-ID: <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
+From: katsuhiro@katsuster.net (Katsuhiro Suzuki)
+Date: Tue, 20 Nov 2018 09:35:52 +0900
+Subject: [PATCH] clk: rockchip: fix ID of 8ch clock of I2S1 for rk3328
+In-Reply-To: <12656761.yaB328pSP6@phil>
+References: <20181118041802.11660-1-katsuhiro@katsuster.net>
+ <12656761.yaB328pSP6@phil>
+Message-ID: <c0f4e568-3941-3fae-a259-88661c4715f1@katsuster.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ some more folks to take a look
+Hello,
 
-On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> Hello all,
->
-> Some of us (on cc) have discussed this a bit on various occasions, so
-> perhaps it's time to sit down and do something about it :-)
->
-> The Clang work that Nick is involved in has made explicit some
-> assumptions that we are currently making in the kernel with respect to
-> the behavior of GCC, and it would be good to formalise this so we can
-> keep relying on it in the future, and to clarify to other compiler
-> developers what is needed.
->
-> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
-> introduce the same for AArch64. Under this model, we should be able to
-> make the following assumptions:
-> - symbol references are emitted as ADRP/ADD pairs
-> -  no absolute references in generated code like jump tables etc (like
-> -fpic/-fpie) [*]
-> - no shared library semantics (no GOT indirections to support symbol
-> preemption, or to reduce the CoW footprint and/or avoid text
-> relocations)
-> - resulting objects can be linked in -pie mode by ld.bfd
->
-> Another thing that came up is that we currently rely on the stack
-> pointer never to assume a value that is not 16-byte aligned, even
-> transiently.
->
-> Other things I've missed?
->
-> [*] This is only strictly required in parts of the code that may
-> execute at a different offset than the linked offset, even after
-> processing dynamic relocations at boot time (e.g., KVM hyp code
-> running in a different exception level) but avoiding those altogether
-> is reasonable. Note that GCC does the right thing for us here already,
-> but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
+Thank you for applying my patch and sorry for mistake...
 
+On 2018?11?19? 22:43, Heiko Stuebner wrote:
+> Am Sonntag, 18. November 2018, 05:18:02 CET schrieb Katsuhiro Suzuki:
+>> This patch fixes mistakes in HCLK_I2S1_8CH for running I2S1
+>> successfully.
+>>
+>> Signed-off-by: Katsuhiro Suzuki <katsuhiro@katsuster.net>
+>> ---
+>>   include/dt-bindings/clock/rk3328-cru.h | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/include/dt-bindings/clock/rk3328-cru.h b/include/dt-bindings/clock/rk3328-cru.h
+>> index a82a0109faff..bcaa4559ab1b 100644
+>> --- a/include/dt-bindings/clock/rk3328-cru.h
+>> +++ b/include/dt-bindings/clock/rk3328-cru.h
+>> @@ -172,13 +172,14 @@
+>>   #define PCLK_HDCP		232
+>>   #define PCLK_DCF		233
+>>   #define PCLK_SARADC		234
+>> +#define PCLK_ACODECPHY		235
+> 
+> I've dropped this unrelated change and applied the
+> real id fix from the rest of the patch for 4.21
+> 
+> 
+> Thanks
+> Heiko
+> 
+> 
+> 
 
-
--- 
-Thanks,
-~Nick Desaulniers
+Best Regards,
+---
+Katsuhiro Suzuki
