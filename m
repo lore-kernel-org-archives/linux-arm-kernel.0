@@ -1,70 +1,91 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 20 Nov 2018 16:26:52 +0100
-Subject: Clock configuration for the SAMA5D2 NAND controller
-In-Reply-To: <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
-References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
- <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
- <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
-Message-ID: <CAGkQfmPZ+9_=SQefg+pW4Hweo1QOtGwgMVWdy_sjyL=eDK0rNQ@mail.gmail.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 20 Nov 2018 15:30:29 +0000
+Subject: [RFC PATCH v2 13/23] KVM: arm64/sve: Context switch the SVE
+ registers
+In-Reply-To: <20181120141659.GZ3505@e103592.cambridge.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-14-git-send-email-Dave.Martin@arm.com>
+ <87sgzxhvny.fsf@linaro.org> <20181119170303.GX3505@e103592.cambridge.arm.com>
+ <87o9akhr6f.fsf@linaro.org> <20181120141659.GZ3505@e103592.cambridge.arm.com>
+Message-ID: <87muq3ix62.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le mar. 20 nov. 2018 ? 12:28, <Tudor.Ambarus@microchip.com> a ?crit :
->
-> Hi, Romain,
->
-> On 11/14/2018 03:45 PM, Tudor Ambarus wrote:
-> > Hi, Romain,
-> >
-> > On 10/10/2018 08:05 PM, Romain Izard wrote:
-> >> Hello,
-> >>
-> >> While evaluating a new flash memory chip for my product based on a SAMA5D2
-> >> chip, I tried to update my software to use the latest device tree bindings.
-> >>
-> >> Until now, I was using the legacy bindings for the NAND controller, that
-> >> preserved the timings configured by the bootloader in the EBI registers. The
-> >> bindings introduced in Linux 4.13 are used together with the NAND driver to
-> >> reconfigure the timings of the memory interface to match the speed profile
-> >> declared by some NAND components.
-> >>
-> >> However, when comparing the timings in the registers, there was a large
-> >> difference between what I calculated by hand in the past and the values
-> >> configured by the drivers. The difference was in fact a 2 factor.
-> >>
-> >> For me, the issue is due to the clock configuration declared in the SAMA5D2
-> >> device tree: The reference clock used by the nand-controller driver is the
-> >> clock for its parent node, which is directly the Master Clock. And on my
-> >> end, what I understood when writing the clock settings for my bootloader was
-> >> that the reference clock was the HSMC clock, which derives from the H32MX
-> >> clock, which runs at half the rate of the Master Clock.
-> >>
-> >> The documentation for the SAMA5D2 is not very precise on this topic, so I
-> >> would like to have some feedback. Is the clock used as a reference for the
-> >> chip select configuration registers the Master Clock itself, or is it the
-> >> peripheral clock for the HSMC module ?
-> >>
-> >
-> > I would say that it's the HSMC peripheral clock because it's the only clock that
->
-> The hardware team confirmed that the timings are based on MCK which is MCK/2.
-> The periph_clk is MCK/2 as well, but used to clock the logic of the IP.
->
-> The HSMC receives a AHB clock HCLOCK_LS (MCK/2) used to generate the timings and
-> a PCLOCK_LS used to clock the HSMC/NFC logic.
->
->
-> > we describe for HSMC. If this is the case, then we will need to know the
-> > derivation formula used by the Peripheral Clock Controller to derive the MCK2
-> > (AHB 32-bit MATRIX system) clock to Periph_clk[17] HCLOCK_LS (HSMC), in order to
-> > correctly configure the timings to match flashes capabilities.
->
-> I assumed that the on/off box from the Peripheral Clock Controller described at
-> 33.3 Block Diagram implies some derivation formula. I was wrong, the on/off box
-> is there just to gate the clocks going to the peripherals.
 
-Ok, I will send a fix.
+Dave Martin <Dave.Martin@arm.com> writes:
 
-Best regards,
--- 
-Romain Izard
+<snip>
+>> >> > @@ -404,10 +444,11 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>> >> >  	 * and restore the guest context lazily.
+>> >> >  	 * If FP/SIMD is not implemented, handle the trap and inject an
+>> >> >  	 * undefined instruction exception to the guest.
+>> >> > +	 * Similarly for trapped SVE accesses.
+>> >> >  	 */
+>> >> > -	if (system_supports_fpsimd() &&
+>> >> > -	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
+>> >> > -		return __hyp_switch_fpsimd(vcpu);
+>> >> > +	guest_has_sve = vcpu_has_sve(vcpu);
+>> >>
+>> >> I'm not sure if it's worth fishing this out here given you are already
+>> >> passing vcpu down the chain.
+>> >
+>> > I wanted to discourage GCC from recomputing this.  If you're in a
+>> > position to do so, can you look at the disassembly with/without this
+>> > factored out and see whether it makes a difference?
+>>
+>> Hmm it is hard to tell. There is code motion but for some reason I'm
+>> seeing the static jump code unrolled, for example (original on left):
+>>
+>> __hyp_switch_fpsimd():                                                                  __hyp_switch_fpsimd():
+>> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
+>>                                                                                       >  ----:  tst     w0, #0x400000
+>>                                                                                       >  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
+>>                                                                                       > arch_static_branch_jump():
+>>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:45
+>>                                                                                       >  ----:  b       38c <fixup_guest_exit+0x304>
+>>                                                                                       > arch_static_branch():
+>>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:31
+>>                                                                                       >  ----:  nop
+>>                                                                                       >  ----:  b       22c <fixup_guest_exit+0x1a4>
+>>                                                                                       > test_bit():
+>>                                                                                       > /home/alex/lsrc/kvm/linux.git/include/asm-generic/bitops/non-atomic.h:106
+>>                                                                                       >  ----:  adrp    x0, 0 <cpu_hwcaps>
+>>                                                                                       >  ----:  ldr     x0, [x0]
+>>                                                                                       > __hyp_switch_fpsimd():
+>>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
+>>  ----:  tst     w0, #0x400000                                                            ----:  tst     w0, #0x400000
+>>  ----:  b.eq    238 <fixup_guest_exit+0x1b0>  // b.none                               |  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
+>>  ----:  cbz     w21, 238 <fixup_guest_exit+0x1b0>                                     |  ----:  tbz     w2, #5, 22c <fixup_guest_exit+0x1a4>
+>> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:383                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382
+>>  ----:  ldr     w2, [x19, #2040]                                                      |  ----:  ldr     w2, [x20, #2040]
+>>  ----:  add     x1, x19, #0x4b0                                                       |  ----:  add     x1, x20, #0x4b0
+>>  ----:  ldr     x0, [x19, #2032]                                                      |  ----:  ldr     x0, [x20, #2032]
+>> sve_ffr_offset():                                                                       sve_ffr_offset():
+>>
+>> Put calculating guest_has_sve at the top of __hyp_switch_fpsimd make
+>> most of that go away and just moves things around a little bit. So I
+>> guess it could makes sense for the fast(ish) path although I'd be
+>> interested in knowing if it made any real difference to the numbers.
+>> After all the first read should be well cached and moving it through the
+>> stack is just additional memory and register pressure.
+>
+> Hmmm, I will have a think about this when I respin.
+>
+> Explicitly caching guest_has_sve() does reduce the compiler's freedom to
+> optimise.
+>
+> We might be able to mark it as __pure or __attribute_const__ to enable
+> the compiler to decide whether to cache the result, but this may not be
+> 100% safe.
+>
+> Part of me would prefer to leave things as they are to avoid the risk of
+> breaking the code again...
+
+Given that the only place you call __hyp_switch_fpsimd is here you could
+just roll in into __hyp_trap_is_fpsimd and have:
+
+	if (__hyp_trap_is_fpsimd(vcpu))
+		return true;
+
+--
+Alex Benn?e
