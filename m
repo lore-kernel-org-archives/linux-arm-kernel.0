@@ -1,130 +1,52 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 20 Nov 2018 14:37:12 +0100
-Subject: compiler code model for the kernel
-In-Reply-To: <979349c7-e6f1-9a2a-f38a-9631b4a35fce@arm.com>
-References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
- <979349c7-e6f1-9a2a-f38a-9631b4a35fce@arm.com>
-Message-ID: <CAKv+Gu9yy5Vm9Rrp_zgkkghca7jchCFBG9yxAOjoFZuo=2tPAA@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 20 Nov 2018 19:06:30 +0530
+Subject: [PATCH v2 01/12] drm/sun4i: sun6i_mipi_dsi: Compute burst mode
+ loop N1 instruction delay
+In-Reply-To: <20181120132357.xge6gkurjjjvwi2i@flea>
+References: <20181116163916.29621-1-jagan@amarulasolutions.com>
+ <20181116163916.29621-2-jagan@amarulasolutions.com>
+ <20181119082707.kbsw2gyntxxbh6no@flea>
+ <CAMty3ZBDa2wjjCh8NtrbKNYz=mr1xhZKv9JfnmDPDBQRO+CkYw@mail.gmail.com>
+ <20181120132357.xge6gkurjjjvwi2i@flea>
+Message-ID: <CAMty3ZDex+UQcZdp2nr3Bd=_PVZH-pAU=GBmLL6sdrfA-dZoVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Nov 2018 at 14:25, Ramana Radhakrishnan
-<Ramana.Radhakrishnan@arm.com> wrote:
+On Tue, Nov 20, 2018 at 6:53 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> Hi Ard,
->
-> CC'ing Richard E and James Greenhalgh as well on this thread.
->
->
-> On 19/11/2018 17:41, Ard Biesheuvel wrote:
-> > Hello all,
+> On Mon, Nov 19, 2018 at 04:28:29PM +0530, Jagan Teki wrote:
+> > On Mon, Nov 19, 2018 at 1:57 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > On Fri, Nov 16, 2018 at 10:09:05PM +0530, Jagan Teki wrote:
+> > > > Loop N1 instruction delay for burst mode lcd panel are
+> > > > computed as per BSP code.
+> > > >
+> > > > Reference code is available in BSP (from linux-sunxi
+> > > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > > >
+> > > > dsi_dev[sel]->dsi_inst_loop_num.bits.loop_n1=
+> > > > (panel->lcd_ht-panel->lcd_x)*(150)/(panel->lcd_dclk_freq*8) - 50;
+> > > > => (((mode->htotal - mode->hdisplay) * 150) /
+> > > >      ((mode->clock / 1000) * 8)) - 50;
+> > > >
+> > > > So use the similar computation for loop N1 delay.
+> > > >
+> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > >
+> > > *why* are you doing this? What is it fixing? on which devices?
 > >
-> > Some of us (on cc) have discussed this a bit on various occasions, so
-> > perhaps it's time to sit down and do something about it :-)
-> >
-> > The Clang work that Nick is involved in has made explicit some
-> > assumptions that we are currently making in the kernel with respect to
-> > the behavior of GCC, and it would be good to formalise this so we can
-> > keep relying on it in the future, and to clarify to other compiler
-> > developers what is needed.
-> >
-> > GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
-> > introduce the same for AArch64. Under this model, we should be able to
-> > make the following assumptions:
+> > You mentioned the separate function to compute the delay for all modes
+> > [1], ie what I did. did I missing anything?
 >
-> I would prefer this is -mcmodel=kernel-small so that it's explicit that
-> this is like the small memory model.
->
+> You're missing that you are never explaining why that patch is needed
+> in the first place. Or answering the question I asked a couple of
+> lines above.
 
-I don't have a strong preference regarding the name, but I will point
-out that other arches have a 'kernel' code model already, also on
-Clang (as Peter reports)
+OK.
 
-> On AArch64 this is what GCC calls the small absolute model in code i.e.
-> really all global data accesses from code are really PC relative and
-> thus position independent. The problem is data initializers but I
-> understand you are able to deal with it by producing relative
-> relocations by using hidden attributes.
->
-> Thus I wonder if we should go as far as implying -fvisibility=hidden in
-> the compiler for all global data. Is that what you do today ?
->
+The instruction delay varies between video and burst mode. for burst
+mode panels it is computed based on the panel clock along with
+horizontal sync+porch timings.
 
-Fortunately, we don't have to do this currently since the non-PIC
-small model already gives us what we need.
-
--fivisibility=hidden isn't quite sufficient though when building with
--fpic, only the visibility pragma affects extern declarations as well
-as definition.
-
-> In-fact the patch stack I am carrying for the sp_el0 based canary toyed
-> with the idea of adding such a flag and only putting out the symbol name
-> for the offset as I really dont' see anyone but the kernel using that
-> kind of code generation.
->
-
-
-> > - symbol references are emitted as ADRP/ADD pairs
->
-> Ok.
->
-> > -  no absolute references in generated code like jump tables etc (like
-> > -fpic/-fpie) [*]
->
-> Ok. -fPIC/pie with default hidden visibility just achieves the same
-> thing with -mcmodel=small ?
->
-
-Yes, but only if you use the pragma
-
-> > - no shared library semantics (no GOT indirections to support symbol
-> > preemption, or to reduce the CoW footprint and/or avoid text
-> > relocations)
->
-> Ok.
->
-> > - resulting objects can be linked in -pie mode by ld.bfd
->
-> Ok, but never producing a GOT. Further you probably want to have checks
-> on the final binary once a build is completed to ensure this ?
->
-
-In general, having no GOT whatsoever is not a hard requirement. It is
-a hard requirement for /some/ pieces of the code (EFI stub, KVM hyp
-code) that we have no absolute references whatsoever, but in general,
-we simply fix up the R_AARCH64_RELATIVE relocations wherever we
-encounter them. Having all symbol references go through the GOT just
-bloats the binary needlessly given that we don't require the shared
-library semantics.
-
-
-> >
-> > Another thing that came up is that we currently rely on the stack
-> > pointer never to assume a value that is not 16-byte aligned, even
-> > transiently.
->
-> I think we've discussed that to great detail as far as GCC is concerned.
->   I would prefer it is documented in the kernel documentation as a
-> requirement for this standard.
->
->
-> TL;DR
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/611445.html
->
->
-> regards
-> Ramana
->
-> >
-> > Other things I've missed?
-> >
-> > [*] This is only strictly required in parts of the code that may
-> > execute at a different offset than the linked offset, even after
-> > processing dynamic relocations at boot time (e.g., KVM hyp code
-> > running in a different exception level) but avoiding those altogether
-> > is reasonable. Note that GCC does the right thing for us here already,
-> > but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
-> >
->
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Got it, the same I need to update on commit, since you asked about
+separate delay route I thought you get the proper details.
