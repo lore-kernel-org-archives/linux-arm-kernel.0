@@ -1,297 +1,195 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Tue, 20 Nov 2018 15:53:40 +0100
-Subject: [PATCH 05/16] staging: vchiq_arm: get rid of vchi_mh.h
-In-Reply-To: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-Message-ID: <20181120145351.30390-6-nsaenzjulienne@suse.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 20 Nov 2018 14:17:00 +0000
+Subject: [RFC PATCH v2 13/23] KVM: arm64/sve: Context switch the SVE
+ registers
+In-Reply-To: <87o9akhr6f.fsf@linaro.org>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-14-git-send-email-Dave.Martin@arm.com>
+ <87sgzxhvny.fsf@linaro.org>
+ <20181119170303.GX3505@e103592.cambridge.arm.com>
+ <87o9akhr6f.fsf@linaro.org>
+Message-ID: <20181120141659.GZ3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The concept of VCHI_MEM_HANDLE_T is introduced by this header file and
-was meant to be used with bulk transfers. After a quick look in
-vchiq_core.c it is pretty clear that it actually accomplishes nothing
-nor alters the bulk transfers in any way.
+On Tue, Nov 20, 2018 at 12:25:12PM +0000, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > On Mon, Nov 19, 2018 at 04:36:01PM +0000, Alex Benn?e wrote:
+> >>
+> >> Dave Martin <Dave.Martin@arm.com> writes:
+> >>
+> >> > In order to give each vcpu its own view of the SVE registers, this
+> >> > patch adds context storage via a new sve_state pointer in struct
+> >> > vcpu_arch.  An additional member sve_max_vl is also added for each
+> >> > vcpu, to determine the maximum vector length visible to the guest
+> >> > and thus the value to be configured in ZCR_EL2.LEN while the is
+> >> > active.  This also determines the layout and size of the storage in
+> >> > sve_state, which is read and written by the same backend functions
+> >> > that are used for context-switching the SVE state for host tasks.
+> >> >
+> >> > On SVE-enabled vcpus, SVE access traps are now handled by switching
+> >> > in the vcpu's SVE context and disabling the trap before returning
+> >> > to the guest.  On other vcpus, the trap is not handled and an exit
+> >> > back to the host occurs, where the handle_sve() fallback path
+> >> > reflects an undefined instruction exception back to the guest,
+> >> > consistently with the behaviour of non-SVE-capable hardware (as was
+> >> > done unconditionally prior to this patch).
+> >> >
+> >> > No SVE handling is added on non-VHE-only paths, since VHE is an
+> >> > architectural and Kconfig prerequisite of SVE.
+> >> >
+> >> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> >
+> > [...]
+> >
+> >> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >> > index 085ed06..9941349 100644
+> >> > --- a/arch/arm64/kvm/hyp/switch.c
+> >> > +++ b/arch/arm64/kvm/hyp/switch.c
+> >
+> > [...]
+> >
+> >> > @@ -380,6 +398,26 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >> >  	return true;
+> >> >  }
+> >> >
+> >> > +static inline bool __hyp_text __hyp_trap_is_fpsimd(struct kvm_vcpu *vcpu,
+> >> > +						   bool guest_has_sve)
+> >> > +{
+> >> > +
+> >> > +	u8 trap_class;
+> >> > +
+> >> > +	if (!system_supports_fpsimd())
+> >> > +		return false;
+> >> > +
+> >> > +	trap_class = kvm_vcpu_trap_get_class(vcpu);
+> >> > +
+> >> > +	if (trap_class == ESR_ELx_EC_FP_ASIMD)
+> >> > +		return true;
+> >> > +
+> >> > +	if_sve (guest_has_sve && trap_class == ESR_ELx_EC_SVE)
+> >> > +		return true;
+> >>
+> >> Do we really need to check the guest has SVE before believing what the
+> >> hardware is telling us? According to the ARM ARM:
+> >>
+> >> For ESR_ELx_EC_FP_ASIMD
+> >>
+> >>   Excludes exceptions resulting from CPACR_EL1 when the value of HCR_EL2.TGE is
+> >>   1, or because SVE or Advanced SIMD and floating-point are not implemented. These
+> >>   are reported with EC value 0b000000
+> >>
+> >> But also for ESR_ELx_EC_SVE
+> >>
+> >>   Access to SVE functionality trapped as a result of CPACR_EL1.ZEN,
+> >>   CPTR_EL2.ZEN, CPTR_EL2.TZ, or CPTR_EL3.EZ, that is not reported using EC
+> >>   0b000000. This EC is defined only if SVE is implemented
+> >>
+> >> Given I got confused maybe we need a comment for clarity?
+> >
+> > This is not about not trusting the value ESR_ELx_EC_SVE on older
+> > hardware: in effect it is retrospectively reserved for this purpose on
+> > all older arch versions, so there is no ambiguity about what it means.
+> > It should never be observed on hardware that doesn't have SVE.
+> >
+> > Rather, how we handle this trap differs depending on whether the guest
+> > is SVE-enabled or not.  If not, then this trap is handled by the generic
+> > fallback path for unhandled guest traps, so we don't check for this
+> > particular EC value explicitly in that case.
+> >
+> >>   /* Catch guests without SVE enabled running on SVE capable hardware */
+> >
+> > I might write something like:
+> >
+> > 	/*
+> > 	 * For sve-enmabled guests only, handle SVE access via FPSIMD
+> > 	 * context handling code.
+> > 	 */
+> >
+> > Does that make sense?  I may have misunderstood your concern here.
+> 
+> s/enmabled/enabled/ but yeah that's fine.
 
-Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
----
- .../vc04_services/interface/vchi/vchi.h       |  3 --
- .../vc04_services/interface/vchi/vchi_mh.h    | 42 -------------------
- .../interface/vchiq_arm/vchiq_2835_arm.c      |  6 +--
- .../interface/vchiq_arm/vchiq_arm.c           | 27 ++++++------
- .../interface/vchiq_arm/vchiq_core.c          | 17 ++++----
- .../interface/vchiq_arm/vchiq_core.h          | 10 ++---
- .../interface/vchiq_arm/vchiq_if.h            |  8 ++--
- 7 files changed, 27 insertions(+), 86 deletions(-)
- delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
+Well spotted... I guess I was in a hurry.
 
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi.h b/drivers/staging/vc04_services/interface/vchi/vchi.h
-index 379a16ebfd5b..e326926eac31 100644
---- a/drivers/staging/vc04_services/interface/vchi/vchi.h
-+++ b/drivers/staging/vc04_services/interface/vchi/vchi.h
-@@ -36,7 +36,6 @@
- 
- #include "interface/vchi/vchi_cfg.h"
- #include "interface/vchi/vchi_common.h"
--#include "vchi_mh.h"
- 
- /******************************************************************************
-  Global defs
-@@ -239,7 +238,6 @@ extern int32_t vchi_bulk_queue_receive(VCHI_SERVICE_HANDLE_T handle,
- 
- // Prepare interface for a transfer from the other side into relocatable memory.
- int32_t vchi_bulk_queue_receive_reloc(const VCHI_SERVICE_HANDLE_T handle,
--				      VCHI_MEM_HANDLE_T h_dst,
- 				      uint32_t offset,
- 				      uint32_t data_size,
- 				      const VCHI_FLAGS_T flags,
-@@ -261,7 +259,6 @@ extern int32_t vchi_bulk_queue_transmit(VCHI_SERVICE_HANDLE_T handle,
- #endif
- 
- extern int32_t vchi_bulk_queue_transmit_reloc(VCHI_SERVICE_HANDLE_T handle,
--					      VCHI_MEM_HANDLE_T h_src,
- 					      uint32_t offset,
- 					      uint32_t data_size,
- 					      VCHI_FLAGS_T flags,
-diff --git a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h b/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-deleted file mode 100644
-index 198bd076b666..000000000000
---- a/drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-+++ /dev/null
-@@ -1,42 +0,0 @@
--/**
-- * Copyright (c) 2010-2012 Broadcom. All rights reserved.
-- *
-- * Redistribution and use in source and binary forms, with or without
-- * modification, are permitted provided that the following conditions
-- * are met:
-- * 1. Redistributions of source code must retain the above copyright
-- *    notice, this list of conditions, and the following disclaimer,
-- *    without modification.
-- * 2. Redistributions in binary form must reproduce the above copyright
-- *    notice, this list of conditions and the following disclaimer in the
-- *    documentation and/or other materials provided with the distribution.
-- * 3. The names of the above-listed copyright holders may not be used
-- *    to endorse or promote products derived from this software without
-- *    specific prior written permission.
-- *
-- * ALTERNATIVELY, this software may be distributed under the terms of the
-- * GNU General Public License ("GPL") version 2, as published by the Free
-- * Software Foundation.
-- *
-- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-- * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
-- * THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-- * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
-- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-- */
--
--#ifndef VCHI_MH_H_
--#define VCHI_MH_H_
--
--#include <linux/types.h>
--
--typedef int32_t VCHI_MEM_HANDLE_T;
--#define VCHI_MEM_HANDLE_INVALID 0
--
--#endif
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-index 83d740feab96..014583cdf367 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_2835_arm.c
-@@ -247,13 +247,10 @@ remote_event_signal(REMOTE_EVENT_T *event)
- }
- 
- VCHIQ_STATUS_T
--vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
--	void *offset, int size, int dir)
-+vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, void *offset, int size, int dir)
- {
- 	struct vchiq_pagelist_info *pagelistinfo;
- 
--	WARN_ON(memhandle != VCHI_MEM_HANDLE_INVALID);
--
- 	pagelistinfo = create_pagelist((char __user *)offset, size,
- 				       (dir == VCHIQ_BULK_RECEIVE)
- 				       ? PAGELIST_READ
-@@ -262,7 +259,6 @@ vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, VCHI_MEM_HANDLE_T memhandle,
- 	if (!pagelistinfo)
- 		return VCHIQ_ERROR;
- 
--	bulk->handle = memhandle;
- 	bulk->data = (void *)(unsigned long)pagelistinfo->dma_addr;
- 
- 	/*
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-index 76de36e9e3b6..525458551a22 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
-@@ -419,9 +419,9 @@ vchiq_bulk_transmit(VCHIQ_SERVICE_HANDLE_T handle, const void *data,
- 	switch (mode) {
- 	case VCHIQ_BULK_MODE_NOCALLBACK:
- 	case VCHIQ_BULK_MODE_CALLBACK:
--		status = vchiq_bulk_transfer(handle,
--			VCHI_MEM_HANDLE_INVALID, (void *)data, size, userdata,
--			mode, VCHIQ_BULK_TRANSMIT);
-+		status = vchiq_bulk_transfer(handle, (void *)data, size,
-+					     userdata, mode,
-+					     VCHIQ_BULK_TRANSMIT);
- 		break;
- 	case VCHIQ_BULK_MODE_BLOCKING:
- 		status = vchiq_blocking_bulk_transfer(handle,
-@@ -444,9 +444,8 @@ vchiq_bulk_receive(VCHIQ_SERVICE_HANDLE_T handle, void *data,
- 	switch (mode) {
- 	case VCHIQ_BULK_MODE_NOCALLBACK:
- 	case VCHIQ_BULK_MODE_CALLBACK:
--		status = vchiq_bulk_transfer(handle,
--			VCHI_MEM_HANDLE_INVALID, data, size, userdata,
--			mode, VCHIQ_BULK_RECEIVE);
-+		status = vchiq_bulk_transfer(handle, data, size, userdata,
-+					     mode, VCHIQ_BULK_RECEIVE);
- 		break;
- 	case VCHIQ_BULK_MODE_BLOCKING:
- 		status = vchiq_blocking_bulk_transfer(handle,
-@@ -513,9 +512,8 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
- 		}
- 	}
- 
--	status = vchiq_bulk_transfer(handle, VCHI_MEM_HANDLE_INVALID,
--		data, size, &waiter->bulk_waiter, VCHIQ_BULK_MODE_BLOCKING,
--		dir);
-+	status = vchiq_bulk_transfer(handle, data, size, &waiter->bulk_waiter,
-+				     VCHIQ_BULK_MODE_BLOCKING, dir);
- 	if ((status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
- 		!waiter->bulk_waiter.bulk) {
- 		VCHIQ_BULK_T *bulk = waiter->bulk_waiter.bulk;
-@@ -1149,14 +1147,13 @@ vchiq_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
- 				current->pid);
- 			args.userdata = &waiter->bulk_waiter;
- 		}
--		status = vchiq_bulk_transfer
--			(args.handle,
--			 VCHI_MEM_HANDLE_INVALID,
--			 args.data, args.size,
--			 args.userdata, args.mode,
--			 dir);
-+
-+		status = vchiq_bulk_transfer(args.handle, args.data, args.size,
-+					     args.userdata, args.mode, dir);
-+
- 		if (!waiter)
- 			break;
-+
- 		if ((status != VCHIQ_RETRY) || fatal_signal_pending(current) ||
- 			!waiter->bulk_waiter.bulk) {
- 			if (waiter->bulk_waiter.bulk) {
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-index 89f1ccdc3b98..8c7bda2e7cb6 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.c
-@@ -3313,10 +3313,10 @@ vchiq_remove_service(VCHIQ_SERVICE_HANDLE_T handle)
-  * When called in blocking mode, the userdata field points to a bulk_waiter
-  * structure.
-  */
--VCHIQ_STATUS_T
--vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
--	VCHI_MEM_HANDLE_T memhandle, void *offset, int size, void *userdata,
--	VCHIQ_BULK_MODE_T mode, VCHIQ_BULK_DIR_T dir)
-+VCHIQ_STATUS_T vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
-+				   void *offset, int size, void *userdata,
-+				   VCHIQ_BULK_MODE_T mode,
-+				   VCHIQ_BULK_DIR_T dir)
- {
- 	VCHIQ_SERVICE_T *service = find_service_by_handle(handle);
- 	VCHIQ_BULK_QUEUE_T *queue;
-@@ -3328,10 +3328,8 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 		VCHIQ_MSG_BULK_TX : VCHIQ_MSG_BULK_RX;
- 	VCHIQ_STATUS_T status = VCHIQ_ERROR;
- 
--	if (!service ||
--		 (service->srvstate != VCHIQ_SRVSTATE_OPEN) ||
--		 ((memhandle == VCHI_MEM_HANDLE_INVALID) && (offset == NULL)) ||
--		 (vchiq_check_service(service) != VCHIQ_SUCCESS))
-+	if (!service || service->srvstate != VCHIQ_SRVSTATE_OPEN ||
-+	    !offset || vchiq_check_service(service) != VCHIQ_SUCCESS)
- 		goto error_exit;
- 
- 	switch (mode) {
-@@ -3388,8 +3386,7 @@ vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
- 	bulk->size = size;
- 	bulk->actual = VCHIQ_BULK_ACTUAL_ABORTED;
- 
--	if (vchiq_prepare_bulk_data(bulk, memhandle, offset, size, dir) !=
--		VCHIQ_SUCCESS)
-+	if (vchiq_prepare_bulk_data(bulk, offset, size, dir) != VCHIQ_SUCCESS)
- 		goto unlock_error_exit;
- 
- 	wmb();
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-index 10deb5745dda..daada568f400 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_core.h
-@@ -242,7 +242,6 @@ typedef struct vchiq_bulk_struct {
- 	short mode;
- 	short dir;
- 	void *userdata;
--	VCHI_MEM_HANDLE_T handle;
- 	void *data;
- 	int size;
- 	void *remote_data;
-@@ -566,9 +565,9 @@ extern void
- remote_event_pollall(VCHIQ_STATE_T *state);
- 
- extern VCHIQ_STATUS_T
--vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle,
--	VCHI_MEM_HANDLE_T memhandle, void *offset, int size, void *userdata,
--	VCHIQ_BULK_MODE_T mode, VCHIQ_BULK_DIR_T dir);
-+vchiq_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *offset, int size,
-+		    void *userdata, VCHIQ_BULK_MODE_T mode,
-+		    VCHIQ_BULK_DIR_T dir);
- 
- extern void
- vchiq_dump_state(void *dump_context, VCHIQ_STATE_T *state);
-@@ -624,8 +623,7 @@ unlock_service(VCHIQ_SERVICE_T *service);
- ** implementations must be provided. */
- 
- extern VCHIQ_STATUS_T
--vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk,
--	VCHI_MEM_HANDLE_T memhandle, void *offset, int size, int dir);
-+vchiq_prepare_bulk_data(VCHIQ_BULK_T *bulk, void *offset, int size, int dir);
- 
- extern void
- vchiq_transfer_bulk(VCHIQ_BULK_T *bulk);
-diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-index 87829a244465..7b948a173e29 100644
---- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-+++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_if.h
-@@ -34,8 +34,6 @@
- #ifndef VCHIQ_IF_H
- #define VCHIQ_IF_H
- 
--#include "interface/vchi/vchi_mh.h"
--
- #define VCHIQ_SERVICE_HANDLE_INVALID 0
- 
- #define VCHIQ_SLOT_SIZE     4096
-@@ -156,11 +154,11 @@ extern VCHIQ_STATUS_T vchiq_bulk_receive(VCHIQ_SERVICE_HANDLE_T service,
- 	void *data, unsigned int size, void *userdata,
- 	VCHIQ_BULK_MODE_T mode);
- extern VCHIQ_STATUS_T vchiq_bulk_transmit_handle(VCHIQ_SERVICE_HANDLE_T service,
--	VCHI_MEM_HANDLE_T handle, const void *offset, unsigned int size,
-+	const void *offset, unsigned int size,
- 	void *userdata,	VCHIQ_BULK_MODE_T mode);
- extern VCHIQ_STATUS_T vchiq_bulk_receive_handle(VCHIQ_SERVICE_HANDLE_T service,
--	VCHI_MEM_HANDLE_T handle, void *offset, unsigned int size,
--	void *userdata, VCHIQ_BULK_MODE_T mode);
-+	void *offset, unsigned int size, void *userdata,
-+	VCHIQ_BULK_MODE_T mode);
- extern int   vchiq_get_client_id(VCHIQ_SERVICE_HANDLE_T service);
- extern void *vchiq_get_service_userdata(VCHIQ_SERVICE_HANDLE_T service);
- extern int   vchiq_get_service_fourcc(VCHIQ_SERVICE_HANDLE_T service);
--- 
-2.19.1
+> > [...]
+> >
+> >> > @@ -387,6 +425,8 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+> >> >   */
+> >> >  static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> >> >  {
+> >> > +	bool guest_has_sve;
+> >> > +
+> >> >  	if (ARM_EXCEPTION_CODE(*exit_code) != ARM_EXCEPTION_IRQ)
+> >> >  		vcpu->arch.fault.esr_el2 = read_sysreg_el2(esr);
+> >> >
+> >> > @@ -404,10 +444,11 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+> >> >  	 * and restore the guest context lazily.
+> >> >  	 * If FP/SIMD is not implemented, handle the trap and inject an
+> >> >  	 * undefined instruction exception to the guest.
+> >> > +	 * Similarly for trapped SVE accesses.
+> >> >  	 */
+> >> > -	if (system_supports_fpsimd() &&
+> >> > -	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
+> >> > -		return __hyp_switch_fpsimd(vcpu);
+> >> > +	guest_has_sve = vcpu_has_sve(vcpu);
+> >>
+> >> I'm not sure if it's worth fishing this out here given you are already
+> >> passing vcpu down the chain.
+> >
+> > I wanted to discourage GCC from recomputing this.  If you're in a
+> > position to do so, can you look at the disassembly with/without this
+> > factored out and see whether it makes a difference?
+> 
+> Hmm it is hard to tell. There is code motion but for some reason I'm
+> seeing the static jump code unrolled, for example (original on left):
+> 
+> __hyp_switch_fpsimd():                                                                  __hyp_switch_fpsimd():
+> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
+>                                                                                       >  ----:  tst     w0, #0x400000
+>                                                                                       >  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
+>                                                                                       > arch_static_branch_jump():
+>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:45
+>                                                                                       >  ----:  b       38c <fixup_guest_exit+0x304>
+>                                                                                       > arch_static_branch():
+>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:31
+>                                                                                       >  ----:  nop
+>                                                                                       >  ----:  b       22c <fixup_guest_exit+0x1a4>
+>                                                                                       > test_bit():
+>                                                                                       > /home/alex/lsrc/kvm/linux.git/include/asm-generic/bitops/non-atomic.h:106
+>                                                                                       >  ----:  adrp    x0, 0 <cpu_hwcaps>
+>                                                                                       >  ----:  ldr     x0, [x0]
+>                                                                                       > __hyp_switch_fpsimd():
+>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
+>  ----:  tst     w0, #0x400000                                                            ----:  tst     w0, #0x400000
+>  ----:  b.eq    238 <fixup_guest_exit+0x1b0>  // b.none                               |  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
+>  ----:  cbz     w21, 238 <fixup_guest_exit+0x1b0>                                     |  ----:  tbz     w2, #5, 22c <fixup_guest_exit+0x1a4>
+> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:383                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382
+>  ----:  ldr     w2, [x19, #2040]                                                      |  ----:  ldr     w2, [x20, #2040]
+>  ----:  add     x1, x19, #0x4b0                                                       |  ----:  add     x1, x20, #0x4b0
+>  ----:  ldr     x0, [x19, #2032]                                                      |  ----:  ldr     x0, [x20, #2032]
+> sve_ffr_offset():                                                                       sve_ffr_offset():
+> 
+> Put calculating guest_has_sve at the top of __hyp_switch_fpsimd make
+> most of that go away and just moves things around a little bit. So I
+> guess it could makes sense for the fast(ish) path although I'd be
+> interested in knowing if it made any real difference to the numbers.
+> After all the first read should be well cached and moving it through the
+> stack is just additional memory and register pressure.
+
+Hmmm, I will have a think about this when I respin.
+
+Explicitly caching guest_has_sve() does reduce the compiler's freedom to
+optimise.
+
+We might be able to mark it as __pure or __attribute_const__ to enable
+the compiler to decide whether to cache the result, but this may not be
+100% safe.
+
+Part of me would prefer to leave things as they are to avoid the risk of
+breaking the code again...
+
+Cheers
+---Dave
