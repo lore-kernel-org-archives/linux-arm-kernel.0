@@ -1,38 +1,52 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Tue, 20 Nov 2018 17:57:37 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d2: use the divided clock for SMC
-Message-ID: <20181120165737.4998-1-romain.izard.pro@gmail.com>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Tue, 20 Nov 2018 09:27:27 +0000
+Subject: [PATCHv2 18/25] PCI: mobiveil: continue to initialize the host upon
+ no PCIe link
+In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-19-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SAMA5D2 is different from SAMA5D3 and SAMA5D4, as there are two
-different clocks for the peripherals in the SoC. The Static Memory
-controller is connected to the divided master clock.
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Unfortunately, the device tree does not correctly show this and uses the
-master clock directly. This clock is then used by the code for the NAND
-controller to calculate the timings for the controller, and we end up with
-slow NAND Flash access.
+Sometimes there is not a PCIe Endpoint in the PCIe slot, so do
+not exit when the PCIe link is not up. And degrade the print
+level of link up info.
 
-Fix the device tree, and the performance of Flash access is improved.
-
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+V2:
+ - no change
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 61f68e5c48e9..b405992eb601 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -308,7 +308,7 @@
- 				  0x1 0x0 0x60000000 0x10000000
- 				  0x2 0x0 0x70000000 0x10000000
- 				  0x3 0x0 0x80000000 0x10000000>;
--			clocks = <&mck>;
-+			clocks = <&h32ck>;
- 			status = "disabled";
+ drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 1 -
+ drivers/pci/controller/mobiveil/pcie-mobiveil.c      | 2 +-
+ 2 files changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+index 1ae82e790562..d1765d572f44 100644
+--- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
++++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+@@ -596,7 +596,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+ 	ret = mobiveil_bringup_link(pcie);
+ 	if (ret) {
+ 		dev_info(dev, "link bring-up failed\n");
+-		goto error;
+ 	}
  
- 			nand_controller: nand-controller {
+ 	/* setup the kernel resources for the newly added PCIe root bus */
+diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.c b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+index ee678a60825d..370658d6546d 100644
+--- a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
++++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+@@ -222,7 +222,7 @@ int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
+ 		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
+ 	}
+ 
+-	dev_err(&pcie->pdev->dev, "link never came up\n");
++	dev_info(&pcie->pdev->dev, "link never came up\n");
+ 
+ 	return -ETIMEDOUT;
+ }
 -- 
 2.17.1
