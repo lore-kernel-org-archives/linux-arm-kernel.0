@@ -1,72 +1,41 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Tue, 20 Nov 2018 18:55:36 +0000
-Subject: [PATCHv2] ARM: dts: exynos: update the usbdrd_phy suspend clk
-Message-ID: <20181120185536.1159-1-linux.amoon@gmail.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 20 Nov 2018 18:57:06 +0000
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Enable pcie
+Message-ID: <31f5fa5e281b53f10dc25d8abe20ccaa569ad86e.1542739826.git.leonard.crestez@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per FSYS usbdrd_phy clk setting CLK_SCLK_USBD300/1 binds
-to SUSPEND_CLK so correct update the suspend clk.
+The imx6qdl-sabreauto boards have a pcie slot so let's enable it.
 
-Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+Tested on imx6dl-sabreauto with an atk9k wifi card; scanning works.
+
+There are unhandled differences for imx6qp but imx6qp-sabreauto.dts
+already contains a snippet explicitly disabling the &pcie node so that
+can be dealt with later.
+
+Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 ---
-[0] https://lkml.org/lkml/2017/10/6/12
-changes from previous patch
-fix the order of clk and update the commit message
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-FSYS block show in user manual
-
-CLKMUX_USBDRD300/1----CLKDIV_USBDRD300/1----SCLK_USBDRD300/1-----SUSPEND_CLK
-                   |
-                   |--CLKDIV_USBPHY300/1----SCLK_USBPHY300/1-----USBDRD30_PHY_0/1
----
- arch/arm/boot/dts/exynos5410.dtsi | 4 ++--
- arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 57fc9c949e54..a92c765a7a84 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -395,7 +395,7 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index a6dc5c42c632..540fbaf57e91 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -756,10 +756,14 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_pwm3>;
+ 	status = "okay";
  };
  
- &usbdrd_phy0 {
--	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-+	clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
- 	clock-names = "phy", "ref";
- 	samsung,pmu-syscon = <&pmu_system_controller>;
- };
-@@ -410,7 +410,7 @@
- };
- 
- &usbdrd_phy1 {
--	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-+	clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
- 	clock-names = "phy", "ref";
- 	samsung,pmu-syscon = <&pmu_system_controller>;
- };
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index aaff15880761..b84b44556efc 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -1509,7 +1509,7 @@
- };
- 
- &usbdrd_phy0 {
--	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-+	clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
- 	clock-names = "phy", "ref";
- 	samsung,pmu-syscon = <&pmu_system_controller>;
- };
-@@ -1524,7 +1524,7 @@
- };
- 
- &usbdrd_phy1 {
--	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-+	clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
- 	clock-names = "phy", "ref";
- 	samsung,pmu-syscon = <&pmu_system_controller>;
++&pcie {
++	status = "okay";
++};
++
+ &spdif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_spdif>;
+ 	status = "okay";
  };
 -- 
 2.17.1
