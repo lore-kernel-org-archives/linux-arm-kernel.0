@@ -1,48 +1,84 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 20 Nov 2018 22:28:34 +1100
-Subject: [PATCH 01/10] perf/core: Add macro to test for event exclusion
- flags
-In-Reply-To: <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
-Message-ID: <87sgzw0yzh.fsf@concordia.ellerman.id.au>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 11:00:43 +0000
+Subject: [PATCHv2 10/25] PCI: mobiveil: fix the INTx process error
+In-Reply-To: <20181120092615.11680-11-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-11-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB2235C1EBD0DF9EB219F5FFE8E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Murray <andrew.murray@arm.com> writes:
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-> Add a macro that tests if any of the perf event exclusion flags
-> are set on a given event.
->
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:27 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 10/25] PCI: mobiveil: fix the INTx process error
+> 
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> In the loop block, there is not code change the loop key, this patch updated
+> the loop key by re-read the INTx status register.
+> 
+> This patch also change to clear the handled INTx status.
+> 
+> Note: Need MV to test this fix.
+> 
+> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver")
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
->  include/linux/perf_event.h | 9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 53c500f..89ee7fa 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
->  extern void
->  perf_log_lost_samples(struct perf_event *event, u64 lost);
->  
-> +static inline bool event_has_exclude_flags(struct perf_event *event)
-> +{
-> +	struct perf_event_attr *attr = &event->attr;
+> V2:
+>  - Added fixes entry.
+> 
+>  drivers/pci/controller/pcie-mobiveil.c | 13 +++++++++----
+>  1 file changed, 9 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index 4ba458474e42..78e575e71f4d 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -361,6 +361,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+>  	/* Handle INTx */
+>  	if (intr_status & PAB_INTP_INTX_MASK) {
+>  		shifted_status = csr_readl(pcie,
+> PAB_INTP_AMBA_MISC_STAT);
+> +		shifted_status &= PAB_INTP_INTX_MASK;
+>  		shifted_status >>= PAB_INTX_START;
+>  		do {
+>  			for_each_set_bit(bit, &shifted_status,
+> PCI_NUM_INTX) { @@ -372,12 +373,16 @@ static void
+> mobiveil_pcie_isr(struct irq_desc *desc)
+>  					dev_err_ratelimited(dev,
+> "unexpected IRQ, INT%d\n",
+>  							    bit);
+> 
+> -				/* clear interrupt */
+> -				csr_writel(pcie,
+> -					   shifted_status << PAB_INTX_START,
+> +				/* clear interrupt handled */
+> +				csr_writel(pcie, 1 << (PAB_INTX_START + bit),
+>  					   PAB_INTP_AMBA_MISC_STAT);
+>  			}
+> -		} while ((shifted_status >> PAB_INTX_START) != 0);
 > +
-> +	return attr->exclude_idle || attr->exclude_user ||
-> +	       attr->exclude_kernel || attr->exclude_hv ||
-> +	       attr->exclude_guest || attr->exclude_host;
-> +}
-
-Sorry to be a total PITA, but using "flags" plural suggests that it only
-returns true if there is more than one exclude flag set.
-
-A better name would be event_has_exclude_flag() or maybe
-event_has_any_exclude_flag().
-
-If you're doing a respin anyway it'd be nice to fix the name, but
-obviously it's not high priority.
-
-cheers
+> +			shifted_status = csr_readl(pcie,
+> +
+> PAB_INTP_AMBA_MISC_STAT);
+> +			shifted_status &= PAB_INTP_INTX_MASK;
+> +			shifted_status >>= PAB_INTX_START;
+> +		} while (shifted_status != 0);
+>  	}
+> 
+>  	/* read extra MSI status register */
+> --
+> 2.17.1
