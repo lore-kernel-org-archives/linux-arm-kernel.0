@@ -1,78 +1,286 @@
-From: frank-w@public-files.de (Frank Wunderlich)
-Date: Tue, 20 Nov 2018 11:34:14 +0100
-Subject: Aw: Re:  Re: [PATCH v5 05/12] drm: mediatek
-In-Reply-To: <1192d203-fcd1-47b0-00bc-9d513e5ffc3e@gmail.com>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-6-matthias.bgg@kernel.org>
- <1542605939.32082.12.camel@mtksdaap41>
- <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
- <1542686700.9073.15.camel@mtksdaap41> <1542686982.26483.1.camel@mtksdaap41>
- <trinity-8f0fde8e-5ef3-4272-b009-49e180c934eb-1542702383860@3c-app-gmx-bs39>
- <1192d203-fcd1-47b0-00bc-9d513e5ffc3e@gmail.com>
-Message-ID: <trinity-cbebb6c8-0084-49a7-b07a-8ea3dbd13e6e-1542710054258@3c-app-gmx-bs39>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 10:17:00 +0000
+Subject: [PATCHv2 01/25] PCI: mobiveil: uniform the register accessors
+In-Reply-To: <20181120092615.11680-2-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-2-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB223598EE9DB8F00248464BEFE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-right this branch based on rc1 with some other commits, but v5-patches are applied on Oct 3rd (listed in Oct 5th)
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-frank at frank-N56VZ:/media/data_ext/bpi-r2-kernel/github
-[11:29:10]$ git checkout 4.19-hdmiv5
-Already on '4.19-hdmiv5'
-Your branch is up to date with 'origin/4.19-hdmiv5'.
-frank at frank-N56VZ:/media/data_ext/bpi-r2-kernel/github
-[11:29:13]$ make kernelversion
-4.19.0-rc1
-frank at frank-N56VZ:/media/data_ext/bpi-r2-kernel/github
-[11:29:19]$ git log --oneline
-...
-fc14b8c515de drm/mediatek: add a error return value when clock driver has been prepared
-0dc856306aaf drm/mediatek: implement connection from BLS to DPI0
-3d0a6749bfe3 drm/mediatek: add hdmi driver for MT2701 and MT7623
-b03e1b353b28 drm/mediatek: add support for SPDIF audio in HDMI
-c5564966272e drm/mediatek: separate hdmi phy to different file
-dee3954828db drm/mediatek: add dpi driver for mt2701 and mt7623
-a838ae8b415c drm/mediatek: convert dpi driver to use drm_of_find_panel_or_bridge
-f7f9f7c080ae drm/mediatek: add clock factor for different IC
-be1a5447330f drm/mediatek: adjust EDGE to match clock and data
-fec4504ea318 drm/mediatek: move hardware register to node data
-db992e429b9c drm/mediatek: add refcount for DPI power on/off
-...
-
-compared with 4.19.0-release there is merge https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/gpu/drm/mediatek?id=53b3b6bbfde6aae8d1ededc86ad4e0e1e00eb5f8 which seems to break v5-patches
-
-> Gesendet: Dienstag, 20. November 2018 um 11:14 Uhr
-> Von: "Matthias Brugger" <matthias.bgg@gmail.com>
-> An: "Frank Wunderlich" <frank-w@public-files.de>, "CK Hu" <ck.hu@mediatek.com>
-> Cc: mark.rutland at arm.com, devicetree at vger.kernel.org, sean.wang at kernel.org, "Matthias Brugger" <mbrugger@suse.com>, airlied at linux.ie, mturquette at baylibre.com, sean.wang at mediatek.com, sboyd at codeaurora.org, linux-kernel at vger.kernel.org, dri-devel at lists.freedesktop.org, wens at csie.org, robh+dt at kernel.org, rdunlap at infradead.org, laurent.pinchart at ideasonboard.com, p.zabel at pengutronix.de, matthias.bgg at kernel.org, ulrich.hecht+renesas at gmail.com, linux-mediatek at lists.infradead.org, linux-clk at vger.kernel.org, linux-arm-kernel at lists.infradead.org
-> Betreff: Re: Aw: Re: [PATCH v5 05/12] drm: mediatek
->
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:26 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 01/25] PCI: mobiveil: uniform the register accessors
 > 
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> On 20/11/2018 09:26, Frank Wunderlich wrote:
-> > Hi,
-> > 
-> > i got v5-patches working on bpi-r2 (mt7623) with a Patch from Ryder.lee and 2 from Bibby Hsieh on 4.19-rc1
-> > 
-> > https://github.com/frank-w/BPI-R2-4.14/commits/4.19-hdmiv5
-> > 
+> It's confused that R/W some registers by csr_readl()/csr_writel(), while
+> others by read_paged_register()/write_paged_register().
+> Actually the low 3KB of 4KB PCIe configure space can be accessed directly and
+> high 1KB is paging area. So this patch uniformed the register accessors to
+> csr_readl() and csr_writel() by comparing the register offset with page access
+> boundary 3KB in the accessor internal.
 > 
-> I don't see the patches applied to this tree. Apart from that this tree has a
-> lot of other patches applied. It differs greatly from mainline, so nothing we
-> should discuss on this mailinglist.
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - no change
 > 
-> Regards,
-> Matthias
+>  drivers/pci/controller/pcie-mobiveil.c | 179 +++++++++++++++++--------
+>  1 file changed, 124 insertions(+), 55 deletions(-)
 > 
-> > but after i tried to include them on 4.19.2, i got a strange behaviour (stretched and pink font instead of white/grey)
-> > 
-> > see here for detailed info:
-> > 
-> > http://forum.banana-pi.org/t/kernel-4-19-rc1-for-testers/6618/75
-> > 
-> > there are some patches between rc1 and final which i tried to revert, but no luck till now (cannot revert, no effect on the issue or no output). Had informed Bibby Hsieh...
-> > 
-> > is there any idea, why this happen?
-> > 
-> > regards Frank
-> > 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index 77052a0712d0..d55c7e780c6e 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -47,7 +47,6 @@
+>  #define  PAGE_SEL_SHIFT	13
+>  #define  PAGE_SEL_MASK		0x3f
+>  #define  PAGE_LO_MASK		0x3ff
+> -#define  PAGE_SEL_EN		0xc00
+>  #define  PAGE_SEL_OFFSET_SHIFT	10
 > 
+>  #define PAB_AXI_PIO_CTRL	0x0840
+> @@ -117,6 +116,12 @@
+>  #define LINK_WAIT_MIN	90000
+>  #define LINK_WAIT_MAX	100000
+> 
+> +#define PAGED_ADDR_BNDRY			0xc00
+> +#define OFFSET_TO_PAGE_ADDR(off)		\
+> +	((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
+> +#define OFFSET_TO_PAGE_IDX(off)			\
+> +	((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
+> +
+>  struct mobiveil_msi {			/* MSI information */
+>  	struct mutex lock;		/* protect bitmap variable */
+>  	struct irq_domain *msi_domain;
+> @@ -145,15 +150,119 @@ struct mobiveil_pcie {
+>  	struct mobiveil_msi msi;
+>  };
+> 
+> -static inline void csr_writel(struct mobiveil_pcie *pcie, const u32 value,
+> -		const u32 reg)
+> +/*
+> + * mobiveil_pcie_sel_page - routine to access paged register
+> + *
+> + * Registers whose address greater than PAGED_ADDR_BNDRY (0xc00) are
+> +paged,
+> + * for this scheme to work extracted higher 6 bits of the offset will
+> +be
+> + * written to pg_sel field of PAB_CTRL register and rest of the lower
+> +10
+> + * bits enabled with PAGED_ADDR_BNDRY are used as offset of the register.
+> + */
+> +static void mobiveil_pcie_sel_page(struct mobiveil_pcie *pcie, u8
+> +pg_idx)
+>  {
+> -	writel_relaxed(value, pcie->csr_axi_slave_base + reg);
+> +	u32 val;
+> +
+> +	val = readl(pcie->csr_axi_slave_base + PAB_CTRL);
+> +	val &= ~(PAGE_SEL_MASK << PAGE_SEL_SHIFT);
+> +	val |= (pg_idx & PAGE_SEL_MASK) << PAGE_SEL_SHIFT;
+> +
+> +	writel(val, pcie->csr_axi_slave_base + PAB_CTRL);
+>  }
+> 
+> -static inline u32 csr_readl(struct mobiveil_pcie *pcie, const u32 reg)
+> +static void *mobiveil_pcie_comp_addr(struct mobiveil_pcie *pcie, u32
+> +off)
+>  {
+> -	return readl_relaxed(pcie->csr_axi_slave_base + reg);
+> +	if (off < PAGED_ADDR_BNDRY) {
+> +		/* For directly accessed registers, clear the pg_sel field */
+> +		mobiveil_pcie_sel_page(pcie, 0);
+> +		return pcie->csr_axi_slave_base + off;
+> +	}
+> +
+> +	mobiveil_pcie_sel_page(pcie, OFFSET_TO_PAGE_IDX(off));
+> +	return pcie->csr_axi_slave_base + OFFSET_TO_PAGE_ADDR(off); }
+> +
+> +static int mobiveil_pcie_read(void __iomem *addr, int size, u32 *val) {
+> +	if ((uintptr_t)addr & (size - 1)) {
+> +		*val = 0;
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +	}
+> +
+> +	switch (size) {
+> +	case 4:
+> +		*val = readl(addr);
+> +		break;
+> +	case 2:
+> +		*val = readw(addr);
+> +		break;
+> +	case 1:
+> +		*val = readb(addr);
+> +		break;
+> +	default:
+> +		*val = 0;
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +	}
+> +
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static int mobiveil_pcie_write(void __iomem *addr, int size, u32 val) {
+> +	if ((uintptr_t)addr & (size - 1))
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +
+> +	switch (size) {
+> +	case 4:
+> +		writel(val, addr);
+> +		break;
+> +	case 2:
+> +		writew(val, addr);
+> +		break;
+> +	case 1:
+> +		writeb(val, addr);
+> +		break;
+> +	default:
+> +		return PCIBIOS_BAD_REGISTER_NUMBER;
+> +	}
+> +
+> +	return PCIBIOS_SUCCESSFUL;
+> +}
+> +
+> +static u32 csr_read(struct mobiveil_pcie *pcie, u32 off, size_t size) {
+> +	void *addr;
+> +	u32 val;
+> +	int ret;
+> +
+> +	addr = mobiveil_pcie_comp_addr(pcie, off);
+> +
+> +	ret = mobiveil_pcie_read(addr, size, &val);
+> +	if (ret)
+> +		dev_err(&pcie->pdev->dev, "read CSR address failed\n");
+> +
+> +	return val;
+> +}
+> +
+> +static void csr_write(struct mobiveil_pcie *pcie, u32 val, u32 off,
+> +size_t size) {
+> +	void *addr;
+> +	int ret;
+> +
+> +	addr = mobiveil_pcie_comp_addr(pcie, off);
+> +
+> +	ret = mobiveil_pcie_write(addr, size, val);
+> +	if (ret)
+> +		dev_err(&pcie->pdev->dev, "write CSR address failed\n"); }
+> +
+> +static u32 csr_readl(struct mobiveil_pcie *pcie, u32 off) {
+> +	return csr_read(pcie, off, 0x4);
+> +}
+> +
+> +static void csr_writel(struct mobiveil_pcie *pcie, u32 val, u32 off) {
+> +	csr_write(pcie, val, off, 0x4);
+>  }
+> 
+>  static bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie) @@ -342,45
+> +451,6 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+>  	return 0;
+>  }
+> 
+> -/*
+> - * select_paged_register - routine to access paged register of root complex
+> - *
+> - * registers of RC are paged, for this scheme to work
+> - * extracted higher 6 bits of the offset will be written to pg_sel
+> - * field of PAB_CTRL register and rest of the lower 10 bits enabled with
+> - * PAGE_SEL_EN are used as offset of the register.
+> - */
+> -static void select_paged_register(struct mobiveil_pcie *pcie, u32 offset) -{
+> -	int pab_ctrl_dw, pg_sel;
+> -
+> -	/* clear pg_sel field */
+> -	pab_ctrl_dw = csr_readl(pcie, PAB_CTRL);
+> -	pab_ctrl_dw = (pab_ctrl_dw & ~(PAGE_SEL_MASK <<
+> PAGE_SEL_SHIFT));
+> -
+> -	/* set pg_sel field */
+> -	pg_sel = (offset >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK;
+> -	pab_ctrl_dw |= ((pg_sel << PAGE_SEL_SHIFT));
+> -	csr_writel(pcie, pab_ctrl_dw, PAB_CTRL);
+> -}
+> -
+> -static void write_paged_register(struct mobiveil_pcie *pcie,
+> -		u32 val, u32 offset)
+> -{
+> -	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
+> -
+> -	select_paged_register(pcie, offset);
+> -	csr_writel(pcie, val, off);
+> -}
+> -
+> -static u32 read_paged_register(struct mobiveil_pcie *pcie, u32 offset) -{
+> -	u32 off = (offset & PAGE_LO_MASK) | PAGE_SEL_EN;
+> -
+> -	select_paged_register(pcie, offset);
+> -	return csr_readl(pcie, off);
+> -}
+> -
+>  static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+>  		int pci_addr, u32 type, u64 size)
+>  {
+> @@ -397,19 +467,19 @@ static void program_ib_windows(struct
+> mobiveil_pcie *pcie, int win_num,
+>  	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
+>  	csr_writel(pcie,
+>  		pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
+> -	amap_ctrl_dw = read_paged_register(pcie,
+> PAB_PEX_AMAP_CTRL(win_num));
+> +	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
+>  	amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
+>  	amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
+> 
+> -	write_paged_register(pcie, amap_ctrl_dw | lower_32_bits(size64),
+> -				PAB_PEX_AMAP_CTRL(win_num));
+> +	csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
+> +		   PAB_PEX_AMAP_CTRL(win_num));
+> 
+> -	write_paged_register(pcie, upper_32_bits(size64),
+> -				PAB_EXT_PEX_AMAP_SIZEN(win_num));
+> +	csr_writel(pcie, upper_32_bits(size64),
+> +		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
+> 
+> -	write_paged_register(pcie, pci_addr,
+> PAB_PEX_AMAP_AXI_WIN(win_num));
+> -	write_paged_register(pcie, pci_addr,
+> PAB_PEX_AMAP_PEX_WIN_L(win_num));
+> -	write_paged_register(pcie, 0,
+> PAB_PEX_AMAP_PEX_WIN_H(win_num));
+> +	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
+> +	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
+> +	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
+>  }
+> 
+>  /*
+> @@ -437,8 +507,7 @@ static void program_ob_windows(struct
+> mobiveil_pcie *pcie, int win_num,
+>  	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT
+> |
+>  			lower_32_bits(size64),
+> PAB_AXI_AMAP_CTRL(win_num));
+> 
+> -	write_paged_register(pcie, upper_32_bits(size64),
+> -				PAB_EXT_AXI_AMAP_SIZE(win_num));
+> +	csr_writel(pcie, upper_32_bits(size64),
+> +PAB_EXT_AXI_AMAP_SIZE(win_num));
+> 
+>  	/*
+>  	 * program AXI window base with appropriate value in
+> --
+> 2.17.1
