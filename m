@@ -1,42 +1,43 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:26:19 +0000
-Subject: [PATCHv2 07/25] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
- outbound window
+Date: Tue, 20 Nov 2018 09:26:06 +0000
+Subject: [PATCHv2 05/25] PCI: mobiveil: correct PCI base address in MEM/IO
+ outbound windows
 In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
 References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-8-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-6-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-As the .map_bus() use the WIN_NUM_0 for CFG transactions,
-it's better passing WIN_NUM_0 explicitly when initialize
-the CFG outbound window.
+It should get PCI base address from the DT node property 'ranges'
+to setup MEM/IO outbound windows instead of always zero.
 
+Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge
+IP driver")
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
 V2:
- - no change
+ - Added fixes entry.
 
- drivers/pci/controller/pcie-mobiveil.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/pci/controller/pcie-mobiveil.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index b2cc9c097fc9..df71c11b4810 100644
+index a0dd337c6214..8ff873023b5f 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -612,9 +612,8 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	 */
+@@ -630,8 +630,9 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
  
- 	/* config outbound translation window */
--	program_ob_windows(pcie, pcie->ob_wins_configured,
--			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
--			   resource_size(pcie->ob_io_res));
-+	program_ob_windows(pcie, WIN_NUM_0, pcie->ob_io_res->start, 0,
-+			   CFG_WINDOW_TYPE, resource_size(pcie->ob_io_res));
+ 		/* configure outbound translation window */
+ 		program_ob_windows(pcie, pcie->ob_wins_configured,
+-				   win->res->start, 0, type,
+-				   resource_size(win->res));
++				   win->res->start,
++				   win->res->start - win->offset,
++				   type, resource_size(win->res));
+ 	}
  
- 	/* memory inbound translation window */
- 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+ 	/* setup MSI hardware registers */
 -- 
 2.17.1
