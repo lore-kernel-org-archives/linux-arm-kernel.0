@@ -1,42 +1,28 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Nov 2018 14:09:52 +0000
-Subject: [PATCH 1/2] swiotlb: Make DIRECT_MAPPING_ERROR viable
-In-Reply-To: <cover.1542722463.git.robin.murphy@arm.com>
-References: <cover.1542722463.git.robin.murphy@arm.com>
-Message-ID: <e90da5fbab881c502ac3412fb05c44b26c99f73a.1542722463.git.robin.murphy@arm.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Tue, 20 Nov 2018 09:06:07 -0500
+Subject: [PATCH] ARM: add of_node_put()
+Message-ID: <20181120140607.20446-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the overflow buffer removed, we no longer have a unique address
-which is guaranteed not to be a valid DMA target to use as an error
-token. The DIRECT_MAPPING_ERROR value of 0 tries to at least represent
-an unlikely DMA target, but unfortunately there are already SWIOTLB
-users with DMA-able memory at physical address 0 which now gets falsely
-treated as a mapping failure and leads to all manner of misbehaviour.
+use of_node_put() to release the refcount.
 
-The best we can do to mitigate that is flip DIRECT_MAPPING_ERROR to the
-commonly-used all-bits-set value, since the last single byte of memory
-is by far the least-likely-valid DMA target.
-
-Fixes: dff8d6c1ed58 ("swiotlb: remove the overflow buffer")]
-Reported-by: John Stultz <john.stultz@linaro.org>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
 ---
- include/linux/dma-direct.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/kernel/setup.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
-index bd73e7a91410..9de9c7ab39d6 100644
---- a/include/linux/dma-direct.h
-+++ b/include/linux/dma-direct.h
-@@ -5,7 +5,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/mem_encrypt.h>
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 375b13f7e780..c20421f0078e 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -949,6 +949,7 @@ static int __init init_machine_late(void)
+ 					      &system_serial);
+ 		if (ret)
+ 			system_serial = NULL;
++		of_node_put(root);
+ 	}
  
--#define DIRECT_MAPPING_ERROR		0
-+#define DIRECT_MAPPING_ERROR		~(dma_addr_t)0
- 
- #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
- #include <asm/dma-direct.h>
+ 	if (!system_serial)
 -- 
-2.19.1.dirty
+2.17.0
