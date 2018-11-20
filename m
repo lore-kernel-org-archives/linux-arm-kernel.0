@@ -1,86 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Nov 2018 11:29:27 +0000
-Subject: [PATCH v1 1/1] arm64: Early boot time stamps
-In-Reply-To: <20181119214443.25175-2-pasha.tatashin@soleen.com>
-References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
- <20181119214443.25175-2-pasha.tatashin@soleen.com>
-Message-ID: <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 11:26:28 +0000
+Subject: [PATCHv2 18/25] PCI: mobiveil: continue to initialize the host
+ upon no PCIe link
+In-Reply-To: <20181120092615.11680-19-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-19-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB223595ADCC743237CC48E3A8E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-On 19/11/2018 21:44, Pavel Tatashin wrote:
-> Allow printk time stamps/sched_clock() to be available from the early
-> boot.
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:27 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 18/25] PCI: mobiveil: continue to initialize the host upon
+> no PCIe link
 > 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@soleen.com>
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> Sometimes there is not a PCIe Endpoint in the PCIe slot, so do not exit when
+> the PCIe link is not up. And degrade the print level of link up info.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
->  arch/arm64/kernel/setup.c | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> V2:
+>  - no change
 > 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index f4fc1e0544b7..4df41a66b403 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -40,6 +40,7 @@
->  #include <linux/efi.h>
->  #include <linux/psci.h>
->  #include <linux/sched/task.h>
-> +#include <linux/sched_clock.h>
->  #include <linux/mm.h>
->  
->  #include <asm/acpi.h>
-> @@ -279,8 +280,26 @@ arch_initcall(reserve_memblock_reserved_regions);
->  
->  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
->  
-> +/*
-> + * Get time stamps available early in boot, useful to identify boot time issues
-> + * from the early boot.
-> + */
-> +static __init void sched_clock_early_init(void)
-> +{
-> +	u64 freq = arch_timer_get_cntfrq();
-> +	u64 (*read_time)(void) = arch_counter_get_cntvct;
-
-We already have arch_timer_read_counter which is exposed from
-arm_arch_timer.h.
-
-> +
-> +	/* Early clock is available only on platforms with known freqs */
-
-This comment is misleading. It should read something like:
-
-	/*
-	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
-	 * the timer frequency. To avoid breakage on misconfigured
-	 * systems, do not register the early sched_clock if the
-	 * programmed value if zero. Other random values will just
-	 * result in random output.
-	 */
-
-> +	if (!freq)
-> +		return;
-> +
-> +	sched_clock_register(read_time, BITS_PER_LONG, freq);
-
-This doesn't seem right. The counter has an architected minimum of 56
-bits, and you can't assume that it is going to be more than that.
-
-> +}
-> +
->  void __init setup_arch(char **cmdline_p)
->  {
-> +	sched_clock_early_init();
-> +
->  	init_mm.start_code = (unsigned long) _text;
->  	init_mm.end_code   = (unsigned long) _etext;
->  	init_mm.end_data   = (unsigned long) _edata;
+>  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 1 -
+>  drivers/pci/controller/mobiveil/pcie-mobiveil.c      | 2 +-
+>  2 files changed, 1 insertion(+), 2 deletions(-)
 > 
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> index 1ae82e790562..d1765d572f44 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> @@ -596,7 +596,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie
+> *pcie)
+>  	ret = mobiveil_bringup_link(pcie);
+>  	if (ret) {
+>  		dev_info(dev, "link bring-up failed\n");
+> -		goto error;
+>  	}
+> 
+>  	/* setup the kernel resources for the newly added PCIe root bus */
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> index ee678a60825d..370658d6546d 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
+> @@ -222,7 +222,7 @@ int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
+>  		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
+>  	}
+> 
+> -	dev_err(&pcie->pdev->dev, "link never came up\n");
+> +	dev_info(&pcie->pdev->dev, "link never came up\n");
+> 
+>  	return -ETIMEDOUT;
+>  }
+> --
+> 2.17.1
