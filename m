@@ -1,67 +1,31 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:26:50 +0000
-Subject: [PATCHv2 12/25] PCI: mobiveil: move out the link up waiting from
- mobiveil_host_init
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-13-Zhiqiang.Hou@nxp.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Tue, 20 Nov 2018 16:41:07 +0800
+Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT7629 soc
+ platform
+In-Reply-To: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+References: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1542703268-17285-2-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+This patch adds a DT binding documentation for the MT7629 soc.
 
-Host initial sequence does not depend on PCIe link up, so move it
-to the place just before the enumeration.
-
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
-V2:
- - no change
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+ 1 file changed, 1 insertion(+)
 
- drivers/pci/controller/pcie-mobiveil.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 8eee1ab7ee24..c2848c22b466 100644
---- a/drivers/pci/controller/pcie-mobiveil.c
-+++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -582,15 +582,8 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
- static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- {
- 	u32 value, pab_ctrl, type;
--	int err;
- 	struct resource_entry *win;
- 
--	err = mobiveil_bringup_link(pcie);
--	if (err) {
--		dev_info(&pcie->pdev->dev, "link bring-up failed\n");
--		return err;
--	}
--
- 	/*
- 	 * program Bus Master Enable Bit in Command Register in PAB Config
- 	 * Space
-@@ -662,7 +655,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	/* setup MSI hardware registers */
- 	mobiveil_pcie_enable_msi(pcie);
- 
--	return err;
-+	return 0;
- }
- 
- static void mobiveil_mask_intx_irq(struct irq_data *data)
-@@ -922,6 +915,12 @@ static int mobiveil_pcie_probe(struct platform_device *pdev)
- 	bridge->map_irq = of_irq_parse_and_map_pci;
- 	bridge->swizzle_irq = pci_common_swizzle;
- 
-+	ret = mobiveil_bringup_link(pcie);
-+	if (ret) {
-+		dev_info(dev, "link bring-up failed\n");
-+		goto error;
-+	}
-+
- 	/* setup the kernel resources for the newly added PCIe root bus */
- 	ret = pci_scan_root_bus_bridge(bridge);
- 	if (ret)
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index 7940940..6cc4e87 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -6,6 +6,7 @@ Required properties:
+     - mediatek,mt2712-spi: for mt2712 platforms
+     - mediatek,mt6589-spi: for mt6589 platforms
+     - mediatek,mt7622-spi: for mt7622 platforms
++    - mediatek,mt7629-spi: for mt7629 platforms
+     - mediatek,mt8135-spi: for mt8135 platforms
+     - mediatek,mt8173-spi: for mt8173 platforms
+     - mediatek,mt8183-spi: for mt8183 platforms
 -- 
-2.17.1
+1.7.9.5
