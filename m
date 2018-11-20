@@ -1,50 +1,40 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 20 Nov 2018 16:14:41 +0530
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
- <20181117160502.dhlqbx5qnmdp5iog@kahuna>
- <b8c1d975-2b4f-5530-2089-dc04c04f8d86@ti.com>
- <12c1d6e2-aba4-be0d-bfc5-1fb5d3ab45f8@ti.com>
- <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
-Message-ID: <a411e291-d02d-064e-d08c-9ab7a1b1409e@ti.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Tue, 20 Nov 2018 10:46:17 -0500
+Subject: [PATCH v2] cpuidle: big.LITTLE: add of_node_put()
+Message-ID: <20181120154617.20903-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/18 4:07 PM, Tero Kristo wrote:
-> On 20/11/2018 12:09, Vignesh R wrote:
->> On 19/11/18 12:49 PM, Tero Kristo wrote:
->>> On 17/11/2018 18:05, Nishanth Menon wrote:
->>>> On 11:31-20181113, Vignesh R wrote:
->>>>> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
->>>>
->> [...]
->>>>
->>>> Thanks for reducing the combinations down to the minimum needed. We can
->>>> worry about the DS and isolation bits when we have a real user for
->>>> them.
->>>>
->>>> Acked-by: Nishanth Menon <nm@ti.com>
->>>>
->>>> Tero: v4.21-rc1 perhaps ?
->>>>
->>>
->>> Yeah, looks fine, queueing up for 4.21.
->>>
->>
->> Thank you all for the review!
->>
->> Tero,
->>
->> Is there a branch with these patches that I can use as base for my next
->> set of DT patches?
-> 
-> Don't have a branch for these atm, but I can create one if you need it.
+The of_node_put() is missing.So we call the of_node_put() to release
+the refcount.
 
-Yes, that would be great. Thanks!
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+Changes in v2
+-update changelog
+-do that right after its last use 
+ to also cover error handling.
+---
+ drivers/cpuidle/cpuidle-big_little.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
+diff --git a/drivers/cpuidle/cpuidle-big_little.c b/drivers/cpuidle/cpuidle-big_little.c
+index db2ede565f1a..650f063ef809 100644
+--- a/drivers/cpuidle/cpuidle-big_little.c
++++ b/drivers/cpuidle/cpuidle-big_little.c
+@@ -174,8 +174,12 @@ static int __init bl_idle_init(void)
+ 	/*
+ 	 * Initialize the driver just for a compliant set of machines
+ 	 */
+-	if (!of_match_node(compatible_machine_match, root))
++	if (!of_match_node(compatible_machine_match, root)){
++		of_node_put(root);
+ 		return -ENODEV;
++	}
++
++	of_node_put(root);
+ 
+ 	if (!mcpm_is_available())
+ 		return -EUNATCH;
 -- 
-Regards
-Vignesh
+2.17.0
