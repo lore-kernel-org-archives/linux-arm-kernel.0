@@ -1,43 +1,51 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:27:08 +0000
-Subject: [PATCHv2 15/25] dt-bindings: pci: mobiveil: change gpio_slave and
- apb_csr to optional
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-16-Zhiqiang.Hou@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 20 Nov 2018 09:52:29 +0100
+Subject: [RFC PATCH v2 11/14] dt-bindings: clock: Add Allwinner suniv
+ F1C100s CCU
+In-Reply-To: <5f0322d5e37726f0c597b919f59e121f0b2855c3.1542546735.git.mesihkilinc@gmail.com>
+References: <cover.1542546735.git.mesihkilinc@gmail.com>
+ <5f0322d5e37726f0c597b919f59e121f0b2855c3.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <20181120085229.suf3affnix3d7bi2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Sun, Nov 18, 2018 at 05:17:10PM +0300, Mesih Kilinc wrote:
+> Add compatiple string for Allwinner suniv F1C100s CCU.
+> Add clock and reset definitions.
+> 
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> ---
+>  .../devicetree/bindings/clock/sunxi-ccu.txt        |  1 +
+>  include/dt-bindings/clock/suniv-ccu-f1c100s.h      | 69 ++++++++++++++++++++++
+>  include/dt-bindings/reset/suniv-ccu-f1c100s.h      | 37 ++++++++++++
+>  3 files changed, 107 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
+>  create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> index 47d2e90..92c16eb 100644
+> --- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> @@ -3,6 +3,7 @@ Allwinner Clock Control Unit Binding
+>  
+>  Required properties :
+>  - compatible: must contain one of the following compatibles:
+> +		- "allwinner,suniv-f1c100s-ccu"
 
-Change the "gpio_slave" and "apb_csr" to optional, the "gpio_slave"
-is not used in current code, and "apb_csr" is not used by some
-platforms.
+Letters come after the numbers in alphabetical order, so that should
+be moved at the end of that list (and you have that issue in a couple
+of other patches).
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-Acked-by: Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
-Acked-by: Rob Herring <robh@kernel.org>
----
-V2:
- - no change
+Maxime
 
- Documentation/devicetree/bindings/pci/mobiveil-pcie.txt | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-index a618d4787dd7..64156993e052 100644
---- a/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-+++ b/Documentation/devicetree/bindings/pci/mobiveil-pcie.txt
-@@ -10,8 +10,10 @@ Required properties:
- 	interrupt source. The value must be 1.
- - compatible: Should contain "mbvl,gpex40-pcie"
- - reg: Should contain PCIe registers location and length
-+	Mandatory:
- 	"config_axi_slave": PCIe controller registers
- 	"csr_axi_slave"	  : Bridge config registers
-+	Optional:
- 	"gpio_slave"	  : GPIO registers to control slot power
- 	"apb_csr"	  : MSI registers
- 
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/76b489e1/attachment.sig>
