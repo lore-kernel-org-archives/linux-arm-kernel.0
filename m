@@ -1,60 +1,118 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 20 Nov 2018 14:19:12 +0000
-Subject: [RFC PATCH v2 20/23] KVM: arm64: Add arch vm ioctl hook
-In-Reply-To: <20181120105852.GJ3835@e113682-lin.lund.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-21-git-send-email-Dave.Martin@arm.com>
- <20181102083227.GU12057@e113682-lin.lund.arm.com>
- <20181115180421.GS3505@e103592.cambridge.arm.com>
- <20181120105852.GJ3835@e113682-lin.lund.arm.com>
-Message-ID: <20181120141911.GA3505@e103592.cambridge.arm.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 20 Nov 2018 14:15:22 +0000
+Subject: [PATCH v2 4/4] arm64: KVM: Enable support for :G/:H perf event
+ modifiers
+In-Reply-To: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
+References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542723322-42536-5-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 11:58:52AM +0100, Christoffer Dall wrote:
-> On Thu, Nov 15, 2018 at 06:04:22PM +0000, Dave Martin wrote:
-> > On Fri, Nov 02, 2018 at 09:32:27AM +0100, Christoffer Dall wrote:
-> > > On Fri, Sep 28, 2018 at 02:39:24PM +0100, Dave Martin wrote:
-> > > > To enable arm64-specific vm ioctls to be added cleanly, this patch
-> > > > adds a kvm_arm_arch_vm_ioctl() hook so that these don't pollute the
-> > > > common code.
-> > > 
-> > > Hmmm, I don't really see the strenght of that argument, and have the
-> > > same concern as before.  I'd like to avoid the additional indirection
-> > > and instead just follow the existing pattern with a dummy implementation
-> > > on the 32-bit side that returns an error.
-> > 
-> > So for this and the similar comment on patch 18, this was premature (or
-> > at least, overzealous) factoring on my part.
-> > 
-> > I'm happy to merge this back together for arm and arm64 as you prefer.
-> > 
-> > Do we have a nice way of writing the arch check, e.g.
-> > 
-> > 	case KVM_ARM_SVE_CONFIG:
-> > 		if (!IS_ENABLED(ARM64))
-> > 			return -EINVAL;
-> > 		else
-> > 			return kvm_vcpu_sve_config(NULL, userp);
-> > 
-> > should work, but looks a bit strange.  Maybe I'm just being fussy.
-> 
-> I prefer just doing:
-> 
-> 	case KVM_ARM_SVE_CONFIG:
-> 		return kvm_vcpu_sve_config(NULL, userp);
-> 
-> 
-> And having this in arch/arm/include/asm/kvm_foo.h:
-> 
-> static inline int kvm_vcpu_sve_config(...)
-> {
-> 	return -EINVAL;
-> }
+Enable/disable event counters as appropriate when entering and exiting
+the guest to enable support for guest or host only event counting.
 
-Sure, I can do that if you prefer.  I was a little uneasy about
-littering arm64 junk all over the arch/arm headers, but we already have
-precedent for this and it keeps the call sites clean.
+For both VHE and non-VHE we switch the counters between host/guest at
+EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
 
-Cheers
----Dave
+The PMU may be on when we change which counters are enabled however
+we avoid adding an isb as we instead rely on existing context
+synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
+the eret from the hvc in kvm_call_hyp.
+
+Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+---
+ arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
+
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index d496ef5..ebf0aac 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
++static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
++{
++	u32 host_only = host_ctxt->events_host_only;
++	u32 guest_only = host_ctxt->events_guest_only;
++
++	if (host_only)
++		write_sysreg(host_only, pmcntenclr_el0);
++
++	if (guest_only)
++		write_sysreg(guest_only, pmcntenset_el0);
++
++	return (host_only || guest_only);
++}
++
++static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
++{
++	u32 host_only = host_ctxt->events_host_only;
++	u32 guest_only = host_ctxt->events_guest_only;
++
++	if (guest_only)
++		write_sysreg(guest_only, pmcntenclr_el0);
++
++	if (host_only)
++		write_sysreg(host_only, pmcntenset_el0);
++}
++
+ /*
+  * Return true when we were able to fixup the guest exit and should return to
+  * the guest, false when we should restore the host state and return to the
+@@ -488,12 +514,15 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
++	bool pmu_switch_needed;
+ 	u64 exit_code;
+ 
+ 	host_ctxt = vcpu->arch.host_cpu_context;
+ 	host_ctxt->__hyp_running_vcpu = vcpu;
+ 	guest_ctxt = &vcpu->arch.ctxt;
+ 
++	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
++
+ 	sysreg_save_host_state_vhe(host_ctxt);
+ 
+ 	__activate_traps(vcpu);
+@@ -524,6 +553,9 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 
+ 	__debug_switch_to_host(vcpu);
+ 
++	if (pmu_switch_needed)
++		__pmu_switch_to_host(host_ctxt);
++
+ 	return exit_code;
+ }
+ 
+@@ -532,6 +564,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm_cpu_context *host_ctxt;
+ 	struct kvm_cpu_context *guest_ctxt;
++	bool pmu_switch_needed;
+ 	u64 exit_code;
+ 
+ 	vcpu = kern_hyp_va(vcpu);
+@@ -540,6 +573,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	host_ctxt->__hyp_running_vcpu = vcpu;
+ 	guest_ctxt = &vcpu->arch.ctxt;
+ 
++	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
++
+ 	__sysreg_save_state_nvhe(host_ctxt);
+ 
+ 	__activate_traps(vcpu);
+@@ -586,6 +621,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 	 */
+ 	__debug_switch_to_host(vcpu);
+ 
++	if (pmu_switch_needed)
++		__pmu_switch_to_host(host_ctxt);
++
+ 	return exit_code;
+ }
+ 
+-- 
+2.7.4
