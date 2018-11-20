@@ -1,105 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 20 Nov 2018 18:44:32 +0000
-Subject: [RFT PATCH] efi: map memreserve table before first use
-In-Reply-To: <CAKv+Gu8Z3NrCV+mq28PfHM4gv_JMZ2mj19DWdigunDxY9av6=Q@mail.gmail.com>
-References: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
- <a6374bfb-9848-c265-224a-dd77118277ad@arm.com>
- <CAKv+Gu8Z3NrCV+mq28PfHM4gv_JMZ2mj19DWdigunDxY9av6=Q@mail.gmail.com>
-Message-ID: <c9b4effa-010b-e4ab-ac3e-57cc0c5e583d@arm.com>
+From: chris@sageembedded.com (Chris Cole)
+Date: Tue, 20 Nov 2018 10:45:12 -0800
+Subject: [PATCH] ARM: V7M: align v7m_dma_inv_range() with v7 counterpart
+In-Reply-To: <1542630508-10325-1-git-send-email-vladimir.murzin@arm.com>
+References: <1542630508-10325-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <CABQ9BCV2tE7WVVPofxkUHxmPGM8NKwb5H6eS5mVcR92pAcwCLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2018 18:35, Ard Biesheuvel wrote:
-> On Tue, 20 Nov 2018 at 19:29, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>
->> Hi Ard,
->>
->> On 20/11/2018 17:35, Ard Biesheuvel wrote:
->>> Mapping the MEMRESERVE EFI configuration table from an early initcall
->>> is too late: the GICv3 ITS code that creates persistent reservations
->>> for the boot CPU's LPI tables is invoked from init_IRQ(), which runs
->>> much earlier than the handling of the initcalls.
->>>
->>> So instead, move the initialization performed by the initcall into
->>> efi_mem_reserve_persistent() itself.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> I've just given it a go on one of my TX2s, and it boots just fine. So
->> for that:
->>
->> Tested-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> A comment below though:
->>
->>> ---
->>>  drivers/firmware/efi/efi.c | 26 ++++++++++----------------
->>>  1 file changed, 10 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
->>> index fad7c62cfc0e..40de2f6734cc 100644
->>> --- a/drivers/firmware/efi/efi.c
->>> +++ b/drivers/firmware/efi/efi.c
->>> @@ -967,15 +967,23 @@ bool efi_is_table_address(unsigned long phys_addr)
->>>  }
->>>
->>>  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
->>> -static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
->>> +static struct linux_efi_memreserve *efi_memreserve_root;
->>>
->>>  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->>>  {
->>>       struct linux_efi_memreserve *rsv;
->>>
->>> -     if (!efi_memreserve_root)
->>> +     if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
->>>               return -ENODEV;
->>>
->>> +     if (!efi_memreserve_root) {
->>> +             efi_memreserve_root = memremap(efi.mem_reserve,
->>> +                                            sizeof(*efi_memreserve_root),
->>> +                                            MEMREMAP_WB);
->>> +             if (WARN_ON_ONCE(!efi_memreserve_root))
->>> +                     return -ENOMEM;
->>
->> This is now a bit racy if there is more than a single online CPU.
->>
->>> +     }
->>> +
->>>       rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
->>>       if (!rsv)
->>>               return -ENOMEM;
->>> @@ -991,20 +999,6 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->>>       return 0;
->>>  }
->>>
->>> -static int __init efi_memreserve_root_init(void)
->>> -{
->>> -     if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
->>> -             return -ENODEV;
->>> -
->>> -     efi_memreserve_root = memremap(efi.mem_reserve,
->>> -                                    sizeof(*efi_memreserve_root),
->>> -                                    MEMREMAP_WB);
->>> -     if (!efi_memreserve_root)
->>> -             return -ENOMEM;
->>> -     return 0;
->>> -}
->>> -early_initcall(efi_memreserve_root_init);
->>
->> But if we keep this (+ a check that the root is indeed NULL), we should
->> be able to make sure efi_memreserve_root is set before we enable a
->> secondary CPU. Still fragile though.
->>
-> 
-> Why is that stil fragile? It sure isn't pretty, but early initcalls
-> run before SMP boot so it should always work as expected no?
+Hi Vladimir,
 
-It is just me being paranoid about things happening without locking, but
-it should indeed work as expected.
+On Mon, Nov 19, 2018 at 4:28 AM Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+>
+> Chris has discovered and reported that v7_dma_inv_range() may corrupt
+> memory if address range is not aligned to cache line size.
+>
+> Since the whole cache-v7m.S was lifted form cache-v7.S the same
+> observation applies to v7m_dma_inv_range(). So the fix just mirrors
+> what has been done for v7 with a little specific of M-class.
+>
+> Cc: Chris Cole <chris@sageembedded.com>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm/mm/cache-v7m.S | 13 ++++++++-----
+>  1 file changed, 8 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mm/cache-v7m.S b/arch/arm/mm/cache-v7m.S
+> index 788486e8..1059d5e 100644
+> --- a/arch/arm/mm/cache-v7m.S
+> +++ b/arch/arm/mm/cache-v7m.S
+> @@ -73,9 +73,11 @@
+>  /*
+>   * dcimvac: Invalidate data cache line by MVA to PoC
+>   */
+> -.macro dcimvac, rt, tmp
+> -       v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC
+> +.irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+> +.macro dcimvac\c, rt, tmp
+> +       v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC, \c
+>  .endm
+> +.endr
+>
+>  /*
+>   * dccmvau: Clean data cache line by MVA to PoU
+> @@ -369,14 +371,15 @@ v7m_dma_inv_range:
+>         tst     r0, r3
+>         bic     r0, r0, r3
+>         dccimvacne r0, r3
+> +       addne   r0, r0, r2
+>         subne   r3, r2, #1      @ restore r3, corrupted by v7m's dccimvac
+>         tst     r1, r3
+>         bic     r1, r1, r3
+>         dccimvacne r1, r3
+>  1:
+> -       dcimvac r0, r3
+> -       add     r0, r0, r2
+> -       cmp     r0, r1
+> +       dcimvaclo r0, r3
+> +       addlo   r0, r0, r2
+> +       cmplo   r0, r1
+>         blo     1b
+>         dsb     st
+>         ret     lr
+> --
+> 1.9.1
+>
+
+There needs to be "cmp r0, r1" added after "1:" label.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Chris
