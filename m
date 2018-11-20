@@ -1,48 +1,60 @@
-From: pasha.tatashin@soleen.com (Pavel Tatashin)
-Date: Tue, 20 Nov 2018 15:03:27 +0000
-Subject: [PATCH v1 1/1] arm64: Early boot time stamps
-In-Reply-To: <01ae5979-9bcd-dd59-adda-efbf69f388ca@arm.com>
-References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
- <20181119214443.25175-2-pasha.tatashin@soleen.com>
- <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
- <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
- <01ae5979-9bcd-dd59-adda-efbf69f388ca@arm.com>
-Message-ID: <20181120150327.kc5bbkfecmfwbgzn@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 20 Nov 2018 15:01:33 +0000
+Subject: [PATCH 1/2] swiotlb: Make DIRECT_MAPPING_ERROR viable
+In-Reply-To: <20181120144918.GH10917@char.us.oracle.com>
+References: <cover.1542722463.git.robin.murphy@arm.com>
+ <e90da5fbab881c502ac3412fb05c44b26c99f73a.1542722463.git.robin.murphy@arm.com>
+ <20181120144918.GH10917@char.us.oracle.com>
+Message-ID: <7ea5809e-1e1d-6bac-b723-9f55fafeaaae@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-11-20 14:55:23, Marc Zyngier wrote:
-> > Yeah, I saw 56 is used in arm_arch_timer.c, but I could not find where
-> > this minimum is defined in aarch64 specs. I will change it to 56.
+On 20/11/2018 14:49, Konrad Rzeszutek Wilk wrote:
+> On Tue, Nov 20, 2018 at 02:09:52PM +0000, Robin Murphy wrote:
+>> With the overflow buffer removed, we no longer have a unique address
+>> which is guaranteed not to be a valid DMA target to use as an error
+>> token. The DIRECT_MAPPING_ERROR value of 0 tries to at least represent
+>> an unlikely DMA target, but unfortunately there are already SWIOTLB
+>> users with DMA-able memory at physical address 0 which now gets falsely
+>> treated as a mapping failure and leads to all manner of misbehaviour.
+>>
+>> The best we can do to mitigate that is flip DIRECT_MAPPING_ERROR to the
+>> commonly-used all-bits-set value, since the last single byte of memory
+>> is by far the least-likely-valid DMA target.
 > 
-> See D10.1.2 (The system counter) in the ARM ARM[1], which says:
-> 
-> <quote>
-> The Generic Timer provides a system counter with the following
-> specification:
-> Width	At least 56 bits wide.
-> 	The value returned by any 64-bit read of the counter is
-> 	zero-extended to 64 bits.
-> </quote>
-> 
-> This is not AArch64-specific though, and 32bit systems implementing the
-> generic timers have the exact same requirements.
+> Are all the callers checking for DIRECT_MAPPING_ERROR or is it more of
+> a comparison (as in if (!ret)) ?
 
-Thank you, makes sense. I was thinking there could be AArch64 specific
-minimum limit.
+dma_direct_map_page() and dma_direct_mapping_error() were already doing 
+the right thing, and external callers must rely on the latter via 
+dma_mapping_error() rather than trying to inspect the actual value 
+themselves, since that varies between implementations anyway. AFAICS all 
+the new return paths from swiotlb_map_page() are also robust in 
+referencing the macro explicitly, so I think we're good.
 
-> 
-> > I will send v2 soon.
-> 
-> Please wait a bit and give others a chance to review this too.
+Thanks,
+Robin.
 
-I already sent, but will wait in the future before sending v3.
-
-> 
-> Thanks,
-> 
-> 	M.
-> 
-> [1] https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf
-> -- 
-> Jazz is not dead. It just smells funny...
+>> Fixes: dff8d6c1ed58 ("swiotlb: remove the overflow buffer")]
+>> Reported-by: John Stultz <john.stultz@linaro.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   include/linux/dma-direct.h | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
+>> index bd73e7a91410..9de9c7ab39d6 100644
+>> --- a/include/linux/dma-direct.h
+>> +++ b/include/linux/dma-direct.h
+>> @@ -5,7 +5,7 @@
+>>   #include <linux/dma-mapping.h>
+>>   #include <linux/mem_encrypt.h>
+>>   
+>> -#define DIRECT_MAPPING_ERROR		0
+>> +#define DIRECT_MAPPING_ERROR		~(dma_addr_t)0
+>>   
+>>   #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
+>>   #include <asm/dma-direct.h>
+>> -- 
+>> 2.19.1.dirty
+>>
