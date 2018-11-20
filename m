@@ -1,54 +1,49 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 20 Nov 2018 14:23:57 +0100
-Subject: [PATCH v2 01/12] drm/sun4i: sun6i_mipi_dsi: Compute burst mode
- loop N1 instruction delay
-In-Reply-To: <CAMty3ZBDa2wjjCh8NtrbKNYz=mr1xhZKv9JfnmDPDBQRO+CkYw@mail.gmail.com>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-2-jagan@amarulasolutions.com>
- <20181119082707.kbsw2gyntxxbh6no@flea>
- <CAMty3ZBDa2wjjCh8NtrbKNYz=mr1xhZKv9JfnmDPDBQRO+CkYw@mail.gmail.com>
-Message-ID: <20181120132357.xge6gkurjjjvwi2i@flea>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 20 Nov 2018 13:23:32 +0000
+Subject: compiler code model for the kernel
+In-Reply-To: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+Message-ID: <20181120132331.GB25884@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 04:28:29PM +0530, Jagan Teki wrote:
-> On Mon, Nov 19, 2018 at 1:57 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Fri, Nov 16, 2018 at 10:09:05PM +0530, Jagan Teki wrote:
-> > > Loop N1 instruction delay for burst mode lcd panel are
-> > > computed as per BSP code.
-> > >
-> > > Reference code is available in BSP (from linux-sunxi
-> > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > >
-> > > dsi_dev[sel]->dsi_inst_loop_num.bits.loop_n1=
-> > > (panel->lcd_ht-panel->lcd_x)*(150)/(panel->lcd_dclk_freq*8) - 50;
-> > > => (((mode->htotal - mode->hdisplay) * 150) /
-> > >      ((mode->clock / 1000) * 8)) - 50;
-> > >
-> > > So use the similar computation for loop N1 delay.
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> >
-> > *why* are you doing this? What is it fixing? on which devices?
+On Mon, Nov 19, 2018 at 09:41:54AM -0800, Ard Biesheuvel wrote:
+> Some of us (on cc) have discussed this a bit on various occasions, so
+> perhaps it's time to sit down and do something about it :-)
 > 
-> You mentioned the separate function to compute the delay for all modes
-> [1], ie what I did. did I missing anything?
+> The Clang work that Nick is involved in has made explicit some
+> assumptions that we are currently making in the kernel with respect to
+> the behavior of GCC, and it would be good to formalise this so we can
+> keep relying on it in the future, and to clarify to other compiler
+> developers what is needed.
+> 
+> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> introduce the same for AArch64. Under this model, we should be able to
+> make the following assumptions:
+> - symbol references are emitted as ADRP/ADD pairs
+> -  no absolute references in generated code like jump tables etc (like
+> -fpic/-fpie) [*]
+> - no shared library semantics (no GOT indirections to support symbol
+> preemption, or to reduce the CoW footprint and/or avoid text
+> relocations)
+> - resulting objects can be linked in -pie mode by ld.bfd
+> 
+> Another thing that came up is that we currently rely on the stack
+> pointer never to assume a value that is not 16-byte aligned, even
+> transiently.
+> 
+> Other things I've missed?
 
-You're missing that you are never explaining why that patch is needed
-in the first place. Or answering the question I asked a couple of
-lines above.
+It would be great if we could disable idiom recognition by the compiler as
+part of this option, since this ends up with us failing to inline code
+because the compiler ends up wanting to use vector registers but can't, so
+replaces the idiom with a call to a libgcc function which we're forced to
+implement out-of-line.
 
-Maxime
+https://bugzilla.kernel.org/show_bug.cgi?id=200671
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/eca9226d/attachment-0001.sig>
+Another desirable feature would be having a way to force the assembler
+to accept arbitrary instructions, rather than have to use .arch_extension
+all over the place.
+
+Will
