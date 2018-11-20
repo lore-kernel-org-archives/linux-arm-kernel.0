@@ -1,41 +1,50 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 20 Nov 2018 13:31:21 +0100
-Subject: [PATCH 1/5] ARM: davinci: dm365: set the GPIO base to 0
-In-Reply-To: <20181120123125.24938-1-brgl@bgdev.pl>
-References: <20181120123125.24938-1-brgl@bgdev.pl>
-Message-ID: <20181120123125.24938-2-brgl@bgdev.pl>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Tue, 20 Nov 2018 10:57:51 +0100
+Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
+In-Reply-To: <1128999886.40745.1542556549581@email.ionos.de>
+References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
+ <1128999886.40745.1542556549581@email.ionos.de>
+Message-ID: <20181120095751.GB17738@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On Sun, Nov 18, 2018 at 04:55:49PM +0100, Stefan Wahren wrote:
+> Hi Nicolas,
+> 
+> > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 14. November 2018 um 13:59 geschrieben:
+> > 
+> > 
+> > Hi All,
+> > 
+> > This series was written in parallel with reading and understanding the
+> > vchiq code. So excuse me for the lack of logic in the sequence of
+> > patches.
+> > 
+> > The main focus was to delete as much code as possible, I've counted
+> > around 550 lines, which is not bad. Apart from that there are some
+> > patches enforcing proper kernel APIs usage.
+> > 
+> > The only patch that really changes code is the
+> > vchiq_ioc_copy_element_data() rewrite.
+> > 
+> > The last commit updates the TODO list with some of my observations, I
+> > realise some of the might be a little opinionated. If anything it's
+> > going to force a discussion on the topic, which is nice.
+> > 
+> > It was developed on top of the latest linux-next, and was tested on a
+> > RPIv3B+ with audio, video and running vchiq_test.
+> > 
+> > Regards,
+> > Nicolas
+> > 
+> 
+> without a changelog i won't start a review.
 
-Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
-automatic base selection") broke the GPIO support on DaVinci boards
-in legacy mode by allowing gpiolib to set the GPIO base automatically.
+What do you mean by this?  The individual patches have a "changelog" in
+them, this is just a summary of the overall changes.
 
-DaVinci board files use the legacy GPIO API with hard-coded GPIO line
-numbers. Use the new fields in struct davinci_gpio_platform_data to
-manually set the GPIO base to 0.
+What do you feel is missing here?
 
-Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
-Cc: stable at vger.kernel.org
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/dm365.c | 2 ++
- 1 file changed, 2 insertions(+)
+thanks,
 
-diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
-index abcf2a5ed89b..c8e66d8745b7 100644
---- a/arch/arm/mach-davinci/dm365.c
-+++ b/arch/arm/mach-davinci/dm365.c
-@@ -273,6 +273,8 @@ static struct resource dm365_gpio_resources[] = {
- };
- 
- static struct davinci_gpio_platform_data dm365_gpio_platform_data = {
-+	.no_auto_base	= true,
-+	.base		= 0,
- 	.ngpio		= 104,
- 	.gpio_unbanked	= 8,
- };
--- 
-2.19.1
+greg k-h
