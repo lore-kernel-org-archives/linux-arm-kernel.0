@@ -1,80 +1,50 @@
-From: rplsssn@codeaurora.org (Raju P L S S S N)
-Date: Tue, 20 Nov 2018 16:17:22 +0530
-Subject: [PATCH v8 24/26] drivers: firmware: psci: Deal with CPU hotplug
- when using OSI mode
-In-Reply-To: <CAPDyKFond=Q-cWsjKwGToprjPTFj=WA_-nsAoUFJdNCdkki8Rw@mail.gmail.com>
-References: <20180620172226.15012-1-ulf.hansson@linaro.org>
- <20180620172226.15012-25-ulf.hansson@linaro.org>
- <9bf3713b-df00-03b3-d235-7549565382c7@codeaurora.org>
- <CAPDyKFond=Q-cWsjKwGToprjPTFj=WA_-nsAoUFJdNCdkki8Rw@mail.gmail.com>
-Message-ID: <5bbdf737-2542-cd5e-f4f2-5aabe8702639@codeaurora.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 20 Nov 2018 16:14:41 +0530
+Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
+ definitions
+In-Reply-To: <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
+References: <20181113060111.16374-1-vigneshr@ti.com>
+ <20181113060111.16374-2-vigneshr@ti.com>
+ <20181117160502.dhlqbx5qnmdp5iog@kahuna>
+ <b8c1d975-2b4f-5530-2089-dc04c04f8d86@ti.com>
+ <12c1d6e2-aba4-be0d-bfc5-1fb5d3ab45f8@ti.com>
+ <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
+Message-ID: <a411e291-d02d-064e-d08c-9ab7a1b1409e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf, This is noticed in v4.19 as well. Could you please check if 
-CONFIG_DEBUG_ATOMIC_SLEEP is enabled in your case? I think with current 
-patch the scenario would be applicable.
+On 20/11/18 4:07 PM, Tero Kristo wrote:
+> On 20/11/2018 12:09, Vignesh R wrote:
+>> On 19/11/18 12:49 PM, Tero Kristo wrote:
+>>> On 17/11/2018 18:05, Nishanth Menon wrote:
+>>>> On 11:31-20181113, Vignesh R wrote:
+>>>>> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
+>>>>
+>> [...]
+>>>>
+>>>> Thanks for reducing the combinations down to the minimum needed. We can
+>>>> worry about the DS and isolation bits when we have a real user for
+>>>> them.
+>>>>
+>>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>>>
+>>>> Tero: v4.21-rc1 perhaps ?
+>>>>
+>>>
+>>> Yeah, looks fine, queueing up for 4.21.
+>>>
+>>
+>> Thank you all for the review!
+>>
+>> Tero,
+>>
+>> Is there a branch with these patches that I can use as base for my next
+>> set of DT patches?
+> 
+> Don't have a branch for these atm, but I can create one if you need it.
 
-On 11/20/2018 3:20 PM, Ulf Hansson wrote:
-> On 19 November 2018 at 20:50, Raju P L S S S N <rplsssn@codeaurora.org> wrote:
->> Hi Ulf,
->>
->> Got one issue in hotplug path where of_genpd_detach_cpu calls
->> dev_pm_qos_remove_notifier which can be sleeping as per below call stack. I
->> think it should be applicable for current patch as well right? Please let me
->> know what am I missing? why didn't you see this issue with this patch?
-> 
-> Weird.
-> 
->>
->>
->> [ 8103.221387] BUG: sleeping function called from invalid context at
->> /mnt/host/source/src/third_party/kernel/v4.14/kernel/locking/mutex.c:238
-> 
-> Could it be due to some other patch in your v.4.14 kernel?
-> 
->> [ 8103.221455] in_atomic(): 1, irqs_disabled(): 128, pid: 11, name:
->> migration/0
->> [ 8103.221487] Preemption disabled at:
->> [ 8103.221529] [<ffffff800814dfb0>] cpu_stopper_thread+0x98/0x118
->> [ 8103.221600] ------------[ cut here ]------------
->> [ 8103.221636] kernel BUG at
->> /mnt/host/source/src/third_party/kernel/v4.14/kernel/sched/core.c:6102!
->> [ 8103.221678] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
->> [ 8103.222396] CPU: 0 PID: 11 Comm: migration/0 Tainted: G        W  4.14.72
->> #1
->> [ 8103.222428] Hardware name: Google Cheza (rev1) (DT)
->> [ 8103.222460] task: ffffffc0f842d580 task.stack: ffffff8009c18000
->> [ 8103.222504] PC is at ___might_sleep+0x138/0x140
->> [ 8103.222542] LR is at ___might_sleep+0x138/0x140
->> [ 8103.222577] pc : [<ffffff80080d8f04>] lr : [<ffffff80080d8f04>] pstate:
->> 60c001c9
->> [ 8103.222605] sp : ffffff8009c1bb40
->> ?.
->> [ 8103.223924] [<ffffff80080d8f04>] ___might_sleep+0x138/0x140
->> [ 8103.223965] [<ffffff80080d8d98>] __might_sleep+0x4c/0x80
->> [ 8103.224009] [<ffffff80088e4258>] mutex_lock+0x28/0x60
->> [ 8103.224054] [<ffffff800850fa2c>] dev_pm_qos_remove_notifier+0x1c/0x54
->> [ 8103.224097] [<ffffff8008517814>] genpd_remove_device+0x3c/0x10c
->> [ 8103.224140] [<ffffff800851949c>] genpd_dev_pm_detach+0x48/0x108
->> [ 8103.224183] [<ffffff80085193e0>] of_genpd_detach_cpu+0x48/0xbc
->> [ 8103.224227] [<ffffff80083edea4>] cpu_pd_dying+0x28/0x38
->> [ 8103.224268] [<ffffff80080ab2c0>] cpuhp_invoke_callback+0x254/0x5f0
->> [ 8103.224308] [<ffffff80080acdec>] take_cpu_down+0x60/0x9c
->> [ 8103.224346] [<ffffff800814d898>] multi_cpu_stop+0xac/0x104
->> [ 8103.224385] [<ffffff800814dfb8>] cpu_stopper_thread+0xa0/0x118
->> [ 8103.224427] [<ffffff80080cff74>] smpboot_thread_fn+0x19c/0x278
->> [ 8103.224472] [<ffffff80080cc0c4>] kthread+0x120/0x130
->> [ 8103.224513] [<ffffff8008084608>] ret_from_fork+0x10/0x18
-> 
-> Thanks for the report, I will double check my series before I post the
-> new version of my series. If nothing unexpected shows up, that should
-> be in a couple of days from now.
-> 
-> I keep you cc.
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+Yes, that would be great. Thanks!
+
+-- 
+Regards
+Vignesh
