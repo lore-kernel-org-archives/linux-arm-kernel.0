@@ -1,37 +1,41 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 20 Nov 2018 11:08:54 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-In-Reply-To: <17a08397268fddb774ca0d1620d67ca38633a284.camel@suse.de>
-References: <20181114125942.25163-1-nsaenzjulienne@suse.de>
- <1128999886.40745.1542556549581@email.ionos.de>
- <20181120095751.GB17738@kroah.com>
- <17a08397268fddb774ca0d1620d67ca38633a284.camel@suse.de>
-Message-ID: <fae40a52-34cc-65a2-09d3-936cf122f8c0@i2se.com>
+From: brgl@bgdev.pl (Bartosz Golaszewski)
+Date: Tue, 20 Nov 2018 13:31:25 +0100
+Subject: [PATCH 5/5] ARM: davinci: dm644x: set the GPIO base to 0
+In-Reply-To: <20181120123125.24938-1-brgl@bgdev.pl>
+References: <20181120123125.24938-1-brgl@bgdev.pl>
+Message-ID: <20181120123125.24938-6-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.11.18 um 11:04 schrieb Nicolas Saenz Julienne:
-> On Tue, 2018-11-20 at 10:57 +0100, Greg KH wrote:
->> On Sun, Nov 18, 2018 at 04:55:49PM +0100, Stefan Wahren wrote:
->>> Hi Nicolas,
->>>
->>>
->>> without a changelog i won't start a review.
->> What do you mean by this?  The individual patches have a "changelog"
->> in
->> them, this is just a summary of the overall changes.
->>
->> What do you feel is missing here?
-> Hi Greg,
-> I did send an RFC version of this, to which Stephan made several
-> comments. I should have added the changelog to the proper series
-> submission. I've been busy with work, but I'll send the updated version
-> during the day.
-Thanks Stefan
->
-> Regards,
-> Nicolas
->
->> thanks,
->>
->> greg k-h
+From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+
+Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
+automatic base selection") broke the GPIO support on DaVinci boards
+in legacy mode by allowing gpiolib to set the GPIO base automatically.
+
+DaVinci board files use the legacy GPIO API with hard-coded GPIO line
+numbers. Use the new fields in struct davinci_gpio_platform_data to
+manually set the GPIO base to 0.
+
+Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
+Cc: stable at vger.kernel.org
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/dm644x.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 0720da7809a6..f25b508a831b 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -498,6 +498,8 @@ static struct resource dm644_gpio_resources[] = {
+ };
+ 
+ static struct davinci_gpio_platform_data dm644_gpio_platform_data = {
++	.no_auto_base	= true,
++	.base		= 0,
+ 	.ngpio		= 71,
+ };
+ 
+-- 
+2.19.1
