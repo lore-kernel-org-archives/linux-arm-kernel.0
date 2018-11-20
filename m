@@ -1,64 +1,35 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:26:37 +0000
-Subject: [PATCHv2 10/25] PCI: mobiveil: fix the INTx process error
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-11-Zhiqiang.Hou@nxp.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 20 Nov 2018 09:49:03 +0100
+Subject: [RFC PATCH v2 08/14] clocksource/drivers/sun4i: register as
+ sched_clock on suniv
+In-Reply-To: <6f4773bdef8979bff71e958c9ca2c832c68ada0d.1542546735.git.mesihkilinc@gmail.com>
+References: <cover.1542546735.git.mesihkilinc@gmail.com>
+ <6f4773bdef8979bff71e958c9ca2c832c68ada0d.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <20181120084903.v6v2m2sdiwdo34bd@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Sun, Nov 18, 2018 at 05:17:07PM +0300, Mesih Kilinc wrote:
+> The suniv chip (newer F-series Allwinner SoCs) is based on ARM926EJ-S
+> CPU, thus it has no architecture timer.
+> 
+> Register sun4i_timer as sched_clock on it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 
-In the loop block, there is not code change the loop key,
-this patch updated the loop key by re-read the INTx status
-register.
+This one should be squashed in the previous patch.
 
-This patch also change to clear the handled INTx status.
+Maxime
 
-Note: Need MV to test this fix.
-
-Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host
-Bridge IP driver")
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - Added fixes entry.
-
- drivers/pci/controller/pcie-mobiveil.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 4ba458474e42..78e575e71f4d 100644
---- a/drivers/pci/controller/pcie-mobiveil.c
-+++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -361,6 +361,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 	/* Handle INTx */
- 	if (intr_status & PAB_INTP_INTX_MASK) {
- 		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT);
-+		shifted_status &= PAB_INTP_INTX_MASK;
- 		shifted_status >>= PAB_INTX_START;
- 		do {
- 			for_each_set_bit(bit, &shifted_status, PCI_NUM_INTX) {
-@@ -372,12 +373,16 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
- 					dev_err_ratelimited(dev, "unexpected IRQ, INT%d\n",
- 							    bit);
- 
--				/* clear interrupt */
--				csr_writel(pcie,
--					   shifted_status << PAB_INTX_START,
-+				/* clear interrupt handled */
-+				csr_writel(pcie, 1 << (PAB_INTX_START + bit),
- 					   PAB_INTP_AMBA_MISC_STAT);
- 			}
--		} while ((shifted_status >> PAB_INTX_START) != 0);
-+
-+			shifted_status = csr_readl(pcie,
-+						   PAB_INTP_AMBA_MISC_STAT);
-+			shifted_status &= PAB_INTP_INTX_MASK;
-+			shifted_status >>= PAB_INTX_START;
-+		} while (shifted_status != 0);
- 	}
- 
- 	/* read extra MSI status register */
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/b3c20907/attachment-0001.sig>
