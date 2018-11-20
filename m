@@ -1,43 +1,72 @@
-From: tytso@mit.edu (Theodore Y. Ts'o)
-Date: Tue, 20 Nov 2018 13:51:54 -0500
-Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
-In-Reply-To: <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
-References: <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
- <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
- <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
- <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
-Message-ID: <20181120185154.GB6401@thunk.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Tue, 20 Nov 2018 18:55:36 +0000
+Subject: [PATCHv2] ARM: dts: exynos: update the usbdrd_phy suspend clk
+Message-ID: <20181120185536.1159-1-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 05:24:41PM +0100, Jason A. Donenfeld wrote:
-> On Tue, Nov 20, 2018 at 3:19 PM Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> > Yes.  In fact it's used for FIPS certification testing.
-> > Sure, nobody sane should be doing it.  But when it comes to
-> > government certification... :)
-> 
-> The kernel does not aim toward any FIPS certification, and we're not
-> going to start bloating our designs to fulfill this. It's never been a
-> goal. Maybe ask Ted to add a FIPS mode to random.c and see what
-> happens... When you start arguing "because FIPS!" as your
-> justification, you really hit a head scratcher.
+As per FSYS usbdrd_phy clk setting CLK_SCLK_USBD300/1 binds
+to SUSPEND_CLK so correct update the suspend clk.
 
-There are crazy people who go for FIPS certification for the kernel.
-That's why crypto/drbg.c exists.  There is a crazy fips mode in
-drivers/char/random.c which causes the kernel to panic with a 1 in
-2**80 probability each time _extract_entropy is called.  It's not the
-default, and I have no idea if any one uses it, or if it's like the
-NIST OSI mandate, which forced everyone to buy an OSI networking stack
---- and then put it on the shelf and use TCP/IP instead.
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+---
+[0] https://lkml.org/lkml/2017/10/6/12
+changes from previous patch
+fix the order of clk and update the commit message
 
-Press release from March 2018:
+FSYS block show in user manual
 
-https://www.redhat.com/en/about/press-releases/red-hat-completes-fips-140-2-re-certification-red-hat-enterprise-linux-7
+CLKMUX_USBDRD300/1----CLKDIV_USBDRD300/1----SCLK_USBDRD300/1-----SUSPEND_CLK
+                   |
+                   |--CLKDIV_USBPHY300/1----SCLK_USBPHY300/1-----USBDRD30_PHY_0/1
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 4 ++--
+ arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-    	     	       	   	     	 	- Ted
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 57fc9c949e54..a92c765a7a84 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -395,7 +395,7 @@
+ };
+ 
+ &usbdrd_phy0 {
+-	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++	clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+@@ -410,7 +410,7 @@
+ };
+ 
+ &usbdrd_phy1 {
+-	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++	clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index aaff15880761..b84b44556efc 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -1509,7 +1509,7 @@
+ };
+ 
+ &usbdrd_phy0 {
+-	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
++	clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+@@ -1524,7 +1524,7 @@
+ };
+ 
+ &usbdrd_phy1 {
+-	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
++	clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
+ 	clock-names = "phy", "ref";
+ 	samsung,pmu-syscon = <&pmu_system_controller>;
+ };
+-- 
+2.17.1
