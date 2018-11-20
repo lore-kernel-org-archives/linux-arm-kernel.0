@@ -1,46 +1,62 @@
-From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
-Date: Tue, 20 Nov 2018 08:08:33 +0000
-Subject: [PATCH v2 0/2] add SAMA5D2 PIOBU GPIO driver
-Message-ID: <1542701330-23466-1-git-send-email-andrei.stefanescu@microchip.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 11:13:19 +0000
+Subject: [PATCHv2 14/25] PCI: mobiveil: initialize
+ Primary/Secondary/Subordinate bus number
+In-Reply-To: <20181120092615.11680-15-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-15-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB22353520967DE24454F733FDE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On SAMA5D2 SoC the PIOBU pins do not lose their
-voltage during Backup/Self-refresh mode. This can
-be useful, for example, when the voltage must remain
-positive for a peripheral during Backup/Self-refresh
-mode (suspend-to ram is the Linux equivalent state).
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-v2:
-- make driver be a subnode of the syscon node
-- change Kconfig to depend on MFD_SYSCON and select GPIO_SYSCON
-- change include header from linux/gpio.h to linux/gpio/driver.h
-- include linux/bits.h header
-- change intrusion in comment to tamper
-- fix kerneldoc of functions
-- replace GPIOF_DIR_* flags with 0/1
-- replace ?: statement with if-else
-- remove the use of sama5d2_piobu_template_chip
-- retrieve syscon via syscon_node_to_regmap(pdev->dev.parent->of_node);
-
-Note that PIOBU_REG_SIZE is used to determine the register to write to
-with regmap:
-	reg = PIOBU_BASE + pin * PIOBU_REG_SIZE;
-
-Also, no irq capability implemented.
-
-Andrei Stefanescu (2):
-  dt-bindings: gpio: add SAMA5D2 PIOBU support
-  gpio: add driver for SAMA5D2 PIOBU pins
-
- .../bindings/gpio/gpio-sama5d2-piobu.txt           |  31 +++
- MAINTAINERS                                        |   7 +
- drivers/gpio/Kconfig                               |  11 +
- drivers/gpio/Makefile                              |   1 +
- drivers/gpio/gpio-sama5d2-piobu.c                  | 253 +++++++++++++++++++++
- 5 files changed, 303 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-sama5d2-piobu.txt
- create mode 100644 drivers/gpio/gpio-sama5d2-piobu.c
-
--- 
-2.7.4
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:27 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 14/25] PCI: mobiveil: initialize
+> Primary/Secondary/Subordinate bus number
+> 
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> The reset value is all zero, so set a workable value for Primary, Secondary
+> and Subordinate bus numbers.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - no change
+> 
+>  drivers/pci/controller/pcie-mobiveil.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index db7ecb021c63..9210165fe8c0 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -582,6 +582,12 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> *pcie)
+>  	u32 value, pab_ctrl, type;
+>  	struct resource_entry *win;
+> 
+> +	/* setup bus numbers */
+> +	value = csr_readl(pcie, PCI_PRIMARY_BUS);
+> +	value &= 0xff000000;
+> +	value |= 0x00ff0100;
+> +	csr_writel(pcie, value, PCI_PRIMARY_BUS);
+> +
+>  	/*
+>  	 * program Bus Master Enable Bit in Command Register in PAB Config
+>  	 * Space
+> --
+> 2.17.1
