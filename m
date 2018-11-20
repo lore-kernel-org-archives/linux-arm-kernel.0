@@ -1,38 +1,56 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Nov 2018 14:09:53 +0000
-Subject: [PATCH 2/2] swiotlb: Skip cache maintenance on map error
-In-Reply-To: <cover.1542722463.git.robin.murphy@arm.com>
-References: <cover.1542722463.git.robin.murphy@arm.com>
-Message-ID: <a77c838eb070fb46c51802aa22c28bd8e1f9741c.1542722463.git.robin.murphy@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 20 Nov 2018 11:19:00 +0100
+Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
+In-Reply-To: <1542686700.9073.15.camel@mtksdaap41>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-6-matthias.bgg@kernel.org>
+ <1542605939.32082.12.camel@mtksdaap41>
+ <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
+ <1542686700.9073.15.camel@mtksdaap41>
+Message-ID: <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If swiotlb_bounce_page() failed, calling arch_sync_dma_for_device() may
-lead to such delights as performing cache maintenance on whatever
-address phys_to_virt(SWIOTLB_MAP_ERROR) looks like, which is typically
-outside the kernel memory map and goes about as well as expected.
 
-Don't do that.
 
-Fixes: a4a4330db46a ("swiotlb: add support for non-coherent DMA")
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- kernel/dma/swiotlb.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+On 20/11/2018 05:05, CK Hu wrote:
+> Hi, Matthias:
+> 
+> On Mon, 2018-11-19 at 10:26 +0100, Matthias Brugger wrote:
+>>
+>> On 19/11/2018 06:38, CK Hu wrote:
+>>> Hi, Matthias:
+>>>
+>>> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
+>>>> From: Matthias Brugger <mbrugger@suse.com>
+>>>>
+>>>> It can happen that the mmsys clock drivers aren't probed before the
+>>>> platform driver gets invoked. The platform driver used to print a warning
+>>>> that the driver failed to get the clocks. Omit this error on
+>>>> the defered probe path.
+>>>
+>>> This patch looks good to me, but you have not modified the sub driver in
+>>> HDMI path. We could let HDMI path print the warning and someone send
+>>> another patch later, or you modify for HDMI path in this patch.
+>>
+>> Sure, I'll add this in v6. After inspecting the code, I think we will need to
+>> also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
+>> now does not even check if the clocks are present. What do you think?
+> 
+> Yes, we do really need to consider mdp driver because mmsys clock
+> include mdp clock. You remind me that mmsys control 4 major function:
+> drm routing, drm clock, mdp routing, and mdp clock. Your design let the
+> mmsys device as drm device (control drm routing) and create a sub device
+> as clock device (control drm clock, mdp clock). If one day mdp device
+> (may need control drm routing) need to control the register of mdp
+> routing, would mdp device be a sub device? Or we need not to consider
+> this because it need not to access mmsys register now?
+> 
 
-diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-index 5731daa09a32..045930e32c0e 100644
---- a/kernel/dma/swiotlb.c
-+++ b/kernel/dma/swiotlb.c
-@@ -679,7 +679,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
- 	}
- 
- 	if (!dev_is_dma_coherent(dev) &&
--	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-+	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0 &&
-+	    dev_addr != DIRECT_MAPPING_ERROR)
- 		arch_sync_dma_for_device(dev, phys, size, dir);
- 
- 	return dev_addr;
--- 
-2.19.1.dirty
+I think we should for now concentrate to fix the clock probing issue. If in the
+future we will need to access drm routing from the mdp device, we can have a
+look into this.
+
+Sounds good?
+Regards,
+Matthias
