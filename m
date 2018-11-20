@@ -1,98 +1,68 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 20 Nov 2018 22:21:37 +1100
-Subject: [PATCH 04/10] powerpc: perf/core: generalise event exclusion
- checking with perf macro
-In-Reply-To: <1542363853-13849-5-git-send-email-andrew.murray@arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <1542363853-13849-5-git-send-email-andrew.murray@arm.com>
-Message-ID: <87va4s0zb2.fsf@concordia.ellerman.id.au>
+From: Peter.Smith@arm.com (Peter Smith)
+Date: Tue, 20 Nov 2018 11:20:02 +0000
+Subject: compiler code model for the kernel
+In-Reply-To: <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>,
+ <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
+Message-ID: <AM0PR08MB3538CEF9CBAB3C49BAABD455F8D90@AM0PR08MB3538.eurprd08.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Murray <andrew.murray@arm.com> writes:
 
-> Replace checking of perf event exclusion flags with perf macro.
+________________________________________
+From: Nick Desaulniers <ndesaulniers@google.com>
+Sent: 19 November 2018 23:54
+To: Ard Biesheuvel
+Cc: Will Deacon; Catalin Marinas; Ramana Radhakrishnan; Linux ARM; Mark Rutland; Arnd Bergmann; Marc Zyngier; Peter Smith; Kristof Beyls; Stephen Hines
+Subject: Re: compiler code model for the kernel
+
++ some more folks to take a look
+
+On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 >
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->  arch/powerpc/perf/hv-24x7.c |  7 +------
->  arch/powerpc/perf/hv-gpci.c |  7 +------
->  arch/powerpc/perf/imc-pmu.c | 14 ++------------
->  3 files changed, 4 insertions(+), 24 deletions(-)
+> Hello all,
+>
+> Some of us (on cc) have discussed this a bit on various occasions, so
+> perhaps it's time to sit down and do something about it :-)
+>
+> The Clang work that Nick is involved in has made explicit some
+> assumptions that we are currently making in the kernel with respect to
+> the behavior of GCC, and it would be good to formalise this so we can
+> keep relying on it in the future, and to clarify to other compiler
+> developers what is needed.
+>
+> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> introduce the same for AArch64. Under this model, we should be able to
+> make the following assumptions:
+> - symbol references are emitted as ADRP/ADD pairs
+> -  no absolute references in generated code like jump tables etc (like
+> -fpic/-fpie) [*]
+> - no shared library semantics (no GOT indirections to support symbol
+> preemption, or to reduce the CoW footprint and/or avoid text
+> relocations)
+> - resulting objects can be linked in -pie mode by ld.bfd
+>
+> Another thing that came up is that we currently rely on the stack
+> pointer never to assume a value that is not 16-byte aligned, even
+> transiently.
+>
+> Other things I've missed?
+>
+> [*] This is only strictly required in parts of the code that may
+> execute at a different offset than the linked offset, even after
+> processing dynamic relocations at boot time (e.g., KVM hyp code
+> running in a different exception level) but avoiding those altogether
+> is reasonable. Note that GCC does the right thing for us here already,
+> but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
 
-These conversions look fine, thanks.
+Not got a lot to add at the moment. Some observations from the clang/llvm side.
 
-Acked-by: Michael Ellerman <mpe@ellerman.id.au>
+Clang already has -mcmodel=kernel for fuchsia targets so there is some prior art. My understanding is that it uses the small code-model with some small tweaks. There will probably need to be some renaming in the back-end to distinguish between fuchsia kernel code model and linux kernel code model.
 
-cheers
+I think that the assumptions above should be describable without too much difficulty. ADRP/ADD is covered by the small code model. I think the existing -fpie where every global has hidden visibility and hence cannot be found in a shared object will produce code with no GOT indirections.
 
-> diff --git a/arch/powerpc/perf/hv-24x7.c b/arch/powerpc/perf/hv-24x7.c
-> index 72238ee..60db22d 100644
-> --- a/arch/powerpc/perf/hv-24x7.c
-> +++ b/arch/powerpc/perf/hv-24x7.c
-> @@ -1307,12 +1307,7 @@ static int h_24x7_event_init(struct perf_event *event)
->  	}
->  
->  	/* unsupported modes and filters */
-> -	if (event->attr.exclude_user   ||
-> -	    event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv     ||
-> -	    event->attr.exclude_idle   ||
-> -	    event->attr.exclude_host   ||
-> -	    event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	/* no branch sampling */
-> diff --git a/arch/powerpc/perf/hv-gpci.c b/arch/powerpc/perf/hv-gpci.c
-> index 43fabb3..2d2b5c0 100644
-> --- a/arch/powerpc/perf/hv-gpci.c
-> +++ b/arch/powerpc/perf/hv-gpci.c
-> @@ -233,12 +233,7 @@ static int h_gpci_event_init(struct perf_event *event)
->  	}
->  
->  	/* unsupported modes and filters */
-> -	if (event->attr.exclude_user   ||
-> -	    event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv     ||
-> -	    event->attr.exclude_idle   ||
-> -	    event->attr.exclude_host   ||
-> -	    event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	/* no branch sampling */
-> diff --git a/arch/powerpc/perf/imc-pmu.c b/arch/powerpc/perf/imc-pmu.c
-> index 1fafc32b..1ae1d3f 100644
-> --- a/arch/powerpc/perf/imc-pmu.c
-> +++ b/arch/powerpc/perf/imc-pmu.c
-> @@ -474,12 +474,7 @@ static int nest_imc_event_init(struct perf_event *event)
->  		return -EINVAL;
->  
->  	/* unsupported modes and filters */
-> -	if (event->attr.exclude_user   ||
-> -	    event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv     ||
-> -	    event->attr.exclude_idle   ||
-> -	    event->attr.exclude_host   ||
-> -	    event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	if (event->cpu < 0)
-> @@ -749,12 +744,7 @@ static int core_imc_event_init(struct perf_event *event)
->  		return -EINVAL;
->  
->  	/* unsupported modes and filters */
-> -	if (event->attr.exclude_user   ||
-> -	    event->attr.exclude_kernel ||
-> -	    event->attr.exclude_hv     ||
-> -	    event->attr.exclude_idle   ||
-> -	    event->attr.exclude_host   ||
-> -	    event->attr.exclude_guest)
-> +	if (event_has_exclude_flags(event))
->  		return -EINVAL;
->  
->  	if (event->cpu < 0)
-> -- 
-> 2.7.4
+My limited understanding of the frame lowering code suggests that clang maintains a minimum 16-byte alignment of the stack pointer at all times. It would need to be looked over by an expert to make sure though.
+
+Peter
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
