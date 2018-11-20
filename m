@@ -1,85 +1,43 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 20 Nov 2018 10:55:45 -0800
-Subject: [PATCH V6 6/6] clk: imx: add imx8qxp lpcg driver
-In-Reply-To: <AM0PR04MB4211A7CA91D6188AB81BA6EA80DC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
- <1541862894-8209-7-git-send-email-aisheng.dong@nxp.com>
- <154223811948.88331.8860718270277533070@swboyd.mtv.corp.google.com>
- <AM0PR04MB4211A7CA91D6188AB81BA6EA80DC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <154274014557.88331.17188709471206009766@swboyd.mtv.corp.google.com>
+From: tytso@mit.edu (Theodore Y. Ts'o)
+Date: Tue, 20 Nov 2018 13:51:54 -0500
+Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
+In-Reply-To: <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
+References: <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
+ <20181112185816.GA8663@gmail.com>
+ <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
+ <20181117001718.GA175522@gmail.com>
+ <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
+ <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
+ <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
+ <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
+ <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
+ <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
+Message-ID: <20181120185154.GB6401@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-11-14 17:28:05)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd at kernel.org]
+On Tue, Nov 20, 2018 at 05:24:41PM +0100, Jason A. Donenfeld wrote:
+> On Tue, Nov 20, 2018 at 3:19 PM Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > Yes.  In fact it's used for FIPS certification testing.
+> > Sure, nobody sane should be doing it.  But when it comes to
+> > government certification... :)
 > 
-> > 
-> > > +
-> > > +       ss_lpcg = of_device_get_match_data(dev);
-> > > +       if (!ss_lpcg)
-> > > +               return -ENODEV;
-> > > +
-> > > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > +       base = devm_ioremap(dev, res->start, resource_size(res));
-> > 
-> > Why not devm_ioremap_resource()?
-> 
-> Because LPCGs are distributed in various subsystem memory space which
-> may be overlapped with some IP modules. So we can't use devm_ioremap_resource
-> which has a request_mem_region() in it.
-> It's something like what we've done for drivers/mfd/syscon.c.
+> The kernel does not aim toward any FIPS certification, and we're not
+> going to start bloating our designs to fulfill this. It's never been a
+> goal. Maybe ask Ted to add a FIPS mode to random.c and see what
+> happens... When you start arguing "because FIPS!" as your
+> justification, you really hit a head scratcher.
 
-Ok. Any chance that the various subsystems that are combined with the
-clk controller can be split up so that we can use
-devm_ioremap_resource() here? It may be better to carve up the I/O space
-of this SoC into device nodes that map to the hardware IP blocks, and
-then have those device drivers generate sub-devices for the various
-logical subsystems that the hardware IP spans. Or it could be a big
-driver that registers with multiple subsytems/frameworks from one device
-driver. This way, the logical structure of the linux kernel device
-driver design doesn't leak into the DT description of the SoC.
+There are crazy people who go for FIPS certification for the kernel.
+That's why crypto/drbg.c exists.  There is a crazy fips mode in
+drivers/char/random.c which causes the kernel to panic with a 1 in
+2**80 probability each time _extract_entropy is called.  It's not the
+default, and I have no idea if any one uses it, or if it's like the
+NIST OSI mandate, which forced everyone to buy an OSI networking stack
+--- and then put it on the shelf and use TCP/IP instead.
 
-> 
-> > > +                               GFP_KERNEL);
-> > > +       if (!clk_data)
-> > > +               return -ENOMEM;
-> > > +
-> > > +       clk_data->num = ss_lpcg->num_max;
-> > > +       clks = clk_data->hws;
-> > > +
-> > > +       for (i = 0; i < ss_lpcg->num_lpcg; i++) {
-> > > +               lpcg = ss_lpcg->lpcg + i;
-> > > +               clks[lpcg->id] = imx_clk_lpcg_scu(lpcg->name,
-> > lpcg->parent,
-> > > +                                                 lpcg->flags, base +
-> > lpcg->offset,
-> > > +                                                 lpcg->bit_idx,
-> > lpcg->hw_gate);
-> > > +       }
-> > > +
-> > > +       for (i = 0; i < clk_data->num; i++) {
-> > > +               if (IS_ERR(clks[i]))
-> > > +                       pr_err("i.MX clk %u: register failed with %ld\n",
-> > > +                               i, PTR_ERR(clks[i]));
-> > 
-> > But we're OK to continue? Alright...
-> > 
-> 
-> Yes, probably better to use pr_warn()?
+Press release from March 2018:
 
-Yes.
+https://www.redhat.com/en/about/press-releases/red-hat-completes-fips-140-2-re-certification-red-hat-enterprise-linux-7
 
-> 
-> > > +       }
-> > > +
-> > > +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
-> > > + clk_data);
-> > 
-> > Why not use devm_? Or can the driver never be unbound from sysfs?
-> > 
-> 
-> We expect the driver to be never unbound from sysfs.
-> Probably we'd better add .suppress_bind_attrs.
-
-Ok. Please add it.
+    	     	       	   	     	 	- Ted
