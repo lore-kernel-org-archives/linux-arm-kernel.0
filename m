@@ -1,300 +1,174 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Tue, 20 Nov 2018 15:08:05 +0200
-Subject: [PATCH v9 05/17] tpm: declare struct tpm_header
-In-Reply-To: <5B8DA87D05A7694D9FA63FD143655C1B9DA235BB@hasmsx108.ger.corp.intel.com>
-References: <20181118124753.18613-1-jarkko.sakkinen@linux.intel.com>
- <20181118124753.18613-6-jarkko.sakkinen@linux.intel.com>
- <5B8DA87D05A7694D9FA63FD143655C1B9DA235BB@hasmsx108.ger.corp.intel.com>
-Message-ID: <20181120130805.GD8813@linux.intel.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 11:30:58 +0000
+Subject: [PATCHv2 21/25] PCI: mobiveil: make mobiveil_host_init can be
+ used to re-init host
+In-Reply-To: <20181120092615.11680-22-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-22-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB223545A1B302BE7B5BC816FCE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 09:33:31PM +0000, Winkler, Tomas wrote:
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:28 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 21/25] PCI: mobiveil: make mobiveil_host_init can be used
+> to re-init host
 > 
-> > 
-> > Decleare struct tpm_header that replaces struct tpm_input_header and
-> Typo 
-
-Thanks, will fix for the next version.
-
-> > struct tpm_output_header.
-> > 
-> > Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
-> > Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
-> > ---
-> >  drivers/char/tpm/tpm-interface.c  |  9 ++++-----
-> >  drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
-> >  drivers/char/tpm/tpm2-cmd.c       |  4 ++--
-> >  drivers/char/tpm/tpm2-space.c     |  6 +++---
-> >  drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
-> > drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
-> >  drivers/char/tpm/xen-tpmfront.c   |  2 +-
-> >  7 files changed, 28 insertions(+), 33 deletions(-)
-> > 
-> > diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-
-> > interface.c
-> > index 7ac6ada8428c..cb0d44c158ae 100644
-> > --- a/drivers/char/tpm/tpm-interface.c
-> > +++ b/drivers/char/tpm/tpm-interface.c
-> > @@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip
-> > *chip,
-> >  				 const u8 *cmd,
-> >  				 size_t len)
-> >  {
-> > -	const struct tpm_input_header *header = (const void *)cmd;
-> > +	const struct tpm_header *header = (const void *)cmd;
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
+> Make the mobiveil_host_init function can be used to re-init host controller's
+> PAB and GPEX CSR register block, as NXP integrated Mobiveil IP has to reset
+> and then re-init the PAB and GPEX CSR registers upon Hot-reset.
 > 
-> Sometimes it is casted (void *), sometimes (struct tpm_header *)
-> Better to use one convention 
-
-I would prefer (const void *) because it is shorter form, and no
-need to duplicate the type name two times, that way also more
-readable. Anyway, agreed that we do have inconsistency with these.
-
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - Reset the statistic of IB/OB windows configured.
+>  - Change the type of member 'resources' to pointer to record the parsed
+>    resources for re-init the outbound windows.
 > 
-> >  	int i;
-> >  	u32 cc;
-> >  	u32 attrs;
-> > @@ -166,7 +166,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip
-> > *chip,
-> >  				u8 *buf, size_t bufsiz,
-> >  				unsigned int flags)
-> >  {
-> > -	struct tpm_output_header *header = (void *)buf;
-> > +	struct tpm_header *header = (void *)buf;
-> >  	int rc;
-> >  	ssize_t len = 0;
-> >  	u32 count, ordinal;
-> > @@ -316,7 +316,7 @@ static ssize_t tpm_try_transmit(struct tpm_chip
-> > *chip,  ssize_t tpm_transmit(struct tpm_chip *chip, struct tpm_space *space,
-> >  		     u8 *buf, size_t bufsiz, unsigned int flags)  {
-> > -	struct tpm_output_header *header = (struct tpm_output_header
-> > *)buf;
-> > +	struct tpm_header *header = (struct tpm_header *)buf;
-> >  	/* space for header and handles */
-> >  	u8 save[TPM_HEADER_SIZE + 3*sizeof(u32)];
-> >  	unsigned int delay_msec = TPM2_DURATION_SHORT; @@ -381,8
-> > +381,7 @@ ssize_t tpm_transmit_cmd(struct tpm_chip *chip, struct
-> > tpm_space *space,
-> >  			 struct tpm_buf *buf, size_t min_rsp_body_length,
-> >  			 unsigned int flags, const char *desc)  {
-> > -	const struct tpm_output_header *header =
-> > -		(struct tpm_output_header *)buf->data;
-> > +	const struct tpm_header *header = (struct tpm_header *)buf->data;
-> >  	int err;
-> >  	ssize_t len;
-> > 
-> > diff --git a/drivers/char/tpm/tpm.h b/drivers/char/tpm/tpm.h index
-> > 49bca4d1e786..86fa8ac0ae20 100644
-> > --- a/drivers/char/tpm/tpm.h
-> > +++ b/drivers/char/tpm/tpm.h
-> > @@ -273,16 +273,13 @@ struct tpm_chip {
-> > 
-> >  #define to_tpm_chip(d) container_of(d, struct tpm_chip, dev)
-> > 
-> > -struct tpm_input_header {
-> > -	__be16	tag;
-> > -	__be32	length;
-> > -	__be32	ordinal;
-> > -} __packed;
-> > -
-> > -struct tpm_output_header {
-> > -	__be16	tag;
-> > -	__be32	length;
-> > -	__be32	return_code;
-> > +struct tpm_header {
-> Does it deserve kdoc? 
-
-Could be done if this is needed at some point in include/linux/tpm.h.
-Do not see it right now as high priority.
-
-> > +	__be16 tag;
-> > +	__be32 length;
-> > +	union {
-> > +		__be32 ordinal;
-> > +		__be32 return_code;
-> > +	};
-> >  } __packed;
-> > 
-> >  #define TPM_TAG_RQU_COMMAND 193
-> > @@ -401,8 +398,8 @@ struct tpm_buf {
-> > 
-> >  static inline void tpm_buf_reset(struct tpm_buf *buf, u16 tag, u32 ordinal)  {
-> > -	struct tpm_input_header *head;
-> > -	head = (struct tpm_input_header *)buf->data;
-> > +	struct tpm_header *head = (struct tpm_header *)buf->data;
-> > +
-> >  	head->tag = cpu_to_be16(tag);
-> >  	head->length = cpu_to_be32(sizeof(*head));
-> >  	head->ordinal = cpu_to_be32(ordinal);
-> > @@ -428,14 +425,14 @@ static inline void tpm_buf_destroy(struct tpm_buf
-> > *buf)
-> > 
-> >  static inline u32 tpm_buf_length(struct tpm_buf *buf)  {
-> > -	struct tpm_input_header *head = (struct tpm_input_header *) buf-
-> > >data;
-> No blank after ) in casting. 
-
-And also here void casting would make sense.
-
+>  .../controller/mobiveil/pcie-mobiveil-host.c  | 32 +++++++++++--------
+>  .../pci/controller/mobiveil/pcie-mobiveil.h   |  3 +-
+>  2 files changed, 20 insertions(+), 15 deletions(-)
 > 
-> > +	struct tpm_header *head = (struct tpm_header *) buf->data;
-> > 
-> >  	return be32_to_cpu(head->length);
-> >  }
-> > 
-> >  static inline u16 tpm_buf_tag(struct tpm_buf *buf)  {
-> > -	struct tpm_input_header *head = (struct tpm_input_header *) buf-
-> > >data;
-> > +	struct tpm_header *head = (struct tpm_header *) buf->data;
-> > 
-> >  	return be16_to_cpu(head->tag);
-> >  }
-> > @@ -444,7 +441,7 @@ static inline void tpm_buf_append(struct tpm_buf
-> > *buf,
-> >  				  const unsigned char *new_data,
-> >  				  unsigned int new_len)
-> >  {
-> > -	struct tpm_input_header *head = (struct tpm_input_header *) buf-
-> > >data;
-> > +	struct tpm_header *head = (struct tpm_header *) buf->data;
-> No blank after ) in casting.
-> >  	u32 len = tpm_buf_length(buf);
-> > 
-> >  	/* Return silently if overflow has already happened. */ diff --git
-> > a/drivers/char/tpm/tpm2-cmd.c b/drivers/char/tpm/tpm2-cmd.c index
-> > 2bcf470c8e5d..ab03f8600f89 100644
-> > --- a/drivers/char/tpm/tpm2-cmd.c
-> > +++ b/drivers/char/tpm/tpm2-cmd.c
-> > @@ -784,7 +784,7 @@ static int tpm2_do_selftest(struct tpm_chip *chip)
-> >   */
-> >  int tpm2_probe(struct tpm_chip *chip)
-> >  {
-> > -	struct tpm_output_header *out;
-> > +	struct tpm_header *out;
-> >  	struct tpm_buf buf;
-> >  	int rc;
-> > 
-> > @@ -797,7 +797,7 @@ int tpm2_probe(struct tpm_chip *chip)
-> >  	rc = tpm_transmit_cmd(chip, NULL, &buf, 0, 0, NULL);
-> >  	/* We ignore TPM return codes on purpose. */
-> >  	if (rc >=  0) {
-> > -		out = (struct tpm_output_header *)buf.data;
-> > +		out = (struct tpm_header *)buf.data;
-> >  		if (be16_to_cpu(out->tag) == TPM2_ST_NO_SESSIONS)
-> >  			chip->flags |= TPM_CHIP_FLAG_TPM2;
-> >  	}
-> > diff --git a/drivers/char/tpm/tpm2-space.c b/drivers/char/tpm/tpm2-space.c
-> > index 5ecc73988f7c..862ee1ce1755 100644
-> > --- a/drivers/char/tpm/tpm2-space.c
-> > +++ b/drivers/char/tpm/tpm2-space.c
-> > @@ -334,7 +334,7 @@ static int tpm2_map_response_header(struct
-> > tpm_chip *chip, u32 cc, u8 *rsp,
-> >  				    size_t len)
-> >  {
-> >  	struct tpm_space *space = &chip->work_space;
-> > -	struct tpm_output_header *header = (void *)rsp;
-> > +	struct tpm_header *header = (void *)rsp;
-> >  	u32 phandle;
-> >  	u32 phandle_type;
-> >  	u32 vhandle;
-> > @@ -394,7 +394,7 @@ static int tpm2_map_response_body(struct tpm_chip
-> > *chip, u32 cc, u8 *rsp,
-> >  				  size_t len)
-> >  {
-> >  	struct tpm_space *space = &chip->work_space;
-> > -	struct tpm_output_header *header = (void *)rsp;
-> > +	struct tpm_header *header = (void *)rsp;
-> >  	struct tpm2_cap_handles *data;
-> >  	u32 phandle;
-> >  	u32 phandle_type;
-> > @@ -492,7 +492,7 @@ static int tpm2_save_space(struct tpm_chip *chip)
-> > int tpm2_commit_space(struct tpm_chip *chip, struct tpm_space *space,
-> >  		      u32 cc, u8 *buf, size_t *bufsiz)  {
-> > -	struct tpm_output_header *header = (void *)buf;
-> > +	struct tpm_header *header = (void *)buf;
-> >  	int rc;
-> > 
-> >  	if (!space)
-> > diff --git a/drivers/char/tpm/tpm_i2c_atmel.c
-> > b/drivers/char/tpm/tpm_i2c_atmel.c
-> > index 95ce2e9ccdc6..4720b2442ffe 100644
-> > --- a/drivers/char/tpm/tpm_i2c_atmel.c
-> > +++ b/drivers/char/tpm/tpm_i2c_atmel.c
-> > @@ -46,7 +46,7 @@ struct priv_data {
-> >  	/* This is the amount we read on the first try. 25 was chosen to fit a
-> >  	 * fair number of read responses in the buffer so a 2nd retry can be
-> >  	 * avoided in small message cases. */
-> > -	u8 buffer[sizeof(struct tpm_output_header) + 25];
-> > +	u8 buffer[sizeof(struct tpm_header) + 25];
-> >  };
-> > 
-> >  static int i2c_atmel_send(struct tpm_chip *chip, u8 *buf, size_t len) @@ -
-> > 72,8 +72,7 @@ static int i2c_atmel_recv(struct tpm_chip *chip, u8 *buf,
-> > size_t count)  {
-> >  	struct priv_data *priv = dev_get_drvdata(&chip->dev);
-> >  	struct i2c_client *client = to_i2c_client(chip->dev.parent);
-> > -	struct tpm_output_header *hdr =
-> > -		(struct tpm_output_header *)priv->buffer;
-> > +	struct tpm_header *hdr = (struct tpm_header *)priv->buffer;
-> >  	u32 expected_len;
-> >  	int rc;
-> > 
-> > diff --git a/drivers/char/tpm/tpm_vtpm_proxy.c
-> > b/drivers/char/tpm/tpm_vtpm_proxy.c
-> > index 5f95fbfb7f6b..28eb5ab15b99 100644
-> > --- a/drivers/char/tpm/tpm_vtpm_proxy.c
-> > +++ b/drivers/char/tpm/tpm_vtpm_proxy.c
-> > @@ -303,9 +303,9 @@ static int vtpm_proxy_tpm_op_recv(struct tpm_chip
-> > *chip, u8 *buf, size_t count)  static int
-> > vtpm_proxy_is_driver_command(struct tpm_chip *chip,
-> >  					u8 *buf, size_t count)
-> >  {
-> > -	struct tpm_input_header *hdr = (struct tpm_input_header *)buf;
-> > +	struct tpm_header *hdr = (struct tpm_header *)buf;
-> > 
-> > -	if (count < sizeof(struct tpm_input_header))
-> > +	if (count < sizeof(struct tpm_header))
-> >  		return 0;
-> > 
-> >  	if (chip->flags & TPM_CHIP_FLAG_TPM2) { @@ -402,7 +402,7 @@
-> > static int vtpm_proxy_request_locality(struct tpm_chip *chip, int locality)  {
-> >  	struct tpm_buf buf;
-> >  	int rc;
-> > -	const struct tpm_output_header *header;
-> > +	const struct tpm_header *header;
-> >  	struct proxy_dev *proxy_dev = dev_get_drvdata(&chip->dev);
-> > 
-> >  	if (chip->flags & TPM_CHIP_FLAG_TPM2)
-> > @@ -427,7 +427,7 @@ static int vtpm_proxy_request_locality(struct
-> > tpm_chip *chip, int locality)
-> >  		goto out;
-> >  	}
-> > 
-> > -	header = (const struct tpm_output_header *)buf.data;
-> > +	header = (const struct tpm_header *)buf.data;
-> >  	rc = be32_to_cpu(header->return_code);
-> >  	if (rc)
-> >  		locality = -1;
-> > diff --git a/drivers/char/tpm/xen-tpmfront.c b/drivers/char/tpm/xen-
-> > tpmfront.c index b150f87f38f5..1259e935fd58 100644
-> > --- a/drivers/char/tpm/xen-tpmfront.c
-> > +++ b/drivers/char/tpm/xen-tpmfront.c
-> > @@ -163,7 +163,7 @@ static int vtpm_send(struct tpm_chip *chip, u8 *buf,
-> > size_t count)
-> >  	wmb();
-> >  	notify_remote_via_evtchn(priv->evtchn);
-> > 
-> > -	ordinal = be32_to_cpu(((struct tpm_input_header*)buf)->ordinal);
-> > +	ordinal = be32_to_cpu(((struct tpm_header *)buf)->ordinal);
-> >  	duration = tpm_calc_ordinal_duration(chip, ordinal);
-> > 
-> >  	if (wait_for_tpm_stat(chip, VTPM_STATUS_IDLE, duration,
-> > --
-> > 2.19.1
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> index d028cdf31d0e..c85f00d3cfcf 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+> @@ -217,7 +217,7 @@ static void mobiveil_pcie_enable_msi(struct
+> mobiveil_pcie *pcie)
+>  	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);  }
 > 
-
-Thank you. Really useful feedback.
-
-/Jarkko
+> -static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+> +int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
+>  {
+>  	u32 value, pab_ctrl, type;
+>  	struct resource_entry *win;
+> @@ -229,11 +229,16 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> *pcie)
+>  	for (i = 0; i < pcie->ppio_wins; i++)
+>  		mobiveil_pcie_disable_ib_win(pcie, i);
+> 
+> -	/* setup bus numbers */
+> -	value = csr_readl(pcie, PCI_PRIMARY_BUS);
+> -	value &= 0xff000000;
+> -	value |= 0x00ff0100;
+> -	csr_writel(pcie, value, PCI_PRIMARY_BUS);
+> +	pcie->ib_wins_configured = 0;
+> +	pcie->ob_wins_configured = 0;
+> +
+> +	if (!reinit) {
+> +		/* setup bus numbers */
+> +		value = csr_readl(pcie, PCI_PRIMARY_BUS);
+> +		value &= 0xff000000;
+> +		value |= 0x00ff0100;
+> +		csr_writel(pcie, value, PCI_PRIMARY_BUS);
+> +	}
+> 
+>  	/*
+>  	 * program Bus Master Enable Bit in Command Register in PAB Config
+> @@ -279,7 +284,7 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> *pcie)
+>  	program_ib_windows(pcie, WIN_NUM_0, 0, 0,
+> MEM_WINDOW_TYPE, IB_WIN_SIZE);
+> 
+>  	/* Get the I/O and memory ranges from DT */
+> -	resource_list_for_each_entry(win, &pcie->resources) {
+> +	resource_list_for_each_entry(win, pcie->resources) {
+>  		if (resource_type(win->res) == IORESOURCE_MEM) {
+>  			type = MEM_WINDOW_TYPE;
+>  		} else if (resource_type(win->res) == IORESOURCE_IO) { @@ -
+> 550,8 +555,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+>  	resource_size_t iobase;
+>  	int ret;
+> 
+> -	INIT_LIST_HEAD(&pcie->resources);
+> -
+>  	ret = mobiveil_pcie_parse_dt(pcie);
+>  	if (ret) {
+>  		dev_err(dev, "Parsing DT failed, ret: %x\n", ret); @@ -565,17
+> +568,19 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+> 
+>  	/* parse the host bridge base addresses from the device tree file */
+>  	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
+> -						    &pcie->resources, &iobase);
+> +						    &bridge->windows,
+> &iobase);
+>  	if (ret) {
+>  		dev_err(dev, "Getting bridge resources failed\n");
+>  		return ret;
+>  	}
+> 
+> +	pcie->resources = &bridge->windows;
+> +
+>  	/*
+>  	 * configure all inbound and outbound windows and prepare the RC
+> for
+>  	 * config access
+>  	 */
+> -	ret = mobiveil_host_init(pcie);
+> +	ret = mobiveil_host_init(pcie, false);
+>  	if (ret) {
+>  		dev_err(dev, "Failed to initialize host\n");
+>  		goto error;
+> @@ -587,12 +592,11 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie
+> *pcie)
+>  		goto error;
+>  	}
+> 
+> -	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
+> +	ret = devm_request_pci_bus_resources(dev, pcie->resources);
+>  	if (ret)
+>  		goto error;
+> 
+>  	/* Initialize bridge */
+> -	list_splice_init(&pcie->resources, &bridge->windows);
+>  	bridge->dev.parent = dev;
+>  	bridge->sysdata = pcie;
+>  	bridge->busnr = pcie->rp.root_bus_nr;
+> @@ -619,6 +623,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie
+> *pcie)
+> 
+>  	return 0;
+>  error:
+> -	pci_free_resource_list(&pcie->resources);
+> +	pci_free_resource_list(pcie->resources);
+>  	return ret;
+>  }
+> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+> b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+> index 933c2f34bc52..0f5303962e88 100644
+> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+> @@ -152,7 +152,7 @@ struct mobiveil_pab_ops {
+> 
+>  struct mobiveil_pcie {
+>  	struct platform_device *pdev;
+> -	struct list_head resources;
+> +	struct list_head *resources;
+>  	void __iomem *csr_axi_slave_base;	/* PAB registers base */
+>  	phys_addr_t pcie_reg_base;	/* Physical PCIe Controller Base */
+>  	void __iomem *apb_csr_base;	/* MSI register base */
+> @@ -165,6 +165,7 @@ struct mobiveil_pcie {  };
+> 
+>  int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie);
+> +int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit);
+>  bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie);  int
+> mobiveil_bringup_link(struct mobiveil_pcie *pcie);  void
+> program_ob_windows(struct mobiveil_pcie *pcie, int win_num, u64
+> cpu_addr,
+> --
+> 2.17.1
