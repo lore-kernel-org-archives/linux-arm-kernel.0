@@ -1,68 +1,52 @@
-From: Peter.Smith@arm.com (Peter Smith)
-Date: Tue, 20 Nov 2018 11:20:02 +0000
-Subject: compiler code model for the kernel
-In-Reply-To: <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
-References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>,
- <CAKwvOdkeA28avR-GKUABE+4+2n6xaWcOXB=FGfVpkXq5DmN0mQ@mail.gmail.com>
-Message-ID: <AM0PR08MB3538CEF9CBAB3C49BAABD455F8D90@AM0PR08MB3538.eurprd08.prod.outlook.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Tue, 20 Nov 2018 13:12:48 +0200
+Subject: [PATCH] clk: Add (devm_)clk_get_optional() functions
+In-Reply-To: <TY1PR01MB176982D5E11A665D0DCC9E31F5D90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+References: <20181119141259.11992-1-phil.edworthy@renesas.com>
+ <20181120103832.GV10650@smile.fi.intel.com>
+ <TY1PR01MB176982D5E11A665D0DCC9E31F5D90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+Message-ID: <20181120111248.GW10650@smile.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 20, 2018 at 10:53:33AM +0000, Phil Edworthy wrote:
+> On 20 November 2018 10:39 Andy Shevchenko wrote:
+> > On Mon, Nov 19, 2018 at 02:12:59PM +0000, Phil Edworthy wrote:
+> > > This adds clk_get_optional() and devm_clk_get_optional() functions to
+> > > get optional clocks.
+> > > They behave the same as (devm_)clk_get except where there is no clock
+> > > producer. In this case, instead of returning -ENOENT, the function
+> > > returns NULL. This makes error checking simpler and allows
+> > > clk_prepare_enable, etc to be called on the returned reference without
+> > > additional checks.
 
-________________________________________
-From: Nick Desaulniers <ndesaulniers@google.com>
-Sent: 19 November 2018 23:54
-To: Ard Biesheuvel
-Cc: Will Deacon; Catalin Marinas; Ramana Radhakrishnan; Linux ARM; Mark Rutland; Arnd Bergmann; Marc Zyngier; Peter Smith; Kristof Beyls; Stephen Hines
-Subject: Re: compiler code model for the kernel
+> > >  - Instead of messing with the core functions, simply wrap them for the
+> > >    _optional() versions. By putting clk_get_optional() inline in the header
+> > >    file, we can get rid of the arch specific patches as well.
 
-+ some more folks to take a look
+> > Fine if it would have no surprises with error handling.
+> There shouldn't be any surprises. My earlier attempts at implementing this
+> were hampered by the fact that of_clk_get_by_name() can return -EINVAL
+> in some circumstances. By directly wrapping the (devm_)clk_get() functions
+> that problem goes away.
 
-On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> Hello all,
->
-> Some of us (on cc) have discussed this a bit on various occasions, so
-> perhaps it's time to sit down and do something about it :-)
->
-> The Clang work that Nick is involved in has made explicit some
-> assumptions that we are currently making in the kernel with respect to
-> the behavior of GCC, and it would be good to formalise this so we can
-> keep relying on it in the future, and to clarify to other compiler
-> developers what is needed.
->
-> GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
-> introduce the same for AArch64. Under this model, we should be able to
-> make the following assumptions:
-> - symbol references are emitted as ADRP/ADD pairs
-> -  no absolute references in generated code like jump tables etc (like
-> -fpic/-fpie) [*]
-> - no shared library semantics (no GOT indirections to support symbol
-> preemption, or to reduce the CoW footprint and/or avoid text
-> relocations)
-> - resulting objects can be linked in -pie mode by ld.bfd
->
-> Another thing that came up is that we currently rely on the stack
-> pointer never to assume a value that is not 16-byte aligned, even
-> transiently.
->
-> Other things I've missed?
->
-> [*] This is only strictly required in parts of the code that may
-> execute at a different offset than the linked offset, even after
-> processing dynamic relocations at boot time (e.g., KVM hyp code
-> running in a different exception level) but avoiding those altogether
-> is reasonable. Note that GCC does the right thing for us here already,
-> but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
+Good!
 
-Not got a lot to add at the moment. Some observations from the clang/llvm side.
+After my comments being addressed,
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 
-Clang already has -mcmodel=kernel for fuchsia targets so there is some prior art. My understanding is that it uses the small code-model with some small tweaks. There will probably need to be some renaming in the back-end to distinguish between fuchsia kernel code model and linux kernel code model.
 
-I think that the assumptions above should be describable without too much difficulty. ADRP/ADD is covered by the small code model. I think the existing -fpie where every global has hidden visibility and hence cannot be found in a shared object will produce code with no GOT indirections.
+> > > +	if (ERR_PTR(-ENOENT))
+> Huh? That wasn't the code I sent...
 
-My limited understanding of the frame lowering code suggests that clang maintains a minimum 16-byte alignment of the stack pointer at all times. It would need to be looked over by an expert to make sure though.
+Yup, it's my wrong editing flow. Anyway, you got the idea.
 
-Peter
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+> > > +		return NULL;
+> > > +	else
+> > > +		return clk;
+
+> > return clk == ERR_PTR(-ENOENT) ? NULL : clk;
+
+-- 
+With Best Regards,
+Andy Shevchenko
