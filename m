@@ -1,52 +1,49 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Tue, 20 Nov 2018 13:12:48 +0200
-Subject: [PATCH] clk: Add (devm_)clk_get_optional() functions
-In-Reply-To: <TY1PR01MB176982D5E11A665D0DCC9E31F5D90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-References: <20181119141259.11992-1-phil.edworthy@renesas.com>
- <20181120103832.GV10650@smile.fi.intel.com>
- <TY1PR01MB176982D5E11A665D0DCC9E31F5D90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
-Message-ID: <20181120111248.GW10650@smile.fi.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Nov 2018 11:05:41 +0000
+Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
+In-Reply-To: <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
+References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
+ <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
+ <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
+ <20181120050650.GC5885@Mani-XPS-13-9360> <86pnv0rwna.wl-marc.zyngier@arm.com>
+ <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
+Message-ID: <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 10:53:33AM +0000, Phil Edworthy wrote:
-> On 20 November 2018 10:39 Andy Shevchenko wrote:
-> > On Mon, Nov 19, 2018 at 02:12:59PM +0000, Phil Edworthy wrote:
-> > > This adds clk_get_optional() and devm_clk_get_optional() functions to
-> > > get optional clocks.
-> > > They behave the same as (devm_)clk_get except where there is no clock
-> > > producer. In this case, instead of returning -ENOENT, the function
-> > > returns NULL. This makes error checking simpler and allows
-> > > clk_prepare_enable, etc to be called on the returned reference without
-> > > additional checks.
+On 20/11/2018 08:56, Linus Walleij wrote:
+> On Tue, Nov 20, 2018 at 9:17 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+>> How does this change anything with the fact that the above code is
+>> broken? 56 or 64 bit, you cannot read this counter with a single
+>> access, or two. The canonical way of reading such a counter is
+>> something like this:
+>>
+>>         do {
+>>                 lo = readl_relaxed(LO);
+>>                 hi = readl_relaxed(HI);
+>>         } while (hi != read_relaxed(HI));
+> 
+> To be fair, I have seen hardware that employ a logic latch
+> such that when a read access is done to the LO register,
+> the value of the whole counter is latched, also for the HI
+> register, so when you read the HI register in the second
+> step, it is never subject to wrapping. (Conversely reading
+> the HI before the LO will always give you insane values
+> :D)
 
-> > >  - Instead of messing with the core functions, simply wrap them for the
-> > >    _optional() versions. By putting clk_get_optional() inline in the header
-> > >    file, we can get rid of the arch specific patches as well.
+I've seen such HW indeed, and I've also seen it being broken... ;-)
 
-> > Fine if it would have no surprises with error handling.
-> There shouldn't be any surprises. My earlier attempts at implementing this
-> were hampered by the fact that of_clk_get_by_name() can return -EINVAL
-> in some circumstances. By directly wrapping the (devm_)clk_get() functions
-> that problem goes away.
+It this timer is built around such a (non-broken) logic, I'd really like
+to see it spelled out. It will otherwise be a real pain to debug...
 
-Good!
+> However the above code should be fine unless you know
+> for sure the hardware was constructed with a clever latch.
 
-After my comments being addressed,
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Let's find out!
 
+Thanks,
 
-> > > +	if (ERR_PTR(-ENOENT))
-> Huh? That wasn't the code I sent...
-
-Yup, it's my wrong editing flow. Anyway, you got the idea.
-
-> > > +		return NULL;
-> > > +	else
-> > > +		return clk;
-
-> > return clk == ERR_PTR(-ENOENT) ? NULL : clk;
-
+	M.
 -- 
-With Best Regards,
-Andy Shevchenko
+Jazz is not dead. It just smells funny...
