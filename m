@@ -1,24 +1,65 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Nov 2018 14:09:51 +0000
-Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
-Message-ID: <cover.1542722463.git.robin.murphy@arm.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Tue, 20 Nov 2018 09:01:09 -0500
+Subject: [PATCH] arm: add missing of_node_put()
+Message-ID: <20181120140109.20334-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is what I have so far, which at least resolves the most ovbious
-problems. I still haven't got very far with the USB corruption issue
-I see on Juno with -rc1, but I'm yet to confirm whether that's actually
-attributable to the SWIOTLB changes or something else entirely.
+use of_node_put() to release the refcount.
 
-Robin.
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ arch/arm/kernel/devtree.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Robin Murphy (2):
-  swiotlb: Make DIRECT_MAPPING_ERROR viable
-  swiotlb: Skip cache maintenance on map error
-
- include/linux/dma-direct.h | 2 +-
- kernel/dma/swiotlb.c       | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+index e3057c1b55b9..9576adf0d15b 100644
+--- a/arch/arm/kernel/devtree.c
++++ b/arch/arm/kernel/devtree.c
+@@ -101,7 +101,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 		if (!cell || prop_bytes < sizeof(*cell)) {
+ 			pr_debug(" * %pOF missing reg property\n", cpu);
+ 			of_node_put(cpu);
+-			return;
++			goto out;
+ 		}
+ 
+ 		/*
+@@ -115,7 +115,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 
+ 		if (prop_bytes || (hwid & ~MPIDR_HWID_BITMASK)) {
+ 			of_node_put(cpu);
+-			return;
++			goto out;
+ 		}
+ 
+ 		/*
+@@ -129,7 +129,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 			if (WARN(tmp_map[j] == hwid,
+ 				 "Duplicate /cpu reg properties in the DT\n")) {
+ 				of_node_put(cpu);
+-				return;
++				goto out;
+ 			}
+ 
+ 		/*
+@@ -171,7 +171,7 @@ void __init arm_dt_init_cpu_maps(void)
+ 
+ 	if (!bootcpu_valid) {
+ 		pr_warn("DT missing boot CPU MPIDR[23:0], fall back to default cpu_logical_map\n");
+-		return;
++		goto out;
+ 	}
+ 
+ 	/*
+@@ -184,6 +184,8 @@ void __init arm_dt_init_cpu_maps(void)
+ 		cpu_logical_map(i) = tmp_map[i];
+ 		pr_debug("cpu logical map 0x%x\n", cpu_logical_map(i));
+ 	}
++out:
++	of_node_put(cpus);
+ }
+ 
+ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
 -- 
-2.19.1.dirty
+2.17.0
