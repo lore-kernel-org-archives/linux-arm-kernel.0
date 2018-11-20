@@ -1,84 +1,64 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:00:43 +0000
-Subject: [PATCHv2 10/25] PCI: mobiveil: fix the INTx process error
-In-Reply-To: <20181120092615.11680-11-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-11-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB2235C1EBD0DF9EB219F5FFE8E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: Tudor.Ambarus@microchip.com (Tudor.Ambarus at microchip.com)
+Date: Tue, 20 Nov 2018 11:28:14 +0000
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+ <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
+Message-ID: <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Hi, Romain,
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:27 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 10/25] PCI: mobiveil: fix the INTx process error
+On 11/14/2018 03:45 PM, Tudor Ambarus wrote:
+> Hi, Romain,
 > 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> On 10/10/2018 08:05 PM, Romain Izard wrote:
+>> Hello,
+>>
+>> While evaluating a new flash memory chip for my product based on a SAMA5D2
+>> chip, I tried to update my software to use the latest device tree bindings.
+>>
+>> Until now, I was using the legacy bindings for the NAND controller, that
+>> preserved the timings configured by the bootloader in the EBI registers. The
+>> bindings introduced in Linux 4.13 are used together with the NAND driver to
+>> reconfigure the timings of the memory interface to match the speed profile
+>> declared by some NAND components.
+>>
+>> However, when comparing the timings in the registers, there was a large
+>> difference between what I calculated by hand in the past and the values
+>> configured by the drivers. The difference was in fact a 2 factor.
+>>
+>> For me, the issue is due to the clock configuration declared in the SAMA5D2
+>> device tree: The reference clock used by the nand-controller driver is the
+>> clock for its parent node, which is directly the Master Clock. And on my
+>> end, what I understood when writing the clock settings for my bootloader was
+>> that the reference clock was the HSMC clock, which derives from the H32MX
+>> clock, which runs at half the rate of the Master Clock.
+>>
+>> The documentation for the SAMA5D2 is not very precise on this topic, so I
+>> would like to have some feedback. Is the clock used as a reference for the
+>> chip select configuration registers the Master Clock itself, or is it the
+>> peripheral clock for the HSMC module ?
+>>
 > 
-> In the loop block, there is not code change the loop key, this patch updated
-> the loop key by re-read the INTx status register.
-> 
-> This patch also change to clear the handled INTx status.
-> 
-> Note: Need MV to test this fix.
-> 
-> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver")
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
-> V2:
->  - Added fixes entry.
-> 
->  drivers/pci/controller/pcie-mobiveil.c | 13 +++++++++----
->  1 file changed, 9 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c
-> b/drivers/pci/controller/pcie-mobiveil.c
-> index 4ba458474e42..78e575e71f4d 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -361,6 +361,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
->  	/* Handle INTx */
->  	if (intr_status & PAB_INTP_INTX_MASK) {
->  		shifted_status = csr_readl(pcie,
-> PAB_INTP_AMBA_MISC_STAT);
-> +		shifted_status &= PAB_INTP_INTX_MASK;
->  		shifted_status >>= PAB_INTX_START;
->  		do {
->  			for_each_set_bit(bit, &shifted_status,
-> PCI_NUM_INTX) { @@ -372,12 +373,16 @@ static void
-> mobiveil_pcie_isr(struct irq_desc *desc)
->  					dev_err_ratelimited(dev,
-> "unexpected IRQ, INT%d\n",
->  							    bit);
-> 
-> -				/* clear interrupt */
-> -				csr_writel(pcie,
-> -					   shifted_status << PAB_INTX_START,
-> +				/* clear interrupt handled */
-> +				csr_writel(pcie, 1 << (PAB_INTX_START + bit),
->  					   PAB_INTP_AMBA_MISC_STAT);
->  			}
-> -		} while ((shifted_status >> PAB_INTX_START) != 0);
-> +
-> +			shifted_status = csr_readl(pcie,
-> +
-> PAB_INTP_AMBA_MISC_STAT);
-> +			shifted_status &= PAB_INTP_INTX_MASK;
-> +			shifted_status >>= PAB_INTX_START;
-> +		} while (shifted_status != 0);
->  	}
-> 
->  	/* read extra MSI status register */
-> --
-> 2.17.1
+> I would say that it's the HSMC peripheral clock because it's the only clock that
+
+The hardware team confirmed that the timings are based on MCK which is MCK/2.
+The periph_clk is MCK/2 as well, but used to clock the logic of the IP.
+
+The HSMC receives a AHB clock HCLOCK_LS (MCK/2) used to generate the timings and
+a PCLOCK_LS used to clock the HSMC/NFC logic.
+
+
+> we describe for HSMC. If this is the case, then we will need to know the
+> derivation formula used by the Peripheral Clock Controller to derive the MCK2
+> (AHB 32-bit MATRIX system) clock to Periph_clk[17] HCLOCK_LS (HSMC), in order to
+> correctly configure the timings to match flashes capabilities.
+
+I assumed that the on/off box from the Peripheral Clock Controller described at
+33.3 Block Diagram implies some derivation formula. I was wrong, the on/off box
+is there just to gate the clocks going to the peripherals.
+
+Cheers,
+ta
