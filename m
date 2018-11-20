@@ -1,70 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 20 Nov 2018 11:32:52 +0100
-Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
-In-Reply-To: <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
-References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
- <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
-Message-ID: <0df98ec5-1189-7297-b58d-8c0f5cbfa2ac@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 20 Nov 2018 09:48:15 +0100
+Subject: [RFC PATCH v2 05/14] irqchip/sun4i: add support for suniv
+ interrupt controller
+In-Reply-To: <d693414b1693a9018956bcc589a9048e88fbc8f6.1542546735.git.mesihkilinc@gmail.com>
+References: <cover.1542546735.git.mesihkilinc@gmail.com>
+ <d693414b1693a9018956bcc589a9048e88fbc8f6.1542546735.git.mesihkilinc@gmail.com>
+Message-ID: <20181120084815.rvh63cvvhxj6sbs2@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-Hi Manivannan,
-
-
-On 19/11/2018 18:09, Manivannan Sadhasivam wrote:
-> Add clock driver for RDA Micro RDA8810PL SoC supporting OSTIMER
-> and HWTIMER.
-
-As it is a new driver, can you elaborate the log and describe the timer.
-
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+On Sun, Nov 18, 2018 at 05:17:04PM +0300, Mesih Kilinc wrote:
+> The new F-series SoCs (suniv) from Allwinner use an stripped version of
+> the interrupt controller in A10/A13.
+> 
+> Add support for it in irq-sun4i driver.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 > ---
-
-[ ... ]
-
-> +static int __init rda_timer_init(struct device_node *node)
-> +{
-> +	unsigned long rate = 2000000;
-> +	int ostimer_irq, ret;
+>  drivers/irqchip/irq-sun4i.c | 47 ++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 42 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+> index e3e5b91..2abf662 100644
+> --- a/drivers/irqchip/irq-sun4i.c
+> +++ b/drivers/irqchip/irq-sun4i.c
+> @@ -23,13 +23,26 @@
+>  
+>  #include <asm/exception.h>
+>  
+> +enum sun4i_irq_type {
+> +	sun4i_ic,
+> +	suniv_ic
+> +};
 > +
-> +	rda_timer_base = of_io_request_and_map(node, 0, "rda-timer");
-> +	if (IS_ERR(rda_timer_base)) {
-> +		pr_err("Can't map timer registers");
-> +		return PTR_ERR(rda_timer_base);
-> +	}
-> +
-> +	ostimer_irq = of_irq_get_byname(node, "ostimer");
-> +	if (ostimer_irq <= 0) {
-> +		pr_err("Can't parse ostimer IRQ");
-> +		return -EINVAL;
-> +	}
-> +
-> +	clocksource_register_hz(&rda_clocksource, rate);
-> +
-> +	ret = request_irq(ostimer_irq, rda_ostimer_interrupt, IRQF_TIMER,
-> +			  "rda-ostimer", &rda_clockevent);
-> +	if (ret) {
-> +		pr_err("failed to request irq %d\n", ostimer_irq);
-> +		return ret;
-> +	}
-> +
+> +static enum sun4i_irq_type sun4i_irq_type;
 
-Use the timer-of API.
+You don't really need that type. It's completely redundant with the
+compatible.
 
-> +
-> +TIMER_OF_DECLARE(rda8810pl, "rda,8810pl-timer", rda_timer_init);
+> +static int sun4i_irq_enable_reg_offset;
+> +static int sun4i_irq_mask_reg_offset;
 
+Ideally, this should be a structure so that we can easily extend it
+without adding more and more global variables. And the type shouldn't
+be signed.
 
-Thanks
-
-  -- Daniel
-
+Maxime
 
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/f43113d5/attachment-0001.sig>
