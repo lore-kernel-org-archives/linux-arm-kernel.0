@@ -1,63 +1,48 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 10:35:27 +0000
-Subject: [PATCHv2 07/25] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
- outbound window
-In-Reply-To: <20181120092615.11680-8-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-8-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB223579F27C305AD96ABC4202E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 20 Nov 2018 12:37:02 +0200
+Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
+ definitions
+In-Reply-To: <12c1d6e2-aba4-be0d-bfc5-1fb5d3ab45f8@ti.com>
+References: <20181113060111.16374-1-vigneshr@ti.com>
+ <20181113060111.16374-2-vigneshr@ti.com>
+ <20181117160502.dhlqbx5qnmdp5iog@kahuna>
+ <b8c1d975-2b4f-5530-2089-dc04c04f8d86@ti.com>
+ <12c1d6e2-aba4-be0d-bfc5-1fb5d3ab45f8@ti.com>
+Message-ID: <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+On 20/11/2018 12:09, Vignesh R wrote:
+> 
+> 
+> On 19/11/18 12:49 PM, Tero Kristo wrote:
+>> On 17/11/2018 18:05, Nishanth Menon wrote:
+>>> On 11:31-20181113, Vignesh R wrote:
+>>>> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
+>>>
+> [...]
+>>>
+>>> Thanks for reducing the combinations down to the minimum needed. We can
+>>> worry about the DS and isolation bits when we have a real user for them.
+>>>
+>>> Acked-by: Nishanth Menon <nm@ti.com>
+>>>
+>>> Tero: v4.21-rc1 perhaps ?
+>>>
+>>
+>> Yeah, looks fine, queueing up for 4.21.
+>>
+> 
+> Thank you all for the review!
+> 
+> Tero,
+> 
+> Is there a branch with these patches that I can use as base for my next
+> set of DT patches?
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:26 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 07/25] PCI: mobiveil: use WIN_NUM_0 explicitly for CFG
-> outbound window
-> 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> As the .map_bus() use the WIN_NUM_0 for CFG transactions, it's better
-> passing WIN_NUM_0 explicitly when initialize the CFG outbound window.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> ---
-> V2:
->  - no change
-> 
->  drivers/pci/controller/pcie-mobiveil.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c
-> b/drivers/pci/controller/pcie-mobiveil.c
-> index b2cc9c097fc9..df71c11b4810 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -612,9 +612,8 @@ static int mobiveil_host_init(struct mobiveil_pcie
-> *pcie)
->  	 */
-> 
->  	/* config outbound translation window */
-> -	program_ob_windows(pcie, pcie->ob_wins_configured,
-> -			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
-> -			   resource_size(pcie->ob_io_res));
-> +	program_ob_windows(pcie, WIN_NUM_0, pcie->ob_io_res->start, 0,
-> +			   CFG_WINDOW_TYPE, resource_size(pcie-
-> >ob_io_res));
-> 
->  	/* memory inbound translation window */
->  	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE,
-> IB_WIN_SIZE);
-> --
-> 2.17.1
+Don't have a branch for these atm, but I can create one if you need it.
+
+-Tero
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
