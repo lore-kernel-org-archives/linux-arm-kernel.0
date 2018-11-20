@@ -1,73 +1,339 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 20 Nov 2018 22:18:50 +0800
-Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
-In-Reply-To: <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
- <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
-Message-ID: <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Tue, 20 Nov 2018 15:53:50 +0100
+Subject: [PATCH 15/16] staging: vchiq_arm: fix open/release cdev functions
+In-Reply-To: <20181120145351.30390-1-nsaenzjulienne@suse.de>
+References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
+Message-ID: <20181120145351.30390-16-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard:
+Both functions checked the minor number of the cdev prior running the
+code. This was useless since the number of devices is already limited by
+alloc_chrdev_region.
 
-On Tue, Nov 20, 2018 at 11:32:05AM +0100, Ard Biesheuvel wrote:
->
-> > 1. The crypto API algorithms remain individually accessible, this
-> > is crucial as these algorithm names are exported to user-space so
-> > changing the names to foo-zinc is not going to work.
-> 
-> Are you saying user space may use names like "ctr-aes-neon" directly
-> rather than "ctr(aes)" for any implementation of the mode?
+This removes the check and reindents the code where relevant.
 
-Yes.  In fact it's used for FIPS certification testing.
+Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+---
+ .../interface/vchiq_arm/vchiq_arm.c           | 247 +++++++-----------
+ 1 file changed, 100 insertions(+), 147 deletions(-)
 
-> If so, that is highly unfortunate, since it means we'd be breaking
-> user space by wrapping a crypto library function with its own arch
-> specific specializations into a generic crypto API wrapper.
-
-You can never break things by introducing new algorithms.  The
-problem is only when you remove existing ones.
-
-> Note that I think that using AF_ALG to access software crypto routines
-> (as opposed to accelerators) is rather pointless to begin with, but if
-> it permits that today than we're stuck with it.
-
-Sure, nobody sane should be doing it.  But when it comes to
-government certification... :)
-
-> > 2. The arch-specific algorithm code lives in their own module rather
-> > than in a monolithic module.
-> 
-> This is one of the remaining issues I have with Zinc. However, modulo
-> the above concerns, I think it does make sense to have a separate
-> function API for synchronous software routines below the current
-> crypto API. What I don't want is a separate Zinc kingdom with a
-> different name, different maintainers and going through a different
-> tree, and with its own approach to test vectors, arch specific code,
-> etc etc
-
-Even without the issue of replacing chacha20-generic with
-chacha20-zinc which breaks point 1 above, we simply don't want
-or need to go through zinc's run-time implementation choice for
-the crypto API algorithms.  They've already paid for the indirect
-function call so why make them go through yet another run-time
-branch?
-
-If the optics of having the code in crypto is the issue, we could
-move the actual algorithm code into a third location, perhaps
-arch/x86/crypto/lib or arch/x86/lib/crypto.  Then both zinc and
-the crypto API can sit on top of that.
-
-Cheers,
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 03cc6947c03c..0caee2d6946f 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -63,8 +63,6 @@
+ #undef MODULE_PARAM_PREFIX
+ #define MODULE_PARAM_PREFIX DEVICE_NAME "."
+ 
+-#define VCHIQ_MINOR 0
+-
+ /* Some per-instance constants */
+ #define MAX_COMPLETIONS 128
+ #define MAX_SERVICES 64
+@@ -1955,195 +1953,150 @@ vchiq_compat_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+ 
+ #endif
+ 
+-/****************************************************************************
+-*
+-*   vchiq_open
+-*
+-***************************************************************************/
+-
+-static int
+-vchiq_open(struct inode *inode, struct file *file)
++static int vchiq_open(struct inode *inode, struct file *file)
+ {
+-	int dev = iminor(inode) & 0x0f;
++	VCHIQ_STATE_T *state = vchiq_get_state();
++	VCHIQ_INSTANCE_T instance;
+ 
+ 	vchiq_log_info(vchiq_arm_log_level, "vchiq_open");
+-	switch (dev) {
+-	case VCHIQ_MINOR: {
+-		VCHIQ_STATE_T *state = vchiq_get_state();
+-		VCHIQ_INSTANCE_T instance;
+ 
+-		if (!state) {
+-			vchiq_log_error(vchiq_arm_log_level,
++	if (!state) {
++		vchiq_log_error(vchiq_arm_log_level,
+ 				"vchiq has no connection to VideoCore");
+-			return -ENOTCONN;
+-		}
+-
+-		instance = kzalloc(sizeof(*instance), GFP_KERNEL);
+-		if (!instance)
+-			return -ENOMEM;
++		return -ENOTCONN;
++	}
+ 
+-		instance->state = state;
+-		instance->pid = current->tgid;
++	instance = kzalloc(sizeof(*instance), GFP_KERNEL);
++	if (!instance)
++		return -ENOMEM;
+ 
+-		vchiq_debugfs_add_instance(instance);
++	instance->state = state;
++	instance->pid = current->tgid;
+ 
+-		init_completion(&instance->insert_event);
+-		init_completion(&instance->remove_event);
+-		mutex_init(&instance->completion_mutex);
+-		mutex_init(&instance->bulk_waiter_list_mutex);
+-		INIT_LIST_HEAD(&instance->bulk_waiter_list);
++	vchiq_debugfs_add_instance(instance);
+ 
+-		file->private_data = instance;
+-	} break;
++	init_completion(&instance->insert_event);
++	init_completion(&instance->remove_event);
++	mutex_init(&instance->completion_mutex);
++	mutex_init(&instance->bulk_waiter_list_mutex);
++	INIT_LIST_HEAD(&instance->bulk_waiter_list);
+ 
+-	default:
+-		vchiq_log_error(vchiq_arm_log_level,
+-			"Unknown minor device: %d", dev);
+-		return -ENXIO;
+-	}
++	file->private_data = instance;
+ 
+ 	return 0;
+ }
+ 
+-/****************************************************************************
+-*
+-*   vchiq_release
+-*
+-***************************************************************************/
+-
+-static int
+-vchiq_release(struct inode *inode, struct file *file)
++static int vchiq_release(struct inode *inode, struct file *file)
+ {
+-	int dev = iminor(inode) & 0x0f;
++	VCHIQ_INSTANCE_T instance = file->private_data;
++	VCHIQ_STATE_T *state = vchiq_get_state();
++	VCHIQ_SERVICE_T *service;
+ 	int ret = 0;
++	int i;
+ 
+-	switch (dev) {
+-	case VCHIQ_MINOR: {
+-		VCHIQ_INSTANCE_T instance = file->private_data;
+-		VCHIQ_STATE_T *state = vchiq_get_state();
+-		VCHIQ_SERVICE_T *service;
+-		int i;
++	vchiq_log_info(vchiq_arm_log_level, "%s: instance=%lx", __func__,
++		       (unsigned long)instance);
+ 
+-		vchiq_log_info(vchiq_arm_log_level,
+-			"%s: instance=%lx",
+-			__func__, (unsigned long)instance);
++	if (!state) {
++		ret = -EPERM;
++		goto out;
++	}
+ 
+-		if (!state) {
+-			ret = -EPERM;
+-			goto out;
+-		}
++	/* Ensure videocore is awake to allow termination. */
++	vchiq_use_internal(instance->state, NULL, USE_TYPE_VCHIQ);
+ 
+-		/* Ensure videocore is awake to allow termination. */
+-		vchiq_use_internal(instance->state, NULL,
+-				USE_TYPE_VCHIQ);
++	mutex_lock(&instance->completion_mutex);
+ 
+-		mutex_lock(&instance->completion_mutex);
++	/* Wake the completion thread and ask it to exit */
++	instance->closing = 1;
++	complete(&instance->insert_event);
+ 
+-		/* Wake the completion thread and ask it to exit */
+-		instance->closing = 1;
+-		complete(&instance->insert_event);
++	mutex_unlock(&instance->completion_mutex);
+ 
+-		mutex_unlock(&instance->completion_mutex);
++	/* Wake the slot handler if the completion queue is full. */
++	complete(&instance->remove_event);
+ 
+-		/* Wake the slot handler if the completion queue is full. */
+-		complete(&instance->remove_event);
++	/* Mark all services for termination... */
++	i = 0;
++	while ((service = next_service_by_instance(state, instance, &i))) {
++		USER_SERVICE_T *user_service = service->base.userdata;
+ 
+-		/* Mark all services for termination... */
+-		i = 0;
+-		while ((service = next_service_by_instance(state, instance,
+-			&i)) !=	NULL) {
+-			USER_SERVICE_T *user_service = service->base.userdata;
++		/* Wake the slot handler if the msg queue is full. */
++		complete(&user_service->remove_event);
+ 
+-			/* Wake the slot handler if the msg queue is full. */
+-			complete(&user_service->remove_event);
++		vchiq_terminate_service_internal(service);
++		unlock_service(service);
++	}
+ 
+-			vchiq_terminate_service_internal(service);
+-			unlock_service(service);
+-		}
++	/* ...and wait for them to die */
++	i = 0;
++	while ((service = next_service_by_instance(state, instance, &i))) {
++		USER_SERVICE_T *user_service = service->base.userdata;
+ 
+-		/* ...and wait for them to die */
+-		i = 0;
+-		while ((service = next_service_by_instance(state, instance, &i))
+-			!= NULL) {
+-			USER_SERVICE_T *user_service = service->base.userdata;
++		wait_for_completion(&service->remove_event);
++
++		BUG_ON(service->srvstate != VCHIQ_SRVSTATE_FREE);
+ 
+-			wait_for_completion(&service->remove_event);
++		spin_lock(&msg_queue_spinlock);
++
++		while (user_service->msg_remove != user_service->msg_insert) {
++			VCHIQ_HEADER_T *header;
++			int m = user_service->msg_remove & (MSG_QUEUE_SIZE - 1);
+ 
+-			BUG_ON(service->srvstate != VCHIQ_SRVSTATE_FREE);
++			header = user_service->msg_queue[m];
++			user_service->msg_remove++;
++			spin_unlock(&msg_queue_spinlock);
+ 
++			if (header)
++				vchiq_release_message(service->handle, header);
+ 			spin_lock(&msg_queue_spinlock);
++		}
+ 
+-			while (user_service->msg_remove !=
+-				user_service->msg_insert) {
+-				VCHIQ_HEADER_T *header;
+-				int m = user_service->msg_remove &
+-					(MSG_QUEUE_SIZE - 1);
++		spin_unlock(&msg_queue_spinlock);
+ 
+-				header = user_service->msg_queue[m];
+-				user_service->msg_remove++;
+-				spin_unlock(&msg_queue_spinlock);
++		unlock_service(service);
++	}
+ 
+-				if (header)
+-					vchiq_release_message(
+-						service->handle,
+-						header);
+-				spin_lock(&msg_queue_spinlock);
+-			}
++	/* Release any closed services */
++	while (instance->completion_remove !=
++		instance->completion_insert) {
++		VCHIQ_COMPLETION_DATA_T *completion;
++		VCHIQ_SERVICE_T *service;
+ 
+-			spin_unlock(&msg_queue_spinlock);
++		completion = &instance->completions[
++			instance->completion_remove & (MAX_COMPLETIONS - 1)];
++		service = completion->service_userdata;
++		if (completion->reason == VCHIQ_SERVICE_CLOSED) {
++			USER_SERVICE_T *user_service = service->base.userdata;
+ 
++			/* Wake any blocked user-thread */
++			if (instance->use_close_delivered)
++				complete(&user_service->close_event);
+ 			unlock_service(service);
+ 		}
++		instance->completion_remove++;
++	}
+ 
+-		/* Release any closed services */
+-		while (instance->completion_remove !=
+-			instance->completion_insert) {
+-			VCHIQ_COMPLETION_DATA_T *completion;
+-			VCHIQ_SERVICE_T *service;
+-
+-			completion = &instance->completions[
+-				instance->completion_remove &
+-				(MAX_COMPLETIONS - 1)];
+-			service = completion->service_userdata;
+-			if (completion->reason == VCHIQ_SERVICE_CLOSED) {
+-				USER_SERVICE_T *user_service =
+-					service->base.userdata;
+-
+-				/* Wake any blocked user-thread */
+-				if (instance->use_close_delivered)
+-					complete(&user_service->close_event);
+-				unlock_service(service);
+-			}
+-			instance->completion_remove++;
+-		}
+-
+-		/* Release the PEER service count. */
+-		vchiq_release_internal(instance->state, NULL);
++	/* Release the PEER service count. */
++	vchiq_release_internal(instance->state, NULL);
+ 
+-		{
+-			struct bulk_waiter_node *waiter, *next;
++	{
++		struct bulk_waiter_node *waiter, *next;
+ 
+-			list_for_each_entry_safe(waiter, next,
+-					&instance->bulk_waiter_list, list) {
+-				list_del(&waiter->list);
+-				vchiq_log_info(vchiq_arm_log_level,
+-					"bulk_waiter - cleaned up %pK for pid %d",
+-					waiter, waiter->pid);
+-				kfree(waiter);
+-			}
++		list_for_each_entry_safe(waiter, next,
++					 &instance->bulk_waiter_list, list) {
++			list_del(&waiter->list);
++			vchiq_log_info(vchiq_arm_log_level,
++				"bulk_waiter - cleaned up %pK for pid %d",
++				waiter, waiter->pid);
++			kfree(waiter);
+ 		}
++	}
+ 
+-		vchiq_debugfs_remove_instance(instance);
++	vchiq_debugfs_remove_instance(instance);
+ 
+-		kfree(instance);
+-		file->private_data = NULL;
+-	} break;
+-
+-	default:
+-		vchiq_log_error(vchiq_arm_log_level,
+-			"Unknown minor device: %d", dev);
+-		ret = -ENXIO;
+-	}
++	kfree(instance);
++	file->private_data = NULL;
+ 
+ out:
+ 	return ret;
+@@ -3618,7 +3571,7 @@ static int __init vchiq_driver_init(void)
+ 		return PTR_ERR(vchiq_class);
+ 	}
+ 
+-	ret = alloc_chrdev_region(&vchiq_devid, VCHIQ_MINOR, 1, DEVICE_NAME);
++	ret = alloc_chrdev_region(&vchiq_devid, 0, 1, DEVICE_NAME);
+ 	if (ret) {
+ 		pr_err("Failed to allocate vchiq's chrdev region\n");
+ 		goto class_destroy;
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+2.19.1
