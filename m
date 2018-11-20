@@ -1,24 +1,31 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 21 Nov 2018 00:33:16 +0100
-Subject: [PATCH 2/2] arm64: dts: renesas: r8a77965: Add CAN FD controller
- node
-In-Reply-To: <20181119104419.aznzc6nafwaaxalw@verge.net.au>
+Date: Wed, 21 Nov 2018 00:30:47 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77965: Add CAN controller
+ nodes
+In-Reply-To: <CAMuHMdUjONJYypV0a5wnxyBx+sUMHzRwZObQ=d7xFG2ZSCM3Ag@mail.gmail.com>
 References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
- <20181118173327.4704-2-marek.vasut+renesas@gmail.com>
- <20181118231053.GC2553@kunai>
- <647080c6-5b96-a39e-db6e-4426cabc5939@gmail.com>
- <20181119104419.aznzc6nafwaaxalw@verge.net.au>
-Message-ID: <f22cb7bc-6aca-b9ed-bd7f-a6c9bae38d4d@gmail.com>
+ <20181118230250.GA2553@kunai>
+ <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
+ <CAMuHMdUjONJYypV0a5wnxyBx+sUMHzRwZObQ=d7xFG2ZSCM3Ag@mail.gmail.com>
+Message-ID: <8808d836-2454-4166-fbe0-02849e52792b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/19/2018 11:44 AM, Simon Horman wrote:
-> On Mon, Nov 19, 2018 at 12:29:37AM +0100, Marek Vasut wrote:
->> On 11/19/2018 12:10 AM, Wolfram Sang wrote:
->>> On Sun, Nov 18, 2018 at 06:33:27PM +0100, Marek Vasut wrote:
+On 11/19/2018 10:00 AM, Geert Uytterhoeven wrote:
+> Hi Marek,
+
+Hi,
+
+> On Mon, Nov 19, 2018 at 12:46 AM Marek Vasut <marek.vasut@gmail.com> wrote:
+>> On 11/19/2018 12:02 AM, Wolfram Sang wrote:
+>>> On Sun, Nov 18, 2018 at 06:33:26PM +0100, Marek Vasut wrote:
 >>>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >>>>
->>>> This patch adds CAN FD controller nodes for the R8A77965 SoC.
+>>>> This patch adds CAN{0,1} controller nodes for the R8A77965 SoC.
+>>>>
+>>>> Based on several similar patches of the R8A7795 device tree
+>>>> by Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+>>>> and Geert Uytterhoeven <geert+renesas@glider.be>.
 >>>>
 >>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 >>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
@@ -30,15 +37,17 @@ On 11/19/2018 11:44 AM, Simon Horman wrote:
 >>>> Cc: linux-renesas-soc at vger.kernel.org
 >>>> Cc: linux-arm-kernel at lists.infradead.org
 >>>
->>> Why seperate patches for CAN and CANFD here while they are merged for
->>> r8a77990 into one patch?
+>>> Were you able to do some testing using EXIO connectors? Would be nice to
+>>> know what was tested.
 >>
->> Because they are two different IP blocks, but I can merge the patches
->> together if that's what you want.
+>> Not on the M3N, since I don't see it broken out on the EXIO ; is it
+>> really there ? It'd be easy to test on M3NSK with KF, but I don't have
+>> either KF or M3NSK.
 > 
-> Merging these patches makes sense to me.
+> Please have a look at EXIO Connector D, pins 13/14/15.
 
-Done
+That's LBSC WE1n/WE0n/CS0n on S-XS . Is there something I obviously
+don't see ?
 
 -- 
 Best regards,
