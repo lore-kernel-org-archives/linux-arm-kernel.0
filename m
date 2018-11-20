@@ -1,29 +1,31 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Tue, 20 Nov 2018 01:22:19 +0000
-Subject: [PATCH 2/3] PCI: imx: No-op imx6_pcie_reset_phy() on i.MX7D
-In-Reply-To: <20181117181225.10737-3-andrew.smirnov@gmail.com>
-References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
- <20181117181225.10737-3-andrew.smirnov@gmail.com>
-Message-ID: <1542676938.30311.581.camel@impinj.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 19 Nov 2018 19:24:21 -0600
+Subject: [PATCH v3 2/5] phy: core: add PHY_MODE_ETHERNET
+In-Reply-To: <20181120012424.11802-1-grygorii.strashko@ti.com>
+References: <20181120012424.11802-1-grygorii.strashko@ti.com>
+Message-ID: <20181120012424.11802-3-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
-> PCIE PHY IP block on i.MX7D differs from the one used on i.MX6 family,
-> so none of the code in current implementation of imx6_pcie_reset_phy()
-> is applicable.
+Add new PHY's mode to be used by Ethernet PHY interface drivers or
+multipurpose PHYs like serdes. It will be reused in further changes.
 
-Tested on IMX7d, still appears to work.
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ include/linux/phy/phy.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Note that your patches will collide with Stefan Agner's patch, "PCI:
-imx6: limit DBI register length", which was recently posted.
-
-He changed the way the variants are handled.  That method would allow
-some of the IMX7D || IMX8MQ checks to be re-written as
-
- imx6_pcie->drvdata->boolean_attribute
-
-Where the attribute can be set in a table and be re-used in every place
-it comes into play and updated for new devices in one spot, instead of
-keeping piles of this version or that version or this other version
-checks up to date.
+diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+index b17e770..02c9ef0 100644
+--- a/include/linux/phy/phy.h
++++ b/include/linux/phy/phy.h
+@@ -42,6 +42,7 @@ enum phy_mode {
+ 	PHY_MODE_UFS_HS_A,
+ 	PHY_MODE_UFS_HS_B,
+ 	PHY_MODE_PCIE,
++	PHY_MODE_ETHERNET,
+ };
+ 
+ /**
+-- 
+2.10.5
