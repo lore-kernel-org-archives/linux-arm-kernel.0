@@ -1,24 +1,38 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Tue, 20 Nov 2018 16:41:06 +0800
-Subject: [PATCH 0/2] add SPI driver support for mt7629 
-Message-ID: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Tue, 20 Nov 2018 09:26:00 +0000
+Subject: [PATCHv2 04/25] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-5-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 51ab18abe1ad0f8ef0bc88696d956431f3e01f3f Mon Sep 17 00:00:00 2001
-From: Leilk Liu <leilk.liu@mediatek.com>
-Date: Tue, 20 Nov 2018 16:34:22 +0800
-Subject: [PATCH 0/2] add SPI driver support for mt7629
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-This series are based on 4.20-rc1 and provide two patches to support mt7629 IC.
+The current code does not support multiple MSIs, so remove
+the corresponding flag from the msi_domain_info structure.
 
-Leilk Liu (2):
-  spi: mediatek: Add bindings for mediatek MT7629 soc platform
-  spi: mediatek: add spi support for mt7629 IC
+Fixes: 1e913e58335f ("PCI: mobiveil: Add MSI support")
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+---
+V2:
+ - Added fixes entry.
 
- Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 1 +
- drivers/spi/spi-mt65xx.c                             | 3 +++
- 2 files changed, 4 insertions(+)
+ drivers/pci/controller/pcie-mobiveil.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
+index 563210e731d3..a0dd337c6214 100644
+--- a/drivers/pci/controller/pcie-mobiveil.c
++++ b/drivers/pci/controller/pcie-mobiveil.c
+@@ -703,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
+ 
+ static struct msi_domain_info mobiveil_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++		   MSI_FLAG_PCI_MSIX),
+ 	.chip	= &mobiveil_msi_irq_chip,
+ };
+ 
 -- 
-1.9.1
+2.17.1
