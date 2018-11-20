@@ -1,435 +1,963 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 20 Nov 2018 11:02:34 +0530
-Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
-In-Reply-To: <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
- <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
-Message-ID: <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Tue, 20 Nov 2018 11:10:34 +0530
+Subject: [PATCH v7 2/2] ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE
+ PMU driver
+In-Reply-To: <b25b462e-d604-2597-820d-289e0a50f365@arm.com>
+References: <20181025055833.28471-1-ganapatrao.kulkarni@cavium.com>
+ <20181025055833.28471-3-ganapatrao.kulkarni@cavium.com>
+ <b25b462e-d604-2597-820d-289e0a50f365@arm.com>
+Message-ID: <CAKTKpr7NOAnPREKWSuf2DkdYSVa2f8m_1rCHN4GJ0CEgJPUiaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Suzuki,
 
-On 12/11/18 3:21 PM, Kishon Vijay Abraham I wrote:
-> Hi Maxime,
-> 
-> On 06/11/18 8:24 PM, Maxime Ripard wrote:
->> Cadence has designed a D-PHY that can be used by the, currently in tree,
->> DSI bridge (DRM), CSI Transceiver and CSI Receiver (v4l2) drivers.
->>
->> Only the DSI driver has an ad-hoc driver for that phy at the moment, while
->> the v4l2 drivers are completely missing any phy support. In order to make
->> that phy support available to all these drivers, without having to
->> duplicate that code three times, let's create a generic phy framework
->> driver.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
->> ---
->>   Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt |  21 +-
->>   Documentation/devicetree/bindings/phy/cdns,dphy.txt           |  20 +-
->>   drivers/phy/cadence/Kconfig                                   |  13 +-
->>   drivers/phy/cadence/Makefile                                  |   1 +-
->>   drivers/phy/cadence/cdns-dphy.c                               | 459 +++++++-
->>   5 files changed, 492 insertions(+), 22 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/phy/cdns,dphy.txt
->>   create mode 100644 drivers/phy/cadence/cdns-dphy.c
->>
->> diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt b/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
->> index f5725bb6c61c..525a4bfd8634 100644
->> --- a/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
->> +++ b/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
->> @@ -31,28 +31,7 @@ Required subnodes:
->>   - one subnode per DSI device connected on the DSI bus. Each DSI device should
->>     contain a reg property encoding its virtual channel.
->>   
->> -Cadence DPHY
->> -============
->> -
->> -Cadence DPHY block.
->> -
->> -Required properties:
->> -- compatible: should be set to "cdns,dphy".
->> -- reg: physical base address and length of the DPHY registers.
->> -- clocks: DPHY reference clocks.
->> -- clock-names: must contain "psm" and "pll_ref".
->> -- #phy-cells: must be set to 0.
->> -
->> -
->>   Example:
->> -	dphy0: dphy at fd0e0000{
->> -		compatible = "cdns,dphy";
->> -		reg = <0x0 0xfd0e0000 0x0 0x1000>;
->> -		clocks = <&psm_clk>, <&pll_ref_clk>;
->> -		clock-names = "psm", "pll_ref";
->> -		#phy-cells = <0>;
->> -	};
->> -
->>   	dsi0: dsi at fd0c0000 {
->>   		compatible = "cdns,dsi";
->>   		reg = <0x0 0xfd0c0000 0x0 0x1000>;
->> diff --git a/Documentation/devicetree/bindings/phy/cdns,dphy.txt b/Documentation/devicetree/bindings/phy/cdns,dphy.txt
->> new file mode 100644
->> index 000000000000..1095bc4e72d9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/cdns,dphy.txt
->> @@ -0,0 +1,20 @@
->> +Cadence DPHY
->> +============
->> +
->> +Cadence DPHY block.
->> +
->> +Required properties:
->> +- compatible: should be set to "cdns,dphy".
->> +- reg: physical base address and length of the DPHY registers.
->> +- clocks: DPHY reference clocks.
->> +- clock-names: must contain "psm" and "pll_ref".
->> +- #phy-cells: must be set to 0.
->> +
->> +Example:
->> +	dphy0: dphy at fd0e0000{
->> +		compatible = "cdns,dphy";
->> +		reg = <0x0 0xfd0e0000 0x0 0x1000>;
->> +		clocks = <&psm_clk>, <&pll_ref_clk>;
->> +		clock-names = "psm", "pll_ref";
->> +		#phy-cells = <0>;
->> +	};
->> diff --git a/drivers/phy/cadence/Kconfig b/drivers/phy/cadence/Kconfig
->> index 57fff7de4031..240effa81046 100644
->> --- a/drivers/phy/cadence/Kconfig
->> +++ b/drivers/phy/cadence/Kconfig
->> @@ -1,6 +1,7 @@
->>   #
->> -# Phy driver for Cadence MHDP DisplayPort controller
->> +# Phy drivers for Cadence IPs
->>   #
->> +
->>   config PHY_CADENCE_DP
->>   	tristate "Cadence MHDP DisplayPort PHY driver"
->>   	depends on OF
->> @@ -8,3 +9,13 @@ config PHY_CADENCE_DP
->>   	select GENERIC_PHY
->>   	help
->>   	  Support for Cadence MHDP DisplayPort PHY.
->> +
->> +config PHY_CADENCE_DPHY
->> +	tristate "Cadence D-PHY Support"
->> +	depends on HAS_IOMEM && OF
->> +	select GENERIC_PHY
->> +	select GENERIC_PHY_MIPI_DPHY
->> +	help
->> +	  Choose this option if you have a Cadence D-PHY in your
->> +	  system. If M is selected, the module will be called
->> +	  cdns-csi.
->> diff --git a/drivers/phy/cadence/Makefile b/drivers/phy/cadence/Makefile
->> index e5b0a11cf28a..64cb9ea66ceb 100644
->> --- a/drivers/phy/cadence/Makefile
->> +++ b/drivers/phy/cadence/Makefile
->> @@ -1 +1,2 @@
->>   obj-$(CONFIG_PHY_CADENCE_DP)	+= phy-cadence-dp.o
->> +obj-$(CONFIG_PHY_CADENCE_DPHY)	+= cdns-dphy.o
->> diff --git a/drivers/phy/cadence/cdns-dphy.c b/drivers/phy/cadence/cdns-dphy.c
->> new file mode 100644
->> index 000000000000..a398b401e5d3
->> --- /dev/null
->> +++ b/drivers/phy/cadence/cdns-dphy.c
->> @@ -0,0 +1,459 @@
->> +// SPDX-License-Identifier: GPL-2.0+
->> +/*
->> + * Copyright: 2017-2018 Cadence Design Systems, Inc.
->> + */
->> +
->> +#include <linux/bitops.h>
->> +#include <linux/clk.h>
->> +#include <linux/io.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_device.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/reset.h>
->> +
->> +#include <linux/phy/phy.h>
->> +#include <linux/phy/phy-mipi-dphy.h>
->> +
->> +#define REG_WAKEUP_TIME_NS		800
->> +#define DPHY_PLL_RATE_HZ		108000000
->> +
->> +/* DPHY registers */
->> +#define DPHY_PMA_CMN(reg)		(reg)
->> +#define DPHY_PMA_LCLK(reg)		(0x100 + (reg))
->> +#define DPHY_PMA_LDATA(lane, reg)	(0x200 + ((lane) * 0x100) + (reg))
->> +#define DPHY_PMA_RCLK(reg)		(0x600 + (reg))
->> +#define DPHY_PMA_RDATA(lane, reg)	(0x700 + ((lane) * 0x100) + (reg))
->> +#define DPHY_PCS(reg)			(0xb00 + (reg))
->> +
->> +#define DPHY_CMN_SSM			DPHY_PMA_CMN(0x20)
->> +#define DPHY_CMN_SSM_EN			BIT(0)
->> +#define DPHY_CMN_TX_MODE_EN		BIT(9)
->> +
->> +#define DPHY_CMN_PWM			DPHY_PMA_CMN(0x40)
->> +#define DPHY_CMN_PWM_DIV(x)		((x) << 20)
->> +#define DPHY_CMN_PWM_LOW(x)		((x) << 10)
->> +#define DPHY_CMN_PWM_HIGH(x)		(x)
->> +
->> +#define DPHY_CMN_FBDIV			DPHY_PMA_CMN(0x4c)
->> +#define DPHY_CMN_FBDIV_VAL(low, high)	(((high) << 11) | ((low) << 22))
->> +#define DPHY_CMN_FBDIV_FROM_REG		(BIT(10) | BIT(21))
->> +
->> +#define DPHY_CMN_OPIPDIV		DPHY_PMA_CMN(0x50)
->> +#define DPHY_CMN_IPDIV_FROM_REG		BIT(0)
->> +#define DPHY_CMN_IPDIV(x)		((x) << 1)
->> +#define DPHY_CMN_OPDIV_FROM_REG		BIT(6)
->> +#define DPHY_CMN_OPDIV(x)		((x) << 7)
->> +
->> +#define DPHY_PSM_CFG			DPHY_PCS(0x4)
->> +#define DPHY_PSM_CFG_FROM_REG		BIT(0)
->> +#define DPHY_PSM_CLK_DIV(x)		((x) << 1)
->> +
->> +#define DSI_HBP_FRAME_OVERHEAD		12
->> +#define DSI_HSA_FRAME_OVERHEAD		14
->> +#define DSI_HFP_FRAME_OVERHEAD		6
->> +#define DSI_HSS_VSS_VSE_FRAME_OVERHEAD	4
->> +#define DSI_BLANKING_FRAME_OVERHEAD	6
->> +#define DSI_NULL_FRAME_OVERHEAD		6
->> +#define DSI_EOT_PKT_SIZE		4
->> +
->> +struct cdns_dphy_cfg {
->> +	u8 pll_ipdiv;
->> +	u8 pll_opdiv;
->> +	u16 pll_fbdiv;
->> +	unsigned int nlanes;
->> +};
->> +
->> +enum cdns_dphy_clk_lane_cfg {
->> +	DPHY_CLK_CFG_LEFT_DRIVES_ALL = 0,
->> +	DPHY_CLK_CFG_LEFT_DRIVES_RIGHT = 1,
->> +	DPHY_CLK_CFG_LEFT_DRIVES_LEFT = 2,
->> +	DPHY_CLK_CFG_RIGHT_DRIVES_ALL = 3,
->> +};
->> +
->> +struct cdns_dphy;
->> +struct cdns_dphy_ops {
->> +	int (*probe)(struct cdns_dphy *dphy);
->> +	void (*remove)(struct cdns_dphy *dphy);
->> +	void (*set_psm_div)(struct cdns_dphy *dphy, u8 div);
->> +	void (*set_clk_lane_cfg)(struct cdns_dphy *dphy,
->> +				 enum cdns_dphy_clk_lane_cfg cfg);
->> +	void (*set_pll_cfg)(struct cdns_dphy *dphy,
->> +			    const struct cdns_dphy_cfg *cfg);
->> +	unsigned long (*get_wakeup_time_ns)(struct cdns_dphy *dphy);
->> +};
->> +
->> +struct cdns_dphy {
->> +	struct cdns_dphy_cfg cfg;
->> +	void __iomem *regs;
->> +	struct clk *psm_clk;
->> +	struct clk *pll_ref_clk;
->> +	const struct cdns_dphy_ops *ops;
->> +	struct phy *phy;
->> +};
->> +
->> +static int cdns_dsi_get_dphy_pll_cfg(struct cdns_dphy *dphy,
->> +				     struct cdns_dphy_cfg *cfg,
->> +				     struct phy_configure_opts_mipi_dphy *opts,
->> +				     unsigned int *dsi_hfp_ext)
->> +{
->> +	u64 dlane_bps, dlane_bps_max, fbdiv, fbdiv_max, adj_dsi_htotal;
->> +	unsigned long pll_ref_hz = clk_get_rate(dphy->pll_ref_clk);
->> +
->> +	memset(cfg, 0, sizeof(*cfg));
->> +
->> +	if (pll_ref_hz < 9600000 || pll_ref_hz >= 150000000)
->> +		return -EINVAL;
->> +	else if (pll_ref_hz < 19200000)
->> +		cfg->pll_ipdiv = 1;
->> +	else if (pll_ref_hz < 38400000)
->> +		cfg->pll_ipdiv = 2;
->> +	else if (pll_ref_hz < 76800000)
->> +		cfg->pll_ipdiv = 4;
->> +	else
->> +		cfg->pll_ipdiv = 8;
->> +
->> +	dlane_bps = opts->hs_clk_rate;
->> +
->> +	if (dlane_bps > 2500000000UL || dlane_bps < 160000000UL)
->> +		return -EINVAL;
->> +	else if (dlane_bps >= 1250000000)
->> +		cfg->pll_opdiv = 1;
->> +	else if (dlane_bps >= 630000000)
->> +		cfg->pll_opdiv = 2;
->> +	else if (dlane_bps >= 320000000)
->> +		cfg->pll_opdiv = 4;
->> +	else if (dlane_bps >= 160000000)
->> +		cfg->pll_opdiv = 8;
->> +
->> +	/*
->> +	 * Allow a deviation of 0.2% on the per-lane data rate to try to
->> +	 * recover a potential mismatch between DPI and PPI clks.
->> +	 */
->> +	dlane_bps_max = dlane_bps + DIV_ROUND_DOWN_ULL(dlane_bps, 500);
->> +	fbdiv_max = DIV_ROUND_DOWN_ULL(dlane_bps_max * 2 *
->> +				       cfg->pll_opdiv * cfg->pll_ipdiv,
->> +				       pll_ref_hz);
->> +	fbdiv = DIV_ROUND_UP_ULL(dlane_bps * 2 * cfg->pll_opdiv *
->> +				 cfg->pll_ipdiv,
->> +				 pll_ref_hz);
->> +
->> +	/*
->> +	 * Iterate over all acceptable fbdiv and try to find an adjusted DSI
->> +	 * htotal length providing an exact match.
->> +	 *
->> +	 * Note that we could do something even trickier by relying on the fact
->> +	 * that a new line is not necessarily aligned on a lane boundary, so,
->> +	 * by making adj_dsi_htotal non aligned on a dsi_lanes we can improve a
->> +	 * bit the precision. With this, the step would be
->> +	 *
->> +	 *	pll_ref_hz / (2 * opdiv * ipdiv * nlanes)
->> +	 *
->> +	 * instead of
->> +	 *
->> +	 *	pll_ref_hz / (2 * opdiv * ipdiv)
->> +	 *
->> +	 * The drawback of this approach is that we would need to make sure the
->> +	 * number or lines is a multiple of the realignment periodicity which is
->> +	 * a function of the number of lanes and the original misalignment. For
->> +	 * example, for NLANES = 4 and HTOTAL % NLANES = 3, it takes 4 lines
->> +	 * to realign on a lane:
->> +	 * LINE 0: expected number of bytes, starts emitting first byte of
->> +	 *	   LINE 1 on LANE 3
->> +	 * LINE 1: expected number of bytes, starts emitting first 2 bytes of
->> +	 *	   LINE 2 on LANES 2 and 3
->> +	 * LINE 2: expected number of bytes, starts emitting first 3 bytes of
->> +	 *	   of LINE 3 on LANES 1, 2 and 3
->> +	 * LINE 3: one byte less, now things are realigned on LANE 0 for LINE 4
->> +	 *
->> +	 * I figured this extra complexity was not worth the benefit, but if
->> +	 * someone really has unfixable mismatch, that would be something to
->> +	 * investigate.
->> +	 */
->> +	for (; fbdiv <= fbdiv_max; fbdiv++) {
->> +		u32 rem;
->> +
->> +		/*
->> +		 * Do the division in 2 steps to avoid an overflow on the
->> +		 * divider.
->> +		 */
->> +		rem = do_div(adj_dsi_htotal, opts->hs_clk_rate);
->> +		if (rem)
->> +			continue;
->> +
->> +		rem = do_div(adj_dsi_htotal,
->> +			     cfg->pll_opdiv * cfg->pll_ipdiv * 2 * 8);
->> +		if (rem)
->> +			continue;
->> +
->> +		cfg->pll_fbdiv = fbdiv;
->> +		break;
->> +	}
->> +
->> +	/* No match, let's just reject the display mode. */
->> +	if (!cfg->pll_fbdiv)
->> +		return -EINVAL;
->> +
->> +	return 0;
->> +}
->> +
->> +static int cdns_dphy_setup_psm(struct cdns_dphy *dphy)
->> +{
->> +	unsigned long psm_clk_hz = clk_get_rate(dphy->psm_clk);
->> +	unsigned long psm_div;
->> +
->> +	if (!psm_clk_hz || psm_clk_hz > 100000000)
->> +		return -EINVAL;
->> +
->> +	psm_div = DIV_ROUND_CLOSEST(psm_clk_hz, 1000000);
->> +	if (dphy->ops->set_psm_div)
->> +		dphy->ops->set_psm_div(dphy, psm_div);
->> +
->> +	return 0;
->> +}
->> +
->> +static void cdns_dphy_set_clk_lane_cfg(struct cdns_dphy *dphy,
->> +				       enum cdns_dphy_clk_lane_cfg cfg)
->> +{
->> +	if (dphy->ops->set_clk_lane_cfg)
->> +		dphy->ops->set_clk_lane_cfg(dphy, cfg);
->> +}
->> +
->> +static void cdns_dphy_set_pll_cfg(struct cdns_dphy *dphy,
->> +				  const struct cdns_dphy_cfg *cfg)
->> +{
->> +	if (dphy->ops->set_pll_cfg)
->> +		dphy->ops->set_pll_cfg(dphy, cfg);
->> +}
->> +
->> +static unsigned long cdns_dphy_get_wakeup_time_ns(struct cdns_dphy *dphy)
->> +{
->> +	return dphy->ops->get_wakeup_time_ns(dphy);
->> +}
->> +
->> +static unsigned long cdns_dphy_ref_get_wakeup_time_ns(struct cdns_dphy *dphy)
->> +{
->> +	/* Default wakeup time is 800 ns (in a simulated environment). */
->> +	return 800;
->> +}
->> +
->> +static void cdns_dphy_ref_set_pll_cfg(struct cdns_dphy *dphy,
->> +				      const struct cdns_dphy_cfg *cfg)
->> +{
->> +	u32 fbdiv_low, fbdiv_high;
->> +
->> +	fbdiv_low = (cfg->pll_fbdiv / 4) - 2;
->> +	fbdiv_high = cfg->pll_fbdiv - fbdiv_low - 2;
->> +
->> +	writel(DPHY_CMN_IPDIV_FROM_REG | DPHY_CMN_OPDIV_FROM_REG |
->> +	       DPHY_CMN_IPDIV(cfg->pll_ipdiv) |
->> +	       DPHY_CMN_OPDIV(cfg->pll_opdiv),
->> +	       dphy->regs + DPHY_CMN_OPIPDIV);
->> +	writel(DPHY_CMN_FBDIV_FROM_REG |
->> +	       DPHY_CMN_FBDIV_VAL(fbdiv_low, fbdiv_high),
->> +	       dphy->regs + DPHY_CMN_FBDIV);
->> +	writel(DPHY_CMN_PWM_HIGH(6) | DPHY_CMN_PWM_LOW(0x101) |
->> +	       DPHY_CMN_PWM_DIV(0x8),
->> +	       dphy->regs + DPHY_CMN_PWM);
->> +}
->> +
->> +static void cdns_dphy_ref_set_psm_div(struct cdns_dphy *dphy, u8 div)
->> +{
->> +	writel(DPHY_PSM_CFG_FROM_REG | DPHY_PSM_CLK_DIV(div),
->> +	       dphy->regs + DPHY_PSM_CFG);
->> +}
->> +
->> +/*
->> + * This is the reference implementation of DPHY hooks. Specific integration of
->> + * this IP may have to re-implement some of them depending on how they decided
->> + * to wire things in the SoC.
->> + */
->> +static const struct cdns_dphy_ops ref_dphy_ops = {
->> +	.get_wakeup_time_ns = cdns_dphy_ref_get_wakeup_time_ns,
->> +	.set_pll_cfg = cdns_dphy_ref_set_pll_cfg,
->> +	.set_psm_div = cdns_dphy_ref_set_psm_div,
->> +};
->> +
->> +static int cdns_dphy_config_from_opts(struct phy *phy,
->> +				      struct phy_configure_opts_mipi_dphy *opts,
->> +				      struct cdns_dphy_cfg *cfg)
->> +{
->> +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
->> +	unsigned int dsi_hfp_ext = 0;
->> +	int ret;
->> +
->> +	ret = phy_mipi_dphy_config_validate(opts);
->> +	if (ret)
->> +		return ret;
->> +
->> +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
->> +					opts, &dsi_hfp_ext);
->> +	if (ret)
->> +		return ret;
->> +
->> +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
+Thanks for the comments, will update next version with your comments.
 
-Is the wakeup populated here used by the consumer driver?
+On Fri, Nov 16, 2018 at 4:14 AM Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+> Hi,
+>
+> On 10/25/2018 06:59 AM, Kulkarni, Ganapatrao wrote:
+> > This patch adds a perf driver for the PMU UNCORE devices DDR4 Memory
+> > Controller(DMC) and Level 3 Cache(L3C). Each PMU supports up to 4
+> > counters. All counters lack overflow interrupt and are
+> > sampled periodically.
+>
+> The patch looks OK overall. Some minor comments below.
+>
+> >
+> > Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+> > ---
+> >   drivers/perf/Kconfig         |   9 +
+> >   drivers/perf/Makefile        |   1 +
+> >   drivers/perf/thunderx2_pmu.c | 867 +++++++++++++++++++++++++++++++++++
+> >   include/linux/cpuhotplug.h   |   1 +
+> >   4 files changed, 878 insertions(+)
+> >   create mode 100644 drivers/perf/thunderx2_pmu.c
+> >
+> > diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+> > index 08ebaf7cca8b..c1956b1af2bb 100644
+> > --- a/drivers/perf/Kconfig
+> > +++ b/drivers/perf/Kconfig
+> > @@ -87,6 +87,15 @@ config QCOM_L3_PMU
+> >          Adds the L3 cache PMU into the perf events subsystem for
+> >          monitoring L3 cache events.
+> >
+> > +config THUNDERX2_PMU
+> > +        tristate "Cavium ThunderX2 SoC PMU UNCORE"
+> > +     depends on ARCH_THUNDER2 && ARM64 && ACPI && NUMA
+> > +        default m
+> > +     help
+> > +       Provides support for ThunderX2 UNCORE events.
+> > +       The SoC has PMU support in its L3 cache controller (L3C) and
+> > +       in the DDR4 Memory Controller (DMC).
+> > +
+> >   config XGENE_PMU
+> >           depends on ARCH_XGENE
+> >           bool "APM X-Gene SoC PMU"
+> > diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+> > index b3902bd37d53..909f27fd9db3 100644
+> > --- a/drivers/perf/Makefile
+> > +++ b/drivers/perf/Makefile
+> > @@ -7,5 +7,6 @@ obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+> >   obj-$(CONFIG_HISI_PMU) += hisilicon/
+> >   obj-$(CONFIG_QCOM_L2_PMU)   += qcom_l2_pmu.o
+> >   obj-$(CONFIG_QCOM_L3_PMU) += qcom_l3_pmu.o
+> > +obj-$(CONFIG_THUNDERX2_PMU) += thunderx2_pmu.o
+> >   obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
+> >   obj-$(CONFIG_ARM_SPE_PMU) += arm_spe_pmu.o
+> > diff --git a/drivers/perf/thunderx2_pmu.c b/drivers/perf/thunderx2_pmu.c
+> > new file mode 100644
+> > index 000000000000..450d36c6a1e1
+> > --- /dev/null
+> > +++ b/drivers/perf/thunderx2_pmu.c
+> > @@ -0,0 +1,867 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * CAVIUM THUNDERX2 SoC PMU UNCORE
+> > + * Copyright (C) 2018 Cavium Inc.
+> > + * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
+> > + */
+> > +
+> > +#include <linux/acpi.h>
+> > +#include <linux/cpuhotplug.h>
+> > +#include <linux/perf_event.h>
+> > +#include <linux/platform_device.h>
+> > +
+> > +/* Each ThunderX2(TX2) Socket has a L3C and DMC UNCORE PMU device.
+> > + * Each UNCORE PMU device consists of 4 independent programmable counters.
+> > + * Counters are 32 bit and do not support overflow interrupt,
+> > + * they need to be sampled before overflow(i.e, at every 2 seconds).
+> > + */
+> > +
+> > +#define TX2_PMU_MAX_COUNTERS         4
+> > +#define TX2_PMU_DMC_CHANNELS         8
+> > +#define TX2_PMU_L3_TILES             16
+> > +
+> > +#define TX2_PMU_HRTIMER_INTERVAL     (2 * NSEC_PER_SEC)
+> > +#define GET_EVENTID(ev)                      ((ev->hw.config) & 0x1ff)
+>
+> > +#define GET_COUNTERID(ev)            ((ev->hw.idx) & 0xf)
+>
+> If the number of counters are 4, should the mask be 0x3 instead ?
+>
+> > +#define DMC_EVENT_CFG(idx, val)              ((val) << (((idx) * 8) + 1))
+>
+> If I understand this correctly, you are accommodating bits[5:1] of the
+> 8bit counter by "+1". It is worth adding a comment about the bit
+> position here.
+>
+>
+> > +
+> > +#define L3C_COUNTER_CTL                      0xA8
+> > +#define L3C_COUNTER_DATA             0xAC
+> > +#define DMC_COUNTER_CTL                      0x234
+> > +#define DMC_COUNTER_DATA             0x240
+> > +
+> > +/* L3C event IDs */
+> > +#define L3_EVENT_READ_REQ            0xD
+> > +#define L3_EVENT_WRITEBACK_REQ               0xE
+> > +#define L3_EVENT_INV_N_WRITE_REQ     0xF
+> > +#define L3_EVENT_INV_REQ             0x10
+> > +#define L3_EVENT_EVICT_REQ           0x13
+> > +#define L3_EVENT_INV_N_WRITE_HIT     0x14
+> > +#define L3_EVENT_INV_HIT             0x15
+> > +#define L3_EVENT_READ_HIT            0x17
+> > +#define L3_EVENT_MAX                 0x18
+> > +
+> > +/* DMC event IDs */
+> > +#define DMC_EVENT_COUNT_CYCLES               0x1
+> > +#define DMC_EVENT_WRITE_TXNS         0xB
+> > +#define DMC_EVENT_DATA_TRANSFERS     0xD
+> > +#define DMC_EVENT_READ_TXNS          0xF
+> > +#define DMC_EVENT_MAX                        0x10
+> > +
+> > +enum tx2_uncore_type {
+> > +     PMU_TYPE_L3C,
+> > +     PMU_TYPE_DMC,
+> > +     PMU_TYPE_INVALID,
+> > +};
+> > +
+> > +/*
+> > + * pmu on each socket has 2 uncore devices(dmc and l3c),
+> > + * each device has 4 counters.
+> > + */
+> > +struct tx2_uncore_pmu {
+> > +     struct hlist_node hpnode;
+> > +     struct list_head  entry;
+> > +     struct pmu pmu;
+> > +     char *name;
+> > +     int node;
+> > +     int cpu;
+> > +     u32    max_counters;
+> > +     u32    prorate_factor;
+> > +     u32    max_events;
+> > +     u64 hrtimer_interval;
+> > +     void __iomem *base;
+> > +     DECLARE_BITMAP(active_counters, TX2_PMU_MAX_COUNTERS);
+> > +     struct perf_event *events[TX2_PMU_MAX_COUNTERS];
+> > +     struct device *dev;
+> > +     struct hrtimer hrtimer;
+> > +     const struct attribute_group **attr_groups;
+> > +     enum tx2_uncore_type type;
+> > +     raw_spinlock_t lock;
+> > +     void    (*init_cntr_base)(struct perf_event *event,
+> > +                     struct tx2_uncore_pmu *tx2_pmu);
+> > +     void    (*stop_event)(struct perf_event *event);
+> > +     void    (*start_event)(struct perf_event *event, int flags);
+> > +};
+> > +
+> > +static LIST_HEAD(tx2_pmus);
+> > +
+> > +static inline struct tx2_uncore_pmu *pmu_to_tx2_pmu(struct pmu *pmu)
+> > +{
+> > +     return container_of(pmu, struct tx2_uncore_pmu, pmu);
+> > +}
+> > +
+> > +/*
+> > + * sysfs format attributes
+> > + */
+> > +static ssize_t tx2_pmu_format_show(struct device *dev,
+> > +                                  struct device_attribute *attr, char *buf)
+> > +{
+> > +     struct dev_ext_attribute *eattr;
+> > +
+> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
+> > +     return sprintf(buf, "%s\n", (char *) eattr->var);
+> > +}
+> > +
+> > +#define FORMAT_ATTR(_name, _config) \
+> > +     (&((struct dev_ext_attribute[]) { \
+> > +        { \
+> > +        .attr = __ATTR(_name, 0444, tx2_pmu_format_show, NULL), \
+> > +        .var = (void *) _config, \
+> > +        } \
+> > +     })[0].attr.attr)
+> > +
+> > +static struct attribute *l3c_pmu_format_attrs[] = {
+> > +     FORMAT_ATTR(event,      "config:0-4"),
+> > +     NULL,
+> > +};
+> > +
+> > +static struct attribute *dmc_pmu_format_attrs[] = {
+> > +     FORMAT_ATTR(event,      "config:0-4"),
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group l3c_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = l3c_pmu_format_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group dmc_pmu_format_attr_group = {
+> > +     .name = "format",
+> > +     .attrs = dmc_pmu_format_attrs,
+> > +};
+> > +
+> > +/*
+> > + * sysfs event attributes
+> > + */
+> > +static ssize_t tx2_pmu_event_show(struct device *dev,
+> > +                                 struct device_attribute *attr, char *buf)
+> > +{
+> > +     struct dev_ext_attribute *eattr;
+> > +
+> > +     eattr = container_of(attr, struct dev_ext_attribute, attr);
+> > +     return sprintf(buf, "config=0x%lx\n", (unsigned long) eattr->var);
+> > +}
+> > +
+> > +#define EVENT_ATTR(_name, _config) \
+> > +     (&((struct dev_ext_attribute[]) { \
+> > +        { \
+> > +        .attr = __ATTR(_name, 0444, tx2_pmu_event_show, NULL), \
+> > +        .var = (void *) _config, \
+> > +        } \
+> > +      })[0].attr.attr)
+> > +
+> > +static struct attribute *l3c_pmu_events_attrs[] = {
+> > +     EVENT_ATTR(read_request,                L3_EVENT_READ_REQ),
+> > +     EVENT_ATTR(writeback_request,           L3_EVENT_WRITEBACK_REQ),
+> > +     EVENT_ATTR(inv_nwrite_request,          L3_EVENT_INV_N_WRITE_REQ),
+> > +     EVENT_ATTR(inv_request,                 L3_EVENT_INV_REQ),
+> > +     EVENT_ATTR(evict_request,               L3_EVENT_EVICT_REQ),
+> > +     EVENT_ATTR(inv_nwrite_hit,              L3_EVENT_INV_N_WRITE_HIT),
+> > +     EVENT_ATTR(inv_hit,                     L3_EVENT_INV_HIT),
+> > +     EVENT_ATTR(read_hit,                    L3_EVENT_READ_HIT),
+> > +     NULL,
+> > +};
+> > +
+> > +static struct attribute *dmc_pmu_events_attrs[] = {
+> > +     EVENT_ATTR(cnt_cycles,                  DMC_EVENT_COUNT_CYCLES),
+> > +     EVENT_ATTR(write_txns,                  DMC_EVENT_WRITE_TXNS),
+> > +     EVENT_ATTR(data_transfers,              DMC_EVENT_DATA_TRANSFERS),
+> > +     EVENT_ATTR(read_txns,                   DMC_EVENT_READ_TXNS),
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group l3c_pmu_events_attr_group = {
+> > +     .name = "events",
+> > +     .attrs = l3c_pmu_events_attrs,
+> > +};
+> > +
+> > +static const struct attribute_group dmc_pmu_events_attr_group = {
+> > +     .name = "events",
+> > +     .attrs = dmc_pmu_events_attrs,
+> > +};
+> > +
+> > +/*
+> > + * sysfs cpumask attributes
+> > + */
+> > +static ssize_t cpumask_show(struct device *dev, struct device_attribute
+> > +             *attr, char *buf)
+>
+> nit: Coding style issues. Please don't split the parameter definition.
+> Also check the alignment.
+>
+>
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(dev_get_drvdata(dev));
+> > +     return cpumap_print_to_pagebuf(true, buf, cpumask_of(tx2_pmu->cpu));
+> > +}
+> > +static DEVICE_ATTR_RO(cpumask);
+> > +
+> > +static struct attribute *tx2_pmu_cpumask_attrs[] = {
+> > +     &dev_attr_cpumask.attr,
+> > +     NULL,
+> > +};
+> > +
+> > +static const struct attribute_group pmu_cpumask_attr_group = {
+> > +     .attrs = tx2_pmu_cpumask_attrs,
+> > +};
+> > +
+> > +/*
+> > + * Per PMU device attribute groups
+> > + */
+> > +static const struct attribute_group *l3c_pmu_attr_groups[] = {
+> > +     &l3c_pmu_format_attr_group,
+> > +     &pmu_cpumask_attr_group,
+> > +     &l3c_pmu_events_attr_group,
+> > +     NULL
+> > +};
+> > +
+> > +static const struct attribute_group *dmc_pmu_attr_groups[] = {
+> > +     &dmc_pmu_format_attr_group,
+> > +     &pmu_cpumask_attr_group,
+> > +     &dmc_pmu_events_attr_group,
+> > +     NULL
+> > +};
+> > +
+> > +static inline u32 reg_readl(unsigned long addr)
+> > +{
+> > +     return readl((void __iomem *)addr);
+> > +}
+> > +
+> > +static inline void reg_writel(u32 val, unsigned long addr)
+> > +{
+> > +     writel(val, (void __iomem *)addr);
+> > +}
+> > +
+> > +static int alloc_counter(struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     int counter;
+> > +
+> > +     counter = find_first_zero_bit(tx2_pmu->active_counters,
+> > +                             tx2_pmu->max_counters);
+> > +     if (counter == tx2_pmu->max_counters)
+> > +             return -ENOSPC;
+> > +
+> > +     set_bit(counter, tx2_pmu->active_counters);
+> > +     return counter;
+> > +}
+> > +
+> > +static inline void free_counter(struct tx2_uncore_pmu *tx2_pmu, int counter)
+> > +{
+> > +     clear_bit(counter, tx2_pmu->active_counters);
+> > +}
+> > +
+> > +static void init_cntr_base_l3c(struct perf_event *event,
+> > +             struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     /* counter ctrl/data reg offset at 8 */
+> > +     hwc->config_base = (unsigned long)tx2_pmu->base
+> > +             + L3C_COUNTER_CTL + (8 * GET_COUNTERID(event));
+> > +     hwc->event_base =  (unsigned long)tx2_pmu->base
+> > +             + L3C_COUNTER_DATA + (8 * GET_COUNTERID(event));
+> > +}
+> > +
+> > +static void init_cntr_base_dmc(struct perf_event *event,
+> > +             struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     hwc->config_base = (unsigned long)tx2_pmu->base
+> > +             + DMC_COUNTER_CTL;
+> > +     /* counter data reg offset at 0xc */
+> > +     hwc->event_base = (unsigned long)tx2_pmu->base
+> > +             + DMC_COUNTER_DATA + (0xc * GET_COUNTERID(event));
+> > +}
+> > +
+> > +static void uncore_start_event_l3c(struct perf_event *event, int flags)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     /* event id encoded in bits [07:03] */
+> > +     val = GET_EVENTID(event) << 3;
+> > +     reg_writel(val, hwc->config_base);
+> > +     local64_set(&hwc->prev_count, 0);
+> > +     reg_writel(0, hwc->event_base);
+> > +}
+> > +
+> > +static inline void uncore_stop_event_l3c(struct perf_event *event)
+> > +{
+> > +     reg_writel(0, event->hw.config_base);
+> > +}
+> > +
+> > +static void uncore_start_event_dmc(struct perf_event *event, int flags)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     int idx = GET_COUNTERID(event);
+> > +     int event_id = GET_EVENTID(event);
+> > +
+> > +     /* enable and start counters.
+> > +      * 8 bits for each counter, bits[05:01] of a counter to set event type.
+> > +      */
+> > +     val = reg_readl(hwc->config_base);
+> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
+> > +     val |= DMC_EVENT_CFG(idx, event_id);
+> > +     reg_writel(val, hwc->config_base);
+> > +     local64_set(&hwc->prev_count, 0);
+> > +     reg_writel(0, hwc->event_base);
+> > +}
+> > +
+> > +static void uncore_stop_event_dmc(struct perf_event *event)
+> > +{
+> > +     u32 val;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     int idx = GET_COUNTERID(event);
+> > +
+> > +     /* clear event type(bits[05:01]) to stop counter */
+> > +     val = reg_readl(hwc->config_base);
+> > +     val &= ~DMC_EVENT_CFG(idx, 0x1f);
+> > +     reg_writel(val, hwc->config_base);
+> > +}
+> > +
+> > +static void tx2_uncore_event_update(struct perf_event *event)
+> > +{
+> > +     s64 prev, delta, new = 0;
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +     enum tx2_uncore_type type;
+> > +     u32    prorate_factor;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +     type = tx2_pmu->type;
+> > +     prorate_factor = tx2_pmu->prorate_factor;
+> > +
+> > +     new = reg_readl(hwc->event_base);
+> > +     prev = local64_xchg(&hwc->prev_count, new);
+> > +
+> > +     /* handles rollover of 32 bit counter */
+> > +     delta = (u32)(((1UL << 32) - prev) + new);
+> > +
+> > +     /* DMC event data_transfers granularity is 16 Bytes, convert it to 64 */
+> > +     if (type == PMU_TYPE_DMC &&
+> > +                     GET_EVENTID(event) == DMC_EVENT_DATA_TRANSFERS)
+> > +             delta = delta/4;
+> > +
+> > +     /* L3C and DMC has 16 and 8 interleave channels respectively.
+> > +      * The sampled value is for channel 0 and multiplied with
+> > +      * prorate_factor to get the count for a device.
+> > +      */
+> > +     local64_add(delta * prorate_factor, &event->count);
+> > +}
+> > +
+> > +enum tx2_uncore_type get_tx2_pmu_type(struct acpi_device *adev)
+> > +{
+> > +     int i = 0;
+> > +     struct acpi_tx2_pmu_device {
+> > +             __u8 id[ACPI_ID_LEN];
+> > +             enum tx2_uncore_type type;
+> > +     } devices[] = {
+> > +             {"CAV901D", PMU_TYPE_L3C},
+> > +             {"CAV901F", PMU_TYPE_DMC},
+> > +             {"", PMU_TYPE_INVALID}
+> > +     };
+> > +
+> > +     while (devices[i].type != PMU_TYPE_INVALID) {
+> > +             if (!strcmp(acpi_device_hid(adev), devices[i].id))
+> > +                     return devices[i].type;
+> > +             i++;
+> > +     }
+> > +     return PMU_TYPE_INVALID;
+>
+> minor nit: The above could be folded to :
+>
+>         while (devices[i].type != PMU_TYPE_INVALID) {
+>                 if (!strcmp(acpi_device_hid(adev), devices[i].id))
+>                         break;
+>                 i++;
+>         }
+>
+>         return devices[i].type;
+>
+> > +}
+> > +
+> > +static bool tx2_uncore_validate_event(struct pmu *pmu,
+> > +                               struct perf_event *event, int *counters)
+> > +{
+> > +     if (is_software_event(event))
+> > +             return true;
+> > +     /* Reject groups spanning multiple HW PMUs. */
+> > +     if (event->pmu != pmu)
+> > +             return false;
+> > +
+> > +     *counters = *counters + 1;
+> > +             return true;
+> > +}
+> > +
+> > +/*
+> > + * Make sure the group of events can be scheduled at once
+> > + * on the PMU.
+> > + */
+> > +static bool tx2_uncore_validate_event_group(struct perf_event *event)
+> > +{
+> > +     struct perf_event *sibling, *leader = event->group_leader;
+> > +     int counters = 0;
+> > +
+> > +     if (event->group_leader == event)
+> > +             return true;
+> > +
+> > +     if (!tx2_uncore_validate_event(event->pmu, leader, &counters))
+> > +             return false;
+> > +
+> > +     for_each_sibling_event(sibling, leader) {
+> > +             if (!tx2_uncore_validate_event(event->pmu, sibling, &counters))
+> > +                     return false;
+> > +     }
+> > +
+> > +     if (!tx2_uncore_validate_event(event->pmu, event, &counters))
+> > +             return false;
+> > +
+> > +     /*
+> > +      * If the group requires more counters than the HW has,
+> > +      * it cannot ever be scheduled.
+> > +      */
+> > +     return counters <= TX2_PMU_MAX_COUNTERS;
+> > +}
+> > +
+> > +
+> > +static int tx2_uncore_event_init(struct perf_event *event)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     /* Test the event attr type check for PMU enumeration */
+> > +     if (event->attr.type != event->pmu->type)
+> > +             return -ENOENT;
+> > +
+> > +     /*
+> > +      * SOC PMU counters are shared across all cores.
+> > +      * Therefore, it does not support per-process mode.
+> > +      * Also, it does not support event sampling mode.
+> > +      */
+> > +     if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
+> > +             return -EINVAL;
+> > +
+> > +     /* SOC counters do not have usr/os/guest/host bits */
+> > +     if (event->attr.exclude_user || event->attr.exclude_kernel ||
+> > +         event->attr.exclude_host || event->attr.exclude_guest)
+>
+> exclude_hv and exclude_idle missing ?
+>
+> > +             return -EINVAL;
+> > +
+> > +     if (event->cpu < 0)
+> > +             return -EINVAL;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +     if (tx2_pmu->cpu >= nr_cpu_ids)
+> > +             return -EINVAL;
+> > +     event->cpu = tx2_pmu->cpu;
+> > +
+> > +     if (event->attr.config >= tx2_pmu->max_events)
+> > +             return -EINVAL;
+> > +
+> > +     /* store event id */
+> > +     hwc->config = event->attr.config > +
+> > +     /* Validate the group */
+> > +     if (!tx2_uncore_validate_event_group(event))
+> > +             return -EINVAL;
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static void tx2_uncore_event_start(struct perf_event *event, int flags)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     hwc->state = 0;
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +
+> > +     tx2_pmu->start_event(event, flags);
+> > +     perf_event_update_userpage(event);
+> > +
+> > +     /* Start timer for first event */
+> > +     if (bitmap_weight(tx2_pmu->active_counters,
+> > +                             tx2_pmu->max_counters) == 1) {
+> > +             hrtimer_start(&tx2_pmu->hrtimer,
+> > +                     ns_to_ktime(tx2_pmu->hrtimer_interval),
+> > +                     HRTIMER_MODE_REL_PINNED);
+> > +     }
+> > +}
+> > +
+> > +static void tx2_uncore_event_stop(struct perf_event *event, int flags)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     if (hwc->state & PERF_HES_UPTODATE)
+> > +             return;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +     tx2_pmu->stop_event(event);
+> > +     WARN_ON_ONCE(hwc->state & PERF_HES_STOPPED);
+> > +     hwc->state |= PERF_HES_STOPPED;
+> > +     if (flags & PERF_EF_UPDATE) {
+> > +             tx2_uncore_event_update(event);
+> > +             hwc->state |= PERF_HES_UPTODATE;
+> > +     }
+> > +}
+> > +
+> > +static int tx2_uncore_event_add(struct perf_event *event, int flags)
+> > +{
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +
+> > +     /* Allocate a free counter */
+> > +     hwc->idx  = alloc_counter(tx2_pmu);
+> > +     if (hwc->idx < 0)
+> > +             return -EAGAIN;
+> > +
+> > +     tx2_pmu->events[hwc->idx] = event;
+> > +     /* set counter control and data registers base address */
+> > +     tx2_pmu->init_cntr_base(event, tx2_pmu);
+> > +
+> > +     hwc->state = PERF_HES_UPTODATE | PERF_HES_STOPPED;
+> > +     if (flags & PERF_EF_START)
+> > +             tx2_uncore_event_start(event, flags);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static void tx2_uncore_event_del(struct perf_event *event, int flags)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu = pmu_to_tx2_pmu(event->pmu);
+> > +     struct hw_perf_event *hwc = &event->hw;
+> > +
+> > +     tx2_uncore_event_stop(event, PERF_EF_UPDATE);
+> > +
+> > +     /* clear the assigned counter */
+> > +     free_counter(tx2_pmu, GET_COUNTERID(event));
+> > +
+> > +     perf_event_update_userpage(event);
+> > +     tx2_pmu->events[hwc->idx] = NULL;
+> > +     hwc->idx = -1;
+> > +}
+> > +
+> > +static void tx2_uncore_event_read(struct perf_event *event)
+> > +{
+> > +     tx2_uncore_event_update(event);
+> > +}
+> > +
+> > +static enum hrtimer_restart tx2_hrtimer_callback(struct hrtimer *timer)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +     int max_counters, idx;
+> > +     unsigned long irqflags;
+> > +
+> > +     tx2_pmu = container_of(timer, struct tx2_uncore_pmu, hrtimer);
+> > +     max_counters = tx2_pmu->max_counters;
+> > +
+> > +     if (bitmap_empty(tx2_pmu->active_counters, max_counters))
+> > +             return HRTIMER_NORESTART;
+> > +
+> > +     raw_spin_lock_irqsave(&tx2_pmu->lock, irqflags);
+> > +
+> > +     for_each_set_bit(idx, tx2_pmu->active_counters, max_counters) {
+> > +             struct perf_event *event = tx2_pmu->events[idx];
+> > +
+> > +             tx2_uncore_event_update(event);
+> > +     }
+> > +     raw_spin_unlock_irqrestore(&tx2_pmu->lock, irqflags);
+>
+> What does this lock protect ? Can there be multiple active hrtimers for
+> the same PMU ?
+>
+> > +     hrtimer_forward_now(timer, ns_to_ktime(tx2_pmu->hrtimer_interval));
+> > +     return HRTIMER_RESTART;
+> > +}
+> > +
+> > +static int tx2_uncore_pmu_register(
+> > +             struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     struct device *dev = tx2_pmu->dev;
+> > +     char *name = tx2_pmu->name;
+> > +
+> > +     /* Perf event registration */
+> > +     tx2_pmu->pmu = (struct pmu) {
+> > +             .module         = THIS_MODULE,
+> > +             .attr_groups    = tx2_pmu->attr_groups,
+> > +             .task_ctx_nr    = perf_invalid_context,
+> > +             .event_init     = tx2_uncore_event_init,
+> > +             .add            = tx2_uncore_event_add,
+> > +             .del            = tx2_uncore_event_del,
+> > +             .start          = tx2_uncore_event_start,
+> > +             .stop           = tx2_uncore_event_stop,
+> > +             .read           = tx2_uncore_event_read,
+> > +     };
+> > +
+> > +     tx2_pmu->pmu.name = devm_kasprintf(dev, GFP_KERNEL,
+> > +                     "%s", name);
+> > +
+> > +     return perf_pmu_register(&tx2_pmu->pmu, tx2_pmu->pmu.name, -1);
+> > +}
+> > +
+> > +static int tx2_uncore_pmu_add_dev(struct tx2_uncore_pmu *tx2_pmu)
+> > +{
+> > +     int ret, cpu;
+> > +
+> > +     cpu = cpumask_any_and(cpumask_of_node(tx2_pmu->node),
+> > +                     cpu_online_mask);
+> > +
+> > +     tx2_pmu->cpu = cpu;
+> > +     hrtimer_init(&tx2_pmu->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+> > +     tx2_pmu->hrtimer.function = tx2_hrtimer_callback;
+> > +
+> > +     ret = tx2_uncore_pmu_register(tx2_pmu);
+> > +     if (ret) {
+> > +             dev_err(tx2_pmu->dev, "%s PMU: Failed to init driver\n",
+> > +                             tx2_pmu->name);
+> > +             return -ENODEV;
+> > +     }
+> > +
+> > +     /* register hotplug callback for the pmu */
+> > +     ret = cpuhp_state_add_instance(
+> > +                     CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
+> > +                     &tx2_pmu->hpnode);
+> > +     if (ret) {
+> > +             dev_err(tx2_pmu->dev, "Error %d registering hotplug", ret);
+> > +             return ret;
+> > +     }
+> > +
+> > +     /* Add to list */
+> > +     list_add(&tx2_pmu->entry, &tx2_pmus);
+> > +
+> > +     dev_dbg(tx2_pmu->dev, "%s PMU UNCORE registered\n",
+> > +                     tx2_pmu->pmu.name);
+> > +     return ret;
+> > +}
+> > +
+> > +static struct tx2_uncore_pmu *tx2_uncore_pmu_init_dev(struct device *dev,
+> > +             acpi_handle handle, struct acpi_device *adev, u32 type)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +     void __iomem *base;
+> > +     struct resource res;
+> > +     struct resource_entry *rentry;
+> > +     struct list_head list;
+> > +     int ret;
+> > +
+> > +     INIT_LIST_HEAD(&list);
+> > +     ret = acpi_dev_get_resources(adev, &list, NULL, NULL);
+> > +     if (ret <= 0) {
+> > +             dev_err(dev, "failed to parse _CRS method, error %d\n", ret);
+> > +             return NULL;
+> > +     }
+> > +
+> > +     list_for_each_entry(rentry, &list, node) {
+> > +             if (resource_type(rentry->res) == IORESOURCE_MEM) {
+> > +                     res = *rentry->res;
+> > +                     break;
+> > +             }
+> > +     }
+> > +
+> > +     if (!rentry->res)
+> > +             return NULL;
+> > +
+> > +     acpi_dev_free_resource_list(&list);
+> > +     base = devm_ioremap_resource(dev, &res);
+> > +     if (IS_ERR(base)) {
+> > +             dev_err(dev, "PMU type %d: Fail to map resource\n", type);
+> > +             return NULL;
+> > +     }
+> > +
+> > +     tx2_pmu = devm_kzalloc(dev, sizeof(*tx2_pmu), GFP_KERNEL);
+> > +     if (!tx2_pmu)
+> > +             return NULL;
+> > +
+> > +     tx2_pmu->dev = dev;
+> > +     tx2_pmu->type = type;
+> > +     tx2_pmu->base = base;
+> > +     tx2_pmu->node = dev_to_node(dev);
+> > +     INIT_LIST_HEAD(&tx2_pmu->entry);
+> > +     raw_spin_lock_init(&tx2_pmu->lock);
+> > +
+> > +     switch (tx2_pmu->type) {
+> > +     case PMU_TYPE_L3C:
+> > +             tx2_pmu->max_counters = TX2_PMU_MAX_COUNTERS;
+> > +             tx2_pmu->prorate_factor = TX2_PMU_L3_TILES;
+> > +             tx2_pmu->max_events = L3_EVENT_MAX;
+> > +             tx2_pmu->hrtimer_interval = TX2_PMU_HRTIMER_INTERVAL;
+> > +             tx2_pmu->attr_groups = l3c_pmu_attr_groups;
+> > +             tx2_pmu->name = devm_kasprintf(dev, GFP_KERNEL,
+> > +                             "uncore_l3c_%d", tx2_pmu->node);
+> > +             tx2_pmu->init_cntr_base = init_cntr_base_l3c;
+> > +             tx2_pmu->start_event = uncore_start_event_l3c;
+> > +             tx2_pmu->stop_event = uncore_stop_event_l3c;
+> > +             break;
+> > +     case PMU_TYPE_DMC:
+> > +             tx2_pmu->max_counters = TX2_PMU_MAX_COUNTERS;
+> > +             tx2_pmu->prorate_factor = TX2_PMU_DMC_CHANNELS;
+> > +             tx2_pmu->max_events = DMC_EVENT_MAX;
+> > +             tx2_pmu->hrtimer_interval = TX2_PMU_HRTIMER_INTERVAL;
+> > +             tx2_pmu->attr_groups = dmc_pmu_attr_groups;
+> > +             tx2_pmu->name = devm_kasprintf(dev, GFP_KERNEL,
+> > +                             "uncore_dmc_%d", tx2_pmu->node);
+> > +             tx2_pmu->init_cntr_base = init_cntr_base_dmc;
+> > +             tx2_pmu->start_event = uncore_start_event_dmc;
+> > +             tx2_pmu->stop_event = uncore_stop_event_dmc;
+> > +             break;
+> > +     case PMU_TYPE_INVALID:
+> > +             devm_kfree(dev, tx2_pmu);
+> > +             return NULL;
+> > +     }
+> > +
+> > +     return tx2_pmu;
+> > +}
+> > +
+> > +static int tx2_uncore_pmu_online_cpu(unsigned int cpu,
+> > +             struct hlist_node *hpnode)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +
+> > +     tx2_pmu = hlist_entry_safe(hpnode,
+> > +                     struct tx2_uncore_pmu, hpnode);
+> > +
+> > +     /* Pick this CPU, If there is no CPU/PMU association and both are
+> > +      * from same node.
+> > +      */
+> > +     if ((tx2_pmu->cpu >= nr_cpu_ids) &&
+> > +             (tx2_pmu->node == cpu_to_node(cpu)))
+> > +             tx2_pmu->cpu = cpu;
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static int tx2_uncore_pmu_offline_cpu(unsigned int cpu,
+> > +             struct hlist_node *hpnode)
+> > +{
+> > +     int new_cpu;
+> > +     struct tx2_uncore_pmu *tx2_pmu;
+> > +     struct cpumask cpu_online_mask_temp;
+> > +
+> > +     tx2_pmu = hlist_entry_safe(hpnode,
+> > +                     struct tx2_uncore_pmu, hpnode);
+> > +
+> > +     if (cpu != tx2_pmu->cpu)
+> > +             return 0;
+> > +
+> > +     hrtimer_cancel(&tx2_pmu->hrtimer);
+> > +     cpumask_copy(&cpu_online_mask_temp, cpu_online_mask);
+> > +     cpumask_clear_cpu(cpu, &cpu_online_mask_temp);
+> > +     new_cpu = cpumask_any_and(
+> > +                     cpumask_of_node(tx2_pmu->node),
+> > +                     &cpu_online_mask_temp);
+> > +
+> > +     tx2_pmu->cpu = new_cpu;
+> > +     if (new_cpu >= nr_cpu_ids)
+> > +             return 0;
+> > +     perf_pmu_migrate_context(&tx2_pmu->pmu, cpu, new_cpu);
+> > +
+> > +     return 0;
+> > +}
+> > +
+> > +static const struct acpi_device_id tx2_uncore_acpi_match[] = {
+> > +     {"CAV901C", 0},
+> > +     {},
+> > +};
+> > +MODULE_DEVICE_TABLE(acpi, tx2_uncore_acpi_match);
+> > +
+> > +static int tx2_uncore_probe(struct platform_device *pdev)
+> > +{
+> > +     struct device *dev = &pdev->dev;
+> > +     acpi_handle handle;
+> > +     acpi_status status;
+> > +
+> > +     set_dev_node(dev, acpi_get_node(ACPI_HANDLE(dev)));
+> > +
+> > +     if (!has_acpi_companion(dev))
+> > +             return -ENODEV;
+> > +
+> > +     handle = ACPI_HANDLE(dev);
+> > +     if (!handle)
+> > +             return -EINVAL;
+> > +
+> > +     /* Walk through the tree for all PMU UNCORE devices */
+> > +     status = acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
+> > +                                  tx2_uncore_pmu_add,
+> > +                                  NULL, dev, NULL);
+> > +     if (ACPI_FAILURE(status)) {
+> > +             dev_err(dev, "failed to probe PMU devices\n");
+> > +             return_ACPI_STATUS(status);
+> > +     }
+> > +
+> > +     dev_info(dev, "node%d: pmu uncore registered\n", dev_to_node(dev));
+> > +     return 0;
+> > +}
+> > +
+> > +static int tx2_uncore_remove(struct platform_device *pdev)
+> > +{
+> > +     struct tx2_uncore_pmu *tx2_pmu, *temp;
+> > +     struct device *dev = &pdev->dev;
+> > +
+> > +     if (!list_empty(&tx2_pmus)) {
+> > +             list_for_each_entry_safe(tx2_pmu, temp, &tx2_pmus, entry) {
+> > +                     if (tx2_pmu->node == dev_to_node(dev)) {
+> > +                             cpuhp_state_remove_instance_nocalls(
+> > +                                     CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
+> > +                                     &tx2_pmu->hpnode);
+> > +                             perf_pmu_unregister(&tx2_pmu->pmu);
+> > +                             list_del(&tx2_pmu->entry);
+> > +                     }
+> > +             }
+> > +     }
+> > +     return 0;
+> > +}
+> > +
+> > +static struct platform_driver tx2_uncore_driver = {
+> > +     .driver = {
+> > +             .name           = "tx2-uncore-pmu",
+> > +             .acpi_match_table = ACPI_PTR(tx2_uncore_acpi_match),
+> > +     },
+> > +     .probe = tx2_uncore_probe,
+> > +     .remove = tx2_uncore_remove,
+> > +};
+> > +
+> > +static int __init tx2_uncore_driver_init(void)
+> > +{
+> > +     int ret;
+> > +
+> > +     ret = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
+> > +                                   "perf/tx2/uncore:online",
+> > +                                   tx2_uncore_pmu_online_cpu,
+> > +                                   tx2_uncore_pmu_offline_cpu);
+> > +     if (ret) {
+> > +             pr_err("TX2 PMU: setup hotplug failed(%d)\n", ret);
+> > +             return ret;
+> > +     }
+> > +     ret = platform_driver_register(&tx2_uncore_driver);
+> > +     if (ret)
+> > +             cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
+> > +
+> > +     return ret;
+> > +}
+> > +module_init(tx2_uncore_driver_init);
+> > +
+> > +static void __exit tx2_uncore_driver_exit(void)
+> > +{
+> > +     platform_driver_unregister(&tx2_uncore_driver);
+> > +     cpuhp_remove_multi_state(CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE);
+> > +}
+> > +module_exit(tx2_uncore_driver_exit);
+> > +
+> > +MODULE_DESCRIPTION("ThunderX2 UNCORE PMU driver");
+> > +MODULE_LICENSE("GPL v2");
+> > +MODULE_AUTHOR("Ganapatrao Kulkarni <gkulkarni@cavium.com>");
+> > diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> > index caf40ad0bbc6..2c13dc2f765d 100644
+> > --- a/include/linux/cpuhotplug.h
+> > +++ b/include/linux/cpuhotplug.h
+> > @@ -163,6 +163,7 @@ enum cpuhp_state {
+> >       CPUHP_AP_PERF_ARM_L2X0_ONLINE,
+> >       CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+> >       CPUHP_AP_PERF_ARM_QCOM_L3_ONLINE,
+> > +     CPUHP_AP_PERF_ARM_TX2_UNCORE_ONLINE,
+> >       CPUHP_AP_PERF_POWERPC_NEST_IMC_ONLINE,
+> >       CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
+> >       CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
+> >
+>
+> Suzuki
 
-Thanks
-Kishon
+Thanks,
+Ganapat
