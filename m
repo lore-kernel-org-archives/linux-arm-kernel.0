@@ -1,52 +1,70 @@
-From: jhugo@codeaurora.org (Jeffrey Hugo)
-Date: Tue, 20 Nov 2018 08:28:18 -0700
-Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
-In-Reply-To: <20181120111146.GA6497@e107155-lin>
-References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
- <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
- <20181120111146.GA6497@e107155-lin>
-Message-ID: <35b92f83-dbbf-fad2-561f-49b0933ffe19@codeaurora.org>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 20 Nov 2018 16:26:52 +0100
+Subject: Clock configuration for the SAMA5D2 NAND controller
+In-Reply-To: <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
+References: <CAGkQfmNuROsD29jR_7opiXcfPB6=FuaoxaK-hF5Ezz7r-1pBZA@mail.gmail.com>
+ <63b44c97-1700-c8e4-0a26-c87e51572575@microchip.com>
+ <1eb26b47-49a7-c667-e986-824ee3d726d5@microchip.com>
+Message-ID: <CAGkQfmPZ+9_=SQefg+pW4Hweo1QOtGwgMVWdy_sjyL=eDK0rNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2018 4:11 AM, Sudeep Holla wrote:
-> On Thu, Nov 15, 2018 at 11:31:33AM -0700, Jeffrey Hugo wrote:
-> 
-> [...]
-> 
->>
->> I was interested in testing these on QDF2400, an ARM64 platform, since this
->> series touches core ARM64 code and I'd hate to see a regression. However, I
->> can't figure out what baseline to use to apply these. Different patches
->> cause different conflicts of a variety of baselines I attempted.
->>
-> 
-> Good to know that we can test DT configuration on QDF2400. I always assumed
-> it's ACPI only.
+Le mar. 20 nov. 2018 ? 12:28, <Tudor.Ambarus@microchip.com> a ?crit :
+>
+> Hi, Romain,
+>
+> On 11/14/2018 03:45 PM, Tudor Ambarus wrote:
+> > Hi, Romain,
+> >
+> > On 10/10/2018 08:05 PM, Romain Izard wrote:
+> >> Hello,
+> >>
+> >> While evaluating a new flash memory chip for my product based on a SAMA5D2
+> >> chip, I tried to update my software to use the latest device tree bindings.
+> >>
+> >> Until now, I was using the legacy bindings for the NAND controller, that
+> >> preserved the timings configured by the bootloader in the EBI registers. The
+> >> bindings introduced in Linux 4.13 are used together with the NAND driver to
+> >> reconfigure the timings of the memory interface to match the speed profile
+> >> declared by some NAND components.
+> >>
+> >> However, when comparing the timings in the registers, there was a large
+> >> difference between what I calculated by hand in the past and the values
+> >> configured by the drivers. The difference was in fact a 2 factor.
+> >>
+> >> For me, the issue is due to the clock configuration declared in the SAMA5D2
+> >> device tree: The reference clock used by the nand-controller driver is the
+> >> clock for its parent node, which is directly the Master Clock. And on my
+> >> end, what I understood when writing the clock settings for my bootloader was
+> >> that the reference clock was the HSMC clock, which derives from the H32MX
+> >> clock, which runs at half the rate of the Master Clock.
+> >>
+> >> The documentation for the SAMA5D2 is not very precise on this topic, so I
+> >> would like to have some feedback. Is the clock used as a reference for the
+> >> chip select configuration registers the Master Clock itself, or is it the
+> >> peripheral clock for the HSMC module ?
+> >>
+> >
+> > I would say that it's the HSMC peripheral clock because it's the only clock that
+>
+> The hardware team confirmed that the timings are based on MCK which is MCK/2.
+> The periph_clk is MCK/2 as well, but used to clock the logic of the IP.
+>
+> The HSMC receives a AHB clock HCLOCK_LS (MCK/2) used to generate the timings and
+> a PCLOCK_LS used to clock the HSMC/NFC logic.
+>
+>
+> > we describe for HSMC. If this is the case, then we will need to know the
+> > derivation formula used by the Peripheral Clock Controller to derive the MCK2
+> > (AHB 32-bit MATRIX system) clock to Periph_clk[17] HCLOCK_LS (HSMC), in order to
+> > correctly configure the timings to match flashes capabilities.
+>
+> I assumed that the on/off box from the Peripheral Clock Controller described at
+> 33.3 Block Diagram implies some derivation formula. I was wrong, the on/off box
+> is there just to gate the clocks going to the peripherals.
 
-It is ACPI only in the production configuration.  I suppose we could 
-hack things up to do basic DT sanity, but I expect it would be nasty and 
-non-trivial.
+Ok, I will send a fix.
 
-> 
->> What are these intended to apply to?
->>
-> 
-> The series alone may not get the package/socket ids correct on QDF2400.
-> I have not yet added support for the same as I wanted to get the initial
-> feedback on DT bindings. The movement of DT binding and corresponding
-> code should not regress and you should be able to validate only that
-> part.
-> 
-
-On a cursory glance, it looks like some of the reorganized code would 
-also be used in the ACPI path (things that are common between DT and 
-ACPI).  I do not expect problems, but I still feel its prudent to do a 
-sanity check on actual hardware.
-
+Best regards,
 -- 
-Jeffrey Hugo
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Romain Izard
