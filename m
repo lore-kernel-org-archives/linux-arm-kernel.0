@@ -1,102 +1,65 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 20 Nov 2018 12:14:48 -0800
-Subject: [PATCH V6 5/6] clk: imx: add lpcg clock support
-In-Reply-To: <1541862894-8209-6-git-send-email-aisheng.dong@nxp.com>
-References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
- <1541862894-8209-6-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <154274488829.88331.14073987677874819400@swboyd.mtv.corp.google.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 20 Nov 2018 21:40:49 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2: use the divided clock for SMC
+In-Reply-To: <CAGkQfmPHRKqMvm6bNDf8S5qM7uE5T-izij=jm2nob0zrOgOM-w@mail.gmail.com>
+References: <20181120165737.4998-1-romain.izard.pro@gmail.com>
+ <20181120171612.GF8367@piout.net>
+ <CAGkQfmPHRKqMvm6bNDf8S5qM7uE5T-izij=jm2nob0zrOgOM-w@mail.gmail.com>
+Message-ID: <20181120204049.GG8367@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting A.s. Dong (2018-11-10 07:20:04)
-> diff --git a/drivers/clk/imx/clk-lpcg-scu.c b/drivers/clk/imx/clk-lpcg-scu.c
-> new file mode 100644
-> index 0000000..54a1cb3
-> --- /dev/null
-> +++ b/drivers/clk/imx/clk-lpcg-scu.c
-> @@ -0,0 +1,108 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * Copyright 2018 NXP
-> + *     Dong Aisheng <aisheng.dong@nxp.com>
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/slab.h>
-> +#include <linux/spinlock.h>
-> +
-> +static DEFINE_SPINLOCK(imx_lpcg_scu_lock);
-> +
-> +#define CLK_GATE_SCU_LPCG_MASK         0x3
-> +#define CLK_GATE_SCU_LPCG_HW_SEL       BIT(0)
-> +#define CLK_GATE_SCU_LPCG_SW_SEL       BIT(1)
-> +
-> +struct clk_lpcg_scu {
-> +       struct clk_hw hw;
-> +       void __iomem *reg;
-> +       u8 bit_idx;
-> +       bool hw_gate;
+On 20/11/2018 19:01:32+0100, Romain Izard wrote:
+> Le mar. 20 nov. 2018 ? 18:16, Alexandre Belloni
+> <alexandre.belloni@bootlin.com> a ?crit :
+> >
+> > Hello Romain,
+> >
+> > On 20/11/2018 17:57:37+0100, Romain Izard wrote:
+> > > The SAMA5D2 is different from SAMA5D3 and SAMA5D4, as there are two
+> > > different clocks for the peripherals in the SoC. The Static Memory
+> > > controller is connected to the divided master clock.
+> > >
+> > > Unfortunately, the device tree does not correctly show this and uses the
+> > > master clock directly. This clock is then used by the code for the NAND
+> > > controller to calculate the timings for the controller, and we end up with
+> > > slow NAND Flash access.
+> > >
+> > > Fix the device tree, and the performance of Flash access is improved.
+> > >
+> > > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> > > ---
+> > >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > >
+> > > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> > > index 61f68e5c48e9..b405992eb601 100644
+> > > --- a/arch/arm/boot/dts/sama5d2.dtsi
+> > > +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> > > @@ -308,7 +308,7 @@
+> > >                                 0x1 0x0 0x60000000 0x10000000
+> > >                                 0x2 0x0 0x70000000 0x10000000
+> > >                                 0x3 0x0 0x80000000 0x10000000>;
+> > > -                     clocks = <&mck>;
+> > > +                     clocks = <&h32ck>;
+> >
+> > You will have to rebase on top of at91-dt. And if I'm not mistaken, this
+> > line should be:
+> >
+> > +                       clocks = <&pmc PMC_TYPE_CORE PMC_MCK2>;
+> >
+> > >                       status = "disabled";
+> > >
+> > >                       nand_controller: nand-controller {
+> 
+> I guess you're right but this will only reach mainline in 4.21. I get slow
+> flash access with 4.19 as well...
+>
 
-What does hw_gate mean? Can you add kernel-doc to this structure?
+Ok, this is super annoying, I'll try to get that as fixes on v4.20 and
+I'll rebase at91-dt on top of that...
 
-> +};
-> +
-> +#define to_clk_lpcg_scu(_hw) container_of(_hw, struct clk_lpcg_scu, hw)
-> +
-> +/* Write to the LPCG bits. */
-
-Please remove this useless comment.
-
-> +static int clk_lpcg_scu_enable(struct clk_hw *hw)
-> +{
-> +       struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
-> +       unsigned long flags = 0;
-
-Don't initialize flags here.
-
-> +       u32 reg;
-> +
-> +       spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
-> +
-> +       if (clk->reg) {
-> +               reg = readl(clk->reg);
-> +               reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
-> +               if (clk->hw_gate)
-> +                       reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
-> +                               CLK_GATE_SCU_LPCG_SW_SEL) << clk->bit_idx;
-> +               else
-> +                       reg |= (CLK_GATE_SCU_LPCG_SW_SEL << clk->bit_idx);
-> +               writel(reg, clk->reg);
-> +       }
-> +
-> +       spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags);
-> +
-> +       return 0;
-> +}
-> +
-> +static void clk_lpcg_scu_disable(struct clk_hw *hw)
-> +{
-> +       struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
-> +       unsigned long flags = 0;
-
-Same comment.
-
-> +       u32 reg;
-> +
-> +       spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
-> +
-> +       if (clk->reg) {
-
-Why do we even call this function if there isn't a clk->reg value?
-Can't we just not assign the clk_ops in that case?
-
-> +               reg = readl(clk->reg);
-> +               reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
-> +               writel(reg, clk->reg);
-> +       }
-> +
-> +       spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags);
-> +}
-> +
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
