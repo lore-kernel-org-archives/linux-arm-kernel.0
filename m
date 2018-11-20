@@ -1,66 +1,61 @@
-From: jarkko.sakkinen@linux.intel.com (Jarkko Sakkinen)
-Date: Wed, 21 Nov 2018 00:50:22 +0200
-Subject: [PATCH v9 05/17] tpm: declare struct tpm_header
-In-Reply-To: <20181120160111.GA22023@ziepe.ca>
-References: <20181118124753.18613-1-jarkko.sakkinen@linux.intel.com>
- <20181118124753.18613-6-jarkko.sakkinen@linux.intel.com>
- <5B8DA87D05A7694D9FA63FD143655C1B9DA235BB@hasmsx108.ger.corp.intel.com>
- <20181120130805.GD8813@linux.intel.com>
- <20181120160111.GA22023@ziepe.ca>
-Message-ID: <20181120225022.GD8391@linux.intel.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 21 Nov 2018 04:36:58 +0530
+Subject: [PATCH 1/3] ARM: davinci: define gpio interrupts as separate
+ resources
+In-Reply-To: <63ac671f-b202-2533-3878-af16149fbdbb@ti.com>
+References: <20181113135051.15308-1-brgl@bgdev.pl>
+ <20181113135051.15308-2-brgl@bgdev.pl>
+ <c092b014-d5cf-f1ad-de91-6696b05cdf17@ti.com>
+ <63ac671f-b202-2533-3878-af16149fbdbb@ti.com>
+Message-ID: <b30f6b76-52c1-89ca-dbf3-a4156d1fb55e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 09:01:11AM -0700, Jason Gunthorpe wrote:
-> On Tue, Nov 20, 2018 at 03:08:05PM +0200, Jarkko Sakkinen wrote:
-> > On Mon, Nov 19, 2018 at 09:33:31PM +0000, Winkler, Tomas wrote:
-> > > 
-> > > > 
-> > > > Decleare struct tpm_header that replaces struct tpm_input_header and
-> > > Typo 
-> > 
-> > Thanks, will fix for the next version.
-> > 
-> > > > struct tpm_output_header.
-> > > > 
-> > > > Signed-off-by: Jarkko Sakkinen <jarkko.sakkinen@linux.intel.com>
-> > > > Reviewed-by: Stefan Berger <stefanb@linux.ibm.com>
-> > > >  drivers/char/tpm/tpm-interface.c  |  9 ++++-----
-> > > >  drivers/char/tpm/tpm.h            | 27 ++++++++++++---------------
-> > > >  drivers/char/tpm/tpm2-cmd.c       |  4 ++--
-> > > >  drivers/char/tpm/tpm2-space.c     |  6 +++---
-> > > >  drivers/char/tpm/tpm_i2c_atmel.c  |  5 ++---
-> > > > drivers/char/tpm/tpm_vtpm_proxy.c |  8 ++++----
-> > > >  drivers/char/tpm/xen-tpmfront.c   |  2 +-
-> > > >  7 files changed, 28 insertions(+), 33 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/char/tpm/tpm-interface.c b/drivers/char/tpm/tpm-
-> > > > interface.c
-> > > > index 7ac6ada8428c..cb0d44c158ae 100644
-> > > > +++ b/drivers/char/tpm/tpm-interface.c
-> > > > @@ -67,7 +67,7 @@ static int tpm_validate_command(struct tpm_chip
-> > > > *chip,
-> > > >  				 const u8 *cmd,
-> > > >  				 size_t len)
-> > > >  {
-> > > > -	const struct tpm_input_header *header = (const void *)cmd;
-> > > > +	const struct tpm_header *header = (const void *)cmd;
-> > > 
-> > > 
-> > > Sometimes it is casted (void *), sometimes (struct tpm_header *)
-> > > Better to use one convention 
-> > 
-> > I would prefer (const void *) because it is shorter form, and no
-> > need to duplicate the type name two times, that way also more
-> > readable. Anyway, agreed that we do have inconsistency with these.
+On 20/11/18 12:08 PM, J, KEERTHY wrote:
 > 
-> It is better to pass in 'const void *cmd' than to explicitly cast like
-> this.
 > 
-> I generally discourage casts to voids to save typing, just creates
-> confusion what is going on. Better to try to avoid casts by
-> constructing the code properly.
+> On 11/20/2018 2:22 AM, Sekhar Nori wrote:
+>> On 13/11/18 7:20 PM, Bartosz Golaszewski wrote:
+>>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>>
+>>> Since commit eb3744a2dd01 ("gpio: davinci: Do not assume continuous
+>>> IRQ numbering") the davinci GPIO driver fails to probe if we boot
+>>> in legacy mode from any of the board files. Since the driver now
+>>> expects every interrupt to be defined as a separate resource, split
+>>> the definition in devices-da8xx.c instead of having a single continuous
+>>> interrupt range.
+>>>
+>>> Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ
+>>> numbering")
+>>> Cc: stable at vger.kernel.org
+>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>
+>> There are a number of other boards that need such fixing too. And the
+>> commit in question does not do a good job of explaining why it was
+>> needed in the first place. The description? just repeats what can be
+>> inferred by reading the patch.
+> 
+> Cc Lokesh
+> 
+> Sekhar,
+> 
+> DT explicitly mentions every IRQ number. The patch in discussion
+> explicitly calls platform_get_irq for all the interrupts which to me is
+> the right thing to do as: platform_get_irq-->
+> of_irq_get-->irq_create_of_mapping--> sequence is to be done for every IRQ.
+> 
+> k3-am654 definitely will need explicit calls to platform_get_irq as it
+> will be involving interrupt router and interrupt numbers need not be
+> continuous.
+> 
+> So i do not think reverting the patch is the right idea.
 
-Definitely. Will change in the next version.
+Well, all of this description of patch motivation should have been in
+the patch description to begin with.
 
-/Jarkko
+Bartosz, can you please extend this patch to fix this problem for other
+DaVinci SoCs too? I am on the road this week, but will do my best to
+queue these fixes at the earliest .
+
+Thanks,
+Sekhar
