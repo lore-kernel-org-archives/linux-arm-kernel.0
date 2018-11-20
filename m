@@ -1,115 +1,148 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:27:51 +0000
-Subject: [PATCHv2 22/25] dt-bindings: pci: Add NXP Layerscape SoCs PCIe Gen4
- controller
+Date: Tue, 20 Nov 2018 09:27:45 +0000
+Subject: [PATCHv2 21/25] PCI: mobiveil: make mobiveil_host_init can be used to
+ re-init host
 In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
 References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-23-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-22-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Add PCIe Gen4 controller DT bindings of NXP Layerscape SoCs.
+Make the mobiveil_host_init function can be used to re-init
+host controller's PAB and GPEX CSR register block, as NXP
+integrated Mobiveil IP has to reset and then re-init the PAB
+and GPEX CSR registers upon Hot-reset.
 
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
 V2:
- - Change to use the layerscape-pci.txt for PCIe Gen4 controller
-   dt-bindings
+ - Reset the statistic of IB/OB windows configured.
+ - Change the type of member 'resources' to pointer to record the parsed
+   resources for re-init the outbound windows.
 
- .../bindings/pci/layerscape-pci.txt           | 57 +++++++++++++++++++
- MAINTAINERS                                   |  8 +++
- 2 files changed, 65 insertions(+)
+ .../controller/mobiveil/pcie-mobiveil-host.c  | 32 +++++++++++--------
+ .../pci/controller/mobiveil/pcie-mobiveil.h   |  3 +-
+ 2 files changed, 20 insertions(+), 15 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-index 66df1e81e0b8..3ef8836b6e97 100644
---- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-@@ -1,4 +1,6 @@
-+====================================
- Freescale Layerscape PCIe controller
-+====================================
+diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+index d028cdf31d0e..c85f00d3cfcf 100644
+--- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
++++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+@@ -217,7 +217,7 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
+ 	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
+ }
  
- This PCIe host controller is based on the Synopsys DesignWare PCIe IP
- and thus inherits all the common properties defined in designware-pcie.txt.
-@@ -58,3 +60,58 @@ Example:
- 				<0000 0 0 3 &gic GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>,
- 				<0000 0 0 4 &gic GIC_SPI 192 IRQ_TYPE_LEVEL_HIGH>;
- 	};
-+
-+===================================
-+NXP Layerscape PCIe Gen4 controller
-+===================================
-+
-+This PCIe controller is based on the Mobiveil PCIe IP and thus inherits all
-+the common properties defined in mobiveil-pcie.txt.
-+
-+Required properties:
-+- compatible: should contain the platform identifier such as:
-+  "fsl,lx2160a-pcie"
-+- reg: base addresses and lengths of the PCIe controller register blocks.
-+  "config_axi_slave": PCIe controller registers
-+  "csr_axi_slave": Bridge config registers
-+- interrupts: A list of interrupt outputs of the controller. Must contain an
-+  entry for each entry in the interrupt-names property.
-+- interrupt-names: It could include the following entries:
-+  "intr": The interrupt that is asserted for controller interrupts
-+  "aer": Asserted for aer interrupt when chip support the aer interrupt with
-+	 none MSI/MSI-X/INTx mode,but there is interrupt line for aer.
-+  "pme": Asserted for pme interrupt when chip support the pme interrupt with
-+	 none MSI/MSI-X/INTx mode,but there is interrupt line for pme.
-+- dma-coherent: Indicates that the hardware IP block can ensure the coherency
-+  of the data transferred from/to the IP block. This can avoid the software
-+  cache flush/invalid actions, and improve the performance significantly.
-+- msi-parent : See the generic MSI binding described in
-+  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-+
-+Example:
-+
-+	pcie at 3400000 {
-+		compatible = "fsl,lx2160a-pcie";
-+		reg = <0x00 0x03400000 0x0 0x00100000   /* controller registers */
-+		       0x80 0x00000000 0x0 0x00001000>; /* configuration space */
-+		reg-names = "csr_axi_slave", "config_axi_slave";
-+		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER interrupt */
-+			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME interrupt */
-+			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /* controller interrupt */
-+		interrupt-names = "aer", "pme", "intr";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		apio-wins = <8>;
-+		ppio-wins = <8>;
-+		dma-coherent;
-+		bus-range = <0x0 0xff>;
-+		msi-parent = <&its>;
-+		ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0 0x40000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>,
-+				<0000 0 0 2 &gic 0 0 GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>,
-+				<0000 0 0 3 &gic 0 0 GIC_SPI 111 IRQ_TYPE_LEVEL_HIGH>,
-+				<0000 0 0 4 &gic 0 0 GIC_SPI 112 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 084d225583e0..b59763e23392 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11405,6 +11405,14 @@ L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
- F:	drivers/pci/controller/dwc/*layerscape*
+-static int mobiveil_host_init(struct mobiveil_pcie *pcie)
++int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit)
+ {
+ 	u32 value, pab_ctrl, type;
+ 	struct resource_entry *win;
+@@ -229,11 +229,16 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	for (i = 0; i < pcie->ppio_wins; i++)
+ 		mobiveil_pcie_disable_ib_win(pcie, i);
  
-+PCI DRIVER FOR NXP LAYERSCAPE GEN4 CONTROLLER
-+M:	Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-+L:	linux-pci at vger.kernel.org
-+L:	linux-arm-kernel at lists.infradead.org
-+S:	Maintained
-+F:	Documentation/devicetree/bindings/pci/layerscape-pci.txt
-+F:	drivers/pci/controller/mobibeil/pci-layerscape-gen4.c
+-	/* setup bus numbers */
+-	value = csr_readl(pcie, PCI_PRIMARY_BUS);
+-	value &= 0xff000000;
+-	value |= 0x00ff0100;
+-	csr_writel(pcie, value, PCI_PRIMARY_BUS);
++	pcie->ib_wins_configured = 0;
++	pcie->ob_wins_configured = 0;
 +
- PCI DRIVER FOR GENERIC OF HOSTS
- M:	Will Deacon <will.deacon@arm.com>
- L:	linux-pci at vger.kernel.org
++	if (!reinit) {
++		/* setup bus numbers */
++		value = csr_readl(pcie, PCI_PRIMARY_BUS);
++		value &= 0xff000000;
++		value |= 0x00ff0100;
++		csr_writel(pcie, value, PCI_PRIMARY_BUS);
++	}
+ 
+ 	/*
+ 	 * program Bus Master Enable Bit in Command Register in PAB Config
+@@ -279,7 +284,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	program_ib_windows(pcie, WIN_NUM_0, 0, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+ 
+ 	/* Get the I/O and memory ranges from DT */
+-	resource_list_for_each_entry(win, &pcie->resources) {
++	resource_list_for_each_entry(win, pcie->resources) {
+ 		if (resource_type(win->res) == IORESOURCE_MEM) {
+ 			type = MEM_WINDOW_TYPE;
+ 		} else if (resource_type(win->res) == IORESOURCE_IO) {
+@@ -550,8 +555,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+ 	resource_size_t iobase;
+ 	int ret;
+ 
+-	INIT_LIST_HEAD(&pcie->resources);
+-
+ 	ret = mobiveil_pcie_parse_dt(pcie);
+ 	if (ret) {
+ 		dev_err(dev, "Parsing DT failed, ret: %x\n", ret);
+@@ -565,17 +568,19 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+ 
+ 	/* parse the host bridge base addresses from the device tree file */
+ 	ret = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
+-						    &pcie->resources, &iobase);
++						    &bridge->windows, &iobase);
+ 	if (ret) {
+ 		dev_err(dev, "Getting bridge resources failed\n");
+ 		return ret;
+ 	}
+ 
++	pcie->resources = &bridge->windows;
++
+ 	/*
+ 	 * configure all inbound and outbound windows and prepare the RC for
+ 	 * config access
+ 	 */
+-	ret = mobiveil_host_init(pcie);
++	ret = mobiveil_host_init(pcie, false);
+ 	if (ret) {
+ 		dev_err(dev, "Failed to initialize host\n");
+ 		goto error;
+@@ -587,12 +592,11 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+ 		goto error;
+ 	}
+ 
+-	ret = devm_request_pci_bus_resources(dev, &pcie->resources);
++	ret = devm_request_pci_bus_resources(dev, pcie->resources);
+ 	if (ret)
+ 		goto error;
+ 
+ 	/* Initialize bridge */
+-	list_splice_init(&pcie->resources, &bridge->windows);
+ 	bridge->dev.parent = dev;
+ 	bridge->sysdata = pcie;
+ 	bridge->busnr = pcie->rp.root_bus_nr;
+@@ -619,6 +623,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie)
+ 
+ 	return 0;
+ error:
+-	pci_free_resource_list(&pcie->resources);
++	pci_free_resource_list(pcie->resources);
+ 	return ret;
+ }
+diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+index 933c2f34bc52..0f5303962e88 100644
+--- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
++++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
+@@ -152,7 +152,7 @@ struct mobiveil_pab_ops {
+ 
+ struct mobiveil_pcie {
+ 	struct platform_device *pdev;
+-	struct list_head resources;
++	struct list_head *resources;
+ 	void __iomem *csr_axi_slave_base;	/* PAB registers base */
+ 	phys_addr_t pcie_reg_base;	/* Physical PCIe Controller Base */
+ 	void __iomem *apb_csr_base;	/* MSI register base */
+@@ -165,6 +165,7 @@ struct mobiveil_pcie {
+ };
+ 
+ int mobiveil_pcie_host_probe(struct mobiveil_pcie *pcie);
++int mobiveil_host_init(struct mobiveil_pcie *pcie, bool reinit);
+ bool mobiveil_pcie_link_up(struct mobiveil_pcie *pcie);
+ int mobiveil_bringup_link(struct mobiveil_pcie *pcie);
+ void program_ob_windows(struct mobiveil_pcie *pcie, int win_num, u64 cpu_addr,
 -- 
 2.17.1
