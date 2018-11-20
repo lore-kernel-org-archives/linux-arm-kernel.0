@@ -1,206 +1,81 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 20 Nov 2018 01:37:01 +0000
-Subject: [PATCH V2] ARM: dts: imx7d-sdb: add rev-a board support
-In-Reply-To: <20181119134624.GT5829@dragon>
-References: <1541726525-19544-1-git-send-email-Anson.Huang@nxp.com>
- <20181119134624.GT5829@dragon>
-Message-ID: <DB3PR0402MB3916DCD69EE46A6F1341F95EF5D90@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: dbasehore@chromium.org (dbasehore .)
+Date: Mon, 19 Nov 2018 18:05:52 -0800
+Subject: [PATCH] arm64: dts: rockchip: rk3399: Add xin32k clk
+In-Reply-To: <11718017.ngvMPIPJQJ@diego>
+References: <20181116051719.23376-1-dbasehore@chromium.org>
+ <CAGAzgsq7uF=E3dzhyCjK4gq09_UV_aZhQbyaTnz7yDY_ErQYKQ@mail.gmail.com>
+ <CAD=FV=XVDAjLt+VtxedHEma1FRrG0LuFZ2c7L5-MsdCZkgEcsw@mail.gmail.com>
+ <11718017.ngvMPIPJQJ@diego>
+Message-ID: <CAGAzgsrWCo97un9WT2DvkHV5ga7rpg05sxd5PsbEN8_w2Dh3rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn
+On Mon, Nov 19, 2018 at 1:41 AM Heiko St?bner <heiko@sntech.de> wrote:
+>
+> Am Freitag, 16. November 2018, 19:23:59 CET schrieb Doug Anderson:
+> > Hi,
+> >
+> > On Fri, Nov 16, 2018 at 9:39 AM dbasehore . <dbasehore@chromium.org> wrote:
+> > > On Fri, Nov 16, 2018 at 8:01 AM Doug Anderson <dianders@chromium.org>
+> wrote:
+> > > > Hi,
+> > > >
+> > > > On Thu, Nov 15, 2018 at 9:17 PM Derek Basehore <dbasehore@chromium.org>
+> wrote:
+> > > > > This adds the xin32k clock to the RK3399 CPU. Even though it's not
+> > > > > directly used, muxes will end up traversing the entire clk tree on
+> > > > > calls to determine_rate if it doesn't exist.
+> > > > >
+> > > > > Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> > > > > ---
+> > > > >
+> > > > >  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 7 +++++++
+> > > > >  1 file changed, 7 insertions(+)
+> > > >
+> > > > nit: I would have expected ${SUBJECT} to have v2 in it somewhere.
+> > > >
+> > > > > diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index
+> > > > > 99e7f65c1779..3d09472978f8 100644
+> > > > > --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > > > +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> > > >
+> > > > Aww crud.  I was at the airport yesterday and so I didn't notice that
+> > > > you were touching rk3399, not rk3399-gru.  This belongs in the gru
+> > > > device tree file, not in the top level rk3399.  As you have written
+> > >
+> > > > this it will break rk3399 boards that have an rk808 on them, AKA:
+> > > Should this be moved to the rk3399.dtsi file? The RK3399 assumes that
+> > > this clk exists (same as the 24MHz clk which is in rk3399.dtsi). While
+> > > it can function without it defined, it really shouldn't. We can just
+> > > assign the existing labels in the dts files you pointed out.
+> >
+> > No, it should be in the board files.  Each board may produce the 32k
+> > clock through a different component.  On gru-based devices we produce
+> > the 32k clock through a silego part.
+>
+> That would also be a great part of the commit message, like
+> "...on Gru boards the 32kHz clock gets produced by a Silego oscillator"
+> or so when you move it over to rk3399-gru.dtsi .
+>
+>
+> > Technically you could say that we don't _truly_ need to model this
+> > clock and we could have just inserted a dummy/fixed 32k clock in the
+> > clk-rk3399.c file.  ...but we did model it so that means we should
+> > probably model it semi-properly.
+> >
+> > If a given board forgets to provide a 32k clock then that's a bug for
+> > them like it was for us.
+>
+> Yep and as I said in my other mail, on these pmic generated clocks
+> the clock generation often even is configurable (rate, on/off), so it
+> should really be a real clock not some hack ;-) .
+>
 
-Best Regards!
-Anson Huang
+Ok, I'll make that change in about a week after I get back from
+vacation in about a week.
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2018?11?19? 21:46
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: robh+dt at kernel.org; mark.rutland at arm.com; s.hauer at pengutronix.de;
-> kernel at pengutronix.de; Fabio Estevam <fabio.estevam@nxp.com>;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH V2] ARM: dts: imx7d-sdb: add rev-a board support
-> 
-> On Fri, Nov 09, 2018 at 01:27:10AM +0000, Anson Huang wrote:
-> > Current imx7d-sdb.dts has some incorrect settings about Rev-A and
-> > Rev-B boards, some of the settings are based on Rev-A board but some
-> > are based on Rev-B board, clean up it by adding i.MX7D SDB Rev-A board
-> > support, make default imx7d-sdb.dts for Rev-B board as usual, and
-> > introduce imx7d-sdb-reva.dts for Rev-A board. Below are the affected
-> > differences of Rev-A and Rev-B board:
-> >
-> >                 Rev-A           Rev-B
-> > USB_OTG2_PWR:   UART3_CTS_B     GPIO1_IO07
-> > ENET_EN_B:      None            GPIO1_IO04
-> > TP_INT_B:       EPDC_DATA13     EPDC_BDR1
-> >
-> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > ---
-> > change since V1:
-> > 	remove "pinctrl-assert-gpios" which is unused in upstream, and use
-> > phy-supply to control fec2's enable pin, model the enable pin as GPIO
-> regulator.
-> >  arch/arm/boot/dts/Makefile           |  1 +
-> >  arch/arm/boot/dts/imx7d-sdb-reva.dts | 39
-> ++++++++++++++++++++++++++++++++++++
-> >  arch/arm/boot/dts/imx7d-sdb.dts      | 29
-> +++++++++++++++++++++++++--
-> >  3 files changed, 67 insertions(+), 2 deletions(-)  create mode 100644
-> > arch/arm/boot/dts/imx7d-sdb-reva.dts
-> >
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index ef9ffa4..6d133b9 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -572,6 +572,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
-> >  	imx7d-pico-pi.dtb \
-> >  	imx7d-sbc-imx7.dtb \
-> >  	imx7d-sdb.dtb \
-> > +	imx7d-sdb-reva.dtb \
-> >  	imx7d-sdb-sht11.dtb \
-> >  	imx7s-colibri-eval-v3.dtb \
-> >  	imx7s-warp.dtb
-> > diff --git a/arch/arm/boot/dts/imx7d-sdb-reva.dts
-> > b/arch/arm/boot/dts/imx7d-sdb-reva.dts
-> > new file mode 100644
-> > index 0000000..7741eaa
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx7d-sdb-reva.dts
-> > @@ -0,0 +1,39 @@
-> > +// SPDX-License-Identifier: GPL-2.0+ OR MIT // // Copyright (C) 2015
-> > +Freescale Semiconductor, Inc.
-> > +
-> > +/dts-v1/;
-> > +
-> > +#include "imx7d-sdb.dts"
-> > +
-> > +/ {
-> > +	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
-> > +		gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
-> > +	};
-> > +};
-> > +
-> > +&fec2 {
-> > +	/delete-property/phy-supply;
-> > +};
-> > +
-> > +&iomuxc {
-> > +	imx7d-sdb {
-> > +		pinctrl_tsc2046_pendown: tsc2046_pendown {
-> > +			fsl,pins = <
-> > +				MX7D_PAD_EPDC_DATA13__GPIO2_IO13	0x59
-> > +			>;
-> > +		};
-> > +
-> > +		pinctrl_hog: hoggrp {
-> > +			fsl,pins = <
-> > +				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
-> > +				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x34  /* bt
-> reg on */
-> > +			>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&iomuxc_lpsr {
-> > +	/delete-property/pinctrl-names;
-> > +	/delete-property/pinctrl-0;
-> > +};
-> > diff --git a/arch/arm/boot/dts/imx7d-sdb.dts
-> > b/arch/arm/boot/dts/imx7d-sdb.dts index f1bafda..8385b9b 100644
-> > --- a/arch/arm/boot/dts/imx7d-sdb.dts
-> > +++ b/arch/arm/boot/dts/imx7d-sdb.dts
-> > @@ -73,7 +73,7 @@
-> >  		regulator-name = "usb_otg2_vbus";
-> >  		regulator-min-microvolt = <5000000>;
-> >  		regulator-max-microvolt = <5000000>;
-> > -		gpio = <&gpio4 7 GPIO_ACTIVE_HIGH>;
-> > +		gpio = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-> >  		enable-active-high;
-> >  	};
-> >
-> > @@ -114,6 +114,16 @@
-> >  		gpio = <&gpio2 14 GPIO_ACTIVE_LOW>;
-> >  	};
-> >
-> > +	reg_fec2_3v3: regulator-fec2-3v3 {
-> > +		compatible = "regulator-fixed";
-> > +		regulator-name = "fec2-3v3";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&pinctrl_enet2_reg>;
-> > +		regulator-min-microvolt = <3300000>;
-> > +		regulator-max-microvolt = <3300000>;
-> > +		gpio = <&gpio1 4 GPIO_ACTIVE_LOW>;
-> > +	};
-> > +
-> >  	backlight: backlight {
-> >  		compatible = "pwm-backlight";
-> >  		pwms = <&pwm1 0 5000000 0>;
-> > @@ -210,6 +220,7 @@
-> >  	assigned-clock-rates = <0>, <100000000>;
-> >  	phy-mode = "rgmii";
-> >  	phy-handle = <&ethphy1>;
-> > +	phy-supply = <&reg_fec2_3v3>;
-> >  	fsl,magic-packet;
-> >  	status = "okay";
-> >  };
-> > @@ -491,6 +502,12 @@
-> >  			>;
-> >  		};
-> >
-> > +		pinctrl_enet2_reg: enet2reggrp {
-> > +			fsl,pins = <
-> > +				MX7D_PAD_LPSR_GPIO1_IO04__GPIO1_IO4	0x14
-> > +			>;
-> > +		};
-> > +
-> >  		pinctrl_flexcan2: flexcan2grp {
-> >  			fsl,pins = <
-> >  				MX7D_PAD_GPIO1_IO14__FLEXCAN2_RX	0x59
-> > @@ -513,7 +530,6 @@
-> >
-> >  		pinctrl_hog: hoggrp {
-> >  			fsl,pins = <
-> > -				MX7D_PAD_UART3_CTS_B__GPIO4_IO7		0x14
-> >  				MX7D_PAD_ECSPI2_SS0__GPIO4_IO23		0x34  /* bt
-> reg on */
-> >  			>;
-> >  		};
-> > @@ -724,6 +740,9 @@
-> >  };
-> >
-> >  &iomuxc_lpsr {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_hog_2>;
-> > +
-> >  	pinctrl_wdog: wdoggrp {
-> >  		fsl,pins = <
-> >  			MX7D_PAD_LPSR_GPIO1_IO00__WDOG1_WDOG_B		0x74
-> > @@ -735,4 +754,10 @@
-> >  			MX7D_PAD_LPSR_GPIO1_IO01__PWM1_OUT		0x30
-> >  		>;
-> >  	};
-> > +
-> > +	pinctrl_hog_2: hoggrp-2 {
-> > +		fsl,pins = <
-> > +			MX7D_PAD_LPSR_GPIO1_IO07__GPIO1_IO7	  0x14
-> 
-> Instead of using hog group, this should be defined by pinctrl entry to be
-> referred by the fixed regulator that uses this GPIO?
-
-Agreed, I remove the hog_2 and add usb_otg2_vbus_reg pinctrl entry for regulator
-to reference, please help review V3 patch, thanks.
-
-Anson.
-
-> 
-> Shawn
-> 
-> > +		>;
-> > +	};
-> >  };
-> > --
-> > 2.7.4
-> >
+>
+> Heiko
+>
+>
