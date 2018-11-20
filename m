@@ -1,80 +1,149 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 20 Nov 2018 16:29:07 +0100
-Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-In-Reply-To: <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
-Message-ID: <20181120152907.GA28796@ulmo>
+From: andrea.merello@gmail.com (Andrea Merello)
+Date: Tue, 20 Nov 2018 16:31:45 +0100
+Subject: [PATCH v6 1/7] dmaengine: xilinx_dma: commonize DMA copy size
+ calculation
+Message-ID: <20181120153151.18024-1-andrea.merello@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
-> On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> >
-> > From: Thierry Reding <treding@nvidia.com>
-> >
-> > The mailbox framework supports blocking transfers via completions for
-> > clients that can sleep. In order to support blocking transfers in cases
-> > where the transmission is not permitted to sleep, add a new ->flush()
-> > callback that controller drivers can implement to busy loop until the
-> > transmission has been completed. This will automatically be called when
-> > available and interrupts are disabled for clients that request blocking
-> > transfers.
-> >
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> >  drivers/mailbox/mailbox.c          | 8 ++++++++
-> >  include/linux/mailbox_controller.h | 4 ++++
-> >  2 files changed, 12 insertions(+)
-> >
-> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> > index 674b35f402f5..0eaf21259874 100644
-> > --- a/drivers/mailbox/mailbox.c
-> > +++ b/drivers/mailbox/mailbox.c
-> > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
-> >                 unsigned long wait;
-> >                 int ret;
-> >
-> > +               if (irqs_disabled() && chan->mbox->ops->flush) {
-> > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
-> > +                       if (ret < 0)
-> > +                               tx_tick(chan, ret);
-> > +
-> > +                       return ret;
-> > +               }
-> > +
-> This is hacky. I think we can do without busy waiting in atomic
-> context. You could queue locally while in atomic context and then
-> transfer in blocking mode. I don't think we should worry about the
-> 'throughput' as there already is no h/w rate control even with
-> busy-waiting.
+This patch removes a bit of duplicated code by introducing a new
+function that implements calculations for DMA copy size, and
+prepares for changes to the copy size calculation that will
+happen in following patches.
 
-I actually tried to do that before I added this flushing mechanism. The
-problem is, like you said, one of rate control. As mentioned in the
-cover letter, the shared mailboxes implemented in tegra-hsp are used as
-RX and TX channels for the TCU, which is like a virtual UART. The TTY
-driver included as part of this series will use one of the mailboxes to
-transmit data that is written to the console. The problem is that if
-these transmissions are not rate-limited on the TTY driver side, the
-console will just keep writing data and eventually overflow the buffer
-that we have in the mailbox subsystem.
+Suggested-by: Vinod Koul <vkoul@kernel.org>
+Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+---
+Changes in v4:
+	- introduce this patch in the patch series
+Changes in v5:
+	None
+Changes in v6:
+	- 2/7 was basically redoing what done here. Anticipate
+	  here the introduction of a local temporary variable
+	  so that 2/7 just add stuff
+	- add dma chan ptr argument to xilinx_calc_cma_copysize()
+	  to prepare for 2/7
+	- introduce max_buffer_len variable in advance, to prepare
+	  for 4/7
+	- reword for above changes
+---
+ drivers/dma/xilinx/xilinx_dma.c | 39 ++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 8 deletions(-)
 
-The problem is that data comes in at a much higher rate than what we can
-output. This is especially true at boot when the TCU console takes over
-and the whole log buffer is dumped on it.
-
-So the only way to rate-limit is to either make mbox_send_message()
-block, but that can only be done in non-atomic context. The console,
-however, will always run in atomic context, so the only way to do rate-
-limiting is by busy looping.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/20d316ab/attachment-0001.sig>
+diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
+index c12442312595..2c1db500284f 100644
+--- a/drivers/dma/xilinx/xilinx_dma.c
++++ b/drivers/dma/xilinx/xilinx_dma.c
+@@ -423,6 +423,7 @@ struct xilinx_dma_config {
+  * @rxs_clk: DMA s2mm stream clock
+  * @nr_channels: Number of channels DMA device supports
+  * @chan_id: DMA channel identifier
++ * @max_buffer_len: Max buffer length
+  */
+ struct xilinx_dma_device {
+ 	void __iomem *regs;
+@@ -442,6 +443,7 @@ struct xilinx_dma_device {
+ 	struct clk *rxs_clk;
+ 	u32 nr_channels;
+ 	u32 chan_id;
++	u32 max_buffer_len;
+ };
+ 
+ /* Macros */
+@@ -957,6 +959,25 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+ 	return 0;
+ }
+ 
++/**
++ * xilinx_dma_calc_copysize - Calculate the amount of data to copy
++ * @chan: Driver specific DMA channel
++ * @size: Total data that needs to be copied
++ * @done: Amount of data that has been already copied
++ *
++ * Return: Amount of data that has to be copied
++ */
++static int xilinx_dma_calc_copysize(struct xilinx_dma_chan *chan,
++				    int size, int done)
++{
++	size_t copy;
++
++	copy = min_t(size_t, size - done,
++		     chan->xdev->max_buffer_len);
++
++	return copy;
++}
++
+ /**
+  * xilinx_dma_tx_status - Get DMA transaction status
+  * @dchan: DMA channel
+@@ -990,7 +1011,7 @@ static enum dma_status xilinx_dma_tx_status(struct dma_chan *dchan,
+ 			list_for_each_entry(segment, &desc->segments, node) {
+ 				hw = &segment->hw;
+ 				residue += (hw->control - hw->status) &
+-					   XILINX_DMA_MAX_TRANS_LEN;
++					   chan->xdev->max_buffer_len;
+ 			}
+ 		}
+ 		spin_unlock_irqrestore(&chan->lock, flags);
+@@ -1250,7 +1271,7 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+ 
+ 		/* Start the transfer */
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+-				hw->control & XILINX_DMA_MAX_TRANS_LEN);
++				hw->control & chan->xdev->max_buffer_len);
+ 	}
+ 
+ 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+@@ -1353,7 +1374,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 
+ 		/* Start the transfer */
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+-			       hw->control & XILINX_DMA_MAX_TRANS_LEN);
++			       hw->control & chan->xdev->max_buffer_len);
+ 	}
+ 
+ 	list_splice_tail_init(&chan->pending_list, &chan->active_list);
+@@ -1714,7 +1735,7 @@ xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t dma_dst,
+ 	struct xilinx_cdma_tx_segment *segment;
+ 	struct xilinx_cdma_desc_hw *hw;
+ 
+-	if (!len || len > XILINX_DMA_MAX_TRANS_LEN)
++	if (!len || len > chan->xdev->max_buffer_len)
+ 		return NULL;
+ 
+ 	desc = xilinx_dma_alloc_tx_descriptor(chan);
+@@ -1804,8 +1825,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+ 			 * Calculate the maximum number of bytes to transfer,
+ 			 * making sure it is less than the hw limit
+ 			 */
+-			copy = min_t(size_t, sg_dma_len(sg) - sg_used,
+-				     XILINX_DMA_MAX_TRANS_LEN);
++			copy = xilinx_dma_calc_copysize(chan, sg_dma_len(sg),
++							sg_used);
+ 			hw = &segment->hw;
+ 
+ 			/* Fill in the descriptor */
+@@ -1909,8 +1930,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 			 * Calculate the maximum number of bytes to transfer,
+ 			 * making sure it is less than the hw limit
+ 			 */
+-			copy = min_t(size_t, period_len - sg_used,
+-				     XILINX_DMA_MAX_TRANS_LEN);
++			copy = xilinx_dma_calc_copysize(chan, period_len,
++							sg_used);
+ 			hw = &segment->hw;
+ 			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
+ 					  period_len * i);
+@@ -2624,6 +2645,8 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 
+ 	/* Retrieve the DMA engine properties from the device tree */
+ 	xdev->has_sg = of_property_read_bool(node, "xlnx,include-sg");
++	xdev->max_buffer_len = XILINX_DMA_MAX_TRANS_LEN;
++
+ 	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
+ 		xdev->mcdma = of_property_read_bool(node, "xlnx,mcdma");
+ 
+-- 
+2.17.1
