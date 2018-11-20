@@ -1,58 +1,75 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 20 Nov 2018 16:45:32 +0100
-Subject: [PATCH v2 03/12] drm/sun4i: sun6i_mipi_dsi: Setup burst mode
- timings
-In-Reply-To: <CAMty3ZBDBDqtH5_m4g-kkKKx+JqcC-r9mc-H+_WWgkLubMWPew@mail.gmail.com>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-4-jagan@amarulasolutions.com>
- <20181119083036.riydru5xefao3xte@flea>
- <CAMty3ZBDBDqtH5_m4g-kkKKx+JqcC-r9mc-H+_WWgkLubMWPew@mail.gmail.com>
-Message-ID: <20181120154532.mykbbrc3homwf2fi@flea>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Nov 2018 14:55:23 +0000
+Subject: [PATCH v1 1/1] arm64: Early boot time stamps
+In-Reply-To: <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
+ <20181119214443.25175-2-pasha.tatashin@soleen.com>
+ <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
+ <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+Message-ID: <01ae5979-9bcd-dd59-adda-efbf69f388ca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 04:30:37PM +0530, Jagan Teki wrote:
-> On Mon, Nov 19, 2018 at 2:00 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Fri, Nov 16, 2018 at 10:09:07PM +0530, Jagan Teki wrote:
-> > > Burst mode display timings are different from convectional
-> > > video mode so update the horizontal and vertical timings.
-> > >
-> > > Reference code taken from BSP (from linux-sunxi/
-> > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > >
-> > > dsi_hsa  = 0;
-> > > dsi_hbp  = 0;
-> > > dsi_hact = x*dsi_pixel_bits[format]/8;
-> > > dsi_hblk = dsi_hact;
-> > > dsi_hfp  = 0;
-> > > dsi_vblk = 0;
-> > >
-> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> >
-> > How is that matching the code you have in the rest of your patch?
+On 20/11/2018 14:40, Pavel Tatashin wrote:
+>>> +static __init void sched_clock_early_init(void)
+>>> +{
+>>> +     u64 freq = arch_timer_get_cntfrq();
+>>> +     u64 (*read_time)(void) = arch_counter_get_cntvct;
+>>
+>> We already have arch_timer_read_counter which is exposed from
+>> arm_arch_timer.h.
 > 
-> +       if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-> +               timings.hblk = (mode->hdisplay * Bpp);
-> +       else
-> +               sun6i_dsi_get_timings(dsi, mode, &timings);
+> OK
 > 
-> It's again your request to "keep the couple of function to make more
-> readable"
+>>
+>>> +
+>>> +     /* Early clock is available only on platforms with known freqs */
+>>
+>> This comment is misleading. It should read something like:
+>>
+>>         /*
+>>          * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
+>>          * the timer frequency. To avoid breakage on misconfigured
+>>          * systems, do not register the early sched_clock if the
+>>          * programmed value if zero. Other random values will just
+>>          * result in random output.
+>>          */
+>>
+> 
+> OK
+> 
+>>> +     if (!freq)
+>>> +             return;
+>>> +
+>>> +     sched_clock_register(read_time, BITS_PER_LONG, freq);
+>>
+>> This doesn't seem right. The counter has an architected minimum of 56
+>> bits, and you can't assume that it is going to be more than that.
+> 
+> Yeah, I saw 56 is used in arm_arch_timer.c, but I could not find where
+> this minimum is defined in aarch64 specs. I will change it to 56.
 
-That function in particular doesn't make it much more readable, but
-more importantly, your commit log doesn't match what you code does.
+See D10.1.2 (The system counter) in the ARM ARM[1], which says:
 
-Maxime
+<quote>
+The Generic Timer provides a system counter with the following
+specification:
+Width	At least 56 bits wide.
+	The value returned by any 64-bit read of the counter is
+	zero-extended to 64 bits.
+</quote>
 
+This is not AArch64-specific though, and 32bit systems implementing the
+generic timers have the exact same requirements.
+
+> I will send v2 soon.
+
+Please wait a bit and give others a chance to review this too.
+
+Thanks,
+
+	M.
+
+[1] https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/5d8cb82f/attachment-0001.sig>
+Jazz is not dead. It just smells funny...
