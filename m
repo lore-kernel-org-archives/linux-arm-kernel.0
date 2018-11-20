@@ -1,53 +1,42 @@
-From: pasha.tatashin@soleen.com (Pavel Tatashin)
-Date: Tue, 20 Nov 2018 09:40:10 -0500
-Subject: [PATCH v1 1/1] arm64: Early boot time stamps
-In-Reply-To: <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
-References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
- <20181119214443.25175-2-pasha.tatashin@soleen.com>
- <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
-Message-ID: <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 20 Nov 2018 14:09:52 +0000
+Subject: [PATCH 1/2] swiotlb: Make DIRECT_MAPPING_ERROR viable
+In-Reply-To: <cover.1542722463.git.robin.murphy@arm.com>
+References: <cover.1542722463.git.robin.murphy@arm.com>
+Message-ID: <e90da5fbab881c502ac3412fb05c44b26c99f73a.1542722463.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +static __init void sched_clock_early_init(void)
-> > +{
-> > +     u64 freq = arch_timer_get_cntfrq();
-> > +     u64 (*read_time)(void) = arch_counter_get_cntvct;
->
-> We already have arch_timer_read_counter which is exposed from
-> arm_arch_timer.h.
+With the overflow buffer removed, we no longer have a unique address
+which is guaranteed not to be a valid DMA target to use as an error
+token. The DIRECT_MAPPING_ERROR value of 0 tries to at least represent
+an unlikely DMA target, but unfortunately there are already SWIOTLB
+users with DMA-able memory at physical address 0 which now gets falsely
+treated as a mapping failure and leads to all manner of misbehaviour.
 
-OK
+The best we can do to mitigate that is flip DIRECT_MAPPING_ERROR to the
+commonly-used all-bits-set value, since the last single byte of memory
+is by far the least-likely-valid DMA target.
 
->
-> > +
-> > +     /* Early clock is available only on platforms with known freqs */
->
-> This comment is misleading. It should read something like:
->
->         /*
->          * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
->          * the timer frequency. To avoid breakage on misconfigured
->          * systems, do not register the early sched_clock if the
->          * programmed value if zero. Other random values will just
->          * result in random output.
->          */
->
+Fixes: dff8d6c1ed58 ("swiotlb: remove the overflow buffer")]
+Reported-by: John Stultz <john.stultz@linaro.org>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ include/linux/dma-direct.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-OK
-
-> > +     if (!freq)
-> > +             return;
-> > +
-> > +     sched_clock_register(read_time, BITS_PER_LONG, freq);
->
-> This doesn't seem right. The counter has an architected minimum of 56
-> bits, and you can't assume that it is going to be more than that.
-
-Yeah, I saw 56 is used in arm_arch_timer.c, but I could not find where
-this minimum is defined in aarch64 specs. I will change it to 56.
-
-I will send v2 soon.
-
-Thank you,
-Pasha
+diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
+index bd73e7a91410..9de9c7ab39d6 100644
+--- a/include/linux/dma-direct.h
++++ b/include/linux/dma-direct.h
+@@ -5,7 +5,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/mem_encrypt.h>
+ 
+-#define DIRECT_MAPPING_ERROR		0
++#define DIRECT_MAPPING_ERROR		~(dma_addr_t)0
+ 
+ #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
+ #include <asm/dma-direct.h>
+-- 
+2.19.1.dirty
