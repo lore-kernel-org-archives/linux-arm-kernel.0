@@ -1,61 +1,78 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 21 Nov 2018 04:36:58 +0530
-Subject: [PATCH 1/3] ARM: davinci: define gpio interrupts as separate
- resources
-In-Reply-To: <63ac671f-b202-2533-3878-af16149fbdbb@ti.com>
-References: <20181113135051.15308-1-brgl@bgdev.pl>
- <20181113135051.15308-2-brgl@bgdev.pl>
- <c092b014-d5cf-f1ad-de91-6696b05cdf17@ti.com>
- <63ac671f-b202-2533-3878-af16149fbdbb@ti.com>
-Message-ID: <b30f6b76-52c1-89ca-dbf3-a4156d1fb55e@ti.com>
+From: alex.popov@linux.com (Alexander Popov)
+Date: Wed, 21 Nov 2018 02:08:29 +0300
+Subject: Investigating a stack state mismatch in Linux kernel
+In-Reply-To: <2a2b1181-2175-7e4e-189c-12630f43d10d@linux.com>
+References: <b7aad232-76e1-241f-00e2-77783ce30f87@linux.com>
+ <875zwyabac.fsf@oldenburg.str.redhat.com>
+ <2a2b1181-2175-7e4e-189c-12630f43d10d@linux.com>
+Message-ID: <57225f38-3f6d-4029-8f89-4b6eba97c3c1@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/18 12:08 PM, J, KEERTHY wrote:
-> 
-> 
-> On 11/20/2018 2:22 AM, Sekhar Nori wrote:
->> On 13/11/18 7:20 PM, Bartosz Golaszewski wrote:
->>> From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> Since commit eb3744a2dd01 ("gpio: davinci: Do not assume continuous
->>> IRQ numbering") the davinci GPIO driver fails to probe if we boot
->>> in legacy mode from any of the board files. Since the driver now
->>> expects every interrupt to be defined as a separate resource, split
->>> the definition in devices-da8xx.c instead of having a single continuous
->>> interrupt range.
->>>
->>> Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ
->>> numbering")
->>> Cc: stable at vger.kernel.org
->>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>
->> There are a number of other boards that need such fixing too. And the
->> commit in question does not do a good job of explaining why it was
->> needed in the first place. The description? just repeats what can be
->> inferred by reading the patch.
-> 
-> Cc Lokesh
-> 
-> Sekhar,
-> 
-> DT explicitly mentions every IRQ number. The patch in discussion
-> explicitly calls platform_get_irq for all the interrupts which to me is
-> the right thing to do as: platform_get_irq-->
-> of_irq_get-->irq_create_of_mapping--> sequence is to be done for every IRQ.
-> 
-> k3-am654 definitely will need explicit calls to platform_get_irq as it
-> will be involving interrupt router and interrupt numbers need not be
-> continuous.
-> 
-> So i do not think reverting the patch is the right idea.
+Hello everyone!
 
-Well, all of this description of patch motivation should have been in
-the patch description to begin with.
+At irc.freenode.org/#gcc people told me that I should CC gcc at gcc.gnu.org to get
+some attention of gcc developers.
 
-Bartosz, can you please extend this patch to fix this problem for other
-DaVinci SoCs too? I am on the road this week, but will do my best to
-queue these fixes at the earliest .
+Link to previous discussion:
+ https://www.openwall.com/lists/kernel-hardening/2018/11/14/1
 
-Thanks,
-Sekhar
+
+On 15.11.2018 23:51, Alexander Popov wrote:
+> In the original grsecurity code the stackleak RTL pass was registered just
+> before the 'rtl-final' pass. Some time ago Richard Sandiford noted that:
+> 
+>>>> This might be too late, since it happens e.g. after addresses have
+>>>> been calculated for branch ranges, and after machine-specific passes
+>>>> (e.g. bundling on ia64).
+>>>>
+>>>> The stack size is final after reload, so inserting the pass after that
+>>>> might be better.
+> 
+> https://lore.kernel.org/patchwork/patch/879912/
+> 
+> So what is the best moment when we know the stack frame size and can safely
+> delete the CALL insn using delete_insn_and_edges()?
+
+At irc.oftc.net/#gcc Segher (kudos to him!) confirmed that 'final' pass is too
+late for this and proposed registering 'stackleak_cleanup' pass before
+'machine_reorg' pass. It's the moment when the stack frame size is already final
+and function prologues and epilogues are generated. That would also fit
+Richard's concerns.
+
+It looks reasonable -- that's what gcc/target.def says about
+machine_dependent_reorg() hook, which is called during 'machine_reorg' pass:
+
+"If non-null, this hook performs a target-specific pass over the
+instruction stream. The compiler will run it at all optimization levels,
+just before the point at which it normally does delayed-branch scheduling.
+The exact purpose of the hook varies from target to target.  Some use
+it to do transformations that are necessary for correctness, such as
+laying out in-function constant pools or avoiding hardware hazards.
+Others use it as an opportunity to do some machine-dependent optimizations".
+
+
+So I would appreciate any comments on the following solution:
+
+diff --git a/scripts/gcc-plugins/stackleak_plugin.c
+b/scripts/gcc-plugins/stackleak_plugin.c
+index 2f48da9..6f41b32 100644
+--- a/scripts/gcc-plugins/stackleak_plugin.c
++++ b/scripts/gcc-plugins/stackleak_plugin.c
+@@ -363,10 +363,12 @@ __visible int plugin_init(struct plugin_name_args
+*plugin_info,
+                                                PASS_POS_INSERT_BEFORE);
+
+        /*
+-        * The stackleak_cleanup pass should be executed after the
+-        * "reload" pass, when the stack frame size is final.
++        * The stackleak_cleanup pass should be executed before the "mach"
++        * pass, which performs the machine dependent code transformations.
++        * It's the moment when the stack frame size is already final and
++        * function prologues and epilogues are generated.
+         */
+-       PASS_INFO(stackleak_cleanup, "reload", 1, PASS_POS_INSERT_AFTER);
++       PASS_INFO(stackleak_cleanup, "mach", 1, PASS_POS_INSERT_BEFORE);
+
+        if (!plugin_default_version_check(version, &gcc_version)) {
+                error(G_("incompatible gcc/plugin versions"));
