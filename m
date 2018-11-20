@@ -1,49 +1,44 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Tue, 20 Nov 2018 13:37:01 -0800
-Subject: [PATCH v2 4/5] ARM: bcm283x: Extend the WDT DT node out to cover the
- whole PM block.
-In-Reply-To: <20181120213702.27958-1-eric@anholt.net>
-References: <20181120213702.27958-1-eric@anholt.net>
-Message-ID: <20181120213702.27958-5-eric@anholt.net>
+Date: Tue, 20 Nov 2018 13:36:57 -0800
+Subject: [PATCH v2 0/5] BCM2835 PM driver (MFD version)
+Message-ID: <20181120213702.27958-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was covering part of the PM block's range, up to the WDT regs.  To
-support the rest of the PM block's functionality, we need the full
-register range plus the AXI Async Bridge regs for PM sequencing.
+Guenter Roeck and Stefan Wahren both wanted a MFD-style driver to
+cover the PM node that lets WDT and soc/bcm2835-power both attach to
+it.  I think this is an ugly solution because it bloats this feature
+addition by 25% more lines for all the boilerplate, but here it is.
+Tested with V3D powering on, haven't double-checked the reset
+controller.
 
-This doesn't convert any of the consumers over to the new binding yet,
-since we will need to be careful in coordinating our usage of firmware
-services that might power domains on and off versus the bcm2835-pm
-driver's access of those same domains.
+Eric Anholt (5):
+  dt-bindings: soc: Add a new binding for the BCM2835 PM node.
+  bcm2835-pm: Move bcm2835-watchdog's DT probe to an MFD.
+  soc: bcm: bcm2835-pm: Add support for power domains under a new
+    binding.
+  ARM: bcm283x: Extend the WDT DT node out to cover the whole PM block.
+  ARM: bcm283x: Switch V3D over to using the PM driver instead of
+    firmware.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- arch/arm/boot/dts/bcm283x.dtsi | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ .../bindings/soc/bcm/brcm,bcm2835-pm.txt      |  42 ++
+ arch/arm/boot/dts/bcm2835-rpi.dtsi            |   4 -
+ arch/arm/boot/dts/bcm283x.dtsi                |  16 +-
+ arch/arm/mach-bcm/Kconfig                     |   1 +
+ drivers/mfd/Makefile                          |   1 +
+ drivers/mfd/bcm2835-pm.c                      |  98 +++
+ drivers/soc/bcm/Kconfig                       |  11 +
+ drivers/soc/bcm/Makefile                      |   1 +
+ drivers/soc/bcm/bcm2835-power.c               | 661 ++++++++++++++++++
+ drivers/watchdog/bcm2835_wdt.c                |  30 +-
+ include/dt-bindings/soc/bcm2835-pm.h          |  28 +
+ include/linux/mfd/bcm2835-pm.h                |  14 +
+ 12 files changed, 882 insertions(+), 25 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+ create mode 100644 drivers/mfd/bcm2835-pm.c
+ create mode 100644 drivers/soc/bcm/bcm2835-power.c
+ create mode 100644 include/dt-bindings/soc/bcm2835-pm.h
+ create mode 100644 include/linux/mfd/bcm2835-pm.h
 
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 31b29646b14c..bd5be68b4561 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -121,8 +121,16 @@
- 		};
- 
- 		watchdog at 7e100000 {
--			compatible = "brcm,bcm2835-pm-wdt";
--			reg = <0x7e100000 0x28>;
-+			compatible = "brcm,bcm2835-pm", "brcm,bcm2835-pm-wdt";
-+			#power-domain-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0x7e100000 0x114>,
-+			      <0x7e00a000 0x24>;
-+			clocks = <&clocks BCM2835_CLOCK_V3D>,
-+				 <&clocks BCM2835_CLOCK_PERI_IMAGE>,
-+				 <&clocks BCM2835_CLOCK_H264>,
-+				 <&clocks BCM2835_CLOCK_ISP>;
-+			clock-names = "v3d", "peri_image", "h264", "isp";
- 		};
- 
- 		clocks: cprman at 7e101000 {
 -- 
 2.19.1
