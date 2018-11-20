@@ -1,55 +1,52 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 20 Nov 2018 18:16:12 +0100
-Subject: [PATCH] ARM: dts: at91: sama5d2: use the divided clock for SMC
-In-Reply-To: <20181120165737.4998-1-romain.izard.pro@gmail.com>
-References: <20181120165737.4998-1-romain.izard.pro@gmail.com>
-Message-ID: <20181120171612.GF8367@piout.net>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 20 Nov 2018 17:18:37 +0000
+Subject: [RFC PATCH v2 13/23] KVM: arm64/sve: Context switch the SVE
+ registers
+In-Reply-To: <87muq3ix62.fsf@linaro.org>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-14-git-send-email-Dave.Martin@arm.com>
+ <87sgzxhvny.fsf@linaro.org>
+ <20181119170303.GX3505@e103592.cambridge.arm.com>
+ <87o9akhr6f.fsf@linaro.org>
+ <20181120141659.GZ3505@e103592.cambridge.arm.com>
+ <87muq3ix62.fsf@linaro.org>
+Message-ID: <20181120171837.GB3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Romain,
-
-On 20/11/2018 17:57:37+0100, Romain Izard wrote:
-> The SAMA5D2 is different from SAMA5D3 and SAMA5D4, as there are two
-> different clocks for the peripherals in the SoC. The Static Memory
-> controller is connected to the divided master clock.
+On Tue, Nov 20, 2018 at 03:30:29PM +0000, Alex Benn?e wrote:
 > 
-> Unfortunately, the device tree does not correctly show this and uses the
-> master clock directly. This clock is then used by the code for the NAND
-> controller to calculate the timings for the controller, and we end up with
-> slow NAND Flash access.
-> 
-> Fix the device tree, and the performance of Flash access is improved.
-> 
-> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
-> ---
->  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 61f68e5c48e9..b405992eb601 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -308,7 +308,7 @@
->  				  0x1 0x0 0x60000000 0x10000000
->  				  0x2 0x0 0x70000000 0x10000000
->  				  0x3 0x0 0x80000000 0x10000000>;
-> -			clocks = <&mck>;
-> +			clocks = <&h32ck>;
+> Dave Martin <Dave.Martin@arm.com> writes:
 
-You will have to rebase on top of at91-dt. And if I'm not mistaken, this
-line should be:
+[...]
 
-+			clocks = <&pmc PMC_TYPE_CORE PMC_MCK2>;
-
->  			status = "disabled";
->  
->  			nand_controller: nand-controller {
-> -- 
-> 2.17.1
+> >> Put calculating guest_has_sve at the top of __hyp_switch_fpsimd make
+> >> most of that go away and just moves things around a little bit. So I
+> >> guess it could makes sense for the fast(ish) path although I'd be
+> >> interested in knowing if it made any real difference to the numbers.
+> >> After all the first read should be well cached and moving it through the
+> >> stack is just additional memory and register pressure.
+> >
+> > Hmmm, I will have a think about this when I respin.
+> >
+> > Explicitly caching guest_has_sve() does reduce the compiler's freedom to
+> > optimise.
+> >
+> > We might be able to mark it as __pure or __attribute_const__ to enable
+> > the compiler to decide whether to cache the result, but this may not be
+> > 100% safe.
+> >
+> > Part of me would prefer to leave things as they are to avoid the risk of
+> > breaking the code again...
 > 
+> Given that the only place you call __hyp_switch_fpsimd is here you could
+> just roll in into __hyp_trap_is_fpsimd and have:
+> 
+> 	if (__hyp_trap_is_fpsimd(vcpu))
+> 		return true;
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Possibly, though the function should be renamed in this case, something
+like __hyp_handle_fpsimd_trap() I guess.
+
+Cheers
+---Dave
