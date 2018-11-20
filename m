@@ -1,670 +1,601 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 20 Nov 2018 11:12:31 +0100
-Subject: [PATCH 2/3] iio: adc: stm32-adc: add power management support
-In-Reply-To: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-References: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1542708752-26163-3-git-send-email-fabrice.gasnier@st.com>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Tue, 20 Nov 2018 09:25:48 +0000
+Subject: [PATCHv2 02/25] PCI: mobiveil: format the code without function change
+In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-3-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for runtime PM & sleep. Move all regulator and clock management
-to dedicated HW start/stop routines. Then rely on (runtime) PM OPS to
-call them.
+From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Just format the code without functionality change.
+
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
- drivers/iio/adc/stm32-adc-core.c | 182 +++++++++++++++++++++++++++------------
- drivers/iio/adc/stm32-adc.c      | 169 ++++++++++++++++++++++++++++--------
- 2 files changed, 258 insertions(+), 93 deletions(-)
+V2:
+ - no change
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index ca432e7..2327ec1 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -16,6 +16,7 @@
- #include <linux/irqdomain.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
- #include <linux/slab.h>
+ drivers/pci/controller/pcie-mobiveil.c | 261 +++++++++++++------------
+ 1 file changed, 137 insertions(+), 124 deletions(-)
+
+diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
+index d55c7e780c6e..b87471f08a40 100644
+--- a/drivers/pci/controller/pcie-mobiveil.c
++++ b/drivers/pci/controller/pcie-mobiveil.c
+@@ -31,38 +31,40 @@
+  * translation tables are grouped into windows, each window registers are
+  * grouped into blocks of 4 or 16 registers each
+  */
+-#define PAB_REG_BLOCK_SIZE	16
+-#define PAB_EXT_REG_BLOCK_SIZE	4
++#define PAB_REG_BLOCK_SIZE		16
++#define PAB_EXT_REG_BLOCK_SIZE		4
  
-@@ -48,15 +49,19 @@
- #define STM32H7_CKMODE_SHIFT		16
- #define STM32H7_CKMODE_MASK		GENMASK(17, 16)
+-#define PAB_REG_ADDR(offset, win) (offset + (win * PAB_REG_BLOCK_SIZE))
+-#define PAB_EXT_REG_ADDR(offset, win) (offset + (win * PAB_EXT_REG_BLOCK_SIZE))
++#define PAB_REG_ADDR(offset, win)	\
++	(offset + (win * PAB_REG_BLOCK_SIZE))
++#define PAB_EXT_REG_ADDR(offset, win)	\
++	(offset + (win * PAB_EXT_REG_BLOCK_SIZE))
  
-+#define STM32_ADC_CORE_SLEEP_DELAY_MS	2000
+-#define LTSSM_STATUS		0x0404
+-#define  LTSSM_STATUS_L0_MASK	0x3f
+-#define  LTSSM_STATUS_L0	0x2d
++#define LTSSM_STATUS			0x0404
++#define  LTSSM_STATUS_L0_MASK		0x3f
++#define  LTSSM_STATUS_L0		0x2d
+ 
+-#define PAB_CTRL		0x0808
+-#define  AMBA_PIO_ENABLE_SHIFT	0
+-#define  PEX_PIO_ENABLE_SHIFT	1
+-#define  PAGE_SEL_SHIFT	13
+-#define  PAGE_SEL_MASK		0x3f
+-#define  PAGE_LO_MASK		0x3ff
+-#define  PAGE_SEL_OFFSET_SHIFT	10
++#define PAB_CTRL			0x0808
++#define  AMBA_PIO_ENABLE_SHIFT		0
++#define  PEX_PIO_ENABLE_SHIFT		1
++#define  PAGE_SEL_SHIFT			13
++#define  PAGE_SEL_MASK			0x3f
++#define  PAGE_LO_MASK			0x3ff
++#define  PAGE_SEL_OFFSET_SHIFT		10
+ 
+-#define PAB_AXI_PIO_CTRL	0x0840
+-#define  APIO_EN_MASK		0xf
++#define PAB_AXI_PIO_CTRL		0x0840
++#define  APIO_EN_MASK			0xf
+ 
+-#define PAB_PEX_PIO_CTRL	0x08c0
+-#define  PIO_ENABLE_SHIFT	0
++#define PAB_PEX_PIO_CTRL		0x08c0
++#define  PIO_ENABLE_SHIFT		0
+ 
+ #define PAB_INTP_AMBA_MISC_ENB		0x0b0c
+-#define PAB_INTP_AMBA_MISC_STAT	0x0b1c
++#define PAB_INTP_AMBA_MISC_STAT		0x0b1c
+ #define  PAB_INTP_INTX_MASK		0x01e0
+ #define  PAB_INTP_MSI_MASK		0x8
+ 
+-#define PAB_AXI_AMAP_CTRL(win)	PAB_REG_ADDR(0x0ba0, win)
+-#define  WIN_ENABLE_SHIFT	0
+-#define  WIN_TYPE_SHIFT	1
++#define PAB_AXI_AMAP_CTRL(win)		PAB_REG_ADDR(0x0ba0, win)
++#define  WIN_ENABLE_SHIFT		0
++#define  WIN_TYPE_SHIFT			1
+ 
+ #define PAB_EXT_AXI_AMAP_SIZE(win)	PAB_EXT_REG_ADDR(0xbaf0, win)
+ 
+@@ -70,16 +72,16 @@
+ #define  AXI_WINDOW_ALIGN_MASK		3
+ 
+ #define PAB_AXI_AMAP_PEX_WIN_L(win)	PAB_REG_ADDR(0x0ba8, win)
+-#define  PAB_BUS_SHIFT		24
+-#define  PAB_DEVICE_SHIFT	19
+-#define  PAB_FUNCTION_SHIFT	16
++#define  PAB_BUS_SHIFT			24
++#define  PAB_DEVICE_SHIFT		19
++#define  PAB_FUNCTION_SHIFT		16
+ 
+ #define PAB_AXI_AMAP_PEX_WIN_H(win)	PAB_REG_ADDR(0x0bac, win)
+ #define PAB_INTP_AXI_PIO_CLASS		0x474
+ 
+-#define PAB_PEX_AMAP_CTRL(win)	PAB_REG_ADDR(0x4ba0, win)
+-#define  AMAP_CTRL_EN_SHIFT	0
+-#define  AMAP_CTRL_TYPE_SHIFT	1
++#define PAB_PEX_AMAP_CTRL(win)		PAB_REG_ADDR(0x4ba0, win)
++#define  AMAP_CTRL_EN_SHIFT		0
++#define  AMAP_CTRL_TYPE_SHIFT		1
+ 
+ #define PAB_EXT_PEX_AMAP_SIZEN(win)	PAB_EXT_REG_ADDR(0xbef0, win)
+ #define PAB_PEX_AMAP_AXI_WIN(win)	PAB_REG_ADDR(0x4ba4, win)
+@@ -87,39 +89,39 @@
+ #define PAB_PEX_AMAP_PEX_WIN_H(win)	PAB_REG_ADDR(0x4bac, win)
+ 
+ /* starting offset of INTX bits in status register */
+-#define PAB_INTX_START	5
++#define PAB_INTX_START			5
+ 
+ /* supported number of MSI interrupts */
+-#define PCI_NUM_MSI	16
++#define PCI_NUM_MSI			16
+ 
+ /* MSI registers */
+-#define MSI_BASE_LO_OFFSET	0x04
+-#define MSI_BASE_HI_OFFSET	0x08
+-#define MSI_SIZE_OFFSET	0x0c
+-#define MSI_ENABLE_OFFSET	0x14
+-#define MSI_STATUS_OFFSET	0x18
+-#define MSI_DATA_OFFSET	0x20
+-#define MSI_ADDR_L_OFFSET	0x24
+-#define MSI_ADDR_H_OFFSET	0x28
++#define MSI_BASE_LO_OFFSET		0x04
++#define MSI_BASE_HI_OFFSET		0x08
++#define MSI_SIZE_OFFSET			0x0c
++#define MSI_ENABLE_OFFSET		0x14
++#define MSI_STATUS_OFFSET		0x18
++#define MSI_DATA_OFFSET			0x20
++#define MSI_ADDR_L_OFFSET		0x24
++#define MSI_ADDR_H_OFFSET		0x28
+ 
+ /* outbound and inbound window definitions */
+-#define WIN_NUM_0		0
+-#define WIN_NUM_1		1
+-#define CFG_WINDOW_TYPE	0
+-#define IO_WINDOW_TYPE		1
+-#define MEM_WINDOW_TYPE	2
+-#define IB_WIN_SIZE		((u64)256 * 1024 * 1024 * 1024)
+-#define MAX_PIO_WINDOWS	8
++#define WIN_NUM_0			0
++#define WIN_NUM_1			1
++#define CFG_WINDOW_TYPE			0
++#define IO_WINDOW_TYPE			1
++#define MEM_WINDOW_TYPE			2
++#define IB_WIN_SIZE			((u64)256 * 1024 * 1024 * 1024)
++#define MAX_PIO_WINDOWS			8
+ 
+ /* Parameters for the waiting for link up routine */
+-#define LINK_WAIT_MAX_RETRIES	10
+-#define LINK_WAIT_MIN	90000
+-#define LINK_WAIT_MAX	100000
++#define LINK_WAIT_MAX_RETRIES		10
++#define LINK_WAIT_MIN			90000
++#define LINK_WAIT_MAX			100000
+ 
+-#define PAGED_ADDR_BNDRY			0xc00
+-#define OFFSET_TO_PAGE_ADDR(off)		\
++#define PAGED_ADDR_BNDRY		0xc00
++#define OFFSET_TO_PAGE_ADDR(off)	\
+ 	((off & PAGE_LO_MASK) | PAGED_ADDR_BNDRY)
+-#define OFFSET_TO_PAGE_IDX(off)			\
++#define OFFSET_TO_PAGE_IDX(off)		\
+ 	((off >> PAGE_SEL_OFFSET_SHIFT) & PAGE_SEL_MASK)
+ 
+ struct mobiveil_msi {			/* MSI information */
+@@ -297,14 +299,14 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
+ 					unsigned int devfn, int where)
+ {
+ 	struct mobiveil_pcie *pcie = bus->sysdata;
++	u32 value;
+ 
+ 	if (!mobiveil_pcie_valid_device(bus, devfn))
+ 		return NULL;
+ 
+-	if (bus->number == pcie->root_bus_nr) {
+-		/* RC config access */
++	/* RC config access */
++	if (bus->number == pcie->root_bus_nr)
+ 		return pcie->csr_axi_slave_base + where;
+-	}
+ 
+ 	/*
+ 	 * EP config access (in Config/APIO space)
+@@ -312,10 +314,12 @@ static void __iomem *mobiveil_pcie_map_bus(struct pci_bus *bus,
+ 	 * (BDF) in PAB_AXI_AMAP_PEX_WIN_L0 Register.
+ 	 * Relies on pci_lock serialization
+ 	 */
+-	csr_writel(pcie, bus->number << PAB_BUS_SHIFT |
+-			PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
+-			PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT,
+-			PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
++	value = bus->number << PAB_BUS_SHIFT |
++		PCI_SLOT(devfn) << PAB_DEVICE_SHIFT |
++		PCI_FUNC(devfn) << PAB_FUNCTION_SHIFT;
 +
- /**
-  * stm32_adc_common_regs - stm32 common registers, compatible dependent data
-  * @csr:	common status register offset
-+ * @ccr:	common control register offset
-  * @eoc1:	adc1 end of conversion flag in @csr
-  * @eoc2:	adc2 end of conversion flag in @csr
-  * @eoc3:	adc3 end of conversion flag in @csr
-  */
- struct stm32_adc_common_regs {
- 	u32 csr;
-+	u32 ccr;
- 	u32 eoc1_msk;
- 	u32 eoc2_msk;
- 	u32 eoc3_msk;
-@@ -85,6 +90,7 @@ struct stm32_adc_priv_cfg {
-  * @vref:		regulator reference
-  * @cfg:		compatible configuration data
-  * @common:		common data for all ADC instances
-+ * @ccr_bak:		backup CCR in low power mode
-  */
- struct stm32_adc_priv {
- 	int				irq[STM32_ADC_MAX_ADCS];
-@@ -94,6 +100,7 @@ struct stm32_adc_priv {
- 	struct regulator		*vref;
- 	const struct stm32_adc_priv_cfg	*cfg;
- 	struct stm32_adc_common		common;
-+	u32				ccr_bak;
- };
- 
- static struct stm32_adc_priv *to_stm32_adc_priv(struct stm32_adc_common *com)
-@@ -265,6 +272,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- /* STM32F4 common registers definitions */
- static const struct stm32_adc_common_regs stm32f4_adc_common_regs = {
- 	.csr = STM32F4_ADC_CSR,
-+	.ccr = STM32F4_ADC_CCR,
- 	.eoc1_msk = STM32F4_EOC1,
- 	.eoc2_msk = STM32F4_EOC2,
- 	.eoc3_msk = STM32F4_EOC3,
-@@ -273,6 +281,7 @@ static int stm32h7_adc_clk_sel(struct platform_device *pdev,
- /* STM32H7 common registers definitions */
- static const struct stm32_adc_common_regs stm32h7_adc_common_regs = {
- 	.csr = STM32H7_ADC_CSR,
-+	.ccr = STM32H7_ADC_CCR,
- 	.eoc1_msk = STM32H7_EOC_MST,
- 	.eoc2_msk = STM32H7_EOC_SLV,
- };
-@@ -379,6 +388,61 @@ static void stm32_adc_irq_remove(struct platform_device *pdev,
- 	}
++	csr_writel(pcie, value, PAB_AXI_AMAP_PEX_WIN_L(WIN_NUM_0));
++
+ 	return pcie->config_axi_slave_base + where;
  }
  
-+static int stm32_adc_core_hw_start(struct device *dev)
-+{
-+	struct stm32_adc_common *common = dev_get_drvdata(dev);
-+	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
-+	int ret;
-+
-+	ret = regulator_enable(priv->vref);
-+	if (ret < 0) {
-+		dev_err(dev, "vref enable failed\n");
-+		return ret;
-+	}
-+
-+	if (priv->bclk) {
-+		ret = clk_prepare_enable(priv->bclk);
-+		if (ret < 0) {
-+			dev_err(dev, "bus clk enable failed\n");
-+			goto err_regulator_disable;
-+		}
-+	}
-+
-+	if (priv->aclk) {
-+		ret = clk_prepare_enable(priv->aclk);
-+		if (ret < 0) {
-+			dev_err(dev, "adc clk enable failed\n");
-+			goto err_bclk_disable;
-+		}
-+	}
-+
-+	writel_relaxed(priv->ccr_bak, priv->common.base + priv->cfg->regs->ccr);
-+
-+	return 0;
-+
-+err_bclk_disable:
-+	if (priv->bclk)
-+		clk_disable_unprepare(priv->bclk);
-+err_regulator_disable:
-+	regulator_disable(priv->vref);
-+
-+	return ret;
-+}
-+
-+static void stm32_adc_core_hw_stop(struct device *dev)
-+{
-+	struct stm32_adc_common *common = dev_get_drvdata(dev);
-+	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
-+
-+	/* Backup CCR that may be lost (depends on power state to achieve) */
-+	priv->ccr_bak = readl_relaxed(priv->common.base + priv->cfg->regs->ccr);
-+	if (priv->aclk)
-+		clk_disable_unprepare(priv->aclk);
-+	if (priv->bclk)
-+		clk_disable_unprepare(priv->bclk);
-+	regulator_disable(priv->vref);
-+}
-+
- static int stm32_adc_probe(struct platform_device *pdev)
+@@ -350,22 +354,22 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+ 
+ 	/* Handle INTx */
+ 	if (intr_status & PAB_INTP_INTX_MASK) {
+-		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT) >>
+-			PAB_INTX_START;
++		shifted_status = csr_readl(pcie, PAB_INTP_AMBA_MISC_STAT);
++		shifted_status >>= PAB_INTX_START;
+ 		do {
+ 			for_each_set_bit(bit, &shifted_status, PCI_NUM_INTX) {
+ 				virq = irq_find_mapping(pcie->intx_domain,
+-						bit + 1);
++							bit + 1);
+ 				if (virq)
+ 					generic_handle_irq(virq);
+ 				else
+-					dev_err_ratelimited(dev,
+-						"unexpected IRQ, INT%d\n", bit);
++					dev_err_ratelimited(dev, "unexpected IRQ, INT%d\n",
++							    bit);
+ 
+ 				/* clear interrupt */
+ 				csr_writel(pcie,
+-					shifted_status << PAB_INTX_START,
+-					PAB_INTP_AMBA_MISC_STAT);
++					   shifted_status << PAB_INTX_START,
++					   PAB_INTP_AMBA_MISC_STAT);
+ 			}
+ 		} while ((shifted_status >> PAB_INTX_START) != 0);
+ 	}
+@@ -375,8 +379,7 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+ 
+ 	/* handle MSI interrupts */
+ 	while (msi_status & 1) {
+-		msi_data = readl_relaxed(pcie->apb_csr_base
+-				+ MSI_DATA_OFFSET);
++		msi_data = readl_relaxed(pcie->apb_csr_base + MSI_DATA_OFFSET);
+ 
+ 		/*
+ 		 * MSI_STATUS_OFFSET register gets updated to zero
+@@ -385,18 +388,18 @@ static void mobiveil_pcie_isr(struct irq_desc *desc)
+ 		 * two dummy reads.
+ 		 */
+ 		msi_addr_lo = readl_relaxed(pcie->apb_csr_base +
+-				MSI_ADDR_L_OFFSET);
++					    MSI_ADDR_L_OFFSET);
+ 		msi_addr_hi = readl_relaxed(pcie->apb_csr_base +
+-				MSI_ADDR_H_OFFSET);
++					    MSI_ADDR_H_OFFSET);
+ 		dev_dbg(dev, "MSI registers, data: %08x, addr: %08x:%08x\n",
+-				msi_data, msi_addr_hi, msi_addr_lo);
++			msi_data, msi_addr_hi, msi_addr_lo);
+ 
+ 		virq = irq_find_mapping(msi->dev_domain, msi_data);
+ 		if (virq)
+ 			generic_handle_irq(virq);
+ 
+ 		msi_status = readl_relaxed(pcie->apb_csr_base +
+-				MSI_STATUS_OFFSET);
++					   MSI_STATUS_OFFSET);
+ 	}
+ 
+ 	/* Clear the interrupt status */
+@@ -413,7 +416,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+ 
+ 	/* map config resource */
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-			"config_axi_slave");
++					   "config_axi_slave");
+ 	pcie->config_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
+ 	if (IS_ERR(pcie->config_axi_slave_base))
+ 		return PTR_ERR(pcie->config_axi_slave_base);
+@@ -421,7 +424,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+ 
+ 	/* map csr resource */
+ 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+-			"csr_axi_slave");
++					   "csr_axi_slave");
+ 	pcie->csr_axi_slave_base = devm_pci_remap_cfg_resource(dev, res);
+ 	if (IS_ERR(pcie->csr_axi_slave_base))
+ 		return PTR_ERR(pcie->csr_axi_slave_base);
+@@ -452,7 +455,7 @@ static int mobiveil_pcie_parse_dt(struct mobiveil_pcie *pcie)
+ }
+ 
+ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+-		int pci_addr, u32 type, u64 size)
++			       int pci_addr, u32 type, u64 size)
  {
- 	struct stm32_adc_priv *priv;
-@@ -393,6 +457,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv)
+ 	int pio_ctrl_val;
+ 	int amap_ctrl_dw;
+@@ -465,19 +468,20 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+ 	}
+ 
+ 	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
+-	csr_writel(pcie,
+-		pio_ctrl_val | (1 << PIO_ENABLE_SHIFT), PAB_PEX_PIO_CTRL);
+-	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
+-	amap_ctrl_dw = (amap_ctrl_dw | (type << AMAP_CTRL_TYPE_SHIFT));
+-	amap_ctrl_dw = (amap_ctrl_dw | (1 << AMAP_CTRL_EN_SHIFT));
++	pio_ctrl_val |= 1 << PIO_ENABLE_SHIFT;
++	csr_writel(pcie, pio_ctrl_val, PAB_PEX_PIO_CTRL);
+ 
+-	csr_writel(pcie, amap_ctrl_dw | lower_32_bits(size64),
+-		   PAB_PEX_AMAP_CTRL(win_num));
++	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
++	amap_ctrl_dw |= (type << AMAP_CTRL_TYPE_SHIFT) |
++			(1 << AMAP_CTRL_EN_SHIFT) |
++			lower_32_bits(size64);
++	csr_writel(pcie, amap_ctrl_dw, PAB_PEX_AMAP_CTRL(win_num));
+ 
+ 	csr_writel(pcie, upper_32_bits(size64),
+ 		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
+ 
+ 	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
++
+ 	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
+ 	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
+ }
+@@ -486,7 +490,8 @@ static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
+  * routine to program the outbound windows
+  */
+ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+-		u64 cpu_addr, u64 pci_addr, u32 config_io_bit, u64 size)
++			       u64 cpu_addr, u64 pci_addr,
++			       u32 config_io_bit, u64 size)
+ {
+ 
+ 	u32 value, type;
+@@ -505,7 +510,7 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+ 	type = config_io_bit;
+ 	value = csr_readl(pcie, PAB_AXI_AMAP_CTRL(win_num));
+ 	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
+-			lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
++		   lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
+ 
+ 	csr_writel(pcie, upper_32_bits(size64), PAB_EXT_AXI_AMAP_SIZE(win_num));
+ 
+@@ -515,14 +520,14 @@ static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
+ 	 */
+ 	value = csr_readl(pcie, PAB_AXI_AMAP_AXI_WIN(win_num));
+ 	csr_writel(pcie, cpu_addr & (~AXI_WINDOW_ALIGN_MASK),
+-			PAB_AXI_AMAP_AXI_WIN(win_num));
++		   PAB_AXI_AMAP_AXI_WIN(win_num));
+ 
+ 	value = csr_readl(pcie, PAB_AXI_AMAP_PEX_WIN_H(win_num));
+ 
+ 	csr_writel(pcie, lower_32_bits(pci_addr),
+-			PAB_AXI_AMAP_PEX_WIN_L(win_num));
++		   PAB_AXI_AMAP_PEX_WIN_L(win_num));
+ 	csr_writel(pcie, upper_32_bits(pci_addr),
+-			PAB_AXI_AMAP_PEX_WIN_H(win_num));
++		   PAB_AXI_AMAP_PEX_WIN_H(win_num));
+ 
+ 	pcie->ob_wins_configured++;
+ }
+@@ -538,7 +543,9 @@ static int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
+ 
+ 		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
+ 	}
++
+ 	dev_err(&pcie->pdev->dev, "link never came up\n");
++
+ 	return -ETIMEDOUT;
+ }
+ 
+@@ -551,16 +558,16 @@ static void mobiveil_pcie_enable_msi(struct mobiveil_pcie *pcie)
+ 	msi->msi_pages_phys = (phys_addr_t)msg_addr;
+ 
+ 	writel_relaxed(lower_32_bits(msg_addr),
+-		pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
++		       pcie->apb_csr_base + MSI_BASE_LO_OFFSET);
+ 	writel_relaxed(upper_32_bits(msg_addr),
+-		pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
++		       pcie->apb_csr_base + MSI_BASE_HI_OFFSET);
+ 	writel_relaxed(4096, pcie->apb_csr_base + MSI_SIZE_OFFSET);
+ 	writel_relaxed(1, pcie->apb_csr_base + MSI_ENABLE_OFFSET);
+ }
+ 
+ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ {
+-	u32 value, pab_ctrl, type = 0;
++	u32 value, pab_ctrl, type;
+ 	int err;
+ 	struct resource_entry *win, *tmp;
+ 
+@@ -575,26 +582,27 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	 * Space
+ 	 */
+ 	value = csr_readl(pcie, PCI_COMMAND);
+-	csr_writel(pcie, value | PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
+-		PCI_COMMAND_MASTER, PCI_COMMAND);
++	value |= PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER;
++	csr_writel(pcie, value, PCI_COMMAND);
+ 
+ 	/*
+ 	 * program PIO Enable Bit to 1 (and PEX PIO Enable to 1) in PAB_CTRL
+ 	 * register
+ 	 */
+ 	pab_ctrl = csr_readl(pcie, PAB_CTRL);
+-	csr_writel(pcie, pab_ctrl | (1 << AMBA_PIO_ENABLE_SHIFT) |
+-		(1 << PEX_PIO_ENABLE_SHIFT), PAB_CTRL);
++	pab_ctrl |= (1 << AMBA_PIO_ENABLE_SHIFT) | (1 << PEX_PIO_ENABLE_SHIFT);
++	csr_writel(pcie, pab_ctrl, PAB_CTRL);
+ 
+ 	csr_writel(pcie, (PAB_INTP_INTX_MASK | PAB_INTP_MSI_MASK),
+-		PAB_INTP_AMBA_MISC_ENB);
++		   PAB_INTP_AMBA_MISC_ENB);
+ 
+ 	/*
+ 	 * program PIO Enable Bit to 1 and Config Window Enable Bit to 1 in
+ 	 * PAB_AXI_PIO_CTRL Register
+ 	 */
+ 	value = csr_readl(pcie, PAB_AXI_PIO_CTRL);
+-	csr_writel(pcie, value | APIO_EN_MASK, PAB_AXI_PIO_CTRL);
++	value |= APIO_EN_MASK;
++	csr_writel(pcie, value, PAB_AXI_PIO_CTRL);
+ 
+ 	/*
+ 	 * we'll program one outbound window for config reads and
+@@ -605,25 +613,25 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 
+ 	/* config outbound translation window */
+ 	program_ob_windows(pcie, pcie->ob_wins_configured,
+-			pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
+-			resource_size(pcie->ob_io_res));
++			   pcie->ob_io_res->start, 0, CFG_WINDOW_TYPE,
++			   resource_size(pcie->ob_io_res));
+ 
+ 	/* memory inbound translation window */
+ 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
+ 
+ 	/* Get the I/O and memory ranges from DT */
+ 	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
+-		type = 0;
+ 		if (resource_type(win->res) == IORESOURCE_MEM)
+ 			type = MEM_WINDOW_TYPE;
+-		if (resource_type(win->res) == IORESOURCE_IO)
++		else if (resource_type(win->res) == IORESOURCE_IO)
+ 			type = IO_WINDOW_TYPE;
+-		if (type) {
+-			/* configure outbound translation window */
+-			program_ob_windows(pcie, pcie->ob_wins_configured,
+-				win->res->start, 0, type,
+-				resource_size(win->res));
+-		}
++		else
++			continue;
++
++		/* configure outbound translation window */
++		program_ob_windows(pcie, pcie->ob_wins_configured,
++				   win->res->start, 0, type,
++				   resource_size(win->res));
+ 	}
+ 
+ 	/* setup MSI hardware registers */
+@@ -643,7 +651,8 @@ static void mobiveil_mask_intx_irq(struct irq_data *data)
+ 	mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
+ 	raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
+ 	shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
+-	csr_writel(pcie, (shifted_val & (~mask)), PAB_INTP_AMBA_MISC_ENB);
++	shifted_val &= ~mask;
++	csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
+ 	raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
+ }
+ 
+@@ -658,7 +667,8 @@ static void mobiveil_unmask_intx_irq(struct irq_data *data)
+ 	mask = 1 << ((data->hwirq + PAB_INTX_START) - 1);
+ 	raw_spin_lock_irqsave(&pcie->intx_mask_lock, flags);
+ 	shifted_val = csr_readl(pcie, PAB_INTP_AMBA_MISC_ENB);
+-	csr_writel(pcie, (shifted_val | mask), PAB_INTP_AMBA_MISC_ENB);
++	shifted_val |= mask;
++	csr_writel(pcie, shifted_val, PAB_INTP_AMBA_MISC_ENB);
+ 	raw_spin_unlock_irqrestore(&pcie->intx_mask_lock, flags);
+ }
+ 
+@@ -672,10 +682,11 @@ static struct irq_chip intx_irq_chip = {
+ 
+ /* routine to setup the INTx related data */
+ static int mobiveil_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+-		irq_hw_number_t hwirq)
++				  irq_hw_number_t hwirq)
+ {
+ 	irq_set_chip_and_handler(irq, &intx_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, domain->host_data);
++
+ 	return 0;
+ }
+ 
+@@ -692,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
+ 
+ static struct msi_domain_info mobiveil_msi_domain_info = {
+ 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+ 	.chip	= &mobiveil_msi_irq_chip,
+ };
+ 
+@@ -710,7 +721,7 @@ static void mobiveil_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
+ }
+ 
+ static int mobiveil_msi_set_affinity(struct irq_data *irq_data,
+-		const struct cpumask *mask, bool force)
++				     const struct cpumask *mask, bool force)
+ {
+ 	return -EINVAL;
+ }
+@@ -722,7 +733,8 @@ static struct irq_chip mobiveil_msi_bottom_irq_chip = {
+ };
+ 
+ static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
+-		unsigned int virq, unsigned int nr_irqs, void *args)
++					 unsigned int virq,
++					 unsigned int nr_irqs, void *args)
+ {
+ 	struct mobiveil_pcie *pcie = domain->host_data;
+ 	struct mobiveil_msi *msi = &pcie->msi;
+@@ -742,13 +754,13 @@ static int mobiveil_irq_msi_domain_alloc(struct irq_domain *domain,
+ 	mutex_unlock(&msi->lock);
+ 
+ 	irq_domain_set_info(domain, virq, bit, &mobiveil_msi_bottom_irq_chip,
+-				domain->host_data, handle_level_irq,
+-				NULL, NULL);
++			    domain->host_data, handle_level_irq, NULL, NULL);
+ 	return 0;
+ }
+ 
+ static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
+-		unsigned int virq, unsigned int nr_irqs)
++					 unsigned int virq,
++					 unsigned int nr_irqs)
+ {
+ 	struct irq_data *d = irq_domain_get_irq_data(domain, virq);
+ 	struct mobiveil_pcie *pcie = irq_data_get_irq_chip_data(d);
+@@ -756,12 +768,11 @@ static void mobiveil_irq_msi_domain_free(struct irq_domain *domain,
+ 
+ 	mutex_lock(&msi->lock);
+ 
+-	if (!test_bit(d->hwirq, msi->msi_irq_in_use)) {
++	if (!test_bit(d->hwirq, msi->msi_irq_in_use))
+ 		dev_err(&pcie->pdev->dev, "trying to free unused MSI#%lu\n",
+ 			d->hwirq);
+-	} else {
++	else
+ 		__clear_bit(d->hwirq, msi->msi_irq_in_use);
+-	}
+ 
+ 	mutex_unlock(&msi->lock);
+ }
+@@ -785,12 +796,14 @@ static int mobiveil_allocate_msi_domains(struct mobiveil_pcie *pcie)
+ 	}
+ 
+ 	msi->msi_domain = pci_msi_create_irq_domain(fwnode,
+-				&mobiveil_msi_domain_info, msi->dev_domain);
++						    &mobiveil_msi_domain_info,
++						    msi->dev_domain);
+ 	if (!msi->msi_domain) {
+ 		dev_err(dev, "failed to create MSI domain\n");
+ 		irq_domain_remove(msi->dev_domain);
  		return -ENOMEM;
-+	platform_set_drvdata(pdev, &priv->common);
- 
- 	priv->cfg = (const struct stm32_adc_priv_cfg *)
- 		of_match_device(dev->driver->of_match_table, dev)->data;
-@@ -410,67 +475,51 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		return ret;
  	}
- 
--	ret = regulator_enable(priv->vref);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "vref enable failed\n");
--		return ret;
--	}
--
--	ret = regulator_get_voltage(priv->vref);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "vref get voltage failed, %d\n", ret);
--		goto err_regulator_disable;
--	}
--	priv->common.vref_mv = ret / 1000;
--	dev_dbg(&pdev->dev, "vref+=%dmV\n", priv->common.vref_mv);
--
- 	priv->aclk = devm_clk_get(&pdev->dev, "adc");
- 	if (IS_ERR(priv->aclk)) {
- 		ret = PTR_ERR(priv->aclk);
--		if (ret == -ENOENT) {
--			priv->aclk = NULL;
--		} else {
-+		if (ret != -ENOENT) {
- 			dev_err(&pdev->dev, "Can't get 'adc' clock\n");
--			goto err_regulator_disable;
--		}
--	}
--
--	if (priv->aclk) {
--		ret = clk_prepare_enable(priv->aclk);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "adc clk enable failed\n");
--			goto err_regulator_disable;
-+			return ret;
- 		}
-+		priv->aclk = NULL;
- 	}
- 
- 	priv->bclk = devm_clk_get(&pdev->dev, "bus");
- 	if (IS_ERR(priv->bclk)) {
- 		ret = PTR_ERR(priv->bclk);
--		if (ret == -ENOENT) {
--			priv->bclk = NULL;
--		} else {
-+		if (ret != -ENOENT) {
- 			dev_err(&pdev->dev, "Can't get 'bus' clock\n");
--			goto err_aclk_disable;
-+			return ret;
- 		}
-+		priv->bclk = NULL;
- 	}
- 
--	if (priv->bclk) {
--		ret = clk_prepare_enable(priv->bclk);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "adc clk enable failed\n");
--			goto err_aclk_disable;
--		}
-+	pm_runtime_get_noresume(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_set_autosuspend_delay(dev, STM32_ADC_CORE_SLEEP_DELAY_MS);
-+	pm_runtime_use_autosuspend(dev);
-+	pm_runtime_enable(dev);
 +
-+	ret = stm32_adc_core_hw_start(dev);
-+	if (ret)
-+		goto err_pm_stop;
-+
-+	ret = regulator_get_voltage(priv->vref);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "vref get voltage failed, %d\n", ret);
-+		goto err_hw_stop;
- 	}
-+	priv->common.vref_mv = ret / 1000;
-+	dev_dbg(&pdev->dev, "vref+=%dmV\n", priv->common.vref_mv);
- 
- 	ret = priv->cfg->clk_sel(pdev, priv);
- 	if (ret < 0)
--		goto err_bclk_disable;
-+		goto err_hw_stop;
- 
- 	ret = stm32_adc_irq_probe(pdev, priv);
- 	if (ret < 0)
--		goto err_bclk_disable;
--
--	platform_set_drvdata(pdev, &priv->common);
-+		goto err_hw_stop;
- 
- 	ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
- 	if (ret < 0) {
-@@ -478,21 +527,19 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		goto err_irq_remove;
- 	}
- 
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
-+
- 	return 0;
- 
- err_irq_remove:
- 	stm32_adc_irq_remove(pdev, priv);
--
--err_bclk_disable:
--	if (priv->bclk)
--		clk_disable_unprepare(priv->bclk);
--
--err_aclk_disable:
--	if (priv->aclk)
--		clk_disable_unprepare(priv->aclk);
--
--err_regulator_disable:
--	regulator_disable(priv->vref);
-+err_hw_stop:
-+	stm32_adc_core_hw_stop(dev);
-+err_pm_stop:
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_suspended(dev);
-+	pm_runtime_put_noidle(dev);
- 
- 	return ret;
- }
-@@ -502,17 +549,39 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	struct stm32_adc_common *common = platform_get_drvdata(pdev);
- 	struct stm32_adc_priv *priv = to_stm32_adc_priv(common);
- 
-+	pm_runtime_get_sync(&pdev->dev);
- 	of_platform_depopulate(&pdev->dev);
- 	stm32_adc_irq_remove(pdev, priv);
--	if (priv->bclk)
--		clk_disable_unprepare(priv->bclk);
--	if (priv->aclk)
--		clk_disable_unprepare(priv->aclk);
--	regulator_disable(priv->vref);
-+	stm32_adc_core_hw_stop(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
- 
  	return 0;
  }
  
-+#if defined(CONFIG_PM)
-+static int stm32_adc_core_runtime_suspend(struct device *dev)
-+{
-+	stm32_adc_core_hw_stop(dev);
-+
-+	return 0;
-+}
-+
-+static int stm32_adc_core_runtime_resume(struct device *dev)
-+{
-+	return stm32_adc_core_hw_start(dev);
-+}
-+#endif
-+
-+static const struct dev_pm_ops stm32_adc_core_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
-+	SET_RUNTIME_PM_OPS(stm32_adc_core_runtime_suspend,
-+			   stm32_adc_core_runtime_resume,
-+			   NULL)
-+};
-+
- static const struct stm32_adc_priv_cfg stm32f4_adc_priv_cfg = {
- 	.regs = &stm32f4_adc_common_regs,
- 	.clk_sel = stm32f4_adc_clk_sel,
-@@ -552,6 +621,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
+@@ -801,8 +814,8 @@ static int mobiveil_pcie_init_irq_domain(struct mobiveil_pcie *pcie)
+ 	int ret;
+ 
+ 	/* setup INTx */
+-	pcie->intx_domain = irq_domain_add_linear(node,
+-				PCI_NUM_INTX, &intx_domain_ops, pcie);
++	pcie->intx_domain = irq_domain_add_linear(node, PCI_NUM_INTX,
++						  &intx_domain_ops, pcie);
+ 
+ 	if (!pcie->intx_domain) {
+ 		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+@@ -917,10 +930,10 @@ MODULE_DEVICE_TABLE(of, mobiveil_pcie_of_match);
+ static struct platform_driver mobiveil_pcie_driver = {
+ 	.probe = mobiveil_pcie_probe,
  	.driver = {
- 		.name = "stm32-adc-core",
- 		.of_match_table = stm32_adc_of_match,
-+		.pm = &stm32_adc_core_pm_ops,
- 	},
+-			.name = "mobiveil-pcie",
+-			.of_match_table = mobiveil_pcie_of_match,
+-			.suppress_bind_attrs = true,
+-		},
++		.name = "mobiveil-pcie",
++		.of_match_table = mobiveil_pcie_of_match,
++		.suppress_bind_attrs = true,
++	},
  };
- module_platform_driver(stm32_adc_driver);
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index dca8733..32c9c61 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -22,6 +22,7 @@
- #include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
  
-@@ -148,6 +149,7 @@ enum stm32h7_adc_dmngt {
- #define STM32_ADC_MAX_SMP		7	/* SMPx range is [0..7] */
- #define STM32_ADC_TIMEOUT_US		100000
- #define STM32_ADC_TIMEOUT	(msecs_to_jiffies(STM32_ADC_TIMEOUT_US / 1000))
-+#define STM32_ADC_HW_STOP_DELAY_MS	100
- 
- #define STM32_DMA_BUFFER_SIZE		PAGE_SIZE
- 
-@@ -623,6 +625,47 @@ static void stm32_adc_set_res(struct stm32_adc *adc)
- 	stm32_adc_writel(adc, res->reg, val);
- }
- 
-+static int stm32_adc_hw_stop(struct device *dev)
-+{
-+	struct stm32_adc *adc = dev_get_drvdata(dev);
-+
-+	if (adc->cfg->unprepare)
-+		adc->cfg->unprepare(adc);
-+
-+	if (adc->clk)
-+		clk_disable_unprepare(adc->clk);
-+
-+	return 0;
-+}
-+
-+static int stm32_adc_hw_start(struct device *dev)
-+{
-+	struct stm32_adc *adc = dev_get_drvdata(dev);
-+	int ret;
-+
-+	if (adc->clk) {
-+		ret = clk_prepare_enable(adc->clk);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	stm32_adc_set_res(adc);
-+
-+	if (adc->cfg->prepare) {
-+		ret = adc->cfg->prepare(adc);
-+		if (ret)
-+			goto err_clk_dis;
-+	}
-+
-+	return 0;
-+
-+err_clk_dis:
-+	if (adc->clk)
-+		clk_disable_unprepare(adc->clk);
-+
-+	return ret;
-+}
-+
- /**
-  * stm32f4_adc_start_conv() - Start conversions for regular channels.
-  * @adc: stm32 adc instance
-@@ -1171,6 +1214,7 @@ static int stm32_adc_single_conv(struct iio_dev *indio_dev,
- 				 int *res)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
-+	struct device *dev = indio_dev->dev.parent;
- 	const struct stm32_adc_regspec *regs = adc->cfg->regs;
- 	long timeout;
- 	u32 val;
-@@ -1180,10 +1224,10 @@ static int stm32_adc_single_conv(struct iio_dev *indio_dev,
- 
- 	adc->bufi = 0;
- 
--	if (adc->cfg->prepare) {
--		ret = adc->cfg->prepare(adc);
--		if (ret)
--			return ret;
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(dev);
-+		return ret;
- 	}
- 
- 	/* Apply sampling time settings */
-@@ -1221,8 +1265,8 @@ static int stm32_adc_single_conv(struct iio_dev *indio_dev,
- 
- 	stm32_adc_conv_irq_disable(adc);
- 
--	if (adc->cfg->unprepare)
--		adc->cfg->unprepare(adc);
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
- 	return ret;
- }
-@@ -1330,15 +1374,22 @@ static int stm32_adc_update_scan_mode(struct iio_dev *indio_dev,
- 				      const unsigned long *scan_mask)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
-+	struct device *dev = indio_dev->dev.parent;
- 	int ret;
- 
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(dev);
-+		return ret;
-+	}
-+
- 	adc->num_conv = bitmap_weight(scan_mask, indio_dev->masklength);
- 
- 	ret = stm32_adc_conf_scan_seq(indio_dev, scan_mask);
--	if (ret)
--		return ret;
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
--	return 0;
-+	return ret;
- }
- 
- static int stm32_adc_of_xlate(struct iio_dev *indio_dev,
-@@ -1368,12 +1419,23 @@ static int stm32_adc_debugfs_reg_access(struct iio_dev *indio_dev,
- 					unsigned *readval)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
-+	struct device *dev = indio_dev->dev.parent;
-+	int ret;
-+
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(dev);
-+		return ret;
-+	}
- 
- 	if (!readval)
- 		stm32_adc_writel(adc, reg, writeval);
- 	else
- 		*readval = stm32_adc_readl(adc, reg);
- 
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
-+
- 	return 0;
- }
- 
-@@ -1459,18 +1521,19 @@ static int stm32_adc_dma_start(struct iio_dev *indio_dev)
- static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
-+	struct device *dev = indio_dev->dev.parent;
- 	int ret;
- 
--	if (adc->cfg->prepare) {
--		ret = adc->cfg->prepare(adc);
--		if (ret)
--			return ret;
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret < 0) {
-+		pm_runtime_put_noidle(dev);
-+		return ret;
- 	}
- 
- 	ret = stm32_adc_set_trig(indio_dev, indio_dev->trig);
- 	if (ret) {
- 		dev_err(&indio_dev->dev, "Can't set trigger\n");
--		goto err_unprepare;
-+		goto err_pm_put;
- 	}
- 
- 	ret = stm32_adc_dma_start(indio_dev);
-@@ -1498,9 +1561,9 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- 		dmaengine_terminate_all(adc->dma_chan);
- err_clr_trig:
- 	stm32_adc_set_trig(indio_dev, NULL);
--err_unprepare:
--	if (adc->cfg->unprepare)
--		adc->cfg->unprepare(adc);
-+err_pm_put:
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
- 	return ret;
- }
-@@ -1508,6 +1571,7 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
-+	struct device *dev = indio_dev->dev.parent;
- 	int ret;
- 
- 	adc->cfg->stop_conv(adc);
-@@ -1524,8 +1588,8 @@ static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
- 	if (stm32_adc_set_trig(indio_dev, NULL))
- 		dev_err(&indio_dev->dev, "Can't clear trigger\n");
- 
--	if (adc->cfg->unprepare)
--		adc->cfg->unprepare(adc);
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
- 
- 	return ret;
- }
-@@ -1864,26 +1928,17 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	if (adc->clk) {
--		ret = clk_prepare_enable(adc->clk);
--		if (ret < 0) {
--			dev_err(&pdev->dev, "clk enable failed\n");
--			return ret;
--		}
--	}
--
- 	ret = stm32_adc_of_get_resolution(indio_dev);
- 	if (ret < 0)
--		goto err_clk_disable;
--	stm32_adc_set_res(adc);
-+		return ret;
- 
- 	ret = stm32_adc_chan_of_init(indio_dev);
- 	if (ret < 0)
--		goto err_clk_disable;
-+		return ret;
- 
- 	ret = stm32_adc_dma_request(indio_dev);
- 	if (ret < 0)
--		goto err_clk_disable;
-+		return ret;
- 
- 	ret = iio_triggered_buffer_setup(indio_dev,
- 					 &iio_pollfunc_store_time,
-@@ -1894,15 +1949,35 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		goto err_dma_disable;
- 	}
- 
-+	/* Get stm32-adc-core PM online */
-+	pm_runtime_get_noresume(dev);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_set_autosuspend_delay(dev, STM32_ADC_HW_STOP_DELAY_MS);
-+	pm_runtime_use_autosuspend(dev);
-+	pm_runtime_enable(dev);
-+
-+	ret = stm32_adc_hw_start(dev);
-+	if (ret)
-+		goto err_buffer_cleanup;
-+
- 	ret = iio_device_register(indio_dev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "iio dev register failed\n");
--		goto err_buffer_cleanup;
-+		goto err_hw_stop;
- 	}
- 
-+	pm_runtime_mark_last_busy(dev);
-+	pm_runtime_put_autosuspend(dev);
-+
- 	return 0;
- 
-+err_hw_stop:
-+	stm32_adc_hw_stop(dev);
-+
- err_buffer_cleanup:
-+	pm_runtime_disable(dev);
-+	pm_runtime_set_suspended(dev);
-+	pm_runtime_put_noidle(dev);
- 	iio_triggered_buffer_cleanup(indio_dev);
- 
- err_dma_disable:
-@@ -1912,9 +1987,6 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 				  adc->rx_buf, adc->rx_dma_buf);
- 		dma_release_channel(adc->dma_chan);
- 	}
--err_clk_disable:
--	if (adc->clk)
--		clk_disable_unprepare(adc->clk);
- 
- 	return ret;
- }
-@@ -1924,7 +1996,12 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	struct stm32_adc *adc = platform_get_drvdata(pdev);
- 	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
- 
-+	pm_runtime_get_sync(&pdev->dev);
- 	iio_device_unregister(indio_dev);
-+	stm32_adc_hw_stop(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
- 	iio_triggered_buffer_cleanup(indio_dev);
- 	if (adc->dma_chan) {
- 		dma_free_coherent(adc->dma_chan->device->dev,
-@@ -1932,12 +2009,29 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 				  adc->rx_buf, adc->rx_dma_buf);
- 		dma_release_channel(adc->dma_chan);
- 	}
--	if (adc->clk)
--		clk_disable_unprepare(adc->clk);
- 
- 	return 0;
- }
- 
-+#if defined(CONFIG_PM)
-+static int stm32_adc_runtime_suspend(struct device *dev)
-+{
-+	return stm32_adc_hw_stop(dev);
-+}
-+
-+static int stm32_adc_runtime_resume(struct device *dev)
-+{
-+	return stm32_adc_hw_start(dev);
-+}
-+#endif
-+
-+static const struct dev_pm_ops stm32_adc_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
-+	SET_RUNTIME_PM_OPS(stm32_adc_runtime_suspend, stm32_adc_runtime_resume,
-+			   NULL)
-+};
-+
- static const struct stm32_adc_cfg stm32f4_adc_cfg = {
- 	.regs = &stm32f4_adc_regspec,
- 	.adc_info = &stm32f4_adc_info,
-@@ -1985,6 +2079,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	.driver = {
- 		.name = "stm32-adc",
- 		.of_match_table = stm32_adc_of_match,
-+		.pm = &stm32_adc_pm_ops,
- 	},
- };
- module_platform_driver(stm32_adc_driver);
+ builtin_platform_driver(mobiveil_pcie_driver);
 -- 
-1.9.1
+2.17.1
