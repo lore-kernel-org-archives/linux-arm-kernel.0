@@ -1,48 +1,36 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:26:12 +0000
-Subject: [PATCHv2 06/25] PCI: mobiveil: replace the resource list iteration
- function
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-7-Zhiqiang.Hou@nxp.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 20 Nov 2018 22:31:36 +1100
+Subject: [PATCH 10/10] perf/doc: update design.txt for
+ exclude_{host|guest} flags
+In-Reply-To: <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-11-git-send-email-andrew.murray@arm.com>
+Message-ID: <87pnv00yuf.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+Andrew Murray <andrew.murray@arm.com> writes:
 
-As it won't delete any node in this iteration, replaced
-the function resource_list_for_each_entry_safe() with
-the resource_list_for_each_entry().
+> Update design.txt to reflect the presence of the exclude_host
+> and exclude_guest perf flags.
+>
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  tools/perf/design.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/tools/perf/design.txt b/tools/perf/design.txt
+> index a28dca2..7de7d83 100644
+> --- a/tools/perf/design.txt
+> +++ b/tools/perf/design.txt
+> @@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
+>  way to request that counting of events be restricted to times when the
+>  CPU is in user, kernel and/or hypervisor mode.
+>  
+> +Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
+> +to request counting of events restricted to guest and host contexts when
+> +using virtualisation.
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - no change
+How does exclude_host differ from exclude_hv ?
 
- drivers/pci/controller/pcie-mobiveil.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 8ff873023b5f..b2cc9c097fc9 100644
---- a/drivers/pci/controller/pcie-mobiveil.c
-+++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -569,7 +569,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- {
- 	u32 value, pab_ctrl, type;
- 	int err;
--	struct resource_entry *win, *tmp;
-+	struct resource_entry *win;
- 
- 	err = mobiveil_bringup_link(pcie);
- 	if (err) {
-@@ -620,7 +620,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
- 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
- 
- 	/* Get the I/O and memory ranges from DT */
--	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
-+	resource_list_for_each_entry(win, &pcie->resources) {
- 		if (resource_type(win->res) == IORESOURCE_MEM)
- 			type = MEM_WINDOW_TYPE;
- 		else if (resource_type(win->res) == IORESOURCE_IO)
--- 
-2.17.1
+cheers
