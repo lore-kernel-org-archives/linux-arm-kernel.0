@@ -1,82 +1,43 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 20 Nov 2018 21:55:42 +0530
-Subject: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix VBP size
- calculation
-In-Reply-To: <20181120155715.andrjp5kg6ugcv72@flea>
-References: <20181113111633.20189-1-jagan@amarulasolutions.com>
- <20181113111633.20189-9-jagan@amarulasolutions.com>
- <20181115095551.uctdkfmuwlnzhjnn@flea>
- <CAMty3ZAEHiovm6OF6JvJVQR4aqpG1Q3ML5YqxJkF2ntwRkUO=A@mail.gmail.com>
- <20181120155715.andrjp5kg6ugcv72@flea>
-Message-ID: <CAMty3ZCUOJmvekupOwh281g5HaazTpBbukWQY2Pv2OYypAwciw@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 20 Nov 2018 11:28:25 +0100
+Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT7629 soc
+ platform
+In-Reply-To: <1542703268-17285-2-git-send-email-leilk.liu@mediatek.com>
+References: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+ <1542703268-17285-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <7bc1777c-fb24-d150-c13f-658c2a33cd71@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 9:27 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Thu, Nov 15, 2018 at 11:19:53PM +0530, Jagan Teki wrote:
-> > On Thu, Nov 15, 2018 at 3:26 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > Hi,
-> > >
-> > > On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
-> > > > The horizontal and vertical back porch calculation in BSP
-> > > > code is simply following the Linux drm comment diagram, in
-> > > > include/drm/drm_modes.h which is
-> > > >
-> > > > [hv]back porch = [hv]total - [hv]sync_end
-> > > >
-> > > > BSP code form BPI-M64-bsp is calculating vertical back porch as
-> > > > (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
-> > > >
-> > > > timmings->ver_sync_time= panel_info->lcd_vspw;
-> > > > timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
-> > > >
-> > > > vbp = panel->lcd_vbp;
-> > > > vspw = panel->lcd_vspw;
-> > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
-> > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
-> > > > =>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
-> > > > =>  timmings->ver_back_porch
-> > > > =>  mode->vtotal - mode->end
-> > > >
-> > > > Which evatually same as mode->vtotal - mode->vsync_end so update the
-> > > > same in SUN6I_DSI_BASIC_SIZE0_VBP
-> > > >
-> > > > On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
-> > > > value.
-> > > >
-> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > >
-> > > I've tested your changes on my A33 board, and this commit will break
-> > > it.
-> > >
-> > > It creates vblank timeouts, and visual artifacts at the bottom of the
-> > > display.
-> >
-> > Strange, VBP is earlier gives front porch which is anyway wrong.
-> >
-> > >
-> > > Later commits seem to fix the issue, but will create some blanking on
-> > > the upper third of the display.
-> > >
-> > > Since the documentation is quite sparse, and a MIPI-DSI analyzer is
-> > > way too expensive, I'd really like to have at least what each of these
-> > > commits are actually fixing, and what symptoms each of these were
-> > > causing, and not just "the BSP does it".
-> >
-> > W/o this 2-lane panel is breaking, same vblank timeout and visual
-> > artifacts at the bottom of the panel. though the commits may reference
-> > BSP, I have at-least tested on 3 different panels for us to prove its
-> > working.
-> >
-> > > Having some datasheet for the panels you had working would help too.
-> >
-> > Unfortunately datasheet doesn't have any required information what we
-> > actually looking for.
->
-> Not even the timings? How did you get that information then?
 
-datasheet has timing values, but this changes need controller
-information about VBP register that I don't have. But again existing
-VBP is not back porch for real, it's front porch.
+
+On 20/11/2018 09:41, Leilk Liu wrote:
+> This patch adds a DT binding documentation for the MT7629 soc.
+> 
+> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> ---
+>  .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> index 7940940..6cc4e87 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> @@ -6,6 +6,7 @@ Required properties:
+>      - mediatek,mt2712-spi: for mt2712 platforms
+>      - mediatek,mt6589-spi: for mt6589 platforms
+>      - mediatek,mt7622-spi: for mt7622 platforms
+> +    - mediatek,mt7629-spi: for mt7629 platforms
+
+That's ok, as you add support in the driver. As it actually doesn't change
+anything in the driver itself you could just describe the binding as something like:
+" mediatek,mt7629-spi", "mediatek,mt7622-spi": for mt7629 platforms
+
+This way the driver will just probe the driver using the fallback (mt7622)
+compatible, but if you realize in the future that you will need to distinguish
+between the two SoCs, you can add a mt7629 compatible.
+
+Just as information for the future :)
+
+Regards,
+Matthias
