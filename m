@@ -1,167 +1,335 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 20 Nov 2018 12:09:42 +0800
-Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <1542686700.9073.15.camel@mtksdaap41>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-6-matthias.bgg@kernel.org>
- <1542605939.32082.12.camel@mtksdaap41>
- <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
- <1542686700.9073.15.camel@mtksdaap41>
-Message-ID: <1542686982.26483.1.camel@mtksdaap41>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Tue, 20 Nov 2018 10:36:50 +0530
+Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
+In-Reply-To: <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
+References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
+ <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
+ <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
+Message-ID: <20181120050650.GC5885@Mani-XPS-13-9360>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Marc,
 
-On Tue, 2018-11-20 at 12:05 +0800, CK Hu wrote:
-> Hi, Matthias:
-> 
-> On Mon, 2018-11-19 at 10:26 +0100, Matthias Brugger wrote:
+On Mon, Nov 19, 2018 at 05:57:12PM +0000, Marc Zyngier wrote:
+> On 19/11/2018 17:09, Manivannan Sadhasivam wrote:
+> > Add clock driver for RDA Micro RDA8810PL SoC supporting OSTIMER
+> > and HWTIMER.
 > > 
-> > On 19/11/2018 06:38, CK Hu wrote:
-> > > Hi, Matthias:
-> > > 
-> > > On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
-> > >> From: Matthias Brugger <mbrugger@suse.com>
-> > >>
-> > >> It can happen that the mmsys clock drivers aren't probed before the
-> > >> platform driver gets invoked. The platform driver used to print a warning
-> > >> that the driver failed to get the clocks. Omit this error on
-> > >> the defered probe path.
-> > > 
-> > > This patch looks good to me, but you have not modified the sub driver in
-> > > HDMI path. We could let HDMI path print the warning and someone send
-> > > another patch later, or you modify for HDMI path in this patch.
+> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> > ---
+> >  arch/arm/mach-rda/Kconfig       |   1 +
+> >  drivers/clocksource/Kconfig     |   7 ++
+> >  drivers/clocksource/Makefile    |   1 +
+> >  drivers/clocksource/timer-rda.c | 187 ++++++++++++++++++++++++++++++++
+> >  4 files changed, 196 insertions(+)
+> >  create mode 100644 drivers/clocksource/timer-rda.c
 > > 
-> > Sure, I'll add this in v6. After inspecting the code, I think we will need to
-> > also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
-> > now does not even check if the clocks are present. What do you think?
+> > diff --git a/arch/arm/mach-rda/Kconfig b/arch/arm/mach-rda/Kconfig
+> > index 29012bc68ca4..1ea753f57b2d 100644
+> > --- a/arch/arm/mach-rda/Kconfig
+> > +++ b/arch/arm/mach-rda/Kconfig
+> > @@ -4,5 +4,6 @@ menuconfig ARCH_RDA
+> >  	select COMMON_CLK
+> >  	select GENERIC_IRQ_CHIP
+> >  	select RDA_INTC
+> > +	select RDA_TIMER
+> >  	help
+> >  	  This enables support for the RDA Micro 8810PL SoC family.
+> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > index 55c77e44bb2d..f51eee3a72ea 100644
+> > --- a/drivers/clocksource/Kconfig
+> > +++ b/drivers/clocksource/Kconfig
+> > @@ -105,6 +105,13 @@ config OWL_TIMER
+> >  	help
+> >  	  Enables the support for the Actions Semi Owl timer driver.
+> >  
+> > +config RDA_TIMER
+> > +	bool "RDA timer driver" if COMPILE_TEST
+> > +	depends on GENERIC_CLOCKEVENTS
+> > +	select CLKSRC_MMIO
+> > +	help
+> > +	  Enables the support for the RDA Micro timer driver.
+> > +
+> >  config SUN4I_TIMER
+> >  	bool "Sun4i timer driver" if COMPILE_TEST
+> >  	depends on HAS_IOMEM
+> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> > index dd9138104568..150020a90707 100644
+> > --- a/drivers/clocksource/Makefile
+> > +++ b/drivers/clocksource/Makefile
+> > @@ -57,6 +57,7 @@ obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
+> >  obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
+> >  obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
+> >  obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
+> > +obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
+> >  
+> >  obj-$(CONFIG_ARC_TIMERS)		+= arc_timer.o
+> >  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+> > diff --git a/drivers/clocksource/timer-rda.c b/drivers/clocksource/timer-rda.c
+> > new file mode 100644
+> > index 000000000000..3aa684d92c5d
+> > --- /dev/null
+> > +++ b/drivers/clocksource/timer-rda.c
+> > @@ -0,0 +1,187 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * RDA8810PL SoC timer driver
+> > + *
+> > + * Copyright RDA Microelectronics Company Limited
+> > + * Copyright (c) 2017 Andreas F?rber
+> > + * Copyright (c) 2018 Manivannan Sadhasivam
+> > + */
+> > +
+> > +#include <linux/clockchips.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/irq.h>
+> > +#include <linux/irqreturn.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +
+> > +#define RDA_OSTIMER_LOADVAL_L	0x000
+> > +#define RDA_OSTIMER_CTRL	0x004
+> > +#define RDA_HWTIMER_LOCKVAL_L	0x024
+> > +#define RDA_HWTIMER_LOCKVAL_H	0x028
+> > +#define RDA_TIMER_IRQ_MASK_SET	0x02c
+> > +#define RDA_TIMER_IRQ_CLR	0x034
+> > +
+> > +#define RDA_OSTIMER_CTRL_ENABLE		BIT(24)
+> > +#define RDA_OSTIMER_CTRL_REPEAT		BIT(28)
+> > +#define RDA_OSTIMER_CTRL_LOAD		BIT(30)
+> > +
+> > +#define RDA_TIMER_IRQ_MASK_SET_OSTIMER	BIT(0)
+> > +
+> > +#define RDA_TIMER_IRQ_CLR_OSTIMER	BIT(0)
+> > +
+> > +static void __iomem *rda_timer_base;
+> > +
+> > +static u64 rda_hwtimer_read(struct clocksource *cs)
+> > +{
+> > +	u32 lo, hi;
+> > +
+> > +	/* Always read low 32 bits first */
+> > +	lo = readl(rda_timer_base + RDA_HWTIMER_LOCKVAL_L);
+> > +	hi = readl(rda_timer_base + RDA_HWTIMER_LOCKVAL_H);
 > 
-> Yes, we do really need to consider mdp driver because mmsys clock
-> include mdp clock. You remind me that mmsys control 4 major function:
-> drm routing, drm clock, mdp routing, and mdp clock. Your design let the
-> mmsys device as drm device (control drm routing) and create a sub device
-> as clock device (control drm clock, mdp clock). If one day mdp device
-> (may need control drm routing) need to control the register of mdp
+> Please use the relaxed accessors throughout this driver. There is zero
+> reason to use the non-relaxed versions here.
+> 
 
-Sorry for typo: 'mdp device (may need control mdp routing)'
+Okay.
 
-Regards,
-CK
+> Now, I'm pretty sure this thing isn't correct.
+> 
+> 	<timer = 0x00000000ffffffff>
+> 	lo = 0xffffffff;
+> 	<tick, timer = 0x0000000100000000>
+> 	hi = 0x00000001;
+> 
+> Bingo. You cannot read a 64bit counter with only two 32bit accesses.
+> 
 
-> routing, would mdp device be a sub device? Or we need not to consider
-> this because it need not to access mmsys register now?
+I think the lack of description makes confusion here. In this SoC, there
+are two independent timers available: OSTIMER (56 bit) and HWTIMER (64 bit)
+with optional interrupt support. I have used OSTIMER for clockevents and
+HWTIMER for clocksource. Will add this information in driver.
+
+Please let me know whether I have to model these two clocksources
+differently!
+
+> > +
+> > +	return ((u64)hi << 32) | lo;
+> > +}
+> > +
+> > +static struct clocksource rda_clocksource = {
+> > +	.name           = "rda-timer",
+> > +	.rating         = 400,
+> > +	.read           = rda_hwtimer_read,
+> > +	.mask           = CLOCKSOURCE_MASK(64),
 > 
-> Regards,
-> CK
+> This is a 64bit counter? See below.
 > 
-> > 
-> > I'll address the coding style issue you metioned below as well.
-> > 
-> > Regards,
-> > Matthias
-> > 
-> > >>
-> > >> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> > >> ---
-> > >>  drivers/gpu/drm/mediatek/mtk_disp_color.c | 4 +++-
-> > >>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c   | 4 +++-
-> > >>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c  | 4 +++-
-> > >>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c    | 3 ++-
-> > >>  drivers/gpu/drm/mediatek/mtk_dsi.c        | 6 ++++--
-> > >>  5 files changed, 15 insertions(+), 6 deletions(-)
-> > >>
-> > >> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_color.c b/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > >> index f609b62b8be6..1ea3178d4c18 100644
-> > >> --- a/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > >> +++ b/drivers/gpu/drm/mediatek/mtk_disp_color.c
-> > >> @@ -126,7 +126,9 @@ static int mtk_disp_color_probe(struct platform_device *pdev)
-> > >>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
-> > >>  				&mtk_disp_color_funcs);
-> > >>  	if (ret) {
-> > >> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
-> > >> +		if (ret != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to initialize component: %d\n",
-> > >> +					ret);
-> > > 
-> > > I would like one more blank line here.
-> > > 
-> > >>  		return ret;
-> > >>  	}
-> > >>  
-> > >> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > >> index 28d191192945..5ebbcaa4e70e 100644
-> > >> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > >> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > >> @@ -293,7 +293,9 @@ static int mtk_disp_ovl_probe(struct platform_device *pdev)
-> > >>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
-> > >>  				&mtk_disp_ovl_funcs);
-> > >>  	if (ret) {
-> > >> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
-> > >> +		if (ret != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to initialize component: %d\n",
-> > >> +					ret);
-> > > 
-> > > I would like to align to the right of '('.
-> > > 
-> > > Regards,
-> > > CK
-> > > 
-> > >>  		return ret;
-> > >>  	}
-> > >>  
-> > >> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > >> index b0a5cffe345a..59a08ed5fea5 100644
-> > >> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > >> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> > >> @@ -295,7 +295,9 @@ static int mtk_disp_rdma_probe(struct platform_device *pdev)
-> > >>  	ret = mtk_ddp_comp_init(dev, dev->of_node, &priv->ddp_comp, comp_id,
-> > >>  				&mtk_disp_rdma_funcs);
-> > >>  	if (ret) {
-> > >> -		dev_err(dev, "Failed to initialize component: %d\n", ret);
-> > >> +		if (ret != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to initialize component: %d\n",
-> > >> +					ret);
-> > >>  		return ret;
-> > >>  	}
-> > >>  
-> > >> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > >> index b06cd9d4b525..b76a2d071a97 100644
-> > >> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > >> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> > >> @@ -566,7 +566,8 @@ static int mtk_ddp_probe(struct platform_device *pdev)
-> > >>  
-> > >>  	ddp->clk = devm_clk_get(dev, NULL);
-> > >>  	if (IS_ERR(ddp->clk)) {
-> > >> -		dev_err(dev, "Failed to get clock\n");
-> > >> +		if (PTR_ERR(ddp->clk) != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to get clock\n");
-> > >>  		return PTR_ERR(ddp->clk);
-> > >>  	}
-> > >>  
-> > >> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > >> index 90109a0d6fff..cc6de75636c3 100644
-> > >> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > >> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> > >> @@ -1103,14 +1103,16 @@ static int mtk_dsi_probe(struct platform_device *pdev)
-> > >>  	dsi->engine_clk = devm_clk_get(dev, "engine");
-> > >>  	if (IS_ERR(dsi->engine_clk)) {
-> > >>  		ret = PTR_ERR(dsi->engine_clk);
-> > >> -		dev_err(dev, "Failed to get engine clock: %d\n", ret);
-> > >> +		if (ret != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to get engine clock: %d\n", ret);
-> > >>  		return ret;
-> > >>  	}
-> > >>  
-> > >>  	dsi->digital_clk = devm_clk_get(dev, "digital");
-> > >>  	if (IS_ERR(dsi->digital_clk)) {
-> > >>  		ret = PTR_ERR(dsi->digital_clk);
-> > >> -		dev_err(dev, "Failed to get digital clock: %d\n", ret);
-> > >> +		if (ret != -EPROBE_DEFER)
-> > >> +			dev_err(dev, "Failed to get digital clock: %d\n", ret);
-> > >>  		return ret;
-> > >>  	}
-> > >>  
-> > > 
-> > > 
+
+Yes, this is the HWTIMER and is 64 bit.
+
+> > +	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
+> > +};
+> > +
+> > +static int rda_ostimer_start(bool periodic, u64 cycles)
+> > +{
+> > +	u32 ctrl, load_l;
+> > +
+> > +	load_l = (u32)cycles;
+> > +	ctrl = ((cycles >> 32) & 0xffffff);
+> > +	ctrl |= RDA_OSTIMER_CTRL_LOAD | RDA_OSTIMER_CTRL_ENABLE;
+> > +	if (periodic)
+> > +		ctrl |= RDA_OSTIMER_CTRL_REPEAT;
+> > +
+> > +	/* Enable ostimer interrupt first */
+> > +	writel(RDA_TIMER_IRQ_MASK_SET_OSTIMER,
+> > +	       rda_timer_base + RDA_TIMER_IRQ_MASK_SET);
 > 
+> Is it masking or enabling the interrupt?
+> 
+
+On this platform, we need to set corresponding bit in the RDA_TIMER_IRQ_MASK_SET
+register to enable an interrupt.
+
+> > +
+> > +	/* Write low 32 bits first, high 24 bits are with ctrl */
+> 
+> You're saying that you can only write 56 bits? This contradicts the 64bt
+> counter thing above.
+> 
+> > +	writel(load_l, rda_timer_base + RDA_OSTIMER_LOADVAL_L);
+> > +	writel(ctrl, rda_timer_base + RDA_OSTIMER_CTRL);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_stop(void)
+> > +{
+> > +	/* Disable ostimer interrupt first */
+> > +	writel(0, rda_timer_base + RDA_TIMER_IRQ_MASK_SET);
+> > +
+
+Here the register should be RDA_TIMER_IRQ_MASK_CLR.
+
+> > +	writel(0, rda_timer_base + RDA_OSTIMER_CTRL);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_set_state_shutdown(struct clock_event_device *evt)
+> > +{
+> > +	rda_ostimer_stop();
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_set_state_oneshot(struct clock_event_device *evt)
+> > +{
+> > +	rda_ostimer_stop();
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_set_state_periodic(struct clock_event_device *evt)
+> > +{
+> > +	unsigned long cycles_per_jiffy;
+> > +
+> > +	rda_ostimer_stop();
+> > +
+> > +	cycles_per_jiffy = ((unsigned long long)NSEC_PER_SEC / HZ *
+> > +			     evt->mult) >> evt->shift;
+> > +	rda_ostimer_start(true, cycles_per_jiffy);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_tick_resume(struct clock_event_device *evt)
+> > +{
+> > +	return 0;
+> > +}
+> > +
+> > +static int rda_ostimer_set_next_event(unsigned long evt,
+> > +				      struct clock_event_device *ev)
+> > +{
+> > +	rda_ostimer_start(false, evt);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct clock_event_device rda_clockevent = {
+> > +	.name			= "rda-ostimer",
+> > +	.rating			= 250,
+> > +	.features		= CLOCK_EVT_FEAT_PERIODIC |
+> > +				  CLOCK_EVT_FEAT_ONESHOT |
+> > +				  CLOCK_EVT_FEAT_DYNIRQ,
+> > +	.set_state_shutdown	= rda_ostimer_set_state_shutdown,
+> > +	.set_state_oneshot	= rda_ostimer_set_state_oneshot,
+> > +	.set_state_periodic	= rda_ostimer_set_state_periodic,
+> > +	.tick_resume		= rda_ostimer_tick_resume,
+> > +	.set_next_event		= rda_ostimer_set_next_event,
+> > +};
+> > +
+> > +static irqreturn_t rda_ostimer_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct clock_event_device *evt = dev_id;
+> > +
+> > +	/* clear timer int */
+> > +	writel(RDA_TIMER_IRQ_CLR_OSTIMER, rda_timer_base + RDA_TIMER_IRQ_CLR);
+> > +
+> > +	if (evt->event_handler)
+> > +		evt->event_handler(evt);
+> > +
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static int __init rda_timer_init(struct device_node *node)
+> > +{
+> > +	unsigned long rate = 2000000;
+> > +	int ostimer_irq, ret;
+> > +
+> > +	rda_timer_base = of_io_request_and_map(node, 0, "rda-timer");
+> > +	if (IS_ERR(rda_timer_base)) {
+> > +		pr_err("Can't map timer registers");
+> > +		return PTR_ERR(rda_timer_base);
+> > +	}
+> > +
+> > +	ostimer_irq = of_irq_get_byname(node, "ostimer");
+> > +	if (ostimer_irq <= 0) {
+> > +		pr_err("Can't parse ostimer IRQ");
+> > +		return -EINVAL;
+> 
+> Leaking IO space.
+> 
+
+Ack.
+
+> > +	}
+> > +
+> > +	clocksource_register_hz(&rda_clocksource, rate);
+> > +
+> > +	ret = request_irq(ostimer_irq, rda_ostimer_interrupt, IRQF_TIMER,
+> > +			  "rda-ostimer", &rda_clockevent);
+> > +	if (ret) {
+> > +		pr_err("failed to request irq %d\n", ostimer_irq);
+> > +		return ret;
+> 
+> Same here.
+> 
+
+Ack.
+
+> > +	}
+> > +
+> > +	irq_force_affinity(ostimer_irq, cpumask_of(0));
+> 
+> Why?
+> 
+
+Not needed, will remove it.
+
+Thanks,
+Mani
+
+> > +
+> > +	rda_clockevent.cpumask = cpumask_of(0);
+> > +	rda_clockevent.irq = ostimer_irq;
+> > +	clockevents_config_and_register(&rda_clockevent, rate,
+> > +					0x2, 0xffffffff);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +TIMER_OF_DECLARE(rda8810pl, "rda,8810pl-timer", rda_timer_init);
+> > 
+> 
+> Thanks,
+> 
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
