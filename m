@@ -1,61 +1,60 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 10:59:52 +0000
-Subject: [PATCHv2 08/25] PCI: mobiveil: use the 1st inbound window for MEM
- inbound transactions
-In-Reply-To: <20181120092615.11680-9-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-9-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB223585D8755A5B5DF6EBC22AE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 20 Nov 2018 10:42:07 +0100
+Subject: [PATCH V2 1/2] mmc: mmci: send stop command if sbc error issue
+In-Reply-To: <1541583041-17461-2-git-send-email-ludovic.Barre@st.com>
+References: <1541583041-17461-1-git-send-email-ludovic.Barre@st.com>
+ <1541583041-17461-2-git-send-email-ludovic.Barre@st.com>
+Message-ID: <CAPDyKFpLTEwrBagJrd98Zyrd_pwJa9Zkgsi+geZainQV+OgpOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
-
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:26 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 08/25] PCI: mobiveil: use the 1st inbound window for
-> MEM inbound transactions
-> 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> The inbound windows have different register set with outbound windows.
-> This patch change the MEM inbound window to the first one.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On 7 November 2018 at 10:30, Ludovic Barre <ludovic.Barre@st.com> wrote:
+> From: Ludovic Barre <ludovic.barre@st.com>
+>
+> Refer to "4.15 set block count command" of sd specification:
+> Host needs to issue CMD12 if any error is detected in
+> the CMD18 and CMD25 operations.
+>
+> In sbc case, the data->stop is fill by framework.
+>
+> Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 > ---
-> V2:
->  - no change
-> 
->  drivers/pci/controller/pcie-mobiveil.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mobiveil.c
-> b/drivers/pci/controller/pcie-mobiveil.c
-> index df71c11b4810..e88afc792a5c 100644
-> --- a/drivers/pci/controller/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -616,7 +616,7 @@ static int mobiveil_host_init(struct mobiveil_pcie
-> *pcie)
->  			   CFG_WINDOW_TYPE, resource_size(pcie-
-> >ob_io_res));
-> 
->  	/* memory inbound translation window */
-> -	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE,
-> IB_WIN_SIZE);
-> +	program_ib_windows(pcie, WIN_NUM_0, 0, MEM_WINDOW_TYPE,
-> IB_WIN_SIZE);
-> 
->  	/* Get the I/O and memory ranges from DT */
->  	resource_list_for_each_entry(win, &pcie->resources) {
+>  drivers/mmc/host/mmci.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+> index 82bab35..13fa640 100644
+> --- a/drivers/mmc/host/mmci.c
+> +++ b/drivers/mmc/host/mmci.c
+> @@ -1190,11 +1190,10 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+>                         /* The error clause is handled above, success! */
+>                         data->bytes_xfered = data->blksz * data->blocks;
+>
+> -               if (!data->stop || host->mrq->sbc) {
+> +               if (!data->stop || (host->mrq->sbc && !data->error))
+>                         mmci_request_end(host, data->mrq);
+> -               } else {
+> +               else
+>                         mmci_start_command(host, data->stop, 0);
+
+This looks correct to me!
+
+Although, just wanted to double check that you tested this for a case
+where we have host->mrq->sbc set and got an error in data->error? I
+guess it can be tricky, so I was thinking of manually trying to
+instruct the code, to set an error in data->error, at some point to
+trigger this code. That would at least give us some confidence that it
+works as expected.
+
+Thoughts?
+
+> -               }
+>         }
+>  }
+>
 > --
-> 2.17.1
+> 2.7.4
+>
+
+Kind regards
+Uffe
