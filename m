@@ -1,36 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 20 Nov 2018 11:11:46 +0000
-Subject: [RFC 0/3] Unify CPU topology across ARM64 & RISC-V
-In-Reply-To: <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
-References: <1541728209-3224-1-git-send-email-atish.patra@wdc.com>
- <07d92dd4-f943-47ee-e168-46bfaf4ed755@codeaurora.org>
-Message-ID: <20181120111146.GA6497@e107155-lin>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 20 Nov 2018 22:28:34 +1100
+Subject: [PATCH 01/10] perf/core: Add macro to test for event exclusion
+ flags
+In-Reply-To: <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
+Message-ID: <87sgzw0yzh.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 11:31:33AM -0700, Jeffrey Hugo wrote:
+Andrew Murray <andrew.murray@arm.com> writes:
 
-[...]
-
+> Add a macro that tests if any of the perf event exclusion flags
+> are set on a given event.
 >
-> I was interested in testing these on QDF2400, an ARM64 platform, since this
-> series touches core ARM64 code and I'd hate to see a regression. However, I
-> can't figure out what baseline to use to apply these. Different patches
-> cause different conflicts of a variety of baselines I attempted.
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  include/linux/perf_event.h | 9 +++++++++
+>  1 file changed, 9 insertions(+)
 >
+> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+> index 53c500f..89ee7fa 100644
+> --- a/include/linux/perf_event.h
+> +++ b/include/linux/perf_event.h
+> @@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
+>  extern void
+>  perf_log_lost_samples(struct perf_event *event, u64 lost);
+>  
+> +static inline bool event_has_exclude_flags(struct perf_event *event)
+> +{
+> +	struct perf_event_attr *attr = &event->attr;
+> +
+> +	return attr->exclude_idle || attr->exclude_user ||
+> +	       attr->exclude_kernel || attr->exclude_hv ||
+> +	       attr->exclude_guest || attr->exclude_host;
+> +}
 
-Good to know that we can test DT configuration on QDF2400. I always assumed
-it's ACPI only.
+Sorry to be a total PITA, but using "flags" plural suggests that it only
+returns true if there is more than one exclude flag set.
 
-> What are these intended to apply to?
->
+A better name would be event_has_exclude_flag() or maybe
+event_has_any_exclude_flag().
 
-The series alone may not get the package/socket ids correct on QDF2400.
-I have not yet added support for the same as I wanted to get the initial
-feedback on DT bindings. The movement of DT binding and corresponding
-code should not regress and you should be able to validate only that
-part.
+If you're doing a respin anyway it'd be nice to fix the name, but
+obviously it's not high priority.
 
---
-Regards,
-Sudeep
+cheers
