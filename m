@@ -1,146 +1,82 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 20 Nov 2018 09:53:41 -0700
-Subject: [PATCH v2 2/2] perf cs-etm: Add support sample flags
-In-Reply-To: <20181119232202.GA7001@xps15>
-References: <1541912876-20967-1-git-send-email-leo.yan@linaro.org>
- <1541912876-20967-3-git-send-email-leo.yan@linaro.org>
- <20181119232202.GA7001@xps15>
-Message-ID: <CANLsYkxQVpSP1D2M_bCni=nkZyo4qC=d33bWC1Xy0_vDfX9Agg@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 20 Nov 2018 21:55:42 +0530
+Subject: [PATCH v4 08/26] drm/sun4i: sun6i_mipi_dsi: Fix VBP size
+ calculation
+In-Reply-To: <20181120155715.andrjp5kg6ugcv72@flea>
+References: <20181113111633.20189-1-jagan@amarulasolutions.com>
+ <20181113111633.20189-9-jagan@amarulasolutions.com>
+ <20181115095551.uctdkfmuwlnzhjnn@flea>
+ <CAMty3ZAEHiovm6OF6JvJVQR4aqpG1Q3ML5YqxJkF2ntwRkUO=A@mail.gmail.com>
+ <20181120155715.andrjp5kg6ugcv72@flea>
+Message-ID: <CAMty3ZCUOJmvekupOwh281g5HaazTpBbukWQY2Pv2OYypAwciw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Nov 2018 at 16:22, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
+On Tue, Nov 20, 2018 at 9:27 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> On Sun, Nov 11, 2018 at 01:07:56PM +0800, Leo Yan wrote:
-> > We have prepared the flags in the packet structure, so need to copy
-> > the related value into sample structure thus perf tool can facilitate
-> > sample flags.
+> On Thu, Nov 15, 2018 at 11:19:53PM +0530, Jagan Teki wrote:
+> > On Thu, Nov 15, 2018 at 3:26 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > Hi,
+> > >
+> > > On Tue, Nov 13, 2018 at 04:46:15PM +0530, Jagan Teki wrote:
+> > > > The horizontal and vertical back porch calculation in BSP
+> > > > code is simply following the Linux drm comment diagram, in
+> > > > include/drm/drm_modes.h which is
+> > > >
+> > > > [hv]back porch = [hv]total - [hv]sync_end
+> > > >
+> > > > BSP code form BPI-M64-bsp is calculating vertical back porch as
+> > > > (from linux-sunxi/drivers/video/sunxi/disp2/disp/de/disp_lcd.c)
+> > > >
+> > > > timmings->ver_sync_time= panel_info->lcd_vspw;
+> > > > timmings->ver_back_porch= panel_info->lcd_vbp-panel_info->lcd_vspw;
+> > > >
+> > > > vbp = panel->lcd_vbp;
+> > > > vspw = panel->lcd_vspw;
+> > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = vbp-vspw;
+> > > > dsi_dev[sel]->dsi_basic_size0.bits.vbp = panel->lcd_vbp - panel->lcd_vspw;
+> > > > =>  timmings->ver_back_porch + panel_info->lcd_vspw - panel_info->lcd_vspw
+> > > > =>  timmings->ver_back_porch
+> > > > =>  mode->vtotal - mode->end
+> > > >
+> > > > Which evatually same as mode->vtotal - mode->vsync_end so update the
+> > > > same in SUN6I_DSI_BASIC_SIZE0_VBP
+> > > >
+> > > > On the information note, existing SUN6I_DSI_BASIC_SIZE0_VSA is proper
+> > > > value.
+> > > >
+> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > >
+> > > I've tested your changes on my A33 board, and this commit will break
+> > > it.
+> > >
+> > > It creates vblank timeouts, and visual artifacts at the bottom of the
+> > > display.
 > >
-> > The PREV_PACKET contains the branch instruction flags and PACKET
-> > actually contains the flags for next branch instruction.  So this patch
-> > is to set sample flags with 'etmq->prev_packet->flags'.
+> > Strange, VBP is earlier gives front porch which is anyway wrong.
 > >
-> > This patch includes three fixing up for sample flags based on the
-> > packets context:
+> > >
+> > > Later commits seem to fix the issue, but will create some blanking on
+> > > the upper third of the display.
+> > >
+> > > Since the documentation is quite sparse, and a MIPI-DSI analyzer is
+> > > way too expensive, I'd really like to have at least what each of these
+> > > commits are actually fixing, and what symptoms each of these were
+> > > causing, and not just "the BSP does it".
 > >
-> > - If the packet is exception packet or exception return packet, update
-> >   the previous packet for exception specific flags;
-> > - If there has TRACE_ON or TRACE_OFF packet in the middle of instruction
-> >   packets, this indicates the trace is discontinuous, so append the flag
-> >   PERF_IP_FLAG_TRACE_END to the previous packet to indicate the trace
-> >   has been ended;
-> > - If one instruction packet is behind TRACE_OFF packet, this instruction
-> >   is restarting trace packet.  So set flag PERF_IP_FLAG_TRACE_START to
-> >   TRACE_OFF packet if one, this flag isn't used by TRACE_OFF packet but
-> >   used to indicate trace restarting when generate sample.
+> > W/o this 2-lane panel is breaking, same vblank timeout and visual
+> > artifacts at the bottom of the panel. though the commits may reference
+> > BSP, I have at-least tested on 3 different panels for us to prove its
+> > working.
 > >
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  tools/perf/util/cs-etm.c | 43 +++++++++++++++++++++++++++++++++++++++++--
-> >  1 file changed, 41 insertions(+), 2 deletions(-)
+> > > Having some datasheet for the panels you had working would help too.
 > >
-> > diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> > index 455f132..afca6f3 100644
-> > --- a/tools/perf/util/cs-etm.c
-> > +++ b/tools/perf/util/cs-etm.c
-> > @@ -676,7 +676,7 @@ static int cs_etm__synth_instruction_sample(struct cs_etm_queue *etmq,
-> >       sample.stream_id = etmq->etm->instructions_id;
-> >       sample.period = period;
-> >       sample.cpu = etmq->packet->cpu;
-> > -     sample.flags = 0;
-> > +     sample.flags = etmq->prev_packet->flags;
-> >       sample.insn_len = 1;
-> >       sample.cpumode = event->sample.header.misc;
-> >
-> > @@ -735,7 +735,7 @@ static int cs_etm__synth_branch_sample(struct cs_etm_queue *etmq)
-> >       sample.stream_id = etmq->etm->branches_id;
-> >       sample.period = 1;
-> >       sample.cpu = etmq->packet->cpu;
-> > -     sample.flags = 0;
-> > +     sample.flags = etmq->prev_packet->flags;
-> >       sample.cpumode = event->sample.header.misc;
-> >
-> >       /*
-> > @@ -878,6 +878,43 @@ static int cs_etm__synth_events(struct cs_etm_auxtrace *etm,
-> >       return 0;
-> >  }
-> >
-> > +static void cs_etm__fixup_flags(struct cs_etm_queue *etmq)
-> > +{
-> > +     /*
-> > +      * Decoding stream might insert one TRACE_OFF packet in the
-> > +      * middle of instruction packets, this means it doesn't
-> > +      * contain the pair packets with TRACE_OFF and TRACE_ON.
-> > +      * For this case, the instruction packet follows with
-> > +      * TRACE_OFF packet so we need to fixup prev_packet with flag
-> > +      * PERF_IP_FLAG_TRACE_BEGIN, this flag finally is used by the
-> > +      * instruction packet to generate samples.
-> > +      */
-> > +     if (etmq->prev_packet->sample_type == CS_ETM_TRACE_OFF &&
-> > +         etmq->packet->sample_type == CS_ETM_RANGE)
-> > +             etmq->prev_packet->flags = PERF_IP_FLAG_BRANCH |
-> > +                                        PERF_IP_FLAG_TRACE_BEGIN;
-> > +
-> > +     if (etmq->prev_packet->sample_type == CS_ETM_RANGE) {
-> > +             /*
-> > +              * When the exception packet is inserted, update flags
-> > +              * so tell perf it is exception related branches.
-> > +              */
-> > +             if (etmq->packet->sample_type == CS_ETM_EXCEPTION ||
-> > +                 etmq->packet->sample_type == CS_ETM_EXCEPTION_RET)
-> > +                     etmq->prev_packet->flags = etmq->packet->flags;
-> > +
-> > +             /*
-> > +              * The trace is discontinuous, weather this is caused by
-> > +              * TRACE_ON packet or TRACE_OFF packet is coming, if the
-> > +              * previous packet is instruction packet, simply set flag
-> > +              * PERF_IP_FLAG_TRACE_END for previous packet.
-> > +              */
-> > +             if (etmq->packet->sample_type == CS_ETM_TRACE_ON ||
-> > +                 etmq->packet->sample_type == CS_ETM_TRACE_OFF)
-> > +                     etmq->prev_packet->flags |= PERF_IP_FLAG_TRACE_END;
-> > +     }
-> > +}
-> > +
+> > Unfortunately datasheet doesn't have any required information what we
+> > actually looking for.
 >
-> I think it would be better to keep all the flag related processing in
-> cs-etm-decoder.c so that things in cs-etm.c are only concered with dealing with
-> perf.
->
-> Look at function cs_etm__alloc_queue(), there you'll find "d_params.data = etmq".
->
-> In function cs_etm_decoder__new(), decoder->data = d_params->data;
->
-> This means that anywhere you have a decoder, decoder->data is an etmq.  I've
-> used this profusely in my work on CPU-wide trace scenarios.  Because you're
-> getting there ahead of me you'll need to fix the declaration of struct
-> cs_etm_queue but that's easy.
+> Not even the timings? How did you get that information then?
 
-I've been thinking further about this and manipulating the etmq packet
-and prev_packet from the cs-etm-decoder.c won't work because all we
-have at that time is the decoder's packet queue.  My goal is to
-manipulate the flags in only one place - either in cs-etm.c or
-cs-etm-decoder.c but not in both.  It might be worth trying to do the
-implementation in cs-etm.c since there is already a lot of packet flow
-intelligence happening there.
-
->
-> Regards,
-> Mathieu
->
-> >  static int cs_etm__sample(struct cs_etm_queue *etmq)
-> >  {
-> >       struct cs_etm_auxtrace *etm = etmq->etm;
-> > @@ -1100,6 +1137,8 @@ static int cs_etm__run_decoder(struct cs_etm_queue *etmq)
-> >                                        */
-> >                                       break;
-> >
-> > +                             cs_etm__fixup_flags(etmq);
-> > +
-> >                               switch (etmq->packet->sample_type) {
-> >                               case CS_ETM_RANGE:
-> >                                       /*
-> > --
-> > 2.7.4
-> >
+datasheet has timing values, but this changes need controller
+information about VBP register that I don't have. But again existing
+VBP is not back porch for real, it's front porch.
