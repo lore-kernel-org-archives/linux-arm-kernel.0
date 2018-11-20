@@ -1,60 +1,126 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 20 Nov 2018 15:01:33 +0000
-Subject: [PATCH 1/2] swiotlb: Make DIRECT_MAPPING_ERROR viable
-In-Reply-To: <20181120144918.GH10917@char.us.oracle.com>
-References: <cover.1542722463.git.robin.murphy@arm.com>
- <e90da5fbab881c502ac3412fb05c44b26c99f73a.1542722463.git.robin.murphy@arm.com>
- <20181120144918.GH10917@char.us.oracle.com>
-Message-ID: <7ea5809e-1e1d-6bac-b723-9f55fafeaaae@arm.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 20 Nov 2018 15:32:29 +0100
+Subject: [PATCH v2 04/12] drm/sun4i: sun6i_mipi_dsi: Simplify drq set to
+ support all modes
+In-Reply-To: <CAMty3ZAKL2fZqwLwd_WiQpzz+cOETMR7ES7HQsBo3PsAvjM+6A@mail.gmail.com>
+References: <20181116163916.29621-1-jagan@amarulasolutions.com>
+ <20181116163916.29621-5-jagan@amarulasolutions.com>
+ <20181119083243.4njj2p2sy2xf2zyf@flea>
+ <CAMty3ZAKL2fZqwLwd_WiQpzz+cOETMR7ES7HQsBo3PsAvjM+6A@mail.gmail.com>
+Message-ID: <20181120143229.ncx3hk2manc7hnwl@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2018 14:49, Konrad Rzeszutek Wilk wrote:
-> On Tue, Nov 20, 2018 at 02:09:52PM +0000, Robin Murphy wrote:
->> With the overflow buffer removed, we no longer have a unique address
->> which is guaranteed not to be a valid DMA target to use as an error
->> token. The DIRECT_MAPPING_ERROR value of 0 tries to at least represent
->> an unlikely DMA target, but unfortunately there are already SWIOTLB
->> users with DMA-able memory at physical address 0 which now gets falsely
->> treated as a mapping failure and leads to all manner of misbehaviour.
->>
->> The best we can do to mitigate that is flip DIRECT_MAPPING_ERROR to the
->> commonly-used all-bits-set value, since the last single byte of memory
->> is by far the least-likely-valid DMA target.
+On Mon, Nov 19, 2018 at 04:52:17PM +0530, Jagan Teki wrote:
+> On Mon, Nov 19, 2018 at 2:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > On Fri, Nov 16, 2018 at 10:09:08PM +0530, Jagan Teki wrote:
+> > > Allwinner MIPI DSI DRQ set value can be varied with respective
+> > > video modes.
+> > > - burst mode the set value is always 0
+> > > - video modes whose front porch greater than 20, the set value
+> > >   can be computed based front porch and bpp.
+> > > - video modes whose front porch is not greater than 20, the set value
+> > >   is simply 0
+> > >
+> > > This patch simplifies existing drq set value code by grouping
+> > > into sun6i_dsi_get_drq and support all video modes.
+> > >
+> > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > > ---
+> > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 38 ++++++++++++++++----------
+> > >  1 file changed, 23 insertions(+), 15 deletions(-)
+> > >
+> > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > index efd08bfd0cb8..d60955880c43 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
+> > > @@ -363,6 +363,26 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
+> > >                    SUN6I_DSI_INST_JUMP_CFG_NUM(1));
+> > >  };
+> > >
+> > > +static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
+> > > +                           struct drm_display_mode *mode)
+> > > +{
+> > > +     struct mipi_dsi_device *device = dsi->device;
+> > > +     int drq = 0;
+> >
+> > So, here, you declaring a variable called drq, set to 0.
+> >
+> > > +     if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> > > +             return drq;
+> >
+> > That you return here. You could just return 0, to be clearer.
+> >
+> > > +     if ((mode->hsync_start - mode->hdisplay) > 20) {
+> > > +             /* Maaaaaagic */
+> > > +             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+> >
+> > You re-declare a variable with the same name here, but a different
+> > type....
+> >
+> > > +             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+> > > +             drq /= 32;
+> > > +     }
+> > > +
+> > > +     return drq;
+> >
+> > And then return the first one? How is that even working?
 > 
-> Are all the callers checking for DIRECT_MAPPING_ERROR or is it more of
-> a comparison (as in if (!ret)) ?
+> Will fix this.
 
-dma_direct_map_page() and dma_direct_mapping_error() were already doing 
-the right thing, and external callers must rely on the latter via 
-dma_mapping_error() rather than trying to inspect the actual value 
-themselves, since that varies between implementations anyway. AFAICS all 
-the new return paths from swiotlb_map_page() are also robust in 
-referencing the macro explicitly, so I think we're good.
+I don't want you to only fix this, I also want you to contribute code
+that is A) useful, B) tested.
 
-Thanks,
-Robin.
+> > >  static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
+> > >                                     struct drm_display_mode *mode, u16 hblk)
+> > >  {
+> > > @@ -478,21 +498,9 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
+> > >  static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
+> > >                                 struct drm_display_mode *mode)
+> > >  {
+> > > -     struct mipi_dsi_device *device = dsi->device;
+> > > -     u32 val = 0;
+> > > -
+> > > -     if ((mode->hsync_start - mode->hdisplay) > 20) {
+> > > -             /* Maaaaaagic */
+> > > -             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
+> > > -
+> > > -             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
+> > > -             drq /= 32;
+> > > -
+> > > -             val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+> > > -                    SUN6I_DSI_TCON_DRQ_SET(drq));
+> > > -     }
+> > > -
+> > > -     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
+> > > +     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
+> > > +                  SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
+> > > +                  SUN6I_DSI_TCON_DRQ_SET(sun6i_dsi_get_drq(dsi, mode)));
+> >
+> > On top of that, you now enable the DRQ stuff all the time, while it
+> 
+> Earlier the val value is ENABLE_MODE ORed with drq value. for the
+> condition drq is computed in if block otherwise the val is 0.
+> So as I explained in commit message the drq value is 0
+> - for video modes whose front porch is not greater than 20 and
+> - for burst mode the val
+> 
+> ie reason I mode it common.
 
->> Fixes: dff8d6c1ed58 ("swiotlb: remove the overflow buffer")]
->> Reported-by: John Stultz <john.stultz@linaro.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   include/linux/dma-direct.h | 2 +-
->>   1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
->> index bd73e7a91410..9de9c7ab39d6 100644
->> --- a/include/linux/dma-direct.h
->> +++ b/include/linux/dma-direct.h
->> @@ -5,7 +5,7 @@
->>   #include <linux/dma-mapping.h>
->>   #include <linux/mem_encrypt.h>
->>   
->> -#define DIRECT_MAPPING_ERROR		0
->> +#define DIRECT_MAPPING_ERROR		~(dma_addr_t)0
->>   
->>   #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
->>   #include <asm/dma-direct.h>
->> -- 
->> 2.19.1.dirty
->>
+The previous code was enabling it if the front porch was larger than
+20 only. You enable it all the time now, and you never explain why.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/2f01363f/attachment-0001.sig>
