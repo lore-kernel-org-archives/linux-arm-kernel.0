@@ -1,354 +1,514 @@
-From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:27:57 +0000
-Subject: [PATCHv2 23/25] PCI: mobiveil: add PCIe Gen4 RC driver for NXP
- Layerscape SoCs
-In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-24-Zhiqiang.Hou@nxp.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Tue, 20 Nov 2018 14:34:57 +0800
+Subject: [PATCH v1 01/11] clk: mediatek: add new clkmux register API
+In-Reply-To: <CANMq1KDEg-9WzfaRB-n4Ab0PxjqfZL_aeTAXD336N6VzX8oFhQ@mail.gmail.com>
+References: <20181106064206.17535-1-weiyi.lu@mediatek.com>
+ <20181106064206.17535-3-weiyi.lu@mediatek.com>
+ <CANMq1KDEg-9WzfaRB-n4Ab0PxjqfZL_aeTAXD336N6VzX8oFhQ@mail.gmail.com>
+Message-ID: <1542695697.5132.24.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+On Tue, 2018-11-13 at 08:00 -0800, Nicolas Boichat wrote:
+> On Mon, Nov 5, 2018 at 10:42 PM Weiyi Lu <weiyi.lu@mediatek.com> wrote:
+> >
+> > From: Owen Chen <owen.chen@mediatek.com>
+> >
+> > On both MT8183 & MT6765, there add "set/clr" register for
+> > each clkmux setting, and one update register to trigger value change.
+> > It is designed to prevent read-modify-write racing issue.
+> > The sw design need to add a new API to handle this hw change with
+> > a new mtk_clk_mux/mtk_mux struct in new file "clk-mux.c", "clk-mux.h".
+> >
+> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> > Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+> > ---
+> >  drivers/clk/mediatek/Makefile  |   2 +-
+> >  drivers/clk/mediatek/clk-mux.c | 252 +++++++++++++++++++++++++++++++++
+> >  drivers/clk/mediatek/clk-mux.h | 101 +++++++++++++
+> >  3 files changed, 354 insertions(+), 1 deletion(-)
+> >  create mode 100644 drivers/clk/mediatek/clk-mux.c
+> >  create mode 100644 drivers/clk/mediatek/clk-mux.h
+> >
+> > diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> > index 844b55d2770d..b97980dbb738 100644
+> > --- a/drivers/clk/mediatek/Makefile
+> > +++ b/drivers/clk/mediatek/Makefile
+> > @@ -1,5 +1,5 @@
+> >  # SPDX-License-Identifier: GPL-2.0
+> > -obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o
+> > +obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o
+> >  obj-$(CONFIG_COMMON_CLK_MT6797) += clk-mt6797.o
+> >  obj-$(CONFIG_COMMON_CLK_MT6797_IMGSYS) += clk-mt6797-img.o
+> >  obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
+> > diff --git a/drivers/clk/mediatek/clk-mux.c b/drivers/clk/mediatek/clk-mux.c
+> > new file mode 100644
+> > index 000000000000..18bc9a146be0
+> > --- /dev/null
+> > +++ b/drivers/clk/mediatek/clk-mux.c
+> > @@ -0,0 +1,252 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (c) 2018 MediaTek Inc.
+> > + * Author: Owen Chen <owen.chen@mediatek.com>
+> > + */
+> > +
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/mfd/syscon.h>
+> > +
+> > +#include "clk-mtk.h"
+> > +#include "clk-mux.h"
+> > +
+> > +static inline struct mtk_clk_mux
+> > +       *to_mtk_clk_mux(struct clk_hw *hw)
+> > +{
+> > +       return container_of(hw, struct mtk_clk_mux, hw);
+> > +}
+> > +
+> > +static int mtk_clk_mux_enable(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 mask = BIT(mux->gate_shift);
+> > +
+> > +       regmap_update_bits(mux->regmap, mux->mux_ofs, mask, 0);
+> > +
+> > +       return 0;
+> 
+> Might as well return regmap_update_bits(...).
+> 
 
-This PCIe controller is based on the Mobiveil GPEX IP, which is
-compatible with the PCI Express? Base Specification, Revision 4.0.
+OK, will fix in next version
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
----
-V2:
- - Changed the name of functions and data structures in this driver.
- - Moved the reset operations to bottle half of the ISR. 
- - Added timeout check in polling the status of the PAB.
- - Moved the interrupt init operations to ls_pcie_g4_interrupt_init().
+> > +}
+> > +
+> > +static void mtk_clk_mux_disable(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 mask = BIT(mux->gate_shift);
+> > +
+> > +       regmap_update_bits(mux->regmap, mux->mux_ofs, mask, mask);
+> > +}
+> > +
+> > +static int mtk_clk_mux_enable_setclr(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 val;
+> > +
+> > +       val = BIT(mux->gate_shift);
+> > +       regmap_write(mux->regmap, mux->mux_clr_ofs, val);
+> > +
+> > +       return 0;
+> 
+> ditto: return regmap_write(...) .
+> 
 
- drivers/pci/controller/mobiveil/Kconfig       |  10 +
- drivers/pci/controller/mobiveil/Makefile      |   1 +
- .../controller/mobiveil/pci-layerscape-gen4.c | 254 ++++++++++++++++++
- .../pci/controller/mobiveil/pcie-mobiveil.h   |  16 +-
- 4 files changed, 279 insertions(+), 2 deletions(-)
- create mode 100644 drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
+will fix in next version
 
-diff --git a/drivers/pci/controller/mobiveil/Kconfig b/drivers/pci/controller/mobiveil/Kconfig
-index 64343c07bfed..3ddb7d6163a9 100644
---- a/drivers/pci/controller/mobiveil/Kconfig
-+++ b/drivers/pci/controller/mobiveil/Kconfig
-@@ -21,4 +21,14 @@ config PCIE_MOBIVEIL_PLAT
- 	  Soft IP. It has up to 8 outbound and inbound windows
- 	  for address translation and it is a PCIe Gen4 IP.
- 
-+config PCI_LAYERSCAPE_GEN4
-+	bool "Freescale Layerscpe PCIe Gen4 controller"
-+	depends on PCI
-+	depends on OF && (ARM64 || ARCH_LAYERSCAPE)
-+	depends on PCI_MSI_IRQ_DOMAIN
-+	select PCIE_MOBIVEIL_HOST
-+	help
-+	  Say Y here if you want PCIe Gen4 controller support on
-+	  Layerscape SoCs. The PCIe controller can work in RC or
-+	  EP mode according to RCW[HOST_AGT_PEX] setting.
- endmenu
-diff --git a/drivers/pci/controller/mobiveil/Makefile b/drivers/pci/controller/mobiveil/Makefile
-index 9fb6d1c6504d..ff66774ccac4 100644
---- a/drivers/pci/controller/mobiveil/Makefile
-+++ b/drivers/pci/controller/mobiveil/Makefile
-@@ -2,3 +2,4 @@
- obj-$(CONFIG_PCIE_MOBIVEIL) += pcie-mobiveil.o
- obj-$(CONFIG_PCIE_MOBIVEIL_HOST) += pcie-mobiveil-host.o
- obj-$(CONFIG_PCIE_MOBIVEIL_PLAT) += pcie-mobiveil-plat.o
-+obj-$(CONFIG_PCI_LAYERSCAPE_GEN4) += pci-layerscape-gen4.o
-diff --git a/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-new file mode 100644
-index 000000000000..174cbcac4059
---- /dev/null
-+++ b/drivers/pci/controller/mobiveil/pci-layerscape-gen4.c
-@@ -0,0 +1,254 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * PCIe host controller driver for NXP Layerscape SoCs
-+ *
-+ * Copyright 2018 NXP
-+ *
-+ * Author: Zhiqiang Hou <Zhiqiang.Hou@nxp.com>
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/interrupt.h>
-+#include <linux/init.h>
-+#include <linux/of_pci.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/pci.h>
-+#include <linux/platform_device.h>
-+#include <linux/resource.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+
-+#include "pcie-mobiveil.h"
-+
-+/* LUT and PF control registers */
-+#define PCIE_LUT_OFF			(0x80000)
-+#define PCIE_PF_OFF			(0xc0000)
-+#define PCIE_PF_INT_STAT		(0x18)
-+#define PF_INT_STAT_PABRST		(31)
-+
-+#define PCIE_PF_DBG			(0x7fc)
-+#define PF_DBG_LTSSM_MASK		(0x3f)
-+#define PF_DBG_WE			(31)
-+#define PF_DBG_PABR			(27)
-+
-+#define LS_PCIE_G4_LTSSM_L0		0x2d /* L0 state */
-+
-+#define to_ls_pcie_g4(x)		platform_get_drvdata((x)->pdev)
-+
-+struct ls_pcie_g4 {
-+	struct mobiveil_pcie *pci;
-+	struct delayed_work dwork;
-+	int irq;
-+};
-+
-+static inline u32 ls_pcie_g4_lut_readl(struct ls_pcie_g4 *pcie, u32 off)
-+{
-+	return ioread32(pcie->pci->csr_axi_slave_base + PCIE_LUT_OFF + off);
-+}
-+
-+static inline void ls_pcie_g4_lut_writel(struct ls_pcie_g4 *pcie,
-+					 u32 off, u32 val)
-+{
-+	iowrite32(val, pcie->pci->csr_axi_slave_base + PCIE_LUT_OFF + off);
-+}
-+
-+static inline u32 ls_pcie_g4_pf_readl(struct ls_pcie_g4 *pcie, u32 off)
-+{
-+	return ioread32(pcie->pci->csr_axi_slave_base + PCIE_PF_OFF + off);
-+}
-+
-+static inline void ls_pcie_g4_pf_writel(struct ls_pcie_g4 *pcie,
-+					u32 off, u32 val)
-+{
-+	iowrite32(val, pcie->pci->csr_axi_slave_base + PCIE_PF_OFF + off);
-+}
-+
-+static bool ls_pcie_g4_is_bridge(struct ls_pcie_g4 *pcie)
-+{
-+	struct mobiveil_pcie *mv_pci = pcie->pci;
-+	u32 header_type;
-+
-+	header_type = csr_readb(mv_pci, PCI_HEADER_TYPE);
-+	header_type &= 0x7f;
-+
-+	return header_type == PCI_HEADER_TYPE_BRIDGE;
-+}
-+
-+static int ls_pcie_g4_link_up(struct mobiveil_pcie *pci)
-+{
-+	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(pci);
-+	u32 state;
-+
-+	state = ls_pcie_g4_pf_readl(pcie, PCIE_PF_DBG);
-+	state =	state & PF_DBG_LTSSM_MASK;
-+
-+	if (state == LS_PCIE_G4_LTSSM_L0)
-+		return 1;
-+
-+	return 0;
-+}
-+
-+static void ls_pcie_g4_reinit_hw(struct ls_pcie_g4 *pcie)
-+{
-+	struct mobiveil_pcie *mv_pci = pcie->pci;
-+	u32 val, act_stat;
-+	int to = 100;
-+
-+	/* Poll for pab_csb_reset to set and PAB activity to clear */
-+	do {
-+		usleep_range(10, 15);
-+		val = ls_pcie_g4_pf_readl(pcie, PCIE_PF_INT_STAT);
-+		act_stat = csr_readl(mv_pci, PAB_ACTIVITY_STAT);
-+	} while (((val & 1 << PF_INT_STAT_PABRST) == 0 || act_stat) && to--);
-+	if (to < 0) {
-+		dev_err(&mv_pci->pdev->dev, "poll PABRST&PABACT timeout\n");
-+		return;
-+	}
-+
-+	/* clear PEX_RESET bit in PEX_PF0_DBG register */
-+	val = ls_pcie_g4_pf_readl(pcie, PCIE_PF_DBG);
-+	val |= 1 << PF_DBG_WE;
-+	ls_pcie_g4_pf_writel(pcie, PCIE_PF_DBG, val);
-+
-+	val = ls_pcie_g4_pf_readl(pcie, PCIE_PF_DBG);
-+	val |= 1 << PF_DBG_PABR;
-+	ls_pcie_g4_pf_writel(pcie, PCIE_PF_DBG, val);
-+
-+	val = ls_pcie_g4_pf_readl(pcie, PCIE_PF_DBG);
-+	val &= ~(1 << PF_DBG_WE);
-+	ls_pcie_g4_pf_writel(pcie, PCIE_PF_DBG, val);
-+
-+	mobiveil_host_init(mv_pci, true);
-+
-+	to = 100;
-+	while (!ls_pcie_g4_link_up(mv_pci) && to--)
-+		usleep_range(200, 250);
-+	if (to < 0)
-+		dev_err(&mv_pci->pdev->dev, "PCIe link trainning timeout\n");
-+}
-+
-+static irqreturn_t ls_pcie_g4_handler(int irq, void *dev_id)
-+{
-+	struct ls_pcie_g4 *pcie = (struct ls_pcie_g4 *)dev_id;
-+	struct mobiveil_pcie *mv_pci = pcie->pci;
-+	u32 val;
-+
-+	val = csr_readl(mv_pci, PAB_INTP_AMBA_MISC_STAT);
-+	if (!val)
-+		return IRQ_NONE;
-+
-+	if (val & PAB_INTP_RESET)
-+		schedule_delayed_work(&pcie->dwork, msecs_to_jiffies(1));
-+
-+	csr_writel(mv_pci, val, PAB_INTP_AMBA_MISC_STAT);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int ls_pcie_g4_interrupt_init(struct mobiveil_pcie *mv_pci)
-+{
-+	struct ls_pcie_g4 *pcie = to_ls_pcie_g4(mv_pci);
-+	u32 val;
-+	int ret;
-+
-+	pcie->irq = platform_get_irq_byname(mv_pci->pdev, "intr");
-+	if (pcie->irq < 0) {
-+		dev_err(&mv_pci->pdev->dev, "Can't get 'intr' irq.\n");
-+		return pcie->irq;
-+	}
-+	ret = devm_request_irq(&mv_pci->pdev->dev, pcie->irq,
-+			       ls_pcie_g4_handler, IRQF_SHARED,
-+			       mv_pci->pdev->name, pcie);
-+	if (ret) {
-+		dev_err(&mv_pci->pdev->dev, "Can't register PCIe IRQ.\n");
-+		return  ret;
-+	}
-+
-+	/* Enable interrupts */
-+	val = PAB_INTP_INTX_MASK | PAB_INTP_MSI | PAB_INTP_RESET |
-+	      PAB_INTP_PCIE_UE | PAB_INTP_IE_PMREDI | PAB_INTP_IE_EC;
-+	csr_writel(mv_pci, val, PAB_INTP_AMBA_MISC_ENB);
-+
-+	return 0;
-+}
-+
-+static void ls_pcie_g4_reset(struct work_struct *work)
-+{
-+	struct delayed_work *dwork = container_of(work, struct delayed_work,
-+						  work);
-+	struct ls_pcie_g4 *pcie = container_of(dwork, struct ls_pcie_g4, dwork);
-+	struct mobiveil_pcie *mv_pci = pcie->pci;
-+	u16 ctrl;
-+
-+	ctrl = csr_readw(mv_pci, PCI_BRIDGE_CONTROL);
-+	ctrl &= ~PCI_BRIDGE_CTL_BUS_RESET;
-+	csr_writew(mv_pci, ctrl, PCI_BRIDGE_CONTROL);
-+	ls_pcie_g4_reinit_hw(pcie);
-+}
-+
-+static struct mobiveil_rp_ops ls_pcie_g4_rp_ops = {
-+	.interrupt_init = ls_pcie_g4_interrupt_init,
-+};
-+
-+static const struct mobiveil_pab_ops ls_pcie_g4_pab_ops = {
-+	.link_up = ls_pcie_g4_link_up,
-+};
-+
-+static int __init ls_pcie_g4_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct mobiveil_pcie *mv_pci;
-+	struct ls_pcie_g4 *pcie;
-+	struct device_node *np = dev->of_node;
-+	int ret;
-+
-+	if (!of_parse_phandle(np, "msi-parent", 0)) {
-+		dev_err(dev, "failed to find msi-parent\n");
-+		return -EINVAL;
-+	}
-+
-+	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
-+	if (!pcie)
-+		return -ENOMEM;
-+
-+	mv_pci = devm_kzalloc(dev, sizeof(*mv_pci), GFP_KERNEL);
-+	if (!mv_pci)
-+		return -ENOMEM;
-+
-+	mv_pci->pdev = pdev;
-+	mv_pci->ops = &ls_pcie_g4_pab_ops;
-+	mv_pci->rp.ops = &ls_pcie_g4_rp_ops;
-+	pcie->pci = mv_pci;
-+
-+	platform_set_drvdata(pdev, pcie);
-+
-+	INIT_DELAYED_WORK(&pcie->dwork, ls_pcie_g4_reset);
-+
-+	ret = mobiveil_pcie_host_probe(mv_pci);
-+	if (ret) {
-+		dev_err(dev, "fail to probe!\n");
-+		return  ret;
-+	}
-+
-+	if (!ls_pcie_g4_is_bridge(pcie))
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ls_pcie_g4_of_match[] = {
-+	{ .compatible = "fsl,lx2160a-pcie", },
-+	{ },
-+};
-+
-+static struct platform_driver ls_pcie_g4_driver = {
-+	.driver = {
-+		.name = "layerscape-pcie-gen4",
-+		.of_match_table = ls_pcie_g4_of_match,
-+		.suppress_bind_attrs = true,
-+	},
-+};
-+
-+builtin_platform_driver_probe(ls_pcie_g4_driver, ls_pcie_g4_probe);
-diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.h b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-index 0f5303962e88..0ccd6cee5f8f 100644
---- a/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-+++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.h
-@@ -41,6 +41,8 @@
- #define  PAGE_LO_MASK			0x3ff
- #define  PAGE_SEL_OFFSET_SHIFT		10
- 
-+#define PAB_ACTIVITY_STAT		0x81c
-+
- #define PAB_AXI_PIO_CTRL		0x0840
- #define  APIO_EN_MASK			0xf
- 
-@@ -49,8 +51,18 @@
- 
- #define PAB_INTP_AMBA_MISC_ENB		0x0b0c
- #define PAB_INTP_AMBA_MISC_STAT		0x0b1c
--#define  PAB_INTP_INTX_MASK		0x01e0
--#define  PAB_INTP_MSI_MASK		0x8
-+#define  PAB_INTP_RESET			(0x1 << 1)
-+#define  PAB_INTP_MSI			(0x1 << 3)
-+#define  PAB_INTP_INTA			(0x1 << 5)
-+#define  PAB_INTP_INTB			(0x1 << 6)
-+#define  PAB_INTP_INTC			(0x1 << 7)
-+#define  PAB_INTP_INTD			(0x1 << 8)
-+#define  PAB_INTP_PCIE_UE		(0x1 << 9)
-+#define  PAB_INTP_IE_PMREDI		(0x1 << 29)
-+#define  PAB_INTP_IE_EC			(0x1 << 30)
-+#define  PAB_INTP_MSI_MASK		PAB_INTP_MSI
-+#define  PAB_INTP_INTX_MASK		(PAB_INTP_INTA | PAB_INTP_INTB |\
-+					PAB_INTP_INTC | PAB_INTP_INTD)
- 
- #define PAB_AXI_AMAP_CTRL(win)		PAB_REG_ADDR(0x0ba0, win)
- #define  WIN_ENABLE_SHIFT		0
--- 
-2.17.1
+> > +}
+> > +
+> > +static void mtk_clk_mux_disable_setclr(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 val;
+> > +
+> > +       val = BIT(mux->gate_shift);
+> > +       regmap_write(mux->regmap, mux->mux_set_ofs, val);
+> > +}
+> > +
+> > +static int mtk_clk_mux_is_enabled(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 val = 0;
+> 
+> No need to init to 0.
+> 
+
+will fix in next version
+
+> > +
+> > +       regmap_read(mux->regmap, mux->mux_ofs, &val);
+> > +
+> > +       return ((val & BIT(mux->gate_shift)) == 0) ? 1 : 0;
+> 
+> Just (val & BIT(mux->gate_shift)) != 0. Or more simply val &
+> BIT(mux->gate_shift).
+> 
+
+will fix in next version
+
+> > +}
+> > +
+> > +static u8 mtk_clk_mux_get_parent(struct clk_hw *hw)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       int num_parents = clk_hw_get_num_parents(hw);
+> > +       u32 mask = GENMASK(mux->mux_width - 1, 0);
+> > +       u32 val;
+> > +
+> > +       regmap_read(mux->regmap, mux->mux_ofs, &val);
+> > +       val = (val >> mux->mux_shift) & mask;
+> > +
+> > +       if (val >= num_parents || val >= U8_MAX)
+> 
+> val > U8_MAX, technically.
+> 
+> > +               return -ERANGE;
+> 
+> This looks wrong, -34 will be cast to an u8 and appear to be valid...
+> 
+
+will fix in next version
+
+> > +
+> > +       return val;
+> > +}
+> > +
+> > +static int mtk_clk_mux_set_parent_lock(struct clk_hw *hw, u8 index)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 mask = GENMASK(mux->mux_width - 1, 0);
+> > +       u32 val;
+> > +       unsigned long flags = 0;
+> 
+> No need to init to 0.
+> 
+
+will fix in next version.
+
+> > +
+> > +       if (mux->lock)
+> > +               spin_lock_irqsave(mux->lock, flags);
+> > +       else
+> > +               __acquire(mux->lock);
+> > +
+> > +       regmap_read(mux->regmap, mux->mux_ofs, &val);
+> > +       val = (val & mask) >> mux->mux_shift;
+> > +
+> > +       if (val != index) {
+> > +               val = index << mux->mux_shift;
+> > +               regmap_update_bits(mux->regmap, mux->mux_ofs, mask, val);
+> > +       }
+> 
+> What's the point of doing read/compare/update? Are there side effects
+> if you just write the value unconditionally?
+> 
+
+Actually writing the value directly has no side effects. We just want to
+reduce unnecessary operations if the target parent of mux is already
+selected.
+
+> > +
+> > +       if (mux->lock)
+> > +               spin_unlock_irqrestore(mux->lock, flags);
+> > +       else
+> > +               __release(mux->lock);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int mtk_clk_mux_set_parent_setclr_lock(struct clk_hw *hw, u8 index)
+> > +{
+> > +       struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
+> > +       u32 mask = GENMASK(mux->mux_width - 1, 0);
+> > +       u32 val, orig;
+> > +       unsigned long flags = 0;
+> > +
+> > +       if (mux->lock)
+> > +               spin_lock_irqsave(mux->lock, flags);
+> > +       else
+> > +               __acquire(mux->lock);
+> > +
+> > +       regmap_read(mux->regmap, mux->mux_ofs, &val);
+> > +       orig = val;
+> 
+> Just read into &orig above.
+> 
+
+will fix in next version
+
+> > +       val &= ~(mask << mux->mux_shift);
+> > +       val |= index << mux->mux_shift;
+> 
+> Maybe this is more readable?
+> val = orig &  ~(mask << mux->mux_shift) | (index << mux->mux_shift)
+> 
+
+will fix in next version
+
+> > +
+> > +       if (val != orig) {
+> > +               val = (mask << mux->mux_shift);
+> > +               regmap_write(mux->regmap, mux->mux_clr_ofs, val);
+> 
+> I'd just regmap_write(..., mask << mux->mux_shift), instead if overriding val.
+> 
+
+will fix in next version
+
+> > +               val = (index << mux->mux_shift);
+> > +               regmap_write(mux->regmap, mux->mux_set_ofs, val);
+> > +
+> > +               if (mux->upd_shift >= 0)
+> > +                       regmap_write(mux->regmap, mux->upd_ofs,
+> > +                                    BIT(mux->upd_shift));
+> > +       }
+> > +
+> > +       if (mux->lock)
+> > +               spin_unlock_irqrestore(mux->lock, flags);
+> > +       else
+> > +               __release(mux->lock);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +const struct clk_ops mtk_mux_ops = {
+> > +       .get_parent = mtk_clk_mux_get_parent,
+> > +       .set_parent = mtk_clk_mux_set_parent_lock,
+> > +};
+> > +
+> > +const struct clk_ops mtk_mux_clr_set_upd_ops = {
+> > +       .get_parent = mtk_clk_mux_get_parent,
+> > +       .set_parent = mtk_clk_mux_set_parent_setclr_lock,
+> > +};
+> > +
+> > +const struct clk_ops mtk_mux_gate_ops = {
+> > +       .enable = mtk_clk_mux_enable,
+> > +       .disable = mtk_clk_mux_disable,
+> > +       .is_enabled = mtk_clk_mux_is_enabled,
+> > +       .get_parent = mtk_clk_mux_get_parent,
+> > +       .set_parent = mtk_clk_mux_set_parent_lock,
+> > +};
+> > +
+> > +const struct clk_ops mtk_mux_gate_clr_set_upd_ops = {
+> > +       .enable = mtk_clk_mux_enable_setclr,
+> > +       .disable = mtk_clk_mux_disable_setclr,
+> > +       .is_enabled = mtk_clk_mux_is_enabled,
+> > +       .get_parent = mtk_clk_mux_get_parent,
+> > +       .set_parent = mtk_clk_mux_set_parent_setclr_lock,
+> > +};
+> > +
+> > +struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
+> > +                                struct regmap *regmap,
+> > +                                spinlock_t *lock)
+> > +{
+> > +       struct mtk_clk_mux *mtk_mux = NULL;
+> 
+> Not necessary to init to NULL.
+> 
+
+will fix in next version
+
+> > +       struct clk_init_data init;
+> > +       struct clk *clk;
+> > +
+> > +       mtk_mux = kzalloc(sizeof(*mtk_mux), GFP_KERNEL);
+> > +       if (!mtk_mux)
+> > +               return ERR_PTR(-ENOMEM);
+> > +
+> > +       init.name = mux->name;
+> > +       init.flags = (mux->flags) | CLK_SET_RATE_PARENT;
+> 
+> mux->flags | CLK_SET_RATE_PARENT
+> 
+
+will fix in next version
+
+> > +       init.parent_names = mux->parent_names;
+> > +       init.num_parents = mux->num_parents;
+> > +       init.ops = mux->ops;
+> > +
+> > +       mtk_mux->regmap = regmap;
+> > +       mtk_mux->name = mux->name;
+> > +       mtk_mux->mux_ofs = mux->mux_ofs;
+> > +       mtk_mux->mux_set_ofs = mux->set_ofs;
+> > +       mtk_mux->mux_clr_ofs = mux->clr_ofs;
+> > +       mtk_mux->upd_ofs = mux->upd_ofs;
+> > +       mtk_mux->mux_shift = mux->mux_shift;
+> > +       mtk_mux->mux_width = mux->mux_width;
+> > +       mtk_mux->gate_shift = mux->gate_shift;
+> > +       mtk_mux->upd_shift = mux->upd_shift;
+> > +
+> > +       mtk_mux->lock = lock;
+> > +       mtk_mux->hw.init = &init;
+> > +
+> > +       clk = clk_register(NULL, &mtk_mux->hw);
+> > +       if (IS_ERR(clk)) {
+> > +               kfree(mtk_mux);
+> > +               return clk;
+> > +       }
+> > +
+> > +       return clk;
+> > +}
+> > +
+> > +int mtk_clk_register_muxes(const struct mtk_mux *muxes,
+> > +                          int num, struct device_node *node,
+> > +                          spinlock_t *lock,
+> > +                          struct clk_onecell_data *clk_data)
+> > +{
+> > +       struct regmap *regmap;
+> > +       struct clk *clk;
+> > +       int i;
+> > +
+> > +       if (!clk_data)
+> > +               return -ENOMEM;
+> 
+> Is this check necessary? After all you know who the callers are and
+> maybe you need to be careful not to call this with NULL clk_data?
+> 
+
+You're right. it's unnecessary. will fix in next version
+
+> > +
+> > +       regmap = syscon_node_to_regmap(node);
+> > +       if (IS_ERR(regmap)) {
+> > +               pr_err("Cannot find regmap for %pOF: %ld\n", node,
+> > +                      PTR_ERR(regmap));
+> > +               return PTR_ERR(regmap);
+> > +       }
+> > +
+> > +       for (i = 0; i < num; i++) {
+> > +               const struct mtk_mux *mux = &muxes[i];
+> > +
+> > +               if (IS_ERR_OR_NULL(clk_data->clks[mux->id])) {
+> 
+> A NULL check seems enough, as you'll never assign a PTR_ERR(..) value
+> into clk_data->clks[mux->id].
+> 
+> > +                       clk = mtk_clk_register_mux(mux, regmap, lock);
+> > +
+> > +                       if (IS_ERR(clk)) {
+> > +                               pr_err("Failed to register clk %s: %ld\n",
+> > +                                      mux->name, PTR_ERR(clk));
+> > +                               continue;
+> 
+> Are we ok with returning 0 even though some of these calls failed?
+> 
+
+We'd like to skip the failed one first and keep registering the
+remainings.
+
+> > +                       }
+> > +
+> > +                       clk_data->clks[mux->id] = clk;
+> > +               }
+> > +       }
+> > +
+> > +       return 0;
+> > +}
+> > diff --git a/drivers/clk/mediatek/clk-mux.h b/drivers/clk/mediatek/clk-mux.h
+> > new file mode 100644
+> > index 000000000000..ff0276bb771c
+> > --- /dev/null
+> > +++ b/drivers/clk/mediatek/clk-mux.h
+> > @@ -0,0 +1,101 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +/*
+> > + * Copyright (c) 2018 MediaTek Inc.
+> > + * Author: Owen Chen <owen.chen@mediatek.com>
+> > + */
+> > +
+> > +#ifndef __DRV_CLK_MUX_H
+> > +#define __DRV_CLK_MUX_H
+> > +
+> > +#include <linux/clk-provider.h>
+> > +
+> > +struct mtk_clk_mux {
+> > +       struct clk_hw hw;
+> > +       struct regmap *regmap;
+> > +
+> > +       const char *name;
+> > +
+> > +       u32 mux_set_ofs;
+> > +       u32 mux_clr_ofs;
+> > +       u32 mux_ofs;
+> > +       u32 upd_ofs;
+> > +
+> > +       u8 mux_shift;
+> > +       u8 mux_width;
+> > +       u8 gate_shift;
+> > +       u8 upd_shift;
+> > +
+> > +       spinlock_t *lock;
+> > +};
+> > +
+> > +struct mtk_mux {
+> > +       int id;
+> > +       const char *name;
+> > +       const char * const *parent_names;
+> > +       unsigned int flags;
+> > +
+> > +       u32 mux_ofs;
+> > +       u32 set_ofs;
+> > +       u32 clr_ofs;
+> > +       u32 upd_ofs;
+> > +
+> > +       u8 mux_shift;
+> > +       u8 mux_width;
+> > +       u8 gate_shift;
+> > +       u8 upd_shift;
+> > +
+> > +       const struct clk_ops *ops;
+> > +
+> > +       signed char num_parents;
+> > +};
+> > +
+> > +extern const struct clk_ops mtk_mux_ops;
+> > +extern const struct clk_ops mtk_mux_clr_set_upd_ops;
+> > +extern const struct clk_ops mtk_mux_gate_ops;
+> > +extern const struct clk_ops mtk_mux_gate_clr_set_upd_ops;
+> > +
+> > +#define GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,         \
+> > +                       _mux_set_ofs, _mux_clr_ofs, _shift, _width,     \
+> > +                       _gate, _upd_ofs, _upd, _flags, _ops) {          \
+> > +               .id = _id,                                              \
+> > +               .name = _name,                                          \
+> > +               .mux_ofs = _mux_ofs,                                    \
+> > +               .set_ofs = _mux_set_ofs,                                \
+> > +               .clr_ofs = _mux_clr_ofs,                                \
+> > +               .upd_ofs = _upd_ofs,                                    \
+> > +               .mux_shift = _shift,                                    \
+> > +               .mux_width = _width,                                    \
+> > +               .gate_shift = _gate,                                    \
+> > +               .upd_shift = _upd,                                      \
+> > +               .parent_names = _parents,                               \
+> > +               .num_parents = ARRAY_SIZE(_parents),                    \
+> > +               .flags = _flags,                                        \
+> > +               .ops = &_ops,                                           \
+> > +       }
+> > +
+> > +#define MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,     \
+> > +                       _mux_set_ofs, _mux_clr_ofs, _shift, _width,     \
+> > +                       _gate, _upd_ofs, _upd, _flags)                  \
+> > +               GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,  \
+> > +                       _mux_set_ofs, _mux_clr_ofs, _shift, _width,     \
+> > +                       _gate, _upd_ofs, _upd, _flags,                  \
+> > +                       mtk_mux_gate_clr_set_upd_ops)
+> > +
+> > +#define MUX_GATE_CLR_SET_UPD(_id, _name, _parents, _mux_ofs,           \
+> > +                       _mux_set_ofs, _mux_clr_ofs, _shift, _width,     \
+> > +                       _gate, _upd_ofs, _upd)                          \
+> > +               MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents,        \
+> > +                       _mux_ofs, _mux_set_ofs, _mux_clr_ofs, _shift,   \
+> > +                       _width, _gate, _upd_ofs, _upd,                  \
+> > +                       CLK_SET_RATE_PARENT)
+> > +
+> > +struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
+> > +                                struct regmap *regmap,
+> > +                                spinlock_t *lock);
+> > +
+> > +int mtk_clk_register_muxes(const struct mtk_mux *muxes,
+> > +                          int num, struct device_node *node,
+> > +                          spinlock_t *lock,
+> > +                          struct clk_onecell_data *clk_data);
+> > +
+> > +#endif /* __DRV_CLK_MUX_H */
+> > --
+> > 2.18.0
+> >
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
