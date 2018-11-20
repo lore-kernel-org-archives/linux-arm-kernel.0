@@ -1,61 +1,274 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 20 Nov 2018 17:39:10 +0530
-Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
-In-Reply-To: <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
-References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
- <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
- <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
- <20181120050650.GC5885@Mani-XPS-13-9360>
- <86pnv0rwna.wl-marc.zyngier@arm.com>
- <CACRpkdan96Vj58s=g9jiAoyLBpZqPCKcjqD82mgDj5WqRP7vDQ@mail.gmail.com>
- <e732ad15-b778-1c84-ad47-5770ee66688b@arm.com>
-Message-ID: <20181120120910.GA13485@mani>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 11:32:36 +0000
+Subject: [PATCHv2 24/25] arm64: dts: freescale: lx2160a: add pcie DT nodes
+In-Reply-To: <20181120092615.11680-25-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-25-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB22354DD78E9ACB940DBB01A0E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 11:05:41AM +0000, Marc Zyngier wrote:
-> On 20/11/2018 08:56, Linus Walleij wrote:
-> > On Tue, Nov 20, 2018 at 9:17 AM Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > 
-> >> How does this change anything with the fact that the above code is
-> >> broken? 56 or 64 bit, you cannot read this counter with a single
-> >> access, or two. The canonical way of reading such a counter is
-> >> something like this:
-> >>
-> >>         do {
-> >>                 lo = readl_relaxed(LO);
-> >>                 hi = readl_relaxed(HI);
-> >>         } while (hi != read_relaxed(HI));
-> > 
-> > To be fair, I have seen hardware that employ a logic latch
-> > such that when a read access is done to the LO register,
-> > the value of the whole counter is latched, also for the HI
-> > register, so when you read the HI register in the second
-> > step, it is never subject to wrapping. (Conversely reading
-> > the HI before the LO will always give you insane values
-> > :D)
-> 
-> I've seen such HW indeed, and I've also seen it being broken... ;-)
-> 
-> It this timer is built around such a (non-broken) logic, I'd really like
-> to see it spelled out. It will otherwise be a real pain to debug...
->
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-There is no information about HW latch in datasheet and vendor code. But the
-vendor driver doesn't use any logic to prevent wrapping. However, this doesn't
-mean that we can assume that the hardware is capable of preventing overrun.
-So I guess it is best to go with Marc's suggestion here.
-
-Thanks,
-Mani
-
-> > However the above code should be fine unless you know
-> > for sure the hardware was constructed with a clever latch.
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:28 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 24/25] arm64: dts: freescale: lx2160a: add pcie DT nodes
 > 
-> Let's find out!
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> Thanks,
+> The LX2160A integrated 6 PCIe Gen4 controllers.
 > 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - Change the default status of PCIe DT nodes to disabled.
+> 
+>  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 163 ++++++++++++++++++
+>  1 file changed, 163 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> index a79f5c1ea56d..3a098c462a25 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a.dtsi
+> @@ -762,5 +762,168 @@
+>  				     <GIC_SPI 209 IRQ_TYPE_LEVEL_HIGH>;
+>  			dma-coherent;
+>  		};
+> +
+> +		pcie at 3400000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03400000 0x0 0x00100000   /*
+> controller registers */
+> +			       0x80 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0x80
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 109
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 110
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 111
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 112
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie at 3500000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03500000 0x0 0x00100000   /*
+> controller registers */
+> +			       0x88 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 113 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0x88
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 114
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 115
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 116
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 117
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie at 3600000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03600000 0x0 0x00100000   /*
+> controller registers */
+> +			       0x90 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0x90
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 119
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 120
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 121
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 122
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie at 3700000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03700000 0x0 0x00100000   /*
+> controller registers */
+> +			       0x98 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0x98
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 124
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 125
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 126
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 127
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie at 3800000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03800000 0x0 0x00100000   /*
+> controller registers */
+> +			       0xa0 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0xa0
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 129
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 130
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 131
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 132
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+> +		pcie at 3900000 {
+> +			compatible = "fsl,lx2160a-pcie";
+> +			reg = <0x00 0x03900000 0x0 0x00100000   /*
+> controller registers */
+> +			       0xa8 0x00000000 0x0 0x00001000>; /*
+> configuration space */
+> +			reg-names = "csr_axi_slave", "config_axi_slave";
+> +			interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>, /*
+> AER interrupt */
+> +				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>, /*
+> PME interrupt */
+> +				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>; /*
+> controller interrupt */
+> +			interrupt-names = "aer", "pme", "intr";
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +			device_type = "pci";
+> +			dma-coherent;
+> +			apio-wins = <8>;
+> +			ppio-wins = <8>;
+> +			bus-range = <0x0 0xff>;
+> +			ranges = <0x82000000 0x0 0x40000000 0xa8
+> 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
+> +			msi-parent = <&its>;
+> +			#interrupt-cells = <1>;
+> +			interrupt-map-mask = <0 0 0 7>;
+> +			interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 104
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 2 &gic 0 0 GIC_SPI 105
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 3 &gic 0 0 GIC_SPI 106
+> IRQ_TYPE_LEVEL_HIGH>,
+> +					<0000 0 0 4 &gic 0 0 GIC_SPI 107
+> IRQ_TYPE_LEVEL_HIGH>;
+> +			status = "disabled";
+> +		};
+> +
+>  	};
+>  };
+> --
+> 2.17.1
