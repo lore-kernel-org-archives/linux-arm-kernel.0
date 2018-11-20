@@ -1,106 +1,70 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 20 Nov 2018 17:22:39 +0000
-Subject: [PATCH 1/4] KVM: arm/arm64: vgic: Do not cond_resched_lock() with
- IRQs disabled
-In-Reply-To: <20181120141832.GA11162@e113682-lin.lund.arm.com>
-References: <1542647279-46609-1-git-send-email-julien.thierry@arm.com>
- <1542647279-46609-2-git-send-email-julien.thierry@arm.com>
- <20181120141832.GA11162@e113682-lin.lund.arm.com>
-Message-ID: <76a488a9-893c-ffbe-16f2-23735af8126a@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 20 Nov 2018 09:19:57 -0800
+Subject: [PATCH 5/8] dt-bindings: soc: Add a new binding for the BCM2835 PM
+ node.
+In-Reply-To: <20181120172000.15102-1-eric@anholt.net>
+References: <20181120172000.15102-1-eric@anholt.net>
+Message-ID: <20181120172000.15102-6-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This binding supersedes the bcm2835-pm-wdt binding which only covered
+enough to provide a watchdog, but the HW block is actually mostly
+about power domains.
 
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ .../bindings/soc/bcm/brcm,bcm2835-pm.txt      | 42 +++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
 
-On 20/11/18 14:18, Christoffer Dall wrote:
-> On Mon, Nov 19, 2018 at 05:07:56PM +0000, Julien Thierry wrote:
->> To change the active state of an MMIO, halt is requested for all vcpus of
->> the affected guest before modifying the IRQ state. This is done by calling
->> cond_resched_lock() in vgic_mmio_change_active(). However interrupts are
->> disabled at this point and running a vcpu cannot get rescheduled.
-> 
-> "running a vcpu cannot get rescheduled" ?
-
-Yes, that doesn't make much sense :\ . I guess I just meant "a vcpu 
-cannot get rescheduled on this cpu".
-
-I'll rewrite this.
-
-> 
->>
->> Solve this by waiting for all vcpus to be halted after emmiting the halt
->> request.
->>
->> Fixes commit 6c1b7521f4a07cc63bbe2dfe290efed47cdb780a ("KVM: arm/arm64:
->> Factor out functionality to get vgic mmio requester_vcpu")
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@arm.com>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: stable at vger.kernel.org
->> ---
->>   virt/kvm/arm/vgic/vgic-mmio.c | 33 +++++++++++----------------------
->>   1 file changed, 11 insertions(+), 22 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->> index f56ff1c..eefd877 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->> @@ -313,27 +313,6 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>
->>   	spin_lock_irqsave(&irq->irq_lock, flags);
->>
->> -	/*
->> -	 * If this virtual IRQ was written into a list register, we
->> -	 * have to make sure the CPU that runs the VCPU thread has
->> -	 * synced back the LR state to the struct vgic_irq.
->> -	 *
->> -	 * As long as the conditions below are true, we know the VCPU thread
->> -	 * may be on its way back from the guest (we kicked the VCPU thread in
->> -	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
->> -	 * so we release and re-acquire the spin_lock to let the other thread
->> -	 * sync back the IRQ.
->> -	 *
->> -	 * When accessing VGIC state from user space, requester_vcpu is
->> -	 * NULL, which is fine, because we guarantee that no VCPUs are running
->> -	 * when accessing VGIC state from user space so irq->vcpu->cpu is
->> -	 * always -1.
->> -	 */
->> -	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
->> -	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
->> -	       irq->vcpu->cpu != -1) /* VCPU thread is running */
->> -		cond_resched_lock(&irq->irq_lock);
->> -
->>   	if (irq->hw) {
->>   		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
->>   	} else {
->> @@ -368,8 +347,18 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->>    */
->>   static void vgic_change_active_prepare(struct kvm_vcpu *vcpu, u32 intid)
->>   {
->> -	if (intid > VGIC_NR_PRIVATE_IRQS)
->> +	if (intid > VGIC_NR_PRIVATE_IRQS) {
->> +		struct kvm_vcpu *tmp;
->> +		int i;
->> +
->>   		kvm_arm_halt_guest(vcpu->kvm);
->> +
->> +		/* Wait for each vcpu to be halted */
->> +		kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
->> +			while (tmp->cpu != -1)
->> +				cond_resched();
-> 
-> We used to have something like this which Andre then found out it could
-> deadlock the system, because the VCPU making this request wouldn't have
-> called kvm_arch_vcpu_put, and its cpu value would still have a value.
-> 
-> That's why we have the vcpu && vcpu != requester check.
-> 
-
-I see, thanks for pointing that out. I'll fix this in the next iteration.
-
-Thanks,
-
+diff --git a/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+new file mode 100644
+index 000000000000..7818d33a158f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/bcm/brcm,bcm2835-pm.txt
+@@ -0,0 +1,42 @@
++BCM2835 PM (Power domains, watchdog)
++
++The PM block controls power domains and some reset lines, and includes
++a watchdog timer.  This binding supersedes the brcm,bcm2835-pm-wdt
++binding which covered some of PM's register range and functionality.
++
++Required properties:
++
++- compatible:		Should be "brcm,bcm2835-pm"
++- reg:			Specifies base physical address and size of the two
++			  register ranges ("PM" and "ASYNC_BRIDGE" in that
++			  order)
++- clocks:		a) v3d: The V3D clock from CPRMAN
++			b) peri_image: The PERI_IMAGE clock from CPRMAN
++			c) h264: The H264 clock from CPRMAN
++			d) isp: The ISP clock from CPRMAN
++- #reset-cells: 	Should be 1.  This property follows the reset controller
++			  bindings[1].
++- #power-domain-cells:	Should be 1.  This property follows the power domain
++			  bindings[2].
++
++Optional properties:
++
++- timeout-sec:	Contains the watchdog timeout in seconds
++
++[1] Documentation/devicetree/bindings/reset/reset.txt
++[2] Documentation/devicetree/bindings/power/power_domain.txt
++
++Example:
++
++pm {
++	compatible = "brcm,bcm2835-pm", "brcm,bcm2835-pm-wdt";
++	#power-domain-cells = <1>;
++	#reset-cells = <1>;
++	reg = <0x7e100000 0x114>,
++	      <0x7e00a000 0x24>;
++	clocks = <&clocks BCM2835_CLOCK_V3D>,
++		 <&clocks BCM2835_CLOCK_PERI_IMAGE>,
++		 <&clocks BCM2835_CLOCK_H264>,
++		 <&clocks BCM2835_CLOCK_ISP>;
++	clock-names = "v3d", "peri_image", "h264", "isp";
++};
 -- 
-Julien Thierry
+2.19.1
