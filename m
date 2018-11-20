@@ -1,56 +1,50 @@
 From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Tue, 20 Nov 2018 11:58:52 +0100
-Subject: [RFC PATCH v2 20/23] KVM: arm64: Add arch vm ioctl hook
-In-Reply-To: <20181115180421.GS3505@e103592.cambridge.arm.com>
+Date: Tue, 20 Nov 2018 11:56:53 +0100
+Subject: [RFC PATCH v2 05/23] KVM: arm: Add arch vcpu uninit hook
+In-Reply-To: <20181115164031.GN3505@e103592.cambridge.arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-21-git-send-email-Dave.Martin@arm.com>
- <20181102083227.GU12057@e113682-lin.lund.arm.com>
- <20181115180421.GS3505@e103592.cambridge.arm.com>
-Message-ID: <20181120105852.GJ3835@e113682-lin.lund.arm.com>
+ <1538141967-15375-6-git-send-email-Dave.Martin@arm.com>
+ <20181102080536.GQ12057@e113682-lin.lund.arm.com>
+ <20181115164031.GN3505@e103592.cambridge.arm.com>
+Message-ID: <20181120105653.GI3835@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 06:04:22PM +0000, Dave Martin wrote:
-> On Fri, Nov 02, 2018 at 09:32:27AM +0100, Christoffer Dall wrote:
-> > On Fri, Sep 28, 2018 at 02:39:24PM +0100, Dave Martin wrote:
-> > > To enable arm64-specific vm ioctls to be added cleanly, this patch
-> > > adds a kvm_arm_arch_vm_ioctl() hook so that these don't pollute the
-> > > common code.
+On Thu, Nov 15, 2018 at 04:40:31PM +0000, Dave Martin wrote:
+> On Fri, Nov 02, 2018 at 09:05:36AM +0100, Christoffer Dall wrote:
+> > On Fri, Sep 28, 2018 at 02:39:09PM +0100, Dave Martin wrote:
+> > > In preparation for adding support for SVE in guests on arm64, a
+> > > hook is needed for freeing additional per-vcpu memory when a vcpu
+> > > is freed.
 > > 
-> > Hmmm, I don't really see the strenght of that argument, and have the
-> > same concern as before.  I'd like to avoid the additional indirection
-> > and instead just follow the existing pattern with a dummy implementation
-> > on the 32-bit side that returns an error.
+> > Can this commit motivate why we can't do the work in kvm_arch_vcpu_free,
+> > which we use for freeing other data structures?
+> > 
+> > (Presumably, uninit is needed when you need to do something at the very
+> > last step after releasing the struct pid.
 > 
-> So for this and the similar comment on patch 18, this was premature (or
-> at least, overzealous) factoring on my part.
+> It wasn't to do with that.
 > 
-> I'm happy to merge this back together for arm and arm64 as you prefer.
+> Rather, the division of responsibility between the vcpu_uninit and
+> vcpu_free paths is not very clear.
 > 
-> Do we have a nice way of writing the arch check, e.g.
+> In the earlier version of the series, I think SVE state may have been
+> allocated rather early and we may have needed to free it in the failure
+> path of kvm_arch_vcpu_create() (which just calls kvm_vcpu_uninit()).
+> (Alternatively, I may just have been wrong.)
 > 
-> 	case KVM_ARM_SVE_CONFIG:
-> 		if (!IS_ENABLED(ARM64))
-> 			return -EINVAL;
-> 		else
-> 			return kvm_vcpu_sve_config(NULL, userp);
+> Now, the vcpu must be fully created before the KVM_ARM_SVE_CONFIG ioctl
+> on it (which is what allocates sve_state) can succeed anyway.
 > 
-> should work, but looks a bit strange.  Maybe I'm just being fussy.
+> So the distinction between these two teardown phases is probably no
+> longer important.
+> 
+> I'll see whether I can get rid of this hook and free the SVE state in
+> kvm_arch_vcpu_free() instead.
+> 
+> Does that make sense?
+> 
 
-I prefer just doing:
-
-	case KVM_ARM_SVE_CONFIG:
-		return kvm_vcpu_sve_config(NULL, userp);
-
-
-And having this in arch/arm/include/asm/kvm_foo.h:
-
-static inline int kvm_vcpu_sve_config(...)
-{
-	return -EINVAL;
-}
-
-
-Thanks,
+Yes, thanks.
 
     Christoffer
