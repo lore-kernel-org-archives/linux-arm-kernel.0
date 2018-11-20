@@ -1,123 +1,143 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 20 Nov 2018 20:18:46 +0530
-Subject: [PATCH v2 04/12] drm/sun4i: sun6i_mipi_dsi: Simplify drq set to
- support all modes
-In-Reply-To: <20181120143229.ncx3hk2manc7hnwl@flea>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-5-jagan@amarulasolutions.com>
- <20181119083243.4njj2p2sy2xf2zyf@flea>
- <CAMty3ZAKL2fZqwLwd_WiQpzz+cOETMR7ES7HQsBo3PsAvjM+6A@mail.gmail.com>
- <20181120143229.ncx3hk2manc7hnwl@flea>
-Message-ID: <CAMty3ZDMrSfzBk8wRkc9KC5FUOOnSiZE7SO+Gn_8BFKzEyZHYQ@mail.gmail.com>
+From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
+Date: Tue, 20 Nov 2018 15:53:49 +0100
+Subject: [PATCH 14/16] staging: vchiq_arm: rework probe and init functions
+In-Reply-To: <20181120145351.30390-1-nsaenzjulienne@suse.de>
+References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
+Message-ID: <20181120145351.30390-15-nsaenzjulienne@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 8:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Mon, Nov 19, 2018 at 04:52:17PM +0530, Jagan Teki wrote:
-> > On Mon, Nov 19, 2018 at 2:02 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > On Fri, Nov 16, 2018 at 10:09:08PM +0530, Jagan Teki wrote:
-> > > > Allwinner MIPI DSI DRQ set value can be varied with respective
-> > > > video modes.
-> > > > - burst mode the set value is always 0
-> > > > - video modes whose front porch greater than 20, the set value
-> > > >   can be computed based front porch and bpp.
-> > > > - video modes whose front porch is not greater than 20, the set value
-> > > >   is simply 0
-> > > >
-> > > > This patch simplifies existing drq set value code by grouping
-> > > > into sun6i_dsi_get_drq and support all video modes.
-> > > >
-> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > > ---
-> > > >  drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c | 38 ++++++++++++++++----------
-> > > >  1 file changed, 23 insertions(+), 15 deletions(-)
-> > > >
-> > > > diff --git a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > index efd08bfd0cb8..d60955880c43 100644
-> > > > --- a/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > +++ b/drivers/gpu/drm/sun4i/sun6i_mipi_dsi.c
-> > > > @@ -363,6 +363,26 @@ static void sun6i_dsi_inst_init(struct sun6i_dsi *dsi,
-> > > >                    SUN6I_DSI_INST_JUMP_CFG_NUM(1));
-> > > >  };
-> > > >
-> > > > +static int sun6i_dsi_get_drq(struct sun6i_dsi *dsi,
-> > > > +                           struct drm_display_mode *mode)
-> > > > +{
-> > > > +     struct mipi_dsi_device *device = dsi->device;
-> > > > +     int drq = 0;
-> > >
-> > > So, here, you declaring a variable called drq, set to 0.
-> > >
-> > > > +     if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-> > > > +             return drq;
-> > >
-> > > That you return here. You could just return 0, to be clearer.
-> > >
-> > > > +     if ((mode->hsync_start - mode->hdisplay) > 20) {
-> > > > +             /* Maaaaaagic */
-> > > > +             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
-> > >
-> > > You re-declare a variable with the same name here, but a different
-> > > type....
-> > >
-> > > > +             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
-> > > > +             drq /= 32;
-> > > > +     }
-> > > > +
-> > > > +     return drq;
-> > >
-> > > And then return the first one? How is that even working?
-> >
-> > Will fix this.
->
-> I don't want you to only fix this, I also want you to contribute code
-> that is A) useful, B) tested.
+Moves the allocation of a chardev region and class creation to the init
+function of the driver since those functions are meant to be run on a
+per driver basis, as opposed to the code run in the probe function which
+is run in a per device basis.
 
-It was tested in burst mode panel, the same added in the series. It
-worked because burst mode need 0 drq rate.
+Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+---
+ .../interface/vchiq_arm/vchiq_arm.c           | 71 ++++++++++++-------
+ 1 file changed, 45 insertions(+), 26 deletions(-)
 
->
-> > > >  static u16 sun6i_dsi_get_timings_vblk(struct sun6i_dsi *dsi,
-> > > >                                     struct drm_display_mode *mode, u16 hblk)
-> > > >  {
-> > > > @@ -478,21 +498,9 @@ static u16 sun6i_dsi_get_video_start_delay(struct sun6i_dsi *dsi,
-> > > >  static void sun6i_dsi_setup_burst(struct sun6i_dsi *dsi,
-> > > >                                 struct drm_display_mode *mode)
-> > > >  {
-> > > > -     struct mipi_dsi_device *device = dsi->device;
-> > > > -     u32 val = 0;
-> > > > -
-> > > > -     if ((mode->hsync_start - mode->hdisplay) > 20) {
-> > > > -             /* Maaaaaagic */
-> > > > -             u16 drq = (mode->hsync_start - mode->hdisplay) - 20;
-> > > > -
-> > > > -             drq *= mipi_dsi_pixel_format_to_bpp(device->format);
-> > > > -             drq /= 32;
-> > > > -
-> > > > -             val = (SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
-> > > > -                    SUN6I_DSI_TCON_DRQ_SET(drq));
-> > > > -     }
-> > > > -
-> > > > -     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG, val);
-> > > > +     regmap_write(dsi->regs, SUN6I_DSI_TCON_DRQ_REG,
-> > > > +                  SUN6I_DSI_TCON_DRQ_ENABLE_MODE |
-> > > > +                  SUN6I_DSI_TCON_DRQ_SET(sun6i_dsi_get_drq(dsi, mode)));
-> > >
-> > > On top of that, you now enable the DRQ stuff all the time, while it
-> >
-> > Earlier the val value is ENABLE_MODE ORed with drq value. for the
-> > condition drq is computed in if block otherwise the val is 0.
-> > So as I explained in commit message the drq value is 0
-> > - for video modes whose front porch is not greater than 20 and
-> > - for burst mode the val
-> >
-> > ie reason I mode it common.
->
-> The previous code was enabling it if the front porch was larger than
-> 20 only. You enable it all the time now, and you never explain why.
-
-Got it. Loo like I was confused to test these two separate series in
-separate panels and missed something. Is it Ok to combine all dsi
-changes together and send it in next version.
+diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+index 20359924ed45..03cc6947c03c 100644
+--- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
++++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_arm.c
+@@ -166,7 +166,6 @@ static struct cdev    vchiq_cdev;
+ static dev_t          vchiq_devid;
+ static VCHIQ_STATE_T g_state;
+ static struct class  *vchiq_class;
+-static struct device *vchiq_dev;
+ static DEFINE_SPINLOCK(msg_queue_spinlock);
+ static struct platform_device *bcm2835_camera;
+ 
+@@ -3557,34 +3556,19 @@ static int vchiq_probe(struct platform_device *pdev)
+ 	if (err != 0)
+ 		goto failed_platform_init;
+ 
+-	err = alloc_chrdev_region(&vchiq_devid, VCHIQ_MINOR, 1, DEVICE_NAME);
+-	if (err != 0) {
+-		vchiq_log_error(vchiq_arm_log_level,
+-			"Unable to allocate device number");
+-		goto failed_platform_init;
+-	}
+ 	cdev_init(&vchiq_cdev, &vchiq_fops);
+ 	vchiq_cdev.owner = THIS_MODULE;
+ 	err = cdev_add(&vchiq_cdev, vchiq_devid, 1);
+ 	if (err != 0) {
+ 		vchiq_log_error(vchiq_arm_log_level,
+ 			"Unable to register device");
+-		goto failed_cdev_add;
++		goto failed_platform_init;
+ 	}
+ 
+-	/* create sysfs entries */
+-	vchiq_class = class_create(THIS_MODULE, DEVICE_NAME);
+-	err = PTR_ERR(vchiq_class);
+-	if (IS_ERR(vchiq_class))
+-		goto failed_class_create;
+-
+-	vchiq_dev = device_create(vchiq_class, NULL,
+-		vchiq_devid, NULL, "vchiq");
+-	err = PTR_ERR(vchiq_dev);
+-	if (IS_ERR(vchiq_dev))
++	if (IS_ERR(device_create(vchiq_class, &pdev->dev, vchiq_devid,
++				 NULL, "vchiq")))
+ 		goto failed_device_create;
+ 
+-	/* create debugfs entries */
+ 	vchiq_debugfs_init();
+ 
+ 	vchiq_log_info(vchiq_arm_log_level,
+@@ -3599,11 +3583,7 @@ static int vchiq_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ failed_device_create:
+-	class_destroy(vchiq_class);
+-failed_class_create:
+ 	cdev_del(&vchiq_cdev);
+-failed_cdev_add:
+-	unregister_chrdev_region(vchiq_devid, 1);
+ failed_platform_init:
+ 	vchiq_log_warning(vchiq_arm_log_level, "could not load vchiq");
+ 	return err;
+@@ -3614,9 +3594,7 @@ static int vchiq_remove(struct platform_device *pdev)
+ 	platform_device_unregister(bcm2835_camera);
+ 	vchiq_debugfs_deinit();
+ 	device_destroy(vchiq_class, vchiq_devid);
+-	class_destroy(vchiq_class);
+ 	cdev_del(&vchiq_cdev);
+-	unregister_chrdev_region(vchiq_devid, 1);
+ 
+ 	return 0;
+ }
+@@ -3629,7 +3607,48 @@ static struct platform_driver vchiq_driver = {
+ 	.probe = vchiq_probe,
+ 	.remove = vchiq_remove,
+ };
+-module_platform_driver(vchiq_driver);
++
++static int __init vchiq_driver_init(void)
++{
++	int ret;
++
++	vchiq_class = class_create(THIS_MODULE, DEVICE_NAME);
++	if (IS_ERR(vchiq_class)) {
++		pr_err("Failed to create vchiq class\n");
++		return PTR_ERR(vchiq_class);
++	}
++
++	ret = alloc_chrdev_region(&vchiq_devid, VCHIQ_MINOR, 1, DEVICE_NAME);
++	if (ret) {
++		pr_err("Failed to allocate vchiq's chrdev region\n");
++		goto class_destroy;
++	}
++
++	ret = platform_driver_register(&vchiq_driver);
++	if (ret) {
++		pr_err("Failed to register vchiq driver\n");
++		goto region_unregister;
++	}
++
++	return 0;
++
++region_unregister:
++	platform_driver_unregister(&vchiq_driver);
++
++class_destroy:
++	class_destroy(vchiq_class);
++
++	return ret;
++}
++module_init(vchiq_driver_init);
++
++static void __exit vchiq_driver_exit(void)
++{
++	platform_driver_unregister(&vchiq_driver);
++	unregister_chrdev_region(vchiq_devid, 1);
++	class_destroy(vchiq_class);
++}
++module_exit(vchiq_driver_exit);
+ 
+ MODULE_LICENSE("Dual BSD/GPL");
+ MODULE_DESCRIPTION("Videocore VCHIQ driver");
+-- 
+2.19.1
