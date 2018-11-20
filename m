@@ -1,42 +1,52 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 20 Nov 2018 19:52:08 +0200
-Subject: [PATCH v6 5/8] arm64: dts: allwinner: a64: pinebook: enable power
- supplies
+Date: Tue, 20 Nov 2018 19:52:11 +0200
+Subject: [PATCH v6 8/8] mfd: axp20x: Add supported cells for AXP803
 In-Reply-To: <20181120175211.3913-1-oskari@lemmela.net>
 References: <20181120175211.3913-1-oskari@lemmela.net>
-Message-ID: <20181120175211.3913-6-oskari@lemmela.net>
+Message-ID: <20181120175211.3913-9-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vasily Khoruzhick <anarsoul@gmail.com>
+Parts of the AXP803 are compatible with their counterparts on the AXP813.
+These include the GPIO, ADC, AC and battery power supplies.
 
-Pinebook has ACIN connector and 10000 mAh battery.
-
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/mfd/axp20x.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index 77fac84797e9..6a1402bf0362 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -148,6 +148,14 @@
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index dfc3cff1d08b..e415b967d38c 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -728,11 +728,26 @@ static const struct mfd_cell axp288_cells[] = {
  
- #include "axp803.dtsi"
+ static const struct mfd_cell axp803_cells[] = {
+ 	{
++		.name		= "axp20x-gpio",
++		.of_compatible	= "x-powers,axp813-gpio",
++	}, {
+ 		.name			= "axp221-pek",
+ 		.num_resources		= ARRAY_SIZE(axp803_pek_resources),
+ 		.resources		= axp803_pek_resources,
+ 	},
+ 	{	.name			= "axp20x-regulator" },
++	{
++		.name		= "axp813-adc",
++		.of_compatible	= "x-powers,axp813-adc",
++	}, {
++		.name		= "axp20x-battery-power-supply",
++		.of_compatible	= "x-powers,axp813-battery-power-supply",
++	}, {
++		.name		= "axp20x-ac-power-supply",
++		.of_compatible	= "x-powers,axp813-ac-power-supply",
++		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
++		.resources	= axp20x_ac_power_supply_resources,
++	},
+ };
  
-+&ac_power_supply {
-+	status = "okay";
-+};
-+
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-min-microvolt = <2800000>;
- 	regulator-max-microvolt = <2800000>;
+ static const struct mfd_cell axp806_self_working_cells[] = {
 -- 
 2.17.1
