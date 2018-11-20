@@ -1,41 +1,48 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Tue, 20 Nov 2018 13:31:24 +0100
-Subject: [PATCH 4/5] ARM: davinci: da830: set the GPIO base to 0
-In-Reply-To: <20181120123125.24938-1-brgl@bgdev.pl>
-References: <20181120123125.24938-1-brgl@bgdev.pl>
-Message-ID: <20181120123125.24938-5-brgl@bgdev.pl>
+From: pasha.tatashin@soleen.com (Pavel Tatashin)
+Date: Tue, 20 Nov 2018 15:03:27 +0000
+Subject: [PATCH v1 1/1] arm64: Early boot time stamps
+In-Reply-To: <01ae5979-9bcd-dd59-adda-efbf69f388ca@arm.com>
+References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
+ <20181119214443.25175-2-pasha.tatashin@soleen.com>
+ <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
+ <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+ <01ae5979-9bcd-dd59-adda-efbf69f388ca@arm.com>
+Message-ID: <20181120150327.kc5bbkfecmfwbgzn@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+On 18-11-20 14:55:23, Marc Zyngier wrote:
+> > Yeah, I saw 56 is used in arm_arch_timer.c, but I could not find where
+> > this minimum is defined in aarch64 specs. I will change it to 56.
+> 
+> See D10.1.2 (The system counter) in the ARM ARM[1], which says:
+> 
+> <quote>
+> The Generic Timer provides a system counter with the following
+> specification:
+> Width	At least 56 bits wide.
+> 	The value returned by any 64-bit read of the counter is
+> 	zero-extended to 64 bits.
+> </quote>
+> 
+> This is not AArch64-specific though, and 32bit systems implementing the
+> generic timers have the exact same requirements.
 
-Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
-automatic base selection") broke the GPIO support on DaVinci boards
-in legacy mode by allowing gpiolib to set the GPIO base automatically.
+Thank you, makes sense. I was thinking there could be AArch64 specific
+minimum limit.
 
-DaVinci board files use the legacy GPIO API with hard-coded GPIO line
-numbers. Use the new fields in struct davinci_gpio_platform_data to
-manually set the GPIO base to 0.
+> 
+> > I will send v2 soon.
+> 
+> Please wait a bit and give others a chance to review this too.
 
-Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
-Cc: stable at vger.kernel.org
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/mach-davinci/da830.c | 2 ++
- 1 file changed, 2 insertions(+)
+I already sent, but will wait in the future before sending v3.
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 0bc5bd2665df..822d2590fbc9 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -759,6 +759,8 @@ static struct davinci_id da830_ids[] = {
- };
- 
- static struct davinci_gpio_platform_data da830_gpio_platform_data = {
-+	.no_auto_base = true,
-+	.base = 0,
- 	.ngpio = 128,
- };
- 
--- 
-2.19.1
+> 
+> Thanks,
+> 
+> 	M.
+> 
+> [1] https://static.docs.arm.com/ddi0487/da/DDI0487D_a_armv8_arm.pdf
+> -- 
+> Jazz is not dead. It just smells funny...
