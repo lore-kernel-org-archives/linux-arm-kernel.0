@@ -1,118 +1,113 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Tue, 20 Nov 2018 14:15:22 +0000
-Subject: [PATCH v2 4/4] arm64: KVM: Enable support for :G/:H perf event
- modifiers
-In-Reply-To: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
-References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1542723322-42536-5-git-send-email-andrew.murray@arm.com>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Tue, 20 Nov 2018 14:14:45 +0000
+Subject: [PATCH v8] clk: Add (devm_)clk_get_optional() functions
+Message-ID: <20181120141445.21378-1-phil.edworthy@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable/disable event counters as appropriate when entering and exiting
-the guest to enable support for guest or host only event counting.
+This adds clk_get_optional() and devm_clk_get_optional() functions to get
+optional clocks.
+They behave the same as (devm_)clk_get except where there is no clock
+producer. In this case, instead of returning -ENOENT, the function
+returns NULL. This makes error checking simpler and allows
+clk_prepare_enable, etc to be called on the returned reference
+without additional checks.
 
-For both VHE and non-VHE we switch the counters between host/guest at
-EL2. EL2 is filtered out by the PMU when we are using the :G modifier.
-
-The PMU may be on when we change which counters are enabled however
-we avoid adding an isb as we instead rely on existing context
-synchronisation events: the isb in kvm_arm_vhe_guest_exit for VHE and
-the eret from the hvc in kvm_call_hyp.
-
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 ---
- arch/arm64/kvm/hyp/switch.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+v8:
+ - Remove else clause
+v7:
+ - Instead of messing with the core functions, simply wrap them for the
+   _optional() versions. By putting clk_get_optional() inline in the header
+   file, we can get rid of the arch specific patches as well.
+v6:
+ - Add doxygen style comment for devm_clk_get_optional() args
+v5:
+ - No changes.
+v4:
+ - No changes.
+v3:
+ - No changes.
+---
+ drivers/clk/clk-devres.c | 11 +++++++++++
+ include/linux/clk.h      | 27 +++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index d496ef5..ebf0aac 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -373,6 +373,32 @@ static bool __hyp_text __hyp_switch_fpsimd(struct kvm_vcpu *vcpu)
- 	return true;
+diff --git a/drivers/clk/clk-devres.c b/drivers/clk/clk-devres.c
+index 12c87457eca1..c6f4a1a92c5f 100644
+--- a/drivers/clk/clk-devres.c
++++ b/drivers/clk/clk-devres.c
+@@ -34,6 +34,17 @@ struct clk *devm_clk_get(struct device *dev, const char *id)
+ }
+ EXPORT_SYMBOL(devm_clk_get);
+ 
++struct clk *devm_clk_get_optional(struct device *dev, const char *id)
++{
++	struct clk *clk = devm_clk_get(dev, id);
++
++	if (clk == ERR_PTR(-ENOENT))
++		clk = NULL;
++
++	return clk;
++}
++EXPORT_SYMBOL(devm_clk_get_optional);
++
+ struct clk_bulk_devres {
+ 	struct clk_bulk_data *clks;
+ 	int num_clks;
+diff --git a/include/linux/clk.h b/include/linux/clk.h
+index a7773b5c0b9f..3ea3c78f62dd 100644
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -383,6 +383,17 @@ int __must_check devm_clk_bulk_get_all(struct device *dev,
+  */
+ struct clk *devm_clk_get(struct device *dev, const char *id);
+ 
++/**
++ * devm_clk_get_optional - lookup and obtain a managed reference to an optional
++ *			   clock producer.
++ * @dev: device for clock "consumer"
++ * @id: clock consumer ID
++ *
++ * Behaves the same as devm_clk_get except where there is no clock producer. In
++ * this case, instead of returning -ENOENT, the function returns NULL.
++ */
++struct clk *devm_clk_get_optional(struct device *dev, const char *id);
++
+ /**
+  * devm_get_clk_from_child - lookup and obtain a managed reference to a
+  *			     clock producer from child node.
+@@ -718,6 +729,12 @@ static inline struct clk *devm_clk_get(struct device *dev, const char *id)
+ 	return NULL;
  }
  
-+static bool __hyp_text __pmu_switch_to_guest(struct kvm_cpu_context *host_ctxt)
++static inline struct clk *devm_clk_get_optional(struct device *dev,
++						const char *id)
 +{
-+	u32 host_only = host_ctxt->events_host_only;
-+	u32 guest_only = host_ctxt->events_guest_only;
-+
-+	if (host_only)
-+		write_sysreg(host_only, pmcntenclr_el0);
-+
-+	if (guest_only)
-+		write_sysreg(guest_only, pmcntenset_el0);
-+
-+	return (host_only || guest_only);
++	return NULL;
 +}
 +
-+static void __hyp_text __pmu_switch_to_host(struct kvm_cpu_context *host_ctxt)
+ static inline int __must_check devm_clk_bulk_get(struct device *dev, int num_clks,
+ 						 struct clk_bulk_data *clks)
+ {
+@@ -862,6 +879,16 @@ static inline void clk_bulk_disable_unprepare(int num_clks,
+ 	clk_bulk_unprepare(num_clks, clks);
+ }
+ 
++static inline struct clk *clk_get_optional(struct device *dev, const char *id)
 +{
-+	u32 host_only = host_ctxt->events_host_only;
-+	u32 guest_only = host_ctxt->events_guest_only;
++	struct clk *clk = clk_get(dev, id);
 +
-+	if (guest_only)
-+		write_sysreg(guest_only, pmcntenclr_el0);
++	if (clk == ERR_PTR(-ENOENT))
++		clk = NULL;
 +
-+	if (host_only)
-+		write_sysreg(host_only, pmcntenset_el0);
++	return clk;
 +}
 +
- /*
-  * Return true when we were able to fixup the guest exit and should return to
-  * the guest, false when we should restore the host state and return to the
-@@ -488,12 +514,15 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-+	bool pmu_switch_needed;
- 	u64 exit_code;
- 
- 	host_ctxt = vcpu->arch.host_cpu_context;
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
-+	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-+
- 	sysreg_save_host_state_vhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
-@@ -524,6 +553,9 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
- 
- 	__debug_switch_to_host(vcpu);
- 
-+	if (pmu_switch_needed)
-+		__pmu_switch_to_host(host_ctxt);
-+
- 	return exit_code;
- }
- 
-@@ -532,6 +564,7 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_cpu_context *host_ctxt;
- 	struct kvm_cpu_context *guest_ctxt;
-+	bool pmu_switch_needed;
- 	u64 exit_code;
- 
- 	vcpu = kern_hyp_va(vcpu);
-@@ -540,6 +573,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	host_ctxt->__hyp_running_vcpu = vcpu;
- 	guest_ctxt = &vcpu->arch.ctxt;
- 
-+	pmu_switch_needed = __pmu_switch_to_guest(host_ctxt);
-+
- 	__sysreg_save_state_nvhe(host_ctxt);
- 
- 	__activate_traps(vcpu);
-@@ -586,6 +621,9 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
- 	 */
- 	__debug_switch_to_host(vcpu);
- 
-+	if (pmu_switch_needed)
-+		__pmu_switch_to_host(host_ctxt);
-+
- 	return exit_code;
- }
- 
+ #if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
 -- 
-2.7.4
+2.17.1
