@@ -1,43 +1,37 @@
 From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 20 Nov 2018 19:52:07 +0200
-Subject: [PATCH v6 4/8] arm64: dts: allwinner: a64: sopine-baseboard: enable
- power supplies
+Date: Tue, 20 Nov 2018 19:52:05 +0200
+Subject: [PATCH v6 2/8] ARM: dts: axp81x: add AC power supply subnode
 In-Reply-To: <20181120175211.3913-1-oskari@lemmela.net>
 References: <20181120175211.3913-1-oskari@lemmela.net>
-Message-ID: <20181120175211.3913-5-oskari@lemmela.net>
+Message-ID: <20181120175211.3913-3-oskari@lemmela.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AXP803 ACIN pins are routed from SOM to the DC jack on the baseboard.
-AXP803 charger pins BATSENSE, LOADSENSE, N_BATDRV, LX_CHG, VIN_CHG
-and IPSOUT are connected via PMOS driver to SOM VBAT pins. VBAT and
-AXP803 TS pins are routed to the baseboard 3-pin battery connector.
+Add AC power supply subnode for AXP81X PMIC.
 
 Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
 Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts    | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/axp81x.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index 53fcc9098df3..4695b0d407b6 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -80,6 +80,14 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 043c717dcef1..bd83962d3627 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -48,6 +48,11 @@
+ 	interrupt-controller;
+ 	#interrupt-cells = <1>;
  
-+&ac_power_supply {
-+	status = "okay";
-+};
++	ac_power_supply: ac-power-supply {
++		compatible = "x-powers,axp813-ac-power-supply";
++		status = "disabled";
++	};
 +
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &de {
- 	status = "okay";
- };
+ 	axp_adc: adc {
+ 		compatible = "x-powers,axp813-adc";
+ 		#io-channel-cells = <1>;
 -- 
 2.17.1
