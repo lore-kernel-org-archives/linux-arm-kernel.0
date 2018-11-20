@@ -1,65 +1,38 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 20 Nov 2018 18:23:23 +0800
-Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-6-matthias.bgg@kernel.org>
- <1542605939.32082.12.camel@mtksdaap41>
- <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
- <1542686700.9073.15.camel@mtksdaap41>
- <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
-Message-ID: <1542709403.13494.0.camel@mtksdaap41>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 20 Nov 2018 17:57:37 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2: use the divided clock for SMC
+Message-ID: <20181120165737.4998-1-romain.izard.pro@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
+The SAMA5D2 is different from SAMA5D3 and SAMA5D4, as there are two
+different clocks for the peripherals in the SoC. The Static Memory
+controller is connected to the divided master clock.
 
-On Tue, 2018-11-20 at 11:19 +0100, Matthias Brugger wrote:
-> 
-> On 20/11/2018 05:05, CK Hu wrote:
-> > Hi, Matthias:
-> > 
-> > On Mon, 2018-11-19 at 10:26 +0100, Matthias Brugger wrote:
-> >>
-> >> On 19/11/2018 06:38, CK Hu wrote:
-> >>> Hi, Matthias:
-> >>>
-> >>> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
-> >>>> From: Matthias Brugger <mbrugger@suse.com>
-> >>>>
-> >>>> It can happen that the mmsys clock drivers aren't probed before the
-> >>>> platform driver gets invoked. The platform driver used to print a warning
-> >>>> that the driver failed to get the clocks. Omit this error on
-> >>>> the defered probe path.
-> >>>
-> >>> This patch looks good to me, but you have not modified the sub driver in
-> >>> HDMI path. We could let HDMI path print the warning and someone send
-> >>> another patch later, or you modify for HDMI path in this patch.
-> >>
-> >> Sure, I'll add this in v6. After inspecting the code, I think we will need to
-> >> also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
-> >> now does not even check if the clocks are present. What do you think?
-> > 
-> > Yes, we do really need to consider mdp driver because mmsys clock
-> > include mdp clock. You remind me that mmsys control 4 major function:
-> > drm routing, drm clock, mdp routing, and mdp clock. Your design let the
-> > mmsys device as drm device (control drm routing) and create a sub device
-> > as clock device (control drm clock, mdp clock). If one day mdp device
-> > (may need control drm routing) need to control the register of mdp
-> > routing, would mdp device be a sub device? Or we need not to consider
-> > this because it need not to access mmsys register now?
-> > 
-> 
-> I think we should for now concentrate to fix the clock probing issue. If in the
-> future we will need to access drm routing from the mdp device, we can have a
-> look into this.
-> 
-> Sounds good?
+Unfortunately, the device tree does not correctly show this and uses the
+master clock directly. This clock is then used by the code for the NAND
+controller to calculate the timings for the controller, and we end up with
+slow NAND Flash access.
 
-Sounds good to me.
+Fix the device tree, and the performance of Flash access is improved.
 
-Regards,
-CK
+Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+---
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Regards,
-> Matthias
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index 61f68e5c48e9..b405992eb601 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -308,7 +308,7 @@
+ 				  0x1 0x0 0x60000000 0x10000000
+ 				  0x2 0x0 0x70000000 0x10000000
+ 				  0x3 0x0 0x80000000 0x10000000>;
+-			clocks = <&mck>;
++			clocks = <&h32ck>;
+ 			status = "disabled";
+ 
+ 			nand_controller: nand-controller {
+-- 
+2.17.1
