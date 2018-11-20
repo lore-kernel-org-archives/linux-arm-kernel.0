@@ -1,51 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 20 Nov 2018 14:53:11 +0800
-Subject: [PATCH 3/3] arm64: dts: allwinner: h6: orangepi: Add device nodes for
- LEDs
-In-Reply-To: <20181120065311.30009-1-wens@csie.org>
-References: <20181120065311.30009-1-wens@csie.org>
-Message-ID: <20181120065311.30009-4-wens@csie.org>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Tue, 20 Nov 2018 16:41:08 +0800
+Subject: [PATCH 2/2] spi: mediatek: add spi support for mt7629 IC
+In-Reply-To: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+References: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1542703268-17285-3-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi Lite 2 and Orange Pi One Plus both have two LEDs, one red
-and one green. These are driven directly by GPIO lines in an active high
-arrangement. The red LED is labeled "power", so it is set to be on by
-default.
+this patch add support for mt7629 IC.
 
-Note that the default drive current for the GPIO lines makes the LEDs
-very bright.
-
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Change-Id: Icb8ced408ebd1340fb0340592b91f24740d07e1e
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- .../boot/dts/allwinner/sun50i-h6-orangepi.dtsi    | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/spi/spi-mt65xx.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-index f16b7ffbe797..b2526dac2fcf 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h6-orangepi.dtsi
-@@ -22,6 +22,21 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		power {
-+			label = "orangepi:red:power";
-+			gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 */
-+			default-state = "on";
-+		};
-+
-+		status {
-+			label = "orangepi:green:status";
-+			gpios = <&r_pio 0 7 GPIO_ACTIVE_HIGH>; /* PL7 */
-+		};
-+	};
-+
- 	reg_vcc5v: vcc5v {
- 		/* board wide 5V supply directly from the DC jack */
- 		compatible = "regulator-fixed";
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 9ee1fe9..0cce6f0 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -150,6 +150,9 @@ struct mtk_spi {
+ 	{ .compatible = "mediatek,mt7622-spi",
+ 		.data = (void *)&mt7622_compat,
+ 	},
++	{ .compatible = "mediatek,mt7629-spi",
++		.data = (void *)&mt7622_compat,
++	},
+ 	{ .compatible = "mediatek,mt8135-spi",
+ 		.data = (void *)&mtk_common_compat,
+ 	},
 -- 
-2.19.1
+1.7.9.5
