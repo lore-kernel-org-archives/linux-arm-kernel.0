@@ -1,335 +1,337 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Tue, 20 Nov 2018 10:36:50 +0530
-Subject: [PATCH 12/16] clocksource: Add clock driver for RDA8810PL SoC
-In-Reply-To: <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
-References: <20181119170939.19153-1-manivannan.sadhasivam@linaro.org>
- <20181119170939.19153-13-manivannan.sadhasivam@linaro.org>
- <e9b208ff-327e-860a-6ef0-15bf797dc6b2@arm.com>
-Message-ID: <20181120050650.GC5885@Mani-XPS-13-9360>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 20 Nov 2018 10:41:30 +0530
+Subject: [PATCH v4 08/10] phy: allwinner: add phy driver for USB3 PHY on
+ Allwinner H6 SoC
+In-Reply-To: <03265185c6a2b9bd95d8cf5c3183eb06c73d9b12.camel@aosc.io>
+References: <20181004122855.22981-1-icenowy@aosc.io>
+ <20181004122855.22981-9-icenowy@aosc.io>
+ <03265185c6a2b9bd95d8cf5c3183eb06c73d9b12.camel@aosc.io>
+Message-ID: <86b842fc-6331-5e4d-04de-dc9f037f4fa5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi,
 
-On Mon, Nov 19, 2018 at 05:57:12PM +0000, Marc Zyngier wrote:
-> On 19/11/2018 17:09, Manivannan Sadhasivam wrote:
-> > Add clock driver for RDA Micro RDA8810PL SoC supporting OSTIMER
-> > and HWTIMER.
-> > 
-> > Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  arch/arm/mach-rda/Kconfig       |   1 +
-> >  drivers/clocksource/Kconfig     |   7 ++
-> >  drivers/clocksource/Makefile    |   1 +
-> >  drivers/clocksource/timer-rda.c | 187 ++++++++++++++++++++++++++++++++
-> >  4 files changed, 196 insertions(+)
-> >  create mode 100644 drivers/clocksource/timer-rda.c
-> > 
-> > diff --git a/arch/arm/mach-rda/Kconfig b/arch/arm/mach-rda/Kconfig
-> > index 29012bc68ca4..1ea753f57b2d 100644
-> > --- a/arch/arm/mach-rda/Kconfig
-> > +++ b/arch/arm/mach-rda/Kconfig
-> > @@ -4,5 +4,6 @@ menuconfig ARCH_RDA
-> >  	select COMMON_CLK
-> >  	select GENERIC_IRQ_CHIP
-> >  	select RDA_INTC
-> > +	select RDA_TIMER
-> >  	help
-> >  	  This enables support for the RDA Micro 8810PL SoC family.
-> > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > index 55c77e44bb2d..f51eee3a72ea 100644
-> > --- a/drivers/clocksource/Kconfig
-> > +++ b/drivers/clocksource/Kconfig
-> > @@ -105,6 +105,13 @@ config OWL_TIMER
-> >  	help
-> >  	  Enables the support for the Actions Semi Owl timer driver.
-> >  
-> > +config RDA_TIMER
-> > +	bool "RDA timer driver" if COMPILE_TEST
-> > +	depends on GENERIC_CLOCKEVENTS
-> > +	select CLKSRC_MMIO
-> > +	help
-> > +	  Enables the support for the RDA Micro timer driver.
-> > +
-> >  config SUN4I_TIMER
-> >  	bool "Sun4i timer driver" if COMPILE_TEST
-> >  	depends on HAS_IOMEM
-> > diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> > index dd9138104568..150020a90707 100644
-> > --- a/drivers/clocksource/Makefile
-> > +++ b/drivers/clocksource/Makefile
-> > @@ -57,6 +57,7 @@ obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
-> >  obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
-> >  obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
-> >  obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
-> > +obj-$(CONFIG_RDA_TIMER)		+= timer-rda.o
-> >  
-> >  obj-$(CONFIG_ARC_TIMERS)		+= arc_timer.o
-> >  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
-> > diff --git a/drivers/clocksource/timer-rda.c b/drivers/clocksource/timer-rda.c
-> > new file mode 100644
-> > index 000000000000..3aa684d92c5d
-> > --- /dev/null
-> > +++ b/drivers/clocksource/timer-rda.c
-> > @@ -0,0 +1,187 @@
-> > +// SPDX-License-Identifier: GPL-2.0+
-> > +/*
-> > + * RDA8810PL SoC timer driver
-> > + *
-> > + * Copyright RDA Microelectronics Company Limited
-> > + * Copyright (c) 2017 Andreas F?rber
-> > + * Copyright (c) 2018 Manivannan Sadhasivam
-> > + */
-> > +
-> > +#include <linux/clockchips.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/irq.h>
-> > +#include <linux/irqreturn.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +
-> > +#define RDA_OSTIMER_LOADVAL_L	0x000
-> > +#define RDA_OSTIMER_CTRL	0x004
-> > +#define RDA_HWTIMER_LOCKVAL_L	0x024
-> > +#define RDA_HWTIMER_LOCKVAL_H	0x028
-> > +#define RDA_TIMER_IRQ_MASK_SET	0x02c
-> > +#define RDA_TIMER_IRQ_CLR	0x034
-> > +
-> > +#define RDA_OSTIMER_CTRL_ENABLE		BIT(24)
-> > +#define RDA_OSTIMER_CTRL_REPEAT		BIT(28)
-> > +#define RDA_OSTIMER_CTRL_LOAD		BIT(30)
-> > +
-> > +#define RDA_TIMER_IRQ_MASK_SET_OSTIMER	BIT(0)
-> > +
-> > +#define RDA_TIMER_IRQ_CLR_OSTIMER	BIT(0)
-> > +
-> > +static void __iomem *rda_timer_base;
-> > +
-> > +static u64 rda_hwtimer_read(struct clocksource *cs)
-> > +{
-> > +	u32 lo, hi;
-> > +
-> > +	/* Always read low 32 bits first */
-> > +	lo = readl(rda_timer_base + RDA_HWTIMER_LOCKVAL_L);
-> > +	hi = readl(rda_timer_base + RDA_HWTIMER_LOCKVAL_H);
+On 14/11/18 10:27 AM, Icenowy Zheng wrote:
+> ? 2018-10-04?? 20:28 +0800?Icenowy Zheng???
+>> Allwinner H6 SoC contains a USB3 PHY (with USB2 DP/DM lines also
+>> controlled).
+>>
+>> Add a driver for it.
+>>
+>> The register operations in this driver is mainly extracted from the
+>> BSP
+>> USB3 driver.
+>>
+>> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+>> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > 
-> Please use the relaxed accessors throughout this driver. There is zero
-> reason to use the non-relaxed versions here.
+> Kishon, I see this patch is picked to linux-next, however this patch is
+> not in the stage that can be picked, because for the Vbus of USB3 PHY
+> Rob Herring still have some problems.
 > 
+> Could you remove PATCH 7 and 8 in this patchset now?
 
-Okay.
+I've updated my tree now.
 
-> Now, I'm pretty sure this thing isn't correct.
+Thanks
+Kishon
 > 
-> 	<timer = 0x00000000ffffffff>
-> 	lo = 0xffffffff;
-> 	<tick, timer = 0x0000000100000000>
-> 	hi = 0x00000001;
+> Thanks!
 > 
-> Bingo. You cannot read a 64bit counter with only two 32bit accesses.
+>> ---
+>> Changes in v4:
+>> - Added support for vbus-supply property.
+>>
+>> Changes in v3:
+>> - Dropped USB_SUPPORT dependency.
+>> - Added Chen-Yu's Review tag.
+>>
+>> No changes in v2, v1.
+>>
+>>   drivers/phy/allwinner/Kconfig           |  12 ++
+>>   drivers/phy/allwinner/Makefile          |   1 +
+>>   drivers/phy/allwinner/phy-sun50i-usb3.c | 239
+>> ++++++++++++++++++++++++
+>>   3 files changed, 252 insertions(+)
+>>   create mode 100644 drivers/phy/allwinner/phy-sun50i-usb3.c
+>>
+>> diff --git a/drivers/phy/allwinner/Kconfig
+>> b/drivers/phy/allwinner/Kconfig
+>> index cdc1e745ba47..064096e6a4e5 100644
+>> --- a/drivers/phy/allwinner/Kconfig
+>> +++ b/drivers/phy/allwinner/Kconfig
+>> @@ -29,3 +29,15 @@ config PHY_SUN9I_USB
+>>   	  sun9i SoCs.
+>>   
+>>   	  This driver controls each individual USB 2 host PHY.
+>> +
+>> +config PHY_SUN50I_USB3
+>> +	tristate "Allwinner sun50i SoC USB3 PHY driver"
+>> +	depends on ARCH_SUNXI && HAS_IOMEM && OF
+>> +	depends on RESET_CONTROLLER
+>> +	select USB_COMMON
+>> +	select GENERIC_PHY
+>> +	help
+>> +	  Enable this to support the USB3.0-capable transceiver that is
+>> +	  part of some Allwinner sun50i SoCs.
+>> +
+>> +	  This driver controls each individual USB 2+3 host PHY combo.
+>> diff --git a/drivers/phy/allwinner/Makefile
+>> b/drivers/phy/allwinner/Makefile
+>> index 8605529c01a1..a8d01e9073c2 100644
+>> --- a/drivers/phy/allwinner/Makefile
+>> +++ b/drivers/phy/allwinner/Makefile
+>> @@ -1,2 +1,3 @@
+>>   obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+>>   obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+>> +obj-$(CONFIG_PHY_SUN50I_USB3)		+= phy-sun50i-usb3.o
+>> diff --git a/drivers/phy/allwinner/phy-sun50i-usb3.c
+>> b/drivers/phy/allwinner/phy-sun50i-usb3.c
+>> new file mode 100644
+>> index 000000000000..70c299c01c3e
+>> --- /dev/null
+>> +++ b/drivers/phy/allwinner/phy-sun50i-usb3.c
+>> @@ -0,0 +1,239 @@
+>> +// SPDX-License-Identifier: GPL-2.0+
+>> +/*
+>> + * Allwinner sun50i(H6) USB 3.0 phy driver
+>> + *
+>> + * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
+>> + *
+>> + * Based on phy-sun9i-usb.c, which is:
+>> + *
+>> + * Copyright (C) 2014-2015 Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * Based on code from Allwinner BSP, which is:
+>> + *
+>> + * Copyright (c) 2010-2015 Allwinner Technology Co., Ltd.
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/err.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/usb/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/regulator/consumer.h>
+>> +#include <linux/reset.h>
+>> +
+>> +/* Interface Status and Control Registers */
+>> +#define SUNXI_ISCR			0x00
+>> +#define SUNXI_PIPE_CLOCK_CONTROL	0x14
+>> +#define SUNXI_PHY_TUNE_LOW		0x18
+>> +#define SUNXI_PHY_TUNE_HIGH		0x1c
+>> +#define SUNXI_PHY_EXTERNAL_CONTROL	0x20
+>> +
+>> +/* USB2.0 Interface Status and Control Register */
+>> +#define SUNXI_ISCR_FORCE_VBUS		(3 << 12)
+>> +
+>> +/* PIPE Clock Control Register */
+>> +#define SUNXI_PCC_PIPE_CLK_OPEN		(1 << 6)
+>> +
+>> +/* PHY External Control Register */
+>> +#define SUNXI_PEC_EXTERN_VBUS		(3 << 1)
+>> +#define SUNXI_PEC_SSC_EN		(1 << 24)
+>> +#define SUNXI_PEC_REF_SSP_EN		(1 << 26)
+>> +
+>> +/* PHY Tune High Register */
+>> +#define SUNXI_TX_DEEMPH_3P5DB(n)	((n) << 19)
+>> +#define SUNXI_TX_DEEMPH_3P5DB_MASK	GENMASK(24, 19)
+>> +#define SUNXI_TX_DEEMPH_6DB(n)		((n) << 13)
+>> +#define SUNXI_TX_DEEMPH_6GB_MASK	GENMASK(18, 13)
+>> +#define SUNXI_TX_SWING_FULL(n)		((n) << 6)
+>> +#define SUNXI_TX_SWING_FULL_MASK	GENMASK(12, 6)
+>> +#define SUNXI_LOS_BIAS(n)		((n) << 3)
+>> +#define SUNXI_LOS_BIAS_MASK		GENMASK(5, 3)
+>> +#define SUNXI_TXVBOOSTLVL(n)		((n) << 0)
+>> +#define SUNXI_TXVBOOSTLVL_MASK		GENMASK(0, 2)
+>> +
+>> +struct sun50i_usb3_phy {
+>> +	struct phy *phy;
+>> +	void __iomem *regs;
+>> +	struct reset_control *reset;
+>> +	struct clk *clk;
+>> +	bool regulator_on;
+>> +	struct regulator *vbus;
+>> +};
+>> +
+>> +static void sun50i_usb3_phy_open(struct sun50i_usb3_phy *phy)
+>> +{
+>> +	u32 val;
+>> +
+>> +	val = readl(phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
+>> +	val |= SUNXI_PEC_EXTERN_VBUS;
+>> +	val |= SUNXI_PEC_SSC_EN | SUNXI_PEC_REF_SSP_EN;
+>> +	writel(val, phy->regs + SUNXI_PHY_EXTERNAL_CONTROL);
+>> +
+>> +	val = readl(phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
+>> +	val |= SUNXI_PCC_PIPE_CLK_OPEN;
+>> +	writel(val, phy->regs + SUNXI_PIPE_CLOCK_CONTROL);
+>> +
+>> +	val = readl(phy->regs + SUNXI_ISCR);
+>> +	val |= SUNXI_ISCR_FORCE_VBUS;
+>> +	writel(val, phy->regs + SUNXI_ISCR);
+>> +
+>> +	/*
+>> +	 * All the magic numbers written to the PHY_TUNE_{LOW_HIGH}
+>> +	 * registers are directly taken from the BSP USB3 driver from
+>> +	 * Allwiner.
+>> +	 */
+>> +	writel(0x0047fc87, phy->regs + SUNXI_PHY_TUNE_LOW);
+>> +
+>> +	val = readl(phy->regs + SUNXI_PHY_TUNE_HIGH);
+>> +	val &= ~(SUNXI_TXVBOOSTLVL_MASK | SUNXI_LOS_BIAS_MASK |
+>> +		 SUNXI_TX_SWING_FULL_MASK | SUNXI_TX_DEEMPH_6GB_MASK |
+>> +		 SUNXI_TX_DEEMPH_3P5DB_MASK);
+>> +	val |= SUNXI_TXVBOOSTLVL(0x7);
+>> +	val |= SUNXI_LOS_BIAS(0x7);
+>> +	val |= SUNXI_TX_SWING_FULL(0x55);
+>> +	val |= SUNXI_TX_DEEMPH_6DB(0x20);
+>> +	val |= SUNXI_TX_DEEMPH_3P5DB(0x15);
+>> +	writel(val, phy->regs + SUNXI_PHY_TUNE_HIGH);
+>> +}
+>> +
+>> +static int sun50i_usb3_phy_init(struct phy *_phy)
+>> +{
+>> +	struct sun50i_usb3_phy *phy = phy_get_drvdata(_phy);
+>> +	int ret;
+>> +
+>> +	ret = clk_prepare_enable(phy->clk);
+>> +	if (ret)
+>> +		goto err_clk;
+>> +
+>> +	ret = reset_control_deassert(phy->reset);
+>> +	if (ret)
+>> +		goto err_reset;
+>> +
+>> +	sun50i_usb3_phy_open(phy);
+>> +	return 0;
+>> +
+>> +err_reset:
+>> +	clk_disable_unprepare(phy->clk);
+>> +
+>> +err_clk:
+>> +	return ret;
+>> +}
+>> +
+>> +static int sun50i_usb3_phy_exit(struct phy *_phy)
+>> +{
+>> +	struct sun50i_usb3_phy *phy = phy_get_drvdata(_phy);
+>> +
+>> +	reset_control_assert(phy->reset);
+>> +	clk_disable_unprepare(phy->clk);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sun50i_usb3_phy_power_on(struct phy *_phy)
+>> +{
+>> +	struct sun50i_usb3_phy *phy = phy_get_drvdata(_phy);
+>> +	int ret;
+>> +
+>> +	if (!phy->vbus || phy->regulator_on)
+>> +		return 0;
+>> +
+>> +	ret = regulator_enable(phy->vbus);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	phy->regulator_on = true;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int sun50i_usb3_phy_power_off(struct phy *_phy)
+>> +{
+>> +	struct sun50i_usb3_phy *phy = phy_get_drvdata(_phy);
+>> +
+>> +	if (!phy->vbus || !phy->regulator_on)
+>> +		return 0;
+>> +
+>> +	regulator_disable(phy->vbus);
+>> +	phy->regulator_on = false;
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static const struct phy_ops sun50i_usb3_phy_ops = {
+>> +	.init		= sun50i_usb3_phy_init,
+>> +	.exit		= sun50i_usb3_phy_exit,
+>> +	.power_on	= sun50i_usb3_phy_power_on,
+>> +	.power_off	= sun50i_usb3_phy_power_off,
+>> +	.owner		= THIS_MODULE,
+>> +};
+>> +
+>> +static int sun50i_usb3_phy_probe(struct platform_device *pdev)
+>> +{
+>> +	struct sun50i_usb3_phy *phy;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct phy_provider *phy_provider;
+>> +	struct resource *res;
+>> +
+>> +	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+>> +	if (!phy)
+>> +		return -ENOMEM;
+>> +
+>> +	phy->clk = devm_clk_get(dev, NULL);
+>> +	if (IS_ERR(phy->clk)) {
+>> +		dev_err(dev, "failed to get phy clock\n");
+>> +		return PTR_ERR(phy->clk);
+>> +	}
+>> +
+>> +	phy->reset = devm_reset_control_get(dev, NULL);
+>> +	if (IS_ERR(phy->reset)) {
+>> +		dev_err(dev, "failed to get reset control\n");
+>> +		return PTR_ERR(phy->reset);
+>> +	}
+>> +
+>> +	phy->vbus = devm_regulator_get_optional(dev, "vbus");
+>> +	if (IS_ERR(phy->vbus)) {
+>> +		if (PTR_ERR(phy->vbus) == -EPROBE_DEFER) {
+>> +			dev_err(dev, "Couldn't get vbus regulator...
+>> Deferring probe\n");
+>> +			return -EPROBE_DEFER;
+>> +		}
+>> +
+>> +		phy->vbus = NULL;
+>> +	}
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	phy->regs = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(phy->regs))
+>> +		return PTR_ERR(phy->regs);
+>> +
+>> +	phy->phy = devm_phy_create(dev, NULL, &sun50i_usb3_phy_ops);
+>> +	if (IS_ERR(phy->phy)) {
+>> +		dev_err(dev, "failed to create PHY\n");
+>> +		return PTR_ERR(phy->phy);
+>> +	}
+>> +
+>> +	phy_set_drvdata(phy->phy, phy);
+>> +	phy_provider = devm_of_phy_provider_register(dev,
+>> of_phy_simple_xlate);
+>> +
+>> +	return PTR_ERR_OR_ZERO(phy_provider);
+>> +}
+>> +
+>> +static const struct of_device_id sun50i_usb3_phy_of_match[] = {
+>> +	{ .compatible = "allwinner,sun50i-h6-usb3-phy" },
+>> +	{ },
+>> +};
+>> +MODULE_DEVICE_TABLE(of, sun50i_usb3_phy_of_match);
+>> +
+>> +static struct platform_driver sun50i_usb3_phy_driver = {
+>> +	.probe	= sun50i_usb3_phy_probe,
+>> +	.driver = {
+>> +		.of_match_table	= sun50i_usb3_phy_of_match,
+>> +		.name  = "sun50i-usb3-phy",
+>> +	}
+>> +};
+>> +module_platform_driver(sun50i_usb3_phy_driver);
+>> +
+>> +MODULE_DESCRIPTION("Allwinner sun50i USB 3.0 phy driver");
+>> +MODULE_AUTHOR("Icenowy Zheng <icenowy@aosc.io>");
+>> +MODULE_LICENSE("GPL");
 > 
-
-I think the lack of description makes confusion here. In this SoC, there
-are two independent timers available: OSTIMER (56 bit) and HWTIMER (64 bit)
-with optional interrupt support. I have used OSTIMER for clockevents and
-HWTIMER for clocksource. Will add this information in driver.
-
-Please let me know whether I have to model these two clocksources
-differently!
-
-> > +
-> > +	return ((u64)hi << 32) | lo;
-> > +}
-> > +
-> > +static struct clocksource rda_clocksource = {
-> > +	.name           = "rda-timer",
-> > +	.rating         = 400,
-> > +	.read           = rda_hwtimer_read,
-> > +	.mask           = CLOCKSOURCE_MASK(64),
-> 
-> This is a 64bit counter? See below.
-> 
-
-Yes, this is the HWTIMER and is 64 bit.
-
-> > +	.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
-> > +};
-> > +
-> > +static int rda_ostimer_start(bool periodic, u64 cycles)
-> > +{
-> > +	u32 ctrl, load_l;
-> > +
-> > +	load_l = (u32)cycles;
-> > +	ctrl = ((cycles >> 32) & 0xffffff);
-> > +	ctrl |= RDA_OSTIMER_CTRL_LOAD | RDA_OSTIMER_CTRL_ENABLE;
-> > +	if (periodic)
-> > +		ctrl |= RDA_OSTIMER_CTRL_REPEAT;
-> > +
-> > +	/* Enable ostimer interrupt first */
-> > +	writel(RDA_TIMER_IRQ_MASK_SET_OSTIMER,
-> > +	       rda_timer_base + RDA_TIMER_IRQ_MASK_SET);
-> 
-> Is it masking or enabling the interrupt?
-> 
-
-On this platform, we need to set corresponding bit in the RDA_TIMER_IRQ_MASK_SET
-register to enable an interrupt.
-
-> > +
-> > +	/* Write low 32 bits first, high 24 bits are with ctrl */
-> 
-> You're saying that you can only write 56 bits? This contradicts the 64bt
-> counter thing above.
-> 
-> > +	writel(load_l, rda_timer_base + RDA_OSTIMER_LOADVAL_L);
-> > +	writel(ctrl, rda_timer_base + RDA_OSTIMER_CTRL);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_stop(void)
-> > +{
-> > +	/* Disable ostimer interrupt first */
-> > +	writel(0, rda_timer_base + RDA_TIMER_IRQ_MASK_SET);
-> > +
-
-Here the register should be RDA_TIMER_IRQ_MASK_CLR.
-
-> > +	writel(0, rda_timer_base + RDA_OSTIMER_CTRL);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_set_state_shutdown(struct clock_event_device *evt)
-> > +{
-> > +	rda_ostimer_stop();
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_set_state_oneshot(struct clock_event_device *evt)
-> > +{
-> > +	rda_ostimer_stop();
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_set_state_periodic(struct clock_event_device *evt)
-> > +{
-> > +	unsigned long cycles_per_jiffy;
-> > +
-> > +	rda_ostimer_stop();
-> > +
-> > +	cycles_per_jiffy = ((unsigned long long)NSEC_PER_SEC / HZ *
-> > +			     evt->mult) >> evt->shift;
-> > +	rda_ostimer_start(true, cycles_per_jiffy);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_tick_resume(struct clock_event_device *evt)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> > +static int rda_ostimer_set_next_event(unsigned long evt,
-> > +				      struct clock_event_device *ev)
-> > +{
-> > +	rda_ostimer_start(false, evt);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static struct clock_event_device rda_clockevent = {
-> > +	.name			= "rda-ostimer",
-> > +	.rating			= 250,
-> > +	.features		= CLOCK_EVT_FEAT_PERIODIC |
-> > +				  CLOCK_EVT_FEAT_ONESHOT |
-> > +				  CLOCK_EVT_FEAT_DYNIRQ,
-> > +	.set_state_shutdown	= rda_ostimer_set_state_shutdown,
-> > +	.set_state_oneshot	= rda_ostimer_set_state_oneshot,
-> > +	.set_state_periodic	= rda_ostimer_set_state_periodic,
-> > +	.tick_resume		= rda_ostimer_tick_resume,
-> > +	.set_next_event		= rda_ostimer_set_next_event,
-> > +};
-> > +
-> > +static irqreturn_t rda_ostimer_interrupt(int irq, void *dev_id)
-> > +{
-> > +	struct clock_event_device *evt = dev_id;
-> > +
-> > +	/* clear timer int */
-> > +	writel(RDA_TIMER_IRQ_CLR_OSTIMER, rda_timer_base + RDA_TIMER_IRQ_CLR);
-> > +
-> > +	if (evt->event_handler)
-> > +		evt->event_handler(evt);
-> > +
-> > +	return IRQ_HANDLED;
-> > +}
-> > +
-> > +static int __init rda_timer_init(struct device_node *node)
-> > +{
-> > +	unsigned long rate = 2000000;
-> > +	int ostimer_irq, ret;
-> > +
-> > +	rda_timer_base = of_io_request_and_map(node, 0, "rda-timer");
-> > +	if (IS_ERR(rda_timer_base)) {
-> > +		pr_err("Can't map timer registers");
-> > +		return PTR_ERR(rda_timer_base);
-> > +	}
-> > +
-> > +	ostimer_irq = of_irq_get_byname(node, "ostimer");
-> > +	if (ostimer_irq <= 0) {
-> > +		pr_err("Can't parse ostimer IRQ");
-> > +		return -EINVAL;
-> 
-> Leaking IO space.
-> 
-
-Ack.
-
-> > +	}
-> > +
-> > +	clocksource_register_hz(&rda_clocksource, rate);
-> > +
-> > +	ret = request_irq(ostimer_irq, rda_ostimer_interrupt, IRQF_TIMER,
-> > +			  "rda-ostimer", &rda_clockevent);
-> > +	if (ret) {
-> > +		pr_err("failed to request irq %d\n", ostimer_irq);
-> > +		return ret;
-> 
-> Same here.
-> 
-
-Ack.
-
-> > +	}
-> > +
-> > +	irq_force_affinity(ostimer_irq, cpumask_of(0));
-> 
-> Why?
-> 
-
-Not needed, will remove it.
-
-Thanks,
-Mani
-
-> > +
-> > +	rda_clockevent.cpumask = cpumask_of(0);
-> > +	rda_clockevent.irq = ostimer_irq;
-> > +	clockevents_config_and_register(&rda_clockevent, rate,
-> > +					0x2, 0xffffffff);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +TIMER_OF_DECLARE(rda8810pl, "rda,8810pl-timer", rda_timer_init);
-> > 
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
