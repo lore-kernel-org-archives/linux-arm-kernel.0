@@ -1,150 +1,86 @@
-From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:31:38 +0000
-Subject: [PATCHv2 22/25] dt-bindings: pci: Add NXP Layerscape SoCs PCIe
- Gen4 controller
-In-Reply-To: <20181120092615.11680-23-Zhiqiang.Hou@nxp.com>
-References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-23-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB223529A482909A952F38352CE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 20 Nov 2018 11:29:27 +0000
+Subject: [PATCH v1 1/1] arm64: Early boot time stamps
+In-Reply-To: <20181119214443.25175-2-pasha.tatashin@soleen.com>
+References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
+ <20181119214443.25175-2-pasha.tatashin@soleen.com>
+Message-ID: <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Hi Pavel,
 
-> -----Original Message-----
-> From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:28 PM
-> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
-> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
-> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
-> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
-> catalin.marinas at arm.com; will.deacon at arm.com
-> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
-> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
-> <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 22/25] dt-bindings: pci: Add NXP Layerscape SoCs PCIe
-> Gen4 controller
+On 19/11/2018 21:44, Pavel Tatashin wrote:
+> Allow printk time stamps/sched_clock() to be available from the early
+> boot.
 > 
-> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> 
-> Add PCIe Gen4 controller DT bindings of NXP Layerscape SoCs.
-> 
-> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@soleen.com>
 > ---
-> V2:
->  - Change to use the layerscape-pci.txt for PCIe Gen4 controller
->    dt-bindings
+>  arch/arm64/kernel/setup.c | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
->  .../bindings/pci/layerscape-pci.txt           | 57 +++++++++++++++++++
->  MAINTAINERS                                   |  8 +++
->  2 files changed, 65 insertions(+)
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index f4fc1e0544b7..4df41a66b403 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -40,6 +40,7 @@
+>  #include <linux/efi.h>
+>  #include <linux/psci.h>
+>  #include <linux/sched/task.h>
+> +#include <linux/sched_clock.h>
+>  #include <linux/mm.h>
+>  
+>  #include <asm/acpi.h>
+> @@ -279,8 +280,26 @@ arch_initcall(reserve_memblock_reserved_regions);
+>  
+>  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
+>  
+> +/*
+> + * Get time stamps available early in boot, useful to identify boot time issues
+> + * from the early boot.
+> + */
+> +static __init void sched_clock_early_init(void)
+> +{
+> +	u64 freq = arch_timer_get_cntfrq();
+> +	u64 (*read_time)(void) = arch_counter_get_cntvct;
+
+We already have arch_timer_read_counter which is exposed from
+arm_arch_timer.h.
+
+> +
+> +	/* Early clock is available only on platforms with known freqs */
+
+This comment is misleading. It should read something like:
+
+	/*
+	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
+	 * the timer frequency. To avoid breakage on misconfigured
+	 * systems, do not register the early sched_clock if the
+	 * programmed value if zero. Other random values will just
+	 * result in random output.
+	 */
+
+> +	if (!freq)
+> +		return;
+> +
+> +	sched_clock_register(read_time, BITS_PER_LONG, freq);
+
+This doesn't seem right. The counter has an architected minimum of 56
+bits, and you can't assume that it is going to be more than that.
+
+> +}
+> +
+>  void __init setup_arch(char **cmdline_p)
+>  {
+> +	sched_clock_early_init();
+> +
+>  	init_mm.start_code = (unsigned long) _text;
+>  	init_mm.end_code   = (unsigned long) _etext;
+>  	init_mm.end_data   = (unsigned long) _edata;
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 66df1e81e0b8..3ef8836b6e97 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -1,4 +1,6 @@
-> +====================================
->  Freescale Layerscape PCIe controller
-> +====================================
-> 
->  This PCIe host controller is based on the Synopsys DesignWare PCIe IP  and
-> thus inherits all the common properties defined in designware-pcie.txt.
-> @@ -58,3 +60,58 @@ Example:
->  				<0000 0 0 3 &gic GIC_SPI 190
-> IRQ_TYPE_LEVEL_HIGH>,
->  				<0000 0 0 4 &gic GIC_SPI 192
-> IRQ_TYPE_LEVEL_HIGH>;
->  	};
-> +
-> +===================================
-> +NXP Layerscape PCIe Gen4 controller
-> +===================================
-> +
-> +This PCIe controller is based on the Mobiveil PCIe IP and thus inherits
-> +all the common properties defined in mobiveil-pcie.txt.
-> +
-> +Required properties:
-> +- compatible: should contain the platform identifier such as:
-> +  "fsl,lx2160a-pcie"
-> +- reg: base addresses and lengths of the PCIe controller register blocks.
-> +  "config_axi_slave": PCIe controller registers
-> +  "csr_axi_slave": Bridge config registers
-> +- interrupts: A list of interrupt outputs of the controller. Must
-> +contain an
-> +  entry for each entry in the interrupt-names property.
-> +- interrupt-names: It could include the following entries:
-> +  "intr": The interrupt that is asserted for controller interrupts
-> +  "aer": Asserted for aer interrupt when chip support the aer interrupt with
-> +	 none MSI/MSI-X/INTx mode,but there is interrupt line for aer.
-> +  "pme": Asserted for pme interrupt when chip support the pme interrupt
-> with
-> +	 none MSI/MSI-X/INTx mode,but there is interrupt line for pme.
-> +- dma-coherent: Indicates that the hardware IP block can ensure the
-> +coherency
-> +  of the data transferred from/to the IP block. This can avoid the
-> +software
-> +  cache flush/invalid actions, and improve the performance significantly.
-> +- msi-parent : See the generic MSI binding described in
-> +  Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-> +
-> +Example:
-> +
-> +	pcie at 3400000 {
-> +		compatible = "fsl,lx2160a-pcie";
-> +		reg = <0x00 0x03400000 0x0 0x00100000   /* controller
-> registers */
-> +		       0x80 0x00000000 0x0 0x00001000>; /* configuration
-> space */
-> +		reg-names = "csr_axi_slave", "config_axi_slave";
-> +		interrupts = <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* AER
-> interrupt */
-> +			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>, /* PME
-> interrupt */
-> +			     <GIC_SPI 108 IRQ_TYPE_LEVEL_HIGH>; /*
-> controller interrupt */
-> +		interrupt-names = "aer", "pme", "intr";
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		apio-wins = <8>;
-> +		ppio-wins = <8>;
-> +		dma-coherent;
-> +		bus-range = <0x0 0xff>;
-> +		msi-parent = <&its>;
-> +		ranges = <0x82000000 0x0 0x40000000 0x80 0x40000000 0x0
-> 0x40000000>;
-> +		#interrupt-cells = <1>;
-> +		interrupt-map-mask = <0 0 0 7>;
-> +		interrupt-map = <0000 0 0 1 &gic 0 0 GIC_SPI 109
-> IRQ_TYPE_LEVEL_HIGH>,
-> +				<0000 0 0 2 &gic 0 0 GIC_SPI 110
-> IRQ_TYPE_LEVEL_HIGH>,
-> +				<0000 0 0 3 &gic 0 0 GIC_SPI 111
-> IRQ_TYPE_LEVEL_HIGH>,
-> +				<0000 0 0 4 &gic 0 0 GIC_SPI 112
-> IRQ_TYPE_LEVEL_HIGH>;
-> +	};
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 084d225583e0..b59763e23392 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -11405,6 +11405,14 @@ L:	linux-arm-kernel at lists.infradead.org
->  S:	Maintained
->  F:	drivers/pci/controller/dwc/*layerscape*
-> 
-> +PCI DRIVER FOR NXP LAYERSCAPE GEN4 CONTROLLER
-> +M:	Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
-> +L:	linux-pci at vger.kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org
-> +S:	Maintained
-> +F:	Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +F:	drivers/pci/controller/mobibeil/pci-layerscape-gen4.c
-> +
->  PCI DRIVER FOR GENERIC OF HOSTS
->  M:	Will Deacon <will.deacon@arm.com>
->  L:	linux-pci at vger.kernel.org
-> --
-> 2.17.1
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
