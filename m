@@ -1,69 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 20 Nov 2018 22:39:28 +0100
-Subject: [PATCH 0/8] BCM2835 PM driver
-In-Reply-To: <87o9aj77sk.fsf@anholt.net>
-References: <20181120172000.15102-1-eric@anholt.net>
- <1299453058.112996.1542736171394@email.ionos.de>
- <87o9aj77sk.fsf@anholt.net>
-Message-ID: <CAK8P3a0fusuKD_7Uy38jRfLFJTAFSO+HwO5XhwZQrEfsfths_g@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 20 Nov 2018 23:08:38 +0100 (CET)
+Subject: [PATCH RESEND 07/17] firmware: raspberrypi: Switch to SPDX
+ identifier
+In-Reply-To: <1542546604-27728-1-git-send-email-stefan.wahren@i2se.com>
+References: <1542546604-27728-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <2094654733.102339.1542751718184@email.ionos.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 10:34 PM Eric Anholt <eric@anholt.net> wrote:
-> >> Eric Anholt <eric@anholt.net> hat am 20. November 2018 um 18:19 geschrieben:
-> >>
-> >>
-> >> This series moves the BCM2835 WDT driver that controls a fraction of
-> >> the PM block out to soc/ and adds most of the rest of its
-> >> functionality.  My motivation has been to have V3D be functional
-> >> without firmware calls, probably improve its interactivity (since
-> >> we'll be able to power on/off without RPC to the firmware that may be
-> >> busy with other tasks), and (in a patch not submitted in this series)
-> >> extend its binding to use the reset controller instead of trying to
-> >> reset by toggling its power domain.
-> >>
-> >> I've tested V3D with a few hours of running a V3D test, sleep(1) (to
-> >> trigger PM domain off); running a GPU hang job (to trigger reset);
-> >> sleep(1).  The non-hanging success-case job always passed, and dmesg
-> >> had no complaints from bcm2835-pm.  The other power domains are not
-> >> tested, but I've done my best.
-> >>
-> >> This series will probably also be of interest to the
-> >> https://github.com/christinaa/rpi-open-firmware project for enabling USB.
-> >>
-> >
-> > apologize to give you my feedback after you send out the series.
-> >
-> > I know you won't be happy about it, but i think we need a little more
-> > complex but future proof solution for this power driver. According to
-> > the register definition of the PM block, we have multiple functions
-> > here (power domains, watchdog, pads/pinctrl, ...). Since this is
-> > common for ARM SoCs there is a subsystem called mfd (multi function
-> > device) [1] to abstract all resources of the IP block.
-> >
-> > This has the advantage that we don't need a monolithic driver which
-> > takes care of all functions.
->
-> I consider your "advantage" to be a disadvantage.  By forcing the split,
-> you end up having more driver files to manage, more platform devices,
-> and more error-prone code to get the resources from the parent down into
-> the client.  It feels like writing software for the sake of writing
-> software, rather than solving a concrete problem.
->
-> My original series:
->
->  10 files changed, 951 insertions(+), 273 deletions(-)
->
-> The MFD series:
->
->  12 files changed, 882 insertions(+), 25 deletions(-)
+Hi Eric,
 
-My preference in general is having less code in drivers/soc
-and more in subsystems of people that understand their stuff.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. November 2018 um 14:10 geschrieben:
+> 
+> 
+> Adopt the SPDX license identifier headers to ease license compliance
+> management.
+> 
+> Cc: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+> ---
+>  drivers/firmware/raspberrypi.c             | 5 +----
+>  include/soc/bcm2835/raspberrypi-firmware.h | 5 +----
+>  2 files changed, 2 insertions(+), 8 deletions(-)
+> 
+> Hi, it seems that i forgot to send this patch last week.
 
-Not every driver leans itself to being an MFD, but the more differnent
-functions it has, the better it is to have it split up. This was the
-original motivation of moving irqchip, clk, pinctrl, etc drivers out
-of arch/arm/mach-* into their own subsystems.
+i accidently added your Reviewed-by which wasn't the case for this particular patch. In case your fine with this patch i would apply it and then from my point of view the pull request would be ready to send.
 
-       Arnd
+Regards Stefan
