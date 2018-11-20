@@ -1,38 +1,48 @@
 From: zhiqiang.hou@nxp.com (Z.q. Hou)
-Date: Tue, 20 Nov 2018 09:26:00 +0000
-Subject: [PATCHv2 04/25] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+Date: Tue, 20 Nov 2018 09:26:12 +0000
+Subject: [PATCHv2 06/25] PCI: mobiveil: replace the resource list iteration
+ function
 In-Reply-To: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
 References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
-Message-ID: <20181120092615.11680-5-Zhiqiang.Hou@nxp.com>
+Message-ID: <20181120092615.11680-7-Zhiqiang.Hou@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 
-The current code does not support multiple MSIs, so remove
-the corresponding flag from the msi_domain_info structure.
+As it won't delete any node in this iteration, replaced
+the function resource_list_for_each_entry_safe() with
+the resource_list_for_each_entry().
 
-Fixes: 1e913e58335f ("PCI: mobiveil: Add MSI support")
 Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 ---
 V2:
- - Added fixes entry.
+ - no change
 
- drivers/pci/controller/pcie-mobiveil.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/controller/pcie-mobiveil.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/controller/pcie-mobiveil.c b/drivers/pci/controller/pcie-mobiveil.c
-index 563210e731d3..a0dd337c6214 100644
+index 8ff873023b5f..b2cc9c097fc9 100644
 --- a/drivers/pci/controller/pcie-mobiveil.c
 +++ b/drivers/pci/controller/pcie-mobiveil.c
-@@ -703,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
+@@ -569,7 +569,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ {
+ 	u32 value, pab_ctrl, type;
+ 	int err;
+-	struct resource_entry *win, *tmp;
++	struct resource_entry *win;
  
- static struct msi_domain_info mobiveil_msi_domain_info = {
- 	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
--		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
-+		   MSI_FLAG_PCI_MSIX),
- 	.chip	= &mobiveil_msi_irq_chip,
- };
+ 	err = mobiveil_bringup_link(pcie);
+ 	if (err) {
+@@ -620,7 +620,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
+ 	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE, IB_WIN_SIZE);
  
+ 	/* Get the I/O and memory ranges from DT */
+-	resource_list_for_each_entry_safe(win, tmp, &pcie->resources) {
++	resource_list_for_each_entry(win, &pcie->resources) {
+ 		if (resource_type(win->res) == IORESOURCE_MEM)
+ 			type = MEM_WINDOW_TYPE;
+ 		else if (resource_type(win->res) == IORESOURCE_IO)
 -- 
 2.17.1
