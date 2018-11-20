@@ -1,11 +1,10 @@
 From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:26:28 +0000
-Subject: [PATCHv2 18/25] PCI: mobiveil: continue to initialize the host
- upon no PCIe link
-In-Reply-To: <20181120092615.11680-19-Zhiqiang.Hou@nxp.com>
+Date: Tue, 20 Nov 2018 11:26:13 +0000
+Subject: [PATCHv2 17/25] PCI: mobiveil: fix the checking of valid device
+In-Reply-To: <20181120092615.11680-18-Zhiqiang.Hou@nxp.com>
 References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-19-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB223595ADCC743237CC48E3A8E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+ <20181120092615.11680-18-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB22354A5A97A9E871B99FD42AE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,50 +22,49 @@ reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
 > <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
 > <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 18/25] PCI: mobiveil: continue to initialize the host upon
-> no PCIe link
+> Subject: [PATCHv2 17/25] PCI: mobiveil: fix the checking of valid device
 > 
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> Sometimes there is not a PCIe Endpoint in the PCIe slot, so do not exit when
-> the PCIe link is not up. And degrade the print level of link up info.
+> Avoid to issue CFG transactions to link partner when the PCIe link is not up.
+> And allow CFG transactions to all functions of Endpoint implemented
+> multiple functions.
 > 
+> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver")
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
 > V2:
->  - no change
+>  - New patch
 > 
->  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 1 -
->  drivers/pci/controller/mobiveil/pcie-mobiveil.c      | 2 +-
->  2 files changed, 1 insertion(+), 2 deletions(-)
+>  drivers/pci/controller/mobiveil/pcie-mobiveil-host.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
 > b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> index 1ae82e790562..d1765d572f44 100644
+> index dc5324d94466..1ae82e790562 100644
 > --- a/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
 > +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
-> @@ -596,7 +596,6 @@ int mobiveil_pcie_host_probe(struct mobiveil_pcie
-> *pcie)
->  	ret = mobiveil_bringup_link(pcie);
->  	if (ret) {
->  		dev_info(dev, "link bring-up failed\n");
-> -		goto error;
->  	}
+> @@ -29,6 +29,10 @@ static bool mobiveil_pcie_valid_device(struct pci_bus
+> *bus, unsigned int devfn)  {
+>  	struct mobiveil_pcie *pcie = bus->sysdata;
 > 
->  	/* setup the kernel resources for the newly added PCIe root bus */
-> diff --git a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
-> b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
-> index ee678a60825d..370658d6546d 100644
-> --- a/drivers/pci/controller/mobiveil/pcie-mobiveil.c
-> +++ b/drivers/pci/controller/mobiveil/pcie-mobiveil.c
-> @@ -222,7 +222,7 @@ int mobiveil_bringup_link(struct mobiveil_pcie *pcie)
->  		usleep_range(LINK_WAIT_MIN, LINK_WAIT_MAX);
->  	}
+> +	/* If there is no link, then there is no device */
+> +	if (bus->number > pcie->rp.root_bus_nr
+> && !mobiveil_pcie_link_up(pcie))
+> +		return false;
+> +
+>  	/* Only one device down on each root port */
+>  	if ((bus->number == pcie->rp.root_bus_nr) && (devfn > 0))
+>  		return false;
+> @@ -37,7 +41,7 @@ static bool mobiveil_pcie_valid_device(struct pci_bus
+> *bus, unsigned int devfn)
+>  	 * Do not read more than one device on the bus directly
+>  	 * attached to RC
+>  	 */
+> -	if ((bus->primary == pcie->rp.root_bus_nr) && (devfn > 0))
+> +	if ((bus->primary == pcie->rp.root_bus_nr) && (PCI_SLOT(devfn) > 0))
+>  		return false;
 > 
-> -	dev_err(&pcie->pdev->dev, "link never came up\n");
-> +	dev_info(&pcie->pdev->dev, "link never came up\n");
-> 
->  	return -ETIMEDOUT;
->  }
+>  	return true;
 > --
 > 2.17.1
