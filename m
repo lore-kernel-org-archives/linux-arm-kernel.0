@@ -1,71 +1,85 @@
-From: chris@sageembedded.com (Chris Cole)
-Date: Tue, 20 Nov 2018 10:45:12 -0800
-Subject: [PATCH] ARM: V7M: align v7m_dma_inv_range() with v7 counterpart
-In-Reply-To: <1542630508-10325-1-git-send-email-vladimir.murzin@arm.com>
-References: <1542630508-10325-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <CABQ9BCV2tE7WVVPofxkUHxmPGM8NKwb5H6eS5mVcR92pAcwCLw@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Tue, 20 Nov 2018 10:55:45 -0800
+Subject: [PATCH V6 6/6] clk: imx: add imx8qxp lpcg driver
+In-Reply-To: <AM0PR04MB4211A7CA91D6188AB81BA6EA80DC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
+ <1541862894-8209-7-git-send-email-aisheng.dong@nxp.com>
+ <154223811948.88331.8860718270277533070@swboyd.mtv.corp.google.com>
+ <AM0PR04MB4211A7CA91D6188AB81BA6EA80DC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+Message-ID: <154274014557.88331.17188709471206009766@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+Quoting A.s. Dong (2018-11-14 17:28:05)
+> > -----Original Message-----
+> > From: Stephen Boyd [mailto:sboyd at kernel.org]
+> 
+> > 
+> > > +
+> > > +       ss_lpcg = of_device_get_match_data(dev);
+> > > +       if (!ss_lpcg)
+> > > +               return -ENODEV;
+> > > +
+> > > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > > +       base = devm_ioremap(dev, res->start, resource_size(res));
+> > 
+> > Why not devm_ioremap_resource()?
+> 
+> Because LPCGs are distributed in various subsystem memory space which
+> may be overlapped with some IP modules. So we can't use devm_ioremap_resource
+> which has a request_mem_region() in it.
+> It's something like what we've done for drivers/mfd/syscon.c.
 
-On Mon, Nov 19, 2018 at 4:28 AM Vladimir Murzin <vladimir.murzin@arm.com> wrote:
->
-> Chris has discovered and reported that v7_dma_inv_range() may corrupt
-> memory if address range is not aligned to cache line size.
->
-> Since the whole cache-v7m.S was lifted form cache-v7.S the same
-> observation applies to v7m_dma_inv_range(). So the fix just mirrors
-> what has been done for v7 with a little specific of M-class.
->
-> Cc: Chris Cole <chris@sageembedded.com>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/mm/cache-v7m.S | 13 ++++++++-----
->  1 file changed, 8 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mm/cache-v7m.S b/arch/arm/mm/cache-v7m.S
-> index 788486e8..1059d5e 100644
-> --- a/arch/arm/mm/cache-v7m.S
-> +++ b/arch/arm/mm/cache-v7m.S
-> @@ -73,9 +73,11 @@
->  /*
->   * dcimvac: Invalidate data cache line by MVA to PoC
->   */
-> -.macro dcimvac, rt, tmp
-> -       v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC
-> +.irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
-> +.macro dcimvac\c, rt, tmp
-> +       v7m_cacheop \rt, \tmp, V7M_SCB_DCIMVAC, \c
->  .endm
-> +.endr
->
->  /*
->   * dccmvau: Clean data cache line by MVA to PoU
-> @@ -369,14 +371,15 @@ v7m_dma_inv_range:
->         tst     r0, r3
->         bic     r0, r0, r3
->         dccimvacne r0, r3
-> +       addne   r0, r0, r2
->         subne   r3, r2, #1      @ restore r3, corrupted by v7m's dccimvac
->         tst     r1, r3
->         bic     r1, r1, r3
->         dccimvacne r1, r3
->  1:
-> -       dcimvac r0, r3
-> -       add     r0, r0, r2
-> -       cmp     r0, r1
-> +       dcimvaclo r0, r3
-> +       addlo   r0, r0, r2
-> +       cmplo   r0, r1
->         blo     1b
->         dsb     st
->         ret     lr
-> --
-> 1.9.1
->
+Ok. Any chance that the various subsystems that are combined with the
+clk controller can be split up so that we can use
+devm_ioremap_resource() here? It may be better to carve up the I/O space
+of this SoC into device nodes that map to the hardware IP blocks, and
+then have those device drivers generate sub-devices for the various
+logical subsystems that the hardware IP spans. Or it could be a big
+driver that registers with multiple subsytems/frameworks from one device
+driver. This way, the logical structure of the linux kernel device
+driver design doesn't leak into the DT description of the SoC.
 
-There needs to be "cmp r0, r1" added after "1:" label.
+> 
+> > > +                               GFP_KERNEL);
+> > > +       if (!clk_data)
+> > > +               return -ENOMEM;
+> > > +
+> > > +       clk_data->num = ss_lpcg->num_max;
+> > > +       clks = clk_data->hws;
+> > > +
+> > > +       for (i = 0; i < ss_lpcg->num_lpcg; i++) {
+> > > +               lpcg = ss_lpcg->lpcg + i;
+> > > +               clks[lpcg->id] = imx_clk_lpcg_scu(lpcg->name,
+> > lpcg->parent,
+> > > +                                                 lpcg->flags, base +
+> > lpcg->offset,
+> > > +                                                 lpcg->bit_idx,
+> > lpcg->hw_gate);
+> > > +       }
+> > > +
+> > > +       for (i = 0; i < clk_data->num; i++) {
+> > > +               if (IS_ERR(clks[i]))
+> > > +                       pr_err("i.MX clk %u: register failed with %ld\n",
+> > > +                               i, PTR_ERR(clks[i]));
+> > 
+> > But we're OK to continue? Alright...
+> > 
+> 
+> Yes, probably better to use pr_warn()?
 
-Thanks,
-Chris
+Yes.
+
+> 
+> > > +       }
+> > > +
+> > > +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
+> > > + clk_data);
+> > 
+> > Why not use devm_? Or can the driver never be unbound from sysfs?
+> > 
+> 
+> We expect the driver to be never unbound from sysfs.
+> Probably we'd better add .suppress_bind_attrs.
+
+Ok. Please add it.
