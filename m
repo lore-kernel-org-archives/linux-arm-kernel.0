@@ -1,56 +1,394 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 20 Nov 2018 11:19:00 +0100
-Subject: [PATCH v5 05/12] drm: mediatek: Omit warning on probe defers
-In-Reply-To: <1542686700.9073.15.camel@mtksdaap41>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-6-matthias.bgg@kernel.org>
- <1542605939.32082.12.camel@mtksdaap41>
- <0a02edf9-78da-dde9-4b69-38c4719b711b@gmail.com>
- <1542686700.9073.15.camel@mtksdaap41>
-Message-ID: <9a445746-b07d-73e1-68c9-10eb9d5bf771@gmail.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Tue, 20 Nov 2018 21:15:31 +0900
+Subject: [RESEND PATCH v3 2/2] PCI: uniphier: Add UniPhier PCIe host
+ controller support
+In-Reply-To: <20181119161653.GA32232@e107981-ln.cambridge.arm.com>
+References: <1539667641-26024-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <20181119161653.GA32232@e107981-ln.cambridge.arm.com>
+Message-ID: <20181120211531.3607.4A936039@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Lorenzo,
 
+Thank you for reviewing it.
 
-On 20/11/2018 05:05, CK Hu wrote:
-> Hi, Matthias:
+On Mon, 19 Nov 2018 16:17:20 +0000 <lorenzo.pieralisi@arm.com> wrote:
+
+> On Tue, Oct 16, 2018 at 02:27:21PM +0900, Kunihiko Hayashi wrote:
+> > This introduces specific glue layer for UniPhier platform to support
+> > PCIe host controller that is based on the DesignWare PCIe core, and
+> > this driver supports Root Complex (host) mode.
+> > 
+> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > ---
+> >  drivers/pci/controller/dwc/Kconfig         |   9 +
+> >  drivers/pci/controller/dwc/Makefile        |   1 +
+> >  drivers/pci/controller/dwc/pcie-uniphier.c | 433 +++++++++++++++++++++++++++++
 > 
-> On Mon, 2018-11-19 at 10:26 +0100, Matthias Brugger wrote:
->>
->> On 19/11/2018 06:38, CK Hu wrote:
->>> Hi, Matthias:
->>>
->>> On Fri, 2018-11-16 at 13:54 +0100, matthias.bgg at kernel.org wrote:
->>>> From: Matthias Brugger <mbrugger@suse.com>
->>>>
->>>> It can happen that the mmsys clock drivers aren't probed before the
->>>> platform driver gets invoked. The platform driver used to print a warning
->>>> that the driver failed to get the clocks. Omit this error on
->>>> the defered probe path.
->>>
->>> This patch looks good to me, but you have not modified the sub driver in
->>> HDMI path. We could let HDMI path print the warning and someone send
->>> another patch later, or you modify for HDMI path in this patch.
->>
->> Sure, I'll add this in v6. After inspecting the code, I think we will need to
->> also check for not initialized clocks in mtk_mdp_comp_init, as the driver for
->> now does not even check if the clocks are present. What do you think?
-> 
-> Yes, we do really need to consider mdp driver because mmsys clock
-> include mdp clock. You remind me that mmsys control 4 major function:
-> drm routing, drm clock, mdp routing, and mdp clock. Your design let the
-> mmsys device as drm device (control drm routing) and create a sub device
-> as clock device (control drm clock, mdp clock). If one day mdp device
-> (may need control drm routing) need to control the register of mdp
-> routing, would mdp device be a sub device? Or we need not to consider
-> this because it need not to access mmsys register now?
-> 
+> The driver needs a MAINTAINERS entry too.
 
-I think we should for now concentrate to fix the clock probing issue. If in the
-future we will need to access drm routing from the mdp device, we can have a
-look into this.
+Okay. I'll add it in v4.
 
-Sounds good?
-Regards,
-Matthias
+
+> >  3 files changed, 443 insertions(+)
+> >  create mode 100644 drivers/pci/controller/dwc/pcie-uniphier.c
+> > 
+> > diff --git a/drivers/pci/controller/dwc/Kconfig b/drivers/pci/controller/dwc/Kconfig
+> > index 91b0194..d8fdb02 100644
+> > --- a/drivers/pci/controller/dwc/Kconfig
+> > +++ b/drivers/pci/controller/dwc/Kconfig
+> > @@ -193,4 +193,13 @@ config PCIE_HISI_STB
+> >  	help
+> >            Say Y here if you want PCIe controller support on HiSilicon STB SoCs
+> >  
+> > +config PCIE_UNIPHIER
+> > +	bool "Socionext UniPhier PCIe controllers"
+> > +	depends on OF && (ARCH_UNIPHIER || COMPILE_TEST)
+> > +	depends on PCI_MSI_IRQ_DOMAIN
+> > +	select PCIE_DW_HOST
+> > +	help
+> > +	  Say Y here if you want PCIe controller support on UniPhier SoCs.
+> > +	  This driver supports LD20 and PXs3 SoCs.
+> > +
+> >  endmenu
+> > diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
+> > index 5d2ce72..cbde733 100644
+> > --- a/drivers/pci/controller/dwc/Makefile
+> > +++ b/drivers/pci/controller/dwc/Makefile
+> > @@ -14,6 +14,7 @@ obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+> >  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+> >  obj-$(CONFIG_PCIE_KIRIN) += pcie-kirin.o
+> >  obj-$(CONFIG_PCIE_HISI_STB) += pcie-histb.o
+> > +obj-$(CONFIG_PCIE_UNIPHIER) += pcie-uniphier.o
+> >  
+> >  # The following drivers are for devices that use the generic ACPI
+> >  # pci_root.c driver but don't support standard ECAM config access.
+> > diff --git a/drivers/pci/controller/dwc/pcie-uniphier.c b/drivers/pci/controller/dwc/pcie-uniphier.c
+> > new file mode 100644
+> > index 0000000..2689449
+> > --- /dev/null
+> > +++ b/drivers/pci/controller/dwc/pcie-uniphier.c
+> > @@ -0,0 +1,433 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * PCIe host controller driver for UniPhier SoCs
+> > + * Copyright 2018 Socionext Inc.
+> > + * Author: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> > + */
+> > +
+> > +#include <linux/bitops.h>
+> > +#include <linux/bitfield.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/delay.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/iopoll.h>
+> > +#include <linux/irqchip/chained_irq.h>
+> > +#include <linux/irqdomain.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/pci.h>
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/reset.h>
+> > +
+> > +#include "pcie-designware.h"
+> > +
+> > +#define PCL_PINCTRL0			0x002c
+> > +#define PCL_PERST_PLDN_REGEN		BIT(12)
+> > +#define PCL_PERST_NOE_REGEN		BIT(11)
+> > +#define PCL_PERST_OUT_REGEN		BIT(8)
+> > +#define PCL_PERST_PLDN_REGVAL		BIT(4)
+> > +#define PCL_PERST_NOE_REGVAL		BIT(3)
+> > +#define PCL_PERST_OUT_REGVAL		BIT(0)
+> > +
+> > +#define PCL_PIPEMON			0x0044
+> > +#define PCL_PCLK_ALIVE			BIT(15)
+> > +
+> > +#define PCL_APP_READY_CTRL		0x8008
+> > +#define PCL_APP_LTSSM_ENABLE		BIT(0)
+> > +
+> > +#define PCL_APP_PM0			0x8078
+> > +#define PCL_SYS_AUX_PWR_DET		BIT(8)
+> > +
+> > +#define PCL_RCV_INT			0x8108
+> > +#define PCL_RCV_INT_ALL_ENABLE		GENMASK(20, 17)
+> > +#define PCL_CFG_BW_MGT_STATUS		BIT(4)
+> > +#define PCL_CFG_LINK_AUTO_BW_STATUS	BIT(3)
+> > +#define PCL_CFG_AER_RC_ERR_MSI_STATUS	BIT(2)
+> > +#define PCL_CFG_PME_MSI_STATUS		BIT(1)
+> > +
+> > +#define PCL_RCV_INTX			0x810c
+> > +#define PCL_RCV_INTX_ALL_ENABLE		GENMASK(19, 16)
+> > +#define PCL_RCV_INTX_ALL_STATUS		GENMASK(3, 0)
+> > +
+> > +#define PCL_STATUS_LINK			0x8140
+> > +#define PCL_RDLH_LINK_UP		BIT(1)
+> > +#define PCL_XMLH_LINK_UP		BIT(0)
+> > +
+> > +struct uniphier_pcie_priv {
+> > +	void __iomem *base;
+> > +	struct dw_pcie pci;
+> > +	struct clk *clk;
+> > +	struct reset_control *rst;
+> > +	struct phy *phy;
+> > +	struct irq_domain *legacy_irq_domain;
+> > +};
+> > +
+> > +#define to_uniphier_pcie(x)	dev_get_drvdata((x)->dev)
+> > +
+> > +static void uniphier_pcie_ltssm_enable(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	u32 val;
+> > +
+> > +	val = readl(priv->base + PCL_APP_READY_CTRL);
+> > +	val |= PCL_APP_LTSSM_ENABLE;
+> > +	writel(val, priv->base + PCL_APP_READY_CTRL);
+> > +}
+> > +
+> > +static void uniphier_pcie_ltssm_disable(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	u32 val;
+> > +
+> > +	val = readl(priv->base + PCL_APP_READY_CTRL);
+> > +	val &= ~PCL_APP_LTSSM_ENABLE;
+> > +	writel(val, priv->base + PCL_APP_READY_CTRL);
+> > +}
+> 
+> A single function with an "enable" parameter would do.
+
+I'll merge them into a single function.
+
+
+> > +static void uniphier_pcie_init_rc(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	u32 val;
+> > +
+> > +	/* use auxiliary power detection */
+> > +	val = readl(priv->base + PCL_APP_PM0);
+> > +	val |= PCL_SYS_AUX_PWR_DET;
+> > +	writel(val, priv->base + PCL_APP_PM0);
+> > +
+> > +	/* assert PERST# */
+> > +	val = readl(priv->base + PCL_PINCTRL0);
+> > +	val &= ~(PCL_PERST_NOE_REGVAL | PCL_PERST_OUT_REGVAL
+> > +		 | PCL_PERST_PLDN_REGVAL);
+> > +	val |= PCL_PERST_NOE_REGEN | PCL_PERST_OUT_REGEN
+> > +		| PCL_PERST_PLDN_REGEN;
+> > +	writel(val, priv->base + PCL_PINCTRL0);
+> > +
+> > +	uniphier_pcie_ltssm_disable(priv);
+> > +
+> > +	usleep_range(100000, 200000);
+> > +
+> > +	/* deassert PERST# */
+> > +	val = readl(priv->base + PCL_PINCTRL0);
+> > +	val |= PCL_PERST_OUT_REGVAL | PCL_PERST_OUT_REGEN;
+> > +	writel(val, priv->base + PCL_PINCTRL0);
+> > +}
+> > +
+> > +static int uniphier_pcie_wait_rc(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	u32 status;
+> > +	int ret;
+> > +
+> > +	/* wait PIPE clock */
+> > +	ret = readl_poll_timeout(priv->base + PCL_PIPEMON, status,
+> > +				 status & PCL_PCLK_ALIVE, 100000, 1000000);
+> > +	if (ret) {
+> > +		dev_err(priv->pci.dev,
+> > +			"Failed to initialize controller in RC mode\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int uniphier_pcie_link_up(struct dw_pcie *pci)
+> 
+> This function returns a bool value, make it return a bool.
+
+This function is registered in struct dw_pcie_ops.link_up, that is defined
+in pcie-designware.h as follows:
+
+       int     (*link_up)(struct dw_pcie *pcie);
+
+Changing the return type of this function makes type mismatch,
+so I think it's difficult to change it.
+
+
+> > +{
+> > +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> > +	u32 val, mask;
+> > +
+> > +	val = readl(priv->base + PCL_STATUS_LINK);
+> > +	mask = PCL_RDLH_LINK_UP | PCL_XMLH_LINK_UP;
+> > +
+> > +	return (val & mask) == mask;
+> > +}
+> > +
+> > +static int uniphier_pcie_establish_link(struct dw_pcie *pci)
+> > +{
+> > +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> > +	int ret;
+> > +
+> > +	if (dw_pcie_link_up(pci))
+> > +		return 0;
+> > +
+> > +	uniphier_pcie_ltssm_enable(priv);
+> > +
+> > +	ret = dw_pcie_wait_for_link(pci);
+> 
+> dw_pcie_wait_for_link() already prints an error, I do not see
+> what this additional warning is adding.
+
+Surely it's redundant, enough for previous error message.
+
+> > +	if (ret == -ETIMEDOUT)
+> > +		dev_warn(pci->dev, "Link not up\n");
+> 
+> 
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static void uniphier_pcie_stop_link(struct dw_pcie *pci)
+> > +{
+> > +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> > +
+> > +	uniphier_pcie_ltssm_disable(priv);
+> > +}
+> > +
+> > +static int uniphier_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
+> > +				  irq_hw_number_t hwirq)
+> > +{
+> > +	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+> > +	irq_set_chip_data(irq, domain->host_data);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct irq_domain_ops uniphier_intx_domain_ops = {
+> > +	.map = uniphier_pcie_intx_map,
+> > +	.xlate = pci_irqd_intx_xlate,
+> > +};
+> 
+> - You should define a proper IRQ chip implementation
+> - INTX are level interrupts, so handle_level_irq() is the flow handler
+> - Using pci_irqd_intx_xlate() is wrong, please update the DT bindings
+>   as I explained
+> 
+> Take a look at pci-ftpci100.c and use that approach to implement INTX
+> handling.
+
+I understand. With referenct to pci-ftpci100.c,
+I'll change to level interrupts, remove xlate, replace dummy_irq_chip with
+own irqchip including mask/unmask/ack functions.
+
+
+> > +static void uniphier_pcie_irq_enable(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	writel(PCL_RCV_INT_ALL_ENABLE, priv->base + PCL_RCV_INT);
+> > +	writel(PCL_RCV_INTX_ALL_ENABLE, priv->base + PCL_RCV_INTX);
+> > +}
+> > +
+> > +static void uniphier_pcie_irq_disable(struct uniphier_pcie_priv *priv)
+> > +{
+> > +	writel(0, priv->base + PCL_RCV_INT);
+> > +	writel(0, priv->base + PCL_RCV_INTX);
+> > +}
+> > +
+> > +static void uniphier_pcie_irq_handler(struct irq_desc *desc)
+> > +{
+> > +	struct pcie_port *pp = irq_desc_get_handler_data(desc);
+> > +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> > +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> > +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> > +	unsigned long reg;
+> > +	u32 val, bit, virq;
+> > +
+> > +	/* INT for debug */
+> > +	val = readl(priv->base + PCL_RCV_INT);
+> > +
+> > +	if (val & PCL_CFG_BW_MGT_STATUS)
+> > +		dev_dbg(pci->dev, "Link Bandwidth Management Event\n");
+> > +	if (val & PCL_CFG_LINK_AUTO_BW_STATUS)
+> > +		dev_dbg(pci->dev, "Link Autonomous Bandwidth Event\n");
+> > +	if (val & PCL_CFG_AER_RC_ERR_MSI_STATUS)
+> > +		dev_dbg(pci->dev, "Root Error\n");
+> > +	if (val & PCL_CFG_PME_MSI_STATUS)
+> > +		dev_dbg(pci->dev, "PME Interrupt\n");
+> > +
+> > +	writel(val, priv->base + PCL_RCV_INT);
+> 
+> What's writing to PCL_RCV_INT needed for ?
+
+Each status bit is cleared by writing 1 to the bit.
+This writel() can clear asserted bit.
+
+
+> > +	/* INTx */
+> > +	chained_irq_enter(chip, desc);
+> > +
+> > +	val = readl(priv->base + PCL_RCV_INTX);
+> > +	reg = FIELD_GET(PCL_RCV_INTX_ALL_STATUS, val);
+> > +
+> > +	for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
+> > +		virq = irq_linear_revmap(priv->legacy_irq_domain, bit);
+> > +		generic_handle_irq(virq);
+> > +	}
+> > +
+> > +	writel(val, priv->base + PCL_RCV_INTX);
+> > +
+> > +	chained_irq_exit(chip, desc);
+> > +}
+> > +
+> > +static int uniphier_pcie_config_legacy_irq(struct pcie_port *pp)
+> > +{
+> > +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> > +	struct uniphier_pcie_priv *priv = to_uniphier_pcie(pci);
+> > +	struct device_node *np = pci->dev->of_node;
+> > +	struct device_node *np_intc;
+> > +
+> > +	np_intc = of_get_child_by_name(np, "legacy-interrupt-controller");
+> > +	if (!np_intc) {
+> > +		dev_err(pci->dev, "Failed to get legacy-interrupt-controller node\n");
+> > +		return -EINVAL;
+> > +	}
+> > +
+> > +	pp->irq = irq_of_parse_and_map(np_intc, 0);
+> > +	if (!pp->irq) {
+> > +		dev_err(pci->dev, "Failed to get an IRQ entry in legacy-interrupt-controller\n");
+> > +		return -EINVAL;
+> > +	}
+> > +	irq_set_chained_handler_and_data(pp->irq, uniphier_pcie_irq_handler,
+> > +					 pp);
+> > +
+> > +	priv->legacy_irq_domain = irq_domain_add_linear(np_intc, PCI_NUM_INTX,
+> > +						&uniphier_intx_domain_ops, pp);
+> > +	if (!priv->legacy_irq_domain) {
+> > +		dev_err(pci->dev, "Failed to get INTx domain\n");
+> > +		return -ENODEV;
+> > +	}
+> 
+> 	priv->legacy_irq_domain = irq_domain_add_linear(np_intc, PCI_NUM_INTX,
+> 						&uniphier_intx_domain_ops, pp);
+> 	if (!priv->legacy_irq_domain) {
+> 		dev_err(pci->dev, "Failed to get INTx domain\n");
+> 		return -ENODEV;
+> 	}
+> 
+> First add IRQs to the domain, then
+> 
+> 	irq_set_chained_handler_and_data(pp->irq, uniphier_pcie_irq_handler,
+> 					 pp);
+> 
+> set up the cascaded handler.
+
+I see. I'll change the order.
+
+Thank you,
+
+---
+Best Regards,
+Kunihiko Hayashi
