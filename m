@@ -1,91 +1,80 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 20 Nov 2018 15:30:29 +0000
-Subject: [RFC PATCH v2 13/23] KVM: arm64/sve: Context switch the SVE
- registers
-In-Reply-To: <20181120141659.GZ3505@e103592.cambridge.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-14-git-send-email-Dave.Martin@arm.com>
- <87sgzxhvny.fsf@linaro.org> <20181119170303.GX3505@e103592.cambridge.arm.com>
- <87o9akhr6f.fsf@linaro.org> <20181120141659.GZ3505@e103592.cambridge.arm.com>
-Message-ID: <87muq3ix62.fsf@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 20 Nov 2018 16:29:07 +0100
+Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+In-Reply-To: <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
+Message-ID: <20181120152907.GA28796@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
+> On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> >
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > The mailbox framework supports blocking transfers via completions for
+> > clients that can sleep. In order to support blocking transfers in cases
+> > where the transmission is not permitted to sleep, add a new ->flush()
+> > callback that controller drivers can implement to busy loop until the
+> > transmission has been completed. This will automatically be called when
+> > available and interrupts are disabled for clients that request blocking
+> > transfers.
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/mailbox/mailbox.c          | 8 ++++++++
+> >  include/linux/mailbox_controller.h | 4 ++++
+> >  2 files changed, 12 insertions(+)
+> >
+> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> > index 674b35f402f5..0eaf21259874 100644
+> > --- a/drivers/mailbox/mailbox.c
+> > +++ b/drivers/mailbox/mailbox.c
+> > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> >                 unsigned long wait;
+> >                 int ret;
+> >
+> > +               if (irqs_disabled() && chan->mbox->ops->flush) {
+> > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
+> > +                       if (ret < 0)
+> > +                               tx_tick(chan, ret);
+> > +
+> > +                       return ret;
+> > +               }
+> > +
+> This is hacky. I think we can do without busy waiting in atomic
+> context. You could queue locally while in atomic context and then
+> transfer in blocking mode. I don't think we should worry about the
+> 'throughput' as there already is no h/w rate control even with
+> busy-waiting.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+I actually tried to do that before I added this flushing mechanism. The
+problem is, like you said, one of rate control. As mentioned in the
+cover letter, the shared mailboxes implemented in tegra-hsp are used as
+RX and TX channels for the TCU, which is like a virtual UART. The TTY
+driver included as part of this series will use one of the mailboxes to
+transmit data that is written to the console. The problem is that if
+these transmissions are not rate-limited on the TTY driver side, the
+console will just keep writing data and eventually overflow the buffer
+that we have in the mailbox subsystem.
 
-<snip>
->> >> > @@ -404,10 +444,11 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
->> >> >  	 * and restore the guest context lazily.
->> >> >  	 * If FP/SIMD is not implemented, handle the trap and inject an
->> >> >  	 * undefined instruction exception to the guest.
->> >> > +	 * Similarly for trapped SVE accesses.
->> >> >  	 */
->> >> > -	if (system_supports_fpsimd() &&
->> >> > -	    kvm_vcpu_trap_get_class(vcpu) == ESR_ELx_EC_FP_ASIMD)
->> >> > -		return __hyp_switch_fpsimd(vcpu);
->> >> > +	guest_has_sve = vcpu_has_sve(vcpu);
->> >>
->> >> I'm not sure if it's worth fishing this out here given you are already
->> >> passing vcpu down the chain.
->> >
->> > I wanted to discourage GCC from recomputing this.  If you're in a
->> > position to do so, can you look at the disassembly with/without this
->> > factored out and see whether it makes a difference?
->>
->> Hmm it is hard to tell. There is code motion but for some reason I'm
->> seeing the static jump code unrolled, for example (original on left):
->>
->> __hyp_switch_fpsimd():                                                                  __hyp_switch_fpsimd():
->> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
->>                                                                                       >  ----:  tst     w0, #0x400000
->>                                                                                       >  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
->>                                                                                       > arch_static_branch_jump():
->>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:45
->>                                                                                       >  ----:  b       38c <fixup_guest_exit+0x304>
->>                                                                                       > arch_static_branch():
->>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/include/asm/jump_label.h:31
->>                                                                                       >  ----:  nop
->>                                                                                       >  ----:  b       22c <fixup_guest_exit+0x1a4>
->>                                                                                       > test_bit():
->>                                                                                       > /home/alex/lsrc/kvm/linux.git/include/asm-generic/bitops/non-atomic.h:106
->>                                                                                       >  ----:  adrp    x0, 0 <cpu_hwcaps>
->>                                                                                       >  ----:  ldr     x0, [x0]
->>                                                                                       > __hyp_switch_fpsimd():
->>                                                                                       > /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:381
->>  ----:  tst     w0, #0x400000                                                            ----:  tst     w0, #0x400000
->>  ----:  b.eq    238 <fixup_guest_exit+0x1b0>  // b.none                               |  ----:  b.eq    22c <fixup_guest_exit+0x1a4>  // b.none
->>  ----:  cbz     w21, 238 <fixup_guest_exit+0x1b0>                                     |  ----:  tbz     w2, #5, 22c <fixup_guest_exit+0x1a4>
->> /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:383                      | /home/alex/lsrc/kvm/linux.git/arch/arm64/kvm/hyp/switch.----:382
->>  ----:  ldr     w2, [x19, #2040]                                                      |  ----:  ldr     w2, [x20, #2040]
->>  ----:  add     x1, x19, #0x4b0                                                       |  ----:  add     x1, x20, #0x4b0
->>  ----:  ldr     x0, [x19, #2032]                                                      |  ----:  ldr     x0, [x20, #2032]
->> sve_ffr_offset():                                                                       sve_ffr_offset():
->>
->> Put calculating guest_has_sve at the top of __hyp_switch_fpsimd make
->> most of that go away and just moves things around a little bit. So I
->> guess it could makes sense for the fast(ish) path although I'd be
->> interested in knowing if it made any real difference to the numbers.
->> After all the first read should be well cached and moving it through the
->> stack is just additional memory and register pressure.
->
-> Hmmm, I will have a think about this when I respin.
->
-> Explicitly caching guest_has_sve() does reduce the compiler's freedom to
-> optimise.
->
-> We might be able to mark it as __pure or __attribute_const__ to enable
-> the compiler to decide whether to cache the result, but this may not be
-> 100% safe.
->
-> Part of me would prefer to leave things as they are to avoid the risk of
-> breaking the code again...
+The problem is that data comes in at a much higher rate than what we can
+output. This is especially true at boot when the TCU console takes over
+and the whole log buffer is dumped on it.
 
-Given that the only place you call __hyp_switch_fpsimd is here you could
-just roll in into __hyp_trap_is_fpsimd and have:
+So the only way to rate-limit is to either make mbox_send_message()
+block, but that can only be done in non-atomic context. The console,
+however, will always run in atomic context, so the only way to do rate-
+limiting is by busy looping.
 
-	if (__hyp_trap_is_fpsimd(vcpu))
-		return true;
-
---
-Alex Benn?e
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181120/20d316ab/attachment-0001.sig>
