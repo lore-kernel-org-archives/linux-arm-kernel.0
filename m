@@ -1,160 +1,59 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 20 Nov 2018 11:12:32 +0100
-Subject: [PATCH 3/3] iio: adc: stm32-adc: switch off running adc when going to
- low power
-In-Reply-To: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-References: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1542708752-26163-4-git-send-email-fabrice.gasnier@st.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 10:33:42 +0000
+Subject: [PATCHv2 04/25] PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+In-Reply-To: <20181120092615.11680-5-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-5-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB22350E24ECD8F70877D7FEF6E8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch off ADC when going to low power mode, in case it has been left
-running in buffer mode. Then re-enable it when resuming.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc.c | 79 ++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 63 insertions(+), 16 deletions(-)
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 32c9c61..2a9891c 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -1518,7 +1518,7 @@ static int stm32_adc_dma_start(struct iio_dev *indio_dev)
- 	return 0;
- }
- 
--static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
-+static int __stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
- 	struct device *dev = indio_dev->dev.parent;
-@@ -1542,10 +1542,6 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- 		goto err_clr_trig;
- 	}
- 
--	ret = iio_triggered_buffer_postenable(indio_dev);
--	if (ret < 0)
--		goto err_stop_dma;
--
- 	/* Reset adc buffer index */
- 	adc->bufi = 0;
- 
-@@ -1556,9 +1552,6 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- 
- 	return 0;
- 
--err_stop_dma:
--	if (adc->dma_chan)
--		dmaengine_terminate_all(adc->dma_chan);
- err_clr_trig:
- 	stm32_adc_set_trig(indio_dev, NULL);
- err_pm_put:
-@@ -1568,20 +1561,30 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
- 	return ret;
- }
- 
--static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
-+static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
-+{
-+	int ret;
-+
-+	ret = iio_triggered_buffer_postenable(indio_dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	ret = __stm32_adc_buffer_postenable(indio_dev);
-+	if (ret < 0)
-+		iio_triggered_buffer_predisable(indio_dev);
-+
-+	return ret;
-+}
-+
-+static void __stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
- {
- 	struct stm32_adc *adc = iio_priv(indio_dev);
- 	struct device *dev = indio_dev->dev.parent;
--	int ret;
- 
- 	adc->cfg->stop_conv(adc);
- 	if (!adc->dma_chan)
- 		stm32_adc_conv_irq_disable(adc);
- 
--	ret = iio_triggered_buffer_predisable(indio_dev);
--	if (ret < 0)
--		dev_err(&indio_dev->dev, "predisable failed\n");
--
- 	if (adc->dma_chan)
- 		dmaengine_terminate_all(adc->dma_chan);
- 
-@@ -1590,6 +1593,17 @@ static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
- 
- 	pm_runtime_mark_last_busy(dev);
- 	pm_runtime_put_autosuspend(dev);
-+}
-+
-+static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
-+{
-+	int ret;
-+
-+	__stm32_adc_buffer_predisable(indio_dev);
-+
-+	ret = iio_triggered_buffer_predisable(indio_dev);
-+	if (ret < 0)
-+		dev_err(&indio_dev->dev, "predisable failed\n");
- 
- 	return ret;
- }
-@@ -2013,6 +2027,40 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#if defined(CONFIG_PM_SLEEP)
-+static int stm32_adc_suspend(struct device *dev)
-+{
-+	struct stm32_adc *adc = dev_get_drvdata(dev);
-+	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
-+
-+	if (iio_buffer_enabled(indio_dev))
-+		__stm32_adc_buffer_predisable(indio_dev);
-+
-+	return pm_runtime_force_suspend(dev);
-+}
-+
-+static int stm32_adc_resume(struct device *dev)
-+{
-+	struct stm32_adc *adc = dev_get_drvdata(dev);
-+	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
-+	int ret;
-+
-+	ret = pm_runtime_force_resume(dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (!iio_buffer_enabled(indio_dev))
-+		return 0;
-+
-+	ret = stm32_adc_update_scan_mode(indio_dev,
-+					 indio_dev->active_scan_mask);
-+	if (ret < 0)
-+		return ret;
-+
-+	return __stm32_adc_buffer_postenable(indio_dev);
-+}
-+#endif
-+
- #if defined(CONFIG_PM)
- static int stm32_adc_runtime_suspend(struct device *dev)
- {
-@@ -2026,8 +2074,7 @@ static int stm32_adc_runtime_resume(struct device *dev)
- #endif
- 
- static const struct dev_pm_ops stm32_adc_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
--				pm_runtime_force_resume)
-+	SET_SYSTEM_SLEEP_PM_OPS(stm32_adc_suspend, stm32_adc_resume)
- 	SET_RUNTIME_PM_OPS(stm32_adc_runtime_suspend, stm32_adc_runtime_resume,
- 			   NULL)
- };
--- 
-1.9.1
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:26 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 04/25] PCI: mobiveil: remove flag
+> MSI_FLAG_MULTI_PCI_MSI
+> 
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> The current code does not support multiple MSIs, so remove the
+> corresponding flag from the msi_domain_info structure.
+> 
+> Fixes: 1e913e58335f ("PCI: mobiveil: Add MSI support")
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - Added fixes entry.
+> 
+>  drivers/pci/controller/pcie-mobiveil.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index 563210e731d3..a0dd337c6214 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -703,7 +703,7 @@ static struct irq_chip mobiveil_msi_irq_chip = {
+> 
+>  static struct msi_domain_info mobiveil_msi_domain_info = {
+>  	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS |
+> MSI_FLAG_USE_DEF_CHIP_OPS |
+> -		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+> +		   MSI_FLAG_PCI_MSIX),
+>  	.chip	= &mobiveil_msi_irq_chip,
+>  };
+> 
+> --
+> 2.17.1
