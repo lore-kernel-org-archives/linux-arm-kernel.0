@@ -1,93 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 20 Nov 2018 09:29:55 -0800
-Subject: [PATCH 1/8] watchdog: bcm2835: Move the driver to the soc/
- directory.
-In-Reply-To: <20181120172000.15102-2-eric@anholt.net>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 20 Nov 2018 18:49:31 +0100 (CET)
+Subject: [PATCH 0/8] BCM2835 PM driver
+In-Reply-To: <20181120172000.15102-1-eric@anholt.net>
 References: <20181120172000.15102-1-eric@anholt.net>
- <20181120172000.15102-2-eric@anholt.net>
-Message-ID: <20181120172955.GD32433@roeck-us.net>
+Message-ID: <1299453058.112996.1542736171394@email.ionos.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 09:19:53AM -0800, Eric Anholt wrote:
-> The binding for the bcm2835 "wdt" actually covers a large range of the
-> PM block's register space.  The WDT is not a separate HW block from
-> the rest of power domain management, so move the driver to the soc/
-> directory in preparation for expanding its role to cover power
-> domains.
-> 
-> This move does result in the driver being made mandatory for the
-> BCM2835 platform, which is probably actually reasonable given that
-> it's necessary for reboot/halt support.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+Hi Eric,
 
-Keeping drivers out of their domain tends to have the effect of maintainers
-not being aware of changes, which in turn tends to result in bad code.
-I have seen that happen a lot with hwmon drivers, and  I am not in favor
-of it. It would be better to keep the watchdog code where it is and have
-it instantiated from a soc parent, which could pass, for example, regmap
-information to the driver for register accesses.
-
-If the new SoC approach is to move everything into SoC, you'll be on 
-your own. I won't NACK this, but I won't ACK it either.
-
-Guenter
-
-> ---
->  drivers/soc/bcm/Makefile                              |  1 +
->  .../{watchdog/bcm2835_wdt.c => soc/bcm/bcm2835-pm.c}  |  0
->  drivers/watchdog/Kconfig                              | 11 -----------
->  drivers/watchdog/Makefile                             |  1 -
->  4 files changed, 1 insertion(+), 12 deletions(-)
->  rename drivers/{watchdog/bcm2835_wdt.c => soc/bcm/bcm2835-pm.c} (100%)
+> Eric Anholt <eric@anholt.net> hat am 20. November 2018 um 18:19 geschrieben:
 > 
-> diff --git a/drivers/soc/bcm/Makefile b/drivers/soc/bcm/Makefile
-> index dc4fced72d21..16504eb694b1 100644
-> --- a/drivers/soc/bcm/Makefile
-> +++ b/drivers/soc/bcm/Makefile
-> @@ -1,2 +1,3 @@
-> +obj-$(CONFIG_ARCH_BCM2835)      += bcm2835-pm.o
->  obj-$(CONFIG_RASPBERRYPI_POWER)	+= raspberrypi-power.o
->  obj-$(CONFIG_SOC_BRCMSTB)	+= brcmstb/
-> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/soc/bcm/bcm2835-pm.c
-> similarity index 100%
-> rename from drivers/watchdog/bcm2835_wdt.c
-> rename to drivers/soc/bcm/bcm2835-pm.c
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 2d64333f4782..796e2a593056 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -1573,17 +1573,6 @@ config BCM63XX_WDT
->  	  To compile this driver as a loadable module, choose M here.
->  	  The module will be called bcm63xx_wdt.
->  
-> -config BCM2835_WDT
-> -	tristate "Broadcom BCM2835 hardware watchdog"
-> -	depends on ARCH_BCM2835 || (OF && COMPILE_TEST)
-> -	select WATCHDOG_CORE
-> -	help
-> -	  Watchdog driver for the built in watchdog hardware in Broadcom
-> -	  BCM2835 SoC.
-> -
-> -	  To compile this driver as a loadable module, choose M here.
-> -	  The module will be called bcm2835_wdt.
-> -
->  config BCM_KONA_WDT
->  	tristate "BCM Kona Watchdog"
->  	depends on ARCH_BCM_MOBILE || COMPILE_TEST
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index f69cdff5ad7f..1788537e85af 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -70,7 +70,6 @@ obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
->  obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
->  obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
->  obj-$(CONFIG_RETU_WATCHDOG) += retu_wdt.o
-> -obj-$(CONFIG_BCM2835_WDT) += bcm2835_wdt.o
->  obj-$(CONFIG_MOXART_WDT) += moxart_wdt.o
->  obj-$(CONFIG_SIRFSOC_WATCHDOG) += sirfsoc_wdt.o
->  obj-$(CONFIG_ST_LPC_WATCHDOG) += st_lpc_wdt.o
-> -- 
-> 2.19.1
 > 
+> This series moves the BCM2835 WDT driver that controls a fraction of
+> the PM block out to soc/ and adds most of the rest of its
+> functionality.  My motivation has been to have V3D be functional
+> without firmware calls, probably improve its interactivity (since
+> we'll be able to power on/off without RPC to the firmware that may be
+> busy with other tasks), and (in a patch not submitted in this series)
+> extend its binding to use the reset controller instead of trying to
+> reset by toggling its power domain.
+> 
+> I've tested V3D with a few hours of running a V3D test, sleep(1) (to
+> trigger PM domain off); running a GPU hang job (to trigger reset);
+> sleep(1).  The non-hanging success-case job always passed, and dmesg
+> had no complaints from bcm2835-pm.  The other power domains are not
+> tested, but I've done my best.
+> 
+> This series will probably also be of interest to the
+> https://github.com/christinaa/rpi-open-firmware project for enabling USB.
+> 
+
+apologize to give you my feedback after you send out the series.
+
+I know you won't be happy about it, but i think we need a little more complex but future proof solution for this power driver. According to the register definition of the PM block, we have multiple functions here (power domains, watchdog, pads/pinctrl, ...). Since this is common for ARM SoCs there is a subsystem called mfd (multi function device) [1] to abstract all resources of the IP block.
+
+This has the advantage that we don't need a monolithic driver which takes care of all functions.
+
+According to this approach we would have the following drivers:
+mfd/bcm2835.c
+soc/bcm/bcm2835-power.c
+watchdog/bcm2835_wdt.c
+
+Best regards
+Stefan
+
+[1] - http://events17.linuxfoundation.org/sites/events/files/slides/belloni-mfd-regmap-syscon_0.pdf
