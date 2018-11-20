@@ -1,53 +1,42 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Tue, 20 Nov 2018 10:53:33 +0000
-Subject: [PATCH] clk: Add (devm_)clk_get_optional() functions
-In-Reply-To: <20181120103832.GV10650@smile.fi.intel.com>
-References: <20181119141259.11992-1-phil.edworthy@renesas.com>
- <20181120103832.GV10650@smile.fi.intel.com>
-Message-ID: <TY1PR01MB176982D5E11A665D0DCC9E31F5D90@TY1PR01MB1769.jpnprd01.prod.outlook.com>
+From: leonard.crestez@nxp.com (Leonard Crestez)
+Date: Tue, 20 Nov 2018 10:48:59 +0000
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <20181117181225.10737-4-andrew.smirnov@gmail.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+Message-ID: <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+> @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+> -	case IMX7D:
+> +	case IMX8MQ:
+> +		if (of_property_read_u32(node, "fsl,iomux-gpr1x",
+> +					 &imx6_pcie->gpr1x)) {
+> +			dev_err(dev, "Failed to get GPR1x address\n");
+> +			return -EINVAL;
+> +		}
 
-On 20 November 2018 10:39 Andy Shevchenko wrote:
-> On Mon, Nov 19, 2018 at 02:12:59PM +0000, Phil Edworthy wrote:
-> > This adds clk_get_optional() and devm_clk_get_optional() functions to
-> > get optional clocks.
-> > They behave the same as (devm_)clk_get except where there is no clock
-> > producer. In this case, instead of returning -ENOENT, the function
-> > returns NULL. This makes error checking simpler and allows
-> > clk_prepare_enable, etc to be called on the returned reference without
-> > additional checks.
-> 
-> >  - Instead of messing with the core functions, simply wrap them for the
-> >    _optional() versions. By putting clk_get_optional() inline in the header
-> >    file, we can get rid of the arch specific patches as well.
-> 
-> Fine if it would have no surprises with error handling.
-There shouldn't be any surprises. My earlier attempts at implementing this
-were hampered by the fact that of_clk_get_by_name() can return -EINVAL
-in some circumstances. By directly wrapping the (devm_)clk_get() functions
-that problem goes away.
+This is for distinguishing multiple controllers on the SOC but other
+registers and bits might differ. Isn't it preferable to have a property
+for controller id instead of adding many registers to DT?
 
-> > +	if (ERR_PTR(-ENOENT))
-Huh? That wasn't the code I sent...
+> +
+> +		if (of_property_read_u32_array(
+> +			    node, "fsl,gpr12-device-type",
+> +			    imx6_pcie->device_type,
+> +			    ARRAY_SIZE(imx6_pcie->device_type))) {
+> +			dev_err(dev, "Failed to get device type
+> mask/value\n");
+> +			return -EINVAL;
+> +		}
 
-> > +		return NULL;
-> > +	else
-> > +		return clk;
-> 
-> return clk == ERR_PTR(-ENOENT) ? NULL : clk;
-> 
-> ?
-> 
-> > +	if (clk == ERR_PTR(-ENOENT))
-> > +		return NULL;
-> > +	else
-> > +		return clk;
-> 
-> Ditto.
-Sure, will fix both.
+The device type can be set on multiple SOCs, why are you adding a
+mandatory property only for 8m?
 
-Thanks
-Phil
+There should probably be a separate patch with documented DT bindings.
+
+--
+Regards,
+Leonard
