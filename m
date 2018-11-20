@@ -1,47 +1,52 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 20 Nov 2018 17:24:41 +0100
-Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
-In-Reply-To: <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
- <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
- <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
-Message-ID: <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 20 Nov 2018 21:52:23 +0530
+Subject: [PATCH v2 03/12] drm/sun4i: sun6i_mipi_dsi: Setup burst mode
+ timings
+In-Reply-To: <20181120154532.mykbbrc3homwf2fi@flea>
+References: <20181116163916.29621-1-jagan@amarulasolutions.com>
+ <20181116163916.29621-4-jagan@amarulasolutions.com>
+ <20181119083036.riydru5xefao3xte@flea>
+ <CAMty3ZBDBDqtH5_m4g-kkKKx+JqcC-r9mc-H+_WWgkLubMWPew@mail.gmail.com>
+ <20181120154532.mykbbrc3homwf2fi@flea>
+Message-ID: <CAMty3ZCZtTa=YYxVnqvOHSGxA4vkXf6iinhoKfVN7B6CHFg_xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 3:19 PM Herbert Xu <herbert@gondor.apana.org.au> wrote:
-> Yes.  In fact it's used for FIPS certification testing.
-> Sure, nobody sane should be doing it.  But when it comes to
-> government certification... :)
+On Tue, Nov 20, 2018 at 9:15 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Mon, Nov 19, 2018 at 04:30:37PM +0530, Jagan Teki wrote:
+> > On Mon, Nov 19, 2018 at 2:00 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> > >
+> > > On Fri, Nov 16, 2018 at 10:09:07PM +0530, Jagan Teki wrote:
+> > > > Burst mode display timings are different from convectional
+> > > > video mode so update the horizontal and vertical timings.
+> > > >
+> > > > Reference code taken from BSP (from linux-sunxi/
+> > > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
+> > > >
+> > > > dsi_hsa  = 0;
+> > > > dsi_hbp  = 0;
+> > > > dsi_hact = x*dsi_pixel_bits[format]/8;
+> > > > dsi_hblk = dsi_hact;
+> > > > dsi_hfp  = 0;
+> > > > dsi_vblk = 0;
+> > > >
+> > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> > >
+> > > How is that matching the code you have in the rest of your patch?
+> >
+> > +       if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> > +               timings.hblk = (mode->hdisplay * Bpp);
+> > +       else
+> > +               sun6i_dsi_get_timings(dsi, mode, &timings);
+> >
+> > It's again your request to "keep the couple of function to make more
+> > readable"
+>
+> That function in particular doesn't make it much more readable, but
+> more importantly, your commit log doesn't match what you code does.
 
-The kernel does not aim toward any FIPS certification, and we're not
-going to start bloating our designs to fulfill this. It's never been a
-goal. Maybe ask Ted to add a FIPS mode to random.c and see what
-happens... When you start arguing "because FIPS!" as your
-justification, you really hit a head scratcher.
-
-> They've already paid for the indirect
-> function call so why make them go through yet another run-time
-> branch?
-
-The indirect function call in the crypto API is the performance hit.
-The branch in Zinc is not, as the predictor does the correct thing
-every single time. I'm not able to distinguish between the two looking
-at the performance measurements between it being there and the branch
-being commented out.
-
-Give me a few more days to finish v9's latest required changes for
-chacha12, and then I'll submit a revision that I think should address
-the remaining technical objections raised over the last several months
-we've been discussing this.
-
-Regards,
-Jason
+May be I can update the commit message if the function is OK. for
+burst most of the timings are 0 so I used structure with memset to
+keep not assigning 0's explicitly. otherwise do you have any
+suggestions, please let me know.
