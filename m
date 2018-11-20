@@ -1,88 +1,44 @@
 From: marek.vasut@gmail.com (Marek Vasut)
-Date: Wed, 21 Nov 2018 00:18:51 +0100
-Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
- device nodes
-In-Reply-To: <CAMuHMdWQYt4nrjBeQnWcZ+OOT+UX=9KTu3Lki7aS=n3n8FczZg@mail.gmail.com>
-References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
- <CAMuHMdWQYt4nrjBeQnWcZ+OOT+UX=9KTu3Lki7aS=n3n8FczZg@mail.gmail.com>
-Message-ID: <94869436-7841-537a-4760-8f117b06200f@gmail.com>
+Date: Wed, 21 Nov 2018 00:33:16 +0100
+Subject: [PATCH 2/2] arm64: dts: renesas: r8a77965: Add CAN FD controller
+ node
+In-Reply-To: <20181119104419.aznzc6nafwaaxalw@verge.net.au>
+References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
+ <20181118173327.4704-2-marek.vasut+renesas@gmail.com>
+ <20181118231053.GC2553@kunai>
+ <647080c6-5b96-a39e-db6e-4426cabc5939@gmail.com>
+ <20181119104419.aznzc6nafwaaxalw@verge.net.au>
+Message-ID: <f22cb7bc-6aca-b9ed-bd7f-a6c9bae38d4d@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2018 11:16 AM, Geert Uytterhoeven wrote:
-> Hi Marek,
-
-Hi,
-
-> On Tue, Nov 6, 2018 at 9:46 PM Marek Vasut <marek.vasut@gmail.com> wrote:
->> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On 11/19/2018 11:44 AM, Simon Horman wrote:
+> On Mon, Nov 19, 2018 at 12:29:37AM +0100, Marek Vasut wrote:
+>> On 11/19/2018 12:10 AM, Wolfram Sang wrote:
+>>> On Sun, Nov 18, 2018 at 06:33:27PM +0100, Marek Vasut wrote:
+>>>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>>>
+>>>> This patch adds CAN FD controller nodes for the R8A77965 SoC.
+>>>>
+>>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>>>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+>>>> Cc: Rob Herring <robh@kernel.org>
+>>>> Cc: Simon Horman <horms+renesas@verge.net.au>
+>>>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+>>>> Cc: linux-renesas-soc at vger.kernel.org
+>>>> Cc: linux-arm-kernel at lists.infradead.org
+>>>
+>>> Why seperate patches for CAN and CANFD here while they are merged for
+>>> r8a77990 into one patch?
 >>
->> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
->> and enables SD card slot connected to SDHI0, micro SD card slot
->> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
->> using the R8A77990 SoC.
->>
->> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+>> Because they are two different IP blocks, but I can merge the patches
+>> together if that's what you want.
 > 
->> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
->> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
->> @@ -129,6 +129,15 @@
->>                 };
->>         };
->>
->> +       reg_1p8v: regulator0 {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "fixed-1.8V";
->> +               regulator-min-microvolt = <1800000>;
->> +               regulator-max-microvolt = <1800000>;
->> +               regulator-boot-on;
->> +               regulator-always-on;
->> +       };
->> +
->>         reg_3p3v: regulator1 {
->>                 compatible = "regulator-fixed";
->>                 regulator-name = "fixed-3.3V";
->> @@ -180,6 +189,54 @@
->>                 #clock-cells = <0>;
->>                 clock-frequency = <74250000>;
->>         };
->> +
->> +       vcc_sdhi0: regulator-vcc-sdhi0 {
->> +               compatible = "regulator-fixed";
->> +
->> +               regulator-name = "SDHI0 Vcc";
->> +               regulator-min-microvolt = <3300000>;
->> +               regulator-max-microvolt = <3300000>;
->> +
->> +               gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
->> +               enable-active-high;
->> +       };
->> +
->> +       vccq_sdhi0: regulator-vccq-sdhi0 {
->> +               compatible = "regulator-gpio";
->> +
->> +               regulator-name = "SDHI0 VccQ";
->> +               regulator-min-microvolt = <1800000>;
->> +               regulator-max-microvolt = <3300000>;
->> +
->> +               gpios = <&gpio5 18 GPIO_ACTIVE_HIGH>;
->> +               gpios-states = <1>;
->> +               states = <3300000 1
->> +                         1800000 0>;
-> 
-> I know this is how it's done in the example in
-> Documentation/devicetree/bindings/regulator/gpio-regulator.txt,
-> but usually brackets are used to group tuples, like:
-> 
->     states = <3300000 1>, <1800000 0>;
-> 
-> Perhaps the example should be changed?
+> Merging these patches makes sense to me.
 
-Well, looking through the DTS, I don't see anyone using tuples for the
-GPIO regulator states. Then again, it could be updated.
-
-+CC Mark and Liam, let's see what their opinion on changing that is.
+Done
 
 -- 
 Best regards,
