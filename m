@@ -1,37 +1,60 @@
-From: oskari@lemmela.net (Oskari Lemmela)
-Date: Tue, 20 Nov 2018 19:52:10 +0200
-Subject: [PATCH v6 7/8] mfd: axp20x: Add AC power supply cell for AXP813
-In-Reply-To: <20181120175211.3913-1-oskari@lemmela.net>
-References: <20181120175211.3913-1-oskari@lemmela.net>
-Message-ID: <20181120175211.3913-8-oskari@lemmela.net>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Tue, 20 Nov 2018 19:01:32 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2: use the divided clock for SMC
+In-Reply-To: <20181120171612.GF8367@piout.net>
+References: <20181120165737.4998-1-romain.izard.pro@gmail.com>
+ <20181120171612.GF8367@piout.net>
+Message-ID: <CAGkQfmPHRKqMvm6bNDf8S5qM7uE5T-izij=jm2nob0zrOgOM-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As axp20x-ac-power-supply now supports AXP813, add a cell for it.
+Le mar. 20 nov. 2018 ? 18:16, Alexandre Belloni
+<alexandre.belloni@bootlin.com> a ?crit :
+>
+> Hello Romain,
+>
+> On 20/11/2018 17:57:37+0100, Romain Izard wrote:
+> > The SAMA5D2 is different from SAMA5D3 and SAMA5D4, as there are two
+> > different clocks for the peripherals in the SoC. The Static Memory
+> > controller is connected to the divided master clock.
+> >
+> > Unfortunately, the device tree does not correctly show this and uses the
+> > master clock directly. This clock is then used by the code for the NAND
+> > controller to calculate the timings for the controller, and we end up with
+> > slow NAND Flash access.
+> >
+> > Fix the device tree, and the performance of Flash access is improved.
+> >
+> > Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+> > index 61f68e5c48e9..b405992eb601 100644
+> > --- a/arch/arm/boot/dts/sama5d2.dtsi
+> > +++ b/arch/arm/boot/dts/sama5d2.dtsi
+> > @@ -308,7 +308,7 @@
+> >                                 0x1 0x0 0x60000000 0x10000000
+> >                                 0x2 0x0 0x70000000 0x10000000
+> >                                 0x3 0x0 0x80000000 0x10000000>;
+> > -                     clocks = <&mck>;
+> > +                     clocks = <&h32ck>;
+>
+> You will have to rebase on top of at91-dt. And if I'm not mistaken, this
+> line should be:
+>
+> +                       clocks = <&pmc PMC_TYPE_CORE PMC_MCK2>;
+>
+> >                       status = "disabled";
+> >
+> >                       nand_controller: nand-controller {
 
-Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
-Reviewed-by: Quentin Schulz <quentin.schulz@bootlin.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
----
- drivers/mfd/axp20x.c | 5 +++++
- 1 file changed, 5 insertions(+)
+I guess you're right but this will only reach mainline in 4.21. I get slow
+flash access with 4.19 as well...
 
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 0be511dd93d0..dfc3cff1d08b 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -778,6 +778,11 @@ static const struct mfd_cell axp813_cells[] = {
- 	}, {
- 		.name		= "axp20x-battery-power-supply",
- 		.of_compatible	= "x-powers,axp813-battery-power-supply",
-+	}, {
-+		.name		= "axp20x-ac-power-supply",
-+		.of_compatible	= "x-powers,axp813-ac-power-supply",
-+		.num_resources	= ARRAY_SIZE(axp20x_ac_power_supply_resources),
-+		.resources	= axp20x_ac_power_supply_resources,
- 	},
- };
- 
+After a second look, it looks like the SAMA5D4 is affected too.
+
+Best regards,
 -- 
-2.17.1
+Romain Izard
