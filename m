@@ -1,76 +1,62 @@
-From: nsaenzjulienne@suse.de (Nicolas Saenz Julienne)
-Date: Tue, 20 Nov 2018 15:53:35 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-Message-ID: <20181120145351.30390-1-nsaenzjulienne@suse.de>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Tue, 20 Nov 2018 14:53:16 +0000
+Subject: [PATCH v1 1/1] arm64: Early boot time stamps
+In-Reply-To: <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+References: <20181119214443.25175-1-pasha.tatashin@soleen.com>
+ <20181119214443.25175-2-pasha.tatashin@soleen.com>
+ <d66a60d9-6772-a951-9da4-c07443b48aad@arm.com>
+ <CA+CK2bAKcdZRRMwhcQ0QnBJ3_6bg=zhaeM7v74f+QFwkw9h17A@mail.gmail.com>
+Message-ID: <20181120145315.GA42987@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Tue, Nov 20, 2018 at 09:40:10AM -0500, Pavel Tatashin wrote:
+> > > +static __init void sched_clock_early_init(void)
+> > > +{
+> > > +     u64 freq = arch_timer_get_cntfrq();
+> > > +     u64 (*read_time)(void) = arch_counter_get_cntvct;
+> >
+> > We already have arch_timer_read_counter which is exposed from
+> > arm_arch_timer.h.
+> 
+> OK
+> 
+> >
+> > > +
+> > > +     /* Early clock is available only on platforms with known freqs */
+> >
+> > This comment is misleading. It should read something like:
+> >
+> >         /*
+> >          * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
+> >          * the timer frequency. To avoid breakage on misconfigured
+> >          * systems, do not register the early sched_clock if the
+> >          * programmed value if zero. Other random values will just
+> >          * result in random output.
+> >          */
+> >
+> 
+> OK
+> 
+> > > +     if (!freq)
+> > > +             return;
+> > > +
+> > > +     sched_clock_register(read_time, BITS_PER_LONG, freq);
+> >
+> > This doesn't seem right. The counter has an architected minimum of 56
+> > bits, and you can't assume that it is going to be more than that.
+> 
+> Yeah, I saw 56 is used in arm_arch_timer.c, but I could not find where
+> this minimum is defined in aarch64 specs. I will change it to 56.
 
-This series was written in parallel with reading and understanding the
-vchiq code. So excuse me for the lack of logic in the sequence of
-patches.
+See section G5.1.2 of the ARM ARM for details.
 
-The main focus was to delete as much code as possible, I've counted
-around 550 lines, which is not bad. Apart from that there are some
-patches enforcing proper kernel APIs usage.
+Thanks,
 
-The only patch that really changes code is the
-vchiq_ioc_copy_element_data() rewrite.
+Andrew Murray
 
-The last commit updates the TODO list with some of my observations, I
-realise some of the might be a little opinionated. If anything it's
-going to force a discussion on the topic, which is nice.
-
-It was developed on top of the latest linux-next, and was tested on a
-RPIv3B+ with audio, video and running vchiq_test.
-
-Regards,
-Nicolas
-
-RFC -> PATCH, as per Stefan's comments:
-  - Remove semaphore initialization from remove_event_create()
-    (commit 9)
-  - Join all three semaphore to completion patches (commit 11)
-  - Update probe/init commit message (commit 14)
-  - Update TODO commit message and clean up (commit 16)
-  - Fix spelling on some of the patches
-
-===
-
-Nicolas Saenz Julienne (16):
-  staging: vchiq_core: rework vchiq_get_config
-  staging: vchiq_arm: rework close/remove_service IOCTLS
-  staging: vchiq_shim: delete vchi_service_create
-  staging: vchiq_arm: use list_for_each_entry when accessing
-    bulk_waiter_list
-  staging: vchiq_arm: get rid of vchi_mh.h
-  staging: vchiq_arm: rework vchiq_ioc_copy_element_data
-  staging: vchiq-core: get rid of is_master distinction
-  staging: vchiq_core: remove unnecessary safety checks in
-    vchiq_init_state
-  staging: vchiq_core: do not initialize semaphores twice
-  staging: vchiq_core: don't add a wmb() before remote_event_signal()
-  staging: vchiq: use completions instead of semaphores
-  staging: vchiq_util: get rid of unneeded memory barriers
-  staging: vchiq_core: fix logic redundancy in parse_open
-  staging: vchiq_arm: rework probe and init functions
-  staging: vchiq_arm: fix open/release cdev functions
-  staging: vchiq: add more tasks to the TODO list
-
- .../staging/vc04_services/interface/vchi/TODO |  42 ++
- .../vc04_services/interface/vchi/vchi.h       |   8 -
- .../vc04_services/interface/vchi/vchi_mh.h    |  42 --
- .../interface/vchiq_arm/vchiq_2835_arm.c      |  18 +-
- .../interface/vchiq_arm/vchiq_arm.c           | 598 ++++++++----------
- .../interface/vchiq_arm/vchiq_core.c          | 523 ++++-----------
- .../interface/vchiq_arm/vchiq_core.h          |  47 +-
- .../interface/vchiq_arm/vchiq_if.h            |  11 +-
- .../interface/vchiq_arm/vchiq_shim.c          |  32 -
- .../interface/vchiq_arm/vchiq_util.c          |  48 +-
- .../interface/vchiq_arm/vchiq_util.h          |   6 +-
- 11 files changed, 435 insertions(+), 940 deletions(-)
- delete mode 100644 drivers/staging/vc04_services/interface/vchi/vchi_mh.h
-
--- 
-2.19.1
+> 
+> I will send v2 soon.
+> 
+> Thank you,
+> Pasha
