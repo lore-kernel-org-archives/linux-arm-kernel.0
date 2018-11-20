@@ -1,67 +1,27 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 20 Nov 2018 15:52:41 +0100
-Subject: [PATCH v3] ARM: dts: sun8i: Add the H3/H5 CSI controller
-Message-ID: <20181120145241.18618-1-maxime.ripard@bootlin.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 20 Nov 2018 15:49:05 +0100
+Subject: [v4, PATCH 2/2] dt-binding: mediatek-dwmac: add binding document
+ for MediaTek MT2712 DWMAC
+In-Reply-To: <1542705696-18507-3-git-send-email-biao.huang@mediatek.com>
+References: <1542705696-18507-1-git-send-email-biao.huang@mediatek.com>
+ <1542705696-18507-3-git-send-email-biao.huang@mediatek.com>
+Message-ID: <20181120144905.GD18335@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> +Optional properties:
+> +- mediatek,tx-delay: TX clock delay macro value. Range is 0~31. Default is 0.
+> +	It should be defined for rgmii/rgmii-rxid/mii interface.
+> +- mediatek,rx-delay: RX clock delay macro value. Range is 0~31. Default is 0.
+> +	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
+> +- mediatek,fine-tune: boolean property, if present indicates that fine delay
+> +	is selected for rgmii interface.
+> +	If present, tx-delay/rx-delay is 170+/-50ps per stage.
+> +	Else tx-delay/rx-delay of coarse delay macro is 0.55+/-0.2ns per stage.
+> +	This property do not apply to non-rgmii PHYs.
+> +	Only coarse-tune delay is supported for mii/rmii PHYs.
 
-The H3 and H5 features the same CSI controller that was initially found on
-the A31.
+Didn't Rob say to express the delay in pS, and have the driver convert
+that to values to put into registers. That is what i would prefer.
 
-Add a DT node for it.
-
-Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-
----
-
-Changes from v3:
-  - Removed the CSI MCLK pin from the default pin group
----
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 4b1530ebe427..39cd445f796a 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -393,6 +393,13 @@
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
- 
-+			csi_pins: csi {
-+				pins = "PE1", "PE2", "PE3", "PE4", "PE5",
-+				       "PE6", "PE7", "PE8", "PE9", "PE10",
-+				       "PE11";
-+				function = "csi";
-+			};
-+
- 			emac_rgmii_pins: emac0 {
- 				pins = "PD0", "PD1", "PD2", "PD3", "PD4",
- 				       "PD5", "PD7", "PD8", "PD9", "PD10",
-@@ -744,6 +751,21 @@
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
- 
-+		csi: camera at 1cb0000 {
-+			compatible = "allwinner,sun8i-h3-csi",
-+				     "allwinner,sun6i-a31-csi";
-+			reg = <0x01cb0000 0x1000>;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CSI>,
-+				 <&ccu CLK_CSI_SCLK>,
-+				 <&ccu CLK_DRAM_CSI>;
-+			clock-names = "bus", "mod", "ram";
-+			resets = <&ccu RST_BUS_CSI>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&csi_pins>;
-+			status = "disabled";
-+		};
-+
- 		hdmi: hdmi at 1ee0000 {
- 			compatible = "allwinner,sun8i-h3-dw-hdmi",
- 				     "allwinner,sun8i-a83t-dw-hdmi";
--- 
-2.19.1
+     Andrew
