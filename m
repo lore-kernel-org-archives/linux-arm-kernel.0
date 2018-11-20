@@ -1,231 +1,80 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Tue, 20 Nov 2018 10:47:11 +0000
-Subject: [RFC PATCH 1/3] drivers: amba: Updates to component
- identification for driver matching.
-In-Reply-To: <fca6da15-7b6a-3c7e-cafb-3767624bcd8e@arm.com>
-References: <20181115012842.2353-1-mike.leach@linaro.org>
- <20181115012842.2353-2-mike.leach@linaro.org>
- <fca6da15-7b6a-3c7e-cafb-3767624bcd8e@arm.com>
-Message-ID: <CAJ9a7Vg8g_0cMTGvMZXMeH5r15tJK81gk+_d7F2oCsf-GU8M_w@mail.gmail.com>
+From: rplsssn@codeaurora.org (Raju P L S S S N)
+Date: Tue, 20 Nov 2018 16:17:22 +0530
+Subject: [PATCH v8 24/26] drivers: firmware: psci: Deal with CPU hotplug
+ when using OSI mode
+In-Reply-To: <CAPDyKFond=Q-cWsjKwGToprjPTFj=WA_-nsAoUFJdNCdkki8Rw@mail.gmail.com>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <20180620172226.15012-25-ulf.hansson@linaro.org>
+ <9bf3713b-df00-03b3-d235-7549565382c7@codeaurora.org>
+ <CAPDyKFond=Q-cWsjKwGToprjPTFj=WA_-nsAoUFJdNCdkki8Rw@mail.gmail.com>
+Message-ID: <5bbdf737-2542-cd5e-f4f2-5aabe8702639@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki,
+Hi Ulf, This is noticed in v4.19 as well. Could you please check if 
+CONFIG_DEBUG_ATOMIC_SLEEP is enabled in your case? I think with current 
+patch the scenario would be applicable.
 
-Thanks for the feedback.
-Agree with all comments and will revise along the lines you suggest.
-
-Mike
-
-On Mon, 19 Nov 2018 at 14:54, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
-> Hi Mike,
->
-> On 11/15/2018 01:28 AM, Mike Leach wrote:
-> > The CoreSight specification (ARM IHI 0029E), updates the ID register
-> > requirements for components on an AMBA bus, to cover both traditional
-> > ARM Primecell type devices, and newer CoreSight and other components.
-> >
-> > The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
-> > cases to uniquely identify components. CoreSight components related to
-> > a single function can share Peripheral ID values, and must be further
-> > identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
-> > PMU and Debug hardware of the A35 all share the same PID.
-> >
-> > Bits 11:8 of the CID are defined to be the device class.
-> > Class 0xF remains for PrimeCell and legacy components.
-> > Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > at present.
-> > Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> >
-> > The specification futher defines which classes of device use the standard
-> > CID/PID pair, and when additional ID registers are required.
-> >
-> > The patches provide an update of amba_device and matching code to handle
-> > the additional registers required for the Class 0x9 (CoreSight) UCI.
-> > The *data pointer in the amba_id is used by the driver to provide extended
-> > ID register values for matching.
-> >
-> > CoreSight components where PID/CID pair is currently sufficient for
-> > unique identification need not provide this additional information.
-> >
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
->
-> The patch looks good to me. A couple of minor comments below.
->
-> > ---
-> >   drivers/amba/bus.c       | 48 ++++++++++++++++++++++++++++++++++++----
-> >   include/linux/amba/bus.h | 33 +++++++++++++++++++++++++++
-> >   2 files changed, 77 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> > index 41b706403ef7..6eab977f4314 100644
-> > --- a/drivers/amba/bus.c
-> > +++ b/drivers/amba/bus.c
-> > @@ -26,6 +26,28 @@
-> >
-> >   #define to_amba_driver(d)   container_of(d, struct amba_driver, drv)
-> >
-> > +/* called on periphid match and class 0x9 coresight device. */
-> > +static int amba_uci_match(const struct amba_id *table, struct amba_device *dev)
-> nit : Could we rename this function to make it explicit about the
-> "coresight" class  ? say, amba_cs_ucid_id_match() ?
->
-> > +{
-> > +     int ret = 0;
-> > +     struct amba_cs_uci_id *uci;
-> > +
-> > +     uci = table->data;
-> > +
-> > +     /* no table data - return match on periphid */
-> > +     if (!uci)
-> > +             return 1;
-> > +
-> > +     if (uci->devarch) {
-> > +             ret = (dev->uci.devtype == uci->devtype) &&
-> > +                    ((dev->uci.devarch & uci->mask) == uci->devarch);
-> > +     } else {
-> > +             /* devtype only if devarch set to 0 */
-> > +             ret = dev->uci.devtype == uci->devtype;
-> > +     }
-> > +     return ret;
-> > +}
-> > +
-> >   static const struct amba_id *
-> >   amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> >   {
-> > @@ -33,11 +55,17 @@ amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> >
-> >       while (table->mask) {
-> >               ret = (dev->periphid & table->mask) == table->id;
-> > -             if (ret)
-> > -                     break;
-> > +             /* matched on periphid - check UCI if CoreSight */
-> > +             if (ret) {
-> > +                     if (dev->cid == CORESIGHT_CID)  {
-> > +                             ret = amba_uci_match(table, dev);
-> > +                             if (ret)
-> > +                                     break;
-> > +                     } else
-> > +                             break;
-> > +             }
-> >               table++;
->
-> This code looks a bit too complex with the ifs and breaks. Could we
-> change it a bit to :
->
->         /* For CoreSight class devices, match the UCI id */
->         if ((dev->periphid & table->mask) == table->id) &&
->             ((dev->cid != CORESIGHT_CID) || amba_uci_match(table, dev)))
->                 return table;
->         table++;
->
->
-> >       }
-> > -
-> >       return ret ? table : NULL;
->
->
-> >   }
-> >
-> > @@ -399,10 +427,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
-> >                       cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-> >                               (i * 8);
-> >
-> > +             if (cid == CORESIGHT_CID) {
-> > +                     /* set the base to the start of the last 4k block */
-> > +                     void __iomem *csbase = tmp + size - 4096;
-> > +
-> > +                     dev->uci.devarch =
-> > +                             readl(csbase + UCI_REG_DEVARCH_OFFSET);
-> > +                     dev->uci.devtype =
-> > +                             readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
-> > +             }
-> > +
-> >               amba_put_disable_pclk(dev);
-> >
-> > -             if (cid == AMBA_CID || cid == CORESIGHT_CID)
-> > +             if (cid == AMBA_CID || cid == CORESIGHT_CID) {
-> >                       dev->periphid = pid;
-> > +                     dev->cid = cid;
-> > +             }
-> >
-> >               if (!dev->periphid)
-> >                       ret = -ENODEV;
-> > diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> > index d143c13bed26..a83a0a3dece8 100644
-> > --- a/include/linux/amba/bus.h
-> > +++ b/include/linux/amba/bus.h
-> > @@ -25,6 +25,36 @@
-> >   #define AMBA_CID    0xb105f00d
-> >   #define CORESIGHT_CID       0xb105900d
-> >
-> > +/*
-> > + * CoreSight Architecture specification updates the ID specification
-> > + * for components on the AMBA bus. (ARM IHI 0029E)
-> > + *
-> > + * Bits 11:8 of the CID are the device class.
-> > + *
-> > + * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
-> > + * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > + * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > + * at present.
-> > + * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> > + *
-> > + * Remaining CID bits stay as 0xb105-00d
-> > + */
-> > +
-> > +/*
-> > + * Class 0x9 components use additional values to form a Unique Component
-> > + * Identifier (UCI), where peripheral ID values are identical for different
-> > + * components. Passed to the amba bus code from the component driver via
-> > + * the amba_id->data pointer.
-> > + */
-> > +struct amba_cs_uci_id {
-> > +     unsigned int devarch;
-> > +     unsigned int mask;
->
-> It is worth changing the mask to reflect that it applies to the
-> "devarch" field, than being a generic mask which is unexplained.
->
-> > +     unsigned int devtype;
-> > +};
-> > +
-> > +#define UCI_REG_DEVTYPE_OFFSET       0xFCC
-> > +#define UCI_REG_DEVARCH_OFFSET       0xFBC
-> > +
-> >   struct clk;
-> >
-> >   struct amba_device {
-> > @@ -32,6 +62,8 @@ struct amba_device {
-> >       struct resource         res;
-> >       struct clk              *pclk;
-> >       unsigned int            periphid;
-> > +     unsigned int            cid;
-> > +     struct amba_cs_uci_id   uci;
-> >       unsigned int            irq[AMBA_NR_IRQS];
-> >       char                    *driver_override;
-> >   };
-> > @@ -61,6 +93,7 @@ enum amba_vendor {
-> >       (((conf) & 0xff) << 24 | ((rev) & 0xf) << 20 | \
-> >       AMBA_VENDOR_LINUX << 12 | ((part) & 0xfff))
-> >
-> > +
->
-> spurious change ?
->
-> >   extern struct bus_type amba_bustype;
-> >
-> >   #define to_amba_device(d)   container_of(d, struct amba_device, dev)
->
-> Otherwise looks good to me.
->
-> Suzuki
-
-
-
--- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Manchester Design Centre. UK
+On 11/20/2018 3:20 PM, Ulf Hansson wrote:
+> On 19 November 2018 at 20:50, Raju P L S S S N <rplsssn@codeaurora.org> wrote:
+>> Hi Ulf,
+>>
+>> Got one issue in hotplug path where of_genpd_detach_cpu calls
+>> dev_pm_qos_remove_notifier which can be sleeping as per below call stack. I
+>> think it should be applicable for current patch as well right? Please let me
+>> know what am I missing? why didn't you see this issue with this patch?
+> 
+> Weird.
+> 
+>>
+>>
+>> [ 8103.221387] BUG: sleeping function called from invalid context at
+>> /mnt/host/source/src/third_party/kernel/v4.14/kernel/locking/mutex.c:238
+> 
+> Could it be due to some other patch in your v.4.14 kernel?
+> 
+>> [ 8103.221455] in_atomic(): 1, irqs_disabled(): 128, pid: 11, name:
+>> migration/0
+>> [ 8103.221487] Preemption disabled at:
+>> [ 8103.221529] [<ffffff800814dfb0>] cpu_stopper_thread+0x98/0x118
+>> [ 8103.221600] ------------[ cut here ]------------
+>> [ 8103.221636] kernel BUG at
+>> /mnt/host/source/src/third_party/kernel/v4.14/kernel/sched/core.c:6102!
+>> [ 8103.221678] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+>> [ 8103.222396] CPU: 0 PID: 11 Comm: migration/0 Tainted: G        W  4.14.72
+>> #1
+>> [ 8103.222428] Hardware name: Google Cheza (rev1) (DT)
+>> [ 8103.222460] task: ffffffc0f842d580 task.stack: ffffff8009c18000
+>> [ 8103.222504] PC is at ___might_sleep+0x138/0x140
+>> [ 8103.222542] LR is at ___might_sleep+0x138/0x140
+>> [ 8103.222577] pc : [<ffffff80080d8f04>] lr : [<ffffff80080d8f04>] pstate:
+>> 60c001c9
+>> [ 8103.222605] sp : ffffff8009c1bb40
+>> ?.
+>> [ 8103.223924] [<ffffff80080d8f04>] ___might_sleep+0x138/0x140
+>> [ 8103.223965] [<ffffff80080d8d98>] __might_sleep+0x4c/0x80
+>> [ 8103.224009] [<ffffff80088e4258>] mutex_lock+0x28/0x60
+>> [ 8103.224054] [<ffffff800850fa2c>] dev_pm_qos_remove_notifier+0x1c/0x54
+>> [ 8103.224097] [<ffffff8008517814>] genpd_remove_device+0x3c/0x10c
+>> [ 8103.224140] [<ffffff800851949c>] genpd_dev_pm_detach+0x48/0x108
+>> [ 8103.224183] [<ffffff80085193e0>] of_genpd_detach_cpu+0x48/0xbc
+>> [ 8103.224227] [<ffffff80083edea4>] cpu_pd_dying+0x28/0x38
+>> [ 8103.224268] [<ffffff80080ab2c0>] cpuhp_invoke_callback+0x254/0x5f0
+>> [ 8103.224308] [<ffffff80080acdec>] take_cpu_down+0x60/0x9c
+>> [ 8103.224346] [<ffffff800814d898>] multi_cpu_stop+0xac/0x104
+>> [ 8103.224385] [<ffffff800814dfb8>] cpu_stopper_thread+0xa0/0x118
+>> [ 8103.224427] [<ffffff80080cff74>] smpboot_thread_fn+0x19c/0x278
+>> [ 8103.224472] [<ffffff80080cc0c4>] kthread+0x120/0x130
+>> [ 8103.224513] [<ffffff8008084608>] ret_from_fork+0x10/0x18
+> 
+> Thanks for the report, I will double check my series before I post the
+> new version of my series. If nothing unexpected shows up, that should
+> be in a couple of days from now.
+> 
+> I keep you cc.
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
