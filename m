@@ -1,11 +1,11 @@
 From: minghuan.lian@nxp.com (M.h. Lian)
-Date: Tue, 20 Nov 2018 11:00:13 +0000
-Subject: [PATCHv2 09/25] PCI: mobiveil: correct inbound/outbound window
- setup routines
-In-Reply-To: <20181120092615.11680-10-Zhiqiang.Hou@nxp.com>
+Date: Tue, 20 Nov 2018 10:59:52 +0000
+Subject: [PATCHv2 08/25] PCI: mobiveil: use the 1st inbound window for MEM
+ inbound transactions
+In-Reply-To: <20181120092615.11680-9-Zhiqiang.Hou@nxp.com>
 References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
- <20181120092615.11680-10-Zhiqiang.Hou@nxp.com>
-Message-ID: <HE1PR0401MB22353E3941A92615D95F212EE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
+ <20181120092615.11680-9-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB223585D8755A5B5DF6EBC22AE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,7 +13,7 @@ reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
 > -----Original Message-----
 > From: Z.q. Hou
-> Sent: Tuesday, November 20, 2018 5:27 PM
+> Sent: Tuesday, November 20, 2018 5:26 PM
 > To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
 > devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
 > bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
@@ -23,211 +23,37 @@ reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 > Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
 > <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
 > <zhiqiang.hou@nxp.com>
-> Subject: [PATCHv2 09/25] PCI: mobiveil: correct inbound/outbound window
-> setup routines
+> Subject: [PATCHv2 08/25] PCI: mobiveil: use the 1st inbound window for
+> MEM inbound transactions
 > 
 > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > 
-> Outbound window routine:
->  - Removed unused var definition and register read operations.
->  - Added the upper 32-bit cpu address setup of the window.
->  - Instead of blindly write, only change the fields specified.
->  - Masked the lower bits of window size in case override the
->    control bits.
->  - Check if the passing window number is available, instead of
->    the total number of the initialized windows.
+> The inbound windows have different register set with outbound windows.
+> This patch change the MEM inbound window to the first one.
 > 
-> Inbound window routine:
->  - Added parameter 'u64 cpu_addr' to specify the cpu address
->    of the window instead of using 'pci_addr'.
->  - Changed 'int pci_addr' to 'u64 pci_addr', and added setup
->    of the upper 32-bit pci address of the window.
->  - Moved the PCIe PIO master enablement to mobiveil_host_init().
->  - Instead of blindly write, only change the fields specified.
->  - Masked the lower bits of window size in case override the
->    control bits.
->  - Check if the passing window number is available, instead of
->    the total number of the initialized windows.
->  - And added the statistic of initialized inbound windows.
-> 
-> Fixes: 9af6bcb11e12 ("PCI: mobiveil: Add Mobiveil PCIe Host Bridge IP driver")
 > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
 > ---
 > V2:
->  - Inbound window setup rountine: clear the size field before set it.
+>  - no change
 > 
->  drivers/pci/controller/pcie-mobiveil.c | 70 +++++++++++++++-----------
->  1 file changed, 42 insertions(+), 28 deletions(-)
+>  drivers/pci/controller/pcie-mobiveil.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
 > diff --git a/drivers/pci/controller/pcie-mobiveil.c
 > b/drivers/pci/controller/pcie-mobiveil.c
-> index e88afc792a5c..4ba458474e42 100644
+> index df71c11b4810..e88afc792a5c 100644
 > --- a/drivers/pci/controller/pcie-mobiveil.c
 > +++ b/drivers/pci/controller/pcie-mobiveil.c
-> @@ -65,9 +65,13 @@
->  #define PAB_AXI_AMAP_CTRL(win)		PAB_REG_ADDR(0x0ba0, win)
->  #define  WIN_ENABLE_SHIFT		0
->  #define  WIN_TYPE_SHIFT			1
-> +#define  WIN_TYPE_MASK			0x3
-> +#define  WIN_SIZE_SHIFT			10
-> +#define  WIN_SIZE_MASK			0x3fffff
-> 
->  #define PAB_EXT_AXI_AMAP_SIZE(win)	PAB_EXT_REG_ADDR(0xbaf0,
-> win)
-> 
-> +#define PAB_EXT_AXI_AMAP_AXI_WIN(win)	PAB_EXT_REG_ADDR(0x80a0,
-> win)
->  #define PAB_AXI_AMAP_AXI_WIN(win)	PAB_REG_ADDR(0x0ba4, win)
->  #define  AXI_WINDOW_ALIGN_MASK		3
-> 
-> @@ -82,8 +86,10 @@
->  #define PAB_PEX_AMAP_CTRL(win)		PAB_REG_ADDR(0x4ba0, win)
->  #define  AMAP_CTRL_EN_SHIFT		0
->  #define  AMAP_CTRL_TYPE_SHIFT		1
-> +#define  AMAP_CTRL_TYPE_MASK		3
-> 
->  #define PAB_EXT_PEX_AMAP_SIZEN(win)	PAB_EXT_REG_ADDR(0xbef0,
-> win)
-> +#define PAB_EXT_PEX_AMAP_AXI_WIN(win)	PAB_EXT_REG_ADDR(0xb4a0,
-> win)
->  #define PAB_PEX_AMAP_AXI_WIN(win)	PAB_REG_ADDR(0x4ba4, win)
->  #define PAB_PEX_AMAP_PEX_WIN_L(win)	PAB_REG_ADDR(0x4ba8, win)
->  #define PAB_PEX_AMAP_PEX_WIN_H(win)	PAB_REG_ADDR(0x4bac, win)
-> @@ -455,49 +461,51 @@ static int mobiveil_pcie_parse_dt(struct
-> mobiveil_pcie *pcie)  }
-> 
->  static void program_ib_windows(struct mobiveil_pcie *pcie, int win_num,
-> -			       int pci_addr, u32 type, u64 size)
-> +			       u64 cpu_addr, u64 pci_addr, u32 type, u64 size)
->  {
-> -	int pio_ctrl_val;
-> -	int amap_ctrl_dw;
-> +	u32 value;
->  	u64 size64 = ~(size - 1);
-> 
-> -	if ((pcie->ib_wins_configured + 1) > pcie->ppio_wins) {
-> +	if (win_num >= pcie->ppio_wins) {
->  		dev_err(&pcie->pdev->dev,
->  			"ERROR: max inbound windows reached !\n");
->  		return;
->  	}
-> 
-> -	pio_ctrl_val = csr_readl(pcie, PAB_PEX_PIO_CTRL);
-> -	pio_ctrl_val |= 1 << PIO_ENABLE_SHIFT;
-> -	csr_writel(pcie, pio_ctrl_val, PAB_PEX_PIO_CTRL);
-> -
-> -	amap_ctrl_dw = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
-> -	amap_ctrl_dw |= (type << AMAP_CTRL_TYPE_SHIFT) |
-> -			(1 << AMAP_CTRL_EN_SHIFT) |
-> -			lower_32_bits(size64);
-> -	csr_writel(pcie, amap_ctrl_dw, PAB_PEX_AMAP_CTRL(win_num));
-> +	value = csr_readl(pcie, PAB_PEX_AMAP_CTRL(win_num));
-> +	value &= ~(AMAP_CTRL_TYPE_MASK << AMAP_CTRL_TYPE_SHIFT |
-> +		 WIN_SIZE_MASK << WIN_SIZE_SHIFT);
-> +	value |= (type << AMAP_CTRL_TYPE_SHIFT) | (1 <<
-> AMAP_CTRL_EN_SHIFT) |
-> +		 (lower_32_bits(size64) & WIN_SIZE_MASK <<
-> WIN_SIZE_SHIFT);
-> +	csr_writel(pcie, value, PAB_PEX_AMAP_CTRL(win_num));
-> 
->  	csr_writel(pcie, upper_32_bits(size64),
->  		   PAB_EXT_PEX_AMAP_SIZEN(win_num));
-> 
-> -	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_AXI_WIN(win_num));
-> +	csr_writel(pcie, lower_32_bits(cpu_addr),
-> +		   PAB_PEX_AMAP_AXI_WIN(win_num));
-> +	csr_writel(pcie, upper_32_bits(cpu_addr),
-> +		   PAB_EXT_PEX_AMAP_AXI_WIN(win_num));
-> +
-> +	csr_writel(pcie, lower_32_bits(pci_addr),
-> +		   PAB_PEX_AMAP_PEX_WIN_L(win_num));
-> +	csr_writel(pcie, upper_32_bits(pci_addr),
-> +		   PAB_PEX_AMAP_PEX_WIN_H(win_num));
-> 
-> -	csr_writel(pcie, pci_addr, PAB_PEX_AMAP_PEX_WIN_L(win_num));
-> -	csr_writel(pcie, 0, PAB_PEX_AMAP_PEX_WIN_H(win_num));
-> +	pcie->ib_wins_configured++;
->  }
-> 
->  /*
->   * routine to program the outbound windows
->   */
->  static void program_ob_windows(struct mobiveil_pcie *pcie, int win_num,
-> -			       u64 cpu_addr, u64 pci_addr,
-> -			       u32 config_io_bit, u64 size)
-> +			       u64 cpu_addr, u64 pci_addr, u32 type, u64 size)
->  {
-> 
-> -	u32 value, type;
-> +	u32 value;
->  	u64 size64 = ~(size - 1);
-> 
-> -	if ((pcie->ob_wins_configured + 1) > pcie->apio_wins) {
-> +	if (win_num >= pcie->apio_wins) {
->  		dev_err(&pcie->pdev->dev,
->  			"ERROR: max outbound windows reached !\n");
->  		return;
-> @@ -507,10 +515,12 @@ static void program_ob_windows(struct
-> mobiveil_pcie *pcie, int win_num,
->  	 * program Enable Bit to 1, Type Bit to (00) base 2, AXI Window Size
-> Bit
->  	 * to 4 KB in PAB_AXI_AMAP_CTRL register
->  	 */
-> -	type = config_io_bit;
->  	value = csr_readl(pcie, PAB_AXI_AMAP_CTRL(win_num));
-> -	csr_writel(pcie, 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT
-> |
-> -		   lower_32_bits(size64), PAB_AXI_AMAP_CTRL(win_num));
-> +	value &= ~(WIN_TYPE_MASK << WIN_TYPE_SHIFT |
-> +		 WIN_SIZE_MASK << WIN_SIZE_SHIFT);
-> +	value |= 1 << WIN_ENABLE_SHIFT | type << WIN_TYPE_SHIFT |
-> +		 (lower_32_bits(size64) & WIN_SIZE_MASK <<
-> WIN_SIZE_SHIFT);
-> +	csr_writel(pcie, value, PAB_AXI_AMAP_CTRL(win_num));
-> 
->  	csr_writel(pcie, upper_32_bits(size64),
-> PAB_EXT_AXI_AMAP_SIZE(win_num));
-> 
-> @@ -518,11 +528,10 @@ static void program_ob_windows(struct
-> mobiveil_pcie *pcie, int win_num,
->  	 * program AXI window base with appropriate value in
->  	 * PAB_AXI_AMAP_AXI_WIN0 register
->  	 */
-> -	value = csr_readl(pcie, PAB_AXI_AMAP_AXI_WIN(win_num));
-> -	csr_writel(pcie, cpu_addr & (~AXI_WINDOW_ALIGN_MASK),
-> +	csr_writel(pcie, lower_32_bits(cpu_addr) &
-> (~AXI_WINDOW_ALIGN_MASK),
->  		   PAB_AXI_AMAP_AXI_WIN(win_num));
-> -
-> -	value = csr_readl(pcie, PAB_AXI_AMAP_PEX_WIN_H(win_num));
-> +	csr_writel(pcie, upper_32_bits(cpu_addr),
-> +		   PAB_EXT_AXI_AMAP_AXI_WIN(win_num));
-> 
->  	csr_writel(pcie, lower_32_bits(pci_addr),
->  		   PAB_AXI_AMAP_PEX_WIN_L(win_num));
-> @@ -604,6 +613,11 @@ static int mobiveil_host_init(struct mobiveil_pcie
+> @@ -616,7 +616,7 @@ static int mobiveil_host_init(struct mobiveil_pcie
 > *pcie)
->  	value |= APIO_EN_MASK;
->  	csr_writel(pcie, value, PAB_AXI_PIO_CTRL);
-> 
-> +	/* Enable PCIe PIO master */
-> +	value = csr_readl(pcie, PAB_PEX_PIO_CTRL);
-> +	value |= 1 << PIO_ENABLE_SHIFT;
-> +	csr_writel(pcie, value, PAB_PEX_PIO_CTRL);
-> +
->  	/*
->  	 * we'll program one outbound window for config reads and
->  	 * another default inbound window for all the upstream traffic @@ -
-> 616,7 +630,7 @@ static int mobiveil_host_init(struct mobiveil_pcie *pcie)
 >  			   CFG_WINDOW_TYPE, resource_size(pcie-
 > >ob_io_res));
 > 
 >  	/* memory inbound translation window */
-> -	program_ib_windows(pcie, WIN_NUM_0, 0, MEM_WINDOW_TYPE,
+> -	program_ib_windows(pcie, WIN_NUM_1, 0, MEM_WINDOW_TYPE,
 > IB_WIN_SIZE);
-> +	program_ib_windows(pcie, WIN_NUM_0, 0, 0,
-> MEM_WINDOW_TYPE,
-> +IB_WIN_SIZE);
+> +	program_ib_windows(pcie, WIN_NUM_0, 0, MEM_WINDOW_TYPE,
+> IB_WIN_SIZE);
 > 
 >  	/* Get the I/O and memory ranges from DT */
 >  	resource_list_for_each_entry(win, &pcie->resources) {
