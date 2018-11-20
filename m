@@ -1,212 +1,73 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 20 Nov 2018 11:12:30 +0100
-Subject: [PATCH 1/3] iio: adc: stm32-adc: move self-calibration to prepare
- routine
-In-Reply-To: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-References: <1542708752-26163-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1542708752-26163-2-git-send-email-fabrice.gasnier@st.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 20 Nov 2018 10:50:22 +0100
+Subject: [PATCH v8 24/26] drivers: firmware: psci: Deal with CPU hotplug
+ when using OSI mode
+In-Reply-To: <9bf3713b-df00-03b3-d235-7549565382c7@codeaurora.org>
+References: <20180620172226.15012-1-ulf.hansson@linaro.org>
+ <20180620172226.15012-25-ulf.hansson@linaro.org>
+ <9bf3713b-df00-03b3-d235-7549565382c7@codeaurora.org>
+Message-ID: <CAPDyKFond=Q-cWsjKwGToprjPTFj=WA_-nsAoUFJdNCdkki8Rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move self-calibration routine to prepare routine.
-- This is precursor patch to ease power management handling.
-- This also allow to factorize few error cases (error handling).
+On 19 November 2018 at 20:50, Raju P L S S S N <rplsssn@codeaurora.org> wrote:
+> Hi Ulf,
+>
+> Got one issue in hotplug path where of_genpd_detach_cpu calls
+> dev_pm_qos_remove_notifier which can be sleeping as per below call stack. I
+> think it should be applicable for current patch as well right? Please let me
+> know what am I missing? why didn't you see this issue with this patch?
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc.c | 59 ++++++++++++++++++---------------------------
- 1 file changed, 24 insertions(+), 35 deletions(-)
+Weird.
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 3784118..dca8733 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -199,11 +199,13 @@ struct stm32_adc_trig_info {
-  * @calfact_s: Calibration offset for single ended channels
-  * @calfact_d: Calibration offset in differential
-  * @lincalfact: Linearity calibration factor
-+ * @calibrated: Indicates calibration status
-  */
- struct stm32_adc_calib {
- 	u32			calfact_s;
- 	u32			calfact_d;
- 	u32			lincalfact[STM32H7_LINCALFACT_NUM];
-+	bool			calibrated;
- };
- 
- /**
-@@ -251,7 +253,6 @@ struct stm32_adc_regspec {
-  * @trigs:		external trigger sources
-  * @clk_required:	clock is required
-  * @has_vregready:	vregready status flag presence
-- * @selfcalib:		optional routine for self-calibration
-  * @prepare:		optional prepare routine (power-up, enable)
-  * @start_conv:		routine to start conversions
-  * @stop_conv:		routine to stop conversions
-@@ -264,7 +265,6 @@ struct stm32_adc_cfg {
- 	struct stm32_adc_trig_info	*trigs;
- 	bool clk_required;
- 	bool has_vregready;
--	int (*selfcalib)(struct stm32_adc *);
- 	int (*prepare)(struct stm32_adc *);
- 	void (*start_conv)(struct stm32_adc *, bool dma);
- 	void (*stop_conv)(struct stm32_adc *);
-@@ -777,6 +777,7 @@ static void stm32h7_adc_disable(struct stm32_adc *adc)
- /**
-  * stm32h7_adc_read_selfcalib() - read calibration shadow regs, save result
-  * @adc: stm32 adc instance
-+ * Note: Must be called once ADC is enabled, so LINCALRDYW[1..6] are writable
-  */
- static int stm32h7_adc_read_selfcalib(struct stm32_adc *adc)
- {
-@@ -784,11 +785,6 @@ static int stm32h7_adc_read_selfcalib(struct stm32_adc *adc)
- 	int i, ret;
- 	u32 lincalrdyw_mask, val;
- 
--	/* Enable adc so LINCALRDYW1..6 bits are writable */
--	ret = stm32h7_adc_enable(adc);
--	if (ret)
--		return ret;
--
- 	/* Read linearity calibration */
- 	lincalrdyw_mask = STM32H7_LINCALRDYW6;
- 	for (i = STM32H7_LINCALFACT_NUM - 1; i >= 0; i--) {
-@@ -801,7 +797,7 @@ static int stm32h7_adc_read_selfcalib(struct stm32_adc *adc)
- 						   100, STM32_ADC_TIMEOUT_US);
- 		if (ret) {
- 			dev_err(&indio_dev->dev, "Failed to read calfact\n");
--			goto disable;
-+			return ret;
- 		}
- 
- 		val = stm32_adc_readl(adc, STM32H7_ADC_CALFACT2);
-@@ -817,11 +813,9 @@ static int stm32h7_adc_read_selfcalib(struct stm32_adc *adc)
- 	adc->cal.calfact_s >>= STM32H7_CALFACT_S_SHIFT;
- 	adc->cal.calfact_d = (val & STM32H7_CALFACT_D_MASK);
- 	adc->cal.calfact_d >>= STM32H7_CALFACT_D_SHIFT;
-+	adc->cal.calibrated = true;
- 
--disable:
--	stm32h7_adc_disable(adc);
--
--	return ret;
-+	return 0;
- }
- 
- /**
-@@ -898,9 +892,9 @@ static int stm32h7_adc_restore_selfcalib(struct stm32_adc *adc)
- #define STM32H7_ADC_CALIB_TIMEOUT_US		100000
- 
- /**
-- * stm32h7_adc_selfcalib() - Procedure to calibrate ADC (from power down)
-+ * stm32h7_adc_selfcalib() - Procedure to calibrate ADC
-  * @adc: stm32 adc instance
-- * Exit from power down, calibrate ADC, then return to power down.
-+ * Note: Must be called once ADC is out of power down.
-  */
- static int stm32h7_adc_selfcalib(struct stm32_adc *adc)
- {
-@@ -908,9 +902,8 @@ static int stm32h7_adc_selfcalib(struct stm32_adc *adc)
- 	int ret;
- 	u32 val;
- 
--	ret = stm32h7_adc_exit_pwr_down(adc);
--	if (ret)
--		return ret;
-+	if (adc->cal.calibrated)
-+		return adc->cal.calibrated;
- 
- 	/*
- 	 * Select calibration mode:
-@@ -927,7 +920,7 @@ static int stm32h7_adc_selfcalib(struct stm32_adc *adc)
- 					   STM32H7_ADC_CALIB_TIMEOUT_US);
- 	if (ret) {
- 		dev_err(&indio_dev->dev, "calibration failed\n");
--		goto pwr_dwn;
-+		goto out;
- 	}
- 
- 	/*
-@@ -944,18 +937,13 @@ static int stm32h7_adc_selfcalib(struct stm32_adc *adc)
- 					   STM32H7_ADC_CALIB_TIMEOUT_US);
- 	if (ret) {
- 		dev_err(&indio_dev->dev, "calibration failed\n");
--		goto pwr_dwn;
-+		goto out;
- 	}
- 
-+out:
- 	stm32_adc_clr_bits(adc, STM32H7_ADC_CR,
- 			   STM32H7_ADCALDIF | STM32H7_ADCALLIN);
- 
--	/* Read calibration result for future reference */
--	ret = stm32h7_adc_read_selfcalib(adc);
--
--pwr_dwn:
--	stm32h7_adc_enter_pwr_down(adc);
--
- 	return ret;
- }
- 
-@@ -972,19 +960,28 @@ static int stm32h7_adc_selfcalib(struct stm32_adc *adc)
-  */
- static int stm32h7_adc_prepare(struct stm32_adc *adc)
- {
--	int ret;
-+	int calib, ret;
- 
- 	ret = stm32h7_adc_exit_pwr_down(adc);
- 	if (ret)
- 		return ret;
- 
-+	ret = stm32h7_adc_selfcalib(adc);
-+	if (ret < 0)
-+		goto pwr_dwn;
-+	calib = ret;
-+
- 	stm32_adc_writel(adc, STM32H7_ADC_DIFSEL, adc->difsel);
- 
- 	ret = stm32h7_adc_enable(adc);
- 	if (ret)
- 		goto pwr_dwn;
- 
--	ret = stm32h7_adc_restore_selfcalib(adc);
-+	/* Either restore or read calibration result for future reference */
-+	if (calib)
-+		ret = stm32h7_adc_restore_selfcalib(adc);
-+	else
-+		ret = stm32h7_adc_read_selfcalib(adc);
- 	if (ret)
- 		goto disable;
- 
-@@ -1880,12 +1877,6 @@ static int stm32_adc_probe(struct platform_device *pdev)
- 		goto err_clk_disable;
- 	stm32_adc_set_res(adc);
- 
--	if (adc->cfg->selfcalib) {
--		ret = adc->cfg->selfcalib(adc);
--		if (ret)
--			goto err_clk_disable;
--	}
--
- 	ret = stm32_adc_chan_of_init(indio_dev);
- 	if (ret < 0)
- 		goto err_clk_disable;
-@@ -1961,7 +1952,6 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	.regs = &stm32h7_adc_regspec,
- 	.adc_info = &stm32h7_adc_info,
- 	.trigs = stm32h7_adc_trigs,
--	.selfcalib = stm32h7_adc_selfcalib,
- 	.start_conv = stm32h7_adc_start_conv,
- 	.stop_conv = stm32h7_adc_stop_conv,
- 	.prepare = stm32h7_adc_prepare,
-@@ -1974,7 +1964,6 @@ static int stm32_adc_remove(struct platform_device *pdev)
- 	.adc_info = &stm32h7_adc_info,
- 	.trigs = stm32h7_adc_trigs,
- 	.has_vregready = true,
--	.selfcalib = stm32h7_adc_selfcalib,
- 	.start_conv = stm32h7_adc_start_conv,
- 	.stop_conv = stm32h7_adc_stop_conv,
- 	.prepare = stm32h7_adc_prepare,
--- 
-1.9.1
+>
+>
+> [ 8103.221387] BUG: sleeping function called from invalid context at
+> /mnt/host/source/src/third_party/kernel/v4.14/kernel/locking/mutex.c:238
+
+Could it be due to some other patch in your v.4.14 kernel?
+
+> [ 8103.221455] in_atomic(): 1, irqs_disabled(): 128, pid: 11, name:
+> migration/0
+> [ 8103.221487] Preemption disabled at:
+> [ 8103.221529] [<ffffff800814dfb0>] cpu_stopper_thread+0x98/0x118
+> [ 8103.221600] ------------[ cut here ]------------
+> [ 8103.221636] kernel BUG at
+> /mnt/host/source/src/third_party/kernel/v4.14/kernel/sched/core.c:6102!
+> [ 8103.221678] Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+> [ 8103.222396] CPU: 0 PID: 11 Comm: migration/0 Tainted: G        W  4.14.72
+> #1
+> [ 8103.222428] Hardware name: Google Cheza (rev1) (DT)
+> [ 8103.222460] task: ffffffc0f842d580 task.stack: ffffff8009c18000
+> [ 8103.222504] PC is at ___might_sleep+0x138/0x140
+> [ 8103.222542] LR is at ___might_sleep+0x138/0x140
+> [ 8103.222577] pc : [<ffffff80080d8f04>] lr : [<ffffff80080d8f04>] pstate:
+> 60c001c9
+> [ 8103.222605] sp : ffffff8009c1bb40
+> ?.
+> [ 8103.223924] [<ffffff80080d8f04>] ___might_sleep+0x138/0x140
+> [ 8103.223965] [<ffffff80080d8d98>] __might_sleep+0x4c/0x80
+> [ 8103.224009] [<ffffff80088e4258>] mutex_lock+0x28/0x60
+> [ 8103.224054] [<ffffff800850fa2c>] dev_pm_qos_remove_notifier+0x1c/0x54
+> [ 8103.224097] [<ffffff8008517814>] genpd_remove_device+0x3c/0x10c
+> [ 8103.224140] [<ffffff800851949c>] genpd_dev_pm_detach+0x48/0x108
+> [ 8103.224183] [<ffffff80085193e0>] of_genpd_detach_cpu+0x48/0xbc
+> [ 8103.224227] [<ffffff80083edea4>] cpu_pd_dying+0x28/0x38
+> [ 8103.224268] [<ffffff80080ab2c0>] cpuhp_invoke_callback+0x254/0x5f0
+> [ 8103.224308] [<ffffff80080acdec>] take_cpu_down+0x60/0x9c
+> [ 8103.224346] [<ffffff800814d898>] multi_cpu_stop+0xac/0x104
+> [ 8103.224385] [<ffffff800814dfb8>] cpu_stopper_thread+0xa0/0x118
+> [ 8103.224427] [<ffffff80080cff74>] smpboot_thread_fn+0x19c/0x278
+> [ 8103.224472] [<ffffff80080cc0c4>] kthread+0x120/0x130
+> [ 8103.224513] [<ffffff8008084608>] ret_from_fork+0x10/0x18
+
+Thanks for the report, I will double check my series before I post the
+new version of my series. If nothing unexpected shows up, that should
+be in a couple of days from now.
+
+I keep you cc.
+
+[...]
+
+Kind regards
+Uffe
