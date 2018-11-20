@@ -1,31 +1,80 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Tue, 20 Nov 2018 11:53:43 +0200
-Subject: [PATCH 3/9] drm: replace "drm_dev_unref" function with
- "drm_dev_put"
-In-Reply-To: <1542387884.1134874.1579436592.07F916C5@webmail.messagingengine.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <20181115221634.22715-4-greenfoo@gluegarage.com>
- <1542363310.23489.22.camel@pengutronix.de>
- <1542387884.1134874.1579436592.07F916C5@webmail.messagingengine.com>
-Message-ID: <87lg5of520.fsf@intel.com>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Tue, 20 Nov 2018 10:31:53 +0000
+Subject: [PATCHv2 03/25] PCI: mobiveil: correct the returned error number
+In-Reply-To: <20181120092615.11680-4-Zhiqiang.Hou@nxp.com>
+References: <20181120092615.11680-1-Zhiqiang.Hou@nxp.com>
+ <20181120092615.11680-4-Zhiqiang.Hou@nxp.com>
+Message-ID: <HE1PR0401MB223513976E17780C1A19EFEDE8D90@HE1PR0401MB2235.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2018, Fernando <greenfoo@gluegarage.com> wrote:
-> And, related to this, what is the "good" branch to start developing
-> new drm patches? Is is "drm-next" or "linux-next"? Or does it change
-> depending on how much time until the merge window closes?
+reviewed-by: Minghuan Lian <Minghuan.Lian@nxp.com>
 
-I advise most of our developers to work on drm-tip because it contains
-the latest stuff in drm core, i915, amd, most of the small drivers, as
-well as sound. It's a bit like "linux-next for graphics". And you don't
-really have to care about the merge cycles with that.
-
-But YMMV, it probably doesn't work for everyone.
-
-BR,
-Jani.
-
-
--- 
-Jani Nikula, Intel Open Source Graphics Center
+> -----Original Message-----
+> From: Z.q. Hou
+> Sent: Tuesday, November 20, 2018 5:26 PM
+> To: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org;
+> bhelgaas at google.com; robh+dt at kernel.org; mark.rutland at arm.com;
+> l.subrahmanya at mobiveil.co.in; shawnguo at kernel.org; Leo Li
+> <leoyang.li@nxp.com>; lorenzo.pieralisi at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com
+> Cc: Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>; Xiaowei Bao <xiaowei.bao@nxp.com>; Z.q. Hou
+> <zhiqiang.hou@nxp.com>
+> Subject: [PATCHv2 03/25] PCI: mobiveil: correct the returned error number
+> 
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> This patch corrected the returned error number by convention, and removed
+> a unnecessary error check.
+> 
+> Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> ---
+> V2:
+>  - no change
+> 
+>  drivers/pci/controller/pcie-mobiveil.c | 8 +++-----
+>  1 file changed, 3 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/pci/controller/pcie-mobiveil.c
+> b/drivers/pci/controller/pcie-mobiveil.c
+> index b87471f08a40..563210e731d3 100644
+> --- a/drivers/pci/controller/pcie-mobiveil.c
+> +++ b/drivers/pci/controller/pcie-mobiveil.c
+> @@ -819,7 +819,7 @@ static int mobiveil_pcie_init_irq_domain(struct
+> mobiveil_pcie *pcie)
+> 
+>  	if (!pcie->intx_domain) {
+>  		dev_err(dev, "Failed to get a INTx IRQ domain\n");
+> -		return -ENODEV;
+> +		return -ENOMEM;
+>  	}
+> 
+>  	raw_spin_lock_init(&pcie->intx_mask_lock);
+> @@ -845,11 +845,9 @@ static int mobiveil_pcie_probe(struct
+> platform_device *pdev)
+>  	/* allocate the PCIe port */
+>  	bridge = devm_pci_alloc_host_bridge(dev, sizeof(*pcie));
+>  	if (!bridge)
+> -		return -ENODEV;
+> +		return -ENOMEM;
+> 
+>  	pcie = pci_host_bridge_priv(bridge);
+> -	if (!pcie)
+> -		return -ENOMEM;
+> 
+>  	pcie->pdev = pdev;
+> 
+> @@ -866,7 +864,7 @@ static int mobiveil_pcie_probe(struct platform_device
+> *pdev)
+>  						    &pcie->resources, &iobase);
+>  	if (ret) {
+>  		dev_err(dev, "Getting bridge resources failed\n");
+> -		return -ENOMEM;
+> +		return ret;
+>  	}
+> 
+>  	/*
+> --
+> 2.17.1
