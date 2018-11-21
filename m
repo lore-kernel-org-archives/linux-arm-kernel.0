@@ -1,263 +1,198 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 21 Nov 2018 15:20:15 +0000
-Subject: [RFC PATCH v2 15/23] KVM: arm64/sve: Add SVE support to register
- access ioctl interface
-In-Reply-To: <1538141967-15375-16-git-send-email-Dave.Martin@arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87lg5mihjk.fsf@linaro.org>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed, 21 Nov 2018 16:24:09 +0100
+Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
+In-Reply-To: <26c4ad81-f808-5a84-c725-72db8de7cd2b@arm.com>
+References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
+ <201811211656540883310@zte.com.cn>
+ <20181121110620.GC18678@e113682-lin.lund.arm.com>
+ <26c4ad81-f808-5a84-c725-72db8de7cd2b@arm.com>
+Message-ID: <20181121152409.GC17441@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 21, 2018 at 12:17:45PM +0000, Julien Thierry wrote:
+> 
+> 
+> On 21/11/18 11:06, Christoffer Dall wrote:
+> >Hi,
+> >
+> >On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
+> >>>On 19/11/2018 09:10, Mark Rutland wrote:
+> >>>>On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
+> >>>>>>On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
+> >>>>>>>>Hi,
+> >>>>>>>>>When virtual machine starts, hang up.
+> >>>>>>>>
+> >>>>>>>>I take it you mean the *guest* hangs? Because it doesn't get a timer
+> >>>>>>>>interrupt?
+> >>>>>>>>
+> >>>>>>>>>The kernel version of guest
+> >>>>>>>>>is 4.16. Host support vgic_v3.
+> >>>>>>>>
+> >>>>>>>>Your host kernel is something recent, I guess?
+> >>>>>>>>
+> >>>>>>>>>It was mainly due to the incorrect vgic_irq's(intid=27) group value
+> >>>>>>>>>during injection interruption. when kvm_vgic_vcpu_init is called,
+> >>>>>>>>>dist is not initialized at this time. Unable to get vgic V3 or V2
+> >>>>>>>>>correctly, so group is not set.
+> >>>>>>>>
+> >>>>>>>>Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
+> >>>>>>>>version?) or some other userland tool?
+> >>>>>>>>
+> >>>>>>>
+> >>>>>>>QEMU emulator version 3.0.50 .
+> >>>>>>>
+> >>>>>>>>>group is setted to 1 when vgic_mmio_write_group is invoked at some
+> >>>>>>>>>time.
+> >>>>>>>>>when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+> >>>>>>>>>interrupt injection failed.
+> >>>>>>>>>
+> >>>>>>>>>Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> >>>>>>>>>---
+> >>>>>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+> >>>>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>>>>>
+> >>>>>>>>>diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>index 9c0dd23..d101000 100644
+> >>>>>>>>>--- a/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>+++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>@@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
+> >>>>>>>>>struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
+> >>>>>>>>>(val & ICH_LR_PENDING_BIT)) irq->line_level = false;
+> >>>>>>>>>
+> >>>>>>>>>-    if (irq->group)
+> >>>>>>>>>+    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >>>>>>>>
+> >>>>>>>>This is not the right fix, not only because it basically reverts the
+> >>>>>>>>GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
+> >>>>>>>>their configured group).
+> >>>>>>>>
+> >>>>>>>>Can you try to work out why kvm_vgic_vcpu_init() is apparently called
+> >>>>>>>>before dist->vgic_model is set, also what value it has?
+> >>>>>>>>If I understand the code correctly, that shouldn't happen for a GICv3.
+> >>>>>>>>
+> >>>>>>>Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
+> >>>>>>>   If the interrupt comes at this time, the interrupt injection fails.
+> >>>>>>
+> >>>>>>Does that mean that the guest is configuring its interrupts as Group0?
+> >>>>>>That sounds wrong, Linux should configure all it's interrupts as
+> >>>>>>non-secure group1.
+> >>>>>
+> >>>>>no, I think that uefi dose this, not linux.
+> >>>>>1. kvm_vgic_vcpu_init
+> >>>>>2. vgic_create
+> >>>>>3. kvm_vgic_dist_init
+> >>>>>4.vgic_mmio_write_group: uefi as guest, write group=0
+> >>>>>5.vgic_mmio_write_group: linux as guest, write group=1
+> >>>>
+> >>>>Is this the same issue fixed by EDK2 commit:
+> >>>>
+> >>>>66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+> >>>>
+> >>>>... where EDK2 would try to use IAR0 rather than IAR1?
+> >>>>
+> >>>>The commit messages notes this lead to a boot-time hang.
+> >>>
+> >>>I managed to trigger an issue with a really old EFI implementation that
+> >>>doesn't configure its interrupts as Group1, and yet tries to ACK its
+> >>>interrupts using the Group1 accessor. Guess what? It is not going to work.
+> >>>
+> >>>Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
+> >>>to be the fix (I only assume it does, I haven't actually checked). A
+> >>>recent build, as found in Debian Buster, works perfectly (tested with
+> >>>both QEMU v2.12 and tip of tree).
+> >>>
+> >>>Now, I really don't get what you're saying about Linux not getting
+> >>>interrupts. How do you get to booting Linux if EFI is not making any
+> >>>forward progress? Are you trying them independently?
+> >>>
+> >>I start linux with bypassing uefi, the print info is the same.
+> >>[507107.748908]  vgic_mmio_write_group:## intid/27 group=0
+> >>[507107.752185]  vgic_mmio_write_group:## intid/27 group=0
+> >>[507107.899566]  vgic_mmio_write_group:## intid/27 group=1
+> >>[507107.907370]  vgic_mmio_write_group:## intid/27 group=1
+> >>the command line is like this:
+> >>/home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
+> >>
+> >>This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
+> >
+> >Could you try the following patch:
+> >
+> >diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> >index c0c0b88af1d5..6fa858c7a5a6 100644
+> >--- a/virt/kvm/arm/vgic/vgic-init.c
+> >+++ b/virt/kvm/arm/vgic/vgic-init.c
+> >@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+> >  			irq->config = VGIC_CONFIG_LEVEL;
+> >  		}
+> >-		/*
+> >-		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+> >-		 * so we always know the emulation type at this point as it's
+> >-		 * either explicitly configured as GICv3, or explicitly
+> >-		 * configured as GICv2, or not configured yet which also
+> >-		 * implies GICv2.
+> >-		 */
+> >  		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >  			irq->group = 1;
+> >  		else
+> >@@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
+> >  	if (ret)
+> >  		goto out;
+> >+	/* Initialize groups on CPUs created before the VGIC type was known */
+> >+	kvm_for_each_vcpu(i, vcpu, kvm) {
+> >+		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >+
+> >+		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+> >+			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+> >+			irq->group = 1;
+> >+		}
+> >+	}
+> >+
+> >  	if (vgic_has_its(kvm)) {
+> >  		ret = vgic_v4_init(kvm);
+> >  		if (ret)
+> >
+> >
+> 
+> If the value of dist->vgic_model is not properly initialized at the time we
+> call kvm_vgic_vcpu_init is call, won't we still overwrite the irq->group
+> when we get there?
 
-Dave Martin <Dave.Martin@arm.com> writes:
+I don't understand this question.  When we get where?
 
-> This patch adds the following registers for access via the
-> KVM_{GET,SET}_ONE_REG interface:
->
->  * KVM_REG_ARM64_SVE_ZREG(n, i) (n = 0..31) (in 2048-bit slices)
->  * KVM_REG_ARM64_SVE_PREG(n, i) (n = 0..15) (in 256-bit slices)
->  * KVM_REG_ARM64_SVE_FFR(i) (in 256-bit slices)
->
-> In order to adapt gracefully to future architectural extensions,
-> the registers are divided up into slices as noted above:  the i
-> parameter denotes the slice index.
->
-> For simplicity, bits or slices that exceed the maximum vector
-> length supported for the vcpu are ignored for KVM_SET_ONE_REG, and
-> read as zero for KVM_GET_ONE_REG.
->
-> For the current architecture, only slice i = 0 is significant.  The
-> interface design allows i to increase to up to 31 in the future if
-> required by future architectural amendments.
->
-> The registers are only visible for vcpus that have SVE enabled.
-> They are not enumerated by KVM_GET_REG_LIST on vcpus that do not
-> have SVE.  In all cases, surplus slices are not enumerated by
-> KVM_GET_REG_LIST.
->
-> Accesses to the FPSIMD registers via KVM_REG_ARM_CORE is not
-> allowed for SVE-enabled vcpus: SVE-aware userspace can use the
-> KVM_REG_ARM64_SVE_ZREG() interface instead to access the same
-> register state.  This avoids some complex and pointless emluation
-> in the kernel.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->
-> Changes since RFCv1:
->
->  * Refactored to remove emulation of FPSIMD registers with the SVE
->    register view and vice-versa.  This simplifies the code a fair bit.
->
->  * Fixed a couple of range errors.
->
->  * Inlined various trivial helpers that now have only one call site.
->
->  * Use KVM_REG_SIZE() as a symbolic way of getting SVE register slice
->    sizes.
-> ---
->  arch/arm64/include/uapi/asm/kvm.h |  10 +++
->  arch/arm64/kvm/guest.c            | 147 ++++++++++++++++++++++++++++++++++----
->  2 files changed, 145 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index 97c3478..1ff68fa 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -226,6 +226,16 @@ struct kvm_vcpu_events {
->  					 KVM_REG_ARM_FW | ((r) & 0xffff))
->  #define KVM_REG_ARM_PSCI_VERSION	KVM_REG_ARM_FW_REG(0)
->
-> +/* SVE registers */
-> +#define KVM_REG_ARM64_SVE		(0x15 << KVM_REG_ARM_COPROC_SHIFT)
-> +#define KVM_REG_ARM64_SVE_ZREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-> +					 KVM_REG_SIZE_U2048 |		\
-> +					 ((n) << 5) | (i))
-> +#define KVM_REG_ARM64_SVE_PREG(n, i)	(KVM_REG_ARM64 | KVM_REG_ARM64_SVE | \
-> +					 KVM_REG_SIZE_U256 |		\
-> +					 ((n) << 5) | (i) | 0x400)
+> (I still haven't seen why we could consider
+> dist->vgic_model is initialized at that point).
 
-What's the 0x400 for? Aren't PREG's already unique by being 256 bit vs
-the Z regs 2048 bit size?
+Because there is no enforced ordering between creating VCPUs and
+creating the VGIC.
 
-> +#define KVM_REG_ARM64_SVE_FFR(i)	KVM_REG_ARM64_SVE_PREG(16, i)
-> +
->  /* Device Control API: ARM VGIC */
->  #define KVM_DEV_ARM_VGIC_GRP_ADDR	0
->  #define KVM_DEV_ARM_VGIC_GRP_DIST_REGS	1
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 953a5c9..320db0f 100644
-<snip>
->
-> @@ -130,6 +154,107 @@ static int set_core_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	return err;
->  }
->
-> +struct kreg_region {
-> +	char *kptr;
-> +	size_t size;
-> +	size_t zeropad;
-> +};
-> +
-> +#define SVE_REG_SLICE_SHIFT	0
-> +#define SVE_REG_SLICE_BITS	5
-> +#define SVE_REG_ID_SHIFT	(SVE_REG_SLICE_SHIFT + SVE_REG_SLICE_BITS)
-> +#define SVE_REG_ID_BITS		5
-> +
-> +#define SVE_REG_SLICE_MASK \
-> +	(GENMASK(SVE_REG_SLICE_BITS - 1, 0) << SVE_REG_SLICE_SHIFT)
-> +#define SVE_REG_ID_MASK	\
-> +	(GENMASK(SVE_REG_ID_BITS - 1, 0) << SVE_REG_ID_SHIFT)
-> +
+> 
+> Shouldn't we do the irq->group initialization somewhere in
+> kvm_arch_vcpu_ioctl_vcpu_init? (with some vgic_* function to encapsulate it
+> of course). At that point I believe we know that dist->vgic_model is
+> initialized.
+> 
 
-I guess this all comes out in the wash once the constants are folded but
-GENMASK does seem to be designed for arbitrary bit positions:
+See above.  AFAICT we don't have a single point at which we can do
+everything because creation of the two components can be interleaved.
 
-  #define SVE_REG_SLICE_MASK \
-     GEN_MASK(SVE_REG_SLICE_BITS + SVE_REG_SLICE_SHIFT - 1, SVE_REG_SLICE_SHIFT)
+We could hook into kvm_vcpu_first_run_init(), but then userspace can
+observe uninitialized values if it looks at the GIC state prior to
+running the VCPUs, which is also not great.
 
-Hmm I guess that might be even harder to follow...
+In other words, I think the problem is that you can do:
 
-> +#define SVE_NUM_SLICES (1 << SVE_REG_SLICE_BITS)
-> +
-> +static int sve_reg_region(struct kreg_region *b,
-> +			  const struct kvm_vcpu *vcpu,
-> +			  const struct kvm_one_reg *reg)
-> +{
-> +	const unsigned int vl = vcpu->arch.sve_max_vl;
-> +	const unsigned int vq = sve_vq_from_vl(vl);
-> +
-> +	const unsigned int reg_num =
-> +		(reg->id & SVE_REG_ID_MASK) >> SVE_REG_ID_SHIFT;
-> +	const unsigned int slice_num =
-> +		(reg->id & SVE_REG_SLICE_MASK) >> SVE_REG_SLICE_SHIFT;
-> +
-> +	unsigned int slice_size, offset, limit;
-> +
-> +	if (reg->id >= KVM_REG_ARM64_SVE_ZREG(0, 0) &&
-> +	    reg->id <= KVM_REG_ARM64_SVE_ZREG(SVE_NUM_ZREGS - 1,
-> +					      SVE_NUM_SLICES - 1)) {
-> +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0));
-> +
-> +		/* Compute start and end of the register: */
-> +		offset = SVE_SIG_ZREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-> +		limit = offset + SVE_SIG_ZREG_SIZE(vq);
-> +
-> +		offset += slice_size * slice_num; /* start of requested slice */
-> +
-> +	} else if (reg->id >= KVM_REG_ARM64_SVE_PREG(0, 0) &&
-> +		   reg->id <= KVM_REG_ARM64_SVE_FFR(SVE_NUM_SLICES - 1)) {
-> +		/* (FFR is P16 for our purposes) */
-> +
-> +		slice_size = KVM_REG_SIZE(KVM_REG_ARM64_SVE_PREG(0, 0));
-> +
-> +		/* Compute start and end of the register: */
-> +		offset = SVE_SIG_PREG_OFFSET(vq, reg_num) - SVE_SIG_REGS_OFFSET;
-> +		limit = offset + SVE_SIG_PREG_SIZE(vq);
-> +
-> +		offset += slice_size * slice_num; /* start of requested slice */
-> +
-> +	} else {
-> +		return -ENOENT;
-> +	}
-> +
-> +	b->kptr = (char *)vcpu->arch.sve_state + offset;
-> +
-> +	/*
-> +	 * If the slice starts after the end of the reg, just pad.
-> +	 * Otherwise, copy as much as possible up to slice_size and pad
-> +	 * the remainder:
-> +	 */
-> +	b->size = offset >= limit ? 0 : min(limit - offset, slice_size);
-> +	b->zeropad = slice_size - b->size;
-> +
-> +	return 0;
-> +}
-> +
-> +static int get_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	struct kreg_region kreg;
-> +	char __user *uptr = (char __user *)reg->addr;
-> +
-> +	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
-> +		return -ENOENT;
-> +
-> +	if (copy_to_user(uptr, kreg.kptr, kreg.size) ||
-> +	    clear_user(uptr + kreg.size, kreg.zeropad))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
-> +static int set_sve_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	struct kreg_region kreg;
-> +	char __user *uptr = (char __user *)reg->addr;
-> +
-> +	if (!vcpu_has_sve(vcpu) || sve_reg_region(&kreg, vcpu, reg))
-> +		return -ENOENT;
-> +
-> +	if (copy_from_user(kreg.kptr, uptr, kreg.size))
-> +		return -EFAULT;
-> +
-> +	return 0;
-> +}
-> +
->  int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
->  {
->  	return -EINVAL;
-> @@ -251,12 +376,11 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
->  		return -EINVAL;
->
-> -	/* Register group 16 means we want a core register. */
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> -		return get_core_reg(vcpu, reg);
-> -
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-> -		return kvm_arm_get_fw_reg(vcpu, reg);
-> +	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-> +	case KVM_REG_ARM_CORE:	return get_core_reg(vcpu, reg);
-> +	case KVM_REG_ARM_FW:	return kvm_arm_get_fw_reg(vcpu, reg);
-> +	case KVM_REG_ARM64_SVE:	return get_sve_reg(vcpu, reg);
-> +	}
->
->  	if (is_timer_reg(reg->id))
->  		return get_timer_reg(vcpu, reg);
-> @@ -270,12 +394,11 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & ~KVM_REG_SIZE_MASK) >> 32 != KVM_REG_ARM64 >> 32)
->  		return -EINVAL;
->
-> -	/* Register group 16 means we set a core register. */
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
-> -		return set_core_reg(vcpu, reg);
-> -
-> -	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_FW)
-> -		return kvm_arm_set_fw_reg(vcpu, reg);
-> +	switch (reg->id & KVM_REG_ARM_COPROC_MASK) {
-> +	case KVM_REG_ARM_CORE:	return set_core_reg(vcpu, reg);
-> +	case KVM_REG_ARM_FW:	return kvm_arm_set_fw_reg(vcpu, reg);
-> +	case KVM_REG_ARM64_SVE:	return set_sve_reg(vcpu, reg);
-> +	}
->
->  	if (is_timer_reg(reg->id))
->  		return set_timer_reg(vcpu, reg);
+  create_vcpu(0);
+  create_vgic(v3);
+  create_vcpu(2);
 
-The kernel coding-style.rst seems mute on the subject of default
-handling in switch but it's probably worth having a:
+Now you'll have vcpu0 have its private IRQs set to group 0, and you'll
+have vcpu1 have its private IRQs set to group 1 (prior to my patch).
 
-  default: break; /* falls through */
 
-to be explicit.
+Am I missing something?
 
-It's out of scope for this review but I did get a bit confused as the
-KVM_REG_ARM_COPROC_SHIFT registers seems to be fairly spread out across
-the files. We have demux_c15_get/set in sys_regs but doesn't look as
-though it touches the rest of the emulation logic and we have
-kvm_arm_get/set_fw_reg which are "special" PCSI registers. I guess this
-is because COPROC_SHIFT has been used for a bunch of disparate core and
-non-core and special registers.
 
---
-Alex Benn?e
+Thanks,
+
+    Christoffer
