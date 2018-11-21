@@ -1,9 +1,9 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Nov 2018 10:35:22 +0100
-Subject: [PATCH 11/12] ARM: davinci: da830: set the GPIO base to 0
+Date: Wed, 21 Nov 2018 10:35:21 +0100
+Subject: [PATCH 10/12] ARM: davinci: dm355: set the GPIO base to 0
 In-Reply-To: <20181121093523.12503-1-brgl@bgdev.pl>
 References: <20181121093523.12503-1-brgl@bgdev.pl>
-Message-ID: <20181121093523.12503-12-brgl@bgdev.pl>
+Message-ID: <20181121093523.12503-11-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,23 +21,21 @@ Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base s
 Cc: stable at vger.kernel.org
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da830.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/dm355.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
-index 0bc5bd2665df..2cc9fe4c3a91 100644
---- a/arch/arm/mach-davinci/da830.c
-+++ b/arch/arm/mach-davinci/da830.c
-@@ -759,7 +759,9 @@ static struct davinci_id da830_ids[] = {
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 2b0f5d97ab7c..4c6e0bef4509 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -584,6 +584,8 @@ static struct resource dm355_gpio_resources[] = {
  };
  
- static struct davinci_gpio_platform_data da830_gpio_platform_data = {
--	.ngpio = 128,
+ static struct davinci_gpio_platform_data dm355_gpio_platform_data = {
 +	.no_auto_base	= true,
 +	.base		= 0,
-+	.ngpio		= 128,
+ 	.ngpio		= 104,
  };
  
- int __init da830_register_gpio(void)
 -- 
 2.19.1
