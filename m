@@ -1,61 +1,154 @@
-From: jmkrzyszt@gmail.com (Janusz Krzysztofik)
-Date: Wed, 21 Nov 2018 12:08:04 +0100
-Subject: [PATCH v4 2/4] mtd: rawnand: ams-delta: Request data port GPIO
- resource
-In-Reply-To: <20181121110806.32076-1-jmkrzyszt@gmail.com>
-References: <20180813223448.21316-1-jmkrzyszt@gmail.com>
- <20181121110806.32076-1-jmkrzyszt@gmail.com>
-Message-ID: <20181121110806.32076-3-jmkrzyszt@gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Wed, 21 Nov 2018 12:06:20 +0100
+Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
+In-Reply-To: <201811211656540883310@zte.com.cn>
+References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
+ <201811211656540883310@zte.com.cn>
+Message-ID: <20181121110620.GC18678@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Data port used by the driver is actually an OMAP MPUIO device, already
-under control of gpio-omap driver.  For that reason we used to not
-request the memory region of the port as that would fail because the
-region is already busy.  Despite that, we are still accessing the port
-by just ioremapping it and performing read/write operations.  Moreover,
-we are doing that without any proteciton from other users legally
-manipulating the port pins over GPIO API.
+Hi,
 
-The plan is to convert the driver to access the port over GPIO consumer
-API.  Before that happens, already prevent from other users accessing
-the port pins by requesting an array of its GPIO descriptors.
+On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
+> >On 19/11/2018 09:10, Mark Rutland wrote:
+> >> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
+> >>>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
+> >>>>>> Hi,
+> >>>>>>> When virtual machine starts, hang up.
+> >>>>>>
+> >>>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
+> >>>>>> interrupt?
+> >>>>>>
+> >>>>>>> The kernel version of guest
+> >>>>>>> is 4.16. Host support vgic_v3.
+> >>>>>>
+> >>>>>> Your host kernel is something recent, I guess?
+> >>>>>>
+> >>>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
+> >>>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
+> >>>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
+> >>>>>>> correctly, so group is not set.
+> >>>>>>
+> >>>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
+> >>>>>> version?) or some other userland tool?
+> >>>>>>
+> >>>>>
+> >>>>> QEMU emulator version 3.0.50 .
+> >>>>>
+> >>>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
+> >>>>>>> time.
+> >>>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+> >>>>>>> interrupt injection failed.
+> >>>>>>>
+> >>>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> >>>>>>> ---
+> >>>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+> >>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>>>
+> >>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>> index 9c0dd23..d101000 100644
+> >>>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
+> >>>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
+> >>>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
+> >>>>>>>
+> >>>>>>> -    if (irq->group)
+> >>>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >>>>>>
+> >>>>>> This is not the right fix, not only because it basically reverts the
+> >>>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
+> >>>>>> their configured group).
+> >>>>>>
+> >>>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
+> >>>>>> before dist->vgic_model is set, also what value it has?
+> >>>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
+> >>>>>>
+> >>>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
+> >>>>>   If the interrupt comes at this time, the interrupt injection fails.
+> >>>>
+> >>>> Does that mean that the guest is configuring its interrupts as Group0?
+> >>>> That sounds wrong, Linux should configure all it's interrupts as
+> >>>> non-secure group1.
+> >>>
+> >>> no, I think that uefi dose this, not linux.
+> >>> 1. kvm_vgic_vcpu_init
+> >>> 2. vgic_create
+> >>> 3. kvm_vgic_dist_init
+> >>> 4.vgic_mmio_write_group: uefi as guest, write group=0
+> >>> 5.vgic_mmio_write_group: linux as guest, write group=1
+> >>
+> >> Is this the same issue fixed by EDK2 commit:
+> >>
+> >> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+> >>
+> >> ... where EDK2 would try to use IAR0 rather than IAR1?
+> >>
+> >> The commit messages notes this lead to a boot-time hang.
+> >
+> >I managed to trigger an issue with a really old EFI implementation that
+> >doesn't configure its interrupts as Group1, and yet tries to ACK its
+> >interrupts using the Group1 accessor. Guess what? It is not going to work.
+> >
+> >Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
+> >to be the fix (I only assume it does, I haven't actually checked). A
+> >recent build, as found in Debian Buster, works perfectly (tested with
+> >both QEMU v2.12 and tip of tree).
+> >
+> >Now, I really don't get what you're saying about Linux not getting
+> >interrupts. How do you get to booting Linux if EFI is not making any
+> >forward progress? Are you trying them independently?
+> >
+> I start linux with bypassing uefi, the print info is the same.
+> [507107.748908]  vgic_mmio_write_group:## intid/27 group=0
+> [507107.752185]  vgic_mmio_write_group:## intid/27 group=0
+> [507107.899566]  vgic_mmio_write_group:## intid/27 group=1
+> [507107.907370]  vgic_mmio_write_group:## intid/27 group=1
+> the command line is like this:
+> /home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
+> 
+> This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
 
-Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
-Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/mtd/nand/raw/ams-delta.c | 11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+Could you try the following patch:
 
-diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
-index f8eb4a419e77..bb50dda05654 100644
---- a/drivers/mtd/nand/raw/ams-delta.c
-+++ b/drivers/mtd/nand/raw/ams-delta.c
-@@ -190,6 +190,7 @@ static int ams_delta_init(struct platform_device *pdev)
- 	struct mtd_info *mtd;
- 	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	void __iomem *io_base;
-+	struct gpio_descs *data_gpiods;
- 	int err = 0;
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index c0c0b88af1d5..6fa858c7a5a6 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+ 			irq->config = VGIC_CONFIG_LEVEL;
+ 		}
  
- 	if (!res)
-@@ -275,8 +276,14 @@ static int ams_delta_init(struct platform_device *pdev)
- 		goto err_unmap;
- 	}
+-		/*
+-		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+-		 * so we always know the emulation type at this point as it's
+-		 * either explicitly configured as GICv3, or explicitly
+-		 * configured as GICv2, or not configured yet which also
+-		 * implies GICv2.
+-		 */
+ 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+ 			irq->group = 1;
+ 		else
+@@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
+ 	if (ret)
+ 		goto out;
  
--	/* Initialize data port direction to a known state */
--	ams_delta_dir_input(priv, true);
-+	/* Request array of data pins, initialize them as input */
-+	data_gpiods = devm_gpiod_get_array(&pdev->dev, "data", GPIOD_IN);
-+	if (IS_ERR(data_gpiods)) {
-+		err = PTR_ERR(data_gpiods);
-+		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
-+		goto err_unmap;
++	/* Initialize groups on CPUs created before the VGIC type was known */
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++
++		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
++			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
++			irq->group = 1;
++		}
 +	}
-+	priv->data_in = true;
- 
- 	/* Initialize the NAND controller object embedded in ams_delta_nand. */
- 	priv->base.ops = &ams_delta_ops;
--- 
-2.18.1
++
+ 	if (vgic_has_its(kvm)) {
+ 		ret = vgic_v4_init(kvm);
+ 		if (ret)
+
+
+Thanks,
+
+    Christoffer
