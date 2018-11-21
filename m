@@ -1,29 +1,28 @@
-From: william.kucharski@oracle.com (William Kucharski)
-Date: Wed, 21 Nov 2018 04:19:11 -0700
-Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
-In-Reply-To: <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
-References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
- <20181116182836.GB17088@rapoport-lnx>
- <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
- <20181117143742.GB7861@bombadil.infradead.org>
- <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
-Message-ID: <833B5050-DEF6-44A0-9832-276F86671212@oracle.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 21 Nov 2018 12:25:21 +0100
+Subject: [PATCH] ARM: dts: at91: nattis: initialize the BLON pin as
+ output-low early
+In-Reply-To: <20181120212036.22497-1-peda@axentia.se>
+References: <20181120212036.22497-1-peda@axentia.se>
+Message-ID: <20181121112521.GL8367@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Could you add a line to the description explicitly stating that a failure
-to insert any page in the range will fail the entire routine, something
-like:
+On 20/11/2018 21:20:43+0000, Peter Rosin wrote:
+> The pwm-backlight driver initializes BLON (the enable gpio) to
+> output-high if the gpio is input on probe. Initializing the gpio
+> to output-low before the driver probes prevents this action by
+> the pwm-backlight driver and gets rid of a nasty blink of full
+> backlight with an uninitialized panel.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
+>  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+Applied, thanks.
 
-> * This allows drivers to insert range of kernel pages they've allocated
-> * into a user vma. This is a generic function which drivers can use
-> * rather than using their own way of mapping range of kernel pages into
-> * user vma.
-> *
-> * A failure to insert any page in the range will fail the call as a whole.
-
-It's obvious when reading the code, but it would be self-documenting to
-state it outright.
-
-Thanks!
-    -- Bill
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
