@@ -1,389 +1,159 @@
-From: sugaya.taichi@socionext.com (sugaya.taichi at socionext.com)
-Date: Wed, 21 Nov 2018 09:33:29 +0000
-Subject: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut m10v
- SoC
-In-Reply-To: <CAL_JsqJotYwwC490XmCtn_=-mrosxG3UUCy0P_SVO3d94yW6VA@mail.gmail.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-2-git-send-email-sugaya.taichi@socionext.com>
- <CAL_JsqJotYwwC490XmCtn_=-mrosxG3UUCy0P_SVO3d94yW6VA@mail.gmail.com>
-Message-ID: <37936bec442a4325bdda03a0fe2e90f8@SOC-EX02V.e01.socionext.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 21 Nov 2018 10:33:53 +0100
+Subject: [PATCH v2 4/9] phy: dphy: Add configuration helpers
+In-Reply-To: <20181119134357.743nskpkqqfkrjux@valkosipuli.retiisi.org.uk>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4d44460c4ecbd47f4cbd9141c6bf2632b6c21e1e.1541516029.git-series.maxime.ripard@bootlin.com>
+ <20181119134357.743nskpkqqfkrjux@valkosipuli.retiisi.org.uk>
+Message-ID: <20181121093353.p3gnj4ebel4h4ya4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Hi Sakari,
 
-Thank you for your comments.
+Thanks for your review.
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh+dt at kernel.org]
-> Sent: Tuesday, November 20, 2018 1:24 AM
-> To: Sugaya, Taichi
-> Cc: linux-clk; devicetree at vger.kernel.org; moderated list:ARM/FREESCALE
-> IMX / MXC ARM ARCHITECTURE; linux-kernel at vger.kernel.org; open list:SERIAL
-> DRIVERS; Michael Turquette; Stephen Boyd; Mark Rutland; Greg Kroah-Hartman;
-> Daniel Lezcano; Thomas Gleixner; Russell King; Jiri Slaby; Masami Hiramatsu;
-> Jassi Brar
-> Subject: Re: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut
-> m10v SoC
-> 
-> On Sun, Nov 18, 2018 at 7:00 PM Sugaya Taichi
-> <sugaya.taichi@socionext.com> wrote:
-> >
-> > This adds the basic M10V SoC support under arch/arm.
-> > Since all cores are activated in the custom bootloader before booting
-> > linux, it is necessary to wait for sub-cores using the trampoline area.
-> >
-> > Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> > ---
-> >  arch/arm/Kconfig                  |   2 +
-> >  arch/arm/Makefile                 |   1 +
-> >  arch/arm/mach-milbeaut/Kconfig    |  28 +++++++
-> >  arch/arm/mach-milbeaut/Makefile   |   3 +
-> >  arch/arm/mach-milbeaut/m10v_evb.c |  31 ++++++++
-> >  arch/arm/mach-milbeaut/platsmp.c  | 157
-> ++++++++++++++++++++++++++++++++++++++
-> >  6 files changed, 222 insertions(+)
-> >  create mode 100644 arch/arm/mach-milbeaut/Kconfig
-> >  create mode 100644 arch/arm/mach-milbeaut/Makefile
-> >  create mode 100644 arch/arm/mach-milbeaut/m10v_evb.c
-> >  create mode 100644 arch/arm/mach-milbeaut/platsmp.c
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 91be74d..0b8a1af 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -767,6 +767,8 @@ source "arch/arm/mach-mediatek/Kconfig"
-> >
-> >  source "arch/arm/mach-meson/Kconfig"
-> >
-> > +source "arch/arm/mach-milbeaut/Kconfig"
-> > +
-> >  source "arch/arm/mach-mmp/Kconfig"
-> >
-> >  source "arch/arm/mach-moxart/Kconfig"
-> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> > index 05a91d8..627853c 100644
-> > --- a/arch/arm/Makefile
-> > +++ b/arch/arm/Makefile
-> > @@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_MV78XX0)              +=
-> mv78xx0
-> >  machine-$(CONFIG_ARCH_MVEBU)           += mvebu
-> >  machine-$(CONFIG_ARCH_MXC)             += imx
-> >  machine-$(CONFIG_ARCH_MEDIATEK)                += mediatek
-> > +machine-$(CONFIG_ARCH_MILBEAUT)                += milbeaut
-> >  machine-$(CONFIG_ARCH_MXS)             += mxs
-> >  machine-$(CONFIG_ARCH_NETX)            += netx
-> >  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
-> > diff --git a/arch/arm/mach-milbeaut/Kconfig
-> b/arch/arm/mach-milbeaut/Kconfig
-> > new file mode 100644
-> > index 0000000..63b6f69
-> > --- /dev/null
-> > +++ b/arch/arm/mach-milbeaut/Kconfig
-> > @@ -0,0 +1,28 @@
-> > +# SPDX-License-Identifier: GPL-2.0
-> > +menuconfig ARCH_MILBEAUT
-> > +       bool "Socionext Milbeaut SoCs"
-> > +       depends on ARCH_MULTI_V7
-> > +       select ARM_GIC
-> 
-> > +       select CLKDEV_LOOKUP
-> > +       select GENERIC_CLOCKEVENTS
-> > +       select CLKSRC_MMIO
-> 
-> The clock and timer drivers' kconfig entries should select these.
-OK. move these to the correct kconfig.
-
-> 
-> > +       select ZONE_DMA
-> 
-> Why is this needed?
-Ah, it may not be needed yet. confirm it.
-
-> 
-> > +       help
-> > +               This enables support for Socionext Milbeaut SoCs
-> > +
-> > +if ARCH_MILBEAUT
-> > +
-> > +config ARCH_MILBEAUT_M10V
-> > +       bool "Milbeaut SC2000/M10V platform"
-> > +       select ARM_ARCH_TIMER
-> > +       select M10V_TIMER
-> > +       select PINCTRL
-> > +       select PINCTRL_M10V
-> > +       help
-> > +         Support for Socionext's MILBEAUT M10V based systems
-> > +
-> > +config MACH_M10V_EVB
-> > +       bool "Support for Milbeaut Evaluation boards"
-> 
-> You shouldn't need a kconfig entry for each board.
-I see. 
-
-> 
-> > +       default y
-> > +
-> > +endif
-> > diff --git a/arch/arm/mach-milbeaut/Makefile
-> b/arch/arm/mach-milbeaut/Makefile
-> > new file mode 100644
-> > index 0000000..64f6f52
-> > --- /dev/null
-> > +++ b/arch/arm/mach-milbeaut/Makefile
-> > @@ -0,0 +1,3 @@
-> > +obj-$(CONFIG_SMP) += platsmp.o
-> > +obj-$(CONFIG_MACH_M10V_EVB) += m10v_evb.o
-> > +
-> > diff --git a/arch/arm/mach-milbeaut/m10v_evb.c
-> b/arch/arm/mach-milbeaut/m10v_evb.c
-> > new file mode 100644
-> > index 0000000..a1fa7c3
-> > --- /dev/null
-> > +++ b/arch/arm/mach-milbeaut/m10v_evb.c
-> 
-> This all looks SoC specific, not board specific.
-Um that is right..
-
-> 
-> > @@ -0,0 +1,31 @@
-> > +// SPDX-License-Identifier: GPL-2.0
+On Mon, Nov 19, 2018 at 03:43:57PM +0200, Sakari Ailus wrote:
 > > +/*
-> > + * Copyright (C) 2018 Socionext Inc.
-> > + * Copyright:   (C) 2015 Linaro Ltd.
+> > + * Minimum D-PHY timings based on MIPI D-PHY specification. Derived
+> > + * from the valid ranges specified in Section 6.9, Table 14, Page 41
+> > + * of the D-PHY specification (v2.1).
+> 
+> I assume these values are compliant with the earlier spec releases.
+
+I have access to the versions 1.2 and 2.1 of the spec and as far as I
+can tell, they match here. I can't really say for other releases, but
+I wouldn't expect any changes (and it can always be adjusted later on
+if needed).
+
 > > + */
-> > +
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
+> > +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
 > 
-> Not needed.
-OK.
+> How about using the bus frequency instead of the pixel clock? Chances are
+> that the caller already has that information, instead of calculating it
+> here?
 
-> 
-> > +
-> > +#include <asm/mach/arch.h>
-> > +#include <asm/mach/map.h>
-> > +
-> > +static struct map_desc m10v_io_desc[] __initdata = {
-> > +};
-> > +
-> > +void __init m10v_map_io(void)
-> > +{
-> > +       debug_ll_io_init();
-> 
-> If you use earlycon instead, then this isn't needed.
-> 
-> > +       iotable_init(m10v_io_desc, ARRAY_SIZE(m10v_io_desc));
-> 
-> This isn't needed.
-OK.
+I went for the pixel clock since it's something that all drivers will
+have access too without any computation. The bus frequency can be
+available as well in v4l2, but won't be in DRM, and that would require
+for all drivers to duplicate that computation, which doesn't seem like
+a good choice.
 
-> 
-> > +}
+> > +				     unsigned int bpp,
+> > +				     unsigned int lanes,
+> > +				     struct phy_configure_opts_mipi_dphy *cfg)
+> > +{
+> > +	unsigned long hs_clk_rate;
+> > +	unsigned long ui;
 > > +
-> > +static const char * const m10v_compat[] = {
-> > +       "socionext,milbeaut-m10v-evb",
-> > +       NULL,
-> > +};
+> > +	if (!cfg)
+> > +		return -EINVAL;
 > > +
-> > +DT_MACHINE_START(M10V_REB, "Socionext Milbeaut")
-> > +       .dt_compat      = m10v_compat,
-> > +       .l2c_aux_mask   = 0xffffffff,
-> > +       .map_io         = m10v_map_io,
+> > +	hs_clk_rate = pixel_clock * bpp / lanes;
+> > +	ui = DIV_ROUND_UP(NSEC_PER_SEC, hs_clk_rate);
 > 
-> It looks like you can remove this entire file and use the default machine
-> desc.
-OK, try to use the default machine descriptor instead.
+> Nanoseconds may not be precise enough for practical computations on these
+> values. At 1 GHz, this ends up being precisely 1. At least Intel hardware
+> has some more precision, I presume others do, too. How about using
+> picoseconds instead?
 
-> 
-> > +MACHINE_END
-> > diff --git a/arch/arm/mach-milbeaut/platsmp.c
-> b/arch/arm/mach-milbeaut/platsmp.c
-> > new file mode 100644
-> > index 0000000..b706851
-> > --- /dev/null
-> > +++ b/arch/arm/mach-milbeaut/platsmp.c
-> > @@ -0,0 +1,157 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> > +/*
-> > + * Copyright (C) 2018 Socionext Inc.
-> > + * Copyright:  (C) 2015 Linaro Ltd.
-> > + */
-> > +
-> > +#include <linux/cpu_pm.h>
-> > +#include <linux/irqchip/arm-gic.h>
-> > +#include <linux/of_device.h>
-> 
-> Not needed.
-Okay.
+Sounds like a good idea.
 
+> > +
+> > +	cfg->clk_miss = 0;
+> > +	cfg->clk_post = 60 + 52 * ui;
+> > +	cfg->clk_pre = 8;
+> > +	cfg->clk_prepare = 38;
+> > +	cfg->clk_settle = 95;
+> > +	cfg->clk_term_en = 0;
+> > +	cfg->clk_trail = 60;
+> > +	cfg->clk_zero = 262;
+> > +	cfg->d_term_en = 0;
+> > +	cfg->eot = 0;
+> > +	cfg->hs_exit = 100;
+> > +	cfg->hs_prepare = 40 + 4 * ui;
+> > +	cfg->hs_zero = 105 + 6 * ui;
+> > +	cfg->hs_settle = 85 + 6 * ui;
+> > +	cfg->hs_skip = 40;
+> > +
+> > +	/*
+> > +	 * The MIPI D-PHY specification (Section 6.9, v1.2, Table 14, Page 40)
+> > +	 * contains this formula as:
+> > +	 *
+> > +	 *     T_HS-TRAIL = max(n * 8 * ui, 60 + n * 4 * ui)
+> > +	 *
+> > +	 * where n = 1 for forward-direction HS mode and n = 4 for reverse-
+> > +	 * direction HS mode. There's only one setting and this function does
+> > +	 * not parameterize on anything other that ui, so this code will
+> > +	 * assumes that reverse-direction HS mode is supported and uses n = 4.
+> > +	 */
+> > +	cfg->hs_trail = max(4 * 8 * ui, 60 + 4 * 4 * ui);
+> > +
+> > +	cfg->init = 100000;
+> > +	cfg->lpx = 60;
+> > +	cfg->ta_get = 5 * cfg->lpx;
+> > +	cfg->ta_go = 4 * cfg->lpx;
+> > +	cfg->ta_sure = 2 * cfg->lpx;
+> > +	cfg->wakeup = 1000000;
+> > +
+> > +	cfg->hs_clk_rate = hs_clk_rate;
 > 
-> > +#include <linux/of_address.h>
-> > +#include <linux/platform_device.h>
+> How about the LP clock?
 > 
-> Not needed.
-Okay.
+> Frankly, I have worked with MIPI CSI-2 hardware soon a decade, and the very
+> few cases where software has needed to deal with these values has been in
+> form of defaults for a receiver, mostly limiting to clk_settle,
+> clk_term_en, d_term_en as well as hs_settle. On some hardware, the data
+> lane specific values can be at least in theory configured separately on
+> different lanes (but perhaps we could ignore that now).
+> 
+> That doesn't say that it'd be useless to convey these values to the PHY
+> though. What I'm a little worried about though is what could be the effect
+> of adding support for this for existing drivers? If you have a new driver,
+> then there is no chance of regressions.
+> 
+> I can't help noticing that many of the above values end up being unused in
+> the rest of the patches in the set. I guess that's ok, they come from the
+> standard anyway and some hardware may need them to be configured.
 
-> 
-> > +#include <linux/suspend.h>
-> > +
-> > +#include <asm/cacheflush.h>
-> > +#include <asm/cp15.h>
-> > +#include <asm/idmap.h>
-> > +#include <asm/smp_plat.h>
-> > +#include <asm/suspend.h>
-> > +
-> > +#define M10V_MAX_CPU   4
-> > +
-> > +#define KERNEL_UNBOOT_FLAG     0x12345678
-> > +#define CPU_FINISH_SUSPEND_FLAG 0x56784321
-> > +
-> > +static void __iomem *trampoline;
-> > +
-> > +static int m10v_boot_secondary(unsigned int l_cpu, struct task_struct
-> *idle)
-> > +{
-> > +       unsigned int mpidr, cpu, cluster;
-> > +
-> > +       mpidr = cpu_logical_map(l_cpu);
-> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +
-> > +       if (cpu >= M10V_MAX_CPU)
-> > +               return -EINVAL;
-> > +
-> > +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
-> > +
-> > +       writel(virt_to_phys(secondary_startup), trampoline + cpu * 4);
-> > +       arch_send_wakeup_ipi_mask(cpumask_of(l_cpu));
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static void m10v_cpu_die(unsigned int l_cpu)
-> > +{
-> > +       gic_cpu_if_down(0);
-> > +
-> > +       v7_exit_coherency_flush(louis);
-> > +
-> > +       /* Now we are prepared for power-down, do it: */
-> > +       wfi();
-> > +}
-> > +
-> > +static int m10v_cpu_kill(unsigned int l_cpu)
-> > +{
-> > +       unsigned int mpidr, cpu;
-> > +
-> > +       mpidr = cpu_logical_map(l_cpu);
-> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +
-> > +       writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
-> > +
-> > +       return 1;
-> > +}
-> > +
-> > +static struct smp_operations m10v_smp_ops __initdata = {
-> > +       .smp_boot_secondary     = m10v_boot_secondary,
-> > +       .cpu_die                = m10v_cpu_die,
-> > +       .cpu_kill               = m10v_cpu_kill,
-> > +};
-> > +
-> > +static int __init m10v_smp_init(void)
-> > +{
-> > +       unsigned int mpidr, cpu, cluster;
-> > +       struct device_node *np;
-> > +
-> > +       np = of_find_compatible_node(NULL, NULL,
-> "socionext,milbeaut-m10v-evb");
-> > +       if (!np || !of_device_is_available(np))
-> 
-> Just use of_machine_is_compatible() here.
-I got it, use the function instead.
+In order to get these parameters, I went through all the MIPI-DSI and
+MIPI-CSI drivers currently in the tree that could be converted, and
+looked at which parameters they needed to exchange with their PHY.
 
-Thanks
-Sugaya Taichi
+I made a summary to Kishon in the previous iteration here:
+https://lwn.net/ml/linux-media/20180919121436.ztjnxofe66quddeq at flea/
 
-> 
-> > +               return -ENODEV;
-> > +       of_node_put(np);
-> > +
-> > +       np = of_find_compatible_node(NULL, NULL,
-> "socionext,smp-trampoline");
-> > +       if (!np)
-> > +               return -ENODEV;
-> > +
-> > +       trampoline = of_iomap(np, 0);
-> > +       if (!trampoline)
-> > +               return -ENODEV;
-> > +       of_node_put(np);
-> > +
-> > +       mpidr = read_cpuid_mpidr();
-> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
-> > +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
-> > +
-> > +       pr_info("MCPM boot on cpu_%u cluster_%u\n", cpu, cluster);
-> > +
-> > +       for (cpu = 0; cpu < M10V_MAX_CPU; cpu++)
-> > +               writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
-> > +
-> > +       smp_set_ops(&m10v_smp_ops);
-> > +
-> > +       return 0;
-> > +}
-> > +early_initcall(m10v_smp_init);
-> > +
-> > +static int m10v_pm_valid(suspend_state_t state)
-> > +{
-> > +       return (state == PM_SUSPEND_STANDBY) || (state ==
-> PM_SUSPEND_MEM);
-> > +}
-> > +
-> > +typedef void (*phys_reset_t)(unsigned long);
-> > +static phys_reset_t phys_reset;
-> > +
-> > +static int m10v_die(unsigned long arg)
-> > +{
-> > +       setup_mm_for_reboot();
-> > +       asm("wfi");
-> > +       /* Boot just like a secondary */
-> > +       phys_reset = (phys_reset_t)(unsigned
-> long)virt_to_phys(cpu_reset);
-> > +       phys_reset(virt_to_phys(cpu_resume));
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int m10v_pm_enter(suspend_state_t state)
-> > +{
-> > +       switch (state) {
-> > +       case PM_SUSPEND_STANDBY:
-> > +               pr_err("STANDBY\n");
-> > +               asm("wfi");
-> > +               break;
-> > +       case PM_SUSPEND_MEM:
-> > +               pr_err("SUSPEND\n");
-> > +               cpu_pm_enter();
-> > +               cpu_suspend(0, m10v_die);
-> > +               cpu_pm_exit();
-> > +               break;
-> > +       }
-> > +       return 0;
-> > +}
-> > +
-> > +static const struct platform_suspend_ops m10v_pm_ops = {
-> > +       .valid          = m10v_pm_valid,
-> > +       .enter          = m10v_pm_enter,
-> > +};
-> > +
-> > +struct clk *m10v_clclk_register(struct device *cpu_dev);
-> > +
-> > +static int __init m10v_pm_init(void)
-> > +{
-> > +       suspend_set_ops(&m10v_pm_ops);
-> > +
-> > +       return 0;
-> > +}
-> > +late_initcall(m10v_pm_init);
-> > --
-> > 1.9.1
-> >
+So it looks like the set of parameters on the MIPI-CSI side is indeed
+pretty limited, it really isn't for MIPI-DSI, and the whole point here
+is to support both :/
+
+> Then there's the question of where should these values originate from.
+> Some drivers appear to have a need to obtain one of these values via
+> firmware, see Documentation/devicetree/bindings/media/samsung-mipi-csis.txt
+> . I presume the defaults should be applicable to most cases, and specific
+> values would need to be defined in the firmware. That means that the
+> defaults have effectively the property of firmware API, meaning that they
+> effectively can never be changed. That suggests we should be pretty sure
+> the defaults are something that should work for the widest possible set of
+> the hardware.
+
+That function here is made to provide the spec default for those
+values. Any driver is free to change those defaults, as long as they
+remain within the spec boundaries of course. And I'd say that how the
+drivers need to get those non-default values would be driver specific,
+it shouldn't really impact the API here.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/615de588/attachment.sig>
