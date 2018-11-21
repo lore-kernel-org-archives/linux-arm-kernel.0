@@ -1,97 +1,33 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 20 Nov 2018 21:17:52 -0800
-Subject: [PATCH v8 7/7] arm64: dts: allwinner: a64: enable sound on Pinebook
+Date: Tue, 20 Nov 2018 21:17:49 -0800
+Subject: [PATCH v8 4/7] ASoC: simple-amplifier: make enable-gpio optional
 In-Reply-To: <20181121051752.18387-1-anarsoul@gmail.com>
 References: <20181121051752.18387-1-anarsoul@gmail.com>
-Message-ID: <20181121051752.18387-8-anarsoul@gmail.com>
+Message-ID: <20181121051752.18387-5-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit enables I2S, digital and analog parts of audiocodec on
-Pinebook
+Amplifier may have no enable GPIO, so make this property
+optional.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../dts/allwinner/sun50i-a64-pinebook.dts     | 53 +++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ sound/soc/codecs/simple-amplifier.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-index 77fac84797e9..cecfa7ea90b2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
-@@ -53,6 +53,12 @@
- 		};
- 	};
+diff --git a/sound/soc/codecs/simple-amplifier.c b/sound/soc/codecs/simple-amplifier.c
+index c07e8a80b4b7..351aa55c384e 100644
+--- a/sound/soc/codecs/simple-amplifier.c
++++ b/sound/soc/codecs/simple-amplifier.c
+@@ -89,7 +89,8 @@ static int simple_amp_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	platform_set_drvdata(pdev, priv);
  
-+	headphone_amp: headphone_amp {
-+		compatible = "simple-audio-amplifier";
-+		VCC-supply = <&reg_eldo1>;
-+		sound-name-prefix = "HP";
-+	};
-+
- 	reg_vcc3v3: vcc3v3 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vcc3v3";
-@@ -64,6 +70,26 @@
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
- 	};
-+
-+	speaker_amp: speaker_amp {
-+		compatible = "simple-audio-amplifier";
-+		VCC-supply = <&reg_ldo_io0>;
-+		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
-+		sound-name-prefix = "SPEAKER";
-+	};
-+
-+};
-+
-+&codec {
-+	status = "okay";
-+};
-+
-+&codec_analog {
-+	status = "okay";
-+};
-+
-+&dai {
-+	status = "okay";
- };
- 
- &ehci0 {
-@@ -267,6 +293,33 @@
- 	vcc-hdmi-supply = <&reg_dldo1>;
- };
- 
-+&sound {
-+	status = "okay";
-+	simple-audio-card,aux-devs = <&codec_analog>, <&headphone_amp>,
-+				     <&speaker_amp>;
-+	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
-+				    "Microphone", "Internal Microphone Right",
-+				    "Headphone", "Headphone Jack",
-+				    "Speaker", "Internal Speaker";
-+	simple-audio-card,routing =
-+			"Left DAC", "AIF1 Slot 0 Left",
-+			"Right DAC", "AIF1 Slot 0 Right",
-+			"SPEAKER INL", "LINEOUT",
-+			"SPEAKER INR", "LINEOUT",
-+			"Internal Speaker", "SPEAKER OUTL",
-+			"Internal Speaker", "SPEAKER OUTR",
-+			"HP INL", "HP",
-+			"HP INR", "HP",
-+			"Headphone Jack", "HP OUTL",
-+			"Headphone Jack", "HP OUTR",
-+			"AIF1 Slot 0 Left ADC", "Left ADC",
-+			"AIF1 Slot 0 Right ADC", "Right ADC",
-+			"Internal Microphone Left", "MBIAS",
-+			"MIC1", "Internal Microphone Left",
-+			"Internal Microphone Right", "HBIAS",
-+			"MIC2", "Internal Microphone Right";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+-	priv->gpiod_enable = devm_gpiod_get(dev, "enable", GPIOD_OUT_LOW);
++	priv->gpiod_enable = devm_gpiod_get_optional(dev, "enable",
++						     GPIOD_OUT_LOW);
+ 	if (IS_ERR(priv->gpiod_enable)) {
+ 		err = PTR_ERR(priv->gpiod_enable);
+ 		if (err != -EPROBE_DEFER)
 -- 
 2.19.1
