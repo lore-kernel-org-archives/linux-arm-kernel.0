@@ -1,82 +1,50 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 21 Nov 2018 15:57:04 +0000
-Subject: [RFC PATCH 2/3] coresight: etmv4: Update ID register table to add
- UCI support
-In-Reply-To: <20181120205907.GB17267@xps15>
-References: <20181115012842.2353-1-mike.leach@linaro.org>
- <20181115012842.2353-3-mike.leach@linaro.org>
- <20181120205907.GB17267@xps15>
-Message-ID: <CAJ9a7Vg_1yiVexh+wE=vw3TZNFkVrqmRjYpPnh65iQDJHZ0=cw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Nov 2018 15:58:14 +0000
+Subject: [PATCH v2 1/4] arm64: arm_pmu: remove unnecessary isb instruction
+In-Reply-To: <1542723322-42536-2-git-send-email-andrew.murray@arm.com>
+References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
+ <1542723322-42536-2-git-send-email-andrew.murray@arm.com>
+Message-ID: <20181121155814.5jvhnrtftiwzaczo@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu
-On Tue, 20 Nov 2018 at 20:59, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
->
-> On Thu, Nov 15, 2018 at 01:28:41AM +0000, Mike Leach wrote:
-> > Updates the ID register tables to contain a UCI entry for the A35 ETM
-> > device to allow correct matching of driver in the amba bus code.
-> >
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> > ---
-> >  drivers/hwtracing/coresight/coresight-etm4x.c | 26 +++++++++++++++----
-> >  1 file changed, 21 insertions(+), 5 deletions(-)
-> >
-> > diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-> > index 53e2fb6e86f6..1dcb7e14ea6b 100644
-> > --- a/drivers/hwtracing/coresight/coresight-etm4x.c
-> > +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-> > @@ -1073,12 +1073,28 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
-> >               .mask   = 0x000fffff,           \
-> >       }
-> >
-> > +static struct amba_cs_uci_id uci_id_etm4[] = {
-> > +     {
-> > +             /*  ETMv4 UCI data */
-> > +             .devarch        = 0x00004a13,
-> > +             .mask           = 0x0000ffff,
-> > +             .devtype        = 0x00000013,
-> > +     }
-> > +};
-> > +
-> > +#define ETM4x_AMBA_UCI_ID(pid)                       \
-> > +     {                                       \
-> > +             .id     = pid,                  \
-> > +             .mask   = 0x000fffff,           \
-> > +             .data   = uci_id_etm4,          \
-> > +     }
-> > +
-> >  static const struct amba_id etm4_ids[] = {
-> > -     ETM4x_AMBA_ID(0x000bb95d),              /* Cortex-A53 */
-> > -     ETM4x_AMBA_ID(0x000bb95e),              /* Cortex-A57 */
-> > -     ETM4x_AMBA_ID(0x000bb95a),              /* Cortex-A72 */
-> > -     ETM4x_AMBA_ID(0x000bb959),              /* Cortex-A73 */
-> > -     ETM4x_AMBA_ID(0x000bb9da),              /* Cortex-A35 */
-> > +     ETM4x_AMBA_ID(0x000bb95d),                      /* Cortex-A53 */
-> > +     ETM4x_AMBA_ID(0x000bb95e),                      /* Cortex-A57 */
-> > +     ETM4x_AMBA_ID(0x000bb95a),                      /* Cortex-A72 */
-> > +     ETM4x_AMBA_ID(0x000bb959),                      /* Cortex-A73 */
->
-> There is no need to add the extra tabulation for the above.
->
+On Tue, Nov 20, 2018 at 02:15:19PM +0000, Andrew Murray wrote:
+> The armv8pmu_enable_event_counter function issues an isb instruction
+> after enabling a pair of counters - this doesn't provide any value
+> and is inconsistent with the armv8pmu_disable_event_counter.
+> 
+> In any case armv8pmu_enable_event_counter is always called with the
+> PMU stopped. Starting the PMU with armv8pmu_start results in an isb
+> instruction being issued.
+> 
+> Let's remove the unnecessary isb instruction.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 
-sorry - unnecessary churn - will fix.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-Mike
+... though it would be nice to explicitly point out that the ISB in 
+armv8pmu_start() is before the write to PMCR_EL1, if you happen to
+respin this patch.
 
+Mark.
 
-> > +     ETM4x_AMBA_UCI_ID(0x000bb9da),                  /* Cortex-A35 */
-> >       {},
-> >  };
-> >
-> > --
-> > 2.19.1
-> >
-
-
-
--- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Manchester Design Centre. UK
+> ---
+>  arch/arm64/kernel/perf_event.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> index 8e38d52..de564ae 100644
+> --- a/arch/arm64/kernel/perf_event.c
+> +++ b/arch/arm64/kernel/perf_event.c
+> @@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+>  	armv8pmu_enable_counter(idx);
+>  	if (armv8pmu_event_is_chained(event))
+>  		armv8pmu_enable_counter(idx - 1);
+> -	isb();
+>  }
+>  
+>  static inline int armv8pmu_disable_counter(int idx)
+> -- 
+> 2.7.4
+> 
