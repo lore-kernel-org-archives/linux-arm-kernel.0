@@ -1,40 +1,54 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 21 Nov 2018 07:48:00 +0100
-Subject: [PATCH] tee: optee: avoid possible double list_del()
-In-Reply-To: <20181121030143.31180-1-zhizhouzhang@asrmicro.com>
-References: <20181121030143.31180-1-zhizhouzhang@asrmicro.com>
-Message-ID: <20181121064759.GA12645@jax.urgonet>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 21 Nov 2018 07:03:44 +0000
+Subject: [PATCH] ARM: dts: imx6sll-evk: add debug LED support
+Message-ID: <1542783500-19546-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhizhou,
+On i.MX6SLL EVK board, there is a debug LED controlled
+by MX6SLL_PAD_EPDC_VCOM1__GPIO2_IO04 pin, add support
+for it.
 
-On Wed, Nov 21, 2018 at 11:01:43AM +0800, Zhizhou Zhang wrote:
-> This bug occurs when:
-> 
-> - a new request arrives, one thread(let's call it A) is pending in
->   optee_supp_req() with req->busy is initial value false.
-> 
-> - tee-supplicant is killed, then optee_supp_release() is called, this
->   function calls list_del(&req->link), and set supp->ctx to NULL. And
->   it also wake up process A.
-> 
-> - process A continues, it firstly checks supp->ctx which is NULL,
->   then checks req->busy which is false, at last run list_del(&req->link).
->   This triggers double list_del() and results kernel panic.
-> 
-> For solve this problem, we rename req->busy to req->in_queue, and
-> associate it with state of whether req is linked to supp->reqs. So we
-> can just only check req->in_queue to make decision calling list_del()
-> or not.
-> 
-> Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
-> ---
->  drivers/tee/optee/supp.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sll-evk.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-Looks good. I'm picking this up.
-
-Thanks,
-Jens
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index c8e1155..9c90cbd 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -31,6 +31,18 @@
+ 		status = "okay";
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led>;
++
++		user {
++			label = "debug";
++			gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
+ 	reg_usb_otg1_vbus: regulator-otg1-vbus {
+ 		compatible = "regulator-fixed";
+ 		pinctrl-names = "default";
+@@ -455,6 +467,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_led: ledgrp {
++		fsl,pins = <
++			MX6SLL_PAD_EPDC_VCOM1__GPIO2_IO04	0x17059
++		>;
++	};
++
+ 	pinctrl_pwm1: pmw1grp {
+ 		fsl,pins = <
+ 			MX6SLL_PAD_PWM1__PWM1_OUT   0x110b0
+-- 
+2.7.4
