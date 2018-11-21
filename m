@@ -1,38 +1,31 @@
 From: Eugen.Hristev@microchip.com (Eugen.Hristev at microchip.com)
-Date: Wed, 21 Nov 2018 08:48:00 +0000
-Subject: [PATCH 2/3] dt-bindings: drm/panel: simple: add support for PDA
- 91-00156-A0
-In-Reply-To: <1542789804-4584-1-git-send-email-eugen.hristev@microchip.com>
-References: <1542789804-4584-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1542789804-4584-3-git-send-email-eugen.hristev@microchip.com>
+Date: Wed, 21 Nov 2018 08:47:54 +0000
+Subject: [PATCH 0/3] drm: Add panel support for PDA 91-00156-A0
+Message-ID: <1542789804-4584-1-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cristian Birsan <cristian.birsan@microchip.com>
+Hello,
 
-PDA 91-00156-A0 5.0 is a 5.0" WVGA TFT LCD panel.
-This panel with backlight is found in PDA 5" LCD screen (TM5000 series or
-AC320005-5).
-Adding Device Tree bindings for this panel.
+This patch series adds support for PDA (Precision Design Associates, Inc.)
+vendor, and for the PDA 91-00156-A0 simple panel, together with the bindings.
 
-Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
----
- .../devicetree/bindings/display/panel/pda,91-00156-a0.txt          | 7 +++++++
- 1 file changed, 7 insertions(+)
+The series is on top of http://anongit.freedesktop.org/git/drm/drm.git drm-next
+branch.
+
+Cristian Birsan (1):
+  dt-bindings: drm/panel: simple: add support for PDA 91-00156-A0
+
+Eugen Hristev (2):
+  dt-bindings: add vendor prefix for PDA Precision Design Associates,
+    Inc.
+  drm/panel: simple: add support for PDA 91-00156-A0 panel
+
+ .../bindings/display/panel/pda,91-00156-a0.txt     |  7 ++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ drivers/gpu/drm/panel/panel-simple.c               | 27 ++++++++++++++++++++++
+ 3 files changed, 35 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
 
-diff --git a/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt b/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
-new file mode 100644
-index 0000000..52f0da9
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/pda,91-00156-a0.txt
-@@ -0,0 +1,7 @@
-+PDA 91-00156-A0 5.0" WVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "pda,91-00156-a0"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
 -- 
 2.7.4
