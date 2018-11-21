@@ -1,28 +1,43 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 21 Nov 2018 16:00:49 +0000
-Subject: [PATCH v2 0/2] SWIOTLB fixes for 4.20
-Message-ID: <cover.1542812807.git.robin.murphy@arm.com>
+Date: Wed, 21 Nov 2018 16:00:51 +0000
+Subject: [PATCH v2 2/2] swiotlb: Skip cache maintenance on map error
+In-Reply-To: <cover.1542812807.git.robin.murphy@arm.com>
+References: <cover.1542812807.git.robin.murphy@arm.com>
+Message-ID: <cc6d91acc357235cbd6e0e134382c58caa188801.1542812807.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's a quick v2 addressing Christoph's nits and collecting the tags
-given so far. I've reproduced my USB problem with a commit prior to the
-dma-mapping pull, so it looks like the cache maintenance changes are off
-the hook for that one (and I'll have to venture into USB/UAS territory).
+If swiotlb_bounce_page() failed, calling arch_sync_dma_for_device() may
+lead to such delights as performing cache maintenance on whatever
+address phys_to_virt(SWIOTLB_MAP_ERROR) looks like, which is typically
+outside the kernel memory map and goes about as well as expected.
 
-No objection from me if Konrad wants to pick this up instead depending
-on timing.
+Don't do that.
 
-Robin.
+Fixes: a4a4330db46a ("swiotlb: add support for non-coherent DMA")
+Tested-by: John Stultz <john.stultz@linaro.org>
+Reviewed-by: Christoph Hellwig <hch@lst.de>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
+v2: Collect tags
 
-Robin Murphy (2):
-  dma-direct: Make DIRECT_MAPPING_ERROR viable for SWIOTLB
-  swiotlb: Skip cache maintenance on map error
+ kernel/dma/swiotlb.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- include/linux/dma-direct.h | 2 +-
- kernel/dma/swiotlb.c       | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
+diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+index 5731daa09a32..045930e32c0e 100644
+--- a/kernel/dma/swiotlb.c
++++ b/kernel/dma/swiotlb.c
+@@ -679,7 +679,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+ 	}
+ 
+ 	if (!dev_is_dma_coherent(dev) &&
+-	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
++	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0 &&
++	    dev_addr != DIRECT_MAPPING_ERROR)
+ 		arch_sync_dma_for_device(dev, phys, size, dir);
+ 
+ 	return dev_addr;
 -- 
 2.19.1.dirty
