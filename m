@@ -1,85 +1,42 @@
-From: Jan.Glauber@cavium.com (Jan Glauber)
-Date: Wed, 21 Nov 2018 09:56:54 +0000
-Subject: [RFT PATCH] efi: map memreserve table before first use
-In-Reply-To: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
-References: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181121095648.GA11514@hc>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 21 Nov 2018 10:59:41 +0100
+Subject: odroid hc2?
+In-Reply-To: <d2fc632f-e0bb-6d0a-35f6-64fcb16c354e@mbox200.swipnet.se>
+References: <CGME20181121091230epcas2p4b08f553cc2e160980a26b1c8a47c5cbc@epcas2p4.samsung.com>
+ <d2fc632f-e0bb-6d0a-35f6-64fcb16c354e@mbox200.swipnet.se>
+Message-ID: <f7d9845c-6970-ac5b-6c24-f5c6298425f7@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 06:35:42PM +0100, Ard Biesheuvel wrote:
-> Mapping the MEMRESERVE EFI configuration table from an early initcall
-> is too late: the GICv3 ITS code that creates persistent reservations
-> for the boot CPU's LPI tables is invoked from init_IRQ(), which runs
-> much earlier than the handling of the initcalls.
-> 
-> So instead, move the initialization performed by the initcall into
-> efi_mem_reserve_persistent() itself.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/efi.c | 26 ++++++++++----------------
->  1 file changed, 10 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index fad7c62cfc0e..40de2f6734cc 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -967,15 +967,23 @@ bool efi_is_table_address(unsigned long phys_addr)
->  }
-> 
->  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
-> -static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
-> +static struct linux_efi_memreserve *efi_memreserve_root;
-> 
->  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->  {
->         struct linux_efi_memreserve *rsv;
-> 
-> -       if (!efi_memreserve_root)
-> +       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
->                 return -ENODEV;
-> 
-> +       if (!efi_memreserve_root) {
-> +               efi_memreserve_root = memremap(efi.mem_reserve,
-> +                                              sizeof(*efi_memreserve_root),
-> +                                              MEMREMAP_WB);
-> +               if (WARN_ON_ONCE(!efi_memreserve_root))
-> +                       return -ENOMEM;
-> +       }
-> +
->         rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
->         if (!rsv)
->                 return -ENOMEM;
-> @@ -991,20 +999,6 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->         return 0;
->  }
-> 
-> -static int __init efi_memreserve_root_init(void)
-> -{
-> -       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
-> -               return -ENODEV;
-> -
-> -       efi_memreserve_root = memremap(efi.mem_reserve,
-> -                                      sizeof(*efi_memreserve_root),
-> -                                      MEMREMAP_WB);
-> -       if (!efi_memreserve_root)
-> -               return -ENOMEM;
-> -       return 0;
-> -}
-> -early_initcall(efi_memreserve_root_init);
-> -
->  #ifdef CONFIG_KEXEC
->  static int update_efi_random_seed(struct notifier_block *nb,
->                                   unsigned long code, void *unused)
-> --
-> 2.17.1
+Hi Torbjorn,
 
-Hi Ard,
+On 2018-11-21 10:06, Torbjorn Jansson wrote:
+> Hello.
+>
+> a question for the experts and a small wish/request.
+> is it possible to get the odroid hc2 up to same level of support in
+> the kernel as hc1?
+> my understanding is that they are basically the same thing but hc1
+> uses a 2.5 inch disk and hc2 uses 3.5 inch discs.
+>
+> there is two parts to this i believe.
+> i'm using fedora 29 to test this and the first part is that uboot (i
+> think) doesn't recognize the hc2 properly so it tries to load the dtb
+> file exynos5422-odroidunknown.dtb
+> i can work around this by creating a symlink from
+> exynos5422-odroidhc1.dtb and get it to boot.
+>
+> second part is ofcourse that there is no dtb file for hc2 so even if
+> uboot did pickup the right file it wound not exist.
+>
+> using the hc1 dtb file with my hc2 appears to work fine.
 
-thanks for the patch, it works fine for me.
+>From Linux kernel perspective Odroid HC2 doesn't differ from HC1, so it
+simply should use HC1 dtb. Recently there have been u-boot patch for
+adding HC2 detection, which also fixes 'unknown' dtb issue on HC2:
+https://lists.denx.de/pipermail/u-boot/2018-October/345365.html
 
-If you want:
-Tested-by: Jan Glauber <jglauber@cavium.com>
-
---Jan
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
