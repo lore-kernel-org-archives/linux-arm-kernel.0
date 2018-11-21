@@ -1,416 +1,294 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 21 Nov 2018 14:41:40 +0000
-Subject: [PATCH] arm64: lib: accelerate do_csum() with NEON instruction
-In-Reply-To: <1542792065-98282-1-git-send-email-huanglingyan2@huawei.com>
-References: <1542792065-98282-1-git-send-email-huanglingyan2@huawei.com>
-Message-ID: <01fe3a6d-0991-eeb0-378e-7a1caaa87680@arm.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Wed, 21 Nov 2018 15:53:35 +0100
+Subject: [PATCH v4 3/4] mtd: rawnand: ams-delta: Use GPIO API for data I/O
+In-Reply-To: <20181121110806.32076-4-jmkrzyszt@gmail.com>
+References: <20180813223448.21316-1-jmkrzyszt@gmail.com>
+ <20181121110806.32076-1-jmkrzyszt@gmail.com>
+ <20181121110806.32076-4-jmkrzyszt@gmail.com>
+Message-ID: <20181121155335.7375f827@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/2018 09:21, huanglingyan wrote:
-> From: Lingyan Huang <huanglingyan2@huawei.com>
+On Wed, 21 Nov 2018 12:08:05 +0100
+Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+
+> Don't readw()/writew() data directly from/to GPIO port which is under
+> control of gpio-omap driver, use GPIO consumer API instead.
 > 
-> Function do_csum() in lib/checksum.c is used to compute checksum,
-> which is turned out to be slowly and costs a lot of resources.
+> The driver should now work with any 8-bit bidirectional GPIO port, not
+> only OMAP.
+> 
+> Signed-off-by: Janusz Krzysztofik <jmkrzyszt@gmail.com>
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Can you say how slow exactly it is? I had been meaning to come back and 
-take a look at do_csum() since I did a rough perf profile on a little 
-Cortex-A53 box with ethernet checksum offloading disabled, but I've not 
-found the time for a proper analysis yet.
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
 
-> Let's use neon instructions to accelerate the checksum computation
-> for arm64.
+And thanks a lot for keeping up with that. I like the new ams-delta
+driver, and I wonder if we couldn't extend it to replace the gpio-nand
+driver.
 
-How much improvement have you measured with this change? Ideally for a 
-range of different-sized workloads on more than one microarchitecture - 
-some CPUs have weaker SIMD pipelines than others, so any possible 
-benefit is still going to have some variance overall.
-
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Lingyan Huang <huanglingyan2@huawei.com>
 > ---
->   arch/arm64/include/asm/checksum.h |   8 ++
->   arch/arm64/lib/Makefile           |   3 +
->   arch/arm64/lib/checksum.c         |  30 +++++++
->   arch/arm64/lib/do_csum.S          | 182 ++++++++++++++++++++++++++++++++++++++
->   lib/checksum.c                    |   6 +-
->   5 files changed, 226 insertions(+), 3 deletions(-)
->   create mode 100644 arch/arm64/lib/checksum.c
->   create mode 100644 arch/arm64/lib/do_csum.S
+>  drivers/mtd/nand/raw/ams-delta.c | 109 +++++++++++++++++--------------
+>  1 file changed, 61 insertions(+), 48 deletions(-)
 > 
-> diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-> index 0b6f5a7..9faf642 100644
-> --- a/arch/arm64/include/asm/checksum.h
-> +++ b/arch/arm64/include/asm/checksum.h
-> @@ -24,8 +24,16 @@ static inline __sum16 csum_fold(__wsum csum)
->   	sum += (sum >> 16) | (sum << 16);
->   	return ~(__force __sum16)(sum >> 16);
->   }
-> +
-
-Please clean up unnecessary noise like this from your patches before 
-posting.
-
->   #define csum_fold csum_fold
->   
-> +#ifdef CONFIG_KERNEL_MODE_NEON
-> +extern unsigned int do_csum_generic(const unsigned char *buff, int len);
-> +unsigned int do_csum_neon(const unsigned char *buff, unsigned int len);
-> +unsigned int do_csum(const unsigned char *buff, unsigned int len);
-> +#define do_csum do_csum
-> +#endif
-> +
->   static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
->   {
->   	__uint128_t tmp;
-> diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-> index 69ff988..9596fd8 100644
-> --- a/arch/arm64/lib/Makefile
-> +++ b/arch/arm64/lib/Makefile
-> @@ -5,6 +5,9 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
->   		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
->   		   strchr.o strrchr.o tishift.o
->   
-> +# If NEON mode is supported, compile this file to speed up do_csum.
-> +lib-$(CONFIG_KERNEL_MODE_NEON) += do_csum.o checksum.o
-> +
->   # Tell the compiler to treat all general purpose registers (with the
->   # exception of the IP registers, which are already handled by the caller
->   # in case of a PLT) as callee-saved, which allows for efficient runtime
-> diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
-> new file mode 100644
-> index 0000000..61dee8b
-> --- /dev/null
-> +++ b/arch/arm64/lib/checksum.c
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Generic C or neon implementation of do_csum operations.
-> + * Choose faster neon instructions when NEON is supported.
-> + *
-> + * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
-> + * Written by Lingyan Huang (huanglingyan2 at huawei.com)
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public Licence
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the Licence, or (at your option) any later version.
-> + */
-> +
-> +#include <asm/neon.h>
-> +#include <asm/simd.h>
-> +#include <asm/checksum.h>
-> +#include <asm/byteorder.h>
-> +
-> +unsigned int do_csum(const unsigned char *buff, unsigned int len)
+> diff --git a/drivers/mtd/nand/raw/ams-delta.c b/drivers/mtd/nand/raw/ams-delta.c
+> index bb50dda05654..8312182088c1 100644
+> --- a/drivers/mtd/nand/raw/ams-delta.c
+> +++ b/drivers/mtd/nand/raw/ams-delta.c
+> @@ -18,11 +18,10 @@
+>  #include <linux/module.h>
+>  #include <linux/delay.h>
+>  #include <linux/gpio/consumer.h>
+> -#include <linux/io.h>
+>  #include <linux/mtd/mtd.h>
+>  #include <linux/mtd/rawnand.h>
+>  #include <linux/mtd/partitions.h>
+> -#include <linux/platform_data/gpio-omap.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/sizes.h>
+>  
+>  /*
+> @@ -38,7 +37,7 @@ struct ams_delta_nand {
+>  	struct gpio_desc	*gpiod_nwe;
+>  	struct gpio_desc	*gpiod_ale;
+>  	struct gpio_desc	*gpiod_cle;
+> -	void __iomem		*io_base;
+> +	struct gpio_descs	*data_gpiods;
+>  	bool			data_in;
+>  };
+>  
+> @@ -67,42 +66,78 @@ static const struct mtd_partition partition_info[] = {
+>  	  .size		=  3 * SZ_256K },
+>  };
+>  
+> -static void ams_delta_io_write(struct ams_delta_nand *priv, u8 byte)
+> +static void ams_delta_write_commit(struct ams_delta_nand *priv)
+>  {
+> -	writew(byte, priv->io_base + OMAP_MPUIO_OUTPUT);
+>  	gpiod_set_value(priv->gpiod_nwe, 0);
+>  	ndelay(40);
+>  	gpiod_set_value(priv->gpiod_nwe, 1);
+>  }
+>  
+> +static void ams_delta_io_write(struct ams_delta_nand *priv, u8 byte)
 > +{
-> +	if (may_use_simd()) {
-
-There's a significant overhead involved with kernel_neon_{begin,end} 
-which means that for sufficiently small values of len, taking this path 
-will almost certainly be slower than even the dumb generic C 
-implementation. For starters, with len<32 your code doesn't even use 
-SIMD anyway, so it's just pure waste.
-
-> +		unsigned int res;
+> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
+> +	DECLARE_BITMAP(values, BITS_PER_TYPE(byte)) = { byte, };
 > +
-> +		kernel_neon_begin();
-
-Also note that you've got preemption disabled the whole time in here - I 
-don't know off-hand how large a single buffer might possibly be 
-checksummed in a single call, but the potential latency there is a 
-problem until proven otherwise, especially for RT.
-
-> +		res = do_csum_neon(buff, len);
-> +		kernel_neon_end();
-> +		return res;
-> +	} else
-> +		return do_csum_generic(buff, len);
+> +	gpiod_set_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
+> +				  data_gpiods->info, values);
+> +
+> +	ams_delta_write_commit(priv);
 > +}
-> diff --git a/arch/arm64/lib/do_csum.S b/arch/arm64/lib/do_csum.S
-> new file mode 100644
-> index 0000000..820302c
-> --- /dev/null
-> +++ b/arch/arm64/lib/do_csum.S
-> @@ -0,0 +1,182 @@
-> +/*
-> + * Copyright (C) 2018 Huawei Inc.
-> + *
-> + * Optmized version of the standard do_csum() function
-> + *
-> + * Parameters:
-> + *	x0 - address of buffer to checksum (const unsigned char *)
-> + *	x1 - length of the buffer (int)
-> + * Returns:
-> + *	x0 - the return checksum of the buffer
-> + */
 > +
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +ENTRY(do_csum_neon)
-> +	ldr	x13, =0xffff
-> +	eor	x4, x4, x4
-> +	eor	x5, x5, x5
-> +	eor	v0.16b, v0.16b, v0.16b // clear v0,x4,x5
+> +static void ams_delta_dir_output(struct ams_delta_nand *priv, u8 byte)
+> +{
+> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
+> +	DECLARE_BITMAP(values, BITS_PER_TYPE(byte)) = { byte, };
+> +	int i;
 > +
-> +	/*
-> +	 * len is zero or negative
-> +	 */
-> +	and	x6, x1, #0x80000000
-> +	cmp	x6, #0
-> +	b.gt	out
-> +	cbz	w1, out
-
-Um... how is that more optimal than
-
-	cmp	x1, #0
-	b.le	out
-?
-
+> +	for (i = 0; i < data_gpiods->ndescs; i++)
+> +		gpiod_direction_output_raw(data_gpiods->desc[i],
+> +					   test_bit(i, values));
 > +
-> +	tst	x0, #1
-> +	b.eq	addr_not_odd
+> +	ams_delta_write_commit(priv);
 > +
-> +	/*
-> +	 * addr is odd
-> +	 */
-> +	mov	x4, #1
-> +	ldr	x6, [x0], #1
-> +#ifdef __AARCH64EB__
-> +	and     x6, x6, #0xff
-> +#else
-> +	lsl   x6, x6, #8
-> +	and   x6, x6, x13
-> +#endif
-
-Did you just manage to open-code an ldrb instruction? :/
-
-AFAICS the aim here is to load a byte, and shift it left if 
-little-endian - there's no way that needs 4 instructions.
-
-> +	add     x5, x5, x6
-> +	sub     x1, x1, #1
+> +	priv->data_in = false;
+> +}
 > +
-> +addr_not_odd:
-> +	cmp	x1, #32
-> +	b.lt	len_4
-> +	cmp	x1, #128
-> +	b.ge	len_gt_128
-> +	b	do_loop_16
+>  static u8 ams_delta_io_read(struct ams_delta_nand *priv)
+>  {
+>  	u8 res;
+> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
+> +	DECLARE_BITMAP(values, BITS_PER_TYPE(res)) = { 0, };
+>  
+>  	gpiod_set_value(priv->gpiod_nre, 0);
+>  	ndelay(40);
+> -	res = readw(priv->io_base + OMAP_MPUIO_INPUT_LATCH);
 > +
-
-Surely you want to align the source pointer to more than just even/odd 
-given that the subsequent loops load in chunks much larger than 2 bytes?
-
-Also, are you actually tuning this for typical static branch prediction 
-on the assumption that len<128 is the likely case (which would really 
-warrant a comment), or is this just an unnecessarily long-winded way of 
-saying:
-
-	cmp	x1, #128
-	b.lt	do_loop_16
-
-?
-
-> +len_gt_128:
-> +    movi v0.4s, #0
-
-We already zeroed v0 earlier (and frankly if we'd done it this way it 
-wouldn't have needed a comment there either).
-
-> +    movi v1.4s, #0
-> +    movi v2.4s, #0
-> +    movi v3.4s, #0
+> +	gpiod_get_raw_array_value(data_gpiods->ndescs, data_gpiods->desc,
+> +				  data_gpiods->info, values);
 > +
-> +do_loop_64:
+>  	gpiod_set_value(priv->gpiod_nre, 1);
+>  
+> +	res = values[0];
+>  	return res;
+>  }
+>  
+> -static void ams_delta_dir_input(struct ams_delta_nand *priv, bool in)
+> +static void ams_delta_dir_input(struct ams_delta_nand *priv)
+>  {
+> -	writew(in ? ~0 : 0, priv->io_base + OMAP_MPUIO_IO_CNTL);
+> -	priv->data_in = in;
+> +	struct gpio_descs *data_gpiods = priv->data_gpiods;
+> +	int i;
 > +
-> +	ldp	q5, q4, [x0], #32
-> +	ldp	q7, q6, [x0], #32
-
-Using post-index writeback is liable to cause an unnecessary register 
-dependency stall between these two loads in at least some cases.
-
+> +	for (i = 0; i < data_gpiods->ndescs; i++)
+> +		gpiod_direction_input(data_gpiods->desc[i]);
 > +
-> +    uadalp v0.4s, v4.8h
-> +    uadalp v1.4s, v5.8h
-> +    uadalp v2.4s, v6.8h
-> +    uadalp v3.4s, v7.8h
-
-What if we're checksumming a buffer larger than 4MB and lose the 
-carry-out when one or more of these accumulations overflow?
-
-> +
-> +	sub	x1, x1, #64
-> +	cmp	x1, #64
-> +	b.ge	do_loop_64
-> +
-> +	add	v0.4s, v0.4s, v1.4s
-> +	add	v2.4s, v2.4s, v3.4s
-> +	add	v0.4s, v0.4s, v2.4s
-> +
-> +	cmp	x1, #16
-> +	b.lt	get_64
-> +
-> +
-> +do_loop_16:
-> +	ldr	q6, [x0], #16
-> +
-> +	uaddl	v24.4s, v0.4h, v6.4h
-> +	uaddl2	v25.4s, v0.8h, v6.8h
-> +	add	v0.4s, v24.4s, v25.4s
-> +
-> +
-> +	sub	x1, x1, #16
-> +	cmp	x1, #16
-> +	b.ge	do_loop_16
-> +
-> +get_64:
-> +	mov	x6, v0.d[0]
-> +	add	x5, x5, x6
-> +	mov	x6, v0.d[1]
-> +
-> +	add	x5, x5, x6
-
-Is that really more efficient than an addp (or addh) and extracting a 
-single element?
-
-> +	cmp	x5, x6
-> +	b.ge	len_4
-> +	add	x5, x5, #1
-
-Is this... manual carry logic without using adds/adc? :/
-
-> +
-> +len_4:
-> +	cmp	x1, #4
-> +	b.lt	len_2
-> +
-> +	sub	x1, x1, #4
-> +	ldr	w6, [x0], #4
-> +	and	x6, x6, #0xffffffff
-
-What's that and for?
-
-> +	add	x5, x5, x6
-> +	b	len_4
-> +
-> +len_2:
-> +	cmp	x1, #2
-> +	b.lt	len_1
-> +	sub	x1, x1, #2
-> +	ldrh	w6, [x0], #2
-> +	and	x6, x6, x13
-> +	add	x5, x5, x6
-> +
-> +len_1:
-> +	cmp	x1, #1
-> +	b.lt	fold_32
-> +	ldr	x6, [x0], #1
-> +#ifdef __AARCH64EB__
-> +	lsl	x6, x6, #8
-> +	and	x6, x6, x13
-> +#else
-> +	and	x6, x6, #0xff
-> +#endif
-> +	add	x5, x5, x6
-> +
-> +fold_32:
-> +	and	x9, x5, x13		/* [15:0] */
-> +	and	x10, x13, x5, lsr #16	/* [31:16] */
-> +	and	x11, x13, x5, lsr #32	/* [47:32] */
-> +	and	x12, x13, x5, lsr #48	/* [47:32] */
-> +
-> +	add	x9, x9, x10
-> +	add	x11, x11, x12
-> +
-> +	add	x9, x9, x11
-> +
-> +	and	x10, x9, x13
-> +	and	x11, x13, x9, lsr #16
-> +
-> +	add	x5, x10, x11
-> +
-> +	and     x9, x5, x13             /* add carry */
-> +	and     x10, x13, x5, lsr #16
-> +	add	x5, x9, x10
-> +
-> +	cbz	x4, out			/* addr isn't odd */
-> +
-> +	lsr	x6, x5, #8
-> +	and	x6, x6, #0xff
-> +	and	x7, x5, #0xff
-> +	lsl	x7, x7, #8
-> +
-> +	orr	x5, x6, x7
-
-I know folding a 32-bit partial sum to 16 bits needs at most 3 
-instructions (ror/add/lsr), and I can't imagine the additional odd-byte 
-correction can need more than about 4 on top of that. As it stands, 
-there's more code in this "optimised" fold alone than in the entire 
-ip_fast_csum() routine.
-
-> +
-> +out:
-> +	mov	x0, x5
-> +
-> +	/*
-> +	 * pop neon register from stack
-> +	 */
-> +/*	ldp	q24, q25, [sp], #0x20
-> +	ldp	q22, q23, [sp], #0x20
-> +	ldp	q20, q21, [sp], #0x20
-> +	ldp	q18, q19, [sp], #0x20
-> +	ldp	q16, q17, [sp], #0x20
-> +	ldp	q14, q15, [sp], #0x20
-> +	ldp	q12, q13, [sp], #0x20
-> +	ldp	q10, q11, [sp], #0x20
-> +	ldp	q8, q9, [sp], #0x20
-> +	ldp	q6, q7, [sp], #0x20
-> +	ldp	q4, q5, [sp], #0x20
-> +	ldp	q2, q3, [sp], #0x20
-> +	ldp	q0, q1, [sp], #0x20
-> +*/
-
-Why's this here?
-
-> +	ret
-> diff --git a/lib/checksum.c b/lib/checksum.c
-> index d3ec93f..422949c 100644
-> --- a/lib/checksum.c
-> +++ b/lib/checksum.c
-> @@ -34,10 +34,8 @@
->   
->   #include <linux/export.h>
->   #include <net/checksum.h>
+> +	priv->data_in = true;
+>  }
+>  
+>  static void ams_delta_write_buf(struct ams_delta_nand *priv, const u8 *buf,
+>  				int len)
+>  {
+> -	int i;
+> +	int i = 0;
+>  
+> -	if (priv->data_in)
+> -		ams_delta_dir_input(priv, false);
+> +	if (len > 0 && priv->data_in)
+> +		ams_delta_dir_output(priv, buf[i++]);
+>  
+> -	for (i = 0; i < len; i++)
+> -		ams_delta_io_write(priv, buf[i]);
+> +	while (i < len)
+> +		ams_delta_io_write(priv, buf[i++]);
+>  }
+>  
+>  static void ams_delta_read_buf(struct ams_delta_nand *priv, u8 *buf, int len)
+> @@ -110,7 +145,7 @@ static void ams_delta_read_buf(struct ams_delta_nand *priv, u8 *buf, int len)
+>  	int i;
+>  
+>  	if (!priv->data_in)
+> -		ams_delta_dir_input(priv, true);
+> +		ams_delta_dir_input(priv);
+>  
+>  	for (i = 0; i < len; i++)
+>  		buf[i] = ams_delta_io_read(priv);
+> @@ -188,14 +223,9 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	struct ams_delta_nand *priv;
+>  	struct nand_chip *this;
+>  	struct mtd_info *mtd;
+> -	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	void __iomem *io_base;
+>  	struct gpio_descs *data_gpiods;
+>  	int err = 0;
+>  
+> -	if (!res)
+> -		return -ENXIO;
 > -
->   #include <asm/byteorder.h>
->   
-> -#ifndef do_csum
->   static inline unsigned short from32to16(unsigned int x)
->   {
->   	/* add up 16-bit and 16-bit for 16+c bit */
-> @@ -47,7 +45,7 @@ static inline unsigned short from32to16(unsigned int x)
->   	return x;
->   }
->   
-> -static unsigned int do_csum(const unsigned char *buff, int len)
-> +unsigned int do_csum_generic(const unsigned char *buff, int len)
->   {
->   	int odd;
->   	unsigned int result = 0;
-> @@ -100,6 +98,8 @@ static unsigned int do_csum(const unsigned char *buff, int len)
->   out:
->   	return result;
->   }
-> +#ifndef do_csum
-> +#define do_csum do_csum_generic
-
-AFAICS this now means that at least one architecture (hexagon) gets the 
-generic version built in despite it being entirely redundant.
-
-Robin.
-
->   #endif
->   
->   #ifndef ip_fast_csum
-> 
+>  	/* Allocate memory for MTD device structure and private data */
+>  	priv = devm_kzalloc(&pdev->dev, sizeof(struct ams_delta_nand),
+>  			    GFP_KERNEL);
+> @@ -207,25 +237,13 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	mtd = nand_to_mtd(this);
+>  	mtd->dev.parent = &pdev->dev;
+>  
+> -	/*
+> -	 * Don't try to request the memory region from here,
+> -	 * it should have been already requested from the
+> -	 * gpio-omap driver and requesting it again would fail.
+> -	 */
+> -	io_base = ioremap(res->start, resource_size(res));
+> -	if (!io_base) {
+> -		dev_err(&pdev->dev, "ioremap failed\n");
+> -		return -EIO;
+> -	}
+> -
+> -	priv->io_base = io_base;
+>  	nand_set_controller_data(this, priv);
+>  
+>  	priv->gpiod_rdy = devm_gpiod_get_optional(&pdev->dev, "rdy", GPIOD_IN);
+>  	if (IS_ERR(priv->gpiod_rdy)) {
+>  		err = PTR_ERR(priv->gpiod_rdy);
+>  		dev_warn(&pdev->dev, "RDY GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	this->ecc.mode = NAND_ECC_SOFT;
+> @@ -238,42 +256,42 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	if (IS_ERR(priv->gpiod_nwp)) {
+>  		err = PTR_ERR(priv->gpiod_nwp);
+>  		dev_err(&pdev->dev, "NWP GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	priv->gpiod_nce = devm_gpiod_get(&pdev->dev, "nce", GPIOD_OUT_HIGH);
+>  	if (IS_ERR(priv->gpiod_nce)) {
+>  		err = PTR_ERR(priv->gpiod_nce);
+>  		dev_err(&pdev->dev, "NCE GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	priv->gpiod_nre = devm_gpiod_get(&pdev->dev, "nre", GPIOD_OUT_HIGH);
+>  	if (IS_ERR(priv->gpiod_nre)) {
+>  		err = PTR_ERR(priv->gpiod_nre);
+>  		dev_err(&pdev->dev, "NRE GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	priv->gpiod_nwe = devm_gpiod_get(&pdev->dev, "nwe", GPIOD_OUT_HIGH);
+>  	if (IS_ERR(priv->gpiod_nwe)) {
+>  		err = PTR_ERR(priv->gpiod_nwe);
+>  		dev_err(&pdev->dev, "NWE GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	priv->gpiod_ale = devm_gpiod_get(&pdev->dev, "ale", GPIOD_OUT_LOW);
+>  	if (IS_ERR(priv->gpiod_ale)) {
+>  		err = PTR_ERR(priv->gpiod_ale);
+>  		dev_err(&pdev->dev, "ALE GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	priv->gpiod_cle = devm_gpiod_get(&pdev->dev, "cle", GPIOD_OUT_LOW);
+>  	if (IS_ERR(priv->gpiod_cle)) {
+>  		err = PTR_ERR(priv->gpiod_cle);
+>  		dev_err(&pdev->dev, "CLE GPIO request failed (%d)\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+>  
+>  	/* Request array of data pins, initialize them as input */
+> @@ -281,8 +299,9 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	if (IS_ERR(data_gpiods)) {
+>  		err = PTR_ERR(data_gpiods);
+>  		dev_err(&pdev->dev, "data GPIO request failed: %d\n", err);
+> -		goto err_unmap;
+> +		return err;
+>  	}
+> +	priv->data_gpiods = data_gpiods;
+>  	priv->data_in = true;
+>  
+>  	/* Initialize the NAND controller object embedded in ams_delta_nand. */
+> @@ -293,7 +312,7 @@ static int ams_delta_init(struct platform_device *pdev)
+>  	/* Scan to find existence of the device */
+>  	err = nand_scan(this, 1);
+>  	if (err)
+> -		goto err_unmap;
+> +		return err;
+>  
+>  	/* Register the partitions */
+>  	err = mtd_device_register(mtd, partition_info,
+> @@ -306,9 +325,6 @@ static int ams_delta_init(struct platform_device *pdev)
+>  err_nand_cleanup:
+>  	nand_cleanup(this);
+>  
+> -err_unmap:
+> -	iounmap(io_base);
+> -
+>  	return err;
+>  }
+>  
+> @@ -319,13 +335,10 @@ static int ams_delta_cleanup(struct platform_device *pdev)
+>  {
+>  	struct ams_delta_nand *priv = platform_get_drvdata(pdev);
+>  	struct mtd_info *mtd = nand_to_mtd(&priv->nand_chip);
+> -	void __iomem *io_base = priv->io_base;
+>  
+> -	/* Release resources, unregister device */
+> +	/* Unregister device */
+>  	nand_release(mtd_to_nand(mtd));
+>  
+> -	iounmap(io_base);
+> -
+>  	return 0;
+>  }
+>  
