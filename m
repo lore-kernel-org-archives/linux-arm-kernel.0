@@ -1,46 +1,31 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Wed, 21 Nov 2018 21:30:40 +0300
-Subject: [RFC PATCH v3 07/17] clocksource: sun4i: add a compatible for suniv
+Date: Wed, 21 Nov 2018 21:30:41 +0300
+Subject: [RFC PATCH v3 08/17] dt-bindings: pinctrl: Add Allwinner suniv
+ F1C100s pinctrl
 In-Reply-To: <cover.1542824904.git.mesihkilinc@gmail.com>
 References: <cover.1542824904.git.mesihkilinc@gmail.com>
-Message-ID: <60bc70fc43743f664de76abf3ab0a01cd7924458.1542824904.git.mesihkilinc@gmail.com>
+Message-ID: <70ac024bf3b6623dc41021ac4893c37adb85a97d.1542824904.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suniv (new F-series) chip has a timer with less functionality than
-the A10 timer, e.g. it has only 3 channels.
-
-Add a new compatible for it. As we didn't use the extra channels on A10
-either now, the code needn't to be changed.
-
-The suniv chip is based on ARM926EJ-S CPU, thus it has no architecture timer.
-
-Register sun4i_timer as sched_clock on it.
+Add compatible string for Allwinner suniv F1C100s SoC's pinctrl.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- drivers/clocksource/sun4i_timer.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 6e0180a..65f38f6 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -186,7 +186,8 @@ static int __init sun4i_timer_init(struct device_node *node)
- 	 */
- 	if (of_machine_is_compatible("allwinner,sun4i-a10") ||
- 	    of_machine_is_compatible("allwinner,sun5i-a13") ||
--	    of_machine_is_compatible("allwinner,sun5i-a10s"))
-+	    of_machine_is_compatible("allwinner,sun5i-a10s") ||
-+	    of_machine_is_compatible("allwinner,suniv-f1c100s"))
- 		sched_clock_register(sun4i_timer_sched_read, 32,
- 				     timer_of_rate(&to));
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 258a464..a7f7133 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -29,6 +29,7 @@ Required properties:
+   "allwinner,sun50i-h5-pinctrl"
+   "allwinner,sun50i-h6-pinctrl"
+   "allwinner,sun50i-h6-r-pinctrl"
++  "allwinner,suniv-f1c100s-pinctrl"
+   "nextthing,gr8-pinctrl"
  
-@@ -218,3 +219,5 @@ static int __init sun4i_timer_init(struct device_node *node)
- }
- TIMER_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
- 		       sun4i_timer_init);
-+TIMER_OF_DECLARE(suniv, "allwinner,suniv-f1c100s-timer",
-+		       sun4i_timer_init);
+ - reg: Should contain the register physical address and length for the
 -- 
 2.7.4
