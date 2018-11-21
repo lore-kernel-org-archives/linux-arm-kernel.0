@@ -1,44 +1,112 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 21 Nov 2018 09:06:52 +0530
-Subject: [PATCH v2 15/15] MAINTAINERS: Add entry for RDA Micro SoC architecture
+Date: Wed, 21 Nov 2018 09:06:42 +0530
+Subject: [PATCH v2 05/15] arm: dts: Add devicetree for RDA8810PL SoC
 In-Reply-To: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
 References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181121033652.12247-16-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181121033652.12247-6-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MAINTAINERS entry for RDA Micro SoC architecture with myself
-and Andreas F?rber as the maintainers.
+Add initial device tree for RDA8810PL SoC from RDA Microelectronics.
 
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- MAINTAINERS | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/rda8810pl.dtsi | 86 ++++++++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 6c3fbbb361f8..7a5ae685a638 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1945,6 +1945,20 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- 
-+ARM/RDA MICRO ARCHITECTURE
-+M:	Andreas F?rber <afaerber@suse.de>
-+M:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	arch/arm/boot/dts/rda8810pl-*
-+F:	drivers/clocksource/timer-rda.c
-+F:	drivers/irqchip/irq-rda-intc.c
-+F:	drivers/tty/serial/rda-uart.c
-+F:	Documentation/devicetree/bindings/arm/rda.txt
-+F:	Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
-+F:	Documentation/devicetree/bindings/serial/rda,8810pl-uart.txt
-+F:	Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
+diff --git a/arch/arm/boot/dts/rda8810pl.dtsi b/arch/arm/boot/dts/rda8810pl.dtsi
+new file mode 100644
+index 000000000000..ab85ee06d84f
+--- /dev/null
++++ b/arch/arm/boot/dts/rda8810pl.dtsi
+@@ -0,0 +1,86 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * RDA8810PL SoC
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ * Copyright (c) 2018 Manivannan Sadhasivam
++ */
 +
- ARM/REALTEK ARCHITECTURE
- M:	Andreas F?rber <afaerber@suse.de>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
++/ {
++	compatible = "rda,8810pl";
++	interrupt-parent = <&intc>;
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a5";
++			reg = <0x0>;
++		};
++	};
++
++	sram at 100000 {
++		compatible = "mmio-sram";
++		reg = <0x100000 0x10000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++	};
++
++	apb at 20800000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x20800000 0x100000>;
++
++		intc: interrupt-controller at 0 {
++			compatible = "rda,8810pl-intc";
++			reg = <0x0 0x1000>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++
++	apb at 20900000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x20900000 0x100000>;
++	};
++
++	apb at 20a00000 {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0x0 0x20a00000 0x100000>;
++
++		uart0: serial at 0 {
++			compatible = "rda,8810pl-uart";
++			reg = <0x0 0x1000>;
++			status = "disabled";
++		};
++
++		uart1: serial at 10000 {
++			compatible = "rda,8810pl-uart";
++			reg = <0x10000 0x1000>;
++			status = "disabled";
++		};
++
++		uart2: serial at 90000 {
++			compatible = "rda,8810pl-uart";
++			reg = <0x90000 0x1000>;
++			status = "disabled";
++		};
++	};
++
++	l2: cache-controller at 21100000 {
++		compatible = "arm,pl310-cache";
++		reg = <0x21100000 0x1000>;
++		cache-unified;
++		cache-level = <2>;
++	};
++};
 -- 
 2.17.1
