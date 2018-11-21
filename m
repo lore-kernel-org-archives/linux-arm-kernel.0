@@ -1,20 +1,32 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 21 Nov 2018 14:03:31 +0100
-Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
-In-Reply-To: <20181120163441.GD31199@char.us.oracle.com>
-References: <cover.1542722463.git.robin.murphy@arm.com>
- <20181120160818.GC2492@lst.de> <20181120163441.GD31199@char.us.oracle.com>
-Message-ID: <20181121130331.GA1373@lst.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 21 Nov 2018 14:11:43 +0100
+Subject: [PATCH 4/5] ARM: bcm2835_defconfig: Enable Raspberry Pi OTP driver
+In-Reply-To: <1542805904-6446-1-git-send-email-stefan.wahren@i2se.com>
+References: <1542805904-6446-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1542805904-6446-5-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 11:34:41AM -0500, Konrad Rzeszutek Wilk wrote:
-> > Konrad, are you ok with me picking up both through the dma-mapping
-> > tree?
-> 
-> Yes, albeit I would want Stefano to take a peek at patch #2 just in case.
+Enable the Raspberry Pi OTP driver, which could be helpful for
+custom Compute Module designs.
 
-Stefano, can you take a look asap?  This is a pretty trivial fix for
-a nasty bug that breaks boot on real life systems.  I'd like to merge
-it by tomorrow so that I can send it off to Linus for the next rc
-(I will be offline for about two days after Friday morning)
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/configs/bcm2835_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+index bb6a35f..4c1405e 100644
+--- a/arch/arm/configs/bcm2835_defconfig
++++ b/arch/arm/configs/bcm2835_defconfig
+@@ -136,6 +136,8 @@ CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_PWM=y
+ CONFIG_PWM_BCM2835=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_NVMEM=y
++CONFIG_NVMEM_RASPBERRYPI_OTP=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+-- 
+2.7.4
