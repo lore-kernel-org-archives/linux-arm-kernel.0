@@ -1,74 +1,151 @@
-From: Al.Grant@arm.com (Al Grant)
-Date: Wed, 21 Nov 2018 16:23:48 +0000
-Subject: [RFC PATCH 1/3] drivers: amba: Updates to component
- identification for driver matching.
-In-Reply-To: <CAJ9a7ViFRUuZQnqvtEO-OOjSGY45e7vxgPn0cTC6wnZw9ij9xg@mail.gmail.com>
-References: <20181115012842.2353-1-mike.leach@linaro.org>
- <20181115012842.2353-2-mike.leach@linaro.org> <20181120205737.GA17267@xps15>
- <CAJ9a7VjD1C3t=OtCpQNGvmSvDh-vPcR_2mObccJJ1Qv8_9BxFw@mail.gmail.com>
- <AM6PR08MB36868BDA513BA392E01EDE9D86DA0@AM6PR08MB3686.eurprd08.prod.outlook.com>
- <CAJ9a7ViFRUuZQnqvtEO-OOjSGY45e7vxgPn0cTC6wnZw9ij9xg@mail.gmail.com>
-Message-ID: <AM6PR08MB3686102303EB6DCF7D004C0F86DA0@AM6PR08MB3686.eurprd08.prod.outlook.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Nov 2018 16:32:03 +0000
+Subject: [RFC PATCH v2 16/23] KVM: arm64: Enumerate SVE register indices
+ for KVM_GET_REG_LIST
+In-Reply-To: <87k1l6ifa8.fsf@linaro.org>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
+ <87k1l6ifa8.fsf@linaro.org>
+Message-ID: <20181121163201.GC3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > The architect field defines what the ARCHID field means (the ARCHID
-> > values are specific to each architect), it's not the same as the
-> > implementer field. You need to check both if you want to know what
-> > component driver to use. The correct mask for that is 0xfff0ffff.
->
-> This is a fair point - thought at present the peripheral ID matching takes in the
-> JDEC ID code of the component designer - in the ETM case ARM (though without
-> a JDEC continuation code check).
-> Given this field too is specified as "designer not implementer", it seems logically
-> unlikely that designer != architect.
+On Wed, Nov 21, 2018 at 04:09:03PM +0000, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch includes the SVE register IDs in the list returned by
+> > KVM_GET_REG_LIST, as appropriate.
+> >
+> > On a non-SVE-enabled vcpu, no extra IDs are added.
+> >
+> > On an SVE-enabled vcpu, the appropriate number of slice IDs are
+> > enumerated for each SVE register, depending on the maximum vector
+> > length for the vcpu.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > ---
+> >
+> > Changes since RFCv1:
+> >
+> >  * Simplify enumerate_sve_regs() based on Andrew Jones' approach.
+> >
+> >  * Reg copying loops are inverted for brevity, since the order we
+> >    spit out the regs in doesn't really matter.
+> >
+> > (I tried to keep part of my approach to avoid the duplicate logic
+> > between num_sve_regs() and copy_sve_reg_indices(), but although
+> > it works in principle, gcc fails to fully collapse the num_regs()
+> > case... so I gave up.  The two functions need to be manually kept
+> > consistent, but hopefully that's fairly straightforward.)
+> > ---
+> >  arch/arm64/kvm/guest.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 45 insertions(+)
+> >
+> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> > index 320db0f..89eab68 100644
+> > --- a/arch/arm64/kvm/guest.c
+> > +++ b/arch/arm64/kvm/guest.c
+> > @@ -323,6 +323,46 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >  	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+> >  }
+> >
+> > +static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
+> > +{
+> > +	const unsigned int slices = DIV_ROUND_UP(
+> > +		vcpu->arch.sve_max_vl,
+> > +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
+> 
+> Having seen this formulation come up several times now I wonder if there
+> should be a kernel private define, KVM_SVE_ZREG/PREG_SIZE to avoid this
+> clumsiness.
 
-It might be exactly like that. On the system I'm using right now:
+I agree it's a bit awkward.  Previous I spelled this "0x100", which
+was terse but more sensitive to typos and other screwups that Io
+liked.
 
-  DEVARCH=0x47714a13  meaning architect=ARM architecture=ETM
-  PIDR= <somebody else>
+> You could still use the KVM_REG_SIZE to extract it as I guess this is to
+> make changes simpler if/when the SVE reg size gets bumped up.
 
-This is not a Cortex core designed by ARM, it's someone else's ARM
-compatible core and they designed their own ARM-compatible ETM.
-It conforms to the ETM architecture defined by ARM, so they set
-DEVARCH to indicate that (architect=ARM), but in the implementer/
-designer code in PIDR they put their own JEDEC code.
+That might be more challenging to determine at compile time.
 
-If you've got DEVARCH, that should be all you need to select the right
-driver and then the driver should be able to get everything it needs
-from the feature ID regs. It should only need to look at implementer
-code / product code as a last resort for errata workarounds or similar
-(e.g. if the feature ID regs are known to be incorrect).
+I'm not sure how good GCC is at doing const-propagation between related
+(but different) expressions, so I preferred to go for something that
+is clearly compiletime constant rather than extracting it from the
+register ID that came from userspace.
 
-If you haven't got DEVARCH, you have to look at implementer code /
-product code. So for example if we see a componet with no DEVARCH
-but with designer=ARM product=0x961, that's "ARM product 0x961"
-i.e. a TMC, and we can write the driver according to the programming
-interface described in the manual for that product.
+So, I'd prefer not to use KVM_REG_SIZE() for this, but I'm happy to add
+a private #define to hide this cumbersome construct.  That would
+certainly make the code more readable.
 
-Al
+(Of course, the actual runtime cost is trivial either way, but I felt
+it was easier to reason about correctness if this is really a constant.)
 
 
+Sound OK?
 
->
-> If we did feel the need to alter the match value / mask values - this happens in
-> the CS driver code, not in this patch - so will need to be addressed there.
->
-> Thanks
->
-> Mike
->
-> > Al
-> > IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended recipient,
-> please notify the sender immediately and do not disclose the contents to any
-> other person, use it for any purpose, or store or copy the information in any
-> medium. Thank you.
->
->
->
-> --
-> Mike Leach
-> Principal Engineer, ARM Ltd.
-> Manchester Design Centre. UK
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+ > 
+> > +
+> > +	if (!vcpu_has_sve(vcpu))
+> > +		return 0;
+> > +
+> > +	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
+> > +}
+> > +
+> > +static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
+> > +{
+> > +	const unsigned int slices = DIV_ROUND_UP(
+> > +		vcpu->arch.sve_max_vl,
+> > +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
+> > +	unsigned int i, n;
+> > +
+> > +	if (!vcpu_has_sve(vcpu))
+> > +		return 0;
+> > +
+> > +	for (i = 0; i < slices; i++) {
+> > +		for (n = 0; n < SVE_NUM_ZREGS; n++) {
+> > +			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
+> > +				return -EFAULT;
+> > +		}
+> > +
+> > +		for (n = 0; n < SVE_NUM_PREGS; n++) {
+> > +			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
+> > +				return -EFAULT;
+> > +		}
+> > +
+> > +		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
+> > +			return -EFAULT;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  /**
+> >   * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
+> >   *
+> > @@ -333,6 +373,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
+> >  	unsigned long res = 0;
+> >
+> >  	res += num_core_regs();
+> > +	res += num_sve_regs(vcpu);
+> >  	res += kvm_arm_num_sys_reg_descs(vcpu);
+> >  	res += kvm_arm_get_fw_num_regs(vcpu);
+> >  	res += NUM_TIMER_REGS;
+> > @@ -357,6 +398,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
+> >  		uindices++;
+> >  	}
+> >
+> > +	ret = copy_sve_reg_indices(vcpu, &uindices);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> >  	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
+> >  	if (ret)
+> >  		return ret;
+> 
+> Otherwise:
+> 
+> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
+Thanks
+---Dave
