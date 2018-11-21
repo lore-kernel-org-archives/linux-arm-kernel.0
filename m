@@ -1,170 +1,76 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed, 21 Nov 2018 12:17:45 +0000
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <20181121110620.GC18678@e113682-lin.lund.arm.com>
-References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
- <201811211656540883310@zte.com.cn>
- <20181121110620.GC18678@e113682-lin.lund.arm.com>
-Message-ID: <26c4ad81-f808-5a84-c725-72db8de7cd2b@arm.com>
+From: julien.grall@arm.com (Julien Grall)
+Date: Wed, 21 Nov 2018 12:23:31 +0000
+Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
+ erratum 1165522
+In-Reply-To: <20181105143617.120602-5-marc.zyngier@arm.com>
+References: <20181105143617.120602-1-marc.zyngier@arm.com>
+ <20181105143617.120602-5-marc.zyngier@arm.com>
+Message-ID: <06743f45-fd39-787d-0c59-12d28d8245bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-
-On 21/11/18 11:06, Christoffer Dall wrote:
-> Hi,
+On 05/11/2018 14:36, Marc Zyngier wrote:
+> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
+> speculate an AT instruction in during a guest switch while the
+> S1/S2 system registers are in an inconsistent state.
 > 
-> On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
->>> On 19/11/2018 09:10, Mark Rutland wrote:
->>>> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
->>>>>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
->>>>>>>> Hi,
->>>>>>>>> When virtual machine starts, hang up.
->>>>>>>>
->>>>>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
->>>>>>>> interrupt?
->>>>>>>>
->>>>>>>>> The kernel version of guest
->>>>>>>>> is 4.16. Host support vgic_v3.
->>>>>>>>
->>>>>>>> Your host kernel is something recent, I guess?
->>>>>>>>
->>>>>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
->>>>>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
->>>>>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
->>>>>>>>> correctly, so group is not set.
->>>>>>>>
->>>>>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
->>>>>>>> version?) or some other userland tool?
->>>>>>>>
->>>>>>>
->>>>>>> QEMU emulator version 3.0.50 .
->>>>>>>
->>>>>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
->>>>>>>>> time.
->>>>>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
->>>>>>>>> interrupt injection failed.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
->>>>>>>>> ---
->>>>>>>>>    virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->>>>>>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
->>>>>>>>>
->>>>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>>>>> index 9c0dd23..d101000 100644
->>>>>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
->>>>>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
->>>>>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
->>>>>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
->>>>>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
->>>>>>>>>
->>>>>>>>> -    if (irq->group)
->>>>>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
->>>>>>>>
->>>>>>>> This is not the right fix, not only because it basically reverts the
->>>>>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
->>>>>>>> their configured group).
->>>>>>>>
->>>>>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
->>>>>>>> before dist->vgic_model is set, also what value it has?
->>>>>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
->>>>>>>>
->>>>>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
->>>>>>>    If the interrupt comes at this time, the interrupt injection fails.
->>>>>>
->>>>>> Does that mean that the guest is configuring its interrupts as Group0?
->>>>>> That sounds wrong, Linux should configure all it's interrupts as
->>>>>> non-secure group1.
->>>>>
->>>>> no, I think that uefi dose this, not linux.
->>>>> 1. kvm_vgic_vcpu_init
->>>>> 2. vgic_create
->>>>> 3. kvm_vgic_dist_init
->>>>> 4.vgic_mmio_write_group: uefi as guest, write group=0
->>>>> 5.vgic_mmio_write_group: linux as guest, write group=1
->>>>
->>>> Is this the same issue fixed by EDK2 commit:
->>>>
->>>> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
->>>>
->>>> ... where EDK2 would try to use IAR0 rather than IAR1?
->>>>
->>>> The commit messages notes this lead to a boot-time hang.
->>>
->>> I managed to trigger an issue with a really old EFI implementation that
->>> doesn't configure its interrupts as Group1, and yet tries to ACK its
->>> interrupts using the Group1 accessor. Guess what? It is not going to work.
->>>
->>> Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
->>> to be the fix (I only assume it does, I haven't actually checked). A
->>> recent build, as found in Debian Buster, works perfectly (tested with
->>> both QEMU v2.12 and tip of tree).
->>>
->>> Now, I really don't get what you're saying about Linux not getting
->>> interrupts. How do you get to booting Linux if EFI is not making any
->>> forward progress? Are you trying them independently?
->>>
->> I start linux with bypassing uefi, the print info is the same.
->> [507107.748908]  vgic_mmio_write_group:## intid/27 group=0
->> [507107.752185]  vgic_mmio_write_group:## intid/27 group=0
->> [507107.899566]  vgic_mmio_write_group:## intid/27 group=1
->> [507107.907370]  vgic_mmio_write_group:## intid/27 group=1
->> the command line is like this:
->> /home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
->>
->> This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
+> Work around it by:
+> - Mandating VHE
+> - Make sure that S1 and S2 system registers are consistent before
+>    clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
+>    regime
 > 
-> Could you try the following patch:
+> These two things together ensure that we cannot hit this erratum.
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> index c0c0b88af1d5..6fa858c7a5a6 100644
-> --- a/virt/kvm/arm/vgic/vgic-init.c
-> +++ b/virt/kvm/arm/vgic/vgic-init.c
-> @@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
->   			irq->config = VGIC_CONFIG_LEVEL;
->   		}
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   Documentation/arm64/silicon-errata.txt |  1 +
+>   arch/arm64/Kconfig                     | 12 ++++++++++++
+>   arch/arm64/include/asm/cpucaps.h       |  3 ++-
+>   arch/arm64/include/asm/kvm_host.h      |  3 +++
+>   arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
+>   arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
+>   arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
+>   7 files changed, 46 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 76ccded8b74c..04f0bc4690c6 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -57,6 +57,7 @@ stable kernels.
+>   | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
+>   | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
+>   | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
+> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
+>   | ARM            | MMU-500         | #841119,#826419 | N/A                         |
+>   |                |                 |                 |                             |
+>   | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 787d7850e064..a68bc6cc2167 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
 >   
-> -		/*
-> -		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
-> -		 * so we always know the emulation type at this point as it's
-> -		 * either explicitly configured as GICv3, or explicitly
-> -		 * configured as GICv2, or not configured yet which also
-> -		 * implies GICv2.
-> -		 */
->   		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
->   			irq->group = 1;
->   		else
-> @@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
->   	if (ret)
->   		goto out;
+>   	  If unsure, say Y.
 >   
-> +	/* Initialize groups on CPUs created before the VGIC type was known */
-> +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> +		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +config ARM64_ERRATUM_1165522
+> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
+> +	default y
+> +	help
+> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
 > +
-> +		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
-> +			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
-> +			irq->group = 1;
-> +		}
-> +	}
+> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
+> +	  corrupted TLBs by speculating an AT instruction during a guest
+> +	  context switch.
 > +
->   	if (vgic_has_its(kvm)) {
->   		ret = vgic_v4_init(kvm);
->   		if (ret)
-> 
-> 
+> +	  If unsure, say Y.
 
-If the value of dist->vgic_model is not properly initialized at the time 
-we call kvm_vgic_vcpu_init is call, won't we still overwrite the 
-irq->group when we get there? (I still haven't seen why we could 
-consider dist->vgic_model is initialized at that point).
-
-Shouldn't we do the irq->group initialization somewhere in 
-kvm_arch_vcpu_ioctl_vcpu_init? (with some vgic_* function to encapsulate 
-it of course). At that point I believe we know that dist->vgic_model is 
-initialized.
+Most of the code in the patch is not guarded by #ifdef ARM64_*. So is there any 
+benefits to add a Kconfig for this option?
 
 Cheers,
 
 -- 
-Julien Thierry
+Julien Grall
