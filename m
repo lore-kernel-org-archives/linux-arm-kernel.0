@@ -1,18 +1,62 @@
-From: cl@linux.com (Christopher Lameter)
-Date: Wed, 21 Nov 2018 18:32:58 +0000
-Subject: [PATCH v2 2/3] mm: Add support for SLAB_CACHE_DMA32
-In-Reply-To: <20181111090341.120786-3-drinkcat@chromium.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <20181111090341.120786-3-drinkcat@chromium.org>
-Message-ID: <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
+From: lyude@redhat.com (Lyude Paul)
+Date: Wed, 21 Nov 2018 13:56:24 -0500
+Subject: [PATCH 6/9] drm: remove deprecated
+ "drm_connector_[un]reference" functions
+In-Reply-To: <20181115221634.22715-7-greenfoo@gluegarage.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <20181115221634.22715-7-greenfoo@gluegarage.com>
+Message-ID: <db5924d66229bd8b50e44395ace64ae2293fa78d.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Nov 2018, Nicolas Boichat wrote:
+Reviewed-by: Lyude Paul <lyude@redhat.com>
 
-> SLAB_CACHE_DMA32 is only available after explicit kmem_cache_create calls,
-> no default cache is created for kmalloc. Add a test in check_slab_flags
-> for this.
-
-This does not define the dma32 kmalloc array. Is that intentional? In that
-case you need to fail any request for GFP_DMA32 coming in via kmalloc.
+On Thu, 2018-11-15 at 23:16 +0100, Fernando Ramos wrote:
+> There are no more places where this (deprecated) function is being
+> used from, thus it can now be removed.
+> 
+> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+> ---
+>  include/drm/drm_connector.h | 24 ------------------------
+>  1 file changed, 24 deletions(-)
+> 
+> diff --git a/include/drm/drm_connector.h b/include/drm/drm_connector.h
+> index 9ccad6b062f2..b91b206f1665 100644
+> --- a/include/drm/drm_connector.h
+> +++ b/include/drm/drm_connector.h
+> @@ -1191,30 +1191,6 @@ static inline void drm_connector_put(struct
+> drm_connector *connector)
+>  	drm_mode_object_put(&connector->base);
+>  }
+>  
+> -/**
+> - * drm_connector_reference - acquire a connector reference
+> - * @connector: DRM connector
+> - *
+> - * This is a compatibility alias for drm_connector_get() and should not be
+> - * used by new code.
+> - */
+> -static inline void drm_connector_reference(struct drm_connector *connector)
+> -{
+> -	drm_connector_get(connector);
+> -}
+> -
+> -/**
+> - * drm_connector_unreference - release a connector reference
+> - * @connector: DRM connector
+> - *
+> - * This is a compatibility alias for drm_connector_put() and should not be
+> - * used by new code.
+> - */
+> -static inline void drm_connector_unreference(struct drm_connector
+> *connector)
+> -{
+> -	drm_connector_put(connector);
+> -}
+> -
+>  /**
+>   * drm_connector_is_unregistered - has the connector been unregistered from
+>   * userspace?
+-- 
+Cheers,
+	Lyude Paul
