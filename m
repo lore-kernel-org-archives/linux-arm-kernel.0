@@ -1,62 +1,85 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Nov 2018 10:52:40 +0100
-Subject: [PATCH v2 3/9] phy: Add MIPI D-PHY configuration options
-In-Reply-To: <20181119135833.zvgxsl7kwmfewdoa@valkosipuli.retiisi.org.uk>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <b1f6e4c1c3487e1f048cce699a86bcf50f7fed69.1541516029.git-series.maxime.ripard@bootlin.com>
- <20181119135833.zvgxsl7kwmfewdoa@valkosipuli.retiisi.org.uk>
-Message-ID: <20181121095240.peq5tpzokdakxvwc@flea>
+From: Jan.Glauber@cavium.com (Jan Glauber)
+Date: Wed, 21 Nov 2018 09:56:54 +0000
+Subject: [RFT PATCH] efi: map memreserve table before first use
+In-Reply-To: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
+References: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181121095648.GA11514@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-On Mon, Nov 19, 2018 at 03:58:34PM +0200, Sakari Ailus wrote:
-> > +	/**
-> > +	 * @clk_pre:
-> > +	 *
-> > +	 * Time, in nanoseconds, that the HS clock shall be driven by
-> > +	 * the transmitter prior to any associated Data Lane beginning
-> > +	 * the transition from LP to HS mode.
-> > +	 */
-> > +	unsigned int		clk_pre;
+On Tue, Nov 20, 2018 at 06:35:42PM +0100, Ard Biesheuvel wrote:
+> Mapping the MEMRESERVE EFI configuration table from an early initcall
+> is too late: the GICv3 ITS code that creates persistent reservations
+> for the boot CPU's LPI tables is invoked from init_IRQ(), which runs
+> much earlier than the handling of the initcalls.
 > 
-> Is the unit of clk_pre intended to be UI or ns?
-
-You're right, it's in UI.
-
-> How about adding information on the limits of these values as well?
-
-I usually feel like the more you duplicate informations, the higher
-the chances are to do a mistake and that becomes a burden to maintain
-over time, but if you feel like it would be best, i'll do it.
-
-> > +	/**
-> > +	 * @lanes:
-> > +	 *
-> > +	 * Number of lanes used for the transmissions.
-> > +	 */
-> > +	unsigned char		lanes;
+> So instead, move the initialization performed by the initcall into
+> efi_mem_reserve_persistent() itself.
 > 
-> This is related to the data_lanes DT property. I assume this is intended to
-> be the number of active lanes. And presumably the first "lanes" number of
-> lanes would be used in that case?
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/efi.c | 26 ++++++++++----------------
+>  1 file changed, 10 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> index fad7c62cfc0e..40de2f6734cc 100644
+> --- a/drivers/firmware/efi/efi.c
+> +++ b/drivers/firmware/efi/efi.c
+> @@ -967,15 +967,23 @@ bool efi_is_table_address(unsigned long phys_addr)
+>  }
+> 
+>  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
+> -static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
+> +static struct linux_efi_memreserve *efi_memreserve_root;
+> 
+>  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+>  {
+>         struct linux_efi_memreserve *rsv;
+> 
+> -       if (!efi_memreserve_root)
+> +       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+>                 return -ENODEV;
+> 
+> +       if (!efi_memreserve_root) {
+> +               efi_memreserve_root = memremap(efi.mem_reserve,
+> +                                              sizeof(*efi_memreserve_root),
+> +                                              MEMREMAP_WB);
+> +               if (WARN_ON_ONCE(!efi_memreserve_root))
+> +                       return -ENOMEM;
+> +       }
+> +
+>         rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
+>         if (!rsv)
+>                 return -ENOMEM;
+> @@ -991,20 +999,6 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
+>         return 0;
+>  }
+> 
+> -static int __init efi_memreserve_root_init(void)
+> -{
+> -       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
+> -               return -ENODEV;
+> -
+> -       efi_memreserve_root = memremap(efi.mem_reserve,
+> -                                      sizeof(*efi_memreserve_root),
+> -                                      MEMREMAP_WB);
+> -       if (!efi_memreserve_root)
+> -               return -ENOMEM;
+> -       return 0;
+> -}
+> -early_initcall(efi_memreserve_root_init);
+> -
+>  #ifdef CONFIG_KEXEC
+>  static int update_efi_random_seed(struct notifier_block *nb,
+>                                   unsigned long code, void *unused)
+> --
+> 2.17.1
 
-I'm not sure I got your question, sorry. But yes, this is the number
-of active lanes. In the v4l2 world, chances are that this is going to
-come from the data lanes property, in DRM this is coming from the
-panel structure.
+Hi Ard,
 
-Maxime
+thanks for the patch, it works fine for me.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/ceea7fcd/attachment.sig>
+If you want:
+Tested-by: Jan Glauber <jglauber@cavium.com>
+
+--Jan
