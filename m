@@ -1,51 +1,63 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 21 Nov 2018 08:36:49 +0100
-Subject: [PATCH v2] tee: optee: log message if dynamic shm is enabled
-In-Reply-To: <CAHqM-Qjr+5T1pMatJ=5MSsJvzaRqPybt_2TtyzHPwLnt=WjCEA@mail.gmail.com>
-References: <CAHqM-Qjr+5T1pMatJ=5MSsJvzaRqPybt_2TtyzHPwLnt=WjCEA@mail.gmail.com>
-Message-ID: <20181121073648.GA20049@jax.urgonet>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 21 Nov 2018 08:37:06 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77965: Add CAN controller
+ nodes
+In-Reply-To: <8808d836-2454-4166-fbe0-02849e52792b@gmail.com>
+References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
+ <20181118230250.GA2553@kunai> <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
+ <CAMuHMdUjONJYypV0a5wnxyBx+sUMHzRwZObQ=d7xFG2ZSCM3Ag@mail.gmail.com>
+ <8808d836-2454-4166-fbe0-02849e52792b@gmail.com>
+Message-ID: <CAMuHMdWrNjmCmAuKjp=J2bUhXtXCNbNE2QHyT0df3AYF8ua9JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Victor,
+Hi Marek,
 
-On Tue, Sep 11, 2018 at 06:09:02PM +0900, Victor Chong wrote:
-> When dynamic shared memory support is enabled in the OP-TEE Trusted
-> OS, it doesn't mean that the driver supports it, which can confuse
-> users during debugging. Log a message when dynamic shared memory is
-> enabled in the driver, to let users know for sure.
-> 
-> Suggested-by: Jerome Forissier <jerome.forissier@linaro.org>
-> Signed-off-by: Victor Chong <victor.chong@linaro.org>
-> Reviewed-by: Jerome Forissier <jerome.forissier@linaro.org>
-> ---
-> 
-> v2:
-> * Added patch description
-> 
-> [v1] lore.kernel.org/patchwork/patch/983949/
-> 
->  drivers/tee/optee/core.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-> index e1aafe842d66..cca5c091e55a 100644
-> --- a/drivers/tee/optee/core.c
-> +++ b/drivers/tee/optee/core.c
-> @@ -631,6 +631,9 @@ static struct optee *optee_probe(struct device_node *np)
-> 
->         optee_enable_shm_cache(optee);
-> 
-> +       if (optee->sec_caps & OPTEE_SMC_SEC_CAP_DYNAMIC_SHM)
-> +               pr_info("dynamic shared memory is enabled\n");
-> +
->         pr_info("initialized driver\n");
->         return optee;
->  err:
-> --
-> 2.17.1
+On Wed, Nov 21, 2018 at 12:33 AM Marek Vasut <marek.vasut@gmail.com> wrote:
+> On 11/19/2018 10:00 AM, Geert Uytterhoeven wrote:
+> > On Mon, Nov 19, 2018 at 12:46 AM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> On 11/19/2018 12:02 AM, Wolfram Sang wrote:
+> >>> On Sun, Nov 18, 2018 at 06:33:26PM +0100, Marek Vasut wrote:
+> >>>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >>>>
+> >>>> This patch adds CAN{0,1} controller nodes for the R8A77965 SoC.
+> >>>>
+> >>>> Based on several similar patches of the R8A7795 device tree
+> >>>> by Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
+> >>>> and Geert Uytterhoeven <geert+renesas@glider.be>.
+> >>>>
+> >>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> >>>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> >>>> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> >>>> Cc: Rob Herring <robh@kernel.org>
+> >>>> Cc: Simon Horman <horms+renesas@verge.net.au>
+> >>>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> >>>> Cc: linux-renesas-soc at vger.kernel.org
+> >>>> Cc: linux-arm-kernel at lists.infradead.org
+> >>>
+> >>> Were you able to do some testing using EXIO connectors? Would be nice to
+> >>> know what was tested.
+> >>
+> >> Not on the M3N, since I don't see it broken out on the EXIO ; is it
+> >> really there ? It'd be easy to test on M3NSK with KF, but I don't have
+> >> either KF or M3NSK.
+> >
+> > Please have a look at EXIO Connector D, pins 13/14/15.
+>
+> That's LBSC WE1n/WE0n/CS0n on S-XS . Is there something I obviously
+> don't see ?
 
-Looks good. I'm picking this up.
+Unless you connect an expansion card to the Ex Memory Connector,
+these signals are free to use, and can be pinmuxed to a CAN function.
 
-Thanks,
-Jens
+Gr{oetje,eeting}s,
+
+                        Geert
+
+-- 
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
