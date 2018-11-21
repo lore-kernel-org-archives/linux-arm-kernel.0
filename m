@@ -1,50 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 21 Nov 2018 15:58:14 +0000
-Subject: [PATCH v2 1/4] arm64: arm_pmu: remove unnecessary isb instruction
-In-Reply-To: <1542723322-42536-2-git-send-email-andrew.murray@arm.com>
-References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
- <1542723322-42536-2-git-send-email-andrew.murray@arm.com>
-Message-ID: <20181121155814.5jvhnrtftiwzaczo@lakrids.cambridge.arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Nov 2018 16:00:50 +0000
+Subject: [PATCH v2 1/2] dma-direct: Make DIRECT_MAPPING_ERROR viable for
+ SWIOTLB
+In-Reply-To: <cover.1542812807.git.robin.murphy@arm.com>
+References: <cover.1542812807.git.robin.murphy@arm.com>
+Message-ID: <0b969e82ff750c50587550c55cb46c4025d35f39.1542812807.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 02:15:19PM +0000, Andrew Murray wrote:
-> The armv8pmu_enable_event_counter function issues an isb instruction
-> after enabling a pair of counters - this doesn't provide any value
-> and is inconsistent with the armv8pmu_disable_event_counter.
-> 
-> In any case armv8pmu_enable_event_counter is always called with the
-> PMU stopped. Starting the PMU with armv8pmu_start results in an isb
-> instruction being issued.
-> 
-> Let's remove the unnecessary isb instruction.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+With the overflow buffer removed, we no longer have a unique address
+which is guaranteed not to be a valid DMA target to use as an error
+token. The DIRECT_MAPPING_ERROR value of 0 tries to at least represent
+an unlikely DMA target, but unfortunately there are already SWIOTLB
+users with DMA-able memory at physical address 0 which now gets falsely
+treated as a mapping failure and leads to all manner of misbehaviour.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+The best we can do to mitigate that is flip DIRECT_MAPPING_ERROR to the
+other commonly-used error value of all-bits-set, since the last single
+byte of memory is by far the least-likely-valid DMA target.
 
-... though it would be nice to explicitly point out that the ISB in 
-armv8pmu_start() is before the write to PMCR_EL1, if you happen to
-respin this patch.
+Fixes: dff8d6c1ed58 ("swiotlb: remove the overflow buffer")
+Reported-by: John Stultz <john.stultz@linaro.org>
+Tested-by: John Stultz <john.stultz@linaro.org>
+Acked-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Reviewed-by: Christoph Hellwig <hch@lst.de>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Mark.
+v2: Add parentheses, tweak commit message, collect tags
 
-> ---
->  arch/arm64/kernel/perf_event.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-> index 8e38d52..de564ae 100644
-> --- a/arch/arm64/kernel/perf_event.c
-> +++ b/arch/arm64/kernel/perf_event.c
-> @@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
->  	armv8pmu_enable_counter(idx);
->  	if (armv8pmu_event_is_chained(event))
->  		armv8pmu_enable_counter(idx - 1);
-> -	isb();
->  }
->  
->  static inline int armv8pmu_disable_counter(int idx)
-> -- 
-> 2.7.4
-> 
+ include/linux/dma-direct.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
+index bd73e7a91410..9e66bfe369aa 100644
+--- a/include/linux/dma-direct.h
++++ b/include/linux/dma-direct.h
+@@ -5,7 +5,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/mem_encrypt.h>
+ 
+-#define DIRECT_MAPPING_ERROR		0
++#define DIRECT_MAPPING_ERROR		(~(dma_addr_t)0)
+ 
+ #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
+ #include <asm/dma-direct.h>
+-- 
+2.19.1.dirty
