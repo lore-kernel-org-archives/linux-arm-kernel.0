@@ -1,132 +1,80 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 21 Nov 2018 17:47:07 +0000
-Subject: [PATCH v2 1/1] arm64: Early boot time stamps
-In-Reply-To: <20181120144340.30201-2-pasha.tatashin@soleen.com>
-References: <20181120144340.30201-1-pasha.tatashin@soleen.com>
- <20181120144340.30201-2-pasha.tatashin@soleen.com>
-Message-ID: <20181121174706.GC9801@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 21 Nov 2018 17:46:59 +0000
+Subject: [RFC PATCH v2 16/23] KVM: arm64: Enumerate SVE register indices
+ for KVM_GET_REG_LIST
+In-Reply-To: <87ftvuide0.fsf@linaro.org>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
+ <87k1l6ifa8.fsf@linaro.org>
+ <20181121163201.GC3505@e103592.cambridge.arm.com>
+ <87ftvuide0.fsf@linaro.org>
+Message-ID: <20181121174658.GE3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Tue, Nov 20, 2018 at 09:43:40AM -0500, Pavel Tatashin wrote:
-> Allow printk time stamps/sched_clock() to be available from the early
-> boot.
+On Wed, Nov 21, 2018 at 04:49:59PM +0000, Alex Benn?e wrote:
 > 
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@soleen.com>
-> ---
->  arch/arm64/kernel/setup.c            | 25 +++++++++++++++++++++++++
->  drivers/clocksource/arm_arch_timer.c |  8 ++++----
->  include/clocksource/arm_arch_timer.h |  3 +++
->  3 files changed, 32 insertions(+), 4 deletions(-)
+> Dave Martin <Dave.Martin@arm.com> writes:
 > 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index f4fc1e0544b7..7a43e63b737b 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -40,6 +40,7 @@
->  #include <linux/efi.h>
->  #include <linux/psci.h>
->  #include <linux/sched/task.h>
-> +#include <linux/sched_clock.h>
->  #include <linux/mm.h>
->  
->  #include <asm/acpi.h>
-> @@ -279,8 +280,32 @@ arch_initcall(reserve_memblock_reserved_regions);
->  
->  u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
->  
-> +/*
-> + * Get time stamps available early in boot, useful to identify boot time issues
-> + * from the early boot.
-> + */
-> +static __init void sched_clock_early_init(void)
-> +{
-> +	u64 freq = arch_timer_get_cntfrq();
-> +
-> +	/*
-> +	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
-> +	 * the timer frequency. To avoid breakage on misconfigured
-> +	 * systems, do not register the early sched_clock if the
-> +	 * programmed value if zero. Other random values will just
-> +	 * result in random output.
-> +	 */
-> +	if (!freq)
-> +		return;
-> +
-> +	arch_timer_read_counter = arch_counter_get_cntvct;
+> > On Wed, Nov 21, 2018 at 04:09:03PM +0000, Alex Benn?e wrote:
+> >>
+> >> Dave Martin <Dave.Martin@arm.com> writes:
 
-Why do you need to assign this here?
+[...]
 
-> +	sched_clock_register(arch_timer_read_counter, ARCH_TIMER_NBITS, freq);
-
-arch_timer_read_counter can be reassigned once the arm_arch_timer driver
-has probed; what stops this from being unused as the sched_clock after that
-has happened? I worry that toggling the function pointer could lead to
-sched_clock() going backwards.
-
-> +}
-> +
->  void __init setup_arch(char **cmdline_p)
->  {
-> +	sched_clock_early_init();
-> +
->  	init_mm.start_code = (unsigned long) _text;
->  	init_mm.end_code   = (unsigned long) _etext;
->  	init_mm.end_data   = (unsigned long) _edata;
-
-The patch from this point onwards just looks like a refactoring to me which
-should be independent of adding early printk timestamps. Also, it doesn't
-update the vdso logic, which hardwires a 56-bit mask for the counter values.
-
-Will
-
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 9a7d4dc00b6e..e4843ad48bd3 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -175,13 +175,13 @@ static struct clocksource clocksource_counter = {
->  	.name	= "arch_sys_counter",
->  	.rating	= 400,
->  	.read	= arch_counter_read,
-> -	.mask	= CLOCKSOURCE_MASK(56),
-> +	.mask	= CLOCKSOURCE_MASK(ARCH_TIMER_NBITS),
->  	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
->  };
->  
->  static struct cyclecounter cyclecounter __ro_after_init = {
->  	.read	= arch_counter_read_cc,
-> -	.mask	= CLOCKSOURCE_MASK(56),
-> +	.mask	= CLOCKSOURCE_MASK(ARCH_TIMER_NBITS),
->  };
->  
->  struct ate_acpi_oem_info {
-> @@ -963,8 +963,8 @@ static void __init arch_counter_register(unsigned type)
->  	timecounter_init(&arch_timer_kvm_info.timecounter,
->  			 &cyclecounter, start_count);
->  
-> -	/* 56 bits minimum, so we assume worst case rollover */
-> -	sched_clock_register(arch_timer_read_counter, 56, arch_timer_rate);
-> +	sched_clock_register(arch_timer_read_counter, ARCH_TIMER_NBITS,
-> +			     arch_timer_rate);
->  }
->  
->  static void arch_timer_stop(struct clock_event_device *clk)
-> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-> index 349e5957c949..c485512e1d01 100644
-> --- a/include/clocksource/arm_arch_timer.h
-> +++ b/include/clocksource/arm_arch_timer.h
-> @@ -71,6 +71,9 @@ enum arch_timer_spi_nr {
->  #define ARCH_TIMER_EVT_STREAM_FREQ				\
->  	(USEC_PER_SEC / ARCH_TIMER_EVT_STREAM_PERIOD_US)
->  
-> +/* 56 bits minimum, so we assume worst case rollover */
-> +#define	ARCH_TIMER_NBITS		56
-> +
->  struct arch_timer_kvm_info {
->  	struct timecounter timecounter;
->  	int virtual_irq;
-> -- 
-> 2.19.1
+> >> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> >> > index 320db0f..89eab68 100644
+> >> > --- a/arch/arm64/kvm/guest.c
+> >> > +++ b/arch/arm64/kvm/guest.c
+> >> > @@ -323,6 +323,46 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> >> >  	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+> >> >  }
+> >> >
+> >> > +static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
+> >> > +{
+> >> > +	const unsigned int slices = DIV_ROUND_UP(
+> >> > +		vcpu->arch.sve_max_vl,
+> >> > +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
+> >>
+> >> Having seen this formulation come up several times now I wonder if there
+> >> should be a kernel private define, KVM_SVE_ZREG/PREG_SIZE to avoid this
+> >> clumsiness.
+> >
+> > I agree it's a bit awkward.  Previous I spelled this "0x100", which
+> > was terse but more sensitive to typos and other screwups that Io
+> > liked.
+> >
+> >> You could still use the KVM_REG_SIZE to extract it as I guess this is to
+> >> make changes simpler if/when the SVE reg size gets bumped up.
+> >
+> > That might be more challenging to determine at compile time.
+> >
+> > I'm not sure how good GCC is at doing const-propagation between related
+> > (but different) expressions, so I preferred to go for something that
+> > is clearly compiletime constant rather than extracting it from the
+> > register ID that came from userspace.
+> >
+> > So, I'd prefer not to use KVM_REG_SIZE() for this, but I'm happy to add
+> > a private #define to hide this cumbersome construct.  That would
+> > certainly make the code more readable.
+> >
+> > (Of course, the actual runtime cost is trivial either way, but I felt
+> > it was easier to reason about correctness if this is really a constant.)
+> >
+> >
+> > Sound OK?
 > 
+> Yes.
+> 
+> I'd almost suggested by not just use KVM_REG_SIZE(KVM_REG_SIZE_U2048)
+> earlier until I realised this might be forward looking.
+
+Having the slice size as 2048 bits is a property of the ABI and isn't
+intended to change in the future.
+
+So, I guess we could write the above, but I prefer to have the size
+determined in the fewest number of places possible.
+
+
+Cheers
+---Dave
