@@ -1,34 +1,88 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 21 Nov 2018 13:50:13 +0100
-Subject: [PATCH V2] arm64: dts: renesas: r8a77965: Add CAN and CANFD
- controller nodes
-In-Reply-To: <20181120233252.1612-1-marek.vasut+renesas@gmail.com>
-References: <20181120233252.1612-1-marek.vasut+renesas@gmail.com>
-Message-ID: <20181121125013.GA847@kunai>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Nov 2018 12:58:15 +0000
+Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
+ erratum 1165522
+In-Reply-To: <06743f45-fd39-787d-0c59-12d28d8245bb@arm.com>
+References: <20181105143617.120602-1-marc.zyngier@arm.com>
+ <20181105143617.120602-5-marc.zyngier@arm.com>
+ <06743f45-fd39-787d-0c59-12d28d8245bb@arm.com>
+Message-ID: <dc5b3168-5832-c7ad-10a4-67cdab2921db@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 12:32:52AM +0100, Marek Vasut wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On 21/11/2018 12:23, Julien Grall wrote:
+> Hi Marc,
 > 
-> This patch adds CAN{0,1} and CANFD controller nodes for the R8A77965 SoC.
+> On 05/11/2018 14:36, Marc Zyngier wrote:
+>> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
+>> speculate an AT instruction in during a guest switch while the
+>> S1/S2 system registers are in an inconsistent state.
+>>
+>> Work around it by:
+>> - Mandating VHE
+>> - Make sure that S1 and S2 system registers are consistent before
+>>    clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
+>>    regime
+>>
+>> These two things together ensure that we cannot hit this erratum.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   Documentation/arm64/silicon-errata.txt |  1 +
+>>   arch/arm64/Kconfig                     | 12 ++++++++++++
+>>   arch/arm64/include/asm/cpucaps.h       |  3 ++-
+>>   arch/arm64/include/asm/kvm_host.h      |  3 +++
+>>   arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
+>>   arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
+>>   arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
+>>   7 files changed, 46 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+>> index 76ccded8b74c..04f0bc4690c6 100644
+>> --- a/Documentation/arm64/silicon-errata.txt
+>> +++ b/Documentation/arm64/silicon-errata.txt
+>> @@ -57,6 +57,7 @@ stable kernels.
+>>   | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
+>>   | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
+>>   | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
+>> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
+>>   | ARM            | MMU-500         | #841119,#826419 | N/A                         |
+>>   |                |                 |                 |                             |
+>>   | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 787d7850e064..a68bc6cc2167 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
+>>   
+>>   	  If unsure, say Y.
+>>   
+>> +config ARM64_ERRATUM_1165522
+>> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
+>> +	default y
+>> +	help
+>> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
+>> +
+>> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
+>> +	  corrupted TLBs by speculating an AT instruction during a guest
+>> +	  context switch.
+>> +
+>> +	  If unsure, say Y.
 > 
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Simon Horman <horms+renesas@verge.net.au>
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Cc: linux-renesas-soc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
+> Most of the code in the patch is not guarded by #ifdef ARM64_*. So is there any 
+> benefits to add a Kconfig for this option?
 
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+The detection code is guarded by this config option, which is the
+important thing. In general, we try to compile everything, all the time,
+unless this is too big to be the case. It drastically simplify the
+maintenance.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/3fea816a/attachment.sig>
+See the VHE code for example, which is always compiled in, and is only
+gated by the detection code that gets compiled out if the option isn't
+selected.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
