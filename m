@@ -1,56 +1,60 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed, 21 Nov 2018 19:01:40 +0100
-Subject: [PATCH 5/6] drivers: power: suspend: call devfreq suspend/resume
-In-Reply-To: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180206eucas1p265865226e3938a28e842e8367233dc2e@eucas1p2.samsung.com>
-Message-ID: <1542823301-23563-6-git-send-email-l.luba@partner.samsung.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Wed, 21 Nov 2018 19:02:20 +0100
+Subject: [PATCH v2 3/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
+ and improve debugging
+In-Reply-To: <20181121164638.GD24883@arm.com>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <20181111090341.120786-4-drinkcat@chromium.org>
+ <20181121164638.GD24883@arm.com>
+Message-ID: <20181121180000.GU12932@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devfreq framework supports suspend of its devices.
-Call the the devfreq interface and allow devfreq devices preserve/restore
-their states during suspend/resume.
+On Wed 21-11-18 16:46:38, Will Deacon wrote:
+> On Sun, Nov 11, 2018 at 05:03:41PM +0800, Nicolas Boichat wrote:
+> > For level 1/2 pages, ensure GFP_DMA32 is used if CONFIG_ZONE_DMA32
+> > is defined (e.g. on arm64 platforms).
+> > 
+> > For level 2 pages, allocate a slab cache in SLAB_CACHE_DMA32.
+> > 
+> > Also, print an error when the physical address does not fit in
+> > 32-bit, to make debugging easier in the future.
+> > 
+> > Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
+> > Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+> > ---
+> > 
+> > Changes since v1:
+> >  - Changed approach to use SLAB_CACHE_DMA32 added by the previous
+> >    commit.
+> >  - Use DMA or DMA32 depending on the architecture (DMA for arm,
+> >    DMA32 for arm64).
+> > 
+> > drivers/iommu/io-pgtable-arm-v7s.c | 20 ++++++++++++++++----
+> >  1 file changed, 16 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
+> > index 445c3bde04800c..996f7b6d00b44a 100644
+> > --- a/drivers/iommu/io-pgtable-arm-v7s.c
+> > +++ b/drivers/iommu/io-pgtable-arm-v7s.c
+> > @@ -161,6 +161,14 @@
+> >  
+> >  #define ARM_V7S_TCR_PD1			BIT(5)
+> >  
+> > +#ifdef CONFIG_ZONE_DMA32
+> > +#define ARM_V7S_TABLE_GFP_DMA GFP_DMA32
+> > +#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA32
+> > +#else
+> > +#define ARM_V7S_TABLE_GFP_DMA GFP_DMA
+> > +#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA
+> > +#endif
+> 
+> It's a bit grotty that GFP_DMA32 doesn't just map to GFP_DMA on 32-bit
+> architectures, since then we wouldn't need this #ifdeffery afaict.
 
-The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
-solve issue with devfreq device's frequency during suspend/resume.
-During the discussion on LKML some corner cases and comments appeared
-related to the design. This patch address them keeping in mind suggestions
-from Chanwoo Choi.
+But GFP_DMA32 should map to GFP_KERNEL on 32b, no? Or what exactly is
+going on in here?
 
-Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
----
- drivers/base/power/main.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/base/power/main.c b/drivers/base/power/main.c
-index a690fd4..0992e67 100644
---- a/drivers/base/power/main.c
-+++ b/drivers/base/power/main.c
-@@ -32,6 +32,7 @@
- #include <trace/events/power.h>
- #include <linux/cpufreq.h>
- #include <linux/cpuidle.h>
-+#include <linux/devfreq.h>
- #include <linux/timer.h>
- 
- #include "../base.h"
-@@ -1078,6 +1079,7 @@ void dpm_resume(pm_message_t state)
- 	dpm_show_time(starttime, state, 0, NULL);
- 
- 	cpufreq_resume();
-+	devfreq_resume();
- 	trace_suspend_resume(TPS("dpm_resume"), state.event, false);
- }
- 
-@@ -1852,6 +1854,7 @@ int dpm_suspend(pm_message_t state)
- 	trace_suspend_resume(TPS("dpm_suspend"), state.event, true);
- 	might_sleep();
- 
-+	devfreq_suspend();
- 	cpufreq_suspend();
- 
- 	mutex_lock(&dpm_list_mtx);
 -- 
-2.7.4
+Michal Hocko
+SUSE Labs
