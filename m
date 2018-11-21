@@ -1,47 +1,44 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Nov 2018 10:39:03 -0600
-Subject: [RFC PATCH] of: make MAX_RESERVED_REGIONS configurable
-In-Reply-To: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
-References: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
-Message-ID: <CAL_JsqLGvUYQmCGXLgSO+6kFj2i87dpaTbMGbyu5oMt=eeu35A@mail.gmail.com>
+Date: Wed, 21 Nov 2018 10:41:01 -0600
+Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for
+ SPI mode
+In-Reply-To: <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
+References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
+ <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
+Message-ID: <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 2:11 AM <miles.chen@mediatek.com> wrote:
+On Wed, Nov 21, 2018 at 5:29 AM Radu Pirea <radu_nicolae.pirea@upb.ro> wrote:
 >
-> From: Miles Chen <miles.chen@mediatek.com>
+> The bindings for DMA are now common for both drivers of the USART
+> IP.
 >
-> When we use more than 32 entries in /resered-memory,
-> there will be an error message: "not enough space all defined regions.".
-> We can increase MAX_RESERVED_REGIONS to fix this.
+> The node given as an example for USART in SPI mode has been updated in
+> order to include DMA bindings.
 >
-> commit 22f8cc6e3373 ("drivers: of: increase MAX_RESERVED_REGIONS to 32")
-> increased MAX_RESERVED_REGIONS to 32 but I'm not sure if increasing
-> MAX_RESERVED_REGIONS to 64 is suitable for everyone.
+> Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
+> ---
+>  .../devicetree/bindings/mfd/atmel-usart.txt       | 15 ++++++++++-----
+>  1 file changed, 10 insertions(+), 5 deletions(-)
 >
-> In this RFC patch, CONFIG_MAX_OF_RESERVED_REGIONS is added and used as
-> MAX_RESERVED_REGIONS. Add a sanity test to make sure that
-> MAX_RESERVED_REGIONS is less than INIT_MEMBLOCK_REGIONS.
-> Users can configure CONFIG_MAX_OF_RESERVED_REGIONS according to their
-> need.
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-usart.txt b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> index 7f0cd72f47d2..8ad008175343 100644
+> --- a/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> @@ -17,17 +17,19 @@ Required properties for USART in SPI mode:
+>  - cs-gpios: chipselects (internal cs not supported)
+>  - atmel,usart-mode : Must be <AT91_USART_MODE_SPI> (found in dt-bindings/mfd/at91-usart.h)
+>
+> +Optional properties in serial and SPI mode:
+> +- dma bindings for dma transfer:
+> +       - dmas: DMA specifier, consisting of a phandle to DMA controller node,
+> +               memory peripheral interface and USART DMA channel ID, FIFO configuration.
+> +               Refer to dma.txt and atmel-dma.txt for details.
+> +       - dma-names: "rx" for RX channel, "tx" for TX channel.
 
-I don't want a kconfig option for this. I think it should be dynamic instead.
+> +               dma-names = "tx", "rx";
 
-The current flow is like this:
-
-for each reserved node:
-  - call memblock_reserve
-  - Add info to reserved_mem array
-
-I think we should change it to:
-
-for each reserved node:
-  - call memblock_reserve
-  - count number of nodes
-
-Alloc array using memblock_alloc
-
-for each reserved node:
-   - Add info to reserved_mem array
+The dma-names should have a defined order.
 
 Rob
