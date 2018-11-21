@@ -1,98 +1,46 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed, 21 Nov 2018 19:01:38 +0100
-Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a devfreq
- device
-In-Reply-To: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
-Message-ID: <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
+Date: Wed, 21 Nov 2018 19:01:35 +0100
+Subject: [PATCH 0/6] devfreq: handle suspend/resume
+References: <CGME20181121180156eucas1p225af7f4341a039264ff26f2a9ad9bb12@eucas1p2.samsung.com>
+Message-ID: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch adds support for handling suspend/resume process.
-It uses atomic variables to make sure no race condition
-affects the process.
+Hi all,
 
-The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
-solve issue with devfreq device's frequency during suspend/resume.
+This patch set aims to address the issue with devfreq devices' frequency
+during suspend/resume. It extends suspend/resume by calls to Devfreq
+framework. In the devfreq framework there is a small refactoring to avoid
+code duplication in changging frequency (patch 2) and there are extensions
+for suspending devices.
+
+It has been tested on Odroid u3 with Exynos 4412.
+
+The patch set draws on Tobias Jakobi's work posted ~2 years ago, who tried
+to solve issue with devfreq device's frequency during suspend/resume.
 During the discussion on LKML some corner cases and comments appeared
-related to the design. This patch address them keeping in mind suggestions
-from Chanwoo Choi.
+related to the design. This patch set address them keeping in mind
+suggestions from Chanwoo Choi.
+Tobias's paches:
+https://www.spinics.net/lists/linux-samsung-soc/msg56602.html 
 
-Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
----
- drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
- 1 file changed, 39 insertions(+), 6 deletions(-)
+Regards,
+Lukasz Luba
 
-diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index cf9c643..7e09de8 100644
---- a/drivers/devfreq/devfreq.c
-+++ b/drivers/devfreq/devfreq.c
-@@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
-  */
- int devfreq_suspend_device(struct devfreq *devfreq)
- {
--	if (!devfreq)
--		return -EINVAL;
-+        int ret;
-+        unsigned long prev_freq;
-+        u32 flags = 0;
-+
-+        if (!devfreq)
-+                return -EINVAL;
-+
-+        if (devfreq->governor) {
-+		ret = devfreq->governor->event_handler(devfreq,
-+					DEVFREQ_GOV_SUSPEND, NULL);
-+		if (ret)
-+			return ret;
-+	}
- 
--	if (!devfreq->governor)
--		return 0;
-+	if (devfreq->suspend_freq) {
-+		if (atomic_inc_return(&devfreq->suspend_count) > 1)
-+			return 0;
- 
--	return devfreq->governor->event_handler(devfreq,
--				DEVFREQ_GOV_SUSPEND, NULL);
-+		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
-+					 &prev_freq, flags);
-+		if (ret)
-+			return ret;
-+
-+		devfreq->resume_freq = prev_freq;
-+	}
-+
-+        return 0;
- }
- EXPORT_SYMBOL(devfreq_suspend_device);
- 
-@@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
-  */
- int devfreq_resume_device(struct devfreq *devfreq)
- {
-+        int ret;
-+        unsigned long prev_freq;
-+        u32 flags = 0;
-+
- 	if (!devfreq)
- 		return -EINVAL;
- 
-+	if (devfreq->suspend_freq) {
-+		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
-+			return 0;
-+
-+		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
-+					 &prev_freq, flags);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	if (!devfreq->governor)
- 		return 0;
- 
+Lukasz Luba (6):
+  devfreq: add basic fileds supporting suspend functionality
+  devfreq: refactor set_target frequency function
+  devfreq: add support for suspend/resume of a devfreq device
+  devfreq: add devfreq_suspend/resume() functions
+  drivers: power: suspend: call devfreq suspend/resume
+  arm: dts: exynos4: set opp-suspend for DMC and leftbus
+
+ arch/arm/boot/dts/exynos4210.dtsi |   2 +
+ arch/arm/boot/dts/exynos4412.dtsi |   2 +
+ drivers/base/power/main.c         |   3 +
+ drivers/devfreq/devfreq.c         | 159 ++++++++++++++++++++++++++++++--------
+ include/linux/devfreq.h           |  11 +++
+ 5 files changed, 146 insertions(+), 31 deletions(-)
+
 -- 
 2.7.4
