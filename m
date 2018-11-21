@@ -1,43 +1,87 @@
-From: sugaya.taichi@socionext.com (sugaya.taichi at socionext.com)
-Date: Wed, 21 Nov 2018 04:07:19 +0000
-Subject: [PATCH 03/14] ARM: milbeaut: Add Milbeaut M10V early printk
-In-Reply-To: <CAL_JsqKMK7nMUxZLu9eV8tpnCXsAr2F4j=xTO8UL0g8V30kYZg@mail.gmail.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-4-git-send-email-sugaya.taichi@socionext.com>
- <CAL_JsqKMK7nMUxZLu9eV8tpnCXsAr2F4j=xTO8UL0g8V30kYZg@mail.gmail.com>
-Message-ID: <7f32b467a1d84987b9d80cdd540e035b@SOC-EX02V.e01.socionext.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 21 Nov 2018 09:06:41 +0530
+Subject: [PATCH v2 04/15] dt-bindings: interrupt-controller: Document
+ RDA8810PL intc
+In-Reply-To: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
+References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181121033652.12247-5-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob
+Document interrupt controller in RDA Micro RDA8810PL SoC.
 
-Thank you for your comment.
+Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+---
+ .../interrupt-controller/rda,8810pl-intc.txt  | 61 +++++++++++++++++++
+ 1 file changed, 61 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh+dt at kernel.org]
-> Sent: Tuesday, November 20, 2018 12:21 AM
-> To: Sugaya, Taichi/?? ??
-> Cc: linux-clk; devicetree at vger.kernel.org; moderated list:ARM/FREESCALE
-> IMX / MXC ARM ARCHITECTURE; linux-kernel at vger.kernel.org; open list:SERIAL
-> DRIVERS; Michael Turquette; Stephen Boyd; Mark Rutland; Greg Kroah-Hartman;
-> Daniel Lezcano; Thomas Gleixner; Russell King; Jiri Slaby; Masami Hiramatsu;
-> Jassi Brar
-> Subject: Re: [PATCH 03/14] ARM: milbeaut: Add Milbeaut M10V early printk
-> 
-> On Sun, Nov 18, 2018 at 7:00 PM Sugaya Taichi
-> <sugaya.taichi@socionext.com> wrote:
-> >
-> > Add Milbeaut M10V earlyprintk.
-> 
-> Do you really need earlyprintk? earlycon is preferred instead. It's
-> not quite as early, but doesn't require rebuilding the kernel and
-> supports more than 1 fixed device. If you crash before earlycon is
-> enabled, that pretty much means either a bad dtb memory node or just
-> flaky memory.
-OK. I use earlycon since would like to use flexible functions.
-
-Thanks
-Sugaya Taichi
-
-> 
-> Rob
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
+new file mode 100644
+index 000000000000..e0062aebf025
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
+@@ -0,0 +1,61 @@
++RDA Micro RDA8810PL Interrupt Controller
++
++The interrupt controller in RDA8810PL SoC is a custom interrupt controller
++which supports up to 32 interrupts.
++
++Required properties:
++
++- compatible: Should be "rda,8810pl-intc".
++- reg: Specifies base physical address of the registers set.
++- interrupt-controller: Identifies the node as an interrupt controller.
++- #interrupt-cells: Specifies the number of cells needed to encode an
++  interrupt source. The value shall be 2.
++
++The interrupt sources are as follows:
++
++ID	Name
++------------
++0:	PULSE_DUMMY
++1:	I2C
++2:	NAND_NFSC
++3:	SDMMC1
++4:	SDMMC2
++5:	SDMMC3
++6:	SPI1
++7:	SPI2
++8:	SPI3
++9:	UART1
++10:	UART2
++11:	UART3
++12:	GPIO1
++13:	GPIO2
++14:	GPIO3
++15:	KEYPAD
++16:	TIMER
++17:	TIMEROS
++18:	COMREG0
++19:	COMREG1
++20:	USB
++21:	DMC
++22:	DMA
++23:	CAMERA
++24:	GOUDA
++25:	GPU
++26:	VPU_JPG
++27:	VPU_HOST
++28:	VOC
++29:	AUIFC0
++30:	AUIFC1
++31:	L2CC
++
++Example:
++		apb at 20800000 {
++			compatible = "simple-bus";
++			...
++			intc: interrupt-controller at 0 {
++				compatible = "rda,8810pl-intc";
++				reg = <0x0 0x1000>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++			};
++		};
+-- 
+2.17.1
