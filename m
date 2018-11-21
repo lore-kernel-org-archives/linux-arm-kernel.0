@@ -1,40 +1,84 @@
-From: sakari.ailus@linux.intel.com (Sakari Ailus)
-Date: Thu, 22 Nov 2018 00:01:03 +0200
-Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
-In-Reply-To: <20181115205106.thbkojnzdwmaeui3@flea>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
- <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
- <20181115205106.thbkojnzdwmaeui3@flea>
-Message-ID: <20181121220102.6nn7uwu2c67zs6pz@mara.localdomain>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Nov 2018 22:26:26 +0000
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <20181121213853.GL3065@bombadil.infradead.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+Message-ID: <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 09:51:06PM +0100, Maxime Ripard wrote:
-> Hi Hans,
+On 2018-11-21 9:38 pm, Matthew Wilcox wrote:
+> On Wed, Nov 21, 2018 at 06:20:02PM +0000, Christopher Lameter wrote:
+>> On Sun, 11 Nov 2018, Nicolas Boichat wrote:
+>>
+>>> This is a follow-up to the discussion in [1], to make sure that the page
+>>> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
+>>> physical address space.
+>>
+>> Page tables? This means you need a page frame? Why go through the slab
+>> allocators?
 > 
-> Thanks for your review! I'll address the other comments you made.
-> 
-> On Tue, Nov 13, 2018 at 01:24:47PM +0100, Hans Verkuil wrote:
-> > > +static int csi_probe(struct platform_device *pdev)
-> > > +{
-> > > +	struct sun4i_csi *csi;
-> > > +	struct resource *res;
-> > > +	int ret;
-> > > +	int irq;
-> > > +
-> > > +	csi = devm_kzalloc(&pdev->dev, sizeof(*csi), GFP_KERNEL);
-> > 
-> > devm_kzalloc is not recommended: all devm_ memory is freed when the driver
-> > is unbound, but a filehandle might still have a reference open.
-> 
-> How would a !devm variant with a kfree in the remove help? We would
-> still fall in the same case, right?
+> Because this particular architecture has sub-page-size PMD page tables.
+> We desperately need to hoist page table allocation out of the architectures;
+> there're a bunch of different implementations and they're mostly bad,
+> one way or another.
 
-Not quite. For video nodes this is handled: the release callback gets called
-once there are no file handles open to the device. That may well be much
-later than the device has been unbound from the driver.
+These are IOMMU page tables, rather than CPU ones, so we're already well 
+outside arch code - indeed the original motivation of io-pgtable was to 
+be entirely independent of the p*d types and arch-specific MM code (this 
+Armv7 short-descriptor format is already "non-native" when used by 
+drivers in an arm64 kernel).
 
--- 
-Sakari Ailus
-sakari.ailus at linux.intel.com
+There are various efficiency reasons for using regular kernel memory 
+instead of coherent DMA allocations - for the most part it works well, 
+we just have the odd corner case like this one where the 32-bit format 
+gets used on 64-bit systems such that the tables themselves still need 
+to be allocated below 4GB (although the final output address can point 
+at higher memory by virtue of the IOMMU in question not implementing 
+permissions and repurposing some of those PTE fields as extra address bits).
+
+TBH, if this DMA32 stuff is going to be contentious we could possibly 
+just rip out the offending kmem_cache - it seemed like good practice for 
+the use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied 
+upon to give the same 1KB alignment and chance of succeeding as the 
+equivalent kmem_cache_alloc(), then we could quite easily make do with 
+that instead.
+
+Thanks,
+Robin.
+
+> For each level of page table we generally have three cases:
+> 
+> 1. single page
+> 2. sub-page, naturally aligned
+> 3. multiple pages, naturally aligned
+> 
+> for 1 and 3, the page allocator will do just fine.
+> for 2, we should have a per-MM page_frag allocator.  s390 already has
+> something like this, although it's more complicated.  ppc also has
+> something a little more complex for the cases when it's configured with
+> a 64k page size but wants to use a 4k page table entry.
+> 
+> I'd like x86 to be able to simply do:
+> 
+> #define pte_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+> #define pmd_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+> #define pud_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+> #define p4d_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+> 
+> An architecture with 4k page size and needing a 16k PMD would do:
+> 
+> #define pmd_alloc_one(mm, addr) page_alloc_table(mm, addr, 2)
+> 
+> while an architecture with a 64k page size needing a 4k PTE would do:
+> 
+> #define ARCH_PAGE_TABLE_FRAG
+> #define pte_alloc_one(mm, addr) pagefrag_alloc_table(mm, addr, 4096)
+> 
+> I haven't had time to work on this, but perhaps someone with a problem
+> that needs fixing would like to, instead of burying yet another awful
+> implementation away in arch/ somewhere.
+> 
