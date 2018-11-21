@@ -1,56 +1,170 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 21 Nov 2018 13:11:39 +0100
-Subject: [PATCH v2] arm64: dts: renesas: r8a77990: Add I2C-DVFS device node
-Message-ID: <20181121121139.25493-1-horms+renesas@verge.net.au>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 21 Nov 2018 12:17:45 +0000
+Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
+In-Reply-To: <20181121110620.GC18678@e113682-lin.lund.arm.com>
+References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
+ <201811211656540883310@zte.com.cn>
+ <20181121110620.GC18678@e113682-lin.lund.arm.com>
+Message-ID: <26c4ad81-f808-5a84-c725-72db8de7cd2b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds I2C-DVFS device node for the R8A77990 SoC.
 
-v2
-* Drop aliases update as in upstream it is not required to configure the
-  BD9571 PMIC for DDR backup, nor is the use of i2c are aliases desired.
-* Do not describe the device as compatible with "renesas,rcar-gen3-iic" or
-  "renesas,rmobile-iic" fallback compat strings. The absence of automatic
-  transmission registers leads us to declare the r8a77990 IIC controller as
-  incompatible.
+On 21/11/18 11:06, Christoffer Dall wrote:
+> Hi,
+> 
+> On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
+>>> On 19/11/2018 09:10, Mark Rutland wrote:
+>>>> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
+>>>>>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
+>>>>>>>> Hi,
+>>>>>>>>> When virtual machine starts, hang up.
+>>>>>>>>
+>>>>>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
+>>>>>>>> interrupt?
+>>>>>>>>
+>>>>>>>>> The kernel version of guest
+>>>>>>>>> is 4.16. Host support vgic_v3.
+>>>>>>>>
+>>>>>>>> Your host kernel is something recent, I guess?
+>>>>>>>>
+>>>>>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
+>>>>>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
+>>>>>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
+>>>>>>>>> correctly, so group is not set.
+>>>>>>>>
+>>>>>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
+>>>>>>>> version?) or some other userland tool?
+>>>>>>>>
+>>>>>>>
+>>>>>>> QEMU emulator version 3.0.50 .
+>>>>>>>
+>>>>>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
+>>>>>>>>> time.
+>>>>>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+>>>>>>>>> interrupt injection failed.
+>>>>>>>>>
+>>>>>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+>>>>>>>>> ---
+>>>>>>>>>    virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+>>>>>>>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>>>>>>>
+>>>>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+>>>>>>>>> index 9c0dd23..d101000 100644
+>>>>>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
+>>>>>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+>>>>>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
+>>>>>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
+>>>>>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
+>>>>>>>>>
+>>>>>>>>> -    if (irq->group)
+>>>>>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>>>>>>>>
+>>>>>>>> This is not the right fix, not only because it basically reverts the
+>>>>>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
+>>>>>>>> their configured group).
+>>>>>>>>
+>>>>>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
+>>>>>>>> before dist->vgic_model is set, also what value it has?
+>>>>>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
+>>>>>>>>
+>>>>>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
+>>>>>>>    If the interrupt comes at this time, the interrupt injection fails.
+>>>>>>
+>>>>>> Does that mean that the guest is configuring its interrupts as Group0?
+>>>>>> That sounds wrong, Linux should configure all it's interrupts as
+>>>>>> non-secure group1.
+>>>>>
+>>>>> no, I think that uefi dose this, not linux.
+>>>>> 1. kvm_vgic_vcpu_init
+>>>>> 2. vgic_create
+>>>>> 3. kvm_vgic_dist_init
+>>>>> 4.vgic_mmio_write_group: uefi as guest, write group=0
+>>>>> 5.vgic_mmio_write_group: linux as guest, write group=1
+>>>>
+>>>> Is this the same issue fixed by EDK2 commit:
+>>>>
+>>>> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+>>>>
+>>>> ... where EDK2 would try to use IAR0 rather than IAR1?
+>>>>
+>>>> The commit messages notes this lead to a boot-time hang.
+>>>
+>>> I managed to trigger an issue with a really old EFI implementation that
+>>> doesn't configure its interrupts as Group1, and yet tries to ACK its
+>>> interrupts using the Group1 accessor. Guess what? It is not going to work.
+>>>
+>>> Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
+>>> to be the fix (I only assume it does, I haven't actually checked). A
+>>> recent build, as found in Debian Buster, works perfectly (tested with
+>>> both QEMU v2.12 and tip of tree).
+>>>
+>>> Now, I really don't get what you're saying about Linux not getting
+>>> interrupts. How do you get to booting Linux if EFI is not making any
+>>> forward progress? Are you trying them independently?
+>>>
+>> I start linux with bypassing uefi, the print info is the same.
+>> [507107.748908]  vgic_mmio_write_group:## intid/27 group=0
+>> [507107.752185]  vgic_mmio_write_group:## intid/27 group=0
+>> [507107.899566]  vgic_mmio_write_group:## intid/27 group=1
+>> [507107.907370]  vgic_mmio_write_group:## intid/27 group=1
+>> the command line is like this:
+>> /home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
+>>
+>> This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
+> 
+> Could you try the following patch:
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index c0c0b88af1d5..6fa858c7a5a6 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+>   			irq->config = VGIC_CONFIG_LEVEL;
+>   		}
+>   
+> -		/*
+> -		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+> -		 * so we always know the emulation type at this point as it's
+> -		 * either explicitly configured as GICv3, or explicitly
+> -		 * configured as GICv2, or not configured yet which also
+> -		 * implies GICv2.
+> -		 */
+>   		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+>   			irq->group = 1;
+>   		else
+> @@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
+>   	if (ret)
+>   		goto out;
+>   
+> +	/* Initialize groups on CPUs created before the VGIC type was known */
+> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+> +		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+> +			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+> +			irq->group = 1;
+> +		}
+> +	}
+> +
+>   	if (vgic_has_its(kvm)) {
+>   		ret = vgic_v4_init(kvm);
+>   		if (ret)
+> 
+> 
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-[simon: drop aliases hunk and fallback compat string usage]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+If the value of dist->vgic_model is not properly initialized at the time 
+we call kvm_vgic_vcpu_init is call, won't we still overwrite the 
+irq->group when we get there? (I still haven't seen why we could 
+consider dist->vgic_model is initialized at that point).
 
- Based on renesas-devel-20181121-v4.20-rc3
+Shouldn't we do the irq->group initialization somewhere in 
+kvm_arch_vcpu_ioctl_vcpu_init? (with some vgic_* function to encapsulate 
+it of course). At that point I believe we know that dist->vgic_model is 
+initialized.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index b0398e05e8ed..4ce07ce791b4 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -357,6 +357,20 @@
- 			reg = <0 0xe6060000 0 0x508>;
- 		};
- 
-+		i2c_dvfs: i2c at e60b0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a77990";
-+			reg = <0 0xe60b0000 0 0x34>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 926>;
-+			dmas = <&dmac0 0x11>, <&dmac0 0x10>;
-+			dma-names = "tx", "rx";
-+			status = "disabled";
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a77990-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+Cheers,
+
 -- 
-2.11.0
+Julien Thierry
