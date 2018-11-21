@@ -1,18 +1,31 @@
-From: cl@linux.com (Christopher Lameter)
-Date: Wed, 21 Nov 2018 18:20:02 +0000
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <20181111090341.120786-1-drinkcat@chromium.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
-Message-ID: <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 21 Nov 2018 12:23:20 -0600
+Subject: [PATCH v3 0/5] phy: core: rework phy_set_mode to accept phy mode
+ and submode
+In-Reply-To: <6418b7c3-7345-76e8-90c0-9a77769f6f87@ti.com>
+References: <20181120012424.11802-1-grygorii.strashko@ti.com>
+ <6418b7c3-7345-76e8-90c0-9a77769f6f87@ti.com>
+Message-ID: <f0d7ea37-ba46-ba44-cfec-55300671a764@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 11 Nov 2018, Nicolas Boichat wrote:
 
-> This is a follow-up to the discussion in [1], to make sure that the page
-> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
-> physical address space.
 
-Page tables? This means you need a page frame? Why go through the slab
-allocators?
+On 11/21/18 2:55 AM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On 20/11/18 6:54 AM, Grygorii Strashko wrote:
+>> Hi Kishon, All,
+>>
+>> Thank you for your review.
+>> I've not added "Tested-by"/"Acked-by" tags due to code changes in v3.
+> 
+> merged after adding the required ACKs.
+> 
+
+Thank you all. I'll send TI specific patches soon.
+
+
+-- 
+regards,
+-grygorii
