@@ -1,47 +1,55 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 21 Nov 2018 14:34:08 -0800
-Subject: [PATCHv3 1/6] atomics: add common header generation files
-In-Reply-To: <20181116025112.xhbfei677awm77ji@blommer>
-References: <20180904104830.2975-1-mark.rutland@arm.com>
- <20180904104830.2975-2-mark.rutland@arm.com>
- <20181115151048.26244bad301a3bcb9a450060@linux-foundation.org>
- <20181116025112.xhbfei677awm77ji@blommer>
-Message-ID: <20181121143408.b91c15aff4206a162f9650f6@linux-foundation.org>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Thu, 22 Nov 2018 00:20:02 +0100
+Subject: [PATCH v2 2/2] arm64/bpf: don't allocate BPF JIT programs in
+ module memory
+In-Reply-To: <20181121131733.14910-3-ard.biesheuvel@linaro.org>
+References: <20181121131733.14910-1-ard.biesheuvel@linaro.org>
+ <20181121131733.14910-3-ard.biesheuvel@linaro.org>
+Message-ID: <945415e1-0ff8-65ce-15fa-33cea0a7d1c9@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 16 Nov 2018 02:51:21 +0000 Mark Rutland <mark.rutland@arm.com> wrote:
-
-> Hi Andrew,
+On 11/21/2018 02:17 PM, Ard Biesheuvel wrote:
+> The arm64 module region is a 128 MB region that is kept close to
+> the core kernel, in order to ensure that relative branches are
+> always in range. So using the same region for programs that do
+> not have this restriction is wasteful, and preferably avoided.
 > 
-> On Thu, Nov 15, 2018 at 03:10:48PM -0800, Andrew Morton wrote:
-> > On Tue,  4 Sep 2018 11:48:25 +0100 Mark Rutland <mark.rutland@arm.com> wrote:
-> > 
-> > > To minimize repetition, to allow for future rework, and to ensure
-> > > regularity of the various atomic APIs, we'd like to automatically
-> > > generate (the bulk of) a number of headers related to atomics.
-> > > 
-> > > This patch adds the infrastructure to do so, leaving actual conversion
-> > > of headers to subsequent patches.
-> > 
-> > This thing is appallingly slow.  `sh scripts/atomic/check-atomics.sh'
-> > takes 8 seconds on a machine which builds an allnoconfig kernel in 30
-> > seconds.
+> Now that the core BPF JIT code permits the alloc/free routines to
+> be overridden, implement them by simple vmalloc_exec()/vfree()
+> calls, which can be served from anywere. This also solves an
+> issue under KASAN, where shadow memory is needlessly allocated for
+> all BPF programs (which don't require KASAN shadow pages since
+> they are not KASAN instrumented)
 > 
-> Hmm... on my laptop it's less than half that, and allnoconfig takes ~35s, so
-> clearly there's a major difference between our setups.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index a6fdaea07c63..f91b7c157841 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -940,3 +940,13 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
+>  					   tmp : orig_prog);
+>  	return prog;
+>  }
+> +
+> +void *bpf_jit_alloc_exec(unsigned long size)
+> +{
+> +	return vmalloc_exec(size);
+> +}
+> +
+> +void bpf_jit_free_exec(const void *addr)
+> +{
+> +	return vfree(size);
+> +}
 
-check-atomics.sh is (was) single-threaded, so the relative pain factor
-will increase with the number of cores.
+Hmm, could you elaborate in the commit log on the potential performance
+regression for JITed progs on arm64 after this change?
 
-> For reference, which distro are you using, and what is /bin/sh on your box?
-
-I forget :) - I can't get at that machine from here.  Recentish
-Ubuntu(ish) on a 12-core.
-
-It seems to be partially fixed in today's linux-next?  On this 12-core
-Ubuntu 17.10 bash-4.4-5ubuntu1 box the delta is 25.9s -> 27.2s.
-
-But my one-liner remains cruelly unapplied so the build still generates
-errors.  All that seems to have changed today is that the -EPERM is simply
-dropped on the floor rather than terminating the build.
+I think this change would also break JITing of BPF to BPF calls. You might
+have the same issue as ppc64 folks where the offset might not fit into imm
+anymore and would have to transfer it via fp->aux->func[off]->bpf_func
+instead.
