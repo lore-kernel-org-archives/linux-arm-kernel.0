@@ -1,76 +1,179 @@
-From: paul.burton@mips.com (Paul Burton)
-Date: Wed, 21 Nov 2018 18:40:06 +0000
-Subject: [PATCH v2 16/15] syscall_get_arch: add "struct task_struct *"
- argument
-In-Reply-To: <20181121004422.GA29053@altlinux.org>
-References: <20181107042751.3b519062@akathisia>
- <CALCETrV1v-DPRfDRwiH=xn29bxWxiHdZtAH1nw=dsmDtnT0YGQ@mail.gmail.com>
- <20181120001128.GA11300@altlinux.org> <20181121004422.GA29053@altlinux.org>
-Message-ID: <20181121184004.jro532jopnbmru2m@pburton-laptop>
+From: mesihkilinc@gmail.com (Mesih Kilinc)
+Date: Wed, 21 Nov 2018 21:30:49 +0300
+Subject: [RFC PATCH v3 16/17] ARM: dts: suniv: add initial DTSI file for
+ F1C100s
+In-Reply-To: <cover.1542824904.git.mesihkilinc@gmail.com>
+References: <cover.1542824904.git.mesihkilinc@gmail.com>
+Message-ID: <05dab577154c72117678c2f49ae85a9663a630e2.1542824904.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+F1C100s is one product with the suniv die, which has a 32MiB co-packaged
+DDR1 DRAM chip. As we have the support for suniv pin controller and CCU now, add a
+initial DTSI for it.
 
-On Wed, Nov 21, 2018 at 03:44:22AM +0300, Dmitry V. Levin wrote:
-> This argument is required to extend the generic ptrace API
-> with PTRACE_GET_SYSCALL_INFO request: syscall_get_arch() is going to be
-> called from ptrace_request() along with other syscall_get_* functions
-> with a tracee as their argument.
-> 
-> This change partially reverts commit 5e937a9ae913 ("syscall_get_arch:
-> remove useless function arguments").
-> 
->%
-> 
-> diff --git a/arch/mips/include/asm/syscall.h b/arch/mips/include/asm/syscall.h
-> index 0170602a1e4e..52b633f20abd 100644
-> --- a/arch/mips/include/asm/syscall.h
-> +++ b/arch/mips/include/asm/syscall.h
-> @@ -73,7 +73,7 @@ static inline unsigned long mips_get_syscall_arg(unsigned long *arg,
->  #ifdef CONFIG_64BIT
->  	case 4: case 5: case 6: case 7:
->  #ifdef CONFIG_MIPS32_O32
-> -		if (test_thread_flag(TIF_32BIT_REGS))
-> +		if (test_ti_thread_flag(task_thread_info(task), TIF_32BIT_REGS))
->  			return get_user(*arg, (int *)usp + n);
->  		else
->  #endif
+Signed-off-by: Mesih Kilinc <mesihkilnc@gmail.com>
+---
+ arch/arm/boot/dts/suniv-f1c100s.dtsi | 151 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 151 insertions(+)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
 
-This ought to be test_tsk_thread_flag(task, TIF_32BIT_REGS) instead of
-open-coding test_tsk_thread_flag.
-
-More fundamentally though, this change doesn't seem to be (directly)
-related to the change you describe in the commit message - it's not
-syscall_get_arch being modified here. I suspect this should be a
-separate commit, or if not please explain in the commit message why this
-change is included.
-
-Compounding the lack of clarity is the fact that I only received this
-patch, not the whole series, so I can't view the change in the context
-of the rest of the series.
-
-> @@ -140,14 +140,14 @@ extern const unsigned long sys_call_table[];
->  extern const unsigned long sys32_call_table[];
->  extern const unsigned long sysn32_call_table[];
->  
-> -static inline int syscall_get_arch(void)
-> +static inline int syscall_get_arch(struct task_struct *task)
->  {
->  	int arch = AUDIT_ARCH_MIPS;
->  #ifdef CONFIG_64BIT
-> -	if (!test_thread_flag(TIF_32BIT_REGS)) {
-> +	if (!test_ti_thread_flag(task_thread_info(task), TIF_32BIT_REGS)) {
->  		arch |= __AUDIT_ARCH_64BIT;
->  		/* N32 sets only TIF_32BIT_ADDR */
-> -		if (test_thread_flag(TIF_32BIT_ADDR))
-> +		if (test_ti_thread_flag(task_thread_info(task), TIF_32BIT_ADDR))
->  			arch |= __AUDIT_ARCH_CONVENTION_MIPS64_N32;
->  	}
->  #endif
-
-This does seem like the described change, but there are 2 more instances
-of open-coding test_tsk_thread_flag which ought to be cleaned up.
-
-Thanks,
-    Paul
+diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+new file mode 100644
+index 0000000..3ad64ee
+--- /dev/null
++++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+@@ -0,0 +1,151 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
++ * Copyright 2018 Mesih Kilinc <mesihkilinc@gmail.com>
++ */
++
++#include <dt-bindings/clock/suniv-ccu-f1c100s.h>
++#include <dt-bindings/reset/suniv-ccu-f1c100s.h>
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&intc>;
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		osc24M: clk-24M {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
++
++		osc32k: clk-32k {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
++	};
++
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		sram-controller at 1c00000 {
++			compatible = "allwinner,suniv-f1c100s-system-control";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_d: sram at 10000 {
++				compatible = "mmio-sram";
++				reg = <0x00010000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00010000 0x1000>;
++
++				otg_sram: sram-section at 0 {
++					compatible = "allwinner,suniv-f1c100s-sram-d";
++					reg = <0x0000 0x1000>;
++					status = "disabled";
++				};
++			};
++		};
++
++		ccu: clock at 1c20000 {
++			compatible = "allwinner,suniv-f1c100s-ccu";
++			reg = <0x01c20000 0x400>;
++			clocks = <&osc24M>, <&osc32k>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		intc: interrupt-controller at 1c20400 {
++			compatible = "allwinner,suniv-f1c100s-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		pio: pinctrl at 1c20800 {
++			compatible = "allwinner,suniv-f1c100s-pinctrl";
++			reg = <0x01c20800 0x400>;
++			interrupts = <38>, <39>, <40>;
++			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			#gpio-cells = <3>;
++
++			uart0_pins_a: uart-pins-pe {
++				pins = "PE0", "PE1";
++				function = "uart0";
++			};
++		};
++
++		timer at 1c20c00 {
++			compatible = "allwinner,suniv-f1c100s-timer";
++			reg = <0x01c20c00 0x90>;
++			interrupts = <13>;
++			clocks = <&osc24M>;
++		};
++
++		wdt: watchdog at 1c20ca0 {
++			compatible = "allwinner,suniv-f1c100s-wdt";
++			reg = <0x01c20ca0 0x20>;
++		};
++
++		uart0: serial at 1c25000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART0>;
++			resets = <&ccu RST_BUS_UART0>;
++			status = "disabled";
++		};
++
++		uart1: serial at 1c25400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART1>;
++			resets = <&ccu RST_BUS_UART1>;
++			status = "disabled";
++		};
++
++		uart2: serial at 1c25800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25800 0x400>;
++			interrupts = <3>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART2>;
++			resets = <&ccu RST_BUS_UART2>;
++			status = "disabled";
++		};
++	};
++};
+-- 
+2.7.4
