@@ -1,118 +1,125 @@
 From: aisheng.dong@nxp.com (Aisheng DONG)
-Date: Wed, 21 Nov 2018 01:50:47 +0000
-Subject: [PATCH V6 6/6] clk: imx: add imx8qxp lpcg driver
-In-Reply-To: <154274014557.88331.17188709471206009766@swboyd.mtv.corp.google.com>
+Date: Wed, 21 Nov 2018 01:54:34 +0000
+Subject: [PATCH V6 5/6] clk: imx: add lpcg clock support
+In-Reply-To: <154274488829.88331.14073987677874819400@swboyd.mtv.corp.google.com>
 References: <1541862894-8209-1-git-send-email-aisheng.dong@nxp.com>
- <1541862894-8209-7-git-send-email-aisheng.dong@nxp.com>
- <154223811948.88331.8860718270277533070@swboyd.mtv.corp.google.com>
- <AM0PR04MB4211A7CA91D6188AB81BA6EA80DC0@AM0PR04MB4211.eurprd04.prod.outlook.com>
- <154274014557.88331.17188709471206009766@swboyd.mtv.corp.google.com>
-Message-ID: <AM0PR04MB4211E36F9553E16A196C101C80DA0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <1541862894-8209-6-git-send-email-aisheng.dong@nxp.com>
+ <154274488829.88331.14073987677874819400@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB4211B12A895180F82BC9AE8180DA0@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Stephen Boyd [mailto:sboyd at kernel.org]
 [...]
-> > > > +
-> > > > +       ss_lpcg = of_device_get_match_data(dev);
-> > > > +       if (!ss_lpcg)
-> > > > +               return -ENODEV;
-> > > > +
-> > > > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > > > +       base = devm_ioremap(dev, res->start, resource_size(res));
-> > >
-> > > Why not devm_ioremap_resource()?
-> >
-> > Because LPCGs are distributed in various subsystem memory space which
-> > may be overlapped with some IP modules. So we can't use
-> > devm_ioremap_resource which has a request_mem_region() in it.
-> > It's something like what we've done for drivers/mfd/syscon.c.
+> Quoting A.s. Dong (2018-11-10 07:20:04)
+> > diff --git a/drivers/clk/imx/clk-lpcg-scu.c
+> > b/drivers/clk/imx/clk-lpcg-scu.c new file mode 100644 index
+> > 0000000..54a1cb3
+> > --- /dev/null
+> > +++ b/drivers/clk/imx/clk-lpcg-scu.c
+> > @@ -0,0 +1,108 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright 2018 NXP
+> > + *     Dong Aisheng <aisheng.dong@nxp.com>
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock.h>
+> > +
+> > +static DEFINE_SPINLOCK(imx_lpcg_scu_lock);
+> > +
+> > +#define CLK_GATE_SCU_LPCG_MASK         0x3
+> > +#define CLK_GATE_SCU_LPCG_HW_SEL       BIT(0)
+> > +#define CLK_GATE_SCU_LPCG_SW_SEL       BIT(1)
+> > +
+> > +struct clk_lpcg_scu {
+> > +       struct clk_hw hw;
+> > +       void __iomem *reg;
+> > +       u8 bit_idx;
+> > +       bool hw_gate;
 > 
-> Ok. Any chance that the various subsystems that are combined with the clk
-> controller can be split up so that we can use
-> devm_ioremap_resource() here? 
-
-We can achieve that by describing each LPCGS node in devicetree, but that would
-bloat the Devicetree seriously as we have hundreds of LPCGS.
-
-This is similar as what we did for legacy SoCs, e.g MX7D.
-The difference is that on MX7D LPCGS are continuous.
-e.g.
-Table 5-19. CCGR Mapping Table
-Gating Register LPCG Enable Offset
-CCM_CCGR4 sim_main 0x4040
-CCM_CCGR5 sim_display 0x4050
-...
-CCM_CCGR168 iomux 0x4A80
-CCM_CCGR169 iomux_lpsr 0x4A90
-CCM_CCGR170 kpp 0x4AA0
-
-But on MX8QXP/QM, they're not continuous anymore and distributed in each SS.
-And we probably want to push our IC designer to re-orgnize them into a continuous
-memory map again for new chips in the future.
-
-So do you think we can start with this way for MX8 as well?
-Then we won't block MX8QXP booting up too long or probably could improve it
-Later.
-
-> It may be better to carve up the I/O space of
-> this SoC into device nodes that map to the hardware IP blocks, and then have
-> those device drivers generate sub-devices for the various logical subsystems
-> that the hardware IP spans. Or it could be a big driver that registers with
-> multiple subsytems/frameworks from one device driver. This way, the logical
-> structure of the linux kernel device driver design doesn't leak into the DT
-> description of the SoC.
+> What does hw_gate mean? Can you add kernel-doc to this structure?
 > 
 
-Yes, we currently already describe them with each subsystems in Devicetree.
-https://patchwork.kernel.org/patch/10677311/
+It's for enabling HW auto gate feature.
+Up till now, mostly IP drivers does not use it, but we still keep it in case someone
+wants it in the future.
+I will add kernel doc for it later.
+
+> > +};
+> > +
+> > +#define to_clk_lpcg_scu(_hw) container_of(_hw, struct clk_lpcg_scu,
+> > +hw)
+> > +
+> > +/* Write to the LPCG bits. */
+> 
+> Please remove this useless comment.
+> 
+
+Got it.
+
+> > +static int clk_lpcg_scu_enable(struct clk_hw *hw) {
+> > +       struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
+> > +       unsigned long flags = 0;
+> 
+> Don't initialize flags here.
+> 
+
+Can't remember whether initialize it to avoid a kernel warning.
+Will check and remove it if not needed.
+
+> > +       u32 reg;
+> > +
+> > +       spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
+> > +
+> > +       if (clk->reg) {
+> > +               reg = readl(clk->reg);
+> > +               reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
+> > +               if (clk->hw_gate)
+> > +                       reg |= (CLK_GATE_SCU_LPCG_HW_SEL |
+> > +                               CLK_GATE_SCU_LPCG_SW_SEL) <<
+> clk->bit_idx;
+> > +               else
+> > +                       reg |= (CLK_GATE_SCU_LPCG_SW_SEL <<
+> clk->bit_idx);
+> > +               writel(reg, clk->reg);
+> > +       }
+> > +
+> > +       spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags);
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static void clk_lpcg_scu_disable(struct clk_hw *hw) {
+> > +       struct clk_lpcg_scu *clk = to_clk_lpcg_scu(hw);
+> > +       unsigned long flags = 0;
+> 
+> Same comment.
+> 
+> > +       u32 reg;
+> > +
+> > +       spin_lock_irqsave(&imx_lpcg_scu_lock, flags);
+> > +
+> > +       if (clk->reg) {
+> 
+> Why do we even call this function if there isn't a clk->reg value?
+> Can't we just not assign the clk_ops in that case?
+> 
+
+Good catch, this is legacy code and could be removed.
 
 Regards
 Dong Aisheng
 
-> >
-> > > > +                               GFP_KERNEL);
-> > > > +       if (!clk_data)
-> > > > +               return -ENOMEM;
-> > > > +
-> > > > +       clk_data->num = ss_lpcg->num_max;
-> > > > +       clks = clk_data->hws;
-> > > > +
-> > > > +       for (i = 0; i < ss_lpcg->num_lpcg; i++) {
-> > > > +               lpcg = ss_lpcg->lpcg + i;
-> > > > +               clks[lpcg->id] = imx_clk_lpcg_scu(lpcg->name,
-> > > lpcg->parent,
-> > > > +                                                 lpcg->flags,
-> > > > + base +
-> > > lpcg->offset,
-> > > > +                                                 lpcg->bit_idx,
-> > > lpcg->hw_gate);
-> > > > +       }
-> > > > +
-> > > > +       for (i = 0; i < clk_data->num; i++) {
-> > > > +               if (IS_ERR(clks[i]))
-> > > > +                       pr_err("i.MX clk %u: register failed
-> with %ld\n",
-> > > > +                               i, PTR_ERR(clks[i]));
-> > >
-> > > But we're OK to continue? Alright...
-> > >
-> >
-> > Yes, probably better to use pr_warn()?
-> 
-> Yes.
-> 
-> >
-> > > > +       }
-> > > > +
-> > > > +       return of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
-> > > > + clk_data);
-> > >
-> > > Why not use devm_? Or can the driver never be unbound from sysfs?
-> > >
-> >
-> > We expect the driver to be never unbound from sysfs.
-> > Probably we'd better add .suppress_bind_attrs.
-> 
-> Ok. Please add it.
+> > +               reg = readl(clk->reg);
+> > +               reg &= ~(CLK_GATE_SCU_LPCG_MASK << clk->bit_idx);
+> > +               writel(reg, clk->reg);
+> > +       }
+> > +
+> > +       spin_unlock_irqrestore(&imx_lpcg_scu_lock, flags); }
+> > +
