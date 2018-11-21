@@ -1,44 +1,55 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Wed, 21 Nov 2018 11:16:30 +0100
-Subject: [PATCH] clk: zynq: do not allow kmalloc failure
-Message-ID: <1542795390-16221-1-git-send-email-hofrat@osadl.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 21 Nov 2018 15:59:43 +0530
+Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
+In-Reply-To: <20181121101121.7rhe2hz2mnmc72cu@flea>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
+ <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
+ <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
+ <20181121101121.7rhe2hz2mnmc72cu@flea>
+Message-ID: <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- The kmalloc here is small (< 16 bytes) and occurs during initialization
-during system startup here (can not be built as module) thus if this
-kmalloc failed it is an indication of something more serious going on
-and it is fine to hang the system here rather than cause some harder
-to understand error by dereferencing NULL.
+Hi Maxime,
 
- Explicitly checking would not make that much sense here as the only
-possible reaction would be would BUG() here anyway.
+On 21/11/18 3:41 PM, Maxime Ripard wrote:
+> Hi Kishon,
+> 
+> On Tue, Nov 20, 2018 at 11:02:34AM +0530, Kishon Vijay Abraham I wrote:
+>>>> +static int cdns_dphy_config_from_opts(struct phy *phy,
+>>>> +				      struct phy_configure_opts_mipi_dphy *opts,
+>>>> +				      struct cdns_dphy_cfg *cfg)
+>>>> +{
+>>>> +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
+>>>> +	unsigned int dsi_hfp_ext = 0;
+>>>> +	int ret;
+>>>> +
+>>>> +	ret = phy_mipi_dphy_config_validate(opts);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
+>>>> +					opts, &dsi_hfp_ext);
+>>>> +	if (ret)
+>>>> +		return ret;
+>>>> +
+>>>> +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
+>>
+>> Is the wakeup populated here used by the consumer driver?
+> 
+> It's supposed to, if it can yes.
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+But I guess right now it's not using. I'm thinking the usefulness of validate
+callback (only from this series point of view). Why should a consumer driver
+invoke validate if it doesn't intend to configure the PHY?
 
-Problem located with experimental coccinelle script
+The 3 steps required are
+	* The consumer driver gets the default config
+	* The consumer driver changes some of the configuration and
+	* The consumer driver invokes phy configure callback.
 
-Patch was compile tested with: multi_v7_defconfig (implies
-CONFIG_ARCH_ZYNQ=y)
+phy_configure anyways can validate the config before actually configuring the phy.
 
-Patch is against 4.20-rc3 (localversion-next is next-20181121)
-
----
- drivers/clk/zynq/clkc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index d7b53ac..014d4a4 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -440,7 +440,7 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			SLCR_GEM1_CLK_CTRL, 0, 0, &gem1clk_lock);
- 
- 	tmp = strlen("mio_clk_00x");
--	clk_name = kmalloc(tmp, GFP_KERNEL);
-+	clk_name = kmalloc(tmp, GFP_KERNEL | __GFP_NOFAIL);
- 	for (i = 0; i < NUM_MIO_PINS; i++) {
- 		int idx;
- 
--- 
-2.1.4
+Thanks
+Kishon
