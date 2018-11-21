@@ -1,36 +1,42 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Wed, 21 Nov 2018 15:56:39 +0100
-Subject: Subject: [PATCH v4 0/4] mtd: rawnand: ams-delta: Use GPIO API
- for data I/O
-In-Reply-To: <20181121110806.32076-1-jmkrzyszt@gmail.com>
-References: <20180813223448.21316-1-jmkrzyszt@gmail.com>
- <20181121110806.32076-1-jmkrzyszt@gmail.com>
-Message-ID: <20181121155639.77873f7f@bbrezillon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Nov 2018 15:07:00 +0000
+Subject: [PATCH] arm64: cpufeature: Fix mismerge of CONFIG_ARM64_SSBD block
+Message-ID: <1542812820-24355-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2018 12:08:02 +0100
-Janusz Krzysztofik <jmkrzyszt@gmail.com> wrote:
+When merging support for SSBD and the CRC32 instructions, the conflict
+resolution for the new capability entries in arm64_features[]
+inadvertedly predicated the availability of the CRC32 instructions on
+CONFIG_ARM64_SSBD, despite the functionality being entirely unrelated.
 
-> Finalize implementation of the idea suggested by Artem Bityutskiy and
-> Tony Lindgren, described in commit b027274d2e3a ("mtd: ams-delta: fix
-> request_mem_region() failure"). Use pure GPIO consumer API, as reqested
-> by Boris Brezillon.
-> 
-> Janusz Krzysztofik (4):
->       ARM: OMAP1: ams-delta: Provide GPIO lookup table for NAND data port
->       mtd: rawnand: ams-delta: Request data port GPIO resource
->       mtd: rawnand: ams-delta: Use GPIO API for data I/O
->       ARM: OMAP1: ams-delta: Drop obsolete NAND resources
-> 
->  arch/arm/mach-omap1/board-ams-delta.c |   22 ++----
->  drivers/mtd/nand/raw/ams-delta.c      |  120 +++++++++++++++++++---------------
->  2 files changed, 80 insertions(+), 62 deletions(-)
-> 
-> Performance on Amstrad Delta is now acceptable after recent extensions
-> to GPIO API and rawnanad enhancements.
-> 
-> Series intented to be merged via mtd tree, should not conflict with
-> other OMAP1 patches submitted for 4.21.
+Move the #ifdef CONFIG_ARM64_SSBD down so that it only covers the SSBD
+capability.
 
-We'll prepare an immutable tag, just in case.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/cpufeature.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index af50064dea51..aec5ecb85737 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -1333,7 +1333,6 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.cpu_enable = cpu_enable_hw_dbm,
+ 	},
+ #endif
+-#ifdef CONFIG_ARM64_SSBD
+ 	{
+ 		.desc = "CRC32 instructions",
+ 		.capability = ARM64_HAS_CRC32,
+@@ -1343,6 +1342,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.field_pos = ID_AA64ISAR0_CRC32_SHIFT,
+ 		.min_field_value = 1,
+ 	},
++#ifdef CONFIG_ARM64_SSBD
+ 	{
+ 		.desc = "Speculative Store Bypassing Safe (SSBS)",
+ 		.capability = ARM64_SSBS,
+-- 
+2.1.4
