@@ -1,46 +1,101 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 21 Nov 2018 08:46:27 -0800
-Subject: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
- mmsys clocks
-In-Reply-To: <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-9-matthias.bgg@kernel.org>
- <20181116231522.GA18006@bogus>
- <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
- <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
-Message-ID: <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 21 Nov 2018 16:46:47 +0000
+Subject: [RFC PATCH v2 17/23] arm64/sve: In-kernel vector length
+ availability query interface
+In-Reply-To: <20181121163525.GD3505@e103592.cambridge.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-18-git-send-email-Dave.Martin@arm.com>
+ <87in0qiexh.fsf@linaro.org> <20181121163525.GD3505@e103592.cambridge.arm.com>
+Message-ID: <87h8gaidjc.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Rob Herring (2018-11-19 11:15:16)
-> On Sun, Nov 18, 2018 at 11:12 AM Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> > On 11/17/18 12:15 AM, Rob Herring wrote:
-> > > On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg at kernel.org wrote:
-> > >> -    #clock-cells = <1>;
-> > >> +
-> > >> +    mmsys_clk: clock-controller at 14000000 {
-> > >> +            compatible = "mediatek,mt2712-mmsys-clk";
-> > >> +            #clock-cells = <1>;
-> > >
-> > > This goes against the general direction of not defining separate nodes
-> > > for providers with no resources.
-> > >
-> > > Why do you need this and what does it buy if you have to continue to
-> > > support the existing chips?
-> > >
-> >
-> > It would show explicitly that the mmsys block is used to probe two
-> > drivers, one for the gpu and one for the clocks. Otherwise that is
-> > hidden in the drm driver code. I think it is cleaner to describe that in
-> > the device tree.
-> 
-> No, that's maybe cleaner for the driver implementation in the Linux
-> kernel. What about other OS's or when Linux drivers and subsystems
-> needs change? Cleaner for DT is design bindings that reflect the h/w.
-> Hardware is sometimes just messy.
-> 
 
-I agree. I fail to see what this patch series is doing besides changing
-driver probe and device creation methods and making a backwards
-incompatible change to DT. Is there any other benefit here?
+Dave Martin <Dave.Martin@arm.com> writes:
+
+> On Wed, Nov 21, 2018 at 04:16:42PM +0000, Alex Benn?e wrote:
+>>
+>> Dave Martin <Dave.Martin@arm.com> writes:
+>>
+>> > KVM will need to interrogate the set of SVE vector lengths
+>> > available on the system.
+>> >
+>> > This patch exposes the relevant bits to the kernel, along with a
+>> > sve_vq_available() helper to check whether a particular vector
+>> > length is supported.
+>> >
+>> > vq_to_bit() and bit_to_vq() are not intended for use outside these
+>> > functions, so they are given a __ prefix to warn people not to use
+>> > them unless they really know what they are doing.
+>>
+>> Personally I wouldn't have bothered with the __ but whatever:
+>>
+>> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+>
+> OK, thanks
+>
+> I'll probably keep the __ unless somebody else objects, but if you feel
+> strongly I could get rid of it.
+
+nah - it's just a personal opinion...
+
+> Perhaps I simply shouldn't have called attention to it in the commit
+> message ;)
+
+Psychological priming ;-)
+
+>
+> Cheers
+> ---Dave
+>
+>>
+>> >
+>> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+>> > ---
+>> >  arch/arm64/include/asm/fpsimd.h | 29 +++++++++++++++++++++++++++++
+>> >  arch/arm64/kernel/fpsimd.c      | 35 ++++++++---------------------------
+>> >  2 files changed, 37 insertions(+), 27 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+>> > index df7a143..ad6d2e4 100644
+>> > --- a/arch/arm64/include/asm/fpsimd.h
+>> > +++ b/arch/arm64/include/asm/fpsimd.h
+>> > @@ -24,10 +24,13 @@
+>> >
+>> >  #ifndef __ASSEMBLY__
+>> >
+>> > +#include <linux/bitmap.h>
+>> >  #include <linux/build_bug.h>
+>> > +#include <linux/bug.h>
+>> >  #include <linux/cache.h>
+>> >  #include <linux/init.h>
+>> >  #include <linux/stddef.h>
+>> > +#include <linux/types.h>
+>> >
+>> >  #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+>> >  /* Masks for extracting the FPSR and FPCR from the FPSCR */
+>> > @@ -89,6 +92,32 @@ extern u64 read_zcr_features(void);
+>> >
+>> >  extern int __ro_after_init sve_max_vl;
+>> >  extern int __ro_after_init sve_max_virtualisable_vl;
+>> > +/* Set of available vector lengths, as vq_to_bit(vq): */
+>> > +extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+>> > +
+>> > +/*
+>> > + * Helpers to translate bit indices in sve_vq_map to VQ values (and
+>> > + * vice versa).  This allows find_next_bit() to be used to find the
+>> > + * _maximum_ VQ not exceeding a certain value.
+>> > + */
+>> > +static inline unsigned int __vq_to_bit(unsigned int vq)
+>> > +{
+>> > +	return SVE_VQ_MAX - vq;
+>> > +}
+>> > +
+>> > +static inline unsigned int __bit_to_vq(unsigned int bit)
+>> > +{
+>
+> [...]
+
+
+--
+Alex Benn?e
