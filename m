@@ -1,48 +1,31 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 21 Nov 2018 14:11:40 +0100
-Subject: [PATCH 1/5] dt-bindings: nvmem: add binding for Raspberry Pi OTP
+Date: Wed, 21 Nov 2018 14:11:44 +0100
+Subject: [PATCH 5/5] ARM: multi_v7_defconfig: Enable Raspberry Pi OTP driver
 In-Reply-To: <1542805904-6446-1-git-send-email-stefan.wahren@i2se.com>
 References: <1542805904-6446-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1542805904-6446-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1542805904-6446-6-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the devicetree binding for Raspberry Pi customer OTP
-driver.
+Enable the Raspberry Pi OTP driver, which could be helpful for
+custom Compute Module 3 designs.
 
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- .../nvmem/raspberrypi,bcm2835-customer-otp.txt     | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt b/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
-new file mode 100644
-index 0000000..041ff17
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/raspberrypi,bcm2835-customer-otp.txt
-@@ -0,0 +1,22 @@
-+Customer OTP Memory for Raspberry Pi
-+
-+The VC4 firmware exposes a mailbox interface that allows the ARM core
-+to access the customer part of the OTP memory.
-+
-+The OTP node must be a child node of the Raspberry Pi firmware node.
-+
-+Required properties :
-+- compatible     : Should be "raspberrypi,bcm2835-customer-otp"
-+
-+See nvmem.txt for more information.
-+
-+Example:
-+
-+firmware: firmware-rpi {
-+	compatible = "raspberrypi,bcm2835-firmware";
-+	mboxes = <&mailbox>;
-+
-+	customer_otp: otp {
-+		compatible = "raspberrypi,bcm2835-customer-otp";
-+	};
-+};
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 1c76168..9b7ba43 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -964,6 +964,7 @@ CONFIG_NVMEM_IMX_OCOTP=y
+ CONFIG_NVMEM_SUNXI_SID=y
+ CONFIG_NVMEM_VF610_OCOTP=y
+ CONFIG_RASPBERRYPI_FIRMWARE=y
++CONFIG_NVMEM_RASPBERRYPI_OTP=y
+ CONFIG_BCM47XX_NVRAM=y
+ CONFIG_BCM47XX_SPROM=y
+ CONFIG_EFI_VARS=m
 -- 
 2.7.4
