@@ -1,51 +1,30 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Nov 2018 11:11:21 +0100
-Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
-In-Reply-To: <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
- <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
- <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
-Message-ID: <20181121101121.7rhe2hz2mnmc72cu@flea>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Nov 2018 11:20:46 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77990: ebisu: Add and enable
+ CAN,FD device nodes
+In-Reply-To: <20181119105508.GC932@kunai>
+References: <20181118173424.4807-1-marek.vasut+renesas@gmail.com>
+ <20181118230313.GB2553@kunai>
+ <63e27a31-d599-4672-87b9-48b0f542313d@gmail.com>
+ <20181119105508.GC932@kunai>
+Message-ID: <20181121102046.vbimumaycuj225op@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On Tue, Nov 20, 2018 at 11:02:34AM +0530, Kishon Vijay Abraham I wrote:
-> > > +static int cdns_dphy_config_from_opts(struct phy *phy,
-> > > +				      struct phy_configure_opts_mipi_dphy *opts,
-> > > +				      struct cdns_dphy_cfg *cfg)
-> > > +{
-> > > +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
-> > > +	unsigned int dsi_hfp_ext = 0;
-> > > +	int ret;
-> > > +
-> > > +	ret = phy_mipi_dphy_config_validate(opts);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +
-> > > +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
-> > > +					opts, &dsi_hfp_ext);
-> > > +	if (ret)
-> > > +		return ret;
-> > > +
-> > > +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
+On Mon, Nov 19, 2018 at 11:55:08AM +0100, Wolfram Sang wrote:
 > 
-> Is the wakeup populated here used by the consumer driver?
+> > > Same here, what was tested?
+> > 
+> > I connected the CN10 to Peak CANFD, brought both interfaces up at
+> > 125kBd/250kBd for FD
+> > $ ip link set canX up type can bitrate 125000 dbitrate 250000 fd on
+> > 
+> > And ran on either side:
+> > $ cangen -m canX
+> > and
+> > $ candump -t d -dex canX
+> > This should give a good mix of CAN messages.
+> 
+> Perfect, thanks!
 
-It's supposed to, if it can yes.
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/ac58d85e/attachment.sig>
+Thanks, applied for v4.21.
