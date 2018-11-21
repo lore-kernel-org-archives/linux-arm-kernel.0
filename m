@@ -1,127 +1,179 @@
 From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 21 Nov 2018 16:09:03 +0000
-Subject: [RFC PATCH v2 16/23] KVM: arm64: Enumerate SVE register indices
- for KVM_GET_REG_LIST
-In-Reply-To: <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
+Date: Wed, 21 Nov 2018 16:16:42 +0000
+Subject: [RFC PATCH v2 17/23] arm64/sve: In-kernel vector length
+ availability query interface
+In-Reply-To: <1538141967-15375-18-git-send-email-Dave.Martin@arm.com>
 References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87k1l6ifa8.fsf@linaro.org>
+ <1538141967-15375-18-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87in0qiexh.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Dave Martin <Dave.Martin@arm.com> writes:
 
-> This patch includes the SVE register IDs in the list returned by
-> KVM_GET_REG_LIST, as appropriate.
+> KVM will need to interrogate the set of SVE vector lengths
+> available on the system.
 >
-> On a non-SVE-enabled vcpu, no extra IDs are added.
+> This patch exposes the relevant bits to the kernel, along with a
+> sve_vq_available() helper to check whether a particular vector
+> length is supported.
 >
-> On an SVE-enabled vcpu, the appropriate number of slice IDs are
-> enumerated for each SVE register, depending on the maximum vector
-> length for the vcpu.
+> vq_to_bit() and bit_to_vq() are not intended for use outside these
+> functions, so they are given a __ prefix to warn people not to use
+> them unless they really know what they are doing.
+
+Personally I wouldn't have bothered with the __ but whatever:
+
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+
 >
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
+>  arch/arm64/include/asm/fpsimd.h | 29 +++++++++++++++++++++++++++++
+>  arch/arm64/kernel/fpsimd.c      | 35 ++++++++---------------------------
+>  2 files changed, 37 insertions(+), 27 deletions(-)
 >
-> Changes since RFCv1:
+> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
+> index df7a143..ad6d2e4 100644
+> --- a/arch/arm64/include/asm/fpsimd.h
+> +++ b/arch/arm64/include/asm/fpsimd.h
+> @@ -24,10 +24,13 @@
 >
->  * Simplify enumerate_sve_regs() based on Andrew Jones' approach.
+>  #ifndef __ASSEMBLY__
 >
->  * Reg copying loops are inverted for brevity, since the order we
->    spit out the regs in doesn't really matter.
+> +#include <linux/bitmap.h>
+>  #include <linux/build_bug.h>
+> +#include <linux/bug.h>
+>  #include <linux/cache.h>
+>  #include <linux/init.h>
+>  #include <linux/stddef.h>
+> +#include <linux/types.h>
 >
-> (I tried to keep part of my approach to avoid the duplicate logic
-> between num_sve_regs() and copy_sve_reg_indices(), but although
-> it works in principle, gcc fails to fully collapse the num_regs()
-> case... so I gave up.  The two functions need to be manually kept
-> consistent, but hopefully that's fairly straightforward.)
-> ---
->  arch/arm64/kvm/guest.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
+>  #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
+>  /* Masks for extracting the FPSR and FPCR from the FPSCR */
+> @@ -89,6 +92,32 @@ extern u64 read_zcr_features(void);
 >
-> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> index 320db0f..89eab68 100644
-> --- a/arch/arm64/kvm/guest.c
-> +++ b/arch/arm64/kvm/guest.c
-> @@ -323,6 +323,46 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
+>  extern int __ro_after_init sve_max_vl;
+>  extern int __ro_after_init sve_max_virtualisable_vl;
+> +/* Set of available vector lengths, as vq_to_bit(vq): */
+> +extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+> +
+> +/*
+> + * Helpers to translate bit indices in sve_vq_map to VQ values (and
+> + * vice versa).  This allows find_next_bit() to be used to find the
+> + * _maximum_ VQ not exceeding a certain value.
+> + */
+> +static inline unsigned int __vq_to_bit(unsigned int vq)
+> +{
+> +	return SVE_VQ_MAX - vq;
+> +}
+> +
+> +static inline unsigned int __bit_to_vq(unsigned int bit)
+> +{
+> +	if (WARN_ON(bit >= SVE_VQ_MAX))
+> +		bit = SVE_VQ_MAX - 1;
+> +
+> +	return SVE_VQ_MAX - bit;
+> +}
+> +
+> +/* Ensure vq >= SVE_VQ_MIN && vq <= SVE_VQ_MAX before calling this function */
+> +static inline bool sve_vq_available(unsigned int vq)
+> +{
+> +	return test_bit(__vq_to_bit(vq), sve_vq_map);
+> +}
+>
+>  #ifdef CONFIG_ARM64_SVE
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 60c5e28..cc5a495 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -136,7 +136,7 @@ static int sve_default_vl = -1;
+>  int __ro_after_init sve_max_vl = SVE_VL_MIN;
+>  int __ro_after_init sve_max_virtualisable_vl = SVE_VL_MIN;
+>  /* Set of available vector lengths, as vq_to_bit(vq): */
+> -static __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+> +__ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
+>  /* Set of vector lengths present on at least one cpu: */
+>  static __ro_after_init DECLARE_BITMAP(sve_vq_partial_map, SVE_VQ_MAX);
+>  static void __percpu *efi_sve_state;
+> @@ -270,25 +270,6 @@ void fpsimd_save(void)
 >  }
 >
-> +static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
-> +{
-> +	const unsigned int slices = DIV_ROUND_UP(
-> +		vcpu->arch.sve_max_vl,
-> +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
-
-Having seen this formulation come up several times now I wonder if there
-should be a kernel private define, KVM_SVE_ZREG/PREG_SIZE to avoid this
-clumsiness.
-
-You could still use the KVM_REG_SIZE to extract it as I guess this is to
-make changes simpler if/when the SVE reg size gets bumped up.
-
-> +
-> +	if (!vcpu_has_sve(vcpu))
-> +		return 0;
-> +
-> +	return slices * (SVE_NUM_PREGS + SVE_NUM_ZREGS + 1 /* FFR */);
-> +}
-> +
-> +static int copy_sve_reg_indices(const struct kvm_vcpu *vcpu, u64 __user **uind)
-> +{
-> +	const unsigned int slices = DIV_ROUND_UP(
-> +		vcpu->arch.sve_max_vl,
-> +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
-> +	unsigned int i, n;
-> +
-> +	if (!vcpu_has_sve(vcpu))
-> +		return 0;
-> +
-> +	for (i = 0; i < slices; i++) {
-> +		for (n = 0; n < SVE_NUM_ZREGS; n++) {
-> +			if (put_user(KVM_REG_ARM64_SVE_ZREG(n, i), (*uind)++))
-> +				return -EFAULT;
-> +		}
-> +
-> +		for (n = 0; n < SVE_NUM_PREGS; n++) {
-> +			if (put_user(KVM_REG_ARM64_SVE_PREG(n, i), (*uind)++))
-> +				return -EFAULT;
-> +		}
-> +
-> +		if (put_user(KVM_REG_ARM64_SVE_FFR(i), (*uind)++))
-> +			return -EFAULT;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  /**
->   * kvm_arm_num_regs - how many registers do we present via KVM_GET_ONE_REG
->   *
-> @@ -333,6 +373,7 @@ unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
->  	unsigned long res = 0;
+>  /*
+> - * Helpers to translate bit indices in sve_vq_map to VQ values (and
+> - * vice versa).  This allows find_next_bit() to be used to find the
+> - * _maximum_ VQ not exceeding a certain value.
+> - */
+> -
+> -static unsigned int vq_to_bit(unsigned int vq)
+> -{
+> -	return SVE_VQ_MAX - vq;
+> -}
+> -
+> -static unsigned int bit_to_vq(unsigned int bit)
+> -{
+> -	if (WARN_ON(bit >= SVE_VQ_MAX))
+> -		bit = SVE_VQ_MAX - 1;
+> -
+> -	return SVE_VQ_MAX - bit;
+> -}
+> -
+> -/*
+>   * All vector length selection from userspace comes through here.
+>   * We're on a slow path, so some sanity-checks are included.
+>   * If things go wrong there's a bug somewhere, but try to fall back to a
+> @@ -309,8 +290,8 @@ static unsigned int find_supported_vector_length(unsigned int vl)
+>  		vl = max_vl;
 >
->  	res += num_core_regs();
-> +	res += num_sve_regs(vcpu);
->  	res += kvm_arm_num_sys_reg_descs(vcpu);
->  	res += kvm_arm_get_fw_num_regs(vcpu);
->  	res += NUM_TIMER_REGS;
-> @@ -357,6 +398,10 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
->  		uindices++;
+>  	bit = find_next_bit(sve_vq_map, SVE_VQ_MAX,
+> -			    vq_to_bit(sve_vq_from_vl(vl)));
+> -	return sve_vl_from_vq(bit_to_vq(bit));
+> +			    __vq_to_bit(sve_vq_from_vl(vl)));
+> +	return sve_vl_from_vq(__bit_to_vq(bit));
+>  }
+>
+>  #ifdef CONFIG_SYSCTL
+> @@ -651,7 +632,7 @@ static void sve_probe_vqs(DECLARE_BITMAP(map, SVE_VQ_MAX))
+>  		write_sysreg_s(zcr | (vq - 1), SYS_ZCR_EL1); /* self-syncing */
+>  		vl = sve_get_vl();
+>  		vq = sve_vq_from_vl(vl); /* skip intervening lengths */
+> -		set_bit(vq_to_bit(vq), map);
+> +		set_bit(__vq_to_bit(vq), map);
 >  	}
+>  }
 >
-> +	ret = copy_sve_reg_indices(vcpu, &uindices);
-> +	if (ret)
-> +		return ret;
-> +
->  	ret = kvm_arm_copy_fw_reg_indices(vcpu, uindices);
->  	if (ret)
->  		return ret;
+> @@ -712,7 +693,7 @@ int sve_verify_vq_map(void)
+>  	 * Mismatches above sve_max_virtualisable_vl are fine, since
+>  	 * no guest is allowed to configure ZCR_EL2.LEN to exceed this:
+>  	 */
+> -	if (sve_vl_from_vq(bit_to_vq(b)) <= sve_max_virtualisable_vl) {
+> +	if (sve_vl_from_vq(__bit_to_vq(b)) <= sve_max_virtualisable_vl) {
+>  		pr_warn("SVE: cpu%d: Unsupported vector length(s) present\n",
+>  			smp_processor_id());
+>  		goto error;
+> @@ -798,8 +779,8 @@ void __init sve_setup(void)
+>  	 * so sve_vq_map must have at least SVE_VQ_MIN set.
+>  	 * If something went wrong, at least try to patch it up:
+>  	 */
+> -	if (WARN_ON(!test_bit(vq_to_bit(SVE_VQ_MIN), sve_vq_map)))
+> -		set_bit(vq_to_bit(SVE_VQ_MIN), sve_vq_map);
+> +	if (WARN_ON(!test_bit(__vq_to_bit(SVE_VQ_MIN), sve_vq_map)))
+> +		set_bit(__vq_to_bit(SVE_VQ_MIN), sve_vq_map);
+>
+>  	zcr = read_sanitised_ftr_reg(SYS_ZCR_EL1);
+>  	sve_max_vl = sve_vl_from_vq((zcr & ZCR_ELx_LEN_MASK) + 1);
+> @@ -828,7 +809,7 @@ void __init sve_setup(void)
+>  		/* No virtualisable VLs?  This is architecturally forbidden. */
+>  		sve_max_virtualisable_vl = SVE_VQ_MIN;
+>  	else /* b + 1 < SVE_VQ_MAX */
+> -		sve_max_virtualisable_vl = sve_vl_from_vq(bit_to_vq(b + 1));
+> +		sve_max_virtualisable_vl = sve_vl_from_vq(__bit_to_vq(b + 1));
+>
+>  	if (sve_max_virtualisable_vl > sve_max_vl)
+>  		sve_max_virtualisable_vl = sve_max_vl;
 
-Otherwise:
-
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
 --
 Alex Benn?e
