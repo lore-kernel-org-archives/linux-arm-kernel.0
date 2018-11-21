@@ -1,82 +1,43 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 21 Nov 2018 09:06:44 +0530
-Subject: [PATCH v2 07/15] arm: dts: Add devicetree for OrangePi i96 board
-In-Reply-To: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
-References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181121033652.12247-8-manivannan.sadhasivam@linaro.org>
+From: sugaya.taichi@socionext.com (sugaya.taichi at socionext.com)
+Date: Wed, 21 Nov 2018 04:07:19 +0000
+Subject: [PATCH 03/14] ARM: milbeaut: Add Milbeaut M10V early printk
+In-Reply-To: <CAL_JsqKMK7nMUxZLu9eV8tpnCXsAr2F4j=xTO8UL0g8V30kYZg@mail.gmail.com>
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-4-git-send-email-sugaya.taichi@socionext.com>
+ <CAL_JsqKMK7nMUxZLu9eV8tpnCXsAr2F4j=xTO8UL0g8V30kYZg@mail.gmail.com>
+Message-ID: <7f32b467a1d84987b9d80cdd540e035b@SOC-EX02V.e01.socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial devicetree for Orange Pi i96 board from Xunlong. It
-is one of the 96Boards IoT Edition board.
+Hi Rob
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm/boot/dts/Makefile                   |  3 +-
- arch/arm/boot/dts/rda8810pl-orangepi-i96.dts | 40 ++++++++++++++++++++
- 2 files changed, 42 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
+Thank you for your comment.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a0fdad8f10dd..cfb08ea33872 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -807,7 +807,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8974-sony-xperia-honami.dtb \
- 	qcom-mdm9615-wp8548-mangoh-green.dtb
- dtb-$(CONFIG_ARCH_RDA) += \
--	rda8810pl-orangepi-2g-iot.dtb
-+	rda8810pl-orangepi-2g-iot.dtb \
-+	rda8810pl-orangepi-i96.dtb
- dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb \
- 	arm-realview-pb11mp.dtb \
-diff --git a/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts b/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
-new file mode 100644
-index 000000000000..11b586e3966b
---- /dev/null
-+++ b/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
-@@ -0,0 +1,40 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ * Copyright (c) 2018 Manivannan Sadhasivam
-+ */
-+
-+/dts-v1/;
-+
-+#include "rda8810pl.dtsi"
-+
-+/ {
-+	compatible = "xunlong,orangepi-i96", "rda,8810pl";
-+	model = "Orange Pi i96";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial2:921600n8";
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>;
-+	};
-+
-+	uart2_clk: uart2-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <921600>;
-+		#clock-cells = <0>;
-+	};
-+};
-+
-+&uart2 {
-+	status = "okay";
-+	clocks = <&uart2_clk>;
-+};
--- 
-2.17.1
+> -----Original Message-----
+> From: Rob Herring [mailto:robh+dt at kernel.org]
+> Sent: Tuesday, November 20, 2018 12:21 AM
+> To: Sugaya, Taichi/?? ??
+> Cc: linux-clk; devicetree at vger.kernel.org; moderated list:ARM/FREESCALE
+> IMX / MXC ARM ARCHITECTURE; linux-kernel at vger.kernel.org; open list:SERIAL
+> DRIVERS; Michael Turquette; Stephen Boyd; Mark Rutland; Greg Kroah-Hartman;
+> Daniel Lezcano; Thomas Gleixner; Russell King; Jiri Slaby; Masami Hiramatsu;
+> Jassi Brar
+> Subject: Re: [PATCH 03/14] ARM: milbeaut: Add Milbeaut M10V early printk
+> 
+> On Sun, Nov 18, 2018 at 7:00 PM Sugaya Taichi
+> <sugaya.taichi@socionext.com> wrote:
+> >
+> > Add Milbeaut M10V earlyprintk.
+> 
+> Do you really need earlyprintk? earlycon is preferred instead. It's
+> not quite as early, but doesn't require rebuilding the kernel and
+> supports more than 1 fixed device. If you crash before earlycon is
+> enabled, that pretty much means either a bad dtb memory node or just
+> flaky memory.
+OK. I use earlycon since would like to use flexible functions.
+
+Thanks
+Sugaya Taichi
+
+> 
+> Rob
