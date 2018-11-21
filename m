@@ -1,62 +1,74 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Nov 2018 10:35:17 +0100
-Subject: [PATCH 06/12] gpio: davinci: restore a way to manually specify the
- GPIO base
+Date: Wed, 21 Nov 2018 10:35:13 +0100
+Subject: [PATCH 02/12] ARM: davinci: dm365: define gpio interrupts as separate
+ resources
 In-Reply-To: <20181121093523.12503-1-brgl@bgdev.pl>
 References: <20181121093523.12503-1-brgl@bgdev.pl>
-Message-ID: <20181121093523.12503-7-brgl@bgdev.pl>
+Message-ID: <20181121093523.12503-3-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Commit 587f7a694f01 ("gpio: davinci: Use dev name for label and
-automatic base selection") broke the network support in legacy boot
-mode for da850-evm since we can no longer request the MDIO clock GPIO.
+Since commit eb3744a2dd01 ("gpio: davinci: Do not assume continuous
+IRQ numbering") the davinci GPIO driver fails to probe if we boot
+in legacy mode from any of the board files. Since the driver now
+expects every interrupt to be defined as a separate resource, split
+the definition of IRQ resources instead of having a single continuous
+interrupt range.
 
-Other boards may be broken too, which I haven't tested.
-
-The problem is in the fact that most board files still use the legacy
-GPIO API where lines are requested by numbers rather than descriptors.
-
-While this should be fixed eventually, in order to unbreak the board
-for now - provide a way to manually specify the GPIO base in platform
-data.
-
-Fixes: 587f7a694f01 ("gpio: davinci: Use dev name for label and automatic base selection")
+Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ numbering")
 Cc: stable at vger.kernel.org
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-davinci.c                | 2 +-
- include/linux/platform_data/gpio-davinci.h | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/dm365.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index 5c1564fcc24e..bdb29e51b417 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -258,7 +258,7 @@ static int davinci_gpio_probe(struct platform_device *pdev)
- 	chips->chip.set = davinci_gpio_set;
- 
- 	chips->chip.ngpio = ngpio;
--	chips->chip.base = -1;
-+	chips->chip.base = pdata->no_auto_base ? pdata->base : -1;
- 
- #ifdef CONFIG_OF_GPIO
- 	chips->chip.of_gpio_n_cells = 2;
-diff --git a/include/linux/platform_data/gpio-davinci.h b/include/linux/platform_data/gpio-davinci.h
-index f92a47e18034..a93841bfb9f7 100644
---- a/include/linux/platform_data/gpio-davinci.h
-+++ b/include/linux/platform_data/gpio-davinci.h
-@@ -17,6 +17,8 @@
- #define __DAVINCI_GPIO_PLATFORM_H
- 
- struct davinci_gpio_platform_data {
-+	bool	no_auto_base;
-+	u32	base;
- 	u32	ngpio;
- 	u32	gpio_unbanked;
- };
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index abcf2a5ed89b..42665914166a 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -267,6 +267,41 @@ static struct resource dm365_gpio_resources[] = {
+ 	},
+ 	{	/* interrupt */
+ 		.start	= IRQ_DM365_GPIO0,
++		.end	= IRQ_DM365_GPIO0,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO1,
++		.end	= IRQ_DM365_GPIO1,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO2,
++		.end	= IRQ_DM365_GPIO2,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO3,
++		.end	= IRQ_DM365_GPIO3,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO4,
++		.end	= IRQ_DM365_GPIO4,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO5,
++		.end	= IRQ_DM365_GPIO5,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO6,
++		.end	= IRQ_DM365_GPIO6,
++		.flags	= IORESOURCE_IRQ,
++	},
++	{
++		.start	= IRQ_DM365_GPIO7,
+ 		.end	= IRQ_DM365_GPIO7,
+ 		.flags	= IORESOURCE_IRQ,
+ 	},
 -- 
 2.19.1
