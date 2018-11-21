@@ -1,242 +1,36 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 21 Nov 2018 11:09:37 +0000
-Subject: [RFC PATCH 1/3] drivers: amba: Updates to component
- identification for driver matching.
-In-Reply-To: <20181120205737.GA17267@xps15>
-References: <20181115012842.2353-1-mike.leach@linaro.org>
- <20181115012842.2353-2-mike.leach@linaro.org>
- <20181120205737.GA17267@xps15>
-Message-ID: <CAJ9a7VjD1C3t=OtCpQNGvmSvDh-vPcR_2mObccJJ1Qv8_9BxFw@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 21 Nov 2018 11:15:44 +0000
+Subject: [PATCH 2/7] arm64: sdei: Always use sdei stack for sdei events
+In-Reply-To: <20181107215844.GC12248@brain-police>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+ <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
+ <20181107215844.GC12248@brain-police>
+Message-ID: <80b48de5-6495-1da9-3555-78095daf3464@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Matthieu,
+Hi guys,
 
-On Tue, 20 Nov 2018 at 20:57, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
->
-> Hi Mike,
->
-> On Thu, Nov 15, 2018 at 01:28:40AM +0000, Mike Leach wrote:
-> > The CoreSight specification (ARM IHI 0029E), updates the ID register
-> > requirements for components on an AMBA bus, to cover both traditional
-> > ARM Primecell type devices, and newer CoreSight and other components.
-> >
-> > The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
-> > cases to uniquely identify components. CoreSight components related to
-> > a single function can share Peripheral ID values, and must be further
-> > identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
-> > PMU and Debug hardware of the A35 all share the same PID.
-> >
-> > Bits 11:8 of the CID are defined to be the device class.
-> > Class 0xF remains for PrimeCell and legacy components.
-> > Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > at present.
-> > Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> >
-> > The specification futher defines which classes of device use the standard
-> > CID/PID pair, and when additional ID registers are required.
-> >
-> > The patches provide an update of amba_device and matching code to handle
-> > the additional registers required for the Class 0x9 (CoreSight) UCI.
-> > The *data pointer in the amba_id is used by the driver to provide extended
-> > ID register values for matching.
-> >
-> > CoreSight components where PID/CID pair is currently sufficient for
-> > unique identification need not provide this additional information.
-> >
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> > ---
-> >  drivers/amba/bus.c       | 48 ++++++++++++++++++++++++++++++++++++----
-> >  include/linux/amba/bus.h | 33 +++++++++++++++++++++++++++
-> >  2 files changed, 77 insertions(+), 4 deletions(-)
-> >
-> > diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> > index 41b706403ef7..6eab977f4314 100644
-> > --- a/drivers/amba/bus.c
-> > +++ b/drivers/amba/bus.c
-> > @@ -26,6 +26,28 @@
-> >
-> >  #define to_amba_driver(d)    container_of(d, struct amba_driver, drv)
-> >
-> > +/* called on periphid match and class 0x9 coresight device. */
-> > +static int amba_uci_match(const struct amba_id *table, struct amba_device *dev)
-> > +{
-> > +     int ret = 0;
-> > +     struct amba_cs_uci_id *uci;
-> > +
-> > +     uci = table->data;
-> > +
-> > +     /* no table data - return match on periphid */
-> > +     if (!uci)
-> > +             return 1;
-> > +
-> > +     if (uci->devarch) {
-> > +             ret = (dev->uci.devtype == uci->devtype) &&
-> > +                    ((dev->uci.devarch & uci->mask) == uci->devarch);
-> > +     } else {
-> > +             /* devtype only if devarch set to 0 */
-> > +             ret = dev->uci.devtype == uci->devtype;
-> > +     }
-> > +     return ret;
-> > +}
-> > +
-> >  static const struct amba_id *
-> >  amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> >  {
-> > @@ -33,11 +55,17 @@ amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> >
-> >       while (table->mask) {
-> >               ret = (dev->periphid & table->mask) == table->id;
-> > -             if (ret)
-> > -                     break;
-> > +             /* matched on periphid - check UCI if CoreSight */
-> > +             if (ret) {
-> > +                     if (dev->cid == CORESIGHT_CID)  {
-> > +                             ret = amba_uci_match(table, dev);
-> > +                             if (ret)
-> > +                                     break;
-> > +                     } else
-> > +                             break;
-> > +             }
-> >               table++;
-> >       }
-> > -
->
-> Carefull with the line removal.
->
+On 07/11/2018 21:58, Will Deacon wrote:
+> On Wed, Sep 26, 2018 at 02:56:19PM +0100, Julien Thierry wrote:
+>> SDEI events can occur at any point, including when the stack pointer is
+>> not aligned. SP could be modified to respect alignment 16-byte alignement,
+>> but there is a need to deal with code using SP as scratch register.
+>>
+>> Always reserve the SDEI stacks to handle its events.
+>>
+>> Since stack allocation relies on VMAPed stacks, lets make SDEI depend on
+>> VMAP_STACK.
 
-This function is significantly re-written in the next version per
-Suzuki's suggestions.
+> One side-effect of this change is that SDEI cannot be enabled in conjunction
+> with KASAN. James -- are you ok with that?
 
-> >       return ret ? table : NULL;
-> >  }
-> >
-> > @@ -399,10 +427,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
-> >                       cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-> >                               (i * 8);
-> >
-> > +             if (cid == CORESIGHT_CID) {
-> > +                     /* set the base to the start of the last 4k block */
-> > +                     void __iomem *csbase = tmp + size - 4096;
-> > +
-> > +                     dev->uci.devarch =
-> > +                             readl(csbase + UCI_REG_DEVARCH_OFFSET);
-> > +                     dev->uci.devtype =
-> > +                             readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
->
-> Any reason for not masking @devarch the same way you're doing for @devtype?  If
-> we were to mask here we wouldn't have to carry the mask in struct amba_cs_uci_id
-> and deal with it in amba_uci_match().
->
-
-@devarch is defined as a 32 bit value. This is masked to widen /
-narrow matching. By default the mask will be the ARCHID field - bits
-15:0, selected in the driver in the same way as the drivers currently
-have a mask for peripheral ID. This ignores the architect and version
-fields as most CS component drivers should handle differences.
-
-However - this is also an optional register - if all 32 bits are 0,
-then we ignore and use just the @devtype. This logic is contained in
-amba_uci_match()
-
-@devtype is architecturally specified as having only 8 significant
-bits, thus is masked at this point.
-
-> Russell King maintains AMBA.  Please address your next revision to him and CC
-> the rest of us, as specified by get_maintainer.pl.
->
-
-get_maintainer.pl returned no specific 'maintainer' for this patch -
-though looking again I do see Russell noted as 'odd fixer'.
-Will ensure this is directed to him next revision.
-
-Thanks for the feedback,
-
-Mike
+So it does. I don't think this matters, the only SDEI users in the short-term
+can be exercised by other notifications.
+I mean to make the stacks for this thing dynamically allocated (so its less of a
+memory hog), I can fix this KASAN hole at the same time.
 
 
-> Thanks,
-> Mathieu
->
-> > +             }
-> > +
-> >               amba_put_disable_pclk(dev);
-> >
-> > -             if (cid == AMBA_CID || cid == CORESIGHT_CID)
-> > +             if (cid == AMBA_CID || cid == CORESIGHT_CID) {
-> >                       dev->periphid = pid;
-> > +                     dev->cid = cid;
-> > +             }
-> >
-> >               if (!dev->periphid)
-> >                       ret = -ENODEV;
-> > diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> > index d143c13bed26..a83a0a3dece8 100644
-> > --- a/include/linux/amba/bus.h
-> > +++ b/include/linux/amba/bus.h
-> > @@ -25,6 +25,36 @@
-> >  #define AMBA_CID     0xb105f00d
-> >  #define CORESIGHT_CID        0xb105900d
-> >
-> > +/*
-> > + * CoreSight Architecture specification updates the ID specification
-> > + * for components on the AMBA bus. (ARM IHI 0029E)
-> > + *
-> > + * Bits 11:8 of the CID are the device class.
-> > + *
-> > + * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
-> > + * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > + * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > + * at present.
-> > + * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> > + *
-> > + * Remaining CID bits stay as 0xb105-00d
-> > + */
-> > +
-> > +/*
-> > + * Class 0x9 components use additional values to form a Unique Component
-> > + * Identifier (UCI), where peripheral ID values are identical for different
-> > + * components. Passed to the amba bus code from the component driver via
-> > + * the amba_id->data pointer.
-> > + */
-> > +struct amba_cs_uci_id {
-> > +     unsigned int devarch;
-> > +     unsigned int mask;
-> > +     unsigned int devtype;
-> > +};
-> > +
-> > +#define UCI_REG_DEVTYPE_OFFSET       0xFCC
-> > +#define UCI_REG_DEVARCH_OFFSET       0xFBC
-> > +
-> >  struct clk;
-> >
-> >  struct amba_device {
-> > @@ -32,6 +62,8 @@ struct amba_device {
-> >       struct resource         res;
-> >       struct clk              *pclk;
-> >       unsigned int            periphid;
-> > +     unsigned int            cid;
-> > +     struct amba_cs_uci_id   uci;
-> >       unsigned int            irq[AMBA_NR_IRQS];
-> >       char                    *driver_override;
-> >  };
-> > @@ -61,6 +93,7 @@ enum amba_vendor {
-> >       (((conf) & 0xff) << 24 | ((rev) & 0xf) << 20 | \
-> >       AMBA_VENDOR_LINUX << 12 | ((part) & 0xfff))
-> >
-> > +
-> >  extern struct bus_type amba_bustype;
-> >
-> >  #define to_amba_device(d)    container_of(d, struct amba_device, dev)
-> > --
-> > 2.19.1
-> >
+Thanks,
 
-
-
---
-Mike Leach
-Principal Engineer, ARM Ltd.
-Manchester Design Centre. UK
+James
