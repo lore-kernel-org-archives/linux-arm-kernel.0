@@ -1,301 +1,176 @@
-From: hao5781286@gmail.com (Hao Zhang)
-Date: Wed, 21 Nov 2018 23:43:57 +0800
-Subject: [PATCH v1 1/2] ARM: dts: sun8i: Add board dts file for t3-cqa3t-bv3.
-Message-ID: <20181121154356.GA4359@arx-s1>
+From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
+Date: Wed, 21 Nov 2018 15:44:31 +0000
+Subject: [PATCH 3/3] regulator: mcp16502: add regulator driver for MCP16502
+In-Reply-To: <20181113174539.GB2089@sirena.org.uk>
+References: <1542108563-10108-1-git-send-email-andrei.stefanescu@microchip.com>
+ <1542108563-10108-4-git-send-email-andrei.stefanescu@microchip.com>
+ <20181113174539.GB2089@sirena.org.uk>
+Message-ID: <03b902d9-49a8-9acd-6f98-048f117b1e93@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The T3/R40/V40 using the same sdk and config file in allwinner
-sdk, it seem they are the same SOC just with different name, so
-compatible with R40.
+Hello Mark,
 
-The t3-cqa3t-bv3 based on Allwinner T3 SoC, it has various connectors,
-leds, buttons, and sell on:
-https://item.taobao.com/item.htm?spm=2013.1.w4023-4203040713.25.62704cce7UCgLS&id=557154455330
+Thank you for your review. While working on the next version I realized that
+the implementation should change a bit. The mcp16502 PMIC has separate 
+registers
+for each of its operating modes (Performance, Active, Low-power, Hibernate).
+So, it is possible to setup the values for Low-power (Linux standby) and
+Hibernate (Linux suspend-to-ram) and these values would not be affected by
+changes made during runtime (which are made to the ACTIVE registers).
 
-It features:
- - X-Powers AXP221s PMIC connected to i2c0
- - 1/2 GB DDR3 DRAM
- - 8 GB eMMC
- - 2x USB 2.0 hosts
- - 1x USB 2.0 OTG
- - 2 LVDS connectors
- - 24 bit RGB LCD connector
- - HDMI output
- - DVP camera interface (support 500w cmos camera)
- - GPIO connectors
- - 5 TTL uarts and 2 RS232 uarts
- - 1 RS485 connector
- - support i2c capacitive tp and usb infrared tp
- - boot control, reset and user buttons
- - 3.5mm headphone and 3.5mm mic jack
- - 100M RJ45
- - micro SD card slot
- - DC power jack
- - RCT power slot
- - 1 CVBS TVIN
- - 1 CVBS TVOUT
- - 2 customer leds
- - 1 buzzer
- - 1 minipcie
- - I2C output
- - SPI output
- - PCM output
- - wifi and bt connector reserved.
+This means that the calls to suspend_set_* are not necessary to be made each
+time the board suspends. My idea is to add three functions to the 
+regulator_ops
+(setup_suspend_standby/mem/max) which would be called after the regulator is
+registered and which would set the values found inside the devicetree
+in the regulator-state-standby/mem/disk subnodes.
 
-Board info can find here:
-https://github.com/Axl-zhang/Allwinner-V40-T3-R40-manual
+However, I am not sure whether this is in fact a good idea or which is 
+the best
+approach.
 
-Signed-off-by: Hao Zhang <hao5781286@gmail.com>
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts | 226 +++++++++++++++++++++++++++++++
- 2 files changed, 227 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts
+Other possible suggestions for this setup_suspend* functions:
+- Break each function into smaller pieces(set_voltage, set_mode, 
+enable/disable)
+- Add support for regmap helpers, which would mean adding reg and mask 
+members
+ ? to regulator_desc. However, I am not sure which naming scheme you prefer
+ ? (enable_suspend_mem_reg for example seems not to be a great idea). 
+Perhaps use
+ ? arrays (e.g. enable_suspend[] and index it via PM_SUSPEND_*)?
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2a1a8c6..7ca266a 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1053,6 +1053,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-r16-nintendo-super-nes-classic.dtb \
- 	sun8i-r16-parrot.dtb \
- 	sun8i-r40-bananapi-m2-ultra.dtb \
-+	sun8i-t3-cqa3t-bv3.dtb \
- 	sun8i-v3s-licheepi-zero.dtb \
- 	sun8i-v3s-licheepi-zero-dock.dtb \
- 	sun8i-v40-bananapi-m2-berry.dtb
-diff --git a/arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts b/arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts
-new file mode 100644
-index 0000000..6931aaa
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-t3-cqa3t-bv3.dts
-@@ -0,0 +1,226 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later
-+/*
-+ * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
-+ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.io>
-+ * Copyright (C) 2018 Hao Zhang <hao5781286@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-r40.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "t3-cqa3t-bv3";
-+	compatible = "qihua,t3-cqa3t-bv3", "allwinner,sun8i-t3",
-+		     "allwinner,sun8i-r40";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	connector {
-+		compatible = "hdmi-connector";
-+		type = "a";
-+
-+		port {
-+			hdmi_con_in: endpoint {
-+				remote-endpoint = <&hdmi_out_con>;
-+			};
-+		};
-+	};
-+
-+	reg_vcc5v0: vcc5v0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 7 23 GPIO_ACTIVE_HIGH>; /* PH23 */
-+		enable-active-high;
-+	};
-+};
-+
-+&ahci {
-+	ahci-supply = <&reg_dldo4>;
-+	phy-supply = <&reg_eldo3>;
-+	status = "okay";
-+};
-+
-+&de {
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&hdmi_out {
-+	hdmi_out_con: endpoint {
-+		remote-endpoint = <&hdmi_con_in>;
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+
-+	axp22x: pmic at 34 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x34>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&mmc0 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 7 15 GPIO_ACTIVE_LOW>; /* PH15 */
-+	status = "okay";
-+};
-+
-+&mmc2 {
-+	vmmc-supply = <&reg_dcdc1>;
-+	vqmmc-supply = <&reg_dcdc1>;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2500000>;
-+	regulator-max-microvolt = <2500000>;
-+	regulator-name = "vcc-pa";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1000000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pg";
-+};
-+
-+&reg_dldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-dldo3";
-+};
-+
-+&reg_eldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "vcc-pe";
-+};
-+
-+&tcon_tv0 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pb_pins>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_vcc5v0>;
-+	usb2_vbus-supply = <&reg_vcc5v0>;
-+	status = "okay";
-+};
--- 
-2.7.4
+
+Best regards,
+Andrei
+
+On 13.11.2018 19:45, Mark Brown wrote:
+> On Tue, Nov 13, 2018 at 11:29:41AM +0000, Andrei.Stefanescu at microchip.com wrote:
+>
+>> index 0000000..29c72d3
+>> --- /dev/null
+>> +++ b/drivers/regulator/mcp16502.c
+>> @@ -0,0 +1,524 @@
+>> +// SPDX-License-Identifier: GPL-2.0
+>> +/*
+>> + * MCP16502 PMIC driver
+> Please make the entire comment a C++ comment so it looks more
+> intentional.
+>
+>> +/*
+>> + * This macro is useful for iterating over all regulators and accessing their
+>> + * registers in a generic way or accessing a regulator device by its id.
+>> + */
+>> +#define BASE(i) (((i) + 1) << 4)
+> This macro name is likely to run into collisions at some point, a prefix
+> would be better.
+>
+>> +static int mcp16502_update_regulator(struct regulator_dev *rdev,
+>> +				     bool hibernate,
+>> +				     unsigned int mask, unsigned int val)
+>> +{
+>> +	struct mcp16502 *mcp = rdev_get_drvdata(rdev);
+>> +	unsigned int reg = BASE(rdev_get_id(rdev));
+>> +
+>> +	reg += (hibernate) ? OFFSET_MODE_HIB : OFFSET_MODE_A;
+> Please write this as a normal if statement to improve legibility.
+>
+>> +static int mcp16502_read(struct regulator_dev *rdev, bool hibernate,
+>> +			 unsigned int mask)
+>> +{
+>> +	struct mcp16502 *mcp = rdev_get_drvdata(rdev);
+>> +	unsigned int reg = BASE(rdev_get_id(rdev));
+>> +	int ret, val;
+>> +
+>> +	reg += (hibernate) ? OFFSET_MODE_HIB : OFFSET_MODE_A;
+>> +
+>> +	ret = regmap_read(mcp->rmap, reg, &val);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	return val & mask;
+>> +}
+> I'm not convinced that these custom read/write functions are adding much
+> compared to just using the standard regmap helpers for things - they're
+> adding a bunch of code instead of data.  If you need extra helpers for
+> suspend mode just add those, I'm sure they'd be useful for other
+> drivers.
+>
+>> +static unsigned int mcp16502_get_mode(struct regulator_dev *rdev)
+>> +{
+>> +	int val;
+>> +
+>> +	val = mcp16502_read(rdev, false, MCP16502_MODE_MASK);
+>> +	if (val < 0)
+>> +		return val;
+>> +
+>> +	if (val == MCP16502_MODE_FPWM)
+>> +		return REGULATOR_MODE_NORMAL;
+>> +	else if (val == MCP16502_MODE_AUTO_PFM)
+>> +		return REGULATOR_MODE_IDLE;
+>> +
+>> +	return REGULATOR_MODE_INVALID;
+>> +}
+> Please just write a switch statement to improve legibility.
+>
+>> +/*
+>> + * mcp16502_is_enabled - regulator_ops is_enabled
+>> + */
+>> +static int mcp16502_is_enabled(struct regulator_dev *rdev)
+>> +{
+>> +	int val;
+>> +
+>> +	val = mcp16502_read(rdev, false, MCP16502_EN_MASK);
+>> +	if (val < 0)
+>> +		return val;
+>> +
+>> +	return !!val;
+>> +}
+> This can use regulator_is_enabled_regmap().
+>
+>> +	if (mode != REGULATOR_MODE_NORMAL && mode != REGULATOR_MODE_IDLE)
+>> +		return -EINVAL;
+>> +
+>> +	val = (mode == REGULATOR_MODE_NORMAL) ? MCP16502_MODE_FPWM :
+>> +						MCP16502_MODE_AUTO_PFM;
+>> +
+>> +	return mcp16502_update_regulator(rdev, hibernate, MCP16502_MODE_MASK,
+>> +					 val);
+> Again a switch statement would be clearer.
+>
+>> +static int mcp16502_get_status(struct regulator_dev *rdev)
+>> +{
+>> +	int mode = mcp16502_get_mode(rdev);
+>> +
+>> +	if (!mcp16502_is_enabled(rdev))
+>> +		return REGULATOR_STATUS_OFF;
+>> +	else if (mode == REGULATOR_MODE_NORMAL)
+>> +		return REGULATOR_STATUS_NORMAL;
+>> +	else if (mode == REGULATOR_MODE_IDLE)
+>> +		return REGULATOR_STATUS_IDLE;
+>> +
+>> +	return REGULATOR_STATUS_UNDEFINED;
+>> +}
+> The _status() function should only be implemented if there's hardware
+> support for reading back the actual status from the device, we already
+> know what we set through software.
+>
+>> +#ifdef CONFIG_PM_SLEEP
+>> +static int mcp16502_suspend(struct device *dev)
+>> +{
+>> +	struct i2c_client *client = to_i2c_client(dev);
+>> +	struct mcp16502 *mcp = i2c_get_clientdata(client);
+>> +
+>> +	mcp16502_gpio_set_mode(mcp, MCP16502_MODE_HIB);
+>> +
+>> +	return 0;
+>> +}
+> This will put the regulators into hibernate mode before the system has
+> finished suspending which is likely to cause breakage - hibernate mode
+> in the PMIC is expected to be triggered by the SoC as it shuts down.
+>
+>> +static int __init mcp16502_init(void)
+>> +{
+>> +	return i2c_add_driver(&mcp16502_drv);
+>> +}
+> module_i2c_driver.
