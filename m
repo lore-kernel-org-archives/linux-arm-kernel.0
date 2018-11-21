@@ -1,43 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 21 Nov 2018 16:00:51 +0000
-Subject: [PATCH v2 2/2] swiotlb: Skip cache maintenance on map error
-In-Reply-To: <cover.1542812807.git.robin.murphy@arm.com>
-References: <cover.1542812807.git.robin.murphy@arm.com>
-Message-ID: <cc6d91acc357235cbd6e0e134382c58caa188801.1542812807.git.robin.murphy@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 21 Nov 2018 16:04:03 +0000
+Subject: [PATCH v2 2/4] arm64: KVM: add accessors to track guest/host only
+ counters
+In-Reply-To: <1542723322-42536-3-git-send-email-andrew.murray@arm.com>
+References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
+ <1542723322-42536-3-git-send-email-andrew.murray@arm.com>
+Message-ID: <da549a51-9b85-f94c-07d6-91140c542ec7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If swiotlb_bounce_page() failed, calling arch_sync_dma_for_device() may
-lead to such delights as performing cache maintenance on whatever
-address phys_to_virt(SWIOTLB_MAP_ERROR) looks like, which is typically
-outside the kernel memory map and goes about as well as expected.
+On 20/11/2018 14:15, Andrew Murray wrote:
+> In order to effeciently enable/disable guest/host only perf counters
+> at guest entry/exit we add bitfields to kvm_cpu_context for guest and
+> host only events as well as accessors for updating them.
+> 
+> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_host.h | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 1550192..b6f998b 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -203,6 +203,8 @@ struct kvm_cpu_context {
+>  	};
+>  
+>  	struct kvm_vcpu *__hyp_running_vcpu;
+> +	u32 events_host_only;
+> +	u32 events_guest_only;
+>  };
+>  
+>  typedef struct kvm_cpu_context kvm_cpu_context_t;
+> @@ -472,6 +474,24 @@ static inline int kvm_arch_vcpu_run_pid_change(struct kvm_vcpu *vcpu)
+>  {
+>  	return kvm_arch_vcpu_run_map_fp(vcpu);
+>  }
+> +static inline void kvm_set_clr_host_pmu_events(u32 clr, u32 set)
 
-Don't do that.
+nit: keep the arguments in an order that match the function name (saves
+a lot of brain power...)
 
-Fixes: a4a4330db46a ("swiotlb: add support for non-coherent DMA")
-Tested-by: John Stultz <john.stultz@linaro.org>
-Reviewed-by: Christoph Hellwig <hch@lst.de>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Thanks,
 
-v2: Collect tags
-
- kernel/dma/swiotlb.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
-index 5731daa09a32..045930e32c0e 100644
---- a/kernel/dma/swiotlb.c
-+++ b/kernel/dma/swiotlb.c
-@@ -679,7 +679,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
- 	}
- 
- 	if (!dev_is_dma_coherent(dev) &&
--	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
-+	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0 &&
-+	    dev_addr != DIRECT_MAPPING_ERROR)
- 		arch_sync_dma_for_device(dev, phys, size, dir);
- 
- 	return dev_addr;
+	M.
 -- 
-2.19.1.dirty
+Jazz is not dead. It just smells funny...
