@@ -1,42 +1,51 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 21 Nov 2018 13:01:28 +0100
-Subject: [PATCH] clk: zynq: do not allow kmalloc failure
-In-Reply-To: <1542795390-16221-1-git-send-email-hofrat@osadl.org>
-References: <1542795390-16221-1-git-send-email-hofrat@osadl.org>
-Message-ID: <e5e7b0be-8d45-ec7a-618d-8248a41e2361@xilinx.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 21 Nov 2018 13:02:57 +0100
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Enable I2C DMA
+In-Reply-To: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
+References: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
+Message-ID: <20181121120252.l433sboqukjpk2ij@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21. 11. 18 11:16, Nicholas Mc Guire wrote:
->  The kmalloc here is small (< 16 bytes) and occurs during initialization
-
-no reason for space in front of "The"
-
-> during system startup here (can not be built as module) thus if this
-> kmalloc failed it is an indication of something more serious going on
-> and it is fine to hang the system here rather than cause some harder
-> to understand error by dereferencing NULL.
+On Sun, Oct 21, 2018 at 06:35:26AM +0900, Yoshihiro Kaneko wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > 
->  Explicitly checking would not make that much sense here as the only
-
-ditto.
-
-> possible reaction would be would BUG() here anyway.
+> This patch enables I2C DMA.
 > 
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
+> Rev.0.80E.
 > 
-> Problem located with experimental coccinelle script
-> 
-> Patch was compile tested with: multi_v7_defconfig (implies
-> CONFIG_ARCH_ZYNQ=y)
-> 
-> Patch is against 4.20-rc3 (localversion-next is next-20181121)
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 
-I have no problem with the patch but things below your SoB shouldn't
-land in the git history.
+Base patch stack:
+* renesas-devel-20181121-v4.20-rc3
++ "iommu/ipmmu-vmsa: Hook up r8a77990 DT matching code"
++ "pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and functions"
++ "pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and functions"
 
-When this is fixed feel free to add my
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+Config: renesas_defconfig + IPMMU_VMSA
 
-Thanks,
-Michal
+Should we enable IPMMU_VMSA in arm64 defconfig and renesas_defconfig?
+
+Test with base patch stack:
+# grep dma /proc/interrupts  | grep -v "0          0"
+(no output)
+# amixer set "DVC Out" 2%
+# play xyz.wav
+# grep dma /proc/interrupts  | grep -v "0          0"
+(no output)
+
+Test with base patch stack + this patch applied:
+# grep dma /proc/interrupts  | grep -v "0          0"
+(no output)
+# amixer set "DVC Out" 2%
+# play xyz.wav
+# grep dma /proc/interrupts  | grep -v "0          0"
+109:        512          0     GIC-0 352 Level     ec700000.dma-controller:0
+
+
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+
+I plan to apply this patch for v4.21.
