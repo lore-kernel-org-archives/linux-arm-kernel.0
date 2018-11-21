@@ -1,32 +1,18 @@
-From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Wed, 21 Nov 2018 21:30:47 +0300
-Subject: [RFC PATCH v3 14/17] dt-bindings: watchdog: Add Allwinner ARMv5
- F1C100s wdt
-In-Reply-To: <cover.1542824904.git.mesihkilinc@gmail.com>
-References: <cover.1542824904.git.mesihkilinc@gmail.com>
-Message-ID: <713a56409ba6afb4896d3ac9617f1784c7889f0f.1542824904.git.mesihkilinc@gmail.com>
+From: cl@linux.com (Christopher Lameter)
+Date: Wed, 21 Nov 2018 18:32:58 +0000
+Subject: [PATCH v2 2/3] mm: Add support for SLAB_CACHE_DMA32
+In-Reply-To: <20181111090341.120786-3-drinkcat@chromium.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <20181111090341.120786-3-drinkcat@chromium.org>
+Message-ID: <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner ARMv5 F1C100s has similar watchdog timer to sun6i A31.
-Add definition for it.
+On Sun, 11 Nov 2018, Nicolas Boichat wrote:
 
-Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
----
- Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 1 +
- 1 file changed, 1 insertion(+)
+> SLAB_CACHE_DMA32 is only available after explicit kmem_cache_create calls,
+> no default cache is created for kmalloc. Add a test in check_slab_flags
+> for this.
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-index ed11ce0..5eefc56 100644
---- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-@@ -6,6 +6,7 @@ Required properties:
- 	"allwinner,sun4i-a10-wdt"
- 	"allwinner,sun6i-a31-wdt"
- 	"allwinner,sun50i-a64-wdt","allwinner,sun6i-a31-wdt"
-+	"allwinner,suniv-f1c100s-wdt"
- - reg : Specifies base physical address and size of the registers.
- 
- Optional properties:
--- 
-2.7.4
+This does not define the dma32 kmalloc array. Is that intentional? In that
+case you need to fail any request for GFP_DMA32 coming in via kmalloc.
