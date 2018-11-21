@@ -1,39 +1,34 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Wed, 21 Nov 2018 07:43:42 -0500
-Subject: [PATCH] soc: bcm: brcmstb: add of_node_put()
-Message-ID: <20181121124342.21987-1-tiny.windzz@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 21 Nov 2018 13:50:13 +0100
+Subject: [PATCH V2] arm64: dts: renesas: r8a77965: Add CAN and CANFD
+ controller nodes
+In-Reply-To: <20181120233252.1612-1-marek.vasut+renesas@gmail.com>
+References: <20181120233252.1612-1-marek.vasut+renesas@gmail.com>
+Message-ID: <20181121125013.GA847@kunai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_node_by_path() acquires a reference to the node returned
-by it and that reference needs to be dropped by its caller.
-bl_idle_init() doesn't do that, so fix it.
+On Wed, Nov 21, 2018 at 12:32:52AM +0100, Marek Vasut wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> 
+> This patch adds CAN{0,1} and CANFD controller nodes for the R8A77965 SoC.
+> 
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
+> Cc: linux-renesas-soc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
----
- drivers/soc/bcm/brcmstb/common.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index 14185451901d..95b777fffee6 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -32,12 +32,15 @@ static const struct of_device_id brcmstb_machine_match[] = {
- bool soc_is_brcmstb(void)
- {
- 	struct device_node *root;
-+	bool rc;
- 
- 	root = of_find_node_by_path("/");
- 	if (!root)
- 		return false;
- 
--	return of_match_node(brcmstb_machine_match, root) != NULL;
-+	rc = of_match_node(brcmstb_machine_match, root) != NULL;
-+	of_node_put(root);
-+	return rc;
- }
- 
- u32 brcmstb_get_family_id(void)
--- 
-2.17.0
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/3fea816a/attachment.sig>
