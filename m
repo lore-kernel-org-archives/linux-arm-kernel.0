@@ -1,101 +1,28 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 21 Nov 2018 15:27:40 +0100
-Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-In-Reply-To: <20181120152907.GA28796@ulmo>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
- <20181120152907.GA28796@ulmo>
-Message-ID: <20181121142740.GA29704@ulmo>
+From: william.kucharski@oracle.com (William Kucharski)
+Date: Wed, 21 Nov 2018 07:29:37 -0700
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <20181121123513.GF3065@bombadil.infradead.org>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+ <20181116182836.GB17088@rapoport-lnx>
+ <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
+ <20181117143742.GB7861@bombadil.infradead.org>
+ <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
+ <833B5050-DEF6-44A0-9832-276F86671212@oracle.com>
+ <20181121123513.GF3065@bombadil.infradead.org>
+Message-ID: <D13F3DA0-1CD3-43AF-BAF6-5103FE7C4B5A@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 04:29:07PM +0100, Thierry Reding wrote:
-> On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
-> > On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > >
-> > > From: Thierry Reding <treding@nvidia.com>
-> > >
-> > > The mailbox framework supports blocking transfers via completions for
-> > > clients that can sleep. In order to support blocking transfers in cases
-> > > where the transmission is not permitted to sleep, add a new ->flush()
-> > > callback that controller drivers can implement to busy loop until the
-> > > transmission has been completed. This will automatically be called when
-> > > available and interrupts are disabled for clients that request blocking
-> > > transfers.
-> > >
-> > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > ---
-> > >  drivers/mailbox/mailbox.c          | 8 ++++++++
-> > >  include/linux/mailbox_controller.h | 4 ++++
-> > >  2 files changed, 12 insertions(+)
-> > >
-> > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> > > index 674b35f402f5..0eaf21259874 100644
-> > > --- a/drivers/mailbox/mailbox.c
-> > > +++ b/drivers/mailbox/mailbox.c
-> > > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
-> > >                 unsigned long wait;
-> > >                 int ret;
-> > >
-> > > +               if (irqs_disabled() && chan->mbox->ops->flush) {
-> > > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
-> > > +                       if (ret < 0)
-> > > +                               tx_tick(chan, ret);
-> > > +
-> > > +                       return ret;
-> > > +               }
-> > > +
-> > This is hacky. I think we can do without busy waiting in atomic
-> > context. You could queue locally while in atomic context and then
-> > transfer in blocking mode. I don't think we should worry about the
-> > 'throughput' as there already is no h/w rate control even with
-> > busy-waiting.
+
+
+> On Nov 21, 2018, at 5:35 AM, Matthew Wilcox <willy@infradead.org> wrote:
 > 
-> I actually tried to do that before I added this flushing mechanism. The
-> problem is, like you said, one of rate control. As mentioned in the
-> cover letter, the shared mailboxes implemented in tegra-hsp are used as
-> RX and TX channels for the TCU, which is like a virtual UART. The TTY
-> driver included as part of this series will use one of the mailboxes to
-> transmit data that is written to the console. The problem is that if
-> these transmissions are not rate-limited on the TTY driver side, the
-> console will just keep writing data and eventually overflow the buffer
-> that we have in the mailbox subsystem.
+> It's probably better to be more explicit and answer Randy's question:
 > 
-> The problem is that data comes in at a much higher rate than what we can
-> output. This is especially true at boot when the TCU console takes over
-> and the whole log buffer is dumped on it.
-> 
-> So the only way to rate-limit is to either make mbox_send_message()
-> block, but that can only be done in non-atomic context. The console,
-> however, will always run in atomic context, so the only way to do rate-
-> limiting is by busy looping.
+> * If we fail to insert any page into the vma, the function will return
+> * immediately leaving any previously-inserted pages present.  Callers
+> * from the mmap handler may immediately return the error as their
+> * caller will destroy the vma, removing any successfully-inserted pages.
+> * Other callers should make their own arrangements for calling unmap_region().
 
-What I also tried before was to implement busy looping within the
-->send_data() callback of the driver so that we didn't have to put this
-into the core. Unfortunately, however, the ->send_data() callback is
-called under chan->lock, which means that from mbox_send_message() we
-don't have a way to mark the transfer as done. In order to do that we'd
-have to call mbox_chan_txdone(), but that ends up calling tx_tick() and
-that in turn also attempts to take the chan->lock, which would cause a
-deadlock.
-
-The explicit flushing is the best alternative that I could come up with.
-I think it's not all that hacky, because it's very explicit about what's
-going on and it has the nice side-effect that it will allow the mailbox
-to work in interrupt driven mode if possible and only resorting to the
-busy loop in atomic context.
-
-At this point I think I have explored all other options and I frankly
-can't find a more proper way to achieve what we need here. Perhaps you
-can think of additional ways to accomplish this?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/8a844def/attachment.sig>
+That works for me as well.
