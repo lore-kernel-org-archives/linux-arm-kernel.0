@@ -1,49 +1,57 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 21 Nov 2018 22:21:57 +0100
-Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for
- SPI mode
-In-Reply-To: <CAL_JsqLO_L+rTZh70nrpBMU1+CYKct7HhNY0gLGUnU7=JVRuQw@mail.gmail.com>
-References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
- <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
- <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
- <20181121164820.GC12656@piout.net>
- <CAL_JsqLO_L+rTZh70nrpBMU1+CYKct7HhNY0gLGUnU7=JVRuQw@mail.gmail.com>
-Message-ID: <20181121212157.GD12656@piout.net>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Wed, 21 Nov 2018 13:38:53 -0800
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+Message-ID: <20181121213853.GL3065@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/2018 14:52:29-0600, Rob Herring wrote:
-> On Wed, Nov 21, 2018 at 10:48 AM Alexandre Belloni
-> <alexandre.belloni@bootlin.com> wrote:
-> >
-> > Hi Rob,
-> >
-> > On 21/11/2018 10:41:01-0600, Rob Herring wrote:
-> > > > +Optional properties in serial and SPI mode:
-> > > > +- dma bindings for dma transfer:
-> > > > +       - dmas: DMA specifier, consisting of a phandle to DMA controller node,
-> > > > +               memory peripheral interface and USART DMA channel ID, FIFO configuration.
-> > > > +               Refer to dma.txt and atmel-dma.txt for details.
-> > > > +       - dma-names: "rx" for RX channel, "tx" for TX channel.
-> > >
-> > > > +               dma-names = "tx", "rx";
-> > >
-> > > The dma-names should have a defined order.
-> > >
-> >
-> > Why is that? Isn't the purpose of names to get rid of any particular
-> > ordering?
+On Wed, Nov 21, 2018 at 06:20:02PM +0000, Christopher Lameter wrote:
+> On Sun, 11 Nov 2018, Nicolas Boichat wrote:
 > 
-> Because a fundamental rule of DT is the order is defined and
-> important. The purpose was to allow for cases that had a variable
-> number of entries, but even a variable number still have a defined
-> order.
+> > This is a follow-up to the discussion in [1], to make sure that the page
+> > tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
+> > physical address space.
 > 
+> Page tables? This means you need a page frame? Why go through the slab
+> allocators?
 
-Thank you for the clarification!
+Because this particular architecture has sub-page-size PMD page tables.
+We desperately need to hoist page table allocation out of the architectures;
+there're a bunch of different implementations and they're mostly bad,
+one way or another.
 
+For each level of page table we generally have three cases:
 
--- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+1. single page
+2. sub-page, naturally aligned
+3. multiple pages, naturally aligned
+
+for 1 and 3, the page allocator will do just fine.
+for 2, we should have a per-MM page_frag allocator.  s390 already has
+something like this, although it's more complicated.  ppc also has
+something a little more complex for the cases when it's configured with
+a 64k page size but wants to use a 4k page table entry.
+
+I'd like x86 to be able to simply do:
+
+#define pte_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+#define pmd_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+#define pud_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+#define p4d_alloc_one(mm, addr)	page_alloc_table(mm, addr, 0)
+
+An architecture with 4k page size and needing a 16k PMD would do:
+
+#define pmd_alloc_one(mm, addr) page_alloc_table(mm, addr, 2)
+
+while an architecture with a 64k page size needing a 4k PTE would do:
+
+#define ARCH_PAGE_TABLE_FRAG
+#define pte_alloc_one(mm, addr) pagefrag_alloc_table(mm, addr, 4096)
+
+I haven't had time to work on this, but perhaps someone with a problem
+that needs fixing would like to, instead of burying yet another awful
+implementation away in arch/ somewhere.
