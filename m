@@ -1,36 +1,54 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 21 Nov 2018 14:01:03 +0800
-Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
-In-Reply-To: <CAHmME9qOFA2hEe-8hb3CxEPsLbwNm8oev4SO5WBDhA+pxqadGA@mail.gmail.com>
-References: <20181105232526.173947-1-ebiggers@kernel.org>
- <20181105232526.173947-11-ebiggers@kernel.org>
- <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
- <20181112185816.GA8663@gmail.com>
- <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
- <20181117001718.GA175522@gmail.com>
- <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
- <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
- <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
- <CAHmME9qOFA2hEe-8hb3CxEPsLbwNm8oev4SO5WBDhA+pxqadGA@mail.gmail.com>
-Message-ID: <20181121060103.4s2byjn2fh2mglno@gondor.apana.org.au>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Wed, 21 Nov 2018 11:54:52 +0530
+Subject: [PATCH 0/9] Use vm_insert_range
+In-Reply-To: <20181115154314.GA27850@jordon-HP-15-Notebook-PC>
+References: <20181115154314.GA27850@jordon-HP-15-Notebook-PC>
+Message-ID: <CAFqt6zZGP5DnAQd_19xKcLezOYaLsZpPr=FGxiTb7JRjTEJ4cA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 05:18:24PM +0100, Jason A. Donenfeld wrote:
+On Thu, Nov 15, 2018 at 9:09 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
 >
-> N'ack. As I mentioned in the last email, this really isn't okay, and
-> mostly defeats the purpose of Zinc in the first place, adding
-> complexity in a discombobulated half-baked way. Your proposal seems to
-> be the worst of all worlds. Having talked to lots of people about the
-> design of Zinc at this point to very positive reception, I'm going to
-> move forward with submitting v9, once I rebase with the required
-> changes for Eric's latest merge.
+> Previouly drivers have their own way of mapping range of
+> kernel pages/memory into user vma and this was done by
+> invoking vm_insert_page() within a loop.
+>
+> As this pattern is common across different drivers, it can
+> be generalized by creating a new function and use it across
+> the drivers.
+>
+> vm_insert_range is the new API which will be used to map a
+> range of kernel memory/pages to user vma.
+>
+> All the applicable places are converted to use new vm_insert_range
+> in this patch series.
+>
+> Souptick Joarder (9):
+>   mm: Introduce new vm_insert_range API
+>   arch/arm/mm/dma-mapping.c: Convert to use vm_insert_range
+>   drivers/firewire/core-iso.c: Convert to use vm_insert_range
+>   drm/rockchip/rockchip_drm_gem.c: Convert to use vm_insert_range
+>   drm/xen/xen_drm_front_gem.c: Convert to use vm_insert_range
+>   iommu/dma-iommu.c: Convert to use vm_insert_range
+>   videobuf2/videobuf2-dma-sg.c: Convert to use vm_insert_range
+>   xen/gntdev.c: Convert to use vm_insert_range
+>   xen/privcmd-buf.c: Convert to use vm_insert_range
 
-Do you have any actual technical reasons for rejecting this apart
-from your apparent hatred of the existing crypto API?
-
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Any further comment on driver changes ?
+>
+>  arch/arm/mm/dma-mapping.c                         | 21 ++++++-----------
+>  drivers/firewire/core-iso.c                       | 15 ++----------
+>  drivers/gpu/drm/rockchip/rockchip_drm_gem.c       | 20 ++--------------
+>  drivers/gpu/drm/xen/xen_drm_front_gem.c           | 20 +++++-----------
+>  drivers/iommu/dma-iommu.c                         | 12 ++--------
+>  drivers/media/common/videobuf2/videobuf2-dma-sg.c | 23 ++++++-------------
+>  drivers/xen/gntdev.c                              | 11 ++++-----
+>  drivers/xen/privcmd-buf.c                         |  8 ++-----
+>  include/linux/mm_types.h                          |  3 +++
+>  mm/memory.c                                       | 28 +++++++++++++++++++++++
+>  mm/nommu.c                                        |  7 ++++++
+>  11 files changed, 70 insertions(+), 98 deletions(-)
+>
+> --
+> 1.9.1
+>
