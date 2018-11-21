@@ -1,46 +1,76 @@
-From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Wed, 21 Nov 2018 21:30:46 +0300
-Subject: [RFC PATCH v3 13/17] SoC: sunxi: Add support for Allwinner ARMv5
- F1C100s sram
-In-Reply-To: <cover.1542824904.git.mesihkilinc@gmail.com>
-References: <cover.1542824904.git.mesihkilinc@gmail.com>
-Message-ID: <89f6179c17a98f160301fdeef27df35b359847e3.1542824904.git.mesihkilinc@gmail.com>
+From: paul.burton@mips.com (Paul Burton)
+Date: Wed, 21 Nov 2018 18:40:06 +0000
+Subject: [PATCH v2 16/15] syscall_get_arch: add "struct task_struct *"
+ argument
+In-Reply-To: <20181121004422.GA29053@altlinux.org>
+References: <20181107042751.3b519062@akathisia>
+ <CALCETrV1v-DPRfDRwiH=xn29bxWxiHdZtAH1nw=dsmDtnT0YGQ@mail.gmail.com>
+ <20181120001128.GA11300@altlinux.org> <20181121004422.GA29053@altlinux.org>
+Message-ID: <20181121184004.jro532jopnbmru2m@pburton-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner ARMv5 F1C100s has similar sram controller to sun4i A10
-Add compatible strings for it.
+Hi Dmitry,
 
-Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
----
- drivers/soc/sunxi/sunxi_sram.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On Wed, Nov 21, 2018 at 03:44:22AM +0300, Dmitry V. Levin wrote:
+> This argument is required to extend the generic ptrace API
+> with PTRACE_GET_SYSCALL_INFO request: syscall_get_arch() is going to be
+> called from ptrace_request() along with other syscall_get_* functions
+> with a tracee as their argument.
+> 
+> This change partially reverts commit 5e937a9ae913 ("syscall_get_arch:
+> remove useless function arguments").
+> 
+>%
+> 
+> diff --git a/arch/mips/include/asm/syscall.h b/arch/mips/include/asm/syscall.h
+> index 0170602a1e4e..52b633f20abd 100644
+> --- a/arch/mips/include/asm/syscall.h
+> +++ b/arch/mips/include/asm/syscall.h
+> @@ -73,7 +73,7 @@ static inline unsigned long mips_get_syscall_arg(unsigned long *arg,
+>  #ifdef CONFIG_64BIT
+>  	case 4: case 5: case 6: case 7:
+>  #ifdef CONFIG_MIPS32_O32
+> -		if (test_thread_flag(TIF_32BIT_REGS))
+> +		if (test_ti_thread_flag(task_thread_info(task), TIF_32BIT_REGS))
+>  			return get_user(*arg, (int *)usp + n);
+>  		else
+>  #endif
 
-diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
-index b4b0f34..27f0607 100644
---- a/drivers/soc/sunxi/sunxi_sram.c
-+++ b/drivers/soc/sunxi/sunxi_sram.c
-@@ -99,6 +99,10 @@ static const struct of_device_id sunxi_sram_dt_ids[] = {
- 		.compatible	= "allwinner,sun50i-a64-sram-c",
- 		.data		= &sun50i_a64_sram_c.data,
- 	},
-+	{
-+		.compatible	= "allwinner,suniv-f1c100s-sram-d",
-+		.data		= &sun4i_a10_sram_d.data,
-+	},
- 	{}
- };
- 
-@@ -389,6 +393,10 @@ static const struct of_device_id sunxi_sram_dt_match[] = {
- 		.compatible = "allwinner,sun50i-a64-system-control",
- 		.data = &sun50i_a64_sramc_variant,
- 	},
-+	{
-+		.compatible = "allwinner,suniv-f1c100s-system-control",
-+		.data = &sun4i_a10_sramc_variant,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, sunxi_sram_dt_match);
--- 
-2.7.4
+This ought to be test_tsk_thread_flag(task, TIF_32BIT_REGS) instead of
+open-coding test_tsk_thread_flag.
+
+More fundamentally though, this change doesn't seem to be (directly)
+related to the change you describe in the commit message - it's not
+syscall_get_arch being modified here. I suspect this should be a
+separate commit, or if not please explain in the commit message why this
+change is included.
+
+Compounding the lack of clarity is the fact that I only received this
+patch, not the whole series, so I can't view the change in the context
+of the rest of the series.
+
+> @@ -140,14 +140,14 @@ extern const unsigned long sys_call_table[];
+>  extern const unsigned long sys32_call_table[];
+>  extern const unsigned long sysn32_call_table[];
+>  
+> -static inline int syscall_get_arch(void)
+> +static inline int syscall_get_arch(struct task_struct *task)
+>  {
+>  	int arch = AUDIT_ARCH_MIPS;
+>  #ifdef CONFIG_64BIT
+> -	if (!test_thread_flag(TIF_32BIT_REGS)) {
+> +	if (!test_ti_thread_flag(task_thread_info(task), TIF_32BIT_REGS)) {
+>  		arch |= __AUDIT_ARCH_64BIT;
+>  		/* N32 sets only TIF_32BIT_ADDR */
+> -		if (test_thread_flag(TIF_32BIT_ADDR))
+> +		if (test_ti_thread_flag(task_thread_info(task), TIF_32BIT_ADDR))
+>  			arch |= __AUDIT_ARCH_CONVENTION_MIPS64_N32;
+>  	}
+>  #endif
+
+This does seem like the described change, but there are 2 more instances
+of open-coding test_tsk_thread_flag which ought to be cleaned up.
+
+Thanks,
+    Paul
