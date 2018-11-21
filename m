@@ -1,50 +1,40 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Wed, 21 Nov 2018 13:28:30 +0100
-Subject: [PATCH V2] clk: zynq: do not allow kmalloc failure
-Message-ID: <1542803310-32673-1-git-send-email-hofrat@osadl.org>
+From: willy@infradead.org (Matthew Wilcox)
+Date: Wed, 21 Nov 2018 04:35:13 -0800
+Subject: [PATCH 1/9] mm: Introduce new vm_insert_range API
+In-Reply-To: <833B5050-DEF6-44A0-9832-276F86671212@oracle.com>
+References: <20181115154530.GA27872@jordon-HP-15-Notebook-PC>
+ <20181116182836.GB17088@rapoport-lnx>
+ <CAFqt6zYp0j999WXw9Jus0oZMjADQQkPfso8btv6du6L9CE3PXA@mail.gmail.com>
+ <20181117143742.GB7861@bombadil.infradead.org>
+ <CAFqt6zbOWX5LUTWwoGDJsGdf+pTR6N1yTPVxyr1W3-6Fte39ww@mail.gmail.com>
+ <833B5050-DEF6-44A0-9832-276F86671212@oracle.com>
+Message-ID: <20181121123513.GF3065@bombadil.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kmalloc here is small (< 16 bytes) and occurs during initialization
-during system startup here (can not be built as module) thus if this
-kmalloc failed it is an indication of something more serious going on
-and it is fine to hang the system here rather than cause some harder
-to understand error by dereferencing NULL.
+On Wed, Nov 21, 2018 at 04:19:11AM -0700, William Kucharski wrote:
+> Could you add a line to the description explicitly stating that a failure
+> to insert any page in the range will fail the entire routine, something
+> like:
+> 
+> > * This allows drivers to insert range of kernel pages they've allocated
+> > * into a user vma. This is a generic function which drivers can use
+> > * rather than using their own way of mapping range of kernel pages into
+> > * user vma.
+> > *
+> > * A failure to insert any page in the range will fail the call as a whole.
+> 
+> It's obvious when reading the code, but it would be self-documenting to
+> state it outright.
 
-Explicitly checking would not make that much sense here as the only
-possible reaction would be would BUG() here anyway.
+It's probably better to be more explicit and answer Randy's question:
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: 0ee52b157b8e ("clk: zynq: Add clock controller driver")
-Acked-by: Michal Simek <michal.simek@xilinx.com>
----
+ * If we fail to insert any page into the vma, the function will return
+ * immediately leaving any previously-inserted pages present.  Callers
+ * from the mmap handler may immediately return the error as their
+ * caller will destroy the vma, removing any successfully-inserted pages.
+ * Other callers should make their own arrangements for calling unmap_region().
 
-V2: dropped leading spaces from commit message and moved the
-    compile/tool info out of git history on request of
-    Michal Simek <michal.simek@xilinx.com> - thanks !
-
-Problem located with experimental coccinelle script
-
-Patch was compile tested with: multi_v7_defconfig (implies
-CONFIG_ARCH_ZYNQ=y)
-
-Patch is against 4.20-rc3 (localversion-next is next-20181121)
-
- drivers/clk/zynq/clkc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index d7b53ac..014d4a4 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -440,7 +440,7 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			SLCR_GEM1_CLK_CTRL, 0, 0, &gem1clk_lock);
- 
- 	tmp = strlen("mio_clk_00x");
--	clk_name = kmalloc(tmp, GFP_KERNEL);
-+	clk_name = kmalloc(tmp, GFP_KERNEL | __GFP_NOFAIL);
- 	for (i = 0; i < NUM_MIO_PINS; i++) {
- 		int idx;
- 
--- 
-2.1.4
+Although unmap_region() is static so there clearly isn't any code in the
+kernel today other than in mmap handlers (or fault handlers) that needs to
+insert pages into a VMA.
