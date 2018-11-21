@@ -1,35 +1,38 @@
-From: quentin.schulz@bootlin.com (Quentin Schulz)
-Date: Wed, 21 Nov 2018 08:52:20 +0100
-Subject: [PATCH v3 4/5] phy: mvebu-cp110-comphy: convert to use eth phy
- mode and submode
-In-Reply-To: <d80901b2-a38a-7abf-23b2-c2b0c84ff321@ti.com>
-References: <20181120012424.11802-1-grygorii.strashko@ti.com>
- <20181120012424.11802-5-grygorii.strashko@ti.com>
- <d80901b2-a38a-7abf-23b2-c2b0c84ff321@ti.com>
-Message-ID: <20181121075220.z6smcpk3y7vab7ix@qschulz>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 21 Nov 2018 15:55:02 +0800
+Subject: [RFC PATCH v2 0/4] Exporting existing crypto API code through zinc
+In-Reply-To: <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
+References: <CAKv+Gu-o0khD5=0EOkv2PiczMs5uZ=XP9V=G2ogBNMK8Kb93sw@mail.gmail.com>
+ <20181112185816.GA8663@gmail.com>
+ <20181116060227.hwu4igi6bp26ddpi@gondor.apana.org.au>
+ <20181117001718.GA175522@gmail.com>
+ <CAHmME9rtsCk8ZLt05xRKMGr4CVRnaUvCaVOS_WX3N22HOat4-A@mail.gmail.com>
+ <20181119052451.qttzfgcm4hvbdc4u@gondor.apana.org.au>
+ <20181120060217.t4nccaqpwnxkl4tx@gondor.apana.org.au>
+ <CAKv+Gu-SHS2tF665dfqSgmH5EF5vGVtef=3_4WgCE=+8+Jw7Rw@mail.gmail.com>
+ <20181120141850.zjmfwcari5kykk6y@gondor.apana.org.au>
+ <CAHmME9oPGkvEmqvfbav-AOf_P=Z4zWYxvqD3a3QhuOSh_OWd_A@mail.gmail.com>
+Message-ID: <20181121075502.zch53qoc66lh6z22@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On Wed, Nov 21, 2018 at 01:08:42PM +0530, Kishon Vijay Abraham I wrote:
-> Antoine,
+On Tue, Nov 20, 2018 at 05:24:41PM +0100, Jason A. Donenfeld wrote:
+> On Tue, Nov 20, 2018 at 3:19 PM Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> > Yes.  In fact it's used for FIPS certification testing.
+> > Sure, nobody sane should be doing it.  But when it comes to
+> > government certification... :)
 > 
-> On 20/11/18 6:54 AM, Grygorii Strashko wrote:
-> > Convert mvebu-cp110-comphy PHY driver to use recently introduced
-> > PHY_MODE_ETHERNET and phy_set_mode_ext().
-> 
-> Care to give ACK for this patch?
-> 
+> The kernel does not aim toward any FIPS certification, and we're not
+> going to start bloating our designs to fulfill this. It's never been a
+> goal. Maybe ask Ted to add a FIPS mode to random.c and see what
+> happens... When you start arguing "because FIPS!" as your
+> justification, you really hit a head scratcher.
 
-Acked-by Antoine and Tested-by Maxime given in v2:
-https://patchwork.kernel.org/patch/10676749/
+FIPS is not the issue.  The issue is that we need to keep the
+existing user-space ABI.  We can't break that.
 
-Quentin
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/32cde8c4/attachment.sig>
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
