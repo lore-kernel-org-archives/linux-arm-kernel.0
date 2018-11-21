@@ -1,74 +1,104 @@
-From: miles.chen@mediatek.com (miles.chen at mediatek.com)
-Date: Wed, 21 Nov 2018 16:11:13 +0800
-Subject: [RFC PATCH] of: make MAX_RESERVED_REGIONS configurable
-Message-ID: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 21 Nov 2018 09:39:15 +0100
+Subject: [PATCH V3] arm64: dts: r8a77990: ebisu: Add and enable SDHI
+ device nodes
+In-Reply-To: <94869436-7841-537a-4760-8f117b06200f@gmail.com>
+References: <20181106204647.18051-1-marek.vasut+renesas@gmail.com>
+ <CAMuHMdWQYt4nrjBeQnWcZ+OOT+UX=9KTu3Lki7aS=n3n8FczZg@mail.gmail.com>
+ <94869436-7841-537a-4760-8f117b06200f@gmail.com>
+Message-ID: <CAMuHMdWXYLkUqBdaYT0f0=OYKi7q5tTFgTRXp28zAiMV_7qFcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Miles Chen <miles.chen@mediatek.com>
+On Wed, Nov 21, 2018 at 12:33 AM Marek Vasut <marek.vasut@gmail.com> wrote:
+> On 11/20/2018 11:16 AM, Geert Uytterhoeven wrote:
+> > On Tue, Nov 6, 2018 at 9:46 PM Marek Vasut <marek.vasut@gmail.com> wrote:
+> >> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >>
+> >> This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
+> >> and enables SD card slot connected to SDHI0, micro SD card slot
+> >> connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
+> >> using the R8A77990 SoC.
+> >>
+> >> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+> >
+> >> --- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> >> +++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+> >> @@ -129,6 +129,15 @@
+> >>                 };
+> >>         };
+> >>
+> >> +       reg_1p8v: regulator0 {
+> >> +               compatible = "regulator-fixed";
+> >> +               regulator-name = "fixed-1.8V";
+> >> +               regulator-min-microvolt = <1800000>;
+> >> +               regulator-max-microvolt = <1800000>;
+> >> +               regulator-boot-on;
+> >> +               regulator-always-on;
+> >> +       };
+> >> +
+> >>         reg_3p3v: regulator1 {
+> >>                 compatible = "regulator-fixed";
+> >>                 regulator-name = "fixed-3.3V";
+> >> @@ -180,6 +189,54 @@
+> >>                 #clock-cells = <0>;
+> >>                 clock-frequency = <74250000>;
+> >>         };
+> >> +
+> >> +       vcc_sdhi0: regulator-vcc-sdhi0 {
+> >> +               compatible = "regulator-fixed";
+> >> +
+> >> +               regulator-name = "SDHI0 Vcc";
+> >> +               regulator-min-microvolt = <3300000>;
+> >> +               regulator-max-microvolt = <3300000>;
+> >> +
+> >> +               gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
+> >> +               enable-active-high;
+> >> +       };
+> >> +
+> >> +       vccq_sdhi0: regulator-vccq-sdhi0 {
+> >> +               compatible = "regulator-gpio";
+> >> +
+> >> +               regulator-name = "SDHI0 VccQ";
+> >> +               regulator-min-microvolt = <1800000>;
+> >> +               regulator-max-microvolt = <3300000>;
+> >> +
+> >> +               gpios = <&gpio5 18 GPIO_ACTIVE_HIGH>;
+> >> +               gpios-states = <1>;
+> >> +               states = <3300000 1
+> >> +                         1800000 0>;
+> >
+> > I know this is how it's done in the example in
+> > Documentation/devicetree/bindings/regulator/gpio-regulator.txt,
+> > but usually brackets are used to group tuples, like:
+> >
+> >     states = <3300000 1>, <1800000 0>;
+> >
+> > Perhaps the example should be changed?
+>
+> Well, looking through the DTS, I don't see anyone using tuples for the
+> GPIO regulator states. Then again, it could be updated.
 
-When we use more than 32 entries in /resered-memory,
-there will be an error message: "not enough space all defined regions.".
-We can increase MAX_RESERVED_REGIONS to fix this.
+Probably a good idea given the current work on schema validation:
 
-commit 22f8cc6e3373 ("drivers: of: increase MAX_RESERVED_REGIONS to 32")
-increased MAX_RESERVED_REGIONS to 32 but I'm not sure if increasing
-MAX_RESERVED_REGIONS to 64 is suitable for everyone.
+    DT YAML Encoding
+    ...
+    dts ?< >? are maintained
+      ? Will need to be stricter about these
+      ? Same for dtb, not for validation:
+          ? prop = <1 2 3 4>;
+          ? prop = <1>, <2>, <3>, <4>;
 
-In this RFC patch, CONFIG_MAX_OF_RESERVED_REGIONS is added and used as
-MAX_RESERVED_REGIONS. Add a sanity test to make sure that
-MAX_RESERVED_REGIONS is less than INIT_MEMBLOCK_REGIONS.
-Users can configure CONFIG_MAX_OF_RESERVED_REGIONS according to their
-need.
+https://www.elinux.org/images/6/6b/LPC2018_json-schema_for_Devicetree.pdf
 
-Signed-off-by: Miles Chen <miles.chen@mediatek.com>
----
- drivers/of/Kconfig           | 9 +++++++++
- drivers/of/of_reserved_mem.c | 5 ++++-
- 2 files changed, 13 insertions(+), 1 deletion(-)
+Gr{oetje,eeting}s,
 
-diff --git a/drivers/of/Kconfig b/drivers/of/Kconfig
-index ad3fcad..63fff2e 100644
---- a/drivers/of/Kconfig
-+++ b/drivers/of/Kconfig
-@@ -86,6 +86,15 @@ config OF_RESERVED_MEM
- 	help
- 	  Helpers to allow for reservation of memory regions
- 
-+config MAX_OF_RESERVED_REGIONS
-+	int "the max number of devicetree reserved memory regions"
-+	depends on OF_RESERVED_MEM
-+	default 32
-+	help
-+	  Setup the max number of devicetree reserved memory regions
-+	  If unsure, leave the default value "32".
-+
-+
- config OF_RESOLVE
- 	bool
- 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 1977ee0..18a7729 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -22,7 +22,7 @@
- #include <linux/slab.h>
- #include <linux/memblock.h>
- 
--#define MAX_RESERVED_REGIONS	32
-+#define MAX_RESERVED_REGIONS	CONFIG_MAX_OF_RESERVED_REGIONS
- static struct reserved_mem reserved_mem[MAX_RESERVED_REGIONS];
- static int reserved_mem_count;
- 
-@@ -246,6 +246,9 @@ void __init fdt_init_reserved_mem(void)
- {
- 	int i;
- 
-+	/* MAX_RESERVED_REGIONS should be bounded by INIT_MEMBLOCK_REGIONS */
-+	BUILD_BUG_ON(MAX_RESERVED_REGIONS > INIT_MEMBLOCK_REGIONS);
-+
- 	/* check for overlapping reserved regions */
- 	__rmem_check_for_overlap();
- 
+                        Geert
+
 -- 
-1.9.1
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
