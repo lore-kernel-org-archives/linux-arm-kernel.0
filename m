@@ -1,55 +1,51 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 21 Nov 2018 15:59:43 +0530
-Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
-In-Reply-To: <20181121101121.7rhe2hz2mnmc72cu@flea>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
- <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
- <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
- <20181121101121.7rhe2hz2mnmc72cu@flea>
-Message-ID: <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
+From: torbjorn.jansson@mbox200.swipnet.se (Torbjorn Jansson)
+Date: Wed, 21 Nov 2018 11:40:21 +0100
+Subject: odroid hc2?
+In-Reply-To: <f7d9845c-6970-ac5b-6c24-f5c6298425f7@samsung.com>
+References: <CGME20181121091230epcas2p4b08f553cc2e160980a26b1c8a47c5cbc@epcas2p4.samsung.com>
+ <d2fc632f-e0bb-6d0a-35f6-64fcb16c354e@mbox200.swipnet.se>
+ <f7d9845c-6970-ac5b-6c24-f5c6298425f7@samsung.com>
+Message-ID: <f6274c20-45ca-1ab9-151f-3784a39e7772@mbox200.swipnet.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On 21/11/18 3:41 PM, Maxime Ripard wrote:
-> Hi Kishon,
+On 2018-11-21 10:59, Marek Szyprowski wrote:
+> Hi Torbjorn,
 > 
-> On Tue, Nov 20, 2018 at 11:02:34AM +0530, Kishon Vijay Abraham I wrote:
->>>> +static int cdns_dphy_config_from_opts(struct phy *phy,
->>>> +				      struct phy_configure_opts_mipi_dphy *opts,
->>>> +				      struct cdns_dphy_cfg *cfg)
->>>> +{
->>>> +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
->>>> +	unsigned int dsi_hfp_ext = 0;
->>>> +	int ret;
->>>> +
->>>> +	ret = phy_mipi_dphy_config_validate(opts);
->>>> +	if (ret)
->>>> +		return ret;
->>>> +
->>>> +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
->>>> +					opts, &dsi_hfp_ext);
->>>> +	if (ret)
->>>> +		return ret;
->>>> +
->>>> +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
+> On 2018-11-21 10:06, Torbjorn Jansson wrote:
+>> Hello.
 >>
->> Is the wakeup populated here used by the consumer driver?
+>> a question for the experts and a small wish/request.
+>> is it possible to get the odroid hc2 up to same level of support in
+>> the kernel as hc1?
+>> my understanding is that they are basically the same thing but hc1
+>> uses a 2.5 inch disk and hc2 uses 3.5 inch discs.
+>>
+>> there is two parts to this i believe.
+>> i'm using fedora 29 to test this and the first part is that uboot (i
+>> think) doesn't recognize the hc2 properly so it tries to load the dtb
+>> file exynos5422-odroidunknown.dtb
+>> i can work around this by creating a symlink from
+>> exynos5422-odroidhc1.dtb and get it to boot.
+>>
+>> second part is ofcourse that there is no dtb file for hc2 so even if
+>> uboot did pickup the right file it wound not exist.
+>>
+>> using the hc1 dtb file with my hc2 appears to work fine.
 > 
-> It's supposed to, if it can yes.
+>  From Linux kernel perspective Odroid HC2 doesn't differ from HC1, so it
+> simply should use HC1 dtb. Recently there have been u-boot patch for
+> adding HC2 detection, which also fixes 'unknown' dtb issue on HC2:
+> https://lists.denx.de/pipermail/u-boot/2018-October/345365.html
+> 
+> Best regards
+> 
 
-But I guess right now it's not using. I'm thinking the usefulness of validate
-callback (only from this series point of view). Why should a consumer driver
-invoke validate if it doesn't intend to configure the PHY?
+Yes that would solve the problem and also confirms I'm doing the right thing by 
+using the hc1 dtb file.
 
-The 3 steps required are
-	* The consumer driver gets the default config
-	* The consumer driver changes some of the configuration and
-	* The consumer driver invokes phy configure callback.
+Next problem is to see if i can figure out how to rebuild uboot and apply the 
+patch so i can test it.
+I'll check the source and see what i can find.
 
-phy_configure anyways can validate the config before actually configuring the phy.
-
-Thanks
-Kishon
+Thanks.
