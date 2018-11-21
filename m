@@ -1,94 +1,95 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 21 Nov 2018 13:33:34 +0000
-Subject: [RFT PATCH] efi: map memreserve table before first use
-In-Reply-To: <20181121095648.GA11514@hc>
-References: <20181120173542.31444-1-ard.biesheuvel@linaro.org>
- <20181121095648.GA11514@hc>
-Message-ID: <d754166a-7c5e-9673-1052-9d433f5593eb@huawei.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 21 Nov 2018 14:47:56 +0100
+Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
+In-Reply-To: <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
+ <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
+ <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
+ <20181121101121.7rhe2hz2mnmc72cu@flea>
+ <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
+Message-ID: <20181121134756.aoj6otdcl4stpd6p@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/2018 09:56, Jan Glauber wrote:
-> On Tue, Nov 20, 2018 at 06:35:42PM +0100, Ard Biesheuvel wrote:
->> Mapping the MEMRESERVE EFI configuration table from an early initcall
->> is too late: the GICv3 ITS code that creates persistent reservations
->> for the boot CPU's LPI tables is invoked from init_IRQ(), which runs
->> much earlier than the handling of the initcalls.
->>
->> So instead, move the initialization performed by the initcall into
->> efi_mem_reserve_persistent() itself.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/efi.c | 26 ++++++++++----------------
->>  1 file changed, 10 insertions(+), 16 deletions(-)
->>
->> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
->> index fad7c62cfc0e..40de2f6734cc 100644
->> --- a/drivers/firmware/efi/efi.c
->> +++ b/drivers/firmware/efi/efi.c
->> @@ -967,15 +967,23 @@ bool efi_is_table_address(unsigned long phys_addr)
->>  }
->>
->>  static DEFINE_SPINLOCK(efi_mem_reserve_persistent_lock);
->> -static struct linux_efi_memreserve *efi_memreserve_root __ro_after_init;
->> +static struct linux_efi_memreserve *efi_memreserve_root;
->>
->>  int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->>  {
->>         struct linux_efi_memreserve *rsv;
->>
->> -       if (!efi_memreserve_root)
->> +       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
->>                 return -ENODEV;
->>
->> +       if (!efi_memreserve_root) {
->> +               efi_memreserve_root = memremap(efi.mem_reserve,
->> +                                              sizeof(*efi_memreserve_root),
->> +                                              MEMREMAP_WB);
->> +               if (WARN_ON_ONCE(!efi_memreserve_root))
->> +                       return -ENOMEM;
->> +       }
->> +
->>         rsv = kmalloc(sizeof(*rsv), GFP_ATOMIC);
->>         if (!rsv)
->>                 return -ENOMEM;
->> @@ -991,20 +999,6 @@ int efi_mem_reserve_persistent(phys_addr_t addr, u64 size)
->>         return 0;
->>  }
->>
->> -static int __init efi_memreserve_root_init(void)
->> -{
->> -       if (efi.mem_reserve == EFI_INVALID_TABLE_ADDR)
->> -               return -ENODEV;
->> -
->> -       efi_memreserve_root = memremap(efi.mem_reserve,
->> -                                      sizeof(*efi_memreserve_root),
->> -                                      MEMREMAP_WB);
->> -       if (!efi_memreserve_root)
->> -               return -ENOMEM;
->> -       return 0;
->> -}
->> -early_initcall(efi_memreserve_root_init);
->> -
->>  #ifdef CONFIG_KEXEC
->>  static int update_efi_random_seed(struct notifier_block *nb,
->>                                   unsigned long code, void *unused)
->> --
->> 2.17.1
->
-> Hi Ard,
->
-> thanks for the patch, it works fine for me.
->
-> If you want:
-> Tested-by: Jan Glauber <jglauber@cavium.com>
+Hi Kishon,
 
-FWIW, the splat is gone:
+On Wed, Nov 21, 2018 at 03:59:43PM +0530, Kishon Vijay Abraham I wrote:
+> On 21/11/18 3:41 PM, Maxime Ripard wrote:
+> > Hi Kishon,
+> > 
+> > On Tue, Nov 20, 2018 at 11:02:34AM +0530, Kishon Vijay Abraham I wrote:
+> >>>> +static int cdns_dphy_config_from_opts(struct phy *phy,
+> >>>> +				      struct phy_configure_opts_mipi_dphy *opts,
+> >>>> +				      struct cdns_dphy_cfg *cfg)
+> >>>> +{
+> >>>> +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
+> >>>> +	unsigned int dsi_hfp_ext = 0;
+> >>>> +	int ret;
+> >>>> +
+> >>>> +	ret = phy_mipi_dphy_config_validate(opts);
+> >>>> +	if (ret)
+> >>>> +		return ret;
+> >>>> +
+> >>>> +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
+> >>>> +					opts, &dsi_hfp_ext);
+> >>>> +	if (ret)
+> >>>> +		return ret;
+> >>>> +
+> >>>> +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
+> >>
+> >> Is the wakeup populated here used by the consumer driver?
+> > 
+> > It's supposed to, if it can yes.
+> 
+> But I guess right now it's not using. I'm thinking the usefulness of validate
+> callback (only from this series point of view). Why should a consumer driver
+> invoke validate if it doesn't intend to configure the PHY?
+> 
+> The 3 steps required are
+> 	* The consumer driver gets the default config
+> 	* The consumer driver changes some of the configuration and
+> 	* The consumer driver invokes phy configure callback.
+> 
+> phy_configure anyways can validate the config before actually configuring the phy.
 
-Tested-by: John Garry <john.garry@huawei.com>
+If you only want to configure the PHY, then yes, sure.
 
->
-> --Jan
->
->
+However, the point here is that validate helps negotiating what the
+source device (DSI controller for example) and what the sink device
+(say a panel) are capable of.
+
+A panel for example might very well have multiple resolutions that it
+supports, and the DSI controller will have some as well. And the PHY
+will only be able to operate within certain boundaries too. However,
+they don't necessarily match, since there's so many panels, and so
+many SoCs.
+
+Let's say our (very weird) panel is able to do 640x480, 1024x768 and
+1280x800. Our DSI driver can only operate with 1024 pixels in both
+dimensions, and the PHY can only reach the bus frequency needed for
+around 800x600.
+
+We'll want to filter out 1280x800 (because the DSI controller can't
+provide that) and 1024x768 (because the PHY can go fast enough), to
+only provide the 640x480 option to the user.
+
+That's what validate bring you. The option to test whether a given
+configuration *would* work, without actually wanting to apply it right
+now.
+
+Does that make sense?
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/e97c0f2f/attachment.sig>
