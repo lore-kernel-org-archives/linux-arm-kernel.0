@@ -1,47 +1,402 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 21 Nov 2018 14:17:33 +0100
-Subject: [PATCH v2 2/2] arm64/bpf: don't allocate BPF JIT programs in module
- memory
-In-Reply-To: <20181121131733.14910-1-ard.biesheuvel@linaro.org>
-References: <20181121131733.14910-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181121131733.14910-3-ard.biesheuvel@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 21 Nov 2018 14:21:32 +0100
+Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
+In-Reply-To: <20181119212420.mlzk2uboduq7npon@valkosipuli.retiisi.org.uk>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
+ <20181119212420.mlzk2uboduq7npon@valkosipuli.retiisi.org.uk>
+Message-ID: <20181121132132.zeecryxvkh2wyyyg@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 module region is a 128 MB region that is kept close to
-the core kernel, in order to ensure that relative branches are
-always in range. So using the same region for programs that do
-not have this restriction is wasteful, and preferably avoided.
+Hi Sakari,
 
-Now that the core BPF JIT code permits the alloc/free routines to
-be overridden, implement them by simple vmalloc_exec()/vfree()
-calls, which can be served from anywere. This also solves an
-issue under KASAN, where shadow memory is needlessly allocated for
-all BPF programs (which don't require KASAN shadow pages since
-they are not KASAN instrumented)
+On Mon, Nov 19, 2018 at 11:24:20PM +0200, Sakari Ailus wrote:
+> Hi Maxime,
+> 
+> On Tue, Nov 06, 2018 at 03:54:20PM +0100, Maxime Ripard wrote:
+> > Cadence has designed a D-PHY that can be used by the, currently in tree,
+> > DSI bridge (DRM), CSI Transceiver and CSI Receiver (v4l2) drivers.
+> > 
+> > Only the DSI driver has an ad-hoc driver for that phy at the moment, while
+> > the v4l2 drivers are completely missing any phy support. In order to make
+> > that phy support available to all these drivers, without having to
+> > duplicate that code three times, let's create a generic phy framework
+> > driver.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt |  21 +-
+> >  Documentation/devicetree/bindings/phy/cdns,dphy.txt           |  20 +-
+> 
+> Coould you split out the DT binding changes into a separate patch?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/net/bpf_jit_comp.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Will do.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index a6fdaea07c63..f91b7c157841 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -940,3 +940,13 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
- 					   tmp : orig_prog);
- 	return prog;
- }
-+
-+void *bpf_jit_alloc_exec(unsigned long size)
-+{
-+	return vmalloc_exec(size);
-+}
-+
-+void bpf_jit_free_exec(const void *addr)
-+{
-+	return vfree(size);
-+}
+> >  drivers/phy/cadence/Kconfig                                   |  13 +-
+> >  drivers/phy/cadence/Makefile                                  |   1 +-
+> >  drivers/phy/cadence/cdns-dphy.c                               | 459 +++++++-
+> >  5 files changed, 492 insertions(+), 22 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/phy/cdns,dphy.txt
+> >  create mode 100644 drivers/phy/cadence/cdns-dphy.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt b/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
+> > index f5725bb6c61c..525a4bfd8634 100644
+> > --- a/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
+> > +++ b/Documentation/devicetree/bindings/display/bridge/cdns,dsi.txt
+> > @@ -31,28 +31,7 @@ Required subnodes:
+> >  - one subnode per DSI device connected on the DSI bus. Each DSI device should
+> >    contain a reg property encoding its virtual channel.
+> >  
+> > -Cadence DPHY
+> > -============
+> > -
+> > -Cadence DPHY block.
+> > -
+> > -Required properties:
+> > -- compatible: should be set to "cdns,dphy".
+> > -- reg: physical base address and length of the DPHY registers.
+> > -- clocks: DPHY reference clocks.
+> > -- clock-names: must contain "psm" and "pll_ref".
+> > -- #phy-cells: must be set to 0.
+> > -
+> > -
+> >  Example:
+> > -	dphy0: dphy at fd0e0000{
+> > -		compatible = "cdns,dphy";
+> > -		reg = <0x0 0xfd0e0000 0x0 0x1000>;
+> > -		clocks = <&psm_clk>, <&pll_ref_clk>;
+> > -		clock-names = "psm", "pll_ref";
+> > -		#phy-cells = <0>;
+> > -	};
+> > -
+> >  	dsi0: dsi at fd0c0000 {
+> >  		compatible = "cdns,dsi";
+> >  		reg = <0x0 0xfd0c0000 0x0 0x1000>;
+> > diff --git a/Documentation/devicetree/bindings/phy/cdns,dphy.txt b/Documentation/devicetree/bindings/phy/cdns,dphy.txt
+> > new file mode 100644
+> > index 000000000000..1095bc4e72d9
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/phy/cdns,dphy.txt
+> > @@ -0,0 +1,20 @@
+> > +Cadence DPHY
+> > +============
+> > +
+> > +Cadence DPHY block.
+> > +
+> > +Required properties:
+> > +- compatible: should be set to "cdns,dphy".
+> > +- reg: physical base address and length of the DPHY registers.
+> > +- clocks: DPHY reference clocks.
+> > +- clock-names: must contain "psm" and "pll_ref".
+> > +- #phy-cells: must be set to 0.
+> > +
+> > +Example:
+> > +	dphy0: dphy at fd0e0000{
+> > +		compatible = "cdns,dphy";
+> > +		reg = <0x0 0xfd0e0000 0x0 0x1000>;
+> > +		clocks = <&psm_clk>, <&pll_ref_clk>;
+> > +		clock-names = "psm", "pll_ref";
+> > +		#phy-cells = <0>;
+> > +	};
+> > diff --git a/drivers/phy/cadence/Kconfig b/drivers/phy/cadence/Kconfig
+> > index 57fff7de4031..240effa81046 100644
+> > --- a/drivers/phy/cadence/Kconfig
+> > +++ b/drivers/phy/cadence/Kconfig
+> > @@ -1,6 +1,7 @@
+> >  #
+> > -# Phy driver for Cadence MHDP DisplayPort controller
+> > +# Phy drivers for Cadence IPs
+> >  #
+> > +
+> >  config PHY_CADENCE_DP
+> >  	tristate "Cadence MHDP DisplayPort PHY driver"
+> >  	depends on OF
+> > @@ -8,3 +9,13 @@ config PHY_CADENCE_DP
+> >  	select GENERIC_PHY
+> >  	help
+> >  	  Support for Cadence MHDP DisplayPort PHY.
+> > +
+> > +config PHY_CADENCE_DPHY
+> > +	tristate "Cadence D-PHY Support"
+> > +	depends on HAS_IOMEM && OF
+> > +	select GENERIC_PHY
+> > +	select GENERIC_PHY_MIPI_DPHY
+> > +	help
+> > +	  Choose this option if you have a Cadence D-PHY in your
+> > +	  system. If M is selected, the module will be called
+> > +	  cdns-csi.
+> > diff --git a/drivers/phy/cadence/Makefile b/drivers/phy/cadence/Makefile
+> > index e5b0a11cf28a..64cb9ea66ceb 100644
+> > --- a/drivers/phy/cadence/Makefile
+> > +++ b/drivers/phy/cadence/Makefile
+> > @@ -1 +1,2 @@
+> >  obj-$(CONFIG_PHY_CADENCE_DP)	+= phy-cadence-dp.o
+> > +obj-$(CONFIG_PHY_CADENCE_DPHY)	+= cdns-dphy.o
+> > diff --git a/drivers/phy/cadence/cdns-dphy.c b/drivers/phy/cadence/cdns-dphy.c
+> > new file mode 100644
+> > index 000000000000..a398b401e5d3
+> > --- /dev/null
+> > +++ b/drivers/phy/cadence/cdns-dphy.c
+> > @@ -0,0 +1,459 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright: 2017-2018 Cadence Design Systems, Inc.
+> > + */
+> > +
+> > +#include <linux/bitops.h>
+> > +#include <linux/clk.h>
+> > +#include <linux/io.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/reset.h>
+> > +
+> > +#include <linux/phy/phy.h>
+> > +#include <linux/phy/phy-mipi-dphy.h>
+> > +
+> > +#define REG_WAKEUP_TIME_NS		800
+> > +#define DPHY_PLL_RATE_HZ		108000000
+> > +
+> > +/* DPHY registers */
+> > +#define DPHY_PMA_CMN(reg)		(reg)
+> > +#define DPHY_PMA_LCLK(reg)		(0x100 + (reg))
+> > +#define DPHY_PMA_LDATA(lane, reg)	(0x200 + ((lane) * 0x100) + (reg))
+> > +#define DPHY_PMA_RCLK(reg)		(0x600 + (reg))
+> > +#define DPHY_PMA_RDATA(lane, reg)	(0x700 + ((lane) * 0x100) + (reg))
+> > +#define DPHY_PCS(reg)			(0xb00 + (reg))
+> > +
+> > +#define DPHY_CMN_SSM			DPHY_PMA_CMN(0x20)
+> > +#define DPHY_CMN_SSM_EN			BIT(0)
+> > +#define DPHY_CMN_TX_MODE_EN		BIT(9)
+> > +
+> > +#define DPHY_CMN_PWM			DPHY_PMA_CMN(0x40)
+> > +#define DPHY_CMN_PWM_DIV(x)		((x) << 20)
+> > +#define DPHY_CMN_PWM_LOW(x)		((x) << 10)
+> > +#define DPHY_CMN_PWM_HIGH(x)		(x)
+> > +
+> > +#define DPHY_CMN_FBDIV			DPHY_PMA_CMN(0x4c)
+> > +#define DPHY_CMN_FBDIV_VAL(low, high)	(((high) << 11) | ((low) << 22))
+> > +#define DPHY_CMN_FBDIV_FROM_REG		(BIT(10) | BIT(21))
+> > +
+> > +#define DPHY_CMN_OPIPDIV		DPHY_PMA_CMN(0x50)
+> > +#define DPHY_CMN_IPDIV_FROM_REG		BIT(0)
+> > +#define DPHY_CMN_IPDIV(x)		((x) << 1)
+> > +#define DPHY_CMN_OPDIV_FROM_REG		BIT(6)
+> > +#define DPHY_CMN_OPDIV(x)		((x) << 7)
+> > +
+> > +#define DPHY_PSM_CFG			DPHY_PCS(0x4)
+> > +#define DPHY_PSM_CFG_FROM_REG		BIT(0)
+> > +#define DPHY_PSM_CLK_DIV(x)		((x) << 1)
+> > +
+> > +#define DSI_HBP_FRAME_OVERHEAD		12
+> > +#define DSI_HSA_FRAME_OVERHEAD		14
+> > +#define DSI_HFP_FRAME_OVERHEAD		6
+> > +#define DSI_HSS_VSS_VSE_FRAME_OVERHEAD	4
+> > +#define DSI_BLANKING_FRAME_OVERHEAD	6
+> > +#define DSI_NULL_FRAME_OVERHEAD		6
+> > +#define DSI_EOT_PKT_SIZE		4
+> > +
+> > +struct cdns_dphy_cfg {
+> > +	u8 pll_ipdiv;
+> > +	u8 pll_opdiv;
+> > +	u16 pll_fbdiv;
+> > +	unsigned int nlanes;
+> > +};
+> > +
+> > +enum cdns_dphy_clk_lane_cfg {
+> > +	DPHY_CLK_CFG_LEFT_DRIVES_ALL = 0,
+> > +	DPHY_CLK_CFG_LEFT_DRIVES_RIGHT = 1,
+> > +	DPHY_CLK_CFG_LEFT_DRIVES_LEFT = 2,
+> > +	DPHY_CLK_CFG_RIGHT_DRIVES_ALL = 3,
+> > +};
+> > +
+> > +struct cdns_dphy;
+> > +struct cdns_dphy_ops {
+> > +	int (*probe)(struct cdns_dphy *dphy);
+> > +	void (*remove)(struct cdns_dphy *dphy);
+> > +	void (*set_psm_div)(struct cdns_dphy *dphy, u8 div);
+> > +	void (*set_clk_lane_cfg)(struct cdns_dphy *dphy,
+> > +				 enum cdns_dphy_clk_lane_cfg cfg);
+> > +	void (*set_pll_cfg)(struct cdns_dphy *dphy,
+> > +			    const struct cdns_dphy_cfg *cfg);
+> > +	unsigned long (*get_wakeup_time_ns)(struct cdns_dphy *dphy);
+> > +};
+> > +
+> > +struct cdns_dphy {
+> > +	struct cdns_dphy_cfg cfg;
+> > +	void __iomem *regs;
+> > +	struct clk *psm_clk;
+> > +	struct clk *pll_ref_clk;
+> > +	const struct cdns_dphy_ops *ops;
+> > +	struct phy *phy;
+> > +};
+> > +
+> > +static int cdns_dsi_get_dphy_pll_cfg(struct cdns_dphy *dphy,
+> > +				     struct cdns_dphy_cfg *cfg,
+> > +				     struct phy_configure_opts_mipi_dphy *opts,
+> > +				     unsigned int *dsi_hfp_ext)
+> > +{
+> > +	u64 dlane_bps, dlane_bps_max, fbdiv, fbdiv_max, adj_dsi_htotal;
+> > +	unsigned long pll_ref_hz = clk_get_rate(dphy->pll_ref_clk);
+> > +
+> > +	memset(cfg, 0, sizeof(*cfg));
+> > +
+> > +	if (pll_ref_hz < 9600000 || pll_ref_hz >= 150000000)
+> > +		return -EINVAL;
+> > +	else if (pll_ref_hz < 19200000)
+> > +		cfg->pll_ipdiv = 1;
+> > +	else if (pll_ref_hz < 38400000)
+> > +		cfg->pll_ipdiv = 2;
+> > +	else if (pll_ref_hz < 76800000)
+> > +		cfg->pll_ipdiv = 4;
+> > +	else
+> > +		cfg->pll_ipdiv = 8;
+> > +
+> > +	dlane_bps = opts->hs_clk_rate;
+> > +
+> > +	if (dlane_bps > 2500000000UL || dlane_bps < 160000000UL)
+> > +		return -EINVAL;
+> > +	else if (dlane_bps >= 1250000000)
+> > +		cfg->pll_opdiv = 1;
+> > +	else if (dlane_bps >= 630000000)
+> > +		cfg->pll_opdiv = 2;
+> > +	else if (dlane_bps >= 320000000)
+> > +		cfg->pll_opdiv = 4;
+> > +	else if (dlane_bps >= 160000000)
+> > +		cfg->pll_opdiv = 8;
+> > +
+> > +	/*
+> > +	 * Allow a deviation of 0.2% on the per-lane data rate to try to
+> > +	 * recover a potential mismatch between DPI and PPI clks.
+> > +	 */
+> > +	dlane_bps_max = dlane_bps + DIV_ROUND_DOWN_ULL(dlane_bps, 500);
+> > +	fbdiv_max = DIV_ROUND_DOWN_ULL(dlane_bps_max * 2 *
+> > +				       cfg->pll_opdiv * cfg->pll_ipdiv,
+> > +				       pll_ref_hz);
+> > +	fbdiv = DIV_ROUND_UP_ULL(dlane_bps * 2 * cfg->pll_opdiv *
+> > +				 cfg->pll_ipdiv,
+> > +				 pll_ref_hz);
+> > +
+> > +	/*
+> > +	 * Iterate over all acceptable fbdiv and try to find an adjusted DSI
+> > +	 * htotal length providing an exact match.
+> > +	 *
+> > +	 * Note that we could do something even trickier by relying on the fact
+> > +	 * that a new line is not necessarily aligned on a lane boundary, so,
+> > +	 * by making adj_dsi_htotal non aligned on a dsi_lanes we can improve a
+> > +	 * bit the precision. With this, the step would be
+> > +	 *
+> > +	 *	pll_ref_hz / (2 * opdiv * ipdiv * nlanes)
+> > +	 *
+> > +	 * instead of
+> > +	 *
+> > +	 *	pll_ref_hz / (2 * opdiv * ipdiv)
+> > +	 *
+> > +	 * The drawback of this approach is that we would need to make sure the
+> > +	 * number or lines is a multiple of the realignment periodicity which is
+> > +	 * a function of the number of lanes and the original misalignment. For
+> > +	 * example, for NLANES = 4 and HTOTAL % NLANES = 3, it takes 4 lines
+> > +	 * to realign on a lane:
+> > +	 * LINE 0: expected number of bytes, starts emitting first byte of
+> > +	 *	   LINE 1 on LANE 3
+> > +	 * LINE 1: expected number of bytes, starts emitting first 2 bytes of
+> > +	 *	   LINE 2 on LANES 2 and 3
+> > +	 * LINE 2: expected number of bytes, starts emitting first 3 bytes of
+> > +	 *	   of LINE 3 on LANES 1, 2 and 3
+> > +	 * LINE 3: one byte less, now things are realigned on LANE 0 for LINE 4
+> > +	 *
+> > +	 * I figured this extra complexity was not worth the benefit, but if
+> > +	 * someone really has unfixable mismatch, that would be something to
+> > +	 * investigate.
+> > +	 */
+> > +	for (; fbdiv <= fbdiv_max; fbdiv++) {
+> > +		u32 rem;
+> > +
+> > +		/*
+> > +		 * Do the division in 2 steps to avoid an overflow on the
+> > +		 * divider.
+> > +		 */
+> > +		rem = do_div(adj_dsi_htotal, opts->hs_clk_rate);
+> 
+> Hmm. I don't see adj_dsi_htotal being set anywhere. I suppose that can't be
+> intended.
+> 
+> > +		if (rem)
+> > +			continue;
+> > +
+> > +		rem = do_div(adj_dsi_htotal,
+> > +			     cfg->pll_opdiv * cfg->pll_ipdiv * 2 * 8);
+> > +		if (rem)
+> > +			continue;
+> 
+> Is fbdiv supposed to be used in the formula somewhere?
+
+Hmmm, right. Something's fishy here.
+
+> > +static int cdns_dphy_exit(struct phy *phy)
+> > +{
+> > +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
+> > +
+> > +	clk_disable_unprepare(dphy->pll_ref_clk);
+> > +	clk_disable_unprepare(dphy->psm_clk);
+> 
+> Wouldn't this belong to power_off() (and enabling the clocks to
+> power_on())?
+
+Yep, it would make more sense.
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static struct phy_ops cdns_dphy_ops = {
+> 
+> const
+> 
+> > +	.configure	= cdns_dphy_configure,
+> > +	.validate	= cdns_dphy_validate,
+> > +	.power_on	= cdns_dphy_power_on,
+> 
+> How does it stop? Or does it? :-)
+
+It's only been run in a simulator so far, so I'm not sure "turn on"
+and "turn off" are concepts that can apply to this driver at this
+point :)
+
+> > +	.init		= cdns_dphy_init,
+> 
+> It'd be nice to maintain the order the same as in here (unless there are
+> reasons to do otherwise, of course).
+
+What do you mean?
+
+> > +		ret = dphy->ops->probe(dphy);
+> > +		if (ret)
+> > +			return ret;
+> > +	}
+> > +
+> > +	dphy->phy = devm_phy_create(&pdev->dev, NULL, &cdns_dphy_ops);
+> > +	if (IS_ERR(dphy->phy)) {
+> > +		dev_err(&pdev->dev, "failed to create PHY\n");
+> > +		return PTR_ERR(dphy->phy);
+> 
+> Would it be appropriate to call the remove callback here?
+
+Definitely, I'll add it.
+
+Thanks!
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/51e9faba/attachment.sig>
