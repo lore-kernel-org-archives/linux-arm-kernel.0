@@ -1,28 +1,28 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 21 Nov 2018 12:25:21 +0100
-Subject: [PATCH] ARM: dts: at91: nattis: initialize the BLON pin as
- output-low early
-In-Reply-To: <20181120212036.22497-1-peda@axentia.se>
-References: <20181120212036.22497-1-peda@axentia.se>
-Message-ID: <20181121112521.GL8367@piout.net>
+From: radu_nicolae.pirea@upb.ro (Radu Pirea)
+Date: Wed, 21 Nov 2018 13:27:29 +0200
+Subject: [PATCH 0/3] Add PM and DMA support for AT91 USART as SPI
+Message-ID: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2018 21:20:43+0000, Peter Rosin wrote:
-> The pwm-backlight driver initializes BLON (the enable gpio) to
-> output-high if the gpio is input on probe. Initializing the gpio
-> to output-low before the driver probes prevents this action by
-> the pwm-backlight driver and gets rid of a nasty blink of full
-> backlight with an uninitialized panel.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  arch/arm/boot/dts/at91-nattis-2-natte-2.dts | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-Applied, thanks.
+Hi,
+
+This patch series improves the SPI driver for AT91 USART IP and
+adds support for DMA transfers, updates the bindings of driver
+and PM callback functions.
+
+I decided to use DMA only for transfers long than 16 bytes. DMA
+setup introduces a little overhead and is better to use PIO for
+short transfers.
+
+Radu Pirea (3):
+  spi: at91-usart: add power management support
+  dt-bindings: mfd: atmel-usart: add DMA bindings for SPI mode
+  spi: at91-usart: add DMA support
+
+ .../devicetree/bindings/mfd/atmel-usart.txt   |  15 +-
+ drivers/spi/spi-at91-usart.c                  | 284 +++++++++++++++++-
+ 2 files changed, 292 insertions(+), 7 deletions(-)
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+2.19.1
