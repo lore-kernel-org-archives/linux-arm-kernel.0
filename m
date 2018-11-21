@@ -1,44 +1,43 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 21 Nov 2018 10:41:01 -0600
-Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for
- SPI mode
-In-Reply-To: <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
-References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
- <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
-Message-ID: <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Wed, 21 Nov 2018 17:35:42 +0100
+Subject: [PATCH] gpio: mt7621: handle failure of devm_kasprintf()
+Message-ID: <1542818142-27800-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 5:29 AM Radu Pirea <radu_nicolae.pirea@upb.ro> wrote:
->
-> The bindings for DMA are now common for both drivers of the USART
-> IP.
->
-> The node given as an example for USART in SPI mode has been updated in
-> order to include DMA bindings.
->
-> Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
-> ---
->  .../devicetree/bindings/mfd/atmel-usart.txt       | 15 ++++++++++-----
->  1 file changed, 10 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-usart.txt b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-> index 7f0cd72f47d2..8ad008175343 100644
-> --- a/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-> @@ -17,17 +17,19 @@ Required properties for USART in SPI mode:
->  - cs-gpios: chipselects (internal cs not supported)
->  - atmel,usart-mode : Must be <AT91_USART_MODE_SPI> (found in dt-bindings/mfd/at91-usart.h)
->
-> +Optional properties in serial and SPI mode:
-> +- dma bindings for dma transfer:
-> +       - dmas: DMA specifier, consisting of a phandle to DMA controller node,
-> +               memory peripheral interface and USART DMA channel ID, FIFO configuration.
-> +               Refer to dma.txt and atmel-dma.txt for details.
-> +       - dma-names: "rx" for RX channel, "tx" for TX channel.
+kasprintf() may return NULL on failure of internal allocation thus the
+assigned  label  is not safe if not explicitly checked. On error
+mediatek_gpio_bank_probe() returns negative values so -ENOMEM in the
+(unlikely) failure case should be fine here.
 
-> +               dma-names = "tx", "rx";
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
+---
 
-The dma-names should have a defined order.
+Problem located with experimental coccinelle script
 
-Rob
+Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
+GPIOLIB=y, GPIO_MT7621=y
+
+Patch is against 4.20-rc3 (localversion-next is next-20181121)
+
+ drivers/gpio/gpio-mt7621.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
+index d72af6f..42f0c67 100644
+--- a/drivers/gpio/gpio-mt7621.c
++++ b/drivers/gpio/gpio-mt7621.c
+@@ -244,6 +244,10 @@ mediatek_gpio_bank_probe(struct device *dev,
+ 	rg->chip.of_xlate = mediatek_gpio_xlate;
+ 	rg->chip.label = devm_kasprintf(dev, GFP_KERNEL, "%s-bank%d",
+ 					dev_name(dev), bank);
++	if (!rg->chip.label) {
++		dev_err(dev, "Could not allocate label\n");
++		return -ENOMEM;
++	}
+ 
+ 	ret = devm_gpiochip_add_data(dev, &rg->chip, mtk);
+ 	if (ret < 0) {
+-- 
+2.1.4
