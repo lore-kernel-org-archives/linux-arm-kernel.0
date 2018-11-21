@@ -1,28 +1,42 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 21 Nov 2018 10:42:33 +0100
-Subject: [PATCH 0/9] drm: remove deprecated functions
-In-Reply-To: <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
-Message-ID: <20181121094233.GN4266@phenom.ffwll.local>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 21 Nov 2018 10:47:10 +0100
+Subject: [PATCH] drm/meson: add support for 1080p25 mode
+In-Reply-To: <1542793169-13008-1-git-send-email-christianshewitt@gmail.com>
+References: <1542793169-13008-1-git-send-email-christianshewitt@gmail.com>
+Message-ID: <2a9d9fa9-c9ba-c624-28da-dd3804faf438@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 11:38:35PM +0100, Linus Walleij wrote:
-> On Thu, Nov 15, 2018 at 11:17 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
+On 21/11/2018 10:39, Christian Hewitt wrote:
+> This essential mode for PAL users is missing, so add it.
 > 
-> > One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
-> > "switch from reference/unreference to get/put". That's what this patch series is
-> > about.
+> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+> ---
+>  drivers/gpu/drm/meson/meson_venc.c | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> The series:
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+> index acbbad3..ab16046 100644
+> --- a/drivers/gpu/drm/meson/meson_venc.c
+> +++ b/drivers/gpu/drm/meson/meson_venc.c
+> @@ -714,6 +714,7 @@ struct meson_hdmi_venc_vic_mode {
+>  	{ 5, &meson_hdmi_encp_mode_1080i60 },
+>  	{ 20, &meson_hdmi_encp_mode_1080i50 },
+>  	{ 32, &meson_hdmi_encp_mode_1080p24 },
+> +	{ 33, &meson_hdmi_encp_mode_1080p50 },
+>  	{ 34, &meson_hdmi_encp_mode_1080p30 },
+>  	{ 31, &meson_hdmi_encp_mode_1080p50 },
+>  	{ 16, &meson_hdmi_encp_mode_1080p60 },
+> 
 
-Since your reviewed it all, and there's a pile of acks for the driver
-parts too: Want to go ahead and apply it too?
+Exact, I forgot this mode...
 
-Thanks, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Thanks for the change !
+
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+
+I'll add :
+Fixes: 335e3713afb87 ("drm/meson: Add support for HDMI venc modes and settings")
+when applying to drm-misc-fixes.
+
+Neil
