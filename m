@@ -1,99 +1,105 @@
-From: zhizhouzhang@asrmicro.com (Zhizhou Zhang)
-Date: Wed, 21 Nov 2018 11:01:43 +0800
-Subject: [PATCH] tee: optee: avoid possible double list_del()
-Message-ID: <20181121030143.31180-1-zhizhouzhang@asrmicro.com>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 21 Nov 2018 09:06:37 +0530
+Subject: [PATCH v2 00/15] Add initial RDA8810PL SoC and Orange Pi boards
+ support
+Message-ID: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug occurs when:
+Hello,
 
-- a new request arrives, one thread(let's call it A) is pending in
-  optee_supp_req() with req->busy is initial value false.
+This patchset adds initial RDA8810PL SoC and Orange Pi boards (2G IoT and
+i96) support. RDA8810PL is an ARM Cortex A5 based SoC with Vivante's GC860
+GPU. The SoC has been added as a new ARM sub architecture with myself
+and Andreas as the maintainers.
 
-- tee-supplicant is killed, then optee_supp_release() is called, this
-  function calls list_del(&req->link), and set supp->ctx to NULL. And
-  it also wake up process A.
+More information about the boards can be found in below links:
 
-- process A continues, it firstly checks supp->ctx which is NULL,
-  then checks req->busy which is false, at last run list_del(&req->link).
-  This triggers double list_del() and results kernel panic.
+1. Orange Pi 2G-IoT - http://www.orangepi.org/OrangePi2GIOT/
+2. Orange Pi i96 - https://www.96boards.org/product/orangepi-i96/
 
-For solve this problem, we rename req->busy to req->in_queue, and
-associate it with state of whether req is linked to supp->reqs. So we
-can just only check req->in_queue to make decision calling list_del()
-or not.
+This patchset is based on the initial revision sent out by Andreas long
+back (http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/515951.html).
 
-Signed-off-by: Zhizhou Zhang <zhizhouzhang@asrmicro.com>
----
- drivers/tee/optee/supp.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+I have extended his patchset with proper irqchip and UART drivers. Now,
+boards can boot into initramfs with console at UART2.
 
-diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
-index df35fc01fd3e..43626e15703a 100644
---- a/drivers/tee/optee/supp.c
-+++ b/drivers/tee/optee/supp.c
-@@ -19,7 +19,7 @@
- struct optee_supp_req {
- 	struct list_head link;
- 
--	bool busy;
-+	bool in_queue;
- 	u32 func;
- 	u32 ret;
- 	size_t num_params;
-@@ -54,7 +54,6 @@ void optee_supp_release(struct optee_supp *supp)
- 
- 	/* Abort all request retrieved by supplicant */
- 	idr_for_each_entry(&supp->idr, req, id) {
--		req->busy = false;
- 		idr_remove(&supp->idr, id);
- 		req->ret = TEEC_ERROR_COMMUNICATION;
- 		complete(&req->c);
-@@ -63,6 +62,7 @@ void optee_supp_release(struct optee_supp *supp)
- 	/* Abort all queued requests */
- 	list_for_each_entry_safe(req, req_tmp, &supp->reqs, link) {
- 		list_del(&req->link);
-+		req->in_queue = false;
- 		req->ret = TEEC_ERROR_COMMUNICATION;
- 		complete(&req->c);
- 	}
-@@ -103,6 +103,7 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
- 	/* Insert the request in the request list */
- 	mutex_lock(&supp->mutex);
- 	list_add_tail(&req->link, &supp->reqs);
-+	req->in_queue = true;
- 	mutex_unlock(&supp->mutex);
- 
- 	/* Tell an eventual waiter there's a new request */
-@@ -130,9 +131,10 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
- 			 * will serve all requests in a timely manner and
- 			 * interrupting then wouldn't make sense.
- 			 */
--			interruptable = !req->busy;
--			if (!req->busy)
-+			if (req->in_queue) {
- 				list_del(&req->link);
-+				req->in_queue = false;
-+			}
- 		}
- 		mutex_unlock(&supp->mutex);
- 
-@@ -176,7 +178,7 @@ static struct optee_supp_req  *supp_pop_entry(struct optee_supp *supp,
- 		return ERR_PTR(-ENOMEM);
- 
- 	list_del(&req->link);
--	req->busy = true;
-+	req->in_queue = false;
- 
- 	return req;
- }
-@@ -318,7 +320,6 @@ static struct optee_supp_req *supp_pop_req(struct optee_supp *supp,
- 	if ((num_params - nm) != req->num_params)
- 		return ERR_PTR(-EINVAL);
- 
--	req->busy = false;
- 	idr_remove(&supp->idr, id);
- 	supp->req_id = -1;
- 	*num_meta = nm;
+Thanks,
+Mani
+
+Changes in v2:
+
+* Used readl/writel_relaxed calls for both irqchip and timer drivers as
+  per Marc's review.
+* Implemented the logic to prevent counter wrapping during read as
+  suggested by Marc.
+* Used the timer-of API as per Daniel's suggestion.
+* Added description about the timer in both commit log and driver.
+* Changed the Vendor name for RDA to Unisoc Communications Inc.
+* Removed the soc node level and cleaned up devicetrees as per Rob's
+  review.
+* Merged interrupt controller DT patch to SoC.
+* Moved aliases to board dts as per Arnd's suggestion.
+* Removed RDA Micro support mail address and used Unisoc one and added
+  my missing signed off by tag as per Andreas's comments.
+
+Andreas F?rber (4):
+  dt-bindings: Add RDA Micro vendor prefix
+  dt-bindings: arm: Document RDA8810PL and reference boards
+  ARM: Prepare RDA8810PL SoC
+  dt-bindings: serial: Document RDA Micro UART
+
+Manivannan Sadhasivam (11):
+  dt-bindings: interrupt-controller: Document RDA8810PL intc
+  arm: dts: Add devicetree for RDA8810PL SoC
+  arm: dts: Add devicetree for OrangePi 2G IoT board
+  arm: dts: Add devicetree for OrangePi i96 board
+  irqchip: Add RDA8810PL interrupt driver
+  dt-bindings: timer: Document RDA8810PL SoC timer
+  arm: dts: rda8810pl: Add timer support
+  clocksource: Add clock driver for RDA8810PL SoC
+  arm: dts: rda8810pl: Add interrupt support for UART
+  tty: serial: Add RDA8810PL UART driver
+  MAINTAINERS: Add entry for RDA Micro SoC architecture
+
+ .../admin-guide/kernel-parameters.txt         |   6 +
+ Documentation/devicetree/bindings/arm/rda.txt |  17 +
+ .../interrupt-controller/rda,8810pl-intc.txt  |  61 ++
+ .../bindings/serial/rda,8810pl-uart.txt       |  15 +
+ .../bindings/timer/rda,8810pl-timer.txt       |  21 +
+ .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+ MAINTAINERS                                   |  14 +
+ arch/arm/Kconfig                              |   2 +
+ arch/arm/Makefile                             |   1 +
+ arch/arm/boot/dts/Makefile                    |   3 +
+ .../boot/dts/rda8810pl-orangepi-2g-iot.dts    |  40 +
+ arch/arm/boot/dts/rda8810pl-orangepi-i96.dts  |  40 +
+ arch/arm/boot/dts/rda8810pl.dtsi              |  99 +++
+ arch/arm/mach-rda/Kconfig                     |   9 +
+ arch/arm/mach-rda/Makefile                    |   1 +
+ drivers/clocksource/Kconfig                   |   8 +
+ drivers/clocksource/Makefile                  |   1 +
+ drivers/clocksource/timer-rda.c               | 195 ++++
+ drivers/irqchip/Kconfig                       |   4 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-rda-intc.c                | 113 +++
+ drivers/tty/serial/Kconfig                    |  19 +
+ drivers/tty/serial/Makefile                   |   1 +
+ drivers/tty/serial/rda-uart.c                 | 831 ++++++++++++++++++
+ include/uapi/linux/serial_core.h              |   3 +
+ 25 files changed, 1506 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rda.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/rda,8810pl-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
+ create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
+ create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
+ create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
+ create mode 100644 arch/arm/mach-rda/Kconfig
+ create mode 100644 arch/arm/mach-rda/Makefile
+ create mode 100644 drivers/clocksource/timer-rda.c
+ create mode 100644 drivers/irqchip/irq-rda-intc.c
+ create mode 100644 drivers/tty/serial/rda-uart.c
+
 -- 
 2.17.1
