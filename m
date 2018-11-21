@@ -1,50 +1,79 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 21 Nov 2018 14:54:30 +0100 (CET)
-Subject: [PATCH RESEND 07/17] firmware: raspberrypi: Switch to SPDX
- identifier
-In-Reply-To: <87ftvv75q8.fsf@anholt.net>
-References: <1542546604-27728-1-git-send-email-stefan.wahren@i2se.com>
- <2094654733.102339.1542751718184@email.ionos.de>
- <87ftvv75q8.fsf@anholt.net>
-Message-ID: <1881981920.83022.1542808470047@email.ionos.de>
+From: aisheng.dong@nxp.com (Aisheng DONG)
+Date: Wed, 21 Nov 2018 14:12:16 +0000
+Subject: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+Message-ID: <1542809234-539-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Eric Anholt <eric@anholt.net> hat am 20. November 2018 um 23:18 geschrieben:
-> 
-> 
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
-> 
-> > Hi Eric,
-> >
-> >> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. November 2018 um 14:10 geschrieben:
-> >> 
-> >> 
-> >> Adopt the SPDX license identifier headers to ease license compliance
-> >> management.
-> >> 
-> >> Cc: Eric Anholt <eric@anholt.net>
-> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> Reviewed-by: Eric Anholt <eric@anholt.net>
-> >> ---
-> >>  drivers/firmware/raspberrypi.c             | 5 +----
-> >>  include/soc/bcm2835/raspberrypi-firmware.h | 5 +----
-> >>  2 files changed, 2 insertions(+), 8 deletions(-)
-> >> 
-> >> Hi, it seems that i forgot to send this patch last week.
-> >
-> > i accidently added your Reviewed-by which wasn't the case for this
-> > particular patch. In case your fine with this patch i would apply it
-> > and then from my point of view the pull request would be ready to
-> > send.
-> 
-> I've reviewed it now, you're good to go :)
+This patch series adds i.MX8QXP clock support which is based
+on the clock service provided by SCU firmware.
 
-Thanks, it's now applied to bcm2835-drivers-next. So the pull request for the following branches are yours:
+Note: It depends on SCU driver which has already been merged by Shawn.
+So this patch series could go through Shawn's tree as well.
 
-bcm2835-defconfig-next
-bcm2835-drivers-next
-bcm2835-dt-next
-bcm2835-soc-next
+ChangeLog:
+v7->v8:
+ * add more kernel doc for lpcg and scu clock structures
+ * remove one unneccessry reg checking
+v6->v7:
+ * use struct_size()
+ * remove MODULE_ macros
+ * add more kernel docs/code comments
+ * other small improvements
+ * update reviewed-by tags
+ * add the missing PATCH 1 in V6
+v5->v6:
+ * simply the driver a lot by re-orgnizing the driver into a few clock types:
+   scu clock (merge scu divider/gate/mux) and scu gpr lock which accessing is
+   through SCU protocol and LPCG clock which is directly accessible by CPU.
+ * LPCG clock is separate from SCU clock, gpr clock is still not used
+   and will be added later.
+ * remove old year license as the code is totally rewritten
+ * scu mux support will be added later as it's also still not used.
+v4->v5:
+ Address all Stephen and Sascha's review comments, see details in each patch
+v3->v4:
+ * scu headfile path update
+ * no functionality change
+v2->v3:
+ * structures/enums name update with imx_sc prefix
+ * no functionality change
+v1->v2:
+ * structure and enums name update
+ * api usage update due to api change
+ * no functionality change
 
-Stefan
+Dong Aisheng (7):
+  clk: imx: add configuration option for mmio clks
+  clk: imx: add scu clock common part
+  dt-bindings: clock: imx8qxp: add SCU clock IDs
+  clk: imx: add imx8qxp clk driver
+  dt-bindings: clock: add imx8qxp lpcg clock binding
+  clk: imx: add lpcg clock support
+  clk: imx: add imx8qxp lpcg driver
+
+ .../devicetree/bindings/clock/imx8qxp-lpcg.txt     |  51 ++++
+ arch/arm/mach-imx/Kconfig                          |  11 +
+ drivers/clk/Kconfig                                |   1 +
+ drivers/clk/imx/Kconfig                            |   9 +
+ drivers/clk/imx/Makefile                           |   8 +-
+ drivers/clk/imx/clk-imx8qxp-lpcg.c                 | 216 +++++++++++++++
+ drivers/clk/imx/clk-imx8qxp-lpcg.h                 | 102 ++++++++
+ drivers/clk/imx/clk-imx8qxp.c                      | 153 +++++++++++
+ drivers/clk/imx/clk-lpcg-scu.c                     | 113 ++++++++
+ drivers/clk/imx/clk-scu.c                          | 267 +++++++++++++++++++
+ drivers/clk/imx/clk-scu.h                          |  24 ++
+ include/dt-bindings/clock/imx8qxp-clock.h          | 289 +++++++++++++++++++++
+ 12 files changed, 1243 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
+ create mode 100644 drivers/clk/imx/Kconfig
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.c
+ create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.h
+ create mode 100644 drivers/clk/imx/clk-imx8qxp.c
+ create mode 100644 drivers/clk/imx/clk-lpcg-scu.c
+ create mode 100644 drivers/clk/imx/clk-scu.c
+ create mode 100644 drivers/clk/imx/clk-scu.h
+ create mode 100644 include/dt-bindings/clock/imx8qxp-clock.h
+
+-- 
+2.7.4
