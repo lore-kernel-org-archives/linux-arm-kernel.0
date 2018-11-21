@@ -1,46 +1,97 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Tue, 20 Nov 2018 21:17:47 -0800
-Subject: [PATCH v8 2/7] ASoC: simple-amplifier: add VCC regulator widget
+Date: Tue, 20 Nov 2018 21:17:52 -0800
+Subject: [PATCH v8 7/7] arm64: dts: allwinner: a64: enable sound on Pinebook
 In-Reply-To: <20181121051752.18387-1-anarsoul@gmail.com>
 References: <20181121051752.18387-1-anarsoul@gmail.com>
-Message-ID: <20181121051752.18387-3-anarsoul@gmail.com>
+Message-ID: <20181121051752.18387-8-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amplifier may have assosicated regulator, so add a widget for it
-and appropriate route.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pinebook
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- sound/soc/codecs/simple-amplifier.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ .../dts/allwinner/sun50i-a64-pinebook.dts     | 53 +++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/sound/soc/codecs/simple-amplifier.c b/sound/soc/codecs/simple-amplifier.c
-index 85524acf3e9c..c07e8a80b4b7 100644
---- a/sound/soc/codecs/simple-amplifier.c
-+++ b/sound/soc/codecs/simple-amplifier.c
-@@ -19,6 +19,7 @@
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+index 77fac84797e9..cecfa7ea90b2 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+@@ -53,6 +53,12 @@
+ 		};
+ 	};
  
- #include <linux/gpio/consumer.h>
- #include <linux/module.h>
-+#include <linux/regulator/consumer.h>
- #include <sound/soc.h>
- 
- #define DRV_NAME "simple-amplifier"
-@@ -58,11 +59,14 @@ static const struct snd_soc_dapm_widget simple_amp_dapm_widgets[] = {
- 			       (SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD)),
- 	SND_SOC_DAPM_OUTPUT("OUTL"),
- 	SND_SOC_DAPM_OUTPUT("OUTR"),
-+	SND_SOC_DAPM_REGULATOR_SUPPLY("VCC", 20, 0),
++	headphone_amp: headphone_amp {
++		compatible = "simple-audio-amplifier";
++		VCC-supply = <&reg_eldo1>;
++		sound-name-prefix = "HP";
++	};
++
+ 	reg_vcc3v3: vcc3v3 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc3v3";
+@@ -64,6 +70,26 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+ 	};
++
++	speaker_amp: speaker_amp {
++		compatible = "simple-audio-amplifier";
++		VCC-supply = <&reg_ldo_io0>;
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
++		sound-name-prefix = "SPEAKER";
++	};
++
++};
++
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
  };
  
- static const struct snd_soc_dapm_route simple_amp_dapm_routes[] = {
- 	{ "DRV", NULL, "INL" },
- 	{ "DRV", NULL, "INR" },
-+	{ "OUTL", NULL, "VCC" },
-+	{ "OUTR", NULL, "VCC" },
- 	{ "OUTL", NULL, "DRV" },
- 	{ "OUTR", NULL, "DRV" },
+ &ehci0 {
+@@ -267,6 +293,33 @@
+ 	vcc-hdmi-supply = <&reg_dldo1>;
  };
+ 
++&sound {
++	status = "okay";
++	simple-audio-card,aux-devs = <&codec_analog>, <&headphone_amp>,
++				     <&speaker_amp>;
++	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
++				    "Microphone", "Internal Microphone Right",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,routing =
++			"Left DAC", "AIF1 Slot 0 Left",
++			"Right DAC", "AIF1 Slot 0 Right",
++			"SPEAKER INL", "LINEOUT",
++			"SPEAKER INR", "LINEOUT",
++			"Internal Speaker", "SPEAKER OUTL",
++			"Internal Speaker", "SPEAKER OUTR",
++			"HP INL", "HP",
++			"HP INR", "HP",
++			"Headphone Jack", "HP OUTL",
++			"Headphone Jack", "HP OUTR",
++			"AIF1 Slot 0 Left ADC", "Left ADC",
++			"AIF1 Slot 0 Right ADC", "Right ADC",
++			"Internal Microphone Left", "MBIAS",
++			"MIC1", "Internal Microphone Left",
++			"Internal Microphone Right", "HBIAS",
++			"MIC2", "Internal Microphone Right";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pb_pins>;
 -- 
 2.19.1
