@@ -1,95 +1,50 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 21 Nov 2018 14:47:56 +0100
-Subject: [PATCH v2 8/9] phy: Add Cadence D-PHY support
-In-Reply-To: <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
-References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
- <4ec9e47fb5aa9794f69a8e75a04108055094c056.1541516029.git-series.maxime.ripard@bootlin.com>
- <5f5bcc06-51b2-d565-56a0-083c66c1f01a@ti.com>
- <8536050b-40ab-1ec4-d325-e59bb3a92e73@ti.com>
- <20181121101121.7rhe2hz2mnmc72cu@flea>
- <20c0fd85-95f6-9849-c10b-998a1e0f527d@ti.com>
-Message-ID: <20181121134756.aoj6otdcl4stpd6p@flea>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 21 Nov 2018 14:54:30 +0100 (CET)
+Subject: [PATCH RESEND 07/17] firmware: raspberrypi: Switch to SPDX
+ identifier
+In-Reply-To: <87ftvv75q8.fsf@anholt.net>
+References: <1542546604-27728-1-git-send-email-stefan.wahren@i2se.com>
+ <2094654733.102339.1542751718184@email.ionos.de>
+ <87ftvv75q8.fsf@anholt.net>
+Message-ID: <1881981920.83022.1542808470047@email.ionos.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-On Wed, Nov 21, 2018 at 03:59:43PM +0530, Kishon Vijay Abraham I wrote:
-> On 21/11/18 3:41 PM, Maxime Ripard wrote:
-> > Hi Kishon,
-> > 
-> > On Tue, Nov 20, 2018 at 11:02:34AM +0530, Kishon Vijay Abraham I wrote:
-> >>>> +static int cdns_dphy_config_from_opts(struct phy *phy,
-> >>>> +				      struct phy_configure_opts_mipi_dphy *opts,
-> >>>> +				      struct cdns_dphy_cfg *cfg)
-> >>>> +{
-> >>>> +	struct cdns_dphy *dphy = phy_get_drvdata(phy);
-> >>>> +	unsigned int dsi_hfp_ext = 0;
-> >>>> +	int ret;
-> >>>> +
-> >>>> +	ret = phy_mipi_dphy_config_validate(opts);
-> >>>> +	if (ret)
-> >>>> +		return ret;
-> >>>> +
-> >>>> +	ret = cdns_dsi_get_dphy_pll_cfg(dphy, cfg,
-> >>>> +					opts, &dsi_hfp_ext);
-> >>>> +	if (ret)
-> >>>> +		return ret;
-> >>>> +
-> >>>> +	opts->wakeup = cdns_dphy_get_wakeup_time_ns(dphy);
-> >>
-> >> Is the wakeup populated here used by the consumer driver?
-> > 
-> > It's supposed to, if it can yes.
+> Eric Anholt <eric@anholt.net> hat am 20. November 2018 um 23:18 geschrieben:
 > 
-> But I guess right now it's not using. I'm thinking the usefulness of validate
-> callback (only from this series point of view). Why should a consumer driver
-> invoke validate if it doesn't intend to configure the PHY?
 > 
-> The 3 steps required are
-> 	* The consumer driver gets the default config
-> 	* The consumer driver changes some of the configuration and
-> 	* The consumer driver invokes phy configure callback.
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
 > 
-> phy_configure anyways can validate the config before actually configuring the phy.
+> > Hi Eric,
+> >
+> >> Stefan Wahren <stefan.wahren@i2se.com> hat am 18. November 2018 um 14:10 geschrieben:
+> >> 
+> >> 
+> >> Adopt the SPDX license identifier headers to ease license compliance
+> >> management.
+> >> 
+> >> Cc: Eric Anholt <eric@anholt.net>
+> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> >> Reviewed-by: Eric Anholt <eric@anholt.net>
+> >> ---
+> >>  drivers/firmware/raspberrypi.c             | 5 +----
+> >>  include/soc/bcm2835/raspberrypi-firmware.h | 5 +----
+> >>  2 files changed, 2 insertions(+), 8 deletions(-)
+> >> 
+> >> Hi, it seems that i forgot to send this patch last week.
+> >
+> > i accidently added your Reviewed-by which wasn't the case for this
+> > particular patch. In case your fine with this patch i would apply it
+> > and then from my point of view the pull request would be ready to
+> > send.
+> 
+> I've reviewed it now, you're good to go :)
 
-If you only want to configure the PHY, then yes, sure.
+Thanks, it's now applied to bcm2835-drivers-next. So the pull request for the following branches are yours:
 
-However, the point here is that validate helps negotiating what the
-source device (DSI controller for example) and what the sink device
-(say a panel) are capable of.
+bcm2835-defconfig-next
+bcm2835-drivers-next
+bcm2835-dt-next
+bcm2835-soc-next
 
-A panel for example might very well have multiple resolutions that it
-supports, and the DSI controller will have some as well. And the PHY
-will only be able to operate within certain boundaries too. However,
-they don't necessarily match, since there's so many panels, and so
-many SoCs.
-
-Let's say our (very weird) panel is able to do 640x480, 1024x768 and
-1280x800. Our DSI driver can only operate with 1024 pixels in both
-dimensions, and the PHY can only reach the bus frequency needed for
-around 800x600.
-
-We'll want to filter out 1280x800 (because the DSI controller can't
-provide that) and 1024x768 (because the PHY can go fast enough), to
-only provide the 640x480 option to the user.
-
-That's what validate bring you. The option to test whether a given
-configuration *would* work, without actually wanting to apply it right
-now.
-
-Does that make sense?
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/e97c0f2f/attachment.sig>
+Stefan
