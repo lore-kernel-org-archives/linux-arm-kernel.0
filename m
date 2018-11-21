@@ -1,72 +1,84 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 21 Nov 2018 08:08:08 -0800
-Subject: [PATCH] arm64: dts: renesas: ebisu: Remove renesas,
- no-ether-link property
-Message-ID: <20181121160808.13374-1-horms+renesas@verge.net.au>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 21 Nov 2018 16:08:14 +0000
+Subject: [PATCH v3] perf: xgene: Add CPU hotplug support
+In-Reply-To: <1541619650-5953-1-git-send-email-hoan@os.amperecomputing.com>
+References: <1541619650-5953-1-git-send-email-hoan@os.amperecomputing.com>
+Message-ID: <20181121160814.u2vrkbtdxzsz5o4j@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Hi Hoan,
 
-It is incorrect to specify the no-ether-link property for the AVB device on
-the Ebisu board. This is because the property should only be used when a
-board does not provide a proper AVB_LINK signal. However, the Ebisu board
-does provide this signal.
+On Wed, Nov 07, 2018 at 07:40:58PM +0000, Hoan Tran wrote:
+> From: Hoan Tran <Hoan@os.amperecomputing.com>
+> 
+> This patch adds CPU hotplug support where the PMU migrates the context to
+> another online CPU when its CPU is offline.
+> 
+> It fixes the below issue where the user does offline the CPU which is assigned
+> to this PMU.
+> 
+> Assuming, CPU0 is assigned for this PMU. When the user does offline CPU0
+> 	[root@(none) ~]# echo 0 > /sys/devices/system/cpu/cpu0/online
+> This PMU does not work anymore and shows the below error.
+> 	[root@(none) ~]# perf stat -a -e l3c0/cycle-count/,l3c0/write/ sleep 1
+> 	Error:
+> 	The sys_perf_event_open() syscall returned with 19 (No such device) for event (l3c0/cycle-count/).
+> 	/bin/dmesg may provide additional information.
+> 	No CONFIG_PERF_EVENTS=y kernel support configured?
+> 
+> With this patch, when CPU0 is offline, PMU migrates to another online CPU and
+> works on that CPU.
+> 
+> Signed-off-by: Hoan Tran <hoan.tran@amperecomputing.com>
+> ---
+> v3:
+>  * Remove email footer
+>  * Fix the space issue
+> 
+> v2:
+>  * Remove the cpuhp instance when unregistering the PMU
 
-As per 87c059e9c39d ("arm64: dts: renesas: salvator-x: Remove renesas,
-no-ether-link property") this fixes a bug:
+Aside from one minor fixup below, this looks good to me, and with that
+applied:
 
-    Steps to reproduce:
-    - start AVB TX stream (Using aplay via MSE),
-    - disconnect+reconnect the eth cable,
-    - after a reconnection the eth connection goes iteratively up/down
-      without user interaction,
-    - this may heal after some seconds or even stay for minutes.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-    As the documentation specifies, the "renesas,no-ether-link" option
-    should be used when a board does not provide a proper AVB_LINK signal.
-    There is no need for this option enabled on RCAR H3/M3 Salvator-X/XS
-    and ULCB starter kits since the AVB_LINK is correctly handled by HW.
+Will, are you happy to apply that fixup when picking the patch?
 
-    Choosing to keep or remove the "renesas,no-ether-link" option will have
-    impact on the code flow in the following ways:
-    - keeping this option enabled may lead to unexpected behavior since the
-      RX & TX are enabled/disabled directly from adjust_link function
-      without any HW interrogation,
-    - removing this option, the RX & TX will only be enabled/disabled after
-      HW interrogation. The HW check is made through the LMON pin in PSR
-      register which specifies AVB_LINK signal value (0 - at low level;
-      1 - at high level).
+[...]
 
-    In conclusion, the present change is also a safety improvement because
-    it removes the "renesas,no-ether-link" option leading to a proper way
-    of detecting the link state based on HW interrogation and not on
-    software heuristic.
+> diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+> index 8796ba3..afefca8a 100644
+> --- a/include/linux/cpuhotplug.h
+> +++ b/include/linux/cpuhotplug.h
+> @@ -164,6 +164,7 @@ enum cpuhp_state {
+>  	CPUHP_AP_PERF_POWERPC_NEST_IMC_ONLINE,
+>  	CPUHP_AP_PERF_POWERPC_CORE_IMC_ONLINE,
+>  	CPUHP_AP_PERF_POWERPC_THREAD_IMC_ONLINE,
+> +	CPUHP_AP_PERF_XGENE_ONLINE,
 
-Fixes: 8441ef643d7d ("arm64: dts: renesas: r8a77990: ebisu: Enable EthernetAVB")
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-[simon: updated changelog]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 1 -
- 1 file changed, 1 deletion(-)
 
- Based on renesas-devel-20181121-v4.20-rc3
+All the other ARM vendors have named their callbacks with a prefix:
 
- I thought I sent this about 10 days ago but it seems to have got
- stuck in my patch queue.
+	CPUHP_AP_PERF_ARM_*
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index 62bdddcbbae7..0c3457bec4ae 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -246,7 +246,6 @@
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
--	renesas,no-ether-link;
- 	phy-handle = <&phy0>;
- 	phy-mode = "rgmii-txid";
- 	status = "okay";
--- 
-2.11.0
+... e.g.
+
+	CPUHP_AP_PERF_ARM_HISI_DDRC_ONLINE,
+	CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+
+... for consistency I'd prefer if  we could rename this state to:
+
+	CPUHP_AP_PERF_ARM_XGENE_ONLINE,
+
+... or:
+
+	CPUHP_AP_PERF_ARM_APM_XGENE_ONLINE,
+
+
+... and place it adjacent to those other entries, fixing up the uses as
+appropriate.
+
+Thanks,
+Mark.
