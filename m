@@ -1,101 +1,35 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 21 Nov 2018 16:46:47 +0000
-Subject: [RFC PATCH v2 17/23] arm64/sve: In-kernel vector length
- availability query interface
-In-Reply-To: <20181121163525.GD3505@e103592.cambridge.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-18-git-send-email-Dave.Martin@arm.com>
- <87in0qiexh.fsf@linaro.org> <20181121163525.GD3505@e103592.cambridge.arm.com>
-Message-ID: <87h8gaidjc.fsf@linaro.org>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 21 Nov 2018 17:48:20 +0100
+Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for
+ SPI mode
+In-Reply-To: <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
+References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
+ <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
+ <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
+Message-ID: <20181121164820.GC12656@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob,
 
-Dave Martin <Dave.Martin@arm.com> writes:
+On 21/11/2018 10:41:01-0600, Rob Herring wrote:
+> > +Optional properties in serial and SPI mode:
+> > +- dma bindings for dma transfer:
+> > +       - dmas: DMA specifier, consisting of a phandle to DMA controller node,
+> > +               memory peripheral interface and USART DMA channel ID, FIFO configuration.
+> > +               Refer to dma.txt and atmel-dma.txt for details.
+> > +       - dma-names: "rx" for RX channel, "tx" for TX channel.
+> 
+> > +               dma-names = "tx", "rx";
+> 
+> The dma-names should have a defined order.
+> 
 
-> On Wed, Nov 21, 2018 at 04:16:42PM +0000, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > KVM will need to interrogate the set of SVE vector lengths
->> > available on the system.
->> >
->> > This patch exposes the relevant bits to the kernel, along with a
->> > sve_vq_available() helper to check whether a particular vector
->> > length is supported.
->> >
->> > vq_to_bit() and bit_to_vq() are not intended for use outside these
->> > functions, so they are given a __ prefix to warn people not to use
->> > them unless they really know what they are doing.
->>
->> Personally I wouldn't have bothered with the __ but whatever:
->>
->> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
->
-> OK, thanks
->
-> I'll probably keep the __ unless somebody else objects, but if you feel
-> strongly I could get rid of it.
-
-nah - it's just a personal opinion...
-
-> Perhaps I simply shouldn't have called attention to it in the commit
-> message ;)
-
-Psychological priming ;-)
-
->
-> Cheers
-> ---Dave
->
->>
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > ---
->> >  arch/arm64/include/asm/fpsimd.h | 29 +++++++++++++++++++++++++++++
->> >  arch/arm64/kernel/fpsimd.c      | 35 ++++++++---------------------------
->> >  2 files changed, 37 insertions(+), 27 deletions(-)
->> >
->> > diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
->> > index df7a143..ad6d2e4 100644
->> > --- a/arch/arm64/include/asm/fpsimd.h
->> > +++ b/arch/arm64/include/asm/fpsimd.h
->> > @@ -24,10 +24,13 @@
->> >
->> >  #ifndef __ASSEMBLY__
->> >
->> > +#include <linux/bitmap.h>
->> >  #include <linux/build_bug.h>
->> > +#include <linux/bug.h>
->> >  #include <linux/cache.h>
->> >  #include <linux/init.h>
->> >  #include <linux/stddef.h>
->> > +#include <linux/types.h>
->> >
->> >  #if defined(__KERNEL__) && defined(CONFIG_COMPAT)
->> >  /* Masks for extracting the FPSR and FPCR from the FPSCR */
->> > @@ -89,6 +92,32 @@ extern u64 read_zcr_features(void);
->> >
->> >  extern int __ro_after_init sve_max_vl;
->> >  extern int __ro_after_init sve_max_virtualisable_vl;
->> > +/* Set of available vector lengths, as vq_to_bit(vq): */
->> > +extern __ro_after_init DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
->> > +
->> > +/*
->> > + * Helpers to translate bit indices in sve_vq_map to VQ values (and
->> > + * vice versa).  This allows find_next_bit() to be used to find the
->> > + * _maximum_ VQ not exceeding a certain value.
->> > + */
->> > +static inline unsigned int __vq_to_bit(unsigned int vq)
->> > +{
->> > +	return SVE_VQ_MAX - vq;
->> > +}
->> > +
->> > +static inline unsigned int __bit_to_vq(unsigned int bit)
->> > +{
->
-> [...]
+Why is that? Isn't the purpose of names to get rid of any particular
+ordering?
 
 
---
-Alex Benn?e
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
