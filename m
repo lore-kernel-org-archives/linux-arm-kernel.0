@@ -1,218 +1,28 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 21 Nov 2018 15:08:41 +0530
-Subject: [RFC PATCH 5/6] net: marvell: neta: add support for 2500base-X
-In-Reply-To: <20181114111104.GS30658@n2100.armlinux.org.uk>
-References: <20181112122933.GD30658@n2100.armlinux.org.uk>
- <E1gMBMx-0008A9-Jb@rmk-PC.armlinux.org.uk>
- <acc97e5e-efa9-a44c-ea87-09135c6c12b6@ti.com>
- <20181114111104.GS30658@n2100.armlinux.org.uk>
-Message-ID: <98d978ec-a92c-7731-bbec-af8c79641e3c@ti.com>
+From: christianshewitt@gmail.com (Christian Hewitt)
+Date: Wed, 21 Nov 2018 13:39:29 +0400
+Subject: [PATCH] drm/meson: add support for 1080p25 mode
+Message-ID: <1542793169-13008-1-git-send-email-christianshewitt@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This essential mode for PAL users is missing, so add it.
 
-On 14/11/18 4:41 PM, Russell King - ARM Linux wrote:
-> On Wed, Nov 14, 2018 at 02:18:14PM +0530, Kishon Vijay Abraham I wrote:
->> Hi,
->>
->> On 12/11/18 6:01 PM, Russell King wrote:
->>> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->>> ---
->>>  drivers/net/ethernet/marvell/mvneta.c | 58 ++++++++++++++++++++++++++++++-----
->>>  1 file changed, 51 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
->>> index 5bfd349bf41a..7305d4cc0630 100644
->>> --- a/drivers/net/ethernet/marvell/mvneta.c
->>> +++ b/drivers/net/ethernet/marvell/mvneta.c
->>> @@ -27,6 +27,7 @@
->>>  #include <linux/of_irq.h>
->>>  #include <linux/of_mdio.h>
->>>  #include <linux/of_net.h>
->>> +#include <linux/phy/phy.h>
->>>  #include <linux/phy.h>
->>>  #include <linux/phylink.h>
->>>  #include <linux/platform_device.h>
->>> @@ -437,6 +438,7 @@ struct mvneta_port {
->>>  	struct device_node *dn;
->>>  	unsigned int tx_csum_limit;
->>>  	struct phylink *phylink;
->>> +	struct phy *comphy;
->>>  
->>>  	struct mvneta_bm *bm_priv;
->>>  	struct mvneta_bm_pool *pool_long;
->>> @@ -3150,6 +3152,8 @@ static void mvneta_start_dev(struct mvneta_port *pp)
->>>  {
->>>  	int cpu;
->>>  
->>> +	WARN_ON(phy_power_on(pp->comphy));
->>> +
->>>  	mvneta_max_rx_size_set(pp, pp->pkt_size);
->>>  	mvneta_txq_max_tx_size_set(pp, pp->pkt_size);
->>>  
->>> @@ -3212,6 +3216,8 @@ static void mvneta_stop_dev(struct mvneta_port *pp)
->>>  
->>>  	mvneta_tx_reset(pp);
->>>  	mvneta_rx_reset(pp);
->>> +
->>> +	WARN_ON(phy_power_off(pp->comphy));
->>>  }
->>>  
->>>  static void mvneta_percpu_enable(void *arg)
->>> @@ -3337,6 +3343,7 @@ static int mvneta_set_mac_addr(struct net_device *dev, void *addr)
->>>  static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->>>  			    struct phylink_link_state *state)
->>>  {
->>> +	struct mvneta_port *pp = netdev_priv(ndev);
->>>  	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
->>>  
->>>  	/* We only support QSGMII, SGMII, 802.3z and RGMII modes */
->>> @@ -3357,14 +3364,14 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->>>  	/* Asymmetric pause is unsupported */
->>>  	phylink_set(mask, Pause);
->>>  
->>> -	/* We cannot use 1Gbps when using the 2.5G interface. */
->>> -	if (state->interface == PHY_INTERFACE_MODE_2500BASEX) {
->>> -		phylink_set(mask, 2500baseT_Full);
->>> -		phylink_set(mask, 2500baseX_Full);
->>> -	} else {
->>> +	/* Half-duplex at speeds higher than 100Mbit is unsupported */
->>> +	if (pp->comphy || state->interface != PHY_INTERFACE_MODE_2500BASEX) {
->>>  		phylink_set(mask, 1000baseT_Full);
->>>  		phylink_set(mask, 1000baseX_Full);
->>>  	}
->>> +	if (pp->comphy || state->interface == PHY_INTERFACE_MODE_2500BASEX) {
->>> +		phylink_set(mask, 2500baseX_Full);
->>> +	}
->>>  
->>>  	if (!phy_interface_mode_is_8023z(state->interface)) {
->>>  		/* 10M and 100M are only supported in non-802.3z mode */
->>> @@ -3378,6 +3385,11 @@ static void mvneta_validate(struct net_device *ndev, unsigned long *supported,
->>>  		   __ETHTOOL_LINK_MODE_MASK_NBITS);
->>>  	bitmap_and(state->advertising, state->advertising, mask,
->>>  		   __ETHTOOL_LINK_MODE_MASK_NBITS);
->>> +
->>> +	/* We can only operate at 2500BaseX or 1000BaseX.  If requested
->>> +	 * to advertise both, only report advertising at 2500BaseX.
->>> +	 */
->>> +	phylink_helper_basex_speed(state);
->>>  }
->>>  
->>>  static int mvneta_mac_link_state(struct net_device *ndev,
->>> @@ -3389,7 +3401,9 @@ static int mvneta_mac_link_state(struct net_device *ndev,
->>>  	gmac_stat = mvreg_read(pp, MVNETA_GMAC_STATUS);
->>>  
->>>  	if (gmac_stat & MVNETA_GMAC_SPEED_1000)
->>> -		state->speed = SPEED_1000;
->>> +		state->speed =
->>> +			state->interface == PHY_INTERFACE_MODE_2500BASEX ?
->>> +			SPEED_2500 : SPEED_1000;
->>>  	else if (gmac_stat & MVNETA_GMAC_SPEED_100)
->>>  		state->speed = SPEED_100;
->>>  	else
->>> @@ -3504,12 +3518,32 @@ static void mvneta_mac_config(struct net_device *ndev, unsigned int mode,
->>>  			    MVNETA_GMAC_FORCE_LINK_DOWN);
->>>  	}
->>>  
->>> +
->>>  	/* When at 2.5G, the link partner can send frames with shortened
->>>  	 * preambles.
->>>  	 */
->>>  	if (state->speed == SPEED_2500)
->>>  		new_ctrl4 |= MVNETA_GMAC4_SHORT_PREAMBLE_ENABLE;
->>>  
->>> +	if (pp->comphy) {
->>> +		enum phy_mode mode = PHY_MODE_INVALID;
->>> +
->>> +		switch (state->interface) {
->>> +		case PHY_INTERFACE_MODE_SGMII:
->>> +		case PHY_INTERFACE_MODE_1000BASEX:
->>> +			mode = PHY_MODE_SGMII;
->>> +			break;
->>> +		case PHY_INTERFACE_MODE_2500BASEX:
->>> +			mode = PHY_MODE_2500SGMII;
->>> +			break;
->>> +		default:
->>> +			break;
->>> +		}
->>> +
->>> +		if (mode != PHY_MODE_INVALID)
->>> +			WARN_ON(phy_set_mode(pp->comphy, mode));
->>> +	}
->>> +
->>>  	if (new_ctrl0 != gmac_ctrl0)
->>>  		mvreg_write(pp, MVNETA_GMAC_CTRL_0, new_ctrl0);
->>>  	if (new_ctrl2 != gmac_ctrl2)
->>> @@ -4411,7 +4445,7 @@ static int mvneta_port_power_up(struct mvneta_port *pp, int phy_mode)
->>>  	if (phy_mode == PHY_INTERFACE_MODE_QSGMII)
->>>  		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_QSGMII_SERDES_PROTO);
->>>  	else if (phy_mode == PHY_INTERFACE_MODE_SGMII ||
->>> -		 phy_mode == PHY_INTERFACE_MODE_1000BASEX)
->>> +		 phy_interface_mode_is_8023z(phy_mode))
->>>  		mvreg_write(pp, MVNETA_SERDES_CFG, MVNETA_SGMII_SERDES_PROTO);
->>>  	else if (!phy_interface_mode_is_rgmii(phy_mode))
->>>  		return -EINVAL;
->>> @@ -4428,6 +4462,7 @@ static int mvneta_probe(struct platform_device *pdev)
->>>  	struct mvneta_port *pp;
->>>  	struct net_device *dev;
->>>  	struct phylink *phylink;
->>> +	struct phy *comphy;
->>>  	const char *dt_mac_addr;
->>>  	char hw_mac_addr[ETH_ALEN];
->>>  	const char *mac_from;
->>> @@ -4453,6 +4488,14 @@ static int mvneta_probe(struct platform_device *pdev)
->>>  		goto err_free_irq;
->>>  	}
->>>  
->>> +	comphy = devm_of_phy_get(&pdev->dev, dn, NULL);
->>> +	if (comphy == ERR_PTR(-EPROBE_DEFER)) {
->>> +		err = -EPROBE_DEFER;
->>> +		goto err_free_irq;
->>> +	} else if (IS_ERR(comphy)) {
->>> +		comphy = NULL;
->>> +	}
->>
->> devm_phy_optional_get can be used here instead.
-> 
-> I don't think that will work with a NULL string.
+Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+---
+ drivers/gpu/drm/meson/meson_venc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-That's correct.
-> 
-> devm_phy_optional_get() ultimately ends up calling phy_get(), which
-> in this case would receive a NULL string.  It will pass that NULL
-> string to of_property_match_string().
-
-There is a check for (string == NULL), even before of_property_match_string is
-invoked in phy_get()
-> 
-> of_property_match_string() will try to find the "phy-names" property,
-> which will not exist, and hence will return -EINVAL.
-> 
-> phy_get() doesn't check for error conditions, but passes this directly
-> to _of_phy_get() as the index.  _of_phy_get() passes that on to
-> of_parse_phandle_with_args(), which will fail to find an entry with
-> cur_index == -EINVAL (since it counts up from zero.)  Hence,
-> _of_phy_get() will return -ENODEV, thereby causing
-> devm_phy_optional_get() to return NULL, even if there's a phys=
-> property present.
-> 
-> of_phy_get() and phy_get() have different behaviours when a NULL string
-> is passed in - the of_phy_get() family will get the first PHY specified
-> in the DT phys= property, whereas the phy_get() family of functions
-> will fail.
-
-Agreed. I'll fix this so that we have similar behavior with of_phy_get() and
-phy_get().
-> 
-> Since there is no devm_of_phy_optional_get(), that leads people down
-> the path of coding that functionality at the callsites, such as in
-> drivers/net/ethernet/marvell/mvpp2/mvpp2_main.c.
-
-Okay.
-
-Thanks
-Kishon
-
-
-> 
+diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+index acbbad3..ab16046 100644
+--- a/drivers/gpu/drm/meson/meson_venc.c
++++ b/drivers/gpu/drm/meson/meson_venc.c
+@@ -714,6 +714,7 @@ struct meson_hdmi_venc_vic_mode {
+ 	{ 5, &meson_hdmi_encp_mode_1080i60 },
+ 	{ 20, &meson_hdmi_encp_mode_1080i50 },
+ 	{ 32, &meson_hdmi_encp_mode_1080p24 },
++	{ 33, &meson_hdmi_encp_mode_1080p50 },
+ 	{ 34, &meson_hdmi_encp_mode_1080p30 },
+ 	{ 31, &meson_hdmi_encp_mode_1080p50 },
+ 	{ 16, &meson_hdmi_encp_mode_1080p60 },
+-- 
+2.7.4
