@@ -1,61 +1,112 @@
 From: radu_nicolae.pirea@upb.ro (Radu Pirea)
-Date: Wed, 21 Nov 2018 13:27:31 +0200
-Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for SPI
- mode
+Date: Wed, 21 Nov 2018 13:27:30 +0200
+Subject: [PATCH 1/3] spi: at91-usart: add power management support
 In-Reply-To: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
 References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
-Message-ID: <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
+Message-ID: <20181121112732.15690-2-radu_nicolae.pirea@upb.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bindings for DMA are now common for both drivers of the USART
-IP.
-
-The node given as an example for USART in SPI mode has been updated in
-order to include DMA bindings.
+This patch implements power management callback function for USART as
+SPI driver.
 
 Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
 ---
- .../devicetree/bindings/mfd/atmel-usart.txt       | 15 ++++++++++-----
- 1 file changed, 10 insertions(+), 5 deletions(-)
+ drivers/spi/spi-at91-usart.c | 61 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 61 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/atmel-usart.txt b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-index 7f0cd72f47d2..8ad008175343 100644
---- a/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-+++ b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
-@@ -17,17 +17,19 @@ Required properties for USART in SPI mode:
- - cs-gpios: chipselects (internal cs not supported)
- - atmel,usart-mode : Must be <AT91_USART_MODE_SPI> (found in dt-bindings/mfd/at91-usart.h)
+diff --git a/drivers/spi/spi-at91-usart.c b/drivers/spi/spi-at91-usart.c
+index a924657642fa..0b07c746453d 100644
+--- a/drivers/spi/spi-at91-usart.c
++++ b/drivers/spi/spi-at91-usart.c
+@@ -13,6 +13,7 @@
+ #include <linux/module.h>
+ #include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
  
-+Optional properties in serial and SPI mode:
-+- dma bindings for dma transfer:
-+	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
-+		memory peripheral interface and USART DMA channel ID, FIFO configuration.
-+		Refer to dma.txt and atmel-dma.txt for details.
-+	- dma-names: "rx" for RX channel, "tx" for TX channel.
+ #include <linux/spi/spi.h>
+ 
+@@ -399,6 +400,59 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
+ 	return ret;
+ }
+ 
++__maybe_unused static int at91_usart_spi_runtime_suspend(struct device *dev)
++{
++	struct spi_controller *ctlr = dev_get_drvdata(dev);
++	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
 +
- Optional properties in serial mode:
- - atmel,use-dma-rx: use of PDC or DMA for receiving data
- - atmel,use-dma-tx: use of PDC or DMA for transmitting data
- - {rts,cts,dtr,dsr,rng,dcd}-gpios: specify a GPIO for RTS/CTS/DTR/DSR/RI/DCD line respectively.
-   It will use specified PIO instead of the peripheral function pin for the USART feature.
-   If unsure, don't specify this property.
--- add dma bindings for dma transfer:
--	- dmas: DMA specifier, consisting of a phandle to DMA controller node,
--		memory peripheral interface and USART DMA channel ID, FIFO configuration.
--		Refer to dma.txt and atmel-dma.txt for details.
--	- dma-names: "rx" for RX channel, "tx" for TX channel.
- - atmel,fifo-size: maximum number of data the RX and TX FIFOs can store for FIFO
-   capable USARTs.
- - rs485-rts-delay, rs485-rx-during-tx, linux,rs485-enabled-at-boot-time: see rs485.txt
-@@ -81,5 +83,8 @@ Example:
- 		interrupts = <12 IRQ_TYPE_LEVEL_HIGH 5>;
- 		clocks = <&usart0_clk>;
- 		clock-names = "usart";
-+		dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(3)>,
-+		       <&dma0 2 (AT91_DMA_CFG_PER_ID(4) | AT91_DMA_CFG_FIFOCFG_ASAP)>;
-+		dma-names = "tx", "rx";
- 		cs-gpios = <&pioB 3 0>;
- 	};
++	clk_disable_unprepare(aus->clk);
++	pinctrl_pm_select_sleep_state(dev);
++
++	return 0;
++}
++
++__maybe_unused static int at91_usart_spi_runtime_resume(struct device *dev)
++{
++	struct spi_controller *ctrl = dev_get_drvdata(dev);
++	struct at91_usart_spi *aus = spi_master_get_devdata(ctrl);
++
++	pinctrl_pm_select_default_state(dev);
++
++	return clk_prepare_enable(aus->clk);
++}
++
++__maybe_unused static int at91_usart_spi_suspend(struct device *dev)
++{
++	struct spi_controller *ctrl = dev_get_drvdata(dev);
++	int ret;
++
++	ret = spi_controller_suspend(ctrl);
++	if (ret)
++		return ret;
++
++	if (!pm_runtime_suspended(dev))
++		at91_usart_spi_runtime_suspend(dev);
++
++	return 0;
++}
++
++__maybe_unused static int at91_usart_spi_resume(struct device *dev)
++{
++	struct spi_controller *ctrl = dev_get_drvdata(dev);
++	struct at91_usart_spi *aus = spi_master_get_devdata(ctrl);
++	int ret;
++
++	if (!pm_runtime_suspended(dev)) {
++		ret = at91_usart_spi_runtime_resume(dev);
++		if (ret)
++			return ret;
++	}
++
++	at91_usart_spi_init(aus);
++
++	return spi_controller_resume(ctrl);
++}
++
+ static int at91_usart_spi_remove(struct platform_device *pdev)
+ {
+ 	struct spi_controller *ctlr = platform_get_drvdata(pdev);
+@@ -409,6 +463,12 @@ static int at91_usart_spi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static const struct dev_pm_ops at91_usart_spi_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(at91_usart_spi_suspend, at91_usart_spi_resume)
++	SET_RUNTIME_PM_OPS(at91_usart_spi_runtime_suspend,
++			   at91_usart_spi_runtime_resume, NULL)
++};
++
+ static const struct of_device_id at91_usart_spi_dt_ids[] = {
+ 	{ .compatible = "microchip,at91sam9g45-usart-spi"},
+ 	{ /* sentinel */}
+@@ -419,6 +479,7 @@ MODULE_DEVICE_TABLE(of, at91_usart_spi_dt_ids);
+ static struct platform_driver at91_usart_spi_driver = {
+ 	.driver = {
+ 		.name = "at91_usart_spi",
++		.pm = &at91_usart_spi_pm_ops,
+ 	},
+ 	.probe = at91_usart_spi_probe,
+ 	.remove = at91_usart_spi_remove,
 -- 
 2.19.1
