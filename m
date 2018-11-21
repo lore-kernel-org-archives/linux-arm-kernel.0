@@ -1,154 +1,242 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Wed, 21 Nov 2018 12:06:20 +0100
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <201811211656540883310@zte.com.cn>
-References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
- <201811211656540883310@zte.com.cn>
-Message-ID: <20181121110620.GC18678@e113682-lin.lund.arm.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 21 Nov 2018 11:09:37 +0000
+Subject: [RFC PATCH 1/3] drivers: amba: Updates to component
+ identification for driver matching.
+In-Reply-To: <20181120205737.GA17267@xps15>
+References: <20181115012842.2353-1-mike.leach@linaro.org>
+ <20181115012842.2353-2-mike.leach@linaro.org>
+ <20181120205737.GA17267@xps15>
+Message-ID: <CAJ9a7VjD1C3t=OtCpQNGvmSvDh-vPcR_2mObccJJ1Qv8_9BxFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Matthieu,
 
-On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
-> >On 19/11/2018 09:10, Mark Rutland wrote:
-> >> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
-> >>>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
-> >>>>>> Hi,
-> >>>>>>> When virtual machine starts, hang up.
-> >>>>>>
-> >>>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
-> >>>>>> interrupt?
-> >>>>>>
-> >>>>>>> The kernel version of guest
-> >>>>>>> is 4.16. Host support vgic_v3.
-> >>>>>>
-> >>>>>> Your host kernel is something recent, I guess?
-> >>>>>>
-> >>>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
-> >>>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
-> >>>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
-> >>>>>>> correctly, so group is not set.
-> >>>>>>
-> >>>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
-> >>>>>> version?) or some other userland tool?
-> >>>>>>
-> >>>>>
-> >>>>> QEMU emulator version 3.0.50 .
-> >>>>>
-> >>>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
-> >>>>>>> time.
-> >>>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-> >>>>>>> interrupt injection failed.
-> >>>>>>>
-> >>>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> >>>>>>> ---
-> >>>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
-> >>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>>>>
-> >>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> >>>>>>> index 9c0dd23..d101000 100644
-> >>>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> >>>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> >>>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
-> >>>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
-> >>>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
-> >>>>>>>
-> >>>>>>> -    if (irq->group)
-> >>>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> >>>>>>
-> >>>>>> This is not the right fix, not only because it basically reverts the
-> >>>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
-> >>>>>> their configured group).
-> >>>>>>
-> >>>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
-> >>>>>> before dist->vgic_model is set, also what value it has?
-> >>>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
-> >>>>>>
-> >>>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
-> >>>>>   If the interrupt comes at this time, the interrupt injection fails.
-> >>>>
-> >>>> Does that mean that the guest is configuring its interrupts as Group0?
-> >>>> That sounds wrong, Linux should configure all it's interrupts as
-> >>>> non-secure group1.
-> >>>
-> >>> no, I think that uefi dose this, not linux.
-> >>> 1. kvm_vgic_vcpu_init
-> >>> 2. vgic_create
-> >>> 3. kvm_vgic_dist_init
-> >>> 4.vgic_mmio_write_group: uefi as guest, write group=0
-> >>> 5.vgic_mmio_write_group: linux as guest, write group=1
-> >>
-> >> Is this the same issue fixed by EDK2 commit:
-> >>
-> >> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
-> >>
-> >> ... where EDK2 would try to use IAR0 rather than IAR1?
-> >>
-> >> The commit messages notes this lead to a boot-time hang.
+On Tue, 20 Nov 2018 at 20:57, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+>
+> Hi Mike,
+>
+> On Thu, Nov 15, 2018 at 01:28:40AM +0000, Mike Leach wrote:
+> > The CoreSight specification (ARM IHI 0029E), updates the ID register
+> > requirements for components on an AMBA bus, to cover both traditional
+> > ARM Primecell type devices, and newer CoreSight and other components.
 > >
-> >I managed to trigger an issue with a really old EFI implementation that
-> >doesn't configure its interrupts as Group1, and yet tries to ACK its
-> >interrupts using the Group1 accessor. Guess what? It is not going to work.
+> > The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
+> > cases to uniquely identify components. CoreSight components related to
+> > a single function can share Peripheral ID values, and must be further
+> > identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
+> > PMU and Debug hardware of the A35 all share the same PID.
 > >
-> >Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
-> >to be the fix (I only assume it does, I haven't actually checked). A
-> >recent build, as found in Debian Buster, works perfectly (tested with
-> >both QEMU v2.12 and tip of tree).
+> > Bits 11:8 of the CID are defined to be the device class.
+> > Class 0xF remains for PrimeCell and legacy components.
+> > Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
+> > Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
+> > at present.
+> > Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
 > >
-> >Now, I really don't get what you're saying about Linux not getting
-> >interrupts. How do you get to booting Linux if EFI is not making any
-> >forward progress? Are you trying them independently?
+> > The specification futher defines which classes of device use the standard
+> > CID/PID pair, and when additional ID registers are required.
 > >
-> I start linux with bypassing uefi, the print info is the same.
-> [507107.748908]  vgic_mmio_write_group:## intid/27 group=0
-> [507107.752185]  vgic_mmio_write_group:## intid/27 group=0
-> [507107.899566]  vgic_mmio_write_group:## intid/27 group=1
-> [507107.907370]  vgic_mmio_write_group:## intid/27 group=1
-> the command line is like this:
-> /home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
-> 
-> This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
+> > The patches provide an update of amba_device and matching code to handle
+> > the additional registers required for the Class 0x9 (CoreSight) UCI.
+> > The *data pointer in the amba_id is used by the driver to provide extended
+> > ID register values for matching.
+> >
+> > CoreSight components where PID/CID pair is currently sufficient for
+> > unique identification need not provide this additional information.
+> >
+> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> > ---
+> >  drivers/amba/bus.c       | 48 ++++++++++++++++++++++++++++++++++++----
+> >  include/linux/amba/bus.h | 33 +++++++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> > index 41b706403ef7..6eab977f4314 100644
+> > --- a/drivers/amba/bus.c
+> > +++ b/drivers/amba/bus.c
+> > @@ -26,6 +26,28 @@
+> >
+> >  #define to_amba_driver(d)    container_of(d, struct amba_driver, drv)
+> >
+> > +/* called on periphid match and class 0x9 coresight device. */
+> > +static int amba_uci_match(const struct amba_id *table, struct amba_device *dev)
+> > +{
+> > +     int ret = 0;
+> > +     struct amba_cs_uci_id *uci;
+> > +
+> > +     uci = table->data;
+> > +
+> > +     /* no table data - return match on periphid */
+> > +     if (!uci)
+> > +             return 1;
+> > +
+> > +     if (uci->devarch) {
+> > +             ret = (dev->uci.devtype == uci->devtype) &&
+> > +                    ((dev->uci.devarch & uci->mask) == uci->devarch);
+> > +     } else {
+> > +             /* devtype only if devarch set to 0 */
+> > +             ret = dev->uci.devtype == uci->devtype;
+> > +     }
+> > +     return ret;
+> > +}
+> > +
+> >  static const struct amba_id *
+> >  amba_lookup(const struct amba_id *table, struct amba_device *dev)
+> >  {
+> > @@ -33,11 +55,17 @@ amba_lookup(const struct amba_id *table, struct amba_device *dev)
+> >
+> >       while (table->mask) {
+> >               ret = (dev->periphid & table->mask) == table->id;
+> > -             if (ret)
+> > -                     break;
+> > +             /* matched on periphid - check UCI if CoreSight */
+> > +             if (ret) {
+> > +                     if (dev->cid == CORESIGHT_CID)  {
+> > +                             ret = amba_uci_match(table, dev);
+> > +                             if (ret)
+> > +                                     break;
+> > +                     } else
+> > +                             break;
+> > +             }
+> >               table++;
+> >       }
+> > -
+>
+> Carefull with the line removal.
+>
 
-Could you try the following patch:
+This function is significantly re-written in the next version per
+Suzuki's suggestions.
 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index c0c0b88af1d5..6fa858c7a5a6 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
- 			irq->config = VGIC_CONFIG_LEVEL;
- 		}
- 
--		/*
--		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
--		 * so we always know the emulation type at this point as it's
--		 * either explicitly configured as GICv3, or explicitly
--		 * configured as GICv2, or not configured yet which also
--		 * implies GICv2.
--		 */
- 		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
- 			irq->group = 1;
- 		else
-@@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
- 
-+	/* Initialize groups on CPUs created before the VGIC type was known */
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
-+			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
-+			irq->group = 1;
-+		}
-+	}
-+
- 	if (vgic_has_its(kvm)) {
- 		ret = vgic_v4_init(kvm);
- 		if (ret)
+> >       return ret ? table : NULL;
+> >  }
+> >
+> > @@ -399,10 +427,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
+> >                       cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
+> >                               (i * 8);
+> >
+> > +             if (cid == CORESIGHT_CID) {
+> > +                     /* set the base to the start of the last 4k block */
+> > +                     void __iomem *csbase = tmp + size - 4096;
+> > +
+> > +                     dev->uci.devarch =
+> > +                             readl(csbase + UCI_REG_DEVARCH_OFFSET);
+> > +                     dev->uci.devtype =
+> > +                             readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
+>
+> Any reason for not masking @devarch the same way you're doing for @devtype?  If
+> we were to mask here we wouldn't have to carry the mask in struct amba_cs_uci_id
+> and deal with it in amba_uci_match().
+>
+
+@devarch is defined as a 32 bit value. This is masked to widen /
+narrow matching. By default the mask will be the ARCHID field - bits
+15:0, selected in the driver in the same way as the drivers currently
+have a mask for peripheral ID. This ignores the architect and version
+fields as most CS component drivers should handle differences.
+
+However - this is also an optional register - if all 32 bits are 0,
+then we ignore and use just the @devtype. This logic is contained in
+amba_uci_match()
+
+@devtype is architecturally specified as having only 8 significant
+bits, thus is masked at this point.
+
+> Russell King maintains AMBA.  Please address your next revision to him and CC
+> the rest of us, as specified by get_maintainer.pl.
+>
+
+get_maintainer.pl returned no specific 'maintainer' for this patch -
+though looking again I do see Russell noted as 'odd fixer'.
+Will ensure this is directed to him next revision.
+
+Thanks for the feedback,
+
+Mike
 
 
-Thanks,
+> Thanks,
+> Mathieu
+>
+> > +             }
+> > +
+> >               amba_put_disable_pclk(dev);
+> >
+> > -             if (cid == AMBA_CID || cid == CORESIGHT_CID)
+> > +             if (cid == AMBA_CID || cid == CORESIGHT_CID) {
+> >                       dev->periphid = pid;
+> > +                     dev->cid = cid;
+> > +             }
+> >
+> >               if (!dev->periphid)
+> >                       ret = -ENODEV;
+> > diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+> > index d143c13bed26..a83a0a3dece8 100644
+> > --- a/include/linux/amba/bus.h
+> > +++ b/include/linux/amba/bus.h
+> > @@ -25,6 +25,36 @@
+> >  #define AMBA_CID     0xb105f00d
+> >  #define CORESIGHT_CID        0xb105900d
+> >
+> > +/*
+> > + * CoreSight Architecture specification updates the ID specification
+> > + * for components on the AMBA bus. (ARM IHI 0029E)
+> > + *
+> > + * Bits 11:8 of the CID are the device class.
+> > + *
+> > + * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
+> > + * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
+> > + * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
+> > + * at present.
+> > + * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
+> > + *
+> > + * Remaining CID bits stay as 0xb105-00d
+> > + */
+> > +
+> > +/*
+> > + * Class 0x9 components use additional values to form a Unique Component
+> > + * Identifier (UCI), where peripheral ID values are identical for different
+> > + * components. Passed to the amba bus code from the component driver via
+> > + * the amba_id->data pointer.
+> > + */
+> > +struct amba_cs_uci_id {
+> > +     unsigned int devarch;
+> > +     unsigned int mask;
+> > +     unsigned int devtype;
+> > +};
+> > +
+> > +#define UCI_REG_DEVTYPE_OFFSET       0xFCC
+> > +#define UCI_REG_DEVARCH_OFFSET       0xFBC
+> > +
+> >  struct clk;
+> >
+> >  struct amba_device {
+> > @@ -32,6 +62,8 @@ struct amba_device {
+> >       struct resource         res;
+> >       struct clk              *pclk;
+> >       unsigned int            periphid;
+> > +     unsigned int            cid;
+> > +     struct amba_cs_uci_id   uci;
+> >       unsigned int            irq[AMBA_NR_IRQS];
+> >       char                    *driver_override;
+> >  };
+> > @@ -61,6 +93,7 @@ enum amba_vendor {
+> >       (((conf) & 0xff) << 24 | ((rev) & 0xf) << 20 | \
+> >       AMBA_VENDOR_LINUX << 12 | ((part) & 0xfff))
+> >
+> > +
+> >  extern struct bus_type amba_bustype;
+> >
+> >  #define to_amba_device(d)    container_of(d, struct amba_device, dev)
+> > --
+> > 2.19.1
+> >
 
-    Christoffer
+
+
+--
+Mike Leach
+Principal Engineer, ARM Ltd.
+Manchester Design Centre. UK
