@@ -1,80 +1,106 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 21 Nov 2018 17:46:59 +0000
-Subject: [RFC PATCH v2 16/23] KVM: arm64: Enumerate SVE register indices
- for KVM_GET_REG_LIST
-In-Reply-To: <87ftvuide0.fsf@linaro.org>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-17-git-send-email-Dave.Martin@arm.com>
- <87k1l6ifa8.fsf@linaro.org>
- <20181121163201.GC3505@e103592.cambridge.arm.com>
- <87ftvuide0.fsf@linaro.org>
-Message-ID: <20181121174658.GE3505@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 21 Nov 2018 17:48:55 +0000
+Subject: [PATCHv4 2/2] iommu/arm-smmu: Get clock config from device tree
+In-Reply-To: <1538773020-27784-3-git-send-email-thor.thayer@linux.intel.com>
+References: <1538773020-27784-1-git-send-email-thor.thayer@linux.intel.com>
+ <1538773020-27784-3-git-send-email-thor.thayer@linux.intel.com>
+Message-ID: <20181121174843.GD9801@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 04:49:59PM +0000, Alex Benn?e wrote:
+Hi Thor,
+
+On Fri, Oct 05, 2018 at 03:57:00PM -0500, thor.thayer at linux.intel.com wrote:
+> From: Thor Thayer <thor.thayer@linux.intel.com>
 > 
-> Dave Martin <Dave.Martin@arm.com> writes:
+> Currently the clocks are specified in a structure as well as
+> in the device tree. Since all the information about clocks can be
+> pulled from the device tree, parse the device tree for the clock
+> information if specified.
 > 
-> > On Wed, Nov 21, 2018 at 04:09:03PM +0000, Alex Benn?e wrote:
-> >>
-> >> Dave Martin <Dave.Martin@arm.com> writes:
-
-[...]
-
-> >> > diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-> >> > index 320db0f..89eab68 100644
-> >> > --- a/arch/arm64/kvm/guest.c
-> >> > +++ b/arch/arm64/kvm/guest.c
-> >> > @@ -323,6 +323,46 @@ static int get_timer_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> >> >  	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id)) ? -EFAULT : 0;
-> >> >  }
-> >> >
-> >> > +static unsigned long num_sve_regs(const struct kvm_vcpu *vcpu)
-> >> > +{
-> >> > +	const unsigned int slices = DIV_ROUND_UP(
-> >> > +		vcpu->arch.sve_max_vl,
-> >> > +		KVM_REG_SIZE(KVM_REG_ARM64_SVE_ZREG(0, 0)));
-> >>
-> >> Having seen this formulation come up several times now I wonder if there
-> >> should be a kernel private define, KVM_SVE_ZREG/PREG_SIZE to avoid this
-> >> clumsiness.
-> >
-> > I agree it's a bit awkward.  Previous I spelled this "0x100", which
-> > was terse but more sensitive to typos and other screwups that Io
-> > liked.
-> >
-> >> You could still use the KVM_REG_SIZE to extract it as I guess this is to
-> >> make changes simpler if/when the SVE reg size gets bumped up.
-> >
-> > That might be more challenging to determine at compile time.
-> >
-> > I'm not sure how good GCC is at doing const-propagation between related
-> > (but different) expressions, so I preferred to go for something that
-> > is clearly compiletime constant rather than extracting it from the
-> > register ID that came from userspace.
-> >
-> > So, I'd prefer not to use KVM_REG_SIZE() for this, but I'm happy to add
-> > a private #define to hide this cumbersome construct.  That would
-> > certainly make the code more readable.
-> >
-> > (Of course, the actual runtime cost is trivial either way, but I felt
-> > it was easier to reason about correctness if this is really a constant.)
-> >
-> >
-> > Sound OK?
+> This patch is dependent upon the following patch series that
+> adds clocks to the driver.
+> "[v16,0/5] iommu/arm-smmu: Add runtime pm/sleep support"
+> https://patchwork.kernel.org/cover/10581891/
 > 
-> Yes.
+> particularly this patch which adds the clocks:
+> "[v16,1/5] iommu/arm-smmu: Add pm_runtime/sleep ops"
+> https://patchwork.kernel.org/patch/10581899/
 > 
-> I'd almost suggested by not just use KVM_REG_SIZE(KVM_REG_SIZE_U2048)
-> earlier until I realised this might be forward looking.
+> Request testing on different platforms for verification.
+> This patch was tested on a Stratix10 SOCFPGA.
+> 
+> Signed-off-by: Thor Thayer <thor.thayer@linux.intel.com>
+> ---
+> v4  Change dependency on pending patch series that adds clocks.
+>     Add code for parsing device tree for the clocks.
+> v3  Change dependency on device tree bulk clock patches.
+> v2  Add structure for SOCFPGA and add dependency on clock patch.
+> ---
+>  drivers/iommu/arm-smmu.c | 30 +++++++++++++++++++++++++++---
+>  1 file changed, 27 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index d315ca637097..3dd10663b09c 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -44,6 +44,7 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_clk.h>
+>  #include <linux/of_device.h>
+>  #include <linux/of_iommu.h>
+>  #include <linux/pci.h>
+> @@ -2139,6 +2140,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+>  	const struct arm_smmu_match_data *data;
+>  	struct device *dev = &pdev->dev;
+>  	bool legacy_binding;
+> +	const char **parent_names;
+>  
+>  	if (of_property_read_u32(dev->of_node, "#global-interrupts",
+>  				 &smmu->num_global_irqs)) {
+> @@ -2149,9 +2151,25 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+>  	data = of_device_get_match_data(dev);
+>  	smmu->version = data->version;
+>  	smmu->model = data->model;
+> -	smmu->num_clks = data->num_clks;
+> -
+> -	arm_smmu_fill_clk_data(smmu, data->clks);
+> +	smmu->num_clks = of_clk_get_parent_count(dev->of_node);
+> +	/* check to see if clocks were specified in DT */
+> +	if (smmu->num_clks) {
+> +		unsigned int i;
+> +
+> +		parent_names = kmalloc_array(smmu->num_clks,
+> +					     sizeof(*parent_names),
+> +					     GFP_KERNEL);
+> +		if (!parent_names)
+> +			goto fail_clk_name;
+> +
+> +		for (i = 0; i < smmu->num_clks; i++) {
+> +			if (of_property_read_string_index(dev->of_node,
+> +							  "clock-names", i,
+> +							  &parent_names[i]))
+> +				goto fail_clk_name;
+> +		}
+> +		arm_smmu_fill_clk_data(smmu, parent_names);
+> +	}
+>  
+>  	parse_driver_options(smmu);
+>  
+> @@ -2171,6 +2189,12 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev,
+>  		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
+>  
+>  	return 0;
+> +
+> +fail_clk_name:
+> +	kfree(parent_names);
+> +	/* clock-names required for clocks in devm_clk_bulk_get() */
+> +	dev_err(dev, "Error: clock-name required in device tree\n");
 
-Having the slice size as 2048 bits is a property of the ABI and isn't
-intended to change in the future.
+I think you can drop the "Error: " prefix here, but the rest of the patch
+looks sensible to me. We just need to work out how this co-exists with
+Vivek's approach of using match_data (see the other thread).
 
-So, I guess we could write the above, but I prefer to have the size
-determined in the fewest number of places possible.
-
-
-Cheers
----Dave
+Will
