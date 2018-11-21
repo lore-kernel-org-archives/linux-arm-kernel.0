@@ -1,175 +1,121 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Wed, 21 Nov 2018 13:47:51 +0800
-Subject: [PATCH v2] PCI: mediatek: Use
- devm_of_pci_get_host_bridge_resources() to parse DT
-In-Reply-To: <1541645815-30340-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1541645815-30340-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1542779271.2401.0.camel@mtkswgap22>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 21 Nov 2018 13:54:52 +0800
+Subject: [PATCH v8 7/7] arm64: dts: allwinner: a64: enable sound on
+ Pinebook
+In-Reply-To: <20181121051752.18387-8-anarsoul@gmail.com>
+References: <20181121051752.18387-1-anarsoul@gmail.com>
+ <20181121051752.18387-8-anarsoul@gmail.com>
+Message-ID: <CAGb2v65_3j7s_avuZgbKnXHnvms7fdKYWjnkMGEqw9T4_ee=oQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-08 at 10:56 +0800, honghui.zhang at mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Use the devm_of_pci_get_host_bridge_resources() API in place of the PCI OF
-> DT parser.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+On Wed, Nov 21, 2018 at 1:19 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>
+> This commit enables I2S, digital and analog parts of audiocodec on
+> Pinebook
+>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 > ---
->  drivers/pci/controller/pcie-mediatek.c | 98 +++++++++-------------------------
->  1 file changed, 24 insertions(+), 74 deletions(-)
-> 
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 2a1f97c..0590a93 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -197,11 +197,7 @@ struct mtk_pcie_port {
->   * @dev: pointer to PCIe device
->   * @base: IO mapped register base
->   * @free_ck: free-run reference clock
-> - * @io: IO resource
-> - * @pio: PIO resource
->   * @mem: non-prefetchable memory resource
-> - * @busn: bus range
-> - * @offset: IO / Memory offset
->   * @ports: pointer to PCIe port information
->   * @soc: pointer to SoC-dependent operations
->   */
-> @@ -210,14 +206,7 @@ struct mtk_pcie {
->  	void __iomem *base;
->  	struct clk *free_ck;
->  
-> -	struct resource io;
-> -	struct resource pio;
->  	struct resource mem;
-> -	struct resource busn;
-> -	struct {
-> -		resource_size_t mem;
-> -		resource_size_t io;
-> -	} offset;
->  	struct list_head ports;
->  	const struct mtk_pcie_soc *soc;
->  };
-> @@ -1045,55 +1034,43 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
->  {
->  	struct device *dev = pcie->dev;
->  	struct device_node *node = dev->of_node, *child;
-> -	struct of_pci_range_parser parser;
-> -	struct of_pci_range range;
-> -	struct resource res;
->  	struct mtk_pcie_port *port, *tmp;
-> +	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> +	struct list_head *windows = &host->windows;
-> +	struct resource_entry *win, *tmp_win;
-> +	resource_size_t io_base;
->  	int err;
->  
-> -	if (of_pci_range_parser_init(&parser, node)) {
-> -		dev_err(dev, "missing \"ranges\" property\n");
-> -		return -EINVAL;
-> -	}
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    windows, &io_base);
-> +	if (err)
-> +		return err;
->  
-> -	for_each_of_pci_range(&parser, &range) {
-> -		err = of_pci_range_to_resource(&range, node, &res);
-> -		if (err < 0)
-> -			return err;
-> +	err = devm_request_pci_bus_resources(dev, windows);
-> +	if (err < 0)
-> +		return err;
->  
-> -		switch (res.flags & IORESOURCE_TYPE_BITS) {
-> +	/* Get the I/O and memory ranges from DT */
-> +	resource_list_for_each_entry_safe(win, tmp_win, windows) {
-> +		switch (resource_type(win->res)) {
->  		case IORESOURCE_IO:
-> -			pcie->offset.io = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->pio, &res, sizeof(res));
-> -			pcie->pio.name = node->full_name;
-> -
-> -			pcie->io.start = range.cpu_addr;
-> -			pcie->io.end = range.cpu_addr + range.size - 1;
-> -			pcie->io.flags = IORESOURCE_MEM;
-> -			pcie->io.name = "I/O";
-> -
-> -			memcpy(&res, &pcie->io, sizeof(res));
-> +			err = devm_pci_remap_iospace(dev, win->res, io_base);
-> +			if (err) {
-> +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> +					 err, win->res);
-> +				resource_list_destroy_entry(win);
-> +			}
->  			break;
-> -
->  		case IORESOURCE_MEM:
-> -			pcie->offset.mem = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->mem, &res, sizeof(res));
-> +			memcpy(&pcie->mem, win->res, sizeof(*win->res));
->  			pcie->mem.name = "non-prefetchable";
->  			break;
-> +		case IORESOURCE_BUS:
-> +			host->busnr = win->res->start;
-> +			break;
->  		}
->  	}
->  
-> -	err = of_pci_parse_bus_range(node, &pcie->busn);
-> -	if (err < 0) {
-> -		dev_err(dev, "failed to parse bus ranges property: %d\n", err);
-> -		pcie->busn.name = node->name;
-> -		pcie->busn.start = 0;
-> -		pcie->busn.end = 0xff;
-> -		pcie->busn.flags = IORESOURCE_BUS;
-> -	}
-> -
->  	for_each_available_child_of_node(node, child) {
->  		int slot;
->  
-> @@ -1125,28 +1102,6 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
->  	return 0;
->  }
->  
-> -static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-> -{
-> -	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> -	struct list_head *windows = &host->windows;
-> -	struct device *dev = pcie->dev;
-> -	int err;
-> -
-> -	pci_add_resource_offset(windows, &pcie->pio, pcie->offset.io);
-> -	pci_add_resource_offset(windows, &pcie->mem, pcie->offset.mem);
-> -	pci_add_resource(windows, &pcie->busn);
-> -
-> -	err = devm_request_pci_bus_resources(dev, windows);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	err = devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	return 0;
-> -}
-> -
->  static int mtk_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -1169,11 +1124,6 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->  	if (err)
->  		return err;
->  
-> -	err = mtk_pcie_request_resources(pcie);
-> -	if (err)
-> -		goto put_resources;
-> -
-> -	host->busnr = pcie->busn.start;
->  	host->dev.parent = pcie->dev;
->  	host->ops = pcie->soc->ops;
->  	host->map_irq = of_irq_parse_and_map_pci;
+>  .../dts/allwinner/sun50i-a64-pinebook.dts     | 53 +++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> index 77fac84797e9..cecfa7ea90b2 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> @@ -53,6 +53,12 @@
+>                 };
+>         };
+>
+> +       headphone_amp: headphone_amp {
+> +               compatible = "simple-audio-amplifier";
+> +               VCC-supply = <&reg_eldo1>;
+> +               sound-name-prefix = "HP";
+> +       };
+> +
 
-Acked-by: Ryder Lee <ryder.lee@mediatek.com>
+This is part of the analog side of the codec. Representing it as a
+standalone amp is inaccurate. Here's what I have to add it to the codec:
+
+DT binding patch:
+https://github.com/wens/linux/commit/ca6360b9788b8495daff658280845683ff401441
+
+Driver patch:
+https://github.com/wens/linux/commit/17a91e45d62d370bb2350753be6db86eaf824a5e
+
+DT fixup:
+https://github.com/wens/linux/commit/df7c2b26d1a66790237ca25e8cc135c237cd8236
+
+As mentioned on IRC, I will pick up this series incorporating some extra
+changes.
+
+Thanks
+ChenYu
+
+>         reg_vcc3v3: vcc3v3 {
+>                 compatible = "regulator-fixed";
+>                 regulator-name = "vcc3v3";
+> @@ -64,6 +70,26 @@
+>                 compatible = "mmc-pwrseq-simple";
+>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>         };
+> +
+> +       speaker_amp: speaker_amp {
+> +               compatible = "simple-audio-amplifier";
+> +               VCC-supply = <&reg_ldo_io0>;
+> +               enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> +               sound-name-prefix = "SPEAKER";
+> +       };
+> +
+> +};
+> +
+> +&codec {
+> +       status = "okay";
+> +};
+> +
+> +&codec_analog {
+> +       status = "okay";
+> +};
+> +
+> +&dai {
+> +       status = "okay";
+>  };
+>
+>  &ehci0 {
+> @@ -267,6 +293,33 @@
+>         vcc-hdmi-supply = <&reg_dldo1>;
+>  };
+>
+> +&sound {
+> +       status = "okay";
+> +       simple-audio-card,aux-devs = <&codec_analog>, <&headphone_amp>,
+> +                                    <&speaker_amp>;
+> +       simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
+> +                                   "Microphone", "Internal Microphone Right",
+> +                                   "Headphone", "Headphone Jack",
+> +                                   "Speaker", "Internal Speaker";
+> +       simple-audio-card,routing =
+> +                       "Left DAC", "AIF1 Slot 0 Left",
+> +                       "Right DAC", "AIF1 Slot 0 Right",
+> +                       "SPEAKER INL", "LINEOUT",
+> +                       "SPEAKER INR", "LINEOUT",
+> +                       "Internal Speaker", "SPEAKER OUTL",
+> +                       "Internal Speaker", "SPEAKER OUTR",
+> +                       "HP INL", "HP",
+> +                       "HP INR", "HP",
+> +                       "Headphone Jack", "HP OUTL",
+> +                       "Headphone Jack", "HP OUTR",
+> +                       "AIF1 Slot 0 Left ADC", "Left ADC",
+> +                       "AIF1 Slot 0 Right ADC", "Right ADC",
+> +                       "Internal Microphone Left", "MBIAS",
+> +                       "MIC1", "Internal Microphone Left",
+> +                       "Internal Microphone Right", "HBIAS",
+> +                       "MIC2", "Internal Microphone Right";
+> +};
+> +
+>  &uart0 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&uart0_pb_pins>;
+> --
+> 2.19.1
+>
