@@ -1,61 +1,117 @@
-From: pasha.tatashin@soleen.com (Pavel Tatashin)
-Date: Wed, 21 Nov 2018 17:58:41 +0000
-Subject: [PATCH v2 1/1] arm64: Early boot time stamps
-In-Reply-To: <20181121174706.GC9801@arm.com>
-References: <20181120144340.30201-1-pasha.tatashin@soleen.com>
- <20181120144340.30201-2-pasha.tatashin@soleen.com>
- <20181121174706.GC9801@arm.com>
-Message-ID: <20181121175841.if3vyumzvw3yoovi@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Wed, 21 Nov 2018 19:01:37 +0100
+Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
+In-Reply-To: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
+Message-ID: <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-11-21 17:47:07, Will Deacon wrote:
-> > +	/*
-> > +	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
-> > +	 * the timer frequency. To avoid breakage on misconfigured
-> > +	 * systems, do not register the early sched_clock if the
-> > +	 * programmed value if zero. Other random values will just
-> > +	 * result in random output.
-> > +	 */
-> > +	if (!freq)
-> > +		return;
-> > +
-> > +	arch_timer_read_counter = arch_counter_get_cntvct;
-> 
-> Why do you need to assign this here?
-> 
-> > +	sched_clock_register(arch_timer_read_counter, ARCH_TIMER_NBITS, freq);
-> 
-> arch_timer_read_counter can be reassigned once the arm_arch_timer driver
-> has probed; what stops this from being unused as the sched_clock after that
-> has happened? I worry that toggling the function pointer could lead to
-> sched_clock() going backwards.
+The refactoring is needed for the new client in devfreq: suspend.
+To avoid code duplication, move it to the new local function
+devfreq_set_target.
 
-No reason, I will revert it back to use a local variable. I agree, time
-can go backward for a period of time while we switch to permanent clock later,
-if that clock is different. 
+The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+solve issue with devfreq device's frequency during suspend/resume.
+During the discussion on LKML some corner cases and comments appeared
+related to the design. This patch address them keeping in mind suggestions
+from Chanwoo Choi.
 
-> 
-> > +}
-> > +
-> >  void __init setup_arch(char **cmdline_p)
-> >  {
-> > +	sched_clock_early_init();
-> > +
-> >  	init_mm.start_code = (unsigned long) _text;
-> >  	init_mm.end_code   = (unsigned long) _etext;
-> >  	init_mm.end_data   = (unsigned long) _edata;
-> 
-> The patch from this point onwards just looks like a refactoring to me which
-> should be independent of adding early printk timestamps. Also, it doesn't
-> update the vdso logic, which hardwires a 56-bit mask for the counter values.
+Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+---
+ drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
+ 1 file changed, 37 insertions(+), 25 deletions(-)
 
-OK, I will split the patch, and will also address the hard coded value
-here:
-
-https://soleen.com/source/xref/linux/arch/arm64/kernel/vdso/gettimeofday.S?r=c80ed088#73
-
-Are there more that you know of?
-
-Thank you,
-Pasha
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index e20e7e4..cf9c643 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+ 	return 0;
+ }
+ 
++static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
++			      unsigned long *prev_freq, u32 flags)
++{
++	struct devfreq_freqs freqs;
++	unsigned long cur_freq;
++	int err = 0;
++
++	if (devfreq->profile->get_cur_freq)
++		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
++	else
++		cur_freq = devfreq->previous_freq;
++
++	freqs.old = cur_freq;
++	freqs.new = new_freq;
++	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
++
++	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
++	if (err) {
++		freqs.new = cur_freq;
++		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
++		return err;
++	}
++
++	freqs.new = new_freq;
++	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
++
++	if (devfreq_update_status(devfreq, new_freq))
++		dev_err(&devfreq->dev,
++			"Couldn't update frequency transition information.\n");
++
++	devfreq->previous_freq = new_freq;
++	*prev_freq = cur_freq;
++
++	return err;
++}
++
+ /* Load monitoring helper functions for governors use */
+ 
+ /**
+@@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+  */
+ int update_devfreq(struct devfreq *devfreq)
+ {
+-	struct devfreq_freqs freqs;
+ 	unsigned long freq, cur_freq, min_freq, max_freq;
+ 	int err = 0;
+ 	u32 flags = 0;
+@@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
+ 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
+ 	}
+ 
+-	if (devfreq->profile->get_cur_freq)
+-		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+-	else
+-		cur_freq = devfreq->previous_freq;
+-
+-	freqs.old = cur_freq;
+-	freqs.new = freq;
+-	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
++	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
+ 
+-	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
+-	if (err) {
+-		freqs.new = cur_freq;
+-		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+-		return err;
+-	}
+-
+-	freqs.new = freq;
+-	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+-
+-	if (devfreq_update_status(devfreq, freq))
+-		dev_err(&devfreq->dev,
+-			"Couldn't update frequency transition information.\n");
+-
+-	devfreq->previous_freq = freq;
+-	return err;
+ }
+ EXPORT_SYMBOL(update_devfreq);
+ 
+-- 
+2.7.4
