@@ -1,106 +1,121 @@
 From: madalin.bucur@nxp.com (Madalin Bucur)
-Date: Wed, 21 Nov 2018 13:41:09 +0200
-Subject: [PATCH v3 3/3] dpaa_eth: add ethtool coalesce control
+Date: Wed, 21 Nov 2018 13:41:08 +0200
+Subject: [PATCH v3 2/3] soc/qman: add return value to interrupt coalesce
+ changing APIs
 In-Reply-To: <1542800469-6802-1-git-send-email-madalin.bucur@nxp.com>
 References: <1542800469-6802-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <1542800469-6802-4-git-send-email-madalin.bucur@nxp.com>
+Message-ID: <1542800469-6802-3-git-send-email-madalin.bucur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow ethtool control of the DPAA QMan portal interrupt coalescing
-settings.
+Check that the values received by the portal interrupt coalesce
+change APIs are in range.
 
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c | 71 ++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ drivers/soc/fsl/qbman/qman.c | 33 ++++++++++++++++++++++++++-------
+ include/soc/fsl/qman.h       |  8 ++++++--
+ 2 files changed, 32 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-index 13d6e2272ece..62497119c85f 100644
---- a/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-+++ b/drivers/net/ethernet/freescale/dpaa/dpaa_ethtool.c
-@@ -529,6 +529,75 @@ static int dpaa_get_ts_info(struct net_device *net_dev,
- 	return 0;
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index ce7c03052e33..52c153cd795a 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -36,6 +36,8 @@
+ #define MAX_IRQNAME	16	/* big enough for "QMan portal %d" */
+ #define QMAN_POLL_LIMIT 32
+ #define QMAN_PIRQ_DQRR_ITHRESH 12
++#define QMAN_DQRR_IT_MAX 15
++#define QMAN_ITP_MAX 0xFFF
+ #define QMAN_PIRQ_MR_ITHRESH 4
+ #define QMAN_PIRQ_IPERIOD 100
+ 
+@@ -727,9 +729,15 @@ static inline void qm_dqrr_vdqcr_set(struct qm_portal *portal, u32 vdqcr)
+ 	qm_out(portal, QM_REG_DQRR_VDQCR, vdqcr);
  }
  
-+static int dpaa_get_coalesce(struct net_device *dev,
-+			     struct ethtool_coalesce *c)
-+{
-+	struct qman_portal *portal;
-+	u32 period;
-+	u8 thresh;
+-static inline void qm_dqrr_set_ithresh(struct qm_portal *portal, u8 ithresh)
++static inline int qm_dqrr_set_ithresh(struct qm_portal *portal, u8 ithresh)
+ {
 +
-+	portal = qman_get_affine_portal(smp_processor_id());
-+	qman_portal_get_iperiod(portal, &period);
-+	qman_dqrr_get_ithresh(portal, &thresh);
-+
-+	c->rx_coalesce_usecs = period;
-+	c->rx_max_coalesced_frames = thresh;
-+	c->use_adaptive_rx_coalesce = false;
-+
-+	return 0;
-+}
-+
-+static int dpaa_set_coalesce(struct net_device *dev,
-+			     struct ethtool_coalesce *c)
-+{
-+	const cpumask_t *cpus = qman_affine_cpus();
-+	bool needs_revert[NR_CPUS] = {false};
-+	struct qman_portal *portal;
-+	u32 period, prev_period;
-+	u8 thresh, prev_thresh;
-+	int cpu, res;
-+
-+	if (c->use_adaptive_rx_coalesce)
++	if (ithresh > QMAN_DQRR_IT_MAX)
 +		return -EINVAL;
 +
-+	period = c->rx_coalesce_usecs;
-+	thresh = c->rx_max_coalesced_frames;
-+
-+	/* save previous values */
-+	portal = qman_get_affine_portal(smp_processor_id());
-+	qman_portal_get_iperiod(portal, &prev_period);
-+	qman_dqrr_get_ithresh(portal, &prev_thresh);
-+
-+	/* set new values */
-+	for_each_cpu(cpu, cpus) {
-+		portal = qman_get_affine_portal(cpu);
-+		res = qman_portal_set_iperiod(portal, period);
-+		if (res)
-+			goto revert_values;
-+		res = qman_dqrr_set_ithresh(portal, thresh);
-+		if (res) {
-+			qman_portal_set_iperiod(portal, prev_period);
-+			goto revert_values;
-+		}
-+		needs_revert[cpu] = true;
-+	}
+ 	qm_out(portal, QM_REG_DQRR_ITR, ithresh);
 +
 +	return 0;
+ }
+ 
+ /* --- MR API --- */
+@@ -1012,13 +1020,20 @@ static inline void put_affine_portal(void)
+ 
+ static struct workqueue_struct *qm_portal_wq;
+ 
+-void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh)
++int qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh)
+ {
++	int res;
 +
-+revert_values:
-+	/* restore previous values */
-+	for_each_cpu(cpu, cpus) {
-+		if (!needs_revert[cpu])
-+			continue;
-+		portal = qman_get_affine_portal(cpu);
-+		/* previous values will not fail, ignore return value */
-+		qman_portal_set_iperiod(portal, prev_period);
-+		qman_dqrr_set_ithresh(portal, prev_thresh);
-+	}
+ 	if (!portal)
+-		return;
++		return -EINVAL;
 +
-+	return res;
-+}
++	res = qm_dqrr_set_ithresh(&portal->p, ithresh);
++	if (res)
++		return res;
+ 
+-	qm_dqrr_set_ithresh(&portal->p, ithresh);
+ 	portal->p.dqrr.ithresh = ithresh;
 +
- const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_drvinfo = dpaa_get_drvinfo,
- 	.get_msglevel = dpaa_get_msglevel,
-@@ -545,4 +614,6 @@ const struct ethtool_ops dpaa_ethtool_ops = {
- 	.get_rxnfc = dpaa_get_rxnfc,
- 	.set_rxnfc = dpaa_set_rxnfc,
- 	.get_ts_info = dpaa_get_ts_info,
-+	.get_coalesce = dpaa_get_coalesce,
-+	.set_coalesce = dpaa_set_coalesce,
- };
++	return 0;
+ }
+ EXPORT_SYMBOL(qman_dqrr_set_ithresh);
+ 
+@@ -1036,10 +1051,14 @@ void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod)
+ }
+ EXPORT_SYMBOL(qman_portal_get_iperiod);
+ 
+-void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod)
++int qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod)
+ {
+-	if (portal)
+-		qm_out(&portal->p, QM_REG_ITPR, iperiod);
++	if (!portal || iperiod > QMAN_ITP_MAX)
++		return -EINVAL;
++
++	qm_out(&portal->p, QM_REG_ITPR, iperiod);
++
++	return 0;
+ }
+ EXPORT_SYMBOL(qman_portal_set_iperiod);
+ 
+diff --git a/include/soc/fsl/qman.h b/include/soc/fsl/qman.h
+index 56877660d5ba..5cc7af06c1ba 100644
+--- a/include/soc/fsl/qman.h
++++ b/include/soc/fsl/qman.h
+@@ -1205,8 +1205,10 @@ void qman_dqrr_get_ithresh(struct qman_portal *portal, u8 *ithresh);
+  * qman_dqrr_set_ithresh - Set coalesce interrupt threshold
+  * @portal: portal to set the new value on
+  * @ithresh: new threshold value
++ *
++ * Returns 0 on success, or a negative error code.
+  */
+-void qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh);
++int qman_dqrr_set_ithresh(struct qman_portal *portal, u8 ithresh);
+ 
+ /**
+  * qman_dqrr_get_iperiod - Get coalesce interrupt period
+@@ -1219,7 +1221,9 @@ void qman_portal_get_iperiod(struct qman_portal *portal, u32 *iperiod);
+  * qman_dqrr_set_iperiod - Set coalesce interrupt period
+  * @portal: portal to set the new value on
+  * @ithresh: new period value
++ *
++ * Returns 0 on success, or a negative error code.
+  */
+-void qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod);
++int qman_portal_set_iperiod(struct qman_portal *portal, u32 iperiod);
+ 
+ #endif	/* __FSL_QMAN_H */
 -- 
 2.1.0
