@@ -1,76 +1,347 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Wed, 21 Nov 2018 18:09:52 +0100
-Subject: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
- mmsys clocks
-In-Reply-To: <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-9-matthias.bgg@kernel.org>
- <20181116231522.GA18006@bogus>
- <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
- <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
- <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
-Message-ID: <458178ac-c0fc-9671-7fc8-ed2d6f61424c@suse.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 21 Nov 2018 17:38:04 +0000
+Subject: [PATCH 3/3] spi: at91-usart: add DMA support
+In-Reply-To: <20181121112732.15690-4-radu_nicolae.pirea@upb.ro>
+References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
+ <20181121112732.15690-4-radu_nicolae.pirea@upb.ro>
+Message-ID: <fe367c1a-700d-c6e3-6b09-ded1a47f2475@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/11/2018 17:46, Stephen Boyd wrote:
-> Quoting Rob Herring (2018-11-19 11:15:16)
->> On Sun, Nov 18, 2018 at 11:12 AM Matthias Brugger
->> <matthias.bgg@gmail.com> wrote:
->>> On 11/17/18 12:15 AM, Rob Herring wrote:
->>>> On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg at kernel.org wrote:
->>>>> -    #clock-cells = <1>;
->>>>> +
->>>>> +    mmsys_clk: clock-controller at 14000000 {
->>>>> +            compatible = "mediatek,mt2712-mmsys-clk";
->>>>> +            #clock-cells = <1>;
->>>>
->>>> This goes against the general direction of not defining separate nodes
->>>> for providers with no resources.
->>>>
->>>> Why do you need this and what does it buy if you have to continue to
->>>> support the existing chips?
->>>>
->>>
->>> It would show explicitly that the mmsys block is used to probe two
->>> drivers, one for the gpu and one for the clocks. Otherwise that is
->>> hidden in the drm driver code. I think it is cleaner to describe that in
->>> the device tree.
->>
->> No, that's maybe cleaner for the driver implementation in the Linux
->> kernel. What about other OS's or when Linux drivers and subsystems
->> needs change? Cleaner for DT is design bindings that reflect the h/w.
->> Hardware is sometimes just messy.
->>
+On 21/11/2018 11:27, Radu Pirea wrote:
+> This patch adds support for DMA. Transfers are done with dma only if
+> they are longer than 16 bytes in order to achieve a better performance.
+> DMA setup introduces a little overhead and for transfers shorter than 16
+> bytes there is no performance improvement.
 > 
-> I agree. I fail to see what this patch series is doing besides changing
-> driver probe and device creation methods and making a backwards
-> incompatible change to DT. Is there any other benefit here?
+> Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
+> ---
+>   drivers/spi/spi-at91-usart.c | 223 ++++++++++++++++++++++++++++++++++-
+>   1 file changed, 221 insertions(+), 2 deletions(-)
 > 
+> diff --git a/drivers/spi/spi-at91-usart.c b/drivers/spi/spi-at91-usart.c
+> index 0b07c746453d..4d908afeaec9 100644
+> --- a/drivers/spi/spi-at91-usart.c
+> +++ b/drivers/spi/spi-at91-usart.c
+> @@ -8,9 +8,12 @@
+>   
+>   #include <linux/clk.h>
+>   #include <linux/delay.h>
+> +#include <linux/dmaengine.h>
+> +#include <linux/dma-direction.h>
 
-You are referring whole series?
-Citing the cover letter:
-"MMSYS in Mediatek SoCs has some registers to control clock gates (which is
-used in the clk driver) and some registers to set the routing and enable
-the differnet (sic!) blocks of the display subsystem.
+It looks rather odd to include this from a driver that isn't otherwise 
+touching anything from linux/dma-mapping.h.
 
-Up to now both drivers, clock and drm are probed with the same device tree
-compatible. But only the first driver get probed, which in effect breaks
-graphics on mt8173 and mt2701.
+>   #include <linux/interrupt.h>
+>   #include <linux/kernel.h>
+>   #include <linux/module.h>
+> +#include <linux/of_platform.h>
+>   #include <linux/of_gpio.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/pm_runtime.h>
+> @@ -58,6 +61,8 @@
+>   
+>   #define US_INIT \
+>   	(US_MR_SPI_MASTER | US_MR_CHRL | US_MR_CLKO | US_MR_WRDBT)
+> +#define US_DMA_MIN_BYTES       16
+> +#define US_DMA_TIMEOUT         (msecs_to_jiffies(1000))
+>   
+>   /* Register access macros */
+>   #define at91_usart_spi_readl(port, reg) \
+> @@ -71,14 +76,19 @@
+>   	writeb_relaxed((value), (port)->regs + US_##reg)
+>   
+>   struct at91_usart_spi {
+> +	struct platform_device  *mpdev;
+>   	struct spi_transfer	*current_transfer;
+>   	void __iomem		*regs;
+>   	struct device		*dev;
+>   	struct clk		*clk;
+>   
+> +	struct completion	xfer_completion;
+> +
+>   	/*used in interrupt to protect data reading*/
+>   	spinlock_t		lock;
+>   
+> +	phys_addr_t		phybase;
+> +
+>   	int			irq;
+>   	unsigned int		current_tx_remaining_bytes;
+>   	unsigned int		current_rx_remaining_bytes;
+> @@ -87,8 +97,184 @@ struct at91_usart_spi {
+>   	u32			status;
+>   
+>   	bool			xfer_failed;
+> +	bool			use_dma;
+>   };
+>   
+> +static void dma_callback(void *data)
+> +{
+> +	struct spi_controller   *ctlr = data;
+> +	struct at91_usart_spi   *aus = spi_master_get_devdata(ctlr);
+> +
+> +	at91_usart_spi_writel(aus, IER, US_IR_RXRDY);
+> +	aus->current_rx_remaining_bytes = 0;
+> +	complete(&aus->xfer_completion);
+> +}
+> +
+> +static bool at91_usart_spi_can_dma(struct spi_controller *ctrl,
+> +				   struct spi_device *spi,
+> +				   struct spi_transfer *xfer)
+> +{
+> +	struct at91_usart_spi *aus = spi_master_get_devdata(ctrl);
+> +
+> +	return aus->use_dma && xfer->len >= US_DMA_MIN_BYTES;
+> +}
+> +
+> +static int at91_usart_spi_configure_dma(struct spi_controller *ctlr,
+> +					struct at91_usart_spi *aus)
+> +{
+> +	struct dma_slave_config slave_config;
+> +	struct device *dev = &aus->mpdev->dev;
+> +	phys_addr_t phybase = aus->phybase;
+> +	dma_cap_mask_t mask;
+> +	int err = 0;
+> +
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+> +
+> +	ctlr->dma_tx = dma_request_slave_channel_reason(dev, "tx");
+> +	if (IS_ERR_OR_NULL(ctlr->dma_tx)) {
+> +		if (IS_ERR(ctlr->dma_tx)) {
+> +			err = PTR_ERR(ctlr->dma_tx);
+> +			goto at91_usart_spi_error_clear;
+> +		}
+> +
+> +		dev_dbg(dev,
+> +			"DMA TX channel not available, SPI unable to use DMA\n");
+> +		err = -EBUSY;
+> +		goto at91_usart_spi_error_clear;
+> +	}
+> +
+> +	ctlr->dma_rx = dma_request_slave_channel_reason(dev, "rx");
+> +	if (IS_ERR_OR_NULL(ctlr->dma_rx)) {
+> +		if (IS_ERR(ctlr->dma_rx)) {
+> +			err = PTR_ERR(ctlr->dma_rx);
+> +			goto at91_usart_spi_error;
+> +		}
+> +
+> +		dev_dbg(dev,
+> +			"DMA RX channel not available, SPI unable to use DMA\n");
+> +		err = -EBUSY;
+> +		goto at91_usart_spi_error;
+> +	}
+> +
+> +	slave_config.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	slave_config.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +	slave_config.dst_addr = (dma_addr_t)phybase + US_THR;
+> +	slave_config.src_addr = (dma_addr_t)phybase + US_RHR;
+> +	slave_config.src_maxburst = 1;
+> +	slave_config.dst_maxburst = 1;
+> +	slave_config.device_fc = false;
+> +
+> +	slave_config.direction = DMA_DEV_TO_MEM;
+> +	if (dmaengine_slave_config(ctlr->dma_rx, &slave_config)) {
+> +		dev_err(&ctlr->dev,
+> +			"failed to configure rx dma channel\n");
+> +		err = -EINVAL;
+> +		goto at91_usart_spi_error;
+> +	}
+> +
+> +	slave_config.direction = DMA_MEM_TO_DEV;
+> +	if (dmaengine_slave_config(ctlr->dma_tx, &slave_config)) {
+> +		dev_err(&ctlr->dev,
+> +			"failed to configure tx dma channel\n");
+> +		err = -EINVAL;
+> +		goto at91_usart_spi_error;
+> +	}
+> +
+> +	aus->use_dma = true;
+> +	return 0;
+> +
+> +at91_usart_spi_error:
+> +	if (!IS_ERR_OR_NULL(ctlr->dma_tx))
+> +		dma_release_channel(ctlr->dma_tx);
+> +	if (!IS_ERR_OR_NULL(ctlr->dma_rx))
+> +		dma_release_channel(ctlr->dma_rx);
+> +	ctlr->dma_tx = NULL;
+> +	ctlr->dma_rx = NULL;
+> +
+> +at91_usart_spi_error_clear:
+> +	return err;
+> +}
+> +
+> +static void at91_usart_spi_release_dma(struct spi_controller *ctlr)
+> +{
+> +	if (ctlr->dma_rx)
+> +		dma_release_channel(ctlr->dma_rx);
+> +	if (ctlr->dma_tx)
+> +		dma_release_channel(ctlr->dma_tx);
+> +}
+> +
+> +static void at91_usart_spi_stop_dma(struct spi_controller *ctlr)
+> +{
+> +	if (ctlr->dma_rx)
+> +		dmaengine_terminate_all(ctlr->dma_rx);
+> +	if (ctlr->dma_tx)
+> +		dmaengine_terminate_all(ctlr->dma_tx);
+> +}
+> +
+> +static int at91_usart_spi_dma_transfer(struct spi_controller *ctlr,
+> +				       struct spi_transfer *xfer)
+> +{
+> +	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+> +	struct dma_chan	 *rxchan = ctlr->dma_rx;
+> +	struct dma_chan *txchan = ctlr->dma_tx;
+> +	struct dma_async_tx_descriptor *rxdesc;
+> +	struct dma_async_tx_descriptor *txdesc;
+> +	dma_cookie_t cookie;
+> +
+> +	rxdesc = dmaengine_prep_slave_sg(rxchan,
+> +					 xfer->rx_sg.sgl,
+> +					 xfer->rx_sg.nents,
+> +					 DMA_FROM_DEVICE,
 
-This patch uses a platform device registration in the DRM driver, which
-will trigger the probe of the corresponding clock driver. It was tested on the
-bananapi-r2 and the Acer R13 Chromebook."
+Ah, this argument should be a dma_transfer_direction, not a 
+dma_data_direction (confusing I know, but they belong to different 
+APIs). I assume you mean DMA_DEV_TO_MEM here...
 
-DT is broken right now, because two drivers rely on the same node, which gets
-consumed just once. The new DT introduced does not break anything because it is
-only used for boards that: "[..] are not available to the general public
-(mt2712e) or only have the mmsys clock driver part implemented (mt6797)."
+> +					 DMA_PREP_INTERRUPT |
+> +					 DMA_CTRL_ACK);
+> +	if (!rxdesc)
+> +		goto at91_usart_spi_err_dma;
+> +
+> +	txdesc = dmaengine_prep_slave_sg(txchan,
+> +					 xfer->tx_sg.sgl,
+> +					 xfer->tx_sg.nents,
+> +					 DMA_TO_DEVICE,
 
-Anyway, I'll send a new version which uses the platform device in the DRM driver
-for all SoCs.
+...and DMA_MEM_TO_DEV here.
 
-Regards,
-Matthias
+Robin.
+
+> +					 DMA_PREP_INTERRUPT |
+> +					 DMA_CTRL_ACK);
+> +	if (!txdesc)
+> +		goto at91_usart_spi_err_dma;
+> +
+> +	/* Disable RX interrupt */
+> +	at91_usart_spi_writel(aus, IDR, US_IR_RXRDY);
+> +
+> +	rxdesc->callback = dma_callback;
+> +	rxdesc->callback_param = ctlr;
+> +
+> +	cookie = rxdesc->tx_submit(rxdesc);
+> +	if (dma_submit_error(cookie))
+> +		goto at91_usart_spi_err_dma;
+> +
+> +	cookie = txdesc->tx_submit(txdesc);
+> +	if (dma_submit_error(cookie))
+> +		goto at91_usart_spi_err_dma;
+> +
+> +	rxchan->device->device_issue_pending(rxchan);
+> +	txchan->device->device_issue_pending(txchan);
+> +
+> +	return 0;
+> +
+> +at91_usart_spi_err_dma:
+> +	/* Enable RX interrupt if submission of any of descriptors fails
+> +	 * and fallback to PIO
+> +	 */
+> +	at91_usart_spi_writel(aus, IER, US_IR_RXRDY);
+> +	at91_usart_spi_stop_dma(ctlr);
+> +
+> +	return -ENOMEM;
+> +}
+> +
+> +static unsigned long at91_usart_spi_dma_timeout(struct at91_usart_spi *aus)
+> +{
+> +	return wait_for_completion_timeout(&aus->xfer_completion,
+> +					   US_DMA_TIMEOUT);
+> +}
+> +
+>   static inline u32 at91_usart_spi_tx_ready(struct at91_usart_spi *aus)
+>   {
+>   	return aus->status & US_IR_TXRDY;
+> @@ -221,6 +407,8 @@ static int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
+>   				       struct spi_transfer *xfer)
+>   {
+>   	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+> +	unsigned long dma_timeout = 0;
+> +	int ret = 0;
+>   
+>   	at91_usart_spi_set_xfer_speed(aus, xfer);
+>   	aus->xfer_failed = false;
+> @@ -230,8 +418,25 @@ static int at91_usart_spi_transfer_one(struct spi_controller *ctlr,
+>   
+>   	while ((aus->current_tx_remaining_bytes ||
+>   		aus->current_rx_remaining_bytes) && !aus->xfer_failed) {
+> -		at91_usart_spi_read_status(aus);
+> -		at91_usart_spi_tx(aus);
+> +		reinit_completion(&aus->xfer_completion);
+> +		if (at91_usart_spi_can_dma(ctlr, spi, xfer) &&
+> +		    !ret) {
+> +			ret = at91_usart_spi_dma_transfer(ctlr, xfer);
+> +			if (ret)
+> +				continue;
+> +
+> +			dma_timeout = at91_usart_spi_dma_timeout(aus);
+> +
+> +			if (WARN_ON(dma_timeout == 0)) {
+> +				dev_err(&spi->dev, "DMA transfer timeout\n");
+> +				return -EIO;
+> +			}
+> +			aus->current_tx_remaining_bytes = 0;
+> +		} else {
+> +			at91_usart_spi_read_status(aus);
+> +			at91_usart_spi_tx(aus);
+> +		}
+> +
+>   		cpu_relax();
+>   	}
+>   
+> @@ -350,6 +555,7 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
+>   	controller->transfer_one = at91_usart_spi_transfer_one;
+>   	controller->prepare_message = at91_usart_spi_prepare_message;
+>   	controller->unprepare_message = at91_usart_spi_unprepare_message;
+> +	controller->can_dma = at91_usart_spi_can_dma;
+>   	controller->cleanup = at91_usart_spi_cleanup;
+>   	controller->max_speed_hz = DIV_ROUND_UP(clk_get_rate(clk),
+>   						US_MIN_CLK_DIV);
+> @@ -381,7 +587,17 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
+>   	aus->spi_clk = clk_get_rate(clk);
+>   	at91_usart_spi_init(aus);
+>   
+> +	aus->phybase = regs->start;
+> +
+> +	aus->mpdev = to_platform_device(pdev->dev.parent);
+> +
+> +	ret = at91_usart_spi_configure_dma(controller, aus);
+> +	if (ret)
+> +		goto at91_usart_fail_dma;
+> +
+>   	spin_lock_init(&aus->lock);
+> +	init_completion(&aus->xfer_completion);
+> +
+>   	ret = devm_spi_register_master(&pdev->dev, controller);
+>   	if (ret)
+>   		goto at91_usart_fail_register_master;
+> @@ -394,6 +610,8 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
+>   	return 0;
+>   
+>   at91_usart_fail_register_master:
+> +	at91_usart_spi_release_dma(controller);
+> +at91_usart_fail_dma:
+>   	clk_disable_unprepare(clk);
+>   at91_usart_spi_probe_fail:
+>   	spi_master_put(controller);
+> @@ -458,6 +676,7 @@ static int at91_usart_spi_remove(struct platform_device *pdev)
+>   	struct spi_controller *ctlr = platform_get_drvdata(pdev);
+>   	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
+>   
+> +	at91_usart_spi_release_dma(ctlr);
+>   	clk_disable_unprepare(aus->clk);
+>   
+>   	return 0;
+> 
