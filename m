@@ -1,52 +1,78 @@
 From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 21 Nov 2018 15:53:23 +0000
-Subject: [RFC PATCH 1/3] drivers: amba: Updates to component
- identification for driver matching.
-In-Reply-To: <AM6PR08MB36868BDA513BA392E01EDE9D86DA0@AM6PR08MB3686.eurprd08.prod.outlook.com>
+Date: Wed, 21 Nov 2018 15:57:04 +0000
+Subject: [RFC PATCH 2/3] coresight: etmv4: Update ID register table to add
+ UCI support
+In-Reply-To: <20181120205907.GB17267@xps15>
 References: <20181115012842.2353-1-mike.leach@linaro.org>
- <20181115012842.2353-2-mike.leach@linaro.org>
- <20181120205737.GA17267@xps15>
- <CAJ9a7VjD1C3t=OtCpQNGvmSvDh-vPcR_2mObccJJ1Qv8_9BxFw@mail.gmail.com>
- <AM6PR08MB36868BDA513BA392E01EDE9D86DA0@AM6PR08MB3686.eurprd08.prod.outlook.com>
-Message-ID: <CAJ9a7ViFRUuZQnqvtEO-OOjSGY45e7vxgPn0cTC6wnZw9ij9xg@mail.gmail.com>
+ <20181115012842.2353-3-mike.leach@linaro.org>
+ <20181120205907.GB17267@xps15>
+Message-ID: <CAJ9a7Vg_1yiVexh+wE=vw3TZNFkVrqmRjYpPnh65iQDJHZ0=cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Al,
-
-On Wed, 21 Nov 2018 at 14:25, Al Grant <Al.Grant@arm.com> wrote:
+Hi Mathieu
+On Tue, 20 Nov 2018 at 20:59, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
 >
-> > @devarch is defined as a 32 bit value. This is masked to widen / narrow
-> > matching. By default the mask will be the ARCHID field - bits 15:0, selected in the
-> > driver in the same way as the drivers currently have a mask for peripheral ID.
-> > This ignores the architect and version fields as most CS component drivers
-> > should handle differences.
+> On Thu, Nov 15, 2018 at 01:28:41AM +0000, Mike Leach wrote:
+> > Updates the ID register tables to contain a UCI entry for the A35 ETM
+> > device to allow correct matching of driver in the amba bus code.
+> >
+> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> > ---
+> >  drivers/hwtracing/coresight/coresight-etm4x.c | 26 +++++++++++++++----
+> >  1 file changed, 21 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> > index 53e2fb6e86f6..1dcb7e14ea6b 100644
+> > --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> > +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> > @@ -1073,12 +1073,28 @@ static int etm4_probe(struct amba_device *adev, const struct amba_id *id)
+> >               .mask   = 0x000fffff,           \
+> >       }
+> >
+> > +static struct amba_cs_uci_id uci_id_etm4[] = {
+> > +     {
+> > +             /*  ETMv4 UCI data */
+> > +             .devarch        = 0x00004a13,
+> > +             .mask           = 0x0000ffff,
+> > +             .devtype        = 0x00000013,
+> > +     }
+> > +};
+> > +
+> > +#define ETM4x_AMBA_UCI_ID(pid)                       \
+> > +     {                                       \
+> > +             .id     = pid,                  \
+> > +             .mask   = 0x000fffff,           \
+> > +             .data   = uci_id_etm4,          \
+> > +     }
+> > +
+> >  static const struct amba_id etm4_ids[] = {
+> > -     ETM4x_AMBA_ID(0x000bb95d),              /* Cortex-A53 */
+> > -     ETM4x_AMBA_ID(0x000bb95e),              /* Cortex-A57 */
+> > -     ETM4x_AMBA_ID(0x000bb95a),              /* Cortex-A72 */
+> > -     ETM4x_AMBA_ID(0x000bb959),              /* Cortex-A73 */
+> > -     ETM4x_AMBA_ID(0x000bb9da),              /* Cortex-A35 */
+> > +     ETM4x_AMBA_ID(0x000bb95d),                      /* Cortex-A53 */
+> > +     ETM4x_AMBA_ID(0x000bb95e),                      /* Cortex-A57 */
+> > +     ETM4x_AMBA_ID(0x000bb95a),                      /* Cortex-A72 */
+> > +     ETM4x_AMBA_ID(0x000bb959),                      /* Cortex-A73 */
 >
-> The architect field defines what the ARCHID field means (the ARCHID
-> values are specific to each architect), it's not the same as the implementer
-> field. You need to check both if you want to know what component driver
-> to use. The correct mask for that is 0xfff0ffff.
->
-> Selecting on ARCHID alone, would only be valid if you are requiring the
-> architect always to be ARM (0x23b) and have already checked that.
+> There is no need to add the extra tabulation for the above.
 >
 
-This is a fair point - thought at present the peripheral ID matching
-takes in the JDEC ID code of the component designer - in the ETM case
-ARM (though without a JDEC continuation code check).
-Given this field too is specified as "designer not implementer", it
-seems logically unlikely that designer != architect.
-
-If we did feel the need to alter the match value / mask values - this
-happens in the CS driver code, not in this patch - so will need to be
-addressed there.
-
-Thanks
+sorry - unnecessary churn - will fix.
 
 Mike
 
-> Al
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+
+> > +     ETM4x_AMBA_UCI_ID(0x000bb9da),                  /* Cortex-A35 */
+> >       {},
+> >  };
+> >
+> > --
+> > 2.19.1
+> >
 
 
 
