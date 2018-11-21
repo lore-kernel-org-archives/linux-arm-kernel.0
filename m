@@ -1,63 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 21 Nov 2018 08:37:06 +0100
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77965: Add CAN controller
- nodes
-In-Reply-To: <8808d836-2454-4166-fbe0-02849e52792b@gmail.com>
-References: <20181118173327.4704-1-marek.vasut+renesas@gmail.com>
- <20181118230250.GA2553@kunai> <6ffce819-4d8e-e54a-ba82-0845c36a6ec4@gmail.com>
- <CAMuHMdUjONJYypV0a5wnxyBx+sUMHzRwZObQ=d7xFG2ZSCM3Ag@mail.gmail.com>
- <8808d836-2454-4166-fbe0-02849e52792b@gmail.com>
-Message-ID: <CAMuHMdWrNjmCmAuKjp=J2bUhXtXCNbNE2QHyT0df3AYF8ua9JA@mail.gmail.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Wed, 21 Nov 2018 13:07:57 +0530
+Subject: [PATCH v2] x86_64,
+ vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
+In-Reply-To: <4AE2DC15AC0B8543882A74EA0D43DBEC03560F84@BPXM09GP.gisp.nec.co.jp>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <4AE2DC15AC0B8543882A74EA0D43DBEC03560F84@BPXM09GP.gisp.nec.co.jp>
+Message-ID: <CACi5LpPestnsByi29X9uOaP04J3LgG4BSj_ODKEDG8S9sLkEsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi Kazu,
 
-On Wed, Nov 21, 2018 at 12:33 AM Marek Vasut <marek.vasut@gmail.com> wrote:
-> On 11/19/2018 10:00 AM, Geert Uytterhoeven wrote:
-> > On Mon, Nov 19, 2018 at 12:46 AM Marek Vasut <marek.vasut@gmail.com> wrote:
-> >> On 11/19/2018 12:02 AM, Wolfram Sang wrote:
-> >>> On Sun, Nov 18, 2018 at 06:33:26PM +0100, Marek Vasut wrote:
-> >>>> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >>>>
-> >>>> This patch adds CAN{0,1} controller nodes for the R8A77965 SoC.
-> >>>>
-> >>>> Based on several similar patches of the R8A7795 device tree
-> >>>> by Ramesh Shanmugasundaram <ramesh.shanmugasundaram@bp.renesas.com>
-> >>>> and Geert Uytterhoeven <geert+renesas@glider.be>.
-> >>>>
-> >>>> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> >>>> Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-> >>>> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-> >>>> Cc: Marc Kleine-Budde <mkl@pengutronix.de>
-> >>>> Cc: Rob Herring <robh@kernel.org>
-> >>>> Cc: Simon Horman <horms+renesas@verge.net.au>
-> >>>> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> >>>> Cc: linux-renesas-soc at vger.kernel.org
-> >>>> Cc: linux-arm-kernel at lists.infradead.org
-> >>>
-> >>> Were you able to do some testing using EXIO connectors? Would be nice to
-> >>> know what was tested.
-> >>
-> >> Not on the M3N, since I don't see it broken out on the EXIO ; is it
-> >> really there ? It'd be easy to test on M3NSK with KF, but I don't have
-> >> either KF or M3NSK.
-> >
-> > Please have a look at EXIO Connector D, pins 13/14/15.
+On Tue, Nov 20, 2018 at 2:47 AM Kazuhito Hagio <k-hagio@ab.jp.nec.com> wrote:
 >
-> That's LBSC WE1n/WE0n/CS0n on S-XS . Is there something I obviously
-> don't see ?
+> On 11/15/2018 4:47 PM, Bhupesh Sharma wrote:
+> > Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
+> > live-debugging of a running kernel via user-space utilities
+> > like makedumpfile (see [1]).
+>
+> I agree.
+>
+> > Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
+> > details), whose live debugging feature is broken with newer kernels
+> > (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
+> > added to kcore, thus leading to an additional sections in the same, and
+> > makedumpfile is not longer able to determine the start of direct
+> > mapping of all physical memory, as it relies on traversing the PT_LOAD
+> > segments inside kcore and using the last PT_LOAD segment
+> > to determine the start of direct mapping.
+>
+> Actually, the KCORE_REMAP segments were already removed from kcore by
+> commit bf904d2762ee ("x86/pti/64: Remove the SYSCALL64 entry trampoline")
+> and kcore's program headers got back to the previous ones, but this
+> fact shows that they are changeable.
+>
+> So I think that if we have this NUMBER(page_offset_base) in vmcoreinfo
+> for x86_64, user-space tools (especially makedumpfile) would become
+> more stable against changes in kcore and vmcore, rather than depending
+> on their PT_LOAD values.
 
-Unless you connect an expansion card to the Ex Memory Connector,
-these signals are free to use, and can be pinmuxed to a CAN function.
+Thanks a lot for your review.
 
-Gr{oetje,eeting}s,
+Hi x86 maintainers,
 
-                        Geert
+Ping, any comments on this patch. Since it is a useful addition to the
+kernel-userspace ABI (as suggested by the user-space utility
+maintainer as well), can we consider including this in the kernel?
 
--- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Bhupesh
