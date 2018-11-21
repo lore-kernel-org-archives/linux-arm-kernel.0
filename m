@@ -1,10 +1,10 @@
 From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Wed, 21 Nov 2018 10:35:12 +0100
-Subject: [PATCH 01/12] ARM: davinci: da8xx: define gpio interrupts as separate
- resources
+Date: Wed, 21 Nov 2018 10:35:14 +0100
+Subject: [PATCH 03/12] ARM: davinci: dm646x: define gpio interrupts as
+ separate resources
 In-Reply-To: <20181121093523.12503-1-brgl@bgdev.pl>
 References: <20181121093523.12503-1-brgl@bgdev.pl>
-Message-ID: <20181121093523.12503-2-brgl@bgdev.pl>
+Message-ID: <20181121093523.12503-4-brgl@bgdev.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -21,58 +21,28 @@ Fixes: eb3744a2dd01 ("gpio: davinci: Do not assume continuous IRQ numbering")
 Cc: stable at vger.kernel.org
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 40 +++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/mach-davinci/dm646x.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 1fd3619f6a09..cf78da5ab054 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -701,6 +701,46 @@ static struct resource da8xx_gpio_resources[] = {
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index 6bd2ed069d0d..d9b93e2806d2 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -442,6 +442,16 @@ static struct resource dm646x_gpio_resources[] = {
  	},
- 	{ /* interrupt */
- 		.start	= IRQ_DA8XX_GPIO0,
-+		.end	= IRQ_DA8XX_GPIO0,
+ 	{	/* interrupt */
+ 		.start	= IRQ_DM646X_GPIOBNK0,
++		.end	= IRQ_DM646X_GPIOBNK0,
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +	{
-+		.start	= IRQ_DA8XX_GPIO1,
-+		.end	= IRQ_DA8XX_GPIO1,
++		.start	= IRQ_DM646X_GPIOBNK1,
++		.end	= IRQ_DM646X_GPIOBNK1,
 +		.flags	= IORESOURCE_IRQ,
 +	},
 +	{
-+		.start	= IRQ_DA8XX_GPIO2,
-+		.end	= IRQ_DA8XX_GPIO2,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO3,
-+		.end	= IRQ_DA8XX_GPIO3,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO4,
-+		.end	= IRQ_DA8XX_GPIO4,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO5,
-+		.end	= IRQ_DA8XX_GPIO5,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO6,
-+		.end	= IRQ_DA8XX_GPIO6,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO7,
-+		.end	= IRQ_DA8XX_GPIO7,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.start	= IRQ_DA8XX_GPIO8,
- 		.end	= IRQ_DA8XX_GPIO8,
++		.start	= IRQ_DM646X_GPIOBNK2,
+ 		.end	= IRQ_DM646X_GPIOBNK2,
  		.flags	= IORESOURCE_IRQ,
  	},
 -- 
