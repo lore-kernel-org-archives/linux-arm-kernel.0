@@ -1,36 +1,47 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 21 Nov 2018 11:15:44 +0000
-Subject: [PATCH 2/7] arm64: sdei: Always use sdei stack for sdei events
-In-Reply-To: <20181107215844.GC12248@brain-police>
-References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
- <1537970184-44348-3-git-send-email-julien.thierry@arm.com>
- <20181107215844.GC12248@brain-police>
-Message-ID: <80b48de5-6495-1da9-3555-78095daf3464@arm.com>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 21 Nov 2018 12:16:23 +0100
+Subject: [GIT PULL] ARM: at91: fixes for 4.20
+Message-ID: <20181121111623.GA10372@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+Arnd, Olof,
 
-On 07/11/2018 21:58, Will Deacon wrote:
-> On Wed, Sep 26, 2018 at 02:56:19PM +0100, Julien Thierry wrote:
->> SDEI events can occur at any point, including when the stack pointer is
->> not aligned. SP could be modified to respect alignment 16-byte alignement,
->> but there is a need to deal with code using SP as scratch register.
->>
->> Always reserve the SDEI stacks to handle its events.
->>
->> Since stack allocation relies on VMAPed stacks, lets make SDEI depend on
->> VMAP_STACK.
+A simple DT fix that is necessary to get reliable access to the NAND on
+sama5d2 based boards.
 
-> One side-effect of this change is that SDEI cannot be enabled in conjunction
-> with KASAN. James -- are you ok with that?
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-So it does. I don't think this matters, the only SDEI users in the short-term
-can be exercised by other notifications.
-I mean to make the stacks for this thing dynamically allocated (so its less of a
-memory hog), I can fix this KASAN hole at the same time.
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
+are available in the Git repository at:
 
-Thanks,
+  git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-fixes
 
-James
+for you to fetch changes up to 4ab7ca092c3c7ac8b16aa28eba723a8868f82f14:
+
+  ARM: dts: at91: sama5d2: use the divided clock for SMC (2018-11-21 11:50:32 +0100)
+
+----------------------------------------------------------------
+AT91 fixes for 4.20
+
+ - Fix the SMC parent clock
+
+----------------------------------------------------------------
+Romain Izard (1):
+      ARM: dts: at91: sama5d2: use the divided clock for SMC
+
+ arch/arm/boot/dts/sama5d2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181121/efce2b4f/attachment.sig>
