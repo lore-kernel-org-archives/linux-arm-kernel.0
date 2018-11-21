@@ -1,16 +1,17 @@
 From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Wed, 21 Nov 2018 19:01:37 +0100
-Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
+Date: Wed, 21 Nov 2018 19:01:38 +0100
+Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a devfreq
+ device
 In-Reply-To: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
 References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
-Message-ID: <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
+Message-ID: <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The refactoring is needed for the new client in devfreq: suspend.
-To avoid code duplication, move it to the new local function
-devfreq_set_target.
+The patch adds support for handling suspend/resume process.
+It uses atomic variables to make sure no race condition
+affects the process.
 
 The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
 solve issue with devfreq device's frequency during suspend/resume.
@@ -22,96 +23,76 @@ Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
 Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
 ---
- drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
- 1 file changed, 37 insertions(+), 25 deletions(-)
+ drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 39 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-index e20e7e4..cf9c643 100644
+index cf9c643..7e09de8 100644
 --- a/drivers/devfreq/devfreq.c
 +++ b/drivers/devfreq/devfreq.c
-@@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
- 	return 0;
- }
+@@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
+  */
+ int devfreq_suspend_device(struct devfreq *devfreq)
+ {
+-	if (!devfreq)
+-		return -EINVAL;
++        int ret;
++        unsigned long prev_freq;
++        u32 flags = 0;
++
++        if (!devfreq)
++                return -EINVAL;
++
++        if (devfreq->governor) {
++		ret = devfreq->governor->event_handler(devfreq,
++					DEVFREQ_GOV_SUSPEND, NULL);
++		if (ret)
++			return ret;
++	}
  
-+static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
-+			      unsigned long *prev_freq, u32 flags)
-+{
-+	struct devfreq_freqs freqs;
-+	unsigned long cur_freq;
-+	int err = 0;
+-	if (!devfreq->governor)
+-		return 0;
++	if (devfreq->suspend_freq) {
++		if (atomic_inc_return(&devfreq->suspend_count) > 1)
++			return 0;
+ 
+-	return devfreq->governor->event_handler(devfreq,
+-				DEVFREQ_GOV_SUSPEND, NULL);
++		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
++					 &prev_freq, flags);
++		if (ret)
++			return ret;
 +
-+	if (devfreq->profile->get_cur_freq)
-+		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
-+	else
-+		cur_freq = devfreq->previous_freq;
-+
-+	freqs.old = cur_freq;
-+	freqs.new = new_freq;
-+	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
-+
-+	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
-+	if (err) {
-+		freqs.new = cur_freq;
-+		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
-+		return err;
++		devfreq->resume_freq = prev_freq;
 +	}
 +
-+	freqs.new = new_freq;
-+	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
-+
-+	if (devfreq_update_status(devfreq, new_freq))
-+		dev_err(&devfreq->dev,
-+			"Couldn't update frequency transition information.\n");
-+
-+	devfreq->previous_freq = new_freq;
-+	*prev_freq = cur_freq;
-+
-+	return err;
-+}
-+
- /* Load monitoring helper functions for governors use */
- 
- /**
-@@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
-  */
- int update_devfreq(struct devfreq *devfreq)
- {
--	struct devfreq_freqs freqs;
- 	unsigned long freq, cur_freq, min_freq, max_freq;
- 	int err = 0;
- 	u32 flags = 0;
-@@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
- 		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
- 	}
- 
--	if (devfreq->profile->get_cur_freq)
--		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
--	else
--		cur_freq = devfreq->previous_freq;
--
--	freqs.old = cur_freq;
--	freqs.new = freq;
--	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
-+	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
- 
--	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
--	if (err) {
--		freqs.new = cur_freq;
--		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
--		return err;
--	}
--
--	freqs.new = freq;
--	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
--
--	if (devfreq_update_status(devfreq, freq))
--		dev_err(&devfreq->dev,
--			"Couldn't update frequency transition information.\n");
--
--	devfreq->previous_freq = freq;
--	return err;
++        return 0;
  }
- EXPORT_SYMBOL(update_devfreq);
+ EXPORT_SYMBOL(devfreq_suspend_device);
+ 
+@@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
+  */
+ int devfreq_resume_device(struct devfreq *devfreq)
+ {
++        int ret;
++        unsigned long prev_freq;
++        u32 flags = 0;
++
+ 	if (!devfreq)
+ 		return -EINVAL;
+ 
++	if (devfreq->suspend_freq) {
++		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
++			return 0;
++
++		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
++					 &prev_freq, flags);
++		if (ret)
++			return ret;
++	}
++
+ 	if (!devfreq->governor)
+ 		return 0;
  
 -- 
 2.7.4
