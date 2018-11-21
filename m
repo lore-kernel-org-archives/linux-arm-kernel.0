@@ -1,71 +1,180 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 21 Nov 2018 09:06:40 +0530
-Subject: [PATCH v2 03/15] ARM: Prepare RDA8810PL SoC
+Date: Wed, 21 Nov 2018 09:06:45 +0530
+Subject: [PATCH v2 08/15] irqchip: Add RDA8810PL interrupt driver
 In-Reply-To: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
 References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181121033652.12247-4-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181121033652.12247-9-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andreas F?rber <afaerber@suse.de>
-
-Introduce ARCH_RDA and mach-rda for RDA Micro SoCs.
+Add interrupt driver for RDA Micro RDA8810PL SoC.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 ---
- arch/arm/Kconfig           | 2 ++
- arch/arm/Makefile          | 1 +
- arch/arm/mach-rda/Kconfig  | 7 +++++++
- arch/arm/mach-rda/Makefile | 1 +
- 4 files changed, 11 insertions(+)
- create mode 100644 arch/arm/mach-rda/Kconfig
- create mode 100644 arch/arm/mach-rda/Makefile
+ arch/arm/mach-rda/Kconfig      |   1 +
+ drivers/irqchip/Kconfig        |   4 ++
+ drivers/irqchip/Makefile       |   1 +
+ drivers/irqchip/irq-rda-intc.c | 113 +++++++++++++++++++++++++++++++++
+ 4 files changed, 119 insertions(+)
+ create mode 100644 drivers/irqchip/irq-rda-intc.c
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 91be74d8df65..084f0983e6b2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -804,6 +804,8 @@ source "arch/arm/plat-pxa/Kconfig"
- 
- source "arch/arm/mach-qcom/Kconfig"
- 
-+source "arch/arm/mach-rda/Kconfig"
-+
- source "arch/arm/mach-realview/Kconfig"
- 
- source "arch/arm/mach-rockchip/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 05a91d8b89f3..10056ccdb8be 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -202,6 +202,7 @@ machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_QCOM)		+= qcom
-+machine-$(CONFIG_ARCH_RDA)		+= rda
- machine-$(CONFIG_ARCH_REALVIEW)		+= realview
- machine-$(CONFIG_ARCH_ROCKCHIP)		+= rockchip
- machine-$(CONFIG_ARCH_RPC)		+= rpc
 diff --git a/arch/arm/mach-rda/Kconfig b/arch/arm/mach-rda/Kconfig
-new file mode 100644
-index 000000000000..dafab78d7aab
---- /dev/null
+index dafab78d7aab..29012bc68ca4 100644
+--- a/arch/arm/mach-rda/Kconfig
 +++ b/arch/arm/mach-rda/Kconfig
-@@ -0,0 +1,7 @@
-+menuconfig ARCH_RDA
-+	bool "RDA Micro SoCs"
-+	depends on ARCH_MULTI_V7
-+	select COMMON_CLK
-+	select GENERIC_IRQ_CHIP
-+	help
-+	  This enables support for the RDA Micro 8810PL SoC family.
-diff --git a/arch/arm/mach-rda/Makefile b/arch/arm/mach-rda/Makefile
+@@ -3,5 +3,6 @@ menuconfig ARCH_RDA
+ 	depends on ARCH_MULTI_V7
+ 	select COMMON_CLK
+ 	select GENERIC_IRQ_CHIP
++	select RDA_INTC
+ 	help
+ 	  This enables support for the RDA Micro 8810PL SoC family.
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 51a5ef0e96ed..9d54645870ad 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -195,6 +195,10 @@ config JCORE_AIC
+ 	help
+ 	  Support for the J-Core integrated AIC.
+ 
++config RDA_INTC
++	bool
++	select IRQ_DOMAIN
++
+ config RENESAS_INTC_IRQPIN
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index 794c13d3ac3d..417108027e40 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -43,6 +43,7 @@ obj-$(CONFIG_IMGPDC_IRQ)		+= irq-imgpdc.o
+ obj-$(CONFIG_IRQ_MIPS_CPU)		+= irq-mips-cpu.o
+ obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
+ obj-$(CONFIG_JCORE_AIC)			+= irq-jcore-aic.o
++obj-$(CONFIG_RDA_INTC)			+= irq-rda-intc.o
+ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+ obj-$(CONFIG_RENESAS_IRQC)		+= irq-renesas-irqc.o
+ obj-$(CONFIG_VERSATILE_FPGA_IRQ)	+= irq-versatile-fpga.o
+diff --git a/drivers/irqchip/irq-rda-intc.c b/drivers/irqchip/irq-rda-intc.c
 new file mode 100644
-index 000000000000..6bea3d3a2dd7
+index 000000000000..1b372bdb23bc
 --- /dev/null
-+++ b/arch/arm/mach-rda/Makefile
-@@ -0,0 +1 @@
-+obj- += dummy.o
++++ b/drivers/irqchip/irq-rda-intc.c
+@@ -0,0 +1,113 @@
++// SPDX-License-Identifier: GPL-2.0+
++/*
++ * RDA8810PL SoC irqchip driver
++ *
++ * Copyright RDA Microelectronics Company Limited
++ * Copyright (c) 2017 Andreas F?rber
++ * Copyright (c) 2018 Manivannan Sadhasivam
++ */
++
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/irqchip.h>
++#include <linux/irqdomain.h>
++#include <linux/of_address.h>
++
++#include <asm/irq.h>
++#include <asm/exception.h>
++
++#define RDA_INTC_FINALSTATUS	0x00
++#define RDA_INTC_STATUS		0x04
++#define RDA_INTC_MASK_SET	0x08
++#define RDA_INTC_MASK_CLR	0x0c
++#define RDA_INTC_WAKEUP_MASK	0x18
++#define RDA_INTC_CPU_SLEEP	0x1c
++
++#define RDA_IRQ_MASK_ALL	0xFFFFFFFF
++
++#define RDA_NR_IRQS 32
++
++static void __iomem *base;
++
++static void rda_intc_mask_irq(struct irq_data *d)
++{
++	writel_relaxed(BIT(d->hwirq), base + RDA_INTC_MASK_CLR);
++}
++
++static void rda_intc_unmask_irq(struct irq_data *d)
++{
++	writel_relaxed(BIT(d->hwirq), base + RDA_INTC_MASK_SET);
++}
++
++static int rda_intc_set_type(struct irq_data *data, unsigned int flow_type)
++{
++	/* Hardware supports only level triggered interrupts */
++	if (flow_type & (IRQF_TRIGGER_HIGH | IRQF_TRIGGER_LOW))
++		irq_set_handler(data->irq, handle_level_irq);
++	else
++		return -EINVAL;
++
++	return 0;
++}
++
++static struct irq_domain *rda_irq_domain;
++
++static void __exception_irq_entry rda_handle_irq(struct pt_regs *regs)
++{
++	u32 stat = readl_relaxed(base + RDA_INTC_FINALSTATUS);
++	u32 hwirq;
++
++	while (stat) {
++		hwirq = __fls(stat);
++		handle_domain_irq(rda_irq_domain, hwirq, regs);
++		stat &= ~(1 << hwirq);
++	}
++}
++
++static struct irq_chip rda_irq_chip = {
++	.name		= "rda-intc",
++	.irq_mask	= rda_intc_mask_irq,
++	.irq_unmask	= rda_intc_unmask_irq,
++	.irq_set_type	= rda_intc_set_type,
++};
++
++static int rda_irq_map(struct irq_domain *d,
++		       unsigned int virq, irq_hw_number_t hw)
++{
++	irq_set_status_flags(virq, IRQ_LEVEL);
++	irq_set_chip_and_handler(virq, &rda_irq_chip, handle_level_irq);
++	irq_set_chip_data(virq, d->host_data);
++	irq_set_probe(virq);
++
++	return 0;
++}
++
++static const struct irq_domain_ops rda_irq_domain_ops = {
++	.map = rda_irq_map,
++	.xlate = irq_domain_xlate_onecell,
++};
++
++static int __init rda8810_intc_init(struct device_node *node,
++				    struct device_node *parent)
++{
++	base = of_io_request_and_map(node, 0, "rda-intc");
++	if (!base)
++		return -ENXIO;
++
++	/* Mask, and invalidate all interrupt sources */
++	writel_relaxed(RDA_IRQ_MASK_ALL, base + RDA_INTC_MASK_CLR);
++
++	rda_irq_domain = irq_domain_create_linear(&node->fwnode, RDA_NR_IRQS,
++						  &rda_irq_domain_ops, base);
++	if (WARN_ON(!rda_irq_domain)) {
++		iounmap(base);
++		return -ENODEV;
++	}
++
++	set_handle_irq(rda_handle_irq);
++
++	return 0;
++}
++
++IRQCHIP_DECLARE(rda_intc, "rda,8810pl-intc", rda8810_intc_init);
 -- 
 2.17.1
