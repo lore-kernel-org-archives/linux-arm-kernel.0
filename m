@@ -1,321 +1,389 @@
-From: huanglingyan2@huawei.com (huanglingyan)
-Date: Wed, 21 Nov 2018 17:21:05 +0800
-Subject: [PATCH] arm64: lib: accelerate do_csum() with NEON instruction
-Message-ID: <1542792065-98282-1-git-send-email-huanglingyan2@huawei.com>
+From: sugaya.taichi@socionext.com (sugaya.taichi at socionext.com)
+Date: Wed, 21 Nov 2018 09:33:29 +0000
+Subject: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut m10v
+ SoC
+In-Reply-To: <CAL_JsqJotYwwC490XmCtn_=-mrosxG3UUCy0P_SVO3d94yW6VA@mail.gmail.com>
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-2-git-send-email-sugaya.taichi@socionext.com>
+ <CAL_JsqJotYwwC490XmCtn_=-mrosxG3UUCy0P_SVO3d94yW6VA@mail.gmail.com>
+Message-ID: <37936bec442a4325bdda03a0fe2e90f8@SOC-EX02V.e01.socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lingyan Huang <huanglingyan2@huawei.com>
+Hi Rob
 
-Function do_csum() in lib/checksum.c is used to compute checksum,
-which is turned out to be slowly and costs a lot of resources.
-Let's use neon instructions to accelerate the checksum computation
-for arm64.
+Thank you for your comments.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Lingyan Huang <huanglingyan2@huawei.com>
----
- arch/arm64/include/asm/checksum.h |   8 ++
- arch/arm64/lib/Makefile           |   3 +
- arch/arm64/lib/checksum.c         |  30 +++++++
- arch/arm64/lib/do_csum.S          | 182 ++++++++++++++++++++++++++++++++++++++
- lib/checksum.c                    |   6 +-
- 5 files changed, 226 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/lib/checksum.c
- create mode 100644 arch/arm64/lib/do_csum.S
+> -----Original Message-----
+> From: Rob Herring [mailto:robh+dt at kernel.org]
+> Sent: Tuesday, November 20, 2018 1:24 AM
+> To: Sugaya, Taichi
+> Cc: linux-clk; devicetree at vger.kernel.org; moderated list:ARM/FREESCALE
+> IMX / MXC ARM ARCHITECTURE; linux-kernel at vger.kernel.org; open list:SERIAL
+> DRIVERS; Michael Turquette; Stephen Boyd; Mark Rutland; Greg Kroah-Hartman;
+> Daniel Lezcano; Thomas Gleixner; Russell King; Jiri Slaby; Masami Hiramatsu;
+> Jassi Brar
+> Subject: Re: [PATCH 01/14] ARM: milbeaut: Add basic support for Milbeaut
+> m10v SoC
+> 
+> On Sun, Nov 18, 2018 at 7:00 PM Sugaya Taichi
+> <sugaya.taichi@socionext.com> wrote:
+> >
+> > This adds the basic M10V SoC support under arch/arm.
+> > Since all cores are activated in the custom bootloader before booting
+> > linux, it is necessary to wait for sub-cores using the trampoline area.
+> >
+> > Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+> > ---
+> >  arch/arm/Kconfig                  |   2 +
+> >  arch/arm/Makefile                 |   1 +
+> >  arch/arm/mach-milbeaut/Kconfig    |  28 +++++++
+> >  arch/arm/mach-milbeaut/Makefile   |   3 +
+> >  arch/arm/mach-milbeaut/m10v_evb.c |  31 ++++++++
+> >  arch/arm/mach-milbeaut/platsmp.c  | 157
+> ++++++++++++++++++++++++++++++++++++++
+> >  6 files changed, 222 insertions(+)
+> >  create mode 100644 arch/arm/mach-milbeaut/Kconfig
+> >  create mode 100644 arch/arm/mach-milbeaut/Makefile
+> >  create mode 100644 arch/arm/mach-milbeaut/m10v_evb.c
+> >  create mode 100644 arch/arm/mach-milbeaut/platsmp.c
+> >
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 91be74d..0b8a1af 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -767,6 +767,8 @@ source "arch/arm/mach-mediatek/Kconfig"
+> >
+> >  source "arch/arm/mach-meson/Kconfig"
+> >
+> > +source "arch/arm/mach-milbeaut/Kconfig"
+> > +
+> >  source "arch/arm/mach-mmp/Kconfig"
+> >
+> >  source "arch/arm/mach-moxart/Kconfig"
+> > diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> > index 05a91d8..627853c 100644
+> > --- a/arch/arm/Makefile
+> > +++ b/arch/arm/Makefile
+> > @@ -190,6 +190,7 @@ machine-$(CONFIG_ARCH_MV78XX0)              +=
+> mv78xx0
+> >  machine-$(CONFIG_ARCH_MVEBU)           += mvebu
+> >  machine-$(CONFIG_ARCH_MXC)             += imx
+> >  machine-$(CONFIG_ARCH_MEDIATEK)                += mediatek
+> > +machine-$(CONFIG_ARCH_MILBEAUT)                += milbeaut
+> >  machine-$(CONFIG_ARCH_MXS)             += mxs
+> >  machine-$(CONFIG_ARCH_NETX)            += netx
+> >  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
+> > diff --git a/arch/arm/mach-milbeaut/Kconfig
+> b/arch/arm/mach-milbeaut/Kconfig
+> > new file mode 100644
+> > index 0000000..63b6f69
+> > --- /dev/null
+> > +++ b/arch/arm/mach-milbeaut/Kconfig
+> > @@ -0,0 +1,28 @@
+> > +# SPDX-License-Identifier: GPL-2.0
+> > +menuconfig ARCH_MILBEAUT
+> > +       bool "Socionext Milbeaut SoCs"
+> > +       depends on ARCH_MULTI_V7
+> > +       select ARM_GIC
+> 
+> > +       select CLKDEV_LOOKUP
+> > +       select GENERIC_CLOCKEVENTS
+> > +       select CLKSRC_MMIO
+> 
+> The clock and timer drivers' kconfig entries should select these.
+OK. move these to the correct kconfig.
 
-diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-index 0b6f5a7..9faf642 100644
---- a/arch/arm64/include/asm/checksum.h
-+++ b/arch/arm64/include/asm/checksum.h
-@@ -24,8 +24,16 @@ static inline __sum16 csum_fold(__wsum csum)
- 	sum += (sum >> 16) | (sum << 16);
- 	return ~(__force __sum16)(sum >> 16);
- }
-+
- #define csum_fold csum_fold
- 
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+extern unsigned int do_csum_generic(const unsigned char *buff, int len);
-+unsigned int do_csum_neon(const unsigned char *buff, unsigned int len);
-+unsigned int do_csum(const unsigned char *buff, unsigned int len);
-+#define do_csum do_csum
-+#endif
-+
- static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
- {
- 	__uint128_t tmp;
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 69ff988..9596fd8 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -5,6 +5,9 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
- 		   strchr.o strrchr.o tishift.o
- 
-+# If NEON mode is supported, compile this file to speed up do_csum.
-+lib-$(CONFIG_KERNEL_MODE_NEON) += do_csum.o checksum.o
-+
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
- # in case of a PLT) as callee-saved, which allows for efficient runtime
-diff --git a/arch/arm64/lib/checksum.c b/arch/arm64/lib/checksum.c
-new file mode 100644
-index 0000000..61dee8b
---- /dev/null
-+++ b/arch/arm64/lib/checksum.c
-@@ -0,0 +1,30 @@
-+/*
-+ * Generic C or neon implementation of do_csum operations.
-+ * Choose faster neon instructions when NEON is supported.
-+ *
-+ * Copyright (C) 2018 Hisilicon, Inc. All Rights Reserved.
-+ * Written by Lingyan Huang (huanglingyan2 at huawei.com)
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public Licence
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the Licence, or (at your option) any later version.
-+ */
-+
-+#include <asm/neon.h>
-+#include <asm/simd.h>
-+#include <asm/checksum.h>
-+#include <asm/byteorder.h>
-+
-+unsigned int do_csum(const unsigned char *buff, unsigned int len)
-+{
-+	if (may_use_simd()) {
-+		unsigned int res;
-+
-+		kernel_neon_begin();
-+		res = do_csum_neon(buff, len);
-+		kernel_neon_end();
-+		return res;
-+	} else
-+		return do_csum_generic(buff, len);
-+}
-diff --git a/arch/arm64/lib/do_csum.S b/arch/arm64/lib/do_csum.S
-new file mode 100644
-index 0000000..820302c
---- /dev/null
-+++ b/arch/arm64/lib/do_csum.S
-@@ -0,0 +1,182 @@
-+/*
-+ * Copyright (C) 2018 Huawei Inc.
-+ *
-+ * Optmized version of the standard do_csum() function
-+ *
-+ * Parameters:
-+ *	x0 - address of buffer to checksum (const unsigned char *)
-+ *	x1 - length of the buffer (int)
-+ * Returns:
-+ *	x0 - the return checksum of the buffer
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+ENTRY(do_csum_neon)
-+	ldr	x13, =0xffff
-+	eor	x4, x4, x4
-+	eor	x5, x5, x5
-+	eor	v0.16b, v0.16b, v0.16b // clear v0,x4,x5
-+
-+	/*
-+	 * len is zero or negative
-+	 */
-+	and	x6, x1, #0x80000000
-+	cmp	x6, #0
-+	b.gt	out
-+	cbz	w1, out
-+
-+	tst	x0, #1
-+	b.eq	addr_not_odd
-+
-+	/*
-+	 * addr is odd
-+	 */
-+	mov	x4, #1
-+	ldr	x6, [x0], #1
-+#ifdef __AARCH64EB__
-+	and     x6, x6, #0xff
-+#else
-+	lsl   x6, x6, #8
-+	and   x6, x6, x13
-+#endif
-+	add     x5, x5, x6
-+	sub     x1, x1, #1
-+
-+addr_not_odd:
-+	cmp	x1, #32
-+	b.lt	len_4
-+	cmp	x1, #128
-+	b.ge	len_gt_128
-+	b	do_loop_16
-+
-+len_gt_128:
-+    movi v0.4s, #0
-+    movi v1.4s, #0
-+    movi v2.4s, #0
-+    movi v3.4s, #0
-+
-+do_loop_64:
-+
-+	ldp	q5, q4, [x0], #32
-+	ldp	q7, q6, [x0], #32
-+
-+    uadalp v0.4s, v4.8h
-+    uadalp v1.4s, v5.8h
-+    uadalp v2.4s, v6.8h
-+    uadalp v3.4s, v7.8h
-+
-+	sub	x1, x1, #64
-+	cmp	x1, #64
-+	b.ge	do_loop_64
-+
-+	add	v0.4s, v0.4s, v1.4s
-+	add	v2.4s, v2.4s, v3.4s
-+	add	v0.4s, v0.4s, v2.4s
-+
-+	cmp	x1, #16
-+	b.lt	get_64
-+
-+
-+do_loop_16:
-+	ldr	q6, [x0], #16
-+
-+	uaddl	v24.4s, v0.4h, v6.4h
-+	uaddl2	v25.4s, v0.8h, v6.8h
-+	add	v0.4s, v24.4s, v25.4s
-+
-+
-+	sub	x1, x1, #16
-+	cmp	x1, #16
-+	b.ge	do_loop_16
-+
-+get_64:
-+	mov	x6, v0.d[0]
-+	add	x5, x5, x6
-+	mov	x6, v0.d[1]
-+
-+	add	x5, x5, x6
-+	cmp	x5, x6
-+	b.ge	len_4
-+	add	x5, x5, #1
-+
-+len_4:
-+	cmp	x1, #4
-+	b.lt	len_2
-+
-+	sub	x1, x1, #4
-+	ldr	w6, [x0], #4
-+	and	x6, x6, #0xffffffff
-+	add	x5, x5, x6
-+	b	len_4
-+
-+len_2:
-+	cmp	x1, #2
-+	b.lt	len_1
-+	sub	x1, x1, #2
-+	ldrh	w6, [x0], #2
-+	and	x6, x6, x13
-+	add	x5, x5, x6
-+
-+len_1:
-+	cmp	x1, #1
-+	b.lt	fold_32
-+	ldr	x6, [x0], #1
-+#ifdef __AARCH64EB__
-+	lsl	x6, x6, #8
-+	and	x6, x6, x13
-+#else
-+	and	x6, x6, #0xff
-+#endif
-+	add	x5, x5, x6
-+
-+fold_32:
-+	and	x9, x5, x13		/* [15:0] */
-+	and	x10, x13, x5, lsr #16	/* [31:16] */
-+	and	x11, x13, x5, lsr #32	/* [47:32] */
-+	and	x12, x13, x5, lsr #48	/* [47:32] */
-+
-+	add	x9, x9, x10
-+	add	x11, x11, x12
-+
-+	add	x9, x9, x11
-+
-+	and	x10, x9, x13
-+	and	x11, x13, x9, lsr #16
-+
-+	add	x5, x10, x11
-+
-+	and     x9, x5, x13             /* add carry */
-+	and     x10, x13, x5, lsr #16
-+	add	x5, x9, x10
-+
-+	cbz	x4, out			/* addr isn't odd */
-+
-+	lsr	x6, x5, #8
-+	and	x6, x6, #0xff
-+	and	x7, x5, #0xff
-+	lsl	x7, x7, #8
-+
-+	orr	x5, x6, x7
-+
-+out:
-+	mov	x0, x5
-+
-+	/*
-+	 * pop neon register from stack
-+	 */
-+/*	ldp	q24, q25, [sp], #0x20
-+	ldp	q22, q23, [sp], #0x20
-+	ldp	q20, q21, [sp], #0x20
-+	ldp	q18, q19, [sp], #0x20
-+	ldp	q16, q17, [sp], #0x20
-+	ldp	q14, q15, [sp], #0x20
-+	ldp	q12, q13, [sp], #0x20
-+	ldp	q10, q11, [sp], #0x20
-+	ldp	q8, q9, [sp], #0x20
-+	ldp	q6, q7, [sp], #0x20
-+	ldp	q4, q5, [sp], #0x20
-+	ldp	q2, q3, [sp], #0x20
-+	ldp	q0, q1, [sp], #0x20
-+*/
-+	ret
-diff --git a/lib/checksum.c b/lib/checksum.c
-index d3ec93f..422949c 100644
---- a/lib/checksum.c
-+++ b/lib/checksum.c
-@@ -34,10 +34,8 @@
- 
- #include <linux/export.h>
- #include <net/checksum.h>
--
- #include <asm/byteorder.h>
- 
--#ifndef do_csum
- static inline unsigned short from32to16(unsigned int x)
- {
- 	/* add up 16-bit and 16-bit for 16+c bit */
-@@ -47,7 +45,7 @@ static inline unsigned short from32to16(unsigned int x)
- 	return x;
- }
- 
--static unsigned int do_csum(const unsigned char *buff, int len)
-+unsigned int do_csum_generic(const unsigned char *buff, int len)
- {
- 	int odd;
- 	unsigned int result = 0;
-@@ -100,6 +98,8 @@ static unsigned int do_csum(const unsigned char *buff, int len)
- out:
- 	return result;
- }
-+#ifndef do_csum
-+#define do_csum do_csum_generic
- #endif
- 
- #ifndef ip_fast_csum
--- 
-2.7.4
+> 
+> > +       select ZONE_DMA
+> 
+> Why is this needed?
+Ah, it may not be needed yet. confirm it.
+
+> 
+> > +       help
+> > +               This enables support for Socionext Milbeaut SoCs
+> > +
+> > +if ARCH_MILBEAUT
+> > +
+> > +config ARCH_MILBEAUT_M10V
+> > +       bool "Milbeaut SC2000/M10V platform"
+> > +       select ARM_ARCH_TIMER
+> > +       select M10V_TIMER
+> > +       select PINCTRL
+> > +       select PINCTRL_M10V
+> > +       help
+> > +         Support for Socionext's MILBEAUT M10V based systems
+> > +
+> > +config MACH_M10V_EVB
+> > +       bool "Support for Milbeaut Evaluation boards"
+> 
+> You shouldn't need a kconfig entry for each board.
+I see. 
+
+> 
+> > +       default y
+> > +
+> > +endif
+> > diff --git a/arch/arm/mach-milbeaut/Makefile
+> b/arch/arm/mach-milbeaut/Makefile
+> > new file mode 100644
+> > index 0000000..64f6f52
+> > --- /dev/null
+> > +++ b/arch/arm/mach-milbeaut/Makefile
+> > @@ -0,0 +1,3 @@
+> > +obj-$(CONFIG_SMP) += platsmp.o
+> > +obj-$(CONFIG_MACH_M10V_EVB) += m10v_evb.o
+> > +
+> > diff --git a/arch/arm/mach-milbeaut/m10v_evb.c
+> b/arch/arm/mach-milbeaut/m10v_evb.c
+> > new file mode 100644
+> > index 0000000..a1fa7c3
+> > --- /dev/null
+> > +++ b/arch/arm/mach-milbeaut/m10v_evb.c
+> 
+> This all looks SoC specific, not board specific.
+Um that is right..
+
+> 
+> > @@ -0,0 +1,31 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2018 Socionext Inc.
+> > + * Copyright:   (C) 2015 Linaro Ltd.
+> > + */
+> > +
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> 
+> Not needed.
+OK.
+
+> 
+> > +
+> > +#include <asm/mach/arch.h>
+> > +#include <asm/mach/map.h>
+> > +
+> > +static struct map_desc m10v_io_desc[] __initdata = {
+> > +};
+> > +
+> > +void __init m10v_map_io(void)
+> > +{
+> > +       debug_ll_io_init();
+> 
+> If you use earlycon instead, then this isn't needed.
+> 
+> > +       iotable_init(m10v_io_desc, ARRAY_SIZE(m10v_io_desc));
+> 
+> This isn't needed.
+OK.
+
+> 
+> > +}
+> > +
+> > +static const char * const m10v_compat[] = {
+> > +       "socionext,milbeaut-m10v-evb",
+> > +       NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(M10V_REB, "Socionext Milbeaut")
+> > +       .dt_compat      = m10v_compat,
+> > +       .l2c_aux_mask   = 0xffffffff,
+> > +       .map_io         = m10v_map_io,
+> 
+> It looks like you can remove this entire file and use the default machine
+> desc.
+OK, try to use the default machine descriptor instead.
+
+> 
+> > +MACHINE_END
+> > diff --git a/arch/arm/mach-milbeaut/platsmp.c
+> b/arch/arm/mach-milbeaut/platsmp.c
+> > new file mode 100644
+> > index 0000000..b706851
+> > --- /dev/null
+> > +++ b/arch/arm/mach-milbeaut/platsmp.c
+> > @@ -0,0 +1,157 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> > +/*
+> > + * Copyright (C) 2018 Socionext Inc.
+> > + * Copyright:  (C) 2015 Linaro Ltd.
+> > + */
+> > +
+> > +#include <linux/cpu_pm.h>
+> > +#include <linux/irqchip/arm-gic.h>
+> > +#include <linux/of_device.h>
+> 
+> Not needed.
+Okay.
+
+> 
+> > +#include <linux/of_address.h>
+> > +#include <linux/platform_device.h>
+> 
+> Not needed.
+Okay.
+
+> 
+> > +#include <linux/suspend.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +#include <asm/cp15.h>
+> > +#include <asm/idmap.h>
+> > +#include <asm/smp_plat.h>
+> > +#include <asm/suspend.h>
+> > +
+> > +#define M10V_MAX_CPU   4
+> > +
+> > +#define KERNEL_UNBOOT_FLAG     0x12345678
+> > +#define CPU_FINISH_SUSPEND_FLAG 0x56784321
+> > +
+> > +static void __iomem *trampoline;
+> > +
+> > +static int m10v_boot_secondary(unsigned int l_cpu, struct task_struct
+> *idle)
+> > +{
+> > +       unsigned int mpidr, cpu, cluster;
+> > +
+> > +       mpidr = cpu_logical_map(l_cpu);
+> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > +
+> > +       if (cpu >= M10V_MAX_CPU)
+> > +               return -EINVAL;
+> > +
+> > +       pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +
+> > +       writel(virt_to_phys(secondary_startup), trampoline + cpu * 4);
+> > +       arch_send_wakeup_ipi_mask(cpumask_of(l_cpu));
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static void m10v_cpu_die(unsigned int l_cpu)
+> > +{
+> > +       gic_cpu_if_down(0);
+> > +
+> > +       v7_exit_coherency_flush(louis);
+> > +
+> > +       /* Now we are prepared for power-down, do it: */
+> > +       wfi();
+> > +}
+> > +
+> > +static int m10v_cpu_kill(unsigned int l_cpu)
+> > +{
+> > +       unsigned int mpidr, cpu;
+> > +
+> > +       mpidr = cpu_logical_map(l_cpu);
+> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +
+> > +       writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
+> > +
+> > +       return 1;
+> > +}
+> > +
+> > +static struct smp_operations m10v_smp_ops __initdata = {
+> > +       .smp_boot_secondary     = m10v_boot_secondary,
+> > +       .cpu_die                = m10v_cpu_die,
+> > +       .cpu_kill               = m10v_cpu_kill,
+> > +};
+> > +
+> > +static int __init m10v_smp_init(void)
+> > +{
+> > +       unsigned int mpidr, cpu, cluster;
+> > +       struct device_node *np;
+> > +
+> > +       np = of_find_compatible_node(NULL, NULL,
+> "socionext,milbeaut-m10v-evb");
+> > +       if (!np || !of_device_is_available(np))
+> 
+> Just use of_machine_is_compatible() here.
+I got it, use the function instead.
+
+Thanks
+Sugaya Taichi
+
+> 
+> > +               return -ENODEV;
+> > +       of_node_put(np);
+> > +
+> > +       np = of_find_compatible_node(NULL, NULL,
+> "socionext,smp-trampoline");
+> > +       if (!np)
+> > +               return -ENODEV;
+> > +
+> > +       trampoline = of_iomap(np, 0);
+> > +       if (!trampoline)
+> > +               return -ENODEV;
+> > +       of_node_put(np);
+> > +
+> > +       mpidr = read_cpuid_mpidr();
+> > +       cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +       cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > +
+> > +       pr_info("MCPM boot on cpu_%u cluster_%u\n", cpu, cluster);
+> > +
+> > +       for (cpu = 0; cpu < M10V_MAX_CPU; cpu++)
+> > +               writel(KERNEL_UNBOOT_FLAG, trampoline + cpu * 4);
+> > +
+> > +       smp_set_ops(&m10v_smp_ops);
+> > +
+> > +       return 0;
+> > +}
+> > +early_initcall(m10v_smp_init);
+> > +
+> > +static int m10v_pm_valid(suspend_state_t state)
+> > +{
+> > +       return (state == PM_SUSPEND_STANDBY) || (state ==
+> PM_SUSPEND_MEM);
+> > +}
+> > +
+> > +typedef void (*phys_reset_t)(unsigned long);
+> > +static phys_reset_t phys_reset;
+> > +
+> > +static int m10v_die(unsigned long arg)
+> > +{
+> > +       setup_mm_for_reboot();
+> > +       asm("wfi");
+> > +       /* Boot just like a secondary */
+> > +       phys_reset = (phys_reset_t)(unsigned
+> long)virt_to_phys(cpu_reset);
+> > +       phys_reset(virt_to_phys(cpu_resume));
+> > +
+> > +       return 0;
+> > +}
+> > +
+> > +static int m10v_pm_enter(suspend_state_t state)
+> > +{
+> > +       switch (state) {
+> > +       case PM_SUSPEND_STANDBY:
+> > +               pr_err("STANDBY\n");
+> > +               asm("wfi");
+> > +               break;
+> > +       case PM_SUSPEND_MEM:
+> > +               pr_err("SUSPEND\n");
+> > +               cpu_pm_enter();
+> > +               cpu_suspend(0, m10v_die);
+> > +               cpu_pm_exit();
+> > +               break;
+> > +       }
+> > +       return 0;
+> > +}
+> > +
+> > +static const struct platform_suspend_ops m10v_pm_ops = {
+> > +       .valid          = m10v_pm_valid,
+> > +       .enter          = m10v_pm_enter,
+> > +};
+> > +
+> > +struct clk *m10v_clclk_register(struct device *cpu_dev);
+> > +
+> > +static int __init m10v_pm_init(void)
+> > +{
+> > +       suspend_set_ops(&m10v_pm_ops);
+> > +
+> > +       return 0;
+> > +}
+> > +late_initcall(m10v_pm_init);
+> > --
+> > 1.9.1
+> >
