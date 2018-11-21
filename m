@@ -1,49 +1,29 @@
-From: wen.yang99@zte.com.cn (Wen Yang)
-Date: Wed, 21 Nov 2018 15:41:51 +0800
-Subject: [PATCH 2/4] soc/fsl/qe: fix potential NULL pointer dereference in
- ucc_of_parse_tdm
-Message-ID: <1542786111-18648-1-git-send-email-wen.yang99@zte.com.cn>
+From: thomas.petazzoni@bootlin.com (Thomas Petazzoni)
+Date: Wed, 21 Nov 2018 08:47:52 +0100
+Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
+ signal
+In-Reply-To: <874lcagb45.fsf@tkos.co.il>
+References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
+ <20181003132811.GC427@lunn.ch>
+ <20181003133543.t7laclm5wbj2olhq@sapphire.tkos.co.il>
+ <20181116121043.GC3228@e107981-ln.cambridge.arm.com>
+ <874lcagb45.fsf@tkos.co.il>
+Message-ID: <20181121084752.544c3e79@windsurf>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes a possible null pointer dereference in
-ucc_of_parse_tdm, detected by the semantic patch
-deref_null.cocci, with the following warning:
+Hello,
 
-./drivers/soc/fsl/qe/qe_tdm.c:177:21-24: ERROR: pdev is NULL but dereferenced.
+On Wed, 21 Nov 2018 09:09:46 +0200, Baruch Siach wrote:
 
-The following code has potential null pointer references:
-        pdev = of_find_device_by_node(np2);
-        if (!pdev) {
-                ret = -EINVAL;
-                pr_err("%pOFn: failed to lookup pdev\n", np2);
-                of_node_put(np2);
-                goto err_miss_siram_property;
-        }
-...
-err_miss_siram_property:
-        devm_iounmap(&pdev->dev, utdm->si_regs);
+> As the listed maintainer of this driver, can you review this patch? This
+> patch makes the PCIe slot reset sequence independent from the
+> bootloader.
 
-Signed-off-by: Wen Yang <wen.yang99@zte.com.cn>
-Reviewed-by: Tan Hu <tan.hu@zte.com.cn>
-CC: Julia Lawall <julia.lawall@lip6.fr>
----
- drivers/soc/fsl/qe/qe_tdm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Yes, I'll have a look. Sorry for the delay.
 
-diff --git a/drivers/soc/fsl/qe/qe_tdm.c b/drivers/soc/fsl/qe/qe_tdm.c
-index f78c346..166378b 100644
---- a/drivers/soc/fsl/qe/qe_tdm.c
-+++ b/drivers/soc/fsl/qe/qe_tdm.c
-@@ -174,7 +174,8 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	return ret;
- 
- err_miss_siram_property:
--	devm_iounmap(&pdev->dev, utdm->si_regs);
-+	if (pdev)
-+		devm_iounmap(&pdev->dev, utdm->si_regs);
- 	return ret;
- }
- EXPORT_SYMBOL(ucc_of_parse_tdm);
+Thomas
 -- 
-2.9.5
+Thomas Petazzoni, CTO, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
