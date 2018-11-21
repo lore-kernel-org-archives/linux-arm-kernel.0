@@ -1,70 +1,76 @@
-From: der.herr@hofr.at (Nicholas Mc Guire)
-Date: Wed, 21 Nov 2018 18:01:16 +0100
-Subject: [PATCH] gpio: mt7621: handle failure of devm_kasprintf()
-In-Reply-To: <CAMpxmJUNYWqk4PEKcZ5o5PMR3RhMhudK+Pf+Pfo64mvJ8ND2wQ@mail.gmail.com>
-References: <1542818142-27800-1-git-send-email-hofrat@osadl.org>
- <CAMpxmJUNYWqk4PEKcZ5o5PMR3RhMhudK+Pf+Pfo64mvJ8ND2wQ@mail.gmail.com>
-Message-ID: <20181121170116.GA10656@osadl.at>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Wed, 21 Nov 2018 18:09:52 +0100
+Subject: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
+ mmsys clocks
+In-Reply-To: <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-9-matthias.bgg@kernel.org>
+ <20181116231522.GA18006@bogus>
+ <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
+ <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
+ <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
+Message-ID: <458178ac-c0fc-9671-7fc8-ed2d6f61424c@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 05:43:43PM +0100, Bartosz Golaszewski wrote:
-> ??r., 21 lis 2018 o 17:39 Nicholas Mc Guire <hofrat@osadl.org> napisa??(a):
-> >
-> > kasprintf() may return NULL on failure of internal allocation thus the
-> > assigned  label  is not safe if not explicitly checked. On error
-> > mediatek_gpio_bank_probe() returns negative values so -ENOMEM in the
-> > (unlikely) failure case should be fine here.
-> >
-> > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> > Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
-> > ---
-> >
-> > Problem located with experimental coccinelle script
-> >
-> > Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
-> > GPIOLIB=y, GPIO_MT7621=y
-> >
-> > Patch is against 4.20-rc3 (localversion-next is next-20181121)
-> >
-> >  drivers/gpio/gpio-mt7621.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> >
-> > diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
-> > index d72af6f..42f0c67 100644
-> > --- a/drivers/gpio/gpio-mt7621.c
-> > +++ b/drivers/gpio/gpio-mt7621.c
-> > @@ -244,6 +244,10 @@ mediatek_gpio_bank_probe(struct device *dev,
-> >         rg->chip.of_xlate = mediatek_gpio_xlate;
-> >         rg->chip.label = devm_kasprintf(dev, GFP_KERNEL, "%s-bank%d",
-> >                                         dev_name(dev), bank);
-> > +       if (!rg->chip.label) {
-> > +               dev_err(dev, "Could not allocate label\n");
+
+
+On 21/11/2018 17:46, Stephen Boyd wrote:
+> Quoting Rob Herring (2018-11-19 11:15:16)
+>> On Sun, Nov 18, 2018 at 11:12 AM Matthias Brugger
+>> <matthias.bgg@gmail.com> wrote:
+>>> On 11/17/18 12:15 AM, Rob Herring wrote:
+>>>> On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg at kernel.org wrote:
+>>>>> -    #clock-cells = <1>;
+>>>>> +
+>>>>> +    mmsys_clk: clock-controller at 14000000 {
+>>>>> +            compatible = "mediatek,mt2712-mmsys-clk";
+>>>>> +            #clock-cells = <1>;
+>>>>
+>>>> This goes against the general direction of not defining separate nodes
+>>>> for providers with no resources.
+>>>>
+>>>> Why do you need this and what does it buy if you have to continue to
+>>>> support the existing chips?
+>>>>
+>>>
+>>> It would show explicitly that the mmsys block is used to probe two
+>>> drivers, one for the gpu and one for the clocks. Otherwise that is
+>>> hidden in the drm driver code. I think it is cleaner to describe that in
+>>> the device tree.
+>>
+>> No, that's maybe cleaner for the driver implementation in the Linux
+>> kernel. What about other OS's or when Linux drivers and subsystems
+>> needs change? Cleaner for DT is design bindings that reflect the h/w.
+>> Hardware is sometimes just messy.
+>>
 > 
-> No need for an error message here, an -ENOMEM says enough.
->
-
-I just thought its more consistent with the rest of
-the code - and as it is a highly unlikely event it would
-probably be hard to pinpoint as some of the other functions
-can return -ENOMEM (but with a message).
-
-....and the call site of mediatek_gpio_bank_probe() actually 
-currently ignores the return value so the -ENOMEM would go
-unnoticed which is a bug as well - patch for that a bit later.
-
-anyway fine with me - I?ll send a V2 and drop the dev_err() here.
-
-thx!
-hofrat
- 
-> Bart
+> I agree. I fail to see what this patch series is doing besides changing
+> driver probe and device creation methods and making a backwards
+> incompatible change to DT. Is there any other benefit here?
 > 
-> > +               return -ENOMEM;
-> > +       }
-> >
-> >         ret = devm_gpiochip_add_data(dev, &rg->chip, mtk);
-> >         if (ret < 0) {
-> > --
-> > 2.1.4
-> >
+
+You are referring whole series?
+Citing the cover letter:
+"MMSYS in Mediatek SoCs has some registers to control clock gates (which is
+used in the clk driver) and some registers to set the routing and enable
+the differnet (sic!) blocks of the display subsystem.
+
+Up to now both drivers, clock and drm are probed with the same device tree
+compatible. But only the first driver get probed, which in effect breaks
+graphics on mt8173 and mt2701.
+
+This patch uses a platform device registration in the DRM driver, which
+will trigger the probe of the corresponding clock driver. It was tested on the
+bananapi-r2 and the Acer R13 Chromebook."
+
+DT is broken right now, because two drivers rely on the same node, which gets
+consumed just once. The new DT introduced does not break anything because it is
+only used for boards that: "[..] are not available to the general public
+(mt2712e) or only have the mmsys clock driver part implemented (mt6797)."
+
+Anyway, I'll send a new version which uses the platform device in the DRM driver
+for all SoCs.
+
+Regards,
+Matthias
