@@ -1,76 +1,50 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 21 Nov 2018 12:23:31 +0000
-Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
- erratum 1165522
-In-Reply-To: <20181105143617.120602-5-marc.zyngier@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-5-marc.zyngier@arm.com>
-Message-ID: <06743f45-fd39-787d-0c59-12d28d8245bb@arm.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Wed, 21 Nov 2018 13:28:30 +0100
+Subject: [PATCH V2] clk: zynq: do not allow kmalloc failure
+Message-ID: <1542803310-32673-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+The kmalloc here is small (< 16 bytes) and occurs during initialization
+during system startup here (can not be built as module) thus if this
+kmalloc failed it is an indication of something more serious going on
+and it is fine to hang the system here rather than cause some harder
+to understand error by dereferencing NULL.
 
-On 05/11/2018 14:36, Marc Zyngier wrote:
-> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
-> speculate an AT instruction in during a guest switch while the
-> S1/S2 system registers are in an inconsistent state.
-> 
-> Work around it by:
-> - Mandating VHE
-> - Make sure that S1 and S2 system registers are consistent before
->    clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
->    regime
-> 
-> These two things together ensure that we cannot hit this erratum.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   Documentation/arm64/silicon-errata.txt |  1 +
->   arch/arm64/Kconfig                     | 12 ++++++++++++
->   arch/arm64/include/asm/cpucaps.h       |  3 ++-
->   arch/arm64/include/asm/kvm_host.h      |  3 +++
->   arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
->   arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
->   arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
->   7 files changed, 46 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 76ccded8b74c..04f0bc4690c6 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -57,6 +57,7 @@ stable kernels.
->   | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
->   | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
->   | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
-> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
->   | ARM            | MMU-500         | #841119,#826419 | N/A                         |
->   |                |                 |                 |                             |
->   | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 787d7850e064..a68bc6cc2167 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
->   
->   	  If unsure, say Y.
->   
-> +config ARM64_ERRATUM_1165522
-> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-> +	default y
-> +	help
-> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
-> +
-> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
-> +	  corrupted TLBs by speculating an AT instruction during a guest
-> +	  context switch.
-> +
-> +	  If unsure, say Y.
+Explicitly checking would not make that much sense here as the only
+possible reaction would be would BUG() here anyway.
 
-Most of the code in the patch is not guarded by #ifdef ARM64_*. So is there any 
-benefits to add a Kconfig for this option?
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: 0ee52b157b8e ("clk: zynq: Add clock controller driver")
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Cheers,
+V2: dropped leading spaces from commit message and moved the
+    compile/tool info out of git history on request of
+    Michal Simek <michal.simek@xilinx.com> - thanks !
 
+Problem located with experimental coccinelle script
+
+Patch was compile tested with: multi_v7_defconfig (implies
+CONFIG_ARCH_ZYNQ=y)
+
+Patch is against 4.20-rc3 (localversion-next is next-20181121)
+
+ drivers/clk/zynq/clkc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index d7b53ac..014d4a4 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -440,7 +440,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 			SLCR_GEM1_CLK_CTRL, 0, 0, &gem1clk_lock);
+ 
+ 	tmp = strlen("mio_clk_00x");
+-	clk_name = kmalloc(tmp, GFP_KERNEL);
++	clk_name = kmalloc(tmp, GFP_KERNEL | __GFP_NOFAIL);
+ 	for (i = 0; i < NUM_MIO_PINS; i++) {
+ 		int idx;
+ 
 -- 
-Julien Grall
+2.1.4
