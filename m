@@ -1,110 +1,379 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Thu, 22 Nov 2018 23:49:39 +0100
-Subject: [PATCH v2 2/2] arm64/bpf: don't allocate BPF JIT programs in
- module memory
-In-Reply-To: <CAKv+Gu-UE0hR-iEkhUieGn+UO_PFs+cD535W1Rq9iyRkgEj=qA@mail.gmail.com>
-References: <20181121131733.14910-1-ard.biesheuvel@linaro.org>
- <20181121131733.14910-3-ard.biesheuvel@linaro.org>
- <945415e1-0ff8-65ce-15fa-33cea0a7d1c9@iogearbox.net>
- <CAKv+Gu-UE0hR-iEkhUieGn+UO_PFs+cD535W1Rq9iyRkgEj=qA@mail.gmail.com>
-Message-ID: <37f48c6a-e760-87eb-6559-afdd2f116ed6@iogearbox.net>
+From: helen.koike@collabora.com (Helen Koike)
+Date: Thu, 22 Nov 2018 21:30:49 -0200
+Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through atomic.
+In-Reply-To: <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
+References: <20181119190805.19139-1-helen.koike@collabora.com>
+ <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
+Message-ID: <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2018 09:02 AM, Ard Biesheuvel wrote:
-> On Thu, 22 Nov 2018 at 00:20, Daniel Borkmann <daniel@iogearbox.net> wrote:
->> On 11/21/2018 02:17 PM, Ard Biesheuvel wrote:
->>> The arm64 module region is a 128 MB region that is kept close to
->>> the core kernel, in order to ensure that relative branches are
->>> always in range. So using the same region for programs that do
->>> not have this restriction is wasteful, and preferably avoided.
->>>
->>> Now that the core BPF JIT code permits the alloc/free routines to
->>> be overridden, implement them by simple vmalloc_exec()/vfree()
->>> calls, which can be served from anywere. This also solves an
->>> issue under KASAN, where shadow memory is needlessly allocated for
->>> all BPF programs (which don't require KASAN shadow pages since
->>> they are not KASAN instrumented)
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm64/net/bpf_jit_comp.c | 10 ++++++++++
->>>  1 file changed, 10 insertions(+)
->>>
->>> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
->>> index a6fdaea07c63..f91b7c157841 100644
->>> --- a/arch/arm64/net/bpf_jit_comp.c
->>> +++ b/arch/arm64/net/bpf_jit_comp.c
->>> @@ -940,3 +940,13 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
->>>                                          tmp : orig_prog);
->>>       return prog;
->>>  }
->>> +
->>> +void *bpf_jit_alloc_exec(unsigned long size)
->>> +{
->>> +     return vmalloc_exec(size);
->>> +}
->>> +
->>> +void bpf_jit_free_exec(const void *addr)
->>> +{
->>> +     return vfree(size);
->>> +}
+Hi Tomasz,
+
+On 11/20/18 4:48 AM, Tomasz Figa wrote:
+> Hi Helen,
+> 
+> On Tue, Nov 20, 2018 at 4:08 AM Helen Koike <helen.koike@collabora.com> wrote:
 >>
->> Hmm, could you elaborate in the commit log on the potential performance
->> regression for JITed progs on arm64 after this change?
+>> From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>>
+>> Add support to async updates of cursors by using the new atomic
+>> interface for that.
+>>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> [updated for upstream]
+>> Signed-off-by: Helen Koike <helen.koike@collabora.com>
+>>
+>> ---
+>> Hello,
+>>
+>> This is the third version of the async-plane update suport to the
+>> Rockchip driver.
+>>
 > 
-> This does not affect the generated code, so I don't anticipate a
-> performance hit. Did you have anything in particular in mind?
-
-We do optimize immediate emission in the JIT, I was mostly wondering that
-once the code is much further away from core kernel how much more insns we
-might need to emit in some worst case for each BPF helper call, but then
-unlike some other archs we always use absolute addresses so nothing would
-change here, so never mind. (And BPF to BPF calls emits unoptimized 64
-immediates since this is needed as we pass through the JIT several times
-so we need this as place holder for later once the address is actually
-known.)
-
->> I think this change would also break JITing of BPF to BPF calls. You might
->> have the same issue as ppc64 folks where the offset might not fit into imm
->> anymore and would have to transfer it via fp->aux->func[off]->bpf_func
->> instead.
+> Thanks for a quick respin. Please see my comments inline. (I'll try to
+> be better at responding from now on...)
 > 
-> If we are relying on BPF programs to remain within 128 MB of each
-> other, then we already have a potential problem, given that the
-> module_alloc() spills over into a 4 GB window if the 128 MB window is
-> exhausted. Perhaps we should do something like
+>> I tested running igt kms_cursor_legacy and kms_atomic tests using a 96Boards Ficus.
+>>
+>> Note that before the patch, the following igt tests failed:
+>>
+>>         basic-flip-before-cursor-atomic
+>>         basic-flip-before-cursor-legacy
+>>         cursor-vs-flip-atomic
+>>         cursor-vs-flip-legacy
+>>         cursor-vs-flip-toggle
+>>         flip-vs-cursor-atomic
+>>         flip-vs-cursor-busy-crc-atomic
+>>         flip-vs-cursor-busy-crc-legacy
+>>         flip-vs-cursor-crc-atomic
+>>         flip-vs-cursor-crc-legacy
+>>         flip-vs-cursor-legacy
+>>
+>> Full log: https://people.collabora.com/~koike/results-4.20/html/
+>>
+>> Now with the patch applied the following were fixed:
+>>         basic-flip-before-cursor-atomic
+>>         basic-flip-before-cursor-legacy
+>>         flip-vs-cursor-atomic
+>>         flip-vs-cursor-legacy
+>>
+>> Full log: https://people.collabora.com/~koike/results-4.20-async/html/
+> 
+> Could you also test modetest, with the -C switch to test the legacy
+> cursor API? I remember it triggering crashes due to synchronization
+> issues easily.
 
-Hmm, good point, presumably you mean this one here fd045f6cd98e ("arm64:
-add support for module PLTs"). Agree that this needs fixing.
+Sure. I tested with
+$ modetest -M rockchip -s 37:1920x1080 -C
 
-> void *bpf_jit_alloc_exec(unsigned long size) {
->   return __vmalloc_node_range(size, MODULE_ALIGN,
->     BPF_REGION_START, BPF_REGION_END,
->     GFP_KERNEL, PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
->     __builtin_return_address(0));
+I also vary the mode but I couldn't trigger any crashes.
+
+> 
+>>
+>> Tomasz, as you mentined in v2 about waiting the hardware before updating
+>> the framebuffer, now I call the loop you pointed out in the async path,
+>> was that what you had in mind? Or do you think I would make sense to
+>> call the vop_crtc_atomic_flush() instead of just exposing that loop?
+>>
+>> Thanks
+>> Helen
+>>
+>> Changes in v3:
+>> - Rebased on top of drm-misc
+>> - Fix missing include in rockchip_drm_vop.c
+>> - New function vop_crtc_atomic_commit_flush
+>>
+>> Changes in v2:
+>> - v2: https://patchwork.freedesktop.org/patch/254180/
+>> - Change the framebuffer as well to cover jumpy cursor when hovering
+>>   text boxes or hyperlink. (Tomasz)
+>> - Use the PSR inhibit mechanism when accessing VOP hardware instead of
+>>   PSR flushing (Tomasz)
+>>
+>> Changes in v1:
+>> - Rebased on top of drm-misc
+>> - In async_check call drm_atomic_helper_check_plane_state to check that
+>>   the desired plane is valid and update various bits of derived state
+>>   (clipped coordinates etc.)
+>> - In async_check allow to configure new scaling in the fast path.
+>> - In async_update force to flush all registered PSR encoders.
+>> - In async_update call atomic_update directly.
+>> - In async_update call vop_cfg_done needed to set the vop registers and take effect.
+>>
+>>  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  36 -------
+>>  drivers/gpu/drm/rockchip/rockchip_drm_psr.c |  37 +++++++
+>>  drivers/gpu/drm/rockchip/rockchip_drm_psr.h |   3 +
+>>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 108 +++++++++++++++++---
+>>  4 files changed, 131 insertions(+), 53 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> index ea18cb2a76c0..08bec50d9c5d 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>> @@ -127,42 +127,6 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+>>         return ERR_PTR(ret);
+>>  }
+>>
+>> -static void
+>> -rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+>> -{
+>> -       struct drm_crtc *crtc;
+>> -       struct drm_crtc_state *crtc_state;
+>> -       struct drm_encoder *encoder;
+>> -       u32 encoder_mask = 0;
+>> -       int i;
+>> -
+>> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>> -               encoder_mask |= crtc_state->encoder_mask;
+>> -               encoder_mask |= crtc->state->encoder_mask;
+>> -       }
+>> -
+>> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>> -               rockchip_drm_psr_inhibit_get(encoder);
+>> -}
+>> -
+>> -static void
+>> -rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+>> -{
+>> -       struct drm_crtc *crtc;
+>> -       struct drm_crtc_state *crtc_state;
+>> -       struct drm_encoder *encoder;
+>> -       u32 encoder_mask = 0;
+>> -       int i;
+>> -
+>> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>> -               encoder_mask |= crtc_state->encoder_mask;
+>> -               encoder_mask |= crtc->state->encoder_mask;
+>> -       }
+>> -
+>> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>> -               rockchip_drm_psr_inhibit_put(encoder);
+>> -}
+>> -
+>>  static void
+>>  rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
+>>  {
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>> index 01ff3c858875..22a70ab6e214 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>> @@ -13,6 +13,7 @@
+>>   */
+>>
+>>  #include <drm/drmP.h>
+>> +#include <drm/drm_atomic.h>
+>>  #include <drm/drm_crtc_helper.h>
+>>
+>>  #include "rockchip_drm_drv.h"
+>> @@ -109,6 +110,42 @@ int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder)
+>>  }
+>>  EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put);
+>>
+>> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+>> +{
+>> +       struct drm_crtc *crtc;
+>> +       struct drm_crtc_state *crtc_state;
+>> +       struct drm_encoder *encoder;
+>> +       u32 encoder_mask = 0;
+>> +       int i;
+>> +
+>> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>> +               encoder_mask |= crtc_state->encoder_mask;
+>> +               encoder_mask |= crtc->state->encoder_mask;
+>> +       }
+>> +
+>> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>> +               rockchip_drm_psr_inhibit_get(encoder);
+>> +}
+>> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_get_state);
+>> +
+>> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+>> +{
+>> +       struct drm_crtc *crtc;
+>> +       struct drm_crtc_state *crtc_state;
+>> +       struct drm_encoder *encoder;
+>> +       u32 encoder_mask = 0;
+>> +       int i;
+>> +
+>> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>> +               encoder_mask |= crtc_state->encoder_mask;
+>> +               encoder_mask |= crtc->state->encoder_mask;
+>> +       }
+>> +
+>> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>> +               rockchip_drm_psr_inhibit_put(encoder);
+>> +}
+>> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put_state);
+>> +
+>>  /**
+>>   * rockchip_drm_psr_inhibit_get - acquire PSR inhibit on given encoder
+>>   * @encoder: encoder to obtain the PSR encoder
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>> index 860c62494496..25350ba3237b 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>> @@ -20,6 +20,9 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev);
+>>  int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
+>>  int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
+>>
+>> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state);
+>> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state);
+>> +
+>>  int rockchip_drm_psr_register(struct drm_encoder *encoder,
+>>                         int (*psr_set)(struct drm_encoder *, bool enable));
+>>  void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> index fb70fb486fbf..176d6e8207ed 100644
+>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>> @@ -15,6 +15,7 @@
+>>  #include <drm/drm.h>
+>>  #include <drm/drmP.h>
+>>  #include <drm/drm_atomic.h>
+>> +#include <drm/drm_atomic_uapi.h>
+>>  #include <drm/drm_crtc.h>
+>>  #include <drm/drm_crtc_helper.h>
+>>  #include <drm/drm_flip_work.h>
+>> @@ -819,10 +820,99 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>>         spin_unlock(&vop->reg_lock);
+>>  }
+>>
+>> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+>> +                                       struct drm_plane_state *state)
+>> +{
+>> +       struct vop_win *vop_win = to_vop_win(plane);
+>> +       const struct vop_win_data *win = vop_win->data;
+>> +       int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
+>> +                                       DRM_PLANE_HELPER_NO_SCALING;
+>> +       int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
+>> +                                       DRM_PLANE_HELPER_NO_SCALING;
+>> +       struct drm_crtc_state *crtc_state;
+>> +       int ret;
+>> +
+>> +       if (plane != state->crtc->cursor)
+>> +               return -EINVAL;
+>> +
+>> +       if (!plane->state)
+>> +               return -EINVAL;
+>> +
+>> +       if (!plane->state->fb)
+>> +               return -EINVAL;
+>> +
+>> +       if (state->state)
+>> +               crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+>> +                                                               state->crtc);
+>> +       else /* Special case for asynchronous cursor updates. */
+>> +               crtc_state = plane->crtc->state;
+>> +
+>> +       ret = drm_atomic_helper_check_plane_state(plane->state,
+>> +                                                 crtc_state,
+>> +                                                 min_scale, max_scale,
+>> +                                                 true, true);
+>> +       return ret;
+>> +}
+>> +
+>> +static void vop_crtc_atomic_commit_flush(struct drm_crtc *crtc,
+>> +                                        struct drm_crtc_state *old_crtc_state)
+>> +{
+>> +       struct drm_atomic_state *old_state = old_crtc_state->state;
+>> +       struct drm_plane_state *old_plane_state, *new_plane_state;
+>> +       struct vop *vop = to_vop(crtc);
+>> +       struct drm_plane *plane;
+>> +       int i;
+>> +
+>> +       for_each_oldnew_plane_in_state(old_state, plane, old_plane_state,
+>> +                                      new_plane_state, i) {
+> 
+> Hmm, from what I can see, we're not going through the full atomic
+> commit sequence, with state flip, so I'm not sure where we would get
+> the new state here from.
+> 
+>> +               if (!old_plane_state->fb)
+>> +                       continue;
+>> +
+>> +               if (old_plane_state->fb == new_plane_state->fb)
+>> +                       continue;
+>> +
+>> +               drm_framebuffer_get(old_plane_state->fb);
+>> +               WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>> +               drm_flip_work_queue(&vop->fb_unref_work, old_plane_state->fb);
+>> +               set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
+>> +       }
+>> +}
+>> +
+>> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+>> +                                         struct drm_plane_state *new_state)
+>> +{
+>> +       struct vop *vop = to_vop(plane->state->crtc);
+>> +
+>> +       if (vop->crtc.state->state)
+>> +               vop_crtc_atomic_commit_flush(&vop->crtc, vop->crtc.state);
+> 
+> Since we just operate on one plane here, we could just do like this:
+> 
+> if (plane->state->fb && plane->state->fb != new_state->fb) {
+>                drm_framebuffer_get(plane->state->fb);
+>                WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>                drm_flip_work_queue(&vop->fb_unref_work, plane->state->fb);
+>                set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
 > }
 > 
-> and make [BPF_REGION_START, BPF_REGION_END) a separate 128 MB window
-> at the top of the vmalloc space. That way, it is guaranteed that BPF
-> programs are within branching range of each other, and we still solve
-> the original problem. I also like that it becomes impossible to infer
-> anything about the state of the vmalloc space, placement of the kernel
-> and modules etc from the placement of the BPF programs (in case it
-> leaks this information in one way or the other)
+> However, we cannot simply to this here, because it races with the
+> vblank interrupt. We need to program the hw plane with the new fb
+> first and trigger the update. This needs all the careful handling that
+> is done in vop_crtc_atomic_flush() and so my original suggestion to
+> just call it.
+
+vop_crtc_atomic_flush() also updates the crtc->state->event, I don't
+think we want that.
+
+And actually I don't think we have this race condition, please see below
+
 > 
-> That would only give you space for 128M/4K == 32768 programs (or
-> 128M/64K == 2048 on 64k pages kernels). So I guess we'd still need a
+> Of course to call it in its current shape, one needs to have a full
+> atomic state from a commit, after a flip, but we only have the new
+> plane state here. Perhaps you could duplicate existing state, update
+> the desired plane state, flip and then call vop_crtc_atomic_flush()?
 
-Note that it's 4k BPF insns which do not map 1:1, if possible I'd actually
-prefer if we could enlarge this space a bit.
+Could you please clarify your proposal? You mean duplicating
+plane->state ? I'm trying to see how this would fit it in the code.
+The drm_atomic_state structure at plate->state->state is actually always
+NULL (as an async update is applied right away).
 
-> spillover window as well, in which case we'd need a fix for the
-> BPF-to-BPF branching issue (but we need that at the moment anyway)
 
-Yeah, or spillover window instead. I think as a fix starting out with
-its own region without the spillover window would be less complex and
-better suited for stable?
+> 
+> Best regards,
+> Tomasz
+> 
 
-Thanks,
-Daniel
+>From your comment in v2:
+
+> Isn't this going to drop the old fb reference on the floor without
+> waiting for the hardware to actually stop scanning out from it?
+
+I've been trying to analyze this better, I also got some help from
+Gustavo Padovan, and I think there is no problem here as the
+configuration we are doing here will just be taken into consideration by
+the hardware in the next vblank, so I guess we can set and re-set
+plane->fb as much as we want.
+
+>From the async_update docs:
+
+     *  - Some hw might still scan out the old buffer until the next
+     *    vblank, however we let go of the fb references as soon as
+     *    we run this hook. For now drivers must implement their own workers
+     *    for deferring if needed, until a common solution is created.
+
+So the idea is to let the reference go asap, then we shouldn't need an
+extra drm_framebuffer_get() as done by vop_crtc_atomic_flush().
+
+Does it make sense to you?
+
+Unless I am missing something, the patch v2 is essentially correct, if
+not, then vc4 driver is also broken.
+
+Please, let me know what you think and I'll send the v4.
+
+Regards,
+Helen
