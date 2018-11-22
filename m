@@ -1,88 +1,50 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Thu, 22 Nov 2018 12:04:12 +0100
-Subject: [PATCH 6/6] arm: dts: exynos4: set opp-suspend for DMC and leftbus
-In-Reply-To: <5BF61DEB.5010403@samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180208eucas1p11482a783ab1b1bceb8c9f6a1f50682c3@eucas1p1.samsung.com>
- <1542823301-23563-7-git-send-email-l.luba@partner.samsung.com>
- <5BF61DEB.5010403@samsung.com>
-Message-ID: <985c35fb-d021-bbad-055b-af0618fa8c55@partner.samsung.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 22 Nov 2018 11:13:51 +0000
+Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering
+ for KVM_GET_REG_LIST
+In-Reply-To: <20181122105344.GF17441@e113682-lin.lund.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
+ <20181102081625.GS12057@e113682-lin.lund.arm.com>
+ <20181115172711.GQ3505@e103592.cambridge.arm.com>
+ <20181122105344.GF17441@e113682-lin.lund.arm.com>
+Message-ID: <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo Choi,
+On 22 November 2018 at 10:53, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> [Adding Peter and Alex for their view on the QEMU side]
+>
+> On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
+>> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
+>> creating the vcpu, so that if issued at all for a vcpu, it is issued
+>> very soon after KVM_VCPU_INIT.
+>>
+>> I think this worked OK with the current structure of kvmtool and I
+>> seem to remember discussing this with Peter Maydell re qemu -- but
+>> it sounds like I should double-check.
+>
+> QEMU does some thing around enumerating all the system registers exposed
+> by KVM and saving/restoring them as part of its startup, but I don't
+> remember the exact sequence.
 
-Thank you for the review of the patch set.
-I will add your suggestions in v2 and add 'Reviewed-by' for the last to 
-patches.
+This all happens in kvm_arch_init_vcpu(), which does:
+ * KVM_ARM_VCPU_INIT ioctl (with the appropriate kvm_init_features set)
+ * read the guest MPIDR with GET_ONE_REG so we know what KVM
+   is doing with MPIDR assignment across CPUs
+ * check for interesting extensions like KVM_CAP_SET_GUEST_DEBUG
+ * get and cache a list of what system registers the vcpu has,
+   using KVM_GET_REG_LIST. This is where we do the "size must
+   be U32 or U64" sanity check.
 
-On 11/22/18 4:09 AM, Chanwoo Choi wrote:
-> Hi,
-> 
-> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
->> Mark the state for devfreq device while entring suspend/resume process.
->>
->> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
->> solve issue with devfreq device's frequency during suspend/resume.
->> During the discussion on LKML some corner cases and comments appeared
->> related to the design. This patch address them keeping in mind suggestions
->> from Chanwoo Choi.
->>
->> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4210.dtsi | 2 ++
->>   arch/arm/boot/dts/exynos4412.dtsi | 2 ++
->>   2 files changed, 4 insertions(+)
-> 
-> Looks good to me.
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
->>
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->> index b6091c2..4429b72 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -298,6 +298,7 @@
->>   			opp-400000000 {
->>   				opp-hz = /bits/ 64 <400000000>;
->>   				opp-microvolt = <1150000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->> @@ -367,6 +368,7 @@
->>   			};
->>   			opp-200000000 {
->>   				opp-hz = /bits/ 64 <200000000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   	};
->> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->> index 51f72f0..908c0c4 100644
->> --- a/arch/arm/boot/dts/exynos4412.dtsi
->> +++ b/arch/arm/boot/dts/exynos4412.dtsi
->> @@ -432,6 +432,7 @@
->>   			opp-400000000 {
->>   				opp-hz = /bits/ 64 <400000000>;
->>   				opp-microvolt = <1050000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->> @@ -520,6 +521,7 @@
->>   			opp-200000000 {
->>   				opp-hz = /bits/ 64 <200000000>;
->>   				opp-microvolt = <1000000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->>
-> 
-> 
+So if there's something we can't do by setting kvm_init_features
+for KVM_ARM_VCPU_INIT but have to do immediately afterwards,
+that is straightforward.
 
-Regards,
-Lukasz Luba
+The major requirement for QEMU is that if we don't specifically
+enable SVE in the VCPU then we must not see any registers
+in the KVM_GET_REG_LIST that are not u32 or u64 -- otherwise
+QEMU will refuse to start.
+
+thanks
+-- PMM
