@@ -1,93 +1,131 @@
-From: wang.yi59@zte.com.cn (Yi Wang)
-Date: Thu, 22 Nov 2018 14:49:45 +0800
-Subject: [PATCH] soc/fsl/qe: fix err handling of ucc_of_parse_tdm
-Message-ID: <1542869385-48337-1-git-send-email-wang.yi59@zte.com.cn>
+From: jjian.zhou@mediatek.com (Jjian Zhou)
+Date: Thu, 22 Nov 2018 15:05:18 +0800
+Subject: [PATCH] mmc: mediatek: add MT8183 SDIO driver support
+Message-ID: <1542870318-10731-1-git-send-email-jjian.zhou@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wen Yang <wen.yang99@zte.com.cn>
+From: jjian zhou <jjian.zhou@mediatek.com>
 
-Currently there are 2 problems with the ucc_of_parse_tdm function:
-1,a possible null pointer dereference in ucc_of_parse_tdm,
-detected by the semantic patch deref_null.cocci,
-with the following warning:
-drivers/soc/fsl/qe/qe_tdm.c:177:21-24: ERROR: pdev is NULL but dereferenced.
-2,dev gets modified, so in any case that devm_iounmap() will fail even when
-the new pdev is valid, because the iomap was done with a different pdev.
-This patch fixes them.
+MT8183 need SDIO driver. So it need add new code
+to support it.
 
-Suggested-by: Christophe LEROY <christophe.leroy@c-s.fr>
-Signed-off-by: Wen Yang <wen.yang99@zte.com.cn>
-CC: Julia Lawall <julia.lawall@lip6.fr>
-CC: Zhao Qiang <qiang.zhao@nxp.com>
+Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
 ---
- drivers/soc/fsl/qe/qe_tdm.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/mmc/host/mtk-sd.c | 51 ++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 48 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/soc/fsl/qe/qe_tdm.c b/drivers/soc/fsl/qe/qe_tdm.c
-index f78c346..9a29f0b 100644
---- a/drivers/soc/fsl/qe/qe_tdm.c
-+++ b/drivers/soc/fsl/qe/qe_tdm.c
-@@ -47,7 +47,7 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	struct resource *res;
- 	struct device_node *np2;
- 	static int siram_init_flag;
--	struct platform_device *pdev;
-+	struct platform_device *pdev_si, *pdev_siram;
- 
- 	sprop = of_get_property(np, "fsl,rx-sync-clock", NULL);
- 	if (sprop) {
-@@ -129,16 +129,16 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	if (!np2)
- 		return -EINVAL;
- 
--	pdev = of_find_device_by_node(np2);
--	if (!pdev) {
-+	pdev_si = of_find_device_by_node(np2);
-+	if (!pdev_si) {
- 		pr_err("%pOFn: failed to lookup pdev\n", np2);
- 		of_node_put(np2);
- 		return -EINVAL;
- 	}
- 
- 	of_node_put(np2);
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	utdm->si_regs = devm_ioremap_resource(&pdev->dev, res);
-+	res = platform_get_resource(pdev_si, IORESOURCE_MEM, 0);
-+	utdm->si_regs = devm_ioremap_resource(&pdev_si->dev, res);
- 	if (IS_ERR(utdm->si_regs)) {
- 		ret = PTR_ERR(utdm->si_regs);
- 		goto err_miss_siram_property;
-@@ -150,8 +150,8 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 		goto err_miss_siram_property;
- 	}
- 
--	pdev = of_find_device_by_node(np2);
--	if (!pdev) {
-+	pdev_siram = of_find_device_by_node(np2);
-+	if (!pdev_siram) {
- 		ret = -EINVAL;
- 		pr_err("%pOFn: failed to lookup pdev\n", np2);
- 		of_node_put(np2);
-@@ -159,8 +159,8 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	}
- 
- 	of_node_put(np2);
--	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	utdm->siram = devm_ioremap_resource(&pdev->dev, res);
-+	res = platform_get_resource(pdev_siram, IORESOURCE_MEM, 0);
-+	utdm->siram = devm_ioremap_resource(&pdev_siram->dev, res);
- 	if (IS_ERR(utdm->siram)) {
- 		ret = PTR_ERR(utdm->siram);
- 		goto err_miss_siram_property;
-@@ -174,7 +174,7 @@ int ucc_of_parse_tdm(struct device_node *np, struct ucc_tdm *utdm,
- 	return ret;
- 
- err_miss_siram_property:
--	devm_iounmap(&pdev->dev, utdm->si_regs);
-+	devm_iounmap(&pdev_si->dev, utdm->si_regs);
- 	return ret;
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index 6334cc7..3128ee7 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
+ 		struct mmc_request *mrq, struct mmc_command *cmd)
+ {
+ 	u32 rawcmd;
++	unsigned long flags;
+
+ 	WARN_ON(host->cmd);
+ 	host->cmd = cmd;
+@@ -1131,7 +1132,12 @@ static void msdc_start_command(struct msdc_host *host,
+ 	cmd->error = 0;
+ 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
+
++	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
++		spin_lock_irqsave(&host->lock, flags);
+ 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
++	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
++		spin_unlock_irqrestore(&host->lock, flags);
++
+ 	writel(cmd->arg, host->base + SDC_ARG);
+ 	writel(rawcmd, host->base + SDC_CMD);
  }
- EXPORT_SYMBOL(ucc_of_parse_tdm);
--- 
-2.9.5
+@@ -1351,6 +1357,27 @@ static void msdc_request_timeout(struct work_struct *work)
+ 	}
+ }
+
++static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
++{
++	unsigned long flags;
++	struct msdc_host *host = mmc_priv(mmc);
++
++	if (enb)
++		pm_runtime_get_sync(host->dev);
++
++	spin_lock_irqsave(&host->lock, flags);
++	if (enb)
++		sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
++	else
++		sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
++	spin_unlock_irqrestore(&host->lock, flags);
++
++	if (!enb) {
++		pm_runtime_mark_last_busy(host->dev);
++		pm_runtime_put_autosuspend(host->dev);
++	}
++}
++
+ static irqreturn_t msdc_irq(int irq, void *dev_id)
+ {
+ 	struct msdc_host *host = (struct msdc_host *) dev_id;
+@@ -1373,7 +1400,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
+ 		data = host->data;
+ 		spin_unlock_irqrestore(&host->lock, flags);
+
+-		if (!(events & event_mask))
++		if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
++			msdc_enable_sdio_irq(host->mmc, 0);
++			sdio_signal_irq(host->mmc);
++		}
++
++		if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
+ 			break;
+
+ 		if (!mrq) {
+@@ -1493,8 +1525,11 @@ static void msdc_init_hw(struct msdc_host *host)
+ 	 */
+ 	sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
+
+-	/* disable detect SDIO device interrupt function */
+-	sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
++	/* Config SDIO device detect interrupt function */
++	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
++		sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
++	else
++		sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
+
+ 	/* Configure to default data timeout */
+ 	sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
+@@ -2013,6 +2048,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
+ 	sdr_clr_bits(host->base + EMMC_IOCON, 1);
+ }
+
++static void msdc_ack_sdio_irq(struct mmc_host *mmc)
++{
++	msdc_enable_sdio_irq(mmc, 1);
++}
++
+ static const struct mmc_host_ops mt_msdc_ops = {
+ 	.post_req = msdc_post_req,
+ 	.pre_req = msdc_pre_req,
+@@ -2020,6 +2060,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
+ 	.set_ios = msdc_ops_set_ios,
+ 	.get_ro = mmc_gpio_get_ro,
+ 	.get_cd = mmc_gpio_get_cd,
++	.enable_sdio_irq = msdc_enable_sdio_irq,
++	.ack_sdio_irq = msdc_ack_sdio_irq,
+ 	.start_signal_voltage_switch = msdc_ops_switch_volt,
+ 	.card_busy = msdc_card_busy,
+ 	.execute_tuning = msdc_execute_tuning,
+@@ -2147,6 +2189,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
+ 	else
+ 		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
+
++	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
++		mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
++
+ 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+ 	/* MMC core transfer sizes tunable parameters */
+ 	mmc->max_segs = MAX_BD_NUM;
+--
+1.9.1
