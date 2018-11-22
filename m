@@ -1,26 +1,58 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Thu, 22 Nov 2018 09:09:47 -0800
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <20181122170715.GI30658@n2100.armlinux.org.uk>
-References: <20181122140320.24080-1-hch@lst.de>
- <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
- <20181122170715.GI30658@n2100.armlinux.org.uk>
-Message-ID: <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Thu, 22 Nov 2018 18:24:12 +0100
+Subject: [PATCH 0/6] devfreq: handle suspend/resume
+In-Reply-To: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+References: <CGME20181121180156eucas1p225af7f4341a039264ff26f2a9ad9bb12@eucas1p2.samsung.com>
+ <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <1d9cf1b6-b625-4b6d-7578-0f02f7efdb8a@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 9:07 AM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> I'm afraid that won't work very well - 32 bit platforms with 64-bit
-> addresses (LPAE) would have dma_addr_t as a 64-bit value, which
-> wouldn't fit into an unsigned long.
+Hey Lukasz,
 
-Good point. So we'd have to have a special IS_DMA_ERR() function that
-takes a dma_addr_t and checks the same "is it the top 4095 values".
+just wanted to say hi and thanks for picking this up. Sadly my work no longer
+permits me to spend time working on the kernel.
 
-Because I'd still prefer to allow people to return the _actual_ error,
-and to have "return -Exyz" as the error case. That part still DTRT
-even with dma_addr_t.
+Anyway, great that this issue finally gets solved! :)
 
-              Linus
+With best wishes,
+Tobias
+
+
+Lukasz Luba wrote:
+> Hi all,
+> 
+> This patch set aims to address the issue with devfreq devices' frequency
+> during suspend/resume. It extends suspend/resume by calls to Devfreq
+> framework. In the devfreq framework there is a small refactoring to avoid
+> code duplication in changging frequency (patch 2) and there are extensions
+> for suspending devices.
+> 
+> It has been tested on Odroid u3 with Exynos 4412.
+> 
+> The patch set draws on Tobias Jakobi's work posted ~2 years ago, who tried
+> to solve issue with devfreq device's frequency during suspend/resume.
+> During the discussion on LKML some corner cases and comments appeared
+> related to the design. This patch set address them keeping in mind
+> suggestions from Chanwoo Choi.
+> Tobias's paches:
+> https://www.spinics.net/lists/linux-samsung-soc/msg56602.html 
+> 
+> Regards,
+> Lukasz Luba
+> 
+> Lukasz Luba (6):
+>   devfreq: add basic fileds supporting suspend functionality
+>   devfreq: refactor set_target frequency function
+>   devfreq: add support for suspend/resume of a devfreq device
+>   devfreq: add devfreq_suspend/resume() functions
+>   drivers: power: suspend: call devfreq suspend/resume
+>   arm: dts: exynos4: set opp-suspend for DMC and leftbus
+> 
+>  arch/arm/boot/dts/exynos4210.dtsi |   2 +
+>  arch/arm/boot/dts/exynos4412.dtsi |   2 +
+>  drivers/base/power/main.c         |   3 +
+>  drivers/devfreq/devfreq.c         | 159 ++++++++++++++++++++++++++++++--------
+>  include/linux/devfreq.h           |  11 +++
+>  5 files changed, 146 insertions(+), 31 deletions(-)
+> 
