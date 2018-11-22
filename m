@@ -1,58 +1,44 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Thu, 22 Nov 2018 17:15:27 +0530
-Subject: [PATCH v2 3/4] ARM: dts: sun8i: Add the H3/H5 CSI controller
-In-Reply-To: <20181114145934.26855-4-maxime.ripard@bootlin.com>
-References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
- <20181114145934.26855-4-maxime.ripard@bootlin.com>
-Message-ID: <CAMty3ZDFsaFR1zb3Wt0wJ0XkeNuSHGxDsmZZKgWy=wxJpNTnHQ@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Thu, 22 Nov 2018 11:49:29 +0000
+Subject: [PATCH 0/7] Ensure stack is aligned for kernel entries
+In-Reply-To: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+References: <1537970184-44348-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <bf872be5-4a56-017b-83b6-544f8d8f528e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 8:29 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> From: Myl?ne Josserand <mylene.josserand@bootlin.com>
->
-> The H3 and H5 features the same CSI controller that was initially found on
-> the A31.
->
-> Add a DT node for it.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> index 4b1530ebe427..8779ee750bd8 100644
-> --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> @@ -393,6 +393,13 @@
->                         interrupt-controller;
->                         #interrupt-cells = <3>;
->
-> +                       csi_pins: csi {
-> +                               pins = "PE0", "PE1", "PE2", "PE3", "PE4",
-> +                                      "PE5", "PE6", "PE7", "PE8", "PE9",
-> +                                      "PE10", "PE11";
-> +                               function = "csi";
-> +                       };
-> +
->                         emac_rgmii_pins: emac0 {
->                                 pins = "PD0", "PD1", "PD2", "PD3", "PD4",
->                                        "PD5", "PD7", "PD8", "PD9", "PD10",
-> @@ -744,6 +751,21 @@
->                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->                 };
->
-> +               csi: camera at 1cb0000 {
-> +                       compatible = "allwinner,sun8i-h3-csi",
-> +                                    "allwinner,sun6i-a31-csi";
-> +                       reg = <0x01cb0000 0x1000>;
-> +                       interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&ccu CLK_BUS_CSI>,
-> +                                <&ccu CLK_CSI_SCLK>,
-> +                                <&ccu CLK_DRAM_CSI>;
-> +                       clock-names = "bus", "mod", "ram";
+Hi,
 
-Don't we need CLK_CSI_MCLK which can be pinout via PE1?
+On 26/09/18 14:56, Julien Thierry wrote:
+> Hi,
+> 
+> Having SCTLR_ELx.SA enabled requires the SP to be 16-bytes aligned before
+> using it to access memory. When taking an exception, it is possible that
+> the context during which the exception occured had SP mis-aligned. The
+> entry code needs to make sure that the stack is aligned before using it to
+> save the context.
+> 
+
+So, as discussed in this thread:
+https://www.spinics.net/lists/arm-kernel/msg688342.html
+
+We might have the compiler provide the guarantee that SP is kept at 
+multiples of 16-bytes throughout C functions. If this is accepted, it 
+avoids the complexity of this series.
+
+There is just one case remaining, which is less important as it is 
+mostly a debug concern. If we take an SP alignment fault from EL1 (due 
+to bad implementation) we take recursive exceptions:
+
+- Without CONFIG_VMAP_STACK, kernel just freezes always taking SP 
+alignment faults
+- With CONFIG_VMAP_STACK after taking a number of exceptions, we 
+overflow the stack and the kernel switches to the overflow stack where 
+it finally manages to display a kernel panic message
+
+So the question is, do we care about doing something for the above case?
+
+Thanks,
+
+-- 
+Julien Thierry
