@@ -1,50 +1,40 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 22 Nov 2018 11:13:51 +0000
-Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering
- for KVM_GET_REG_LIST
-In-Reply-To: <20181122105344.GF17441@e113682-lin.lund.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
- <20181102081625.GS12057@e113682-lin.lund.arm.com>
- <20181115172711.GQ3505@e103592.cambridge.arm.com>
- <20181122105344.GF17441@e113682-lin.lund.arm.com>
-Message-ID: <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 22 Nov 2018 11:25:47 +0000
+Subject: [PATCH v3 1/4] arm64: arm_pmu: remove unnecessary isb instruction
+In-Reply-To: <1542885950-23816-1-git-send-email-andrew.murray@arm.com>
+References: <1542885950-23816-1-git-send-email-andrew.murray@arm.com>
+Message-ID: <1542885950-23816-2-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2018 at 10:53, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> [Adding Peter and Alex for their view on the QEMU side]
->
-> On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
->> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
->> creating the vcpu, so that if issued at all for a vcpu, it is issued
->> very soon after KVM_VCPU_INIT.
->>
->> I think this worked OK with the current structure of kvmtool and I
->> seem to remember discussing this with Peter Maydell re qemu -- but
->> it sounds like I should double-check.
->
-> QEMU does some thing around enumerating all the system registers exposed
-> by KVM and saving/restoring them as part of its startup, but I don't
-> remember the exact sequence.
+The armv8pmu_enable_event_counter function issues an isb instruction
+after enabling a pair of counters - this doesn't provide any value
+and is inconsistent with the armv8pmu_disable_event_counter.
 
-This all happens in kvm_arch_init_vcpu(), which does:
- * KVM_ARM_VCPU_INIT ioctl (with the appropriate kvm_init_features set)
- * read the guest MPIDR with GET_ONE_REG so we know what KVM
-   is doing with MPIDR assignment across CPUs
- * check for interesting extensions like KVM_CAP_SET_GUEST_DEBUG
- * get and cache a list of what system registers the vcpu has,
-   using KVM_GET_REG_LIST. This is where we do the "size must
-   be U32 or U64" sanity check.
+In any case armv8pmu_enable_event_counter is always called with the
+PMU stopped. Starting the PMU with armv8pmu_start results in an isb
+instruction being issued prior to writing to PMCR_EL0.
 
-So if there's something we can't do by setting kvm_init_features
-for KVM_ARM_VCPU_INIT but have to do immediately afterwards,
-that is straightforward.
+Let's remove the unnecessary isb instruction.
 
-The major requirement for QEMU is that if we don't specifically
-enable SVE in the VCPU then we must not see any registers
-in the KVM_GET_REG_LIST that are not u32 or u64 -- otherwise
-QEMU will refuse to start.
+Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm64/kernel/perf_event.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-thanks
--- PMM
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 8e38d52..de564ae 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+ 	armv8pmu_enable_counter(idx);
+ 	if (armv8pmu_event_is_chained(event))
+ 		armv8pmu_enable_counter(idx - 1);
+-	isb();
+ }
+ 
+ static inline int armv8pmu_disable_counter(int idx)
+-- 
+2.7.4
