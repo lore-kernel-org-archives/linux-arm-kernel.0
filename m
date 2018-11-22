@@ -1,26 +1,29 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 22:45:29 +0100
-Subject: [PATCH] mmc: meson-mx-sdio: check devm_kasprintf for failure
-In-Reply-To: <1542879319-2196-1-git-send-email-hofrat@osadl.org>
-References: <1542879319-2196-1-git-send-email-hofrat@osadl.org>
-Message-ID: <CAFBinCBEU336qqWnCvCVDuJ8ffOaXK5-jnUM0fuabdnmq8ZvWQ@mail.gmail.com>
+Date: Thu, 22 Nov 2018 23:01:10 +0100
+Subject: [PATCH 0/1] meson-saradc: fix internal clock names
+Message-ID: <20181122220111.28808-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 10:41 AM Nicholas Mc Guire <hofrat@osadl.org> wrote:
->
-> devm_kasprintf() may return NULL on failure of internal allocation thus
-> the assignments to  init.name  are not safe if not checked. On error
-> meson_mx_mmc_register_clks() returns negative values so -ENOMEM in the
-> (unlikely) failure case of devm_kasprintf() should be fine here.
->
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> Fixes: ed80a13bb4c4 ("mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8 and Meson8b SoCs")
-Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+This fixes the internal clock names which (prior to this change)
+contained slashes. That breaks the debugfs structure for these clocks
+in /sys/kernel/debug/clk.
 
-thank you for the patch!
-I tested the non-error case on my Odroid-C1 and it still works fine.
+The idea for this fix is shamelessly taken from commit b96e9eb62841c5
+("pwm: meson: Fix mux clock names").
+
+NOTE: This is meant to be applied on top of "iio: adc: meson-saradc:
+check for devm_kasprintf failure" from [0]
 
 
-Regards
-Martin
+[0] https://patchwork.kernel.org/patch/10693631/
+
+
+Martin Blumenstingl (1):
+  iio: adc: meson-saradc: fix internal clock names
+
+ drivers/iio/adc/meson_saradc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+-- 
+2.19.1
