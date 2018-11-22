@@ -1,17 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 22 Nov 2018 11:09:51 +0100
-Subject: [PATCH v2 14/15] tty: serial: Add RDA8810PL UART driver
-In-Reply-To: <20181121033652.12247-15-manivannan.sadhasivam@linaro.org>
-References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
- <20181121033652.12247-15-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181122100951.GA31718@kroah.com>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 22 Nov 2018 10:14:04 +0000
+Subject: [PATCH v2 1/4] arm64: arm_pmu: remove unnecessary isb instruction
+In-Reply-To: <20181121155814.5jvhnrtftiwzaczo@lakrids.cambridge.arm.com>
+References: <1542723322-42536-1-git-send-email-andrew.murray@arm.com>
+ <1542723322-42536-2-git-send-email-andrew.murray@arm.com>
+ <20181121155814.5jvhnrtftiwzaczo@lakrids.cambridge.arm.com>
+Message-ID: <20181122101404.GF42987@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 09:06:51AM +0530, Manivannan Sadhasivam wrote:
-> Add UART driver for RDA Micro RDA8810PL SoC.
+On Wed, Nov 21, 2018 at 03:58:14PM +0000, Mark Rutland wrote:
+> On Tue, Nov 20, 2018 at 02:15:19PM +0000, Andrew Murray wrote:
+> > The armv8pmu_enable_event_counter function issues an isb instruction
+> > after enabling a pair of counters - this doesn't provide any value
+> > and is inconsistent with the armv8pmu_disable_event_counter.
+> > 
+> > In any case armv8pmu_enable_event_counter is always called with the
+> > PMU stopped. Starting the PMU with armv8pmu_start results in an isb
+> > instruction being issued.
+> > 
+> > Let's remove the unnecessary isb instruction.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 > 
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> ... though it would be nice to explicitly point out that the ISB in 
+> armv8pmu_start() is before the write to PMCR_EL1, if you happen to
+> respin this patch.
 
-Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Thanks, I'm respining so I'll update the log and preserve your ack.
+
+Andrew Murray
+
+> 
+> Mark.
+> 
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index 8e38d52..de564ae 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -652,7 +652,6 @@ static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> >  	armv8pmu_enable_counter(idx);
+> >  	if (armv8pmu_event_is_chained(event))
+> >  		armv8pmu_enable_counter(idx - 1);
+> > -	isb();
+> >  }
+> >  
+> >  static inline int armv8pmu_disable_counter(int idx)
+> > -- 
+> > 2.7.4
+> > 
