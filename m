@@ -1,57 +1,59 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Thu, 22 Nov 2018 08:07:36 -0500
-Subject: [PATCH] soc: ti: Change to use DEFINE_SHOW_ATTRIBUTE macro
-Message-ID: <20181122130736.24703-1-tiny.windzz@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 22 Nov 2018 14:23:41 +0100
+Subject: [RFC PATCH v3 07/17] clocksource: sun4i: add a compatible for
+ suniv
+In-Reply-To: <60bc70fc43743f664de76abf3ab0a01cd7924458.1542824904.git.mesihkilinc@gmail.com>
+References: <cover.1542824904.git.mesihkilinc@gmail.com>
+ <60bc70fc43743f664de76abf3ab0a01cd7924458.1542824904.git.mesihkilinc@gmail.com>
+Message-ID: <a732f908-c70e-ce30-ad18-ddbb6879995f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+On 21/11/2018 19:30, Mesih Kilinc wrote:
+> The suniv (new F-series) chip has a timer with less functionality than
+> the A10 timer, e.g. it has only 3 channels.
+> 
+> Add a new compatible for it. As we didn't use the extra channels on A10
+> either now, the code needn't to be changed.
+> 
+> The suniv chip is based on ARM926EJ-S CPU, thus it has no architecture timer.
+> 
+> Register sun4i_timer as sched_clock on it.
+> 
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
----
- drivers/soc/ti/knav_dma.c | 16 +++-------------
- 1 file changed, 3 insertions(+), 13 deletions(-)
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-diff --git a/drivers/soc/ti/knav_dma.c b/drivers/soc/ti/knav_dma.c
-index e05ab16d9a9e..2a66f36b9fd6 100644
---- a/drivers/soc/ti/knav_dma.c
-+++ b/drivers/soc/ti/knav_dma.c
-@@ -355,7 +355,7 @@ static void dma_debug_show_devices(struct seq_file *s,
- 	}
- }
- 
--static int dma_debug_show(struct seq_file *s, void *v)
-+static int knav_dma_debug_show(struct seq_file *s, void *v)
- {
- 	struct knav_dma_device *dma;
- 
-@@ -370,17 +370,7 @@ static int dma_debug_show(struct seq_file *s, void *v)
- 	return 0;
- }
- 
--static int knav_dma_debug_open(struct inode *inode, struct file *file)
--{
--	return single_open(file, dma_debug_show, NULL);
--}
--
--static const struct file_operations knav_dma_debug_ops = {
--	.open		= knav_dma_debug_open,
--	.read		= seq_read,
--	.llseek		= seq_lseek,
--	.release	= single_release,
--};
-+DEFINE_SHOW_ATTRIBUTE(knav_dma_debug);
- 
- static int of_channel_match_helper(struct device_node *np, const char *name,
- 					const char **dma_instance)
-@@ -778,7 +768,7 @@ static int knav_dma_probe(struct platform_device *pdev)
- 	}
- 
- 	debugfs_create_file("knav_dma", S_IFREG | S_IRUGO, NULL, NULL,
--			    &knav_dma_debug_ops);
-+			    &knav_dma_debug_fops);
- 
- 	device_ready = true;
- 	return ret;
+> ---
+>  drivers/clocksource/sun4i_timer.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
+> index 6e0180a..65f38f6 100644
+> --- a/drivers/clocksource/sun4i_timer.c
+> +++ b/drivers/clocksource/sun4i_timer.c
+> @@ -186,7 +186,8 @@ static int __init sun4i_timer_init(struct device_node *node)
+>  	 */
+>  	if (of_machine_is_compatible("allwinner,sun4i-a10") ||
+>  	    of_machine_is_compatible("allwinner,sun5i-a13") ||
+> -	    of_machine_is_compatible("allwinner,sun5i-a10s"))
+> +	    of_machine_is_compatible("allwinner,sun5i-a10s") ||
+> +	    of_machine_is_compatible("allwinner,suniv-f1c100s"))
+>  		sched_clock_register(sun4i_timer_sched_read, 32,
+>  				     timer_of_rate(&to));
+>  
+> @@ -218,3 +219,5 @@ static int __init sun4i_timer_init(struct device_node *node)
+>  }
+>  TIMER_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
+>  		       sun4i_timer_init);
+> +TIMER_OF_DECLARE(suniv, "allwinner,suniv-f1c100s-timer",
+> +		       sun4i_timer_init);
+> 
+
+
 -- 
-2.17.0
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
