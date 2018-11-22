@@ -1,57 +1,97 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 22 Nov 2018 10:05:48 +0100
-Subject: [PATCH 0/3] Meson8b: add the CPU clock post-dividers
-In-Reply-To: <20181116205303.6354-1-martin.blumenstingl@googlemail.com>
-References: <20181116205303.6354-1-martin.blumenstingl@googlemail.com>
-Message-ID: <59801d61ba4e5d5fc8f0df1adffad1f9c7afb45c.camel@baylibre.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 22 Nov 2018 10:07:47 +0100
+Subject: [PATCH] drm/sun4i: wait on implicit fence before display
+In-Reply-To: <20181122014417.23285-1-yuq825@gmail.com>
+References: <20181122014417.23285-1-yuq825@gmail.com>
+Message-ID: <20181122090747.GB4266@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2018-11-16 at 21:53 +0100, Martin Blumenstingl wrote:
-> This is the successor to my previous series "meson8b: add the CPU_DIV16
-> clock for the ARM TWD" from [0]. I decided to not send this as v2 of
-> the original series because the PERIPH clock is not the CPU_DIV16 clock.
-> It's not clear whether a CPU_DIV16 clock exists.
+On Thu, Nov 22, 2018 at 09:44:17AM +0800, Qiang Yu wrote:
+> Render like lima will attach a fence to the framebuffer
+> dma_buf, display like sun4i should wait it finish before
+> show the framebuffer. Otherwise tearing will be observed.
 > 
-> With this series we get all the CPU_CLK post-dividers as listed in the
-> public S805 datasheet [1] on pages 31 and 32:
-> - ABP
-> - PERIPH (used as input for the ARM global timer and ARM TWD timer)
-> - AXI
-> - L2 DRAM
-> 
-> Each of these clocks has a register called "..._CLK_DIS" which is
-> documented as a "just in case" bit:
-> "Set to 1 to manually disable the [...] clock when changing the mux
-> selection. Typically this bit is set to 0 since the clock muxes can
-> switch without glitches."
-> Since we're not supposed to touch that register we're setting
-> CLK_IS_CRITICAL for these clocks in the driver.
+> Signed-off-by: Qiang Yu <yuq825@gmail.com>
 
-If we are not supposed to touch the register, I'd prefer if you used RO ops
-instead of using CLK_IS_CRITICAL.
+Thanks for submitting this fix, applied to drm-misc-next.
+-Daniel
 
+> ---
+>  drivers/gpu/drm/sun4i/sun4i_layer.c    | 2 ++
+>  drivers/gpu/drm/sun4i/sun8i_ui_layer.c | 2 ++
+>  drivers/gpu/drm/sun4i/sun8i_vi_layer.c | 2 ++
+>  3 files changed, 6 insertions(+)
 > 
-> The result of this is that we can use the PERIPH clock which clocks
-> the ARM TWD timer. I will send a separate series to add the TWD timer.
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> index 750ad24de1d7..d68e663df9a0 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <drm/drm_atomic_helper.h>
+>  #include <drm/drm_plane_helper.h>
+> +#include <drm/drm_gem_framebuffer_helper.h>
+>  #include <drm/drmP.h>
+>  
+>  #include "sun4i_backend.h"
+> @@ -114,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+>  }
+>  
+>  static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
+> +	.prepare_fb	= drm_gem_fb_prepare_fb,
+>  	.atomic_disable	= sun4i_backend_layer_atomic_disable,
+>  	.atomic_update	= sun4i_backend_layer_atomic_update,
+>  };
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+> index 28c15c6ef1ef..7bc2ca2bd0c3 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+> @@ -19,6 +19,7 @@
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_fb_cma_helper.h>
+>  #include <drm/drm_gem_cma_helper.h>
+> +#include <drm/drm_gem_framebuffer_helper.h>
+>  #include <drm/drm_plane_helper.h>
+>  #include <drm/drmP.h>
+>  
+> @@ -287,6 +288,7 @@ static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
+>  }
+>  
+>  static struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
+> +	.prepare_fb	= drm_gem_fb_prepare_fb,
+>  	.atomic_check	= sun8i_ui_layer_atomic_check,
+>  	.atomic_disable	= sun8i_ui_layer_atomic_disable,
+>  	.atomic_update	= sun8i_ui_layer_atomic_update,
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+> index f4fe97813f94..815895795afd 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+> @@ -13,6 +13,7 @@
+>  #include <drm/drm_crtc_helper.h>
+>  #include <drm/drm_fb_cma_helper.h>
+>  #include <drm/drm_gem_cma_helper.h>
+> +#include <drm/drm_gem_framebuffer_helper.h>
+>  #include <drm/drm_plane_helper.h>
+>  #include <drm/drmP.h>
+>  
+> @@ -315,6 +316,7 @@ static void sun8i_vi_layer_atomic_update(struct drm_plane *plane,
+>  }
+>  
+>  static struct drm_plane_helper_funcs sun8i_vi_layer_helper_funcs = {
+> +	.prepare_fb	= drm_gem_fb_prepare_fb,
+>  	.atomic_check	= sun8i_vi_layer_atomic_check,
+>  	.atomic_disable	= sun8i_vi_layer_atomic_disable,
+>  	.atomic_update	= sun8i_vi_layer_atomic_update,
+> -- 
+> 2.17.1
 > 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
-> [1] 
-> https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
-> 
-> Martin Blumenstingl (3):
->   dt-bindings: clock: meson8b: export the CPU post dividers
->   clk: meson: meson8b: rename cpu_div2/cpu_div3 to
->     cpu_in_div2/cpu_in_div3
->   clk: meson: meson8b: add the CPU clock post divider clocks
-> 
->  drivers/clk/meson/meson8b.c              | 268 ++++++++++++++++++++++-
->  drivers/clk/meson/meson8b.h              |  17 +-
->  include/dt-bindings/clock/meson8b-clkc.h |   4 +
->  3 files changed, 276 insertions(+), 13 deletions(-)
-> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-With CLK_IS_CRITICAL removed, looks good to me:
-
-Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
