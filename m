@@ -1,84 +1,54 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 22 Nov 2018 08:54:18 +0100
-Subject: [PATCHv2] ARM: dts: exynos: update the usbdrd_phy suspend clk
-In-Reply-To: <20181120185536.1159-1-linux.amoon@gmail.com>
-References: <20181120185536.1159-1-linux.amoon@gmail.com>
-Message-ID: <CAJKOXPcphirR=+25evzVxHGv1g_4xNfPv3gazXWOes1G6iBt5g@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Thu, 22 Nov 2018 08:57:42 +0100
+Subject: [PATCH] MAINTAINERS: add all files matching "imx" and "mxs" to the
+ IMX entry
+Message-ID: <20181122075742.31966-1-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 20 Nov 2018 at 19:55, Anand Moon <linux.amoon@gmail.com> wrote:
->
-> As per FSYS usbdrd_phy clk setting CLK_SCLK_USBD300/1 binds
-> to SUSPEND_CLK so correct update the suspend clk.
->
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
-> [0] https://lkml.org/lkml/2017/10/6/12
-> changes from previous patch
-> fix the order of clk and update the commit message
->
-> FSYS block show in user manual
->
-> CLKMUX_USBDRD300/1----CLKDIV_USBDRD300/1----SCLK_USBDRD300/1-----SUSPEND_CLK
->                    |
->                    |--CLKDIV_USBPHY300/1----SCLK_USBPHY300/1-----USBDRD30_PHY_0/1
+This way also the spi, i2c and other drivers are covered.
 
-Your new clock - SCLK_USBD301 - is not mentioned here. I don't get the
-reason behind this change.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+Hello,
 
-Best regards,
-Krzysztof
+I was surprised by changes to the spi-imx driver[1]. To lessen the
+chances that this happens again, I like making the IMX entry match all
+relevant drivers.
 
-> ---
->  arch/arm/boot/dts/exynos5410.dtsi | 4 ++--
->  arch/arm/boot/dts/exynos5420.dtsi | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> index 57fc9c949e54..a92c765a7a84 100644
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -395,7 +395,7 @@
->  };
->
->  &usbdrd_phy0 {
-> -       clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-> +       clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
->         clock-names = "phy", "ref";
->         samsung,pmu-syscon = <&pmu_system_controller>;
->  };
-> @@ -410,7 +410,7 @@
->  };
->
->  &usbdrd_phy1 {
-> -       clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-> +       clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
->         clock-names = "phy", "ref";
->         samsung,pmu-syscon = <&pmu_system_controller>;
->  };
-> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-> index aaff15880761..b84b44556efc 100644
-> --- a/arch/arm/boot/dts/exynos5420.dtsi
-> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> @@ -1509,7 +1509,7 @@
->  };
->
->  &usbdrd_phy0 {
-> -       clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-> +       clocks = <&clock CLK_SCLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
->         clock-names = "phy", "ref";
->         samsung,pmu-syscon = <&pmu_system_controller>;
->  };
-> @@ -1524,7 +1524,7 @@
->  };
->
->  &usbdrd_phy1 {
-> -       clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-> +       clocks = <&clock CLK_SCLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
->         clock-names = "phy", "ref";
->         samsung,pmu-syscon = <&pmu_system_controller>;
->  };
-> --
-> 2.17.1
->
+Best regards
+Uwe
+
+[1] FTR: I didn't test yet, but I think
+987a2dfe3f0485a82d87106e7e1c43f35c1d3b09 broke i.MX31 and i.MX35. Even
+though a later patch made spi_imx_dma_transfer fail if .setup_wml isn't
+provided, I guess this only changes from a NULL pointer exception to a
+non-functional driver.
+
+ MAINTAINERS | 11 ++---------
+ 1 file changed, 2 insertions(+), 9 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b755a89fa325..cb9cbaa1ba19 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1517,15 +1517,8 @@ R:	NXP Linux Team <linux-imx@nxp.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ S:	Maintained
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+-F:	arch/arm/mach-imx/
+-F:	arch/arm/mach-mxs/
+-F:	arch/arm/boot/dts/imx*
+-F:	arch/arm/configs/imx*_defconfig
+-F:	drivers/clk/imx/
+-F:	drivers/firmware/imx/
+-F:	drivers/soc/imx/
+-F:	include/linux/firmware/imx/
+-F:	include/soc/imx/
++N:	imx
++N:	mxs
+ 
+ ARM/FREESCALE VYBRID ARM ARCHITECTURE
+ M:	Shawn Guo <shawnguo@kernel.org>
+-- 
+2.19.1
