@@ -1,68 +1,39 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu, 22 Nov 2018 09:20:46 +0800
-Subject: [PATCH v2 3/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
- and improve debugging
-In-Reply-To: <20181121180000.GU12932@dhcp22.suse.cz>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <20181111090341.120786-4-drinkcat@chromium.org>
- <20181121164638.GD24883@arm.com>
- <20181121180000.GU12932@dhcp22.suse.cz>
-Message-ID: <CANMq1KCHGZ2vEWg+OQQ-SwvHcU-oMp4qKzEYfLwRYD5ZmRdRsA@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 21 Nov 2018 20:27:11 -0500
+Subject: [RFC][PATCH 03/14] arm64: function_graph: Remove use of
+ FTRACE_NOTRACE_DEPTH
+References: <20181122012708.491151844@goodmis.org>
+Message-ID: <20181122012803.040221352@goodmis.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 2:02 AM Michal Hocko <mhocko@kernel.org> wrote:
->
-> On Wed 21-11-18 16:46:38, Will Deacon wrote:
-> > On Sun, Nov 11, 2018 at 05:03:41PM +0800, Nicolas Boichat wrote:
-> > > For level 1/2 pages, ensure GFP_DMA32 is used if CONFIG_ZONE_DMA32
-> > > is defined (e.g. on arm64 platforms).
-> > >
-> > > For level 2 pages, allocate a slab cache in SLAB_CACHE_DMA32.
-> > >
-> > > Also, print an error when the physical address does not fit in
-> > > 32-bit, to make debugging easier in the future.
-> > >
-> > > Fixes: ad67f5a6545f ("arm64: replace ZONE_DMA with ZONE_DMA32")
-> > > Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
-> > > ---
-> > >
-> > > Changes since v1:
-> > >  - Changed approach to use SLAB_CACHE_DMA32 added by the previous
-> > >    commit.
-> > >  - Use DMA or DMA32 depending on the architecture (DMA for arm,
-> > >    DMA32 for arm64).
-> > >
-> > > drivers/iommu/io-pgtable-arm-v7s.c | 20 ++++++++++++++++----
-> > >  1 file changed, 16 insertions(+), 4 deletions(-)
-> > >
-> > > diff --git a/drivers/iommu/io-pgtable-arm-v7s.c b/drivers/iommu/io-pgtable-arm-v7s.c
-> > > index 445c3bde04800c..996f7b6d00b44a 100644
-> > > --- a/drivers/iommu/io-pgtable-arm-v7s.c
-> > > +++ b/drivers/iommu/io-pgtable-arm-v7s.c
-> > > @@ -161,6 +161,14 @@
-> > >
-> > >  #define ARM_V7S_TCR_PD1                    BIT(5)
-> > >
-> > > +#ifdef CONFIG_ZONE_DMA32
-> > > +#define ARM_V7S_TABLE_GFP_DMA GFP_DMA32
-> > > +#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA32
-> > > +#else
-> > > +#define ARM_V7S_TABLE_GFP_DMA GFP_DMA
-> > > +#define ARM_V7S_TABLE_SLAB_CACHE SLAB_CACHE_DMA
-> > > +#endif
-> >
-> > It's a bit grotty that GFP_DMA32 doesn't just map to GFP_DMA on 32-bit
-> > architectures, since then we wouldn't need this #ifdeffery afaict.
->
-> But GFP_DMA32 should map to GFP_KERNEL on 32b, no? Or what exactly is
-> going on in here?
+From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 
-GFP_DMA32 will fail due to check_slab_flags (aka GFP_SLAB_BUG_MASK
-before patch 1/3 of this series)... But yes, it may be neater if there
-was transparent remapping of GFP_DMA32/SLAB_CACHE_DMA32 to
-GFP_DMA/SLAB_CACHE_DMA on 32-bit arch...
+The curr_ret_stack is no longer set to -1 when not tracing a function. It is
+now done differently, and the FTRACE_NOTRACE_DEPTH value is no longer used.
+Remove the reference to it.
 
-> --
-> Michal Hocko
-> SUSE Labs
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+---
+ arch/arm64/kernel/stacktrace.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 4989f7ea1e59..7723dadf25be 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+ 			(frame->pc == (unsigned long)return_to_handler)) {
+ 		if (WARN_ON_ONCE(frame->graph == -1))
+ 			return -EINVAL;
+-		if (frame->graph < -1)
+-			frame->graph += FTRACE_NOTRACE_DEPTH;
+-
+ 		/*
+ 		 * This is a case where function graph tracer has
+ 		 * modified a return address (LR) in a stack frame
+-- 
+2.19.1
