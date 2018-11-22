@@ -1,42 +1,65 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Nov 2018 13:11:34 +1300
-Subject: [PATCH v7 1/9] ARM: l2c: move cache-aurora-l2.h to asm/hardware
+Date: Thu, 22 Nov 2018 13:11:40 +1300
+Subject: [PATCH v7 7/9] EDAC: Add missing debugfs_create_x32 wrapper
 In-Reply-To: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
 References: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181122001142.19187-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181122001142.19187-8-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jan Luebbe <jlu@pengutronix.de>
 
-This include file will be used by the AURORA EDAC code.
+We already have wrappers for x8 and x16, so add the missing x32 one.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
-Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Reviewed-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
- arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h | 0
- arch/arm/mm/cache-l2x0.c                                | 2 +-
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename arch/arm/{mm => include/asm/hardware}/cache-aurora-l2.h (100%)
+ drivers/edac/debugfs.c     | 11 +++++++++++
+ drivers/edac/edac_module.h |  5 +++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm/mm/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
-similarity index 100%
-rename from arch/arm/mm/cache-aurora-l2.h
-rename to arch/arm/include/asm/hardware/cache-aurora-l2.h
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 808efbb89b88..a00d6f7fd34c 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -30,8 +30,8 @@
- #include <asm/cp15.h>
- #include <asm/cputype.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include <asm/hardware/cache-aurora-l2.h>
- #include "cache-tauros3.h"
--#include "cache-aurora-l2.h"
+diff --git a/drivers/edac/debugfs.c b/drivers/edac/debugfs.c
+index 92dbb7e2320c..268ede7a60b2 100644
+--- a/drivers/edac/debugfs.c
++++ b/drivers/edac/debugfs.c
+@@ -161,3 +161,14 @@ struct dentry *edac_debugfs_create_x16(const char *name, umode_t mode,
+ 	return debugfs_create_x16(name, mode, parent, value);
+ }
+ EXPORT_SYMBOL_GPL(edac_debugfs_create_x16);
++
++/* Wrapper for debugfs_create_x32() */
++struct dentry *edac_debugfs_create_x32(const char *name, umode_t mode,
++				       struct dentry *parent, u32 *value)
++{
++	if (!parent)
++		parent = edac_debugfs;
++
++	return debugfs_create_x32(name, mode, parent, value);
++}
++EXPORT_SYMBOL_GPL(edac_debugfs_create_x32);
+diff --git a/drivers/edac/edac_module.h b/drivers/edac/edac_module.h
+index dec88dcea036..546b16e29221 100644
+--- a/drivers/edac/edac_module.h
++++ b/drivers/edac/edac_module.h
+@@ -82,6 +82,8 @@ struct dentry *
+ edac_debugfs_create_x8(const char *name, umode_t mode, struct dentry *parent, u8 *value);
+ struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode, struct dentry *parent, u16 *value);
++struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode, struct dentry *parent, u32 *value);
+ #else
+ static inline int edac_debugfs_init(void)					{ return -ENODEV; }
+ static inline void edac_debugfs_exit(void)					{ }
+@@ -98,6 +100,9 @@ edac_debugfs_create_x8(const char *name, umode_t mode,
+ static inline struct dentry *
+ edac_debugfs_create_x16(const char *name, umode_t mode,
+ 		       struct dentry *parent, u16 *value)			{ return NULL; }
++static inline struct dentry *
++edac_debugfs_create_x32(const char *name, umode_t mode,
++		       struct dentry *parent, u32 *value)			{ return NULL; }
+ #endif
  
- struct l2c_init_data {
- 	const char *type;
+ /*
 -- 
 2.19.1
