@@ -1,81 +1,144 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 22 Nov 2018 16:59:44 +0100
-Subject: [RFC PATCH v3 05/17] irqchip/sun4i: add support for suniv
- interrupt controller
-In-Reply-To: <20181122150200.p6e22sp3v4npb42w@ThinkPad>
-References: <cover.1542824904.git.mesihkilinc@gmail.com>
- <08b40429e46626f4caf8e4d2287b5c4d354e3b7f.1542824904.git.mesihkilinc@gmail.com>
- <20181122083547.srnopylueqx6p2qj@flea>
- <20181122150200.p6e22sp3v4npb42w@ThinkPad>
-Message-ID: <20181122155944.vkx2u4iwwedheor2@flea>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 22 Nov 2018 10:07:09 -0600
+Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+In-Reply-To: <20181122084712.GA5741@ulmo>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
+ <20181120152907.GA28796@ulmo> <20181121142740.GA29704@ulmo>
+ <CABb+yY0nH3Su6a11TZLJf=CCpD+gTpqUkLnRhpy4MUwNJk5prw@mail.gmail.com>
+ <20181122084712.GA5741@ulmo>
+Message-ID: <CABb+yY1Ez=tSyPq=bX7oE3s3Eu97kdOS6+PkfDg1HKtkYyWTpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 06:02:00PM +0300, Mesih Kilinc wrote:
-> > > diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> > > index e3e5b91..7ca4a4d 100644
-> > > --- a/drivers/irqchip/irq-sun4i.c
-> > > +++ b/drivers/irqchip/irq-sun4i.c
-> > > @@ -28,11 +28,21 @@
-> > >  #define SUN4I_IRQ_NMI_CTRL_REG		0x0c
-> > >  #define SUN4I_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
-> > >  #define SUN4I_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
-> > > -#define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
-> > > -#define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
-> > > +#define SUN4I_IRQ_ENABLE_REG(x)		(irq_ic_data->enable_req_offset + 0x4 * x)
-> > > +#define SUN4I_IRQ_MASK_REG(x)		(irq_ic_data->mask_req_offset + 0x4 * x)
-> > 
-> > You shouldn't have all the values you use passed as argument, so
-> > irq_ic_data should be one of them here.
-> >
+Hi Thierry,
+
+On Thu, Nov 22, 2018 at 2:47 AM Thierry Reding <thierry.reding@gmail.com> wrote:
 >
-> Could you elaborate it a little bit?
+> On Wed, Nov 21, 2018 at 08:18:22PM -0600, Jassi Brar wrote:
+> > On Wed, Nov 21, 2018 at 8:27 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > >
+> > > On Tue, Nov 20, 2018 at 04:29:07PM +0100, Thierry Reding wrote:
+> > > > On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
+> > > > > On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > > >
+> > > > > > From: Thierry Reding <treding@nvidia.com>
+> > > > > >
+> > > > > > The mailbox framework supports blocking transfers via completions for
+> > > > > > clients that can sleep. In order to support blocking transfers in cases
+> > > > > > where the transmission is not permitted to sleep, add a new ->flush()
+> > > > > > callback that controller drivers can implement to busy loop until the
+> > > > > > transmission has been completed. This will automatically be called when
+> > > > > > available and interrupts are disabled for clients that request blocking
+> > > > > > transfers.
+> > > > > >
+> > > > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > > > > > ---
+> > > > > >  drivers/mailbox/mailbox.c          | 8 ++++++++
+> > > > > >  include/linux/mailbox_controller.h | 4 ++++
+> > > > > >  2 files changed, 12 insertions(+)
+> > > > > >
+> > > > > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> > > > > > index 674b35f402f5..0eaf21259874 100644
+> > > > > > --- a/drivers/mailbox/mailbox.c
+> > > > > > +++ b/drivers/mailbox/mailbox.c
+> > > > > > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> > > > > >                 unsigned long wait;
+> > > > > >                 int ret;
+> > > > > >
+> > > > > > +               if (irqs_disabled() && chan->mbox->ops->flush) {
+> > > > > > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
+> > > > > > +                       if (ret < 0)
+> > > > > > +                               tx_tick(chan, ret);
+> > > > > > +
+> > > > > > +                       return ret;
+> > > > > > +               }
+> > > > > > +
+> > > > > This is hacky. I think we can do without busy waiting in atomic
+> > > > > context. You could queue locally while in atomic context and then
+> > > > > transfer in blocking mode. I don't think we should worry about the
+> > > > > 'throughput' as there already is no h/w rate control even with
+> > > > > busy-waiting.
+> > > >
+> > > > I actually tried to do that before I added this flushing mechanism. The
+> > > > problem is, like you said, one of rate control. As mentioned in the
+> > > > cover letter, the shared mailboxes implemented in tegra-hsp are used as
+> > > > RX and TX channels for the TCU, which is like a virtual UART. The TTY
+> > > > driver included as part of this series will use one of the mailboxes to
+> > > > transmit data that is written to the console. The problem is that if
+> > > > these transmissions are not rate-limited on the TTY driver side, the
+> > > > console will just keep writing data and eventually overflow the buffer
+> > > > that we have in the mailbox subsystem.
+> > > >
+> > > > The problem is that data comes in at a much higher rate than what we can
+> > > > output. This is especially true at boot when the TCU console takes over
+> > > > and the whole log buffer is dumped on it.
+> > > >
+> > > > So the only way to rate-limit is to either make mbox_send_message()
+> > > > block, but that can only be done in non-atomic context. The console,
+> > > > however, will always run in atomic context, so the only way to do rate-
+> > > > limiting is by busy looping.
+> > >
+> > > What I also tried before was to implement busy looping within the
+> > > ->send_data() callback of the driver so that we didn't have to put this
+> > > into the core. Unfortunately, however, the ->send_data() callback is
+> > > called under chan->lock, which means that from mbox_send_message() we
+> > > don't have a way to mark the transfer as done. In order to do that we'd
+> > > have to call mbox_chan_txdone(), but that ends up calling tx_tick() and
+> > > that in turn also attempts to take the chan->lock, which would cause a
+> > > deadlock.
+> > >
+> > > The explicit flushing is the best alternative that I could come up with.
+> > > I think it's not all that hacky, because it's very explicit about what's
+> > > going on and it has the nice side-effect that it will allow the mailbox
+> > > to work in interrupt driven mode if possible and only resorting to the
+> > > busy loop in atomic context.
+> > >
+> > > At this point I think I have explored all other options and I frankly
+> > > can't find a more proper way to achieve what we need here. Perhaps you
+> > > can think of additional ways to accomplish this?
+> > >
+> > Well, I would have a local ring buffer (array) of enough size to hold
+> > the characters and then have a task consuming data from that ring
+> > buffer by transmitting over mailbox.
+>
+> There's already such a ringbuffer in the printk code. To implement what
+> you suggest would effectively be creating a copy of that buffer because
+> we'd be allocating the buffer and the console code would just dump each
+> and every character in the logbuf into that ring buffer without rate-
+> limitation.
+>
+Well, the console assumes there exists an atomic path to put character
+on the bus, But because there isn't in case of tcu, we have to emulate
+that. Frankly I prefer the one-off driver jump some hoops, rather than
+implement exceptions in the api.
+BTW, there is already no rate-limitation because its all virtual -
+data is consumed as fast as possible.
 
-You should change your macro to something like:
+> To make matters worse, the ringbuffer would be empty most of the time
+> after the initial dump of the logbuf, so we'd be wasting all that buffer
+> space.
+>
+The idea is console and uart-ops both feed into this buffer and the
+only consumer thread runs the mailbox.
 
-SUN4I_IRQ_ENABLE_REG(data, x) ((data)->enable_req_offset + 0x4 * x)
+> It just seems to me like we should be keeping the TCU driver as close as
+> possible to other UART drivers which also busy loop in order to rate-
+> limit what the console can write. Given the current mailbox framework it
+> is not possible to do that (in interrupt context), so an extension seems
+> like the most sensible option.
+>
+> Perhaps you'd be less concerned about such a change if it was perhaps
+> more explicit? Just throwing ideas around, I think something that could
+> also work is if we explicitly add a mbox_flush() function that would
+> basically be calling ->flush(). That way users of the mailbox can make
+> their requirement very explicit. I haven't actually tested that, but I
+> think it would work. Does that sound more acceptable to you?
+>
+I am happy to see features and bugfixes added to the api. What I am
+not eager about is supporting less than 100% legit and very platform
+specific usecases, especially when there is a work around.
 
-That way, you are transparent about the parameters that the macro
-expects, and don't rely on some unwritten rule about the variable
-name.
-
-> > > +
-> > > +static int __init suniv_ic_of_init(struct device_node *node,
-> > > +				   struct device_node *parent)
-> > > +{
-> > > +	irq_ic_data = kzalloc(sizeof(struct sunxi_irq_chip_data), GFP_KERNEL);
-> > > +	if (!irq_ic_data) {
-> > > +		pr_err("kzalloc failed!\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +	irq_ic_data->enable_req_offset = SUNIV_IRQ_ENABLE_REG_OFFSET;
-> > > +	irq_ic_data->mask_req_offset = SUNIV_IRQ_MASK_REG_OFFSET;
-> > > +
-> > > +	return sun4i_of_init(node, parent);
-> > > +}
-> > > +
-> > > +IRQCHIP_DECLARE(allwinner_sunvi_ic, "allwinner,suniv-f1c100s-ic", suniv_ic_of_init);
-> > 
-> > You can even split that addition to a new patch as well.
-> 
-> OK. I will do 3 patches. First one will add a struct that holds only
-> base and domain. Second one will add register offsets to that struct. 
-> Third one will add f1c100s support. Is that ok?
-
-Sounds perfect :)
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/6f17eed2/attachment.sig>
+Thanks.
