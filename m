@@ -1,63 +1,59 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 23:01:11 +0100
-Subject: [PATCH 1/1] iio: adc: meson-saradc: fix internal clock names
-In-Reply-To: <20181122220111.28808-1-martin.blumenstingl@googlemail.com>
-References: <20181122220111.28808-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181122220111.28808-2-martin.blumenstingl@googlemail.com>
+Date: Thu, 22 Nov 2018 23:05:48 +0100
+Subject: [PATCH] clk: meson: Fix GXL HDMI PLL fractional bits width
+In-Reply-To: <5e87ffda-4a38-f45b-00c4-6b73dc721656@baylibre.com>
+References: <20181121111922.1277-1-narmstrong@baylibre.com>
+ <CAFBinCDkXYH9bCf_aaVptqcgZabreuZxLoAW3-o2qBHgcbm8Xw@mail.gmail.com>
+ <5e87ffda-4a38-f45b-00c4-6b73dc721656@baylibre.com>
+Message-ID: <CAFBinCCjmw=8ESk0tztWszXnuA4aqWqC8_wdpvMtSYfwZ-KT=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before this patch we are registering the internal clocks (for example on
-Meson8b, where the SAR ADC IP block implements the divider and gate
-clocks) with the following names:
-- /soc/cbus at c1100000/adc at 8680#adc_div
-- /soc/cbus at c1100000/adc at 8680#adc_en
+Hi Neil,
 
-This is bad because the common clock framework uses the clock to create
-a directory in <debugfs>/clk. With such name, the directory creation
-(silently) fails and the debugfs entry ends up being created at the
-debugfs root.
+On Thu, Nov 22, 2018 at 9:26 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>
+> Hi Martin,
+>
+> On 21/11/2018 22:53, Martin Blumenstingl wrote:
+> > Hi Neil,
+> >
+> > On Wed, Nov 21, 2018 at 12:19 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+> >>
+> >> The GXL Documentation specifies 12 bits for the Fractional bit field,
+> >> bit the last bits have a different purpose that we cannot handle right
+> >> now, so update the bitwidth to have correct fractional calculations.
+> > I assume you have more accurate documentation than what's available publicly:
+> > - the S805 datasheet doesn't have any documentation for this register at all
+> > - the S905 datasheet states that HHI_HDMI_PLL_CNTL2[11:0] are DIV_FRAC
+> > - the S905X and S912 datasheets state that SDMNC_POWER is at
+> > HHI_HDMI_PLL_CNTL2[6:0], SDMNC_ULMS is at HHI_HDMI_PLL_CNTL2[9:7] and
+> > SSC_DEP_SEL is at HHI_HDMI_PLL_CNTL2[13:10]
+> > - the S905X and S912 datasheets state that HHI_HDMI_PLL_CNTL1[11:0] are DIV_FRAC
+>
+> On S905, the HHI_HDMI_PLL_CNTL2 is at address 0xc9 << 2, but on S905X/S905D/S912 the
+> equivalent register at same address is named HHI_HDMI_PLL_CNTL1.
+>
+> They changed the numbering of registers between these 2 SoCs, but the register
+> content and addresses are similar for m/n/frac/reset.
+I totally missed that - thanks for the explanation!
 
-With this change, the new clock names are:
-- c1108680.adc#adc_div
-- c1108680.adc#adc_en
+> >
+> > can you confirm that the public S905X and S912 documentation is wrong
+> > and that the .frac field is really part of HHI_HDMI_PLL_CNTL2 instead
+> > of HHI_HDMI_PLL_CNTL1?
+>
+> Is is part of HHI_HDMI_PLL_CNTL1 but at address of S905 HHI_HDMI_PLL_CNTL2.
+>
+> When jerome pushed the PLL support earlier, he added a comment.
+> I simply forgot to put it back when I added back the GXL HDMI PLL DCO.
+I'm curious: do you know whether the fractional divider field on
+Meson8b is 10 or 12 bits wide?
 
-This matches the clock naming scheme used in the PWM, Ethernet and MMC
-drivers. It also fixes the problem with debugfs.
-The idea is shamelessly taken from commit b96e9eb62841c5 ("pwm: meson:
-Fix mux clock names").
+if you can add a short note about the naming confusion to the patch
+description when applying the patch:
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Fixes: 3921db46a8c5bc ("iio: Convert to using %pOF instead of full_name")
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/iio/adc/meson_saradc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-index 6155d26091eb..729becb2d3d9 100644
---- a/drivers/iio/adc/meson_saradc.c
-+++ b/drivers/iio/adc/meson_saradc.c
-@@ -656,8 +656,8 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
- 	struct clk_init_data init;
- 	const char *clk_parents[1];
- 
--	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_div",
--				   indio_dev->dev.of_node);
-+	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_div",
-+				   dev_name(indio_dev->dev.parent));
- 	if (!init.name)
- 		return -ENOMEM;
- 
-@@ -678,8 +678,8 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
- 	if (WARN_ON(IS_ERR(priv->adc_div_clk)))
- 		return PTR_ERR(priv->adc_div_clk);
- 
--	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_en",
--				   indio_dev->dev.of_node);
-+	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_en",
-+				   dev_name(indio_dev->dev.parent));
- 	if (!init.name)
- 		return -ENOMEM;
- 
--- 
-2.19.1
+Regards
+Martin
