@@ -1,272 +1,50 @@
-From: sugaya.taichi@socionext.com (Sugaya, Taichi)
-Date: Thu, 22 Nov 2018 11:23:54 +0900
-Subject: [PATCH 05/14] clocksource/drivers/timer-milbeaut: Add Milbeaut
- M10V timer
-In-Reply-To: <c6b7ddb0-064a-8f09-bbb4-9754f3d63ecb@linaro.org>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-6-git-send-email-sugaya.taichi@socionext.com>
- <c6b7ddb0-064a-8f09-bbb4-9754f3d63ecb@linaro.org>
-Message-ID: <07d26609-e10c-70f1-1360-63ed0e214d7e@socionext.com>
+From: xiaowei.bao@nxp.com (Xiaowei Bao)
+Date: Thu, 22 Nov 2018 02:33:29 +0000
+Subject: [PATCHv4 0/3] dts: Add the property of IB and OB
+In-Reply-To: <20181120173021.GA29331@e107981-ln.cambridge.arm.com>
+References: <20171110034847.17891-1-xiaowei.bao@nxp.com>
+ <20181120173021.GA29331@e107981-ln.cambridge.arm.com>
+Message-ID: <HE1PR04MB14978C967CFAE17815FF1CC8F5DB0@HE1PR04MB1497.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel
+Hi Lorenzo,
 
-Thank you for your comments.
+Yes, these series patches can drop, thanks a lot. 
 
-On 2018/11/21 19:08, Daniel Lezcano wrote:
-> Hi Sugaya,
->
->
-> On 19/11/2018 02:01, Sugaya Taichi wrote:
->> Add Milbeaut M10V timer using 32bit timer in peripheral.
-> Give a better description of the timer as it is new timer introduced.
+Best regards
+Xiaowei
 
-I got it. Add more description.
+-----Original Message-----
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> 
+Sent: 2018?11?21? 1:31
+To: Xiaowei Bao <xiaowei.bao@nxp.com>
+Cc: robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com; bhelgaas at google.com; shawnguo at kernel.org; Madalin-cristian Bucur <madalin.bucur@nxp.com>; sumit.garg at nxp.com; Y.B. LU <yangbo.lu@nxp.com>; hongtao.jia at nxp.com; Andy Tang <andy.tang@nxp.com>; Leo Li <leoyang.li@nxp.com>; kishon at ti.com; jingoohan1 at gmail.com; pbrobinson at gmail.com; songxiaowei at hisilicon.com; devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-pci at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; Z.q. Hou <zhiqiang.hou@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
+Subject: Re: [PATCHv4 0/3] dts: Add the property of IB and OB
 
+On Fri, Nov 10, 2017 at 11:48:44AM +0800, Bao Xiaowei wrote:
+> Depend on 
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fpatc
+> hwork.ozlabs.org%2Fpatch%2F815382%2F&amp;data=02%7C01%7Cxiaowei.bao%40
+> nxp.com%7C675188594567418ccf6a08d64f0de9f5%7C686ea1d3bc2b4c6fa92cd99c5
+> c301635%7C0%7C0%7C636783318517192971&amp;sdata=HilLT%2B5T%2B%2Bubpxra8
+> l54ZViEFN7SBCf4vDB8zDMWUd4%3D&amp;reserved=0
+> 
+> Bao Xiaowei (3):
+>   ARMv8: dts: ls1046a: add the property of IB and OB
+>   ARMv8: layerscape: add the pcie ep function support
+>   ARMv8: pcie: make the DWC EP driver support for layerscape
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi |   6 ++
+>  drivers/pci/dwc/Kconfig                        |   1 +
+>  drivers/pci/dwc/pci-layerscape.c               | 121 +++++++++++++++++++++++--
+>  3 files changed, 121 insertions(+), 7 deletions(-)
 
->> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
->> ---
->>   drivers/clocksource/Kconfig      |   8 +++
->>   drivers/clocksource/Makefile     |   1 +
->>   drivers/clocksource/timer-m10v.c | 146 +++++++++++++++++++++++++++++++++++++++
->>   3 files changed, 155 insertions(+)
->>   create mode 100644 drivers/clocksource/timer-m10v.c
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 55c77e4..a278d72 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -638,4 +638,12 @@ config GX6605S_TIMER
->>   	help
->>   	  This option enables support for gx6605s SOC's timer.
->>   
->> +config M10V_TIMER
->> +	bool "Milbeaut M10V timer driver" if COMPILE_TEST
->> +	depends on OF
->> +	depends on ARM
->> +	select TIMER_OF
->> +	help
->> +	  Enables the support for Milbeaut M10V timer driver.
->> +
->>   endmenu
->> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
->> index dd91381..8e908b4 100644
->> --- a/drivers/clocksource/Makefile
->> +++ b/drivers/clocksource/Makefile
->> @@ -55,6 +55,7 @@ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
->>   obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
->>   obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
->>   obj-$(CONFIG_OWL_TIMER)		+= timer-owl.o
->> +obj-$(CONFIG_M10V_TIMER)	+= timer-m10v.o
->>   obj-$(CONFIG_SPRD_TIMER)	+= timer-sprd.o
->>   obj-$(CONFIG_NPCM7XX_TIMER)	+= timer-npcm7xx.o
->>   
->> diff --git a/drivers/clocksource/timer-m10v.c b/drivers/clocksource/timer-m10v.c
->> new file mode 100644
->> index 0000000..ff97c23
->> --- /dev/null
->> +++ b/drivers/clocksource/timer-m10v.c
->> @@ -0,0 +1,146 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Copyright (C) 2018 Socionext Inc.
->> + */
->> +
->> +#include <linux/clk.h>
-> ------->
->
->> +#include <linux/clockchips.h>
-> It is included from timer-of.h
->
-> <-------
+Can I drop this series from the linux-pci patch queue ? I reckon it is superseded by:
 
-OK. Remove it.
+https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fpatchwork.ozlabs.org%2Fpatch%2F992928%2F&amp;data=02%7C01%7Cxiaowei.bao%40nxp.com%7C675188594567418ccf6a08d64f0de9f5%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C636783318517192971&amp;sdata=i3U%2F7uT%2Fno%2FSGVc6VD1gg7Ybn0zV%2F%2B8A9698QHfuoTo%3D&amp;reserved=0
 
+but I wanted to make sure that's the case, I really can't follow the version numbering so I am asking.
 
->
->> +#include <linux/interrupt.h>
->> +#include <linux/irq.h>
->> +#include <linux/irqreturn.h>
-> ------->
->
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/slab.h>
-> Those are not needed IMO.
->
-> <---------
-
-OK, remove these.
-
-
->
->
->> +#include "timer-of.h"
->> +
->> +#define FSL_TMR_TMCSR_OFS	0x0
->> +#define FSL_TMR_TMR_OFS		0x4
->> +#define FSL_TMR_TMRLR1_OFS	0x8
->> +#define FSL_TMR_TMRLR2_OFS	0xc
->> +#define FSL_RMT_REGSZPCH	0x10
->> +
->> +#define FSL_TMR_TMCSR_OUTL	BIT(5)
->> +#define FSL_TMR_TMCSR_RELD	BIT(4)
->> +#define FSL_TMR_TMCSR_INTE	BIT(3)
->> +#define FSL_TMR_TMCSR_UF	BIT(2)
->> +#define FSL_TMR_TMCSR_CNTE	BIT(1)
->> +#define FSL_TMR_TMCSR_TRG	BIT(0)
->> +
->> +#define FSL_TMR_TMCSR_CSL_DIV2	0
->> +#define FSL_TMR_TMCSR_CSL	BIT(10)
->> +
->> +#define M10V_TIMER_RATING	500
->> +
->> +static irqreturn_t m10v_timer_interrupt(int irq, void *dev_id)
->> +{
->> +	struct clock_event_device *clk = dev_id;
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val;
->> +
->> +	val = readl_relaxed(timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +	val &= ~FSL_TMR_TMCSR_UF;
->> +	writel_relaxed(val, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +
->> +	clk->event_handler(clk);
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +static int m10v_set_state_periodic(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = (FSL_TMR_TMCSR_CSL_DIV2 * FSL_TMR_TMCSR_CSL);
-> 	FSL_TMR_TMCSR_CSL_DIV2 is zero, so val is always zero.
-Ah, yes.
-The FSL_TMR_TMCSR is the 10th bit field of the register, so it would be 
-better
-to bit-shift.
-I will use it as simply 0.
-
-> 	
->> +	writel_relaxed(val, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +
->> +	writel_relaxed(to->of_clk.period, timer_of_base(to) +
->> +				FSL_TMR_TMRLR1_OFS);
->> +	val |= FSL_TMR_TMCSR_RELD | FSL_TMR_TMCSR_CNTE |
->> +		FSL_TMR_TMCSR_TRG | FSL_TMR_TMCSR_INTE;
->> +	writel_relaxed(val, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int m10v_set_state_oneshot(struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +	u32 val = (FSL_TMR_TMCSR_CSL_DIV2 * FSL_TMR_TMCSR_CSL);
->> +
->> +	writel_relaxed(val, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int m10v_clkevt_next_event(unsigned long event,
->> +				   struct clock_event_device *clk)
->> +{
->> +	struct timer_of *to = to_timer_of(clk);
->> +
->> +	writel_relaxed(event, timer_of_base(to) + FSL_TMR_TMRLR1_OFS);
->> +	writel_relaxed((FSL_TMR_TMCSR_CSL_DIV2 * FSL_TMR_TMCSR_CSL) |
-> Same comment here.
-
-I got it.
-
-
->> +			FSL_TMR_TMCSR_CNTE | FSL_TMR_TMCSR_INTE |
->> +			FSL_TMR_TMCSR_TRG, timer_of_base(to) +
->> +			FSL_TMR_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int m10v_config_clock_source(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + FSL_TMR_TMR_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + FSL_TMR_TMRLR1_OFS);
->> +	writel_relaxed(~0, timer_of_base(to) + FSL_TMR_TMRLR2_OFS);
->> +	writel_relaxed(BIT(4) | BIT(1) | BIT(0), timer_of_base(to) +
->> +		FSL_TMR_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static int m10v_config_clock_event(struct timer_of *to)
->> +{
->> +	writel_relaxed(0, timer_of_base(to) + FSL_TMR_TMCSR_OFS);
->> +	return 0;
->> +}
->> +
->> +static struct timer_of to = {
->> +	.flags = TIMER_OF_IRQ | TIMER_OF_BASE | TIMER_OF_CLOCK,
->> +
->> +	.clkevt = {
->> +		.name = "m10v-clkevt",
->> +		.rating = M10V_TIMER_RATING,
->> +		.cpumask = cpu_possible_mask,
->> +	},
->> +
->> +	.of_irq = {
->> +		.flags = IRQF_TIMER | IRQF_IRQPOLL,
->> +	},
->> +};
->> +
->> +static int __init m10v_timer_init(struct device_node *node)
->> +{
->> +	int ret;
->> +
->> +	to.clkevt.features = CLOCK_EVT_FEAT_DYNIRQ | CLOCK_EVT_FEAT_ONESHOT;
->> +	to.clkevt.set_state_oneshot = m10v_set_state_oneshot;
->> +	to.clkevt.set_state_periodic = m10v_set_state_periodic;
->> +	to.clkevt.set_next_event = m10v_clkevt_next_event;
->> +	to.of_irq.handler = m10v_timer_interrupt;
-> Move the initialization in the timer_of structure above.
-
-Okay.
-
-
->
->> +	ret = timer_of_init(node, &to);
->> +	if (ret)
->> +		goto err;
-> You should return directly, rollback is done in the timer_of_init().
-
-OK.
-
-
->
->> +
->> +	m10v_config_clock_source(&to);
->> +	clocksource_mmio_init(timer_of_base(&to) + FSL_TMR_TMR_OFS,
->> +		node->name, timer_of_rate(&to), M10V_TIMER_RATING, 32,
->> +		clocksource_mmio_readl_down);
-> May be you can add the sched_clock also ?
-
-OK. Add it and confirm.
-
-
-Thanks
-Sugaya Taichi
-
-
->
->> +	m10v_config_clock_event(&to);
->> +	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to),
->> +				15, 0xffffffff);
->> +
->> +	return 0;
->> +err:
->> +	timer_of_cleanup(&to);
->> +	return ret;
->> +}
->> +TIMER_OF_DECLARE(m10v_peritimer, "socionext,milbeaut-m10v-timer",
->> +		m10v_timer_init);
->>
->
+Thanks,
+Lorenzo
