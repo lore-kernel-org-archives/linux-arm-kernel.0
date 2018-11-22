@@ -1,51 +1,72 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 22 Nov 2018 09:26:21 +0100
-Subject: [PATCH] clk: meson: Fix GXL HDMI PLL fractional bits width
-In-Reply-To: <CAFBinCDkXYH9bCf_aaVptqcgZabreuZxLoAW3-o2qBHgcbm8Xw@mail.gmail.com>
-References: <20181121111922.1277-1-narmstrong@baylibre.com>
- <CAFBinCDkXYH9bCf_aaVptqcgZabreuZxLoAW3-o2qBHgcbm8Xw@mail.gmail.com>
-Message-ID: <5e87ffda-4a38-f45b-00c4-6b73dc721656@baylibre.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Thu, 22 Nov 2018 09:26:35 +0100
+Subject: [RFC PATCH v3 01/17] ARM: add CONFIG_ARCH_SUNXI_V7 for
+ differentiate ARMv5/v7 Allwinner SoCs
+In-Reply-To: <267ffcf3b91930a82f20d93e1fad1fceaf8b9b0e.1542824904.git.mesihkilinc@gmail.com>
+References: <cover.1542824904.git.mesihkilinc@gmail.com>
+ <267ffcf3b91930a82f20d93e1fad1fceaf8b9b0e.1542824904.git.mesihkilinc@gmail.com>
+Message-ID: <20181122082635.br5n33owxxpenv62@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
-
-On 21/11/2018 22:53, Martin Blumenstingl wrote:
-> Hi Neil,
+On Wed, Nov 21, 2018 at 09:30:34PM +0300, Mesih Kilinc wrote:
+> Allwinner also has some ARMv5 SoCs.
 > 
-> On Wed, Nov 21, 2018 at 12:19 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
->>
->> The GXL Documentation specifies 12 bits for the Fractional bit field,
->> bit the last bits have a different purpose that we cannot handle right
->> now, so update the bitwidth to have correct fractional calculations.
-> I assume you have more accurate documentation than what's available publicly:
-> - the S805 datasheet doesn't have any documentation for this register at all
-> - the S905 datasheet states that HHI_HDMI_PLL_CNTL2[11:0] are DIV_FRAC
-> - the S905X and S912 datasheets state that SDMNC_POWER is at
-> HHI_HDMI_PLL_CNTL2[6:0], SDMNC_ULMS is at HHI_HDMI_PLL_CNTL2[9:7] and
-> SSC_DEP_SEL is at HHI_HDMI_PLL_CNTL2[13:10]
-> - the S905X and S912 datasheets state that HHI_HDMI_PLL_CNTL1[11:0] are DIV_FRAC
-
-On S905, the HHI_HDMI_PLL_CNTL2 is at address 0xc9 << 2, but on S905X/S905D/S912 the
-equivalent register@same address is named HHI_HDMI_PLL_CNTL1.
-
-They changed the numbering of registers between these 2 SoCs, but the register
-content and addresses are similar for m/n/frac/reset.
-
+> In order to add support for them, add a CONFIG_ARCH_SUNXI_V7 bool config
+> which is selected when a ARMv7 soc is selected, and make CONFIG_ARCH_SUNXI
+> a common option which is selected by both V7 and V5 sunxi option.
 > 
-> can you confirm that the public S905X and S912 documentation is wrong
-> and that the .frac field is really part of HHI_HDMI_PLL_CNTL2 instead
-> of HHI_HDMI_PLL_CNTL1?
-
-Is is part of HHI_HDMI_PLL_CNTL1 but at address of S905 HHI_HDMI_PLL_CNTL2.
-
-When jerome pushed the PLL support earlier, he added a comment.
-I simply forgot to put it back when I added back the GXL HDMI PLL DCO.
-
-Neil
-
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> ---
+>  arch/arm/mach-sunxi/Kconfig | 23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
 > 
-> 
-> Regards
-> Martin
-> 
+> diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> index d9c8ecf..7e5f173 100644
+> --- a/arch/arm/mach-sunxi/Kconfig
+> +++ b/arch/arm/mach-sunxi/Kconfig
+> @@ -6,31 +6,38 @@ menuconfig ARCH_SUNXI
+>  	select GENERIC_IRQ_CHIP
+>  	select GPIOLIB
+>  	select PINCTRL
+> -	select PM_OPP
+>  	select SUN4I_TIMER
+>  	select RESET_CONTROLLER
+> +	help
+> +	  Support for Allwinner ARM-based family of processors
+>  
+>  if ARCH_SUNXI
+>  
+> +if ARCH_MULTI_V7
+> +
+> +config ARCH_SUNXI_V7
+> +	bool
+> +	select PM_OPP
+> +
+
+Actually, thinking more about this, I don't see why the PM_OPP config
+option should be made specific to the ARMv7 sunxi SoCs, you will have
+things cpufreq enabled at some point as well on the armv5 support.
+
+>  config MACH_SUN4I
+>  	bool "Allwinner A10 (sun4i) SoCs support"
+> -	default ARCH_SUNXI
+> +	select ARCH_SUNXI_V7
+
+The option is still changed from being on by default to being off by
+default. This breaks all the defconfig, and we really shouldn't change
+that.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/0390c8e4/attachment.sig>
