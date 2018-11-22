@@ -1,175 +1,48 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 22 Nov 2018 11:54:50 +0900
-Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
-In-Reply-To: <5BF619EE.8090006@samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
- <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
- <5BF619EE.8090006@samsung.com>
-Message-ID: <5BF61A7A.1060805@samsung.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 22 Nov 2018 02:55:45 +0000
+Subject: [PATCH] ARM: dts: imx6sll-evk: use WDOG_B pin reset
+Message-ID: <1542855018-30217-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018? 11? 22? 11:52, Chanwoo Choi wrote:
-> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
->> The refactoring is needed for the new client in devfreq: suspend.
->> To avoid code duplication, move it to the new local function
->> devfreq_set_target.
->>
->> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
->> solve issue with devfreq device's frequency during suspend/resume.
->> During the discussion on LKML some corner cases and comments appeared
->> related to the design. This patch address them keeping in mind suggestions
->> from Chanwoo Choi.
-> 
-> As I commented on patch1, please remove it.
-> 
->>
->> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>  drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
->>  1 file changed, 37 insertions(+), 25 deletions(-)
->>
->> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
->> index e20e7e4..cf9c643 100644
->> --- a/drivers/devfreq/devfreq.c
->> +++ b/drivers/devfreq/devfreq.c
->> @@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
->>  	return 0;
->>  }
->>  
->> +static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
->> +			      unsigned long *prev_freq, u32 flags)
-> 
-> Please remove the unused space in front of 'unsigned long *prev_freq'.
-> Use tab only for indentation.
-> 
->> +{
->> +	struct devfreq_freqs freqs;
->> +	unsigned long cur_freq;
->> +	int err = 0;
->> +
->> +	if (devfreq->profile->get_cur_freq)
->> +		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
->> +	else
->> +		cur_freq = devfreq->previous_freq;
->> +
->> +	freqs.old = cur_freq;
->> +	freqs.new = new_freq;
->> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
->> +
->> +	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
->> +	if (err) {
->> +		freqs.new = cur_freq;
->> +		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> +		return err;
->> +	}
->> +
->> +	freqs.new = new_freq;
->> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> +
->> +	if (devfreq_update_status(devfreq, new_freq))
->> +		dev_err(&devfreq->dev,
->> +			"Couldn't update frequency transition information.\n");
->> +
->> +	devfreq->previous_freq = new_freq;
->> +	*prev_freq = cur_freq;
->> +
->> +	return err;
->> +}
+i.MX6SLL EVK board has WDOG_B pin connected to the PMIC;
 
-You can change the devfreq_set_target as following:
+Add the WDOG_B pinctrl entry and 'fsl,ext-reset-output'
+property to wdog node to let watchdog trigger a system
+POR reset via the PMIC.
 
- static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
--                             unsigned long *prev_freq, u32 flags)
-+                       u32 flags)
- {
-        struct devfreq_freqs freqs;
-        unsigned long cur_freq;
-@@ -319,7 +319,9 @@ static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
-                        "Couldn't update frequency transition information.\n");
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm/boot/dts/imx6sll-evk.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
+index 9c90cbd..d8ad2a2 100644
+--- a/arch/arm/boot/dts/imx6sll-evk.dts
++++ b/arch/arm/boot/dts/imx6sll-evk.dts
+@@ -313,6 +313,12 @@
+ 	status = "okay";
+ };
  
-        devfreq->previous_freq = new_freq;
--       *prev_freq = cur_freq;
-
-
-But, you have to add following new code on patch3 instead of patch2.
-
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog1>;
++	fsl,ext-reset-output;
++};
 +
-+       if (devfreq->suspend_freq)
-+               devfreq->resume_freq = cur_freq;
-
- 
-        return err;
- }
-
-
-
->> +
->>  /* Load monitoring helper functions for governors use */
->>  
->>  /**
->> @@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
->>   */
->>  int update_devfreq(struct devfreq *devfreq)
->>  {
->> -	struct devfreq_freqs freqs;
->>  	unsigned long freq, cur_freq, min_freq, max_freq;
-> 
-> 
-> cur_freq is not used after modification. Remove it.
-> 
->>  	int err = 0;
->>  	u32 flags = 0;
->> @@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
->>  		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
->>  	}
->>  
->> -	if (devfreq->profile->get_cur_freq)
->> -		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
->> -	else
->> -		cur_freq = devfreq->previous_freq;
->> -
->> -	freqs.old = cur_freq;
->> -	freqs.new = freq;
->> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
->> +	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
-> 
-> You get the 'cur_freq' from devfreq_set_taget() for devfreq_suspend_device() on patch3.
-> But, update_devfreq() and devfreq_resume_device() don't use the 'cur_freq' value
-> from devfreq_set_target().
-> 
-> Instead, getting 'cur_freq' for 'devfreq->resume_freq' in the devfreq_set_target().
-> Please remove the 'cur_freq' parameter from devfreq_set_target.
-> 
->>  
->> -	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
->> -	if (err) {
->> -		freqs.new = cur_freq;
->> -		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> -		return err;
->> -	}
->> -
->> -	freqs.new = freq;
->> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> -
->> -	if (devfreq_update_status(devfreq, freq))
->> -		dev_err(&devfreq->dev,
->> -			"Couldn't update frequency transition information.\n");
->> -
->> -	devfreq->previous_freq = freq;
->> -	return err;
->>  }
->>  EXPORT_SYMBOL(update_devfreq);
->>  
->>
-> 
-> 
-
-
+ &iomuxc {
+ 	pinctrl_reg_sd3_vmmc: sd3vmmcgrp {
+ 		fsl,pins = <
+@@ -478,4 +484,10 @@
+ 			MX6SLL_PAD_PWM1__PWM1_OUT   0x110b0
+ 		>;
+ 	};
++
++	pinctrl_wdog1: wdog1grp	{
++		fsl,pins = <
++			MX6SLL_PAD_WDOG_B__WDOG1_B   0x170b0
++		>;
++	};
+ };
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+2.7.4
