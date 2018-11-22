@@ -1,40 +1,330 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 22:40:14 +0100
-Subject: [PATCH v2 1/4] dt-bindings: clock: meson8b: export the CPU post
- dividers
+Date: Thu, 22 Nov 2018 22:40:17 +0100
+Subject: [PATCH v2 4/4] clk: meson: meson8b: add the CPU clock post divider
+ clocks
 In-Reply-To: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
 References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181122214017.25643-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20181122214017.25643-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 There are four CPU clock post dividers:
 - ABP
-- PERIPH (used as input for the ARM global timer and ARM TWD timer)
+- PERIPH (used for the ARM global timer and ARM TWD timer)
 - AXI
 - L2 DRAM
 
-Export these so we can use them in .dts files.
+Each of these clocks consists of two clocks:
+- a mux to select between "cpu_clk" divided by 2, 3, 4, 5, 6, 7 or 8
+- a "_clk_dis" gate. The public S805 datasheet states that this should
+  be set to 1 to disable the clock, the default value is 0. There is
+  also a hint that these are "just in case" bits which only exist in
+  case the corresponding mux implementation does not allow glitch-free
+  parent changes (the muxes are designed in a way that the clock can
+  stay enabled when changing the mux). It's still good practise to
+  describe this clock even if we're not supposed to modify it. Thus
+  this uses the read-only gate ops.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Acked-by: Jerome Brunet <jbrunet@baylibre.com>
 ---
- include/dt-bindings/clock/meson8b-clkc.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/clk/meson/meson8b.c | 244 ++++++++++++++++++++++++++++++++++++
+ drivers/clk/meson/meson8b.h |  13 +-
+ 2 files changed, 256 insertions(+), 1 deletion(-)
 
-diff --git a/include/dt-bindings/clock/meson8b-clkc.h b/include/dt-bindings/clock/meson8b-clkc.h
-index a60f47b49231..5fe2923382d0 100644
---- a/include/dt-bindings/clock/meson8b-clkc.h
-+++ b/include/dt-bindings/clock/meson8b-clkc.h
-@@ -103,5 +103,9 @@
- #define CLKID_MPLL1		94
- #define CLKID_MPLL2		95
- #define CLKID_NAND_CLK		112
-+#define CLKID_ABP		124
-+#define CLKID_PERIPH		126
-+#define CLKID_AXI		128
-+#define CLKID_L2_DRAM		130
+diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+index 010dccc86b5d..f906a9f0eefd 100644
+--- a/drivers/clk/meson/meson8b.c
++++ b/drivers/clk/meson/meson8b.c
+@@ -704,6 +704,227 @@ static struct clk_regmap meson8b_nand_clk_gate = {
+ 	},
+ };
  
- #endif /* __MESON8B_CLKC_H */
++static struct clk_fixed_factor meson8b_cpu_clk_div2 = {
++	.mult = 1,
++	.div = 2,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div2",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div3 = {
++	.mult = 1,
++	.div = 3,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div3",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div4 = {
++	.mult = 1,
++	.div = 4,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div4",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div5 = {
++	.mult = 1,
++	.div = 5,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div5",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div6 = {
++	.mult = 1,
++	.div = 6,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div6",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div7 = {
++	.mult = 1,
++	.div = 7,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div7",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static struct clk_fixed_factor meson8b_cpu_clk_div8 = {
++	.mult = 1,
++	.div = 8,
++	.hw.init = &(struct clk_init_data){
++		.name = "cpu_clk_div8",
++		.ops = &clk_fixed_factor_ops,
++		.parent_names = (const char *[]){ "cpu_clk" },
++		.num_parents = 1,
++	},
++};
++
++static u32 mux_table_abp[] = { 1, 2, 3, 4, 5, 6, 7 };
++static struct clk_regmap meson8b_abp_clk_sel = {
++	.data = &(struct clk_regmap_mux_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.mask = 0x7,
++		.shift = 3,
++		.table = mux_table_abp,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "abp_clk_sel",
++		.ops = &clk_regmap_mux_ops,
++		.parent_names = (const char *[]){ "cpu_clk_div2",
++						  "cpu_clk_div3",
++						  "cpu_clk_div4",
++						  "cpu_clk_div5",
++						  "cpu_clk_div6",
++						  "cpu_clk_div7",
++						  "cpu_clk_div8", },
++		.num_parents = 7,
++	},
++};
++
++static struct clk_regmap meson8b_abp_clk_gate = {
++	.data = &(struct clk_regmap_gate_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.bit_idx = 16,
++		.flags = CLK_GATE_SET_TO_DISABLE,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "abp_clk_dis",
++		.ops = &clk_regmap_gate_ro_ops,
++		.parent_names = (const char *[]){ "abp_clk_sel" },
++		.num_parents = 1,
++		.flags = CLK_SET_RATE_PARENT,
++	},
++};
++
++static struct clk_regmap meson8b_periph_clk_sel = {
++	.data = &(struct clk_regmap_mux_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.mask = 0x7,
++		.shift = 6,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "periph_clk_sel",
++		.ops = &clk_regmap_mux_ops,
++		.parent_names = (const char *[]){ "cpu_clk_div2",
++						  "cpu_clk_div3",
++						  "cpu_clk_div4",
++						  "cpu_clk_div5",
++						  "cpu_clk_div6",
++						  "cpu_clk_div7",
++						  "cpu_clk_div8", },
++		.num_parents = 7,
++	},
++};
++
++static struct clk_regmap meson8b_periph_clk_gate = {
++	.data = &(struct clk_regmap_gate_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.bit_idx = 17,
++		.flags = CLK_GATE_SET_TO_DISABLE,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "periph_clk_dis",
++		.ops = &clk_regmap_gate_ro_ops,
++		.parent_names = (const char *[]){ "periph_clk_sel" },
++		.num_parents = 1,
++		.flags = CLK_SET_RATE_PARENT,
++	},
++};
++
++static u32 mux_table_axi[] = { 1, 2, 3, 4, 5, 6, 7 };
++static struct clk_regmap meson8b_axi_clk_sel = {
++	.data = &(struct clk_regmap_mux_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.mask = 0x7,
++		.shift = 9,
++		.table = mux_table_axi,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "axi_clk_sel",
++		.ops = &clk_regmap_mux_ops,
++		.parent_names = (const char *[]){ "cpu_clk_div2",
++						  "cpu_clk_div3",
++						  "cpu_clk_div4",
++						  "cpu_clk_div5",
++						  "cpu_clk_div6",
++						  "cpu_clk_div7",
++						  "cpu_clk_div8", },
++		.num_parents = 7,
++	},
++};
++
++static struct clk_regmap meson8b_axi_clk_gate = {
++	.data = &(struct clk_regmap_gate_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.bit_idx = 18,
++		.flags = CLK_GATE_SET_TO_DISABLE,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "axi_clk_dis",
++		.ops = &clk_regmap_gate_ro_ops,
++		.parent_names = (const char *[]){ "axi_clk_sel" },
++		.num_parents = 1,
++		.flags = CLK_SET_RATE_PARENT,
++	},
++};
++
++static struct clk_regmap meson8b_l2_dram_clk_sel = {
++	.data = &(struct clk_regmap_mux_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.mask = 0x7,
++		.shift = 12,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "l2_dram_clk_sel",
++		.ops = &clk_regmap_mux_ops,
++		.parent_names = (const char *[]){ "cpu_clk_div2",
++						  "cpu_clk_div3",
++						  "cpu_clk_div4",
++						  "cpu_clk_div5",
++						  "cpu_clk_div6",
++						  "cpu_clk_div7",
++						  "cpu_clk_div8", },
++		.num_parents = 7,
++	},
++};
++
++static struct clk_regmap meson8b_l2_dram_clk_gate = {
++	.data = &(struct clk_regmap_gate_data){
++		.offset = HHI_SYS_CPU_CLK_CNTL1,
++		.bit_idx = 19,
++		.flags = CLK_GATE_SET_TO_DISABLE,
++	},
++	.hw.init = &(struct clk_init_data){
++		.name = "l2_dram_clk_dis",
++		.ops = &clk_regmap_gate_ro_ops,
++		.parent_names = (const char *[]){ "l2_dram_clk_sel" },
++		.num_parents = 1,
++		.flags = CLK_SET_RATE_PARENT,
++	},
++};
++
+ /* Everything Else (EE) domain gates */
+ 
+ static MESON_GATE(meson8b_ddr, HHI_GCLK_MPEG0, 0);
+@@ -905,6 +1126,21 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
+ 		[CLKID_PLL_FIXED_DCO]	    = &meson8b_fixed_pll_dco.hw,
+ 		[CLKID_PLL_VID_DCO]	    = &meson8b_vid_pll_dco.hw,
+ 		[CLKID_PLL_SYS_DCO]	    = &meson8b_sys_pll_dco.hw,
++		[CLKID_CPU_CLK_DIV2]	    = &meson8b_cpu_clk_div2.hw,
++		[CLKID_CPU_CLK_DIV3]	    = &meson8b_cpu_clk_div3.hw,
++		[CLKID_CPU_CLK_DIV4]	    = &meson8b_cpu_clk_div4.hw,
++		[CLKID_CPU_CLK_DIV5]	    = &meson8b_cpu_clk_div5.hw,
++		[CLKID_CPU_CLK_DIV6]	    = &meson8b_cpu_clk_div6.hw,
++		[CLKID_CPU_CLK_DIV7]	    = &meson8b_cpu_clk_div7.hw,
++		[CLKID_CPU_CLK_DIV8]	    = &meson8b_cpu_clk_div8.hw,
++		[CLKID_ABP_SEL]		    = &meson8b_abp_clk_sel.hw,
++		[CLKID_ABP]		    = &meson8b_abp_clk_gate.hw,
++		[CLKID_PERIPH_SEL]	    = &meson8b_periph_clk_sel.hw,
++		[CLKID_PERIPH]		    = &meson8b_periph_clk_gate.hw,
++		[CLKID_AXI_SEL]		    = &meson8b_axi_clk_sel.hw,
++		[CLKID_AXI]		    = &meson8b_axi_clk_gate.hw,
++		[CLKID_L2_DRAM_SEL]	    = &meson8b_l2_dram_clk_sel.hw,
++		[CLKID_L2_DRAM]		    = &meson8b_l2_dram_clk_gate.hw,
+ 		[CLK_NR_CLKS]		    = NULL,
+ 	},
+ 	.num = CLK_NR_CLKS,
+@@ -1016,6 +1252,14 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
+ 	&meson8b_fixed_pll_dco,
+ 	&meson8b_vid_pll_dco,
+ 	&meson8b_sys_pll_dco,
++	&meson8b_abp_clk_sel,
++	&meson8b_abp_clk_gate,
++	&meson8b_periph_clk_sel,
++	&meson8b_periph_clk_gate,
++	&meson8b_axi_clk_sel,
++	&meson8b_axi_clk_gate,
++	&meson8b_l2_dram_clk_sel,
++	&meson8b_l2_dram_clk_gate,
+ };
+ 
+ static const struct meson8b_clk_reset_line {
+diff --git a/drivers/clk/meson/meson8b.h b/drivers/clk/meson/meson8b.h
+index 9cba34c6cb92..0abb331162ab 100644
+--- a/drivers/clk/meson/meson8b.h
++++ b/drivers/clk/meson/meson8b.h
+@@ -78,8 +78,19 @@
+ #define CLKID_PLL_FIXED_DCO	113
+ #define CLKID_PLL_VID_DCO	114
+ #define CLKID_PLL_SYS_DCO	115
++#define CLKID_CPU_CLK_DIV2	116
++#define CLKID_CPU_CLK_DIV3	117
++#define CLKID_CPU_CLK_DIV4	118
++#define CLKID_CPU_CLK_DIV5	119
++#define CLKID_CPU_CLK_DIV6	120
++#define CLKID_CPU_CLK_DIV7	121
++#define CLKID_CPU_CLK_DIV8	122
++#define CLKID_ABP_SEL		123
++#define CLKID_PERIPH_SEL	125
++#define CLKID_AXI_SEL		127
++#define CLKID_L2_DRAM_SEL	129
+ 
+-#define CLK_NR_CLKS		116
++#define CLK_NR_CLKS		131
+ 
+ /*
+  * include the CLKID and RESETID that have
 -- 
 2.19.1
