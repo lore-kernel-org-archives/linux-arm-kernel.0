@@ -1,38 +1,38 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 22 Nov 2018 09:45:26 +0100
-Subject: [RFC PATCH v3 09/17] pinctrl: sunxi: add support for suniv
- F1C100s (newer F-series SoCs)
-In-Reply-To: <fc20d96f5531d7d1eb5ce3d5cf920c8bf59cad58.1542824904.git.mesihkilinc@gmail.com>
-References: <cover.1542824904.git.mesihkilinc@gmail.com>
- <fc20d96f5531d7d1eb5ce3d5cf920c8bf59cad58.1542824904.git.mesihkilinc@gmail.com>
-Message-ID: <20181122084526.gc5qfez4ppxstq3d@flea>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 22 Nov 2018 09:46:44 +0100
+Subject: [PATCH 0/2] use adrp/add pairs for PLT entries
+Message-ID: <20181122084646.3247-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, PLT entries use a non-idiomatic movn/movz/movz/br instruction
+sequence which is also longer than necessary. Also, the code emitting
+them does not use the instruction generation code but open codes the
+opcodes directly.
 
-On Wed, Nov 21, 2018 at 09:30:42PM +0300, Mesih Kilinc wrote:
-> +static const struct sunxi_pinctrl_desc suniv_f1c100s_pinctrl_data = {
-> +	.pins = suniv_f1c100s_pins,
-> +	.npins = ARRAY_SIZE(suniv_f1c100s_pins),
-> +	.irq_banks = 3,
-> +	.disable_strict_mode = true,
-> +};
+The extended KASLR range is now 4 GB, given that we switched to the
+small code model everywhere else (including for modules), so we can
+switch to adrp/add/br sequences which are easier in the I-cache.
 
-One thing I forgot to check before giving my Acked-by, you shouldn't
-disable the strict mode here, this is only meant as a legacy option,
-new drivers need to enforce it.
+So implement adrp/add pair generation in the instruction generation code
+and wire it up into the PLT code. Note that the Cortex-A53 errata handling
+requires some special care to ensure that generated veneers are not
+susceptible to the erratum.
 
-Maxime
+Cc: Torsten Duwe <duwe@lst.de>
+Cc: Jessica Yu <jeyu@kernel.org>
+
+Ard Biesheuvel (2):
+  arm64/insn: add support for emitting ADR/ADRP instructions
+  arm64/module: switch to ADRP/ADD sequences for PLT entries
+
+ arch/arm64/include/asm/insn.h   |  8 ++
+ arch/arm64/include/asm/module.h | 36 ++------
+ arch/arm64/kernel/ftrace.c      |  2 +-
+ arch/arm64/kernel/insn.c        | 29 ++++++
+ arch/arm64/kernel/module-plts.c | 93 +++++++++++++++-----
+ arch/arm64/kernel/module.c      |  4 +-
+ 6 files changed, 119 insertions(+), 53 deletions(-)
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/478fd4e9/attachment.sig>
+2.17.1
