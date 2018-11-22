@@ -1,70 +1,102 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 22:29:15 +0100
-Subject: [PATCH 0/3] Meson8b: add the CPU clock post-dividers
-In-Reply-To: <59801d61ba4e5d5fc8f0df1adffad1f9c7afb45c.camel@baylibre.com>
-References: <20181116205303.6354-1-martin.blumenstingl@googlemail.com>
- <59801d61ba4e5d5fc8f0df1adffad1f9c7afb45c.camel@baylibre.com>
-Message-ID: <CAFBinCAgJTRgF-YX2Yt84c57URvV6Tr_R7=s1tjFPyzeWmup-A@mail.gmail.com>
+Date: Thu, 22 Nov 2018 22:40:16 +0100
+Subject: [PATCH v2 3/4] clk: meson: meson8b: rename cpu_div2/cpu_div3 to
+ cpu_in_div2/cpu_in_div3
+In-Reply-To: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
+References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20181122214017.25643-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jerome,
+The "cpu_div2" and "cpu_div3" take "cpu_in" as input and divide that by
+2 or 3. The clock controller can also generate various CPU clock
+post-dividers (2, 3, 4, 5, 6, 7, 8) which are derived from "cpu_clk".
+When adding support for these post-dividers our clock naming could be
+misleading as we have "cpu_div2" as well as "cpu_clk_div2".
+Rename the existing "cpu_in" dividers so the name of the divider's
+parent is part of the divider clock's name.
 
-On Thu, Nov 22, 2018 at 10:05 AM Jerome Brunet <jbrunet@baylibre.com> wrote:
->
-> On Fri, 2018-11-16 at 21:53 +0100, Martin Blumenstingl wrote:
-> > This is the successor to my previous series "meson8b: add the CPU_DIV16
-> > clock for the ARM TWD" from [0]. I decided to not send this as v2 of
-> > the original series because the PERIPH clock is not the CPU_DIV16 clock.
-> > It's not clear whether a CPU_DIV16 clock exists.
-> >
-> > With this series we get all the CPU_CLK post-dividers as listed in the
-> > public S805 datasheet [1] on pages 31 and 32:
-> > - ABP
-> > - PERIPH (used as input for the ARM global timer and ARM TWD timer)
-> > - AXI
-> > - L2 DRAM
-> >
-> > Each of these clocks has a register called "..._CLK_DIS" which is
-> > documented as a "just in case" bit:
-> > "Set to 1 to manually disable the [...] clock when changing the mux
-> > selection. Typically this bit is set to 0 since the clock muxes can
-> > switch without glitches."
-> > Since we're not supposed to touch that register we're setting
-> > CLK_IS_CRITICAL for these clocks in the driver.
->
-> If we are not supposed to touch the register, I'd prefer if you used RO ops
-> instead of using CLK_IS_CRITICAL.
-that makes sense as other "read-only" clocks are using RO ops as well.
-I'll add a new patch which introduces clk_regmap_gate_ro_ops as we
-don't have that yet
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ drivers/clk/meson/meson8b.c | 20 ++++++++++----------
+ drivers/clk/meson/meson8b.h |  4 ++--
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-> >
-> > The result of this is that we can use the PERIPH clock which clocks
-> > the ARM TWD timer. I will send a separate series to add the TWD timer.
-> >
-> >
-> > [0] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
-> > [1]
-> > https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
-> >
-> > Martin Blumenstingl (3):
-> >   dt-bindings: clock: meson8b: export the CPU post dividers
-> >   clk: meson: meson8b: rename cpu_div2/cpu_div3 to
-> >     cpu_in_div2/cpu_in_div3
-> >   clk: meson: meson8b: add the CPU clock post divider clocks
-> >
-> >  drivers/clk/meson/meson8b.c              | 268 ++++++++++++++++++++++-
-> >  drivers/clk/meson/meson8b.h              |  17 +-
-> >  include/dt-bindings/clock/meson8b-clkc.h |   4 +
-> >  3 files changed, 276 insertions(+), 13 deletions(-)
-> >
->
-> With CLK_IS_CRITICAL removed, looks good to me:
->
-> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
-thanks for reviewing this!
-
-
-Regards
-Martin
+diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+index b3bdc7e05441..010dccc86b5d 100644
+--- a/drivers/clk/meson/meson8b.c
++++ b/drivers/clk/meson/meson8b.c
+@@ -560,11 +560,11 @@ static struct clk_regmap meson8b_cpu_in_sel = {
+ 	},
+ };
+ 
+-static struct clk_fixed_factor meson8b_cpu_div2 = {
++static struct clk_fixed_factor meson8b_cpu_in_div2 = {
+ 	.mult = 1,
+ 	.div = 2,
+ 	.hw.init = &(struct clk_init_data){
+-		.name = "cpu_div2",
++		.name = "cpu_in_div2",
+ 		.ops = &clk_fixed_factor_ops,
+ 		.parent_names = (const char *[]){ "cpu_in_sel" },
+ 		.num_parents = 1,
+@@ -572,11 +572,11 @@ static struct clk_fixed_factor meson8b_cpu_div2 = {
+ 	},
+ };
+ 
+-static struct clk_fixed_factor meson8b_cpu_div3 = {
++static struct clk_fixed_factor meson8b_cpu_in_div3 = {
+ 	.mult = 1,
+ 	.div = 3,
+ 	.hw.init = &(struct clk_init_data){
+-		.name = "cpu_div3",
++		.name = "cpu_in_div3",
+ 		.ops = &clk_fixed_factor_ops,
+ 		.parent_names = (const char *[]){ "cpu_in_sel" },
+ 		.num_parents = 1,
+@@ -626,12 +626,12 @@ static struct clk_regmap meson8b_cpu_scale_out_sel = {
+ 		.ops = &clk_regmap_mux_ops,
+ 		/*
+ 		 * NOTE: We are skipping the parent with value 0x2 (which is
+-		 * "cpu_div3") because it results in a duty cycle of 33% which
+-		 * makes the system unstable and can result in a lockup of the
+-		 * whole system.
++		 * "cpu_in_div3") because it results in a duty cycle of 33%
++		 * which makes the system unstable and can result in a lockup
++		 * of the whole system.
+ 		 */
+ 		.parent_names = (const char *[]) { "cpu_in_sel",
+-						   "cpu_div2",
++						   "cpu_in_div2",
+ 						   "cpu_scale_div" },
+ 		.num_parents = 3,
+ 		.flags = CLK_SET_RATE_PARENT,
+@@ -889,8 +889,8 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
+ 		[CLKID_MPLL1_DIV]	    = &meson8b_mpll1_div.hw,
+ 		[CLKID_MPLL2_DIV]	    = &meson8b_mpll2_div.hw,
+ 		[CLKID_CPU_IN_SEL]	    = &meson8b_cpu_in_sel.hw,
+-		[CLKID_CPU_DIV2]	    = &meson8b_cpu_div2.hw,
+-		[CLKID_CPU_DIV3]	    = &meson8b_cpu_div3.hw,
++		[CLKID_CPU_IN_DIV2]	    = &meson8b_cpu_in_div2.hw,
++		[CLKID_CPU_IN_DIV3]	    = &meson8b_cpu_in_div3.hw,
+ 		[CLKID_CPU_SCALE_DIV]	    = &meson8b_cpu_scale_div.hw,
+ 		[CLKID_CPU_SCALE_OUT_SEL]   = &meson8b_cpu_scale_out_sel.hw,
+ 		[CLKID_MPLL_PREDIV]	    = &meson8b_mpll_prediv.hw,
+diff --git a/drivers/clk/meson/meson8b.h b/drivers/clk/meson/meson8b.h
+index 1c6fb180e6a2..9cba34c6cb92 100644
+--- a/drivers/clk/meson/meson8b.h
++++ b/drivers/clk/meson/meson8b.h
+@@ -63,8 +63,8 @@
+ #define CLKID_MPLL1_DIV		97
+ #define CLKID_MPLL2_DIV		98
+ #define CLKID_CPU_IN_SEL	99
+-#define CLKID_CPU_DIV2		100
+-#define CLKID_CPU_DIV3		101
++#define CLKID_CPU_IN_DIV2	100
++#define CLKID_CPU_IN_DIV3	101
+ #define CLKID_CPU_SCALE_DIV	102
+ #define CLKID_CPU_SCALE_OUT_SEL	103
+ #define CLKID_MPLL_PREDIV	104
+-- 
+2.19.1
