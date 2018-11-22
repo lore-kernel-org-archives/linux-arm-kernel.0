@@ -1,35 +1,37 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 22 Nov 2018 12:59:10 +0000
-Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering
- for KVM_GET_REG_LIST
-In-Reply-To: <20181122123424.GG17441@e113682-lin.lund.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
- <20181102081625.GS12057@e113682-lin.lund.arm.com>
- <20181115172711.GQ3505@e103592.cambridge.arm.com>
- <20181122105344.GF17441@e113682-lin.lund.arm.com>
- <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
- <20181122123424.GG17441@e113682-lin.lund.arm.com>
-Message-ID: <CAFEAcA_G1ceUGnDX5u6bK_pX_7-tAHtP8+NkAkK-vKOhzC1hyA@mail.gmail.com>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 22 Nov 2018 13:59:31 +0100
+Subject: [PATCH v3 00/15] MT8183 IOMMU SUPPORT
+In-Reply-To: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
+References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <20181122125931.GC1586@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 November 2018 at 12:34, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> So on migration, will you have the required information for
-> KVM_ARM_VCPU_INIT before setting the registers from the migration
-> stream?
->
-> (I assume so, because presumably this comes from a command-line switch
-> or from the machine definition, which must match the source.)
+Hi,
 
-Yes. QEMU always sets up the VCPU completely before doing any
-inbound migration.
+On Sat, Nov 17, 2018 at 10:35:27AM +0800, Yong Wu wrote:
+> Yong Wu (14):
+>   dt-bindings: mediatek: Add binding for mt8183 IOMMU and SMI
+>   iommu/mediatek: Use a struct as the platform data
+>   memory: mtk-smi: Use a general config_port interface
+>   iommu/io-pgtable-arm-v7s: Add paddr_to_iopte and iopte_to_paddr
+>     helpers
+>   iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB Mode
+>   iommu/mediatek: Add mt8183 IOMMU support
+>   iommu/mediatek: Add mmu1 support
+>   memory: mtk-smi: Invoke pm runtime_callback to enable clocks
+>   memory: mtk-smi: Use a struct for the platform data for smi-common
+>   memory: mtk-smi: Add bus_sel for mt8183
+>   iommu/mediatek: Add VLD_PA_RANGE register backup when suspend
+>   iommu/mediatek: Add shutdown callback
+>   memory: mtk-smi: Get rid of need_larbid
+>   iommu/mediatek: Switch to SPDX license identifier
 
-> Therefore, I don't think there's an issue with this patch, but from
-> bitter experience I think we should enforce ordering if possible.
+This should probably go through the IOMMU tree. For that I'd like to
+have Acks (reviews are even better) for the io-pgtable parts from Robin
+and for the memory parts from Matthias first.
 
-Yes, if there are semantic ordering constraints on the various
-calls it would be nice to have the kernel enforce them.
 
-thanks
--- PMM
+Regards,
+
+	Joerg
