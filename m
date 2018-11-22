@@ -1,36 +1,65 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu, 22 Nov 2018 08:52:46 +0800
-Subject: [PATCH v2 2/3] mm: Add support for SLAB_CACHE_DMA32
-In-Reply-To: <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <20181111090341.120786-3-drinkcat@chromium.org>
- <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
-Message-ID: <CANMq1KD4j=Zh1izN8Ujn3+ZsdMMzCLPurfkXTkM9TyQaTptjFw@mail.gmail.com>
+From: tiny.windzz@gmail.com (Frank Lee)
+Date: Thu, 22 Nov 2018 08:55:16 +0800
+Subject: [PATCH] soc: bcm: brcmstb: add of_node_put()
+In-Reply-To: <1395243f-2c08-6079-e8a8-79712179fe57@gmail.com>
+References: <20181121124342.21987-1-tiny.windzz@gmail.com>
+ <1395243f-2c08-6079-e8a8-79712179fe57@gmail.com>
+Message-ID: <CAEExFWtSwPwCFUH73GvoWKhbz8wHZbJC0fNsO=rRzgrSzEBYkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 2:32 AM Christopher Lameter <cl@linux.com> wrote:
+On Thu, Nov 22, 2018 at 3:23 AM Florian Fainelli <f.fainelli@gmail.com> wrote:
 >
-> On Sun, 11 Nov 2018, Nicolas Boichat wrote:
 >
-> > SLAB_CACHE_DMA32 is only available after explicit kmem_cache_create calls,
-> > no default cache is created for kmalloc. Add a test in check_slab_flags
-> > for this.
 >
-> This does not define the dma32 kmalloc array. Is that intentional?
+> On 11/21/2018 4:43 AM, Yangtao Li wrote:
+> > of_find_node_by_path() acquires a reference to the node returned
+> > by it and that reference needs to be dropped by its caller.
+> > bl_idle_init() doesn't do that, so fix it.
+>
+> You probably copied/pasted this from a prior patch, the function name is
+> soc_is_brcmstb() here, do you mind fixing that and also providing a
+> Fixes: tag?
+Hi Florian:
 
-Yes that's intentional, AFAICT there is no user, so there is no point
-creating the cache.
+Do you need me to send a patch that changed the commit log or refactor
+the soc_is_brcmstb()?
+For example:
+https://lore.kernel.org/patchwork/patch/1015523/
 
- (okay, I could find one, but it's probably broken:
-git grep GFP_DMA32 | grep k[a-z]*alloc
-drivers/media/platform/vivid/vivid-osd.c: dev->video_vbase =
-kzalloc(dev->video_buffer_size, GFP_KERNEL | GFP_DMA32);
-).
-
-> In that
-> case you need to fail any request for GFP_DMA32 coming in via kmalloc.
-
-Well, we do check for these in check_slab_flags (aka GFP_SLAB_BUG_MASK
-before patch 1/3 of this series), so, with or without this patch,
-calls with GFP_DMA32 will end up failing in check_slab_flags.
+Yours,
+    Yangtao
+>
+> Thanks
+>
+> >
+> > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> > ---
+> >  drivers/soc/bcm/brcmstb/common.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> > index 14185451901d..95b777fffee6 100644
+> > --- a/drivers/soc/bcm/brcmstb/common.c
+> > +++ b/drivers/soc/bcm/brcmstb/common.c
+> > @@ -32,12 +32,15 @@ static const struct of_device_id brcmstb_machine_match[] = {
+> >  bool soc_is_brcmstb(void)
+> >  {
+> >       struct device_node *root;
+> > +     bool rc;
+> >
+> >       root = of_find_node_by_path("/");
+> >       if (!root)
+> >               return false;
+> >
+> > -     return of_match_node(brcmstb_machine_match, root) != NULL;
+> > +     rc = of_match_node(brcmstb_machine_match, root) != NULL;
+> > +     of_node_put(root);
+> > +     return rc;
+> >  }
+> >
+> >  u32 brcmstb_get_family_id(void)
+> >
+>
+> --
+> Florian
