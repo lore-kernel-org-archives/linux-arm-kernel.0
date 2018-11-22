@@ -1,92 +1,91 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 22 Nov 2018 12:21:43 +0000
-Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
-In-Reply-To: <20181119130800.GE9761@hirez.programming.kicks-ass.net>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <20181119130800.GE9761@hirez.programming.kicks-ass.net>
-Message-ID: <20181122122142.GI42987@e119886-lin.cambridge.arm.com>
+From: vincent.whitchurch@axis.com (Vincent Whitchurch)
+Date: Thu, 22 Nov 2018 13:24:11 +0100
+Subject: [PATCH 1/2] module: Overwrite st_size instead of st_info
+In-Reply-To: <20181122120154.GH3505@e103592.cambridge.arm.com>
+References: <20181119162513.16562-1-vincent.whitchurch@axis.com>
+ <20181122120154.GH3505@e103592.cambridge.arm.com>
+Message-ID: <20181122122411.6ydftk7bjlrefwa5@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 02:08:00PM +0100, Peter Zijlstra wrote:
-> On Fri, Nov 16, 2018 at 10:24:03AM +0000, Andrew Murray wrote:
-> > Many PMU drivers do not have the capability to exclude counting events
-> > that occur in specific contexts such as idle, kernel, guest, etc. These
-> > drivers indicate this by returning an error in their event_init upon
-> > testing the events attribute flags.
+On Thu, Nov 22, 2018 at 12:01:54PM +0000, Dave Martin wrote:
+> On Mon, Nov 19, 2018 at 05:25:12PM +0100, Vincent Whitchurch wrote:
+> > st_info is currently overwritten after relocation and used to store the
+> > elf_type().  However, we're going to need it fix kallsyms on ARM's
+> > Thumb-2 kernels, so preserve st_info and overwrite the st_size field
+> > instead.  st_size is neither used by the module core nor by any
+> > architecture.
 > > 
-> > However this approach requires that each time a new event modifier is
-> > added to perf, all the perf drivers need to be modified to indicate that
-> > they don't support the attribute. This results in additional boiler-plate
-> > code common to many drivers that needs to be maintained. An example of
-> > this is the addition of exclude_host and exclude_guest in 2011 yet many
-> > PMU drivers do not support this or indicate an error on events that make
-> > use of it.
+> > Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+> > ---
+> > v4: Split out to separate patch.  Use st_size instead of st_other.
+> > v1-v3: See PATCH 2/2
 > > 
-> > This patch generalises the test for exclusion and updates PMU drivers to
-> > use it. This is a functional change as some PMU drivers will now correctly
-> > report that they don't support certain events whereas they previously did.
+> >  kernel/module.c | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/kernel/module.c b/kernel/module.c
+> > index 49a405891587..3d86a38b580c 100644
+> > --- a/kernel/module.c
+> > +++ b/kernel/module.c
+> > @@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
+> >  
+> >  	/* Set types up while we still have access to sections. */
+> >  	for (i = 0; i < mod->kallsyms->num_symtab; i++)
+> > -		mod->kallsyms->symtab[i].st_info
+> > +		mod->kallsyms->symtab[i].st_size
+> >  			= elf_type(&mod->kallsyms->symtab[i], info);
+> >  
+> >  	/* Now populate the cut down core kallsyms for after init. */
+> > @@ -4061,7 +4061,7 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+> >  		kallsyms = rcu_dereference_sched(mod->kallsyms);
+> >  		if (symnum < kallsyms->num_symtab) {
+> >  			*value = kallsyms->symtab[symnum].st_value;
+> > -			*type = kallsyms->symtab[symnum].st_info;
+> > +			*type = kallsyms->symtab[symnum].st_size;
+> >  			strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
+> >  			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+> >  			*exported = is_exported(name, *value, mod);
 > 
-> Right, I like that idea, and yes, there's a lot of fail around there :/
+> This is fine if st_size is really unused, but how sure are you of that?
 > 
-> > A longer term approach may instead be for PMU's to advertise their
-> > capabilities on registration.
+> grepping for st_size throws up some hits that appear ELF-related, but
+> I've not investigated them in detail.
 > 
-> This I think is the better approach. We already have the
-> PERF_PMU_CAP_flags that can be used to advertise various PMU
-> capabilities.
+> (The fact that struct stat has an identically named field throws up
+> a load of false positives too.)
 
-OK I'll respin my series to take this approach.
+$ git describe --tags
+v4.20-rc3-93-g92b419289cee
+ 
+$ rg -m1 '[\.>]st_size'  --iglob '!**/tools/**' --iglob '!**/vdso*' --iglob '!**/scripts/**' --iglob '!**/usr/**' --iglob '!**/samples/**' | cat
+| kernel/kexec_file.c:	if (sym->st_size != size) {
 
-> 
-> Something along these lines I suppose; then every PMU that actually
-> checks the flags, needs to set the flag, otherwise it'll fail.
-> 
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index 53c500f0ca79..de15723ea52a 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -244,6 +244,7 @@ struct perf_event;
->  #define PERF_PMU_CAP_EXCLUSIVE			0x10
->  #define PERF_PMU_CAP_ITRACE			0x20
->  #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
-> +#define PERF_PMU_CAP_EXCLUDE			0x80
->  
->  /**
->   * struct pmu - generic performance monitoring unit
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 84530ab358c3..d76b724177b9 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
->  	if (ctx)
->  		perf_event_ctx_unlock(event->group_leader, ctx);
->  
-> +	if (!ret) {
-> +		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
-> +		    event_has_exclude_flags(event)) {
-> +			event->destroy(event);
-> +			ret = -EINVAL;
-> +		}
-> +	}
-> +
+Symbols in kexec kernel.
 
-I don't quite follow this logic. Should that not have been:
+| fs/stat.c:	tmp.st_size = stat->size;
+| Documentation/networking/tls.txt:  sendfile(sock, file, &offset, stat.st_size);
+| net/9p/client.c:		ret->st_rdev, ret->st_size, ret->st_blksize,
+| net/9p/protocol.c:					&stbuf->st_rdev, &stbuf->st_size,
+| fs/9p/vfs_inode_dotl.c:		i_size_write(inode, stat->st_size);
+| fs/hostfs/hostfs_user.c:	p->size = buf->st_size;
+| arch/powerpc/boot/mktree.c:	nblks = (st.st_size + IMGBLK) / IMGBLK;
+| arch/alpha/kernel/osf_sys.c:	tmp.st_size	= lstat->size;
+| arch/x86/ia32/sys_ia32.c:	    __put_user(stat->size, &ubuf->st_size) ||
 
-if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
-     event_has_exclude_flags(event)) {
+Not Elf_Sym.
 
-Meaning that if an event has any exclude flags but the pmu doesn't
-have the capability to handle them then error.
+| arch/x86/kernel/machine_kexec_64.c:			 sym->st_size);
 
-If you're happy with my proposed logic, then would it also make
-sense to move this before the call to the pmu->event_init ?
+Symbols in kexec kernel.
 
-Thanks,
+| arch/sparc/boot/piggyback.c:	st4(buffer + 12, s.st_size);
+| arch/sparc/kernel/sys_sparc32.c:	err |= put_user(stat->size, &statbuf->st_size);
+| arch/um/os-Linux/file.c:		.ust_size    = src->st_size,    /* total size, in bytes */
+| arch/um/os-Linux/start_up.c:	size = (buf.st_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
+| arch/s390/kernel/compat_linux.c:	tmp.st_size = stat->size;
+| arch/arm/kernel/sys_oabi-compat.c:	tmp.st_size = stat->size;
+| arch/mips/boot/compressed/calc_vmlinuz_load_addr.c:	vmlinux_size = (uint64_t)sb.st_size;
+| drivers/net/ethernet/marvell/sky2.c:		hw->st_idx = RING_NEXT(hw->st_idx, hw->st_size);
 
-Andrew Murray
-
->  	if (ret)
->  		module_put(pmu->module);
->  
-> 
+Not Elf_Sym.
