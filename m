@@ -1,76 +1,91 @@
 From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Thu, 22 Nov 2018 05:14:25 +0000
-Subject: [PATCH v4 0/7] spi: add support for octo mode
-Message-ID: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Date: Thu, 22 Nov 2018 05:14:31 +0000
+Subject: [PATCH v4 1/7] spi: add support for octo mode I/O data transfer
+In-Reply-To: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+References: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
+Message-ID: <1542863544-21257-2-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for octo mode IO data transfer.
-Micron flash, mt35xu512aba, supports octal mode data transfer and
-NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
+Add flags for Octo mode I/O data transfer
+Required for the SPI controller which can do the data transfer (TX/RX)
+on 8 data lines e.g. NXP FlexSPI controller.
+ SPI_TX_OCTO: transmit with 8 wires
+ SPI_RX_OCTO: receive with 8 wires
 
-Patch series
-* Add support for octo mode flags and parsing of same in spi driver.
-* Add parsing logic for spi-mem framework and m25p80.c device file.
-* Add opcodes for octo I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
-  Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
-* Add mode bit required for octo mode in nxp-fspi driver [2].
-* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
-
-Tested on LX2160ARDB target with nxp-fspi driver, below are
-Read performance number of 1-1-1 and 1-1-8 read protocol.
-
- root at lxxx:~# cat /proc/mtd
- dev:    size   erasesize  name
- mtd0: 04000000 00001000 "spi0.0"
- mtd1: 04000000 00001000 "spi0.1"
- root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
-
- real    0m2.792s
- user    0m0.000s
- sys     0m2.790s
- root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
- Copied 16777216 bytes from address 0x00000000 in flash to 0read
-
- real    0m0.441s
- user    0m0.000s
- sys     0m0.440s
- root at ls1012ardb:~#
-
- Flash device MTD0 configured in 1-1-1 protocol.
- Flash device MTD1 configured in 1-1-8 protocol.
-
-[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384&state=*
-[2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=76402
-
-Yogesh Gaur (7):
-  spi: add support for octo mode I/O data transfer
-  spi: spi-mem: add support for octo mode I/O data transfer
-  mtd: spi-nor: add opcodes for octo Read/Write commands
-  mtd: spi-nor: add octo read flag for flash mt35xu512aba
-  mtd: m25p80: add support of octo mode I/O transfer
-  spi: nxp-fspi: add octo mode flag bit for octal support
-  arm64: dts: lx2160a: update fspi node
-
+Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@bootlin.com>
+---
 Changes for v4:
-- Rebase on top of v4.20-rc2.
-- Modify octo entries enum value in spi.h.
+- Rebase on top of v4.20-rc2
 Changes for v3:
+- Modified string 'octal' with 'octo'.
 - Add octo mode support in spi_setup().
-- Rename all patches with 'octal' string modified as 'octo'.
 Changes for v2:
-- Incorporated review comments of Boris and Vignesh.
+- Incorporated review comments of Boris.
+---
+ drivers/spi/spi.c       | 12 ++++++++++--
+ include/linux/spi/spi.h |  4 +++-
+ 2 files changed, 13 insertions(+), 3 deletions(-)
 
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
- drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
- drivers/mtd/spi-nor/spi-nor.c                     | 15 ++++++++++++++-
- drivers/spi/spi-mem.c                             |  9 ++++++++-
- drivers/spi/spi-nxp-fspi.c                        |  4 ++--
- drivers/spi/spi.c                                 | 12 ++++++++++--
- include/linux/mtd/spi-nor.h                       |  8 ++++++++
- include/linux/spi/spi.h                           |  4 +++-
- 8 files changed, 57 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 6ca5940..af4e4c6 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1617,6 +1617,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
+ 		case 4:
+ 			spi->mode |= SPI_TX_QUAD;
+ 			break;
++		case 8:
++			spi->mode |= SPI_TX_OCTO;
++			break;
+ 		default:
+ 			dev_warn(&ctlr->dev,
+ 				"spi-tx-bus-width %d not supported\n",
+@@ -1635,6 +1638,9 @@ static int of_spi_parse_dt(struct spi_controller *ctlr, struct spi_device *spi,
+ 		case 4:
+ 			spi->mode |= SPI_RX_QUAD;
+ 			break;
++		case 8:
++			spi->mode |= SPI_RX_OCTO;
++			break;
+ 		default:
+ 			dev_warn(&ctlr->dev,
+ 				"spi-rx-bus-width %d not supported\n",
+@@ -2823,7 +2829,8 @@ int spi_setup(struct spi_device *spi)
+ 	/* if it is SPI_3WIRE mode, DUAL and QUAD should be forbidden
+ 	 */
+ 	if ((spi->mode & SPI_3WIRE) && (spi->mode &
+-		(SPI_TX_DUAL | SPI_TX_QUAD | SPI_RX_DUAL | SPI_RX_QUAD)))
++		(SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTO |
++		 SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTO)))
+ 		return -EINVAL;
+ 	/* help drivers fail *cleanly* when they need options
+ 	 * that aren't supported with their current controller
+@@ -2832,7 +2839,8 @@ int spi_setup(struct spi_device *spi)
+ 	 */
+ 	bad_bits = spi->mode & ~(spi->controller->mode_bits | SPI_CS_WORD);
+ 	ugly_bits = bad_bits &
+-		    (SPI_TX_DUAL | SPI_TX_QUAD | SPI_RX_DUAL | SPI_RX_QUAD);
++		    (SPI_TX_DUAL | SPI_TX_QUAD | SPI_TX_OCTO |
++		     SPI_RX_DUAL | SPI_RX_QUAD | SPI_RX_OCTO);
+ 	if (ugly_bits) {
+ 		dev_warn(&spi->dev,
+ 			 "setup: ignoring unsupported mode bits %x\n",
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index 6be77fa..e2d69eb 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -154,7 +154,9 @@ struct spi_device {
+ #define	SPI_TX_QUAD	0x200			/* transmit with 4 wires */
+ #define	SPI_RX_DUAL	0x400			/* receive with 2 wires */
+ #define	SPI_RX_QUAD	0x800			/* receive with 4 wires */
+-#define SPI_CS_WORD	0x1000			/* toggle cs after each word */
++#define	SPI_CS_WORD	0x1000			/* toggle cs after each word */
++#define	SPI_TX_OCTO	0x2000			/* transmit with 8 wires */
++#define	SPI_RX_OCTO	0x4000			/* receive with 8 wires */
+ 	int			irq;
+ 	void			*controller_state;
+ 	void			*controller_data;
 -- 
 2.7.4
