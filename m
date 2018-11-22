@@ -1,57 +1,30 @@
-From: brgl@bgdev.pl (Bartosz Golaszewski)
-Date: Thu, 22 Nov 2018 17:44:33 +0100
-Subject: [PATCH 2/2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure
- up the stack
-In-Reply-To: <1542823573-20228-2-git-send-email-hofrat@osadl.org>
-References: <1542823573-20228-1-git-send-email-hofrat@osadl.org>
- <1542823573-20228-2-git-send-email-hofrat@osadl.org>
-Message-ID: <CAMRc=MfcKOnDTEkTpe7X7vRq2PjV=fST7qjef+tbV8Tv-kWELQ@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 22 Nov 2018 08:50:47 -0800
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181122140320.24080-1-hch@lst.de>
+References: <20181122140320.24080-1-hch@lst.de>
+Message-ID: <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?r., 21 lis 2018 o 19:13 Nicholas Mc Guire <hofrat@osadl.org> napisa?(a):
+On Thu, Nov 22, 2018 at 6:03 AM Christoph Hellwig <hch@lst.de> wrote:
 >
-> The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
-> for the dev_err() messages). The probe function should return an error
-> if one of the banks failed to initialize properly.
->
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
-> ---
->
-> Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
-> GPIOLIB=y, GPIO_MT7621=y
->
-> Patch is against 4.20-rc3 (localversion-next is next-20181121)
->
->  drivers/gpio/gpio-mt7621.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
-> index 1ec95bc..68fca8b 100644
-> --- a/drivers/gpio/gpio-mt7621.c
-> +++ b/drivers/gpio/gpio-mt7621.c
-> @@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
->         struct device_node *np = dev->of_node;
->         struct mtk *mtk;
->         int i;
-> +       int ret;
->
->         mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
->         if (!mtk)
-> @@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
->         platform_set_drvdata(pdev, mtk);
->         mediatek_gpio_irq_chip.name = dev_name(dev);
->
-> -       for (i = 0; i < MTK_BANK_CNT; i++)
-> -               mediatek_gpio_bank_probe(dev, np, i);
-> +       for (i = 0; i < MTK_BANK_CNT; i++) {
-> +               ret = mediatek_gpio_bank_probe(dev, np, i);
-> +               if (!ret)
-> +                       return ret;
-> +       }
+> The 0 return doesn't work for direct mappings that have ram at address
+> zero and a lot of IOMMUs that start allocating bus space from address
+> zero, so we can't consolidate on that, but I think we can move everyone
+> to all-Fs, which the patch here does.
 
-Looks like are resources allocated in mediatek_gpio_bank_probe() will
-be freed automatically so:
+Hmm. Maybe not limit it to just all ones, but actually use the
+(standard, for the kernel) IS_ERR_VALUE()?
 
-Reviewed-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+That basically reserves the last 4095 values in an unsigned long for
+error values.
+
+Then those functions could actually return *what* error they
+encountered, using just plain
+
+        return -ENOMEM;
+
+or whatever?
+
+               Linus
