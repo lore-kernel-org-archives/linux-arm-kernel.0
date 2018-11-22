@@ -1,256 +1,132 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 22 Nov 2018 09:46:46 +0100
-Subject: [PATCH 2/2] arm64/module: switch to ADRP/ADD sequences for PLT entries
-In-Reply-To: <20181122084646.3247-1-ard.biesheuvel@linaro.org>
-References: <20181122084646.3247-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181122084646.3247-3-ard.biesheuvel@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 22 Nov 2018 09:47:12 +0100
+Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+In-Reply-To: <CABb+yY0nH3Su6a11TZLJf=CCpD+gTpqUkLnRhpy4MUwNJk5prw@mail.gmail.com>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
+ <20181120152907.GA28796@ulmo> <20181121142740.GA29704@ulmo>
+ <CABb+yY0nH3Su6a11TZLJf=CCpD+gTpqUkLnRhpy4MUwNJk5prw@mail.gmail.com>
+Message-ID: <20181122084712.GA5741@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have switched to the small code model entirely, and
-reduced the extended KASLR range to 4 GB, we can be sure that the
-targets of relative branches that are out of range are in range
-for a ADRP/ADD pair, which is one instruction shorter than our
-current MOVN/MOVK/MOVK sequence, and is more idiomatic and so it
-is more likely to be implemented efficiently by micro-architectures.
+On Wed, Nov 21, 2018 at 08:18:22PM -0600, Jassi Brar wrote:
+> On Wed, Nov 21, 2018 at 8:27 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> >
+> > On Tue, Nov 20, 2018 at 04:29:07PM +0100, Thierry Reding wrote:
+> > > On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
+> > > > On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > >
+> > > > > From: Thierry Reding <treding@nvidia.com>
+> > > > >
+> > > > > The mailbox framework supports blocking transfers via completions for
+> > > > > clients that can sleep. In order to support blocking transfers in cases
+> > > > > where the transmission is not permitted to sleep, add a new ->flush()
+> > > > > callback that controller drivers can implement to busy loop until the
+> > > > > transmission has been completed. This will automatically be called when
+> > > > > available and interrupts are disabled for clients that request blocking
+> > > > > transfers.
+> > > > >
+> > > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > > > > ---
+> > > > >  drivers/mailbox/mailbox.c          | 8 ++++++++
+> > > > >  include/linux/mailbox_controller.h | 4 ++++
+> > > > >  2 files changed, 12 insertions(+)
+> > > > >
+> > > > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> > > > > index 674b35f402f5..0eaf21259874 100644
+> > > > > --- a/drivers/mailbox/mailbox.c
+> > > > > +++ b/drivers/mailbox/mailbox.c
+> > > > > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> > > > >                 unsigned long wait;
+> > > > >                 int ret;
+> > > > >
+> > > > > +               if (irqs_disabled() && chan->mbox->ops->flush) {
+> > > > > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
+> > > > > +                       if (ret < 0)
+> > > > > +                               tx_tick(chan, ret);
+> > > > > +
+> > > > > +                       return ret;
+> > > > > +               }
+> > > > > +
+> > > > This is hacky. I think we can do without busy waiting in atomic
+> > > > context. You could queue locally while in atomic context and then
+> > > > transfer in blocking mode. I don't think we should worry about the
+> > > > 'throughput' as there already is no h/w rate control even with
+> > > > busy-waiting.
+> > >
+> > > I actually tried to do that before I added this flushing mechanism. The
+> > > problem is, like you said, one of rate control. As mentioned in the
+> > > cover letter, the shared mailboxes implemented in tegra-hsp are used as
+> > > RX and TX channels for the TCU, which is like a virtual UART. The TTY
+> > > driver included as part of this series will use one of the mailboxes to
+> > > transmit data that is written to the console. The problem is that if
+> > > these transmissions are not rate-limited on the TTY driver side, the
+> > > console will just keep writing data and eventually overflow the buffer
+> > > that we have in the mailbox subsystem.
+> > >
+> > > The problem is that data comes in at a much higher rate than what we can
+> > > output. This is especially true at boot when the TCU console takes over
+> > > and the whole log buffer is dumped on it.
+> > >
+> > > So the only way to rate-limit is to either make mbox_send_message()
+> > > block, but that can only be done in non-atomic context. The console,
+> > > however, will always run in atomic context, so the only way to do rate-
+> > > limiting is by busy looping.
+> >
+> > What I also tried before was to implement busy looping within the
+> > ->send_data() callback of the driver so that we didn't have to put this
+> > into the core. Unfortunately, however, the ->send_data() callback is
+> > called under chan->lock, which means that from mbox_send_message() we
+> > don't have a way to mark the transfer as done. In order to do that we'd
+> > have to call mbox_chan_txdone(), but that ends up calling tx_tick() and
+> > that in turn also attempts to take the chan->lock, which would cause a
+> > deadlock.
+> >
+> > The explicit flushing is the best alternative that I could come up with.
+> > I think it's not all that hacky, because it's very explicit about what's
+> > going on and it has the nice side-effect that it will allow the mailbox
+> > to work in interrupt driven mode if possible and only resorting to the
+> > busy loop in atomic context.
+> >
+> > At this point I think I have explored all other options and I frankly
+> > can't find a more proper way to achieve what we need here. Perhaps you
+> > can think of additional ways to accomplish this?
+> >
+> Well, I would have a local ring buffer (array) of enough size to hold
+> the characters and then have a task consuming data from that ring
+> buffer by transmitting over mailbox.
 
-So switch over the ordinary PLT code and the special handling of
-the Cortex-A53 ADRP errata, as well as the ftrace trampline
-handling.
+There's already such a ringbuffer in the printk code. To implement what
+you suggest would effectively be creating a copy of that buffer because
+we'd be allocating the buffer and the console code would just dump each
+and every character in the logbuf into that ring buffer without rate-
+limitation.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/module.h | 36 ++------
- arch/arm64/kernel/ftrace.c      |  2 +-
- arch/arm64/kernel/module-plts.c | 93 +++++++++++++++-----
- arch/arm64/kernel/module.c      |  4 +-
- 4 files changed, 82 insertions(+), 53 deletions(-)
+To make matters worse, the ringbuffer would be empty most of the time
+after the initial dump of the logbuf, so we'd be wasting all that buffer
+space.
 
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index 97d0ef12e2ff..9ce31b056ac9 100644
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -56,39 +56,19 @@ struct plt_entry {
- 	 * is exactly what we are dealing with here, we are free to use x16
- 	 * as a scratch register in the PLT veneers.
- 	 */
--	__le32	mov0;	/* movn	x16, #0x....			*/
--	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
--	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-+	__le32	adrp;	/* adrp	x16, ....			*/
-+	__le32	add;	/* add	x16, x16, #0x....		*/
- 	__le32	br;	/* br	x16				*/
- };
- 
--static inline struct plt_entry get_plt_entry(u64 val)
-+static inline bool is_forbidden_offset_for_adrp(void *place)
- {
--	/*
--	 * MOVK/MOVN/MOVZ opcode:
--	 * +--------+------------+--------+-----------+-------------+---------+
--	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
--	 * +--------+------------+--------+-----------+-------------+---------+
--	 *
--	 * Rd     := 0x10 (x16)
--	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
--	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
--	 * sf     := 1 (64-bit variant)
--	 */
--	return (struct plt_entry){
--		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
--		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
--		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
--		cpu_to_le32(0xd61f0200)
--	};
-+	return IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
-+	       cpus_have_const_cap(ARM64_WORKAROUND_843419) &&
-+	       ((u64)place & 0xfff) >= 0xff8;
- }
- 
--static inline bool plt_entries_equal(const struct plt_entry *a,
--				     const struct plt_entry *b)
--{
--	return a->mov0 == b->mov0 &&
--	       a->mov1 == b->mov1 &&
--	       a->mov2 == b->mov2;
--}
-+struct plt_entry get_plt_entry(u64 dst, void *pc);
-+bool plt_entries_equal(const struct plt_entry *a, const struct plt_entry *b);
- 
- #endif /* __ASM_MODULE_H */
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index 50986e388d2b..2135665a8ab3 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -104,7 +104,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 		 * is added in the future, but for now, the pr_err() below
- 		 * deals with a theoretical issue only.
- 		 */
--		trampoline = get_plt_entry(addr);
-+		trampoline = get_plt_entry(addr, mod->arch.ftrace_trampoline);
- 		if (!plt_entries_equal(mod->arch.ftrace_trampoline,
- 				       &trampoline)) {
- 			if (!plt_entries_equal(mod->arch.ftrace_trampoline,
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index f0690c2ca3e0..3c6e5f3a4973 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -11,6 +11,55 @@
- #include <linux/module.h>
- #include <linux/sort.h>
- 
-+static struct plt_entry __get_adrp_add_pair(u64 dst, u64 pc,
-+					    enum aarch64_insn_register reg)
-+{
-+	u32 adrp, add;
-+
-+	adrp = aarch64_insn_gen_adr(pc, dst, reg, AARCH64_INSN_ADR_TYPE_ADRP);
-+	add = aarch64_insn_gen_add_sub_imm(reg, reg, dst % SZ_4K,
-+					   AARCH64_INSN_VARIANT_64BIT,
-+					   AARCH64_INSN_ADSB_ADD);
-+
-+	return (struct plt_entry){ cpu_to_le32(adrp), cpu_to_le32(add) };
-+}
-+
-+struct plt_entry get_plt_entry(u64 dst, void *pc)
-+{
-+	struct plt_entry plt;
-+	static u32 br;
-+
-+	if (!br)
-+		br = aarch64_insn_gen_branch_reg(AARCH64_INSN_REG_16,
-+						 AARCH64_INSN_BRANCH_NOLINK);
-+
-+	plt = __get_adrp_add_pair(dst, (u64)pc, AARCH64_INSN_REG_16);
-+	plt.br = cpu_to_le32(br);
-+
-+	return plt;
-+}
-+
-+bool plt_entries_equal(const struct plt_entry *a, const struct plt_entry *b)
-+{
-+	u64 p, q;
-+
-+	/*
-+	 * Check whether both entries refer to the same target:
-+	 * do the cheapest checks first.
-+	 */
-+	if (a->add != b->add || a->br != b->br)
-+		return false;
-+
-+	p = ALIGN_DOWN((u64)a, SZ_4K);
-+	q = ALIGN_DOWN((u64)b, SZ_4K);
-+
-+	if (a->adrp == b->adrp && p == q)
-+		return true;
-+
-+	return (p + aarch64_insn_adrp_get_offset(le32_to_cpu(a->adrp))) ==
-+	       (q + aarch64_insn_adrp_get_offset(le32_to_cpu(b->adrp)));
-+}
-+
- static bool in_init(const struct module *mod, void *loc)
- {
- 	return (u64)loc - (u64)mod->init_layout.base < mod->init_layout.size;
-@@ -23,19 +72,23 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
- 							  &mod->arch.init;
- 	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
- 	int i = pltsec->plt_num_entries;
-+	int j = i - 1;
- 	u64 val = sym->st_value + rela->r_addend;
- 
--	plt[i] = get_plt_entry(val);
-+	if (is_forbidden_offset_for_adrp(&plt[i].adrp))
-+		i++;
-+
-+	plt[i] = get_plt_entry(val, &plt[i]);
- 
- 	/*
- 	 * Check if the entry we just created is a duplicate. Given that the
- 	 * relocations are sorted, this will be the last entry we allocated.
- 	 * (if one exists).
- 	 */
--	if (i > 0 && plt_entries_equal(plt + i, plt + i - 1))
--		return (u64)&plt[i - 1];
-+	if (j >= 0 && plt_entries_equal(plt + i, plt + j))
-+		return (u64)&plt[j];
- 
--	pltsec->plt_num_entries++;
-+	pltsec->plt_num_entries += i - j;
- 	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
- 		return 0;
- 
-@@ -49,35 +102,24 @@ u64 module_emit_veneer_for_adrp(struct module *mod, void *loc, u64 val)
- 							  &mod->arch.init;
- 	struct plt_entry *plt = (struct plt_entry *)pltsec->plt->sh_addr;
- 	int i = pltsec->plt_num_entries++;
--	u32 mov0, mov1, mov2, br;
-+	u32 br;
- 	int rd;
- 
- 	if (WARN_ON(pltsec->plt_num_entries > pltsec->plt_max_entries))
- 		return 0;
- 
-+	if (is_forbidden_offset_for_adrp(&plt[i].adrp))
-+		i = pltsec->plt_num_entries++;
-+
- 	/* get the destination register of the ADRP instruction */
- 	rd = aarch64_insn_decode_register(AARCH64_INSN_REGTYPE_RD,
- 					  le32_to_cpup((__le32 *)loc));
- 
--	/* generate the veneer instructions */
--	mov0 = aarch64_insn_gen_movewide(rd, (u16)~val, 0,
--					 AARCH64_INSN_VARIANT_64BIT,
--					 AARCH64_INSN_MOVEWIDE_INVERSE);
--	mov1 = aarch64_insn_gen_movewide(rd, (u16)(val >> 16), 16,
--					 AARCH64_INSN_VARIANT_64BIT,
--					 AARCH64_INSN_MOVEWIDE_KEEP);
--	mov2 = aarch64_insn_gen_movewide(rd, (u16)(val >> 32), 32,
--					 AARCH64_INSN_VARIANT_64BIT,
--					 AARCH64_INSN_MOVEWIDE_KEEP);
- 	br = aarch64_insn_gen_branch_imm((u64)&plt[i].br, (u64)loc + 4,
- 					 AARCH64_INSN_BRANCH_NOLINK);
- 
--	plt[i] = (struct plt_entry){
--			cpu_to_le32(mov0),
--			cpu_to_le32(mov1),
--			cpu_to_le32(mov2),
--			cpu_to_le32(br)
--		};
-+	plt[i] = __get_adrp_add_pair(val, (u64)&plt[i], rd);
-+	plt[i].br = cpu_to_le32(br);
- 
- 	return (u64)&plt[i];
- }
-@@ -193,6 +235,15 @@ static unsigned int count_plts(Elf64_Sym *syms, Elf64_Rela *rela, int num,
- 			break;
- 		}
- 	}
-+
-+	if (IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) &&
-+	    cpus_have_const_cap(ARM64_WORKAROUND_843419))
-+		/*
-+		 * Add some slack so we can skip PLT slots that may trigger
-+		 * the erratum due to the placement of the ADRP instruction.
-+		 */
-+		ret += DIV_ROUND_UP(ret, (SZ_4K / sizeof(struct plt_entry)));
-+
- 	return ret;
- }
- 
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f0f27aeefb73..3b6dc4ce7ec7 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -202,9 +202,7 @@ static int reloc_insn_adrp(struct module *mod, __le32 *place, u64 val)
- {
- 	u32 insn;
- 
--	if (!IS_ENABLED(CONFIG_ARM64_ERRATUM_843419) ||
--	    !cpus_have_const_cap(ARM64_WORKAROUND_843419) ||
--	    ((u64)place & 0xfff) < 0xff8)
-+	if (!is_forbidden_offset_for_adrp(place))
- 		return reloc_insn_imm(RELOC_OP_PAGE, place, val, 12, 21,
- 				      AARCH64_INSN_IMM_ADR);
- 
--- 
-2.17.1
+It just seems to me like we should be keeping the TCU driver as close as
+possible to other UART drivers which also busy loop in order to rate-
+limit what the console can write. Given the current mailbox framework it
+is not possible to do that (in interrupt context), so an extension seems
+like the most sensible option.
+
+Perhaps you'd be less concerned about such a change if it was perhaps
+more explicit? Just throwing ideas around, I think something that could
+also work is if we explicitly add a mbox_flush() function that would
+basically be calling ->flush(). That way users of the mailbox can make
+their requirement very explicit. I haven't actually tested that, but I
+think it would work. Does that sound more acceptable to you?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/d3b3ee6e/attachment.sig>
