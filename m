@@ -1,37 +1,39 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 22 Nov 2018 13:59:31 +0100
-Subject: [PATCH v3 00/15] MT8183 IOMMU SUPPORT
-In-Reply-To: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
-References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <20181122125931.GC1586@8bytes.org>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Thu, 22 Nov 2018 07:59:41 -0500
+Subject: [PATCH] soc: sunxi: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181122125941.24615-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-On Sat, Nov 17, 2018 at 10:35:27AM +0800, Yong Wu wrote:
-> Yong Wu (14):
->   dt-bindings: mediatek: Add binding for mt8183 IOMMU and SMI
->   iommu/mediatek: Use a struct as the platform data
->   memory: mtk-smi: Use a general config_port interface
->   iommu/io-pgtable-arm-v7s: Add paddr_to_iopte and iopte_to_paddr
->     helpers
->   iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB Mode
->   iommu/mediatek: Add mt8183 IOMMU support
->   iommu/mediatek: Add mmu1 support
->   memory: mtk-smi: Invoke pm runtime_callback to enable clocks
->   memory: mtk-smi: Use a struct for the platform data for smi-common
->   memory: mtk-smi: Add bus_sel for mt8183
->   iommu/mediatek: Add VLD_PA_RANGE register backup when suspend
->   iommu/mediatek: Add shutdown callback
->   memory: mtk-smi: Get rid of need_larbid
->   iommu/mediatek: Switch to SPDX license identifier
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/soc/sunxi/sunxi_sram.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-This should probably go through the IOMMU tree. For that I'd like to
-have Acks (reviews are even better) for the io-pgtable parts from Robin
-and for the memory parts from Matthias first.
-
-
-Regards,
-
-	Joerg
+diff --git a/drivers/soc/sunxi/sunxi_sram.c b/drivers/soc/sunxi/sunxi_sram.c
+index b4b0f3480bd3..71e3ee4a3f19 100644
+--- a/drivers/soc/sunxi/sunxi_sram.c
++++ b/drivers/soc/sunxi/sunxi_sram.c
+@@ -155,17 +155,7 @@ static int sunxi_sram_show(struct seq_file *s, void *data)
+ 	return 0;
+ }
+ 
+-static int sunxi_sram_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, sunxi_sram_show, inode->i_private);
+-}
+-
+-static const struct file_operations sunxi_sram_fops = {
+-	.open = sunxi_sram_open,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(sunxi_sram);
+ 
+ static inline struct sunxi_sram_desc *to_sram_desc(const struct sunxi_sram_data *data)
+ {
+-- 
+2.17.0
