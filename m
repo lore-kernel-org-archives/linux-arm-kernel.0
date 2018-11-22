@@ -1,196 +1,114 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 22 Nov 2018 18:34:32 +0100
-Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-In-Reply-To: <CABb+yY1Ez=tSyPq=bX7oE3s3Eu97kdOS6+PkfDg1HKtkYyWTpA@mail.gmail.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
- <20181120152907.GA28796@ulmo> <20181121142740.GA29704@ulmo>
- <CABb+yY0nH3Su6a11TZLJf=CCpD+gTpqUkLnRhpy4MUwNJk5prw@mail.gmail.com>
- <20181122084712.GA5741@ulmo>
- <CABb+yY1Ez=tSyPq=bX7oE3s3Eu97kdOS6+PkfDg1HKtkYyWTpA@mail.gmail.com>
-Message-ID: <20181122173432.GA7659@ulmo>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 22 Nov 2018 18:40:45 +0100
+Subject: [PATCH 1/2] module: Overwrite st_size instead of st_info
+In-Reply-To: <20181122162849.GA8856@linux-8ccs>
+References: <20181119162513.16562-1-vincent.whitchurch@axis.com>
+ <20181122120154.GH3505@e103592.cambridge.arm.com>
+ <20181122122411.6ydftk7bjlrefwa5@axis.com>
+ <20181122162849.GA8856@linux-8ccs>
+Message-ID: <CAKv+Gu_vAKhQ2oakTeJNwP_F6dhqKe2ZwjAR13wrVKfL5aS4Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 10:07:09AM -0600, Jassi Brar wrote:
-> Hi Thierry,
-> 
-> On Thu, Nov 22, 2018 at 2:47 AM Thierry Reding <thierry.reding@gmail.com> wrote:
+On Thu, 22 Nov 2018 at 17:29, Jessica Yu <jeyu@kernel.org> wrote:
+>
+> +++ Vincent Whitchurch [22/11/18 13:24 +0100]:
+> >On Thu, Nov 22, 2018 at 12:01:54PM +0000, Dave Martin wrote:
+> >> On Mon, Nov 19, 2018 at 05:25:12PM +0100, Vincent Whitchurch wrote:
+> >> > st_info is currently overwritten after relocation and used to store the
+> >> > elf_type().  However, we're going to need it fix kallsyms on ARM's
+> >> > Thumb-2 kernels, so preserve st_info and overwrite the st_size field
+> >> > instead.  st_size is neither used by the module core nor by any
+> >> > architecture.
+> >> >
+> >> > Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+> >> > ---
+> >> > v4: Split out to separate patch.  Use st_size instead of st_other.
+> >> > v1-v3: See PATCH 2/2
+> >> >
+> >> >  kernel/module.c | 4 ++--
+> >> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> >> >
+> >> > diff --git a/kernel/module.c b/kernel/module.c
+> >> > index 49a405891587..3d86a38b580c 100644
+> >> > --- a/kernel/module.c
+> >> > +++ b/kernel/module.c
+> >> > @@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
+> >> >
+> >> >    /* Set types up while we still have access to sections. */
+> >> >    for (i = 0; i < mod->kallsyms->num_symtab; i++)
+> >> > -          mod->kallsyms->symtab[i].st_info
+> >> > +          mod->kallsyms->symtab[i].st_size
+> >> >                    = elf_type(&mod->kallsyms->symtab[i], info);
+> >> >
+> >> >    /* Now populate the cut down core kallsyms for after init. */
+> >> > @@ -4061,7 +4061,7 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+> >> >            kallsyms = rcu_dereference_sched(mod->kallsyms);
+> >> >            if (symnum < kallsyms->num_symtab) {
+> >> >                    *value = kallsyms->symtab[symnum].st_value;
+> >> > -                  *type = kallsyms->symtab[symnum].st_info;
+> >> > +                  *type = kallsyms->symtab[symnum].st_size;
+> >> >                    strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
+> >> >                    strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+> >> >                    *exported = is_exported(name, *value, mod);
+> >>
+> >> This is fine if st_size is really unused, but how sure are you of that?
+> >>
+> >> grepping for st_size throws up some hits that appear ELF-related, but
+> >> I've not investigated them in detail.
+> >>
+> >> (The fact that struct stat has an identically named field throws up
+> >> a load of false positives too.)
 > >
-> > On Wed, Nov 21, 2018 at 08:18:22PM -0600, Jassi Brar wrote:
-> > > On Wed, Nov 21, 2018 at 8:27 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > >
-> > > > On Tue, Nov 20, 2018 at 04:29:07PM +0100, Thierry Reding wrote:
-> > > > > On Sat, Nov 17, 2018 at 11:27:17AM -0600, Jassi Brar wrote:
-> > > > > > On Mon, Nov 12, 2018 at 9:18 AM Thierry Reding <thierry.reding@gmail.com> wrote:
-> > > > > > >
-> > > > > > > From: Thierry Reding <treding@nvidia.com>
-> > > > > > >
-> > > > > > > The mailbox framework supports blocking transfers via completions for
-> > > > > > > clients that can sleep. In order to support blocking transfers in cases
-> > > > > > > where the transmission is not permitted to sleep, add a new ->flush()
-> > > > > > > callback that controller drivers can implement to busy loop until the
-> > > > > > > transmission has been completed. This will automatically be called when
-> > > > > > > available and interrupts are disabled for clients that request blocking
-> > > > > > > transfers.
-> > > > > > >
-> > > > > > > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > > > > > > ---
-> > > > > > >  drivers/mailbox/mailbox.c          | 8 ++++++++
-> > > > > > >  include/linux/mailbox_controller.h | 4 ++++
-> > > > > > >  2 files changed, 12 insertions(+)
-> > > > > > >
-> > > > > > > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> > > > > > > index 674b35f402f5..0eaf21259874 100644
-> > > > > > > --- a/drivers/mailbox/mailbox.c
-> > > > > > > +++ b/drivers/mailbox/mailbox.c
-> > > > > > > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
-> > > > > > >                 unsigned long wait;
-> > > > > > >                 int ret;
-> > > > > > >
-> > > > > > > +               if (irqs_disabled() && chan->mbox->ops->flush) {
-> > > > > > > +                       ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
-> > > > > > > +                       if (ret < 0)
-> > > > > > > +                               tx_tick(chan, ret);
-> > > > > > > +
-> > > > > > > +                       return ret;
-> > > > > > > +               }
-> > > > > > > +
-> > > > > > This is hacky. I think we can do without busy waiting in atomic
-> > > > > > context. You could queue locally while in atomic context and then
-> > > > > > transfer in blocking mode. I don't think we should worry about the
-> > > > > > 'throughput' as there already is no h/w rate control even with
-> > > > > > busy-waiting.
-> > > > >
-> > > > > I actually tried to do that before I added this flushing mechanism. The
-> > > > > problem is, like you said, one of rate control. As mentioned in the
-> > > > > cover letter, the shared mailboxes implemented in tegra-hsp are used as
-> > > > > RX and TX channels for the TCU, which is like a virtual UART. The TTY
-> > > > > driver included as part of this series will use one of the mailboxes to
-> > > > > transmit data that is written to the console. The problem is that if
-> > > > > these transmissions are not rate-limited on the TTY driver side, the
-> > > > > console will just keep writing data and eventually overflow the buffer
-> > > > > that we have in the mailbox subsystem.
-> > > > >
-> > > > > The problem is that data comes in at a much higher rate than what we can
-> > > > > output. This is especially true at boot when the TCU console takes over
-> > > > > and the whole log buffer is dumped on it.
-> > > > >
-> > > > > So the only way to rate-limit is to either make mbox_send_message()
-> > > > > block, but that can only be done in non-atomic context. The console,
-> > > > > however, will always run in atomic context, so the only way to do rate-
-> > > > > limiting is by busy looping.
-> > > >
-> > > > What I also tried before was to implement busy looping within the
-> > > > ->send_data() callback of the driver so that we didn't have to put this
-> > > > into the core. Unfortunately, however, the ->send_data() callback is
-> > > > called under chan->lock, which means that from mbox_send_message() we
-> > > > don't have a way to mark the transfer as done. In order to do that we'd
-> > > > have to call mbox_chan_txdone(), but that ends up calling tx_tick() and
-> > > > that in turn also attempts to take the chan->lock, which would cause a
-> > > > deadlock.
-> > > >
-> > > > The explicit flushing is the best alternative that I could come up with.
-> > > > I think it's not all that hacky, because it's very explicit about what's
-> > > > going on and it has the nice side-effect that it will allow the mailbox
-> > > > to work in interrupt driven mode if possible and only resorting to the
-> > > > busy loop in atomic context.
-> > > >
-> > > > At this point I think I have explored all other options and I frankly
-> > > > can't find a more proper way to achieve what we need here. Perhaps you
-> > > > can think of additional ways to accomplish this?
-> > > >
-> > > Well, I would have a local ring buffer (array) of enough size to hold
-> > > the characters and then have a task consuming data from that ring
-> > > buffer by transmitting over mailbox.
+> >$ git describe --tags
+> >v4.20-rc3-93-g92b419289cee
 > >
-> > There's already such a ringbuffer in the printk code. To implement what
-> > you suggest would effectively be creating a copy of that buffer because
-> > we'd be allocating the buffer and the console code would just dump each
-> > and every character in the logbuf into that ring buffer without rate-
-> > limitation.
+> >$ rg -m1 '[\.>]st_size'  --iglob '!**/tools/**' --iglob '!**/vdso*' --iglob '!**/scripts/**' --iglob '!**/usr/**' --iglob '!**/samples/**' | cat
+> >| kernel/kexec_file.c: if (sym->st_size != size) {
 > >
-> Well, the console assumes there exists an atomic path to put character
-> on the bus, But because there isn't in case of tcu, we have to emulate
-> that. Frankly I prefer the one-off driver jump some hoops, rather than
-> implement exceptions in the api.
-
-I wouldn't have any objections to that if the hoops were reasonable
-ones. What you're asking me to do is basically implement a second copy
-of the logbuf. I don't call that a reasonable hoop to jump through. It
-is also not guaranteed to work properly because we can always end up
-with a situation where we produce more data than we can consume. Also,
-by providing this additional buffer we make things worse because the
-standard mechanisms of the logbuf are side-stepped. Typically the logbuf
-code will warn if it overflows. In our case we provide a buffer that the
-console can dump into, so instead of the logbuf overflowing and warning
-about it, we'd now overflow the mailbox buffer and we'd have to add
-extra code to warn about overflows.
-
-The console really only works because it assumes that the output driver
-will stall and thereby rate-limit.
-
-> BTW, there is already no rate-limitation because its all virtual -
-> data is consumed as fast as possible.
-
-No, that's not true. On the receiving end of the TX mailbox is a micro-
-processor that reads out the mailbox data. Once it has read the data it
-needs to clear the FULL bit so that the TCU driver can write more data.
-Even if the microprocessor on the receiving end did buffering (there is
-no indication that it does) it would eventually run out of buffer space
-and have to stall until it's clocked all the characters out of the
-physical UART. At that point no amount of buffering is going to save us
-and the only option is to stall, which, again, can currently only be
-done from the mailbox, because it is the only one that knows when it is
-busy. But it's also the one place where we can't because the framework
-doesn't allow it.
-
-> > To make matters worse, the ringbuffer would be empty most of the time
-> > after the initial dump of the logbuf, so we'd be wasting all that buffer
-> > space.
+> >Symbols in kexec kernel.
 > >
-> The idea is console and uart-ops both feed into this buffer and the
-> only consumer thread runs the mailbox.
-> 
-> > It just seems to me like we should be keeping the TCU driver as close as
-> > possible to other UART drivers which also busy loop in order to rate-
-> > limit what the console can write. Given the current mailbox framework it
-> > is not possible to do that (in interrupt context), so an extension seems
-> > like the most sensible option.
+> >| fs/stat.c:   tmp.st_size = stat->size;
+> >| Documentation/networking/tls.txt:  sendfile(sock, file, &offset, stat.st_size);
+> >| net/9p/client.c:             ret->st_rdev, ret->st_size, ret->st_blksize,
+> >| net/9p/protocol.c:                                   &stbuf->st_rdev, &stbuf->st_size,
+> >| fs/9p/vfs_inode_dotl.c:              i_size_write(inode, stat->st_size);
+> >| fs/hostfs/hostfs_user.c:     p->size = buf->st_size;
+> >| arch/powerpc/boot/mktree.c:  nblks = (st.st_size + IMGBLK) / IMGBLK;
+> >| arch/alpha/kernel/osf_sys.c: tmp.st_size     = lstat->size;
+> >| arch/x86/ia32/sys_ia32.c:        __put_user(stat->size, &ubuf->st_size) ||
 > >
-> > Perhaps you'd be less concerned about such a change if it was perhaps
-> > more explicit? Just throwing ideas around, I think something that could
-> > also work is if we explicitly add a mbox_flush() function that would
-> > basically be calling ->flush(). That way users of the mailbox can make
-> > their requirement very explicit. I haven't actually tested that, but I
-> > think it would work. Does that sound more acceptable to you?
+> >Not Elf_Sym.
 > >
-> I am happy to see features and bugfixes added to the api. What I am
-> not eager about is supporting less than 100% legit and very platform
-> specific usecases, especially when there is a work around.
+> >| arch/x86/kernel/machine_kexec_64.c:                   sym->st_size);
+> >
+> >Symbols in kexec kernel.
+> >
+> >| arch/sparc/boot/piggyback.c: st4(buffer + 12, s.st_size);
+> >| arch/sparc/kernel/sys_sparc32.c:     err |= put_user(stat->size, &statbuf->st_size);
+> >| arch/um/os-Linux/file.c:             .ust_size    = src->st_size,    /* total size, in bytes */
+> >| arch/um/os-Linux/start_up.c: size = (buf.st_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
+> >| arch/s390/kernel/compat_linux.c:     tmp.st_size = stat->size;
+> >| arch/arm/kernel/sys_oabi-compat.c:   tmp.st_size = stat->size;
+> >| arch/mips/boot/compressed/calc_vmlinuz_load_addr.c:  vmlinux_size = (uint64_t)sb.st_size;
+> >| drivers/net/ethernet/marvell/sky2.c:         hw->st_idx = RING_NEXT(hw->st_idx, hw->st_size);
+> >
+> >Not Elf_Sym.
+>
+> [ added Miroslav to CC, just in case he would like to check :) ]
+>
+> I have just double checked as well, and am fairly certain that the
+> Elf_Sym st_size field is not used to apply module relocations in any
+> arches, and it is not used in the core module loader nor in the module
+> kallsyms code. We'd like to avoid overwriting st_info in any case, to
+> fix kallsyms on Thumb-2 and also so that livepatch won't run into any
+> issues with delayed relocations, should livepatch support ever expand
+> to arches (e.g., arm) that rely on st_info for module relocations.
+>
 
-Look, I'd be willing to push this all into the driver, but the framework
-doesn't allow me to do that. If it was possible to run the state machine
-outside of mbox_send_message() then I'd be able to just move the busy
-loop or flush into the driver. But the locking is such that I can't do
-that because it will cause a deadlock.
-
-The ringbuffer workaround would be very brittle and if at all only work
-by accident, not to mention that it would require duplicating much of
-the logbuf logic.
-
-Also I don't consider usage in atomic context a very platform specific
-use-case, and I don't understand why I should be required to resort to
-some unreliable workaround rather than find a proper fix that guarantees
-proper operation.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/72a36a13/attachment.sig>
+Also note that st_size cannot be relied upon in general, since we
+overwrite the addresses of undefined symbols in a module's symbol
+table when resolve them against ksyms, while the st_size field is kept
+at 0. At relocation time, we don't really distinguish anymore between
+local and external module symbols, and so relying on st_size to be
+accurate would definitely break things.
