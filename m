@@ -1,69 +1,36 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 21 Nov 2018 19:28:04 -0500
-Subject: [for-next][PATCH 03/18] ARM: function_graph: Simplify with
- function_graph_entry()
-References: <20181122002801.501220343@goodmis.org>
-Message-ID: <20181122003331.771117906@goodmis.org>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Thu, 22 Nov 2018 08:52:46 +0800
+Subject: [PATCH v2 2/3] mm: Add support for SLAB_CACHE_DMA32
+In-Reply-To: <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <20181111090341.120786-3-drinkcat@chromium.org>
+ <01000167378bf31a-a639b46c-4d1d-43de-9bed-9cdd9c07fa94-000000@email.amazonses.com>
+Message-ID: <CANMq1KD4j=Zh1izN8Ujn3+ZsdMMzCLPurfkXTkM9TyQaTptjFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+On Thu, Nov 22, 2018 at 2:32 AM Christopher Lameter <cl@linux.com> wrote:
+>
+> On Sun, 11 Nov 2018, Nicolas Boichat wrote:
+>
+> > SLAB_CACHE_DMA32 is only available after explicit kmem_cache_create calls,
+> > no default cache is created for kmalloc. Add a test in check_slab_flags
+> > for this.
+>
+> This does not define the dma32 kmalloc array. Is that intentional?
 
-The function_graph_entry() function does the work of calling the function
-graph hook function and the management of the shadow stack, simplifying the
-work done in the architecture dependent prepare_ftrace_return().
+Yes that's intentional, AFAICT there is no user, so there is no point
+creating the cache.
 
-Have ARM use the new code, and remove the shadow stack management as well as
-having to set up the trace structure.
+ (okay, I could find one, but it's probably broken:
+git grep GFP_DMA32 | grep k[a-z]*alloc
+drivers/media/platform/vivid/vivid-osd.c: dev->video_vbase =
+kzalloc(dev->video_buffer_size, GFP_KERNEL | GFP_DMA32);
+).
 
-This is needed to prepare for a fix of a design bug on how the curr_ret_stack
-is used.
+> In that
+> case you need to fail any request for GFP_DMA32 coming in via kmalloc.
 
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: stable at kernel.org
-Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
----
- arch/arm/kernel/ftrace.c | 17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
-
-diff --git a/arch/arm/kernel/ftrace.c b/arch/arm/kernel/ftrace.c
-index 0142fcfcc3d3..bda949fd84e8 100644
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -183,9 +183,7 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- 			   unsigned long frame_pointer)
- {
- 	unsigned long return_hooker = (unsigned long) &return_to_handler;
--	struct ftrace_graph_ent trace;
- 	unsigned long old;
--	int err;
- 
- 	if (unlikely(atomic_read(&current->tracing_graph_pause)))
- 		return;
-@@ -193,21 +191,8 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
- 	old = *parent;
- 	*parent = return_hooker;
- 
--	trace.func = self_addr;
--	trace.depth = current->curr_ret_stack + 1;
--
--	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace)) {
-+	if (function_graph_enter(old, self_addr, frame_pointer, NULL))
- 		*parent = old;
--		return;
--	}
--
--	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
--				       frame_pointer, NULL);
--	if (err == -EBUSY) {
--		*parent = old;
--		return;
--	}
- }
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
--- 
-2.19.1
+Well, we do check for these in check_slab_flags (aka GFP_SLAB_BUG_MASK
+before patch 1/3 of this series), so, with or without this patch,
+calls with GFP_DMA32 will end up failing in check_slab_flags.
