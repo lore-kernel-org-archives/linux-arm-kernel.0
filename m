@@ -1,76 +1,500 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 22 Nov 2018 15:23:10 +0000
-Subject: [PATCH] PCI: armada8k: add support for gpio controlled reset
- signal
-In-Reply-To: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
-References: <405efb21a4600efad10413fcf4c72aacce180125.1538570983.git.baruch@tkos.co.il>
-Message-ID: <20181122152310.GA16857@e107981-ln.cambridge.arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 22 Nov 2018 15:23:13 +0000
+Subject: [RFC PATCH v2 19/23] KVM: arm64/sve: Report and enable SVE API
+ extensions for userspace
+In-Reply-To: <1538141967-15375-20-git-send-email-Dave.Martin@arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-20-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87a7m1i1b2.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 03, 2018 at 03:49:43PM +0300, Baruch Siach wrote:
-> This commit adds support for the gpio reset signal binding as described
-> in the designware-pcie.txt DT binding document. Both the documented
-> 'reset-gpio' property name, and the more standard 'reset-gpios' name are
-> supported.
-> 
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+
+Dave Martin <Dave.Martin@arm.com> writes:
+
+> This patch adds the necessary API extensions to allow userspace to
+> detect SVE support for guests and enable it.
+>
+> A new capability KVM_CAP_ARM_SVE is defined to allow userspace to
+> detect the availability of the KVM SVE API extensions in the usual
+> way.
+>
+> Userspace needs to enable SVE explicitly per vcpu and configure the
+> set of SVE vector lengths available to the guest before the vcpu is
+> allowed to run.  For these purposes, a new arm64-specific vcpu
+> ioctl KVM_ARM_SVE_CONFIG is added, with the following subcommands
+> (in rough order of expected use):
+>
+> KVM_ARM_SVE_CONFIG_QUERY: report the set of vector lengths
+>     supported by this host.
+>
+>     The resulting set can be supplied directly to
+>     KVM_ARM_SVE_CONFIG_SET in order to obtain the maximal possible
+>     set, or used to inform userspace's decision on the appropriate
+>     set of vector lengths (possibly taking into account the
+>     configuration of other nodes in the cluster so that the VM can
+>     migrate freely).
+>
+> KVM_ARM_SVE_CONFIG_SET: enable SVE for this vcpu and configure the
+>     set of vector lengths it offers to the guest.
+>
+>     This can only be done once, before the vcpu is run.
+>
+> KVM_ARM_SVE_CONFIG_GET: report the set of vector lengths available
+>     to the guest on this vcpu (for use when snapshotting or
+>     migrating a VM).
+>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 > ---
->  drivers/pci/controller/dwc/pcie-armada8k.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-
-Applied to pci/dwc for v4.21, thanks.
-
-Lorenzo
-
-> diff --git a/drivers/pci/controller/dwc/pcie-armada8k.c b/drivers/pci/controller/dwc/pcie-armada8k.c
-> index 0c389a30ef5d..b171b6bc15c8 100644
-> --- a/drivers/pci/controller/dwc/pcie-armada8k.c
-> +++ b/drivers/pci/controller/dwc/pcie-armada8k.c
-> @@ -22,6 +22,7 @@
->  #include <linux/resource.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_irq.h>
-> +#include <linux/gpio/consumer.h>
->  
->  #include "pcie-designware.h"
->  
-> @@ -29,6 +30,7 @@ struct armada8k_pcie {
->  	struct dw_pcie *pci;
->  	struct clk *clk;
->  	struct clk *clk_reg;
-> +	struct gpio_desc *reset_gpio;
+>
+> Changes since RFCv1:
+>
+>  * The new feature bit for PREFERRED_TARGET / VCPU_INIT is gone in
+>    favour of a capability and a new ioctl to enable/configure SVE.
+>
+>    Perhaps the SVE configuration could be done via device attributes,
+>    but it still has to be done early, so crowbarring support for this
+>    behind a generic API may cause more trouble than it solves.
+>
+>    This is still up for discussion if anybody feels strongly about it.
+>
+>  * An ioctl KVM_ARM_SVE_CONFIG has been added to report the set of
+>    vector lengths available and configure SVE for a vcpu.
+>
+>    To reduce ioctl namespace pollution the new operations are grouped
+>    as subcommands under a single ioctl, since they use the same
+>    argument format anyway.
+> ---
+>  arch/arm64/include/asm/kvm_host.h |   8 +-
+>  arch/arm64/include/uapi/asm/kvm.h |  14 ++++
+>  arch/arm64/kvm/guest.c            | 164 +++++++++++++++++++++++++++++++++++++-
+>  arch/arm64/kvm/reset.c            |  50 ++++++++++++
+>  include/uapi/linux/kvm.h          |   4 +
+>  5 files changed, 238 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index bbde597..5225485 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -52,6 +52,12 @@
+>
+>  DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
+>
+> +#ifdef CONFIG_ARM64_SVE
+> +bool kvm_sve_supported(void);
+> +#else
+> +static inline bool kvm_sve_supported(void) { return false; }
+> +#endif
+> +
+>  int __attribute_const__ kvm_target_cpu(void);
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+>  int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
+> @@ -441,7 +447,7 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
+>  static inline void kvm_arch_vcpu_block_finish(struct kvm_vcpu *vcpu) {}
+>
+> -static inline void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+> +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu);
+>
+>  void kvm_arm_init_debug(void);
+>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 1ff68fa..94f6932 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -32,6 +32,7 @@
+>  #define KVM_NR_SPSR	5
+>
+>  #ifndef __ASSEMBLY__
+> +#include <linux/kernel.h>
+>  #include <linux/psci.h>
+>  #include <linux/types.h>
+>  #include <asm/ptrace.h>
+> @@ -108,6 +109,19 @@ struct kvm_vcpu_init {
+>  	__u32 features[7];
 >  };
->  
->  #define PCIE_VENDOR_REGS_OFFSET		0x8000
-> @@ -137,6 +139,12 @@ static int armada8k_pcie_host_init(struct pcie_port *pp)
->  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
->  	struct armada8k_pcie *pcie = to_armada8k_pcie(pci);
->  
-> +	if (pcie->reset_gpio) {
-> +		/* assert and then deassert the reset signal */
-> +		gpiod_set_value_cansleep(pcie->reset_gpio, 1);
-> +		msleep(100);
-> +		gpiod_set_value_cansleep(pcie->reset_gpio, 0);
-> +	}
->  	dw_pcie_setup_rc(pp);
->  	armada8k_pcie_establish_link(pcie);
->  
-> @@ -249,6 +257,14 @@ static int armada8k_pcie_probe(struct platform_device *pdev)
->  		goto fail_clkreg;
->  	}
->  
-> +	/* Get reset gpio signal and hold asserted (logically high) */
-> +	pcie->reset_gpio = devm_gpiod_get_optional(dev, "reset",
-> +						   GPIOD_OUT_HIGH);
-> +	if (IS_ERR(pcie->reset_gpio)) {
-> +		ret = PTR_ERR(pcie->reset_gpio);
-> +		goto fail_clkreg;
+>
+> +/* Vector length set for KVM_ARM_SVE_CONFIG */
+> +struct kvm_sve_vls {
+> +	__u16 cmd;
+> +	__u16 max_vq;
+> +	__u16 _reserved[2];
+> +	__u64 required_vqs[__KERNEL_DIV_ROUND_UP(SVE_VQ_MAX - SVE_VQ_MIN + 1, 64)];
+> +};
+> +
+> +/* values for cmd: */
+> +#define KVM_ARM_SVE_CONFIG_QUERY	0 /* query what the host can support */
+> +#define KVM_ARM_SVE_CONFIG_SET		1 /* enable SVE for vcpu and set VLs */
+> +#define KVM_ARM_SVE_CONFIG_GET		2 /* read the set of VLs for a vcpu */
+> +
+>  struct kvm_sregs {
+>  };
+>
+> diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+> index 331b85e..d96145a 100644
+> --- a/arch/arm64/kvm/guest.c
+> +++ b/arch/arm64/kvm/guest.c
+> @@ -26,6 +26,9 @@
+>  #include <linux/module.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/fs.h>
+> +#include <linux/slab.h>
+> +#include <linux/string.h>
+> +#include <linux/types.h>
+>  #include <kvm/arm_psci.h>
+>  #include <asm/cputype.h>
+>  #include <linux/uaccess.h>
+> @@ -56,6 +59,11 @@ int kvm_arch_vcpu_setup(struct kvm_vcpu *vcpu)
+>  	return 0;
+>  }
+>
+> +void kvm_arm_arch_vcpu_uninit(struct kvm_vcpu *vcpu)
+> +{
+> +	kfree(vcpu->arch.sve_state);
+> +}
+> +
+>  static u64 core_reg_offset_from_id(u64 id)
+>  {
+>  	return id & ~(KVM_REG_ARCH_MASK | KVM_REG_SIZE_MASK | KVM_REG_ARM_CORE);
+> @@ -546,10 +554,164 @@ int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init)
+>  	return 0;
+>  }
+>
+> +#define VQS_PER_U64 64
+> +#define vq_word(vqs, vq) (&(vqs)[((vq) - SVE_VQ_MIN) / VQS_PER_U64])
+> +#define vq_mask(vq) ((u64)1 << (((vq) - SVE_VQ_MIN) % VQS_PER_U64))
+> +
+> +static void set_vq(u64 *vqs, unsigned int vq)
+> +{
+> +	*vq_word(vqs, vq) |= vq_mask(vq);
+> +}
+> +
+> +static bool vq_set(const u64 *vqs, unsigned int vq)
+> +{
+> +	return *vq_word(vqs, vq) & vq_mask(vq);
+> +}
+> +
+> +static int kvm_vcpu_set_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+> +		struct kvm_sve_vls __user *userp)
+> +{
+> +	unsigned int vq, max_vq;
+> +	int ret;
+> +
+> +	if (vcpu->arch.has_run_once || vcpu_has_sve(vcpu))
+> +		return -EBADFD; /* too late, or already configured */
+> +
+> +	BUG_ON(vcpu->arch.sve_max_vl || vcpu->arch.sve_state);
+> +
+> +	if (vls->max_vq < SVE_VQ_MIN || vls->max_vq > SVE_VQ_MAX)
+> +		return -EINVAL;
+> +
+> +	max_vq = 0;
+> +	for (vq = SVE_VQ_MIN; vq <= vls->max_vq; ++vq) {
+> +		bool available = sve_vq_available(vq);
+> +		bool required = vq_set(vls->required_vqs, vq);
+> +
+> +		if (required != available)
+> +			break;
+> +
+> +		if (required)
+> +			max_vq = vq;
 > +	}
 > +
->  	platform_set_drvdata(pdev, pcie);
->  
->  	ret = armada8k_add_pcie_port(pcie, pdev);
-> -- 
-> 2.19.0
-> 
+> +	if (max_vq < SVE_VQ_MIN)
+> +		return -EINVAL;
+> +
+> +	vls->max_vq = max_vq;
+> +	ret = put_user(vls->max_vq, &userp->max_vq);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/*
+> +	 * kvm_reset_vcpu() may already have run in KVM_VCPU_INIT, so we
+> +	 * rely on kzalloc() being sufficient to reset the guest SVE
+> +	 * state here for a new vcpu.
+> +	 *
+> +	 * Subsequent resets after vcpu initialisation are handled by
+> +	 * kvm_reset_sve().
+> +	 */
+> +	vcpu->arch.sve_state = kzalloc(SVE_SIG_REGS_SIZE(vls->max_vq),
+> +				       GFP_KERNEL);
+> +	if (!vcpu->arch.sve_state)
+> +		return -ENOMEM;
+> +
+> +	vcpu->arch.flags |= KVM_ARM64_GUEST_HAS_SVE;
+> +	vcpu->arch.sve_max_vl = sve_vl_from_vq(vls->max_vq);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __kvm_vcpu_query_sve_vls(struct kvm_sve_vls *vls,
+> +		unsigned int max_vq, struct kvm_sve_vls __user *userp)
+> +{
+> +	unsigned int vq, max_available_vq;
+> +
+> +	memset(&vls->required_vqs, 0, sizeof(vls->required_vqs));
+> +
+> +	BUG_ON(max_vq < SVE_VQ_MIN || max_vq > SVE_VQ_MAX);
+> +
+> +	max_available_vq = 0;
+> +	for (vq = SVE_VQ_MIN; vq <= max_vq; ++vq)
+> +		if (sve_vq_available(vq)) {
+> +			set_vq(vls->required_vqs, vq);
+> +			max_available_vq = vq;
+> +		}
+> +
+> +	if (WARN_ON(max_available_vq < SVE_VQ_MIN))
+> +		return -EIO;
+> +
+> +	vls->max_vq = max_available_vq;
+> +	if (copy_to_user(userp, vls, sizeof(*vls)))
+> +		return -EFAULT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int kvm_vcpu_query_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+> +		struct kvm_sve_vls __user *userp)
+> +{
+> +	BUG_ON(!sve_vl_valid(sve_max_vl));
+> +
+> +	return __kvm_vcpu_query_sve_vls(vls,
+> +			sve_vq_from_vl(sve_max_vl), userp);
+> +}
+> +
+> +static int kvm_vcpu_get_sve_vls(struct kvm_vcpu *vcpu, struct kvm_sve_vls *vls,
+> +		struct kvm_sve_vls __user *userp)
+> +{
+> +	if (!vcpu_has_sve(vcpu))
+> +		return -EBADFD; /* not configured yet */
+> +
+> +	BUG_ON(!sve_vl_valid(vcpu->arch.sve_max_vl));
+> +
+> +	return __kvm_vcpu_query_sve_vls(vls,
+> +			sve_vq_from_vl(vcpu->arch.sve_max_vl), userp);
+> +}
+> +
+> +static int kvm_vcpu_sve_config(struct kvm_vcpu *vcpu,
+> +			       struct kvm_sve_vls __user *userp)
+> +{
+> +	struct kvm_sve_vls vls;
+> +
+> +	if (!kvm_sve_supported())
+> +		return -EINVAL;
+> +
+> +	if (copy_from_user(&vls, userp, sizeof(vls)))
+> +		return -EFAULT;
+> +
+> +	/*
+> +	 * For forwards compatibility, flush any set bits in _reserved[]
+> +	 * to tell userspace that we didn't look at them:
+> +	 */
+> +	memset(&vls._reserved, 0, sizeof vls._reserved);
+> +
+> +	switch (vls.cmd) {
+> +	case KVM_ARM_SVE_CONFIG_QUERY:
+> +		return kvm_vcpu_query_sve_vls(vcpu, &vls, userp);
+> +
+> +	case KVM_ARM_SVE_CONFIG_SET:
+> +		return kvm_vcpu_set_sve_vls(vcpu, &vls, userp);
+> +
+> +	case KVM_ARM_SVE_CONFIG_GET:
+> +		return kvm_vcpu_get_sve_vls(vcpu, &vls, userp);
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+>  int kvm_arm_arch_vcpu_ioctl(struct kvm_vcpu *vcpu,
+>  			    unsigned int ioctl, unsigned long arg)
+>  {
+> -	return -EINVAL;
+> +	void __user *userp = (void __user *)arg;
+> +
+> +	switch (ioctl) {
+> +	case KVM_ARM_SVE_CONFIG:
+> +		return kvm_vcpu_sve_config(vcpu, userp);
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+>  }
+>
+>  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index e37c78b..c2edcde 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -19,10 +19,12 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>   */
+>
+> +#include <linux/atomic.h>
+>  #include <linux/errno.h>
+>  #include <linux/kvm_host.h>
+>  #include <linux/kvm.h>
+>  #include <linux/hw_breakpoint.h>
+> +#include <linux/string.h>
+>
+>  #include <kvm/arm_arch_timer.h>
+>
+> @@ -54,6 +56,31 @@ static bool cpu_has_32bit_el1(void)
+>  	return !!(pfr0 & 0x20);
+>  }
+>
+> +#ifdef CONFIG_ARM64_SVE
+> +bool kvm_sve_supported(void)
+> +{
+> +	static bool warn_printed = false;
+> +
+> +	if (!system_supports_sve())
+> +		return false;
+> +
+> +	/*
+> +	 * For now, consider the hardware broken if implementation
+> +	 * differences between CPUs in the system result in the set of
+> +	 * vector lengths safely virtualisable for guests being less
+> +	 * than the set provided to userspace:
+> +	 */
+> +	if (sve_max_virtualisable_vl != sve_max_vl) {
+> +		if (!xchg(&warn_printed, true))
+> +			kvm_err("Hardware SVE implementations
+> mismatched: suppressing SVE for guests.");
+
+This seems like you are re-inventing WARN_ONCE for the sake of having
+"kvm [%i]: " in your printk string.
+
+> +
+> +		return false;
+> +	}
+> +
+> +	return true;
+> +}
+> +#endif
+> +
+>  /**
+>   * kvm_arch_dev_ioctl_check_extension
+>   *
+> @@ -85,6 +112,9 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	case KVM_CAP_VCPU_EVENTS:
+>  		r = 1;
+>  		break;
+> +	case KVM_CAP_ARM_SVE:
+> +		r = kvm_sve_supported();
+> +		break;
+
+For debugging we actually use the return value to indicate how many
+WP/BPs we have. We could do the same here for max number of VQs but I
+guess KVM_ARM_SVE_CONFIG_QUERY reports a much richer set of information.
+However this does beg the question of how useful all this extra
+information is to the guest program?
+
+A dumber implementation would be:
+
+QEMU                 |        Kernel
+
+KVM_CAP_ARM_SVE  --------->
+                              Max VQ=n
+           VQ/0  <---------
+
+We want n < max VQ
+
+KVM_ARM_SVE_CONFIG(n) ---->
+                              Unsupported VQ
+           EINVAL <--------
+
+Weird HW can't support our choice of n.
+Give up or try another value.
+
+KVM_ARM_SVE_CONFIG(n-1) --->
+                              That's OK
+           0 (OK) <---------
+
+It imposes more heavy lifting on the userspace side of things but I
+would expect the "normal" case would be sane hardware supports all VLs
+from Max VQ to 1. And for cases where it doesn't iterating through
+several KVM_ARM_SVE_CONFIG steps is a start-up cost not a runtime one.
+
+This would mean one capability and one SVE_CONFIG sub-command with a single
+parameter. Would could always add the extend the interface later but I
+wonder if we are gold plating the API too early here?
+
+What do the maintainers thing?
+
+
+>  	default:
+>  		r = 0;
+>  	}
+> @@ -92,6 +122,21 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  	return r;
+>  }
+>
+> +int kvm_reset_sve(struct kvm_vcpu *vcpu)
+> +{
+> +	if (!vcpu_has_sve(vcpu))
+> +		return 0;
+> +
+> +	if (WARN_ON(!vcpu->arch.sve_state ||
+> +		    !sve_vl_valid(vcpu->arch.sve_max_vl)))
+> +		return -EIO;
+
+For some reason using WARN_ON for side effects seems sketchy but while
+BUG_ON can compile away to nothing it seems WARN_ON has been designed to
+always give you a result of the condition so never mind...
+
+> +
+> +	memset(vcpu->arch.sve_state, 0,
+> +	       SVE_SIG_REGS_SIZE(sve_vq_from_vl(vcpu->arch.sve_max_vl)));
+> +
+> +	return 0;
+> +}
+> +
+>  /**
+>   * kvm_reset_vcpu - sets core registers and sys_regs to reset value
+>   * @vcpu: The VCPU pointer
+> @@ -103,6 +148,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  {
+>  	const struct kvm_regs *cpu_reset;
+> +	int ret;
+>
+>  	switch (vcpu->arch.target) {
+>  	default:
+> @@ -120,6 +166,10 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	/* Reset core registers */
+>  	memcpy(vcpu_gp_regs(vcpu), cpu_reset, sizeof(*cpu_reset));
+>
+> +	ret = kvm_reset_sve(vcpu);
+> +	if (ret)
+> +		return ret;
+> +
+>  	/* Reset system registers */
+>  	kvm_reset_sys_regs(vcpu);
+>
+> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+> index 7c3c5cc..488ca56 100644
+> --- a/include/uapi/linux/kvm.h
+> +++ b/include/uapi/linux/kvm.h
+> @@ -953,6 +953,7 @@ struct kvm_ppc_resize_hpt {
+>  #define KVM_CAP_NESTED_STATE 157
+>  #define KVM_CAP_ARM_INJECT_SERROR_ESR 158
+>  #define KVM_CAP_MSR_PLATFORM_INFO 159
+> +#define KVM_CAP_ARM_SVE 160
+>
+>  #ifdef KVM_CAP_IRQ_ROUTING
+>
+> @@ -1400,6 +1401,9 @@ struct kvm_enc_region {
+>  #define KVM_GET_NESTED_STATE         _IOWR(KVMIO, 0xbe, struct kvm_nested_state)
+>  #define KVM_SET_NESTED_STATE         _IOW(KVMIO,  0xbf, struct kvm_nested_state)
+>
+> +/* Available with KVM_CAP_ARM_SVE */
+> +#define KVM_ARM_SVE_CONFIG	  _IOWR(KVMIO,  0xc0, struct kvm_sve_vls)
+> +
+>  /* Secure Encrypted Virtualization command */
+>  enum sev_cmd_id {
+>  	/* Guest initialization commands */
+
+
+--
+Alex Benn?e
