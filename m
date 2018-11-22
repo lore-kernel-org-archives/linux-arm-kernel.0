@@ -1,137 +1,52 @@
-From: frieder.schrempf@kontron.de (Schrempf Frieder)
-Date: Thu, 22 Nov 2018 07:41:27 +0000
-Subject: [PATCH] ARM: dts: imx: Add dummy PHYs for HSIC-only USB
- controllers
-In-Reply-To: <VI1PR04MB5327E5CE977E59E03B1B6C4C8BDB0@VI1PR04MB5327.eurprd04.prod.outlook.com>
-References: <1539848729-27646-1-git-send-email-frieder.schrempf@kontron.de>
- <20181031073112.GL10386@tiger>
- <VI1PR04MB5327E5CE977E59E03B1B6C4C8BDB0@VI1PR04MB5327.eurprd04.prod.outlook.com>
-Message-ID: <f29e4392-f466-df5f-83f6-52e04f27204c@kontron.de>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Thu, 22 Nov 2018 08:46:43 +0100
+Subject: [PATCH] iio: adc: meson-saradc: check for devm_kasprintf failure
+Message-ID: <1542872803-29060-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.11.18 07:48, PETER CHEN wrote:
->   
->>
->> On Thu, Oct 18, 2018 at 09:45:04AM +0200, Frieder Schrempf wrote:
->>> Some SOCs in the i.MX6 family have a USB host controller that is only
->>> capable of the HSIC interface and has no on-board PHY.
->>>
->>> To be able to use these controllers, we need to add "usb-nop-xceiv"
->>> dummy PHYs.
->>>
->>> Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
->>
->> @Peter, looks good to you?
->>
->> Shawn
->>
->>> ---
->>>   arch/arm/boot/dts/imx6qdl.dtsi | 14 ++++++++++++++
->>> arch/arm/boot/dts/imx6sl.dtsi  |  7 +++++++
->>> arch/arm/boot/dts/imx6sx.dtsi  |  6 ++++++
->>>   3 files changed, 27 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
->>> b/arch/arm/boot/dts/imx6qdl.dtsi index 61d2d26..d3404d1 100644
->>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
->>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
->>> @@ -139,6 +139,16 @@
->>>   		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
->>>   	};
->>>
->>> +	usbphynop1: usbphynop1 {
->>> +		compatible = "usb-nop-xceiv";
->>> +		#phy-cells = <0>;
->>> +	};
->>> +
-> 
-> Why #phy-cells property is needed? Others are ok for me.
+devm_kasprintf() may return NULL on failure of internal allocation thus 
+the assignments to  init.name  are not safe if not checked. On error
+meson_sar_adc_clk_init() returns negative values so -ENOMEM in the
+(unlikely) failure case of devm_kasprintf() should be fine here.
 
- From Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: 3adbf3427330 ("iio: adc: add a driver for the SAR ADC found in Amlogic Meson SoCs")
+---
 
-Required properties:
-- compatible: should be usb-nop-xceiv
-- #phy-cells: Must be 0
+Problem located with an experimental coccinelle script
 
-> 
-> Peter
-> 
->>> +	usbphynop2: usbphynop2 {
->>> +		compatible = "usb-nop-xceiv";
->>> +		#phy-cells = <0>;
->>> +	};
->>> +
->>>   	soc {
->>>   		#address-cells = <1>;
->>>   		#size-cells = <1>;
->>> @@ -981,6 +991,8 @@
->>>   				reg = <0x02184400 0x200>;
->>>   				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
->>>   				clocks = <&clks IMX6QDL_CLK_USBOH3>;
->>> +				fsl,usbphy = <&usbphynop1>;
->>> +				phy_type = "hsic";
->>>   				fsl,usbmisc = <&usbmisc 2>;
->>>   				dr_mode = "host";
->>>   				ahb-burst-config = <0x0>;
->>> @@ -994,6 +1006,8 @@
->>>   				reg = <0x02184600 0x200>;
->>>   				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
->>>   				clocks = <&clks IMX6QDL_CLK_USBOH3>;
->>> +				fsl,usbphy = <&usbphynop2>;
->>> +				phy_type = "hsic";
->>>   				fsl,usbmisc = <&usbmisc 3>;
->>>   				dr_mode = "host";
->>>   				ahb-burst-config = <0x0>;
->>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi
->>> b/arch/arm/boot/dts/imx6sl.dtsi index 7a4f5da..81edcdc 100644
->>> --- a/arch/arm/boot/dts/imx6sl.dtsi
->>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
->>> @@ -110,6 +110,11 @@
->>>   		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
->>>   	};
->>>
->>> +	usbphynop1: usbphynop1 {
->>> +		compatible = "usb-nop-xceiv";
->>> +		#phy-cells = <0>;
->>> +	};
->>> +
->>>   	soc {
->>>   		#address-cells = <1>;
->>>   		#size-cells = <1>;
->>> @@ -815,6 +820,8 @@
->>>   				reg = <0x02184400 0x200>;
->>>   				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
->>>   				clocks = <&clks IMX6SL_CLK_USBOH3>;
->>> +				fsl,usbphy = <&usbphynop1>;
->>> +				phy_type = "hsic";
->>>   				fsl,usbmisc = <&usbmisc 2>;
->>>   				dr_mode = "host";
->>>   				ahb-burst-config = <0x0>;
->>> diff --git a/arch/arm/boot/dts/imx6sx.dtsi
->>> b/arch/arm/boot/dts/imx6sx.dtsi index 844caa3..07ed417 100644
->>> --- a/arch/arm/boot/dts/imx6sx.dtsi
->>> +++ b/arch/arm/boot/dts/imx6sx.dtsi
->>> @@ -159,6 +159,11 @@
->>>   		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
->>>   	};
->>>
->>> +	usbphynop1: usbphynop1 {
->>> +		compatible = "usb-nop-xceiv";
->>> +		#phy-cells = <0>;
->>> +	};
->>> +
->>>   	soc {
->>>   		#address-cells = <1>;
->>>   		#size-cells = <1>;
->>> @@ -877,6 +882,7 @@
->>>   				reg = <0x02184400 0x200>;
->>>   				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
->>>   				clocks = <&clks IMX6SX_CLK_USBOH3>;
->>> +				fsl,usbphy = <&usbphynop1>;
->>>   				fsl,usbmisc = <&usbmisc 2>;
->>>   				phy_type = "hsic";
->>>   				fsl,anatop = <&anatop>;
->>> --
->>> 2.7.4
->>>
+Patch was compile tested with: multi_v7_defconfig (implies ARCH_MESON=y &
+MESON_SARADC=y)
+
+Patch is against 4.20-rc3 (localversion-next is next-20181122)
+
+ drivers/iio/adc/meson_saradc.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+index 028ccd2..672a5de 100644
+--- a/drivers/iio/adc/meson_saradc.c
++++ b/drivers/iio/adc/meson_saradc.c
+@@ -589,6 +589,9 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
+ 
+ 	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_div",
+ 				   indio_dev->dev.of_node);
++	if (!init.name)
++		return -ENOMEM;
++
+ 	init.flags = 0;
+ 	init.ops = &clk_divider_ops;
+ 	clk_parents[0] = __clk_get_name(priv->clkin);
+@@ -608,6 +611,9 @@ static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
+ 
+ 	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%pOF#adc_en",
+ 				   indio_dev->dev.of_node);
++	if (!init.name)
++		return -ENOMEM;
++
+ 	init.flags = CLK_SET_RATE_PARENT;
+ 	init.ops = &clk_gate_ops;
+ 	clk_parents[0] = __clk_get_name(priv->adc_div_clk);
+-- 
+2.1.4
