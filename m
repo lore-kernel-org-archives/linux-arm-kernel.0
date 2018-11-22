@@ -1,87 +1,68 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 22 Nov 2018 18:02:00 +0300
-Subject: [RFC PATCH v3 05/17] irqchip/sun4i: add support for suniv
- interrupt controller
-In-Reply-To: <20181122083547.srnopylueqx6p2qj@flea>
+Date: Thu, 22 Nov 2018 18:07:51 +0300
+Subject: [RFC PATCH v3 01/17] ARM: add CONFIG_ARCH_SUNXI_V7 for
+ differentiate ARMv5/v7 Allwinner SoCs
+In-Reply-To: <20181122082635.br5n33owxxpenv62@flea>
 References: <cover.1542824904.git.mesihkilinc@gmail.com>
- <08b40429e46626f4caf8e4d2287b5c4d354e3b7f.1542824904.git.mesihkilinc@gmail.com>
- <20181122083547.srnopylueqx6p2qj@flea>
-Message-ID: <20181122150200.p6e22sp3v4npb42w@ThinkPad>
+ <267ffcf3b91930a82f20d93e1fad1fceaf8b9b0e.1542824904.git.mesihkilinc@gmail.com>
+ <20181122082635.br5n33owxxpenv62@flea>
+Message-ID: <20181122150751.n26pvywmvnuglly5@ThinkPad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/22 09:35, Maxime Ripard wrote:
-> Hi Mesih,
-> 
-Hi!
-> On Wed, Nov 21, 2018 at 09:30:38PM +0300, Mesih Kilinc wrote:
-> > The new F-series SoCs (suniv) from Allwinner use an stripped version of
-> > the interrupt controller in A10/A13
+On 18/11/22 09:26, Maxime Ripard wrote:
+> On Wed, Nov 21, 2018 at 09:30:34PM +0300, Mesih Kilinc wrote:
+> > Allwinner also has some ARMv5 SoCs.
 > > 
-> > Add support for it in irq-sun4i driver.
+> > In order to add support for them, add a CONFIG_ARCH_SUNXI_V7 bool config
+> > which is selected when a ARMv7 soc is selected, and make CONFIG_ARCH_SUNXI
+> > a common option which is selected by both V7 and V5 sunxi option.
 > > 
 > > Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 > > ---
-> >  drivers/irqchip/irq-sun4i.c | 104 +++++++++++++++++++++++++++++++-------------
-> >  1 file changed, 74 insertions(+), 30 deletions(-)
+> >  arch/arm/mach-sunxi/Kconfig | 23 ++++++++++++++++-------
+> >  1 file changed, 16 insertions(+), 7 deletions(-)
 > > 
-> > diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
-> > index e3e5b91..7ca4a4d 100644
-> > --- a/drivers/irqchip/irq-sun4i.c
-> > +++ b/drivers/irqchip/irq-sun4i.c
-> > @@ -28,11 +28,21 @@
-> >  #define SUN4I_IRQ_NMI_CTRL_REG		0x0c
-> >  #define SUN4I_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
-> >  #define SUN4I_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
-> > -#define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
-> > -#define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
-> > +#define SUN4I_IRQ_ENABLE_REG(x)		(irq_ic_data->enable_req_offset + 0x4 * x)
-> > +#define SUN4I_IRQ_MASK_REG(x)		(irq_ic_data->mask_req_offset + 0x4 * x)
-> 
-> You shouldn't have all the values you use passed as argument, so
-> irq_ic_data should be one of them here.
-> 
-Could you elaborate it a little bit?
-> > +#define SUN4I_IRQ_ENABLE_REG_OFFSET	0x40
-> > +#define SUN4I_IRQ_MASK_REG_OFFSET	0x50
-> > +#define SUNIV_IRQ_ENABLE_REG_OFFSET	0x20
-> > +#define SUNIV_IRQ_MASK_REG_OFFSET	0x30
+> > diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+> > index d9c8ecf..7e5f173 100644
+> > --- a/arch/arm/mach-sunxi/Kconfig
+> > +++ b/arch/arm/mach-sunxi/Kconfig
+> > @@ -6,31 +6,38 @@ menuconfig ARCH_SUNXI
+> >  	select GENERIC_IRQ_CHIP
+> >  	select GPIOLIB
+> >  	select PINCTRL
+> > -	select PM_OPP
+> >  	select SUN4I_TIMER
+> >  	select RESET_CONTROLLER
+> > +	help
+> > +	  Support for Allwinner ARM-based family of processors
+> >  
+> >  if ARCH_SUNXI
+> >  
+> > +if ARCH_MULTI_V7
 > > +
-> > +struct sunxi_irq_chip_data{
->                              ^ a space here
+> > +config ARCH_SUNXI_V7
+> > +	bool
+> > +	select PM_OPP
+> > +
 > 
-> > +	void __iomem *irq_base;
-> > +	struct irq_domain *irq_domain;
-> > +	u32 enable_req_offset;
-> > +	u32 mask_req_offset;
+> Actually, thinking more about this, I don't see why the PM_OPP config
+> option should be made specific to the ARMv7 sunxi SoCs, you will have
+> things cpufreq enabled at some point as well on the armv5 support.
 > 
-> s/req/reg/ ?
-> 
-Oops sorry
+OK. I was basing this code to the first patch series. 
+So there will be no need for ARCH_SUNXI_VX configs. Should I drop them
+and differantiate IC's by only ARCH_MULTI_VX?
 
-...
-> > +
-> > +static int __init suniv_ic_of_init(struct device_node *node,
-> > +				   struct device_node *parent)
-> > +{
-> > +	irq_ic_data = kzalloc(sizeof(struct sunxi_irq_chip_data), GFP_KERNEL);
-> > +	if (!irq_ic_data) {
-> > +		pr_err("kzalloc failed!\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	irq_ic_data->enable_req_offset = SUNIV_IRQ_ENABLE_REG_OFFSET;
-> > +	irq_ic_data->mask_req_offset = SUNIV_IRQ_MASK_REG_OFFSET;
-> > +
-> > +	return sun4i_of_init(node, parent);
-> > +}
-> > +
-> > +IRQCHIP_DECLARE(allwinner_sunvi_ic, "allwinner,suniv-f1c100s-ic", suniv_ic_of_init);
+> >  config MACH_SUN4I
+> >  	bool "Allwinner A10 (sun4i) SoCs support"
+> > -	default ARCH_SUNXI
+> > +	select ARCH_SUNXI_V7
 > 
-> You can even split that addition to a new patch as well.
+> The option is still changed from being on by default to being off by
+> default. This breaks all the defconfig, and we really shouldn't change
+> that.
 
-OK. I will do 3 patches. First one will add a struct that holds only
-base and domain. Second one will add register offsets to that struct. 
-Third one will add f1c100s support. Is that ok?
+OK. I will fix it.
 
-Mesih
+Mesih Veysi K?l?n?
