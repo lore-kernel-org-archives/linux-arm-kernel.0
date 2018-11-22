@@ -1,21 +1,21 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 22:44:55 +0100
-Subject: [PATCH] iio: adc: meson-saradc: check for devm_kasprintf failure
-In-Reply-To: <1542872803-29060-1-git-send-email-hofrat@osadl.org>
-References: <1542872803-29060-1-git-send-email-hofrat@osadl.org>
-Message-ID: <CAFBinCAXt1GPFMptVXrGYi-TsgSxSyNqeWFuz=B=vWV3c1+zwA@mail.gmail.com>
+Date: Thu, 22 Nov 2018 22:45:29 +0100
+Subject: [PATCH] mmc: meson-mx-sdio: check devm_kasprintf for failure
+In-Reply-To: <1542879319-2196-1-git-send-email-hofrat@osadl.org>
+References: <1542879319-2196-1-git-send-email-hofrat@osadl.org>
+Message-ID: <CAFBinCBEU336qqWnCvCVDuJ8ffOaXK5-jnUM0fuabdnmq8ZvWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 8:52 AM Nicholas Mc Guire <hofrat@osadl.org> wrote:
+On Thu, Nov 22, 2018 at 10:41 AM Nicholas Mc Guire <hofrat@osadl.org> wrote:
 >
 > devm_kasprintf() may return NULL on failure of internal allocation thus
 > the assignments to  init.name  are not safe if not checked. On error
-> meson_sar_adc_clk_init() returns negative values so -ENOMEM in the
+> meson_mx_mmc_register_clks() returns negative values so -ENOMEM in the
 > (unlikely) failure case of devm_kasprintf() should be fine here.
 >
 > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> Fixes: 3adbf3427330 ("iio: adc: add a driver for the SAR ADC found in Amlogic Meson SoCs")
+> Fixes: ed80a13bb4c4 ("mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8 and Meson8b SoCs")
 Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
 thank you for the patch!
