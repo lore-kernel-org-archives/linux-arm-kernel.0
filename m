@@ -1,131 +1,67 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 22 Nov 2018 11:58:02 +0900
-Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a
- devfreq device
-In-Reply-To: <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
- <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
-Message-ID: <5BF61B3A.9050402@samsung.com>
+From: Ganapatrao.Kulkarni@cavium.com (Kulkarni, Ganapatrao)
+Date: Thu, 22 Nov 2018 03:04:27 +0000
+Subject: [PATCH v8 0/2] Add ThunderX2 SoC Performance Monitoring Unit driver
+Message-ID: <20181122030354.13570-1-ganapatrao.kulkarni@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018? 11? 22? 03:01, Lukasz Luba wrote:
-> The patch adds support for handling suspend/resume process.
-> It uses atomic variables to make sure no race condition
-> affects the process.
-> 
-> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
-> solve issue with devfreq device's frequency during suspend/resume.
-> During the discussion on LKML some corner cases and comments appeared
-> related to the design. This patch address them keeping in mind suggestions
-> from Chanwoo Choi.
+This patchset adds PMU driver for Cavium's ThunderX2 SoC UNCORE devices.
+The SoC has PMU support in L3 cache controller (L3C) and in the
+DDR4 Memory Controller (DMC).
 
-Please remove the duplicate information about patch history.
+v8:
+	Updated with Comments [4]
 
-> 
-> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
-> ---
->  drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
->  1 file changed, 39 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
-> index cf9c643..7e09de8 100644
-> --- a/drivers/devfreq/devfreq.c
-> +++ b/drivers/devfreq/devfreq.c
-> @@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
->   */
->  int devfreq_suspend_device(struct devfreq *devfreq)
->  {
-> -	if (!devfreq)
-> -		return -EINVAL;
-> +        int ret;
+[4] https://lkml.org/lkml/2018/10/25/215
 
-Move 'ret' definition under 'if (devfreq->suspend_freq) {'
-because 'ret' is used if suspend_freq isn't zero.
+v7:
+	Incorporated review comments [3].
+	Modified driver as loadable module.
+	Updated Documentation with Event description.
+	Removed per-channel(no SMC calls) sampling implementation(
+	Since DMC and L3C channels are interleave, we have decided to
+	sample channel zero and prorate it to account for a Device).
 
-> +        unsigned long prev_freq;
-> +        u32 flags = 0;
-> +
-> +        if (!devfreq)
-> +                return -EINVAL;
-> +
-> +        if (devfreq->governor) {
-> +		ret = devfreq->governor->event_handler(devfreq,
-> +					DEVFREQ_GOV_SUSPEND, NULL);
-> +		if (ret)
-> +			return ret;
-> +	}
->  
-> -	if (!devfreq->governor)
-> -		return 0;
-> +	if (devfreq->suspend_freq) {
-> +		if (atomic_inc_return(&devfreq->suspend_count) > 1)
-> +			return 0;
->  
-> -	return devfreq->governor->event_handler(devfreq,
-> -				DEVFREQ_GOV_SUSPEND, NULL);
-> +		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
-> +					 &prev_freq, flags);
+[3] https://patchwork.kernel.org/patch/10479203/
 
-Remove the 'prev_freq' parameter.
+v6:
+	Rebased to 4.18-rc1
+	Updated with comments from John Garry[3]
 
-> +		if (ret)
-> +			return ret;
-> +
-> +		devfreq->resume_freq = prev_freq;
+[3] https://lkml.org/lkml/2018/5/17/408
 
-As I commented on patch2, if devfreq_set_taget save the current frequency
-to 'devfreq->resume_freq', this line is not needed.
+v5:
+	Incorporated review comments from Mark Rutland[2]
+v4:
+	Incorporated review comments from Mark Rutland[1]
+
+[1] https://www.spinics.net/lists/arm-kernel/msg588563.html
+[2] https://lkml.org/lkml/2018/4/26/376
+
+v3:
+	Fixed warning reported by kbuild robot
+
+v2:
+	Rebased to 4.12-rc1
+	Removed Arch VULCAN dependency.
+	Update SMC call parameters as per latest firmware.
+
+v1:
+	Initial patch
 
 
-> +	}
-> +
-> +        return 0;
->  }
->  EXPORT_SYMBOL(devfreq_suspend_device);
->  
-> @@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
->   */
->  int devfreq_resume_device(struct devfreq *devfreq)
->  {
-> +        int ret;
+Ganapatrao Kulkarni (2):
+  perf, uncore: Adding documentation for ThunderX2 pmu uncore driver
+  ThunderX2, perf : Add Cavium ThunderX2 SoC UNCORE PMU driver
 
-Move 'ret' definition under 'if (devfreq->suspend_freq) {'
-because 'ret' is used if suspend_freq isn't zero.
-
-> +        unsigned long prev_freq;
-
-Remove prev_freq variable which is not used on this function.
-After calling devfreq_set_target, prev_freq is not used.
-
-> +        u32 flags = 0;
-> +
->  	if (!devfreq)
->  		return -EINVAL;
->  
-> +	if (devfreq->suspend_freq) {
-> +		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
-> +			return 0;
-> +
-> +		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
-> +					 &prev_freq, flags);
-
-Remove the 'prev_freq' parameter.
-
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
->  	if (!devfreq->governor)
->  		return 0;
->  
-> 
-
+ Documentation/perf/thunderx2-pmu.txt | 106 ++++
+ drivers/perf/Kconfig                 |   9 +
+ drivers/perf/Makefile                |   1 +
+ drivers/perf/thunderx2_pmu.c         | 869 +++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h           |   1 +
+ 5 files changed, 986 insertions(+)
+ create mode 100644 Documentation/perf/thunderx2-pmu.txt
+ create mode 100644 drivers/perf/thunderx2_pmu.c
 
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+2.18.0
