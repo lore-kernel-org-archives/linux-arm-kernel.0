@@ -1,43 +1,51 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 22 Nov 2018 13:11:39 +1300
-Subject: [PATCH v7 6/9] ARM: l2x0: add marvell,ecc-enable property for aurora
+Date: Thu, 22 Nov 2018 13:11:35 +1300
+Subject: [PATCH v7 2/9] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
 In-Reply-To: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
 References: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20181122001142.19187-7-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181122001142.19187-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The aurora cache on the Marvell Armada-XP SoC supports ECC protection
-for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
-which can be used to enable this.
+From: Jan Luebbe <jlu@pengutronix.de>
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+The macro name is too generic, so add a AURORA_ prefix.
+
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 ---
+ arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
+ arch/arm/mm/cache-l2x0.c                        | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-Notes:
-    Changes in v7:
-    - remove marvell,ecc-disable
-
- arch/arm/mm/cache-l2x0.c | 5 +++++
- 1 file changed, 5 insertions(+)
-
+diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+index c86124769831..dc5c479ec4c3 100644
+--- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
++++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+@@ -41,7 +41,7 @@
+ #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
+ 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+ 
+-#define MAX_RANGE_SIZE		1024
++#define AURORA_MAX_RANGE_SIZE	1024
+ 
+ #define AURORA_WAY_SIZE_SHIFT	2
+ 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b70bee74750d..e5380f7b14a5 100644
+index a00d6f7fd34c..7d2d2a3c67d0 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -1505,6 +1505,11 @@ static void __init aurora_of_parse(const struct device_node *np,
- 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
- 	}
+@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
+ 	 * since cache range operations stall the CPU pipeline
+ 	 * until completion.
+ 	 */
+-	if (end > start + MAX_RANGE_SIZE)
+-		end = start + MAX_RANGE_SIZE;
++	if (end > start + AURORA_MAX_RANGE_SIZE)
++		end = start + AURORA_MAX_RANGE_SIZE;
  
-+	if (of_property_read_bool(np, "marvell,ecc-enable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+		val |= AURORA_ACR_ECC_EN;
-+	}
-+
- 	if (of_property_read_bool(np, "arm,parity-enable")) {
- 		mask |= AURORA_ACR_PARITY_EN;
- 		val |= AURORA_ACR_PARITY_EN;
+ 	/*
+ 	 * Cache range operations can't straddle a page boundary.
 -- 
 2.19.1
