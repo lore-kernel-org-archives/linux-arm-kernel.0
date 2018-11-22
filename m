@@ -1,135 +1,105 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 22 Nov 2018 11:25:49 +0000
-Subject: [PATCH v3 3/4] arm64: arm_pmu: Add support for
- exclude_host/exclude_guest attributes
-In-Reply-To: <1542885950-23816-1-git-send-email-andrew.murray@arm.com>
-References: <1542885950-23816-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1542885950-23816-4-git-send-email-andrew.murray@arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 22 Nov 2018 11:27:53 +0000
+Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering
+ for KVM_GET_REG_LIST
+In-Reply-To: <20181122105344.GF17441@e113682-lin.lund.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
+ <20181102081625.GS12057@e113682-lin.lund.arm.com>
+ <20181115172711.GQ3505@e103592.cambridge.arm.com>
+ <20181122105344.GF17441@e113682-lin.lund.arm.com>
+Message-ID: <87bm6hic7a.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the :G and :H attributes in perf by handling the
-exclude_host/exclude_guest event attributes.
 
-We notify KVM of counters that we wish to be enabled or disabled on
-guest entry/exit and thus defer from starting or stopping :G events
-as per the events exclude_host attribute.
+Christoffer Dall <christoffer.dall@arm.com> writes:
 
-With both VHE and non-VHE we switch the counters between host/guest
-at EL2. We are able to eliminate counters counting host events on
-the boundaries of guest entry/exit when using :G by filtering out
-EL2 for exclude_host. However when using :H unless exclude_hv is set
-on non-VHE then there is a small blackout window at the guest
-entry/exit where host events are not captured.
+> [Adding Peter and Alex for their view on the QEMU side]
+>
+> On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
+>> On Fri, Nov 02, 2018 at 09:16:25AM +0100, Christoffer Dall wrote:
+>> > On Fri, Sep 28, 2018 at 02:39:15PM +0100, Dave Martin wrote:
+>> > > KVM_GET_REG_LIST should only enumerate registers that are actually
+>> > > accessible, so it is necessary to filter out any register that is
+>> > > not exposed to the guest.  For features that are configured at
+>> > > runtime, this will require a dynamic check.
+>> > >
+>> > > For example, ZCR_EL1 and ID_AA64ZFR0_EL1 would need to be hidden
+>> > > if SVE is not enabled for the guest.
+>> >
+>> > This implies that userspace can never access this interface for a vcpu
+>> > before having decided whether such features are enabled for the guest or
+>> > not, since otherwise userspace will see different states for a VCPU
+>> > depending on sequencing of the API, which sounds fragile to me.
+>> >
+>> > That should probably be documented somewhere, and I hope the
+>> > enable/disable API for SVE in guests already takes that into account.
+>> >
+>> > Not sure if there's an action to take here, but it was the best place I
+>> > could raise this concern.
+>>
+>> Fair point.  I struggled to come up with something better that solves
+>> all problems.
+>>
+>> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
+>> creating the vcpu, so that if issued at all for a vcpu, it is issued
+>> very soon after KVM_VCPU_INIT.
+>>
+>> I think this worked OK with the current structure of kvmtool and I
+>> seem to remember discussing this with Peter Maydell re qemu -- but
+>> it sounds like I should double-check.
+>
+> QEMU does some thing around enumerating all the system registers exposed
+> by KVM and saving/restoring them as part of its startup, but I don't
+> remember the exact sequence.
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- arch/arm64/kernel/perf_event.c | 52 ++++++++++++++++++++++++++++++++++++------
- 1 file changed, 45 insertions(+), 7 deletions(-)
+QEMU does this for each vCPU as part of it's start-up sequence:
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index de564ae..e0619ba 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -26,6 +26,7 @@
- 
- #include <linux/acpi.h>
- #include <linux/clocksource.h>
-+#include <linux/kvm_host.h>
- #include <linux/of.h>
- #include <linux/perf/arm_pmu.h>
- #include <linux/platform_device.h>
-@@ -647,11 +648,23 @@ static inline int armv8pmu_enable_counter(int idx)
- 
- static inline void armv8pmu_enable_event_counter(struct perf_event *event)
- {
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = event->hw.idx;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
- 
--	armv8pmu_enable_counter(idx);
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_enable_counter(idx - 1);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	if (attr->exclude_host)
-+		kvm_clr_set_guest_pmu_events(0, counter_bits);
-+	if (attr->exclude_guest)
-+		kvm_clr_set_host_pmu_events(0, counter_bits);
-+
-+	if (!attr->exclude_host) {
-+		armv8pmu_enable_counter(idx);
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_enable_counter(idx - 1);
-+	}
- }
- 
- static inline int armv8pmu_disable_counter(int idx)
-@@ -664,11 +677,23 @@ static inline int armv8pmu_disable_counter(int idx)
- static inline void armv8pmu_disable_event_counter(struct perf_event *event)
- {
- 	struct hw_perf_event *hwc = &event->hw;
-+	struct perf_event_attr *attr = &event->attr;
- 	int idx = hwc->idx;
-+	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
- 
- 	if (armv8pmu_event_is_chained(event))
--		armv8pmu_disable_counter(idx - 1);
--	armv8pmu_disable_counter(idx);
-+		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
-+
-+	if (attr->exclude_host)
-+		kvm_clr_set_guest_pmu_events(counter_bits, 0);
-+	if (attr->exclude_guest)
-+		kvm_clr_set_host_pmu_events(counter_bits, 0);
-+
-+	if (!attr->exclude_host) {
-+		if (armv8pmu_event_is_chained(event))
-+			armv8pmu_disable_counter(idx - 1);
-+		armv8pmu_disable_counter(idx);
-+	}
- }
- 
- static inline int armv8pmu_enable_intens(int idx)
-@@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
- 	 * Therefore we ignore exclude_hv in this configuration, since
- 	 * there's no hypervisor to sample anyway. This is consistent
- 	 * with other architectures (x86 and Power).
-+	 *
-+	 * To eliminate counting host events on the boundaries of
-+	 * guest entry/exit we ensure EL2 is not included in hyp mode
-+	 * with !exclude_host.
- 	 */
- 	if (is_kernel_in_hyp_mode()) {
--		if (!attr->exclude_kernel)
-+		if (!attr->exclude_kernel && !attr->exclude_host)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	} else {
--		if (attr->exclude_kernel)
--			config_base |= ARMV8_PMU_EXCLUDE_EL1;
- 		if (!attr->exclude_hv)
- 			config_base |= ARMV8_PMU_INCLUDE_EL2;
- 	}
-+
-+	/*
-+	 * Filter out !VHE kernels and guest kernels
-+	 */
-+	if (attr->exclude_kernel)
-+		config_base |= ARMV8_PMU_EXCLUDE_EL1;
-+
- 	if (attr->exclude_user)
- 		config_base |= ARMV8_PMU_EXCLUDE_EL0;
- 
-@@ -976,6 +1010,10 @@ static void armv8pmu_reset(void *info)
- 		armv8pmu_disable_intens(idx);
- 	}
- 
-+	/* Clear the counters we flip at guest entry/exit */
-+	kvm_clr_set_host_pmu_events(U32_MAX, 0);
-+	kvm_clr_set_guest_pmu_events(U32_MAX, 0);
-+
- 	/*
- 	 * Initialize & Reset PMNC. Request overflow interrupt for
- 	 * 64 bit cycle counter but cheat in armv8pmu_write_counter().
--- 
-2.7.4
+  kvm_init_vcpu
+    kvm_get_cpu (-> KVM_CREATE_VCPU)
+    KVM_GET_VCPU_MMAP_SIZE
+    kvm_arch_init_vcpu
+      kvm_arm_vcpu_init (-> KVM_ARM_VCPU_INIT)
+      kvm_get_one_reg(ARM_CPU_ID_MPIDR)
+      kvm_arm_init_debug (chk for KVM_CAP SET_GUEST_DEBUG/GUEST_DEBUG_HW_WPS/BPS)
+      kvm_arm_init_serror_injection (chk KVM_CAP_ARM_INJECT_SERROR_ESR)
+      kvm_arm_init_cpreg_list (KVM_GET_REG_LIST)
+
+At this point we have the register list we need for
+kvm_arch_get_registers which is what we call every time we want to
+synchronise state. We only really do this for debug events, crashes and
+at some point when migrating.
+
+>
+>>
+>> Either way, you're right, this needs to be clearly documented.
+>>
+>>
+>> If we want to be more robust, maybe we should add a capability too,
+>> so that userspace that enables this capability promises to call
+>> KVM_ARM_SVE_CONFIG_SET for each vcpu, and affected ioctls (KVM_RUN,
+>> KVM_GET_REG_LIST etc.) are forbidden until that is done?
+>>
+>> That should help avoid accidents.
+>>
+>> I could add a special meaning for an empty kvm_sve_vls, such that
+>> it doesn't enable SVE on the affected vcpu.  That retains the ability
+>> to create heterogeneous guests while still following the above flow.
+>>
+> I think making sure that userspace can ever only see the same list of
+> available system regiters is going to cause us less pain going forward.
+>
+> If the separate ioctl and capability check is the easiest way of doing
+> that, then I think that sounds good.  (I had wished we could have just
+> added some data to KVM_CREATE_VCPU, but that doesn't seem to be the
+> case.)
+>
+>
+> Thanks,
+>
+>     Christoffer
+
+
+--
+Alex Benn?e
