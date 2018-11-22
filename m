@@ -1,67 +1,143 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Thu, 22 Nov 2018 10:51:28 +0800
-Subject: [RFC PATCH] of: make MAX_RESERVED_REGIONS configurable
-In-Reply-To: <CAL_JsqLGvUYQmCGXLgSO+6kFj2i87dpaTbMGbyu5oMt=eeu35A@mail.gmail.com>
-References: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
- <CAL_JsqLGvUYQmCGXLgSO+6kFj2i87dpaTbMGbyu5oMt=eeu35A@mail.gmail.com>
-Message-ID: <1542855088.15789.6.camel@mtkswgap22>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 22 Nov 2018 11:52:30 +0900
+Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
+In-Reply-To: <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
+ <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <5BF619EE.8090006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-21 at 10:39 -0600, Rob Herring wrote:
-> On Wed, Nov 21, 2018 at 2:11 AM <miles.chen@mediatek.com> wrote:
-> >
-> > From: Miles Chen <miles.chen@mediatek.com>
-> >
-> > When we use more than 32 entries in /resered-memory,
-> > there will be an error message: "not enough space all defined regions.".
-> > We can increase MAX_RESERVED_REGIONS to fix this.
-> >
-> > commit 22f8cc6e3373 ("drivers: of: increase MAX_RESERVED_REGIONS to 32")
-> > increased MAX_RESERVED_REGIONS to 32 but I'm not sure if increasing
-> > MAX_RESERVED_REGIONS to 64 is suitable for everyone.
-> >
-> > In this RFC patch, CONFIG_MAX_OF_RESERVED_REGIONS is added and used as
-> > MAX_RESERVED_REGIONS. Add a sanity test to make sure that
-> > MAX_RESERVED_REGIONS is less than INIT_MEMBLOCK_REGIONS.
-> > Users can configure CONFIG_MAX_OF_RESERVED_REGIONS according to their
-> > need.
+On 2018? 11? 22? 03:01, Lukasz Luba wrote:
+> The refactoring is needed for the new client in devfreq: suspend.
+> To avoid code duplication, move it to the new local function
+> devfreq_set_target.
 > 
-> I don't want a kconfig option for this. I think it should be dynamic instead.
+> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+> solve issue with devfreq device's frequency during suspend/resume.
+> During the discussion on LKML some corner cases and comments appeared
+> related to the design. This patch address them keeping in mind suggestions
+> from Chanwoo Choi.
+
+As I commented on patch1, please remove it.
+
 > 
-> The current flow is like this:
+> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
+>  1 file changed, 37 insertions(+), 25 deletions(-)
 > 
-> for each reserved node:
->   - call memblock_reserve
->   - Add info to reserved_mem array
-> 
-> I think we should change it to:
-> 
-> for each reserved node:
->   - call memblock_reserve
->   - count number of nodes
-> 
-> Alloc array using memblock_alloc
-> 
-> for each reserved node:
->    - Add info to reserved_mem array
+> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+> index e20e7e4..cf9c643 100644
+> --- a/drivers/devfreq/devfreq.c
+> +++ b/drivers/devfreq/devfreq.c
+> @@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+>  	return 0;
+>  }
+>  
+> +static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
+> +			      unsigned long *prev_freq, u32 flags)
+
+Please remove the unused space in front of 'unsigned long *prev_freq'.
+Use tab only for indentation.
+
+> +{
+> +	struct devfreq_freqs freqs;
+> +	unsigned long cur_freq;
+> +	int err = 0;
+> +
+> +	if (devfreq->profile->get_cur_freq)
+> +		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+> +	else
+> +		cur_freq = devfreq->previous_freq;
+> +
+> +	freqs.old = cur_freq;
+> +	freqs.new = new_freq;
+> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
+> +
+> +	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
+> +	if (err) {
+> +		freqs.new = cur_freq;
+> +		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+> +		return err;
+> +	}
+> +
+> +	freqs.new = new_freq;
+> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+> +
+> +	if (devfreq_update_status(devfreq, new_freq))
+> +		dev_err(&devfreq->dev,
+> +			"Couldn't update frequency transition information.\n");
+> +
+> +	devfreq->previous_freq = new_freq;
+> +	*prev_freq = cur_freq;
+> +
+> +	return err;
+> +}
+> +
+>  /* Load monitoring helper functions for governors use */
+>  
+>  /**
+> @@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+>   */
+>  int update_devfreq(struct devfreq *devfreq)
+>  {
+> -	struct devfreq_freqs freqs;
+>  	unsigned long freq, cur_freq, min_freq, max_freq;
+
+
+cur_freq is not used after modification. Remove it.
+
+>  	int err = 0;
+>  	u32 flags = 0;
+> @@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
+>  		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
+>  	}
+>  
+> -	if (devfreq->profile->get_cur_freq)
+> -		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+> -	else
+> -		cur_freq = devfreq->previous_freq;
+> -
+> -	freqs.old = cur_freq;
+> -	freqs.new = freq;
+> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
+> +	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
+
+You get the 'cur_freq' from devfreq_set_taget() for devfreq_suspend_device() on patch3.
+But, update_devfreq() and devfreq_resume_device() don't use the 'cur_freq' value
+from devfreq_set_target().
+
+Instead, getting 'cur_freq' for 'devfreq->resume_freq' in the devfreq_set_target().
+Please remove the 'cur_freq' parameter from devfreq_set_target.
+
+>  
+> -	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
+> -	if (err) {
+> -		freqs.new = cur_freq;
+> -		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+> -		return err;
+> -	}
+> -
+> -	freqs.new = freq;
+> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+> -
+> -	if (devfreq_update_status(devfreq, freq))
+> -		dev_err(&devfreq->dev,
+> -			"Couldn't update frequency transition information.\n");
+> -
+> -	devfreq->previous_freq = freq;
+> -	return err;
+>  }
+>  EXPORT_SYMBOL(update_devfreq);
+>  
 > 
 
-thanks for your comment.
 
-I reviewed the flow and it might be easier to count the
-nodes and setup array first:
-
-for each reserved node:
-    - count number of nodes
-
-Alloc array using memblock_alloc
-
-
-for each reserved node:
-   - call memblock_reserve
-   - Add info to reserved_mem array
-
-What do you think?
-
-> Rob
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
