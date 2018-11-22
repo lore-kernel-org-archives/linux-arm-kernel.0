@@ -1,52 +1,17 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Thu, 22 Nov 2018 10:35:19 +0100
-Subject: [PATCH] mmc: meson-mx-sdio: check devm_kasprintf for failure
-Message-ID: <1542879319-2196-1-git-send-email-hofrat@osadl.org>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 22 Nov 2018 11:09:51 +0100
+Subject: [PATCH v2 14/15] tty: serial: Add RDA8810PL UART driver
+In-Reply-To: <20181121033652.12247-15-manivannan.sadhasivam@linaro.org>
+References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
+ <20181121033652.12247-15-manivannan.sadhasivam@linaro.org>
+Message-ID: <20181122100951.GA31718@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_kasprintf() may return NULL on failure of internal allocation thus
-the assignments to  init.name  are not safe if not checked. On error
-meson_mx_mmc_register_clks() returns negative values so -ENOMEM in the
-(unlikely) failure case of devm_kasprintf() should be fine here.
+On Wed, Nov 21, 2018 at 09:06:51AM +0530, Manivannan Sadhasivam wrote:
+> Add UART driver for RDA Micro RDA8810PL SoC.
+> 
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: ed80a13bb4c4 ("mmc: meson-mx-sdio: Add a driver for the Amlogic Meson8 and Meson8b SoCs")
----
-
-Problem located with an experimental coccinelle script
-
-Patch was compile tested with: multi_v7_defconfig (implies ARCH_MESON=y &
-MMC_MESON_MX_SDIO=y)
-
-Patch is against 4.20-rc3 (localversion-next is next-20181122)
-
- drivers/mmc/host/meson-mx-sdio.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/mmc/host/meson-mx-sdio.c b/drivers/mmc/host/meson-mx-sdio.c
-index abe253c..ec980bd 100644
---- a/drivers/mmc/host/meson-mx-sdio.c
-+++ b/drivers/mmc/host/meson-mx-sdio.c
-@@ -596,6 +596,9 @@ static int meson_mx_mmc_register_clks(struct meson_mx_mmc_host *host)
- 	init.name = devm_kasprintf(host->controller_dev, GFP_KERNEL,
- 				   "%s#fixed_factor",
- 				   dev_name(host->controller_dev));
-+	if (!init.name)
-+		return -ENOMEM;
-+
- 	init.ops = &clk_fixed_factor_ops;
- 	init.flags = 0;
- 	init.parent_names = &clk_fixed_factor_parent;
-@@ -612,6 +615,9 @@ static int meson_mx_mmc_register_clks(struct meson_mx_mmc_host *host)
- 	clk_div_parent = __clk_get_name(host->fixed_factor_clk);
- 	init.name = devm_kasprintf(host->controller_dev, GFP_KERNEL,
- 				   "%s#div", dev_name(host->controller_dev));
-+	if (!init.name)
-+		return -ENOMEM;
-+
- 	init.ops = &clk_divider_ops;
- 	init.flags = CLK_SET_RATE_PARENT;
- 	init.parent_names = &clk_div_parent;
--- 
-2.1.4
+Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
