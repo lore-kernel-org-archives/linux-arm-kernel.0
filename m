@@ -1,59 +1,54 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Thu, 22 Nov 2018 14:58:53 +0100
-Subject: [PATCH 3/5] media: sunxi: Add A10 CSI driver
-In-Reply-To: <20181121220102.6nn7uwu2c67zs6pz@mara.localdomain>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <c53e1cdc3b139382b00ee06bf3980d3fd1742ec0.1542097288.git-series.maxime.ripard@bootlin.com>
- <f34c79f5-66d6-2c2f-5616-020ad2b96400@xs4all.nl>
- <20181115205106.thbkojnzdwmaeui3@flea>
- <20181121220102.6nn7uwu2c67zs6pz@mara.localdomain>
-Message-ID: <20181122135853.4rpxb32d6ios5zac@flea>
+From: hch@lst.de (Christoph Hellwig)
+Date: Thu, 22 Nov 2018 15:02:56 +0100
+Subject: remove the ->mapping_error method from dma_map_ops V2
+Message-ID: <20181122140320.24080-1-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sakari,
+Error reporting for the dma_map_single and dma_map_page operations is
+currently a mess.  Both APIs directly return the dma_addr_t to be used for
+the DMA, with a magic error escape that is specific to the instance and
+checked by another method provided.  This has a few downsides:
 
-On Thu, Nov 22, 2018 at 12:01:03AM +0200, Sakari Ailus wrote:
-> On Thu, Nov 15, 2018 at 09:51:06PM +0100, Maxime Ripard wrote:
-> > Hi Hans,
-> > 
-> > Thanks for your review! I'll address the other comments you made.
-> > 
-> > On Tue, Nov 13, 2018 at 01:24:47PM +0100, Hans Verkuil wrote:
-> > > > +static int csi_probe(struct platform_device *pdev)
-> > > > +{
-> > > > +	struct sun4i_csi *csi;
-> > > > +	struct resource *res;
-> > > > +	int ret;
-> > > > +	int irq;
-> > > > +
-> > > > +	csi = devm_kzalloc(&pdev->dev, sizeof(*csi), GFP_KERNEL);
-> > > 
-> > > devm_kzalloc is not recommended: all devm_ memory is freed when the driver
-> > > is unbound, but a filehandle might still have a reference open.
-> > 
-> > How would a !devm variant with a kfree in the remove help? We would
-> > still fall in the same case, right?
-> 
-> Not quite. For video nodes this is handled: the release callback gets called
-> once there are no file handles open to the device. That may well be much
-> later than the device has been unbound from the driver.
+ - the error check is easily forgotten and a __must_check marker doesn't
+   help as the value always is consumed anyway
+ - the error checking requires another indirect call, which have gotten
+   incredibly expensive
+ - a lot of code is wasted on implementing these methods
 
-I might be missing something, but how the release callback will be
-able to get the reference to the structure we allocated here so that
-it can free it?
+The historical reason for this is that people thought DMA mappings would
+not fail when the API was created, which sounds like a really bad
+assumption in retrospective, and then we tried to cram error handling
+onto it later on.
 
-Thanks!
-Maxime
+There basically are two variants:  the error code is 0 because the
+implementation will never return 0 as a valid DMA address, or the error
+code is all-F as the implementation won't ever return an address that
+high.  The old AMD GART is the only one not falling into these two camps
+as it picks sort of a relative zero relative to where it is mapped.
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181122/bff95c00/attachment-0001.sig>
+The 0 return doesn't work for direct mappings that have ram at address
+zero and a lot of IOMMUs that start allocating bus space from address
+zero, so we can't consolidate on that, but I think we can move everyone
+to all-Fs, which the patch here does.  The reason for that is that
+there is only one way to ever get this address: by doing a 1-byte long,
+1-byte aligned mapping, but all our mappings are not only longer but
+generally aligned, and the mappings have to keep at least the basic
+alignment.
+
+Note that the first two patches are queued up for 4.20 and included
+for reference.
+
+A git tree is also available here:
+
+    git://git.infradead.org/users/hch/misc.git dma-mapping-error.2
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-mapping-error.2
+
+Changes since v1:
+ - dropped the signature change
+ - split into multiple patches
+ - fixed the iova allocator return check in amd-iommu
+ - remove EMERGENCY_PAGES in amd_gart and calgary
