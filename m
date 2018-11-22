@@ -1,69 +1,60 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 22 Nov 2018 23:12:08 +0100
-Subject: [PATCH v2 0/2] clocksource/meson6_timer: implement ARM delay timer
-In-Reply-To: <5ff1a888-cce2-8fd8-a98e-14c3d7c33acf@linaro.org>
-References: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
- <5ff1a888-cce2-8fd8-a98e-14c3d7c33acf@linaro.org>
-Message-ID: <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Thu, 22 Nov 2018 23:20:04 +0100
+Subject: [PATCH] ASoC: sunxi: rename SND_SUN8I_ADDA_PR_REGMAP
+In-Reply-To: <20181122212905.GA13187@zn.tnic>
+References: <20181102153406.1528053-1-arnd@arndb.de>
+ <13542843.KjxkD9786N@anarsoul-thinkpad>
+ <CAK8P3a3A-mq2HLZjp7-5miL2Pk71=FqP5QKUxxda_y5ywCa7TA@mail.gmail.com>
+ <CA+E=qVfnkH-e6hoHA1eZ7rCJvJH02zgBSF=y30R6AEGwLpssXA@mail.gmail.com>
+ <20181122212905.GA13187@zn.tnic>
+Message-ID: <s5h5zwoah63.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Thu, 22 Nov 2018 22:29:05 +0100,
+Borislav Petkov wrote:
+> 
+> On Fri, Nov 02, 2018 at 03:06:59PM -0700, Vasily Khoruzhick wrote:
+> > On Fri, Nov 2, 2018 at 3:04 PM Arnd Bergmann <arnd@arndb.de> wrote:
+> > >
+> > > On 11/2/18, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> > > > On Friday, November 2, 2018 8:33:40 AM PDT Arnd Bergmann wrote:
+> > > >> The newly added SND_SUN50I_CODEC_ANALOG driver selects a nonexisting
+> > > >> symbol SND_SUNXI_ADDA_PR_REGMAP, which was evidently intended to replace
+> > > >> SND_SUN8I_ADDA_PR_REGMAP, but since they are now mismatched, we can run
+> > > >> into link errors for some configurations:
+> > > >>
+> > > >> sound/soc/sunxi/sun50i-codec-analog.o: In function
+> > > >> `sun50i_codec_analog_probe': sun50i-codec-analog.c:(.text+0x62):
+> > > >> undefined
+> > > >> reference to `sun8i_adda_pr_regmap_init'
+> > > >>
+> > > >> The new name appears to be more sensible, and as the symbol is hidden,
+> > > >> there are no downsides in the rename, so use that consistently now.
+> > > >
+> > > > Maxime asked it to be SND_SUN8I_ADDA_PR_REGMAP, and also it would be easier
+> > > > to
+> > > > fix it my renaming last remaining SND_SUNXI_ADDA_PR_REGMAP to
+> > > > SND_SUN8I_ADDA_PR_REGMAP.
+> > >
+> > > Sure, I don't care either way. Please send a patch to do that then.
+> > 
+> > Will do tonight.
+> 
+> Is that patch coming up or on its way somewhere?
+> 
+> I still hit randconfig build failures:
+> 
+> ERROR: "sun8i_adda_pr_regmap_init" [sound/soc/sunxi/sun50i-codec-analog.ko] undefined!
+> make[1]: *** [__modpost] Error 1
+> make: *** [modules] Error 2
 
-On Sun, Nov 18, 2018 at 2:27 AM Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
->
-> On 15/11/2018 23:46, Martin Blumenstingl wrote:
-> > While trying to add support for the ARM TWD Timer and the ARM Global
-> > Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
-> > I did a review of the existing driver.
-> > Unfortunately I found it hard to review because the pre-processor
-> > #defines did not match the names from the public S805 datasheet. Thus
-> > patch #1 adjusts these. No functional changes here, this is just
-> > preparation work for patch #2.
-> >
-> > Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
-> > would have given us a timer-based delay implementation (so udelay() and
-> > friends would use the timer instead of using a loop-based delay
-> > implementation). Unfortunately we can't use the ARM Global Timer yet
-> > because it's input clock is derived from the CPU clock (which can change
-> > once we enable CPU frequency scaling on these SoCs, for which I will be
-> > sending patches in the near future).
-> > Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
-> > current configuration) has a resolution of 1us. So patch #2 uses
-> > register_current_timer_delay() to register Timer E as ARM delay timer
-> > (which will be especially useful as we have to use udelay() when
-> > changing the CPU clocks during DVFS).
-> >
-> >
-> > Changes since v1 at [0]:
-> > - convert the enums for the input clock (meson6_timera_input_clock and
-> >   meson6_timere_input_clock) to simple #defines as these are register
-> >   values and not something driver-internal. All other register values
-> >   are #defines so it makes sense that these are #defines as well.
-> >
-> >
-> > [0] https://patchwork.kernel.org/cover/10658591/
-> >
-> >
-> > Martin Blumenstingl (2):
-> >   clocksource: meson6_timer: use register names from the datasheet
-> >   clocksource: meson6_timer: implement ARM delay timer
-> >
-> >  drivers/clocksource/meson6_timer.c | 128 +++++++++++++++++++----------
-> >  1 file changed, 85 insertions(+), 43 deletions(-)
->
-> Both applied, thanks!
-thank you for taking my patches
+It's been in Mark's asoc tree.
 
-I have one question more: can you please push these patches to a
-repository/branch which is included in -next?
-I'm asking because I'd like to send patches that enable CPU frequency
-scaling on Meson8, Meson8b and Meson8m2. The code to change the CPU
-clock calls udelay(), which (in this special case) needs a delay timer
-to work properly (we can't use jiffies as we're using udelay() *while*
-changing the CPU clock).
+Mark, could you send a pull request?  It might be too late for rc4,
+but sooner, better.
 
 
-Regards
-Martin
+thanks,
+
+Takashi
