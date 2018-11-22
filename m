@@ -1,47 +1,38 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 22 Nov 2018 13:26:37 +0100
-Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
-In-Reply-To: <20181122122142.GI42987@e119886-lin.cambridge.arm.com>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <20181119130800.GE9761@hirez.programming.kicks-ass.net>
- <20181122122142.GI42987@e119886-lin.cambridge.arm.com>
-Message-ID: <20181122122637.GS2131@hirez.programming.kicks-ass.net>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 22 Nov 2018 13:32:04 +0100
+Subject: [GIT PULL 1/2] Rockchip arm32 devicetree fixes for 4.20
+Message-ID: <110221357.jpgQ0Qy0za@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 12:21:43PM +0000, Andrew Murray wrote:
-> On Mon, Nov 19, 2018 at 02:08:00PM +0100, Peter Zijlstra wrote:
+Hi Arnd, Kevin, Olof,
 
-> > diff --git a/kernel/events/core.c b/kernel/events/core.c
-> > index 84530ab358c3..d76b724177b9 100644
-> > --- a/kernel/events/core.c
-> > +++ b/kernel/events/core.c
-> > @@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
-> >  	if (ctx)
-> >  		perf_event_ctx_unlock(event->group_leader, ctx);
-> >  
-> > +	if (!ret) {
-> > +		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
-> > +		    event_has_exclude_flags(event)) {
-> > +			event->destroy(event);
-> > +			ret = -EINVAL;
-> > +		}
-> > +	}
-> > +
-> 
-> I don't quite follow this logic. Should that not have been:
-> 
-> if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
->      event_has_exclude_flags(event)) {
-> 
-> Meaning that if an event has any exclude flags but the pmu doesn't
-> have the capability to handle them then error.
+please find below and in the second mail some fixes for Rockchip boards.
+Please pull.
 
-Uhm, yes. Brainfart on my side that.
+Thanks
+Heiko
 
-> If you're happy with my proposed logic, then would it also make
-> sense to move this before the call to the pmu->event_init ?
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-I'm not sure that can work; I think we need ->event_init() first such
-that it can -ENOENT. Only after ->event_init() returns success can we be
-certain of @pmu.
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.20-rockchip-dts32fixes-1
+
+for you to fetch changes up to 672e60b72bbe7aace88721db55b380b6a51fb8f9:
+
+  ARM: dts: rockchip: Remove @0 from the veyron memory node (2018-11-19 09:28:17 +0100)
+
+----------------------------------------------------------------
+Moving the veyron memory node from memory at 0 back to memory, as the
+firmware on these devices as issues identifying the formally correct
+node.
+
+----------------------------------------------------------------
+Heiko Stuebner (1):
+      ARM: dts: rockchip: Remove @0 from the veyron memory node
+
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
