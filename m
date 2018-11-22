@@ -1,62 +1,57 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 22 Nov 2018 12:51:01 +0000
-Subject: arm: dma-mapping: CPU may not see up-to-date data after DMA
- transaction
-In-Reply-To: <1542889465.26115.54.camel@atviedlbe741.rss.d3s.at.thales>
-References: <1542872133.26115.4.camel@atviedlbe741.rss.d3s.at.thales>
- <20181122092928.GF30658@n2100.armlinux.org.uk>
- <1542889465.26115.54.camel@atviedlbe741.rss.d3s.at.thales>
-Message-ID: <20181122125100.GG30658@n2100.armlinux.org.uk>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Thu, 22 Nov 2018 12:59:00 +0000
+Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
+In-Reply-To: <20181122122637.GS2131@hirez.programming.kicks-ass.net>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <20181119130800.GE9761@hirez.programming.kicks-ass.net>
+ <20181122122142.GI42987@e119886-lin.cambridge.arm.com>
+ <20181122122637.GS2131@hirez.programming.kicks-ass.net>
+Message-ID: <20181122125859.GJ42987@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 12:25:18PM +0000, JABLONSKY Jan wrote:
-> After DMA transaction is complete, content of the DMA buffer is stored in the main memory.
+On Thu, Nov 22, 2018 at 01:26:37PM +0100, Peter Zijlstra wrote:
+> On Thu, Nov 22, 2018 at 12:21:43PM +0000, Andrew Murray wrote:
+> > On Mon, Nov 19, 2018 at 02:08:00PM +0100, Peter Zijlstra wrote:
 > 
-> outer_inv_range invalidates cache lines only in L2 level.
+> > > diff --git a/kernel/events/core.c b/kernel/events/core.c
+> > > index 84530ab358c3..d76b724177b9 100644
+> > > --- a/kernel/events/core.c
+> > > +++ b/kernel/events/core.c
+> > > @@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
+> > >  	if (ctx)
+> > >  		perf_event_ctx_unlock(event->group_leader, ctx);
+> > >  
+> > > +	if (!ret) {
+> > > +		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
+> > > +		    event_has_exclude_flags(event)) {
+> > > +			event->destroy(event);
+> > > +			ret = -EINVAL;
+> > > +		}
+> > > +	}
+> > > +
+> > 
+> > I don't quite follow this logic. Should that not have been:
+> > 
+> > if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
+> >      event_has_exclude_flags(event)) {
+> > 
+> > Meaning that if an event has any exclude flags but the pmu doesn't
+> > have the capability to handle them then error.
+> 
+> Uhm, yes. Brainfart on my side that.
+> 
+> > If you're happy with my proposed logic, then would it also make
+> > sense to move this before the call to the pmu->event_init ?
+> 
+> I'm not sure that can work; I think we need ->event_init() first such
+> that it can -ENOENT. Only after ->event_init() returns success can we be
+> certain of @pmu.
 
-Correct.
+Ah yes I see now. Until event_init doesn't return -ENOENT we can't be sure
+that this will be the PMU we use (as per the other calls to
+perf_try_init_event in perf_init_event).
 
-> outer_cache is dedicated to L2 cache, but CPU must also clean L1 dcache to avoid possible L1 hit
+Thanks,
 
-Correct, except we _do_ handle the L1 cache.  See dmac_*_area functions
-that are already being called via dma_cache_maint_page().  You did
-analyse the code before proposing these modifications? ;)
-
-Given that we already handle the L1 cache, why do we need more L1 cache
-maintanence?
-
-In any case, in your patch, using phys_to_virt() on the addresses is
-utterly wrong, and will lead to hitting the wrong memory if the physical
-address is a highmem page (this is why we have dma_cache_maint_page(),
-which has the necessary code to handle this case.)  The physical to
-virtual translation functions and macros are only valid for lowmem.
-
-So, I think your patch actually ends up breaking stuff by doing cache
-maintanence on unexpected memory locations.
-
-Given, also, that we have shed-loads of Cortex A9 systems out there,
-using DMA with MMC, some using it for the rootfs, I doubt that the
-problem lies here but elsewhere - which MMC host controller are you
-using?  Has that driver been properly reviewed - does it use the DMA
-API correctly?  Does it use the correct DMA direction (which should
-always be the same for all DMA API operations on the buffer.)
-
-It could also be a hardware bug (which is suggested with your
-modifications to disable preemption).  As cache maintanence is
-broadcasted across all cores in a SMP system with Cortex A9, it should
-not matter whether we are pre-empted during cache handling for DMA.  If
-disabling preemption makes a difference for that, it probably means you
-have bigger coherency issues on your SoC.
-
-Yes, you may have found a rare corner case, but we really need to fully
-understand the details of what is going on here _before_ making radical
-changes to code that has been proven by probably billions of users over
-the course of the last nine years.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Andrew Murray
