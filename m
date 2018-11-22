@@ -1,57 +1,35 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Thu, 22 Nov 2018 12:59:00 +0000
-Subject: [PATCH 00/10] perf/core: Generalise event exclusion checking
-In-Reply-To: <20181122122637.GS2131@hirez.programming.kicks-ass.net>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <20181119130800.GE9761@hirez.programming.kicks-ass.net>
- <20181122122142.GI42987@e119886-lin.cambridge.arm.com>
- <20181122122637.GS2131@hirez.programming.kicks-ass.net>
-Message-ID: <20181122125859.GJ42987@e119886-lin.cambridge.arm.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 22 Nov 2018 12:59:10 +0000
+Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg filtering
+ for KVM_GET_REG_LIST
+In-Reply-To: <20181122123424.GG17441@e113682-lin.lund.arm.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
+ <20181102081625.GS12057@e113682-lin.lund.arm.com>
+ <20181115172711.GQ3505@e103592.cambridge.arm.com>
+ <20181122105344.GF17441@e113682-lin.lund.arm.com>
+ <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
+ <20181122123424.GG17441@e113682-lin.lund.arm.com>
+Message-ID: <CAFEAcA_G1ceUGnDX5u6bK_pX_7-tAHtP8+NkAkK-vKOhzC1hyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 01:26:37PM +0100, Peter Zijlstra wrote:
-> On Thu, Nov 22, 2018 at 12:21:43PM +0000, Andrew Murray wrote:
-> > On Mon, Nov 19, 2018 at 02:08:00PM +0100, Peter Zijlstra wrote:
-> 
-> > > diff --git a/kernel/events/core.c b/kernel/events/core.c
-> > > index 84530ab358c3..d76b724177b9 100644
-> > > --- a/kernel/events/core.c
-> > > +++ b/kernel/events/core.c
-> > > @@ -9772,6 +9772,14 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
-> > >  	if (ctx)
-> > >  		perf_event_ctx_unlock(event->group_leader, ctx);
-> > >  
-> > > +	if (!ret) {
-> > > +		if ((pmu->capabilities & PERF_PMU_CAP_EXCLUDE) ||
-> > > +		    event_has_exclude_flags(event)) {
-> > > +			event->destroy(event);
-> > > +			ret = -EINVAL;
-> > > +		}
-> > > +	}
-> > > +
-> > 
-> > I don't quite follow this logic. Should that not have been:
-> > 
-> > if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
-> >      event_has_exclude_flags(event)) {
-> > 
-> > Meaning that if an event has any exclude flags but the pmu doesn't
-> > have the capability to handle them then error.
-> 
-> Uhm, yes. Brainfart on my side that.
-> 
-> > If you're happy with my proposed logic, then would it also make
-> > sense to move this before the call to the pmu->event_init ?
-> 
-> I'm not sure that can work; I think we need ->event_init() first such
-> that it can -ENOENT. Only after ->event_init() returns success can we be
-> certain of @pmu.
+On 22 November 2018 at 12:34, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> So on migration, will you have the required information for
+> KVM_ARM_VCPU_INIT before setting the registers from the migration
+> stream?
+>
+> (I assume so, because presumably this comes from a command-line switch
+> or from the machine definition, which must match the source.)
 
-Ah yes I see now. Until event_init doesn't return -ENOENT we can't be sure
-that this will be the PMU we use (as per the other calls to
-perf_try_init_event in perf_init_event).
+Yes. QEMU always sets up the VCPU completely before doing any
+inbound migration.
 
-Thanks,
+> Therefore, I don't think there's an issue with this patch, but from
+> bitter experience I think we should enforce ordering if possible.
 
-Andrew Murray
+Yes, if there are semantic ordering constraints on the various
+calls it would be nice to have the kernel enforce them.
+
+thanks
+-- PMM
