@@ -1,50 +1,50 @@
-From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
-Date: Thu, 22 Nov 2018 05:15:06 +0000
-Subject: [PATCH v4 7/7] arm64: dts: lx2160a: update fspi node
-In-Reply-To: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Message-ID: <1542863544-21257-8-git-send-email-yogeshnarayan.gaur@nxp.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Thu, 22 Nov 2018 13:56:47 +0800
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <20181122023558.GO3065@bombadil.infradead.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+ <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
+ <20181122023558.GO3065@bombadil.infradead.org>
+Message-ID: <CANMq1KA0rQ9uvEOFV3K9Cvb3kX8riY8qJXfoH6ENyjgNiyNjpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Flash mt35xu512aba connected to FlexSPI controller supports
-1-1-8/1-8-8 protocol.
-Added flag spi-rx-bus-width and spi-tx-bus-width with values as
-8 and 8 respectively for both flashes connected at CS0 and CS1.
+On Thu, Nov 22, 2018 at 10:36 AM Matthew Wilcox <willy@infradead.org> wrote:
+>
+> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
+> > These are IOMMU page tables, rather than CPU ones, so we're already well
+> > outside arch code - indeed the original motivation of io-pgtable was to be
+> > entirely independent of the p*d types and arch-specific MM code (this Armv7
+> > short-descriptor format is already "non-native" when used by drivers in an
+> > arm64 kernel).
+>
+> There was quite a lot of explanation missing from this patch description!
 
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v4:
-- None
-Changes for v3:
-- None
-Changes for v2:
-- None
+I totally agree ,-) I'm not familiar at all with either iommu or
+mm/... Looks like the patchset triggered a helpful discussion, and I
+understand the problem better now. I'll improve the description in the
+next revision.
 
- arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+> > There are various efficiency reasons for using regular kernel memory instead
+> > of coherent DMA allocations - for the most part it works well, we just have
+> > the odd corner case like this one where the 32-bit format gets used on
+> > 64-bit systems such that the tables themselves still need to be allocated
+> > below 4GB (although the final output address can point at higher memory by
+> > virtue of the IOMMU in question not implementing permissions and repurposing
+> > some of those PTE fields as extra address bits).
+> >
+> > TBH, if this DMA32 stuff is going to be contentious we could possibly just
+> > rip out the offending kmem_cache - it seemed like good practice for the
+> > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
+> > give the same 1KB alignment and chance of succeeding as the equivalent
+> > kmem_cache_alloc(), then we could quite easily make do with that instead.
+>
+> I think you should look at using the page_frag allocator here.  You can
+> use whatever GFP_DMA flags you like.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-index 3b20c97..24cc41c 100644
---- a/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-+++ b/arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts
-@@ -45,6 +45,8 @@
- 		m25p,fast-read;
- 		spi-max-frequency = <20000000>;
- 		reg = <0>;
-+		spi-rx-bus-width = <8>;
-+		spi-tx-bus-width = <8>;
- 	};
- 
- 	mt35xu512aba1: flash at 1 {
-@@ -54,6 +56,8 @@
- 		m25p,fast-read;
- 		spi-max-frequency = <20000000>;
- 		reg = <1>;
-+		spi-rx-bus-width = <8>;
-+		spi-tx-bus-width = <8>;
- 	};
- };
- 
--- 
-2.7.4
+I'll try that.
+
+Thanks!
