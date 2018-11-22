@@ -1,131 +1,66 @@
-From: jjian.zhou@mediatek.com (Jjian Zhou)
-Date: Thu, 22 Nov 2018 15:05:18 +0800
-Subject: [PATCH] mmc: mediatek: add MT8183 SDIO driver support
-Message-ID: <1542870318-10731-1-git-send-email-jjian.zhou@mediatek.com>
+From: Jan.JABLONSKY@thalesgroup.com (JABLONSKY Jan)
+Date: Thu, 22 Nov 2018 07:36:26 +0000
+Subject: arm: dma-mapping: CPU may not see up-to-date data after DMA
+ transaction
+Message-ID: <1542872133.26115.4.camel@atviedlbe741.rss.d3s.at.thales>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: jjian zhou <jjian.zhou@mediatek.com>
+Proper cleaning and invalidating has to be performed also for inner cache,
+otherwise CPU may work with data from inner cache
 
-MT8183 need SDIO driver. So it need add new code
-to support it.
+Problem appears on The Altera SoC FPGA (Cortex-A9), during
+higher CPU and system memory load followed reading by CPU from memory after
+DMA transaction.
+That means CPU may not see most up-to-date and correct copy of DMA buffer.
 
-Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
+Replace with functions __sync_cache_range_r/w, which handle mentioned
+situation.
+Protect against preemption to make sure, that the code is
+running on the current CPU
+
+Signed-off-by: Jan Jablonsky <jan.jablonsky@thalesgroup.com>
 ---
- drivers/mmc/host/mtk-sd.c | 51 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 48 insertions(+), 3 deletions(-)
+ arch/arm/mm/dma-mapping.c | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 6334cc7..3128ee7 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
- 		struct mmc_request *mrq, struct mmc_command *cmd)
- {
- 	u32 rawcmd;
-+	unsigned long flags;
-
- 	WARN_ON(host->cmd);
- 	host->cmd = cmd;
-@@ -1131,7 +1132,12 @@ static void msdc_start_command(struct msdc_host *host,
- 	cmd->error = 0;
- 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
-
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		spin_lock_irqsave(&host->lock, flags);
- 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		spin_unlock_irqrestore(&host->lock, flags);
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 661fe48ab78d..f40dc8b250d8 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -997,11 +997,18 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
+ 
+ 	paddr = page_to_phys(page) + off;
 +
- 	writel(cmd->arg, host->base + SDC_ARG);
- 	writel(rawcmd, host->base + SDC_CMD);
- }
-@@ -1351,6 +1357,27 @@ static void msdc_request_timeout(struct work_struct *work)
++	/*
++	 * Protect against preemption
++	 * Ensure that the code is running on the current CPU
++	 */
++	preempt_disable();
+ 	if (dir == DMA_FROM_DEVICE) {
+-		outer_inv_range(paddr, paddr + size);
++		__sync_cache_range_r(phys_to_virt(paddr), size);
+ 	} else {
+-		outer_clean_range(paddr, paddr + size);
++		__sync_cache_range_w(phys_to_virt(paddr), size);
  	}
++	preempt_enable();
+ 	/* FIXME: non-speculating: flush on bidirectional mappings? */
  }
-
-+static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-+{
-+	unsigned long flags;
-+	struct msdc_host *host = mmc_priv(mmc);
-+
-+	if (enb)
-+		pm_runtime_get_sync(host->dev);
-+
-+	spin_lock_irqsave(&host->lock, flags);
-+	if (enb)
-+		sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	else
-+		sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+
-+	if (!enb) {
-+		pm_runtime_mark_last_busy(host->dev);
-+		pm_runtime_put_autosuspend(host->dev);
-+	}
-+}
-+
- static irqreturn_t msdc_irq(int irq, void *dev_id)
- {
- 	struct msdc_host *host = (struct msdc_host *) dev_id;
-@@ -1373,7 +1400,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
- 		data = host->data;
- 		spin_unlock_irqrestore(&host->lock, flags);
-
--		if (!(events & event_mask))
-+		if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
-+			msdc_enable_sdio_irq(host->mmc, 0);
-+			sdio_signal_irq(host->mmc);
-+		}
-+
-+		if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
- 			break;
-
- 		if (!mrq) {
-@@ -1493,8 +1525,11 @@ static void msdc_init_hw(struct msdc_host *host)
- 	 */
- 	sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
-
--	/* disable detect SDIO device interrupt function */
--	sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	/* Config SDIO device detect interrupt function */
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	else
-+		sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-
- 	/* Configure to default data timeout */
- 	sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-@@ -2013,6 +2048,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	sdr_clr_bits(host->base + EMMC_IOCON, 1);
- }
-
-+static void msdc_ack_sdio_irq(struct mmc_host *mmc)
-+{
-+	msdc_enable_sdio_irq(mmc, 1);
-+}
-+
- static const struct mmc_host_ops mt_msdc_ops = {
- 	.post_req = msdc_post_req,
- 	.pre_req = msdc_pre_req,
-@@ -2020,6 +2060,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	.set_ios = msdc_ops_set_ios,
- 	.get_ro = mmc_gpio_get_ro,
- 	.get_cd = mmc_gpio_get_cd,
-+	.enable_sdio_irq = msdc_enable_sdio_irq,
-+	.ack_sdio_irq = msdc_ack_sdio_irq,
- 	.start_signal_voltage_switch = msdc_ops_switch_volt,
- 	.card_busy = msdc_card_busy,
- 	.execute_tuning = msdc_execute_tuning,
-@@ -2147,6 +2189,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	else
- 		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
-
-+	if (mmc->caps & MMC_CAP_SDIO_IRQ) {
-+		mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-+
- 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_segs = MAX_BD_NUM;
---
-1.9.1
+ 
+@@ -1013,7 +1020,13 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	/* FIXME: non-speculating: not required */
+ 	/* in any case, don't bother invalidating if DMA to device */
+ 	if (dir != DMA_TO_DEVICE) {
+-		outer_inv_range(paddr, paddr + size);
++		/*
++		 * Protect against preemption
++		 * Ensure that the code is running on the current CPU
++		 */
++		preempt_disable();
++		__sync_cache_range_r(phys_to_virt(paddr), size);
++		preempt_enable();
+ 
+ 		dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+ 	}
