@@ -1,52 +1,79 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Thu, 22 Nov 2018 15:03:08 +0100
-Subject: [PATCH 12/24] arm64: remove the dummy_dma_ops mapping_error method
+Date: Thu, 22 Nov 2018 15:03:09 +0100
+Subject: [PATCH 13/24] alpha: remove the mapping_error dma_map_ops method
 In-Reply-To: <20181122140320.24080-1-hch@lst.de>
 References: <20181122140320.24080-1-hch@lst.de>
-Message-ID: <20181122140320.24080-13-hch@lst.de>
+Message-ID: <20181122140320.24080-14-hch@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just return DMA_MAPPING_ERROR from __dummy_map_page and let the core
-dma-mapping code handle the rest.
+Return DMA_MAPPING_ERROR instead of 0 on a dma mapping failure and let
+the core dma-mapping code handle the rest.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/arm64/mm/dma-mapping.c | 8 +-------
- 1 file changed, 1 insertion(+), 7 deletions(-)
+ arch/alpha/kernel/pci_iommu.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index a3ac26284845..fdc26ea5036c 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -282,7 +282,7 @@ static dma_addr_t __dummy_map_page(struct device *dev, struct page *page,
- 				   enum dma_data_direction dir,
- 				   unsigned long attrs)
- {
--	return 0;
-+	return DMA_MAPPING_ERROR;
+diff --git a/arch/alpha/kernel/pci_iommu.c b/arch/alpha/kernel/pci_iommu.c
+index 46e08e0d9181..e1716e0d92fd 100644
+--- a/arch/alpha/kernel/pci_iommu.c
++++ b/arch/alpha/kernel/pci_iommu.c
+@@ -291,7 +291,7 @@ pci_map_single_1(struct pci_dev *pdev, void *cpu_addr, size_t size,
+ 	   use direct_map above, it now must be considered an error. */
+ 	if (! alpha_mv.mv_pci_tbi) {
+ 		printk_once(KERN_WARNING "pci_map_single: no HW sg\n");
+-		return 0;
++		return DMA_MAPPING_ERROR;
+ 	}
+ 
+ 	arena = hose->sg_pci;
+@@ -307,7 +307,7 @@ pci_map_single_1(struct pci_dev *pdev, void *cpu_addr, size_t size,
+ 	if (dma_ofs < 0) {
+ 		printk(KERN_WARNING "pci_map_single failed: "
+ 		       "could not allocate dma page tables\n");
+-		return 0;
++		return DMA_MAPPING_ERROR;
+ 	}
+ 
+ 	paddr &= PAGE_MASK;
+@@ -455,7 +455,7 @@ static void *alpha_pci_alloc_coherent(struct device *dev, size_t size,
+ 	memset(cpu_addr, 0, size);
+ 
+ 	*dma_addrp = pci_map_single_1(pdev, cpu_addr, size, 0);
+-	if (*dma_addrp == 0) {
++	if (*dma_addrp == DMA_MAPPING_ERROR) {
+ 		free_pages((unsigned long)cpu_addr, order);
+ 		if (alpha_mv.mv_pci_tbi || (gfp & GFP_DMA))
+ 			return NULL;
+@@ -671,7 +671,7 @@ static int alpha_pci_map_sg(struct device *dev, struct scatterlist *sg,
+ 		sg->dma_address
+ 		  = pci_map_single_1(pdev, SG_ENT_VIRT_ADDRESS(sg),
+ 				     sg->length, dac_allowed);
+-		return sg->dma_address != 0;
++		return sg->dma_address != DMA_MAPPING_ERROR;
+ 	}
+ 
+ 	start = sg;
+@@ -935,11 +935,6 @@ iommu_unbind(struct pci_iommu_arena *arena, long pg_start, long pg_count)
+ 	return 0;
  }
  
- static void __dummy_unmap_page(struct device *dev, dma_addr_t dev_addr,
-@@ -317,11 +317,6 @@ static void __dummy_sync_sg(struct device *dev,
- {
- }
- 
--static int __dummy_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+-static int alpha_pci_mapping_error(struct device *dev, dma_addr_t dma_addr)
 -{
--	return 1;
+-	return dma_addr == 0;
 -}
 -
- static int __dummy_dma_supported(struct device *hwdev, u64 mask)
- {
- 	return 0;
-@@ -339,7 +334,6 @@ const struct dma_map_ops dummy_dma_ops = {
- 	.sync_single_for_device = __dummy_sync_single,
- 	.sync_sg_for_cpu        = __dummy_sync_sg,
- 	.sync_sg_for_device     = __dummy_sync_sg,
--	.mapping_error          = __dummy_mapping_error,
- 	.dma_supported          = __dummy_dma_supported,
+ const struct dma_map_ops alpha_pci_ops = {
+ 	.alloc			= alpha_pci_alloc_coherent,
+ 	.free			= alpha_pci_free_coherent,
+@@ -947,7 +942,6 @@ const struct dma_map_ops alpha_pci_ops = {
+ 	.unmap_page		= alpha_pci_unmap_page,
+ 	.map_sg			= alpha_pci_map_sg,
+ 	.unmap_sg		= alpha_pci_unmap_sg,
+-	.mapping_error		= alpha_pci_mapping_error,
+ 	.dma_supported		= alpha_pci_supported,
  };
- EXPORT_SYMBOL(dummy_dma_ops);
+ EXPORT_SYMBOL(alpha_pci_ops);
 -- 
 2.19.1
