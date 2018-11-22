@@ -1,81 +1,82 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 22 Nov 2018 12:09:31 +0900
-Subject: [PATCH 6/6] arm: dts: exynos4: set opp-suspend for DMC and leftbus
-In-Reply-To: <1542823301-23563-7-git-send-email-l.luba@partner.samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180208eucas1p11482a783ab1b1bceb8c9f6a1f50682c3@eucas1p1.samsung.com>
- <1542823301-23563-7-git-send-email-l.luba@partner.samsung.com>
-Message-ID: <5BF61DEB.5010403@samsung.com>
+From: kys@linuxonhyperv.com (kys at linuxonhyperv.com)
+Date: Thu, 22 Nov 2018 03:09:14 +0000
+Subject: [PATCH 0/4] Hyper-V: Enable Linux guests on Hyper-V on ARM64 
+Message-ID: <20181122030914.16274-1-kys@linuxonhyperv.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: "K. Y. Srinivasan" <kys@microsoft.com>
 
-On 2018? 11? 22? 03:01, Lukasz Luba wrote:
-> Mark the state for devfreq device while entring suspend/resume process.
-> 
-> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
-> solve issue with devfreq device's frequency during suspend/resume.
-> During the discussion on LKML some corner cases and comments appeared
-> related to the design. This patch address them keeping in mind suggestions
-> from Chanwoo Choi.
-> 
-> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
-> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4210.dtsi | 2 ++
->  arch/arm/boot/dts/exynos4412.dtsi | 2 ++
->  2 files changed, 4 insertions(+)
+This series enables Linux guests running on Hyper-V on ARM64
+hardware. New ARM64-specific code in arch/arm64/hyperv initializes
+Hyper-V, including its synthetic clocks and hypercall mechanism.
+Existing architecture independent drivers for Hyper-V's VMbus and
+synthetic devices just work when built for ARM64. Hyper-V code is
+built and included in the image and modules only if CONFIG_HYPERV
+is enabled.
 
-Looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+The four patches are organized as follows:
+1) Add include files that define the Hyper-V interface as
+   described in the Hyper-V Top Level Functional Spec (TLFS), plus
+   additional definitions specific to Linux running on Hyper-V.
 
-> 
-> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-> index b6091c2..4429b72 100644
-> --- a/arch/arm/boot/dts/exynos4210.dtsi
-> +++ b/arch/arm/boot/dts/exynos4210.dtsi
-> @@ -298,6 +298,7 @@
->  			opp-400000000 {
->  				opp-hz = /bits/ 64 <400000000>;
->  				opp-microvolt = <1150000>;
-> +				opp-suspend;
->  			};
->  		};
->  
-> @@ -367,6 +368,7 @@
->  			};
->  			opp-200000000 {
->  				opp-hz = /bits/ 64 <200000000>;
-> +				opp-suspend;
->  			};
->  		};
->  	};
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index 51f72f0..908c0c4 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -432,6 +432,7 @@
->  			opp-400000000 {
->  				opp-hz = /bits/ 64 <400000000>;
->  				opp-microvolt = <1050000>;
-> +				opp-suspend;
->  			};
->  		};
->  
-> @@ -520,6 +521,7 @@
->  			opp-200000000 {
->  				opp-hz = /bits/ 64 <200000000>;
->  				opp-microvolt = <1000000>;
-> +				opp-suspend;
->  			};
->  		};
->  
-> 
+2) Add core Hyper-V support on ARM64, including hypercalls,
+   synthetic clock initialization, and interrupt handlers.
 
+3) Update the existing VMbus driver to generalize interrupt
+   management across x86/x64 and ARM64.
+
+4) Make CONFIG_HYPERV selectable on ARM64 in addition to x86/x64.
+
+Some areas of Linux guests on Hyper-V on ARM64 are a work-
+in-progress, primarily due to work still being done in Hyper-V:
+
+* Hyper-V on ARM64 currently runs with a 4 Kbyte page size, and only
+  supports guests with a 4 Kbyte page size. Because Hyper-V uses
+  shared pages to communicate between the guest and the hypervisor,
+  there are open design decisions on the page size to use when
+  the guest is using 16K/64K pages.  Once those issues are
+  resolved and Hyper-V fully supports 16K/64K guest pages, changes
+  may be needed in the Linux drivers for Hyper-V synthetic devices.
+
+* Hyper-V on ARM64 does not currently support mapping PCI devices
+  into the guest address space. The Hyper-V PCI driver at
+  drivers/pci/host/pci-hyperv.c has x86/x64-specific code and is
+  not being built for ARM64.
+
+In a few cases, terminology from the x86/x64 world has been carried
+over into the ARM64 code ("MSR", "TSC").  Hyper-V still uses the
+x86/x64 terminology and has not replaced it with something more
+generic, so the code uses the Hyper-V terminology.  This will be
+fixed when Hyper-V updates the usage in the TLFS.
+
+
+Michael Kelley (4):
+  arm64: hyperv: Add core Hyper-V include files
+  arm64: hyperv: Add support for Hyper-V as a hypervisor
+  Drivers: hv: vmbus: Add hooks for per-CPU IRQ
+  Drivers: hv: Enable CONFIG_HYPERV on ARM64
+
+ MAINTAINERS                          |   4 +
+ arch/arm64/Makefile                  |   1 +
+ arch/arm64/hyperv/Makefile           |   2 +
+ arch/arm64/hyperv/hv_hvc.S           |  54 ++++
+ arch/arm64/hyperv/hv_init.c          | 441 +++++++++++++++++++++++++++
+ arch/arm64/hyperv/mshyperv.c         | 178 +++++++++++
+ arch/arm64/include/asm/hyperv-tlfs.h | 338 ++++++++++++++++++++
+ arch/arm64/include/asm/mshyperv.h    | 116 +++++++
+ arch/x86/include/asm/mshyperv.h      |   4 +
+ drivers/hv/Kconfig                   |   3 +-
+ drivers/hv/hv.c                      |   2 +
+ include/asm-generic/mshyperv.h       | 240 +++++++++++++++
+ 12 files changed, 1382 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/hyperv/Makefile
+ create mode 100644 arch/arm64/hyperv/hv_hvc.S
+ create mode 100644 arch/arm64/hyperv/hv_init.c
+ create mode 100644 arch/arm64/hyperv/mshyperv.c
+ create mode 100644 arch/arm64/include/asm/hyperv-tlfs.h
+ create mode 100644 arch/arm64/include/asm/mshyperv.h
+ create mode 100644 include/asm-generic/mshyperv.h
 
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+2.19.1
