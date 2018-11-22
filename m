@@ -1,96 +1,49 @@
-From: Jan.JABLONSKY@thalesgroup.com (JABLONSKY Jan)
-Date: Thu, 22 Nov 2018 15:36:13 +0000
-Subject: arm: dma-mapping: CPU may not see up-to-date data after DMA
- transaction
-In-Reply-To: <20181122125100.GG30658@n2100.armlinux.org.uk>
-References: <1542872133.26115.4.camel@atviedlbe741.rss.d3s.at.thales>
- <20181122092928.GF30658@n2100.armlinux.org.uk>
- <1542889465.26115.54.camel@atviedlbe741.rss.d3s.at.thales>
- <20181122125100.GG30658@n2100.armlinux.org.uk>
-Message-ID: <1542900920.26115.92.camel@atviedlbe741.rss.d3s.at.thales>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 22 Nov 2018 23:41:57 +0800
+Subject: [PATCH v9 1/8] ASoC: dt-bindings: sun50i-codec-analog: Add
+ headphone amp regulator supply
+In-Reply-To: <20181122153241.lzrwhkewg5q4hy2c@flea>
+References: <20181122102325.29495-1-wens@csie.org>
+ <20181122102325.29495-2-wens@csie.org>
+ <20181122153241.lzrwhkewg5q4hy2c@flea>
+Message-ID: <CAGb2v64-Wszg9m8+jCPWzYYRQduwpod2P0UdrFdhTLvAe3paPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, you have right,
+On Thu, Nov 22, 2018 at 11:33 PM Maxime Ripard
+<maxime.ripard@bootlin.com> wrote:
+>
+> On Thu, Nov 22, 2018 at 06:23:18PM +0800, Chen-Yu Tsai wrote:
+> > On the Allwinner A64 SoC, the audio codec has a built-in headphone
+> > amplifier. This amplifier has a power supply separate from the rest of
+> > the analog audio circuitry.
+> >
+> > Add a regulator supply property to handle this.
+> >
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> >  Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+> > index 4f8ad0e04d20..056a098495cc 100644
+> > --- a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+> > +++ b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
+> > @@ -4,9 +4,11 @@ Required properties:
+> >  - compatible: must be one of the following compatibles:
+> >               - "allwinner,sun50i-a64-codec-analog"
+> >  - reg: must contain the registers location and length
+> > +- cpvdd-supply: Regulator supply for the headphone amplifier
+>
+> I guess we should make this optional, since even if it's missing, it's
+> going to create a dummy regulator. and that allows to have backward
+> compatibility.
+>
+> For the rest of the series,
+> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Synopsys DesignWare Multimedia Card Interface driver dw_mmc
+This one (not sun8i-codec-analog) is new for the next release, so there's
+no backward compatibility to consider. Plus none of the device tree changes
+for A64 have been merged.
 
-SoC is using internal DMA controller (IDMAC)
-A Few days ago, I also analyzed driver and proper using of DMA-API.
-I found in dw_mci_dmac_complete_dma callback function, that invalidation of caches is performed only in the case 
-of external DMA.
-https://lore.kernel.org/patchwork/patch/1015401/
-
-there is some significant progress, but the problem still occurs 
-
-
-
-The idea behind using function __sync_cache_range_r is, that the sequence 
-of cache maintaining is similar as described in L2 cache controller TRM to ensure coherency
-
-http://infocenter.arm.com/help/topic/com.arm.doc.ddi0246h/DDI0246H_l2c310_r3p3_trm.pdf
-
-Perform a combination of Clean and Invalidate operations that ensures coherency from
-the outside in, and from the inside out.
-
-CleanLevel1 Address ; This is broadcast within the cluster
-DSB ; Ensure completion of the clean as far as Level 2
-Clean&InvalLevel2 Address ; forces the address out past level 2
-SYNC ; Ensures completion of the L2 inval
-Clean&InvalLevel1 Address ; This is broadcast within the cluster
-DSB ; Ensure completion of the clean&inval as far as Level 2 (no data lost)
-
-With mentioned sequence, I really can see big difference.
-But anyway, I understand what you mean, I will continue with the analysis
-
-
-
-
-
-On Do, 2018-11-22 at 12:51 +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 22, 2018 at 12:25:18PM +0000, JABLONSKY Jan wrote:
-> > After DMA transaction is complete, content of the DMA buffer is stored in the main memory.
-> > 
-> > outer_inv_range invalidates cache lines only in L2 level.
-> 
-> Correct.
-> 
-> > outer_cache is dedicated to L2 cache, but CPU must also clean L1 dcache to avoid possible L1 hit
-> 
-> Correct, except we _do_ handle the L1 cache.  See dmac_*_area functions
-> that are already being called via dma_cache_maint_page().  You did
-> analyse the code before proposing these modifications? ;)
-> 
-> Given that we already handle the L1 cache, why do we need more L1 cache
-> maintanence?
-> 
-> In any case, in your patch, using phys_to_virt() on the addresses is
-> utterly wrong, and will lead to hitting the wrong memory if the physical
-> address is a highmem page (this is why we have dma_cache_maint_page(),
-> which has the necessary code to handle this case.)  The physical to
-> virtual translation functions and macros are only valid for lowmem.
-> 
-> So, I think your patch actually ends up breaking stuff by doing cache
-> maintanence on unexpected memory locations.
-> 
-> Given, also, that we have shed-loads of Cortex A9 systems out there,
-> using DMA with MMC, some using it for the rootfs, I doubt that the
-> problem lies here but elsewhere - which MMC host controller are you
-> using?  Has that driver been properly reviewed - does it use the DMA
-> API correctly?  Does it use the correct DMA direction (which should
-> always be the same for all DMA API operations on the buffer.)
-> 
-> It could also be a hardware bug (which is suggested with your
-> modifications to disable preemption).  As cache maintanence is
-> broadcasted across all cores in a SMP system with Cortex A9, it should
-> not matter whether we are pre-empted during cache handling for DMA.  If
-> disabling preemption makes a difference for that, it probably means you
-> have bigger coherency issues on your SoC.
-> 
-> Yes, you may have found a rare corner case, but we really need to fully
-> understand the details of what is going on here _before_ making radical
-> changes to code that has been proven by probably billions of users over
-> the course of the last nine years.
-> 
-> Thanks.
-> 
+ChenYu
