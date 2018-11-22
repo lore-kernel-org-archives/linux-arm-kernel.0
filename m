@@ -1,157 +1,232 @@
-From: l.luba@partner.samsung.com (Lukasz Luba)
-Date: Thu, 22 Nov 2018 11:40:09 +0100
-Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
-In-Reply-To: <5BF619EE.8090006@samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
- <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
- <5BF619EE.8090006@samsung.com>
-Message-ID: <9eef3348-e86f-1113-3691-39ba3a620fb8@partner.samsung.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 22 Nov 2018 11:45:51 +0100
+Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
+In-Reply-To: <84693a4d-34a5-8847-818a-9c05461f0ac8@arm.com>
+References: <01746207-c9bb-dc91-58d7-a66c0d971f88@arm.com>
+ <201811211656540883310@zte.com.cn>
+ <20181121110620.GC18678@e113682-lin.lund.arm.com>
+ <26c4ad81-f808-5a84-c725-72db8de7cd2b@arm.com>
+ <20181121152409.GC17441@e113682-lin.lund.arm.com>
+ <84693a4d-34a5-8847-818a-9c05461f0ac8@arm.com>
+Message-ID: <20181122104551.GE17441@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo Choi
+On Wed, Nov 21, 2018 at 03:53:03PM +0000, Julien Thierry wrote:
+> 
+> 
+> On 21/11/18 15:24, Christoffer Dall wrote:
+> >On Wed, Nov 21, 2018 at 12:17:45PM +0000, Julien Thierry wrote:
+> >>
+> >>
+> >>On 21/11/18 11:06, Christoffer Dall wrote:
+> >>>Hi,
+> >>>
+> >>>On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
+> >>>>>On 19/11/2018 09:10, Mark Rutland wrote:
+> >>>>>>On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
+> >>>>>>>>On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
+> >>>>>>>>>>Hi,
+> >>>>>>>>>>>When virtual machine starts, hang up.
+> >>>>>>>>>>
+> >>>>>>>>>>I take it you mean the *guest* hangs? Because it doesn't get a timer
+> >>>>>>>>>>interrupt?
+> >>>>>>>>>>
+> >>>>>>>>>>>The kernel version of guest
+> >>>>>>>>>>>is 4.16. Host support vgic_v3.
+> >>>>>>>>>>
+> >>>>>>>>>>Your host kernel is something recent, I guess?
+> >>>>>>>>>>
+> >>>>>>>>>>>It was mainly due to the incorrect vgic_irq's(intid=27) group value
+> >>>>>>>>>>>during injection interruption. when kvm_vgic_vcpu_init is called,
+> >>>>>>>>>>>dist is not initialized at this time. Unable to get vgic V3 or V2
+> >>>>>>>>>>>correctly, so group is not set.
+> >>>>>>>>>>
+> >>>>>>>>>>Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
+> >>>>>>>>>>version?) or some other userland tool?
+> >>>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>>QEMU emulator version 3.0.50 .
+> >>>>>>>>>
+> >>>>>>>>>>>group is setted to 1 when vgic_mmio_write_group is invoked at some
+> >>>>>>>>>>>time.
+> >>>>>>>>>>>when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
+> >>>>>>>>>>>interrupt injection failed.
+> >>>>>>>>>>>
+> >>>>>>>>>>>Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
+> >>>>>>>>>>>---
+> >>>>>>>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+> >>>>>>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>>>>>>>>>>
+> >>>>>>>>>>>diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>>>index 9c0dd23..d101000 100644
+> >>>>>>>>>>>--- a/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>>>+++ b/virt/kvm/arm/vgic/vgic-v3.c
+> >>>>>>>>>>>@@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
+> >>>>>>>>>>>struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
+> >>>>>>>>>>>(val & ICH_LR_PENDING_BIT)) irq->line_level = false;
+> >>>>>>>>>>>
+> >>>>>>>>>>>-    if (irq->group)
+> >>>>>>>>>>>+    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >>>>>>>>>>
+> >>>>>>>>>>This is not the right fix, not only because it basically reverts the
+> >>>>>>>>>>GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
+> >>>>>>>>>>their configured group).
+> >>>>>>>>>>
+> >>>>>>>>>>Can you try to work out why kvm_vgic_vcpu_init() is apparently called
+> >>>>>>>>>>before dist->vgic_model is set, also what value it has?
+> >>>>>>>>>>If I understand the code correctly, that shouldn't happen for a GICv3.
+> >>>>>>>>>>
+> >>>>>>>>>Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through vgic_mmio_write_group.
+> >>>>>>>>>   If the interrupt comes at this time, the interrupt injection fails.
+> >>>>>>>>
+> >>>>>>>>Does that mean that the guest is configuring its interrupts as Group0?
+> >>>>>>>>That sounds wrong, Linux should configure all it's interrupts as
+> >>>>>>>>non-secure group1.
+> >>>>>>>
+> >>>>>>>no, I think that uefi dose this, not linux.
+> >>>>>>>1. kvm_vgic_vcpu_init
+> >>>>>>>2. vgic_create
+> >>>>>>>3. kvm_vgic_dist_init
+> >>>>>>>4.vgic_mmio_write_group: uefi as guest, write group=0
+> >>>>>>>5.vgic_mmio_write_group: linux as guest, write group=1
+> >>>>>>
+> >>>>>>Is this the same issue fixed by EDK2 commit:
+> >>>>>>
+> >>>>>>66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
+> >>>>>>
+> >>>>>>... where EDK2 would try to use IAR0 rather than IAR1?
+> >>>>>>
+> >>>>>>The commit messages notes this lead to a boot-time hang.
+> >>>>>
+> >>>>>I managed to trigger an issue with a really old EFI implementation that
+> >>>>>doesn't configure its interrupts as Group1, and yet tries to ACK its
+> >>>>>interrupts using the Group1 accessor. Guess what? It is not going to work.
+> >>>>>
+> >>>>>Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
+> >>>>>to be the fix (I only assume it does, I haven't actually checked). A
+> >>>>>recent build, as found in Debian Buster, works perfectly (tested with
+> >>>>>both QEMU v2.12 and tip of tree).
+> >>>>>
+> >>>>>Now, I really don't get what you're saying about Linux not getting
+> >>>>>interrupts. How do you get to booting Linux if EFI is not making any
+> >>>>>forward progress? Are you trying them independently?
+> >>>>>
+> >>>>I start linux with bypassing uefi, the print info is the same.
+> >>>>[507107.748908]  vgic_mmio_write_group:## intid/27 group=0
+> >>>>[507107.752185]  vgic_mmio_write_group:## intid/27 group=0
+> >>>>[507107.899566]  vgic_mmio_write_group:## intid/27 group=1
+> >>>>[507107.907370]  vgic_mmio_write_group:## intid/27 group=1
+> >>>>the command line is like this:
+> >>>>/home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg timestamp=on
+> >>>>
+> >>>>This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
+> >>>
+> >>>Could you try the following patch:
+> >>>
+> >>>diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> >>>index c0c0b88af1d5..6fa858c7a5a6 100644
+> >>>--- a/virt/kvm/arm/vgic/vgic-init.c
+> >>>+++ b/virt/kvm/arm/vgic/vgic-init.c
+> >>>@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
+> >>>  			irq->config = VGIC_CONFIG_LEVEL;
+> >>>  		}
+> >>>-		/*
+> >>>-		 * GICv3 can only be created via the KVM_DEVICE_CREATE API and
+> >>>-		 * so we always know the emulation type at this point as it's
+> >>>-		 * either explicitly configured as GICv3, or explicitly
+> >>>-		 * configured as GICv2, or not configured yet which also
+> >>>-		 * implies GICv2.
+> >>>-		 */
+> >>>  		if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+> >>>  			irq->group = 1;
+> >>>  		else
+> >>>@@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
+> >>>  	if (ret)
+> >>>  		goto out;
+> >>>+	/* Initialize groups on CPUs created before the VGIC type was known */
+> >>>+	kvm_for_each_vcpu(i, vcpu, kvm) {
+> >>>+		struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >>>+
+> >>>+		for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
+> >>>+			struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
+> >>>+			irq->group = 1;
+> >>>+		}
+> >>>+	}
+> >>>+
+> >>>  	if (vgic_has_its(kvm)) {
+> >>>  		ret = vgic_v4_init(kvm);
+> >>>  		if (ret)
+> >>>
+> >>>
+> >>
+> >>If the value of dist->vgic_model is not properly initialized at the time we
+> >>call kvm_vgic_vcpu_init is call, won't we still overwrite the irq->group
+> >>when we get there?
+> >
+> >I don't understand this question.  When we get where?
+> 
+> Sorry, I meant when we get to the irq->group initialization in
+> kvm_vgic_vcpu_init.
+> 
+> >
+> >>(I still haven't seen why we could consider
+> >>dist->vgic_model is initialized at that point).
+> >
+> >Because there is no enforced ordering between creating VCPUs and
+> >creating the VGIC.
+> 
+> Hmmm, I think that's what I am saying, so we shouldn't look at the value of
+> vgic_dist->vgic_model since it could be uninitialized (or 0).
+> 
+> >
+> >>
+> >>Shouldn't we do the irq->group initialization somewhere in
+> >>kvm_arch_vcpu_ioctl_vcpu_init? (with some vgic_* function to encapsulate it
+> >>of course). At that point I believe we know that dist->vgic_model is
+> >>initialized.
+> >>
+> >
+> >See above.  AFAICT we don't have a single point at which we can do
+> >everything because creation of the two components can be interleaved.
+> >
+> >We could hook into kvm_vcpu_first_run_init(), but then userspace can
+> >observe uninitialized values if it looks at the GIC state prior to
+> >running the VCPUs, which is also not great.
+> >
+> >In other words, I think the problem is that you can do:
+> >
+> >   create_vcpu(0);
+> >   create_vgic(v3);
+> >   create_vcpu(2);
+> >
+> >Now you'll have vcpu0 have its private IRQs set to group 0, and you'll
+> >have vcpu1 have its private IRQs set to group 1 (prior to my patch).
+> >
+> >
+> >Am I missing something?
+> >
+> 
+> No, I just got confused between create_vgic and vgic_init. So the place
+> looks fine. Sorry for the confusion.
+> 
+> The fact that we still check dist->vgic_model in kvm_vgic_vcpu_init (twice
+> actually), however seems dodgy to me since it might not have been
+> initialized.
+> 
+It might not, but it might also be.  In which case you want to
+initialize the CPU to the right values.  So you have:
 
-On 11/22/18 3:52 AM, Chanwoo Choi wrote:
-> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
->> The refactoring is needed for the new client in devfreq: suspend.
->> To avoid code duplication, move it to the new local function
->> devfreq_set_target.
->>
->> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
->> solve issue with devfreq device's frequency during suspend/resume.
->> During the discussion on LKML some corner cases and comments appeared
->> related to the design. This patch address them keeping in mind suggestions
->> from Chanwoo Choi.
-> 
-> As I commented on patch1, please remove it.
-OK
-> 
->>
->> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
->>   1 file changed, 37 insertions(+), 25 deletions(-)
->>
->> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
->> index e20e7e4..cf9c643 100644
->> --- a/drivers/devfreq/devfreq.c
->> +++ b/drivers/devfreq/devfreq.c
->> @@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
->>   	return 0;
->>   }
->>   
->> +static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
->> +			      unsigned long *prev_freq, u32 flags)
-> 
-> Please remove the unused space in front of 'unsigned long *prev_freq'.
-> Use tab only for indentation.
-OK
-> 
->> +{
->> +	struct devfreq_freqs freqs;
->> +	unsigned long cur_freq;
->> +	int err = 0;
->> +
->> +	if (devfreq->profile->get_cur_freq)
->> +		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
->> +	else
->> +		cur_freq = devfreq->previous_freq;
->> +
->> +	freqs.old = cur_freq;
->> +	freqs.new = new_freq;
->> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
->> +
->> +	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
->> +	if (err) {
->> +		freqs.new = cur_freq;
->> +		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> +		return err;
->> +	}
->> +
->> +	freqs.new = new_freq;
->> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> +
->> +	if (devfreq_update_status(devfreq, new_freq))
->> +		dev_err(&devfreq->dev,
->> +			"Couldn't update frequency transition information.\n");
->> +
->> +	devfreq->previous_freq = new_freq;
->> +	*prev_freq = cur_freq;
->> +
->> +	return err;
->> +}
->> +
->>   /* Load monitoring helper functions for governors use */
->>   
->>   /**
->> @@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
->>    */
->>   int update_devfreq(struct devfreq *devfreq)
->>   {
->> -	struct devfreq_freqs freqs;
->>   	unsigned long freq, cur_freq, min_freq, max_freq;
-> 
-> 
-> cur_freq is not used after modification. Remove it.
-> 
->>   	int err = 0;
->>   	u32 flags = 0;
->> @@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
->>   		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
->>   	}
->>   
->> -	if (devfreq->profile->get_cur_freq)
->> -		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
->> -	else
->> -		cur_freq = devfreq->previous_freq;
->> -
->> -	freqs.old = cur_freq;
->> -	freqs.new = freq;
->> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
->> +	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
-> 
-> You get the 'cur_freq' from devfreq_set_taget() for devfreq_suspend_device() on patch3.
-> But, update_devfreq() and devfreq_resume_device() don't use the 'cur_freq' value
-> from devfreq_set_target().
-> 
-> Instead, getting 'cur_freq' for 'devfreq->resume_freq' in the devfreq_set_target().
-> Please remove the 'cur_freq' parameter from devfreq_set_target.
+1. VCPUs created before the VGIC are initialized according to the model
+   version when the VGIC is created.
 
-I can remove the 3rd parameter from devfreq_set_target(),
-but it implies that patch 1 and 3 cannot be merged. The function 
-devfreq_set_target will use 'devfreq->resume_freq' so it must be in 
-devfreq struct.
-So, in v2 version there will be still 6 patches, with the 1st patch 
-defining needed fields in devfreq struct.
-Do you agree for that?
+2. VCPUs created after the VGIC is initialized are initialized according
+   to the model as they are created.
 
-> 
->>   
->> -	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
->> -	if (err) {
->> -		freqs.new = cur_freq;
->> -		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> -		return err;
->> -	}
->> -
->> -	freqs.new = freq;
->> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
->> -
->> -	if (devfreq_update_status(devfreq, freq))
->> -		dev_err(&devfreq->dev,
->> -			"Couldn't update frequency transition information.\n");
->> -
->> -	devfreq->previous_freq = freq;
->> -	return err;
->>   }
->>   EXPORT_SYMBOL(update_devfreq);
->>   
->>
-> 
-> 
+The alternative is to have a sync-point after the two above, but I
+haven't been able to find a good API-backwards way of doing that.
 
-Regards,
-Lukasz Luba
+
+Thanks,
+
+    Christoffer
