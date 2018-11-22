@@ -1,50 +1,128 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu, 22 Nov 2018 13:56:47 +0800
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <20181122023558.GO3065@bombadil.infradead.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
- <20181121213853.GL3065@bombadil.infradead.org>
- <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
- <20181122023558.GO3065@bombadil.infradead.org>
-Message-ID: <CANMq1KA0rQ9uvEOFV3K9Cvb3kX8riY8qJXfoH6ENyjgNiyNjpw@mail.gmail.com>
+From: peter.chen@nxp.com (PETER CHEN)
+Date: Thu, 22 Nov 2018 06:48:09 +0000
+Subject: [PATCH] ARM: dts: imx: Add dummy PHYs for HSIC-only USB
+ controllers
+In-Reply-To: <20181031073112.GL10386@tiger>
+References: <1539848729-27646-1-git-send-email-frieder.schrempf@kontron.de>
+ <20181031073112.GL10386@tiger>
+Message-ID: <VI1PR04MB5327E5CE977E59E03B1B6C4C8BDB0@VI1PR04MB5327.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 10:36 AM Matthew Wilcox <willy@infradead.org> wrote:
->
-> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
-> > These are IOMMU page tables, rather than CPU ones, so we're already well
-> > outside arch code - indeed the original motivation of io-pgtable was to be
-> > entirely independent of the p*d types and arch-specific MM code (this Armv7
-> > short-descriptor format is already "non-native" when used by drivers in an
-> > arm64 kernel).
->
-> There was quite a lot of explanation missing from this patch description!
-
-I totally agree ,-) I'm not familiar at all with either iommu or
-mm/... Looks like the patchset triggered a helpful discussion, and I
-understand the problem better now. I'll improve the description in the
-next revision.
-
-> > There are various efficiency reasons for using regular kernel memory instead
-> > of coherent DMA allocations - for the most part it works well, we just have
-> > the odd corner case like this one where the 32-bit format gets used on
-> > 64-bit systems such that the tables themselves still need to be allocated
-> > below 4GB (although the final output address can point at higher memory by
-> > virtue of the IOMMU in question not implementing permissions and repurposing
-> > some of those PTE fields as extra address bits).
+ 
+> 
+> On Thu, Oct 18, 2018 at 09:45:04AM +0200, Frieder Schrempf wrote:
+> > Some SOCs in the i.MX6 family have a USB host controller that is only
+> > capable of the HSIC interface and has no on-board PHY.
 > >
-> > TBH, if this DMA32 stuff is going to be contentious we could possibly just
-> > rip out the offending kmem_cache - it seemed like good practice for the
-> > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
-> > give the same 1KB alignment and chance of succeeding as the equivalent
-> > kmem_cache_alloc(), then we could quite easily make do with that instead.
->
-> I think you should look at using the page_frag allocator here.  You can
-> use whatever GFP_DMA flags you like.
+> > To be able to use these controllers, we need to add "usb-nop-xceiv"
+> > dummy PHYs.
+> >
+> > Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+> 
+> @Peter, looks good to you?
+> 
+> Shawn
+> 
+> > ---
+> >  arch/arm/boot/dts/imx6qdl.dtsi | 14 ++++++++++++++
+> > arch/arm/boot/dts/imx6sl.dtsi  |  7 +++++++
+> > arch/arm/boot/dts/imx6sx.dtsi  |  6 ++++++
+> >  3 files changed, 27 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+> > b/arch/arm/boot/dts/imx6qdl.dtsi index 61d2d26..d3404d1 100644
+> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> > @@ -139,6 +139,16 @@
+> >  		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+> >  	};
+> >
+> > +	usbphynop1: usbphynop1 {
+> > +		compatible = "usb-nop-xceiv";
+> > +		#phy-cells = <0>;
+> > +	};
+> > +
 
-I'll try that.
+Why #phy-cells property is needed? Others are ok for me.
 
-Thanks!
+Peter
+
+> > +	usbphynop2: usbphynop2 {
+> > +		compatible = "usb-nop-xceiv";
+> > +		#phy-cells = <0>;
+> > +	};
+> > +
+> >  	soc {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> > @@ -981,6 +991,8 @@
+> >  				reg = <0x02184400 0x200>;
+> >  				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
+> >  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+> > +				fsl,usbphy = <&usbphynop1>;
+> > +				phy_type = "hsic";
+> >  				fsl,usbmisc = <&usbmisc 2>;
+> >  				dr_mode = "host";
+> >  				ahb-burst-config = <0x0>;
+> > @@ -994,6 +1006,8 @@
+> >  				reg = <0x02184600 0x200>;
+> >  				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+> >  				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+> > +				fsl,usbphy = <&usbphynop2>;
+> > +				phy_type = "hsic";
+> >  				fsl,usbmisc = <&usbmisc 3>;
+> >  				dr_mode = "host";
+> >  				ahb-burst-config = <0x0>;
+> > diff --git a/arch/arm/boot/dts/imx6sl.dtsi
+> > b/arch/arm/boot/dts/imx6sl.dtsi index 7a4f5da..81edcdc 100644
+> > --- a/arch/arm/boot/dts/imx6sl.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> > @@ -110,6 +110,11 @@
+> >  		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+> >  	};
+> >
+> > +	usbphynop1: usbphynop1 {
+> > +		compatible = "usb-nop-xceiv";
+> > +		#phy-cells = <0>;
+> > +	};
+> > +
+> >  	soc {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> > @@ -815,6 +820,8 @@
+> >  				reg = <0x02184400 0x200>;
+> >  				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+> >  				clocks = <&clks IMX6SL_CLK_USBOH3>;
+> > +				fsl,usbphy = <&usbphynop1>;
+> > +				phy_type = "hsic";
+> >  				fsl,usbmisc = <&usbmisc 2>;
+> >  				dr_mode = "host";
+> >  				ahb-burst-config = <0x0>;
+> > diff --git a/arch/arm/boot/dts/imx6sx.dtsi
+> > b/arch/arm/boot/dts/imx6sx.dtsi index 844caa3..07ed417 100644
+> > --- a/arch/arm/boot/dts/imx6sx.dtsi
+> > +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> > @@ -159,6 +159,11 @@
+> >  		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+> >  	};
+> >
+> > +	usbphynop1: usbphynop1 {
+> > +		compatible = "usb-nop-xceiv";
+> > +		#phy-cells = <0>;
+> > +	};
+> > +
+> >  	soc {
+> >  		#address-cells = <1>;
+> >  		#size-cells = <1>;
+> > @@ -877,6 +882,7 @@
+> >  				reg = <0x02184400 0x200>;
+> >  				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+> >  				clocks = <&clks IMX6SX_CLK_USBOH3>;
+> > +				fsl,usbphy = <&usbphynop1>;
+> >  				fsl,usbmisc = <&usbmisc 2>;
+> >  				phy_type = "hsic";
+> >  				fsl,anatop = <&anatop>;
+> > --
+> > 2.7.4
+> >
