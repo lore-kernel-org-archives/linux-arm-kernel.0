@@ -1,59 +1,26 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 23 Nov 2018 05:40:23 +0800
-Subject: [PATCH v2 1/2] bpf: add __weak hook for allocating executable
- memory
-In-Reply-To: <20181121131733.14910-2-ard.biesheuvel@linaro.org>
-References: <20181121131733.14910-2-ard.biesheuvel@linaro.org>
-Message-ID: <201811230557.PsL96owu%fengguang.wu@intel.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Thu, 22 Nov 2018 22:44:55 +0100
+Subject: [PATCH] iio: adc: meson-saradc: check for devm_kasprintf failure
+In-Reply-To: <1542872803-29060-1-git-send-email-hofrat@osadl.org>
+References: <1542872803-29060-1-git-send-email-hofrat@osadl.org>
+Message-ID: <CAFBinCAXt1GPFMptVXrGYi-TsgSxSyNqeWFuz=B=vWV3c1+zwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Thu, Nov 22, 2018 at 8:52 AM Nicholas Mc Guire <hofrat@osadl.org> wrote:
+>
+> devm_kasprintf() may return NULL on failure of internal allocation thus
+> the assignments to  init.name  are not safe if not checked. On error
+> meson_sar_adc_clk_init() returns negative values so -ENOMEM in the
+> (unlikely) failure case of devm_kasprintf() should be fine here.
+>
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: 3adbf3427330 ("iio: adc: add a driver for the SAR ADC found in Amlogic Meson SoCs")
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-I love your patch! Yet something to improve:
+thank you for the patch!
+I tested the non-error case on my Odroid-C1 and it still works fine.
 
-[auto build test ERROR on bpf-next/master]
-[also build test ERROR on v4.20-rc3]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/bpf-permit-JIT-allocations-to-be-served-outside-the-module-region/20181123-033144
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git master
-config: i386-randconfig-s0-11191736 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
-   kernel/bpf/core.c: In function 'bpf_jit_free_exec':
->> kernel/bpf/core.c:632:24: error: 'size' undeclared (first use in this function)
-     return module_memfree(size);
-                           ^~~~
-   kernel/bpf/core.c:632:24: note: each undeclared identifier is reported only once for each function it appears in
-   kernel/bpf/core.c:632:9: warning: 'return' with a value, in function returning void
-     return module_memfree(size);
-            ^~~~~~~~~~~~~~
-   kernel/bpf/core.c:630:13: note: declared here
-    void __weak bpf_jit_free_exec(const void *addr)
-                ^~~~~~~~~~~~~~~~~
-
-vim +/size +632 kernel/bpf/core.c
-
-   629	
-   630	void __weak bpf_jit_free_exec(const void *addr)
-   631	{
- > 632		return module_memfree(size);
-   633	}
-   634	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 36733 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/479932ec/attachment-0001.gz>
+Regards
+Martin
