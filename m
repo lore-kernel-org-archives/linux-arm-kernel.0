@@ -1,65 +1,48 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Thu, 22 Nov 2018 13:34:24 +0100
-Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg
- filtering for KVM_GET_REG_LIST
-In-Reply-To: <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
- <20181102081625.GS12057@e113682-lin.lund.arm.com>
- <20181115172711.GQ3505@e103592.cambridge.arm.com>
- <20181122105344.GF17441@e113682-lin.lund.arm.com>
- <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
-Message-ID: <20181122123424.GG17441@e113682-lin.lund.arm.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Thu, 22 Nov 2018 07:48:54 -0500
+Subject: [PATCH] soc: ti: QMSS: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181122124854.24528-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 11:13:51AM +0000, Peter Maydell wrote:
-> On 22 November 2018 at 10:53, Christoffer Dall <christoffer.dall@arm.com> wrote:
-> > [Adding Peter and Alex for their view on the QEMU side]
-> >
-> > On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
-> >> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
-> >> creating the vcpu, so that if issued at all for a vcpu, it is issued
-> >> very soon after KVM_VCPU_INIT.
-> >>
-> >> I think this worked OK with the current structure of kvmtool and I
-> >> seem to remember discussing this with Peter Maydell re qemu -- but
-> >> it sounds like I should double-check.
-> >
-> > QEMU does some thing around enumerating all the system registers exposed
-> > by KVM and saving/restoring them as part of its startup, but I don't
-> > remember the exact sequence.
-> 
-> This all happens in kvm_arch_init_vcpu(), which does:
->  * KVM_ARM_VCPU_INIT ioctl (with the appropriate kvm_init_features set)
->  * read the guest MPIDR with GET_ONE_REG so we know what KVM
->    is doing with MPIDR assignment across CPUs
->  * check for interesting extensions like KVM_CAP_SET_GUEST_DEBUG
->  * get and cache a list of what system registers the vcpu has,
->    using KVM_GET_REG_LIST. This is where we do the "size must
->    be U32 or U64" sanity check.
-> 
-> So if there's something we can't do by setting kvm_init_features
-> for KVM_ARM_VCPU_INIT but have to do immediately afterwards,
-> that is straightforward.
-> 
-> The major requirement for QEMU is that if we don't specifically
-> enable SVE in the VCPU then we must not see any registers
-> in the KVM_GET_REG_LIST that are not u32 or u64 -- otherwise
-> QEMU will refuse to start.
-> 
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-So on migration, will you have the required information for
-KVM_ARM_VCPU_INIT before setting the registers from the migration
-stream?
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/soc/ti/knav_qmss_queue.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
 
-(I assume so, because presumably this comes from a command-line switch
-or from the machine definition, which must match the source.)
-
-Therefore, I don't think there's an issue with this patch, but from
-bitter experience I think we should enforce ordering if possible.
-
-
-Thanks,
-
-    Christoffer
+diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
+index 8b418379272d..67f7c003417b 100644
+--- a/drivers/soc/ti/knav_qmss_queue.c
++++ b/drivers/soc/ti/knav_qmss_queue.c
+@@ -483,17 +483,7 @@ static int knav_queue_debug_show(struct seq_file *s, void *v)
+ 	return 0;
+ }
+ 
+-static int knav_queue_debug_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, knav_queue_debug_show, NULL);
+-}
+-
+-static const struct file_operations knav_queue_debug_ops = {
+-	.open		= knav_queue_debug_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(knav_queue_debug);
+ 
+ static inline int knav_queue_pdsp_wait(u32 * __iomem addr, unsigned timeout,
+ 					u32 flags)
+@@ -1883,7 +1873,7 @@ static int knav_queue_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	debugfs_create_file("qmss", S_IFREG | S_IRUGO, NULL, NULL,
+-			    &knav_queue_debug_ops);
++			    &knav_queue_debug_fops);
+ 	device_ready = true;
+ 	return 0;
+ 
+-- 
+2.17.0
