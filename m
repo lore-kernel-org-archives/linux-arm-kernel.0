@@ -1,38 +1,76 @@
-From: willy@infradead.org (Matthew Wilcox)
-Date: Wed, 21 Nov 2018 18:35:58 -0800
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
- <20181121213853.GL3065@bombadil.infradead.org>
- <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
-Message-ID: <20181122023558.GO3065@bombadil.infradead.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 22 Nov 2018 11:37:29 +0900
+Subject: [PATCH 1/6] devfreq: add basic fileds supporting suspend
+ functionality
+In-Reply-To: <1542823301-23563-2-git-send-email-l.luba@partner.samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180201eucas1p1f1f96941c3d16a96722e65d5c21bfe80@eucas1p1.samsung.com>
+ <1542823301-23563-2-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <5BF61669.9030800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
-> These are IOMMU page tables, rather than CPU ones, so we're already well
-> outside arch code - indeed the original motivation of io-pgtable was to be
-> entirely independent of the p*d types and arch-specific MM code (this Armv7
-> short-descriptor format is already "non-native" when used by drivers in an
-> arm64 kernel).
+Hi,
 
-There was quite a lot of explanation missing from this patch description!
-
-> There are various efficiency reasons for using regular kernel memory instead
-> of coherent DMA allocations - for the most part it works well, we just have
-> the odd corner case like this one where the 32-bit format gets used on
-> 64-bit systems such that the tables themselves still need to be allocated
-> below 4GB (although the final output address can point at higher memory by
-> virtue of the IOMMU in question not implementing permissions and repurposing
-> some of those PTE fields as extra address bits).
+On 2018? 11? 22? 03:01, Lukasz Luba wrote:
+> The patch prepares devfreq device for handling suspend/resume functionality.
+> The new fields will store needed information during this process.
+> Devfreq framework handles opp-suspend DT entry and there is no need of
+> modyfications in the drivers code.
 > 
-> TBH, if this DMA32 stuff is going to be contentious we could possibly just
-> rip out the offending kmem_cache - it seemed like good practice for the
-> use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
-> give the same 1KB alignment and chance of succeeding as the equivalent
-> kmem_cache_alloc(), then we could quite easily make do with that instead.
+> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+> solve issue with devfreq device's frequency during suspend/resume.
+> During the discussion on LKML some corner cases and comments appeared
+> related to the design. This patch address them keeping in mind suggestions
+> from Chanwoo Choi.
 
-I think you should look at using the page_frag allocator here.  You can
-use whatever GFP_DMA flags you like.
+You already explain the patch history on cover letter. It is enough.
+Please remove the duplicate history description from all patches except for cover letter.
+
+> 
+> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  drivers/devfreq/devfreq.c | 3 +++
+>  include/linux/devfreq.h   | 4 ++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+> index 1414130..e20e7e4 100644
+> --- a/drivers/devfreq/devfreq.c
+> +++ b/drivers/devfreq/devfreq.c
+> @@ -657,6 +657,9 @@ struct devfreq *devfreq_add_device(struct device *dev,
+>  	}
+>  	devfreq->max_freq = devfreq->scaling_max_freq;
+>  
+> +	devfreq->suspend_freq = dev_pm_opp_get_suspend_opp_freq(dev);
+> +	atomic_set(&devfreq->suspend_count, 0);
+> +
+>  	dev_set_name(&devfreq->dev, "devfreq%d",
+>  				atomic_inc_return(&devfreq_no));
+>  	err = device_register(&devfreq->dev);
+> diff --git a/include/linux/devfreq.h b/include/linux/devfreq.h
+> index e4963b0..7fe96f9 100644
+> --- a/include/linux/devfreq.h
+> +++ b/include/linux/devfreq.h
+> @@ -167,6 +167,10 @@ struct devfreq {
+>  	unsigned long scaling_max_freq;
+>  	bool stop_polling;
+>  
+> +	unsigned long suspend_freq;
+> +	unsigned long resume_freq;
+> +	atomic_t suspend_count;
+> +
+>  	/* information for device frequency transition */
+>  	unsigned int total_trans;
+>  	unsigned int *trans_table;
+> 
+
+You don't need to make the separate patch for this. You can squash patch1
+into patch3 because the newly added variables are used on patch3.
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
