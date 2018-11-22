@@ -1,55 +1,43 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Thu, 22 Nov 2018 00:20:02 +0100
-Subject: [PATCH v2 2/2] arm64/bpf: don't allocate BPF JIT programs in
- module memory
-In-Reply-To: <20181121131733.14910-3-ard.biesheuvel@linaro.org>
-References: <20181121131733.14910-1-ard.biesheuvel@linaro.org>
- <20181121131733.14910-3-ard.biesheuvel@linaro.org>
-Message-ID: <945415e1-0ff8-65ce-15fa-33cea0a7d1c9@iogearbox.net>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 22 Nov 2018 13:11:39 +1300
+Subject: [PATCH v7 6/9] ARM: l2x0: add marvell,ecc-enable property for aurora
+In-Reply-To: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
+References: <20181122001142.19187-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20181122001142.19187-7-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2018 02:17 PM, Ard Biesheuvel wrote:
-> The arm64 module region is a 128 MB region that is kept close to
-> the core kernel, in order to ensure that relative branches are
-> always in range. So using the same region for programs that do
-> not have this restriction is wasteful, and preferably avoided.
-> 
-> Now that the core BPF JIT code permits the alloc/free routines to
-> be overridden, implement them by simple vmalloc_exec()/vfree()
-> calls, which can be served from anywere. This also solves an
-> issue under KASAN, where shadow memory is needlessly allocated for
-> all BPF programs (which don't require KASAN shadow pages since
-> they are not KASAN instrumented)
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/net/bpf_jit_comp.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index a6fdaea07c63..f91b7c157841 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -940,3 +940,13 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
->  					   tmp : orig_prog);
->  	return prog;
->  }
-> +
-> +void *bpf_jit_alloc_exec(unsigned long size)
-> +{
-> +	return vmalloc_exec(size);
-> +}
-> +
-> +void bpf_jit_free_exec(const void *addr)
-> +{
-> +	return vfree(size);
-> +}
+The aurora cache on the Marvell Armada-XP SoC supports ECC protection
+for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
+which can be used to enable this.
 
-Hmm, could you elaborate in the commit log on the potential performance
-regression for JITed progs on arm64 after this change?
+Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
+Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+---
 
-I think this change would also break JITing of BPF to BPF calls. You might
-have the same issue as ppc64 folks where the offset might not fit into imm
-anymore and would have to transfer it via fp->aux->func[off]->bpf_func
-instead.
+Notes:
+    Changes in v7:
+    - remove marvell,ecc-disable
+
+ arch/arm/mm/cache-l2x0.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+index b70bee74750d..e5380f7b14a5 100644
+--- a/arch/arm/mm/cache-l2x0.c
++++ b/arch/arm/mm/cache-l2x0.c
+@@ -1505,6 +1505,11 @@ static void __init aurora_of_parse(const struct device_node *np,
+ 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
+ 	}
+ 
++	if (of_property_read_bool(np, "marvell,ecc-enable")) {
++		mask |= AURORA_ACR_ECC_EN;
++		val |= AURORA_ACR_ECC_EN;
++	}
++
+ 	if (of_property_read_bool(np, "arm,parity-enable")) {
+ 		mask |= AURORA_ACR_PARITY_EN;
+ 		val |= AURORA_ACR_PARITY_EN;
+-- 
+2.19.1
