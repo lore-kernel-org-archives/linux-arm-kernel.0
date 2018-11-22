@@ -1,59 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Nov 2018 14:14:29 +0000
-Subject: [PATCH v2 1/1] arm64: Early boot time stamps
-In-Reply-To: <20181121175841.if3vyumzvw3yoovi@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
-References: <20181120144340.30201-1-pasha.tatashin@soleen.com>
- <20181120144340.30201-2-pasha.tatashin@soleen.com>
- <20181121174706.GC9801@arm.com>
- <20181121175841.if3vyumzvw3yoovi@soleen.tm1wkky2jk1uhgkn0ivaxijq1c.bx.internal.cloudapp.net>
-Message-ID: <86lg5lrygq.wl-marc.zyngier@arm.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Thu, 22 Nov 2018 09:05:19 -0500
+Subject: [PATCH] firmware: ti_sci: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181122140519.25166-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2018 17:58:41 +0000,
-Pavel Tatashin <pasha.tatashin@soleen.com> wrote:
-> 
-> On 18-11-21 17:47:07, Will Deacon wrote:
-> > > +	/*
-> > > +	 * The arm64 boot protocol mandates that CNTFRQ_EL0 reflects
-> > > +	 * the timer frequency. To avoid breakage on misconfigured
-> > > +	 * systems, do not register the early sched_clock if the
-> > > +	 * programmed value if zero. Other random values will just
-> > > +	 * result in random output.
-> > > +	 */
-> > > +	if (!freq)
-> > > +		return;
-> > > +
-> > > +	arch_timer_read_counter = arch_counter_get_cntvct;
-> > 
-> > Why do you need to assign this here?
-> > 
-> > > +	sched_clock_register(arch_timer_read_counter, ARCH_TIMER_NBITS, freq);
-> > 
-> > arch_timer_read_counter can be reassigned once the arm_arch_timer driver
-> > has probed; what stops this from being unused as the sched_clock after that
-> > has happened? I worry that toggling the function pointer could lead to
-> > sched_clock() going backwards.
-> 
-> No reason, I will revert it back to use a local variable.
+Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
 
-I think the issue is that you are doing an assignment for something
-that the kernel has already statically initialized.
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/firmware/ti_sci.c | 21 ++-------------------
+ 1 file changed, 2 insertions(+), 19 deletions(-)
 
-> I agree, time can go backward for a period of time while we switch
-> to permanent clock later, if that clock is different.
-
-It is worse than that. You're setting up sched_clock with an
-unreliable clock source which can go backward at any point, not just
-at handover time.
-
-I'd rather we have the timestamping code be able to use another souce
-than sched_clock, and eventually switch to it once sched_clock is
-registered (and properly corrected.
-
-Thanks,
-
-	M.
-
+diff --git a/drivers/firmware/ti_sci.c b/drivers/firmware/ti_sci.c
+index 69ed1464175c..3fbbb61012c4 100644
+--- a/drivers/firmware/ti_sci.c
++++ b/drivers/firmware/ti_sci.c
+@@ -146,25 +146,8 @@ static int ti_sci_debug_show(struct seq_file *s, void *unused)
+ 	return 0;
+ }
+ 
+-/**
+- * ti_sci_debug_open() - debug file open
+- * @inode:	inode pointer
+- * @file:	file pointer
+- *
+- * Return: result of single_open
+- */
+-static int ti_sci_debug_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, ti_sci_debug_show, inode->i_private);
+-}
+-
+-/* log file operations */
+-static const struct file_operations ti_sci_debug_fops = {
+-	.open = ti_sci_debug_open,
+-	.read = seq_read,
+-	.llseek = seq_lseek,
+-	.release = single_release,
+-};
++/* Provide the log file operations interface*/
++DEFINE_SHOW_ATTRIBUTE(ti_sci_debug);
+ 
+ /**
+  * ti_sci_debugfs_create() - Create log debug file
 -- 
-Jazz is not dead, it just smell funny.
+2.17.0
