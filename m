@@ -1,181 +1,253 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 23 Nov 2018 04:40:43 +0800
-Subject: [PATCH] mmc: mediatek: add MT8183 SDIO driver support
-In-Reply-To: <1542870318-10731-1-git-send-email-jjian.zhou@mediatek.com>
-References: <1542870318-10731-1-git-send-email-jjian.zhou@mediatek.com>
-Message-ID: <201811230433.SOYb61N9%fengguang.wu@intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 22 Nov 2018 12:47:24 -0800
+Subject: [PATCH v2 2/5] bcm2835-pm: Move bcm2835-watchdog's DT probe to an
+ MFD.
+In-Reply-To: <20181120213702.27958-3-eric@anholt.net>
+References: <20181120213702.27958-1-eric@anholt.net>
+ <20181120213702.27958-3-eric@anholt.net>
+Message-ID: <83d14e62-982d-64a6-99df-e16b3a254745@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi jjian,
+On 11/20/18 1:36 PM, Eric Anholt wrote:
+> The PM block that the wdt driver was binding to actually has multiple
+> features we want to expose (power domains, reset, watchdog).  Move the
+> DT attachment to a MFD driver and make WDT probe against MFD.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>   arch/arm/mach-bcm/Kconfig      |  1 +
+>   drivers/mfd/Makefile           |  1 +
+>   drivers/mfd/bcm2835-pm.c       | 70 ++++++++++++++++++++++++++++++++++
+>   drivers/watchdog/bcm2835_wdt.c | 30 ++++++---------
+>   include/linux/mfd/bcm2835-pm.h | 13 +++++++
+>   5 files changed, 97 insertions(+), 18 deletions(-)
+>   create mode 100644 drivers/mfd/bcm2835-pm.c
+>   create mode 100644 include/linux/mfd/bcm2835-pm.h
+> 
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 25aac6ee2ab1..95242c2162a2 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -167,6 +167,7 @@ config ARCH_BCM2835
+>   	select BCM2835_TIMER
+>   	select PINCTRL
+>   	select PINCTRL_BCM2835
+> +	select MFD_CORE
+>   	help
+>   	  This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
+>   	  This SoC is used in the Raspberry Pi and Roku 2 devices.
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 12980a4ad460..ee6fb6af655e 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_MFD_88PM805)	+= 88pm805.o 88pm80x.o
+>   obj-$(CONFIG_MFD_ACT8945A)	+= act8945a.o
+>   obj-$(CONFIG_MFD_SM501)		+= sm501.o
+>   obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
+> +obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835-pm.o
+>   obj-$(CONFIG_MFD_BCM590XX)	+= bcm590xx.o
+>   obj-$(CONFIG_MFD_BD9571MWV)	+= bd9571mwv.o
+>   cros_ec_core-objs		:= cros_ec.o
+> diff --git a/drivers/mfd/bcm2835-pm.c b/drivers/mfd/bcm2835-pm.c
+> new file mode 100644
+> index 000000000000..197ff8bcca90
+> --- /dev/null
+> +++ b/drivers/mfd/bcm2835-pm.c
+> @@ -0,0 +1,70 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * PM MFD driver for Broadcom BCM2835
+> + *
+> + * This driver binds to the PM block and creates the MFD device for
+> + * the WDT driver.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/types.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/mfd/bcm2835-pm.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/watchdog.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
 
-Thank you for the patch! Yet something to improve:
+Alphabetic order would be a bit nicer.
 
-[auto build test ERROR on ulf.hansson-mmc/next]
-[also build test ERROR on v4.20-rc3 next-20181122]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> +
+> +static const struct mfd_cell bcm2835_pm_devs[] = {
+> +	{ .name = "bcm2835-wdt" },
+> +};
+> +
+> +static int bcm2835_pm_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	struct bcm2835_pm *pm;
+> +
+> +	pm = devm_kzalloc(dev, sizeof(*pm), GFP_KERNEL);
+> +	if (!pm)
+> +		return -ENOMEM;
+> +	platform_set_drvdata(pdev, pm);
+> +
+> +	pm->dev = dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pm->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(pm->base))
+> +		return PTR_ERR(pm->base);
+> +
+> +	return devm_mfd_add_devices(dev, -1,
+> +				    bcm2835_pm_devs, ARRAY_SIZE(bcm2835_pm_devs),
+> +				    NULL, 0, NULL);
+> +}
+> +
+> +static int bcm2835_pm_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
 
-url:    https://github.com/0day-ci/linux/commits/Jjian-Zhou/mmc-mediatek-add-MT8183-SDIO-driver-support/20181123-025850
-base:   git://git.kernel.org/pub/scm/linux/kernel/git/ulfh/mmc.git next
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+I don't think that is needed.
 
-All error/warnings (new ones prefixed by >>):
+> +
+> +static const struct of_device_id bcm2835_pm_of_match[] = {
+> +	{ .compatible = "brcm,bcm2835-pm-wdt", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835_pm_of_match);
+> +
+> +static struct platform_driver bcm2835_pm_driver = {
+> +	.probe		= bcm2835_pm_probe,
+> +	.remove		= bcm2835_pm_remove,
+> +	.driver = {
+> +		.name =	"bcm2835-pm",
+> +		.of_match_table = bcm2835_pm_of_match,
+> +	},
+> +};
+> +module_platform_driver(bcm2835_pm_driver);
+> +
+> +MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
+> +MODULE_DESCRIPTION("Driver for Broadcom BCM2835 PM MFD");
+> +MODULE_LICENSE("GPL");
+> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+> index ed05514cc2dc..9061436fbf90 100644
+> --- a/drivers/watchdog/bcm2835_wdt.c
+> +++ b/drivers/watchdog/bcm2835_wdt.c
+> @@ -12,6 +12,7 @@
+>   
+>   #include <linux/delay.h>
+>   #include <linux/types.h>
+> +#include <linux/mfd/bcm2835-pm.h>
+>   #include <linux/module.h>
+>   #include <linux/io.h>
+>   #include <linux/watchdog.h>
+> @@ -47,6 +48,8 @@ struct bcm2835_wdt {
+>   	spinlock_t		lock;
+>   };
+>   
+> +struct bcm2835_wdt *bcm2835_power_off_wdt;
 
-   drivers/mmc/host/mtk-sd.c: In function 'msdc_drv_probe':
-   drivers/mmc/host/mtk-sd.c:2263:12: error: invalid storage class for function 'msdc_drv_remove'
-    static int msdc_drv_remove(struct platform_device *pdev)
-               ^~~~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2263:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
-    static int msdc_drv_remove(struct platform_device *pdev)
-    ^~~~~~
-   drivers/mmc/host/mtk-sd.c:2292:13: error: invalid storage class for function 'msdc_save_reg'
-    static void msdc_save_reg(struct msdc_host *host)
-                ^~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2319:13: error: invalid storage class for function 'msdc_restore_reg'
-    static void msdc_restore_reg(struct msdc_host *host)
-                ^~~~~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2346:12: error: invalid storage class for function 'msdc_runtime_suspend'
-    static int msdc_runtime_suspend(struct device *dev)
-               ^~~~~~~~~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2356:12: error: invalid storage class for function 'msdc_runtime_resume'
-    static int msdc_runtime_resume(struct device *dev)
-               ^~~~~~~~~~~~~~~~~~~
-   In file included from include/linux/device.h:23:0,
-                    from include/linux/dma-mapping.h:7,
-                    from drivers/mmc/host/mtk-sd.c:18:
-   drivers/mmc/host/mtk-sd.c:2370:21: error: initializer element is not constant
-     SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-                        ^
-   include/linux/pm.h:354:21: note: in definition of macro 'SET_RUNTIME_PM_OPS'
-     .runtime_suspend = suspend_fn, \
-                        ^~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2370:21: note: (near initialization for 'msdc_dev_pm_ops.runtime_suspend')
-     SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-                        ^
-   include/linux/pm.h:354:21: note: in definition of macro 'SET_RUNTIME_PM_OPS'
-     .runtime_suspend = suspend_fn, \
-                        ^~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2370:43: error: initializer element is not constant
-     SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-                                              ^
-   include/linux/pm.h:355:20: note: in definition of macro 'SET_RUNTIME_PM_OPS'
-     .runtime_resume = resume_fn, \
-                       ^~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2370:43: note: (near initialization for 'msdc_dev_pm_ops.runtime_resume')
-     SET_RUNTIME_PM_OPS(msdc_runtime_suspend, msdc_runtime_resume, NULL)
-                                              ^
-   include/linux/pm.h:355:20: note: in definition of macro 'SET_RUNTIME_PM_OPS'
-     .runtime_resume = resume_fn, \
-                       ^~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2375:12: error: initializer element is not constant
-     .remove = msdc_drv_remove,
-               ^~~~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2375:12: note: (near initialization for 'mt_msdc_driver.remove')
-   In file included from include/linux/dma-mapping.h:7:0,
-                    from drivers/mmc/host/mtk-sd.c:18:
-   drivers/mmc/host/mtk-sd.c:2383:24: error: invalid storage class for function 'mt_msdc_driver_init'
-    module_platform_driver(mt_msdc_driver);
-                           ^
-   include/linux/device.h:1611:19: note: in definition of macro 'module_driver'
-    static int __init __driver##_init(void) \
-                      ^~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2383:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/mmc/host/mtk-sd.c:15:0:
->> include/linux/module.h:130:42: error: invalid storage class for function '__inittest'
-     static inline initcall_t __maybe_unused __inittest(void)  \
-                                             ^
-   include/linux/device.h:1615:1: note: in expansion of macro 'module_init'
-    module_init(__driver##_init); \
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:229:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2383:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> drivers/mmc/host/mtk-sd.c:2383:1: warning: 'alias' attribute ignored [-Wattributes]
-   In file included from include/linux/dma-mapping.h:7:0,
-                    from drivers/mmc/host/mtk-sd.c:18:
-   drivers/mmc/host/mtk-sd.c:2383:24: error: invalid storage class for function 'mt_msdc_driver_exit'
-    module_platform_driver(mt_msdc_driver);
-                           ^
-   include/linux/device.h:1616:20: note: in definition of macro 'module_driver'
-    static void __exit __driver##_exit(void) \
-                       ^~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2383:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   include/linux/device.h:1616:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
-    static void __exit __driver##_exit(void) \
-    ^
-   include/linux/platform_device.h:229:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2383:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/mmc/host/mtk-sd.c:15:0:
->> include/linux/module.h:136:42: error: invalid storage class for function '__exittest'
-     static inline exitcall_t __maybe_unused __exittest(void)  \
-                                             ^
-   include/linux/device.h:1620:1: note: in expansion of macro 'module_exit'
-    module_exit(__driver##_exit);
-    ^~~~~~~~~~~
-   include/linux/platform_device.h:229:2: note: in expansion of macro 'module_driver'
-     module_driver(__platform_driver, platform_driver_register, \
-     ^~~~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2383:1: note: in expansion of macro 'module_platform_driver'
-    module_platform_driver(mt_msdc_driver);
-    ^~~~~~~~~~~~~~~~~~~~~~
->> drivers/mmc/host/mtk-sd.c:2383:1: warning: 'alias' attribute ignored [-Wattributes]
-   In file included from include/linux/module.h:18:0,
-                    from drivers/mmc/host/mtk-sd.c:15:
-   include/linux/moduleparam.h:22:1: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
-    static const char __UNIQUE_ID(name)[]       \
-    ^
-   include/linux/module.h:161:32: note: in expansion of macro '__MODULE_INFO'
-    #define MODULE_INFO(tag, info) __MODULE_INFO(tag, tag, info)
-                                   ^~~~~~~~~~~~~
-   include/linux/module.h:199:34: note: in expansion of macro 'MODULE_INFO'
-    #define MODULE_LICENSE(_license) MODULE_INFO(license, _license)
-                                     ^~~~~~~~~~~
-   drivers/mmc/host/mtk-sd.c:2384:1: note: in expansion of macro 'MODULE_LICENSE'
-    MODULE_LICENSE("GPL v2");
-    ^~~~~~~~~~~~~~
->> drivers/mmc/host/mtk-sd.c:2385:1: error: expected declaration or statement at end of input
-    MODULE_DESCRIPTION("MediaTek SD/MMC Card Driver");
-    ^~~~~~~~~~~~~~~~~~
-   At top level:
-   drivers/mmc/host/mtk-sd.c:2094:12: warning: 'msdc_drv_probe' defined but not used [-Wunused-function]
-    static int msdc_drv_probe(struct platform_device *pdev)
-               ^~~~~~~~~~~~~~
+static
 
-vim +2385 drivers/mmc/host/mtk-sd.c
+> +
+>   static unsigned int heartbeat;
+>   static bool nowayout = WATCHDOG_NOWAYOUT;
+>   
+> @@ -148,10 +151,7 @@ static struct watchdog_device bcm2835_wdt_wdd = {
+>    */
+>   static void bcm2835_power_off(void)
+>   {
+> -	struct device_node *np =
+> -		of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
+> -	struct platform_device *pdev = of_find_device_by_node(np);
+> -	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+> +	struct bcm2835_wdt *wdt = bcm2835_power_off_wdt;
+>   	u32 val;
+>   
+>   	/*
+> @@ -169,7 +169,7 @@ static void bcm2835_power_off(void)
+>   
+>   static int bcm2835_wdt_probe(struct platform_device *pdev)
+>   {
+> -	struct resource *res;
+> +	struct bcm2835_pm *pm = dev_get_drvdata(pdev->dev.parent);
+>   	struct device *dev = &pdev->dev;
+>   	struct bcm2835_wdt *wdt;
+>   	int err;
+> @@ -181,10 +181,7 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>   
+>   	spin_lock_init(&wdt->lock);
+>   
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	wdt->base = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(wdt->base))
+> -		return PTR_ERR(wdt->base);
+> +	wdt->base = pm->base;
+>   
+>   	watchdog_set_drvdata(&bcm2835_wdt_wdd, wdt);
+>   	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+> @@ -211,8 +208,10 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>   		return err;
+>   	}
+>   
+> -	if (pm_power_off == NULL)
+> +	if (pm_power_off == NULL) {
+>   		pm_power_off = bcm2835_power_off;
+> +		bcm2835_power_off_wdt = wdt;
+> +	}
+>   
+>   	dev_info(dev, "Broadcom BCM2835 watchdog timer");
+>   	return 0;
+> @@ -220,24 +219,19 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>   
+>   static int bcm2835_wdt_remove(struct platform_device *pdev)
+>   {
+> -	if (pm_power_off == bcm2835_power_off)
+> +	if (pm_power_off == bcm2835_power_off) {
+>   		pm_power_off = NULL;
+> +		bcm2835_power_off_wdt = NULL;
 
-20848903 Chaotian Jing 2015-06-15  2382  
-20848903 Chaotian Jing 2015-06-15 @2383  module_platform_driver(mt_msdc_driver);
-20848903 Chaotian Jing 2015-06-15 @2384  MODULE_LICENSE("GPL v2");
-20848903 Chaotian Jing 2015-06-15 @2385  MODULE_DESCRIPTION("MediaTek SD/MMC Card Driver");
+I don't think this is needed.
 
-:::::: The code at line 2385 was first introduced by commit
-:::::: 208489032bdd8d4a7de50f3057c175058f271956 mmc: mediatek: Add Mediatek MMC driver
-
-:::::: TO: Chaotian Jing <chaotian.jing@mediatek.com>
-:::::: CC: Ulf Hansson <ulf.hansson@linaro.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 66024 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/07b8e4d9/attachment-0001.gz>
+> +	}
+>   
+>   	return 0;
+>   }
+>   
+> -static const struct of_device_id bcm2835_wdt_of_match[] = {
+> -	{ .compatible = "brcm,bcm2835-pm-wdt", },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, bcm2835_wdt_of_match);
+> -
+>   static struct platform_driver bcm2835_wdt_driver = {
+>   	.probe		= bcm2835_wdt_probe,
+>   	.remove		= bcm2835_wdt_remove,
+>   	.driver = {
+>   		.name =		"bcm2835-wdt",
+> -		.of_match_table = bcm2835_wdt_of_match,
+>   	},
+>   };
+>   module_platform_driver(bcm2835_wdt_driver);
+> diff --git a/include/linux/mfd/bcm2835-pm.h b/include/linux/mfd/bcm2835-pm.h
+> new file mode 100644
+> index 000000000000..b7d0ee1feffa
+> --- /dev/null
+> +++ b/include/linux/mfd/bcm2835-pm.h
+> @@ -0,0 +1,13 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +
+> +#ifndef BCM2835_MFD_PM_H
+> +#define BCM2835_MFD_PM_H
+> +
+> +#include <linux/regmap.h>
+> +
+> +struct bcm2835_pm {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +};
+> +
+> +#endif /* BCM2835_MFD_PM_H */
+> 
