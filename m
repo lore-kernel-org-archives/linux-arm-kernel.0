@@ -1,115 +1,105 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Nov 2018 18:23:23 +0800
-Subject: [PATCH v9 6/8] arm64: dts: allwinner: a64: add nodes necessary for
- analog sound support
-In-Reply-To: <20181122102325.29495-1-wens@csie.org>
-References: <20181122102325.29495-1-wens@csie.org>
-Message-ID: <20181122102325.29495-7-wens@csie.org>
+From: biao.huang@mediatek.com (Biao Huang)
+Date: Thu, 22 Nov 2018 18:28:41 +0800
+Subject: [v5, PATCH 2/2] dt-binding: mediatek-dwmac: add binding document for
+ MediaTek MT2712 DWMAC
+In-Reply-To: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
+References: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
+Message-ID: <1542882521-18874-3-git-send-email-biao.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vasily Khoruzhick <anarsoul@gmail.com>
+The commit adds the device tree binding documentation for the MediaTek DWMAC
+found on MediaTek MT2712.
 
-Add nodes for i2s, digital and analog parts of audiocodec on A64.
-
-The routing paths listed are entries connecting the digital and analog
-side of the audio codec together. Due to how device tree works, these
-must be copied over to each board device tree, in addition to any board
-level routes.
-
-The oversampling rate is set to 128, so that when playing back 192 kHz
-audio samples, the MCLK runs at the same rate as the module clock, at
-24.576 MHz.
-
-The user manual suggests using different oversampling rates for different
-sample rates, but that's not possible without a platform-specific machine
-driver.
-
-Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-[wens at csie.org: Lowered oversampling rate to 128; expanded commit message]
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Biao Huang <biao.huang@mediatek.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 54 +++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ .../devicetree/bindings/net/mediatek-dwmac.txt     |   78 ++++++++++++++++++++
+ 1 file changed, 78 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/net/mediatek-dwmac.txt
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 42abfbf56b88..384c417cb7a2 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -155,6 +155,30 @@
- 		method = "smc";
- 	};
- 
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "sun50i-a64-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&cpudai>;
-+		simple-audio-card,bitclock-master = <&cpudai>;
-+		simple-audio-card,mclk-fs = <128>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+				"Left DAC", "AIF1 Slot 0 Left",
-+				"Right DAC", "AIF1 Slot 0 Right",
-+				"AIF1 Slot 0 Left ADC", "Left ADC",
-+				"AIF1 Slot 0 Right ADC", "Right ADC";
-+		status = "disabled";
+diff --git a/Documentation/devicetree/bindings/net/mediatek-dwmac.txt b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+new file mode 100644
+index 0000000..0f8a915
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/mediatek-dwmac.txt
+@@ -0,0 +1,78 @@
++MediaTek DWMAC glue layer controller
 +
-+		cpudai: simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
++This file documents platform glue layer for stmmac.
++Please see stmmac.txt for the other unchanged properties.
 +
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
++The device node has following properties.
++
++Required properties:
++- compatible:  Should be "mediatek,mt2712-gmac" for MT2712 SoC
++- reg:  Address and length of the register set for the device
++- interrupts:  Should contain the MAC interrupts
++- interrupt-names: Should contain a list of interrupt names corresponding to
++	the interrupts in the interrupts property, if available.
++	Should be "macirq" for the main MAC IRQ
++- clocks: Must contain a phandle for each entry in clock-names.
++- clock-names: The name of the clock listed in the clocks property. These are
++	"axi", "apb", "mac_main", "ptp_ref" for MT2712 SoC
++- mac-address: See ethernet.txt in the same directory
++- phy-mode: See ethernet.txt in the same directory
++
++Optional properties:
++- mediatek,tx-delay: TX clock delay macro value. Range is 0~31. Default is 0.
++	It should be defined for rgmii/rgmii-rxid/mii interface.
++- mediatek,rx-delay: RX clock delay macro value. Range is 0~31. Default is 0.
++	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
++- mediatek,fine-tune: boolean property, if present indicates that fine delay
++	is selected for rgmii interface.
++	If present, tx-delay/rx-delay is 170+/-50ps per stage.
++	Else tx-delay/rx-delay of coarse delay macro is 0.55+/-0.2ns per stage.
++	This property do not apply to non-rgmii PHYs.
++	Only coarse-tune delay is supported for mii/rmii PHYs.
++- mediatek,rmii-rxc: boolean property, if present indicates that the rmii
++	reference clock, which is from external PHYs, is connected to RXC pin
++	on MT2712 SoC.
++	Otherwise, is connected to TXC pin.
++- mediatek,txc-inverse: boolean property, if present indicates that
++	1. tx clock will be inversed in mii/rgmii case,
++	2. tx clock inside MAC will be inversed relative to reference clock
++	   which is from external PHYs in rmii case, and it rarely happen.
++- mediatek,rxc-inverse: boolean property, if present indicates that
++	1. rx clock will be inversed in mii/rgmii case.
++	2. reference clock will be inversed when arrived at MAC in rmii case.
++- assigned-clocks: mac_main and ptp_ref clocks
++- assigned-clock-parents: parent clocks of the assigned clocks
++
++Example:
++	eth: ethernet at 1101c000 {
++		compatible = "mediatek,mt2712-gmac";
++		reg = <0 0x1101c000 0 0x1300>;
++		interrupts = <GIC_SPI 237 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-names = "macirq";
++		phy-mode ="rgmii-id";
++		mac-address = [00 55 7b b5 7d f7];
++		clock-names = "axi",
++			      "apb",
++			      "mac_main",
++			      "ptp_ref",
++			      "ptp_top";
++		clocks = <&pericfg CLK_PERI_GMAC>,
++			 <&pericfg CLK_PERI_GMAC_PCLK>,
++			 <&topckgen CLK_TOP_ETHER_125M_SEL>,
++			 <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clocks = <&topckgen CLK_TOP_ETHER_125M_SEL>,
++				  <&topckgen CLK_TOP_ETHER_50M_SEL>;
++		assigned-clock-parents = <&topckgen CLK_TOP_ETHERPLL_125M>,
++					 <&topckgen CLK_TOP_APLL1_D3>;
++		mediatek,pericfg = <&pericfg>;
++		mediatek,tx-delay = <9>;
++		mediatek,rx-delay = <9>;
++		mediatek,fine-tune;
++		mediatek,rmii-rxc;
++		mediatek,txc-inverse;
++		mediatek,rxc-inverse;
++		snps,txpbl = <32>;
++		snps,rxpbl = <32>;
++		snps,reset-gpio = <&pio 87 GPIO_ACTIVE_LOW>;
++		snps,reset-active-low;
 +	};
-+
- 	sound_spdif {
- 		compatible = "simple-audio-card";
- 		simple-audio-card,name = "On-board SPDIF";
-@@ -665,6 +689,30 @@
- 			status = "disabled";
- 		};
- 
-+		dai: dai at 1c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun50i-a64-codec-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			reset-names = "rst";
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
-+
-+		codec: codec at 1c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x600>;
-+			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+
- 		uart0: serial at 1c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
-@@ -924,6 +972,12 @@
- 			#reset-cells = <1>;
- 		};
- 
-+		codec_analog: codec-analog at 1f015c0 {
-+			compatible = "allwinner,sun50i-a64-codec-analog";
-+			reg = <0x01f015c0 0x4>;
-+			status = "disabled";
-+		};
-+
- 		r_i2c: i2c at 1f02400 {
- 			compatible = "allwinner,sun50i-a64-i2c",
- 				     "allwinner,sun6i-a31-i2c";
 -- 
-2.19.1
+1.7.9.5
