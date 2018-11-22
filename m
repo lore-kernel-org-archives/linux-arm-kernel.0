@@ -1,66 +1,65 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 22 Nov 2018 20:33:29 +0800
-Subject: [PATCH v2 3/4] ARM: dts: sun8i: Add the H3/H5 CSI controller
-In-Reply-To: <CAMty3ZDFsaFR1zb3Wt0wJ0XkeNuSHGxDsmZZKgWy=wxJpNTnHQ@mail.gmail.com>
-References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
- <20181114145934.26855-4-maxime.ripard@bootlin.com>
- <CAMty3ZDFsaFR1zb3Wt0wJ0XkeNuSHGxDsmZZKgWy=wxJpNTnHQ@mail.gmail.com>
-Message-ID: <CAGb2v67dprbvVNtR-ciH+1d1EsmCejmAMBQ_-y-Jb6Z3S11abA@mail.gmail.com>
+From: christoffer.dall@arm.com (Christoffer Dall)
+Date: Thu, 22 Nov 2018 13:34:24 +0100
+Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg
+ filtering for KVM_GET_REG_LIST
+In-Reply-To: <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
+References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
+ <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
+ <20181102081625.GS12057@e113682-lin.lund.arm.com>
+ <20181115172711.GQ3505@e103592.cambridge.arm.com>
+ <20181122105344.GF17441@e113682-lin.lund.arm.com>
+ <CAFEAcA8UEqxM7KJGm81ETgPpsO6ByK7Vc9SuCKr4FZGVU8vxxg@mail.gmail.com>
+Message-ID: <20181122123424.GG17441@e113682-lin.lund.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 7:45 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> On Wed, Nov 14, 2018 at 8:29 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Thu, Nov 22, 2018 at 11:13:51AM +0000, Peter Maydell wrote:
+> On 22 November 2018 at 10:53, Christoffer Dall <christoffer.dall@arm.com> wrote:
+> > [Adding Peter and Alex for their view on the QEMU side]
 > >
-> > From: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> > On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
+> >> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
+> >> creating the vcpu, so that if issued at all for a vcpu, it is issued
+> >> very soon after KVM_VCPU_INIT.
+> >>
+> >> I think this worked OK with the current structure of kvmtool and I
+> >> seem to remember discussing this with Peter Maydell re qemu -- but
+> >> it sounds like I should double-check.
 > >
-> > The H3 and H5 features the same CSI controller that was initially found on
-> > the A31.
-> >
-> > Add a DT node for it.
-> >
-> > Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > ---
-> >  arch/arm/boot/dts/sunxi-h3-h5.dtsi | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > index 4b1530ebe427..8779ee750bd8 100644
-> > --- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > +++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-> > @@ -393,6 +393,13 @@
-> >                         interrupt-controller;
-> >                         #interrupt-cells = <3>;
-> >
-> > +                       csi_pins: csi {
-> > +                               pins = "PE0", "PE1", "PE2", "PE3", "PE4",
-> > +                                      "PE5", "PE6", "PE7", "PE8", "PE9",
-> > +                                      "PE10", "PE11";
-> > +                               function = "csi";
-> > +                       };
-> > +
-> >                         emac_rgmii_pins: emac0 {
-> >                                 pins = "PD0", "PD1", "PD2", "PD3", "PD4",
-> >                                        "PD5", "PD7", "PD8", "PD9", "PD10",
-> > @@ -744,6 +751,21 @@
-> >                         interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> >                 };
-> >
-> > +               csi: camera at 1cb0000 {
-> > +                       compatible = "allwinner,sun8i-h3-csi",
-> > +                                    "allwinner,sun6i-a31-csi";
-> > +                       reg = <0x01cb0000 0x1000>;
-> > +                       interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > +                       clocks = <&ccu CLK_BUS_CSI>,
-> > +                                <&ccu CLK_CSI_SCLK>,
-> > +                                <&ccu CLK_DRAM_CSI>;
-> > +                       clock-names = "bus", "mod", "ram";
->
-> Don't we need CLK_CSI_MCLK which can be pinout via PE1?
+> > QEMU does some thing around enumerating all the system registers exposed
+> > by KVM and saving/restoring them as part of its startup, but I don't
+> > remember the exact sequence.
+> 
+> This all happens in kvm_arch_init_vcpu(), which does:
+>  * KVM_ARM_VCPU_INIT ioctl (with the appropriate kvm_init_features set)
+>  * read the guest MPIDR with GET_ONE_REG so we know what KVM
+>    is doing with MPIDR assignment across CPUs
+>  * check for interesting extensions like KVM_CAP_SET_GUEST_DEBUG
+>  * get and cache a list of what system registers the vcpu has,
+>    using KVM_GET_REG_LIST. This is where we do the "size must
+>    be U32 or U64" sanity check.
+> 
+> So if there's something we can't do by setting kvm_init_features
+> for KVM_ARM_VCPU_INIT but have to do immediately afterwards,
+> that is straightforward.
+> 
+> The major requirement for QEMU is that if we don't specifically
+> enable SVE in the VCPU then we must not see any registers
+> in the KVM_GET_REG_LIST that are not u32 or u64 -- otherwise
+> QEMU will refuse to start.
+> 
 
-The CSI hardware block does not have any controls for MCLK.
-It's simply routed from the CCU directly to the pin.
+So on migration, will you have the required information for
+KVM_ARM_VCPU_INIT before setting the registers from the migration
+stream?
 
-ChenYu
+(I assume so, because presumably this comes from a command-line switch
+or from the machine definition, which must match the source.)
+
+Therefore, I don't think there's an issue with this patch, but from
+bitter experience I think we should enforce ordering if possible.
+
+
+Thanks,
+
+    Christoffer
