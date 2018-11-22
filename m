@@ -1,162 +1,77 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 22 Nov 2018 12:50:02 +0100
-Subject: [PATCH v2] PCI: imx: Add imx6sx suspend/resume support
-In-Reply-To: <20181122113853.GB11952@e107981-ln.cambridge.arm.com>
-References: <984fcef6d928632241a4a3bce41e2645a304d335.1541598751.git.leonard.crestez@nxp.com>
- <20181122113853.GB11952@e107981-ln.cambridge.arm.com>
-Message-ID: <1542887402.23859.18.camel@pengutronix.de>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 22 Nov 2018 11:53:34 +0000
+Subject: compiler code model for the kernel
+In-Reply-To: <CAKwvOdmOUHH9BbRV=zfx9LKyfwL41NPDke_uqD_4ZwyGqxJGKg@mail.gmail.com>
+References: <CAKv+Gu8LchCWB-b+cDmStwrNf5qDs6ZMQ4drv2HMk-8OyjbzNQ@mail.gmail.com>
+ <CAKwvOdmOUHH9BbRV=zfx9LKyfwL41NPDke_uqD_4ZwyGqxJGKg@mail.gmail.com>
+Message-ID: <20181122115331.GG3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 22.11.2018, 11:38 +0000 schrieb Lorenzo Pieralisi:
-> On Wed, Nov 07, 2018 at 01:57:03PM +0000, Leonard Crestez wrote:
-> > Enable PCI suspend/resume support on imx6sx socs. This is similar to
-> > imx7d with a few differences:
-> > 
-> > * The PM_Turn_Off bit is exposed through an IOMUX GPR, like all other
-> > pcie control bits on 6sx.
-> > * The pcie_inbound_axi clk needs to be turned off in suspend. On resume
-> > it is restored via resume -> deassert_core_reset -> enable_ref_clk.
-> > 
-> > Most of the resume logic is shared with the initial reset after probe.
-> > 
-> > > > Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
-> > 
-> > ---
-> > Changes since v1:
-> > * Use a switch statement in imx6_pcie_pm_turnoff. The DT-based turnoff
-> > path is still an if statement.
-> > * Did not split imx6_pcie_clk_disable or call it from other paths, this
-> > would bring complications and is somewhat unrelated.
-> > * See v1 comments: https://lore.kernel.org/patchwork/patch/996806/
-> > 
-> > ?drivers/pci/controller/dwc/pci-imx6.c???????| 44 ++++++++++++++++++---
-> > ?include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |??1 +
-> > ?2 files changed, 40 insertions(+), 5 deletions(-)
+On Mon, Nov 19, 2018 at 09:48:16AM -0800, Nick Desaulniers wrote:
+> On Mon, Nov 19, 2018 at 9:42 AM Ard Biesheuvel
+> <ard.biesheuvel@linaro.org> wrote:
+> >
+> > Hello all,
+> >
+> > Some of us (on cc) have discussed this a bit on various occasions, so
+> > perhaps it's time to sit down and do something about it :-)
+> >
+> > The Clang work that Nick is involved in has made explicit some
+> > assumptions that we are currently making in the kernel with respect to
+> > the behavior of GCC, and it would be good to formalise this so we can
+> > keep relying on it in the future, and to clarify to other compiler
+> > developers what is needed.
+> >
+> > GCC for x86 has a -mcmodel=kernel parameter, so perhaps we should
+> > introduce the same for AArch64. Under this model, we should be able to
+> > make the following assumptions:
+> > - symbol references are emitted as ADRP/ADD pairs
+> > -  no absolute references in generated code like jump tables etc (like
+> > -fpic/-fpie) [*]
+> > - no shared library semantics (no GOT indirections to support symbol
+> > preemption, or to reduce the CoW footprint and/or avoid text
+> > relocations)
+> > - resulting objects can be linked in -pie mode by ld.bfd
+> >
+> > Another thing that came up is that we currently rely on the stack
+> > pointer never to assume a value that is not 16-byte aligned, even
+> > transiently.
+> >
+> > Other things I've missed?
+> >
+> > [*] This is only strictly required in parts of the code that may
+> > execute at a different offset than the linked offset, even after
+> > processing dynamic relocations at boot time (e.g., KVM hyp code
+> > running in a different exception level) but avoiding those altogether
+> > is reasonable. Note that GCC does the right thing for us here already,
+> > but Clang current;y needs -fno-jump-tables to build the KVM hyp code.
 > 
-> I request Richard/Lucas ACK in order to merge this patch.
+> Just following up on the KVM hyp code. At plumbers Mark and I took a
+> look at that case and were no longer able to reproduce.  Mark was able
+> to boot a Clang compiled kernel at EL2.  IIRC, the code in question
+> had been changed.  Note: Clang still probably does the wrong thing for
+> jump tables, so we should pursue this code model, I just don't think
+> this previous example is still the case.  Since it could always come
+> back, we should fix the issue on the compiler side though.
 
-I'm fine with this patch.
+We should absolutely document it as a requirement either way,
+and the putative gcc -mcmodel=kernel for arm64 should guarantee it.
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
+Is this a requirement for non-hyp code though?
 
+KASLR doesn't strictly need it, since we could keep the relocation info
+around and fix the kernel up at boot time (though obviously life is
+easier if we don't need to do this).
 
-> Thanks,
-> Lorenzo
-> 
-> > diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-> > index 2cbef2d7c207..54625569d0bc 100644
-> > --- a/drivers/pci/controller/dwc/pci-imx6.c
-> > +++ b/drivers/pci/controller/dwc/pci-imx6.c
-> > @@ -771,41 +771,75 @@ static void imx6_pcie_ltssm_disable(struct device *dev)
-> > > > ?	}
-> > ?}
-> > ?
-> > ?static void imx6_pcie_pm_turnoff(struct imx6_pcie *imx6_pcie)
-> > ?{
-> > > > -	reset_control_assert(imx6_pcie->turnoff_reset);
-> > > > -	reset_control_deassert(imx6_pcie->turnoff_reset);
-> > > > +	struct device *dev = imx6_pcie->pci->dev;
-> > +
-> > > > +	/* Some variants have a turnoff reset in DT */
-> > > > +	if (imx6_pcie->turnoff_reset) {
-> > > > +		reset_control_assert(imx6_pcie->turnoff_reset);
-> > > > +		reset_control_deassert(imx6_pcie->turnoff_reset);
-> > > > +		goto pm_turnoff_sleep;
-> > > > +	}
-> > +
-> > > > +	/* Others poke directly at IOMUXC registers */
-> > > > +	switch (imx6_pcie->variant) {
-> > > > +	case IMX6SX:
-> > > > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > > > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF,
-> > > > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF);
-> > > > +		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > > > +				IMX6SX_GPR12_PCIE_PM_TURN_OFF, 0);
-> > > > +		break;
-> > > > +	default:
-> > > > +		dev_err(dev, "PME_Turn_Off not implemented\n");
-> > > > +		return;
-> > > > +	}
-> > ?
-> > > > ?	/*
-> > > > ?	?* Components with an upstream port must respond to
-> > > > ?	?* PME_Turn_Off with PME_TO_Ack but we can't check.
-> > > > ?	?*
-> > > > ?	?* The standard recommends a 1-10ms timeout after which to
-> > > > ?	?* proceed anyway as if acks were received.
-> > > > ?	?*/
-> > +pm_turnoff_sleep:
-> > > > ?	usleep_range(1000, 10000);
-> > ?}
-> > ?
-> > ?static void imx6_pcie_clk_disable(struct imx6_pcie *imx6_pcie)
-> > ?{
-> > > > ?	clk_disable_unprepare(imx6_pcie->pcie);
-> > > > ?	clk_disable_unprepare(imx6_pcie->pcie_phy);
-> > > > ?	clk_disable_unprepare(imx6_pcie->pcie_bus);
-> > ?
-> > > > -	if (imx6_pcie->variant == IMX7D) {
-> > > > +	switch (imx6_pcie->variant) {
-> > > > +	case IMX6SX:
-> > > > +		clk_disable_unprepare(imx6_pcie->pcie_inbound_axi);
-> > > > +		break;
-> > > > +	case IMX7D:
-> > > > ?		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-> > > > ?				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL,
-> > > > ?				???IMX7D_GPR12_PCIE_PHY_REFCLK_SEL);
-> > > > +		break;
-> > > > +	default:
-> > > > +		break;
-> > > > ?	}
-> > ?}
-> > ?
-> > +static inline bool imx6_pcie_supports_suspend(struct imx6_pcie *imx6_pcie)
-> > +{
-> > > > +	return (imx6_pcie->variant == IMX7D ||
-> > > > +		imx6_pcie->variant == IMX6SX);
-> > +}
-> > +
-> > ?static int imx6_pcie_suspend_noirq(struct device *dev)
-> > ?{
-> > > > ?	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > ?
-> > > > -	if (imx6_pcie->variant != IMX7D)
-> > > > +	if (!imx6_pcie_supports_suspend(imx6_pcie))
-> > > > ?		return 0;
-> > ?
-> > > > ?	imx6_pcie_pm_turnoff(imx6_pcie);
-> > > > ?	imx6_pcie_clk_disable(imx6_pcie);
-> > > > ?	imx6_pcie_ltssm_disable(dev);
-> > @@ -817,11 +851,11 @@ static int imx6_pcie_resume_noirq(struct device *dev)
-> > ?{
-> > > > ?	int ret;
-> > > > ?	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-> > > > ?	struct pcie_port *pp = &imx6_pcie->pci->pp;
-> > ?
-> > > > -	if (imx6_pcie->variant != IMX7D)
-> > > > +	if (!imx6_pcie_supports_suspend(imx6_pcie))
-> > > > ?		return 0;
-> > ?
-> > > > ?	imx6_pcie_assert_core_reset(imx6_pcie);
-> > > > ?	imx6_pcie_init_phy(imx6_pcie);
-> > > > ?	imx6_pcie_deassert_core_reset(imx6_pcie);
-> > diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > index 6c1ad160ed87..c1b25f5e386d 100644
-> > --- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > +++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-> > @@ -438,10 +438,11 @@
-> > > > ?#define IMX6SX_GPR5_DISP_MUX_DCIC1_LCDIF1		(0x0 << 1)
-> > > > ?#define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
-> > > > ?#define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
-> > ?
-> > > > ?#define IMX6SX_GPR12_PCIE_TEST_POWERDOWN		BIT(30)
-> > > > +#define IMX6SX_GPR12_PCIE_PM_TURN_OFF			BIT(16)
-> > > > ?#define IMX6SX_GPR12_PCIE_RX_EQ_MASK			(0x7 << 0)
-> > > > ?#define IMX6SX_GPR12_PCIE_RX_EQ_2			(0x2 << 0)
-> > ?
-> > ?/* For imx6ul iomux gpr register field define */
-> > > > ?#define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
-> > --?
-> > 2.17.1
-> > 
+Currently the lack of relocations seems to be an accidental side-effect
+of -mcmodel=small.  It's not clear to me whether we rely on this because
+it's advantageous, or whether we rely on it by accident because it
+happens to be the default.
+
+My question is: should there be just one kernel memory model, or do we
+want position-independent (for hyp-like stuff) and non-position-
+independent variants (for everything else)?
+
+Cheers
+---Dave
