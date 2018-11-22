@@ -1,97 +1,80 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 22 Nov 2018 10:07:47 +0100
-Subject: [PATCH] drm/sun4i: wait on implicit fence before display
-In-Reply-To: <20181122014417.23285-1-yuq825@gmail.com>
-References: <20181122014417.23285-1-yuq825@gmail.com>
-Message-ID: <20181122090747.GB4266@phenom.ffwll.local>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 22 Nov 2018 09:29:28 +0000
+Subject: arm: dma-mapping: CPU may not see up-to-date data after DMA
+ transaction
+In-Reply-To: <1542872133.26115.4.camel@atviedlbe741.rss.d3s.at.thales>
+References: <1542872133.26115.4.camel@atviedlbe741.rss.d3s.at.thales>
+Message-ID: <20181122092928.GF30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 09:44:17AM +0800, Qiang Yu wrote:
-> Render like lima will attach a fence to the framebuffer
-> dma_buf, display like sun4i should wait it finish before
-> show the framebuffer. Otherwise tearing will be observed.
+On Thu, Nov 22, 2018 at 07:36:26AM +0000, JABLONSKY Jan wrote:
+> Proper cleaning and invalidating has to be performed also for inner cache,
+> otherwise CPU may work with data from inner cache
+
+The functions are _already_ performing cache maintanence on the inner
+cache, this patch makes no sense.
+
+> Problem appears on The Altera SoC FPGA (Cortex-A9), during
+> higher CPU and system memory load followed reading by CPU from memory after
+> DMA transaction.
+> That means CPU may not see most up-to-date and correct copy of DMA buffer.
 > 
-> Signed-off-by: Qiang Yu <yuq825@gmail.com>
+> Replace with functions __sync_cache_range_r/w, which handle mentioned
+> situation.
+> Protect against preemption to make sure, that the code is
+> running on the current CPU
 
-Thanks for submitting this fix, applied to drm-misc-next.
--Daniel
+This is too vague to say much more.
 
+> 
+> Signed-off-by: Jan Jablonsky <jan.jablonsky@thalesgroup.com>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_layer.c    | 2 ++
->  drivers/gpu/drm/sun4i/sun8i_ui_layer.c | 2 ++
->  drivers/gpu/drm/sun4i/sun8i_vi_layer.c | 2 ++
->  3 files changed, 6 insertions(+)
+>  arch/arm/mm/dma-mapping.c | 19 ++++++++++++++++---
+>  1 file changed, 16 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> index 750ad24de1d7..d68e663df9a0 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-> @@ -12,6 +12,7 @@
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 661fe48ab78d..f40dc8b250d8 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -997,11 +997,18 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+>  	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
 >  
->  #include <drm/drm_atomic_helper.h>
->  #include <drm/drm_plane_helper.h>
-> +#include <drm/drm_gem_framebuffer_helper.h>
->  #include <drm/drmP.h>
->  
->  #include "sun4i_backend.h"
-> @@ -114,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+>  	paddr = page_to_phys(page) + off;
+> +
+> +	/*
+> +	 * Protect against preemption
+> +	 * Ensure that the code is running on the current CPU
+> +	 */
+> +	preempt_disable();
+>  	if (dir == DMA_FROM_DEVICE) {
+> -		outer_inv_range(paddr, paddr + size);
+> +		__sync_cache_range_r(phys_to_virt(paddr), size);
+>  	} else {
+> -		outer_clean_range(paddr, paddr + size);
+> +		__sync_cache_range_w(phys_to_virt(paddr), size);
+>  	}
+> +	preempt_enable();
+>  	/* FIXME: non-speculating: flush on bidirectional mappings? */
 >  }
 >  
->  static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
-> +	.prepare_fb	= drm_gem_fb_prepare_fb,
->  	.atomic_disable	= sun4i_backend_layer_atomic_disable,
->  	.atomic_update	= sun4i_backend_layer_atomic_update,
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-> index 28c15c6ef1ef..7bc2ca2bd0c3 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
-> @@ -19,6 +19,7 @@
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_fb_cma_helper.h>
->  #include <drm/drm_gem_cma_helper.h>
-> +#include <drm/drm_gem_framebuffer_helper.h>
->  #include <drm/drm_plane_helper.h>
->  #include <drm/drmP.h>
+> @@ -1013,7 +1020,13 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+>  	/* FIXME: non-speculating: not required */
+>  	/* in any case, don't bother invalidating if DMA to device */
+>  	if (dir != DMA_TO_DEVICE) {
+> -		outer_inv_range(paddr, paddr + size);
+> +		/*
+> +		 * Protect against preemption
+> +		 * Ensure that the code is running on the current CPU
+> +		 */
+> +		preempt_disable();
+> +		__sync_cache_range_r(phys_to_virt(paddr), size);
+> +		preempt_enable();
 >  
-> @@ -287,6 +288,7 @@ static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
->  }
->  
->  static struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
-> +	.prepare_fb	= drm_gem_fb_prepare_fb,
->  	.atomic_check	= sun8i_ui_layer_atomic_check,
->  	.atomic_disable	= sun8i_ui_layer_atomic_disable,
->  	.atomic_update	= sun8i_ui_layer_atomic_update,
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-> index f4fe97813f94..815895795afd 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
-> @@ -13,6 +13,7 @@
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_fb_cma_helper.h>
->  #include <drm/drm_gem_cma_helper.h>
-> +#include <drm/drm_gem_framebuffer_helper.h>
->  #include <drm/drm_plane_helper.h>
->  #include <drm/drmP.h>
->  
-> @@ -315,6 +316,7 @@ static void sun8i_vi_layer_atomic_update(struct drm_plane *plane,
->  }
->  
->  static struct drm_plane_helper_funcs sun8i_vi_layer_helper_funcs = {
-> +	.prepare_fb	= drm_gem_fb_prepare_fb,
->  	.atomic_check	= sun8i_vi_layer_atomic_check,
->  	.atomic_disable	= sun8i_vi_layer_atomic_disable,
->  	.atomic_update	= sun8i_vi_layer_atomic_update,
-> -- 
-> 2.17.1
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>  		dma_cache_maint_page(page, off, size, dir, dmac_unmap_area);
+>  	}
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
