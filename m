@@ -1,158 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 22 Nov 2018 16:13:16 +0000
-Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
- erratum 1165522
-In-Reply-To: <20181108201054.GG3835@e113682-lin.lund.arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-5-marc.zyngier@arm.com>
- <20181106081546.GH12057@e113682-lin.lund.arm.com>
- <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
- <20181108201054.GG3835@e113682-lin.lund.arm.com>
-Message-ID: <11733182-4e0a-5607-268e-73b8d00fbcee@arm.com>
+From: jeyu@kernel.org (Jessica Yu)
+Date: Thu, 22 Nov 2018 17:28:49 +0100
+Subject: [PATCH 1/2] module: Overwrite st_size instead of st_info
+In-Reply-To: <20181122122411.6ydftk7bjlrefwa5@axis.com>
+References: <20181119162513.16562-1-vincent.whitchurch@axis.com>
+ <20181122120154.GH3505@e103592.cambridge.arm.com>
+ <20181122122411.6ydftk7bjlrefwa5@axis.com>
+Message-ID: <20181122162849.GA8856@linux-8ccs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/2018 20:10, Christoffer Dall wrote:
-> On Thu, Nov 08, 2018 at 06:05:55PM +0000, Marc Zyngier wrote:
->> On 06/11/18 08:15, Christoffer Dall wrote:
->>> On Mon, Nov 05, 2018 at 02:36:16PM +0000, Marc Zyngier wrote:
->>>> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
->>>> speculate an AT instruction in during a guest switch while the
->>>> S1/S2 system registers are in an inconsistent state.
->>>>
->>>> Work around it by:
->>>> - Mandating VHE
->>>> - Make sure that S1 and S2 system registers are consistent before
->>>>   clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
->>>>   regime
->>>>
->>>> These two things together ensure that we cannot hit this erratum.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  Documentation/arm64/silicon-errata.txt |  1 +
->>>>  arch/arm64/Kconfig                     | 12 ++++++++++++
->>>>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->>>>  arch/arm64/include/asm/kvm_host.h      |  3 +++
->>>>  arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
->>>>  arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
->>>>  arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
->>>>  7 files changed, 46 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->>>> index 76ccded8b74c..04f0bc4690c6 100644
->>>> --- a/Documentation/arm64/silicon-errata.txt
->>>> +++ b/Documentation/arm64/silicon-errata.txt
->>>> @@ -57,6 +57,7 @@ stable kernels.
->>>>  | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
->>>>  | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
->>>>  | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
->>>> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
->>>>  | ARM            | MMU-500         | #841119,#826419 | N/A                         |
->>>>  |                |                 |                 |                             |
->>>>  | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 787d7850e064..a68bc6cc2167 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
->>>>  
->>>>  	  If unsure, say Y.
->>>>  
->>>> +config ARM64_ERRATUM_1165522
->>>> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
->>>> +	default y
->>>> +	help
->>>> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
->>>> +
->>>> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
->>>> +	  corrupted TLBs by speculating an AT instruction during a guest
->>>> +	  context switch.
->>>> +
->>>> +	  If unsure, say Y.
->>>> +
->>>>  config CAVIUM_ERRATUM_22375
->>>>  	bool "Cavium erratum 22375, 24313"
->>>>  	default y
->>>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->>>> index 6e2d254c09eb..62d8cd15fdf2 100644
->>>> --- a/arch/arm64/include/asm/cpucaps.h
->>>> +++ b/arch/arm64/include/asm/cpucaps.h
->>>> @@ -54,7 +54,8 @@
->>>>  #define ARM64_HAS_CRC32				33
->>>>  #define ARM64_SSBS				34
->>>>  #define ARM64_WORKAROUND_1188873		35
->>>> +#define ARM64_WORKAROUND_1165522		36
->>>>  
->>>> -#define ARM64_NCAPS				36
->>>> +#define ARM64_NCAPS				37
->>>>  
->>>>  #endif /* __ASM_CPUCAPS_H */
->>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->>>> index 7d6e974d024a..8f486026ac87 100644
->>>> --- a/arch/arm64/include/asm/kvm_host.h
->>>> +++ b/arch/arm64/include/asm/kvm_host.h
->>>> @@ -435,6 +435,9 @@ static inline bool kvm_arch_sve_requires_vhe(void)
->>>>  static inline bool kvm_arch_impl_requires_vhe(void)
->>>>  {
->>>>  	/* Some implementations have defects that confine them to VHE */
->>>> +	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
->>>> +		return true;
->>>> +
->>>>  	return false;
->>>>  }
->>>>  
->>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
->>>> index 23aca66767f9..9681360d0959 100644
->>>> --- a/arch/arm64/include/asm/kvm_hyp.h
->>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
->>>> @@ -163,6 +163,12 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
->>>>  {
->>>>  	write_sysreg(kvm->arch.vtcr, vtcr_el2);
->>>>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
->>>> +
->>>> +	/*
->>>> +	 * ARM erratum 1165522 requires the actual execution of the
->>>> +	 * above before we can switch to the guest translation regime.
->>>> +	 */
->>>
->>> Is it about a guest translation 'regime' or should this just say before
->>> we can enable stage 2 translation?
++++ Vincent Whitchurch [22/11/18 13:24 +0100]:
+>On Thu, Nov 22, 2018 at 12:01:54PM +0000, Dave Martin wrote:
+>> On Mon, Nov 19, 2018 at 05:25:12PM +0100, Vincent Whitchurch wrote:
+>> > st_info is currently overwritten after relocation and used to store the
+>> > elf_type().  However, we're going to need it fix kallsyms on ARM's
+>> > Thumb-2 kernels, so preserve st_info and overwrite the st_size field
+>> > instead.  st_size is neither used by the module core nor by any
+>> > architecture.
+>> >
+>> > Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+>> > ---
+>> > v4: Split out to separate patch.  Use st_size instead of st_other.
+>> > v1-v3: See PATCH 2/2
+>> >
+>> >  kernel/module.c | 4 ++--
+>> >  1 file changed, 2 insertions(+), 2 deletions(-)
+>> >
+>> > diff --git a/kernel/module.c b/kernel/module.c
+>> > index 49a405891587..3d86a38b580c 100644
+>> > --- a/kernel/module.c
+>> > +++ b/kernel/module.c
+>> > @@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
+>> >
+>> >  	/* Set types up while we still have access to sections. */
+>> >  	for (i = 0; i < mod->kallsyms->num_symtab; i++)
+>> > -		mod->kallsyms->symtab[i].st_info
+>> > +		mod->kallsyms->symtab[i].st_size
+>> >  			= elf_type(&mod->kallsyms->symtab[i], info);
+>> >
+>> >  	/* Now populate the cut down core kallsyms for after init. */
+>> > @@ -4061,7 +4061,7 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+>> >  		kallsyms = rcu_dereference_sched(mod->kallsyms);
+>> >  		if (symnum < kallsyms->num_symtab) {
+>> >  			*value = kallsyms->symtab[symnum].st_value;
+>> > -			*type = kallsyms->symtab[symnum].st_info;
+>> > +			*type = kallsyms->symtab[symnum].st_size;
+>> >  			strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
+>> >  			strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+>> >  			*exported = is_exported(name, *value, mod);
 >>
->> No, this isn't strictly about enabling stage-2 translation. This is
->> about making sure that anything that impacts the guest translations is
->> actually executed.
+>> This is fine if st_size is really unused, but how sure are you of that?
 >>
->> I wonder if it would be clearer to move this outside of
->> __load_guest_stage2 and make it explicit in the callers of this helper...
-> 
-> I think it makes sense to have this here to explain the alternative.
-> 
-> But it's the 'switch to guest translation regime' thing that bothers me
-> a bit.  Is that an architectural concept (I thought we only had EL1 and
-> EL2 translation regimes in stage 1, and then stage 2 translations).  So
-> When you say 'guest translation regime' I'm just not entirely sure what
-> that means, unless I'm missing something.
+>> grepping for st_size throws up some hits that appear ELF-related, but
+>> I've not investigated them in detail.
+>>
+>> (The fact that struct stat has an identically named field throws up
+>> a load of false positives too.)
+>
+>$ git describe --tags
+>v4.20-rc3-93-g92b419289cee
+>
+>$ rg -m1 '[\.>]st_size'  --iglob '!**/tools/**' --iglob '!**/vdso*' --iglob '!**/scripts/**' --iglob '!**/usr/**' --iglob '!**/samples/**' | cat
+>| kernel/kexec_file.c:	if (sym->st_size != size) {
+>
+>Symbols in kexec kernel.
+>
+>| fs/stat.c:	tmp.st_size = stat->size;
+>| Documentation/networking/tls.txt:  sendfile(sock, file, &offset, stat.st_size);
+>| net/9p/client.c:		ret->st_rdev, ret->st_size, ret->st_blksize,
+>| net/9p/protocol.c:					&stbuf->st_rdev, &stbuf->st_size,
+>| fs/9p/vfs_inode_dotl.c:		i_size_write(inode, stat->st_size);
+>| fs/hostfs/hostfs_user.c:	p->size = buf->st_size;
+>| arch/powerpc/boot/mktree.c:	nblks = (st.st_size + IMGBLK) / IMGBLK;
+>| arch/alpha/kernel/osf_sys.c:	tmp.st_size	= lstat->size;
+>| arch/x86/ia32/sys_ia32.c:	    __put_user(stat->size, &ubuf->st_size) ||
+>
+>Not Elf_Sym.
+>
+>| arch/x86/kernel/machine_kexec_64.c:			 sym->st_size);
+>
+>Symbols in kexec kernel.
+>
+>| arch/sparc/boot/piggyback.c:	st4(buffer + 12, s.st_size);
+>| arch/sparc/kernel/sys_sparc32.c:	err |= put_user(stat->size, &statbuf->st_size);
+>| arch/um/os-Linux/file.c:		.ust_size    = src->st_size,    /* total size, in bytes */
+>| arch/um/os-Linux/start_up.c:	size = (buf.st_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
+>| arch/s390/kernel/compat_linux.c:	tmp.st_size = stat->size;
+>| arch/arm/kernel/sys_oabi-compat.c:	tmp.st_size = stat->size;
+>| arch/mips/boot/compressed/calc_vmlinuz_load_addr.c:	vmlinux_size = (uint64_t)sb.st_size;
+>| drivers/net/ethernet/marvell/sky2.c:		hw->st_idx = RING_NEXT(hw->st_idx, hw->st_size);
+>
+>Not Elf_Sym.
 
-[coming back to this as I'm preparing the next round]
+[ added Miroslav to CC, just in case he would like to check :) ]
 
-What I'm trying to convey by "guest translation regime" is the following
-from the ARM ARM:
+I have just double checked as well, and am fairly certain that the
+Elf_Sym st_size field is not used to apply module relocations in any
+arches, and it is not used in the core module loader nor in the module
+kallsyms code. We'd like to avoid overwriting st_info in any case, to
+fix kallsyms on Thumb-2 and also so that livepatch won't run into any
+issues with delayed relocations, should livepatch support ever expand
+to arches (e.g., arm) that rely on st_info for module relocations.
 
-C5.4.7 AT S1E1R, Address Translate Stage 1 EL1 Read
-[...]
+Thanks,
 
-When EL2 is implemented and enabled in the current Security state:
-? If HCR_EL2.{E2H, TGE} is not {1, 1}, the EL1&0 translation regime,
-accessed from EL1.
-? If HCR_EL2.{E2H, TGE} is {1, 1}, the EL2&0 translation regime,
-accessed from EL2.
-
-So maybe I should just bite the bullet and call out EL1/EL2 translation
-regime instead of guest/host.
-
-Thoughts?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Jessica
