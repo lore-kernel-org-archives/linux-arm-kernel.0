@@ -1,76 +1,137 @@
-From: Robert.Richter@cavium.com (Richter, Robert)
-Date: Thu, 22 Nov 2018 07:37:32 +0000
-Subject: WARN_ON after gic_reserve_range
-In-Reply-To: <61079d3d-6bb6-cd00-fbfa-d13c19706e0f@arm.com>
-References: <20181120162305.GA2088@hc>
- <2665ddbd-5912-12b9-f5bd-6ccaec0e6e2d@huawei.com>
- <61079d3d-6bb6-cd00-fbfa-d13c19706e0f@arm.com>
-Message-ID: <20181122073725.GB5509@rric.localdomain>
+From: frieder.schrempf@kontron.de (Schrempf Frieder)
+Date: Thu, 22 Nov 2018 07:41:27 +0000
+Subject: [PATCH] ARM: dts: imx: Add dummy PHYs for HSIC-only USB
+ controllers
+In-Reply-To: <VI1PR04MB5327E5CE977E59E03B1B6C4C8BDB0@VI1PR04MB5327.eurprd04.prod.outlook.com>
+References: <1539848729-27646-1-git-send-email-frieder.schrempf@kontron.de>
+ <20181031073112.GL10386@tiger>
+ <VI1PR04MB5327E5CE977E59E03B1B6C4C8BDB0@VI1PR04MB5327.eurprd04.prod.outlook.com>
+Message-ID: <f29e4392-f466-df5f-83f6-52e04f27204c@kontron.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20.11.18 17:37:37, Marc Zyngier wrote:
-> On 20/11/2018 17:30, John Garry wrote:
-> > I see it also:
-> >
-> > [    0.000000] Booting Linux on physical CPU 0x0000010000 [0x410fd082]
-> > [    0.000000] Linux version 4.20.0-rc3
-> > (johnpgarry at johnpgarry-ThinkCentre-M93p) (gcc version 7.3.1 20180425
-> > [linaro-7.3-2018.05-rc1 revision
-> > 38aec9a676236eaa42ca03ccb3a6c1dd0182c29f] (Linaro GCC 7.3-2018.05-rc1))
-> > #971 SMP PREEMPT Tue Nov 20 17:15:03 GMT 2018
-> > [    0.000000] efi: Getting EFI parameters from FDT:
-> > [    0.000000] efi: EFI v2.60 by EDK II
-> > [    0.000000] efi:  SMBIOS=0x3f050000  SMBIOS 3.0=0x39b00000
-> > ACPI=0x39bd0000  ACPI 2.0=
-> >
-> > ...
-> >
-> >
-> > [    0.000000] ITS at 0x00000408c6000000: allocated 65536 Virtual CPUs
-> > @1fb9d80000 (flat, esz 8, psz 4K, shr 1)
-> > [    0.000000] ITS at 0x00000408c6000000: allocated 512 Interrupt
-> > Collections @1fbb977000 (flat, esz 8, psz 4K, shr 1)
-> > [    0.000000] WARNING: CPU: 0 PID: 0 at
-> > drivers/irqchip/irq-gic-v3-its.c:1696 its_init+0x360/0x5f4
-> > [    0.000000] Modules linked in:
-> > [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.20.0-rc3 #971
-> > [    0.000000] pstate: 00000085 (nzcv daIf -PAN -UAO)
-> > [    0.000000] pc : its_init+0x360/0x5f4
-> > [    0.000000] lr : its_init+0x35c/0x5f4
-> > [    0.000000] sp : ffff000009183ca0
-> > [    0.000000] x29: ffff000009183ca0 x28: ffff7dfffe67b3e4
-> > [    0.000000] x27: 0000000000000001 x26: ffff801fbb928000
-> > [    0.000000] x25: ffff000009325360 x24: ffff00000918c8c8
-> > [    0.000000] x23: ffff801fbb802100 x22: ffff00000918c8c8
-> > [    0.000000] x21: ffff000009189000 x20: ffff0000091b8000
-> > [    0.000000] x19: ffff000009325000 x18: ffffffffffffffff
-> > [    0.000000] x17: 0000000001f4d3b5 x16: 0000000000000000
-> > [    0.000000] x15: ffff0000091896c8 x14: ffff801fbb97389b
-> > [    0.000000] x13: ffff801fbb97389a x12: 2074707572726574
-> > [    0.000000] x11: ffff000009183a00 x10: ffff000009183a00
-> > [    0.000000] x9 : ffff7e007eeed400 x8 : ffff801fbbb60000
-> > [    0.000000] x7 : a2a2a2a2a2a2a2a2 x6 : 0000801ff2d1c000
-> > [    0.000000] x5 : ffff7e0000000000 x4 : ffff00000918c8c8
-> > [    0.000000] x3 : ffff801fbbb50000 x2 : 0000000000000000
-> > [    0.000000] x1 : 0000000000010000 x0 : 00000000ffffffed
-> > [    0.000000] Call trace:
-> > [    0.000000]  its_init+0x360/0x5f4
-> > [    0.000000]  gic_init_bases+0x2d4/0x2f4
-> > [    0.000000]  gic_acpi_init+0x154/0x278
-> > [    0.000000]  acpi_match_madt+0x44/0x78
-> > [    0.000000]  acpi_table_parse_entries_array+0x13c/0x214
-> > [    0.000000]  acpi_table_parse_entries+0x40/0x60
-> > [    0.000000]  acpi_table_parse_madt+0x24/0x2c
-> > [    0.000000]  __acpi_probe_device_table+0x80/0xdc
-> > [    0.000000]  irqchip_init+0x30/0x38
-> > [    0.000000]  init_IRQ+0xfc/0x130
-> > [    0.000000]  start_kernel+0x288/0x418
-> > [    0.000000] ---[ end trace c841ef100bdd09a6 ]---
+On 22.11.18 07:48, PETER CHEN wrote:
+>   
+>>
+>> On Thu, Oct 18, 2018 at 09:45:04AM +0200, Frieder Schrempf wrote:
+>>> Some SOCs in the i.MX6 family have a USB host controller that is only
+>>> capable of the HSIC interface and has no on-board PHY.
+>>>
+>>> To be able to use these controllers, we need to add "usb-nop-xceiv"
+>>> dummy PHYs.
+>>>
+>>> Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+>>
+>> @Peter, looks good to you?
+>>
+>> Shawn
+>>
+>>> ---
+>>>   arch/arm/boot/dts/imx6qdl.dtsi | 14 ++++++++++++++
+>>> arch/arm/boot/dts/imx6sl.dtsi  |  7 +++++++
+>>> arch/arm/boot/dts/imx6sx.dtsi  |  6 ++++++
+>>>   3 files changed, 27 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+>>> b/arch/arm/boot/dts/imx6qdl.dtsi index 61d2d26..d3404d1 100644
+>>> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>>> @@ -139,6 +139,16 @@
+>>>   		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+>>>   	};
+>>>
+>>> +	usbphynop1: usbphynop1 {
+>>> +		compatible = "usb-nop-xceiv";
+>>> +		#phy-cells = <0>;
+>>> +	};
+>>> +
 > 
-> Yes, anyone with GICv3 and EFI will see this.
+> Why #phy-cells property is needed? Others are ok for me.
 
-My late its_init implementation might fix this, though it does not fix
-4.20.
+ From Documentation/devicetree/bindings/usb/usb-nop-xceiv.txt:
 
--Robert
+Required properties:
+- compatible: should be usb-nop-xceiv
+- #phy-cells: Must be 0
+
+> 
+> Peter
+> 
+>>> +	usbphynop2: usbphynop2 {
+>>> +		compatible = "usb-nop-xceiv";
+>>> +		#phy-cells = <0>;
+>>> +	};
+>>> +
+>>>   	soc {
+>>>   		#address-cells = <1>;
+>>>   		#size-cells = <1>;
+>>> @@ -981,6 +991,8 @@
+>>>   				reg = <0x02184400 0x200>;
+>>>   				interrupts = <0 41 IRQ_TYPE_LEVEL_HIGH>;
+>>>   				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+>>> +				fsl,usbphy = <&usbphynop1>;
+>>> +				phy_type = "hsic";
+>>>   				fsl,usbmisc = <&usbmisc 2>;
+>>>   				dr_mode = "host";
+>>>   				ahb-burst-config = <0x0>;
+>>> @@ -994,6 +1006,8 @@
+>>>   				reg = <0x02184600 0x200>;
+>>>   				interrupts = <0 42 IRQ_TYPE_LEVEL_HIGH>;
+>>>   				clocks = <&clks IMX6QDL_CLK_USBOH3>;
+>>> +				fsl,usbphy = <&usbphynop2>;
+>>> +				phy_type = "hsic";
+>>>   				fsl,usbmisc = <&usbmisc 3>;
+>>>   				dr_mode = "host";
+>>>   				ahb-burst-config = <0x0>;
+>>> diff --git a/arch/arm/boot/dts/imx6sl.dtsi
+>>> b/arch/arm/boot/dts/imx6sl.dtsi index 7a4f5da..81edcdc 100644
+>>> --- a/arch/arm/boot/dts/imx6sl.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+>>> @@ -110,6 +110,11 @@
+>>>   		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+>>>   	};
+>>>
+>>> +	usbphynop1: usbphynop1 {
+>>> +		compatible = "usb-nop-xceiv";
+>>> +		#phy-cells = <0>;
+>>> +	};
+>>> +
+>>>   	soc {
+>>>   		#address-cells = <1>;
+>>>   		#size-cells = <1>;
+>>> @@ -815,6 +820,8 @@
+>>>   				reg = <0x02184400 0x200>;
+>>>   				interrupts = <0 40 IRQ_TYPE_LEVEL_HIGH>;
+>>>   				clocks = <&clks IMX6SL_CLK_USBOH3>;
+>>> +				fsl,usbphy = <&usbphynop1>;
+>>> +				phy_type = "hsic";
+>>>   				fsl,usbmisc = <&usbmisc 2>;
+>>>   				dr_mode = "host";
+>>>   				ahb-burst-config = <0x0>;
+>>> diff --git a/arch/arm/boot/dts/imx6sx.dtsi
+>>> b/arch/arm/boot/dts/imx6sx.dtsi index 844caa3..07ed417 100644
+>>> --- a/arch/arm/boot/dts/imx6sx.dtsi
+>>> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+>>> @@ -159,6 +159,11 @@
+>>>   		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+>>>   	};
+>>>
+>>> +	usbphynop1: usbphynop1 {
+>>> +		compatible = "usb-nop-xceiv";
+>>> +		#phy-cells = <0>;
+>>> +	};
+>>> +
+>>>   	soc {
+>>>   		#address-cells = <1>;
+>>>   		#size-cells = <1>;
+>>> @@ -877,6 +882,7 @@
+>>>   				reg = <0x02184400 0x200>;
+>>>   				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+>>>   				clocks = <&clks IMX6SX_CLK_USBOH3>;
+>>> +				fsl,usbphy = <&usbphynop1>;
+>>>   				fsl,usbmisc = <&usbmisc 2>;
+>>>   				phy_type = "hsic";
+>>>   				fsl,anatop = <&anatop>;
+>>> --
+>>> 2.7.4
+>>>
