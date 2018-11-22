@@ -1,39 +1,80 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 21 Nov 2018 20:27:11 -0500
-Subject: [RFC][PATCH 03/14] arm64: function_graph: Remove use of
- FTRACE_NOTRACE_DEPTH
-References: <20181122012708.491151844@goodmis.org>
-Message-ID: <20181122012803.040221352@goodmis.org>
+From: yuq825@gmail.com (Qiang Yu)
+Date: Thu, 22 Nov 2018 09:44:17 +0800
+Subject: [PATCH] drm/sun4i: wait on implicit fence before display
+Message-ID: <20181122014417.23285-1-yuq825@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+Render like lima will attach a fence to the framebuffer
+dma_buf, display like sun4i should wait it finish before
+show the framebuffer. Otherwise tearing will be observed.
 
-The curr_ret_stack is no longer set to -1 when not tracing a function. It is
-now done differently, and the FTRACE_NOTRACE_DEPTH value is no longer used.
-Remove the reference to it.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+Signed-off-by: Qiang Yu <yuq825@gmail.com>
 ---
- arch/arm64/kernel/stacktrace.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c    | 2 ++
+ drivers/gpu/drm/sun4i/sun8i_ui_layer.c | 2 ++
+ drivers/gpu/drm/sun4i/sun8i_vi_layer.c | 2 ++
+ 3 files changed, 6 insertions(+)
 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 4989f7ea1e59..7723dadf25be 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 			(frame->pc == (unsigned long)return_to_handler)) {
- 		if (WARN_ON_ONCE(frame->graph == -1))
- 			return -EINVAL;
--		if (frame->graph < -1)
--			frame->graph += FTRACE_NOTRACE_DEPTH;
--
- 		/*
- 		 * This is a case where function graph tracer has
- 		 * modified a return address (LR) in a stack frame
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 750ad24de1d7..d68e663df9a0 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -12,6 +12,7 @@
+ 
+ #include <drm/drm_atomic_helper.h>
+ #include <drm/drm_plane_helper.h>
++#include <drm/drm_gem_framebuffer_helper.h>
+ #include <drm/drmP.h>
+ 
+ #include "sun4i_backend.h"
+@@ -114,6 +115,7 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ }
+ 
+ static const struct drm_plane_helper_funcs sun4i_backend_layer_helper_funcs = {
++	.prepare_fb	= drm_gem_fb_prepare_fb,
+ 	.atomic_disable	= sun4i_backend_layer_atomic_disable,
+ 	.atomic_update	= sun4i_backend_layer_atomic_update,
+ };
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+index 28c15c6ef1ef..7bc2ca2bd0c3 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_ui_layer.c
+@@ -19,6 +19,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_gem_framebuffer_helper.h>
+ #include <drm/drm_plane_helper.h>
+ #include <drm/drmP.h>
+ 
+@@ -287,6 +288,7 @@ static void sun8i_ui_layer_atomic_update(struct drm_plane *plane,
+ }
+ 
+ static struct drm_plane_helper_funcs sun8i_ui_layer_helper_funcs = {
++	.prepare_fb	= drm_gem_fb_prepare_fb,
+ 	.atomic_check	= sun8i_ui_layer_atomic_check,
+ 	.atomic_disable	= sun8i_ui_layer_atomic_disable,
+ 	.atomic_update	= sun8i_ui_layer_atomic_update,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+index f4fe97813f94..815895795afd 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_vi_layer.c
+@@ -13,6 +13,7 @@
+ #include <drm/drm_crtc_helper.h>
+ #include <drm/drm_fb_cma_helper.h>
+ #include <drm/drm_gem_cma_helper.h>
++#include <drm/drm_gem_framebuffer_helper.h>
+ #include <drm/drm_plane_helper.h>
+ #include <drm/drmP.h>
+ 
+@@ -315,6 +316,7 @@ static void sun8i_vi_layer_atomic_update(struct drm_plane *plane,
+ }
+ 
+ static struct drm_plane_helper_funcs sun8i_vi_layer_helper_funcs = {
++	.prepare_fb	= drm_gem_fb_prepare_fb,
+ 	.atomic_check	= sun8i_vi_layer_atomic_check,
+ 	.atomic_disable	= sun8i_vi_layer_atomic_disable,
+ 	.atomic_update	= sun8i_vi_layer_atomic_update,
 -- 
-2.19.1
+2.17.1
