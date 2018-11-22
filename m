@@ -1,48 +1,131 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 22 Nov 2018 02:55:45 +0000
-Subject: [PATCH] ARM: dts: imx6sll-evk: use WDOG_B pin reset
-Message-ID: <1542855018-30217-1-git-send-email-Anson.Huang@nxp.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 22 Nov 2018 11:58:02 +0900
+Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a
+ devfreq device
+In-Reply-To: <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
+ <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
+Message-ID: <5BF61B3A.9050402@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX6SLL EVK board has WDOG_B pin connected to the PMIC;
+On 2018? 11? 22? 03:01, Lukasz Luba wrote:
+> The patch adds support for handling suspend/resume process.
+> It uses atomic variables to make sure no race condition
+> affects the process.
+> 
+> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+> solve issue with devfreq device's frequency during suspend/resume.
+> During the discussion on LKML some corner cases and comments appeared
+> related to the design. This patch address them keeping in mind suggestions
+> from Chanwoo Choi.
 
-Add the WDOG_B pinctrl entry and 'fsl,ext-reset-output'
-property to wdog node to let watchdog trigger a system
-POR reset via the PMIC.
+Please remove the duplicate information about patch history.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm/boot/dts/imx6sll-evk.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> 
+> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+> ---
+>  drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
+>  1 file changed, 39 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+> index cf9c643..7e09de8 100644
+> --- a/drivers/devfreq/devfreq.c
+> +++ b/drivers/devfreq/devfreq.c
+> @@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
+>   */
+>  int devfreq_suspend_device(struct devfreq *devfreq)
+>  {
+> -	if (!devfreq)
+> -		return -EINVAL;
+> +        int ret;
 
-diff --git a/arch/arm/boot/dts/imx6sll-evk.dts b/arch/arm/boot/dts/imx6sll-evk.dts
-index 9c90cbd..d8ad2a2 100644
---- a/arch/arm/boot/dts/imx6sll-evk.dts
-+++ b/arch/arm/boot/dts/imx6sll-evk.dts
-@@ -313,6 +313,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog1>;
-+	fsl,ext-reset-output;
-+};
-+
- &iomuxc {
- 	pinctrl_reg_sd3_vmmc: sd3vmmcgrp {
- 		fsl,pins = <
-@@ -478,4 +484,10 @@
- 			MX6SLL_PAD_PWM1__PWM1_OUT   0x110b0
- 		>;
- 	};
-+
-+	pinctrl_wdog1: wdog1grp	{
-+		fsl,pins = <
-+			MX6SLL_PAD_WDOG_B__WDOG1_B   0x170b0
-+		>;
-+	};
- };
+Move 'ret' definition under 'if (devfreq->suspend_freq) {'
+because 'ret' is used if suspend_freq isn't zero.
+
+> +        unsigned long prev_freq;
+> +        u32 flags = 0;
+> +
+> +        if (!devfreq)
+> +                return -EINVAL;
+> +
+> +        if (devfreq->governor) {
+> +		ret = devfreq->governor->event_handler(devfreq,
+> +					DEVFREQ_GOV_SUSPEND, NULL);
+> +		if (ret)
+> +			return ret;
+> +	}
+>  
+> -	if (!devfreq->governor)
+> -		return 0;
+> +	if (devfreq->suspend_freq) {
+> +		if (atomic_inc_return(&devfreq->suspend_count) > 1)
+> +			return 0;
+>  
+> -	return devfreq->governor->event_handler(devfreq,
+> -				DEVFREQ_GOV_SUSPEND, NULL);
+> +		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
+> +					 &prev_freq, flags);
+
+Remove the 'prev_freq' parameter.
+
+> +		if (ret)
+> +			return ret;
+> +
+> +		devfreq->resume_freq = prev_freq;
+
+As I commented on patch2, if devfreq_set_taget save the current frequency
+to 'devfreq->resume_freq', this line is not needed.
+
+
+> +	}
+> +
+> +        return 0;
+>  }
+>  EXPORT_SYMBOL(devfreq_suspend_device);
+>  
+> @@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
+>   */
+>  int devfreq_resume_device(struct devfreq *devfreq)
+>  {
+> +        int ret;
+
+Move 'ret' definition under 'if (devfreq->suspend_freq) {'
+because 'ret' is used if suspend_freq isn't zero.
+
+> +        unsigned long prev_freq;
+
+Remove prev_freq variable which is not used on this function.
+After calling devfreq_set_target, prev_freq is not used.
+
+> +        u32 flags = 0;
+> +
+>  	if (!devfreq)
+>  		return -EINVAL;
+>  
+> +	if (devfreq->suspend_freq) {
+> +		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
+> +			return 0;
+> +
+> +		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
+> +					 &prev_freq, flags);
+
+Remove the 'prev_freq' parameter.
+
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	if (!devfreq->governor)
+>  		return 0;
+>  
+> 
+
+
 -- 
-2.7.4
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
