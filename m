@@ -1,131 +1,61 @@
-From: jjian.zhou@mediatek.com (Jjian Zhou)
-Date: Thu, 22 Nov 2018 16:03:00 +0800
-Subject: [PATCH v2] mmc: mediatek: add MT8183 SDIO driver support
-Message-ID: <1542873780-13911-1-git-send-email-jjian.zhou@mediatek.com>
+From: r.schwebel@pengutronix.de (Robert Schwebel)
+Date: Thu, 22 Nov 2018 09:17:04 +0100
+Subject: [PATCH] MAINTAINERS: add all files matching "imx" and "mxs" to
+ the IMX entry
+In-Reply-To: <20181122075742.31966-1-u.kleine-koenig@pengutronix.de>
+References: <20181122075742.31966-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <20181122081704.pk6oqw664ewpkenm@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8183 need SDIO driver. So it need add new code
-to support it.
+On Thu, Nov 22, 2018 at 08:57:42AM +0100, Uwe Kleine-K?nig wrote:
+> This way also the spi, i2c and other drivers are covered.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> Hello,
+> 
+> I was surprised by changes to the spi-imx driver[1]. To lessen the
+> chances that this happens again, I like making the IMX entry match all
+> relevant drivers.
+> 
+> Best regards
+> Uwe
+> 
+> [1] FTR: I didn't test yet, but I think
+> 987a2dfe3f0485a82d87106e7e1c43f35c1d3b09 broke i.MX31 and i.MX35. Even
+> though a later patch made spi_imx_dma_transfer fail if .setup_wml isn't
+> provided, I guess this only changes from a NULL pointer exception to a
+> non-functional driver.
+> 
+>  MAINTAINERS | 11 ++---------
+>  1 file changed, 2 insertions(+), 9 deletions(-)
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index b755a89fa325..cb9cbaa1ba19 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1517,15 +1517,8 @@ R:	NXP Linux Team <linux-imx@nxp.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  S:	Maintained
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git
+> -F:	arch/arm/mach-imx/
+> -F:	arch/arm/mach-mxs/
+> -F:	arch/arm/boot/dts/imx*
+> -F:	arch/arm/configs/imx*_defconfig
+> -F:	drivers/clk/imx/
+> -F:	drivers/firmware/imx/
+> -F:	drivers/soc/imx/
+> -F:	include/linux/firmware/imx/
+> -F:	include/soc/imx/
+> +N:	imx
+> +N:	mxs
 
-Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
-Signed-off-by: Yong mao <yong.mao@mediatek.com>
-Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
----
- drivers/mmc/host/mtk-sd.c | 51 ++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 48 insertions(+), 3 deletions(-)
+This probably also matches drivers/media/i2c/*imx*, no?
 
-diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-index 6334cc7..da2a047 100644
---- a/drivers/mmc/host/mtk-sd.c
-+++ b/drivers/mmc/host/mtk-sd.c
-@@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
- 		struct mmc_request *mrq, struct mmc_command *cmd)
- {
- 	u32 rawcmd;
-+	unsigned long flags;
-
- 	WARN_ON(host->cmd);
- 	host->cmd = cmd;
-@@ -1131,7 +1132,12 @@ static void msdc_start_command(struct msdc_host *host,
- 	cmd->error = 0;
- 	rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
-
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		spin_lock_irqsave(&host->lock, flags);
- 	sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		spin_unlock_irqrestore(&host->lock, flags);
-+
- 	writel(cmd->arg, host->base + SDC_ARG);
- 	writel(rawcmd, host->base + SDC_CMD);
- }
-@@ -1351,6 +1357,27 @@ static void msdc_request_timeout(struct work_struct *work)
- 	}
- }
-
-+static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-+{
-+	unsigned long flags;
-+	struct msdc_host *host = mmc_priv(mmc);
-+
-+	if (enb)
-+		pm_runtime_get_sync(host->dev);
-+
-+	spin_lock_irqsave(&host->lock, flags);
-+	if (enb)
-+		sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	else
-+		sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-+	spin_unlock_irqrestore(&host->lock, flags);
-+
-+	if (!enb) {
-+		pm_runtime_mark_last_busy(host->dev);
-+		pm_runtime_put_autosuspend(host->dev);
-+	}
-+}
-+
- static irqreturn_t msdc_irq(int irq, void *dev_id)
- {
- 	struct msdc_host *host = (struct msdc_host *) dev_id;
-@@ -1373,7 +1400,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
- 		data = host->data;
- 		spin_unlock_irqrestore(&host->lock, flags);
-
--		if (!(events & event_mask))
-+		if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
-+			msdc_enable_sdio_irq(host->mmc, 0);
-+			sdio_signal_irq(host->mmc);
-+		}
-+
-+		if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
- 			break;
-
- 		if (!mrq) {
-@@ -1493,8 +1525,11 @@ static void msdc_init_hw(struct msdc_host *host)
- 	 */
- 	sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
-
--	/* disable detect SDIO device interrupt function */
--	sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	/* Config SDIO device detect interrupt function */
-+	if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-+		sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-+	else
-+		sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-
- 	/* Configure to default data timeout */
- 	sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-@@ -2013,6 +2048,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	sdr_clr_bits(host->base + EMMC_IOCON, 1);
- }
-
-+static void msdc_ack_sdio_irq(struct mmc_host *mmc)
-+{
-+	msdc_enable_sdio_irq(mmc, 1);
-+}
-+
- static const struct mmc_host_ops mt_msdc_ops = {
- 	.post_req = msdc_post_req,
- 	.pre_req = msdc_pre_req,
-@@ -2020,6 +2060,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
- 	.set_ios = msdc_ops_set_ios,
- 	.get_ro = mmc_gpio_get_ro,
- 	.get_cd = mmc_gpio_get_cd,
-+	.enable_sdio_irq = msdc_enable_sdio_irq,
-+	.ack_sdio_irq = msdc_ack_sdio_irq,
- 	.start_signal_voltage_switch = msdc_ops_switch_volt,
- 	.card_busy = msdc_card_busy,
- 	.execute_tuning = msdc_execute_tuning,
-@@ -2147,6 +2189,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
- 	else
- 		mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
-
-+	if (mmc->caps & MMC_CAP_SDIO_IRQ)
-+		mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-+
- 	mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
- 	/* MMC core transfer sizes tunable parameters */
- 	mmc->max_segs = MAX_BD_NUM;
---
-1.9.1
+rsc
+-- 
+Pengutronix e.K.                           | Dipl.-Ing. Robert Schwebel  |
+Industrial Linux Solutions                 | https://www.pengutronix.de/ |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
