@@ -1,65 +1,40 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 22 Nov 2018 22:08:00 +0100
-Subject: [PATCH v2 1/2] bpf: add __weak hook for allocating executable
- memory
-In-Reply-To: <201811230404.yavKPUOn%fengguang.wu@intel.com>
-References: <20181121131733.14910-2-ard.biesheuvel@linaro.org>
- <201811230404.yavKPUOn%fengguang.wu@intel.com>
-Message-ID: <800264DE-658A-46B4-8FA1-CD1CF314AA7A@linaro.org>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Thu, 22 Nov 2018 22:22:10 +0100
+Subject: [PATCH 0/2] Link consumer with clock driver
+Message-ID: <20181122212212.16039-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
+
+While working on suspend to RAM feature, I ran into troubles multiple
+times when clocks where not suspending/resuming at the desired time. I
+had a look at the core and I think the same logic as in the
+regulator's core may be applied here to (very easily) fix this issue:
+using device links.
+
+The only additional change I had to do was to always (when available)
+populate the device entry of the core clock structure so that it could
+be used later. This is the purpose of patch 1. Patch 2 actually adds
+support for device links.
+
+As I am not used to hack into the clock subsystem I might have missed
+something big preventing such change but so far I could not see
+anything wrong with it. As this touches core code, I am of course
+entirely open to suggestions.
+
+Thanks,
+Miqu?l
 
 
-> On 22 Nov 2018, at 21:01, kbuild test robot <lkp@intel.com> wrote:
-> 
-> Hi Ard,
-> 
-> I love your patch! Yet something to improve:
-> 
+Miquel Raynal (2):
+  clk: core: clarify the check for runtime PM
+  clk: core: link consumer with clock driver
 
-Ugh, apologies for this. I?m sure i build tested /something/ but clearly not what i should have tested.
+ drivers/clk/clk.c            | 31 +++++++++++++++++++++++++------
+ drivers/clk/clkdev.c         | 13 ++++++++++---
+ include/linux/clk-provider.h |  2 ++
+ 3 files changed, 37 insertions(+), 9 deletions(-)
 
-In any case, following up on the discussion I?ll have to respin this in any case. I?ll triple check next time that what i send out was tested properly.
-
-
-> [auto build test ERROR on bpf-next/master]
-> [also build test ERROR on v4.20-rc3 next-20181122]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/bpf-permit-JIT-allocations-to-be-served-outside-the-module-region/20181123-033144
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git master
-> config: x86_64-randconfig-x002-201846 (attached as .config)
-> compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-> reproduce:
->        # save the attached .config to linux build tree
->        make ARCH=x86_64 
-> 
-> All error/warnings (new ones prefixed by >>):
-> 
->   kernel//bpf/core.c: In function 'bpf_jit_free_exec':
->>> kernel//bpf/core.c:632:24: error: 'size' undeclared (first use in this function); did you mean 'ksize'?
->     return module_memfree(size);
->                           ^~~~
->                           ksize
->   kernel//bpf/core.c:632:24: note: each undeclared identifier is reported only once for each function it appears in
->>> kernel//bpf/core.c:632:9: warning: 'return' with a value, in function returning void
->     return module_memfree(size);
->            ^~~~~~~~~~~~~~
->   kernel//bpf/core.c:630:13: note: declared here
->    void __weak bpf_jit_free_exec(const void *addr)
->                ^~~~~~~~~~~~~~~~~
-> 
-> vim +632 kernel//bpf/core.c
-> 
->   629    
->   630    void __weak bpf_jit_free_exec(const void *addr)
->   631    {
->> 632        return module_memfree(size);
->   633    }
->   634    
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> <.config.gz>
+-- 
+2.19.1
