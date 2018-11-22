@@ -1,37 +1,76 @@
-From: kys@linuxonhyperv.com (kys at linuxonhyperv.com)
-Date: Thu, 22 Nov 2018 03:10:59 +0000
-Subject: [PATCH 4/4] Drivers: hv: Enable CONFIG_HYPERV on ARM64
-In-Reply-To: <20181122031059.16338-1-kys@linuxonhyperv.com>
-References: <20181122030914.16274-1-kys@linuxonhyperv.com>
- <20181122031059.16338-1-kys@linuxonhyperv.com>
-Message-ID: <20181122031059.16338-4-kys@linuxonhyperv.com>
+From: yogeshnarayan.gaur@nxp.com (Yogesh Narayan Gaur)
+Date: Thu, 22 Nov 2018 05:14:25 +0000
+Subject: [PATCH v4 0/7] spi: add support for octo mode
+Message-ID: <1542863544-21257-1-git-send-email-yogeshnarayan.gaur@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Michael Kelley <mikelley@microsoft.com>
+Add support for octo mode IO data transfer.
+Micron flash, mt35xu512aba, supports octal mode data transfer and
+NXP FlexSPI controller supports 8 data lines for data transfer (Rx/Tx).
 
-Update drivers/hv/Kconfig so CONFIG_HYPERV can be selected on ARM64,
-causing the Hyper-V specific code to be built.
+Patch series
+* Add support for octo mode flags and parsing of same in spi driver.
+* Add parsing logic for spi-mem framework and m25p80.c device file.
+* Add opcodes for octo I/O commands in spi-nor framework, Read and Write proto for (1-1-8/1-8-8) mode.
+  Opcodes are added as per octal data IO commands required for mt35xu512aba [1] flash.
+* Add mode bit required for octo mode in nxp-fspi driver [2].
+* Define binding property 'spi-rx/tx-bus-width' for LX2160ARDB target [2].
 
-Signed-off-by: Michael Kelley <mikelley@microsoft.com>
-Signed-off-by: K. Y. Srinivasan <kys@microsoft.com>
----
- drivers/hv/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Tested on LX2160ARDB target with nxp-fspi driver, below are
+Read performance number of 1-1-1 and 1-1-8 read protocol.
 
-diff --git a/drivers/hv/Kconfig b/drivers/hv/Kconfig
-index 97954f575c3f..c3e11a2f9c70 100644
---- a/drivers/hv/Kconfig
-+++ b/drivers/hv/Kconfig
-@@ -4,7 +4,8 @@ menu "Microsoft Hyper-V guest support"
- 
- config HYPERV
- 	tristate "Microsoft Hyper-V client drivers"
--	depends on X86 && ACPI && PCI && X86_LOCAL_APIC && HYPERVISOR_GUEST
-+	depends on ACPI && PCI && \
-+			((X86 && X86_LOCAL_APIC && HYPERVISOR_GUEST) || ARM64)
- 	select PARAVIRT
- 	help
- 	  Select this option to run Linux as a Hyper-V client operating
+ root at lxxx:~# cat /proc/mtd
+ dev:    size   erasesize  name
+ mtd0: 04000000 00001000 "spi0.0"
+ mtd1: 04000000 00001000 "spi0.1"
+ root at lxxx:~# time mtd_debug read /dev/mtd0 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
+
+ real    0m2.792s
+ user    0m0.000s
+ sys     0m2.790s
+ root at lxxx:~# time mtd_debug read /dev/mtd1 0x0 0x1000000 0read
+ Copied 16777216 bytes from address 0x00000000 in flash to 0read
+
+ real    0m0.441s
+ user    0m0.000s
+ sys     0m0.440s
+ root at ls1012ardb:~#
+
+ Flash device MTD0 configured in 1-1-1 protocol.
+ Flash device MTD1 configured in 1-1-8 protocol.
+
+[1] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=70384&state=*
+[2] https://patchwork.ozlabs.org/project/linux-mtd/list/?series=76402
+
+Yogesh Gaur (7):
+  spi: add support for octo mode I/O data transfer
+  spi: spi-mem: add support for octo mode I/O data transfer
+  mtd: spi-nor: add opcodes for octo Read/Write commands
+  mtd: spi-nor: add octo read flag for flash mt35xu512aba
+  mtd: m25p80: add support of octo mode I/O transfer
+  spi: nxp-fspi: add octo mode flag bit for octal support
+  arm64: dts: lx2160a: update fspi node
+
+Changes for v4:
+- Rebase on top of v4.20-rc2.
+- Modify octo entries enum value in spi.h.
+Changes for v3:
+- Add octo mode support in spi_setup().
+- Rename all patches with 'octal' string modified as 'octo'.
+Changes for v2:
+- Incorporated review comments of Boris and Vignesh.
+
+ arch/arm64/boot/dts/freescale/fsl-lx2160a-rdb.dts |  4 ++++
+ drivers/mtd/devices/m25p80.c                      |  9 ++++++++-
+ drivers/mtd/spi-nor/spi-nor.c                     | 15 ++++++++++++++-
+ drivers/spi/spi-mem.c                             |  9 ++++++++-
+ drivers/spi/spi-nxp-fspi.c                        |  4 ++--
+ drivers/spi/spi.c                                 | 12 ++++++++++--
+ include/linux/mtd/spi-nor.h                       |  8 ++++++++
+ include/linux/spi/spi.h                           |  4 +++-
+ 8 files changed, 57 insertions(+), 8 deletions(-)
+
 -- 
-2.19.1
+2.7.4
