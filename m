@@ -1,135 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 23 Nov 2018 17:43:52 +0000
-Subject: [PATCH v11 05/24] kasan: add CONFIG_KASAN_GENERIC and
- CONFIG_KASAN_SW_TAGS
-In-Reply-To: <356c34c9a2ae8348a6cbd1de53135a28187fa120.1542648335.git.andreyknvl@google.com>
-References: <cover.1542648335.git.andreyknvl@google.com>
- <356c34c9a2ae8348a6cbd1de53135a28187fa120.1542648335.git.andreyknvl@google.com>
-Message-ID: <20181123174352.ri3qo3wx2irm6hzj@lakrids.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Nov 2018 17:50:20 +0000
+Subject: [RESEND PATCH v3 2/2] PCI: uniphier: Add UniPhier PCIe host
+ controller support
+In-Reply-To: <20181120211531.3607.4A936039@socionext.com>
+References: <1539667641-26024-3-git-send-email-hayashi.kunihiko@socionext.com>
+ <20181119161653.GA32232@e107981-ln.cambridge.arm.com>
+ <20181120211531.3607.4A936039@socionext.com>
+Message-ID: <20181123174754.GA9772@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 06:26:21PM +0100, Andrey Konovalov wrote:
-> This commit splits the current CONFIG_KASAN config option into two:
-> 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
->    that exists now);
-> 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
+On Tue, Nov 20, 2018 at 09:15:31PM +0900, Kunihiko Hayashi wrote:
+
+[...]
+
+> > > +static int uniphier_pcie_link_up(struct dw_pcie *pci)
+> > 
+> > This function returns a bool value, make it return a bool.
 > 
-> The name CONFIG_KASAN_SW_TAGS is chosen as in the future we will have
-> another hardware tag-based KASAN mode, that will rely on hardware memory
-> tagging support in arm64.
+> This function is registered in struct dw_pcie_ops.link_up, that is defined
+> in pcie-designware.h as follows:
 > 
-> With CONFIG_KASAN_SW_TAGS enabled, compiler options are changed to
-> instrument kernel files with -fsantize=kernel-hwaddress (except the ones
-> for which KASAN_SANITIZE := n is set).
+>        int     (*link_up)(struct dw_pcie *pcie);
 > 
-> Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_SW_TAGS support both
-> CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
-> 
-> This commit also adds empty placeholder (for now) implementation of
-> tag-based KASAN specific hooks inserted by the compiler and adjusts
-> common hooks implementation to compile correctly with each of the
-> config options.
-> 
-> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
-> ---
->  arch/arm64/Kconfig                  |  1 +
->  include/linux/compiler-clang.h      |  5 +-
->  include/linux/compiler-gcc.h        |  6 ++
->  include/linux/compiler_attributes.h | 13 ----
->  include/linux/kasan.h               | 16 +++--
->  lib/Kconfig.kasan                   | 96 +++++++++++++++++++++++------
->  mm/kasan/Makefile                   |  6 +-
->  mm/kasan/generic.c                  |  2 +-
->  mm/kasan/kasan.h                    |  3 +-
->  mm/kasan/tags.c                     | 75 ++++++++++++++++++++++
->  mm/slub.c                           |  2 +-
->  scripts/Makefile.kasan              | 53 +++++++++-------
->  12 files changed, 216 insertions(+), 62 deletions(-)
->  create mode 100644 mm/kasan/tags.c
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 787d7850e064..8b331dcfb48e 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -111,6 +111,7 @@ config ARM64
->  	select HAVE_ARCH_JUMP_LABEL
->  	select HAVE_ARCH_JUMP_LABEL_RELATIVE
->  	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-> +	select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+> Changing the return type of this function makes type mismatch,
+> so I think it's difficult to change it.
 
-> --- a/lib/Kconfig.kasan
-> +++ b/lib/Kconfig.kasan
-> @@ -1,35 +1,95 @@
-> +# This config refers to the generic KASAN mode.
->  config HAVE_ARCH_KASAN
->  	bool
->  
-> +config HAVE_ARCH_KASAN_SW_TAGS
-> +	bool
-> +
-> +config CC_HAS_KASAN_GENERIC
-> +	def_bool $(cc-option, -fsanitize=kernel-address)
-> +
-> +config CC_HAS_KASAN_SW_TAGS
-> +	def_bool $(cc-option, -fsanitize=kernel-hwaddress)
-
-> +if HAVE_ARCH_KASAN_SW_TAGS
-> +
-> +config KASAN_SW_TAGS
-> +	bool "Software tag-based mode"
-> +	depends on CC_HAS_KASAN_SW_TAGS
-> +	depends on (SLUB && SYSFS) || (SLAB && !DEBUG_SLAB)
-> +	select SLUB_DEBUG if SLUB
-> +	select CONSTRUCTORS
-> +	select STACKDEPOT
-> +	help
-> +	  Enables software tag-based KASAN mode.
-> +	  This mode requires Top Byte Ignore support by the CPU and therefore
-> +	  is only supported for arm64.
-> +	  This mode requires Clang version 7.0.0 or later.
-> +	  This mode consumes about 1/16th of available memory at kernel start
-> +	  and introduces an overhead of ~20% for the rest of the allocations.
-> +	  This mode may potentially introduce problems relating to pointer
-> +	  casting and comparison, as it embeds tags into the top byte of each
-> +	  pointer.
-> +	  For better error detection enable CONFIG_STACKTRACE.
-> +	  Currently CONFIG_KASAN_SW_TAGS doesn't work with CONFIG_DEBUG_SLAB
-> +	  (the resulting kernel does not boot).
-> +
-> +endif
-
-IIUC as of this patch a user can select KASAN_SW_TAGS...
-
-> +ifdef CONFIG_KASAN_SW_TAGS
-> +
-> +ifdef CONFIG_KASAN_INLINE
-> +    instrumentation_flags := -mllvm -hwasan-mapping-offset=$(KASAN_SHADOW_OFFSET)
-> +else
-> +    instrumentation_flags := -mllvm -hwasan-instrument-with-calls=1
-> +endif
-> +
-> +CFLAGS_KASAN := -fsanitize=kernel-hwaddress \
-> +		-mllvm -hwasan-instrument-stack=0 \
-> +		$(instrumentation_flags)
-> +
-> +endif # CONFIG_KASAN_SW_TAGS
-
-... and therefore we start using the compiler option, even though we
-haven't introduced all of the necessary infrastructure yet.
-
-That doesn't sound right to me. At the very least, that breaks
-randconfig builds.
-
-What we can do, in-order, is:
-
-1) introduce the core refactoring, dependent on HAVE_ARCH_KASAN_SW_TAGS
-2) instroduce the new infrastructure and arch code
-3) select HAVE_ARCH_KASAN_SW_TAGS
-
-... such that at (3), all KASAN configurations are known to work.
+You are right, it is fine.
 
 Thanks,
-Mark.
+Lorenzo
