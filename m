@@ -1,54 +1,36 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 23 Nov 2018 09:44:11 +0000
-Subject: [PATCH 1/3] clk: samsung: exynos5420: add VPLL rate table for g3d
- clock
-Message-ID: <20181123094413.1108-1-linux.amoon@gmail.com>
+Date: Fri, 23 Nov 2018 09:44:12 +0000
+Subject: [PATCH 2/3] clk: samsung: exynos5420: Add CLK_SET_RATE_PARENT flag to
+ mout_sclk_vpll
+In-Reply-To: <20181123094413.1108-1-linux.amoon@gmail.com>
+References: <20181123094413.1108-1-linux.amoon@gmail.com>
+Message-ID: <20181123094413.1108-2-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marian Mihailescu <mihailescu2m@gmail.com>
-
-A specific clock rate table is added for VPLL so it is possible
-to set frequency of the VPLL output clock that used by the g3d clock.
+This allows changing the VPLL output frequency through the g3d subsystem
+clock tree leaf clocks.
 
 Cc: Andrzej Hajda <a.hajda@samsung.com>
 Cc: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/clk/samsung/clk-exynos5420.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 34cce3c5898f..34156bdfd0d2 100644
+index 34156bdfd0d2..6bf1b2e89106 100644
 --- a/drivers/clk/samsung/clk-exynos5420.c
 +++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -1303,6 +1303,18 @@ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
- 	PLL_36XX_RATE(24 * MHZ,  32768001U, 131, 3, 5, 4719),
- };
+@@ -647,7 +647,8 @@ static const struct samsung_mux_clock exynos5x_mux_clks[] __initconst = {
+ 			mout_user_aclk300_gscl_p, SRC_TOP5, 28, 1),
  
-+static const struct samsung_pll_rate_table exynos5420_vpll_24mhz_tbl[] __initconst = {
-+	PLL_35XX_RATE(24 * MHZ, 600000000U, 200, 2, 2),
-+	PLL_35XX_RATE(24 * MHZ, 543000000U, 181, 2, 2),
-+	PLL_35XX_RATE(24 * MHZ, 533000000U, 533, 6, 2),
-+	PLL_35XX_RATE(24 * MHZ, 480000000U, 320, 4, 2),
-+	PLL_35XX_RATE(24 * MHZ, 420000000U, 140, 2, 2),
-+	PLL_35XX_RATE(24 * MHZ, 350000000U, 175, 3, 2),
-+	PLL_35XX_RATE(24 * MHZ, 266000000U, 266, 3, 3),
-+	PLL_35XX_RATE(24 * MHZ, 177000000U, 118, 2, 3),
-+	PLL_35XX_RATE(24 * MHZ, 100000000U, 200, 3, 4),
-+};
-+
- static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
- 	[apll] = PLL(pll_2550, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, NULL),
-@@ -1428,6 +1440,7 @@ static void __init exynos5x_clk_init(struct device_node *np,
- 		exynos5x_plls[epll].rate_table = exynos5420_epll_24mhz_tbl;
- 		exynos5x_plls[kpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
- 		exynos5x_plls[bpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
-+		exynos5x_plls[vpll].rate_table = exynos5420_vpll_24mhz_tbl;
- 	}
- 
- 	samsung_clk_register_pll(ctx, exynos5x_plls, ARRAY_SIZE(exynos5x_plls),
+ 	MUX(0, "mout_sclk_mpll", mout_mpll_p, SRC_TOP6, 0, 1),
+-	MUX(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
++	MUX_F(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1,
++			CLK_SET_RATE_PARENT, 0),
+ 	MUX(0, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
+ 	MUX(0, "mout_sclk_ipll", mout_ipll_p, SRC_TOP6, 12, 1),
+ 	MUX(0, "mout_sclk_rpll", mout_rpll_p, SRC_TOP6, 16, 1),
 -- 
 2.17.1
