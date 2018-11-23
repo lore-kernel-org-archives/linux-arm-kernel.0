@@ -1,68 +1,62 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Nov 2018 23:18:02 +0100
-Subject: [PATCH v4 0/2] bpf: permit JIT allocations to be served outside the
- module region
-Message-ID: <20181123221804.440-1-ard.biesheuvel@linaro.org>
+Date: Fri, 23 Nov 2018 23:18:03 +0100
+Subject: [PATCH v4 1/2] bpf: add __weak hook for allocating executable memory
+In-Reply-To: <20181123221804.440-1-ard.biesheuvel@linaro.org>
+References: <20181123221804.440-1-ard.biesheuvel@linaro.org>
+Message-ID: <20181123221804.440-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, modules are allocated from a 128 MB window which is close to
-the core kernel, so that relative direct branches are guaranteed to be
-in range (except in some KASLR configurations). Also, module_alloc()
-is in charge of allocating KASAN shadow memory when running with KASAN
-enabled.
+By default, BPF uses module_alloc() to allocate executable memory,
+but this is not necessary on all arches and potentially undesirable
+on some of them.
 
-This means that the way BPF reuses module_alloc()/module_memfree() is
-undesirable on arm64 (and potentially other architectures as well),
-and so this series refactors BPF's use of those functions to permit
-architectures to change this behavior.
+So break out the module_alloc() and module_memfree() calls into __weak
+functions to allow them to be overridden in arch code.
 
-Patch #1 breaks out the module_alloc() and module_memfree() calls into
-__weak functions so they can be overridden.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ kernel/bpf/core.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Patch #2 implements the new alloc/free overrides for arm64
-
-Changes since v3:
-- drop 'const' modifier for free() hook void* argument
-- move the dedicated BPF region to before the module region, putting it
-  within 4GB of the module and kernel regions on non-KASLR kernels
-
-Changes since v2:
-- properly build time and runtime tested this time (log after the diffstat)
-- create a dedicated 128 MB region at the top of the vmalloc space for BPF
-  programs, ensuring that the programs will be in branching range of each
-  other (which we currently rely upon) but at an arbitrary distance from
-  the kernel and modules (which we don't care about)
-
-Changes since v1:
-- Drop misguided attempt to 'fix' and refactor the free path. Instead,
-  just add another __weak wrapper for the invocation of module_memfree()
-
-Cc: Daniel Borkmann <daniel@iogearbox.net>
-Cc: Alexei Starovoitov <ast@kernel.org>
-Cc: Rick Edgecombe <rick.p.edgecombe@intel.com>
-Cc: Eric Dumazet <eric.dumazet@gmail.com>
-Cc: Jann Horn <jannh@google.com>
-Cc: Kees Cook <keescook@chromium.org>
-
-Cc: Jessica Yu <jeyu@kernel.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: "David S. Miller" <davem@davemloft.net>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Cc: netdev at vger.kernel.org
-
-Ard Biesheuvel (2):
-  bpf: add __weak hook for allocating executable memory
-  arm64/bpf: don't allocate BPF JIT programs in module memory
-
- arch/arm64/include/asm/memory.h |  5 ++++-
- arch/arm64/net/bpf_jit_comp.c   | 13 +++++++++++++
- kernel/bpf/core.c               | 14 ++++++++++++--
- 3 files changed, 29 insertions(+), 3 deletions(-)
-
+diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
+index 1a796e0799ec..78e9b76201b3 100644
+--- a/kernel/bpf/core.c
++++ b/kernel/bpf/core.c
+@@ -609,6 +609,16 @@ static void bpf_jit_uncharge_modmem(u32 pages)
+ 	atomic_long_sub(pages, &bpf_jit_current);
+ }
+ 
++void *__weak bpf_jit_alloc_exec(unsigned long size)
++{
++	return module_alloc(size);
++}
++
++void __weak bpf_jit_free_exec(void *addr)
++{
++	module_memfree(addr);
++}
++
+ struct bpf_binary_header *
+ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+ 		     unsigned int alignment,
+@@ -626,7 +636,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+ 
+ 	if (bpf_jit_charge_modmem(pages))
+ 		return NULL;
+-	hdr = module_alloc(size);
++	hdr = bpf_jit_alloc_exec(size);
+ 	if (!hdr) {
+ 		bpf_jit_uncharge_modmem(pages);
+ 		return NULL;
+@@ -650,7 +660,7 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+ {
+ 	u32 pages = hdr->pages;
+ 
+-	module_memfree(hdr);
++	bpf_jit_free_exec(hdr);
+ 	bpf_jit_uncharge_modmem(pages);
+ }
+ 
 -- 
 2.19.1
