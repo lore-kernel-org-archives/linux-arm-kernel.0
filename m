@@ -1,168 +1,55 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 23 Nov 2018 10:57:06 +0100
-Subject: [PATCH 4/4] arm64: KVM: Implement workaround for Cortex-A76
- erratum 1165522
-In-Reply-To: <11733182-4e0a-5607-268e-73b8d00fbcee@arm.com>
-References: <20181105143617.120602-1-marc.zyngier@arm.com>
- <20181105143617.120602-5-marc.zyngier@arm.com>
- <20181106081546.GH12057@e113682-lin.lund.arm.com>
- <ec7d0e34-022f-125e-00b4-b06be23ee2a8@arm.com>
- <20181108201054.GG3835@e113682-lin.lund.arm.com>
- <11733182-4e0a-5607-268e-73b8d00fbcee@arm.com>
-Message-ID: <20181123095706.GA3331@e113682-lin.lund.arm.com>
+From: hpa@zytor.com (hpa at zytor.com)
+Date: Fri, 23 Nov 2018 01:57:12 -0800
+Subject: Sleeping in user_access section
+In-Reply-To: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
+References: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
+Message-ID: <5B3B6AF9-9D8C-4577-905E-D407A5E7D0E3@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 04:13:16PM +0000, Marc Zyngier wrote:
-> On 08/11/2018 20:10, Christoffer Dall wrote:
-> > On Thu, Nov 08, 2018 at 06:05:55PM +0000, Marc Zyngier wrote:
-> >> On 06/11/18 08:15, Christoffer Dall wrote:
-> >>> On Mon, Nov 05, 2018 at 02:36:16PM +0000, Marc Zyngier wrote:
-> >>>> Early versions of Cortex-A76 can end-up with corrupt TLBs if they
-> >>>> speculate an AT instruction in during a guest switch while the
-> >>>> S1/S2 system registers are in an inconsistent state.
-> >>>>
-> >>>> Work around it by:
-> >>>> - Mandating VHE
-> >>>> - Make sure that S1 and S2 system registers are consistent before
-> >>>>   clearing HCR_EL2.TGE, which allows AT to target the EL1 translation
-> >>>>   regime
-> >>>>
-> >>>> These two things together ensure that we cannot hit this erratum.
-> >>>>
-> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> ---
-> >>>>  Documentation/arm64/silicon-errata.txt |  1 +
-> >>>>  arch/arm64/Kconfig                     | 12 ++++++++++++
-> >>>>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
-> >>>>  arch/arm64/include/asm/kvm_host.h      |  3 +++
-> >>>>  arch/arm64/include/asm/kvm_hyp.h       |  6 ++++++
-> >>>>  arch/arm64/kernel/cpu_errata.c         |  8 ++++++++
-> >>>>  arch/arm64/kvm/hyp/switch.c            | 14 ++++++++++++++
-> >>>>  7 files changed, 46 insertions(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> >>>> index 76ccded8b74c..04f0bc4690c6 100644
-> >>>> --- a/Documentation/arm64/silicon-errata.txt
-> >>>> +++ b/Documentation/arm64/silicon-errata.txt
-> >>>> @@ -57,6 +57,7 @@ stable kernels.
-> >>>>  | ARM            | Cortex-A73      | #858921         | ARM64_ERRATUM_858921        |
-> >>>>  | ARM            | Cortex-A55      | #1024718        | ARM64_ERRATUM_1024718       |
-> >>>>  | ARM            | Cortex-A76      | #1188873        | ARM64_ERRATUM_1188873       |
-> >>>> +| ARM            | Cortex-A76      | #1165522        | ARM64_ERRATUM_1165522       |
-> >>>>  | ARM            | MMU-500         | #841119,#826419 | N/A                         |
-> >>>>  |                |                 |                 |                             |
-> >>>>  | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375        |
-> >>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> >>>> index 787d7850e064..a68bc6cc2167 100644
-> >>>> --- a/arch/arm64/Kconfig
-> >>>> +++ b/arch/arm64/Kconfig
-> >>>> @@ -497,6 +497,18 @@ config ARM64_ERRATUM_1188873
-> >>>>  
-> >>>>  	  If unsure, say Y.
-> >>>>  
-> >>>> +config ARM64_ERRATUM_1165522
-> >>>> +	bool "Cortex-A76: Speculative AT instruction using out-of-context translation regime could cause subsequent request to generate an incorrect translation"
-> >>>> +	default y
-> >>>> +	help
-> >>>> +	  This option adds work arounds for ARM Cortex-A76 erratum 1165522
-> >>>> +
-> >>>> +	  Affected Cortex-A76 cores (r0p0, r1p0, r2p0) could end-up with
-> >>>> +	  corrupted TLBs by speculating an AT instruction during a guest
-> >>>> +	  context switch.
-> >>>> +
-> >>>> +	  If unsure, say Y.
-> >>>> +
-> >>>>  config CAVIUM_ERRATUM_22375
-> >>>>  	bool "Cavium erratum 22375, 24313"
-> >>>>  	default y
-> >>>> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> >>>> index 6e2d254c09eb..62d8cd15fdf2 100644
-> >>>> --- a/arch/arm64/include/asm/cpucaps.h
-> >>>> +++ b/arch/arm64/include/asm/cpucaps.h
-> >>>> @@ -54,7 +54,8 @@
-> >>>>  #define ARM64_HAS_CRC32				33
-> >>>>  #define ARM64_SSBS				34
-> >>>>  #define ARM64_WORKAROUND_1188873		35
-> >>>> +#define ARM64_WORKAROUND_1165522		36
-> >>>>  
-> >>>> -#define ARM64_NCAPS				36
-> >>>> +#define ARM64_NCAPS				37
-> >>>>  
-> >>>>  #endif /* __ASM_CPUCAPS_H */
-> >>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>> index 7d6e974d024a..8f486026ac87 100644
-> >>>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>>> @@ -435,6 +435,9 @@ static inline bool kvm_arch_sve_requires_vhe(void)
-> >>>>  static inline bool kvm_arch_impl_requires_vhe(void)
-> >>>>  {
-> >>>>  	/* Some implementations have defects that confine them to VHE */
-> >>>> +	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
-> >>>> +		return true;
-> >>>> +
-> >>>>  	return false;
-> >>>>  }
-> >>>>  
-> >>>> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> >>>> index 23aca66767f9..9681360d0959 100644
-> >>>> --- a/arch/arm64/include/asm/kvm_hyp.h
-> >>>> +++ b/arch/arm64/include/asm/kvm_hyp.h
-> >>>> @@ -163,6 +163,12 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
-> >>>>  {
-> >>>>  	write_sysreg(kvm->arch.vtcr, vtcr_el2);
-> >>>>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-> >>>> +
-> >>>> +	/*
-> >>>> +	 * ARM erratum 1165522 requires the actual execution of the
-> >>>> +	 * above before we can switch to the guest translation regime.
-> >>>> +	 */
-> >>>
-> >>> Is it about a guest translation 'regime' or should this just say before
-> >>> we can enable stage 2 translation?
-> >>
-> >> No, this isn't strictly about enabling stage-2 translation. This is
-> >> about making sure that anything that impacts the guest translations is
-> >> actually executed.
-> >>
-> >> I wonder if it would be clearer to move this outside of
-> >> __load_guest_stage2 and make it explicit in the callers of this helper...
-> > 
-> > I think it makes sense to have this here to explain the alternative.
-> > 
-> > But it's the 'switch to guest translation regime' thing that bothers me
-> > a bit.  Is that an architectural concept (I thought we only had EL1 and
-> > EL2 translation regimes in stage 1, and then stage 2 translations).  So
-> > When you say 'guest translation regime' I'm just not entirely sure what
-> > that means, unless I'm missing something.
-> 
-> [coming back to this as I'm preparing the next round]
-> 
-> What I'm trying to convey by "guest translation regime" is the following
-> from the ARM ARM:
-> 
-> C5.4.7 AT S1E1R, Address Translate Stage 1 EL1 Read
-> [...]
-> 
-> When EL2 is implemented and enabled in the current Security state:
-> ? If HCR_EL2.{E2H, TGE} is not {1, 1}, the EL1&0 translation regime,
-> accessed from EL1.
-> ? If HCR_EL2.{E2H, TGE} is {1, 1}, the EL2&0 translation regime,
-> accessed from EL2.
-> 
-> So maybe I should just bite the bullet and call out EL1/EL2 translation
-> regime instead of guest/host.
-> 
+On November 23, 2018 1:27:02 AM PST, Julien Thierry <julien.thierry@arm.com> wrote:
+>Hi,
+>
+>I made an attempt at implementing the 
+>user_access_begin()/user_access_end() macros along with the 
+>get/put_user_unsafe() for arm64 by toggling the status of PAN (more or 
+>less similar to x86's STAC/CTAC).
+>
+>With a small mistake in my patch, we realized that directly calling 
+>function that could reschedule while in a user_access section could
+>lead to:
+>
+>- scheduling another task keeping the user_access status enabled
+>despite 
+>the task never calling user_access_begin()
+>
+>- when re-scheduling the task that was mid user_access section, 
+>user_access would be disabled and the task would fault on the next 
+>get/put_user_unsafe.
+>
+>
+>This is because __switch_to does not alter the user_access status when 
+>switching from next to prev (at least on arm64 we currently don't, and 
+>by looking at the x86 code I don't think this is done either).
+>
+>
+> From my understanding, this is not an issue when the task in 
+>user_access mode gets scheduled out/in as a result of an interrupt as 
+>PAN and EFLAGS.AC get saved/restore on exception entry/exit (at least I
+>
+>know it is the case for PAN, I am less sure for the x86 side).
+>
+>
+>So, the question is, should __switch_to take care of the user_access 
+>status when scheduling new tasks? Or should there be a restriction
+>about 
+>scheduling out a task with user_access mode enabled and maybe add a 
+>warning if we can detect this?
+>
+>(Or did we miss something and this is not an issue on x86?)
+>
+>Thanks,
 
-How about the following, does that work?
-
-	/*
-	 * ARM erratum 1165522 requires the actual execution of the
-	 * above before we can switch to the EL1/EL0 translation regime
-	 * used by the guest.
-	 */
-
-
-Thanks,
-
-    Christoffer
+You should never call a sleeping function from a user_access section. It is intended for very limited regions.
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
