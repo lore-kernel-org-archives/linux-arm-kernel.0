@@ -1,85 +1,61 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:14 +0100
-Subject: [PATCH v2 42/43] drm/sun4i: frontend: Move the FIR filter phases to
- our quirks
+Date: Fri, 23 Nov 2018 10:25:15 +0100
+Subject: [PATCH v2 43/43] drm/sun4i: frontend: Add A20-specific device-tree
+ compatible and quirks
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-43-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-44-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+This adds the appropriate device-tree compatible and quirk data for
+hooking frontend support for the A20. It supports the FIR coefficients
+ready bit but not the access control bit. It also takes different phase
+values than the A33 for these coefficients.
 
-The FIR filters phase depend on the SoC, so let's move it to our quirks
-structure instead of removing them.
+The compatible is already used in the A20 device-tree and already
+documented in the device-tree bindings.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 28 ++++++++++++++++++++------
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  5 +++++
- 2 files changed, 27 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index f50507ee6d75..427c51029a9c 100644
+index 427c51029a9c..4a9cb478167f 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -438,12 +438,18 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 	 * I have no idea what this does exactly, but it seems to be
- 	 * related to the scaler FIR filter phase parameters.
- 	 */
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG, 0x400);
--	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG, 0x400);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZPHASE_REG,
-+		     frontend->data->ch_phase[0].horzphase);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_HORZPHASE_REG,
-+		     frontend->data->ch_phase[1].horzphase);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE0_REG,
-+		     frontend->data->ch_phase[0].vertphase[0]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE0_REG,
-+		     frontend->data->ch_phase[1].vertphase[0]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_VERTPHASE1_REG,
-+		     frontend->data->ch_phase[0].vertphase[1]);
-+	regmap_write(frontend->regs, SUN4I_FRONTEND_CH1_VERTPHASE1_REG,
-+		     frontend->data->ch_phase[1].vertphase[1]);
- 
- 	if (fb->format->is_yuv && !drm_format_is_yuv(out_fmt)) {
- 		/* Setup the CSC engine for YUV to RGB conversion. */
-@@ -671,6 +677,16 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
+@@ -676,6 +676,20 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
+ 	.runtime_suspend	= sun4i_frontend_runtime_suspend,
  };
  
- static const struct sun4i_frontend_data sun8i_a33_frontend = {
++static const struct sun4i_frontend_data sun7i_a20_frontend = {
 +	.ch_phase		= {
 +		{
-+			.horzphase = 0x400,
-+			.vertphase = { 0x400, 0x400 },
++			.horzphase = 0,
++			.vertphase = { 0, 0 },
 +		},
 +		{
-+			.horzphase = 0x400,
-+			.vertphase = { 0x400, 0x400 },
++			.horzphase = 0xfc000,
++			.vertphase = { 0xfc000, 0xfc000 },
 +		},
 +	},
- 	.has_coef_access_ctrl	= true,
- };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 3618993f8e49..45f5f4f3d06f 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -103,6 +103,11 @@ struct reset_control;
- struct sun4i_frontend_data {
- 	bool	has_coef_access_ctrl;
- 	bool	has_coef_rdy;
++	.has_coef_rdy		= true,
++};
 +
-+	struct {
-+		u32	horzphase;
-+		u32	vertphase[2];
-+	} ch_phase[2];
+ static const struct sun4i_frontend_data sun8i_a33_frontend = {
+ 	.ch_phase		= {
+ 		{
+@@ -691,6 +705,10 @@ static const struct sun4i_frontend_data sun8i_a33_frontend = {
  };
  
- struct sun4i_frontend {
+ const struct of_device_id sun4i_frontend_of_table[] = {
++	{
++		.compatible = "allwinner,sun7i-a20-display-frontend",
++		.data = &sun7i_a20_frontend
++	},
+ 	{
+ 		.compatible = "allwinner,sun8i-a33-display-frontend",
+ 		.data = &sun8i_a33_frontend
 -- 
 2.19.1
