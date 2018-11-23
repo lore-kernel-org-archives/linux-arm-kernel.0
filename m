@@ -1,43 +1,44 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 23 Nov 2018 20:53:06 +0100
-Subject: [PATCH 1/6] ARM: meson: select HAVE_ARM_TWD and ARM_GLOBAL_TIMER
+Date: Fri, 23 Nov 2018 20:53:08 +0100
+Subject: [PATCH 3/6] ARM: dts: meson8: add the ARM TWD timer
 In-Reply-To: <20181123195311.4578-1-martin.blumenstingl@googlemail.com>
 References: <20181123195311.4578-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181123195311.4578-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20181123195311.4578-4-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 32-bit Meson SoCs use multiple Cortex-A9 (Meson8 and Meson8m2) or
-Cortex-A5 (Meson8b) CPU cores. These come with the "ARM global timer"
-and "Timer-Watchdog" (aka TWD, which provides both a per-cpu local timer
-and watchdog).
+The Meson8 and Meson8m2 SoC are using four ARM Cortex-A9 cores which
+come with a "TWD" (Timer-Watchdog) based timer. This adds support for
+the ARM TWD Timer on these two SoCs.
 
-Selecting ARM_GLOBAL_TIMER and HAVE_ARM_TWD allows us to add the timers
-to the SoC.dtsi files.
-
+Suggested-by: Carlo Caione <carlo@endlessm.com>
+[ rebased patch from Carlo, use IRQ_TYPE_EDGE_RISING instead of
+  IRQ_TYPE_LEVEL_LOW to prevent "GIC: PPI13 is secure or misconfigured"
+  message during boot, use pre-processor macros to specify the IRQ,
+  added the correct clock, dropped TWD watchdog node since there's no
+  driver for it anymore ]
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 ---
- arch/arm/mach-meson/Kconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/meson8.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-meson/Kconfig b/arch/arm/mach-meson/Kconfig
-index d51cfda953d4..b16831697183 100644
---- a/arch/arm/mach-meson/Kconfig
-+++ b/arch/arm/mach-meson/Kconfig
-@@ -4,12 +4,14 @@ menuconfig ARCH_MESON
- 	select GPIOLIB
- 	select GENERIC_IRQ_CHIP
- 	select ARM_GIC
-+	select ARM_GLOBAL_TIMER
- 	select CACHE_L2X0
- 	select PINCTRL
- 	select PINCTRL_MESON
- 	select COMMON_CLK
- 	select COMMON_CLK_AMLOGIC
- 	select HAVE_ARM_SCU if SMP
-+	select HAVE_ARM_TWD if SMP
+diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+index 28b9f6779993..2b0b3edbd896 100644
+--- a/arch/arm/boot/dts/meson8.dtsi
++++ b/arch/arm/boot/dts/meson8.dtsi
+@@ -362,6 +362,13 @@
+ 		compatible = "arm,cortex-a9-scu";
+ 		reg = <0x0 0x100>;
+ 	};
++
++	timer at 600 {
++		compatible = "arm,cortex-a9-twd-timer";
++		reg = <0x600 0x20>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
++		clocks = <&clkc CLKID_PERIPH>;
++	};
+ };
  
- if ARCH_MESON
- 
+ &pwm_ab {
 -- 
 2.19.2
