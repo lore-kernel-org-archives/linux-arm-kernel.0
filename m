@@ -1,36 +1,150 @@
 From: linux.amoon@gmail.com (Anand Moon)
-Date: Fri, 23 Nov 2018 09:44:12 +0000
-Subject: [PATCH 2/3] clk: samsung: exynos5420: Add CLK_SET_RATE_PARENT flag to
- mout_sclk_vpll
+Date: Fri, 23 Nov 2018 09:44:13 +0000
+Subject: [PATCH 3/3] ARM: dts: Add g3d bus nodes using VDD_INT for Exynos542x
+ SoC
 In-Reply-To: <20181123094413.1108-1-linux.amoon@gmail.com>
 References: <20181123094413.1108-1-linux.amoon@gmail.com>
-Message-ID: <20181123094413.1108-2-linux.amoon@gmail.com>
+Message-ID: <20181123094413.1108-3-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows changing the VPLL output frequency through the g3d subsystem
-clock tree leaf clocks.
+Add missing Netwwork on chip for g3d bus node using VDD_INI
+for Exynos542x SoC.
 
-Cc: Andrzej Hajda <a.hajda@samsung.com>
+- CLK_DOUT_ACLK_G3D for G3D's AXI
+
 Cc: Chanwoo Choi <cw00.choi@samsung.com>
 Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
- drivers/clk/samsung/clk-exynos5420.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5420.dtsi             | 57 +++++++++++++++++--
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  5 ++
+ 2 files changed, 56 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-index 34156bdfd0d2..6bf1b2e89106 100644
---- a/drivers/clk/samsung/clk-exynos5420.c
-+++ b/drivers/clk/samsung/clk-exynos5420.c
-@@ -647,7 +647,8 @@ static const struct samsung_mux_clock exynos5x_mux_clks[] __initconst = {
- 			mout_user_aclk300_gscl_p, SRC_TOP5, 28, 1),
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index aaff15880761..bc7203bb1282 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -1047,6 +1047,14 @@
+ 			status = "disabled";
+ 		};
  
- 	MUX(0, "mout_sclk_mpll", mout_mpll_p, SRC_TOP6, 0, 1),
--	MUX(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1),
-+	MUX_F(CLK_MOUT_VPLL, "mout_sclk_vpll", mout_vpll_p, SRC_TOP6, 4, 1,
-+			CLK_SET_RATE_PARENT, 0),
- 	MUX(0, "mout_sclk_spll", mout_spll_p, SRC_TOP6, 8, 1),
- 	MUX(0, "mout_sclk_ipll", mout_ipll_p, SRC_TOP6, 12, 1),
- 	MUX(0, "mout_sclk_rpll", mout_rpll_p, SRC_TOP6, 16, 1),
++		bus_g3d: bus_g3d {
++			compatible = "samsung,exynos-bus";
++			clocks = <&clock CLK_DOUT_ACLK_G3D>;
++			clock-names = "bus";
++			operating-points-v2 = <&bus_g3d_opp_table>;
++			status = "disabled";
++		};
++
+ 		bus_jpeg: bus_jpeg {
+ 			compatible = "samsung,exynos-bus";
+ 			clocks = <&clock CLK_DOUT_ACLK300_JPEG>;
+@@ -1245,7 +1253,44 @@
+ 			};
+ 		};
+ 
+-		bus_jpeg_opp_table: opp_table11 {
++		bus_g3d_opp_table: opp_table11 {
++			compatible = "operating-points-v2";
++
++			opp at 600000000 {
++				opp-hz = /bits/ 64 <600000000>;
++				opp-microvolt = <1025000>;
++			};
++			opp at 543000000 {
++				opp-hz = /bits/ 64 <543000000>;
++				opp-microvolt = <987500>;
++			};
++			opp at 480000000 {
++				opp-hz = /bits/ 64 <480000000>;
++				opp-microvolt = <950000>;
++			};
++			opp at 420000000 {
++				opp-hz = /bits/ 64 <420000000>;
++				opp-microvolt = <937500>;
++			};
++			opp at 350000000 {
++				opp-hz = /bits/ 64 <350000000>;
++				opp-microvolt = <900000>;
++			};
++			opp at 266000000 {
++				opp-hz = /bits/ 64 <266000000>;
++				opp-microvolt = <862500>;
++			};
++			opp at 177000000 {
++				opp-hz = /bits/ 64 <177000000>;
++				opp-microvolt = <862500>;
++			};
++			opp at 100000000 {
++				opp-hz = /bits/ 64 <100000000>;
++				opp-microvolt = <862500>;
++			};
++		};
++
++		bus_jpeg_opp_table: opp_table12 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+@@ -1262,7 +1307,7 @@
+ 			};
+ 		};
+ 
+-		bus_jpeg_apb_opp_table: opp_table12 {
++		bus_jpeg_apb_opp_table: opp_table13 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+@@ -1279,7 +1324,7 @@
+ 			};
+ 		};
+ 
+-		bus_disp1_fimd_opp_table: opp_table13 {
++		bus_disp1_fimd_opp_table: opp_table14 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+@@ -1290,7 +1335,7 @@
+ 			};
+ 		};
+ 
+-		bus_disp1_opp_table: opp_table14 {
++		bus_disp1_opp_table: opp_table15 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+@@ -1304,7 +1349,7 @@
+ 			};
+ 		};
+ 
+-		bus_gscl_opp_table: opp_table15 {
++		bus_gscl_opp_table: opp_table16 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+@@ -1318,7 +1363,7 @@
+ 			};
+ 		};
+ 
+-		bus_mscl_opp_table: opp_table16 {
++		bus_mscl_opp_table: opp_table17 {
+ 			compatible = "operating-points-v2";
+ 
+ 			opp00 {
+diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+index 2fac4baf1eb4..6e39e4594502 100644
+--- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+@@ -89,6 +89,11 @@
+ 	status = "okay";
+ };
+ 
++&bus_g3d {
++	devfreq = <&bus_wcore>;
++	status = "okay";
++};
++
+ &bus_jpeg {
+ 	devfreq = <&bus_wcore>;
+ 	status = "okay";
 -- 
 2.17.1
