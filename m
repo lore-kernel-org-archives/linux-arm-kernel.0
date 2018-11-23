@@ -1,488 +1,90 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 23 Nov 2018 13:31:17 +0100
-Subject: [PATCH v2] arm64: dts: rockchip: Add DT for nanopc-t4
-In-Reply-To: <20181123074744.11583-1-tomeu.vizoso@collabora.com>
-References: <20181123073120.6250-1-tomeu.vizoso@collabora.com>
- <20181123074744.11583-1-tomeu.vizoso@collabora.com>
-Message-ID: <2370153.n0vTqR1ltx@phil>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 23 Nov 2018 12:32:09 +0000
+Subject: [PATCH 4/5] drm: rcar-du: Add R8A7744 support
+In-Reply-To: <2739044.1unFEStFin@avalon>
+References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
+ <5135719.5JoeYGyzrK@avalon>
+ <TY1PR01MB17707049DE6A8FD71E032157C0DB0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+ <2739044.1unFEStFin@avalon>
+Message-ID: <TY1PR01MB17703AC2B9D5D9E86D172769C0D40@TY1PR01MB1770.jpnprd01.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
+Thank you Laurent.
 
-Am Freitag, 23. November 2018, 08:46:30 CET schrieb Tomeu Vizoso:
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
-> index 0cc71236d639..e907d309486e 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -71,6 +71,10 @@ Rockchip platforms device tree bindings
->      Required root node properties:
->        - compatible = "firefly,roc-rk3399-pc", "rockchip,rk3399";
->  
-> +- FriendlyElec NanoPC-T4 board:
-> +    Required root node properties:
-> +      - compatible = "friendlyarm,nanopc-t4", "rockchip,rk3399";
-> +
+Cheers,
+Fab
 
-alphabetical please
-
->  - ChipSPARK PopMetal-RK3288 board:
->      Required root node properties:
->        - compatible = "chipspark,popmetal-rk3288", "rockchip,rk3288";
-> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-> index 49042c477870..ed90cd1e5a8b 100644
-> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> @@ -20,3 +20,4 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-rock960.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-rockpro64.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-sapphire-excavator.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopc-t4.dtb
-
-alphabetical please
-
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> new file mode 100644
-> index 000000000000..148f85b4bd49
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-
-[...]
-
-General comment about regulators, the vendor-kernel dts' regularly
-don't model regulators in a nice way representing the hardware.
-
-There is obviously schematics available for the board
-http://wiki.friendlyarm.com/wiki/images/d/dd/NanoPi-M4-2GB-1807-Schematic.pdf
-
-Please model the regulator tree following the naming scheme from the
-schematics and including correct supply chaining, so that
-$debug/regulator/regulator_summary looks nice.
-
-This makes it way easier to find issues later on if needed and represents
-the hardware in a correct way.
-
-I guess in the end it should look pretty similar to the rock960 or other
-rk3399 boards (except gru), as most boards follow the reference schematics
-for a big part.
-
-> +	vcc3v3_sys: vcc3v3-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	vcc5v0_host: vcc5v0-host-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_host";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +	};
-> +
-> +	vcc5v0_sys: vcc5v0-sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +	};
-> +
-> +	vccadc_ref: vccadc-ref {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +	};
-> +
-> +	vcc_sd: vcc-sd {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&vcc_sd_h>;
-> +		regulator-name = "vcc_sd";
-> +		regulator-min-microvolt = <3000000>;
-> +		regulator-max-microvolt = <3000000>;
-> +	};
-> +
-> +	vcc_phy: vcc-phy-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_phy";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	vcc_lcd: vcc-lcd {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc_lcd";
-> +		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-> +		startup-delay-us = <20000>;
-> +		enable-active-high;
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc5v0_sys>;
-> +	};
-> +
-> +	vcc5v0_typec: vcc5v0-typec-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpios = <&gpio4 26 GPIO_ACTIVE_HIGH>;
-> +		regulator-name = "vcc5v0_typec";
-> +		regulator-always-on;
-> +		vin-supply = <&vcc5v0_sys>;
-> +	};
-> +
-> +	vdd_log: vdd-log {
-> +		compatible = "pwm-regulator";
-> +		pwms = <&pwm2 0 25000 1>;
-> +		regulator-name = "vdd_log";
-> +		regulator-min-microvolt = <800000>;
-> +		regulator-max-microvolt = <1400000>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +
-> +		/* for rockchip boot on */
-> +		rockchip,pwm_id = <2>;
-> +		rockchip,pwm_voltage = <900000>;
-> +	};
-
-you might want to drop vdd_log for the time being. See
-https://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git/commit/?h=v4.20-armsoc/dts64-fixes&id=13682e524167cbd7e2a26c5e91bec765f0f96273
-
-> +	sdio_pwrseq: sdio-pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		clocks = <&rk808 1>;
-> +		clock-names = "ext_clock";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&wifi_enable_h>;
-> +
-> +		/*
-> +		 * On the module itself this is one of these (depending
-> +		 * on the actual card populated):
-> +		 * - SDIO_RESET_L_WL_REG_ON
-> +		 * - PDN (power down when low)
-> +		 */
-> +		reset-gpios = <&gpio0 10 GPIO_ACTIVE_LOW>; /* GPIO0_B2 */
-
-general for all gpios: <&gpio RK_PB2 ...> for new boards please
+> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Sent: 23 November 2018 12:05
+> Subject: Re: [PATCH 4/5] drm: rcar-du: Add R8A7744 support
+>
+> Hi Fabrizio,
+>
+> On Thursday, 22 November 2018 17:59:32 EET Fabrizio Castro wrote:
+> > On 15 October 2018 23:25 Laurent Pinchart wrote:
+> > > On Friday, 21 September 2018 21:08:30 EEST Fabrizio Castro wrote:
+> > >> From: Biju Das <biju.das@bp.renesas.com>
+> > >>
+> > >> Add support for the R8A7744 DU (which is very similar to the R8A7743
+> > >> DU);
+> > >> it has 1 DPAD (RGB) output and 1 LVDS output.
+> > >>
+> > >> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+> > >> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> > >> ---
+> > >>
+> > >>  drivers/gpu/drm/rcar-du/rcar_du_drv.c | 1 +
+> > >>  1 file changed, 1 insertion(+)
+> > >>
+> > >> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> > >> b/drivers/gpu/drm/rcar-du/rcar_du_drv.c index c07d3f1..2c3d0e5 100644
+> > >> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> > >> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
+> > >> @@ -321,6 +321,7 @@ static const struct rcar_du_device_info
+> > >> rcar_du_r8a77970_info = {
+> > >>  static const struct of_device_id rcar_du_of_table[] = {
+> > >>  { .compatible = "renesas,du-r8a7743", .data = &rzg1_du_r8a7743_info },
+> > >> +{ .compatible = "renesas,du-r8a7744", .data = &rzg1_du_r8a7743_info },
+> > >>  { .compatible = "renesas,du-r8a7745", .data = &rzg1_du_r8a7745_info },
+> > >>  { .compatible = "renesas,du-r8a77470", .data = &rzg1_du_r8a77470_info
+> > >>  },
+> > >>  { .compatible = "renesas,du-r8a7779", .data = &rcar_du_r8a7779_info },
+> > >
+> > > This looks good to me. I would also apply this change:
+> > >
+> > > @@ -41,7 +41,7 @@ static const struct rcar_du_device_info
+> > > rzg1_du_r8a7743_info = {
+> > >         .channels_mask = BIT(1) | BIT(0),
+> > >         .routes = {
+> > >                 /*
+> > > -                * R8A7743 has one RGB output and one LVDS output
+> > > +                * R8A774[34] has one RGB output and one LVDS output
+> > >                  */
+> > >                 [RCAR_DU_OUTPUT_DPAD0] = {
+> > >                         .possible_crtcs = BIT(1) | BIT(0),
+> > >
+> > > With this,
+> > >
+> > > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > >
+> > > There's no need to resubmit, I've applied the patch to my tree with the
+> > > above change.
+> >
+> > I was expecting to see this patch at least on linux-next by now but it looks
+> > like it's not in there, could you please double check what happened to it?
+>
+> I've sent the R-Car DU v4.21 pull request today, it should end up in linux-
+> next in the near future.
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
+>
 
 
-> +	};
-> +};
-
-[...]
-
-> +&rga {
-> +	status = "disabled";
-
-Why disabled? It shouldn't hurt.
-
-> +};
-> +
-> +&cdn_dp {
-> +// TODO: typec/fusb302 doesn't have extcon support yet
-> +//	status = "enabled";
-> +	extcon = <&fusb0>;
-
-extcon is not specified and as we talked about yesterday, the
-whole thing doesn't work with the type-c framework yet,
-so ideally just remove the whole &cdn_dp node here.
-
-> +	phys = <&tcphy0_dp>;
-> +};
-> +
-> +&hdmi {
-
-general for node-phandles: alphabetical please
-
-> +	ddc-i2c-bus = <&i2c7>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&hdmi_cec>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +	i2c-scl-rising-time-ns = <160>;
-> +	i2c-scl-falling-time-ns = <30>;
-> +	clock-frequency = <400000>;
-> +
-> +	vdd_cpu_b: syr827 at 40 {
-> +		compatible = "silergy,syr827";
-> +		reg = <0x40>;
-> +		vin-supply = <&vcc3v3_sys>;
-> +		regulator-compatible = "fan53555-reg";
-
-deprecated (and unusued) property
-
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&vsel1_gpio>;
-> +		vsel-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-
-not specified in mainline, ideally look at rock960 and friends
-for reference
-
-> +		regulator-name = "vdd_cpu_b";
-> +		regulator-min-microvolt = <712500>;
-> +		regulator-max-microvolt = <1500000>;
-> +		regulator-ramp-delay = <1000>;
-> +		fcs,suspend-voltage-selector = <1>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-initial-state = <3>;
-> +			regulator-state-mem {
-> +			regulator-off-in-suspend;
-> +		};
-> +	};
-> +
-> +	vdd_gpu: syr828 at 41 {
-> +		compatible = "silergy,syr828";
-> +		reg = <0x41>;
-> +		vin-supply = <&vcc3v3_sys>;
-> +		regulator-compatible = "fan53555-reg";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&vsel2_gpio>;
-> +		vsel-gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-
-same here
-
-> +		regulator-name = "vdd_gpu";
-> +		regulator-min-microvolt = <712500>;
-> +		regulator-max-microvolt = <1500000>;
-> +		regulator-ramp-delay = <1000>;
-> +		fcs,suspend-voltage-selector = <1>;
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-initial-state = <3>;
-> +			regulator-state-mem {
-> +			regulator-off-in-suspend;
-> +		};
-> +	};
-> +
-
-[...]
-
-> +&i2c4 {
-> +	status = "okay";
-> +	i2c-scl-rising-time-ns = <160>;
-> +	i2c-scl-falling-time-ns = <30>;
-> +	clock-frequency = <400000>;
-> +
-> +	fusb0: typec-portc at 22 {
-> +		compatible = "fcs,fusb302";
-> +		reg = <0x22>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <RK_PA2 IRQ_TYPE_LEVEL_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&fusb0_int>;
-> +		vbus-supply = <&vcc5v0_typec>;
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&i2c7 {
-> +	status = "okay";
-> +};
-> +
-> +
-
-double empty line
-
-> +&io_domains {
-> +	status = "okay";
-> +
-> +	bt656-supply = <&vcc1v8_dvp>;		/* bt656_gpio2ab_ms */
-> +	audio-supply = <&vcca1v8_codec>;
-> +	sdmmc-supply = <&vccio_sd>;		/* sdmmc_gpio4b_ms */
-> +	gpio1830-supply = <&vcc_3v0>;		/* gpio1833_gpio4cd_ms */
-
-I think we can do without the comments.
-
-> +};
-> +
-> +&pmu_io_domains {
-> +	status = "okay";
-> +	pmu1830-supply = <&vcc_3v0>;
-> +};
-> +
-> +&pcie_phy {
-> +	status = "okay";
-> +	assigned-clocks = <&cru SCLK_PCIEPHY_REF>;
-> +	assigned-clock-parents = <&cru SCLK_PCIEPHY_REF100M>;
-> +	assigned-clock-rates = <100000000>;
-> +};
-> +
-> +&pcie0 {
-> +	status = "okay";
-> +	ep-gpios = <&gpio2 4 GPIO_ACTIVE_HIGH>;
-> +	num-lanes = <4>;
-> +	max-link-speed = <2>;
-> +};
-> +
-> +&pwm0 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm1 {
-> +	status = "okay";
-> +};
-> +
-> +&pwm2 {
-> +	status = "okay";
-> +	pinctrl-names = "active";
-> +	pinctrl-0 = <&pwm2_pin_pull_down>;
-> +};
-> +
-> +&saradc {
-> +	status = "okay";
-> +	vref-supply = <&vccadc_ref>; /* TBD */
-> +};
-> +
-> +&sdhci {
-> +	bus-width = <8>;
-> +	mmc-hs400-1_8v;
-> +	supports-emmc;
-> +	non-removable;
-> +	keep-power-in-suspend;
-> +	mmc-hs400-enhanced-strobe;
-> +	status = "okay";
-> +};
-> +
-> +&emmc_phy {
-> +	status = "okay";
-> +};
-> +
-> +&sdio0 {
-> +	clock-frequency = <50000000>;
-
-We have a ciu clock, so there should be no need for "clock-frquency"
-
-> +	clock-freq-min-max = <200000 50000000>;
-
-Not part of a binding and the mmc code also seems to ignore it
-
-> +	supports-sdio;
-
-unused and undocumented
-
-> +	bus-width = <4>;
-> +	disable-wp;
-> +	cap-sd-highspeed;
-> +	cap-sdio-irq;
-> +	keep-power-in-suspend;
-> +	mmc-pwrseq = <&sdio_pwrseq>;
-> +	non-removable;
-> +	num-slots = <1>;
-
-outdated and unused property
-
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-> +	sd-uhs-sdr104;
-> +	status = "okay";
-> +};
-> +
-> +&sdmmc {
-> +	clock-frequency = <150000000>;
-> +	clock-freq-min-max = <100000 150000000>;
-
-same as sdio
-
-> +	supports-sd;
-
-unused and undocumented
-
-> +	bus-width = <4>;
-> +	cap-mmc-highspeed;
-> +	cap-sd-highspeed;
-> +	disable-wp;
-> +	num-slots = <1>;
-
-outdated and unused property
-
-> +	sd-uhs-sdr104;
-> +	vmmc-supply = <&vcc_sd>;
-> +	vqmmc-supply = <&vccio_sd>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&sdmmc_clk &sdmmc_cmd &sdmmc_cd &sdmmc_bus4>;
-> +	status = "okay";
-> +};
-> +
-> +&tsadc {
-> +	/* tshut mode 0:CRU 1:GPIO */
-> +	rockchip,hw-tshut-mode = <1>;
-> +	/* tshut polarity 0:LOW 1:HIGH */
-> +	rockchip,hw-tshut-polarity = <1>;
-> +	status = "okay";
-> +};
-> +
-> +&tcphy0 {
-> +	extcon = <&fusb0>;
-
-right now the fusb302 does not provide this extcon and should also
-never do so. When omitting it, the tcphy will at least work in usb3
-host mode.
-
-> +	status = "okay";
-> +};
-> +
-> +&tcphy1 {
-> +	status = "okay";
-> +};
-> +
-> +&u2phy0 {
-> +	status = "okay";
-> +	extcon = <&fusb0>;
-
-same with the extcon
-
-> +
-> +	u2phy0_otg: otg-port {
-> +		status = "okay";
-> +	};
-> +
-> +	u2phy0_host: host-port {
-> +		phy-supply = <&vcc5v0_host>;
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&u2phy1 {
-> +	status = "okay";
-> +
-> +	u2phy1_otg: otg-port {
-> +		status = "okay";
-> +	};
-> +
-> +	u2phy1_host: host-port {
-> +		phy-supply = <&vcc5v0_host>;
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&usbdrd3_0 {
-> +	status = "okay";
-> +	extcon = <&fusb0>;
-
-not part of any binding I think?
-
-> +&pinctrl {
-> +
-> +	hdmi {
-> +		/delete-node/ hdmi-i2c-xfer;
-> +	};
-
-No need to delete the node, the hdmi-pinctrl above does not use the
-internal i2c.
 
 
-Heiko
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
