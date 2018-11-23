@@ -1,200 +1,56 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:00 +0100
-Subject: [PATCH v2 28/43] drm/sun4i: frontend: Add support for planar YUV
- input formats
+Date: Fri, 23 Nov 2018 10:25:13 +0100
+Subject: [PATCH v2 41/43] drm/sun4i: Make COEF_RDY conditional
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-29-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-42-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Planar YUV formats come with 3 distinct planes, which requires
-configuring the frontend line stride and address registers for the
-third plane.
+From: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Our hardware only supports the YUV planes order and in order to support
-formats with a YVU plane order, a helper is introduced to indicate
-whether to invert the address of the two chroma planes.
+The COEF_RDY bit isn't found in all the SoCs featuring some variant of the
+frontend.
 
-Missing definitions for YUV411 and YUV444 input format configuration are
-also introduced as support is added for these formats. For the input
-sequence part, no configuration is required for planar YUV formats so
-zero is returned in that case.
+Add it to our quirks structure.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 54 +++++++++++++++++++++++++-
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  5 +++
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  8 ++++
- 3 files changed, 66 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 9 +++++----
+ drivers/gpu/drm/sun4i/sun4i_frontend.h | 1 +
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index e31438e5cabd..001139417cf5 100644
+index 0e92f59efd49..f50507ee6d75 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -106,12 +106,27 @@ void sun4i_frontend_exit(struct sun4i_frontend *frontend)
- }
- EXPORT_SYMBOL(sun4i_frontend_exit);
- 
-+static bool sun4i_frontend_format_chroma_requires_swap(uint32_t fmt)
-+{
-+	switch (fmt) {
-+	case DRM_FORMAT_YVU411:
-+	case DRM_FORMAT_YVU420:
-+	case DRM_FORMAT_YVU422:
-+	case DRM_FORMAT_YVU444:
-+		return true;
-+
-+	default:
-+		return false;
-+	}
-+}
-+
- void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
- 	dma_addr_t paddr;
-+	bool swap;
- 
- 	/* Set the line width */
- 	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
-@@ -122,6 +137,13 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
- 			     fb->pitches[1]);
- 
-+	if (fb->format->num_planes > 2)
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD2_REG,
-+			     fb->pitches[2]);
-+
-+	/* Some planar formats require chroma channel swapping by hand. */
-+	swap = sun4i_frontend_format_chroma_requires_swap(fb->format->format);
-+
- 	/* Set the physical address of the buffer in memory */
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	paddr -= PHYS_OFFSET;
-@@ -129,12 +151,20 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
- 
- 	if (fb->format->num_planes > 1) {
--		paddr = drm_fb_cma_get_gem_addr(fb, state, 1);
-+		paddr = drm_fb_cma_get_gem_addr(fb, state, swap ? 2 : 1);
- 		paddr -= PHYS_OFFSET;
- 		DRM_DEBUG_DRIVER("Setting buffer #1 address to %pad\n", &paddr);
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR1_REG,
- 			     paddr);
+@@ -95,10 +95,11 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+ 			     sun4i_frontend_vert_coef[i]);
  	}
-+
-+	if (fb->format->num_planes > 2) {
-+		paddr = drm_fb_cma_get_gem_addr(fb, state, swap ? 1 : 2);
-+		paddr -= PHYS_OFFSET;
-+		DRM_DEBUG_DRIVER("Setting buffer #2 address to %pad\n", &paddr);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR2_REG,
-+			     paddr);
-+	}
+ 
+-	regmap_write_bits(frontend->regs,
+-			  SUN4I_FRONTEND_FRM_CTRL_REG,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
+-			  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
++	if (frontend->data->has_coef_rdy)
++		regmap_write_bits(frontend->regs,
++				  SUN4I_FRONTEND_FRM_CTRL_REG,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY,
++				  SUN4I_FRONTEND_FRM_CTRL_COEF_RDY);
  }
- EXPORT_SYMBOL(sun4i_frontend_update_buffer);
  
-@@ -142,10 +172,14 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- {
- 	if (!drm_format_is_yuv(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
-+	else if (drm_format_is_yuv_sampling_411(fmt))
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV411;
- 	else if (drm_format_is_yuv_sampling_420(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420;
- 	else if (drm_format_is_yuv_sampling_422(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422;
-+	else if (drm_format_is_yuv_sampling_444(fmt))
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV444;
- 	else
- 		return -EINVAL;
- 
-@@ -165,6 +199,10 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
- 		return 0;
- 
-+	case 3:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR;
-+		return 0;
-+
- 	default:
- 		return -EINVAL;
- 	}
-@@ -172,6 +210,12 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- 
- static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
- {
-+	/* Planar formats have an explicit input sequence. */
-+	if (drm_format_is_yuv_planar(fmt)) {
-+		*val = 0;
-+		return 0;
-+	}
-+
- 	switch (fmt) {
- 	case DRM_FORMAT_BGRX8888:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
-@@ -243,7 +287,15 @@ static const uint32_t sun4i_frontend_formats[] = {
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_YUV411,
-+	DRM_FORMAT_YUV420,
-+	DRM_FORMAT_YUV422,
-+	DRM_FORMAT_YUV444,
- 	DRM_FORMAT_YUYV,
-+	DRM_FORMAT_YVU411,
-+	DRM_FORMAT_YVU420,
-+	DRM_FORMAT_YVU422,
-+	DRM_FORMAT_YVU444,
- 	DRM_FORMAT_YVYU,
- };
- 
+ int sun4i_frontend_init(struct sun4i_frontend *frontend)
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 7d01b4f09b75..54ec71a3e2f4 100644
+index daf3fa5d01ba..3618993f8e49 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -23,15 +23,20 @@
+@@ -102,6 +102,7 @@ struct reset_control;
  
- #define SUN4I_FRONTEND_BUF_ADDR0_REG		0x020
- #define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
-+#define SUN4I_FRONTEND_BUF_ADDR2_REG		0x028
- 
- #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
- #define SUN4I_FRONTEND_LINESTRD1_REG		0x044
-+#define SUN4I_FRONTEND_LINESTRD2_REG		0x048
- 
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR	(0 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR	(2 << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV444	(0 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422	(1 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420	(2 << 4)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV411	(3 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB		(5 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UYVY		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_YUYV		1
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 80c718f06ce8..2fb27819ad20 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -143,7 +143,15 @@ static const uint32_t sun4i_layer_formats[] = {
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_YUV411,
-+	DRM_FORMAT_YUV420,
-+	DRM_FORMAT_YUV422,
-+	DRM_FORMAT_YUV444,
- 	DRM_FORMAT_YUYV,
-+	DRM_FORMAT_YVU411,
-+	DRM_FORMAT_YVU420,
-+	DRM_FORMAT_YVU422,
-+	DRM_FORMAT_YVU444,
- 	DRM_FORMAT_YVYU,
+ struct sun4i_frontend_data {
+ 	bool	has_coef_access_ctrl;
++	bool	has_coef_rdy;
  };
  
+ struct sun4i_frontend {
 -- 
 2.19.1
