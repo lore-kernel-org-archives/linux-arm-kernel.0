@@ -1,107 +1,63 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:43 +0100
-Subject: [PATCH v2 11/43] drm/fourcc: Add format info helpers for checking YUV
- sub-sampling
+Date: Fri, 23 Nov 2018 10:24:38 +0100
+Subject: [PATCH v2 06/43] drm/sun4i: backend: Refine the logic behind using
+ the frontend
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-12-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-7-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Display engine drivers often need to distinguish between different types of
-YUV sub-sampling. This introduces helpers to check for common sub-sampling
-ratios in their commonly-used denomination from the DRM format info.
+Checking that scaling is in use is not sufficient as a condition to
+decide to use the frontend.
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Since not all layer formats are supported by the frontend, we need to
+check for that support first. Then, the frontend must only be enabled
+if the backend doesn't support the format or that scaling is required.
+
+Signed-off-by:Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- include/drm/drm_fourcc.h | 75 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 75 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
-index b652b711df1a..d170b7b323f7 100644
---- a/include/drm/drm_fourcc.h
-+++ b/include/drm/drm_fourcc.h
-@@ -185,6 +185,81 @@ drm_format_info_is_yuv_planar(const struct drm_format_info *info)
- 	return info->is_yuv && info->num_planes == 3;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 7dd24eb03f89..735fea7ead0b 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -449,16 +449,32 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+ {
+ 	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
+ 	struct sun4i_backend *backend = layer->backend;
++	uint32_t format = state->fb->format->format;
+ 
+ 	if (IS_ERR(backend->frontend))
+ 		return false;
+ 
++	if (!sun4i_frontend_format_is_supported(format))
++		return false;
++
++	if (!sun4i_backend_format_is_supported(format))
++		return true;
++
+ 	/*
+ 	 * TODO: The backend alone allows 2x and 4x integer scaling, including
+ 	 * support for an alpha component (which the frontend doesn't support).
+-	 * Use the backend directly instead of the frontend in this case.
++	 * Use the backend directly instead of the frontend in this case, with
++	 * another test to return false.
++	 */
++
++	if (sun4i_backend_plane_uses_scaler(state))
++		return true;
++
++	/*
++	 * Here the format is supported by both the frontend and the backend
++	 * and no frontend scaling is required, so use the backend directly.
+ 	 */
+-	return sun4i_backend_plane_uses_scaler(state);
++	return false;
  }
  
-+/**
-+ * drm_format_info_is_yuv_sampling_410 - check that the format info matches a
-+ * YUV format with 4:1:0 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:1:0
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_410(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 4 && info->vsub == 4;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_411 - check that the format info matches a
-+ * YUV format with 4:1:1 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:1:1
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_411(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 4 && info->vsub == 1;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_420 - check that the format info matches a
-+ * YUV format with 4:2:0 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:2:0
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_420(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 2 && info->vsub == 2;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_422 - check that the format info matches a
-+ * YUV format with 4:2:2 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:2:2
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_422(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 2 && info->vsub == 1;
-+}
-+
-+/**
-+ * drm_format_info_is_yuv_sampling_444 - check that the format info matches a
-+ * YUV format with 4:4:4 sub-sampling
-+ * @info: format info
-+ *
-+ * Returns:
-+ * A boolean indicating whether the format info matches a YUV format with 4:4:4
-+ * sub-sampling.
-+ */
-+static inline bool
-+drm_format_info_is_yuv_sampling_444(const struct drm_format_info *info)
-+{
-+	return info->is_yuv && info->hsub == 1 && info->vsub == 1;
-+}
-+
- const struct drm_format_info *__drm_format_info(u32 format);
- const struct drm_format_info *drm_format_info(u32 format);
- const struct drm_format_info *
+ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
 -- 
 2.19.1
