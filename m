@@ -1,91 +1,47 @@
-From: biao.huang@mediatek.com (biao huang)
-Date: Fri, 23 Nov 2018 09:31:16 +0800
-Subject: [v5, PATCH 2/2] dt-binding: mediatek-dwmac: add binding
- document for MediaTek MT2712 DWMAC
-In-Reply-To: <20181122151932.GD15403@lunn.ch>
-References: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
- <1542882521-18874-3-git-send-email-biao.huang@mediatek.com>
- <20181122151932.GD15403@lunn.ch>
-Message-ID: <1542936676.24219.66.camel@mhfsdcap03>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Fri, 23 Nov 2018 09:50:00 +0800
+Subject: [PATCH 1/2] spi: mediatek: Add bindings for mediatek MT7629 soc
+ platform
+In-Reply-To: <7bc1777c-fb24-d150-c13f-658c2a33cd71@gmail.com>
+References: <1542703268-17285-1-git-send-email-leilk.liu@mediatek.com>
+ <1542703268-17285-2-git-send-email-leilk.liu@mediatek.com>
+ <7bc1777c-fb24-d150-c13f-658c2a33cd71@gmail.com>
+Message-ID: <1542937800.27607.27.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew,
-
-	Thanks for you remind.
-
-	Sincerely, I respect any comment from any reviewer. If I didn't reply
-for any comment, really sorry for that.
-
-	As to this "tx-delay" issue, the following reply in v3 maybe ignored.
-	https://lkml.org/lkml/2018/11/19/158
-
-	"the delay time in mediatek dwmac design is not so accurate,
-	the current mt2712 and the following ICs will not use the
-	same delay design, but will use stages to indicate different
-	delay time.
-	so maybe "mediatek.tx-delay" represent the delay stage is a
-	good choice"
-
-	And to make it clearer here.
-
-	In mt2712, there are two delay macro circuit: named fine-tune and
-coarse-tune.
-	a. fine-tune, 170+/-50ps per stage, total 32 stages
-	b. coarse-tune, 0.55+/-0.2ns per stage, total 32 stages
-	If we only consider mt2712, delay in fine-tune select a integer
-multiple of 170ps, delay in coarse-tune select a integer multiple of
-550ps, for stage 0~31, the delay in fine-tune will not have the same
-value with that in coarse-tune.
-	OK, It seems the property "fine-tune" can be eliminated .
-
-	But the following ic will not have the same accuracy as mt2712,
-and maybe will not have two delay macro circuit to be selected.
-	1. assume two delay macro circuit in the following ic,
-	fine-tune, 100ps per stage, coarse-tune, 0.55ns per stage,
-	if we want delay 2.2ns, fine-tune will get a 22, and coarse-tune get a
-4. We can't distinguish which delay macro we are choosing.
-	2. assume only one delay macro circuit is used, a similar case as 1
-will also increase the complexity of driver.
-	Then, we need define more flag property to know which delay macro we
-are handling.
-
-	The common things for all delay macro circuit in MediaTek mac design is
-the stages, not the accuracy. so if we maintain stage info in "mediatek,
-tx-delay", we only need care which stage we should choose.
-And for each IC, we will recommend a best stage as a candidate.
-
-	Above is my personal opinion, may be my understanding is wrong,
-welcome for further discussion.
-
-	Thanks a lot.
-
-On Thu, 2018-11-22 at 16:19 +0100, Andrew Lunn wrote:
-> On Thu, Nov 22, 2018 at 06:28:41PM +0800, Biao Huang wrote:
-> > The commit adds the device tree binding documentation for the MediaTek DWMAC
-> > found on MediaTek MT2712.
+On Tue, 2018-11-20 at 11:28 +0100, Matthias Brugger wrote:
+> 
+> On 20/11/2018 09:41, Leilk Liu wrote:
+> > This patch adds a DT binding documentation for the MT7629 soc.
 > > 
-> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> > index 7940940..6cc4e87 100644
+> > --- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> > +++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+> > @@ -6,6 +6,7 @@ Required properties:
+> >      - mediatek,mt2712-spi: for mt2712 platforms
+> >      - mediatek,mt6589-spi: for mt6589 platforms
+> >      - mediatek,mt7622-spi: for mt7622 platforms
+> > +    - mediatek,mt7629-spi: for mt7629 platforms
 > 
-> > +Optional properties:
-> > +- mediatek,tx-delay: TX clock delay macro value. Range is 0~31. Default is 0.
-> > +	It should be defined for rgmii/rgmii-rxid/mii interface.
-> > +- mediatek,rx-delay: RX clock delay macro value. Range is 0~31. Default is 0.
-> > +	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
+> That's ok, as you add support in the driver. As it actually doesn't change
+> anything in the driver itself you could just describe the binding as something like:
+> " mediatek,mt7629-spi", "mediatek,mt7622-spi": for mt7629 platforms
 > 
-> You have received the same feedback at least twice now, from two
-> different maintainers, that the delay should be specified in pS, and
-> the driver should figure out what values to place into registers.
+> This way the driver will just probe the driver using the fallback (mt7622)
+> compatible, but if you realize in the future that you will need to distinguish
+> between the two SoCs, you can add a mt7629 compatible.
 > 
-> You should not ignore feedback like that. If you don't understand the
-> feedback, please ask us to explain it. If you don't agree with the
-> feedback, you need to argue why you think it is wrong, or why what you
-> are doing is better, etc.
+> Just as information for the future :)
 > 
-> We are here to help, but just ignoring us won't get you anywhere.
-> 
-> For the moment:
-> 
-> NACK
-> 
-> 	Andrew
+
+Got it, thanks for your advice and information :)
+
+> Regards,
+> Matthias
