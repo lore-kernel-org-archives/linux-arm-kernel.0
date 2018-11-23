@@ -1,149 +1,83 @@
-From: jacopo@jmondi.org (jacopo mondi)
-Date: Fri, 23 Nov 2018 09:13:00 +0100
-Subject: [PATCH v12 1/2] dt-bindings: media: Add Allwinner V3s Camera
- Sensor Interface (CSI)
-In-Reply-To: <20181123160117.7eed41aac3e7e31e4e6d98be@magewell.com>
-References: <1540887143-27904-1-git-send-email-yong.deng@magewell.com>
- <308184907.pMD7ZDI2dr@avalon> <20181123074514.GB6788@w540>
- <20181123160117.7eed41aac3e7e31e4e6d98be@magewell.com>
-Message-ID: <20181123081300.GC6788@w540>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 23 Nov 2018 16:30:00 +0800
+Subject: [PATCH 2/2] clk: core: link consumer with clock driver
+In-Reply-To: <20181122212212.16039-3-miquel.raynal@bootlin.com>
+References: <20181122212212.16039-3-miquel.raynal@bootlin.com>
+Message-ID: <201811231627.H7ojlKLL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+Hi Miquel,
 
-On Fri, Nov 23, 2018 at 04:01:17PM +0800, Yong wrote:
-> Hi jacopo,
->
-> On Fri, 23 Nov 2018 08:45:14 +0100
-> jacopo mondi <jacopo@jmondi.org> wrote:
->
-> > Hi Yong,
-> >
-> > On Tue, Oct 30, 2018 at 03:06:24PM +0200, Laurent Pinchart wrote:
-> > > Hi Yong,
-> > >
-> > > Thank you for the patch.
-> > >
-> > > On Tuesday, 30 October 2018 10:12:23 EET Yong Deng wrote:
-> > > > Add binding documentation for Allwinner V3s CSI.
-> > > >
-> > > > Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> > > > Reviewed-by: Rob Herring <robh@kernel.org>
-> > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > >
-> > > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > >
-> > > > ---
-> > > >  .../devicetree/bindings/media/sun6i-csi.txt        | 56 +++++++++++++++++++
-> > > >  1 file changed, 56 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > b/Documentation/devicetree/bindings/media/sun6i-csi.txt new file mode
-> > > > 100644
-> > > > index 000000000000..443e18c181b3
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-> > > > @@ -0,0 +1,56 @@
-> > > > +Allwinner V3s Camera Sensor Interface
-> > > > +-------------------------------------
-> > > > +
-> > > > +Allwinner V3s SoC features a CSI module(CSI1) with parallel interface.
-> > > > +
-> > > > +Required properties:
-> > > > +  - compatible: value must be "allwinner,sun8i-v3s-csi"
-> > > > +  - reg: base address and size of the memory-mapped region.
-> > > > +  - interrupts: interrupt associated to this IP
-> > > > +  - clocks: phandles to the clocks feeding the CSI
-> > > > +    * bus: the CSI interface clock
-> > > > +    * mod: the CSI module clock
-> > > > +    * ram: the CSI DRAM clock
-> > > > +  - clock-names: the clock names mentioned above
-> > > > +  - resets: phandles to the reset line driving the CSI
-> > > > +
-> > > > +The CSI node should contain one 'port' child node with one child 'endpoint'
-> > > > +node, according to the bindings defined in
-> > > > +Documentation/devicetree/bindings/media/video-interfaces.txt.
-> > > > +
-> > > > +Endpoint node properties for CSI
-> > > > +---------------------------------
-> > > > +See the video-interfaces.txt for a detailed description of these
-> > > > properties. +- remote-endpoint	: (required) a phandle to the bus receiver's
-> > > > endpoint +			   node
-> > > > +- bus-width:		: (required) must be 8, 10, 12 or 16
-> > > > +- pclk-sample		: (optional) (default: sample on falling edge)
-> > > > +- hsync-active		: (required; parallel-only)
-> > > > +- vsync-active		: (required; parallel-only)
-> > > > +
-> > > > +Example:
-> > > > +
-> > > > +csi1: csi at 1cb4000 {
-> > > > +	compatible = "allwinner,sun8i-v3s-csi";
-> > > > +	reg = <0x01cb4000 0x1000>;
-> > > > +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > > > +	clocks = <&ccu CLK_BUS_CSI>,
-> > > > +		 <&ccu CLK_CSI1_SCLK>,
-> > > > +		 <&ccu CLK_DRAM_CSI>;
-> > > > +	clock-names = "bus", "mod", "ram";
-> > > > +	resets = <&ccu RST_BUS_CSI>;
-> > > > +
-> > > > +	port {
-> > > > +		/* Parallel bus endpoint */
-> > > > +		csi1_ep: endpoint {
-> > > > +			remote-endpoint = <&adv7611_ep>;
-> > > > +			bus-width = <16>;
-> > > > +
-> > > > +			/* If hsync-active/vsync-active are missing,
-> > > > +			   embedded BT.656 sync is used */
-> >
-> > Am I confused? The properties description defines [v|h]sync-active as
-> > required, but the example reports that they can be omitted to use
-> > BT.656 synchronization.
-> >
-> > Which one of the following is correct?
-> > 1) [h|v]sync-active are mandatory: no BT.656 support can be selected.
-> > 2) [h|v]sync-active are optional, and if not specified BT.656 is
-> >    selected.
-> > 3) I am confused.
-> >
->
-> hsync-active		: (required; parallel-only)
-> vsync-active		: (required; parallel-only)
->
-> Here, parallel means seperate sync signal, BT.656 means embedded sync
-> signal. Kernel use these two properties to detect if the bus type is
-> parallel or Bt656. So [h|v]sync-active are mandatory only if your bus
-> type is parallel and must not be specified if your bus type is Bt656.
+I love your patch! Yet something to improve:
 
-Well, BT.565 sync mode applies to parallel data transmission busses as
-BT.601 sync mode does... I don't want to bikeshed on terms though, I'm
-sorry...
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.20-rc3 next-20181122]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-I would have write here:
+url:    https://github.com/0day-ci/linux/commits/Miquel-Raynal/Link-consumer-with-clock-driver/20181123-113833
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: sh-titan_defconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sh 
 
-hsync-active		: Required when using explicit HSYNC synchronism
-                          signal. Default valuse is "high"/"low".
-vsync-active		: Required when using explicit VSYNC synchronism
-                          signal. Default valuse is "high"/"low".
-When both vsync-active and hsync-active are omitted BT.565 implicit
-synchronization mode is used.
+All errors (new ones prefixed by >>):
 
-To avoid confusing people already confused as I am :)
+   drivers//clk/clkdev.c: In function 'clk_get':
+>> drivers//clk/clkdev.c:209:3: error: implicit declaration of function '__clk_device_link'; did you mean '__clk_free_clk'? [-Werror=implicit-function-declaration]
+      __clk_device_link(dev, clk);
+      ^~~~~~~~~~~~~~~~~
+      __clk_free_clk
+   drivers//clk/clkdev.c: In function 'clk_put':
+>> drivers//clk/clkdev.c:217:2: error: implicit declaration of function '__clk_device_unlink'; did you mean 'device_online'? [-Werror=implicit-function-declaration]
+     __clk_device_unlink(clk);
+     ^~~~~~~~~~~~~~~~~~~
+     device_online
+   cc1: some warnings being treated as errors
 
-I got this patch is already in, right? Feel free to ignore my comment or
-either send an incremental patch if you think it is appropriate.
+vim +209 drivers//clk/clkdev.c
 
-Thanks
-  j
+   193	
+   194	struct clk *clk_get(struct device *dev, const char *con_id)
+   195	{
+   196		const char *dev_id = dev ? dev_name(dev) : NULL;
+   197		struct clk *clk = NULL;
+   198	
+   199		if (dev && dev->of_node) {
+   200			clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
+   201			if (PTR_ERR(clk) == -EPROBE_DEFER)
+   202				return clk;
+   203		}
+   204	
+   205		if (IS_ERR_OR_NULL(clk))
+   206			clk = clk_get_sys(dev_id, con_id);
+   207	
+   208		if (!IS_ERR(clk))
+ > 209			__clk_device_link(dev, clk);
+   210	
+   211		return clk;
+   212	}
+   213	EXPORT_SYMBOL(clk_get);
+   214	
+   215	void clk_put(struct clk *clk)
+   216	{
+ > 217		__clk_device_unlink(clk);
+   218		__clk_put(clk);
+   219	}
+   220	EXPORT_SYMBOL(clk_put);
+   221	
 
-> Thanks,
-> Yong
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
+Name: .config.gz
+Type: application/gzip
+Size: 16439 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/d8253d6a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/7a74ec89/attachment-0001.gz>
