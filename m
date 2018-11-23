@@ -1,32 +1,97 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 23 Nov 2018 14:19:54 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Enable I2C DMA
-In-Reply-To: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
-References: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
-Message-ID: <CAMuHMdV0RVdYR6SocArG9JujT-GQc-+CjkgUbmtcf-Qy2x2PiQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Nov 2018 13:20:38 +0000
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181123130313.GI1586@8bytes.org>
+References: <20181122140320.24080-1-hch@lst.de>
+ <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
+ <20181122170715.GI30658@n2100.armlinux.org.uk>
+ <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <20181123104918.GE1586@8bytes.org>
+ <20181123110155.GR30658@n2100.armlinux.org.uk>
+ <20181123130313.GI1586@8bytes.org>
+Message-ID: <20181123132038.GT30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 20, 2018 at 11:35 PM Yoshihiro Kaneko <ykaneko0929@gmail.com> wrote:
-> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
->
-> This patch enables I2C DMA.
->
-> NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
-> Rev.0.80E.
->
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+On Fri, Nov 23, 2018 at 02:03:13PM +0100, Joerg Roedel wrote:
+> On Fri, Nov 23, 2018 at 11:01:55AM +0000, Russell King - ARM Linux wrote:
+> > Yuck.  So, if we have a 4GB non-PAE 32-bit system, or a PAE system
+> > where we have valid memory across the 4GB boundary and no IOMMU,
+> > we have to reserve the top 4K page in the first 4GB of RAM?
+> 
+> But that is only needed when dma_addr_t is 32bit anyway, no?
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+You said:
 
-Gr{oetje,eeting}s,
+  But we can easily work around that by reserving the top 4k of the first
+  4GB of IOVA address space in the allocator, no? Then these values are
+  never returned as valid DMA handles.
 
-                        Geert
+To me, your proposal equates to this in code:
+
+int dma_error(dma_addr_t addr)
+{
+	return (addr & ~(dma_addr_t)0xfff) == 0xfffff000 ? (s32)addr : 0; 
+}
+
+Hence, the size of dma_addr_t would be entirely irrelevant.  This
+makes dma_addr_t values in the range of 0xfffff000 to 0xffffffff special,
+irrespective of whether dma_addr_t is 32-bit or 64-bit.
+
+If that's not what you meant, then I'm afraid your statement wasn't
+worded very well - so please can you re-word to state more precisely
+what your proposal is?
+
+> > Rather than inventing magic cookies like this, I'd much rather we
+> > sanitised the API so that we have functions that return success or
+> > an error code, rather than trying to shoe-horn some kind of magic
+> > error codes into dma_addr_t and subtly break systems in the process.
+> 
+> Sure, but is has the obvious downside that we need to touch every driver
+> that uses these functions, and that are probably a lot of drivers.
+
+So we have two options:
+- change the interface
+- subtly break drivers
+
+In any case, I disagree that we need to touch every driver.  Today,
+drivers just do:
+
+	if (dma_mapping_error(dev, addr))
+
+and, because dma_mapping_error() returns a boolean, they only care about
+the true/falseness.  If we're going to start returning error codes, then
+there's no point just returning error codes unless we have some way for
+drivers to use them.  Yes, the simple way would be to make
+dma_mapping_error() translate addr to an error code, and that maintains
+compatibility with existing drivers.
+
+If, instead, we revamped the DMA API, and had the *new* mapping functions
+which returned an error code, then the existing mapping functions can be
+implemented as part of compatibility rather trivially:
+
+dma_addr_t dma_map_single(...)
+{
+	dma_addr_t addr;
+	int error;
+
+	error = dma_map_single_error(..., &addr);
+	if (error)
+		addr = DMA_MAPPING_ERROR;
+	return addr;
+}
+
+which means that if drivers want access to the error code, they use
+dma_map_single_error(), meanwhile existing drivers just get on with life
+as it _currently_ is, with the cookie-based all-ones error code - without
+introducing any of this potential breakage.
+
+Remember, existing drivers would need modification in _any_ case to make
+use of a returned error code, so the argument that we'd need to touch
+every driver doesn't really stand up.
 
 -- 
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
