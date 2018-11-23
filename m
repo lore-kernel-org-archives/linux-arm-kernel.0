@@ -1,71 +1,42 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:53 +0100
-Subject: [PATCH v2 21/43] drm/sun4i: frontend: Add support for the BGRX8888
- input format
+Date: Fri, 23 Nov 2018 10:24:55 +0100
+Subject: [PATCH v2 23/43] drm/sun4i: backend: Detail the YUV to RGB values
+ coding explanation
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-22-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-24-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces support for the BGRX8888 input format for the frontend,
-with its associated pixel sequence value definition. Other fields are
-already configured correctly as they no longer depend on the format's
-fourcc directly.
+From: Paul Kocialkowski <contact@paulk.fr>
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+The values in the BT601 YUV to RGB colorspace translation are not
+simply coded as multiples, but rather as fixed-point signed fractional
+values on a given number of bits. Add an explanation about that.
+
+Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 5 +++++
- drivers/gpu/drm/sun4i/sun4i_frontend.h | 1 +
- drivers/gpu/drm/sun4i/sun4i_layer.c    | 1 +
- 3 files changed, 7 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 7a8efbd516ac..e579fcf63ab4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -127,6 +127,10 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
- {
- 	switch (fmt) {
-+	case DRM_FORMAT_BGRX8888:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
-+		return 0;
-+
- 	case DRM_FORMAT_XRGB8888:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB;
- 		return 0;
-@@ -149,6 +153,7 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
- }
- 
- static const uint32_t sun4i_frontend_formats[] = {
-+	DRM_FORMAT_BGRX8888,
- 	DRM_FORMAT_XRGB8888,
- };
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 56bd5a3f9723..2ee1bccf378a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -28,6 +28,7 @@
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB		(5 << 4)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB		1
- 
- #define SUN4I_FRONTEND_OUTPUT_FMT_REG		0x05c
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index c3368b17e5f1..6155eca6b1bd 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -131,6 +131,7 @@ static const uint32_t sun4i_layer_formats[] = {
- 	DRM_FORMAT_ARGB8888,
- 	DRM_FORMAT_ARGB4444,
- 	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_BGRX8888,
- 	DRM_FORMAT_RGBA5551,
- 	DRM_FORMAT_RGBA4444,
- 	DRM_FORMAT_RGB888,
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index a39d8b75d76a..986bdb64521c 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -48,8 +48,12 @@ static const u32 sunxi_rgb2yuv_coef[12] = {
+ /*
+  * These coefficients are taken from the A33 BSP from Allwinner.
+  *
+- * The formula is for each component, each coefficient being multiplied by
+- * 1024 and each constant being multiplied by 16:
++ * The first three values of each row are coded as 13-bit signed fixed-point
++ * numbers, with 10 bits for the fractional part. The fourth value is a
++ * constant coded as a 14-bit signed fixed-point number with 4 bits for the
++ * fractional part.
++ *
++ * The values in table order give the following colorspace translation:
+  * G = 1.164 * Y - 0.391 * U - 0.813 * V + 135
+  * R = 1.164 * Y + 1.596 * V - 222
+  * B = 1.164 * Y + 2.018 * U + 276
 -- 
 2.19.1
