@@ -1,99 +1,115 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 23 Nov 2018 17:31:13 +0100 (CET)
-Subject: [PATCH 09/17] irqchip: bcm283x: Switch to SPDX identifier
-In-Reply-To: <dda72906-fc11-da81-8aa2-c53639b3dbcc@arm.com>
-References: <1541865263-7571-1-git-send-email-stefan.wahren@i2se.com>
- <7ab4438c-6cdd-8655-0745-2bbc137970d0@i2se.com>
- <dda72906-fc11-da81-8aa2-c53639b3dbcc@arm.com>
-Message-ID: <2029817264.143270.1542990673605@email.ionos.de>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Fri, 23 Nov 2018 11:54:18 -0500
+Subject: [PATCH] irqchhip: Convert to using %pOFn instead of device_node.name
+Message-ID: <20181123165418.27745-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+In preparation to remove the node name pointer from struct device_node,
+convert printf users to use the %pOFn format specifier.
 
-> Marc Zyngier <marc.zyngier@arm.com> hat am 23. November 2018 um 16:34 geschrieben:
-> 
-> 
-> On 23/11/2018 15:23, Stefan Wahren wrote:
-> > Hi Jason,
-> > hi Marc,
-> > 
-> > Am 10.11.18 um 16:54 schrieb Stefan Wahren:
-> >> Adopt the SPDX license identifier headers to ease license compliance
-> >> management.
-> >>
-> >> Cc: Simon Arlott <simon@arlott.org>
-> >> Cc: Eric Anholt <eric@anholt.net>
-> >> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> ---
-> >>  drivers/irqchip/irq-bcm2835.c | 11 +----------
-> >>  drivers/irqchip/irq-bcm2836.c | 11 +----------
-> >>  2 files changed, 2 insertions(+), 20 deletions(-)
-> >>
-> >> diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
-> >> index d2da8a1..418245d 100644
-> >> --- a/drivers/irqchip/irq-bcm2835.c
-> >> +++ b/drivers/irqchip/irq-bcm2835.c
-> >> @@ -1,17 +1,8 @@
-> >> +// SPDX-License-Identifier: GPL-2.0+
-> >>  /*
-> >>   * Copyright 2010 Broadcom
-> >>   * Copyright 2012 Simon Arlott, Chris Boot, Stephen Warren
-> >>   *
-> >> - * This program is free software; you can redistribute it and/or modify
-> >> - * it under the terms of the GNU General Public License as published by
-> >> - * the Free Software Foundation; either version 2 of the License, or
-> >> - * (at your option) any later version.
-> >> - *
-> >> - * This program is distributed in the hope that it will be useful,
-> >> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> - * GNU General Public License for more details.
-> >> - *
-> >>   * Quirk 1: Shortcut interrupts don't set the bank 1/2 register pending bits
-> >>   *
-> >>   * If an interrupt fires on bank 1 that isn't in the shortcuts list, bit 8
-> >> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-> >> index dfe4a46..2038693 100644
-> >> --- a/drivers/irqchip/irq-bcm2836.c
-> >> +++ b/drivers/irqchip/irq-bcm2836.c
-> >> @@ -1,17 +1,8 @@
-> >> +// SPDX-License-Identifier: GPL-2.0+
-> >>  /*
-> >>   * Root interrupt controller for the BCM2836 (Raspberry Pi 2).
-> >>   *
-> >>   * Copyright 2015 Broadcom
-> >> - *
-> >> - * This program is free software; you can redistribute it and/or modify
-> >> - * it under the terms of the GNU General Public License as published by
-> >> - * the Free Software Foundation; either version 2 of the License, or
-> >> - * (at your option) any later version.
-> >> - *
-> >> - * This program is distributed in the hope that it will be useful,
-> >> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> - * GNU General Public License for more details.
-> >>   */
-> >>  
-> >>  #include <linux/cpu.h>
-> > 
-> > Eric already made a review. Are you fine with it?
-> 
-> Sure. How do you want this to go in?
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/irqchip/irq-mscc-ocelot.c |  6 +++---
+ drivers/irqchip/irq-stm32-exti.c  |  6 +++---
+ drivers/irqchip/irq-tango.c       | 10 +++++-----
+ 3 files changed, 11 insertions(+), 11 deletions(-)
 
-i would prefer if this patch go via irqchip tree.
-
-Thanks Stefan
-
-> If you have a series repainting
-> multiple subsystems, I'd rather it stays as such, and you can stick my
-> 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> 
-> on it.
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+diff --git a/drivers/irqchip/irq-mscc-ocelot.c b/drivers/irqchip/irq-mscc-ocelot.c
+index b63e40c00a02..88143c0b700c 100644
+--- a/drivers/irqchip/irq-mscc-ocelot.c
++++ b/drivers/irqchip/irq-mscc-ocelot.c
+@@ -72,7 +72,7 @@ static int __init ocelot_irq_init(struct device_node *node,
+ 	domain = irq_domain_add_linear(node, OCELOT_NR_IRQ,
+ 				       &irq_generic_chip_ops, NULL);
+ 	if (!domain) {
+-		pr_err("%s: unable to add irq domain\n", node->name);
++		pr_err("%pOFn: unable to add irq domain\n", node);
+ 		return -ENOMEM;
+ 	}
+ 
+@@ -80,14 +80,14 @@ static int __init ocelot_irq_init(struct device_node *node,
+ 					     "icpu", handle_level_irq,
+ 					     0, 0, 0);
+ 	if (ret) {
+-		pr_err("%s: unable to alloc irq domain gc\n", node->name);
++		pr_err("%pOFn: unable to alloc irq domain gc\n", node);
+ 		goto err_domain_remove;
+ 	}
+ 
+ 	gc = irq_get_domain_generic_chip(domain, 0);
+ 	gc->reg_base = of_iomap(node, 0);
+ 	if (!gc->reg_base) {
+-		pr_err("%s: unable to map resource\n", node->name);
++		pr_err("%pOFn: unable to map resource\n", node);
+ 		ret = -ENOMEM;
+ 		goto err_gc_free;
+ 	}
+diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+index 0a2088e12d96..363385750fa7 100644
+--- a/drivers/irqchip/irq-stm32-exti.c
++++ b/drivers/irqchip/irq-stm32-exti.c
+@@ -678,8 +678,8 @@ static int __init stm32_exti_init(const struct stm32_exti_drv_data *drv_data,
+ 	domain = irq_domain_add_linear(node, drv_data->bank_nr * IRQS_PER_BANK,
+ 				       &irq_exti_domain_ops, NULL);
+ 	if (!domain) {
+-		pr_err("%s: Could not register interrupt domain.\n",
+-		       node->name);
++		pr_err("%pOFn: Could not register interrupt domain.\n",
++		       node);
+ 		ret = -ENOMEM;
+ 		goto out_unmap;
+ 	}
+@@ -768,7 +768,7 @@ __init stm32_exti_hierarchy_init(const struct stm32_exti_drv_data *drv_data,
+ 					  host_data);
+ 
+ 	if (!domain) {
+-		pr_err("%s: Could not register exti domain.\n", node->name);
++		pr_err("%pOFn: Could not register exti domain.\n", node);
+ 		ret = -ENOMEM;
+ 		goto out_unmap;
+ 	}
+diff --git a/drivers/irqchip/irq-tango.c b/drivers/irqchip/irq-tango.c
+index 580e2d72b9ba..ae28d8648679 100644
+--- a/drivers/irqchip/irq-tango.c
++++ b/drivers/irqchip/irq-tango.c
+@@ -184,11 +184,11 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
+ 
+ 	irq = irq_of_parse_and_map(node, 0);
+ 	if (!irq)
+-		panic("%s: failed to get IRQ", node->name);
++		panic("%pOFn: failed to get IRQ", node);
+ 
+ 	err = of_address_to_resource(node, 0, &res);
+ 	if (err)
+-		panic("%s: failed to get address", node->name);
++		panic("%pOFn: failed to get address", node);
+ 
+ 	chip = kzalloc(sizeof(*chip), GFP_KERNEL);
+ 	chip->ctl = res.start - baseres->start;
+@@ -196,12 +196,12 @@ static int __init tangox_irq_init(void __iomem *base, struct resource *baseres,
+ 
+ 	dom = irq_domain_add_linear(node, 64, &irq_generic_chip_ops, chip);
+ 	if (!dom)
+-		panic("%s: failed to create irqdomain", node->name);
++		panic("%pOFn: failed to create irqdomain", node);
+ 
+ 	err = irq_alloc_domain_generic_chips(dom, 32, 2, node->name,
+ 					     handle_level_irq, 0, 0, 0);
+ 	if (err)
+-		panic("%s: failed to allocate irqchip", node->name);
++		panic("%pOFn: failed to allocate irqchip", node);
+ 
+ 	tangox_irq_domain_init(dom);
+ 
+@@ -219,7 +219,7 @@ static int __init tangox_of_irq_init(struct device_node *node,
+ 
+ 	base = of_iomap(node, 0);
+ 	if (!base)
+-		panic("%s: of_iomap failed", node->name);
++		panic("%pOFn: of_iomap failed", node);
+ 
+ 	of_address_to_resource(node, 0, &res);
+ 
+-- 
+2.17.0
