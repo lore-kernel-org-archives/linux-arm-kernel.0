@@ -1,45 +1,118 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 23 Nov 2018 10:55:10 +0800
-Subject: [PATCH v3 00/15] MT8183 IOMMU SUPPORT
-In-Reply-To: <20181122133526.GA13896@arm.com>
+Date: Fri, 23 Nov 2018 10:59:53 +0800
+Subject: [PATCH v3 10/15] memory: mtk-smi: Add bus_sel for mt8183
+In-Reply-To: <1542422142-30688-11-git-send-email-yong.wu@mediatek.com>
 References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
- <20181122125931.GC1586@8bytes.org> <20181122133526.GA13896@arm.com>
-Message-ID: <1542941710.15759.8.camel@mhfsdcap03>
+ <1542422142-30688-11-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1542941993.15759.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2018-11-22 at 13:35 +0000, Will Deacon wrote:
-> On Thu, Nov 22, 2018 at 01:59:31PM +0100, Joerg Roedel wrote:
-> > On Sat, Nov 17, 2018 at 10:35:27AM +0800, Yong Wu wrote:
-> > > Yong Wu (14):
-> > >   dt-bindings: mediatek: Add binding for mt8183 IOMMU and SMI
-> > >   iommu/mediatek: Use a struct as the platform data
-> > >   memory: mtk-smi: Use a general config_port interface
-> > >   iommu/io-pgtable-arm-v7s: Add paddr_to_iopte and iopte_to_paddr
-> > >     helpers
-> > >   iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB Mode
-> > >   iommu/mediatek: Add mt8183 IOMMU support
-> > >   iommu/mediatek: Add mmu1 support
-> > >   memory: mtk-smi: Invoke pm runtime_callback to enable clocks
-> > >   memory: mtk-smi: Use a struct for the platform data for smi-common
-> > >   memory: mtk-smi: Add bus_sel for mt8183
-> > >   iommu/mediatek: Add VLD_PA_RANGE register backup when suspend
-> > >   iommu/mediatek: Add shutdown callback
-> > >   memory: mtk-smi: Get rid of need_larbid
-> > >   iommu/mediatek: Switch to SPDX license identifier
-> > 
-> > This should probably go through the IOMMU tree. For that I'd like to
-> > have Acks (reviews are even better) for the io-pgtable parts from Robin
-> > and for the memory parts from Matthias first.
+On Sat, 2018-11-17 at 10:35 +0800, Yong Wu wrote:
+> There are 2 mmu cells in a M4U HW. we could adjust some larbs entering
+> mmu0 or mmu1 to balance the bandwidth via the smi-common register
+> SMI_BUS_SEL(0x220)(Each larb occupy 2 bits).
 > 
-> Robin already reviewed the pgtable bits, I think.
+> In mt8183, For better performance, we switch larb1/2/3/7 to enter
+> mmu1 while the others still keep enter mmu0.
 
-Thanks Joerg/Will for your comment.
-
-Hi Matthias,
-
-  Could you help also have a look at this patchset? Especially for the
-memory part. Thanks in advance.
+The larb listed here don't match with the code below. I will fix it.
 
 > 
-> Will
+> In mt8173 and mt2712, we don't get the performance issue,
+> Keep its default value(0x0), that means all the larbs enter mmu0.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
+>  drivers/memory/mtk-smi.c | 29 ++++++++++++++++++++++++++---
+>  1 file changed, 26 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
+> index 3e6e0a8..e4daabb 100644
+> --- a/drivers/memory/mtk-smi.c
+> +++ b/drivers/memory/mtk-smi.c
+> @@ -49,6 +49,12 @@
+>  #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
+>  #define F_MMU_EN		BIT(0)
+>  
+> +/* SMI COMMON */
+> +#define SMI_BUS_SEL			0x220
+> +#define SMI_BUS_LARB_SHIFT(larbid)	((larbid) << 1)
+> +/* All are MMU0 defaultly. Only specialize mmu1 here. */
+> +#define F_MMU1_LARB(larbid)		(0x1 << SMI_BUS_LARB_SHIFT(larbid))
+> +
+>  enum mtk_smi_gen {
+>  	MTK_SMI_GEN1,
+>  	MTK_SMI_GEN2
+> @@ -56,6 +62,8 @@ enum mtk_smi_gen {
+>  
+>  struct mtk_smi_common_plat {
+>  	enum mtk_smi_gen gen;
+> +
+> +	u32 bus_sel; /* Balance some larbs to enter mmu0 or mmu1 */
+>  };
+>  
+>  struct mtk_smi_larb_gen {
+> @@ -70,8 +78,8 @@ struct mtk_smi {
+>  	struct clk			*clk_apb, *clk_smi;
+>  	struct clk			*clk_gals0, *clk_gals1;
+>  	struct clk			*clk_async; /*only needed by mt2701*/
+> -	void __iomem			*smi_ao_base;
+> -
+> +	void __iomem			*smi_ao_base; /* only for gen1 */
+> +	void __iomem			*base;	      /* only for gen2 */
+>  	const struct mtk_smi_common_plat *plat;
+>  };
+>  
+> @@ -401,6 +409,12 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
+>  	.gen = MTK_SMI_GEN2,
+>  };
+>  
+> +static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
+> +	.gen = MTK_SMI_GEN2,
+> +	.bus_sel = F_MMU1_LARB(1) | F_MMU1_LARB(3) | F_MMU1_LARB(4) |
+> +		   F_MMU1_LARB(7),
+> +};
+> +
+>  static const struct of_device_id mtk_smi_common_of_ids[] = {
+>  	{
+>  		.compatible = "mediatek,mt8173-smi-common",
+> @@ -416,7 +430,7 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
+>  	},
+>  	{
+>  		.compatible = "mediatek,mt8183-smi-common",
+> -		.data = &mtk_smi_common_gen2,
+> +		.data = &mtk_smi_common_mt8183,
+>  	},
+>  	{}
+>  };
+> @@ -473,6 +487,11 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
+>  		ret = clk_prepare_enable(common->clk_async);
+>  		if (ret)
+>  			return ret;
+> +	} else {
+> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +		common->base = devm_ioremap_resource(dev, res);
+> +		if (IS_ERR(common->base))
+> +			return PTR_ERR(common->base);
+>  	}
+>  	pm_runtime_enable(dev);
+>  	platform_set_drvdata(pdev, common);
+> @@ -488,6 +507,7 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
+>  static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+>  {
+>  	struct mtk_smi *common = dev_get_drvdata(dev);
+> +	u32 bus_sel = common->plat->bus_sel;
+>  	int ret;
+>  
+>  	ret = mtk_smi_clk_enable(common);
+> @@ -495,6 +515,9 @@ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
+>  		dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
+>  		return ret;
+>  	}
+> +
+> +	if (common->plat->gen == MTK_SMI_GEN2 && bus_sel)
+> +		writel(bus_sel, common->base + SMI_BUS_SEL);
+>  	return 0;
+>  }
+>  
