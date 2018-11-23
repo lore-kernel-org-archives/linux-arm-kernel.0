@@ -1,32 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Nov 2018 18:35:16 +0000
-Subject: [PATCH V3 4/5] arm64: mm: introduce 52-bit userspace support
-In-Reply-To: <20181114133920.7134-5-steve.capper@arm.com>
-References: <20181114133920.7134-1-steve.capper@arm.com>
- <20181114133920.7134-5-steve.capper@arm.com>
-Message-ID: <20181123183516.GM3360@arrakis.emea.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 23 Nov 2018 18:41:02 +0000
+Subject: [PATCH v2 3/8] arm64: KVM: Install stage-2 translation before
+ enabling traps
+In-Reply-To: <20181123184107.39334-1-marc.zyngier@arm.com>
+References: <20181123184107.39334-1-marc.zyngier@arm.com>
+Message-ID: <20181123184107.39334-4-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 01:39:19PM +0000, Steve Capper wrote:
-> diff --git a/arch/arm64/include/asm/pgalloc.h b/arch/arm64/include/asm/pgalloc.h
-> index 2e05bcd944c8..56c3ccabeffe 100644
-> --- a/arch/arm64/include/asm/pgalloc.h
-> +++ b/arch/arm64/include/asm/pgalloc.h
-> @@ -27,7 +27,11 @@
->  #define check_pgt_cache()		do { } while (0)
->  
->  #define PGALLOC_GFP	(GFP_KERNEL | __GFP_ZERO)
-> +#ifdef CONFIG_ARM64_52BIT_VA
-> +#define PGD_SIZE	((1 << (52 - PGDIR_SHIFT)) * sizeof(pgd_t))
-> +#else
->  #define PGD_SIZE	(PTRS_PER_PGD * sizeof(pgd_t))
-> +#endif
+It is a bit odd that we only install stage-2 translation after having
+cleared HCR_EL2.TGE, which means that there is a window during which
+AT requests could fail as stage-2 is not configured yet.
 
-This introduces a mismatch between PTRS_PER_PGD and PGD_SIZE. While it
-happens not to corrupt any memory (we allocate a full page for pgdirs),
-the compiler complains about the memset() in map_entry_trampoline()
-since tramp_pg_dir[] is smaller.
+Let's move stage-2 configuration before we clear TGE, making the
+guest entry sequence clearer: we first configure all the guest stuff,
+then only switch to the guest translation regime.
 
+While we're at it, do the same thing for !VHE. It doesn't hurt,
+and keeps things symmetric.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kvm/hyp/switch.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 7cc175c88a37..a8fa61c68c32 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -499,8 +499,8 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 
+ 	sysreg_save_host_state_vhe(host_ctxt);
+ 
+-	__activate_traps(vcpu);
+ 	__activate_vm(vcpu->kvm);
++	__activate_traps(vcpu);
+ 
+ 	sysreg_restore_guest_state_vhe(guest_ctxt);
+ 	__debug_switch_to_guest(vcpu);
+@@ -545,8 +545,8 @@ int __hyp_text __kvm_vcpu_run_nvhe(struct kvm_vcpu *vcpu)
+ 
+ 	__sysreg_save_state_nvhe(host_ctxt);
+ 
+-	__activate_traps(vcpu);
+ 	__activate_vm(kern_hyp_va(vcpu->kvm));
++	__activate_traps(vcpu);
+ 
+ 	__hyp_vgic_restore_state(vcpu);
+ 	__timer_enable_traps(vcpu);
 -- 
-Catalin
+2.19.1
