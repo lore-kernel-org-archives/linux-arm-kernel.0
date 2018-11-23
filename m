@@ -1,19 +1,47 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 23 Nov 2018 11:17:19 -0800 (PST)
-Subject: [PATCH v3 0/3] dpaa_eth: add ethtool coalesce control
-In-Reply-To: <1542800469-6802-1-git-send-email-madalin.bucur@nxp.com>
-References: <1542800469-6802-1-git-send-email-madalin.bucur@nxp.com>
-Message-ID: <20181123.111719.418226927543456028.davem@davemloft.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 23 Nov 2018 19:34:15 +0000
+Subject: [PATCH 06/10] swiotlb: use swiotlb_map_page in
+ swiotlb_map_sg_attrs
+In-Reply-To: <20181123182715.GA21183@arm.com>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-7-hch@lst.de>
+ <CANcMJZAzrxA9LGNvP-epv2DwsUacEM_hcgA1n5gmaPuWRJG4iw@mail.gmail.com>
+ <20181109074955.GA27489@lst.de>
+ <CALAqxLVSDkv4faF3ta_ue9AA9s8B=-8cAMxC_sow+wZYtrfxeQ@mail.gmail.com>
+ <20181114141311.GA26677@lst.de> <20181114161239.GA29462@lst.de>
+ <CALAqxLVMW2sYkaQvggZ-LhvkzpuF2rssQJ4thZkkAkROk=wVVw@mail.gmail.com>
+ <20181120092516.GC7270@lst.de> <20181123182715.GA21183@arm.com>
+Message-ID: <1c782a3d-cac4-954f-21e7-ef89147f0d56@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madalin Bucur <madalin.bucur@nxp.com>
-Date: Wed, 21 Nov 2018 13:41:06 +0200
+Hi Will,
 
-> Add control of the DPAA portal interrupt coalescing settings from
-> ethtool.
+On 2018-11-23 6:27 pm, Will Deacon wrote:
+> Hi John,
 > 
-> changes from v2: read ithresh from HW, set previous values on failure
-> changes from v1: added range checking for the QMan APIs
+> On Tue, Nov 20, 2018 at 10:25:16AM +0100, Christoph Hellwig wrote:
+>> On Mon, Nov 19, 2018 at 03:22:13PM -0800, John Stultz wrote:
+>>>> +               sg->dma_address = dma_addr;
+>>>>                  sg_dma_len(sg) = sg->length;
+>>>>          }
+>>>
+>>> I know Robin has already replied with more detailed info, but just to
+>>> close the loop as I'm finally home, applying this patch didn't seem to
+>>> help with the IO hangs I'm seeing w/ HiKey960.
+>>
+>> If Robins observation is right this should fix the problem for you:
+> 
+> Please could you give this diff a try and let us know whether the problem
+> persists with your board?
 
-Series applied.
+This is actually the exact same change that I ended up with in my 
+fixes[1], which John has indeed confirmed.
+
+(sorry, it's the thing I was telling you about the other day, but I 
+neglected to include you on cc you when I sent the patches out the 
+following morning)
+
+Robin.
+
+[1] https://lore.kernel.org/lkml/cover.1542812807.git.robin.murphy at arm.com/
