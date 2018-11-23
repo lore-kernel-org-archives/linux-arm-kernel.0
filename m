@@ -1,46 +1,54 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:52 +0100
-Subject: [PATCH v2 20/43] drm/sun4i: frontend: Determine input format based on
- colorspace
-In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-21-paul.kocialkowski@bootlin.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Fri, 23 Nov 2018 09:44:11 +0000
+Subject: [PATCH 1/3] clk: samsung: exynos5420: add VPLL rate table for g3d
+ clock
+Message-ID: <20181123094413.1108-1-linux.amoon@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since all the RGB input formats have the same value for the DATA_FMT
-field of the INPUT_FMT register, we can group them when the format is
-known to be RGB. Here, we assume that a non-YUV format is RGB, because
-the hardware does not support any other colorspace than RGB and YUV.
-Thus, we can use the associated common DRM helper.
+From: Marian Mihailescu <mihailescu2m@gmail.com>
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+A specific clock rate table is added for VPLL so it is possible
+to set frequency of the VPLL output clock that used by the g3d clock.
+
+Cc: Andrzej Hajda <a.hajda@samsung.com>
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
+Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ drivers/clk/samsung/clk-exynos5420.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index a16697b0eac5..7a8efbd516ac 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -106,14 +106,12 @@ EXPORT_SYMBOL(sun4i_frontend_update_buffer);
+diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+index 34cce3c5898f..34156bdfd0d2 100644
+--- a/drivers/clk/samsung/clk-exynos5420.c
++++ b/drivers/clk/samsung/clk-exynos5420.c
+@@ -1303,6 +1303,18 @@ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
+ 	PLL_36XX_RATE(24 * MHZ,  32768001U, 131, 3, 5, 4719),
+ };
  
- static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- {
--	switch (fmt) {
--	case DRM_FORMAT_XRGB8888:
-+	if (!drm_format_is_yuv(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
--		return 0;
--
--	default:
-+	else
- 		return -EINVAL;
--	}
++static const struct samsung_pll_rate_table exynos5420_vpll_24mhz_tbl[] __initconst = {
++	PLL_35XX_RATE(24 * MHZ, 600000000U, 200, 2, 2),
++	PLL_35XX_RATE(24 * MHZ, 543000000U, 181, 2, 2),
++	PLL_35XX_RATE(24 * MHZ, 533000000U, 533, 6, 2),
++	PLL_35XX_RATE(24 * MHZ, 480000000U, 320, 4, 2),
++	PLL_35XX_RATE(24 * MHZ, 420000000U, 140, 2, 2),
++	PLL_35XX_RATE(24 * MHZ, 350000000U, 175, 3, 2),
++	PLL_35XX_RATE(24 * MHZ, 266000000U, 266, 3, 3),
++	PLL_35XX_RATE(24 * MHZ, 177000000U, 118, 2, 3),
++	PLL_35XX_RATE(24 * MHZ, 100000000U, 200, 3, 4),
++};
 +
-+	return 0;
- }
+ static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
+ 	[apll] = PLL(pll_2550, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, NULL),
+@@ -1428,6 +1440,7 @@ static void __init exynos5x_clk_init(struct device_node *np,
+ 		exynos5x_plls[epll].rate_table = exynos5420_epll_24mhz_tbl;
+ 		exynos5x_plls[kpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
+ 		exynos5x_plls[bpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
++		exynos5x_plls[vpll].rate_table = exynos5420_vpll_24mhz_tbl;
+ 	}
  
- static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
+ 	samsung_clk_register_pll(ctx, exynos5x_plls, ARRAY_SIZE(exynos5x_plls),
 -- 
-2.19.1
+2.17.1
