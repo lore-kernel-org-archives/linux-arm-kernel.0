@@ -1,55 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Nov 2018 13:37:40 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Enable I2C DMA
-In-Reply-To: <20181121120252.l433sboqukjpk2ij@verge.net.au>
-References: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
- <20181121120252.l433sboqukjpk2ij@verge.net.au>
-Message-ID: <20181123123739.eufwbgqq6b7x574z@verge.net.au>
+Date: Fri, 23 Nov 2018 13:38:46 +0100
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: add thermal device
+ support
+In-Reply-To: <20181017095828.lgp6e7q4ag4meybs@verge.net.au>
+References: <1539612746-9711-1-git-send-email-ykaneko0929@gmail.com>
+ <20181017095828.lgp6e7q4ag4meybs@verge.net.au>
+Message-ID: <20181123123845.ak23g2wthryysfaz@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 01:02:57PM +0100, Simon Horman wrote:
-> On Sun, Oct 21, 2018 at 06:35:26AM +0900, Yoshihiro Kaneko wrote:
-> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+On Wed, Oct 17, 2018 at 11:58:29AM +0200, Simon Horman wrote:
+> On Mon, Oct 15, 2018 at 11:12:26PM +0900, Yoshihiro Kaneko wrote:
+> > This patch adds the thermal device node and the thermal-zone for
+> > the R8A77990 SoC.
 > > 
-> > This patch enables I2C DMA.
-> > 
-> > NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
-> > Rev.0.80E.
-> > 
-> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 > > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> Thanks,
 > 
-> Base patch stack:
-> * renesas-devel-20181121-v4.20-rc3
-> + "iommu/ipmmu-vmsa: Hook up r8a77990 DT matching code"
-> + "pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and functions"
-> + "pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and functions"
+> This looks fine to me but I will wait to see if there are other reviews
+> before applying.
 > 
-> Config: renesas_defconfig + IPMMU_VMSA
-> 
-> Should we enable IPMMU_VMSA in arm64 defconfig and renesas_defconfig?
-> 
-> Test with base patch stack:
-> # grep dma /proc/interrupts  | grep -v "0          0"
-> (no output)
-> # amixer set "DVC Out" 2%
-> # play xyz.wav
-> # grep dma /proc/interrupts  | grep -v "0          0"
-> (no output)
-> 
-> Test with base patch stack + this patch applied:
-> # grep dma /proc/interrupts  | grep -v "0          0"
-> (no output)
-> # amixer set "DVC Out" 2%
-> # play xyz.wav
-> # grep dma /proc/interrupts  | grep -v "0          0"
-> 109:        512          0     GIC-0 352 Level     ec700000.dma-controller:0
-> 
-> 
-> Tested-by: Simon Horman <horms+renesas@verge.net.au>
 > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> I plan to apply this patch for v4.21.
+> Also tested on Ebisu/E3 in conjunction with "[PATCH/RFT 0/2] thermal: add
+> suport for R8A77990"
+> 
+> # X=1000000; while [ "$X" -gt 0 ]; do X=$(($X -1 )); done; cat
+> # /sys/devices/virtual/thermal/thermal_zone0/temp; sleep 1; cat
+> # /sys/devices/virtual/thermal/thermal_zone0/temp
+> 30000
+> 25000
+> 
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> 
 
-Done.
+I was waiting for the bindings to be reviewed, that has now happened
+and I have applied this patch for v4.21.
