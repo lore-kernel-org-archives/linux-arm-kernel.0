@@ -1,54 +1,48 @@
-From: gregory.clement@bootlin.com (Gregory CLEMENT)
-Date: Fri, 23 Nov 2018 16:02:56 +0100
-Subject: [PATCH 6/6] arm64: dts: marvell: Add cpu clock node on Armada
- 7K/8K
-In-Reply-To: <153936613666.5275.6122138233361141260@swboyd.mtv.corp.google.com>
- (Stephen Boyd's message of "Fri, 12 Oct 2018 10:42:16 -0700")
-References: <20180922181709.13007-1-gregory.clement@bootlin.com>
- <20180922181709.13007-7-gregory.clement@bootlin.com>
- <153936613666.5275.6122138233361141260@swboyd.mtv.corp.google.com>
-Message-ID: <87a7lzq1jz.fsf@bootlin.com>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Fri, 23 Nov 2018 10:06:00 -0500
+Subject: [PATCH] clk: nomadik: Change to use DEFINE_SHOW_ATTRIBUTE macro
+Message-ID: <20181123150600.27445-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Use macro to simplify the code.
+
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+ drivers/clk/clk-nomadik.c | 14 ++------------
+ 1 file changed, 2 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
+index 84a24875c629..e331634d34df 100644
+--- a/drivers/clk/clk-nomadik.c
++++ b/drivers/clk/clk-nomadik.c
+@@ -479,17 +479,7 @@ static int nomadik_src_clk_show(struct seq_file *s, void *what)
+ 	return 0;
+ }
  
- On ven., oct. 12 2018, Stephen Boyd <sboyd@kernel.org> wrote:
-
-> +Rob
->
-> Quoting Gregory CLEMENT (2018-09-22 11:17:09)
->> diff --git a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> index 4a65e4e830aa..27c840e91abe 100644
->> --- a/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> +++ b/arch/arm64/boot/dts/marvell/armada-ap806.dtsi
->> @@ -280,6 +280,12 @@
->>                                 #address-cells = <1>;
->>                                 #size-cells = <1>;
->>  
->> +                               cpu_clk: clock-cpu {
->> +                                       compatible = "marvell,ap806-cpu-clock";
->> +                                       clocks = <&ap_clk 0>, <&ap_clk 1>;
->> +                                       #clock-cells = <1>;
->> +                               };
->
-> This looks like the wrong place because there isn't a reg property. It
-
-There is no reg property because we are inside a syscon node where the
-registers are shared between multiple IPs.
-
-> should go to the root of the tree. And then it looks like we're adding
-> something to DT to get a driver to probe, which is improper DT design.
-
-There is nothing related to the driver, this subnode describes the way
-the hardware is designed. Under the system controller node there are
-several IPs , like the CPU clocks, but also the GPIO or the pinctrl.
-
-Gregory
-
->
-
+-static int nomadik_src_clk_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, nomadik_src_clk_show, NULL);
+-}
+-
+-static const struct file_operations nomadik_src_clk_debugfs_ops = {
+-	.open           = nomadik_src_clk_open,
+-	.read           = seq_read,
+-        .llseek         = seq_lseek,
+-	.release        = single_release,
+-};
++DEFINE_SHOW_ATTRIBUTE(nomadik_src_clk_debugfs);
+ 
+ static int __init nomadik_src_clk_init_debugfs(void)
+ {
+@@ -499,7 +489,7 @@ static int __init nomadik_src_clk_init_debugfs(void)
+ 	src_pcksr0_boot = readl(src_base + SRC_PCKSR0);
+ 	src_pcksr1_boot = readl(src_base + SRC_PCKSR1);
+ 	debugfs_create_file("nomadik-src-clk", S_IFREG | S_IRUGO,
+-			    NULL, NULL, &nomadik_src_clk_debugfs_ops);
++			    NULL, NULL, &nomadik_src_clk_debugfs_fops);
+ 	return 0;
+ }
+ device_initcall(nomadik_src_clk_init_debugfs);
 -- 
-Gregory Clement, Bootlin
-Embedded Linux and Kernel engineering
-http://bootlin.com
+2.17.0
