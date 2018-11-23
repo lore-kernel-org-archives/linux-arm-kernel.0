@@ -1,43 +1,119 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 23 Nov 2018 13:23:41 +0100
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <20181122082336.GA2049@infradead.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
- <20181121213853.GL3065@bombadil.infradead.org>
- <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
- <20181122082336.GA2049@infradead.org>
-Message-ID: <555dd63a-0634-6a39-7abc-121e02273cb2@suse.cz>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Nov 2018 13:27:29 +0100
+Subject: [PATCH v2] arm64: dts: renesas: r8a77990: Add I2C-DVFS device node
+In-Reply-To: <CAMuHMdW1Kqmu3spuejDQH6Yv1CPTvmYjFQA8L1n3fHbECoYT9A@mail.gmail.com>
+References: <20181121121139.25493-1-horms+renesas@verge.net.au>
+ <CAMuHMdW1Kqmu3spuejDQH6Yv1CPTvmYjFQA8L1n3fHbECoYT9A@mail.gmail.com>
+Message-ID: <20181123122728.klshbmzxqjzk6d5r@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/18 9:23 AM, Christoph Hellwig wrote:
-> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
->> TBH, if this DMA32 stuff is going to be contentious we could possibly just
->> rip out the offending kmem_cache - it seemed like good practice for the
->> use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
->> give the same 1KB alignment and chance of succeeding as the equivalent
->> kmem_cache_alloc(), then we could quite easily make do with that instead.
+On Fri, Nov 23, 2018 at 10:21:39AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Neither is the slab support for kmalloc, not do kmalloc allocations
-> have useful alignment apparently (at least if you use slub debug).
+> On Wed, Nov 21, 2018 at 1:12 PM Simon Horman <horms+renesas@verge.net.au> wrote:
+> >
+> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> >
+> > This patch adds I2C-DVFS device node for the R8A77990 SoC.
+> >
+> > v2
+> > * Drop aliases update as in upstream it is not required to configure the
+> >   BD9571 PMIC for DDR backup, nor is the use of i2c are aliases desired.
+> > * Do not describe the device as compatible with "renesas,rcar-gen3-iic" or
+> >   "renesas,rmobile-iic" fallback compat strings. The absence of automatic
+> >   transmission registers leads us to declare the r8a77990 IIC controller as
+> >   incompatible.
+> >
+> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> > [simon: drop aliases hunk and fallback compat string usage]
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Thanks for the update!
+> 
+> > --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> > +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+> > @@ -357,6 +357,20 @@
+> >                         reg = <0 0xe6060000 0 0x508>;
+> >                 };
+> >
+> > +               i2c_dvfs: i2c at e60b0000 {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <0>;
+> > +                       compatible = "renesas,iic-r8a77990";
+> > +                       reg = <0 0xe60b0000 0 0x34>;
+> 
+> ... 0x15>;
 
-Is this also true for caches created by kmem_cache_create(), that
-debugging options can result in not respecting the alignment passed to
-kmem_cache_create()? That would be rather bad, IMHO.
+Thanks, sorry for missing that.
 
-> But I do agree with the sentiment of not wanting to spread GFP_DMA32
-> futher into the slab allocator.
+> > +                       interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+> > +                       clocks = <&cpg CPG_MOD 926>;
+> > +                       power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+> > +                       resets = <&cpg 926>;
+> > +                       dmas = <&dmac0 0x11>, <&dmac0 0x10>;
+> > +                       dma-names = "tx", "rx";
+> > +                       status = "disabled";
+> > +               };
+> 
+> With thwe above fixed:
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I don't see a problem with GFP_DMA32 for custom caches. Generic
-kmalloc() would be worse, since it would have to create a new array of
-kmalloc caches. But that's already ruled out due to the alignment.
+I have applied the following for v4.21:
 
-> I think you want a simple genalloc allocator for this rather special
-> use case.
+>From 0b80b6f4b26e3c6e5861234badc4b12ef2928cac Mon Sep 17 00:00:00 2001
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Date: Wed, 21 Nov 2018 13:11:39 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a77990: Add I2C-DVFS device node
 
-I would prefer if slab could support it, as it doesn't have to
-preallocate. OTOH if the allocations are GFP_ATOMIC as suggested later
-in the thread, and need to always succeed, then preallocation could be
-better, and thus maybe genalloc.
+This patch adds I2C-DVFS device node for the R8A77990 SoC.
+
+v2
+* Drop aliases update as in upstream it is not required to configure the
+  BD9571 PMIC for DDR backup, nor is the use of i2c are aliases desired.
+* Do not describe the device as compatible with "renesas,rcar-gen3-iic" or
+  "renesas,rmobile-iic" fallback compat strings. The absence of automatic
+  transmission registers leads us to declare the r8a77990 IIC controller as
+  incompatible.
+
+v2.1
+* Reduced register range to reflect documentation
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index b0398e05e8ed..3b334be843f4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -357,6 +357,20 @@
+ 			reg = <0 0xe6060000 0 0x508>;
+ 		};
+ 
++		i2c_dvfs: i2c at e60b0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a77990";
++			reg = <0 0xe60b0000 0 0x15>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 926>;
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 926>;
++			dmas = <&dmac0 0x11>, <&dmac0 0x10>;
++			dma-names = "tx", "rx";
++			status = "disabled";
++		};
++
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a77990-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
+-- 
+2.11.0
