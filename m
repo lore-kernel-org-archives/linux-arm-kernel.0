@@ -1,106 +1,85 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Fri, 23 Nov 2018 11:51:38 +0530
-Subject: [PATCH v2 4/4] [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera
- module to the Nano Pi M1+
-In-Reply-To: <20181114145934.26855-5-maxime.ripard@bootlin.com>
-References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
- <20181114145934.26855-5-maxime.ripard@bootlin.com>
-Message-ID: <CAMty3ZDtKNvH75r3m3D1b=0HKrZ+ZVsrP-OwS_Ws2NRqtf4v5g@mail.gmail.com>
+From: zhiqiang.hou@nxp.com (Z.q. Hou)
+Date: Fri, 23 Nov 2018 06:22:06 +0000
+Subject: [PATCH 2/4] doc/layerscape-pci: removed unsuitable compatible
+ string
+In-Reply-To: <20181122112809.GA11952@e107981-ln.cambridge.arm.com>
+References: <20181008031428.25293-1-Zhiqiang.Hou@nxp.com>
+ <20181008031428.25293-3-Zhiqiang.Hou@nxp.com>
+ <20181122112809.GA11952@e107981-ln.cambridge.arm.com>
+Message-ID: <AM6PR04MB5781C1086B4EFF1BF73F72B284D40@AM6PR04MB5781.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 8:29 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> From: Myl?ne Josserand <mylene.josserand@bootlin.com>
->
-> The Nano Pi M1+ comes with an optional sensor based on the ov5640 from
-> Omnivision. Enable the support for it in the DT.
->
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 85 +++++++++++++++++++
->  1 file changed, 85 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> index 06010a9afba0..2ac62d109285 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
-> @@ -52,6 +52,37 @@
->                 ethernet1 = &sdio_wifi;
->         };
->
-> +       cam_xclk: cam-xclk {
-> +                #clock-cells = <0>;
-> +                compatible = "fixed-clock";
-> +                clock-frequency = <24000000>;
-> +                clock-output-names = "cam-xclk";
-> +        };
-> +
-> +        reg_cam_avdd: cam-avdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-avdd";
-> +                regulator-min-microvolt = <2800000>;
-> +                regulator-max-microvolt = <2800000>;
-> +                vin-supply = <&reg_vcc3v3>;
-> +        };
-> +
-> +        reg_cam_dovdd: cam-dovdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-dovdd";
-> +                regulator-min-microvolt = <1800000>;
-> +                regulator-max-microvolt = <1800000>;
-> +                vin-supply = <&reg_vcc3v3>;
-> +        };
-> +
-> +        reg_cam_dvdd: cam-dvdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-dvdd";
-> +                regulator-min-microvolt = <1500000>;
-> +                regulator-max-microvolt = <1500000>;
-> +                vin-supply = <&reg_vcc3v3>;
-> +        };
-> +
->         reg_gmac_3v3: gmac-3v3 {
->                 compatible = "regulator-fixed";
->                 regulator-name = "gmac-3v3";
-> @@ -69,6 +100,26 @@
->         };
->  };
->
-> +&csi {
-> +        status = "okay";
-> +
-> +        port {
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +
-> +                /* Parallel bus endpoint */
-> +                csi_from_ov5640: endpoint {
-> +                        remote-endpoint = <&ov5640_to_csi>;
-> +                        bus-width = <8>;
-> +                        data-shift = <2>;
-> +                        hsync-active = <1>; /* Active high */
-> +                        vsync-active = <0>; /* Active low */
-> +                        data-active = <1>;  /* Active high */
-> +                        pclk-sample = <1>;  /* Rising */
-> +                };
-> +        };
-> +};
-> +
->  &ehci1 {
->         status = "okay";
->  };
-> @@ -94,6 +145,40 @@
->         };
->  };
->
-> +&i2c2 {
-> +       status = "okay";
-> +
-> +       ov5640: camera at 3c {
-> +                compatible = "ovti,ov5640";
-> +                reg = <0x3c>;
-> +                clocks = <&cam_xclk>;
+Hi Lorenzo,
 
-I think we can directly use existing 24MHz oscillator, &osc24M
+Thanks a lot for your comments!
+
+> -----Original Message-----
+> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
+> Sent: 2018?11?22? 19:28
+> To: Z.q. Hou <zhiqiang.hou@nxp.com>
+> Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> linux-pci at vger.kernel.org; devicetree at vger.kernel.org; robh+dt at kernel.org;
+> Leo Li <leoyang.li@nxp.com>; shawnguo at kernel.org;
+> mark.rutland at arm.com; bhelgaas at google.com; Mingkai Hu
+> <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
+> Subject: Re: [PATCH 2/4] doc/layerscape-pci: removed unsuitable compatible
+> string
+> 
+> On Mon, Oct 08, 2018 at 11:14:26AM +0800, Zhiqiang Hou wrote:
+> > From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> >
+> > Removed the compatible string "snps,dw-pcie", it is for the reference
+> > platform driver for PCI RC IP Protoyping Kits based on the ARC SDP, so
+> > it is not suitable for all platform with designware PCIe controller,
+> > and platform vendors have themselves' drivers.
+> >
+> > The compatible string "snsp,dw-pcie" was added by mistake and it's not
+> > matched that time, but it is matched because pcie drivers has been
+> > collected recently.
+> 
+> I do not understand what you mean, please explain it to me and I will update
+> the commit log accordingly before merging it.
+
+Before moving PCIe controller drivers to directory drivers/pci/controllers/, pci-layerscape.c can be matched correctly, but after that the pcie-designware-plat.c is matched instead of the pci-layerscape.c. So this patch is to avoid matching pcie-designware-plat.c by removing the "snps,dw-pcie".
+
+Thanks,
+Zhiqiang
+
+> Lorenzo
+> 
+> > Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> > ---
+> >  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 6 +++---
+> >  1 file changed, 3 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > index 5eb1c202932f..9b2b8d66d1f4 100644
+> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> > @@ -13,8 +13,8 @@ information.
+> >
+> >  Required properties:
+> >  - compatible: should contain the platform identifier such as:
+> > -        "fsl,ls1021a-pcie", "snps,dw-pcie"
+> > -        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie", "snps,dw-pcie"
+> > +        "fsl,ls1021a-pcie"
+> > +        "fsl,ls2080a-pcie", "fsl,ls2085a-pcie"
+> >          "fsl,ls2088a-pcie"
+> >          "fsl,ls1088a-pcie"
+> >          "fsl,ls1046a-pcie"
+> > @@ -36,7 +36,7 @@ Required properties:
+> >  Example:
+> >
+> >  	pcie at 3400000 {
+> > -		compatible = "fsl,ls1021a-pcie", "snps,dw-pcie";
+> > +		compatible = "fsl,ls1021a-pcie";
+> >  		reg = <0x00 0x03400000 0x0 0x00010000   /* controller registers
+> */
+> >  		       0x40 0x00000000 0x0 0x00002000>; /* configuration space
+> */
+> >  		reg-names = "regs", "config";
+> > --
+> > 2.17.1
+> >
