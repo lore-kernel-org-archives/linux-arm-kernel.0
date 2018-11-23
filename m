@@ -1,107 +1,135 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 23 Nov 2018 17:42:17 +0000
-Subject: [RFC PATCH v2 11/23] KVM: arm64: Support runtime sysreg
- filtering for KVM_GET_REG_LIST
-In-Reply-To: <20181122130717.GH17441@e113682-lin.lund.arm.com>
-References: <1538141967-15375-1-git-send-email-Dave.Martin@arm.com>
- <1538141967-15375-12-git-send-email-Dave.Martin@arm.com>
- <20181102081625.GS12057@e113682-lin.lund.arm.com>
- <20181115172711.GQ3505@e103592.cambridge.arm.com>
- <20181122105344.GF17441@e113682-lin.lund.arm.com>
- <87bm6hic7a.fsf@linaro.org>
- <20181122123235.GQ4719@e103592.cambridge.arm.com>
- <20181122130717.GH17441@e113682-lin.lund.arm.com>
-Message-ID: <20181123174216.GK3505@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 23 Nov 2018 17:43:52 +0000
+Subject: [PATCH v11 05/24] kasan: add CONFIG_KASAN_GENERIC and
+ CONFIG_KASAN_SW_TAGS
+In-Reply-To: <356c34c9a2ae8348a6cbd1de53135a28187fa120.1542648335.git.andreyknvl@google.com>
+References: <cover.1542648335.git.andreyknvl@google.com>
+ <356c34c9a2ae8348a6cbd1de53135a28187fa120.1542648335.git.andreyknvl@google.com>
+Message-ID: <20181123174352.ri3qo3wx2irm6hzj@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 02:07:18PM +0100, Christoffer Dall wrote:
-> On Thu, Nov 22, 2018 at 01:32:37PM +0100, Dave P Martin wrote:
-> > On Thu, Nov 22, 2018 at 11:27:53AM +0000, Alex Benn?e wrote:
-> > > 
-> > > Christoffer Dall <christoffer.dall@arm.com> writes:
-> > > 
-> > > > [Adding Peter and Alex for their view on the QEMU side]
-> > > >
-> > > > On Thu, Nov 15, 2018 at 05:27:11PM +0000, Dave Martin wrote:
-> > > >> On Fri, Nov 02, 2018 at 09:16:25AM +0100, Christoffer Dall wrote:
-> > > >> > On Fri, Sep 28, 2018 at 02:39:15PM +0100, Dave Martin wrote:
-> > > >> > > KVM_GET_REG_LIST should only enumerate registers that are actually
-> > > >> > > accessible, so it is necessary to filter out any register that is
-> > > >> > > not exposed to the guest.  For features that are configured at
-> > > >> > > runtime, this will require a dynamic check.
-> > > >> > >
-> > > >> > > For example, ZCR_EL1 and ID_AA64ZFR0_EL1 would need to be hidden
-> > > >> > > if SVE is not enabled for the guest.
-> > > >> >
-> > > >> > This implies that userspace can never access this interface for a vcpu
-> > > >> > before having decided whether such features are enabled for the guest or
-> > > >> > not, since otherwise userspace will see different states for a VCPU
-> > > >> > depending on sequencing of the API, which sounds fragile to me.
-> > > >> >
-> > > >> > That should probably be documented somewhere, and I hope the
-> > > >> > enable/disable API for SVE in guests already takes that into account.
-> > > >> >
-> > > >> > Not sure if there's an action to take here, but it was the best place I
-> > > >> > could raise this concern.
-> > > >>
-> > > >> Fair point.  I struggled to come up with something better that solves
-> > > >> all problems.
-> > > >>
-> > > >> My expectation is that KVM_ARM_SVE_CONFIG_SET is considered part of
-> > > >> creating the vcpu, so that if issued at all for a vcpu, it is issued
-> > > >> very soon after KVM_VCPU_INIT.
-> > > >>
-> > > >> I think this worked OK with the current structure of kvmtool and I
-> > > >> seem to remember discussing this with Peter Maydell re qemu -- but
-> > > >> it sounds like I should double-check.
-> > > >
-> > > > QEMU does some thing around enumerating all the system registers exposed
-> > > > by KVM and saving/restoring them as part of its startup, but I don't
-> > > > remember the exact sequence.
-> > > 
-> > > QEMU does this for each vCPU as part of it's start-up sequence:
-> > > 
-> > >   kvm_init_vcpu
-> > >     kvm_get_cpu (-> KVM_CREATE_VCPU)
-> > >     KVM_GET_VCPU_MMAP_SIZE
-> > >     kvm_arch_init_vcpu
-> > >       kvm_arm_vcpu_init (-> KVM_ARM_VCPU_INIT)
-> > >       kvm_get_one_reg(ARM_CPU_ID_MPIDR)
-> > >       kvm_arm_init_debug (chk for KVM_CAP SET_GUEST_DEBUG/GUEST_DEBUG_HW_WPS/BPS)
-> > >       kvm_arm_init_serror_injection (chk KVM_CAP_ARM_INJECT_SERROR_ESR)
-> > >       kvm_arm_init_cpreg_list (KVM_GET_REG_LIST)
-> > > 
-> > > At this point we have the register list we need for
-> > > kvm_arch_get_registers which is what we call every time we want to
-> > > synchronise state. We only really do this for debug events, crashes and
-> > > at some point when migrating.
-> > 
-> > So we would need to insert KVM_ARM_SVE_CONFIG_SET into this sequence,
-> > meaning that the new capability is not strictly necessary.
-> > 
-> > I sympathise with Christoffer's view though that without the capability
-> > mechanism it may be too easy for software to make mistakes: code
-> > refactoring might swap the KVM_GET_REG_LIST and KVM_ARM_SVE_CONFIG ioctls
-> > over and then things would go wrong with no immediate error indication.
-> > 
-> > In effect, the SVE regs would be missing from the list yielded by
-> > KVM_GET_REG_LIST, possibly leading to silent migration failures.
-> > 
-> > I'm a bit uneasy about that.  Am I being too paranoid now?
-> > 
+On Mon, Nov 19, 2018 at 06:26:21PM +0100, Andrey Konovalov wrote:
+> This commit splits the current CONFIG_KASAN config option into two:
+> 1. CONFIG_KASAN_GENERIC, that enables the generic KASAN mode (the one
+>    that exists now);
+> 2. CONFIG_KASAN_SW_TAGS, that enables the software tag-based KASAN mode.
 > 
-> No, we've made decisions in the past where we didn't enforce ordering
-> which ended up being a huge pain (vgic lazy init, as a clear example of
-> something really bad).  Of course, it's a tradeoff.  If it's a huge pain
-> to implement, maybe things will be ok, but if it's just a read/write
-> capability handshake, I think it's worth doing.
+> The name CONFIG_KASAN_SW_TAGS is chosen as in the future we will have
+> another hardware tag-based KASAN mode, that will rely on hardware memory
+> tagging support in arm64.
+> 
+> With CONFIG_KASAN_SW_TAGS enabled, compiler options are changed to
+> instrument kernel files with -fsantize=kernel-hwaddress (except the ones
+> for which KASAN_SANITIZE := n is set).
+> 
+> Both CONFIG_KASAN_GENERIC and CONFIG_KASAN_SW_TAGS support both
+> CONFIG_KASAN_INLINE and CONFIG_KASAN_OUTLINE instrumentation modes.
+> 
+> This commit also adds empty placeholder (for now) implementation of
+> tag-based KASAN specific hooks inserted by the compiler and adjusts
+> common hooks implementation to compile correctly with each of the
+> config options.
+> 
+> Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+> Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+> ---
+>  arch/arm64/Kconfig                  |  1 +
+>  include/linux/compiler-clang.h      |  5 +-
+>  include/linux/compiler-gcc.h        |  6 ++
+>  include/linux/compiler_attributes.h | 13 ----
+>  include/linux/kasan.h               | 16 +++--
+>  lib/Kconfig.kasan                   | 96 +++++++++++++++++++++++------
+>  mm/kasan/Makefile                   |  6 +-
+>  mm/kasan/generic.c                  |  2 +-
+>  mm/kasan/kasan.h                    |  3 +-
+>  mm/kasan/tags.c                     | 75 ++++++++++++++++++++++
+>  mm/slub.c                           |  2 +-
+>  scripts/Makefile.kasan              | 53 +++++++++-------
+>  12 files changed, 216 insertions(+), 62 deletions(-)
+>  create mode 100644 mm/kasan/tags.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 787d7850e064..8b331dcfb48e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -111,6 +111,7 @@ config ARM64
+>  	select HAVE_ARCH_JUMP_LABEL
+>  	select HAVE_ARCH_JUMP_LABEL_RELATIVE
+>  	select HAVE_ARCH_KASAN if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+> +	select HAVE_ARCH_KASAN_SW_TAGS if !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
 
-OK, I'll add the capability and enforcement in the respin.
+> --- a/lib/Kconfig.kasan
+> +++ b/lib/Kconfig.kasan
+> @@ -1,35 +1,95 @@
+> +# This config refers to the generic KASAN mode.
+>  config HAVE_ARCH_KASAN
+>  	bool
+>  
+> +config HAVE_ARCH_KASAN_SW_TAGS
+> +	bool
+> +
+> +config CC_HAS_KASAN_GENERIC
+> +	def_bool $(cc-option, -fsanitize=kernel-address)
+> +
+> +config CC_HAS_KASAN_SW_TAGS
+> +	def_bool $(cc-option, -fsanitize=kernel-hwaddress)
 
-We never came up with a way to extent KVM_VCPU_INIT that felt 100% right
-for this case, and a capability is straightforward to reason about,
-even if it's a bit clunky.
+> +if HAVE_ARCH_KASAN_SW_TAGS
+> +
+> +config KASAN_SW_TAGS
+> +	bool "Software tag-based mode"
+> +	depends on CC_HAS_KASAN_SW_TAGS
+> +	depends on (SLUB && SYSFS) || (SLAB && !DEBUG_SLAB)
+> +	select SLUB_DEBUG if SLUB
+> +	select CONSTRUCTORS
+> +	select STACKDEPOT
+> +	help
+> +	  Enables software tag-based KASAN mode.
+> +	  This mode requires Top Byte Ignore support by the CPU and therefore
+> +	  is only supported for arm64.
+> +	  This mode requires Clang version 7.0.0 or later.
+> +	  This mode consumes about 1/16th of available memory at kernel start
+> +	  and introduces an overhead of ~20% for the rest of the allocations.
+> +	  This mode may potentially introduce problems relating to pointer
+> +	  casting and comparison, as it embeds tags into the top byte of each
+> +	  pointer.
+> +	  For better error detection enable CONFIG_STACKTRACE.
+> +	  Currently CONFIG_KASAN_SW_TAGS doesn't work with CONFIG_DEBUG_SLAB
+> +	  (the resulting kernel does not boot).
+> +
+> +endif
 
-Cheers
----Dave
+IIUC as of this patch a user can select KASAN_SW_TAGS...
+
+> +ifdef CONFIG_KASAN_SW_TAGS
+> +
+> +ifdef CONFIG_KASAN_INLINE
+> +    instrumentation_flags := -mllvm -hwasan-mapping-offset=$(KASAN_SHADOW_OFFSET)
+> +else
+> +    instrumentation_flags := -mllvm -hwasan-instrument-with-calls=1
+> +endif
+> +
+> +CFLAGS_KASAN := -fsanitize=kernel-hwaddress \
+> +		-mllvm -hwasan-instrument-stack=0 \
+> +		$(instrumentation_flags)
+> +
+> +endif # CONFIG_KASAN_SW_TAGS
+
+... and therefore we start using the compiler option, even though we
+haven't introduced all of the necessary infrastructure yet.
+
+That doesn't sound right to me. At the very least, that breaks
+randconfig builds.
+
+What we can do, in-order, is:
+
+1) introduce the core refactoring, dependent on HAVE_ARCH_KASAN_SW_TAGS
+2) instroduce the new infrastructure and arch code
+3) select HAVE_ARCH_KASAN_SW_TAGS
+
+... such that at (3), all KASAN configurations are known to work.
+
+Thanks,
+Mark.
