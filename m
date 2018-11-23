@@ -1,63 +1,73 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:37 +0100
-Subject: [PATCH v2 05/43] drm/sun4i: frontend: Add a helper and a list for
- supported formats
+Date: Fri, 23 Nov 2018 10:24:39 +0100
+Subject: [PATCH v2 07/43] drm/sun4i: backend: Use a specific function to check
+ if a plane is supported
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-6-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-8-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to check whether the frontend supports a specific format, an
-explicit list and a related helper are introduced.
+Before this patch, it is assumed that a plane is supported either
+through the frontend or through the backend alone. However, the DRM
+interface does not allow finely reporting our hardware capabilities
+and there are cases where neither are support.
 
-Just like in the backend, the prototype of the helper is added to the
-frontend header so that it can be used later on. The helper is also
-exported because it will be used outside of the frontend module.
+In particular, some plane formats are supported by the backend and not
+the frontend, so they can only be supported without scaling.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 16 ++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  1 +
- 2 files changed, 17 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 27 ++++++++++++++++++++++-----
+ 1 file changed, 22 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 3ea925584891..0f7f8c7b3402 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -128,6 +128,22 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
- 	}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 735fea7ead0b..52caf561da0e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -477,6 +477,23 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
+ 	return false;
  }
  
-+static const uint32_t sun4i_frontend_formats[] = {
-+	DRM_FORMAT_XRGB8888,
-+};
-+
-+bool sun4i_frontend_format_is_supported(uint32_t fmt)
++static bool sun4i_backend_plane_is_supported(struct drm_plane_state *state,
++					     bool *uses_frontend)
 +{
-+	unsigned int i;
++	if (sun4i_backend_plane_uses_frontend(state)) {
++		*uses_frontend = true;
++		return true;
++	}
 +
-+	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
-+		if (sun4i_frontend_formats[i] == fmt)
-+			return true;
++	*uses_frontend = false;
 +
-+	return false;
++	/* Scaling is not supported without the frontend. */
++	if (sun4i_backend_plane_uses_scaler(state))
++		return false;
++
++	return true;
 +}
-+EXPORT_SYMBOL(sun4i_frontend_format_is_supported);
 +
- int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane, uint32_t out_fmt)
+ static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+ 				       struct drm_crtc_state *old_state)
  {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 02661ce81f3e..a9cb908ced16 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -95,5 +95,6 @@ void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
- 				 struct drm_plane *plane);
- int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane, uint32_t out_fmt);
-+bool sun4i_frontend_format_is_supported(uint32_t fmt);
+@@ -517,14 +534,14 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
+ 		struct drm_framebuffer *fb = plane_state->fb;
+ 		struct drm_format_name_buf format_name;
  
- #endif /* _SUN4I_FRONTEND_H_ */
+-		if (sun4i_backend_plane_uses_frontend(plane_state)) {
++		if (!sun4i_backend_plane_is_supported(plane_state,
++						      &layer_state->uses_frontend))
++			return -EINVAL;
++
++		if (layer_state->uses_frontend) {
+ 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
+ 					 plane->index);
+-
+-			layer_state->uses_frontend = true;
+ 			num_frontend_planes++;
+-		} else {
+-			layer_state->uses_frontend = false;
+ 		}
+ 
+ 		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
 -- 
 2.19.1
