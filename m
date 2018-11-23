@@ -1,192 +1,132 @@
-From: christoffer.dall@arm.com (Christoffer Dall)
-Date: Fri, 23 Nov 2018 11:03:02 +0100
-Subject: [PATCH] kvm: arm/arm64 : fix vm's hanging at startup time
-In-Reply-To: <201811231401560886603@zte.com.cn>
-References: <20181121110620.GC18678@e113682-lin.lund.arm.com>
- <201811231401560886603@zte.com.cn>
-Message-ID: <20181123100302.GB3331@e113682-lin.lund.arm.com>
+From: mchehab+samsung@kernel.org (Mauro Carvalho Chehab)
+Date: Fri, 23 Nov 2018 05:13:23 -0500
+Subject: [PATCH 2/2] media: sun6i-csi: manually fix other coding style issues
+In-Reply-To: <ad8d7a438746a7f6dd3300ff9f07bd5506de100c.1542967999.git.mchehab+samsung@kernel.org>
+References: <ad8d7a438746a7f6dd3300ff9f07bd5506de100c.1542967999.git.mchehab+samsung@kernel.org>
+Message-ID: <5470d46e7afc781f858eda7d7013934e46764f14.1542967999.git.mchehab+samsung@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 02:01:56PM +0800, peng.hao2 at zte.com.cn wrote:
-> >Hi,
-> >
-> >On Wed, Nov 21, 2018 at 04:56:54PM +0800, peng.hao2 at zte.com.cn wrote:
-> >> >On 19/11/2018 09:10, Mark Rutland wrote:
-> >> >> On Sat, Nov 17, 2018 at 10:58:37AM +0800, peng.hao2 at zte.com.cn wrote:
-> >> >>>> On 16/11/18 00:23, peng.hao2 at zte.com.cn wrote:
-> >> >>>>>> Hi,
-> >> >>>>>>> When virtual machine starts, hang up.
-> >> >>>>>>
-> >> >>>>>> I take it you mean the *guest* hangs? Because it doesn't get a timer
-> >> >>>>>> interrupt?
-> >> >>>>>>
-> >> >>>>>>> The kernel version of guest
-> >> >>>>>>> is 4.16. Host support vgic_v3.
-> >> >>>>>>
-> >> >>>>>> Your host kernel is something recent, I guess?
-> >> >>>>>>
-> >> >>>>>>> It was mainly due to the incorrect vgic_irq's(intid=27) group value
-> >> >>>>>>> during injection interruption. when kvm_vgic_vcpu_init is called,
-> >> >>>>>>> dist is not initialized at this time. Unable to get vgic V3 or V2
-> >> >>>>>>> correctly, so group is not set.
-> >> >>>>>>
-> >> >>>>>> Mmh, that shouldn't happen with (v)GICv3. Do you use QEMU (which
-> >> >>>>>> version?) or some other userland tool?
-> >> >>>>>>
-> >> >>>>>
-> >> >>>>> QEMU emulator version 3.0.50 .
-> >> >>>>>
-> >> >>>>>>> group is setted to 1 when vgic_mmio_write_group is invoked at some
-> >> >>>>>>> time.
-> >> >>>>>>> when irq->group=0 (intid=27), No ICH_LR_GROUP flag was set and
-> >> >>>>>>> interrupt injection failed.
-> >> >>>>>>>
-> >> >>>>>>> Signed-off-by: Peng Hao <peng.hao2@zte.com.cn>
-> >> >>>>>>> ---
-> >> >>>>>>>   virt/kvm/arm/vgic/vgic-v3.c | 2 +-
-> >> >>>>>>>   1 file changed, 1 insertion(+), 1 deletion(-)
-> >> >>>>>>>
-> >> >>>>>>> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> >> >>>>>>> index 9c0dd23..d101000 100644
-> >> >>>>>>> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> >> >>>>>>> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> >> >>>>>>> @@ -198,7 +198,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu,
-> >> >>>>>>> struct vgic_irq *irq, int lr) if (vgic_irq_is_mapped_level(irq) &&
-> >> >>>>>>> (val & ICH_LR_PENDING_BIT)) irq->line_level = false;
-> >> >>>>>>>
-> >> >>>>>>> -    if (irq->group)
-> >> >>>>>>> +    if (model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> >> >>>>>>
-> >> >>>>>> This is not the right fix, not only because it basically reverts the
-> >> >>>>>> GICv3 part of 87322099052 (KVM: arm/arm64: vgic: Signal IRQs using
-> >> >>>>>> their configured group).
-> >> >>>>>>
-> >> >>>>>> Can you try to work out why kvm_vgic_vcpu_init() is apparently called
-> >> >>>>>> before dist->vgic_model is set, also what value it has?
-> >> >>>>>> If I understand the code correctly, that shouldn't happen for a GICv3.
-> >> >>>>>>
-> >> >>>>> Even if the value of  group is correctly assigned in kvm_vgic_vcpu_init, the group is then written 0 through >vgic_mmio_write_group.
-> >> >>>>>   If the interrupt comes at this time, the interrupt injection fails.
-> >> >>>>
-> >> >>>> Does that mean that the guest is configuring its interrupts as Group0?
-> >> >>>> That sounds wrong, Linux should configure all it's interrupts as
-> >> >>>> non-secure group1.
-> >> >>>
-> >> >>> no, I think that uefi dose this, not linux.
-> >> >>> 1. kvm_vgic_vcpu_init
-> >> >>> 2. vgic_create
-> >> >>> 3. kvm_vgic_dist_init
-> >> >>> 4.vgic_mmio_write_group: uefi as guest, write group=0
-> >> >>> 5.vgic_mmio_write_group: linux as guest, write group=1
-> >> >>
-> >> >> Is this the same issue fixed by EDK2 commit:
-> >> >>
-> >> >> 66127011a544b90e ("ArmPkg/ArmGicDxe ARM: fix encoding for GICv3 interrupt acknowledge")
-> >> >>
-> >> >> ... where EDK2 would try to use IAR0 rather than IAR1?
-> >> >>
-> >> >> The commit messages notes this lead to a boot-time hang.
-> >> >
-> >> >I managed to trigger an issue with a really old EFI implementation that
-> >> >doesn't configure its interrupts as Group1, and yet tries to ACK its
-> >> >interrupts using the Group1 accessor. Guess what? It is not going to work.
-> >> >
-> >> >Commit c7fefb690661f2e38afcb8200bd318ecf38ab961 in the edk2 tree seems
-> >> >to be the fix (I only assume it does, I haven't actually checked). A
-> >> >recent build, as found in Debian Buster, works perfectly (tested with
-> >> >both QEMU v2.12 and tip of tree).
-> >> >
-> >> >Now, I really don't get what you're saying about Linux not getting
-> >> >interrupts. How do you get to booting Linux if EFI is not making any
-> >> >forward progress? Are you trying them independently?
-> >> >
-> >> I start linux with bypassing uefi, the print info is the same.
-> >> [507107.748908]  vgic_mmio_write_group:## intid/27 group=0
-> >> [507107.752185]  vgic_mmio_write_group:## intid/27 group=0
-> >> [507107.899566]  vgic_mmio_write_group:## intid/27 group=1
-> >> [507107.907370]  vgic_mmio_write_group:## intid/27 group=1
-> >> the command line is like this:
-> >> /home/qemu-patch/linshi/qemu/aarch64-softmmu/qemu-system-aarch64  -machine virt-3.1,accel=kvm,usb=off,dump-guest-core=off,gic-version=3  -kernel /home/kernelboot/vmlinuz-4.16.0+ -initrd /home/kernelboot/initramfs-4.16.0+.img -append root=/dev/mapper/cla-root ro crashkernel=auto rd.lvm.lv=cla/root rd.lvm.lv=cla/swap.UTF-8  -drive file=/home/centos74-ph/boot.qcow2,format=qcow2,if=none,id=drive-scsi0-0-0-0 -device scsi-hd,bus=scsi0.0,channel=0,scsi-id=0,lun=0,drive=drive-scsi0-0-0-0,id=scsi0-0-0-0,bootindex=1  -vnc 0.0.0.0:0 -k en-us -device virtio-gpu-pci,id=video0,max_outputs=1,bus=pci.3,addr=0x0 -device pvpanic-mmio -msg >timestamp=on
-> >>
-> >> This is strange. That's probably the Linux 4.16  kernel setting group to 0, and I'll continue to track in guest.
-> >
-> >Could you try the following patch:
-> >
-> >diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> >index c0c0b88af1d5..6fa858c7a5a6 100644
-> >--- a/virt/kvm/arm/vgic/vgic-init.c
-> >+++ b/virt/kvm/arm/vgic/vgic-init.c
-> >@@ -231,13 +231,6 @@ int kvm_vgic_vcpu_init(struct kvm_vcpu *vcpu)
-> >irq->config = VGIC_CONFIG_LEVEL;
-> >}
-> >-        /*
-> >-         * GICv3 can only be created via the KVM_DEVICE_CREATE API and
-> >-         * so we always know the emulation type at this point as it's
-> >-         * either explicitly configured as GICv3, or explicitly
-> >-         * configured as GICv2, or not configured yet which also
-> >-         * implies GICv2.
-> >-         */
-> >if (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-> >irq->group = 1;
-> >else
-> >@@ -298,6 +291,16 @@ int vgic_init(struct kvm *kvm)
-> >if (ret)
-> >goto out;
-> >+    /* Initialize groups on CPUs created before the VGIC type was known */
-> >+    kvm_for_each_vcpu(i, vcpu, kvm) {
-> >+        struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> >+
-> >+        for (i = 0; i < VGIC_NR_PRIVATE_IRQS; i++) {
-> >+            struct vgic_irq *irq = &vgic_cpu->private_irqs[i];
-> >+            irq->group = 1;
-> >+        }
-> >+    }
-> >+
-> >if (vgic_has_its(kvm)) {
-> >ret = vgic_v4_init(kvm);
-> >if (ret)
-> >
-> Sorry for the late reply. 
-> I test the patch and it works. But I think there is randomness here.
-> 1.vgic_init:  set intid/27 group=1
-> 2.vgic_mmio_write_group:## intid/27 group=0
-> 3.!!! receive a  vtimer irq   ----- it may exist.
-> 4.vgic_mmio_write_group:## intid/27 group=1
+There are a few other coding style issues reported by checkpatch
+while in --strict mode. Fix the ones that make sense.
 
-Are these writes from userspace or from the guest?
-(I assume they're from the guest.)
+Signed-off-by: Mauro Carvalho Chehab <mchehab+samsung@kernel.org>
+---
+ .../platform/sunxi/sun6i-csi/sun6i_csi.c      |  9 +++----
+ .../platform/sunxi/sun6i-csi/sun6i_csi_reg.h  | 24 +++++++++----------
+ .../platform/sunxi/sun6i-csi/sun6i_video.c    |  3 ++-
+ 3 files changed, 19 insertions(+), 17 deletions(-)
 
-> 
-> I made an attempt before:
-
-Was this previous experiment using my patch or without my patch?
-
-> 1. kvm_vgic_vcpu_init
->      according to if  kvm_vgic_global_state.type == VGIC_V3, set group=1
-> 2.vgic_mmio_write_group:## intid/27 group=0
-> 3.!!! receive a  vtimer irq   -----I really receive a vtimer irq, then the guest hangs.
-> 
-
-If the guest you're using is flipping the group of the interrupt and yet
-enabling the device and interrupt while flipping the group, then it's
-not expected to work and it's a guest bug.
-
-My hunch here tells me that my patch is what we need for KVM, and either
-
-  (1) You no longer have a problem but are tracing some guest
-      initialization behavior which is fine, or
-
-  (2) You still have a problem because you also have some broken guest
-      code (guest UEFI or guest Linux) that also needs fixing.
-
-If you can demonstrate that you still have a problem, with my path
-applied to KVM, and with a recent guest Linux and guest UEFI, then I'll
-be happy to have another look.  In that case, could you please provide
-the exact versions of your guest Linux and UEFI, as well as the QEMU
-version and command line.
-
-
-Thanks,
-
-    Christoffer
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+index 89fe2c1e21a8..9c8a98d78c97 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+@@ -57,7 +57,7 @@ bool sun6i_csi_is_format_supported(struct sun6i_csi *csi,
+ 	 * Identify the media bus format from device tree.
+ 	 */
+ 	if ((sdev->csi.v4l2_ep.bus_type == V4L2_MBUS_PARALLEL
+-	      || sdev->csi.v4l2_ep.bus_type == V4L2_MBUS_BT656)
++	     || sdev->csi.v4l2_ep.bus_type == V4L2_MBUS_BT656)
+ 	     && sdev->csi.v4l2_ep.bus.parallel.bus_width == 16) {
+ 		switch (pixformat) {
+ 		case V4L2_PIX_FMT_HM12:
+@@ -726,9 +726,10 @@ static int sun6i_csi_v4l2_init(struct sun6i_csi *csi)
+ 	if (ret)
+ 		goto unreg_v4l2;
+ 
+-	ret = v4l2_async_notifier_parse_fwnode_endpoints(
+-		csi->dev, &csi->notifier, sizeof(struct v4l2_async_subdev),
+-		sun6i_csi_fwnode_parse);
++	ret = v4l2_async_notifier_parse_fwnode_endpoints(csi->dev,
++							 &csi->notifier,
++							 sizeof(struct v4l2_async_subdev),
++							 sun6i_csi_fwnode_parse);
+ 	if (ret)
+ 		goto clean_video;
+ 
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h
+index d9b6d89f1927..703fa14bb313 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi_reg.h
+@@ -46,7 +46,7 @@
+ 
+ #define CSI_CAP_REG			0x8
+ #define CSI_CAP_CH0_CAP_MASK_MASK		GENMASK(5, 2)
+-#define CSI_CAP_CH0_CAP_MASK(count)		((count << 2) & CSI_CAP_CH0_CAP_MASK_MASK)
++#define CSI_CAP_CH0_CAP_MASK(count)		(((count) << 2) & CSI_CAP_CH0_CAP_MASK_MASK)
+ #define CSI_CAP_CH0_VCAP_ON			BIT(1)
+ #define CSI_CAP_CH0_SCAP_ON			BIT(0)
+ 
+@@ -59,9 +59,9 @@
+ 
+ #define CSI_CH_CFG_REG			0x44
+ #define CSI_CH_CFG_INPUT_FMT_MASK		GENMASK(23, 20)
+-#define CSI_CH_CFG_INPUT_FMT(fmt)		((fmt << 20) & CSI_CH_CFG_INPUT_FMT_MASK)
++#define CSI_CH_CFG_INPUT_FMT(fmt)		(((fmt) << 20) & CSI_CH_CFG_INPUT_FMT_MASK)
+ #define CSI_CH_CFG_OUTPUT_FMT_MASK		GENMASK(19, 16)
+-#define CSI_CH_CFG_OUTPUT_FMT(fmt)		((fmt << 16) & CSI_CH_CFG_OUTPUT_FMT_MASK)
++#define CSI_CH_CFG_OUTPUT_FMT(fmt)		(((fmt) << 16) & CSI_CH_CFG_OUTPUT_FMT_MASK)
+ #define CSI_CH_CFG_VFLIP_EN			BIT(13)
+ #define CSI_CH_CFG_HFLIP_EN			BIT(12)
+ #define CSI_CH_CFG_FIELD_SEL_MASK		GENMASK(11, 10)
+@@ -69,7 +69,7 @@
+ #define CSI_CH_CFG_FIELD_SEL_FIELD1		((1 << 10) & CSI_CH_CFG_FIELD_SEL_MASK)
+ #define CSI_CH_CFG_FIELD_SEL_BOTH		((2 << 10) & CSI_CH_CFG_FIELD_SEL_MASK)
+ #define CSI_CH_CFG_INPUT_SEQ_MASK		GENMASK(9, 8)
+-#define CSI_CH_CFG_INPUT_SEQ(seq)		((seq << 8) & CSI_CH_CFG_INPUT_SEQ_MASK)
++#define CSI_CH_CFG_INPUT_SEQ(seq)		(((seq) << 8) & CSI_CH_CFG_INPUT_SEQ_MASK)
+ 
+ #define CSI_CH_SCALE_REG		0x4c
+ #define CSI_CH_SCALE_QUART_EN			BIT(0)
+@@ -111,27 +111,27 @@
+ 
+ #define CSI_CH_HSIZE_REG		0x80
+ #define CSI_CH_HSIZE_HOR_LEN_MASK		GENMASK(28, 16)
+-#define CSI_CH_HSIZE_HOR_LEN(len)		((len << 16) & CSI_CH_HSIZE_HOR_LEN_MASK)
++#define CSI_CH_HSIZE_HOR_LEN(len)		(((len) << 16) & CSI_CH_HSIZE_HOR_LEN_MASK)
+ #define CSI_CH_HSIZE_HOR_START_MASK		GENMASK(12, 0)
+-#define CSI_CH_HSIZE_HOR_START(start)		((start << 0) & CSI_CH_HSIZE_HOR_START_MASK)
++#define CSI_CH_HSIZE_HOR_START(start)		(((start) << 0) & CSI_CH_HSIZE_HOR_START_MASK)
+ 
+ #define CSI_CH_VSIZE_REG		0x84
+ #define CSI_CH_VSIZE_VER_LEN_MASK		GENMASK(28, 16)
+-#define CSI_CH_VSIZE_VER_LEN(len)		((len << 16) & CSI_CH_VSIZE_VER_LEN_MASK)
++#define CSI_CH_VSIZE_VER_LEN(len)		(((len) << 16) & CSI_CH_VSIZE_VER_LEN_MASK)
+ #define CSI_CH_VSIZE_VER_START_MASK		GENMASK(12, 0)
+-#define CSI_CH_VSIZE_VER_START(start)		((start << 0) & CSI_CH_VSIZE_VER_START_MASK)
++#define CSI_CH_VSIZE_VER_START(start)		(((start) << 0) & CSI_CH_VSIZE_VER_START_MASK)
+ 
+ #define CSI_CH_BUF_LEN_REG		0x88
+ #define CSI_CH_BUF_LEN_BUF_LEN_C_MASK		GENMASK(29, 16)
+-#define CSI_CH_BUF_LEN_BUF_LEN_C(len)		((len << 16) & CSI_CH_BUF_LEN_BUF_LEN_C_MASK)
++#define CSI_CH_BUF_LEN_BUF_LEN_C(len)		(((len) << 16) & CSI_CH_BUF_LEN_BUF_LEN_C_MASK)
+ #define CSI_CH_BUF_LEN_BUF_LEN_Y_MASK		GENMASK(13, 0)
+-#define CSI_CH_BUF_LEN_BUF_LEN_Y(len)		((len << 0) & CSI_CH_BUF_LEN_BUF_LEN_Y_MASK)
++#define CSI_CH_BUF_LEN_BUF_LEN_Y(len)		(((len) << 0) & CSI_CH_BUF_LEN_BUF_LEN_Y_MASK)
+ 
+ #define CSI_CH_FLIP_SIZE_REG		0x8c
+ #define CSI_CH_FLIP_SIZE_VER_LEN_MASK		GENMASK(28, 16)
+-#define CSI_CH_FLIP_SIZE_VER_LEN(len)		((len << 16) & CSI_CH_FLIP_SIZE_VER_LEN_MASK)
++#define CSI_CH_FLIP_SIZE_VER_LEN(len)		(((len) << 16) & CSI_CH_FLIP_SIZE_VER_LEN_MASK)
+ #define CSI_CH_FLIP_SIZE_VALID_LEN_MASK		GENMASK(12, 0)
+-#define CSI_CH_FLIP_SIZE_VALID_LEN(len)		((len << 0) & CSI_CH_FLIP_SIZE_VALID_LEN_MASK)
++#define CSI_CH_FLIP_SIZE_VALID_LEN(len)		(((len) << 0) & CSI_CH_FLIP_SIZE_VALID_LEN_MASK)
+ 
+ #define CSI_CH_FRM_CLK_CNT_REG		0x90
+ #define CSI_CH_ACC_ITNL_CLK_CNT_REG	0x94
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
+index 306b9d2aeafb..37c85b8f37a9 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_video.c
+@@ -86,7 +86,8 @@ sun6i_video_remote_subdev(struct sun6i_video *video, u32 *pad)
+ }
+ 
+ static int sun6i_video_queue_setup(struct vb2_queue *vq,
+-				   unsigned int *nbuffers, unsigned int *nplanes,
++				   unsigned int *nbuffers,
++				   unsigned int *nplanes,
+ 				   unsigned int sizes[],
+ 				   struct device *alloc_devs[])
+ {
+-- 
+2.19.1
