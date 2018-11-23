@@ -1,103 +1,117 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:11 +0100
-Subject: [PATCH v2 39/43] drm/sun4i: frontend: Add a quirk structure
+Date: Fri, 23 Nov 2018 10:25:06 +0100
+Subject: [PATCH v2 34/43] drm/sun4i: Add buffer stride and offset
+ configuration for tiling mode
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-40-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-35-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+This introduces stride and offset configuration for the VPU tiling mode.
+Stride is calculated differently than it is for linear formats and an
+offset is calculated, for which new register definitions are introduced.
 
-The ACCESS_CTRL bit is not found on all the variants of the frontend, so
-let's introduce a structure that will hold whether or not we need to set
-it, and associate it with the compatible.
-
-This will be extended for further similar quirks later on.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 21 +++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  6 ++++++
- 2 files changed, 23 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 54 ++++++++++++++++++++++++--
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  7 ++++
+ 2 files changed, 58 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 2c9dcb4ffde0..368391a9e5fd 100644
+index efa1ff0802bd..3f76a5572449 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -10,6 +10,7 @@
- #include <linux/clk.h>
- #include <linux/component.h>
- #include <linux/module.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
- #include <linux/regmap.h>
-@@ -74,9 +75,10 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
+@@ -125,21 +125,69 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
  {
- 	int i;
- 
--	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
--			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
-+	if (frontend->data->has_coef_access_ctrl)
-+		regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
-+				  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
- 
- 	for (i = 0; i < 32; i++) {
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
-@@ -547,6 +549,10 @@ static int sun4i_frontend_bind(struct device *dev, struct device *master,
- 	frontend->dev = dev;
- 	frontend->node = dev->of_node;
- 
-+	frontend->data = of_device_get_match_data(dev);
-+	if (!frontend->data)
-+		return -ENODEV;
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
++	unsigned int strides[3] = {};
 +
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(regs))
-@@ -659,8 +665,15 @@ static const struct dev_pm_ops sun4i_frontend_pm_ops = {
- 	.runtime_suspend	= sun4i_frontend_runtime_suspend,
- };
+ 	dma_addr_t paddr;
+ 	bool swap;
  
-+static const struct sun4i_frontend_data sun8i_a33_frontend = {
-+	.has_coef_access_ctrl	= true,
-+};
++	if (fb->modifier == DRM_FORMAT_MOD_ALLWINNER_TILED) {
++		unsigned int width = state->src_w >> 16;
++		unsigned int offset;
 +
- const struct of_device_id sun4i_frontend_of_table[] = {
--	{ .compatible = "allwinner,sun8i-a33-display-frontend" },
-+	{
-+		.compatible = "allwinner,sun8i-a33-display-frontend",
-+		.data = &sun8i_a33_frontend
-+	},
- 	{ }
- };
- EXPORT_SYMBOL(sun4i_frontend_of_table);
++		/*
++		 * In MB32 tiled mode, the stride is defined as the distance
++		 * between the start of the end line of the current tile and
++		 * the start of the first line in the next vertical tile.
++		 *
++		 * Tiles are represented in row-major order, thus the end line
++		 * of current tile starts at: 31 * 32 (31 lines of 32 cols),
++		 * the next vertical tile starts at: 32-bit-aligned-width * 32
++		 * and the distance is: 32 * (32-bit-aligned-width - 31).
++		 */
++
++		strides[0] = (fb->pitches[0] - 31) * 32;
++
++		/* Offset of the bottom-right point in the end tile. */
++		offset = (width + (32 - 1)) & (32 - 1);
++
++		regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF0_REG,
++			     SUN4I_FRONTEND_TB_OFF_X1(offset));
++
++		if (fb->format->num_planes > 1) {
++			strides[1] = (fb->pitches[1] - 31) * 32;
++
++			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF1_REG,
++				     SUN4I_FRONTEND_TB_OFF_X1(offset));
++		}
++
++		if (fb->format->num_planes > 2) {
++			strides[2] = (fb->pitches[2] - 31) * 32;
++
++			regmap_write(frontend->regs, SUN4I_FRONTEND_TB_OFF2_REG,
++				     SUN4I_FRONTEND_TB_OFF_X1(offset));
++		}
++	} else {
++		strides[0] = fb->pitches[0];
++
++		if (fb->format->num_planes > 1)
++			strides[1] = fb->pitches[1];
++
++		if (fb->format->num_planes > 2)
++			strides[2] = fb->pitches[2];
++	}
++
+ 	/* Set the line width */
+ 	DRM_DEBUG_DRIVER("Frontend stride: %d bytes\n", fb->pitches[0]);
+ 	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
+-		     fb->pitches[0]);
++		     strides[0]);
+ 
+ 	if (fb->format->num_planes > 1)
+ 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
+-			     fb->pitches[1]);
++			     strides[1]);
+ 
+ 	if (fb->format->num_planes > 2)
+ 		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD2_REG,
+-			     fb->pitches[2]);
++			     strides[2]);
+ 
+ 	/* Some planar formats require chroma channel swapping by hand. */
+ 	swap = sun4i_frontend_format_chroma_requires_swap(fb->format->format);
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 822d39ca4b8e..daf3fa5d01ba 100644
+index ae53ee644694..822d39ca4b8e 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -100,6 +100,10 @@ struct drm_plane;
- struct regmap;
- struct reset_control;
+@@ -25,6 +25,13 @@
+ #define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
+ #define SUN4I_FRONTEND_BUF_ADDR2_REG		0x028
  
-+struct sun4i_frontend_data {
-+	bool	has_coef_access_ctrl;
-+};
++#define SUN4I_FRONTEND_TB_OFF0_REG		0x030
++#define SUN4I_FRONTEND_TB_OFF1_REG		0x034
++#define SUN4I_FRONTEND_TB_OFF2_REG		0x038
++#define SUN4I_FRONTEND_TB_OFF_X1(x1)			((x1) << 16)
++#define SUN4I_FRONTEND_TB_OFF_Y0(y0)			((y0) << 8)
++#define SUN4I_FRONTEND_TB_OFF_X0(x0)			(x0)
 +
- struct sun4i_frontend {
- 	struct list_head	list;
- 	struct device		*dev;
-@@ -110,6 +114,8 @@ struct sun4i_frontend {
- 	struct clk		*ram_clk;
- 	struct regmap		*regs;
- 	struct reset_control	*reset;
-+
-+	const struct sun4i_frontend_data	*data;
- };
- 
- extern const struct of_device_id sun4i_frontend_of_table[];
+ #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
+ #define SUN4I_FRONTEND_LINESTRD1_REG		0x044
+ #define SUN4I_FRONTEND_LINESTRD2_REG		0x048
 -- 
 2.19.1
