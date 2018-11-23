@@ -1,74 +1,72 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:36 +0100
-Subject: [PATCH v2 04/43] drm/sun4i: backend: Add a helper and a list for
- supported formats
+Date: Fri, 23 Nov 2018 10:24:33 +0100
+Subject: [PATCH v2 01/43] drm/sun4i: Cleanup video/YUV source before enabling
+ a layer
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-5-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-2-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to check whether the backend supports a specific format, an
-explicit list and a related helper are introduced.
+This adds a dedicated function for cleaning the video and YUV source
+channel layer enable bits. This function is called first on layer atomic
+update to make sure that there are no leftover bits from previous
+plane configuration that were not cleaned until now.
 
-The prototype of this helper is added to the header so that it can be
-called from sun4i_layer later (when introducing tiled mode support).
+It fixes issues when alternating between video and YUV planes, where
+both bits would be set eventually, leading to broken plane display.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 27 +++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.h |  1 +
- 2 files changed, 28 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 9 +++++++++
+ drivers/gpu/drm/sun4i/sun4i_backend.h | 2 ++
+ drivers/gpu/drm/sun4i/sun4i_layer.c   | 2 ++
+ 3 files changed, 13 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index c3444246755b..7dd24eb03f89 100644
+index bf49c55b0f2c..67b4bb4f5365 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -155,6 +155,33 @@ static int sun4i_backend_drm_format_to_layer(u32 format, u32 *mode)
+@@ -395,6 +395,15 @@ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend, int layer,
  	return 0;
  }
  
-+static const uint32_t sun4i_backend_formats[] = {
-+	DRM_FORMAT_ARGB1555,
-+	DRM_FORMAT_ARGB4444,
-+	DRM_FORMAT_ARGB8888,
-+	DRM_FORMAT_BGRX8888,
-+	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_RGB888,
-+	DRM_FORMAT_RGBA4444,
-+	DRM_FORMAT_RGBA5551,
-+	DRM_FORMAT_UYVY,
-+	DRM_FORMAT_VYUY,
-+	DRM_FORMAT_XRGB8888,
-+	DRM_FORMAT_YUYV,
-+	DRM_FORMAT_YVYU,
-+};
-+
-+bool sun4i_backend_format_is_supported(uint32_t fmt)
++void sun4i_backend_cleanup_layer(struct sun4i_backend *backend,
++				 int layer)
 +{
-+	unsigned int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(sun4i_backend_formats); i++)
-+		if (sun4i_backend_formats[i] == fmt)
-+			return true;
-+
-+	return false;
++	regmap_update_bits(backend->engine.regs,
++			   SUN4I_BACKEND_ATTCTL_REG0(layer),
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_VDOEN |
++			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN, 0);
 +}
 +
- int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 				     int layer, struct drm_plane *plane)
+ static bool sun4i_backend_plane_uses_scaler(struct drm_plane_state *state)
  {
+ 	u16 src_h = state->src_h >> 16;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 339dbff1cce4..93db3af675b3 100644
+index e3d4c6035eb2..339dbff1cce4 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_backend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -198,6 +198,7 @@ engine_to_sun4i_backend(struct sunxi_engine *engine)
+@@ -208,5 +208,7 @@ int sun4i_backend_update_layer_frontend(struct sun4i_backend *backend,
+ 					int layer, uint32_t in_fmt);
+ int sun4i_backend_update_layer_zpos(struct sun4i_backend *backend,
+ 				    int layer, struct drm_plane *plane);
++void sun4i_backend_cleanup_layer(struct sun4i_backend *backend,
++				 int layer);
  
- void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- 				int layer, bool enable);
-+bool sun4i_backend_format_is_supported(uint32_t fmt);
- int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 				     int layer, struct drm_plane *plane);
- int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
+ #endif /* _SUN4I_BACKEND_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 78f77af8805a..e0e37c2f1721 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -92,6 +92,8 @@ static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
+ 	struct sun4i_backend *backend = layer->backend;
+ 	struct sun4i_frontend *frontend = backend->frontend;
+ 
++	sun4i_backend_cleanup_layer(backend, layer->id);
++
+ 	if (layer_state->uses_frontend) {
+ 		sun4i_frontend_init(frontend);
+ 		sun4i_frontend_update_coord(frontend, plane);
 -- 
 2.19.1
