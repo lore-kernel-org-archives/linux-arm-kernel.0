@@ -1,167 +1,56 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:59 +0100
-Subject: [PATCH v2 27/43] drm/sun4i: frontend: Add support for semi-planar YUV
- input formats
+Date: Fri, 23 Nov 2018 10:25:02 +0100
+Subject: [PATCH v2 30/43] drm/fourcc: Add definitions for Allwinner vendor and
+ VPU tiled format
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-28-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-31-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Semi-planar YUV formats use two distinct planes, one for luminance and
-one for chrominance. To add support for them, we need to configure the
-second line stride and buffer address registers to setup the second YUV
-plane.
-
-New definitions are introduced to configure the input format register
-for the YUV420 and YUV422 semi-planar formats.
+This introduces specific definitions for vendor Allwinner and its
+associated tiled format modifier. This modifier is used for the output
+format of the VPU, that can be imported directly with the display
+engine hardware supported by the sun4i-drm driver.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 52 +++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  6 +++
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  4 ++
- 3 files changed, 57 insertions(+), 5 deletions(-)
+ include/uapi/drm/drm_fourcc.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index f443e8e1d8ec..e31438e5cabd 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -118,11 +118,23 @@ void sun4i_frontend_update_buffer(struct sun4i_frontend *frontend,
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD0_REG,
- 		     fb->pitches[0]);
+diff --git a/include/uapi/drm/drm_fourcc.h b/include/uapi/drm/drm_fourcc.h
+index e7e48f1f4a74..841535172507 100644
+--- a/include/uapi/drm/drm_fourcc.h
++++ b/include/uapi/drm/drm_fourcc.h
+@@ -237,6 +237,8 @@ extern "C" {
+ #define DRM_FORMAT_MOD_VENDOR_VIVANTE 0x06
+ #define DRM_FORMAT_MOD_VENDOR_BROADCOM 0x07
+ #define DRM_FORMAT_MOD_VENDOR_ARM     0x08
++#define DRM_FORMAT_MOD_VENDOR_ALLWINNER 0x09
++
+ /* add more to the end as needed */
  
-+	if (fb->format->num_planes > 1)
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_LINESTRD1_REG,
-+			     fb->pitches[1]);
+ #define DRM_FORMAT_RESERVED	      ((1ULL << 56) - 1)
+@@ -643,6 +645,20 @@ extern "C" {
+  */
+ #define AFBC_FORMAT_MOD_SC      (1ULL <<  9)
+ 
++/*
++ * Allwinner tiled modifier
++ *
++ * This tiling mode is implemented by the VPU found on all Allwinner platforms,
++ * codenamed sunxi. It is associated with a YUV format that uses either 2 or 3
++ * planes.
++ *
++ * With this tiling, the luminance samples are disposed in tiles representing
++ * 32x32 pixels and the chrominance samples in tiles representing 32x64 pixels.
++ * The pixel order in each tile is linear and the tiles are disposed linearly,
++ * both in row-major order.
++ */
++#define DRM_FORMAT_MOD_ALLWINNER_TILED fourcc_mod_code(ALLWINNER, 1)
 +
- 	/* Set the physical address of the buffer in memory */
- 	paddr = drm_fb_cma_get_gem_addr(fb, state, 0);
- 	paddr -= PHYS_OFFSET;
--	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
-+	DRM_DEBUG_DRIVER("Setting buffer #0 address to %pad\n", &paddr);
- 	regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR0_REG, paddr);
-+
-+	if (fb->format->num_planes > 1) {
-+		paddr = drm_fb_cma_get_gem_addr(fb, state, 1);
-+		paddr -= PHYS_OFFSET;
-+		DRM_DEBUG_DRIVER("Setting buffer #1 address to %pad\n", &paddr);
-+		regmap_write(frontend->regs, SUN4I_FRONTEND_BUF_ADDR1_REG,
-+			     paddr);
-+	}
+ #if defined(__cplusplus)
  }
- EXPORT_SYMBOL(sun4i_frontend_update_buffer);
- 
-@@ -130,6 +142,8 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- {
- 	if (!drm_format_is_yuv(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
-+	else if (drm_format_is_yuv_sampling_420(fmt))
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420;
- 	else if (drm_format_is_yuv_sampling_422(fmt))
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422;
- 	else
-@@ -140,12 +154,20 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- 
- static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- {
--	if (drm_format_num_planes(fmt) == 1)
-+	int num_planes = drm_format_num_planes(fmt);
-+
-+	switch (num_planes) {
-+	case 1:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
--	else
--		return -EINVAL;
-+		return 0;
- 
--	return 0;
-+	case 2:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
-+		return 0;
-+
-+	default:
-+		return -EINVAL;
-+	}
- }
- 
- static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
-@@ -155,6 +177,22 @@ static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX;
- 		return 0;
- 
-+	case DRM_FORMAT_NV12:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV;
-+		return 0;
-+
-+	case DRM_FORMAT_NV16:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV;
-+		return 0;
-+
-+	case DRM_FORMAT_NV21:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU;
-+		return 0;
-+
-+	case DRM_FORMAT_NV61:
-+		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU;
-+		return 0;
-+
- 	case DRM_FORMAT_UYVY:
- 		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UYVY;
- 		return 0;
-@@ -198,6 +236,10 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
- 
- static const uint32_t sun4i_frontend_formats[] = {
- 	DRM_FORMAT_BGRX8888,
-+	DRM_FORMAT_NV12,
-+	DRM_FORMAT_NV16,
-+	DRM_FORMAT_NV21,
-+	DRM_FORMAT_NV61,
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 399755939a28..7d01b4f09b75 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -22,17 +22,23 @@
- #define SUN4I_FRONTEND_BYPASS_CSC_EN			BIT(1)
- 
- #define SUN4I_FRONTEND_BUF_ADDR0_REG		0x020
-+#define SUN4I_FRONTEND_BUF_ADDR1_REG		0x024
- 
- #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
-+#define SUN4I_FRONTEND_LINESTRD1_REG		0x044
- 
- #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR	(2 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422	(1 << 4)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420	(2 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB		(5 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UYVY		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_YUYV		1
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VYUY		2
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_YVYU		3
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_UV		0
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_VU		1
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_BGRX		0
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB		1
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
-index 6155eca6b1bd..80c718f06ce8 100644
---- a/drivers/gpu/drm/sun4i/sun4i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
-@@ -136,6 +136,10 @@ static const uint32_t sun4i_layer_formats[] = {
- 	DRM_FORMAT_RGBA4444,
- 	DRM_FORMAT_RGB888,
- 	DRM_FORMAT_RGB565,
-+	DRM_FORMAT_NV12,
-+	DRM_FORMAT_NV16,
-+	DRM_FORMAT_NV21,
-+	DRM_FORMAT_NV61,
- 	DRM_FORMAT_UYVY,
- 	DRM_FORMAT_VYUY,
- 	DRM_FORMAT_XRGB8888,
+ #endif
 -- 
 2.19.1
