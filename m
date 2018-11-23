@@ -1,90 +1,103 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:05 +0100
-Subject: [PATCH v2 33/43] drm/sun4i: frontend: Add support for tiled YUV input
- mode configuration
+Date: Fri, 23 Nov 2018 10:24:50 +0100
+Subject: [PATCH v2 18/43] drm/sun4i: frontend: Add proper definitions for
+ format registers
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-34-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-19-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces the data input mode definitions for the tiled YUV mode,
-that are used in the input mode helper if tiling is requested.
-
-The modifier is passed to the helper from the framebuffer to determine
-if tiling is requested.
-
-Only semiplanar and planar YUV formats are supported for tiling mode.
+This introduces proper definitions for the input and output format
+configuration registers instead of a macro and raw values in the code,
+with the intent to increase code readability and reduce indirections.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 14 ++++++++++----
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  2 ++
- 2 files changed, 12 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 14 ++++++--------
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  8 ++++----
+ 2 files changed, 10 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index b78e0a208c95..efa1ff0802bd 100644
+index bb5977a466f3..a305b731b042 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -186,9 +186,11 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
- 	return 0;
- }
- 
--static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
-+static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt,
-+						   uint64_t modifier, u32 *val)
+@@ -108,7 +108,7 @@ static int sun4i_frontend_drm_format_to_input_fmt(uint32_t fmt, u32 *val)
  {
- 	int num_planes = drm_format_num_planes(fmt);
-+	bool tiled = (modifier == DRM_FORMAT_MOD_ALLWINNER_TILED);
- 
- 	switch (num_planes) {
- 	case 1:
-@@ -196,11 +198,13 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
- 		return 0;
- 
- 	case 2:
--		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
-+		*val = tiled ? SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_SEMIPLANAR
-+			     : SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR;
- 		return 0;
- 
- 	case 3:
--		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR;
-+		*val = tiled ? SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_PLANAR
-+			     : SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR;
+ 	switch (fmt) {
+ 	case DRM_FORMAT_XRGB8888:
+-		*val = 5;
++		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB;
  		return 0;
  
  	default:
-@@ -320,6 +324,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
- 	uint32_t format = fb->format->format;
-+	uint64_t modifier = fb->modifier;
- 	u32 out_fmt_val;
- 	u32 in_fmt_val, in_mod_val, in_ps_val;
- 	unsigned int i;
-@@ -332,7 +337,8 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 		return ret;
- 	}
+@@ -120,7 +120,7 @@ static int sun4i_frontend_drm_format_to_input_mode(uint32_t fmt, u32 *val)
+ {
+ 	switch (fmt) {
+ 	case DRM_FORMAT_XRGB8888:
+-		*val = 1;
++		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED;
+ 		return 0;
  
--	ret = sun4i_frontend_drm_format_to_input_mode(format, &in_mod_val);
-+	ret = sun4i_frontend_drm_format_to_input_mode(format, modifier,
-+						      &in_mod_val);
- 	if (ret) {
- 		DRM_DEBUG_DRIVER("Invalid input mode\n");
- 		return ret;
+ 	default:
+@@ -132,7 +132,7 @@ static int sun4i_frontend_drm_format_to_input_sequence(uint32_t fmt, u32 *val)
+ {
+ 	switch (fmt) {
+ 	case DRM_FORMAT_XRGB8888:
+-		*val = 1;
++		*val = SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB;
+ 		return 0;
+ 
+ 	default:
+@@ -144,7 +144,7 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
+ {
+ 	switch (fmt) {
+ 	case DRM_FORMAT_XRGB8888:
+-		*val = 2;
++		*val = SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT_XRGB8888;
+ 		return 0;
+ 
+ 	default:
+@@ -218,9 +218,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 			   SUN4I_FRONTEND_BYPASS_CSC_EN);
+ 
+ 	regmap_write(frontend->regs, SUN4I_FRONTEND_INPUT_FMT_REG,
+-		     SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(in_mod_val) |
+-		     SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(in_fmt_val) |
+-		     SUN4I_FRONTEND_INPUT_FMT_PS(in_ps_val));
++		     in_mod_val | in_fmt_val | in_ps_val);
+ 
+ 	/*
+ 	 * TODO: It look like the A31 and A80 at least will need the
+@@ -228,7 +226,7 @@ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 	 * ARGB8888).
+ 	 */
+ 	regmap_write(frontend->regs, SUN4I_FRONTEND_OUTPUT_FMT_REG,
+-		     SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(out_fmt_val));
++		     out_fmt_val);
+ 
+ 	return 0;
+ }
 diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index b209eacdf8c2..ae53ee644694 100644
+index a9cb908ced16..56bd5a3f9723 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
 +++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -33,6 +33,8 @@
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PLANAR	(0 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_SEMIPLANAR	(2 << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_PLANAR	(4 << 8)
-+#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_MB32_SEMIPLANAR (6 << 8)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV444	(0 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV422	(1 << 4)
- #define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_YUV420	(2 << 4)
+@@ -26,12 +26,12 @@
+ #define SUN4I_FRONTEND_LINESTRD0_REG		0x040
+ 
+ #define SUN4I_FRONTEND_INPUT_FMT_REG		0x04c
+-#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD(mod)		((mod) << 8)
+-#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT(fmt)		((fmt) << 4)
+-#define SUN4I_FRONTEND_INPUT_FMT_PS(ps)			(ps)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_MOD_PACKED	(1 << 8)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_FMT_RGB		(5 << 4)
++#define SUN4I_FRONTEND_INPUT_FMT_DATA_PS_XRGB		1
+ 
+ #define SUN4I_FRONTEND_OUTPUT_FMT_REG		0x05c
+-#define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT(fmt)		(fmt)
++#define SUN4I_FRONTEND_OUTPUT_FMT_DATA_FMT_XRGB8888	2
+ 
+ #define SUN4I_FRONTEND_CH0_INSIZE_REG		0x100
+ #define SUN4I_FRONTEND_INSIZE(h, w)			((((h) - 1) << 16) | (((w) - 1)))
 -- 
 2.19.1
