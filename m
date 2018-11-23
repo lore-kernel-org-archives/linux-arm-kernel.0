@@ -1,53 +1,100 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Fri, 23 Nov 2018 11:04:36 +0800
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <20181122082336.GA2049@infradead.org>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
- <20181121213853.GL3065@bombadil.infradead.org>
- <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
- <20181122082336.GA2049@infradead.org>
-Message-ID: <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 22 Nov 2018 20:15:02 -0800
+Subject: [PATCH v9 8/8] arm64: dts: allwinner: a64: enable sound on
+ Pinebook
+In-Reply-To: <20181122102325.29495-9-wens@csie.org>
+References: <20181122102325.29495-1-wens@csie.org>
+ <20181122102325.29495-9-wens@csie.org>
+Message-ID: <4447541.czlqnMh8c9@anarsoul-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 4:23 PM Christoph Hellwig <hch@infradead.org> wrote:
->
-> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
-> > TBH, if this DMA32 stuff is going to be contentious we could possibly just
-> > rip out the offending kmem_cache - it seemed like good practice for the
-> > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
-> > give the same 1KB alignment and chance of succeeding as the equivalent
-> > kmem_cache_alloc(), then we could quite easily make do with that instead.
->
-> Neither is the slab support for kmalloc, not do kmalloc allocations
-> have useful alignment apparently (at least if you use slub debug).
->
-> But I do agree with the sentiment of not wanting to spread GFP_DMA32
-> futher into the slab allocator.
->
-> I think you want a simple genalloc allocator for this rather special
-> use case.
+On Thursday, November 22, 2018 2:23:25 AM PST Chen-Yu Tsai wrote:
+> From: Vasily Khoruzhick <anarsoul@gmail.com>
+> 
+> The Pinebook has a headphone jack tied to the HP headphone output of
+> the SoC, and internal speakers connected to the LINEOUT of the SoC,
+> through a standalone amplifier.
+> 
+> This commit enables I2S, digital and analog parts of audio codec on
+> Pinebook, along with a device node for the external amplifier.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> [wens at csie.org: dropped headphone_amp; added headphone amp regulator supply;
+> fixed speaker_amp node name and sound-name-prefix name]
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../dts/allwinner/sun50i-a64-pinebook.dts     | 49 +++++++++++++++++++
+>  1 file changed, 49 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts index
+> ec537c529726..b6d0b926a2ff 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pinebook.dts
+> @@ -74,6 +74,32 @@
+>  		compatible = "mmc-pwrseq-simple";
+>  		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+>  	};
+> +
+> +	speaker_amp: audio-amplifier {
+> +		compatible = "simple-audio-amplifier";
+> +		/*
+> +		 * TODO This is actually a fixed regulator controlled by
+> +		 * the GPIO line on the PMIC. This should be corrected
+> +		 * once GPIO support is added for this PMIC.
+> +		 */
+> +		VCC-supply = <&reg_ldo_io0>;
+> +		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 */
+> +		sound-name-prefix = "Speaker Amp";
+> +	};
+> +
+> +};
+> +
+> +&codec {
+> +	hpvcc-supply = <&reg_eldo1>;
 
-So I had a look at genalloc, we'd need to add pre-allocated memory
-using gen_pool_add [1]. There can be up to 4096 L2 page tables, so we
-may need to pre-allocate 4MB of memory (1KB per L2 page table). We
-could add chunks on demand, but then it'd be difficult to free them up
-(genalloc does not have a "gen_pool_remove" call). So basically if the
-full 4MB end up being requested, we'd be stuck with that until the
-iommu domain is freed (on the arm64 Mediatek platforms I looked at,
-there is only one iommu domain, and it never gets freed).
+It should be a property of codec_analog, not codec
 
-page_frag would at least have a chance to reclaim those pages (if I
-understand Christoph's statement correctly)
-
-Robin: Do you have some ideas of the lifetime/usage of L2 tables? If
-they are usually few of them, or if they don't get reclaimed easily,
-some on demand genalloc allocation would be ok (or even 4MB allocation
-on init, if we're willing to take that hit). If they get allocated and
-freed together, maybe page_frag is a better option?
-
-Thanks,
-
-[1] https://www.kernel.org/doc/html/v4.19/core-api/genalloc.html
+> +	status = "okay";
+> +};
+> +
+> +&codec_analog {
+> +	status = "okay";
+> +};
+> +
+> +&dai {
+> +	status = "okay";
+>  };
+> 
+>  &ehci0 {
+> @@ -277,6 +303,29 @@
+>  	vcc-hdmi-supply = <&reg_dldo1>;
+>  };
+> 
+> +&sound {
+> +	status = "okay";
+> +	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
+> +	simple-audio-card,widgets = "Microphone", "Internal Microphone Left",
+> +				    "Microphone", "Internal Microphone Right",
+> +				    "Headphone", "Headphone Jack",
+> +				    "Speaker", "Internal Speaker";
+> +	simple-audio-card,routing =
+> +			"Left DAC", "AIF1 Slot 0 Left",
+> +			"Right DAC", "AIF1 Slot 0 Right",
+> +			"Speaker Amp INL", "LINEOUT",
+> +			"Speaker Amp INR", "LINEOUT",
+> +			"Internal Speaker", "Speaker Amp OUTL",
+> +			"Internal Speaker", "Speaker Amp OUTR",
+> +			"Headphone Jack", "HP",
+> +			"AIF1 Slot 0 Left ADC", "Left ADC",
+> +			"AIF1 Slot 0 Right ADC", "Right ADC",
+> +			"Internal Microphone Left", "MBIAS",
+> +			"MIC1", "Internal Microphone Left",
+> +			"Internal Microphone Right", "HBIAS",
+> +			"MIC2", "Internal Microphone Right";
+> +};
+> +
+>  &uart0 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&uart0_pb_pins>;
