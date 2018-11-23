@@ -1,63 +1,82 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Fri, 23 Nov 2018 13:37:11 +0800
-Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
- tables
-In-Reply-To: <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
-References: <20181111090341.120786-1-drinkcat@chromium.org>
- <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
- <20181121213853.GL3065@bombadil.infradead.org>
- <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
- <20181122082336.GA2049@infradead.org>
- <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
-Message-ID: <CANMq1KC56nz7u8r54LUbN43DXxZPQWBY67FR1P18tps5V3E-Zw@mail.gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 23 Nov 2018 07:15:19 +0100
+Subject: [PATCH v2 0/2] clocksource/meson6_timer: implement ARM delay timer
+In-Reply-To: <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
+References: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
+ <5ff1a888-cce2-8fd8-a98e-14c3d7c33acf@linaro.org>
+ <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
+Message-ID: <a83b92fb-5950-01b8-521d-7b05939dce3a@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 11:04 AM Nicolas Boichat <drinkcat@chromium.org> wrote:
->
-> On Thu, Nov 22, 2018 at 4:23 PM Christoph Hellwig <hch@infradead.org> wrote:
-> >
-> > On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
-> > > TBH, if this DMA32 stuff is going to be contentious we could possibly just
-> > > rip out the offending kmem_cache - it seemed like good practice for the
-> > > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
-> > > give the same 1KB alignment and chance of succeeding as the equivalent
-> > > kmem_cache_alloc(), then we could quite easily make do with that instead.
-> >
-> > Neither is the slab support for kmalloc, not do kmalloc allocations
-> > have useful alignment apparently (at least if you use slub debug).
-> >
-> > But I do agree with the sentiment of not wanting to spread GFP_DMA32
-> > futher into the slab allocator.
-> >
-> > I think you want a simple genalloc allocator for this rather special
-> > use case.
->
-> So I had a look at genalloc, we'd need to add pre-allocated memory
-> using gen_pool_add [1]. There can be up to 4096 L2 page tables, so we
-> may need to pre-allocate 4MB of memory (1KB per L2 page table). We
-> could add chunks on demand, but then it'd be difficult to free them up
-> (genalloc does not have a "gen_pool_remove" call). So basically if the
-> full 4MB end up being requested, we'd be stuck with that until the
-> iommu domain is freed (on the arm64 Mediatek platforms I looked at,
-> there is only one iommu domain, and it never gets freed).
+On 22/11/2018 23:12, Martin Blumenstingl wrote:
+> Hi Daniel,
+> 
+> On Sun, Nov 18, 2018 at 2:27 AM Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>>
+>> On 15/11/2018 23:46, Martin Blumenstingl wrote:
+>>> While trying to add support for the ARM TWD Timer and the ARM Global
+>>> Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
+>>> I did a review of the existing driver.
+>>> Unfortunately I found it hard to review because the pre-processor
+>>> #defines did not match the names from the public S805 datasheet. Thus
+>>> patch #1 adjusts these. No functional changes here, this is just
+>>> preparation work for patch #2.
+>>>
+>>> Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
+>>> would have given us a timer-based delay implementation (so udelay() and
+>>> friends would use the timer instead of using a loop-based delay
+>>> implementation). Unfortunately we can't use the ARM Global Timer yet
+>>> because it's input clock is derived from the CPU clock (which can change
+>>> once we enable CPU frequency scaling on these SoCs, for which I will be
+>>> sending patches in the near future).
+>>> Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
+>>> current configuration) has a resolution of 1us. So patch #2 uses
+>>> register_current_timer_delay() to register Timer E as ARM delay timer
+>>> (which will be especially useful as we have to use udelay() when
+>>> changing the CPU clocks during DVFS).
+>>>
+>>>
+>>> Changes since v1 at [0]:
+>>> - convert the enums for the input clock (meson6_timera_input_clock and
+>>>   meson6_timere_input_clock) to simple #defines as these are register
+>>>   values and not something driver-internal. All other register values
+>>>   are #defines so it makes sense that these are #defines as well.
+>>>
+>>>
+>>> [0] https://patchwork.kernel.org/cover/10658591/
+>>>
+>>>
+>>> Martin Blumenstingl (2):
+>>>   clocksource: meson6_timer: use register names from the datasheet
+>>>   clocksource: meson6_timer: implement ARM delay timer
+>>>
+>>>  drivers/clocksource/meson6_timer.c | 128 +++++++++++++++++++----------
+>>>  1 file changed, 85 insertions(+), 43 deletions(-)
+>>
+>> Both applied, thanks!
+> thank you for taking my patches
+> 
+> I have one question more: can you please push these patches to a
+> repository/branch which is included in -next?
+> I'm asking because I'd like to send patches that enable CPU frequency
+> scaling on Meson8, Meson8b and Meson8m2. The code to change the CPU
+> clock calls udelay(), which (in this special case) needs a delay timer
+> to work properly (we can't use jiffies as we're using udelay() *while*
+> changing the CPU clock).
 
-I tried out genalloc with pre-allocated 4MB, and that seems to work
-fine. Allocating in chunks would require genalloc changes as
-gen_pool_add calls kmalloc with just GFP_KERNEL [2], and we are in
-atomic context in __arm_v7s_alloc_table...
+branch pushed [1], should appear in linux-next very soon.
 
-[2] https://elixir.bootlin.com/linux/latest/source/lib/genalloc.c#L190
+  -- Daniel
 
-> page_frag would at least have a chance to reclaim those pages (if I
-> understand Christoph's statement correctly)
->
-> Robin: Do you have some ideas of the lifetime/usage of L2 tables? If
-> they are usually few of them, or if they don't get reclaimed easily,
-> some on demand genalloc allocation would be ok (or even 4MB allocation
-> on init, if we're willing to take that hit). If they get allocated and
-> freed together, maybe page_frag is a better option?
->
-> Thanks,
->
-> [1] https://www.kernel.org/doc/html/v4.19/core-api/genalloc.html
+[1]
+https://git.linaro.org/people/daniel.lezcano/linux.git/log/?h=clockevents/next
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
