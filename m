@@ -1,679 +1,199 @@
-From: dev@pschenker.ch (Philippe Schenker)
-Date: Fri, 23 Nov 2018 15:24:09 +0100
-Subject: [PATCH v3 2/4] iio: adc: add STMPE ADC driver using IIO framework
-In-Reply-To: <20181123142411.8921-1-dev@pschenker.ch>
-References: <20181123142411.8921-1-dev@pschenker.ch>
-Message-ID: <20181123142411.8921-2-dev@pschenker.ch>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Fri, 23 Nov 2018 14:31:13 +0000
+Subject: [PATCH 09/10] drivers/perf: perf/core: generalise event
+ exclusion checking with perf macro
+In-Reply-To: <20181119160352.ua2lx72l754imiek@lakrids.cambridge.arm.com>
+References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
+ <1542363853-13849-10-git-send-email-andrew.murray@arm.com>
+ <20181119160352.ua2lx72l754imiek@lakrids.cambridge.arm.com>
+Message-ID: <20181123143113.GA1617@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Agner <stefan@agner.ch>
+On Mon, Nov 19, 2018 at 04:03:52PM +0000, Mark Rutland wrote:
+> On Fri, Nov 16, 2018 at 10:24:12AM +0000, Andrew Murray wrote:
+> > Replace checking of perf event exclusion flags with perf macro.
+> > 
+> > This is a functional change as exclude_host and exclude_guest are added
+> > in the following files:
+> > 
+> >  - drivers/perf/qcom_l2_pmu.c
+> >  - drivers/perf/qcom_l3_pmu.c
+> >  - drivers/perf/arm_pmu.c
+> > 
+> > And exclude_idle and exclude_hv are added in these files:
+> > 
+> >  - drivers/perf/xgene_pmu.c
+> 
+> FWIW, that all sounds fine to me.
+> 
+> Assuming you fix up the 'macro' nit:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> ... unless we go for Peter's core cap for this.
 
-This adds an ADC driver for the STMPE device using the industrial
-input/output interface. The driver supports raw reading of values.
-The driver depends on the MFD STMPE driver. If the touchscreen
-block is enabled too, only four of the 8 ADC channels are available.
+Yeah I'm going to re-spin with the core cap approach - but thanks anyway.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
-Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
-Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
----
+Thanks,
 
-Changes in v3:
- - Undo ADC-settings related code-deletions in stmpe-ts.c that the code is
-   backwards-compatible to older devicetrees.
+Andrew Murray
 
-Changes in v2:
- - Code formatting
- - Move code to setup ADC to MFD device, as it is used by both drivers
-   adc and touchscreen
- - Removed unused includes
- - Defined the macro STMPE_START_ONE_TEMP_CONV with other macros.
- - Added new macro that defines the channel of the temperature sensor.
-   Took new name for STMPE_MAX_ADC->STMPE_ADC_LAST_NR and used it throughout
-   the code for better readability.
- - Added mutex_unlock where missing.
-
- drivers/iio/adc/Kconfig              |   7 +
- drivers/iio/adc/Makefile             |   1 +
- drivers/iio/adc/stmpe-adc.c          | 326 +++++++++++++++++++++++++++
- drivers/input/touchscreen/stmpe-ts.c |  36 +--
- drivers/mfd/Kconfig                  |   3 +-
- drivers/mfd/stmpe.c                  |  81 +++++++
- include/linux/mfd/stmpe.h            |   9 +
- 7 files changed, 437 insertions(+), 26 deletions(-)
- create mode 100644 drivers/iio/adc/stmpe-adc.c
-
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index a52fea8749a9..224f2067494d 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -734,6 +734,13 @@ config STM32_DFSDM_ADC
- 	  This driver can also be built as a module.  If so, the module
- 	  will be called stm32-dfsdm-adc.
- 
-+config STMPE_ADC
-+	tristate "STMicroelectronics STMPE ADC driver"
-+	depends on OF && MFD_STMPE
-+	help
-+	  Say yes here to build support for ST Microelectronics STMPE
-+	  built-in ADC block (stmpe811).
-+
- config STX104
- 	tristate "Apex Embedded Systems STX104 driver"
- 	depends on PC104 && X86
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index a6e6a0b659e2..cba889c30bf9 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -69,6 +69,7 @@ obj-$(CONFIG_STM32_ADC_CORE) += stm32-adc-core.o
- obj-$(CONFIG_STM32_ADC) += stm32-adc.o
- obj-$(CONFIG_STM32_DFSDM_CORE) += stm32-dfsdm-core.o
- obj-$(CONFIG_STM32_DFSDM_ADC) += stm32-dfsdm-adc.o
-+obj-$(CONFIG_STMPE_ADC) += stmpe-adc.o
- obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
- obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
- obj-$(CONFIG_TI_ADC084S021) += ti-adc084s021.o
-diff --git a/drivers/iio/adc/stmpe-adc.c b/drivers/iio/adc/stmpe-adc.c
-new file mode 100644
-index 000000000000..bea3f3c27bb5
---- /dev/null
-+++ b/drivers/iio/adc/stmpe-adc.c
-@@ -0,0 +1,326 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ *  STMicroelectronics STMPE811 IIO ADC Driver
-+ *
-+ *  4 channel, 10/12-bit ADC
-+ *
-+ *  Copyright (C) 2013-2018 Toradex AG <stefan.agner@toradex.com>
-+ */
-+
-+#include <linux/completion.h>
-+#include <linux/err.h>
-+#include <linux/iio/iio.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/stmpe.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/platform_device.h>
-+
-+#define STMPE_REG_INT_STA		0x0B
-+#define STMPE_REG_ADC_INT_EN		0x0E
-+#define STMPE_REG_ADC_INT_STA		0x0F
-+
-+#define STMPE_REG_ADC_CTRL1		0x20
-+#define STMPE_REG_ADC_CTRL2		0x21
-+#define STMPE_REG_ADC_CAPT		0x22
-+#define STMPE_REG_ADC_DATA_CH(channel)	(0x30 + 2 * (channel))
-+
-+#define STMPE_REG_TEMP_CTRL		0x60
-+#define STMPE_TEMP_CTRL_ENABLE		BIT(0)
-+#define STMPE_TEMP_CTRL_ACQ		BIT(1)
-+#define STMPE_TEMP_CTRL_THRES_EN	BIT(3)
-+#define STMPE_START_ONE_TEMP_CONV	(STMPE_TEMP_CTRL_ENABLE | \
-+					STMPE_TEMP_CTRL_ACQ | \
-+					STMPE_TEMP_CTRL_THRES_EN)
-+#define STMPE_REG_TEMP_DATA		0x61
-+#define STMPE_REG_TEMP_TH		0x63
-+#define STMPE_ADC_LAST_NR		7
-+#define STMPE_TEMP_CHANNEL		(STMPE_ADC_LAST_NR + 1)
-+
-+#define STMPE_ADC_CH(channel)		((1 << (channel)) & 0xff)
-+
-+#define STMPE_ADC_TIMEOUT		msecs_to_jiffies(1000)
-+
-+struct stmpe_adc {
-+	struct stmpe *stmpe;
-+	struct clk *clk;
-+	struct device *dev;
-+
-+	/* We are allocating plus one for the temperature channel */
-+	struct iio_chan_spec stmpe_adc_iio_channels[STMPE_ADC_LAST_NR + 2];
-+
-+	struct completion completion;
-+
-+	u8 channel;
-+	u32 value;
-+};
-+
-+static int stmpe_read_raw(struct iio_dev *indio_dev,
-+			  struct iio_chan_spec const *chan,
-+			  int *val,
-+			  int *val2,
-+			  long mask)
-+{
-+	struct stmpe_adc *info = iio_priv(indio_dev);
-+	long ret;
-+
-+	switch (mask) {
-+	case IIO_CHAN_INFO_RAW:
-+	case IIO_CHAN_INFO_PROCESSED:
-+
-+		mutex_lock(&indio_dev->mlock);
-+
-+		info->channel = (u8)chan->channel;
-+
-+		switch (chan->type) {
-+		case IIO_VOLTAGE:
-+			if (info->channel > STMPE_ADC_LAST_NR) {
-+				mutex_unlock(&indio_dev->mlock);
-+				return -EINVAL;
-+			}
-+
-+			stmpe_reg_write(info->stmpe, STMPE_REG_ADC_INT_EN,
-+					STMPE_ADC_CH(info->channel));
-+
-+			stmpe_reg_write(info->stmpe, STMPE_REG_ADC_CAPT,
-+					STMPE_ADC_CH(info->channel));
-+
-+			*val = info->value;
-+			break;
-+
-+		case IIO_TEMP:
-+			if (info->channel != STMPE_TEMP_CHANNEL) {
-+				mutex_unlock(&indio_dev->mlock);
-+				return -EINVAL;
-+			}
-+
-+			stmpe_reg_write(info->stmpe, STMPE_REG_TEMP_CTRL,
-+					STMPE_START_ONE_TEMP_CONV);
-+			break;
-+		default:
-+			mutex_unlock(&indio_dev->mlock);
-+			return -EINVAL;
-+		}
-+
-+		ret = wait_for_completion_interruptible_timeout
-+			(&info->completion, STMPE_ADC_TIMEOUT);
-+
-+		if (ret <= 0) {
-+			mutex_unlock(&indio_dev->mlock);
-+			if (ret == 0)
-+				return -ETIMEDOUT;
-+			else
-+				return ret;
-+		}
-+
-+		switch (chan->type) {
-+		case IIO_VOLTAGE:
-+			*val = info->value;
-+			break;
-+
-+		case IIO_TEMP:
-+			/*
-+			 * absolute temp = +V3.3 * value /7.51 [K]
-+			 * scale to [milli ?C]
-+			 */
-+			*val = ((449960l * info->value) / 1024l) - 273150;
-+			break;
-+		default:
-+			break;
-+		}
-+
-+		mutex_unlock(&indio_dev->mlock);
-+		return IIO_VAL_INT;
-+
-+	case IIO_CHAN_INFO_SCALE:
-+		*val = 3300;
-+		*val2 = info->stmpe->mod_12b ? 12 : 10;
-+		return IIO_VAL_FRACTIONAL_LOG2;
-+
-+	default:
-+		break;
-+	}
-+
-+	return -EINVAL;
-+}
-+
-+static irqreturn_t stmpe_adc_isr(int irq, void *dev_id)
-+{
-+	struct stmpe_adc *info = (struct stmpe_adc *)dev_id;
-+	u8 data[2];
-+
-+	if (info->channel > STMPE_TEMP_CHANNEL)
-+		return IRQ_NONE;
-+
-+	if (info->channel <= STMPE_ADC_LAST_NR) {
-+		int int_sta;
-+
-+		int_sta = stmpe_reg_read(info->stmpe, STMPE_REG_ADC_INT_STA);
-+
-+		/* Is the interrupt relevant */
-+		if (!(int_sta & STMPE_ADC_CH(info->channel)))
-+			return IRQ_NONE;
-+
-+		/* Read value */
-+		stmpe_block_read(info->stmpe,
-+			STMPE_REG_ADC_DATA_CH(info->channel), 2, data);
-+
-+		stmpe_reg_write(info->stmpe, STMPE_REG_ADC_INT_STA, int_sta);
-+	} else if (info->channel == STMPE_TEMP_CHANNEL) {
-+		/* Read value */
-+		stmpe_block_read(info->stmpe, STMPE_REG_TEMP_DATA, 2, data);
-+	}
-+
-+	info->value = ((u32)data[0] << 8) + data[1];
-+	complete(&info->completion);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static const struct iio_info stmpe_adc_iio_info = {
-+	.read_raw = &stmpe_read_raw,
-+};
-+
-+static void stmpe_adc_voltage_chan(struct iio_chan_spec *ics, int chan)
-+{
-+	ics->type = IIO_VOLTAGE;
-+	ics->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
-+	ics->info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE);
-+	ics->indexed = 1;
-+	ics->channel = chan;
-+}
-+
-+static void stmpe_adc_temp_chan(struct iio_chan_spec *ics, int chan)
-+{
-+	ics->type = IIO_TEMP;
-+	ics->info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED);
-+	ics->indexed = 1;
-+	ics->channel = chan;
-+}
-+
-+static int stmpe_adc_init_hw(struct stmpe_adc *adc)
-+{
-+	struct stmpe *stmpe = adc->stmpe;
-+
-+	/* use temp irq for each conversion completion */
-+	stmpe_reg_write(stmpe, STMPE_REG_TEMP_TH, 0);
-+	stmpe_reg_write(stmpe, STMPE_REG_TEMP_TH + 1, 0);
-+
-+	return 0;
-+}
-+
-+static int stmpe_adc_probe(struct platform_device *pdev)
-+{
-+	struct iio_dev *indio_dev = NULL;
-+	struct stmpe_adc *info = NULL;
-+	struct device_node *np;
-+	u32 norequest_mask = 0;
-+	int irq_temp, irq_adc;
-+	int num_chan = 0;
-+	int i = 0;
-+	int ret;
-+
-+	irq_adc = platform_get_irq_byname(pdev, "STMPE_ADC");
-+	if (irq_adc < 0)
-+		return irq_adc;
-+
-+	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(struct stmpe_adc));
-+	if (!indio_dev) {
-+		dev_err(&pdev->dev, "failed allocating iio device\n");
-+		return -ENOMEM;
-+	}
-+
-+	info = iio_priv(indio_dev);
-+
-+	init_completion(&info->completion);
-+	ret = devm_request_threaded_irq(&pdev->dev, irq_adc, NULL,
-+					stmpe_adc_isr, IRQF_ONESHOT,
-+					"stmpe-adc", info);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n",
-+				irq_adc);
-+		return ret;
-+	}
-+
-+	irq_temp = platform_get_irq_byname(pdev, "STMPE_TEMP_SENS");
-+	if (irq_temp >= 0) {
-+		ret = devm_request_threaded_irq(&pdev->dev, irq_temp, NULL,
-+						stmpe_adc_isr, IRQF_ONESHOT,
-+						"stmpe-adc", info);
-+		if (ret < 0)
-+			dev_warn(&pdev->dev, "failed requesting irq for"
-+				 " temp sensor, irq = %d\n", irq_temp);
-+	}
-+
-+	platform_set_drvdata(pdev, indio_dev);
-+
-+	indio_dev->name		= dev_name(&pdev->dev);
-+	indio_dev->dev.parent	= &pdev->dev;
-+	indio_dev->info		= &stmpe_adc_iio_info;
-+	indio_dev->modes	= INDIO_DIRECT_MODE;
-+
-+	info->stmpe = dev_get_drvdata(pdev->dev.parent);
-+
-+	np = pdev->dev.of_node;
-+
-+	if (!np)
-+		dev_err(&pdev->dev, "no device tree node found\n");
-+
-+	of_property_read_u32(np, "st,norequest-mask", &norequest_mask);
-+
-+	for_each_clear_bit(i, (unsigned long *) &norequest_mask,
-+			   (STMPE_ADC_LAST_NR + 1)) {
-+		stmpe_adc_voltage_chan(&info->stmpe_adc_iio_channels[num_chan], i);
-+		num_chan++;
-+	}
-+	stmpe_adc_temp_chan(&info->stmpe_adc_iio_channels[num_chan], i);
-+	num_chan++;
-+	indio_dev->channels = info->stmpe_adc_iio_channels;
-+	indio_dev->num_channels = num_chan;
-+
-+	ret = stmpe_adc_init_hw(info);
-+	if (ret)
-+		return ret;
-+
-+	return iio_device_register(indio_dev);
-+}
-+
-+static int stmpe_adc_remove(struct platform_device *pdev)
-+{
-+	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
-+	struct stmpe_adc *info = iio_priv(indio_dev);
-+
-+	iio_device_unregister(indio_dev);
-+	stmpe_disable(info->stmpe, STMPE_BLOCK_ADC);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused stmpe_adc_resume(struct device *dev)
-+{
-+	struct iio_dev *indio_dev = dev_get_drvdata(dev);
-+	struct stmpe_adc *info = iio_priv(indio_dev);
-+
-+	stmpe_adc_init_hw(info);
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(stmpe_adc_pm_ops, NULL, stmpe_adc_resume);
-+
-+static struct platform_driver stmpe_adc_driver = {
-+	.probe		= stmpe_adc_probe,
-+	.remove		= stmpe_adc_remove,
-+	.driver		= {
-+		.name	= "stmpe-adc",
-+		.pm	= &stmpe_adc_pm_ops,
-+	},
-+};
-+
-+module_platform_driver(stmpe_adc_driver);
-+
-+MODULE_AUTHOR("Stefan Agner <stefan.agner@toradex.com>");
-+MODULE_DESCRIPTION("STMPEXXX ADC driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:stmpe-adc");
-diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
-index c5d9006588a2..81aa313d6e5a 100644
---- a/drivers/input/touchscreen/stmpe-ts.c
-+++ b/drivers/input/touchscreen/stmpe-ts.c
-@@ -30,8 +30,6 @@
-  * with touchscreen controller
-  */
- #define STMPE_REG_INT_STA		0x0B
--#define STMPE_REG_ADC_CTRL1		0x20
--#define STMPE_REG_ADC_CTRL2		0x21
- #define STMPE_REG_TSC_CTRL		0x40
- #define STMPE_REG_TSC_CFG		0x41
- #define STMPE_REG_FIFO_TH		0x4A
-@@ -58,15 +56,6 @@
-  * @idev: registered input device
-  * @work: a work item used to scan the device
-  * @dev: a pointer back to the MFD cell struct device*
-- * @sample_time: ADC converstion time in number of clock.
-- * (0 -> 36 clocks, 1 -> 44 clocks, 2 -> 56 clocks, 3 -> 64 clocks,
-- * 4 -> 80 clocks, 5 -> 96 clocks, 6 -> 144 clocks),
-- * recommended is 4.
-- * @mod_12b: ADC Bit mode (0 -> 10bit ADC, 1 -> 12bit ADC)
-- * @ref_sel: ADC reference source
-- * (0 -> internal reference, 1 -> external reference)
-- * @adc_freq: ADC Clock speed
-- * (0 -> 1.625 MHz, 1 -> 3.25 MHz, 2 || 3 -> 6.5 MHz)
-  * @ave_ctrl: Sample average control
-  * (0 -> 1 sample, 1 -> 2 samples, 2 -> 4 samples, 3 -> 8 samples)
-  * @touch_det_delay: Touch detect interrupt delay
-@@ -88,10 +77,6 @@ struct stmpe_touch {
- 	struct input_dev *idev;
- 	struct delayed_work work;
- 	struct device *dev;
--	u8 sample_time;
--	u8 mod_12b;
--	u8 ref_sel;
--	u8 adc_freq;
- 	u8 ave_ctrl;
- 	u8 touch_det_delay;
- 	u8 settling;
-@@ -176,7 +161,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
- 	input_report_key(ts->idev, BTN_TOUCH, 1);
- 	input_sync(ts->idev);
- 
--       /* flush the FIFO after we have read out our values. */
-+	/* flush the FIFO after we have read out our values. */
- 	__stmpe_reset_fifo(ts->stmpe);
- 
- 	/* reenable the tsc */
-@@ -202,20 +187,21 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
- 		return ret;
- 	}
- 
--	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
--		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
-+	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
-+		    STMPE_MOD_12B(stmpe->mod_12b) |
-+		    STMPE_REF_SEL(stmpe->ref_sel);
- 	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
- 			 STMPE_REF_SEL(0xff);
- 
--	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
-+	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
- 			adc_ctrl1_mask, adc_ctrl1);
- 	if (ret) {
- 		dev_err(dev, "Could not setup ADC\n");
- 		return ret;
- 	}
- 
--	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
--			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
-+	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
-+			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
- 	if (ret) {
- 		dev_err(dev, "Could not setup ADC\n");
- 		return ret;
-@@ -295,13 +281,13 @@ static void stmpe_ts_get_platform_info(struct platform_device *pdev,
- 
- 	if (np) {
- 		if (!of_property_read_u32(np, "st,sample-time", &val))
--			ts->sample_time = val;
-+			ts->stmpe->sample_time = val;
- 		if (!of_property_read_u32(np, "st,mod-12b", &val))
--			ts->mod_12b = val;
-+			ts->stmpe->mod_12b = val;
- 		if (!of_property_read_u32(np, "st,ref-sel", &val))
--			ts->ref_sel = val;
-+			ts->stmpe->ref_sel = val;
- 		if (!of_property_read_u32(np, "st,adc-freq", &val))
--			ts->adc_freq = val;
-+			ts->stmpe->adc_freq = val;
- 		if (!of_property_read_u32(np, "st,ave-ctrl", &val))
- 			ts->ave_ctrl = val;
- 		if (!of_property_read_u32(np, "st,touch-det-delay", &val))
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 8c5dfdce4326..bba159e8eaa4 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1204,7 +1204,7 @@ config MFD_STMPE
- 
- 	  Currently supported devices are:
- 
--		STMPE811: GPIO, Touchscreen
-+		STMPE811: GPIO, Touchscreen, ADC
- 		STMPE1601: GPIO, Keypad
- 		STMPE1801: GPIO, Keypad
- 		STMPE2401: GPIO, Keypad
-@@ -1217,6 +1217,7 @@ config MFD_STMPE
- 		GPIO: stmpe-gpio
- 		Keypad: stmpe-keypad
- 		Touchscreen: stmpe-ts
-+		ADC: stmpe-adc
- 
- menu "STMicroelectronics STMPE Interface Drivers"
- depends on MFD_STMPE
-diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
-index 566caca4efd8..35390d1c2e64 100644
---- a/drivers/mfd/stmpe.c
-+++ b/drivers/mfd/stmpe.c
-@@ -463,6 +463,28 @@ static const struct mfd_cell stmpe_ts_cell = {
- 	.num_resources	= ARRAY_SIZE(stmpe_ts_resources),
- };
- 
-+/*
-+ * ADC (STMPE811)
-+ */
-+
-+static struct resource stmpe_adc_resources[] = {
-+	{
-+		.name	= "STMPE_TEMP_SENS",
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+	{
-+		.name	= "STMPE_ADC",
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static const struct mfd_cell stmpe_adc_cell = {
-+	.name		= "stmpe-adc",
-+	.of_compatible	= "st,stmpe-adc",
-+	.resources	= stmpe_adc_resources,
-+	.num_resources	= ARRAY_SIZE(stmpe_adc_resources),
-+};
-+
- /*
-  * STMPE811 or STMPE610
-  */
-@@ -497,6 +519,11 @@ static struct stmpe_variant_block stmpe811_blocks[] = {
- 		.irq	= STMPE811_IRQ_TOUCH_DET,
- 		.block	= STMPE_BLOCK_TOUCHSCREEN,
- 	},
-+	{
-+		.cell	= &stmpe_adc_cell,
-+		.irq	= STMPE811_IRQ_TEMP_SENS,
-+		.block	= STMPE_BLOCK_ADC,
-+	},
- };
- 
- static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
-@@ -517,6 +544,44 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
- 				enable ? 0 : mask);
- }
- 
-+static int stmpe811_init_adc(struct stmpe *stmpe)
-+{
-+	int ret;
-+	u8 adc_ctrl1, adc_ctrl1_mask;
-+
-+	ret = stmpe_enable(stmpe, STMPE_BLOCK_ADC);
-+	if (ret) {
-+		dev_err(stmpe->dev, "Could not enable clock for ADC\n");
-+		goto err_adc;
-+	}
-+
-+	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
-+		    STMPE_MOD_12B(stmpe->mod_12b) |
-+		    STMPE_REF_SEL(stmpe->ref_sel);
-+	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
-+			 STMPE_REF_SEL(0xff);
-+
-+	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
-+			adc_ctrl1_mask, adc_ctrl1);
-+	if (ret) {
-+		dev_err(stmpe->dev, "Could not setup ADC\n");
-+		goto err_adc;
-+	}
-+
-+	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
-+			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
-+	if (ret) {
-+		dev_err(stmpe->dev, "Could not setup ADC\n");
-+		goto err_adc;
-+	}
-+
-+	return 0;
-+err_adc:
-+	stmpe_disable(stmpe, STMPE_BLOCK_ADC);
-+
-+	return ret;
-+}
-+
- static int stmpe811_get_altfunc(struct stmpe *stmpe, enum stmpe_block block)
- {
- 	/* 0 for touchscreen, 1 for GPIO */
-@@ -1235,6 +1300,12 @@ static int stmpe_chip_init(struct stmpe *stmpe)
- 			return ret;
- 	}
- 
-+	if (id == STMPE811_ID) {
-+		ret = stmpe811_init_adc(stmpe);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	return stmpe_reg_write(stmpe, stmpe->regs[STMPE_IDX_ICR_LSB], icr);
- }
- 
-@@ -1325,6 +1396,7 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
- 	struct device_node *np = ci->dev->of_node;
- 	struct stmpe *stmpe;
- 	int ret;
-+	u32 val;
- 
- 	pdata = devm_kzalloc(ci->dev, sizeof(*pdata), GFP_KERNEL);
- 	if (!pdata)
-@@ -1342,6 +1414,15 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
- 	mutex_init(&stmpe->irq_lock);
- 	mutex_init(&stmpe->lock);
- 
-+	if (!of_property_read_u32(np, "st,sample-time", &val))
-+		stmpe->sample_time = val;
-+	if (!of_property_read_u32(np, "st,mod-12b", &val))
-+		stmpe->mod_12b = val;
-+	if (!of_property_read_u32(np, "st,ref-sel", &val))
-+		stmpe->ref_sel = val;
-+	if (!of_property_read_u32(np, "st,adc-freq", &val))
-+		stmpe->adc_freq = val;
-+
- 	stmpe->dev = ci->dev;
- 	stmpe->client = ci->client;
- 	stmpe->pdata = pdata;
-diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
-index c0353f6431f9..86dca9e9880a 100644
---- a/include/linux/mfd/stmpe.h
-+++ b/include/linux/mfd/stmpe.h
-@@ -21,6 +21,9 @@
- #define STMPE_I_DRIVE(x)	(x & 0x1)
- #define STMPE_OP_MODE(x)	((x & 0x7) << 1)
- 
-+#define STMPE811_REG_ADC_CTRL1	0x20
-+#define STMPE811_REG_ADC_CTRL2	0x21
-+
- struct device;
- struct regulator;
- 
-@@ -134,6 +137,12 @@ struct stmpe {
- 	u8 ier[2];
- 	u8 oldier[2];
- 	struct stmpe_platform_data *pdata;
-+
-+	/* For devices that use an ADC */
-+	u8 sample_time;
-+	u8 mod_12b;
-+	u8 ref_sel;
-+	u8 adc_freq;
- };
- 
- extern int stmpe_reg_write(struct stmpe *stmpe, u8 reg, u8 data);
--- 
-2.19.1
+> 
+> Thanks,
+> Mark.
+> 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >  drivers/perf/arm-cci.c                   | 7 +------
+> >  drivers/perf/arm-ccn.c                   | 5 +----
+> >  drivers/perf/arm_dsu_pmu.c               | 7 +------
+> >  drivers/perf/arm_pmu.c                   | 9 +--------
+> >  drivers/perf/hisilicon/hisi_uncore_pmu.c | 7 +------
+> >  drivers/perf/qcom_l2_pmu.c               | 3 +--
+> >  drivers/perf/qcom_l3_pmu.c               | 3 +--
+> >  drivers/perf/xgene_pmu.c                 | 3 +--
+> >  8 files changed, 8 insertions(+), 36 deletions(-)
+> > 
+> > diff --git a/drivers/perf/arm-cci.c b/drivers/perf/arm-cci.c
+> > index 1bfeb16..d749f19 100644
+> > --- a/drivers/perf/arm-cci.c
+> > +++ b/drivers/perf/arm-cci.c
+> > @@ -1328,12 +1328,7 @@ static int cci_pmu_event_init(struct perf_event *event)
+> >  		return -EOPNOTSUPP;
+> >  
+> >  	/* We have no filtering of any kind */
+> > -	if (event->attr.exclude_user	||
+> > -	    event->attr.exclude_kernel	||
+> > -	    event->attr.exclude_hv	||
+> > -	    event->attr.exclude_idle	||
+> > -	    event->attr.exclude_host	||
+> > -	    event->attr.exclude_guest)
+> > +	if (event_has_exclude_flags(event))
+> >  		return -EINVAL;
+> >  
+> >  	/*
+> > diff --git a/drivers/perf/arm-ccn.c b/drivers/perf/arm-ccn.c
+> > index 7dd850e..9a22a95 100644
+> > --- a/drivers/perf/arm-ccn.c
+> > +++ b/drivers/perf/arm-ccn.c
+> > @@ -741,10 +741,7 @@ static int arm_ccn_pmu_event_init(struct perf_event *event)
+> >  		return -EOPNOTSUPP;
+> >  	}
+> >  
+> > -	if (has_branch_stack(event) || event->attr.exclude_user ||
+> > -			event->attr.exclude_kernel || event->attr.exclude_hv ||
+> > -			event->attr.exclude_idle || event->attr.exclude_host ||
+> > -			event->attr.exclude_guest) {
+> > +	if (has_branch_stack(event) || event_has_exclude_flags(event)) {
+> >  		dev_dbg(ccn->dev, "Can't exclude execution levels!\n");
+> >  		return -EINVAL;
+> >  	}
+> > diff --git a/drivers/perf/arm_dsu_pmu.c b/drivers/perf/arm_dsu_pmu.c
+> > index 660cb8a..300ff3d 100644
+> > --- a/drivers/perf/arm_dsu_pmu.c
+> > +++ b/drivers/perf/arm_dsu_pmu.c
+> > @@ -563,12 +563,7 @@ static int dsu_pmu_event_init(struct perf_event *event)
+> >  	}
+> >  
+> >  	if (has_branch_stack(event) ||
+> > -	    event->attr.exclude_user ||
+> > -	    event->attr.exclude_kernel ||
+> > -	    event->attr.exclude_hv ||
+> > -	    event->attr.exclude_idle ||
+> > -	    event->attr.exclude_host ||
+> > -	    event->attr.exclude_guest) {
+> > +	    event_has_exclude_flags(event)) {
+> >  		dev_dbg(dsu_pmu->pmu.dev, "Can't support filtering\n");
+> >  		return -EINVAL;
+> >  	}
+> > diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> > index 7f01f6f..a03634f 100644
+> > --- a/drivers/perf/arm_pmu.c
+> > +++ b/drivers/perf/arm_pmu.c
+> > @@ -357,13 +357,6 @@ static irqreturn_t armpmu_dispatch_irq(int irq, void *dev)
+> >  }
+> >  
+> >  static int
+> > -event_requires_mode_exclusion(struct perf_event_attr *attr)
+> > -{
+> > -	return attr->exclude_idle || attr->exclude_user ||
+> > -	       attr->exclude_kernel || attr->exclude_hv;
+> > -}
+> > -
+> > -static int
+> >  __hw_perf_event_init(struct perf_event *event)
+> >  {
+> >  	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
+> > @@ -395,7 +388,7 @@ __hw_perf_event_init(struct perf_event *event)
+> >  	 */
+> >  	if ((!armpmu->set_event_filter ||
+> >  	     armpmu->set_event_filter(hwc, &event->attr)) &&
+> > -	     event_requires_mode_exclusion(&event->attr)) {
+> > +	     event_has_exclude_flags(event)) {
+> >  		pr_debug("ARM performance counters do not support "
+> >  			 "mode exclusion\n");
+> >  		return -EOPNOTSUPP;
+> > diff --git a/drivers/perf/hisilicon/hisi_uncore_pmu.c b/drivers/perf/hisilicon/hisi_uncore_pmu.c
+> > index 9efd241..d3edff9 100644
+> > --- a/drivers/perf/hisilicon/hisi_uncore_pmu.c
+> > +++ b/drivers/perf/hisilicon/hisi_uncore_pmu.c
+> > @@ -143,12 +143,7 @@ int hisi_uncore_pmu_event_init(struct perf_event *event)
+> >  		return -EOPNOTSUPP;
+> >  
+> >  	/* counters do not have these bits */
+> > -	if (event->attr.exclude_user	||
+> > -	    event->attr.exclude_kernel	||
+> > -	    event->attr.exclude_host	||
+> > -	    event->attr.exclude_guest	||
+> > -	    event->attr.exclude_hv	||
+> > -	    event->attr.exclude_idle)
+> > +	if (event_has_exclude_flags(event))
+> >  		return -EINVAL;
+> >  
+> >  	/*
+> > diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+> > index 842135c..d7d85a2 100644
+> > --- a/drivers/perf/qcom_l2_pmu.c
+> > +++ b/drivers/perf/qcom_l2_pmu.c
+> > @@ -510,8 +510,7 @@ static int l2_cache_event_init(struct perf_event *event)
+> >  	}
+> >  
+> >  	/* We cannot filter accurately so we just don't allow it. */
+> > -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+> > -	    event->attr.exclude_hv || event->attr.exclude_idle) {
+> > +	if (event_has_exclude_flags(event)) {
+> >  		dev_dbg_ratelimited(&l2cache_pmu->pdev->dev,
+> >  				    "Can't exclude execution levels\n");
+> >  		return -EOPNOTSUPP;
+> > diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
+> > index 2dc63d6..f27af67 100644
+> > --- a/drivers/perf/qcom_l3_pmu.c
+> > +++ b/drivers/perf/qcom_l3_pmu.c
+> > @@ -497,8 +497,7 @@ static int qcom_l3_cache__event_init(struct perf_event *event)
+> >  	/*
+> >  	 * There are no per-counter mode filters in the PMU.
+> >  	 */
+> > -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+> > -	    event->attr.exclude_hv || event->attr.exclude_idle)
+> > +	if (event_has_exclude_flags(event))
+> >  		return -EINVAL;
+> >  
+> >  	/*
+> > diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+> > index 0e31f13..1fcd5a0 100644
+> > --- a/drivers/perf/xgene_pmu.c
+> > +++ b/drivers/perf/xgene_pmu.c
+> > @@ -915,8 +915,7 @@ static int xgene_perf_event_init(struct perf_event *event)
+> >  		return -EINVAL;
+> >  
+> >  	/* SOC counters do not have usr/os/guest/host bits */
+> > -	if (event->attr.exclude_user || event->attr.exclude_kernel ||
+> > -	    event->attr.exclude_host || event->attr.exclude_guest)
+> > +	if (event_has_exclude_flags(event))
+> >  		return -EINVAL;
+> >  
+> >  	if (event->cpu < 0)
+> > -- 
+> > 2.7.4
+> > 
