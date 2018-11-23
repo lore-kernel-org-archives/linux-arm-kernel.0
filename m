@@ -1,41 +1,86 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Nov 2018 18:41:03 +0000
-Subject: [PATCH v2 4/8] arm64: Add TCR_EPD{0,1} definitions
+Date: Fri, 23 Nov 2018 18:41:01 +0000
+Subject: [PATCH v2 2/8] KVM: arm64: Rework detection of SVE, !VHE systems
 In-Reply-To: <20181123184107.39334-1-marc.zyngier@arm.com>
 References: <20181123184107.39334-1-marc.zyngier@arm.com>
-Message-ID: <20181123184107.39334-5-marc.zyngier@arm.com>
+Message-ID: <20181123184107.39334-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are soon going to play with TCR_EL1.EPD{0,1}, so let's add the
-relevant definitions.
+An SVE system is so far the only case where we mandate VHE. As we're
+starting to grow this requirements, let's slightly rework the way we
+deal with that situation, allowing for easy extension of this check.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/kvm_host.h   | 2 +-
+ arch/arm64/include/asm/kvm_host.h | 6 +++---
+ virt/kvm/arm/arm.c                | 8 ++++----
+ 3 files changed, 8 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 1d7d8da2ef9b..a7d5d6e459eb 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -224,6 +224,8 @@
- #define TCR_TxSZ_WIDTH		6
- #define TCR_T0SZ_MASK		(((UL(1) << TCR_TxSZ_WIDTH) - 1) << TCR_T0SZ_OFFSET)
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 5ca5d9af0c26..2184d9ddb418 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -285,7 +285,7 @@ void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
  
-+#define TCR_EPD0_SHIFT		7
-+#define TCR_EPD0_MASK		(UL(1) << TCR_EPD0_SHIFT)
- #define TCR_IRGN0_SHIFT		8
- #define TCR_IRGN0_MASK		(UL(3) << TCR_IRGN0_SHIFT)
- #define TCR_IRGN0_NC		(UL(0) << TCR_IRGN0_SHIFT)
-@@ -231,6 +233,8 @@
- #define TCR_IRGN0_WT		(UL(2) << TCR_IRGN0_SHIFT)
- #define TCR_IRGN0_WBnWA		(UL(3) << TCR_IRGN0_SHIFT)
+ struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
  
-+#define TCR_EPD1_SHIFT		23
-+#define TCR_EPD1_MASK		(UL(1) << TCR_EPD1_SHIFT)
- #define TCR_IRGN1_SHIFT		24
- #define TCR_IRGN1_MASK		(UL(3) << TCR_IRGN1_SHIFT)
- #define TCR_IRGN1_NC		(UL(0) << TCR_IRGN1_SHIFT)
+-static inline bool kvm_arch_check_sve_has_vhe(void) { return true; }
++static inline bool kvm_arch_requires_vhe(void) { return false; }
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 52fbc823ff8c..d6d9aa76a943 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -422,7 +422,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ 	}
+ }
+ 
+-static inline bool kvm_arch_check_sve_has_vhe(void)
++static inline bool kvm_arch_requires_vhe(void)
+ {
+ 	/*
+ 	 * The Arm architecture specifies that implementation of SVE
+@@ -430,9 +430,9 @@ static inline bool kvm_arch_check_sve_has_vhe(void)
+ 	 * relies on this when SVE is present:
+ 	 */
+ 	if (system_supports_sve())
+-		return has_vhe();
+-	else
+ 		return true;
++
++	return false;
+ }
+ 
+ static inline void kvm_arch_hardware_unsetup(void) {}
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 23774970c9df..1db4c15edcdd 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -1640,8 +1640,10 @@ int kvm_arch_init(void *opaque)
+ 		return -ENODEV;
+ 	}
+ 
+-	if (!kvm_arch_check_sve_has_vhe()) {
+-		kvm_pr_unimpl("SVE system without VHE unsupported.  Broken cpu?");
++	in_hyp_mode = is_kernel_in_hyp_mode();
++
++	if (!in_hyp_mode && kvm_arch_requires_vhe()) {
++		kvm_pr_unimpl("CPU requiring VHE was booted in non-VHE mode");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -1657,8 +1659,6 @@ int kvm_arch_init(void *opaque)
+ 	if (err)
+ 		return err;
+ 
+-	in_hyp_mode = is_kernel_in_hyp_mode();
+-
+ 	if (!in_hyp_mode) {
+ 		err = init_hyp_mode();
+ 		if (err)
 -- 
 2.19.1
