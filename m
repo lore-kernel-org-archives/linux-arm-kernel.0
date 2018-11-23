@@ -1,78 +1,60 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 23 Nov 2018 20:40:28 +0100
-Subject: [PATCH v2 0/2] clocksource/meson6_timer: implement ARM delay timer
-In-Reply-To: <a83b92fb-5950-01b8-521d-7b05939dce3a@linaro.org>
-References: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
- <5ff1a888-cce2-8fd8-a98e-14c3d7c33acf@linaro.org>
- <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
- <a83b92fb-5950-01b8-521d-7b05939dce3a@linaro.org>
-Message-ID: <CAFBinCA+htBGeT3SfTdCivmKpq3bBF7vAvR-OWqnwO-rgXx22w@mail.gmail.com>
+Date: Fri, 23 Nov 2018 20:53:05 +0100
+Subject: [PATCH 0/6] 32-bit Meson: add the ARM TWD and Global Timers
+Message-ID: <20181123195311.4578-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 7:15 AM Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
->
-> On 22/11/2018 23:12, Martin Blumenstingl wrote:
-> > Hi Daniel,
-> >
-> > On Sun, Nov 18, 2018 at 2:27 AM Daniel Lezcano
-> > <daniel.lezcano@linaro.org> wrote:
-> >>
-> >> On 15/11/2018 23:46, Martin Blumenstingl wrote:
-> >>> While trying to add support for the ARM TWD Timer and the ARM Global
-> >>> Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
-> >>> I did a review of the existing driver.
-> >>> Unfortunately I found it hard to review because the pre-processor
-> >>> #defines did not match the names from the public S805 datasheet. Thus
-> >>> patch #1 adjusts these. No functional changes here, this is just
-> >>> preparation work for patch #2.
-> >>>
-> >>> Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
-> >>> would have given us a timer-based delay implementation (so udelay() and
-> >>> friends would use the timer instead of using a loop-based delay
-> >>> implementation). Unfortunately we can't use the ARM Global Timer yet
-> >>> because it's input clock is derived from the CPU clock (which can change
-> >>> once we enable CPU frequency scaling on these SoCs, for which I will be
-> >>> sending patches in the near future).
-> >>> Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
-> >>> current configuration) has a resolution of 1us. So patch #2 uses
-> >>> register_current_timer_delay() to register Timer E as ARM delay timer
-> >>> (which will be especially useful as we have to use udelay() when
-> >>> changing the CPU clocks during DVFS).
-> >>>
-> >>>
-> >>> Changes since v1 at [0]:
-> >>> - convert the enums for the input clock (meson6_timera_input_clock and
-> >>>   meson6_timere_input_clock) to simple #defines as these are register
-> >>>   values and not something driver-internal. All other register values
-> >>>   are #defines so it makes sense that these are #defines as well.
-> >>>
-> >>>
-> >>> [0] https://patchwork.kernel.org/cover/10658591/
-> >>>
-> >>>
-> >>> Martin Blumenstingl (2):
-> >>>   clocksource: meson6_timer: use register names from the datasheet
-> >>>   clocksource: meson6_timer: implement ARM delay timer
-> >>>
-> >>>  drivers/clocksource/meson6_timer.c | 128 +++++++++++++++++++----------
-> >>>  1 file changed, 85 insertions(+), 43 deletions(-)
-> >>
-> >> Both applied, thanks!
-> > thank you for taking my patches
-> >
-> > I have one question more: can you please push these patches to a
-> > repository/branch which is included in -next?
-> > I'm asking because I'd like to send patches that enable CPU frequency
-> > scaling on Meson8, Meson8b and Meson8m2. The code to change the CPU
-> > clock calls udelay(), which (in this special case) needs a delay timer
-> > to work properly (we can't use jiffies as we're using udelay() *while*
-> > changing the CPU clock).
->
-> branch pushed [1], should appear in linux-next very soon.
-awesome, thank you!
+The 32-bit Meson SoCs use Cortex-A9 or Cortex-A5 cores. These come
+with the ARM TWD ("Timer Watchdog") which contains a timer and a
+watchdog as well as the ARM Global Timer.
+
+This enables the corresponding configs for the 32-bit Meson target.
+Additionally this adds and enables the ARM TWD timer. The Global
+Timer is added but currently disabled because it's clock input is
+the PERIPH clock which is derived from the CPU clock. Thus the rate
+of the PERIPH clock will change when changing the CPU frequency.
+Unfortunately the Global Timer driver doesn't handle clocks with
+changing rates yet (unlike the TWD timer), thus we keep it disabled
+for now.
+
+The whole series is inspired by an almost 3 year old patch from
+Carlo: [0]
 
 
-Regards
-Martin
+Dependencies:
+- I build this on top of my other series "ARM: dts: meson: add the
+  timer interrupts and clocks" from [1]
+- CLKID_PERIPH requires updated clock driver headers. Neil provided
+  a tag which includes the updated headers: [2]
+- There is no runtime dependency on the PERIPH clock as we don't
+  have CPU frequency scaling support enabled yet. In case the TWD
+  timer driver can't find the clock it falls back to auto-detecting
+  the clock rate at boot time. This is safe as long as we don't have
+  .dts patches in place which allow changing the CPU clock rate. Once
+  we enable CPU frequency scaling support for the PERIPH clock becomes
+  mandatory so the TWD timer driver knows about changes to the PERIPH
+  clock (which is derived from the CPU clock).
+
+
+[0] https://patchwork.kernel.org/patch/7797581/
+[1] https://patchwork.kernel.org/cover/10687005/
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2018-November/009136.html
+
+
+Martin Blumenstingl (6):
+  ARM: meson: select HAVE_ARM_TWD and ARM_GLOBAL_TIMER
+  ARM: dts: meson: group the Cortex-A5 / Cortex-A9 peripherals
+  ARM: dts: meson8: add the ARM TWD timer
+  ARM: dts: meson8: add the Cortex-A9 global timer
+  ARM: dts: meson8b: add the ARM TWD timer
+  ARM: dts: meson8b: add the Cortex-A5 global timer
+
+ arch/arm/boot/dts/meson.dtsi   | 24 ++++++++++++++++--------
+ arch/arm/boot/dts/meson8.dtsi  | 32 +++++++++++++++++++++++++++-----
+ arch/arm/boot/dts/meson8b.dtsi | 32 +++++++++++++++++++++++++++-----
+ arch/arm/mach-meson/Kconfig    |  2 ++
+ 4 files changed, 72 insertions(+), 18 deletions(-)
+
+-- 
+2.19.2
