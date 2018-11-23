@@ -1,22 +1,35 @@
 From: hch@lst.de (Christoph Hellwig)
-Date: Fri, 23 Nov 2018 07:55:11 +0100
+Date: Fri, 23 Nov 2018 07:57:20 +0100
 Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+In-Reply-To: <20181122180526.GL30658@n2100.armlinux.org.uk>
 References: <20181122140320.24080-1-hch@lst.de>
  <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
  <20181122170715.GI30658@n2100.armlinux.org.uk>
  <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
  <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
  <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
-Message-ID: <20181123065511.GA17856@lst.de>
+ <20181122180526.GL30658@n2100.armlinux.org.uk>
+Message-ID: <20181123065720.GB17856@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 09:55:25AM -0800, Linus Torvalds wrote:
-> No, the big immediate benefit of allowing "return -EINVAL" etc is
-> simply legibility and error avoidance.
+On Thu, Nov 22, 2018 at 06:05:26PM +0000, Russell King - ARM Linux wrote:
+> An alternative idea would be to migrate away from the
+> dma_map_single() and dma_map_page() interfaces that return a
+> dma_addr_t, and instead have them return an error code or zero
+> on success.
 
-Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
-instead of the old 1 is as bool true.  The callers should all be fine,
-although I'd have to audit them.  Still wouldn't help with being able to
-return different errors.
+See here for a proposal:
+
+https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030912.html
+
+That is just the attr variants, but that would be a start.  Dave didn't
+particularly like it, though.
+
+> note the simpler unmap API, which inherently guarantees that the
+> parameters to the map could be carried over to the unmap - without
+> our many driver authors having to think about it.
+
+The problem is that we can often derive some or all parameters from
+field already inherent in the upper layer or hardware interface.  So
+for these cases your version would bloat the required data structures.
