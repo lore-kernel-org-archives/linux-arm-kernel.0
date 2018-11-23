@@ -1,67 +1,55 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 24 Nov 2018 00:03:01 +0800
-Subject: [PATCH v9 0/8] Add support for audiocodec in Allwinner A64
-In-Reply-To: <CAGb2v67J6ptnr_uPW0+H=WvCdAVzZ1Sw1wTUQrr6KrNsc_mXKQ@mail.gmail.com>
-References: <20181122102325.29495-1-wens@csie.org>
- <2007258.VzpTJLJblp@anarsoul-thinkpad>
- <CAGb2v67J6ptnr_uPW0+H=WvCdAVzZ1Sw1wTUQrr6KrNsc_mXKQ@mail.gmail.com>
-Message-ID: <CAGb2v66e7KmCLDgj8XFAbNhfg5txBnxE5svP30Zm0=p30mBF2w@mail.gmail.com>
+From: radu_nicolae.pirea@upb.ro (Radu Nicolae Pirea)
+Date: Fri, 23 Nov 2018 18:07:40 +0200
+Subject: [PATCH 2/3] dt-bindings: mfd: atmel-usart: add DMA bindings for
+ SPI mode
+In-Reply-To: <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
+References: <20181121112732.15690-1-radu_nicolae.pirea@upb.ro>
+ <20181121112732.15690-3-radu_nicolae.pirea@upb.ro>
+ <CAL_JsqLNURZTWCb5WOyJvN-trUP9r-ueftwUOGWPnrEaQPBKSw@mail.gmail.com>
+Message-ID: <975b9de554cea6f905afd1f54a2d5510c2e24bd4.camel@upb.ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 12:37 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> On Fri, Nov 23, 2018 at 12:26 PM Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> >
-> > On Thursday, November 22, 2018 2:23:17 AM PST Chen-Yu Tsai wrote:
-> > > Hi everyone,
-> > >
-> > > This is v9 of the A64 audio codec series, originally started by Vasily.
-> > > These are the last changes to make the A64 audio codec work correctly,
-> > > and be accurately represented in the device tree and in software.
-> > >
-> > > Notably, the new driver changes cover regulator supplies for the simple
-> > > audio amplifier, which is used in the Pinebook for the internal
-> > > speakers, and the audio codec's internal headphone amp. There's also an
-> > > extra patch that enables SDM fractional clock support for the audio PLL
-> > > on the A64, which gives us accurate audio playback.
-> > >
-> > > Patch 1 & 2 add the cpvdd regulator supply to the sun50i-codec-analog
-> > > dt bindings & driver.
-> > >
-> > > Patch 3 & 4 add a regulator supply to the simple-audio-amplifier dt
-> > > bindings & driver.
-> > >
-> > > Patch 5 adds SDM fractional clock support for the audio PLL on the A64.
-> > >
-> > > Patch 6 ~ 8 add the device tree bits and enables audio on several
-> > > boards.
-> > >
-> > > I have one extra patch for the Bananapi M64 that's not included here,
-> > > as I'm waiting for an accessory to test the microphone bias. I'll send
-> > > that one out once it's tested.
-> > >
-> > > As always, we'll take the clock and dts patches after Mark has merged
-> > > the ASoC ones.
-> > >
-> > > And a big thanks to Vasily for having worked on this for so long.
-> >
-> > Thank you for picking it up!
-> >
-> > Just a minor note: hpvcc-supply should be a property of codec_analog in
-> > sun50i-a64-pinebook.dts
->
-> Thanks. I'll fix that up when applying.
+On Wed, 2018-11-21 at 10:41 -0600, Rob Herring wrote:
+> On Wed, Nov 21, 2018 at 5:29 AM Radu Pirea <radu_nicolae.pirea@upb.ro
+> > wrote:
+> > The bindings for DMA are now common for both drivers of the USART
+> > IP.
+> > 
+> > The node given as an example for USART in SPI mode has been updated
+> > in
+> > order to include DMA bindings.
+> > 
+> > Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
+> > ---
+> >  .../devicetree/bindings/mfd/atmel-usart.txt       | 15 ++++++++++-
+> > ----
+> >  1 file changed, 10 insertions(+), 5 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> > b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> > index 7f0cd72f47d2..8ad008175343 100644
+> > --- a/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/atmel-usart.txt
+> > @@ -17,17 +17,19 @@ Required properties for USART in SPI mode:
+> >  - cs-gpios: chipselects (internal cs not supported)
+> >  - atmel,usart-mode : Must be <AT91_USART_MODE_SPI> (found in dt-
+> > bindings/mfd/at91-usart.h)
+> > 
+> > +Optional properties in serial and SPI mode:
+> > +- dma bindings for dma transfer:
+> > +       - dmas: DMA specifier, consisting of a phandle to DMA
+> > controller node,
+> > +               memory peripheral interface and USART DMA channel
+> > ID, FIFO configuration.
+> > +               Refer to dma.txt and atmel-dma.txt for details.
+> > +       - dma-names: "rx" for RX channel, "tx" for TX channel.
+> > +               dma-names = "tx", "rx";
+> 
+> The dma-names should have a defined order.
 
-Merged the remaining 4 patches with the misplaced regulator supply property
-in the last patch fixed.
+Thanks Rob.
+I will specify in bindings a fixed order for dmas and dma-names.
 
-ChenYu
-
-> > Otherwise looks fine, tested on Pinebook and Pine64-LTS.
-> >
-> > Tested-by: Vasily Khoruzhick <anarsoul@gmail.com>
->
-> Great!
->
-> ChenYu
+> 
+> Rob
