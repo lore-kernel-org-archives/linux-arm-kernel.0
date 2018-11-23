@@ -1,70 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Nov 2018 18:41:04 +0000
-Subject: [PATCH v2 5/8] arm64: KVM: Force VHE for systems affected by erratum
- 1165522
+Date: Fri, 23 Nov 2018 18:41:05 +0000
+Subject: [PATCH v2 6/8] arm64: KVM: Add synchronization on translation regime
+ change for erratum 1165522
 In-Reply-To: <20181123184107.39334-1-marc.zyngier@arm.com>
 References: <20181123184107.39334-1-marc.zyngier@arm.com>
-Message-ID: <20181123184107.39334-6-marc.zyngier@arm.com>
+Message-ID: <20181123184107.39334-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to easily mitigate ARM erratum 1165522, we need to force
-affected CPUs to run in VHE mode if using KVM.
+In order to ensure that slipping HCR_EL2.TGE is done at the right
+time when switching translation regime, let insert the required ISBs
+that will be patched in when erratum 1165522 is detected.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/cpucaps.h  | 3 ++-
- arch/arm64/include/asm/kvm_host.h | 4 ++++
- arch/arm64/kernel/cpu_errata.c    | 8 ++++++++
- 3 files changed, 14 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/kvm_hyp.h |  7 +++++++
+ arch/arm64/kvm/hyp/switch.c      | 19 +++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 6e2d254c09eb..62d8cd15fdf2 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -54,7 +54,8 @@
- #define ARM64_HAS_CRC32				33
- #define ARM64_SSBS				34
- #define ARM64_WORKAROUND_1188873		35
-+#define ARM64_WORKAROUND_1165522		36
- 
--#define ARM64_NCAPS				36
-+#define ARM64_NCAPS				37
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d6d9aa76a943..9217759afa6b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -432,6 +432,10 @@ static inline bool kvm_arch_requires_vhe(void)
- 	if (system_supports_sve())
- 		return true;
- 
-+	/* Some implementations have defects that confine them to VHE */
-+	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
-+		return true;
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 23aca66767f9..ce46bb1c5f4b 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -163,6 +163,13 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+ {
+ 	write_sysreg(kvm->arch.vtcr, vtcr_el2);
+ 	write_sysreg(kvm->arch.vttbr, vttbr_el2);
 +
- 	return false;
++	/*
++	 * ARM erratum 1165522 requires the actual execution of the above
++	 * before we can switch to the EL1/EL0 translation regime used by
++	 * the guest.
++	 */
++	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
  }
  
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a509e35132d2..476e738e6c46 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -739,6 +739,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.capability = ARM64_WORKAROUND_1188873,
- 		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
- 	},
-+#endif
-+#ifdef CONFIG_ARM64_ERRATUM_1165522
-+	{
-+		/* Cortex-A76 r0p0 to r2p0 */
-+		.desc = "ARM erratum 1165522",
-+		.capability = ARM64_WORKAROUND_1165522,
-+		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
-+	},
- #endif
- 	{
- 	}
+ #endif /* __ARM64_KVM_HYP_H__ */
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index a8fa61c68c32..31ee0bfc432f 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -143,6 +143,14 @@ static void deactivate_traps_vhe(void)
+ {
+ 	extern char vectors[];	/* kernel exception vectors */
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
++
++	/*
++	 * ARM erratum 1165522 requires the actual execution of the above
++	 * before we can switch to the EL2/EL0 translation regime used by
++	 * the host.
++	 */
++	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
++
+ 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+@@ -499,6 +507,17 @@ int kvm_vcpu_run_vhe(struct kvm_vcpu *vcpu)
+ 
+ 	sysreg_save_host_state_vhe(host_ctxt);
+ 
++	/*
++	 * ARM erratum 1165522 requires us to configure both stage 1 and
++	 * stage 2 translation for the guest context before we clear
++	 * HCR_EL2.TGE.
++	 *
++	 * We have already configured the guest's stage 1 translation in
++	 * kvm_vcpu_load_sysregs above.  We must now call __activate_vm
++	 * before __activate_traps, because __activate_vm configures
++	 * stage 2 translation, and __activate_traps clear HCR_EL2.TGE
++	 * (among other things).
++	 */
+ 	__activate_vm(vcpu->kvm);
+ 	__activate_traps(vcpu);
+ 
 -- 
 2.19.1
