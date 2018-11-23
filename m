@@ -1,55 +1,185 @@
-From: hpa@zytor.com (hpa at zytor.com)
-Date: Fri, 23 Nov 2018 01:57:12 -0800
-Subject: Sleeping in user_access section
-In-Reply-To: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
-References: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
-Message-ID: <5B3B6AF9-9D8C-4577-905E-D407A5E7D0E3@zytor.com>
+From: l.luba@partner.samsung.com (Lukasz Luba)
+Date: Fri, 23 Nov 2018 10:58:35 +0100
+Subject: [PATCH 2/6] devfreq: refactor set_target frequency function
+In-Reply-To: <5BF73FA9.7010402@samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180202eucas1p27d3aa58411abeae03181c38b91fc67de@eucas1p2.samsung.com>
+ <1542823301-23563-3-git-send-email-l.luba@partner.samsung.com>
+ <5BF619EE.8090006@samsung.com>
+ <9eef3348-e86f-1113-3691-39ba3a620fb8@partner.samsung.com>
+ <5BF73FA9.7010402@samsung.com>
+Message-ID: <1c3a4aad-99cb-9295-3a5e-ff7a3c5245a3@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On November 23, 2018 1:27:02 AM PST, Julien Thierry <julien.thierry@arm.com> wrote:
->Hi,
->
->I made an attempt at implementing the 
->user_access_begin()/user_access_end() macros along with the 
->get/put_user_unsafe() for arm64 by toggling the status of PAN (more or 
->less similar to x86's STAC/CTAC).
->
->With a small mistake in my patch, we realized that directly calling 
->function that could reschedule while in a user_access section could
->lead to:
->
->- scheduling another task keeping the user_access status enabled
->despite 
->the task never calling user_access_begin()
->
->- when re-scheduling the task that was mid user_access section, 
->user_access would be disabled and the task would fault on the next 
->get/put_user_unsafe.
->
->
->This is because __switch_to does not alter the user_access status when 
->switching from next to prev (at least on arm64 we currently don't, and 
->by looking at the x86 code I don't think this is done either).
->
->
-> From my understanding, this is not an issue when the task in 
->user_access mode gets scheduled out/in as a result of an interrupt as 
->PAN and EFLAGS.AC get saved/restore on exception entry/exit (at least I
->
->know it is the case for PAN, I am less sure for the x86 side).
->
->
->So, the question is, should __switch_to take care of the user_access 
->status when scheduling new tasks? Or should there be a restriction
->about 
->scheduling out a task with user_access mode enabled and maybe add a 
->warning if we can detect this?
->
->(Or did we miss something and this is not an issue on x86?)
->
->Thanks,
+Hi Chanwoo Choi,
 
-You should never call a sleeping function from a user_access section. It is intended for very limited regions.
--- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+On 11/23/18 12:45 AM, Chanwoo Choi wrote:
+> Hi Lukasz,
+> 
+> On 2018? 11? 22? 19:40, Lukasz Luba wrote:
+>> Hi Chanwoo Choi
+>>
+>> On 11/22/18 3:52 AM, Chanwoo Choi wrote:
+>>> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
+>>>> The refactoring is needed for the new client in devfreq: suspend.
+>>>> To avoid code duplication, move it to the new local function
+>>>> devfreq_set_target.
+>>>>
+>>>> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+>>>> solve issue with devfreq device's frequency during suspend/resume.
+>>>> During the discussion on LKML some corner cases and comments appeared
+>>>> related to the design. This patch address them keeping in mind suggestions
+>>>> from Chanwoo Choi.
+>>>
+>>> As I commented on patch1, please remove it.
+>> OK
+>>>
+>>>>
+>>>> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+>>>> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+>>>> ---
+>>>>    drivers/devfreq/devfreq.c | 62 ++++++++++++++++++++++++++++-------------------
+>>>>    1 file changed, 37 insertions(+), 25 deletions(-)
+>>>>
+>>>> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+>>>> index e20e7e4..cf9c643 100644
+>>>> --- a/drivers/devfreq/devfreq.c
+>>>> +++ b/drivers/devfreq/devfreq.c
+>>>> @@ -285,6 +285,42 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+>>>>    	return 0;
+>>>>    }
+>>>>    
+>>>> +static int devfreq_set_target(struct devfreq *devfreq, unsigned long new_freq,
+>>>> +			      unsigned long *prev_freq, u32 flags)
+>>>
+>>> Please remove the unused space in front of 'unsigned long *prev_freq'.
+>>> Use tab only for indentation.
+>> OK
+>>>
+>>>> +{
+>>>> +	struct devfreq_freqs freqs;
+>>>> +	unsigned long cur_freq;
+>>>> +	int err = 0;
+>>>> +
+>>>> +	if (devfreq->profile->get_cur_freq)
+>>>> +		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+>>>> +	else
+>>>> +		cur_freq = devfreq->previous_freq;
+>>>> +
+>>>> +	freqs.old = cur_freq;
+>>>> +	freqs.new = new_freq;
+>>>> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
+>>>> +
+>>>> +	err = devfreq->profile->target(devfreq->dev.parent, &new_freq, flags);
+>>>> +	if (err) {
+>>>> +		freqs.new = cur_freq;
+>>>> +		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+>>>> +		return err;
+>>>> +	}
+>>>> +
+>>>> +	freqs.new = new_freq;
+>>>> +	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+>>>> +
+>>>> +	if (devfreq_update_status(devfreq, new_freq))
+>>>> +		dev_err(&devfreq->dev,
+>>>> +			"Couldn't update frequency transition information.\n");
+>>>> +
+>>>> +	devfreq->previous_freq = new_freq;
+>>>> +	*prev_freq = cur_freq;
+>>>> +
+>>>> +	return err;
+>>>> +}
+>>>> +
+>>>>    /* Load monitoring helper functions for governors use */
+>>>>    
+>>>>    /**
+>>>> @@ -296,7 +332,6 @@ static int devfreq_notify_transition(struct devfreq *devfreq,
+>>>>     */
+>>>>    int update_devfreq(struct devfreq *devfreq)
+>>>>    {
+>>>> -	struct devfreq_freqs freqs;
+>>>>    	unsigned long freq, cur_freq, min_freq, max_freq;
+>>>
+>>>
+>>> cur_freq is not used after modification. Remove it.
+>>>
+>>>>    	int err = 0;
+>>>>    	u32 flags = 0;
+>>>> @@ -333,31 +368,8 @@ int update_devfreq(struct devfreq *devfreq)
+>>>>    		flags |= DEVFREQ_FLAG_LEAST_UPPER_BOUND; /* Use LUB */
+>>>>    	}
+>>>>    
+>>>> -	if (devfreq->profile->get_cur_freq)
+>>>> -		devfreq->profile->get_cur_freq(devfreq->dev.parent, &cur_freq);
+>>>> -	else
+>>>> -		cur_freq = devfreq->previous_freq;
+>>>> -
+>>>> -	freqs.old = cur_freq;
+>>>> -	freqs.new = freq;
+>>>> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_PRECHANGE);
+>>>> +	return devfreq_set_target(devfreq, freq, &cur_freq, flags);
+>>>
+>>> You get the 'cur_freq' from devfreq_set_taget() for devfreq_suspend_device() on patch3.
+>>> But, update_devfreq() and devfreq_resume_device() don't use the 'cur_freq' value
+>>> from devfreq_set_target().
+>>>
+>>> Instead, getting 'cur_freq' for 'devfreq->resume_freq' in the devfreq_set_target().
+>>> Please remove the 'cur_freq' parameter from devfreq_set_target.
+>>
+>> I can remove the 3rd parameter from devfreq_set_target(),
+>> but it implies that patch 1 and 3 cannot be merged. The function
+>> devfreq_set_target will use 'devfreq->resume_freq' so it must be in
+>> devfreq struct.
+>> So, in v2 version there will be still 6 patches, with the 1st patch
+>> defining needed fields in devfreq struct.
+>> Do you agree for that?
+> 
+> So, I replied again as following on my other reply[1] of patch2:
+> [1] https://lkml.org/lkml/2018/11/22/507
+> 
+> But, you have to add following new code on patch3 instead of patch2.
+> patch2 doesn't contain the following codes and then
+> patch3 adds 'resume_freq' variable and adds the following code on patch3.
+> 
+> +
+> +       if (devfreq->suspend_freq)
+> +               devfreq->resume_freq = cur_freq;
+> 
+OK, I will add that change to patch 3.
+
+Regards,
+Lukasz
+>>
+>>>
+>>>>    
+>>>> -	err = devfreq->profile->target(devfreq->dev.parent, &freq, flags);
+>>>> -	if (err) {
+>>>> -		freqs.new = cur_freq;
+>>>> -		devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+>>>> -		return err;
+>>>> -	}
+>>>> -
+>>>> -	freqs.new = freq;
+>>>> -	devfreq_notify_transition(devfreq, &freqs, DEVFREQ_POSTCHANGE);
+>>>> -
+>>>> -	if (devfreq_update_status(devfreq, freq))
+>>>> -		dev_err(&devfreq->dev,
+>>>> -			"Couldn't update frequency transition information.\n");
+>>>> -
+>>>> -	devfreq->previous_freq = freq;
+>>>> -	return err;
+>>>>    }
+>>>>    EXPORT_SYMBOL(update_devfreq);
+>>>>    
+>>>>
+>>>
+>>>
+>>
+>> Regards,
+>> Lukasz Luba
+>>
+>>
+> 
+> 
