@@ -1,57 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Nov 2018 11:41:19 +0900
-Subject: [PATCH 5/9] PCI: consolidate the PCI_DOMAINS and
- PCI_DOMAINS_GENERIC config options
-In-Reply-To: <20181115190538.17016-6-hch@lst.de>
-References: <20181115190538.17016-1-hch@lst.de>
- <20181115190538.17016-6-hch@lst.de>
-Message-ID: <CAK7LNASYobpeAMqenZXycNieWErRFkNHz6xQUzEruJ0-nNwfdA@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 23 Nov 2018 10:55:10 +0800
+Subject: [PATCH v3 00/15] MT8183 IOMMU SUPPORT
+In-Reply-To: <20181122133526.GA13896@arm.com>
+References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
+ <20181122125931.GC1586@8bytes.org> <20181122133526.GA13896@arm.com>
+Message-ID: <1542941710.15759.8.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 4:07 AM Christoph Hellwig <hch@lst.de> wrote:
+On Thu, 2018-11-22 at 13:35 +0000, Will Deacon wrote:
+> On Thu, Nov 22, 2018 at 01:59:31PM +0100, Joerg Roedel wrote:
+> > On Sat, Nov 17, 2018 at 10:35:27AM +0800, Yong Wu wrote:
+> > > Yong Wu (14):
+> > >   dt-bindings: mediatek: Add binding for mt8183 IOMMU and SMI
+> > >   iommu/mediatek: Use a struct as the platform data
+> > >   memory: mtk-smi: Use a general config_port interface
+> > >   iommu/io-pgtable-arm-v7s: Add paddr_to_iopte and iopte_to_paddr
+> > >     helpers
+> > >   iommu/io-pgtable-arm-v7s: Extend MediaTek 4GB Mode
+> > >   iommu/mediatek: Add mt8183 IOMMU support
+> > >   iommu/mediatek: Add mmu1 support
+> > >   memory: mtk-smi: Invoke pm runtime_callback to enable clocks
+> > >   memory: mtk-smi: Use a struct for the platform data for smi-common
+> > >   memory: mtk-smi: Add bus_sel for mt8183
+> > >   iommu/mediatek: Add VLD_PA_RANGE register backup when suspend
+> > >   iommu/mediatek: Add shutdown callback
+> > >   memory: mtk-smi: Get rid of need_larbid
+> > >   iommu/mediatek: Switch to SPDX license identifier
+> > 
+> > This should probably go through the IOMMU tree. For that I'd like to
+> > have Acks (reviews are even better) for the io-pgtable parts from Robin
+> > and for the memory parts from Matthias first.
+> 
+> Robin already reviewed the pgtable bits, I think.
 
-> diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-> index a8128a1946a2..95812fc4958c 100644
-> --- a/drivers/pci/Kconfig
-> +++ b/drivers/pci/Kconfig
-> @@ -21,6 +21,15 @@ menuconfig PCI
->           support for PCI-X and the foundations for PCI Express support.
->           Say 'Y' here unless you know what you are doing.
->
-> +config PCI_DOMAINS
-> +       depends on PCI
-> +       bool
-> +
-> +config PCI_DOMAINS_GENERIC
-> +       depends on PCI
-> +       select PCI_DOMAINS
-> +       bool
-> +
->  source "drivers/pci/pcie/Kconfig"
->
->  config PCI_MSI
+Thanks Joerg/Will for your comment.
 
+Hi Matthias,
 
-I reordered this so it 'bool' comes first.
+  Could you help also have a look at this patchset? Especially for the
+memory part. Thanks in advance.
 
-config PCI_DOMAINS
-       bool
-       depends on PCI
-
-
-config PCI_DOMAINS_GENERIC
-       bool
-       depends on PCI
-       select PCI_DOMAINS
-
-
-Of course, it is just a matter of slight taste.
-I just wanted the code to look consistent.
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Will
