@@ -1,63 +1,45 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:38 +0100
-Subject: [PATCH v2 06/43] drm/sun4i: backend: Refine the logic behind using
- the frontend
+Date: Fri, 23 Nov 2018 10:24:47 +0100
+Subject: [PATCH v2 15/43] drm/sun4i: Rename sun4i_backend_layer_formats to
+ sun4i_layer_formats
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-7-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-16-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checking that scaling is in use is not sufficient as a condition to
-decide to use the frontend.
+Since more formats can be supported by the frontend, rename the
+variable listing the layer formats to avoid suggesting that the backend
+itself supports all the listed formats.
 
-Since not all layer formats are supported by the frontend, we need to
-check for that support first. Then, the frontend must only be enabled
-if the backend doesn't support the format or that scaling is required.
-
-Signed-off-by:Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_layer.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 7dd24eb03f89..735fea7ead0b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -449,16 +449,32 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
- {
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
- 	struct sun4i_backend *backend = layer->backend;
-+	uint32_t format = state->fb->format->format;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_layer.c b/drivers/gpu/drm/sun4i/sun4i_layer.c
+index 50bb16566f03..c3368b17e5f1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun4i_layer.c
+@@ -127,7 +127,7 @@ static const struct drm_plane_funcs sun4i_backend_layer_funcs = {
+ 	.update_plane		= drm_atomic_helper_update_plane,
+ };
  
- 	if (IS_ERR(backend->frontend))
- 		return false;
- 
-+	if (!sun4i_frontend_format_is_supported(format))
-+		return false;
-+
-+	if (!sun4i_backend_format_is_supported(format))
-+		return true;
-+
- 	/*
- 	 * TODO: The backend alone allows 2x and 4x integer scaling, including
- 	 * support for an alpha component (which the frontend doesn't support).
--	 * Use the backend directly instead of the frontend in this case.
-+	 * Use the backend directly instead of the frontend in this case, with
-+	 * another test to return false.
-+	 */
-+
-+	if (sun4i_backend_plane_uses_scaler(state))
-+		return true;
-+
-+	/*
-+	 * Here the format is supported by both the frontend and the backend
-+	 * and no frontend scaling is required, so use the backend directly.
- 	 */
--	return sun4i_backend_plane_uses_scaler(state);
-+	return false;
- }
- 
- static void sun4i_backend_atomic_begin(struct sunxi_engine *engine,
+-static const uint32_t sun4i_backend_layer_formats[] = {
++static const uint32_t sun4i_layer_formats[] = {
+ 	DRM_FORMAT_ARGB8888,
+ 	DRM_FORMAT_ARGB4444,
+ 	DRM_FORMAT_ARGB1555,
+@@ -156,8 +156,8 @@ static struct sun4i_layer *sun4i_layer_init_one(struct drm_device *drm,
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun4i_backend_layer_funcs,
+-				       sun4i_backend_layer_formats,
+-				       ARRAY_SIZE(sun4i_backend_layer_formats),
++				       sun4i_layer_formats,
++				       ARRAY_SIZE(sun4i_layer_formats),
+ 				       NULL, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
 -- 
 2.19.1
