@@ -1,115 +1,56 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 23 Nov 2018 12:22:16 +0100
-Subject: [PATCH 2/3] usb: host: xhci: mvebu: add reset on resume quirk
-In-Reply-To: <20181123112217.4878-1-miquel.raynal@bootlin.com>
-References: <20181123112217.4878-1-miquel.raynal@bootlin.com>
-Message-ID: <20181123112217.4878-3-miquel.raynal@bootlin.com>
+Date: Fri, 23 Nov 2018 12:22:14 +0100
+Subject: [PATCH 0/3] Bring suspend to RAM support to xHCI MVEBU driver
+Message-ID: <20181123112217.4878-1-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ofer Heifetz <oferh@marvell.com>
+Hello,
 
-The mvebu xHCI host driver does not have suspend/resume support. Use of
-the XHCI_RESET_ON_RESUME quirk is mandatory in order to avoid failures
-after resume. This will work only if no USB device is plugged-in.
+As part of an effort to bring suspend to RAM support to Armada 3700
+SoCs (main target: ESPRESSObin), this series handles the work around
+the USB3 host IP.
 
-While at it, mention in the Kconfig file that this IP is also present
-on the A3700 SoC.
+First, a change in the core adds support for the new PHY framework by
+following the phy_set_mode()/phy_power_on() sequence (patch 1). The
+second change needed is to update the xHCI MVEBU driver (patch 2) with
+the XHCI_RESET_ON_RESUME quirk that will do most of the
+reconfiguration work when resuming.
 
-Signed-off-by: Ofer Heifetz <oferh@marvell.com>
-[miquel.raynal at bootlin.com: Reword the commit message]
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/usb/host/Kconfig      |  2 +-
- drivers/usb/host/xhci-mvebu.c | 11 +++++++++++
- drivers/usb/host/xhci-mvebu.h |  6 ++++++
- drivers/usb/host/xhci-plat.c  |  7 +++++++
- 4 files changed, 25 insertions(+), 1 deletion(-)
+Then, because of the asynchronous suspend feature implemented lately
+the driver was blocking during the S2RAM operation, probably due to a
+register access while the clock was not enabled. A first patch has
+been written for that, adding a new quirk to ignore the asynchronous
+setting [1] which has become useless once clock links with consumer
+have been contributed [2] (series not merged yet).
 
-diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 16758b12a5e9..2f9b099c10f7 100644
---- a/drivers/usb/host/Kconfig
-+++ b/drivers/usb/host/Kconfig
-@@ -75,7 +75,7 @@ config USB_XHCI_MVEBU
- 	depends on ARCH_MVEBU || COMPILE_TEST
- 	---help---
- 	  Say 'Y' to enable the support for the xHCI host controller
--	  found in Marvell Armada 375/38x ARM SOCs.
-+	  found in Marvell Armada 375/38x/3700 ARM SOCs.
- 
- config USB_XHCI_RCAR
- 	tristate "xHCI support for Renesas R-Car SoCs"
-diff --git a/drivers/usb/host/xhci-mvebu.c b/drivers/usb/host/xhci-mvebu.c
-index 32e158568788..60651a50770f 100644
---- a/drivers/usb/host/xhci-mvebu.c
-+++ b/drivers/usb/host/xhci-mvebu.c
-@@ -13,6 +13,7 @@
- #include <linux/usb/hcd.h>
- 
- #include "xhci-mvebu.h"
-+#include "xhci.h"
- 
- #define USB3_MAX_WINDOWS	4
- #define USB3_WIN_CTRL(w)	(0x0 + ((w) * 8))
-@@ -72,3 +73,13 @@ int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
- 
- 	return 0;
- }
-+
-+int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
-+{
-+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
-+
-+	/* Without reset on resume, the HC won't work at all */
-+	xhci->quirks |= XHCI_RESET_ON_RESUME;
-+
-+	return 0;
-+}
-diff --git a/drivers/usb/host/xhci-mvebu.h b/drivers/usb/host/xhci-mvebu.h
-index 09791df2cec0..ca0a3a5721dd 100644
---- a/drivers/usb/host/xhci-mvebu.h
-+++ b/drivers/usb/host/xhci-mvebu.h
-@@ -12,10 +12,16 @@ struct usb_hcd;
- 
- #if IS_ENABLED(CONFIG_USB_XHCI_MVEBU)
- int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd);
-+int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd);
- #else
- static inline int xhci_mvebu_mbus_init_quirk(struct usb_hcd *hcd)
- {
- 	return 0;
- }
-+
-+static inline int xhci_mvebu_a3700_init_quirk(struct usb_hcd *hcd)
-+{
-+	return 0;
-+}
- #endif
- #endif /* __LINUX_XHCI_MVEBU_H */
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 32b5574ad5c5..9eaefd9b3217 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -98,6 +98,10 @@ static const struct xhci_plat_priv xhci_plat_marvell_armada = {
- 	.init_quirk = xhci_mvebu_mbus_init_quirk,
- };
- 
-+static const struct xhci_plat_priv xhci_plat_marvell_armada3700 = {
-+	.init_quirk = xhci_mvebu_a3700_init_quirk,
-+};
-+
- static const struct xhci_plat_priv xhci_plat_renesas_rcar_gen2 = {
- 	.firmware_name = XHCI_RCAR_FIRMWARE_NAME_V1,
- 	.init_quirk = xhci_rcar_init_quirk,
-@@ -123,6 +127,9 @@ static const struct of_device_id usb_xhci_of_match[] = {
- 	}, {
- 		.compatible = "marvell,armada-380-xhci",
- 		.data = &xhci_plat_marvell_armada,
-+	}, {
-+		.compatible = "marvell,armada3700-xhci",
-+		.data = &xhci_plat_marvell_armada3700,
- 	}, {
- 		.compatible = "renesas,xhci-r8a7790",
- 		.data = &xhci_plat_renesas_rcar_gen2,
+Finally, the ESPRESSObin device tree is updated (patch 3) to reference
+the PHY. xHCI bindings already document the PHY so no update is needed
+on this regard.
+
+[1] http://code.bulix.org/s2ccd4-511198
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/614527.html
+
+Thanks,
+Miqu?l
+
+
+Miquel Raynal (2):
+  usb: core: comply to PHY framework
+  ARM64: dts: marvell: armada-3720-espressobin: declare USB3 PHY
+
+Ofer Heifetz (1):
+  usb: host: xhci: mvebu: add reset on resume quirk
+
+ .../dts/marvell/armada-3720-espressobin.dts   |  1 +
+ drivers/usb/core/hcd.c                        |  5 ++++
+ drivers/usb/core/phy.c                        | 28 +++++++++++++++++++
+ drivers/usb/core/phy.h                        |  2 ++
+ drivers/usb/host/Kconfig                      |  2 +-
+ drivers/usb/host/xhci-mvebu.c                 | 11 ++++++++
+ drivers/usb/host/xhci-mvebu.h                 |  6 ++++
+ drivers/usb/host/xhci-plat.c                  |  7 +++++
+ 8 files changed, 61 insertions(+), 1 deletion(-)
+
 -- 
 2.19.1
