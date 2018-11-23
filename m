@@ -1,466 +1,91 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Thu, 22 Nov 2018 16:54:25 -0800
-Subject: [v5, PATCH 1/2] net:stmmac: dwmac-mediatek: add support for mt2712
-In-Reply-To: <1542882521-18874-2-git-send-email-biao.huang@mediatek.com>
+From: biao.huang@mediatek.com (biao huang)
+Date: Fri, 23 Nov 2018 09:31:16 +0800
+Subject: [v5, PATCH 2/2] dt-binding: mediatek-dwmac: add binding
+ document for MediaTek MT2712 DWMAC
+In-Reply-To: <20181122151932.GD15403@lunn.ch>
 References: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
- <1542882521-18874-2-git-send-email-biao.huang@mediatek.com>
-Message-ID: <CAGp9LzoJTVm4OP+SRWCDk0TUmU5jNMFCsT_yyURXzXxjTF+-=g@mail.gmail.com>
+ <1542882521-18874-3-git-send-email-biao.huang@mediatek.com>
+ <20181122151932.GD15403@lunn.ch>
+Message-ID: <1542936676.24219.66.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 2:29 AM Biao Huang <biao.huang@mediatek.com> wrote:
->
-> Add Ethernet support for MediaTek SoCs from the mt2712 family
->
-> Signed-off-by: Biao Huang <biao.huang@mediatek.com>
-> ---
->  drivers/net/ethernet/stmicro/stmmac/Kconfig        |    8 +
->  drivers/net/ethernet/stmicro/stmmac/Makefile       |    1 +
->  .../net/ethernet/stmicro/stmmac/dwmac-mediatek.c   |  364 ++++++++++++++++++++
->  3 files changed, 373 insertions(+)
->  create mode 100644 drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
->
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/Kconfig b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> index 324049e..6209cc1 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> +++ b/drivers/net/ethernet/stmicro/stmmac/Kconfig
-> @@ -75,6 +75,14 @@ config DWMAC_LPC18XX
->         ---help---
->           Support for NXP LPC18xx/43xx DWMAC Ethernet.
->
-> +config DWMAC_MEDIATEK
-> +       tristate "MediaTek MT27xx GMAC support"
-> +       depends on OF && (ARCH_MEDIATEK || COMPILE_TEST)
-> +       help
-> +         Support for MediaTek GMAC Ethernet controller.
-> +
-> +         This selects the MT2712 SoC support for the stmmac driver.
-> +
->  config DWMAC_MESON
->         tristate "Amlogic Meson dwmac support"
->         default ARCH_MESON
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/Makefile b/drivers/net/ethernet/stmicro/stmmac/Makefile
-> index 99967a8..bf09701 100644
-> --- a/drivers/net/ethernet/stmicro/stmmac/Makefile
-> +++ b/drivers/net/ethernet/stmicro/stmmac/Makefile
-> @@ -13,6 +13,7 @@ obj-$(CONFIG_STMMAC_PLATFORM) += stmmac-platform.o
->  obj-$(CONFIG_DWMAC_ANARION)    += dwmac-anarion.o
->  obj-$(CONFIG_DWMAC_IPQ806X)    += dwmac-ipq806x.o
->  obj-$(CONFIG_DWMAC_LPC18XX)    += dwmac-lpc18xx.o
-> +obj-$(CONFIG_DWMAC_MEDIATEK)   += dwmac-mediatek.o
->  obj-$(CONFIG_DWMAC_MESON)      += dwmac-meson.o dwmac-meson8b.o
->  obj-$(CONFIG_DWMAC_OXNAS)      += dwmac-oxnas.o
->  obj-$(CONFIG_DWMAC_ROCKCHIP)   += dwmac-rk.o
-> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-> new file mode 100644
-> index 0000000..dd8d4cc
-> --- /dev/null
-> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-mediatek.c
-> @@ -0,0 +1,364 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (c) 2018 MediaTek Inc.
-> + */
-> +#include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_net.h>
-> +#include <linux/regmap.h>
-> +#include <linux/stmmac.h>
-> +
-> +#include "stmmac.h"
-> +#include "stmmac_platform.h"
-> +
-> +/* Peri Configuration register for mt2712 */
-> +#define PERI_ETH_PHY_INTF_SEL  0x418
-> +#define PHY_INTF_MII_GMII      0
-> +#define PHY_INTF_RGMII         1
-> +#define PHY_INTF_RMII          4
-> +#define RMII_CLK_SRC_RXC       BIT(4)
-> +#define RMII_CLK_SRC_INTERNAL  BIT(5)
-> +
-> +#define PERI_ETH_PHY_DLY       0x428
-> +#define PHY_DLY_GTXC_INV       BIT(6)
-> +#define PHY_DLY_GTXC_ENABLE    BIT(5)
-> +#define PHY_DLY_GTXC_STAGES    GENMASK(4, 0)
-> +#define PHY_DLY_TXC_INV                BIT(20)
-> +#define PHY_DLY_TXC_ENABLE     BIT(19)
-> +#define PHY_DLY_TXC_STAGES     GENMASK(18, 14)
-> +#define PHY_DLY_TXC_SHIFT      14
-> +#define PHY_DLY_RXC_INV                BIT(13)
-> +#define PHY_DLY_RXC_ENABLE     BIT(12)
-> +#define PHY_DLY_RXC_STAGES     GENMASK(11, 7)
-> +#define PHY_DLY_RXC_SHIFT      7
-> +
-> +#define PERI_ETH_DLY_FINE      0x800
-> +#define ETH_RMII_DLY_TX_INV    BIT(2)
-> +#define ETH_FINE_DLY_GTXC      BIT(1)
-> +#define ETH_FINE_DLY_RXC       BIT(0)
-> +
-> +struct mac_delay_struct {
-> +       u32 tx_delay;
-> +       u32 rx_delay;
-> +       u32 tx_inv;
-bool should be enough
+Dear Andrew,
 
-> +       u32 rx_inv;
-bool should be enough
+	Thanks for you remind.
 
-> +};
-> +
-> +struct mediatek_dwmac_plat_data {
-> +       const struct mediatek_dwmac_variant *variant;
-> +       struct mac_delay_struct mac_delay;
-> +       struct clk_bulk_data *clks;
-> +       struct device_node *np;
-> +       struct regmap *peri_regmap;
-> +       struct device *dev;
-> +       int fine_tune;
-bool
+	Sincerely, I respect any comment from any reviewer. If I didn't reply
+for any comment, really sorry for that.
 
-> +       int phy_mode;
-> +       int rmii_rxc;
-bool
+	As to this "tx-delay" issue, the following reply in v3 maybe ignored.
+	https://lkml.org/lkml/2018/11/19/158
 
-> +};
-> +
-> +struct mediatek_dwmac_variant {
-> +       int (*dwmac_set_phy_interface)(struct mediatek_dwmac_plat_data *plat);
-> +       int (*dwmac_set_delay)(struct mediatek_dwmac_plat_data *plat);
-> +
-> +       /* clock ids to be requested */
-> +       const char * const *clk_list;
-> +       int num_clks;
-> +
-> +       u32 dma_bit_mask;
-> +       u32 rx_delay_max;
-> +       u32 tx_delay_max;
-> +};
-> +
-> +/* list of clocks required for mac */
-> +static const char * const mt2712_dwmac_clk_l[] = {
-> +       "axi", "apb", "mac_main", "ptp_ref"
-> +};
-> +
-> +static int mt2712_set_interface(struct mediatek_dwmac_plat_data *plat)
-> +{
-> +       int rmii_rxc = plat->rmii_rxc ? RMII_CLK_SRC_RXC : 0;
-> +       u32 intf_val = 0;
-> +
-> +       /* select phy interface in top control domain */
-> +       switch (plat->phy_mode) {
-> +       case PHY_INTERFACE_MODE_MII:
-> +               intf_val |= PHY_INTF_MII_GMII;
-> +               break;
-> +       case PHY_INTERFACE_MODE_RMII:
-> +               intf_val |= PHY_INTF_RMII;
-> +               intf_val |= rmii_rxc;
-how about putting into one line such as intf_val |= (PHY_INTF_RMII | rmii_rxc) ?
+	"the delay time in mediatek dwmac design is not so accurate,
+	the current mt2712 and the following ICs will not use the
+	same delay design, but will use stages to indicate different
+	delay time.
+	so maybe "mediatek.tx-delay" represent the delay stage is a
+	good choice"
 
-> +               break;
-> +       case PHY_INTERFACE_MODE_RGMII:
-> +       case PHY_INTERFACE_MODE_RGMII_TXID:
-> +       case PHY_INTERFACE_MODE_RGMII_RXID:
-> +       case PHY_INTERFACE_MODE_RGMII_ID:
-> +               intf_val |= PHY_INTF_RGMII;
-> +               break;
-> +       default:
-> +               dev_err(plat->dev, "phy interface not supported\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       regmap_write(plat->peri_regmap, PERI_ETH_PHY_INTF_SEL, intf_val);
-> +
-> +       return 0;
-> +}
-> +
-> +static int mt2712_set_delay(struct mediatek_dwmac_plat_data *plat)
-> +{
-> +       struct mac_delay_struct *mac_delay = &plat->mac_delay;
-> +       u32 delay_val = 0;
-> +       u32 fine_val = 0;
-The same type declaration can be put into the one line
+	And to make it clearer here.
 
-> +
-> +       switch (plat->phy_mode) {
+	In mt2712, there are two delay macro circuit: named fine-tune and
+coarse-tune.
+	a. fine-tune, 170+/-50ps per stage, total 32 stages
+	b. coarse-tune, 0.55+/-0.2ns per stage, total 32 stages
+	If we only consider mt2712, delay in fine-tune select a integer
+multiple of 170ps, delay in coarse-tune select a integer multiple of
+550ps, for stage 0~31, the delay in fine-tune will not have the same
+value with that in coarse-tune.
+	OK, It seems the property "fine-tune" can be eliminated .
 
-There exists some room for code optimization in the switch statement
-such as PHY_INTERFACE_MODE_MII and PHY_INTERFACE_MODE_RGMII both are
-almost the same and even the configuration for the other PHY modes can
-reuse their partial setup. It appears to be better using a common way
-to set up various PHY modes.
+	But the following ic will not have the same accuracy as mt2712,
+and maybe will not have two delay macro circuit to be selected.
+	1. assume two delay macro circuit in the following ic,
+	fine-tune, 100ps per stage, coarse-tune, 0.55ns per stage,
+	if we want delay 2.2ns, fine-tune will get a 22, and coarse-tune get a
+4. We can't distinguish which delay macro we are choosing.
+	2. assume only one delay macro circuit is used, a similar case as 1
+will also increase the complexity of driver.
+	Then, we need define more flag property to know which delay macro we
+are handling.
 
-> +       case PHY_INTERFACE_MODE_MII:
-> +               delay_val |= mac_delay->tx_delay ? PHY_DLY_TXC_ENABLE : 0;
-> +               delay_val |= (mac_delay->tx_delay << PHY_DLY_TXC_SHIFT) &
-> +                            PHY_DLY_TXC_STAGES;
-> +               delay_val |= mac_delay->tx_inv ? PHY_DLY_TXC_INV : 0;
-> +               delay_val |= mac_delay->rx_delay ? PHY_DLY_RXC_ENABLE : 0;
-> +               delay_val |= (mac_delay->rx_delay << PHY_DLY_RXC_SHIFT) &
-> +                            PHY_DLY_RXC_STAGES;
-> +               delay_val |= mac_delay->rx_inv ? PHY_DLY_RXC_INV : 0;
-> +               break;
-> +       case PHY_INTERFACE_MODE_RMII:
-> +               if (plat->rmii_rxc) {
-> +                       delay_val |= mac_delay->rx_delay ?
-> +                                    PHY_DLY_RXC_ENABLE : 0;
-> +                       delay_val |= (mac_delay->rx_delay <<
-> +                                     PHY_DLY_RXC_SHIFT) & PHY_DLY_RXC_STAGES;
-> +                       delay_val |= mac_delay->rx_inv ? PHY_DLY_RXC_INV : 0;
-> +                       fine_val |= mac_delay->tx_inv ?
-> +                                    ETH_RMII_DLY_TX_INV : 0;
-why is fine_val got from tx_inv?
+	The common things for all delay macro circuit in MediaTek mac design is
+the stages, not the accuracy. so if we maintain stage info in "mediatek,
+tx-delay", we only need care which stage we should choose.
+And for each IC, we will recommend a best stage as a candidate.
 
-> +               } else {
-> +                       delay_val |= mac_delay->rx_delay ?
-> +                                    PHY_DLY_TXC_ENABLE : 0;
-> +                       delay_val |= (mac_delay->rx_delay <<
-> +                                    PHY_DLY_TXC_SHIFT) & PHY_DLY_TXC_STAGES;
-> +                       delay_val |= mac_delay->rx_inv ? PHY_DLY_TXC_INV : 0;
-> +                       fine_val |= mac_delay->tx_inv ?
-> +                                    ETH_RMII_DLY_TX_INV : 0;
-ditto, why is fine_val got from tx_inv?
+	Above is my personal opinion, may be my understanding is wrong,
+welcome for further discussion.
 
-> +               }
-> +               break;
-> +       case PHY_INTERFACE_MODE_RGMII:
-> +               fine_val = plat->fine_tune ?
-> +                           (ETH_FINE_DLY_GTXC | ETH_FINE_DLY_RXC) : 0;
-> +               delay_val |= mac_delay->tx_delay ? PHY_DLY_GTXC_ENABLE : 0;
-> +               delay_val |= mac_delay->tx_delay & PHY_DLY_GTXC_STAGES;
-> +               delay_val |= mac_delay->tx_inv ? PHY_DLY_GTXC_INV : 0;
-> +               delay_val |= mac_delay->rx_delay ? PHY_DLY_RXC_ENABLE : 0;
-> +               delay_val |= (mac_delay->rx_delay << PHY_DLY_RXC_SHIFT) &
-> +                            PHY_DLY_RXC_STAGES;
-> +               delay_val |= mac_delay->rx_inv ? PHY_DLY_RXC_INV : 0;
-> +               break;
-> +       case PHY_INTERFACE_MODE_RGMII_TXID:
-> +               fine_val = plat->fine_tune ? ETH_FINE_DLY_RXC : 0;
-> +               delay_val |= mac_delay->rx_delay ? PHY_DLY_RXC_ENABLE : 0;
-> +               delay_val |= (mac_delay->rx_delay << PHY_DLY_RXC_SHIFT) &
-> +                            PHY_DLY_RXC_STAGES;
-> +               delay_val |= mac_delay->rx_inv ? PHY_DLY_RXC_INV : 0;
-why is PHY_INTERFACE_MODE_RGMII_TXID applied with *_RXC_* register
-bits, not with *_TXC_* bits? I'm a little confused about what path the
-register PHY_DLY_RXC_* cause the effects to? MAC to PHY or PHY to MAC?
+	Thanks a lot.
 
-> +               break;
-> +       case PHY_INTERFACE_MODE_RGMII_RXID:
-> +               fine_val = plat->fine_tune ? ETH_FINE_DLY_GTXC : 0;
-> +               delay_val |= mac_delay->tx_delay ? PHY_DLY_GTXC_ENABLE : 0;
-> +               delay_val |= mac_delay->tx_delay & PHY_DLY_GTXC_STAGES;
-> +               delay_val |= mac_delay->tx_inv ? PHY_DLY_GTXC_INV : 0;
-ditto, as the above quetion
-
-> +               break;
-> +       case PHY_INTERFACE_MODE_RGMII_ID:
-> +               break;
-> +       default:
-> +               dev_err(plat->dev, "phy interface not supported\n");
-> +               return -EINVAL;
-> +       }
-> +       regmap_write(plat->peri_regmap, PERI_ETH_PHY_DLY, delay_val);
-> +       regmap_write(plat->peri_regmap, PERI_ETH_DLY_FINE, fine_val);
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct mediatek_dwmac_variant mt2712_gmac_variant = {
-> +               .dwmac_set_phy_interface = mt2712_set_interface,
-> +               .dwmac_set_delay = mt2712_set_delay,
-> +               .clk_list = mt2712_dwmac_clk_l,
-> +               .num_clks = ARRAY_SIZE(mt2712_dwmac_clk_l),
-> +               .dma_bit_mask = 33,
-> +               .rx_delay_max = 32,
-> +               .tx_delay_max = 32,
-> +};
-> +
-> +static int mediatek_dwmac_config_dt(struct mediatek_dwmac_plat_data *plat)
-> +{
-> +       u32 tx_delay, rx_delay;
-> +
-> +       plat->peri_regmap = syscon_regmap_lookup_by_phandle(plat->np, "mediatek,pericfg");
-> +       if (IS_ERR(plat->peri_regmap)) {
-> +               dev_err(plat->dev, "Failed to get pericfg syscon\n");
-> +               return PTR_ERR(plat->peri_regmap);
-> +       }
-> +
-> +       plat->phy_mode = of_get_phy_mode(plat->np);
-> +       if (plat->phy_mode < 0) {
-> +               dev_err(plat->dev, "not find phy-mode\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       if (!of_property_read_u32(plat->np, "mediatek,tx-delay", &tx_delay)) {
-> +               if (tx_delay < plat->variant->tx_delay_max) {
-> +                       plat->mac_delay.tx_delay = tx_delay;
-> +               } else {
-> +                       dev_err(plat->dev, "Invalid TX clock delay: %d\n", tx_delay);
-> +                       return -EINVAL;
-> +               }
-> +       }
-> +
-> +       if (!of_property_read_u32(plat->np, "mediatek,rx-delay", &rx_delay)) {
-> +               if (rx_delay < plat->variant->rx_delay_max) {
-> +                       plat->mac_delay.rx_delay = rx_delay;
-> +               } else {
-> +                       dev_err(plat->dev, "Invalid RX clock delay: %d\n", rx_delay);
-> +                       return -EINVAL;
-> +               }
-> +       }
-> +
-> +       plat->mac_delay.tx_inv = of_property_read_bool(plat->np, "mediatek,txc-inverse");
-> +       plat->mac_delay.rx_inv = of_property_read_bool(plat->np, "mediatek,rxc-inverse");
-> +       plat->fine_tune = of_property_read_bool(plat->np, "mediatek,fine-tune");
-> +       plat->rmii_rxc = of_property_read_bool(plat->np, "mediatek,rmii-rxc");
-> +
-> +       return 0;
-> +}
-> +
-> +static int mediatek_dwmac_clk_init(struct mediatek_dwmac_plat_data *plat)
-> +{
-> +       const struct mediatek_dwmac_variant *variant = plat->variant;
-> +       int num = variant->num_clks;
-> +       int i;
-put into the same line seems good
-
-> +
-> +       plat->clks = devm_kcalloc(plat->dev, num, sizeof(*plat->clks), GFP_KERNEL);
-> +       if (!plat->clks)
-> +               return -ENOMEM;
-> +
-> +       for (i = 0; i < num; i++)
-> +               plat->clks[i].id = variant->clk_list[i];
-> +
-> +       return devm_clk_bulk_get(plat->dev, num, plat->clks);
-> +}
-> +
-> +static int mediatek_dwmac_init(struct platform_device *pdev, void *priv)
-> +{
-> +       struct mediatek_dwmac_plat_data *plat = priv;
-> +       const struct mediatek_dwmac_variant *variant = plat->variant;
-> +       int ret = 0;
-zero initialized seems unnecessary
-
-> +
-> +       ret = dma_set_mask_and_coherent(plat->dev, DMA_BIT_MASK(variant->dma_bit_mask));
-> +       if (ret) {
-> +               dev_err(plat->dev, "No suitable DMA available, err = %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       ret = variant->dwmac_set_phy_interface(plat);
-> +       if (ret) {
-> +               dev_err(plat->dev, "failed to set phy interface, err = %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       ret = variant->dwmac_set_delay(plat);
-> +       if (ret) {
-> +               dev_err(plat->dev, "failed to set delay value, err = %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_bulk_prepare_enable(variant->num_clks, plat->clks);
-> +       if (ret) {
-> +               dev_err(plat->dev, "failed to enable clks, err = %d\n", ret);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static void mediatek_dwmac_exit(struct platform_device *pdev, void *priv)
-> +{
-> +       struct mediatek_dwmac_plat_data *plat = priv;
-> +       const struct mediatek_dwmac_variant *variant = plat->variant;
-> +
-> +       clk_bulk_disable_unprepare(variant->num_clks, plat->clks);
-> +}
-> +
-> +static int mediatek_dwmac_probe(struct platform_device *pdev)
-> +{
-> +       struct mediatek_dwmac_plat_data *priv_plat;
-> +       struct plat_stmmacenet_data *plat_dat;
-> +       struct stmmac_resources stmmac_res;
-> +       int ret = 0;
-zero initialized seems unnecessary
-
-> +
-> +       priv_plat = devm_kzalloc(&pdev->dev, sizeof(*priv_plat), GFP_KERNEL);
-> +       if (!priv_plat)
-> +               return -ENOMEM;
-> +
-> +       priv_plat->variant = of_device_get_match_data(&pdev->dev);
-> +       if (!priv_plat->variant) {
-> +               dev_err(&pdev->dev, "Missing dwmac-mediatek variant\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       priv_plat->dev = &pdev->dev;
-> +       priv_plat->np = pdev->dev.of_node;
-> +
-> +       ret = mediatek_dwmac_config_dt(priv_plat);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = mediatek_dwmac_clk_init(priv_plat);
-> +       if (ret)
-> +               return ret;
-> +
-> +       ret = stmmac_get_platform_resources(pdev, &stmmac_res);
-> +       if (ret)
-> +               return ret;
-> +
-> +       plat_dat = stmmac_probe_config_dt(pdev, &stmmac_res.mac);
-> +       if (IS_ERR(plat_dat))
-> +               return PTR_ERR(plat_dat);
-> +
-> +       plat_dat->interface = priv_plat->phy_mode;
-> +       /* clk_csr_i = 250-300MHz & MDC = clk_csr_i/124 */
-> +       plat_dat->clk_csr = 5;
-> +       plat_dat->has_gmac4 = 1;
-> +       plat_dat->has_gmac = 0;
-> +       plat_dat->pmt = 0;
-> +       plat_dat->maxmtu = ETH_DATA_LEN;
-> +       plat_dat->bsp_priv = priv_plat;
-> +       plat_dat->init = mediatek_dwmac_init;
-> +       plat_dat->exit = mediatek_dwmac_exit;
-> +       mediatek_dwmac_init(pdev, priv_plat);
-> +
-> +       ret = stmmac_dvr_probe(&pdev->dev, plat_dat, &stmmac_res);
-> +       if (ret) {
-> +               stmmac_remove_config_dt(pdev, plat_dat);
-> +               return ret;
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static const struct of_device_id mediatek_dwmac_match[] = {
-> +       { .compatible = "mediatek,mt2712-gmac",
-> +         .data = &mt2712_gmac_variant },
-> +       { }
-> +};
-> +
-> +MODULE_DEVICE_TABLE(of, mediatek_dwmac_match);
-> +
-> +static struct platform_driver mediatek_dwmac_driver = {
-> +       .probe  = mediatek_dwmac_probe,
-> +       .remove = stmmac_pltfr_remove,
-> +       .driver = {
-> +               .name           = "dwmac-mediatek",
-> +               .pm             = &stmmac_pltfr_pm_ops,
-> +               .of_match_table = mediatek_dwmac_match,
-> +       },
-> +};
-> +module_platform_driver(mediatek_dwmac_driver);
-> --
-> 1.7.9.5
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+On Thu, 2018-11-22 at 16:19 +0100, Andrew Lunn wrote:
+> On Thu, Nov 22, 2018 at 06:28:41PM +0800, Biao Huang wrote:
+> > The commit adds the device tree binding documentation for the MediaTek DWMAC
+> > found on MediaTek MT2712.
+> > 
+> > Signed-off-by: Biao Huang <biao.huang@mediatek.com>
+> 
+> > +Optional properties:
+> > +- mediatek,tx-delay: TX clock delay macro value. Range is 0~31. Default is 0.
+> > +	It should be defined for rgmii/rgmii-rxid/mii interface.
+> > +- mediatek,rx-delay: RX clock delay macro value. Range is 0~31. Default is 0.
+> > +	It should be defined for rgmii/rgmii-txid/mii/rmii interface.
+> 
+> You have received the same feedback at least twice now, from two
+> different maintainers, that the delay should be specified in pS, and
+> the driver should figure out what values to place into registers.
+> 
+> You should not ignore feedback like that. If you don't understand the
+> feedback, please ask us to explain it. If you don't agree with the
+> feedback, you need to argue why you think it is wrong, or why what you
+> are doing is better, etc.
+> 
+> We are here to help, but just ignoring us won't get you anywhere.
+> 
+> For the moment:
+> 
+> NACK
+> 
+> 	Andrew
