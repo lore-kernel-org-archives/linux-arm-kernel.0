@@ -1,43 +1,43 @@
 From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 23 Nov 2018 13:15:16 +0100
-Subject: [PATCH v2 3/3] iommu/io-pgtable-arm-v7s: Request DMA32 memory,
- and improve debugging
-In-Reply-To: <CANMq1KCHGZ2vEWg+OQQ-SwvHcU-oMp4qKzEYfLwRYD5ZmRdRsA@mail.gmail.com>
+Date: Fri, 23 Nov 2018 13:23:41 +0100
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <20181122082336.GA2049@infradead.org>
 References: <20181111090341.120786-1-drinkcat@chromium.org>
- <20181111090341.120786-4-drinkcat@chromium.org>
- <20181121164638.GD24883@arm.com> <20181121180000.GU12932@dhcp22.suse.cz>
- <CANMq1KCHGZ2vEWg+OQQ-SwvHcU-oMp4qKzEYfLwRYD5ZmRdRsA@mail.gmail.com>
-Message-ID: <f5411603-2d06-916c-473d-1a40a5463876@suse.cz>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+ <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
+ <20181122082336.GA2049@infradead.org>
+Message-ID: <555dd63a-0634-6a39-7abc-121e02273cb2@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/18 2:20 AM, Nicolas Boichat wrote:
-> On Thu, Nov 22, 2018 at 2:02 AM Michal Hocko <mhocko@kernel.org> wrote:
->>
->> On Wed 21-11-18 16:46:38, Will Deacon wrote:
->>> On Sun, Nov 11, 2018 at 05:03:41PM +0800, Nicolas Boichat wrote:
->>>
->>> It's a bit grotty that GFP_DMA32 doesn't just map to GFP_DMA on 32-bit
->>> architectures, since then we wouldn't need this #ifdeffery afaict.
->>
->> But GFP_DMA32 should map to GFP_KERNEL on 32b, no? Or what exactly is
->> going on in here?
+On 11/22/18 9:23 AM, Christoph Hellwig wrote:
+> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
+>> TBH, if this DMA32 stuff is going to be contentious we could possibly just
+>> rip out the offending kmem_cache - it seemed like good practice for the
+>> use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
+>> give the same 1KB alignment and chance of succeeding as the equivalent
+>> kmem_cache_alloc(), then we could quite easily make do with that instead.
 > 
-> GFP_DMA32 will fail due to check_slab_flags (aka GFP_SLAB_BUG_MASK
-> before patch 1/3 of this series)... But yes, it may be neater if there
-> was transparent remapping of GFP_DMA32/SLAB_CACHE_DMA32 to
-> GFP_DMA/SLAB_CACHE_DMA on 32-bit arch...
+> Neither is the slab support for kmalloc, not do kmalloc allocations
+> have useful alignment apparently (at least if you use slub debug).
 
-I don't know about ARM, but AFAIK on x86 DMA means within first 4MB of
-physical memory, and DMA32 means within first 4GB. It doesn't matter if
-the CPU is running in 32bit or 64bit mode. But, when it runs 32bit, the
-kernel can direct map less than 4GB anyway, which means it doesn't need
-the extra DMA32 zone, i.e. GFP_KERNEL can only get you memory that's
-also acceptable for GFP_DMA32.
-But, DMA is still DMA, i.e. first 4MB. Remapping GFP_DMA32 to GFP_DMA on
-x86 wouldn't work, as the GFP_DMA32 allocations would then only use
-those 4MB and exhaust it very fast.
+Is this also true for caches created by kmem_cache_create(), that
+debugging options can result in not respecting the alignment passed to
+kmem_cache_create()? That would be rather bad, IMHO.
 
->> --
->> Michal Hocko
->> SUSE Labs
+> But I do agree with the sentiment of not wanting to spread GFP_DMA32
+> futher into the slab allocator.
+
+I don't see a problem with GFP_DMA32 for custom caches. Generic
+kmalloc() would be worse, since it would have to create a new array of
+kmalloc caches. But that's already ruled out due to the alignment.
+
+> I think you want a simple genalloc allocator for this rather special
+> use case.
+
+I would prefer if slab could support it, as it doesn't have to
+preallocate. OTOH if the allocations are GFP_ATOMIC as suggested later
+in the thread, and need to always succeed, then preallocation could be
+better, and thus maybe genalloc.
