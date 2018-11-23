@@ -1,150 +1,190 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 23 Nov 2018 17:21:07 +0000
-Subject: [PATCH 1/2] module: Overwrite st_size instead of st_info
-In-Reply-To: <20181122174923.GK30658@n2100.armlinux.org.uk>
-References: <20181119162513.16562-1-vincent.whitchurch@axis.com>
- <20181122120154.GH3505@e103592.cambridge.arm.com>
- <20181122122411.6ydftk7bjlrefwa5@axis.com>
- <20181122162849.GA8856@linux-8ccs>
- <CAKv+Gu_vAKhQ2oakTeJNwP_F6dhqKe2ZwjAR13wrVKfL5aS4Fw@mail.gmail.com>
- <20181122174923.GK30658@n2100.armlinux.org.uk>
-Message-ID: <20181123172106.GJ3505@e103592.cambridge.arm.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Fri, 23 Nov 2018 19:23:08 +0200
+Subject: [PATCH v2 12/43] drm/fourcc: Add format helpers for checking YUV
+ sub-sampling
+In-Reply-To: <20181123165532.GA22326@arm.com>
+References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+ <20181123092515.2511-13-paul.kocialkowski@bootlin.com>
+ <20181123165532.GA22326@arm.com>
+Message-ID: <20181123172308.GR9144@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 22, 2018 at 05:49:23PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 22, 2018 at 06:40:45PM +0100, Ard Biesheuvel wrote:
-> > On Thu, 22 Nov 2018 at 17:29, Jessica Yu <jeyu@kernel.org> wrote:
-> > >
-> > > +++ Vincent Whitchurch [22/11/18 13:24 +0100]:
-> > > >On Thu, Nov 22, 2018 at 12:01:54PM +0000, Dave Martin wrote:
-> > > >> On Mon, Nov 19, 2018 at 05:25:12PM +0100, Vincent Whitchurch wrote:
-> > > >> > st_info is currently overwritten after relocation and used to store the
-> > > >> > elf_type().  However, we're going to need it fix kallsyms on ARM's
-> > > >> > Thumb-2 kernels, so preserve st_info and overwrite the st_size field
-> > > >> > instead.  st_size is neither used by the module core nor by any
-> > > >> > architecture.
-> > > >> >
-> > > >> > Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
-> > > >> > ---
-> > > >> > v4: Split out to separate patch.  Use st_size instead of st_other.
-> > > >> > v1-v3: See PATCH 2/2
-> > > >> >
-> > > >> >  kernel/module.c | 4 ++--
-> > > >> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > >> >
-> > > >> > diff --git a/kernel/module.c b/kernel/module.c
-> > > >> > index 49a405891587..3d86a38b580c 100644
-> > > >> > --- a/kernel/module.c
-> > > >> > +++ b/kernel/module.c
-> > > >> > @@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
-> > > >> >
-> > > >> >    /* Set types up while we still have access to sections. */
-> > > >> >    for (i = 0; i < mod->kallsyms->num_symtab; i++)
-> > > >> > -          mod->kallsyms->symtab[i].st_info
-> > > >> > +          mod->kallsyms->symtab[i].st_size
-> > > >> >                    = elf_type(&mod->kallsyms->symtab[i], info);
-> > > >> >
-> > > >> >    /* Now populate the cut down core kallsyms for after init. */
-> > > >> > @@ -4061,7 +4061,7 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
-> > > >> >            kallsyms = rcu_dereference_sched(mod->kallsyms);
-> > > >> >            if (symnum < kallsyms->num_symtab) {
-> > > >> >                    *value = kallsyms->symtab[symnum].st_value;
-> > > >> > -                  *type = kallsyms->symtab[symnum].st_info;
-> > > >> > +                  *type = kallsyms->symtab[symnum].st_size;
-> > > >> >                    strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
-> > > >> >                    strlcpy(module_name, mod->name, MODULE_NAME_LEN);
-> > > >> >                    *exported = is_exported(name, *value, mod);
-> > > >>
-> > > >> This is fine if st_size is really unused, but how sure are you of that?
-> > > >>
-> > > >> grepping for st_size throws up some hits that appear ELF-related, but
-> > > >> I've not investigated them in detail.
-> > > >>
-> > > >> (The fact that struct stat has an identically named field throws up
-> > > >> a load of false positives too.)
-> > > >
-> > > >$ git describe --tags
-> > > >v4.20-rc3-93-g92b419289cee
-> > > >
-> > > >$ rg -m1 '[\.>]st_size'  --iglob '!**/tools/**' --iglob '!**/vdso*' --iglob '!**/scripts/**' --iglob '!**/usr/**' --iglob '!**/samples/**' | cat
-> > > >| kernel/kexec_file.c: if (sym->st_size != size) {
-> > > >
-> > > >Symbols in kexec kernel.
-> > > >
-> > > >| fs/stat.c:   tmp.st_size = stat->size;
-> > > >| Documentation/networking/tls.txt:  sendfile(sock, file, &offset, stat.st_size);
-> > > >| net/9p/client.c:             ret->st_rdev, ret->st_size, ret->st_blksize,
-> > > >| net/9p/protocol.c:                                   &stbuf->st_rdev, &stbuf->st_size,
-> > > >| fs/9p/vfs_inode_dotl.c:              i_size_write(inode, stat->st_size);
-> > > >| fs/hostfs/hostfs_user.c:     p->size = buf->st_size;
-> > > >| arch/powerpc/boot/mktree.c:  nblks = (st.st_size + IMGBLK) / IMGBLK;
-> > > >| arch/alpha/kernel/osf_sys.c: tmp.st_size     = lstat->size;
-> > > >| arch/x86/ia32/sys_ia32.c:        __put_user(stat->size, &ubuf->st_size) ||
-> > > >
-> > > >Not Elf_Sym.
-> > > >
-> > > >| arch/x86/kernel/machine_kexec_64.c:                   sym->st_size);
-> > > >
-> > > >Symbols in kexec kernel.
-> > > >
-> > > >| arch/sparc/boot/piggyback.c: st4(buffer + 12, s.st_size);
-> > > >| arch/sparc/kernel/sys_sparc32.c:     err |= put_user(stat->size, &statbuf->st_size);
-> > > >| arch/um/os-Linux/file.c:             .ust_size    = src->st_size,    /* total size, in bytes */
-> > > >| arch/um/os-Linux/start_up.c: size = (buf.st_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
-> > > >| arch/s390/kernel/compat_linux.c:     tmp.st_size = stat->size;
-> > > >| arch/arm/kernel/sys_oabi-compat.c:   tmp.st_size = stat->size;
-> > > >| arch/mips/boot/compressed/calc_vmlinuz_load_addr.c:  vmlinux_size = (uint64_t)sb.st_size;
-> > > >| drivers/net/ethernet/marvell/sky2.c:         hw->st_idx = RING_NEXT(hw->st_idx, hw->st_size);
-> > > >
-> > > >Not Elf_Sym.
-> > >
-> > > [ added Miroslav to CC, just in case he would like to check :) ]
-> > >
-> > > I have just double checked as well, and am fairly certain that the
-> > > Elf_Sym st_size field is not used to apply module relocations in any
-> > > arches, and it is not used in the core module loader nor in the module
-> > > kallsyms code. We'd like to avoid overwriting st_info in any case, to
-> > > fix kallsyms on Thumb-2 and also so that livepatch won't run into any
-> > > issues with delayed relocations, should livepatch support ever expand
-> > > to arches (e.g., arm) that rely on st_info for module relocations.
-> > >
+On Fri, Nov 23, 2018 at 04:55:33PM +0000, Ayan Halder wrote:
+> On Fri, Nov 23, 2018 at 10:24:44AM +0100, Paul Kocialkowski wrote:
+> 
+> Hi Paul,
+> 
+> > This introduces new format helpers that use the previously-introduced
+> > format info helpers for checking YUV sub-sampling.
 > > 
-> > Also note that st_size cannot be relied upon in general, since we
-> > overwrite the addresses of undefined symbols in a module's symbol
-> > table when resolve them against ksyms, while the st_size field is kept
-> > at 0. At relocation time, we don't really distinguish anymore between
-> > local and external module symbols, and so relying on st_size to be
-> > accurate would definitely break things.
+> > Only the format fourcc is required by these helpers and the formats are
+> > iterated from the list.
+> > 
+> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > ---
+> >  drivers/gpu/drm/drm_fourcc.c | 105 +++++++++++++++++++++++++++++++++++
+> >  include/drm/drm_fourcc.h     |   5 ++
+> >  2 files changed, 110 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/drm_fourcc.c b/drivers/gpu/drm/drm_fourcc.c
+> > index b56e773f9f63..6d395c586ad5 100644
+> > --- a/drivers/gpu/drm/drm_fourcc.c
+> > +++ b/drivers/gpu/drm/drm_fourcc.c
+> > @@ -492,6 +492,111 @@ bool drm_format_is_yuv_planar(uint32_t format)
+> >  }
+> >  EXPORT_SYMBOL(drm_format_is_yuv_planar);
+> >  
+> > +/**
+> > + * drm_format_is_yuv_sampling_410 - check that the format is a YUV format with
+> > + * 4:1:0 sub-sampling
+> > + * @format: pixel format
+> > + *
+> > + * Returns:
+> > + * A boolean indicating whether the format is a YUV format with 4:1:0
+> > + * sub-sampling.
+> > + */
+> > +bool drm_format_is_yuv_sampling_410(uint32_t format)
+> > +{
+> > +	const struct drm_format_info *info;
+> > +
+> > +	info = drm_format_info(format);
+> > +	if (!info)
+> > +		return false;
+
+Looks like you're doing a lot of drm_format_info(fb->format->format),
+which doesn't make sense. Not to mention that each lookup is a linear
+search so the costs may start to add up.
+
+Unless there's a really good reason I'd rather we try to remove all
+the current helpers that do these lookups, and not add any more.
+
+> > +
+> > +	return drm_format_info_is_yuv_sampling_410(info);
+> > +}
+> > +EXPORT_SYMBOL(drm_format_is_yuv_sampling_410);
+> > +
+> > +/**
+> > + * drm_format_is_yuv_sampling_411 - check that the format is a YUV format with
+> > + * 4:1:1 sub-sampling
+> > + * @format: pixel format
+> > + *
+> > + * Returns:
+> > + * A boolean indicating whether the format is a YUV format with 4:1:1
+> > + * sub-sampling.
+> > + */
+> > +bool drm_format_is_yuv_sampling_411(uint32_t format)
+> > +{
+> > +	const struct drm_format_info *info;
+> > +
+> > +	info = drm_format_info(format);
+> > +	if (!info)
+> > +		return false;
+> > +
+> > +	return drm_format_info_is_yuv_sampling_411(info);
+> > +}
+> > +EXPORT_SYMBOL(drm_format_is_yuv_sampling_411);
+> > +
+> > +/**
+> > + * drm_format_is_yuv_sampling_420 - check that the format is a YUV format with
+> > + * 4:2:0 sub-sampling
+> > + * @format: pixel format
+> > + *
+> > + * Returns:
+> > + * A boolean indicating whether the format is a YUV format with 4:2:0
+> > + * sub-sampling.
+> > + */
+> > +bool drm_format_is_yuv_sampling_420(uint32_t format)
+> > +{
+> > +	const struct drm_format_info *info;
+> > +
+> > +	info = drm_format_info(format);
+> > +	if (!info)
+> > +		return false;
+> > +
+> > +	return drm_format_info_is_yuv_sampling_420(info);
+> > +}
+> > +EXPORT_SYMBOL(drm_format_is_yuv_sampling_420);
+> > +
+> > +/**
+> > + * drm_format_is_yuv_sampling_422 - check that the format is a YUV format with
+> > + * 4:2:2 sub-sampling
+> > + * @format: pixel format
+> > + *
+> > + * Returns:
+> > + * A boolean indicating whether the format is a YUV format with 4:2:2
+> > + * sub-sampling.
+> > + */
+> > +bool drm_format_is_yuv_sampling_422(uint32_t format)
+> > +{
+> > +	const struct drm_format_info *info;
+> > +
+> > +	info = drm_format_info(format);
+> > +	if (!info)
+> > +		return false;
+> > +
+> > +	return drm_format_info_is_yuv_sampling_422(info);
+> > +}
+> > +EXPORT_SYMBOL(drm_format_is_yuv_sampling_422);
+> > +
+> > +/**
+> > + * drm_format_is_yuv_sampling_444 - check that the format is a YUV format with
+> > + * 4:4:4 sub-sampling
+> > + * @format: pixel format
+> > + *
+> > + * Returns:
+> > + * A boolean indicating whether the format is a YUV format with 4:4:4
+> > + * sub-sampling.
+> > + */
+> > +bool drm_format_is_yuv_sampling_444(uint32_t format)
+> > +{
+> > +	const struct drm_format_info *info;
+> > +
+> > +	info = drm_format_info(format);
+> > +	if (!info)
+> > +		return false;
+> > +
+> > +	return drm_format_info_is_yuv_sampling_444(info);
+> > +}
+> > +EXPORT_SYMBOL(drm_format_is_yuv_sampling_444);
+> > +
+> >  /**
+> >   * drm_format_info_block_width - width in pixels of block.
+> >   * @info: pixel format info
+> > diff --git a/include/drm/drm_fourcc.h b/include/drm/drm_fourcc.h
+> > index d170b7b323f7..cf082d8b6ad4 100644
+> > --- a/include/drm/drm_fourcc.h
+> > +++ b/include/drm/drm_fourcc.h
+> > @@ -278,6 +278,11 @@ bool drm_format_is_yuv(uint32_t format);
+> >  bool drm_format_is_yuv_packed(uint32_t format);
+> >  bool drm_format_is_yuv_semiplanar(uint32_t format);
+> >  bool drm_format_is_yuv_planar(uint32_t format);
+> > +bool drm_format_is_yuv_sampling_410(uint32_t format);
+> > +bool drm_format_is_yuv_sampling_411(uint32_t format);
+> > +bool drm_format_is_yuv_sampling_420(uint32_t format);
+> > +bool drm_format_is_yuv_sampling_422(uint32_t format);
+> > +bool drm_format_is_yuv_sampling_444(uint32_t format);
+> >  unsigned int drm_format_info_block_width(const struct drm_format_info *info,
+> >  					 int plane);
+> >  unsigned int drm_format_info_block_height(const struct drm_format_info *info,
+> > -- 
+> > 2.19.1
+> > 
+> From patches [PATCH v2 08/43] till [PATCH v2 12/43], looks good to me.
 > 
-> Umm.
+> How about clubbing all the drm_format_helper functions together in a
+> separate file (call it drm_fourcc_helper.c)? This way, we could
+> keep the __drm_format_info[] only drm_fourcc.c.
 > 
-> Undefined symbols of course have a zero size, because it's not known
-> how large the definition that the symbol refers to is.  However,
-> the non-undefined symbols should have a size with them - anything
-> emitted by the compiler should, but only if .size has been used in
-> the assembler will assembly have correct sizes.
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-which I guess is one reason st_size is a bit unreliable.
-
-For kallsyms purposes we assume that the size of each symbol is just the
-offset from it to the next symbol, which seems good enough in practice.
-
-> Aren't SHN_UNDEF symbols ignored, except when applying the
-> relocations, where we rely on st_value to be set on SHN_UNDEF
-> symbols?
-
-Presumably, but it looks like st_size is pretty much don't care.
-
-I renamed st_size in the struct in elf.h to a garbage name and the
-kernel and modules still build fine, though I only tried this for arm64
-so far.
-
-This suggests that at runtime at least, there is no runtime usage of
-this field at all unless it's in arch-specific code for other arches.
-Others seem confident that it's not used anywhere, and although I've not
-gone through all the grep hits, I've only encountered false positives so
-far.
-
-Cheers
----Dave
+-- 
+Ville Syrj?l?
+Intel
