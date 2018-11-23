@@ -1,30 +1,48 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Nov 2018 11:34:34 +0900
-Subject: [PATCH 9/9] eisa: consolidate EISA Kconfig entry in drivers/eisa
-In-Reply-To: <20181115190538.17016-10-hch@lst.de>
+Date: Fri, 23 Nov 2018 11:36:07 +0900
+Subject: move bus (PCI, PCMCIA, EISA, rapdio) config to drivers/ v4
+In-Reply-To: <CAK7LNARL8yZexzXiEaT77U_rdwhr5uENXbSaSTGHU33HbSmW6g@mail.gmail.com>
 References: <20181115190538.17016-1-hch@lst.de>
- <20181115190538.17016-10-hch@lst.de>
-Message-ID: <CAK7LNAQ01oHpZHJ2Zb49o7pUU_vB5+-262MhueTLQg+t29W3nw@mail.gmail.com>
+ <CAK7LNARL8yZexzXiEaT77U_rdwhr5uENXbSaSTGHU33HbSmW6g@mail.gmail.com>
+Message-ID: <CAK7LNARA-wbDDh_T2HghAUGizY-bF28O_8cjLmp9DMHaoxZPNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 4:06 AM Christoph Hellwig <hch@lst.de> wrote:
+On Fri, Nov 23, 2018 at 11:32 AM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 >
-> Let architectures opt into EISA support by selecting HAS_EISA and
+> Hi Christoph,
+>
+>
+> On Fri, Nov 16, 2018 at 4:08 AM Christoph Hellwig <hch@lst.de> wrote:
+> >
+> > Hi all,
+> >
+> > currently every architecture that wants to provide on of the common
+> > periphal busses needs to add some boilerplate code and include the
+> > right Kconfig files.   This series instead just selects the presence
+> > (when needed) and then handles everything in the bus-specific
+> > Kconfig file under drivers/.
+>
+>
+> Thanks for this work!
+>
+>
+> I applied this series, and it is available at
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-kbuild.git
+> kconfig2
 
-I locally fixed the commit log (HAS_EISA -> HAVE_EISA)
-so that it matches to the code.
+
+BTW, if you find questionable parts,
+please let me know.
+
+We still have plenty of time by the next MW.
 
 Thanks.
 
 
 
-> handle everything else in drivers/eisa.
->
-> Signed-off-by: Christoph Hellwig <hch@lst.de>
-> Acked-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
-
---
+-- 
 Best Regards
 Masahiro Yamada
