@@ -1,48 +1,47 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:10 +0100
-Subject: [PATCH v2 38/43] drm/sun4i: Move access control before setting the
- register as documented
-In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-39-paul.kocialkowski@bootlin.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 23 Nov 2018 09:27:02 +0000
+Subject: Sleeping in user_access section
+Message-ID: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Maxime Ripard <maxime.ripard@bootlin.com>
+Hi,
 
-Unlike what is currently being done, the ACCESS_CTRL bit documentation asks
-that this bit should be set before modifying any register. The code in the
-BSP also does this, so make sure we do this as well.
+I made an attempt at implementing the 
+user_access_begin()/user_access_end() macros along with the 
+get/put_user_unsafe() for arm64 by toggling the status of PAN (more or 
+less similar to x86's STAC/CTAC).
 
-Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+With a small mistake in my patch, we realized that directly calling 
+function that could reschedule while in a user_access section could lead to:
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index b9c18fa2fff3..2c9dcb4ffde0 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -74,6 +74,10 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
- {
- 	int i;
- 
-+	regmap_write_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
-+			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
-+			  SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
-+
- 	for (i = 0; i < 32; i++) {
- 		regmap_write(frontend->regs, SUN4I_FRONTEND_CH0_HORZCOEF0_REG(i),
- 			     sun4i_frontend_horz_coef[2 * i]);
-@@ -89,9 +93,6 @@ static void sun4i_frontend_scaler_init(struct sun4i_frontend *frontend)
- 			     sun4i_frontend_vert_coef[i]);
- 	}
- 
--	regmap_update_bits(frontend->regs, SUN4I_FRONTEND_FRM_CTRL_REG,
--			   SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL,
--			   SUN4I_FRONTEND_FRM_CTRL_COEF_ACCESS_CTRL);
- }
- 
- int sun4i_frontend_init(struct sun4i_frontend *frontend)
+- scheduling another task keeping the user_access status enabled despite 
+the task never calling user_access_begin()
+
+- when re-scheduling the task that was mid user_access section, 
+user_access would be disabled and the task would fault on the next 
+get/put_user_unsafe.
+
+
+This is because __switch_to does not alter the user_access status when 
+switching from next to prev (at least on arm64 we currently don't, and 
+by looking at the x86 code I don't think this is done either).
+
+
+ From my understanding, this is not an issue when the task in 
+user_access mode gets scheduled out/in as a result of an interrupt as 
+PAN and EFLAGS.AC get saved/restore on exception entry/exit (at least I 
+know it is the case for PAN, I am less sure for the x86 side).
+
+
+So, the question is, should __switch_to take care of the user_access 
+status when scheduling new tasks? Or should there be a restriction about 
+scheduling out a task with user_access mode enabled and maybe add a 
+warning if we can detect this?
+
+(Or did we miss something and this is not an issue on x86?)
+
+Thanks,
+
 -- 
-2.19.1
+Julien Thierry
