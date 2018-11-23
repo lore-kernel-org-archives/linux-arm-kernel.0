@@ -1,65 +1,63 @@
-From: tfiga@chromium.org (Tomasz Figa)
-Date: Fri, 23 Nov 2018 14:35:48 +0900
-Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
- atomic.
-In-Reply-To: <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
-References: <20181119190805.19139-1-helen.koike@collabora.com>
- <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
- <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
- <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
- <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
-Message-ID: <CAAFQd5DAti8Vf+jyLp6nVH5FiesE=jLNoLq3AFaqdm2FfY=v9Q@mail.gmail.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Fri, 23 Nov 2018 13:37:11 +0800
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+ <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
+ <20181122082336.GA2049@infradead.org>
+ <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
+Message-ID: <CANMq1KC56nz7u8r54LUbN43DXxZPQWBY67FR1P18tps5V3E-Zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-On Fri, Nov 23, 2018 at 1:58 PM Michael Zoran <mzoran@crowfest.net> wrote:
+On Fri, Nov 23, 2018 at 11:04 AM Nicolas Boichat <drinkcat@chromium.org> wrote:
 >
-> On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:
+> On Thu, Nov 22, 2018 at 4:23 PM Christoph Hellwig <hch@infradead.org> wrote:
 > >
-> > The point here is not about setting and resetting the plane->fb
-> > pointer. It's about what happens inside
-> > drm_atomic_set_fb_for_plane().
+> > On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
+> > > TBH, if this DMA32 stuff is going to be contentious we could possibly just
+> > > rip out the offending kmem_cache - it seemed like good practice for the
+> > > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
+> > > give the same 1KB alignment and chance of succeeding as the equivalent
+> > > kmem_cache_alloc(), then we could quite easily make do with that instead.
 > >
-> > It calls drm_framebuffer_get() for the new fb and
-> > drm_framebuffer_put() for the old fb. In result, if the fb changes,
-> > the old fb, which had its reference count incremented in the atomic
-> > commit that set it to the plane before, has its reference count
-> > decremented. Moreover, if the new reference count becomes 0,
-> > drm_framebuffer_put() will immediately free the buffer.
+> > Neither is the slab support for kmalloc, not do kmalloc allocations
+> > have useful alignment apparently (at least if you use slub debug).
 > >
-> > Freeing a buffer when the hardware is still scanning out of it isn't
-> > a
-> > good idea, is it?
+> > But I do agree with the sentiment of not wanting to spread GFP_DMA32
+> > futher into the slab allocator.
+> >
+> > I think you want a simple genalloc allocator for this rather special
+> > use case.
 >
-> No, it's not.  But the board I submitted the patch for doesn't have
-> anything like hot swapable ram.  The ram access is still going to work,
-> just it might display something it shouldn't. Say for example if that
-> frame buffer got reused by somethig else and filled with new data in
-> the very small window.
+> So I had a look at genalloc, we'd need to add pre-allocated memory
+> using gen_pool_add [1]. There can be up to 4096 L2 page tables, so we
+> may need to pre-allocate 4MB of memory (1KB per L2 page table). We
+> could add chunks on demand, but then it'd be difficult to free them up
+> (genalloc does not have a "gen_pool_remove" call). So basically if the
+> full 4MB end up being requested, we'd be stuck with that until the
+> iommu domain is freed (on the arm64 Mediatek platforms I looked at,
+> there is only one iommu domain, and it never gets freed).
 
-Thanks for a quick reply!
+I tried out genalloc with pre-allocated 4MB, and that seems to work
+fine. Allocating in chunks would require genalloc changes as
+gen_pool_add calls kmalloc with just GFP_KERNEL [2], and we are in
+atomic context in __arm_v7s_alloc_table...
 
-To clarify, on the Rockchip platform this patch is for (and many other
-arm/arm64 SoCs) the display controller is behind an IOMMU. Freeing the
-buffer would mean unmapping the related IOVAs from the IOMMU. If the
-hardware is still scanning out from the unmapped addresses, it would
-cause IOMMU page faults. We don't have any good IOMMU page fault
-handling in the kernel, so on most platforms that would likely end up
-stalling the display controller completely (on Rockchip it does).
+[2] https://elixir.bootlin.com/linux/latest/source/lib/genalloc.c#L190
 
+> page_frag would at least have a chance to reclaim those pages (if I
+> understand Christoph's statement correctly)
 >
-> But yes, I agree the best solution would be to not release the buffer
-> until the next vblank.
+> Robin: Do you have some ideas of the lifetime/usage of L2 tables? If
+> they are usually few of them, or if they don't get reclaimed easily,
+> some on demand genalloc allocation would be ok (or even 4MB allocation
+> on init, if we're willing to take that hit). If they get allocated and
+> freed together, maybe page_frag is a better option?
 >
-> Perhaps a good solution would be for the DRM api to have the concept of
-> a deferred release?  Meaning if the put() call just added the frame
-> buffer to a list that DRM core could walk during the vblank.  That
-> might be better then every single driver trying to work up a custom
-> solution.
-
-Agreed.
-
-Best regards,
-Tomasz
+> Thanks,
+>
+> [1] https://www.kernel.org/doc/html/v4.19/core-api/genalloc.html
