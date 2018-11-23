@@ -1,107 +1,188 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:25:04 +0100
-Subject: [PATCH v2 32/43] drm/sun4i: Pass modifier to backend and frontend
- format support helpers
+Date: Fri, 23 Nov 2018 10:25:03 +0100
+Subject: [PATCH v2 31/43] drm/sun4i: Add a dedicated ioctl call for allocating
+ tiled buffers
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-33-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-32-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare the introduction of tiled mode support, pass the framebuffer
-format modifier to the helpers dealing with format support.
+This introduces a dedicated ioctl for allocating buffers for the VPU
+tiling mode. It allows setting up buffers that comply to the hardware
+alignment requirements, by aligning the stride and height to 32 bytes.
 
-Since only linear mode is supported for now, add corresponding checks in
-each helper.
+Only YUV semiplanar and planar formats are allowed by the ioctl, as the
+hardware does not support the tiling mode for other formats.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 10 +++++++---
- drivers/gpu/drm/sun4i/sun4i_backend.h  |  2 +-
- drivers/gpu/drm/sun4i/sun4i_frontend.c |  5 ++++-
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  2 +-
- 4 files changed, 13 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 89 +++++++++++++++++++++++++++++++
+ include/uapi/drm/sun4i_drm.h      | 42 +++++++++++++++
+ 2 files changed, 131 insertions(+)
+ create mode 100644 include/uapi/drm/sun4i_drm.h
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 986bdb64521c..bbadc2ab9f4d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -175,10 +175,13 @@ static const uint32_t sun4i_backend_formats[] = {
- 	DRM_FORMAT_YVYU,
- };
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index ccdeae6299eb..5ae32973cf34 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -21,6 +21,7 @@
+ #include <drm/drm_gem_cma_helper.h>
+ #include <drm/drm_fb_helper.h>
+ #include <drm/drm_of.h>
++#include <drm/sun4i_drm.h>
  
--bool sun4i_backend_format_is_supported(uint32_t fmt)
-+bool sun4i_backend_format_is_supported(uint32_t fmt, uint64_t modifier)
- {
- 	unsigned int i;
+ #include "sun4i_drv.h"
+ #include "sun4i_frontend.h"
+@@ -28,6 +29,92 @@
+ #include "sun4i_tcon.h"
+ #include "sun8i_tcon_top.h"
  
-+	if (modifier != DRM_FORMAT_MOD_LINEAR)
-+		return false;
++int drm_sun4i_gem_create_tiled(struct drm_device *drm, void *data,
++			       struct drm_file *file_priv)
++{
++	struct drm_sun4i_gem_create_tiled *args = data;
++	struct drm_gem_cma_object *cma_obj;
++	struct drm_gem_object *gem_obj;
++	uint32_t luma_stride, chroma_stride;
++	uint32_t luma_height, chroma_height;
++	uint32_t chroma_width;
++	const struct drm_format_info *info;
++	int ret;
 +
- 	for (i = 0; i < ARRAY_SIZE(sun4i_backend_formats); i++)
- 		if (sun4i_backend_formats[i] == fmt)
- 			return true;
-@@ -455,14 +458,15 @@ static bool sun4i_backend_plane_uses_frontend(struct drm_plane_state *state)
- 	struct sun4i_layer *layer = plane_to_sun4i_layer(state->plane);
- 	struct sun4i_backend *backend = layer->backend;
- 	uint32_t format = state->fb->format->format;
-+	uint64_t modifier = state->fb->modifier;
- 
- 	if (IS_ERR(backend->frontend))
- 		return false;
- 
--	if (!sun4i_frontend_format_is_supported(format))
-+	if (!sun4i_frontend_format_is_supported(format, modifier))
- 		return false;
- 
--	if (!sun4i_backend_format_is_supported(format))
-+	if (!sun4i_backend_format_is_supported(format, modifier))
- 		return true;
- 
- 	/*
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.h b/drivers/gpu/drm/sun4i/sun4i_backend.h
-index 93db3af675b3..01f66463271b 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.h
-@@ -198,7 +198,7 @@ engine_to_sun4i_backend(struct sunxi_engine *engine)
- 
- void sun4i_backend_layer_enable(struct sun4i_backend *backend,
- 				int layer, bool enable);
--bool sun4i_backend_format_is_supported(uint32_t fmt);
-+bool sun4i_backend_format_is_supported(uint32_t fmt, uint64_t modifier);
- int sun4i_backend_update_layer_coord(struct sun4i_backend *backend,
- 				     int layer, struct drm_plane *plane);
- int sun4i_backend_update_layer_formats(struct sun4i_backend *backend,
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-index 001139417cf5..b78e0a208c95 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
-@@ -299,10 +299,13 @@ static const uint32_t sun4i_frontend_formats[] = {
- 	DRM_FORMAT_YVYU,
- };
- 
--bool sun4i_frontend_format_is_supported(uint32_t fmt)
-+bool sun4i_frontend_format_is_supported(uint32_t fmt, uint64_t modifier)
- {
- 	unsigned int i;
- 
-+	if (modifier != DRM_FORMAT_MOD_LINEAR)
-+		return false;
++	info = drm_format_info(args->format);
++	if (!info)
++		return -EINVAL;
 +
- 	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
- 		if (sun4i_frontend_formats[i] == fmt)
- 			return true;
-diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-index 54ec71a3e2f4..b209eacdf8c2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
-@@ -115,6 +115,6 @@ void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
- 				 struct drm_plane *plane);
- int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
- 				  struct drm_plane *plane, uint32_t out_fmt);
--bool sun4i_frontend_format_is_supported(uint32_t fmt);
-+bool sun4i_frontend_format_is_supported(uint32_t fmt, uint64_t modifier);
++	/* The tiled output format only applies to non-packed YUV formats. */
++	if (!info->is_yuv || info->num_planes == 1)
++		return -EINVAL;
++
++	memset(args->pitches, 0, sizeof(args->pitches));
++	memset(args->offsets, 0, sizeof(args->offsets));
++
++	/* Stride and height are aligned to 32 bytes for our tiled format. */
++	luma_stride = ALIGN(args->width, 32);
++	luma_height = ALIGN(args->height, 32);
++
++	chroma_width = args->width;
++
++	/* Semiplanar formats have both U and V data in their chroma plane. */
++	if (drm_format_info_is_yuv_semiplanar(info))
++		chroma_width *= 2;
++
++	chroma_stride = ALIGN(DIV_ROUND_UP(chroma_width, info->hsub), 32);
++	chroma_height = ALIGN(DIV_ROUND_UP(args->height, info->vsub), 32);
++
++	if (drm_format_info_is_yuv_semiplanar(info)) {
++		args->pitches[0] = luma_stride;
++		args->pitches[1] = chroma_stride;
++
++		args->offsets[0] = 0;
++		args->offsets[1] = luma_stride * luma_height;
++
++		args->size = luma_stride * luma_height +
++			     chroma_stride * chroma_height;
++	} else if (drm_format_info_is_yuv_planar(info)) {
++		args->pitches[0] = luma_stride;
++		args->pitches[1] = chroma_stride;
++		args->pitches[2] = chroma_stride;
++
++		args->offsets[0] = 0;
++		args->offsets[1] = luma_stride * luma_height;
++		args->offsets[2] = luma_stride * luma_height +
++				   chroma_stride * chroma_height;
++
++		args->size = luma_stride * luma_height +
++			     chroma_stride * chroma_height * 2;
++	} else {
++		/* No support for other formats in tiled mode. */
++		return -EINVAL;
++	}
++
++	cma_obj = drm_gem_cma_create(drm, args->size);
++	if (IS_ERR(cma_obj))
++		return PTR_ERR(cma_obj);
++
++	gem_obj = &cma_obj->base;
++
++	/*
++	 * allocate a id of idr table where the obj is registered
++	 * and handle has the id what user can see.
++	 */
++	ret = drm_gem_handle_create(file_priv, gem_obj, &args->handle);
++	/* drop reference from allocate - handle holds it now. */
++	drm_gem_object_put_unlocked(gem_obj);
++	if (ret)
++		return ret;
++
++	return PTR_ERR_OR_ZERO(cma_obj);
++}
++
++static const struct drm_ioctl_desc sun4i_drv_ioctls[] = {
++	DRM_IOCTL_DEF_DRV(SUN4I_GEM_CREATE_TILED, drm_sun4i_gem_create_tiled,
++			  DRM_UNLOCKED),
++};
++
+ static int drm_sun4i_gem_dumb_create(struct drm_file *file_priv,
+ 				     struct drm_device *drm,
+ 				     struct drm_mode_create_dumb *args)
+@@ -44,6 +131,8 @@ static struct drm_driver sun4i_drv_driver = {
+ 	.driver_features	= DRIVER_GEM | DRIVER_MODESET | DRIVER_PRIME | DRIVER_ATOMIC,
  
- #endif /* _SUN4I_FRONTEND_H_ */
+ 	/* Generic Operations */
++	.ioctls			= sun4i_drv_ioctls,
++	.num_ioctls		= ARRAY_SIZE(sun4i_drv_ioctls),
+ 	.fops			= &sun4i_drv_fops,
+ 	.name			= "sun4i-drm",
+ 	.desc			= "Allwinner sun4i Display Engine",
+diff --git a/include/uapi/drm/sun4i_drm.h b/include/uapi/drm/sun4i_drm.h
+new file mode 100644
+index 000000000000..2c77584b057b
+--- /dev/null
++++ b/include/uapi/drm/sun4i_drm.h
+@@ -0,0 +1,42 @@
++/* SPDX-License-Identifier: GPL-2.0+ WITH Linux-syscall-note */
++/* sun4i_drm.h
++ *
++ * Copyright (C) 2018 Paul Kocialkowski <paul.kocialkowski@bootlin.com>
++ *
++ * This program is free software; you can redistribute  it and/or modify it
++ * under  the terms of  the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++
++#ifndef _UAPI_SUN4I_DRM_H_
++#define _UAPI_SUN4I_DRM_H_
++
++#include "drm.h"
++
++#if defined(__cplusplus)
++extern "C" {
++#endif
++
++struct drm_sun4i_gem_create_tiled {
++	__u32 height;
++	__u32 width;
++	__u32 format;
++	/* handle, offsets, pitches, size will be returned */
++	__u32 handle;
++	__u32 pitches[4];
++	__u32 offsets[4];
++	__u64 size;
++};
++
++#define DRM_SUN4I_GEM_CREATE_TILED	0x00
++
++#define DRM_IOCTL_SUN4I_GEM_CREATE_TILED \
++	DRM_IOWR(DRM_COMMAND_BASE + DRM_SUN4I_GEM_CREATE_TILED, \
++		 struct drm_sun4i_gem_create_tiled)
++
++#if defined(__cplusplus)
++}
++#endif
++
++#endif /* _UAPI_SUN4I_DRM_H_ */
 -- 
 2.19.1
