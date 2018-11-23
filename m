@@ -1,65 +1,25 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 23 Nov 2018 15:40:55 +0100
-Subject: [PATCH v2 0/4] Meson8b: add the CPU clock post-dividers
-In-Reply-To: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
-References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
-Message-ID: <4859b354-ade4-8172-eeb5-7a4a42045589@baylibre.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 23 Nov 2018 14:42:26 +0000
+Subject: [PATCH V3 4/5] arm64/mm: Enable HugeTLB migration
+In-Reply-To: <1540299721-26484-5-git-send-email-anshuman.khandual@arm.com>
+References: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
+ <1540299721-26484-5-git-send-email-anshuman.khandual@arm.com>
+Message-ID: <20181123144226.GD3360@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/2018 22:40, Martin Blumenstingl wrote:
-> This is the successor to my previous series "meson8b: add the CPU_DIV16
-> clock for the ARM TWD" from [0]. I decided to not send this as v2 of
-> the original series because the PERIPH clock is not the CPU_DIV16 clock.
-> It's not clear whether a CPU_DIV16 clock exists.
+On Tue, Oct 23, 2018 at 06:32:00PM +0530, Anshuman Khandual wrote:
+> Let arm64 subscribe to generic HugeTLB page migration framework. Right now
+> this only works on the following PMD and PUD level HugeTLB page sizes with
+> various kernel base page size combinations.
 > 
-> With this series we get all the CPU_CLK post-dividers as listed in the
-> public S805 datasheet [1] on pages 31 and 32:
-> - ABP
-> - PERIPH (used as input for the ARM global timer and ARM TWD timer)
-> - AXI
-> - L2 DRAM
+>        CONT PTE    PMD    CONT PMD    PUD
+>        --------    ---    --------    ---
+> 4K:         NA     2M         NA      1G
+> 16K:        NA    32M         NA
+> 64K:        NA   512M         NA
 > 
-> Each of these clocks has a register called "..._CLK_DIS" which is
-> documented as a "just in case" bit:
-> "Set to 1 to manually disable the [...] clock when changing the mux
-> selection. Typically this bit is set to 0 since the clock muxes can
-> switch without glitches."
-> Since we're not supposed to touch that register we're using the new
-> read-only gate clk_ops to ensure that nothing accidentally modifies
-> these bits.
-> 
-> The result of this is that we can use the PERIPH clock which clocks
-> the ARM TWD timer. I will send a separate series to add the TWD timer.
-> 
-> 
-> changes since v1 at [2]:
-> - added new patch 2 "clk: meson: clk-regmap: add read-only gate ops"
-> - switched from CLK_IS_CRITICAL to the new clk_regmap_gate_ro_ops
->   so we're consistent with all other read-only clocks
-> - collected Jerome's Acked-by tags (thanks!)
-> 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
-> [1] https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
-> [2] https://patchwork.kernel.org/cover/10687023/
-> 
-> 
-> Martin Blumenstingl (4):
->   dt-bindings: clock: meson8b: export the CPU post dividers
->   clk: meson: clk-regmap: add read-only gate ops
->   clk: meson: meson8b: rename cpu_div2/cpu_div3 to
->     cpu_in_div2/cpu_in_div3
->   clk: meson: meson8b: add the CPU clock post divider clocks
-> 
->  drivers/clk/meson/clk-regmap.c           |   5 +
->  drivers/clk/meson/clk-regmap.h           |   1 +
->  drivers/clk/meson/meson8b.c              | 264 ++++++++++++++++++++++-
->  drivers/clk/meson/meson8b.h              |  17 +-
->  include/dt-bindings/clock/meson8b-clkc.h |   4 +
->  5 files changed, 278 insertions(+), 13 deletions(-)
+> Reviewed-by: Naoya Horiguchi <n-horiguchi@ah.jp.nec.com>
+> Signed-off-by: Anshuman Khandual <anshuman.khandual@arm.com>
 
-
-Applied, with the bindings on next/headers
-
-Neil
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
