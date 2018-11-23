@@ -1,38 +1,28 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Nov 2018 13:38:46 +0100
-Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: add thermal device
- support
-In-Reply-To: <20181017095828.lgp6e7q4ag4meybs@verge.net.au>
-References: <1539612746-9711-1-git-send-email-ykaneko0929@gmail.com>
- <20181017095828.lgp6e7q4ag4meybs@verge.net.au>
-Message-ID: <20181123123845.ak23g2wthryysfaz@verge.net.au>
+Date: Fri, 23 Nov 2018 13:51:32 +0100
+Subject: [PATCH 08/10] ARM64: dts: renesas: Add all CPUs in cooling maps
+In-Reply-To: <f2116377ab65e4b3ece39c32f54ac3eec2fb7d8c.1542362530.git.viresh.kumar@linaro.org>
+References: <cover.1542362530.git.viresh.kumar@linaro.org>
+ <f2116377ab65e4b3ece39c32f54ac3eec2fb7d8c.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <20181123125131.fxrslxz4wvphpe5o@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 17, 2018 at 11:58:29AM +0200, Simon Horman wrote:
-> On Mon, Oct 15, 2018 at 11:12:26PM +0900, Yoshihiro Kaneko wrote:
-> > This patch adds the thermal device node and the thermal-zone for
-> > the R8A77990 SoC.
-> > 
-> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-> Thanks,
+On Fri, Nov 16, 2018 at 03:34:31PM +0530, Viresh Kumar wrote:
+> Each CPU can (and does) participate in cooling down the system but the
+> DT only captures a handful of them, normally CPU0, in the cooling maps.
+> Things work by chance currently as under normal circumstances its the
+> first CPU of each cluster which is used by the operating systems to
+> probe the cooling devices. But as soon as this CPU ordering changes and
+> any other CPU is used to bring up the cooling device, we will start
+> seeing failures.
 > 
-> This looks fine to me but I will wait to see if there are other reviews
-> before applying.
+> Also the DT is rather incomplete when we list only one CPU in the
+> cooling maps, as the hardware doesn't have any such limitations.
 > 
-> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> Update cooling maps to include all devices affected by individual trip
+> points.
 > 
-> Also tested on Ebisu/E3 in conjunction with "[PATCH/RFT 0/2] thermal: add
-> suport for R8A77990"
-> 
-> # X=1000000; while [ "$X" -gt 0 ]; do X=$(($X -1 )); done; cat
-> # /sys/devices/virtual/thermal/thermal_zone0/temp; sleep 1; cat
-> # /sys/devices/virtual/thermal/thermal_zone0/temp
-> 30000
-> 25000
-> 
-> Tested-by: Simon Horman <horms+renesas@verge.net.au>
-> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I was waiting for the bindings to be reviewed, that has now happened
-and I have applied this patch for v4.21.
+Thanks, applied for v4.21.
