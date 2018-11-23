@@ -1,111 +1,36 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:32 +0100
-Subject: [PATCH v2 00/43] drm/sun4i: Support for linear and tiled YUV formats
- with the frontend
-Message-ID: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+Date: Fri, 23 Nov 2018 10:24:45 +0100
+Subject: [PATCH v2 13/43] drm/sun4i: backend: Use explicit fourcc helpers for
+ packed YUV422 check
+In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-14-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements support for YUV formats using the display engine
-frontend in the sun4i DRM driver, with various fixes along the way.
-Scaling is supported for every format handled by the frontend.
+Checking for the number of planes is not sufficient to en ensure that
+the format is a packed YUV422.
 
-The tiling mode used by the VPU on Allwinner platforms is also supported
-by this series and a dedicated fourcc modifier is introduced, along with
-a specific ioctl for allocating tiled buffers.
+Use explicit fourcc helpers for the check instead.
 
-New common fourcc helpers are also introduced in this series, especially
-related to YUV formats.
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-This was tested on the A33 and A20 platforms and all supported features
-work properly on both. Framebuffer offsets and source positions are not
-supported at this point.
-
-Changes since v1:
-* Extended source selected cleanup to both YUV and video channels;
-* Split and reworded comment about backend scaling;
-* Sorted newly-introduced lists alphabetically;
-* Simplified functions to check if a format is supported;
-* Reworked frontend selection logic as discussed;
-* Made YUV helpers common, with fourcc and drm_info fashions;
-* Changed the CREATE_TILED ioctl flags to match the CREATE_DUMB ioctl;
-* Reworked YUV dimensions calculations to use drm_format_info;
-* Dropped MB32 part in modifier to match V4L2 definition name;
-* Improved the description of the tiling modifier;
-* Avoided splitting CSC coefficients to avoid introducing a new module;
-* Fixed building the driver as modules;
-* Various code simplifications and cleanups;
-* Split commits into logical changes.
-
-Maxime Ripard (5):
-  drm/sun4i: Move access control before setting the register as
-    documented
-  drm/sun4i: frontend: Add a quirk structure
-  drm/sun4i: Set the coef_rdy bit right after the coef have been set
-  drm/sun4i: Make COEF_RDY conditional
-  drm/sun4i: frontend: Move the FIR filter phases to our quirks
-
-Paul Kocialkowski (38):
-  drm/sun4i: Cleanup video/YUV source before enabling a layer
-  drm/sun4i: frontend: Replace ARGB with XRGB as supported format
-  drm/sun4i: Add TODO comment about supporting scaling with the backend
-  drm/sun4i: backend: Add a helper and a list for supported formats
-  drm/sun4i: frontend: Add a helper and a list for supported formats
-  drm/sun4i: backend: Refine the logic behind using the frontend
-  drm/sun4i: backend: Use a specific function to check if a plane is
-    supported
-  drm/fourcc: Add helper to check if a format uses a YUV colorspace
-  drm/fourcc: Add format info helpers for checking YUV planes
-    disposition
-  drm/fourcc: Add format helpers for checking YUV planes disposition
-  drm/fourcc: Add format info helpers for checking YUV sub-sampling
-  drm/fourcc: Add format helpers for checking YUV sub-sampling
-  drm/sun4i: backend: Use explicit fourcc helpers for packed YUV422
-    check
-  drm/sun4i: backend: Avoid counting YUV planes that use the frontend
-  drm/sun4i: Rename sun4i_backend_layer_formats to sun4i_layer_formats
-  drm/sun4i: frontend: Move CSC bypass setup to format update routine
-  drm/sun4i: frontend: Add helpers for input data mode and pixel
-    sequence
-  drm/sun4i: frontend: Add proper definitions for format registers
-  drm/sun4i: frontend: Determine input mode based on the number of
-    planes
-  drm/sun4i: frontend: Determine input format based on colorspace
-  drm/sun4i: frontend: Add support for the BGRX8888 input format
-  drm/sun4i: frontend: Add support for the BGRX8888 output format
-  drm/sun4i: backend: Detail the YUV to RGB values coding explanation
-  drm/sun4i: frontend: Configure and enable YUV to RGB CSC when needed
-  drm/sun4i: frontend: Apply format sub-sampling to CH1 dimensions
-  drm/sun4i: frontend: Add support for packed YUV422 input formats
-  drm/sun4i: frontend: Add support for semi-planar YUV input formats
-  drm/sun4i: frontend: Add support for planar YUV input formats
-  drm/sun4i: Make pitch even for GEM dumb alloc as per hardware
-    constraint
-  drm/fourcc: Add definitions for Allwinner vendor and VPU tiled format
-  drm/sun4i: Add a dedicated ioctl call for allocating tiled buffers
-  drm/sun4i: Pass modifier to backend and frontend format support
-    helpers
-  drm/sun4i: frontend: Add support for tiled YUV input mode
-    configuration
-  drm/sun4i: Add buffer stride and offset configuration for tiling mode
-  drm/sun4i: frontend: Add and use helper for checking tiling support
-  drm/sun4i: layer: Add tiled modifier support and helper
-  drm/sun4i: drv: Allow framebuffer modifiers in mode config
-  drm/sun4i: frontend: Add A20-specific device-tree compatible and
-    quirks
-
- drivers/gpu/drm/drm_fourcc.c           | 184 +++++++++++
- drivers/gpu/drm/sun4i/sun4i_backend.c  | 109 ++++++-
- drivers/gpu/drm/sun4i/sun4i_backend.h  |   3 +
- drivers/gpu/drm/sun4i/sun4i_drv.c      | 102 +++++-
- drivers/gpu/drm/sun4i/sun4i_frontend.c | 415 ++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun4i_frontend.h |  50 ++-
- drivers/gpu/drm/sun4i/sun4i_layer.c    |  41 ++-
- include/drm/drm_fourcc.h               | 126 ++++++++
- include/uapi/drm/drm_fourcc.h          |  16 +
- include/uapi/drm/sun4i_drm.h           |  42 +++
- 10 files changed, 1029 insertions(+), 59 deletions(-)
- create mode 100644 include/uapi/drm/sun4i_drm.h
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
+index 52caf561da0e..30d7bc76c0af 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_backend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
+@@ -238,7 +238,8 @@ static int sun4i_backend_update_yuv_format(struct sun4i_backend *backend,
+ 			   SUN4I_BACKEND_ATTCTL_REG0_LAY_YUVEN);
+ 
+ 	/* TODO: Add support for the multi-planar YUV formats */
+-	if (format->num_planes == 1)
++	if (drm_format_info_is_yuv_packed(format) &&
++	    drm_format_info_is_yuv_sampling_422(format))
+ 		val |= SUN4I_BACKEND_IYUVCTL_FBFMT_PACKED_YUV422;
+ 	else
+ 		DRM_DEBUG_DRIVER("Unsupported YUV format (0x%x)\n", fmt);
 -- 
 2.19.1
