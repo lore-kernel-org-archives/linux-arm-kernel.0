@@ -1,43 +1,33 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 23 Nov 2018 15:18:25 +0100
-Subject: [PATCH 06/12] dt-bindings: PCI: aardvark: describe the reset-gpios
- property
+Date: Fri, 23 Nov 2018 15:18:29 +0100
+Subject: [PATCH 10/12] ARM64: dts: marvell: armada-3720-espressobin: declare
+ PCIe reset GPIO
 In-Reply-To: <20181123141831.8214-1-miquel.raynal@bootlin.com>
 References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
-Message-ID: <20181123141831.8214-7-miquel.raynal@bootlin.com>
+Message-ID: <20181123141831.8214-11-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A GPIO might be used to reset the PCI IP. Describe the property needed
-in this case.
+Add a reset-gpios property to the PCIe node.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- Documentation/devicetree/bindings/pci/aardvark-pci.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pci/aardvark-pci.txt b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-index 310ef7145c47..252934237138 100644
---- a/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/aardvark-pci.txt
-@@ -20,6 +20,10 @@ contain the following properties:
-    define the mapping of the PCIe interface to interrupt numbers.
-  - bus-range: PCI bus numbers covered
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+index 094994a9c68e..76a508da80b9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+@@ -46,6 +46,9 @@
+ /* J9 */
+ &pcie0 {
+ 	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcie_pins>;
++	reset-gpios = <&gpiosb 3 GPIO_ACTIVE_HIGH>;
+ };
  
-+The following are optional properties:
-+
-+ - reset-gpios: GPIO to reset the device
-+
- In addition, the Device Tree describing an Aardvark PCIe controller
- must include a sub-node that describes the legacy interrupt controller
- built into the PCIe controller. This sub-node must have the following
-@@ -48,6 +52,7 @@ Example:
- 				<0 0 0 2 &pcie_intc 1>,
- 				<0 0 0 3 &pcie_intc 2>,
- 				<0 0 0 4 &pcie_intc 3>;
-+		reset-gpios = <&gpiosb 3 GPIO_ACTIVE_HIGH>;
- 		pcie_intc: interrupt-controller {
- 			interrupt-controller;
- 			#interrupt-cells = <1>;
+ /* J6 */
 -- 
 2.19.1
