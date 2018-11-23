@@ -1,75 +1,85 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Nov 2018 23:18:04 +0100
-Subject: [PATCH v4 2/2] arm64/bpf: don't allocate BPF JIT programs in module
- memory
-In-Reply-To: <20181123221804.440-1-ard.biesheuvel@linaro.org>
-References: <20181123221804.440-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181123221804.440-3-ard.biesheuvel@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 24 Nov 2018 07:41:17 +0800
+Subject: [xlnx:xlnx_rebase_v4.14 1052/1439]
+ drivers//fpga/zynqmp-fpga.c:173:2: error: implicit declaration of function
+ 'seq_puts'; did you mean 'set_pte'?
+Message-ID: <201811240715.diaKGfzl%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 module region is a 128 MB region that is kept close to
-the core kernel, in order to ensure that relative branches are
-always in range. So using the same region for programs that do
-not have this restriction is wasteful, and preferably avoided.
+tree:   https://github.com/Xilinx/linux-xlnx xlnx_rebase_v4.14
+head:   eeab73d1207d6fc2082776c954eb19fd7290bfbe
+commit: e3f77c879ff0fe1fd1389f740dcdaa795ae180b7 [1052/1439] fpga: zynqmp-fpga: Add support for pl configuration readback
+config: ia64-allmodconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 8.1.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout e3f77c879ff0fe1fd1389f740dcdaa795ae180b7
+        # save the attached .config to linux build tree
+        GCC_VERSION=8.1.0 make.cross ARCH=ia64 
 
-Now that the core BPF JIT code permits the alloc/free routines to
-be overridden, implement them by vmalloc()/vfree() calls from a
-dedicated 128 MB region set aside for BPF programs. This ensures
-that BPF programs are still in branching range of each other, which
-is something the JIT currently depends upon (and is not guaranteed
-when using module_alloc() on KASLR kernels like we do currently).
-It also ensures that placement of BPF programs does not correlate
-with the placement of the core kernel or modules, making it less
-likely that leaking the former will reveal the latter.
+All errors (new ones prefixed by >>):
 
-This also solves an issue under KASAN, where shadow memory is
-needlessly allocated for all BPF programs (which don't require KASAN
-shadow pages since they are not KASAN instrumented)
+   drivers//fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgreg':
+>> drivers//fpga/zynqmp-fpga.c:173:2: error: implicit declaration of function 'seq_puts'; did you mean 'set_pte'? [-Werror=implicit-function-declaration]
+     seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+     ^~~~~~~~
+     set_pte
+   drivers//fpga/zynqmp-fpga.c:180:3: error: implicit declaration of function 'seq_printf'; did you mean 'dev_printk'? [-Werror=implicit-function-declaration]
+      seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+      ^~~~~~~~~~
+      dev_printk
+   drivers//fpga/zynqmp-fpga.c: In function 'zynqmp_fpga_read_cfgdata':
+   drivers//fpga/zynqmp-fpga.c:215:2: error: implicit declaration of function 'seq_write'; did you mean 'vfs_write'? [-Werror=implicit-function-declaration]
+     seq_write(s, &buf[data_offset], priv->size);
+     ^~~~~~~~~
+     vfs_write
+   cc1: some warnings being treated as errors
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+vim +173 drivers//fpga/zynqmp-fpga.c
+
+   158	
+   159	static int zynqmp_fpga_read_cfgreg(struct fpga_manager *mgr,
+   160					   struct seq_file *s)
+   161	{
+   162		const struct zynqmp_eemi_ops *eemi_ops = zynqmp_pm_get_eemi_ops();
+   163		int ret, val;
+   164		unsigned int *buf;
+   165		dma_addr_t dma_addr;
+   166		struct zynqmp_configreg *p = cfgreg;
+   167	
+   168		buf = dma_zalloc_coherent(mgr->dev.parent, READ_DMA_SIZE,
+   169					  &dma_addr, GFP_KERNEL);
+   170		if (!buf)
+   171			return -ENOMEM;
+   172	
+ > 173		seq_puts(s, "zynqMP FPGA Configuration register contents are\n");
+   174	
+   175		while (p->reg) {
+   176			ret = eemi_ops->fpga_read(p->offset, dma_addr, readback_type,
+   177						  &val);
+   178			if (ret)
+   179				goto free_dmabuf;
+   180			seq_printf(s, "%s --> \t %x \t\r\n", p->reg, val);
+   181			p++;
+   182		}
+   183	
+   184	free_dmabuf:
+   185		dma_free_coherent(mgr->dev.parent, READ_DMA_SIZE, buf,
+   186				  dma_addr);
+   187	
+   188		return ret;
+   189	}
+   190	
+
 ---
- arch/arm64/include/asm/memory.h |  5 ++++-
- arch/arm64/net/bpf_jit_comp.c   | 13 +++++++++++++
- 2 files changed, 17 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..ee20fc63899c 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -62,8 +62,11 @@
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
- 	(UL(1) << (VA_BITS - 1)) + 1)
- #define KIMAGE_VADDR		(MODULES_END)
-+#define BPF_JIT_REGION_START	(VA_START + KASAN_SHADOW_SIZE)
-+#define BPF_JIT_REGION_SIZE	(SZ_128M)
-+#define BPF_JIT_REGION_END	(BPF_JIT_REGION_START + BPF_JIT_REGION_SIZE)
- #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
--#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-+#define MODULES_VADDR		(BPF_JIT_REGION_END)
- #define MODULES_VSIZE		(SZ_128M)
- #define VMEMMAP_START		(PAGE_OFFSET - VMEMMAP_SIZE)
- #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index a6fdaea07c63..76c2ab40c02d 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -940,3 +940,16 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
- 					   tmp : orig_prog);
- 	return prog;
- }
-+
-+void *bpf_jit_alloc_exec(unsigned long size)
-+{
-+	return __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
-+				    BPF_JIT_REGION_END, GFP_KERNEL,
-+				    PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
-+				    __builtin_return_address(0));
-+}
-+
-+void bpf_jit_free_exec(void *addr)
-+{
-+	return vfree(addr);
-+}
--- 
-2.19.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 49111 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181124/42eb62d0/attachment-0001.gz>
