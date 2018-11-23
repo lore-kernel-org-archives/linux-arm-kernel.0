@@ -1,32 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 23 Nov 2018 18:22:34 +0000
-Subject: [PATCH V3 5/5] arm64: mm: Allow forcing all userspace addresses
- to 52-bit
-In-Reply-To: <20181114133920.7134-6-steve.capper@arm.com>
-References: <20181114133920.7134-1-steve.capper@arm.com>
- <20181114133920.7134-6-steve.capper@arm.com>
-Message-ID: <20181123182233.GL3360@arrakis.emea.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 23 Nov 2018 18:27:16 +0000
+Subject: [PATCH 06/10] swiotlb: use swiotlb_map_page in
+ swiotlb_map_sg_attrs
+In-Reply-To: <20181120092516.GC7270@lst.de>
+References: <20181008080246.20543-1-hch@lst.de>
+ <20181008080246.20543-7-hch@lst.de>
+ <CANcMJZAzrxA9LGNvP-epv2DwsUacEM_hcgA1n5gmaPuWRJG4iw@mail.gmail.com>
+ <20181109074955.GA27489@lst.de>
+ <CALAqxLVSDkv4faF3ta_ue9AA9s8B=-8cAMxC_sow+wZYtrfxeQ@mail.gmail.com>
+ <20181114141311.GA26677@lst.de> <20181114161239.GA29462@lst.de>
+ <CALAqxLVMW2sYkaQvggZ-LhvkzpuF2rssQJ4thZkkAkROk=wVVw@mail.gmail.com>
+ <20181120092516.GC7270@lst.de>
+Message-ID: <20181123182715.GA21183@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 01:39:20PM +0000, Steve Capper wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index eab02d24f5d1..17d363e40c4d 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -1165,6 +1165,20 @@ config ARM64_CNP
->  	  at runtime, and does not affect PEs that do not implement
->  	  this feature.
+Hi John,
+
+On Tue, Nov 20, 2018 at 10:25:16AM +0100, Christoph Hellwig wrote:
+> On Mon, Nov 19, 2018 at 03:22:13PM -0800, John Stultz wrote:
+> > > +               sg->dma_address = dma_addr;
+> > >                 sg_dma_len(sg) = sg->length;
+> > >         }
+> > 
+> > I know Robin has already replied with more detailed info, but just to
+> > close the loop as I'm finally home, applying this patch didn't seem to
+> > help with the IO hangs I'm seeing w/ HiKey960.
+> 
+> If Robins observation is right this should fix the problem for you:
+
+Please could you give this diff a try and let us know whether the problem
+persists with your board?
+
+Thanks,
+
+Will
+
+> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
+> index bd73e7a91410..1833f0c1fba0 100644
+> --- a/include/linux/dma-direct.h
+> +++ b/include/linux/dma-direct.h
+> @@ -5,7 +5,7 @@
+>  #include <linux/dma-mapping.h>
+>  #include <linux/mem_encrypt.h>
 >  
-> +config ARM64_FORCE_52BIT
-> +	bool "Force 52-bit virtual addresses for userspace"
-> +	default n
-
-No need for "default n"
-
-> +	depends on ARM64_52BIT_VA && EXPERT
-
-As long as it's for debug only and depends on EXPERT, it's fine by me.
-
--- 
-Catalin
+> -#define DIRECT_MAPPING_ERROR		0
+> +#define DIRECT_MAPPING_ERROR		(~(dma_addr_t)0x0)
+>  
+>  #ifdef CONFIG_ARCH_HAS_PHYS_TO_DMA
+>  #include <asm/dma-direct.h>
