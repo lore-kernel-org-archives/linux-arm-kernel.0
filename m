@@ -1,135 +1,96 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 11:35:55 +0100
-Subject: [PATCH 1/2] media: v4l: Add definitions for the HEVC slice
- format and controls
-In-Reply-To: <CAAFQd5An1htKNpNJmwHAzw6Oz+Z=T_MuBg+T=_yMbT7SkkokBw@mail.gmail.com>
-References: <20180828080240.10982-1-paul.kocialkowski@bootlin.com>
- <20180828080240.10982-2-paul.kocialkowski@bootlin.com>
- <CAAFQd5An1htKNpNJmwHAzw6Oz+Z=T_MuBg+T=_yMbT7SkkokBw@mail.gmail.com>
-Message-ID: <6faa1471b1c3c1ea80e6576b0e29950bcca47614.camel@bootlin.com>
+From: vincenzo.frascino@arm.com (Vincenzo Frascino)
+Date: Fri, 23 Nov 2018 10:49:28 +0000
+Subject: [PATCH 07/27] arm64: Substitute gettimeofday with C implementation
+In-Reply-To: <CAK8P3a0ht6TjXubYiWaLh96hOGy3FH_K=JJVhQrYV3D+z-JqBA@mail.gmail.com>
+References: <20181109123730.8743-1-vincenzo.frascino@arm.com>
+ <20181109123730.8743-8-vincenzo.frascino@arm.com>
+ <CAK8P3a1w=GBcYk2OaVNzfagMMeD_zdBK3G16BSYjFANKdSAezQ@mail.gmail.com>
+ <8e306faf-6261-8363-3f18-70e754fa3a9d@arm.com>
+ <CAK8P3a0ht6TjXubYiWaLh96hOGy3FH_K=JJVhQrYV3D+z-JqBA@mail.gmail.com>
+Message-ID: <f283de36-b620-03f0-b97b-fd63900e33ce@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Wed, 2018-10-10 at 17:33 +0900, Tomasz Figa wrote:
-> Hi Paul,
+On 11/14/18 5:47 PM, Arnd Bergmann wrote:
+> On Tue, Nov 13, 2018 at 2:58 AM Vincenzo Frascino
+> <vincenzo.frascino@arm.com> wrote:
+>>
+>> On 09/11/2018 16:13, Arnd Bergmann wrote:
 > 
-> On Tue, Aug 28, 2018 at 5:02 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
-> > This introduces the required definitions for HEVC decoding support with
-> > stateless VPUs. The controls associated to the HEVC slice format provide
-> > the required meta-data for decoding slices extracted from the bitstream.
-> > 
+>>>> diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
+>>>> index beca249bc2f3..9de0ffc369c5 100644
+>>>> --- a/arch/arm64/kernel/vdso/vdso.lds.S
+>>>> +++ b/arch/arm64/kernel/vdso/vdso.lds.S
+>>>> @@ -88,6 +88,7 @@ VERSION
+>>>>                 __kernel_gettimeofday;
+>>>>                 __kernel_clock_gettime;
+>>>>                 __kernel_clock_getres;
+>>>> +               __kernel_time;
+>>>>         local: *;
+>>>>         };
+>>>>  }
+>>>
+>>> I would  prefer to not add any deprecated interfaces in the VDSO. If we
+>>> have the 64-bit version of clock_gettime, we don't need the 32-bit version
+>>> of it, and we don't need gettimeofday() or time() either. The C library
+>>> can easily implement those by calling into clock_gettime.
+>>>
+>>
+>> I like the idea, this would make the vdso lib code more simple and more maintainable.
+>>
+>> In this patchset I tried to cover the widest possible scenario making things configurable: each architecture can select and enable exactly what it needs from the vdso common code.
+>>
+>> Based on what you are proposing, once the C library will implement things in this way, it will be easy to deprecate and remove the unused code.
 > 
-> Sorry for being late to the party. Please see my comments inline. Only
-> high level, because I don't know too much about HEVC.
+> Just to clarify: we can never remove interfaces that an older version of the
+> C library was using. What I'm asking is that we don't introduce any of the
+> unnecessary ones for architectures that don't already have them.
 > 
-> [snip]
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_SPS (struct)``
-> > +    Specifies the Sequence Parameter Set fields (as extracted from the
-> > +    bitstream) for the associated HEVC slice data.
-> > +    The bitstream parameters are defined according to the ISO/IEC 23008-2 and
-> > +    ITU-T Rec. H.265 specifications.
-> > +
-> > +.. c:type:: v4l2_ctrl_hevc_sps
-> > +
-> > +.. cssclass:: longtable
-> > +
-> > +.. flat-table:: struct v4l2_ctrl_hevc_sps
-> > +    :header-rows:  0
-> > +    :stub-columns: 0
-> > +    :widths:       1 1 2
-> > +
-> > +    * - __u8
-> > +      - ``chroma_format_idc``
-> > +      - Syntax description inherited from the specification.
+
+I agree, I realize now I should have worded my answer differently. With
+"deprecate and remove the unused code" was referring to redirect gettimeofday
+through clock_gettime, not to remove completely gettimeofday interface since
+this would cause userspace breakage for old C libraries as you are pointing out
+as well.
+
+>> I am not familiar with the development plans of the various C libraries, but looking at
+>> bionic libc currently seems using all the vdso exposed functions [1].
+>>
+>> [1] https://github.com/aosp-mirror/platform_bionic/blob/master/libc/bionic/vdso.cpp
 > 
-> I wonder if it wouldn't make sense to instead document this in C code
-> using kernel-doc and then have the kernel-doc included in the sphinx
-> doc. It seems to be possible, according to
-> https://www.kernel.org/doc/html/latest/doc-guide/kernel-doc.html .
+> It looks like this implementation checks for each one of them to be present
+> first and then uses a fallback implementation if it does not exist. This would
+> clearly let us remove the handlers we don't want to support, but there
+> are two possible downsides:
+>> - some other libc might be lacking that fallback path
+> - the fallback might be much slower, e.g. time() should fallback to
+>   the vdso version of clock_gettime(CLOCK_REALTIME_COARSE) for
+>   best performance, rather than the time() syscall or CLOCK_REALTIME.
 > 
-> Such approach would have the advantage of the person looking through C
-> cross reference being able to actually see the documentation of the
-> struct in question and also making it easier to ensure the relevant C
-> code and documentation are in sync. (Although this is UAPI so it would
-> be unlikely to change too often or at all.)
+> So I'd argue that if an architecture already has a time() vdso implementation,
+> we probably want to keep that entry point but make it point to the best
+> generic implementation (i.e. clock_gettime CLOCK_REALTIME_COARSE).
 
-I have somewhat mixed feelings about this. I believe we should be
-keeping the video codec control structures as close as we can to the
-codec specs (and in the case of H.265, most of the fields are directly
-inherited from the spec). So for most of them, the documentation
-wouldn't be in the kernel docs but in the spec itself. From that
-perspective, it doesn't really help much to move the documentation in
-the headers.
+What I was trying to point out here is that if the symbol is present in the vdso
+library the C library implementation tends to prefer to use it.
 
-> [snip]
-> > +``V4L2_CID_MPEG_VIDEO_HEVC_SLICE_PARAMS (struct)``
-> > +    Specifies various slice-specific parameters, especially from the NAL unit
-> > +    header, general slice segment header and weighted prediction parameter
-> > +    parts of the bitstream.
-> > +    The bitstream parameters are defined according to the ISO/IEC 23008-2 and
-> > +    ITU-T Rec. H.265 specifications.
+Said that, I agree with what you are saying and in this first iteration I will
+make sure that we do not add new symbols for the architectures that did not
+support them previously, but I will keep the library the most generic possible,
+
+I would prefer though to introduce the redirection for gettimeofday() and time()
+to the best performing clock_gettime() at a later stage (and with a separate
+patchset) because it would involve some cleanup in the vdso.c of the
+architectures that would use the library (i.e. update_vsyscall_tz() not required
+anymore) and because based on what I measured with a quick test the performance
+difference seems small with the current implementation of the library.
+
+
 > 
-> In the Chromium H.264 controls, we define this as an array control, so
-> that we can include multiple slices in one buffer and each entry of
-> the array has an offset field pointing to the part of the buffer that
-> contains corresponding slice data. I've mentioned this in the
-> discussion on Alex's stateless decoder interface documentation, so
-> let's keep the discussion there, though.
-
-Yes definitely. Out current proposals (for H.264 and H.265) still
-require "as many macroblocks as needed for a full frame", but we should
-definitely move away from that as discussed in the thread you
-mentionned. I think this is something we should aim for before declaring
-the API as stable.
-
-> [snip]
-> > @@ -1696,6 +1708,11 @@ static int std_validate(const struct v4l2_ctrl *ctrl, u32 idx,
-> >         case V4L2_CTRL_TYPE_H264_DECODE_PARAMS:
-> >                 return 0;
-> > 
-> > +       case V4L2_CTRL_TYPE_HEVC_SPS:
-> > +       case V4L2_CTRL_TYPE_HEVC_PPS:
-> > +       case V4L2_CTRL_TYPE_HEVC_SLICE_PARAMS:
-> > +               return 0;
-> > +
+>       Arnd
 > 
-> I wonder to what extent we should be validating this. I can see 3 options:
-> 1) Defer validation to drivers completely. - Potentially error prone
-> and leading to a lot of code duplication?
-> 2) Validate completely. - Might need solving some interesting
-> problems, e.g. validating reference frame indices in DPB against
-> current state of respective VB2 queue...
-> 3) Validate only what we can easily do, defer more complicated
-> validation to the drivers. - Potentially a good middle ground?
-
-I definitely agree with you that option 1 is not really desirable, for
-the reasons you mentionned.
-
-I would tend to back option 3 with the following suggestion: we should
-validate controls for "syntax" (that is, checking that the bitstream
-fields take values permitted by the spec) when they are submitted and
-leave it up to the driver to deal with requirements on other frames
-(validity of the DPB). I don't think we can validate the availability of
-reference frames at control submission time anyway since it would be
-valid to queue and set controls for frames in reverse decoding order.
-
-What do you think?
-
-Cheers,
-
-Paul
 
 -- 
-Paul Kocialkowski, Bootlin (formerly Free Electrons)
-Embedded Linux and kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/770a1844/attachment.sig>
+Regards,
+Vincenzo
