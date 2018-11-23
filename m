@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Nov 2018 14:14:22 +0000 (GMT)
-Subject: Applied "ASoC: dt-bindings: sun50i-codec-analog: Add headphone amp
+Date: Fri, 23 Nov 2018 14:14:12 +0000 (GMT)
+Subject: Applied "ASoC: sunxi: sun50i-codec-analog: Add support for cpvdd
  regulator supply" to the asoc tree
-In-Reply-To: <20181122102325.29495-2-wens@csie.org>
-Message-ID: <20181123141422.73C16440078@finisterre.ee.mobilebroadband>
+In-Reply-To: <20181122102325.29495-3-wens@csie.org>
+Message-ID: <20181123141412.18976440078@finisterre.ee.mobilebroadband>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: dt-bindings: sun50i-codec-analog: Add headphone amp regulator supply
+   ASoC: sunxi: sun50i-codec-analog: Add support for cpvdd regulator supply
 
 has been applied to the asoc tree at
 
@@ -34,39 +34,45 @@ to this mail.
 Thanks,
 Mark
 
->From 21dd30200e3d350fe420d23a2a00b17633a3d1a2 Mon Sep 17 00:00:00 2001
+>From ca0412a05756cd0b94751ca4d54fe6522f00b1f4 Mon Sep 17 00:00:00 2001
 From: Chen-Yu Tsai <wens@csie.org>
-Date: Thu, 22 Nov 2018 18:23:18 +0800
-Subject: [PATCH] ASoC: dt-bindings: sun50i-codec-analog: Add headphone amp
+Date: Thu, 22 Nov 2018 18:23:19 +0800
+Subject: [PATCH] ASoC: sunxi: sun50i-codec-analog: Add support for cpvdd
  regulator supply
 
-On the Allwinner A64 SoC, the audio codec has a built-in headphone
+On the Allwinner A64 SoCs, the audio codec has a built-in headphone
 amplifier. This amplifier has a power supply separate from the rest of
-the analog audio circuitry.
+the analog audio circuitry, labeled cpvdd.
 
-Add a regulator supply property to handle this.
+This patch adds a DAPM widget for this supply, and ties it to the
+headphone amp widget.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt | 2 ++
+ sound/soc/sunxi/sun50i-codec-analog.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-index 4f8ad0e04d20..056a098495cc 100644
---- a/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-+++ b/Documentation/devicetree/bindings/sound/sun50i-codec-analog.txt
-@@ -4,9 +4,11 @@ Required properties:
- - compatible: must be one of the following compatibles:
- 		- "allwinner,sun50i-a64-codec-analog"
- - reg: must contain the registers location and length
-+- cpvdd-supply: Regulator supply for the headphone amplifier
+diff --git a/sound/soc/sunxi/sun50i-codec-analog.c b/sound/soc/sunxi/sun50i-codec-analog.c
+index 8f5f999df631..df1fed0aa001 100644
+--- a/sound/soc/sunxi/sun50i-codec-analog.c
++++ b/sound/soc/sunxi/sun50i-codec-analog.c
+@@ -274,6 +274,7 @@ static const struct snd_soc_dapm_widget sun50i_a64_codec_widgets[] = {
+ 	 * stream widgets at the card level.
+ 	 */
  
- Example:
- 	codec_analog: codec-analog at 1f015c0 {
- 		compatible = "allwinner,sun50i-a64-codec-analog";
- 		reg = <0x01f015c0 0x4>;
-+		cpvdd-supply = <&reg_eldo1>;
- 	};
++	SND_SOC_DAPM_REGULATOR_SUPPLY("hpvcc", 0, 0),
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun50i_codec_hp_src),
+ 	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN50I_ADDA_HP_CTRL,
+@@ -361,6 +362,7 @@ static const struct snd_soc_dapm_route sun50i_a64_codec_routes[] = {
+ 	{ "Headphone Source Playback Route", "Mixer", "Left Mixer" },
+ 	{ "Headphone Source Playback Route", "Mixer", "Right Mixer" },
+ 	{ "Headphone Amp", NULL, "Headphone Source Playback Route" },
++	{ "Headphone Amp", NULL, "hpvcc" },
+ 	{ "HP", NULL, "Headphone Amp" },
+ 
+ 	/* Microphone Routes */
 -- 
 2.19.1
