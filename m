@@ -1,55 +1,94 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Nov 2018 12:21:39 +0200
-Subject: [PATCH v2 1/4] dt-bindings: pinctrl: k3: Introduce pinmux
- definitions
-In-Reply-To: <a411e291-d02d-064e-d08c-9ab7a1b1409e@ti.com>
-References: <20181113060111.16374-1-vigneshr@ti.com>
- <20181113060111.16374-2-vigneshr@ti.com>
- <20181117160502.dhlqbx5qnmdp5iog@kahuna>
- <b8c1d975-2b4f-5530-2089-dc04c04f8d86@ti.com>
- <12c1d6e2-aba4-be0d-bfc5-1fb5d3ab45f8@ti.com>
- <9f87eb33-45b4-905a-2afd-5bbb450fc6c6@ti.com>
- <a411e291-d02d-064e-d08c-9ab7a1b1409e@ti.com>
-Message-ID: <0b796f85-5002-8eca-3e51-de239f7b3b41@ti.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 23 Nov 2018 11:33:15 +0100
+Subject: [PATCH 1/7] ata: libahci_platform: comply to PHY framework
+In-Reply-To: <20181123101556.29888-2-miquel.raynal@bootlin.com>
+References: <20181123101556.29888-1-miquel.raynal@bootlin.com>
+ <20181123101556.29888-2-miquel.raynal@bootlin.com>
+Message-ID: <f14c6e8e-73a9-0b62-0dbc-87d390789c0c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/2018 12:44, Vignesh R wrote:
-> On 20/11/18 4:07 PM, Tero Kristo wrote:
->> On 20/11/2018 12:09, Vignesh R wrote:
->>> On 19/11/18 12:49 PM, Tero Kristo wrote:
->>>> On 17/11/2018 18:05, Nishanth Menon wrote:
->>>>> On 11:31-20181113, Vignesh R wrote:
->>>>>> The dt-bindings header for TI K3 AM6 SoCs define a set of macros for
->>>>>
->>> [...]
->>>>>
->>>>> Thanks for reducing the combinations down to the minimum needed. We can
->>>>> worry about the DS and isolation bits when we have a real user for
->>>>> them.
->>>>>
->>>>> Acked-by: Nishanth Menon <nm@ti.com>
->>>>>
->>>>> Tero: v4.21-rc1 perhaps ?
->>>>>
->>>>
->>>> Yeah, looks fine, queueing up for 4.21.
->>>>
->>>
->>> Thank you all for the review!
->>>
->>> Tero,
->>>
->>> Is there a branch with these patches that I can use as base for my next
->>> set of DT patches?
->>
->> Don't have a branch for these atm, but I can create one if you need it.
-> 
-> Yes, that would be great. Thanks!
-> 
+Hi Miquel,
 
-Pushed 4.20-rc1-am65x-queue into my public tree.
+On 23-11-18 11:15, Miquel Raynal wrote:
+> Current implementation of the libahci does not take into account the
+> new PHY framework. Correct the situation by adding a call to
+> phy_set_mode() before phy_power_on() and by adding calls to
+> ahci_platform_enable/disable_phys() at suspend/resume_host() time.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>   drivers/ata/libahci_platform.c | 11 +++++++++++
+>   1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+> index 4b900fc659f7..9f33f72b674b 100644
+> --- a/drivers/ata/libahci_platform.c
+> +++ b/drivers/ata/libahci_platform.c
+> @@ -56,6 +56,12 @@ static int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
+>   		if (rc)
+>   			goto disable_phys;
+>   
+> +		rc = phy_set_mode(hpriv->phys[i], PHY_MODE_SATA);
+> +		if (rc) {
+> +			phy_exit(hpriv->phys[i]);
+> +			goto disable_phys;
+> +		}
+> +
 
--Tero
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+I see that phy_set_mode returns 0 for drivers which do not implement it,
+so this should be fine.
+
+
+>   		rc = phy_power_on(hpriv->phys[i]);
+>   		if (rc) {
+>   			phy_exit(hpriv->phys[i]);
+> @@ -738,6 +744,8 @@ int ahci_platform_suspend_host(struct device *dev)
+>   	writel(ctl, mmio + HOST_CTL);
+>   	readl(mmio + HOST_CTL); /* flush */
+>   
+> +	ahci_platform_disable_phys(hpriv);
+> +
+>   	return ata_host_suspend(host, PMSG_SUSPEND);
+>   }
+>   EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
+
+I'm afraid that this and the matching change in ahci_platform_suspend_host
+needs to be guarded by a flag, there are quite a few sata drivers
+using the libahci_platform functions as well as quite a few sata drivers
+combining this with using phy drivers.
+
+I'm worried that doing this unconditionally on drivers which have
+not been tested with this change my break things.
+
+I think it might be cleanest to extend the existing flags passed
+to ahci_platform_get_resources with a flag for this and storing them
+somewhere in ahci_host_priv so that the suspend/resume functions can
+get to them.
+
+Regards,
+
+Hans
+
+
+
+
+
+> @@ -756,6 +764,7 @@ EXPORT_SYMBOL_GPL(ahci_platform_suspend_host);
+>   int ahci_platform_resume_host(struct device *dev)
+>   {
+>   	struct ata_host *host = dev_get_drvdata(dev);
+> +	struct ahci_host_priv *hpriv = host->private_data;
+>   	int rc;
+>   
+>   	if (dev->power.power_state.event == PM_EVENT_SUSPEND) {
+> @@ -766,6 +775,8 @@ int ahci_platform_resume_host(struct device *dev)
+>   		ahci_init_controller(host);
+>   	}
+>   
+> +	ahci_platform_enable_phys(hpriv);
+> +
+>   	ata_host_resume(host);
+>   
+>   	return 0;
+> 
