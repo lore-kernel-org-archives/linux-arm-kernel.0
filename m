@@ -1,83 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 23 Nov 2018 16:30:00 +0800
-Subject: [PATCH 2/2] clk: core: link consumer with clock driver
-In-Reply-To: <20181122212212.16039-3-miquel.raynal@bootlin.com>
-References: <20181122212212.16039-3-miquel.raynal@bootlin.com>
-Message-ID: <201811231627.H7ojlKLL%fengguang.wu@intel.com>
+From: miquel.raynal@bootlin.com (Miquel Raynal)
+Date: Fri, 23 Nov 2018 09:30:38 +0100
+Subject: [PATCH 2/6] phy: add A3700 COMPHY support
+In-Reply-To: <20181122210420.14861-3-miquel.raynal@bootlin.com>
+References: <20181122210420.14861-1-miquel.raynal@bootlin.com>
+ <20181122210420.14861-3-miquel.raynal@bootlin.com>
+Message-ID: <20181123093038.20278133@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Miquel,
+Hello,
 
-I love your patch! Yet something to improve:
++ Adding people concerned by this driver that I forgot when initially
+  sending the driver, will update the Cc: list if there is a v2.
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.20-rc3 next-20181122]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+One question below.
 
-url:    https://github.com/0day-ci/linux/commits/Miquel-Raynal/Link-consumer-with-clock-driver/20181123-113833
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: sh-titan_defconfig (attached as .config)
-compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=sh 
+Miquel Raynal <miquel.raynal@bootlin.com> wrote on Thu, 22 Nov 2018
+22:04:16 +0100:
 
-All errors (new ones prefixed by >>):
+> Add a driver to support COMPHY, a hardware block providing shared
+> serdes PHYs on Marvell Armada 3700. This driver uses SMC calls and
+> rely on having an up-to-date firmware.
+> 
+> SATA, PCie and USB3 host mode have been tested successfully with an
+> ESPRESSObin. SGMII mode cannot be tested with this platform.
+> 
+> Co-Developed-by: Evan Wang <xswang@marvell.com>
+> Signed-off-by: Evan Wang <xswang@marvell.com>
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/phy/marvell/Kconfig                  |  10 +
+>  drivers/phy/marvell/Makefile                 |   1 +
+>  drivers/phy/marvell/phy-mvebu-a3700-comphy.c | 276 +++++++++++++++++++
+>  3 files changed, 287 insertions(+)
+>  create mode 100644 drivers/phy/marvell/phy-mvebu-a3700-comphy.c
 
-   drivers//clk/clkdev.c: In function 'clk_get':
->> drivers//clk/clkdev.c:209:3: error: implicit declaration of function '__clk_device_link'; did you mean '__clk_free_clk'? [-Werror=implicit-function-declaration]
-      __clk_device_link(dev, clk);
-      ^~~~~~~~~~~~~~~~~
-      __clk_free_clk
-   drivers//clk/clkdev.c: In function 'clk_put':
->> drivers//clk/clkdev.c:217:2: error: implicit declaration of function '__clk_device_unlink'; did you mean 'device_online'? [-Werror=implicit-function-declaration]
-     __clk_device_unlink(clk);
-     ^~~~~~~~~~~~~~~~~~~
-     device_online
-   cc1: some warnings being treated as errors
+[...]
 
-vim +209 drivers//clk/clkdev.c
+> +
+> +static int mvebu_a3700_comphy_power_on(struct phy *phy)
+> +{
+> +	struct mvebu_a3700_comphy_lane *lane = phy_get_drvdata(phy);
+> +	u32 fw_param;
+> +	int fw_mode;
+> +
+> +	fw_mode = mvebu_a3700_comphy_get_fw_mode(lane->id, lane->port,
+> +						 lane->mode);
+> +	if (fw_mode < 0) {
+> +		dev_err(lane->dev, "invalid COMPHY mode\n");
+> +		return fw_mode;
+> +	}
+> +
+> +	switch (lane->mode) {
+> +	case PHY_MODE_USB_HOST_SS:
+> +		dev_dbg(lane->dev, "set lane %d to USB3 host mode\n", lane->id);
+> +		fw_param = COMPHY_FW_MODE(fw_mode);
+> +		break;
+> +	case PHY_MODE_SATA:
+> +		dev_dbg(lane->dev, "set lane %d to SATA mode\n", lane->id);
+> +		fw_param = COMPHY_FW_MODE(fw_mode);
+> +		break;
+> +	case PHY_MODE_SGMII:
+> +		dev_dbg(lane->dev, "set lane %d to SGMII mode\n", lane->id);
+> +		fw_param = COMPHY_FW_NET(fw_mode, lane->port,
+> +					 COMPHY_FW_SPEED_1_25G);
+> +		break;
+> +	case PHY_MODE_PCIE:
+> +		dev_dbg(lane->dev, "set lane %d to PCIe mode\n", lane->id);
+> +		fw_param = COMPHY_FW_PCIE(fw_mode, lane->port,
+> +					  COMPHY_FW_SPEED_5G,
+> +					  phy->attrs.bus_width);
+> +		break;
+> +	default:
+> +		dev_err(lane->dev, "unsupported PHY mode (%d)\n", lane->mode);
+> +		return -ENOTSUPP;
+> +	}
+> +
+> +	return mvebu_a3700_comphy_smc(COMPHY_SIP_POWER_ON, lane->id, fw_param);
 
-   193	
-   194	struct clk *clk_get(struct device *dev, const char *con_id)
-   195	{
-   196		const char *dev_id = dev ? dev_name(dev) : NULL;
-   197		struct clk *clk = NULL;
-   198	
-   199		if (dev && dev->of_node) {
-   200			clk = __of_clk_get_by_name(dev->of_node, dev_id, con_id);
-   201			if (PTR_ERR(clk) == -EPROBE_DEFER)
-   202				return clk;
-   203		}
-   204	
-   205		if (IS_ERR_OR_NULL(clk))
-   206			clk = clk_get_sys(dev_id, con_id);
-   207	
-   208		if (!IS_ERR(clk))
- > 209			__clk_device_link(dev, clk);
-   210	
-   211		return clk;
-   212	}
-   213	EXPORT_SYMBOL(clk_get);
-   214	
-   215	void clk_put(struct clk *clk)
-   216	{
- > 217		__clk_device_unlink(clk);
-   218		__clk_put(clk);
-   219	}
-   220	EXPORT_SYMBOL(clk_put);
-   221	
+This call might fail because the firmware is not up-to-date. In this
+case, I wonder what is the appropriate behavior. Here I just return the
+error; this means drivers may fail to probe when enabling their PHY.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 16439 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/7a74ec89/attachment-0001.gz>
+Shall I ignore a "not supported by the firmware" code and return 0 to
+the caller (with a printed warning) so it will continue probing? Doing
+so is lying as the PHY might not be configured as expected and S2RAM
+will always fail in this case. 
+
+Thanks,
+Miqu?l
