@@ -1,117 +1,150 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 23 Nov 2018 18:07:00 +0100
-Subject: [PATCH v1 3/3] arm64: dts: mt7622: Drop the general purpose timer
- node
-In-Reply-To: <17fde639c7d37f9cfabab230379913e652cf869a.1541643419.git.ryder.lee@mediatek.com>
-References: <30f4a4110190a175307ac4dfebc98ffe96c44b90.1541643419.git.ryder.lee@mediatek.com>
- <17fde639c7d37f9cfabab230379913e652cf869a.1541643419.git.ryder.lee@mediatek.com>
-Message-ID: <be2b45e1-f639-e14c-1c40-9cd94b006309@gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 23 Nov 2018 17:21:07 +0000
+Subject: [PATCH 1/2] module: Overwrite st_size instead of st_info
+In-Reply-To: <20181122174923.GK30658@n2100.armlinux.org.uk>
+References: <20181119162513.16562-1-vincent.whitchurch@axis.com>
+ <20181122120154.GH3505@e103592.cambridge.arm.com>
+ <20181122122411.6ydftk7bjlrefwa5@axis.com>
+ <20181122162849.GA8856@linux-8ccs>
+ <CAKv+Gu_vAKhQ2oakTeJNwP_F6dhqKe2ZwjAR13wrVKfL5aS4Fw@mail.gmail.com>
+ <20181122174923.GK30658@n2100.armlinux.org.uk>
+Message-ID: <20181123172106.GJ3505@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 12/11/2018 02:28, Ryder Lee wrote:
-> The crash http://termbin.com/zitb is caused by the timer register
-> into system in early pahse during kernel boot, but the clock
-> sources didn't get ready at that time.
+On Thu, Nov 22, 2018 at 05:49:23PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 22, 2018 at 06:40:45PM +0100, Ard Biesheuvel wrote:
+> > On Thu, 22 Nov 2018 at 17:29, Jessica Yu <jeyu@kernel.org> wrote:
+> > >
+> > > +++ Vincent Whitchurch [22/11/18 13:24 +0100]:
+> > > >On Thu, Nov 22, 2018 at 12:01:54PM +0000, Dave Martin wrote:
+> > > >> On Mon, Nov 19, 2018 at 05:25:12PM +0100, Vincent Whitchurch wrote:
+> > > >> > st_info is currently overwritten after relocation and used to store the
+> > > >> > elf_type().  However, we're going to need it fix kallsyms on ARM's
+> > > >> > Thumb-2 kernels, so preserve st_info and overwrite the st_size field
+> > > >> > instead.  st_size is neither used by the module core nor by any
+> > > >> > architecture.
+> > > >> >
+> > > >> > Signed-off-by: Vincent Whitchurch <vincent.whitchurch@axis.com>
+> > > >> > ---
+> > > >> > v4: Split out to separate patch.  Use st_size instead of st_other.
+> > > >> > v1-v3: See PATCH 2/2
+> > > >> >
+> > > >> >  kernel/module.c | 4 ++--
+> > > >> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > >> >
+> > > >> > diff --git a/kernel/module.c b/kernel/module.c
+> > > >> > index 49a405891587..3d86a38b580c 100644
+> > > >> > --- a/kernel/module.c
+> > > >> > +++ b/kernel/module.c
+> > > >> > @@ -2682,7 +2682,7 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
+> > > >> >
+> > > >> >    /* Set types up while we still have access to sections. */
+> > > >> >    for (i = 0; i < mod->kallsyms->num_symtab; i++)
+> > > >> > -          mod->kallsyms->symtab[i].st_info
+> > > >> > +          mod->kallsyms->symtab[i].st_size
+> > > >> >                    = elf_type(&mod->kallsyms->symtab[i], info);
+> > > >> >
+> > > >> >    /* Now populate the cut down core kallsyms for after init. */
+> > > >> > @@ -4061,7 +4061,7 @@ int module_get_kallsym(unsigned int symnum, unsigned long *value, char *type,
+> > > >> >            kallsyms = rcu_dereference_sched(mod->kallsyms);
+> > > >> >            if (symnum < kallsyms->num_symtab) {
+> > > >> >                    *value = kallsyms->symtab[symnum].st_value;
+> > > >> > -                  *type = kallsyms->symtab[symnum].st_info;
+> > > >> > +                  *type = kallsyms->symtab[symnum].st_size;
+> > > >> >                    strlcpy(name, symname(kallsyms, symnum), KSYM_NAME_LEN);
+> > > >> >                    strlcpy(module_name, mod->name, MODULE_NAME_LEN);
+> > > >> >                    *exported = is_exported(name, *value, mod);
+> > > >>
+> > > >> This is fine if st_size is really unused, but how sure are you of that?
+> > > >>
+> > > >> grepping for st_size throws up some hits that appear ELF-related, but
+> > > >> I've not investigated them in detail.
+> > > >>
+> > > >> (The fact that struct stat has an identically named field throws up
+> > > >> a load of false positives too.)
+> > > >
+> > > >$ git describe --tags
+> > > >v4.20-rc3-93-g92b419289cee
+> > > >
+> > > >$ rg -m1 '[\.>]st_size'  --iglob '!**/tools/**' --iglob '!**/vdso*' --iglob '!**/scripts/**' --iglob '!**/usr/**' --iglob '!**/samples/**' | cat
+> > > >| kernel/kexec_file.c: if (sym->st_size != size) {
+> > > >
+> > > >Symbols in kexec kernel.
+> > > >
+> > > >| fs/stat.c:   tmp.st_size = stat->size;
+> > > >| Documentation/networking/tls.txt:  sendfile(sock, file, &offset, stat.st_size);
+> > > >| net/9p/client.c:             ret->st_rdev, ret->st_size, ret->st_blksize,
+> > > >| net/9p/protocol.c:                                   &stbuf->st_rdev, &stbuf->st_size,
+> > > >| fs/9p/vfs_inode_dotl.c:              i_size_write(inode, stat->st_size);
+> > > >| fs/hostfs/hostfs_user.c:     p->size = buf->st_size;
+> > > >| arch/powerpc/boot/mktree.c:  nblks = (st.st_size + IMGBLK) / IMGBLK;
+> > > >| arch/alpha/kernel/osf_sys.c: tmp.st_size     = lstat->size;
+> > > >| arch/x86/ia32/sys_ia32.c:        __put_user(stat->size, &ubuf->st_size) ||
+> > > >
+> > > >Not Elf_Sym.
+> > > >
+> > > >| arch/x86/kernel/machine_kexec_64.c:                   sym->st_size);
+> > > >
+> > > >Symbols in kexec kernel.
+> > > >
+> > > >| arch/sparc/boot/piggyback.c: st4(buffer + 12, s.st_size);
+> > > >| arch/sparc/kernel/sys_sparc32.c:     err |= put_user(stat->size, &statbuf->st_size);
+> > > >| arch/um/os-Linux/file.c:             .ust_size    = src->st_size,    /* total size, in bytes */
+> > > >| arch/um/os-Linux/start_up.c: size = (buf.st_size + UM_KERN_PAGE_SIZE) & ~(UM_KERN_PAGE_SIZE - 1);
+> > > >| arch/s390/kernel/compat_linux.c:     tmp.st_size = stat->size;
+> > > >| arch/arm/kernel/sys_oabi-compat.c:   tmp.st_size = stat->size;
+> > > >| arch/mips/boot/compressed/calc_vmlinuz_load_addr.c:  vmlinux_size = (uint64_t)sb.st_size;
+> > > >| drivers/net/ethernet/marvell/sky2.c:         hw->st_idx = RING_NEXT(hw->st_idx, hw->st_size);
+> > > >
+> > > >Not Elf_Sym.
+> > >
+> > > [ added Miroslav to CC, just in case he would like to check :) ]
+> > >
+> > > I have just double checked as well, and am fairly certain that the
+> > > Elf_Sym st_size field is not used to apply module relocations in any
+> > > arches, and it is not used in the core module loader nor in the module
+> > > kallsyms code. We'd like to avoid overwriting st_info in any case, to
+> > > fix kallsyms on Thumb-2 and also so that livepatch won't run into any
+> > > issues with delayed relocations, should livepatch support ever expand
+> > > to arches (e.g., arm) that rely on st_info for module relocations.
+> > >
+> > 
+> > Also note that st_size cannot be relied upon in general, since we
+> > overwrite the addresses of undefined symbols in a module's symbol
+> > table when resolve them against ksyms, while the st_size field is kept
+> > at 0. At relocation time, we don't really distinguish anymore between
+> > local and external module symbols, and so relying on st_size to be
+> > accurate would definitely break things.
 > 
-> A better way is to switch to use CLK_OF_DECLARE() in driver for things
-> that need them early, but this node is actually useless in MT7622.
-> So we drop it.
+> Umm.
+> 
+> Undefined symbols of course have a zero size, because it's not known
+> how large the definition that the symbol refers to is.  However,
+> the non-undefined symbols should have a size with them - anything
+> emitted by the compiler should, but only if .size has been used in
+> the assembler will assembly have correct sizes.
 
-I suppose the root cause is, that the driver doesn't check the error
-timer_of_init returned.
+which I guess is one reason st_size is a bit unreliable.
 
-Would you mind to test the following patch to see if this fixes the problem?
+For kallsyms purposes we assume that the size of each symbol is just the
+offset from it to the next symbol, which seems good enough in practice.
 
---->8
->From be91e56ed527261137335af340845eb3dd3dd33a Mon Sep 17 00:00:00 2001
-From: Matthias Brugger <matthias.bgg@gmail.com>
-Date: Fri, 23 Nov 2018 17:04:08 +0100
-Subject: [PATCH] clocksource/drivers/timer-mediatek: error out on probe defer
+> Aren't SHN_UNDEF symbols ignored, except when applying the
+> relocations, where we rely on st_value to be set on SHN_UNDEF
+> symbols?
 
-If the clocks are not yet present, because they are loaded after
-the timer is initialized, we are unable to boot.
-Check if the return value of timer_of_init and return on EPROBE_DEFER.
+Presumably, but it looks like st_size is pretty much don't care.
 
-Error seen is:
-[    0.008337] Failed to get clock for /timer at 10004000
-[    0.013435] WARNING: CPU: 0 PID: 0 at ../drivers/clk/clk.c:3615
-__clk_put+0xf0/0x120
-[    0.021453] Modules linked in:
-[    0.024614] CPU: 0 PID: 0 Comm: swapper/0 Not tainted
-4.20.0-rc1-00063-g2859d9abd7e8 #2
-[    0.032902] Hardware name: MediaTek MT7622 RFB1 board (DT)
-[    0.038580] pstate: 20000085 (nzCv daIf -PAN -UAO)
-[    0.043538] pc : __clk_put+0xf0/0x120
-[    0.047328] lr : clk_put+0xc/0x18
-[    0.050753] sp : ffff000009163ed0
-[    0.054178] x29: ffff000009163ed0 x28: 0000000041010018
-[    0.059676] x27: 0000000000000000 x26: 0000000000000000
-[    0.065174] x25: ffff0000090cb008 x24: ffff80001dfd7800
-[    0.070672] x23: ffff000008f934b8 x22: ffff80001dfdeae0
-[    0.076169] x21: ffff80001dfdeae0 x20: fffffffffffffdfb
-[    0.081668] x19: ffff00000929ac40 x18: ffffffffffffffff
-[    0.087166] x17: 0000000000000000 x16: 0000000000000000
-[    0.092664] x15: ffff0000091696c8 x14: ffff0000892cd70f
-[    0.098162] x13: ffff0000092cd71d x12: ffff000009181348
-[    0.103661] x11: ffff000009181000 x10: 0000000005f5e0ff
-[    0.109159] x9 : 0000000000000040 x8 : ffff000009181400
-[    0.114657] x7 : ffff80001c800270 x6 : 0000000000000000
-[    0.120155] x5 : ffff80001c800248 x4 : 0000000000000000
-[    0.125653] x3 : 0000000000000000 x2 : 0000000000000000
-[    0.131151] x1 : 0000000000000000 x0 : fffffffffffffdfb
-[    0.136649] Call trace:
-[    0.139175]  __clk_put+0xf0/0x120
-[    0.142605]  timer_of_cleanup+0x60/0x7c
-[    0.146572]  mtk_gpt_init+0x18c/0x1a0
-[    0.150359]  timer_probe+0x74/0x10c
-[    0.153969]  time_init+0x14/0x44
-[    0.157307]  start_kernel+0x29c/0x414
-[    0.161098] ---[ end trace c3137b005300b618 ]---
+I renamed st_size in the struct in elf.h to a garbage name and the
+kernel and modules still build fine, though I only tried this for arm64
+so far.
 
-Fixes: a0858f937960 ("clocksource/drivers/timer-mediatek: Convert the driver to
-timer-of")
-Fixes: e3af677607d9 ("clocksource/drivers/timer-mediatek: Add support for system
-timer")
-Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
----
- drivers/clocksource/timer-mediatek.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+This suggests that at runtime at least, there is no runtime usage of
+this field at all unless it's in arch-specific code for other arches.
+Others seem confident that it's not used anywhere, and although I've not
+gone through all the grep hits, I've only encountered false positives so
+far.
 
-diff --git a/drivers/clocksource/timer-mediatek.c
-b/drivers/clocksource/timer-mediatek.c
-index eb10321f8517..d40c77a65b08 100644
---- a/drivers/clocksource/timer-mediatek.c
-+++ b/drivers/clocksource/timer-mediatek.c
-@@ -276,8 +276,12 @@ static int __init mtk_syst_init(struct device_node *node)
- 	to.of_irq.handler = mtk_syst_handler;
-
- 	ret = timer_of_init(node, &to);
--	if (ret)
-+	if (ret) {
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
- 		goto err;
-+	}
-
- 	clockevents_config_and_register(&to.clkevt, timer_of_rate(&to),
- 					TIMER_SYNC_TICKS, 0xffffffff);
-@@ -301,8 +305,12 @@ static int __init mtk_gpt_init(struct device_node *node)
- 	to.of_irq.handler = mtk_gpt_interrupt;
-
- 	ret = timer_of_init(node, &to);
--	if (ret)
-+	if (ret) {
-+		if (ret == -EPROBE_DEFER)
-+			return ret;
-+
- 		goto err;
-+	}
-
- 	/* Configure clock source */
- 	mtk_gpt_setup(&to, TIMER_CLK_SRC, GPT_CTRL_OP_FREERUN);
--- 
-2.19.1
+Cheers
+---Dave
