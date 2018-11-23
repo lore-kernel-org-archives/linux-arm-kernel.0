@@ -1,59 +1,81 @@
 From: miquel.raynal@bootlin.com (Miquel Raynal)
-Date: Fri, 23 Nov 2018 15:18:20 +0100
-Subject: [PATCH 01/12] PCI: aardvark: configure more registers in the
- configuration helper
+Date: Fri, 23 Nov 2018 15:18:23 +0100
+Subject: [PATCH 04/12] PCI: aardvark: add clock support
 In-Reply-To: <20181123141831.8214-1-miquel.raynal@bootlin.com>
 References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
-Message-ID: <20181123141831.8214-2-miquel.raynal@bootlin.com>
+Message-ID: <20181123141831.8214-5-miquel.raynal@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mimic U-Boot configuration to be sure all hardware registers are set
-properly. This will be needed for future S2RAM operation.
+The IP relies on a gated clock. When we will add S2RAM support, this
+clock will need to be resumed before any PCIe registers are
+accessed. Add support for this clock.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
 ---
- drivers/pci/controller/pci-aardvark.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/pci/controller/pci-aardvark.c | 29 +++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
 diff --git a/drivers/pci/controller/pci-aardvark.c b/drivers/pci/controller/pci-aardvark.c
-index 750081c1cb48..b95eb2aa00bb 100644
+index da695572a2ed..108b3f15c410 100644
 --- a/drivers/pci/controller/pci-aardvark.c
 +++ b/drivers/pci/controller/pci-aardvark.c
-@@ -100,6 +100,8 @@
- #define     PCIE_CORE_CTRL2_STRICT_ORDER_ENABLE	BIT(5)
- #define     PCIE_CORE_CTRL2_OB_WIN_ENABLE	BIT(6)
- #define     PCIE_CORE_CTRL2_MSI_ENABLE		BIT(10)
-+#define PCIE_PHY_REFCLK				(CONTROL_BASE_ADDR + 0x14)
-+#define     PCIE_PHY_REFCLK_BUF_CTRL		0x1342
- #define PCIE_MSG_LOG_REG			(CONTROL_BASE_ADDR + 0x30)
- #define PCIE_ISR0_REG				(CONTROL_BASE_ADDR + 0x40)
- #define PCIE_MSG_PM_PME_MASK			BIT(7)
-@@ -243,6 +245,9 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
+@@ -8,6 +8,7 @@
+  * Author: Hezi Shahmoon <hezi.shahmoon@marvell.com>
+  */
+ 
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/gpio.h>
+ #include <linux/interrupt.h>
+@@ -190,6 +191,7 @@
+ 
+ struct advk_pcie {
+ 	struct platform_device *pdev;
++	struct clk *clk;
+ 	void __iomem *base;
+ 	struct list_head resources;
+ 	struct irq_domain *irq_domain;
+@@ -1083,6 +1085,29 @@ static int advk_pcie_setup_phy(struct advk_pcie *pcie)
+ 	return ret;
+ }
+ 
++static int advk_pcie_setup_clk(struct advk_pcie *pcie)
++{
++	struct device *dev = &pcie->pdev->dev;
++	int ret;
++
++	pcie->clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(pcie->clk) && (PTR_ERR(pcie->clk) == -EPROBE_DEFER))
++		return PTR_ERR(pcie->clk);
++
++	/* Old bindings miss the clock handle */
++	if (IS_ERR(pcie->clk)) {
++		dev_warn(dev, "Clock unavailable (%ld)\n", PTR_ERR(pcie->clk));
++		pcie->clk = NULL;
++		return 0;
++	}
++
++	ret = clk_prepare_enable(pcie->clk);
++	if (ret)
++		dev_err(dev, "Clock initialization failed (%d)\n", ret);
++
++	return ret;
++}
++
+ static int advk_pcie_probe(struct platform_device *pdev)
  {
- 	u32 reg;
+ 	struct device *dev = &pdev->dev;
+@@ -1118,6 +1143,10 @@ static int advk_pcie_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
-+	/* Set HW Reference Clock Buffer Control */
-+	advk_writel(pcie, PCIE_PHY_REFCLK_BUF_CTRL, PCIE_PHY_REFCLK);
++	ret = advk_pcie_setup_clk(pcie);
++	if (ret)
++		return ret;
 +
- 	/* Set to Direct mode */
- 	reg = advk_readl(pcie, CTRL_CONFIG_REG);
- 	reg &= ~(CTRL_MODE_MASK << CTRL_MODE_SHIFT);
-@@ -274,6 +279,15 @@ static void advk_pcie_setup_hw(struct advk_pcie *pcie)
- 		PCIE_CORE_CTRL2_TD_ENABLE;
- 	advk_writel(pcie, reg, PCIE_CORE_CTRL2_REG);
- 
-+	/* Set PCIe Device Control and Status 1 PF0 register */
-+	reg = PCIE_CORE_DEV_CTRL_STATS_RELAX_ORDER_DISABLE |
-+		PCIE_CORE_DEV_CTRL_STATS_SNOOP_DISABLE;
-+	advk_writel(pcie, reg, PCIE_CORE_DEV_CTRL_STATS_REG);
-+
-+	/* Program PCIe Control 2 to disable strict ordering */
-+	reg = PCIE_CORE_CTRL2_RESERVED | PCIE_CORE_CTRL2_TD_ENABLE;
-+	advk_writel(pcie, reg, PCIE_CORE_CTRL2_REG);
-+
- 	/* Set GEN2 */
- 	reg = advk_readl(pcie, PCIE_CORE_CTRL0_REG);
- 	reg &= ~PCIE_GEN_SEL_MSK;
+ 	ret = advk_pcie_setup_phy(pcie);
+ 	if (ret)
+ 		return ret;
 -- 
 2.19.1
