@@ -1,48 +1,90 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 23 Nov 2018 20:53:11 +0100
-Subject: [PATCH 6/6] ARM: dts: meson8b: add the Cortex-A5 global timer
-In-Reply-To: <20181123195311.4578-1-martin.blumenstingl@googlemail.com>
-References: <20181123195311.4578-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20181123195311.4578-7-martin.blumenstingl@googlemail.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Fri, 23 Nov 2018 22:07:11 +0100
+Subject: [PATCH v3 1/2] bpf: add __weak hook for allocating executable
+ memory
+In-Reply-To: <20181123094152.21368-2-ard.biesheuvel@linaro.org>
+References: <20181123094152.21368-1-ard.biesheuvel@linaro.org>
+ <20181123094152.21368-2-ard.biesheuvel@linaro.org>
+Message-ID: <a3e95c22-fcae-3550-2d3c-4d07eaad95ae@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Meson8b SoC is using four Cortex-A5 cores. These come with an ARM
-global timer.
-This adds the Cortex-A5 global timer but keeps it disabled for now. The
-timer is clocked by the "PERIPH" clock whose rate can change during
-runtime (when changing the frequency of the CPU clock). Unfortunately
-the arm_global_timer driver does not handle changes to the clock rate
-yet.
+On 11/23/2018 10:41 AM, Ard Biesheuvel wrote:
+> By default, BPF uses module_alloc() to allocate executable memory,
+> but this is not necessary on all arches and potentially undesirable
+> on some of them.
+> 
+> So break out the module_alloc() and module_memfree() calls into __weak
+> functions to allow them to be overridden in arch code.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  kernel/bpf/core.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/kernel/bpf/core.c b/kernel/bpf/core.c
+> index 1a796e0799ec..572dd74c26e3 100644
+> --- a/kernel/bpf/core.c
+> +++ b/kernel/bpf/core.c
+> @@ -609,6 +609,16 @@ static void bpf_jit_uncharge_modmem(u32 pages)
+>  	atomic_long_sub(pages, &bpf_jit_current);
+>  }
+>  
+> +void *__weak bpf_jit_alloc_exec(unsigned long size)
+> +{
+> +	return module_alloc(size);
+> +}
+> +
+> +void __weak bpf_jit_free_exec(const void *addr)
+> +{
+> +	module_memfree(addr);
+> +}
+> +
+>  struct bpf_binary_header *
+>  bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+>  		     unsigned int alignment,
+> @@ -626,7 +636,7 @@ bpf_jit_binary_alloc(unsigned int proglen, u8 **image_ptr,
+>  
+>  	if (bpf_jit_charge_modmem(pages))
+>  		return NULL;
+> -	hdr = module_alloc(size);
+> +	hdr = bpf_jit_alloc_exec(size);
+>  	if (!hdr) {
+>  		bpf_jit_uncharge_modmem(pages);
+>  		return NULL;
+> @@ -650,7 +660,7 @@ void bpf_jit_binary_free(struct bpf_binary_header *hdr)
+>  {
+>  	u32 pages = hdr->pages;
+>  
+> -	module_memfree(hdr);
+> +	bpf_jit_free_exec(hdr);
+>  	bpf_jit_uncharge_modmem(pages);
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+The const needs to be removed, this generates the following warning:
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index a3a5649e32fa..a38d187d3d6e 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -350,6 +350,19 @@
- 		reg = <0x0 0x100>;
- 	};
- 
-+	timer at 200 {
-+		compatible = "arm,cortex-a5-global-timer";
-+		reg = <0x200 0x20>;
-+		interrupts = <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_EDGE_RISING)>;
-+		clocks = <&clkc CLKID_PERIPH>;
-+
-+		/*
-+		 * the arm_global_timer driver currently does not handle clock
-+		 * rate changes. Keep it disabled for now.
-+		 */
-+		status = "disabled";
-+	};
-+
- 	timer at 600 {
- 		compatible = "arm,cortex-a5-twd-timer";
- 		reg = <0x600 0x20>;
--- 
-2.19.2
+# make -j8 kernel/bpf/
+  DESCEND  objtool
+  CALL    scripts/checksyscalls.sh
+  CC      kernel/bpf/core.o
+  CC      kernel/bpf/syscall.o
+  CC      kernel/bpf/verifier.o
+  CC      kernel/bpf/hashtab.o
+  CC      kernel/bpf/helpers.o
+  CC      kernel/bpf/inode.o
+  CC      kernel/bpf/arraymap.o
+  CC      kernel/bpf/lpm_trie.o
+kernel/bpf/core.c: In function ?bpf_jit_free_exec?:
+kernel/bpf/core.c:619:17: warning: passing argument 1 of ?module_memfree? discards ?const? qualifier from pointer target type [-Wdiscarded-qualifiers]
+  module_memfree(addr);
+                 ^~~~
+In file included from kernel/bpf/core.c:28:0:
+./include/linux/moduleloader.h:30:6: note: expected ?void *? but argument is of type ?const void *?
+ void module_memfree(void *module_region);
+      ^~~~~~~~~~~~~~
+  CC      kernel/bpf/local_storage.o
+[...]
+
+Please respin with that fixed.
+
+Thanks,
+Daniel
