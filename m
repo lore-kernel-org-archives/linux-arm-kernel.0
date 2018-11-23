@@ -1,62 +1,61 @@
-From: amonakov@ispras.ru (Alexander Monakov)
-Date: Fri, 23 Nov 2018 17:06:38 +0300 (MSK)
-Subject: Investigating a stack state mismatch in Linux kernel
-In-Reply-To: <57225f38-3f6d-4029-8f89-4b6eba97c3c1@linux.com>
-References: <b7aad232-76e1-241f-00e2-77783ce30f87@linux.com>
- <875zwyabac.fsf@oldenburg.str.redhat.com>
- <2a2b1181-2175-7e4e-189c-12630f43d10d@linux.com>
- <57225f38-3f6d-4029-8f89-4b6eba97c3c1@linux.com>
-Message-ID: <alpine.LNX.2.20.13.1811231634330.6732@monopod.intra.ispras.ru>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 23 Nov 2018 15:06:53 +0100
+Subject: [PATCH v2 2/4] clk: meson: clk-regmap: add read-only gate ops
+In-Reply-To: <20181122214017.25643-3-martin.blumenstingl@googlemail.com>
+References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
+ <20181122214017.25643-3-martin.blumenstingl@googlemail.com>
+Message-ID: <46911a32-43bc-4fd8-b4bd-92fe934cecf8@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, 21 Nov 2018, Alexander Popov wrote:
-
-> Hello everyone!
+On 22/11/2018 22:40, Martin Blumenstingl wrote:
+> Some of the gate clocks are described as "just in case" bits in the
+> datasheet. Examples are the ABP, PERIPH, AXI and L2 DRAM clocks on
+> Meson8b.
+> The datasheet suggests that these bits are not touched. The full
+> explanation is:
+> "Set to 1 to manually disable the [...] clock when changing the mux
+> selection. Typically this bit is set to 0 since the clock muxes can
+> switch without glitches.".
 > 
-> At irc.freenode.org/#gcc people told me that I should CC gcc at gcc.gnu.org to get
-> some attention of gcc developers.
+> This adds new read-only ops for gate clocks so we can describe these
+> clocks in our clock controller drivers while ensuring that we can't
+> accidentally modify the registers.
 > 
-> Link to previous discussion:
->  https://www.openwall.com/lists/kernel-hardening/2018/11/14/1
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/clk/meson/clk-regmap.c | 5 +++++
+>  drivers/clk/meson/clk-regmap.h | 1 +
+>  2 files changed, 6 insertions(+)
+> 
+> diff --git a/drivers/clk/meson/clk-regmap.c b/drivers/clk/meson/clk-regmap.c
+> index 305ee307c003..c515f67322a3 100644
+> --- a/drivers/clk/meson/clk-regmap.c
+> +++ b/drivers/clk/meson/clk-regmap.c
+> @@ -50,6 +50,11 @@ const struct clk_ops clk_regmap_gate_ops = {
+>  };
+>  EXPORT_SYMBOL_GPL(clk_regmap_gate_ops);
+>  
+> +const struct clk_ops clk_regmap_gate_ro_ops = {
+> +	.is_enabled = clk_regmap_gate_is_enabled,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_regmap_gate_ro_ops);
+> +
+>  static unsigned long clk_regmap_div_recalc_rate(struct clk_hw *hw,
+>  						unsigned long prate)
+>  {
+> diff --git a/drivers/clk/meson/clk-regmap.h b/drivers/clk/meson/clk-regmap.h
+> index ed2d4348dbe2..e9c5728d40eb 100644
+> --- a/drivers/clk/meson/clk-regmap.h
+> +++ b/drivers/clk/meson/clk-regmap.h
+> @@ -51,6 +51,7 @@ clk_get_regmap_gate_data(struct clk_regmap *clk)
+>  }
+>  
+>  extern const struct clk_ops clk_regmap_gate_ops;
+> +extern const struct clk_ops clk_regmap_gate_ro_ops;
+>  
+>  /**
+>   * struct clk_regmap_div_data - regmap backed adjustable divider specific data
+> 
 
-So just for information, it isn't a plugin bug. I'll elaborate below, but in
-short, objtool was complaining about unreachable code.  To be fair though,
-gcc could have made the problem easier to spot.
-
-Now for the details.
-
-The repro uses an unusual (randomized) kernel config, in particular gcov is
-enabled and NR_CPUS is 1. Thus we have
-
-static int duplicate_processor_ids[] = {
-        [0 ... 1 - 1] = -1,
-};
-
-and the compiler deduces that the loop in acpi_duplicate_processor_id does not
-iterate:
-
-bool acpi_duplicate_processor_id(int proc_id)
-{
-        int i;
-
-        for (i = 0; i < nr_duplicate_ids; i++) {
-                if (duplicate_processor_ids[i] == proc_id)
-                        return true;
-        }
-        return false;
-}
-
-However as gcov is enabled, loop backedge remains, followed by gcov counter
-increment and __builtin_unreachable() (on GIMPLE). On RTL, however, the basic
-block with the increment ends with a barrier rtx, which is not visible in
-assembly and looks just as if control flow falls through to a function exit.
-Since the exit in question corresponds to a shrink-wrapped early exit that
-does not push/pop registers, objtool complains.
-
-Ultimately this is poor luck, if gcc optimized the code better or terminated
-the block that-should-not-be-reached with ud2, it would not arise.
-
-Alexander
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
