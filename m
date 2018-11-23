@@ -1,118 +1,53 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 23 Nov 2018 10:59:53 +0800
-Subject: [PATCH v3 10/15] memory: mtk-smi: Add bus_sel for mt8183
-In-Reply-To: <1542422142-30688-11-git-send-email-yong.wu@mediatek.com>
-References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
- <1542422142-30688-11-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1542941993.15759.11.camel@mhfsdcap03>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Fri, 23 Nov 2018 11:04:36 +0800
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <20181122082336.GA2049@infradead.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+ <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
+ <20181122082336.GA2049@infradead.org>
+Message-ID: <CANMq1KALUmxkhE8aaYzEbd7YodF1296KdVympOP+2mWVQ9zmDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-11-17 at 10:35 +0800, Yong Wu wrote:
-> There are 2 mmu cells in a M4U HW. we could adjust some larbs entering
-> mmu0 or mmu1 to balance the bandwidth via the smi-common register
-> SMI_BUS_SEL(0x220)(Each larb occupy 2 bits).
-> 
-> In mt8183, For better performance, we switch larb1/2/3/7 to enter
-> mmu1 while the others still keep enter mmu0.
+On Thu, Nov 22, 2018 at 4:23 PM Christoph Hellwig <hch@infradead.org> wrote:
+>
+> On Wed, Nov 21, 2018 at 10:26:26PM +0000, Robin Murphy wrote:
+> > TBH, if this DMA32 stuff is going to be contentious we could possibly just
+> > rip out the offending kmem_cache - it seemed like good practice for the
+> > use-case, but provided kzalloc(SZ_1K, gfp | GFP_DMA32) can be relied upon to
+> > give the same 1KB alignment and chance of succeeding as the equivalent
+> > kmem_cache_alloc(), then we could quite easily make do with that instead.
+>
+> Neither is the slab support for kmalloc, not do kmalloc allocations
+> have useful alignment apparently (at least if you use slub debug).
+>
+> But I do agree with the sentiment of not wanting to spread GFP_DMA32
+> futher into the slab allocator.
+>
+> I think you want a simple genalloc allocator for this rather special
+> use case.
 
-The larb listed here don't match with the code below. I will fix it.
+So I had a look at genalloc, we'd need to add pre-allocated memory
+using gen_pool_add [1]. There can be up to 4096 L2 page tables, so we
+may need to pre-allocate 4MB of memory (1KB per L2 page table). We
+could add chunks on demand, but then it'd be difficult to free them up
+(genalloc does not have a "gen_pool_remove" call). So basically if the
+full 4MB end up being requested, we'd be stuck with that until the
+iommu domain is freed (on the arm64 Mediatek platforms I looked at,
+there is only one iommu domain, and it never gets freed).
 
-> 
-> In mt8173 and mt2712, we don't get the performance issue,
-> Keep its default value(0x0), that means all the larbs enter mmu0.
-> 
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> ---
->  drivers/memory/mtk-smi.c | 29 ++++++++++++++++++++++++++---
->  1 file changed, 26 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/memory/mtk-smi.c b/drivers/memory/mtk-smi.c
-> index 3e6e0a8..e4daabb 100644
-> --- a/drivers/memory/mtk-smi.c
-> +++ b/drivers/memory/mtk-smi.c
-> @@ -49,6 +49,12 @@
->  #define SMI_LARB_NONSEC_CON(id)	(0x380 + ((id) * 4))
->  #define F_MMU_EN		BIT(0)
->  
-> +/* SMI COMMON */
-> +#define SMI_BUS_SEL			0x220
-> +#define SMI_BUS_LARB_SHIFT(larbid)	((larbid) << 1)
-> +/* All are MMU0 defaultly. Only specialize mmu1 here. */
-> +#define F_MMU1_LARB(larbid)		(0x1 << SMI_BUS_LARB_SHIFT(larbid))
-> +
->  enum mtk_smi_gen {
->  	MTK_SMI_GEN1,
->  	MTK_SMI_GEN2
-> @@ -56,6 +62,8 @@ enum mtk_smi_gen {
->  
->  struct mtk_smi_common_plat {
->  	enum mtk_smi_gen gen;
-> +
-> +	u32 bus_sel; /* Balance some larbs to enter mmu0 or mmu1 */
->  };
->  
->  struct mtk_smi_larb_gen {
-> @@ -70,8 +78,8 @@ struct mtk_smi {
->  	struct clk			*clk_apb, *clk_smi;
->  	struct clk			*clk_gals0, *clk_gals1;
->  	struct clk			*clk_async; /*only needed by mt2701*/
-> -	void __iomem			*smi_ao_base;
-> -
-> +	void __iomem			*smi_ao_base; /* only for gen1 */
-> +	void __iomem			*base;	      /* only for gen2 */
->  	const struct mtk_smi_common_plat *plat;
->  };
->  
-> @@ -401,6 +409,12 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
->  	.gen = MTK_SMI_GEN2,
->  };
->  
-> +static const struct mtk_smi_common_plat mtk_smi_common_mt8183 = {
-> +	.gen = MTK_SMI_GEN2,
-> +	.bus_sel = F_MMU1_LARB(1) | F_MMU1_LARB(3) | F_MMU1_LARB(4) |
-> +		   F_MMU1_LARB(7),
-> +};
-> +
->  static const struct of_device_id mtk_smi_common_of_ids[] = {
->  	{
->  		.compatible = "mediatek,mt8173-smi-common",
-> @@ -416,7 +430,7 @@ static int __maybe_unused mtk_smi_larb_suspend(struct device *dev)
->  	},
->  	{
->  		.compatible = "mediatek,mt8183-smi-common",
-> -		.data = &mtk_smi_common_gen2,
-> +		.data = &mtk_smi_common_mt8183,
->  	},
->  	{}
->  };
-> @@ -473,6 +487,11 @@ static int mtk_smi_common_probe(struct platform_device *pdev)
->  		ret = clk_prepare_enable(common->clk_async);
->  		if (ret)
->  			return ret;
-> +	} else {
-> +		res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +		common->base = devm_ioremap_resource(dev, res);
-> +		if (IS_ERR(common->base))
-> +			return PTR_ERR(common->base);
->  	}
->  	pm_runtime_enable(dev);
->  	platform_set_drvdata(pdev, common);
-> @@ -488,6 +507,7 @@ static int mtk_smi_common_remove(struct platform_device *pdev)
->  static int __maybe_unused mtk_smi_common_resume(struct device *dev)
->  {
->  	struct mtk_smi *common = dev_get_drvdata(dev);
-> +	u32 bus_sel = common->plat->bus_sel;
->  	int ret;
->  
->  	ret = mtk_smi_clk_enable(common);
-> @@ -495,6 +515,9 @@ static int __maybe_unused mtk_smi_common_resume(struct device *dev)
->  		dev_err(common->dev, "Failed to enable clock(%d).\n", ret);
->  		return ret;
->  	}
-> +
-> +	if (common->plat->gen == MTK_SMI_GEN2 && bus_sel)
-> +		writel(bus_sel, common->base + SMI_BUS_SEL);
->  	return 0;
->  }
->  
+page_frag would at least have a chance to reclaim those pages (if I
+understand Christoph's statement correctly)
+
+Robin: Do you have some ideas of the lifetime/usage of L2 tables? If
+they are usually few of them, or if they don't get reclaimed easily,
+some on demand genalloc allocation would be ok (or even 4MB allocation
+on init, if we're willing to take that hit). If they get allocated and
+freed together, maybe page_frag is a better option?
+
+Thanks,
+
+[1] https://www.kernel.org/doc/html/v4.19/core-api/genalloc.html
