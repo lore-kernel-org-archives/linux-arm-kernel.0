@@ -1,60 +1,46 @@
-From: anshuman.khandual@arm.com (Anshuman Khandual)
-Date: Fri, 23 Nov 2018 20:38:27 +0530
-Subject: [PATCH V3 0/5] arm64/mm: Enable HugeTLB migration
-In-Reply-To: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
-References: <1540299721-26484-1-git-send-email-anshuman.khandual@arm.com>
-Message-ID: <6cd51837-9d9c-af7a-6843-ef668a99e2ee@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 23 Nov 2018 16:18:06 +0100
+Subject: [PATCH 1/7] ata: libahci_platform: comply to PHY framework
+In-Reply-To: <20181123101556.29888-2-miquel.raynal@bootlin.com>
+References: <20181123101556.29888-1-miquel.raynal@bootlin.com>
+ <20181123101556.29888-2-miquel.raynal@bootlin.com>
+Message-ID: <20181123151806.GC30913@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Nov 23, 2018 at 11:15:50AM +0100, Miquel Raynal wrote:
+> Current implementation of the libahci does not take into account the
+> new PHY framework. Correct the situation by adding a call to
+> phy_set_mode() before phy_power_on() and by adding calls to
+> ahci_platform_enable/disable_phys() at suspend/resume_host() time.
+> 
+> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> ---
+>  drivers/ata/libahci_platform.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+> index 4b900fc659f7..9f33f72b674b 100644
+> --- a/drivers/ata/libahci_platform.c
+> +++ b/drivers/ata/libahci_platform.c
+> @@ -56,6 +56,12 @@ static int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
+>  		if (rc)
+>  			goto disable_phys;
+>  
+> +		rc = phy_set_mode(hpriv->phys[i], PHY_MODE_SATA);
+> +		if (rc) {
+> +			phy_exit(hpriv->phys[i]);
+> +			goto disable_phys;
+> +		}
 
+Hi Miquel
 
-On 10/23/2018 06:31 PM, Anshuman Khandual wrote:
-> This patch series enables HugeTLB migration support for all supported
-> huge page sizes at all levels including contiguous bit implementation.
-> Following HugeTLB migration support matrix has been enabled with this
-> patch series. All permutations have been tested except for the 16GB.
-> 
->          CONT PTE    PMD    CONT PMD    PUD
->          --------    ---    --------    ---
-> 4K:         64K     2M         32M     1G
-> 16K:         2M    32M          1G
-> 64K:         2M   512M         16G
-> 
-> First the series adds migration support for PUD based huge pages. It
-> then adds a platform specific hook to query an architecture if a
-> given huge page size is supported for migration while also providing
-> a default fallback option preserving the existing semantics which just
-> checks for (PMD|PUD|PGDIR)_SHIFT macros. The last two patches enables
-> HugeTLB migration on arm64 and subscribe to this new platform specific
-> hook by defining an override.
-> 
-> The second patch differentiates between movability and migratability
-> aspects of huge pages and implements hugepage_movable_supported() which
-> can then be used during allocation to decide whether to place the huge
-> page in movable zone or not.
-> 
-> Changes in V3:
-> 
-> - Re-ordered patches 1 and 2 per Michal
-> - s/Movability/Migratability/ in unmap_and_move_huge_page() per Naoya
-> 
-> Changes in V2: (https://lkml.org/lkml/2018/10/12/190)
-> 
-> - Added a new patch which differentiates migratability and movability
->   of huge pages and implements hugepage_movable_supported() function
->   as suggested by Michal Hocko.
-> 
-> Anshuman Khandual (5):
->   mm/hugetlb: Distinguish between migratability and movability
->   mm/hugetlb: Enable PUD level huge page migration
->   mm/hugetlb: Enable arch specific huge page size support for migration
->   arm64/mm: Enable HugeTLB migration
->   arm64/mm: Enable HugeTLB migration for contiguous bit HugeTLB pages
+Russell King wrote a comphy driver for the Armada 3XX family. It only
+supports network PHYs. Did you check it does the right thing when
+passed PHY_MODE_SATA? This is slightly different to Hans's comment, in
+that i expect phy_set_mode() is implemented for the comphy driver, but
+it might not understand PHY_MODE_SATA and return an error?
 
-Hello Andrew,
+Maybe you should look at rc and keep going if EOPNOTSUPP is returned?
 
-This patch series has been reviewed and acked both for it's core MM and
-arm64 changes. Could you please consider this series. Thank you.
-
-- Anshuman
+      Andrew
