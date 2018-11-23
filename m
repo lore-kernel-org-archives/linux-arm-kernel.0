@@ -1,90 +1,55 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Fri, 23 Nov 2018 12:32:09 +0000
-Subject: [PATCH 4/5] drm: rcar-du: Add R8A7744 support
-In-Reply-To: <2739044.1unFEStFin@avalon>
-References: <1537553311-8831-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <5135719.5JoeYGyzrK@avalon>
- <TY1PR01MB17707049DE6A8FD71E032157C0DB0@TY1PR01MB1770.jpnprd01.prod.outlook.com>
- <2739044.1unFEStFin@avalon>
-Message-ID: <TY1PR01MB17703AC2B9D5D9E86D172769C0D40@TY1PR01MB1770.jpnprd01.prod.outlook.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Nov 2018 13:37:40 +0100
+Subject: [PATCH/RFT] arm64: dts: renesas: r8a77990: Enable I2C DMA
+In-Reply-To: <20181121120252.l433sboqukjpk2ij@verge.net.au>
+References: <1540071326-27428-1-git-send-email-ykaneko0929@gmail.com>
+ <20181121120252.l433sboqukjpk2ij@verge.net.au>
+Message-ID: <20181123123739.eufwbgqq6b7x574z@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thank you Laurent.
+On Wed, Nov 21, 2018 at 01:02:57PM +0100, Simon Horman wrote:
+> On Sun, Oct 21, 2018 at 06:35:26AM +0900, Yoshihiro Kaneko wrote:
+> > From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > 
+> > This patch enables I2C DMA.
+> > 
+> > NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
+> > Rev.0.80E.
+> > 
+> > Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> > Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+> 
+> Base patch stack:
+> * renesas-devel-20181121-v4.20-rc3
+> + "iommu/ipmmu-vmsa: Hook up r8a77990 DT matching code"
+> + "pinctrl: sh-pfc: r8a77990: Add Audio SSI pins, groups and functions"
+> + "pinctrl: sh-pfc: r8a77990: Add Audio clock pins, groups and functions"
+> 
+> Config: renesas_defconfig + IPMMU_VMSA
+> 
+> Should we enable IPMMU_VMSA in arm64 defconfig and renesas_defconfig?
+> 
+> Test with base patch stack:
+> # grep dma /proc/interrupts  | grep -v "0          0"
+> (no output)
+> # amixer set "DVC Out" 2%
+> # play xyz.wav
+> # grep dma /proc/interrupts  | grep -v "0          0"
+> (no output)
+> 
+> Test with base patch stack + this patch applied:
+> # grep dma /proc/interrupts  | grep -v "0          0"
+> (no output)
+> # amixer set "DVC Out" 2%
+> # play xyz.wav
+> # grep dma /proc/interrupts  | grep -v "0          0"
+> 109:        512          0     GIC-0 352 Level     ec700000.dma-controller:0
+> 
+> 
+> Tested-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> I plan to apply this patch for v4.21.
 
-Cheers,
-Fab
-
-> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Sent: 23 November 2018 12:05
-> Subject: Re: [PATCH 4/5] drm: rcar-du: Add R8A7744 support
->
-> Hi Fabrizio,
->
-> On Thursday, 22 November 2018 17:59:32 EET Fabrizio Castro wrote:
-> > On 15 October 2018 23:25 Laurent Pinchart wrote:
-> > > On Friday, 21 September 2018 21:08:30 EEST Fabrizio Castro wrote:
-> > >> From: Biju Das <biju.das@bp.renesas.com>
-> > >>
-> > >> Add support for the R8A7744 DU (which is very similar to the R8A7743
-> > >> DU);
-> > >> it has 1 DPAD (RGB) output and 1 LVDS output.
-> > >>
-> > >> Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-> > >> Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> > >> ---
-> > >>
-> > >>  drivers/gpu/drm/rcar-du/rcar_du_drv.c | 1 +
-> > >>  1 file changed, 1 insertion(+)
-> > >>
-> > >> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > >> b/drivers/gpu/drm/rcar-du/rcar_du_drv.c index c07d3f1..2c3d0e5 100644
-> > >> --- a/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > >> +++ b/drivers/gpu/drm/rcar-du/rcar_du_drv.c
-> > >> @@ -321,6 +321,7 @@ static const struct rcar_du_device_info
-> > >> rcar_du_r8a77970_info = {
-> > >>  static const struct of_device_id rcar_du_of_table[] = {
-> > >>  { .compatible = "renesas,du-r8a7743", .data = &rzg1_du_r8a7743_info },
-> > >> +{ .compatible = "renesas,du-r8a7744", .data = &rzg1_du_r8a7743_info },
-> > >>  { .compatible = "renesas,du-r8a7745", .data = &rzg1_du_r8a7745_info },
-> > >>  { .compatible = "renesas,du-r8a77470", .data = &rzg1_du_r8a77470_info
-> > >>  },
-> > >>  { .compatible = "renesas,du-r8a7779", .data = &rcar_du_r8a7779_info },
-> > >
-> > > This looks good to me. I would also apply this change:
-> > >
-> > > @@ -41,7 +41,7 @@ static const struct rcar_du_device_info
-> > > rzg1_du_r8a7743_info = {
-> > >         .channels_mask = BIT(1) | BIT(0),
-> > >         .routes = {
-> > >                 /*
-> > > -                * R8A7743 has one RGB output and one LVDS output
-> > > +                * R8A774[34] has one RGB output and one LVDS output
-> > >                  */
-> > >                 [RCAR_DU_OUTPUT_DPAD0] = {
-> > >                         .possible_crtcs = BIT(1) | BIT(0),
-> > >
-> > > With this,
-> > >
-> > > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > >
-> > > There's no need to resubmit, I've applied the patch to my tree with the
-> > > above change.
-> >
-> > I was expecting to see this patch at least on linux-next by now but it looks
-> > like it's not in there, could you please double check what happened to it?
->
-> I've sent the R-Car DU v4.21 pull request today, it should end up in linux-
-> next in the near future.
->
-> --
-> Regards,
->
-> Laurent Pinchart
->
->
-
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Done.
