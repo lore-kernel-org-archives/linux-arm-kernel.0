@@ -1,52 +1,63 @@
 From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Fri, 23 Nov 2018 10:24:46 +0100
-Subject: [PATCH v2 14/43] drm/sun4i: backend: Avoid counting YUV planes that
- use the frontend
+Date: Fri, 23 Nov 2018 10:24:37 +0100
+Subject: [PATCH v2 05/43] drm/sun4i: frontend: Add a helper and a list for
+ supported formats
 In-Reply-To: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181123092515.2511-15-paul.kocialkowski@bootlin.com>
+Message-ID: <20181123092515.2511-6-paul.kocialkowski@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our hardware has a limited number of YUV planes (usually 1) that can be
-supported using the backend only. However, YUV planes can also be
-supported by the frontend and must then not be counted when checking for
-that limitation.
+In order to check whether the frontend supports a specific format, an
+explicit list and a related helper are introduced.
 
-Only count the YUV plane when the frontend is not used.
+Just like in the backend, the prototype of the helper is added to the
+frontend header so that it can be used later on. The helper is also
+exported because it will be used outside of the frontend module.
 
 Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_backend.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_frontend.c | 16 ++++++++++++++++
+ drivers/gpu/drm/sun4i/sun4i_frontend.h |  1 +
+ 2 files changed, 17 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_backend.c b/drivers/gpu/drm/sun4i/sun4i_backend.c
-index 30d7bc76c0af..a39d8b75d76a 100644
---- a/drivers/gpu/drm/sun4i/sun4i_backend.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_backend.c
-@@ -543,6 +543,11 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 			DRM_DEBUG_DRIVER("Using the frontend for plane %d\n",
- 					 plane->index);
- 			num_frontend_planes++;
-+		} else {
-+			if (fb->format->is_yuv) {
-+				DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
-+				num_yuv_planes++;
-+			}
- 		}
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.c b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+index 3ea925584891..0f7f8c7b3402 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.c
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.c
+@@ -128,6 +128,22 @@ static int sun4i_frontend_drm_format_to_output_fmt(uint32_t fmt, u32 *val)
+ 	}
+ }
  
- 		DRM_DEBUG_DRIVER("Plane FB format is %s\n",
-@@ -551,11 +556,6 @@ static int sun4i_backend_atomic_check(struct sunxi_engine *engine,
- 		if (fb->format->has_alpha || (plane_state->alpha != DRM_BLEND_ALPHA_OPAQUE))
- 			num_alpha_planes++;
++static const uint32_t sun4i_frontend_formats[] = {
++	DRM_FORMAT_XRGB8888,
++};
++
++bool sun4i_frontend_format_is_supported(uint32_t fmt)
++{
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(sun4i_frontend_formats); i++)
++		if (sun4i_frontend_formats[i] == fmt)
++			return true;
++
++	return false;
++}
++EXPORT_SYMBOL(sun4i_frontend_format_is_supported);
++
+ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 				  struct drm_plane *plane, uint32_t out_fmt)
+ {
+diff --git a/drivers/gpu/drm/sun4i/sun4i_frontend.h b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+index 02661ce81f3e..a9cb908ced16 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_frontend.h
++++ b/drivers/gpu/drm/sun4i/sun4i_frontend.h
+@@ -95,5 +95,6 @@ void sun4i_frontend_update_coord(struct sun4i_frontend *frontend,
+ 				 struct drm_plane *plane);
+ int sun4i_frontend_update_formats(struct sun4i_frontend *frontend,
+ 				  struct drm_plane *plane, uint32_t out_fmt);
++bool sun4i_frontend_format_is_supported(uint32_t fmt);
  
--		if (fb->format->is_yuv) {
--			DRM_DEBUG_DRIVER("Plane FB format is YUV\n");
--			num_yuv_planes++;
--		}
--
- 		DRM_DEBUG_DRIVER("Plane zpos is %d\n",
- 				 plane_state->normalized_zpos);
- 
+ #endif /* _SUN4I_FRONTEND_H_ */
 -- 
 2.19.1
