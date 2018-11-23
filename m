@@ -1,82 +1,106 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 23 Nov 2018 07:15:19 +0100
-Subject: [PATCH v2 0/2] clocksource/meson6_timer: implement ARM delay timer
-In-Reply-To: <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
-References: <20181115224657.14736-1-martin.blumenstingl@googlemail.com>
- <5ff1a888-cce2-8fd8-a98e-14c3d7c33acf@linaro.org>
- <CAFBinCDSLEAzJVVgFxKhN3LCUwgC3Rrr=4ZhtHCdvqEPBLWbJA@mail.gmail.com>
-Message-ID: <a83b92fb-5950-01b8-521d-7b05939dce3a@linaro.org>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Fri, 23 Nov 2018 11:51:38 +0530
+Subject: [PATCH v2 4/4] [DO NOT MERGE] ARM: dts: sun8i: Add CAM500B camera
+ module to the Nano Pi M1+
+In-Reply-To: <20181114145934.26855-5-maxime.ripard@bootlin.com>
+References: <20181114145934.26855-1-maxime.ripard@bootlin.com>
+ <20181114145934.26855-5-maxime.ripard@bootlin.com>
+Message-ID: <CAMty3ZDtKNvH75r3m3D1b=0HKrZ+ZVsrP-OwS_Ws2NRqtf4v5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/2018 23:12, Martin Blumenstingl wrote:
-> Hi Daniel,
-> 
-> On Sun, Nov 18, 2018 at 2:27 AM Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->>
->> On 15/11/2018 23:46, Martin Blumenstingl wrote:
->>> While trying to add support for the ARM TWD Timer and the ARM Global
->>> Timer on Meson8, Meson8b and Meson8m2 (ARM Cortex-A5 and Cortex-A9 SoCs)
->>> I did a review of the existing driver.
->>> Unfortunately I found it hard to review because the pre-processor
->>> #defines did not match the names from the public S805 datasheet. Thus
->>> patch #1 adjusts these. No functional changes here, this is just
->>> preparation work for patch #2.
->>>
->>> Using the ARM Global Timer (drivers/clocksource/arm_global_timer.c)
->>> would have given us a timer-based delay implementation (so udelay() and
->>> friends would use the timer instead of using a loop-based delay
->>> implementation). Unfortunately we can't use the ARM Global Timer yet
->>> because it's input clock is derived from the CPU clock (which can change
->>> once we enable CPU frequency scaling on these SoCs, for which I will be
->>> sending patches in the near future).
->>> Amlogic's 3.10 kernel uses Timer E as delay timer which (with the
->>> current configuration) has a resolution of 1us. So patch #2 uses
->>> register_current_timer_delay() to register Timer E as ARM delay timer
->>> (which will be especially useful as we have to use udelay() when
->>> changing the CPU clocks during DVFS).
->>>
->>>
->>> Changes since v1 at [0]:
->>> - convert the enums for the input clock (meson6_timera_input_clock and
->>>   meson6_timere_input_clock) to simple #defines as these are register
->>>   values and not something driver-internal. All other register values
->>>   are #defines so it makes sense that these are #defines as well.
->>>
->>>
->>> [0] https://patchwork.kernel.org/cover/10658591/
->>>
->>>
->>> Martin Blumenstingl (2):
->>>   clocksource: meson6_timer: use register names from the datasheet
->>>   clocksource: meson6_timer: implement ARM delay timer
->>>
->>>  drivers/clocksource/meson6_timer.c | 128 +++++++++++++++++++----------
->>>  1 file changed, 85 insertions(+), 43 deletions(-)
->>
->> Both applied, thanks!
-> thank you for taking my patches
-> 
-> I have one question more: can you please push these patches to a
-> repository/branch which is included in -next?
-> I'm asking because I'd like to send patches that enable CPU frequency
-> scaling on Meson8, Meson8b and Meson8m2. The code to change the CPU
-> clock calls udelay(), which (in this special case) needs a delay timer
-> to work properly (we can't use jiffies as we're using udelay() *while*
-> changing the CPU clock).
+On Wed, Nov 14, 2018 at 8:29 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> From: Myl?ne Josserand <mylene.josserand@bootlin.com>
+>
+> The Nano Pi M1+ comes with an optional sensor based on the ov5640 from
+> Omnivision. Enable the support for it in the DT.
+>
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@bootlin.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts | 85 +++++++++++++++++++
+>  1 file changed, 85 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> index 06010a9afba0..2ac62d109285 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-nanopi-m1-plus.dts
+> @@ -52,6 +52,37 @@
+>                 ethernet1 = &sdio_wifi;
+>         };
+>
+> +       cam_xclk: cam-xclk {
+> +                #clock-cells = <0>;
+> +                compatible = "fixed-clock";
+> +                clock-frequency = <24000000>;
+> +                clock-output-names = "cam-xclk";
+> +        };
+> +
+> +        reg_cam_avdd: cam-avdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-avdd";
+> +                regulator-min-microvolt = <2800000>;
+> +                regulator-max-microvolt = <2800000>;
+> +                vin-supply = <&reg_vcc3v3>;
+> +        };
+> +
+> +        reg_cam_dovdd: cam-dovdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-dovdd";
+> +                regulator-min-microvolt = <1800000>;
+> +                regulator-max-microvolt = <1800000>;
+> +                vin-supply = <&reg_vcc3v3>;
+> +        };
+> +
+> +        reg_cam_dvdd: cam-dvdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-dvdd";
+> +                regulator-min-microvolt = <1500000>;
+> +                regulator-max-microvolt = <1500000>;
+> +                vin-supply = <&reg_vcc3v3>;
+> +        };
+> +
+>         reg_gmac_3v3: gmac-3v3 {
+>                 compatible = "regulator-fixed";
+>                 regulator-name = "gmac-3v3";
+> @@ -69,6 +100,26 @@
+>         };
+>  };
+>
+> +&csi {
+> +        status = "okay";
+> +
+> +        port {
+> +                #address-cells = <1>;
+> +                #size-cells = <0>;
+> +
+> +                /* Parallel bus endpoint */
+> +                csi_from_ov5640: endpoint {
+> +                        remote-endpoint = <&ov5640_to_csi>;
+> +                        bus-width = <8>;
+> +                        data-shift = <2>;
+> +                        hsync-active = <1>; /* Active high */
+> +                        vsync-active = <0>; /* Active low */
+> +                        data-active = <1>;  /* Active high */
+> +                        pclk-sample = <1>;  /* Rising */
+> +                };
+> +        };
+> +};
+> +
+>  &ehci1 {
+>         status = "okay";
+>  };
+> @@ -94,6 +145,40 @@
+>         };
+>  };
+>
+> +&i2c2 {
+> +       status = "okay";
+> +
+> +       ov5640: camera at 3c {
+> +                compatible = "ovti,ov5640";
+> +                reg = <0x3c>;
+> +                clocks = <&cam_xclk>;
 
-branch pushed [1], should appear in linux-next very soon.
-
-  -- Daniel
-
-[1]
-https://git.linaro.org/people/daniel.lezcano/linux.git/log/?h=clockevents/next
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+I think we can directly use existing 24MHz oscillator, &osc24M
