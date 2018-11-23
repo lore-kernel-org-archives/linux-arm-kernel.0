@@ -1,57 +1,65 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Fri, 23 Nov 2018 14:32:13 +0000
-Subject: [PATCH 01/10] perf/core: Add macro to test for event exclusion
- flags
-In-Reply-To: <87sgzw0yzh.fsf@concordia.ellerman.id.au>
-References: <1542363853-13849-1-git-send-email-andrew.murray@arm.com>
- <1542363853-13849-2-git-send-email-andrew.murray@arm.com>
- <87sgzw0yzh.fsf@concordia.ellerman.id.au>
-Message-ID: <20181123143213.GB1617@e119886-lin.cambridge.arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 23 Nov 2018 15:40:55 +0100
+Subject: [PATCH v2 0/4] Meson8b: add the CPU clock post-dividers
+In-Reply-To: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
+References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
+Message-ID: <4859b354-ade4-8172-eeb5-7a4a42045589@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 10:28:34PM +1100, Michael Ellerman wrote:
-> Andrew Murray <andrew.murray@arm.com> writes:
+On 22/11/2018 22:40, Martin Blumenstingl wrote:
+> This is the successor to my previous series "meson8b: add the CPU_DIV16
+> clock for the ARM TWD" from [0]. I decided to not send this as v2 of
+> the original series because the PERIPH clock is not the CPU_DIV16 clock.
+> It's not clear whether a CPU_DIV16 clock exists.
 > 
-> > Add a macro that tests if any of the perf event exclusion flags
-> > are set on a given event.
-> >
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> > ---
-> >  include/linux/perf_event.h | 9 +++++++++
-> >  1 file changed, 9 insertions(+)
-> >
-> > diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> > index 53c500f..89ee7fa 100644
-> > --- a/include/linux/perf_event.h
-> > +++ b/include/linux/perf_event.h
-> > @@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
-> >  extern void
-> >  perf_log_lost_samples(struct perf_event *event, u64 lost);
-> >  
-> > +static inline bool event_has_exclude_flags(struct perf_event *event)
-> > +{
-> > +	struct perf_event_attr *attr = &event->attr;
-> > +
-> > +	return attr->exclude_idle || attr->exclude_user ||
-> > +	       attr->exclude_kernel || attr->exclude_hv ||
-> > +	       attr->exclude_guest || attr->exclude_host;
-> > +}
+> With this series we get all the CPU_CLK post-dividers as listed in the
+> public S805 datasheet [1] on pages 31 and 32:
+> - ABP
+> - PERIPH (used as input for the ARM global timer and ARM TWD timer)
+> - AXI
+> - L2 DRAM
 > 
-> Sorry to be a total PITA, but using "flags" plural suggests that it only
-> returns true if there is more than one exclude flag set.
+> Each of these clocks has a register called "..._CLK_DIS" which is
+> documented as a "just in case" bit:
+> "Set to 1 to manually disable the [...] clock when changing the mux
+> selection. Typically this bit is set to 0 since the clock muxes can
+> switch without glitches."
+> Since we're not supposed to touch that register we're using the new
+> read-only gate clk_ops to ensure that nothing accidentally modifies
+> these bits.
 > 
-> A better name would be event_has_exclude_flag() or maybe
-> event_has_any_exclude_flag().
+> The result of this is that we can use the PERIPH clock which clocks
+> the ARM TWD timer. I will send a separate series to add the TWD timer.
 > 
-> If you're doing a respin anyway it'd be nice to fix the name, but
-> obviously it's not high priority.
+> 
+> changes since v1 at [2]:
+> - added new patch 2 "clk: meson: clk-regmap: add read-only gate ops"
+> - switched from CLK_IS_CRITICAL to the new clk_regmap_gate_ro_ops
+>   so we're consistent with all other read-only clocks
+> - collected Jerome's Acked-by tags (thanks!)
+> 
+> 
+> [0] http://lists.infradead.org/pipermail/linux-amlogic/2018-July/007890.html
+> [1] https://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
+> [2] https://patchwork.kernel.org/cover/10687023/
+> 
+> 
+> Martin Blumenstingl (4):
+>   dt-bindings: clock: meson8b: export the CPU post dividers
+>   clk: meson: clk-regmap: add read-only gate ops
+>   clk: meson: meson8b: rename cpu_div2/cpu_div3 to
+>     cpu_in_div2/cpu_in_div3
+>   clk: meson: meson8b: add the CPU clock post divider clocks
+> 
+>  drivers/clk/meson/clk-regmap.c           |   5 +
+>  drivers/clk/meson/clk-regmap.h           |   1 +
+>  drivers/clk/meson/meson8b.c              | 264 ++++++++++++++++++++++-
+>  drivers/clk/meson/meson8b.h              |  17 +-
+>  include/dt-bindings/clock/meson8b-clkc.h |   4 +
+>  5 files changed, 278 insertions(+), 13 deletions(-)
 
-No problem - I'll go with event_has_any_exclude_flag.
 
-Thanks,
+Applied, with the bindings on next/headers
 
-Andrew Murray
-
-> 
-> cheers
+Neil
