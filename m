@@ -1,49 +1,68 @@
-From: hancock@sedsystems.ca (Robert Hancock)
-Date: Fri, 23 Nov 2018 16:17:05 -0600
-Subject: iMX6 PCIe MSI issues
-Message-ID: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Nov 2018 23:18:02 +0100
+Subject: [PATCH v4 0/2] bpf: permit JIT allocations to be served outside the
+ module region
+Message-ID: <20181123221804.440-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I am working with a custom FPGA PCI Express endpoint connected to an NXP
-iMX6D processor running the 4.19.2 kernel. It seems happy using INTx
-interrupts but when trying to enable MSI the device driver is not
-receiving any interrupts.
+On arm64, modules are allocated from a 128 MB window which is close to
+the core kernel, so that relative direct branches are guaranteed to be
+in range (except in some KASLR configurations). Also, module_alloc()
+is in charge of allocating KASAN shadow memory when running with KASAN
+enabled.
 
->From some register poking I have figured out:
--the MSI address set on the PCIe device is correctly set in the iMX MSI
-controller's MSI Controller Address register (0x1ffc820)
--the interrupt vectors are enabled in the MSI controller's Interrupt
-Enable register (0x1ffc828)
--the interrupt vectors are not masked in the MSI controller's Interrupt
-Mask register (0x1ffc82c)
--The MSI controller's Interrupt Status register (0x1ffc830) shows that
-the requested interrupt vectors are pending
--In the ARM GIC, vector 152 (for msi_ctrl_int) is enabled in the IS
-enable register (0x00a01110), but not set in the IS pending (0x00a01210)
-or IS active (0x00a01310) registers
--Vector 152 is not masked in the GPC interrupt mask (0x00a01310)
--Vector 152 is not active in the GPC interrupt status (0x00a01310)
+This means that the way BPF reuses module_alloc()/module_memfree() is
+undesirable on arm64 (and potentially other architectures as well),
+and so this series refactors BPF's use of those functions to permit
+architectures to change this behavior.
 
-So it appears the MSI controller is receiving and recognizing the MSI
-from the device, but the interrupt is not making it into the GIC for
-some reason. If I manually set vector 152 to pending in the GIC, the
-dw_handle_msi_irq handler in pci-designware-host.c does get called along
-with the interrupt handler(s) for the PCIe device, so it appears the
-chain from that point on is working:
+Patch #1 breaks out the module_alloc() and module_memfree() calls into
+__weak functions so they can be overridden.
 
-# devmem 0x00a01210 32 0x1000000
+Patch #2 implements the new alloc/free overrides for arm64
 
-I found someone else reporting this in 2014 with an unknown kernel
-version on the NXP forums here, but with no resolution listed there:
+Changes since v3:
+- drop 'const' modifier for free() hook void* argument
+- move the dedicated BPF region to before the module region, putting it
+  within 4GB of the module and kernel regions on non-KASLR kernels
 
-https://community.nxp.com/thread/318307
+Changes since v2:
+- properly build time and runtime tested this time (log after the diffstat)
+- create a dedicated 128 MB region at the top of the vmalloc space for BPF
+  programs, ensuring that the programs will be in branching range of each
+  other (which we currently rely upon) but at an arbitrary distance from
+  the kernel and modules (which we don't care about)
 
-Any ideas on what may be going wrong? My next step may be to try an
-older kernel version to see if this got broken at some point.
+Changes since v1:
+- Drop misguided attempt to 'fix' and refactor the free path. Instead,
+  just add another __weak wrapper for the invocation of module_memfree()
+
+Cc: Daniel Borkmann <daniel@iogearbox.net>
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Rick Edgecombe <rick.p.edgecombe@intel.com>
+Cc: Eric Dumazet <eric.dumazet@gmail.com>
+Cc: Jann Horn <jannh@google.com>
+Cc: Kees Cook <keescook@chromium.org>
+
+Cc: Jessica Yu <jeyu@kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: "David S. Miller" <davem@davemloft.net>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: netdev at vger.kernel.org
+
+Ard Biesheuvel (2):
+  bpf: add __weak hook for allocating executable memory
+  arm64/bpf: don't allocate BPF JIT programs in module memory
+
+ arch/arm64/include/asm/memory.h |  5 ++++-
+ arch/arm64/net/bpf_jit_comp.c   | 13 +++++++++++++
+ kernel/bpf/core.c               | 14 ++++++++++++--
+ 3 files changed, 29 insertions(+), 3 deletions(-)
 
 -- 
-Robert Hancock
-Senior Software Developer
-SED Systems
-Email: hancock at sedsystems.ca
+2.19.1
