@@ -1,52 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 23 Nov 2018 12:56:17 +0100
-Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-In-Reply-To: <20181123111700.GA31881@ulmo>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <CABb+yY3HwvG6sSKnweiDpyg85Fk8Q9hOVaF-s7gv4RDzEoaGqA@mail.gmail.com>
- <20181120152907.GA28796@ulmo> <20181121142740.GA29704@ulmo>
- <CABb+yY0nH3Su6a11TZLJf=CCpD+gTpqUkLnRhpy4MUwNJk5prw@mail.gmail.com>
- <20181122084712.GA5741@ulmo> <20181123111700.GA31881@ulmo>
-Message-ID: <20181123115617.GB31881@ulmo>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 23 Nov 2018 11:57:31 +0000
+Subject: Sleeping in user_access section
+In-Reply-To: <20181123105034.GQ30658@n2100.armlinux.org.uk>
+References: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
+ <5B3B6AF9-9D8C-4577-905E-D407A5E7D0E3@zytor.com>
+ <20181123105034.GQ30658@n2100.armlinux.org.uk>
+Message-ID: <44297716-74aa-1f14-67be-3594b5244b74@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 12:17:00PM +0100, Thierry Reding wrote:
-> On Thu, Nov 22, 2018 at 09:47:12AM +0100, Thierry Reding wrote:
-> [...]
-> > Perhaps you'd be less concerned about such a change if it was perhaps
-> > more explicit? Just throwing ideas around, I think something that could
-> > also work is if we explicitly add a mbox_flush() function that would
-> > basically be calling ->flush(). That way users of the mailbox can make
-> > their requirement very explicit. I haven't actually tested that, but I
-> > think it would work. Does that sound more acceptable to you?
-> 
-> I tried implementing the explicit flushing on top of this series and it
-> would look roughly like the below. What do you think?
-> 
-> Thierry
-> 
-> --->8---
-> diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-[...]
-> @@ -184,9 +185,6 @@ static int tegra_tcu_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  
->  	tcu->tx_client.dev = &pdev->dev;
-> -	tcu->tx_client.tx_block = true;
-> -	tcu->tx_client.tx_tout = 10000;
-> -	tcu->rx_client.dev = &pdev->dev;
 
-Somehow this line ended up being removed in the diff, but it's actually
-required. Only tx_block and tx_tout should be removed in this hunk.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181123/26eb64d0/attachment.sig>
+On 23/11/18 10:50, Russell King - ARM Linux wrote:
+> On Fri, Nov 23, 2018 at 01:57:12AM -0800, hpa at zytor.com wrote:
+>> You should never call a sleeping function from a user_access section.
+>> It is intended for very limited regions.
+> 
+> So, what happens if the "unsafe" user access causes a page fault that
+> ends up sleeping?
+> 
+
+Thanks for pointing that out.
+
+On the arm64 side, PAN state is saved in spsr and (if PAN feature is 
+enabled in SCTLR) PAN bit gets set (disabling the user accesses). For 
+software PAN we follow the same behaviour on exception entry. So upon 
+exception we implicitly exit user_access mode and then re-enter it when 
+returning from the exception.
+
+On x86, the EFLAGS.AC bit is also saved upon exception and I think it is 
+cleared upon exception entry so there is implicit exit from the 
+user_access mode when taking exception/interrupt.
+
+This however is just how those two architectures happen to behave and 
+doesn't seem to be specified as part of the user_access API...
+
+Which is why I'd like to clarify the semantics of user_access region wrt 
+sleeping functions.
+
+Thanks,
+
+-- 
+Julien Thierry
