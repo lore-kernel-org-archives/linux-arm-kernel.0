@@ -1,72 +1,74 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 23 Nov 2018 16:20:16 +0100
-Subject: [PATCH v2 1/4] dt-bindings: clock: meson8b: export the CPU post
- dividers
-In-Reply-To: <20181122214017.25643-2-martin.blumenstingl@googlemail.com>
-References: <20181122214017.25643-1-martin.blumenstingl@googlemail.com>
- <20181122214017.25643-2-martin.blumenstingl@googlemail.com>
-Message-ID: <4e82df94-dcb0-57ca-c751-074012d054dd@baylibre.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 23 Nov 2018 16:23:36 +0100
+Subject: [PATCH 09/17] irqchip: bcm283x: Switch to SPDX identifier
+In-Reply-To: <1541865263-7571-1-git-send-email-stefan.wahren@i2se.com>
+References: <1541865263-7571-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <7ab4438c-6cdd-8655-0745-2bbc137970d0@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/2018 22:40, Martin Blumenstingl wrote:
-> There are four CPU clock post dividers:
-> - ABP
-> - PERIPH (used as input for the ARM global timer and ARM TWD timer)
-> - AXI
-> - L2 DRAM
-> 
-> Export these so we can use them in .dts files.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Acked-by: Jerome Brunet <jbrunet@baylibre.com>
+Hi Jason,
+hi Marc,
+
+Am 10.11.18 um 16:54 schrieb Stefan Wahren:
+> Adopt the SPDX license identifier headers to ease license compliance
+> management.
+>
+> Cc: Simon Arlott <simon@arlott.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  include/dt-bindings/clock/meson8b-clkc.h | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/include/dt-bindings/clock/meson8b-clkc.h b/include/dt-bindings/clock/meson8b-clkc.h
-> index a60f47b49231..5fe2923382d0 100644
-> --- a/include/dt-bindings/clock/meson8b-clkc.h
-> +++ b/include/dt-bindings/clock/meson8b-clkc.h
-> @@ -103,5 +103,9 @@
->  #define CLKID_MPLL1		94
->  #define CLKID_MPLL2		95
->  #define CLKID_NAND_CLK		112
-> +#define CLKID_ABP		124
-> +#define CLKID_PERIPH		126
-> +#define CLKID_AXI		128
-> +#define CLKID_L2_DRAM		130
+>  drivers/irqchip/irq-bcm2835.c | 11 +----------
+>  drivers/irqchip/irq-bcm2836.c | 11 +----------
+>  2 files changed, 2 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+> index d2da8a1..418245d 100644
+> --- a/drivers/irqchip/irq-bcm2835.c
+> +++ b/drivers/irqchip/irq-bcm2835.c
+> @@ -1,17 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+>  /*
+>   * Copyright 2010 Broadcom
+>   * Copyright 2012 Simon Arlott, Chris Boot, Stephen Warren
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+> - *
+>   * Quirk 1: Shortcut interrupts don't set the bank 1/2 register pending bits
+>   *
+>   * If an interrupt fires on bank 1 that isn't in the shortcuts list, bit 8
+> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+> index dfe4a46..2038693 100644
+> --- a/drivers/irqchip/irq-bcm2836.c
+> +++ b/drivers/irqchip/irq-bcm2836.c
+> @@ -1,17 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+>  /*
+>   * Root interrupt controller for the BCM2836 (Raspberry Pi 2).
+>   *
+>   * Copyright 2015 Broadcom
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+> - *
+> - * This program is distributed in the hope that it will be useful,
+> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> - * GNU General Public License for more details.
+>   */
 >  
->  #endif /* __MESON8B_CLKC_H */
-> 
+>  #include <linux/cpu.h>
 
-Kevin,
+Eric already made a review. Are you fine with it?
 
-Martin asked my a tag for this patch since he has a dependency on it.
-
-You can find it here :
-
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  git://github.com/BayLibre/clk-meson.git tags/meson-clk-headers-4.21-1
-
-for you to fetch changes up to 8e1dd17c8b0e3f8c66ed2a3f88a440d36135e589:
-
-  dt-bindings: clock: meson8b: export the CPU post dividers (2018-11-23 15:11:55 +0100)
-
-----------------------------------------------------------------
-Update for meson clocks bindings targeted at v4.21:
-- Export Meson8b CPU post dividers
-
-----------------------------------------------------------------
-Martin Blumenstingl (1):
-      dt-bindings: clock: meson8b: export the CPU post dividers
-
- include/dt-bindings/clock/meson8b-clkc.h | 4 ++++
- 1 file changed, 4 insertions(+)
-
-Neil
+Stefan
