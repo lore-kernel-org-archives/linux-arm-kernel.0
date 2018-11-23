@@ -1,149 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 23 Nov 2018 18:41:00 +0000
-Subject: [PATCH v2 1/8] arm64: KVM: Make VHE Stage-2 TLB invalidation
- operations non-interruptible
+Date: Fri, 23 Nov 2018 18:41:04 +0000
+Subject: [PATCH v2 5/8] arm64: KVM: Force VHE for systems affected by erratum
+ 1165522
 In-Reply-To: <20181123184107.39334-1-marc.zyngier@arm.com>
 References: <20181123184107.39334-1-marc.zyngier@arm.com>
-Message-ID: <20181123184107.39334-2-marc.zyngier@arm.com>
+Message-ID: <20181123184107.39334-6-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to the non-VHE version of the TLB invalidation helpers, the VHE
-code  has interrupts enabled, meaning that we can take an interrupt in
-the middle of such a sequence, and start running something else with
-HCR_EL2.TGE cleared.
+In order to easily mitigate ARM erratum 1165522, we need to force
+affected CPUs to run in VHE mode if using KVM.
 
-That's really not a good idea.
-
-Take the heavy-handed option and disable interrupts in
-__tlb_switch_to_guest_vhe, restoring them in __tlb_switch_to_host_vhe.
-The latter also gain an ISB in order to make sure that TGE really has
-taken effect.
-
-Cc: stable at vger.kernel.org
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/tlb.c | 35 +++++++++++++++++++++++++----------
- 1 file changed, 25 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/cpucaps.h  | 3 ++-
+ arch/arm64/include/asm/kvm_host.h | 4 ++++
+ arch/arm64/kernel/cpu_errata.c    | 8 ++++++++
+ 3 files changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 4dbd9c69a96d..7fcc9c1a5f45 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -15,14 +15,19 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 6e2d254c09eb..62d8cd15fdf2 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -54,7 +54,8 @@
+ #define ARM64_HAS_CRC32				33
+ #define ARM64_SSBS				34
+ #define ARM64_WORKAROUND_1188873		35
++#define ARM64_WORKAROUND_1165522		36
  
-+#include <linux/irqflags.h>
+-#define ARM64_NCAPS				36
++#define ARM64_NCAPS				37
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index d6d9aa76a943..9217759afa6b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -432,6 +432,10 @@ static inline bool kvm_arch_requires_vhe(void)
+ 	if (system_supports_sve())
+ 		return true;
+ 
++	/* Some implementations have defects that confine them to VHE */
++	if (cpus_have_cap(ARM64_WORKAROUND_1165522))
++		return true;
 +
- #include <asm/kvm_hyp.h>
- #include <asm/kvm_mmu.h>
- #include <asm/tlbflush.h>
- 
--static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
-+static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm,
-+						 unsigned long *flags)
- {
- 	u64 val;
- 
-+	local_irq_save(*flags);
-+
- 	/*
- 	 * With VHE enabled, we have HCR_EL2.{E2H,TGE} = {1,1}, and
- 	 * most TLB operations target EL2/EL0. In order to affect the
-@@ -37,7 +42,8 @@ static void __hyp_text __tlb_switch_to_guest_vhe(struct kvm *kvm)
- 	isb();
+ 	return false;
  }
  
--static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm)
-+static void __hyp_text __tlb_switch_to_guest_nvhe(struct kvm *kvm,
-+						  unsigned long *flags)
- {
- 	__load_guest_stage2(kvm);
- 	isb();
-@@ -48,7 +54,8 @@ static hyp_alternate_select(__tlb_switch_to_guest,
- 			    __tlb_switch_to_guest_vhe,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
- 
--static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
-+static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm,
-+						unsigned long flags)
- {
- 	/*
- 	 * We're done with the TLB operation, let's restore the host's
-@@ -56,9 +63,12 @@ static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
- 	 */
- 	write_sysreg(0, vttbr_el2);
- 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	isb();
-+	local_irq_restore(flags);
- }
- 
--static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
-+static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm,
-+						 unsigned long flags)
- {
- 	write_sysreg(0, vttbr_el2);
- }
-@@ -70,11 +80,13 @@ static hyp_alternate_select(__tlb_switch_to_host,
- 
- void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- {
-+	unsigned long flags;
-+
- 	dsb(ishst);
- 
- 	/* Switch to requested VMID */
- 	kvm = kern_hyp_va(kvm);
--	__tlb_switch_to_guest()(kvm);
-+	__tlb_switch_to_guest()(kvm, &flags);
- 
- 	/*
- 	 * We could do so much better if we had the VA as well.
-@@ -117,36 +129,39 @@ void __hyp_text __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
- 	if (!has_vhe() && icache_is_vpipt())
- 		__flush_icache_all();
- 
--	__tlb_switch_to_host()(kvm);
-+	__tlb_switch_to_host()(kvm, flags);
- }
- 
- void __hyp_text __kvm_tlb_flush_vmid(struct kvm *kvm)
- {
-+	unsigned long flags;
-+
- 	dsb(ishst);
- 
- 	/* Switch to requested VMID */
- 	kvm = kern_hyp_va(kvm);
--	__tlb_switch_to_guest()(kvm);
-+	__tlb_switch_to_guest()(kvm, &flags);
- 
- 	__tlbi(vmalls12e1is);
- 	dsb(ish);
- 	isb();
- 
--	__tlb_switch_to_host()(kvm);
-+	__tlb_switch_to_host()(kvm, flags);
- }
- 
- void __hyp_text __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = kern_hyp_va(kern_hyp_va(vcpu)->kvm);
-+	unsigned long flags;
- 
- 	/* Switch to requested VMID */
--	__tlb_switch_to_guest()(kvm);
-+	__tlb_switch_to_guest()(kvm, &flags);
- 
- 	__tlbi(vmalle1);
- 	dsb(nsh);
- 	isb();
- 
--	__tlb_switch_to_host()(kvm);
-+	__tlb_switch_to_host()(kvm, flags);
- }
- 
- void __hyp_text __kvm_flush_vm_context(void)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a509e35132d2..476e738e6c46 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -739,6 +739,14 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.capability = ARM64_WORKAROUND_1188873,
+ 		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
+ 	},
++#endif
++#ifdef CONFIG_ARM64_ERRATUM_1165522
++	{
++		/* Cortex-A76 r0p0 to r2p0 */
++		.desc = "ARM erratum 1165522",
++		.capability = ARM64_WORKAROUND_1165522,
++		ERRATA_MIDR_RANGE(MIDR_CORTEX_A76, 0, 0, 2, 0),
++	},
+ #endif
+ 	{
+ 	}
 -- 
 2.19.1
