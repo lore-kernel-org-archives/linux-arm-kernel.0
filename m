@@ -1,47 +1,21 @@
-From: tiny.windzz@gmail.com (Yangtao Li)
-Date: Sat, 24 Nov 2018 09:52:23 -0500
-Subject: [PATCH v2] soc: bcm: brcmstb: Don't leak device tree node reference
-Message-ID: <20181124145223.29208-1-tiny.windzz@gmail.com>
+From: pr-tracker-bot@kernel.org (pr-tracker-bot at kernel.org)
+Date: Sat, 24 Nov 2018 17:55:02 +0000
+Subject: [GIT PULL] arm64 fixes for 4.20-rc4
+In-Reply-To: <20181124123637.matxo4anfxj5q5vm@mbp>
+References: <20181124123637.matxo4anfxj5q5vm@mbp>
+Message-ID: <20181124175502.27639.15501.pr-tracker-bot@pdx-korg-gitolite-1.ci.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_node_by_path() acquires a reference to the node returned by it
-and that reference needs to be dropped by its caller. soc_is_brcmstb()
-doesn't do that, so fix it.
+The pull request you sent on Sat, 24 Nov 2018 12:36:40 +0000:
 
-[treding: slightly rewrite to avoid inline comparison]
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
 
-Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
----
-Changes in v2:
--update changelog
--slightly rewrite to avoid inline comparison
----
- drivers/soc/bcm/brcmstb/common.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+has been merged into torvalds/linux.git:
+https://git.kernel.org/torvalds/c/d146194f31c96f9b260c5a1cf1592d2e7f82a2e2
 
-diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-index 14185451901d..bf9123f727e8 100644
---- a/drivers/soc/bcm/brcmstb/common.c
-+++ b/drivers/soc/bcm/brcmstb/common.c
-@@ -31,13 +31,17 @@ static const struct of_device_id brcmstb_machine_match[] = {
- 
- bool soc_is_brcmstb(void)
- {
-+	const struct of_device_id *match;
- 	struct device_node *root;
- 
- 	root = of_find_node_by_path("/");
- 	if (!root)
- 		return false;
- 
--	return of_match_node(brcmstb_machine_match, root) != NULL;
-+	match = of_match_node(brcmstb_machine_match, root);
-+	of_node_put(root);
-+
-+	return match != NULL;
- }
- 
- u32 brcmstb_get_family_id(void)
+Thank you!
+
 -- 
-2.17.0
+Deet-doot-dot, I am a bot.
+https://korg.wiki.kernel.org/userdoc/prtracker
