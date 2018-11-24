@@ -1,36 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 24 Nov 2018 22:17:13 +0100
-Subject: [PATCH 0/9] drm: remove deprecated functions
-In-Reply-To: <20181121094233.GN4266@phenom.ffwll.local>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
- <20181121094233.GN4266@phenom.ffwll.local>
-Message-ID: <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
+From: mpatocka@redhat.com (Mikulas Patocka)
+Date: Sat, 24 Nov 2018 18:45:00 -0500 (EST)
+Subject: [PATCH] thermal: armada: fix broken temperature sensor in 4.19
+Message-ID: <alpine.LRH.2.02.1811241838180.7275@file01.intranet.prod.int.rdu2.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 21, 2018 at 10:42 AM Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Thu, Nov 15, 2018 at 11:38:35PM +0100, Linus Walleij wrote:
-> > On Thu, Nov 15, 2018 at 11:17 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
-> >
-> > > One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
-> > > "switch from reference/unreference to get/put". That's what this patch series is
-> > > about.
-> >
-> > The series:
-> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Since your reviewed it all, and there's a pile of acks for the driver
-> parts too: Want to go ahead and apply it too?
+The patch 8c0e64ac4075b7ca870098ed2ad6089868f5fa7b ("thermal: armada: get
+rid of the ->is_valid() pointer") breaks temperature readings on the
+MacchiatoBIN board. Reading the temperature with
+	cat /sys/devices/virtual/thermal/thermal_zone*/temp
+results in errors:
 
-OK I did... the git was quirky, patches changes around
-under my feet and dim started to complain about problems
-with commits that weren't even mine.
+armada_thermal f06f808c.thermal: Temperature sensor reading not valid
+armada_thermal f2400078.thermal: Temperature sensor reading not valid
+armada_thermal f4400078.thermal: Temperature sensor reading not valid
 
-It was especially scary.
+The patch was meant as simple refactoring, but unfortunatelly, it reverses
+the condition in armada_get_temp_legacy, so that the error is reported if
+armada_is_valid returns true.
 
-But I think I managed to apply the patches and push the
-branch now.
+Fixes: 8c0e64ac4075 ("thermal: armada: get rid of the ->is_valid() pointer")
+Cc: stable at vger.kernel.org	# 4.19
 
-Yours,
-Linus Walleij
+---
+ drivers/thermal/armada_thermal.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+Index: linux-4.19.4/drivers/thermal/armada_thermal.c
+===================================================================
+--- linux-4.19.4.orig/drivers/thermal/armada_thermal.c	2018-11-25 00:19:20.000000000 +0100
++++ linux-4.19.4/drivers/thermal/armada_thermal.c	2018-11-25 00:39:49.000000000 +0100
+@@ -357,7 +357,7 @@ static int armada_get_temp_legacy(struct
+ 	int ret;
+ 
+ 	/* Valid check */
+-	if (armada_is_valid(priv)) {
++	if (!armada_is_valid(priv)) {
+ 		dev_err(priv->dev,
+ 			"Temperature sensor reading not valid\n");
+ 		return -EIO;
