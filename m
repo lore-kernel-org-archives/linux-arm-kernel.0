@@ -1,22 +1,47 @@
-From: vkoul@kernel.org (Vinod Koul)
-Date: Sat, 24 Nov 2018 20:00:35 +0530
-Subject: [PATCH] dma: coh901318: Fix a double-lock bug
-In-Reply-To: <20181106033348.27361-1-baijiaju1990@gmail.com>
-References: <20181106033348.27361-1-baijiaju1990@gmail.com>
-Message-ID: <20181124143035.GJ3175@vkoul-mobl.Dlink>
+From: tiny.windzz@gmail.com (Yangtao Li)
+Date: Sat, 24 Nov 2018 09:52:23 -0500
+Subject: [PATCH v2] soc: bcm: brcmstb: Don't leak device tree node reference
+Message-ID: <20181124145223.29208-1-tiny.windzz@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-11-18, 11:33, Jia-Ju Bai wrote:
-> The function coh901318_alloc_chan_resources() calls spin_lock_irqsave() 
-> before calling coh901318_config().
-> But coh901318_config() calls spin_lock_irqsave() again in its
-> definition, which may cause a double-lock bug.
-> 
-> Because coh901318_config() is only called by
-> coh901318_alloc_chan_resources(), the bug fix is to remove the
-> calls to spin-lock and -unlock functions in coh901318_config().
+of_find_node_by_path() acquires a reference to the node returned by it
+and that reference needs to be dropped by its caller. soc_is_brcmstb()
+doesn't do that, so fix it.
 
-Applied after fixing subsystem tag, thanks
+[treding: slightly rewrite to avoid inline comparison]
+
+Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+---
+Changes in v2:
+-update changelog
+-slightly rewrite to avoid inline comparison
+---
+ drivers/soc/bcm/brcmstb/common.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+index 14185451901d..bf9123f727e8 100644
+--- a/drivers/soc/bcm/brcmstb/common.c
++++ b/drivers/soc/bcm/brcmstb/common.c
+@@ -31,13 +31,17 @@ static const struct of_device_id brcmstb_machine_match[] = {
+ 
+ bool soc_is_brcmstb(void)
+ {
++	const struct of_device_id *match;
+ 	struct device_node *root;
+ 
+ 	root = of_find_node_by_path("/");
+ 	if (!root)
+ 		return false;
+ 
+-	return of_match_node(brcmstb_machine_match, root) != NULL;
++	match = of_match_node(brcmstb_machine_match, root);
++	of_node_put(root);
++
++	return match != NULL;
+ }
+ 
+ u32 brcmstb_get_family_id(void)
 -- 
-~Vinod
+2.17.0
