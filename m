@@ -1,163 +1,202 @@
-From: lyude@redhat.com (Lyude Paul)
-Date: Sat, 24 Nov 2018 14:12:38 -0500
-Subject: [PATCH] drm/meson: Enable fast_io in meson_dw_hdmi_regmap_config
-Message-ID: <20181124191238.28276-1-lyude@redhat.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Sun, 25 Nov 2018 01:36:37 +0530
+Subject: [PATCH v2] x86_64,
+ vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
+In-Reply-To: <20181121113944.GD27797@zn.tnic>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181121113944.GD27797@zn.tnic>
+Message-ID: <CACi5LpPx1bmH6duAbWFNMVStg-2GR=dSVuKrEfVCko8HzmqF_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Seeing as we use this registermap in the context of our IRQ handlers, we
-need to be using spinlocks for reading/writing registers so that we can
-still read them from IRQ handlers without having to grab any mutexes and
-accidentally sleep. We don't currently do this, as pointed out by
-lockdep:
+Hi Boris,
 
-[   18.403770] BUG: sleeping function called from invalid context at kernel/locking/mutex.c:908
-[   18.406744] in_atomic(): 1, irqs_disabled(): 128, pid: 68, name: kworker/u17:0
-[   18.413864] INFO: lockdep is turned off.
-[   18.417675] irq event stamp: 12
-[   18.420778] hardirqs last  enabled at (11): [<ffff000008a4f57c>] _raw_spin_unlock_irq+0x2c/0x60
-[   18.429510] hardirqs last disabled at (12): [<ffff000008a48914>] __schedule+0xc4/0xa60
-[   18.437345] softirqs last  enabled at (0): [<ffff0000080b55e0>] copy_process.isra.4.part.5+0x4d8/0x1c50
-[   18.446684] softirqs last disabled at (0): [<0000000000000000>]           (null)
-[   18.453979] CPU: 0 PID: 68 Comm: kworker/u17:0 Tainted: G        W  O      4.20.0-rc3Lyude-Test+ #9
-[   18.469839] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
-[   18.480037] Workqueue: hci0 hci_power_on [bluetooth]
-[   18.487138] Call trace:
-[   18.494192]  dump_backtrace+0x0/0x1b8
-[   18.501280]  show_stack+0x14/0x20
-[   18.508361]  dump_stack+0xbc/0xf4
-[   18.515427]  ___might_sleep+0x140/0x1d8
-[   18.522515]  __might_sleep+0x50/0x88
-[   18.529582]  __mutex_lock+0x60/0x870
-[   18.536621]  mutex_lock_nested+0x1c/0x28
-[   18.543660]  regmap_lock_mutex+0x10/0x18
-[   18.550696]  regmap_read+0x38/0x70
-[   18.557727]  dw_hdmi_hardirq+0x58/0x138 [dw_hdmi]
-[   18.564804]  __handle_irq_event_percpu+0xac/0x410
-[   18.571891]  handle_irq_event_percpu+0x34/0x88
-[   18.578982]  handle_irq_event+0x48/0x78
-[   18.586051]  handle_fasteoi_irq+0xac/0x160
-[   18.593061]  generic_handle_irq+0x24/0x38
-[   18.599989]  __handle_domain_irq+0x60/0xb8
-[   18.606857]  gic_handle_irq+0x50/0xa0
-[   18.613659]  el1_irq+0xb4/0x130
-[   18.620394]  debug_lockdep_rcu_enabled+0x2c/0x30
-[   18.627111]  schedule+0x38/0xa0
-[   18.633781]  schedule_timeout+0x3a8/0x510
-[   18.640389]  wait_for_common+0x15c/0x180
-[   18.646905]  wait_for_completion+0x14/0x20
-[   18.653319]  mmc_wait_for_req_done+0x28/0x168
-[   18.659693]  mmc_wait_for_req+0xa8/0xe8
-[   18.665978]  mmc_wait_for_cmd+0x64/0x98
-[   18.672180]  mmc_io_rw_direct_host+0x94/0x130
-[   18.678385]  mmc_io_rw_direct+0x10/0x18
-[   18.684516]  sdio_enable_func+0xe8/0x1d0
-[   18.690627]  btsdio_open+0x24/0xc0 [btsdio]
-[   18.696821]  hci_dev_do_open+0x64/0x598 [bluetooth]
-[   18.703025]  hci_power_on+0x50/0x270 [bluetooth]
-[   18.709163]  process_one_work+0x2a0/0x6e0
-[   18.715252]  worker_thread+0x40/0x448
-[   18.721310]  kthread+0x12c/0x130
-[   18.727326]  ret_from_fork+0x10/0x1c
-[   18.735555] ------------[ cut here ]------------
-[   18.741430] do not call blocking ops when !TASK_RUNNING; state=2 set at [<000000006265ec59>] wait_for_common+0x140/0x180
-[   18.752417] WARNING: CPU: 0 PID: 68 at kernel/sched/core.c:6096 __might_sleep+0x7c/0x88
-[   18.760553] Modules linked in: dm_mirror dm_region_hash dm_log dm_mod
-btsdio bluetooth snd_soc_hdmi_codec dw_hdmi_i2s_audio ecdh_generic
-brcmfmac brcmutil cfg80211 rfkill ir_nec_decoder meson_dw_hdmi(O)
-dw_hdmi rc_geekbox meson_rng meson_ir ao_cec rng_core rc_core cec
-leds_pwm efivars nfsd ip_tables x_tables crc32_generic f2fs uas
-meson_gxbb_wdt pwm_meson efivarfs ipv6
-[   18.799469] CPU: 0 PID: 68 Comm: kworker/u17:0 Tainted: G        W  O      4.20.0-rc3Lyude-Test+ #9
-[   18.808858] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
-[   18.818045] Workqueue: hci0 hci_power_on [bluetooth]
-[   18.824088] pstate: 80000085 (Nzcv daIf -PAN -UAO)
-[   18.829891] pc : __might_sleep+0x7c/0x88
-[   18.835722] lr : __might_sleep+0x7c/0x88
-[   18.841256] sp : ffff000008003cb0
-[   18.846751] x29: ffff000008003cb0 x28: 0000000000000000
-[   18.852269] x27: ffff00000938e000 x26: ffff800010283000
-[   18.857726] x25: ffff800010353280 x24: ffff00000868ef50
-[   18.863166] x23: 0000000000000000 x22: 0000000000000000
-[   18.868551] x21: 0000000000000000 x20: 000000000000038c
-[   18.873850] x19: ffff000008cd08c0 x18: 0000000000000010
-[   18.879081] x17: ffff000008a68cb0 x16: 0000000000000000
-[   18.884197] x15: 0000000000aaaaaa x14: 0e200e200e200e20
-[   18.889239] x13: 0000000000000001 x12: 00000000ffffffff
-[   18.894261] x11: ffff000008adfa48 x10: 0000000000000001
-[   18.899517] x9 : ffff0000092a0158 x8 : 0000000000000000
-[   18.904674] x7 : ffff00000812136c x6 : 0000000000000000
-[   18.909895] x5 : 0000000000000000 x4 : 0000000000000001
-[   18.915080] x3 : 0000000000000007 x2 : 0000000000000007
-[   18.920269] x1 : 99ab8e9ebb6c8500 x0 : 0000000000000000
-[   18.925443] Call trace:
-[   18.929904]  __might_sleep+0x7c/0x88
-[   18.934311]  __mutex_lock+0x60/0x870
-[   18.938687]  mutex_lock_nested+0x1c/0x28
-[   18.943076]  regmap_lock_mutex+0x10/0x18
-[   18.947453]  regmap_read+0x38/0x70
-[   18.951842]  dw_hdmi_hardirq+0x58/0x138 [dw_hdmi]
-[   18.956269]  __handle_irq_event_percpu+0xac/0x410
-[   18.960712]  handle_irq_event_percpu+0x34/0x88
-[   18.965176]  handle_irq_event+0x48/0x78
-[   18.969612]  handle_fasteoi_irq+0xac/0x160
-[   18.974058]  generic_handle_irq+0x24/0x38
-[   18.978501]  __handle_domain_irq+0x60/0xb8
-[   18.982938]  gic_handle_irq+0x50/0xa0
-[   18.987351]  el1_irq+0xb4/0x130
-[   18.991734]  debug_lockdep_rcu_enabled+0x2c/0x30
-[   18.996180]  schedule+0x38/0xa0
-[   19.000609]  schedule_timeout+0x3a8/0x510
-[   19.005064]  wait_for_common+0x15c/0x180
-[   19.009513]  wait_for_completion+0x14/0x20
-[   19.013951]  mmc_wait_for_req_done+0x28/0x168
-[   19.018402]  mmc_wait_for_req+0xa8/0xe8
-[   19.022809]  mmc_wait_for_cmd+0x64/0x98
-[   19.027177]  mmc_io_rw_direct_host+0x94/0x130
-[   19.031563]  mmc_io_rw_direct+0x10/0x18
-[   19.035922]  sdio_enable_func+0xe8/0x1d0
-[   19.040294]  btsdio_open+0x24/0xc0 [btsdio]
-[   19.044742]  hci_dev_do_open+0x64/0x598 [bluetooth]
-[   19.049228]  hci_power_on+0x50/0x270 [bluetooth]
-[   19.053687]  process_one_work+0x2a0/0x6e0
-[   19.058143]  worker_thread+0x40/0x448
-[   19.062608]  kthread+0x12c/0x130
-[   19.067064]  ret_from_fork+0x10/0x1c
-[   19.071513] irq event stamp: 12
-[   19.075937] hardirqs last  enabled at (11): [<ffff000008a4f57c>] _raw_spin_unlock_irq+0x2c/0x60
-[   19.083560] hardirqs last disabled at (12): [<ffff000008a48914>] __schedule+0xc4/0xa60
-[   19.091401] softirqs last  enabled at (0): [<ffff0000080b55e0>] copy_process.isra.4.part.5+0x4d8/0x1c50
-[   19.100801] softirqs last disabled at (0): [<0000000000000000>]           (null)
-[   19.108135] ---[ end trace 38c4920787b88c75 ]---
+Thanks for your review. Please see my replies inline:
 
-So, fix this by enabling the fast_io option in our regmap config so that
-regmap uses spinlocks for locking instead of mutexes.
+On Wed, Nov 21, 2018 at 5:10 PM Borislav Petkov <bp@alien8.de> wrote:
+>
+> + Kees.
+>
+> On Fri, Nov 16, 2018 at 03:17:49AM +0530, Bhupesh Sharma wrote:
+> > x86_64 kernel uses 'page_offset_base' variable to point to the
+> > start of direct mapping of all physical memory. This variable
+> > is also updated for KASLR boot cases, so this can be exported
+> > via vmcoreinfo as a standard ABI between kernel and user-space,
+> > to allow user-space utilities to use the same for calculating
+> > the start of direct mapping of all physical memory.
+> >
+> > 'arch/x86/kernel/head64.c' sets the same as:
+> >    unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
+> >
+> > and also uses the same to indicate the base of KASLR regions on x86_64:
+> >    static __initdata struct kaslr_memory_region {
+> >           unsigned long *base;
+> >               unsigned long size_tb;
+> >    } kaslr_regions[] = {
+> >           { &page_offset_base, 0 },
+> >    .. snip ..
+>
+> Why is that detail needed in the commit message?
 
-Signed-off-by: Lyude Paul <lyude@redhat.com>
-Fixes: 3f68be7d8e96 ("drm/meson: Add support for HDMI encoder and DW-HDMI bridge + PHY")
-Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
-Cc: Neil Armstrong <narmstrong@baylibre.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: <stable@vger.kernel.org> # v4.12+
----
- drivers/gpu/drm/meson/meson_dw_hdmi.c | 1 +
- 1 file changed, 1 insertion(+)
+This (and similar) details were requested by Baoquan during the v1
+review, that is why I added them to the v2 commit log.
+Although personally I also think that such details are probably not
+needed in a commit log (may be better suited for a cover letter, which
+is maybe a overkill for this single patch).
+Will drop this from v3.
 
-diff --git a/drivers/gpu/drm/meson/meson_dw_hdmi.c b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-index df7247cd93f9..2cb2ad26d716 100644
---- a/drivers/gpu/drm/meson/meson_dw_hdmi.c
-+++ b/drivers/gpu/drm/meson/meson_dw_hdmi.c
-@@ -706,6 +706,7 @@ static const struct regmap_config meson_dw_hdmi_regmap_config = {
- 	.reg_read = meson_dw_hdmi_reg_read,
- 	.reg_write = meson_dw_hdmi_reg_write,
- 	.max_register = 0x10000,
-+	.fast_io = true,
- };
- 
- static bool meson_hdmi_connector_is_available(struct device *dev)
--- 
-2.19.1
+> > Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
+> > live-debugging of a running kernel via user-space utilities
+> > like makedumpfile (see [1]).
+> >
+> > Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
+>
+> Use passive tone in your commit message: no "we" or "I", etc.
+
+Ok.
+
+> Also, pls read section "2) Describe your changes" in
+> Documentation/process/submitting-patches.rst.
+
+Ok.
+
+> > details), whose live debugging feature is broken with newer kernels
+> > (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
+> > added to kcore, thus leading to an additional sections in the same, and
+> > makedumpfile is not longer able to determine the start of direct
+> > mapping of all physical memory, as it relies on traversing the PT_LOAD
+> > segments inside kcore and using the last PT_LOAD segment
+> > to determine the start of direct mapping.
+> >
+> > Such user-space issues can be resolved if the user-space code instead
+> > uses a standard ABI to read the kernel exposed machine specific
+> > variables. With the kernel commit 23c85094fe1895caefdd
+> > ["proc/kcore: add vmcoreinfo note to /proc/kcore"]), it is
+>
+> ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 23c85094fe18 ("proc/kcore: add vmcoreinfo note to /proc/kcore")'
+> #54:
+> variables. With the kernel commit 23c85094fe1895caefdd
+
+Ok.
+
+> > now possible to use the vmcoreinfo present inside kcore as the standard
+> > ABI which can be used by the user-space utilities for reading
+> > the machine specific information (and hence for debugging a
+> > live kernel).
+> >
+> > User-space utilities like makedumpfile, kexec-tools and crash
+> > are either already using this ABI or are discussing patches
+> > which look to add the same feature. This helps in simplifying the
+> > overall code and also in reducing code-rewrite across the
+> > user-space utilities for getting values of these kernel
+> > symbols/variables.
+>
+> > Accordingly this patch allows appending 'page_offset_base' for
+> > x86_64 platforms to vmcoreinfo, so that user-space tools can use the
+> > same as a standard interface to determine the start of direct mapping
+> > of all physical memory.
+> >
+> > Testing:
+> > -------
+> >  - I tested this patch (rebased on 'linux-next') on a x86_64 machine
+> >    using the modified 'makedumpfile' user-space code (see [3] for my
+> >    github tree which contains the same) for determining how many pages
+> >    are dumpable when different dump_level is specified (which is
+> >    one use-case of live-debugging via 'makedumpfile').
+> >  - I tested both the KASLR and non-KASLR boot cases with this patch.
+> >  - Here is one sample log (for KASLR boot case) on my x86_64 machine:
+> >
+> >    < snip..>
+> >    The kernel doesn't support mmap(),read() will be used instead.
+> >
+> >    TYPE               PAGES                   EXCLUDABLE      DESCRIPTION
+> >    ----------------------------------------------------------------------
+> >    ZERO               21299                   yes             Pages filled
+> >    with zero
+> >    NON_PRI_CACHE      91785                   yes             Cache
+> >    pages without private flag
+> >    PRI_CACHE  1                       yes             Cache pages with
+> >    private flag
+> >    USER               14057                   yes             User process
+> >    pages
+> >    FREE               740346                  yes             Free pages
+> >    KERN_DATA  58152                   no              Dumpable kernel
+> >    data
+> >
+> >    page size:         4096
+> >    Total pages on system:     925640
+> >    Total size on system:      3791421440       Byte
+> >
+> > [1]. MAN pages -> MAKEDUMPFILE(8) and CRASH(8)
+> > [2]. makedumpfile issue with latest kernels -> http://lists.infradead.org/pipermail/kexec/2018-October/021769.html
+> > [3]. https://github.com/bhupesh-sharma/makedumpfile/tree/add-page-offset-base-to-vmcore-v1
+> >
+> > Cc: Boris Petkov <bp@alien8.de>
+> > Cc: Baoquan He <bhe@redhat.com>
+> > Cc: Ingo Molnar <mingo@kernel.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
+> > Cc: Dave Anderson <anderson@redhat.com>
+> > Cc: James Morse <james.morse@arm.com>
+> > Cc: Omar Sandoval <osandov@fb.com>
+> > Cc: x86 at kernel.org
+> > Cc: kexec at lists.infradead.org
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Bhupesh Sharma <bhsharma@redhat.com>
+> > ---
+> > Changes since v1:
+> >  - Fixed the build issue reported by build bot and tested this version
+> >    with 'make allmodconfig'.
+> >  - Reworded most of the commit log to explain the intent behind the
+> >    patch.
+> >
+> >  arch/x86/kernel/machine_kexec_64.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+> > index 4c8acdfdc5a7..6161d77c5bfb 100644
+> > --- a/arch/x86/kernel/machine_kexec_64.c
+> > +++ b/arch/x86/kernel/machine_kexec_64.c
+> > @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+> >       VMCOREINFO_SYMBOL(init_top_pgt);
+> >       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+> >                       pgtable_l5_enabled());
+> > +#ifdef CONFIG_RANDOMIZE_BASE
+> > +     VMCOREINFO_NUMBER(page_offset_base);
+> > +#endif
+> >
+> >  #ifdef CONFIG_NUMA
+> >       VMCOREINFO_SYMBOL(node_data);
+> > --
+>
+> All above are only nitpicks though.
+
+Right the above are mostly nitpicks, but useful ones, so I will
+address these in the v3.
+
+> My opinion is this: people are exporting all kinds of kernel-internal
+> stuff in vmcoreinfo and frankly, I'm not crazy about this idea.
+>
+> And AFAICT, this thing basically bypasses KASLR completely but you need
+> root for it so it probably doesn't really matter.
+>
+> Now, on another thread we agreed more or less that what gets exported in
+> vmcoreinfo is so tightly coupled to the running kernel so that it is not
+> even considered an ABI. I guess that is debatable but whatever.
+
+I understand.
+
+> So my only request right now would be to have all those things being
+> exported, documented somewhere and I believe Lianbo is working on that.
+
+I will work with Lianbo to get this added to his documentation patch as well.
+
+> But I'm sure others will have more to say about it.
+
+Sure, I will wait for a couple of days more and then send out a v3 and
+also make sure that
+this variable being export'ed also gets added to the overall documentation patch
+which Lianbo is creating.
+
+Regards,
+Bhupesh
