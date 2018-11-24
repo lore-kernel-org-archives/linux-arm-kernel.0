@@ -1,80 +1,76 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sat, 24 Nov 2018 10:57:46 +0800
-Subject: [PATCH v2 2/2] arm64/bpf: don't allocate BPF JIT programs in
- module memory
-In-Reply-To: <20181121131733.14910-3-ard.biesheuvel@linaro.org>
-References: <20181121131733.14910-3-ard.biesheuvel@linaro.org>
-Message-ID: <201811241058.juYoIaEF%fengguang.wu@intel.com>
+Date: Sat, 24 Nov 2018 16:30:06 +0800
+Subject: [PATCH v2 15/15] MAINTAINERS: Add entry for RDA Micro SoC
+ architecture
+In-Reply-To: <20181121033652.12247-16-manivannan.sadhasivam@linaro.org>
+References: <20181121033652.12247-16-manivannan.sadhasivam@linaro.org>
+Message-ID: <201811241627.2eQKZPBL%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi Manivannan,
 
-I love your patch! Yet something to improve:
+I love your patch! Perhaps something to improve:
 
-[auto build test ERROR on bpf-next/master]
-[also build test ERROR on v4.20-rc3 next-20181123]
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.20-rc3 next-20181123]
 [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/bpf-permit-JIT-allocations-to-be-served-outside-the-module-region/20181123-033144
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/bpf/bpf-next.git master
+url:    https://github.com/0day-ci/linux/commits/Manivannan-Sadhasivam/Add-initial-RDA8810PL-SoC-and-Orange-Pi-boards-support/20181123-125507
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
 config: x86_64-allmodconfig (attached as .config)
 compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
 reproduce:
         # save the attached .config to linux build tree
         make ARCH=x86_64 
 
-All errors (new ones prefixed by >>):
+All warnings (new ones prefixed by >>):
 
-   include/linux/slab.h:332:43: warning: dubious: x & !y
-   kernel/bpf/core.c:625:6: warning: symbol 'bpf_jit_alloc_exec' was not declared. Should it be static?
->> kernel/bpf/core.c:632:31: error: undefined identifier 'size'
->> kernel/bpf/core.c:632:30: error: return expression in void function
-   include/linux/slab.h:332:43: warning: dubious: x & !y
-   kernel/bpf/core.c:1621:9: warning: incorrect type in argument 1 (different address spaces)
-   include/linux/slab.h:332:43: warning: dubious: x & !y
-   kernel/bpf/core.c:1695:44: warning: incorrect type in initializer (different address spaces)
-   kernel/bpf/core.c:1719:26: warning: incorrect type in assignment (different address spaces)
-   kernel/bpf/core.c:1753:26: warning: incorrect type in assignment (different address spaces)
-   include/trace/events/xdp.h:28:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:53:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:111:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:126:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:161:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:196:1: warning: Using plain integer as NULL pointer
-   include/trace/events/xdp.h:231:1: warning: Using plain integer as NULL pointer
-   kernel/bpf/core.c:1012:18: warning: Initializer entry defined twice
-   kernel/bpf/core.c: In function 'bpf_jit_free_exec':
-   kernel/bpf/core.c:632:24: error: 'size' undeclared (first use in this function); did you mean 'ksize'?
-     return module_memfree(size);
-                           ^~~~
-                           ksize
-   kernel/bpf/core.c:632:24: note: each undeclared identifier is reported only once for each function it appears in
-   kernel/bpf/core.c:632:9: warning: 'return' with a value, in function returning void
-     return module_memfree(size);
-            ^~~~~~~~~~~~~~
-   kernel/bpf/core.c:630:13: note: declared here
-    void __weak bpf_jit_free_exec(const void *addr)
-                ^~~~~~~~~~~~~~~~~
+>> drivers/tty/serial/rda-uart.c:619:28: warning: context imbalance in 'rda_uart_port_write' - unexpected unlock
 
-vim +/size +632 kernel/bpf/core.c
+vim +/rda_uart_port_write +619 drivers/tty/serial/rda-uart.c
 
-ede95a63b Daniel Borkmann 2018-10-23  624  
-f65149135 Ard Biesheuvel  2018-11-21 @625  void *__weak bpf_jit_alloc_exec(unsigned long size)
-f65149135 Ard Biesheuvel  2018-11-21  626  {
-f65149135 Ard Biesheuvel  2018-11-21  627  	return module_alloc(size);
-f65149135 Ard Biesheuvel  2018-11-21  628  }
-f65149135 Ard Biesheuvel  2018-11-21  629  
-f65149135 Ard Biesheuvel  2018-11-21  630  void __weak bpf_jit_free_exec(const void *addr)
-f65149135 Ard Biesheuvel  2018-11-21  631  {
-f65149135 Ard Biesheuvel  2018-11-21 @632  	return module_memfree(size);
-f65149135 Ard Biesheuvel  2018-11-21  633  }
-f65149135 Ard Biesheuvel  2018-11-21  634  
+efb19753 Manivannan Sadhasivam 2018-11-21  588  
+efb19753 Manivannan Sadhasivam 2018-11-21  589  static void rda_uart_port_write(struct uart_port *port, const char *s,
+efb19753 Manivannan Sadhasivam 2018-11-21  590  				u_int count)
+efb19753 Manivannan Sadhasivam 2018-11-21  591  {
+efb19753 Manivannan Sadhasivam 2018-11-21  592  	u32 old_irq_mask;
+efb19753 Manivannan Sadhasivam 2018-11-21  593  	unsigned long flags;
+efb19753 Manivannan Sadhasivam 2018-11-21  594  	int locked;
+efb19753 Manivannan Sadhasivam 2018-11-21  595  
+efb19753 Manivannan Sadhasivam 2018-11-21  596  	local_irq_save(flags);
+efb19753 Manivannan Sadhasivam 2018-11-21  597  
+efb19753 Manivannan Sadhasivam 2018-11-21  598  	if (port->sysrq) {
+efb19753 Manivannan Sadhasivam 2018-11-21  599  		locked = 0;
+efb19753 Manivannan Sadhasivam 2018-11-21  600  	} else if (oops_in_progress) {
+efb19753 Manivannan Sadhasivam 2018-11-21  601  		locked = spin_trylock(&port->lock);
+efb19753 Manivannan Sadhasivam 2018-11-21  602  	} else {
+efb19753 Manivannan Sadhasivam 2018-11-21  603  		spin_lock(&port->lock);
+efb19753 Manivannan Sadhasivam 2018-11-21  604  		locked = 1;
+efb19753 Manivannan Sadhasivam 2018-11-21  605  	}
+efb19753 Manivannan Sadhasivam 2018-11-21  606  
+efb19753 Manivannan Sadhasivam 2018-11-21  607  	old_irq_mask = rda_uart_read(port, RDA_UART_IRQ_MASK);
+efb19753 Manivannan Sadhasivam 2018-11-21  608  	rda_uart_write(port, 0, RDA_UART_IRQ_MASK);
+efb19753 Manivannan Sadhasivam 2018-11-21  609  
+efb19753 Manivannan Sadhasivam 2018-11-21  610  	uart_console_write(port, s, count, rda_console_putchar);
+efb19753 Manivannan Sadhasivam 2018-11-21  611  
+efb19753 Manivannan Sadhasivam 2018-11-21  612  	/* wait until all contents have been sent out */
+efb19753 Manivannan Sadhasivam 2018-11-21  613  	while (!(rda_uart_read(port, RDA_UART_STATUS) & RDA_UART_TX_FIFO_MASK))
+efb19753 Manivannan Sadhasivam 2018-11-21  614  		cpu_relax();
+efb19753 Manivannan Sadhasivam 2018-11-21  615  
+efb19753 Manivannan Sadhasivam 2018-11-21  616  	rda_uart_write(port, old_irq_mask, RDA_UART_IRQ_MASK);
+efb19753 Manivannan Sadhasivam 2018-11-21  617  
+efb19753 Manivannan Sadhasivam 2018-11-21  618  	if (locked)
+efb19753 Manivannan Sadhasivam 2018-11-21 @619  		spin_unlock(&port->lock);
+efb19753 Manivannan Sadhasivam 2018-11-21  620  
+efb19753 Manivannan Sadhasivam 2018-11-21  621  	local_irq_restore(flags);
+efb19753 Manivannan Sadhasivam 2018-11-21  622  }
+efb19753 Manivannan Sadhasivam 2018-11-21  623  
 
-:::::: The code at line 632 was first introduced by commit
-:::::: f6514913515dca448eb8ebd150918cc6d0a5515e bpf: add __weak hook for allocating executable memory
+:::::: The code at line 619 was first introduced by commit
+:::::: efb197538a7e148635e096850a818e3b29b1c4b2 tty: serial: Add RDA8810PL UART driver
 
-:::::: TO: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+:::::: TO: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 :::::: CC: 0day robot <lkp@intel.com>
 
 ---
@@ -84,6 +80,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/gzip
-Size: 66569 bytes
+Size: 66615 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181124/65a7e461/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181124/e9bedca7/attachment-0001.gz>
