@@ -1,24 +1,36 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 24 Nov 2018 21:59:10 +0100
-Subject: [PATCH 9/9] docs: drm: remove no longer relevant TODO entry
-In-Reply-To: <20181115221634.22715-10-greenfoo@gluegarage.com>
+Date: Sat, 24 Nov 2018 22:17:13 +0100
+Subject: [PATCH 0/9] drm: remove deprecated functions
+In-Reply-To: <20181121094233.GN4266@phenom.ffwll.local>
 References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <20181115221634.22715-10-greenfoo@gluegarage.com>
-Message-ID: <CACRpkdbRbXCq8DjzeJSGmH=tcb+B1f24oO209wMsLxAdHzvdkg@mail.gmail.com>
+ <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
+ <20181121094233.GN4266@phenom.ffwll.local>
+Message-ID: <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 11:18 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
-
-> This entry asked to rename all drm core "*_reference/_unrefence"
-> functions to "*_get/_put".
+On Wed, Nov 21, 2018 at 10:42 AM Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Thu, Nov 15, 2018 at 11:38:35PM +0100, Linus Walleij wrote:
+> > On Thu, Nov 15, 2018 at 11:17 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
+> >
+> > > One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
+> > > "switch from reference/unreference to get/put". That's what this patch series is
+> > > about.
+> >
+> > The series:
+> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Now that this task is complete, we can remove this entry from the TODO
-> list.
->
-> Signed-off-by: Fernando Ramos <greenfoo@gluegarage.com>
+> Since your reviewed it all, and there's a pile of acks for the driver
+> parts too: Want to go ahead and apply it too?
 
-Patch applied.
+OK I did... the git was quirky, patches changes around
+under my feet and dim started to complain about problems
+with commits that weren't even mine.
+
+It was especially scary.
+
+But I think I managed to apply the patches and push the
+branch now.
 
 Yours,
 Linus Walleij
