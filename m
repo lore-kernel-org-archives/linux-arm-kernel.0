@@ -1,43 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 24 Nov 2018 12:36:40 +0000
-Subject: [GIT PULL] arm64 fixes for 4.20-rc4
-Message-ID: <20181124123637.matxo4anfxj5q5vm@mbp>
+From: vkoul@kernel.org (Vinod Koul)
+Date: Sat, 24 Nov 2018 19:11:55 +0530
+Subject: [PATCH] dmaengine: xilinx_dma: Remove __aligned attribute on
+ zynqmp_dma_desc_ll
+In-Reply-To: <20181025180525.28378-1-natechancellor@gmail.com>
+References: <20181025180525.28378-1-natechancellor@gmail.com>
+Message-ID: <20181124134155.GC3175@vkoul-mobl.Dlink>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 25-10-18, 11:05, Nathan Chancellor wrote:
+> Clang warns:
+> 
+> drivers/dma/xilinx/zynqmp_dma.c:166:4: warning: attribute 'aligned' is
+> ignored, place it after "struct" to apply attribute to type declaration
+> [-Wignored-attributes]
+> }; __aligned(64)
+>    ^
+> ./include/linux/compiler_types.h:200:38: note: expanded from macro
+> '__aligned'
+> #define __aligned(x)            __attribute__((aligned(x)))
+>                                                ^
+> 1 warning generated.
+> 
+> As Nick pointed out in the previous version of this patch, the author
+> likely intended for this struct to be 8-byte (64-bit) aligned, not
+> 64-byte, which is the default. Remove the hanging __aligned attribute.
 
-Please pull the arm64 fixes below. Thanks.
-
-The following changes since commit 9ff01193a20d391e8dbce4403dd5ef87c7eaaca6:
-
-  Linux 4.20-rc3 (2018-11-18 13:33:44 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 4f9f49646a5733c0c2bd49940673dde89a9c5add:
-
-  arm64: cpufeature: Fix mismerge of CONFIG_ARM64_SSBD block (2018-11-23 18:44:16 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Fix wrong conflict resolution around CONFIG_ARM64_SSBD
-
-- Fix sparse warning on unsigned long constant
-
-----------------------------------------------------------------
-Sergey Matyukevich (1):
-      arm64: sysreg: fix sparse warnings
-
-Will Deacon (1):
-      arm64: cpufeature: Fix mismerge of CONFIG_ARM64_SSBD block
-
- arch/arm64/include/asm/sysreg.h | 4 ++--
- arch/arm64/kernel/cpufeature.c  | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Applied, thanks
 
 -- 
-Catalin
+~Vinod
