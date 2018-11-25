@@ -1,33 +1,36 @@
-From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 19:21:57 -0200
-Subject: [PATCH v2 1/3] ARM: imx_v6_v7_defconfig: Remove explicit ARM_UNWIND
- disable
-Message-ID: <20181125212159.11590-1-otavio@ossystems.com.br>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Sun, 25 Nov 2018 23:44:34 +0200
+Subject: [PATCH 2/5] microblaze: prefer memblock API returning virtual address
+In-Reply-To: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
+References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
+Message-ID: <1543182277-8819-3-git-send-email-rppt@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-selected by the Kconfig logic.  This is done in preparation to making
-further changes to this defconfig cleaner.
+Rather than use the memblock_alloc_base that returns a physical address and
+then convert this address to the virtual one, use appropriate memblock
+function that returns a virtual address.
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
-Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 ---
+ arch/microblaze/mm/init.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Changes in v2:
-- rework commit log (Fabio Estevam)
-
- arch/arm/configs/imx_v6_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index aa02d18f44d1..0c887a059df3 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -445,4 +445,3 @@ CONFIG_MAGIC_SYSRQ=y
- CONFIG_PROVE_LOCKING=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_FTRACE is not set
--# CONFIG_ARM_UNWIND is not set
+diff --git a/arch/microblaze/mm/init.c b/arch/microblaze/mm/init.c
+index b17fd8a..44f4b89 100644
+--- a/arch/microblaze/mm/init.c
++++ b/arch/microblaze/mm/init.c
+@@ -363,8 +363,9 @@ void __init *early_get_page(void)
+ 	 * Mem start + kernel_tlb -> here is limit
+ 	 * because of mem mapping from head.S
+ 	 */
+-	return __va(memblock_alloc_base(PAGE_SIZE, PAGE_SIZE,
+-				memory_start + kernel_tlb));
++	return memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
++				MEMBLOCK_LOW_LIMIT, memory_start + kernel_tlb,
++				NUMA_NO_NODE);
+ }
+ 
+ #endif /* CONFIG_MMU */
 -- 
-2.19.1
+2.7.4
