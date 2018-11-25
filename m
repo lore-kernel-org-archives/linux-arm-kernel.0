@@ -1,46 +1,46 @@
-From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 20:21:27 -0200
-Subject: [PATCH v2 1/3] ARM: imx_v6_v7_defconfig: Remove explicit
- ARM_UNWIND disable
-In-Reply-To: <CAK8P3a3bCK4MxXoCmzfdgvELz9dNgOkACb1Gzpf8vRH8Cd-FnA@mail.gmail.com>
-References: <20181125212159.11590-1-otavio@ossystems.com.br>
- <CAK8P3a2FXsz4-fBvUuQ6J5ERDkK6QsBoKvLLsDsczZqCOrq3Kw@mail.gmail.com>
- <CAP9ODKqDySwsJ+3hJFXYfm8NyhsVGDwyRi+3sUUJiP304SU07g@mail.gmail.com>
- <CAK8P3a3bCK4MxXoCmzfdgvELz9dNgOkACb1Gzpf8vRH8Cd-FnA@mail.gmail.com>
-Message-ID: <CAP9ODKr3kQjEcKGwiVpsnFTFEEzjTxP0HdJYsQuc7jvqLEBypA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 25 Nov 2018 14:25:04 -0800
+Subject: [PATCH 02/13] ARM: multi_v7_defconfig: Add missing systemd options
+In-Reply-To: <20181125211907.9895-2-otavio@ossystems.com.br>
+References: <20181125211907.9895-1-otavio@ossystems.com.br>
+ <20181125211907.9895-2-otavio@ossystems.com.br>
+Message-ID: <CAOesGMjR--5XC1pNMkPHR9BaPfgGfdC8JHAM3oqS3Xte3TQbGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Arnd,
-
-On Sun, Nov 25, 2018 at 7:48 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sun, Nov 25, 2018 at 10:45 PM Otavio Salvador
-> <otavio.salvador@ossystems.com.br> wrote:
-> >
-> > On Sun, Nov 25, 2018 at 7:35 PM Arnd Bergmann <arnd@arndb.de> wrote:
-> > > On Sun, Nov 25, 2018 at 10:24 PM Otavio Salvador
-> > > <otavio@ossystems.com.br> wrote:
-> > > >
-> > > > CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-> > > > selected by the Kconfig logic.  This is done in preparation to making
-> > > > further changes to this defconfig cleaner.
-> > > >
-> > >
-> > > Does this mean we no longer get the unwinder, or there is some other
-> > > config (which?) that unconditionally selects it?
-> >
-> > It is selected. Before changing the defconfig I did a savedefconfig to
-> > avoid unrelated changes to be included on the subsequent patches and
-> > then I found it was now selected.
+On Sun, Nov 25, 2018 at 1:19 PM Otavio Salvador <otavio@ossystems.com.br> wrote:
 >
-> Ok, then please mention in the changelog which other option selects it,
-> as I said.
+> From: Fabio Berton <fabio.berton@ossystems.com.br>
 >
-> Aside from that, your series looks fine to me.
+> Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
+> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 
-Thank you for reviewing it. I sent a v3 mentioning it.
+Hi Otavio,
 
--- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9 9981-7854          Mobile: +1 (347) 903-9750
+Thanks for these patches. I don't have a reason to _not_ enable
+systemd features, but would you mind providing a brief description of
+what's not working without this change? Is it completely broken, or is
+it just the random-UID featues that don't work, or something else?.
+Useful for others to know what's expected to break if someone turns
+them off, etc.
+
+Also, I noticed you posted a series of 13 patches, which includes some
+dts files for rv1108, some network driver changes and some of these
+more generic defconfig changes. I would suggest that you split up your
+patches into independent series where possible, especially when they
+end up going to different subsystems. Providing suitable cover letters
+for the series when you post them is also useful to help reviewers by
+summarizing the series, including changes from last time it was
+posted, etc. Please address it to the superset of patch receivers on
+the series.
+
+I'm asking for the cover letter because this time I was wondering if
+there was a reason for the mix of patches so I went looking for it.
+Maybe there is a need to group them together even though the
+sub-series seem somewhat independent -- I can't tell from the way they
+were posted.
+
+
+Thanks!
+
+-Olof
