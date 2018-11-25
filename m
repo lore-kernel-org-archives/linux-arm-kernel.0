@@ -1,22 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 25 Nov 2018 22:35:10 +0100
-Subject: [PATCH v2 1/3] ARM: imx_v6_v7_defconfig: Remove explicit
- ARM_UNWIND disable
-In-Reply-To: <20181125212159.11590-1-otavio@ossystems.com.br>
-References: <20181125212159.11590-1-otavio@ossystems.com.br>
-Message-ID: <CAK8P3a2FXsz4-fBvUuQ6J5ERDkK6QsBoKvLLsDsczZqCOrq3Kw@mail.gmail.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Sun, 25 Nov 2018 19:19:06 -0200
+Subject: [PATCH 12/13] ARM: dts: rv1108: Pass the 'arm,
+ cpu-registers-not-fw-configured' property
+In-Reply-To: <20181125211907.9895-1-otavio@ossystems.com.br>
+References: <20181125211907.9895-1-otavio@ossystems.com.br>
+Message-ID: <20181125211907.9895-12-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2018 at 10:24 PM Otavio Salvador
-<otavio@ossystems.com.br> wrote:
->
-> CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-> selected by the Kconfig logic.  This is done in preparation to making
-> further changes to this defconfig cleaner.
->
+Since firmware does not initialize  any of the generic timer CPU
+registers pass the 'arm,cpu-registers-not-fw-configured' property as
+suggested in Documentation/devicetree/bindings/timer/arm,arch_timer.txt.
 
-Does this mean we no longer get the unwinder, or there is some other
-config (which?) that unconditionally selects it?
+This also aligns with other Rockchip SoC dtsi files.
 
-      Arnd
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
+
+ arch/arm/boot/dts/rv1108.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index 42566adadc83..d96c58728b28 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -71,6 +71,7 @@
+ 
+ 	timer {
+ 		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+ 			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		clock-frequency = <24000000>;
+-- 
+2.19.1
