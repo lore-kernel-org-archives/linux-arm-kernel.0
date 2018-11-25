@@ -1,91 +1,750 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Sun, 25 Nov 2018 18:19:30 +0800
-Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
- vmcoreinfo
-In-Reply-To: <CACi5LpPx1bmH6duAbWFNMVStg-2GR=dSVuKrEfVCko8HzmqF_A@mail.gmail.com>
-References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
- <20181121113944.GD27797@zn.tnic>
- <CACi5LpPx1bmH6duAbWFNMVStg-2GR=dSVuKrEfVCko8HzmqF_A@mail.gmail.com>
-Message-ID: <20181125101930.GA1824@MiWiFi-R3L-srv>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 25 Nov 2018 10:27:57 +0000
+Subject: [PATCH v3 2/4] iio: adc: add STMPE ADC driver using IIO framework
+In-Reply-To: <20181123142411.8921-2-dev@pschenker.ch>
+References: <20181123142411.8921-1-dev@pschenker.ch>
+ <20181123142411.8921-2-dev@pschenker.ch>
+Message-ID: <20181125102757.2c34371c@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/25/18 at 01:36am, Bhupesh Sharma wrote:
-> Hi Boris,
+On Fri, 23 Nov 2018 15:24:09 +0100
+Philippe Schenker <dev@pschenker.ch> wrote:
+
+> From: Stefan Agner <stefan@agner.ch>
 > 
-> Thanks for your review. Please see my replies inline:
+> This adds an ADC driver for the STMPE device using the industrial
+> input/output interface. The driver supports raw reading of values.
+> The driver depends on the MFD STMPE driver. If the touchscreen
+> block is enabled too, only four of the 8 ADC channels are available.
 > 
-> On Wed, Nov 21, 2018 at 5:10 PM Borislav Petkov <bp@alien8.de> wrote:
-> >
-> > + Kees.
-> >
-> > On Fri, Nov 16, 2018 at 03:17:49AM +0530, Bhupesh Sharma wrote:
-> > > x86_64 kernel uses 'page_offset_base' variable to point to the
-> > > start of direct mapping of all physical memory. This variable
-> > > is also updated for KASLR boot cases, so this can be exported
-> > > via vmcoreinfo as a standard ABI between kernel and user-space,
-> > > to allow user-space utilities to use the same for calculating
-> > > the start of direct mapping of all physical memory.
-> > >
-> > > 'arch/x86/kernel/head64.c' sets the same as:
-> > >    unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
-> > >
-> > > and also uses the same to indicate the base of KASLR regions on x86_64:
-> > >    static __initdata struct kaslr_memory_region {
-> > >           unsigned long *base;
-> > >               unsigned long size_tb;
-> > >    } kaslr_regions[] = {
-> > >           { &page_offset_base, 0 },
-> > >    .. snip ..
-> >
-> > Why is that detail needed in the commit message?
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+
+Given the dt related refactoring in here is mixed up somewhat with the
+ADC driver, I would like to see that as a precursor patch.
+
+Another area that I think needs a rethink is balance between
+enable and disable.  The enable is in the mfd call, but the disable
+in the iio driver remove which isn't right.  Not immediately
+sure what we do about that, but it should be one or the other.
+
+I'd previously missed your use of the IIO core mlock.  Please don't
+use that in a driver directly.  It has very carefully defined
+locking semantics which aren't even in use here.  A locally defined
+lock with well documented scope is much better.  We 'used'
+to abuse mlock for this and have spent years slowly unwinding that.
+
+Thanks,
+
+Jonathan
+
+> ---
 > 
-> This (and similar) details were requested by Baoquan during the v1
-> review, that is why I added them to the v2 commit log.
+> Changes in v3:
+>  - Undo ADC-settings related code-deletions in stmpe-ts.c that the code is
+>    backwards-compatible to older devicetrees.
+> 
+> Changes in v2:
+>  - Code formatting
+>  - Move code to setup ADC to MFD device, as it is used by both drivers
+>    adc and touchscreen
+>  - Removed unused includes
+>  - Defined the macro STMPE_START_ONE_TEMP_CONV with other macros.
+>  - Added new macro that defines the channel of the temperature sensor.
+>    Took new name for STMPE_MAX_ADC->STMPE_ADC_LAST_NR and used it throughout
+>    the code for better readability.
+>  - Added mutex_unlock where missing.
+> 
+>  drivers/iio/adc/Kconfig              |   7 +
+>  drivers/iio/adc/Makefile             |   1 +
+>  drivers/iio/adc/stmpe-adc.c          | 326 +++++++++++++++++++++++++++
+>  drivers/input/touchscreen/stmpe-ts.c |  36 +--
+>  drivers/mfd/Kconfig                  |   3 +-
+>  drivers/mfd/stmpe.c                  |  81 +++++++
+>  include/linux/mfd/stmpe.h            |   9 +
+>  7 files changed, 437 insertions(+), 26 deletions(-)
+>  create mode 100644 drivers/iio/adc/stmpe-adc.c
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index a52fea8749a9..224f2067494d 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -734,6 +734,13 @@ config STM32_DFSDM_ADC
+>  	  This driver can also be built as a module.  If so, the module
+>  	  will be called stm32-dfsdm-adc.
+>  
+> +config STMPE_ADC
+> +	tristate "STMicroelectronics STMPE ADC driver"
+> +	depends on OF && MFD_STMPE
+> +	help
+> +	  Say yes here to build support for ST Microelectronics STMPE
+> +	  built-in ADC block (stmpe811).
+> +
+>  config STX104
+>  	tristate "Apex Embedded Systems STX104 driver"
+>  	depends on PC104 && X86
+> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+> index a6e6a0b659e2..cba889c30bf9 100644
+> --- a/drivers/iio/adc/Makefile
+> +++ b/drivers/iio/adc/Makefile
+> @@ -69,6 +69,7 @@ obj-$(CONFIG_STM32_ADC_CORE) += stm32-adc-core.o
+>  obj-$(CONFIG_STM32_ADC) += stm32-adc.o
+>  obj-$(CONFIG_STM32_DFSDM_CORE) += stm32-dfsdm-core.o
+>  obj-$(CONFIG_STM32_DFSDM_ADC) += stm32-dfsdm-adc.o
+> +obj-$(CONFIG_STMPE_ADC) += stmpe-adc.o
+>  obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+>  obj-$(CONFIG_TI_ADC0832) += ti-adc0832.o
+>  obj-$(CONFIG_TI_ADC084S021) += ti-adc084s021.o
+> diff --git a/drivers/iio/adc/stmpe-adc.c b/drivers/iio/adc/stmpe-adc.c
+> new file mode 100644
+> index 000000000000..bea3f3c27bb5
+> --- /dev/null
+> +++ b/drivers/iio/adc/stmpe-adc.c
+> @@ -0,0 +1,326 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + *  STMicroelectronics STMPE811 IIO ADC Driver
+> + *
+> + *  4 channel, 10/12-bit ADC
+> + *
+> + *  Copyright (C) 2013-2018 Toradex AG <stefan.agner@toradex.com>
+> + */
+> +
+> +#include <linux/completion.h>
+> +#include <linux/err.h>
+> +#include <linux/iio/iio.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/mfd/stmpe.h>
+> +#include <linux/module.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define STMPE_REG_INT_STA		0x0B
+> +#define STMPE_REG_ADC_INT_EN		0x0E
+> +#define STMPE_REG_ADC_INT_STA		0x0F
+> +
+> +#define STMPE_REG_ADC_CTRL1		0x20
+> +#define STMPE_REG_ADC_CTRL2		0x21
+> +#define STMPE_REG_ADC_CAPT		0x22
+> +#define STMPE_REG_ADC_DATA_CH(channel)	(0x30 + 2 * (channel))
+> +
+> +#define STMPE_REG_TEMP_CTRL		0x60
+> +#define STMPE_TEMP_CTRL_ENABLE		BIT(0)
+> +#define STMPE_TEMP_CTRL_ACQ		BIT(1)
+> +#define STMPE_TEMP_CTRL_THRES_EN	BIT(3)
+> +#define STMPE_START_ONE_TEMP_CONV	(STMPE_TEMP_CTRL_ENABLE | \
+> +					STMPE_TEMP_CTRL_ACQ | \
+> +					STMPE_TEMP_CTRL_THRES_EN)
+> +#define STMPE_REG_TEMP_DATA		0x61
+> +#define STMPE_REG_TEMP_TH		0x63
+> +#define STMPE_ADC_LAST_NR		7
+> +#define STMPE_TEMP_CHANNEL		(STMPE_ADC_LAST_NR + 1)
+> +
+> +#define STMPE_ADC_CH(channel)		((1 << (channel)) & 0xff)
+> +
+> +#define STMPE_ADC_TIMEOUT		msecs_to_jiffies(1000)
+> +
+> +struct stmpe_adc {
+> +	struct stmpe *stmpe;
+> +	struct clk *clk;
+> +	struct device *dev;
+> +
+> +	/* We are allocating plus one for the temperature channel */
+> +	struct iio_chan_spec stmpe_adc_iio_channels[STMPE_ADC_LAST_NR + 2];
+> +
+> +	struct completion completion;
+> +
+> +	u8 channel;
+> +	u32 value;
+> +};
+> +
+> +static int stmpe_read_raw(struct iio_dev *indio_dev,
+> +			  struct iio_chan_spec const *chan,
+> +			  int *val,
+> +			  int *val2,
+> +			  long mask)
+> +{
+> +	struct stmpe_adc *info = iio_priv(indio_dev);
+> +	long ret;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +	case IIO_CHAN_INFO_PROCESSED:
+> +
+> +		mutex_lock(&indio_dev->mlock);
 
-Hmm, Bhupesh, this is what I requested in your v1:
-lkml.kernel.org/r/20181030020752.GB11408 at MiWiFi-R3L-srv
+That's not what this lock is for and I think we have almost
+entirely removed it's use from drivers.  That's the internal IIO lock
+used to protect against changing from polled to trigger driven operation.
 
-You said x86 makedumpfile is broken because KCORE_REMAP is added. I
-wanted to know why it's broken. Now I think I don't need to request it
-in this thread, becasue Kazu has made it clear and fixed it:
-4AE2DC15AC0B8543882A74EA0D43DBEC0355DFC9 at BPXM09GP.gisp.nec.co.jp
+Please add your own local lock for which the scope can be cleanly defined
+and documented.  Sorry I missed this before. I only noticed now whilst
+trying to sanity check the documentation for a lock I expected to find
+in the private data structure that wasn't there!.
 
-Or could you abstract the sentences in which I requested you to add
-above information into patch log so that I can notice my expression
-and can improve on future reviewing and communicating?
+> +
+> +		info->channel = (u8)chan->channel;
+> +
+> +		switch (chan->type) {
+> +		case IIO_VOLTAGE:
+There isn't a whole lot shared in the voltage raw / temp processed
+paths.  It might be more readable to separate them out - perhaps
+as a pair of utility functions rather than having the
+multiple switch statements with common blocks inbetween.
 
-And for problem solving and describing, if things are simple, just
-tell it direclty; If things are complex, try to simplify it and make it
-be simply told. For this page_offset_base exporting, we can save time on
-'what' and 'how' since it's very simple and very easy to see what it is
-and how it's done. You just need tell WHY it's needed. BUT I saw so many
-words and not easy to get why. If simplifying problems is one kind of
-ability, I don't know what to say about complicating one simple problem,
-another kind of ability?
+stmpe_read_voltage / stmpe_read_temp?
 
-I have read your patch log when you sent out v2, honestly I don't like it.
-I tried to not touch this patch, hope other people can review and give
-comments. This can make you know I didn't intentionally embarrass you on
-patch reviewing.
+A few lines will get repeated, but the flow will be more obvious
+I think and the indenting considerably reduced which always
+helps!
 
-Honestly, if this patch is merged, no matter v2 or your old v1,
-a small record will be made. On my x1 laptop, I need scroll down FOUR
-full screens till the real patch content is seen. Are those really
-needed? You can check other vmcoreinfo exporting patch.
 
-I really don't want to review people's patch if they don't welcome my
-words, just I was asked to do. Hope you know I had no any offence when
-I started to read your patch, just I felt not good when my head was 
-scratched to bleed when read. My english is not good, I don't know how to
-express euphemistically sometime, so if I say so about one thing, that is
-how I think so to the thing, without any personal prejudice or attack to
-person. Please forgive me if any offence felt.
+> +			if (info->channel > STMPE_ADC_LAST_NR) {
+> +				mutex_unlock(&indio_dev->mlock);
+> +				return -EINVAL;
+> +			}
+> +
+> +			stmpe_reg_write(info->stmpe, STMPE_REG_ADC_INT_EN,
+> +					STMPE_ADC_CH(info->channel));
+> +
+> +			stmpe_reg_write(info->stmpe, STMPE_REG_ADC_CAPT,
+> +					STMPE_ADC_CH(info->channel));
+> +
+> +			*val = info->value;
+> +			break;
+> +
+> +		case IIO_TEMP:
+> +			if (info->channel != STMPE_TEMP_CHANNEL) {
+> +				mutex_unlock(&indio_dev->mlock);
+> +				return -EINVAL;
+> +			}
+> +
+> +			stmpe_reg_write(info->stmpe, STMPE_REG_TEMP_CTRL,
+> +					STMPE_START_ONE_TEMP_CONV);
+> +			break;
+> +		default:
+> +			mutex_unlock(&indio_dev->mlock);
+> +			return -EINVAL;
+> +		}
+> +
+> +		ret = wait_for_completion_interruptible_timeout
+> +			(&info->completion, STMPE_ADC_TIMEOUT);
+> +
+> +		if (ret <= 0) {
+> +			mutex_unlock(&indio_dev->mlock);
+> +			if (ret == 0)
+> +				return -ETIMEDOUT;
+> +			else
+> +				return ret;
+> +		}
+> +
+> +		switch (chan->type) {
+> +		case IIO_VOLTAGE:
+> +			*val = info->value;
+> +			break;
+> +
+> +		case IIO_TEMP:
+> +			/*
+> +			 * absolute temp = +V3.3 * value /7.51 [K]
+> +			 * scale to [milli ?C]
+> +			 */
+> +			*val = ((449960l * info->value) / 1024l) - 273150;
+> +			break;
+> +		default:
+> +			break;
+> +		}
+> +
+> +		mutex_unlock(&indio_dev->mlock);
+> +		return IIO_VAL_INT;
+> +
+> +	case IIO_CHAN_INFO_SCALE:
+> +		*val = 3300;
+> +		*val2 = info->stmpe->mod_12b ? 12 : 10;
+> +		return IIO_VAL_FRACTIONAL_LOG2;
+> +
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static irqreturn_t stmpe_adc_isr(int irq, void *dev_id)
+> +{
+> +	struct stmpe_adc *info = (struct stmpe_adc *)dev_id;
+> +	u8 data[2];
+> +
+> +	if (info->channel > STMPE_TEMP_CHANNEL)
+> +		return IRQ_NONE;
+> +
+> +	if (info->channel <= STMPE_ADC_LAST_NR) {
+> +		int int_sta;
+> +
+> +		int_sta = stmpe_reg_read(info->stmpe, STMPE_REG_ADC_INT_STA);
+> +
+> +		/* Is the interrupt relevant */
+> +		if (!(int_sta & STMPE_ADC_CH(info->channel)))
+> +			return IRQ_NONE;
+> +
+> +		/* Read value */
+> +		stmpe_block_read(info->stmpe,
+> +			STMPE_REG_ADC_DATA_CH(info->channel), 2, data);
+> +
+> +		stmpe_reg_write(info->stmpe, STMPE_REG_ADC_INT_STA, int_sta);
+> +	} else if (info->channel == STMPE_TEMP_CHANNEL) {
+> +		/* Read value */
+> +		stmpe_block_read(info->stmpe, STMPE_REG_TEMP_DATA, 2, data);
+> +	}
+> +
+> +	info->value = ((u32)data[0] << 8) + data[1];
 
-Thanks
-Baoquan
+This is an endian conversion of aligned data.  Can we use an appropriate
+endian to cpu function to do it as cleaner and quite possibly a noop.
 
-> Although personally I also think that such details are probably not
-> needed in a commit log (may be better suited for a cover letter, which
-> is maybe a overkill for this single patch).
-> Will drop this from v3.
+> +	complete(&info->completion);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static const struct iio_info stmpe_adc_iio_info = {
+> +	.read_raw = &stmpe_read_raw,
+> +};
+> +
+> +static void stmpe_adc_voltage_chan(struct iio_chan_spec *ics, int chan)
+> +{
+> +	ics->type = IIO_VOLTAGE;
+> +	ics->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
+> +	ics->info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE);
+> +	ics->indexed = 1;
+> +	ics->channel = chan;
+> +}
+> +
+> +static void stmpe_adc_temp_chan(struct iio_chan_spec *ics, int chan)
+> +{
+> +	ics->type = IIO_TEMP;
+> +	ics->info_mask_separate = BIT(IIO_CHAN_INFO_PROCESSED);
+> +	ics->indexed = 1;
+> +	ics->channel = chan;
+> +}
+> +
+> +static int stmpe_adc_init_hw(struct stmpe_adc *adc)
+> +{
+> +	struct stmpe *stmpe = adc->stmpe;
+> +
+> +	/* use temp irq for each conversion completion */
+> +	stmpe_reg_write(stmpe, STMPE_REG_TEMP_TH, 0);
+> +	stmpe_reg_write(stmpe, STMPE_REG_TEMP_TH + 1, 0);
+> +
+> +	return 0;
+> +}
+> +
+> +static int stmpe_adc_probe(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = NULL;
+> +	struct stmpe_adc *info = NULL;
+> +	struct device_node *np;
+> +	u32 norequest_mask = 0;
+> +	int irq_temp, irq_adc;
+> +	int num_chan = 0;
+> +	int i = 0;
+> +	int ret;
+> +
+> +	irq_adc = platform_get_irq_byname(pdev, "STMPE_ADC");
+> +	if (irq_adc < 0)
+> +		return irq_adc;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(struct stmpe_adc));
+> +	if (!indio_dev) {
+> +		dev_err(&pdev->dev, "failed allocating iio device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	info = iio_priv(indio_dev);
+> +
+> +	init_completion(&info->completion);
+> +	ret = devm_request_threaded_irq(&pdev->dev, irq_adc, NULL,
+> +					stmpe_adc_isr, IRQF_ONESHOT,
+> +					"stmpe-adc", info);
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n",
+> +				irq_adc);
+> +		return ret;
+> +	}
+> +
+> +	irq_temp = platform_get_irq_byname(pdev, "STMPE_TEMP_SENS");
+> +	if (irq_temp >= 0) {
+> +		ret = devm_request_threaded_irq(&pdev->dev, irq_temp, NULL,
+> +						stmpe_adc_isr, IRQF_ONESHOT,
+> +						"stmpe-adc", info);
+> +		if (ret < 0)
+> +			dev_warn(&pdev->dev, "failed requesting irq for"
+> +				 " temp sensor, irq = %d\n", irq_temp);
+> +	}
+> +
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	indio_dev->name		= dev_name(&pdev->dev);
+> +	indio_dev->dev.parent	= &pdev->dev;
+> +	indio_dev->info		= &stmpe_adc_iio_info;
+> +	indio_dev->modes	= INDIO_DIRECT_MODE;
+> +
+> +	info->stmpe = dev_get_drvdata(pdev->dev.parent);
+> +
+> +	np = pdev->dev.of_node;
+> +
+> +	if (!np)
+> +		dev_err(&pdev->dev, "no device tree node found\n");
+> +
+> +	of_property_read_u32(np, "st,norequest-mask", &norequest_mask);
+> +
+> +	for_each_clear_bit(i, (unsigned long *) &norequest_mask,
+> +			   (STMPE_ADC_LAST_NR + 1)) {
+> +		stmpe_adc_voltage_chan(&info->stmpe_adc_iio_channels[num_chan], i);
+> +		num_chan++;
+> +	}
+> +	stmpe_adc_temp_chan(&info->stmpe_adc_iio_channels[num_chan], i);
+> +	num_chan++;
+> +	indio_dev->channels = info->stmpe_adc_iio_channels;
+> +	indio_dev->num_channels = num_chan;
+> +
+> +	ret = stmpe_adc_init_hw(info);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return iio_device_register(indio_dev);
+> +}
+> +
+> +static int stmpe_adc_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +	struct stmpe_adc *info = iio_priv(indio_dev);
+> +
+> +	iio_device_unregister(indio_dev);
+> +	stmpe_disable(info->stmpe, STMPE_BLOCK_ADC);
+
+Could we use a devm_add_action_or_reset call covering this so that
+we can get rid of the remove function entirely?
+
+Mind you, this is unwinding something being called from the mfd
+I think rather than being called from the adc probe function.
+
+We need to fix that balance by either calling the disable from
+the ADC or moving the enable in here as necessary.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused stmpe_adc_resume(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +	struct stmpe_adc *info = iio_priv(indio_dev);
+> +
+> +	stmpe_adc_init_hw(info);
+> +
+> +	return 0;
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(stmpe_adc_pm_ops, NULL, stmpe_adc_resume);
+> +
+> +static struct platform_driver stmpe_adc_driver = {
+> +	.probe		= stmpe_adc_probe,
+> +	.remove		= stmpe_adc_remove,
+> +	.driver		= {
+> +		.name	= "stmpe-adc",
+> +		.pm	= &stmpe_adc_pm_ops,
+> +	},
+> +};
+> +
+> +module_platform_driver(stmpe_adc_driver);
+> +
+> +MODULE_AUTHOR("Stefan Agner <stefan.agner@toradex.com>");
+> +MODULE_DESCRIPTION("STMPEXXX ADC driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:stmpe-adc");
+> diff --git a/drivers/input/touchscreen/stmpe-ts.c b/drivers/input/touchscreen/stmpe-ts.c
+> index c5d9006588a2..81aa313d6e5a 100644
+> --- a/drivers/input/touchscreen/stmpe-ts.c
+> +++ b/drivers/input/touchscreen/stmpe-ts.c
+> @@ -30,8 +30,6 @@
+>   * with touchscreen controller
+>   */
+>  #define STMPE_REG_INT_STA		0x0B
+> -#define STMPE_REG_ADC_CTRL1		0x20
+> -#define STMPE_REG_ADC_CTRL2		0x21
+>  #define STMPE_REG_TSC_CTRL		0x40
+>  #define STMPE_REG_TSC_CFG		0x41
+>  #define STMPE_REG_FIFO_TH		0x4A
+> @@ -58,15 +56,6 @@
+>   * @idev: registered input device
+>   * @work: a work item used to scan the device
+>   * @dev: a pointer back to the MFD cell struct device*
+> - * @sample_time: ADC converstion time in number of clock.
+> - * (0 -> 36 clocks, 1 -> 44 clocks, 2 -> 56 clocks, 3 -> 64 clocks,
+> - * 4 -> 80 clocks, 5 -> 96 clocks, 6 -> 144 clocks),
+> - * recommended is 4.
+> - * @mod_12b: ADC Bit mode (0 -> 10bit ADC, 1 -> 12bit ADC)
+> - * @ref_sel: ADC reference source
+> - * (0 -> internal reference, 1 -> external reference)
+> - * @adc_freq: ADC Clock speed
+> - * (0 -> 1.625 MHz, 1 -> 3.25 MHz, 2 || 3 -> 6.5 MHz)
+>   * @ave_ctrl: Sample average control
+>   * (0 -> 1 sample, 1 -> 2 samples, 2 -> 4 samples, 3 -> 8 samples)
+>   * @touch_det_delay: Touch detect interrupt delay
+> @@ -88,10 +77,6 @@ struct stmpe_touch {
+>  	struct input_dev *idev;
+>  	struct delayed_work work;
+>  	struct device *dev;
+> -	u8 sample_time;
+> -	u8 mod_12b;
+> -	u8 ref_sel;
+> -	u8 adc_freq;
+>  	u8 ave_ctrl;
+>  	u8 touch_det_delay;
+>  	u8 settling;
+> @@ -176,7 +161,7 @@ static irqreturn_t stmpe_ts_handler(int irq, void *data)
+>  	input_report_key(ts->idev, BTN_TOUCH, 1);
+>  	input_sync(ts->idev);
+>  
+> -       /* flush the FIFO after we have read out our values. */
+> +	/* flush the FIFO after we have read out our values. */
+>  	__stmpe_reset_fifo(ts->stmpe);
+>  
+>  	/* reenable the tsc */
+> @@ -202,20 +187,21 @@ static int stmpe_init_hw(struct stmpe_touch *ts)
+>  		return ret;
+>  	}
+>  
+> -	adc_ctrl1 = STMPE_SAMPLE_TIME(ts->sample_time) |
+> -		    STMPE_MOD_12B(ts->mod_12b) | STMPE_REF_SEL(ts->ref_sel);
+> +	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
+> +		    STMPE_MOD_12B(stmpe->mod_12b) |
+> +		    STMPE_REF_SEL(stmpe->ref_sel);
+
+Could we split this refactor out 'ahead' of the ADC patch?
+
+>  	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
+>  			 STMPE_REF_SEL(0xff);
+>  
+> -	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL1,
+> +	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
+>  			adc_ctrl1_mask, adc_ctrl1);
+>  	if (ret) {
+>  		dev_err(dev, "Could not setup ADC\n");
+>  		return ret;
+>  	}
+>  
+> -	ret = stmpe_set_bits(stmpe, STMPE_REG_ADC_CTRL2,
+> -			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(ts->adc_freq));
+> +	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
+> +			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
+>  	if (ret) {
+>  		dev_err(dev, "Could not setup ADC\n");
+>  		return ret;
+> @@ -295,13 +281,13 @@ static void stmpe_ts_get_platform_info(struct platform_device *pdev,
+>  
+>  	if (np) {
+>  		if (!of_property_read_u32(np, "st,sample-time", &val))
+> -			ts->sample_time = val;
+> +			ts->stmpe->sample_time = val;
+>  		if (!of_property_read_u32(np, "st,mod-12b", &val))
+> -			ts->mod_12b = val;
+> +			ts->stmpe->mod_12b = val;
+>  		if (!of_property_read_u32(np, "st,ref-sel", &val))
+> -			ts->ref_sel = val;
+> +			ts->stmpe->ref_sel = val;
+>  		if (!of_property_read_u32(np, "st,adc-freq", &val))
+> -			ts->adc_freq = val;
+> +			ts->stmpe->adc_freq = val;
+>  		if (!of_property_read_u32(np, "st,ave-ctrl", &val))
+>  			ts->ave_ctrl = val;
+>  		if (!of_property_read_u32(np, "st,touch-det-delay", &val))
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index 8c5dfdce4326..bba159e8eaa4 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1204,7 +1204,7 @@ config MFD_STMPE
+>  
+>  	  Currently supported devices are:
+>  
+> -		STMPE811: GPIO, Touchscreen
+> +		STMPE811: GPIO, Touchscreen, ADC
+>  		STMPE1601: GPIO, Keypad
+>  		STMPE1801: GPIO, Keypad
+>  		STMPE2401: GPIO, Keypad
+> @@ -1217,6 +1217,7 @@ config MFD_STMPE
+>  		GPIO: stmpe-gpio
+>  		Keypad: stmpe-keypad
+>  		Touchscreen: stmpe-ts
+> +		ADC: stmpe-adc
+>  
+>  menu "STMicroelectronics STMPE Interface Drivers"
+>  depends on MFD_STMPE
+> diff --git a/drivers/mfd/stmpe.c b/drivers/mfd/stmpe.c
+> index 566caca4efd8..35390d1c2e64 100644
+> --- a/drivers/mfd/stmpe.c
+> +++ b/drivers/mfd/stmpe.c
+> @@ -463,6 +463,28 @@ static const struct mfd_cell stmpe_ts_cell = {
+>  	.num_resources	= ARRAY_SIZE(stmpe_ts_resources),
+>  };
+>  
+> +/*
+> + * ADC (STMPE811)
+> + */
+> +
+> +static struct resource stmpe_adc_resources[] = {
+> +	{
+> +		.name	= "STMPE_TEMP_SENS",
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +	{
+> +		.name	= "STMPE_ADC",
+> +		.flags	= IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static const struct mfd_cell stmpe_adc_cell = {
+> +	.name		= "stmpe-adc",
+> +	.of_compatible	= "st,stmpe-adc",
+> +	.resources	= stmpe_adc_resources,
+> +	.num_resources	= ARRAY_SIZE(stmpe_adc_resources),
+> +};
+> +
+>  /*
+>   * STMPE811 or STMPE610
+>   */
+> @@ -497,6 +519,11 @@ static struct stmpe_variant_block stmpe811_blocks[] = {
+>  		.irq	= STMPE811_IRQ_TOUCH_DET,
+>  		.block	= STMPE_BLOCK_TOUCHSCREEN,
+>  	},
+> +	{
+> +		.cell	= &stmpe_adc_cell,
+> +		.irq	= STMPE811_IRQ_TEMP_SENS,
+> +		.block	= STMPE_BLOCK_ADC,
+> +	},
+>  };
+>  
+>  static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+> @@ -517,6 +544,44 @@ static int stmpe811_enable(struct stmpe *stmpe, unsigned int blocks,
+>  				enable ? 0 : mask);
+>  }
+>  
+> +static int stmpe811_init_adc(struct stmpe *stmpe)
+> +{
+> +	int ret;
+> +	u8 adc_ctrl1, adc_ctrl1_mask;
+> +
+> +	ret = stmpe_enable(stmpe, STMPE_BLOCK_ADC);
+> +	if (ret) {
+> +		dev_err(stmpe->dev, "Could not enable clock for ADC\n");
+
+This is a little unusual flow wise. It would be expected that stmpe_enable
+would leave no visible effects if it fails, so we shouldn't need
+to disable it explicitly in the error path here.  Any requirement
+for that should have been done inside stmpe_enable when it detects
+the error.  There are corner cases in which it might fail undetectably
+up, but we typically wouldn't handle those odd ones.
+
+If there is a really good reason that I'm missing I'd like to see
+a comment here saying why.
+
+> +		goto err_adc;
+> +	}
+> +
+> +	adc_ctrl1 = STMPE_SAMPLE_TIME(stmpe->sample_time) |
+> +		    STMPE_MOD_12B(stmpe->mod_12b) |
+> +		    STMPE_REF_SEL(stmpe->ref_sel);
+> +	adc_ctrl1_mask = STMPE_SAMPLE_TIME(0xff) | STMPE_MOD_12B(0xff) |
+> +			 STMPE_REF_SEL(0xff);
+> +
+> +	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL1,
+> +			adc_ctrl1_mask, adc_ctrl1);
+> +	if (ret) {
+> +		dev_err(stmpe->dev, "Could not setup ADC\n");
+> +		goto err_adc;
+> +	}
+> +
+> +	ret = stmpe_set_bits(stmpe, STMPE811_REG_ADC_CTRL2,
+> +			STMPE_ADC_FREQ(0xff), STMPE_ADC_FREQ(stmpe->adc_freq));
+> +	if (ret) {
+> +		dev_err(stmpe->dev, "Could not setup ADC\n");
+> +		goto err_adc;
+> +	}
+> +
+> +	return 0;
+> +err_adc:
+> +	stmpe_disable(stmpe, STMPE_BLOCK_ADC);
+> +
+> +	return ret;
+> +}
+> +
+>  static int stmpe811_get_altfunc(struct stmpe *stmpe, enum stmpe_block block)
+>  {
+>  	/* 0 for touchscreen, 1 for GPIO */
+> @@ -1235,6 +1300,12 @@ static int stmpe_chip_init(struct stmpe *stmpe)
+>  			return ret;
+>  	}
+>  
+> +	if (id == STMPE811_ID) {
+> +		ret = stmpe811_init_adc(stmpe);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+>  	return stmpe_reg_write(stmpe, stmpe->regs[STMPE_IDX_ICR_LSB], icr);
+>  }
+>  
+> @@ -1325,6 +1396,7 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+>  	struct device_node *np = ci->dev->of_node;
+>  	struct stmpe *stmpe;
+>  	int ret;
+> +	u32 val;
+>  
+>  	pdata = devm_kzalloc(ci->dev, sizeof(*pdata), GFP_KERNEL);
+>  	if (!pdata)
+> @@ -1342,6 +1414,15 @@ int stmpe_probe(struct stmpe_client_info *ci, enum stmpe_partnum partnum)
+>  	mutex_init(&stmpe->irq_lock);
+>  	mutex_init(&stmpe->lock);
+>  
+> +	if (!of_property_read_u32(np, "st,sample-time", &val))
+> +		stmpe->sample_time = val;
+> +	if (!of_property_read_u32(np, "st,mod-12b", &val))
+> +		stmpe->mod_12b = val;
+> +	if (!of_property_read_u32(np, "st,ref-sel", &val))
+> +		stmpe->ref_sel = val;
+> +	if (!of_property_read_u32(np, "st,adc-freq", &val))
+> +		stmpe->adc_freq = val;
+> +
+>  	stmpe->dev = ci->dev;
+>  	stmpe->client = ci->client;
+>  	stmpe->pdata = pdata;
+> diff --git a/include/linux/mfd/stmpe.h b/include/linux/mfd/stmpe.h
+> index c0353f6431f9..86dca9e9880a 100644
+> --- a/include/linux/mfd/stmpe.h
+> +++ b/include/linux/mfd/stmpe.h
+> @@ -21,6 +21,9 @@
+>  #define STMPE_I_DRIVE(x)	(x & 0x1)
+>  #define STMPE_OP_MODE(x)	((x & 0x7) << 1)
+>  
+> +#define STMPE811_REG_ADC_CTRL1	0x20
+> +#define STMPE811_REG_ADC_CTRL2	0x21
+> +
+>  struct device;
+>  struct regulator;
+>  
+> @@ -134,6 +137,12 @@ struct stmpe {
+>  	u8 ier[2];
+>  	u8 oldier[2];
+>  	struct stmpe_platform_data *pdata;
+> +
+> +	/* For devices that use an ADC */
+> +	u8 sample_time;
+> +	u8 mod_12b;
+> +	u8 ref_sel;
+> +	u8 adc_freq;
+>  };
+>  
+>  extern int stmpe_reg_write(struct stmpe *stmpe, u8 reg, u8 data);
