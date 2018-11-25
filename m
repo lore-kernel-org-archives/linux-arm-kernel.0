@@ -1,46 +1,46 @@
 From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 18:49:22 -0200
-Subject: [PATCH 1/3] ARM: imx_v6_v7_defconfig: Remove CONFIG_ARM_UNWIND
-In-Reply-To: <CAOMZO5AVWbk_gdtDvXQfYqmENr8d3z5oxQVtzFtex0WrfY6tZQ@mail.gmail.com>
-References: <20181125201729.19836-1-otavio@ossystems.com.br>
- <CAOMZO5AVWbk_gdtDvXQfYqmENr8d3z5oxQVtzFtex0WrfY6tZQ@mail.gmail.com>
-Message-ID: <CAP9ODKrpde0tpRgoRMihvDur=ftQsT59h4Cqr3VQAOOimoSB1Q@mail.gmail.com>
+Date: Sun, 25 Nov 2018 18:53:01 -0200
+Subject: [PATCH] ARM: dts: rv1108-evb: enable eMMC support
+In-Reply-To: <6815120.yyevdQbq0d@phil>
+References: <20181009213656.27719-1-otavio@ossystems.com.br>
+ <6815120.yyevdQbq0d@phil>
+Message-ID: <CAP9ODKpnv0FmK1no6mpqR=WGUgwvMUpKjVFNkXsEXReqb9OnXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Fabio,
-On Sun, Nov 25, 2018 at 6:30 PM Fabio Estevam <festevam@gmail.com> wrote:
-> On Sun, Nov 25, 2018 at 6:18 PM Otavio Salvador <otavio@ossystems.com.br> wrote:
+Hi Heiko,
+On Tue, Oct 16, 2018 at 10:09 AM Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Dienstag, 9. Oktober 2018, 23:36:56 CEST schrieb Otavio Salvador:
+> > Enable eMMC support for rv1108 evaluation board.
 > >
-> > The setting is removed when running a `savedefconfig` using the
-> > current setting set. It is being applied in preparation to some
+> > Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+> > ---
+> >
+> >  arch/arm/boot/dts/rv1108-evb.dts |  8 ++++++++
+> >  arch/arm/boot/dts/rv1108.dtsi    | 29 +++++++++++++++++++++++++++++
+> >  2 files changed, 37 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/rv1108-evb.dts b/arch/arm/boot/dts/rv1108-evb.dts
+> > index 70f0106d1252..f3c6f52c49e6 100644
+> > --- a/arch/arm/boot/dts/rv1108-evb.dts
+> > +++ b/arch/arm/boot/dts/rv1108-evb.dts
+> > @@ -226,6 +226,14 @@
+> >       status = "okay";
+> >  };
+> >
+> > +&emmc {
+> > +     cap-mmc-highspeed;
+> > +     supports-emmc;
+> > +     non-removable;
+> > +     num-slots = <1>;
 >
-> "setting set" is a bit confusing.
+> num-slots should not be present anymore on new additions
 >
-> > patches making changes to this defconfig.
->
-> It would be good to mention that CONFIG_ARM_UNWIND is still selected
-> automatically.
->
-> Otherwise it may give the impression that such functionality is being removed.
->
-> You could reword the commit log to something like this:
->
-> CONFIG_ARM_UNWIND is removed when running  'savedefconfig', but it is
-> still selected by the Kconfig logic.
-> This is done in preparation to making further changes to this defconfig cleaner.
+> Also missing the pinctrl settings you're defining below?
+> Aka pinctrl-0 = <&emmc_*>; + pinctrl-names = "default"
 
-In fact, was removed and now selected.
+Thank you, I am preparing a v2 of this patch together with few more changes.
 
-I changed the commit log as:
-
-ARM: imx_v6_v7_defconfig: Remove explicit ARM_UNWIND disable
-
-CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-selected by the Kconfig logic.  This is done in preparation to making
-further changes to this defconfig cleaner.
-
-Do you agree?
 
 -- 
 Otavio Salvador                             O.S. Systems
