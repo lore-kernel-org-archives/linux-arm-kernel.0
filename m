@@ -1,37 +1,38 @@
 From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 19:18:57 -0200
-Subject: [PATCH 03/13] net: stmmac: dwmac-rk: Allow the driver to probe when
- phy-supply is not present
+Date: Sun, 25 Nov 2018 19:18:58 -0200
+Subject: [PATCH 04/13] net: stmmac: dwmac-rk: Do not print redundant error
+ message
 In-Reply-To: <20181125211907.9895-1-otavio@ossystems.com.br>
 References: <20181125211907.9895-1-otavio@ossystems.com.br>
-Message-ID: <20181125211907.9895-3-otavio@ossystems.com.br>
+Message-ID: <20181125211907.9895-4-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The phy-supply is an optional regulator, so we should not treat
-as an error when phy-supply is not passed in the device tree.
-
-This allows the dwmac-rk driver to probe when phy-supply is not
-present in the dts.
+rk_gmac_setup() already prints a message saying that the PHY regulator
+is not found, so we should not print it again.
 
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
 ---
 
- drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-index 7b923362ee55..73855622445b 100644
+index 73855622445b..c895a9a6939a 100644
 --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
 +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
-@@ -1205,7 +1205,7 @@ static int phy_power_on(struct rk_priv_data *bsp_priv, bool enable)
+@@ -1203,10 +1203,8 @@ static int phy_power_on(struct rk_priv_data *bsp_priv, bool enable)
+ 	int ret;
+ 	struct device *dev = &bsp_priv->pdev->dev;
  
- 	if (!ldo) {
- 		dev_err(dev, "no regulator found\n");
--		return -1;
-+		return 0;
- 	}
+-	if (!ldo) {
+-		dev_err(dev, "no regulator found\n");
++	if (!ldo)
+ 		return 0;
+-	}
  
  	if (enable) {
+ 		ret = regulator_enable(ldo);
 -- 
 2.19.1
