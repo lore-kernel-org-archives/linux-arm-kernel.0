@@ -1,53 +1,134 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sun, 25 Nov 2018 00:54:53 +0000
-Subject: [PATCH] thermal: armada: fix broken temperature sensor in 4.19
-In-Reply-To: <alpine.LRH.2.02.1811241838180.7275@file01.intranet.prod.int.rdu2.redhat.com>
-References: <alpine.LRH.2.02.1811241838180.7275@file01.intranet.prod.int.rdu2.redhat.com>
-Message-ID: <20181125005453.GV30658@n2100.armlinux.org.uk>
+From: lyude@redhat.com (Lyude Paul)
+Date: Sat, 24 Nov 2018 20:21:17 -0500
+Subject: [PATCH] drm/meson: Fix OOB memory accesses in meson_viu_set_osd_lut()
+Message-ID: <20181125012117.31915-1-lyude@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2018 at 06:45:00PM -0500, Mikulas Patocka wrote:
-> The patch 8c0e64ac4075b7ca870098ed2ad6089868f5fa7b ("thermal: armada: get
-> rid of the ->is_valid() pointer") breaks temperature readings on the
-> MacchiatoBIN board. Reading the temperature with
-> 	cat /sys/devices/virtual/thermal/thermal_zone*/temp
-> results in errors:
-> 
-> armada_thermal f06f808c.thermal: Temperature sensor reading not valid
-> armada_thermal f2400078.thermal: Temperature sensor reading not valid
-> armada_thermal f4400078.thermal: Temperature sensor reading not valid
-> 
-> The patch was meant as simple refactoring, but unfortunatelly, it reverses
-> the condition in armada_get_temp_legacy, so that the error is reported if
-> armada_is_valid returns true.
+Currently on driver bringup with KASAN enabled, meson triggers an OOB
+memory access as shown below:
 
-I sent a patch for exactly this issue on 9th November... it doesn't
-seem to have made it into mainline yet.
+[  117.904528] ==================================================================
+[  117.904560] BUG: KASAN: global-out-of-bounds in meson_viu_set_osd_lut+0x7a0/0x890
+[  117.904588] Read of size 4 at addr ffff20000a63ce24 by task systemd-udevd/498
+[  117.904601]
+[  118.083372] CPU: 4 PID: 498 Comm: systemd-udevd Not tainted 4.20.0-rc3Lyude-Test+ #20
+[  118.091143] Hardware name: amlogic khadas-vim2/khadas-vim2, BIOS 2018.07-rc2-armbian 09/11/2018
+[  118.099768] Call trace:
+[  118.102181]  dump_backtrace+0x0/0x3e8
+[  118.105796]  show_stack+0x14/0x20
+[  118.109083]  dump_stack+0x130/0x1c4
+[  118.112539]  print_address_description+0x60/0x25c
+[  118.117214]  kasan_report+0x1b4/0x368
+[  118.120851]  __asan_report_load4_noabort+0x18/0x20
+[  118.125566]  meson_viu_set_osd_lut+0x7a0/0x890
+[  118.129953]  meson_viu_init+0x10c/0x290
+[  118.133741]  meson_drv_bind_master+0x474/0x748
+[  118.138141]  meson_drv_bind+0x10/0x18
+[  118.141760]  try_to_bring_up_master+0x3d8/0x768
+[  118.146249]  component_add+0x214/0x570
+[  118.149978]  meson_dw_hdmi_probe+0x18/0x20 [meson_dw_hdmi]
+[  118.155404]  platform_drv_probe+0x98/0x138
+[  118.159455]  really_probe+0x2a0/0xa70
+[  118.163070]  driver_probe_device+0x1b4/0x2d8
+[  118.167299]  __driver_attach+0x200/0x280
+[  118.171189]  bus_for_each_dev+0x10c/0x1a8
+[  118.175144]  driver_attach+0x38/0x50
+[  118.178681]  bus_add_driver+0x330/0x608
+[  118.182471]  driver_register+0x140/0x388
+[  118.186361]  __platform_driver_register+0xc8/0x108
+[  118.191117]  meson_dw_hdmi_platform_driver_init+0x1c/0x1000 [meson_dw_hdmi]
+[  118.198022]  do_one_initcall+0x12c/0x3bc
+[  118.201883]  do_init_module+0x1fc/0x638
+[  118.205673]  load_module+0x4b4c/0x6808
+[  118.209387]  __se_sys_init_module+0x2e8/0x3c0
+[  118.213699]  __arm64_sys_init_module+0x68/0x98
+[  118.218100]  el0_svc_common+0x104/0x210
+[  118.221893]  el0_svc_handler+0x48/0xb8
+[  118.225594]  el0_svc+0x8/0xc
+[  118.228429]
+[  118.229887] The buggy address belongs to the variable:
+[  118.235007]  eotf_33_linear_mapping+0x84/0xc0
+[  118.239301]
+[  118.240752] Memory state around the buggy address:
+[  118.245522]  ffff20000a63cd00: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.252695]  ffff20000a63cd80: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+[  118.259850] >ffff20000a63ce00: 00 00 00 00 04 fa fa fa fa fa fa fa 00 00 00 00
+[  118.267000]                                ^
+[  118.271222]  ffff20000a63ce80: 00 fa fa fa fa fa fa fa 00 00 00 00 00 00 00 00
+[  118.278393]  ffff20000a63cf00: 00 00 00 00 00 00 00 00 00 00 00 00 04 fa fa fa
+[  118.285542] ==================================================================
+[  118.292699] Disabling lock debugging due to kernel taint
 
-> 
-> Fixes: 8c0e64ac4075 ("thermal: armada: get rid of the ->is_valid() pointer")
-> Cc: stable at vger.kernel.org	# 4.19
-> 
-> ---
->  drivers/thermal/armada_thermal.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> Index: linux-4.19.4/drivers/thermal/armada_thermal.c
-> ===================================================================
-> --- linux-4.19.4.orig/drivers/thermal/armada_thermal.c	2018-11-25 00:19:20.000000000 +0100
-> +++ linux-4.19.4/drivers/thermal/armada_thermal.c	2018-11-25 00:39:49.000000000 +0100
-> @@ -357,7 +357,7 @@ static int armada_get_temp_legacy(struct
->  	int ret;
->  
->  	/* Valid check */
-> -	if (armada_is_valid(priv)) {
-> +	if (!armada_is_valid(priv)) {
->  		dev_err(priv->dev,
->  			"Temperature sensor reading not valid\n");
->  		return -EIO;
+It seems that when looping through the OSD EOTF LUT maps, we use the
+same max iterator for OETF: 20. This is wrong though, since 20*2 is 40,
+which means that we'll stop out of bounds on the EOTF maps.
 
+But, this whole thing is already confusing enough to read through as-is,
+so let's just replace all of the hardcoded sizes with
+OSD_(OETF/EOTF)_LUT_SIZE / 2.
+
+Signed-off-by: Lyude Paul <lyude@redhat.com>
+Fixes: bbbe775ec5b5 ("drm: Add support for Amlogic Meson Graphic Controller")
+Cc: Neil Armstrong <narmstrong@baylibre.com>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-amlogic at lists.infradead.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: <stable@vger.kernel.org> # v4.10+
+---
+ drivers/gpu/drm/meson/meson_viu.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/meson/meson_viu.c b/drivers/gpu/drm/meson/meson_viu.c
+index 6bcfa527c180..26a0857878bf 100644
+--- a/drivers/gpu/drm/meson/meson_viu.c
++++ b/drivers/gpu/drm/meson/meson_viu.c
+@@ -184,18 +184,18 @@ void meson_viu_set_osd_lut(struct meson_drm *priv, enum viu_lut_sel_e lut_sel,
+ 	if (lut_sel == VIU_LUT_OSD_OETF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_OETF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_OETF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+@@ -211,18 +211,18 @@ void meson_viu_set_osd_lut(struct meson_drm *priv, enum viu_lut_sel_e lut_sel,
+ 	} else if (lut_sel == VIU_LUT_OSD_EOTF) {
+ 		writel(0, priv->io_base + _REG(addr_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(r_map[i * 2] | (r_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+ 		writel(r_map[OSD_EOTF_LUT_SIZE - 1] | (g_map[0] << 16),
+ 			priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(g_map[i * 2 + 1] | (g_map[i * 2 + 2] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
+-		for (i = 0; i < 20; i++)
++		for (i = 0; i < (OSD_EOTF_LUT_SIZE / 2); i++)
+ 			writel(b_map[i * 2] | (b_map[i * 2 + 1] << 16),
+ 				priv->io_base + _REG(data_port));
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+2.19.1
