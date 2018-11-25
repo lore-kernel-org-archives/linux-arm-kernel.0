@@ -1,32 +1,32 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 25 Nov 2018 10:43:13 +0300
-Subject: [RFC PATCH v4 10/17] dt-bindings: pinctrl: Add Allwinner suniv
- F1C100s pinctrl
+Date: Sun, 25 Nov 2018 10:43:18 +0300
+Subject: [RFC PATCH v4 15/17] dt-bindings: watchdog: Add Allwinner ARMv5
+ F1C100s wdt
 In-Reply-To: <cover.1543131714.git.mesihkilinc@gmail.com>
 References: <cover.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <ac8d900789e967650e0ab16eeadc04ec456fcf34.1543131714.git.mesihkilinc@gmail.com>
+Message-ID: <29723ab4d09399185b8807a3f20bb2551b940f2f.1543131714.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible string for Allwinner suniv F1C100s SoC's pinctrl.
+Allwinner ARMv5 F1C100s has similar watchdog timer to sun6i A31.
+Add definition for it.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt | 1 +
+ Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 258a464..a7f7133 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -29,6 +29,7 @@ Required properties:
-   "allwinner,sun50i-h5-pinctrl"
-   "allwinner,sun50i-h6-pinctrl"
-   "allwinner,sun50i-h6-r-pinctrl"
-+  "allwinner,suniv-f1c100s-pinctrl"
-   "nextthing,gr8-pinctrl"
+diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+index ed11ce0..4605525 100644
+--- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
++++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
+@@ -6,6 +6,7 @@ Required properties:
+ 	"allwinner,sun4i-a10-wdt"
+ 	"allwinner,sun6i-a31-wdt"
+ 	"allwinner,sun50i-a64-wdt","allwinner,sun6i-a31-wdt"
++	"allwinner,suniv-f1c100s-wdt", "allwinner,sun4i-a10-wdt"
+ - reg : Specifies base physical address and size of the registers.
  
- - reg: Should contain the register physical address and length for the
+ Optional properties:
 -- 
 2.7.4
