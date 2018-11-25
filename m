@@ -1,37 +1,37 @@
 From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 19:18:56 -0200
-Subject: [PATCH 02/13] ARM: multi_v7_defconfig: Add missing systemd options
+Date: Sun, 25 Nov 2018 19:18:57 -0200
+Subject: [PATCH 03/13] net: stmmac: dwmac-rk: Allow the driver to probe when
+ phy-supply is not present
 In-Reply-To: <20181125211907.9895-1-otavio@ossystems.com.br>
 References: <20181125211907.9895-1-otavio@ossystems.com.br>
-Message-ID: <20181125211907.9895-2-otavio@ossystems.com.br>
+Message-ID: <20181125211907.9895-3-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Berton <fabio.berton@ossystems.com.br>
+The phy-supply is an optional regulator, so we should not treat
+as an error when phy-supply is not passed in the device tree.
 
-Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
+This allows the dwmac-rk driver to probe when phy-supply is not
+present in the dts.
+
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
 
- arch/arm/configs/multi_v7_defconfig | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a8ec309d182a..34c8a745d951 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -2,7 +2,12 @@ CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_CGROUPS=y
-+CONFIG_CGROUP_BPF=y
-+CONFIG_NAMESPACES=y
-+CONFIG_USER_NS=y
-+CONFIG_CHECKPOINT_RESTORE=y
- CONFIG_BLK_DEV_INITRD=y
-+CONFIG_BPF_SYSCALL=y
- CONFIG_EMBEDDED=y
- CONFIG_PERF_EVENTS=y
- CONFIG_MODULES=y
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+index 7b923362ee55..73855622445b 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-rk.c
+@@ -1205,7 +1205,7 @@ static int phy_power_on(struct rk_priv_data *bsp_priv, bool enable)
+ 
+ 	if (!ldo) {
+ 		dev_err(dev, "no regulator found\n");
+-		return -1;
++		return 0;
+ 	}
+ 
+ 	if (enable) {
 -- 
 2.19.1
