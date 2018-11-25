@@ -1,48 +1,99 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 25 Nov 2018 10:43:12 +0300
-Subject: [RFC PATCH v4 09/17] clocksource: sun4i: add a compatible for suniv
+Date: Sun, 25 Nov 2018 10:43:09 +0300
+Subject: [RFC PATCH v4 06/17] irqchip/sun4i: Move IC specific register offsets
+ to struct
 In-Reply-To: <cover.1543131714.git.mesihkilinc@gmail.com>
 References: <cover.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <c7f0f45f5da8e8b1842e9b71380b0e39783db27b.1543131714.git.mesihkilinc@gmail.com>
+Message-ID: <0242923026be282e26fe9e50d9bb0ec3d5ae355f.1543131714.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suniv (new F-series) chip has a timer with less functionality than
-the A10 timer, e.g. it has only 3 channels.
-
-Add a new compatible for it. As we didn't use the extra channels on A10
-either now, the code needn't to be changed.
-
-The suniv chip is based on ARM926EJ-S CPU, thus it has no architecture timer.
-
-Register sun4i_timer as sched_clock on it.
+This patch moves IC specific register offsets to sun4i_irq_chip_data
+struct in order to support different chips.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/sun4i_timer.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-sun4i.c | 33 +++++++++++++++++++++------------
+ 1 file changed, 21 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 6e0180a..65f38f6 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -186,7 +186,8 @@ static int __init sun4i_timer_init(struct device_node *node)
- 	 */
- 	if (of_machine_is_compatible("allwinner,sun4i-a10") ||
- 	    of_machine_is_compatible("allwinner,sun5i-a13") ||
--	    of_machine_is_compatible("allwinner,sun5i-a10s"))
-+	    of_machine_is_compatible("allwinner,sun5i-a10s") ||
-+	    of_machine_is_compatible("allwinner,suniv-f1c100s"))
- 		sched_clock_register(sun4i_timer_sched_read, 32,
- 				     timer_of_rate(&to));
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index 0c32506..507f4e3 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -28,12 +28,16 @@
+ #define SUN4I_IRQ_NMI_CTRL_REG		0x0c
+ #define SUN4I_IRQ_PENDING_REG(x)	(0x10 + 0x4 * x)
+ #define SUN4I_IRQ_FIQ_PENDING_REG(x)	(0x20 + 0x4 * x)
+-#define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
+-#define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
++#define SUN4I_IRQ_ENABLE_REG(data, x)	((data)->enable_reg_offset + 0x4 * x)
++#define SUN4I_IRQ_MASK_REG(data, x)	((data)->mask_reg_offset + 0x4 * x)
++#define SUN4I_IRQ_ENABLE_REG_OFFSET	0x40
++#define SUN4I_IRQ_MASK_REG_OFFSET	0x50
  
-@@ -218,3 +219,5 @@ static int __init sun4i_timer_init(struct device_node *node)
+ struct sun4i_irq_chip_data {
+ 	void __iomem *irq_base;
+ 	struct irq_domain *irq_domain;
++	u32 enable_reg_offset;
++	u32 mask_reg_offset;
+ };
+ 
+ static struct sun4i_irq_chip_data *irq_ic_data;
+@@ -57,9 +61,10 @@ static void sun4i_irq_mask(struct irq_data *irqd)
+ 	int reg = irq / 32;
+ 	u32 val;
+ 
+-	val = readl(irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	val = readl(irq_ic_data->irq_base +
++			SUN4I_IRQ_ENABLE_REG(irq_ic_data, reg));
+ 	writel(val & ~(1 << irq_off),
+-	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(irq_ic_data, reg));
  }
- TIMER_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
- 		       sun4i_timer_init);
-+TIMER_OF_DECLARE(suniv, "allwinner,suniv-f1c100s-timer",
-+		       sun4i_timer_init);
+ 
+ static void sun4i_irq_unmask(struct irq_data *irqd)
+@@ -69,9 +74,10 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+ 	int reg = irq / 32;
+ 	u32 val;
+ 
+-	val = readl(irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	val = readl(irq_ic_data->irq_base +
++			SUN4I_IRQ_ENABLE_REG(irq_ic_data, reg));
+ 	writel(val | (1 << irq_off),
+-	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(irq_ic_data, reg));
+ }
+ 
+ static struct irq_chip sun4i_irq_chip = {
+@@ -105,20 +111,23 @@ static int __init sun4i_of_init(struct device_node *node,
+ 		return -ENOMEM;
+ 	}
+ 
++	irq_ic_data->enable_reg_offset = SUN4I_IRQ_ENABLE_REG_OFFSET;
++	irq_ic_data->mask_reg_offset = SUN4I_IRQ_MASK_REG_OFFSET;
++
+ 	irq_ic_data->irq_base = of_iomap(node, 0);
+ 	if (!irq_ic_data->irq_base)
+ 		panic("%pOF: unable to map IC registers\n",
+ 			node);
+ 
+ 	/* Disable all interrupts */
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(0));
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(1));
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(2));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(irq_ic_data, 0));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(irq_ic_data, 1));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(irq_ic_data, 2));
+ 
+ 	/* Unmask all the interrupts, ENABLE_REG(x) is used for masking */
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(0));
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(1));
+-	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(2));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(irq_ic_data, 0));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(irq_ic_data, 1));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(irq_ic_data, 2));
+ 
+ 	/* Clear all the pending interrupts */
+ 	writel(0xffffffff, irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(0));
 -- 
 2.7.4
