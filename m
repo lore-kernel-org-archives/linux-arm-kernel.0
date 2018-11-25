@@ -1,32 +1,69 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 25 Nov 2018 10:43:18 +0300
-Subject: [RFC PATCH v4 15/17] dt-bindings: watchdog: Add Allwinner ARMv5
- F1C100s wdt
+Date: Sun, 25 Nov 2018 10:43:20 +0300
+Subject: [RFC PATCH v4 17/17] ARM: suniv: f1c100s: add device tree for Lichee
+ Pi Nano
 In-Reply-To: <cover.1543131714.git.mesihkilinc@gmail.com>
 References: <cover.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <29723ab4d09399185b8807a3f20bb2551b940f2f.1543131714.git.mesihkilinc@gmail.com>
+Message-ID: <7026f63df56684afb81443ed7cae6313d0dba71e.1543131714.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner ARMv5 F1C100s has similar watchdog timer to sun6i A31.
-Add definition for it.
+Lichee Pi Nano is a F1C100s board by Lichee Pi.
 
+Add initial device tree for it.
+
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/Makefile                        |  2 ++
+ arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 26 +++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-index ed11ce0..4605525 100644
---- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-@@ -6,6 +6,7 @@ Required properties:
- 	"allwinner,sun4i-a10-wdt"
- 	"allwinner,sun6i-a31-wdt"
- 	"allwinner,sun50i-a64-wdt","allwinner,sun6i-a31-wdt"
-+	"allwinner,suniv-f1c100s-wdt", "allwinner,sun4i-a10-wdt"
- - reg : Specifies base physical address and size of the registers.
- 
- Optional properties:
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index b0e966d..2b96a5b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -1066,6 +1066,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+ 	sun9i-a80-cubieboard4.dtb
++dtb-$(CONFIG_MACH_SUNIV) += \
++	suniv-f1c100s-licheepi-nano.dtb
+ dtb-$(CONFIG_ARCH_TANGO) += \
+ 	tango4-vantage-1172.dtb
+ dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
+diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+new file mode 100644
+index 0000000..6ae5ccc
+--- /dev/null
++++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
++ */
++
++/dts-v1/;
++#include "suniv-f1c100s.dtsi"
++
++/ {
++	model = "Lichee Pi Nano";
++	compatible = "licheepi,licheepi-nano", "allwinner,suniv-f1c100s";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
 -- 
 2.7.4
