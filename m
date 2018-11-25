@@ -1,69 +1,41 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Sun, 25 Nov 2018 10:43:20 +0300
-Subject: [RFC PATCH v4 17/17] ARM: suniv: f1c100s: add device tree for Lichee
- Pi Nano
+Date: Sun, 25 Nov 2018 10:43:17 +0300
+Subject: [RFC PATCH v4 14/17] dt-bindings: sram: Add Allwinner suniv F1C100s
 In-Reply-To: <cover.1543131714.git.mesihkilinc@gmail.com>
 References: <cover.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <7026f63df56684afb81443ed7cae6313d0dba71e.1543131714.git.mesihkilinc@gmail.com>
+Message-ID: <f80ca2de497c44c9415b02ac9aba93721d723730.1543131714.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Nano is a F1C100s board by Lichee Pi.
+The suniv ARMv5 F1C100s chip has similar sram controller to sun4i A10.
+Add compatible string for it.
 
-Add initial device tree for it.
-
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- arch/arm/boot/dts/Makefile                        |  2 ++
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 26 +++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+ Documentation/devicetree/bindings/sram/sunxi-sram.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d..2b96a5b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1066,6 +1066,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-+dtb-$(CONFIG_MACH_SUNIV) += \
-+	suniv-f1c100s-licheepi-nano.dtb
- dtb-$(CONFIG_ARCH_TANGO) += \
- 	tango4-vantage-1172.dtb
- dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
-diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-new file mode 100644
-index 0000000..6ae5ccc
---- /dev/null
-+++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-+/*
-+ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
-+ */
+diff --git a/Documentation/devicetree/bindings/sram/sunxi-sram.txt b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+index 62dd074..5c84850 100644
+--- a/Documentation/devicetree/bindings/sram/sunxi-sram.txt
++++ b/Documentation/devicetree/bindings/sram/sunxi-sram.txt
+@@ -19,6 +19,7 @@ Required properties:
+     - "allwinner,sun50i-a64-sram-controller" (deprecated)
+     - "allwinner,sun50i-a64-system-control"
+     - "allwinner,sun50i-h6-system-control", "allwinner,sun50i-a64-system-control"
++    - "allwinner,suniv-f1c100s-system-control", "allwinner,sun4i-a10-system-control"
+ - reg : sram controller register offset + length
+ 
+ SRAM nodes
+@@ -58,6 +59,9 @@ The valid sections compatible for A64 are:
+ The valid sections compatible for H6 are:
+     - allwinner,sun50i-h6-sram-c, allwinner,sun50i-a64-sram-c
+ 
++The valid sections compatible for F1C100s are:
++    - allwinner,suniv-f1c100s-sram-d, allwinner,sun4i-a10-sram-d
 +
-+/dts-v1/;
-+#include "suniv-f1c100s.dtsi"
-+
-+/ {
-+	model = "Lichee Pi Nano";
-+	compatible = "licheepi,licheepi-nano", "allwinner,suniv-f1c100s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
+ Devices using SRAM sections
+ ---------------------------
+ 
 -- 
 2.7.4
