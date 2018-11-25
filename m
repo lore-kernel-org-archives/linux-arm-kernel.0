@@ -1,28 +1,37 @@
 From: otavio@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 18:17:27 -0200
-Subject: [PATCH 1/3] ARM: imx_v6_v7_defconfig: Remove CONFIG_ARM_UNWIND
-Message-ID: <20181125201729.19836-1-otavio@ossystems.com.br>
+Date: Sun, 25 Nov 2018 18:17:28 -0200
+Subject: [PATCH 2/3] ARM: imx_v6_v7_defconfig: Enable BT_BNEP
+In-Reply-To: <20181125201729.19836-1-otavio@ossystems.com.br>
+References: <20181125201729.19836-1-otavio@ossystems.com.br>
+Message-ID: <20181125201729.19836-2-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The setting is removed when running a `savedefconfig` using the
-current setting set. It is being applied in preparation to some
-patches making changes to this defconfig.
+From: Andreas M?ller <schnitzeltony@gmail.com>
 
+This is necessary to support network over bluetooth:
+
+| Sep 11 15:36:33 imx6qdl-variscite-som bluetoothd[281]: kernel lacks bnep-protocol support
+| Sep 11 15:36:33 imx6qdl-variscite-som bluetoothd[281]: System does not support network plugin
+
+Signed-off-by: Andreas M?ller <schnitzeltony@gmail.com>
 Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/configs/imx_v6_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index aa02d18f44d1..0c887a059df3 100644
+index 0c887a059df3..22ad2d7a1cf2 100644
 --- a/arch/arm/configs/imx_v6_v7_defconfig
 +++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -445,4 +445,3 @@ CONFIG_MAGIC_SYSRQ=y
- CONFIG_PROVE_LOCKING=y
- # CONFIG_DEBUG_BUGVERBOSE is not set
- # CONFIG_FTRACE is not set
--# CONFIG_ARM_UNWIND is not set
+@@ -81,6 +81,7 @@ CONFIG_NETFILTER=y
+ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
++CONFIG_BT_BNEP=m
+ CONFIG_BT_HCIUART=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
 -- 
 2.19.1
