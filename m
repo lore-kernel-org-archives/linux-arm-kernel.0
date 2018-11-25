@@ -1,31 +1,56 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 25 Nov 2018 18:55:01 -0200
-Subject: [PATCH 1/3] ARM: imx_v6_v7_defconfig: Remove CONFIG_ARM_UNWIND
-In-Reply-To: <CAP9ODKrpde0tpRgoRMihvDur=ftQsT59h4Cqr3VQAOOimoSB1Q@mail.gmail.com>
-References: <20181125201729.19836-1-otavio@ossystems.com.br>
- <CAOMZO5AVWbk_gdtDvXQfYqmENr8d3z5oxQVtzFtex0WrfY6tZQ@mail.gmail.com>
- <CAP9ODKrpde0tpRgoRMihvDur=ftQsT59h4Cqr3VQAOOimoSB1Q@mail.gmail.com>
-Message-ID: <CAOMZO5APMEksc3B0pxGzaEGMuwqC+TeuBcdhUSqR1+M7VOdTKw@mail.gmail.com>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Sun, 25 Nov 2018 19:14:27 -0200
+Subject: [PATCH v2] ARM: dts: rv1108: enable eMMC support
+Message-ID: <20181125211427.4926-1-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Otavio,
+Enable eMMC support for rv1108.dtsi as it can be used across multiple
+boards.
 
-On Sun, Nov 25, 2018 at 6:49 PM Otavio Salvador
-<otavio.salvador@ossystems.com.br> wrote:
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
 
-> In fact, was removed and now selected.
+Changes in v2:
+- rework evb device tree (Heiko Stuebner)
+- avoid adding the evb use as it is not present on evb but
+  minievb (which I don't have to test) and we are using it on a custom
+  customer board.
 
-Yes, correct. In 4.20-rc1 this option is automatically selected.
+ arch/arm/boot/dts/rv1108.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> I changed the commit log as:
->
-> ARM: imx_v6_v7_defconfig: Remove explicit ARM_UNWIND disable
->
-> CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-> selected by the Kconfig logic.  This is done in preparation to making
-> further changes to this defconfig cleaner.
->
-> Do you agree?
-
-Looks good to me, thanks.
+diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
+index ed8f6ca52c5b..4f4275599f7a 100644
+--- a/arch/arm/boot/dts/rv1108.dtsi
++++ b/arch/arm/boot/dts/rv1108.dtsi
+@@ -734,6 +734,27 @@
+ 			};
+ 		};
+ 
++		emmc {
++			emmc_clk: emmc-clk {
++				rockchip,pins = <2 RK_PB6 RK_FUNC_1 &pcfg_pull_none_drv_8ma>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins = <2 RK_PB4 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins = <2 RK_PA0 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA1 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA2 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA3 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA4 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA5 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA6 RK_FUNC_2 &pcfg_pull_up_drv_8ma>,
++						<2 RK_PA7 RK_FUNC_2 &pcfg_pull_up_drv_8ma>;
++			};
++		};
++
+ 		sdmmc {
+ 			sdmmc_clk: sdmmc-clk {
+ 				rockchip,pins = <3 RK_PC4 RK_FUNC_1 &pcfg_pull_none_drv_4ma>;
+-- 
+2.19.1
