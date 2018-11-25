@@ -1,56 +1,91 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 26 Nov 2018 03:17:45 +0800
-Subject: [PATCH v3 1/2] bpf: add __weak hook for allocating executable
- memory
-In-Reply-To: <20181123094152.21368-2-ard.biesheuvel@linaro.org>
-References: <20181123094152.21368-2-ard.biesheuvel@linaro.org>
-Message-ID: <201811260345.7q7d6M1C%fengguang.wu@intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 25 Nov 2018 18:02:44 -0200
+Subject: [PATCH 1/2] ARM: dts: imx6qdl-wandboard: Switch to SPDX identifier
+Message-ID: <1543176165-26733-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Adopt the SPDX license identifier headers to ease license compliance
+management. 
 
-I love your patch! Perhaps something to improve:
+Most of the wandboard dts files have already been converted, so switch
+the remaining ones.
 
-[auto build test WARNING on arm64/for-next/core]
-[also build test WARNING on v4.20-rc3 next-20181123]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/bpf-permit-JIT-allocations-to-be-served-outside-the-module-region/20181126-024110
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
-config: x86_64-randconfig-x007-201847 (attached as .config)
-compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
-
-All warnings (new ones prefixed by >>):
-
-   kernel//bpf/core.c: In function 'bpf_jit_free_exec':
->> kernel//bpf/core.c:619:17: warning: passing argument 1 of 'module_memfree' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
-     module_memfree(addr);
-                    ^~~~
-   In file included from kernel//bpf/core.c:28:0:
-   include/linux/moduleloader.h:30:6: note: expected 'void *' but argument is of type 'const void *'
-    void module_memfree(void *module_region);
-         ^~~~~~~~~~~~~~
-
-vim +619 kernel//bpf/core.c
-
-   616	
-   617	void __weak bpf_jit_free_exec(const void *addr)
-   618	{
- > 619		module_memfree(addr);
-   620	}
-   621	
-
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28772 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/3406027b/attachment-0001.gz>
+ arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi | 15 +++++----------
+ arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi | 15 +++++----------
+ arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi | 15 +++++----------
+ 3 files changed, 15 insertions(+), 30 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
+index 855dc6f..e781a45 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard-revb1.dtsi
+@@ -1,13 +1,8 @@
+-/*
+- * Copyright 2013 Freescale Semiconductor, Inc.
+- *
+- * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright 2013 Freescale Semiconductor, Inc.
++//
++// Author: Fabio Estevam <fabio.estevam@freescale.com>
+ 
+ #include "imx6qdl-wandboard.dtsi"
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
+index 49a0a55..3874e74 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard-revc1.dtsi
+@@ -1,13 +1,8 @@
+-/*
+- * Copyright 2013 Freescale Semiconductor, Inc.
+- *
+- * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright 2013 Freescale Semiconductor, Inc.
++//
++// Author: Fabio Estevam <fabio.estevam@freescale.com>
+ 
+ #include "imx6qdl-wandboard.dtsi"
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
+index 69d9c86..9390979 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
+@@ -1,13 +1,8 @@
+-/*
+- * Copyright 2013 Freescale Semiconductor, Inc.
+- *
+- * Author: Fabio Estevam <fabio.estevam@freescale.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- */
++// SPDX-License-Identifier: GPL-2.0
++//
++// Copyright 2013 Freescale Semiconductor, Inc.
++//
++// Author: Fabio Estevam <fabio.estevam@freescale.com>
+ 
+ #include "imx6qdl-wandboard.dtsi"
+ 
+-- 
+2.7.4
