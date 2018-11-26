@@ -1,41 +1,50 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 27 Nov 2018 00:59:17 +0800
-Subject: [PATCH v3 4/4] arm64: dts: actions: s700-cubieboard7: Enable SIRQ
-In-Reply-To: <20181126100940.2944780-1-pn@denx.de>
-References: <20181126100940.2944780-1-pn@denx.de>
-Message-ID: <201811270010.jiasM1Ez%fengguang.wu@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Nov 2018 17:01:07 +0000
+Subject: [PATCH] arm64: tlbi: Set MAX_TLBI_OPS to PTRS_PER_PTE
+Message-ID: <1543251667-30520-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Parthiban,
+In order to reduce the possibility of soft lock-ups, we bound the
+maximum number of TLBI operations performed by a single call to
+flush_tlb_range() to an arbitrary constant of 1024.
 
-Thank you for the patch! Yet something to improve:
+Whilst this does the job of avoiding lock-ups, we can actually be a bit
+smarter by defining this as PTRS_PER_PTE. Due to the structure of our
+page tables, using PTRS_PER_PTE means that an outer loop calling
+flush_tlb_range() for entire table entries will end up performing just a
+single TLBI operation for each entry. As an example, mremap()ing a 1GB
+range mapped using 4k pages now requires only 512 TLBI operations when
+moving the page tables as opposed to 262144 operations (512*512) when
+using the current threshold of 1024.
 
-[auto build test ERROR on tip/irq/core]
-[also build test ERROR on v4.20-rc4 next-20181126]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Parthiban-Nallathambi/Add-Actions-Semi-Owl-family-sirq-support/20181126-181439
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm64/boot/dts/actions/s700-cubieboard7.dts:46.1-9 Label or path pinctrl not found
->> FATAL ERROR: Syntax error parsing input tree
-
+Cc: Joel Fernandes <joel@joelfernandes.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 61742 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/576b5316/attachment-0001.gz>
+ arch/arm64/include/asm/tlbflush.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index c3c0387aee18..460fdd69ad5b 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -179,7 +179,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+  * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
+  * necessarily a performance improvement.
+  */
+-#define MAX_TLBI_OPS	1024UL
++#define MAX_TLBI_OPS	PTRS_PER_PTE
+ 
+ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 				     unsigned long start, unsigned long end,
+@@ -188,7 +188,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
+ 	unsigned long asid = ASID(vma->vm_mm);
+ 	unsigned long addr;
+ 
+-	if ((end - start) > (MAX_TLBI_OPS * stride)) {
++	if ((end - start) >= (MAX_TLBI_OPS * stride)) {
+ 		flush_tlb_mm(vma->vm_mm);
+ 		return;
+ 	}
+-- 
+2.1.4
