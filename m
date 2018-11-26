@@ -1,79 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 26 Nov 2018 14:10:24 +0000
-Subject: [PATCH v2 03/20] perf/core: add PERF_PMU_CAP_EXCLUDE for
- exclusion capable PMUs
-In-Reply-To: <1543230756-15319-4-git-send-email-andrew.murray@arm.com>
-References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
- <1543230756-15319-4-git-send-email-andrew.murray@arm.com>
-Message-ID: <8c9003c3-ccbf-c342-024f-772d697a911b@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 26 Nov 2018 15:12:41 +0100
+Subject: [PATCH 0/9] drm: remove deprecated functions
+In-Reply-To: <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
+References: <20181115221634.22715-1-greenfoo@gluegarage.com>
+ <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
+ <20181121094233.GN4266@phenom.ffwll.local>
+ <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
+Message-ID: <20181126141241.GM4266@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
-
-On 26/11/2018 11:12, Andrew Murray wrote:
-> Many PMU drivers do not have the capability to exclude counting events
-> that occur in specific contexts such as idle, kernel, guest, etc. These
-> drivers indicate this by returning an error in their event_init upon
-> testing the events attribute flags. This approach is error prone and
-> often inconsistent.
+On Sat, Nov 24, 2018 at 10:17:13PM +0100, Linus Walleij wrote:
+> On Wed, Nov 21, 2018 at 10:42 AM Daniel Vetter <daniel@ffwll.ch> wrote:
+> > On Thu, Nov 15, 2018 at 11:38:35PM +0100, Linus Walleij wrote:
+> > > On Thu, Nov 15, 2018 at 11:17 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
+> > >
+> > > > One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
+> > > > "switch from reference/unreference to get/put". That's what this patch series is
+> > > > about.
+> > >
+> > > The series:
+> > > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Since your reviewed it all, and there's a pile of acks for the driver
+> > parts too: Want to go ahead and apply it too?
 > 
-> Let's instead allow PMU drivers to advertise their ability to exclude
-> based on context via a new capability: PERF_PMU_CAP_EXCLUDE. This
-> allows the perf core to reject requests for exclusion events where
-> there is no support in the PMU.
+> OK I did... the git was quirky, patches changes around
+> under my feet and dim started to complain about problems
+> with commits that weren't even mine.
 > 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
-> ---
->   include/linux/perf_event.h | 1 +
->   kernel/events/core.c       | 9 +++++++++
->   2 files changed, 10 insertions(+)
+> It was especially scary.
 > 
-> diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> index b2e806f..69b3d65 100644
-> --- a/include/linux/perf_event.h
-> +++ b/include/linux/perf_event.h
-> @@ -244,6 +244,7 @@ struct perf_event;
->   #define PERF_PMU_CAP_EXCLUSIVE			0x10
->   #define PERF_PMU_CAP_ITRACE			0x20
->   #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
-> +#define PERF_PMU_CAP_EXCLUDE			0x80
->   
->   /**
->    * struct pmu - generic performance monitoring unit
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 5a97f34..9afb33c 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -9743,6 +9743,15 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
->   	if (ctx)
->   		perf_event_ctx_unlock(event->group_leader, ctx);
->   
-> +	if (!ret) {
-> +		if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
-> +				event_has_any_exclude_flag(event)) {
+> But I think I managed to apply the patches and push the
+> branch now.
 
-Technically this is a bisection-breaker, since no driver has this 
-capability yet - ideally, this patch should come after all the ones 
-introducing it to the relevant drivers (with the removal of the 
-now-redundant code from the other drivers at the end).
-
-Alternatively, since we already have several other negative 
-capabilities, unless there's a strong feeling against adding any more 
-then it might work out simpler to flip it to PERF_PMU_CAP_NO_EXCLUDE, 
-such that we only need to introduce the core check then directly replace 
-the open-coded event checks with the capability in the appropriate 
-drivers, and need not touch the exclusion-supporting ones at all.
-
-Robin.
-
-> +			if (event->destroy)
-> +				event->destroy(event);
-> +			ret = -EINVAL;
-> +		}
-> +	}
-> +
->   	if (ret)
->   		module_put(pmu->module);
->   
-> 
+Except when you're racing with someone else you should only see conflicts
+with stuff you've just pushed. Or if someone forgot to fix up their mess.
+What was the conflict? Looking at the git-rerere log I'm not exactly sure
+what happened ... Looks like only one of the patches didn't apply cleanly
+anymore because it was somewhat outdated. Otherwise nothing from you.
+-Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
