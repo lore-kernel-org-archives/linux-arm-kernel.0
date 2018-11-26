@@ -1,36 +1,45 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:42 +0100
-Subject: [PATCH 16/40] arm64: dts: renesas: r8a77990: Connect R-Car E3 AVB to
- IPMMU
-In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
-References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <430212752cd71fe8ed10a6c1cd9e6f8fe7fda222.1543229515.git.horms+renesas@verge.net.au>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Mon, 26 Nov 2018 15:13:24 +0200
+Subject: [PATCH 1/3] ARM: dts: imx1: Fix memory node duplicaton
+In-Reply-To: <1543236054-10450-1-git-send-email-festevam@gmail.com>
+References: <1543236054-10450-1-git-send-email-festevam@gmail.com>
+Message-ID: <7a0bd2b6-a624-85f0-6b63-ae2f80907685@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Fabio,
 
-Hook up the R-Car E3 AVB device to IPMMU-DS0 16 as described in
-the data sheet.
+On 11/26/2018 02:40 PM, Fabio Estevam wrote:
+> Boards based on imx1 have duplicate memory nodes:
+> 
+> - One coming from the board dts file: memory@
+> 
+> - One coming from the imx1.dtsi file.
+> 
+> Fix the duplication by removing the memory node from the dtsi file
+> and by adding 'device_type = "memory";' in the board dts.
+> 
+> Reported-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> ---
+>  arch/arm/boot/dts/imx1-ads.dts     | 1 +
+>  arch/arm/boot/dts/imx1-apf9328.dts | 1 +
+>  arch/arm/boot/dts/imx1.dtsi        | 2 --
+>  3 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx1-ads.dts b/arch/arm/boot/dts/imx1-ads.dts
+> index a1d81ba..3459a58 100644
+> --- a/arch/arm/boot/dts/imx1-ads.dts
+> +++ b/arch/arm/boot/dts/imx1-ads.dts
+> @@ -21,6 +21,7 @@
+>  	};
+>  
+>  	memory at 8000000 {
+> +		 device_type = "memory";
+>  		reg = <0x08000000 0x04000000>;
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+there is an unwanted space symbol before 'device_type'.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index cb83d866db7f..a945db3c4644 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -604,6 +604,7 @@
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
- 			phy-mode = "rgmii";
-+			iommus = <&ipmmu_ds0 16>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
--- 
-2.11.0
+--
+Best wishes,
+Vladimir
