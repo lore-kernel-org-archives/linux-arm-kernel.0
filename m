@@ -1,94 +1,126 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 14:55:04 +0000
-Subject: [PATCH v2 03/20] perf/core: add PERF_PMU_CAP_EXCLUDE for
- exclusion capable PMUs
-In-Reply-To: <8c9003c3-ccbf-c342-024f-772d697a911b@arm.com>
-References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
- <1543230756-15319-4-git-send-email-andrew.murray@arm.com>
- <8c9003c3-ccbf-c342-024f-772d697a911b@arm.com>
-Message-ID: <20181126145503.GA25271@e119886-lin.cambridge.arm.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 26 Nov 2018 15:09:56 +0000
+Subject: [PATCH 1/7] arm64: capabilities: Merge entries for
+ ARM64_WORKAROUND_CLEAN_CACHE
+In-Reply-To: <20181126140603.GA29684@arm.com>
+References: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
+ <1541418917-14219-2-git-send-email-suzuki.poulose@arm.com>
+ <20181126140603.GA29684@arm.com>
+Message-ID: <20181126150956.GA24096@en101>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 02:10:24PM +0000, Robin Murphy wrote:
-> Hi Andrew,
-> 
-> On 26/11/2018 11:12, Andrew Murray wrote:
-> > Many PMU drivers do not have the capability to exclude counting events
-> > that occur in specific contexts such as idle, kernel, guest, etc. These
-> > drivers indicate this by returning an error in their event_init upon
-> > testing the events attribute flags. This approach is error prone and
-> > often inconsistent.
+On Mon, Nov 26, 2018 at 02:06:04PM +0000, Will Deacon wrote:
+> On Mon, Nov 05, 2018 at 11:55:11AM +0000, Suzuki K Poulose wrote:
+> > We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
 > > 
-> > Let's instead allow PMU drivers to advertise their ability to exclude
-> > based on context via a new capability: PERF_PMU_CAP_EXCLUDE. This
-> > allows the perf core to reject requests for exclusion events where
-> > there is no support in the PMU.
+> > 1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
+> > 2) ARM Errata 819472 on A53 r0p[01]
 > > 
-> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > Both have the same work around. Merge these entries to avoid
+> > duplicate entries for a single capability.
+> > 
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Andre Przywara <andre.przywara@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > > ---
-> >   include/linux/perf_event.h | 1 +
-> >   kernel/events/core.c       | 9 +++++++++
-> >   2 files changed, 10 insertions(+)
+> >  arch/arm64/kernel/cpu_errata.c | 19 +++++++------------
+> >  1 file changed, 7 insertions(+), 12 deletions(-)
 > > 
-> > diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-> > index b2e806f..69b3d65 100644
-> > --- a/include/linux/perf_event.h
-> > +++ b/include/linux/perf_event.h
-> > @@ -244,6 +244,7 @@ struct perf_event;
-> >   #define PERF_PMU_CAP_EXCLUSIVE			0x10
-> >   #define PERF_PMU_CAP_ITRACE			0x20
-> >   #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
-> > +#define PERF_PMU_CAP_EXCLUDE			0x80
-> >   /**
-> >    * struct pmu - generic performance monitoring unit
-> > diff --git a/kernel/events/core.c b/kernel/events/core.c
-> > index 5a97f34..9afb33c 100644
-> > --- a/kernel/events/core.c
-> > +++ b/kernel/events/core.c
-> > @@ -9743,6 +9743,15 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
-> >   	if (ctx)
-> >   		perf_event_ctx_unlock(event->group_leader, ctx);
-> > +	if (!ret) {
-> > +		if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
-> > +				event_has_any_exclude_flag(event)) {
+> > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > index a509e351..c825bc0 100644
+> > --- a/arch/arm64/kernel/cpu_errata.c
+> > +++ b/arch/arm64/kernel/cpu_errata.c
+> > @@ -573,24 +573,19 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
+> >  const struct arm64_cpu_capabilities arm64_errata[] = {
+> >  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+> >  	defined(CONFIG_ARM64_ERRATUM_827319) || \
+> > -	defined(CONFIG_ARM64_ERRATUM_824069)
+> > +	defined(CONFIG_ARM64_ERRATUM_824069) || \
+> > +	defined(CONFIG_ARM64_ERRATUM_819472)
+> >  	{
+> > -	/* Cortex-A53 r0p[012] */
+> > -		.desc = "ARM errata 826319, 827319, 824069",
+> > +	/*
+> > +	 * Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069
+> > +	 * Cortex-A53 r0p[01] : ARM errata 819472
+> > +	 */
+> > +		.desc = "ARM errata 826319, 827319, 824069, 819472",
+> >  		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+> >  		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
+> >  		.cpu_enable = cpu_enable_cache_maint_trap,
 > 
-> Technically this is a bisection-breaker, since no driver has this capability
-> yet - ideally, this patch should come after all the ones introducing it to
-> the relevant drivers (with the removal of the now-redundant code from the
-> other drivers at the end).
+> Isn't this a semantic change wrt the Kconfig options? After this change,
+> if I /only/ set CONFIG_ARM64_ERRATUM_819472=y, then I still get the
+> workaround applied for CPUs > r0[p01] which isn't what I asked for.
 
-Indeed. Thought it is possible to first introduce the capability, update the
-relevant drivers to advertise it, then add the change to core.c and finally
-remove the unnecessary error checks as a result of using the new capability.
-This approach could be bisection-proof.
+You're right. I could change this to :
 
-> 
-> Alternatively, since we already have several other negative capabilities,
-> unless there's a strong feeling against adding any more then it might work
-> out simpler to flip it to PERF_PMU_CAP_NO_EXCLUDE, such that we only need to
-> introduce the core check then directly replace the open-coded event checks
-> with the capability in the appropriate drivers, and need not touch the
-> exclusion-supporting ones at all.
 
-This would certaintly be less risky and invasive (e.g. compare the number of
-files touched between this v2 and the previous v1).
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 787d785..56a921f 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -313,6 +313,11 @@ menu "Kernel Features"
+ 
+ menu "ARM errata workarounds via the alternatives framework"
+ 
++config ARM64_WORKAROUND_CLEAN_CACHE
++	default y
++	depends on ARM64_ERRATUM_826319 || ARM64_ERRATUM_827319 ||
++		   ARM64_ERRATUM_824069 || ARM64_ERRATUM_819472
++
+ config ARM64_ERRATUM_826319
+ 	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
+ 	default y
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a509e351..80f2e66 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -570,24 +570,28 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
+ 
+ #endif
+ 
+-const struct arm64_cpu_capabilities arm64_errata[] = {
++#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
++static const struct midr_range workaround_clean_cache[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_824069)
+-	{
+-	/* Cortex-A53 r0p[012] */
+-		.desc = "ARM errata 826319, 827319, 824069",
+-		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
+-		.cpu_enable = cpu_enable_cache_maint_trap,
+-	},
++	/* Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069 */
++	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
++#endif
++#ifdef	CONFIG_ARM64_ERRATUM_819472
++	/* Cortex-A53 r0p[01] : ARM errata 819472 */
++	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
++#endif
++	{},
++};
+ #endif
+-#ifdef CONFIG_ARM64_ERRATUM_819472
++
++const struct arm64_cpu_capabilities arm64_errata[] = {
++#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
+ 	{
+-	/* Cortex-A53 r0p[01] */
+-		.desc = "ARM errata 819472",
++		.desc = "ARM errata 826319, 827319, 824069, 819472",
+ 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
++		ERRATA_MIDR_REV_LIST(workaround_clean_cache),
+ 		.cpu_enable = cpu_enable_cache_maint_trap,
+ 	},
+ #endif
 
-I'm happy with either approach.
+---
 
-Thanks,
-
-Andrew Murray
-
-> 
-> Robin.
-> 
-> > +			if (event->destroy)
-> > +				event->destroy(event);
-> > +			ret = -EINVAL;
-> > +		}
-> > +	}
-> > +
-> >   	if (ret)
-> >   		module_put(pmu->module);
-> > 
+Cheers
+Suzuki
