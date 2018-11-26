@@ -1,76 +1,125 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 26 Nov 2018 12:36:03 -0800
-Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
- atomic.
-In-Reply-To: <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
-References: <20181119190805.19139-1-helen.koike@collabora.com>
- <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
- <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
- <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
- <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
-Message-ID: <87o9abbmq4.fsf@anholt.net>
+From: jcrouse@codeaurora.org (Jordan Crouse)
+Date: Mon, 26 Nov 2018 13:38:19 -0700
+Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
+In-Reply-To: <20181126193147.GB534@arm.com>
+References: <20180927224609.19515-1-robdclark@gmail.com>
+ <20181029191000.GD16739@arm.com>
+ <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
+ <20181113063225.GA3109@brain-police>
+ <CAF6AEGuV2zh97iq+TgkRw0bK3VNSxJieD1N2KMW3N28h07M+0w@mail.gmail.com>
+ <20181126193147.GB534@arm.com>
+Message-ID: <20181126203819.GL31792@jcrouse-lnx.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Zoran <mzoran@crowfest.net> writes:
+On Mon, Nov 26, 2018 at 07:31:48PM +0000, Will Deacon wrote:
+> Hi Rob,
+> 
+> On Tue, Nov 13, 2018 at 08:12:35AM -0500, Rob Clark wrote:
+> > On Tue, Nov 13, 2018 at 1:32 AM Will Deacon <will.deacon@arm.com> wrote:
+> > > On Fri, Nov 09, 2018 at 01:01:55PM -0500, Rob Clark wrote:
+> > > > On Mon, Oct 29, 2018 at 3:09 PM Will Deacon <will.deacon@arm.com> wrote:
+> > > > > On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
+> > > > > > We seem to need to set either this or CFCFG (stall), otherwise gpu
+> > > > > > faults trigger problems with other in-flight transactions from the
+> > > > > > GPU causing CP errors, etc.
+> > > > > >
+> > > > > > In the ARM SMMU spec, the 'Hit under previous context fault' bit is
+> > > > > > described as:
+> > > > > >
+> > > > > >  '0' - Stall or terminate subsequent transactions in the presence
+> > > > > >        of an outstanding context fault
+> > > > > >  '1' - Process all subsequent transactions independently of any
+> > > > > >        outstanding context fault.
+> > > > > >
+> > > > > > Since we don't enable CFCFG (stall) the behavior of terminating
+> > > > > > other transactions makes sense.  And is probably not what we want
+> > > > > > (and definately not what we want for GPU).
+> > > > > >
+> > > > > > Signed-off-by: Rob Clark <robdclark@gmail.com>
+> > > > > > ---
+> > > > > > So I hit this issue a long time back on 820 (msm8996) and at the
+> > > > > > time I solved it with a patch that enabled CFCFG.  And it resurfaced
+> > > > > > more recently on sdm845.  But at the time CFCFG was rejected, iirc
+> > > > > > because of concern that it would cause problems on other non-qcom
+> > > > > > arm smmu implementations.  And I think I forgot to send this version
+> > > > > > of the solution.
+> > > > > >
+> > > > > > If enabling HUPCF is anticipated to cause problems on other ARM
+> > > > > > SMMU implementations, I think I can come up with a variant of this
+> > > > > > patch which conditionally enables it for snapdragon.
+> > > > > >
+> > > > > > Either way, I'd really like to get some variant of this fix merged
+> > > > > > (and probably it would be a good idea for stable kernel branches
+> > > > > > too), since current behaviour with the GPU means faults turn into
+> > > > > > a fantastic cascade of fail.
+> > > > >
+> > > > > Can you describe how this fantastic cascade of fail improves with this
+> > > > > patch, please? If you're getting context faults then something has already
+> > > > > gone horribly wrong, so I'm trying to work out how this improves things.
+> > > > >
+> > > >
+> > > > There are plenty of cases where getting iommu faults with a GPU is
+> > > > "normal", or at least not something the kernel or even GL driver can
+> > > > control.
+> > >
+> > > Such as? All the mainline driver does is print a diagnostic and clear the
+> > > fault, which doesn't seem generally useful.
+> > 
+> > it is useful to debug the fault ;-)
+> > 
+> > Although eventually we'll want to be able to do more than that, like
+> > have the fault trigger bringing in pages of a mmap'd file and that
+> > sort of thing.
+> 
+> Right, and feels very strange to me if we have this bit set because it
+> means that your fault is no longer synchronous and therefore diverges
+> from the fault model that you get from the CPU, where you certainly
+> wouldn't expect stores appearing in the program after a faulting load to
+> be visible in memory. However, thinking harder about it, I suppose we're
+> already in a situation where the translations are handled out of order
+> in the absence of barriers, so maybe it's not the end of the world.
+> 
+> Could you dump the FSR value that you see in the fault handler, please?
+> From my reading of the architecture spec, as long as clear all of the
+> fault bits in the irq handler, then your machine shouldn't die like it
+> does with HUPCFG=CFCFG=0..
+> 
+> > > > With this patch, you still get the iommu fault, but it doesn't cause
+> > > > the gpu to crash.  But without it, other memory accesses in flight
+> > > > while the fault occurs, like the GPU command-processor reading further
+> > > > ahead in the cmdstream to setup next draw, would return zero's,
+> > > > causing the GPU to crash or get into a bad state.
+> > >
+> > > I get that part, but I don't understand why we're seeing faults in the first
+> > > place and I worry that this patch is just the tip of the iceberg. It's also
+> > > not clear that processing subsequent transactions is always the right thing
+> > > to do in a world where we actually want to report (and handle) synchronous
+> > > faults from devices.
+> > 
+> > Sure, it is a bug.. but it can be an application bug that is not
+> > something the userspace GL driver or kernel could do anything about.
+> > We shouldn't let this kill the GPU.  If the application didn't have
+> > this much control, we wouldn't need an IOMMU in the first place[1].
+> > With opencl compute, the userspace controlled shader has full blown
+> > pointers to GPU memory.
+> > 
+> > And even in cases where it is a userspace GL driver bug, having some
+> > robustness to not completely kill the GPU makes debugging much easier.
+> > Something I do a lot when bringing up support for a new generation of
+> > GPU.
+> > 
+> > I'm having a hard time understanding your objection to this.
+> > Returning zero's for non-faulting transactions is a *really bad idea*.
+> 
+> Wait -- who said anything about returning zeroes? Where does that behaviour
+> appear in the architecture?
 
-> On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:
->> 
->> The point here is not about setting and resetting the plane->fb
->> pointer. It's about what happens inside
->> drm_atomic_set_fb_for_plane().
->> 
->> It calls drm_framebuffer_get() for the new fb and
->> drm_framebuffer_put() for the old fb. In result, if the fb changes,
->> the old fb, which had its reference count incremented in the atomic
->> commit that set it to the plane before, has its reference count
->> decremented. Moreover, if the new reference count becomes 0,
->> drm_framebuffer_put() will immediately free the buffer.
->> 
->> Freeing a buffer when the hardware is still scanning out of it isn't
->> a
->> good idea, is it?
->
-> No, it's not.  But the board I submitted the patch for doesn't have
-> anything like hot swapable ram.  The ram access is still going to work,
-> just it might display something it shouldn't. Say for example if that
-> frame buffer got reused by somethig else and filled with new data in
-> the very small window.
->
-> But yes, I agree the best solution would be to not release the buffer
-> until the next vblank.
->
-> Perhaps a good solution would be for the DRM api to have the concept of
-> a deferred release?  Meaning if the put() call just added the frame
-> buffer to a list that DRM core could walk during the vblank.  That
-> might be better then every single driver trying to work up a custom
-> solution.
->
->> The vc4 driver seems to be able to program the hardware to switch the
->> scanout to the new buffer immediately:
->> 
->> https://elixir.bootlin.com/linux/v4.20-rc3/source/drivers/gpu/drm/vc4/vc4_plane.c#L794
->> 
->> Although I wonder if there isn't still a tiny race there - the
->> hardware may have just started refilling the FIFO from the old
->> address. Still, if the FIFO is small, the FIFO refill operation may
->> be
->> much shorter than it takes for the kernel code to actually free the
->> buffer. Eric and Michael, could you confirm?
->> 
->
-> I don't have those boards anymore, and I don't have access to any
-> technical documentation on the GPU so I can't really add much here.  
-> Eric can probably provide the best information.
+I _think_ it is the bus implementation that returns zero on a terminated
+transaction but the effect on the GPU is the same.
 
-I don't think I understood my scanout hardware well enough when I
-started on the async update stuff for rpi.  vc4 probably needs to wait
-until the HW starts scanning out a new line before letting the old BO
-get freed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/e38d77a3/attachment.sig>
+Jordan
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
