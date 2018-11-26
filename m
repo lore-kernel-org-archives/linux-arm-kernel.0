@@ -1,71 +1,170 @@
-From: rppt@linux.ibm.com (Mike Rapoport)
-Date: Mon, 26 Nov 2018 09:25:46 +0200
-Subject: [PATCH 5/5] arch: simplify several early memory allocations
-In-Reply-To: <7a92357c-6251-fe84-d724-16fdc49d03a3@c-s.fr>
-References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
- <1543182277-8819-6-git-send-email-rppt@linux.ibm.com>
- <7a92357c-6251-fe84-d724-16fdc49d03a3@c-s.fr>
-Message-ID: <20181126072546.GB14863@rapoport-lnx>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 26 Nov 2018 16:37:53 +0900
+Subject: [PATCH 3/3] ARM: dts: Add g3d bus nodes using VDD_INT for
+ Exynos542x SoC
+In-Reply-To: <20181123094413.1108-3-linux.amoon@gmail.com>
+References: <20181123094413.1108-1-linux.amoon@gmail.com>
+ <CGME20181123094508epcas5p4b7958b812bf0f64ca47006ced9fda279@epcas5p4.samsung.com>
+ <20181123094413.1108-3-linux.amoon@gmail.com>
+Message-ID: <5BFBA2D1.8090409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 08:03:55AM +0100, Christophe LEROY wrote:
-> 
-> 
-> Le 25/11/2018 ? 22:44, Mike Rapoport a ?crit?:
-> >There are several early memory allocations in arch/ code that use
-> >memblock_phys_alloc() to allocate memory, convert the returned physical
-> >address to the virtual address and then set the allocated memory to zero.
-> >
-> >Exactly the same behaviour can be achieved simply by calling
-> >memblock_alloc(): it allocates the memory in the same way as
-> >memblock_phys_alloc(), then it performs the phys_to_virt() conversion and
-> >clears the allocated memory.
-> >
-> >Replace the longer sequence with a simpler call to memblock_alloc().
-> >
-> >Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
-> >---
-> >  arch/arm/mm/mmu.c                     |  4 +---
-> >  arch/c6x/mm/dma-coherent.c            |  9 ++-------
-> >  arch/nds32/mm/init.c                  | 12 ++++--------
-> >  arch/powerpc/kernel/setup-common.c    |  4 ++--
-> >  arch/powerpc/mm/pgtable_32.c          |  4 +---
-> >  arch/powerpc/mm/ppc_mmu_32.c          |  3 +--
-> >  arch/powerpc/platforms/powernv/opal.c |  3 +--
-> >  arch/sparc/kernel/prom_64.c           |  7 ++-----
-> >  arch/sparc/mm/init_64.c               |  9 +++------
-> >  arch/unicore32/mm/mmu.c               |  4 +---
-> >  10 files changed, 18 insertions(+), 41 deletions(-)
-> >
-> [...]
-> 
-> >diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
-> >index bda3c6f..9931e68 100644
-> >--- a/arch/powerpc/mm/pgtable_32.c
-> >+++ b/arch/powerpc/mm/pgtable_32.c
-> >@@ -50,9 +50,7 @@ __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
-> >  	if (slab_is_available()) {
-> >  		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
-> >  	} else {
-> >-		pte = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
-> >-		if (pte)
-> >-			clear_page(pte);
-> >+		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
-> 
-> memblock_alloc() uses memset to zeroize the block.
-> 
-> clear_page() is more performant than memset().
+Hi Anand,
 
-As far as I can tell, the majority of the page table pages will be anyway
-allocated with __get_free_page() so I think the performance loss here will
-negligible.
- 
-> Christophe
+CLK_DOUT_ACLK_G3D is the clock for GPU h/w and it requires the buck4_reg("vdd_g3d").
+
+bus_wcore uses the buck3_reg("vdd_int"). bus_wcore and bus_g3d don't share the 
+same voltage line. It is wrong to make 'bus_g3d' as the child of 'bus_wcore'
+because of using the different regulator.
+
+CLK_DOUT_ACLK_G3D and buck4_reg should be controlled from MALI driver 
+with DEVFREQ framework. Unfortunately, MALI driver is not posted to mainline.
+
+
+On 2018? 11? 23? 18:44, Anand Moon wrote:
+> Add missing Netwwork on chip for g3d bus node using VDD_INI
+> for Exynos542x SoC.
 > 
-> [...]
+> - CLK_DOUT_ACLK_G3D for G3D's AXI
 > 
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos5420.dtsi             | 57 +++++++++++++++++--
+>  arch/arm/boot/dts/exynos5422-odroid-core.dtsi |  5 ++
+>  2 files changed, 56 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index aaff15880761..bc7203bb1282 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -1047,6 +1047,14 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		bus_g3d: bus_g3d {
+> +			compatible = "samsung,exynos-bus";
+> +			clocks = <&clock CLK_DOUT_ACLK_G3D>;
+> +			clock-names = "bus";
+> +			operating-points-v2 = <&bus_g3d_opp_table>;
+> +			status = "disabled";
+> +		};
+> +
+>  		bus_jpeg: bus_jpeg {
+>  			compatible = "samsung,exynos-bus";
+>  			clocks = <&clock CLK_DOUT_ACLK300_JPEG>;
+> @@ -1245,7 +1253,44 @@
+>  			};
+>  		};
+>  
+> -		bus_jpeg_opp_table: opp_table11 {
+> +		bus_g3d_opp_table: opp_table11 {
+> +			compatible = "operating-points-v2";
+> +
+> +			opp at 600000000 {
+> +				opp-hz = /bits/ 64 <600000000>;
+> +				opp-microvolt = <1025000>;
+> +			};
+> +			opp at 543000000 {
+> +				opp-hz = /bits/ 64 <543000000>;
+> +				opp-microvolt = <987500>;
+> +			};
+> +			opp at 480000000 {
+> +				opp-hz = /bits/ 64 <480000000>;
+> +				opp-microvolt = <950000>;
+> +			};
+> +			opp at 420000000 {
+> +				opp-hz = /bits/ 64 <420000000>;
+> +				opp-microvolt = <937500>;
+> +			};
+> +			opp at 350000000 {
+> +				opp-hz = /bits/ 64 <350000000>;
+> +				opp-microvolt = <900000>;
+> +			};
+> +			opp at 266000000 {
+> +				opp-hz = /bits/ 64 <266000000>;
+> +				opp-microvolt = <862500>;
+> +			};
+> +			opp at 177000000 {
+> +				opp-hz = /bits/ 64 <177000000>;
+> +				opp-microvolt = <862500>;
+> +			};
+> +			opp at 100000000 {
+> +				opp-hz = /bits/ 64 <100000000>;
+> +				opp-microvolt = <862500>;
+> +			};
+> +		};
+> +
+> +		bus_jpeg_opp_table: opp_table12 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> @@ -1262,7 +1307,7 @@
+>  			};
+>  		};
+>  
+> -		bus_jpeg_apb_opp_table: opp_table12 {
+> +		bus_jpeg_apb_opp_table: opp_table13 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> @@ -1279,7 +1324,7 @@
+>  			};
+>  		};
+>  
+> -		bus_disp1_fimd_opp_table: opp_table13 {
+> +		bus_disp1_fimd_opp_table: opp_table14 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> @@ -1290,7 +1335,7 @@
+>  			};
+>  		};
+>  
+> -		bus_disp1_opp_table: opp_table14 {
+> +		bus_disp1_opp_table: opp_table15 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> @@ -1304,7 +1349,7 @@
+>  			};
+>  		};
+>  
+> -		bus_gscl_opp_table: opp_table15 {
+> +		bus_gscl_opp_table: opp_table16 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> @@ -1318,7 +1363,7 @@
+>  			};
+>  		};
+>  
+> -		bus_mscl_opp_table: opp_table16 {
+> +		bus_mscl_opp_table: opp_table17 {
+>  			compatible = "operating-points-v2";
+>  
+>  			opp00 {
+> diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> index 2fac4baf1eb4..6e39e4594502 100644
+> --- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> +++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+> @@ -89,6 +89,11 @@
+>  	status = "okay";
+>  };
+>  
+> +&bus_g3d {
+> +	devfreq = <&bus_wcore>;
+> +	status = "okay";
+> +};
+> +
+>  &bus_jpeg {
+>  	devfreq = <&bus_wcore>;
+>  	status = "okay";
+> 
+
 
 -- 
-Sincerely yours,
-Mike.
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
