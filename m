@@ -1,67 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 Nov 2018 16:45:55 -0200
-Subject: [RFC 2/2] ARM: dts: imx7: Correct mask for GIC PPI interrupts
-In-Reply-To: <1543257955-8910-1-git-send-email-festevam@gmail.com>
-References: <1543257955-8910-1-git-send-email-festevam@gmail.com>
-Message-ID: <1543257955-8910-2-git-send-email-festevam@gmail.com>
+From: pn@denx.de (Parthiban Nallathambi)
+Date: Mon, 26 Nov 2018 19:58:17 +0100
+Subject: [PATCH v2 0/4] Add Actions Semi Owl family S700 I2C support
+Message-ID: <20181126185821.2480449-1-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC_CPU_MASK_SIMPLE() macro should take as its argument the actual
-number of CPU cores the interrupt controller is wired to.
+This patch series adds support for Actions Semi Owl SoC family S700
+I2C controller. S700 provides 4 I2C masters and with cubieboard7
+2 (I2C0 and I2C1) are exposed.
 
-i.MX7S contains a single Cortex-A7, hence the second interrupt specifier
-cell for Private Peripheral Interrupts should use "GIC_CPU_MASK_SIMPLE(1)".
+Added pinctrl definition for I2C controllers in cubieboard7. This patch
+depends on s700 pinctrl driver support (yet to be merged),
+https://lkml.org/lkml/2018/11/19/514
+https://lore.kernel.org/patchwork/patch/1012859/
 
-Likewise, i.MX7D contains two Cortex-A7 cores, so it should use
-"GIC_CPU_MASK_SIMPLE(2)" instead.
+Changelog in v2:
+- Initial version https://lore.kernel.org/patchwork/patch/1011911/ only
+added the I2C nodes using s900 compatible property. Now, new s700
+compatiable string is added and used for S700
+- Device tree bindings added with s700 compatible string
+- pinctrl definition for cubieboard7
 
-Tested on a imx7s-warp.
+Parthiban Nallathambi (4):
+  dt-bindings: i2c: Add S700 support for Actions Semi Soc's
+  i2c: Add Actions Semiconductor Owl family S700 I2C support
+  arm64: dts: actions: s700: Add I2C controller nodes
+  arm64: dts: actions: s700-cubieboard7: Enable I2C0 and I2C1
 
-Signed-off-by: Fabio Estevam <festevam@gmail.com>
----
- arch/arm/boot/dts/imx7d.dtsi | 9 +++++++++
- arch/arm/boot/dts/imx7s.dtsi | 8 ++++----
- 2 files changed, 13 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/i2c/i2c-owl.txt       |  2 +-
+ .../boot/dts/actions/s700-cubieboard7.dts     | 53 +++++++++++++++++++
+ arch/arm64/boot/dts/actions/s700.dtsi         | 40 ++++++++++++++
+ drivers/i2c/busses/i2c-owl.c                  |  1 +
+ 4 files changed, 95 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 826224b..b066749 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -24,6 +24,15 @@
- 		};
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&intc>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
- 	cpu0_opp_table: opp-table {
- 		compatible = "operating-points-v2";
- 		opp-shared;
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 477901c..be02a10 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -160,10 +160,10 @@
- 	timer {
- 		compatible = "arm,armv7-timer";
- 		interrupt-parent = <&intc>;
--		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
--			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
- 	soc {
 -- 
-2.7.4
+2.17.2
