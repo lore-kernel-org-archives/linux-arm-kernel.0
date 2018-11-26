@@ -1,177 +1,84 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:47 +0100
-Subject: [PATCH 21/40] arm64: dts: renesas: r8a779{7|8}0: add TMU support
+Date: Mon, 26 Nov 2018 13:54:49 +0100
+Subject: [PATCH 23/40] arm64: dts: renesas: Switch eMMC bus to 1V8 on
+ Salvator-X and ULCB
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <cb202e7c5895437fbabd0e575cf2530c65763dde.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <5f65328df3f5cd25af741638153929d3c7ad4d8a.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Marek Vasut <marek.vasut@gmail.com>
 
-Describe TMUs in the R8A779{7|8}0 device trees.
+The eMMC card has two supplies, VCC and VCCQ. The VCC supplies the NAND
+array and the VCCQ supplies the bus. On Salvator-X and ULCB, the VCC is
+connected to 3.3V rail, while the VCCQ is connected to 1.8V rail. Adjust
+the pinmux to match the bus, which is always operating in 1.8V mode.
 
-Based on the original (and large) patches by Vladimir Barinov.
+While at it, deduplicate the pinmux entries, which are now the same for
+both default and UHS modes. We still need the two pinctrl entries to
+match the bindings though.
 
-Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Tested-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 65 +++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 65 +++++++++++++++++++++++++++++++
- 2 files changed, 130 insertions(+)
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 8 +-------
+ arch/arm64/boot/dts/renesas/ulcb.dtsi            | 8 +-------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index 4abd154bca1f..563428d1cdc2 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -329,6 +329,71 @@
- 			resets = <&cpg 407>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index a3e89504e044..f66d990b92f1 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -607,12 +607,6 @@
+ 	sdhi2_pins: sd2 {
+ 		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
+ 		function = "sdhi2";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi2_pins_uhs: sd2_uhs {
+-		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
+-		function = "sdhi2";
+ 		power-source = <1800>;
+ 	};
  
-+		tmu0: timer at e61e0000 {
-+			compatible = "renesas,tmu-r8a77970", "renesas,tmu";
-+			reg = <0 0xe61e0000 0 0x30>;
-+			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 125>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 125>;
-+			status = "disabled";
-+		};
-+
-+		tmu1: timer at e6fc0000 {
-+			compatible = "renesas,tmu-r8a77970", "renesas,tmu";
-+			reg = <0 0xe6fc0000 0 0x30>;
-+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 124>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 124>;
-+			status = "disabled";
-+		};
-+
-+		tmu2: timer at e6fd0000 {
-+			compatible = "renesas,tmu-r8a77970", "renesas,tmu";
-+			reg = <0 0xe6fd0000 0 0x30>;
-+			interrupts = <GIC_SPI 303 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 123>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 123>;
-+			status = "disabled";
-+		};
-+
-+		tmu3: timer at e6fe0000 {
-+			compatible = "renesas,tmu-r8a77970", "renesas,tmu";
-+			reg = <0 0xe6fe0000 0 0x30>;
-+			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 122>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 122>;
-+			status = "disabled";
-+		};
-+
-+		tmu4: timer at ffc00000 {
-+			compatible = "renesas,tmu-r8a77970", "renesas,tmu";
-+			reg = <0 0xffc00000 0 0x30>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 121>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
-+			resets = <&cpg 121>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at e6500000 {
- 			compatible = "renesas,i2c-r8a77970",
- 				     "renesas,rcar-gen3-i2c";
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index ce2c9955df75..5bd9b2547c36 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -359,6 +359,71 @@
- 			resets = <&cpg 407>;
- 		};
+@@ -763,7 +757,7 @@
+ &sdhi2 {
+ 	/* used for on-board 8bit eMMC */
+ 	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-1 = <&sdhi2_pins_uhs>;
++	pinctrl-1 = <&sdhi2_pins>;
+ 	pinctrl-names = "default", "state_uhs";
  
-+		tmu0: timer at e61e0000 {
-+			compatible = "renesas,tmu-r8a77980", "renesas,tmu";
-+			reg = <0 0xe61e0000 0 0x30>;
-+			interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 137 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 125>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 125>;
-+			status = "disabled";
-+		};
-+
-+		tmu1: timer at e6fc0000 {
-+			compatible = "renesas,tmu-r8a77980", "renesas,tmu";
-+			reg = <0 0xe6fc0000 0 0x30>;
-+			interrupts = <GIC_SPI 128 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 129 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 130 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 124>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 124>;
-+			status = "disabled";
-+		};
-+
-+		tmu2: timer at e6fd0000 {
-+			compatible = "renesas,tmu-r8a77980", "renesas,tmu";
-+			reg = <0 0xe6fd0000 0 0x30>;
-+			interrupts = <GIC_SPI 303 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 304 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 305 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 123>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 123>;
-+			status = "disabled";
-+		};
-+
-+		tmu3: timer at e6fe0000 {
-+			compatible = "renesas,tmu-r8a77980", "renesas,tmu";
-+			reg = <0 0xe6fe0000 0 0x30>;
-+			interrupts = <GIC_SPI 131 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 122>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 122>;
-+			status = "disabled";
-+		};
-+
-+		tmu4: timer at ffc00000 {
-+			compatible = "renesas,tmu-r8a77980", "renesas,tmu";
-+			reg = <0 0xffc00000 0 0x30>;
-+			interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 121>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
-+			resets = <&cpg 121>;
-+			status = "disabled";
-+		};
-+
- 		i2c0: i2c at e6500000 {
- 			compatible = "renesas,i2c-r8a77980",
- 				     "renesas,rcar-gen3-i2c";
+ 	vmmc-supply = <&reg_3p3v>;
+diff --git a/arch/arm64/boot/dts/renesas/ulcb.dtsi b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+index 89daca7356df..de694fdae067 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb.dtsi
+@@ -332,12 +332,6 @@
+ 	sdhi2_pins: sd2 {
+ 		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
+ 		function = "sdhi2";
+-		power-source = <3300>;
+-	};
+-
+-	sdhi2_pins_uhs: sd2_uhs {
+-		groups = "sdhi2_data8", "sdhi2_ctrl", "sdhi2_ds";
+-		function = "sdhi2";
+ 		power-source = <1800>;
+ 	};
+ 
+@@ -426,7 +420,7 @@
+ &sdhi2 {
+ 	/* used for on-board 8bit eMMC */
+ 	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-1 = <&sdhi2_pins_uhs>;
++	pinctrl-1 = <&sdhi2_pins>;
+ 	pinctrl-names = "default", "state_uhs";
+ 
+ 	vmmc-supply = <&reg_3p3v>;
 -- 
 2.11.0
