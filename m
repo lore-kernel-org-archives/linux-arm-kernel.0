@@ -1,29 +1,94 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Nov 2018 14:53:42 +0000
-Subject: [PATCH v8 1/7] ASoC: dt-bindings: add regulator property to
- simple amplifier
-In-Reply-To: <20181121051752.18387-2-anarsoul@gmail.com>
-References: <20181121051752.18387-1-anarsoul@gmail.com>
- <20181121051752.18387-2-anarsoul@gmail.com>
-Message-ID: <20181126145342.GE9715@sirena.org.uk>
+From: andrew.murray@arm.com (Andrew Murray)
+Date: Mon, 26 Nov 2018 14:55:04 +0000
+Subject: [PATCH v2 03/20] perf/core: add PERF_PMU_CAP_EXCLUDE for
+ exclusion capable PMUs
+In-Reply-To: <8c9003c3-ccbf-c342-024f-772d697a911b@arm.com>
+References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
+ <1543230756-15319-4-git-send-email-andrew.murray@arm.com>
+ <8c9003c3-ccbf-c342-024f-772d697a911b@arm.com>
+Message-ID: <20181126145503.GA25271@e119886-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 09:17:46PM -0800, Vasily Khoruzhick wrote:
+On Mon, Nov 26, 2018 at 02:10:24PM +0000, Robin Murphy wrote:
+> Hi Andrew,
+> 
+> On 26/11/2018 11:12, Andrew Murray wrote:
+> > Many PMU drivers do not have the capability to exclude counting events
+> > that occur in specific contexts such as idle, kernel, guest, etc. These
+> > drivers indicate this by returning an error in their event_init upon
+> > testing the events attribute flags. This approach is error prone and
+> > often inconsistent.
+> > 
+> > Let's instead allow PMU drivers to advertise their ability to exclude
+> > based on context via a new capability: PERF_PMU_CAP_EXCLUDE. This
+> > allows the perf core to reject requests for exclusion events where
+> > there is no support in the PMU.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >   include/linux/perf_event.h | 1 +
+> >   kernel/events/core.c       | 9 +++++++++
+> >   2 files changed, 10 insertions(+)
+> > 
+> > diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+> > index b2e806f..69b3d65 100644
+> > --- a/include/linux/perf_event.h
+> > +++ b/include/linux/perf_event.h
+> > @@ -244,6 +244,7 @@ struct perf_event;
+> >   #define PERF_PMU_CAP_EXCLUSIVE			0x10
+> >   #define PERF_PMU_CAP_ITRACE			0x20
+> >   #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
+> > +#define PERF_PMU_CAP_EXCLUDE			0x80
+> >   /**
+> >    * struct pmu - generic performance monitoring unit
+> > diff --git a/kernel/events/core.c b/kernel/events/core.c
+> > index 5a97f34..9afb33c 100644
+> > --- a/kernel/events/core.c
+> > +++ b/kernel/events/core.c
+> > @@ -9743,6 +9743,15 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
+> >   	if (ctx)
+> >   		perf_event_ctx_unlock(event->group_leader, ctx);
+> > +	if (!ret) {
+> > +		if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
+> > +				event_has_any_exclude_flag(event)) {
+> 
+> Technically this is a bisection-breaker, since no driver has this capability
+> yet - ideally, this patch should come after all the ones introducing it to
+> the relevant drivers (with the removal of the now-redundant code from the
+> other drivers at the end).
 
-> +Optional properties:
-> +- VCC-supply   : power supply for the device, as covered
-> +                 in Documentation/devicetree/bindings/regulator/regulator.txt
-> +
+Indeed. Thought it is possible to first introduce the capability, update the
+relevant drivers to advertise it, then add the change to core.c and finally
+remove the unnecessary error checks as a result of using the new capability.
+This approach could be bisection-proof.
 
-As ever supplies shouldn't be marked as optional unless they can be
-missing even though they can safely be omitted on Linux.  This one's a
-bit odd in that the name is going to depend on which amp is connected
-but still it's probably best that we do that for consistency.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/17bc6e82/attachment.sig>
+> 
+> Alternatively, since we already have several other negative capabilities,
+> unless there's a strong feeling against adding any more then it might work
+> out simpler to flip it to PERF_PMU_CAP_NO_EXCLUDE, such that we only need to
+> introduce the core check then directly replace the open-coded event checks
+> with the capability in the appropriate drivers, and need not touch the
+> exclusion-supporting ones at all.
+
+This would certaintly be less risky and invasive (e.g. compare the number of
+files touched between this v2 and the previous v1).
+
+I'm happy with either approach.
+
+Thanks,
+
+Andrew Murray
+
+> 
+> Robin.
+> 
+> > +			if (event->destroy)
+> > +				event->destroy(event);
+> > +			ret = -EINVAL;
+> > +		}
+> > +	}
+> > +
+> >   	if (ret)
+> >   		module_put(pmu->module);
+> > 
