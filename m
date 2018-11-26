@@ -1,223 +1,399 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Nov 2018 00:48:23 +0100
-Subject: [PATCH v3] arm64: dts: rockchip: Add DT for nanopc-t4
-In-Reply-To: <20181126145107.38222-1-tomeu.vizoso@collabora.com>
-References: <20181123073120.6250-1-tomeu.vizoso@collabora.com>
- <20181126145107.38222-1-tomeu.vizoso@collabora.com>
-Message-ID: <26178858.xdqtN7Rtck@phil>
+From: gustavo.padovan@collabora.com (Gustavo Padovan)
+Date: Mon, 26 Nov 2018 21:54:06 -0200
+Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
+ atomic.
+In-Reply-To: <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
+References: <20181119190805.19139-1-helen.koike@collabora.com>
+ <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
+ <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
+ <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
+Message-ID: <a9839683-1bef-4721-5828-c772a188075d@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomeu,
+Hi Tomasz,
 
-Am Montag, 26. November 2018, 15:47:49 CET schrieb Tomeu Vizoso:
-> This adds a device tree for the NanoPC-T4 SBC, which is based on the
-> Rockchip RK3399 SoC and marketed by FriendlyELEC.
-> 
-> Known working:
-> 
-> - Serial
-> - Ethernet
-> - HDMI
-> - USB 2.0
-> 
-> All of the interesting stuff is in a .dtsi because there are at least
-> two other boards that share most of it: NanoPi M4 and NanoPi NEO4.
-> 
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On 11/23/18 12:27 AM, Tomasz Figa wrote:
+> Hi Helen,
+>
+> On Fri, Nov 23, 2018 at 8:31 AM Helen Koike <helen.koike@collabora.com> wrote:
+>> Hi Tomasz,
+>>
+>> On 11/20/18 4:48 AM, Tomasz Figa wrote:
+>>> Hi Helen,
+>>>
+>>> On Tue, Nov 20, 2018 at 4:08 AM Helen Koike <helen.koike@collabora.com> wrote:
+>>>> From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>>>>
+>>>> Add support to async updates of cursors by using the new atomic
+>>>> interface for that.
+>>>>
+>>>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>>>> [updated for upstream]
+>>>> Signed-off-by: Helen Koike <helen.koike@collabora.com>
+>>>>
+>>>> ---
+>>>> Hello,
+>>>>
+>>>> This is the third version of the async-plane update suport to the
+>>>> Rockchip driver.
+>>>>
+>>> Thanks for a quick respin. Please see my comments inline. (I'll try to
+>>> be better at responding from now on...)
+>>>
+>>>> I tested running igt kms_cursor_legacy and kms_atomic tests using a 96Boards Ficus.
+>>>>
+>>>> Note that before the patch, the following igt tests failed:
+>>>>
+>>>>          basic-flip-before-cursor-atomic
+>>>>          basic-flip-before-cursor-legacy
+>>>>          cursor-vs-flip-atomic
+>>>>          cursor-vs-flip-legacy
+>>>>          cursor-vs-flip-toggle
+>>>>          flip-vs-cursor-atomic
+>>>>          flip-vs-cursor-busy-crc-atomic
+>>>>          flip-vs-cursor-busy-crc-legacy
+>>>>          flip-vs-cursor-crc-atomic
+>>>>          flip-vs-cursor-crc-legacy
+>>>>          flip-vs-cursor-legacy
+>>>>
+>>>> Full log: https://people.collabora.com/~koike/results-4.20/html/
+>>>>
+>>>> Now with the patch applied the following were fixed:
+>>>>          basic-flip-before-cursor-atomic
+>>>>          basic-flip-before-cursor-legacy
+>>>>          flip-vs-cursor-atomic
+>>>>          flip-vs-cursor-legacy
+>>>>
+>>>> Full log: https://people.collabora.com/~koike/results-4.20-async/html/
+>>> Could you also test modetest, with the -C switch to test the legacy
+>>> cursor API? I remember it triggering crashes due to synchronization
+>>> issues easily.
+>> Sure. I tested with
+>> $ modetest -M rockchip -s 37:1920x1080 -C
+>>
+>> I also vary the mode but I couldn't trigger any crashes.
+>>
+>>>> Tomasz, as you mentined in v2 about waiting the hardware before updating
+>>>> the framebuffer, now I call the loop you pointed out in the async path,
+>>>> was that what you had in mind? Or do you think I would make sense to
+>>>> call the vop_crtc_atomic_flush() instead of just exposing that loop?
+>>>>
+>>>> Thanks
+>>>> Helen
+>>>>
+>>>> Changes in v3:
+>>>> - Rebased on top of drm-misc
+>>>> - Fix missing include in rockchip_drm_vop.c
+>>>> - New function vop_crtc_atomic_commit_flush
+>>>>
+>>>> Changes in v2:
+>>>> - v2: https://patchwork.freedesktop.org/patch/254180/
+>>>> - Change the framebuffer as well to cover jumpy cursor when hovering
+>>>>    text boxes or hyperlink. (Tomasz)
+>>>> - Use the PSR inhibit mechanism when accessing VOP hardware instead of
+>>>>    PSR flushing (Tomasz)
+>>>>
+>>>> Changes in v1:
+>>>> - Rebased on top of drm-misc
+>>>> - In async_check call drm_atomic_helper_check_plane_state to check that
+>>>>    the desired plane is valid and update various bits of derived state
+>>>>    (clipped coordinates etc.)
+>>>> - In async_check allow to configure new scaling in the fast path.
+>>>> - In async_update force to flush all registered PSR encoders.
+>>>> - In async_update call atomic_update directly.
+>>>> - In async_update call vop_cfg_done needed to set the vop registers and take effect.
+>>>>
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_fb.c  |  36 -------
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_psr.c |  37 +++++++
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_psr.h |   3 +
+>>>>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 108 +++++++++++++++++---
+>>>>   4 files changed, 131 insertions(+), 53 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>> index ea18cb2a76c0..08bec50d9c5d 100644
+>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>> @@ -127,42 +127,6 @@ rockchip_user_fb_create(struct drm_device *dev, struct drm_file *file_priv,
+>>>>          return ERR_PTR(ret);
+>>>>   }
+>>>>
+>>>> -static void
+>>>> -rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+>>>> -{
+>>>> -       struct drm_crtc *crtc;
+>>>> -       struct drm_crtc_state *crtc_state;
+>>>> -       struct drm_encoder *encoder;
+>>>> -       u32 encoder_mask = 0;
+>>>> -       int i;
+>>>> -
+>>>> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>>>> -               encoder_mask |= crtc_state->encoder_mask;
+>>>> -               encoder_mask |= crtc->state->encoder_mask;
+>>>> -       }
+>>>> -
+>>>> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>>>> -               rockchip_drm_psr_inhibit_get(encoder);
+>>>> -}
+>>>> -
+>>>> -static void
+>>>> -rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+>>>> -{
+>>>> -       struct drm_crtc *crtc;
+>>>> -       struct drm_crtc_state *crtc_state;
+>>>> -       struct drm_encoder *encoder;
+>>>> -       u32 encoder_mask = 0;
+>>>> -       int i;
+>>>> -
+>>>> -       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>>>> -               encoder_mask |= crtc_state->encoder_mask;
+>>>> -               encoder_mask |= crtc->state->encoder_mask;
+>>>> -       }
+>>>> -
+>>>> -       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>>>> -               rockchip_drm_psr_inhibit_put(encoder);
+>>>> -}
+>>>> -
+>>>>   static void
+>>>>   rockchip_atomic_helper_commit_tail_rpm(struct drm_atomic_state *old_state)
+>>>>   {
+>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>>>> index 01ff3c858875..22a70ab6e214 100644
+>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.c
+>>>> @@ -13,6 +13,7 @@
+>>>>    */
+>>>>
+>>>>   #include <drm/drmP.h>
+>>>> +#include <drm/drm_atomic.h>
+>>>>   #include <drm/drm_crtc_helper.h>
+>>>>
+>>>>   #include "rockchip_drm_drv.h"
+>>>> @@ -109,6 +110,42 @@ int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder)
+>>>>   }
+>>>>   EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put);
+>>>>
+>>>> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state)
+>>>> +{
+>>>> +       struct drm_crtc *crtc;
+>>>> +       struct drm_crtc_state *crtc_state;
+>>>> +       struct drm_encoder *encoder;
+>>>> +       u32 encoder_mask = 0;
+>>>> +       int i;
+>>>> +
+>>>> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>>>> +               encoder_mask |= crtc_state->encoder_mask;
+>>>> +               encoder_mask |= crtc->state->encoder_mask;
+>>>> +       }
+>>>> +
+>>>> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>>>> +               rockchip_drm_psr_inhibit_get(encoder);
+>>>> +}
+>>>> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_get_state);
+>>>> +
+>>>> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state)
+>>>> +{
+>>>> +       struct drm_crtc *crtc;
+>>>> +       struct drm_crtc_state *crtc_state;
+>>>> +       struct drm_encoder *encoder;
+>>>> +       u32 encoder_mask = 0;
+>>>> +       int i;
+>>>> +
+>>>> +       for_each_old_crtc_in_state(state, crtc, crtc_state, i) {
+>>>> +               encoder_mask |= crtc_state->encoder_mask;
+>>>> +               encoder_mask |= crtc->state->encoder_mask;
+>>>> +       }
+>>>> +
+>>>> +       drm_for_each_encoder_mask(encoder, state->dev, encoder_mask)
+>>>> +               rockchip_drm_psr_inhibit_put(encoder);
+>>>> +}
+>>>> +EXPORT_SYMBOL(rockchip_drm_psr_inhibit_put_state);
+>>>> +
+>>>>   /**
+>>>>    * rockchip_drm_psr_inhibit_get - acquire PSR inhibit on given encoder
+>>>>    * @encoder: encoder to obtain the PSR encoder
+>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>>>> index 860c62494496..25350ba3237b 100644
+>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_psr.h
+>>>> @@ -20,6 +20,9 @@ void rockchip_drm_psr_flush_all(struct drm_device *dev);
+>>>>   int rockchip_drm_psr_inhibit_put(struct drm_encoder *encoder);
+>>>>   int rockchip_drm_psr_inhibit_get(struct drm_encoder *encoder);
+>>>>
+>>>> +void rockchip_drm_psr_inhibit_get_state(struct drm_atomic_state *state);
+>>>> +void rockchip_drm_psr_inhibit_put_state(struct drm_atomic_state *state);
+>>>> +
+>>>>   int rockchip_drm_psr_register(struct drm_encoder *encoder,
+>>>>                          int (*psr_set)(struct drm_encoder *, bool enable));
+>>>>   void rockchip_drm_psr_unregister(struct drm_encoder *encoder);
+>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> index fb70fb486fbf..176d6e8207ed 100644
+>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>> @@ -15,6 +15,7 @@
+>>>>   #include <drm/drm.h>
+>>>>   #include <drm/drmP.h>
+>>>>   #include <drm/drm_atomic.h>
+>>>> +#include <drm/drm_atomic_uapi.h>
+>>>>   #include <drm/drm_crtc.h>
+>>>>   #include <drm/drm_crtc_helper.h>
+>>>>   #include <drm/drm_flip_work.h>
+>>>> @@ -819,10 +820,99 @@ static void vop_plane_atomic_update(struct drm_plane *plane,
+>>>>          spin_unlock(&vop->reg_lock);
+>>>>   }
+>>>>
+>>>> +static int vop_plane_atomic_async_check(struct drm_plane *plane,
+>>>> +                                       struct drm_plane_state *state)
+>>>> +{
+>>>> +       struct vop_win *vop_win = to_vop_win(plane);
+>>>> +       const struct vop_win_data *win = vop_win->data;
+>>>> +       int min_scale = win->phy->scl ? FRAC_16_16(1, 8) :
+>>>> +                                       DRM_PLANE_HELPER_NO_SCALING;
+>>>> +       int max_scale = win->phy->scl ? FRAC_16_16(8, 1) :
+>>>> +                                       DRM_PLANE_HELPER_NO_SCALING;
+>>>> +       struct drm_crtc_state *crtc_state;
+>>>> +       int ret;
+>>>> +
+>>>> +       if (plane != state->crtc->cursor)
+>>>> +               return -EINVAL;
+>>>> +
+>>>> +       if (!plane->state)
+>>>> +               return -EINVAL;
+>>>> +
+>>>> +       if (!plane->state->fb)
+>>>> +               return -EINVAL;
+>>>> +
+>>>> +       if (state->state)
+>>>> +               crtc_state = drm_atomic_get_existing_crtc_state(state->state,
+>>>> +                                                               state->crtc);
+>>>> +       else /* Special case for asynchronous cursor updates. */
+>>>> +               crtc_state = plane->crtc->state;
+>>>> +
+>>>> +       ret = drm_atomic_helper_check_plane_state(plane->state,
+>>>> +                                                 crtc_state,
+>>>> +                                                 min_scale, max_scale,
+>>>> +                                                 true, true);
+>>>> +       return ret;
+>>>> +}
+>>>> +
+>>>> +static void vop_crtc_atomic_commit_flush(struct drm_crtc *crtc,
+>>>> +                                        struct drm_crtc_state *old_crtc_state)
+>>>> +{
+>>>> +       struct drm_atomic_state *old_state = old_crtc_state->state;
+>>>> +       struct drm_plane_state *old_plane_state, *new_plane_state;
+>>>> +       struct vop *vop = to_vop(crtc);
+>>>> +       struct drm_plane *plane;
+>>>> +       int i;
+>>>> +
+>>>> +       for_each_oldnew_plane_in_state(old_state, plane, old_plane_state,
+>>>> +                                      new_plane_state, i) {
+>>> Hmm, from what I can see, we're not going through the full atomic
+>>> commit sequence, with state flip, so I'm not sure where we would get
+>>> the new state here from.
+>>>
+>>>> +               if (!old_plane_state->fb)
+>>>> +                       continue;
+>>>> +
+>>>> +               if (old_plane_state->fb == new_plane_state->fb)
+>>>> +                       continue;
+>>>> +
+>>>> +               drm_framebuffer_get(old_plane_state->fb);
+>>>> +               WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>>>> +               drm_flip_work_queue(&vop->fb_unref_work, old_plane_state->fb);
+>>>> +               set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
+>>>> +       }
+>>>> +}
+>>>> +
+>>>> +static void vop_plane_atomic_async_update(struct drm_plane *plane,
+>>>> +                                         struct drm_plane_state *new_state)
+>>>> +{
+>>>> +       struct vop *vop = to_vop(plane->state->crtc);
+>>>> +
+>>>> +       if (vop->crtc.state->state)
+>>>> +               vop_crtc_atomic_commit_flush(&vop->crtc, vop->crtc.state);
+>>> Since we just operate on one plane here, we could just do like this:
+>>>
+>>> if (plane->state->fb && plane->state->fb != new_state->fb) {
+>>>                 drm_framebuffer_get(plane->state->fb);
+>>>                 WARN_ON(drm_crtc_vblank_get(crtc) != 0);
+>>>                 drm_flip_work_queue(&vop->fb_unref_work, plane->state->fb);
+>>>                 set_bit(VOP_PENDING_FB_UNREF, &vop->pending);
+>>> }
+>>>
+>>> However, we cannot simply to this here, because it races with the
+>>> vblank interrupt. We need to program the hw plane with the new fb
+>>> first and trigger the update. This needs all the careful handling that
+>>> is done in vop_crtc_atomic_flush() and so my original suggestion to
+>>> just call it.
+>> vop_crtc_atomic_flush() also updates the crtc->state->event, I don't
+>> think we want that.
+> Good point, we don't want to touch the event.
+>
+>> And actually I don't think we have this race condition, please see below
+>>
+> Just to clarify, the race conditions I'm talking here are not anything
+> new to this patch alone. I had actually observed those when
+> implementing the Chrome OS downstream async cursor code before:
+>
+> https://chromium.googlesource.com/chromiumos/third_party/kernel/+/65d4ff0af3f8c7ebecad8f3b402b546f277d9225/drivers/gpu/drm/rockchip/rockchip_drm_vop.c#1015
+>
+> Note that the code there actually duplicates the current plane state,
+> updates the copy, swaps both states and then update the hardware based
+> on both new and old states, as the regular atomic commit flow would
+> do. With that, no reference counts are dropped until the old state
+> gets destroyed at the end of the function. Also note the if block that
+> handles the condition of (plane_state->fb && plane_state->fb !=
+> plane->state->fb) (plane_state is the old state after the swap).
+>
+>>> Of course to call it in its current shape, one needs to have a full
+>>> atomic state from a commit, after a flip, but we only have the new
+>>> plane state here. Perhaps you could duplicate existing state, update
+>>> the desired plane state, flip and then call vop_crtc_atomic_flush()?
+>> Could you please clarify your proposal? You mean duplicating
+>> plane->state ? I'm trying to see how this would fit it in the code.
+>> The drm_atomic_state structure at plate->state->state is actually always
+>> NULL (as an async update is applied right away).
+>>
+>>
+>>> Best regards,
+>>> Tomasz
+>>>
+>>  From your comment in v2:
+>>
+>>> Isn't this going to drop the old fb reference on the floor without
+>>> waiting for the hardware to actually stop scanning out from it?
+>> I've been trying to analyze this better, I also got some help from
+>> Gustavo Padovan, and I think there is no problem here as the
+>> configuration we are doing here will just be taken into consideration by
+>> the hardware in the next vblank, so I guess we can set and re-set
+>> plane->fb as much as we want.
+> The point here is not about setting and resetting the plane->fb
+> pointer. It's about what happens inside drm_atomic_set_fb_for_plane().
+>
+> It calls drm_framebuffer_get() for the new fb and
+> drm_framebuffer_put() for the old fb. In result, if the fb changes,
+> the old fb, which had its reference count incremented in the atomic
+> commit that set it to the plane before, has its reference count
+> decremented. Moreover, if the new reference count becomes 0,
+> drm_framebuffer_put() will immediately free the buffer.
+>
+> Freeing a buffer when the hardware is still scanning out of it isn't a
+> good idea, is it?
 
-looks pretty good overall, just some more small-scale things
-below.
+My understanding is that in the async update path we never touch the fb 
+that is still being scanned out - what you are referring as old fb. That 
+is the design of async update. drm_atomic_set_fb_for_plane() replace 
+pointers and refs between the fb we just received from userspace with 
+the one on plane->state (that after the atomic swap holds the new state) 
+which won't be scanned out until the next flip. However I don't 
+understand this part of the rockchip hardware, the fb is not the one 
+being scanned out. Is this still a problem?
 
-> ---
-> 
-> v2: - Rename compatible from friendlyelec to friendlyarm, to match
->       existing bindings
->     - Remove superfluous node spi1
-> 
-> v3: - Rewrite regulator tree to match the schematics (Heiko)
->     - Sort top-level nodes alphabetically (Heiko)
->     - Used defines for GPIO numbers (Heiko)
->     - Enabled rga (Heiko)
->     - Removed cdn_dp node (Heiko)
->     - Removed dependencies to fusb0 as extcon (Heiko)
->     - Removed superfluous properties (Heiko)
+Regards,
+
+Gustavo
 
 
-> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
-> index 49042c477870..4cbd2c461052 100644
-> --- a/arch/arm64/boot/dts/rockchip/Makefile
-> +++ b/arch/arm64/boot/dts/rockchip/Makefile
-> @@ -1,6 +1,7 @@
->  # SPDX-License-Identifier: GPL-2.0
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += px30-evb.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
-> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopc-t4.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-roc-cc.dtb
->  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
-
-These are definitly sorted in the Makefile, so this should move between
-rk3399-gru-scarlet-kd.dtb and rk3399-puma-haikou.dtb :-)
-
-
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> new file mode 100644
-> index 000000000000..f102ff2317c3
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
-> @@ -0,0 +1,740 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> +/*
-> + * RK3399-based FriendlyElec boards device tree source
-> + *
-> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
-> + *
-> + * Copyright (c) 2018 FriendlyElec Computer Tech. Co., Ltd.
-> + * (http://www.friendlyarm.com)
-> + *
-> + * Copyright (c) 2018 Collabora Ltd.
-> + */
-> +
-> +/dts-v1/;
-> +#include <dt-bindings/input/linux-event-codes.h>
-> +#include "rk3399.dtsi"
-> +#include "rk3399-opp.dtsi"
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = "serial2:1500000n8";
-> +	};
-> +
-> +	clkin_gmac: external-gmac-clock {
-> +		compatible = "fixed-clock";
-> +		clock-frequency = <125000000>;
-> +		clock-output-names = "clkin_gmac";
-> +		#clock-cells = <0>;
-> +	};
-> +
-> +	vdd_5v: vdd_5v {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vdd_5v";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +	};
-> +
-> +	vcc5v0_core: vcc5v0_core {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_core";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vdd_5v>;
-> +	};
-> +
-> +	vcc3v3_sys: vcc3v3_sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc3v3_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		vin-supply = <&vcc5v0_core>;
-> +	};
-> +
-> +	vcc5v0_sys: vcc5v0_sys {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_sys";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		vin-supply = <&vdd_5v>;
-> +	};
-> +
-> +	vcc5v0_usb1: vcc5v0_usb1 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_usb1";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc5v0_sys>;
-> +	};
-> +
-> +	vcc5v0_usb2: vcc5v0_usb2 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc5v0_usb2";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc5v0_sys>;
-> +	};
-> +
-> +	/* switched by pmic_sleep */
-> +	vcc1v8_s3: vcca1v8_s3: vcc1v8-s3 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vcc1v8_s3";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		regulator-min-microvolt = <1800000>;
-> +		regulator-max-microvolt = <1800000>;
-> +		vin-supply = <&vcc_1v8>;
-> +	};
-> +
-> +	vcc3v0_sd: vcc3v0_sd {
-
-dt-spec mandates node names with "-", so this should become
-	vcc3v0_sd: vcc3v0-sd {
-
-Same for most regulators above.
-
-> +	rk808: pmic at 1b {
-> +		compatible = "rockchip,rk808";
-> +		reg = <0x1b>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pmic_int_l>;
-> +		rockchip,system-power-controller;
-> +		wakeup-source;
-> +		#clock-cells = <1>;
-> +		clock-output-names = "rk808-clkout1", "rk808-clkout2";
-
-rename rk808-clkout1 to xin32k so that it hooks correctly into
-the rk3399 clock controller, as that signals is providing the 32kHz clock
-for the system. (see $debug/clk/clk_summary and rk3399-cru dt binding)
-
-
-> +&pinctrl {
-> +
-
-unnecessary empty line
-
-> +	pmic {
-
-
-> +&rga {
-> +	status = "okay";
-> +};
-
-rga is not dependant on pinout, so is always enabled in rk3399.dtsi
-So this node can go away.
-
-> +&sdhci {
-> +	bus-width = <8>;
-> +	mmc-hs400-1_8v;
-> +	supports-emmc;
-
-remnant from the vendor-kernel?
-Should also go away.
-
-> +	non-removable;
-> +	keep-power-in-suspend;
-> +	mmc-hs400-enhanced-strobe;
-> +	status = "okay";
-> +};
-> +
-
-> +&usbdrd3_0 {
-> +	status = "okay";
-> +	extcon = <&fusb0>;
-
-I still don't think that extcon gets defined at all and is also
-not specified in any dwc3 binding, so should probably go away.
-
-
-Heiko
+-- 
+Gustavo Padovan
+Collabora Ltd
