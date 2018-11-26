@@ -1,74 +1,189 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Sun, 25 Nov 2018 18:15:24 -0600
-Subject: [PATCH linux-next 03/10] dt-bindings: net: ti: cpsw: switch to use
- phy-gmii-sel phy
-In-Reply-To: <20181126001531.12974-1-grygorii.strashko@ti.com>
-References: <20181126001531.12974-1-grygorii.strashko@ti.com>
-Message-ID: <20181126001531.12974-4-grygorii.strashko@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 26 Nov 2018 09:19:35 +0900
+Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a
+ devfreq device
+In-Reply-To: <734d0941-c885-4d36-274b-23843d6626c1@partner.samsung.com>
+References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
+ <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
+ <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
+ <5BF61B3A.9050402@samsung.com>
+ <cce4f194-b574-a12c-e876-f11a6f245940@partner.samsung.com>
+ <5BF7419E.90006@samsung.com>
+ <734d0941-c885-4d36-274b-23843d6626c1@partner.samsung.com>
+Message-ID: <5BFB3C17.40502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cpsw-phy-sel driver was replaced with new PHY driver phy-gmii-sel, so
-deprecate cpsw-phy-sel bindings and update CPSW binding to use phy-gmii-sel
-PHY bindings.
+Hi Lukasz,
 
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- Documentation/devicetree/bindings/net/cpsw.txt | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+I add the one more comment for devfreq_resume_device()
 
-diff --git a/Documentation/devicetree/bindings/net/cpsw.txt b/Documentation/devicetree/bindings/net/cpsw.txt
-index b3acebe..3264e19 100644
---- a/Documentation/devicetree/bindings/net/cpsw.txt
-+++ b/Documentation/devicetree/bindings/net/cpsw.txt
-@@ -22,7 +22,8 @@ Required properties:
- - cpsw-phy-sel		: Specifies the phandle to the CPSW phy mode selection
- 			  device. See also cpsw-phy-sel.txt for it's binding.
- 			  Note that in legacy cases cpsw-phy-sel may be
--			  a child device instead of a phandle.
-+			  a child device instead of a phandle
-+			  (DEPRECATED, use phys property instead).
- 
- Optional properties:
- - ti,hwmods		: Must be "cpgmac0"
-@@ -44,6 +45,7 @@ Optional properties:
- Slave Properties:
- Required properties:
- - phy-mode		: See ethernet.txt file in the same directory
-+- phys			: phandle on phy-gmii-sel PHY (see phy/ti-phy-gmii-sel.txt)
- 
- Optional properties:
- - dual_emac_res_vlan	: Specifies VID to be used to segregate the ports
-@@ -85,12 +87,14 @@ Examples:
- 			phy-mode = "rgmii-txid";
- 			/* Filled in by U-Boot */
- 			mac-address = [ 00 00 00 00 00 00 ];
-+			phys = <&phy_gmii_sel 1 0>;
- 		};
- 		cpsw_emac1: slave at 1 {
- 			phy_id = <&davinci_mdio>, <1>;
- 			phy-mode = "rgmii-txid";
- 			/* Filled in by U-Boot */
- 			mac-address = [ 00 00 00 00 00 00 ];
-+			phys = <&phy_gmii_sel 2 0>;
- 		};
- 	};
- 
-@@ -114,11 +118,13 @@ Examples:
- 			phy-mode = "rgmii-txid";
- 			/* Filled in by U-Boot */
- 			mac-address = [ 00 00 00 00 00 00 ];
-+			phys = <&phy_gmii_sel 1 0>;
- 		};
- 		cpsw_emac1: slave at 1 {
- 			phy_id = <&davinci_mdio>, <1>;
- 			phy-mode = "rgmii-txid";
- 			/* Filled in by U-Boot */
- 			mac-address = [ 00 00 00 00 00 00 ];
-+			phys = <&phy_gmii_sel 2 0>;
- 		};
- 	};
+On 2018? 11? 23? 19:01, Lukasz Luba wrote:
+> Hi Chanwoo Choi,
+> 
+> On 11/23/18 12:54 AM, Chanwoo Choi wrote:
+>> Hi Lukasz,
+>>
+>> I add one more comment about devfreq_resume_device().
+>>
+>> On 2018? 11? 22? 20:00, Lukasz Luba wrote:
+>>>
+>>>
+>>> On 11/22/18 3:58 AM, Chanwoo Choi wrote:
+>>>> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
+>>>>> The patch adds support for handling suspend/resume process.
+>>>>> It uses atomic variables to make sure no race condition
+>>>>> affects the process.
+>>>>>
+>>>>> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
+>>>>> solve issue with devfreq device's frequency during suspend/resume.
+>>>>> During the discussion on LKML some corner cases and comments appeared
+>>>>> related to the design. This patch address them keeping in mind suggestions
+>>>>> from Chanwoo Choi.
+>>>>
+>>>> Please remove the duplicate information about patch history.
+>>>>
+>>>>>
+>>>>> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
+>>>>> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
+>>>>> ---
+>>>>>    drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
+>>>>>    1 file changed, 39 insertions(+), 6 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+>>>>> index cf9c643..7e09de8 100644
+>>>>> --- a/drivers/devfreq/devfreq.c
+>>>>> +++ b/drivers/devfreq/devfreq.c
+>>>>> @@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
+>>>>>     */
+>>>>>    int devfreq_suspend_device(struct devfreq *devfreq)
+>>>>>    {
+>>>>> -	if (!devfreq)
+>>>>> -		return -EINVAL;
+>>>>> +        int ret;
+>>>>
+>>>> Move 'ret' definition under 'if (devfreq->suspend_freq) {'
+>>>> because 'ret' is used if suspend_freq isn't zero.
+>>> Not only there, 6 lines above 'ret' is used for
+>>> devfreq->governor->event_handler().
+>>
+>> OK.
+>>
+>>>>
+>>>>> +        unsigned long prev_freq;
+>>>>> +        u32 flags = 0;
+>>>>> +
+>>>>> +        if (!devfreq)
+>>>>> +                return -EINVAL;
+>>>>> +
+>>>>> +        if (devfreq->governor) {
+>>>>> +		ret = devfreq->governor->event_handler(devfreq,
+>>>>> +					DEVFREQ_GOV_SUSPEND, NULL);
+>>>>> +		if (ret)
+>>>>> +			return ret;
+>>>>> +	}
+>>>>>    
+>>>>> -	if (!devfreq->governor)
+>>>>> -		return 0;
+>>>>> +	if (devfreq->suspend_freq) {
+>>>>> +		if (atomic_inc_return(&devfreq->suspend_count) > 1)
+>>>>> +			return 0;
+>>>>>    
+>>>>> -	return devfreq->governor->event_handler(devfreq,
+>>>>> -				DEVFREQ_GOV_SUSPEND, NULL);
+>>>>> +		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
+>>>>> +					 &prev_freq, flags);
+>>>>
+>>>> Remove the 'prev_freq' parameter.
+>>> OK
+>>>>
+>>>>> +		if (ret)
+>>>>> +			return ret;
+>>>>> +
+>>>>> +		devfreq->resume_freq = prev_freq;
+>>>>
+>>>> As I commented on patch2, if devfreq_set_taget save the current frequency
+>>>> to 'devfreq->resume_freq', this line is not needed.
+>>> OK
+>>>>
+>>>>
+>>>>> +	}
+>>>>> +
+>>>>> +        return 0;
+>>>>>    }
+>>>>>    EXPORT_SYMBOL(devfreq_suspend_device);
+>>>>>    
+>>>>> @@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
+>>>>>     */
+>>>>>    int devfreq_resume_device(struct devfreq *devfreq)
+>>>>>    {
+>>>>> +        int ret;
+>>>>
+>>>> Move 'ret' definition under 'if (devfreq->suspend_freq) {'
+>>>> because 'ret' is used if suspend_freq isn't zero.
+>>> OK
+>>
+>> If you change the devfreq_resume_device() according to my new comment,
+>> please ignore it.
+>>
+>>>>
+>>>>> +        unsigned long prev_freq;
+>>>>
+>>>> Remove prev_freq variable which is not used on this function.
+>>>> After calling devfreq_set_target, prev_freq is not used.
+>>> OK
+>>>>
+>>>>> +        u32 flags = 0;
+>>>>> +
+>>>>>    	if (!devfreq)
+>>>>>    		return -EINVAL;
+>>>>>    
+>>>>> +	if (devfreq->suspend_freq) {
+
+In devfreq_resume_device(), it should check the 'devfreq->resume_freq'
+instead of 'devfreq->suspend_freq'.
+
+
+>>>>> +		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
+>>>>> +			return 0;
+>>>>> +
+>>>>> +		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
+>>>>> +					 &prev_freq, flags);
+>>>>
+>>>> Remove the 'prev_freq' parameter.
+>>> OK
+>>>>
+>>>>> +		if (ret)
+>>>>> +			return ret;
+>>>>> +	}
+>>>>> +
+>>>>>    	if (!devfreq->governor)
+>>>>>    		return 0;
+>>
+>> Please change the code as following because you uses the following type
+>> in the devfreq_suspend_device(). If there is any special issue, please
+>> keep the same format in order to improve the readability.
+>>
+>> 	if (devfreq->governor) {
+>> 		ret = devfreq->governor->event_handler(devfreq,
+>> 				DEVFREQ_GOV_RESUME, NULL);
+>> 		if (ret)
+>> 			return ret;
+>> 	}
+>>
+>>
+> OK, I will change the code to keep the same format.
+> Thank you for the review.
+> 
+> Regards,
+> Lukasz
+> 
+> 
+> 
+
+
 -- 
-2.10.5
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
