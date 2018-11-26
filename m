@@ -1,78 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Nov 2018 15:56:04 -0600
-Subject: [PATCH v4 0/6] arm64: Get rid of __early_init_dt_declare_initrd()
-In-Reply-To: <20181113002216.GA26854@bogus>
-References: <20181105225431.24485-1-f.fainelli@gmail.com>
- <20181106140642.GA19280@rapoport-lnx>
- <68b32163-85ff-45f7-8887-60273da7c6e2@gmail.com>
- <20181113002216.GA26854@bogus>
-Message-ID: <20181126215604.GA12509@bogus>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Mon, 26 Nov 2018 17:31:31 -0500
+Subject: [PATCH 2/9] iommu: rockchip: make it explicitly non-modular
+In-Reply-To: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <1543271498-28966-3-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 12, 2018 at 06:22:16PM -0600, Rob Herring wrote:
-> On Mon, Nov 12, 2018 at 12:32:50PM -0800, Florian Fainelli wrote:
-> > On 11/6/18 6:06 AM, Mike Rapoport wrote:
-> > > On Mon, Nov 05, 2018 at 02:54:25PM -0800, Florian Fainelli wrote:
-> > >> Hi all,
-> > >>
-> > >> Changes in v4:
-> > >>
-> > >> - dropped initrd_below_start_ok assignment in ARM64, not necessary at
-> > >>   all (Ard)
-> > >> - replace #ifdef CONFIG_BLK_DEV_INITRD with if
-> > >>   (IS_ENABLED(CONFIG_BLK_DEV_INITRD) for consistency with other parts
-> > >>   of arm64_memblock_init() (Rob)
-> > >>
-> > >> Changes in v3:
-> > >>
-> > >> - use C conditionals in drivers/of/fdt.c
-> > >> - added check on phys_initrd_size in arch/arm64/mm/init.c to determine
-> > >>   whether initrd_start must be populated
-> > >> - fixed a build warning with ARC that was just missing an (unsigned
-> > >>   long) cast
-> > >>
-> > >> Changes in v2:
-> > >>
-> > >> - get rid of ARCH_HAS_PHYS_INITRD and instead define
-> > >>   phys_initrd_start/phys_initrd_size in init/do_mounts_initrd.c
-> > >>
-> > >> - make __early_init_dt_declare_initrd() account for ARM64 specific
-> > >>   behavior with __va() when having CONFIG_DEBUG_VM enabled
-> > >>
-> > >> - consolidate early_initrd() command line parsing into
-> > >>   init/do_mounts_initrd.c
-> > >>
-> > >> Because phys_initrd_start/phys_initrd_size are now compiled in
-> > >> ini/do_mounts_initrd.c which is only built with CONFIG_BLK_DEV_INITRD=y,
-> > >> we need to be a bit careful about the uses throughout architecture
-> > >> specific code.
-> > >>
-> > >> Previous discussions/submissions list here:
-> > >>
-> > >> v3:
-> > >> https://www.spinics.net/lists/arm-kernel/msg683566.html
-> > >> v2:
-> > >> https://lkml.org/lkml/2018/10/25/4
-> > >>
-> > >> Florian Fainelli (6):
-> > >>   nds32: Remove phys_initrd_start and phys_initrd_size
-> > >>   arch: Make phys_initrd_start and phys_initrd_size global variables
-> > >>   of/fdt: Populate phys_initrd_start/phys_initrd_size from FDT
-> > >>   arm64: Utilize phys_initrd_start/phys_initrd_size
-> > >>   of/fdt: Remove custom __early_init_dt_declare_initrd() implementation
-> > >>   arch: Move initrd= parsing into do_mounts_initrd.c
-> > > 
-> > > For the series:
-> > > 
-> > > Reviewed-by: Mike Rapoport <rppt@linux.ibm.com>
-> > 
-> > Thanks Mike, Rob, do you want to merge that series through the OF tree?
-> 
-> Sure, some arch maintainer acks would be nice.
+The Kconfig currently controlling compilation of this code is:
 
-I've now applied the series.
+drivers/iommu/Kconfig:config ROCKCHIP_IOMMU
+drivers/iommu/Kconfig:  bool "Rockchip IOMMU Support"
 
-Thanks,
+...meaning that it currently is not being built as a module by anyone.
 
-Rob
+The bind/unbind/remove was already explicitly disabled in commit
+98b72b94def9 ("iommu/rockchip: Prohibit unbind and remove").
+
+Lets remove the remaining traces of  modular infrastructure, so that
+when reading the driver there is no doubt it is builtin-only.
+
+Since module_init was not in use by this code, the init ordering
+remains unchanged with this commit.
+
+Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+
+We also delete the MODULE_LICENSE tag etc. since all that information
+was (or is now) contained at the top of the file in the comments.
+
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Simon Xue <xxm@rock-chips.com>
+Cc: Daniel Kurtz <djkurtz@chromium.org>
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: iommu at lists.linux-foundation.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+---
+ drivers/iommu/rockchip-iommu.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index ad3e2b97469e..c9ba9f377f63 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1,4 +1,9 @@
+ /*
++ * IOMMU API for Rockchip
++ *
++ * Module Authors:	Simon Xue <xxm@rock-chips.com>
++ *			Daniel Kurtz <djkurtz@chromium.org>
++ *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+@@ -17,7 +22,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/list.h>
+ #include <linux/mm.h>
+-#include <linux/module.h>
++#include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
+@@ -1281,7 +1286,6 @@ static const struct of_device_id rk_iommu_dt_ids[] = {
+ 	{ .compatible = "rockchip,iommu" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
+ 
+ static struct platform_driver rk_iommu_driver = {
+ 	.probe = rk_iommu_probe,
+@@ -1299,8 +1303,3 @@ static int __init rk_iommu_init(void)
+ 	return platform_driver_register(&rk_iommu_driver);
+ }
+ subsys_initcall(rk_iommu_init);
+-
+-MODULE_DESCRIPTION("IOMMU API for Rockchip");
+-MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
+-MODULE_ALIAS("platform:rockchip-iommu");
+-MODULE_LICENSE("GPL v2");
+-- 
+2.7.4
