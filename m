@@ -1,50 +1,33 @@
-From: govinds@codeaurora.org (Govind Singh)
-Date: Mon, 26 Nov 2018 19:51:33 +0530
-Subject: [PATCH] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device node
-Message-ID: <20181126142133.16966-1-govinds@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 26 Nov 2018 14:16:49 +0100
+Subject: [PATCH 4/6] ARM: dts: rockchip: Add all CPUs in cooling maps
+In-Reply-To: <8e59f97ae89a116b835ee14c63f550b159b000cc.1542362000.git.viresh.kumar@linaro.org>
+References: <cover.1542362000.git.viresh.kumar@linaro.org>
+ <8e59f97ae89a116b835ee14c63f550b159b000cc.1542362000.git.viresh.kumar@linaro.org>
+Message-ID: <3908885.3xsdfg7bED@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for the ath10k SNOC platform driver probe
-and add resources required for WCN3990 on qcs404 soc.
-Optional clock and regulator controls are not yet available in
-upstream, hence add them once available.
+Am Freitag, 16. November 2018, 11:01:13 CET schrieb Viresh Kumar:
+> Each CPU can (and does) participate in cooling down the system but the
+> DT only captures a handful of them, normally CPU0, in the cooling maps.
+> Things work by chance currently as under normal circumstances its the
+> first CPU of each cluster which is used by the operating systems to
+> probe the cooling devices. But as soon as this CPU ordering changes and
+> any other CPU is used to bring up the cooling device, we will start
+> seeing failures.
+> 
+> Also the DT is rather incomplete when we list only one CPU in the
+> cooling maps, as the hardware doesn't have any such limitations.
+> 
+> Update cooling maps to include all devices affected by individual trip
+> points.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Signed-off-by: Govind Singh <govinds@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/qcs404.dtsi | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+looks like I forgot to respond ... applied like 7 days ago
+and already part of my pull-request for 4.21
 
-diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-index 9ca4f061ecc5..1a401a32d4a1 100644
---- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
-+++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-@@ -958,6 +958,25 @@
- 				status = "disabled";
- 			};
- 		};
-+
-+		wifi: wifi at 0A000000 {
-+			compatible = "qcom,wcn3990-wifi";
-+			reg = <0x0A000000 0x800000>;
-+			reg-names = "membase";
-+			memory-region = <&wlan_msa_mem>;
-+			interrupts = <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+		};
- 	};
- 
- 	timer {
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+Thanks
+Heiko
