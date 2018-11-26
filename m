@@ -1,122 +1,105 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:48 +0100
-Subject: [PATCH 22/40] arm64: dts: renesas: r8a77990: Add all HSCIF nodes
+Date: Mon, 26 Nov 2018 13:55:06 +0100
+Subject: [PATCH 40/40] arm64: dts: renesas: Add all CPUs in cooling maps
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <b7a1da2193e635373a80238137720e86e8ff4119.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <275e4eb3f21a09b6b8bd4a353b9a01e500240385.1543229516.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Viresh Kumar <viresh.kumar@linaro.org>
 
-This patch adds the device nodes for all HSCIF serial ports to
-the R8A77990 SoC.
+Each CPU can (and does) participate in cooling down the system but the
+DT only captures a handful of them, normally CPU0, in the cooling maps.
+Things work by chance currently as under normal circumstances its the
+first CPU of each cluster which is used by the operating systems to
+probe the cooling devices. But as soon as this CPU ordering changes and
+any other CPU is used to bring up the cooling device, we will start
+seeing failures.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Also the DT is rather incomplete when we list only one CPU in the
+cooling maps, as the hardware doesn't have any such limitations.
+
+Update cooling maps to include all devices affected by individual trip
+points.
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 88 +++++++++++++++++++++++++++++++
- 1 file changed, 88 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 15 ++++++++++++---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi |  6 +++---
+ 2 files changed, 15 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 887b066211a2..beb53aaa9e2c 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -380,6 +380,94 @@
- 			resets = <&cpg 407>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e94a5f2dbd08..8643ecb1a3f3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -3115,7 +3115,10 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor1_passive>;
+-					cooling-device = <&a57_0 4 4>;
++					cooling-device = <&a57_0 4 4>,
++							 <&a57_1 4 4>,
++							 <&a57_2 4 4>,
++							 <&a57_3 4 4>;
+ 				};
+ 			};
  		};
- 
-+		hscif0: serial at e6540000 {
-+			compatible = "renesas,hscif-r8a77990",
-+				     "renesas,rcar-gen3-hscif",
-+				     "renesas,hscif";
-+			reg = <0 0xe6540000 0 0x60>;
-+			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 520>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
-+			       <&dmac2 0x31>, <&dmac2 0x30>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 520>;
-+			status = "disabled";
-+		};
-+
-+		hscif1: serial at e6550000 {
-+			compatible = "renesas,hscif-r8a77990",
-+				     "renesas,rcar-gen3-hscif",
-+				     "renesas,hscif";
-+			reg = <0 0xe6550000 0 0x60>;
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 519>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
-+			       <&dmac2 0x33>, <&dmac2 0x32>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 519>;
-+			status = "disabled";
-+		};
-+
-+		hscif2: serial at e6560000 {
-+			compatible = "renesas,hscif-r8a77990",
-+				     "renesas,rcar-gen3-hscif",
-+				     "renesas,hscif";
-+			reg = <0 0xe6560000 0 0x60>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 518>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
-+			       <&dmac2 0x35>, <&dmac2 0x34>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 518>;
-+			status = "disabled";
-+		};
-+
-+		hscif3: serial at e66a0000 {
-+			compatible = "renesas,hscif-r8a77990",
-+				     "renesas,rcar-gen3-hscif",
-+				     "renesas,hscif";
-+			reg = <0 0xe66a0000 0 0x60>;
-+			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 517>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 517>;
-+			status = "disabled";
-+		};
-+
-+		hscif4: serial at e66b0000 {
-+			compatible = "renesas,hscif-r8a77990",
-+				     "renesas,rcar-gen3-hscif",
-+				     "renesas,hscif";
-+			reg = <0 0xe66b0000 0 0x60>;
-+			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 516>,
-+				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x39>, <&dmac0 0x38>;
-+			dma-names = "tx", "rx";
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 516>;
-+			status = "disabled";
-+		};
-+
- 		hsusb: usb at e6590000 {
- 			compatible = "renesas,usbhs-r8a77990",
- 				     "renesas,rcar-gen3-usbhs";
+@@ -3141,7 +3144,10 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor2_passive>;
+-					cooling-device = <&a57_0 4 4>;
++					cooling-device = <&a57_0 4 4>,
++							 <&a57_1 4 4>,
++							 <&a57_2 4 4>,
++							 <&a57_3 4 4>;
+ 				};
+ 			};
+ 		};
+@@ -3167,7 +3173,10 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor3_passive>;
+-					cooling-device = <&a57_0 4 4>;
++					cooling-device = <&a57_0 4 4>,
++							 <&a57_1 4 4>,
++							 <&a57_2 4 4>,
++							 <&a57_3 4 4>;
+ 				};
+ 			};
+ 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index e7614b781308..afedbf5728ec 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -2839,7 +2839,7 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor1_passive>;
+-					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
+ 				};
+ 			};
+ 		};
+@@ -2865,7 +2865,7 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor2_passive>;
+-					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
+ 				};
+ 			};
+ 		};
+@@ -2891,7 +2891,7 @@
+ 			cooling-maps {
+ 				map0 {
+ 					trip = <&sensor3_passive>;
+-					cooling-device = <&a57_0 5 5>;
++					cooling-device = <&a57_0 5 5>, <&a57_1 5 5>;
+ 				};
+ 			};
+ 		};
 -- 
 2.11.0
