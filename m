@@ -1,116 +1,152 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Nov 2018 19:31:48 +0000
-Subject: [PATCH] iommu: arm-smmu: Set SCTLR.HUPCF bit
-In-Reply-To: <CAF6AEGuV2zh97iq+TgkRw0bK3VNSxJieD1N2KMW3N28h07M+0w@mail.gmail.com>
-References: <20180927224609.19515-1-robdclark@gmail.com>
- <20181029191000.GD16739@arm.com>
- <CAF6AEGtgC0V6ii2=p2HGmqvHFKNJhaOLi8873SGPDsrg70xGRg@mail.gmail.com>
- <20181113063225.GA3109@brain-police>
- <CAF6AEGuV2zh97iq+TgkRw0bK3VNSxJieD1N2KMW3N28h07M+0w@mail.gmail.com>
-Message-ID: <20181126193147.GB534@arm.com>
+From: bhsharma@redhat.com (Bhupesh Sharma)
+Date: Tue, 27 Nov 2018 01:01:49 +0530
+Subject: [PATCH v2] x86_64,
+ vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
+In-Reply-To: <20181126012824.GB1824@MiWiFi-R3L-srv>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181126012824.GB1824@MiWiFi-R3L-srv>
+Message-ID: <CACi5LpPqdzNxi4=UQqVgT6aCyn9nx+sjM-ds0Xx6qBji_xgP1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Nov 13, 2018 at 08:12:35AM -0500, Rob Clark wrote:
-> On Tue, Nov 13, 2018 at 1:32 AM Will Deacon <will.deacon@arm.com> wrote:
-> > On Fri, Nov 09, 2018 at 01:01:55PM -0500, Rob Clark wrote:
-> > > On Mon, Oct 29, 2018 at 3:09 PM Will Deacon <will.deacon@arm.com> wrote:
-> > > > On Thu, Sep 27, 2018 at 06:46:07PM -0400, Rob Clark wrote:
-> > > > > We seem to need to set either this or CFCFG (stall), otherwise gpu
-> > > > > faults trigger problems with other in-flight transactions from the
-> > > > > GPU causing CP errors, etc.
-> > > > >
-> > > > > In the ARM SMMU spec, the 'Hit under previous context fault' bit is
-> > > > > described as:
-> > > > >
-> > > > >  '0' - Stall or terminate subsequent transactions in the presence
-> > > > >        of an outstanding context fault
-> > > > >  '1' - Process all subsequent transactions independently of any
-> > > > >        outstanding context fault.
-> > > > >
-> > > > > Since we don't enable CFCFG (stall) the behavior of terminating
-> > > > > other transactions makes sense.  And is probably not what we want
-> > > > > (and definately not what we want for GPU).
-> > > > >
-> > > > > Signed-off-by: Rob Clark <robdclark@gmail.com>
-> > > > > ---
-> > > > > So I hit this issue a long time back on 820 (msm8996) and at the
-> > > > > time I solved it with a patch that enabled CFCFG.  And it resurfaced
-> > > > > more recently on sdm845.  But at the time CFCFG was rejected, iirc
-> > > > > because of concern that it would cause problems on other non-qcom
-> > > > > arm smmu implementations.  And I think I forgot to send this version
-> > > > > of the solution.
-> > > > >
-> > > > > If enabling HUPCF is anticipated to cause problems on other ARM
-> > > > > SMMU implementations, I think I can come up with a variant of this
-> > > > > patch which conditionally enables it for snapdragon.
-> > > > >
-> > > > > Either way, I'd really like to get some variant of this fix merged
-> > > > > (and probably it would be a good idea for stable kernel branches
-> > > > > too), since current behaviour with the GPU means faults turn into
-> > > > > a fantastic cascade of fail.
-> > > >
-> > > > Can you describe how this fantastic cascade of fail improves with this
-> > > > patch, please? If you're getting context faults then something has already
-> > > > gone horribly wrong, so I'm trying to work out how this improves things.
-> > > >
-> > >
-> > > There are plenty of cases where getting iommu faults with a GPU is
-> > > "normal", or at least not something the kernel or even GL driver can
-> > > control.
+On Mon, Nov 26, 2018 at 6:58 AM Baoquan He <bhe@redhat.com> wrote:
+>
+> On 11/16/18 at 03:17am, Bhupesh Sharma wrote:
+> > Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
+> > live-debugging of a running kernel via user-space utilities
+> > like makedumpfile (see [1]).
 > >
-> > Such as? All the mainline driver does is print a diagnostic and clear the
-> > fault, which doesn't seem generally useful.
-> 
-> it is useful to debug the fault ;-)
-> 
-> Although eventually we'll want to be able to do more than that, like
-> have the fault trigger bringing in pages of a mmap'd file and that
-> sort of thing.
+> > Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
+> > details), whose live debugging feature is broken with newer kernels
+>
+> I think this paragraph explained why KCORE_REMAP adding caused the
+> mistake of page_offset calculation in makedumpfile. It can prove the
+> advantage of appending 'page_offset_base' to vmcoreinfo. The old way I
+> took in makedumpfile could be impacted by kernel code change, adding it
+> to vmcoreinfo can make it stable. The example is KCORE_REMAP adding, and
+> later it's removed.
+>
+> But it's not live debugging feature of makedumpfile. Makedumpfile can't be
+> used to live debug. The feature is called '--mem-usage' in makedumpfile,
+> in fact it's used to estimate how big the vmcore could be so that customer
+> can deply an appropriate size of storage space to store it. Because both
+> kcore and vmcore are all elf files which the 1st kernel's memory is
+> mapped to, even though they are different, kcore is dynamically changing.
+> This is more likely a precision in order of of magnitude. This is a feature
+> required by redhat customer.
 
-Right, and feels very strange to me if we have this bit set because it
-means that your fault is no longer synchronous and therefore diverges
-from the fault model that you get from the CPU, where you certainly
-wouldn't expect stores appearing in the program after a faulting load to
-be visible in memory. However, thinking harder about it, I suppose we're
-already in a situation where the translations are handled out of order
-in the absence of barriers, so maybe it's not the end of the world.
+Indeed this is a live debugging feature - see we are running this in
+the primary kernel
+context, not in kdump context. We are trying to debug a kernel we are
+presently running (in this case determining the page mapping)
+hence the term live debugging.
 
-Could you dump the FSR value that you see in the fault handler, please?
->From my reading of the architecture spec, as long as clear all of the
-fault bits in the irq handler, then your machine shouldn't die like it
-does with HUPCFG=CFCFG=0..
+Also, this feature is not limited to redhat - we are talking in
+upstream makedumpfile context here - it is used by other projects as
+well which can have even a simple busybox rootfs configuration (e.g.
+qemu).
 
-> > > With this patch, you still get the iommu fault, but it doesn't cause
-> > > the gpu to crash.  But without it, other memory accesses in flight
-> > > while the fault occurs, like the GPU command-processor reading further
-> > > ahead in the cmdstream to setup next draw, would return zero's,
-> > > causing the GPU to crash or get into a bad state.
+> I thought you are talking about using DaveA's crash utility to live
+> debug the running kernel, like we usually do with gdb.
+>
+>         gdb vmlinux /proc/kcore
+>
+> Yes, this gdb live debugging is broken because of KASLR. We have bug about
+> this, while it has not been fixed. Using Crash utility to replace gdb is
+> one way if Crash code is adjusted.
+>
+> > (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
+> > added to kcore, thus leading to an additional sections in the same, and
+> > makedumpfile is not longer able to determine the start of direct
+> > mapping of all physical memory, as it relies on traversing the PT_LOAD
+> > segments inside kcore and using the last PT_LOAD segment
+> > to determine the start of direct mapping.
+> ...
+> > Testing:
+> > -------
+>
+> This one vmcoreinfo entry adding won't impact kernel performance. And
+> page_offset_base need be got during makedumpfile initialization, it
+> won't impact makedumpfile efficiency either, especially compared with
+> the later page filterring and writting out to storage space. I don't
+> think there's any need to provide a detailed test result here. If
+> possible, just mention it works in this way, maybe it's better in some
+> aspects, such as code simplicity, etc.
+>
+> >  - I tested this patch (rebased on 'linux-next') on a x86_64 machine
+> >    using the modified 'makedumpfile' user-space code (see [3] for my
+> >    github tree which contains the same) for determining how many pages
+> >    are dumpable when different dump_level is specified (which is
+> >    one use-case of live-debugging via 'makedumpfile').
+> >  - I tested both the KASLR and non-KASLR boot cases with this patch.
+> >  - Here is one sample log (for KASLR boot case) on my x86_64 machine:
 > >
-> > I get that part, but I don't understand why we're seeing faults in the first
-> > place and I worry that this patch is just the tip of the iceberg. It's also
-> > not clear that processing subsequent transactions is always the right thing
-> > to do in a world where we actually want to report (and handle) synchronous
-> > faults from devices.
-> 
-> Sure, it is a bug.. but it can be an application bug that is not
-> something the userspace GL driver or kernel could do anything about.
-> We shouldn't let this kill the GPU.  If the application didn't have
-> this much control, we wouldn't need an IOMMU in the first place[1].
-> With opencl compute, the userspace controlled shader has full blown
-> pointers to GPU memory.
-> 
-> And even in cases where it is a userspace GL driver bug, having some
-> robustness to not completely kill the GPU makes debugging much easier.
-> Something I do a lot when bringing up support for a new generation of
-> GPU.
-> 
-> I'm having a hard time understanding your objection to this.
-> Returning zero's for non-faulting transactions is a *really bad idea*.
+> >    < snip..>
+> >    The kernel doesn't support mmap(),read() will be used instead.
+> >
+> >    TYPE               PAGES                   EXCLUDABLE      DESCRIPTION
+> >    ----------------------------------------------------------------------
+> >    ZERO               21299                   yes             Pages filled
+> >    with zero
+> >    NON_PRI_CACHE      91785                   yes             Cache
+> >    pages without private flag
+> >    PRI_CACHE  1                       yes             Cache pages with
+> >    private flag
+> >    USER               14057                   yes             User process
+> >    pages
+> >    FREE               740346                  yes             Free pages
+> >    KERN_DATA  58152                   no              Dumpable kernel
+> >    data
+> >
+> >    page size:         4096
+> >    Total pages on system:     925640
+> >    Total size on system:      3791421440       Byte
+> >
+> ...
+>
+> > diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+> > index 4c8acdfdc5a7..6161d77c5bfb 100644
+> > --- a/arch/x86/kernel/machine_kexec_64.c
+> > +++ b/arch/x86/kernel/machine_kexec_64.c
+> > @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+> >       VMCOREINFO_SYMBOL(init_top_pgt);
+> >       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+> >                       pgtable_l5_enabled());
+> > +#ifdef CONFIG_RANDOMIZE_BASE
+>
+> Finally, embracing it into CONFIG_RANDOMIZE_BASE ifdefery seems not
+> right. The latest kernel is using page_offset_base to do the dynamic
+> memory layout between level4 and level5 changing. This may not work in
+> 5-level system with CONFIG_RANDOMIZE_BASE=n.
 
-Wait -- who said anything about returning zeroes? Where does that behaviour
-appear in the architecture?
+I think you missed the v2 change log and the build-bot error on v1
+(see here: <https://patchwork.kernel.org/patch/10657933/#22291691>).
+With .config files which have CONFIG_RANDOMIZE_BASE=n, we get the
+following compilation error
+without the #ifdef jugglery:
 
-Will
+ arch/x86/kernel/machine_kexec_64.o: In function `arch_crash_save_vmcoreinfo':
+ arch/x86/kernel/machine_kexec_64.c:359: undefined reference to
+`page_offset_base'
+ arch/x86/kernel/machine_kexec_64.c:359: undefined reference to
+`page_offset_base'
+
+Anyways, with Kazu's and Boris's comments on the v2, I understand that
+adding 'page_offset_base' variable to vmcoreinfo is useful for x86
+kernel.
+I will now work on the v3 to take into account review comments and
+also work with Lianbo to get the same added to the overall vmcoreinfo
+documentation he is preparing for x86.
+
+Thanks,
+Bhupesh
+
+
+> > +     VMCOREINFO_NUMBER(page_offset_base);
+> > +#endif
+> >
+> >  #ifdef CONFIG_NUMA
+> >       VMCOREINFO_SYMBOL(node_data);
+> > --
+> > 2.7.4
+> >
