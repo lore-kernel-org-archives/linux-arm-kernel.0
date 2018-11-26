@@ -1,82 +1,74 @@
-From: boris.brezillon@bootlin.com (Boris Brezillon)
-Date: Mon, 26 Nov 2018 22:41:02 +0100
-Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
- atomic.
-In-Reply-To: <87o9abbmq4.fsf@anholt.net>
-References: <20181119190805.19139-1-helen.koike@collabora.com>
- <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
- <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
- <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
- <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
- <87o9abbmq4.fsf@anholt.net>
-Message-ID: <20181126224102.1efbf2d1@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 26 Nov 2018 15:46:26 -0600
+Subject: [v5, PATCH 2/2] dt-binding: mediatek-dwmac: add binding document
+ for MediaTek MT2712 DWMAC
+In-Reply-To: <1542936676.24219.66.camel@mhfsdcap03>
+References: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
+ <1542882521-18874-3-git-send-email-biao.huang@mediatek.com>
+ <20181122151932.GD15403@lunn.ch>
+ <1542936676.24219.66.camel@mhfsdcap03>
+Message-ID: <20181126214626.GA13830@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Nov 2018 12:36:03 -0800
-Eric Anholt <eric@anholt.net> wrote:
-
-> Michael Zoran <mzoran@crowfest.net> writes:
+On Fri, Nov 23, 2018 at 09:31:16AM +0800, biao huang wrote:
+> Dear Andrew,
 > 
-> > On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:  
-> >> 
-> >> The point here is not about setting and resetting the plane->fb
-> >> pointer. It's about what happens inside
-> >> drm_atomic_set_fb_for_plane().
-> >> 
-> >> It calls drm_framebuffer_get() for the new fb and
-> >> drm_framebuffer_put() for the old fb. In result, if the fb changes,
-> >> the old fb, which had its reference count incremented in the atomic
-> >> commit that set it to the plane before, has its reference count
-> >> decremented. Moreover, if the new reference count becomes 0,
-> >> drm_framebuffer_put() will immediately free the buffer.
-> >> 
-> >> Freeing a buffer when the hardware is still scanning out of it isn't
-> >> a
-> >> good idea, is it?  
-> >
-> > No, it's not.  But the board I submitted the patch for doesn't have
-> > anything like hot swapable ram.  The ram access is still going to work,
-> > just it might display something it shouldn't. Say for example if that
-> > frame buffer got reused by somethig else and filled with new data in
-> > the very small window.
-> >
-> > But yes, I agree the best solution would be to not release the buffer
-> > until the next vblank.
-> >
-> > Perhaps a good solution would be for the DRM api to have the concept of
-> > a deferred release?  Meaning if the put() call just added the frame
-> > buffer to a list that DRM core could walk during the vblank.  That
-> > might be better then every single driver trying to work up a custom
-> > solution.
-> >  
-> >> The vc4 driver seems to be able to program the hardware to switch the
-> >> scanout to the new buffer immediately:
-> >> 
-> >> https://elixir.bootlin.com/linux/v4.20-rc3/source/drivers/gpu/drm/vc4/vc4_plane.c#L794
-> >> 
-> >> Although I wonder if there isn't still a tiny race there - the
-> >> hardware may have just started refilling the FIFO from the old
-> >> address. Still, if the FIFO is small, the FIFO refill operation may
-> >> be
-> >> much shorter than it takes for the kernel code to actually free the
-> >> buffer. Eric and Michael, could you confirm?
-> >>   
-> >
-> > I don't have those boards anymore, and I don't have access to any
-> > technical documentation on the GPU so I can't really add much here.  
-> > Eric can probably provide the best information.  
+> 	Thanks for you remind.
 > 
-> I don't think I understood my scanout hardware well enough when I
-> started on the async update stuff for rpi.  vc4 probably needs to wait
-> until the HW starts scanning out a new line before letting the old BO
-> get freed.
+> 	Sincerely, I respect any comment from any reviewer. If I didn't reply
+> for any comment, really sorry for that.
+> 
+> 	As to this "tx-delay" issue, the following reply in v3 maybe ignored.
+> 	https://lkml.org/lkml/2018/11/19/158
+> 
+> 	"the delay time in mediatek dwmac design is not so accurate,
+> 	the current mt2712 and the following ICs will not use the
+> 	same delay design, but will use stages to indicate different
+> 	delay time.
+> 	so maybe "mediatek.tx-delay" represent the delay stage is a
+> 	good choice"
+> 
+> 	And to make it clearer here.
+> 
+> 	In mt2712, there are two delay macro circuit: named fine-tune and
+> coarse-tune.
+> 	a. fine-tune, 170+/-50ps per stage, total 32 stages
+> 	b. coarse-tune, 0.55+/-0.2ns per stage, total 32 stages
+> 	If we only consider mt2712, delay in fine-tune select a integer
+> multiple of 170ps, delay in coarse-tune select a integer multiple of
+> 550ps, for stage 0~31, the delay in fine-tune will not have the same
+> value with that in coarse-tune.
+> 	OK, It seems the property "fine-tune" can be eliminated .
+> 
+> 	But the following ic will not have the same accuracy as mt2712,
+> and maybe will not have two delay macro circuit to be selected.
 
-That's also my understanding. Note that even if the BO is freed before
-the HVS has finished generating a line it shouldn't crash, because
-accesses are done through DMA. Might be a security issue though if we
-start re-using the memory for something else while it's still being
-accessed.
+New IC will have new compatible string then. If it is different, then 
+likely these properties would have to change or have different meaning 
+unless you use time.
 
-The solution would be to wait for the EOL (End Of Line) interrupt in
-the async update path, but I'm not sure this is allowed.
+> 	1. assume two delay macro circuit in the following ic,
+> 	fine-tune, 100ps per stage, coarse-tune, 0.55ns per stage,
+> 	if we want delay 2.2ns, fine-tune will get a 22, and coarse-tune get a
+> 4. We can't distinguish which delay macro we are choosing.
+
+Why wouldn't you just choose fine-tune for anything less than the max 
+range (3200ps in this example) and course for greater than 3100ps.
+
+> 	2. assume only one delay macro circuit is used, a similar case as 1
+> will also increase the complexity of driver.
+> 	Then, we need define more flag property to know which delay macro we
+> are handling.
+> 
+> 	The common things for all delay macro circuit in MediaTek mac design is
+> the stages, not the accuracy. so if we maintain stage info in "mediatek,
+> tx-delay", we only need care which stage we should choose.
+> And for each IC, we will recommend a best stage as a candidate.
+
+What if you had a 3rd delay circuit?
+
+> 	Above is my personal opinion, may be my understanding is wrong,
+> welcome for further discussion.
+> 
+> 	Thanks a lot.
