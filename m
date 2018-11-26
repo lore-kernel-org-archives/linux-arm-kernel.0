@@ -1,79 +1,100 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Mon, 26 Nov 2018 14:21:45 +0530
-Subject: [PATCH 1/3] clk: samsung: exynos5420: add VPLL rate table for g3d
- clock
-In-Reply-To: <5BFBA550.4020401@samsung.com>
-References: <CGME20181123094453epcas4p16be0412e0195fe4bf06680111805352a@epcas4p1.samsung.com>
- <20181123094413.1108-1-linux.amoon@gmail.com> <5BFBA550.4020401@samsung.com>
-Message-ID: <CANAwSgRqvw454E2twn+RwGGhy0XQE0T=k2dKfD50CWVk88p=rQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 26 Nov 2018 09:52:16 +0100
+Subject: [PATCH] drm/meson: add support for 1080p25 mode
+In-Reply-To: <CAFW1BFwocpL3brp8h66gaAiMgcCvsr1t=tU2+oNVFNOG4DMYPQ@mail.gmail.com>
+References: <1542793169-13008-1-git-send-email-christianshewitt@gmail.com>
+ <2a9d9fa9-c9ba-c624-28da-dd3804faf438@baylibre.com>
+ <CAFW1BFzC0wzwmjvpSqb90ipY4mzdWPMc3buXjkwvi4X5e8wGJg@mail.gmail.com>
+ <ea9d3fd1-068f-7bec-4166-9399d0aea02f@baylibre.com>
+ <CAFW1BFwocpL3brp8h66gaAiMgcCvsr1t=tU2+oNVFNOG4DMYPQ@mail.gmail.com>
+Message-ID: <47e37691-b3b1-c6e2-8359-0d0d5d521a2c@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+Hi Michal,
 
-On Mon, 26 Nov 2018 at 13:18, Chanwoo Choi <cw00.choi@samsung.com> wrote:
->
-> Hi,
->
-> On 2018? 11? 23? 18:44, Anand Moon wrote:
-> > From: Marian Mihailescu <mihailescu2m@gmail.com>
-> >
-> > A specific clock rate table is added for VPLL so it is possible
-> > to set frequency of the VPLL output clock that used by the g3d clock.
-> >
-> > Cc: Andrzej Hajda <a.hajda@samsung.com>
-> > Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> > Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
-> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> > ---
-> >  drivers/clk/samsung/clk-exynos5420.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> >
-> > diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> > index 34cce3c5898f..34156bdfd0d2 100644
-> > --- a/drivers/clk/samsung/clk-exynos5420.c
-> > +++ b/drivers/clk/samsung/clk-exynos5420.c
-> > @@ -1303,6 +1303,18 @@ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
-> >       PLL_36XX_RATE(24 * MHZ,  32768001U, 131, 3, 5, 4719),
-> >  };
-> >
-> > +static const struct samsung_pll_rate_table exynos5420_vpll_24mhz_tbl[] __initconst = {
-> > +     PLL_35XX_RATE(24 * MHZ, 600000000U, 200, 2, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 543000000U, 181, 2, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 533000000U, 533, 6, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 480000000U, 320, 4, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 420000000U, 140, 2, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 350000000U, 175, 3, 2),
-> > +     PLL_35XX_RATE(24 * MHZ, 266000000U, 266, 3, 3),
-> > +     PLL_35XX_RATE(24 * MHZ, 177000000U, 118, 2, 3),
-> > +     PLL_35XX_RATE(24 * MHZ, 100000000U, 200, 3, 4),
-> > +};
->
-> VPLL has the same PMS table with apll/kpll/bpll. You don't need to add new
-> 'exynos5420_vpll_24mhz_tbl' table. Just adding the missing frequency entries
-> to 'exynos5420_pll2550x_24mhz_tbl' table.
->
-Thanks for your input. I will leave this for the expert to fix this.
+On 23/11/2018 14:23, Michal Lazo wrote:
 
-> > +
-> >  static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
-> >       [apll] = PLL(pll_2550, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
-> >               APLL_CON0, NULL),
-> > @@ -1428,6 +1440,7 @@ static void __init exynos5x_clk_init(struct device_node *np,
-> >               exynos5x_plls[epll].rate_table = exynos5420_epll_24mhz_tbl;
-> >               exynos5x_plls[kpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
-> >               exynos5x_plls[bpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
-> > +             exynos5x_plls[vpll].rate_table = exynos5420_vpll_24mhz_tbl;
-> >       }
-> >
-> >       samsung_clk_register_pll(ctx, exynos5x_plls, ARRAY_SIZE(exynos5x_plls),
-> >
->
->
-> --
-> Best Regards,
-> Chanwoo Choi
-> Samsung Electronics
+Please do not top-post !
 
-Best Regards
--Anand
+> I checked 1080p30/1080p60 and values are same
+> I didn't check others
+> so clean duplicates
+> or make duplicates :)
+
+I'll be happy to apply your patches !
+
+Neil
+
+> 
+> 
+> On Fri, Nov 23, 2018 at 2:15 PM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>
+>> Hi Michal,
+>>
+>> On 23/11/2018 13:57, Michal Lazo wrote:
+>>> I would suggest same aproach as for
+>>> "meson_hdmi_encp_mode_1080p30"
+>>> and "meson_hdmi_encp_mode_1080p60"
+>>>
+>>> so duplicate "meson_hdmi_encp_mode_1080p50"
+>>> with name "meson_hdmi_encp_mode_1080p25"
+>>
+>> The configs are litterally the same for 1080p25 and 1080p60 unlike 1080p30/1080p60,
+>> so I don't see the point about duplicating a same table for the sake of naming.
+>>
+>> We will the exact same thing to support the 2160p50/2160p60 modes by reusing the
+>> same config are 2160p25/2160p50, and I don't see the point of duplication the
+>> tables here aswell.
+>>
+>> Neil
+>>
+>>>
+>>> now the code looks really like common copy paste problem
+>>> Michal Lazo
+>>> On Wed, Nov 21, 2018 at 10:47 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>>>>
+>>>> On 21/11/2018 10:39, Christian Hewitt wrote:
+>>>>> This essential mode for PAL users is missing, so add it.
+>>>>>
+>>>>> Signed-off-by: Christian Hewitt <christianshewitt@gmail.com>
+>>>>> ---
+>>>>>  drivers/gpu/drm/meson/meson_venc.c | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+>>>>> index acbbad3..ab16046 100644
+>>>>> --- a/drivers/gpu/drm/meson/meson_venc.c
+>>>>> +++ b/drivers/gpu/drm/meson/meson_venc.c
+>>>>> @@ -714,6 +714,7 @@ struct meson_hdmi_venc_vic_mode {
+>>>>>       { 5, &meson_hdmi_encp_mode_1080i60 },
+>>>>>       { 20, &meson_hdmi_encp_mode_1080i50 },
+>>>>>       { 32, &meson_hdmi_encp_mode_1080p24 },
+>>>>> +     { 33, &meson_hdmi_encp_mode_1080p50 },
+>>>>>       { 34, &meson_hdmi_encp_mode_1080p30 },
+>>>>>       { 31, &meson_hdmi_encp_mode_1080p50 },
+>>>>>       { 16, &meson_hdmi_encp_mode_1080p60 },
+>>>>>
+>>>>
+>>>> Exact, I forgot this mode...
+>>>>
+>>>> Thanks for the change !
+>>>>
+>>>> Acked-by: Neil Armstrong <narmstrong@baylibre.com>
+>>>>
+>>>> I'll add :
+>>>> Fixes: 335e3713afb87 ("drm/meson: Add support for HDMI venc modes and settings")
+>>>> when applying to drm-misc-fixes.
+>>>>
+>>>> Neil
+>>>>
+>>>> _______________________________________________
+>>>> linux-amlogic mailing list
+>>>> linux-amlogic at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+>>>
+>>>
+>>>
+>>
+> 
+> 
