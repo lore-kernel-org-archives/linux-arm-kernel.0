@@ -1,189 +1,115 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 26 Nov 2018 09:19:35 +0900
-Subject: [PATCH 3/6] devfreq: add support for suspend/resume of a
- devfreq device
-In-Reply-To: <734d0941-c885-4d36-274b-23843d6626c1@partner.samsung.com>
-References: <1542823301-23563-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181121180204eucas1p1c5891d498aa59c0e10dd3ba4727a4382@eucas1p1.samsung.com>
- <1542823301-23563-4-git-send-email-l.luba@partner.samsung.com>
- <5BF61B3A.9050402@samsung.com>
- <cce4f194-b574-a12c-e876-f11a6f245940@partner.samsung.com>
- <5BF7419E.90006@samsung.com>
- <734d0941-c885-4d36-274b-23843d6626c1@partner.samsung.com>
-Message-ID: <5BFB3C17.40502@samsung.com>
+From: bhe@redhat.com (Baoquan He)
+Date: Mon, 26 Nov 2018 09:28:24 +0800
+Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
+ vmcoreinfo
+In-Reply-To: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+Message-ID: <20181126012824.GB1824@MiWiFi-R3L-srv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lukasz,
-
-I add the one more comment for devfreq_resume_device()
-
-On 2018? 11? 23? 19:01, Lukasz Luba wrote:
-> Hi Chanwoo Choi,
+On 11/16/18 at 03:17am, Bhupesh Sharma wrote:
+> Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
+> live-debugging of a running kernel via user-space utilities
+> like makedumpfile (see [1]).
 > 
-> On 11/23/18 12:54 AM, Chanwoo Choi wrote:
->> Hi Lukasz,
->>
->> I add one more comment about devfreq_resume_device().
->>
->> On 2018? 11? 22? 20:00, Lukasz Luba wrote:
->>>
->>>
->>> On 11/22/18 3:58 AM, Chanwoo Choi wrote:
->>>> On 2018? 11? 22? 03:01, Lukasz Luba wrote:
->>>>> The patch adds support for handling suspend/resume process.
->>>>> It uses atomic variables to make sure no race condition
->>>>> affects the process.
->>>>>
->>>>> The patch draws on Tobias Jakobi's work posted ~2 years ago, who tried to
->>>>> solve issue with devfreq device's frequency during suspend/resume.
->>>>> During the discussion on LKML some corner cases and comments appeared
->>>>> related to the design. This patch address them keeping in mind suggestions
->>>>> from Chanwoo Choi.
->>>>
->>>> Please remove the duplicate information about patch history.
->>>>
->>>>>
->>>>> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->>>>> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->>>>> ---
->>>>>    drivers/devfreq/devfreq.c | 45 +++++++++++++++++++++++++++++++++++++++------
->>>>>    1 file changed, 39 insertions(+), 6 deletions(-)
->>>>>
->>>>> diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
->>>>> index cf9c643..7e09de8 100644
->>>>> --- a/drivers/devfreq/devfreq.c
->>>>> +++ b/drivers/devfreq/devfreq.c
->>>>> @@ -872,14 +872,33 @@ EXPORT_SYMBOL(devm_devfreq_remove_device);
->>>>>     */
->>>>>    int devfreq_suspend_device(struct devfreq *devfreq)
->>>>>    {
->>>>> -	if (!devfreq)
->>>>> -		return -EINVAL;
->>>>> +        int ret;
->>>>
->>>> Move 'ret' definition under 'if (devfreq->suspend_freq) {'
->>>> because 'ret' is used if suspend_freq isn't zero.
->>> Not only there, 6 lines above 'ret' is used for
->>> devfreq->governor->event_handler().
->>
->> OK.
->>
->>>>
->>>>> +        unsigned long prev_freq;
->>>>> +        u32 flags = 0;
->>>>> +
->>>>> +        if (!devfreq)
->>>>> +                return -EINVAL;
->>>>> +
->>>>> +        if (devfreq->governor) {
->>>>> +		ret = devfreq->governor->event_handler(devfreq,
->>>>> +					DEVFREQ_GOV_SUSPEND, NULL);
->>>>> +		if (ret)
->>>>> +			return ret;
->>>>> +	}
->>>>>    
->>>>> -	if (!devfreq->governor)
->>>>> -		return 0;
->>>>> +	if (devfreq->suspend_freq) {
->>>>> +		if (atomic_inc_return(&devfreq->suspend_count) > 1)
->>>>> +			return 0;
->>>>>    
->>>>> -	return devfreq->governor->event_handler(devfreq,
->>>>> -				DEVFREQ_GOV_SUSPEND, NULL);
->>>>> +		ret = devfreq_set_target(devfreq, devfreq->suspend_freq,
->>>>> +					 &prev_freq, flags);
->>>>
->>>> Remove the 'prev_freq' parameter.
->>> OK
->>>>
->>>>> +		if (ret)
->>>>> +			return ret;
->>>>> +
->>>>> +		devfreq->resume_freq = prev_freq;
->>>>
->>>> As I commented on patch2, if devfreq_set_taget save the current frequency
->>>> to 'devfreq->resume_freq', this line is not needed.
->>> OK
->>>>
->>>>
->>>>> +	}
->>>>> +
->>>>> +        return 0;
->>>>>    }
->>>>>    EXPORT_SYMBOL(devfreq_suspend_device);
->>>>>    
->>>>> @@ -893,9 +912,23 @@ EXPORT_SYMBOL(devfreq_suspend_device);
->>>>>     */
->>>>>    int devfreq_resume_device(struct devfreq *devfreq)
->>>>>    {
->>>>> +        int ret;
->>>>
->>>> Move 'ret' definition under 'if (devfreq->suspend_freq) {'
->>>> because 'ret' is used if suspend_freq isn't zero.
->>> OK
->>
->> If you change the devfreq_resume_device() according to my new comment,
->> please ignore it.
->>
->>>>
->>>>> +        unsigned long prev_freq;
->>>>
->>>> Remove prev_freq variable which is not used on this function.
->>>> After calling devfreq_set_target, prev_freq is not used.
->>> OK
->>>>
->>>>> +        u32 flags = 0;
->>>>> +
->>>>>    	if (!devfreq)
->>>>>    		return -EINVAL;
->>>>>    
->>>>> +	if (devfreq->suspend_freq) {
+> Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
+> details), whose live debugging feature is broken with newer kernels
 
-In devfreq_resume_device(), it should check the 'devfreq->resume_freq'
-instead of 'devfreq->suspend_freq'.
+I think this paragraph explained why KCORE_REMAP adding caused the
+mistake of page_offset calculation in makedumpfile. It can prove the
+advantage of appending 'page_offset_base' to vmcoreinfo. The old way I
+took in makedumpfile could be impacted by kernel code change, adding it
+to vmcoreinfo can make it stable. The example is KCORE_REMAP adding, and
+later it's removed.
 
+But it's not live debugging feature of makedumpfile. Makedumpfile can't be
+used to live debug. The feature is called '--mem-usage' in makedumpfile,
+in fact it's used to estimate how big the vmcore could be so that customer
+can deply an appropriate size of storage space to store it. Because both
+kcore and vmcore are all elf files which the 1st kernel's memory is
+mapped to, even though they are different, kcore is dynamically changing.
+This is more likely a precision in order of of magnitude. This is a feature
+required by redhat customer.
 
->>>>> +		if (atomic_dec_return(&devfreq->suspend_count) >= 1)
->>>>> +			return 0;
->>>>> +
->>>>> +		ret = devfreq_set_target(devfreq, devfreq->resume_freq,
->>>>> +					 &prev_freq, flags);
->>>>
->>>> Remove the 'prev_freq' parameter.
->>> OK
->>>>
->>>>> +		if (ret)
->>>>> +			return ret;
->>>>> +	}
->>>>> +
->>>>>    	if (!devfreq->governor)
->>>>>    		return 0;
->>
->> Please change the code as following because you uses the following type
->> in the devfreq_suspend_device(). If there is any special issue, please
->> keep the same format in order to improve the readability.
->>
->> 	if (devfreq->governor) {
->> 		ret = devfreq->governor->event_handler(devfreq,
->> 				DEVFREQ_GOV_RESUME, NULL);
->> 		if (ret)
->> 			return ret;
->> 	}
->>
->>
-> OK, I will change the code to keep the same format.
-> Thank you for the review.
+I thought you are talking about using DaveA's crash utility to live
+debug the running kernel, like we usually do with gdb.
+
+	gdb vmlinux /proc/kcore
+
+Yes, this gdb live debugging is broken because of KASLR. We have bug about
+this, while it has not been fixed. Using Crash utility to replace gdb is
+one way if Crash code is adjusted.
+
+> (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
+> added to kcore, thus leading to an additional sections in the same, and
+> makedumpfile is not longer able to determine the start of direct
+> mapping of all physical memory, as it relies on traversing the PT_LOAD
+> segments inside kcore and using the last PT_LOAD segment
+> to determine the start of direct mapping.
+...
+> Testing:
+> -------
+
+This one vmcoreinfo entry adding won't impact kernel performance. And
+page_offset_base need be got during makedumpfile initialization, it
+won't impact makedumpfile efficiency either, especially compared with
+the later page filterring and writting out to storage space. I don't
+think there's any need to provide a detailed test result here. If
+possible, just mention it works in this way, maybe it's better in some
+aspects, such as code simplicity, etc.
+
+>  - I tested this patch (rebased on 'linux-next') on a x86_64 machine
+>    using the modified 'makedumpfile' user-space code (see [3] for my
+>    github tree which contains the same) for determining how many pages
+>    are dumpable when different dump_level is specified (which is
+>    one use-case of live-debugging via 'makedumpfile').
+>  - I tested both the KASLR and non-KASLR boot cases with this patch.
+>  - Here is one sample log (for KASLR boot case) on my x86_64 machine:
 > 
-> Regards,
-> Lukasz
+>    < snip..>
+>    The kernel doesn't support mmap(),read() will be used instead.
 > 
+>    TYPE		PAGES			EXCLUDABLE	DESCRIPTION
+>    ----------------------------------------------------------------------
+>    ZERO		21299           	yes		Pages filled
+>    with zero
+>    NON_PRI_CACHE	91785           	yes		Cache
+>    pages without private flag
+>    PRI_CACHE	1               	yes		Cache pages with
+>    private flag
+>    USER		14057           	yes		User process
+>    pages
+>    FREE		740346          	yes		Free pages
+>    KERN_DATA	58152           	no		Dumpable kernel
+>    data
 > 
+>    page size:		4096
+>    Total pages on system:	925640
+>    Total size on system:	3791421440       Byte
 > 
+...
 
+> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+> index 4c8acdfdc5a7..6161d77c5bfb 100644
+> --- a/arch/x86/kernel/machine_kexec_64.c
+> +++ b/arch/x86/kernel/machine_kexec_64.c
+> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+>  	VMCOREINFO_SYMBOL(init_top_pgt);
+>  	vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+>  			pgtable_l5_enabled());
+> +#ifdef CONFIG_RANDOMIZE_BASE
 
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+Finally, embracing it into CONFIG_RANDOMIZE_BASE ifdefery seems not
+right. The latest kernel is using page_offset_base to do the dynamic
+memory layout between level4 and level5 changing. This may not work in
+5-level system with CONFIG_RANDOMIZE_BASE=n.
+
+> +	VMCOREINFO_NUMBER(page_offset_base);
+> +#endif
+>  
+>  #ifdef CONFIG_NUMA
+>  	VMCOREINFO_SYMBOL(node_data);
+> -- 
+> 2.7.4
+> 
