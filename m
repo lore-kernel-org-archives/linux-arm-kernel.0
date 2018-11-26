@@ -1,119 +1,103 @@
 From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 26 Nov 2018 17:31:38 -0500
-Subject: [PATCH 9/9] iommu: arm-smmu-v3: make it explicitly non-modular
-In-Reply-To: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <1543271498-28966-10-git-send-email-paul.gortmaker@windriver.com>
+Date: Mon, 26 Nov 2018 17:31:29 -0500
+Subject: [PATCH 0/9] iommu: clean up/remove modular stuff from non-modules.
+Message-ID: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+The work here represents a scan over the iommu dir, looking for files/drivers
+that have nothing to do with a modular use case, but are using modular
+infrastructure regardless.
 
-drivers/iommu/Kconfig:config ARM_SMMU_V3
-drivers/iommu/Kconfig:  bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
+We are trying to make driver code consistent with the Makefiles/Kconfigs that
+control them.  This means not using modular functions/macros for drivers that
+can never be built as a module.  I've done this in other subsystem dirs
+already, and some of this has already happened in drivers/iommu by others;
+such as 98b72b94def9 ("iommu/rockchip: Prohibit unbind and remove").
 
-...meaning that it currently is not being built as a module by anyone.
+Using modular infrastructure in non-modules might seem harmless, but some
+of the downfalls this leads to are:
 
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
+ (1) it is easy to accidentally write unused module_exit and remove code
+ (2) it can be misleading when reading the source, thinking it can be
+     modular when the Makefile and/or Kconfig prohibit it
+ (3) it requires the include of the module.h header file which in turn
+     includes nearly everything else, thus adding to CPP overhead.
+ (4) it gets copied/replicated into other drivers and spreads quickly.
 
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
+The last two commits (arm-smmu related ones) deserve an extra mention,
+and I put them at the end in case they want to be deferred for later or
+altered.  Normally a "module-ectomy" allows us to delete the ".remove"
+function, as per the rockchip commit above, but ...
 
-We explicitly disallow a driver unbind, since that doesn't have a
-sensible use case anyway, but unlike most drivers, we can't delete the
-function tied to the ".remove" field.  This is because as of commit
-7aa8619a66ae ("iommu/arm-smmu-v3: Implement shutdown method") the
-.remove function was given a one line wrapper and re-used to provide a
-.shutdown service.  So we delete the wrapper and re-name the function
-from remove to shutdown.
+A kexec commit (7aa8619a66ae) tried to improve reliability by trying to
+shutdown the iommu in the compromised/crashing kernel, but of course the
+better solution is to have the recovery kernel be able to handle all of
+the possible initial conditions.  It appears this was done later in the
+commit b63b3439b856 - but I don't know if that means relying on an
+orderly shutdown is no longer required - I don't have the platform and
+am only going on what is in git history.
 
-We add a moduleparam.h include since the file does actually declare
-some module parameters, and leaving them as such is the easiest way
-currently to remain backwards compatible with existing use cases.
+So, as the kexec commit recycled the ".remove" handle to also be the
+".shutdown" handle, in this series the remove function was renamed to
+shutdown, and the ".remove" handle was deleted.  This was IMHO the most
+back compatible way to make this update.  If the reliance on the
+compromised kernel to run ".shutdown" is no longer necessary, then it
+can be removed in a future change.
 
-Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
+Patches were build tested on top of next-20181122 for ARM, ARM64, x86-64
+on an allyesconfig.
 
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
+Paul.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Nate Watterson <nwatters@codeaurora.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: iommu at lists.linux-foundation.org
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 25 +++++++++----------------
- 1 file changed, 9 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 6947ccf26512..1189c06079d4 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -20,7 +20,8 @@
- #include <linux/interrupt.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
--#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/moduleparam.h>
- #include <linux/msi.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -356,6 +357,10 @@
- #define MSI_IOVA_BASE			0x8000000
- #define MSI_IOVA_LENGTH			0x100000
- 
-+/*
-+ * not really modular, but the easiest way to keep compat with existing
-+ * bootargs behaviour is to continue using module_param_named here.
-+ */
- static bool disable_bypass = 1;
- module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
- MODULE_PARM_DESC(disable_bypass,
-@@ -2928,37 +2933,25 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int arm_smmu_device_remove(struct platform_device *pdev)
-+static void arm_smmu_device_shutdown(struct platform_device *pdev)
- {
- 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
- 
- 	arm_smmu_device_disable(smmu);
--
--	return 0;
--}
--
--static void arm_smmu_device_shutdown(struct platform_device *pdev)
--{
--	arm_smmu_device_remove(pdev);
- }
- 
- static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "arm,smmu-v3", },
- 	{ },
- };
--MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
- 
- static struct platform_driver arm_smmu_driver = {
- 	.driver	= {
- 		.name		= "arm-smmu-v3",
- 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
-+		.suppress_bind_attrs = true,
- 	},
- 	.probe	= arm_smmu_device_probe,
--	.remove	= arm_smmu_device_remove,
- 	.shutdown = arm_smmu_device_shutdown,
- };
--module_platform_driver(arm_smmu_driver);
--
--MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
--MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
--MODULE_LICENSE("GPL v2");
-+builtin_platform_driver(arm_smmu_driver);
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Daniel Kurtz <djkurtz@chromium.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Cc: Honghui Zhang <honghui.zhang@mediatek.com>
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Nate Watterson <nwatters@codeaurora.org>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Simon Xue <xxm@rock-chips.com>
+Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: iommu at lists.linux-foundation.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+Cc: linux-tegra at vger.kernel.org
+
+Paul Gortmaker (9):
+  iommu: audit and remove any unnecessary uses of module.h
+  iommu: rockchip: make it explicitly non-modular
+  iommu: msm_iommu: make it explicitly non-modular
+  iommu: mtk_iommu: make it explicitly non-modular
+  iommu: ipmmu-vmsa: make it explicitly non-modular
+  iommu: qcom_iommu: make it explicitly non-modular
+  iommu: tegra-gart: make it explicitly non-modular
+  iommu: arm-smmu: make it explicitly non-modular
+  iommu: arm-smmu-v3: make it explicitly non-modular
+
+ drivers/iommu/arm-smmu-v3.c    | 25 +++++++++----------------
+ drivers/iommu/arm-smmu.c       | 32 +++++++++++++-------------------
+ drivers/iommu/iommu-sysfs.c    |  2 +-
+ drivers/iommu/iommu.c          |  3 ++-
+ drivers/iommu/ipmmu-vmsa.c     | 16 +++-------------
+ drivers/iommu/msm_iommu.c      | 13 +++----------
+ drivers/iommu/mtk_iommu_v1.c   | 15 +++------------
+ drivers/iommu/qcom_iommu.c     | 16 ++--------------
+ drivers/iommu/rockchip-iommu.c | 13 ++++++-------
+ drivers/iommu/tegra-gart.c     | 37 +++++++------------------------------
+ 10 files changed, 49 insertions(+), 123 deletions(-)
+
 -- 
 2.7.4
