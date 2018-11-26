@@ -1,72 +1,96 @@
-From: hongxing.zhu@nxp.com (Richard Zhu)
-Date: Mon, 26 Nov 2018 01:53:39 +0000
-Subject: iMX6 PCIe MSI issues
-In-Reply-To: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
-References: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
-Message-ID: <AM0PR0402MB357044467379F0C49D498ACA8CD70@AM0PR0402MB3570.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 26 Nov 2018 10:22:41 +0800
+Subject: [PATCH v3 2/2] arm64/bpf: don't allocate BPF JIT programs in
+ module memory
+In-Reply-To: <20181123094152.21368-3-ard.biesheuvel@linaro.org>
+References: <20181123094152.21368-3-ard.biesheuvel@linaro.org>
+Message-ID: <201811261045.VYtat2yg%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert:
-Can you make reference to the following URL?
+Hi Ard,
 
-https://patchwork.ozlabs.org/patch/989802/
-It may be helpful.
+I love your patch! Perhaps something to improve:
 
+[auto build test WARNING on arm64/for-next/core]
+[also build test WARNING on v4.20-rc4 next-20181123]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Best Regards
-Richard Zhu
-Office: 86-21-28937189
-Mobile: 86-13386059786
+url:    https://github.com/0day-ci/linux/commits/Ard-Biesheuvel/bpf-permit-JIT-allocations-to-be-served-outside-the-module-region/20181126-024110
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-7 (Debian 7.3.0-1) 7.3.0
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
+All warnings (new ones prefixed by >>):
 
-> -----Original Message-----
-> From: Robert Hancock [mailto:hancock at sedsystems.ca]
-> Sent: 2018?11?24? 6:17
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>; l.stach at pengutronix.de
-> Subject: iMX6 PCIe MSI issues
-> 
-> I am working with a custom FPGA PCI Express endpoint connected to an NXP
-> iMX6D processor running the 4.19.2 kernel. It seems happy using INTx
-> interrupts but when trying to enable MSI the device driver is not receiving any
-> interrupts.
-> 
-> From some register poking I have figured out:
-> -the MSI address set on the PCIe device is correctly set in the iMX MSI
-> controller's MSI Controller Address register (0x1ffc820) -the interrupt vectors
-> are enabled in the MSI controller's Interrupt Enable register (0x1ffc828) -the
-> interrupt vectors are not masked in the MSI controller's Interrupt Mask
-> register (0x1ffc82c) -The MSI controller's Interrupt Status register (0x1ffc830)
-> shows that the requested interrupt vectors are pending -In the ARM GIC,
-> vector 152 (for msi_ctrl_int) is enabled in the IS enable register (0x00a01110),
-> but not set in the IS pending (0x00a01210) or IS active (0x00a01310) registers
-> -Vector 152 is not masked in the GPC interrupt mask (0x00a01310) -Vector
-> 152 is not active in the GPC interrupt status (0x00a01310)
-> 
-> So it appears the MSI controller is receiving and recognizing the MSI from the
-> device, but the interrupt is not making it into the GIC for some reason. If I
-> manually set vector 152 to pending in the GIC, the dw_handle_msi_irq
-> handler in pci-designware-host.c does get called along with the interrupt
-> handler(s) for the PCIe device, so it appears the chain from that point on is
-> working:
-> 
-> # devmem 0x00a01210 32 0x1000000
-> 
-> I found someone else reporting this in 2014 with an unknown kernel version
-> on the NXP forums here, but with no resolution listed there:
-> 
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fcom
-> munity.nxp.com%2Fthread%2F318307&amp;data=02%7C01%7Chongxing.zhu
-> %40nxp.com%7C83e67fc00a0a488ed23908d651917763%7C686ea1d3bc2b4
-> c6fa92cd99c5c301635%7C0%7C0%7C636786082558025273&amp;sdata=c%
-> 2BATbyH0928oYCMejdXByUI9GSv5entWGgNlmZ4E7Nc%3D&amp;reserved=0
-> 
-> Any ideas on what may be going wrong? My next step may be to try an older
-> kernel version to see if this got broken at some point.
-> 
-> --
-> Robert Hancock
-> Senior Software Developer
-> SED Systems
-> Email: hancock at sedsystems.ca
+   include/linux/slab.h:332:43: warning: dubious: x & !y
+   kernel/bpf/core.c:612:6: warning: symbol 'bpf_jit_alloc_exec' was not declared. Should it be static?
+>> kernel/bpf/core.c:619:24: warning: incorrect type in argument 1 (different modifiers)
+   kernel/bpf/core.c:619:24:    expected void *module_region
+   kernel/bpf/core.c:619:24:    got void const *addr
+   kernel/bpf/core.c:617:13: warning: symbol 'bpf_jit_free_exec' was not declared. Should it be static?
+   include/linux/slab.h:332:43: warning: dubious: x & !y
+   kernel/bpf/core.c:1608:9: warning: incorrect type in argument 1 (different address spaces)
+   kernel/bpf/core.c:1608:9:    expected struct callback_head *head
+   kernel/bpf/core.c:1608:9:    got struct callback_head [noderef] <asn:4>*<noident>
+   include/linux/slab.h:332:43: warning: dubious: x & !y
+   kernel/bpf/core.c:1682:44: warning: incorrect type in initializer (different address spaces)
+   kernel/bpf/core.c:1682:44:    expected struct bpf_prog_array_item *item
+   kernel/bpf/core.c:1682:44:    got struct bpf_prog_array_item [noderef] <asn:4>*<noident>
+   kernel/bpf/core.c:1706:26: warning: incorrect type in assignment (different address spaces)
+   kernel/bpf/core.c:1706:26:    expected struct bpf_prog_array_item *existing
+   kernel/bpf/core.c:1706:26:    got struct bpf_prog_array_item [noderef] <asn:4>*<noident>
+   kernel/bpf/core.c:1740:26: warning: incorrect type in assignment (different address spaces)
+   kernel/bpf/core.c:1740:26:    expected struct bpf_prog_array_item *[assigned] existing
+   kernel/bpf/core.c:1740:26:    got struct bpf_prog_array_item [noderef] <asn:4>*<noident>
+   include/trace/events/xdp.h:28:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:53:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:111:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:126:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:161:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:196:1: warning: Using plain integer as NULL pointer
+   include/trace/events/xdp.h:231:1: warning: Using plain integer as NULL pointer
+   kernel/bpf/core.c:999:18: warning: Initializer entry defined twice
+   kernel/bpf/core.c:1001:17:   also defined here
+   kernel/bpf/core.c: In function 'bpf_jit_free_exec':
+   kernel/bpf/core.c:619:17: warning: passing argument 1 of 'module_memfree' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+     module_memfree(addr);
+                    ^~~~
+   In file included from kernel/bpf/core.c:28:0:
+   include/linux/moduleloader.h:30:6: note: expected 'void *' but argument is of type 'const void *'
+    void module_memfree(void *module_region);
+         ^~~~~~~~~~~~~~
+
+vim +619 kernel/bpf/core.c
+
+ede95a63b Daniel Borkmann 2018-10-23  611  
+eff59cbcb Ard Biesheuvel  2018-11-23 @612  void *__weak bpf_jit_alloc_exec(unsigned long size)
+eff59cbcb Ard Biesheuvel  2018-11-23  613  {
+eff59cbcb Ard Biesheuvel  2018-11-23  614  	return module_alloc(size);
+eff59cbcb Ard Biesheuvel  2018-11-23  615  }
+eff59cbcb Ard Biesheuvel  2018-11-23  616  
+eff59cbcb Ard Biesheuvel  2018-11-23  617  void __weak bpf_jit_free_exec(const void *addr)
+eff59cbcb Ard Biesheuvel  2018-11-23  618  {
+eff59cbcb Ard Biesheuvel  2018-11-23 @619  	module_memfree(addr);
+eff59cbcb Ard Biesheuvel  2018-11-23  620  }
+eff59cbcb Ard Biesheuvel  2018-11-23  621  
+
+:::::: The code at line 619 was first introduced by commit
+:::::: eff59cbcb348cb3df3fd41aba28df574c6cf7c27 bpf: add __weak hook for allocating executable memory
+
+:::::: TO: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+:::::: CC: 0day robot <lkp@intel.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 66620 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/00c6c7fd/attachment-0001.gz>
