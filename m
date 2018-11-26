@@ -1,59 +1,68 @@
-From: tiny.windzz@gmail.com (Frank Lee)
-Date: Mon, 26 Nov 2018 22:42:37 +0800
-Subject: [PATCH v2] soc: bcm: brcmstb: Don't leak device tree node
- reference
-In-Reply-To: <20181124145223.29208-1-tiny.windzz@gmail.com>
-References: <20181124145223.29208-1-tiny.windzz@gmail.com>
-Message-ID: <CAEExFWut2Vu0e+j1U8_1PS683DtMMi7FVD6X=LfwwE63DT7Syg@mail.gmail.com>
+From: vkoul@kernel.org (Vinod Koul)
+Date: Mon, 26 Nov 2018 20:14:22 +0530
+Subject: [PATCH] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device
+ node
+In-Reply-To: <20181126142133.16966-1-govinds@codeaurora.org>
+References: <20181126142133.16966-1-govinds@codeaurora.org>
+Message-ID: <20181126144422.GU3175@vkoul-mobl.Dlink>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2018 at 10:52 PM Yangtao Li <tiny.windzz@gmail.com> wrote:
->
-> of_find_node_by_path() acquires a reference to the node returned by it
-> and that reference needs to be dropped by its caller. soc_is_brcmstb()
-> doesn't do that, so fix it.
->
-> [treding: slightly rewrite to avoid inline comparison]
->
-> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+Hi Govind,
+
+On 26-11-18, 19:51, Govind Singh wrote:
+> Add device node for the ath10k SNOC platform driver probe
+> and add resources required for WCN3990 on qcs404 soc.
+> Optional clock and regulator controls are not yet available in
+> upstream, hence add them once available.
+> 
+> Signed-off-by: Govind Singh <govinds@codeaurora.org>
 > ---
-> Changes in v2:
-> -update changelog
-> -slightly rewrite to avoid inline comparison
-> ---
->  drivers/soc/bcm/brcmstb/common.c | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-> index 14185451901d..bf9123f727e8 100644
-> --- a/drivers/soc/bcm/brcmstb/common.c
-> +++ b/drivers/soc/bcm/brcmstb/common.c
-> @@ -31,13 +31,17 @@ static const struct of_device_id brcmstb_machine_match[] = {
->
->  bool soc_is_brcmstb(void)
->  {
-> +       const struct of_device_id *match;
->         struct device_node *root;
->
->         root = of_find_node_by_path("/");
->         if (!root)
->                 return false;
->
-> -       return of_match_node(brcmstb_machine_match, root) != NULL;
-> +       match = of_match_node(brcmstb_machine_match, root);
-> +       of_node_put(root);
+>  arch/arm64/boot/dts/qcom/qcs404.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+> index 9ca4f061ecc5..1a401a32d4a1 100644
+> --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+> @@ -958,6 +958,25 @@
+>  				status = "disabled";
+>  			};
+>  		};
 > +
-> +       return match != NULL;
->  }
->
->  u32 brcmstb_get_family_id(void)
-> --
-> 2.17.0
->
-Hi Florian:
+> +		wifi: wifi at 0A000000 {
 
-How about this ?
+Please remove leading 0 from node
 
-MBR,
-Yangtao
+> +			compatible = "qcom,wcn3990-wifi";
+> +			reg = <0x0A000000 0x800000>;
+> +			reg-names = "membase";
+> +			memory-region = <&wlan_msa_mem>;
+> +			interrupts = <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+> +		};
+>  	};
+>  
+>  	timer {
+
+This file is sorted alphabetically and reg values. So this should be
+between blsp1_uart2 and intc node, can you please change that
+
+Also please compile this with W=12
+
+Lastly, I am not sure, but should the wifi node be always enabled?
+Should it not be enabled in the board dts file? Bjorn..?
+
+Thanks
+-- 
+~Vinod
