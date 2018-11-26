@@ -1,43 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Nov 2018 00:37:07 +0100
-Subject: [PATCH 2/9] iommu: rockchip: make it explicitly non-modular
-In-Reply-To: <1543271498-28966-3-git-send-email-paul.gortmaker@windriver.com>
-References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
- <1543271498-28966-3-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <3696101.6o5idU3W3V@phil>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 26 Nov 2018 23:41:11 +0000
+Subject: [PATCH] arm: always update thread_info->syscall
+In-Reply-To: <20181126233303.GZ30658@n2100.armlinux.org.uk>
+References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
+ <20181126233303.GZ30658@n2100.armlinux.org.uk>
+Message-ID: <20181126234111.GA30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 26. November 2018, 23:31:31 CET schrieb Paul Gortmaker:
-> The Kconfig currently controlling compilation of this code is:
+On Mon, Nov 26, 2018 at 11:33:03PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 26, 2018 at 08:53:35PM -0200, Rafael David Tinoco wrote:
+> > Right now, only way for task->thread_info->syscall to be updated is if
+> > if _TIF_SYSCALL_WORK is set in current's task thread_info->flags
+> > (similar to what has_syscall_work() checks for arm64).
+> > 
+> > This means that "->syscall" will only be updated if we are tracing the
+> > syscalls through ptrace, for example. This is NOT the same behavior as
+> > arm64, when pt_regs->syscallno is updated in the beginning of svc0
+> > handler for *every* syscall entry.
 > 
-> drivers/iommu/Kconfig:config ROCKCHIP_IOMMU
-> drivers/iommu/Kconfig:  bool "Rockchip IOMMU Support"
-> 
-> ...meaning that it currently is not being built as a module by anyone.
-> 
-> The bind/unbind/remove was already explicitly disabled in commit
-> 98b72b94def9 ("iommu/rockchip: Prohibit unbind and remove").
-> 
-> Lets remove the remaining traces of  modular infrastructure, so that
-> when reading the driver there is no doubt it is builtin-only.
-> 
-> Since module_init was not in use by this code, the init ordering
-> remains unchanged with this commit.
-> 
-> Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
-> 
-> We also delete the MODULE_LICENSE tag etc. since all that information
-> was (or is now) contained at the top of the file in the comments.
-> 
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: Simon Xue <xxm@rock-chips.com>
-> Cc: Daniel Kurtz <djkurtz@chromium.org>
-> Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> So when was it decided that the syscall number will always be required
+> (we need it to know how far back this has to be backported).
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+PS, I rather object to the fact that the required behaviour seems to
+change, arch maintainers aren't told about it until... some test is
+created at some random point in the future which then fails.
+
+Surely there's a better way to communicate changes in requirements
+than discovery-by-random-bug-report ?
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
