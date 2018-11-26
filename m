@@ -1,82 +1,72 @@
-From: miles.chen@mediatek.com (Miles Chen)
-Date: Mon, 26 Nov 2018 09:33:24 +0800
-Subject: [RFC PATCH] of: make MAX_RESERVED_REGIONS configurable
-In-Reply-To: <CAL_Jsq+O1YDP1yiHZpcxUaFG1LYDqi74D_kEnErP+cwGDppVWQ@mail.gmail.com>
-References: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
- <CAL_JsqLGvUYQmCGXLgSO+6kFj2i87dpaTbMGbyu5oMt=eeu35A@mail.gmail.com>
- <1542855088.15789.6.camel@mtkswgap22>
- <CAL_Jsq+O1YDP1yiHZpcxUaFG1LYDqi74D_kEnErP+cwGDppVWQ@mail.gmail.com>
-Message-ID: <1543196004.21289.1.camel@mtkswgap22>
+From: hongxing.zhu@nxp.com (Richard Zhu)
+Date: Mon, 26 Nov 2018 01:53:39 +0000
+Subject: iMX6 PCIe MSI issues
+In-Reply-To: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
+References: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
+Message-ID: <AM0PR0402MB357044467379F0C49D498ACA8CD70@AM0PR0402MB3570.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2018-11-24 at 14:56 -0600, Rob Herring wrote:
-> On Wed, Nov 21, 2018 at 8:51 PM Miles Chen <miles.chen@mediatek.com> wrote:
-> >
-> > On Wed, 2018-11-21 at 10:39 -0600, Rob Herring wrote:
-> > > On Wed, Nov 21, 2018 at 2:11 AM <miles.chen@mediatek.com> wrote:
-> > > >
-> > > > From: Miles Chen <miles.chen@mediatek.com>
-> > > >
-> > > > When we use more than 32 entries in /resered-memory,
-> > > > there will be an error message: "not enough space all defined regions.".
-> > > > We can increase MAX_RESERVED_REGIONS to fix this.
-> > > >
-> > > > commit 22f8cc6e3373 ("drivers: of: increase MAX_RESERVED_REGIONS to 32")
-> > > > increased MAX_RESERVED_REGIONS to 32 but I'm not sure if increasing
-> > > > MAX_RESERVED_REGIONS to 64 is suitable for everyone.
-> > > >
-> > > > In this RFC patch, CONFIG_MAX_OF_RESERVED_REGIONS is added and used as
-> > > > MAX_RESERVED_REGIONS. Add a sanity test to make sure that
-> > > > MAX_RESERVED_REGIONS is less than INIT_MEMBLOCK_REGIONS.
-> > > > Users can configure CONFIG_MAX_OF_RESERVED_REGIONS according to their
-> > > > need.
-> > >
-> > > I don't want a kconfig option for this. I think it should be dynamic instead.
-> > >
-> > > The current flow is like this:
-> > >
-> > > for each reserved node:
-> > >   - call memblock_reserve
-> > >   - Add info to reserved_mem array
-> > >
-> > > I think we should change it to:
-> > >
-> > > for each reserved node:
-> > >   - call memblock_reserve
-> > >   - count number of nodes
-> > >
-> > > Alloc array using memblock_alloc
-> > >
-> > > for each reserved node:
-> > >    - Add info to reserved_mem array
-> > >
-> >
-> > thanks for your comment.
-> >
-> > I reviewed the flow and it might be easier to count the
-> > nodes and setup array first:
-> >
-> > for each reserved node:
-> >     - count number of nodes
-> >
-> > Alloc array using memblock_alloc
-> >
-> >
-> > for each reserved node:
-> >    - call memblock_reserve
-> 
-> The order here is wrong. It is important that you reserve the memory
-> blocks before doing any allocations.
+Hi Robert:
+Can you make reference to the following URL?
 
-thanks for pointing that out. You are right. I'll follow your
-suggestion.
+https://patchwork.ozlabs.org/patch/989802/
+It may be helpful.
 
+
+Best Regards
+Richard Zhu
+Office: 86-21-28937189
+Mobile: 86-13386059786
+
+
+> -----Original Message-----
+> From: Robert Hancock [mailto:hancock at sedsystems.ca]
+> Sent: 2018?11?24? 6:17
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>; l.stach at pengutronix.de
+> Subject: iMX6 PCIe MSI issues
 > 
-> >    - Add info to reserved_mem array
-> >
-> > What do you think?
-> >
-> > > Rob
-> >
-> >
+> I am working with a custom FPGA PCI Express endpoint connected to an NXP
+> iMX6D processor running the 4.19.2 kernel. It seems happy using INTx
+> interrupts but when trying to enable MSI the device driver is not receiving any
+> interrupts.
+> 
+> From some register poking I have figured out:
+> -the MSI address set on the PCIe device is correctly set in the iMX MSI
+> controller's MSI Controller Address register (0x1ffc820) -the interrupt vectors
+> are enabled in the MSI controller's Interrupt Enable register (0x1ffc828) -the
+> interrupt vectors are not masked in the MSI controller's Interrupt Mask
+> register (0x1ffc82c) -The MSI controller's Interrupt Status register (0x1ffc830)
+> shows that the requested interrupt vectors are pending -In the ARM GIC,
+> vector 152 (for msi_ctrl_int) is enabled in the IS enable register (0x00a01110),
+> but not set in the IS pending (0x00a01210) or IS active (0x00a01310) registers
+> -Vector 152 is not masked in the GPC interrupt mask (0x00a01310) -Vector
+> 152 is not active in the GPC interrupt status (0x00a01310)
+> 
+> So it appears the MSI controller is receiving and recognizing the MSI from the
+> device, but the interrupt is not making it into the GIC for some reason. If I
+> manually set vector 152 to pending in the GIC, the dw_handle_msi_irq
+> handler in pci-designware-host.c does get called along with the interrupt
+> handler(s) for the PCIe device, so it appears the chain from that point on is
+> working:
+> 
+> # devmem 0x00a01210 32 0x1000000
+> 
+> I found someone else reporting this in 2014 with an unknown kernel version
+> on the NXP forums here, but with no resolution listed there:
+> 
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fcom
+> munity.nxp.com%2Fthread%2F318307&amp;data=02%7C01%7Chongxing.zhu
+> %40nxp.com%7C83e67fc00a0a488ed23908d651917763%7C686ea1d3bc2b4
+> c6fa92cd99c5c301635%7C0%7C0%7C636786082558025273&amp;sdata=c%
+> 2BATbyH0928oYCMejdXByUI9GSv5entWGgNlmZ4E7Nc%3D&amp;reserved=0
+> 
+> Any ideas on what may be going wrong? My next step may be to try an older
+> kernel version to see if this got broken at some point.
+> 
+> --
+> Robert Hancock
+> Senior Software Developer
+> SED Systems
+> Email: hancock at sedsystems.ca
