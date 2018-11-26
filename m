@@ -1,46 +1,34 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:21 +0000
-Subject: [PATCH v2 05/20] alpha: perf/core: remove unnecessary checks for
- exclusion
+Date: Mon, 26 Nov 2018 11:12:22 +0000
+Subject: [PATCH v2 06/20] arc: perf/core: advertise PMU exclusion capability
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-6-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-7-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the Alpha PMU doesn't support context exclusion we do not
-advertise the PERF_PMU_CAP_EXCLUDE capability. This ensures that
-perf will prevent us from handling events where any exclusion
-flags are set. Let's remove the now unnecessary check for
-exclusion flags.
-
-This change means that __hw_perf_event_init will now also
-indicate that it doesn't support exclude_host and exclude_guest and
-will now implicitly return -EINVAL instead of -EPERM. This is likely
-more desirable as -EPERM will result in a kernel.perf_event_paranoid
-related warning from the perf userspace utility.
+The ARC PMU has the capability to exclude events based on
+context. Let's advertise that we support the
+PERF_PMU_CAP_EXCLUDE capability to ensure that perf doesn't
+prevent us from handling events where any exclusion flags are
+set.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/alpha/kernel/perf_event.c | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arc/kernel/perf_event.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/alpha/kernel/perf_event.c b/arch/alpha/kernel/perf_event.c
-index 5613aa37..5c17077 100644
---- a/arch/alpha/kernel/perf_event.c
-+++ b/arch/alpha/kernel/perf_event.c
-@@ -630,12 +630,6 @@ static int __hw_perf_event_init(struct perf_event *event)
- 		return ev;
- 	}
+diff --git a/arch/arc/kernel/perf_event.c b/arch/arc/kernel/perf_event.c
+index 8aec462..cf8ea6d 100644
+--- a/arch/arc/kernel/perf_event.c
++++ b/arch/arc/kernel/perf_event.c
+@@ -514,6 +514,7 @@ static int arc_pmu_device_probe(struct platform_device *pdev)
+ 		.start		= arc_pmu_start,
+ 		.stop		= arc_pmu_stop,
+ 		.read		= arc_pmu_read,
++		.capabilities	= PERF_PMU_CAP_EXCLUDE,
+ 	};
  
--	/* The EV67 does not support mode exclusion */
--	if (attr->exclude_kernel || attr->exclude_user
--			|| attr->exclude_hv || attr->exclude_idle) {
--		return -EPERM;
--	}
--
- 	/*
- 	 * We place the event type in event_base here and leave calculation
- 	 * of the codes to programme the PMU for alpha_pmu_enable() because
+ 	if (has_interrupts) {
 -- 
 2.7.4
