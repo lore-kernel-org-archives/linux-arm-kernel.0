@@ -1,14 +1,14 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Nov 2018 00:49:04 +0900
-Subject: [PATCH 10/10] ARM64: dts: uniphier: Add all CPUs in cooling maps
-In-Reply-To: <c759699a44189aed078186fd19089d2f44d988e3.1542362530.git.viresh.kumar@linaro.org>
-References: <cover.1542362530.git.viresh.kumar@linaro.org>
- <c759699a44189aed078186fd19089d2f44d988e3.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <CAK7LNAQ5OhS4tcZCP_Rykpxsgc5-rJTiZXS_yOravZv6iEeP3g@mail.gmail.com>
+Date: Tue, 27 Nov 2018 00:49:23 +0900
+Subject: [PATCH 6/6] ARM: dts: uniphier: Add all CPUs in cooling maps
+In-Reply-To: <b522f13dfffcec1e2b78e126513114428ec9a4b4.1542362000.git.viresh.kumar@linaro.org>
+References: <cover.1542362000.git.viresh.kumar@linaro.org>
+ <b522f13dfffcec1e2b78e126513114428ec9a4b4.1542362000.git.viresh.kumar@linaro.org>
+Message-ID: <CAK7LNATh3cGVC+KhBtATyzvCnzqv_QpFujjg_J7WikRHq0rjPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 7:06 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Fri, Nov 16, 2018 at 7:02 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
 >
 > Each CPU can (and does) participate in cooling down the system but the
 > DT only captures a handful of them, normally CPU0, in the cooling maps.
@@ -30,27 +30,19 @@ On Fri, Nov 16, 2018 at 7:06 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
 Applied to linux-uniphier.
 Thanks.
 
-
-
-
 > ---
->  arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+>  arch/arm/boot/dts/uniphier-pxs2.dtsi | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 >
-> diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> index d7e2d8969601..4a0c46cb11cd 100644
-> --- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> +++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-> @@ -206,13 +206,10 @@
+> diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> index 8d20e9548e39..06a049f6edf8 100644
+> --- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> +++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
+> @@ -141,8 +141,10 @@
 >                         cooling-maps {
->                                 map0 {
+>                                 map {
 >                                         trip = <&cpu_alert>;
 > -                                       cooling-device = <&cpu0
-> -                                           THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> -                               };
-> -                               map1 {
-> -                                       trip = <&cpu_alert>;
-> -                                       cooling-device = <&cpu2
 > -                                           THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
 > +                                       cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
 > +                                                        <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
