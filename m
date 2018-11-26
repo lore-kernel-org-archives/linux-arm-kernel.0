@@ -1,45 +1,60 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 26 Nov 2018 18:22:47 +0000
-Subject: [PATCH v2 01/20] perf/doc: update design.txt for
- exclude_{host|guest} flags
-In-Reply-To: <1543230756-15319-2-git-send-email-andrew.murray@arm.com>
-References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
- <1543230756-15319-2-git-send-email-andrew.murray@arm.com>
-Message-ID: <b5ba3edb-bc2a-225b-5a87-dd144104cabb@arm.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 26 Nov 2018 10:24:31 -0800
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+ <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+Message-ID: <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+>
+> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+> > @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+> > -     case IMX7D:
+> > +     case IMX8MQ:
+> > +             if (of_property_read_u32(node, "fsl,iomux-gpr1x",
+> > +                                      &imx6_pcie->gpr1x)) {
+> > +                     dev_err(dev, "Failed to get GPR1x address\n");
+> > +                     return -EINVAL;
+> > +             }
+>
+> This is for distinguishing multiple controllers on the SOC but other
+> registers and bits might differ. Isn't it preferable to have a property
+> for controller id instead of adding many registers to DT?
+>
 
-On 26/11/2018 11:12, Andrew Murray wrote:
-> Update design.txt to reflect the presence of the exclude_host
-> and exclude_guest perf flags.
-> 
-> Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+I liked encoding necessary info in DT directly slightly better than
+encoding abstract ID and then decoding it further in the driver code.
+OTOH, I am not really attached to that path. Lucas, can you comment on
+this please?
 
-Thanks a lot for adding this !
+> > +
+> > +             if (of_property_read_u32_array(
+> > +                         node, "fsl,gpr12-device-type",
+> > +                         imx6_pcie->device_type,
+> > +                         ARRAY_SIZE(imx6_pcie->device_type))) {
+> > +                     dev_err(dev, "Failed to get device type
+> > mask/value\n");
+> > +                     return -EINVAL;
+> > +             }
+>
+> The device type can be set on multiple SOCs, why are you adding a
+> mandatory property only for 8m?
 
-> ---
->   tools/perf/design.txt | 4 ++++
->   1 file changed, 4 insertions(+)
-> 
-> diff --git a/tools/perf/design.txt b/tools/perf/design.txt
-> index a28dca2..5b2b23b 100644
-> --- a/tools/perf/design.txt
-> +++ b/tools/perf/design.txt
-> @@ -222,6 +222,10 @@ The 'exclude_user', 'exclude_kernel' and 'exclude_hv' bits provide a
->   way to request that counting of events be restricted to times when the
->   CPU is in user, kernel and/or hypervisor mode.
->   
-> +Furthermore the 'exclude_host' and 'exclude_guest' bits provide a way
-> +to request counting of events restricted to guest and host contexts when
-> +using KVM virtualisation.
+My thinking was that other SoCs don't really have two controllers, so
+they don't really need to have that property, but, more importantly,
+not forcing them to have this property should preserve backwards
+compatibility with old DTBs.
 
-minor nit: could we generalise this to :
+>
+> There should probably be a separate patch with documented DT bindings.
+>
 
-"using Linux as the hypervisor".
+Yes, definitely, I just wanted to come up with a set of bindings
+agreed on by the driver maintainers first.
 
-Otherwise, looks good to me.
-
-Cheers
-Suzuki
+Thanks,
+Andrey Smirnov
