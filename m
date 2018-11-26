@@ -1,84 +1,41 @@
-From: govinds@codeaurora.org (Govind Singh)
-Date: Mon, 26 Nov 2018 22:28:57 +0530
-Subject: [PATCH] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device
- node
-In-Reply-To: <20181126144422.GU3175@vkoul-mobl.Dlink>
-References: <20181126142133.16966-1-govinds@codeaurora.org>
- <20181126144422.GU3175@vkoul-mobl.Dlink>
-Message-ID: <bcda9f6ffc58c8457e8822226b751132@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 27 Nov 2018 00:59:17 +0800
+Subject: [PATCH v3 4/4] arm64: dts: actions: s700-cubieboard7: Enable SIRQ
+In-Reply-To: <20181126100940.2944780-1-pn@denx.de>
+References: <20181126100940.2944780-1-pn@denx.de>
+Message-ID: <201811270010.jiasM1Ez%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Parthiban,
 
-Thanks for the review.
+Thank you for the patch! Yet something to improve:
 
-On 2018-11-26 20:14, Vinod Koul wrote:
-> Hi Govind,
-> 
-> On 26-11-18, 19:51, Govind Singh wrote:
->> Add device node for the ath10k SNOC platform driver probe
->> and add resources required for WCN3990 on qcs404 soc.
->> Optional clock and regulator controls are not yet available in
->> upstream, hence add them once available.
->> 
->> Signed-off-by: Govind Singh <govinds@codeaurora.org>
->> ---
->>  arch/arm64/boot/dts/qcom/qcs404.dtsi | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->> 
->> diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi 
->> b/arch/arm64/boot/dts/qcom/qcs404.dtsi
->> index 9ca4f061ecc5..1a401a32d4a1 100644
->> --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
->> @@ -958,6 +958,25 @@
->>  				status = "disabled";
->>  			};
->>  		};
->> +
->> +		wifi: wifi at 0A000000 {
-> 
-> Please remove leading 0 from node
-> 
+[auto build test ERROR on tip/irq/core]
+[also build test ERROR on v4.20-rc4 next-20181126]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Sure, i will change in v2.
+url:    https://github.com/0day-ci/linux/commits/Parthiban-Nallathambi/Add-Actions-Semi-Owl-family-sirq-support/20181126-181439
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=arm64 
 
->> +			compatible = "qcom,wcn3990-wifi";
->> +			reg = <0x0A000000 0x800000>;
->> +			reg-names = "membase";
->> +			memory-region = <&wlan_msa_mem>;
->> +			interrupts = <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>,
->> +				     <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
->> +		};
->>  	};
->> 
->>  	timer {
-> 
-> This file is sorted alphabetically and reg values. So this should be
-> between blsp1_uart2 and intc node, can you please change that
-> 
-> Also please compile this with W=12
-> 
+All errors (new ones prefixed by >>):
 
-Sure, i will change in v2.
+>> Error: arch/arm64/boot/dts/actions/s700-cubieboard7.dts:46.1-9 Label or path pinctrl not found
+>> FATAL ERROR: Syntax error parsing input tree
 
-> Lastly, I am not sure, but should the wifi node be always enabled?
-> Should it not be enabled in the board dts file? Bjorn..?
-> 
-
-yes, i some how missed this.
-I will mark the status disabled by default and enable from qcs404 evb 
-dts.
-
-> Thanks
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 61742 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/576b5316/attachment-0001.gz>
