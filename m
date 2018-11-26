@@ -1,26 +1,84 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 26 Nov 2018 16:58:22 +0000
-Subject: [PATCH 07/14] dt-bindings: mfd: axp20x: Add software based
- soft_start for AXP209 LDO3
-In-Reply-To: <2cd75ee27982f3be0d86104d80eaa13efeb2c65d.1543245984.git-series.plaes@plaes.org>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
- <2cd75ee27982f3be0d86104d80eaa13efeb2c65d.1543245984.git-series.plaes@plaes.org>
-Message-ID: <20181126165822.GJ9715@sirena.org.uk>
+From: govinds@codeaurora.org (Govind Singh)
+Date: Mon, 26 Nov 2018 22:28:57 +0530
+Subject: [PATCH] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device
+ node
+In-Reply-To: <20181126144422.GU3175@vkoul-mobl.Dlink>
+References: <20181126142133.16966-1-govinds@codeaurora.org>
+ <20181126144422.GU3175@vkoul-mobl.Dlink>
+Message-ID: <bcda9f6ffc58c8457e8822226b751132@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 05:27:48PM +0200, Priit Laes wrote:
+Hi Vinod,
 
-> +- regulator-soft-start:	enable the output at the lowest possible voltage and
-> +			only then set the desired voltage
-> +			AXP20x/LDO3
+Thanks for the review.
 
-This is a generic property, there is no need to document it in each
-device binding.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/12232943/attachment.sig>
+On 2018-11-26 20:14, Vinod Koul wrote:
+> Hi Govind,
+> 
+> On 26-11-18, 19:51, Govind Singh wrote:
+>> Add device node for the ath10k SNOC platform driver probe
+>> and add resources required for WCN3990 on qcs404 soc.
+>> Optional clock and regulator controls are not yet available in
+>> upstream, hence add them once available.
+>> 
+>> Signed-off-by: Govind Singh <govinds@codeaurora.org>
+>> ---
+>>  arch/arm64/boot/dts/qcom/qcs404.dtsi | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>> 
+>> diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi 
+>> b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+>> index 9ca4f061ecc5..1a401a32d4a1 100644
+>> --- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
+>> +++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
+>> @@ -958,6 +958,25 @@
+>>  				status = "disabled";
+>>  			};
+>>  		};
+>> +
+>> +		wifi: wifi at 0A000000 {
+> 
+> Please remove leading 0 from node
+> 
+
+Sure, i will change in v2.
+
+>> +			compatible = "qcom,wcn3990-wifi";
+>> +			reg = <0x0A000000 0x800000>;
+>> +			reg-names = "membase";
+>> +			memory-region = <&wlan_msa_mem>;
+>> +			interrupts = <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>,
+>> +				     <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
+>> +		};
+>>  	};
+>> 
+>>  	timer {
+> 
+> This file is sorted alphabetically and reg values. So this should be
+> between blsp1_uart2 and intc node, can you please change that
+> 
+> Also please compile this with W=12
+> 
+
+Sure, i will change in v2.
+
+> Lastly, I am not sure, but should the wifi node be always enabled?
+> Should it not be enabled in the board dts file? Bjorn..?
+> 
+
+yes, i some how missed this.
+I will mark the status disabled by default and enable from qcs404 evb 
+dts.
+
+> Thanks
