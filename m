@@ -1,61 +1,46 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:19 +0000
-Subject: [PATCH v2 03/20] perf/core: add PERF_PMU_CAP_EXCLUDE for exclusion
- capable PMUs
+Date: Mon, 26 Nov 2018 11:12:21 +0000
+Subject: [PATCH v2 05/20] alpha: perf/core: remove unnecessary checks for
+ exclusion
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-4-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-6-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many PMU drivers do not have the capability to exclude counting events
-that occur in specific contexts such as idle, kernel, guest, etc. These
-drivers indicate this by returning an error in their event_init upon
-testing the events attribute flags. This approach is error prone and
-often inconsistent.
+As the Alpha PMU doesn't support context exclusion we do not
+advertise the PERF_PMU_CAP_EXCLUDE capability. This ensures that
+perf will prevent us from handling events where any exclusion
+flags are set. Let's remove the now unnecessary check for
+exclusion flags.
 
-Let's instead allow PMU drivers to advertise their ability to exclude
-based on context via a new capability: PERF_PMU_CAP_EXCLUDE. This
-allows the perf core to reject requests for exclusion events where
-there is no support in the PMU.
+This change means that __hw_perf_event_init will now also
+indicate that it doesn't support exclude_host and exclude_guest and
+will now implicitly return -EINVAL instead of -EPERM. This is likely
+more desirable as -EPERM will result in a kernel.perf_event_paranoid
+related warning from the perf userspace utility.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- include/linux/perf_event.h | 1 +
- kernel/events/core.c       | 9 +++++++++
- 2 files changed, 10 insertions(+)
+ arch/alpha/kernel/perf_event.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index b2e806f..69b3d65 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -244,6 +244,7 @@ struct perf_event;
- #define PERF_PMU_CAP_EXCLUSIVE			0x10
- #define PERF_PMU_CAP_ITRACE			0x20
- #define PERF_PMU_CAP_HETEROGENEOUS_CPUS		0x40
-+#define PERF_PMU_CAP_EXCLUDE			0x80
+diff --git a/arch/alpha/kernel/perf_event.c b/arch/alpha/kernel/perf_event.c
+index 5613aa37..5c17077 100644
+--- a/arch/alpha/kernel/perf_event.c
++++ b/arch/alpha/kernel/perf_event.c
+@@ -630,12 +630,6 @@ static int __hw_perf_event_init(struct perf_event *event)
+ 		return ev;
+ 	}
  
- /**
-  * struct pmu - generic performance monitoring unit
-diff --git a/kernel/events/core.c b/kernel/events/core.c
-index 5a97f34..9afb33c 100644
---- a/kernel/events/core.c
-+++ b/kernel/events/core.c
-@@ -9743,6 +9743,15 @@ static int perf_try_init_event(struct pmu *pmu, struct perf_event *event)
- 	if (ctx)
- 		perf_event_ctx_unlock(event->group_leader, ctx);
- 
-+	if (!ret) {
-+		if (!(pmu->capabilities & PERF_PMU_CAP_EXCLUDE) &&
-+				event_has_any_exclude_flag(event)) {
-+			if (event->destroy)
-+				event->destroy(event);
-+			ret = -EINVAL;
-+		}
-+	}
-+
- 	if (ret)
- 		module_put(pmu->module);
- 
+-	/* The EV67 does not support mode exclusion */
+-	if (attr->exclude_kernel || attr->exclude_user
+-			|| attr->exclude_hv || attr->exclude_idle) {
+-		return -EPERM;
+-	}
+-
+ 	/*
+ 	 * We place the event type in event_base here and leave calculation
+ 	 * of the codes to programme the PMU for alpha_pmu_enable() because
 -- 
 2.7.4
