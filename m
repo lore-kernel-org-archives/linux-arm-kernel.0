@@ -1,80 +1,143 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:34 +0000
-Subject: [PATCH v2 18/20] x86: perf/core remove unnecessary checks for
- exclusion
-In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-19-git-send-email-andrew.murray@arm.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Mon, 26 Nov 2018 19:47:10 +0800
+Subject: [PATCH v2] mmc: mediatek: add MT8183 SDIO driver support
+In-Reply-To: <1542873780-13911-1-git-send-email-jjian.zhou@mediatek.com>
+References: <1542873780-13911-1-git-send-email-jjian.zhou@mediatek.com>
+Message-ID: <CANMq1KCO7tUGpXBR6x8cWiVd+5if2sPxU5N9J2aiMtuWuff3eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For x86 PMUs that do not support context exclusion we do not
-advertise the PERF_PMU_CAP_EXCLUDE capability. This ensures
-that perf will prevent us from handling events where any
-exclusion flags are set. Let's remove the now unnecessary
-check for exclusion flags.
+On Thu, Nov 22, 2018 at 4:03 PM Jjian Zhou <jjian.zhou@mediatek.com> wrote:
+>
+> MT8183 need SDIO driver. So it need add new code
+> to support it.
 
-This change means that amd/iommu and amd/uncore will now
-also indicate that they do not support exclude_{hv|idle} and
-intel/uncore that it does not support exclude_{guest|host}.
+The description does not seem to match what is going on below: I don't
+see anything that is obviously MT8183-specific. At first glance, this
+seems like a patch that makes it possible to enable MMC_CAP_SDIO_IRQ
+("cap-sdio-irq" dt property).
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- arch/x86/events/amd/iommu.c    | 5 -----
- arch/x86/events/amd/uncore.c   | 5 -----
- arch/x86/events/intel/uncore.c | 8 --------
- 3 files changed, 18 deletions(-)
+Can you describe in more detail what is going on here?
 
-diff --git a/arch/x86/events/amd/iommu.c b/arch/x86/events/amd/iommu.c
-index 3210fee..eb35fe4 100644
---- a/arch/x86/events/amd/iommu.c
-+++ b/arch/x86/events/amd/iommu.c
-@@ -223,11 +223,6 @@ static int perf_iommu_event_init(struct perf_event *event)
- 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
- 		return -EINVAL;
- 
--	/* IOMMU counters do not have usr/os/guest/host bits */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--	    event->attr.exclude_host || event->attr.exclude_guest)
--		return -EINVAL;
--
- 	if (event->cpu < 0)
- 		return -EINVAL;
- 
-diff --git a/arch/x86/events/amd/uncore.c b/arch/x86/events/amd/uncore.c
-index 8671de1..d6ade30 100644
---- a/arch/x86/events/amd/uncore.c
-+++ b/arch/x86/events/amd/uncore.c
-@@ -201,11 +201,6 @@ static int amd_uncore_event_init(struct perf_event *event)
- 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
- 		return -EINVAL;
- 
--	/* NB and Last level cache counters do not have usr/os/guest/host bits */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--	    event->attr.exclude_host || event->attr.exclude_guest)
--		return -EINVAL;
--
- 	/* and we do not enable counter overflow interrupts */
- 	hwc->config = event->attr.config & AMD64_RAW_EVENT_MASK_NB;
- 	hwc->idx = -1;
-diff --git a/arch/x86/events/intel/uncore.c b/arch/x86/events/intel/uncore.c
-index 27a4614..f1d78d9 100644
---- a/arch/x86/events/intel/uncore.c
-+++ b/arch/x86/events/intel/uncore.c
-@@ -695,14 +695,6 @@ static int uncore_pmu_event_init(struct perf_event *event)
- 	if (pmu->func_id < 0)
- 		return -ENOENT;
- 
--	/*
--	 * Uncore PMU does measure@all privilege level all the time.
--	 * So it doesn't make sense to specify any exclude bits.
--	 */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--			event->attr.exclude_hv || event->attr.exclude_idle)
--		return -EINVAL;
--
- 	/* Sampling not supported yet */
- 	if (hwc->sample_period)
- 		return -EINVAL;
--- 
-2.7.4
+> Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
+> Signed-off-by: Yong mao <yong.mao@mediatek.com>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> ---
+>  drivers/mmc/host/mtk-sd.c | 51 ++++++++++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 48 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+> index 6334cc7..da2a047 100644
+> --- a/drivers/mmc/host/mtk-sd.c
+> +++ b/drivers/mmc/host/mtk-sd.c
+> @@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
+>                 struct mmc_request *mrq, struct mmc_command *cmd)
+>  {
+>         u32 rawcmd;
+> +       unsigned long flags;
+>
+>         WARN_ON(host->cmd);
+>         host->cmd = cmd;
+> @@ -1131,7 +1132,12 @@ static void msdc_start_command(struct msdc_host *host,
+>         cmd->error = 0;
+>         rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
+>
+> +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
+> +               spin_lock_irqsave(&host->lock, flags);
+>         sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
+> +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
+> +               spin_unlock_irqrestore(&host->lock, flags);
+> +
+>         writel(cmd->arg, host->base + SDC_ARG);
+>         writel(rawcmd, host->base + SDC_CMD);
+>  }
+> @@ -1351,6 +1357,27 @@ static void msdc_request_timeout(struct work_struct *work)
+>         }
+>  }
+>
+> +static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
+> +{
+> +       unsigned long flags;
+> +       struct msdc_host *host = mmc_priv(mmc);
+> +
+> +       if (enb)
+> +               pm_runtime_get_sync(host->dev);
+> +
+> +       spin_lock_irqsave(&host->lock, flags);
+> +       if (enb)
+> +               sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
+> +       else
+> +               sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
+> +       spin_unlock_irqrestore(&host->lock, flags);
+> +
+> +       if (!enb) {
+> +               pm_runtime_mark_last_busy(host->dev);
+> +               pm_runtime_put_autosuspend(host->dev);
+> +       }
+> +}
+> +
+>  static irqreturn_t msdc_irq(int irq, void *dev_id)
+>  {
+>         struct msdc_host *host = (struct msdc_host *) dev_id;
+> @@ -1373,7 +1400,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
+>                 data = host->data;
+>                 spin_unlock_irqrestore(&host->lock, flags);
+>
+> -               if (!(events & event_mask))
+> +               if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
+> +                       msdc_enable_sdio_irq(host->mmc, 0);
+> +                       sdio_signal_irq(host->mmc);
+> +               }
+> +
+> +               if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
+>                         break;
+>
+>                 if (!mrq) {
+> @@ -1493,8 +1525,11 @@ static void msdc_init_hw(struct msdc_host *host)
+>          */
+>         sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
+>
+> -       /* disable detect SDIO device interrupt function */
+> -       sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
+> +       /* Config SDIO device detect interrupt function */
+> +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
+> +               sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
+> +       else
+> +               sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
+>
+>         /* Configure to default data timeout */
+>         sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
+> @@ -2013,6 +2048,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
+>         sdr_clr_bits(host->base + EMMC_IOCON, 1);
+>  }
+>
+> +static void msdc_ack_sdio_irq(struct mmc_host *mmc)
+> +{
+> +       msdc_enable_sdio_irq(mmc, 1);
+> +}
+> +
+>  static const struct mmc_host_ops mt_msdc_ops = {
+>         .post_req = msdc_post_req,
+>         .pre_req = msdc_pre_req,
+> @@ -2020,6 +2060,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
+>         .set_ios = msdc_ops_set_ios,
+>         .get_ro = mmc_gpio_get_ro,
+>         .get_cd = mmc_gpio_get_cd,
+> +       .enable_sdio_irq = msdc_enable_sdio_irq,
+> +       .ack_sdio_irq = msdc_ack_sdio_irq,
+>         .start_signal_voltage_switch = msdc_ops_switch_volt,
+>         .card_busy = msdc_card_busy,
+>         .execute_tuning = msdc_execute_tuning,
+> @@ -2147,6 +2189,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
+>         else
+>                 mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
+>
+> +       if (mmc->caps & MMC_CAP_SDIO_IRQ)
+> +               mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
+> +
+>         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
+>         /* MMC core transfer sizes tunable parameters */
+>         mmc->max_segs = MAX_BD_NUM;
+> --
+> 1.9.1
+>
