@@ -1,58 +1,110 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Nov 2018 00:49:23 +0900
-Subject: [PATCH 6/6] ARM: dts: uniphier: Add all CPUs in cooling maps
-In-Reply-To: <b522f13dfffcec1e2b78e126513114428ec9a4b4.1542362000.git.viresh.kumar@linaro.org>
-References: <cover.1542362000.git.viresh.kumar@linaro.org>
- <b522f13dfffcec1e2b78e126513114428ec9a4b4.1542362000.git.viresh.kumar@linaro.org>
-Message-ID: <CAK7LNATh3cGVC+KhBtATyzvCnzqv_QpFujjg_J7WikRHq0rjPA@mail.gmail.com>
+Date: Tue, 27 Nov 2018 00:50:15 +0900
+Subject: [PATCH v3 1/2] dt-bindings: uniphier: add bindings for UniPhier
+ SoC family
+In-Reply-To: <1539945019-24950-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1539945019-24950-1-git-send-email-yamada.masahiro@socionext.com>
+ <1539945019-24950-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAQi6TT86260vy_5iLJuH9cxBnXYzW7dsEU_cmDTrGADxg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 7:02 PM Viresh Kumar <viresh.kumar@linaro.org> wrote:
+On Fri, Oct 19, 2018 at 7:32 PM Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 >
-> Each CPU can (and does) participate in cooling down the system but the
-> DT only captures a handful of them, normally CPU0, in the cooling maps.
-> Things work by chance currently as under normal circumstances its the
-> first CPU of each cluster which is used by the operating systems to
-> probe the cooling devices. But as soon as this CPU ordering changes and
-> any other CPU is used to bring up the cooling device, we will start
-> seeing failures.
+> Document the list of SoCs and boards of UniPhier platform.
 >
-> Also the DT is rather incomplete when we list only one CPU in the
-> cooling maps, as the hardware doesn't have any such limitations.
->
-> Update cooling maps to include all devices affected by individual trip
-> points.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> ---
 
 Applied to linux-uniphier.
-Thanks.
 
-> ---
->  arch/arm/boot/dts/uniphier-pxs2.dtsi | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+
+> Changes in v3:
+>   - Capitalize 'Board' consistently
+>   - Add Rob's Reviewed-by
 >
-> diff --git a/arch/arm/boot/dts/uniphier-pxs2.dtsi b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> index 8d20e9548e39..06a049f6edf8 100644
-> --- a/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> +++ b/arch/arm/boot/dts/uniphier-pxs2.dtsi
-> @@ -141,8 +141,10 @@
->                         cooling-maps {
->                                 map {
->                                         trip = <&cpu_alert>;
-> -                                       cooling-device = <&cpu0
-> -                                           THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-> +                                       cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-> +                                                        <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-> +                                                        <&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-> +                                                        <&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
->                                 };
->                         };
->                 };
+> Changes in v2:
+>   Changes suggested by Rob.
+>   - Move the file to
+>     Documentation/devicetree/bindings/arm/socionext/uniphier.txt
+>   - Group boards by each SoC
+>   Previous post:
+>   v1: https://patchwork.ozlabs.org/patch/842010/
+>
+>  .../devicetree/bindings/arm/socionext/uniphier.txt | 47 ++++++++++++++++++++++
+>  MAINTAINERS                                        |  1 +
+>  2 files changed, 48 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/socionext/uniphier.txt
+>
+> diff --git a/Documentation/devicetree/bindings/arm/socionext/uniphier.txt b/Documentation/devicetree/bindings/arm/socionext/uniphier.txt
+> new file mode 100644
+> index 0000000..b3ed103
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/socionext/uniphier.txt
+> @@ -0,0 +1,47 @@
+> +Socionext UniPhier SoC family
+> +-----------------------------
+> +
+> +Required properties in the root node:
+> +  - compatible: should contain board and SoC compatible strings
+> +
+> +SoC and board compatible strings:
+> +  (sorted chronologically)
+> +
+> +  - LD4 SoC:  "socionext,uniphier-ld4"
+> +      - Reference Board: "socionext,uniphier-ld4-ref"
+> +
+> +  - Pro4 SoC: "socionext,uniphier-pro4"
+> +      - Reference Board: "socionext,uniphier-pro4-ref"
+> +      - Ace Board:       "socionext,uniphier-pro4-ace"
+> +      - Sanji Board:     "socionext,uniphier-pro4-sanji"
+> +
+> +  - sLD8 SoC: "socionext,uniphier-sld8"
+> +      - Reference Board: "socionext,uniphier-sld8-ref"
+> +
+> +  - PXs2 SoC: "socionext,uniphier-pxs2"
+> +      - Gentil Board:    "socionext,uniphier-pxs2-gentil"
+> +      - Vodka Board:     "socionext,uniphier-pxs2-vodka"
+> +
+> +  - LD6b SoC: "socionext,uniphier-ld6b"
+> +      - Reference Board: "socionext,uniphier-ld6b-ref"
+> +
+> +  - LD11 SoC: "socionext,uniphier-ld11"
+> +      - Reference Board: "socionext,uniphier-ld11-ref"
+> +      - Global Board:    "socionext,uniphier-ld11-global"
+> +
+> +  - LD20 SoC: "socionext,uniphier-ld20"
+> +      - Reference Board: "socionext,uniphier-ld20-ref"
+> +      - Global Board:    "socionext,uniphier-ld20-global"
+> +
+> +  - PXs3 SoC: "socionext,uniphier-pxs3"
+> +      - Reference Board: "socionext,uniphier-pxs3-ref"
+> +
+> +Example:
+> +
+> +/dts-v1/;
+> +
+> +/ {
+> +       compatible = "socionext,uniphier-ld20-ref", "socionext,uniphier-ld20";
+> +
+> +       ...
+> +};
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 5e6a1da..87b2c2c 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2183,6 +2183,7 @@ M:        Masahiro Yamada <yamada.masahiro@socionext.com>
+>  L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  T:     git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+>  S:     Maintained
+> +F:     Documentation/devicetree/bindings/arm/socionext/uniphier.txt
+>  F:     Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+>  F:     Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
+>  F:     arch/arm/boot/dts/uniphier*
 > --
-> 2.19.1.568.g152ad8e3369a
+> 2.7.4
 >
 
 
