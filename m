@@ -1,53 +1,73 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Mon, 26 Nov 2018 17:27:41 +0200
-Subject: [PATCH 00/14] regulator: axp20x: Stop AXP209 from crashing when
- enabling LDO3
-Message-ID: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+Date: Mon, 26 Nov 2018 17:27:44 +0200
+Subject: [PATCH 03/14] regulator: core: enable power when setting up
+ constraints
+In-Reply-To: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+Message-ID: <1e2f8f5a5eeebd40431675675569012cb8e17473.1543245984.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements voltage ramping for AXP209 DCDC2 and LDO3
-regulators and software based soft-start for AXP209 LDO3 regulator.
+From: Olliver Schinagl <oliver@schinagl.nl>
 
-Both features are needed to work around a PMIC shutdown when
-toggling LDO3 on certain boards with high capacitance on the
-LDO3 output.
+When a regulator is marked as always on, it is enabled early on, when
+checking and setting up constraints. It makes the assumption that the
+bootloader properly initialized the regulator, and just in case enables
+the regulator anyway.
 
-Similar features (or workarounds) have been also implemented
-on u-boot side [1].
+Some constraints however currently get missed, such as the soft-start
+and ramp-delay. This causes the regulator to be enabled, without the
+soft-start and ramp-delay being applied, which in turn can cause
+high-currents or other start-up problems.
 
-Also included in this series are various magic constant cleanups
-and also fix for core regulator framework, where 'always-enabled'
-constraint overrides the 'soft-start' and 'ramp-delay' features.
+By moving the always-enabled constraints later in the constraints check,
+we can at least ensure all constraints for the regulator are followed.
 
-[1] https://lists.denx.de/pipermail/u-boot/2018-November/348612.html
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ drivers/regulator/core.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-Olliver Schinagl (14):
-  regulator: axp20x: use defines for masks
-  regulator: axp20x: name voltage ramping define properly
-  regulator: core: enable power when setting up constraints
-  regulator: axp20x: add support for set_ramp_delay for AXP209
-  dt-bindings: mfd: axp20x: add support for regulator-ramp-delay for AXP209
-  regulator: axp20x: add software based soft_start for AXP209 LDO3
-  dt-bindings: mfd: axp20x: Add software based soft_start for AXP209 LDO3
-  regulator: dts: enable soft-start and ramp delay for the OLinuXino Lime2
-  regulator: dts: add full voltage range to LDO4 on the Lime2
-  regulator: dts: set proper lradc vref on OLinuXino Lime2
-  mfd: axp20x: Clean up included headers
-  mfd: axp20x: use explicit bit defines
-  power: supply: axp20x: add missing include bitops.h
-  power: supply: axp288: use the BIT() macro
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |   8 +-
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  |  13 +-
- drivers/mfd/axp20x.c                             |  13 +-
- drivers/power/supply/axp20x_usb_power.c          |   1 +-
- drivers/power/supply/axp288_charger.c            |  35 +-
- drivers/regulator/axp20x-regulator.c             | 875 ++++++++++++----
- drivers/regulator/core.c                         |  22 +-
- include/linux/mfd/axp20x.h                       |   4 +-
- 8 files changed, 753 insertions(+), 218 deletions(-)
-
-base-commit: 2e6e902d185027f8e3cb8b7305238f7e35d6a436
+diff --git a/drivers/regulator/core.c b/drivers/regulator/core.c
+index 2c66b52..6e14610 100644
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -1158,17 +1158,6 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 		}
+ 	}
+ 
+-	/* If the constraints say the regulator should be on at this point
+-	 * and we have control then make sure it is enabled.
+-	 */
+-	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
+-		ret = _regulator_do_enable(rdev);
+-		if (ret < 0 && ret != -EINVAL) {
+-			rdev_err(rdev, "failed to enable\n");
+-			return ret;
+-		}
+-	}
+-
+ 	if ((rdev->constraints->ramp_delay || rdev->constraints->ramp_disable)
+ 		&& ops->set_ramp_delay) {
+ 		ret = ops->set_ramp_delay(rdev, rdev->constraints->ramp_delay);
+@@ -1214,6 +1203,17 @@ static int set_machine_constraints(struct regulator_dev *rdev,
+ 		}
+ 	}
+ 
++	/* If the constraints say the regulator should be on at this point
++	 * and we have control then make sure it is enabled.
++	 */
++	if (rdev->constraints->always_on || rdev->constraints->boot_on) {
++		ret = _regulator_do_enable(rdev);
++		if (ret < 0 && ret != -EINVAL) {
++			rdev_err(rdev, "failed to enable\n");
++			return ret;
++		}
++	}
++
+ 	print_constraints(rdev);
+ 	return 0;
+ }
 -- 
 git-series 0.9.1
