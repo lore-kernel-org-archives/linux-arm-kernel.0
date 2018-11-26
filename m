@@ -1,46 +1,59 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Nov 2018 22:42:10 +0800
-Subject: [PATCH v3 2/2] arm64: dts: Add support for NXP LS1028A SoC
-In-Reply-To: <1542156591-3224-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
-References: <1542156591-3224-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <1542156591-3224-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
-Message-ID: <20181126144208.GC31334@dragon>
+From: tiny.windzz@gmail.com (Frank Lee)
+Date: Mon, 26 Nov 2018 22:42:37 +0800
+Subject: [PATCH v2] soc: bcm: brcmstb: Don't leak device tree node
+ reference
+In-Reply-To: <20181124145223.29208-1-tiny.windzz@gmail.com>
+References: <20181124145223.29208-1-tiny.windzz@gmail.com>
+Message-ID: <CAEExFWut2Vu0e+j1U8_1PS683DtMMi7FVD6X=LfwwE63DT7Syg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 14, 2018 at 05:30:52AM +0000, Bhaskar Upadhaya wrote:
-> LS1028A contains two ARM v8 CortexA72 processor cores
-> with 32 KB L1-D cache and 48 KB L1-I cache
-> 
-> Features summary
->  Two 32-bit / 64-bit ARM v8 Cortex-A72 CPUs
->   - Arranged as single clusters of two cores sharing a 1 MB L2 cache
->   - Speed Up to 1.3 GHz
->   - Support for cluster power-gating.
->  Cache coherent interconnect (CCI-400)
->   - Hardware-managed data coherency
->   - Up to 400 MHz
->  32-bit DDR4 SDRAM memory controller with ECC
->  Two PCIe 3.0 controllers
->  One serial ATA (SATA 3.0) controller
->  Two high-speed USB 3.0 controllers with integrated PHY
-> 
->  Following levels of DTSI/DTS files have been created for the LS1028A
->   SoC family:
-> 
->          - fsl-ls1028a.dtsi:
->                  DTS-Include file for NXP LS1028A SoC.
-> 
->          - fsl-ls1028a-qds.dts:
->                  DTS file for NXP LS1028A QDS board.
-> 
->          - fsl-ls1028a-rdb.dts:
->                  DTS file for NXP LS1028A RDB board
-> 
-> Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
-> Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
-> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+On Sat, Nov 24, 2018 at 10:52 PM Yangtao Li <tiny.windzz@gmail.com> wrote:
+>
+> of_find_node_by_path() acquires a reference to the node returned by it
+> and that reference needs to be dropped by its caller. soc_is_brcmstb()
+> doesn't do that, so fix it.
+>
+> [treding: slightly rewrite to avoid inline comparison]
+>
+> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> ---
+> Changes in v2:
+> -update changelog
+> -slightly rewrite to avoid inline comparison
+> ---
+>  drivers/soc/bcm/brcmstb/common.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+> index 14185451901d..bf9123f727e8 100644
+> --- a/drivers/soc/bcm/brcmstb/common.c
+> +++ b/drivers/soc/bcm/brcmstb/common.c
+> @@ -31,13 +31,17 @@ static const struct of_device_id brcmstb_machine_match[] = {
+>
+>  bool soc_is_brcmstb(void)
+>  {
+> +       const struct of_device_id *match;
+>         struct device_node *root;
+>
+>         root = of_find_node_by_path("/");
+>         if (!root)
+>                 return false;
+>
+> -       return of_match_node(brcmstb_machine_match, root) != NULL;
+> +       match = of_match_node(brcmstb_machine_match, root);
+> +       of_node_put(root);
+> +
+> +       return match != NULL;
+>  }
+>
+>  u32 brcmstb_get_family_id(void)
+> --
+> 2.17.0
+>
+Hi Florian:
 
-@Leo, looks good to you?
+How about this ?
 
-Shawn
+MBR,
+Yangtao
