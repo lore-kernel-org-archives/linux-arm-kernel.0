@@ -1,45 +1,48 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 26 Nov 2018 06:26:36 +0100
-Subject: [PATCH 07/13] ARM: dts: rv1108: Fix the timer mask
-In-Reply-To: <20181125211907.9895-7-otavio@ossystems.com.br>
-References: <20181125211907.9895-1-otavio@ossystems.com.br>
- <20181125211907.9895-7-otavio@ossystems.com.br>
-Message-ID: <4443441.F7S2jYBxxL@phil>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 26 Nov 2018 13:30:00 +0800
+Subject: [PATCH] drm/mediatek: Only try to attach bridge if there is one
+In-Reply-To: <20181126040737.138682-1-drinkcat@chromium.org>
+References: <20181126040737.138682-1-drinkcat@chromium.org>
+Message-ID: <1543210200.1796.2.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 25. November 2018, 22:19:01 CET schrieb Otavio Salvador:
-> As done in the Rockchip vendor tree and also on other
-> "arm,armv7-timer" instances, the correct GIC_CPU_MASK_SIMPLE mask
-> is 4 instead of 1.
+Hi, Nicolas:
 
-Nope. That value represents the number of cores in the system.
-As the rv1108 only has one core, that should likely stay as it is.
+On Mon, 2018-11-26 at 12:07 +0800, Nicolas Boichat wrote:
+> Even if dsi->bridge is NULL, we still try to call drm_bridge_attach,
+> and print out an error message, before creating the connector.
+> 
+> When no bridge is provided, let's skip these 2 steps and directly
+> create the connector.
 
-Also, it seems I only got patches 6-13 what happened to 1-5?
+Reviewed-by: CK Hu <ck.hu@mediatek.com>
 
-Heiko
-
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
-> Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
+> 
+> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
 > ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
 > 
->  arch/arm/boot/dts/rv1108.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-> index c7a26f82655b..7b331766120d 100644
-> --- a/arch/arm/boot/dts/rv1108.dtsi
-> +++ b/arch/arm/boot/dts/rv1108.dtsi
-> @@ -71,8 +71,8 @@
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index 66df1b17795921..27b507eb4a997d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -818,10 +818,13 @@ static int mtk_dsi_create_conn_enc(struct drm_device *drm, struct mtk_dsi *dsi)
+>  	dsi->encoder.possible_crtcs = 1;
 >  
->  	timer {
->  		compatible = "arm,armv7-timer";
-> -		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>,
-> -			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
->  		clock-frequency = <24000000>;
->  	};
->  
-> 
+>  	/* If there's a bridge, attach to it and let it create the connector */
+> -	ret = drm_bridge_attach(&dsi->encoder, dsi->bridge, NULL);
+> -	if (ret) {
+> -		DRM_ERROR("Failed to attach bridge to drm\n");
+> -
+> +	if (dsi->bridge) {
+> +		ret = drm_bridge_attach(&dsi->encoder, dsi->bridge, NULL);
+> +		if (ret) {
+> +			DRM_ERROR("Failed to attach bridge to drm\n");
+> +			goto err_encoder_cleanup;
+> +		}
+> +	} else {
+>  		/* Otherwise create our own connector and attach to a panel */
+>  		ret = mtk_dsi_create_connector(drm, dsi);
+>  		if (ret)
