@@ -1,50 +1,26 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Nov 2018 17:01:07 +0000
-Subject: [PATCH] arm64: tlbi: Set MAX_TLBI_OPS to PTRS_PER_PTE
-Message-ID: <1543251667-30520-1-git-send-email-will.deacon@arm.com>
+From: rick.p.edgecombe@intel.com (Edgecombe, Rick P)
+Date: Mon, 26 Nov 2018 17:02:35 +0000
+Subject: [PATCH v4 1/2] bpf: add __weak hook for allocating executable
+ memory
+In-Reply-To: <20181123221804.440-2-ard.biesheuvel@linaro.org>
+References: <20181123221804.440-1-ard.biesheuvel@linaro.org>
+ <20181123221804.440-2-ard.biesheuvel@linaro.org>
+Message-ID: <a16dc0bb806d6a0685978bb94c2e3f19588c063f.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to reduce the possibility of soft lock-ups, we bound the
-maximum number of TLBI operations performed by a single call to
-flush_tlb_range() to an arbitrary constant of 1024.
+On Fri, 2018-11-23 at 23:18 +0100, Ard Biesheuvel wrote:
+> By default, BPF uses module_alloc() to allocate executable memory,
+> but this is not necessary on all arches and potentially undesirable
+> on some of them.
+> 
+> So break out the module_alloc() and module_memfree() calls into __weak
+> functions to allow them to be overridden in arch code.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
 
-Whilst this does the job of avoiding lock-ups, we can actually be a bit
-smarter by defining this as PTRS_PER_PTE. Due to the structure of our
-page tables, using PTRS_PER_PTE means that an outer loop calling
-flush_tlb_range() for entire table entries will end up performing just a
-single TLBI operation for each entry. As an example, mremap()ing a 1GB
-range mapped using 4k pages now requires only 512 TLBI operations when
-moving the page tables as opposed to 262144 operations (512*512) when
-using the current threshold of 1024.
+It looks like some of the architectures call module_alloc directly in their
+bpf_jit_compile implementations as well.
 
-Cc: Joel Fernandes <joel@joelfernandes.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/tlbflush.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index c3c0387aee18..460fdd69ad5b 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -179,7 +179,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
-  * This is meant to avoid soft lock-ups on large TLB flushing ranges and not
-  * necessarily a performance improvement.
-  */
--#define MAX_TLBI_OPS	1024UL
-+#define MAX_TLBI_OPS	PTRS_PER_PTE
- 
- static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 				     unsigned long start, unsigned long end,
-@@ -188,7 +188,7 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 	unsigned long asid = ASID(vma->vm_mm);
- 	unsigned long addr;
- 
--	if ((end - start) > (MAX_TLBI_OPS * stride)) {
-+	if ((end - start) >= (MAX_TLBI_OPS * stride)) {
- 		flush_tlb_mm(vma->vm_mm);
- 		return;
- 	}
--- 
-2.1.4
+Rick
