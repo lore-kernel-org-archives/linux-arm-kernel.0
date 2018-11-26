@@ -1,37 +1,69 @@
 From: pn@denx.de (Parthiban Nallathambi)
-Date: Mon, 26 Nov 2018 19:58:17 +0100
-Subject: [PATCH v2 0/4] Add Actions Semi Owl family S700 I2C support
-Message-ID: <20181126185821.2480449-1-pn@denx.de>
+Date: Mon, 26 Nov 2018 19:58:20 +0100
+Subject: [PATCH v2 3/4] arm64: dts: actions: s700: Add I2C controller nodes
+In-Reply-To: <20181126185821.2480449-1-pn@denx.de>
+References: <20181126185821.2480449-1-pn@denx.de>
+Message-ID: <20181126185821.2480449-4-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for Actions Semi Owl SoC family S700
-I2C controller. S700 provides 4 I2C masters and with cubieboard7
-2 (I2C0 and I2C1) are exposed.
+Add I2C controller nodes for Actions Semiconductor S700 SoC.
 
-Added pinctrl definition for I2C controllers in cubieboard7. This patch
-depends on s700 pinctrl driver support (yet to be merged),
-https://lkml.org/lkml/2018/11/19/514
-https://lore.kernel.org/patchwork/patch/1012859/
+Signed-off-by: Parthiban Nallathambi <pn@denx.de>
+---
+ arch/arm64/boot/dts/actions/s700.dtsi | 40 +++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-Changelog in v2:
-- Initial version https://lore.kernel.org/patchwork/patch/1011911/ only
-added the I2C nodes using s900 compatible property. Now, new s700
-compatiable string is added and used for S700
-- Device tree bindings added with s700 compatible string
-- pinctrl definition for cubieboard7
-
-Parthiban Nallathambi (4):
-  dt-bindings: i2c: Add S700 support for Actions Semi Soc's
-  i2c: Add Actions Semiconductor Owl family S700 I2C support
-  arm64: dts: actions: s700: Add I2C controller nodes
-  arm64: dts: actions: s700-cubieboard7: Enable I2C0 and I2C1
-
- .../devicetree/bindings/i2c/i2c-owl.txt       |  2 +-
- .../boot/dts/actions/s700-cubieboard7.dts     | 53 +++++++++++++++++++
- arch/arm64/boot/dts/actions/s700.dtsi         | 40 ++++++++++++++
- drivers/i2c/busses/i2c-owl.c                  |  1 +
- 4 files changed, 95 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index 192c7b39c8c1..35fddba2af1c 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -174,6 +174,46 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		i2c0: i2c at e0170000 {
++			compatible = "actions,s700-i2c";
++			reg = <0 0xe0170000 0 0x1000>;
++			clocks = <&cmu CLK_I2C0>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c1: i2c at e0174000 {
++			compatible = "actions,s700-i2c";
++			reg = <0 0xe0174000 0 0x1000>;
++			clocks = <&cmu CLK_I2C1>;
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c2: i2c at e0178000 {
++			compatible = "actions,s700-i2c";
++			reg = <0 0xe0178000 0 0x1000>;
++			clocks = <&cmu CLK_I2C2>;
++			interrupts = <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
++		i2c3: i2c at e017c000 {
++			compatible = "actions,s700-i2c";
++			reg = <0 0xe017c000 0 0x1000>;
++			clocks = <&cmu CLK_I2C3>;
++			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		sps: power-controller at e01b0100 {
+ 			compatible = "actions,s700-sps";
+ 			reg = <0x0 0xe01b0100 0x0 0x100>;
 -- 
 2.17.2
