@@ -1,184 +1,82 @@
-From: JOLLYS@xilinx.com (Jolly Shah)
-Date: Mon, 26 Nov 2018 21:39:58 +0000
-Subject: [PATCH 0/9] dt-bindings: Firmware node binding for ZynqMP core
-In-Reply-To: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-References: <1542412619-387-1-git-send-email-jollys@xilinx.com>
-Message-ID: <DM5PR0201MB35255E725459B3CE05A7402DB8D70@DM5PR0201MB3525.namprd02.prod.outlook.com>
+From: boris.brezillon@bootlin.com (Boris Brezillon)
+Date: Mon, 26 Nov 2018 22:41:02 +0100
+Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
+ atomic.
+In-Reply-To: <87o9abbmq4.fsf@anholt.net>
+References: <20181119190805.19139-1-helen.koike@collabora.com>
+ <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
+ <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
+ <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
+ <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
+ <87o9abbmq4.fsf@anholt.net>
+Message-ID: <20181126224102.1efbf2d1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ping for comments
+On Mon, 26 Nov 2018 12:36:03 -0800
+Eric Anholt <eric@anholt.net> wrote:
 
-> -----Original Message-----
-> From: Jolly Shah [mailto:jolly.shah at xilinx.com]
-> Sent: Friday, November 16, 2018 3:57 PM
-> To: robh+dt at kernel.org; mark.rutland at arm.com
-> Cc: Michal Simek <michals@xilinx.com>; Rajan Vaja <RAJANV@xilinx.com>;
-> Nava kishore Manne <navam@xilinx.com>; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; Jolly Shah <JOLLYS@xilinx.com>
-> Subject: [PATCH 0/9] dt-bindings: Firmware node binding for ZynqMP core
+> Michael Zoran <mzoran@crowfest.net> writes:
 > 
-> Base firmware node and clock child node binding are part of mainline kernel.
-> This patchset adds documentation to describe rest of the firmware child node
-> bindings.
-> Complete firmware DT node example is shown below for ease of understanding:
+> > On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:  
+> >> 
+> >> The point here is not about setting and resetting the plane->fb
+> >> pointer. It's about what happens inside
+> >> drm_atomic_set_fb_for_plane().
+> >> 
+> >> It calls drm_framebuffer_get() for the new fb and
+> >> drm_framebuffer_put() for the old fb. In result, if the fb changes,
+> >> the old fb, which had its reference count incremented in the atomic
+> >> commit that set it to the plane before, has its reference count
+> >> decremented. Moreover, if the new reference count becomes 0,
+> >> drm_framebuffer_put() will immediately free the buffer.
+> >> 
+> >> Freeing a buffer when the hardware is still scanning out of it isn't
+> >> a
+> >> good idea, is it?  
+> >
+> > No, it's not.  But the board I submitted the patch for doesn't have
+> > anything like hot swapable ram.  The ram access is still going to work,
+> > just it might display something it shouldn't. Say for example if that
+> > frame buffer got reused by somethig else and filled with new data in
+> > the very small window.
+> >
+> > But yes, I agree the best solution would be to not release the buffer
+> > until the next vblank.
+> >
+> > Perhaps a good solution would be for the DRM api to have the concept of
+> > a deferred release?  Meaning if the put() call just added the frame
+> > buffer to a list that DRM core could walk during the vblank.  That
+> > might be better then every single driver trying to work up a custom
+> > solution.
+> >  
+> >> The vc4 driver seems to be able to program the hardware to switch the
+> >> scanout to the new buffer immediately:
+> >> 
+> >> https://elixir.bootlin.com/linux/v4.20-rc3/source/drivers/gpu/drm/vc4/vc4_plane.c#L794
+> >> 
+> >> Although I wonder if there isn't still a tiny race there - the
+> >> hardware may have just started refilling the FIFO from the old
+> >> address. Still, if the FIFO is small, the FIFO refill operation may
+> >> be
+> >> much shorter than it takes for the kernel code to actually free the
+> >> buffer. Eric and Michael, could you confirm?
+> >>   
+> >
+> > I don't have those boards anymore, and I don't have access to any
+> > technical documentation on the GPU so I can't really add much here.  
+> > Eric can probably provide the best information.  
 > 
-> firmware {
-> 	zynqmp_firmware: zynqmp-firmware {
-> 		compatible = "xlnx,zynqmp-firmware";
-> 		method = "smc";
-> 		#power-domain-cells = <1>;
-> 		#reset-cells = <1>;
-> 
-> 		zynqmp_clk: clock-controller {
-> 			#clock-cells = <1>;
-> 			compatible = "xlnx,zynqmp-clk";
-> 			clocks = <&pss_ref_clk>, <&video_clk>,
-> <&pss_alt_ref_clk>, <&aux_ref_clk>, <&gt_crx_ref_clk>;
-> 			clock-names = "pss_ref_clk", "video_clk",
-> "pss_alt_ref_clk","aux_ref_clk", "gt_crx_ref_clk";
-> 		};
-> 
-> 		zynqmp_power: zynqmp-power {
-> 			compatible = "xlnx,zynqmp-power";
-> 			interrupts = <0 35 4>;
-> 		};
-> 
-> 		nvmem_firmware {
-> 			compatible = "xlnx,zynqmp-nvmem-fw";
-> 			#address-cells = <1>;
-> 			#size-cells = <1>;
-> 
-> 			/* Data cells */
-> 			soc_revision: soc_revision {
-> 				reg = <0x0 0x4>;
-> 			};
-> 		};
-> 
-> 		afi0: afi0 {
-> 			compatible = "xlnx,afi-fpga";
-> 			config-afi = <0 2>, <1 1>, <2 1>;
-> 		};
-> 
-> 		qspi: spi at ff0f0000 {
-> 			compatible = "xlnx,zynqmp-qspi-1.0";
-> 			clock-names = "ref_clk", "pclk";
-> 			clocks = <&misc_clk &misc_clk>;
-> 			interrupts = <0 15 4>;
-> 			interrupt-parent = <&gic>;
-> 			num-cs = <1>;
-> 			reg = <0x0 0xff0f0000 0x1000>,<0x0 0xc0000000
-> 0x8000000>;
-> 		};
-> 
-> 		serdes: zynqmp_phy at fd400000 {
-> 			compatible = "xlnx,zynqmp-psgtr";
-> 			status = "okay";
-> 			reg = <0x0 0xfd400000 0x0 0x40000>, <0x0 0xfd3d0000
-> 0x0 0x1000>,
-> 				<0x0 0xff5e0000 0x0 0x1000>;
-> 			reg-names = "serdes", "siou", "lpd";
-> 
-> 			lane0: lane at 0 {
-> 				#phy-cells = <4>;
-> 			};
-> 			lane1: lane at 1 {
-> 				#phy-cells = <4>;
-> 			};
-> 			lane2: lane at 2 {
-> 				#phy-cells = <4>;
-> 			};
-> 			lane3: lane at 3 {
-> 				#phy-cells = <4>;
-> 			};
-> 		};
-> 
-> 		pinctrl_uart1_default: uart1-default {
-> 			mux {
-> 				groups = "uart0_4_grp";
-> 				function = "uart0";
-> 			};
-> 
-> 			conf {
-> 				groups = "uart0_4_grp";
-> 				slew-rate = <SLEW_RATE_SLOW>;
-> 				io-standard = <IO_STANDARD_LVCMOS18>;
-> 			};
-> 
-> 			conf-rx {
-> 				pins = "MIO18";
-> 				bias-high-impedance;
-> 			};
-> 
-> 			conf-tx {
-> 				pins = "MIO19";
-> 				bias-disable;
-> 				schmitt-cmos = <PIN_INPUT_TYPE_CMOS>;
-> 			};
-> 		};
-> 		zynqmp-r5-remoteproc at 0 {
-> 			compatible = "xlnx,zynqmp-r5-remoteproc-1.0";
-> 			reg = <0x0 0xFFE00000 0x0 0x10000>,
-> 				<0x0 0xFFE20000 0x0 0x10000>,
-> 				<0x0 0xff340000 0x0 0x100>;
-> 			reg-names = "tcm_a", "tcm_b", "ipi";
-> 			dma-ranges;
-> 			core_conf = "split0";
-> 			memory-region = <&rproc_0_fw_reserved>,
-> 					<&rproc_0_dma_reserved>;
-> 			tcm-pnode-id = <0xf>, <0x10>;
-> 			rpu-pnode-id = <0x7>;
-> 			interrupt-parent = <&gic>;
-> 			interrupts = <0 29 4>;
-> 		};
-> 	};
-> };
-> 
-> Jolly Shah (2):
->   dt-bindings: phy: Add dt bindings for ZynqMP PHY
->   dt-bindings: fpga: Add binding doc for the afi config driver
-> 
-> Nava kishore Manne (2):
->   dt-bindings: reset: Add bindings for ZynqMP reset driver
->   dt-bindings: nvmem: Add bindings for ZynqMP nvmem driver
-> 
-> Rajan Vaja (4):
->   dt-bindings: power: Add ZynqMP power domain bindings
->   dt-bindings: soc: Add ZynqMP PM bindings
->   dt-bindings: pinctrl: Add ZynqMP pin controller bindings
->   dt-bindings: spi: zynqmp: Move SPI node under zynqmp firmware
-> 
-> Wendy Liang (1):
->   dt-bindings: remoteproc: Add Xilinx R5 rproc binding
-> 
->  .../devicetree/bindings/fpga/xlnx,afi-fpga.txt     |  67 +++++
->  .../bindings/nvmem/xlnx,zynqmp-nvmem.txt           |  44 ++++
->  .../devicetree/bindings/phy/phy-zynqmp.txt         | 126 ++++++++++
->  .../bindings/pinctrl/xlnx,zynqmp-pinctrl.txt       | 272 +++++++++++++++++++++
->  .../bindings/power/reset/xlnx,zynqmp-power.txt     |  25 ++
->  .../bindings/power/xlnx,zynqmp-genpd.txt           |  34 +++
->  .../remoteproc/xlnx,zynqmp-r5-remoteproc.txt       |  81 ++++++
->  .../bindings/reset/xlnx,zynqmp-reset.txt           | 148 +++++++++++
->  .../devicetree/bindings/spi/spi-zynqmp-qspi.txt    |  22 +-
->  include/dt-bindings/power/xlnx-zynqmp-power.h      |  39 +++
->  10 files changed, 850 insertions(+), 8 deletions(-)  create mode 100644
-> Documentation/devicetree/bindings/fpga/xlnx,afi-fpga.txt
->  create mode 100644 Documentation/devicetree/bindings/nvmem/xlnx,zynqmp-
-> nvmem.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-zynqmp.txt
->  create mode 100644 Documentation/devicetree/bindings/pinctrl/xlnx,zynqmp-
-> pinctrl.txt
->  create mode 100644
-> Documentation/devicetree/bindings/power/reset/xlnx,zynqmp-power.txt
->  create mode 100644 Documentation/devicetree/bindings/power/xlnx,zynqmp-
-> genpd.txt
->  create mode 100644
-> Documentation/devicetree/bindings/remoteproc/xlnx,zynqmp-r5-
-> remoteproc.txt
->  create mode 100644 Documentation/devicetree/bindings/reset/xlnx,zynqmp-
-> reset.txt
->  create mode 100644 include/dt-bindings/power/xlnx-zynqmp-power.h
-> 
-> --
-> 2.7.4
+> I don't think I understood my scanout hardware well enough when I
+> started on the async update stuff for rpi.  vc4 probably needs to wait
+> until the HW starts scanning out a new line before letting the old BO
+> get freed.
+
+That's also my understanding. Note that even if the BO is freed before
+the HVS has finished generating a line it shouldn't crash, because
+accesses are done through DMA. Might be a security issue though if we
+start re-using the memory for something else while it's still being
+accessed.
+
+The solution would be to wait for the EOL (End Of Line) interrupt in
+the async update path, but I'm not sure this is allowed.
