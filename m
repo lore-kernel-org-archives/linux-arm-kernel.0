@@ -1,44 +1,36 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 26 Nov 2018 10:32:12 -0800
-Subject: [PATCH 2/3] PCI: imx: No-op imx6_pcie_reset_phy() on i.MX7D
-In-Reply-To: <1542676938.30311.581.camel@impinj.com>
-References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
- <20181117181225.10737-3-andrew.smirnov@gmail.com>
- <1542676938.30311.581.camel@impinj.com>
-Message-ID: <CAHQ1cqG0oVWQw9NC_22f7bZMfX11wwuvO2_x8P3GJYsb-ecGvQ@mail.gmail.com>
+Date: Mon, 26 Nov 2018 10:38:06 -0800
+Subject: [PATCH 0/3] GPCv2 support for i.MX8MQ
+In-Reply-To: <1542636653.2508.8.camel@pengutronix.de>
+References: <20181117181206.10267-1-andrew.smirnov@gmail.com>
+ <1542636653.2508.8.camel@pengutronix.de>
+Message-ID: <CAHQ1cqHSNMMMcgaL1dBZxFc-h_hGSQpCZo6x+dwcQmqz9UP9dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 5:22 PM Trent Piepho <tpiepho@impinj.com> wrote:
+On Mon, Nov 19, 2018 at 6:10 AM Lucas Stach <l.stach@pengutronix.de> wrote:
 >
-> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
-> > PCIE PHY IP block on i.MX7D differs from the one used on i.MX6 family,
-> > so none of the code in current implementation of imx6_pcie_reset_phy()
-> > is applicable.
+> Hi Andrey,
 >
-> Tested on IMX7d, still appears to work.
+> Am Samstag, den 17.11.2018, 10:12 -0800 schrieb Andrey Smirnov:
+> > Everyone:
+> >
+> > This series contains changes I made to add support for i.MX8MQ to
+> > GPCv2 driver in order to enable support of PCIE IP block on i.MX8MQ
+> > SoCs (full tree can be found at [github-v0]). This series is _very_
+> > preliminary and by no means is ready for inclusion (it also has some
+> > unmet dependencies).  However is should be in OK enough shape to get
+> > some early feedback on, which is the intent of this submission.
+> >
+> > All other feedback is appreciated as well!
+>
+> I've already sent out my version of the GPCv2 i.MX8M support on Friday,
+> but for whatever reason missed to CC you. It's unfortunate that we now
+> have 2 slightly different versions of this on the list.
 >
 
-Thanks for testing! Unless you object, I'll add your Tested-by tag to
-this patch.
-
-> Note that your patches will collide with Stefan Agner's patch, "PCI:
-> imx6: limit DBI register length", which was recently posted.
->
-> He changed the way the variants are handled.  That method would allow
-> some of the IMX7D || IMX8MQ checks to be re-written as
->
->  imx6_pcie->drvdata->boolean_attribute
->
-> Where the attribute can be set in a table and be re-used in every place
-> it comes into play and updated for new devices in one spot, instead of
-> keeping piles of this version or that version or this other version
-> checks up to date.
-
-Thanks for the heads up! I am expecting that I'd have to re-base this
-series on "next" in PCI tree before it can be applied. This should
-provide for a good opportunity to discover and resolve all of the
-conflicts, I think.
+Well, assuming first come first served, I am guessing this is your
+adventure now.
 
 Thanks,
 Andrey Smirnov
