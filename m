@@ -1,36 +1,48 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:27 +0000
-Subject: [PATCH v2 11/20] drivers/perf: perf/core: advertise PMU exclusion
+Date: Mon, 26 Nov 2018 11:12:29 +0000
+Subject: [PATCH v2 13/20] powerpc: perf/core: advertise PMU exclusion
  capability
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-12-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-14-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm_pse PMU has the capability to exclude events based on
-context. Let's advertise that we support the PERF_PMU_CAP_EXCLUDE
-capability to ensure that perf doesn't prevent us from handling
-events where any exclusion flags are set.
+For PowerPC PMUs that have the capability to exclude events
+based on context. Let's advertise that we support the
+PERF_PMU_CAP_EXCLUDE capability to ensure that perf doesn't
+prevent us from handling events where any exclusion flags are
+set.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- drivers/perf/arm_spe_pmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/powerpc/perf/core-book3s.c  | 1 +
+ arch/powerpc/perf/core-fsl-emb.c | 1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 54ec278..a09c38a 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -902,7 +902,8 @@ static int arm_spe_pmu_perf_init(struct arm_spe_pmu *spe_pmu)
+diff --git a/arch/powerpc/perf/core-book3s.c b/arch/powerpc/perf/core-book3s.c
+index 81f8a0c..2f44b09 100644
+--- a/arch/powerpc/perf/core-book3s.c
++++ b/arch/powerpc/perf/core-book3s.c
+@@ -2007,6 +2007,7 @@ static struct pmu power_pmu = {
+ 	.commit_txn	= power_pmu_commit_txn,
+ 	.event_idx	= power_pmu_event_idx,
+ 	.sched_task	= power_pmu_sched_task,
++	.capabilities	= PERF_PMU_CAP_EXCLUDE,
+ };
  
- 	spe_pmu->pmu = (struct pmu) {
- 		.module = THIS_MODULE,
--		.capabilities	= PERF_PMU_CAP_EXCLUSIVE | PERF_PMU_CAP_ITRACE,
-+		.capabilities	= PERF_PMU_CAP_EXCLUSIVE | PERF_PMU_CAP_ITRACE |
-+				  PERF_PMU_CAP_EXCLUDE,
- 		.attr_groups	= arm_spe_pmu_attr_groups,
- 		/*
- 		 * We hitch a ride on the software context here, so that
+ /*
+diff --git a/arch/powerpc/perf/core-fsl-emb.c b/arch/powerpc/perf/core-fsl-emb.c
+index ba48584..cea5bcb 100644
+--- a/arch/powerpc/perf/core-fsl-emb.c
++++ b/arch/powerpc/perf/core-fsl-emb.c
+@@ -596,6 +596,7 @@ static struct pmu fsl_emb_pmu = {
+ 	.start		= fsl_emb_pmu_start,
+ 	.stop		= fsl_emb_pmu_stop,
+ 	.read		= fsl_emb_pmu_read,
++	.capabilities	= PERF_PMU_CAP_EXCLUDE,
+ };
+ 
+ /*
 -- 
 2.7.4
