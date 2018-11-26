@@ -1,32 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Nov 2018 10:05:59 -0600
-Subject: [PATCH v3 1/3] dt-bindings: amlogic: Add Internal Clock Measurer
- bindings
-In-Reply-To: <20181118135310.31458-1-narmstrong@baylibre.com>
-References: <20181118135024.30720-1-narmstrong@baylibre.com>
- <20181118135310.31458-1-narmstrong@baylibre.com>
-Message-ID: <20181126160559.GA8094@bogus>
+Date: Mon, 26 Nov 2018 10:12:42 -0600
+Subject: [PATCH v6 3/7] dt-bindings: dmaengine: xilinx_dma: add optional
+ xlnx,sg-length-width property
+In-Reply-To: <20181120153151.18024-3-andrea.merello@gmail.com>
+References: <20181120153151.18024-1-andrea.merello@gmail.com>
+ <20181120153151.18024-3-andrea.merello@gmail.com>
+Message-ID: <20181126161242.GA19168@bogus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 18, 2018 at 02:53:10PM +0100, Neil Armstrong wrote:
-> The Amlogic Meson SoCs embeds a clock measurer IP to measure the internal
-> clock paths frequencies.
+On Tue, Nov 20, 2018 at 04:31:47PM +0100, Andrea Merello wrote:
+> The width of the "length register" cannot be autodetected, and it is now
+> specified with a DT property. Add documentation for it.
 > 
-> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
+> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
+> Reviewed-by: Radhey Shyam Pandey <radhey.shyam.pandey@xilinx.com>
 > ---
-> Rob,
-> 
-> I didn't take your v2 Reviewed-by since I changed the compatible list,
-> tell me if i can still keep the tag.
+> Changes in v2:
+> 	- change property name
+> 	- property is now optional
+> 	- cc DT maintainer
+> Changes in v3:
+> 	- reword
+> 	- cc DT maintainerS and ML
+> Changes in v4:
+> 	- specify the unit, the valid range and the default value
+> Changes in v5:
+> 	- commit message trivial fix
+> 	- fix spaces before tab
+> Changes in v6:
+> 	None
+> ---
+>  Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-
->  
-> Thanks,
-> Neil
-> 
->  .../bindings/soc/amlogic/clk-measure.txt       | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+Please add acks/reviewed-bys when posting new versions.
