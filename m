@@ -1,23 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Nov 2018 14:05:49 -0600
-Subject: [PATCH v6 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
-In-Reply-To: <1542662761-31158-3-git-send-email-wendy.liang@xilinx.com>
-References: <1542662761-31158-1-git-send-email-wendy.liang@xilinx.com>
- <1542662761-31158-3-git-send-email-wendy.liang@xilinx.com>
-Message-ID: <20181126200549.GA611@bogus>
+From: jrp@pun.org (Joshua R. Poulson)
+Date: Mon, 26 Nov 2018 12:21:33 -0800
+Subject: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
+In-Reply-To: <20181126191812.GA32208@kroah.com>
+References: <20181122030914.16274-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-1-kys@linuxonhyperv.com>
+ <20181126191812.GA32208@kroah.com>
+Message-ID: <CABHrTiLtn6BjWoqUoSxwUjEAJAcrRvMkpPLsFnNGCCXWdFoRXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 19 Nov 2018 13:26:01 -0800, Wendy Liang wrote:
-> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
-> in ZynqMP SoC used for the communication between various processor
-> systems.
-> 
-> Signed-off-by: Wendy Liang <wendy.liang@xilinx.com>
-> ---
->  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 127 +++++++++++++++++++++
->  1 file changed, 127 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
-> 
+That's https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/reference/tlfs
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks, --jrp
+On Mon, Nov 26, 2018 at 11:18 AM Greg KH <gregkh@linuxfoundation.org> wrote:
+>
+> On Thu, Nov 22, 2018 at 03:10:56AM +0000, kys at linuxonhyperv.com wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/hyperv-tlfs.h
+> > @@ -0,0 +1,338 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +
+> > +/*
+> > + * This file contains definitions from the Hyper-V Hypervisor Top-Level
+> > + * Functional Specification (TLFS):
+> > + * https://na01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fdocs.microsoft.com%2Fen-us%2Fvirtualization%2Fhyper-v-on-windows%2Freference%2Ftlfs&amp;data=02%7C01%7Ckys%40microsoft.com%7Cc831a45fd63e4a4b083908d641216aa8%7C72f988bf86f141af91ab2d7cd011db47%7C1%7C0%7C636768009113747528&amp;sdata=jRSrs9ZWXdmeS7LQUEpoSyUfBS7a5KLYy%2FolFdE2tI0%3D&amp;reserved=0
+>
+> "interesting" url :(
+>
+> Care to use a real one?
+>
+> thanks,
+>
+> greg k-h
