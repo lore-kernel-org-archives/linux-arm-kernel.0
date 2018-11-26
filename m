@@ -1,34 +1,76 @@
-From: jrp@pun.org (Joshua R. Poulson)
-Date: Mon, 26 Nov 2018 12:21:33 -0800
-Subject: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
-In-Reply-To: <20181126191812.GA32208@kroah.com>
-References: <20181122030914.16274-1-kys@linuxonhyperv.com>
- <20181122031059.16338-1-kys@linuxonhyperv.com>
- <20181126191812.GA32208@kroah.com>
-Message-ID: <CABHrTiLtn6BjWoqUoSxwUjEAJAcrRvMkpPLsFnNGCCXWdFoRXQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 26 Nov 2018 12:36:03 -0800
+Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
+ atomic.
+In-Reply-To: <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
+References: <20181119190805.19139-1-helen.koike@collabora.com>
+ <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
+ <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
+ <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
+ <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
+Message-ID: <87o9abbmq4.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That's https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/reference/tlfs
+Michael Zoran <mzoran@crowfest.net> writes:
 
-Thanks, --jrp
-On Mon, Nov 26, 2018 at 11:18 AM Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:
+>> 
+>> The point here is not about setting and resetting the plane->fb
+>> pointer. It's about what happens inside
+>> drm_atomic_set_fb_for_plane().
+>> 
+>> It calls drm_framebuffer_get() for the new fb and
+>> drm_framebuffer_put() for the old fb. In result, if the fb changes,
+>> the old fb, which had its reference count incremented in the atomic
+>> commit that set it to the plane before, has its reference count
+>> decremented. Moreover, if the new reference count becomes 0,
+>> drm_framebuffer_put() will immediately free the buffer.
+>> 
+>> Freeing a buffer when the hardware is still scanning out of it isn't
+>> a
+>> good idea, is it?
 >
-> On Thu, Nov 22, 2018 at 03:10:56AM +0000, kys at linuxonhyperv.com wrote:
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/hyperv-tlfs.h
-> > @@ -0,0 +1,338 @@
-> > +/* SPDX-License-Identifier: GPL-2.0 */
-> > +
-> > +/*
-> > + * This file contains definitions from the Hyper-V Hypervisor Top-Level
-> > + * Functional Specification (TLFS):
-> > + * https://na01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fdocs.microsoft.com%2Fen-us%2Fvirtualization%2Fhyper-v-on-windows%2Freference%2Ftlfs&amp;data=02%7C01%7Ckys%40microsoft.com%7Cc831a45fd63e4a4b083908d641216aa8%7C72f988bf86f141af91ab2d7cd011db47%7C1%7C0%7C636768009113747528&amp;sdata=jRSrs9ZWXdmeS7LQUEpoSyUfBS7a5KLYy%2FolFdE2tI0%3D&amp;reserved=0
+> No, it's not.  But the board I submitted the patch for doesn't have
+> anything like hot swapable ram.  The ram access is still going to work,
+> just it might display something it shouldn't. Say for example if that
+> frame buffer got reused by somethig else and filled with new data in
+> the very small window.
 >
-> "interesting" url :(
+> But yes, I agree the best solution would be to not release the buffer
+> until the next vblank.
 >
-> Care to use a real one?
+> Perhaps a good solution would be for the DRM api to have the concept of
+> a deferred release?  Meaning if the put() call just added the frame
+> buffer to a list that DRM core could walk during the vblank.  That
+> might be better then every single driver trying to work up a custom
+> solution.
 >
-> thanks,
+>> The vc4 driver seems to be able to program the hardware to switch the
+>> scanout to the new buffer immediately:
+>> 
+>> https://elixir.bootlin.com/linux/v4.20-rc3/source/drivers/gpu/drm/vc4/vc4_plane.c#L794
+>> 
+>> Although I wonder if there isn't still a tiny race there - the
+>> hardware may have just started refilling the FIFO from the old
+>> address. Still, if the FIFO is small, the FIFO refill operation may
+>> be
+>> much shorter than it takes for the kernel code to actually free the
+>> buffer. Eric and Michael, could you confirm?
+>> 
 >
-> greg k-h
+> I don't have those boards anymore, and I don't have access to any
+> technical documentation on the GPU so I can't really add much here.  
+> Eric can probably provide the best information.
+
+I don't think I understood my scanout hardware well enough when I
+started on the async update stuff for rpi.  vc4 probably needs to wait
+until the HW starts scanning out a new line before letting the old BO
+get freed.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/e38d77a3/attachment.sig>
