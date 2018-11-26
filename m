@@ -1,97 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Nov 2018 16:53:48 +0000
-Subject: [PATCH] arm64: io: Ensure calls to delay routines are ordered against
- prior readX()
-Message-ID: <1543251228-30001-1-git-send-email-will.deacon@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 26 Nov 2018 16:57:38 +0000
+Subject: [PATCH 09/14] regulator: dts: add full voltage range to LDO4 on
+ the Lime2
+In-Reply-To: <0b1aa5b28cb5efe17c04150a181ef1fa4027bc55.1543245984.git-series.plaes@plaes.org>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+ <0b1aa5b28cb5efe17c04150a181ef1fa4027bc55.1543245984.git-series.plaes@plaes.org>
+Message-ID: <20181126165738.GI9715@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A relatively standard idiom for ensuring that a pair of MMIO writes to a
-device arrive at that device with a specified minimum delay between them
-is as follows:
+On Mon, Nov 26, 2018 at 05:27:50PM +0200, Priit Laes wrote:
 
-	writel_relaxed(42, dev_base + CTL1);
-	readl(dev_base + CTL1);
-	udelay(10);
-	writel_relaxed(42, dev_base + CTL2);
+> In the defense of LDO3, LDO3 is the regulator that feeds port bank E,
+> which has no other purpose then a CSI/TS interface, however the case
+> may still be, that the connected IO may be just as well be 3.3 volts.
+> The big misnomer is however, that the schematic names GPIO-2 pin4
+> LDO3_2.8V, rather then VDD-CSI0 or similar.
 
-the intention being that the read-back from the device will push the
-prior write to CTL1, and the udelay will hold up the write to CTL1 until
-at least 10us have elapsed.
+In general you want to run regulators at the lowest voltage you can,
+this tends to reduce power consumption.
 
-Unfortunately, on arm64 where the underlying delay loop is implemented
-as a read of the architected counter, the CPU does not guarantee
-ordering from the readl() to the delay loop and therefore the delay loop
-could in theory be speculated and not provide the desired interval
-between the two writes.
+> Ideally, we want to set a supply voltage for each port bank, but the
+> monolithic nature of the sunxi pinctroller currently prevents this and
+> as such, the board should at least configure the LDO4 with the proper
+> ranges.
 
-Fix this in a similar manner to PowerPC by introducing a dummy control
-dependency on the output of readX() which, combined with the ISB in the
-read of the architected counter, guarantees that a subsequent delay loop
-can not be executed until the readX() has returned its result.
+>  &reg_ldo4 {
+> -	regulator-min-microvolt = <2800000>;
+> -	regulator-max-microvolt = <2800000>;
+> -	regulator-name = "vddio-csi1";
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1250000>;
+> +	regulator-max-microvolt = <3300000>;
+> +	regulator-name = "vdd-io-pg";
+>  };
 
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/io.h | 31 +++++++++++++++++++++++--------
- 1 file changed, 23 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 9f8b915af3a7..d42d00d8d5b6 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -104,7 +104,22 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- }
- 
- /* IO barriers */
--#define __iormb()		rmb()
-+#define __iormb(v)							\
-+({									\
-+	unsigned long tmp;						\
-+									\
-+	rmb();								\
-+									\
-+	/*								\
-+	 * Create a dummy control dependency from the IO read to any	\
-+	 * later instructions. This ensures that a subsequent call to	\
-+	 * udelay() will be ordered due to the ISB in get_cycles().	\
-+	 */								\
-+	asm volatile("eor	%0, %1, %1\n"				\
-+		     "cbnz	%0, ."					\
-+		     : "=r" (tmp) : "r" (v) : "memory");		\
-+})
-+
- #define __iowmb()		wmb()
- 
- #define mmiowb()		do { } while (0)
-@@ -129,10 +144,10 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
-  * following Normal memory access. Writes are ordered relative to any prior
-  * Normal memory access.
-  */
--#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
--#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
--#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
--#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(); __v; })
-+#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(__v); __v; })
-+#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(__v); __v; })
-+#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(__v); __v; })
-+#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(__v); __v; })
- 
- #define writeb(v,c)		({ __iowmb(); writeb_relaxed((v),(c)); })
- #define writew(v,c)		({ __iowmb(); writew_relaxed((v),(c)); })
-@@ -183,9 +198,9 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- /*
-  * io{read,write}{16,32,64}be() macros
-  */
--#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
--#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
--#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
-+#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(__v); __v; })
-+#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(__v); __v; })
-+#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(__v); __v; })
- 
- #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
--- 
-2.1.4
+This is obviously broken even according to your analysis above - if you
+have consumers for which 2.8V is too low allowing other consumers to set
+even lower voltages is not going to help as soon as they start doing
+that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181126/4225ebda/attachment.sig>
