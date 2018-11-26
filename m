@@ -1,87 +1,53 @@
-From: pn@denx.de (Parthiban Nallathambi)
-Date: Mon, 26 Nov 2018 11:03:53 +0100
-Subject: [PATCH v3 1/4] dt-bindings: interrupt-controller: Actions external
- interrupt controller
-In-Reply-To: <20181126100356.2840578-1-pn@denx.de>
-References: <20181126100356.2840578-1-pn@denx.de>
-Message-ID: <20181126100356.2840578-2-pn@denx.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 26 Nov 2018 11:06:06 +0100
+Subject: [GIT PULL 1/3] Rockchip driver updates for 4.21
+Message-ID: <49803144.2ZsBJmaiIN@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Actions Semi OWL family SoC's provides support for external interrupt
-controller to be connected and controlled using SIRQ pins. S500, S700
-and S900 provides 3 SIRQ lines and works independently for 3 external
-interrupt controllers.
+Hi Arnd, Kevin Olof,
 
-Signed-off-by: Parthiban Nallathambi <pn@denx.de>
-Signed-off-by: Saravanan Sekar <sravanhome@gmail.com>
----
- .../interrupt-controller/actions,owl-sirq.txt | 57 +++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
+please find below and in the replies the first round of Rockchip pull
+requests. I guess the most notable change is the addition of Gru-Scarlet
+devicetree which - judging by the "silence" in the ChromeOS gerrit - may
+conclude the series of rk3399-based ChromeOS devices.
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-new file mode 100644
-index 000000000000..b3adc4bddf40
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/actions,owl-sirq.txt
-@@ -0,0 +1,57 @@
-+Actions Semi Owl SoCs SIRQ interrupt controller
-+
-+S500, S700 and S900 SoC's from Actions provides 3 SPI's from GIC,
-+in which external interrupt controller can be connected. 3 SPI's
-+45, 46, 47 from GIC are directly exposed as SIRQ. It has
-+the following properties:
-+
-+- inputs three interrupt signal from external interrupt controller
-+
-+Required properties:
-+
-+- compatible: should be "actions,owl-sirq"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupt-controller: identifies the node as an interrupt controller
-+- #interrupt-cells: specifies the number of cells needed to encode an interrupt
-+  source, should be 2.
-+- actions,sirq-shared-reg: Applicable for S500 and S700 where SIRQ register
-+  details are maintained at same offset/register.
-+- actions,sirq-reg-offset: register offset for SIRQ interrupts. When registers are
-+  shared, all the three offsets will be same (S500 and S700).
-+- actions,ext-irq-range: Identifies external irq number range in different SoCs.
-+
-+Example for S900:
-+
-+sirq: interrupt-controller at e01b0000 {
-+	compatible = "actions,owl-sirq";
-+	reg = <0x0 0xe01b0000 0x0 0x1000>;
-+	interrupt-controller;
-+	#interrupt-cells = <3>;
-+	actions,sirq-offset = <0x200 0x528 0x52c>;
-+	actions,ext-irq-range = <13 15>;
-+};
-+
-+Example for S700:
-+
-+sirq: interrupt-controller at e01b0000 {
-+	compatible = "actions,owl-sirq";
-+	reg = <0x0 0xe01b0000 0x0 0x1000>;
-+	interrupt-controller;
-+	#interrupt-cells = <3>;
-+	actions,sirq-shared-reg;
-+	actions,sirq-reg-offset = <0x200 0x200 0x200>;
-+	actions,ext-irq-range = <13 15>;
-+};
-+
-+Example for S500:
-+
-+sirq: interrupt-controller at b01b0000 {
-+	compatible = "actions,owl-sirq";
-+	reg = <0x0 0xb01b0000 0x0 0x1000>;
-+	interrupt-controller;
-+	#interrupt-cells = <3>;
-+	actions,sirq-shared-reg;
-+	actions,sirq-offset = <0x200 0x200 0x200>;
-+	actions,ext-irq-range = <13 15>;
-+};
--- 
-2.17.2
+Other than that there are smaller improvements all around,
+so please pull.
+
+
+Thanks
+Heiko
+
+
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.21-rockchip-drivers-1
+
+for you to fetch changes up to 24869610e867e9791f0fdab70ff60f246299b859:
+
+  soc: rockchip: power-domain: add rk3066 powerdomains (2018-11-06 14:13:32 +0100)
+
+----------------------------------------------------------------
+Powerdomain support for rk3066 and rk3188.
+
+----------------------------------------------------------------
+Heiko Stuebner (6):
+      dt-bindings: add power-domain header for RK3188 SoCs
+      dt-bindings: add power-domain header for RK3066 SoCs
+      dt-bindings: add compatibles for rk3066/rk3188 power controllers
+      Merge branch 'v4.21-shared/pdids' into v4.21-armsoc/drivers
+      soc: rockchip: power-domain: add rk3188 powerdomains
+      soc: rockchip: power-domain: add rk3066 powerdomains
+
+ .../bindings/soc/rockchip/power_domain.txt         |  4 ++
+ drivers/soc/rockchip/pm_domains.c                  | 48 ++++++++++++++++++++++
+ include/dt-bindings/power/rk3066-power.h           | 22 ++++++++++
+ include/dt-bindings/power/rk3188-power.h           | 24 +++++++++++
+ 4 files changed, 98 insertions(+)
+ create mode 100644 include/dt-bindings/power/rk3066-power.h
+ create mode 100644 include/dt-bindings/power/rk3188-power.h
