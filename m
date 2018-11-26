@@ -1,42 +1,46 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Mon, 26 Nov 2018 12:07:37 +0800
-Subject: [PATCH] drm/mediatek: Only try to attach bridge if there is one
-Message-ID: <20181126040737.138682-1-drinkcat@chromium.org>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Mon, 26 Nov 2018 10:36:12 +0530
+Subject: [PATCHv2] ARM: dts: exynos: update the usbdrd_phy suspend clk
+In-Reply-To: <CAJKOXPcphirR=+25evzVxHGv1g_4xNfPv3gazXWOes1G6iBt5g@mail.gmail.com>
+References: <20181120185536.1159-1-linux.amoon@gmail.com>
+ <CAJKOXPcphirR=+25evzVxHGv1g_4xNfPv3gazXWOes1G6iBt5g@mail.gmail.com>
+Message-ID: <CANAwSgS2F-5Fa+okswFDsj1b55N44aduyX7vWFFRfr7fZFELuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Even if dsi->bridge is NULL, we still try to call drm_bridge_attach,
-and print out an error message, before creating the connector.
+Hi Krzysztof,
 
-When no bridge is provided, let's skip these 2 steps and directly
-create the connector.
+On Thu, 22 Nov 2018 at 13:24, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>
+> On Tue, 20 Nov 2018 at 19:55, Anand Moon <linux.amoon@gmail.com> wrote:
+> >
+> > As per FSYS usbdrd_phy clk setting CLK_SCLK_USBD300/1 binds
+> > to SUSPEND_CLK so correct update the suspend clk.
+> >
+> > Signed-off-by: Anand Moon <linux.amoon@gmail.com>
+> > ---
+> > [0] https://lkml.org/lkml/2017/10/6/12
+> > changes from previous patch
+> > fix the order of clk and update the commit message
+> >
+> > FSYS block show in user manual
+> >
+> > CLKMUX_USBDRD300/1----CLKDIV_USBDRD300/1----SCLK_USBDRD300/1-----SUSPEND_CLK
+> >                    |
+> >                    |--CLKDIV_USBPHY300/1----SCLK_USBPHY300/1-----USBDRD30_PHY_0/1
+>
+> Your new clock - SCLK_USBD301 - is not mentioned here. I don't get the
+> reason behind this change.
+>
+> Best regards,
+> Krzysztof
+>
 
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
- drivers/gpu/drm/mediatek/mtk_dsi.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+My patch was based on following block diagram.
+[0] https://imgur.com/a/fmpk9aR
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-index 66df1b17795921..27b507eb4a997d 100644
---- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-+++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-@@ -818,10 +818,13 @@ static int mtk_dsi_create_conn_enc(struct drm_device *drm, struct mtk_dsi *dsi)
- 	dsi->encoder.possible_crtcs = 1;
- 
- 	/* If there's a bridge, attach to it and let it create the connector */
--	ret = drm_bridge_attach(&dsi->encoder, dsi->bridge, NULL);
--	if (ret) {
--		DRM_ERROR("Failed to attach bridge to drm\n");
--
-+	if (dsi->bridge) {
-+		ret = drm_bridge_attach(&dsi->encoder, dsi->bridge, NULL);
-+		if (ret) {
-+			DRM_ERROR("Failed to attach bridge to drm\n");
-+			goto err_encoder_cleanup;
-+		}
-+	} else {
- 		/* Otherwise create our own connector and attach to a panel */
- 		ret = mtk_dsi_create_connector(drm, dsi);
- 		if (ret)
--- 
-2.20.0.rc0.387.gc7a69e6b6c-goog
+But looks like I am bit wrong with this patch again.
+Sorry for the noise.
+
+Best Regards
+-Anand
