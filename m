@@ -1,35 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:41 +0100
-Subject: [PATCH 15/40] arm64: dts: renesas: r8a77980: Connect R-Car V3H AVB to
- IPMMU
+Date: Mon, 26 Nov 2018 13:54:50 +0100
+Subject: [PATCH 24/40] arm64: dts: renesas: ebisu: Add serial console pins
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <7ffbcb232c7b8f90dbb40338ce084b65c65fb9fc.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <f3962b824af9fe9c372dcedde68bbbe86a361bc6.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-Hook up the R-Car V3H AVB device to IPMMU-DS1 33 as described in
-the data sheet.
+This patch adds pin control for SCIF2 on R8A77990 E3 Ebisu.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
+Reviewed-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77980.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-index 54acc494a43f..ce2c9955df75 100644
---- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
-@@ -602,6 +602,7 @@
- 			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
- 			phy-mode = "rgmii";
-+			iommus = <&ipmmu_ds1 33>;
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+index b178f261d805..f9c592adbbd3 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
+@@ -421,6 +421,11 @@
+ 		function = "audio_clk";
+ 	};
+ 
++	scif2_pins: scif2 {
++		groups = "scif2_data_a";
++		function = "scif2";
++	};
++
+ 	usb0_pins: usb {
+ 		groups = "usb0_b", "usb0_id";
+ 		function = "usb0";
+@@ -493,6 +498,9 @@
+ };
+ 
+ &scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
+ 	status = "okay";
+ };
+ 
 -- 
 2.11.0
