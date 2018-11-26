@@ -1,93 +1,46 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 26 Nov 2018 22:36:22 +0800
-Subject: [PATCH] ARM: dts: Provide support for reading ID code from MVB
- device (BK4)
-In-Reply-To: <20181113121213.14296-1-lukma@denx.de>
-References: <20181113121213.14296-1-lukma@denx.de>
-Message-ID: <20181126143619.GB31334@dragon>
+Date: Mon, 26 Nov 2018 22:42:10 +0800
+Subject: [PATCH v3 2/2] arm64: dts: Add support for NXP LS1028A SoC
+In-Reply-To: <1542156591-3224-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1542156591-3224-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <1542156591-3224-2-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <20181126144208.GC31334@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 01:12:13PM +0100, Lukasz Majewski wrote:
-> The procedure to read this ID value is as follows:
+On Wed, Nov 14, 2018 at 05:30:52AM +0000, Bhaskar Upadhaya wrote:
+> LS1028A contains two ARM v8 CortexA72 processor cores
+> with 32 KB L1-D cache and 48 KB L1-I cache
 > 
-> rmmod spi_fsl_dspi
-> insmod spi-gpio.ko
+> Features summary
+>  Two 32-bit / 64-bit ARM v8 Cortex-A72 CPUs
+>   - Arranged as single clusters of two cores sharing a 1 MB L2 cache
+>   - Speed Up to 1.3 GHz
+>   - Support for cluster power-gating.
+>  Cache coherent interconnect (CCI-400)
+>   - Hardware-managed data coherency
+>   - Up to 400 MHz
+>  32-bit DDR4 SDRAM memory controller with ECC
+>  Two PCIe 3.0 controllers
+>  One serial ATA (SATA 3.0) controller
+>  Two high-speed USB 3.0 controllers with integrated PHY
 > 
-> echo 504 > /sys/class/gpio/export
-> cat /sys/class/gpio/gpio504/value
-> ...
-> echo 511 > /sys/class/gpio/export
-> cat /sys/class/gpio/gpio511/value
+>  Following levels of DTSI/DTS files have been created for the LS1028A
+>   SoC family:
 > 
-> rmmod spi-gpio.ko
-> insmod spi_fsl_dspi
+>          - fsl-ls1028a.dtsi:
+>                  DTS-Include file for NXP LS1028A SoC.
 > 
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
-
-A prefix like 'ARM: dts: vf610-bk4: ...' might be better.
-
-> ---
->  arch/arm/boot/dts/vf610-bk4.dts | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+>          - fsl-ls1028a-qds.dts:
+>                  DTS file for NXP LS1028A QDS board.
 > 
-> diff --git a/arch/arm/boot/dts/vf610-bk4.dts b/arch/arm/boot/dts/vf610-bk4.dts
-> index cab95714c058..f01c735807ae 100644
-> --- a/arch/arm/boot/dts/vf610-bk4.dts
-> +++ b/arch/arm/boot/dts/vf610-bk4.dts
-> @@ -59,6 +59,29 @@
->  		regulator-min-microvolt = <3300000>;
->  		regulator-max-microvolt = <3300000>;
->  	};
-> +
-> +	spi_gpio {
+>          - fsl-ls1028a-rdb.dts:
+>                  DTS file for NXP LS1028A RDB board
+> 
+> Signed-off-by: Sudhanshu Gupta <sudhanshu.gupta@nxp.com>
+> Signed-off-by: Rai Harninder <harninder.rai@nxp.com>
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
 
-We recommend hyphen rather than underscore be used in node name.
-
-> +		compatible = "spi-gpio";
-> +		pinctrl-0 = <&pinctrl_gpio_spi>;
-> +		pinctrl-names = "default";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		/* PTD12 ->RPIO[91] */
-> +		sck-gpios  = <&gpio2 27 GPIO_ACTIVE_LOW>;
-> +		/* PTD10 ->RPIO[89] */
-> +		miso-gpios = <&gpio2 25 GPIO_ACTIVE_HIGH>;
-> +		num-chipselects = <0>;
-> +
-> +		72xx165 at 0 {
-
-Please use a generic name for the node.
+@Leo, looks good to you?
 
 Shawn
-
-> +			compatible = "pisosr-gpio";
-> +			reg = <0>;
-> +			gpio-controller;
-> +			#gpio-cells = <2>;
-> +			/* PTB18 -> RGPIO[40] */
-> +			load-gpios  = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> +			spi-max-frequency = <100000>;
-> +		};
-> +	};
->  };
->  
->  &adc0 {
-> @@ -430,6 +453,14 @@
->  		>;
->  	};
->  
-> +	pinctrl_gpio_spi: pinctrl-gpio-spi {
-> +		fsl,pins = <
-> +			VF610_PAD_PTB18__GPIO_40        0x1183
-> +			VF610_PAD_PTD10__GPIO_89        0x1183
-> +			VF610_PAD_PTD12__GPIO_91        0x1183
-> +		>;
-> +	};
-> +
->  	pinctrl_i2c2: i2c2grp {
->  		fsl,pins = <
->  			VF610_PAD_PTA22__I2C2_SCL               0x34df
-> -- 
-> 2.11.0
-> 
