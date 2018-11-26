@@ -1,45 +1,47 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:36 +0000
-Subject: [PATCH v2 20/20] perf/core: remove unused perf_flags
+Date: Mon, 26 Nov 2018 11:12:31 +0000
+Subject: [PATCH v2 15/20] s390: perf/events: advertise PMU exclusion capability
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-21-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-16-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that perf_flags is not used we remove it.
+The s390 cpum_cf and cpum_sf PMUs have the capability to exclude
+events based on context. Let's advertise that we support the
+PERF_PMU_CAP_EXCLUDE capability to ensure that perf doesn't
+prevent us from handling events where any exclusion flags are set.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- include/uapi/linux/perf_event.h       | 2 --
- tools/include/uapi/linux/perf_event.h | 2 --
- 2 files changed, 4 deletions(-)
+ arch/s390/kernel/perf_cpum_cf.c | 1 +
+ arch/s390/kernel/perf_cpum_sf.c | 2 ++
+ 2 files changed, 3 insertions(+)
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index f35eb72..ba89bd3 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
+diff --git a/arch/s390/kernel/perf_cpum_cf.c b/arch/s390/kernel/perf_cpum_cf.c
+index cc085e2..7b583ed 100644
+--- a/arch/s390/kernel/perf_cpum_cf.c
++++ b/arch/s390/kernel/perf_cpum_cf.c
+@@ -667,6 +667,7 @@ static struct pmu cpumf_pmu = {
+ 	.start_txn    = cpumf_pmu_start_txn,
+ 	.commit_txn   = cpumf_pmu_commit_txn,
+ 	.cancel_txn   = cpumf_pmu_cancel_txn,
++	.capabilities = PERF_PMU_CAP_EXCLUDE,
  };
  
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
-diff --git a/tools/include/uapi/linux/perf_event.h b/tools/include/uapi/linux/perf_event.h
-index f35eb72..ba89bd3 100644
---- a/tools/include/uapi/linux/perf_event.h
-+++ b/tools/include/uapi/linux/perf_event.h
-@@ -445,8 +445,6 @@ struct perf_event_query_bpf {
- 	__u32	ids[0];
+ static int cpumf_pmf_setup(unsigned int cpu, int flags)
+diff --git a/arch/s390/kernel/perf_cpum_sf.c b/arch/s390/kernel/perf_cpum_sf.c
+index 5c53e97..25a64aa 100644
+--- a/arch/s390/kernel/perf_cpum_sf.c
++++ b/arch/s390/kernel/perf_cpum_sf.c
+@@ -1885,6 +1885,8 @@ static struct pmu cpumf_sampling = {
+ 
+ 	.setup_aux    = aux_buffer_setup,
+ 	.free_aux     = aux_buffer_free,
++
++	.capabilities = PERF_PMU_CAP_EXCLUDE,
  };
  
--#define perf_flags(attr)	(*(&(attr)->read_format + 1))
--
- /*
-  * Ioctls that can be done on a perf event fd:
-  */
+ static void cpumf_measurement_alert(struct ext_code ext_code,
 -- 
 2.7.4
