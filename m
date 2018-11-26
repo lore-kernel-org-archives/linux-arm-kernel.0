@@ -1,240 +1,93 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:51 +0100
-Subject: [PATCH 25/40] arm64: dts: renesas: ebisu: Add and enable SDHI device
- nodes
+Date: Mon, 26 Nov 2018 13:54:33 +0100
+Subject: [PATCH 07/40] arm64: dts: renesas: r8a77980: add thermal support
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <9aa3558a02f0bb074d02ef2956fee60a5ee57a47.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <69c5e602d0bd717da04c18c08017d195ec10da8d.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This patch adds SDHI{0,1,3} device nodes for the r8a77990 SoC
-and enables SD card slot connected to SDHI0, micro SD card slot
-connected to SDHI1 and eMMC connected to SDHI3 on the Ebisu board
-using the R8A77990 SoC.
+Describe THS/CIVM in the R8A77980 device trees.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Marek Vasut <marek.vasut+renesas@gmail.com>
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Cc: Simon Horman <horms+renesas@verge.net.au>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
-Cc: linux-renesas-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Acked-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts | 130 +++++++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a77990.dtsi      |  36 +++++++
- 2 files changed, 166 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 53 +++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-index f9c592adbbd3..2f1cbcde8ae0 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a77990-ebisu.dts
-@@ -129,6 +129,15 @@
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index a1fda9901423..42c7088223c8 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -330,6 +330,19 @@
+ 			#power-domain-cells = <1>;
+ 		};
+ 
++		tsc: thermal at e6198000 {
++			compatible = "renesas,r8a77980-thermal";
++			reg = <0 0xe6198000 0 0x100>,
++			      <0 0xe61a0000 0 0x100>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 522>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 522>;
++			#thermal-sensor-cells = <1>;
++		};
++
+ 		intc_ex: interrupt-controller at e61c0000 {
+ 			compatible = "renesas,intc-ex-r8a77980", "renesas,irqc";
+ 			#interrupt-cells = <2>;
+@@ -1404,6 +1417,46 @@
  		};
  	};
  
-+	reg_1p8v: regulator0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "fixed-1.8V";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
++	thermal-zones {
++		thermal-sensor-1 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&tsc 0>;
 +
- 	reg_3p3v: regulator1 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "fixed-3.3V";
-@@ -180,6 +189,54 @@
- 		#clock-cells = <0>;
- 		clock-frequency = <74250000>;
- 	};
-+
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI0 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio5 17 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI0 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio5 18 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
-+
-+	vcc_sdhi1: regulator-vcc-sdhi1 {
-+		compatible = "regulator-fixed";
-+
-+		regulator-name = "SDHI1 Vcc";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpio = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	vccq_sdhi1: regulator-vccq-sdhi1 {
-+		compatible = "regulator-gpio";
-+
-+		regulator-name = "SDHI1 VccQ";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+
-+		gpios = <&gpio3 15 GPIO_ACTIVE_HIGH>;
-+		gpios-states = <1>;
-+		states = <3300000 1
-+			  1800000 0>;
-+	};
- };
- 
- &audio_clk_a {
-@@ -410,6 +467,36 @@
- 		function = "pwm5";
- 	};
- 
-+	sdhi0_pins: sd0 {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi0_pins_uhs: sd0_uhs {
-+		groups = "sdhi0_data4", "sdhi0_ctrl";
-+		function = "sdhi0";
-+		power-source = <1800>;
-+	};
-+
-+	sdhi1_pins: sd1 {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <3300>;
-+	};
-+
-+	sdhi1_pins_uhs: sd1_uhs {
-+		groups = "sdhi1_data4", "sdhi1_ctrl";
-+		function = "sdhi1";
-+		power-source = <1800>;
-+	};
-+
-+	sdhi3_pins: sd3 {
-+		groups = "sdhi3_data8", "sdhi3_ctrl", "sdhi3_ds";
-+		function = "sdhi3";
-+		power-source = <1800>;
-+	};
-+
- 	sound_pins: sound {
- 		groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data";
- 		function = "ssi";
-@@ -531,3 +618,46 @@
- 
- 	status = "okay";
- };
-+
-+&sdhi0 {
-+	pinctrl-0 = <&sdhi0_pins>;
-+	pinctrl-1 = <&sdhi0_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&vcc_sdhi0>;
-+	vqmmc-supply = <&vccq_sdhi0>;
-+	cd-gpios = <&gpio3 12 GPIO_ACTIVE_LOW>;
-+	wp-gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
-+	bus-width = <4>;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
-+	status = "okay";
-+};
-+
-+&sdhi1 {
-+	pinctrl-0 = <&sdhi1_pins>;
-+	pinctrl-1 = <&sdhi1_pins_uhs>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&vcc_sdhi1>;
-+	vqmmc-supply = <&vccq_sdhi1>;
-+	cd-gpios = <&gpio3 14 GPIO_ACTIVE_LOW>;
-+	bus-width = <4>;
-+	sd-uhs-sdr50;
-+	sd-uhs-sdr104;
-+	status = "okay";
-+};
-+
-+&sdhi3 {
-+	/* used for on-board 8bit eMMC */
-+	pinctrl-0 = <&sdhi3_pins>;
-+	pinctrl-1 = <&sdhi3_pins>;
-+	pinctrl-names = "default", "state_uhs";
-+
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_1p8v>;
-+	mmc-hs200-1_8v;
-+	bus-width = <8>;
-+	non-removable;
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index beb53aaa9e2c..e0092fb27ec0 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -1351,6 +1351,42 @@
- 			status = "disabled";
- 		};
- 
-+		sdhi0: sd at ee100000 {
-+			compatible = "renesas,sdhi-r8a77990",
-+				     "renesas,rcar-gen3-sdhi";
-+			reg = <0 0xee100000 0 0x2000>;
-+			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 314>;
-+			max-frequency = <200000000>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 314>;
-+			status = "disabled";
++			trips {
++				sensor1-passive {
++					temperature = <95000>;
++					hysteresis = <1000>;
++					type = "passive";
++				};
++				sensor1-critical {
++					temperature = <120000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
 +		};
 +
-+		sdhi1: sd at ee120000 {
-+			compatible = "renesas,sdhi-r8a77990",
-+				     "renesas,rcar-gen3-sdhi";
-+			reg = <0 0xee120000 0 0x2000>;
-+			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 313>;
-+			max-frequency = <200000000>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 313>;
-+			status = "disabled";
-+		};
++		thermal-sensor-2 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++			thermal-sensors = <&tsc 1>;
 +
-+		sdhi3: sd at ee160000 {
-+			compatible = "renesas,sdhi-r8a77990",
-+				     "renesas,rcar-gen3-sdhi";
-+			reg = <0 0xee160000 0 0x2000>;
-+			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 311>;
-+			max-frequency = <200000000>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 311>;
-+			status = "disabled";
++			trips {
++				sensor2-passive {
++					temperature = <95000>;
++					hysteresis = <1000>;
++					type = "passive";
++				};
++				sensor2-critical {
++					temperature = <120000>;
++					hysteresis = <1000>;
++					type = "critical";
++				};
++			};
 +		};
++	};
 +
- 		gic: interrupt-controller at f1010000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts-extended = <&gic GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
 -- 
 2.11.0
