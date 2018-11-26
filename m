@@ -1,35 +1,27 @@
 From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Mon, 26 Nov 2018 11:36:01 -0200
-Subject: [PATCH 08/13] ARM: dts: rv1108: Fix the PMU interrupt number
-In-Reply-To: <3361921.c4PKPBIJKP@phil>
+Date: Mon, 26 Nov 2018 11:45:16 -0200
+Subject: [PATCH 07/13] ARM: dts: rv1108: Fix the timer mask
+In-Reply-To: <4443441.F7S2jYBxxL@phil>
 References: <20181125211907.9895-1-otavio@ossystems.com.br>
- <20181125211907.9895-8-otavio@ossystems.com.br> <3361921.c4PKPBIJKP@phil>
-Message-ID: <CAP9ODKrX__KXo-XEdoaL=qwALFAxyzKV4-xu_t5baMqN1kQH4g@mail.gmail.com>
+ <20181125211907.9895-7-otavio@ossystems.com.br> <4443441.F7S2jYBxxL@phil>
+Message-ID: <CAP9ODKoFaUP3JyY=x-6H-b_SZnN3BTtS5dMVsqE2-n96AWp2dQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Heiko,
-
-On Mon, Nov 26, 2018 at 3:59 AM Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Sonntag, 25. November 2018, 22:19:02 CET schrieb Otavio Salvador:
-> > According to the Rockchip vendor tree the PMU interrupt number is
-> > 76, so fix it accordingly.
-> >
-> > Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
-> > Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
+On Mon, Nov 26, 2018 at 3:27 AM Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Sonntag, 25. November 2018, 22:19:01 CET schrieb Otavio Salvador:
+> > As done in the Rockchip vendor tree and also on other
+> > "arm,armv7-timer" instances, the correct GIC_CPU_MASK_SIMPLE mask
+> > is 4 instead of 1.
 >
-> looks ok, especially as the TRM I have doesn't list neither irqs :-)
-> But please explain the second Signed-off by Fabio?
->
-> If Fabio is the original author, the patch From should reflect that
-> and the Signed-off-by lines should be swapped. As it is now
-> I would expect Fabio being the one sending the patches.
-> Or is it supposed to be a "Co-developed-by:"?
-> See Documentation/process/5.Posting.rst.
+> Nope. That value represents the number of cores in the system.
+> As the rv1108 only has one core, that should likely stay as it is.
 
-He works with me and he applied and tested it in our internal tree for
-our customer. He reviewed and tested this with me, so I'd like to
-provide him credit as well.
+I see, I will drop it for v2.
+
+> Also, it seems I only got patches 6-13 what happened to 1-5?
+
+It went to other mailing lists, I think. I will add you on Cc to all for v2.
 
 -- 
 Otavio Salvador                             O.S. Systems
