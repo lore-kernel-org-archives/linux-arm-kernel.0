@@ -1,46 +1,48 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 26 Nov 2018 15:12:41 +0100
-Subject: [PATCH 0/9] drm: remove deprecated functions
-In-Reply-To: <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
- <20181121094233.GN4266@phenom.ffwll.local>
- <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
-Message-ID: <20181126141241.GM4266@phenom.ffwll.local>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Nov 2018 14:21:54 +0000
+Subject: [PATCH 03/10] arm64: add <asm/export.h>
+In-Reply-To: <20181105130649.29429-4-mark.rutland@arm.com>
+References: <20181105130649.29429-1-mark.rutland@arm.com>
+ <20181105130649.29429-4-mark.rutland@arm.com>
+Message-ID: <20181126142154.GB29684@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 24, 2018 at 10:17:13PM +0100, Linus Walleij wrote:
-> On Wed, Nov 21, 2018 at 10:42 AM Daniel Vetter <daniel@ffwll.ch> wrote:
-> > On Thu, Nov 15, 2018 at 11:38:35PM +0100, Linus Walleij wrote:
-> > > On Thu, Nov 15, 2018 at 11:17 PM Fernando Ramos <greenfoo@gluegarage.com> wrote:
-> > >
-> > > > One of the things in the DRM TODO list ("Documentation/gpu/todo.rst") was to
-> > > > "switch from reference/unreference to get/put". That's what this patch series is
-> > > > about.
-> > >
-> > > The series:
-> > > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> >
-> > Since your reviewed it all, and there's a pile of acks for the driver
-> > parts too: Want to go ahead and apply it too?
+On Mon, Nov 05, 2018 at 01:06:42PM +0000, Mark Rutland wrote:
+> So that we can export symbols directly from assembly files, let's make
+> use of the generic <asm/export.h>. We have a few symbols that we'll want
+> to conditionally export for !KASAN kernel builds, so we add a helepr for
+> that.
 > 
-> OK I did... the git was quirky, patches changes around
-> under my feet and dim started to complain about problems
-> with commits that weren't even mine.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/export.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/export.h
 > 
-> It was especially scary.
-> 
-> But I think I managed to apply the patches and push the
-> branch now.
+> diff --git a/arch/arm64/include/asm/export.h b/arch/arm64/include/asm/export.h
+> new file mode 100644
+> index 000000000000..d7a82246816e
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/export.h
+> @@ -0,0 +1,13 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +
+> +#ifndef __ASM_EXPORT_H
+> +#define __ASM_EXPORT_H
+> +#include <asm-generic/export.h>
+> +
+> +#ifdef CONFIG_KASAN
+> +#define EXPORT_SYMBOL_NOKASAN(name)
+> +#else
+> +#define EXPORT_SYMBOL_NOKASAN(name)	EXPORT_SYMBOL(name)
+> +#endif
+> +
+> +#endif /* __ASM_EXPORT_H */
 
-Except when you're racing with someone else you should only see conflicts
-with stuff you've just pushed. Or if someone forgot to fix up their mess.
-What was the conflict? Looking at the git-rerere log I'm not exactly sure
-what happened ... Looks like only one of the patches didn't apply cleanly
-anymore because it was somewhat outdated. Otherwise nothing from you.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+It feels a bit OTT to create a new arch header for this. Could we either
+put it in the core code, or move it into asm/assembler.h instead?
+
+Will
