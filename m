@@ -1,61 +1,71 @@
 From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Mon, 26 Nov 2018 11:06:42 +0530
-Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+Date: Mon, 26 Nov 2018 11:07:36 +0530
+Subject: [PATCH 2/9] arch/arm/mm/dma-mapping.c: Convert to use
  vm_insert_range
-In-Reply-To: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
-References: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
-Message-ID: <CAFqt6zZy0-dy=a+KDrx7V1-j37pAVmt2r6bOkjgHwiopG-L+xA@mail.gmail.com>
+In-Reply-To: <20181115154645.GA27912@jordon-HP-15-Notebook-PC>
+References: <20181115154645.GA27912@jordon-HP-15-Notebook-PC>
+Message-ID: <CAFqt6zYgzRUAisxAjFcuO_QZ3FnX+Yuhndjz9=Dx7Edx6M91xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Russell,
 
-On Thu, Nov 15, 2018 at 9:14 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
+On Thu, Nov 15, 2018 at 9:13 PM Souptick Joarder <jrdr.linux@gmail.com> wrote:
 >
 > Convert to use vm_insert_range() to map range of kernel
 > memory to user vma.
 >
 > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 
-Any feedback for this patch ?
+Any comment on this patch ?
 
 > ---
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 20 ++------------------
->  1 file changed, 2 insertions(+), 18 deletions(-)
+>  arch/arm/mm/dma-mapping.c | 21 +++++++--------------
+>  1 file changed, 7 insertions(+), 14 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index a8db758..2cb83bb 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -221,26 +221,10 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
->                                               struct vm_area_struct *vma)
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 661fe48..4eec323 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -1582,31 +1582,24 @@ static int __arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma
+>                     void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>                     unsigned long attrs)
 >  {
->         struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
-> -       unsigned int i, count = obj->size >> PAGE_SHIFT;
->         unsigned long user_count = vma_pages(vma);
 > -       unsigned long uaddr = vma->vm_start;
-> -       unsigned long offset = vma->vm_pgoff;
-> -       unsigned long end = user_count + offset;
-> -       int ret;
-> -
-> -       if (user_count == 0)
-> -               return -ENXIO;
-> -       if (end > count)
-> -               return -ENXIO;
+> -       unsigned long usize = vma->vm_end - vma->vm_start;
+> +       unsigned long page_count = vma_pages(vma);
+>         struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+>         unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>         unsigned long off = vma->vm_pgoff;
+> +       int err;
 >
-> -       for (i = offset; i < end; i++) {
-> -               ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
-> -               if (ret)
+>         if (!pages)
+>                 return -ENXIO;
+>
+> -       if (off >= nr_pages || (usize >> PAGE_SHIFT) > nr_pages - off)
+> +       if (off >= nr_pages || page_count > nr_pages - off)
+>                 return -ENXIO;
+>
+>         pages += off;
+> +       err = vm_insert_range(vma, vma->vm_start, pages, page_count);
+> +       if (err)
+> +               pr_err("Remapping memory failed: %d\n", err);
+>
+> -       do {
+> -               int ret = vm_insert_page(vma, uaddr, *pages++);
+> -               if (ret) {
+> -                       pr_err("Remapping memory failed: %d\n", ret);
 > -                       return ret;
+> -               }
 > -               uaddr += PAGE_SIZE;
-> -       }
+> -               usize -= PAGE_SIZE;
+> -       } while (usize > 0);
 > -
 > -       return 0;
-> +       return vm_insert_range(vma, vma->vm_start, rk_obj->pages,
-> +                               user_count);
+> +       return err;
 >  }
->
->  static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
+>  static int arm_iommu_mmap_attrs(struct device *dev,
+>                 struct vm_area_struct *vma, void *cpu_addr,
 > --
 > 1.9.1
 >
