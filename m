@@ -1,248 +1,104 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:55:02 +0100
-Subject: [PATCH 36/40] arm64: dts: renesas: r8a7796: add SSIU support for sound
+Date: Mon, 26 Nov 2018 13:54:56 +0100
+Subject: [PATCH 30/40] arm64: dts: renesas: Add CPU topology on R-Car Gen3 SoCs
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <8d14bfa074dbd7ad9a1ff1bfbaff9ec5e450a567.1543229516.git.horms+renesas@verge.net.au>
+Message-ID: <b380ae0db6039131fd0ad985b760c5b3f5096dfc.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Gaku Inami <gaku.inami.xh@renesas.com>
 
-rsnd driver supports SSIU now, let's use it.
-Then, BUSIF DMA settings on rcar_sound,ssi (= rxu, txu) are
-no longer needed.
-To avoid git merge timing issue / git bisect issue,
-this patch doesn't remove it so far, but will be removed in
-the future.
+This patch adds the "cpu-map" into r8a7795/r8a7796 composed of
+multi-cluster. This definition is used to parse the cpu topology.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xh@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 211 +++++++++++++++++++++++++++++++
- 1 file changed, 211 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 32 ++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 26 ++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 369d0bccc651..e62c1702ab72 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1826,6 +1826,217 @@
- 				};
- 			};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 660fd54d384b..408ff4e8170a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -116,6 +116,38 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
-+			rcar_sound,ssiu {
-+				ssiu00: ssiu-0 {
-+					dmas = <&audma0 0x15>, <&audma1 0x16>;
-+					dma-names = "rx", "tx";
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&a57_0>;
 +				};
-+				ssiu01: ssiu-1 {
-+					dmas = <&audma0 0x35>, <&audma1 0x36>;
-+					dma-names = "rx", "tx";
++				core1 {
++					cpu = <&a57_1>;
 +				};
-+				ssiu02: ssiu-2 {
-+					dmas = <&audma0 0x37>, <&audma1 0x38>;
-+					dma-names = "rx", "tx";
++				core2 {
++					cpu = <&a57_2>;
 +				};
-+				ssiu03: ssiu-3 {
-+					dmas = <&audma0 0x47>, <&audma1 0x48>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu04: ssiu-4 {
-+					dmas = <&audma0 0x3F>, <&audma1 0x40>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu05: ssiu-5 {
-+					dmas = <&audma0 0x43>, <&audma1 0x44>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu06: ssiu-6 {
-+					dmas = <&audma0 0x4F>, <&audma1 0x50>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu07: ssiu-7 {
-+					dmas = <&audma0 0x53>, <&audma1 0x54>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu10: ssiu-8 {
-+					dmas = <&audma0 0x49>, <&audma1 0x4a>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu11: ssiu-9 {
-+					dmas = <&audma0 0x4B>, <&audma1 0x4C>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu12: ssiu-10 {
-+					dmas = <&audma0 0x57>, <&audma1 0x58>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu13: ssiu-11 {
-+					dmas = <&audma0 0x59>, <&audma1 0x5A>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu14: ssiu-12 {
-+					dmas = <&audma0 0x5F>, <&audma1 0x60>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu15: ssiu-13 {
-+					dmas = <&audma0 0xC3>, <&audma1 0xC4>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu16: ssiu-14 {
-+					dmas = <&audma0 0xC7>, <&audma1 0xC8>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu17: ssiu-15 {
-+					dmas = <&audma0 0xCB>, <&audma1 0xCC>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu20: ssiu-16 {
-+					dmas = <&audma0 0x63>, <&audma1 0x64>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu21: ssiu-17 {
-+					dmas = <&audma0 0x67>, <&audma1 0x68>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu22: ssiu-18 {
-+					dmas = <&audma0 0x6B>, <&audma1 0x6C>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu23: ssiu-19 {
-+					dmas = <&audma0 0x6D>, <&audma1 0x6E>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu24: ssiu-20 {
-+					dmas = <&audma0 0xCF>, <&audma1 0xCE>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu25: ssiu-21 {
-+					dmas = <&audma0 0xEB>, <&audma1 0xEC>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu26: ssiu-22 {
-+					dmas = <&audma0 0xED>, <&audma1 0xEE>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu27: ssiu-23 {
-+					dmas = <&audma0 0xEF>, <&audma1 0xF0>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu30: ssiu-24 {
-+					dmas = <&audma0 0x6f>, <&audma1 0x70>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu31: ssiu-25 {
-+					dmas = <&audma0 0x21>, <&audma1 0x22>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu32: ssiu-26 {
-+					dmas = <&audma0 0x23>, <&audma1 0x24>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu33: ssiu-27 {
-+					dmas = <&audma0 0x25>, <&audma1 0x26>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu34: ssiu-28 {
-+					dmas = <&audma0 0x27>, <&audma1 0x28>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu35: ssiu-29 {
-+					dmas = <&audma0 0x29>, <&audma1 0x2A>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu36: ssiu-30 {
-+					dmas = <&audma0 0x2B>, <&audma1 0x2C>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu37: ssiu-31 {
-+					dmas = <&audma0 0x2D>, <&audma1 0x2E>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu40: ssiu-32 {
-+					dmas =	<&audma0 0x71>, <&audma1 0x72>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu41: ssiu-33 {
-+					dmas = <&audma0 0x17>, <&audma1 0x18>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu42: ssiu-34 {
-+					dmas = <&audma0 0x19>, <&audma1 0x1A>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu43: ssiu-35 {
-+					dmas = <&audma0 0x1B>, <&audma1 0x1C>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu44: ssiu-36 {
-+					dmas = <&audma0 0x1D>, <&audma1 0x1E>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu45: ssiu-37 {
-+					dmas = <&audma0 0x1F>, <&audma1 0x20>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu46: ssiu-38 {
-+					dmas = <&audma0 0x31>, <&audma1 0x32>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu47: ssiu-39 {
-+					dmas = <&audma0 0x33>, <&audma1 0x34>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu50: ssiu-40 {
-+					dmas = <&audma0 0x73>, <&audma1 0x74>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu60: ssiu-41 {
-+					dmas = <&audma0 0x75>, <&audma1 0x76>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu70: ssiu-42 {
-+					dmas = <&audma0 0x79>, <&audma1 0x7a>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu80: ssiu-43 {
-+					dmas = <&audma0 0x7b>, <&audma1 0x7c>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu90: ssiu-44 {
-+					dmas = <&audma0 0x7d>, <&audma1 0x7e>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu91: ssiu-45 {
-+					dmas = <&audma0 0x7F>, <&audma1 0x80>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu92: ssiu-46 {
-+					dmas = <&audma0 0x81>, <&audma1 0x82>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu93: ssiu-47 {
-+					dmas = <&audma0 0x83>, <&audma1 0x84>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu94: ssiu-48 {
-+					dmas = <&audma0 0xA3>, <&audma1 0xA4>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu95: ssiu-49 {
-+					dmas = <&audma0 0xA5>, <&audma1 0xA6>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu96: ssiu-50 {
-+					dmas = <&audma0 0xA7>, <&audma1 0xA8>;
-+					dma-names = "rx", "tx";
-+				};
-+				ssiu97: ssiu-51 {
-+					dmas = <&audma0 0xA9>, <&audma1 0xAA>;
-+					dma-names = "rx", "tx";
++				core3 {
++					cpu = <&a57_3>;
 +				};
 +			};
 +
- 			rcar_sound,ssi {
- 				ssi0: ssi-0 {
- 					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
++			cluster1 {
++				core0 {
++					cpu = <&a53_0>;
++				};
++				core1 {
++					cpu = <&a53_1>;
++				};
++				core2 {
++					cpu = <&a53_2>;
++				};
++				core3 {
++					cpu = <&a53_3>;
++				};
++			};
++		};
++
+ 		a57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 3baee26ae372..b12bf73bb03b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -127,6 +127,32 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&a57_0>;
++				};
++				core1 {
++					cpu = <&a57_1>;
++				};
++			};
++
++			cluster1 {
++				core0 {
++					cpu = <&a53_0>;
++				};
++				core1 {
++					cpu = <&a53_1>;
++				};
++				core2 {
++					cpu = <&a53_2>;
++				};
++				core3 {
++					cpu = <&a53_3>;
++				};
++			};
++		};
++
+ 		a57_0: cpu at 0 {
+ 			compatible = "arm,cortex-a57", "arm,armv8";
+ 			reg = <0x0>;
 -- 
 2.11.0
