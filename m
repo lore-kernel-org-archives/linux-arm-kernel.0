@@ -1,25 +1,61 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Mon, 26 Nov 2018 07:58:43 +0100
-Subject: [PATCH] drm/mediatek: Only try to attach bridge if there is one
-In-Reply-To: <20181126040737.138682-1-drinkcat@chromium.org>
-References: <CGME20181126041445epcas4p1f0db29e800181de3971f08f6939eec51@epcas4p1.samsung.com>
- <20181126040737.138682-1-drinkcat@chromium.org>
-Message-ID: <6be0a453-80fb-4d97-1610-e4db124faf61@samsung.com>
+From: christophe.leroy@c-s.fr (Christophe LEROY)
+Date: Mon, 26 Nov 2018 08:03:55 +0100
+Subject: [PATCH 5/5] arch: simplify several early memory allocations
+In-Reply-To: <1543182277-8819-6-git-send-email-rppt@linux.ibm.com>
+References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
+ <1543182277-8819-6-git-send-email-rppt@linux.ibm.com>
+Message-ID: <7a92357c-6251-fe84-d724-16fdc49d03a3@c-s.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.11.2018 05:07, Nicolas Boichat wrote:
-> Even if dsi->bridge is NULL, we still try to call drm_bridge_attach,
-> and print out an error message, before creating the connector.
->
-> When no bridge is provided, let's skip these 2 steps and directly
-> create the connector.
->
-> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
 
-?--
+Le 25/11/2018 ? 22:44, Mike Rapoport a ?crit?:
+> There are several early memory allocations in arch/ code that use
+> memblock_phys_alloc() to allocate memory, convert the returned physical
+> address to the virtual address and then set the allocated memory to zero.
+> 
+> Exactly the same behaviour can be achieved simply by calling
+> memblock_alloc(): it allocates the memory in the same way as
+> memblock_phys_alloc(), then it performs the phys_to_virt() conversion and
+> clears the allocated memory.
+> 
+> Replace the longer sequence with a simpler call to memblock_alloc().
+> 
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+> ---
+>   arch/arm/mm/mmu.c                     |  4 +---
+>   arch/c6x/mm/dma-coherent.c            |  9 ++-------
+>   arch/nds32/mm/init.c                  | 12 ++++--------
+>   arch/powerpc/kernel/setup-common.c    |  4 ++--
+>   arch/powerpc/mm/pgtable_32.c          |  4 +---
+>   arch/powerpc/mm/ppc_mmu_32.c          |  3 +--
+>   arch/powerpc/platforms/powernv/opal.c |  3 +--
+>   arch/sparc/kernel/prom_64.c           |  7 ++-----
+>   arch/sparc/mm/init_64.c               |  9 +++------
+>   arch/unicore32/mm/mmu.c               |  4 +---
+>   10 files changed, 18 insertions(+), 41 deletions(-)
+> 
+[...]
 
-Regards
-Andrzej
+> diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
+> index bda3c6f..9931e68 100644
+> --- a/arch/powerpc/mm/pgtable_32.c
+> +++ b/arch/powerpc/mm/pgtable_32.c
+> @@ -50,9 +50,7 @@ __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+>   	if (slab_is_available()) {
+>   		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
+>   	} else {
+> -		pte = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+> -		if (pte)
+> -			clear_page(pte);
+> +		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+
+memblock_alloc() uses memset to zeroize the block.
+
+clear_page() is more performant than memset().
+
+
+Christophe
+
+[...]
