@@ -1,50 +1,148 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:29 +0100
-Subject: [PATCH 03/40] arm64: dts: renesas: r8a77990: Add INTC-EX device node
+Date: Mon, 26 Nov 2018 13:54:30 +0100
+Subject: [PATCH 04/40] arm64: dts: renesas: r8a779{7|8}0: add PWM support
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <0c793a02cc7cc8ba66855a08d3015b8385885b1e.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <de625477c632abecf23feba94ff4c5904764f57d.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This patch adds a device node for the Interrupt Controller for External
-Devices (INTC-EX) on R-Car E3, which serves external IRQ pins IRQ[0-5].
+Describe PWMs in the R8A779{7|8}0 device trees.
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Based on the original (and large) patches by Vladimir Barinov.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 50 +++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a77980.dtsi | 50 +++++++++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 9509dc05665f..7278cd52891d 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -341,6 +341,22 @@
- 			#power-domain-cells = <1>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index cba7885cf7c3..e58040e76303 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -543,6 +543,56 @@
+ 			status = "disabled";
  		};
  
-+		intc_ex: interrupt-controller at e61c0000 {
-+			compatible = "renesas,intc-ex-r8a77990", "renesas,irqc";
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
-+			reg = <0 0xe61c0000 0 0x200>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
-+				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 407>;
-+			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
-+			resets = <&cpg 407>;
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a77970", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
 +		};
 +
- 		dmac0: dma-controller at e6700000 {
- 			compatible = "renesas,dmac-r8a77990",
- 				     "renesas,rcar-dmac";
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a77970", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a77970", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a7790", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a77970", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 8>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
+ 		scif0: serial at e6e60000 {
+ 			compatible = "renesas,scif-r8a77970",
+ 				     "renesas,rcar-gen3-scif",
+diff --git a/arch/arm64/boot/dts/renesas/r8a77980.dtsi b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+index d4952b527d14..a1fda9901423 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77980.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77980.dtsi
+@@ -594,6 +594,56 @@
+ 			status = "disabled";
+ 		};
+ 
++		pwm0: pwm at e6e30000 {
++			compatible = "renesas,pwm-r8a77980", "renesas,pwm-rcar";
++			reg = <0 0xe6e30000 0 0x10>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm1: pwm at e6e31000 {
++			compatible = "renesas,pwm-r8a77980", "renesas,pwm-rcar";
++			reg = <0 0xe6e31000 0 0x10>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm2: pwm at e6e32000 {
++			compatible = "renesas,pwm-r8a77980", "renesas,pwm-rcar";
++			reg = <0 0xe6e32000 0 0x10>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm3: pwm at e6e33000 {
++			compatible = "renesas,pwm-r8a77980", "renesas,pwm-rcar";
++			reg = <0 0xe6e33000 0 0x10>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
++		pwm4: pwm at e6e34000 {
++			compatible = "renesas,pwm-r8a77980", "renesas,pwm-rcar";
++			reg = <0 0xe6e34000 0 0x10>;
++			#pwm-cells = <2>;
++			clocks = <&cpg CPG_MOD 523>;
++			power-domains = <&sysc R8A77980_PD_ALWAYS_ON>;
++			resets = <&cpg 523>;
++			status = "disabled";
++		};
++
+ 		scif0: serial at e6e60000 {
+ 			compatible = "renesas,scif-r8a77980",
+ 				     "renesas,rcar-gen3-scif",
 -- 
 2.11.0
