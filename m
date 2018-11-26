@@ -1,60 +1,97 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 26 Nov 2018 14:31:44 -0200
-Subject: iMX6 PCIe MSI issues
-In-Reply-To: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
-References: <aad42775-52b6-6086-60a8-e45a17d50960@sedsystems.ca>
-Message-ID: <CAOMZO5DuZ4ZWk03tnsTx=Vpd8AbnCADMgyyKRuL0F6N3ZmN6qw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Nov 2018 16:53:48 +0000
+Subject: [PATCH] arm64: io: Ensure calls to delay routines are ordered against
+ prior readX()
+Message-ID: <1543251228-30001-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Trent and Tim (as I think they managed to fix some imx6 MSI issues)
+A relatively standard idiom for ensuring that a pair of MMIO writes to a
+device arrive at that device with a specified minimum delay between them
+is as follows:
 
-On Fri, Nov 23, 2018 at 8:17 PM Robert Hancock <hancock@sedsystems.ca> wrote:
->
-> I am working with a custom FPGA PCI Express endpoint connected to an NXP
-> iMX6D processor running the 4.19.2 kernel. It seems happy using INTx
-> interrupts but when trying to enable MSI the device driver is not
-> receiving any interrupts.
->
-> From some register poking I have figured out:
-> -the MSI address set on the PCIe device is correctly set in the iMX MSI
-> controller's MSI Controller Address register (0x1ffc820)
-> -the interrupt vectors are enabled in the MSI controller's Interrupt
-> Enable register (0x1ffc828)
-> -the interrupt vectors are not masked in the MSI controller's Interrupt
-> Mask register (0x1ffc82c)
-> -The MSI controller's Interrupt Status register (0x1ffc830) shows that
-> the requested interrupt vectors are pending
-> -In the ARM GIC, vector 152 (for msi_ctrl_int) is enabled in the IS
-> enable register (0x00a01110), but not set in the IS pending (0x00a01210)
-> or IS active (0x00a01310) registers
-> -Vector 152 is not masked in the GPC interrupt mask (0x00a01310)
-> -Vector 152 is not active in the GPC interrupt status (0x00a01310)
->
-> So it appears the MSI controller is receiving and recognizing the MSI
-> from the device, but the interrupt is not making it into the GIC for
-> some reason. If I manually set vector 152 to pending in the GIC, the
-> dw_handle_msi_irq handler in pci-designware-host.c does get called along
-> with the interrupt handler(s) for the PCIe device, so it appears the
-> chain from that point on is working:
->
-> # devmem 0x00a01210 32 0x1000000
->
-> I found someone else reporting this in 2014 with an unknown kernel
-> version on the NXP forums here, but with no resolution listed there:
->
-> https://community.nxp.com/thread/318307
->
-> Any ideas on what may be going wrong? My next step may be to try an
-> older kernel version to see if this got broken at some point.
->
-> --
-> Robert Hancock
-> Senior Software Developer
-> SED Systems
-> Email: hancock at sedsystems.ca
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	writel_relaxed(42, dev_base + CTL1);
+	readl(dev_base + CTL1);
+	udelay(10);
+	writel_relaxed(42, dev_base + CTL2);
+
+the intention being that the read-back from the device will push the
+prior write to CTL1, and the udelay will hold up the write to CTL1 until
+at least 10us have elapsed.
+
+Unfortunately, on arm64 where the underlying delay loop is implemented
+as a read of the architected counter, the CPU does not guarantee
+ordering from the readl() to the delay loop and therefore the delay loop
+could in theory be speculated and not provide the desired interval
+between the two writes.
+
+Fix this in a similar manner to PowerPC by introducing a dummy control
+dependency on the output of readX() which, combined with the ISB in the
+read of the architected counter, guarantees that a subsequent delay loop
+can not be executed until the readX() has returned its result.
+
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/io.h | 31 +++++++++++++++++++++++--------
+ 1 file changed, 23 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 9f8b915af3a7..d42d00d8d5b6 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -104,7 +104,22 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ }
+ 
+ /* IO barriers */
+-#define __iormb()		rmb()
++#define __iormb(v)							\
++({									\
++	unsigned long tmp;						\
++									\
++	rmb();								\
++									\
++	/*								\
++	 * Create a dummy control dependency from the IO read to any	\
++	 * later instructions. This ensures that a subsequent call to	\
++	 * udelay() will be ordered due to the ISB in get_cycles().	\
++	 */								\
++	asm volatile("eor	%0, %1, %1\n"				\
++		     "cbnz	%0, ."					\
++		     : "=r" (tmp) : "r" (v) : "memory");		\
++})
++
+ #define __iowmb()		wmb()
+ 
+ #define mmiowb()		do { } while (0)
+@@ -129,10 +144,10 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+  * following Normal memory access. Writes are ordered relative to any prior
+  * Normal memory access.
+  */
+-#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(); __v; })
+-#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(); __v; })
+-#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(); __v; })
+-#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(); __v; })
++#define readb(c)		({ u8  __v = readb_relaxed(c); __iormb(__v); __v; })
++#define readw(c)		({ u16 __v = readw_relaxed(c); __iormb(__v); __v; })
++#define readl(c)		({ u32 __v = readl_relaxed(c); __iormb(__v); __v; })
++#define readq(c)		({ u64 __v = readq_relaxed(c); __iormb(__v); __v; })
+ 
+ #define writeb(v,c)		({ __iowmb(); writeb_relaxed((v),(c)); })
+ #define writew(v,c)		({ __iowmb(); writew_relaxed((v),(c)); })
+@@ -183,9 +198,9 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ /*
+  * io{read,write}{16,32,64}be() macros
+  */
+-#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+-#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
+-#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
++#define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(__v); __v; })
++#define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(__v); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(__v); __v; })
+ 
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
+-- 
+2.1.4
