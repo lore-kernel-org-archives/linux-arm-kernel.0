@@ -1,60 +1,56 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 26 Nov 2018 10:24:31 -0800
-Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
-In-Reply-To: <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
-References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
- <20181117181225.10737-4-andrew.smirnov@gmail.com>
- <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
-Message-ID: <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 26 Nov 2018 18:26:43 +0000
+Subject: [PATCH v2 0/4] KVM: arm/arm64: vgic: Use raw_spinlock for locks taken
+ in IRQ context
+Message-ID: <1543256807-9768-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
->
-> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
-> > @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
-> > -     case IMX7D:
-> > +     case IMX8MQ:
-> > +             if (of_property_read_u32(node, "fsl,iomux-gpr1x",
-> > +                                      &imx6_pcie->gpr1x)) {
-> > +                     dev_err(dev, "Failed to get GPR1x address\n");
-> > +                     return -EINVAL;
-> > +             }
->
-> This is for distinguishing multiple controllers on the SOC but other
-> registers and bits might differ. Isn't it preferable to have a property
-> for controller id instead of adding many registers to DT?
->
+Hi,
 
-I liked encoding necessary info in DT directly slightly better than
-encoding abstract ID and then decoding it further in the driver code.
-OTOH, I am not really attached to that path. Lucas, can you comment on
-this please?
+While testing KVM running on PREEMPT_RT, starting guest could simply
+freeze the machine. This is because we are using spinlocks for VGIC
+locks, which is invalid in the VGIC case since the locks must be take
+with interrupts disabled.
 
-> > +
-> > +             if (of_property_read_u32_array(
-> > +                         node, "fsl,gpr12-device-type",
-> > +                         imx6_pcie->device_type,
-> > +                         ARRAY_SIZE(imx6_pcie->device_type))) {
-> > +                     dev_err(dev, "Failed to get device type
-> > mask/value\n");
-> > +                     return -EINVAL;
-> > +             }
->
-> The device type can be set on multiple SOCs, why are you adding a
-> mandatory property only for 8m?
+The solution is to use raw_spinlock instead of spinlocks.
 
-My thinking was that other SoCs don't really have two controllers, so
-they don't really need to have that property, but, more importantly,
-not forcing them to have this property should preserve backwards
-compatibility with old DTBs.
+Replacing those locks also highlighted an issue where we attempt to
+cond_resched with interrupts disabled.
 
->
-> There should probably be a separate patch with documented DT bindings.
->
+Patch 1 fixes the cond_resched issue.
+Patch 2-4 replace the VGIC spinlocks with raw_spinlocks
 
-Yes, definitely, I just wanted to come up with a set of bindings
-agreed on by the driver maintainers first.
+Changes since v1[1]:
+- Rebase on v4.20-rc4
+- Add Christoffer's Acked-by
+- Fix potential lock up when waiting for vcpus to halt
 
-Thanks,
-Andrey Smirnov
+[1] https://lkml.org/lkml/2018/11/19/776
+
+Cheers,
+
+Julien
+
+-->
+
+Julien Thierry (4):
+  KVM: arm/arm64: vgic: Do not cond_resched_lock() with IRQs disabled
+  KVM: arm/arm64: vgic: Make vgic_irq->irq_lock a raw_spinlock
+  KVM: arm/arm64: vgic: Make vgic_dist->lpi_list_lock a raw_spinlock
+  KVM: arm/arm64: vgic: Make vgic_cpu->ap_list_lock a raw_spinlock
+
+ include/kvm/arm_vgic.h           |   6 +-
+ virt/kvm/arm/vgic/vgic-debug.c   |   4 +-
+ virt/kvm/arm/vgic/vgic-init.c    |   8 +--
+ virt/kvm/arm/vgic/vgic-its.c     |  22 +++----
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  14 ++---
+ virt/kvm/arm/vgic/vgic-mmio-v3.c |  12 ++--
+ virt/kvm/arm/vgic/vgic-mmio.c    |  70 ++++++++++-----------
+ virt/kvm/arm/vgic/vgic-v2.c      |   4 +-
+ virt/kvm/arm/vgic/vgic-v3.c      |   8 +--
+ virt/kvm/arm/vgic/vgic.c         | 130 +++++++++++++++++++--------------------
+ 10 files changed, 135 insertions(+), 143 deletions(-)
+
+--
+1.9.1
