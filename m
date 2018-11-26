@@ -1,103 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:55:03 +0100
-Subject: [PATCH 37/40] arm64: dts: renesas: r8a7796: Add CMT device nodes
+Date: Mon, 26 Nov 2018 13:55:04 +0100
+Subject: [PATCH 38/40] arm64: dts: renesas: r8a77990: Enable I2C DMA
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <8942ce2bfaa162f8d915b50778724be0c5c2662b.1543229516.git.horms+renesas@verge.net.au>
+Message-ID: <8fbe048bd95b560ed5fcb8eaa80456a64aeb66a2.1543229516.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds CMT{0|1|2|3} device nodes for r8a7796 SoC.
+This patch enables I2C DMA.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
+Rev.0.80E.
+
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 70 ++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index e62c1702ab72..e7614b781308 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -433,6 +433,76 @@
- 			reg = <0 0xe6060000 0 0x50c>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+index 3b334be843f4..de25eda4f2f4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
+@@ -250,6 +250,9 @@
+ 			clocks = <&cpg CPG_MOD 931>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 931>;
++			dmas = <&dmac1 0x91>, <&dmac1 0x90>,
++			       <&dmac2 0x91>, <&dmac2 0x90>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <110>;
+ 			status = "disabled";
  		};
- 
-+		cmt0: timer at e60f0000 {
-+			compatible = "renesas,r8a7796-cmt0",
-+				     "renesas,rcar-gen3-cmt0";
-+			reg = <0 0xe60f0000 0 0x1004>;
-+			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 303>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 303>;
-+			status = "disabled";
-+		};
-+
-+		cmt1: timer at e6130000 {
-+			compatible = "renesas,r8a7796-cmt1",
-+				     "renesas,rcar-gen3-cmt1";
-+			reg = <0 0xe6130000 0 0x1004>;
-+			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 302>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 302>;
-+			status = "disabled";
-+		};
-+
-+		cmt2: timer at e6140000 {
-+			compatible = "renesas,r8a7796-cmt1",
-+				     "renesas,rcar-gen3-cmt1";
-+			reg = <0 0xe6140000 0 0x1004>;
-+			interrupts = <GIC_SPI 398 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 399 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 400 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 401 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 403 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 404 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 405 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 301>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 301>;
-+			status = "disabled";
-+		};
-+
-+		cmt3: timer at e6148000 {
-+			compatible = "renesas,r8a7796-cmt1",
-+				     "renesas,rcar-gen3-cmt1";
-+			reg = <0 0xe6148000 0 0x1004>;
-+			interrupts = <GIC_SPI 470 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 471 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 472 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 473 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 474 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 475 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 476 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 477 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 300>;
-+			clock-names = "fck";
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			resets = <&cpg 300>;
-+			status = "disabled";
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7796-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+@@ -264,6 +267,9 @@
+ 			clocks = <&cpg CPG_MOD 930>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 930>;
++			dmas = <&dmac1 0x93>, <&dmac1 0x92>,
++			       <&dmac2 0x93>, <&dmac2 0x92>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <6>;
+ 			status = "disabled";
+ 		};
+@@ -278,6 +284,9 @@
+ 			clocks = <&cpg CPG_MOD 929>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 929>;
++			dmas = <&dmac1 0x95>, <&dmac1 0x94>,
++			       <&dmac2 0x95>, <&dmac2 0x94>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <6>;
+ 			status = "disabled";
+ 		};
+@@ -292,6 +301,8 @@
+ 			clocks = <&cpg CPG_MOD 928>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 928>;
++			dmas = <&dmac0 0x97>, <&dmac0 0x96>;
++			dma-names = "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <110>;
+ 			status = "disabled";
+ 		};
+@@ -306,6 +317,8 @@
+ 			clocks = <&cpg CPG_MOD 927>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 927>;
++			dmas = <&dmac0 0x99>, <&dmac0 0x98>;
++			dma-names = "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <6>;
+ 			status = "disabled";
+ 		};
+@@ -320,6 +333,8 @@
+ 			clocks = <&cpg CPG_MOD 919>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 919>;
++			dmas = <&dmac0 0x9b>, <&dmac0 0x9a>;
++			dma-names = "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <6>;
+ 			status = "disabled";
+ 		};
+@@ -334,6 +349,8 @@
+ 			clocks = <&cpg CPG_MOD 918>;
+ 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
+ 			resets = <&cpg 918>;
++			dmas = <&dmac0 0x9d>, <&dmac0 0x9c>;
++			dma-names = "tx", "rx";
+ 			i2c-scl-internal-delay-ns = <6>;
+ 			status = "disabled";
+ 		};
 -- 
 2.11.0
