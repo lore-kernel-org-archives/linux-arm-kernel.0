@@ -1,49 +1,62 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 26 Nov 2018 20:36:33 +0100 (CET)
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-In-Reply-To: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
-Message-ID: <2009845931.201432.1543260993249@email.ionos.de>
+From: mikelley@microsoft.com (Michael Kelley)
+Date: Mon, 26 Nov 2018 19:47:41 +0000
+Subject: [PATCH 3/4] Drivers: hv: vmbus: Add hooks for per-CPU IRQ
+In-Reply-To: <20181126192101.GC32208@kroah.com>
+References: <20181122030914.16274-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-3-kys@linuxonhyperv.com>
+ <20181126192101.GC32208@kroah.com>
+Message-ID: <CY4PR21MB07735AB610D4BFD3EB7556D5D7D70@CY4PR21MB0773.namprd21.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 20. November 2018 um 15:53 geschrieben:
+From: Greg KH <gregkh@linuxfoundation.org>  Monday, November 26, 2018 11:21 AM
+
+> > diff --git a/arch/x86/include/asm/mshyperv.h b/arch/x86/include/asm/mshyperv.h
+> > index 0d6271cce198..8d97bd3a13a6 100644
+> > --- a/arch/x86/include/asm/mshyperv.h
+> > +++ b/arch/x86/include/asm/mshyperv.h
+> > @@ -109,6 +109,10 @@ void hyperv_vector_handler(struct pt_regs *regs);
+> >  void hv_setup_vmbus_irq(void (*handler)(void));
+> >  void hv_remove_vmbus_irq(void);
+> >
+> > +/* On x86/x64, there isn't a real IRQ to be enabled/disable */
+> > +static inline void hv_enable_vmbus_irq(void) {}
+> > +static inline void hv_disable_vmbus_irq(void) {}
+> > +
+> >  void hv_setup_kexec_handler(void (*handler)(void));
+> >  void hv_remove_kexec_handler(void);
+> >  void hv_setup_crash_handler(void (*handler)(struct pt_regs *regs));
+> > diff --git a/drivers/hv/hv.c b/drivers/hv/hv.c
+> > index 166c2501de17..d0bb09a4bd73 100644
+> > --- a/drivers/hv/hv.c
+> > +++ b/drivers/hv/hv.c
+> > @@ -307,6 +307,7 @@ int hv_synic_init(unsigned int cpu)
+> >  	hv_set_siefp(siefp.as_uint64);
+> >
+> >  	/* Setup the shared SINT. */
+> > +	hv_enable_vmbus_irq();
+> >  	hv_get_synint_state(VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
+> >
+> >  	shared_sint.vector = HYPERVISOR_CALLBACK_VECTOR;
+> > @@ -434,6 +435,7 @@ int hv_synic_cleanup(unsigned int cpu)
+> >  	/* Disable the global synic bit */
+> >  	sctrl.enable = 0;
+> >  	hv_set_synic_state(sctrl.as_uint64);
+> > +	hv_disable_vmbus_irq();
+> >
+> >  	return 0;
+> >  }
+> > --
+> > 2.19.1
 > 
-> 
-> Hi All,
-> 
-> This series was written in parallel with reading and understanding the
-> vchiq code. So excuse me for the lack of logic in the sequence of
-> patches.
-> 
-> The main focus was to delete as much code as possible, I've counted
-> around 550 lines, which is not bad. Apart from that there are some
-> patches enforcing proper kernel APIs usage.
-> 
-> The only patch that really changes code is the
-> vchiq_ioc_copy_element_data() rewrite.
-> 
-> The last commit updates the TODO list with some of my observations, I
-> realise some of the might be a little opinionated. If anything it's
-> going to force a discussion on the topic, which is nice.
-> 
-> It was developed on top of the latest linux-next, and was tested on a
-> RPIv3B+ with audio, video and running vchiq_test.
-> 
-> Regards,
-> Nicolas
-> 
-> RFC -> PATCH, as per Stefan's comments:
->   - Remove semaphore initialization from remove_event_create()
->     (commit 9)
->   - Join all three semaphore to completion patches (commit 11)
->   - Update probe/init commit message (commit 14)
->   - Update TODO commit message and clean up (commit 16)
->   - Fix spelling on some of the patches
+> You created "null" hooks that do nothing, for no one in this patch
+> series, why?
 > 
 
-The whole series is
+hv_enable_vmbus_irq() and hv_disable_vmbus_irq() have non-null
+implementations in the ARM64 code in patch 2 of this series.  The
+implementations are in the new file arch/arm64/hyperv/mshyperv.c.
+Or am I misunderstanding your point?
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Unfortunately patch 05 might not apply.
+Michael
