@@ -1,48 +1,33 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:29 +0000
-Subject: [PATCH v2 13/20] powerpc: perf/core: advertise PMU exclusion
- capability
+Date: Mon, 26 Nov 2018 11:12:32 +0000
+Subject: [PATCH v2 16/20] sparc: perf/core: advertise PMU exclusion capability
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-14-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-17-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For PowerPC PMUs that have the capability to exclude events
-based on context. Let's advertise that we support the
-PERF_PMU_CAP_EXCLUDE capability to ensure that perf doesn't
-prevent us from handling events where any exclusion flags are
-set.
+The SPARC PMU has the capability to exclude events based on context
+ - let's advertise that we support the PERF_PMU_CAP_EXCLUDE
+capability to ensure that perf doesn't prevent us from handling
+events where any exclusion flags are set.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- arch/powerpc/perf/core-book3s.c  | 1 +
- arch/powerpc/perf/core-fsl-emb.c | 1 +
- 2 files changed, 2 insertions(+)
+ arch/sparc/kernel/perf_event.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/powerpc/perf/core-book3s.c b/arch/powerpc/perf/core-book3s.c
-index 81f8a0c..2f44b09 100644
---- a/arch/powerpc/perf/core-book3s.c
-+++ b/arch/powerpc/perf/core-book3s.c
-@@ -2007,6 +2007,7 @@ static struct pmu power_pmu = {
- 	.commit_txn	= power_pmu_commit_txn,
- 	.event_idx	= power_pmu_event_idx,
- 	.sched_task	= power_pmu_sched_task,
+diff --git a/arch/sparc/kernel/perf_event.c b/arch/sparc/kernel/perf_event.c
+index d3149ba..38fac17 100644
+--- a/arch/sparc/kernel/perf_event.c
++++ b/arch/sparc/kernel/perf_event.c
+@@ -1571,6 +1571,7 @@ static struct pmu pmu = {
+ 	.start_txn	= sparc_pmu_start_txn,
+ 	.cancel_txn	= sparc_pmu_cancel_txn,
+ 	.commit_txn	= sparc_pmu_commit_txn,
 +	.capabilities	= PERF_PMU_CAP_EXCLUDE,
  };
  
- /*
-diff --git a/arch/powerpc/perf/core-fsl-emb.c b/arch/powerpc/perf/core-fsl-emb.c
-index ba48584..cea5bcb 100644
---- a/arch/powerpc/perf/core-fsl-emb.c
-+++ b/arch/powerpc/perf/core-fsl-emb.c
-@@ -596,6 +596,7 @@ static struct pmu fsl_emb_pmu = {
- 	.start		= fsl_emb_pmu_start,
- 	.stop		= fsl_emb_pmu_stop,
- 	.read		= fsl_emb_pmu_read,
-+	.capabilities	= PERF_PMU_CAP_EXCLUDE,
- };
- 
- /*
+ void perf_event_print_debug(void)
 -- 
 2.7.4
