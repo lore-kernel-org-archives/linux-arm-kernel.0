@@ -1,67 +1,71 @@
 From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Sun, 25 Nov 2018 18:15:31 -0600
-Subject: [PATCH linux-next 10/10] net: ethernet: ti: cpsw: deprecate
- cpsw-phy-sel driver
+Date: Sun, 25 Nov 2018 18:15:26 -0600
+Subject: [PATCH linux-next 05/10] ARM: dts: dra7: switch to use phy-gmii-sel
 In-Reply-To: <20181126001531.12974-1-grygorii.strashko@ti.com>
 References: <20181126001531.12974-1-grygorii.strashko@ti.com>
-Message-ID: <20181126001531.12974-11-grygorii.strashko@ti.com>
+Message-ID: <20181126001531.12974-6-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Deprecate cpsw-phy-sel driver as it's been replaced with new
-TI phy-gmii-sel PHY driver.
+Switch to use phy-gmii-sel PHY instead of cpsw-phy-sel.
 
 Cc: Kishon Vijay Abraham I <kishon@ti.com>
 Cc: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
 ---
- drivers/net/ethernet/ti/Kconfig | 6 +++---
- drivers/net/ethernet/ti/cpsw.h  | 6 ++++++
- 2 files changed, 9 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/dra7-l4.dtsi | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/net/ethernet/ti/Kconfig b/drivers/net/ethernet/ti/Kconfig
-index f932923..96415da 100644
---- a/drivers/net/ethernet/ti/Kconfig
-+++ b/drivers/net/ethernet/ti/Kconfig
-@@ -49,10 +49,11 @@ config TI_DAVINCI_CPDMA
- 	  will be called davinci_cpdma.  This is recommended.
+diff --git a/arch/arm/boot/dts/dra7-l4.dtsi b/arch/arm/boot/dts/dra7-l4.dtsi
+index 7e5c0d4f..7070095 100644
+--- a/arch/arm/boot/dts/dra7-l4.dtsi
++++ b/arch/arm/boot/dts/dra7-l4.dtsi
+@@ -77,18 +77,18 @@
+ 						};
+ 					};
  
- config TI_CPSW_PHY_SEL
--	bool
-+	bool "TI CPSW Phy mode Selection (DEPRECATED)"
-+	default n
- 	---help---
- 	  This driver supports configuring of the phy mode connected to
--	  the CPSW.
-+	  the CPSW. DEPRECATED: use PHY_TI_GMII_SEL.
++					phy_gmii_sel: phy-gmii-sel {
++						compatible = "ti,dra7xx-phy-gmii-sel";
++						reg = <0x554 0x4>;
++						#phy-cells = <1>;
++					};
++
+ 					scm_conf_clocks: clocks {
+ 						#address-cells = <1>;
+ 						#size-cells = <0>;
+ 					};
+ 				};
  
- config TI_CPSW_ALE
- 	tristate "TI CPSW ALE Support"
-@@ -64,7 +65,6 @@ config TI_CPSW
- 	depends on ARCH_DAVINCI || ARCH_OMAP2PLUS || COMPILE_TEST
- 	select TI_DAVINCI_CPDMA
- 	select TI_DAVINCI_MDIO
--	select TI_CPSW_PHY_SEL
- 	select TI_CPSW_ALE
- 	select MFD_SYSCON
- 	select REGMAP
-diff --git a/drivers/net/ethernet/ti/cpsw.h b/drivers/net/ethernet/ti/cpsw.h
-index cf111db..907e05fc 100644
---- a/drivers/net/ethernet/ti/cpsw.h
-+++ b/drivers/net/ethernet/ti/cpsw.h
-@@ -21,7 +21,13 @@
- 			 ((mac)[2] << 16) | ((mac)[3] << 24))
- #define mac_lo(mac)	(((mac)[4] << 0) | ((mac)[5] << 8))
+-				phy_sel: cpsw-phy-sel at 554 {
+-					compatible = "ti,dra7xx-cpsw-phy-sel";
+-					reg= <0x554 0x4>;
+-					reg-names = "gmii-sel";
+-				};
+-
+ 				dra7_pmx_core: pinmux at 1400 {
+ 					compatible = "ti,dra7-padconf",
+ 						     "pinctrl-single";
+@@ -3060,7 +3060,6 @@
+ 					     <GIC_SPI 337 IRQ_TYPE_LEVEL_HIGH>;
+ 				ranges = <0 0 0x4000>;
+ 				syscon = <&scm_conf>;
+-				cpsw-phy-sel = <&phy_sel>;
+ 				status = "disabled";
  
-+#if IS_ENABLED(CONFIG_TI_CPSW_PHY_SEL)
- void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave);
-+#else
-+static inline
-+void cpsw_phy_sel(struct device *dev, phy_interface_t phy_mode, int slave)
-+{}
-+#endif
- int ti_cm_get_macid(struct device *dev, int slave, u8 *mac_addr);
+ 				davinci_mdio: mdio at 1000 {
+@@ -3075,11 +3074,13 @@
+ 				cpsw_emac0: slave at 200 {
+ 					/* Filled in by U-Boot */
+ 					mac-address = [ 00 00 00 00 00 00 ];
++					phys = <&phy_gmii_sel 1>;
+ 				};
  
- #endif /* __CPSW_H__ */
+ 				cpsw_emac1: slave at 300 {
+ 					/* Filled in by U-Boot */
+ 					mac-address = [ 00 00 00 00 00 00 ];
++					phys = <&phy_gmii_sel 2>;
+ 				};
+ 			};
+ 		};
 -- 
 2.10.5
