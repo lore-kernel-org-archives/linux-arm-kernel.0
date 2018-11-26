@@ -1,87 +1,31 @@
-From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:26 +0000
-Subject: [PATCH v2 10/20] drivers/perf: perf/core: remove unnecessary checks
- for exclusion
-In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-11-git-send-email-andrew.murray@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 26 Nov 2018 16:55:31 +0530
+Subject: [RFC 0/9] ASoC/ARM: Merge the davinci and omap audio directories
+In-Reply-To: <20181108151628.GH56134@atomide.com>
+References: <20181108083754.1746-1-peter.ujfalusi@ti.com>
+ <20181108151628.GH56134@atomide.com>
+Message-ID: <808d350d-9e0e-d9b5-a474-1a4fd0c9b292@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For drivers that do not support context exclusion we do not
-advertise the PERF_PMU_CAP_EXCLUDE capability. This ensures that
-perf will prevent us from handling events where any exclusion
-flags are set. Let's remove the now unnecessary check for
-exclusion flags.
+On 08/11/18 8:46 PM, Tony Lindgren wrote:
+> * Peter Ujfalusi <peter.ujfalusi@ti.com> [181108 08:36]:
+>> I believe with v1 all of this can be merged via ASoC tree as the chances of
+>> conflicts are low for the touched arch/arm files. But Sekhar and Tony can
+>> correct me if I'm wrong.
+> 
+> Good to see this :) Yes merging these changes via the ASoC tree makes
+> sense to me. I will take a look and ack when you post the version
+> without RFC.
 
-This change means that qcom_{l2|l3}_pmu will now also indicate that
-they do not support exclude_{host|guest} and that xgene_pmu does
-not also support exclude_idle and exclude_hv.
+Looks good to me too. And fine with the series getting merged through ASoC.
 
-Note that for qcom_l2_pmu we now implictly return -EINVAL instead
-of -EOPNOTSUPP. This change will result in the perf userspace
-utility retrying the perf_event_open system call with fallback
-event attributes that do not fail.
+But will appreciate an immutable commit over v4.20-rc1 in case I do end
+up queuing something that clashes with changes here (especially worried
+about the defconfig changes - those are notorious for merge conflicts,
+and are pain to resolve).
 
-Signed-off-by: Andrew Murray <andrew.murray@arm.com>
----
- drivers/perf/qcom_l2_pmu.c | 8 --------
- drivers/perf/qcom_l3_pmu.c | 7 -------
- drivers/perf/xgene_pmu.c   | 5 -----
- 3 files changed, 20 deletions(-)
+I will test this once the non-RFC version is posted.
 
-diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
-index 842135c..518e18c 100644
---- a/drivers/perf/qcom_l2_pmu.c
-+++ b/drivers/perf/qcom_l2_pmu.c
-@@ -509,14 +509,6 @@ static int l2_cache_event_init(struct perf_event *event)
- 		return -EOPNOTSUPP;
- 	}
- 
--	/* We cannot filter accurately so we just don't allow it. */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--	    event->attr.exclude_hv || event->attr.exclude_idle) {
--		dev_dbg_ratelimited(&l2cache_pmu->pdev->dev,
--				    "Can't exclude execution levels\n");
--		return -EOPNOTSUPP;
--	}
--
- 	if (((L2_EVT_GROUP(event->attr.config) > L2_EVT_GROUP_MAX) ||
- 	     ((event->attr.config & ~L2_EVT_MASK) != 0)) &&
- 	    (event->attr.config != L2CYCLE_CTR_RAW_CODE)) {
-diff --git a/drivers/perf/qcom_l3_pmu.c b/drivers/perf/qcom_l3_pmu.c
-index 2dc63d6..e28bd2f 100644
---- a/drivers/perf/qcom_l3_pmu.c
-+++ b/drivers/perf/qcom_l3_pmu.c
-@@ -495,13 +495,6 @@ static int qcom_l3_cache__event_init(struct perf_event *event)
- 		return -ENOENT;
- 
- 	/*
--	 * There are no per-counter mode filters in the PMU.
--	 */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--	    event->attr.exclude_hv || event->attr.exclude_idle)
--		return -EINVAL;
--
--	/*
- 	 * Sampling not supported since these events are not core-attributable.
- 	 */
- 	if (hwc->sample_period)
-diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-index 0e31f13..bdc55de 100644
---- a/drivers/perf/xgene_pmu.c
-+++ b/drivers/perf/xgene_pmu.c
-@@ -914,11 +914,6 @@ static int xgene_perf_event_init(struct perf_event *event)
- 	if (is_sampling_event(event) || event->attach_state & PERF_ATTACH_TASK)
- 		return -EINVAL;
- 
--	/* SOC counters do not have usr/os/guest/host bits */
--	if (event->attr.exclude_user || event->attr.exclude_kernel ||
--	    event->attr.exclude_host || event->attr.exclude_guest)
--		return -EINVAL;
--
- 	if (event->cpu < 0)
- 		return -EINVAL;
- 	/*
--- 
-2.7.4
+Thanks,
+Sekhar
