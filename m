@@ -1,65 +1,122 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:54:52 +0100
-Subject: [PATCH 26/40] arm64: dts: renesas: r8a77990: Fix VIN endpoint
- numbering
+Date: Mon, 26 Nov 2018 13:54:48 +0100
+Subject: [PATCH 22/40] arm64: dts: renesas: r8a77990: Add all HSCIF nodes
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <5e53dbf4edb4d0d1cc97318139f2c20338f207c8.1543229515.git.horms+renesas@verge.net.au>
+Message-ID: <b7a1da2193e635373a80238137720e86e8ff4119.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacopo Mondi <jacopo+renesas@jmondi.org>
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-The VIN driver bindings dictates fixed numbering for VIN endpoints connected
-to CSI-2 endpoints, even when a single endpoint exists.
+This patch adds the device nodes for all HSCIF serial ports to
+the R8A77990 SoC.
 
-Without proper endpoint numbering the VIN driver fails to probe.
-
-Based on a patch in BSP from Koji Matsuoka <koji.matsuoka.xm@renesas.com>
-
-Fixes: ec70407ae7d7 ("arm64: dts: renesas: r8a77990: Add VIN and CSI-2 device nodes")
-Signed-off-by: Koji Matsuoka <koji.matsuoka.xm@renesas.com>
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Jacopo Mondi <jacopo+renesas@jmondi.org>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a77990.dtsi | 88 +++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index e0092fb27ec0..a2524fc138a2 100644
+index 887b066211a2..beb53aaa9e2c 100644
 --- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -1011,9 +1011,13 @@
- 				#size-cells = <0>;
+@@ -380,6 +380,94 @@
+ 			resets = <&cpg 407>;
+ 		};
  
- 				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++		hscif0: serial at e6540000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6540000 0 0x60>;
++			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 520>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
++			       <&dmac2 0x31>, <&dmac2 0x30>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 520>;
++			status = "disabled";
++		};
 +
- 					reg = <1>;
- 
--					vin4csi40: endpoint {
-+					vin4csi40: endpoint at 2 {
-+						reg = <2>;
- 						remote-endpoint= <&csi40vin4>;
- 					};
- 				};
-@@ -1035,9 +1039,13 @@
- 				#size-cells = <0>;
- 
- 				port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
++		hscif1: serial at e6550000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6550000 0 0x60>;
++			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 519>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
++			       <&dmac2 0x33>, <&dmac2 0x32>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 519>;
++			status = "disabled";
++		};
 +
- 					reg = <1>;
- 
--					vin5csi40: endpoint {
-+					vin5csi40: endpoint at 2 {
-+						reg = <2>;
- 						remote-endpoint= <&csi40vin5>;
- 					};
- 				};
++		hscif2: serial at e6560000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe6560000 0 0x60>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 518>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
++			       <&dmac2 0x35>, <&dmac2 0x34>;
++			dma-names = "tx", "rx", "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 518>;
++			status = "disabled";
++		};
++
++		hscif3: serial at e66a0000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66a0000 0 0x60>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 517>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x37>, <&dmac0 0x36>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 517>;
++			status = "disabled";
++		};
++
++		hscif4: serial at e66b0000 {
++			compatible = "renesas,hscif-r8a77990",
++				     "renesas,rcar-gen3-hscif",
++				     "renesas,hscif";
++			reg = <0 0xe66b0000 0 0x60>;
++			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 516>,
++				 <&cpg CPG_CORE R8A77990_CLK_S3D1C>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			dmas = <&dmac0 0x39>, <&dmac0 0x38>;
++			dma-names = "tx", "rx";
++			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
++			resets = <&cpg 516>;
++			status = "disabled";
++		};
++
+ 		hsusb: usb at e6590000 {
+ 			compatible = "renesas,usbhs-r8a77990",
+ 				     "renesas,rcar-gen3-usbhs";
 -- 
 2.11.0
