@@ -1,82 +1,33 @@
 From: pn@denx.de (Parthiban Nallathambi)
-Date: Mon, 26 Nov 2018 19:58:21 +0100
-Subject: [PATCH v2 4/4] arm64: dts: actions: s700-cubieboard7: Enable I2C0 and
- I2C1
+Date: Mon, 26 Nov 2018 19:58:19 +0100
+Subject: [PATCH v2 2/4] i2c: Add Actions Semiconductor Owl family S700 I2C
+ support
 In-Reply-To: <20181126185821.2480449-1-pn@denx.de>
 References: <20181126185821.2480449-1-pn@denx.de>
-Message-ID: <20181126185821.2480449-5-pn@denx.de>
+Message-ID: <20181126185821.2480449-3-pn@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl definitions for Actions Semiconductor S700 I2C controllers.
-Pinctrl definitions are only available for I2C0, I2C1 and I2C2.
-Enable I2C0 (PMIC), I2C1 (gyro, touchscreen) in cubieboard7.
+Add S700 to the list of devices supported by Owl I2C driver.
+
+Add Actions Semiconductor Owl family S900 I2C driver.
 
 Signed-off-by: Parthiban Nallathambi <pn@denx.de>
 ---
- .../boot/dts/actions/s700-cubieboard7.dts     | 53 +++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ drivers/i2c/busses/i2c-owl.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-index 28f3f4a0f7f0..6a75fdd7ab42 100644
---- a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-+++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-@@ -37,3 +37,56 @@
- &uart3 {
- 	status = "okay";
+diff --git a/drivers/i2c/busses/i2c-owl.c b/drivers/i2c/busses/i2c-owl.c
+index 96b4572e6d9c..b6b5a495118b 100644
+--- a/drivers/i2c/busses/i2c-owl.c
++++ b/drivers/i2c/busses/i2c-owl.c
+@@ -475,6 +475,7 @@ static int owl_i2c_probe(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id owl_i2c_of_match[] = {
++	{ .compatible = "actions,s700-i2c" },
+ 	{ .compatible = "actions,s900-i2c" },
+ 	{ /* sentinel */ }
  };
-+
-+&i2c0 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_default>;
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_default>;
-+};
-+
-+&i2c2 {
-+	status = "disabled";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_default>;
-+};
-+
-+&pinctrl {
-+	i2c0_default: i2c0_default {
-+		pinmux {
-+			groups = "i2c0_mfp";
-+			function = "i2c0";
-+		};
-+		pinconf {
-+			pins = "i2c0_sclk", "i2c0_sdata";
-+			bias-pull-up;
-+		};
-+	};
-+
-+	i2c1_default: i2c1_default {
-+		pinmux {
-+			groups = "i2c1_dummy";
-+			function = "i2c1";
-+		};
-+		pinconf {
-+			pins = "i2c1_sclk", "i2c1_sdata";
-+			bias-pull-up;
-+		};
-+	};
-+
-+	i2c2_default: i2c2_default {
-+		pinmux {
-+			groups = "i2c2_dummy";
-+			function = "i2c2";
-+		};
-+		pinconf {
-+			pins = "i2c2_sclk", "i2c2_sdata";
-+			bias-pull-up;
-+		};
-+	};
-+};
 -- 
 2.17.2
