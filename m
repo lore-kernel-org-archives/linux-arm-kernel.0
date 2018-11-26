@@ -1,50 +1,96 @@
-From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Sun, 25 Nov 2018 21:10:51 -0200
-Subject: [PATCH 02/13] ARM: multi_v7_defconfig: Add missing systemd options
-In-Reply-To: <CAOesGMjR--5XC1pNMkPHR9BaPfgGfdC8JHAM3oqS3Xte3TQbGA@mail.gmail.com>
-References: <20181125211907.9895-1-otavio@ossystems.com.br>
- <20181125211907.9895-2-otavio@ossystems.com.br>
- <CAOesGMjR--5XC1pNMkPHR9BaPfgGfdC8JHAM3oqS3Xte3TQbGA@mail.gmail.com>
-Message-ID: <CAP9ODKrTZm8FuRWLh+5NZSbpMh_yptotdoEgfrARHypUx8FkMg@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Sun, 25 Nov 2018 18:15:22 -0600
+Subject: [PATCH linux-next 01/10] dt-bindings: phy: add cpsw port interface
+ mode selection phy bindings
+In-Reply-To: <20181126001531.12974-1-grygorii.strashko@ti.com>
+References: <20181126001531.12974-1-grygorii.strashko@ti.com>
+Message-ID: <20181126001531.12974-2-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Olof,
+Add CPSW Port's Interface Mode Selection PHY (phy-gmii-sel) DT Bindings
 
-On Sun, Nov 25, 2018 at 8:25 PM Olof Johansson <olof@lixom.net> wrote:
-> Thanks for these patches. I don't have a reason to _not_ enable
-> systemd features, but would you mind providing a brief description of
-> what's not working without this change? Is it completely broken, or is
-> it just the random-UID featues that don't work, or something else?.
-> Useful for others to know what's expected to break if someone turns
-> them off, etc.
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ .../devicetree/bindings/phy/ti-phy-gmii-sel.txt    | 68 ++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/ti-phy-gmii-sel.txt
 
-Thank you for your kindness reviewing this. I am not an experienced
-Linux kernel contributor so I am going to do some mistakes during this
-process.
-
-We usually follow the required feature set listed on Gentoo wiki[1] as
-it is usually up to date and avoids a lot of headaches for us when
-dealing with boot issues with SystemD.
-
-1. https://wiki.gentoo.org/wiki/Systemd#Kernel
-
-Do you think mentioning where it has been taken from is enough?
-
-> Also, I noticed you posted a series of 13 patches, which includes some
-> dts files for rv1108, some network driver changes and some of these
-> more generic defconfig changes. I would suggest that you split up your
-> patches into independent series where possible, especially when they
-> end up going to different subsystems. Providing suitable cover letters
-> for the series when you post them is also useful to help reviewers by
-> summarizing the series, including changes from last time it was
-> posted, etc. Please address it to the superset of patch receivers on
-> the series.
-
-I can certainly improve it for the next submission. Should I split
-them all and tag them v2 to easy it?
-
+diff --git a/Documentation/devicetree/bindings/phy/ti-phy-gmii-sel.txt b/Documentation/devicetree/bindings/phy/ti-phy-gmii-sel.txt
+new file mode 100644
+index 0000000..50ce9ae
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/ti-phy-gmii-sel.txt
+@@ -0,0 +1,68 @@
++CPSW Port's Interface Mode Selection PHY Tree Bindings
++-----------------------------------------------
++
++TI am335x/am437x/dra7(am5)/dm814x CPSW3G Ethernet Subsystem supports
++two 10/100/1000 Ethernet ports with selectable G/MII, RMII, and RGMII interfaces.
++The interface mode is selected by configuring the MII mode selection register(s)
++(GMII_SEL) in the System Control Module chapter (SCM). GMII_SEL register(s) and
++bit fields placement in SCM are different between SoCs while fields meaning
++is the same.
++                                               +--------------+
++        +-------------------------------+      |SCM           |
++        |                     CPSW      |      |  +---------+ |
++        |        +--------------------------------+gmii_sel | |
++        |        |                      |      |  +---------+ |
++        |   +----v---+     +--------+   |      +--------------+
++        |   |Port 1..<--+-->GMII/MII<------->
++        |   |        |  |  |        |   |
++        |   +--------+  |  +--------+   |
++        |               |               |
++        |               |  +--------+   |
++        |               |  | RMII   <------->
++        |               +-->        |   |
++        |               |  +--------+   |
++        |               |               |
++        |               |  +--------+   |
++        |               |  | RGMII  <------->
++        |               +-->        |   |
++        |                  +--------+   |
++        +-------------------------------+
++
++CPSW Port's Interface Mode Selection PHY describes MII interface mode between
++CPSW Port and Ethernet PHY which depends on Eth PHY and board configuration.
++
++CPSW Port's Interface Mode Selection PHY device should defined as child device
++of SCM node (scm_conf) and can be attached to each CPSW port node using standard
++PHY bindings (See phy/phy-bindings.txt).
++
++Required properties:
++- compatible		: Should be "ti,am3352-phy-gmii-sel" for am335x platform
++			  "ti,dra7xx-phy-gmii-sel" for dra7xx/am57xx platform
++			  "ti,am43xx-phy-gmii-sel" for am43xx platform
++			  "ti,dm814-phy-gmii-sel" for dm814x platform
++- reg			: Address and length of the register set for the device
++- #phy-cells		: must be 2.
++			  cell 1 - CPSW port number (starting from 1)
++			  cell 2 - RMII refclk mode
++
++Examples:
++	phy_gmii_sel: phy-gmii-sel {
++		compatible = "ti,am3352-phy-gmii-sel";
++		reg = <0x650 0x4>;
++		#phy-cells = <2>;
++	};
++
++	mac: ethernet at 4a100000 {
++		compatible = "ti,am335x-cpsw","ti,cpsw";
++		...
++
++		cpsw_emac0: slave at 4a100200 {
++			...
++			phys = <&phy_gmii_sel 1 1>;
++		};
++
++		cpsw_emac1: slave at 4a100300 {
++			...
++			phys = <&phy_gmii_sel 2 1>;
++		};
++	};
 -- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9 9981-7854          Mobile: +1 (347) 903-9750
+2.10.5
