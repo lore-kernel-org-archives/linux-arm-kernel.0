@@ -1,50 +1,54 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Mon, 26 Nov 2018 17:27:46 +0200
-Subject: [PATCH 05/14] dt-bindings: mfd: axp20x: add support for
- regulator-ramp-delay for AXP209
-In-Reply-To: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
-Message-ID: <4333f81dfa1d9be082b09ab9ddf2694cb56285e2.1543245984.git-series.plaes@plaes.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 26 Nov 2018 15:38:20 +0000
+Subject: [PATCH 2/2] arm64: defconfig: enable BPF related configs
+In-Reply-To: <CAKv+Gu9EE_bWcoxEFr4pi41pfAQsDAywKR+gSueA9vE_Z4Np+g@mail.gmail.com>
+References: <20181111181048.10933-1-pbrobinson@gmail.com>
+ <20181111181048.10933-2-pbrobinson@gmail.com>
+ <20181112183623.GA2265@brain-police>
+ <CAKv+Gu9EE_bWcoxEFr4pi41pfAQsDAywKR+gSueA9vE_Z4Np+g@mail.gmail.com>
+Message-ID: <20181126153820.GA28400@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <oliver@schinagl.nl>
+On Sat, Nov 17, 2018 at 03:18:04PM -0800, Ard Biesheuvel wrote:
+> On Mon, 12 Nov 2018 at 10:36, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sun, Nov 11, 2018 at 06:10:48PM +0000, Peter Robinson wrote:
+> > > The BPF components are getting more widely used by various components
+> > > so we should enable them in the ARMv7 multi config to ensure they
+> > > get wider testing and don't regress.
+> >
+> > Have other architectures already made this leap?
+> >
+> 
+> $ git grep CONFIG_BPF_SYSCALL=y arch/
+> arch/arm/configs/aspeed_g4_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/arm/configs/aspeed_g5_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/mips/configs/generic_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/powerpc/configs/44x/fsp2_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/powerpc/configs/powernv_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/powerpc/configs/ppc64_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/powerpc/configs/pseries_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/riscv/configs/defconfig:CONFIG_BPF_SYSCALL=y
+> arch/s390/configs/debug_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/s390/configs/performance_defconfig:CONFIG_BPF_SYSCALL=y
+> arch/s390/defconfig:CONFIG_BPF_SYSCALL=y
+> 
+> but nobody seems to enable CONFIG_BPF_JIT_ALWAYS_ON.
+> 
+> I sent some patches to move the BPF JIT allocations out of the module
+> range. Whether that really improves things in terms of security is not
+> obvious to me, but at least we stop wasting module region space (and
+> potentially KASAN shadow pages) on BPF programs.
+> 
+> If this is mainly for coverage, it would indeed be nice if we could at
+> least make it root only by default. However, if the distros are
+> enabling this in their default configurations, I'd prefer it if we at
+> least have a config that will help us spot issues early on.
 
-The AXP209 supports ramping up voltages on several regulators such as
-DCDC2 and LDO3, therefore we can use the standard 'regulator-ramp-delay'
-property for those 2 regulators.
+That's a fair point on the distros. Peter, as author of the patch, please
+can you take a look at the arm64 kernel configs from some popular
+distributions and see which of these options they tend to enable?
 
-Note that the voltage ramp only works when the regulator is already
-enabled. E.g. when going from say 0.7 V to 3.6 V.
+Thanks,
 
-When turning on the regulator, no voltage ramp is performed in hardware.
-
-What this means, is that if the bootloader brings up the voltage at 0.7 V,
-the ramp delay property is properly applied. If however, the bootloader
-leaves the power off, no ramp delay is applied when the power is
-enabled by the regulator framework.
-
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- Documentation/devicetree/bindings/mfd/axp20x.txt | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 188f037..5542212 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -32,6 +32,11 @@ Required properties:
- - interrupt-controller: The PMIC has its own internal IRQs
- - #interrupt-cells: Should be set to 1
- 
-+Supported common regulator properties, see regulator.txt for more information:
-+- regulator-ramp-delay: sets the ramp up delay in uV/us
-+			AXP20x/DCDC2: 1600, 800
-+			AXP20x/LDO3:  1600, 800
-+
- Optional properties:
- - x-powers,dcdc-freq: defines the work frequency of DC-DC in KHz
- 		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
--- 
-git-series 0.9.1
+Will
