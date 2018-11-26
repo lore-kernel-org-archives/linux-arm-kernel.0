@@ -1,70 +1,34 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 26 Nov 2018 16:48:32 +0900
-Subject: [PATCH 1/3] clk: samsung: exynos5420: add VPLL rate table for
- g3d clock
-In-Reply-To: <20181123094413.1108-1-linux.amoon@gmail.com>
-References: <CGME20181123094453epcas4p16be0412e0195fe4bf06680111805352a@epcas4p1.samsung.com>
- <20181123094413.1108-1-linux.amoon@gmail.com>
-Message-ID: <5BFBA550.4020401@samsung.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 26 Nov 2018 00:02:13 -0800
+Subject: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+In-Reply-To: <555dd63a-0634-6a39-7abc-121e02273cb2@suse.cz>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <0100016737801f14-84f1265d-4577-4dcf-ad57-90dbc8e0a78f-000000@email.amazonses.com>
+ <20181121213853.GL3065@bombadil.infradead.org>
+ <c5ccde1e-a711-ad33-537c-2d5a0bd9edd4@arm.com>
+ <20181122082336.GA2049@infradead.org>
+ <555dd63a-0634-6a39-7abc-121e02273cb2@suse.cz>
+Message-ID: <20181126080213.GA17809@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Nov 23, 2018 at 01:23:41PM +0100, Vlastimil Babka wrote:
+> Is this also true for caches created by kmem_cache_create(), that
+> debugging options can result in not respecting the alignment passed to
+> kmem_cache_create()? That would be rather bad, IMHO.
 
-On 2018? 11? 23? 18:44, Anand Moon wrote:
-> From: Marian Mihailescu <mihailescu2m@gmail.com>
+That's what I understood in the discussion.  If not it would make
+our live simpler, but would need to be well document.
+
+Christoph can probably explain the alignment choices in slub.
+
 > 
-> A specific clock rate table is added for VPLL so it is possible
-> to set frequency of the VPLL output clock that used by the g3d clock.
+> > But I do agree with the sentiment of not wanting to spread GFP_DMA32
+> > futher into the slab allocator.
 > 
-> Cc: Andrzej Hajda <a.hajda@samsung.com>
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Signed-off-by: Marian Mihailescu <mihailescu2m@gmail.com>
-> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
-> ---
->  drivers/clk/samsung/clk-exynos5420.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
-> index 34cce3c5898f..34156bdfd0d2 100644
-> --- a/drivers/clk/samsung/clk-exynos5420.c
-> +++ b/drivers/clk/samsung/clk-exynos5420.c
-> @@ -1303,6 +1303,18 @@ static const struct samsung_pll_rate_table exynos5420_epll_24mhz_tbl[] = {
->  	PLL_36XX_RATE(24 * MHZ,  32768001U, 131, 3, 5, 4719),
->  };
->  
-> +static const struct samsung_pll_rate_table exynos5420_vpll_24mhz_tbl[] __initconst = {
-> +	PLL_35XX_RATE(24 * MHZ, 600000000U, 200, 2, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 543000000U, 181, 2, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 533000000U, 533, 6, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 480000000U, 320, 4, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 420000000U, 140, 2, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 350000000U, 175, 3, 2),
-> +	PLL_35XX_RATE(24 * MHZ, 266000000U, 266, 3, 3),
-> +	PLL_35XX_RATE(24 * MHZ, 177000000U, 118, 2, 3),
-> +	PLL_35XX_RATE(24 * MHZ, 100000000U, 200, 3, 4),
-> +};
+> I don't see a problem with GFP_DMA32 for custom caches. Generic
+> kmalloc() would be worse, since it would have to create a new array of
+> kmalloc caches. But that's already ruled out due to the alignment.
 
-VPLL has the same PMS table with apll/kpll/bpll. You don't need to add new
-'exynos5420_vpll_24mhz_tbl' table. Just adding the missing frequency entries
-to 'exynos5420_pll2550x_24mhz_tbl' table.
-
-> +
->  static struct samsung_pll_clock exynos5x_plls[nr_plls] __initdata = {
->  	[apll] = PLL(pll_2550, CLK_FOUT_APLL, "fout_apll", "fin_pll", APLL_LOCK,
->  		APLL_CON0, NULL),
-> @@ -1428,6 +1440,7 @@ static void __init exynos5x_clk_init(struct device_node *np,
->  		exynos5x_plls[epll].rate_table = exynos5420_epll_24mhz_tbl;
->  		exynos5x_plls[kpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
->  		exynos5x_plls[bpll].rate_table = exynos5420_pll2550x_24mhz_tbl;
-> +		exynos5x_plls[vpll].rate_table = exynos5420_vpll_24mhz_tbl;
->  	}
->  
->  	samsung_clk_register_pll(ctx, exynos5x_plls, ARRAY_SIZE(exynos5x_plls),
-> 
-
-
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+True, purely slab probably isn't too bad.
