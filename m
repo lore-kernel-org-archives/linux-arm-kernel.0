@@ -1,72 +1,53 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Mon, 26 Nov 2018 17:27:50 +0200
-Subject: [PATCH 09/14] regulator: dts: add full voltage range to LDO4 on the
- Lime2
-In-Reply-To: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
-Message-ID: <0b1aa5b28cb5efe17c04150a181ef1fa4027bc55.1543245984.git-series.plaes@plaes.org>
+Date: Mon, 26 Nov 2018 17:27:41 +0200
+Subject: [PATCH 00/14] regulator: axp20x: Stop AXP209 from crashing when
+ enabling LDO3
+Message-ID: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <oliver@schinagl.nl>
+This series implements voltage ramping for AXP209 DCDC2 and LDO3
+regulators and software based soft-start for AXP209 LDO3 regulator.
 
-With commit b43776d65a33b46092 ("ARM: dts: sunxi: Use axp209.dtsi for
-Olinuxino Lime2") we force them an arbitrary 2.8 volts. Granted, for
-LDO3 this may be less arbitrary, but for LDO4 this is just wrong.
+Both features are needed to work around a PMIC shutdown when
+toggling LDO3 on certain boards with high capacitance on the
+LDO3 output.
 
-In the defense of LDO3, LDO3 is the regulator that feeds port bank E,
-which has no other purpose then a CSI/TS interface, however the case
-may still be, that the connected IO may be just as well be 3.3 volts.
-The big misnomer is however, that the schematic names GPIO-2 pin4
-LDO3_2.8V, rather then VDD-CSI0 or similar.
+Similar features (or workarounds) have been also implemented
+on u-boot side [1].
 
-This is much worse for LDO4 however, which is not referenced on any
-pin, is now set to 2.8 volts, but port bank G can also support various
-other peripherals such as UARTS etc.
+Also included in this series are various magic constant cleanups
+and also fix for core regulator framework, where 'always-enabled'
+constraint overrides the 'soft-start' and 'ramp-delay' features.
 
-By having 2.8 volts however for LDO4, we thus now have peripherals that
-no longer function properly all of the time.
+[1] https://lists.denx.de/pipermail/u-boot/2018-November/348612.html
 
-Ideally, we want to set a supply voltage for each port bank, but the
-monolithic nature of the sunxi pinctroller currently prevents this and
-as such, the board should at least configure the LDO4 with the proper
-ranges.
+Olliver Schinagl (14):
+  regulator: axp20x: use defines for masks
+  regulator: axp20x: name voltage ramping define properly
+  regulator: core: enable power when setting up constraints
+  regulator: axp20x: add support for set_ramp_delay for AXP209
+  dt-bindings: mfd: axp20x: add support for regulator-ramp-delay for AXP209
+  regulator: axp20x: add software based soft_start for AXP209 LDO3
+  dt-bindings: mfd: axp20x: Add software based soft_start for AXP209 LDO3
+  regulator: dts: enable soft-start and ramp delay for the OLinuXino Lime2
+  regulator: dts: add full voltage range to LDO4 on the Lime2
+  regulator: dts: set proper lradc vref on OLinuXino Lime2
+  mfd: axp20x: Clean up included headers
+  mfd: axp20x: use explicit bit defines
+  power: supply: axp20x: add missing include bitops.h
+  power: supply: axp288: use the BIT() macro
 
-Until we can set the consumer at the port bank level, a child
-device-tree has to do something like:
+ Documentation/devicetree/bindings/mfd/axp20x.txt |   8 +-
+ arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts  |  13 +-
+ drivers/mfd/axp20x.c                             |  13 +-
+ drivers/power/supply/axp20x_usb_power.c          |   1 +-
+ drivers/power/supply/axp288_charger.c            |  35 +-
+ drivers/regulator/axp20x-regulator.c             | 875 ++++++++++++----
+ drivers/regulator/core.c                         |  22 +-
+ include/linux/mfd/axp20x.h                       |   4 +-
+ 8 files changed, 753 insertions(+), 218 deletions(-)
 
-&reg_ldo4 {
-    regulator-min-microvolt = <3300000>;
-    regulator-max-microvolt = <3300000>;
-};
-
-While doing this the same way results in the same solution currently,
-we force the hack into the final devicetree rather then having it wrong
-at the board level.
-
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-Signed-off-by: Priit Laes <plaes@plaes.org>
----
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index ffafe97..1b9867f 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -250,9 +250,10 @@
- };
- 
- &reg_ldo4 {
--	regulator-min-microvolt = <2800000>;
--	regulator-max-microvolt = <2800000>;
--	regulator-name = "vddio-csi1";
-+	regulator-always-on;
-+	regulator-min-microvolt = <1250000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vdd-io-pg";
- };
- 
- &reg_usb0_vbus {
+base-commit: 2e6e902d185027f8e3cb8b7305238f7e35d6a436
 -- 
 git-series 0.9.1
