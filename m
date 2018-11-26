@@ -1,97 +1,248 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Nov 2018 13:55:04 +0100
-Subject: [PATCH 38/40] arm64: dts: renesas: r8a77990: Enable I2C DMA
+Date: Mon, 26 Nov 2018 13:54:53 +0100
+Subject: [PATCH 27/40] arm64: dts: renesas: r8a7795: add SSIU support for sound
 In-Reply-To: <cover.1543229515.git.horms+renesas@verge.net.au>
 References: <cover.1543229515.git.horms+renesas@verge.net.au>
-Message-ID: <8fbe048bd95b560ed5fcb8eaa80456a64aeb66a2.1543229516.git.horms+renesas@verge.net.au>
+Message-ID: <da90dd849dc22e920388d18a0f877366bd4d2b7f.1543229515.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch enables I2C DMA.
+rsnd driver supports SSIU now, let's use it.
+Then, BUSIF DMA settings on rcar_sound,ssi (= rxu, txu) are
+no longer needed.
+To avoid git merge timing issue / git bisect issue,
+this patch doesn't remove it so far, but will be removed in
+the future.
 
-NOTE: I2C7 DMA is not supported by R-Car Gen3 Hardware User's Manual
-Rev.0.80E.
-
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Yoshihiro Kaneko <ykaneko0929@gmail.com>
-Tested-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77990.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 211 +++++++++++++++++++++++++++++++
+ 1 file changed, 211 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77990.dtsi b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-index 3b334be843f4..de25eda4f2f4 100644
---- a/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77990.dtsi
-@@ -250,6 +250,9 @@
- 			clocks = <&cpg CPG_MOD 931>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 931>;
-+			dmas = <&dmac1 0x91>, <&dmac1 0x90>,
-+			       <&dmac2 0x91>, <&dmac2 0x90>;
-+			dma-names = "tx", "rx", "tx", "rx";
- 			i2c-scl-internal-delay-ns = <110>;
- 			status = "disabled";
- 		};
-@@ -264,6 +267,9 @@
- 			clocks = <&cpg CPG_MOD 930>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 930>;
-+			dmas = <&dmac1 0x93>, <&dmac1 0x92>,
-+			       <&dmac2 0x93>, <&dmac2 0x92>;
-+			dma-names = "tx", "rx", "tx", "rx";
- 			i2c-scl-internal-delay-ns = <6>;
- 			status = "disabled";
- 		};
-@@ -278,6 +284,9 @@
- 			clocks = <&cpg CPG_MOD 929>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 929>;
-+			dmas = <&dmac1 0x95>, <&dmac1 0x94>,
-+			       <&dmac2 0x95>, <&dmac2 0x94>;
-+			dma-names = "tx", "rx", "tx", "rx";
- 			i2c-scl-internal-delay-ns = <6>;
- 			status = "disabled";
- 		};
-@@ -292,6 +301,8 @@
- 			clocks = <&cpg CPG_MOD 928>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 928>;
-+			dmas = <&dmac0 0x97>, <&dmac0 0x96>;
-+			dma-names = "tx", "rx";
- 			i2c-scl-internal-delay-ns = <110>;
- 			status = "disabled";
- 		};
-@@ -306,6 +317,8 @@
- 			clocks = <&cpg CPG_MOD 927>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 927>;
-+			dmas = <&dmac0 0x99>, <&dmac0 0x98>;
-+			dma-names = "tx", "rx";
- 			i2c-scl-internal-delay-ns = <6>;
- 			status = "disabled";
- 		};
-@@ -320,6 +333,8 @@
- 			clocks = <&cpg CPG_MOD 919>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 919>;
-+			dmas = <&dmac0 0x9b>, <&dmac0 0x9a>;
-+			dma-names = "tx", "rx";
- 			i2c-scl-internal-delay-ns = <6>;
- 			status = "disabled";
- 		};
-@@ -334,6 +349,8 @@
- 			clocks = <&cpg CPG_MOD 918>;
- 			power-domains = <&sysc R8A77990_PD_ALWAYS_ON>;
- 			resets = <&cpg 918>;
-+			dmas = <&dmac0 0x9d>, <&dmac0 0x9c>;
-+			dma-names = "tx", "rx";
- 			i2c-scl-internal-delay-ns = <6>;
- 			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 27faaccd0cae..660fd54d384b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1920,6 +1920,217 @@
+ 				};
+ 			};
+ 
++			rcar_sound,ssiu {
++				ssiu00: ssiu-0 {
++					dmas = <&audma0 0x15>, <&audma1 0x16>;
++					dma-names = "rx", "tx";
++				};
++				ssiu01: ssiu-1 {
++					dmas = <&audma0 0x35>, <&audma1 0x36>;
++					dma-names = "rx", "tx";
++				};
++				ssiu02: ssiu-2 {
++					dmas = <&audma0 0x37>, <&audma1 0x38>;
++					dma-names = "rx", "tx";
++				};
++				ssiu03: ssiu-3 {
++					dmas = <&audma0 0x47>, <&audma1 0x48>;
++					dma-names = "rx", "tx";
++				};
++				ssiu04: ssiu-4 {
++					dmas = <&audma0 0x3F>, <&audma1 0x40>;
++					dma-names = "rx", "tx";
++				};
++				ssiu05: ssiu-5 {
++					dmas = <&audma0 0x43>, <&audma1 0x44>;
++					dma-names = "rx", "tx";
++				};
++				ssiu06: ssiu-6 {
++					dmas = <&audma0 0x4F>, <&audma1 0x50>;
++					dma-names = "rx", "tx";
++				};
++				ssiu07: ssiu-7 {
++					dmas = <&audma0 0x53>, <&audma1 0x54>;
++					dma-names = "rx", "tx";
++				};
++				ssiu10: ssiu-8 {
++					dmas = <&audma0 0x49>, <&audma1 0x4a>;
++					dma-names = "rx", "tx";
++				};
++				ssiu11: ssiu-9 {
++					dmas = <&audma0 0x4B>, <&audma1 0x4C>;
++					dma-names = "rx", "tx";
++				};
++				ssiu12: ssiu-10 {
++					dmas = <&audma0 0x57>, <&audma1 0x58>;
++					dma-names = "rx", "tx";
++				};
++				ssiu13: ssiu-11 {
++					dmas = <&audma0 0x59>, <&audma1 0x5A>;
++					dma-names = "rx", "tx";
++				};
++				ssiu14: ssiu-12 {
++					dmas = <&audma0 0x5F>, <&audma1 0x60>;
++					dma-names = "rx", "tx";
++				};
++				ssiu15: ssiu-13 {
++					dmas = <&audma0 0xC3>, <&audma1 0xC4>;
++					dma-names = "rx", "tx";
++				};
++				ssiu16: ssiu-14 {
++					dmas = <&audma0 0xC7>, <&audma1 0xC8>;
++					dma-names = "rx", "tx";
++				};
++				ssiu17: ssiu-15 {
++					dmas = <&audma0 0xCB>, <&audma1 0xCC>;
++					dma-names = "rx", "tx";
++				};
++				ssiu20: ssiu-16 {
++					dmas = <&audma0 0x63>, <&audma1 0x64>;
++					dma-names = "rx", "tx";
++				};
++				ssiu21: ssiu-17 {
++					dmas = <&audma0 0x67>, <&audma1 0x68>;
++					dma-names = "rx", "tx";
++				};
++				ssiu22: ssiu-18 {
++					dmas = <&audma0 0x6B>, <&audma1 0x6C>;
++					dma-names = "rx", "tx";
++				};
++				ssiu23: ssiu-19 {
++					dmas = <&audma0 0x6D>, <&audma1 0x6E>;
++					dma-names = "rx", "tx";
++				};
++				ssiu24: ssiu-20 {
++					dmas = <&audma0 0xCF>, <&audma1 0xCE>;
++					dma-names = "rx", "tx";
++				};
++				ssiu25: ssiu-21 {
++					dmas = <&audma0 0xEB>, <&audma1 0xEC>;
++					dma-names = "rx", "tx";
++				};
++				ssiu26: ssiu-22 {
++					dmas = <&audma0 0xED>, <&audma1 0xEE>;
++					dma-names = "rx", "tx";
++				};
++				ssiu27: ssiu-23 {
++					dmas = <&audma0 0xEF>, <&audma1 0xF0>;
++					dma-names = "rx", "tx";
++				};
++				ssiu30: ssiu-24 {
++					dmas = <&audma0 0x6f>, <&audma1 0x70>;
++					dma-names = "rx", "tx";
++				};
++				ssiu31: ssiu-25 {
++					dmas = <&audma0 0x21>, <&audma1 0x22>;
++					dma-names = "rx", "tx";
++				};
++				ssiu32: ssiu-26 {
++					dmas = <&audma0 0x23>, <&audma1 0x24>;
++					dma-names = "rx", "tx";
++				};
++				ssiu33: ssiu-27 {
++					dmas = <&audma0 0x25>, <&audma1 0x26>;
++					dma-names = "rx", "tx";
++				};
++				ssiu34: ssiu-28 {
++					dmas = <&audma0 0x27>, <&audma1 0x28>;
++					dma-names = "rx", "tx";
++				};
++				ssiu35: ssiu-29 {
++					dmas = <&audma0 0x29>, <&audma1 0x2A>;
++					dma-names = "rx", "tx";
++				};
++				ssiu36: ssiu-30 {
++					dmas = <&audma0 0x2B>, <&audma1 0x2C>;
++					dma-names = "rx", "tx";
++				};
++				ssiu37: ssiu-31 {
++					dmas = <&audma0 0x2D>, <&audma1 0x2E>;
++					dma-names = "rx", "tx";
++				};
++				ssiu40: ssiu-32 {
++					dmas =	<&audma0 0x71>, <&audma1 0x72>;
++					dma-names = "rx", "tx";
++				};
++				ssiu41: ssiu-33 {
++					dmas = <&audma0 0x17>, <&audma1 0x18>;
++					dma-names = "rx", "tx";
++				};
++				ssiu42: ssiu-34 {
++					dmas = <&audma0 0x19>, <&audma1 0x1A>;
++					dma-names = "rx", "tx";
++				};
++				ssiu43: ssiu-35 {
++					dmas = <&audma0 0x1B>, <&audma1 0x1C>;
++					dma-names = "rx", "tx";
++				};
++				ssiu44: ssiu-36 {
++					dmas = <&audma0 0x1D>, <&audma1 0x1E>;
++					dma-names = "rx", "tx";
++				};
++				ssiu45: ssiu-37 {
++					dmas = <&audma0 0x1F>, <&audma1 0x20>;
++					dma-names = "rx", "tx";
++				};
++				ssiu46: ssiu-38 {
++					dmas = <&audma0 0x31>, <&audma1 0x32>;
++					dma-names = "rx", "tx";
++				};
++				ssiu47: ssiu-39 {
++					dmas = <&audma0 0x33>, <&audma1 0x34>;
++					dma-names = "rx", "tx";
++				};
++				ssiu50: ssiu-40 {
++					dmas = <&audma0 0x73>, <&audma1 0x74>;
++					dma-names = "rx", "tx";
++				};
++				ssiu60: ssiu-41 {
++					dmas = <&audma0 0x75>, <&audma1 0x76>;
++					dma-names = "rx", "tx";
++				};
++				ssiu70: ssiu-42 {
++					dmas = <&audma0 0x79>, <&audma1 0x7a>;
++					dma-names = "rx", "tx";
++				};
++				ssiu80: ssiu-43 {
++					dmas = <&audma0 0x7b>, <&audma1 0x7c>;
++					dma-names = "rx", "tx";
++				};
++				ssiu90: ssiu-44 {
++					dmas = <&audma0 0x7d>, <&audma1 0x7e>;
++					dma-names = "rx", "tx";
++				};
++				ssiu91: ssiu-45 {
++					dmas = <&audma0 0x7F>, <&audma1 0x80>;
++					dma-names = "rx", "tx";
++				};
++				ssiu92: ssiu-46 {
++					dmas = <&audma0 0x81>, <&audma1 0x82>;
++					dma-names = "rx", "tx";
++				};
++				ssiu93: ssiu-47 {
++					dmas = <&audma0 0x83>, <&audma1 0x84>;
++					dma-names = "rx", "tx";
++				};
++				ssiu94: ssiu-48 {
++					dmas = <&audma0 0xA3>, <&audma1 0xA4>;
++					dma-names = "rx", "tx";
++				};
++				ssiu95: ssiu-49 {
++					dmas = <&audma0 0xA5>, <&audma1 0xA6>;
++					dma-names = "rx", "tx";
++				};
++				ssiu96: ssiu-50 {
++					dmas = <&audma0 0xA7>, <&audma1 0xA8>;
++					dma-names = "rx", "tx";
++				};
++				ssiu97: ssiu-51 {
++					dmas = <&audma0 0xA9>, <&audma1 0xAA>;
++					dma-names = "rx", "tx";
++				};
++			};
++
+ 			rcar_sound,ssi {
+ 				ssi0: ssi-0 {
+ 					interrupts = <GIC_SPI 370 IRQ_TYPE_LEVEL_HIGH>;
 -- 
 2.11.0
