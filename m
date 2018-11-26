@@ -1,33 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 26 Nov 2018 14:16:23 +0100
-Subject: [PATCH 09/10] ARM64: dts: rockchip: Add all CPUs in cooling maps
-In-Reply-To: <ee0bd5fb56652141e5ce23927b258b1779844af6.1542362530.git.viresh.kumar@linaro.org>
-References: <cover.1542362530.git.viresh.kumar@linaro.org>
- <ee0bd5fb56652141e5ce23927b258b1779844af6.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <3451054.D49JNUWnuL@phil>
+From: otavio.salvador@ossystems.com.br (Otavio Salvador)
+Date: Mon, 26 Nov 2018 11:36:01 -0200
+Subject: [PATCH 08/13] ARM: dts: rv1108: Fix the PMU interrupt number
+In-Reply-To: <3361921.c4PKPBIJKP@phil>
+References: <20181125211907.9895-1-otavio@ossystems.com.br>
+ <20181125211907.9895-8-otavio@ossystems.com.br> <3361921.c4PKPBIJKP@phil>
+Message-ID: <CAP9ODKrX__KXo-XEdoaL=qwALFAxyzKV4-xu_t5baMqN1kQH4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 16. November 2018, 11:04:32 CET schrieb Viresh Kumar:
-> Each CPU can (and does) participate in cooling down the system but the
-> DT only captures a handful of them, normally CPU0, in the cooling maps.
-> Things work by chance currently as under normal circumstances its the
-> first CPU of each cluster which is used by the operating systems to
-> probe the cooling devices. But as soon as this CPU ordering changes and
-> any other CPU is used to bring up the cooling device, we will start
-> seeing failures.
-> 
-> Also the DT is rather incomplete when we list only one CPU in the
-> cooling maps, as the hardware doesn't have any such limitations.
-> 
-> Update cooling maps to include all devices affected by individual trip
-> points.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hello Heiko,
 
-looks like I forgot to respond ... applied like 7 days ago
-and already part of my pull-request for 4.21
+On Mon, Nov 26, 2018 at 3:59 AM Heiko Stuebner <heiko@sntech.de> wrote:
+> Am Sonntag, 25. November 2018, 22:19:02 CET schrieb Otavio Salvador:
+> > According to the Rockchip vendor tree the PMU interrupt number is
+> > 76, so fix it accordingly.
+> >
+> > Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+> > Signed-off-by: Fabio Berton <fabio.berton@ossystems.com.br>
+>
+> looks ok, especially as the TRM I have doesn't list neither irqs :-)
+> But please explain the second Signed-off by Fabio?
+>
+> If Fabio is the original author, the patch From should reflect that
+> and the Signed-off-by lines should be swapped. As it is now
+> I would expect Fabio being the one sending the patches.
+> Or is it supposed to be a "Co-developed-by:"?
+> See Documentation/process/5.Posting.rst.
 
+He works with me and he applied and tested it in our internal tree for
+our customer. He reviewed and tested this with me, so I'd like to
+provide him credit as well.
 
-Thanks
-Heiko
+-- 
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9 9981-7854          Mobile: +1 (347) 903-9750
