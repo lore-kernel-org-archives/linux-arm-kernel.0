@@ -1,35 +1,40 @@
 From: andrew.murray@arm.com (Andrew Murray)
-Date: Mon, 26 Nov 2018 11:12:20 +0000
-Subject: [PATCH v2 04/20] perf/hw_breakpoint: perf/core: advertise PMU
- exclusion capability
+Date: Mon, 26 Nov 2018 11:12:18 +0000
+Subject: [PATCH v2 02/20] perf/core: add function to test for event exclusion
+ flags
 In-Reply-To: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
 References: <1543230756-15319-1-git-send-email-andrew.murray@arm.com>
-Message-ID: <1543230756-15319-5-git-send-email-andrew.murray@arm.com>
+Message-ID: <1543230756-15319-3-git-send-email-andrew.murray@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The breakpoint PMU has the capability to exclude kernel contexts,
-let's advertise that we support the PERF_PMU_CAP_EXCLUDE
-capability so that perf doesn't prevent us from handling events
-with any exclusion flags set.
+Add a function that tests if any of the perf event exclusion flags
+are set on a given event.
 
 Signed-off-by: Andrew Murray <andrew.murray@arm.com>
 ---
- kernel/events/hw_breakpoint.c | 2 ++
- 1 file changed, 2 insertions(+)
+ include/linux/perf_event.h | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/kernel/events/hw_breakpoint.c b/kernel/events/hw_breakpoint.c
-index d6b5618..fefe3d5 100644
---- a/kernel/events/hw_breakpoint.c
-+++ b/kernel/events/hw_breakpoint.c
-@@ -669,6 +669,8 @@ static struct pmu perf_breakpoint = {
- 	.start		= hw_breakpoint_start,
- 	.stop		= hw_breakpoint_stop,
- 	.read		= hw_breakpoint_pmu_read,
-+
-+	.capabilities	= PERF_PMU_CAP_EXCLUDE,
- };
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 53c500f..b2e806f 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -1004,6 +1004,15 @@ perf_event__output_id_sample(struct perf_event *event,
+ extern void
+ perf_log_lost_samples(struct perf_event *event, u64 lost);
  
- int __init init_hw_breakpoint(void)
++static inline bool event_has_any_exclude_flag(struct perf_event *event)
++{
++	struct perf_event_attr *attr = &event->attr;
++
++	return attr->exclude_idle || attr->exclude_user ||
++	       attr->exclude_kernel || attr->exclude_hv ||
++	       attr->exclude_guest || attr->exclude_host;
++}
++
+ static inline bool is_sampling_event(struct perf_event *event)
+ {
+ 	return event->attr.sample_period != 0;
 -- 
 2.7.4
