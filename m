@@ -1,115 +1,82 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Mon, 26 Nov 2018 09:28:24 +0800
-Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
- vmcoreinfo
-In-Reply-To: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
-References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
-Message-ID: <20181126012824.GB1824@MiWiFi-R3L-srv>
+From: miles.chen@mediatek.com (Miles Chen)
+Date: Mon, 26 Nov 2018 09:33:24 +0800
+Subject: [RFC PATCH] of: make MAX_RESERVED_REGIONS configurable
+In-Reply-To: <CAL_Jsq+O1YDP1yiHZpcxUaFG1LYDqi74D_kEnErP+cwGDppVWQ@mail.gmail.com>
+References: <1542787873-8429-1-git-send-email-miles.chen@mediatek.com>
+ <CAL_JsqLGvUYQmCGXLgSO+6kFj2i87dpaTbMGbyu5oMt=eeu35A@mail.gmail.com>
+ <1542855088.15789.6.camel@mtkswgap22>
+ <CAL_Jsq+O1YDP1yiHZpcxUaFG1LYDqi74D_kEnErP+cwGDppVWQ@mail.gmail.com>
+Message-ID: <1543196004.21289.1.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/18 at 03:17am, Bhupesh Sharma wrote:
-> Adding 'page_offset_base' to the vmcoreinfo can be specially useful for
-> live-debugging of a running kernel via user-space utilities
-> like makedumpfile (see [1]).
+On Sat, 2018-11-24 at 14:56 -0600, Rob Herring wrote:
+> On Wed, Nov 21, 2018 at 8:51 PM Miles Chen <miles.chen@mediatek.com> wrote:
+> >
+> > On Wed, 2018-11-21 at 10:39 -0600, Rob Herring wrote:
+> > > On Wed, Nov 21, 2018 at 2:11 AM <miles.chen@mediatek.com> wrote:
+> > > >
+> > > > From: Miles Chen <miles.chen@mediatek.com>
+> > > >
+> > > > When we use more than 32 entries in /resered-memory,
+> > > > there will be an error message: "not enough space all defined regions.".
+> > > > We can increase MAX_RESERVED_REGIONS to fix this.
+> > > >
+> > > > commit 22f8cc6e3373 ("drivers: of: increase MAX_RESERVED_REGIONS to 32")
+> > > > increased MAX_RESERVED_REGIONS to 32 but I'm not sure if increasing
+> > > > MAX_RESERVED_REGIONS to 64 is suitable for everyone.
+> > > >
+> > > > In this RFC patch, CONFIG_MAX_OF_RESERVED_REGIONS is added and used as
+> > > > MAX_RESERVED_REGIONS. Add a sanity test to make sure that
+> > > > MAX_RESERVED_REGIONS is less than INIT_MEMBLOCK_REGIONS.
+> > > > Users can configure CONFIG_MAX_OF_RESERVED_REGIONS according to their
+> > > > need.
+> > >
+> > > I don't want a kconfig option for this. I think it should be dynamic instead.
+> > >
+> > > The current flow is like this:
+> > >
+> > > for each reserved node:
+> > >   - call memblock_reserve
+> > >   - Add info to reserved_mem array
+> > >
+> > > I think we should change it to:
+> > >
+> > > for each reserved node:
+> > >   - call memblock_reserve
+> > >   - count number of nodes
+> > >
+> > > Alloc array using memblock_alloc
+> > >
+> > > for each reserved node:
+> > >    - Add info to reserved_mem array
+> > >
+> >
+> > thanks for your comment.
+> >
+> > I reviewed the flow and it might be easier to count the
+> > nodes and setup array first:
+> >
+> > for each reserved node:
+> >     - count number of nodes
+> >
+> > Alloc array using memblock_alloc
+> >
+> >
+> > for each reserved node:
+> >    - call memblock_reserve
 > 
-> Recently, I saw an issue with the 'makedumpfile' utility (see [2] for
-> details), whose live debugging feature is broken with newer kernels
+> The order here is wrong. It is important that you reserve the memory
+> blocks before doing any allocations.
 
-I think this paragraph explained why KCORE_REMAP adding caused the
-mistake of page_offset calculation in makedumpfile. It can prove the
-advantage of appending 'page_offset_base' to vmcoreinfo. The old way I
-took in makedumpfile could be impacted by kernel code change, adding it
-to vmcoreinfo can make it stable. The example is KCORE_REMAP adding, and
-later it's removed.
+thanks for pointing that out. You are right. I'll follow your
+suggestion.
 
-But it's not live debugging feature of makedumpfile. Makedumpfile can't be
-used to live debug. The feature is called '--mem-usage' in makedumpfile,
-in fact it's used to estimate how big the vmcore could be so that customer
-can deply an appropriate size of storage space to store it. Because both
-kcore and vmcore are all elf files which the 1st kernel's memory is
-mapped to, even though they are different, kcore is dynamically changing.
-This is more likely a precision in order of of magnitude. This is a feature
-required by redhat customer.
-
-I thought you are talking about using DaveA's crash utility to live
-debug the running kernel, like we usually do with gdb.
-
-	gdb vmlinux /proc/kcore
-
-Yes, this gdb live debugging is broken because of KASLR. We have bug about
-this, while it has not been fixed. Using Crash utility to replace gdb is
-one way if Crash code is adjusted.
-
-> (I tested the same with 4.19-rc8+ kernel), as KCORE_REMAP segments were
-> added to kcore, thus leading to an additional sections in the same, and
-> makedumpfile is not longer able to determine the start of direct
-> mapping of all physical memory, as it relies on traversing the PT_LOAD
-> segments inside kcore and using the last PT_LOAD segment
-> to determine the start of direct mapping.
-...
-> Testing:
-> -------
-
-This one vmcoreinfo entry adding won't impact kernel performance. And
-page_offset_base need be got during makedumpfile initialization, it
-won't impact makedumpfile efficiency either, especially compared with
-the later page filterring and writting out to storage space. I don't
-think there's any need to provide a detailed test result here. If
-possible, just mention it works in this way, maybe it's better in some
-aspects, such as code simplicity, etc.
-
->  - I tested this patch (rebased on 'linux-next') on a x86_64 machine
->    using the modified 'makedumpfile' user-space code (see [3] for my
->    github tree which contains the same) for determining how many pages
->    are dumpable when different dump_level is specified (which is
->    one use-case of live-debugging via 'makedumpfile').
->  - I tested both the KASLR and non-KASLR boot cases with this patch.
->  - Here is one sample log (for KASLR boot case) on my x86_64 machine:
 > 
->    < snip..>
->    The kernel doesn't support mmap(),read() will be used instead.
-> 
->    TYPE		PAGES			EXCLUDABLE	DESCRIPTION
->    ----------------------------------------------------------------------
->    ZERO		21299           	yes		Pages filled
->    with zero
->    NON_PRI_CACHE	91785           	yes		Cache
->    pages without private flag
->    PRI_CACHE	1               	yes		Cache pages with
->    private flag
->    USER		14057           	yes		User process
->    pages
->    FREE		740346          	yes		Free pages
->    KERN_DATA	58152           	no		Dumpable kernel
->    data
-> 
->    page size:		4096
->    Total pages on system:	925640
->    Total size on system:	3791421440       Byte
-> 
-...
-
-> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
-> index 4c8acdfdc5a7..6161d77c5bfb 100644
-> --- a/arch/x86/kernel/machine_kexec_64.c
-> +++ b/arch/x86/kernel/machine_kexec_64.c
-> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
->  	VMCOREINFO_SYMBOL(init_top_pgt);
->  	vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
->  			pgtable_l5_enabled());
-> +#ifdef CONFIG_RANDOMIZE_BASE
-
-Finally, embracing it into CONFIG_RANDOMIZE_BASE ifdefery seems not
-right. The latest kernel is using page_offset_base to do the dynamic
-memory layout between level4 and level5 changing. This may not work in
-5-level system with CONFIG_RANDOMIZE_BASE=n.
-
-> +	VMCOREINFO_NUMBER(page_offset_base);
-> +#endif
->  
->  #ifdef CONFIG_NUMA
->  	VMCOREINFO_SYMBOL(node_data);
-> -- 
-> 2.7.4
-> 
+> >    - Add info to reserved_mem array
+> >
+> > What do you think?
+> >
+> > > Rob
+> >
+> >
