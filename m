@@ -1,29 +1,25 @@
-From: liang.yang@amlogic.com (Liang Yang)
-Date: Mon, 26 Nov 2018 14:39:58 +0800
-Subject: [PATCH v7 0/2] mtd: rawnand: meson: add Amlogic NAND driver
- support
-In-Reply-To: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
-References: <1542386439-30166-1-git-send-email-jianxin.pan@amlogic.com>
-Message-ID: <9c340a88-06a1-2b81-f435-f9da338077ba@amlogic.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Mon, 26 Nov 2018 07:58:43 +0100
+Subject: [PATCH] drm/mediatek: Only try to attach bridge if there is one
+In-Reply-To: <20181126040737.138682-1-drinkcat@chromium.org>
+References: <CGME20181126041445epcas4p1f0db29e800181de3971f08f6939eec51@epcas4p1.samsung.com>
+ <20181126040737.138682-1-drinkcat@chromium.org>
+Message-ID: <6be0a453-80fb-4d97-1610-e4db124faf61@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris and Miquel,
+On 26.11.2018 05:07, Nicolas Boichat wrote:
+> Even if dsi->bridge is NULL, we still try to call drm_bridge_attach,
+> and print out an error message, before creating the connector.
+>
+> When no bridge is provided, let's skip these 2 steps and directly
+> create the connector.
+>
+> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
 
-How about the v7 patch?
 
-On 2018/11/17 0:40, Jianxin Pan wrote:
-> These two patches try to add initial NAND driver support for Amlogic Meson
-> SoCs, current it has been tested on GXL(p212) and AXG(s400) platform.
-> 
-> Changes since V6 at [7]
->   - use timings->tBERS_max as the maximum time out, delete NFC_CMD_RB_TIMEOUT
->   - fix nand_rw_cmd and support small block flash and which row address less than 3
->   - fix coding style
->   - replace readl/writel_* with readl/writel_relaxed*
->   - delete ECC_SET_PROTECTED_OOB_BYTE and ECC_GET_PROTECTED_OOB_BYTE
->   - implement dma access for read_buf and write_buf, more efficient.
->   - delete waiting dma finish in write process and let NAND_CMD_PAGEPROG and
-> RB command go on queuing
->   - add waiting the completed flag of last ecc page be set, for more strict
-> 
+?--
+
+Regards
+Andrzej
