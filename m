@@ -1,54 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 26 Nov 2018 15:38:20 +0000
-Subject: [PATCH 2/2] arm64: defconfig: enable BPF related configs
-In-Reply-To: <CAKv+Gu9EE_bWcoxEFr4pi41pfAQsDAywKR+gSueA9vE_Z4Np+g@mail.gmail.com>
-References: <20181111181048.10933-1-pbrobinson@gmail.com>
- <20181111181048.10933-2-pbrobinson@gmail.com>
- <20181112183623.GA2265@brain-police>
- <CAKv+Gu9EE_bWcoxEFr4pi41pfAQsDAywKR+gSueA9vE_Z4Np+g@mail.gmail.com>
-Message-ID: <20181126153820.GA28400@arm.com>
+From: plaes@plaes.org (Priit Laes)
+Date: Mon, 26 Nov 2018 17:27:54 +0200
+Subject: [PATCH 13/14] power: supply: axp20x: add missing include bitops.h
+In-Reply-To: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+Message-ID: <9547ef8e8e6fe9f933264119bd186bdd83974999.1543245984.git-series.plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 17, 2018 at 03:18:04PM -0800, Ard Biesheuvel wrote:
-> On Mon, 12 Nov 2018 at 10:36, Will Deacon <will.deacon@arm.com> wrote:
-> > On Sun, Nov 11, 2018 at 06:10:48PM +0000, Peter Robinson wrote:
-> > > The BPF components are getting more widely used by various components
-> > > so we should enable them in the ARMv7 multi config to ensure they
-> > > get wider testing and don't regress.
-> >
-> > Have other architectures already made this leap?
-> >
-> 
-> $ git grep CONFIG_BPF_SYSCALL=y arch/
-> arch/arm/configs/aspeed_g4_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/arm/configs/aspeed_g5_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/mips/configs/generic_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/powerpc/configs/44x/fsp2_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/powerpc/configs/powernv_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/powerpc/configs/ppc64_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/powerpc/configs/pseries_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/riscv/configs/defconfig:CONFIG_BPF_SYSCALL=y
-> arch/s390/configs/debug_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/s390/configs/performance_defconfig:CONFIG_BPF_SYSCALL=y
-> arch/s390/defconfig:CONFIG_BPF_SYSCALL=y
-> 
-> but nobody seems to enable CONFIG_BPF_JIT_ALWAYS_ON.
-> 
-> I sent some patches to move the BPF JIT allocations out of the module
-> range. Whether that really improves things in terms of security is not
-> obvious to me, but at least we stop wasting module region space (and
-> potentially KASAN shadow pages) on BPF programs.
-> 
-> If this is mainly for coverage, it would indeed be nice if we could at
-> least make it root only by default. However, if the distros are
-> enabling this in their default configurations, I'd prefer it if we at
-> least have a config that will help us spot issues early on.
+From: Olliver Schinagl <oliver@schinagl.nl>
 
-That's a fair point on the distros. Peter, as author of the patch, please
-can you take a look at the arm64 kernel configs from some popular
-distributions and see which of these options they tend to enable?
+The axp20x_usb_power driver uses BIT() operations but lacks the include
+for it. Include the bitops.h header file.
 
-Thanks,
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+ drivers/power/supply/axp20x_usb_power.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Will
+diff --git a/drivers/power/supply/axp20x_usb_power.c b/drivers/power/supply/axp20x_usb_power.c
+index 42001df..f52fe77 100644
+--- a/drivers/power/supply/axp20x_usb_power.c
++++ b/drivers/power/supply/axp20x_usb_power.c
+@@ -10,6 +10,7 @@
+  * option) any later version.
+  */
+ 
++#include <linux/bitops.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+-- 
+git-series 0.9.1
