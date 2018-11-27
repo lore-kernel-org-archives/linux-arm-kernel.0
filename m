@@ -1,37 +1,125 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 27 Nov 2018 20:03:48 +0200
-Subject: [PATCH v10 6/7] arm64: dts: sdm845: Add interconnect provider DT nodes
+Date: Tue, 27 Nov 2018 20:03:46 +0200
+Subject: [PATCH v10 4/7] interconnect: Add debugfs support
 In-Reply-To: <20181127180349.29997-1-georgi.djakov@linaro.org>
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
-Message-ID: <20181127180349.29997-7-georgi.djakov@linaro.org>
+Message-ID: <20181127180349.29997-5-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Dai <daidavid1@codeaurora.org>
+Add a functionality to provide information about the current constraints
+per each node and provider.
 
-Add RSC (Resource State Coordinator) provider
-dictating network-on-chip interconnect bus performance
-found on SDM845-based platforms.
-
-Signed-off-by: David Dai <daidavid1@codeaurora.org>
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- arch/arm64/boot/dts/qcom/sdm845.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/interconnect/core.c | 71 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-index b72bdb0a31a5..856d33604e9c 100644
---- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
-+++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
-@@ -1324,6 +1324,11 @@
- 				compatible = "qcom,sdm845-rpmh-clk";
- 				#clock-cells = <1>;
- 			};
-+
-+			qnoc: qnoc {
-+				compatible = "qcom,sdm845-rsc-hlos";
-+				#interconnect-cells = <1>;
-+			};
- 		};
+diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+index ebc42ef9fa46..efe39e8934cc 100644
+--- a/drivers/interconnect/core.c
++++ b/drivers/interconnect/core.c
+@@ -6,6 +6,7 @@
+  * Author: Georgi Djakov <georgi.djakov@linaro.org>
+  */
  
- 		intc: interrupt-controller at 17a00000 {
++#include <linux/debugfs.h>
+ #include <linux/device.h>
+ #include <linux/idr.h>
+ #include <linux/init.h>
+@@ -17,10 +18,12 @@
+ #include <linux/slab.h>
+ #include <linux/of.h>
+ #include <linux/overflow.h>
++#include <linux/uaccess.h>
+ 
+ static DEFINE_IDR(icc_idr);
+ static LIST_HEAD(icc_providers);
+ static DEFINE_MUTEX(icc_lock);
++static struct dentry *icc_debugfs_dir;
+ 
+ /**
+  * struct icc_req - constraints that are attached to each node
+@@ -48,6 +51,59 @@ struct icc_path {
+ 	struct icc_req reqs[];
+ };
+ 
++static void icc_summary_show_one(struct seq_file *s, struct icc_node *n)
++{
++	if (!n)
++		return;
++
++	seq_printf(s, "%-30s %12u %12u\n",
++		   n->name, n->avg_bw, n->peak_bw);
++}
++
++static int icc_summary_show(struct seq_file *s, void *data)
++{
++	struct icc_provider *provider;
++
++	seq_puts(s, " node                                   avg         peak\n");
++	seq_puts(s, "--------------------------------------------------------\n");
++
++	mutex_lock(&icc_lock);
++
++	list_for_each_entry(provider, &icc_providers, provider_list) {
++		struct icc_node *n;
++
++		list_for_each_entry(n, &provider->nodes, node_list) {
++			struct icc_req *r;
++
++			icc_summary_show_one(s, n);
++			hlist_for_each_entry(r, &n->req_list, req_node) {
++				if (!r->dev)
++					continue;
++
++				seq_printf(s, "    %-26s %12u %12u\n",
++					   dev_name(r->dev), r->avg_bw,
++					   r->peak_bw);
++			}
++		}
++	}
++
++	mutex_unlock(&icc_lock);
++
++	return 0;
++}
++
++static int icc_summary_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, icc_summary_show, inode->i_private);
++}
++
++static const struct file_operations icc_summary_fops = {
++	.open		= icc_summary_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
+ static struct icc_node *node_find(const int id)
+ {
+ 	return idr_find(&icc_idr, id);
+@@ -720,6 +776,21 @@ int icc_provider_del(struct icc_provider *provider)
+ }
+ EXPORT_SYMBOL_GPL(icc_provider_del);
+ 
++static int __init icc_init(void)
++{
++	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
++	debugfs_create_file("interconnect_summary", 0444,
++			    icc_debugfs_dir, NULL, &icc_summary_fops);
++	return 0;
++}
++
++static void __exit icc_exit(void)
++{
++	debugfs_remove_recursive(icc_debugfs_dir);
++}
++module_init(icc_init);
++module_exit(icc_exit);
++
+ MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
+ MODULE_DESCRIPTION("Interconnect Driver Core");
+ MODULE_LICENSE("GPL v2");
