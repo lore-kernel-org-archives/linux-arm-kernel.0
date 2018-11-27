@@ -1,106 +1,81 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:40 +0100
-Subject: [PATCH v12 22/25] kasan: add __must_check annotations to kasan hooks
+Date: Tue, 27 Nov 2018 17:55:36 +0100
+Subject: [PATCH v12 18/25] mm: move obj_to_index to include/linux/slab_def.h
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <6d8c6f59c5b5a3dde569f893ecf3b56e58030ba1.1543337629.git.andreyknvl@google.com>
+Message-ID: <b68796c554fba66d5285274ea6356e642e18a9e5.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds __must_check annotations to kasan hooks that return a
-pointer to make sure that a tagged pointer always gets propagated.
+While with SLUB we can actually preassign tags for caches with contructors
+and store them in pointers in the freelist, SLAB doesn't allow that since
+the freelist is stored as an array of indexes, so there are no pointers to
+store the tags.
 
-Suggested-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Instead we compute the tag twice, once when a slab is created before
+calling the constructor and then again each time when an object is
+allocated with kmalloc. Tag is computed simply by taking the lowest byte of
+the index that corresponds to the object. However in kasan_kmalloc we only
+have access to the objects pointer, so we need a way to find out which
+index this object corresponds to.
+
+This patch moves obj_to_index from slab.c to include/linux/slab_def.h to
+be reused by KASAN.
+
+Acked-by: Christoph Lameter <cl@linux.com>
+Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- include/linux/kasan.h | 16 ++++++++++------
- mm/kasan/common.c     | 15 +++++++++------
- 2 files changed, 19 insertions(+), 12 deletions(-)
+ include/linux/slab_def.h | 13 +++++++++++++
+ mm/slab.c                | 13 -------------
+ 2 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 8da7b7a4397a..b40ea104dd36 100644
---- a/include/linux/kasan.h
-+++ b/include/linux/kasan.h
-@@ -49,16 +49,20 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
- void kasan_poison_slab(struct page *page);
- void kasan_unpoison_object_data(struct kmem_cache *cache, void *object);
- void kasan_poison_object_data(struct kmem_cache *cache, void *object);
--void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object);
-+void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
-+					const void *object);
- 
--void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags);
-+void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
-+						gfp_t flags);
- void kasan_kfree_large(void *ptr, unsigned long ip);
- void kasan_poison_kfree(void *ptr, unsigned long ip);
--void *kasan_kmalloc(struct kmem_cache *s, const void *object, size_t size,
--		  gfp_t flags);
--void *kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
-+void * __must_check kasan_kmalloc(struct kmem_cache *s, const void *object,
-+					size_t size, gfp_t flags);
-+void * __must_check kasan_krealloc(const void *object, size_t new_size,
-+					gfp_t flags);
- 
--void *kasan_slab_alloc(struct kmem_cache *s, void *object, gfp_t flags);
-+void * __must_check kasan_slab_alloc(struct kmem_cache *s, void *object,
-+					gfp_t flags);
- bool kasan_slab_free(struct kmem_cache *s, void *object, unsigned long ip);
- 
- struct kasan_cache {
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 195ca385cf7a..1144e741feb6 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -373,7 +373,8 @@ static u8 assign_tag(struct kmem_cache *cache, const void *object, bool new)
- #endif
+diff --git a/include/linux/slab_def.h b/include/linux/slab_def.h
+index 3485c58cfd1c..9a5eafb7145b 100644
+--- a/include/linux/slab_def.h
++++ b/include/linux/slab_def.h
+@@ -104,4 +104,17 @@ static inline void *nearest_obj(struct kmem_cache *cache, struct page *page,
+ 		return object;
  }
  
--void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
-+void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
-+						const void *object)
- {
- 	struct kasan_alloc_meta *alloc_info;
- 
-@@ -389,7 +390,8 @@ void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
- 	return (void *)object;
++/*
++ * We want to avoid an expensive divide : (offset / cache->size)
++ *   Using the fact that size is a constant for a particular cache,
++ *   we can replace (offset / cache->size) by
++ *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
++ */
++static inline unsigned int obj_to_index(const struct kmem_cache *cache,
++					const struct page *page, void *obj)
++{
++	u32 offset = (obj - page->s_mem);
++	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
++}
++
+ #endif	/* _LINUX_SLAB_DEF_H */
+diff --git a/mm/slab.c b/mm/slab.c
+index 27859fb39889..d2f827316dfc 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -406,19 +406,6 @@ static inline void *index_to_obj(struct kmem_cache *cache, struct page *page,
+ 	return page->s_mem + cache->size * idx;
  }
  
--void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
-+void * __must_check kasan_slab_alloc(struct kmem_cache *cache, void *object,
-+					gfp_t flags)
- {
- 	return kasan_kmalloc(cache, object, cache->object_size, flags);
- }
-@@ -449,8 +451,8 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
- 	return __kasan_slab_free(cache, object, ip, true);
- }
- 
--void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
--		   gfp_t flags)
-+void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
-+					size_t size, gfp_t flags)
- {
- 	unsigned long redzone_start;
- 	unsigned long redzone_end;
-@@ -482,7 +484,8 @@ void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
- }
- EXPORT_SYMBOL(kasan_kmalloc);
- 
--void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
-+void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
-+						gfp_t flags)
- {
- 	struct page *page;
- 	unsigned long redzone_start;
-@@ -506,7 +509,7 @@ void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
- 	return (void *)ptr;
- }
- 
--void *kasan_krealloc(const void *object, size_t size, gfp_t flags)
-+void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
- {
- 	struct page *page;
- 
+-/*
+- * We want to avoid an expensive divide : (offset / cache->size)
+- *   Using the fact that size is a constant for a particular cache,
+- *   we can replace (offset / cache->size) by
+- *   reciprocal_divide(offset, cache->reciprocal_buffer_size)
+- */
+-static inline unsigned int obj_to_index(const struct kmem_cache *cache,
+-					const struct page *page, void *obj)
+-{
+-	u32 offset = (obj - page->s_mem);
+-	return reciprocal_divide(offset, cache->reciprocal_buffer_size);
+-}
+-
+ #define BOOT_CPUCACHE_ENTRIES	1
+ /* internal cache of cache description objs */
+ static struct kmem_cache kmem_cache_boot = {
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
