@@ -1,60 +1,122 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 10:19:05 +0000
-Subject: [PATCH 3/4] Drivers: hv: vmbus: Add hooks for per-CPU IRQ
-In-Reply-To: <20181127062056.GA30285@kroah.com>
-References: <20181122030914.16274-1-kys@linuxonhyperv.com>
- <20181122031059.16338-1-kys@linuxonhyperv.com>
- <20181122031059.16338-3-kys@linuxonhyperv.com>
- <20181126192101.GC32208@kroah.com>
- <CY4PR21MB07735AB610D4BFD3EB7556D5D7D70@CY4PR21MB0773.namprd21.prod.outlook.com>
- <20181126195727.GA9957@kroah.com>
- <CY4PR21MB0773AFA3555BC08A4CC129D4D7D70@CY4PR21MB0773.namprd21.prod.outlook.com>
- <20181127062056.GA30285@kroah.com>
-Message-ID: <20181127101904.GA2928@arm.com>
+From: frieder.schrempf@kontron.de (Schrempf Frieder)
+Date: Tue, 27 Nov 2018 10:24:19 +0000
+Subject: [PATCH v6 1/9] ARM: dts: Reflect change of FSL QSPI driver and remove
+ unused properties
+In-Reply-To: <1543314174-28580-1-git-send-email-frieder.schrempf@kontron.de>
+References: <1543314174-28580-1-git-send-email-frieder.schrempf@kontron.de>
+Message-ID: <1543314174-28580-2-git-send-email-frieder.schrempf@kontron.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 07:20:56AM +0100, Greg KH wrote:
-> On Mon, Nov 26, 2018 at 08:56:50PM +0000, Michael Kelley wrote:
-> > From: Greg KH <gregkh@linuxfoundation.org>  Monday, November 26, 2018 11:57 AM
-> > 
-> > > > > You created "null" hooks that do nothing, for no one in this patch
-> > > > > series, why?
-> > > > >
-> > > >
-> > > > hv_enable_vmbus_irq() and hv_disable_vmbus_irq() have non-null
-> > > > implementations in the ARM64 code in patch 2 of this series.  The
-> > > > implementations are in the new file arch/arm64/hyperv/mshyperv.c.
-> > > > Or am I misunderstanding your point?
-> > > 
-> > > So you use a hook in an earlier patch and then add it in a later one?
-> > > 
-> > > Shouldn't you do it the other way around?  As it is, the earlier patch
-> > > should not work properly, right?
-> > 
-> > The earlier patch implements the hook on the ARM64 side but it is
-> > unused -- it's not called.  The later patch then calls it.  Wouldn't the
-> > other way around be backwards?
-> 
-> Ah, it wasn't obvious that the previous patch added it at all, why not
-> just make that addition part of this patch?
-> 
-> > The general approach is for patches 1 and 2 of the series to provide
-> > all the new code under arch/arm64 to enable Hyper-V.  But the code
-> > won't get called (or even built) with just these two patches because
-> > CONFIG_HYPERV can't be selected.  Patch 3 is separate because it
-> > applies to architecture independent code and arch/x86 code -- I thought
-> > there might be value in keeping the ARM64 and x86 patches distinct. 
-> > Patch 4 applies to architecture independent code, and enables the
-> > ARM64 code in patches 1 and 2 to be compiled and run when
-> > CONFIG_HYPERV is selected.
-> > 
-> > If combining some of the patches in the series is a better approach, I'm
-> > good with that.
-> 
-> Ok, that makes more sense, if it is easier to get the ARM people to
-> review this, that's fine.  Doesn't seem like anyone did that yet :(
+The FSL QSPI driver will be moved to the SPI framework and it then
+acts as a SPI controller. Therefore the subnodes need to set
+spi-[rx/tx]-bus-width = <4>, so quad mode is used just as before.
 
-It's on the list, but thanks for having a look as well!
+Also the properties 'bus-num', 'fsl,spi-num-chipselects' and
+'fsl,spi-flash-chipselects' were never read by the driver and
+can be removed.
 
-Will
+The 'reg' properties are adjusted to reflect what bus and
+chipselect the flash is connected to, as the new driver needs
+this information.
+
+The property 'fsl,qspi-has-second-chip' is not needed anymore
+and will be removed after the old driver was disabled to avoid
+breaking ls1021a-moxa-uc-8410a.dts.
+
+Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
+---
+ arch/arm/boot/dts/imx6sx-sdb-reva.dts       | 8 ++++++--
+ arch/arm/boot/dts/imx6sx-sdb.dts            | 8 ++++++--
+ arch/arm/boot/dts/imx6ul-14x14-evk.dtsi     | 2 ++
+ arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 5 ++---
+ 4 files changed, 16 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+index 9cc6ff2..9997156 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+@@ -132,13 +132,17 @@
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
+ 
+-	flash1: s25fl128s at 1 {
+-		reg = <1>;
++	flash1: s25fl128s at 2 {
++		reg = <2>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+ 		spi-max-frequency = <66000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+index 6dd9beb..9acfda8 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dts
++++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+@@ -117,15 +117,19 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ 
+-	flash1: n25q256a at 1 {
++	flash1: n25q256a at 2 {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a", "jedec,spi-nor";
+ 		spi-max-frequency = <29000000>;
+-		reg = <1>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
++		reg = <2>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+index 32a0723..c2c9a2a 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dtsi
+@@ -176,6 +176,8 @@
+ 		#size-cells = <1>;
+ 		compatible = "micron,n25q256a";
+ 		spi-max-frequency = <29000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+index d01f64b..6a83f30 100644
+--- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
++++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+@@ -203,9 +203,6 @@
+ };
+ 
+ &qspi {
+-	bus-num = <0>;
+-	fsl,spi-num-chipselects = <2>;
+-	fsl,spi-flash-chipselects = <0>;
+ 	fsl,qspi-has-second-chip;
+ 	status = "okay";
+ 
+@@ -214,6 +211,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+ 		spi-max-frequency = <20000000>;
++		spi-rx-bus-width = <4>;
++		spi-tx-bus-width = <4>;
+ 		reg = <0>;
+ 
+ 		partitions at 0 {
+-- 
+2.7.4
