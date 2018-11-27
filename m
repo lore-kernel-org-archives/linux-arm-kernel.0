@@ -1,31 +1,58 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 27 Nov 2018 17:48:15 +0100
-Subject: [PATCH 1/3] dt-bindings: mfd: syscon: Add optional clock support
-In-Reply-To: <1543337297-21873-1-git-send-email-fabrice.gasnier@st.com>
-References: <1543337297-21873-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1543337297-21873-2-git-send-email-fabrice.gasnier@st.com>
+From: andreyknvl@google.com (Andrey Konovalov)
+Date: Tue, 27 Nov 2018 17:55:22 +0100
+Subject: [PATCH v12 04/25] kasan: rename source files to reflect the new
+ naming scheme
+In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
+References: <cover.1543337629.git.andreyknvl@google.com>
+Message-ID: <a6cd5acdc334d532754279a7d2d770e2be96419d.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some system control registers need to be clocked, so the registers can
-be accessed. Add an optional clock.
+We now have two KASAN modes: generic KASAN and tag-based KASAN. Rename
+kasan.c to generic.c to reflect that. Also rename kasan_init.c to init.c
+as it contains initialization code for both KASAN modes.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- Documentation/devicetree/bindings/mfd/syscon.txt | 1 +
- 1 file changed, 1 insertion(+)
+ mm/kasan/Makefile                 | 8 ++++----
+ mm/kasan/{kasan.c => generic.c}   | 0
+ mm/kasan/{kasan_init.c => init.c} | 0
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+ rename mm/kasan/{kasan.c => generic.c} (100%)
+ rename mm/kasan/{kasan_init.c => init.c} (100%)
 
-diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-index 25d9e9c..a9aaa51 100644
---- a/Documentation/devicetree/bindings/mfd/syscon.txt
-+++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-@@ -17,6 +17,7 @@ Optional property:
- - reg-io-width: the size (in bytes) of the IO accesses that should be
-   performed on the device.
- - hwlocks: reference to a phandle of a hardware spinlock provider node.
-+- clocks: phandle to the syscon clock
+diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
+index a6df14bffb6b..d643530b24aa 100644
+--- a/mm/kasan/Makefile
++++ b/mm/kasan/Makefile
+@@ -1,14 +1,14 @@
+ # SPDX-License-Identifier: GPL-2.0
+ KASAN_SANITIZE := n
+ UBSAN_SANITIZE_common.o := n
+-UBSAN_SANITIZE_kasan.o := n
++UBSAN_SANITIZE_generic.o := n
+ KCOV_INSTRUMENT := n
  
- Examples:
- gpr: iomuxc-gpr at 20e0000 {
+-CFLAGS_REMOVE_kasan.o = -pg
++CFLAGS_REMOVE_generic.o = -pg
+ # Function splitter causes unnecessary splits in __asan_load1/__asan_store1
+ # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
+ 
+ CFLAGS_common.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+-CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
++CFLAGS_generic.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+ 
+-obj-y := common.o kasan.o report.o kasan_init.o quarantine.o
++obj-y := common.o generic.o report.o init.o quarantine.o
+diff --git a/mm/kasan/kasan.c b/mm/kasan/generic.c
+similarity index 100%
+rename from mm/kasan/kasan.c
+rename to mm/kasan/generic.c
+diff --git a/mm/kasan/kasan_init.c b/mm/kasan/init.c
+similarity index 100%
+rename from mm/kasan/kasan_init.c
+rename to mm/kasan/init.c
 -- 
-1.9.1
+2.20.0.rc0.387.gc7a69e6b6c-goog
