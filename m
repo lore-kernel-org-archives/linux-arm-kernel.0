@@ -1,37 +1,42 @@
 From: jan.tuerk@emtrion.com (Jan Tuerk)
-Date: Tue, 27 Nov 2018 16:04:01 +0100
-Subject: [PATCH v8 1/4] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
-In-Reply-To: <20180829100811.55836-1-jan.tuerk@emtrion.com>
+Date: Tue, 27 Nov 2018 16:04:02 +0100
+Subject: [PATCH v8 2/4] dt-bindings: arm: Document emtrion emCON-MX6 bindings
+In-Reply-To: <20181127150407.15098-1-jan.tuerk@emtrion.com>
 References: <20180829100811.55836-1-jan.tuerk@emtrion.com>
-Message-ID: <20181127150407.15098-1-jan.tuerk@emtrion.com>
+ <20181127150407.15098-1-jan.tuerk@emtrion.com>
+Message-ID: <20181127150407.15098-2-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the label cpu0 allows the adjustment of cpu-parameters
-by reference in overlaying dtsi files in the same way as it
-is possible for imx6q devices.
+Document the compatible strings for emtrion emCON-MX6 SoM's.
 
 Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/boot/dts/imx6dl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/emtrion.txt | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/emtrion.txt
 
-Unchanged since v1 (rebased)
+Unchanged since v6 (rebased)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index f0607eb41df4..2ed10310a7b7 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -15,7 +15,7 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			compatible = "arm,cortex-a9";
- 			device_type = "cpu";
- 			reg = <0>;
+diff --git a/Documentation/devicetree/bindings/arm/emtrion.txt b/Documentation/devicetree/bindings/arm/emtrion.txt
+new file mode 100644
+index 000000000000..83329aefc483
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/emtrion.txt
+@@ -0,0 +1,12 @@
++Emtrion Devicetree Bindings
++===========================
++
++emCON Series:
++-------------
++
++Required root node properties
++	- compatible:
++	- "emtrion,emcon-mx6", "fsl,imx6q"; 		: emCON-MX6D or emCON-MX6Q SoM
++	- "emtrion,emcon-mx6-avari", "fsl,imx6q";	: emCON-MX6D or emCON-MX6Q SoM on Avari Base
++	- "emtrion,emcon-mx6", "fsl,imx6dl"; 		: emCON-MX6S or emCON-MX6DL SoM
++	- "emtrion,emcon-mx6-avari", "fsl,imx6dl";	: emCON-MX6S or emCON-MX6DL SoM on Avari Base
 -- 
 emtrion GmbH
 Alter Schlachthof 45
