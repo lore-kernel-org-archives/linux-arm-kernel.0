@@ -1,29 +1,66 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Tue, 27 Nov 2018 08:37:15 +0100
-Subject: move the arm arch_dma_alloc implementation to common code
-In-Reply-To: <b3267453-0c2d-4bda-2122-d6212967dafc@arm.com>
-References: <20181105121931.13481-1-hch@lst.de>
- <20181109075238.GA27578@lst.de> <20181115195041.GC4535@brain-police>
- <b3267453-0c2d-4bda-2122-d6212967dafc@arm.com>
-Message-ID: <20181127073715.GA30033@lst.de>
+From: sean.wang@kernel.org (Sean Wang)
+Date: Mon, 26 Nov 2018 23:49:26 -0800
+Subject: [PATCH 2/2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure
+ up the stack
+In-Reply-To: <1542823573-20228-2-git-send-email-hofrat@osadl.org>
+References: <1542823573-20228-1-git-send-email-hofrat@osadl.org>
+ <1542823573-20228-2-git-send-email-hofrat@osadl.org>
+Message-ID: <CAGp9LzoT7ueXyyVSYQdWOU0JkQDWMVcwCuSE3gJnEn0fLLjCBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 15, 2018 at 12:58:04PM -0800, Robin Murphy wrote:
-> On 2018-11-15 11:50 am, Will Deacon wrote:
->> On Fri, Nov 09, 2018 at 08:52:38AM +0100, Christoph Hellwig wrote:
->>> Can I get a quick review from the arm64 folks?  I think it should
->>> be fine there as it basically is a code move, but an additional pair
->>> or two of eyes always helps to weed out bugs.
->>
->> I reviewed the arm64 parts, but it would be ideal if Robin could have a look
->> as well.
+Nicholas Mc Guire <hofrat@osadl.org> ? 2018?11?21? ?? ??10:13???
 >
-> Yup, from a quick skim the general shape of the whole series looks 
-> pleasing, but I've been holding off going through it in detail until I've 
-> figured out what's up with the last thing I thought I'd reviewed 
-> exhaustively...
+> The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
+> for the dev_err() messages). The probe function should return an error
+> if one of the banks failed to initialize properly.
 >
-> Either way I'll make some time for a proper look next week once I'm back.
+> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
+> ---
+>
+> Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
+> GPIOLIB=y, GPIO_MT7621=y
+>
+> Patch is against 4.20-rc3 (localversion-next is next-20181121)
+>
+>  drivers/gpio/gpio-mt7621.c | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
+> index 1ec95bc..68fca8b 100644
+> --- a/drivers/gpio/gpio-mt7621.c
+> +++ b/drivers/gpio/gpio-mt7621.c
+> @@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
+>         struct device_node *np = dev->of_node;
+>         struct mtk *mtk;
+>         int i;
+> +       int ret;
+>
+>         mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
+>         if (!mtk)
+> @@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
+>         platform_set_drvdata(pdev, mtk);
+>         mediatek_gpio_irq_chip.name = dev_name(dev);
+>
+> -       for (i = 0; i < MTK_BANK_CNT; i++)
+> -               mediatek_gpio_bank_probe(dev, np, i);
+> +       for (i = 0; i < MTK_BANK_CNT; i++) {
+> +               ret = mediatek_gpio_bank_probe(dev, np, i);
+> +               if (!ret)
 
-Did you get a chance to look over this?
+it should be if (ret < 0) ?
+
+> +                       return ret;
+> +       }
+>
+>         return 0;
+>  }
+> --
+> 2.1.4
+>
+>
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
