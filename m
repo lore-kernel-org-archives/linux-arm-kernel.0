@@ -1,99 +1,77 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 27 Nov 2018 08:56:02 +0100
-Subject: [PATCH v3] drm/rockchip: update cursors asynchronously through
- atomic.
-In-Reply-To: <20181126224102.1efbf2d1@bbrezillon>
-References: <20181119190805.19139-1-helen.koike@collabora.com>
- <CAAFQd5DDZwhdMDbrHthQwm2bQ3+NoZNcemAktVTxkR3=LfnnTg@mail.gmail.com>
- <d3fb3b21-6c3d-6b01-727b-dbd66540ce92@collabora.com>
- <CAAFQd5Afa9ndmU0=q5Kjv-BY+0qpvOdq2+eOTO6OebX4-2NENA@mail.gmail.com>
- <1d10a4323a49ca09bbb7dc865aaaf5b8c5e3b3d5.camel@crowfest.net>
- <87o9abbmq4.fsf@anholt.net> <20181126224102.1efbf2d1@bbrezillon>
-Message-ID: <20181127075602.GV4266@phenom.ffwll.local>
+From: der.herr@hofr.at (Nicholas Mc Guire)
+Date: Tue, 27 Nov 2018 09:01:13 +0100
+Subject: [PATCH 2/2] gpio: mt7621: pass mediatek_gpio_bank_probe()
+ failure up the stack
+In-Reply-To: <CAGp9LzoT7ueXyyVSYQdWOU0JkQDWMVcwCuSE3gJnEn0fLLjCBA@mail.gmail.com>
+References: <1542823573-20228-1-git-send-email-hofrat@osadl.org>
+ <1542823573-20228-2-git-send-email-hofrat@osadl.org>
+ <CAGp9LzoT7ueXyyVSYQdWOU0JkQDWMVcwCuSE3gJnEn0fLLjCBA@mail.gmail.com>
+Message-ID: <20181127080113.GA2426@osadl.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 10:41:02PM +0100, Boris Brezillon wrote:
-> On Mon, 26 Nov 2018 12:36:03 -0800
-> Eric Anholt <eric@anholt.net> wrote:
+On Mon, Nov 26, 2018 at 11:49:26PM -0800, Sean Wang wrote:
+> Nicholas Mc Guire <hofrat@osadl.org> ??? 2018???11???21??? ?????? ??????10:13?????????
+> >
+> > The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
+> > for the dev_err() messages). The probe function should return an error
+> > if one of the banks failed to initialize properly.
+> >
+> > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+> > Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
+> > ---
+> >
+> > Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
+> > GPIOLIB=y, GPIO_MT7621=y
+> >
+> > Patch is against 4.20-rc3 (localversion-next is next-20181121)
+> >
+> >  drivers/gpio/gpio-mt7621.c | 8 ++++++--
+> >  1 file changed, 6 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
+> > index 1ec95bc..68fca8b 100644
+> > --- a/drivers/gpio/gpio-mt7621.c
+> > +++ b/drivers/gpio/gpio-mt7621.c
+> > @@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
+> >         struct device_node *np = dev->of_node;
+> >         struct mtk *mtk;
+> >         int i;
+> > +       int ret;
+> >
+> >         mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
+> >         if (!mtk)
+> > @@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
+> >         platform_set_drvdata(pdev, mtk);
+> >         mediatek_gpio_irq_chip.name = dev_name(dev);
+> >
+> > -       for (i = 0; i < MTK_BANK_CNT; i++)
+> > -               mediatek_gpio_bank_probe(dev, np, i);
+> > +       for (i = 0; i < MTK_BANK_CNT; i++) {
+> > +               ret = mediatek_gpio_bank_probe(dev, np, i);
+> > +               if (!ret)
 > 
-> > Michael Zoran <mzoran@crowfest.net> writes:
-> > 
-> > > On Fri, 2018-11-23 at 11:27 +0900, Tomasz Figa wrote:  
-> > >> 
-> > >> The point here is not about setting and resetting the plane->fb
-> > >> pointer. It's about what happens inside
-> > >> drm_atomic_set_fb_for_plane().
-> > >> 
-> > >> It calls drm_framebuffer_get() for the new fb and
-> > >> drm_framebuffer_put() for the old fb. In result, if the fb changes,
-> > >> the old fb, which had its reference count incremented in the atomic
-> > >> commit that set it to the plane before, has its reference count
-> > >> decremented. Moreover, if the new reference count becomes 0,
-> > >> drm_framebuffer_put() will immediately free the buffer.
-> > >> 
-> > >> Freeing a buffer when the hardware is still scanning out of it isn't
-> > >> a
-> > >> good idea, is it?  
-> > >
-> > > No, it's not.  But the board I submitted the patch for doesn't have
-> > > anything like hot swapable ram.  The ram access is still going to work,
-> > > just it might display something it shouldn't. Say for example if that
-> > > frame buffer got reused by somethig else and filled with new data in
-> > > the very small window.
-> > >
-> > > But yes, I agree the best solution would be to not release the buffer
-> > > until the next vblank.
-> > >
-> > > Perhaps a good solution would be for the DRM api to have the concept of
-> > > a deferred release?  Meaning if the put() call just added the frame
-> > > buffer to a list that DRM core could walk during the vblank.  That
-> > > might be better then every single driver trying to work up a custom
-> > > solution.
-> > >  
-> > >> The vc4 driver seems to be able to program the hardware to switch the
-> > >> scanout to the new buffer immediately:
-> > >> 
-> > >> https://elixir.bootlin.com/linux/v4.20-rc3/source/drivers/gpu/drm/vc4/vc4_plane.c#L794
-> > >> 
-> > >> Although I wonder if there isn't still a tiny race there - the
-> > >> hardware may have just started refilling the FIFO from the old
-> > >> address. Still, if the FIFO is small, the FIFO refill operation may
-> > >> be
-> > >> much shorter than it takes for the kernel code to actually free the
-> > >> buffer. Eric and Michael, could you confirm?
-> > >>   
-> > >
-> > > I don't have those boards anymore, and I don't have access to any
-> > > technical documentation on the GPU so I can't really add much here.  
-> > > Eric can probably provide the best information.  
-> > 
-> > I don't think I understood my scanout hardware well enough when I
-> > started on the async update stuff for rpi.  vc4 probably needs to wait
-> > until the HW starts scanning out a new line before letting the old BO
-> > get freed.
-> 
-> That's also my understanding. Note that even if the BO is freed before
-> the HVS has finished generating a line it shouldn't crash, because
-> accesses are done through DMA. Might be a security issue though if we
-> start re-using the memory for something else while it's still being
-> accessed.
-> 
-> The solution would be to wait for the EOL (End Of Line) interrupt in
-> the async update path, but I'm not sure this is allowed.
+> it should be if (ret < 0) ?
 
-For subsuming async page_flip into the async atomic commit stuff we need
-completion events anyway. Firing those from the EOL (or some other
-hw-dependent interrupt, could also be the next vblank) should be hard to
-arrange for drivers. And the heleprs could then easily offload the
-cleanup_planes work to a worker and delay it until after the event has
-fired. Like it already does for normal atomic commits.
+I don?t think so mediatek_gpio_bank_probe() returns 0 on success
+and all other returns are error paths - while the current code
+only returns negative values I do thik that any non 0 would be
+an error indication so !ret should be fine here.
 
-But yeah right now that's all missing. The biggest issue here is figuring
-out what these events should look like, and how generic userspace needs to
-use them.
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+thx!
+hofrat
+
+> 
+> > +                       return ret;
+> > +       }
+> >
+> >         return 0;
+> >  }
+> > --
+> > 2.1.4
+> >
+> >
+> > _______________________________________________
+> > Linux-mediatek mailing list
+> > Linux-mediatek at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
