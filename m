@@ -1,218 +1,57 @@
-From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:35 +0100
-Subject: [PATCH v12 17/25] kasan: add bug reporting routines for tag-based mode
-In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
-References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <996c09ec2c8f11294c106973f3b1a211417fa74e.1543337629.git.andreyknvl@google.com>
+From: hofrat@osadl.org (Nicholas Mc Guire)
+Date: Tue, 27 Nov 2018 18:00:18 +0100
+Subject: [PATCH V2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure up
+ the stack
+Message-ID: <1543338018-708-1-git-send-email-hofrat@osadl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds rountines, that print tag-based KASAN error reports.
-Those are quite similar to generic KASAN, the difference is:
+The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
+for the dev_err() messages). The probe function should return an error
+if one of the banks failed to initialize properly indicated by
+not returning non-0.
 
-1. The way tag-based KASAN finds the first bad shadow cell (with a
-   mismatching tag). Tag-based KASAN compares memory tags from the shadow
-   memory to the pointer tag.
-
-2. Tag-based KASAN reports all bugs with the "KASAN: invalid-access"
-   header.
-
-Also simplify generic KASAN find_first_bad_addr.
-
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
-Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
 ---
- mm/kasan/generic_report.c | 16 ++++-------
- mm/kasan/kasan.h          |  5 ++++
- mm/kasan/report.c         | 57 +++++++++++++++++++++------------------
- mm/kasan/tags_report.c    | 18 +++++++++++++
- 4 files changed, 59 insertions(+), 37 deletions(-)
 
-diff --git a/mm/kasan/generic_report.c b/mm/kasan/generic_report.c
-index 5201d1770700..a4604cceae59 100644
---- a/mm/kasan/generic_report.c
-+++ b/mm/kasan/generic_report.c
-@@ -33,16 +33,13 @@
- #include "kasan.h"
- #include "../slab.h"
+V2: A logic error spoted by Sean Wang <sean.wang@kernel.org> the
+    success case is 0 and thus returning early should be on on 
+    ret!=0 and not on !ret - thanks for catching this stupid mistake !
+
+Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
+GPIOLIB=y, GPIO_MT7621=y
+
+Patch is against 4.20-rc3 (localversion-next is next-20181121)
+
+ drivers/gpio/gpio-mt7621.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
+index 1ec95bc..68fca8b 100644
+--- a/drivers/gpio/gpio-mt7621.c
++++ b/drivers/gpio/gpio-mt7621.c
+@@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
+ 	struct device_node *np = dev->of_node;
+ 	struct mtk *mtk;
+ 	int i;
++	int ret;
  
--static const void *find_first_bad_addr(const void *addr, size_t size)
-+void *find_first_bad_addr(void *addr, size_t size)
- {
--	u8 shadow_val = *(u8 *)kasan_mem_to_shadow(addr);
--	const void *first_bad_addr = addr;
-+	void *p = addr;
+ 	mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
+ 	if (!mtk)
+@@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, mtk);
+ 	mediatek_gpio_irq_chip.name = dev_name(dev);
  
--	while (!shadow_val && first_bad_addr < addr + size) {
--		first_bad_addr += KASAN_SHADOW_SCALE_SIZE;
--		shadow_val = *(u8 *)kasan_mem_to_shadow(first_bad_addr);
--	}
--	return first_bad_addr;
-+	while (p < addr + size && !(*(u8 *)kasan_mem_to_shadow(p)))
-+		p += KASAN_SHADOW_SCALE_SIZE;
-+	return p;
- }
- 
- static const char *get_shadow_bug_type(struct kasan_access_info *info)
-@@ -50,9 +47,6 @@ static const char *get_shadow_bug_type(struct kasan_access_info *info)
- 	const char *bug_type = "unknown-crash";
- 	u8 *shadow_addr;
- 
--	info->first_bad_addr = find_first_bad_addr(info->access_addr,
--						info->access_size);
--
- 	shadow_addr = (u8 *)kasan_mem_to_shadow(info->first_bad_addr);
- 
- 	/*
-diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
-index 33cc3b0e017e..82a23b23ff93 100644
---- a/mm/kasan/kasan.h
-+++ b/mm/kasan/kasan.h
-@@ -119,6 +119,7 @@ void kasan_poison_shadow(const void *address, size_t size, u8 value);
- void check_memory_region(unsigned long addr, size_t size, bool write,
- 				unsigned long ret_ip);
- 
-+void *find_first_bad_addr(void *addr, size_t size);
- const char *get_bug_type(struct kasan_access_info *info);
- 
- void kasan_report(unsigned long addr, size_t size,
-@@ -139,10 +140,14 @@ static inline void quarantine_remove_cache(struct kmem_cache *cache) { }
- 
- #ifdef CONFIG_KASAN_SW_TAGS
- 
-+void print_tags(u8 addr_tag, const void *addr);
-+
- u8 random_tag(void);
- 
- #else
- 
-+static inline void print_tags(u8 addr_tag, const void *addr) { }
-+
- static inline u8 random_tag(void)
- {
- 	return 0;
-diff --git a/mm/kasan/report.c b/mm/kasan/report.c
-index 64a74f334c45..214d85035f99 100644
---- a/mm/kasan/report.c
-+++ b/mm/kasan/report.c
-@@ -64,11 +64,10 @@ static int __init kasan_set_multi_shot(char *str)
- }
- __setup("kasan_multi_shot", kasan_set_multi_shot);
- 
--static void print_error_description(struct kasan_access_info *info,
--					const char *bug_type)
-+static void print_error_description(struct kasan_access_info *info)
- {
- 	pr_err("BUG: KASAN: %s in %pS\n",
--		bug_type, (void *)info->ip);
-+		get_bug_type(info), (void *)info->ip);
- 	pr_err("%s of size %zu at addr %px by task %s/%d\n",
- 		info->is_write ? "Write" : "Read", info->access_size,
- 		info->access_addr, current->comm, task_pid_nr(current));
-@@ -272,6 +271,8 @@ void kasan_report_invalid_free(void *object, unsigned long ip)
- 
- 	start_report(&flags);
- 	pr_err("BUG: KASAN: double-free or invalid-free in %pS\n", (void *)ip);
-+	print_tags(get_tag(object), reset_tag(object));
-+	object = reset_tag(object);
- 	pr_err("\n");
- 	print_address_description(object);
- 	pr_err("\n");
-@@ -279,41 +280,45 @@ void kasan_report_invalid_free(void *object, unsigned long ip)
- 	end_report(&flags);
- }
- 
--static void kasan_report_error(struct kasan_access_info *info)
--{
--	unsigned long flags;
--
--	start_report(&flags);
--
--	print_error_description(info, get_bug_type(info));
--	pr_err("\n");
--
--	if (!addr_has_shadow(info->access_addr)) {
--		dump_stack();
--	} else {
--		print_address_description((void *)info->access_addr);
--		pr_err("\n");
--		print_shadow_for_address(info->first_bad_addr);
--	}
--
--	end_report(&flags);
--}
--
- void kasan_report(unsigned long addr, size_t size,
- 		bool is_write, unsigned long ip)
- {
- 	struct kasan_access_info info;
-+	void *tagged_addr;
-+	void *untagged_addr;
-+	unsigned long flags;
- 
- 	if (likely(!report_enabled()))
- 		return;
- 
- 	disable_trace_on_warning();
- 
--	info.access_addr = (void *)addr;
--	info.first_bad_addr = (void *)addr;
-+	tagged_addr = (void *)addr;
-+	untagged_addr = reset_tag(tagged_addr);
-+
-+	info.access_addr = tagged_addr;
-+	if (addr_has_shadow(untagged_addr))
-+		info.first_bad_addr = find_first_bad_addr(tagged_addr, size);
-+	else
-+		info.first_bad_addr = untagged_addr;
- 	info.access_size = size;
- 	info.is_write = is_write;
- 	info.ip = ip;
- 
--	kasan_report_error(&info);
-+	start_report(&flags);
-+
-+	print_error_description(&info);
-+	if (addr_has_shadow(untagged_addr))
-+		print_tags(get_tag(tagged_addr), info.first_bad_addr);
-+	pr_err("\n");
-+
-+	if (addr_has_shadow(untagged_addr)) {
-+		print_address_description(untagged_addr);
-+		pr_err("\n");
-+		print_shadow_for_address(info.first_bad_addr);
-+	} else {
-+		dump_stack();
+-	for (i = 0; i < MTK_BANK_CNT; i++)
+-		mediatek_gpio_bank_probe(dev, np, i);
++	for (i = 0; i < MTK_BANK_CNT; i++) {
++		ret = mediatek_gpio_bank_probe(dev, np, i);
++		if (ret)
++			return ret;
 +	}
-+
-+	end_report(&flags);
+ 
+ 	return 0;
  }
-diff --git a/mm/kasan/tags_report.c b/mm/kasan/tags_report.c
-index 8af15e87d3bc..573c51d20d09 100644
---- a/mm/kasan/tags_report.c
-+++ b/mm/kasan/tags_report.c
-@@ -37,3 +37,21 @@ const char *get_bug_type(struct kasan_access_info *info)
- {
- 	return "invalid-access";
- }
-+
-+void *find_first_bad_addr(void *addr, size_t size)
-+{
-+	u8 tag = get_tag(addr);
-+	void *p = reset_tag(addr);
-+	void *end = p + size;
-+
-+	while (p < end && tag == *(u8 *)kasan_mem_to_shadow(p))
-+		p += KASAN_SHADOW_SCALE_SIZE;
-+	return p;
-+}
-+
-+void print_tags(u8 addr_tag, const void *addr)
-+{
-+	u8 *shadow = (u8 *)kasan_mem_to_shadow(addr);
-+
-+	pr_err("Pointer tag: [%02x], memory tag: [%02x]\n", addr_tag, *shadow);
-+}
 -- 
-2.20.0.rc0.387.gc7a69e6b6c-goog
+2.1.4
