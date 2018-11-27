@@ -1,36 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 27 Nov 2018 17:41:10 +0800
-Subject: [PATCH 10/14] regulator: dts: set proper lradc vref on OLinuXino
- Lime2
-In-Reply-To: <20181127093735.amfqfcsxzreajte4@flea>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
- <b27515a1cfe3512253a3fbcda04a3367818520b9.1543245984.git-series.plaes@plaes.org>
- <20181127093735.amfqfcsxzreajte4@flea>
-Message-ID: <CAGb2v66odUU9OOwon4URR-+P_jFw2rV+8PLVzrnLmFpKtqT8gA@mail.gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Tue, 27 Nov 2018 09:41:37 +0000
+Subject: [PATCH 3/4] defconfig: arm64: add i.MX system controller RTC support
+In-Reply-To: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
+References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1543311334-8807-4-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 5:37 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Mon, Nov 26, 2018 at 05:27:51PM +0200, Priit Laes wrote:
-> > From: Olliver Schinagl <oliver@schinagl.nl>
-> >
-> > The lradc's analog reference voltage is set to 3.0 volt in the
-> > hardware. This is more or less set in copper for at least lradc0. Set the
-> > property in the dts to ensure the lradc is referenced properly.
-> >
-> > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> > Signed-off-by: Priit Laes <plaes@plaes.org>
->
-> I'm not sure why that patch is part of this series, but I applied
-> it. Thanks!
+This patch enables CONFIG_RTC_DRV_IMX_SC by default.
 
-Please help fix up the subject. Should read
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-"ARM: dts: sun7i: set proper lradc vref on OLinuXino Lime2"
-
-or
-
-"ARM: dts: sun7i: olinoxino-lime2: set proper lradc vref"
-
-ChenYu
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 6d224f7..6fdf2d0 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -573,6 +573,7 @@ CONFIG_RTC_DRV_PL031=y
+ CONFIG_RTC_DRV_SUN6I=y
+ CONFIG_RTC_DRV_ARMADA38X=y
+ CONFIG_RTC_DRV_TEGRA=y
++CONFIG_RTC_DRV_IMX_SC=y
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_DMADEVICES=y
+ CONFIG_DMA_BCM2835=m
+-- 
+2.7.4
