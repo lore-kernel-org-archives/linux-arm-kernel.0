@@ -1,46 +1,33 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:46 +0100
-Subject: [PATCH 45/77] ARM: dts: sun7i: som204: Use the UART3 TX and RX pin
- group
+Date: Tue, 27 Nov 2018 13:45:48 +0100
+Subject: [PATCH 47/77] ARM: dts: sun7i: Fix HDMI output DTC warning
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <a759b993e411da67166b0a6a86e79c6b93b7b421.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <9668c8faee169042aa5cb6dc06f502c6e9ab275d.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SOM204-EVB doesn't use the CTS pin, and thus was defining its own
-pinctrl node for the UART3 muxing. Since we split away the TX and RX pin,
-we can use the global node now, and only have the RTS pin in our local
-node.
+Our HDMI output endpoint on the A10s DTSI has a warning under DTC: "graph
+node has single child node 'endpoint', #address-cells/#size-cells are not
+necessary". Fix this by removing those properties.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-index 631a80ae958e..249bb57d50e0 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som204-evb.dts
-@@ -203,8 +203,8 @@
- };
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index bffd3a21bee3..1b247369ec86 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -662,8 +662,6 @@
+ 				};
  
- &pio {
--	bt_uart_pins: bt_uart_pins at 0 {
--		pins = "PG6", "PG7", "PG8";
-+	uart3_rts_pin: uart3-rts-pin {
-+		pins = "PG8";
- 		function = "uart3";
- 	};
- };
-@@ -296,7 +296,7 @@
- /* Used for RTL8723BS bluetooth */
- &uart3 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&bt_uart_pins>;
-+	pinctrl-0 = <&uart3_pg_pins>, <&uart3_rts_pin>;
- 	status = "okay";
- };
- 
+ 				hdmi_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+ 					reg = <1>;
+ 				};
+ 			};
 -- 
 git-series 0.9.1
