@@ -1,123 +1,172 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:59 +0100
-Subject: [PATCH 58/77] ARM: dts: sun8i: a23/a33: Remove redundant MMC pinmux
- tuning
+Date: Tue, 27 Nov 2018 13:45:42 +0100
+Subject: [PATCH 41/77] ARM: dts: sun7i: Change LRADC node names to avoid
+ warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <d856497c2ad879816c6f944128bc62371f604f7a.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <5132bc3d58d17790ef7b779fd0b9d1672ccf2996.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards override the MMC pin muxing settings in order to enable the
-pull-ups and change the drive strength to a value higher than the default.
+One of the usage of the LRADC is to implement buttons. The bindings define
+that we should have one subnode per button, with their associated voltage
+as a property.
 
-While this was needed in the earlier days, this is now the default setting
-for those pins, and therefore we don't need those board-specific settings
-anymore.
+However, there was no reg property but we still used the voltage associated
+to the button as the unit-address, which eventually generated warnings in
+DTC.
+
+Rename the node names to avoid those warnings.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 4 ----
- arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts | 4 ----
- arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        | 4 ----
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts        | 7 -------
- arch/arm/boot/dts/sun8i-q8-common.dtsi                | 4 ----
- arch/arm/boot/dts/sun8i-r16-parrot.dts                | 5 -----
- 6 files changed, 28 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts  | 14 +++++++-------
+ arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 14 +++++++-------
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts  |  4 ++--
+ 3 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-index 649e31339662..61a4702b63c1 100644
---- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts
-@@ -85,10 +85,6 @@
- 	};
- };
- 
--&mmc1_pins_a {
--	bias-pull-up;
--};
--
- &r_pio {
- 	wifi_pwrseq_pin_mid2407: wifi_pwrseq_pin at 0 {
- 		pins = "PL6";
-diff --git a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-index 6b3bcae089f2..29a032164e3d 100644
---- a/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts
-@@ -78,10 +78,6 @@
- 	};
- };
- 
--&mmc1_pins_a {
--	bias-pull-up;
--};
--
- &r_pio {
- 	wifi_pwrseq_pin_mid2809: wifi_pwrseq_pin at 0 {
- 		pins = "PL6";
-diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-index 3e05959104f1..f8a72d07467c 100644
---- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-@@ -70,10 +70,6 @@
- 	};
- };
- 
--&mmc1_pins_a {
--	bias-pull-up;
--};
--
- &mmc1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc1_pins_a>;
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index b343153948f4..7e006d0fbf27 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -151,13 +151,6 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+index 892b84bbf357..2aa719338dac 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+@@ -158,49 +158,49 @@
+ 	vref-supply = <&reg_vcc3v0>;
  	status = "okay";
- };
  
--&mmc2_8bit_pins {
--	/* Increase drive strength for DDR modes */
--	drive-strength = <40>;
--	/* eMMC is missing pull-ups */
--	bias-pull-up;
--};
--
- &ohci0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index c676940a96da..0b3db925254b 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -82,10 +82,6 @@
+-	button at 190 {
++	button-190 {
+ 		label = "Volume Up";
+ 		linux,code = <KEY_VOLUMEUP>;
+ 		channel = <0>;
+ 		voltage = <190000>;
  	};
- };
  
--&mmc1_pins_a {
--	bias-pull-up;
--};
--
- &r_pio {
- 	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
- 		pins = "PL6", "PL7", "PL11";
-diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-index 472c03b7aeab..5d93a2711dc3 100644
---- a/arch/arm/boot/dts/sun8i-r16-parrot.dts
-+++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-@@ -156,11 +156,6 @@
- 	status = "okay";
- };
+-	button at 390 {
++	button-390 {
+ 		label = "Volume Down";
+ 		linux,code = <KEY_VOLUMEDOWN>;
+ 		channel = <0>;
+ 		voltage = <390000>;
+ 	};
  
--&mmc2_8bit_pins {
--	drive-strength = <40>;
--	bias-pull-up;
--};
--
- &ohci0 {
+-	button at 600 {
++	button-600 {
+ 		label = "Menu";
+ 		linux,code = <KEY_MENU>;
+ 		channel = <0>;
+ 		voltage = <600000>;
+ 	};
+ 
+-	button at 800 {
++	button-800 {
+ 		label = "Search";
+ 		linux,code = <KEY_SEARCH>;
+ 		channel = <0>;
+ 		voltage = <800000>;
+ 	};
+ 
+-	button at 980 {
++	button-980 {
+ 		label = "Home";
+ 		linux,code = <KEY_HOMEPAGE>;
+ 		channel = <0>;
+ 		voltage = <980000>;
+ 	};
+ 
+-	button at 1180 {
++	button-1180 {
+ 		label = "Esc";
+ 		linux,code = <KEY_ESC>;
+ 		channel = <0>;
+ 		voltage = <1180000>;
+ 	};
+ 
+-	button at 1400 {
++	button-1400 {
+ 		label = "Enter";
+ 		linux,code = <KEY_ENTER>;
+ 		channel = <0>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+index 50e7229727a6..f78f18fd7c1c 100644
+--- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
++++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
+@@ -171,49 +171,49 @@
+ 	vref-supply = <&reg_vcc3v0>;
  	status = "okay";
- };
+ 
+-	button at 191 {
++	button-191 {
+ 		label = "Volume Up";
+ 		linux,code = <KEY_VOLUMEUP>;
+ 		channel = <0>;
+ 		voltage = <191274>;
+ 	};
+ 
+-	button at 392 {
++	button-392 {
+ 		label = "Volume Down";
+ 		linux,code = <KEY_VOLUMEDOWN>;
+ 		channel = <0>;
+ 		voltage = <392644>;
+ 	};
+ 
+-	button at 601 {
++	button-601 {
+ 		label = "Menu";
+ 		linux,code = <KEY_MENU>;
+ 		channel = <0>;
+ 		voltage = <601151>;
+ 	};
+ 
+-	button at 795 {
++	button-795 {
+ 		label = "Search";
+ 		linux,code = <KEY_SEARCH>;
+ 		channel = <0>;
+ 		voltage = <795090>;
+ 	};
+ 
+-	button at 987 {
++	button-987 {
+ 		label = "Home";
+ 		linux,code = <KEY_HOMEPAGE>;
+ 		channel = <0>;
+ 		voltage = <987387>;
+ 	};
+ 
+-	button at 1184 {
++	button-1184 {
+ 		label = "Esc";
+ 		linux,code = <KEY_ESC>;
+ 		channel = <0>;
+ 		voltage = <1184678>;
+ 	};
+ 
+-	button at 1398 {
++	button-1398 {
+ 		label = "Enter";
+ 		linux,code = <KEY_ENTER>;
+ 		channel = <0>;
+diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+index b526890a3203..8fd85c6597bf 100644
+--- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
++++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
+@@ -128,14 +128,14 @@
+ 	vref-supply = <&reg_vcc3v0>;
+ 	status = "okay";
+ 
+-	button at 571 {
++	button-571 {
+ 		label = "Volume Up";
+ 		linux,code = <KEY_VOLUMEUP>;
+ 		channel = <0>;
+ 		voltage = <571428>;
+ 	};
+ 
+-	button at 761 {
++	button-761 {
+ 		label = "Volume Down";
+ 		linux,code = <KEY_VOLUMEDOWN>;
+ 		channel = <0>;
 -- 
 git-series 0.9.1
