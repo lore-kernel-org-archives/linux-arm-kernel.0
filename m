@@ -1,53 +1,35 @@
 From: richard.genoud@gmail.com (Richard Genoud)
-Date: Tue, 27 Nov 2018 17:06:34 +0100
-Subject: [PATCH] dmaengine: at_hdmac: fix memory leak in at_dma_xlate()
-Message-ID: <20181127160635.11836-1-richard.genoud@gmail.com>
+Date: Tue, 27 Nov 2018 17:06:35 +0100
+Subject: [PATCH] dmaengine: at_hdmac: fix module unloading
+In-Reply-To: <20181127160635.11836-1-richard.genoud@gmail.com>
+References: <20181127160635.11836-1-richard.genoud@gmail.com>
+Message-ID: <20181127160635.11836-2-richard.genoud@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The leak was found when opening/closing a serial port a great number of
-time, increasing kmalloc-32 in slabinfo.
-
-Each time the port was opened, dma_request_slave_channel() was called.
-Then, in at_dma_xlate(), atslave was allocated with devm_kzalloc() and
-never freed. (Well, it was free at module unload, but that's not what we
-want).
-So, here, kzalloc is more suited for the job since it has to be freed in
-atc_free_chan_resources().
+of_dma_controller_free() was not called on module onloading.
+This lead to a soft lockup:
+watchdog: BUG: soft lockup - CPU#0 stuck for 23s!
+Modules linked in: at_hdmac [last unloaded: at_hdmac]
+when of_dma_request_slave_channel() tried to call ofdma->of_dma_xlate().
 
 Cc: stable at vger.kernel.org
 Fixes: bbe89c8e3d59 ("at_hdmac: move to generic DMA binding")
-Reported-by: Mario Forner <m.forner@be4energy.com>
-Suggested-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@bootlin.com>
 Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- drivers/dma/at_hdmac.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/dma/at_hdmac.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 7cbac6e8c113..1b7f0ca0d5cd 100644
+index 1b7f0ca0d5cd..01d936c9fe89 100644
 --- a/drivers/dma/at_hdmac.c
 +++ b/drivers/dma/at_hdmac.c
-@@ -1641,6 +1641,12 @@ static void atc_free_chan_resources(struct dma_chan *chan)
- 	atchan->descs_allocated = 0;
- 	atchan->status = 0;
+@@ -2006,6 +2006,8 @@ static int at_dma_remove(struct platform_device *pdev)
+ 	struct resource		*io;
  
-+	/*
-+	 * Free atslave allocated in at_dma_xlate()
-+	 */
-+	kfree(chan->private);
-+	chan->private = NULL;
-+
- 	dev_vdbg(chan2dev(chan), "free_chan_resources: done\n");
- }
+ 	at_dma_off(atdma);
++	if (pdev->dev.of_node)
++		of_dma_controller_free(pdev->dev.of_node);
+ 	dma_async_device_unregister(&atdma->dma_common);
  
-@@ -1675,7 +1681,7 @@ static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 
--	atslave = devm_kzalloc(&dmac_pdev->dev, sizeof(*atslave), GFP_KERNEL);
-+	atslave = kzalloc(sizeof(*atslave), GFP_KERNEL);
- 	if (!atslave)
- 		return NULL;
- 
+ 	dma_pool_destroy(atdma->memset_pool);
