@@ -1,54 +1,86 @@
-From: kys@microsoft.com (KY Srinivasan)
-Date: Tue, 27 Nov 2018 03:06:55 +0000
-Subject: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
-In-Reply-To: <20181126191812.GA32208@kroah.com>
-References: <20181122030914.16274-1-kys@linuxonhyperv.com>
- <20181122031059.16338-1-kys@linuxonhyperv.com>
- <20181126191812.GA32208@kroah.com>
-Message-ID: <CY4PR2101MB080498D01F0DC5A90C1E4F8FA0D00@CY4PR2101MB0804.namprd21.prod.outlook.com>
+From: weiyi.lu@mediatek.com (Weiyi Lu)
+Date: Tue, 27 Nov 2018 11:42:50 +0800
+Subject: [PATCH v2 07/11] clk: mediatek: Add flags support for mtk_gate data
+In-Reply-To: <20181127034254.24721-1-weiyi.lu@mediatek.com>
+References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
+Message-ID: <20181127034254.24721-9-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On some Mediatek platforms, there are critical clocks of
+clock gate type.
+To register clock gate with flags CLK_IS_CRITICAL,
+we need to add the flags field in mtk_gate data and register APIs.
 
+Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+---
+ drivers/clk/mediatek/clk-gate.c | 5 +++--
+ drivers/clk/mediatek/clk-gate.h | 3 ++-
+ drivers/clk/mediatek/clk-mtk.c  | 3 ++-
+ drivers/clk/mediatek/clk-mtk.h  | 1 +
+ 4 files changed, 8 insertions(+), 4 deletions(-)
 
-> -----Original Message-----
-> From: Greg KH <gregkh@linuxfoundation.org>
-> Sent: Monday, November 26, 2018 11:18 AM
-> To: KY Srinivasan <kys@microsoft.com>
-> Cc: will.deacon at arm.com; catalin.marinas at armm.com;
-> mark.rutland at arm.com; marc.zyngier at arm.com; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> devel at linuxdriverproject.org; olaf at aepfle.de; apw at canonical.com;
-> jasowang at redhat.com; Stephen Hemminger <sthemmin@microsoft.com>;
-> Michael Kelley <mikelley@microsoft.com>; vkuznets
-> <vkuznets@redhat.com>; Michael Kelley <mikelley@microsoft.com>
-> Subject: Re: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
-> 
-> On Thu, Nov 22, 2018 at 03:10:56AM +0000, kys at linuxonhyperv.com wrote:
-> > --- /dev/null
-> > +++ b/arch/arm64/include/asm/hyperv-tlfs.h
-> > @@ -0,0 +1,338 @@
-> > +/* SPDX-License-Identifier: GPL-2.0 */
-> > +
-> > +/*
-> > + * This file contains definitions from the Hyper-V Hypervisor Top-Level
-> > + * Functional Specification (TLFS):
-> > + *
-> https://na01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fdocs.
-> microsoft.com%2Fen-us%2Fvirtualization%2Fhyper-v-on-
-> windows%2Freference%2Ftlfs&amp;data=02%7C01%7Ckys%40microsoft.co
-> m%7Cce3a8662cbbc4afe157508d653d3eadf%7C72f988bf86f141af91ab2d7cd0
-> 11db47%7C1%7C0%7C636788566988323167&amp;sdata=VJHHMNbpOdAANd
-> DNUD3UMuR8SkbBGOew7uy%2B%2BUCS2sE%3D&amp;reserved=0
-> 
-> "interesting" url :(
-> 
-> Care to use a real one?
-
-Will fix and resend.
-
-K. Y
-> 
-> thanks,
-> 
-> greg k-h
+diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
+index 934bf0e45e26..85daf826619a 100644
+--- a/drivers/clk/mediatek/clk-gate.c
++++ b/drivers/clk/mediatek/clk-gate.c
+@@ -157,7 +157,8 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops)
++		const struct clk_ops *ops,
++		unsigned long flags)
+ {
+ 	struct mtk_clk_gate *cg;
+ 	struct clk *clk;
+@@ -168,7 +169,7 @@ struct clk *mtk_clk_register_gate(
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	init.name = name;
+-	init.flags = CLK_SET_RATE_PARENT;
++	init.flags = flags | CLK_SET_RATE_PARENT;
+ 	init.parent_names = parent_name ? &parent_name : NULL;
+ 	init.num_parents = parent_name ? 1 : 0;
+ 	init.ops = ops;
+diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
+index 72ef89b3ad7b..9f766dfe1d57 100644
+--- a/drivers/clk/mediatek/clk-gate.h
++++ b/drivers/clk/mediatek/clk-gate.h
+@@ -47,6 +47,7 @@ struct clk *mtk_clk_register_gate(
+ 		int clr_ofs,
+ 		int sta_ofs,
+ 		u8 bit,
+-		const struct clk_ops *ops);
++		const struct clk_ops *ops,
++		unsigned long flags);
+ 
+ #endif /* __DRV_CLK_GATE_H */
+diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
+index 9c0ae4278a94..35359e5397c7 100644
+--- a/drivers/clk/mediatek/clk-mtk.c
++++ b/drivers/clk/mediatek/clk-mtk.c
+@@ -130,7 +130,8 @@ int mtk_clk_register_gates(struct device_node *node,
+ 				gate->regs->set_ofs,
+ 				gate->regs->clr_ofs,
+ 				gate->regs->sta_ofs,
+-				gate->shift, gate->ops);
++				gate->shift, gate->ops,
++				gate->flags);
+ 
+ 		if (IS_ERR(clk)) {
+ 			pr_err("Failed to register clk %s: %ld\n",
+diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+index 11b5517903d0..928905496c4b 100644
+--- a/drivers/clk/mediatek/clk-mtk.h
++++ b/drivers/clk/mediatek/clk-mtk.h
+@@ -158,6 +158,7 @@ struct mtk_gate {
+ 	const struct mtk_gate_regs *regs;
+ 	int shift;
+ 	const struct clk_ops *ops;
++	unsigned long flags;
+ };
+ 
+ int mtk_clk_register_gates(struct device_node *node,
+-- 
+2.18.0
