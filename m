@@ -1,137 +1,169 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 27 Nov 2018 08:16:25 -0800
-Subject: [PATCH 4/4] ARM: dts: am335x: Move l4 child devices to probe
- them with ti-sysc
-In-Reply-To: <612b09a4-5007-39bf-becb-66fdca9d6d41@ti.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <20180925000545.22931-5-tony@atomide.com>
- <612b09a4-5007-39bf-becb-66fdca9d6d41@ti.com>
-Message-ID: <20181127161625.GR53235@atomide.com>
+From: Andrei.Stefanescu@microchip.com (Andrei.Stefanescu at microchip.com)
+Date: Tue, 27 Nov 2018 16:25:45 +0000
+Subject: [PATCH v2 1/3] regulator: dt-bindings: add MCP16502 regulator bindings
+In-Reply-To: <1543335937-12689-1-git-send-email-andrei.stefanescu@microchip.com>
+References: <1543335937-12689-1-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <1543335937-12689-2-git-send-email-andrei.stefanescu@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [181127 13:01]:
-> Reverting this patch in linux-next makes audio working again on am335x
-> (bb white + audio cape) :o
-> 
-> Without revert the McASP FIFO would constantly underflow.
+This patch describes the compatible and the device tree
+bindings necessary for the MCP16502 PMIC.
 
-Thanks for testing. Hmm the dts change looks right. And
-am3_l3s_clkctrl_regs[] has CLKF_SW_SUP for the mcasp fcks.
-And there are no opt clocks to enable according to the TRM.
-
-> Memcpy test via dmatest works with EDMA
-
-OK. Can you please test if the following partial revert
-also works or is there maybe a dependency to some other
-device?
-
-Regards,
-
-Tony
-
-8< ------------------
->From tony Mon Sep 17 00:00:00 2001
-From: Tony Lindgren <tony@atomide.com>
-Date: Tue, 27 Nov 2018 08:11:48 -0800
-Subject: [PATCH] ARM: dts: Revert am335x mcasp ti-sysc changes
-
-Without this McASP FIFO would constantly underflow. EDMA
-test via dmatest works though.
-
-Let's revert the change for now until we know the root cause.
-
-Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Andrei Stefanescu <andrei.stefanescu@microchip.com>
 ---
- arch/arm/boot/dts/am33xx-l4.dtsi | 28 ++--------------------------
- arch/arm/boot/dts/am33xx.dtsi    | 29 +++++++++++++++++++++++++++++
- 2 files changed, 31 insertions(+), 26 deletions(-)
+ .../bindings/regulator/mcp16502-regulator.txt      | 143 +++++++++++++++++++++
+ 1 file changed, 143 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
 
-diff --git a/arch/arm/boot/dts/am33xx-l4.dtsi b/arch/arm/boot/dts/am33xx-l4.dtsi
---- a/arch/arm/boot/dts/am33xx-l4.dtsi
-+++ b/arch/arm/boot/dts/am33xx-l4.dtsi
-@@ -1056,19 +1056,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges = <0x0 0x38000 0x2000>;
--
--			mcasp0: mcasp at 0 {
--				compatible = "ti,am33xx-mcasp-audio";
--				reg = <0x0 0x2000>,
--				      <0x46000000 0x400000>;
--				reg-names = "mpu", "dat";
--				interrupts = <80>, <81>;
--				interrupt-names = "tx", "rx";
--				status = "disabled";
--				dmas = <&edma 8 2>,
--					<&edma 9 2>;
--				dma-names = "tx", "rx";
--			};
-+			status = "disabled";
- 		};
- 
- 		target-module at 3c000 {			/* 0x4803c000, ap 20 32.0 */
-@@ -1086,19 +1074,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges = <0x0 0x3c000 0x2000>;
--
--			mcasp1: mcasp at 0 {
--				compatible = "ti,am33xx-mcasp-audio";
--				reg = <0x0 0x2000>,
--				      <0x46400000 0x400000>;
--				reg-names = "mpu", "dat";
--				interrupts = <82>, <83>;
--				interrupt-names = "tx", "rx";
--				status = "disabled";
--				dmas = <&edma 10 2>,
--					<&edma 11 2>;
--				dma-names = "tx", "rx";
--			};
-+			status = "disabled";
- 		};
- 
- 		target-module at 40000 {			/* 0x48040000, ap 22 1e.0 */
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -440,7 +440,36 @@
- 			       <&edma 5 0>;
- 			dma-names = "tx", "rx";
- 		};
+diff --git a/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+new file mode 100644
+index 0000000..b8f843f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/regulator/mcp16502-regulator.txt
+@@ -0,0 +1,143 @@
++MCP16502 PMIC
 +
-+		mcasp0: mcasp at 48038000 {
-+			compatible = "ti,am33xx-mcasp-audio";
-+			ti,hwmods = "mcasp0";
-+			reg = <0x48038000 0x2000>,
-+			      <0x46000000 0x400000>;
-+			reg-names = "mpu", "dat";
-+			interrupts = <80>, <81>;
-+			interrupt-names = "tx", "rx";
-+			status = "disabled";
-+			dmas = <&edma 8 2>,
-+				<&edma 9 2>;
-+			dma-names = "tx", "rx";
++Required properties:
++- compatible: "microchip,mcp16502"
++- reg: I2C slave address
++- lpm-gpios: GPIO for LPM pin. Note that this GPIO *must* remain high during
++	     suspend-to-ram, keeping the PMIC into HIBERNATE mode.
++- regulators: A node that houses a sub-node for each regulator within
++              the device. Each sub-node is identified using the node's
++              name. The content of each sub-node is defined by the
++              standard binding for regulators; see regulator.txt.
++
++Regualtors of MCP16502 PMIC:
++1) VDD_IO	- Buck (1.2 - 3.7 V)
++2) VDD_DDR	- Buck (0.6 - 1.85 V)
++3) VDD_CORE	- Buck (0.6 - 1.85 V)
++4) VDD_OTHER	- BUCK (0.6 - 1.85 V)
++5) LDO1		- LDO  (1.2 - 3.7 V)
++6) LDO2		- LDO  (1.2 - 3.7 V)
++
++Regulator modes:
++2 - FPWM: higher precision, higher consumption
++4 - AutoPFM: lower precision, lower consumption
++
++Each regulator is defined using the standard binding for regulators.
++
++Example:
++
++mcp16502 at 5b {
++	compatible = "microchip,mcp16502";
++	reg = <0x5b>;
++	status = "okay";
++	lpm-gpios = <&pioBU 7 GPIO_ACTIVE_HIGH>;
++
++	regulators {
++		VDD_IO {
++			regulator-name = "VDD_IO";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
 +		};
 +
-+		mcasp1: mcasp at 4803c000 {
-+			compatible = "ti,am33xx-mcasp-audio";
-+			ti,hwmods = "mcasp1";
-+			reg = <0x4803C000 0x2000>,
-+			      <0x46400000 0x400000>;
-+			reg-names = "mpu", "dat";
-+			interrupts = <82>, <83>;
-+			interrupt-names = "tx", "rx";
-+			status = "disabled";
-+			dmas = <&edma 10 2>,
-+				<&edma 11 2>;
-+			dma-names = "tx", "rx";
-+		};
- 	};
++		VDD_DDR {
++			regulator-name = "VDD_DDR";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
 +
- };
- 
- #include "am33xx-l4.dtsi"
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_CORE {
++			regulator-name = "VDD_CORE";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		VDD_OTHER {
++			regulator-name = "VDD_OTHER";
++			regulator-min-microvolt = <600000>;
++			regulator-max-microvolt = <1850000>;
++			regulator-initial-mode = <2>;
++			regulator-allowed-modes = <2>, <4>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++				regulator-mode = <4>;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++				regulator-mode = <4>;
++			};
++		};
++
++		LDO1 {
++			regulator-name = "LDO1";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++		LDO2 {
++			regulator-name = "LDO2";
++			regulator-min-microvolt = <1200000>;
++			regulator-max-microvolt = <3700000>;
++			regulator-always-on;
++
++			regulator-state-standby {
++				regulator-on-in-suspend;
++			};
++
++			regulator-state-mem {
++				regulator-off-in-suspend;
++			};
++		};
++
++	};
++};
 -- 
-2.19.1
+2.7.4
