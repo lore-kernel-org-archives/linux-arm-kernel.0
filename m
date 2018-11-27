@@ -1,114 +1,103 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:28 +0100
-Subject: [PATCH 27/77] ARM: dts: sun6i: Change LRADC node names to avoid
- warnings
+Date: Tue, 27 Nov 2018 13:45:27 +0100
+Subject: [PATCH 26/77] ARM: dts: sun6i: Fix Display Engine DTC warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <c9ad49aa85447600fcd4d2885692a0b9f59b641e.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <5787dbe557d085e65ea01bfb0360143d0df7c8b7.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the usage of the LRADC is to implement buttons. The bindings define
-that we should have one subnode per button, with their associated voltage
-as a property.
+Our display engine endpoints trigger some DTC warnings due to the fact that
+we're having a single endpoint that doesn't need any reg property, and
+since we don't have a reg property, we don't need the address-cells and
+size-cells properties anymore.
 
-However, there was no reg property but we still used the voltage associated
-to the button as the unit-address, which eventually generated warnings in
-DTC.
-
-Rename the node names to avoid those warnings.
+Fix those
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts | 2 +-
- arch/arm/boot/dts/sun6i-a31s-inet-q972.dts        | 6 +++---
- arch/arm/boot/dts/sun6i-a31s-primo81.dts          | 4 ++--
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts          | 4 ++--
- 4 files changed, 8 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 12 ++----------
+ arch/arm/boot/dts/sun6i-a31.dtsi            | 12 ++----------
+ 2 files changed, 4 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-index 882a4d89fa22..a2ef7846e2c8 100644
---- a/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-colorfly-e708-q1.dts
-@@ -53,7 +53,7 @@
- 	vref-supply = <&reg_aldo3>;
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+index ce4f9e9834bf..4eab94737203 100644
+--- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
++++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
+@@ -86,31 +86,23 @@
+ 	vga-dac {
+ 		compatible = "dumb-vga-dac";
+ 		vdd-supply = <&reg_vga_3v3>;
+-		#address-cells = <1>;
+-		#size-cells = <0>;
  
--	button at 1000 {
-+	button-1000 {
- 		label = "Home";
- 		linux,code = <KEY_HOMEPAGE>;
- 		channel = <0>;
-diff --git a/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts b/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
-index e584e6b186a7..85dab04be261 100644
---- a/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-inet-q972.dts
-@@ -73,21 +73,21 @@
- 	vref-supply = <&reg_aldo3>;
- 	status = "okay";
+ 		ports {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
  
--	button at 200 {
-+	button-200 {
- 		label = "Volume Down";
- 		linux,code = <KEY_VOLUMEDOWN>;
- 		channel = <0>;
- 		voltage = <200000>;
- 	};
+ 			port at 0 {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+ 				reg = <0>;
  
--	button at 900 {
-+	button-900 {
- 		label = "Volume Up";
- 		linux,code = <KEY_VOLUMEUP>;
- 		channel = <0>;
- 		voltage = <900000>;
- 	};
+-				vga_dac_in: endpoint at 0 {
+-					reg = <0>;
++				vga_dac_in: endpoint {
+ 					remote-endpoint = <&tcon0_out_vga>;
+ 				};
+ 			};
  
--	button at 1200 {
-+	button-1200 {
- 		label = "Back";
- 		linux,code = <KEY_BACK>;
- 		channel = <0>;
-diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-index 4cb9664cdb29..ca1c711ed450 100644
---- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-@@ -131,14 +131,14 @@
- 	vref-supply = <&reg_aldo3>;
- 	status = "okay";
+ 			port at 1 {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+ 				reg = <1>;
  
--	button at 158 {
-+	button-158 {
- 		label = "Volume Up";
- 		linux,code = <KEY_VOLUMEUP>;
- 		channel = <0>;
- 		voltage = <158730>;
- 	};
+-				vga_dac_out: endpoint at 0 {
+-					reg = <0>;
++				vga_dac_out: endpoint {
+ 					remote-endpoint = <&vga_con_in>;
+ 				};
+ 			};
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 5355213f73b9..c5fd97b88b90 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -486,8 +486,6 @@
+ 				};
  
--	button at 349 {
-+	button-349 {
- 		label = "Volume Down";
- 		linux,code = <KEY_VOLUMEDOWN>;
- 		channel = <0>;
-diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-index da0ccf5a2c44..3a7e68c46ba7 100644
---- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-@@ -147,14 +147,14 @@
- 	vref-supply = <&reg_aldo3>;
- 	status = "okay";
+ 				hdmi_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+ 					reg = <1>;
+ 				};
+ 			};
+@@ -1218,12 +1216,9 @@
+ 				};
  
--	button at 158 {
-+	button-158 {
- 		label = "Volume Up";
- 		linux,code = <KEY_VOLUMEUP>;
- 		channel = <0>;
- 		voltage = <158730>;
- 	};
+ 				be0_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+ 					reg = <1>;
  
--	button at 349 {
-+	button-349 {
- 		label = "Volume Down";
- 		linux,code = <KEY_VOLUMEDOWN>;
- 		channel = <0>;
+-					be0_out_drc0: endpoint at 0 {
+-						reg = <0>;
++					be0_out_drc0: endpoint {
+ 						remote-endpoint = <&drc0_in_be0>;
+ 					};
+ 				};
+@@ -1248,12 +1243,9 @@
+ 				#size-cells = <0>;
+ 
+ 				drc0_in: port at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+ 					reg = <0>;
+ 
+-					drc0_in_be0: endpoint at 0 {
+-						reg = <0>;
++					drc0_in_be0: endpoint {
+ 						remote-endpoint = <&be0_out_drc0>;
+ 					};
+ 				};
 -- 
 git-series 0.9.1
