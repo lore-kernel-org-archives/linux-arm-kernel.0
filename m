@@ -1,115 +1,64 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:30:55 +0000
-Subject: [PATCH 0/3] arm64: use subsections instead of function calls for
- LL/SC fallbacks
-In-Reply-To: <20181113233923.20098-1-ard.biesheuvel@linaro.org>
-References: <20181113233923.20098-1-ard.biesheuvel@linaro.org>
-Message-ID: <20181127193054.GF5641@arm.com>
+Date: Tue, 27 Nov 2018 19:31:23 +0000
+Subject: [PATCH 1/7] arm64: capabilities: Merge entries for
+ ARM64_WORKAROUND_CLEAN_CACHE
+In-Reply-To: <20181126150956.GA24096@en101>
+References: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
+ <1541418917-14219-2-git-send-email-suzuki.poulose@arm.com>
+ <20181126140603.GA29684@arm.com> <20181126150956.GA24096@en101>
+Message-ID: <20181127193123.GH5641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Tue, Nov 13, 2018 at 03:39:20PM -0800, Ard Biesheuvel wrote:
-> Refactor the LL/SC atomics code so we can emit the LL/SC fallbacks for the
-> LSE atomics as subsections that get instantiated at each call site rather
-> than as out of line functions that get called from inline asm (without the
-> awareness of the compiler)
+On Mon, Nov 26, 2018 at 03:09:56PM +0000, Suzuki K Poulose wrote:
+> On Mon, Nov 26, 2018 at 02:06:04PM +0000, Will Deacon wrote:
+> > On Mon, Nov 05, 2018 at 11:55:11AM +0000, Suzuki K Poulose wrote:
+> > > We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
+> > > 
+> > > 1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
+> > > 2) ARM Errata 819472 on A53 r0p[01]
+> > > 
+> > > Both have the same work around. Merge these entries to avoid
+> > > duplicate entries for a single capability.
+> > > 
+> > > Cc: Will Deacon <will.deacon@arm.com>
+> > > Cc: Andre Przywara <andre.przywara@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> > > ---
+> > >  arch/arm64/kernel/cpu_errata.c | 19 +++++++------------
+> > >  1 file changed, 7 insertions(+), 12 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+> > > index a509e351..c825bc0 100644
+> > > --- a/arch/arm64/kernel/cpu_errata.c
+> > > +++ b/arch/arm64/kernel/cpu_errata.c
+> > > @@ -573,24 +573,19 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
+> > >  const struct arm64_cpu_capabilities arm64_errata[] = {
+> > >  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+> > >  	defined(CONFIG_ARM64_ERRATUM_827319) || \
+> > > -	defined(CONFIG_ARM64_ERRATUM_824069)
+> > > +	defined(CONFIG_ARM64_ERRATUM_824069) || \
+> > > +	defined(CONFIG_ARM64_ERRATUM_819472)
+> > >  	{
+> > > -	/* Cortex-A53 r0p[012] */
+> > > -		.desc = "ARM errata 826319, 827319, 824069",
+> > > +	/*
+> > > +	 * Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069
+> > > +	 * Cortex-A53 r0p[01] : ARM errata 819472
+> > > +	 */
+> > > +		.desc = "ARM errata 826319, 827319, 824069, 819472",
+> > >  		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+> > >  		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
+> > >  		.cpu_enable = cpu_enable_cache_maint_trap,
+> > 
+> > Isn't this a semantic change wrt the Kconfig options? After this change,
+> > if I /only/ set CONFIG_ARM64_ERRATUM_819472=y, then I still get the
+> > workaround applied for CPUs > r0[p01] which isn't what I asked for.
 > 
-> This should allow slightly better LSE code, and removes stack spilling and
-> potential PLT indirection for the LL/SC fallbacks.
+> You're right. I could change this to :
 
-Thanks, I much prefer using subsections to the current approach. However,
-a downside of your patches is that the some of the asm operands passed
-to the LSE implementation are redundant, for example, in the fetch-ops:
-
-"	" #lse_op #ac #rl " %w[i], %w[res], %[v]")			\
-	: [res]"=&r" (result), [val]"=&r" (val), [tmp]"=&r" (tmp),	\
-	  [v]"+Q" (v->counter)						\
-
-I'd have thought we could avoid this by splitting up the asms and using
-a static key to dispatch them. For example, the really crude hacking
-below resulted in reasonable code generation:
-
-000000000000040 <will_atomic_add>:
-  40:   14000004        b       50 <will_atomic_add+0x10>	// Patched with NOP once features are determined
-  44:   14000007        b       60 <will_atomic_add+0x20>	// Patched with NOP if LSE
-  48:   b820003f        stadd   w0, [x1]
-  4c:   d65f03c0        ret
-  50:   90000002        adrp    x2, 0 <cpu_hwcaps>
-  54:   f9400042        ldr     x2, [x2]
-  58:   721b005f        tst     w2, #0x20
-  5c:   54ffff61        b.ne    48 <will_atomic_add+0x8>  // b.any
-  60:   14000002        b       68 <will_atomic_add+0x28>
-  64:   d65f03c0        ret
-  68:   f9800031        prfm    pstl1strm, [x1]
-  6c:   885f7c22        ldxr    w2, [x1]
-  70:   0b000042        add     w2, w2, w0
-  74:   88037c22        stxr    w3, w2, [x1]
-  78:   35ffffa3        cbnz    w3, 6c <will_atomic_add+0x2c>
-  7c:   17fffffa        b       64 <will_atomic_add+0x24>
-
-So if we tweaked the existing code so that we can generate the LL/SC
-versions either in a subsection or not depending on LSE, then we could
-probably play this sort of trick using a static key.
-
-What do you think?
+Indeed, and you'll probably need something similar for the other entries
+that you're merging.
 
 Will
-
---->8
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 7e2ec64aa414..ec7bfa40ee85 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -369,7 +369,7 @@ static inline bool __cpus_have_const_cap(int num)
- {
- 	if (num >= ARM64_NCAPS)
- 		return false;
--	return static_branch_unlikely(&cpu_hwcap_keys[num]);
-+	return static_branch_likely(&cpu_hwcap_keys[num]);
- }
- 
- static inline bool cpus_have_cap(unsigned int num)
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f4fc1e0544b7..f44080ef7188 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -405,3 +405,36 @@ static int __init register_kernel_offset_dumper(void)
- 	return 0;
- }
- __initcall(register_kernel_offset_dumper);
-+
-+static inline void ll_sc_atomic_add(int i, atomic_t *v)
-+{
-+	unsigned long tmp;
-+	int result;
-+
-+	asm volatile(
-+"	b	3f\n"
-+"	.subsection 1\n"
-+"3:	prfm	pstl1strm, %2\n"
-+"1:	ldxr	%w0, %2\n"
-+"	add	%w0, %w0, %w3\n"
-+"	stxr	%w1, %w0, %2\n"
-+"	cbnz	%w1, 1b\n"
-+"	b	4f\n"
-+"	.previous\n"
-+"4:"
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
-+	: "Ir" (i));
-+}
-+
-+void will_atomic_add(int i, atomic_t *v)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_LSE_ATOMICS)) {
-+		ll_sc_atomic_add(i, v);
-+	} else {
-+		asm volatile("stadd	%w[i], %[v]"
-+		: [v] "+Q" (v->counter)
-+		: [i] "r" (i));
-+	}
-+
-+	return;
-+}
