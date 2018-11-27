@@ -1,63 +1,62 @@
-From: vkoul@kernel.org (Vinod Koul)
-Date: Tue, 27 Nov 2018 20:29:11 +0530
-Subject: [PATCH v4 0/2] dmaengine: add UniPhier MIO DMAC driver
-In-Reply-To: <CAK7LNAR8Tk9iXPLnv4XDM0E=kTWwv2+UGz+xmtA-eJyjRFjFRw@mail.gmail.com>
-References: <1539276063-5103-1-git-send-email-yamada.masahiro@socionext.com>
- <20181124141616.GH3175@vkoul-mobl.Dlink>
- <CAK7LNAR8Tk9iXPLnv4XDM0E=kTWwv2+UGz+xmtA-eJyjRFjFRw@mail.gmail.com>
-Message-ID: <20181127145911.GC3175@vkoul-mobl.Dlink>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 27 Nov 2018 15:01:50 +0000
+Subject: [PATCH 2/2] arm64: acpi: Prepare for longer MADTs
+In-Reply-To: <20181012192937.3819951-1-jeremy.linton@arm.com>
+References: <20181012192937.3819951-1-jeremy.linton@arm.com>
+Message-ID: <20181127150150.GA25270@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25-11-18, 22:53, Masahiro Yamada wrote:
-> On Sat, Nov 24, 2018 at 11:16 PM Vinod Koul <vkoul@kernel.org> wrote:
-> >
-> > On 12-10-18, 01:41, Masahiro Yamada wrote:
-> > > 1/2: DT-binding
-> > > 2/2: driver
-> >
-> > Applied this series, thanks
+On Fri, Oct 12, 2018 at 02:29:37PM -0500, Jeremy Linton wrote:
+> The BAD_MADT_GICC_ENTRY check is a little too strict because
+> it rejects MADT entries that don't match the currently known
+> lengths. We should remove this restriction to avoid problems
+> if the table length changes. Future code which might depend on
+> additional fields should be written to validate those fields
+> before using them, rather than trying to globally check
+> known MADT version lengths.
 > 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/include/asm/acpi.h | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+
+Hi Jeremy,
+
+as mentioned, I added a comment to the macro so that in the future
+we will be able to remember the logic behind it.
+
+I pushed the commit out:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git acpi/madt
+
+Please have a look, if I hear no objections I shall be sending it to
+Will and Catalin to queue it for v4.21.
+
+Thanks,
+Lorenzo
+
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 709208dfdc8b..4d0946bd485a 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -22,12 +22,12 @@
+>  #include <asm/tlbflush.h>
+>  
+>  /* Macros for consistency checks of the GICC subtable of MADT */
+> -#define ACPI_MADT_GICC_LENGTH	\
+> -	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
+> +#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
+> +	struct acpi_madt_generic_interrupt, efficiency_class)
+>  
+>  #define BAD_MADT_GICC_ENTRY(entry, end)					\
+> -	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
+> -	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
+> +	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
+> +	(unsigned long)(entry) + (entry)->header.length > (end))
+>  
+>  /* Basic configuration for ACPI */
+>  #ifdef	CONFIG_ACPI
+> -- 
+> 2.14.3
 > 
-> Thanks.
-> 
-> 
-> > While building I noticed that we get few warns when compiling with
-> > C=1, I would prefer you fix them. Please send fixes on top of the
-> > applied patches.
-> 
-> My code is fine.
-
-Lets see..
-
-> If you are talking about the following, your sparse is too old.
-> Upgrade your sparse.
-
-Not really!!
-
-$ sparse --version
-0.5.2
-
-.. is the last released version!
-
-Do you use from git?
-
-> ./include/linux/overflow.h:285:13: error: undefined identifier
-> '__builtin_mul_overflow'
-> ./include/linux/overflow.h:285:13: error: incorrect type in conditional
-> ./include/linux/overflow.h:285:13:    got void
-> ./include/linux/overflow.h:287:13: error: undefined identifier
-> '__builtin_add_overflow'
-> ./include/linux/overflow.h:287:13: error: incorrect type in conditional
-> ./include/linux/overflow.h:287:13:    got void
-> ./include/linux/overflow.h:285:13: warning: call with no type!
-> ./include/linux/overflow.h:287:13: warning: call with no type!
-
-and I was also talking about:
-
-arch/arm64/include/asm/sysreg.h:471:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-arch/arm64/include/asm/sysreg.h:512:42: warning: constant 0xffffffffffffffff is so big it is unsigned long
-include/linux/slab.h:332:43: warning: dubious: x & !y
-
--- 
-~Vinod
