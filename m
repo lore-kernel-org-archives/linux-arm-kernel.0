@@ -1,65 +1,42 @@
-From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 27 Nov 2018 20:05:39 +0200
-Subject: [PATCH v9 2/8] dt-bindings: Introduce interconnect binding
-In-Reply-To: <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
-References: <20180831140151.13972-1-georgi.djakov@linaro.org>
- <20180831140151.13972-3-georgi.djakov@linaro.org>
- <20180925180215.GA12435@bogus>
- <b67253fb-d86d-2ddd-6c30-0833d6ed62ad@linaro.org>
-Message-ID: <bfed1f52-1544-8491-9f0f-b46c2787b45e@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Nov 2018 18:07:23 +0000
+Subject: [for-next][PATCH 04/18] arm64: function_graph: Simplify with
+ function_graph_entry()
+In-Reply-To: <20181122003331.917870132@goodmis.org>
+References: <20181122002801.501220343@goodmis.org>
+ <20181122003331.917870132@goodmis.org>
+Message-ID: <20181127180722.GB19216@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On 9/26/18 17:42, Georgi Djakov wrote:
-> Hi Rob,
+On Wed, Nov 21, 2018 at 07:28:05PM -0500, Steven Rostedt wrote:
+> From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
 > 
-> Thanks for the comments!
+> The function_graph_entry() function does the work of calling the function
+> graph hook function and the management of the shadow stack, simplifying the
+> work done in the architecture dependent prepare_ftrace_return().
 > 
-> On 09/25/2018 09:02 PM, Rob Herring wrote:
->> On Fri, Aug 31, 2018 at 05:01:45PM +0300, Georgi Djakov wrote:
->>> This binding is intended to represent the relations between the interconnect
->>> controllers (providers) and consumer device nodes. It will allow creating links
->>> between consumers and interconnect paths (exposed by interconnect providers).
->>
->> As I mentioned in person, I want to see other SoC families using this
->> before accepting. They don't have to be ready for upstream, but WIP
->> patches or even just a "yes, this works for us and we're going to use
->> this binding on X".
-
-Patches for the iMX7ULP platform are already available [1]. Thanks 
-Alexandre Bailon!
-
-The interconnect API seems to be also a good fit for Nvidia SoCs. There 
-is an ongoing discussion about implementing an interconnect provider 
-driver for Tegra [2]. Thanks Thierry and Krishna!
-
-In addition of the above, i also checked privately with a few other SoC 
-maintainers and made them aware of these patches. Some are not ready for 
-upstream yet, but the feedback was positive and i expect more SoCs to 
-make use of this in the future.
-
-BR,
-Georgi
-
-[1] https://lkml.org/lkml/2018/11/17/368
-[2] https://marc.info/?t=154056181900001&r=1&w=2
-
-
-> Other than the 3 Qualcomm SoCs (msm8916, msm8996, sdm845) that are
-> currently using this binding, there is ongoing work from at least two
-> other vendors that would be using this same binding. I will check on
-> what is their progress so far.
+> Have arm64 use the new code, and remove the shadow stack management as well as
+> having to set up the trace structure.
 > 
->> Also, I think the QCom GPU use of this should be fully sorted out. Or
->> more generically how this fits into OPP binding which seems to be never
->> ending extended...
+> This is needed to prepare for a fix of a design bug on how the curr_ret_stack
+> is used.
 > 
-> I see this as a further step. It could be OPP binding which include
-> bandwidth values or some separate DT property. Jordan has already
-> proposed something, do you have any initial comments on that?
-> 
-> BR,
-> Georgi
-> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: stable at kernel.org
+> Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
+> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> ---
+>  arch/arm64/kernel/ftrace.c | 15 +--------------
+>  1 file changed, 1 insertion(+), 14 deletions(-)
+
+Minor nit: the subject refers to function_graph_entry(), but looks like
+you settled on function_graph_enter() in the end.
+
+Anyway, looks like no change for us, so:
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
