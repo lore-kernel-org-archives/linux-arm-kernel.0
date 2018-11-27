@@ -1,64 +1,76 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:31:23 +0000
-Subject: [PATCH 1/7] arm64: capabilities: Merge entries for
- ARM64_WORKAROUND_CLEAN_CACHE
-In-Reply-To: <20181126150956.GA24096@en101>
-References: <1541418917-14219-1-git-send-email-suzuki.poulose@arm.com>
- <1541418917-14219-2-git-send-email-suzuki.poulose@arm.com>
- <20181126140603.GA29684@arm.com> <20181126150956.GA24096@en101>
-Message-ID: <20181127193123.GH5641@arm.com>
+Date: Tue, 27 Nov 2018 19:31:18 +0000
+Subject: [PATCH 2/2] arm64: defconfig: enable BPF related configs
+In-Reply-To: <20181126155247.GY30658@n2100.armlinux.org.uk>
+References: <20181111181048.10933-1-pbrobinson@gmail.com>
+ <20181111181048.10933-2-pbrobinson@gmail.com>
+ <20181112183623.GA2265@brain-police>
+ <CAKv+Gu9EE_bWcoxEFr4pi41pfAQsDAywKR+gSueA9vE_Z4Np+g@mail.gmail.com>
+ <20181126153820.GA28400@arm.com>
+ <20181126155247.GY30658@n2100.armlinux.org.uk>
+Message-ID: <20181127193118.GG5641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 03:09:56PM +0000, Suzuki K Poulose wrote:
-> On Mon, Nov 26, 2018 at 02:06:04PM +0000, Will Deacon wrote:
-> > On Mon, Nov 05, 2018 at 11:55:11AM +0000, Suzuki K Poulose wrote:
-> > > We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
-> > > 
-> > > 1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
-> > > 2) ARM Errata 819472 on A53 r0p[01]
-> > > 
-> > > Both have the same work around. Merge these entries to avoid
-> > > duplicate entries for a single capability.
-> > > 
-> > > Cc: Will Deacon <will.deacon@arm.com>
-> > > Cc: Andre Przywara <andre.przywara@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> > > ---
-> > >  arch/arm64/kernel/cpu_errata.c | 19 +++++++------------
-> > >  1 file changed, 7 insertions(+), 12 deletions(-)
-> > > 
-> > > diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> > > index a509e351..c825bc0 100644
-> > > --- a/arch/arm64/kernel/cpu_errata.c
-> > > +++ b/arch/arm64/kernel/cpu_errata.c
-> > > @@ -573,24 +573,19 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
-> > >  const struct arm64_cpu_capabilities arm64_errata[] = {
-> > >  #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
-> > >  	defined(CONFIG_ARM64_ERRATUM_827319) || \
-> > > -	defined(CONFIG_ARM64_ERRATUM_824069)
-> > > +	defined(CONFIG_ARM64_ERRATUM_824069) || \
-> > > +	defined(CONFIG_ARM64_ERRATUM_819472)
-> > >  	{
-> > > -	/* Cortex-A53 r0p[012] */
-> > > -		.desc = "ARM errata 826319, 827319, 824069",
-> > > +	/*
-> > > +	 * Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069
-> > > +	 * Cortex-A53 r0p[01] : ARM errata 819472
-> > > +	 */
-> > > +		.desc = "ARM errata 826319, 827319, 824069, 819472",
-> > >  		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
-> > >  		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
-> > >  		.cpu_enable = cpu_enable_cache_maint_trap,
-> > 
-> > Isn't this a semantic change wrt the Kconfig options? After this change,
-> > if I /only/ set CONFIG_ARM64_ERRATUM_819472=y, then I still get the
-> > workaround applied for CPUs > r0[p01] which isn't what I asked for.
-> 
-> You're right. I could change this to :
+Hi Russell,
 
-Indeed, and you'll probably need something similar for the other entries
-that you're merging.
+On Mon, Nov 26, 2018 at 03:52:47PM +0000, Russell King - ARM Linux wrote:
+> On Mon, Nov 26, 2018 at 03:38:20PM +0000, Will Deacon wrote:
+> > On Sat, Nov 17, 2018 at 03:18:04PM -0800, Ard Biesheuvel wrote:
+> > > On Mon, 12 Nov 2018 at 10:36, Will Deacon <will.deacon@arm.com> wrote:
+> > > > On Sun, Nov 11, 2018 at 06:10:48PM +0000, Peter Robinson wrote:
+> > > > > The BPF components are getting more widely used by various components
+> > > > > so we should enable them in the ARMv7 multi config to ensure they
+> > > > > get wider testing and don't regress.
+> > > >
+> > > > Have other architectures already made this leap?
+> > > >
+> > > 
+> > > $ git grep CONFIG_BPF_SYSCALL=y arch/
+> > > arch/arm/configs/aspeed_g4_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/arm/configs/aspeed_g5_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/mips/configs/generic_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/powerpc/configs/44x/fsp2_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/powerpc/configs/powernv_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/powerpc/configs/ppc64_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/powerpc/configs/pseries_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/riscv/configs/defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/s390/configs/debug_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/s390/configs/performance_defconfig:CONFIG_BPF_SYSCALL=y
+> > > arch/s390/defconfig:CONFIG_BPF_SYSCALL=y
+> > > 
+> > > but nobody seems to enable CONFIG_BPF_JIT_ALWAYS_ON.
+> > > 
+> > > I sent some patches to move the BPF JIT allocations out of the module
+> > > range. Whether that really improves things in terms of security is not
+> > > obvious to me, but at least we stop wasting module region space (and
+> > > potentially KASAN shadow pages) on BPF programs.
+> > > 
+> > > If this is mainly for coverage, it would indeed be nice if we could at
+> > > least make it root only by default. However, if the distros are
+> > > enabling this in their default configurations, I'd prefer it if we at
+> > > least have a config that will help us spot issues early on.
+> > 
+> > That's a fair point on the distros. Peter, as author of the patch, please
+> > can you take a look at the arm64 kernel configs from some popular
+> > distributions and see which of these options they tend to enable?
+> 
+> Another point to consider is whether the BPF JIT creates code that
+> is safe from Spectre, or whether it opens up more Spectre issues.
+> If it isn't, maybe the better option is to disable kernel-side BPF
+> entirely until it is fixed up.
+> 
+> I've raised that point for 32-bit ARM already, and the 32-bit ARM
+> BPF JIT isn't going to have the Spectre mitigations applied (since
+> no one appears interested whenever I've raised it.)  So, for 32-bit
+> ARM, it's better to have kernel-side BPF entirely disabled if you
+> care about Spectre mitigations.
+
+I thought that the Spectre mitigations (at least for variant 1) were handled
+by the core BPF JIT, as a result of b2157399cc98 ("bpf: prevent out-of-bounds
+speculation")? I think we rely on randomization to protect against variant 2
+for JITted code.
+
+Did I miss something here?
 
 Will
