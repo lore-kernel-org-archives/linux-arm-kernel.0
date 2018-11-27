@@ -1,72 +1,332 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 11:07:24 +0100
-Subject: [PATCH v2 03/12] drm/sun4i: sun6i_mipi_dsi: Setup burst mode
- timings
-In-Reply-To: <CAMty3ZCZtTa=YYxVnqvOHSGxA4vkXf6iinhoKfVN7B6CHFg_xQ@mail.gmail.com>
-References: <20181116163916.29621-1-jagan@amarulasolutions.com>
- <20181116163916.29621-4-jagan@amarulasolutions.com>
- <20181119083036.riydru5xefao3xte@flea>
- <CAMty3ZBDBDqtH5_m4g-kkKKx+JqcC-r9mc-H+_WWgkLubMWPew@mail.gmail.com>
- <20181120154532.mykbbrc3homwf2fi@flea>
- <CAMty3ZCZtTa=YYxVnqvOHSGxA4vkXf6iinhoKfVN7B6CHFg_xQ@mail.gmail.com>
-Message-ID: <20181127100724.od5rm7vxdn7qemdv@flea>
+From: liuyun01@kylinos.cn (Jackie Liu)
+Date: Tue, 27 Nov 2018 18:08:58 +0800
+Subject: [PATCH v3 2/2] arm64: crypto: add NEON accelerated XOR implementation
+In-Reply-To: <20181127100858.6995-1-liuyun01@kylinos.cn>
+References: <20181127100858.6995-1-liuyun01@kylinos.cn>
+Message-ID: <20181127100858.6995-2-liuyun01@kylinos.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 09:52:23PM +0530, Jagan Teki wrote:
-> On Tue, Nov 20, 2018 at 9:15 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > On Mon, Nov 19, 2018 at 04:30:37PM +0530, Jagan Teki wrote:
-> > > On Mon, Nov 19, 2018 at 2:00 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > >
-> > > > On Fri, Nov 16, 2018 at 10:09:07PM +0530, Jagan Teki wrote:
-> > > > > Burst mode display timings are different from convectional
-> > > > > video mode so update the horizontal and vertical timings.
-> > > > >
-> > > > > Reference code taken from BSP (from linux-sunxi/
-> > > > > drivers/video/sunxi/disp2/disp/de/lowlevel_sun50iw1/de_dsi.c)
-> > > > >
-> > > > > dsi_hsa  = 0;
-> > > > > dsi_hbp  = 0;
-> > > > > dsi_hact = x*dsi_pixel_bits[format]/8;
-> > > > > dsi_hblk = dsi_hact;
-> > > > > dsi_hfp  = 0;
-> > > > > dsi_vblk = 0;
-> > > > >
-> > > > > Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> > > >
-> > > > How is that matching the code you have in the rest of your patch?
-> > >
-> > > +       if (device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-> > > +               timings.hblk = (mode->hdisplay * Bpp);
-> > > +       else
-> > > +               sun6i_dsi_get_timings(dsi, mode, &timings);
-> > >
-> > > It's again your request to "keep the couple of function to make more
-> > > readable"
-> >
-> > That function in particular doesn't make it much more readable, but
-> > more importantly, your commit log doesn't match what you code does.
-> 
-> May be I can update the commit message if the function is OK. for
-> burst most of the timings are 0 so I used structure with memset to
-> keep not assigning 0's explicitly. otherwise do you have any
-> suggestions, please let me know.
+This is a NEON acceleration method that can improve
+performance by approximately 20%. I got the following
+data from the centos 7.5 on Huawei's HISI1616 chip:
 
-Drop the part that move the timings setup to another function in this
-patch.
+[ 93.837726] xor: measuring software checksum speed
+[ 93.874039]   8regs  : 7123.200 MB/sec
+[ 93.914038]   32regs : 7180.300 MB/sec
+[ 93.954043]   arm64_neon: 9856.000 MB/sec
+[ 93.954047] xor: using function: arm64_neon (9856.000 MB/sec)
 
-Thanks!
-Maxime
+I believe this code can bring some optimization for
+all arm64 platform.
 
+That is patch version 3. Thanks for Ard Biesheuvel's
+suggestions.
+
+Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
+---
+ arch/arm64/include/asm/Kbuild |   1 -
+ arch/arm64/include/asm/xor.h  |  73 +++++++++++++++++
+ arch/arm64/lib/Makefile       |   6 ++
+ arch/arm64/lib/xor-neon.c     | 184 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 263 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/xor.h
+ create mode 100644 arch/arm64/lib/xor-neon.c
+
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 6cd5d77..1877f29 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -27,4 +27,3 @@ generic-y += trace_clock.h
+ generic-y += unaligned.h
+ generic-y += user.h
+ generic-y += vga.h
+-generic-y += xor.h
+diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
+new file mode 100644
+index 0000000..856386a
+--- /dev/null
++++ b/arch/arm64/include/asm/xor.h
+@@ -0,0 +1,73 @@
++/*
++ * arch/arm64/include/asm/xor.h
++ *
++ * Authors: Jackie Liu <liuyun01@kylinos.cn>
++ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/hardirq.h>
++#include <asm-generic/xor.h>
++#include <asm/hwcap.h>
++#include <asm/neon.h>
++
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++extern struct xor_block_template const xor_block_inner_neon;
++
++static void
++xor_neon_2(unsigned long bytes, unsigned long *p1, unsigned long *p2)
++{
++	kernel_neon_begin();
++	xor_block_inner_neon.do_2(bytes, p1, p2);
++	kernel_neon_end();
++}
++
++static void
++xor_neon_3(unsigned long bytes, unsigned long *p1, unsigned long *p2,
++		unsigned long *p3)
++{
++	kernel_neon_begin();
++	xor_block_inner_neon.do_3(bytes, p1, p2, p3);
++	kernel_neon_end();
++}
++
++static void
++xor_neon_4(unsigned long bytes, unsigned long *p1, unsigned long *p2,
++		unsigned long *p3, unsigned long *p4)
++{
++	kernel_neon_begin();
++	xor_block_inner_neon.do_4(bytes, p1, p2, p3, p4);
++	kernel_neon_end();
++}
++
++static void
++xor_neon_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
++		unsigned long *p3, unsigned long *p4, unsigned long *p5)
++{
++	kernel_neon_begin();
++	xor_block_inner_neon.do_5(bytes, p1, p2, p3, p4, p5);
++	kernel_neon_end();
++}
++
++static struct xor_block_template xor_block_arm64 = {
++	.name   = "arm64_neon",
++	.do_2   = xor_neon_2,
++	.do_3   = xor_neon_3,
++	.do_4   = xor_neon_4,
++	.do_5	= xor_neon_5
++};
++#undef XOR_TRY_TEMPLATES
++#define XOR_TRY_TEMPLATES           \
++	do {        \
++		xor_speed(&xor_block_8regs);    \
++		xor_speed(&xor_block_32regs);    \
++		if (cpu_has_neon()) { \
++			xor_speed(&xor_block_arm64);\
++		} \
++	} while (0)
++
++#endif /* ! CONFIG_KERNEL_MODE_NEON */
+diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
+index 69ff988..5540a16 100644
+--- a/arch/arm64/lib/Makefile
++++ b/arch/arm64/lib/Makefile
+@@ -5,6 +5,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
+ 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
+ 		   strchr.o strrchr.o tishift.o
+ 
++ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
++obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
++CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
++CFLAGS_xor-neon.o		+= -ffreestanding
++endif
++
+ # Tell the compiler to treat all general purpose registers (with the
+ # exception of the IP registers, which are already handled by the caller
+ # in case of a PLT) as callee-saved, which allows for efficient runtime
+diff --git a/arch/arm64/lib/xor-neon.c b/arch/arm64/lib/xor-neon.c
+new file mode 100644
+index 0000000..131c60c2
+--- /dev/null
++++ b/arch/arm64/lib/xor-neon.c
+@@ -0,0 +1,184 @@
++/*
++ * arch/arm64/lib/xor-neon.c
++ *
++ * Authors: Jackie Liu <liuyun01@kylinos.cn>
++ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/raid/xor.h>
++#include <linux/module.h>
++#include <asm/neon-intrinsics.h>
++
++void xor_arm64_neon_2(unsigned long bytes, unsigned long *p1,
++	unsigned long *p2)
++{
++	uint64_t *dp1 = (uint64_t *)p1;
++	uint64_t *dp2 = (uint64_t *)p2;
++
++	register uint64x2_t v0, v1, v2, v3;
++	long lines = bytes / (sizeof(uint64x2_t) * 4);
++
++	do {
++		/* p1 ^= p2 */
++		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
++		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
++		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
++		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
++
++		/* store */
++		vst1q_u64(dp1 +  0, v0);
++		vst1q_u64(dp1 +  2, v1);
++		vst1q_u64(dp1 +  4, v2);
++		vst1q_u64(dp1 +  6, v3);
++
++		dp1 += 8;
++		dp2 += 8;
++	} while (--lines > 0);
++}
++
++void xor_arm64_neon_3(unsigned long bytes, unsigned long *p1,
++	unsigned long *p2, unsigned long *p3)
++{
++	uint64_t *dp1 = (uint64_t *)p1;
++	uint64_t *dp2 = (uint64_t *)p2;
++	uint64_t *dp3 = (uint64_t *)p3;
++
++	register uint64x2_t v0, v1, v2, v3;
++	long lines = bytes / (sizeof(uint64x2_t) * 4);
++
++	do {
++		/* p1 ^= p2 */
++		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
++		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
++		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
++		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
++
++		/* p1 ^= p3 */
++		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
++
++		/* store */
++		vst1q_u64(dp1 +  0, v0);
++		vst1q_u64(dp1 +  2, v1);
++		vst1q_u64(dp1 +  4, v2);
++		vst1q_u64(dp1 +  6, v3);
++
++		dp1 += 8;
++		dp2 += 8;
++		dp3 += 8;
++	} while (--lines > 0);
++}
++
++void xor_arm64_neon_4(unsigned long bytes, unsigned long *p1,
++	unsigned long *p2, unsigned long *p3, unsigned long *p4)
++{
++	uint64_t *dp1 = (uint64_t *)p1;
++	uint64_t *dp2 = (uint64_t *)p2;
++	uint64_t *dp3 = (uint64_t *)p3;
++	uint64_t *dp4 = (uint64_t *)p4;
++
++	register uint64x2_t v0, v1, v2, v3;
++	long lines = bytes / (sizeof(uint64x2_t) * 4);
++
++	do {
++		/* p1 ^= p2 */
++		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
++		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
++		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
++		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
++
++		/* p1 ^= p3 */
++		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
++
++		/* p1 ^= p4 */
++		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
++
++		/* store */
++		vst1q_u64(dp1 +  0, v0);
++		vst1q_u64(dp1 +  2, v1);
++		vst1q_u64(dp1 +  4, v2);
++		vst1q_u64(dp1 +  6, v3);
++
++		dp1 += 8;
++		dp2 += 8;
++		dp3 += 8;
++		dp4 += 8;
++	} while (--lines > 0);
++}
++
++void xor_arm64_neon_5(unsigned long bytes, unsigned long *p1,
++	unsigned long *p2, unsigned long *p3,
++	unsigned long *p4, unsigned long *p5)
++{
++	uint64_t *dp1 = (uint64_t *)p1;
++	uint64_t *dp2 = (uint64_t *)p2;
++	uint64_t *dp3 = (uint64_t *)p3;
++	uint64_t *dp4 = (uint64_t *)p4;
++	uint64_t *dp5 = (uint64_t *)p5;
++
++	register uint64x2_t v0, v1, v2, v3;
++	long lines = bytes / (sizeof(uint64x2_t) * 4);
++
++	do {
++		/* p1 ^= p2 */
++		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
++		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
++		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
++		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
++
++		/* p1 ^= p3 */
++		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
++
++		/* p1 ^= p4 */
++		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
++
++		/* p1 ^= p5 */
++		v0 = veorq_u64(v0, vld1q_u64(dp5 +  0));
++		v1 = veorq_u64(v1, vld1q_u64(dp5 +  2));
++		v2 = veorq_u64(v2, vld1q_u64(dp5 +  4));
++		v3 = veorq_u64(v3, vld1q_u64(dp5 +  6));
++
++		/* store */
++		vst1q_u64(dp1 +  0, v0);
++		vst1q_u64(dp1 +  2, v1);
++		vst1q_u64(dp1 +  4, v2);
++		vst1q_u64(dp1 +  6, v3);
++
++		dp1 += 8;
++		dp2 += 8;
++		dp3 += 8;
++		dp4 += 8;
++		dp5 += 8;
++	} while (--lines > 0);
++}
++
++struct xor_block_template const xor_block_inner_neon = {
++	.name	= "__inner_neon__",
++	.do_2	= xor_arm64_neon_2,
++	.do_3	= xor_arm64_neon_3,
++	.do_4	= xor_arm64_neon_4,
++	.do_5	= xor_arm64_neon_5,
++};
++EXPORT_SYMBOL(xor_block_inner_neon);
++
++MODULE_AUTHOR("Jackie Liu <liuyun01@kylinos.cn>");
++MODULE_DESCRIPTION("ARMv8 XOR Extensions");
++MODULE_LICENSE("GPL");
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/b6abb19d/attachment.sig>
+2.7.4
