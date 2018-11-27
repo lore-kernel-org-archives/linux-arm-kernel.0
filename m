@@ -1,182 +1,45 @@
-From: mjourdan@baylibre.com (Maxime Jourdan)
-Date: Tue, 27 Nov 2018 15:19:47 +0100
-Subject: [PATCH] drm/meson: Add HDMI 1.4 4k modes
-In-Reply-To: <1541496909-19625-1-git-send-email-narmstrong@baylibre.com>
-References: <1541496909-19625-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAMO6naz=pm_cGo=_fFQdjes_HUXrSAi0CUTEVZYLkHvRCPZq0A@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 27 Nov 2018 15:21:03 +0100
+Subject: [PATCH v3 4/4] ARM: dts: Add stmpe-adc driver to relevant
+ devicetrees
+In-Reply-To: <20181123142411.8921-4-dev@pschenker.ch>
+References: <20181123142411.8921-1-dev@pschenker.ch>
+ <20181123142411.8921-4-dev@pschenker.ch>
+Message-ID: <20181127142103.GC10560@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 6, 2018 at 10:35 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
->
-> Add the timings for the HDMI 1.4 4K modes support :
-> - 3840x2160 at 30
-> - 3840x2160 at 25
-> - 3840x2160 at 24
->
-> Since the 297000Hz pixel clock is already managed and the modes are
-> compatible with the HDMI 1.4 current HDMI PHY+Controller support, only
-> the missing timings values needs to be added.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+On Fri, Nov 23, 2018 at 03:24:11PM +0100, Philippe Schenker wrote:
+> From: Philippe Schenker <philippe.schenker@toradex.com>
+> 
+> Activate the stmpe-adc driver as found on Apalis/Colibri iMX6/T30 modules
+> 
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
 > ---
->  drivers/gpu/drm/meson/meson_venc.c | 129 +++++++++++++++++++++++++++++++++++++
->  1 file changed, 129 insertions(+)
->
-> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
-> index 514245e..bcffe8e 100644
-> --- a/drivers/gpu/drm/meson/meson_venc.c
-> +++ b/drivers/gpu/drm/meson/meson_venc.c
-> @@ -697,6 +697,132 @@ union meson_hdmi_venc_mode meson_hdmi_encp_mode_1080p60 = {
->         },
->  };
->
-> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p24 = {
-> +       .encp = {
-> +               .dvi_settings = 0x1,
-> +               .video_mode = 0x4040,
-> +               .video_mode_adv = 0x8,
-> +               /* video_sync_mode */
-> +               /* video_yc_dly */
-> +               /* video_rgb_ctrl */
-> +               .video_filt_ctrl = 0x1000,
-> +               .video_filt_ctrl_present = true,
-> +               /* video_ofld_voav_ofst */
-> +               .yfp1_htime = 140,
-> +               .yfp2_htime = 140+3840,
-> +               .max_pxcnt = 3840+1660-1,
-> +               .hspuls_begin = 2156+1920,
-> +               .hspuls_end = 44,
-> +               .hspuls_switch = 44,
-> +               .vspuls_begin = 140,
-> +               .vspuls_end = 2059+1920,
-> +               .vspuls_bline = 0,
-> +               .vspuls_eline = 4,
-> +               .havon_begin = 148,
-> +               .havon_end = 3987,
-> +               .vavon_bline = 89,
-> +               .vavon_eline = 2248,
-> +               /* eqpuls_begin */
-> +               /* eqpuls_end */
-> +               /* eqpuls_bline */
-> +               /* eqpuls_eline */
-> +               .hso_begin = 44,
-> +               .hso_end = 2156+1920,
-> +               .vso_begin = 2100+1920,
-> +               .vso_end = 2164+1920,
-> +               .vso_bline = 51,
-> +               .vso_eline = 53,
-> +               .vso_eline_present = true,
-> +               /* sy_val */
-> +               /* sy2_val */
-> +               .max_lncnt = 2249,
-> +       },
-> +};
-> +
-> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p25 = {
-> +       .encp = {
-> +               .dvi_settings = 0x1,
-> +               .video_mode = 0x4040,
-> +               .video_mode_adv = 0x8,
-> +               /* video_sync_mode */
-> +               /* video_yc_dly */
-> +               /* video_rgb_ctrl */
-> +               .video_filt_ctrl = 0x1000,
-> +               .video_filt_ctrl_present = true,
-> +               /* video_ofld_voav_ofst */
-> +               .yfp1_htime = 140,
-> +               .yfp2_htime = 140+3840,
-> +               .max_pxcnt = 3840+1440-1,
-> +               .hspuls_begin = 2156+1920,
-> +               .hspuls_end = 44,
-> +               .hspuls_switch = 44,
-> +               .vspuls_begin = 140,
-> +               .vspuls_end = 2059+1920,
-> +               .vspuls_bline = 0,
-> +               .vspuls_eline = 4,
-> +               .havon_begin = 148,
-> +               .havon_end = 3987,
-> +               .vavon_bline = 89,
-> +               .vavon_eline = 2248,
-> +               /* eqpuls_begin */
-> +               /* eqpuls_end */
-> +               /* eqpuls_bline */
-> +               /* eqpuls_eline */
-> +               .hso_begin = 44,
-> +               .hso_end = 2156+1920,
-> +               .vso_begin = 2100+1920,
-> +               .vso_end = 2164+1920,
-> +               .vso_bline = 51,
-> +               .vso_eline = 53,
-> +               .vso_eline_present = true,
-> +               /* sy_val */
-> +               /* sy2_val */
-> +               .max_lncnt = 2249,
-> +       },
-> +};
-> +
-> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p30 = {
-> +       .encp = {
-> +               .dvi_settings = 0x1,
-> +               .video_mode = 0x4040,
-> +               .video_mode_adv = 0x8,
-> +               /* video_sync_mode */
-> +               /* video_yc_dly */
-> +               /* video_rgb_ctrl */
-> +               .video_filt_ctrl = 0x1000,
-> +               .video_filt_ctrl_present = true,
-> +               /* video_ofld_voav_ofst */
-> +               .yfp1_htime = 140,
-> +               .yfp2_htime = 140+3840,
-> +               .max_pxcnt = 3840+560-1,
-> +               .hspuls_begin = 2156+1920,
-> +               .hspuls_end = 44,
-> +               .hspuls_switch = 44,
-> +               .vspuls_begin = 140,
-> +               .vspuls_end = 2059+1920,
-> +               .vspuls_bline = 0,
-> +               .vspuls_eline = 4,
-> +               .havon_begin = 148,
-> +               .havon_end = 3987,
-> +               .vavon_bline = 89,
-> +               .vavon_eline = 2248,
-> +               /* eqpuls_begin */
-> +               /* eqpuls_end */
-> +               /* eqpuls_bline */
-> +               /* eqpuls_eline */
-> +               .hso_begin = 44,
-> +               .hso_end = 2156+1920,
-> +               .vso_begin = 2100+1920,
-> +               .vso_end = 2164+1920,
-> +               .vso_bline = 51,
-> +               .vso_eline = 53,
-> +               .vso_eline_present = true,
-> +               /* sy_val */
-> +               /* sy2_val */
-> +               .max_lncnt = 2249,
-> +       },
-> +};
-> +
->  struct meson_hdmi_venc_vic_mode {
->         unsigned int vic;
->         union meson_hdmi_venc_mode *mode;
-> @@ -717,6 +843,9 @@ struct meson_hdmi_venc_vic_mode {
->         { 34, &meson_hdmi_encp_mode_1080p30 },
->         { 31, &meson_hdmi_encp_mode_1080p50 },
->         { 16, &meson_hdmi_encp_mode_1080p60 },
-> +       { 93, &meson_hdmi_encp_mode_2160p24 },
-> +       { 94, &meson_hdmi_encp_mode_2160p25 },
-> +       { 95, &meson_hdmi_encp_mode_2160p30 },
->         { 0, NULL}, /* sentinel */
->  };
->
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
+> Changes in v3:
+>  - None
+> 
+> Changes in v2:
+>  - Put common ADC settings in mfd
+> 
+>  arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 ++++++++++++++--------
+>  arch/arm/boot/dts/imx6qdl-colibri.dtsi | 23 +++++++++++++++--------
+>  arch/arm/boot/dts/tegra30-apalis.dtsi  | 22 ++++++++++++++--------
+>  arch/arm/boot/dts/tegra30-colibri.dtsi | 22 ++++++++++++++--------
+>  4 files changed, 57 insertions(+), 32 deletions(-)
 
-Reviewed-by: Maxime Jourdan <mjourdan@baylibre.com>
+You might want to split this up into two patches, one for i.MX and the
+other for Tegra so that the respective maintainers can apply them
+separately.
+
+Also, where are patches 1-3?
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/c0d2cd93/attachment.sig>
