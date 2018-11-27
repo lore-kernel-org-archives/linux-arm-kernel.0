@@ -1,36 +1,48 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:58 +0100
-Subject: [PATCH 57/77] ARM: dts: sun8i: a23/a33: Change framebuffer node names
- to avoid warnings
+Date: Tue, 27 Nov 2018 13:45:18 +0100
+Subject: [PATCH 17/77] ARM: dts: sunxi: Change LRADC node names to avoid
+ warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <5581c89e3dc87081d16f869b0340cc5d62865965.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <ac22e434043703cafb6340512ee3dfc7e50600aa.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The simple-framebuffer nodes have a unit address, but no reg property which
-generates a warning when compiling it with DTC.
+One of the usage of the LRADC is to implement buttons. The bindings define
+that we should have one subnode per button, with their associated voltage
+as a property.
 
-Change the simple-framebuffer node names so that there is no warnings on
-this anymore.
+However, there was no reg property but we still used the voltage associated
+to the button as the unit-address, which eventually generated warnings in
+DTC.
+
+Rename the node names to avoid those warnings.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 5d79860bef88..b76b88a45e99 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -57,7 +57,7 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi b/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
+index 245d0bcde441..00dc6623f30f 100644
+--- a/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sunxi-reference-design-tablet.dtsi
+@@ -60,14 +60,14 @@
+ 	vref-supply = <&reg_vcc3v0>;
+ 	status = "okay";
  
--		simplefb_lcd: framebuffer at 0 {
-+		simplefb_lcd: framebuffer-lcd0 {
- 			compatible = "allwinner,simple-framebuffer",
- 				     "simple-framebuffer";
- 			allwinner,pipeline = "de_be0-lcd0";
+-	button at 200 {
++	button-200 {
+ 		label = "Volume Up";
+ 		linux,code = <KEY_VOLUMEUP>;
+ 		channel = <0>;
+ 		voltage = <200000>;
+ 	};
+ 
+-	button at 400 {
++	button-400 {
+ 		label = "Volume Down";
+ 		linux,code = <KEY_VOLUMEDOWN>;
+ 		channel = <0>;
 -- 
 git-series 0.9.1
