@@ -1,78 +1,62 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:08 +0100
-Subject: [PATCH 07/77] ARM: dts: sun5i: Remove SoC node unit-name to avoid
- warnings
+Date: Tue, 27 Nov 2018 13:45:19 +0100
+Subject: [PATCH 18/77] ARM: dts: sun5i: Fix Display Engine DTC warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <003a6d6316bb1f6238556674ed162fd0b7e57456.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <f2dbd10e7c99093198e133197e3cd5ad07cf7256.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our main node for all the in-SoC controllers used to have a unit name. The
-unit-name, in addition to being actually false, would not match any reg
-property, which generates a warning.
+Our display engine endpoints trigger some DTC warnings due to the fact that
+we're having a single endpoint that doesn't need any reg property, and
+since we don't have a reg property, we don't need the address-cells and
+size-cells properties anymore.
 
-Remove it in order to remove those warnings.
+Fix those
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun5i-a10s.dtsi | 2 +-
- arch/arm/boot/dts/sun5i-a13.dtsi  | 2 +-
- arch/arm/boot/dts/sun5i-gr8.dtsi  | 2 +-
- arch/arm/boot/dts/sun5i.dtsi      | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts |  2 --
+ arch/arm/boot/dts/sun5i-a13-q8-tablet.dts | 10 ++--------
+ 2 files changed, 2 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-index 0c0c5e08520f..a2d0ceacf00e 100644
---- a/arch/arm/boot/dts/sun5i-a10s.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -74,7 +74,7 @@
- 		allwinner,pipelines = <&fe0>;
- 	};
+diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+index 8855ddb78e0b..0dafbdb00599 100644
+--- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
++++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
+@@ -74,8 +74,6 @@
  
--	soc at 1c00000 {
-+	soc {
- 		hdmi: hdmi at 1c16000 {
- 			compatible = "allwinner,sun5i-a10s-hdmi";
- 			reg = <0x01c16000 0x1000>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index a75ca4504a75..ee99f6f23f17 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -86,7 +86,7 @@
- 		allwinner,pipelines = <&fe0>;
- 	};
+ 	bridge {
+ 		compatible = "dumb-vga-dac";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
  
--	soc at 1c00000 {
-+	soc {
- 		pwm: pwm at 1c20e00 {
- 			compatible = "allwinner,sun5i-a13-pwm";
- 			reg = <0x01c20e00 0xc>;
-diff --git a/arch/arm/boot/dts/sun5i-gr8.dtsi b/arch/arm/boot/dts/sun5i-gr8.dtsi
-index ef0b7446a99d..d3eea4cfe442 100644
---- a/arch/arm/boot/dts/sun5i-gr8.dtsi
-+++ b/arch/arm/boot/dts/sun5i-gr8.dtsi
-@@ -54,7 +54,7 @@
- 		allwinner,pipelines = <&fe0>;
- 	};
+ 		ports {
+ 			#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
+index a89f29fa3e40..85edbd98f7db 100644
+--- a/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
++++ b/arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
+@@ -50,18 +50,12 @@
  
--	soc at 1c00000 {
-+	soc {
- 		pwm: pwm at 1c20e00 {
- 			compatible = "allwinner,sun5i-a10s-pwm";
- 			reg = <0x01c20e00 0xc>;
-diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-index 07b60462356e..4ea6e1867186 100644
---- a/arch/arm/boot/dts/sun5i.dtsi
-+++ b/arch/arm/boot/dts/sun5i.dtsi
-@@ -123,7 +123,7 @@
+ 	panel: panel {
+ 		compatible = "urt,umsh-8596md-t", "simple-panel";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+ 
+-		port at 0 {
+-			reg = <0>;
++		port {
+ 			/* TODO: lcd panel uses axp gpio0 as enable pin */
+ 			backlight = <&backlight>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 
+-			panel_input: endpoint at 0 {
+-				reg = <0>;
++			panel_input: endpoint {
+ 				remote-endpoint = <&tcon0_out_lcd>;
+ 			};
  		};
- 	};
- 
--	soc at 1c00000 {
-+	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <1>;
 -- 
 git-series 0.9.1
