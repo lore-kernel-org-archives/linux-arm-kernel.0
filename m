@@ -1,107 +1,205 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:26 +0100
-Subject: [PATCH v12 08/25] kasan: initialize shadow to 0xff for tag-based mode
+Date: Tue, 27 Nov 2018 17:55:28 +0100
+Subject: [PATCH v12 10/25] kasan: add tag related helper functions
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <9004fd16d56d8772775cf671a8fa66e54ed138dd.1543337629.git.andreyknvl@google.com>
+Message-ID: <643b46fbcd6433a4be18b3a19ce9f3e727618a8d.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A tag-based KASAN shadow memory cell contains a memory tag, that
-corresponds to the tag in the top byte of the pointer, that points to that
-memory. The native top byte value of kernel pointers is 0xff, so with
-tag-based KASAN we need to initialize shadow memory to 0xff.
+This commit adds a few helper functions, that are meant to be used to
+work with tags embedded in the top byte of kernel pointers: to set, to
+get or to reset the top byte.
 
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/mm/kasan_init.c | 15 +++++++++++++--
- include/linux/kasan.h      |  8 ++++++++
- mm/kasan/common.c          |  3 ++-
- 3 files changed, 23 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/kasan.h  |  8 +++++--
+ arch/arm64/include/asm/memory.h | 12 +++++++++++
+ arch/arm64/mm/kasan_init.c      |  2 ++
+ include/linux/kasan.h           | 13 ++++++++++++
+ mm/kasan/kasan.h                | 31 +++++++++++++++++++++++++++
+ mm/kasan/tags.c                 | 37 +++++++++++++++++++++++++++++++++
+ 6 files changed, 101 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
+index 8758bb008436..b52aacd2c526 100644
+--- a/arch/arm64/include/asm/kasan.h
++++ b/arch/arm64/include/asm/kasan.h
+@@ -4,12 +4,16 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
+-#ifdef CONFIG_KASAN
+-
+ #include <linux/linkage.h>
+ #include <asm/memory.h>
+ #include <asm/pgtable-types.h>
+ 
++#define arch_kasan_set_tag(addr, tag)	__tag_set(addr, tag)
++#define arch_kasan_reset_tag(addr)	__tag_reset(addr)
++#define arch_kasan_get_tag(addr)	__tag_get(addr)
++
++#ifdef CONFIG_KASAN
++
+ /*
+  * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
+  * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/N of kernel virtual addresses,
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index e2c9857157f2..83c1366a1233 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -219,6 +219,18 @@ static inline unsigned long kaslr_offset(void)
+ #define untagged_addr(addr)	\
+ 	((__typeof__(addr))sign_extend64((u64)(addr), 55))
+ 
++#ifdef CONFIG_KASAN_SW_TAGS
++#define __tag_shifted(tag)	((u64)(tag) << 56)
++#define __tag_set(addr, tag)	(__typeof__(addr))( \
++		((u64)(addr) & ~__tag_shifted(0xff)) | __tag_shifted(tag))
++#define __tag_reset(addr)	untagged_addr(addr)
++#define __tag_get(addr)		(__u8)((u64)(addr) >> 56)
++#else
++#define __tag_set(addr, tag)	(addr)
++#define __tag_reset(addr)	(addr)
++#define __tag_get(addr)		0
++#endif
++
+ /*
+  * Physical vs virtual RAM address space conversion.  These are
+  * private definitions which should NOT be used outside memory.h
 diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 4ebc19422931..7a4a0904cac8 100644
+index 7a4a0904cac8..1df536bdabcb 100644
 --- a/arch/arm64/mm/kasan_init.c
 +++ b/arch/arm64/mm/kasan_init.c
-@@ -43,6 +43,15 @@ static phys_addr_t __init kasan_alloc_zeroed_page(int node)
- 	return __pa(p);
- }
- 
-+static phys_addr_t __init kasan_alloc_raw_page(int node)
-+{
-+	void *p = memblock_alloc_try_nid_raw(PAGE_SIZE, PAGE_SIZE,
-+						__pa(MAX_DMA_ADDRESS),
-+						MEMBLOCK_ALLOC_ACCESSIBLE,
-+						node);
-+	return __pa(p);
-+}
-+
- static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
- 				      bool early)
- {
-@@ -92,7 +101,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
- 	do {
- 		phys_addr_t page_phys = early ?
- 				__pa_symbol(kasan_early_shadow_page)
--					: kasan_alloc_zeroed_page(node);
-+					: kasan_alloc_raw_page(node);
-+		if (!early)
-+			memset(__va(page_phys), KASAN_SHADOW_INIT, PAGE_SIZE);
- 		next = addr + PAGE_SIZE;
- 		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
- 	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
-@@ -239,7 +250,7 @@ void __init kasan_init(void)
- 			pfn_pte(sym_to_pfn(kasan_early_shadow_page),
- 				PAGE_KERNEL_RO));
- 
--	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
-+	memset(kasan_early_shadow_page, KASAN_SHADOW_INIT, PAGE_SIZE);
+@@ -253,6 +253,8 @@ void __init kasan_init(void)
+ 	memset(kasan_early_shadow_page, KASAN_SHADOW_INIT, PAGE_SIZE);
  	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
  
++	kasan_init_tags();
++
  	/* At this point kasan is fully initialized. Enable error messages */
+ 	init_task.kasan_depth = 0;
+ 	pr_info("KernelAddressSanitizer initialized\n");
 diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index ec22d548d0d7..c56af24bd3e7 100644
+index c56af24bd3e7..a477ce2abdc9 100644
 --- a/include/linux/kasan.h
 +++ b/include/linux/kasan.h
-@@ -153,6 +153,8 @@ static inline size_t kasan_metadata_size(struct kmem_cache *cache) { return 0; }
+@@ -169,6 +169,19 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
  
- #ifdef CONFIG_KASAN_GENERIC
+ #define KASAN_SHADOW_INIT 0xFF
  
-+#define KASAN_SHADOW_INIT 0
++void kasan_init_tags(void);
 +
- void kasan_cache_shrink(struct kmem_cache *cache);
- void kasan_cache_shutdown(struct kmem_cache *cache);
++void *kasan_reset_tag(const void *addr);
++
++#else /* CONFIG_KASAN_SW_TAGS */
++
++static inline void kasan_init_tags(void) { }
++
++static inline void *kasan_reset_tag(const void *addr)
++{
++	return (void *)addr;
++}
++
+ #endif /* CONFIG_KASAN_SW_TAGS */
  
-@@ -163,4 +165,10 @@ static inline void kasan_cache_shutdown(struct kmem_cache *cache) {}
+ #endif /* LINUX_KASAN_H */
+diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
+index 19b950eaccff..b080b8d92812 100644
+--- a/mm/kasan/kasan.h
++++ b/mm/kasan/kasan.h
+@@ -8,6 +8,10 @@
+ #define KASAN_SHADOW_SCALE_SIZE (1UL << KASAN_SHADOW_SCALE_SHIFT)
+ #define KASAN_SHADOW_MASK       (KASAN_SHADOW_SCALE_SIZE - 1)
  
- #endif /* CONFIG_KASAN_GENERIC */
++#define KASAN_TAG_KERNEL	0xFF /* native kernel pointers tag */
++#define KASAN_TAG_INVALID	0xFE /* inaccessible memory tag */
++#define KASAN_TAG_MAX		0xFD /* maximum value for random tags */
++
+ #define KASAN_FREE_PAGE         0xFF  /* page was freed */
+ #define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
+ #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
+@@ -126,6 +130,33 @@ static inline void quarantine_reduce(void) { }
+ static inline void quarantine_remove_cache(struct kmem_cache *cache) { }
+ #endif
  
 +#ifdef CONFIG_KASAN_SW_TAGS
 +
-+#define KASAN_SHADOW_INIT 0xFF
++u8 random_tag(void);
 +
-+#endif /* CONFIG_KASAN_SW_TAGS */
++#else
 +
- #endif /* LINUX_KASAN_H */
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 5f68c93734ba..7134e75447ff 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -473,11 +473,12 @@ int kasan_module_alloc(void *addr, size_t size)
++static inline u8 random_tag(void)
++{
++	return 0;
++}
++
++#endif
++
++#ifndef arch_kasan_set_tag
++#define arch_kasan_set_tag(addr, tag)	((void *)(addr))
++#endif
++#ifndef arch_kasan_reset_tag
++#define arch_kasan_reset_tag(addr)	((void *)(addr))
++#endif
++#ifndef arch_kasan_get_tag
++#define arch_kasan_get_tag(addr)	0
++#endif
++
++#define set_tag(addr, tag)	((void *)arch_kasan_set_tag((addr), (tag)))
++#define reset_tag(addr)		((void *)arch_kasan_reset_tag(addr))
++#define get_tag(addr)		arch_kasan_get_tag(addr)
++
+ /*
+  * Exported functions for interfaces called from assembly or from generated
+  * code. Declarations here to avoid warning about missing declarations.
+diff --git a/mm/kasan/tags.c b/mm/kasan/tags.c
+index 04194923c543..1c4e7ce2e6fe 100644
+--- a/mm/kasan/tags.c
++++ b/mm/kasan/tags.c
+@@ -38,6 +38,43 @@
+ #include "kasan.h"
+ #include "../slab.h"
  
- 	ret = __vmalloc_node_range(shadow_size, 1, shadow_start,
- 			shadow_start + shadow_size,
--			GFP_KERNEL | __GFP_ZERO,
-+			GFP_KERNEL,
- 			PAGE_KERNEL, VM_NO_GUARD, NUMA_NO_NODE,
- 			__builtin_return_address(0));
- 
- 	if (ret) {
-+		__memset(ret, KASAN_SHADOW_INIT, shadow_size);
- 		find_vm_area(addr)->flags |= VM_KASAN;
- 		kmemleak_ignore(ret);
- 		return 0;
++static DEFINE_PER_CPU(u32, prng_state);
++
++void kasan_init_tags(void)
++{
++	int cpu;
++
++	for_each_possible_cpu(cpu)
++		per_cpu(prng_state, cpu) = get_random_u32();
++}
++
++/*
++ * If a preemption happens between this_cpu_read and this_cpu_write, the only
++ * side effect is that we'll give a few allocated in different contexts objects
++ * the same tag. Since tag-based KASAN is meant to be used a probabilistic
++ * bug-detection debug feature, this doesn't have significant negative impact.
++ *
++ * Ideally the tags use strong randomness to prevent any attempts to predict
++ * them during explicit exploit attempts. But strong randomness is expensive,
++ * and we did an intentional trade-off to use a PRNG. This non-atomic RMW
++ * sequence has in fact positive effect, since interrupts that randomly skew
++ * PRNG@unpredictable points do only good.
++ */
++u8 random_tag(void)
++{
++	u32 state = this_cpu_read(prng_state);
++
++	state = 1664525 * state + 1013904223;
++	this_cpu_write(prng_state, state);
++
++	return (u8)(state % (KASAN_TAG_MAX + 1));
++}
++
++void *kasan_reset_tag(const void *addr)
++{
++	return reset_tag(addr);
++}
++
+ void check_memory_region(unsigned long addr, size_t size, bool write,
+ 				unsigned long ret_ip)
+ {
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
