@@ -1,31 +1,20 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 10:04:24 +0100
-Subject: [PATCH v2 22/43] drm/sun4i: frontend: Add support for the
- BGRX8888 output format
-In-Reply-To: <20181123092515.2511-23-paul.kocialkowski@bootlin.com>
-References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
- <20181123092515.2511-23-paul.kocialkowski@bootlin.com>
-Message-ID: <20181127090424.d4i5ziky4uovjm23@flea>
+From: peter.laszlo@your-benefits.eu (=?UTF-8?Q? L=C3=A1szl=C3=B3_P=C3=A9ter ?=)
+Date: Tue, 27 Nov 2018 09:02:01 GMT
+Subject: =?UTF-8?Q?Dolgoz=C3=B3i_juttat=C3=A1sok?=
+Message-ID: <20181127091301-0.1.k.1b9w.0.fic489lego@your-benefits.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 10:24:54AM +0100, Paul Kocialkowski wrote:
-> This introduces support for the BGRX8888 output format for the frontend,
-> with its associated output format value definition.
-> 
-> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Kedves H?lgyem/Uram!
 
-Applied, thanks!
-Maxime
+2019 janu?rj?t?l szinte minden b?ren k?v?li juttat?s j?vedelemk?nt fog ad?zni (kiv?telt k?pez ez al?l a SZ?P k?rtya). A v?ltoz?sok ellen?re a v?llalatok t?bb mint 55%-a meg k?v?nja tartani a dolgoz?i juttat?sok nett? ?sszeg?t, mag?ra v?llalva ezzel a megemelkedett ad?terheket. 
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/85961fa8/attachment-0001.sig>
+Juttat?si k?rty?ink seg?ts?g?vel 2019-ben a munk?ltat?k lefedhetik szinte az ?sszes jelenleg haszn?lt b?ren k?v?li juttat?st, mik?zben munkav?llal?ik ?lvezhetik az ak?r korl?tlan felhaszn?l?s lehet?s?g?t.  A SZ?P k?rty?t?l elt?r?en a mi k?rty?inkkal olyan mindennapos k?lts?gek fedezhet?ek mint p?ld?ul ?lelmiszer v?s?rl?s, eg?szs?g?gyi ell?t?s, ruh?zat, elektronika, ?zemanyagk?lts?g, k?zm?d?j, s?t, ak?r m?g k?szp?nzfelv?telre is alkalmasak. 
+
+Ez az egyetlen olyan juttat?si k?rtya a magyar piacon, melyet minden hazai POS termin?l elfogad, ezzel biztos?tva a k?rtya sz?les k?r? felhaszn?lhat?s?g?t. 
+
+Sz?vesen bemutatom ?nnek, milyen tov?bbi el?ny?kkel j?r k?rty?ink dolgoz?i juttat?sk?nt t?rt?n? alkalmaz?sa, ?s r?szletes t?j?koztat?st adok a k?rty?k felhaszn?l?si lehet?s?geir?l ? k?rem jelezze ez ir?nti ig?ny?t. 
+
+
+L?szl? P?ter
+Menedzser
