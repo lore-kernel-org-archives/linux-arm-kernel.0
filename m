@@ -1,33 +1,36 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:34 +0100
-Subject: [PATCH 33/77] ARM: dts: sun6i: colombus: Change i2c node name to
- avoid warnings
+Date: Tue, 27 Nov 2018 13:45:37 +0100
+Subject: [PATCH 36/77] ARM: dts: sun7i: Remove SoC node unit-name to avoid
+ warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <c89c360f86fcbc48d9e11fdb02ba2d65245a4643.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <4ed22cc15f873bc0708a8eab076f080ee3280ad4.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our I2C GPIO bus node name has a unit address, but no reg property, which
-generates a warning in DTC. Change the name to remove that unit address.
+Our main node for all the in-SoC controllers used to have a unit name. The
+unit-name, in addition to being actually false, would not match any reg
+property, which generates a warning.
+
+Remove it in order to remove those warnings.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun6i-a31-colombus.dts | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-index 99f25b2d5189..6aa3f5d074bd 100644
---- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -60,7 +60,7 @@
- 		stdout-path = "serial0:115200n8";
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 3ed0575ed301..2a88ff58fee4 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -258,7 +258,7 @@
+ 		status = "disabled";
  	};
  
--	i2c_lcd: i2c at 0 {
-+	i2c_lcd: i2c {
- 		/* The lcd panel i2c interface is hooked up via gpios */
- 		compatible = "i2c-gpio";
- 		pinctrl-names = "default";
+-	soc at 1c00000 {
++	soc {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 git-series 0.9.1
