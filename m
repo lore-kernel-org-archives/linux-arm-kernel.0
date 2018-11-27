@@ -1,58 +1,26 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 27 Nov 2018 08:04:18 +0100
-Subject: [PATCH v3 1/6] Documentation: ARM: sunxi: pwm: add Allwinner
- sun8i.
-In-Reply-To: <20181125161859.GA5277@arx-s1>
-References: <20181125161859.GA5277@arx-s1>
-Message-ID: <20181127070418.khdi4wslyv4lmngv@pengutronix.de>
+From: bhe@redhat.com (Baoquan He)
+Date: Tue, 27 Nov 2018 15:15:25 +0800
+Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
+ vmcoreinfo
+In-Reply-To: <20181127064816.GE1824@MiWiFi-R3L-srv>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181126012824.GB1824@MiWiFi-R3L-srv>
+ <CACi5LpPqdzNxi4=UQqVgT6aCyn9nx+sjM-ds0Xx6qBji_xgP1g@mail.gmail.com>
+ <20181127064816.GE1824@MiWiFi-R3L-srv>
+Message-ID: <20181127071525.GF1824@MiWiFi-R3L-srv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 11/27/18 at 02:48pm, Baoquan He wrote:
+ 
+> #ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
+> 	VMCOREINFO_SYMBOL(node_data);
+	^^^ 
 
-On Mon, Nov 26, 2018 at 12:18:59AM +0800, Hao Zhang wrote:
-> This patch adds Allwinner sun8i pwm binding document.
-> 
-> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-sun8i.txt          | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> new file mode 100644
-> index 0000000..7531d85
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
-> @@ -0,0 +1,24 @@
-> +Allwinner sun8i R40/V40/T3 SoC PWM controller
-> +
-> +Required properties:
-> +  - compatible: Should be one of:
-> +    - "allwinner,sun8i-r40-pwm"
-> +  - reg: Physical base address and length of the controller's registers
-> +  - interrupts: Should contain interrupt.
-> +  - clocks: From common clock binding, handle to the parent clock.
-> +  - clock-names: Must contain the clock names described just above.
-> +  - pwm-channels: PWM channels of the controller.
-> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-> +    the cells format.
+> #endif
 
-I wonder why "interrupts" is needed here. I guess this is only needed
-for waveform capture? Is this only "optional"? The driver doesn't use
-it.
+Wrong copy
+#ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
+	VMCOREINFO_NUMBER(page_offset_base);
 
-Apart from this interrupts property this is all pretty standard and I
-wonder if we could merge several documents into one.
-
-For example Documentation/devicetree/bindings/pwm/pwm-st.txt looks
-identically apart from "pwm-channels" being called "st,pwm-num-chan"
-there. (It even has an interrupts property. Should the st driver move to
-"pwm-channels", too?)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+#endif
