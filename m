@@ -1,63 +1,60 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 27 Nov 2018 13:14:54 -0800
-Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
-In-Reply-To: <VI1PR04MB5533DE497786CD80D4FE0941EED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
-References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
- <20181117181225.10737-4-andrew.smirnov@gmail.com>
- <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
- <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
- <1543313169.2507.39.camel@pengutronix.de>
- <VI1PR04MB5533DE497786CD80D4FE0941EED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
-Message-ID: <CAHQ1cqEGABcH3EG9yGo7Ns2fPR1s_u1YPtFoKRjUh50=aa=J2Q@mail.gmail.com>
+From: shorne@gmail.com (Stafford Horne)
+Date: Wed, 28 Nov 2018 06:16:00 +0900
+Subject: [PATCH 4/5] openrisc: simplify pte_alloc_one_kernel()
+In-Reply-To: <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
+References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
+ <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
+Message-ID: <20181127211600.GB3235@lianli.shorne-pla.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 2:46 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
->
-> On 11/27/18 12:06 PM, Lucas Stach wrote:
-> > Hi Andrey,
-> >
-> > Am Montag, den 26.11.2018, 10:24 -0800 schrieb Andrey Smirnov:
-> >> On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> >>>
-> >>> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
-> >>>> @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
-> >>>> -     case IMX7D:
-> >>>> +     case IMX8MQ:
-> >>>> +             if (of_property_read_u32(node, "fsl,iomux-gpr1x",
-> >>>> +                                      &imx6_pcie->gpr1x)) {
-> >>>> +                     dev_err(dev, "Failed to get GPR1x address\n");
-> >>>> +                     return -EINVAL;
-> >>>> +             }
-> >>>
-> >>> This is for distinguishing multiple controllers on the SOC but other
-> >>> registers and bits might differ. Isn't it preferable to have a property
-> >>> for controller id instead of adding many registers to DT?
-> >>
-> >> I liked encoding necessary info in DT directly slightly better than
-> >> encoding abstract ID and then decoding it further in the driver code.
-> >> OTOH, I am not really attached to that path. Lucas, can you comment on
-> >> this please?
-> >
-> > Yes, after rereading the patch with this in mind I agree that having
-> > the GPR offset on DT directly is IMO the better approach than an
-> > abstract ID.
->
-> But it's not a single offset, for example the device_type (EP/RC) has
-> bits for the two controllers side-by-side in GPR12.
->
+On Sun, Nov 25, 2018 at 11:44:36PM +0200, Mike Rapoport wrote:
+> The pte_alloc_one_kernel() function allocates a page using
+> __get_free_page(GFP_KERNEL) when mm initialization is complete and
+> memblock_phys_alloc() on the earlier stages. The physical address of the
+> page allocated with memblock_phys_alloc() is converted to the virtual
+> address and in the both cases the allocated page is cleared using
+> clear_page().
+> 
+> The code is simplified by replacing __get_free_page() with
+> get_zeroed_page() and by replacing memblock_phys_alloc() with
+> memblock_alloc().
 
-Playing devil's advocate for a bit:
+Hello Mike,
 
-More specifically, currently the following per-controller bits need to
-be configured:
+This looks fine to me.  How do you plan to get this merged?  Will you be taking
+care of the whole series or so you want me to queue this openrisc part?
 
-- Location of the "device type" field within GPR12
-- GPR register to use to control PCIn_CLKREQ_B_OVERRIDE_EN and
-PCIn_CLKREQ_B_OVERRIDE_EN (GPR14 vs GPR16)
-- Now that Philip spoke against PCIE_CTRL_APPS_CLK_REQ being exposed
-via reset controller driver, we need to know which SRC register to use
-to control that bit (SRC_PCIEPHY_RCR vs. SRC_PCIE2_RCR)
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
 
-Thanks,
-Andrey Smirnov
+Acked-by: Stafford Horne <shorne@gmail.com>
+
+> ---
+>  arch/openrisc/mm/ioremap.c | 11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
+> index c969752..cfef989 100644
+> --- a/arch/openrisc/mm/ioremap.c
+> +++ b/arch/openrisc/mm/ioremap.c
+> @@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct mm_struct *mm,
+>  {
+>  	pte_t *pte;
+>  
+> -	if (likely(mem_init_done)) {
+> -		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+> -	} else {
+> -		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+> -	}
+> +	if (likely(mem_init_done))
+> +		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
+> +	else
+> +		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+>  
+> -	if (pte)
+> -		clear_page(pte);
+>  	return pte;
+>  }
+> -- 
+> 2.7.4
+> 
