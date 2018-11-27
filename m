@@ -1,70 +1,54 @@
-From: vdumpa@nvidia.com (Krishna Reddy)
-Date: Tue, 27 Nov 2018 02:30:05 +0000
-Subject: [PATCH v2 0/5] Add Tegra194 Dual ARM SMMU driver
-In-Reply-To: <20181126235856.vnseoe5lucfryc5p@localhost>
-References: <1541029430-14150-1-git-send-email-vdumpa@nvidia.com>
- <20181126235856.vnseoe5lucfryc5p@localhost>
-Message-ID: <BYAPR12MB27598D08E89D93CD8C171993B3D00@BYAPR12MB2759.namprd12.prod.outlook.com>
+From: kys@microsoft.com (KY Srinivasan)
+Date: Tue, 27 Nov 2018 03:06:55 +0000
+Subject: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
+In-Reply-To: <20181126191812.GA32208@kroah.com>
+References: <20181122030914.16274-1-kys@linuxonhyperv.com>
+ <20181122031059.16338-1-kys@linuxonhyperv.com>
+ <20181126191812.GA32208@kroah.com>
+Message-ID: <CY4PR2101MB080498D01F0DC5A90C1E4F8FA0D00@CY4PR2101MB0804.namprd21.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-Thanks for the comments!
-
->>Based on what I can see, it seems that you're trying to describe two
-pieces of hardware with only one device in the DT. That seems like an
-odd choice. 
-
-T194 SOC HW is designed to use Two ARM SMMU's together like one SMMU.
-The IOVA accesses from the HW controllers clients is interleaved across these Two
-SMMU's by Memory controller HW.
-Even though,  there are two ARM SMMU's,  HW design requires SW programming
-these two ARM SMMU instances identically.
-
->>Also, it seems like all three SMMUs share the same interrupt
-line? That's somewhat suboptimal IMHO, but harder to change.
-
-This is by HW design.  SMMU interrupts are only expected if there is an illegal IOVA
-access, which shouldn't happen in practical. The SMMU interrupts are only used
-to log the faults and for debug purpose on T194.
 
 
->>Why not instantiate both of them and create a reference between then
-such that the TLB and sync ops are done on both of them in the native
-driver? I.e. two arm_smmu structs and a pointer between then (i.e. add a
-"next shared smmu" pointer in the struct arm_smmu).
+> -----Original Message-----
+> From: Greg KH <gregkh@linuxfoundation.org>
+> Sent: Monday, November 26, 2018 11:18 AM
+> To: KY Srinivasan <kys@microsoft.com>
+> Cc: will.deacon at arm.com; catalin.marinas at armm.com;
+> mark.rutland at arm.com; marc.zyngier at arm.com; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> devel at linuxdriverproject.org; olaf at aepfle.de; apw at canonical.com;
+> jasowang at redhat.com; Stephen Hemminger <sthemmin@microsoft.com>;
+> Michael Kelley <mikelley@microsoft.com>; vkuznets
+> <vkuznets@redhat.com>; Michael Kelley <mikelley@microsoft.com>
+> Subject: Re: [PATCH 1/4] arm64: hyperv: Add core Hyper-V include files
+> 
+> On Thu, Nov 22, 2018 at 03:10:56AM +0000, kys at linuxonhyperv.com wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/hyperv-tlfs.h
+> > @@ -0,0 +1,338 @@
+> > +/* SPDX-License-Identifier: GPL-2.0 */
+> > +
+> > +/*
+> > + * This file contains definitions from the Hyper-V Hypervisor Top-Level
+> > + * Functional Specification (TLFS):
+> > + *
+> https://na01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fdocs.
+> microsoft.com%2Fen-us%2Fvirtualization%2Fhyper-v-on-
+> windows%2Freference%2Ftlfs&amp;data=02%7C01%7Ckys%40microsoft.co
+> m%7Cce3a8662cbbc4afe157508d653d3eadf%7C72f988bf86f141af91ab2d7cd0
+> 11db47%7C1%7C0%7C636788566988323167&amp;sdata=VJHHMNbpOdAANd
+> DNUD3UMuR8SkbBGOew7uy%2B%2BUCS2sE%3D&amp;reserved=0
+> 
+> "interesting" url :(
+> 
+> Care to use a real one?
 
-DMA framework supports only one SMMU driver instance per device.
-SMMU driver setup iommu_ops pointer in the device struct during the boot when
-the platform device is added to the bus.
-There is no support to allow a platform device register with two different SMMU
-devices.
-Two different  SMMU instances is 2x page table memory and 2x map/unmap overhead.
-With SMMU driver knowing about two smmu instances, page table memory usage, map/unmap
-Overhead would be efficient.
+Will fix and resend.
 
->>As long as devices only references one of them, locking only that one should
-provide suitable protection as well.
-
-Earlier proposal on creating one Master SMMU node and slave SMMU nodes within isn't liked. 
-Will has proposed creating a library and reusing the code. I have made the patches
-to share the code.
-https://www.spinics.net/lists/linux-tegra/msg35539.html
-https://www.spinics.net/lists/linux-tegra/msg35494.html
-
-
->>Seems like a simpler approach than adding a new layer to the driver, but maybe
->>I am missing some complexity here?
-
-Programming both SMMU instances identically with existing ARM SMMU driver is not
-possible with multiple DT nodes. 
-In the following patch, by writel* macro override, both ARM SMMU instances are
-programmed identically in  Tegra194 SMMU driver transparently. Only tlb sync and
-interrupt handling need to know about specific instance.
-
-https://lkml.org/lkml/2018/11/1/573
-+#define writel_relaxed writel_relaxed_all
-+#define writeq_relaxed writeq_relaxed_all
-+#define writel writel_all
-
--KR
+K. Y
+> 
+> thanks,
+> 
+> greg k-h
