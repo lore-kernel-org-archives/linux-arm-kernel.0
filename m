@@ -1,40 +1,24 @@
-From: vkoul@kernel.org (Vinod Koul)
-Date: Tue, 27 Nov 2018 22:09:28 +0530
-Subject: [PATCH v2] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module
- device node
-In-Reply-To: <20181127151716.31992-1-govinds@codeaurora.org>
-References: <20181127151716.31992-1-govinds@codeaurora.org>
-Message-ID: <20181127163928.GF3175@vkoul-mobl.Dlink>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 27 Nov 2018 17:48:14 +0100
+Subject: [PATCH 0/3] mfd: syscon: Add optional clock support needed on stm32
+Message-ID: <1543337297-21873-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-11-18, 20:47, Govind Singh wrote:
-> Add device node for the ath10k SNOC platform driver probe
-> and add resources required for WCN3990 on qcs404 soc.
-> Optional clock and regulator controls are not yet available in
-> upstream, hence add them once available.
-> 
-> Signed-off-by: Govind Singh <govinds@codeaurora.org>
-> ---
->  arch/arm64/boot/dts/qcom/qcs404-evb.dtsi |  4 ++++
->  arch/arm64/boot/dts/qcom/qcs404.dtsi     | 20 ++++++++++++++++++++
->  2 files changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> index 0767389c68c1..36905524b0ff 100644
-> --- a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-> @@ -310,6 +310,10 @@
->  	status = "okay";
->  };
->  
-> +&wifi {
-> +	status = "okay";
-> +};
+STM32 syscfg registers are accessed using syscon. It needs syscfg clock
+to be enabled while accessing registers.
+This adds support for optional clock on syscon, and the relevant clock
+in stm32mp157 device tree.
 
-I am assuming this is common to both evb variants, so:
+Fabrice Gasnier (3):
+  dt-bindings: mfd: syscon: Add optional clock support
+  mfd: syscon: Add optional clock support
+  ARM: dts: stm32: Add clock on stm32mp157c syscfg
 
-Reviewed-by: Vinod Koul <vkoul@kernel.org>
+ Documentation/devicetree/bindings/mfd/syscon.txt |  1 +
+ arch/arm/boot/dts/stm32mp157c.dtsi               |  1 +
+ drivers/mfd/syscon.c                             | 19 +++++++++++++++++++
+ 3 files changed, 21 insertions(+)
 
 -- 
-~Vinod
+1.9.1
