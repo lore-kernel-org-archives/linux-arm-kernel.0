@@ -1,62 +1,63 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:32 +0100
-Subject: [PATCH v12 14/25] kasan, arm64: enable top byte ignore for the kernel
+Date: Tue, 27 Nov 2018 17:55:27 +0100
+Subject: [PATCH v12 09/25] arm64: move untagged_addr macro from uaccess.h to
+ memory.h
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <1ed03d53ee679cba52ba7118d2acbef948d21fcc.1543337629.git.andreyknvl@google.com>
+Message-ID: <432ef6686a25b49244f54c4dfd86bc4b20381d8a.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tag-based KASAN uses the Top Byte Ignore feature of arm64 CPUs to store a
-pointer tag in the top byte of each pointer. This commit enables the
-TCR_TBI1 bit, which enables Top Byte Ignore for the kernel, when tag-based
-KASAN is used.
+Move the untagged_addr() macro from arch/arm64/include/asm/uaccess.h
+to arch/arm64/include/asm/memory.h to be later reused by KASAN.
 
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+Also make the untagged_addr() macro accept all kinds of address types
+(void *, unsigned long, etc.). This allows not to specify type casts in
+each place where the macro is used. This is done by using __typeof__.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/mm/proc.S                   | 8 +++++++-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/memory.h  | 8 ++++++++
+ arch/arm64/include/asm/uaccess.h | 7 -------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 1d7d8da2ef9b..d43b870c39b3 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -291,6 +291,7 @@
- #define TCR_A1			(UL(1) << 22)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
-+#define TCR_TBI1		(UL(1) << 38)
- #define TCR_HA			(UL(1) << 39)
- #define TCR_HD			(UL(1) << 40)
- #define TCR_NFD1		(UL(1) << 54)
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 2c75b0b903ae..d861f208eeb1 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -47,6 +47,12 @@
- /* PTWs cacheable, inner/outer WBWA */
- #define TCR_CACHE_FLAGS	TCR_IRGN_WBWA | TCR_ORGN_WBWA
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 05fbc7ffcd31..e2c9857157f2 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -211,6 +211,14 @@ static inline unsigned long kaslr_offset(void)
+  */
+ #define PHYS_PFN_OFFSET	(PHYS_OFFSET >> PAGE_SHIFT)
  
-+#ifdef CONFIG_KASAN_SW_TAGS
-+#define TCR_KASAN_FLAGS TCR_TBI1
-+#else
-+#define TCR_KASAN_FLAGS 0
-+#endif
++/*
++ * When dealing with data aborts, watchpoints, or instruction traps we may end
++ * up with a tagged userland pointer. Clear the tag to get a sane pointer to
++ * pass on to access_ok(), for instance.
++ */
++#define untagged_addr(addr)	\
++	((__typeof__(addr))sign_extend64((u64)(addr), 55))
 +
- #define MAIR(attr, mt)	((attr) << ((mt) * 8))
- 
  /*
-@@ -445,7 +451,7 @@ ENTRY(__cpu_setup)
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
- 			TCR_TG_FLAGS | TCR_KASLR_FLAGS | TCR_ASID16 | \
--			TCR_TBI0 | TCR_A1
-+			TCR_TBI0 | TCR_A1 | TCR_KASAN_FLAGS
- 	tcr_set_idmap_t0sz	x10, x9
+  * Physical vs virtual RAM address space conversion.  These are
+  * private definitions which should NOT be used outside memory.h
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 07c34087bd5e..281a1e47263d 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -96,13 +96,6 @@ static inline unsigned long __range_ok(const void __user *addr, unsigned long si
+ 	return ret;
+ }
  
- 	/*
+-/*
+- * When dealing with data aborts, watchpoints, or instruction traps we may end
+- * up with a tagged userland pointer. Clear the tag to get a sane pointer to
+- * pass on to access_ok(), for instance.
+- */
+-#define untagged_addr(addr)		sign_extend64(addr, 55)
+-
+ #define access_ok(type, addr, size)	__range_ok(addr, size)
+ #define user_addr_max			get_fs
+ 
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
