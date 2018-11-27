@@ -1,79 +1,190 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 27 Nov 2018 15:35:21 +0000
-Subject: [PATCH] arm64: Use a raw spinlock in __install_bp_hardening_cb()
-Message-ID: <20181127153521.29182-1-james.morse@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Nov 2018 15:35:53 +0000
+Subject: [PATCH] arm: always update thread_info->syscall
+In-Reply-To: <20181127105620.GD30658@n2100.armlinux.org.uk>
+References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
+ <20181126233303.GZ30658@n2100.armlinux.org.uk>
+ <20181126234111.GA30658@n2100.armlinux.org.uk>
+ <20181126234456.GB30658@n2100.armlinux.org.uk>
+ <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
+ <20181127105620.GD30658@n2100.armlinux.org.uk>
+Message-ID: <20181127153553.GE30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-__install_bp_hardening_cb() is called via stop_machine() as part
-of the cpu_enable callback. To force each CPU to take its turn
-when allocating slots, they take a spinlock.
+On Tue, Nov 27, 2018 at 10:56:20AM +0000, Russell King - ARM Linux wrote:
+> On Tue, Nov 27, 2018 at 08:30:32AM -0200, Rafael David Tinoco wrote:
+> > On 11/26/18 9:44 PM, Russell King - ARM Linux wrote:
+> > >On Mon, Nov 26, 2018 at 11:41:11PM +0000, Russell King - ARM Linux wrote:
+> > >>On Mon, Nov 26, 2018 at 11:33:03PM +0000, Russell King - ARM Linux wrote:
+> > >>>On Mon, Nov 26, 2018 at 08:53:35PM -0200, Rafael David Tinoco wrote:
+> > >>>>Right now, only way for task->thread_info->syscall to be updated is if
+> > >>>>if _TIF_SYSCALL_WORK is set in current's task thread_info->flags
+> > >>>>(similar to what has_syscall_work() checks for arm64).
+> > >>>>
+> > >>>>This means that "->syscall" will only be updated if we are tracing the
+> > >>>>syscalls through ptrace, for example. This is NOT the same behavior as
+> > >>>>arm64, when pt_regs->syscallno is updated in the beginning of svc0
+> > >>>>handler for *every* syscall entry.
+> > >>>
+> > >>>So when was it decided that the syscall number will always be required
+> > >>>(we need it to know how far back this has to be backported).
+> > >>
+> > >>PS, I rather object to the fact that the required behaviour seems to
+> > >>change, arch maintainers aren't told about it until... some test is
+> > >>created at some random point in the future which then fails.
+> > >>
+> > >>Surely there's a better way to communicate changes in requirements
+> > >>than discovery-by-random-bug-report ?
+> > >
+> > >Final comment for tonight - the commit introducing /proc/*/syscall says:
+> > >
+> > >     This adds /proc/PID/syscall and /proc/PID/task/TID/syscall magic files.
+> > >     These use task_current_syscall() to show the task's current system call
+> > >     number and argument registers, stack pointer and PC.  For a task blocked
+> > >     but not in a syscall, the file shows "-1" in place of the syscall number,
+> > >     followed by only the SP and PC.  For a task that's not blocked, it shows
+> > >     "running".
+> > >
+> > >Please validate that a blocked task does indeed show -1 with your patch
+> > >applied.
+> > 
+> > Will do. This is done in an upper level (collect_syscall <-
+> > task_current_syscall <- proc_pid_syscall):
+> > 
+> > 	if (!try_get_task_stack(target)) {
+> > 		/* Task has no stack, so the task isn't in a syscall. */
+> > 		*sp = *pc = 0;
+> > 		*callno = -1;
+> > 		return 0;
+> > 	}
+> > 
+> > I think only missing part for arm was that one, but will confirm, after
+> > fixing usage of "r7" for obtaining "scno". Will send a v2 in this thread.
+> 
+> There's another question - what's the expected behaviour when we
+> restart a syscall using the restartblock mechanism?  Is the syscall
+> number expected to be __NR_restart_syscall or the original syscall
+> number?
+> 
+> I can't find anywhere that this detail is specified (damn the lack
+> of API documentation - I'm tempted to say that we won't implement
+> this until it gets documented properly, and that test can continue
+> failing until such time that happens.)
 
-With the RT patches applied, the spinlock becomes a mutex,
-and we get warnings about sleeping while in stop_machine():
-| [    0.319176] CPU features: detected: RAS Extension Support
-| [    0.319950] BUG: scheduling while atomic: migration/3/36/0x00000002
-| [    0.319955] Modules linked in:
-| [    0.319958] Preemption disabled at:
-| [    0.319969] [<ffff000008181ae4>] cpu_stopper_thread+0x7c/0x108
-| [    0.319973] CPU: 3 PID: 36 Comm: migration/3 Not tainted 4.19.1-rt3-00250-g330fc2c2a880 #2
-| [    0.319975] Hardware name: linux,dummy-virt (DT)
-| [    0.319976] Call trace:
-| [    0.319981]  dump_backtrace+0x0/0x148
-| [    0.319983]  show_stack+0x14/0x20
-| [    0.319987]  dump_stack+0x80/0xa4
-| [    0.319989]  __schedule_bug+0x94/0xb0
-| [    0.319991]  __schedule+0x510/0x560
-| [    0.319992]  schedule+0x38/0xe8
-| [    0.319994]  rt_spin_lock_slowlock_locked+0xf0/0x278
-| [    0.319996]  rt_spin_lock_slowlock+0x5c/0x90
-| [    0.319998]  rt_spin_lock+0x54/0x58
-| [    0.320000]  enable_smccc_arch_workaround_1+0xdc/0x260
-| [    0.320001]  __enable_cpu_capability+0x10/0x20
-| [    0.320003]  multi_cpu_stop+0x84/0x108
-| [    0.320004]  cpu_stopper_thread+0x84/0x108
-| [    0.320008]  smpboot_thread_fn+0x1e8/0x2b0
-| [    0.320009]  kthread+0x124/0x128
-| [    0.320010]  ret_from_fork+0x10/0x18
+Having looked around, it seems that the /proc/<PID>/syscall interface
+was sneaked into the kernel.  The patch series which added it was
+sent in 2008 with a covering message that made no mention of this new
+interface, instead stating:
 
-Switch this to a raw spinlock, as we know this is only called with
-IRQs masked.
+  http://lkml.iu.edu/hypermail/linux/kernel/0807.2/0551.html
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/cpu_errata.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+   Most of these changes move code around with little or no change,
+   and they should not break anything or change any behavior.
 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a509e35132d2..00d93a91c4d5 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -135,7 +135,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 				      const char *hyp_vecs_start,
- 				      const char *hyp_vecs_end)
- {
--	static DEFINE_SPINLOCK(bp_lock);
-+	static DEFINE_RAW_SPINLOCK(bp_lock);
- 	int cpu, slot = -1;
- 
- 	/*
-@@ -147,7 +147,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 		return;
- 	}
- 
--	spin_lock(&bp_lock);
-+	raw_spin_lock(&bp_lock);
- 	for_each_possible_cpu(cpu) {
- 		if (per_cpu(bp_hardening_data.fn, cpu) == fn) {
- 			slot = per_cpu(bp_hardening_data.hyp_vectors_slot, cpu);
-@@ -163,7 +163,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
- 
- 	__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
- 	__this_cpu_write(bp_hardening_data.fn, fn);
--	spin_unlock(&bp_lock);
-+	raw_spin_unlock(&bp_lock);
- }
- #else
- #define __smccc_workaround_1_smc_start		NULL
+While that statement is absolutely correct, it doesn't highlight the
+fact that the set of patches _also_ include a brand new userspace
+interface exposing things like syscall numbers and arguments in /proc.
+
+There appears to be no documentation at all of this interface, so there
+is no definition of how it is supposed to work or what it is supposed
+to expose beyond what little information is in the original patch:
+
+  http://lkml.iu.edu/hypermail/linux/kernel/0807.2/0577.html
+
+   This adds /proc/PID/syscall and /proc/PID/task/TID/syscall magic files.
+   These use task_current_syscall() to show the task's current system call
+   number and argument registers, stack pointer and PC. For a task blocked
+   but not in a syscall, the file shows "-1" in place of the syscall number,
+   followed by only the SP and PC. For a task that's not blocked, it shows
+   "running".
+
+This really isn't a good place to be - this is why commit messages
+should _not_ just describe what the changes are doing, also _why_ they
+are being made.  Also, any new user interface needs to be fully and
+properly documented, because years later, people will move away,
+knowledge will be lost, and that leaves us with a maintainability
+problem, exactly like we have right now with this.
+
+With the lack of interface documentation, how do we even know whether
+the /proc/*/syscall is supposed to show the syscall number of non-traced
+threads?  How do we know that the test that found this is actually
+correct in reporting a failure?  How do we know whether it's supposed to
+expose __NR_restart_syscall?
+
+So, I thought I'd write a test program:
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <sys/fcntl.h>
+#include <unistd.h>
+
+static int read_file(const char *fn, char *buf, size_t size)
+{
+	int fd, ret, nr;
+
+	fd = open(fn, O_RDONLY);
+	if (fd == -1)
+		return -1;
+
+	for (nr = 0; nr < size; nr += ret) {
+		ret = read(fd, buf + nr, size - nr);
+		if (ret <= 0)
+			break;
+	}
+
+	close(fd);
+
+	return nr ? nr : ret;
+}
+
+int main()
+{
+	char fn[64], buf[256];
+	int pid, ret;
+
+	pid = fork();
+	if (pid == 0) {
+		/* child */
+		sleep(5);
+		exit(0);
+	}
+
+	/* parent */
+	sleep(1);
+	snprintf(fn, sizeof(fn), "/proc/%d/syscall", pid);
+	ret = read_file(fn, buf, sizeof(buf));
+
+	printf("%.*s", ret, buf);
+
+	kill(pid, SIGCONT);
+	sleep(1);
+
+	ret = read_file(fn, buf, sizeof(buf));
+
+	printf("%.*s", ret, buf);
+
+	return 0;
+}
+
+On x86 (32-bit app on 64-bit kernel), it has this behaviour:
+
+$ ./syscall-test
+162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
+162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
+
+which looks good, except:
+
+$ strace -o /dev/null -f ./syscall-test
+162 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
+0 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
+
+So, if we're syscall ptracing a program, __NR_restart_syscall gets
+exposed through this interface, but if we aren't, it isn't exposed.
+Which version is correct?  *shrug*, no documentation...
+
 -- 
-2.19.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync@12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
