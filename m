@@ -1,35 +1,48 @@
-From: frieder.schrempf@kontron.de (Schrempf Frieder)
-Date: Tue, 27 Nov 2018 10:24:36 +0000
-Subject: [PATCH v6 7/9] ARM: dts: ls1021a: Remove fsl, qspi-has-second-chip as
- it is not used
-In-Reply-To: <1543314174-28580-1-git-send-email-frieder.schrempf@kontron.de>
-References: <1543314174-28580-1-git-send-email-frieder.schrempf@kontron.de>
-Message-ID: <1543314174-28580-8-git-send-email-frieder.schrempf@kontron.de>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Tue, 27 Nov 2018 11:11:56 +0100
+Subject: [PATCH 0/9] iommu: clean up/remove modular stuff from non-modules.
+In-Reply-To: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+Message-ID: <20181127101156.GA12298@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After switching to the new FSL QSPI driver the property
-'fsl,qspi-has-second-chip' is not needed anymore.
+Hi Paul,
 
-The driver now uses the 'reg' property to determine the bus and
-the chipselect.
+thanks for your cleanup!
 
-Signed-off-by: Frieder Schrempf <frieder.schrempf@kontron.de>
----
- arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 1 -
- 1 file changed, 1 deletion(-)
+The iommu-tree uses another rule for the subject line of patches. Can
+you please resend with correct subject lines? See below for what is
+used.
 
-diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-index 6a83f30..d3a1a73 100644
---- a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-+++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
-@@ -203,7 +203,6 @@
- };
- 
- &qspi {
--	fsl,qspi-has-second-chip;
- 	status = "okay";
- 
- 	flash: flash at 0 {
--- 
-2.7.4
+The general format is:
+
+	iommu/<driver>: _C_apital letter starting subject
+
+Please also collect the Acks you get and add them to the patches before
+the resend.
+
+On Mon, Nov 26, 2018 at 05:31:29PM -0500, Paul Gortmaker wrote:
+> Paul Gortmaker (9):
+>   iommu: audit and remove any unnecessary uses of module.h
+Fine.
+>   iommu: rockchip: make it explicitly non-modular
+	iommu/rockchip: Make it explicitly non-modular
+>   iommu: msm_iommu: make it explicitly non-modular
+	iommu/msm: Make it explicitly non-modular
+>   iommu: mtk_iommu: make it explicitly non-modular
+	iommu/mediatek: Make it explicitly non-modular
+>   iommu: ipmmu-vmsa: make it explicitly non-modular
+	iommu/ipmmu-vmsa: Make it explicitly non-modular
+>   iommu: qcom_iommu: make it explicitly non-modular
+	iommu/qcom: Make it explicitly non-modular
+>   iommu: tegra-gart: make it explicitly non-modular
+	iommu/tegra: Make it explicitly non-modular
+>   iommu: arm-smmu: make it explicitly non-modular
+	iommu/arm-smmu: Make arm-smmu explicitly non-modular
+>   iommu: arm-smmu-v3: make it explicitly non-modular
+	iommu/arm-smmu: Make arm-smmu-v3 explicitly non-modular
+
+Thanks a lot,
+
+       Joerg
