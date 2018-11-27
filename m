@@ -1,65 +1,170 @@
-From: rafael.tinoco@linaro.org (Rafael David Tinoco)
-Date: Tue, 27 Nov 2018 08:30:32 -0200
-Subject: [PATCH] arm: always update thread_info->syscall
-In-Reply-To: <20181126234456.GB30658@n2100.armlinux.org.uk>
-References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
- <20181126233303.GZ30658@n2100.armlinux.org.uk>
- <20181126234111.GA30658@n2100.armlinux.org.uk>
- <20181126234456.GB30658@n2100.armlinux.org.uk>
-Message-ID: <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Nov 2018 11:31:06 +0100
+Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+In-Reply-To: <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
+ <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
+Message-ID: <20181127103106.vykudp36vkyy5vme@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/26/18 9:44 PM, Russell King - ARM Linux wrote:
-> On Mon, Nov 26, 2018 at 11:41:11PM +0000, Russell King - ARM Linux wrote:
->> On Mon, Nov 26, 2018 at 11:33:03PM +0000, Russell King - ARM Linux wrote:
->>> On Mon, Nov 26, 2018 at 08:53:35PM -0200, Rafael David Tinoco wrote:
->>>> Right now, only way for task->thread_info->syscall to be updated is if
->>>> if _TIF_SYSCALL_WORK is set in current's task thread_info->flags
->>>> (similar to what has_syscall_work() checks for arm64).
->>>>
->>>> This means that "->syscall" will only be updated if we are tracing the
->>>> syscalls through ptrace, for example. This is NOT the same behavior as
->>>> arm64, when pt_regs->syscallno is updated in the beginning of svc0
->>>> handler for *every* syscall entry.
->>>
->>> So when was it decided that the syscall number will always be required
->>> (we need it to know how far back this has to be backported).
->>
->> PS, I rather object to the fact that the required behaviour seems to
->> change, arch maintainers aren't told about it until... some test is
->> created at some random point in the future which then fails.
->>
->> Surely there's a better way to communicate changes in requirements
->> than discovery-by-random-bug-report ?
+On Tue, Nov 27, 2018 at 12:26:09PM +0530, Jagan Teki wrote:
+> On Tue, Nov 13, 2018 at 1:54 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 98 +++++++++++++++++++++++++-
+> >  1 file changed, 98 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> > index 70dfc4ac0bb5..18dbff9f1ce9 100644
+> > --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> > +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> > @@ -54,6 +54,9 @@
+> >         compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
+> >
+> >         aliases {
+> > +               i2c0 = &i2c0;
+> > +               i2c1 = &i2c1;
+> > +               i2c2 = &i2c2;
+> >                 serial0 = &uart0;
+> >                 serial1 = &uart3;
+> >                 serial2 = &uart7;
+> > @@ -63,6 +66,41 @@
+> >                 stdout-path = "serial0:115200n8";
+> >         };
+> >
+> > +       reg_cam: cam {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "cam";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +               vin-supply = <&reg_vcc5v0>;
+> > +               gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>;
+> > +               enable-active-high;
+> > +               regulator-always-on;
+> > +       };
+> > +
+> > +        reg_cam_avdd: cam-avdd {
+> > +                compatible = "regulator-fixed";
+> > +                regulator-name = "cam500b-avdd";
+> > +                regulator-min-microvolt = <2800000>;
+> > +                regulator-max-microvolt = <2800000>;
+> > +                vin-supply = <&reg_cam>;
+> > +        };
+> > +
+> > +        reg_cam_dovdd: cam-dovdd {
+> > +                compatible = "regulator-fixed";
+> > +                regulator-name = "cam500b-dovdd";
+> > +                regulator-min-microvolt = <1800000>;
+> > +                regulator-max-microvolt = <1800000>;
+> > +                vin-supply = <&reg_cam>;
+> > +        };
+> > +
+> > +        reg_cam_dvdd: cam-dvdd {
+> > +                compatible = "regulator-fixed";
+> > +                regulator-name = "cam500b-dvdd";
+> > +                regulator-min-microvolt = <1500000>;
+> > +                regulator-max-microvolt = <1500000>;
+> > +                vin-supply = <&reg_cam>;
+> > +        };
+> > +
+> >         hdmi-connector {
+> >                 compatible = "hdmi-connector";
+> >                 type = "a";
+> > @@ -120,6 +158,27 @@
+> >                 >;
+> >  };
+> >
+> > +&csi0 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&csi0_pins_a>;
+> > +       status = "okay";
+> > +
+> > +       port {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +
+> > +               csi_from_ov5640: endpoint {
+> > +                        remote-endpoint = <&ov5640_to_csi>;
+> > +                        bus-width = <8>;
+> > +                        data-shift = <2>;
+> > +                        hsync-active = <1>; /* Active high */
+> > +                        vsync-active = <0>; /* Active low */
+> > +                        data-active = <1>;  /* Active high */
+> > +                        pclk-sample = <1>;  /* Rising */
+> > +                };
+> > +       };
+> > +};
+> > +
+> >  &de {
+> >         status = "okay";
+> >  };
+> > @@ -167,6 +226,39 @@
+> >         };
+> >  };
+> >
+> > +&i2c1 {
+> > +       pinctrl-names = "default";
+> > +       pinctrl-0 = <&i2c1_pins_a>;
+> > +       status = "okay";
+> > +
+> > +       camera: camera at 21 {
+> > +               compatible = "ovti,ov5640";
+> > +               reg = <0x21>;
+> > +                clocks = <&ccu CLK_CSI0>;
+> > +                clock-names = "xclk";
+> > +               assigned-clocks = <&ccu CLK_CSI0>;
+> > +               assigned-clock-rates = <24000000>;
+> > +
+> > +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
+> > +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
+> > +                AVDD-supply = <&reg_cam_avdd>;
+> > +                DOVDD-supply = <&reg_cam_dovdd>;
+> > +                DVDD-supply = <&reg_cam_dvdd>;
+> > +
+> > +                port {
+> > +                        ov5640_to_csi: endpoint {
+> > +                                remote-endpoint = <&csi_from_ov5640>;
+> > +                                bus-width = <8>;
+> > +                                data-shift = <2>;
+> > +                                hsync-active = <1>; /* Active high */
+> > +                                vsync-active = <0>; /* Active low */
+> > +                                data-active = <1>;  /* Active high */
+> > +                                pclk-sample = <1>;  /* Rising */
+> > +                        };
+> > +                };
+> > +       };
 > 
-> Final comment for tonight - the commit introducing /proc/*/syscall says:
+> Does ov5640 need any further patches, wrt linux-next? I'm trying to
+> test this on top of linux-next but the slave id seems not detecting.
 > 
->      This adds /proc/PID/syscall and /proc/PID/task/TID/syscall magic files.
->      These use task_current_syscall() to show the task's current system call
->      number and argument registers, stack pointer and PC.  For a task blocked
->      but not in a syscall, the file shows "-1" in place of the syscall number,
->      followed by only the SP and PC.  For a task that's not blocked, it shows
->      "running".
+> [    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
+> [    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
+> [    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
+> [    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
+> [    2.357543] ov5640 1-0021: Dropping the link to regulator.5
+> [    2.363224] ov5640 1-0021: Dropping the link to regulator.6
+> [    2.368829] ov5640 1-0021: Dropping the link to regulator.4
 > 
-> Please validate that a blocked task does indeed show -1 with your patch
-> applied.
+> Here is the full log [1], please let me know if I miss anything, I
+> even tried to remove MCLK pin
 
-Will do. This is done in an upper level (collect_syscall <- 
-task_current_syscall <- proc_pid_syscall):
+You seem to have made local modifications to your tree, what are they?
+This indicates that the communication over i2c doesn't work, what is
+your setup?
 
-	if (!try_get_task_stack(target)) {
-		/* Task has no stack, so the task isn't in a syscall. */
-		*sp = *pc = 0;
-		*callno = -1;
-		return 0;
-	}
-
-I think only missing part for arm was that one, but will confirm, after 
-fixing usage of "r7" for obtaining "scno". Will send a v2 in this thread.
-
-Thanks!
+Maxime
 
 -- 
-Rafael D. Tinoco
-Linaro Kernel Validation
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/7a6ac65e/attachment-0001.sig>
