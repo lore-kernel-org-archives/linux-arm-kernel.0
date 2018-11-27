@@ -1,125 +1,37 @@
 From: georgi.djakov@linaro.org (Georgi Djakov)
-Date: Tue, 27 Nov 2018 20:03:46 +0200
-Subject: [PATCH v10 4/7] interconnect: Add debugfs support
+Date: Tue, 27 Nov 2018 20:03:49 +0200
+Subject: [PATCH v10 7/7] MAINTAINERS: add a maintainer for the interconnect API
 In-Reply-To: <20181127180349.29997-1-georgi.djakov@linaro.org>
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
-Message-ID: <20181127180349.29997-5-georgi.djakov@linaro.org>
+Message-ID: <20181127180349.29997-8-georgi.djakov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a functionality to provide information about the current constraints
-per each node and provider.
+Add myself as the maintainer of the interconnect API.
 
 Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
-Reviewed-by: Evan Green <evgreen@chromium.org>
 ---
- drivers/interconnect/core.c | 71 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ MAINTAINERS | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-index ebc42ef9fa46..efe39e8934cc 100644
---- a/drivers/interconnect/core.c
-+++ b/drivers/interconnect/core.c
-@@ -6,6 +6,7 @@
-  * Author: Georgi Djakov <georgi.djakov@linaro.org>
-  */
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 380e43f585d3..4f426863ff3b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -7694,6 +7694,16 @@ L:	linux-gpio at vger.kernel.org
+ S:	Maintained
+ F:	drivers/gpio/gpio-intel-mid.c
  
-+#include <linux/debugfs.h>
- #include <linux/device.h>
- #include <linux/idr.h>
- #include <linux/init.h>
-@@ -17,10 +18,12 @@
- #include <linux/slab.h>
- #include <linux/of.h>
- #include <linux/overflow.h>
-+#include <linux/uaccess.h>
- 
- static DEFINE_IDR(icc_idr);
- static LIST_HEAD(icc_providers);
- static DEFINE_MUTEX(icc_lock);
-+static struct dentry *icc_debugfs_dir;
- 
- /**
-  * struct icc_req - constraints that are attached to each node
-@@ -48,6 +51,59 @@ struct icc_path {
- 	struct icc_req reqs[];
- };
- 
-+static void icc_summary_show_one(struct seq_file *s, struct icc_node *n)
-+{
-+	if (!n)
-+		return;
++INTERCONNECT API
++M:	Georgi Djakov <georgi.djakov@linaro.org>
++S:	Maintained
++F:	Documentation/interconnect/
++F:	Documentation/devicetree/bindings/interconnect/
++F:	drivers/interconnect/
++F:	include/dt-bindings/interconnect/
++F:	include/linux/interconnect-provider.h
++F:	include/linux/interconnect.h
 +
-+	seq_printf(s, "%-30s %12u %12u\n",
-+		   n->name, n->avg_bw, n->peak_bw);
-+}
-+
-+static int icc_summary_show(struct seq_file *s, void *data)
-+{
-+	struct icc_provider *provider;
-+
-+	seq_puts(s, " node                                   avg         peak\n");
-+	seq_puts(s, "--------------------------------------------------------\n");
-+
-+	mutex_lock(&icc_lock);
-+
-+	list_for_each_entry(provider, &icc_providers, provider_list) {
-+		struct icc_node *n;
-+
-+		list_for_each_entry(n, &provider->nodes, node_list) {
-+			struct icc_req *r;
-+
-+			icc_summary_show_one(s, n);
-+			hlist_for_each_entry(r, &n->req_list, req_node) {
-+				if (!r->dev)
-+					continue;
-+
-+				seq_printf(s, "    %-26s %12u %12u\n",
-+					   dev_name(r->dev), r->avg_bw,
-+					   r->peak_bw);
-+			}
-+		}
-+	}
-+
-+	mutex_unlock(&icc_lock);
-+
-+	return 0;
-+}
-+
-+static int icc_summary_open(struct inode *inode, struct file *file)
-+{
-+	return single_open(file, icc_summary_show, inode->i_private);
-+}
-+
-+static const struct file_operations icc_summary_fops = {
-+	.open		= icc_summary_open,
-+	.read		= seq_read,
-+	.llseek		= seq_lseek,
-+	.release	= single_release,
-+};
-+
- static struct icc_node *node_find(const int id)
- {
- 	return idr_find(&icc_idr, id);
-@@ -720,6 +776,21 @@ int icc_provider_del(struct icc_provider *provider)
- }
- EXPORT_SYMBOL_GPL(icc_provider_del);
- 
-+static int __init icc_init(void)
-+{
-+	icc_debugfs_dir = debugfs_create_dir("interconnect", NULL);
-+	debugfs_create_file("interconnect_summary", 0444,
-+			    icc_debugfs_dir, NULL, &icc_summary_fops);
-+	return 0;
-+}
-+
-+static void __exit icc_exit(void)
-+{
-+	debugfs_remove_recursive(icc_debugfs_dir);
-+}
-+module_init(icc_init);
-+module_exit(icc_exit);
-+
- MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
- MODULE_DESCRIPTION("Interconnect Driver Core");
- MODULE_LICENSE("GPL v2");
+ INVENSENSE MPU-3050 GYROSCOPE DRIVER
+ M:	Linus Walleij <linus.walleij@linaro.org>
+ L:	linux-iio at vger.kernel.org
