@@ -1,125 +1,44 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 16:04:19 +0100
-Subject: [PATCH 1/5] dt-bindings: media: Add Allwinner A10 CSI binding
-In-Reply-To: <20181121215650.urefxctd245os6t5@mara.localdomain>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <60494dd4245ab01473d074dc5cd46198a2181614.1542097288.git-series.maxime.ripard@bootlin.com>
- <20181113083855.s5jxrb32ru3myu3t@kekkonen.localdomain>
- <20181115190424.gpuekifrjli5mu77@flea>
- <20181121215650.urefxctd245os6t5@mara.localdomain>
-Message-ID: <20181127150419.wmlqhhixb5pg7mkr@flea>
+From: jan.tuerk@emtrion.com (Jan Tuerk)
+Date: Tue, 27 Nov 2018 16:04:01 +0100
+Subject: [PATCH v8 1/4] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
+In-Reply-To: <20180829100811.55836-1-jan.tuerk@emtrion.com>
+References: <20180829100811.55836-1-jan.tuerk@emtrion.com>
+Message-ID: <20181127150407.15098-1-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Adding the label cpu0 allows the adjustment of cpu-parameters
+by reference in overlaying dtsi files in the same way as it
+is possible for imx6q devices.
 
-On Wed, Nov 21, 2018 at 11:56:50PM +0200, Sakari Ailus wrote:
-> On Thu, Nov 15, 2018 at 08:04:24PM +0100, Maxime Ripard wrote:
-> > On Tue, Nov 13, 2018 at 10:38:55AM +0200, Sakari Ailus wrote:
-> > > > +  - allwinner,has-isp: Whether the CSI controller has an ISP
-> > > > +                       associated to it or not
-> > > 
-> > > Is the ISP a part of the same device? It sounds like that this is actually
-> > > a different device if it contains an ISP as well, and that should be
-> > > apparent from the compatible string. What do you think?
-> > 
-> > I guess we can see it as both. It seems to be the exact same register
-> > set, except for the fact that the first instance has that ISP in
-> > addition, and several channels, as you pointed out in your other mail.
-> 
-> I'm simply referring to existing practices as far as I know them. If it's a
-> different device, it should have a different compatible string, not a
-> vendor-specific property to tell it's somehow different.
+Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/imx6dl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The line is blurrier than that. Different devices are indeed
-represented using different compatibles, but different features set
-can be represented using properties.
+Unchanged since v1 (rebased)
 
-> Many SoCs also separate the DMA and the CSI-2 receivers, and thus they have
-> separate drivers. I don't know about your case, but the ISP requiring a
-> different clock is a hint.
-
-In this particular case, the datasheet represents the ISP as part of
-the DMA, so it looks like a feature. And since we don't have any
-source code for this, we can only do guesswork.
-
-> > What these channels are is not exactly clear. It looks like it's
-> > related to the BT656 interface where you could interleave channel
-> > bytes over the bus. I haven't really looked into it, and it doesn't
-> > look like we have any code (or hardware) able to do that though.
-> > 
-> > > > +
-> > > > +If allwinner,has-isp is set, an additional "isp" clock is needed,
-> > > > +being a phandle to the clock driving the ISP.
-> > > > +
-> > > > +The CSI node should contain one 'port' child node with one child
-> > > > +'endpoint' node, according to the bindings defined in
-> > > > +Documentation/devicetree/bindings/media/video-interfaces.txt. The
-> > > > +endpoint's bus type must be parallel or BT656.
-> > > > +
-> > > > +Endpoint node properties for CSI
-> > > > +---------------------------------
-> > > > +
-> > > > +- remote-endpoint	: (required) a phandle to the bus receiver's endpoint
-> > > > +			   node
-> > > 
-> > > Rob's opinion has been (AFAIU) that this is not needed as it's already a
-> > > part of the graph bindings. Unless you want to say that it's required, that
-> > > is --- the graph bindings document it as optional.
-> > 
-> > Ok, I'll remove it.
-> > 
-> > > > +- bus-width:		: (required) must be 8
-> > > 
-> > > If this is the only value the hardware supports, I don't see why you should
-> > > specify it here.
-> > 
-> > Ditto :)
-> > 
-> > > > +- pclk-sample		: (optional) (default: sample on falling edge)
-> > > > +- hsync-active		: (only required for parallel)
-> > > > +- vsync-active		: (only required for parallel)
-> > > > +
-> > > > +Example:
-> > > > +
-> > > > +csi0: csi at 1c09000 {
-> > > > +	compatible = "allwinner,sun7i-a20-csi",
-> > > > +		     "allwinner,sun4i-a10-csi";
-> > > > +	reg = <0x01c09000 0x1000>;
-> > > > +	interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-> > > > +	clocks = <&ccu CLK_AHB_CSI0>, <&ccu CLK_CSI0>,
-> > > > +		 <&ccu CLK_CSI_SCLK>, <&ccu CLK_DRAM_CSI0>;
-> > > > +	clock-names = "ahb", "mod", "isp", "ram";
-> > > > +	resets = <&ccu RST_CSI0>;
-> > > > +	allwinner,csi-channels = <4>;
-> > > > +	allwinner,has-isp;
-> > > > +	
-> > > > +	port {
-> > > > +		csi_from_ov5640: endpoint {
-> > > > +                        remote-endpoint = <&ov5640_to_csi>;
-> > > > +                        bus-width = <8>;
-> > > > +                        data-shift = <2>;
-> > > 
-> > > data-shift needs to be documented above if it's relevant for the device.
-> > 
-> > It's not really related to the CSI device in that case but the sensor,
-> > so I'll just leave it out.
-> 
-> Hmm. data-shift should only be relevant for the receiver, shoudn't it?
-
-Sorry, I mispoke. We're not using it anywhere in either drivers, so
-it's totally useless.
-
-Maxime
-
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index f0607eb41df4..2ed10310a7b7 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -15,7 +15,7 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-		cpu at 0 {
++		cpu0: cpu at 0 {
+ 			compatible = "arm,cortex-a9";
+ 			device_type = "cpu";
+ 			reg = <0>;
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/ee863bf4/attachment.sig>
+emtrion GmbH
+Alter Schlachthof 45
+76131 Karlsruhe
+GERMANY
+https://www.emtrion.de
+
+Amtsgericht Mannheim
+HRB 110 300
+Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
