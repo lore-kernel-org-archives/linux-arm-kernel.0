@@ -1,239 +1,157 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 27 Nov 2018 08:45:13 +0800
-Subject: [PATCH v3] arm64: dts: rockchip: Add DT for nanopc-t4
-In-Reply-To: <26178858.xdqtN7Rtck@phil>
-References: <20181123073120.6250-1-tomeu.vizoso@collabora.com>
- <20181126145107.38222-1-tomeu.vizoso@collabora.com>
- <26178858.xdqtN7Rtck@phil>
-Message-ID: <e9ee8167-c398-c14e-d798-3b4233ba2ff2@rock-chips.com>
+From: rk.katana.steel@gmail.com (=?UTF-8?Q?Ren=C3=A9_Kjellerup?=)
+Date: Mon, 26 Nov 2018 16:49:18 -0800
+Subject: Adding a Basic DT for the Linksys ea6500 v2 wireless home router
+In-Reply-To: <CACE8ZKb5CxEBAdCdGAhwaQHC9_nHBjTTVwxdDOXRayqgz0FK5g@mail.gmail.com>
+References: <CACE8ZKbUhFyWg5oK1B8+aWAa0tdqKf5Kokj80+8x1X2EUaA_DQ@mail.gmail.com>
+ <CACE8ZKZEpQjOW6CSvUuM9xhjtkSCF0bYxcfQ3htSabC=rVJcTA@mail.gmail.com>
+ <86f391e5-9e38-c8b0-4753-4646c322c9bc@hauke-m.de>
+ <CACE8ZKb5CxEBAdCdGAhwaQHC9_nHBjTTVwxdDOXRayqgz0FK5g@mail.gmail.com>
+Message-ID: <CACE8ZKYCyDx_E+3sLpjQSV6xrFxGyrYwEfhEO=QZPGpm3jsBrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2018/11/27 7:48, Heiko Stuebner wrote:
-> Hi Tomeu,
-> 
-> Am Montag, 26. November 2018, 15:47:49 CET schrieb Tomeu Vizoso:
->> This adds a device tree for the NanoPC-T4 SBC, which is based on the
->> Rockchip RK3399 SoC and marketed by FriendlyELEC.
->>
->> Known working:
->>
->> - Serial
->> - Ethernet
->> - HDMI
->> - USB 2.0
->>
->> All of the interesting stuff is in a .dtsi because there are at least
->> two other boards that share most of it: NanoPi M4 and NanoPi NEO4.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> 
-> looks pretty good overall, just some more small-scale things
-> below.
-> 
->> ---
->>
->> v2: - Rename compatible from friendlyelec to friendlyarm, to match
->>        existing bindings
->>      - Remove superfluous node spi1
->>
->> v3: - Rewrite regulator tree to match the schematics (Heiko)
->>      - Sort top-level nodes alphabetically (Heiko)
->>      - Used defines for GPIO numbers (Heiko)
->>      - Enabled rga (Heiko)
->>      - Removed cdn_dp node (Heiko)
->>      - Removed dependencies to fusb0 as extcon (Heiko)
->>      - Removed superfluous properties (Heiko)
-> 
-> 
->> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
->> index 49042c477870..4cbd2c461052 100644
->> --- a/arch/arm64/boot/dts/rockchip/Makefile
->> +++ b/arch/arm64/boot/dts/rockchip/Makefile
->> @@ -1,6 +1,7 @@
->>   # SPDX-License-Identifier: GPL-2.0
->>   dtb-$(CONFIG_ARCH_ROCKCHIP) += px30-evb.dtb
->>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
->> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopc-t4.dtb
->>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
->>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-roc-cc.dtb
->>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
-> 
-> These are definitly sorted in the Makefile, so this should move between
-> rk3399-gru-scarlet-kd.dtb and rk3399-puma-haikou.dtb :-)
-> 
-> 
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
->> new file mode 100644
->> index 000000000000..f102ff2317c3
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
->> @@ -0,0 +1,740 @@
->> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> +/*
->> + * RK3399-based FriendlyElec boards device tree source
->> + *
->> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
->> + *
->> + * Copyright (c) 2018 FriendlyElec Computer Tech. Co., Ltd.
->> + * (http://www.friendlyarm.com)
->> + *
->> + * Copyright (c) 2018 Collabora Ltd.
->> + */
->> +
->> +/dts-v1/;
->> +#include <dt-bindings/input/linux-event-codes.h>
->> +#include "rk3399.dtsi"
->> +#include "rk3399-opp.dtsi"
->> +
->> +/ {
->> +	chosen {
->> +		stdout-path = "serial2:1500000n8";
->> +	};
->> +
->> +	clkin_gmac: external-gmac-clock {
->> +		compatible = "fixed-clock";
->> +		clock-frequency = <125000000>;
->> +		clock-output-names = "clkin_gmac";
->> +		#clock-cells = <0>;
->> +	};
->> +
->> +	vdd_5v: vdd_5v {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vdd_5v";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +	};
->> +
->> +	vcc5v0_core: vcc5v0_core {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc5v0_core";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		vin-supply = <&vdd_5v>;
->> +	};
->> +
->> +	vcc3v3_sys: vcc3v3_sys {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc3v3_sys";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		vin-supply = <&vcc5v0_core>;
->> +	};
->> +
->> +	vcc5v0_sys: vcc5v0_sys {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc5v0_sys";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		vin-supply = <&vdd_5v>;
->> +	};
->> +
->> +	vcc5v0_usb1: vcc5v0_usb1 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc5v0_usb1";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		vin-supply = <&vcc5v0_sys>;
->> +	};
->> +
->> +	vcc5v0_usb2: vcc5v0_usb2 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc5v0_usb2";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		vin-supply = <&vcc5v0_sys>;
->> +	};
->> +
->> +	/* switched by pmic_sleep */
->> +	vcc1v8_s3: vcca1v8_s3: vcc1v8-s3 {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "vcc1v8_s3";
->> +		regulator-always-on;
->> +		regulator-boot-on;
->> +		regulator-min-microvolt = <1800000>;
->> +		regulator-max-microvolt = <1800000>;
->> +		vin-supply = <&vcc_1v8>;
->> +	};
->> +
->> +	vcc3v0_sd: vcc3v0_sd {
-> 
-> dt-spec mandates node names with "-", so this should become
-> 	vcc3v0_sd: vcc3v0-sd {
-> 
-> Same for most regulators above.
-> 
->> +	rk808: pmic at 1b {
->> +		compatible = "rockchip,rk808";
->> +		reg = <0x1b>;
->> +		interrupt-parent = <&gpio1>;
->> +		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pmic_int_l>;
->> +		rockchip,system-power-controller;
->> +		wakeup-source;
->> +		#clock-cells = <1>;
->> +		clock-output-names = "rk808-clkout1", "rk808-clkout2";
-> 
-> rename rk808-clkout1 to xin32k so that it hooks correctly into
-> the rk3399 clock controller, as that signals is providing the 32kHz clock
-> for the system. (see $debug/clk/clk_summary and rk3399-cru dt binding)
-> 
-> 
->> +&pinctrl {
->> +
-> 
-> unnecessary empty line
-> 
->> +	pmic {
-> 
-> 
->> +&rga {
->> +	status = "okay";
->> +};
-> 
-> rga is not dependant on pinout, so is always enabled in rk3399.dtsi
-> So this node can go away.
-> 
->> +&sdhci {
->> +	bus-width = <8>;
->> +	mmc-hs400-1_8v;
->> +	supports-emmc;
-> 
-> remnant from the vendor-kernel?
-> Should also go away.
-> 
->> +	non-removable;
->> +	keep-power-in-suspend;
+To the broadcom kernel maintainers, (for BCM4708 CPUs)
 
-keep-power-in-suspend is for SDIO only.
-Please remove this.
+I just want to add a little attention to this patch again...
+let me know if there's any concerns and I will try to address highlighted issues
+as soon as possible.
 
->> +	mmc-hs400-enhanced-strobe;
->> +	status = "okay";
->> +};
->> +
-> 
->> +&usbdrd3_0 {
->> +	status = "okay";
->> +	extcon = <&fusb0>;
-> 
-> I still don't think that extcon gets defined at all and is also
-> not specified in any dwc3 binding, so should probably go away.
-> 
-> 
-> Heiko
-> 
-> 
-> 
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-> 
-> 
-> 
+I've been running the development builds of OpenWrt kernels, where
+this patch has
+been included, on my Linksys EA6500v2 router for the past months,
+updating as new
+builds are available. With only the on board BCM4360 chip (5GHz WiFi) is being
+disabled, has so far been stable for my use case.
+
+thank you for the consideration
+Rene (aka Katana_Steel)
+
+On Mon, Oct 8, 2018 at 9:34 AM Ren? Kjellerup <rk.katana.steel@gmail.com> wrote:
+>
+> Hi Hauke,
+>
+> Updated the file header per your suggestion.
+>
+> From e97c15ef78d2535c23f32ebbec43bced72b5eaf7 Mon Sep 17 00:00:00 2001
+> From: Rene Kjellerup <rk.katana.steel@gmail.com>
+> Date: Mon, 1 Oct 2018 14:11:56 -0700
+> Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA6500 V2
+>
+> It's wireless home router based on BCM4708A0 with BCM4360 + BCM4331
+> wireless chipsets. The 5GHz chip currently isn't supported only due
+> to missing compatible firmware.
+>
+> the DTS here was based on the Linksys EA6300 V1 DTS, only changing
+> the model strings
+>
+> Signed-off-by: Rene Kjellerup <rk.katana.steel@gmail.com>
+> ---
+>  arch/arm/boot/dts/Makefile                      |  1 +
+>  arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts | 47 +++++++++++++++++++++++++
+>  2 files changed, 48 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b5bd3de87c33..adf8f28f5e44 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>      bcm4708-asus-rt-ac68u.dtb \
+>      bcm4708-buffalo-wzr-1750dhp.dtb \
+>      bcm4708-linksys-ea6300-v1.dtb \
+> +    bcm4708-linksys-ea6500-v2.dtb \
+>      bcm4708-luxul-xap-1510.dtb \
+>      bcm4708-luxul-xwc-1000.dtb \
+>      bcm4708-netgear-r6250.dtb \
+> diff --git a/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+> b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+> new file mode 100644
+> index 000000000000..8a434d2a4b72
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+> @@ -0,0 +1,47 @@
+> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+> +/*
+> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+> + * Copyright (C) 2018 Rene Kjellerup <rk.katana.steel@gmail.com>
+> + *
+> + * this DTS was originally based on bcm4708-linksys-ea6300-v1.dts
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "bcm4708.dtsi"
+> +#include "bcm5301x-nand-cs0-bch8.dtsi"
+> +
+> +/ {
+> +    compatible = "linksys,ea6500-v2", "brcm,bcm4708";
+> +    model = "Linksys EA6500 V2";
+> +
+> +    chosen {
+> +        bootargs = "console=ttyS0,115200";
+> +    };
+> +
+> +    memory {
+> +        reg = <0x00000000 0x08000000>;
+> +    };
+> +
+> +    gpio-keys {
+> +        compatible = "gpio-keys";
+> +        #address-cells = <1>;
+> +        #size-cells = <0>;
+> +
+> +        wps {
+> +            label = "WPS";
+> +            linux,code = <KEY_WPS_BUTTON>;
+> +            gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
+> +        };
+> +
+> +        restart {
+> +            label = "Reset";
+> +            linux,code = <KEY_RESTART>;
+> +            gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
+> +        };
+> +    };
+> +};
+> +
+> +&usb3_phy {
+> +    status = "okay";
+> +};
+> --
+> 2.16.4
+>
+> On Sun, Oct 7, 2018 at 2:08 PM Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> >
+> > On 10/04/2018 11:08 PM, Ren? Kjellerup wrote:
+> > > Hi Hauke,
+> > >
+> > > thank you for suggesting adding the dts patch to mainline kernel,
+> > > so here it is.
+> > > I feel Rafal technically still have the copyrights, this is pretty
+> > > much just a few string updates for the ea6500v2. However with this
+> > > dts in latest OpenWrt 18.06 loads and installs on my device.
+> > >
+> > > I will be available to do more testing should it be required.
+> > >
+> > > Regrads
+> > > Rene Kjellerup
+> > > --
+> > > -- as life grows older, I gain experience.
+> > > -- http://www.alchemiestick.net/
+> > >
+> >
+> > Hi Rene,
+> >
+> > Please send you patch inline in the mail and not as an attachment, I
+> > would suggest to use "git send-email" for sending the patch.
+> >
+> > Adding Rafal as copyright owner is ok, like you did it now. You could
+> > mention in the file header on which dts file this is based.
+> >
+> > Hauke
+> >
+>
+>
+> --
+> -- as life grows older, I gain experience.
+> -- http://www.alchemiestick.net/apps/
