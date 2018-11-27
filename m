@@ -1,142 +1,117 @@
-From: jernej.skrabec@gmail.com (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 27 Nov 2018 18:23:10 +0100
-Subject: [linux-sunxi] [PATCH v2 1/2] media: uapi: Add H264 low-level
- decoder API compound controls.
-In-Reply-To: <20181115145650.9827-2-maxime.ripard@bootlin.com>
-References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
- <20181115145650.9827-2-maxime.ripard@bootlin.com>
-Message-ID: <2123591.3TCVFQjlgd@jernej-laptop>
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Tue, 27 Nov 2018 18:09:52 +0100
+Subject: [PATCH] drm/fbdev: Make skip_vt_switch the default
+Message-ID: <20181127170952.28507-1-daniel.vetter@ffwll.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+KMS drivers really should all be able to restore their display state
+on resume without fbcon helping out. So make this the default.
 
-Dne ?etrtek, 15. november 2018 ob 15:56:49 CET je Maxime Ripard napisal(a):
-> From: Pawel Osciak <posciak@chromium.org>
-> 
-> Stateless video codecs will require both the H264 metadata and slices in
-> order to be able to decode frames.
-> 
-> This introduces the definitions for a new pixel format for H264 slices that
-> have been parsed, as well as the structures used to pass the metadata from
-> the userspace to the kernel.
-> 
-> Co-Developed-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> Signed-off-by: Pawel Osciak <posciak@chromium.org>
-> Signed-off-by: Guenter Roeck <groeck@chromium.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  Documentation/media/uapi/v4l/biblio.rst       |   9 +
->  .../media/uapi/v4l/extended-controls.rst      | 364 ++++++++++++++++++
->  .../media/uapi/v4l/pixfmt-compressed.rst      |  20 +
->  .../media/uapi/v4l/vidioc-queryctrl.rst       |  30 ++
->  .../media/videodev2.h.rst.exceptions          |   5 +
->  drivers/media/v4l2-core/v4l2-ctrls.c          |  42 ++
->  drivers/media/v4l2-core/v4l2-ioctl.c          |   1 +
->  include/media/v4l2-ctrls.h                    |  10 +
->  include/uapi/linux/v4l2-controls.h            | 166 ++++++++
->  include/uapi/linux/videodev2.h                |  11 +
->  10 files changed, 658 insertions(+)
-> 
+Since I'm not entirely foolish, make it only a default, which drivers
+can still override. That way when the inevitable regression report
+happens I can fix things up with a one-liner plus FIXME comment that
+someone should fix up the suspend/resume code in that driver.
 
-<snip>
+But at least all new drivers won't be broken by accident because
+"suspend/resume worked when I tested it" as soon as you turn off
+fbcon.
 
-> @@ -1156,4 +1164,162 @@ struct v4l2_ctrl_mpeg2_quantization {
->  	__u8	chroma_non_intra_quantiser_matrix[64];
->  };
-> 
-> +/* Compounds controls */
-> +
-> +#define V4L2_H264_SPS_CONSTRAINT_SET0_FLAG			0x01
-> +#define V4L2_H264_SPS_CONSTRAINT_SET1_FLAG			0x02
-> +#define V4L2_H264_SPS_CONSTRAINT_SET2_FLAG			0x04
-> +#define V4L2_H264_SPS_CONSTRAINT_SET3_FLAG			0x08
-> +#define V4L2_H264_SPS_CONSTRAINT_SET4_FLAG			0x10
-> +#define V4L2_H264_SPS_CONSTRAINT_SET5_FLAG			0x20
+Signed-off-by: Daniel Vetter <daniel.vetter@intel.com>
+Cc: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>
+Cc: Sean Paul <sean@poorly.run>
+Cc: David Airlie <airlied@linux.ie>
+Cc: Jani Nikula <jani.nikula@linux.intel.com>
+Cc: Joonas Lahtinen <joonas.lahtinen@linux.intel.com>
+Cc: Rodrigo Vivi <rodrigo.vivi@intel.com>
+Cc: Ben Skeggs <bskeggs@redhat.com>
+Cc: Sandy Huang <hjc@rock-chips.com>
+Cc: "Heiko St?bner" <heiko@sntech.de>
+Cc: Alex Deucher <alexander.deucher@amd.com>
+Cc: "Christian K?nig" <christian.koenig@amd.com>
+Cc: Samuel Li <Samuel.Li@amd.com>
+Cc: "Michel D?nzer" <michel.daenzer@amd.com>
+Cc: Daniel Vetter <daniel.vetter@ffwll.ch>
+Cc: Junwei Zhang <Jerry.Zhang@amd.com>
+Cc: Huang Rui <ray.huang@amd.com>
+Cc: Shirish S <shirish.s@amd.com>
+Cc: Daniel Stone <daniels@collabora.com>
+Cc: "Noralf Tr?nnes" <noralf@tronnes.org>
+Cc: intel-gfx at lists.freedesktop.org
+Cc: nouveau at lists.freedesktop.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+---
+ drivers/gpu/drm/amd/amdgpu/amdgpu_fb.c        | 1 -
+ drivers/gpu/drm/drm_fb_helper.c               | 1 +
+ drivers/gpu/drm/i915/intel_fbdev.c            | 3 ---
+ drivers/gpu/drm/nouveau/nouveau_fbcon.c       | 1 -
+ drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c | 2 --
+ 5 files changed, 1 insertion(+), 7 deletions(-)
 
-How are these constraint flags meant to be used?
-
-> +
-> +#define V4L2_H264_SPS_FLAG_SEPARATE_COLOUR_PLANE		0x01
-> +#define V4L2_H264_SPS_FLAG_QPPRIME_Y_ZERO_TRANSFORM_BYPASS	0x02
-> +#define V4L2_H264_SPS_FLAG_DELTA_PIC_ORDER_ALWAYS_ZERO		0x04
-> +#define V4L2_H264_SPS_FLAG_GAPS_IN_FRAME_NUM_VALUE_ALLOWED	0x08
-> +#define V4L2_H264_SPS_FLAG_FRAME_MBS_ONLY			0x10
-> +#define V4L2_H264_SPS_FLAG_MB_ADAPTIVE_FRAME_FIELD		0x20
-> +#define V4L2_H264_SPS_FLAG_DIRECT_8X8_INFERENCE			0x40
-> +
-> +struct v4l2_ctrl_h264_sps {
-> +	__u8 profile_idc;
-> +	__u8 constraint_set_flags;
-> +	__u8 level_idc;
-> +	__u8 seq_parameter_set_id;
-> +	__u8 chroma_format_idc;
-> +	__u8 bit_depth_luma_minus8;
-> +	__u8 bit_depth_chroma_minus8;
-> +	__u8 log2_max_frame_num_minus4;
-> +	__u8 pic_order_cnt_type;
-> +	__u8 log2_max_pic_order_cnt_lsb_minus4;
-> +	__u8 max_num_ref_frames;
-> +	__u8 num_ref_frames_in_pic_order_cnt_cycle;
-> +	__s32 offset_for_ref_frame[255];
-> +	__s32 offset_for_non_ref_pic;
-> +	__s32 offset_for_top_to_bottom_field;
-> +	__u16 pic_width_in_mbs_minus1;
-> +	__u16 pic_height_in_map_units_minus1;
-> +	__u8 flags;
-> +};
-> +
-> +#define V4L2_H264_PPS_FLAG_ENTROPY_CODING_MODE				0x0001
-> +#define V4L2_H264_PPS_FLAG_BOTTOM_FIELD_PIC_ORDER_IN_FRAME_PRESENT	0x0002
-> +#define V4L2_H264_PPS_FLAG_WEIGHTED_PRED				0x0004
-> +#define V4L2_H264_PPS_FLAG_DEBLOCKING_FILTER_CONTROL_PRESENT		0x0008
-> +#define V4L2_H264_PPS_FLAG_CONSTRAINED_INTRA_PRED			0x0010
-> +#define V4L2_H264_PPS_FLAG_REDUNDANT_PIC_CNT_PRESENT			0x0020
-> +#define V4L2_H264_PPS_FLAG_TRANSFORM_8X8_MODE				0x0040
-> +#define V4L2_H264_PPS_FLAG_PIC_SCALING_MATRIX_PRESENT			0x0080
-> +
-> +struct v4l2_ctrl_h264_pps {
-> +	__u8 pic_parameter_set_id;
-> +	__u8 seq_parameter_set_id;
-> +	__u8 num_slice_groups_minus1;
-> +	__u8 num_ref_idx_l0_default_active_minus1;
-> +	__u8 num_ref_idx_l1_default_active_minus1;
-> +	__u8 weighted_bipred_idc;
-> +	__s8 pic_init_qp_minus26;
-> +	__s8 pic_init_qs_minus26;
-> +	__s8 chroma_qp_index_offset;
-> +	__s8 second_chroma_qp_index_offset;
-> +	__u8 flags;
-> +};
-> +
-> +struct v4l2_ctrl_h264_scaling_matrix {
-> +	__u8 scaling_list_4x4[6][16];
-> +	__u8 scaling_list_8x8[6][64];
-> +};
-> +
-> +struct v4l2_h264_weight_factors {
-> +	__s8 luma_weight[32];
-> +	__s8 luma_offset[32];
-> +	__s8 chroma_weight[32][2];
-> +	__s8 chroma_offset[32][2];
-> +};
-
-Regarding weight type __s8 - isn't too small just a bit?
-
-ITU-T Rec. H264 (05/2003) says that this field has value between -128 to 127 if 
-weight flag is set. That fits perfectly. However, when weight flag is 0, default 
-value is 2^luma_log2_weight_denom (for example). luma_log2_weight_denom can 
-have values between 0 and 7, which means that weight will have values from 1 
-to 128. That is just slightly over the max value for __s8.
-
-__s8 is fine for offsets, though.
-
-Best regards,
-Jernej
-
-> +
-> +struct v4l2_h264_pred_weight_table {
-> +	__u8 luma_log2_weight_denom;
-> +	__u8 chroma_log2_weight_denom;
-> +	struct v4l2_h264_weight_factors weight_factors[2];
-> +};
+diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_fb.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_fb.c
+index 5cbde74b97dd..24890d8f9ee4 100644
+--- a/drivers/gpu/drm/amd/amdgpu/amdgpu_fb.c
++++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_fb.c
+@@ -234,7 +234,6 @@ static int amdgpufb_create(struct drm_fb_helper *helper,
+ 	}
+ 
+ 	info->par = rfbdev;
+-	info->skip_vt_switch = true;
+ 
+ 	ret = amdgpu_display_framebuffer_init(adev->ddev, &rfbdev->rfb,
+ 					      &mode_cmd, gobj);
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index 5e9ca6f96379..41f37704e0a3 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -934,6 +934,7 @@ struct fb_info *drm_fb_helper_alloc_fbi(struct drm_fb_helper *fb_helper)
+ 	}
+ 
+ 	fb_helper->fbdev = info;
++	info->skip_vt_switch = true;
+ 
+ 	return info;
+ 
+diff --git a/drivers/gpu/drm/i915/intel_fbdev.c b/drivers/gpu/drm/i915/intel_fbdev.c
+index 2480c7d6edee..d6f8d4bbc9fc 100644
+--- a/drivers/gpu/drm/i915/intel_fbdev.c
++++ b/drivers/gpu/drm/i915/intel_fbdev.c
+@@ -257,9 +257,6 @@ static int intelfb_create(struct drm_fb_helper *helper,
+ 	info->screen_base = vaddr;
+ 	info->screen_size = vma->node.size;
+ 
+-	/* This driver doesn't need a VT switch to restore the mode on resume */
+-	info->skip_vt_switch = true;
+-
+ 	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->format->depth);
+ 	drm_fb_helper_fill_var(info, &ifbdev->helper, sizes->fb_width, sizes->fb_height);
+ 
+diff --git a/drivers/gpu/drm/nouveau/nouveau_fbcon.c b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
+index 032317c81bf0..67572408d9ae 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_fbcon.c
++++ b/drivers/gpu/drm/nouveau/nouveau_fbcon.c
+@@ -365,7 +365,6 @@ nouveau_fbcon_create(struct drm_fb_helper *helper,
+ 		ret = PTR_ERR(info);
+ 		goto out_unlock;
+ 	}
+-	info->skip_vt_switch = 1;
+ 
+ 	info->par = fbcon;
+ 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+index e6650553f5d6..361604e51361 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_fbdev.c
+@@ -111,8 +111,6 @@ static int rockchip_drm_fbdev_create(struct drm_fb_helper *helper,
+ 		      rk_obj->kvaddr,
+ 		      offset, size);
+ 
+-	fbi->skip_vt_switch = true;
+-
+ 	return 0;
+ 
+ out:
+-- 
+2.19.1
