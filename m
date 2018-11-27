@@ -1,58 +1,34 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 27 Nov 2018 13:03:56 -0800
-Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
-In-Reply-To: <VI1PR04MB553359EA5E0F88701A92A3AEEED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
-References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
- <20181117181225.10737-4-andrew.smirnov@gmail.com>
- <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
- <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
- <VI1PR04MB553359EA5E0F88701A92A3AEEED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
-Message-ID: <CAHQ1cqE0cUUsT99A5ZM6XkNd7E5+17qjZRkCdCERSp2-nWsf=Q@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 27 Nov 2018 13:12:59 -0800
+Subject: [GIT PULL 2/4] bcm2835-soc-next-2018-11-27
+In-Reply-To: <20181127211301.30296-1-eric@anholt.net>
+References: <20181127211301.30296-1-eric@anholt.net>
+Message-ID: <20181127211301.30296-2-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 2:16 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
->
-> On 11/26/18 8:24 PM, Andrey Smirnov wrote:
-> > On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
-> >> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
->
-> >>> +             if (of_property_read_u32_array(
-> >>> +                         node, "fsl,gpr12-device-type",
-> >>> +                         imx6_pcie->device_type,
-> >>> +                         ARRAY_SIZE(imx6_pcie->device_type))) {
-> >>> +                     dev_err(dev, "Failed to get device type
-> >>> mask/value\n");
-> >>> +                     return -EINVAL;
-> >>> +             }
-> >>
-> >> The device type can be set on multiple SOCs, why are you adding a
-> >> mandatory property only for 8m?
-> >
-> > My thinking was that other SoCs don't really have two controllers, so
-> > they don't really need to have that property, but, more importantly,
-> > not forcing them to have this property should preserve backwards
-> > compatibility with old DTBs.
->
-> The "device_type" registers determine Root Complex versus End Point
-> mode. This is not yet supported on imx in upstream but it can be done on
-> many soc versions.
->
+Hi Florian,
 
-Yeah, I am aware, I wasn't really trying to make it possible to
-configure IP block to be a EP, that is just an unavoidable consequence
-of the approach taken.
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-> Looking at other pcie controllers (and dwc core) this is normally done
-> with a different compatible string with an "-ep" suffix. It feels wrong
-> to expose bitmasks and values directly in DT instead.
->
-> For this patch you should probably just hardcode RC mode.
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-Hmm, given how the mask/value have to be different for each
-controller, the only way to hardcode it  that I can think of would be
-to change the property pass a bit offset instead of mask/value pair.
-Is that what you are suggesting?
+are available in the Git repository at:
 
-Thanks,
-Andrey Smirnov
+  git://github.com/anholt/linux tags/bcm2835-soc-next-2018-11-27
+
+for you to fetch changes up to 7b369a42e6d06c59fc56a1769fb4da797fac9bad:
+
+  ARM: mach-bcm: Switch bcm2835 and platsmp to SPDX identifier (2018-11-14 20:55:30 +0100)
+
+----------------------------------------------------------------
+This pull request adds SPDX identifiers to the bcm2835 platform files.
+
+----------------------------------------------------------------
+Stefan Wahren (1):
+      ARM: mach-bcm: Switch bcm2835 and platsmp to SPDX identifier
+
+ arch/arm/mach-bcm/board_bcm2835.c | 11 +----------
+ arch/arm/mach-bcm/platsmp.c       | 10 +---------
+ arch/arm/mach-bcm/platsmp.h       |  6 +-----
+ 3 files changed, 3 insertions(+), 24 deletions(-)
