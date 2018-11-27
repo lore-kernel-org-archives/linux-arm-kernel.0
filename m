@@ -1,33 +1,43 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 10:49:46 +0100
-Subject: [RFC PATCH v4 07/17] irqchip/sun4i: Add support for Allwinner
- ARMv5 F1C100s
-In-Reply-To: <1f3cce09623052eaa90093f13ea9d13047a2b250.1543131714.git.mesihkilinc@gmail.com>
-References: <cover.1543131714.git.mesihkilinc@gmail.com>
- <1f3cce09623052eaa90093f13ea9d13047a2b250.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <20181127094946.zm4rzbscqc5okupl@flea>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 27 Nov 2018 09:51:03 +0000
+Subject: [PATCH v2 6/8] arm64: KVM: Add synchronization on translation
+ regime change for erratum 1165522
+In-Reply-To: <20181123184107.39334-7-marc.zyngier@arm.com>
+References: <20181123184107.39334-1-marc.zyngier@arm.com>
+ <20181123184107.39334-7-marc.zyngier@arm.com>
+Message-ID: <488a0599-fcc3-65bb-acf2-d017c02e39ac@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-65;5402;1c
-On Sun, Nov 25, 2018 at 10:43:10AM +0300, Mesih Kilinc wrote:
-> This patch adds support for suniv Allwinner ARMv5 F1C100s SoC which has
-> stripped version of interrupt controller that found in A10/A13.
-> 
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+Hi Marc,
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+On 23/11/2018 18:41, Marc Zyngier wrote:
+> In order to ensure that slipping HCR_EL2.TGE is done at the right
+> time when switching translation regime, let insert the required ISBs
+> that will be patched in when erratum 1165522 is detected.
 
-Maxime
+Reviewed-by: James Morse <james.morse@arm.com>
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/da120221/attachment.sig>
+
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index 23aca66767f9..ce46bb1c5f4b 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -163,6 +163,13 @@ static __always_inline void __hyp_text __load_guest_stage2(struct kvm *kvm)
+>  {
+>  	write_sysreg(kvm->arch.vtcr, vtcr_el2);
+>  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
+> +
+> +	/*
+> +	 * ARM erratum 1165522 requires the actual execution of the above
+> +	 * before we can switch to the EL1/EL0 translation regime used by
+> +	 * the guest.
+> +	 */
+> +	asm(ALTERNATIVE("nop", "isb", ARM64_WORKAROUND_1165522));
+
+(kvm_hyp.h doesn't include alternative.h, .... but already uses ALTERNATIVE())
+
+
+Thanks,
+
+James
