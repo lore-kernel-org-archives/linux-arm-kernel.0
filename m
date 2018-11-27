@@ -1,28 +1,50 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Tue, 27 Nov 2018 11:07:04 -0800 (PST)
-Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
-In-Reply-To: <20181121151133.GC26925@char.us.oracle.com>
-References: <cover.1542722463.git.robin.murphy@arm.com>
- <20181120160818.GC2492@lst.de> <20181120163441.GD31199@char.us.oracle.com>
- <20181121130331.GA1373@lst.de> <20181121151133.GC26925@char.us.oracle.com>
-Message-ID: <alpine.DEB.2.10.1811271106460.4577@sstabellini-ThinkPad-X260>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Nov 2018 19:15:22 +0000
+Subject: [PATCH] arm64: Use a raw spinlock in __install_bp_hardening_cb()
+In-Reply-To: <20181127153521.29182-1-james.morse@arm.com>
+References: <20181127153521.29182-1-james.morse@arm.com>
+Message-ID: <20181127191521.GA5641@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 21 Nov 2018, Konrad Rzeszutek Wilk wrote:
-> On Wed, Nov 21, 2018 at 02:03:31PM +0100, Christoph Hellwig wrote:
-> > On Tue, Nov 20, 2018 at 11:34:41AM -0500, Konrad Rzeszutek Wilk wrote:
-> > > > Konrad, are you ok with me picking up both through the dma-mapping
-> > > > tree?
-> > > 
-> > > Yes, albeit I would want Stefano to take a peek at patch #2 just in case.
-> > 
-> > Stefano, can you take a look asap?  This is a pretty trivial fix for
-> > a nasty bug that breaks boot on real life systems.  I'd like to merge
-> > it by tomorrow so that I can send it off to Linus for the next rc
-> > (I will be offline for about two days after Friday morning)
+On Tue, Nov 27, 2018 at 03:35:21PM +0000, James Morse wrote:
+> __install_bp_hardening_cb() is called via stop_machine() as part
+> of the cpu_enable callback. To force each CPU to take its turn
+> when allocating slots, they take a spinlock.
 > 
-> It is Turkey Day in US so he may be busy catching those pesky turkeys.
-> How about Tuesday? And in can also send the GIT PULL.
+> With the RT patches applied, the spinlock becomes a mutex,
+> and we get warnings about sleeping while in stop_machine():
+> | [    0.319176] CPU features: detected: RAS Extension Support
+> | [    0.319950] BUG: scheduling while atomic: migration/3/36/0x00000002
+> | [    0.319955] Modules linked in:
+> | [    0.319958] Preemption disabled at:
+> | [    0.319969] [<ffff000008181ae4>] cpu_stopper_thread+0x7c/0x108
+> | [    0.319973] CPU: 3 PID: 36 Comm: migration/3 Not tainted 4.19.1-rt3-00250-g330fc2c2a880 #2
+> | [    0.319975] Hardware name: linux,dummy-virt (DT)
+> | [    0.319976] Call trace:
+> | [    0.319981]  dump_backtrace+0x0/0x148
+> | [    0.319983]  show_stack+0x14/0x20
+> | [    0.319987]  dump_stack+0x80/0xa4
+> | [    0.319989]  __schedule_bug+0x94/0xb0
+> | [    0.319991]  __schedule+0x510/0x560
+> | [    0.319992]  schedule+0x38/0xe8
+> | [    0.319994]  rt_spin_lock_slowlock_locked+0xf0/0x278
+> | [    0.319996]  rt_spin_lock_slowlock+0x5c/0x90
+> | [    0.319998]  rt_spin_lock+0x54/0x58
+> | [    0.320000]  enable_smccc_arch_workaround_1+0xdc/0x260
+> | [    0.320001]  __enable_cpu_capability+0x10/0x20
+> | [    0.320003]  multi_cpu_stop+0x84/0x108
+> | [    0.320004]  cpu_stopper_thread+0x84/0x108
+> | [    0.320008]  smpboot_thread_fn+0x1e8/0x2b0
+> | [    0.320009]  kthread+0x124/0x128
+> | [    0.320010]  ret_from_fork+0x10/0x18
+> 
+> Switch this to a raw spinlock, as we know this is only called with
+> IRQs masked.
 
-I have just come back to the office. I'll give it a look today.
+There might be a lock-free way to do this, but this isn't a fast-path
+so I've queued up your patch for 4.21.
+
+Thanks!
+
+Will
