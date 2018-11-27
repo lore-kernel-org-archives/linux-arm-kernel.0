@@ -1,41 +1,36 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Tue, 27 Nov 2018 09:41:29 +0000
-Subject: [PATCH 2/4] dt-bindings: rtc: add binding doc for i.MX system
- controller RTC driver
-In-Reply-To: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
-References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1543311334-8807-3-git-send-email-Anson.Huang@nxp.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 27 Nov 2018 17:41:10 +0800
+Subject: [PATCH 10/14] regulator: dts: set proper lradc vref on OLinuXino
+ Lime2
+In-Reply-To: <20181127093735.amfqfcsxzreajte4@flea>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+ <b27515a1cfe3512253a3fbcda04a3367818520b9.1543245984.git-series.plaes@plaes.org>
+ <20181127093735.amfqfcsxzreajte4@flea>
+Message-ID: <CAGb2v66odUU9OOwon4URR-+P_jFw2rV+8PLVzrnLmFpKtqT8gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
-system controller, the system controller is in charge of system
-power, clock and secure RTC etc. management, Linux kernel
-has to communicate with system controller via MU (message unit)
-IPC to do RTC operation, this patch adds binding doc for i.MX
-system controller RTC driver.
+On Tue, Nov 27, 2018 at 5:37 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Mon, Nov 26, 2018 at 05:27:51PM +0200, Priit Laes wrote:
+> > From: Olliver Schinagl <oliver@schinagl.nl>
+> >
+> > The lradc's analog reference voltage is set to 3.0 volt in the
+> > hardware. This is more or less set in copper for at least lradc0. Set the
+> > property in the dts to ensure the lradc is referenced properly.
+> >
+> > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> > Signed-off-by: Priit Laes <plaes@plaes.org>
+>
+> I'm not sure why that patch is part of this series, but I applied
+> it. Thanks!
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt | 10 ++++++++++
- 1 file changed, 10 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
+Please help fix up the subject. Should read
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt b/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
-new file mode 100644
-index 0000000..d6e2353
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
-@@ -0,0 +1,10 @@
-+* NXP i.MX System Controller Real Time Clock
-+
-+Required properties:
-+- compatible: should be "nxp,imx8qxp-sc-rtc";
-+
-+Example:
-+
-+rtc: rtc {
-+	compatible = "nxp,imx8qxp-sc-rtc";
-+};
--- 
-2.7.4
+"ARM: dts: sun7i: set proper lradc vref on OLinuXino Lime2"
+
+or
+
+"ARM: dts: sun7i: olinoxino-lime2: set proper lradc vref"
+
+ChenYu
