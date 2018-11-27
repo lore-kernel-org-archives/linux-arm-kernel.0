@@ -1,81 +1,79 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 27 Nov 2018 21:04:25 +0530
-Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
-In-Reply-To: <20181127151948.gaqodlnkiuh3vkud@flea>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
- <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
- <20181127103106.vykudp36vkyy5vme@flea>
- <CAMty3ZAhGAN2nEJkiRLHqFHz9Oi1WboiyqLL4ox+-0z7NhbG8w@mail.gmail.com>
- <20181127151948.gaqodlnkiuh3vkud@flea>
-Message-ID: <CAMty3ZC4LtAAb-09em8Cm8HTUtiK3oHvL8mynn8bhJr3Sgdvsg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 27 Nov 2018 15:35:21 +0000
+Subject: [PATCH] arm64: Use a raw spinlock in __install_bp_hardening_cb()
+Message-ID: <20181127153521.29182-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 8:49 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> On Tue, Nov 27, 2018 at 04:30:55PM +0530, Jagan Teki wrote:
-> > > > > +&i2c1 {
-> > > > > +       pinctrl-names = "default";
-> > > > > +       pinctrl-0 = <&i2c1_pins_a>;
-> > > > > +       status = "okay";
-> > > > > +
-> > > > > +       camera: camera at 21 {
-> > > > > +               compatible = "ovti,ov5640";
-> > > > > +               reg = <0x21>;
-> > > > > +                clocks = <&ccu CLK_CSI0>;
-> > > > > +                clock-names = "xclk";
-> > > > > +               assigned-clocks = <&ccu CLK_CSI0>;
-> > > > > +               assigned-clock-rates = <24000000>;
-> > > > > +
-> > > > > +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
-> > > > > +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
-> > > > > +                AVDD-supply = <&reg_cam_avdd>;
-> > > > > +                DOVDD-supply = <&reg_cam_dovdd>;
-> > > > > +                DVDD-supply = <&reg_cam_dvdd>;
-> > > > > +
-> > > > > +                port {
-> > > > > +                        ov5640_to_csi: endpoint {
-> > > > > +                                remote-endpoint = <&csi_from_ov5640>;
-> > > > > +                                bus-width = <8>;
-> > > > > +                                data-shift = <2>;
-> > > > > +                                hsync-active = <1>; /* Active high */
-> > > > > +                                vsync-active = <0>; /* Active low */
-> > > > > +                                data-active = <1>;  /* Active high */
-> > > > > +                                pclk-sample = <1>;  /* Rising */
-> > > > > +                        };
-> > > > > +                };
-> > > > > +       };
-> > > >
-> > > > Does ov5640 need any further patches, wrt linux-next? I'm trying to
-> > > > test this on top of linux-next but the slave id seems not detecting.
-> > > >
-> > > > [    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
-> > > > [    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
-> > > > [    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
-> > > > [    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
-> > > > [    2.357543] ov5640 1-0021: Dropping the link to regulator.5
-> > > > [    2.363224] ov5640 1-0021: Dropping the link to regulator.6
-> > > > [    2.368829] ov5640 1-0021: Dropping the link to regulator.4
-> > > >
-> > > > Here is the full log [1], please let me know if I miss anything, I
-> > > > even tried to remove MCLK pin
-> > >
-> > > You seem to have made local modifications to your tree, what are they?
-> > > This indicates that the communication over i2c doesn't work, what is
-> > > your setup?
-> >
-> > I just used your commits on linux-next [2], with the setup similar in
-> > Page 5 on datasheet[3]. The only difference is csi build issue, I have
-> > updated similar fix you mentioned on sun6i_csi [4]
-> >
-> > [2] https://github.com/amarula/linux-amarula/commits/CSI-A20
-> > [3] https://www.tme.eu/gb/Document/187887186b98a8f78b47da2774a34f4c/BPI-CAMERA.pdf
-> > [4] https://github.com/amarula/linux-amarula/commit/a6762ecd38f000e2bd02dd255f6fd0c1ae755429#diff-0809a7f97ca58771c1cda186e73ec657
->
-> That branch doesn't have any commit with the same ID that you have in
-> your boot log.
+__install_bp_hardening_cb() is called via stop_machine() as part
+of the cpu_enable callback. To force each CPU to take its turn
+when allocating slots, they take a spinlock.
 
-I have created this branch for your reference, here is the clean log on this [5]
+With the RT patches applied, the spinlock becomes a mutex,
+and we get warnings about sleeping while in stop_machine():
+| [    0.319176] CPU features: detected: RAS Extension Support
+| [    0.319950] BUG: scheduling while atomic: migration/3/36/0x00000002
+| [    0.319955] Modules linked in:
+| [    0.319958] Preemption disabled at:
+| [    0.319969] [<ffff000008181ae4>] cpu_stopper_thread+0x7c/0x108
+| [    0.319973] CPU: 3 PID: 36 Comm: migration/3 Not tainted 4.19.1-rt3-00250-g330fc2c2a880 #2
+| [    0.319975] Hardware name: linux,dummy-virt (DT)
+| [    0.319976] Call trace:
+| [    0.319981]  dump_backtrace+0x0/0x148
+| [    0.319983]  show_stack+0x14/0x20
+| [    0.319987]  dump_stack+0x80/0xa4
+| [    0.319989]  __schedule_bug+0x94/0xb0
+| [    0.319991]  __schedule+0x510/0x560
+| [    0.319992]  schedule+0x38/0xe8
+| [    0.319994]  rt_spin_lock_slowlock_locked+0xf0/0x278
+| [    0.319996]  rt_spin_lock_slowlock+0x5c/0x90
+| [    0.319998]  rt_spin_lock+0x54/0x58
+| [    0.320000]  enable_smccc_arch_workaround_1+0xdc/0x260
+| [    0.320001]  __enable_cpu_capability+0x10/0x20
+| [    0.320003]  multi_cpu_stop+0x84/0x108
+| [    0.320004]  cpu_stopper_thread+0x84/0x108
+| [    0.320008]  smpboot_thread_fn+0x1e8/0x2b0
+| [    0.320009]  kthread+0x124/0x128
+| [    0.320010]  ret_from_fork+0x10/0x18
 
-[5] https://paste.ubuntu.com/p/4bkFs5WG6c/
+Switch this to a raw spinlock, as we know this is only called with
+IRQs masked.
+
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/kernel/cpu_errata.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a509e35132d2..00d93a91c4d5 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -135,7 +135,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 				      const char *hyp_vecs_start,
+ 				      const char *hyp_vecs_end)
+ {
+-	static DEFINE_SPINLOCK(bp_lock);
++	static DEFINE_RAW_SPINLOCK(bp_lock);
+ 	int cpu, slot = -1;
+ 
+ 	/*
+@@ -147,7 +147,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 		return;
+ 	}
+ 
+-	spin_lock(&bp_lock);
++	raw_spin_lock(&bp_lock);
+ 	for_each_possible_cpu(cpu) {
+ 		if (per_cpu(bp_hardening_data.fn, cpu) == fn) {
+ 			slot = per_cpu(bp_hardening_data.hyp_vectors_slot, cpu);
+@@ -163,7 +163,7 @@ static void __install_bp_hardening_cb(bp_hardening_cb_t fn,
+ 
+ 	__this_cpu_write(bp_hardening_data.hyp_vectors_slot, slot);
+ 	__this_cpu_write(bp_hardening_data.fn, fn);
+-	spin_unlock(&bp_lock);
++	raw_spin_unlock(&bp_lock);
+ }
+ #else
+ #define __smccc_workaround_1_smc_start		NULL
+-- 
+2.19.1
