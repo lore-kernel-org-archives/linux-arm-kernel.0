@@ -1,68 +1,88 @@
-From: govinds@codeaurora.org (Govind Singh)
-Date: Tue, 27 Nov 2018 20:47:16 +0530
-Subject: [PATCH v2] arm64: dts: qcom: qcs404: Add WCN3990 WLAN module device
- node
-Message-ID: <20181127151716.31992-1-govinds@codeaurora.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Nov 2018 16:19:48 +0100
+Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+In-Reply-To: <CAMty3ZAhGAN2nEJkiRLHqFHz9Oi1WboiyqLL4ox+-0z7NhbG8w@mail.gmail.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
+ <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
+ <20181127103106.vykudp36vkyy5vme@flea>
+ <CAMty3ZAhGAN2nEJkiRLHqFHz9Oi1WboiyqLL4ox+-0z7NhbG8w@mail.gmail.com>
+Message-ID: <20181127151948.gaqodlnkiuh3vkud@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for the ath10k SNOC platform driver probe
-and add resources required for WCN3990 on qcs404 soc.
-Optional clock and regulator controls are not yet available in
-upstream, hence add them once available.
+On Tue, Nov 27, 2018 at 04:30:55PM +0530, Jagan Teki wrote:
+> > > > +&i2c1 {
+> > > > +       pinctrl-names = "default";
+> > > > +       pinctrl-0 = <&i2c1_pins_a>;
+> > > > +       status = "okay";
+> > > > +
+> > > > +       camera: camera at 21 {
+> > > > +               compatible = "ovti,ov5640";
+> > > > +               reg = <0x21>;
+> > > > +                clocks = <&ccu CLK_CSI0>;
+> > > > +                clock-names = "xclk";
+> > > > +               assigned-clocks = <&ccu CLK_CSI0>;
+> > > > +               assigned-clock-rates = <24000000>;
+> > > > +
+> > > > +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
+> > > > +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
+> > > > +                AVDD-supply = <&reg_cam_avdd>;
+> > > > +                DOVDD-supply = <&reg_cam_dovdd>;
+> > > > +                DVDD-supply = <&reg_cam_dvdd>;
+> > > > +
+> > > > +                port {
+> > > > +                        ov5640_to_csi: endpoint {
+> > > > +                                remote-endpoint = <&csi_from_ov5640>;
+> > > > +                                bus-width = <8>;
+> > > > +                                data-shift = <2>;
+> > > > +                                hsync-active = <1>; /* Active high */
+> > > > +                                vsync-active = <0>; /* Active low */
+> > > > +                                data-active = <1>;  /* Active high */
+> > > > +                                pclk-sample = <1>;  /* Rising */
+> > > > +                        };
+> > > > +                };
+> > > > +       };
+> > >
+> > > Does ov5640 need any further patches, wrt linux-next? I'm trying to
+> > > test this on top of linux-next but the slave id seems not detecting.
+> > >
+> > > [    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
+> > > [    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
+> > > [    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
+> > > [    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
+> > > [    2.357543] ov5640 1-0021: Dropping the link to regulator.5
+> > > [    2.363224] ov5640 1-0021: Dropping the link to regulator.6
+> > > [    2.368829] ov5640 1-0021: Dropping the link to regulator.4
+> > >
+> > > Here is the full log [1], please let me know if I miss anything, I
+> > > even tried to remove MCLK pin
+> >
+> > You seem to have made local modifications to your tree, what are they?
+> > This indicates that the communication over i2c doesn't work, what is
+> > your setup?
+> 
+> I just used your commits on linux-next [2], with the setup similar in
+> Page 5 on datasheet[3]. The only difference is csi build issue, I have
+> updated similar fix you mentioned on sun6i_csi [4]
+> 
+> [2] https://github.com/amarula/linux-amarula/commits/CSI-A20
+> [3] https://www.tme.eu/gb/Document/187887186b98a8f78b47da2774a34f4c/BPI-CAMERA.pdf
+> [4] https://github.com/amarula/linux-amarula/commit/a6762ecd38f000e2bd02dd255f6fd0c1ae755429#diff-0809a7f97ca58771c1cda186e73ec657
 
-Signed-off-by: Govind Singh <govinds@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/qcs404-evb.dtsi |  4 ++++
- arch/arm64/boot/dts/qcom/qcs404.dtsi     | 20 ++++++++++++++++++++
- 2 files changed, 24 insertions(+)
+That branch doesn't have any commit with the same ID that you have in
+your boot log.
 
-diff --git a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-index 0767389c68c1..36905524b0ff 100644
---- a/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-+++ b/arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
-@@ -310,6 +310,10 @@
- 	status = "okay";
- };
- 
-+&wifi {
-+	status = "okay";
-+};
-+
- /* PINCTRL - additions to nodes defined in qcs404.dtsi */
- 
- &blsp1_i2c1_default {
-diff --git a/arch/arm64/boot/dts/qcom/qcs404.dtsi b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-index 9ca4f061ecc5..b3b98745046f 100644
---- a/arch/arm64/boot/dts/qcom/qcs404.dtsi
-+++ b/arch/arm64/boot/dts/qcom/qcs404.dtsi
-@@ -886,6 +886,26 @@
- 			status = "disabled";
- 		};
- 
-+		wifi: wifi at a000000 {
-+			compatible = "qcom,wcn3990-wifi";
-+			reg = <0xa000000 0x800000>;
-+			reg-names = "membase";
-+			memory-region = <&wlan_msa_mem>;
-+			interrupts = <GIC_SPI 277 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 279 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 280 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 281 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 282 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 283 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 284 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 285 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
- 		intc: interrupt-controller at b000000 {
- 			compatible = "qcom,msm-qgic2";
- 			interrupt-controller;
+Maxime
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/b02a73d2/attachment.sig>
