@@ -1,36 +1,76 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Tue, 27 Nov 2018 22:36:41 +0100
-Subject: [PATCH 3/4] defconfig: arm64: add i.MX system controller RTC
- support
-In-Reply-To: <1543311334-8807-4-git-send-email-Anson.Huang@nxp.com>
-References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
- <1543311334-8807-4-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <20181127213641.GC7569@piout.net>
+From: rppt@linux.ibm.com (Mike Rapoport)
+Date: Tue, 27 Nov 2018 23:48:45 +0200
+Subject: [PATCH 4/5] openrisc: simplify pte_alloc_one_kernel()
+In-Reply-To: <20181127211600.GB3235@lianli.shorne-pla.net>
+References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
+ <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
+ <20181127211600.GB3235@lianli.shorne-pla.net>
+Message-ID: <7843DE67-DCC3-48BF-873F-71D87B08EDA8@linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2018 09:41:37+0000, Anson Huang wrote:
-> This patch enables CONFIG_RTC_DRV_IMX_SC by default.
-> 
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> ---
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 6d224f7..6fdf2d0 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -573,6 +573,7 @@ CONFIG_RTC_DRV_PL031=y
->  CONFIG_RTC_DRV_SUN6I=y
->  CONFIG_RTC_DRV_ARMADA38X=y
->  CONFIG_RTC_DRV_TEGRA=y
-> +CONFIG_RTC_DRV_IMX_SC=y
 
-I think this has to be m unless you need the RTC to be able to boot.
 
+On November 27, 2018 11:16:00 PM GMT+02:00, Stafford Horne <shorne@gmail.com> wrote:
+>On Sun, Nov 25, 2018 at 11:44:36PM +0200, Mike Rapoport wrote:
+>> The pte_alloc_one_kernel() function allocates a page using
+>> __get_free_page(GFP_KERNEL) when mm initialization is complete and
+>> memblock_phys_alloc() on the earlier stages. The physical address of
+>the
+>> page allocated with memblock_phys_alloc() is converted to the virtual
+>> address and in the both cases the allocated page is cleared using
+>> clear_page().
+>> 
+>> The code is simplified by replacing __get_free_page() with
+>> get_zeroed_page() and by replacing memblock_phys_alloc() with
+>> memblock_alloc().
+>
+>Hello Mike,
+>
+>This looks fine to me.  How do you plan to get this merged?  Will you
+>be taking
+>care of the whole series or so you want me to queue this openrisc part?
+
+I was thinking about merging via the -mm tree.
+Andrew, would that be ok?
+
+>> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+>
+>Acked-by: Stafford Horne <shorne@gmail.com>
+
+Thanks!
+
+>> ---
+>>  arch/openrisc/mm/ioremap.c | 11 ++++-------
+>>  1 file changed, 4 insertions(+), 7 deletions(-)
+>> 
+>> diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
+>> index c969752..cfef989 100644
+>> --- a/arch/openrisc/mm/ioremap.c
+>> +++ b/arch/openrisc/mm/ioremap.c
+>> @@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct
+>mm_struct *mm,
+>>  {
+>>  	pte_t *pte;
+>>  
+>> -	if (likely(mem_init_done)) {
+>> -		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+>> -	} else {
+>> -		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+>> -	}
+>> +	if (likely(mem_init_done))
+>> +		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
+>> +	else
+>> +		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+>>  
+>> -	if (pte)
+>> -		clear_page(pte);
+>>  	return pte;
+>>  }
+>> -- 
+>> 2.7.4
+>> 
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+Sincerely yours,
+Mike.
