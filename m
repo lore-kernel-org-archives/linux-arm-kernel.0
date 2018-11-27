@@ -1,355 +1,459 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:44:44 +0000
-Subject: [PATCH 1/4] arm64: Avoid redundant type conversions in xchg() and
- cmpxchg()
+Date: Tue, 27 Nov 2018 19:44:46 +0000
+Subject: [PATCH 3/4] arm64: percpu: Rewrite per-cpu ops to allow use of LSE
+ atomics
 In-Reply-To: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
 References: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1543347887-21101-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1543347887-21101-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our atomic instructions (either LSE atomics of LDXR/STXR sequences)
-natively support byte, half-word, word and double-word memory accesses
-so there is no need to mask the data register prior to being stored.
+Our percpu code is a bit of an inconsistent mess:
+
+  * It rolls its own xchg(), but reuses cmpxchg_local()
+  * It uses various different flavours of preempt_{enable,disable}()
+  * It returns values even for the non-returning RmW operations
+  * It makes no use of LSE atomics outside of the cmpxchg() ops
+  * There are individual macros for different sizes of access, but these
+    are all funneled through a switch statement rather than dispatched
+    directly to the relevant case
+
+This patch rewrites the per-cpu operations to address these shortcomings.
+Whilst the new code is a lot cleaner, the big advantage is that we can
+use the non-returning ST- atomic instructions when we have LSE.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h |  53 ++++++++--------
- arch/arm64/include/asm/atomic_lse.h   |  46 +++++++-------
- arch/arm64/include/asm/cmpxchg.h      | 116 +++++++++++++++++-----------------
- 3 files changed, 108 insertions(+), 107 deletions(-)
+ arch/arm64/include/asm/percpu.h | 390 +++++++++++++++++-----------------------
+ 1 file changed, 160 insertions(+), 230 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index f5a2d09afb38..f02d3bf7b9e6 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -248,48 +248,49 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
+diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
+index 21a81b59a0cc..f7b1bbbb6f12 100644
+--- a/arch/arm64/include/asm/percpu.h
++++ b/arch/arm64/include/asm/percpu.h
+@@ -48,263 +48,193 @@ static inline unsigned long __my_cpu_offset(void)
  }
- __LL_SC_EXPORT(atomic64_dec_if_positive);
+ #define __my_cpu_offset __my_cpu_offset()
  
--#define __CMPXCHG_CASE(w, sz, name, mb, acq, rel, cl)			\
--__LL_SC_INLINE unsigned long						\
--__LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
--				     unsigned long old,			\
--				     unsigned long new))		\
-+#define __CMPXCHG_CASE(w, sfx, name, sz, mb, acq, rel, cl)		\
-+__LL_SC_INLINE u##sz							\
-+__LL_SC_PREFIX(__cmpxchg_case_##name##sz(volatile void *ptr,		\
-+					 unsigned long old,		\
-+					 u##sz new))			\
+-#define PERCPU_OP(op, asm_op)						\
+-static inline unsigned long __percpu_##op(void *ptr,			\
+-			unsigned long val, int size)			\
++#define PERCPU_RW_OPS(sz)						\
++static inline unsigned long __percpu_read_##sz(void *ptr)		\
  {									\
--	unsigned long tmp, oldval;					\
-+	unsigned long tmp;						\
-+	u##sz oldval;							\
+-	unsigned long loop, ret;					\
++	return READ_ONCE(*(u##sz *)ptr);				\
++}									\
  									\
- 	asm volatile(							\
- 	"	prfm	pstl1strm, %[v]\n"				\
--	"1:	ld" #acq "xr" #sz "\t%" #w "[oldval], %[v]\n"		\
-+	"1:	ld" #acq "xr" #sfx "\t%" #w "[oldval], %[v]\n"		\
- 	"	eor	%" #w "[tmp], %" #w "[oldval], %" #w "[old]\n"	\
- 	"	cbnz	%" #w "[tmp], 2f\n"				\
--	"	st" #rel "xr" #sz "\t%w[tmp], %" #w "[new], %[v]\n"	\
-+	"	st" #rel "xr" #sfx "\t%w[tmp], %" #w "[new], %[v]\n"	\
- 	"	cbnz	%w[tmp], 1b\n"					\
- 	"	" #mb "\n"						\
- 	"2:"								\
- 	: [tmp] "=&r" (tmp), [oldval] "=&r" (oldval),			\
--	  [v] "+Q" (*(unsigned long *)ptr)				\
-+	  [v] "+Q" (*(u##sz *)ptr)					\
- 	: [old] "Lr" (old), [new] "r" (new)				\
- 	: cl);								\
- 									\
- 	return oldval;							\
- }									\
--__LL_SC_EXPORT(__cmpxchg_case_##name);
-+__LL_SC_EXPORT(__cmpxchg_case_##name##sz);
- 
--__CMPXCHG_CASE(w, b,     1,        ,  ,  ,         )
--__CMPXCHG_CASE(w, h,     2,        ,  ,  ,         )
--__CMPXCHG_CASE(w,  ,     4,        ,  ,  ,         )
--__CMPXCHG_CASE( ,  ,     8,        ,  ,  ,         )
--__CMPXCHG_CASE(w, b, acq_1,        , a,  , "memory")
--__CMPXCHG_CASE(w, h, acq_2,        , a,  , "memory")
--__CMPXCHG_CASE(w,  , acq_4,        , a,  , "memory")
--__CMPXCHG_CASE( ,  , acq_8,        , a,  , "memory")
--__CMPXCHG_CASE(w, b, rel_1,        ,  , l, "memory")
--__CMPXCHG_CASE(w, h, rel_2,        ,  , l, "memory")
--__CMPXCHG_CASE(w,  , rel_4,        ,  , l, "memory")
--__CMPXCHG_CASE( ,  , rel_8,        ,  , l, "memory")
--__CMPXCHG_CASE(w, b,  mb_1, dmb ish,  , l, "memory")
--__CMPXCHG_CASE(w, h,  mb_2, dmb ish,  , l, "memory")
--__CMPXCHG_CASE(w,  ,  mb_4, dmb ish,  , l, "memory")
--__CMPXCHG_CASE( ,  ,  mb_8, dmb ish,  , l, "memory")
-+__CMPXCHG_CASE(w, b,     ,  8,        ,  ,  ,         )
-+__CMPXCHG_CASE(w, h,     , 16,        ,  ,  ,         )
-+__CMPXCHG_CASE(w,  ,     , 32,        ,  ,  ,         )
-+__CMPXCHG_CASE( ,  ,     , 64,        ,  ,  ,         )
-+__CMPXCHG_CASE(w, b, acq_,  8,        , a,  , "memory")
-+__CMPXCHG_CASE(w, h, acq_, 16,        , a,  , "memory")
-+__CMPXCHG_CASE(w,  , acq_, 32,        , a,  , "memory")
-+__CMPXCHG_CASE( ,  , acq_, 64,        , a,  , "memory")
-+__CMPXCHG_CASE(w, b, rel_,  8,        ,  , l, "memory")
-+__CMPXCHG_CASE(w, h, rel_, 16,        ,  , l, "memory")
-+__CMPXCHG_CASE(w,  , rel_, 32,        ,  , l, "memory")
-+__CMPXCHG_CASE( ,  , rel_, 64,        ,  , l, "memory")
-+__CMPXCHG_CASE(w, b,  mb_,  8, dmb ish,  , l, "memory")
-+__CMPXCHG_CASE(w, h,  mb_, 16, dmb ish,  , l, "memory")
-+__CMPXCHG_CASE(w,  ,  mb_, 32, dmb ish,  , l, "memory")
-+__CMPXCHG_CASE( ,  ,  mb_, 64, dmb ish,  , l, "memory")
- 
- #undef __CMPXCHG_CASE
- 
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index f9b0b09153e0..4d6f917b654e 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -446,22 +446,22 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
- 
- #define __LL_SC_CMPXCHG(op)	__LL_SC_CALL(__cmpxchg_case_##op)
- 
--#define __CMPXCHG_CASE(w, sz, name, mb, cl...)				\
--static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
--						  unsigned long old,	\
--						  unsigned long new)	\
-+#define __CMPXCHG_CASE(w, sfx, name, sz, mb, cl...)			\
-+static inline u##sz __cmpxchg_case_##name##sz(volatile void *ptr,	\
-+					      unsigned long old,	\
-+					      u##sz new)		\
- {									\
- 	register unsigned long x0 asm ("x0") = (unsigned long)ptr;	\
- 	register unsigned long x1 asm ("x1") = old;			\
--	register unsigned long x2 asm ("x2") = new;			\
-+	register u##sz x2 asm ("x2") = new;				\
- 									\
- 	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
- 	/* LL/SC */							\
--	__LL_SC_CMPXCHG(name)						\
-+	__LL_SC_CMPXCHG(name##sz)					\
- 	__nops(2),							\
- 	/* LSE atomics */						\
- 	"	mov	" #w "30, %" #w "[old]\n"			\
--	"	cas" #mb #sz "\t" #w "30, %" #w "[new], %[v]\n"		\
-+	"	cas" #mb #sfx "\t" #w "30, %" #w "[new], %[v]\n"	\
- 	"	mov	%" #w "[ret], " #w "30")			\
- 	: [ret] "+r" (x0), [v] "+Q" (*(unsigned long *)ptr)		\
- 	: [old] "r" (x1), [new] "r" (x2)				\
-@@ -470,22 +470,22 @@ static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
- 	return x0;							\
- }
- 
--__CMPXCHG_CASE(w, b,     1,   )
--__CMPXCHG_CASE(w, h,     2,   )
--__CMPXCHG_CASE(w,  ,     4,   )
--__CMPXCHG_CASE(x,  ,     8,   )
--__CMPXCHG_CASE(w, b, acq_1,  a, "memory")
--__CMPXCHG_CASE(w, h, acq_2,  a, "memory")
--__CMPXCHG_CASE(w,  , acq_4,  a, "memory")
--__CMPXCHG_CASE(x,  , acq_8,  a, "memory")
--__CMPXCHG_CASE(w, b, rel_1,  l, "memory")
--__CMPXCHG_CASE(w, h, rel_2,  l, "memory")
--__CMPXCHG_CASE(w,  , rel_4,  l, "memory")
--__CMPXCHG_CASE(x,  , rel_8,  l, "memory")
--__CMPXCHG_CASE(w, b,  mb_1, al, "memory")
--__CMPXCHG_CASE(w, h,  mb_2, al, "memory")
--__CMPXCHG_CASE(w,  ,  mb_4, al, "memory")
--__CMPXCHG_CASE(x,  ,  mb_8, al, "memory")
-+__CMPXCHG_CASE(w, b,     ,  8,   )
-+__CMPXCHG_CASE(w, h,     , 16,   )
-+__CMPXCHG_CASE(w,  ,     , 32,   )
-+__CMPXCHG_CASE(x,  ,     , 64,   )
-+__CMPXCHG_CASE(w, b, acq_,  8,  a, "memory")
-+__CMPXCHG_CASE(w, h, acq_, 16,  a, "memory")
-+__CMPXCHG_CASE(w,  , acq_, 32,  a, "memory")
-+__CMPXCHG_CASE(x,  , acq_, 64,  a, "memory")
-+__CMPXCHG_CASE(w, b, rel_,  8,  l, "memory")
-+__CMPXCHG_CASE(w, h, rel_, 16,  l, "memory")
-+__CMPXCHG_CASE(w,  , rel_, 32,  l, "memory")
-+__CMPXCHG_CASE(x,  , rel_, 64,  l, "memory")
-+__CMPXCHG_CASE(w, b,  mb_,  8, al, "memory")
-+__CMPXCHG_CASE(w, h,  mb_, 16, al, "memory")
-+__CMPXCHG_CASE(w,  ,  mb_, 32, al, "memory")
-+__CMPXCHG_CASE(x,  ,  mb_, 64, al, "memory")
- 
- #undef __LL_SC_CMPXCHG
- #undef __CMPXCHG_CASE
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index 3b0938281541..1f0340fc6dad 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -30,46 +30,46 @@
-  * barrier case is generated as release+dmb for the former and
-  * acquire+release for the latter.
-  */
--#define __XCHG_CASE(w, sz, name, mb, nop_lse, acq, acq_lse, rel, cl)	\
--static inline unsigned long __xchg_case_##name(unsigned long x,		\
--					       volatile void *ptr)	\
--{									\
--	unsigned long ret, tmp;						\
--									\
--	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
--	/* LL/SC */							\
--	"	prfm	pstl1strm, %2\n"				\
--	"1:	ld" #acq "xr" #sz "\t%" #w "0, %2\n"			\
--	"	st" #rel "xr" #sz "\t%w1, %" #w "3, %2\n"		\
--	"	cbnz	%w1, 1b\n"					\
--	"	" #mb,							\
--	/* LSE atomics */						\
--	"	swp" #acq_lse #rel #sz "\t%" #w "3, %" #w "0, %2\n"	\
--		__nops(3)						\
--	"	" #nop_lse)						\
--	: "=&r" (ret), "=&r" (tmp), "+Q" (*(unsigned long *)ptr)	\
--	: "r" (x)							\
--	: cl);								\
+-	switch (size) {							\
+-	case 1:								\
+-		asm ("//__per_cpu_" #op "_1\n"				\
+-		"1:	ldxrb	  %w[ret], %[ptr]\n"			\
+-			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-		"	stxrb	  %w[loop], %w[ret], %[ptr]\n"		\
+-		"	cbnz	  %w[loop], 1b"				\
+-		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
+-		  [ptr] "+Q"(*(u8 *)ptr)				\
+-		: [val] "Ir" (val));					\
+-		break;							\
+-	case 2:								\
+-		asm ("//__per_cpu_" #op "_2\n"				\
+-		"1:	ldxrh	  %w[ret], %[ptr]\n"			\
+-			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-		"	stxrh	  %w[loop], %w[ret], %[ptr]\n"		\
+-		"	cbnz	  %w[loop], 1b"				\
+-		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
+-		  [ptr]  "+Q"(*(u16 *)ptr)				\
+-		: [val] "Ir" (val));					\
+-		break;							\
+-	case 4:								\
+-		asm ("//__per_cpu_" #op "_4\n"				\
+-		"1:	ldxr	  %w[ret], %[ptr]\n"			\
+-			#asm_op " %w[ret], %w[ret], %w[val]\n"		\
+-		"	stxr	  %w[loop], %w[ret], %[ptr]\n"		\
+-		"	cbnz	  %w[loop], 1b"				\
+-		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
+-		  [ptr] "+Q"(*(u32 *)ptr)				\
+-		: [val] "Ir" (val));					\
+-		break;							\
+-	case 8:								\
+-		asm ("//__per_cpu_" #op "_8\n"				\
+-		"1:	ldxr	  %[ret], %[ptr]\n"			\
+-			#asm_op " %[ret], %[ret], %[val]\n"		\
+-		"	stxr	  %w[loop], %[ret], %[ptr]\n"		\
+-		"	cbnz	  %w[loop], 1b"				\
+-		: [loop] "=&r" (loop), [ret] "=&r" (ret),		\
+-		  [ptr] "+Q"(*(u64 *)ptr)				\
+-		: [val] "Ir" (val));					\
+-		break;							\
+-	default:							\
+-		ret = 0;						\
+-		BUILD_BUG();						\
+-	}								\
 -									\
 -	return ret;							\
-+#define __XCHG_CASE(w, sfx, name, sz, mb, nop_lse, acq, acq_lse, rel, cl)	\
-+static inline u##sz __xchg_case_##name##sz(u##sz x, volatile void *ptr)		\
-+{										\
-+	u##sz ret;								\
-+	unsigned long tmp;							\
-+										\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(					\
-+	/* LL/SC */								\
-+	"	prfm	pstl1strm, %2\n"					\
-+	"1:	ld" #acq "xr" #sfx "\t%" #w "0, %2\n"				\
-+	"	st" #rel "xr" #sfx "\t%w1, %" #w "3, %2\n"			\
-+	"	cbnz	%w1, 1b\n"						\
-+	"	" #mb,								\
-+	/* LSE atomics */							\
-+	"	swp" #acq_lse #rel #sfx "\t%" #w "3, %" #w "0, %2\n"		\
-+		__nops(3)							\
-+	"	" #nop_lse)							\
-+	: "=&r" (ret), "=&r" (tmp), "+Q" (*(u##sz *)ptr)			\
-+	: "r" (x)								\
-+	: cl);									\
-+										\
-+	return ret;								\
+-}
+-
+-PERCPU_OP(add, add)
+-PERCPU_OP(and, and)
+-PERCPU_OP(or, orr)
+-#undef PERCPU_OP
+-
+-static inline unsigned long __percpu_read(void *ptr, int size)
+-{
+-	unsigned long ret;
+-
+-	switch (size) {
+-	case 1:
+-		ret = READ_ONCE(*(u8 *)ptr);
+-		break;
+-	case 2:
+-		ret = READ_ONCE(*(u16 *)ptr);
+-		break;
+-	case 4:
+-		ret = READ_ONCE(*(u32 *)ptr);
+-		break;
+-	case 8:
+-		ret = READ_ONCE(*(u64 *)ptr);
+-		break;
+-	default:
+-		ret = 0;
+-		BUILD_BUG();
+-	}
+-
+-	return ret;
++static inline void __percpu_write_##sz(void *ptr, unsigned long val)	\
++{									\
++	WRITE_ONCE(*(u##sz *)ptr, (u##sz)val);				\
  }
  
--__XCHG_CASE(w, b,     1,        ,    ,  ,  ,  ,         )
--__XCHG_CASE(w, h,     2,        ,    ,  ,  ,  ,         )
--__XCHG_CASE(w,  ,     4,        ,    ,  ,  ,  ,         )
--__XCHG_CASE( ,  ,     8,        ,    ,  ,  ,  ,         )
--__XCHG_CASE(w, b, acq_1,        ,    , a, a,  , "memory")
--__XCHG_CASE(w, h, acq_2,        ,    , a, a,  , "memory")
--__XCHG_CASE(w,  , acq_4,        ,    , a, a,  , "memory")
--__XCHG_CASE( ,  , acq_8,        ,    , a, a,  , "memory")
--__XCHG_CASE(w, b, rel_1,        ,    ,  ,  , l, "memory")
--__XCHG_CASE(w, h, rel_2,        ,    ,  ,  , l, "memory")
--__XCHG_CASE(w,  , rel_4,        ,    ,  ,  , l, "memory")
--__XCHG_CASE( ,  , rel_8,        ,    ,  ,  , l, "memory")
--__XCHG_CASE(w, b,  mb_1, dmb ish, nop,  , a, l, "memory")
--__XCHG_CASE(w, h,  mb_2, dmb ish, nop,  , a, l, "memory")
--__XCHG_CASE(w,  ,  mb_4, dmb ish, nop,  , a, l, "memory")
--__XCHG_CASE( ,  ,  mb_8, dmb ish, nop,  , a, l, "memory")
-+__XCHG_CASE(w, b,     ,  8,        ,    ,  ,  ,  ,         )
-+__XCHG_CASE(w, h,     , 16,        ,    ,  ,  ,  ,         )
-+__XCHG_CASE(w,  ,     , 32,        ,    ,  ,  ,  ,         )
-+__XCHG_CASE( ,  ,     , 64,        ,    ,  ,  ,  ,         )
-+__XCHG_CASE(w, b, acq_,  8,        ,    , a, a,  , "memory")
-+__XCHG_CASE(w, h, acq_, 16,        ,    , a, a,  , "memory")
-+__XCHG_CASE(w,  , acq_, 32,        ,    , a, a,  , "memory")
-+__XCHG_CASE( ,  , acq_, 64,        ,    , a, a,  , "memory")
-+__XCHG_CASE(w, b, rel_,  8,        ,    ,  ,  , l, "memory")
-+__XCHG_CASE(w, h, rel_, 16,        ,    ,  ,  , l, "memory")
-+__XCHG_CASE(w,  , rel_, 32,        ,    ,  ,  , l, "memory")
-+__XCHG_CASE( ,  , rel_, 64,        ,    ,  ,  , l, "memory")
-+__XCHG_CASE(w, b,  mb_,  8, dmb ish, nop,  , a, l, "memory")
-+__XCHG_CASE(w, h,  mb_, 16, dmb ish, nop,  , a, l, "memory")
-+__XCHG_CASE(w,  ,  mb_, 32, dmb ish, nop,  , a, l, "memory")
-+__XCHG_CASE( ,  ,  mb_, 64, dmb ish, nop,  , a, l, "memory")
+-static inline void __percpu_write(void *ptr, unsigned long val, int size)
+-{
+-	switch (size) {
+-	case 1:
+-		WRITE_ONCE(*(u8 *)ptr, (u8)val);
+-		break;
+-	case 2:
+-		WRITE_ONCE(*(u16 *)ptr, (u16)val);
+-		break;
+-	case 4:
+-		WRITE_ONCE(*(u32 *)ptr, (u32)val);
+-		break;
+-	case 8:
+-		WRITE_ONCE(*(u64 *)ptr, (u64)val);
+-		break;
+-	default:
+-		BUILD_BUG();
+-	}
++#define __PERCPU_OP_CASE(w, sfx, name, sz, op_llsc, op_lse)		\
++static inline void							\
++__percpu_##name##_case_##sz(void *ptr, unsigned long val)		\
++{									\
++	unsigned int loop;						\
++	u##sz tmp;							\
++									\
++	asm volatile (ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"1:	ldxr" #sfx "\t%" #w "[tmp], %[ptr]\n"			\
++		#op_llsc "\t%" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"	\
++	"	stxr" #sfx "\t%w[loop], %" #w "[tmp], %[ptr]\n"		\
++	"	cbnz	%w[loop], 1b",					\
++	/* LSE atomics */						\
++		#op_lse "\t%" #w "[val], %[ptr]\n"			\
++		__nops(3))						\
++	: [loop] "=&r" (loop), [tmp] "=&r" (tmp),			\
++	  [ptr] "+Q"(*(u##sz *)ptr)					\
++	: [val] "r" ((u##sz)(val)));					\
+ }
  
- #undef __XCHG_CASE
+-static inline unsigned long __percpu_xchg(void *ptr, unsigned long val,
+-						int size)
+-{
+-	unsigned long ret, loop;
+-
+-	switch (size) {
+-	case 1:
+-		asm ("//__percpu_xchg_1\n"
+-		"1:	ldxrb	%w[ret], %[ptr]\n"
+-		"	stxrb	%w[loop], %w[val], %[ptr]\n"
+-		"	cbnz	%w[loop], 1b"
+-		: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-		  [ptr] "+Q"(*(u8 *)ptr)
+-		: [val] "r" (val));
+-		break;
+-	case 2:
+-		asm ("//__percpu_xchg_2\n"
+-		"1:	ldxrh	%w[ret], %[ptr]\n"
+-		"	stxrh	%w[loop], %w[val], %[ptr]\n"
+-		"	cbnz	%w[loop], 1b"
+-		: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-		  [ptr] "+Q"(*(u16 *)ptr)
+-		: [val] "r" (val));
+-		break;
+-	case 4:
+-		asm ("//__percpu_xchg_4\n"
+-		"1:	ldxr	%w[ret], %[ptr]\n"
+-		"	stxr	%w[loop], %w[val], %[ptr]\n"
+-		"	cbnz	%w[loop], 1b"
+-		: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-		  [ptr] "+Q"(*(u32 *)ptr)
+-		: [val] "r" (val));
+-		break;
+-	case 8:
+-		asm ("//__percpu_xchg_8\n"
+-		"1:	ldxr	%[ret], %[ptr]\n"
+-		"	stxr	%w[loop], %[val], %[ptr]\n"
+-		"	cbnz	%w[loop], 1b"
+-		: [loop] "=&r"(loop), [ret] "=&r"(ret),
+-		  [ptr] "+Q"(*(u64 *)ptr)
+-		: [val] "r" (val));
+-		break;
+-	default:
+-		ret = 0;
+-		BUILD_BUG();
+-	}
+-
+-	return ret;
++#define __PERCPU_RET_OP_CASE(w, sfx, name, sz, op_llsc, op_lse)		\
++static inline u##sz							\
++__percpu_##name##_return_case_##sz(void *ptr, unsigned long val)	\
++{									\
++	unsigned int loop;						\
++	u##sz ret;							\
++									\
++	asm volatile (ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"1:	ldxr" #sfx "\t%" #w "[ret], %[ptr]\n"			\
++		#op_llsc "\t%" #w "[ret], %" #w "[ret], %" #w "[val]\n"	\
++	"	stxr" #sfx "\t%w[loop], %" #w "[ret], %[ptr]\n"		\
++	"	cbnz	%w[loop], 1b",					\
++	/* LSE atomics */						\
++		#op_lse "\t%" #w "[ret], %" #w "[val], %[ptr]\n"	\
++		#op_llsc "\t%" #w "[ret], %" #w "[ret], %" #w "[val]\n"	\
++		__nops(2))						\
++	: [loop] "=&r" (loop), [ret] "=&r" (ret),			\
++	  [ptr] "+Q"(*(u##sz *)ptr)					\
++	: [val] "r" ((u##sz)(val)));					\
++									\
++	return ret;							\
+ }
  
-@@ -80,13 +80,13 @@ static inline unsigned long __xchg##sfx(unsigned long x,		\
- {									\
- 	switch (size) {							\
- 	case 1:								\
--		return __xchg_case##sfx##_1(x, ptr);			\
-+		return __xchg_case##sfx##_8(x, ptr);			\
- 	case 2:								\
--		return __xchg_case##sfx##_2(x, ptr);			\
-+		return __xchg_case##sfx##_16(x, ptr);			\
- 	case 4:								\
--		return __xchg_case##sfx##_4(x, ptr);			\
-+		return __xchg_case##sfx##_32(x, ptr);			\
- 	case 8:								\
--		return __xchg_case##sfx##_8(x, ptr);			\
-+		return __xchg_case##sfx##_64(x, ptr);			\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
-@@ -123,13 +123,13 @@ static inline unsigned long __cmpxchg##sfx(volatile void *ptr,		\
- {									\
- 	switch (size) {							\
- 	case 1:								\
--		return __cmpxchg_case##sfx##_1(ptr, (u8)old, new);	\
-+		return __cmpxchg_case##sfx##_8(ptr, (u8)old, new);	\
- 	case 2:								\
--		return __cmpxchg_case##sfx##_2(ptr, (u16)old, new);	\
-+		return __cmpxchg_case##sfx##_16(ptr, (u16)old, new);	\
- 	case 4:								\
--		return __cmpxchg_case##sfx##_4(ptr, old, new);		\
-+		return __cmpxchg_case##sfx##_32(ptr, old, new);		\
- 	case 8:								\
--		return __cmpxchg_case##sfx##_8(ptr, old, new);		\
-+		return __cmpxchg_case##sfx##_64(ptr, old, new);		\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
-@@ -197,16 +197,16 @@ __CMPXCHG_GEN(_mb)
- 	__ret; \
+-/* this_cpu_cmpxchg */
+-#define _protect_cmpxchg_local(pcp, o, n)			\
+-({								\
+-	typeof(*raw_cpu_ptr(&(pcp))) __ret;			\
+-	preempt_disable();					\
+-	__ret = cmpxchg_local(raw_cpu_ptr(&(pcp)), o, n);	\
+-	preempt_enable();					\
+-	__ret;							\
+-})
+-
+-#define this_cpu_cmpxchg_1(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+-#define this_cpu_cmpxchg_2(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+-#define this_cpu_cmpxchg_4(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
+-#define this_cpu_cmpxchg_8(ptr, o, n) _protect_cmpxchg_local(ptr, o, n)
++#define PERCPU_OP(name, op_llsc, op_lse)				\
++	__PERCPU_OP_CASE(w, b, name,  8, op_llsc, op_lse)		\
++	__PERCPU_OP_CASE(w, h, name, 16, op_llsc, op_lse)		\
++	__PERCPU_OP_CASE(w,  , name, 32, op_llsc, op_lse)		\
++	__PERCPU_OP_CASE( ,  , name, 64, op_llsc, op_lse)
++
++#define PERCPU_RET_OP(name, op_llsc, op_lse)				\
++	__PERCPU_RET_OP_CASE(w, b, name,  8, op_llsc, op_lse)		\
++	__PERCPU_RET_OP_CASE(w, h, name, 16, op_llsc, op_lse)		\
++	__PERCPU_RET_OP_CASE(w,  , name, 32, op_llsc, op_lse)		\
++	__PERCPU_RET_OP_CASE( ,  , name, 64, op_llsc, op_lse)
++
++PERCPU_RW_OPS(8)
++PERCPU_RW_OPS(16)
++PERCPU_RW_OPS(32)
++PERCPU_RW_OPS(64)
++PERCPU_OP(add, add, stadd)
++PERCPU_OP(andnot, bic, stclr)
++PERCPU_OP(or, orr, stset)
++PERCPU_RET_OP(add, add, ldadd)
++
++#undef PERCPU_RW_OPS
++#undef __PERCPU_OP_CASE
++#undef __PERCPU_RET_OP_CASE
++#undef PERCPU_OP
++#undef PERCPU_RET_OP
+ 
++/*
++ * It would be nice to avoid the conditional call into the scheduler when
++ * re-enabling preemption for preemptible kernels, but doing that in a way
++ * which builds inside a module would mean messing directly with the preempt
++ * count. If you do this, peterz and tglx will hunt you down.
++ */
+ #define this_cpu_cmpxchg_double_8(ptr1, ptr2, o1, o2, n1, n2)		\
+ ({									\
+ 	int __ret;							\
+-	preempt_disable();						\
++	preempt_disable_notrace();					\
+ 	__ret = cmpxchg_double_local(	raw_cpu_ptr(&(ptr1)),		\
+ 					raw_cpu_ptr(&(ptr2)),		\
+ 					o1, o2, n1, n2);		\
+-	preempt_enable();						\
++	preempt_enable_notrace();					\
+ 	__ret;								\
  })
  
--#define __CMPWAIT_CASE(w, sz, name)					\
--static inline void __cmpwait_case_##name(volatile void *ptr,		\
--					 unsigned long val)		\
-+#define __CMPWAIT_CASE(w, sfx, sz)					\
-+static inline void __cmpwait_case_##sz(volatile void *ptr,		\
-+				       unsigned long val)		\
- {									\
- 	unsigned long tmp;						\
- 									\
- 	asm volatile(							\
- 	"	sevl\n"							\
- 	"	wfe\n"							\
--	"	ldxr" #sz "\t%" #w "[tmp], %[v]\n"			\
-+	"	ldxr" #sfx "\t%" #w "[tmp], %[v]\n"			\
- 	"	eor	%" #w "[tmp], %" #w "[tmp], %" #w "[val]\n"	\
- 	"	cbnz	%" #w "[tmp], 1f\n"				\
- 	"	wfe\n"							\
-@@ -215,10 +215,10 @@ static inline void __cmpwait_case_##name(volatile void *ptr,		\
- 	: [val] "r" (val));						\
- }
+-#define _percpu_read(pcp)						\
++#define _pcp_protect(op, pcp, ...)					\
+ ({									\
+-	typeof(pcp) __retval;						\
+ 	preempt_disable_notrace();					\
+-	__retval = (typeof(pcp))__percpu_read(raw_cpu_ptr(&(pcp)), 	\
+-					      sizeof(pcp));		\
++	op(raw_cpu_ptr(&(pcp)), __VA_ARGS__);				\
+ 	preempt_enable_notrace();					\
+-	__retval;							\
+ })
  
--__CMPWAIT_CASE(w, b, 1);
--__CMPWAIT_CASE(w, h, 2);
--__CMPWAIT_CASE(w,  , 4);
--__CMPWAIT_CASE( ,  , 8);
-+__CMPWAIT_CASE(w, b, 8);
-+__CMPWAIT_CASE(w, h, 16);
-+__CMPWAIT_CASE(w,  , 32);
-+__CMPWAIT_CASE( ,  , 64);
+-#define _percpu_write(pcp, val)						\
+-do {									\
++#define _pcp_protect_return(op, pcp, args...)				\
++({									\
++	typeof(pcp) __retval;						\
+ 	preempt_disable_notrace();					\
+-	__percpu_write(raw_cpu_ptr(&(pcp)), (unsigned long)(val), 	\
+-				sizeof(pcp));				\
++	__retval = (typeof(pcp))op(raw_cpu_ptr(&(pcp)), ##args);	\
+ 	preempt_enable_notrace();					\
+-} while(0)								\
+-
+-#define _pcp_protect(operation, pcp, val)			\
+-({								\
+-	typeof(pcp) __retval;					\
+-	preempt_disable();					\
+-	__retval = (typeof(pcp))operation(raw_cpu_ptr(&(pcp)),	\
+-					  (val), sizeof(pcp));	\
+-	preempt_enable();					\
+-	__retval;						\
++	__retval;							\
+ })
  
- #undef __CMPWAIT_CASE
+-#define _percpu_add(pcp, val) \
+-	_pcp_protect(__percpu_add, pcp, val)
+-
+-#define _percpu_add_return(pcp, val) _percpu_add(pcp, val)
+-
+-#define _percpu_and(pcp, val) \
+-	_pcp_protect(__percpu_and, pcp, val)
+-
+-#define _percpu_or(pcp, val) \
+-	_pcp_protect(__percpu_or, pcp, val)
+-
+-#define _percpu_xchg(pcp, val) (typeof(pcp)) \
+-	_pcp_protect(__percpu_xchg, pcp, (unsigned long)(val))
+-
+-#define this_cpu_add_1(pcp, val) _percpu_add(pcp, val)
+-#define this_cpu_add_2(pcp, val) _percpu_add(pcp, val)
+-#define this_cpu_add_4(pcp, val) _percpu_add(pcp, val)
+-#define this_cpu_add_8(pcp, val) _percpu_add(pcp, val)
+-
+-#define this_cpu_add_return_1(pcp, val) _percpu_add_return(pcp, val)
+-#define this_cpu_add_return_2(pcp, val) _percpu_add_return(pcp, val)
+-#define this_cpu_add_return_4(pcp, val) _percpu_add_return(pcp, val)
+-#define this_cpu_add_return_8(pcp, val) _percpu_add_return(pcp, val)
+-
+-#define this_cpu_and_1(pcp, val) _percpu_and(pcp, val)
+-#define this_cpu_and_2(pcp, val) _percpu_and(pcp, val)
+-#define this_cpu_and_4(pcp, val) _percpu_and(pcp, val)
+-#define this_cpu_and_8(pcp, val) _percpu_and(pcp, val)
+-
+-#define this_cpu_or_1(pcp, val) _percpu_or(pcp, val)
+-#define this_cpu_or_2(pcp, val) _percpu_or(pcp, val)
+-#define this_cpu_or_4(pcp, val) _percpu_or(pcp, val)
+-#define this_cpu_or_8(pcp, val) _percpu_or(pcp, val)
+-
+-#define this_cpu_read_1(pcp) _percpu_read(pcp)
+-#define this_cpu_read_2(pcp) _percpu_read(pcp)
+-#define this_cpu_read_4(pcp) _percpu_read(pcp)
+-#define this_cpu_read_8(pcp) _percpu_read(pcp)
+-
+-#define this_cpu_write_1(pcp, val) _percpu_write(pcp, val)
+-#define this_cpu_write_2(pcp, val) _percpu_write(pcp, val)
+-#define this_cpu_write_4(pcp, val) _percpu_write(pcp, val)
+-#define this_cpu_write_8(pcp, val) _percpu_write(pcp, val)
+-
+-#define this_cpu_xchg_1(pcp, val) _percpu_xchg(pcp, val)
+-#define this_cpu_xchg_2(pcp, val) _percpu_xchg(pcp, val)
+-#define this_cpu_xchg_4(pcp, val) _percpu_xchg(pcp, val)
+-#define this_cpu_xchg_8(pcp, val) _percpu_xchg(pcp, val)
++#define this_cpu_read_1(pcp)		\
++	_pcp_protect_return(__percpu_read_8, pcp)
++#define this_cpu_read_2(pcp)		\
++	_pcp_protect_return(__percpu_read_16, pcp)
++#define this_cpu_read_4(pcp)		\
++	_pcp_protect_return(__percpu_read_32, pcp)
++#define this_cpu_read_8(pcp)		\
++	_pcp_protect_return(__percpu_read_64, pcp)
++
++#define this_cpu_write_1(pcp, val)	\
++	_pcp_protect(__percpu_write_8, pcp, (unsigned long)val)
++#define this_cpu_write_2(pcp, val)	\
++	_pcp_protect(__percpu_write_16, pcp, (unsigned long)val)
++#define this_cpu_write_4(pcp, val)	\
++	_pcp_protect(__percpu_write_32, pcp, (unsigned long)val)
++#define this_cpu_write_8(pcp, val)	\
++	_pcp_protect(__percpu_write_64, pcp, (unsigned long)val)
++
++#define this_cpu_add_1(pcp, val)	\
++	_pcp_protect(__percpu_add_case_8, pcp, val)
++#define this_cpu_add_2(pcp, val)	\
++	_pcp_protect(__percpu_add_case_16, pcp, val)
++#define this_cpu_add_4(pcp, val)	\
++	_pcp_protect(__percpu_add_case_32, pcp, val)
++#define this_cpu_add_8(pcp, val)	\
++	_pcp_protect(__percpu_add_case_64, pcp, val)
++
++#define this_cpu_add_return_1(pcp, val)	\
++	_pcp_protect_return(__percpu_add_return_case_8, pcp, val)
++#define this_cpu_add_return_2(pcp, val)	\
++	_pcp_protect_return(__percpu_add_return_case_16, pcp, val)
++#define this_cpu_add_return_4(pcp, val)	\
++	_pcp_protect_return(__percpu_add_return_case_32, pcp, val)
++#define this_cpu_add_return_8(pcp, val)	\
++	_pcp_protect_return(__percpu_add_return_case_64, pcp, val)
++
++#define this_cpu_and_1(pcp, val)	\
++	_pcp_protect(__percpu_andnot_case_8, pcp, ~val)
++#define this_cpu_and_2(pcp, val)	\
++	_pcp_protect(__percpu_andnot_case_16, pcp, ~val)
++#define this_cpu_and_4(pcp, val)	\
++	_pcp_protect(__percpu_andnot_case_32, pcp, ~val)
++#define this_cpu_and_8(pcp, val)	\
++	_pcp_protect(__percpu_andnot_case_64, pcp, ~val)
++
++#define this_cpu_or_1(pcp, val)		\
++	_pcp_protect(__percpu_or_case_8, pcp, val)
++#define this_cpu_or_2(pcp, val)		\
++	_pcp_protect(__percpu_or_case_16, pcp, val)
++#define this_cpu_or_4(pcp, val)		\
++	_pcp_protect(__percpu_or_case_32, pcp, val)
++#define this_cpu_or_8(pcp, val)		\
++	_pcp_protect(__percpu_or_case_64, pcp, val)
++
++#define this_cpu_xchg_1(pcp, val)	\
++	_pcp_protect_return(xchg_relaxed, pcp, val)
++#define this_cpu_xchg_2(pcp, val)	\
++	_pcp_protect_return(xchg_relaxed, pcp, val)
++#define this_cpu_xchg_4(pcp, val)	\
++	_pcp_protect_return(xchg_relaxed, pcp, val)
++#define this_cpu_xchg_8(pcp, val)	\
++	_pcp_protect_return(xchg_relaxed, pcp, val)
++
++#define this_cpu_cmpxchg_1(pcp, o, n)	\
++	_pcp_protect_return(cmpxchg_relaxed, pcp, o, n)
++#define this_cpu_cmpxchg_2(pcp, o, n)	\
++	_pcp_protect_return(cmpxchg_relaxed, pcp, o, n)
++#define this_cpu_cmpxchg_4(pcp, o, n)	\
++	_pcp_protect_return(cmpxchg_relaxed, pcp, o, n)
++#define this_cpu_cmpxchg_8(pcp, o, n)	\
++	_pcp_protect_return(cmpxchg_relaxed, pcp, o, n)
  
-@@ -229,13 +229,13 @@ static inline void __cmpwait##sfx(volatile void *ptr,			\
- {									\
- 	switch (size) {							\
- 	case 1:								\
--		return __cmpwait_case##sfx##_1(ptr, (u8)val);		\
-+		return __cmpwait_case##sfx##_8(ptr, (u8)val);		\
- 	case 2:								\
--		return __cmpwait_case##sfx##_2(ptr, (u16)val);		\
-+		return __cmpwait_case##sfx##_16(ptr, (u16)val);		\
- 	case 4:								\
--		return __cmpwait_case##sfx##_4(ptr, val);		\
-+		return __cmpwait_case##sfx##_32(ptr, val);		\
- 	case 8:								\
--		return __cmpwait_case##sfx##_8(ptr, val);		\
-+		return __cmpwait_case##sfx##_64(ptr, val);		\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
+ #include <asm-generic/percpu.h>
+ 
 -- 
 2.1.4
