@@ -1,70 +1,32 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Tue, 27 Nov 2018 12:38:29 -0800
-Subject: [PATCH V2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure
- up the stack
-In-Reply-To: <1543338018-708-1-git-send-email-hofrat@osadl.org>
-References: <1543338018-708-1-git-send-email-hofrat@osadl.org>
-Message-ID: <CAGp9Lzp=D72LZCk-h5XU9V2DePLHKTRCmioKEjZRjHGW6P_y6g@mail.gmail.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 27 Nov 2018 12:39:33 -0800 (PST)
+Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
+In-Reply-To: <alpine.DEB.2.10.1811271106460.4577@sstabellini-ThinkPad-X260>
+References: <cover.1542722463.git.robin.murphy@arm.com>
+ <20181120160818.GC2492@lst.de> <20181120163441.GD31199@char.us.oracle.com>
+ <20181121130331.GA1373@lst.de> <20181121151133.GC26925@char.us.oracle.com>
+ <alpine.DEB.2.10.1811271106460.4577@sstabellini-ThinkPad-X260>
+Message-ID: <alpine.DEB.2.10.1811271239080.4577@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicholas Mc Guire <hofrat@osadl.org> ? 2018?11?27? ?? ??9:07???
->
-> The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
-> for the dev_err() messages). The probe function should return an error
-> if one of the banks failed to initialize properly indicated by
-> not returning non-0.
->
-> Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
+On Tue, 27 Nov 2018, Stefano Stabellini wrote:
+> On Wed, 21 Nov 2018, Konrad Rzeszutek Wilk wrote:
+> > On Wed, Nov 21, 2018 at 02:03:31PM +0100, Christoph Hellwig wrote:
+> > > On Tue, Nov 20, 2018 at 11:34:41AM -0500, Konrad Rzeszutek Wilk wrote:
+> > > > > Konrad, are you ok with me picking up both through the dma-mapping
+> > > > > tree?
+> > > > 
+> > > > Yes, albeit I would want Stefano to take a peek at patch #2 just in case.
+> > > 
+> > > Stefano, can you take a look asap?  This is a pretty trivial fix for
+> > > a nasty bug that breaks boot on real life systems.  I'd like to merge
+> > > it by tomorrow so that I can send it off to Linus for the next rc
+> > > (I will be offline for about two days after Friday morning)
+> > 
+> > It is Turkey Day in US so he may be busy catching those pesky turkeys.
+> > How about Tuesday? And in can also send the GIT PULL.
+> 
+> I have just come back to the office. I'll give it a look today.
 
-Acked-by: Sean Wang <sean.wang@kernel.org>
-
-> Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
-> ---
->
-> V2: A logic error spoted by Sean Wang <sean.wang@kernel.org> the
->     success case is 0 and thus returning early should be on on
->     ret!=0 and not on !ret - thanks for catching this stupid mistake !
->
-> Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
-> GPIOLIB=y, GPIO_MT7621=y
->
-> Patch is against 4.20-rc3 (localversion-next is next-20181121)
->
->  drivers/gpio/gpio-mt7621.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
-> index 1ec95bc..68fca8b 100644
-> --- a/drivers/gpio/gpio-mt7621.c
-> +++ b/drivers/gpio/gpio-mt7621.c
-> @@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
->         struct device_node *np = dev->of_node;
->         struct mtk *mtk;
->         int i;
-> +       int ret;
->
->         mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
->         if (!mtk)
-> @@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
->         platform_set_drvdata(pdev, mtk);
->         mediatek_gpio_irq_chip.name = dev_name(dev);
->
-> -       for (i = 0; i < MTK_BANK_CNT; i++)
-> -               mediatek_gpio_bank_probe(dev, np, i);
-> +       for (i = 0; i < MTK_BANK_CNT; i++) {
-> +               ret = mediatek_gpio_bank_probe(dev, np, i);
-> +               if (ret)
-> +                       return ret;
-> +       }
->
->         return 0;
->  }
-> --
-> 2.1.4
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Everything looks good to me, thanks for keeping me in the loop.
