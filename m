@@ -1,164 +1,89 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 26 Nov 2018 19:39:24 -0600
-Subject: [RFC PATCH v4 12/17] dt-bindings: clock: Add Allwinner suniv
- F1C100s CCU
-In-Reply-To: <c2e6e3f510d5663ecf25262126dcff1df112af15.1543131714.git.mesihkilinc@gmail.com>
-References: <cover.1543131714.git.mesihkilinc@gmail.com>
- <c2e6e3f510d5663ecf25262126dcff1df112af15.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <20181127013924.GA23537@bogus>
+From: biao.huang@mediatek.com (biao huang)
+Date: Tue, 27 Nov 2018 09:39:29 +0800
+Subject: [v5, PATCH 2/2] dt-binding: mediatek-dwmac: add binding
+ document for MediaTek MT2712 DWMAC
+In-Reply-To: <20181126214626.GA13830@bogus>
+References: <1542882521-18874-1-git-send-email-biao.huang@mediatek.com>
+ <1542882521-18874-3-git-send-email-biao.huang@mediatek.com>
+ <20181122151932.GD15403@lunn.ch> <1542936676.24219.66.camel@mhfsdcap03>
+ <20181126214626.GA13830@bogus>
+Message-ID: <1543282769.24219.129.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2018 at 10:43:15AM +0300, Mesih Kilinc wrote:
-> Add compatiple string for Allwinner suniv F1C100s CCU.
-> Add clock and reset definitions.
+Dear Rob,
+	Thanks for your comments.
+On Mon, 2018-11-26 at 15:46 -0600, Rob Herring wrote:
+> On Fri, Nov 23, 2018 at 09:31:16AM +0800, biao huang wrote:
+> > Dear Andrew,
+> > 
+> > 	Thanks for you remind.
+> > 
+> > 	Sincerely, I respect any comment from any reviewer. If I didn't reply
+> > for any comment, really sorry for that.
+> > 
+> > 	As to this "tx-delay" issue, the following reply in v3 maybe ignored.
+> > 	https://lkml.org/lkml/2018/11/19/158
+> > 
+> > 	"the delay time in mediatek dwmac design is not so accurate,
+> > 	the current mt2712 and the following ICs will not use the
+> > 	same delay design, but will use stages to indicate different
+> > 	delay time.
+> > 	so maybe "mediatek.tx-delay" represent the delay stage is a
+> > 	good choice"
+> > 
+> > 	And to make it clearer here.
+> > 
+> > 	In mt2712, there are two delay macro circuit: named fine-tune and
+> > coarse-tune.
+> > 	a. fine-tune, 170+/-50ps per stage, total 32 stages
+> > 	b. coarse-tune, 0.55+/-0.2ns per stage, total 32 stages
+> > 	If we only consider mt2712, delay in fine-tune select a integer
+> > multiple of 170ps, delay in coarse-tune select a integer multiple of
+> > 550ps, for stage 0~31, the delay in fine-tune will not have the same
+> > value with that in coarse-tune.
+> > 	OK, It seems the property "fine-tune" can be eliminated .
+> > 
+> > 	But the following ic will not have the same accuracy as mt2712,
+> > and maybe will not have two delay macro circuit to be selected.
 > 
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  .../devicetree/bindings/clock/sunxi-ccu.txt        |  1 +
->  include/dt-bindings/clock/suniv-ccu-f1c100s.h      | 69 ++++++++++++++++++++++
->  include/dt-bindings/reset/suniv-ccu-f1c100s.h      | 37 ++++++++++++
->  3 files changed, 107 insertions(+)
->  create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
->  create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
+> New IC will have new compatible string then. If it is different, then 
+> likely these properties would have to change or have different meaning 
+> unless you use time.
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> index 47d2e90..e3bd88a 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-> @@ -22,6 +22,7 @@ Required properties :
->  		- "allwinner,sun50i-h5-ccu"
->  		- "allwinner,sun50i-h6-ccu"
->  		- "allwinner,sun50i-h6-r-ccu"
-> +		- "allwinner,suniv-f1c100s-ccu"
->  		- "nextthing,gr8-ccu"
->  
->  - reg: Must contain the registers base address and length
-> diff --git a/include/dt-bindings/clock/suniv-ccu-f1c100s.h b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
-> new file mode 100644
-> index 0000000..56f6d0d
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Copyright (c) 2018 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-Goes on 1st line.
-
-> + */
-> +
-> +#ifndef _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
-> +#define _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
-> +
-> +#define CLK_CPU			11
-> +
-> +#define CLK_BUS_MMC0		14
-> +#define CLK_BUS_MMC1		15
-> +#define CLK_BUS_DRAM		16
-> +#define CLK_BUS_SPI0		17
-> +#define CLK_BUS_SPI1		18
-> +#define CLK_BUS_OTG		19
-> +#define CLK_BUS_VE		20
-> +#define CLK_BUS_LCD		21
-> +#define CLK_BUS_DEINTERLACE	22
-> +#define CLK_BUS_CSI		23
-> +#define CLK_BUS_TVD		24
-> +#define CLK_BUS_TVE		25
-> +#define CLK_BUS_DE_BE		26
-> +#define CLK_BUS_DE_FE		27
-> +#define CLK_BUS_CODEC		28
-> +#define CLK_BUS_SPDIF		29
-> +#define CLK_BUS_IR		30
-> +#define CLK_BUS_RSB		31
-> +#define CLK_BUS_I2S0		32
-> +#define CLK_BUS_I2C0		33
-> +#define CLK_BUS_I2C1		34
-> +#define CLK_BUS_I2C2		35
-> +#define CLK_BUS_PIO		36
-> +#define CLK_BUS_UART0		37
-> +#define CLK_BUS_UART1		38
-> +#define CLK_BUS_UART2		39
-> +
-> +#define CLK_MMC0		40
-> +#define CLK_MMC0_SAMPLE		41
-> +#define CLK_MMC0_OUTPUT		42
-> +#define CLK_MMC1		43
-> +#define CLK_MMC1_SAMPLE		44
-> +#define CLK_MMC1_OUTPUT		45
-> +#define CLK_I2S			46
-> +#define CLK_SPDIF		47
-> +
-> +#define CLK_USB_PHY0		48
-> +
-> +#define CLK_DRAM_VE		49
-> +#define CLK_DRAM_CSI		50
-> +#define CLK_DRAM_DEINTERLACE	51
-> +#define CLK_DRAM_TVD		52
-> +#define CLK_DRAM_DE_FE		53
-> +#define CLK_DRAM_DE_BE		54
-> +
-> +#define CLK_DE_BE		55
-> +#define CLK_DE_FE		56
-> +#define CLK_TCON		57
-> +#define CLK_DEINTERLACE		58
-> +#define CLK_TVE2_CLK		59
-> +#define CLK_TVE1_CLK		60
-> +#define CLK_TVD			61
-> +#define CLK_CSI			62
-> +#define CLK_VE			63
-> +#define CLK_CODEC		64
-> +#define CLK_AVS			65
-> +
-> +#endif
-> diff --git a/include/dt-bindings/reset/suniv-ccu-f1c100s.h b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-> new file mode 100644
-> index 0000000..95f1ed0
-> --- /dev/null
-> +++ b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-> @@ -0,0 +1,37 @@
-> +/*
-> + * Copyright (C) 2018 Icenowy Zheng <icenowy@aosc.xyz>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-ditto
-
-> + */
-> +
-> +#ifndef _DT_BINDINGS_RST_SUNIV_F1C100S_H_
-> +#define _DT_BINDINGS_RST_SUNIV_F1C100S_H_
-> +
-> +#define RST_USB_PHY0		0
-> +#define RST_BUS_MMC0		1
-> +#define RST_BUS_MMC1		2
-> +#define RST_BUS_DRAM		3
-> +#define RST_BUS_SPI0		4
-> +#define RST_BUS_SPI1		5
-> +#define RST_BUS_OTG		6
-> +#define RST_BUS_VE		7
-> +#define RST_BUS_LCD		8
-> +#define RST_BUS_DEINTERLACE		9
-> +#define RST_BUS_CSI		10
-> +#define RST_BUS_TVD		11
-> +#define RST_BUS_TVE		12
-> +#define RST_BUS_DE_BE		13
-> +#define RST_BUS_DE_FE		14
-> +#define RST_BUS_CODEC		15
-> +#define RST_BUS_SPDIF		16
-> +#define RST_BUS_IR		17
-> +#define RST_BUS_RSB		18
-> +#define RST_BUS_I2S0		19
-> +#define RST_BUS_I2C0		20
-> +#define RST_BUS_I2C1		21
-> +#define RST_BUS_I2C2		22
-> +#define RST_BUS_UART0		23
-> +#define RST_BUS_UART1		24
-> +#define RST_BUS_UART2		25
-> +
-> +#endif /* _DT_BINDINGS_RST_SUNIV_F1C100S_H_ */
-> -- 
-> 2.7.4
+OK, I'll use tx-delay-ps instead of tx-delay.
+> > 	1. assume two delay macro circuit in the following ic,
+> > 	fine-tune, 100ps per stage, coarse-tune, 0.55ns per stage,
+> > 	if we want delay 2.2ns, fine-tune will get a 22, and coarse-tune get a
+> > 4. We can't distinguish which delay macro we are choosing.
 > 
+> Why wouldn't you just choose fine-tune for anything less than the max 
+> range (3200ps in this example) and course for greater than 3100ps.
+> 
+The fine-tune circuit and coarse-tune circuit are parallel, and
+fine-tuen is a select switch.
+It depends on users to choose which circuit is take effect.
+I shouldn't assume users would choose fine-tune when delay < 3200ps, and
+coarse for > 3100ps.
+
+so, tx-delay-ps will be chosen, and "fine-tune" boolean property should
+be remained as a indicator.
+> > 	2. assume only one delay macro circuit is used, a similar case as 1
+> > will also increase the complexity of driver.
+> > 	Then, we need define more flag property to know which delay macro we
+> > are handling.
+> > 
+> > 	The common things for all delay macro circuit in MediaTek mac design is
+> > the stages, not the accuracy. so if we maintain stage info in "mediatek,
+> > tx-delay", we only need care which stage we should choose.
+> > And for each IC, we will recommend a best stage as a candidate.
+> 
+> What if you had a 3rd delay circuit?
+> 
+OK, tx-delay-ps will be a meaningful property.
+If more delay circuit is added, fine-tune property(boolean --> u32) can
+still be a indicator.
+> > 	Above is my personal opinion, may be my understanding is wrong,
+> > welcome for further discussion.
+> > 
+> > 	Thanks a lot.
