@@ -1,10 +1,10 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:23 +0100
-Subject: [PATCH 22/77] ARM: dts: sun6i: Remove skeleton and memory to avoid
+Date: Tue, 27 Nov 2018 13:45:36 +0100
+Subject: [PATCH 35/77] ARM: dts: sun7i: Remove skeleton and memory to avoid
  warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <e3a2d4a2babc00b2baac2a3145505ced92e3130d.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <1da5c4b912ccb84e0d1873843410c6f8d282258c.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,13 +14,13 @@ just remove it entirely in order to remove that warning.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun6i-a31.dtsi | 8 ++------
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++------
  1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 1eaa60cd3218..b60aaacbab5e 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 1ca1fdff2288..3ed0575ed301 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
 @@ -42,8 +42,6 @@
   *     OTHER DEALINGS IN THE SOFTWARE.
   */
@@ -29,7 +29,7 @@ index 1eaa60cd3218..b60aaacbab5e 100644
 -
  #include <dt-bindings/interrupt-controller/arm-gic.h>
  #include <dt-bindings/thermal/thermal.h>
- 
+ #include <dt-bindings/dma/sun4i-a10.h>
 @@ -52,6 +50,8 @@
  
  / {
@@ -39,7 +39,7 @@ index 1eaa60cd3218..b60aaacbab5e 100644
  
  	aliases {
  		ethernet0 = &gmac;
-@@ -199,10 +199,6 @@
+@@ -171,10 +171,6 @@
  		};
  	};
  
@@ -47,8 +47,8 @@ index 1eaa60cd3218..b60aaacbab5e 100644
 -		reg = <0x40000000 0x80000000>;
 -	};
 -
- 	pmu {
- 		compatible = "arm,cortex-a7-pmu", "arm,cortex-a15-pmu";
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+ 	reserved-memory {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
 git-series 0.9.1
