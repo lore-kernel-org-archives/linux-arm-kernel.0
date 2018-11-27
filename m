@@ -1,157 +1,152 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Tue, 27 Nov 2018 14:48:16 +0800
-Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
- vmcoreinfo
-In-Reply-To: <CACi5LpPqdzNxi4=UQqVgT6aCyn9nx+sjM-ds0Xx6qBji_xgP1g@mail.gmail.com>
-References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
- <20181126012824.GB1824@MiWiFi-R3L-srv>
- <CACi5LpPqdzNxi4=UQqVgT6aCyn9nx+sjM-ds0Xx6qBji_xgP1g@mail.gmail.com>
-Message-ID: <20181127064816.GE1824@MiWiFi-R3L-srv>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 27 Nov 2018 12:26:09 +0530
+Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+In-Reply-To: <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/18 at 01:01am, Bhupesh Sharma wrote:
-> > But it's not live debugging feature of makedumpfile. Makedumpfile can't be
-> > used to live debug. The feature is called '--mem-usage' in makedumpfile,
-> > in fact it's used to estimate how big the vmcore could be so that customer
-> > can deply an appropriate size of storage space to store it. Because both
-> > kcore and vmcore are all elf files which the 1st kernel's memory is
-> > mapped to, even though they are different, kcore is dynamically changing.
-> > This is more likely a precision in order of of magnitude. This is a feature
-> > required by redhat customer.
-> 
-> Indeed this is a live debugging feature - see we are running this in
-> the primary kernel
-> context, not in kdump context. We are trying to debug a kernel we are
-> presently running (in this case determining the page mapping)
-> hence the term live debugging.
+On Tue, Nov 13, 2018 at 1:54 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 98 +++++++++++++++++++++++++-
+>  1 file changed, 98 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> index 70dfc4ac0bb5..18dbff9f1ce9 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+> @@ -54,6 +54,9 @@
+>         compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
+>
+>         aliases {
+> +               i2c0 = &i2c0;
+> +               i2c1 = &i2c1;
+> +               i2c2 = &i2c2;
+>                 serial0 = &uart0;
+>                 serial1 = &uart3;
+>                 serial2 = &uart7;
+> @@ -63,6 +66,41 @@
+>                 stdout-path = "serial0:115200n8";
+>         };
+>
+> +       reg_cam: cam {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "cam";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               vin-supply = <&reg_vcc5v0>;
+> +               gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>;
+> +               enable-active-high;
+> +               regulator-always-on;
+> +       };
+> +
+> +        reg_cam_avdd: cam-avdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-avdd";
+> +                regulator-min-microvolt = <2800000>;
+> +                regulator-max-microvolt = <2800000>;
+> +                vin-supply = <&reg_cam>;
+> +        };
+> +
+> +        reg_cam_dovdd: cam-dovdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-dovdd";
+> +                regulator-min-microvolt = <1800000>;
+> +                regulator-max-microvolt = <1800000>;
+> +                vin-supply = <&reg_cam>;
+> +        };
+> +
+> +        reg_cam_dvdd: cam-dvdd {
+> +                compatible = "regulator-fixed";
+> +                regulator-name = "cam500b-dvdd";
+> +                regulator-min-microvolt = <1500000>;
+> +                regulator-max-microvolt = <1500000>;
+> +                vin-supply = <&reg_cam>;
+> +        };
+> +
+>         hdmi-connector {
+>                 compatible = "hdmi-connector";
+>                 type = "a";
+> @@ -120,6 +158,27 @@
+>                 >;
+>  };
+>
+> +&csi0 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&csi0_pins_a>;
+> +       status = "okay";
+> +
+> +       port {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               csi_from_ov5640: endpoint {
+> +                        remote-endpoint = <&ov5640_to_csi>;
+> +                        bus-width = <8>;
+> +                        data-shift = <2>;
+> +                        hsync-active = <1>; /* Active high */
+> +                        vsync-active = <0>; /* Active low */
+> +                        data-active = <1>;  /* Active high */
+> +                        pclk-sample = <1>;  /* Rising */
+> +                };
+> +       };
+> +};
+> +
+>  &de {
+>         status = "okay";
+>  };
+> @@ -167,6 +226,39 @@
+>         };
+>  };
+>
+> +&i2c1 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&i2c1_pins_a>;
+> +       status = "okay";
+> +
+> +       camera: camera at 21 {
+> +               compatible = "ovti,ov5640";
+> +               reg = <0x21>;
+> +                clocks = <&ccu CLK_CSI0>;
+> +                clock-names = "xclk";
+> +               assigned-clocks = <&ccu CLK_CSI0>;
+> +               assigned-clock-rates = <24000000>;
+> +
+> +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
+> +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
+> +                AVDD-supply = <&reg_cam_avdd>;
+> +                DOVDD-supply = <&reg_cam_dovdd>;
+> +                DVDD-supply = <&reg_cam_dvdd>;
+> +
+> +                port {
+> +                        ov5640_to_csi: endpoint {
+> +                                remote-endpoint = <&csi_from_ov5640>;
+> +                                bus-width = <8>;
+> +                                data-shift = <2>;
+> +                                hsync-active = <1>; /* Active high */
+> +                                vsync-active = <0>; /* Active low */
+> +                                data-active = <1>;  /* Active high */
+> +                                pclk-sample = <1>;  /* Rising */
+> +                        };
+> +                };
+> +       };
 
-Thanks for redefining '--mem-usage' of makedumpfile as a live debugging
-feature. I am the author of this feature, I don't know it has this
-awesome attribute. Can you post patch to refresh it's doc or man page
-about this live debugging thing? I think it's important, I am
-astonished. I noticed Boris said you are adding this to support live
-debug, just not sure if he is misled by you, or he also think this
-vmcore size estimating feature of makedumpfile is live debugging
-feature. 
+Does ov5640 need any further patches, wrt linux-next? I'm trying to
+test this on top of linux-next but the slave id seems not detecting.
 
-> 
-> Also, this feature is not limited to redhat - we are talking in
-> upstream makedumpfile context here - it is used by other projects as
-> well which can have even a simple busybox rootfs configuration (e.g.
-> qemu).
+[    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
+[    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
+[    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
+[    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
+[    2.357543] ov5640 1-0021: Dropping the link to regulator.5
+[    2.363224] ov5640 1-0021: Dropping the link to regulator.6
+[    2.368829] ov5640 1-0021: Dropping the link to regulator.4
 
-Yes, it's not limited to redhat, I am just saying its origin.
+Here is the full log [1], please let me know if I miss anything, I
+even tried to remove MCLK pin
 
-> 
-> > I thought you are talking about using DaveA's crash utility to live
-> > debug the running kernel, like we usually do with gdb.
-> >
-> >         gdb vmlinux /proc/kcore
-> >
-> > Yes, this gdb live debugging is broken because of KASLR. We have bug about
-> > this, while it has not been fixed. Using Crash utility to replace gdb is
-> > one way if Crash code is adjusted.
-
-......
-
-> > > diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
-> > > index 4c8acdfdc5a7..6161d77c5bfb 100644
-> > > --- a/arch/x86/kernel/machine_kexec_64.c
-> > > +++ b/arch/x86/kernel/machine_kexec_64.c
-> > > @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
-> > >       VMCOREINFO_SYMBOL(init_top_pgt);
-> > >       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
-> > >                       pgtable_l5_enabled());
-> > > +#ifdef CONFIG_RANDOMIZE_BASE
-> >
-> > Finally, embracing it into CONFIG_RANDOMIZE_BASE ifdefery seems not
-> > right. The latest kernel is using page_offset_base to do the dynamic
-> > memory layout between level4 and level5 changing. This may not work in
-> > 5-level system with CONFIG_RANDOMIZE_BASE=n.
-> 
-> I think you missed the v2 change log and the build-bot error on v1
-> (see here: <https://patchwork.kernel.org/patch/10657933/#22291691>).
-> With .config files which have CONFIG_RANDOMIZE_BASE=n, we get the
-> following compilation error
-> without the #ifdef jugglery:
-
-Which line of your v2 change log did I miss?
-
-Ask again, what if I set
-CONFIG_DYNAMIC_MEMORY_LAYOUT=y && CONFIG_RANDOMIZE_MEMORY=n
-in a kernel with LEVEL5 enabled to make kernel be able to switch
-into l4 and l5 dynamically?
-
-Is there anything wrong if I add it like this:
-
-#ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
-	VMCOREINFO_SYMBOL(node_data);
-#endif
-
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
-unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;
-EXPORT_SYMBOL(page_offset_base);
-...
-#endif
-
-config DYNAMIC_MEMORY_LAYOUT
-        bool
-        ---help---
-          This option makes base addresses of vmalloc and vmemmap as well as
-          __PAGE_OFFSET movable during boot.
-
-config RANDOMIZE_MEMORY
-        bool "Randomize the kernel memory sections"
-        depends on X86_64
-        depends on RANDOMIZE_BASE
-        select DYNAMIC_MEMORY_LAYOUT
-        default RANDOMIZE_BASE
-        ---help---
-           Randomizes the base virtual address of kernel memory sections
-           (physical memory mapping, vmalloc & vmemmap). This security feature
-           makes exploits relying on predictable memory locations less reliable.
-
-           The order of allocations remains unchanged. Entropy is generated in
-           the same way as RANDOMIZE_BASE. Current implementation in the optimal
-           configuration have in average 30,000 different possible virtual
-           addresses for each memory section.
-
-           If unsure, say Y.
-
-> 
->  arch/x86/kernel/machine_kexec_64.o: In function `arch_crash_save_vmcoreinfo':
->  arch/x86/kernel/machine_kexec_64.c:359: undefined reference to
-> `page_offset_base'
->  arch/x86/kernel/machine_kexec_64.c:359: undefined reference to
-> `page_offset_base'
-> 
-> Anyways, with Kazu's and Boris's comments on the v2, I understand that
-> adding 'page_offset_base' variable to vmcoreinfo is useful for x86
-> kernel.
-
-Please notice that the makedumpfile '--mem-usage' bug has been fixed by
-below commit. Adding 'page_offset_base' into vmcoreinfo is 50:50 to
-me. Adding it to vmcoreinfo to expose, or deducing it from kcore/vmcore
-program segment, both is fine to me since both has pro and con. Adding
-it you have to give a good log, based on good understanding, but
-not those confusing self invented term and the useless test results,
-and wrong code.
-
-commit 1ea989bf6a93db377689c16b61e9c2c6a9bafa17 (HEAD -> devel, origin/devel)
-Author: Kazuhito Hagio <k-hagio@ab.jp.nec.com>
-Date:   Wed Nov 21 13:57:31 2018 -0500
-
-    [PATCH] x86_64: fix failure of getting kcore vmcoreinfo on kernel 4.19
-
-> I will now work on the v3 to take into account review comments and
-> also work with Lianbo to get the same added to the overall vmcoreinfo
-> documentation he is preparing for x86.
-
-So please do not post new version directly without replying to confirm if
-we have agreement on concerns, then saying that is requested by me or
-other people.
-
-Thanks
-Baoquan
+[1] https://paste.ubuntu.com/p/yfy5cvs32x/
