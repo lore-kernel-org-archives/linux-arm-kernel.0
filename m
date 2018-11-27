@@ -1,357 +1,299 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:29 +0100
-Subject: [PATCH 28/77] ARM: dts: sun6i: Remove all useless pinctrl nodes
+Date: Tue, 27 Nov 2018 13:45:30 +0100
+Subject: [PATCH 29/77] ARM: dts: sun6i: Remove card detect pull-up
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <af84d92ced266a1f2e8eefb194abc5f813884c91.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <ad634fe042cbab93dd8bbad1ed868a96e3cb75b4.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio pinctrl nodes are redundant and as such useless most of the times.
-Since they will also generate warnings in DTC, we can simply remove most of
-them.
+Boards usually have an external pull-up on the card-detect signal, so
+there's no need to add another one.
+
+This also removes a DTC warning.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun6i-a31-app4-evb1.dts        |  8 +------
- arch/arm/boot/dts/sun6i-a31-colombus.dts         |  7 +-----
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts      | 13 +---------
- arch/arm/boot/dts/sun6i-a31-i7.dts               | 14 +----------
- arch/arm/boot/dts/sun6i-a31-m9.dts               | 14 +----------
- arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts | 14 +----------
- arch/arm/boot/dts/sun6i-a31s-primo81.dts         |  7 +-----
- arch/arm/boot/dts/sun6i-a31s-sina31s.dts         |  7 +-----
- arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts | 23 +-----------------
- 9 files changed, 3 insertions(+), 104 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-colombus.dts                 |  8 +-------
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts              | 11 +---------
+ arch/arm/boot/dts/sun6i-a31-i7.dts                       | 10 +--------
+ arch/arm/boot/dts/sun6i-a31-m9.dts                       | 10 +--------
+ arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts         | 10 +--------
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts                 |  8 +-------
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts                 | 10 +--------
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts         | 10 +--------
+ arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts | 10 +--------
+ arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi     |  8 +-------
+ 10 files changed, 10 insertions(+), 85 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-index 7f34323a668c..f26b84b61daf 100644
---- a/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-app4-evb1.dts
-@@ -65,15 +65,7 @@
- 	status = "okay";
- };
- 
--&pio {
--	usb1_vbus_pin_a: usb1_vbus_pin at 0 {
--		pins = "PH27";
--		function = "gpio_out";
--	};
--};
--
- &reg_usb1_vbus {
--	pinctrl-0 = <&usb1_vbus_pin_a>;
- 	gpio = <&pio 7 27 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
 diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-index 939c497a6f70..557d4a988d9a 100644
+index 557d4a988d9a..21584c2f968f 100644
 --- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
 +++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
-@@ -132,11 +132,6 @@
- 		bias-pull-up;
- 	};
+@@ -114,7 +114,7 @@
  
--	usb2_vbus_pin_colombus: usb2_vbus_pin at 0 {
--		pins = "PH24";
--		function = "gpio_out";
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_colombus>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v0>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
+@@ -126,12 +126,6 @@
+ };
+ 
+ &pio {
+-	mmc0_cd_pin_colombus: mmc0_cd_pin at 0 {
+-		pins = "PA8";
+-		function = "gpio_in";
+-		bias-pull-up;
 -	};
 -
  	i2c_lcd_pins: i2c_lcd_pin at 0 {
  		pins = "PA23", "PA24";
  		function = "gpio_out";
-@@ -145,8 +140,6 @@
- };
- 
- &reg_usb2_vbus {
--	pinctrl-names = "default";
--	pinctrl-0 = <&usb2_vbus_pin_colombus>;
- 	gpio = <&pio 7 24 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
 diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index 4eab94737203..a55291538c59 100644
+index a55291538c59..65b1b6e9180f 100644
 --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
 +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -152,7 +152,7 @@
+@@ -207,7 +207,7 @@
  
- &gmac {
+ &mmc0 {
  	pinctrl-names = "default";
--	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_hummingbird>;
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
- 	phy = <&phy1>;
- 	phy-mode = "rgmii";
- 	snps,reset-gpio = <&pio 0 21 GPIO_ACTIVE_HIGH>;
-@@ -221,7 +221,7 @@
- 
- &mmc1 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&mmc1_pins_a>, <&wifi_reset_pin_hummingbird>;
-+	pinctrl-0 = <&mmc1_pins_a>;
- 	vmmc-supply = <&reg_aldo1>;
- 	mmc-pwrseq = <&wifi_pwrseq>;
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_hummingbird>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
  	bus-width = <4>;
-@@ -234,21 +234,12 @@
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
+@@ -233,15 +233,6 @@
+ 	status = "okay";
  };
  
- &pio {
--	gmac_phy_reset_pin_hummingbird: gmac_phy_reset_pin at 0 {
--		pins = "PA21";
--		function = "gpio_out";
+-&pio {
+-	mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
+-		pins = "PA8";
+-		function = "gpio_in";
+-		bias-pull-up;
 -	};
 -
- 	mmc0_cd_pin_hummingbird: mmc0_cd_pin at 0 {
- 		pins = "PA8";
+-};
+-
+ &p2wi {
+ 	status = "okay";
+ 
+diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
+index 679f0fa7e50c..f3e95d08fefc 100644
+--- a/arch/arm/boot/dts/sun6i-a31-i7.dts
++++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
+@@ -144,21 +144,13 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_i7>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
+ 	status = "okay";
+ };
+ 
+-&pio {
+-	mmc0_cd_pin_i7: mmc0_cd_pin at 0 {
+-		pins = "PH22";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &reg_usb1_vbus {
+ 	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
+index 87ae3031aa89..90fb1f603820 100644
+--- a/arch/arm/boot/dts/sun6i-a31-m9.dts
++++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
+@@ -102,7 +102,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
+@@ -122,14 +122,6 @@
+ 
+ #include "axp22x.dtsi"
+ 
+-&pio {
+-	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
+-		pins = "PH22";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &reg_aldo1 {
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+index 0711f55945e0..3dcf44580839 100644
+--- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
++++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+@@ -102,7 +102,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 7 22 GPIO_ACTIVE_LOW>; /* PH22 */
+@@ -122,14 +122,6 @@
+ 
+ #include "axp22x.dtsi"
+ 
+-&pio {
+-	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
+-		pins = "PH22";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &reg_aldo1 {
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+index dd6ede6a8377..55d60c68694e 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
+@@ -146,7 +146,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_primo81>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
+@@ -159,12 +159,6 @@
  		function = "gpio_in";
  		bias-pull-up;
  	};
- 
--	wifi_reset_pin_hummingbird: wifi_reset_pin at 0 {
--		pins = "PG10";
--		function = "gpio_out";
+-
+-	mmc0_cd_pin_primo81: mmc0_cd_pin at 0 {
+-		pins = "PA8";
+-		function = "gpio_in";
+-		bias-pull-up;
 -	};
  };
  
  &p2wi {
-diff --git a/arch/arm/boot/dts/sun6i-a31-i7.dts b/arch/arm/boot/dts/sun6i-a31-i7.dts
-index d659be9dbc50..679f0fa7e50c 100644
---- a/arch/arm/boot/dts/sun6i-a31-i7.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-i7.dts
-@@ -71,8 +71,6 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_i7>;
- 
- 		blue {
- 			label = "i7:blue:usr";
-@@ -154,26 +152,14 @@
- };
- 
- &pio {
--	led_pins_i7: led_pins at 0 {
--		pins = "PH13";
--		function = "gpio_out";
--	};
--
- 	mmc0_cd_pin_i7: mmc0_cd_pin at 0 {
- 		pins = "PH22";
- 		function = "gpio_in";
- 		bias-pull-up;
- 	};
--
--	usb1_vbus_pin_i7: usb1_vbus_pin at 0 {
--		pins = "PC27";
--		function = "gpio_out";
--	};
- };
- 
- &reg_usb1_vbus {
--	pinctrl-names = "default";
--	pinctrl-0 = <&usb1_vbus_pin_i7>;
- 	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
-index 9698f6d38d03..87ae3031aa89 100644
---- a/arch/arm/boot/dts/sun6i-a31-m9.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
-@@ -60,8 +60,6 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_m9>;
- 
- 		blue {
- 			label = "m9:blue:pwr";
-@@ -125,21 +123,11 @@
- #include "axp22x.dtsi"
- 
- &pio {
--	led_pins_m9: led_pins at 0 {
--		pins = "PH13";
--		function = "gpio_out";
--	};
--
- 	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
- 		pins = "PH22";
- 		function = "gpio_in";
- 		bias-pull-up;
- 	};
--
--	usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
--		pins = "PC27";
--		function = "gpio_out";
--	};
- };
- 
- &reg_aldo1 {
-@@ -215,8 +203,6 @@
- };
- 
- &reg_usb1_vbus {
--	pinctrl-names = "default";
--	pinctrl-0 = <&usb1_vbus_pin_m9>;
- 	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
-index bb14b171b160..0711f55945e0 100644
---- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
-@@ -60,8 +60,6 @@
- 
- 	leds {
- 		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_m9>;
- 
- 		blue {
- 			label = "a1000g:blue:pwr";
-@@ -125,21 +123,11 @@
- #include "axp22x.dtsi"
- 
- &pio {
--	led_pins_m9: led_pins at 0 {
--		pins = "PH13";
--		function = "gpio_out";
--	};
--
- 	mmc0_cd_pin_m9: mmc0_cd_pin at 0 {
- 		pins = "PH22";
- 		function = "gpio_in";
- 		bias-pull-up;
- 	};
--
--	usb1_vbus_pin_m9: usb1_vbus_pin at 0 {
--		pins = "PC27";
--		function = "gpio_out";
--	};
- };
- 
- &reg_aldo1 {
-@@ -215,8 +203,6 @@
- };
- 
- &reg_usb1_vbus {
--	pinctrl-names = "default";
--	pinctrl-0 = <&usb1_vbus_pin_m9>;
- 	gpio = <&pio 2 27 GPIO_ACTIVE_HIGH>;
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-index ca1c711ed450..dd6ede6a8377 100644
---- a/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-+++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-@@ -101,8 +101,6 @@
- 	status = "okay";
- 
- 	ctp at 5d {
--		pinctrl-names = "default";
--		pinctrl-0 = <&gt911_int_primo81>;
- 		compatible = "goodix,gt911";
- 		reg = <0x5d>;
- 		interrupt-parent = <&pio>;
-@@ -156,11 +154,6 @@
- };
- 
- &pio {
--	gt911_int_primo81: gt911_int_pin at 0 {
--		pins = "PA3";
--		function = "gpio_in";
--	};
--
- 	mma8452_int_primo81: mma8452_int_pin at 0 {
- 		pins = "PA9";
- 		function = "gpio_in";
 diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-index 3a7e68c46ba7..1b07a950cb45 100644
+index 1b07a950cb45..02c9a90fe876 100644
 --- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
 +++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
-@@ -66,8 +66,6 @@
+@@ -162,7 +162,7 @@
  
- 	leds {
- 		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pin_sina31s>;
- 
- 		status {
- 			label = "sina31s:status:usr";
-@@ -176,11 +174,6 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina31s>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
+@@ -173,14 +173,6 @@
+ 	status = "okay";
  };
  
- &pio {
--	led_pin_sina31s: led_pin at 0 {
--		pins = "PH13";
--		function = "gpio_out";
+-&pio {
+-	mmc0_cd_pin_sina31s: mmc0_cd_pin at 0 {
+-		pins = "PA4";
+-		function = "gpio_in";
+-		bias-pull-up;
 -	};
+-};
 -
- 	mmc0_cd_pin_sina31s: mmc0_cd_pin at 0 {
- 		pins = "PA4";
- 		function = "gpio_in";
+ &reg_dldo1 {
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
 diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-index b8b79c0e9ee0..ea29af15125b 100644
+index ea29af15125b..016b23831cec 100644
 --- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
 +++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
-@@ -58,8 +58,6 @@
+@@ -113,7 +113,7 @@
  
- 	leds {
- 		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pins_bpi_m2>;
- 
- 		blue {
- 			label = "bpi-m2:blue:usr";
-@@ -79,8 +77,6 @@
- 
- 	mmc2_pwrseq: mmc2_pwrseq {
- 		compatible = "mmc-pwrseq-simple";
--		pinctrl-names = "default";
--		pinctrl-0 = <&mmc2_pwrseq_pin_bpi_m2>;
- 		reset-gpios = <&r_pio 0 8 GPIO_ACTIVE_LOW>; /* PL8 WIFI_EN */
- 	};
- };
-@@ -95,7 +91,7 @@
- 
- &gmac {
+ &mmc0 {
  	pinctrl-names = "default";
--	pinctrl-0 = <&gmac_pins_rgmii_a>, <&gmac_phy_reset_pin_bpi_m2>;
-+	pinctrl-0 = <&gmac_pins_rgmii_a>;
- 	phy = <&phy1>;
- 	phy-mode = "rgmii";
- 	phy-supply = <&reg_dldo1>;
-@@ -168,16 +164,6 @@
- };
- 
- &pio {
--	gmac_phy_reset_pin_bpi_m2: gmac_phy_reset_pin at 0 {
--		pins = "PA21";
--		function = "gpio_out";
--	};
--
--	led_pins_bpi_m2: led_pins at 0 {
--		pins = "PG5", "PG10", "PG11";
--		function = "gpio_out";
--	};
--
- 	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
- 		pins = "PA4";
- 		function = "gpio_in";
-@@ -185,13 +171,6 @@
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bpi_m2>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 4 GPIO_ACTIVE_LOW>; /* PA4 */
+@@ -163,14 +163,6 @@
  	};
  };
  
--&r_pio {
--	mmc2_pwrseq_pin_bpi_m2: mmc2_pwrseq_pin at 0 {
--		pins = "PL8";
--		function = "gpio_out";
+-&pio {
+-	mmc0_cd_pin_bpi_m2: mmc0_cd_pin at 0 {
+-		pins = "PA4";
+-		function = "gpio_in";
+-		bias-pull-up;
 -	};
 -};
 -
  #include "axp22x.dtsi"
  
  &reg_aldo1 {
+diff --git a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+index aab6c1720ef7..2d8dc4321b7b 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+@@ -89,17 +89,9 @@
+ 	status = "okay";
+ };
+ 
+-&pio {
+-	mmc0_cd_pin_bs1078v2: mmc0_cd_pin at 0 {
+-		pins = "PA8";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_bs1078v2>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v0>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
+diff --git a/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+index 4e72e4f3ef96..77f952b12188 100644
+--- a/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
++++ b/arch/arm/boot/dts/sun6i-reference-design-tablet.dtsi
+@@ -66,7 +66,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_e708_q1>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 0 8 GPIO_ACTIVE_LOW>; /* PA8 */
+@@ -74,12 +74,6 @@
+ };
+ 
+ &pio {
+-	mmc0_cd_pin_e708_q1: mmc0_cd_pin at 0 {
+-		pins = "PA8";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
+ 		pins = "PA15";
+ 		function = "gpio_in";
 -- 
 git-series 0.9.1
