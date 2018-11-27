@@ -1,152 +1,58 @@
-From: jagan@amarulasolutions.com (Jagan Teki)
-Date: Tue, 27 Nov 2018 12:26:09 +0530
-Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
-In-Reply-To: <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
-References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
- <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 27 Nov 2018 08:04:18 +0100
+Subject: [PATCH v3 1/6] Documentation: ARM: sunxi: pwm: add Allwinner
+ sun8i.
+In-Reply-To: <20181125161859.GA5277@arx-s1>
+References: <20181125161859.GA5277@arx-s1>
+Message-ID: <20181127070418.khdi4wslyv4lmngv@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 13, 2018 at 1:54 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hello,
+
+On Mon, Nov 26, 2018 at 12:18:59AM +0800, Hao Zhang wrote:
+> This patch adds Allwinner sun8i pwm binding document.
+> 
+> Signed-off-by: Hao Zhang <hao5781286@gmail.com>
 > ---
->  arch/arm/boot/dts/sun7i-a20-bananapi.dts | 98 +++++++++++++++++++++++++-
->  1 file changed, 98 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> index 70dfc4ac0bb5..18dbff9f1ce9 100644
-> --- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
-> @@ -54,6 +54,9 @@
->         compatible = "lemaker,bananapi", "allwinner,sun7i-a20";
->
->         aliases {
-> +               i2c0 = &i2c0;
-> +               i2c1 = &i2c1;
-> +               i2c2 = &i2c2;
->                 serial0 = &uart0;
->                 serial1 = &uart3;
->                 serial2 = &uart7;
-> @@ -63,6 +66,41 @@
->                 stdout-path = "serial0:115200n8";
->         };
->
-> +       reg_cam: cam {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "cam";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               vin-supply = <&reg_vcc5v0>;
-> +               gpio = <&pio 7 16 GPIO_ACTIVE_HIGH>;
-> +               enable-active-high;
-> +               regulator-always-on;
-> +       };
+>  .../devicetree/bindings/pwm/pwm-sun8i.txt          | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> new file mode 100644
+> index 0000000..7531d85
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-sun8i.txt
+> @@ -0,0 +1,24 @@
+> +Allwinner sun8i R40/V40/T3 SoC PWM controller
 > +
-> +        reg_cam_avdd: cam-avdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-avdd";
-> +                regulator-min-microvolt = <2800000>;
-> +                regulator-max-microvolt = <2800000>;
-> +                vin-supply = <&reg_cam>;
-> +        };
-> +
-> +        reg_cam_dovdd: cam-dovdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-dovdd";
-> +                regulator-min-microvolt = <1800000>;
-> +                regulator-max-microvolt = <1800000>;
-> +                vin-supply = <&reg_cam>;
-> +        };
-> +
-> +        reg_cam_dvdd: cam-dvdd {
-> +                compatible = "regulator-fixed";
-> +                regulator-name = "cam500b-dvdd";
-> +                regulator-min-microvolt = <1500000>;
-> +                regulator-max-microvolt = <1500000>;
-> +                vin-supply = <&reg_cam>;
-> +        };
-> +
->         hdmi-connector {
->                 compatible = "hdmi-connector";
->                 type = "a";
-> @@ -120,6 +158,27 @@
->                 >;
->  };
->
-> +&csi0 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&csi0_pins_a>;
-> +       status = "okay";
-> +
-> +       port {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               csi_from_ov5640: endpoint {
-> +                        remote-endpoint = <&ov5640_to_csi>;
-> +                        bus-width = <8>;
-> +                        data-shift = <2>;
-> +                        hsync-active = <1>; /* Active high */
-> +                        vsync-active = <0>; /* Active low */
-> +                        data-active = <1>;  /* Active high */
-> +                        pclk-sample = <1>;  /* Rising */
-> +                };
-> +       };
-> +};
-> +
->  &de {
->         status = "okay";
->  };
-> @@ -167,6 +226,39 @@
->         };
->  };
->
-> +&i2c1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&i2c1_pins_a>;
-> +       status = "okay";
-> +
-> +       camera: camera at 21 {
-> +               compatible = "ovti,ov5640";
-> +               reg = <0x21>;
-> +                clocks = <&ccu CLK_CSI0>;
-> +                clock-names = "xclk";
-> +               assigned-clocks = <&ccu CLK_CSI0>;
-> +               assigned-clock-rates = <24000000>;
-> +
-> +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
-> +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
-> +                AVDD-supply = <&reg_cam_avdd>;
-> +                DOVDD-supply = <&reg_cam_dovdd>;
-> +                DVDD-supply = <&reg_cam_dvdd>;
-> +
-> +                port {
-> +                        ov5640_to_csi: endpoint {
-> +                                remote-endpoint = <&csi_from_ov5640>;
-> +                                bus-width = <8>;
-> +                                data-shift = <2>;
-> +                                hsync-active = <1>; /* Active high */
-> +                                vsync-active = <0>; /* Active low */
-> +                                data-active = <1>;  /* Active high */
-> +                                pclk-sample = <1>;  /* Rising */
-> +                        };
-> +                };
-> +       };
+> +Required properties:
+> +  - compatible: Should be one of:
+> +    - "allwinner,sun8i-r40-pwm"
+> +  - reg: Physical base address and length of the controller's registers
+> +  - interrupts: Should contain interrupt.
+> +  - clocks: From common clock binding, handle to the parent clock.
+> +  - clock-names: Must contain the clock names described just above.
+> +  - pwm-channels: PWM channels of the controller.
+> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+> +    the cells format.
 
-Does ov5640 need any further patches, wrt linux-next? I'm trying to
-test this on top of linux-next but the slave id seems not detecting.
+I wonder why "interrupts" is needed here. I guess this is only needed
+for waveform capture? Is this only "optional"? The driver doesn't use
+it.
 
-[    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
-[    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
-[    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
-[    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
-[    2.357543] ov5640 1-0021: Dropping the link to regulator.5
-[    2.363224] ov5640 1-0021: Dropping the link to regulator.6
-[    2.368829] ov5640 1-0021: Dropping the link to regulator.4
+Apart from this interrupts property this is all pretty standard and I
+wonder if we could merge several documents into one.
 
-Here is the full log [1], please let me know if I miss anything, I
-even tried to remove MCLK pin
+For example Documentation/devicetree/bindings/pwm/pwm-st.txt looks
+identically apart from "pwm-channels" being called "st,pwm-num-chan"
+there. (It even has an interrupts property. Should the st driver move to
+"pwm-channels", too?)
 
-[1] https://paste.ubuntu.com/p/yfy5cvs32x/
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
