@@ -1,76 +1,48 @@
-From: rppt@linux.ibm.com (Mike Rapoport)
-Date: Tue, 27 Nov 2018 23:48:45 +0200
-Subject: [PATCH 4/5] openrisc: simplify pte_alloc_one_kernel()
-In-Reply-To: <20181127211600.GB3235@lianli.shorne-pla.net>
-References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
- <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
- <20181127211600.GB3235@lianli.shorne-pla.net>
-Message-ID: <7843DE67-DCC3-48BF-873F-71D87B08EDA8@linux.ibm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 27 Nov 2018 14:16:25 -0800
+Subject: [PATCH v2] x86_64,
+ vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
+In-Reply-To: <20181121113944.GD27797@zn.tnic>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181121113944.GD27797@zn.tnic>
+Message-ID: <CAGXu5jKYxgLPD4YonGSXjECJS=c18rxWmuFC1eeUJK9fLeTxcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On November 27, 2018 11:16:00 PM GMT+02:00, Stafford Horne <shorne@gmail.com> wrote:
->On Sun, Nov 25, 2018 at 11:44:36PM +0200, Mike Rapoport wrote:
->> The pte_alloc_one_kernel() function allocates a page using
->> __get_free_page(GFP_KERNEL) when mm initialization is complete and
->> memblock_phys_alloc() on the earlier stages. The physical address of
->the
->> page allocated with memblock_phys_alloc() is converted to the virtual
->> address and in the both cases the allocated page is cleared using
->> clear_page().
->> 
->> The code is simplified by replacing __get_free_page() with
->> get_zeroed_page() and by replacing memblock_phys_alloc() with
->> memblock_alloc().
+On Wed, Nov 21, 2018 at 3:39 AM, Borislav Petkov <bp@alien8.de> wrote:
+> + Kees.
 >
->Hello Mike,
->
->This looks fine to me.  How do you plan to get this merged?  Will you
->be taking
->care of the whole series or so you want me to queue this openrisc part?
+> On Fri, Nov 16, 2018 at 03:17:49AM +0530, Bhupesh Sharma wrote:
+>> x86_64 kernel uses 'page_offset_base' variable to point to the
+>> start of direct mapping of all physical memory. This variable
+>> is also updated for KASLR boot cases, so this can be exported
+>> via vmcoreinfo as a standard ABI between kernel and user-space,
+>> to allow user-space utilities to use the same for calculating
+>> the start of direct mapping of all physical memory.
 
-I was thinking about merging via the -mm tree.
-Andrew, would that be ok?
+Why is KERNELOFFSET= not sufficient?
 
->> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
->
->Acked-by: Stafford Horne <shorne@gmail.com>
+See commit b6085a865762 ("x86, kaslr: export offset in VMCOREINFO ELF notes")
 
-Thanks!
++       vmcoreinfo_append_str("KERNELOFFSET=%lx\n",
++                             (unsigned long)&_text - __START_KERNEL);
 
->> ---
->>  arch/openrisc/mm/ioremap.c | 11 ++++-------
->>  1 file changed, 4 insertions(+), 7 deletions(-)
->> 
->> diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
->> index c969752..cfef989 100644
->> --- a/arch/openrisc/mm/ioremap.c
->> +++ b/arch/openrisc/mm/ioremap.c
->> @@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct
->mm_struct *mm,
->>  {
->>  	pte_t *pte;
->>  
->> -	if (likely(mem_init_done)) {
->> -		pte = (pte_t *) __get_free_page(GFP_KERNEL);
->> -	} else {
->> -		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
->> -	}
->> +	if (likely(mem_init_done))
->> +		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
->> +	else
->> +		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
->>  
->> -	if (pte)
->> -		clear_page(pte);
->>  	return pte;
->>  }
->> -- 
->> 2.7.4
->> 
+-Kees
+
+>> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+>> index 4c8acdfdc5a7..6161d77c5bfb 100644
+>> --- a/arch/x86/kernel/machine_kexec_64.c
+>> +++ b/arch/x86/kernel/machine_kexec_64.c
+>> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+>>       VMCOREINFO_SYMBOL(init_top_pgt);
+>>       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+>>                       pgtable_l5_enabled());
+>> +#ifdef CONFIG_RANDOMIZE_BASE
+>> +     VMCOREINFO_NUMBER(page_offset_base);
+>> +#endif
+>>
+>>  #ifdef CONFIG_NUMA
+>>       VMCOREINFO_SYMBOL(node_data);
 
 -- 
-Sincerely yours,
-Mike.
+Kees Cook
