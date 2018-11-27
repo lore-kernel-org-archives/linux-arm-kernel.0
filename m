@@ -1,38 +1,45 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:46:13 +0100
-Subject: [PATCH 72/77] ARM: dts: sun8i: v3s: Remove skeleton and memory to
- avoid warnings
+Date: Tue, 27 Nov 2018 13:45:51 +0100
+Subject: [PATCH 50/77] ARM: dts: sun7i: lamobo-r1: Remove unused
+ address-cells/size-cells
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <3d2df36c4b2e62efd774ff40449b359992e55ebb.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <c0199b0484f2faafce367a0aa1240ca351e48f74.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our memory node will generate a warning in DTC since the unit address is
-not matching the reg property. However, that node will be created by the
-bootloader, so we can just remove it entirely in order to remove that
-warning.
+The #address-cells and #size-cells are only relevant for nodes that have
+childs with reg properties. Otherwise, DTC will emit a warning saying that
+those properties are unnecessary.
+
+Remove them when needed.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 5617dd387fd3..b099d2fbb5cd 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -187,11 +187,6 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+index 6f8dfa717994..f91e1bee44e8 100644
+--- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
++++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
+@@ -123,6 +123,8 @@
+ 	phy-mode = "rgmii";
+ 	phy-supply = <&reg_gmac_3v3>;
+ 	status = "okay";
++	/delete-property/#address-cells;
++	/delete-property/#size-cells;
  
--	memory {
--		reg = <0x40000000 0x80000000>;
--		device_type = "memory";
--	};
--
- 	cpu0_opp_table: opp_table0 {
- 		compatible = "operating-points-v2";
- 		opp-shared;
+ 	fixed-link {
+ 		speed = <1000>;
+@@ -137,8 +139,6 @@
+ 		switch: ethernet-switch at 1e {
+ 			compatible = "brcm,bcm53125";
+ 			reg = <30>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+ 
+ 			ports {
+ 				#address-cells = <1>;
 -- 
 git-series 0.9.1
