@@ -1,60 +1,54 @@
-From: shorne@gmail.com (Stafford Horne)
-Date: Wed, 28 Nov 2018 06:16:00 +0900
-Subject: [PATCH 4/5] openrisc: simplify pte_alloc_one_kernel()
-In-Reply-To: <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
-References: <1543182277-8819-1-git-send-email-rppt@linux.ibm.com>
- <1543182277-8819-5-git-send-email-rppt@linux.ibm.com>
-Message-ID: <20181127211600.GB3235@lianli.shorne-pla.net>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Tue, 27 Nov 2018 22:26:12 +0100
+Subject: [PATCH 2/4] dt-bindings: rtc: add binding doc for i.MX system
+ controller RTC driver
+In-Reply-To: <1543311334-8807-3-git-send-email-Anson.Huang@nxp.com>
+References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
+ <1543311334-8807-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20181127212612.GA7569@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2018 at 11:44:36PM +0200, Mike Rapoport wrote:
-> The pte_alloc_one_kernel() function allocates a page using
-> __get_free_page(GFP_KERNEL) when mm initialization is complete and
-> memblock_phys_alloc() on the earlier stages. The physical address of the
-> page allocated with memblock_phys_alloc() is converted to the virtual
-> address and in the both cases the allocated page is cleared using
-> clear_page().
+Hello,
+
+On 27/11/2018 09:41:29+0000, Anson Huang wrote:
+> NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
+> system controller, the system controller is in charge of system
+> power, clock and secure RTC etc. management, Linux kernel
+> has to communicate with system controller via MU (message unit)
+> IPC to do RTC operation, this patch adds binding doc for i.MX
+> system controller RTC driver.
 > 
-> The code is simplified by replacing __get_free_page() with
-> get_zeroed_page() and by replacing memblock_phys_alloc() with
-> memblock_alloc().
-
-Hello Mike,
-
-This looks fine to me.  How do you plan to get this merged?  Will you be taking
-care of the whole series or so you want me to queue this openrisc part?
-
-> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
-
-Acked-by: Stafford Horne <shorne@gmail.com>
-
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 > ---
->  arch/openrisc/mm/ioremap.c | 11 ++++-------
->  1 file changed, 4 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
 > 
-> diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
-> index c969752..cfef989 100644
-> --- a/arch/openrisc/mm/ioremap.c
-> +++ b/arch/openrisc/mm/ioremap.c
-> @@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct mm_struct *mm,
->  {
->  	pte_t *pte;
->  
-> -	if (likely(mem_init_done)) {
-> -		pte = (pte_t *) __get_free_page(GFP_KERNEL);
-> -	} else {
-> -		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
-> -	}
-> +	if (likely(mem_init_done))
-> +		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
-> +	else
-> +		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
->  
-> -	if (pte)
-> -		clear_page(pte);
->  	return pte;
->  }
+
+This patch should come first to silence checkpatch.
+
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt b/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
+> new file mode 100644
+> index 0000000..d6e2353
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
+> @@ -0,0 +1,10 @@
+> +* NXP i.MX System Controller Real Time Clock
+> +
+> +Required properties:
+> +- compatible: should be "nxp,imx8qxp-sc-rtc";
+> +
+> +Example:
+> +
+> +rtc: rtc {
+> +	compatible = "nxp,imx8qxp-sc-rtc";
+> +};
 > -- 
 > 2.7.4
 > 
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
