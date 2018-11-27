@@ -1,66 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:45:00 +0000
-Subject: [PATCH 0/2] arm64: Only call into preempt_schedule() if need_resched()
-Message-ID: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 27 Nov 2018 14:50:44 -0500
+Subject: [RFC][PATCH 03/14] arm64: function_graph: Remove use of
+ FTRACE_NOTRACE_DEPTH
+In-Reply-To: <20181127193149.GJ5641@arm.com>
+References: <20181122012708.491151844@goodmis.org>
+ <20181122012803.040221352@goodmis.org>
+ <20181127193149.GJ5641@arm.com>
+Message-ID: <20181127145044.53ddb58a@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, 27 Nov 2018 19:31:50 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-This pair of patches improves our preempt_enable() implementation slightly
-on arm64 by making the resulting call to preempt_schedule() conditional
-on need_resched(), which is tracked in bit 32 of the preempt count. The
-logic is inverted so that we can detect the preempt count going to zero
-and need_resched being set with a single CBZ instruction.
+> Hi Steve,
+> 
+> On Wed, Nov 21, 2018 at 08:27:11PM -0500, Steven Rostedt wrote:
+> > From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+> > 
+> > The curr_ret_stack is no longer set to -1 when not tracing a function. It is
+> > now done differently, and the FTRACE_NOTRACE_DEPTH value is no longer used.
+> > Remove the reference to it.  
+> 
+> Do you have a pointer to the commit that changed that behaviour? I just want
+> to make sure we're not missing something in our unwind_frame() code.
 
-Consequently, our preempt_enable() code (including prologue/epilogue)
-goes from:
+The commit log is slightly wrong. The -1 goes away in patch 11 of this
+series (and this is patch 3). But the FTRACE_NOTRACE_DEPTH is going
+away, which is why we need this patch.
 
-  40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
-  44:   910003fd        mov     x29, sp
-  48:   d5384101        mrs     x1, sp_el0
-  4c:   b9401020        ldr     w0, [x1, #16]
-  50:   51000400        sub     w0, w0, #0x1
-  54:   b9001020        str     w0, [x1, #16]
-  58:   350000a0        cbnz    w0, 6c
-  5c:   f9400020        ldr     x0, [x1]
-  60:   721f001f        tst     w0, #0x2
-  64:   54000040        b.eq    6c // b.none
-  68:   94000000        bl      0 <preempt_schedule>
-  6c:   a8c17bfd        ldp     x29, x30, [sp], #16
-  70:   d65f03c0        ret
+> 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > ---
+> >  arch/arm64/kernel/stacktrace.c | 3 ---
+> >  1 file changed, 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> > index 4989f7ea1e59..7723dadf25be 100644
+> > --- a/arch/arm64/kernel/stacktrace.c
+> > +++ b/arch/arm64/kernel/stacktrace.c
+> > @@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
+> >  			(frame->pc == (unsigned long)return_to_handler)) {
+> >  		if (WARN_ON_ONCE(frame->graph == -1))
+> >  			return -EINVAL;  
+> 
+> Hmm, so is this code redundant too ^^ ?
 
-to:
+Actually, it is fine before patch 11 (which I'm only going to take the
+first 10 patches for the next merge window, after they are cleaned up).
 
-  40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
-  44:   910003fd        mov     x29, sp
-  48:   d5384101        mrs     x1, sp_el0
-  4c:   f9400820        ldr     x0, [x1, #16]
-  50:   d1000400        sub     x0, x0, #0x1
-  54:   b9001020        str     w0, [x1, #16]
-  58:   b4000060        cbz     x0, 64 <will+0x24>
-  5c:   a8c17bfd        ldp     x29, x30, [sp], #16
-  60:   d65f03c0        ret
-  64:   94000000        bl      0 <preempt_schedule>
-  68:   a8c17bfd        ldp     x29, x30, [sp], #16
-  6c:   d65f03c0        ret
 
-Will
+> 
+> > -		if (frame->graph < -1)
+> > -			frame->graph += FTRACE_NOTRACE_DEPTH;
+> > -  
+> 
+> Do we still need to initialise frame->graph in __save_stack_trace()?
 
---->8
+You are fine till patch 11, which will probably break all this (another
+reason why I'm not going to push that in the next merge window).
 
-Will Deacon (2):
-  preempt: Move PREEMPT_NEED_RESCHED definition into arch code
-  arm64: preempt: Provide our own implementation of asm/preempt.h
+Ideally, we need to get rid of all users of curr_ret_stack outside of
+the function graph logic. As it's going to change drastically. We need
+this in order to combine function graph and kretprobes.
 
- arch/arm64/include/asm/Kbuild        |  1 -
- arch/arm64/include/asm/preempt.h     | 78 ++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/thread_info.h | 13 +++++-
- arch/s390/include/asm/preempt.h      |  2 +
- arch/x86/include/asm/preempt.h       |  3 ++
- include/linux/preempt.h              |  3 --
- 6 files changed, 95 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/include/asm/preempt.h
+I'm working on a v2 that's going to be aimed at the next merge window,
+that will only contain patches 1-10 of this series (and some other
+updates). I'll Cc you on that entire set.
 
--- 
-2.1.4
+-- Steve
