@@ -1,63 +1,58 @@
-From: rafael.tinoco@linaro.org (Rafael David Tinoco)
-Date: Tue, 27 Nov 2018 18:52:54 -0200
-Subject: [PATCH] arm: always update thread_info->syscall
-In-Reply-To: <20181127153553.GE30658@n2100.armlinux.org.uk>
-References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
- <20181126233303.GZ30658@n2100.armlinux.org.uk>
- <20181126234111.GA30658@n2100.armlinux.org.uk>
- <20181126234456.GB30658@n2100.armlinux.org.uk>
- <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
- <20181127105620.GD30658@n2100.armlinux.org.uk>
- <20181127153553.GE30658@n2100.armlinux.org.uk>
-Message-ID: <df0f7e94-8577-2789-a749-77855387909e@linaro.org>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 27 Nov 2018 13:03:56 -0800
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <VI1PR04MB553359EA5E0F88701A92A3AEEED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+ <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+ <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+ <VI1PR04MB553359EA5E0F88701A92A3AEEED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
+Message-ID: <CAHQ1cqE0cUUsT99A5ZM6XkNd7E5+17qjZRkCdCERSp2-nWsf=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/18 1:35 PM, Russell King - ARM Linux wrote:
-> On x86 (32-bit app on 64-bit kernel), it has this behaviour:
-> 
-> $ ./syscall-test
-> 162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
-> 162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
-> 
-> which looks good, except:
-> 
-> $ strace -o /dev/null -f ./syscall-test
-> 162 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
-> 0 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
-> 
-> So, if we're syscall ptracing a program, __NR_restart_syscall gets
-> exposed through this interface, but if we aren't, it isn't exposed.
-> Which version is correct?  *shrug*, no documentation...
+On Tue, Nov 27, 2018 at 2:16 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+>
+> On 11/26/18 8:24 PM, Andrey Smirnov wrote:
+> > On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> >> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+>
+> >>> +             if (of_property_read_u32_array(
+> >>> +                         node, "fsl,gpr12-device-type",
+> >>> +                         imx6_pcie->device_type,
+> >>> +                         ARRAY_SIZE(imx6_pcie->device_type))) {
+> >>> +                     dev_err(dev, "Failed to get device type
+> >>> mask/value\n");
+> >>> +                     return -EINVAL;
+> >>> +             }
+> >>
+> >> The device type can be set on multiple SOCs, why are you adding a
+> >> mandatory property only for 8m?
+> >
+> > My thinking was that other SoCs don't really have two controllers, so
+> > they don't really need to have that property, but, more importantly,
+> > not forcing them to have this property should preserve backwards
+> > compatibility with old DTBs.
+>
+> The "device_type" registers determine Root Complex versus End Point
+> mode. This is not yet supported on imx in upstream but it can be done on
+> many soc versions.
+>
 
-I looked around and could only find people using this interface as an
-alternate mechanism - than ptracing - for discovering what a task was
-doing a certain moment (Mostly during hangs. I haven't found a good
-schematic way - or tool - that uses it, but I might be wrong there). For
-that purpose, it would be better *not* to update when restart_syscall
-happens, unless the hang is right there =o).
+Yeah, I am aware, I wasn't really trying to make it possible to
+configure IP block to be a EP, that is just an unavoidable consequence
+of the approach taken.
 
-If you check:
-https://bugs.linaro.org/show_bug.cgi?id=3783#c11
+> Looking at other pcie controllers (and dwc core) this is normally done
+> with a different compatible string with an "-ep" suffix. It feels wrong
+> to expose bitmasks and values directly in DT instead.
+>
+> For this patch you should probably just hardcode RC mode.
 
-The only syscalls being updated now - that I could get, without any
-workload - were 252 (epoll_wait) or 252 (sched_getaffinity):
+Hmm, given how the mask/value have to be different for each
+controller, the only way to hardcode it  that I can think of would be
+to change the property pass a bit offset instead of mask/value pair.
+Is that what you are suggesting?
 
-252 0x7 0xbee80578 0x1b 0xffffffff 0xbee80578 0x7 0xbee80550 0xb6e9d286
-252 0xa 0xbef3d930 0x9 0xffffffff 0x0 0x6c 0xbef3d908 0xb6e6f286
-142 0x4 0x0 0xbea3eb2c 0x0 0x0 0x6c 0xbea3ea88 0xb6e40286
-252 0x4 0xbe8d59e8 0x9 0xffffffff 0xbe8d59e8 0x4 0xbe8d59c0 0xb6e11286
-
-All others I got zeroed, and that's where everything started.
-
-Please, let me know if you still want a v2, or something else... like
-fixing it and making it to ignore the restart_syscall for *at least*
-having the same behavior across diff archs.
-
-If it is not worth, I'll just blacklist those tests in our functional
-tests environment and move on =).
-
-Thanks a lot, very best rgds,
--- 
-Rafael D. Tinoco
-Linaro Kernel Validation
+Thanks,
+Andrey Smirnov
