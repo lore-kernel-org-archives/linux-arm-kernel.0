@@ -1,86 +1,33 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Tue, 27 Nov 2018 00:32:59 -0800
-Subject: [PATCH 2/2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure
- up the stack
-In-Reply-To: <20181127080113.GA2426@osadl.at>
-References: <1542823573-20228-1-git-send-email-hofrat@osadl.org>
- <1542823573-20228-2-git-send-email-hofrat@osadl.org>
- <CAGp9LzoT7ueXyyVSYQdWOU0JkQDWMVcwCuSE3gJnEn0fLLjCBA@mail.gmail.com>
- <20181127080113.GA2426@osadl.at>
-Message-ID: <CAGp9LzoNKmJvTccQd7Syi_XMew4Mhf_tXsMAAZ+asE5btH9Dag@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 27 Nov 2018 09:35:23 +0100
+Subject: [PATCH v3 1/6] Documentation: ARM: sunxi: pwm: add Allwinner
+ sun8i.
+In-Reply-To: <20181127075226.qo3mv3o6etqdjaop@flea>
+References: <20181125161859.GA5277@arx-s1>
+ <20181127075226.qo3mv3o6etqdjaop@flea>
+Message-ID: <20181127083523.pciie2gyaplrwiey@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->
-> On Mon, Nov 26, 2018 at 11:49:26PM -0800, Sean Wang wrote:
-> > Nicholas Mc Guire <hofrat@osadl.org> ??? 2018???11???21??? ?????? ??????10:13?????????
-> > >
-> > > The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
-> > > for the dev_err() messages). The probe function should return an error
-> > > if one of the banks failed to initialize properly.
-> > >
-> > > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> > > Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
-> > > ---
-> > >
-> > > Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
-> > > GPIOLIB=y, GPIO_MT7621=y
-> > >
-> > > Patch is against 4.20-rc3 (localversion-next is next-20181121)
-> > >
-> > >  drivers/gpio/gpio-mt7621.c | 8 ++++++--
-> > >  1 file changed, 6 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
-> > > index 1ec95bc..68fca8b 100644
-> > > --- a/drivers/gpio/gpio-mt7621.c
-> > > +++ b/drivers/gpio/gpio-mt7621.c
-> > > @@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
-> > >         struct device_node *np = dev->of_node;
-> > >         struct mtk *mtk;
-> > >         int i;
-> > > +       int ret;
-> > >
-> > >         mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
-> > >         if (!mtk)
-> > > @@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
-> > >         platform_set_drvdata(pdev, mtk);
-> > >         mediatek_gpio_irq_chip.name = dev_name(dev);
-> > >
-> > > -       for (i = 0; i < MTK_BANK_CNT; i++)
-> > > -               mediatek_gpio_bank_probe(dev, np, i);
-> > > +       for (i = 0; i < MTK_BANK_CNT; i++) {
-> > > +               ret = mediatek_gpio_bank_probe(dev, np, i);
-> > > +               if (!ret)
-> >
-> > it should be if (ret < 0) ?
->
-> I don?t think so mediatek_gpio_bank_probe() returns 0 on success
-> and all other returns are error paths - while the current code
-> only returns negative values I do thik that any non 0 would be
-> an error indication so !ret should be fine here.
->
-!0 would be true
+Hello,
 
-> thx!
-> hofrat
->
-> >
-> > > +                       return ret;
-> > > +       }
-> > >
-> > >         return 0;
-> > >  }
-> > > --
-> > > 2.1.4
-> > >
-> > >
-> > > _______________________________________________
-> > > Linux-mediatek mailing list
-> > > Linux-mediatek at lists.infradead.org
-> > > http://lists.infradead.org/mailman/listinfo/linux-mediatek
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+On Tue, Nov 27, 2018 at 08:52:26AM +0100, Maxime Ripard wrote:
+> On Mon, Nov 26, 2018 at 12:18:59AM +0800, Hao Zhang wrote:
+> > +  - clocks: From common clock binding, handle to the parent clock.
+> > +  - clock-names: Must contain the clock names described just above.
+> 
+> [...]
+> 
+> You seem to have used mux-0 and mux-1 for the clock names. I guess we
+> don't have to use a name there, we can simply use the position to find
+> out (as long as it's documented in the binding)
+
+I also wondered if the driver relies on the fact that the second clock
+is the faster running one. Is this sensible?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
