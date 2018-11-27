@@ -1,114 +1,49 @@
-From: sean.wang@kernel.org (Sean Wang)
-Date: Tue, 27 Nov 2018 12:36:58 -0800
-Subject: [PATCH v2 03/11] clk: mediatek: Disable tuner_en before change
- PLL rate
-In-Reply-To: <20181127034254.24721-5-weiyi.lu@mediatek.com>
-References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
- <20181127034254.24721-5-weiyi.lu@mediatek.com>
-Message-ID: <CAGp9Lzro5YHCYqzOWFJJa4g75odf6yK52cean_aS3p2STOtJYg@mail.gmail.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 27 Nov 2018 12:38:49 -0800 (PST)
+Subject: [PATCH v2 2/2] swiotlb: Skip cache maintenance on map error
+In-Reply-To: <cc6d91acc357235cbd6e0e134382c58caa188801.1542812807.git.robin.murphy@arm.com>
+References: <cover.1542812807.git.robin.murphy@arm.com>
+ <cc6d91acc357235cbd6e0e134382c58caa188801.1542812807.git.robin.murphy@arm.com>
+Message-ID: <alpine.DEB.2.10.1811271238290.4577@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Weiyi Lu <weiyi.lu@mediatek.com> ? 2018?11?26? ?? ??7:45???
->
-> From: Owen Chen <owen.chen@mediatek.com>
->
-> PLLs with tuner_en bit, such as APLL1, need to disable
-> tuner_en before apply new frequency settings, or the new frequency
-> settings (pcw) will not be applied.
-> The tuner_en bit will be disabled during changing PLL rate
-> and be restored after new settings applied.
+On Wed, 21 Nov 2018, Robin Murphy wrote:
+> If swiotlb_bounce_page() failed, calling arch_sync_dma_for_device() may
+> lead to such delights as performing cache maintenance on whatever
+> address phys_to_virt(SWIOTLB_MAP_ERROR) looks like, which is typically
+> outside the kernel memory map and goes about as well as expected.
+> 
+> Don't do that.
+> 
+> Fixes: a4a4330db46a ("swiotlb: add support for non-coherent DMA")
+> Tested-by: John Stultz <john.stultz@linaro.org>
+> Reviewed-by: Christoph Hellwig <hch@lst.de>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-It looks like a bug fix. If so, you should add a fixes tag and even cc
-stable tree
+Acked-by: Stefano Stabellini <sstabellini@kernel.org>
 
->
-> Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 > ---
->  drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
->  1 file changed, 31 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> index 1db161aced31..81400601f107 100644
-> --- a/drivers/clk/mediatek/clk-pll.c
-> +++ b/drivers/clk/mediatek/clk-pll.c
-> @@ -27,7 +27,7 @@
->  #define CON0_BASE_EN           BIT(0)
->  #define CON0_PWR_ON            BIT(0)
->  #define CON0_ISO_EN            BIT(1)
-> -#define CON0_PCW_CHG           BIT(31)
-> +#define CON1_PCW_CHG           BIT(31)
-
-it seems like an unnecessary change
-
->
->  #define AUDPLL_TUNER_EN                BIT(31)
->
-> @@ -97,9 +97,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->  {
->         u32 con1, val;
->         int pll_en;
-> +       u32 tuner_en = 0;
-> +       u32 tuner_en_mask;
-> +       void __iomem *tuner_en_addr = NULL;
->
->         pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
->
-> +       /* disable tuner */
-
-similar code pieces are ready on mtk_pll_[un]prepare. maybe we can add
-common tuner operations for them to reuse.
-
-> +       if (pll->tuner_en_addr) {
-> +               tuner_en_addr = pll->tuner_en_addr;
-> +               tuner_en_mask = BIT(pll->data->tuner_en_bit);
-> +       } else if (pll->tuner_addr) {
-> +               tuner_en_addr = pll->tuner_addr;
-> +               tuner_en_mask = AUDPLL_TUNER_EN;
-> +       }
-> +
-> +       if (tuner_en_addr) {
-> +               val = readl(tuner_en_addr);
-> +               tuner_en = val & tuner_en_mask;
-> +
-> +               if (tuner_en) {
-> +                       val &= ~tuner_en_mask;
-> +                       writel(val, tuner_en_addr);
-> +               }
-> +       }
-> +
->         /* set postdiv */
->         val = readl(pll->pd_addr);
->         val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-> @@ -120,12 +142,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
->         con1 = readl(pll->base_addr + REG_CON1);
->
->         if (pll_en)
-> -               con1 |= CON0_PCW_CHG;
-> +               con1 |= CON1_PCW_CHG;
->
->         writel(con1, pll->base_addr + REG_CON1);
->         if (pll->tuner_addr)
->                 writel(con1 + 1, pll->tuner_addr);
->
-> +       /* restore tuner_en */
-> +       if (tuner_en_addr && tuner_en) {
-
-if (tuner_en) is sufficient
-
-> +               val = readl(tuner_en_addr);
-> +               val |= tuner_en_mask;
-> +               writel(val, tuner_en_addr);
-> +       }
-> +
->         if (pll_en)
->                 udelay(20);
->  }
-> --
-> 2.18.0
->
->
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+> 
+> v2: Collect tags
+> 
+>  kernel/dma/swiotlb.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/kernel/dma/swiotlb.c b/kernel/dma/swiotlb.c
+> index 5731daa09a32..045930e32c0e 100644
+> --- a/kernel/dma/swiotlb.c
+> +++ b/kernel/dma/swiotlb.c
+> @@ -679,7 +679,8 @@ dma_addr_t swiotlb_map_page(struct device *dev, struct page *page,
+>  	}
+>  
+>  	if (!dev_is_dma_coherent(dev) &&
+> -	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0)
+> +	    (attrs & DMA_ATTR_SKIP_CPU_SYNC) == 0 &&
+> +	    dev_addr != DIRECT_MAPPING_ERROR)
+>  		arch_sync_dma_for_device(dev, phys, size, dir);
+>  
+>  	return dev_addr;
+> -- 
+> 2.19.1.dirty
+> 
