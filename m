@@ -1,96 +1,393 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 27 Nov 2018 11:42:53 +0800
-Subject: [PATCH v2 10/11] dt-bindings: soc: Add MT8183 power dt-bindings
+Date: Tue, 27 Nov 2018 11:42:44 +0800
+Subject: [PATCH v2 01/11] clk: mediatek: add new clkmux register API
 In-Reply-To: <20181127034254.24721-1-weiyi.lu@mediatek.com>
 References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
-Message-ID: <20181127034254.24721-12-weiyi.lu@mediatek.com>
+Message-ID: <20181127034254.24721-3-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power dt-bindings for MT8183.
+From: Owen Chen <owen.chen@mediatek.com>
 
+On both MT8183 & MT6765, there add "set/clr" register for
+each clkmux setting, and one update register to trigger value change.
+It is designed to prevent read-modify-write racing issue.
+The sw design need to add a new API to handle this hw change with
+a new mtk_clk_mux/mtk_mux struct in new file "clk-mux.c", "clk-mux.h".
+
+Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- .../bindings/soc/mediatek/scpsys.txt          | 14 ++++++++++
- include/dt-bindings/power/mt8183-power.h      | 26 +++++++++++++++++++
- 2 files changed, 40 insertions(+)
- create mode 100644 include/dt-bindings/power/mt8183-power.h
+ drivers/clk/mediatek/Makefile  |   2 +-
+ drivers/clk/mediatek/clk-mux.c | 240 +++++++++++++++++++++++++++++++++
+ drivers/clk/mediatek/clk-mux.h | 101 ++++++++++++++
+ 3 files changed, 342 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/mediatek/clk-mux.c
+ create mode 100644 drivers/clk/mediatek/clk-mux.h
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index d6fe16f094af..b4728ce81c43 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -14,6 +14,7 @@ power/power_domain.txt. It provides the power domains defined in
- - include/dt-bindings/power/mt2701-power.h
- - include/dt-bindings/power/mt2712-power.h
- - include/dt-bindings/power/mt7622-power.h
-+- include/dt-bindings/power/mt8183-power.h
- 
- Required properties:
- - compatible: Should be one of:
-@@ -24,18 +25,31 @@ Required properties:
- 	- "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
- 	- "mediatek,mt7623a-scpsys": For MT7623A SoC
- 	- "mediatek,mt8173-scpsys"
-+	- "mediatek,mt8183-scpsys"
- - #power-domain-cells: Must be 1
- - reg: Address range of the SCPSYS unit
- - infracfg: must contain a phandle to the infracfg controller
- - clock, clock-names: clocks according to the common clock binding.
-                       These are clocks which hardware needs to be
-                       enabled before enabling certain power domains.
-+                      The new clock type "BASIC" belongs to the type above.
-+                      As to the new clock type "SUBSYS" needs to be
-+                      enabled before releasing bus protection.
- 	Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
- 	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
- 	Required clocks for MT6797: "mm", "mfg", "vdec"
- 	Required clocks for MT7622: "hif_sel"
- 	Required clocks for MT7622A: "ethif"
- 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
-+	Required clocks for MT8183: BASIC: "audio", "mfg", "mm", "cam", "isp",
-+					   "vpu", "vpu1", "vpu2", "vpu3"
-+				    SUBSYS: "mm-0", "mm-1", "mm-2", "mm-3",
-+					    "mm-4", "mm-5", "mm-6", "mm-7",
-+					    "mm-8", "mm-9", "isp-0", "isp-1",
-+					    "cam-0", "cam-1", "cam-2", "cam-3",
-+					    "cam-4", "cam-5", "cam-6", "vpu-0",
-+					    "vpu-1", "vpu-2", "vpu-3", "vpu-4",
-+					    "vpu-5"
- 
- Optional properties:
- - vdec-supply: Power supply for the vdec power domain
-diff --git a/include/dt-bindings/power/mt8183-power.h b/include/dt-bindings/power/mt8183-power.h
+diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+index 844b55d2770d..b97980dbb738 100644
+--- a/drivers/clk/mediatek/Makefile
++++ b/drivers/clk/mediatek/Makefile
+@@ -1,5 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+-obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o
++obj-$(CONFIG_COMMON_CLK_MEDIATEK) += clk-mtk.o clk-pll.o clk-gate.o clk-apmixed.o clk-cpumux.o reset.o clk-mux.o
+ obj-$(CONFIG_COMMON_CLK_MT6797) += clk-mt6797.o
+ obj-$(CONFIG_COMMON_CLK_MT6797_IMGSYS) += clk-mt6797-img.o
+ obj-$(CONFIG_COMMON_CLK_MT6797_MMSYS) += clk-mt6797-mm.o
+diff --git a/drivers/clk/mediatek/clk-mux.c b/drivers/clk/mediatek/clk-mux.c
 new file mode 100644
-index 000000000000..5c0c8c7e3cd0
+index 000000000000..8618e5fa2b30
 --- /dev/null
-+++ b/include/dt-bindings/power/mt8183-power.h
-@@ -0,0 +1,26 @@
-+/* SPDX-License-Identifier: GPL-2.0
-+ *
++++ b/drivers/clk/mediatek/clk-mux.c
+@@ -0,0 +1,240 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
 + * Copyright (c) 2018 MediaTek Inc.
-+ * Author: Weiyi Lu <weiyi.lu@mediatek.com>
++ * Author: Owen Chen <owen.chen@mediatek.com>
 + */
 +
-+#ifndef _DT_BINDINGS_POWER_MT8183_POWER_H
-+#define _DT_BINDINGS_POWER_MT8183_POWER_H
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/slab.h>
++#include <linux/mfd/syscon.h>
 +
-+#define MT8183_POWER_DOMAIN_AUDIO	0
-+#define MT8183_POWER_DOMAIN_CONN	1
-+#define MT8183_POWER_DOMAIN_MFG_ASYNC	2
-+#define MT8183_POWER_DOMAIN_MFG		3
-+#define MT8183_POWER_DOMAIN_MFG_CORE0	4
-+#define MT8183_POWER_DOMAIN_MFG_CORE1	5
-+#define MT8183_POWER_DOMAIN_MFG_2D	6
-+#define MT8183_POWER_DOMAIN_DISP	7
-+#define MT8183_POWER_DOMAIN_CAM		8
-+#define MT8183_POWER_DOMAIN_ISP		9
-+#define MT8183_POWER_DOMAIN_VDEC	10
-+#define MT8183_POWER_DOMAIN_VENC	11
-+#define MT8183_POWER_DOMAIN_VPU_TOP	12
-+#define MT8183_POWER_DOMAIN_VPU_CORE0	13
-+#define MT8183_POWER_DOMAIN_VPU_CORE1	14
++#include "clk-mtk.h"
++#include "clk-mux.h"
 +
-+#endif /* _DT_BINDINGS_POWER_MT8183_POWER_H */
++static inline struct mtk_clk_mux
++	*to_mtk_clk_mux(struct clk_hw *hw)
++{
++	return container_of(hw, struct mtk_clk_mux, hw);
++}
++
++static int mtk_clk_mux_enable(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = BIT(mux->gate_shift);
++
++	return regmap_update_bits(mux->regmap, mux->mux_ofs, mask, 0);
++}
++
++static void mtk_clk_mux_disable(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = BIT(mux->gate_shift);
++
++	regmap_update_bits(mux->regmap, mux->mux_ofs, mask, mask);
++}
++
++static int mtk_clk_mux_enable_setclr(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val;
++
++	val = BIT(mux->gate_shift);
++
++	return regmap_write(mux->regmap, mux->mux_clr_ofs, val);
++}
++
++static void mtk_clk_mux_disable_setclr(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val;
++
++	val = BIT(mux->gate_shift);
++	regmap_write(mux->regmap, mux->mux_set_ofs, val);
++}
++
++static int mtk_clk_mux_is_enabled(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 val;
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++
++	return (val & BIT(mux->gate_shift)) == 0;
++}
++
++static u8 mtk_clk_mux_get_parent(struct clk_hw *hw)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val;
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++	val = (val >> mux->mux_shift) & mask;
++
++	return val;
++}
++
++static int mtk_clk_mux_set_parent_lock(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val;
++	unsigned long flags = 0;
++
++	if (mux->lock)
++		spin_lock_irqsave(mux->lock, flags);
++	else
++		__acquire(mux->lock);
++
++	regmap_read(mux->regmap, mux->mux_ofs, &val);
++	val = (val & mask) >> mux->mux_shift;
++
++	if (val != index) {
++		val = index << mux->mux_shift;
++		regmap_update_bits(mux->regmap, mux->mux_ofs, mask, val);
++	}
++
++	if (mux->lock)
++		spin_unlock_irqrestore(mux->lock, flags);
++	else
++		__release(mux->lock);
++
++	return 0;
++}
++
++static int mtk_clk_mux_set_parent_setclr_lock(struct clk_hw *hw, u8 index)
++{
++	struct mtk_clk_mux *mux = to_mtk_clk_mux(hw);
++	u32 mask = GENMASK(mux->mux_width - 1, 0);
++	u32 val, orig;
++	unsigned long flags = 0;
++
++	if (mux->lock)
++		spin_lock_irqsave(mux->lock, flags);
++	else
++		__acquire(mux->lock);
++
++	regmap_read(mux->regmap, mux->mux_ofs, &orig);
++	val = (orig & ~(mask << mux->mux_shift)) | (index << mux->mux_shift);
++
++	if (val != orig) {
++		regmap_write(mux->regmap, mux->mux_clr_ofs,
++				mask << mux->mux_shift);
++		regmap_write(mux->regmap, mux->mux_set_ofs,
++				index << mux->mux_shift);
++
++		if (mux->upd_shift >= 0)
++			regmap_write(mux->regmap, mux->upd_ofs,
++					BIT(mux->upd_shift));
++	}
++
++	if (mux->lock)
++		spin_unlock_irqrestore(mux->lock, flags);
++	else
++		__release(mux->lock);
++
++	return 0;
++}
++
++const struct clk_ops mtk_mux_ops = {
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_lock,
++};
++
++const struct clk_ops mtk_mux_clr_set_upd_ops = {
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_setclr_lock,
++};
++
++const struct clk_ops mtk_mux_gate_ops = {
++	.enable = mtk_clk_mux_enable,
++	.disable = mtk_clk_mux_disable,
++	.is_enabled = mtk_clk_mux_is_enabled,
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_lock,
++};
++
++const struct clk_ops mtk_mux_gate_clr_set_upd_ops = {
++	.enable = mtk_clk_mux_enable_setclr,
++	.disable = mtk_clk_mux_disable_setclr,
++	.is_enabled = mtk_clk_mux_is_enabled,
++	.get_parent = mtk_clk_mux_get_parent,
++	.set_parent = mtk_clk_mux_set_parent_setclr_lock,
++};
++
++struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
++				 struct regmap *regmap,
++				 spinlock_t *lock)
++{
++	struct mtk_clk_mux *mtk_mux;
++	struct clk_init_data init;
++	struct clk *clk;
++
++	mtk_mux = kzalloc(sizeof(*mtk_mux), GFP_KERNEL);
++	if (!mtk_mux)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = mux->name;
++	init.flags = mux->flags | CLK_SET_RATE_PARENT;
++	init.parent_names = mux->parent_names;
++	init.num_parents = mux->num_parents;
++	init.ops = mux->ops;
++
++	mtk_mux->regmap = regmap;
++	mtk_mux->name = mux->name;
++	mtk_mux->mux_ofs = mux->mux_ofs;
++	mtk_mux->mux_set_ofs = mux->set_ofs;
++	mtk_mux->mux_clr_ofs = mux->clr_ofs;
++	mtk_mux->upd_ofs = mux->upd_ofs;
++	mtk_mux->mux_shift = mux->mux_shift;
++	mtk_mux->mux_width = mux->mux_width;
++	mtk_mux->gate_shift = mux->gate_shift;
++	mtk_mux->upd_shift = mux->upd_shift;
++
++	mtk_mux->lock = lock;
++	mtk_mux->hw.init = &init;
++
++	clk = clk_register(NULL, &mtk_mux->hw);
++	if (IS_ERR(clk)) {
++		kfree(mtk_mux);
++		return clk;
++	}
++
++	return clk;
++}
++
++int mtk_clk_register_muxes(const struct mtk_mux *muxes,
++			   int num, struct device_node *node,
++			   spinlock_t *lock,
++			   struct clk_onecell_data *clk_data)
++{
++	struct regmap *regmap;
++	struct clk *clk;
++	int i;
++
++	regmap = syscon_node_to_regmap(node);
++	if (IS_ERR(regmap)) {
++		pr_err("Cannot find regmap for %pOF: %ld\n", node,
++		       PTR_ERR(regmap));
++		return PTR_ERR(regmap);
++	}
++
++	for (i = 0; i < num; i++) {
++		const struct mtk_mux *mux = &muxes[i];
++
++		if (IS_ERR_OR_NULL(clk_data->clks[mux->id])) {
++			clk = mtk_clk_register_mux(mux, regmap, lock);
++
++			if (IS_ERR(clk)) {
++				pr_err("Failed to register clk %s: %ld\n",
++				       mux->name, PTR_ERR(clk));
++				continue;
++			}
++
++			clk_data->clks[mux->id] = clk;
++		}
++	}
++
++	return 0;
++}
+diff --git a/drivers/clk/mediatek/clk-mux.h b/drivers/clk/mediatek/clk-mux.h
+new file mode 100644
+index 000000000000..ff0276bb771c
+--- /dev/null
++++ b/drivers/clk/mediatek/clk-mux.h
+@@ -0,0 +1,101 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Owen Chen <owen.chen@mediatek.com>
++ */
++
++#ifndef __DRV_CLK_MUX_H
++#define __DRV_CLK_MUX_H
++
++#include <linux/clk-provider.h>
++
++struct mtk_clk_mux {
++	struct clk_hw hw;
++	struct regmap *regmap;
++
++	const char *name;
++
++	u32 mux_set_ofs;
++	u32 mux_clr_ofs;
++	u32 mux_ofs;
++	u32 upd_ofs;
++
++	u8 mux_shift;
++	u8 mux_width;
++	u8 gate_shift;
++	u8 upd_shift;
++
++	spinlock_t *lock;
++};
++
++struct mtk_mux {
++	int id;
++	const char *name;
++	const char * const *parent_names;
++	unsigned int flags;
++
++	u32 mux_ofs;
++	u32 set_ofs;
++	u32 clr_ofs;
++	u32 upd_ofs;
++
++	u8 mux_shift;
++	u8 mux_width;
++	u8 gate_shift;
++	u8 upd_shift;
++
++	const struct clk_ops *ops;
++
++	signed char num_parents;
++};
++
++extern const struct clk_ops mtk_mux_ops;
++extern const struct clk_ops mtk_mux_clr_set_upd_ops;
++extern const struct clk_ops mtk_mux_gate_ops;
++extern const struct clk_ops mtk_mux_gate_clr_set_upd_ops;
++
++#define GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,		\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags, _ops) {		\
++		.id = _id,						\
++		.name = _name,						\
++		.mux_ofs = _mux_ofs,					\
++		.set_ofs = _mux_set_ofs,				\
++		.clr_ofs = _mux_clr_ofs,				\
++		.upd_ofs = _upd_ofs,					\
++		.mux_shift = _shift,					\
++		.mux_width = _width,					\
++		.gate_shift = _gate,					\
++		.upd_shift = _upd,					\
++		.parent_names = _parents,				\
++		.num_parents = ARRAY_SIZE(_parents),			\
++		.flags = _flags,					\
++		.ops = &_ops,						\
++	}
++
++#define MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags)			\
++		GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents, _mux_ofs,	\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd, _flags,			\
++			mtk_mux_gate_clr_set_upd_ops)
++
++#define MUX_GATE_CLR_SET_UPD(_id, _name, _parents, _mux_ofs,		\
++			_mux_set_ofs, _mux_clr_ofs, _shift, _width,	\
++			_gate, _upd_ofs, _upd)				\
++		MUX_GATE_CLR_SET_UPD_FLAGS(_id, _name, _parents,	\
++			_mux_ofs, _mux_set_ofs, _mux_clr_ofs, _shift,	\
++			_width, _gate, _upd_ofs, _upd,			\
++			CLK_SET_RATE_PARENT)
++
++struct clk *mtk_clk_register_mux(const struct mtk_mux *mux,
++				 struct regmap *regmap,
++				 spinlock_t *lock);
++
++int mtk_clk_register_muxes(const struct mtk_mux *muxes,
++			   int num, struct device_node *node,
++			   spinlock_t *lock,
++			   struct clk_onecell_data *clk_data);
++
++#endif /* __DRV_CLK_MUX_H */
 -- 
 2.18.0
