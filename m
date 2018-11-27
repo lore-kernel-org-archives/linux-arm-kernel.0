@@ -1,80 +1,131 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:46:05 +0100
-Subject: [PATCH 64/77] ARM: dts: sun8i: a23/a33: Remove underscores from nodes
- names
+Date: Tue, 27 Nov 2018 13:46:03 +0100
+Subject: [PATCH 62/77] ARM: dts: sun8i: a23/a33: Remove card detect pull-up
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <a63e38a6c93909fe248ffb52d98d47cb4c16ea81.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <7e71c2b672d2a007a6a98bfa0945da402e31c8ed.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GPIO pinctrl nodes cannot be easily removed, because they would also
-change the pin configuration, for example to add a pull resistor or change
-the current delivered by the pin.
+Boards usually have an external pull-up on the card-detect signal, so
+there's no need to add another one.
 
-Those nodes still have underscores and unit-addresses in their node names
-in our DTs, so adjust their name to remove the warnings. Use that occasion
-to also fix some poorly chosen node-names.
+This also removes a DTC warning.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts       | 2 +-
- arch/arm/boot/dts/sun8i-q8-common.dtsi               | 2 +-
- arch/arm/boot/dts/sun8i-r16-parrot.dts               | 2 +-
- arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/sun8i-a23-evb.dts                  | 10 +---------
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts       | 10 +---------
+ arch/arm/boot/dts/sun8i-r16-parrot.dts               |  8 +-------
+ arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi |  8 +-------
+ 4 files changed, 4 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-index 42726576a6a9..317763069c0a 100644
---- a/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts
-@@ -84,7 +84,7 @@
+diff --git a/arch/arm/boot/dts/sun8i-a23-evb.dts b/arch/arm/boot/dts/sun8i-a23-evb.dts
+index b6aeb23b6ee9..3c994df0ffdf 100644
+--- a/arch/arm/boot/dts/sun8i-a23-evb.dts
++++ b/arch/arm/boot/dts/sun8i-a23-evb.dts
+@@ -104,21 +104,13 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_evb>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_vcc3v0>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_LOW>; /* PB4 */
+ 	status = "okay";
  };
  
- &r_pio {
--	led_pin_d978: led_pin_d978 at 0 {
-+	led_pin_d978: led-pin {
- 		pins = "PL5";
- 		function = "gpio_out";
- 		drive-strength = <20>;
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index e3ca8a94d690..719ad769b837 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -83,7 +83,7 @@
+-&pio {
+-	mmc0_cd_pin_evb: mmc0_cd_pin at 0 {
+-		pins = "PB4";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ /*
+  * The RX line has a non-populated resistance. In order to use it, you
+  * need to solder R207 on the back of the board in order to close the
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index a2b8948393fc..035c4d8006cd 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -134,7 +134,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_sina33>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_LOW>; /* PB4 */
+@@ -155,14 +155,6 @@
+ 	status = "okay";
  };
  
- &r_pio {
--	wifi_pwrseq_pin_q8: wifi_pwrseq_pin at 0 {
-+	wifi_pwrseq_pin_q8: wifi-pwrseq-pins {
- 		pins = "PL6", "PL7", "PL11";
- 		function = "gpio_in";
- 		bias-pull-up;
+-&pio {
+-	mmc0_cd_pin_sina33: mmc0_cd_pin at 0 {
+-		pins = "PB4";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-};
+-
+ &r_rsb {
+ 	status = "okay";
+ 
 diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-index 62f53291ff22..85576092f5d9 100644
+index ffb3a5b6b043..0465863743c2 100644
 --- a/arch/arm/boot/dts/sun8i-r16-parrot.dts
 +++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
-@@ -159,7 +159,7 @@
+@@ -127,7 +127,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_parrot>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	cd-gpios = <&pio 3 14 GPIO_ACTIVE_LOW>; /* PD14 */
+ 	bus-width = <4>;
+@@ -159,12 +159,6 @@
  };
  
  &pio {
--	usb0_id_det: usb0_id_detect_pin at 0 {
-+	usb0_id_det: usb0-id-detect-pin {
+-	mmc0_cd_pin_parrot: mmc0_cd_pin at 0 {
+-		pins = "PD14";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-
+ 	usb0_id_det: usb0_id_detect_pin at 0 {
  		pins = "PD10";
  		function = "gpio_in";
- 		bias-pull-up;
 diff --git a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-index 12a2ad67844e..787a3121e179 100644
+index c5f0f2e627bf..6838bce7dd4e 100644
 --- a/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
 +++ b/arch/arm/boot/dts/sun8i-reference-design-tablet.dtsi
-@@ -94,7 +94,7 @@
+@@ -81,7 +81,7 @@
+ 
+ &mmc0 {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	pinctrl-0 = <&mmc0_pins_a>;
+ 	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_LOW>; /* PB4 */
+@@ -89,12 +89,6 @@
  };
  
  &pio {
--	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+	usb0_id_detect_pin: usb0-id-detect-pin {
+-	mmc0_cd_pin: mmc0_cd_pin at 0 {
+-		pins = "PB4";
+-		function = "gpio_in";
+-		bias-pull-up;
+-	};
+-
+ 	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
  		pins = "PH8";
  		function = "gpio_in";
- 		bias-pull-up;
 -- 
 git-series 0.9.1
