@@ -1,24 +1,24 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 27 Nov 2018 13:10:34 +0100
-Subject: [PATCH v2] i2c: i2c-stm32f7: add PM Runtime support
-In-Reply-To: <1542625464-4704-1-git-send-email-pierre-yves.mordret@st.com>
-References: <1542625464-4704-1-git-send-email-pierre-yves.mordret@st.com>
-Message-ID: <20181127121034.GK1107@kunai>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 27 Nov 2018 15:11:29 +0300
+Subject: [PATCH V5 00/10] x86/KVM/Hyper-v: Add HV ept tlb range flush
+ hypercall support in KVM
+In-Reply-To: <CAOLK0pyvtfhoGM+D7h=gXwNpNjXGZiDJKpuVi9HOwb++4asCXw@mail.gmail.com>
+References: <20181108144259.10817-1-Tianyu.Lan@microsoft.com>
+ <CAOLK0pyvtfhoGM+D7h=gXwNpNjXGZiDJKpuVi9HOwb++4asCXw@mail.gmail.com>
+Message-ID: <20181127121129.GR3088@unbuntlaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 12:04:24PM +0100, Pierre-Yves MORDRET wrote:
-> Use PM Runtime API to enable/disable clock
+On Tue, Nov 27, 2018 at 07:59:22PM +0800, Tianyu Lan wrote:
+> Gentile Ping...
 > 
-> Signed-off-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
+> On Thu, Nov 8, 2018 at 10:43 PM <lantianyu1986@gmail.com> wrote:
+> >
+> > From: Lan Tianyu <Tianyu.Lan@microsoft.com>
+> >
+> > Sorry. Some patches was blocked and I try to resend via another account.
 
-Looks good but doesn't apply on top of your other patches for me. Can
-you rebase?
+The patches were still blocked?  They didn't show up on driver-devel.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/92e66acc/attachment.sig>
+regards,
+dan carpenter
