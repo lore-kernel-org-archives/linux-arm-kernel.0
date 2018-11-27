@@ -1,26 +1,27 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 09:39:24 +0100
-Subject: [PATCH v2 06/43] drm/sun4i: backend: Refine the logic behind
- using the frontend
-In-Reply-To: <20181123092515.2511-7-paul.kocialkowski@bootlin.com>
+Date: Tue, 27 Nov 2018 09:41:58 +0100
+Subject: [PATCH v2 07/43] drm/sun4i: backend: Use a specific function to
+ check if a plane is supported
+In-Reply-To: <20181123092515.2511-8-paul.kocialkowski@bootlin.com>
 References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
- <20181123092515.2511-7-paul.kocialkowski@bootlin.com>
-Message-ID: <20181127083924.qv7vapvaq3mjb4lu@flea>
+ <20181123092515.2511-8-paul.kocialkowski@bootlin.com>
+Message-ID: <20181127084158.inmmvsf6ayhlhk7l@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 10:24:38AM +0100, Paul Kocialkowski wrote:
-> Checking that scaling is in use is not sufficient as a condition to
-> decide to use the frontend.
+On Fri, Nov 23, 2018 at 10:24:39AM +0100, Paul Kocialkowski wrote:
+> Before this patch, it is assumed that a plane is supported either
+> through the frontend or through the backend alone. However, the DRM
+> interface does not allow finely reporting our hardware capabilities
+> and there are cases where neither are support.
 > 
-> Since not all layer formats are supported by the frontend, we need to
-> check for that support first. Then, the frontend must only be enabled
-> if the backend doesn't support the format or that scaling is required.
+> In particular, some plane formats are supported by the backend and not
+> the frontend, so they can only be supported without scaling.
 > 
-> Signed-off-by:Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-You were missing a space to that SoB. I added it and applied, thanks!
-maxime
+Applied, thanks!
+Maxime
 
 -- 
 Maxime Ripard, Bootlin
@@ -32,4 +33,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/47bc0caa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/7e51e211/attachment.sig>
