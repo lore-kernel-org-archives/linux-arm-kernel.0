@@ -1,103 +1,98 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:27 +0100
-Subject: [PATCH 26/77] ARM: dts: sun6i: Fix Display Engine DTC warnings
+Date: Tue, 27 Nov 2018 13:45:31 +0100
+Subject: [PATCH 30/77] ARM: dts: sun6i: Remove redundant MMC pinmux tuning
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <5787dbe557d085e65ea01bfb0360143d0df7c8b7.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <f0fedb9e722eb18306d0a33e7997f90910417b17.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our display engine endpoints trigger some DTC warnings due to the fact that
-we're having a single endpoint that doesn't need any reg property, and
-since we don't have a reg property, we don't need the address-cells and
-size-cells properties anymore.
+Some boards override the MMC pin muxing settings in order to enable the
+pull-ups and change the drive strength to a value higher than the default.
 
-Fix those
+While this was needed in the earlier days, this is now the default setting
+for those pins, and therefore we don't need those board-specific settings
+anymore.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun6i-a31-hummingbird.dts | 12 ++----------
- arch/arm/boot/dts/sun6i-a31.dtsi            | 12 ++----------
- 2 files changed, 4 insertions(+), 20 deletions(-)
+ arch/arm/boot/dts/sun6i-a31-colombus.dts                 | 4 ----
+ arch/arm/boot/dts/sun6i-a31-hummingbird.dts              | 5 -----
+ arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts         | 8 --------
+ arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts | 4 ----
+ 4 files changed, 21 deletions(-)
 
+diff --git a/arch/arm/boot/dts/sun6i-a31-colombus.dts b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+index 21584c2f968f..f9c4169a875d 100644
+--- a/arch/arm/boot/dts/sun6i-a31-colombus.dts
++++ b/arch/arm/boot/dts/sun6i-a31-colombus.dts
+@@ -121,10 +121,6 @@
+ 	status = "okay";
+ };
+ 
+-&mmc0_pins_a {
+-	bias-pull-up;
+-};
+-
+ &pio {
+ 	i2c_lcd_pins: i2c_lcd_pin at 0 {
+ 		pins = "PA23", "PA24";
 diff --git a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-index ce4f9e9834bf..4eab94737203 100644
+index 65b1b6e9180f..f38413fd9906 100644
 --- a/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
 +++ b/arch/arm/boot/dts/sun6i-a31-hummingbird.dts
-@@ -86,31 +86,23 @@
- 	vga-dac {
- 		compatible = "dumb-vga-dac";
- 		vdd-supply = <&reg_vga_3v3>;
--		#address-cells = <1>;
--		#size-cells = <0>;
+@@ -214,11 +214,6 @@
+ 	status = "okay";
+ };
  
- 		ports {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+-&mmc0_pins_a {
+-	/* external pull-ups missing for some pins */
+-	bias-pull-up;
+-};
+-
+ &mmc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins_a>;
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+index 016b23831cec..14e27e81ddf8 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sinovoip-bpi-m2.dts
+@@ -120,10 +120,6 @@
+ 	status = "okay";
+ };
  
- 			port at 0 {
--				#address-cells = <1>;
--				#size-cells = <0>;
- 				reg = <0>;
+-&mmc0_pins_a {
+-	bias-pull-up;
+-};
+-
+ &mmc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc2_pins_a>;
+@@ -142,10 +138,6 @@
+ 	};
+ };
  
--				vga_dac_in: endpoint at 0 {
--					reg = <0>;
-+				vga_dac_in: endpoint {
- 					remote-endpoint = <&tcon0_out_vga>;
- 				};
- 			};
+-&mmc2_pins_a {
+-	bias-pull-up;
+-};
+-
+ &ohci0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+index 2d8dc4321b7b..153e40d6f4c5 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-yones-toptech-bs1078-v2.dts
+@@ -98,10 +98,6 @@
+ 	status = "okay";
+ };
  
- 			port at 1 {
--				#address-cells = <1>;
--				#size-cells = <0>;
- 				reg = <1>;
+-&mmc0_pins_a {
+-	bias-pull-up;
+-};
+-
+ &p2wi {
+ 	status = "okay";
  
--				vga_dac_out: endpoint at 0 {
--					reg = <0>;
-+				vga_dac_out: endpoint {
- 					remote-endpoint = <&vga_con_in>;
- 				};
- 			};
-diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
-index 5355213f73b9..c5fd97b88b90 100644
---- a/arch/arm/boot/dts/sun6i-a31.dtsi
-+++ b/arch/arm/boot/dts/sun6i-a31.dtsi
-@@ -486,8 +486,6 @@
- 				};
- 
- 				hdmi_out: port at 1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
- 					reg = <1>;
- 				};
- 			};
-@@ -1218,12 +1216,9 @@
- 				};
- 
- 				be0_out: port at 1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
- 					reg = <1>;
- 
--					be0_out_drc0: endpoint at 0 {
--						reg = <0>;
-+					be0_out_drc0: endpoint {
- 						remote-endpoint = <&drc0_in_be0>;
- 					};
- 				};
-@@ -1248,12 +1243,9 @@
- 				#size-cells = <0>;
- 
- 				drc0_in: port at 0 {
--					#address-cells = <1>;
--					#size-cells = <0>;
- 					reg = <0>;
- 
--					drc0_in_be0: endpoint at 0 {
--						reg = <0>;
-+					drc0_in_be0: endpoint {
- 						remote-endpoint = <&be0_out_drc0>;
- 					};
- 				};
 -- 
 git-series 0.9.1
