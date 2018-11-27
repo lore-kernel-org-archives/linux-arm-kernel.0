@@ -1,150 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:45:02 +0000
-Subject: [PATCH 2/2] arm64: preempt: Provide our own implementation of
- asm/preempt.h
-In-Reply-To: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
-References: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1543347902-21170-3-git-send-email-will.deacon@arm.com>
+Date: Tue, 27 Nov 2018 19:45:00 +0000
+Subject: [PATCH 0/2] arm64: Only call into preempt_schedule() if need_resched()
+Message-ID: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The asm-generic/preempt.h implementation doesn't make use of the
-PREEMPT_NEED_RESCHED flag, since this can interact badly with load/store
-architectures which rely on the preempt_count word being unchanged across
-an interrupt.
+Hi all,
 
-However, since we're a 64-bit architecture and the preempt count is
-only 32 bits wide, we can simply pack it next to the resched flag and
-load the whole thing in one go, so that a dec-and-test operation doesn't
-need to load twice.
+This pair of patches improves our preempt_enable() implementation slightly
+on arm64 by making the resulting call to preempt_schedule() conditional
+on need_resched(), which is tracked in bit 32 of the preempt count. The
+logic is inverted so that we can detect the preempt count going to zero
+and need_resched being set with a single CBZ instruction.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Consequently, our preempt_enable() code (including prologue/epilogue)
+goes from:
+
+  40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
+  44:   910003fd        mov     x29, sp
+  48:   d5384101        mrs     x1, sp_el0
+  4c:   b9401020        ldr     w0, [x1, #16]
+  50:   51000400        sub     w0, w0, #0x1
+  54:   b9001020        str     w0, [x1, #16]
+  58:   350000a0        cbnz    w0, 6c
+  5c:   f9400020        ldr     x0, [x1]
+  60:   721f001f        tst     w0, #0x2
+  64:   54000040        b.eq    6c // b.none
+  68:   94000000        bl      0 <preempt_schedule>
+  6c:   a8c17bfd        ldp     x29, x30, [sp], #16
+  70:   d65f03c0        ret
+
+to:
+
+  40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
+  44:   910003fd        mov     x29, sp
+  48:   d5384101        mrs     x1, sp_el0
+  4c:   f9400820        ldr     x0, [x1, #16]
+  50:   d1000400        sub     x0, x0, #0x1
+  54:   b9001020        str     w0, [x1, #16]
+  58:   b4000060        cbz     x0, 64 <will+0x24>
+  5c:   a8c17bfd        ldp     x29, x30, [sp], #16
+  60:   d65f03c0        ret
+  64:   94000000        bl      0 <preempt_schedule>
+  68:   a8c17bfd        ldp     x29, x30, [sp], #16
+  6c:   d65f03c0        ret
+
+Will
+
+--->8
+
+Will Deacon (2):
+  preempt: Move PREEMPT_NEED_RESCHED definition into arch code
+  arm64: preempt: Provide our own implementation of asm/preempt.h
+
  arch/arm64/include/asm/Kbuild        |  1 -
  arch/arm64/include/asm/preempt.h     | 78 ++++++++++++++++++++++++++++++++++++
  arch/arm64/include/asm/thread_info.h | 13 +++++-
- 3 files changed, 90 insertions(+), 2 deletions(-)
+ arch/s390/include/asm/preempt.h      |  2 +
+ arch/x86/include/asm/preempt.h       |  3 ++
+ include/linux/preempt.h              |  3 --
+ 6 files changed, 95 insertions(+), 5 deletions(-)
  create mode 100644 arch/arm64/include/asm/preempt.h
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 6cd5d77b6b44..33498f900390 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -14,7 +14,6 @@ generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += mm-arch-hooks.h
- generic-y += msi.h
--generic-y += preempt.h
- generic-y += qrwlock.h
- generic-y += qspinlock.h
- generic-y += rwsem.h
-diff --git a/arch/arm64/include/asm/preempt.h b/arch/arm64/include/asm/preempt.h
-new file mode 100644
-index 000000000000..832227d5ebc0
---- /dev/null
-+++ b/arch/arm64/include/asm/preempt.h
-@@ -0,0 +1,78 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __ASM_PREEMPT_H
-+#define __ASM_PREEMPT_H
-+
-+#include <linux/thread_info.h>
-+
-+#define PREEMPT_NEED_RESCHED	BIT(32)
-+#define PREEMPT_ENABLED	(PREEMPT_NEED_RESCHED)
-+
-+static inline int preempt_count(void)
-+{
-+	return READ_ONCE(current_thread_info()->preempt.count);
-+}
-+
-+static inline void preempt_count_set(u64 pc)
-+{
-+	/* Preserve existing value of PREEMPT_NEED_RESCHED */
-+	WRITE_ONCE(current_thread_info()->preempt.count, pc);
-+}
-+
-+#define init_task_preempt_count(p) do { \
-+	task_thread_info(p)->preempt_count = FORK_PREEMPT_COUNT; \
-+} while (0)
-+
-+#define init_idle_preempt_count(p, cpu) do { \
-+	task_thread_info(p)->preempt_count = PREEMPT_ENABLED; \
-+} while (0)
-+
-+static inline void set_preempt_need_resched(void)
-+{
-+	current_thread_info()->preempt.need_resched = 0;
-+}
-+
-+static inline void clear_preempt_need_resched(void)
-+{
-+	current_thread_info()->preempt.need_resched = 1;
-+}
-+
-+static inline bool test_preempt_need_resched(void)
-+{
-+	return !current_thread_info()->preempt.need_resched;
-+}
-+
-+static inline void __preempt_count_add(int val)
-+{
-+	u32 pc = READ_ONCE(current_thread_info()->preempt.count);
-+	pc += val;
-+	WRITE_ONCE(current_thread_info()->preempt.count, pc);
-+}
-+
-+static inline void __preempt_count_sub(int val)
-+{
-+	u32 pc = READ_ONCE(current_thread_info()->preempt.count);
-+	pc -= val;
-+	WRITE_ONCE(current_thread_info()->preempt.count, pc);
-+}
-+
-+static inline bool __preempt_count_dec_and_test(void)
-+{
-+	u64 pc = READ_ONCE(current_thread_info()->preempt_count);
-+	WRITE_ONCE(current_thread_info()->preempt.count, --pc);
-+	return !pc;
-+}
-+
-+static inline bool should_resched(int preempt_offset)
-+{
-+	u64 pc = READ_ONCE(current_thread_info()->preempt_count);
-+	return pc == preempt_offset;
-+}
-+
-+#ifdef CONFIG_PREEMPT
-+void preempt_schedule(void);
-+#define __preempt_schedule() preempt_schedule()
-+void preempt_schedule_notrace(void);
-+#define __preempt_schedule_notrace() preempt_schedule_notrace()
-+#endif /* CONFIG_PREEMPT */
-+
-+#endif /* __ASM_PREEMPT_H */
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index cb2c10a8f0a8..bbca68b54732 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -42,7 +42,18 @@ struct thread_info {
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	u64			ttbr0;		/* saved TTBR0_EL1 */
- #endif
--	int			preempt_count;	/* 0 => preemptable, <0 => bug */
-+	union {
-+		u64		preempt_count;	/* 0 => preemptible, <0 => bug */
-+		struct {
-+#ifdef CONFIG_CPU_BIG_ENDIAN
-+			u32	need_resched;
-+			u32	count;
-+#else
-+			u32	count;
-+			u32	need_resched;
-+#endif
-+		} preempt;
-+	};
- };
- 
- #define thread_saved_pc(tsk)	\
 -- 
 2.1.4
