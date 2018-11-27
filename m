@@ -1,39 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 27 Nov 2018 22:13:38 +0100
-Subject: [PATCH 0/2] use adrp/add pairs for PLT entries
-In-Reply-To: <20181127194444.GK5641@arm.com>
-References: <20181122084646.3247-1-ard.biesheuvel@linaro.org>
- <20181127194444.GK5641@arm.com>
-Message-ID: <CAKv+Gu-fzP_Jx3bajQkO=S706a8Qc=_0VoktEywsvb8AWmJtWg@mail.gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Tue, 27 Nov 2018 13:14:54 -0800
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <VI1PR04MB5533DE497786CD80D4FE0941EED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+ <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+ <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+ <1543313169.2507.39.camel@pengutronix.de>
+ <VI1PR04MB5533DE497786CD80D4FE0941EED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
+Message-ID: <CAHQ1cqEGABcH3EG9yGo7Ns2fPR1s_u1YPtFoKRjUh50=aa=J2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
+On Tue, Nov 27, 2018 at 2:46 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
 >
-> Hi Ard,
+> On 11/27/18 12:06 PM, Lucas Stach wrote:
+> > Hi Andrey,
+> >
+> > Am Montag, den 26.11.2018, 10:24 -0800 schrieb Andrey Smirnov:
+> >> On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> >>>
+> >>> On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+> >>>> @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+> >>>> -     case IMX7D:
+> >>>> +     case IMX8MQ:
+> >>>> +             if (of_property_read_u32(node, "fsl,iomux-gpr1x",
+> >>>> +                                      &imx6_pcie->gpr1x)) {
+> >>>> +                     dev_err(dev, "Failed to get GPR1x address\n");
+> >>>> +                     return -EINVAL;
+> >>>> +             }
+> >>>
+> >>> This is for distinguishing multiple controllers on the SOC but other
+> >>> registers and bits might differ. Isn't it preferable to have a property
+> >>> for controller id instead of adding many registers to DT?
+> >>
+> >> I liked encoding necessary info in DT directly slightly better than
+> >> encoding abstract ID and then decoding it further in the driver code.
+> >> OTOH, I am not really attached to that path. Lucas, can you comment on
+> >> this please?
+> >
+> > Yes, after rereading the patch with this in mind I agree that having
+> > the GPR offset on DT directly is IMO the better approach than an
+> > abstract ID.
 >
-> On Thu, Nov 22, 2018 at 09:46:44AM +0100, Ard Biesheuvel wrote:
-> > Currently, PLT entries use a non-idiomatic movn/movz/movz/br instruction
-> > sequence which is also longer than necessary. Also, the code emitting
-> > them does not use the instruction generation code but open codes the
-> > opcodes directly.
-> >
-> > The extended KASLR range is now 4 GB, given that we switched to the
-> > small code model everywhere else (including for modules), so we can
-> > switch to adrp/add/br sequences which are easier in the I-cache.
-> >
-> > So implement adrp/add pair generation in the instruction generation code
-> > and wire it up into the PLT code. Note that the Cortex-A53 errata handling
-> > requires some special care to ensure that generated veneers are not
-> > susceptible to the erratum.
-> >
-> > Cc: Torsten Duwe <duwe@lst.de>
-> > Cc: Jessica Yu <jeyu@kernel.org>
->
-> I've applied this, with a couple of extra comments in the plt comparison
-> code and the Reviewed-by from Torsten. There were some trivial conflicts
-> with Jessica's rework of the plt lookup, but I think I got it right. Please
-> take a look at for-next/core when you get a chance.
+> But it's not a single offset, for example the device_type (EP/RC) has
+> bits for the two controllers side-by-side in GPR12.
 >
 
-Looks fine to me.
+Playing devil's advocate for a bit:
+
+More specifically, currently the following per-controller bits need to
+be configured:
+
+- Location of the "device type" field within GPR12
+- GPR register to use to control PCIn_CLKREQ_B_OVERRIDE_EN and
+PCIn_CLKREQ_B_OVERRIDE_EN (GPR14 vs GPR16)
+- Now that Philip spoke against PCIE_CTRL_APPS_CLK_REQ being exposed
+via reset controller driver, we need to know which SRC register to use
+to control that bit (SRC_PCIEPHY_RCR vs. SRC_PCIE2_RCR)
+
+Thanks,
+Andrey Smirnov
