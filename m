@@ -1,24 +1,35 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 27 Nov 2018 15:11:29 +0300
-Subject: [PATCH V5 00/10] x86/KVM/Hyper-v: Add HV ept tlb range flush
- hypercall support in KVM
-In-Reply-To: <CAOLK0pyvtfhoGM+D7h=gXwNpNjXGZiDJKpuVi9HOwb++4asCXw@mail.gmail.com>
-References: <20181108144259.10817-1-Tianyu.Lan@microsoft.com>
- <CAOLK0pyvtfhoGM+D7h=gXwNpNjXGZiDJKpuVi9HOwb++4asCXw@mail.gmail.com>
-Message-ID: <20181127121129.GR3088@unbuntlaptop>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Nov 2018 12:14:30 +0000
+Subject: [PATCH v2 1/4] mfd: stmpe: Move ADC related defines to header of
+ mfd
+In-Reply-To: <20181119102528.2830-1-dev@pschenker.ch>
+References: <20181119102528.2830-1-dev@pschenker.ch>
+Message-ID: <20181127121430.GJ4272@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 07:59:22PM +0800, Tianyu Lan wrote:
-> Gentile Ping...
+On Mon, 19 Nov 2018, Philippe Schenker wrote:
+
+> Move defines that are ADC related to the header of the overlying mfd,
+> so they can be used from multiple sub-devices.
 > 
-> On Thu, Nov 8, 2018 at 10:43 PM <lantianyu1986@gmail.com> wrote:
-> >
-> > From: Lan Tianyu <Tianyu.Lan@microsoft.com>
-> >
-> > Sorry. Some patches was blocked and I try to resend via another account.
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> ---
+> 
+> Changes in v2:
+>  - This is a new added commit. Separate commit for moving the defines out of
+>    drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device drivers/mfd/stmpe.c
+>  - Pre-fix defines with STMPE_
+> 
+>  drivers/input/touchscreen/stmpe-ts.c | 34 +++++++++++-----------------
+>  include/linux/mfd/stmpe.h            | 11 +++++++++
+>  2 files changed, 24 insertions(+), 21 deletions(-)
 
-The patches were still blocked?  They didn't show up on driver-devel.
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-regards,
-dan carpenter
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
