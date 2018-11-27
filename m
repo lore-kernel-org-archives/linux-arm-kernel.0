@@ -1,51 +1,81 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 27 Nov 2018 15:28:25 +0000
-Subject: 'branches' perf event mapping differs on ARC and ARM
-In-Reply-To: <1543329386.13651.13.camel@synopsys.com>
-References: <1543329386.13651.13.camel@synopsys.com>
-Message-ID: <48cfcbf3-0084-7b17-f30d-371bbb5cbdde@arm.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 27 Nov 2018 21:04:25 +0530
+Subject: [PATCH 5/5] DO NOT MERGE: ARM: dts: bananapi: Add Camera support
+In-Reply-To: <20181127151948.gaqodlnkiuh3vkud@flea>
+References: <cover.71b0f9855c251f9dc389ee77ee6f0e1fad91fb0b.1542097288.git-series.maxime.ripard@bootlin.com>
+ <12093630fdd7d8b43ebcb0340691e0f2200e26c6.1542097288.git-series.maxime.ripard@bootlin.com>
+ <CAMty3ZBO6B=vgduv5u28zC8P1DOm1TYGFAVjDtJOpU8dozrk=A@mail.gmail.com>
+ <20181127103106.vykudp36vkyy5vme@flea>
+ <CAMty3ZAhGAN2nEJkiRLHqFHz9Oi1WboiyqLL4ox+-0z7NhbG8w@mail.gmail.com>
+ <20181127151948.gaqodlnkiuh3vkud@flea>
+Message-ID: <CAMty3ZC4LtAAb-09em8Cm8HTUtiK3oHvL8mynn8bhJr3Sgdvsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/11/2018 14:36, Eugeniy Paltsev wrote:
-> Hi,
-> 
-> While playing with perf tool on ARMv7 and ARCv2 processors and profiling the
-> same application I got interesting results. Even if we got pretty
-> similar total
-> execution time and instructions number the number of branches on ARC is about
-> three times more then on ARM.
-> 
-> I dug into architecture
-> specific perf sources and found that we map different
-> HW counters into generic 'branches' event on ARC and ARM.
-> - We use "ijmp" event on ARC which
-> counts all jump and branch instructions (regardless
-> of real execution flow - even if no real jump happens)
-> - We use "pc_write_retired" event on ARM
-> which counts only taken branches (Instruction
-> architecturally executed, condition check pass - software change of the PC)
-> 
-> So I was wondering do you know
-> which approach is correct?
-> 
-> 
-> 
-> I guess counting all jump and branch instructions is correct because we use
-> 'branches' event value to calculate relative value of 'branch-misses' using
-> 
-> following formula:
-> ----------------------------8----------------------------
-> branch-misses-ration = 'branch-misses' / 'branches' * 100.0
-> ----------------
-> ------------8----------------------------
-> And using only taken branches here is incorrect IMHO. So I guess we should
-> map 'br_immed_retired' instead of
-> "pc_write_retired" into generic 'branches'
-> event on ARM.
+On Tue, Nov 27, 2018 at 8:49 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> On Tue, Nov 27, 2018 at 04:30:55PM +0530, Jagan Teki wrote:
+> > > > > +&i2c1 {
+> > > > > +       pinctrl-names = "default";
+> > > > > +       pinctrl-0 = <&i2c1_pins_a>;
+> > > > > +       status = "okay";
+> > > > > +
+> > > > > +       camera: camera at 21 {
+> > > > > +               compatible = "ovti,ov5640";
+> > > > > +               reg = <0x21>;
+> > > > > +                clocks = <&ccu CLK_CSI0>;
+> > > > > +                clock-names = "xclk";
+> > > > > +               assigned-clocks = <&ccu CLK_CSI0>;
+> > > > > +               assigned-clock-rates = <24000000>;
+> > > > > +
+> > > > > +                reset-gpios = <&pio 7 14 GPIO_ACTIVE_LOW>;
+> > > > > +                powerdown-gpios = <&pio 7 19 GPIO_ACTIVE_HIGH>;
+> > > > > +                AVDD-supply = <&reg_cam_avdd>;
+> > > > > +                DOVDD-supply = <&reg_cam_dovdd>;
+> > > > > +                DVDD-supply = <&reg_cam_dvdd>;
+> > > > > +
+> > > > > +                port {
+> > > > > +                        ov5640_to_csi: endpoint {
+> > > > > +                                remote-endpoint = <&csi_from_ov5640>;
+> > > > > +                                bus-width = <8>;
+> > > > > +                                data-shift = <2>;
+> > > > > +                                hsync-active = <1>; /* Active high */
+> > > > > +                                vsync-active = <0>; /* Active low */
+> > > > > +                                data-active = <1>;  /* Active high */
+> > > > > +                                pclk-sample = <1>;  /* Rising */
+> > > > > +                        };
+> > > > > +                };
+> > > > > +       };
+> > > >
+> > > > Does ov5640 need any further patches, wrt linux-next? I'm trying to
+> > > > test this on top of linux-next but the slave id seems not detecting.
+> > > >
+> > > > [    2.304711] ov5640 1-0021: Linked as a consumer to regulator.5
+> > > > [    2.310639] ov5640 1-0021: Linked as a consumer to regulator.6
+> > > > [    2.316592] ov5640 1-0021: Linked as a consumer to regulator.4
+> > > > [    2.351540] ov5640 1-0021: ov5640_init_slave_id: failed with -6
+> > > > [    2.357543] ov5640 1-0021: Dropping the link to regulator.5
+> > > > [    2.363224] ov5640 1-0021: Dropping the link to regulator.6
+> > > > [    2.368829] ov5640 1-0021: Dropping the link to regulator.4
+> > > >
+> > > > Here is the full log [1], please let me know if I miss anything, I
+> > > > even tried to remove MCLK pin
+> > >
+> > > You seem to have made local modifications to your tree, what are they?
+> > > This indicates that the communication over i2c doesn't work, what is
+> > > your setup?
+> >
+> > I just used your commits on linux-next [2], with the setup similar in
+> > Page 5 on datasheet[3]. The only difference is csi build issue, I have
+> > updated similar fix you mentioned on sun6i_csi [4]
+> >
+> > [2] https://github.com/amarula/linux-amarula/commits/CSI-A20
+> > [3] https://www.tme.eu/gb/Document/187887186b98a8f78b47da2774a34f4c/BPI-CAMERA.pdf
+> > [4] https://github.com/amarula/linux-amarula/commit/a6762ecd38f000e2bd02dd255f6fd0c1ae755429#diff-0809a7f97ca58771c1cda186e73ec657
+>
+> That branch doesn't have any commit with the same ID that you have in
+> your boot log.
 
-But register branches (including procedure returns) are also branches, 
-so only counting immediate branches would be just as, if not more, 
-misleading.
+I have created this branch for your reference, here is the clean log on this [5]
 
-Robin.
+[5] https://paste.ubuntu.com/p/4bkFs5WG6c/
