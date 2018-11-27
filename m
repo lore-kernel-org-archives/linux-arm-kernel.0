@@ -1,43 +1,182 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Nov 2018 15:14:07 +0100
-Subject: [PATCH 0/6] ARM: dts: rockchip: Add BQ Edison2 QuadCore tablet
-In-Reply-To: <20181113130559.31221-1-heiko@sntech.de>
-References: <20181113130559.31221-1-heiko@sntech.de>
-Message-ID: <1759618.CptkHEOS8g@phil>
+From: mjourdan@baylibre.com (Maxime Jourdan)
+Date: Tue, 27 Nov 2018 15:19:47 +0100
+Subject: [PATCH] drm/meson: Add HDMI 1.4 4k modes
+In-Reply-To: <1541496909-19625-1-git-send-email-narmstrong@baylibre.com>
+References: <1541496909-19625-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAMO6naz=pm_cGo=_fFQdjes_HUXrSAi0CUTEVZYLkHvRCPZq0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 13. November 2018, 14:05:53 CET schrieb Heiko Stuebner:
-> Add a devicetree for the BQ Edison2 tablet from MundoReader.
-> Incidentially this is the device I wanted to run mainline Linux
-> on when starting the Rockchip port - thinking, "this can't take
-> thaaat long" ;-) - so I've come somewhat full-circle now.
-> 
-> With Lima it can also use gpu acceleration for gles2.
-> 
-> Notable absent peripherals are the touchscreen (ft5606),
-> IT66121 hdmi bridge (internal panel is working nicely) and sound.
-> All areas I'm still trying to get working.
-> 
-> The series includes some smallish cleanups before the board
-> with cleaning up the cpu-core nodes being a big part.
-> 
-> And there are a number of driver-side additions pending that
-> should get accepted before the board itself can go in.
-> (bq24196, Innolux panel, tmp108-interrupt).
-> 
-> 
-> Heiko Stuebner (6):
->   ARM: dts: rockchip: add #sound-dai-cells to Cortex-A9 i2s
->   ARM: dts: rockchip: convert rk3188 to opp-v2
->   ARM: dts: rockchip: add cpu-core resets for rk3188
->   ARM: dts: rockchip: add phandles to secondary cpu cores
->   ARM: dts: rockchip: update cpu supplies on rk3188
+On Tue, Nov 6, 2018 at 10:35 AM Neil Armstrong <narmstrong@baylibre.com> wrote:
+>
+> Add the timings for the HDMI 1.4 4K modes support :
+> - 3840x2160 at 30
+> - 3840x2160 at 25
+> - 3840x2160 at 24
+>
+> Since the 297000Hz pixel clock is already managed and the modes are
+> compatible with the HDMI 1.4 current HDMI PHY+Controller support, only
+> the missing timings values needs to be added.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/gpu/drm/meson/meson_venc.c | 129 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 129 insertions(+)
+>
+> diff --git a/drivers/gpu/drm/meson/meson_venc.c b/drivers/gpu/drm/meson/meson_venc.c
+> index 514245e..bcffe8e 100644
+> --- a/drivers/gpu/drm/meson/meson_venc.c
+> +++ b/drivers/gpu/drm/meson/meson_venc.c
+> @@ -697,6 +697,132 @@ union meson_hdmi_venc_mode meson_hdmi_encp_mode_1080p60 = {
+>         },
+>  };
+>
+> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p24 = {
+> +       .encp = {
+> +               .dvi_settings = 0x1,
+> +               .video_mode = 0x4040,
+> +               .video_mode_adv = 0x8,
+> +               /* video_sync_mode */
+> +               /* video_yc_dly */
+> +               /* video_rgb_ctrl */
+> +               .video_filt_ctrl = 0x1000,
+> +               .video_filt_ctrl_present = true,
+> +               /* video_ofld_voav_ofst */
+> +               .yfp1_htime = 140,
+> +               .yfp2_htime = 140+3840,
+> +               .max_pxcnt = 3840+1660-1,
+> +               .hspuls_begin = 2156+1920,
+> +               .hspuls_end = 44,
+> +               .hspuls_switch = 44,
+> +               .vspuls_begin = 140,
+> +               .vspuls_end = 2059+1920,
+> +               .vspuls_bline = 0,
+> +               .vspuls_eline = 4,
+> +               .havon_begin = 148,
+> +               .havon_end = 3987,
+> +               .vavon_bline = 89,
+> +               .vavon_eline = 2248,
+> +               /* eqpuls_begin */
+> +               /* eqpuls_end */
+> +               /* eqpuls_bline */
+> +               /* eqpuls_eline */
+> +               .hso_begin = 44,
+> +               .hso_end = 2156+1920,
+> +               .vso_begin = 2100+1920,
+> +               .vso_end = 2164+1920,
+> +               .vso_bline = 51,
+> +               .vso_eline = 53,
+> +               .vso_eline_present = true,
+> +               /* sy_val */
+> +               /* sy2_val */
+> +               .max_lncnt = 2249,
+> +       },
+> +};
+> +
+> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p25 = {
+> +       .encp = {
+> +               .dvi_settings = 0x1,
+> +               .video_mode = 0x4040,
+> +               .video_mode_adv = 0x8,
+> +               /* video_sync_mode */
+> +               /* video_yc_dly */
+> +               /* video_rgb_ctrl */
+> +               .video_filt_ctrl = 0x1000,
+> +               .video_filt_ctrl_present = true,
+> +               /* video_ofld_voav_ofst */
+> +               .yfp1_htime = 140,
+> +               .yfp2_htime = 140+3840,
+> +               .max_pxcnt = 3840+1440-1,
+> +               .hspuls_begin = 2156+1920,
+> +               .hspuls_end = 44,
+> +               .hspuls_switch = 44,
+> +               .vspuls_begin = 140,
+> +               .vspuls_end = 2059+1920,
+> +               .vspuls_bline = 0,
+> +               .vspuls_eline = 4,
+> +               .havon_begin = 148,
+> +               .havon_end = 3987,
+> +               .vavon_bline = 89,
+> +               .vavon_eline = 2248,
+> +               /* eqpuls_begin */
+> +               /* eqpuls_end */
+> +               /* eqpuls_bline */
+> +               /* eqpuls_eline */
+> +               .hso_begin = 44,
+> +               .hso_end = 2156+1920,
+> +               .vso_begin = 2100+1920,
+> +               .vso_end = 2164+1920,
+> +               .vso_bline = 51,
+> +               .vso_eline = 53,
+> +               .vso_eline_present = true,
+> +               /* sy_val */
+> +               /* sy2_val */
+> +               .max_lncnt = 2249,
+> +       },
+> +};
+> +
+> +union meson_hdmi_venc_mode meson_hdmi_encp_mode_2160p30 = {
+> +       .encp = {
+> +               .dvi_settings = 0x1,
+> +               .video_mode = 0x4040,
+> +               .video_mode_adv = 0x8,
+> +               /* video_sync_mode */
+> +               /* video_yc_dly */
+> +               /* video_rgb_ctrl */
+> +               .video_filt_ctrl = 0x1000,
+> +               .video_filt_ctrl_present = true,
+> +               /* video_ofld_voav_ofst */
+> +               .yfp1_htime = 140,
+> +               .yfp2_htime = 140+3840,
+> +               .max_pxcnt = 3840+560-1,
+> +               .hspuls_begin = 2156+1920,
+> +               .hspuls_end = 44,
+> +               .hspuls_switch = 44,
+> +               .vspuls_begin = 140,
+> +               .vspuls_end = 2059+1920,
+> +               .vspuls_bline = 0,
+> +               .vspuls_eline = 4,
+> +               .havon_begin = 148,
+> +               .havon_end = 3987,
+> +               .vavon_bline = 89,
+> +               .vavon_eline = 2248,
+> +               /* eqpuls_begin */
+> +               /* eqpuls_end */
+> +               /* eqpuls_bline */
+> +               /* eqpuls_eline */
+> +               .hso_begin = 44,
+> +               .hso_end = 2156+1920,
+> +               .vso_begin = 2100+1920,
+> +               .vso_end = 2164+1920,
+> +               .vso_bline = 51,
+> +               .vso_eline = 53,
+> +               .vso_eline_present = true,
+> +               /* sy_val */
+> +               /* sy2_val */
+> +               .max_lncnt = 2249,
+> +       },
+> +};
+> +
+>  struct meson_hdmi_venc_vic_mode {
+>         unsigned int vic;
+>         union meson_hdmi_venc_mode *mode;
+> @@ -717,6 +843,9 @@ struct meson_hdmi_venc_vic_mode {
+>         { 34, &meson_hdmi_encp_mode_1080p30 },
+>         { 31, &meson_hdmi_encp_mode_1080p50 },
+>         { 16, &meson_hdmi_encp_mode_1080p60 },
+> +       { 93, &meson_hdmi_encp_mode_2160p24 },
+> +       { 94, &meson_hdmi_encp_mode_2160p25 },
+> +       { 95, &meson_hdmi_encp_mode_2160p30 },
+>         { 0, NULL}, /* sentinel */
+>  };
+>
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
 
-applied the general cleanups from patch 1-5 for 4.21 now.
-
-
->   ARM: dts: rockchip: add BQ Edison 2 QC devicetree
-
-this one gets a bit more time for possible dt-maintainer Review of the
-small binding addition.
+Reviewed-by: Maxime Jourdan <mjourdan@baylibre.com>
