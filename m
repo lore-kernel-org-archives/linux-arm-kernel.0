@@ -1,95 +1,49 @@
-From: liuyun01@kylinos.cn (JackieLiu)
-Date: Tue, 27 Nov 2018 18:01:40 +0800
-Subject: [PATCH v2 1/2] arm64: add workaround for ambiguous C99 stdint.h
- types
-In-Reply-To: <CAKv+Gu9TEZ9j3xB9dM_tP9tenzoH+p6Y7-1KCKGEL7AkiVdRdw@mail.gmail.com>
-References: <20181127052701.4144-1-liuyun01@kylinos.cn>
- <CAKv+Gu9TEZ9j3xB9dM_tP9tenzoH+p6Y7-1KCKGEL7AkiVdRdw@mail.gmail.com>
-Message-ID: <36D96063-1722-4231-9810-CFAE6368616A@kylinos.cn>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 27 Nov 2018 11:06:09 +0100
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+ <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+ <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+Message-ID: <1543313169.2507.39.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yep, you are right. I will change code later.
+Hi Andrey,
 
-But now, I found an new problem, when build the kernel, 
-I got follow message:
+Am Montag, den 26.11.2018, 10:24 -0800 schrieb Andrey Smirnov:
+> On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > 
+> > On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+> > > @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+> > > -?????case IMX7D:
+> > > +?????case IMX8MQ:
+> > > +?????????????if (of_property_read_u32(node, "fsl,iomux-gpr1x",
+> > > +??????????????????????????????????????&imx6_pcie->gpr1x)) {
+> > > +?????????????????????dev_err(dev, "Failed to get GPR1x address\n");
+> > > +?????????????????????return -EINVAL;
+> > > +?????????????}
+> > 
+> > This is for distinguishing multiple controllers on the SOC but other
+> > registers and bits might differ. Isn't it preferable to have a property
+> > for controller id instead of adding many registers to DT?
+> > 
+> 
+> I liked encoding necessary info in DT directly slightly better than
+> encoding abstract ID and then decoding it further in the driver code.
+> OTOH, I am not really attached to that path. Lucas, can you comment on
+> this please?
 
-WARNING: EXPORT symbol "xor_block_inner_neon" [arch/arm64/lib/xor-neon.ko] 
-version generation failed, symbol will not be versioned.
+Yes, after rereading the patch with this in mind I agree that having
+the GPR offset on DT directly is IMO the better approach than an
+abstract ID.
 
-I don?t know why, do you have any idea?
+One other thing I noticed is that we probably need some property to
+encode if the clock is supplied by an external clkgen, or if the clock
+is provided by the i.MX. Hardcoding this in the driver will lead to DT
+backward compatibility headaches later on if someone decides to build a
+board with the clock provided from the i.MX.
 
-> ? 2018?11?27??16:17?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
-> 
-> On Tue, 27 Nov 2018 at 06:28, Jackie Liu <liuyun01@kylinos.cn> wrote:
->> 
->> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
->> for ambiguous C99 stdint.h types"), this patch redefines the macros that
->> are used in stdint.h so its definitions of uint64_t and int64_t are
->> compatible with those of the kernel.
->> 
->> This patch comes from: https://patchwork.kernel.org/patch/3540001/
->> Wrote by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> 
-> 
-> OK, I remember now :-)
-> 
-> So this is the reason you had two separate source files in the
-> previous revision.
-> 
-> Could we maybe deal with this differently? Could we add a header
-> 
-> arch/arm64/include/asm/neon-intrinsics.h
-> 
-> that includes <arm_neon.h> after setting the preprocessor overrides
-> below? And reference that header from your code?
-> 
-> That way, we don't have to override asm/types.h for everyone.
-> 
-> 
-> 
->> Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
->> ---
->> arch/arm64/include/uapi/asm/types.h | 26 ++++++++++++++++++++++++++
->> 1 file changed, 26 insertions(+)
->> create mode 100644 arch/arm64/include/uapi/asm/types.h
->> 
->> diff --git a/arch/arm64/include/uapi/asm/types.h b/arch/arm64/include/uapi/asm/types.h
->> new file mode 100644
->> index 0000000..0016780
->> --- /dev/null
->> +++ b/arch/arm64/include/uapi/asm/types.h
->> @@ -0,0 +1,26 @@
->> +#ifndef _UAPI_ASM_TYPES_H
->> +#define _UAPI_ASM_TYPES_H
->> +
->> +#include <asm-generic/int-ll64.h>
->> +
->> +/*
->> + * For Aarch64, there is some ambiguity in the definition of the types below
->> + * between the kernel and GCC itself. This is usually not a big deal, but it
->> + * causes trouble when including GCC's version of 'stdint.h' (this is the file
->> + * that gets included when you #include <stdint.h> on a -ffreestanding build).
->> + * As this file also gets included implicitly when including 'arm_neon.h' (the
->> + * NEON intrinsics support header), we need the following to work around the
->> + * issue if we want to use NEON intrinsics in the kernel.
->> + */
->> +
->> +#ifdef __INT64_TYPE__
->> +#undef __INT64_TYPE__
->> +#define __INT64_TYPE__         __signed__ long long
->> +#endif
->> +
->> +#ifdef __UINT64_TYPE__
->> +#undef __UINT64_TYPE__
->> +#define __UINT64_TYPE__                unsigned long long
->> +#endif
->> +
->> +#endif /* _UAPI_ASM_TYPES_H */
->> --
->> 2.7.4
->> 
->> 
->> 
->> 
-> 
+Regards,
+Lucas
