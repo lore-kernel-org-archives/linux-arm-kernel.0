@@ -1,91 +1,96 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 27 Nov 2018 11:42:45 +0800
-Subject: [PATCH v2 02/11] clk: mediatek: add new member to mtk_pll_data
+Date: Tue, 27 Nov 2018 11:42:53 +0800
+Subject: [PATCH v2 10/11] dt-bindings: soc: Add MT8183 power dt-bindings
 In-Reply-To: <20181127034254.24721-1-weiyi.lu@mediatek.com>
 References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
-Message-ID: <20181127034254.24721-4-weiyi.lu@mediatek.com>
+Message-ID: <20181127034254.24721-12-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Owen Chen <owen.chen@mediatek.com>
+Add power dt-bindings for MT8183.
 
-1. pcwibits: The integer bits of pcw for plls is extend to 8 bits,
-   add a variable to indicate this change and
-   backward-compatible.
-2. fmin: The pll freqency lower-bound is vary from 1GMhz to
-   1.5Ghz, add a variable to indicate platform-dependent.
-
-Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mtk.h |  2 ++
- drivers/clk/mediatek/clk-pll.c | 12 +++++++++---
- 2 files changed, 11 insertions(+), 3 deletions(-)
+ .../bindings/soc/mediatek/scpsys.txt          | 14 ++++++++++
+ include/dt-bindings/power/mt8183-power.h      | 26 +++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 include/dt-bindings/power/mt8183-power.h
 
-diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index f83c2bbb677e..11b5517903d0 100644
---- a/drivers/clk/mediatek/clk-mtk.h
-+++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -214,8 +214,10 @@ struct mtk_pll_data {
- 	unsigned int flags;
- 	const struct clk_ops *ops;
- 	u32 rst_bar_mask;
-+	unsigned long fmin;
- 	unsigned long fmax;
- 	int pcwbits;
-+	int pcwibits;
- 	uint32_t pcw_reg;
- 	int pcw_shift;
- 	const struct mtk_pll_div_table *div_table;
-diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-index f54e4015b0b1..1db161aced31 100644
---- a/drivers/clk/mediatek/clk-pll.c
-+++ b/drivers/clk/mediatek/clk-pll.c
-@@ -32,6 +32,8 @@
- #define AUDPLL_TUNER_EN		BIT(31)
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+index d6fe16f094af..b4728ce81c43 100644
+--- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
++++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+@@ -14,6 +14,7 @@ power/power_domain.txt. It provides the power domains defined in
+ - include/dt-bindings/power/mt2701-power.h
+ - include/dt-bindings/power/mt2712-power.h
+ - include/dt-bindings/power/mt7622-power.h
++- include/dt-bindings/power/mt8183-power.h
  
- #define POSTDIV_MASK		0x7
+ Required properties:
+ - compatible: Should be one of:
+@@ -24,18 +25,31 @@ Required properties:
+ 	- "mediatek,mt7623-scpsys", "mediatek,mt2701-scpsys": For MT7623 SoC
+ 	- "mediatek,mt7623a-scpsys": For MT7623A SoC
+ 	- "mediatek,mt8173-scpsys"
++	- "mediatek,mt8183-scpsys"
+ - #power-domain-cells: Must be 1
+ - reg: Address range of the SCPSYS unit
+ - infracfg: must contain a phandle to the infracfg controller
+ - clock, clock-names: clocks according to the common clock binding.
+                       These are clocks which hardware needs to be
+                       enabled before enabling certain power domains.
++                      The new clock type "BASIC" belongs to the type above.
++                      As to the new clock type "SUBSYS" needs to be
++                      enabled before releasing bus protection.
+ 	Required clocks for MT2701 or MT7623: "mm", "mfg", "ethif"
+ 	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
+ 	Required clocks for MT6797: "mm", "mfg", "vdec"
+ 	Required clocks for MT7622: "hif_sel"
+ 	Required clocks for MT7622A: "ethif"
+ 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
++	Required clocks for MT8183: BASIC: "audio", "mfg", "mm", "cam", "isp",
++					   "vpu", "vpu1", "vpu2", "vpu3"
++				    SUBSYS: "mm-0", "mm-1", "mm-2", "mm-3",
++					    "mm-4", "mm-5", "mm-6", "mm-7",
++					    "mm-8", "mm-9", "isp-0", "isp-1",
++					    "cam-0", "cam-1", "cam-2", "cam-3",
++					    "cam-4", "cam-5", "cam-6", "vpu-0",
++					    "vpu-1", "vpu-2", "vpu-3", "vpu-4",
++					    "vpu-5"
+ 
+ Optional properties:
+ - vdec-supply: Power supply for the vdec power domain
+diff --git a/include/dt-bindings/power/mt8183-power.h b/include/dt-bindings/power/mt8183-power.h
+new file mode 100644
+index 000000000000..5c0c8c7e3cd0
+--- /dev/null
++++ b/include/dt-bindings/power/mt8183-power.h
+@@ -0,0 +1,26 @@
++/* SPDX-License-Identifier: GPL-2.0
++ *
++ * Copyright (c) 2018 MediaTek Inc.
++ * Author: Weiyi Lu <weiyi.lu@mediatek.com>
++ */
 +
-+/* default 7 bits integer, can be overridden with pcwibits. */
- #define INTEGER_BITS		7
- 
- /*
-@@ -69,11 +71,13 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
- {
- 	int pcwbits = pll->data->pcwbits;
- 	int pcwfbits;
-+	int ibits;
- 	u64 vco;
- 	u8 c = 0;
- 
- 	/* The fractional part of the PLL divider. */
--	pcwfbits = pcwbits > INTEGER_BITS ? pcwbits - INTEGER_BITS : 0;
-+	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
-+	pcwfbits = pcwbits > ibits ? pcwbits - ibits : 0;
- 
- 	vco = (u64)fin * pcw;
- 
-@@ -138,9 +142,10 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
- static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
- 		u32 freq, u32 fin)
- {
--	unsigned long fmin = 1000 * MHZ;
-+	unsigned long fmin = pll->data->fmin ? pll->data->fmin : (1000 * MHZ);
- 	const struct mtk_pll_div_table *div_table = pll->data->div_table;
- 	u64 _pcw;
-+	int ibits;
- 	u32 val;
- 
- 	if (freq > pll->data->fmax)
-@@ -164,7 +169,8 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
- 	}
- 
- 	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
--	_pcw = ((u64)freq << val) << (pll->data->pcwbits - INTEGER_BITS);
-+	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
-+	_pcw = ((u64)freq << val) << (pll->data->pcwbits - ibits);
- 	do_div(_pcw, fin);
- 
- 	*pcw = (u32)_pcw;
++#ifndef _DT_BINDINGS_POWER_MT8183_POWER_H
++#define _DT_BINDINGS_POWER_MT8183_POWER_H
++
++#define MT8183_POWER_DOMAIN_AUDIO	0
++#define MT8183_POWER_DOMAIN_CONN	1
++#define MT8183_POWER_DOMAIN_MFG_ASYNC	2
++#define MT8183_POWER_DOMAIN_MFG		3
++#define MT8183_POWER_DOMAIN_MFG_CORE0	4
++#define MT8183_POWER_DOMAIN_MFG_CORE1	5
++#define MT8183_POWER_DOMAIN_MFG_2D	6
++#define MT8183_POWER_DOMAIN_DISP	7
++#define MT8183_POWER_DOMAIN_CAM		8
++#define MT8183_POWER_DOMAIN_ISP		9
++#define MT8183_POWER_DOMAIN_VDEC	10
++#define MT8183_POWER_DOMAIN_VENC	11
++#define MT8183_POWER_DOMAIN_VPU_TOP	12
++#define MT8183_POWER_DOMAIN_VPU_CORE0	13
++#define MT8183_POWER_DOMAIN_VPU_CORE1	14
++
++#endif /* _DT_BINDINGS_POWER_MT8183_POWER_H */
 -- 
 2.18.0
