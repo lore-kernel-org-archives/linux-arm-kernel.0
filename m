@@ -1,49 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Nov 2018 19:31:50 +0000
-Subject: [RFC][PATCH 03/14] arm64: function_graph: Remove use of
- FTRACE_NOTRACE_DEPTH
-In-Reply-To: <20181122012803.040221352@goodmis.org>
-References: <20181122012708.491151844@goodmis.org>
- <20181122012803.040221352@goodmis.org>
-Message-ID: <20181127193149.GJ5641@arm.com>
+From: rafael.tinoco@linaro.org (Rafael David Tinoco)
+Date: Tue, 27 Nov 2018 18:33:29 -0200
+Subject: [PATCH v2] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
+In-Reply-To: <91776bf8-0d12-1cc4-1ffb-ca3c486aeb0b@linaro.org>
+References: <20181025134344.GZ30658@n2100.armlinux.org.uk>
+ <20181121001150.405-1-rafael.tinoco@linaro.org>
+ <91776bf8-0d12-1cc4-1ffb-ca3c486aeb0b@linaro.org>
+Message-ID: <93b0cce5-4ceb-14ab-5987-af54f15958f2@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
-
-On Wed, Nov 21, 2018 at 08:27:11PM -0500, Steven Rostedt wrote:
-> From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+On 11/20/18 10:18 PM, Rafael David Tinoco wrote:
 > 
-> The curr_ret_stack is no longer set to -1 when not tracing a function. It is
-> now done differently, and the FTRACE_NOTRACE_DEPTH value is no longer used.
-> Remove the reference to it.
-
-Do you have a pointer to the commit that changed that behaviour? I just want
-to make sure we're not missing something in our unwind_frame() code.
-
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-> ---
->  arch/arm64/kernel/stacktrace.c | 3 ---
->  1 file changed, 3 deletions(-)
+> Russell,
 > 
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 4989f7ea1e59..7723dadf25be 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -61,9 +61,6 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
->  			(frame->pc == (unsigned long)return_to_handler)) {
->  		if (WARN_ON_ONCE(frame->graph == -1))
->  			return -EINVAL;
+> I have tried to place MAX_POSSIBLE_PHYSMEM_BITS in the best available
+> header for each architecture, considering different paging levels, PAE
+> existence, and existing similar definitions. Also, I have only
+> considered those architectures already having "sparsemem.h" header.
+> 
+> Would you mind reviewing it ?
 
-Hmm, so is this code redundant too ^^ ?
+Should I re-send the this v2 (as v3) with complete list of
+get_maintainer.pl ? I was in doubt because I'm touching headers from
+several archs and I'm not sure who, if it is accepted, would merge it.
 
-> -		if (frame->graph < -1)
-> -			frame->graph += FTRACE_NOTRACE_DEPTH;
-> -
-
-Do we still need to initialise frame->graph in __save_stack_trace()?
-
-Will
+Thank you
+-- 
+Rafael D. Tinoco
+Linaro Kernel Validation
