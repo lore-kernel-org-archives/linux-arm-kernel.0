@@ -1,57 +1,34 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Tue, 27 Nov 2018 10:13:57 +0100
-Subject: [PATCH 00/16] staging: vchiq: dead code removal & misc fixes
-In-Reply-To: <2009845931.201432.1543260993249@email.ionos.de>
-References: <20181120145351.30390-1-nsaenzjulienne@suse.de>
- <2009845931.201432.1543260993249@email.ionos.de>
-Message-ID: <20181127091357.GA14089@kroah.com>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Nov 2018 10:13:51 +0100
+Subject: [PATCH v2 32/43] drm/sun4i: Pass modifier to backend and
+ frontend format support helpers
+In-Reply-To: <20181123092515.2511-33-paul.kocialkowski@bootlin.com>
+References: <20181123092515.2511-1-paul.kocialkowski@bootlin.com>
+ <20181123092515.2511-33-paul.kocialkowski@bootlin.com>
+Message-ID: <20181127091351.ho4fmn2miph3xph7@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 08:36:33PM +0100, Stefan Wahren wrote:
-> > Nicolas Saenz Julienne <nsaenzjulienne@suse.de> hat am 20. November 2018 um 15:53 geschrieben:
-> > 
-> > 
-> > Hi All,
-> > 
-> > This series was written in parallel with reading and understanding the
-> > vchiq code. So excuse me for the lack of logic in the sequence of
-> > patches.
-> > 
-> > The main focus was to delete as much code as possible, I've counted
-> > around 550 lines, which is not bad. Apart from that there are some
-> > patches enforcing proper kernel APIs usage.
-> > 
-> > The only patch that really changes code is the
-> > vchiq_ioc_copy_element_data() rewrite.
-> > 
-> > The last commit updates the TODO list with some of my observations, I
-> > realise some of the might be a little opinionated. If anything it's
-> > going to force a discussion on the topic, which is nice.
-> > 
-> > It was developed on top of the latest linux-next, and was tested on a
-> > RPIv3B+ with audio, video and running vchiq_test.
-> > 
-> > Regards,
-> > Nicolas
-> > 
-> > RFC -> PATCH, as per Stefan's comments:
-> >   - Remove semaphore initialization from remove_event_create()
-> >     (commit 9)
-> >   - Join all three semaphore to completion patches (commit 11)
-> >   - Update probe/init commit message (commit 14)
-> >   - Update TODO commit message and clean up (commit 16)
-> >   - Fix spelling on some of the patches
-> > 
+On Fri, Nov 23, 2018 at 10:25:04AM +0100, Paul Kocialkowski wrote:
+> To prepare the introduction of tiled mode support, pass the framebuffer
+> format modifier to the helpers dealing with format support.
 > 
-> The whole series is
+> Since only linear mode is supported for now, add corresponding checks in
+> each helper.
 > 
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
-> Unfortunately patch 05 might not apply.
+> Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
 
-I fixed it up.
+Applied, thanks!
+Maxime
 
-thanks,
-
-greg k-h
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/591f8909/attachment.sig>
