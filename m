@@ -1,70 +1,31 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 27 Nov 2018 17:48:16 +0100
-Subject: [PATCH 2/3] mfd: syscon: Add optional clock support
+Date: Tue, 27 Nov 2018 17:48:15 +0100
+Subject: [PATCH 1/3] dt-bindings: mfd: syscon: Add optional clock support
 In-Reply-To: <1543337297-21873-1-git-send-email-fabrice.gasnier@st.com>
 References: <1543337297-21873-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1543337297-21873-3-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1543337297-21873-2-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Some system control registers need to be clocked, so the registers can
-be accessed. Add an optional clock and attach it to regmap.
+be accessed. Add an optional clock.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- drivers/mfd/syscon.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ Documentation/devicetree/bindings/mfd/syscon.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-index b6d05cd..a0ba4ff 100644
---- a/drivers/mfd/syscon.c
-+++ b/drivers/mfd/syscon.c
-@@ -12,6 +12,7 @@
-  * (at your option) any later version.
-  */
+diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+index 25d9e9c..a9aaa51 100644
+--- a/Documentation/devicetree/bindings/mfd/syscon.txt
++++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+@@ -17,6 +17,7 @@ Optional property:
+ - reg-io-width: the size (in bytes) of the IO accesses that should be
+   performed on the device.
+ - hwlocks: reference to a phandle of a hardware spinlock provider node.
++- clocks: phandle to the syscon clock
  
-+#include <linux/clk.h>
- #include <linux/err.h>
- #include <linux/hwspinlock.h>
- #include <linux/io.h>
-@@ -45,6 +46,7 @@ struct syscon {
- 
- static struct syscon *of_syscon_register(struct device_node *np)
- {
-+	struct clk *clk;
- 	struct syscon *syscon;
- 	struct regmap *regmap;
- 	void __iomem *base;
-@@ -119,6 +121,18 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 		goto err_regmap;
- 	}
- 
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk)) {
-+		ret = PTR_ERR(clk);
-+		/* clock is optional */
-+		if (ret != -ENOENT)
-+			goto err_clk;
-+	} else {
-+		ret = regmap_mmio_attach_clk(regmap, clk);
-+		if (ret)
-+			goto err_attach;
-+	}
-+
- 	syscon->regmap = regmap;
- 	syscon->np = np;
- 
-@@ -128,6 +142,11 @@ static struct syscon *of_syscon_register(struct device_node *np)
- 
- 	return syscon;
- 
-+err_attach:
-+	if (!IS_ERR(clk))
-+		clk_put(clk);
-+err_clk:
-+	regmap_exit(regmap);
- err_regmap:
- 	iounmap(base);
- err_map:
+ Examples:
+ gpr: iomuxc-gpr at 20e0000 {
 -- 
 1.9.1
