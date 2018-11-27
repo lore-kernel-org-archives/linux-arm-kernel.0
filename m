@@ -1,34 +1,39 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 27 Nov 2018 13:12:58 -0800
-Subject: [GIT PULL 1/4] bcm2835-defconfig-next-2018-11-27
-Message-ID: <20181127211301.30296-1-eric@anholt.net>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 27 Nov 2018 22:13:38 +0100
+Subject: [PATCH 0/2] use adrp/add pairs for PLT entries
+In-Reply-To: <20181127194444.GK5641@arm.com>
+References: <20181122084646.3247-1-ard.biesheuvel@linaro.org>
+ <20181127194444.GK5641@arm.com>
+Message-ID: <CAKv+Gu-fzP_Jx3bajQkO=S706a8Qc=_0VoktEywsvb8AWmJtWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Ard,
+>
+> On Thu, Nov 22, 2018 at 09:46:44AM +0100, Ard Biesheuvel wrote:
+> > Currently, PLT entries use a non-idiomatic movn/movz/movz/br instruction
+> > sequence which is also longer than necessary. Also, the code emitting
+> > them does not use the instruction generation code but open codes the
+> > opcodes directly.
+> >
+> > The extended KASLR range is now 4 GB, given that we switched to the
+> > small code model everywhere else (including for modules), so we can
+> > switch to adrp/add/br sequences which are easier in the I-cache.
+> >
+> > So implement adrp/add pair generation in the instruction generation code
+> > and wire it up into the PLT code. Note that the Cortex-A53 errata handling
+> > requires some special care to ensure that generated veneers are not
+> > susceptible to the erratum.
+> >
+> > Cc: Torsten Duwe <duwe@lst.de>
+> > Cc: Jessica Yu <jeyu@kernel.org>
+>
+> I've applied this, with a couple of extra comments in the plt comparison
+> code and the Reviewed-by from Torsten. There were some trivial conflicts
+> with Jessica's rework of the plt lookup, but I think I got it right. Please
+> take a look at for-next/core when you get a chance.
+>
 
-Hopefully I'm not too late this time around.  Stefan's been doing a
-great job maintaining the bcm2835 branches, and was waiting for me to
-send the PRs.
-
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  git://github.com/anholt/linux tags/bcm2835-defconfig-next-2018-11-27
-
-for you to fetch changes up to 24632d6b78a1929b14f32cab762a0859db7086f2:
-
-  ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2 camera driver (2018-11-15 19:07:36 +0100)
-
-----------------------------------------------------------------
-This pull request enables the V4L2 camera driver on the Pi1 defconfig.
-
-----------------------------------------------------------------
-Stefan Wahren (1):
-      ARM: bcm2835_defconfig: Enable BCM2835 MMAL-based V4L2 camera driver
-
- arch/arm/configs/bcm2835_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Looks fine to me.
