@@ -1,190 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 27 Nov 2018 18:42:55 +0100
-Subject: [PATCH] arm64/lib: improve CRC32 performance for deep pipelines
-Message-ID: <20181127174255.24372-1-ard.biesheuvel@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 27 Nov 2018 17:59:12 +0000
+Subject: [RESEND PATCH] arm64: acpi: Prepare for longer MADTs
+Message-ID: <20181127175912.2651-1-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improve the performance of the crc32() asm routines by getting rid of
-most of the branches and small sized loads on the common path.
+From: Jeremy Linton <jeremy.linton@arm.com>
 
-Instead, use a branchless code path involving overlapping 16 byte
-loads to process the first (length % 32) bytes, and process the
-remainder using a loop that processes 32 bytes at a time.
+The BAD_MADT_GICC_ENTRY check is a little too strict because
+it rejects MADT entries that don't match the currently known
+lengths. We should remove this restriction to avoid problems
+if the table length changes. Future code which might depend on
+additional fields should be written to validate those fields
+before using them, rather than trying to globally check
+known MADT version lengths.
 
-Tested using the following test program:
-
-  #include <stdlib.h>
-
-  extern void crc32_le(unsigned short, char const*, int);
-
-  int main(void)
-  {
-    static const char buf[4096];
-
-    srand(20181126);
-
-    for (int i = 0; i < 100 * 1000 * 1000; i++)
-      crc32_le(0, buf, rand() % 1024);
-
-    return 0;
-  }
-
-On Cortex-A53 and Cortex-A57, the performance regresses but only very
-slightly. On Cortex-A72 however, the performance improves from
-
-  $ time ./crc32
-
-  real  0m10.149s
-  user  0m10.149s
-  sys   0m0.000s
-
-to
-
-  $ time ./crc32
-
-  real  0m7.915s
-  user  0m7.915s
-  sys   0m0.000s
-
-Cc: Rui Sun <sunrui26@huawei.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Link: https://lkml.kernel.org/r/20181012192937.3819951-1-jeremy.linton at arm.com
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+[lorenzo.pieralisi at arm.com: added MADT macro comments]
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Al Stone <ahs3@redhat.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
-Cortex-A57 tcrypt results after the patch.
+Hi Will, Catalin,
 
-I ran Rui's code [0] as well. On Cortex-A57, performance regresses a bit
-more (but not dramatically). On Cortex-A72, it executes at
+resending a patch already posted on public mailing lists[1], I have
+just added a comment to the existing patch for future reference as
+discussed in [1], please consider merging it.
 
-$ time ./crc32 
+Thanks,
+Lorenzo
 
-real	0m9.625s
-user	0m9.625s
-sys	0m0.000s
+[1] https://lore.kernel.org/lkml/20181012192937.3819951-1-jeremy.linton at arm.com/T/#u
 
-Rui, can you please benchmark this code on your system as well?
+ arch/arm64/include/asm/acpi.h | 19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-[0] https://lore.kernel.org/lkml/1542612560-10089-1-git-send-email-sunrui26 at huawei.com/
-
- arch/arm64/lib/crc32.S | 54 ++++++++++++++++++--
- 1 file changed, 49 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/lib/crc32.S b/arch/arm64/lib/crc32.S
-index 5bc1e85b4e1c..f132f2a7522e 100644
---- a/arch/arm64/lib/crc32.S
-+++ b/arch/arm64/lib/crc32.S
-@@ -15,15 +15,59 @@
- 	.cpu		generic+crc
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 709208dfdc8b..2def77ec14be 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -22,12 +22,23 @@
+ #include <asm/tlbflush.h>
  
- 	.macro		__crc32, c
--0:	subs		x2, x2, #16
--	b.mi		8f
--	ldp		x3, x4, [x1], #16
-+	cmp		x2, #16
-+	b.lt		8f			// less than 16 bytes
+ /* Macros for consistency checks of the GICC subtable of MADT */
+-#define ACPI_MADT_GICC_LENGTH	\
+-	(acpi_gbl_FADT.header.revision < 6 ? 76 : 80)
 +
-+	and		x7, x2, #0x1f
-+	and		x2, x2, #~0x1f
-+	cbz		x7, 32f			// multiple of 32 bytes
-+
-+	and		x8, x7, #0xf
-+	ldp		x3, x4, [x1]
-+	add		x8, x8, x1
-+	add		x1, x1, x7
-+	ldp		x5, x6, [x8]
- CPU_BE(	rev		x3, x3		)
- CPU_BE(	rev		x4, x4		)
-+CPU_BE(	rev		x5, x5		)
-+CPU_BE(	rev		x6, x6		)
-+
-+	tst		x7, #8
-+	crc32\c\()x	w8, w0, x3
-+	csel		x3, x3, x4, eq
-+	csel		w0, w0, w8, eq
-+	tst		x7, #4
-+	lsr		x4, x3, #32
-+	crc32\c\()w	w8, w0, w3
-+	csel		x3, x3, x4, eq
-+	csel		w0, w0, w8, eq
-+	tst		x7, #2
-+	lsr		w4, w3, #16
-+	crc32\c\()h	w8, w0, w3
-+	csel		w3, w3, w4, eq
-+	csel		w0, w0, w8, eq
-+	tst		x7, #1
-+	crc32\c\()b	w8, w0, w3
-+	csel		w0, w0, w8, eq
-+	tst		x7, #16
-+	crc32\c\()x	w8, w0, x5
-+	crc32\c\()x	w8, w8, x6
-+	csel		w0, w0, w8, eq
-+	cbz		x2, 0f
-+
-+32:	ldp		x3, x4, [x1], #32
-+	sub		x2, x2, #32
-+	ldp		x5, x6, [x1, #-16]
-+CPU_BE(	rev		x3, x3		)
-+CPU_BE(	rev		x4, x4		)
-+CPU_BE(	rev		x5, x5		)
-+CPU_BE(	rev		x6, x6		)
- 	crc32\c\()x	w0, w0, x3
- 	crc32\c\()x	w0, w0, x4
--	b.ne		0b
--	ret
-+	crc32\c\()x	w0, w0, x5
-+	crc32\c\()x	w0, w0, x6
-+	cbnz		x2, 32b
-+0:	ret
++/*
++ * MADT GICC minimum length refers to the MADT GICC structure table length as
++ * defined in the earliest ACPI version supported on arm64, ie ACPI 5.1.
++ *
++ * The efficiency_class member was added to the
++ * struct acpi_madt_generic_interrupt to represent the MADT GICC structure
++ * "Processor Power Efficiency Class" field, added in ACPI 6.0 whose offset
++ * is therefore used to delimit the MADT GICC structure minimum length
++ * appropriately.
++ */
++#define ACPI_MADT_GICC_MIN_LENGTH   ACPI_OFFSET(  \
++	struct acpi_madt_generic_interrupt, efficiency_class)
  
- 8:	tbz		x2, #3, 4f
- 	ldr		x3, [x1], #8
+ #define BAD_MADT_GICC_ENTRY(entry, end)					\
+-	(!(entry) || (entry)->header.length != ACPI_MADT_GICC_LENGTH ||	\
+-	(unsigned long)(entry) + ACPI_MADT_GICC_LENGTH > (end))
++	(!(entry) || (entry)->header.length < ACPI_MADT_GICC_MIN_LENGTH || \
++	(unsigned long)(entry) + (entry)->header.length > (end))
+ 
+ /* Basic configuration for ACPI */
+ #ifdef	CONFIG_ACPI
 -- 
-2.19.1
-
-
-BEFORE testing speed of async crc32c (crc32c-generic)
-tcrypt: test  0 (   16 byte blocks,   16 bytes per update,   1 updates): 35416299 opers/sec, 566660784 bytes/sec
-tcrypt: test  1 (   64 byte blocks,   16 bytes per update,   4 updates): 5342888 opers/sec, 341944832 bytes/sec
-tcrypt: test  2 (   64 byte blocks,   64 bytes per update,   1 updates): 30056634 opers/sec, 1923624576 bytes/sec
-tcrypt: test  3 (  256 byte blocks,   16 bytes per update,  16 updates): 1543567 opers/sec, 395153152 bytes/sec
-tcrypt: test  4 (  256 byte blocks,   64 bytes per update,   4 updates): 4865198 opers/sec, 1245490688 bytes/sec
-tcrypt: test  5 (  256 byte blocks,  256 bytes per update,   1 updates): 12709474 opers/sec, 3253625344 bytes/sec
-tcrypt: test  6 ( 1024 byte blocks,   16 bytes per update,  64 updates): 401746 opers/sec, 411387904 bytes/sec
-tcrypt: test  7 ( 1024 byte blocks,  256 bytes per update,   4 updates): 2576764 opers/sec, 2638606336 bytes/sec
-tcrypt: test  8 ( 1024 byte blocks, 1024 bytes per update,   1 updates): 4464109 opers/sec, 4571247616 bytes/sec
-tcrypt: test  9 ( 2048 byte blocks,   16 bytes per update, 128 updates): 202236 opers/sec, 414179328 bytes/sec
-tcrypt: test 10 ( 2048 byte blocks,  256 bytes per update,   8 updates): 1344017 opers/sec, 2752546816 bytes/sec
-tcrypt: test 11 ( 2048 byte blocks, 1024 bytes per update,   2 updates): 2000544 opers/sec, 4097114112 bytes/sec
-tcrypt: test 12 ( 2048 byte blocks, 2048 bytes per update,   1 updates): 2395890 opers/sec, 4906782720 bytes/sec
-tcrypt: test 13 ( 4096 byte blocks,   16 bytes per update, 256 updates): 101569 opers/sec, 416026624 bytes/sec
-tcrypt: test 14 ( 4096 byte blocks,  256 bytes per update,  16 updates): 687876 opers/sec, 2817540096 bytes/sec
-tcrypt: test 15 ( 4096 byte blocks, 1024 bytes per update,   4 updates): 1029042 opers/sec, 4214956032 bytes/sec
-tcrypt: test 16 ( 4096 byte blocks, 4096 bytes per update,   1 updates): 1206227 opers/sec, 4940705792 bytes/sec
-tcrypt: test 17 ( 8192 byte blocks,   16 bytes per update, 512 updates):  50842 opers/sec, 416497664 bytes/sec
-tcrypt: test 18 ( 8192 byte blocks,  256 bytes per update,  32 updates): 347779 opers/sec, 2849005568 bytes/sec
-tcrypt: test 19 ( 8192 byte blocks, 1024 bytes per update,   8 updates): 525054 opers/sec, 4301242368 bytes/sec
-tcrypt: test 20 ( 8192 byte blocks, 4096 bytes per update,   2 updates): 600919 opers/sec, 4922728448 bytes/sec
-tcrypt: test 21 ( 8192 byte blocks, 8192 bytes per update,   1 updates): 606954 opers/sec, 4972167168 bytes/sec
-
-AFTER testing speed of async crc32c (crc32c-generic)
-tcrypt: test  0 (   16 byte blocks,   16 bytes per update,   1 updates): 30535173 opers/sec, 488562768 bytes/sec
-tcrypt: test  1 (   64 byte blocks,   16 bytes per update,   4 updates): 4798401 opers/sec, 307097664 bytes/sec
-tcrypt: test  2 (   64 byte blocks,   64 bytes per update,   1 updates): 30061075 opers/sec, 1923908800 bytes/sec
-tcrypt: test  3 (  256 byte blocks,   16 bytes per update,  16 updates): 1359905 opers/sec, 348135680 bytes/sec
-tcrypt: test  4 (  256 byte blocks,   64 bytes per update,   4 updates): 4862043 opers/sec, 1244683008 bytes/sec
-tcrypt: test  5 (  256 byte blocks,  256 bytes per update,   1 updates): 14375092 opers/sec, 3680023552 bytes/sec
-tcrypt: test  6 ( 1024 byte blocks,   16 bytes per update,  64 updates): 351936 opers/sec, 360382464 bytes/sec
-tcrypt: test  7 ( 1024 byte blocks,  256 bytes per update,   4 updates): 2665564 opers/sec, 2729537536 bytes/sec
-tcrypt: test  8 ( 1024 byte blocks, 1024 bytes per update,   1 updates): 4467924 opers/sec, 4575154176 bytes/sec
-tcrypt: test  9 ( 2048 byte blocks,   16 bytes per update, 128 updates): 177021 opers/sec, 362539008 bytes/sec
-tcrypt: test 10 ( 2048 byte blocks,  256 bytes per update,   8 updates): 1414689 opers/sec, 2897283072 bytes/sec
-tcrypt: test 11 ( 2048 byte blocks, 1024 bytes per update,   2 updates): 1995413 opers/sec, 4086605824 bytes/sec
-tcrypt: test 12 ( 2048 byte blocks, 2048 bytes per update,   1 updates): 2393630 opers/sec, 4902154240 bytes/sec
-tcrypt: test 13 ( 4096 byte blocks,   16 bytes per update, 256 updates):  88758 opers/sec, 363552768 bytes/sec
-tcrypt: test 14 ( 4096 byte blocks,  256 bytes per update,  16 updates): 731752 opers/sec, 2997256192 bytes/sec
-tcrypt: test 15 ( 4096 byte blocks, 1024 bytes per update,   4 updates): 1030393 opers/sec, 4220489728 bytes/sec
-tcrypt: test 16 ( 4096 byte blocks, 4096 bytes per update,   1 updates): 1205718 opers/sec, 4938620928 bytes/sec
-tcrypt: test 17 ( 8192 byte blocks,   16 bytes per update, 512 updates):  44450 opers/sec, 364134400 bytes/sec
-tcrypt: test 18 ( 8192 byte blocks,  256 bytes per update,  32 updates): 373236 opers/sec, 3057549312 bytes/sec
-tcrypt: test 19 ( 8192 byte blocks, 1024 bytes per update,   8 updates): 524905 opers/sec, 4300021760 bytes/sec
-tcrypt: test 20 ( 8192 byte blocks, 4096 bytes per update,   2 updates): 601242 opers/sec, 4925374464 bytes/sec
-tcrypt: test 21 ( 8192 byte blocks, 8192 bytes per update,   1 updates): 606769 opers/sec, 4970651648 bytes/sec
+2.19.2
