@@ -1,39 +1,106 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:33 +0100
-Subject: [PATCH v12 15/25] kasan,
- mm: perform untagged pointers comparison in krealloc
+Date: Tue, 27 Nov 2018 17:55:40 +0100
+Subject: [PATCH v12 22/25] kasan: add __must_check annotations to kasan hooks
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <5045db8a8e249a1eda3199b952120035eacb3bd4.1543337629.git.andreyknvl@google.com>
+Message-ID: <6d8c6f59c5b5a3dde569f893ecf3b56e58030ba1.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The krealloc function checks where the same buffer was reused or a new one
-allocated by comparing kernel pointers. Tag-based KASAN changes memory tag
-on the krealloc'ed chunk of memory and therefore also changes the pointer
-tag of the returned pointer. Therefore we need to perform comparison on
-untagged (with tags reset) pointers to check whether it's the same memory
-region or not.
+This patch adds __must_check annotations to kasan hooks that return a
+pointer to make sure that a tagged pointer always gets propagated.
 
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+Suggested-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- mm/slab_common.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ include/linux/kasan.h | 16 ++++++++++------
+ mm/kasan/common.c     | 15 +++++++++------
+ 2 files changed, 19 insertions(+), 12 deletions(-)
 
-diff --git a/mm/slab_common.c b/mm/slab_common.c
-index 5f3504e26d4c..5aabcbd32d82 100644
---- a/mm/slab_common.c
-+++ b/mm/slab_common.c
-@@ -1534,7 +1534,7 @@ void *krealloc(const void *p, size_t new_size, gfp_t flags)
- 	}
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index 8da7b7a4397a..b40ea104dd36 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -49,16 +49,20 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
+ void kasan_poison_slab(struct page *page);
+ void kasan_unpoison_object_data(struct kmem_cache *cache, void *object);
+ void kasan_poison_object_data(struct kmem_cache *cache, void *object);
+-void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object);
++void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
++					const void *object);
  
- 	ret = __do_krealloc(p, new_size, flags);
--	if (ret && p != ret)
-+	if (ret && kasan_reset_tag(p) != kasan_reset_tag(ret))
- 		kfree(p);
+-void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags);
++void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
++						gfp_t flags);
+ void kasan_kfree_large(void *ptr, unsigned long ip);
+ void kasan_poison_kfree(void *ptr, unsigned long ip);
+-void *kasan_kmalloc(struct kmem_cache *s, const void *object, size_t size,
+-		  gfp_t flags);
+-void *kasan_krealloc(const void *object, size_t new_size, gfp_t flags);
++void * __must_check kasan_kmalloc(struct kmem_cache *s, const void *object,
++					size_t size, gfp_t flags);
++void * __must_check kasan_krealloc(const void *object, size_t new_size,
++					gfp_t flags);
  
- 	return ret;
+-void *kasan_slab_alloc(struct kmem_cache *s, void *object, gfp_t flags);
++void * __must_check kasan_slab_alloc(struct kmem_cache *s, void *object,
++					gfp_t flags);
+ bool kasan_slab_free(struct kmem_cache *s, void *object, unsigned long ip);
+ 
+ struct kasan_cache {
+diff --git a/mm/kasan/common.c b/mm/kasan/common.c
+index 195ca385cf7a..1144e741feb6 100644
+--- a/mm/kasan/common.c
++++ b/mm/kasan/common.c
+@@ -373,7 +373,8 @@ static u8 assign_tag(struct kmem_cache *cache, const void *object, bool new)
+ #endif
+ }
+ 
+-void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
++void * __must_check kasan_init_slab_obj(struct kmem_cache *cache,
++						const void *object)
+ {
+ 	struct kasan_alloc_meta *alloc_info;
+ 
+@@ -389,7 +390,8 @@ void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
+ 	return (void *)object;
+ }
+ 
+-void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
++void * __must_check kasan_slab_alloc(struct kmem_cache *cache, void *object,
++					gfp_t flags)
+ {
+ 	return kasan_kmalloc(cache, object, cache->object_size, flags);
+ }
+@@ -449,8 +451,8 @@ bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
+ 	return __kasan_slab_free(cache, object, ip, true);
+ }
+ 
+-void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
+-		   gfp_t flags)
++void * __must_check kasan_kmalloc(struct kmem_cache *cache, const void *object,
++					size_t size, gfp_t flags)
+ {
+ 	unsigned long redzone_start;
+ 	unsigned long redzone_end;
+@@ -482,7 +484,8 @@ void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
+ }
+ EXPORT_SYMBOL(kasan_kmalloc);
+ 
+-void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
++void * __must_check kasan_kmalloc_large(const void *ptr, size_t size,
++						gfp_t flags)
+ {
+ 	struct page *page;
+ 	unsigned long redzone_start;
+@@ -506,7 +509,7 @@ void *kasan_kmalloc_large(const void *ptr, size_t size, gfp_t flags)
+ 	return (void *)ptr;
+ }
+ 
+-void *kasan_krealloc(const void *object, size_t size, gfp_t flags)
++void * __must_check kasan_krealloc(const void *object, size_t size, gfp_t flags)
+ {
+ 	struct page *page;
+ 
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
