@@ -1,70 +1,49 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:24 +0100
-Subject: [PATCH v12 06/25] kasan, arm64: adjust shadow size for tag-based mode
+Date: Tue, 27 Nov 2018 17:55:20 +0100
+Subject: [PATCH v12 02/25] kasan,
+ slub: handle pointer tags in early_kmem_cache_node_alloc
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <95fa472a03a8ff268e24b8730ebd108922824e74.1543337629.git.andreyknvl@google.com>
+Message-ID: <3459b9f5d4daf96668d9579da2cf15eb5523284b.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tag-based KASAN uses 1 shadow byte for 16 bytes of kernel memory, so it
-requires 1/16th of the kernel virtual address space for the shadow memory.
+The previous patch updated KASAN hooks signatures and their usage in SLAB
+and SLUB code, except for the early_kmem_cache_node_alloc function. This
+patch handles that function separately, as it requires to reorder some of
+the initialization code to correctly propagate a tagged pointer in case a
+tag is assigned by kasan_kmalloc.
 
-This commit sets KASAN_SHADOW_SCALE_SHIFT to 4 when the tag-based KASAN
-mode is enabled.
-
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- arch/arm64/Makefile             | 11 ++++++++++-
- arch/arm64/include/asm/memory.h |  7 +++----
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ mm/slub.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 6cb9fc7e9382..99e7d08c6083 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -91,10 +91,19 @@ else
- TEXT_OFFSET := 0x00080000
- endif
+diff --git a/mm/slub.c b/mm/slub.c
+index fdd4a86aa882..8561a32910dd 100644
+--- a/mm/slub.c
++++ b/mm/slub.c
+@@ -3364,16 +3364,16 @@ static void early_kmem_cache_node_alloc(int node)
  
-+ifeq ($(CONFIG_KASAN_SW_TAGS), y)
-+KASAN_SHADOW_SCALE_SHIFT := 4
-+else
-+KASAN_SHADOW_SCALE_SHIFT := 3
-+endif
-+
-+KBUILD_CFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+KBUILD_CPPFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+KBUILD_AFLAGS += -DKASAN_SHADOW_SCALE_SHIFT=$(KASAN_SHADOW_SCALE_SHIFT)
-+
- # KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #				 - (1 << (64 - KASAN_SHADOW_SCALE_SHIFT))
- # in 32-bit arithmetic
--KASAN_SHADOW_SCALE_SHIFT := 3
- KASAN_SHADOW_OFFSET := $(shell printf "0x%08x00000000\n" $$(( \
- 	(0xffffffff & (-1 << ($(CONFIG_ARM64_VA_BITS) - 32))) \
- 	+ (1 << ($(CONFIG_ARM64_VA_BITS) - 32 - $(KASAN_SHADOW_SCALE_SHIFT))) \
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index b96442960aea..05fbc7ffcd31 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -74,12 +74,11 @@
- #define KERNEL_END        _end
+ 	n = page->freelist;
+ 	BUG_ON(!n);
+-	page->freelist = get_freepointer(kmem_cache_node, n);
+-	page->inuse = 1;
+-	page->frozen = 0;
+-	kmem_cache_node->node[node] = n;
+ #ifdef CONFIG_SLUB_DEBUG
+ 	init_object(kmem_cache_node, n, SLUB_RED_ACTIVE);
+ 	init_tracking(kmem_cache_node, n);
+ #endif
+-	kasan_kmalloc(kmem_cache_node, n, sizeof(struct kmem_cache_node),
++	n = kasan_kmalloc(kmem_cache_node, n, sizeof(struct kmem_cache_node),
+ 		      GFP_KERNEL);
++	page->freelist = get_freepointer(kmem_cache_node, n);
++	page->inuse = 1;
++	page->frozen = 0;
++	kmem_cache_node->node[node] = n;
+ 	init_kmem_cache_node(n);
+ 	inc_slabs_node(kmem_cache_node, node, page->objects);
  
- /*
-- * KASAN requires 1/8th of the kernel virtual address space for the shadow
-- * region. KASAN can bloat the stack significantly, so double the (minimum)
-- * stack size when KASAN is in use.
-+ * Generic and tag-based KASAN require 1/8th and 1/16th of the kernel virtual
-+ * address space for the shadow region respectively. They can bloat the stack
-+ * significantly, so double the (minimum) stack size when they are in use.
-  */
- #ifdef CONFIG_KASAN
--#define KASAN_SHADOW_SCALE_SHIFT 3
- #define KASAN_SHADOW_SIZE	(UL(1) << (VA_BITS - KASAN_SHADOW_SCALE_SHIFT))
- #define KASAN_THREAD_SHIFT	1
- #else
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
