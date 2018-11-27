@@ -1,57 +1,86 @@
-From: hofrat@osadl.org (Nicholas Mc Guire)
-Date: Tue, 27 Nov 2018 18:00:18 +0100
-Subject: [PATCH V2] gpio: mt7621: pass mediatek_gpio_bank_probe() failure up
- the stack
-Message-ID: <1543338018-708-1-git-send-email-hofrat@osadl.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 27 Nov 2018 17:09:32 +0000
+Subject: [PATCH V3 2/5] arm64: mm: Introduce DEFAULT_MAP_WINDOW
+In-Reply-To: <20181114133920.7134-3-steve.capper@arm.com>
+References: <20181114133920.7134-1-steve.capper@arm.com>
+ <20181114133920.7134-3-steve.capper@arm.com>
+Message-ID: <20181127170931.GC3563@arrakis.emea.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The error cases of mediatek_gpio_bank_probe() would go unnoticed (except
-for the dev_err() messages). The probe function should return an error
-if one of the banks failed to initialize properly indicated by
-not returning non-0.
+Hi Steve,
 
-Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-Fixes: 4ba9c3afda41 ("gpio: mt7621: Add a driver for MT7621")
----
+On Wed, Nov 14, 2018 at 01:39:17PM +0000, Steve Capper wrote:
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index 3e2091708b8e..da41a2655b69 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -25,6 +25,9 @@
+>  #define USER_DS		(TASK_SIZE_64 - 1)
+>  
+>  #ifndef __ASSEMBLY__
+> +
+> +#define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
+> +
+>  #ifdef __KERNEL__
 
-V2: A logic error spoted by Sean Wang <sean.wang@kernel.org> the
-    success case is 0 and thus returning early should be on on 
-    ret!=0 and not on !ret - thanks for catching this stupid mistake !
+That's a strange place to place DEFAULT_MAP_WINDOW_64. Did you have any
+#include dependency issues? If yes, we could look at cleaning them up,
+maybe moving these definitions into a separate file.
 
-Patch was compile tested with: omega2p_defconfig, SOC_MT7621=y,
-GPIOLIB=y, GPIO_MT7621=y
+(also, if you do a clean-up I don't think we need __KERNEL__ anymore)
 
-Patch is against 4.20-rc3 (localversion-next is next-20181121)
+>  
+>  #include <linux/build_bug.h>
+> @@ -51,13 +54,16 @@
+>  				TASK_SIZE_32 : TASK_SIZE_64)
+>  #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+>  				TASK_SIZE_32 : TASK_SIZE_64)
+> +#define DEFAULT_MAP_WINDOW	(test_thread_flag(TIF_32BIT) ? \
+> +				TASK_SIZE_32 : DEFAULT_MAP_WINDOW_64)
+>  #else
+>  #define TASK_SIZE		TASK_SIZE_64
+> +#define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
+>  #endif /* CONFIG_COMPAT */
+>  
+> -#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+> +#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+> +#define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
+>  
+> -#define STACK_TOP_MAX		TASK_SIZE_64
+>  #ifdef CONFIG_COMPAT
+>  #define AARCH32_VECTORS_BASE	0xffff0000
+>  #define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 9d9582cac6c4..e5a1dc0beef9 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -609,7 +609,7 @@ void __init mem_init(void)
+>  	 * detected at build time already.
+>  	 */
+>  #ifdef CONFIG_COMPAT
+> -	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
+> +	BUILD_BUG_ON(TASK_SIZE_32			> DEFAULT_MAP_WINDOW_64);
+>  #endif
 
- drivers/gpio/gpio-mt7621.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Since you are at this, can you please remove the useless white space (I
+guess it was there before when we had more BUILD_BUG_ONs).
 
-diff --git a/drivers/gpio/gpio-mt7621.c b/drivers/gpio/gpio-mt7621.c
-index 1ec95bc..68fca8b 100644
---- a/drivers/gpio/gpio-mt7621.c
-+++ b/drivers/gpio/gpio-mt7621.c
-@@ -297,6 +297,7 @@ mediatek_gpio_probe(struct platform_device *pdev)
- 	struct device_node *np = dev->of_node;
- 	struct mtk *mtk;
- 	int i;
-+	int ret;
- 
- 	mtk = devm_kzalloc(dev, sizeof(*mtk), GFP_KERNEL);
- 	if (!mtk)
-@@ -311,8 +312,11 @@ mediatek_gpio_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, mtk);
- 	mediatek_gpio_irq_chip.name = dev_name(dev);
- 
--	for (i = 0; i < MTK_BANK_CNT; i++)
--		mediatek_gpio_bank_probe(dev, np, i);
-+	for (i = 0; i < MTK_BANK_CNT; i++) {
-+		ret = mediatek_gpio_bank_probe(dev, np, i);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	return 0;
- }
+> diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> index 30ac0c975f8a..d1ec7136e3e1 100644
+> --- a/drivers/firmware/efi/libstub/arm-stub.c
+> +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> @@ -33,7 +33,7 @@
+>  #define EFI_RT_VIRTUAL_SIZE	SZ_512M
+>  
+>  #ifdef CONFIG_ARM64
+> -# define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE_64
+> +# define EFI_RT_VIRTUAL_LIMIT	DEFAULT_MAP_WINDOW_64
+>  #else
+>  # define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE
+>  #endif
+
+Just curious, would anything happen if we leave this to TASK_SIZE_64?
+
 -- 
-2.1.4
+Catalin
