@@ -1,126 +1,26 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 10:36:19 +0100
-Subject: [PATCH 06/14] regulator: axp20x: add software based soft_start
- for AXP209 LDO3
-In-Reply-To: <41cb1b4dac3a15595c89fa962b78d3f68f370021.1543245984.git-series.plaes@plaes.org>
+Date: Tue, 27 Nov 2018 10:37:35 +0100
+Subject: [PATCH 10/14] regulator: dts: set proper lradc vref on OLinuXino
+ Lime2
+In-Reply-To: <b27515a1cfe3512253a3fbcda04a3367818520b9.1543245984.git-series.plaes@plaes.org>
 References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
- <41cb1b4dac3a15595c89fa962b78d3f68f370021.1543245984.git-series.plaes@plaes.org>
-Message-ID: <20181127093619.72ensythkx2mhdf5@flea>
+ <b27515a1cfe3512253a3fbcda04a3367818520b9.1543245984.git-series.plaes@plaes.org>
+Message-ID: <20181127093735.amfqfcsxzreajte4@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 05:27:47PM +0200, Priit Laes wrote:
+On Mon, Nov 26, 2018 at 05:27:51PM +0200, Priit Laes wrote:
 > From: Olliver Schinagl <oliver@schinagl.nl>
 > 
-> In the past, there have been words on various lists that if LDO3 is
-> disabled in u-boot, but enabled in the DTS, the axp209 driver would
-> fail to continue/hang. Several enable/disable patches have been
-> issues to devicetree's in both the kernel and u-boot to address
-> this issue.
-> 
-> What really happened however, was that the AXP209 shuts down without
-> a notice and without setting an interrupt. This is caused when LDO3
-> gets overloaded, for example with large capacitors on the LDO3 output.
-> 
-> Normally, we would expect that AXP209 would source 200 mA as per
-> datasheet and set and trigger an interrupt when being overloaded.
-> For some reason however, this does not happen.
-> 
-> As a work-around, we use the soft-start constraint of the regulator
-> node to first bring up the LDO3 to the lowest possible voltage and
-> then enable the LDO. After that, we can set the requested voltage
-> as usual.
-> 
-> Combining this setting with the regulator-ramp-delay allows LDO3 to
-> enable voltage slowly and staggered, potentially reducing overall
-> inrush current.
+> The lradc's analog reference voltage is set to 3.0 volt in the
+> hardware. This is more or less set in copper for at least lradc0. Set the
+> property in the dts to ensure the lradc is referenced properly.
 > 
 > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 > Signed-off-by: Priit Laes <plaes@plaes.org>
-> ---
->  drivers/regulator/axp20x-regulator.c | 57 ++++++++++++++++++++++++++++-
->  1 file changed, 56 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-> index 1d9fa62..e8a895b 100644
-> --- a/drivers/regulator/axp20x-regulator.c
-> +++ b/drivers/regulator/axp20x-regulator.c
-> @@ -14,6 +14,7 @@
->   */
->  
->  #include <linux/bitops.h>
-> +#include <linux/delay.h>
->  #include <linux/err.h>
->  #include <linux/init.h>
->  #include <linux/mfd/axp20x.h>
-> @@ -23,6 +24,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/regulator/driver.h>
-> +#include <linux/regulator/machine.h>
->  #include <linux/regulator/of_regulator.h>
->  
->  #define AXP20X_GPIO0_FUNC_MASK		GENMASK(3, 0)
-> @@ -430,6 +432,59 @@ static int axp20x_set_ramp_delay(struct regulator_dev *rdev, int ramp)
->  	return regmap_update_bits(axp20x->regmap, reg, mask, cfg);
->  }
->  
-> +static int axp20x_regulator_enable_regmap(struct regulator_dev *rdev)
-> +{
-> +	struct axp20x_dev *axp20x = rdev_get_drvdata(rdev);
-> +	const struct regulator_desc *desc = rdev->desc;
-> +
-> +	if (!rdev)
-> +		return -EINVAL;
-> +
-> +	switch (axp20x->variant) {
-> +	case AXP209_ID:
-> +		if ((desc->id == AXP20X_LDO3) &&
-> +		    rdev->constraints && rdev->constraints->soft_start) {
-> +			int v_out;
-> +			int ret;
-> +
-> +			/*
-> +			 * On some boards, the LDO3 can be overloaded when
-> +			 * turning on, causing the entire PMIC to shutdown
-> +			 * without warning. Turning it on at the minimal voltage
-> +			 * and then setting the voltage to the requested value
-> +			 * works reliably.
-> +			 */
-> +			if (regulator_is_enabled_regmap(rdev))
-> +				break;
-> +
-> +			v_out = regulator_get_voltage_sel_regmap(rdev);
-> +			if (v_out < 0)
-> +				return v_out;
-> +
-> +			if (v_out == 0)
-> +				break;
-> +
-> +			ret = regulator_set_voltage_sel_regmap(rdev, 0x00);
-> +			/*
-> +			 * A small pause is needed between
-> +			 * setting the voltage and enabling the LDO to give the
-> +			 * internal state machine time to process the request.
-> +			 */
-> +			usleep_range(1000, 5000);
-> +			ret |= regulator_enable_regmap(rdev);
-> +			ret |= regulator_set_voltage_sel_regmap(rdev, v_out);
-> +
-> +			return ret;
-> +		}
-> +		break;
-> +	default:
-> +		/* No quirks */
-> +		break;
-> +	}
-> +
-> +	return regulator_enable_regmap(rdev);
-> +};
-> +
 
-This is some pretty generic code, and could be useful to some other
-users. I guess a generic function would be better for this.
+I'm not sure why that patch is part of this series, but I applied
+it. Thanks!
 
 Maxime
 
@@ -134,4 +34,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/f95e9f28/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/8f7df264/attachment.sig>
