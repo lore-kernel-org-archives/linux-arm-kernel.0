@@ -1,66 +1,239 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Nov 2018 01:28:59 +0100
-Subject: [PATCH v2 4/4] ARM: dts: rockchip: Add internal timer support for
- rv1108
-In-Reply-To: <20181126173506.24068-4-otavio@ossystems.com.br>
-References: <20181126173506.24068-1-otavio@ossystems.com.br>
- <20181126173506.24068-4-otavio@ossystems.com.br>
-Message-ID: <2433008.lBIgasatsU@phil>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 27 Nov 2018 08:45:13 +0800
+Subject: [PATCH v3] arm64: dts: rockchip: Add DT for nanopc-t4
+In-Reply-To: <26178858.xdqtN7Rtck@phil>
+References: <20181123073120.6250-1-tomeu.vizoso@collabora.com>
+ <20181126145107.38222-1-tomeu.vizoso@collabora.com>
+ <26178858.xdqtN7Rtck@phil>
+Message-ID: <e9ee8167-c398-c14e-d798-3b4233ba2ff2@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 26. November 2018, 18:35:06 CET schrieb Otavio Salvador:
-> Add support for the internal timer peripheral on RV1108.
+On 2018/11/27 7:48, Heiko Stuebner wrote:
+> Hi Tomeu,
 > 
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
-> ---
-
-looks good, but due to the newly added compatible
-I'll let this sit a bit longer to give Rob a chance to add a
-Review-tag or so.
-
-
-Heiko
-
-
+> Am Montag, 26. November 2018, 15:47:49 CET schrieb Tomeu Vizoso:
+>> This adds a device tree for the NanoPC-T4 SBC, which is based on the
+>> Rockchip RK3399 SoC and marketed by FriendlyELEC.
+>>
+>> Known working:
+>>
+>> - Serial
+>> - Ethernet
+>> - HDMI
+>> - USB 2.0
+>>
+>> All of the interesting stuff is in a .dtsi because there are at least
+>> two other boards that share most of it: NanoPi M4 and NanoPi NEO4.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > 
-> Changes in v2:
-> - add binding to doc
-> - fixup commit log
+> looks pretty good overall, just some more small-scale things
+> below.
 > 
->  .../devicetree/bindings/timer/rockchip,rk-timer.txt       | 1 +
->  arch/arm/boot/dts/rv1108.dtsi                             | 8 ++++++++
->  2 files changed, 9 insertions(+)
+>> ---
+>>
+>> v2: - Rename compatible from friendlyelec to friendlyarm, to match
+>>        existing bindings
+>>      - Remove superfluous node spi1
+>>
+>> v3: - Rewrite regulator tree to match the schematics (Heiko)
+>>      - Sort top-level nodes alphabetically (Heiko)
+>>      - Used defines for GPIO numbers (Heiko)
+>>      - Enabled rga (Heiko)
+>>      - Removed cdn_dp node (Heiko)
+>>      - Removed dependencies to fusb0 as extcon (Heiko)
+>>      - Removed superfluous properties (Heiko)
 > 
-> diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-> index 16a5f4577a61..d65fdce7c7f0 100644
-> --- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-> +++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-> @@ -2,6 +2,7 @@ Rockchip rk timer
->  
->  Required properties:
->  - compatible: should be:
-> +  "rockchip,rv1108-timer", "rockchip,rk3288-timer": for Rockchip RV1108
->    "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
->    "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
->    "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
-> diff --git a/arch/arm/boot/dts/rv1108.dtsi b/arch/arm/boot/dts/rv1108.dtsi
-> index 23ac4b10d690..9683f3b00d9d 100644
-> --- a/arch/arm/boot/dts/rv1108.dtsi
-> +++ b/arch/arm/boot/dts/rv1108.dtsi
-> @@ -293,6 +293,14 @@
->  		};
->  	};
->  
-> +	timer: timer at 10350000 {
-> +		compatible = "rockchip,rv1108-timer", "rockchip,rk3288-timer";
-> +		reg = <0x10350000 0x20>;
-> +		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&xin24m>, <&cru PCLK_TIMER>;
-> +		clock-names = "timer", "pclk";
-> +	};
-> +
->  	watchdog: wdt at 10360000 {
->  		compatible = "snps,dw-wdt";
->  		reg = <0x10360000 0x100>;
+> 
+>> diff --git a/arch/arm64/boot/dts/rockchip/Makefile b/arch/arm64/boot/dts/rockchip/Makefile
+>> index 49042c477870..4cbd2c461052 100644
+>> --- a/arch/arm64/boot/dts/rockchip/Makefile
+>> +++ b/arch/arm64/boot/dts/rockchip/Makefile
+>> @@ -1,6 +1,7 @@
+>>   # SPDX-License-Identifier: GPL-2.0
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += px30-evb.dtb
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-evb.dtb
+>> +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3399-nanopc-t4.dtb
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-rock64.dtb
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3328-roc-cc.dtb
+>>   dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3368-evb-act8846.dtb
+> 
+> These are definitly sorted in the Makefile, so this should move between
+> rk3399-gru-scarlet-kd.dtb and rk3399-puma-haikou.dtb :-)
+> 
+> 
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+>> new file mode 100644
+>> index 000000000000..f102ff2317c3
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopi4.dtsi
+>> @@ -0,0 +1,740 @@
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> +/*
+>> + * RK3399-based FriendlyElec boards device tree source
+>> + *
+>> + * Copyright (c) 2016 Fuzhou Rockchip Electronics Co., Ltd
+>> + *
+>> + * Copyright (c) 2018 FriendlyElec Computer Tech. Co., Ltd.
+>> + * (http://www.friendlyarm.com)
+>> + *
+>> + * Copyright (c) 2018 Collabora Ltd.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include <dt-bindings/input/linux-event-codes.h>
+>> +#include "rk3399.dtsi"
+>> +#include "rk3399-opp.dtsi"
+>> +
+>> +/ {
+>> +	chosen {
+>> +		stdout-path = "serial2:1500000n8";
+>> +	};
+>> +
+>> +	clkin_gmac: external-gmac-clock {
+>> +		compatible = "fixed-clock";
+>> +		clock-frequency = <125000000>;
+>> +		clock-output-names = "clkin_gmac";
+>> +		#clock-cells = <0>;
+>> +	};
+>> +
+>> +	vdd_5v: vdd_5v {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vdd_5v";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +	};
+>> +
+>> +	vcc5v0_core: vcc5v0_core {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0_core";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		vin-supply = <&vdd_5v>;
+>> +	};
+>> +
+>> +	vcc3v3_sys: vcc3v3_sys {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc3v3_sys";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		regulator-min-microvolt = <3300000>;
+>> +		regulator-max-microvolt = <3300000>;
+>> +		vin-supply = <&vcc5v0_core>;
+>> +	};
+>> +
+>> +	vcc5v0_sys: vcc5v0_sys {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0_sys";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		vin-supply = <&vdd_5v>;
+>> +	};
+>> +
+>> +	vcc5v0_usb1: vcc5v0_usb1 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0_usb1";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		vin-supply = <&vcc5v0_sys>;
+>> +	};
+>> +
+>> +	vcc5v0_usb2: vcc5v0_usb2 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc5v0_usb2";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		vin-supply = <&vcc5v0_sys>;
+>> +	};
+>> +
+>> +	/* switched by pmic_sleep */
+>> +	vcc1v8_s3: vcca1v8_s3: vcc1v8-s3 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "vcc1v8_s3";
+>> +		regulator-always-on;
+>> +		regulator-boot-on;
+>> +		regulator-min-microvolt = <1800000>;
+>> +		regulator-max-microvolt = <1800000>;
+>> +		vin-supply = <&vcc_1v8>;
+>> +	};
+>> +
+>> +	vcc3v0_sd: vcc3v0_sd {
+> 
+> dt-spec mandates node names with "-", so this should become
+> 	vcc3v0_sd: vcc3v0-sd {
+> 
+> Same for most regulators above.
+> 
+>> +	rk808: pmic at 1b {
+>> +		compatible = "rockchip,rk808";
+>> +		reg = <0x1b>;
+>> +		interrupt-parent = <&gpio1>;
+>> +		interrupts = <21 IRQ_TYPE_LEVEL_LOW>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pmic_int_l>;
+>> +		rockchip,system-power-controller;
+>> +		wakeup-source;
+>> +		#clock-cells = <1>;
+>> +		clock-output-names = "rk808-clkout1", "rk808-clkout2";
+> 
+> rename rk808-clkout1 to xin32k so that it hooks correctly into
+> the rk3399 clock controller, as that signals is providing the 32kHz clock
+> for the system. (see $debug/clk/clk_summary and rk3399-cru dt binding)
+> 
+> 
+>> +&pinctrl {
+>> +
+> 
+> unnecessary empty line
+> 
+>> +	pmic {
+> 
+> 
+>> +&rga {
+>> +	status = "okay";
+>> +};
+> 
+> rga is not dependant on pinout, so is always enabled in rk3399.dtsi
+> So this node can go away.
+> 
+>> +&sdhci {
+>> +	bus-width = <8>;
+>> +	mmc-hs400-1_8v;
+>> +	supports-emmc;
+> 
+> remnant from the vendor-kernel?
+> Should also go away.
+> 
+>> +	non-removable;
+>> +	keep-power-in-suspend;
+
+keep-power-in-suspend is for SDIO only.
+Please remove this.
+
+>> +	mmc-hs400-enhanced-strobe;
+>> +	status = "okay";
+>> +};
+>> +
+> 
+>> +&usbdrd3_0 {
+>> +	status = "okay";
+>> +	extcon = <&fusb0>;
+> 
+> I still don't think that extcon gets defined at all and is also
+> not specified in any dwc3 binding, so should probably go away.
+> 
+> 
+> Heiko
+> 
+> 
+> 
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> 
+> 
 > 
