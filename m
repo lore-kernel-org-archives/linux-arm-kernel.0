@@ -1,28 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 27 Nov 2018 18:57:04 +0000
-Subject: [PATCH] arm64: tlbi: Set MAX_TLBI_OPS to PTRS_PER_PTE
-In-Reply-To: <1543251667-30520-1-git-send-email-will.deacon@arm.com>
-References: <1543251667-30520-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20181127185703.zbpl2uketmgyfpjk@mbp>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 27 Nov 2018 11:05:40 -0800
+Subject: Sleeping in user_access section
+In-Reply-To: <44297716-74aa-1f14-67be-3594b5244b74@arm.com>
+References: <3e881ee6-0ff6-b8b6-0633-3d4a7743411d@arm.com>
+ <5B3B6AF9-9D8C-4577-905E-D407A5E7D0E3@zytor.com>
+ <20181123105034.GQ30658@n2100.armlinux.org.uk>
+ <44297716-74aa-1f14-67be-3594b5244b74@arm.com>
+Message-ID: <691acc7f-6ce1-69da-d56d-4d3c0fdad9ab@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 05:01:07PM +0000, Will Deacon wrote:
-> In order to reduce the possibility of soft lock-ups, we bound the
-> maximum number of TLBI operations performed by a single call to
-> flush_tlb_range() to an arbitrary constant of 1024.
+On 11/23/18 3:57 AM, Julien Thierry wrote:
 > 
-> Whilst this does the job of avoiding lock-ups, we can actually be a bit
-> smarter by defining this as PTRS_PER_PTE. Due to the structure of our
-> page tables, using PTRS_PER_PTE means that an outer loop calling
-> flush_tlb_range() for entire table entries will end up performing just a
-> single TLBI operation for each entry. As an example, mremap()ing a 1GB
-> range mapped using 4k pages now requires only 512 TLBI operations when
-> moving the page tables as opposed to 262144 operations (512*512) when
-> using the current threshold of 1024.
+> On x86, the EFLAGS.AC bit is also saved upon exception and I think it is
+> cleared upon exception entry so there is implicit exit from the
+> user_access mode when taking exception/interrupt.
+> 
 
-To be more precise, we'd have 512 TLBI ASIDE1IS vs 262144 TLBI VAE1IS
-(or VALE1IS). But since it only affects the given ASID, I don't think it
-matters.
+No, it is restored, not cleared.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+In summary: on exceptions, user_access regions are suspended, and on
+return the user_access status is resumed.
+
+However, explicitly calling sleeping functions is not supported.
+
+	-hpa
