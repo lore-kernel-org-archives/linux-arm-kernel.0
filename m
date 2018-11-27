@@ -1,147 +1,95 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 10:59:58 +0100
-Subject: [RFC PATCH v4 16/17] ARM: dts: suniv: add initial DTSI file for
- F1C100s
-In-Reply-To: <3a0db6052d58eb440ea29772fc7ad2502a1dfa3b.1543131714.git.mesihkilinc@gmail.com>
-References: <cover.1543131714.git.mesihkilinc@gmail.com>
- <3a0db6052d58eb440ea29772fc7ad2502a1dfa3b.1543131714.git.mesihkilinc@gmail.com>
-Message-ID: <20181127095958.vxyymf63ehdyem4z@flea>
+From: liuyun01@kylinos.cn (JackieLiu)
+Date: Tue, 27 Nov 2018 18:01:40 +0800
+Subject: [PATCH v2 1/2] arm64: add workaround for ambiguous C99 stdint.h
+ types
+In-Reply-To: <CAKv+Gu9TEZ9j3xB9dM_tP9tenzoH+p6Y7-1KCKGEL7AkiVdRdw@mail.gmail.com>
+References: <20181127052701.4144-1-liuyun01@kylinos.cn>
+ <CAKv+Gu9TEZ9j3xB9dM_tP9tenzoH+p6Y7-1KCKGEL7AkiVdRdw@mail.gmail.com>
+Message-ID: <36D96063-1722-4231-9810-CFAE6368616A@kylinos.cn>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2018 at 10:43:19AM +0300, Mesih Kilinc wrote:
-> F1C100s is one product with the suniv die, which has a 32MiB co-packaged
-> DDR1 DRAM chip. As we have the support for suniv pin controller and CCU now, add a
-> initial DTSI for it.
+Yep, you are right. I will change code later.
+
+But now, I found an new problem, when build the kernel, 
+I got follow message:
+
+WARNING: EXPORT symbol "xor_block_inner_neon" [arch/arm64/lib/xor-neon.ko] 
+version generation failed, symbol will not be versioned.
+
+I don?t know why, do you have any idea?
+
+> ? 2018?11?27??16:17?Ard Biesheuvel <ard.biesheuvel@linaro.org> ???
 > 
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-> ---
->  arch/arm/boot/dts/suniv-f1c100s.dtsi | 147 +++++++++++++++++++++++++++++++++++
->  1 file changed, 147 insertions(+)
->  create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
+> On Tue, 27 Nov 2018 at 06:28, Jackie Liu <liuyun01@kylinos.cn> wrote:
+>> 
+>> In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
+>> for ambiguous C99 stdint.h types"), this patch redefines the macros that
+>> are used in stdint.h so its definitions of uint64_t and int64_t are
+>> compatible with those of the kernel.
+>> 
+>> This patch comes from: https://patchwork.kernel.org/patch/3540001/
+>> Wrote by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> 
 > 
-> diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/suniv-f1c100s.dtsi
-> new file mode 100644
-> index 0000000..11bc999
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
-> @@ -0,0 +1,147 @@
-> +// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-> +/*
-> + * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
-> + * Copyright 2018 Mesih Kilinc <mesihkilinc@gmail.com>
-> + */
-> +
-> +#include <dt-bindings/clock/suniv-ccu-f1c100s.h>
-> +#include <dt-bindings/reset/suniv-ccu-f1c100s.h>
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	interrupt-parent = <&intc>;
-> +
-> +	clocks {
-> +		osc24M: clk-24M {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <24000000>;
-> +			clock-output-names = "osc24M";
-> +		};
-> +
-> +		osc32k: clk-32k {
-> +			#clock-cells = <0>;
-> +			compatible = "fixed-clock";
-> +			clock-frequency = <32768>;
-> +			clock-output-names = "osc32k";
-> +		};
-> +	};
-> +
-> +	cpus {
-> +		cpu {
-> +			compatible = "arm,arm926ej-s";
-> +			device_type = "cpu";
-> +		};
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		sram-controller at 1c00000 {
-> +			compatible = "allwinner,suniv-f1c100s-system-control",
-> +				     "allwinner,sun4i-a10-system-control";
-> +			reg = <0x01c00000 0x30>;
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			sram_d: sram at 10000 {
-> +				compatible = "mmio-sram";
-> +				reg = <0x00010000 0x1000>;
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				ranges = <0 0x00010000 0x1000>;
-> +
-> +				otg_sram: sram-section at 0 {
-> +					compatible = "allwinner,suniv-f1c100s-sram-d",
-> +						     "allwinner,sun4i-a10-sram-d";
-> +					reg = <0x0000 0x1000>;
-> +					status = "disabled";
-> +				};
-> +			};
-> +		};
-> +
-> +		ccu: clock at 1c20000 {
-> +			compatible = "allwinner,suniv-f1c100s-ccu";
-> +			reg = <0x01c20000 0x400>;
-> +			clocks = <&osc24M>, <&osc32k>;
-> +			clock-names = "hosc", "losc";
-> +			#clock-cells = <1>;
-> +			#reset-cells = <1>;
-> +		};
-> +
-> +		intc: interrupt-controller at 1c20400 {
-> +			compatible = "allwinner,suniv-f1c100s-ic";
-> +			reg = <0x01c20400 0x400>;
-> +			interrupt-controller;
-> +			#interrupt-cells = <1>;
-> +		};
-> +
-> +		pio: pinctrl at 1c20800 {
-> +			compatible = "allwinner,suniv-f1c100s-pinctrl";
-> +			reg = <0x01c20800 0x400>;
-> +			interrupts = <38>, <39>, <40>;
-> +			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc32k>;
-
-The dt bindings headers and those DT are going to be merged through
-separate trees, so you can't use these defines yet. Please use the
-actual numbers in the DT for now, and send a patch fixing this when
-4.21-rc1 will be out.
-
-> +			clock-names = "apb", "hosc", "losc";
-> +			gpio-controller;
-> +			interrupt-controller;
-> +			#interrupt-cells = <3>;
-> +			#gpio-cells = <3>;
-> +
-> +			uart0_pins_a: uart-pins-pe {
-
-This would be uart0_pe_pins: uart0-pe-pins.
-
-Thanks!
-
-Maxime
-
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/3c90d43b/attachment.sig>
+> OK, I remember now :-)
+> 
+> So this is the reason you had two separate source files in the
+> previous revision.
+> 
+> Could we maybe deal with this differently? Could we add a header
+> 
+> arch/arm64/include/asm/neon-intrinsics.h
+> 
+> that includes <arm_neon.h> after setting the preprocessor overrides
+> below? And reference that header from your code?
+> 
+> That way, we don't have to override asm/types.h for everyone.
+> 
+> 
+> 
+>> Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
+>> ---
+>> arch/arm64/include/uapi/asm/types.h | 26 ++++++++++++++++++++++++++
+>> 1 file changed, 26 insertions(+)
+>> create mode 100644 arch/arm64/include/uapi/asm/types.h
+>> 
+>> diff --git a/arch/arm64/include/uapi/asm/types.h b/arch/arm64/include/uapi/asm/types.h
+>> new file mode 100644
+>> index 0000000..0016780
+>> --- /dev/null
+>> +++ b/arch/arm64/include/uapi/asm/types.h
+>> @@ -0,0 +1,26 @@
+>> +#ifndef _UAPI_ASM_TYPES_H
+>> +#define _UAPI_ASM_TYPES_H
+>> +
+>> +#include <asm-generic/int-ll64.h>
+>> +
+>> +/*
+>> + * For Aarch64, there is some ambiguity in the definition of the types below
+>> + * between the kernel and GCC itself. This is usually not a big deal, but it
+>> + * causes trouble when including GCC's version of 'stdint.h' (this is the file
+>> + * that gets included when you #include <stdint.h> on a -ffreestanding build).
+>> + * As this file also gets included implicitly when including 'arm_neon.h' (the
+>> + * NEON intrinsics support header), we need the following to work around the
+>> + * issue if we want to use NEON intrinsics in the kernel.
+>> + */
+>> +
+>> +#ifdef __INT64_TYPE__
+>> +#undef __INT64_TYPE__
+>> +#define __INT64_TYPE__         __signed__ long long
+>> +#endif
+>> +
+>> +#ifdef __UINT64_TYPE__
+>> +#undef __UINT64_TYPE__
+>> +#define __UINT64_TYPE__                unsigned long long
+>> +#endif
+>> +
+>> +#endif /* _UAPI_ASM_TYPES_H */
+>> --
+>> 2.7.4
+>> 
+>> 
+>> 
+>> 
+> 
