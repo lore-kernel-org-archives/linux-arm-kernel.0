@@ -1,44 +1,59 @@
-From: eugeniy.paltsev@synopsys.com (Eugeniy Paltsev)
-Date: Tue, 27 Nov 2018 14:36:27 +0000
-Subject: 'branches' perf event mapping differs on ARC and ARM
-Message-ID: <1543329386.13651.13.camel@synopsys.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Tue, 27 Nov 2018 09:39:12 -0500
+Subject: [PATCH 0/9] iommu: clean up/remove modular stuff from non-modules.
+In-Reply-To: <20181127101156.GA12298@8bytes.org>
+References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+ <20181127101156.GA12298@8bytes.org>
+Message-ID: <20181127143912.GF14659@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+[Re: [PATCH 0/9] iommu: clean up/remove modular stuff from non-modules.] On 27/11/2018 (Tue 11:11) Joerg Roedel wrote:
 
-While playing with perf tool on ARMv7 and ARCv2 processors and profiling the
-same application I got interesting results. Even if we got pretty
-similar total
-execution time and instructions number the number of branches on ARC is about
-three times more then on ARM.
+> Hi Paul,
+> 
+> thanks for your cleanup!
+> 
+> The iommu-tree uses another rule for the subject line of patches. Can
+> you please resend with correct subject lines? See below for what is
+> used.
 
-I dug into architecture
-specific perf sources and found that we map different
-HW counters into generic 'branches' event on ARC and ARM.
-- We use "ijmp" event on ARC which
-counts all jump and branch instructions (regardless
-of real execution flow - even if no real jump happens)
-- We use "pc_write_retired" event on ARM
-which counts only taken branches (Instruction
-architecturally executed, condition check pass - software change of the PC)
+Sure - I'll wait another day or two in case anyone on the Cc sends in
+some additional Acks.
 
-So I was wondering do you know
-which approach is correct?
+Thanks,
+Paul.
+--
 
-
-
-I guess counting all jump and branch instructions is correct because we use
-'branches' event value to calculate relative value of 'branch-misses' using
-
-following formula:
-----------------------------8----------------------------
-branch-misses-ration = 'branch-misses' / 'branches' * 100.0
-----------------
-------------8----------------------------
-And using only taken branches here is incorrect IMHO. So I guess we should
-map 'br_immed_retired' instead of
-"pc_write_retired" into generic 'branches'
-event on ARM.
--- 
- Eugeniy Paltsev
+> 
+> The general format is:
+> 
+> 	iommu/<driver>: _C_apital letter starting subject
+> 
+> Please also collect the Acks you get and add them to the patches before
+> the resend.
+> 
+> On Mon, Nov 26, 2018 at 05:31:29PM -0500, Paul Gortmaker wrote:
+> > Paul Gortmaker (9):
+> >   iommu: audit and remove any unnecessary uses of module.h
+> Fine.
+> >   iommu: rockchip: make it explicitly non-modular
+> 	iommu/rockchip: Make it explicitly non-modular
+> >   iommu: msm_iommu: make it explicitly non-modular
+> 	iommu/msm: Make it explicitly non-modular
+> >   iommu: mtk_iommu: make it explicitly non-modular
+> 	iommu/mediatek: Make it explicitly non-modular
+> >   iommu: ipmmu-vmsa: make it explicitly non-modular
+> 	iommu/ipmmu-vmsa: Make it explicitly non-modular
+> >   iommu: qcom_iommu: make it explicitly non-modular
+> 	iommu/qcom: Make it explicitly non-modular
+> >   iommu: tegra-gart: make it explicitly non-modular
+> 	iommu/tegra: Make it explicitly non-modular
+> >   iommu: arm-smmu: make it explicitly non-modular
+> 	iommu/arm-smmu: Make arm-smmu explicitly non-modular
+> >   iommu: arm-smmu-v3: make it explicitly non-modular
+> 	iommu/arm-smmu: Make arm-smmu-v3 explicitly non-modular
+> 
+> Thanks a lot,
+> 
+>        Joerg
