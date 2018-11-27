@@ -1,92 +1,107 @@
-From: Claudiu.Beznea@microchip.com (Claudiu.Beznea at microchip.com)
-Date: Tue, 27 Nov 2018 11:57:25 +0000
-Subject: [PATCH v2 5/5] regulator: add documentation for regulator modes and
- suspend states
-In-Reply-To: <1543319801-19100-1-git-send-email-claudiu.beznea@microchip.com>
-References: <1543319801-19100-1-git-send-email-claudiu.beznea@microchip.com>
-Message-ID: <1543319801-19100-6-git-send-email-claudiu.beznea@microchip.com>
+From: lantianyu1986@gmail.com (Tianyu Lan)
+Date: Tue, 27 Nov 2018 19:59:22 +0800
+Subject: [PATCH V5 00/10] x86/KVM/Hyper-v: Add HV ept tlb range flush
+ hypercall support in KVM
+In-Reply-To: <20181108144259.10817-1-Tianyu.Lan@microsoft.com>
+References: <20181108144259.10817-1-Tianyu.Lan@microsoft.com>
+Message-ID: <CAOLK0pyvtfhoGM+D7h=gXwNpNjXGZiDJKpuVi9HOwb++4asCXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Claudiu Beznea <claudiu.beznea@microchip.com>
+Gentile Ping...
 
-Add documentation for regulator modes and suspend states.
+On Thu, Nov 8, 2018 at 10:43 PM <lantianyu1986@gmail.com> wrote:
+>
+> From: Lan Tianyu <Tianyu.Lan@microsoft.com>
+>
+> Sorry. Some patches was blocked and I try to resend via another account.
+>
+> For nested memory virtualization, Hyper-v doesn't set write-protect
+> L1 hypervisor EPT page directory and page table node to track changes
+> while it relies on guest to tell it changes via HvFlushGuestAddressLlist
+> hypercall. HvFlushGuestAddressLlist hypercall provides a way to flush
+> EPT page table with ranges which are specified by L1 hypervisor.
+>
+> If L1 hypervisor uses INVEPT or HvFlushGuestAddressSpace hypercall to
+> flush EPT tlb, Hyper-V will invalidate associated EPT shadow page table
+> and sync L1's EPT table when next EPT page fault is triggered.
+> HvFlushGuestAddressLlist hypercall helps to avoid such redundant EPT
+> page fault and synchronization of shadow page table.
+>
+> This patchset is rebased on the Linux 4.20-rc1 and Patch "KVM/VMX: Check
+> ept_pointer before flushing ept tlb".(https://www.mail-archive.com/linux
+> -kernel at vger.kernel.org/msg1798827.html).
+>
+> Change since v4:
+>        1) Split flush address and flush list patches. This patchset only contains
+>        flush address patches. Will post flush list patches later.
+>        2) Expose function hyperv_fill_flush_guest_mapping_list()
+>        out of hyperv file
+>        3) Adjust parameter of hyperv_flush_guest_mapping_range()
+>        4) Reorder patchset and move Hyper-V and VMX changes ahead.
+>
+> Change since v3:
+>         1) Remove code of updating "tlbs_dirty" in kvm_flush_remote_tlbs_with_range()
+>         2) Remove directly tlb flush in the kvm_handle_hva_range()
+>         3) Move tlb flush in kvm_set_pte_rmapp() to kvm_mmu_notifier_change_pte()
+>         4) Combine Vitaly's "don't pass EPT configuration info to
+> vmx_hv_remote_flush_tlb()" fix
+>
+> Change since v2:
+>        1) Fix comment in the kvm_flush_remote_tlbs_with_range()
+>        2) Move HV_MAX_FLUSH_PAGES and HV_MAX_FLUSH_REP_COUNT to
+>         hyperv-tlfs.h.
+>        3) Calculate HV_MAX_FLUSH_REP_COUNT in the macro definition
+>        4) Use HV_MAX_FLUSH_REP_COUNT to define length of gpa_list in
+>         struct hv_guest_mapping_flush_list.
+>
+> Change since v1:
+>        1) Convert "end_gfn" of struct kvm_tlb_range to "pages" in order
+>           to avoid confusion as to whether "end_gfn" is inclusive or exlusive.
+>        2) Add hyperv tlb range struct and replace kvm tlb range struct
+>           with new struct in order to avoid using kvm struct in the hyperv
+>           code directly.
+>
+>
+> Lan Tianyu (10):
+>   KVM: Add tlb_remote_flush_with_range callback in kvm_x86_ops
+>   x86/hyper-v: Add HvFlushGuestAddressList hypercall support
+>   x86/Hyper-v: Add trace in the
+>     hyperv_nested_flush_guest_mapping_range()
+>   KVM/VMX: Add hv tlb range flush support
+>   KVM/MMU: Add tlb flush with range helper function
+>   KVM: Replace old tlb flush function with new one to flush a specified
+>     range.
+>   KVM: Make kvm_set_spte_hva() return int
+>   KVM/MMU: Move tlb flush in kvm_set_pte_rmapp() to
+>     kvm_mmu_notifier_change_pte()
+>   KVM/MMU: Flush tlb directly in the kvm_set_pte_rmapp()
+>   KVM/MMU: Flush tlb directly in the kvm_zap_gfn_range()
+>
+>  arch/arm/include/asm/kvm_host.h     |  2 +-
+>  arch/arm64/include/asm/kvm_host.h   |  2 +-
+>  arch/mips/include/asm/kvm_host.h    |  2 +-
+>  arch/mips/kvm/mmu.c                 |  3 +-
+>  arch/powerpc/include/asm/kvm_host.h |  2 +-
+>  arch/powerpc/kvm/book3s.c           |  3 +-
+>  arch/powerpc/kvm/e500_mmu_host.c    |  3 +-
+>  arch/x86/hyperv/nested.c            | 80 +++++++++++++++++++++++++++++++
+>  arch/x86/include/asm/hyperv-tlfs.h  | 32 +++++++++++++
+>  arch/x86/include/asm/kvm_host.h     |  9 +++-
+>  arch/x86/include/asm/mshyperv.h     | 15 ++++++
+>  arch/x86/include/asm/trace/hyperv.h | 14 ++++++
+>  arch/x86/kvm/mmu.c                  | 96 +++++++++++++++++++++++++++++--------
+>  arch/x86/kvm/paging_tmpl.h          |  3 +-
+>  arch/x86/kvm/vmx.c                  | 69 ++++++++++++++++++--------
+>  virt/kvm/arm/mmu.c                  |  6 ++-
+>  virt/kvm/kvm_main.c                 |  5 +-
+>  17 files changed, 295 insertions(+), 51 deletions(-)
+>
+> --
+> 2.14.4
+>
 
-Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
----
- .../bindings/regulator/act8945a-regulator.txt      | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-index ac955dea00d1..4017527619ab 100644
---- a/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/act8945a-regulator.txt
-@@ -15,11 +15,17 @@ Optional input supply properties:
-   - inl67-supply: The input supply for REG_LDO3 and REG_LDO4
- 
- Any standard regulator properties can be used to configure the single regulator.
-+regulator-initial-mode, regulator-allowed-modes and regulator-mode could be
-+specified using mode values from dt-bindings/regulator/active-semi,8945a-regulator.h
-+file.
- 
- The valid names for regulators are:
- 	REG_DCDC1, REG_DCDC2, REG_DCDC3, REG_LDO1, REG_LDO2, REG_LDO3, REG_LDO4.
- 
- Example:
-+
-+#include <dt-bindings/regulator/active-semi,8945a-regulator.h>
-+
- 	pmic at 5b {
- 		compatible = "active-semi,act8945a";
- 		reg = <0x5b>;
-@@ -32,6 +38,18 @@ Example:
- 				regulator-min-microvolt = <1350000>;
- 				regulator-max-microvolt = <1350000>;
- 				regulator-always-on;
-+
-+				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
-+							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-+				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
-+
-+				regulator-state-mem {
-+					regulator-on-in-suspend;
-+					regulator-suspend-min-microvolt=<1400000>;
-+					regulator-suspend-max-microvolt=<1400000>;
-+					regulator-changeable-in-suspend;
-+					regulator-mode=<ACT8945A_REGULATOR_MODE_LOWPOWER>;
-+				};
- 			};
- 
- 			vdd_1v2_reg: REG_DCDC2 {
-@@ -39,6 +57,14 @@ Example:
- 				regulator-min-microvolt = <1100000>;
- 				regulator-max-microvolt = <1300000>;
- 				regulator-always-on;
-+
-+				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_FIXED>,
-+							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-+				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_FIXED>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			vdd_3v3_reg: REG_DCDC3 {
-@@ -53,6 +79,14 @@ Example:
- 				regulator-min-microvolt = <2500000>;
- 				regulator-max-microvolt = <2500000>;
- 				regulator-always-on;
-+
-+				regulator-allowed-modes = <ACT8945A_REGULATOR_MODE_NORMAL>,
-+							  <ACT8945A_REGULATOR_MODE_LOWPOWER>;
-+				regulator-initial-mode = <ACT8945A_REGULATOR_MODE_NORMAL>;
-+
-+				regulator-state-mem {
-+					regulator-off-in-suspend;
-+				};
- 			};
- 
- 			vdd_3v3_lp_reg: REG_LDO2 {
 -- 
-2.7.4
+Best regards
+Tianyu Lan
