@@ -1,404 +1,692 @@
 From: andreyknvl@google.com (Andrey Konovalov)
-Date: Tue, 27 Nov 2018 17:55:37 +0100
-Subject: [PATCH v12 19/25] kasan: add hooks implementation for tag-based mode
+Date: Tue, 27 Nov 2018 17:55:25 +0100
+Subject: [PATCH v12 07/25] kasan: rename kasan_zero_page to
+ kasan_early_shadow_page
 In-Reply-To: <cover.1543337629.git.andreyknvl@google.com>
 References: <cover.1543337629.git.andreyknvl@google.com>
-Message-ID: <b10d44bace6a7e9279b9b5a5b4c2a9c4c58cbf4f.1543337629.git.andreyknvl@google.com>
+Message-ID: <1aa5a8e562380e0bfb1d58c8ec3130436cff8b47.1543337629.git.andreyknvl@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds tag-based KASAN specific hooks implementation and
-adjusts common generic and tag-based KASAN ones.
+With tag based KASAN mode the early shadow value is 0xff and not 0x00,
+so this patch renames kasan_zero_(page|pte|pmd|pud|p4d) to
+kasan_early_shadow_(page|pte|pmd|pud|p4d) to avoid confusion.
 
-1. When a new slab cache is created, tag-based KASAN rounds up the size of
-   the objects in this cache to KASAN_SHADOW_SCALE_SIZE (== 16).
-
-2. On each kmalloc tag-based KASAN generates a random tag, sets the shadow
-   memory, that corresponds to this object to this tag, and embeds this
-   tag value into the top byte of the returned pointer.
-
-3. On each kfree tag-based KASAN poisons the shadow memory with a random
-   tag to allow detection of use-after-free bugs.
-
-The rest of the logic of the hook implementation is very much similar to
-the one provided by generic KASAN. Tag-based KASAN saves allocation and
-free stack metadata to the slab object the same way generic KASAN does.
-
-Reviewed-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Reviewed-by: Dmitry Vyukov <dvyukov@google.com>
+Suggested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
 ---
- mm/kasan/common.c | 116 ++++++++++++++++++++++++++++++++++++++--------
- mm/kasan/kasan.h  |   8 ++++
- mm/kasan/tags.c   |  48 +++++++++++++++++++
- 3 files changed, 153 insertions(+), 19 deletions(-)
+ arch/arm64/mm/kasan_init.c     | 43 ++++++++++++---------
+ arch/s390/mm/dump_pagetables.c | 17 +++++----
+ arch/s390/mm/kasan_init.c      | 33 +++++++++-------
+ arch/x86/mm/dump_pagetables.c  | 11 +++---
+ arch/x86/mm/kasan_init_64.c    | 55 +++++++++++++-------------
+ arch/xtensa/mm/kasan_init.c    | 18 +++++----
+ include/linux/kasan.h          | 12 +++---
+ mm/kasan/init.c                | 70 +++++++++++++++++++---------------
+ 8 files changed, 145 insertions(+), 114 deletions(-)
 
-diff --git a/mm/kasan/common.c b/mm/kasan/common.c
-index 7134e75447ff..27f0cae336c9 100644
---- a/mm/kasan/common.c
-+++ b/mm/kasan/common.c
-@@ -140,6 +140,13 @@ void kasan_poison_shadow(const void *address, size_t size, u8 value)
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 63527e585aac..4ebc19422931 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -47,8 +47,9 @@ static pte_t *__init kasan_pte_offset(pmd_t *pmdp, unsigned long addr, int node,
+ 				      bool early)
  {
- 	void *shadow_start, *shadow_end;
- 
-+	/*
-+	 * Perform shadow offset calculation based on untagged address, as
-+	 * some of the callers (e.g. kasan_poison_object_data) pass tagged
-+	 * addresses to this function.
-+	 */
-+	address = reset_tag(address);
-+
- 	shadow_start = kasan_mem_to_shadow(address);
- 	shadow_end = kasan_mem_to_shadow(address + size);
- 
-@@ -148,11 +155,24 @@ void kasan_poison_shadow(const void *address, size_t size, u8 value)
- 
- void kasan_unpoison_shadow(const void *address, size_t size)
- {
--	kasan_poison_shadow(address, size, 0);
-+	u8 tag = get_tag(address);
-+
-+	/*
-+	 * Perform shadow offset calculation based on untagged address, as
-+	 * some of the callers (e.g. kasan_unpoison_object_data) pass tagged
-+	 * addresses to this function.
-+	 */
-+	address = reset_tag(address);
-+
-+	kasan_poison_shadow(address, size, tag);
- 
- 	if (size & KASAN_SHADOW_MASK) {
- 		u8 *shadow = (u8 *)kasan_mem_to_shadow(address + size);
--		*shadow = size & KASAN_SHADOW_MASK;
-+
-+		if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-+			*shadow = tag;
-+		else
-+			*shadow = size & KASAN_SHADOW_MASK;
+ 	if (pmd_none(READ_ONCE(*pmdp))) {
+-		phys_addr_t pte_phys = early ? __pa_symbol(kasan_zero_pte)
+-					     : kasan_alloc_zeroed_page(node);
++		phys_addr_t pte_phys = early ?
++				__pa_symbol(kasan_early_shadow_pte)
++					: kasan_alloc_zeroed_page(node);
+ 		__pmd_populate(pmdp, pte_phys, PMD_TYPE_TABLE);
  	}
- }
  
-@@ -200,8 +220,9 @@ void kasan_unpoison_stack_above_sp_to(const void *watermark)
- 
- void kasan_alloc_pages(struct page *page, unsigned int order)
+@@ -60,8 +61,9 @@ static pmd_t *__init kasan_pmd_offset(pud_t *pudp, unsigned long addr, int node,
+ 				      bool early)
  {
--	if (likely(!PageHighMem(page)))
--		kasan_unpoison_shadow(page_address(page), PAGE_SIZE << order);
-+	if (unlikely(PageHighMem(page)))
-+		return;
-+	kasan_unpoison_shadow(page_address(page), PAGE_SIZE << order);
- }
- 
- void kasan_free_pages(struct page *page, unsigned int order)
-@@ -218,6 +239,9 @@ void kasan_free_pages(struct page *page, unsigned int order)
-  */
- static inline unsigned int optimal_redzone(unsigned int object_size)
- {
-+	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-+		return 0;
-+
- 	return
- 		object_size <= 64        - 16   ? 16 :
- 		object_size <= 128       - 32   ? 32 :
-@@ -232,6 +256,7 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
- 			slab_flags_t *flags)
- {
- 	unsigned int orig_size = *size;
-+	unsigned int redzone_size;
- 	int redzone_adjust;
- 
- 	/* Add alloc meta. */
-@@ -239,20 +264,20 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
- 	*size += sizeof(struct kasan_alloc_meta);
- 
- 	/* Add free meta. */
--	if (cache->flags & SLAB_TYPESAFE_BY_RCU || cache->ctor ||
--	    cache->object_size < sizeof(struct kasan_free_meta)) {
-+	if (IS_ENABLED(CONFIG_KASAN_GENERIC) &&
-+	    (cache->flags & SLAB_TYPESAFE_BY_RCU || cache->ctor ||
-+	     cache->object_size < sizeof(struct kasan_free_meta))) {
- 		cache->kasan_info.free_meta_offset = *size;
- 		*size += sizeof(struct kasan_free_meta);
+ 	if (pud_none(READ_ONCE(*pudp))) {
+-		phys_addr_t pmd_phys = early ? __pa_symbol(kasan_zero_pmd)
+-					     : kasan_alloc_zeroed_page(node);
++		phys_addr_t pmd_phys = early ?
++				__pa_symbol(kasan_early_shadow_pmd)
++					: kasan_alloc_zeroed_page(node);
+ 		__pud_populate(pudp, pmd_phys, PMD_TYPE_TABLE);
  	}
--	redzone_adjust = optimal_redzone(cache->object_size) -
--		(*size - cache->object_size);
  
-+	redzone_size = optimal_redzone(cache->object_size);
-+	redzone_adjust = redzone_size -	(*size - cache->object_size);
- 	if (redzone_adjust > 0)
- 		*size += redzone_adjust;
+@@ -72,8 +74,9 @@ static pud_t *__init kasan_pud_offset(pgd_t *pgdp, unsigned long addr, int node,
+ 				      bool early)
+ {
+ 	if (pgd_none(READ_ONCE(*pgdp))) {
+-		phys_addr_t pud_phys = early ? __pa_symbol(kasan_zero_pud)
+-					     : kasan_alloc_zeroed_page(node);
++		phys_addr_t pud_phys = early ?
++				__pa_symbol(kasan_early_shadow_pud)
++					: kasan_alloc_zeroed_page(node);
+ 		__pgd_populate(pgdp, pud_phys, PMD_TYPE_TABLE);
+ 	}
  
- 	*size = min_t(unsigned int, KMALLOC_MAX_SIZE,
--			max(*size, cache->object_size +
--					optimal_redzone(cache->object_size)));
-+			max(*size, cache->object_size + redzone_size));
+@@ -87,8 +90,9 @@ static void __init kasan_pte_populate(pmd_t *pmdp, unsigned long addr,
+ 	pte_t *ptep = kasan_pte_offset(pmdp, addr, node, early);
+ 
+ 	do {
+-		phys_addr_t page_phys = early ? __pa_symbol(kasan_zero_page)
+-					      : kasan_alloc_zeroed_page(node);
++		phys_addr_t page_phys = early ?
++				__pa_symbol(kasan_early_shadow_page)
++					: kasan_alloc_zeroed_page(node);
+ 		next = addr + PAGE_SIZE;
+ 		set_pte(ptep, pfn_pte(__phys_to_pfn(page_phys), PAGE_KERNEL));
+ 	} while (ptep++, addr = next, addr != end && pte_none(READ_ONCE(*ptep)));
+@@ -205,14 +209,14 @@ void __init kasan_init(void)
+ 	kasan_map_populate(kimg_shadow_start, kimg_shadow_end,
+ 			   early_pfn_to_nid(virt_to_pfn(lm_alias(_text))));
+ 
+-	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
+-				   (void *)mod_shadow_start);
+-	kasan_populate_zero_shadow((void *)kimg_shadow_end,
+-				   kasan_mem_to_shadow((void *)PAGE_OFFSET));
++	kasan_populate_early_shadow((void *)KASAN_SHADOW_START,
++				    (void *)mod_shadow_start);
++	kasan_populate_early_shadow((void *)kimg_shadow_end,
++				    kasan_mem_to_shadow((void *)PAGE_OFFSET));
+ 
+ 	if (kimg_shadow_start > mod_shadow_end)
+-		kasan_populate_zero_shadow((void *)mod_shadow_end,
+-					   (void *)kimg_shadow_start);
++		kasan_populate_early_shadow((void *)mod_shadow_end,
++					    (void *)kimg_shadow_start);
+ 
+ 	for_each_memblock(memory, reg) {
+ 		void *start = (void *)__phys_to_virt(reg->base);
+@@ -227,14 +231,15 @@ void __init kasan_init(void)
+ 	}
  
  	/*
- 	 * If the metadata doesn't fit, don't enable KASAN at all.
-@@ -265,6 +290,8 @@ void kasan_cache_create(struct kmem_cache *cache, unsigned int *size,
+-	 * KAsan may reuse the contents of kasan_zero_pte directly, so we
+-	 * should make sure that it maps the zero page read-only.
++	 * KAsan may reuse the contents of kasan_early_shadow_pte directly,
++	 * so we should make sure that it maps the zero page read-only.
+ 	 */
+ 	for (i = 0; i < PTRS_PER_PTE; i++)
+-		set_pte(&kasan_zero_pte[i],
+-			pfn_pte(sym_to_pfn(kasan_zero_page), PAGE_KERNEL_RO));
++		set_pte(&kasan_early_shadow_pte[i],
++			pfn_pte(sym_to_pfn(kasan_early_shadow_page),
++				PAGE_KERNEL_RO));
+ 
+-	memset(kasan_zero_page, 0, PAGE_SIZE);
++	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
+ 	cpu_replace_ttbr1(lm_alias(swapper_pg_dir));
+ 
+ 	/* At this point kasan is fully initialized. Enable error messages */
+diff --git a/arch/s390/mm/dump_pagetables.c b/arch/s390/mm/dump_pagetables.c
+index 363f6470d742..3b93ba0b5d8d 100644
+--- a/arch/s390/mm/dump_pagetables.c
++++ b/arch/s390/mm/dump_pagetables.c
+@@ -111,11 +111,12 @@ static void note_page(struct seq_file *m, struct pg_state *st,
+ }
+ 
+ #ifdef CONFIG_KASAN
+-static void note_kasan_zero_page(struct seq_file *m, struct pg_state *st)
++static void note_kasan_early_shadow_page(struct seq_file *m,
++						struct pg_state *st)
+ {
+ 	unsigned int prot;
+ 
+-	prot = pte_val(*kasan_zero_pte) &
++	prot = pte_val(*kasan_early_shadow_pte) &
+ 		(_PAGE_PROTECT | _PAGE_INVALID | _PAGE_NOEXEC);
+ 	note_page(m, st, prot, 4);
+ }
+@@ -154,8 +155,8 @@ static void walk_pmd_level(struct seq_file *m, struct pg_state *st,
+ 	int i;
+ 
+ #ifdef CONFIG_KASAN
+-	if ((pud_val(*pud) & PAGE_MASK) == __pa(kasan_zero_pmd)) {
+-		note_kasan_zero_page(m, st);
++	if ((pud_val(*pud) & PAGE_MASK) == __pa(kasan_early_shadow_pmd)) {
++		note_kasan_early_shadow_page(m, st);
  		return;
  	}
+ #endif
+@@ -185,8 +186,8 @@ static void walk_pud_level(struct seq_file *m, struct pg_state *st,
+ 	int i;
  
-+	cache->align = round_up(cache->align, KASAN_SHADOW_SCALE_SIZE);
-+
- 	*flags |= SLAB_KASAN;
- }
+ #ifdef CONFIG_KASAN
+-	if ((p4d_val(*p4d) & PAGE_MASK) == __pa(kasan_zero_pud)) {
+-		note_kasan_zero_page(m, st);
++	if ((p4d_val(*p4d) & PAGE_MASK) == __pa(kasan_early_shadow_pud)) {
++		note_kasan_early_shadow_page(m, st);
+ 		return;
+ 	}
+ #endif
+@@ -215,8 +216,8 @@ static void walk_p4d_level(struct seq_file *m, struct pg_state *st,
+ 	int i;
  
-@@ -309,6 +336,32 @@ void kasan_poison_object_data(struct kmem_cache *cache, void *object)
- 			KASAN_KMALLOC_REDZONE);
- }
+ #ifdef CONFIG_KASAN
+-	if ((pgd_val(*pgd) & PAGE_MASK) == __pa(kasan_zero_p4d)) {
+-		note_kasan_zero_page(m, st);
++	if ((pgd_val(*pgd) & PAGE_MASK) == __pa(kasan_early_shadow_p4d)) {
++		note_kasan_early_shadow_page(m, st);
+ 		return;
+ 	}
+ #endif
+diff --git a/arch/s390/mm/kasan_init.c b/arch/s390/mm/kasan_init.c
+index acb9645b762b..bac5c27d11fc 100644
+--- a/arch/s390/mm/kasan_init.c
++++ b/arch/s390/mm/kasan_init.c
+@@ -107,7 +107,8 @@ static void __init kasan_early_vmemmap_populate(unsigned long address,
+ 			if (mode == POPULATE_ZERO_SHADOW &&
+ 			    IS_ALIGNED(address, PGDIR_SIZE) &&
+ 			    end - address >= PGDIR_SIZE) {
+-				pgd_populate(&init_mm, pg_dir, kasan_zero_p4d);
++				pgd_populate(&init_mm, pg_dir,
++						kasan_early_shadow_p4d);
+ 				address = (address + PGDIR_SIZE) & PGDIR_MASK;
+ 				continue;
+ 			}
+@@ -120,7 +121,8 @@ static void __init kasan_early_vmemmap_populate(unsigned long address,
+ 			if (mode == POPULATE_ZERO_SHADOW &&
+ 			    IS_ALIGNED(address, P4D_SIZE) &&
+ 			    end - address >= P4D_SIZE) {
+-				p4d_populate(&init_mm, p4_dir, kasan_zero_pud);
++				p4d_populate(&init_mm, p4_dir,
++						kasan_early_shadow_pud);
+ 				address = (address + P4D_SIZE) & P4D_MASK;
+ 				continue;
+ 			}
+@@ -133,7 +135,8 @@ static void __init kasan_early_vmemmap_populate(unsigned long address,
+ 			if (mode == POPULATE_ZERO_SHADOW &&
+ 			    IS_ALIGNED(address, PUD_SIZE) &&
+ 			    end - address >= PUD_SIZE) {
+-				pud_populate(&init_mm, pu_dir, kasan_zero_pmd);
++				pud_populate(&init_mm, pu_dir,
++						kasan_early_shadow_pmd);
+ 				address = (address + PUD_SIZE) & PUD_MASK;
+ 				continue;
+ 			}
+@@ -146,7 +149,8 @@ static void __init kasan_early_vmemmap_populate(unsigned long address,
+ 			if (mode == POPULATE_ZERO_SHADOW &&
+ 			    IS_ALIGNED(address, PMD_SIZE) &&
+ 			    end - address >= PMD_SIZE) {
+-				pmd_populate(&init_mm, pm_dir, kasan_zero_pte);
++				pmd_populate(&init_mm, pm_dir,
++						kasan_early_shadow_pte);
+ 				address = (address + PMD_SIZE) & PMD_MASK;
+ 				continue;
+ 			}
+@@ -188,7 +192,7 @@ static void __init kasan_early_vmemmap_populate(unsigned long address,
+ 				pte_val(*pt_dir) = __pa(page) | pgt_prot;
+ 				break;
+ 			case POPULATE_ZERO_SHADOW:
+-				page = kasan_zero_page;
++				page = kasan_early_shadow_page;
+ 				pte_val(*pt_dir) = __pa(page) | pgt_prot_zero;
+ 				break;
+ 			}
+@@ -256,14 +260,14 @@ void __init kasan_early_init(void)
+ 	unsigned long vmax;
+ 	unsigned long pgt_prot = pgprot_val(PAGE_KERNEL_RO);
+ 	pte_t pte_z;
+-	pmd_t pmd_z = __pmd(__pa(kasan_zero_pte) | _SEGMENT_ENTRY);
+-	pud_t pud_z = __pud(__pa(kasan_zero_pmd) | _REGION3_ENTRY);
+-	p4d_t p4d_z = __p4d(__pa(kasan_zero_pud) | _REGION2_ENTRY);
++	pmd_t pmd_z = __pmd(__pa(kasan_early_shadow_pte) | _SEGMENT_ENTRY);
++	pud_t pud_z = __pud(__pa(kasan_early_shadow_pmd) | _REGION3_ENTRY);
++	p4d_t p4d_z = __p4d(__pa(kasan_early_shadow_pud) | _REGION2_ENTRY);
  
-+/*
-+ * Since it's desirable to only call object contructors once during slab
-+ * allocation, we preassign tags to all such objects. Also preassign tags for
-+ * SLAB_TYPESAFE_BY_RCU slabs to avoid use-after-free reports.
-+ * For SLAB allocator we can't preassign tags randomly since the freelist is
-+ * stored as an array of indexes instead of a linked list. Assign tags based
-+ * on objects indexes, so that objects that are next to each other get
-+ * different tags.
-+ * After a tag is assigned, the object always gets allocated with the same tag.
-+ * The reason is that we can't change tags for objects with constructors on
-+ * reallocation (even for non-SLAB_TYPESAFE_BY_RCU), because the constructor
-+ * code can save the pointer to the object somewhere (e.g. in the object
-+ * itself). Then if we retag it, the old saved pointer will become invalid.
-+ */
-+static u8 assign_tag(struct kmem_cache *cache, const void *object, bool new)
-+{
-+	if (!cache->ctor && !(cache->flags & SLAB_TYPESAFE_BY_RCU))
-+		return new ? KASAN_TAG_KERNEL : random_tag();
-+
-+#ifdef CONFIG_SLAB
-+	return (u8)obj_to_index(cache, virt_to_page(object), (void *)object);
-+#else
-+	return new ? random_tag() : get_tag(object);
-+#endif
-+}
-+
- void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
- {
- 	struct kasan_alloc_meta *alloc_info;
-@@ -319,6 +372,9 @@ void *kasan_init_slab_obj(struct kmem_cache *cache, const void *object)
- 	alloc_info = get_alloc_info(cache, object);
- 	__memset(alloc_info, 0, sizeof(*alloc_info));
+ 	kasan_early_detect_facilities();
+ 	if (!has_nx)
+ 		pgt_prot &= ~_PAGE_NOEXEC;
+-	pte_z = __pte(__pa(kasan_zero_page) | pgt_prot);
++	pte_z = __pte(__pa(kasan_early_shadow_page) | pgt_prot);
  
-+	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-+		object = set_tag(object, assign_tag(cache, object, true));
-+
- 	return (void *)object;
- }
- 
-@@ -327,15 +383,30 @@ void *kasan_slab_alloc(struct kmem_cache *cache, void *object, gfp_t flags)
- 	return kasan_kmalloc(cache, object, cache->object_size, flags);
- }
- 
-+static inline bool shadow_invalid(u8 tag, s8 shadow_byte)
-+{
-+	if (IS_ENABLED(CONFIG_KASAN_GENERIC))
-+		return shadow_byte < 0 ||
-+			shadow_byte >= KASAN_SHADOW_SCALE_SIZE;
-+	else
-+		return tag != (u8)shadow_byte;
-+}
-+
- static bool __kasan_slab_free(struct kmem_cache *cache, void *object,
- 			      unsigned long ip, bool quarantine)
- {
- 	s8 shadow_byte;
-+	u8 tag;
-+	void *tagged_object;
- 	unsigned long rounded_up_size;
- 
-+	tag = get_tag(object);
-+	tagged_object = object;
-+	object = reset_tag(object);
-+
- 	if (unlikely(nearest_obj(cache, virt_to_head_page(object), object) !=
- 	    object)) {
--		kasan_report_invalid_free(object, ip);
-+		kasan_report_invalid_free(tagged_object, ip);
- 		return true;
+ 	memsize = get_mem_detect_end();
+ 	if (!memsize)
+@@ -292,10 +296,13 @@ void __init kasan_early_init(void)
  	}
  
-@@ -344,20 +415,22 @@ static bool __kasan_slab_free(struct kmem_cache *cache, void *object,
- 		return false;
+ 	/* init kasan zero shadow */
+-	crst_table_init((unsigned long *)kasan_zero_p4d, p4d_val(p4d_z));
+-	crst_table_init((unsigned long *)kasan_zero_pud, pud_val(pud_z));
+-	crst_table_init((unsigned long *)kasan_zero_pmd, pmd_val(pmd_z));
+-	memset64((u64 *)kasan_zero_pte, pte_val(pte_z), PTRS_PER_PTE);
++	crst_table_init((unsigned long *)kasan_early_shadow_p4d,
++				p4d_val(p4d_z));
++	crst_table_init((unsigned long *)kasan_early_shadow_pud,
++				pud_val(pud_z));
++	crst_table_init((unsigned long *)kasan_early_shadow_pmd,
++				pmd_val(pmd_z));
++	memset64((u64 *)kasan_early_shadow_pte, pte_val(pte_z), PTRS_PER_PTE);
  
- 	shadow_byte = READ_ONCE(*(s8 *)kasan_mem_to_shadow(object));
--	if (shadow_byte < 0 || shadow_byte >= KASAN_SHADOW_SCALE_SIZE) {
--		kasan_report_invalid_free(object, ip);
-+	if (shadow_invalid(tag, shadow_byte)) {
-+		kasan_report_invalid_free(tagged_object, ip);
- 		return true;
- 	}
- 
- 	rounded_up_size = round_up(cache->object_size, KASAN_SHADOW_SCALE_SIZE);
- 	kasan_poison_shadow(object, rounded_up_size, KASAN_KMALLOC_FREE);
- 
--	if (!quarantine || unlikely(!(cache->flags & SLAB_KASAN)))
-+	if ((IS_ENABLED(CONFIG_KASAN_GENERIC) && !quarantine) ||
-+			unlikely(!(cache->flags & SLAB_KASAN)))
- 		return false;
- 
- 	set_track(&get_alloc_info(cache, object)->free_track, GFP_NOWAIT);
- 	quarantine_put(get_free_info(cache, object), cache);
--	return true;
-+
-+	return IS_ENABLED(CONFIG_KASAN_GENERIC);
- }
- 
- bool kasan_slab_free(struct kmem_cache *cache, void *object, unsigned long ip)
-@@ -370,6 +443,7 @@ void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
- {
- 	unsigned long redzone_start;
- 	unsigned long redzone_end;
-+	u8 tag;
- 
- 	if (gfpflags_allow_blocking(flags))
- 		quarantine_reduce();
-@@ -382,14 +456,18 @@ void *kasan_kmalloc(struct kmem_cache *cache, const void *object, size_t size,
- 	redzone_end = round_up((unsigned long)object + cache->object_size,
- 				KASAN_SHADOW_SCALE_SIZE);
- 
--	kasan_unpoison_shadow(object, size);
-+	if (IS_ENABLED(CONFIG_KASAN_SW_TAGS))
-+		tag = assign_tag(cache, object, false);
-+
-+	/* Tag is ignored in set_tag without CONFIG_KASAN_SW_TAGS */
-+	kasan_unpoison_shadow(set_tag(object, tag), size);
- 	kasan_poison_shadow((void *)redzone_start, redzone_end - redzone_start,
- 		KASAN_KMALLOC_REDZONE);
- 
- 	if (cache->flags & SLAB_KASAN)
- 		set_track(&get_alloc_info(cache, object)->alloc_track, flags);
- 
--	return (void *)object;
-+	return set_tag(object, tag);
- }
- EXPORT_SYMBOL(kasan_kmalloc);
- 
-@@ -439,7 +517,7 @@ void kasan_poison_kfree(void *ptr, unsigned long ip)
- 	page = virt_to_head_page(ptr);
- 
- 	if (unlikely(!PageSlab(page))) {
--		if (ptr != page_address(page)) {
-+		if (reset_tag(ptr) != page_address(page)) {
- 			kasan_report_invalid_free(ptr, ip);
- 			return;
- 		}
-@@ -452,7 +530,7 @@ void kasan_poison_kfree(void *ptr, unsigned long ip)
- 
- void kasan_kfree_large(void *ptr, unsigned long ip)
- {
--	if (ptr != page_address(virt_to_head_page(ptr)))
-+	if (reset_tag(ptr) != page_address(virt_to_head_page(ptr)))
- 		kasan_report_invalid_free(ptr, ip);
- 	/* The object will be poisoned by page_alloc. */
- }
-diff --git a/mm/kasan/kasan.h b/mm/kasan/kasan.h
-index 82a23b23ff93..ea51b2d898ec 100644
---- a/mm/kasan/kasan.h
-+++ b/mm/kasan/kasan.h
-@@ -12,10 +12,18 @@
- #define KASAN_TAG_INVALID	0xFE /* inaccessible memory tag */
- #define KASAN_TAG_MAX		0xFD /* maximum value for random tags */
- 
-+#ifdef CONFIG_KASAN_GENERIC
- #define KASAN_FREE_PAGE         0xFF  /* page was freed */
- #define KASAN_PAGE_REDZONE      0xFE  /* redzone for kmalloc_large allocations */
- #define KASAN_KMALLOC_REDZONE   0xFC  /* redzone inside slub object */
- #define KASAN_KMALLOC_FREE      0xFB  /* object was freed (kmem_cache_free/kfree) */
-+#else
-+#define KASAN_FREE_PAGE         KASAN_TAG_INVALID
-+#define KASAN_PAGE_REDZONE      KASAN_TAG_INVALID
-+#define KASAN_KMALLOC_REDZONE   KASAN_TAG_INVALID
-+#define KASAN_KMALLOC_FREE      KASAN_TAG_INVALID
-+#endif
-+
- #define KASAN_GLOBAL_REDZONE    0xFA  /* redzone for global variable */
+ 	shadow_alloc_size = memsize >> KASAN_SHADOW_SCALE_SHIFT;
+ 	pgalloc_low = round_up((unsigned long)_end, _SEGMENT_SIZE);
+diff --git a/arch/x86/mm/dump_pagetables.c b/arch/x86/mm/dump_pagetables.c
+index fc37bbd23eb8..c4696ab9a72b 100644
+--- a/arch/x86/mm/dump_pagetables.c
++++ b/arch/x86/mm/dump_pagetables.c
+@@ -380,7 +380,7 @@ static void walk_pte_level(struct seq_file *m, struct pg_state *st, pmd_t addr,
  
  /*
-diff --git a/mm/kasan/tags.c b/mm/kasan/tags.c
-index 1c4e7ce2e6fe..1d1b79350e28 100644
---- a/mm/kasan/tags.c
-+++ b/mm/kasan/tags.c
-@@ -78,15 +78,60 @@ void *kasan_reset_tag(const void *addr)
- void check_memory_region(unsigned long addr, size_t size, bool write,
- 				unsigned long ret_ip)
+  * This is an optimization for KASAN=y case. Since all kasan page tables
+- * eventually point to the kasan_zero_page we could call note_page()
++ * eventually point to the kasan_early_shadow_page we could call note_page()
+  * right away without walking through lower level page tables. This saves
+  * us dozens of seconds (minutes for 5-level config) while checking for
+  * W+X mapping or reading kernel_page_tables debugfs file.
+@@ -388,10 +388,11 @@ static void walk_pte_level(struct seq_file *m, struct pg_state *st, pmd_t addr,
+ static inline bool kasan_page_table(struct seq_file *m, struct pg_state *st,
+ 				void *pt)
  {
-+	u8 tag;
-+	u8 *shadow_first, *shadow_last, *shadow;
-+	void *untagged_addr;
-+
-+	if (unlikely(size == 0))
-+		return;
-+
-+	tag = get_tag((const void *)addr);
-+
+-	if (__pa(pt) == __pa(kasan_zero_pmd) ||
+-	    (pgtable_l5_enabled() && __pa(pt) == __pa(kasan_zero_p4d)) ||
+-	    __pa(pt) == __pa(kasan_zero_pud)) {
+-		pgprotval_t prot = pte_flags(kasan_zero_pte[0]);
++	if (__pa(pt) == __pa(kasan_early_shadow_pmd) ||
++	    (pgtable_l5_enabled() &&
++			__pa(pt) == __pa(kasan_early_shadow_p4d)) ||
++	    __pa(pt) == __pa(kasan_early_shadow_pud)) {
++		pgprotval_t prot = pte_flags(kasan_early_shadow_pte[0]);
+ 		note_page(m, st, __pgprot(prot), 0, 5);
+ 		return true;
+ 	}
+diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
+index 04a9cf6b034f..462fde83b515 100644
+--- a/arch/x86/mm/kasan_init_64.c
++++ b/arch/x86/mm/kasan_init_64.c
+@@ -211,7 +211,8 @@ static void __init kasan_early_p4d_populate(pgd_t *pgd,
+ 	unsigned long next;
+ 
+ 	if (pgd_none(*pgd)) {
+-		pgd_entry = __pgd(_KERNPG_TABLE | __pa_nodebug(kasan_zero_p4d));
++		pgd_entry = __pgd(_KERNPG_TABLE |
++					__pa_nodebug(kasan_early_shadow_p4d));
+ 		set_pgd(pgd, pgd_entry);
+ 	}
+ 
+@@ -222,7 +223,8 @@ static void __init kasan_early_p4d_populate(pgd_t *pgd,
+ 		if (!p4d_none(*p4d))
+ 			continue;
+ 
+-		p4d_entry = __p4d(_KERNPG_TABLE | __pa_nodebug(kasan_zero_pud));
++		p4d_entry = __p4d(_KERNPG_TABLE |
++					__pa_nodebug(kasan_early_shadow_pud));
+ 		set_p4d(p4d, p4d_entry);
+ 	} while (p4d++, addr = next, addr != end && p4d_none(*p4d));
+ }
+@@ -261,10 +263,11 @@ static struct notifier_block kasan_die_notifier = {
+ void __init kasan_early_init(void)
+ {
+ 	int i;
+-	pteval_t pte_val = __pa_nodebug(kasan_zero_page) | __PAGE_KERNEL | _PAGE_ENC;
+-	pmdval_t pmd_val = __pa_nodebug(kasan_zero_pte) | _KERNPG_TABLE;
+-	pudval_t pud_val = __pa_nodebug(kasan_zero_pmd) | _KERNPG_TABLE;
+-	p4dval_t p4d_val = __pa_nodebug(kasan_zero_pud) | _KERNPG_TABLE;
++	pteval_t pte_val = __pa_nodebug(kasan_early_shadow_page) |
++				__PAGE_KERNEL | _PAGE_ENC;
++	pmdval_t pmd_val = __pa_nodebug(kasan_early_shadow_pte) | _KERNPG_TABLE;
++	pudval_t pud_val = __pa_nodebug(kasan_early_shadow_pmd) | _KERNPG_TABLE;
++	p4dval_t p4d_val = __pa_nodebug(kasan_early_shadow_pud) | _KERNPG_TABLE;
+ 
+ 	/* Mask out unsupported __PAGE_KERNEL bits: */
+ 	pte_val &= __default_kernel_pte_mask;
+@@ -273,16 +276,16 @@ void __init kasan_early_init(void)
+ 	p4d_val &= __default_kernel_pte_mask;
+ 
+ 	for (i = 0; i < PTRS_PER_PTE; i++)
+-		kasan_zero_pte[i] = __pte(pte_val);
++		kasan_early_shadow_pte[i] = __pte(pte_val);
+ 
+ 	for (i = 0; i < PTRS_PER_PMD; i++)
+-		kasan_zero_pmd[i] = __pmd(pmd_val);
++		kasan_early_shadow_pmd[i] = __pmd(pmd_val);
+ 
+ 	for (i = 0; i < PTRS_PER_PUD; i++)
+-		kasan_zero_pud[i] = __pud(pud_val);
++		kasan_early_shadow_pud[i] = __pud(pud_val);
+ 
+ 	for (i = 0; pgtable_l5_enabled() && i < PTRS_PER_P4D; i++)
+-		kasan_zero_p4d[i] = __p4d(p4d_val);
++		kasan_early_shadow_p4d[i] = __p4d(p4d_val);
+ 
+ 	kasan_map_early_shadow(early_top_pgt);
+ 	kasan_map_early_shadow(init_top_pgt);
+@@ -326,7 +329,7 @@ void __init kasan_init(void)
+ 
+ 	clear_pgds(KASAN_SHADOW_START & PGDIR_MASK, KASAN_SHADOW_END);
+ 
+-	kasan_populate_zero_shadow((void *)(KASAN_SHADOW_START & PGDIR_MASK),
++	kasan_populate_early_shadow((void *)(KASAN_SHADOW_START & PGDIR_MASK),
+ 			kasan_mem_to_shadow((void *)PAGE_OFFSET));
+ 
+ 	for (i = 0; i < E820_MAX_ENTRIES; i++) {
+@@ -338,41 +341,41 @@ void __init kasan_init(void)
+ 
+ 	shadow_cpu_entry_begin = (void *)CPU_ENTRY_AREA_BASE;
+ 	shadow_cpu_entry_begin = kasan_mem_to_shadow(shadow_cpu_entry_begin);
+-	shadow_cpu_entry_begin = (void *)round_down((unsigned long)shadow_cpu_entry_begin,
+-						PAGE_SIZE);
++	shadow_cpu_entry_begin = (void *)round_down(
++			(unsigned long)shadow_cpu_entry_begin, PAGE_SIZE);
+ 
+ 	shadow_cpu_entry_end = (void *)(CPU_ENTRY_AREA_BASE +
+ 					CPU_ENTRY_AREA_MAP_SIZE);
+ 	shadow_cpu_entry_end = kasan_mem_to_shadow(shadow_cpu_entry_end);
+-	shadow_cpu_entry_end = (void *)round_up((unsigned long)shadow_cpu_entry_end,
+-					PAGE_SIZE);
++	shadow_cpu_entry_end = (void *)round_up(
++			(unsigned long)shadow_cpu_entry_end, PAGE_SIZE);
+ 
+-	kasan_populate_zero_shadow(
++	kasan_populate_early_shadow(
+ 		kasan_mem_to_shadow((void *)PAGE_OFFSET + MAXMEM),
+ 		shadow_cpu_entry_begin);
+ 
+ 	kasan_populate_shadow((unsigned long)shadow_cpu_entry_begin,
+ 			      (unsigned long)shadow_cpu_entry_end, 0);
+ 
+-	kasan_populate_zero_shadow(shadow_cpu_entry_end,
+-				kasan_mem_to_shadow((void *)__START_KERNEL_map));
++	kasan_populate_early_shadow(shadow_cpu_entry_end,
++			kasan_mem_to_shadow((void *)__START_KERNEL_map));
+ 
+ 	kasan_populate_shadow((unsigned long)kasan_mem_to_shadow(_stext),
+ 			      (unsigned long)kasan_mem_to_shadow(_end),
+ 			      early_pfn_to_nid(__pa(_stext)));
+ 
+-	kasan_populate_zero_shadow(kasan_mem_to_shadow((void *)MODULES_END),
+-				(void *)KASAN_SHADOW_END);
++	kasan_populate_early_shadow(kasan_mem_to_shadow((void *)MODULES_END),
++					(void *)KASAN_SHADOW_END);
+ 
+ 	load_cr3(init_top_pgt);
+ 	__flush_tlb_all();
+ 
+ 	/*
+-	 * kasan_zero_page has been used as early shadow memory, thus it may
+-	 * contain some garbage. Now we can clear and write protect it, since
+-	 * after the TLB flush no one should write to it.
++	 * kasan_early_shadow_page has been used as early shadow memory, thus
++	 * it may contain some garbage. Now we can clear and write protect it,
++	 * since after the TLB flush no one should write to it.
+ 	 */
+-	memset(kasan_zero_page, 0, PAGE_SIZE);
++	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
+ 	for (i = 0; i < PTRS_PER_PTE; i++) {
+ 		pte_t pte;
+ 		pgprot_t prot;
+@@ -380,8 +383,8 @@ void __init kasan_init(void)
+ 		prot = __pgprot(__PAGE_KERNEL_RO | _PAGE_ENC);
+ 		pgprot_val(prot) &= __default_kernel_pte_mask;
+ 
+-		pte = __pte(__pa(kasan_zero_page) | pgprot_val(prot));
+-		set_pte(&kasan_zero_pte[i], pte);
++		pte = __pte(__pa(kasan_early_shadow_page) | pgprot_val(prot));
++		set_pte(&kasan_early_shadow_pte[i], pte);
+ 	}
+ 	/* Flush TLBs again to be sure that write protection applied. */
+ 	__flush_tlb_all();
+diff --git a/arch/xtensa/mm/kasan_init.c b/arch/xtensa/mm/kasan_init.c
+index 6b95ca43aec0..1734cda6bc4a 100644
+--- a/arch/xtensa/mm/kasan_init.c
++++ b/arch/xtensa/mm/kasan_init.c
+@@ -24,12 +24,13 @@ void __init kasan_early_init(void)
+ 	int i;
+ 
+ 	for (i = 0; i < PTRS_PER_PTE; ++i)
+-		set_pte(kasan_zero_pte + i,
+-			mk_pte(virt_to_page(kasan_zero_page), PAGE_KERNEL));
++		set_pte(kasan_early_shadow_pte + i,
++			mk_pte(virt_to_page(kasan_early_shadow_page),
++				PAGE_KERNEL));
+ 
+ 	for (vaddr = 0; vaddr < KASAN_SHADOW_SIZE; vaddr += PMD_SIZE, ++pmd) {
+ 		BUG_ON(!pmd_none(*pmd));
+-		set_pmd(pmd, __pmd((unsigned long)kasan_zero_pte));
++		set_pmd(pmd, __pmd((unsigned long)kasan_early_shadow_pte));
+ 	}
+ 	early_trap_init();
+ }
+@@ -80,13 +81,16 @@ void __init kasan_init(void)
+ 	populate(kasan_mem_to_shadow((void *)VMALLOC_START),
+ 		 kasan_mem_to_shadow((void *)XCHAL_KSEG_BYPASS_VADDR));
+ 
+-	/* Write protect kasan_zero_page and zero-initialize it again. */
 +	/*
-+	 * Ignore accesses for pointers tagged with 0xff (native kernel
-+	 * pointer tag) to suppress false positives caused by kmap.
-+	 *
-+	 * Some kernel code was written to account for archs that don't keep
-+	 * high memory mapped all the time, but rather map and unmap particular
-+	 * pages when needed. Instead of storing a pointer to the kernel memory,
-+	 * this code saves the address of the page structure and offset within
-+	 * that page for later use. Those pages are then mapped and unmapped
-+	 * with kmap/kunmap when necessary and virt_to_page is used to get the
-+	 * virtual address of the page. For arm64 (that keeps the high memory
-+	 * mapped all the time), kmap is turned into a page_address call.
-+
-+	 * The issue is that with use of the page_address + virt_to_page
-+	 * sequence the top byte value of the original pointer gets lost (gets
-+	 * set to KASAN_TAG_KERNEL (0xFF)).
++	 * Write protect kasan_early_shadow_page and zero-initialize it again.
 +	 */
-+	if (tag == KASAN_TAG_KERNEL)
-+		return;
-+
-+	untagged_addr = reset_tag((const void *)addr);
-+	if (unlikely(untagged_addr <
-+			kasan_shadow_to_mem((void *)KASAN_SHADOW_START))) {
-+		kasan_report(addr, size, write, ret_ip);
-+		return;
-+	}
-+	shadow_first = kasan_mem_to_shadow(untagged_addr);
-+	shadow_last = kasan_mem_to_shadow(untagged_addr + size - 1);
-+	for (shadow = shadow_first; shadow <= shadow_last; shadow++) {
-+		if (*shadow != tag) {
-+			kasan_report(addr, size, write, ret_ip);
-+			return;
-+		}
-+	}
- }
+ 	for (i = 0; i < PTRS_PER_PTE; ++i)
+-		set_pte(kasan_zero_pte + i,
+-			mk_pte(virt_to_page(kasan_zero_page), PAGE_KERNEL_RO));
++		set_pte(kasan_early_shadow_pte + i,
++			mk_pte(virt_to_page(kasan_early_shadow_page),
++				PAGE_KERNEL_RO));
  
- #define DEFINE_HWASAN_LOAD_STORE(size)					\
- 	void __hwasan_load##size##_noabort(unsigned long addr)		\
- 	{								\
-+		check_memory_region(addr, size, false, _RET_IP_);	\
- 	}								\
- 	EXPORT_SYMBOL(__hwasan_load##size##_noabort);			\
- 	void __hwasan_store##size##_noabort(unsigned long addr)		\
- 	{								\
-+		check_memory_region(addr, size, true, _RET_IP_);	\
- 	}								\
- 	EXPORT_SYMBOL(__hwasan_store##size##_noabort)
+ 	local_flush_tlb_all();
+-	memset(kasan_zero_page, 0, PAGE_SIZE);
++	memset(kasan_early_shadow_page, 0, PAGE_SIZE);
  
-@@ -98,15 +143,18 @@ DEFINE_HWASAN_LOAD_STORE(16);
+ 	/* At this point kasan is fully initialized. Enable error messages. */
+ 	current->kasan_depth = 0;
+diff --git a/include/linux/kasan.h b/include/linux/kasan.h
+index b66fdf5ea7ab..ec22d548d0d7 100644
+--- a/include/linux/kasan.h
++++ b/include/linux/kasan.h
+@@ -14,13 +14,13 @@ struct task_struct;
+ #include <asm/kasan.h>
+ #include <asm/pgtable.h>
  
- void __hwasan_loadN_noabort(unsigned long addr, unsigned long size)
+-extern unsigned char kasan_zero_page[PAGE_SIZE];
+-extern pte_t kasan_zero_pte[PTRS_PER_PTE];
+-extern pmd_t kasan_zero_pmd[PTRS_PER_PMD];
+-extern pud_t kasan_zero_pud[PTRS_PER_PUD];
+-extern p4d_t kasan_zero_p4d[MAX_PTRS_PER_P4D];
++extern unsigned char kasan_early_shadow_page[PAGE_SIZE];
++extern pte_t kasan_early_shadow_pte[PTRS_PER_PTE];
++extern pmd_t kasan_early_shadow_pmd[PTRS_PER_PMD];
++extern pud_t kasan_early_shadow_pud[PTRS_PER_PUD];
++extern p4d_t kasan_early_shadow_p4d[MAX_PTRS_PER_P4D];
+ 
+-int kasan_populate_zero_shadow(const void *shadow_start,
++int kasan_populate_early_shadow(const void *shadow_start,
+ 				const void *shadow_end);
+ 
+ static inline void *kasan_mem_to_shadow(const void *addr)
+diff --git a/mm/kasan/init.c b/mm/kasan/init.c
+index c7550eb65922..2b21d3717d62 100644
+--- a/mm/kasan/init.c
++++ b/mm/kasan/init.c
+@@ -30,13 +30,13 @@
+  *   - Latter it reused it as zero shadow to cover large ranges of memory
+  *     that allowed to access, but not handled by kasan (vmalloc/vmemmap ...).
+  */
+-unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
++unsigned char kasan_early_shadow_page[PAGE_SIZE] __page_aligned_bss;
+ 
+ #if CONFIG_PGTABLE_LEVELS > 4
+-p4d_t kasan_zero_p4d[MAX_PTRS_PER_P4D] __page_aligned_bss;
++p4d_t kasan_early_shadow_p4d[MAX_PTRS_PER_P4D] __page_aligned_bss;
+ static inline bool kasan_p4d_table(pgd_t pgd)
  {
-+	check_memory_region(addr, size, false, _RET_IP_);
+-	return pgd_page(pgd) == virt_to_page(lm_alias(kasan_zero_p4d));
++	return pgd_page(pgd) == virt_to_page(lm_alias(kasan_early_shadow_p4d));
  }
- EXPORT_SYMBOL(__hwasan_loadN_noabort);
- 
- void __hwasan_storeN_noabort(unsigned long addr, unsigned long size)
+ #else
+ static inline bool kasan_p4d_table(pgd_t pgd)
+@@ -45,10 +45,10 @@ static inline bool kasan_p4d_table(pgd_t pgd)
+ }
+ #endif
+ #if CONFIG_PGTABLE_LEVELS > 3
+-pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
++pud_t kasan_early_shadow_pud[PTRS_PER_PUD] __page_aligned_bss;
+ static inline bool kasan_pud_table(p4d_t p4d)
  {
-+	check_memory_region(addr, size, true, _RET_IP_);
+-	return p4d_page(p4d) == virt_to_page(lm_alias(kasan_zero_pud));
++	return p4d_page(p4d) == virt_to_page(lm_alias(kasan_early_shadow_pud));
  }
- EXPORT_SYMBOL(__hwasan_storeN_noabort);
- 
- void __hwasan_tag_memory(unsigned long addr, u8 tag, unsigned long size)
+ #else
+ static inline bool kasan_pud_table(p4d_t p4d)
+@@ -57,10 +57,10 @@ static inline bool kasan_pud_table(p4d_t p4d)
+ }
+ #endif
+ #if CONFIG_PGTABLE_LEVELS > 2
+-pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
++pmd_t kasan_early_shadow_pmd[PTRS_PER_PMD] __page_aligned_bss;
+ static inline bool kasan_pmd_table(pud_t pud)
  {
-+	kasan_poison_shadow((void *)addr, size, tag);
+-	return pud_page(pud) == virt_to_page(lm_alias(kasan_zero_pmd));
++	return pud_page(pud) == virt_to_page(lm_alias(kasan_early_shadow_pmd));
  }
- EXPORT_SYMBOL(__hwasan_tag_memory);
+ #else
+ static inline bool kasan_pmd_table(pud_t pud)
+@@ -68,16 +68,16 @@ static inline bool kasan_pmd_table(pud_t pud)
+ 	return 0;
+ }
+ #endif
+-pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
++pte_t kasan_early_shadow_pte[PTRS_PER_PTE] __page_aligned_bss;
+ 
+ static inline bool kasan_pte_table(pmd_t pmd)
+ {
+-	return pmd_page(pmd) == virt_to_page(lm_alias(kasan_zero_pte));
++	return pmd_page(pmd) == virt_to_page(lm_alias(kasan_early_shadow_pte));
+ }
+ 
+-static inline bool kasan_zero_page_entry(pte_t pte)
++static inline bool kasan_early_shadow_page_entry(pte_t pte)
+ {
+-	return pte_page(pte) == virt_to_page(lm_alias(kasan_zero_page));
++	return pte_page(pte) == virt_to_page(lm_alias(kasan_early_shadow_page));
+ }
+ 
+ static __init void *early_alloc(size_t size, int node)
+@@ -92,7 +92,8 @@ static void __ref zero_pte_populate(pmd_t *pmd, unsigned long addr,
+ 	pte_t *pte = pte_offset_kernel(pmd, addr);
+ 	pte_t zero_pte;
+ 
+-	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_zero_page)), PAGE_KERNEL);
++	zero_pte = pfn_pte(PFN_DOWN(__pa_symbol(kasan_early_shadow_page)),
++				PAGE_KERNEL);
+ 	zero_pte = pte_wrprotect(zero_pte);
+ 
+ 	while (addr + PAGE_SIZE <= end) {
+@@ -112,7 +113,8 @@ static int __ref zero_pmd_populate(pud_t *pud, unsigned long addr,
+ 		next = pmd_addr_end(addr, end);
+ 
+ 		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
+-			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
++			pmd_populate_kernel(&init_mm, pmd,
++					lm_alias(kasan_early_shadow_pte));
+ 			continue;
+ 		}
+ 
+@@ -145,9 +147,11 @@ static int __ref zero_pud_populate(p4d_t *p4d, unsigned long addr,
+ 		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
+ 			pmd_t *pmd;
+ 
+-			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
++			pud_populate(&init_mm, pud,
++					lm_alias(kasan_early_shadow_pmd));
+ 			pmd = pmd_offset(pud, addr);
+-			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
++			pmd_populate_kernel(&init_mm, pmd,
++					lm_alias(kasan_early_shadow_pte));
+ 			continue;
+ 		}
+ 
+@@ -181,12 +185,14 @@ static int __ref zero_p4d_populate(pgd_t *pgd, unsigned long addr,
+ 			pud_t *pud;
+ 			pmd_t *pmd;
+ 
+-			p4d_populate(&init_mm, p4d, lm_alias(kasan_zero_pud));
++			p4d_populate(&init_mm, p4d,
++					lm_alias(kasan_early_shadow_pud));
+ 			pud = pud_offset(p4d, addr);
+-			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
++			pud_populate(&init_mm, pud,
++					lm_alias(kasan_early_shadow_pmd));
+ 			pmd = pmd_offset(pud, addr);
+ 			pmd_populate_kernel(&init_mm, pmd,
+-						lm_alias(kasan_zero_pte));
++					lm_alias(kasan_early_shadow_pte));
+ 			continue;
+ 		}
+ 
+@@ -209,13 +215,13 @@ static int __ref zero_p4d_populate(pgd_t *pgd, unsigned long addr,
+ }
+ 
+ /**
+- * kasan_populate_zero_shadow - populate shadow memory region with
+- *                               kasan_zero_page
++ * kasan_populate_early_shadow - populate shadow memory region with
++ *                               kasan_early_shadow_page
+  * @shadow_start - start of the memory range to populate
+  * @shadow_end   - end of the memory range to populate
+  */
+-int __ref kasan_populate_zero_shadow(const void *shadow_start,
+-				const void *shadow_end)
++int __ref kasan_populate_early_shadow(const void *shadow_start,
++					const void *shadow_end)
+ {
+ 	unsigned long addr = (unsigned long)shadow_start;
+ 	unsigned long end = (unsigned long)shadow_end;
+@@ -231,7 +237,7 @@ int __ref kasan_populate_zero_shadow(const void *shadow_start,
+ 			pmd_t *pmd;
+ 
+ 			/*
+-			 * kasan_zero_pud should be populated with pmds
++			 * kasan_early_shadow_pud should be populated with pmds
+ 			 * at this moment.
+ 			 * [pud,pmd]_populate*() below needed only for
+ 			 * 3,2 - level page tables where we don't have
+@@ -241,21 +247,25 @@ int __ref kasan_populate_zero_shadow(const void *shadow_start,
+ 			 * The ifndef is required to avoid build breakage.
+ 			 *
+ 			 * With 5level-fixup.h, pgd_populate() is not nop and
+-			 * we reference kasan_zero_p4d. It's not defined
++			 * we reference kasan_early_shadow_p4d. It's not defined
+ 			 * unless 5-level paging enabled.
+ 			 *
+ 			 * The ifndef can be dropped once all KASAN-enabled
+ 			 * architectures will switch to pgtable-nop4d.h.
+ 			 */
+ #ifndef __ARCH_HAS_5LEVEL_HACK
+-			pgd_populate(&init_mm, pgd, lm_alias(kasan_zero_p4d));
++			pgd_populate(&init_mm, pgd,
++					lm_alias(kasan_early_shadow_p4d));
+ #endif
+ 			p4d = p4d_offset(pgd, addr);
+-			p4d_populate(&init_mm, p4d, lm_alias(kasan_zero_pud));
++			p4d_populate(&init_mm, p4d,
++					lm_alias(kasan_early_shadow_pud));
+ 			pud = pud_offset(p4d, addr);
+-			pud_populate(&init_mm, pud, lm_alias(kasan_zero_pmd));
++			pud_populate(&init_mm, pud,
++					lm_alias(kasan_early_shadow_pmd));
+ 			pmd = pmd_offset(pud, addr);
+-			pmd_populate_kernel(&init_mm, pmd, lm_alias(kasan_zero_pte));
++			pmd_populate_kernel(&init_mm, pmd,
++					lm_alias(kasan_early_shadow_pte));
+ 			continue;
+ 		}
+ 
+@@ -350,7 +360,7 @@ static void kasan_remove_pte_table(pte_t *pte, unsigned long addr,
+ 		if (!pte_present(*pte))
+ 			continue;
+ 
+-		if (WARN_ON(!kasan_zero_page_entry(*pte)))
++		if (WARN_ON(!kasan_early_shadow_page_entry(*pte)))
+ 			continue;
+ 		pte_clear(&init_mm, addr, pte);
+ 	}
+@@ -480,7 +490,7 @@ int kasan_add_zero_shadow(void *start, unsigned long size)
+ 	    WARN_ON(size % (KASAN_SHADOW_SCALE_SIZE * PAGE_SIZE)))
+ 		return -EINVAL;
+ 
+-	ret = kasan_populate_zero_shadow(shadow_start, shadow_end);
++	ret = kasan_populate_early_shadow(shadow_start, shadow_end);
+ 	if (ret)
+ 		kasan_remove_zero_shadow(shadow_start,
+ 					size >> KASAN_SHADOW_SCALE_SHIFT);
 -- 
 2.20.0.rc0.387.gc7a69e6b6c-goog
