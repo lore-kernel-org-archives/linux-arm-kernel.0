@@ -1,332 +1,72 @@
-From: liuyun01@kylinos.cn (Jackie Liu)
-Date: Tue, 27 Nov 2018 13:27:01 +0800
-Subject: [PATCH v2 2/2] arm64: crypto: add NEON accelerated XOR implementation
-In-Reply-To: <20181127052701.4144-1-liuyun01@kylinos.cn>
-References: <20181127052701.4144-1-liuyun01@kylinos.cn>
-Message-ID: <20181127052701.4144-2-liuyun01@kylinos.cn>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 27 Nov 2018 13:38:41 +0800
+Subject: [PATCH v5 2/4] kgdb: Fix kgdb_roundup_cpus() for arches who used
+ smp_call_function()
+In-Reply-To: <20181127035133.225592-3-dianders@chromium.org>
+References: <20181127035133.225592-3-dianders@chromium.org>
+Message-ID: <201811271333.8ZTVxYUT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a NEON acceleration method that can improve
-performance by approximately 20%. I got the following
-data from the centos 7.5 on Huawei's HISI1616 chip:
+Hi Douglas,
 
-[ 93.837726] xor: measuring software checksum speed
-[ 93.874039]   8regs  : 7123.200 MB/sec
-[ 93.914038]   32regs : 7180.300 MB/sec
-[ 93.954043]   arm64_neon: 9856.000 MB/sec
-[ 93.954047] xor: using function: arm64_neon (9856.000 MB/sec)
+Thank you for the patch! Yet something to improve:
 
-I believe this code can bring some optimization for
-all arm64 platform.
+[auto build test ERROR on kgdb/kgdb-next]
+[also build test ERROR on v4.20-rc4 next-20181126]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-That is patch version 2. Thanks for Ard Biesheuvel's
-suggestions.
+url:    https://github.com/0day-ci/linux/commits/Douglas-Anderson/kgdb-Fix-kgdb_roundup_cpus/20181127-115425
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/jwessel/kgdb.git kgdb-next
+config: sparc64-allyesconfig (attached as .config)
+compiler: sparc64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sparc64 
 
-Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
+Note: the linux-review/Douglas-Anderson/kgdb-Fix-kgdb_roundup_cpus/20181127-115425 HEAD b8d0502e65f2d7a2187baa69870146a6fbf18c9f builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+   kernel/debug/debug_core.c: In function 'kgdb_roundup_cpus':
+>> kernel/debug/debug_core.c:261:18: error: 'struct debuggerinfo_struct' has no member named 'rounding_up'
+       kgdb_info[cpu].rounding_up = false;
+                     ^
+
+vim +261 kernel/debug/debug_core.c
+
+   244	
+   245	void __weak kgdb_roundup_cpus(void)
+   246	{
+   247		call_single_data_t *csd;
+   248		int this_cpu = raw_smp_processor_id();
+   249		int cpu;
+   250		int ret;
+   251	
+   252		for_each_online_cpu(cpu) {
+   253			/* No need to roundup ourselves */
+   254			if (cpu == this_cpu)
+   255				continue;
+   256	
+   257			csd = &per_cpu(kgdb_roundup_csd, cpu);
+   258			csd->func = kgdb_call_nmi_hook;
+   259			ret = smp_call_function_single_async(cpu, csd);
+   260			if (ret)
+ > 261				kgdb_info[cpu].rounding_up = false;
+   262		}
+   263	}
+   264	
+
 ---
- arch/arm64/include/asm/Kbuild |   1 -
- arch/arm64/include/asm/xor.h  |  73 +++++++++++++++++
- arch/arm64/lib/Makefile       |   6 ++
- arch/arm64/lib/xor-neon.c     | 184 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 263 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/xor.h
- create mode 100644 arch/arm64/lib/xor-neon.c
-
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 6cd5d77..1877f29 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -27,4 +27,3 @@ generic-y += trace_clock.h
- generic-y += unaligned.h
- generic-y += user.h
- generic-y += vga.h
--generic-y += xor.h
-diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
-new file mode 100644
-index 0000000..856386a
---- /dev/null
-+++ b/arch/arm64/include/asm/xor.h
-@@ -0,0 +1,73 @@
-+/*
-+ * arch/arm64/include/asm/xor.h
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/hardirq.h>
-+#include <asm-generic/xor.h>
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+extern struct xor_block_template const xor_block_inner_neon;
-+
-+static void
-+xor_neon_2(unsigned long bytes, unsigned long *p1, unsigned long *p2)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_2(bytes, p1, p2);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_3(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_3(bytes, p1, p2, p3);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_4(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_4(bytes, p1, p2, p3, p4);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4, unsigned long *p5)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_5(bytes, p1, p2, p3, p4, p5);
-+	kernel_neon_end();
-+}
-+
-+static struct xor_block_template xor_block_arm64 = {
-+	.name   = "arm64_neon",
-+	.do_2   = xor_neon_2,
-+	.do_3   = xor_neon_3,
-+	.do_4   = xor_neon_4,
-+	.do_5	= xor_neon_5
-+};
-+#undef XOR_TRY_TEMPLATES
-+#define XOR_TRY_TEMPLATES           \
-+	do {        \
-+		xor_speed(&xor_block_8regs);    \
-+		xor_speed(&xor_block_32regs);    \
-+		if (cpu_has_neon()) { \
-+			xor_speed(&xor_block_arm64);\
-+		} \
-+	} while (0)
-+
-+#endif /* ! CONFIG_KERNEL_MODE_NEON */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 69ff988..5540a16 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -5,6 +5,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
- 		   strchr.o strrchr.o tishift.o
- 
-+ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
-+obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
-+CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
-+CFLAGS_xor-neon.o		+= -ffreestanding
-+endif
-+
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
- # in case of a PLT) as callee-saved, which allows for efficient runtime
-diff --git a/arch/arm64/lib/xor-neon.c b/arch/arm64/lib/xor-neon.c
-new file mode 100644
-index 0000000..e2d2f4a
---- /dev/null
-+++ b/arch/arm64/lib/xor-neon.c
-@@ -0,0 +1,184 @@
-+/*
-+ * arch/arm64/lib/xor-neon-core.c
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/raid/xor.h>
-+#include <linux/module.h>
-+#include <arm_neon.h>
-+
-+void xor_arm64_neon_2(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_3(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_4(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3, unsigned long *p4)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_5(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3,
-+	unsigned long *p4, unsigned long *p5)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+	uint64_t *dp5 = (uint64_t *)p5;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* p1 ^= p5 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp5 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp5 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp5 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp5 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+		dp5 += 8;
-+	} while (--lines > 0);
-+}
-+
-+struct xor_block_template const xor_block_inner_neon = {
-+	.name	= "__inner_neon__",
-+	.do_2	= xor_arm64_neon_2,
-+	.do_3	= xor_arm64_neon_3,
-+	.do_4	= xor_arm64_neon_4,
-+	.do_5	= xor_arm64_neon_5,
-+};
-+EXPORT_SYMBOL(xor_block_inner_neon);
-+
-+MODULE_AUTHOR("Jackie Liu <liuyun01@kylinos.cn>");
-+MODULE_DESCRIPTION("ARMv8 XOR Extensions");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 55426 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/a09a6228/attachment-0001.gz>
