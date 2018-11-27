@@ -1,161 +1,137 @@
-From: jjian.zhou@mediatek.com (Jjian Zhou)
-Date: Tue, 27 Nov 2018 17:27:36 +0800
-Subject: [PATCH v2] mmc: mediatek: add MT8183 SDIO driver support
-In-Reply-To: <CANMq1KCO7tUGpXBR6x8cWiVd+5if2sPxU5N9J2aiMtuWuff3eg@mail.gmail.com>
-References: <1542873780-13911-1-git-send-email-jjian.zhou@mediatek.com>
- <CANMq1KCO7tUGpXBR6x8cWiVd+5if2sPxU5N9J2aiMtuWuff3eg@mail.gmail.com>
-Message-ID: <1543310856.15593.32.camel@mhfsdcap03>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Tue, 27 Nov 2018 10:36:19 +0100
+Subject: [PATCH 06/14] regulator: axp20x: add software based soft_start
+ for AXP209 LDO3
+In-Reply-To: <41cb1b4dac3a15595c89fa962b78d3f68f370021.1543245984.git-series.plaes@plaes.org>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+ <41cb1b4dac3a15595c89fa962b78d3f68f370021.1543245984.git-series.plaes@plaes.org>
+Message-ID: <20181127093619.72ensythkx2mhdf5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2018-11-26 at 19:47 +0800, Nicolas Boichat wrote:
-> On Thu, Nov 22, 2018 at 4:03 PM Jjian Zhou <jjian.zhou@mediatek.com> wrote:
-> >
-> > MT8183 need SDIO driver. So it need add new code
-> > to support it.
+On Mon, Nov 26, 2018 at 05:27:47PM +0200, Priit Laes wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
 > 
-> The description does not seem to match what is going on below: I don't
-> see anything that is obviously MT8183-specific. At first glance, this
-> seems like a patch that makes it possible to enable MMC_CAP_SDIO_IRQ
-> ("cap-sdio-irq" dt property).
+> In the past, there have been words on various lists that if LDO3 is
+> disabled in u-boot, but enabled in the DTS, the axp209 driver would
+> fail to continue/hang. Several enable/disable patches have been
+> issues to devicetree's in both the kernel and u-boot to address
+> this issue.
 > 
-> Can you describe in more detail what is going on here?
-
-Hi Nicolas,
-   Thank you for your comments.
-
-Host wants to use the new method to signal/process SDIO IRQs, must
-enable MMC_CAPS_SDIO_IRQ_NOTHREAD and implement the ->ack_sdio_irq()
-callback. The current driver doesn't support it. This code makes it
-possible to enable SDIO IRQs by using the new method. It is described as
-"MT8183 need SDIO driver". Because it is tested based on MT8183. 
-How about the below commit message:
-
-This code wants to support SDIO IRQs. It enables MMC_CAP_SDIO_IRQ &
-MMC_CAP2_SDIO_IRQ_NOTHREAD and implement the ->ack_sdio_irq() callback.
-
-   Thanks a lot.
-
+> What really happened however, was that the AXP209 shuts down without
+> a notice and without setting an interrupt. This is caused when LDO3
+> gets overloaded, for example with large capacitors on the LDO3 output.
 > 
-> > Signed-off-by: Jjian Zhou <jjian.zhou@mediatek.com>
-> > Signed-off-by: Yong mao <yong.mao@mediatek.com>
-> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
-> > ---
-> >  drivers/mmc/host/mtk-sd.c | 51 ++++++++++++++++++++++++++++++++++++++++++++---
-> >  1 file changed, 48 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
-> > index 6334cc7..da2a047 100644
-> > --- a/drivers/mmc/host/mtk-sd.c
-> > +++ b/drivers/mmc/host/mtk-sd.c
-> > @@ -1114,6 +1114,7 @@ static void msdc_start_command(struct msdc_host *host,
-> >                 struct mmc_request *mrq, struct mmc_command *cmd)
-> >  {
-> >         u32 rawcmd;
-> > +       unsigned long flags;
-> >
-> >         WARN_ON(host->cmd);
-> >         host->cmd = cmd;
-> > @@ -1131,7 +1132,12 @@ static void msdc_start_command(struct msdc_host *host,
-> >         cmd->error = 0;
-> >         rawcmd = msdc_cmd_prepare_raw_cmd(host, mrq, cmd);
-> >
-> > +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-> > +               spin_lock_irqsave(&host->lock, flags);
-> >         sdr_set_bits(host->base + MSDC_INTEN, cmd_ints_mask);
-> > +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-> > +               spin_unlock_irqrestore(&host->lock, flags);
-> > +
-> >         writel(cmd->arg, host->base + SDC_ARG);
-> >         writel(rawcmd, host->base + SDC_CMD);
-> >  }
-> > @@ -1351,6 +1357,27 @@ static void msdc_request_timeout(struct work_struct *work)
-> >         }
-> >  }
-> >
-> > +static void msdc_enable_sdio_irq(struct mmc_host *mmc, int enb)
-> > +{
-> > +       unsigned long flags;
-> > +       struct msdc_host *host = mmc_priv(mmc);
-> > +
-> > +       if (enb)
-> > +               pm_runtime_get_sync(host->dev);
-> > +
-> > +       spin_lock_irqsave(&host->lock, flags);
-> > +       if (enb)
-> > +               sdr_set_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-> > +       else
-> > +               sdr_clr_bits(host->base + MSDC_INTEN, MSDC_INTEN_SDIOIRQ);
-> > +       spin_unlock_irqrestore(&host->lock, flags);
-> > +
-> > +       if (!enb) {
-> > +               pm_runtime_mark_last_busy(host->dev);
-> > +               pm_runtime_put_autosuspend(host->dev);
-> > +       }
-> > +}
-> > +
-> >  static irqreturn_t msdc_irq(int irq, void *dev_id)
-> >  {
-> >         struct msdc_host *host = (struct msdc_host *) dev_id;
-> > @@ -1373,7 +1400,12 @@ static irqreturn_t msdc_irq(int irq, void *dev_id)
-> >                 data = host->data;
-> >                 spin_unlock_irqrestore(&host->lock, flags);
-> >
-> > -               if (!(events & event_mask))
-> > +               if ((events & event_mask) & MSDC_INT_SDIOIRQ) {
-> > +                       msdc_enable_sdio_irq(host->mmc, 0);
-> > +                       sdio_signal_irq(host->mmc);
-> > +               }
-> > +
-> > +               if (!(events & (event_mask & ~MSDC_INT_SDIOIRQ)))
-> >                         break;
-> >
-> >                 if (!mrq) {
-> > @@ -1493,8 +1525,11 @@ static void msdc_init_hw(struct msdc_host *host)
-> >          */
-> >         sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIO);
-> >
-> > -       /* disable detect SDIO device interrupt function */
-> > -       sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> > +       /* Config SDIO device detect interrupt function */
-> > +       if (host->mmc->caps & MMC_CAP_SDIO_IRQ)
-> > +               sdr_set_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> > +       else
-> > +               sdr_clr_bits(host->base + SDC_CFG, SDC_CFG_SDIOIDE);
-> >
-> >         /* Configure to default data timeout */
-> >         sdr_set_field(host->base + SDC_CFG, SDC_CFG_DTOC, 3);
-> > @@ -2013,6 +2048,11 @@ static void msdc_hw_reset(struct mmc_host *mmc)
-> >         sdr_clr_bits(host->base + EMMC_IOCON, 1);
-> >  }
-> >
-> > +static void msdc_ack_sdio_irq(struct mmc_host *mmc)
-> > +{
-> > +       msdc_enable_sdio_irq(mmc, 1);
-> > +}
-> > +
-> >  static const struct mmc_host_ops mt_msdc_ops = {
-> >         .post_req = msdc_post_req,
-> >         .pre_req = msdc_pre_req,
-> > @@ -2020,6 +2060,8 @@ static void msdc_hw_reset(struct mmc_host *mmc)
-> >         .set_ios = msdc_ops_set_ios,
-> >         .get_ro = mmc_gpio_get_ro,
-> >         .get_cd = mmc_gpio_get_cd,
-> > +       .enable_sdio_irq = msdc_enable_sdio_irq,
-> > +       .ack_sdio_irq = msdc_ack_sdio_irq,
-> >         .start_signal_voltage_switch = msdc_ops_switch_volt,
-> >         .card_busy = msdc_card_busy,
-> >         .execute_tuning = msdc_execute_tuning,
-> > @@ -2147,6 +2189,9 @@ static int msdc_drv_probe(struct platform_device *pdev)
-> >         else
-> >                 mmc->f_min = DIV_ROUND_UP(host->src_clk_freq, 4 * 4095);
-> >
-> > +       if (mmc->caps & MMC_CAP_SDIO_IRQ)
-> > +               mmc->caps2 |= MMC_CAP2_SDIO_IRQ_NOTHREAD;
-> > +
-> >         mmc->caps |= MMC_CAP_ERASE | MMC_CAP_CMD23;
-> >         /* MMC core transfer sizes tunable parameters */
-> >         mmc->max_segs = MAX_BD_NUM;
-> > --
-> > 1.9.1
-> >
+> Normally, we would expect that AXP209 would source 200 mA as per
+> datasheet and set and trigger an interrupt when being overloaded.
+> For some reason however, this does not happen.
+> 
+> As a work-around, we use the soft-start constraint of the regulator
+> node to first bring up the LDO3 to the lowest possible voltage and
+> then enable the LDO. After that, we can set the requested voltage
+> as usual.
+> 
+> Combining this setting with the regulator-ramp-delay allows LDO3 to
+> enable voltage slowly and staggered, potentially reducing overall
+> inrush current.
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  drivers/regulator/axp20x-regulator.c | 57 ++++++++++++++++++++++++++++-
+>  1 file changed, 56 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+> index 1d9fa62..e8a895b 100644
+> --- a/drivers/regulator/axp20x-regulator.c
+> +++ b/drivers/regulator/axp20x-regulator.c
+> @@ -14,6 +14,7 @@
+>   */
+>  
+>  #include <linux/bitops.h>
+> +#include <linux/delay.h>
+>  #include <linux/err.h>
+>  #include <linux/init.h>
+>  #include <linux/mfd/axp20x.h>
+> @@ -23,6 +24,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+>  #include <linux/regulator/driver.h>
+> +#include <linux/regulator/machine.h>
+>  #include <linux/regulator/of_regulator.h>
+>  
+>  #define AXP20X_GPIO0_FUNC_MASK		GENMASK(3, 0)
+> @@ -430,6 +432,59 @@ static int axp20x_set_ramp_delay(struct regulator_dev *rdev, int ramp)
+>  	return regmap_update_bits(axp20x->regmap, reg, mask, cfg);
+>  }
+>  
+> +static int axp20x_regulator_enable_regmap(struct regulator_dev *rdev)
+> +{
+> +	struct axp20x_dev *axp20x = rdev_get_drvdata(rdev);
+> +	const struct regulator_desc *desc = rdev->desc;
+> +
+> +	if (!rdev)
+> +		return -EINVAL;
+> +
+> +	switch (axp20x->variant) {
+> +	case AXP209_ID:
+> +		if ((desc->id == AXP20X_LDO3) &&
+> +		    rdev->constraints && rdev->constraints->soft_start) {
+> +			int v_out;
+> +			int ret;
+> +
+> +			/*
+> +			 * On some boards, the LDO3 can be overloaded when
+> +			 * turning on, causing the entire PMIC to shutdown
+> +			 * without warning. Turning it on at the minimal voltage
+> +			 * and then setting the voltage to the requested value
+> +			 * works reliably.
+> +			 */
+> +			if (regulator_is_enabled_regmap(rdev))
+> +				break;
+> +
+> +			v_out = regulator_get_voltage_sel_regmap(rdev);
+> +			if (v_out < 0)
+> +				return v_out;
+> +
+> +			if (v_out == 0)
+> +				break;
+> +
+> +			ret = regulator_set_voltage_sel_regmap(rdev, 0x00);
+> +			/*
+> +			 * A small pause is needed between
+> +			 * setting the voltage and enabling the LDO to give the
+> +			 * internal state machine time to process the request.
+> +			 */
+> +			usleep_range(1000, 5000);
+> +			ret |= regulator_enable_regmap(rdev);
+> +			ret |= regulator_set_voltage_sel_regmap(rdev, v_out);
+> +
+> +			return ret;
+> +		}
+> +		break;
+> +	default:
+> +		/* No quirks */
+> +		break;
+> +	}
+> +
+> +	return regulator_enable_regmap(rdev);
+> +};
+> +
+
+This is some pretty generic code, and could be useful to some other
+users. I guess a generic function would be better for this.
+
+Maxime
+
+-- 
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181127/f95e9f28/attachment-0001.sig>
