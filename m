@@ -1,86 +1,91 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 27 Nov 2018 11:42:50 +0800
-Subject: [PATCH v2 07/11] clk: mediatek: Add flags support for mtk_gate data
+Date: Tue, 27 Nov 2018 11:42:45 +0800
+Subject: [PATCH v2 02/11] clk: mediatek: add new member to mtk_pll_data
 In-Reply-To: <20181127034254.24721-1-weiyi.lu@mediatek.com>
 References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
-Message-ID: <20181127034254.24721-9-weiyi.lu@mediatek.com>
+Message-ID: <20181127034254.24721-4-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some Mediatek platforms, there are critical clocks of
-clock gate type.
-To register clock gate with flags CLK_IS_CRITICAL,
-we need to add the flags field in mtk_gate data and register APIs.
+From: Owen Chen <owen.chen@mediatek.com>
 
+1. pcwibits: The integer bits of pcw for plls is extend to 8 bits,
+   add a variable to indicate this change and
+   backward-compatible.
+2. fmin: The pll freqency lower-bound is vary from 1GMhz to
+   1.5Ghz, add a variable to indicate platform-dependent.
+
+Signed-off-by: Owen Chen <owen.chen@mediatek.com>
 Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
 ---
- drivers/clk/mediatek/clk-gate.c | 5 +++--
- drivers/clk/mediatek/clk-gate.h | 3 ++-
- drivers/clk/mediatek/clk-mtk.c  | 3 ++-
- drivers/clk/mediatek/clk-mtk.h  | 1 +
- 4 files changed, 8 insertions(+), 4 deletions(-)
+ drivers/clk/mediatek/clk-mtk.h |  2 ++
+ drivers/clk/mediatek/clk-pll.c | 12 +++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-gate.c b/drivers/clk/mediatek/clk-gate.c
-index 934bf0e45e26..85daf826619a 100644
---- a/drivers/clk/mediatek/clk-gate.c
-+++ b/drivers/clk/mediatek/clk-gate.c
-@@ -157,7 +157,8 @@ struct clk *mtk_clk_register_gate(
- 		int clr_ofs,
- 		int sta_ofs,
- 		u8 bit,
--		const struct clk_ops *ops)
-+		const struct clk_ops *ops,
-+		unsigned long flags)
- {
- 	struct mtk_clk_gate *cg;
- 	struct clk *clk;
-@@ -168,7 +169,7 @@ struct clk *mtk_clk_register_gate(
- 		return ERR_PTR(-ENOMEM);
- 
- 	init.name = name;
--	init.flags = CLK_SET_RATE_PARENT;
-+	init.flags = flags | CLK_SET_RATE_PARENT;
- 	init.parent_names = parent_name ? &parent_name : NULL;
- 	init.num_parents = parent_name ? 1 : 0;
- 	init.ops = ops;
-diff --git a/drivers/clk/mediatek/clk-gate.h b/drivers/clk/mediatek/clk-gate.h
-index 72ef89b3ad7b..9f766dfe1d57 100644
---- a/drivers/clk/mediatek/clk-gate.h
-+++ b/drivers/clk/mediatek/clk-gate.h
-@@ -47,6 +47,7 @@ struct clk *mtk_clk_register_gate(
- 		int clr_ofs,
- 		int sta_ofs,
- 		u8 bit,
--		const struct clk_ops *ops);
-+		const struct clk_ops *ops,
-+		unsigned long flags);
- 
- #endif /* __DRV_CLK_GATE_H */
-diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-index 9c0ae4278a94..35359e5397c7 100644
---- a/drivers/clk/mediatek/clk-mtk.c
-+++ b/drivers/clk/mediatek/clk-mtk.c
-@@ -130,7 +130,8 @@ int mtk_clk_register_gates(struct device_node *node,
- 				gate->regs->set_ofs,
- 				gate->regs->clr_ofs,
- 				gate->regs->sta_ofs,
--				gate->shift, gate->ops);
-+				gate->shift, gate->ops,
-+				gate->flags);
- 
- 		if (IS_ERR(clk)) {
- 			pr_err("Failed to register clk %s: %ld\n",
 diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index 11b5517903d0..928905496c4b 100644
+index f83c2bbb677e..11b5517903d0 100644
 --- a/drivers/clk/mediatek/clk-mtk.h
 +++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -158,6 +158,7 @@ struct mtk_gate {
- 	const struct mtk_gate_regs *regs;
- 	int shift;
+@@ -214,8 +214,10 @@ struct mtk_pll_data {
+ 	unsigned int flags;
  	const struct clk_ops *ops;
-+	unsigned long flags;
- };
+ 	u32 rst_bar_mask;
++	unsigned long fmin;
+ 	unsigned long fmax;
+ 	int pcwbits;
++	int pcwibits;
+ 	uint32_t pcw_reg;
+ 	int pcw_shift;
+ 	const struct mtk_pll_div_table *div_table;
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+index f54e4015b0b1..1db161aced31 100644
+--- a/drivers/clk/mediatek/clk-pll.c
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -32,6 +32,8 @@
+ #define AUDPLL_TUNER_EN		BIT(31)
  
- int mtk_clk_register_gates(struct device_node *node,
+ #define POSTDIV_MASK		0x7
++
++/* default 7 bits integer, can be overridden with pcwibits. */
+ #define INTEGER_BITS		7
+ 
+ /*
+@@ -69,11 +71,13 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
+ {
+ 	int pcwbits = pll->data->pcwbits;
+ 	int pcwfbits;
++	int ibits;
+ 	u64 vco;
+ 	u8 c = 0;
+ 
+ 	/* The fractional part of the PLL divider. */
+-	pcwfbits = pcwbits > INTEGER_BITS ? pcwbits - INTEGER_BITS : 0;
++	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
++	pcwfbits = pcwbits > ibits ? pcwbits - ibits : 0;
+ 
+ 	vco = (u64)fin * pcw;
+ 
+@@ -138,9 +142,10 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+ 		u32 freq, u32 fin)
+ {
+-	unsigned long fmin = 1000 * MHZ;
++	unsigned long fmin = pll->data->fmin ? pll->data->fmin : (1000 * MHZ);
+ 	const struct mtk_pll_div_table *div_table = pll->data->div_table;
+ 	u64 _pcw;
++	int ibits;
+ 	u32 val;
+ 
+ 	if (freq > pll->data->fmax)
+@@ -164,7 +169,8 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+ 	}
+ 
+ 	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
+-	_pcw = ((u64)freq << val) << (pll->data->pcwbits - INTEGER_BITS);
++	ibits = pll->data->pcwibits ? pll->data->pcwibits : INTEGER_BITS;
++	_pcw = ((u64)freq << val) << (pll->data->pcwbits - ibits);
+ 	do_div(_pcw, fin);
+ 
+ 	*pcw = (u32)_pcw;
 -- 
 2.18.0
