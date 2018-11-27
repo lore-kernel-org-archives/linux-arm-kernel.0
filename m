@@ -1,33 +1,42 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:03 +0100
-Subject: [PATCH 02/77] ARM: dts: sun4i: Fix HDMI output DTC warning
+Date: Tue, 27 Nov 2018 13:45:06 +0100
+Subject: [PATCH 05/77] ARM: dts: sun5i: Change clock node names to avoid
+ warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <f94e560d48baed0c5d9932eec1102c1fe76ff29d.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <f46c0b69240d050a52ef2ca4c6c4a73f3f587974.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our HDMI output endpoint on the A10 DTSI has a warning under DTC: "graph
-node has single child node 'endpoint', #address-cells/#size-cells are not
-necessary". Fix this by removing those properties.
+Our oscillators clock names have a unit address, but no reg property, which
+generates a warning in DTC. Change these names to remove those unit
+addresses.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/sun5i.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 3d62a8950720..5d46bb0139fa 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -530,8 +530,6 @@
- 				};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 3e7b251ce7a6..97236b112b01 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -93,14 +93,14 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- 				hdmi_out: port at 1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
- 					reg = <1>;
- 				};
- 			};
+-		osc24M: clk at 1c20050 {
++		osc24M: clk-24M {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <24000000>;
+ 			clock-output-names = "osc24M";
+ 		};
+ 
+-		osc32k: clk at 0 {
++		osc32k: clk-32k {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-clock";
+ 			clock-frequency = <32768>;
 -- 
 git-series 0.9.1
