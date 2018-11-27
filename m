@@ -1,32 +1,63 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Tue, 27 Nov 2018 12:39:33 -0800 (PST)
-Subject: [PATCH 0/2] SWIOTLB fixes for 4.20
-In-Reply-To: <alpine.DEB.2.10.1811271106460.4577@sstabellini-ThinkPad-X260>
-References: <cover.1542722463.git.robin.murphy@arm.com>
- <20181120160818.GC2492@lst.de> <20181120163441.GD31199@char.us.oracle.com>
- <20181121130331.GA1373@lst.de> <20181121151133.GC26925@char.us.oracle.com>
- <alpine.DEB.2.10.1811271106460.4577@sstabellini-ThinkPad-X260>
-Message-ID: <alpine.DEB.2.10.1811271239080.4577@sstabellini-ThinkPad-X260>
+From: rafael.tinoco@linaro.org (Rafael David Tinoco)
+Date: Tue, 27 Nov 2018 18:52:54 -0200
+Subject: [PATCH] arm: always update thread_info->syscall
+In-Reply-To: <20181127153553.GE30658@n2100.armlinux.org.uk>
+References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
+ <20181126233303.GZ30658@n2100.armlinux.org.uk>
+ <20181126234111.GA30658@n2100.armlinux.org.uk>
+ <20181126234456.GB30658@n2100.armlinux.org.uk>
+ <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
+ <20181127105620.GD30658@n2100.armlinux.org.uk>
+ <20181127153553.GE30658@n2100.armlinux.org.uk>
+Message-ID: <df0f7e94-8577-2789-a749-77855387909e@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2018, Stefano Stabellini wrote:
-> On Wed, 21 Nov 2018, Konrad Rzeszutek Wilk wrote:
-> > On Wed, Nov 21, 2018 at 02:03:31PM +0100, Christoph Hellwig wrote:
-> > > On Tue, Nov 20, 2018 at 11:34:41AM -0500, Konrad Rzeszutek Wilk wrote:
-> > > > > Konrad, are you ok with me picking up both through the dma-mapping
-> > > > > tree?
-> > > > 
-> > > > Yes, albeit I would want Stefano to take a peek at patch #2 just in case.
-> > > 
-> > > Stefano, can you take a look asap?  This is a pretty trivial fix for
-> > > a nasty bug that breaks boot on real life systems.  I'd like to merge
-> > > it by tomorrow so that I can send it off to Linus for the next rc
-> > > (I will be offline for about two days after Friday morning)
-> > 
-> > It is Turkey Day in US so he may be busy catching those pesky turkeys.
-> > How about Tuesday? And in can also send the GIT PULL.
+On 11/27/18 1:35 PM, Russell King - ARM Linux wrote:
+> On x86 (32-bit app on 64-bit kernel), it has this behaviour:
 > 
-> I have just come back to the office. I'll give it a look today.
+> $ ./syscall-test
+> 162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
+> 162 0xffcc5a6c 0xffcc5a6c 0x48d09000 0x0 0xffcc5af4 0xffcc5a74 0xffcc5a2c 0xf77dfa59
+> 
+> which looks good, except:
+> 
+> $ strace -o /dev/null -f ./syscall-test
+> 162 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
+> 0 0xffc0070c 0xffc0070c 0x48d09000 0x0 0xffc00794 0xffc00714 0xffc006cc 0xf77f3a59
+> 
+> So, if we're syscall ptracing a program, __NR_restart_syscall gets
+> exposed through this interface, but if we aren't, it isn't exposed.
+> Which version is correct?  *shrug*, no documentation...
 
-Everything looks good to me, thanks for keeping me in the loop.
+I looked around and could only find people using this interface as an
+alternate mechanism - than ptracing - for discovering what a task was
+doing a certain moment (Mostly during hangs. I haven't found a good
+schematic way - or tool - that uses it, but I might be wrong there). For
+that purpose, it would be better *not* to update when restart_syscall
+happens, unless the hang is right there =o).
+
+If you check:
+https://bugs.linaro.org/show_bug.cgi?id=3783#c11
+
+The only syscalls being updated now - that I could get, without any
+workload - were 252 (epoll_wait) or 252 (sched_getaffinity):
+
+252 0x7 0xbee80578 0x1b 0xffffffff 0xbee80578 0x7 0xbee80550 0xb6e9d286
+252 0xa 0xbef3d930 0x9 0xffffffff 0x0 0x6c 0xbef3d908 0xb6e6f286
+142 0x4 0x0 0xbea3eb2c 0x0 0x0 0x6c 0xbea3ea88 0xb6e40286
+252 0x4 0xbe8d59e8 0x9 0xffffffff 0xbe8d59e8 0x4 0xbe8d59c0 0xb6e11286
+
+All others I got zeroed, and that's where everything started.
+
+Please, let me know if you still want a v2, or something else... like
+fixing it and making it to ignore the restart_syscall for *at least*
+having the same behavior across diff archs.
+
+If it is not worth, I'll just blacklist those tests in our functional
+tests environment and move on =).
+
+Thanks a lot, very best rgds,
+-- 
+Rafael D. Tinoco
+Linaro Kernel Validation
