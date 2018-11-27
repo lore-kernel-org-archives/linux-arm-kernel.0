@@ -1,54 +1,54 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Tue, 27 Nov 2018 13:45:36 +0100
-Subject: [PATCH 35/77] ARM: dts: sun7i: Remove skeleton and memory to avoid
+Date: Tue, 27 Nov 2018 13:45:39 +0100
+Subject: [PATCH 38/77] ARM: dts: sun7i: Change framebuffer node names to avoid
  warnings
 In-Reply-To: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <1da5c4b912ccb84e0d1873843410c6f8d282258c.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <bc7833d43f0e28c57ea3414ffe5692255ac1e7ad.1543321707.git-series.maxime.ripard@bootlin.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using skeleton.dtsi will create a memory node that will generate a warning
-in DTC. However, that node will be created by the bootloader, so we can
-just remove it entirely in order to remove that warning.
+The simple-framebuffer nodes have a unit address, but no reg property which
+generates a warning when compiling it with DTC.
+
+Change the simple-framebuffer node names so that there is no warnings on
+this anymore.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 1ca1fdff2288..3ed0575ed301 100644
+index 9e84dcffc978..c5a6b7a65c52 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -42,8 +42,6 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- 
--#include "skeleton.dtsi"
--
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/thermal/thermal.h>
- #include <dt-bindings/dma/sun4i-a10.h>
-@@ -52,6 +50,8 @@
- 
- / {
- 	interrupt-parent = <&gic>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
- 
- 	aliases {
- 		ethernet0 = &gmac;
-@@ -171,10 +171,6 @@
- 		};
- 	};
- 
--	memory {
--		reg = <0x40000000 0x80000000>;
--	};
--
- 	reserved-memory {
- 		#address-cells = <1>;
+@@ -62,7 +62,7 @@
  		#size-cells = <1>;
+ 		ranges;
+ 
+-		framebuffer at 0 {
++		framebuffer-lcd0-hdmi {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-hdmi";
+@@ -73,7 +73,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		framebuffer at 1 {
++		framebuffer-lcd0 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+@@ -83,7 +83,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		framebuffer at 2 {
++		framebuffer-lcd0-tve0 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
 -- 
 git-series 0.9.1
