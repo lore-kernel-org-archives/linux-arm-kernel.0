@@ -1,61 +1,76 @@
-From: richard@sorico.fr (Richard Genoud)
-Date: Tue, 27 Nov 2018 11:46:56 +0100
-Subject: DMA: atmel_serial: Opening and closing the serial device
- repeatedly causes kmalloc-32 slab leak
-In-Reply-To: <20181127095843.GF19871@piout.net>
-References: <22061488.b0eNpyQjWt@linux-7rm0>
- <83753d21-f3c8-c8dd-75d7-741cb597d1a3@sorico.fr>
- <20181127095843.GF19871@piout.net>
-Message-ID: <febddc12-200d-139f-18f0-fcb055951324@sorico.fr>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 27 Nov 2018 10:56:20 +0000
+Subject: [PATCH] arm: always update thread_info->syscall
+In-Reply-To: <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
+References: <20181126225335.10477-1-rafael.tinoco@linaro.org>
+ <20181126233303.GZ30658@n2100.armlinux.org.uk>
+ <20181126234111.GA30658@n2100.armlinux.org.uk>
+ <20181126234456.GB30658@n2100.armlinux.org.uk>
+ <ad23e3dc-eee0-f9af-2f12-bfd7a14cd546@linaro.org>
+Message-ID: <20181127105620.GD30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/11/2018 ? 10:58, Alexandre Belloni a ?crit?:
-> Hello Richard,
+On Tue, Nov 27, 2018 at 08:30:32AM -0200, Rafael David Tinoco wrote:
+> On 11/26/18 9:44 PM, Russell King - ARM Linux wrote:
+> >On Mon, Nov 26, 2018 at 11:41:11PM +0000, Russell King - ARM Linux wrote:
+> >>On Mon, Nov 26, 2018 at 11:33:03PM +0000, Russell King - ARM Linux wrote:
+> >>>On Mon, Nov 26, 2018 at 08:53:35PM -0200, Rafael David Tinoco wrote:
+> >>>>Right now, only way for task->thread_info->syscall to be updated is if
+> >>>>if _TIF_SYSCALL_WORK is set in current's task thread_info->flags
+> >>>>(similar to what has_syscall_work() checks for arm64).
+> >>>>
+> >>>>This means that "->syscall" will only be updated if we are tracing the
+> >>>>syscalls through ptrace, for example. This is NOT the same behavior as
+> >>>>arm64, when pt_regs->syscallno is updated in the beginning of svc0
+> >>>>handler for *every* syscall entry.
+> >>>
+> >>>So when was it decided that the syscall number will always be required
+> >>>(we need it to know how far back this has to be backported).
+> >>
+> >>PS, I rather object to the fact that the required behaviour seems to
+> >>change, arch maintainers aren't told about it until... some test is
+> >>created at some random point in the future which then fails.
+> >>
+> >>Surely there's a better way to communicate changes in requirements
+> >>than discovery-by-random-bug-report ?
+> >
+> >Final comment for tonight - the commit introducing /proc/*/syscall says:
+> >
+> >     This adds /proc/PID/syscall and /proc/PID/task/TID/syscall magic files.
+> >     These use task_current_syscall() to show the task's current system call
+> >     number and argument registers, stack pointer and PC.  For a task blocked
+> >     but not in a syscall, the file shows "-1" in place of the syscall number,
+> >     followed by only the SP and PC.  For a task that's not blocked, it shows
+> >     "running".
+> >
+> >Please validate that a blocked task does indeed show -1 with your patch
+> >applied.
 > 
-> On 27/11/2018 10:51:13+0100, richard.genoud at gmail.com wrote:
->> Hi all,
->>
->> I reproduced the memory leak on my board (at91sam9g35-cm) with a 4.20-rc3.
->>
->> It triggered an OOM after a couple of hours running a code like this:
->> #include <sys/types.h>
->> #include <sys/stat.h>
->> #include <fcntl.h>
->> #include <unistd.h>
->>
->>
->> int main(int argc, char **argv)
->> {
->> 	int fd;
->> 	do {
->> 		fd = open("/dev/ttyS1", O_RDONLY);
->> 		close(fd);
->> 	} while (true);
->> 	return 0;
->> }
->>
->> As Mario pointed out, this only happens when atmel,use-dma-{r,t}x are
->> used in the device-tree.
->>
->> Adding:
->> CONFIG_DEBUG_SLAB=y
->> CONFIG_DEBUG_SLAB_LEAK=y
->> Doesn't show anything suspect in /proc/slab_allocators
->>
->> From what I found until now, it's something done in :
->> dma_request_slave_channel();
->> that leaks kmalloc-32
->> Mabe I missed something, but it seems that everything DMA related is
->> deallocated in atmel_release_{tx,rx}_dma().
->>
->> Is this ringing a bell ?
->>
+> Will do. This is done in an upper level (collect_syscall <-
+> task_current_syscall <- proc_pid_syscall):
 > 
-> Yes, this is known issue and it has yet to be worked on.
+> 	if (!try_get_task_stack(target)) {
+> 		/* Task has no stack, so the task isn't in a syscall. */
+> 		*sp = *pc = 0;
+> 		*callno = -1;
+> 		return 0;
+> 	}
 > 
+> I think only missing part for arm was that one, but will confirm, after
+> fixing usage of "r7" for obtaining "scno". Will send a v2 in this thread.
 
-After a talk on freenode, Alex found the problem.
-A patch is on its way.
+There's another question - what's the expected behaviour when we
+restart a syscall using the restartblock mechanism?  Is the syscall
+number expected to be __NR_restart_syscall or the original syscall
+number?
 
-Thanks !
+I can't find anywhere that this detail is specified (damn the lack
+of API documentation - I'm tempted to say that we won't implement
+this until it gets documented properly, and that test can continue
+failing until such time that happens.)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
