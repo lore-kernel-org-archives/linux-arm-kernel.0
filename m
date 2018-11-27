@@ -1,35 +1,51 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 27 Nov 2018 19:24:40 +0100
-Subject: [PATCH] arm64/bpf: use movn/movk/movk sequence to generate kernel
- addresses
-In-Reply-To: <20181127182203.GA19721@arm.com>
-References: <20181123172902.21480-1-ard.biesheuvel@linaro.org>
- <20181127182203.GA19721@arm.com>
-Message-ID: <c8f11ce3-1ab4-5e54-85f6-2431c7eb8a7a@iogearbox.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 27 Nov 2018 13:26:18 -0500
+Subject: [for-next][PATCH 04/18] arm64: function_graph: Simplify with
+ function_graph_entry()
+In-Reply-To: <20181127180722.GB19216@arm.com>
+References: <20181122002801.501220343@goodmis.org>
+ <20181122003331.917870132@goodmis.org>
+ <20181127180722.GB19216@arm.com>
+Message-ID: <20181127132618.2b3e1944@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2018 07:22 PM, Will Deacon wrote:
-> Hi Ard,
+On Tue, 27 Nov 2018 18:07:23 +0000
+Will Deacon <will.deacon@arm.com> wrote:
+
+> On Wed, Nov 21, 2018 at 07:28:05PM -0500, Steven Rostedt wrote:
+> > From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
+> > 
+> > The function_graph_entry() function does the work of calling the function
+> > graph hook function and the management of the shadow stack, simplifying the
+> > work done in the architecture dependent prepare_ftrace_return().
+> > 
+> > Have arm64 use the new code, and remove the shadow stack management as well as
+> > having to set up the trace structure.
+> > 
+> > This is needed to prepare for a fix of a design bug on how the curr_ret_stack
+> > is used.
+> > 
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: linux-arm-kernel at lists.infradead.org
+> > Cc: stable at kernel.org
+> > Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
+> > Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+> > ---
+> >  arch/arm64/kernel/ftrace.c | 15 +--------------
+> >  1 file changed, 1 insertion(+), 14 deletions(-)  
 > 
-> On Fri, Nov 23, 2018 at 06:29:02PM +0100, Ard Biesheuvel wrote:
->> On arm64, all executable code is guaranteed to reside in the vmalloc
->> space (or the module space), and so jump targets will only use 48
->> bits at most, and the remaining bits are guaranteed to be 0x1.
->>
->> This means we can generate an immediate jump address using a sequence
->> of one MOVN (move wide negated) and two MOVK instructions, where the
->> first one sets the lower 16 bits but also sets all top bits to 0x1.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
+> Minor nit: the subject refers to function_graph_entry(), but looks like
+> you settled on function_graph_enter() in the end.
+
+Ah you're right!
+
+> 
+> Anyway, looks like no change for us, so:
 > 
 > Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Denial, Alexei, shall I take this via arm64, or would you rather take
-> it via davem?
 
-Yeah we can take it via bpf trees, thanks.
+Thanks!
 
-Cheers,
-Daniel
+-- Steve
