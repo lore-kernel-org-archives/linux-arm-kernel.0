@@ -1,80 +1,36 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Wed, 28 Nov 2018 10:12:30 +0100
-Subject: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
- support
-In-Reply-To: <DB3PR0402MB3916FFD700313BF684CF32AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
- <1543311334-8807-5-git-send-email-Anson.Huang@nxp.com>
- <20181128100420.0c9a721a@karo-electronics.de>
- <DB3PR0402MB3916FFD700313BF684CF32AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
-Message-ID: <20181128101230.435bfbeb@ipc1.ka-ro>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Nov 2018 09:15:32 +0000
+Subject: [PATCH v3 1/4] mfd: stmpe: Move ADC related defines to header of
+ mfd
+In-Reply-To: <20181123142411.8921-1-dev@pschenker.ch>
+References: <20181123142411.8921-1-dev@pschenker.ch>
+Message-ID: <20181128091532.GU4272@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Anson Huang <anson.huang@nxp.com> wrote:
+On Fri, 23 Nov 2018, Philippe Schenker wrote:
 
-> Hi, Lothar
+> Move defines that are ADC related to the header of the overlying mfd,
+> so they can be used from multiple sub-devices.
 > 
-> Best Regards!
-> Anson Huang
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> ---
 > 
-> > -----Original Message-----
-> > From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
-> > Sent: 2018?11?28? 17:04
-> > To: Anson Huang <anson.huang@nxp.com>
-> > Cc: a.zummo at towertech.it; alexandre.belloni at bootlin.com;
-> > robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> > will.deacon at arm.com; Aisheng DONG <aisheng.dong@nxp.com>; Andy Gross
-> > <andy.gross@linaro.org>; arnd at arndb.de; horms+renesas at verge.net.au;
-> > heiko at sntech.de; bjorn.andersson at linaro.org; enric.balletbo at collabora.com;
-> > amit.kucheria at linaro.org; ezequiel at collabora.com; olof at lixom.net;
-> > shawnguo at kernel.org; linux-rtc at vger.kernel.org; devicetree at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > dl-linux-imx <linux-imx@nxp.com>
-> > Subject: Re: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller
-> > RTC support
-> > 
-> > Hi,
-> > 
-> > On Tue, 27 Nov 2018 09:41:46 +0000 Anson Huang wrote:  
-> > > Add i.MX8QXP system controller RTC support.
-> > >
-> > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > > ---
-> > >  arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 4 ++++
-> > >  1 file changed, 4 insertions(+)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi  
-> > b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi  
-> > > index 9155d45..ef57db6 100644
-> > > --- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-> > > +++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-> > > @@ -433,4 +433,8 @@
-> > >  		#size-cells = <1>;
-> > >  		ranges = <0x5f000000 0x0 0x5f000000 0x1000000>;
-> > >  	};
-> > > +
-> > > +	rtc: rtc {
-> > > +		compatible = "nxp,imx8qxp-sc-rtc";
-> > > +	};
-> > >  };  
-> > IMO this should be disabled by default.  
+> Changes in v3:
+>  - None
 > 
-> This module is NOT depending on any board design, should it be enabled by default in soc dtsi?
-> Like wdog etc..
+> Changes in v2:
+>  - This is a new added commit. Separate commit for moving the defines out of
+>    drivers/input/touchscreen/stmpe-ts.c to overlying mfd-device drivers/mfd/stmpe.c
+>  - Pre-fix defines with STMPE_
 > 
-What about existing users (if there are any), which would have a new
-device appearing when updating the DTB?
+>  drivers/input/touchscreen/stmpe-ts.c | 34 +++++++++++-----------------
+>  include/linux/mfd/stmpe.h            | 11 +++++++++
 
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Lothar Wa?mann
 -- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
