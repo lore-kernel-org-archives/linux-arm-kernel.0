@@ -1,205 +1,205 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 28 Nov 2018 11:11:47 +0000
-Subject: [PATCH 3/8] ARM: sa1100/jornada720: switch PCMCIA to gpiod APIs
+Date: Wed, 28 Nov 2018 11:11:53 +0000
+Subject: [PATCH 4/8] ARM: sa1100/neponset: switch PCMCIA to MAX1600 library
+ and gpiod APIs
 In-Reply-To: <20181128111041.GG30658@n2100.armlinux.org.uk>
-Message-ID: <E1gRxkx-0001uV-V2@rmk-PC.armlinux.org.uk>
+Message-ID: <E1gRxl3-0001ui-2y@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the low level PCMCIA driver to gpiod APIs for controlling
-the socket power.
+Convert Neponset to use the gpiod API to specify which GPIOs are used
+for PCMCIA, and use the MAX1600 power switch library for Neponset,
+simplifying the neponset pcmcia driver as a result.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/mach-sa1100/jornada720.c  | 12 ++++++
- drivers/pcmcia/sa1111_jornada720.c | 83 +++++++++++++++++++++++++-------------
- 2 files changed, 67 insertions(+), 28 deletions(-)
+ arch/arm/mach-sa1100/neponset.c  | 19 ++++++++++
+ drivers/pcmcia/Kconfig           |  1 +
+ drivers/pcmcia/sa1111_neponset.c | 79 +++++++++-------------------------------
+ 3 files changed, 38 insertions(+), 61 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
-index 0a2ca9be00e6..6298bad09ef3 100644
---- a/arch/arm/mach-sa1100/jornada720.c
-+++ b/arch/arm/mach-sa1100/jornada720.c
-@@ -190,6 +190,17 @@ static struct platform_device s1d13xxxfb_device = {
- 	.resource	= s1d13xxxfb_resources,
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index b1823f445358..eb60a71cf125 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -5,6 +5,7 @@
+ #include <linux/err.h>
+ #include <linux/gpio/driver.h>
+ #include <linux/gpio/gpio-reg.h>
++#include <linux/gpio/machine.h>
+ #include <linux/init.h>
+ #include <linux/ioport.h>
+ #include <linux/irq.h>
+@@ -96,6 +97,19 @@ struct neponset_drvdata {
+ 	struct gpio_chip *gpio[4];
  };
  
-+static struct gpiod_lookup_table jornada_pcmcia_gpiod_table = {
++static struct gpiod_lookup_table neponset_pcmcia_table = {
 +	.dev_id = "1800",
 +	.table = {
-+		GPIO_LOOKUP("sa1111", 0, "s0-power", GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP("sa1111", 1, "s1-power", GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP("sa1111", 2, "s0-3v", GPIO_ACTIVE_HIGH),
-+		GPIO_LOOKUP("sa1111", 3, "s1-3v", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 1, "a0vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 0, "a1vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("neponset-ncr", 5, "a0vpp", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("neponset-ncr", 6, "a1vpp", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 2, "b0vcc", GPIO_ACTIVE_HIGH),
++		GPIO_LOOKUP("sa1111", 3, "b1vcc", GPIO_ACTIVE_HIGH),
 +		{ },
 +	},
 +};
 +
- static struct resource sa1111_resources[] = {
- 	[0] = DEFINE_RES_MEM(SA1111REGSTART, SA1111REGLEN),
- 	[1] = DEFINE_RES_IRQ(IRQ_GPIO1),
-@@ -265,6 +276,7 @@ static int __init jornada720_init(void)
- 		udelay(20);		/* give it some time to restart */
+ static struct neponset_drvdata *nep;
  
- 		gpiod_add_lookup_table(&jornada_ts_gpiod_table);
-+		gpiod_add_lookup_table(&jornada_pcmcia_gpiod_table);
+ void neponset_ncr_frob(unsigned int mask, unsigned int val)
+@@ -374,6 +388,8 @@ static int neponset_probe(struct platform_device *dev)
+ 			   d->base + AUD_CTL, AUD_NGPIO, false,
+ 			   neponset_aud_names);
  
- 		ret = platform_add_devices(devices, ARRAY_SIZE(devices));
- 	}
-diff --git a/drivers/pcmcia/sa1111_jornada720.c b/drivers/pcmcia/sa1111_jornada720.c
-index 3d4ca87ca76c..1083e1b4f25d 100644
---- a/drivers/pcmcia/sa1111_jornada720.c
-+++ b/drivers/pcmcia/sa1111_jornada720.c
-@@ -6,29 +6,62 @@
-  *
-  */
- #include <linux/module.h>
--#include <linux/kernel.h>
- #include <linux/device.h>
++	gpiod_add_lookup_table(&neponset_pcmcia_table);
++
+ 	/*
+ 	 * We would set IRQ_GPIO25 to be a wake-up IRQ, but unfortunately
+ 	 * something on the Neponset activates this IRQ on sleep (eth?)
+@@ -424,6 +440,9 @@ static int neponset_remove(struct platform_device *dev)
+ 		platform_device_unregister(d->sa1111);
+ 	if (!IS_ERR(d->smc91x))
+ 		platform_device_unregister(d->smc91x);
++
++	gpiod_remove_lookup_table(&neponset_pcmcia_table);
++
+ 	irq_set_chained_handler(irq, NULL);
+ 	irq_free_descs(d->irq_base, NEP_IRQ_NR);
+ 	nep = NULL;
+diff --git a/drivers/pcmcia/Kconfig b/drivers/pcmcia/Kconfig
+index 1a257a323923..8e8db3aa9fce 100644
+--- a/drivers/pcmcia/Kconfig
++++ b/drivers/pcmcia/Kconfig
+@@ -194,6 +194,7 @@ config PCMCIA_SA1111
+ 	select PCMCIA_SOC_COMMON
+ 	select PCMCIA_SA11XX_BASE if ARCH_SA1100
+ 	select PCMCIA_PXA2XX if ARCH_LUBBOCK && SA1111
++	select PCMCIA_MAX1600 if ASSABET_NEPONSET
+ 	help
+ 	  Say Y  here to include support for SA1111-based PCMCIA or CF
+ 	  sockets, found on the Jornada 720, Graphicsmaster and other
+diff --git a/drivers/pcmcia/sa1111_neponset.c b/drivers/pcmcia/sa1111_neponset.c
+index 0ccf05a28a4b..de0ce13355b4 100644
+--- a/drivers/pcmcia/sa1111_neponset.c
++++ b/drivers/pcmcia/sa1111_neponset.c
+@@ -10,12 +10,10 @@
  #include <linux/errno.h>
-+#include <linux/gpio/consumer.h>
  #include <linux/init.h>
- #include <linux/io.h>
  
- #include <mach/hardware.h>
--#include <asm/hardware/sa1111.h>
+-#include <mach/hardware.h>
  #include <asm/mach-types.h>
+-#include <mach/neponset.h>
+-#include <asm/hardware/sa1111.h>
  
  #include "sa1111_generic.h"
++#include "max1600.h"
  
--/* Does SOCKET1_3V actually do anything? */
--#define SOCKET0_POWER	GPIO_GPIO0
--#define SOCKET0_3V	GPIO_GPIO2
--#define SOCKET1_POWER	(GPIO_GPIO1 | GPIO_GPIO3)
--#define SOCKET1_3V	GPIO_GPIO3
-+/*
-+ * Socket 0 power: GPIO A0
-+ * Socket 0 3V: GPIO A2
-+ * Socket 1 power: GPIO A1 & GPIO A3
-+ * Socket 1 3V: GPIO A3
-+ * Does Socket 1 3V actually do anything?
-+ */
-+enum {
-+	J720_GPIO_PWR,
-+	J720_GPIO_3V,
-+	J720_GPIO_MAX,
-+};
-+struct jornada720_data {
-+	struct gpio_desc *gpio[J720_GPIO_MAX];
-+};
-+
-+static int jornada720_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
-+{
-+	struct device *dev = skt->socket.dev.parent;
-+	struct jornada720_data *j;
-+
-+	j = devm_kzalloc(dev, sizeof(*j), GFP_KERNEL);
-+	if (!j)
-+		return -ENOMEM;
-+
-+	j->gpio[J720_GPIO_PWR] = devm_gpiod_get(dev, skt->nr ? "s1-power" :
-+						"s0-power", GPIOD_OUT_LOW);
-+	if (IS_ERR(j->gpio[J720_GPIO_PWR]))
-+		return PTR_ERR(j->gpio[J720_GPIO_PWR]);
-+
-+	j->gpio[J720_GPIO_3V] = devm_gpiod_get(dev, skt->nr ? "s1-3v" :
-+					       "s0-3v", GPIOD_OUT_LOW);
-+	if (IS_ERR(j->gpio[J720_GPIO_3V]))
-+		return PTR_ERR(j->gpio[J720_GPIO_3V]);
-+
-+	skt->driver_data = j;
-+
-+	return 0;
-+}
- 
- static int
- jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
+ /*
+  * Neponset uses the Maxim MAX1600, with the following connections:
+@@ -40,70 +38,36 @@
+  * "Standard Intel code" mode. Refer to the Maxim data sheet for
+  * the corresponding truth table.
+  */
+-
+-static int
+-neponset_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
++static int neponset_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
  {
 -	struct sa1111_pcmcia_socket *s = to_skt(skt);
--	unsigned int pa_dwr_mask, pa_dwr_set;
-+	struct jornada720_data *j = skt->driver_data;
-+	DECLARE_BITMAP(values, J720_GPIO_MAX) = { 0, };
+-	unsigned int ncr_mask, ncr_set, pa_dwr_mask, pa_dwr_set;
++	struct max1600 *m;
  	int ret;
  
- 	printk(KERN_INFO "%s(): config socket %d vcc %d vpp %d\n", __func__,
-@@ -36,35 +69,34 @@ jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
- 
- 	switch (skt->nr) {
- 	case 0:
--		pa_dwr_mask = SOCKET0_POWER | SOCKET0_3V;
+-	switch (skt->nr) {
+-	case 0:
+-		pa_dwr_mask = GPIO_A0 | GPIO_A1;
+-		ncr_mask = NCR_A0VPP | NCR_A1VPP;
 -
- 		switch (state->Vcc) {
- 		default:
- 		case  0:
--			pa_dwr_set = 0;
-+			__assign_bit(J720_GPIO_PWR, values, 0);
-+			__assign_bit(J720_GPIO_3V, values, 0);
- 			break;
- 		case 33:
--			pa_dwr_set = SOCKET0_POWER | SOCKET0_3V;
-+			__assign_bit(J720_GPIO_PWR, values, 1);
-+			__assign_bit(J720_GPIO_3V, values, 1);
- 			break;
- 		case 50:
--			pa_dwr_set = SOCKET0_POWER;
-+			__assign_bit(J720_GPIO_PWR, values, 1);
-+			__assign_bit(J720_GPIO_3V, values, 0);
- 			break;
- 		}
- 		break;
- 
- 	case 1:
--		pa_dwr_mask = SOCKET1_POWER;
+-		if (state->Vpp == 0)
+-			ncr_set = 0;
+-		else if (state->Vpp == 120)
+-			ncr_set = NCR_A1VPP;
+-		else if (state->Vpp == state->Vcc)
+-			ncr_set = NCR_A0VPP;
+-		else {
+-			printk(KERN_ERR "%s(): unrecognized VPP %u\n",
+-			       __func__, state->Vpp);
+-			return -1;
+-		}
+-		break;
 -
- 		switch (state->Vcc) {
- 		default:
- 		case 0:
--			pa_dwr_set = 0;
-+			__assign_bit(J720_GPIO_PWR, values, 0);
-+			__assign_bit(J720_GPIO_3V, values, 0);
- 			break;
- 		case 33:
--			pa_dwr_set = SOCKET1_POWER;
--			break;
- 		case 50:
--			pa_dwr_set = SOCKET1_POWER;
-+			__assign_bit(J720_GPIO_PWR, values, 1);
-+			__assign_bit(J720_GPIO_3V, values, 1);
- 			break;
- 		}
- 		break;
-@@ -81,13 +113,15 @@ jornada720_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_s
+-	case 1:
+-		pa_dwr_mask = GPIO_A2 | GPIO_A3;
+-		ncr_mask = 0;
+-		ncr_set = 0;
+-
+-		if (state->Vpp != state->Vcc && state->Vpp != 0) {
+-			printk(KERN_ERR "%s(): CF slot cannot support VPP %u\n",
+-			       __func__, state->Vpp);
+-			return -1;
+-		}
+-		break;
++	ret = max1600_init(skt->socket.dev.parent, &m,
++			   skt->nr ? MAX1600_CHAN_B : MAX1600_CHAN_A,
++			   MAX1600_CODE_LOW);
++	if (ret == 0)
++		skt->driver_data = m;
+ 
+-	default:
+-		return -1;
+-	}
++	return ret;
++}
+ 
+-	/*
+-	 * pa_dwr_set is the mask for selecting Vcc on both sockets.
+-	 * pa_dwr_mask selects which bits (and therefore socket) we change.
+-	 */
+-	switch (state->Vcc) {
+-	default:
+-	case 0:  pa_dwr_set = 0;		break;
+-	case 33: pa_dwr_set = GPIO_A1|GPIO_A2;	break;
+-	case 50: pa_dwr_set = GPIO_A0|GPIO_A3;	break;
+-	}
++static int
++neponset_pcmcia_configure_socket(struct soc_pcmcia_socket *skt, const socket_state_t *state)
++{
++	struct max1600 *m = skt->driver_data;
++	int ret;
  
  	ret = sa1111_pcmcia_configure_socket(skt, state);
- 	if (ret == 0)
+-	if (ret == 0) {
+-		neponset_ncr_frob(ncr_mask, ncr_set);
 -		sa1111_set_io(s->dev, pa_dwr_mask, pa_dwr_set);
-+		ret = gpiod_set_array_value_cansleep(J720_GPIO_MAX, j->gpio,
-+						     NULL, values);
+-	}
++	if (ret == 0)
++		ret = max1600_configure(m, state->Vcc, state->Vpp);
  
  	return ret;
  }
  
- static struct pcmcia_low_level jornada720_pcmcia_ops = {
+ static struct pcmcia_low_level neponset_pcmcia_ops = {
  	.owner			= THIS_MODULE,
-+	.hw_init		= jornada720_pcmcia_hw_init,
- 	.configure_socket	= jornada720_pcmcia_configure_socket,
++	.hw_init		= neponset_pcmcia_hw_init,
+ 	.configure_socket	= neponset_pcmcia_configure_socket,
  	.first			= 0,
  	.nr			= 2,
-@@ -95,16 +129,9 @@ static struct pcmcia_low_level jornada720_pcmcia_ops = {
+@@ -111,13 +75,6 @@ static struct pcmcia_low_level neponset_pcmcia_ops = {
  
- int pcmcia_jornada720_init(struct sa1111_dev *sadev)
+ int pcmcia_neponset_init(struct sa1111_dev *sadev)
  {
--	unsigned int pin = GPIO_A0 | GPIO_A1 | GPIO_A2 | GPIO_A3;
--
- 	/* Fixme: why messing around with SA11x0's GPIO1? */
- 	GRER |= 0x00000002;
- 
--	/* Set GPIO_A<3:1> to be outputs for PCMCIA/CF power controller: */
--	sa1111_set_io_dir(sadev, pin, 0, 0);
--	sa1111_set_io(sadev, pin, 0);
--	sa1111_set_sleep_io(sadev, pin, 0);
--
- 	sa11xx_drv_pcmcia_ops(&jornada720_pcmcia_ops);
- 	return sa1111_pcmcia_add(sadev, &jornada720_pcmcia_ops,
+-	/*
+-	 * Set GPIO_A<3:0> to be outputs for the MAX1600,
+-	 * and switch to standby mode.
+-	 */
+-	sa1111_set_io_dir(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0, 0);
+-	sa1111_set_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
+-	sa1111_set_sleep_io(sadev, GPIO_A0|GPIO_A1|GPIO_A2|GPIO_A3, 0);
+ 	sa11xx_drv_pcmcia_ops(&neponset_pcmcia_ops);
+ 	return sa1111_pcmcia_add(sadev, &neponset_pcmcia_ops,
  				 sa11xx_drv_pcmcia_add_one);
 -- 
 2.7.4
