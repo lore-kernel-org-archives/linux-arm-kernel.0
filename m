@@ -1,81 +1,83 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 11:28:57 +0800
-Subject: [PATCH 10/77] ARM: dts: sun5i: Remove all useless pinctrl nodes
-In-Reply-To: <820ad10fea1f06f9be94497f82df3cd6cad070b1.1543321707.git-series.maxime.ripard@bootlin.com>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <820ad10fea1f06f9be94497f82df3cd6cad070b1.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v64rQ25Q1Q2JLXUw8wjya-Rvf7-jW1vzGW0zSMQiZhRxbA@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 28 Nov 2018 11:28:56 +0800
+Subject: [PATCH v2 3/3] regulator: mcp16502: add regulator driver for
+ MCP16502
+In-Reply-To: <1543335937-12689-4-git-send-email-andrei.stefanescu@microchip.com>
+References: <1543335937-12689-4-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <201811281107.R2ycG2WQ%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> The gpio pinctrl nodes are redundant and as such useless most of the times.
-> Since they will also generate warnings in DTC, we can simply remove most of
-> them.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts         |  6 +---
->  arch/arm/boot/dts/sun5i-a10s-mk802.dts               | 13 +------
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts     |  6 +---
->  arch/arm/boot/dts/sun5i-a10s-r7-tv-dongle.dts        |  6 +---
->  arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts             | 14 +-------
->  arch/arm/boot/dts/sun5i-a13-hsg-h702.dts             |  7 +---
->  arch/arm/boot/dts/sun5i-a13-olinuxino-micro.dts      | 12 +------
->  arch/arm/boot/dts/sun5i-a13-olinuxino.dts            |  6 +---
->  arch/arm/boot/dts/sun5i-a13-utoo-p66.dts             |  8 +----
->  arch/arm/boot/dts/sun5i-gr8-chip-pro.dts             | 16 +--------
->  arch/arm/boot/dts/sun5i-gr8-evb.dts                  | 27 +-------------
->  arch/arm/boot/dts/sun5i-r8-chip.dts                  | 19 +---------
->  arch/arm/boot/dts/sun5i-reference-design-tablet.dtsi | 21 +----------
->  13 files changed, 2 insertions(+), 159 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-> index 8d4fb9331212..d5bca68ca6ca 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-> +++ b/arch/arm/boot/dts/sun5i-a10s-auxtek-t004.dts
-> @@ -72,7 +72,6 @@
->         reg_vmmc1: vmmc1 {
->                 compatible = "regulator-fixed";
->                 pinctrl-names = "default";
+Hi Andrei.Stefanescu,
 
-You can also drop pinctrl-names? Or is it actually desired?
-IIRC the pinctrl core complains if it can't find a default setting.
+Thank you for the patch! Yet something to improve:
 
-> -               pinctrl-0 = <&mmc1_vcc_en_pin_t004>;
->                 regulator-name = "vmmc1";
->                 regulator-min-microvolt = <3300000>;
->                 regulator-max-microvolt = <3300000>;
-> @@ -139,11 +138,6 @@
->                 bias-pull-up;
->         };
->
-> -       mmc1_vcc_en_pin_t004: mmc1_vcc_en_pin at 0 {
-> -               pins = "PB18";
-> -               function = "gpio_out";
-> -       };
-> -
->         led_pins_t004: led_pins at 0 {
->                 pins = "PB2";
->                 function = "gpio_out";
-> diff --git a/arch/arm/boot/dts/sun5i-a10s-mk802.dts b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
-> index dd7fd5c3d76f..b17c036293d6 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s-mk802.dts
-> +++ b/arch/arm/boot/dts/sun5i-a10s-mk802.dts
-> @@ -59,8 +59,6 @@
->
->         leds {
->                 compatible = "gpio-leds";
-> -               pinctrl-names = "default";
-> -               pinctrl-0 = <&led_pins_mk802>;
+[auto build test ERROR on regulator/for-next]
+[also build test ERROR on v4.20-rc4 next-20181127]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-You did remove it here.
+url:    https://github.com/0day-ci/linux/commits/Andrei-Stefanescu-microchip-com/add-support-for-MCP16502-PMIC/20181128-041809
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+config: sh-allyesconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        GCC_VERSION=7.2.0 make.cross ARCH=sh 
 
-The rest looks ok, so
+All error/warnings (new ones prefixed by >>):
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+   drivers//regulator/mcp16502.c: In function 'mcp16502_suspend_get_target_reg':
+>> drivers//regulator/mcp16502.c:273:10: error: 'pm_suspend_target_state' undeclared (first use in this function); did you mean 'pm_suspended_storage'?
+     switch (pm_suspend_target_state) {
+             ^~~~~~~~~~~~~~~~~~~~~~~
+             pm_suspended_storage
+   drivers//regulator/mcp16502.c:273:10: note: each undeclared identifier is reported only once for each function it appears in
+   drivers//regulator/mcp16502.c: In function 'mcp16502_set_suspend_mode':
+   drivers//regulator/mcp16502.c:310:10: error: 'pm_suspend_target_state' undeclared (first use in this function); did you mean 'pm_suspended_storage'?
+     switch (pm_suspend_target_state) {
+             ^~~~~~~~~~~~~~~~~~~~~~~
+             pm_suspended_storage
+   drivers//regulator/mcp16502.c: In function 'mcp16502_suspend_get_target_reg':
+>> drivers//regulator/mcp16502.c:284:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
+   drivers//regulator/mcp16502.c: In function 'mcp16502_set_suspend_mode':
+   drivers//regulator/mcp16502.c:321:1: warning: control reaches end of non-void function [-Wreturn-type]
+    }
+    ^
 
-One thing worth noting is that the pinctrl overrides for common vbus regulators
-haven't had any effect for a while since I removed the default pinctrl settings
-for the GPIO pins.
+vim +273 drivers//regulator/mcp16502.c
+
+   266	
+   267	/*
+   268	 * mcp16502_suspend_get_target_reg() - get the reg of the target suspend PMIC
+   269	 *				       mode
+   270	 */
+   271	static int mcp16502_suspend_get_target_reg(struct regulator_dev *rdev)
+   272	{
+ > 273		switch (pm_suspend_target_state) {
+   274		case PM_SUSPEND_STANDBY:
+   275			return mcp16502_get_reg(rdev, MCP16502_OPMODE_LPM);
+   276		case PM_SUSPEND_ON:
+   277		case PM_SUSPEND_MEM:
+   278			return mcp16502_get_reg(rdev, MCP16502_OPMODE_HIB);
+   279		default:
+   280			dev_err(&rdev->dev, "invalid suspend target: %d\n",
+   281				pm_suspend_target_state);
+   282			return -EINVAL;
+   283		}
+ > 284	}
+   285	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 50575 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/5945d017/attachment-0001.gz>
