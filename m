@@ -1,43 +1,20 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Tue, 27 Nov 2018 18:01:14 -0800
-Subject: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
- description
-In-Reply-To: <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
-Message-ID: <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 28 Nov 2018 10:06:04 +0800
+Subject: [PATCH v8 1/4] ARM: dts: imx: Add an cpu0 label for imx6dl
+ devices.
+In-Reply-To: <20181127150407.15098-1-jan.tuerk@emtrion.com>
+References: <20180829100811.55836-1-jan.tuerk@emtrion.com>
+ <20181127150407.15098-1-jan.tuerk@emtrion.com>
+Message-ID: <20181128020602.GA20643@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sugaya Taichi (2018-11-18 17:01:07)
-> Add DT bindings document for Milbeaut trampoline.
+On Tue, Nov 27, 2018 at 04:04:01PM +0100, Jan Tuerk wrote:
+> Adding the label cpu0 allows the adjustment of cpu-parameters
+> by reference in overlaying dtsi files in the same way as it
+> is possible for imx6q devices.
 > 
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> ---
->  .../devicetree/bindings/soc/socionext/socionext,m10v.txt     | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
-> new file mode 100644
-> index 0000000..f5d906c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
-> @@ -0,0 +1,12 @@
-> +Socionext M10V SMP trampoline driver binding
-> +
-> +This is a driver to wait for sub-cores while boot process.
-> +
-> +- compatible: should be "socionext,smp-trampoline"
-> +- reg: should be <0x4C000100 0x100>
-> +
-> +EXAMPLE
-> +       trampoline: trampoline at 0x4C000100 {
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+> Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-Drop the 0x part of unit addresses.
-
-> +               compatible = "socionext,smp-trampoline";
-> +               reg = <0x4C000100 0x100>;
-
-Looks like a software construct, which we wouldn't want to put into DT
-this way. DT doesn't describe drivers.
+Applied all, thanks.
