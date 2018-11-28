@@ -1,38 +1,42 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Nov 2018 19:47:09 +0000
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <20181128.112717.149234960284639699.davem@davemloft.net>
-References: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
- <20181128174545.GJ30658@n2100.armlinux.org.uk>
- <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
- <20181128.112717.149234960284639699.davem@davemloft.net>
-Message-ID: <20181128194708.GP30658@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Nov 2018 19:52:44 +0000
+Subject: [PATCH] pci: imx6: support kernels built in Thumb-2 mode
+In-Reply-To: <1543431377.18519.94.camel@impinj.com>
+References: <20181128132554.28139-1-stefan@agner.ch>
+ <ff476784-b79e-18bf-5870-4365c8377deb@arm.com>
+ <1543431377.18519.94.camel@impinj.com>
+Message-ID: <f7096d74-9097-771d-1a4b-f6665b3689d4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 11:27:17AM -0800, David Miller wrote:
-> From: Linus Torvalds <torvalds@linux-foundation.org>
-> Date: Wed, 28 Nov 2018 10:00:06 -0800
+On 28/11/2018 18:56, Trent Piepho wrote:
+> On Wed, 2018-11-28 at 16:16 +0000, Robin Murphy wrote:
+>>
+>>>    
+>>> +static int imx6q_pcie_abort_handler_thumb2(unsigned long addr,
+>>> +		unsigned int fsr, struct pt_regs *regs)
+>>> +{
+>>> +	unsigned long pc = instruction_pointer(regs);
+>>> +	unsigned long instr = *(unsigned long *)pc;
+>>> +	unsigned long thumb2_instr = __mem_to_opcode_thumb16(instr);
+>>> +	int reg = thumb2_instr & 7;
+>>> +
+>>> +	if (!__opcode_is_thumb16(instr & 0x0000ffffUL))
+>>> +		return 1;
+>>
+>> There are plenty of 32-bit Thumb encodings of various LDR/STR variants,
+>> and I doubt we can guarantee that the offset, target register, and/or
+>> addressing mode for a config space access will *always* suit the
+>> (relatively limited) 16-bit ones.
 > 
-> > Not all memory is accessible even to the kernel. If you have memory
-> > that shows up in the last page of phys_addr_t, you just mark it
-> > reserved at boot-time.
-> 
-> It's not the physical memory at the end that needs to be reserved.
-> 
-> It's the IOMMU mapping arena.
+> It might be the case that PLD/PLI, 32-bit thumb2 instructions, could
+> trigger an abort too.
 
-True, if and only if you have an IOMMU.
+Preload instructions shouldn't cause a *synchronous* abort, which is 
+what we're trapping here, and they could only result in an asynchronous 
+abort coming back later if the address is mapped as Normal memory, which 
+it really shouldn't be in this case. Frankly either way, anyone even 
+thinking about trying to pull PCI config space into data caches, let 
+alone instruction caches, probably deserves everything they get ;)
 
-Where there isn't an IOMMU, then we'd have to reserve every page that
-that translates to a bus address in the top 4K of dma_addr_t on any
-bus in the system - that means knowing early in the kernel
-initialisation about all buses in the system so we can detect and
-reserve these pages.
-
-I don't think that's trivial to do.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+Robin.
