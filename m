@@ -1,19 +1,23 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 16:41:44 +0800
-Subject: [PATCH v3 1/3] ARM: imx_v6_v7_defconfig: Remove explicit
- ARM_UNWIND disable
-In-Reply-To: <20181125222027.22071-1-otavio@ossystems.com.br>
-References: <20181125222027.22071-1-otavio@ossystems.com.br>
-Message-ID: <20181128084142.GN20643@dragon>
+Date: Wed, 28 Nov 2018 16:52:54 +0800
+Subject: [PATCH 1/2] ARM: dts: imx23: Fix memory node duplicaton
+In-Reply-To: <1543234136-6824-1-git-send-email-festevam@gmail.com>
+References: <1543234136-6824-1-git-send-email-festevam@gmail.com>
+Message-ID: <20181128085252.GO20643@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 25, 2018 at 08:20:25PM -0200, Otavio Salvador wrote:
-> CONFIG_ARM_UNWIND is removed when running 'savedefconfig', but
-> selected by ARM EABI (AEBI) support.  This is done in preparation to making
-> further changes to this defconfig cleaner.
+On Mon, Nov 26, 2018 at 10:08:55AM -0200, Fabio Estevam wrote:
+> Boards based on imx23 have duplicate memory nodes:
 > 
-> Reviewed-by: Fabio Estevam <festevam@gmail.com>
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+> - One coming from the board dts file: memory@
+> 
+> - One coming from the imx23.dtsi file.
+> 
+> Fix the duplication by removing the memory node from the dtsi file
+> and by adding 'device_type = "memory";' in the board dts.
+> 
+> Reported-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Fabio Estevam <festevam@gmail.com>
 
-Applied all, thanks.
+Applied, thanks.
