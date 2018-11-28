@@ -1,211 +1,216 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 28 Nov 2018 14:54:28 +0000
-Subject: [RFC PATCH v2 1/3] drivers: amba: Updates to component
- identification for driver matching.
-In-Reply-To: <16a3cb27-bc7c-36ff-d8fd-bac17f5fc28d@arm.com>
-References: <20181128101423.15961-1-mike.leach@linaro.org>
- <20181128101423.15961-2-mike.leach@linaro.org>
- <16a3cb27-bc7c-36ff-d8fd-bac17f5fc28d@arm.com>
-Message-ID: <CAJ9a7VjrXQqw+AQOYJJ4R0JjvA4OKK4nj4NwQWfSTb12ux61PQ@mail.gmail.com>
+From: steven.price@arm.com (Steven Price)
+Date: Wed, 28 Nov 2018 14:45:25 +0000
+Subject: [PATCH 10/12] arm64: Retrieve stolen time as paravirtualized guest
+In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
+References: <20181128144527.44710-1-steven.price@arm.com>
+Message-ID: <20181128144527.44710-11-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suzuki
+Enable paravirtualization features when running under a hypervisor
+supporting the PV_TIME_ST hypercall.
 
-On Wed, 28 Nov 2018 at 10:44, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
-> Hi Mike,
->
-> On 28/11/2018 10:14, Mike Leach wrote:
-> > The CoreSight specification (ARM IHI 0029E), updates the ID register
-> > requirements for components on an AMBA bus, to cover both traditional
-> > ARM Primecell type devices, and newer CoreSight and other components.
-> >
-> > The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
-> > cases to uniquely identify components. CoreSight components related to
-> > a single function can share Peripheral ID values, and must be further
-> > identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
-> > PMU and Debug hardware of the A35 all share the same PID.
-> >
-> > Bits 11:8 of the CID are defined to be the device class.
-> > Class 0xF remains for PrimeCell and legacy components.
-> > Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > at present.
-> > Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> >
-> > The specification futher defines which classes of device use the standard
-> > CID/PID pair, and when additional ID registers are required.
-> >
-> > The patches provide an update of amba_device and matching code to handle
-> > the additional registers required for the Class 0x9 (CoreSight) UCI.
-> > The *data pointer in the amba_id is used by the driver to provide extended
-> > ID register values for matching.
-> >
-> > CoreSight components where PID/CID pair is currently sufficient for
-> > unique identification need not provide this additional information.
-> >
-> > Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> > ---
-> >   drivers/amba/bus.c       | 49 +++++++++++++++++++++++++++++++++-------
-> >   include/linux/amba/bus.h | 32 ++++++++++++++++++++++++++
-> >   2 files changed, 73 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> > index 41b706403ef7..387ee8f7720b 100644
-> > --- a/drivers/amba/bus.c
-> > +++ b/drivers/amba/bus.c
-> > @@ -26,19 +26,40 @@
-> >
-> >   #define to_amba_driver(d)   container_of(d, struct amba_driver, drv)
-> >
-> > -static const struct amba_id *
-> > -amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> > +/* called on periphid match and class 0x9 coresight device. */
-> > +static int
-> > +amba_cs_uci_id_match(const struct amba_id *table, struct amba_device *dev)
-> >   {
-> >       int ret = 0;
-> > +     struct amba_cs_uci_id *uci;
-> > +
-> > +     uci = table->data;
-> > +
-> > +     /* no table data - return match on periphid */
-> > +     if (!uci)
-> > +             return 1;
-> > +
-> > +     if (uci->devarch) {
->
-> minor nit: It would be good to check the devarch_mask instead, as we
-> will be covered if at all there is an expected devarch == 0. But the
-> mask can never be 0, if we have something to check.
+For each (v)CPU, we ask the hypervisor for the location of a shared
+page which the hypervisor will use to report stolen time to us. We set
+pv_time_ops to the stolen time function which simply reads the stolen
+value from the shared page for a VCPU. We guarantee single-copy
+atomicity using READ_ONCE which means we can also read the stolen
+time for another VCPU than the currently running one while it is
+potentially being updated by the hypervisor.
 
-There is an expected devarch == 0 - it is defined in the spec as when
-devarch is not implemented - hence the explicit test here.
-If there is no devarch - then we can match on devtype alone.
+Signed-off-by: Steven Price <steven.price@arm.com>
+---
+ arch/arm64/kernel/Makefile |   1 +
+ arch/arm64/kernel/kvm.c    | 156 +++++++++++++++++++++++++++++++++++++
+ include/linux/cpuhotplug.h |   1 +
+ 3 files changed, 158 insertions(+)
+ create mode 100644 arch/arm64/kernel/kvm.c
 
->
-> > +             ret = (dev->uci.devtype == uci->devtype) &&
-> > +                    ((dev->uci.devarch & uci->devarch_mask) == uci->devarch);
-> > +     } else {
-> > +             /* devtype only if devarch set to 0 */
-> > +             ret = dev->uci.devtype == uci->devtype;
-> > +     }
-> > +     return ret;
-> > +}
-> >
-> > +static const struct amba_id *
-> > +amba_lookup(const struct amba_id *table, struct amba_device *dev)
-> > +{
-> >       while (table->mask) {
-> > -             ret = (dev->periphid & table->mask) == table->id;
-> > -             if (ret)
-> > -                     break;
-> > +             if (((dev->periphid & table->mask) == table->id) &&
-> > +                     ((dev->cid != CORESIGHT_CID) ||
-> > +                      (amba_cs_uci_id_match(table, dev))))
-> > +                     return table;
-> >               table++;
-> >       }
-> > -
-> > -     return ret ? table : NULL;
-> > +     return NULL;
-> >   }
-> >
-> >   static int amba_match(struct device *dev, struct device_driver *drv)
-> > @@ -399,10 +420,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
-> >                       cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
-> >                               (i * 8);
-> >
-> > +             if (cid == CORESIGHT_CID) {
-> > +                     /* set the base to the start of the last 4k block */
-> > +                     void __iomem *csbase = tmp + size - 4096;
-> > +
-> > +                     dev->uci.devarch =
-> > +                             readl(csbase + UCI_REG_DEVARCH_OFFSET);
-> > +                     dev->uci.devtype =
-> > +                             readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
-> > +             }
-> > +
-> >               amba_put_disable_pclk(dev);
-> >
-> > -             if (cid == AMBA_CID || cid == CORESIGHT_CID)
-> > +             if (cid == AMBA_CID || cid == CORESIGHT_CID) {
-> >                       dev->periphid = pid;
-> > +                     dev->cid = cid;
-> > +             }
-> >
-> >               if (!dev->periphid)
-> >                       ret = -ENODEV;
-> > diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> > index d143c13bed26..ff0ce0587ee9 100644
-> > --- a/include/linux/amba/bus.h
-> > +++ b/include/linux/amba/bus.h
-> > @@ -25,6 +25,36 @@
-> >   #define AMBA_CID    0xb105f00d
-> >   #define CORESIGHT_CID       0xb105900d
-> >
-> > +/*
-> > + * CoreSight Architecture specification updates the ID specification
-> > + * for components on the AMBA bus. (ARM IHI 0029E)
-> > + *
-> > + * Bits 11:8 of the CID are the device class.
->
-> I think this should be Bits 15:12 ?
->
-
-It should.
-
-Thanks
-
-Mike
-> > + *
-> > + * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
-> > + * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-> > + * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-> > + * at present.
-> > + * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-> > + *
-> > + * Remaining CID bits stay as 0xb105-00d
-> > + */
-> > +
-> > +/*
-> > + * Class 0x9 components use additional values to form a Unique Component
-> > + * Identifier (UCI), where peripheral ID values are identical for different
-> > + * components. Passed to the amba bus code from the component driver via
-> > + * the amba_id->data pointer.
-> > + */
-> > +struct amba_cs_uci_id {
-> > +     unsigned int devarch;
-> > +     unsigned int devarch_mask;
-> > +     unsigned int devtype;
-> > +};
-> > +
-> > +#define UCI_REG_DEVTYPE_OFFSET       0xFCC
-> > +#define UCI_REG_DEVARCH_OFFSET       0xFBC
-> > +
-> >   struct clk;
-> >
-> >   struct amba_device {
-> > @@ -32,6 +62,8 @@ struct amba_device {
-> >       struct resource         res;
-> >       struct clk              *pclk;
-> >       unsigned int            periphid;
-> > +     unsigned int            cid;
-> > +     struct amba_cs_uci_id   uci;
-> >       unsigned int            irq[AMBA_NR_IRQS];
-> >       char                    *driver_override;
-> >   };
-> >
->
-> Rest looks fine. With the above addressed,
->
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->
->
-
-
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 4c8b13bede80..daaed14ed7a4 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -57,6 +57,7 @@ arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
+ arm64-obj-$(CONFIG_CRASH_CORE)		+= crash_core.o
+ arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
+ arm64-obj-$(CONFIG_ARM64_SSBD)		+= ssbd.o
++arm64-obj-$(CONFIG_PARAVIRT)		+= kvm.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/kvm.c b/arch/arm64/kernel/kvm.c
+new file mode 100644
+index 000000000000..72c9554648fc
+--- /dev/null
++++ b/arch/arm64/kernel/kvm.c
+@@ -0,0 +1,156 @@
++// SPDX-License-Identifier: GPL-2.0
++// Copyright (C) 2018 Arm Ltd.
++
++#define pr_fmt(fmt) "kvmarm-pv: " fmt
++
++#include <linux/arm-smccc.h>
++#include <linux/cpuhotplug.h>
++#include <linux/io.h>
++#include <linux/printk.h>
++#include <linux/psci.h>
++#include <linux/reboot.h>
++#include <linux/slab.h>
++
++#include <kvm/arm_pv.h>
++
++#include <asm/paravirt.h>
++#include <asm/smp_plat.h>
++
++struct kvmarm_stolen_time_region {
++	struct pvclock_vcpu_stolen_time_info *kaddr;
++};
++
++static DEFINE_PER_CPU(struct kvmarm_stolen_time_region, stolen_time_region);
++
++static bool steal_acc = true;
++static int __init parse_no_stealacc(char *arg)
++{
++	steal_acc = false;
++	return 0;
++}
++early_param("no-steal-acc", parse_no_stealacc);
++
++/* return stolen time in ns by asking the hypervisor */
++static u64 kvm_steal_clock(int cpu)
++{
++	struct kvmarm_stolen_time_region *reg;
++
++	reg = per_cpu_ptr(&stolen_time_region, cpu);
++	if (!reg->kaddr) {
++		pr_warn_once("stolen time enabled but not configued for cpu %d\n",
++			     cpu);
++		return 0;
++	}
++
++	return le64_to_cpu(READ_ONCE(reg->kaddr->stolen_time));
++}
++
++static int disable_stolen_time_current_cpu(void)
++{
++	struct kvmarm_stolen_time_region *reg;
++
++	reg = this_cpu_ptr(&stolen_time_region);
++	if (!reg->kaddr)
++		return 0;
++
++	memunmap(reg->kaddr);
++	memset(reg, 0, sizeof(*reg));
++
++	return 0;
++}
++
++static int stolen_time_dying_cpu(unsigned int cpu)
++{
++	return disable_stolen_time_current_cpu();
++}
++
++static int init_stolen_time_cpu(unsigned int cpu)
++{
++	struct kvmarm_stolen_time_region *reg;
++	int ret;
++	struct arm_smccc_res res;
++
++	reg = this_cpu_ptr(&stolen_time_region);
++
++	if (reg->kaddr)
++		return 0;
++
++	ret = arm_smccc_1_1(ARM_SMCCC_HV_PV_TIME_ST, &res);
++
++	if ((long)res.a0 < 0)
++		return -EINVAL;
++
++	reg->kaddr = memremap(res.a0,
++			sizeof(struct pvclock_vcpu_stolen_time_info),
++			MEMREMAP_WB);
++
++	if (reg->kaddr == NULL) {
++		pr_warn("Failed to map stolen time data structure\n");
++		return -EINVAL;
++	}
++
++	if (le32_to_cpu(reg->kaddr->revision) != 0 ||
++			le32_to_cpu(reg->kaddr->attributes) != 0) {
++		pr_warn("Unexpected revision or attributes in stolen time data\n");
++		return -ENXIO;
++	}
++
++	return 0;
++}
++
++static int kvm_arm_init_stolen_time(void)
++{
++	int ret;
++
++	ret = cpuhp_setup_state(CPUHP_AP_ARM_KVMPV_STARTING,
++				"hypervisor/kvmarm/pv:starting",
++				init_stolen_time_cpu, stolen_time_dying_cpu);
++	if (ret < 0)
++		return ret;
++	return 0;
++}
++
++static bool has_kvm_steal_clock(void)
++{
++	struct arm_smccc_res res;
++
++	/* To detect the presence of PV time support we require SMCCC 1.1+ */
++	if (psci_ops.smccc_version < SMCCC_VERSION_1_1)
++		return false;
++
++	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++		      ARM_SMCCC_HV_PV_FEATURES, &res);
++
++	if (res.a0 != SMCCC_RET_SUCCESS)
++		return false;
++
++	arm_smccc_1_1(ARM_SMCCC_HV_PV_FEATURES, ARM_SMCCC_HV_PV_TIME_ST, &res);
++
++	if (res.a0 != SMCCC_RET_SUCCESS)
++		return false;
++
++	return true;
++}
++
++static int __init kvm_guest_init(void)
++{
++	int ret = 0;
++
++	if (!has_kvm_steal_clock())
++		return 0;
++
++	ret = kvm_arm_init_stolen_time();
++	if (ret)
++		return ret;
++
++	pv_ops.time.steal_clock = kvm_steal_clock;
++
++	static_key_slow_inc(&paravirt_steal_enabled);
++	if (steal_acc)
++		static_key_slow_inc(&paravirt_steal_rq_enabled);
++
++	pr_info("using stolen time PV\n");
++
++	return 0;
++}
++early_initcall(kvm_guest_init);
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index e0cd2baa8380..5c176a31deb8 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -134,6 +134,7 @@ enum cpuhp_state {
+ 	/* Must be the last timer callback */
+ 	CPUHP_AP_DUMMY_TIMER_STARTING,
+ 	CPUHP_AP_ARM_XEN_STARTING,
++	CPUHP_AP_ARM_KVMPV_STARTING,
+ 	CPUHP_AP_ARM_CORESIGHT_STARTING,
+ 	CPUHP_AP_ARM64_ISNDEP_STARTING,
+ 	CPUHP_AP_SMPCFD_DYING,
 -- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Manchester Design Centre. UK
+2.19.2
