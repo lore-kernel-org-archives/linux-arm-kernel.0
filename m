@@ -1,22 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 19:54:42 +0800
-Subject: [PATCH 38/77] ARM: dts: sun7i: Change framebuffer node names to
- avoid warnings
-In-Reply-To: <bc7833d43f0e28c57ea3414ffe5692255ac1e7ad.1543321707.git-series.maxime.ripard@bootlin.com>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <bc7833d43f0e28c57ea3414ffe5692255ac1e7ad.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v66fP8=8O4BhqtmmuU9MMf0OJugvLoPvb3qM6O6VAEa_oA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 28 Nov 2018 12:58:54 +0100
+Subject: [PATCH] arm64: mm: define NET_IP_ALIGN to 0
+In-Reply-To: <20181128150225.8D30.4A936039@socionext.com>
+References: <20181107171038.25281-1-ard.biesheuvel@linaro.org>
+ <20181128150225.8D30.4A936039@socionext.com>
+Message-ID: <CAKv+Gu8nVmzT-XWr-EASOdrmqN3VmacapqLqPhK0q-cNAKkhZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> The simple-framebuffer nodes have a unit address, but no reg property which
-> generates a warning when compiling it with DTC.
->
-> Change the simple-framebuffer node names so that there is no warnings on
-> this anymore.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hello Kunihiko,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Wed, 28 Nov 2018 at 07:02, Kunihiko Hayashi
+<hayashi.kunihiko@socionext.com> wrote:
+>
+> Hi Ard,
+>
+> I found that arm64 board that had AVE controller couldn't receive
+> any packets after this change.
+>
+> AVE controller (hardware) forces to ignore lower 2bits of buffer start address,
+> that is, the address is always aligned with 4bytes.
+> And more, the controller puts received datas with "2byte headroom" [1].
+>
+> [1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/drivers/net/ethernet/socionext/sni_ave.c#n591
+>
+> In case that NET_IP_ALIGN is 2, the driver proceeds skb->data by 2byte
+> with calling netdev_alloc_skb_ip_align(), and then, skb->data is equivalent
+> to start address of data reception.
+>
+>     +0x00 00  buffer start address
+>     +0x01 00
+>     +0x02 XX  skb->data == start address of data reception
+>     +0x03 XX
+>     ...
+>
+> However, in case that NET_IP_ALIGN is zero, skb->data is the same address
+> as buffer start address, so skb->data differs from start address of data
+> reception. Finally the driver can't receive any packets collectly.
+>
+>     +0x00 00  skb->data == buffer start address
+>     +0x01 00
+>     +0x02 XX  start address of data reception
+>     +0x03 XX
+>     ...
+>
+> Although I might be able to replace NET_IP_ALIGN with an own macro
+> without calling netdev_alloc_skb_ip_align(), it seems clumsy.
+> Is that any ideas?
+>
+
+If your hardware assumes NET_IP_ALIGN == 2, then yes, I suggest you
+introduce your own macros here instead.
