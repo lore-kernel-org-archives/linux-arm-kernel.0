@@ -1,92 +1,51 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Wed, 28 Nov 2018 19:20:58 +0530
-Subject: [PATCH v3 07/15] arm: dts: Add devicetree for OrangePi i96 board
-In-Reply-To: <20181128135106.9255-1-manivannan.sadhasivam@linaro.org>
-References: <20181128135106.9255-1-manivannan.sadhasivam@linaro.org>
-Message-ID: <20181128135106.9255-8-manivannan.sadhasivam@linaro.org>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 28 Nov 2018 15:23:52 +0100
+Subject: [PATCH 77/77] ARM: dts: sun9i: Add missing unit address
+In-Reply-To: <CAGb2v67atuezsjqb-1-0e7Nr1Rt=Fz7TfQhq8R-+meUpDd-M6Q@mail.gmail.com>
+References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
+ <39e9a2c3caec8bf63469f65563361b39c85b607a.1543321707.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v67atuezsjqb-1-0e7Nr1Rt=Fz7TfQhq8R-+meUpDd-M6Q@mail.gmail.com>
+Message-ID: <20181128142352.xsl5p7z4afl7gjs5@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial devicetree for Orange Pi i96 board from Xunlong. It
-is one of the 96Boards IoT Edition board.
+On Wed, Nov 28, 2018 at 09:07:24PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > The soc node in the A80 DTSI has a ranges property, but no matching unit
+> > address, which results in a DTC warning. Add the unit address to remove
+> > that warning.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  arch/arm/boot/dts/sun9i-a80.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+> > index 27c2ad6bf002..ec504cea1b3e 100644
+> > --- a/arch/arm/boot/dts/sun9i-a80.dtsi
+> > +++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+> > @@ -254,7 +254,7 @@
+> >                 status = "disabled";
+> >         };
+> >
+> > -       soc {
+> > +       soc at 20000 {
+> 
+> Shouldn't it be 0? The BROM, though unlisted, is at 0x0.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
-Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm/boot/dts/Makefile                   |  3 +-
- arch/arm/boot/dts/rda8810pl-orangepi-i96.dts | 50 ++++++++++++++++++++
- 2 files changed, 52 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
+Hmm, I don't know what happened here, you're obviously right :)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a0fdad8f10dd..cfb08ea33872 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -807,7 +807,8 @@ dtb-$(CONFIG_ARCH_QCOM) += \
- 	qcom-msm8974-sony-xperia-honami.dtb \
- 	qcom-mdm9615-wp8548-mangoh-green.dtb
- dtb-$(CONFIG_ARCH_RDA) += \
--	rda8810pl-orangepi-2g-iot.dtb
-+	rda8810pl-orangepi-2g-iot.dtb \
-+	rda8810pl-orangepi-i96.dtb
- dtb-$(CONFIG_ARCH_REALVIEW) += \
- 	arm-realview-pb1176.dtb \
- 	arm-realview-pb11mp.dtb \
-diff --git a/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts b/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
-new file mode 100644
-index 000000000000..728f76931b99
---- /dev/null
-+++ b/arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
-@@ -0,0 +1,50 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ * Copyright (c) 2018 Manivannan Sadhasivam
-+ */
-+
-+/dts-v1/;
-+
-+#include "rda8810pl.dtsi"
-+
-+/ {
-+	compatible = "xunlong,orangepi-i96", "rda,8810pl";
-+	model = "Orange Pi i96";
-+
-+	aliases {
-+		serial0 = &uart2;
-+		serial1 = &uart1;
-+		serial2 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial2:921600n8";
-+	};
-+
-+	memory at 80000000 {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>;
-+	};
-+
-+	uart_clk: uart-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <921600>;
-+		#clock-cells = <0>;
-+	};
-+};
-+
-+&uart1 {
-+	status = "okay";
-+	clocks = <&uart_clk>;
-+};
-+
-+&uart2 {
-+	status = "okay";
-+	clocks = <&uart_clk>;
-+};
-+
-+&uart3 {
-+	status = "okay";
-+	clocks = <&uart_clk>;
-+};
+Maxime
+
 -- 
-2.17.1
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/9f7c684d/attachment.sig>
