@@ -1,46 +1,36 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 29 Nov 2018 01:33:11 +0300
-Subject: [PATCH v5 01/17] ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7
- Allwinner SoCs
+Date: Thu, 29 Nov 2018 01:33:18 +0300
+Subject: [PATCH v5 08/17] dt-bindings: timer: Add Allwinner suniv timer
 In-Reply-To: <cover.1543443475.git.mesihkilinc@gmail.com>
 References: <cover.1543443475.git.mesihkilinc@gmail.com>
-Message-ID: <ec9d798e883d45d5dc0e01617e4bf217bc9a6be7.1543443475.git.mesihkilinc@gmail.com>
+Message-ID: <ebcaf22f77ae631bb626a74baaaf1187c1878b99.1543443475.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner also has some ARMv5 SoCs.
-
-In order to add support for them, check ARM_MULTI_V7 before enabling
-ARMv7 SoC's. Add help text for ARCH_SUNXI menuconfig.
+Add compatible string for Allwinner suniv timer which is similar to
+sun4i timer.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm/mach-sunxi/Kconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
-index d9c8ecf..185c573 100644
---- a/arch/arm/mach-sunxi/Kconfig
-+++ b/arch/arm/mach-sunxi/Kconfig
-@@ -9,9 +9,13 @@ menuconfig ARCH_SUNXI
- 	select PM_OPP
- 	select SUN4I_TIMER
- 	select RESET_CONTROLLER
-+	help
-+	  Support for Allwinner ARM-based family of processors
+diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+index 5c2e235..3da9d51 100644
+--- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
++++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
+@@ -2,7 +2,9 @@ Allwinner A1X SoCs Timer Controller
  
- if ARCH_SUNXI
+ Required properties:
  
-+if ARCH_MULTI_V7
-+
- config MACH_SUN4I
- 	bool "Allwinner A10 (sun4i) SoCs support"
- 	default ARCH_SUNXI
-@@ -56,3 +60,5 @@ config ARCH_SUNXI_MC_SMP
- 	select ARM_CPU_SUSPEND
- 
- endif
-+
-+endif
+-- compatible : should be "allwinner,sun4i-a10-timer"
++- compatible : should be one of the following:
++              "allwinner,sun4i-a10-timer"
++              "allwinner,suniv-f1c100s-timer"
+ - reg : Specifies base physical address and size of the registers.
+ - interrupts : The interrupt of the first timer
+ - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
 -- 
 2.7.4
