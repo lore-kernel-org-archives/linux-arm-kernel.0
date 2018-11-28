@@ -1,176 +1,74 @@
 From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:19 +0000
-Subject: [PATCH 04/12] arm/arm64: Make use of the SMCCC 1.1 wrapper
+Date: Wed, 28 Nov 2018 14:45:26 +0000
+Subject: [PATCH 11/12] KVM: Allow kvm_device_ops to be const
 In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
 References: <20181128144527.44710-1-steven.price@arm.com>
-Message-ID: <20181128144527.44710-5-steven.price@arm.com>
+Message-ID: <20181128144527.44710-12-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than directly choosing which function to use based on
-psci_ops.conduit, use the new arm_smccc_1_1 wrapper instead.
-
-In some cases we still need to do some operations based on the
-conduit, but the code duplication is removed.
+Currently a kvm_device_ops structure cannot be const without triggering
+compiler warnings. However the structure doesn't need to be written to
+and, by marking it const, it can be read-only in memory. Add some more
+const keywords to allow this.
 
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/arm/mm/proc-v7-bugs.c     | 46 +++++++++++++++------------------
- arch/arm64/kernel/cpu_errata.c | 47 +++++++++-------------------------
- 2 files changed, 32 insertions(+), 61 deletions(-)
+ include/linux/kvm_host.h | 4 ++--
+ virt/kvm/kvm_main.c      | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
-index 5544b82a2e7a..c24d32d3589d 100644
---- a/arch/arm/mm/proc-v7-bugs.c
-+++ b/arch/arm/mm/proc-v7-bugs.c
-@@ -78,39 +78,33 @@ static void cpu_v7_spectre_init(void)
- 	case ARM_CPU_PART_CORTEX_A57:
- 	case ARM_CPU_PART_CORTEX_A72: {
- 		struct arm_smccc_res res;
-+		int conduit;
+diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
+index c192eda05b95..14afddd9e70b 100644
+--- a/include/linux/kvm_host.h
++++ b/include/linux/kvm_host.h
+@@ -1178,7 +1178,7 @@ extern unsigned int halt_poll_ns_grow;
+ extern unsigned int halt_poll_ns_shrink;
  
- 		if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
- 			break;
+ struct kvm_device {
+-	struct kvm_device_ops *ops;
++	const struct kvm_device_ops *ops;
+ 	struct kvm *kvm;
+ 	void *private;
+ 	struct list_head vm_node;
+@@ -1221,7 +1221,7 @@ struct kvm_device_ops {
+ void kvm_device_get(struct kvm_device *dev);
+ void kvm_device_put(struct kvm_device *dev);
+ struct kvm_device *kvm_device_from_filp(struct file *filp);
+-int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type);
++int kvm_register_device_ops(const struct kvm_device_ops *ops, u32 type);
+ void kvm_unregister_device_ops(u32 type);
  
--		switch (psci_ops.conduit) {
--		case PSCI_CONDUIT_HVC:
--			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--			if ((int)res.a0 != 0)
--				break;
-+		conduit = arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+					ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+
-+		if ((int)res.a0 == 0) {
- 			if (processor.switch_mm != cpu_v7_hvc_switch_mm && cpu)
- 				goto bl_error;
--			per_cpu(harden_branch_predictor_fn, cpu) =
--				call_hvc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_hvc_switch_mm;
--			spectre_v2_method = "hypervisor";
--			break;
--
--		case PSCI_CONDUIT_SMC:
--			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--			if ((int)res.a0 != 0)
-+			switch (conduit) {
-+			case PSCI_CONDUIT_HVC:
-+				per_cpu(harden_branch_predictor_fn, cpu) =
-+					call_hvc_arch_workaround_1;
-+				processor.switch_mm = cpu_v7_hvc_switch_mm;
-+				spectre_v2_method = "hypervisor";
- 				break;
--			if (processor.switch_mm != cpu_v7_smc_switch_mm && cpu)
--				goto bl_error;
--			per_cpu(harden_branch_predictor_fn, cpu) =
--				call_smc_arch_workaround_1;
--			processor.switch_mm = cpu_v7_smc_switch_mm;
--			spectre_v2_method = "firmware";
--			break;
--
--		default:
--			break;
-+			case PSCI_CONDUIT_SMC:
-+				per_cpu(harden_branch_predictor_fn, cpu) =
-+					call_smc_arch_workaround_1;
-+				processor.switch_mm = cpu_v7_smc_switch_mm;
-+				spectre_v2_method = "firmware";
-+				break;
-+			default:
-+				break;
-+			}
- 		}
- 	}
- #endif
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a509e35132d2..6266284cc801 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -234,12 +234,14 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
- 		return;
- 
-+	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+				ARM_SMCCC_ARCH_WORKAROUND_1, &res);
-+
-+	if ((int)res.a0 < 0)
-+		return;
-+
- 	switch (psci_ops.conduit) {
- 	case PSCI_CONDUIT_HVC:
--		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--		if ((int)res.a0 < 0)
--			return;
- 		cb = call_hvc_arch_workaround_1;
- 		/* This is a guest, no need to patch KVM vectors */
- 		smccc_start = NULL;
-@@ -247,10 +249,6 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
- 		break;
- 
- 	case PSCI_CONDUIT_SMC:
--		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
--		if ((int)res.a0 < 0)
--			return;
- 		cb = call_smc_arch_workaround_1;
- 		smccc_start = __smccc_workaround_1_smc_start;
- 		smccc_end = __smccc_workaround_1_smc_end;
-@@ -343,6 +341,8 @@ void __init arm64_enable_wa2_handling(struct alt_instr *alt,
- 
- void arm64_set_ssbd_mitigation(bool state)
- {
-+	int conduit;
-+
- 	if (this_cpu_has_cap(ARM64_SSBS)) {
- 		if (state)
- 			asm volatile(SET_PSTATE_SSBS(0));
-@@ -351,19 +351,9 @@ void arm64_set_ssbd_mitigation(bool state)
- 		return;
- 	}
- 
--	switch (psci_ops.conduit) {
--	case PSCI_CONDUIT_HVC:
--		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
--		break;
--
--	case PSCI_CONDUIT_SMC:
--		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
--		break;
-+	conduit = arm_smccc_1_1(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
- 
--	default:
--		WARN_ON_ONCE(1);
--		break;
--	}
-+	WARN_ON_ONCE(conduit == PSCI_CONDUIT_NONE);
+ extern struct kvm_device_ops kvm_mpic_ops;
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index af38ce961d24..c99b3bc85af1 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2853,14 +2853,14 @@ struct kvm_device *kvm_device_from_filp(struct file *filp)
+ 	return filp->private_data;
  }
  
- static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
-@@ -385,21 +375,8 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
- 		return false;
- 	}
+-static struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
++static const struct kvm_device_ops *kvm_device_ops_table[KVM_DEV_TYPE_MAX] = {
+ #ifdef CONFIG_KVM_MPIC
+ 	[KVM_DEV_TYPE_FSL_MPIC_20]	= &kvm_mpic_ops,
+ 	[KVM_DEV_TYPE_FSL_MPIC_42]	= &kvm_mpic_ops,
+ #endif
+ };
  
--	switch (psci_ops.conduit) {
--	case PSCI_CONDUIT_HVC:
--		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
--		break;
--
--	case PSCI_CONDUIT_SMC:
--		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
--				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
--		break;
--
--	default:
--		ssbd_state = ARM64_SSBD_UNKNOWN;
--		return false;
--	}
-+	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
-+		      ARM_SMCCC_ARCH_WORKAROUND_2, &res);
- 
- 	val = (s32)res.a0;
- 
+-int kvm_register_device_ops(struct kvm_device_ops *ops, u32 type)
++int kvm_register_device_ops(const struct kvm_device_ops *ops, u32 type)
+ {
+ 	if (type >= ARRAY_SIZE(kvm_device_ops_table))
+ 		return -ENOSPC;
+@@ -2881,7 +2881,7 @@ void kvm_unregister_device_ops(u32 type)
+ static int kvm_ioctl_create_device(struct kvm *kvm,
+ 				   struct kvm_create_device *cd)
+ {
+-	struct kvm_device_ops *ops = NULL;
++	const struct kvm_device_ops *ops = NULL;
+ 	struct kvm_device *dev;
+ 	bool test = cd->flags & KVM_CREATE_DEVICE_TEST;
+ 	int ret;
 -- 
 2.19.2
