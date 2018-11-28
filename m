@@ -1,56 +1,229 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 10:57:10 +0800
-Subject: [PATCH 3/3] soc: imx: gpcv2: add support for i.MX8MQ SoC
-In-Reply-To: <20181116154927.16152-3-l.stach@pengutronix.de>
-References: <20181116154927.16152-1-l.stach@pengutronix.de>
- <20181116154927.16152-3-l.stach@pengutronix.de>
-Message-ID: <20181128025709.GF20643@dragon>
+Date: Wed, 28 Nov 2018 11:00:12 +0800
+Subject: [PATCH v2 4/4] ARM: dts: Add stmpe-adc driver to relevant
+ devicetrees
+In-Reply-To: <20181119102528.2830-4-dev@pschenker.ch>
+References: <20181119102528.2830-1-dev@pschenker.ch>
+ <20181119102528.2830-4-dev@pschenker.ch>
+Message-ID: <20181128030011.GG20643@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 04:49:27PM +0100, Lucas Stach wrote:
-> The GPCv2 on the Freescale i.MX8MQ SoC works in the same way as the
-> GPCv2 on the i.MX7, but only controls more power domains with a
-> different mapping.
+On Mon, Nov 19, 2018 at 11:25:28AM +0100, Philippe Schenker wrote:
+> From: Philippe Schenker <philippe.schenker@toradex.com>
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  .../bindings/power/fsl,imx-gpcv2.txt          |   7 +-
+> Activate the stmpe-adc driver as found on Apalis/Colibri iMX6/T30 modules
 
-The series looks good to me.
-
-@Rob, can you please ACK on the bindings change?
+iMX6 and T30 changes need to be separate patches.
 
 Shawn
 
->  drivers/soc/imx/Kconfig                       |   6 +-
->  drivers/soc/imx/Makefile                      |   2 +-
->  drivers/soc/imx/gpcv2.c                       | 208 +++++++++++++++++-
->  include/dt-bindings/power/imx8mq-power.h      |  21 ++
->  5 files changed, 237 insertions(+), 7 deletions(-)
->  create mode 100644 include/dt-bindings/power/imx8mq-power.h
 > 
-> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> index 9acce75b29ab..7c947a996df1 100644
-> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpcv2.txt
-> @@ -6,7 +6,9 @@ Control (PGC) for various power domains.
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> ---
+> 
+> Changes in v2:
+>  - Put common ADC settings in mfd
+> 
+>  arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 ++++++++++++++--------
+>  arch/arm/boot/dts/imx6qdl-colibri.dtsi | 23 +++++++++++++++--------
+>  arch/arm/boot/dts/tegra30-apalis.dtsi  | 22 ++++++++++++++--------
+>  arch/arm/boot/dts/tegra30-colibri.dtsi | 22 ++++++++++++++--------
+>  4 files changed, 57 insertions(+), 32 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> index 3dc99dd8dde1..8db476d8978d 100644
+> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> @@ -331,11 +331,18 @@
+>  		id = <0>;
+>  		blocks = <0x5>;
+>  		irq-trigger = <0x1>;
+> +		/* 3.25 MHz ADC clock speed */
+> +		st,adc-freq = <1>;
+> +		/* 12-bit ADC */
+> +		st,mod-12b = <1>;
+> +		/* internal ADC reference */
+> +		st,ref-sel = <0>;
+> +		/* ADC converstion time: 80 clocks */
+> +		st,sample-time = <4>;
+> +		/* forbid to use ADC channels 3-0 (touch) */
 >  
->  Required properties:
+>  		stmpe_touchscreen {
+>  			compatible = "st,stmpe-ts";
+> -			/* 3.25 MHz ADC clock speed */
+> -			st,adc-freq = <1>;
+>  			/* 8 sample average control */
+>  			st,ave-ctrl = <3>;
+>  			/* 7 length fractional part in z */
+> @@ -345,17 +352,16 @@
+>  			 * current limit value
+>  			 */
+>  			st,i-drive = <1>;
+> -			/* 12-bit ADC */
+> -			st,mod-12b = <1>;
+> -			/* internal ADC reference */
+> -			st,ref-sel = <0>;
+> -			/* ADC converstion time: 80 clocks */
+> -			st,sample-time = <4>;
+>  			/* 1 ms panel driver settling time */
+>  			st,settling = <3>;
+>  			/* 5 ms touch detect interrupt delay */
+>  			st,touch-det-delay = <5>;
+>  		};
+> +
+> +		stmpe_adc {
+> +			compatible = "st,stmpe-adc";
+> +			st,norequest-mask = <0x0F>;
+> +		};
+>  	};
+>  };
 >  
-> -- compatible: Should be "fsl,imx7d-gpc"
-> +- compatible: Should be one of:
-> +	- "fsl,imx7d-gpc"
-> +	- "fsl,imx8mq-gpc"
+> diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+> index 87e15e7cb32b..2e303d79c7f8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
+> @@ -262,11 +262,18 @@
+>  		id = <0>;
+>  		blocks = <0x5>;
+>  		irq-trigger = <0x1>;
+> +		/* 3.25 MHz ADC clock speed */
+> +		st,adc-freq = <1>;
+> +		/* 12-bit ADC */
+> +		st,mod-12b = <1>;
+> +		/* internal ADC reference */
+> +		st,ref-sel = <0>;
+> +		/* ADC converstion time: 80 clocks */
+> +		st,sample-time = <4>;
+> +		/* forbid to use ADC channels 3-0 (touch) */
 >  
->  - reg: should be register base and length as documented in the
->    datasheet
-> @@ -22,7 +24,8 @@ which, in turn, is expected to contain the following:
->  Required properties:
+>  		stmpe_touchscreen {
+>  			compatible = "st,stmpe-ts";
+> -			/* 3.25 MHz ADC clock speed */
+> -			st,adc-freq = <1>;
+>  			/* 8 sample average control */
+>  			st,ave-ctrl = <3>;
+>  			/* 7 length fractional part in z */
+> @@ -276,17 +283,17 @@
+>  			 * current limit value
+>  			 */
+>  			st,i-drive = <1>;
+> -			/* 12-bit ADC */
+> -			st,mod-12b = <1>;
+> -			/* internal ADC reference */
+> -			st,ref-sel = <0>;
+> -			/* ADC converstion time: 80 clocks */
+> -			st,sample-time = <4>;
+>  			/* 1 ms panel driver settling time */
+>  			st,settling = <3>;
+>  			/* 5 ms touch detect interrupt delay */
+>  			st,touch-det-delay = <5>;
+>  		};
+> +
+> +		stmpe_adc {
+> +			compatible = "st,stmpe-adc";
+> +			/* 3.25 MHz ADC clock speed */
+> +			st,norequest-mask = <0x0F>;
+> +		};
+>  	};
+>  };
 >  
->  - reg: Power domain index. Valid values are defined in
-> -  include/dt-bindings/power/imx7-power.h
-> +  include/dt-bindings/power/imx7-power.h for fsl,imx7d-gpc and
-> +  include/dt-bindings/power/imx8m-power.h for fsl,imx8mq-gpc
+> diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
+> index 7f112f192fe9..850b0d13549a 100644
+> --- a/arch/arm/boot/dts/tegra30-apalis.dtsi
+> +++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
+> @@ -976,11 +976,18 @@
+>  			id = <0>;
+>  			blocks = <0x5>;
+>  			irq-trigger = <0x1>;
+> +			/* 3.25 MHz ADC clock speed */
+> +			st,adc-freq = <1>;
+> +			/* 12-bit ADC */
+> +			st,mod-12b = <1>;
+> +			/* internal ADC reference */
+> +			st,ref-sel = <0>;
+> +			/* ADC converstion time: 80 clocks */
+> +			st,sample-time = <4>;
+> +			/* forbid to use ADC channels 3-0 (touch) */
 >  
->  - #power-domain-cells: Should be 0
+>  			stmpe_touchscreen {
+>  				compatible = "st,stmpe-ts";
+> -				/* 3.25 MHz ADC clock speed */
+> -				st,adc-freq = <1>;
+>  				/* 8 sample average control */
+>  				st,ave-ctrl = <3>;
+>  				/* 7 length fractional part in z */
+> @@ -990,17 +997,16 @@
+>  				 * current limit value
+>  				 */
+>  				st,i-drive = <1>;
+> -				/* 12-bit ADC */
+> -				st,mod-12b = <1>;
+> -				/* internal ADC reference */
+> -				st,ref-sel = <0>;
+> -				/* ADC converstion time: 80 clocks */
+> -				st,sample-time = <4>;
+>  				/* 1 ms panel driver settling time */
+>  				st,settling = <3>;
+>  				/* 5 ms touch detect interrupt delay */
+>  				st,touch-det-delay = <5>;
+>  			};
+> +
+> +			stmpe_adc {
+> +				compatible = "st,stmpe-adc";
+> +				st,norequest-mask = <0x0F>;
+> +			};
+>  		};
+>  
+>  		/*
+> diff --git a/arch/arm/boot/dts/tegra30-colibri.dtsi b/arch/arm/boot/dts/tegra30-colibri.dtsi
+> index 35af03ca9e90..1f9198bb24ff 100644
+> --- a/arch/arm/boot/dts/tegra30-colibri.dtsi
+> +++ b/arch/arm/boot/dts/tegra30-colibri.dtsi
+> @@ -845,11 +845,18 @@
+>  			id = <0>;
+>  			blocks = <0x5>;
+>  			irq-trigger = <0x1>;
+> +			/* 3.25 MHz ADC clock speed */
+> +			st,adc-freq = <1>;
+> +			/* 12-bit ADC */
+> +			st,mod-12b = <1>;
+> +			/* internal ADC reference */
+> +			st,ref-sel = <0>;
+> +			/* ADC converstion time: 80 clocks */
+> +			st,sample-time = <4>;
+> +			/* forbid to use ADC channels 3-0 (touch) */
+>  
+>  			stmpe_touchscreen {
+>  				compatible = "st,stmpe-ts";
+> -				/* 3.25 MHz ADC clock speed */
+> -				st,adc-freq = <1>;
+>  				/* 8 sample average control */
+>  				st,ave-ctrl = <3>;
+>  				/* 7 length fractional part in z */
+> @@ -859,17 +866,16 @@
+>  				 * current limit value
+>  				 */
+>  				st,i-drive = <1>;
+> -				/* 12-bit ADC */
+> -				st,mod-12b = <1>;
+> -				/* internal ADC reference */
+> -				st,ref-sel = <0>;
+> -				/* ADC converstion time: 80 clocks */
+> -				st,sample-time = <4>;
+>  				/* 1 ms panel driver settling time */
+>  				st,settling = <3>;
+>  				/* 5 ms touch detect interrupt delay */
+>  				st,touch-det-delay = <5>;
+>  			};
+> +
+> +			stmpe_adc {
+> +				compatible = "st,stmpe-adc";
+> +				st,norequest-mask = <0x0F>;
+> +			};
+>  		};
+>  
+>  		/*
+> -- 
+> 2.19.1
+> 
