@@ -1,53 +1,44 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 28 Nov 2018 09:45:17 -0600
-Subject: [GIT PULL 1/2] ARM: socfpga: updates for v4.20
-In-Reply-To: <20181128154403.12872-1-dinguyen@kernel.org>
-References: <20181128154403.12872-1-dinguyen@kernel.org>
-Message-ID: <28c08eee-2a39-c676-fe73-08252574c997@kernel.org>
+From: aisheng.dong@nxp.com (Aisheng DONG)
+Date: Wed, 28 Nov 2018 15:46:24 +0000
+Subject: [PATCH V3 4/4] ARM64: dts: imx: add i.MX8QXP system controller
+ RTC support
+In-Reply-To: <1543398696-3140-5-git-send-email-Anson.Huang@nxp.com>
+References: <1543398696-3140-1-git-send-email-Anson.Huang@nxp.com>
+ <1543398696-3140-5-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <AM0PR04MB42115A31CAE5A72D047BE7B880D10@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, the header should be for "ARM: socfpga: updates for v5.0".
+[...]
+> Subject: [PATCH V3 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
+> support
+> 
+> Add i.MX8QXP system controller RTC support.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> index da99b6f..5e8b554 100644
+> --- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
+> @@ -406,4 +406,8 @@
+>  		#size-cells = <1>;
+>  		ranges = <0x5f000000 0x0 0x5f000000 0x1000000>;
+>  	};
+> +
+> +	rtc: rtc {
+> +		compatible = "nxp,imx8qxp-sc-rtc";
 
-Dinh
+As I replied in patch 1, this belongs to scu node as well.
 
-On 11/28/18 9:44 AM, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
-> 
-> Please pull in these SoCFPGA updates for v5.0.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-> 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v5.0
-> 
-> for you to fetch changes up to fbc125afdc5048cb027002147a0e0def7c18573a:
-> 
->   ARM: socfpga: Turn on ARM errata for L2 cache (2018-11-28 09:23:11 -0600)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA updates for v5.0
-> - Split Kconfig options for debug UART on Cyclone5
-> - Remove unused functions from socfpga platform code
-> - Turn on ARM and PL310 errata for SOCFPGA ARMv7 platform
-> 
-> ----------------------------------------------------------------
-> Cl?ment P?ron (2):
->       ARM: debug: enable UART1 for socfpga Cyclone5
->       ARM: socfpga: Clean unused functions
-> 
-> Dinh Nguyen (1):
->       ARM: socfpga: Turn on ARM errata for L2 cache
-> 
->  arch/arm/Kconfig.debug          | 23 ++++++++++++++++-------
->  arch/arm/mach-socfpga/Kconfig   |  7 +++++++
->  arch/arm/mach-socfpga/core.h    |  2 --
->  arch/arm/mach-socfpga/socfpga.c |  2 +-
->  4 files changed, 24 insertions(+), 10 deletions(-)
-> 
+Regards
+Dong Aisheng
+
+> +	};
+>  };
+> --
+> 2.7.4
