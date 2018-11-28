@@ -1,333 +1,108 @@
-From: liuyun01@kylinos.cn (Jackie Liu)
-Date: Wed, 28 Nov 2018 09:09:01 +0800
-Subject: [PATCH v5 2/2] arm64: crypto: add NEON accelerated XOR implementation
-In-Reply-To: <20181128010901.1052-1-liuyun01@kylinos.cn>
-References: <20181128010901.1052-1-liuyun01@kylinos.cn>
-Message-ID: <20181128010901.1052-2-liuyun01@kylinos.cn>
+From: bhe@redhat.com (Baoquan He)
+Date: Wed, 28 Nov 2018 09:39:49 +0800
+Subject: [PATCH v2] x86_64, vmcoreinfo: Append 'page_offset_base' to
+ vmcoreinfo
+In-Reply-To: <CAGXu5jJzVMmqJ9JvFqDhDx=QShiWisWO0bY49cD5r-7By5dxFg@mail.gmail.com>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181121113944.GD27797@zn.tnic>
+ <CAGXu5jKYxgLPD4YonGSXjECJS=c18rxWmuFC1eeUJK9fLeTxcg@mail.gmail.com>
+ <20181127232916.GG1824@MiWiFi-R3L-srv>
+ <CAGXu5jJzVMmqJ9JvFqDhDx=QShiWisWO0bY49cD5r-7By5dxFg@mail.gmail.com>
+Message-ID: <20181128013949.GH1824@MiWiFi-R3L-srv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a NEON acceleration method that can improve
-performance by approximately 20%. I got the following
-data from the centos 7.5 on Huawei's HISI1616 chip:
+On 11/27/18 at 04:39pm, Kees Cook wrote:
+> >> >> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+> >> >> index 4c8acdfdc5a7..6161d77c5bfb 100644
+> >> >> --- a/arch/x86/kernel/machine_kexec_64.c
+> >> >> +++ b/arch/x86/kernel/machine_kexec_64.c
+> >> >> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+> >> >>       VMCOREINFO_SYMBOL(init_top_pgt);
+> >> >>       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+> >> >>                       pgtable_l5_enabled());
+> >> >> +#ifdef CONFIG_RANDOMIZE_BASE
+> 
+> Okay, gotcha. In that case, shouldn't this be CONFIG_RANDOMIZE_MEMORY?
 
-[ 93.837726] xor: measuring software checksum speed
-[ 93.874039]   8regs  : 7123.200 MB/sec
-[ 93.914038]   32regs : 7180.300 MB/sec
-[ 93.954043]   arm64_neon: 9856.000 MB/sec
-[ 93.954047] xor: using function: arm64_neon (9856.000 MB/sec)
+Currently, Kirill added level5 support to x86_64, and kernel with level5
+enabled can be boot switched into level4 or level5 with kernel option
+"no5lvl". So page_offset_base will be changed accordingly. You can see
+code pasted at bottom, DYNAMIC_MEMORY_LAYOUT is added for this change,
+not only KASLR, but 5LEVEL.
 
-I believe this code can bring some optimization for
-all arm64 platform.
+If only put it inside ifdef CONFIG_RANDOMIZE_MEMORY, change between l4
+and l5 will force us to decide page_offset again if
+CONFIG_RANDOMIZE_MEMORY or CONFIG_RANDOMIZE_BASE is not set. Besides, 
+below commit change the starting address of the direct mapping again, if
+only judge CONFIG_RANDOMIZE_MEMORY, in case KASLR is disabled, code in
+userspace may need many if-else checking as below. So if we pass, better
+pass it for all.
 
-That is patch version 5. Thanks for Ard Biesheuvel's
-suggestions.
+get_page_offset()
+{
+	if(get_page_offset_from_vmcoreinfo()) {
+		xxx //in KASLR case
+		return;
+	} else if (check_5level_paging()) {
+		if (version < 4.21) {
+			page_offset = 0xff10000000000000;
+		} else //version > = 4.21
+		{
+			page_offset = 0xff11000000000000;
+		}
+		
+	} else { //4level
+		if (version < 2.6.27) {
+			page_offset = 0xffff810000000000;
+		} else if (version < 4.21) {
+			page_offset = 0xffff880000000000;
+		} else //version > = 4.21
+		{
+			page_offset = 0xffff888000000000,;
+		}
+	}
+}
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
----
- arch/arm64/include/asm/Kbuild |   1 -
- arch/arm64/include/asm/xor.h  |  73 +++++++++++++++++
- arch/arm64/lib/Makefile       |   6 ++
- arch/arm64/lib/xor-neon.c     | 184 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 263 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/xor.h
- create mode 100644 arch/arm64/lib/xor-neon.c
+Sign, seeing above code, I still think that deducing it from
+kcore/vmcore elf header is better. Can't we be better to ourselves?
 
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 6cd5d77..1877f29 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -27,4 +27,3 @@ generic-y += trace_clock.h
- generic-y += unaligned.h
- generic-y += user.h
- generic-y += vga.h
--generic-y += xor.h
-diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
-new file mode 100644
-index 0000000..856386a
---- /dev/null
-+++ b/arch/arm64/include/asm/xor.h
-@@ -0,0 +1,73 @@
-+/*
-+ * arch/arm64/include/asm/xor.h
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/hardirq.h>
-+#include <asm-generic/xor.h>
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+extern struct xor_block_template const xor_block_inner_neon;
-+
-+static void
-+xor_neon_2(unsigned long bytes, unsigned long *p1, unsigned long *p2)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_2(bytes, p1, p2);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_3(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_3(bytes, p1, p2, p3);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_4(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_4(bytes, p1, p2, p3, p4);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4, unsigned long *p5)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_5(bytes, p1, p2, p3, p4, p5);
-+	kernel_neon_end();
-+}
-+
-+static struct xor_block_template xor_block_arm64 = {
-+	.name   = "arm64_neon",
-+	.do_2   = xor_neon_2,
-+	.do_3   = xor_neon_3,
-+	.do_4   = xor_neon_4,
-+	.do_5	= xor_neon_5
-+};
-+#undef XOR_TRY_TEMPLATES
-+#define XOR_TRY_TEMPLATES           \
-+	do {        \
-+		xor_speed(&xor_block_8regs);    \
-+		xor_speed(&xor_block_32regs);    \
-+		if (cpu_has_neon()) { \
-+			xor_speed(&xor_block_arm64);\
-+		} \
-+	} while (0)
-+
-+#endif /* ! CONFIG_KERNEL_MODE_NEON */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 69ff988..5540a16 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -5,6 +5,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
- 		   strchr.o strrchr.o tishift.o
- 
-+ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
-+obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
-+CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
-+CFLAGS_xor-neon.o		+= -ffreestanding
-+endif
-+
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
- # in case of a PLT) as callee-saved, which allows for efficient runtime
-diff --git a/arch/arm64/lib/xor-neon.c b/arch/arm64/lib/xor-neon.c
-new file mode 100644
-index 0000000..131c60c2
---- /dev/null
-+++ b/arch/arm64/lib/xor-neon.c
-@@ -0,0 +1,184 @@
-+/*
-+ * arch/arm64/lib/xor-neon.c
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/raid/xor.h>
-+#include <linux/module.h>
-+#include <asm/neon-intrinsics.h>
-+
-+void xor_arm64_neon_2(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_3(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_4(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3, unsigned long *p4)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_5(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3,
-+	unsigned long *p4, unsigned long *p5)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+	uint64_t *dp5 = (uint64_t *)p5;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* p1 ^= p5 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp5 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp5 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp5 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp5 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+		dp5 += 8;
-+	} while (--lines > 0);
-+}
-+
-+struct xor_block_template const xor_block_inner_neon = {
-+	.name	= "__inner_neon__",
-+	.do_2	= xor_arm64_neon_2,
-+	.do_3	= xor_arm64_neon_3,
-+	.do_4	= xor_arm64_neon_4,
-+	.do_5	= xor_arm64_neon_5,
-+};
-+EXPORT_SYMBOL(xor_block_inner_neon);
-+
-+MODULE_AUTHOR("Jackie Liu <liuyun01@kylinos.cn>");
-+MODULE_DESCRIPTION("ARMv8 XOR Extensions");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
+commit d52888aa2753e3063a9d3a0c9f72f94aa9809c15
+Author: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Date:   Fri Oct 26 15:28:54 2018 +0300
+
+    x86/mm: Move LDT remap out of KASLR region on 5-level paging
+
+[bhe@ linux]$ git describe --contains d52888aa2753e3063a9d3a0c9f72f94aa9809c15
+v4.20-rc2~5^2~4
+
+
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#ifdef CONFIG_DYNAMIC_MEMORY_LAYOUT
+unsigned long page_offset_base __ro_after_init = __PAGE_OFFSET_BASE_L4;                                                                           
+EXPORT_SYMBOL(page_offset_base);
+unsigned long vmalloc_base __ro_after_init = __VMALLOC_BASE_L4;
+EXPORT_SYMBOL(vmalloc_base);
+unsigned long vmemmap_base __ro_after_init = __VMEMMAP_BASE_L4;
+EXPORT_SYMBOL(vmemmap_base);
+#endif
+
+
+config DYNAMIC_MEMORY_LAYOUT                                                                                                                      
+        bool
+        ---help---
+          This option makes base addresses of vmalloc and vmemmap as well as
+          __PAGE_OFFSET movable during boot.
+
+config RANDOMIZE_MEMORY
+        bool "Randomize the kernel memory sections"
+        depends on X86_64
+        depends on RANDOMIZE_BASE
+        select DYNAMIC_MEMORY_LAYOUT
+        default RANDOMIZE_BASE
+
+config X86_5LEVEL
+        bool "Enable 5-level page tables support"
+        select DYNAMIC_MEMORY_LAYOUT
+        select SPARSEMEM_VMEMMAP
+        depends on X86_64
