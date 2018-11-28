@@ -1,64 +1,61 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Wed, 28 Nov 2018 14:09:35 +0000
-Subject: [PATCH 3/3] ARM: sa1100/cerf: switch to using
- gpio_led_register_device()
-In-Reply-To: <20181128140842.GH30658@n2100.armlinux.org.uk>
-References: <20181128140842.GH30658@n2100.armlinux.org.uk>
-Message-ID: <E1gS0X1-0000yu-NV@rmk-PC.armlinux.org.uk>
+From: maxime.ripard@bootlin.com (Maxime Ripard)
+Date: Wed, 28 Nov 2018 15:15:29 +0100
+Subject: [PATCH 00/77] ARM: dts: sunxi: Cleanup DTC warnings
+In-Reply-To: <CAGb2v65zbQ7HGAGdgbQQWjhqC81-E6-_UVO8KVan25kx84g+Dw@mail.gmail.com>
+References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v65zbQ7HGAGdgbQQWjhqC81-E6-_UVO8KVan25kx84g+Dw@mail.gmail.com>
+Message-ID: <20181128141529.vg6hu3jo6mqsk6my@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than statically declaring the leds-gpio device, use the helper
-function provided.
+On Wed, Nov 28, 2018 at 09:25:00PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+> >
+> > Here is a (rather big) series that fixes most of our DTC warnings. The
+> > number of warnings when compiled with W=1 after applying this series
+> > goes from 3343 to 23, 21 of them being the same warning, which would
+> > be fixed by the current series adding support for the Cedrus driver on
+> > H3/H5.
+> >
+> > The two remaining one are on the A80 and would require some change in
+> > the clock driver. Given how little activity there is on the A80, we
+> > can expect it to not happen in a near future, but I can live with two
+> > warnings.
+> >
+> > I also took the occasion to convert all the arm SoCs to our newer
+> > syntax and rules when applicable.
+> >
+> > Let me know what you think,
+> > Maxime
+> 
+> This series looks pretty good. Only bits I'm concerned about are the
+> removal of "reg = <0>" for the display pipeline. This is likely to
+> cause the backend and mixer drivers to not bind.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/mach-sa1100/Kconfig |  1 +
- arch/arm/mach-sa1100/cerf.c  | 11 +----------
- 2 files changed, 2 insertions(+), 10 deletions(-)
+I've dropped them for now.
 
-diff --git a/arch/arm/mach-sa1100/Kconfig b/arch/arm/mach-sa1100/Kconfig
-index ab0a71c8b10e..af15ae50b5a2 100644
---- a/arch/arm/mach-sa1100/Kconfig
-+++ b/arch/arm/mach-sa1100/Kconfig
-@@ -25,6 +25,7 @@ config ASSABET_NEPONSET
- config SA1100_CERF
- 	bool "CerfBoard"
- 	select ARM_SA1110_CPUFREQ
-+	select LEDS_GPIO_REGISTER
- 	help
- 	  The Intrinsyc CerfBoard is based on the StrongARM 1110 (Discontinued).
- 	  More information is available at:
-diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
-index b2a4b41626ef..88e526561a24 100644
---- a/arch/arm/mach-sa1100/cerf.c
-+++ b/arch/arm/mach-sa1100/cerf.c
-@@ -89,18 +89,8 @@ static struct gpio_led_platform_data cerf_gpio_led_info = {
- 	.num_leds	= ARRAY_SIZE(cerf_gpio_leds),
- };
- 
--static struct platform_device cerf_leds = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &cerf_gpio_led_info,
--	}
--};
--
--
- static struct platform_device *cerf_devices[] __initdata = {
- 	&cerfuart2_device,
--	&cerf_leds,
- };
- 
- #ifdef CONFIG_SA1100_CERF_FLASH_32MB
-@@ -176,6 +166,7 @@ static void __init cerf_init(void)
- {
- 	sa11x0_ppc_configure_mcp();
- 	platform_add_devices(cerf_devices, ARRAY_SIZE(cerf_devices));
-+	gpio_led_register_device(-1, &cerf_gpio_led_info);
- 	sa11x0_register_mtd(&cerf_flash_data, &cerf_flash_resource, 1);
- 	sa11x0_register_mcp(&cerf_mcp_data);
- 	sa11x0_register_pcmcia(1, &cerf_cf_gpio_table);
+> Also, I think we can get rid of the pull-ups for the USB ID pin. All
+> the reference designs show an external pull-up for that.
+
+Yeah, I was wondering that too, but I ended up being conservative
+about it. I'll send a patch.
+
+> As for the GPIO LED drive current bits, I'd really like an alternative.
+> I need something like that for the Orange Pi Lite 2 (H6).
+
+There was some effort a few months ago, maybe we should ping Linus
+about this.
+
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 228 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/90452766/attachment.sig>
