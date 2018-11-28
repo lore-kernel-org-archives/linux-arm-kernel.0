@@ -1,275 +1,86 @@
 From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:21 +0000
-Subject: [PATCH 06/12] KVM: arm64: Support Live Physical Time reporting
-In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
-Message-ID: <20181128144527.44710-7-steven.price@arm.com>
+Date: Wed, 28 Nov 2018 14:45:15 +0000
+Subject: [PATCH 00/12] arm64: Paravirtualized time support
+Message-ID: <20181128144527.44710-1-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a method for a guest to derive a paravirtualized counter/timer
-which isn't dependent on the host's counter frequency. This allows a
-guest to be migrated onto a new host which doesn't have the same
-frequency without the virtual counter being disturbed.
+This series add support for paravirtualized time for Arm64 guests and
+KVM hosts following the specification in Arm's document DEN 0057A:
 
-The host provides a shared page which contains coefficients that can be
-used to map the real counter from the host (the Arm "virtual counter")
-to a paravirtualized view of time. On migration the new host updates the
-coefficients to ensure that the guests view of time (after using the
-coefficients) doesn't change and that the derived counter progresses at
-the same real frequency.
+https://developer.arm.com/docs/den0057/a
 
-The guest can probe the existence of this support using the PV_FEATURES
-SMCCC interface provided in the previous patch.
+It implements support for Live Physical Time (LPT) which provides the
+guest with a method to derive a stable counter of time during which the
+guest is executing even when the guest is being migrated between hosts
+with different physical counter frequencies.
 
-Signed-off-by: Steven Price <steven.price@arm.com>
----
- arch/arm64/include/asm/kvm_host.h |   7 ++
- include/kvm/arm_arch_timer.h      |   2 +
- include/linux/kvm_types.h         |   2 +
- virt/kvm/arm/arm.c                |   5 +
- virt/kvm/arm/hypercalls.c         | 146 ++++++++++++++++++++++++++++++
- 5 files changed, 162 insertions(+)
+It also implements support for stolen time, allowing the guest to
+identify time when it is forcibly not executing.
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 52fbc823ff8c..827162b1fabf 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -80,6 +80,13 @@ struct kvm_arch {
- 
- 	/* Mandated version of PSCI */
- 	u32 psci_version;
-+
-+	struct kvm_arch_pvtime {
-+		void *pv_page;
-+
-+		gpa_t lpt_page;
-+		u32 lpt_fpv;
-+	} pvtime;
- };
- 
- #define KVM_NR_MEM_OBJS     40
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 6502feb9524b..c8cdd96052e0 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -92,6 +92,8 @@ void kvm_timer_init_vhe(void);
- 
- bool kvm_arch_timer_get_input_level(int vintid);
- 
-+int kvm_arm_update_lpt_sequence(struct kvm *kvm);
-+
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
- #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
- 
-diff --git a/include/linux/kvm_types.h b/include/linux/kvm_types.h
-index 8bf259dae9f6..fd3a2caabeb2 100644
---- a/include/linux/kvm_types.h
-+++ b/include/linux/kvm_types.h
-@@ -49,6 +49,8 @@ typedef unsigned long  gva_t;
- typedef u64            gpa_t;
- typedef u64            gfn_t;
- 
-+#define GPA_INVALID    -1
-+
- typedef unsigned long  hva_t;
- typedef u64            hpa_t;
- typedef u64            hfn_t;
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 23774970c9df..4c6355f21352 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -148,6 +148,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 	kvm->arch.max_vcpus = vgic_present ?
- 				kvm_vgic_get_max_vcpus() : KVM_MAX_VCPUS;
- 
-+	/* Set the PV Time addresses to invalid values */
-+	kvm->arch.pvtime.lpt_page = GPA_INVALID;
-+
- 	return ret;
- out_free_stage2_pgd:
- 	kvm_free_stage2_pgd(kvm);
-@@ -587,6 +590,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 
- 	ret = kvm_arm_pmu_v3_enable(vcpu);
- 
-+	kvm_arm_update_lpt_sequence(kvm);
-+
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/hypercalls.c b/virt/kvm/arm/hypercalls.c
-index ba13b798f0f8..fdb1880ab4c6 100644
---- a/virt/kvm/arm/hypercalls.c
-+++ b/virt/kvm/arm/hypercalls.c
-@@ -2,6 +2,7 @@
- // Copyright (C) 2018 Arm Ltd.
- 
- #include <linux/arm-smccc.h>
-+#include <linux/highmem.h>
- #include <linux/kvm_host.h>
- 
- #include <asm/kvm_emulate.h>
-@@ -10,6 +11,145 @@
- #include <kvm/arm_hypercalls.h>
- #include <kvm/arm_psci.h>
- 
-+#include <clocksource/arm_arch_timer.h>
-+
-+/*
-+ * Returns ((u128)dividend << 64) / divisor
-+ * Precondition: dividend < divisor
-+ */
-+static u64 shift64_div(u32 dividend, u32 divisor)
-+{
-+	u64 high = (u64)dividend << 32;
-+	u64 low;
-+	u64 rem;
-+
-+	WARN_ON(dividend >= divisor);
-+
-+	rem = do_div(high, divisor);
-+	low = rem << 32;
-+	do_div(low, divisor);
-+
-+	return (high << 32) | low;
-+}
-+
-+/*
-+ * Calculate the relative offset of each vCPU's timer and convert that to the
-+ * new timer rate.
-+ */
-+static void update_vtimer_cval(struct kvm *kvm, u32 previous_rate)
-+{
-+	u32 current_rate = arch_timer_get_rate();
-+	u64 current_time = kvm_phys_timer_read();
-+	int i;
-+	struct kvm_vcpu *vcpu;
-+	u64 rel_cval;
-+
-+	/* Early out if there's nothing to do */
-+	if (likely(previous_rate == current_rate))
-+		return;
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+		u64 cntvct;
-+		u64 new_cntvct;
-+
-+		/*
-+		 * The vtimer should not be already loaded as this function is
-+		 * only called on the first run of the first VCPU before any
-+		 * timers are loaded.
-+		 */
-+		if (WARN_ON(vtimer->loaded))
-+			continue;
-+
-+		cntvct = current_time - vtimer->cntvoff;
-+		new_cntvct = mul_u64_u32_div(cntvct, current_rate,
-+					     previous_rate);
-+		vtimer->cntvoff = current_time - new_cntvct;
-+
-+		rel_cval = vtimer->cnt_cval - cntvct;
-+
-+		rel_cval = mul_u64_u32_div(rel_cval, current_rate,
-+					   previous_rate);
-+
-+		vtimer->cnt_cval = new_cntvct + rel_cval;
-+	}
-+}
-+
-+int kvm_arm_update_lpt_sequence(struct kvm *kvm)
-+{
-+	struct pvclock_vm_time_info *pvclock;
-+	u64 lpt_ipa = kvm->arch.pvtime.lpt_page;
-+	u64 native_freq, pv_freq, scale_mult, div_by_pv_freq_mult;
-+	u64 shift = 0;
-+	u64 sequence_number = 0;
-+
-+	if (lpt_ipa == GPA_INVALID)
-+		return -EINVAL;
-+
-+	/* Page address must be 64 byte aligned */
-+	if (lpt_ipa & 63)
-+		return -EINVAL;
-+
-+	pvclock = kvm->arch.pvtime.pv_page;
-+
-+
-+	if (!pvclock)
-+		return -EINVAL;
-+
-+	mutex_lock(&kvm->lock);
-+
-+	sequence_number = le64_to_cpu(pvclock->sequence_number);
-+	native_freq = le64_to_cpu(pvclock->native_freq);
-+
-+	if (native_freq) {
-+		/*
-+		 * The VM has been migrated, so update the sequence number
-+		 * and correct the compare for the timer if the frequency has
-+		 * changed
-+		 */
-+		sequence_number = sequence_number + 2;
-+		update_vtimer_cval(kvm, native_freq);
-+	}
-+
-+	native_freq = arch_timer_get_rate();
-+	pv_freq = kvm->arch.pvtime.lpt_fpv;
-+
-+	if (pv_freq >= native_freq)
-+		shift = ilog2(pv_freq / native_freq) + 1;
-+
-+	WARN_ON(native_freq > U32_MAX);
-+	/* scale_mult = (pv_freq << 64) / (native_freq << shift) */
-+	scale_mult = shift64_div(pv_freq, native_freq << shift);
-+	/* div_by_pv_freq_mult = (1 << 64) / pv_freq */
-+	div_by_pv_freq_mult = shift64_div(1, pv_freq);
-+
-+	pvclock->sequence_number = cpu_to_le64(sequence_number);
-+	pvclock->native_freq = cpu_to_le64(native_freq);
-+	pvclock->pv_freq = cpu_to_le64(pv_freq);
-+	pvclock->shift = cpu_to_le32(shift);
-+	pvclock->scale_mult = cpu_to_le64(scale_mult);
-+	pvclock->div_by_pv_freq_mult = cpu_to_le64(div_by_pv_freq_mult);
-+
-+	mutex_unlock(&kvm->lock);
-+
-+	return 0;
-+}
-+
-+static int kvm_hypercall_time_lpt(struct kvm_vcpu *vcpu)
-+{
-+	u32 flags;
-+	u64 ret = vcpu->kvm->arch.pvtime.lpt_page;
-+
-+	flags = smccc_get_arg1(vcpu);
-+
-+	if (flags) {
-+		/* Currently no support for any flags */
-+		ret = PV_VM_TIME_INVALID_PARAMETERS;
-+	}
-+
-+	smccc_set_retval(vcpu, ret, 0, 0, 0);
-+	return 1;
-+}
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- {
- 	u32 func_id = smccc_get_function(vcpu);
-@@ -49,8 +189,14 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
- 	case ARM_SMCCC_HV_PV_FEATURES:
- 		feature = smccc_get_arg1(vcpu);
- 		switch (feature) {
-+		case ARM_SMCCC_HV_PV_FEATURES:
-+		case ARM_SMCCC_HV_PV_TIME_LPT:
-+			val = SMCCC_RET_SUCCESS;
-+			break;
- 		}
- 		break;
-+	case ARM_SMCCC_HV_PV_TIME_LPT:
-+		return kvm_hypercall_time_lpt(vcpu);
- 	default:
- 		return kvm_psci_call(vcpu);
- 	}
+Patch 1 provides some documentation
+Patches 2-4, 8 and 11 provide some refactoring of existing code
+Patch 5 implements the new PV_FEATURES discovery mechanism
+Patches 6-7 implement live physical time
+Patches 9-10 implement stolen time
+Patch 12 adds the 'PV_TIME' device for user space to enable the features
+
+Christoffer Dall (2):
+  KVM: arm/arm64: Factor out hypercall handling from PSCI code
+  KVM: Export mark_page_dirty_in_slot
+
+Steven Price (10):
+  KVM: arm64: Document PV-time interface
+  arm/arm64: Provide a wrapper for SMCCC 1.1 calls
+  arm/arm64: Make use of the SMCCC 1.1 wrapper
+  KVM: arm64: Implement PV_FEATURES call
+  KVM: arm64: Support Live Physical Time reporting
+  clocksource: arm_arch_timer: Use paravirtualized LPT
+  KVM: arm64: Support stolen time reporting via shared page
+  arm64: Retrieve stolen time as paravirtualized guest
+  KVM: Allow kvm_device_ops to be const
+  KVM: arm64: Provide a PV_TIME device to user space
+
+ Documentation/virtual/kvm/arm/pvtime.txt | 169 ++++++++++++++
+ arch/arm/kvm/Makefile                    |   2 +-
+ arch/arm/kvm/handle_exit.c               |   2 +-
+ arch/arm/mm/proc-v7-bugs.c               |  46 ++--
+ arch/arm64/include/asm/arch_timer.h      |  32 ++-
+ arch/arm64/include/asm/kvm_host.h        |  16 ++
+ arch/arm64/include/asm/kvm_mmu.h         |   2 +
+ arch/arm64/include/asm/pvclock-abi.h     |  32 +++
+ arch/arm64/include/uapi/asm/kvm.h        |   8 +
+ arch/arm64/kernel/Makefile               |   1 +
+ arch/arm64/kernel/cpu_errata.c           |  47 +---
+ arch/arm64/kernel/cpuinfo.c              |   2 +-
+ arch/arm64/kernel/kvm.c                  | 156 +++++++++++++
+ arch/arm64/kvm/Kconfig                   |   1 +
+ arch/arm64/kvm/Makefile                  |   2 +
+ arch/arm64/kvm/handle_exit.c             |   4 +-
+ drivers/clocksource/arm_arch_timer.c     | 176 ++++++++++++++-
+ include/kvm/arm_arch_timer.h             |   2 +
+ include/kvm/arm_hypercalls.h             |  44 ++++
+ include/kvm/arm_psci.h                   |   2 +-
+ include/kvm/arm_pv.h                     |  28 +++
+ include/linux/arm-smccc.h                |  45 ++++
+ include/linux/cpuhotplug.h               |   1 +
+ include/linux/kvm_host.h                 |   5 +-
+ include/linux/kvm_types.h                |   2 +
+ include/uapi/linux/kvm.h                 |   2 +
+ virt/kvm/arm/arm.c                       |  25 +-
+ virt/kvm/arm/hypercalls.c                | 276 +++++++++++++++++++++++
+ virt/kvm/arm/mmu.c                       |  44 ++++
+ virt/kvm/arm/psci.c                      |  76 +------
+ virt/kvm/arm/pvtime.c                    | 243 ++++++++++++++++++++
+ virt/kvm/kvm_main.c                      |  12 +-
+ 32 files changed, 1348 insertions(+), 157 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/arm/pvtime.txt
+ create mode 100644 arch/arm64/include/asm/pvclock-abi.h
+ create mode 100644 arch/arm64/kernel/kvm.c
+ create mode 100644 include/kvm/arm_hypercalls.h
+ create mode 100644 include/kvm/arm_pv.h
+ create mode 100644 virt/kvm/arm/hypercalls.c
+ create mode 100644 virt/kvm/arm/pvtime.c
+
 -- 
 2.19.2
