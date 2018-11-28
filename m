@@ -1,26 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 17:44:10 +0800
-Subject: [linux-sunxi] [PATCH 07/15] rtc: sun6i: Add support for all known
- variants
-In-Reply-To: <20181128093013.24442-9-wens@csie.org>
-References: <20181128093013.24442-1-wens@csie.org>
- <20181128093013.24442-9-wens@csie.org>
-Message-ID: <CAGb2v669CSQLq+jQPkzn0MH3Avt2tf0vEA4E29epeXrQA4=yww@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Nov 2018 09:33:35 +0000
+Subject: [PATCH 12/14] mfd: axp20x: use explicit bit defines
+In-Reply-To: <a0f3f8a763d948159de122b8071b5de4bfc785c0.1543245984.git-series.plaes@plaes.org>
+References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
+ <a0f3f8a763d948159de122b8071b5de4bfc785c0.1543245984.git-series.plaes@plaes.org>
+Message-ID: <20181128093335.GB4272@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 5:30 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> There are different variants to the RTC hardware first seen on sun6i
-> (A31). The differences we care about in this driver are the clock rate
-> for the internal oscillator, prescalers, and the presence of an external
-> clock output.
->
-> This patch adds support for all the known base compatibles using the
-> variants data structure previously introduced.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Mon, 26 Nov 2018, Priit Laes wrote:
 
-This one was from a prior WiP version. Please ignore it.
+> From: Olliver Schinagl <oliver@schinagl.nl>
+> 
+> The AXP20X_OFF define is an actual specific bit, define it as such.
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
+> ---
+>  drivers/mfd/axp20x.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-ChenYu
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
