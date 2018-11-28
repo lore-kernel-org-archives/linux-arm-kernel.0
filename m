@@ -1,33 +1,19 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 28 Nov 2018 12:04:03 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: enable CONFIG_UNIPHIER_MDMAC
-Message-ID: <1543374243-29475-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Nov 2018 11:05:04 +0800
+Subject: [PATCH 06/77] ARM: dts: sun5i: Remove skeleton to avoid warnings
+In-Reply-To: <856695e90059a2e85dd3b0aacc9e6881967b0ccf.1543321707.git-series.maxime.ripard@bootlin.com>
+References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
+ <856695e90059a2e85dd3b0aacc9e6881967b0ccf.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v66c-f8o=Yai_Yr02cuk976TTbpR+0oxwPnP_WUB0WPjQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the UniPhier MIO DMAC driver. This is used as the DMA engine
-for accelerating the SD/eMMC controller drivers.
+On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Using skeleton.dtsi will create a memory node that will generate a warning
+> in DTC. However, that node will be created by the bootloader, so we can
+> just remove it entirely in order to remove that warning.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
-The insertion context was decided by savedefconfig on next-20181127.
-
-
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 63af623..715da88 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -862,6 +862,7 @@ CONFIG_STM32_DMA=y
- CONFIG_STM32_DMAMUX=y
- CONFIG_STM32_MDMA=y
- CONFIG_TEGRA20_APB_DMA=y
-+CONFIG_UNIPHIER_MDMAC=y
- CONFIG_XILINX_DMA=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_DW_DMAC=y
--- 
-2.7.4
+Acked-by: Chen-Yu Tsai <wens@csie.org>
