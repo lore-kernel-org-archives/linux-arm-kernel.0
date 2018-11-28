@@ -1,33 +1,174 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 29 Nov 2018 01:33:25 +0300
-Subject: [PATCH v5 15/17] dt-bindings: watchdog: Add Allwinner ARMv5 F1C100s
- wdt
+Date: Thu, 29 Nov 2018 01:33:26 +0300
+Subject: [PATCH v5 16/17] ARM: dts: suniv: add initial DTSI file for F1C100s
 In-Reply-To: <cover.1543443475.git.mesihkilinc@gmail.com>
 References: <cover.1543443475.git.mesihkilinc@gmail.com>
-Message-ID: <cbe3ad4ce1d0fb565a525c98165b0c0b8f50a4d7.1543443475.git.mesihkilinc@gmail.com>
+Message-ID: <ad582610c3df538ad192fbec4231a634c6aab583.1543443475.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner ARMv5 F1C100s has similar watchdog timer to sun6i A31.
-Add definition for it.
+F1C100s is one product with the suniv die, which has a 32MiB co-packaged
+DDR1 DRAM chip. As we have the support for suniv pin controller and CCU now, add a
+initial DTSI for it.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/suniv-f1c100s.dtsi | 147 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
 
-diff --git a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-index ed11ce0..4605525 100644
---- a/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-+++ b/Documentation/devicetree/bindings/watchdog/sunxi-wdt.txt
-@@ -6,6 +6,7 @@ Required properties:
- 	"allwinner,sun4i-a10-wdt"
- 	"allwinner,sun6i-a31-wdt"
- 	"allwinner,sun50i-a64-wdt","allwinner,sun6i-a31-wdt"
-+	"allwinner,suniv-f1c100s-wdt", "allwinner,sun4i-a10-wdt"
- - reg : Specifies base physical address and size of the registers.
- 
- Optional properties:
+diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+new file mode 100644
+index 0000000..aff5f90
+--- /dev/null
++++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+@@ -0,0 +1,147 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
++ * Copyright 2018 Mesih Kilinc <mesihkilinc@gmail.com>
++ */
++
++#include <dt-bindings/clock/suniv-ccu-f1c100s.h>
++#include <dt-bindings/reset/suniv-ccu-f1c100s.h>
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&intc>;
++
++	clocks {
++		osc24M: clk-24M {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
++
++		osc32k: clk-32k {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
++	};
++
++	cpus {
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		sram-controller at 1c00000 {
++			compatible = "allwinner,suniv-f1c100s-system-control",
++				     "allwinner,sun4i-a10-system-control";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			sram_d: sram at 10000 {
++				compatible = "mmio-sram";
++				reg = <0x00010000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00010000 0x1000>;
++
++				otg_sram: sram-section at 0 {
++					compatible = "allwinner,suniv-f1c100s-sram-d",
++						     "allwinner,sun4i-a10-sram-d";
++					reg = <0x0000 0x1000>;
++					status = "disabled";
++				};
++			};
++		};
++
++		ccu: clock at 1c20000 {
++			compatible = "allwinner,suniv-f1c100s-ccu";
++			reg = <0x01c20000 0x400>;
++			clocks = <&osc24M>, <&osc32k>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		intc: interrupt-controller at 1c20400 {
++			compatible = "allwinner,suniv-f1c100s-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		pio: pinctrl at 1c20800 {
++			compatible = "allwinner,suniv-f1c100s-pinctrl";
++			reg = <0x01c20800 0x400>;
++			interrupts = <38>, <39>, <40>;
++			clocks = <&ccu 37>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			#gpio-cells = <3>;
++
++			uart0_pe_pins: uart0-pe-pins {
++				pins = "PE0", "PE1";
++				function = "uart0";
++			};
++		};
++
++		timer at 1c20c00 {
++			compatible = "allwinner,suniv-f1c100s-timer";
++			reg = <0x01c20c00 0x90>;
++			interrupts = <13>;
++			clocks = <&osc24M>;
++		};
++
++		wdt: watchdog at 1c20ca0 {
++			compatible = "allwinner,suniv-f1c100s-wdt",
++				     "allwinner,sun4i-a10-wdt";
++			reg = <0x01c20ca0 0x20>;
++		};
++
++		uart0: serial at 1c25000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 38>;
++			resets = <&ccu 24>;
++			status = "disabled";
++		};
++
++		uart1: serial at 1c25400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 39>;
++			resets = <&ccu 25>;
++			status = "disabled";
++		};
++
++		uart2: serial at 1c25800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25800 0x400>;
++			interrupts = <3>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 40>;
++			resets = <&ccu 26>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.7.4
