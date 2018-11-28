@@ -1,145 +1,124 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 28 Nov 2018 16:05:54 +0000 (GMT)
-Subject: Applied "spi: at91-usart: add power management support" to the spi
- tree
-In-Reply-To: <20181121112732.15690-2-radu_nicolae.pirea@upb.ro>
-Message-ID: <20181128160554.460C0112521B@debutante.sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Nov 2018 16:16:30 +0000
+Subject: [PATCH] pci: imx6: support kernels built in Thumb-2 mode
+In-Reply-To: <20181128132554.28139-1-stefan@agner.ch>
+References: <20181128132554.28139-1-stefan@agner.ch>
+Message-ID: <ff476784-b79e-18bf-5870-4365c8377deb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Stefan,
 
-   spi: at91-usart: add power management support
+On 28/11/2018 13:25, Stefan Agner wrote:
+> Add a fault handler which handles reads in Thumb-2 mode. Install
+> the appropriate handler depending on which mode the kernel has
+> been built. This avoids an "Unhandled fault: external abort on
+> non-linefetch (0x1008) at 0xf0a80000" during boot on a device
+> with a PCIe switch connected.
+> 
+> Link: https://lore.kernel.org/linux-pci/20181126161645.8177-1-stefan at agner.ch/
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+> FWIW, I found this manual helpful to write the code below:
+> http://hermes.wings.cs.wisc.edu/files/Thumb-2SupplementReferenceManual.pdf#page=43&zoom=100,0,66
 
-has been applied to the spi tree at
+This one's rather less ancient and even more authoritative ;)
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+https://static.docs.arm.com/ddi0406/cd/DDI0406C_d_armv7ar_arm.pdf
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+(ARMv7 had a few new encodings over and above ARMv6T2, although in 
+fairness I don't think any should be relevant to this specific case)
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+> --
+> Stefan
+> 
+>   drivers/pci/controller/dwc/pci-imx6.c | 37 ++++++++++++++++++++++++++-
+>   1 file changed, 36 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
+> index 69f86234f7c0..683deb74d69f 100644
+> --- a/drivers/pci/controller/dwc/pci-imx6.c
+> +++ b/drivers/pci/controller/dwc/pci-imx6.c
+> @@ -29,6 +29,7 @@
+>   #include <linux/reset.h>
+>   #include <linux/pm_domain.h>
+>   #include <linux/pm_runtime.h>
+> +#include <asm/opcodes.h>
+>   
+>   #include "pcie-designware.h"
+>   
+> @@ -299,6 +300,37 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
+>   	return 1;
+>   }
+>   
+> +static int imx6q_pcie_abort_handler_thumb2(unsigned long addr,
+> +		unsigned int fsr, struct pt_regs *regs)
+> +{
+> +	unsigned long pc = instruction_pointer(regs);
+> +	unsigned long instr = *(unsigned long *)pc;
+> +	unsigned long thumb2_instr = __mem_to_opcode_thumb16(instr);
+> +	int reg = thumb2_instr & 7;
+> +
+> +	if (!__opcode_is_thumb16(instr & 0x0000ffffUL))
+> +		return 1;
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+There are plenty of 32-bit Thumb encodings of various LDR/STR variants, 
+and I doubt we can guarantee that the offset, target register, and/or 
+addressing mode for a config space access will *always* suit the 
+(relatively limited) 16-bit ones.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> +
+> +	/* Load word/byte and halfword immediate offset */
+> +	if (((thumb2_instr & 0xe800) == 0x6800) ||
+> +	    ((thumb2_instr & 0xf800) == 0x8800)) {
+> +		unsigned long val;
+> +
+> +		if (thumb2_instr & 0x1000)
+> +			val = 0xff;
+> +		else if (thumb2_instr & 0x8000)
+> +			val = 0xffff;
+> +		else
+> +			val = 0xffffffffUL;
+> +
+> +		regs->uregs[reg] = val;
+> +		regs->ARM_pc += 2;
+> +		return 0;
+> +	}
 
-Thanks,
-Mark
+What about stores? The existing implementation handles them, so either 
+that's dead code which could perhaps be cleaned up, or they need to be 
+handled here too.
 
->From 96ed3ecde2c0911ffa11838050a058c2a40742f0 Mon Sep 17 00:00:00 2001
-From: Radu Pirea <radu_nicolae.pirea@upb.ro>
-Date: Wed, 21 Nov 2018 13:27:30 +0200
-Subject: [PATCH] spi: at91-usart: add power management support
+> +
+> +	return 1;
+> +}
+> +
+>   static int imx6_pcie_attach_pd(struct device *dev)
+>   {
+>   	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
+> @@ -1069,6 +1101,8 @@ static struct platform_driver imx6_pcie_driver = {
+>   
+>   static int __init imx6_pcie_init(void)
+>   {
+> +	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
 
-This patch implements power management callback function for USART as
-SPI driver.
+Can these aborts definitely *only* be triggered by kernel accesses, and 
+never, say, via an mmap() of anything exposed to userspace?
 
-Signed-off-by: Radu Pirea <radu_nicolae.pirea@upb.ro>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-at91-usart.c | 61 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 61 insertions(+)
+Robin.
 
-diff --git a/drivers/spi/spi-at91-usart.c b/drivers/spi/spi-at91-usart.c
-index a924657642fa..0b07c746453d 100644
---- a/drivers/spi/spi-at91-usart.c
-+++ b/drivers/spi/spi-at91-usart.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- 
- #include <linux/spi/spi.h>
- 
-@@ -399,6 +400,59 @@ static int at91_usart_spi_probe(struct platform_device *pdev)
- 	return ret;
- }
- 
-+__maybe_unused static int at91_usart_spi_runtime_suspend(struct device *dev)
-+{
-+	struct spi_controller *ctlr = dev_get_drvdata(dev);
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctlr);
-+
-+	clk_disable_unprepare(aus->clk);
-+	pinctrl_pm_select_sleep_state(dev);
-+
-+	return 0;
-+}
-+
-+__maybe_unused static int at91_usart_spi_runtime_resume(struct device *dev)
-+{
-+	struct spi_controller *ctrl = dev_get_drvdata(dev);
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctrl);
-+
-+	pinctrl_pm_select_default_state(dev);
-+
-+	return clk_prepare_enable(aus->clk);
-+}
-+
-+__maybe_unused static int at91_usart_spi_suspend(struct device *dev)
-+{
-+	struct spi_controller *ctrl = dev_get_drvdata(dev);
-+	int ret;
-+
-+	ret = spi_controller_suspend(ctrl);
-+	if (ret)
-+		return ret;
-+
-+	if (!pm_runtime_suspended(dev))
-+		at91_usart_spi_runtime_suspend(dev);
-+
-+	return 0;
-+}
-+
-+__maybe_unused static int at91_usart_spi_resume(struct device *dev)
-+{
-+	struct spi_controller *ctrl = dev_get_drvdata(dev);
-+	struct at91_usart_spi *aus = spi_master_get_devdata(ctrl);
-+	int ret;
-+
-+	if (!pm_runtime_suspended(dev)) {
-+		ret = at91_usart_spi_runtime_resume(dev);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	at91_usart_spi_init(aus);
-+
-+	return spi_controller_resume(ctrl);
-+}
-+
- static int at91_usart_spi_remove(struct platform_device *pdev)
- {
- 	struct spi_controller *ctlr = platform_get_drvdata(pdev);
-@@ -409,6 +463,12 @@ static int at91_usart_spi_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct dev_pm_ops at91_usart_spi_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(at91_usart_spi_suspend, at91_usart_spi_resume)
-+	SET_RUNTIME_PM_OPS(at91_usart_spi_runtime_suspend,
-+			   at91_usart_spi_runtime_resume, NULL)
-+};
-+
- static const struct of_device_id at91_usart_spi_dt_ids[] = {
- 	{ .compatible = "microchip,at91sam9g45-usart-spi"},
- 	{ /* sentinel */}
-@@ -419,6 +479,7 @@ MODULE_DEVICE_TABLE(of, at91_usart_spi_dt_ids);
- static struct platform_driver at91_usart_spi_driver = {
- 	.driver = {
- 		.name = "at91_usart_spi",
-+		.pm = &at91_usart_spi_pm_ops,
- 	},
- 	.probe = at91_usart_spi_probe,
- 	.remove = at91_usart_spi_remove,
--- 
-2.19.0.rc2
+> +
+>   	/*
+>   	 * Since probe() can be deferred we need to make sure that
+>   	 * hook_fault_code is not called after __init memory is freed
+> @@ -1076,7 +1110,8 @@ static int __init imx6_pcie_init(void)
+>   	 * we can install the handler here without risking it
+>   	 * accessing some uninitialized driver state.
+>   	 */
+> -	hook_fault_code(8, imx6q_pcie_abort_handler, SIGBUS, 0,
+> +	hook_fault_code(8, thumb2 ? imx6q_pcie_abort_handler_thumb2 :
+> +			imx6q_pcie_abort_handler, SIGBUS, 0,
+>   			"external abort on non-linefetch");
+>   
+>   	return platform_driver_register(&imx6_pcie_driver);
+> 
