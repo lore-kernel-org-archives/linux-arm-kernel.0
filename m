@@ -1,28 +1,29 @@
-From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Wed, 28 Nov 2018 18:06:37 -0200
-Subject: [PATCH] ARM: dts: imx7d-pico: Describe the Wifi clock
-In-Reply-To: <1543432806-11949-1-git-send-email-festevam@gmail.com>
-References: <1543432806-11949-1-git-send-email-festevam@gmail.com>
-Message-ID: <CAP9ODKoODBGXJfP48MH0DA0DiG=MZv6LrgU1Bhb+dqmBZma5+A@mail.gmail.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 28 Nov 2018 13:29:04 -0800
+Subject: [PATCH 09/15] clk: sunxi-ng: r40: Force LOSC parent to RTC LOSC
+ output
+In-Reply-To: <20181128093013.24442-11-wens@csie.org>
+References: <20181128093013.24442-1-wens@csie.org>
+ <20181128093013.24442-11-wens@csie.org>
+Message-ID: <154344054442.88331.8887745218976145062@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 5:20 PM Fabio Estevam <festevam@gmail.com> wrote:
->
-> The Wifi chip should be clocked by a 32kHz clock coming from i.MX7D
-> CLKO2 output pin, so describe the pinmux and clock hierarchy in the
-> device tree to allow the Wifi chip to be properly clocked.
->
-> Managed to successfully test Wifi with such change. Used the standard
-> nvram.txt file provided by Technexion, which selects an external 32kHz
-> clock for the Wifi chip by default.
->
-> Suggested-by: Arend van Spriel <arend.vanspriel@broadcom.com>
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+Quoting Chen-Yu Tsai (2018-11-28 01:30:07)
+> On the R40, in addition to a mux between the RTC's own RC oscillator and
+> an external 32768 Hz crystal, which are muxed inside the RTC module, the
+> CCU also has its own RC oscillator, which runs at around 2 MHz, and can
+> be muxed with the LOSC output from the RTC. This muxed output is called
+> "SYS 32K" in the module clock diagram, but otherwise referred to as the
+> LOSC throughout the CCU documentation.
+> 
+> The RC oscillator is not very accurate, even though it has an undocumented
+> calibration function. We really want a precise clock at 32768 Hz,
+> instead of something at around 32 KHz. This patch forces the SYS 32K
+> clock to use the RTC output as its parent, and doesn't bother
+> registering the internal oscillator nor a clock mux.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
-Tested-by: Otavio Salvador <otavio@ossystems.com.br>
-
--- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9 9981-7854          Mobile: +1 (347) 903-9750
+Acked-by: Stephen Boyd <sboyd@kernel.org>
