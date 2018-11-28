@@ -1,69 +1,44 @@
-From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 29 Nov 2018 01:33:27 +0300
-Subject: [PATCH v5 17/17] ARM: suniv: f1c100s: add device tree for Lichee Pi
- Nano
-In-Reply-To: <cover.1543443475.git.mesihkilinc@gmail.com>
-References: <cover.1543443475.git.mesihkilinc@gmail.com>
-Message-ID: <d7d83183c481102f30dfde7fadb9ce3db8ac43e2.1543443475.git.mesihkilinc@gmail.com>
+From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
+Date: Wed, 28 Nov 2018 16:36:09 -0600
+Subject: [PATCH i2c-next v9 1/5] dt-bindings: i2c: Add 'bus-timeout-ms'
+ and '#retries' properties as common optional
+In-Reply-To: <20181128215458.GB1666@kunai>
+References: <20181030210917.32711-1-jae.hyun.yoo@linux.intel.com>
+ <20181030210917.32711-2-jae.hyun.yoo@linux.intel.com>
+ <20181128215458.GB1666@kunai>
+Message-ID: <5dde6770-ce7a-720a-f1db-56d9ef044a99@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Nano is a F1C100s board by Lichee Pi.
+On 11/28/2018 3:54 PM, Wolfram Sang wrote:
+> On Tue, Oct 30, 2018 at 02:09:12PM -0700, Jae Hyun Yoo wrote:
+>> This commit adds 'bus-timeout-ms' and '#retries' properties as
+>> common optional properties that can be used for setting 'timeout'
+>> and 'retries' values of 'struct i2c_adapter'. With this patch, the
+>> bus timeout value and the master transfer retries count can be set
+>> through these properties at the registration time of an adapter.
+>> Still the values can be set by I2C_TIMEOUT and I2C_RETRIES ioctls
+>> on cdev at runtime too.
+>>
+>> These properties may not be supported by all drivers. However, if
+>> a driver wants to support one of them, it should adapt the
+>> bindings in this document.
+>>
+>> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
+>> Reviewed-by: Rob Herring <robh@kernel.org>
+> 
+> Definately NACK on the #retries part. This is purely a configuration
+> thing. Besides that it is kind of ancient cruft, too. I don't recommend
+> it, at all.
+> 
+> On the timeout thing, I am still not fully convinced that this is a HW
+> description. I said that before. But maybe I need to understand your
+> problem case better.
+> 
 
-Add initial device tree for it.
+Okay, I got it. I'll leave those as configuration things. Will remove
+this part in the next version.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
-Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
----
- arch/arm/boot/dts/Makefile                        |  2 ++
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 26 +++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+Thanks for your comment.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b0e966d..2b96a5b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -1066,6 +1066,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-+dtb-$(CONFIG_MACH_SUNIV) += \
-+	suniv-f1c100s-licheepi-nano.dtb
- dtb-$(CONFIG_ARCH_TANGO) += \
- 	tango4-vantage-1172.dtb
- dtb-$(CONFIG_ARCH_TEGRA_2x_SOC) += \
-diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-new file mode 100644
-index 0000000..a1154e6
---- /dev/null
-+++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
-@@ -0,0 +1,26 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-+/*
-+ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
-+ */
-+
-+/dts-v1/;
-+#include "suniv-f1c100s.dtsi"
-+
-+/ {
-+	model = "Lichee Pi Nano";
-+	compatible = "licheepi,licheepi-nano", "allwinner,suniv-f1c100s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pe_pins>;
-+	status = "okay";
-+};
--- 
-2.7.4
+Jae
