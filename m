@@ -1,23 +1,36 @@
-From: linux@dominikbrodowski.net (Dominik Brodowski)
-Date: Wed, 28 Nov 2018 15:34:46 +0100
-Subject: [PATCH 0/8] SA11xx PCMCIA updates and GPIOD conversion
-In-Reply-To: <20181128111041.GG30658@n2100.armlinux.org.uk>
-References: <20181128111041.GG30658@n2100.armlinux.org.uk>
-Message-ID: <20181128143446.GA10668@light.dominikbrodowski.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 28 Nov 2018 16:19:41 +0100
+Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+In-Reply-To: <CAFqt6zZy0-dy=a+KDrx7V1-j37pAVmt2r6bOkjgHwiopG-L+xA@mail.gmail.com>
+References: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
+ <CAFqt6zZy0-dy=a+KDrx7V1-j37pAVmt2r6bOkjgHwiopG-L+xA@mail.gmail.com>
+Message-ID: <5480157.mmjlM7ZeET@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 11:10:41AM +0000, Russell King - ARM Linux wrote:
-> This series adds a generic MAX1600 library which uses the GPIOD
-> interfaces to control the PCMCIA power switches, and converts
-> some SA11x0/PXA drivers to it, reducing the code duplication.
-> This also allows us to kill the SA1111 private GPIO interfaces.
+Hi Souptick,
 
-As I'll presume you'll push this upstream via arm, you may add my
+Am Montag, 26. November 2018, 06:36:42 CET schrieb Souptick Joarder:
+> On Thu, Nov 15, 2018 at 9:14 PM Souptick Joarder <jrdr.linux@gmail.com> 
+wrote:
+> > Convert to use vm_insert_range() to map range of kernel
+> > memory to user vma.
+> > 
+> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> 
+> Any feedback for this patch ?
 
-	Acked-by: Dominik Brodowski <linux@dominikbrodowski.net>
+sorry, took a bit longer to find time for a test-run.
 
-in relation to the PCMCIA-related changes.
+Except the missing EXPORT_SYMBOL already pointed out in patch1,
+my displays are still working on modern (with iommu) and the older
+(without iommu) Rockchip socs, so
 
-Thanks,
-	Dominik
+On rk3188, rk3288, rk3328 and rk3399
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+and in general
+Acked-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Heiko
