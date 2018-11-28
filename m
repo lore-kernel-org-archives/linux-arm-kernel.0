@@ -1,32 +1,31 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 28 Nov 2018 09:57:45 +0000
-Subject: [PATCH V3 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
+Date: Wed, 28 Nov 2018 09:59:07 +0000
+Subject: [PATCH V3 3/4] defconfig: arm64: add i.MX system controller thermal
  support
-In-Reply-To: <1543398696-3140-1-git-send-email-Anson.Huang@nxp.com>
-References: <1543398696-3140-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1543398696-3140-5-git-send-email-Anson.Huang@nxp.com>
+In-Reply-To: <1543398783-3185-1-git-send-email-Anson.Huang@nxp.com>
+References: <1543398783-3185-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1543398783-3185-4-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX8QXP system controller RTC support.
+This patch enables CONFIG_IMX_SC_THERMAL as module.
 
 Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index da99b6f..5e8b554 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -406,4 +406,8 @@
- 		#size-cells = <1>;
- 		ranges = <0x5f000000 0x0 0x5f000000 0x1000000>;
- 	};
-+
-+	rtc: rtc {
-+		compatible = "nxp,imx8qxp-sc-rtc";
-+	};
- };
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index abd80c5..9f12324 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -376,6 +376,7 @@ CONFIG_SENSORS_RASPBERRYPI_HWMON=m
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
++CONFIG_IMX_SC_THERMAL=m
+ CONFIG_ROCKCHIP_THERMAL=m
+ CONFIG_RCAR_GEN3_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
 -- 
 2.7.4
