@@ -1,76 +1,53 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 29 Nov 2018 00:20:02 +0200
-Subject: [PATCH] iio: adc: Replace license text w/ SPDX identifier
-In-Reply-To: <20181128175312.9634-1-matheus.bernardino@usp.br>
-References: <20181128175312.9634-1-matheus.bernardino@usp.br>
-Message-ID: <ac2e8875-f4c8-70be-6ff6-9a7cbd3f3e46@mleia.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 28 Nov 2018 14:23:34 -0800
+Subject: [RFC] mmc: host: sdhci-msm: Use the interconnect API
+In-Reply-To: <20181011120336.9129-1-georgi.djakov@linaro.org>
+References: <20181011120336.9129-1-georgi.djakov@linaro.org>
+Message-ID: <20181128222333.GA24969@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2018 07:53 PM, Matheus Tavares wrote:
-> From: Lucas Santos <ilucas.ms@gmail.com>
-> 
-> This patch removes all license boilerplate texts from the .c and .h
-> files at drivers/iio/adc/ and, instead, adds the proper SPDX license
-> identifiers.
-> 
-> Signed-off-by: Lucas Santos <ilucas.ms@gmail.com>
-> Signed-off-by: Matheus Tavares <matheus.bernardino@usp.br>
+On Thu 11 Oct 05:03 PDT 2018, Georgi Djakov wrote:
 
-[snip]
+> The interconnect API provides an interface for consumer drivers to express
+> their bandwidth needs in the SoC. This data is aggregated and the on-chip
+> interconnect hardware is configured to the appropriate power/performance
+> profile.
+> 
+> Use the interconnect API to get() the path between the endpoints used for
+> data transfers by the SD host controller and report the needed bandwidth
+> based on the clock rate, bus width and mode.
+> 
 
-> diff --git a/drivers/iio/adc/lpc18xx_adc.c b/drivers/iio/adc/lpc18xx_adc.c
-> index 041dc4a3f66c..00d39234143d 100644
-> --- a/drivers/iio/adc/lpc18xx_adc.c
-> +++ b/drivers/iio/adc/lpc18xx_adc.c
-> @@ -1,12 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * IIO ADC driver for NXP LPC18xx ADC
->   *
->   * Copyright (C) 2016 Joachim Eastwood <manabian@gmail.com>
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
->   * UNSUPPORTED hardware features:
->   *  - Hardware triggers
->   *  - Burst mode
-> diff --git a/drivers/iio/adc/lpc32xx_adc.c b/drivers/iio/adc/lpc32xx_adc.c
-> index 20b36690fa4f..e361c1532a75 100644
-> --- a/drivers/iio/adc/lpc32xx_adc.c
-> +++ b/drivers/iio/adc/lpc32xx_adc.c
-> @@ -1,23 +1,10 @@
-> +// SPDX-License-Identifier: GPL-2.0+
->  /*
->   *  lpc32xx_adc.c - Support for ADC in LPC32XX
->   *
->   *  3-channel, 10-bit ADC
->   *
->   *  Copyright (C) 2011, 2012 Roland Stigge <stigge@antcom.de>
-> - *
-> - *  This program is free software; you can redistribute it and/or modify
-> - *  it under the terms of the GNU General Public License as published by
-> - *  the Free Software Foundation; either version 2 of the License, or
-> - *  (at your option) any later version.
-> - *
-> - *  This program is distributed in the hope that it will be useful,
-> - *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - *  GNU General Public License for more details.
-> - *
-> - *  You should have received a copy of the GNU General Public License
-> - *  along with this program; if not, write to the Free Software
-> - *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
->   */
+Although the Qualcomm SDHCI driver is our primary target, wouldn't it be
+possible to add this in the mmc core or sdhci helper functions instead,
+so that other platforms doesn't need to duplicate this code?
+
+[..]
+> diff --git a/drivers/mmc/host/sdhci-msm.c b/drivers/mmc/host/sdhci-msm.c
+[..]
+> @@ -1917,6 +1957,7 @@ static int sdhci_msm_runtime_suspend(struct device *dev)
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
 >  
->  #include <linux/module.h>
+> +	icc_set(msm_host->path, 0, 0);
 
-For lpc18xx/lpc32xx:
+The use sdhci_msm_icc_update() to enable a bus vote and icc_set() to
+disable the vote lacks symmetry. Please see if this can be improved,
+e.g. by passing a boolean to the update function to "enable"/"disable"
+the vote.
 
-Acked-by: Vladimir Zapolskiy <vz@mleia.com>
+>  	clk_bulk_disable_unprepare(ARRAY_SIZE(msm_host->bulk_clks),
+>  				   msm_host->bulk_clks);
+>  
+> @@ -1929,6 +1970,7 @@ static int sdhci_msm_runtime_resume(struct device *dev)
+>  	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>  	struct sdhci_msm_host *msm_host = sdhci_pltfm_priv(pltfm_host);
+>  
+> +	sdhci_msm_icc_update(msm_host);
+>  	return clk_bulk_prepare_enable(ARRAY_SIZE(msm_host->bulk_clks),
+>  				       msm_host->bulk_clks);
+>  }
 
---
-Best wishes,
-Vladimir
+Regards,
+Bjorn
