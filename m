@@ -1,239 +1,254 @@
 From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:24 +0000
-Subject: [PATCH 09/12] KVM: arm64: Support stolen time reporting via shared
- page
+Date: Wed, 28 Nov 2018 14:45:21 +0000
+Subject: [PATCH 06/12] KVM: arm64: Support Live Physical Time reporting
 In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
 References: <20181128144527.44710-1-steven.price@arm.com>
-Message-ID: <20181128144527.44710-10-steven.price@arm.com>
+Message-ID: <20181128144527.44710-7-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the service call for configuring a shared page between a VCPU
-and the hypervisor in which the hypervisor can write the time stolen
-from the VCPU's execution time by other tasks on the host.
+Provide a method for a guest to derive a paravirtualized counter/timer
+which isn't dependent on the host's counter frequency. This allows a
+guest to be migrated onto a new host which doesn't have the same
+frequency without the virtual counter being disturbed.
 
-We translate the IPA provided by user space (in a later patch) to the
-corresponding physical page on the host, which we pin in memory and
-kmap to the kernel's linear mapping. We can then use WRITE_ONCE() to
-ensure single copy atomicity of the 64-bit unsigned value that reports
-stolen time in nanoseconds.
+The host provides a shared page which contains coefficients that can be
+used to map the real counter from the host (the Arm "virtual counter")
+to a paravirtualized view of time. On migration the new host updates the
+coefficients to ensure that the guests view of time (after using the
+coefficients) doesn't change and that the derived counter progresses at
+the same real frequency.
 
-We make sure to update the page mapping if user space changes the
-memslots during execution by using the existing gfn_to_hva_cache feature
-and memslots generation counter. If the gfn to hva mapping changes, we
-update the pinned and mapped page accordingly.
-
-Whenever stolen time is enabled by the guest, the stolen time counter is
-reset.
-
-The stolen time itself is retrieved from the sched_info structure
-maintained by the Linux scheduler code. We enable SCHEDSTATS when
-selecting KVM Kconfig to ensure this value is meaningful.
+The guest can probe the existence of this support using the PV_FEATURES
+SMCCC interface provided in the previous patch.
 
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/arm64/include/asm/kvm_host.h |  9 ++++
- arch/arm64/kvm/Kconfig            |  1 +
- include/kvm/arm_hypercalls.h      |  1 +
- virt/kvm/arm/arm.c                | 20 ++++++++-
- virt/kvm/arm/hypercalls.c         | 70 +++++++++++++++++++++++++++++++
- 5 files changed, 99 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |   7 ++
+ include/kvm/arm_arch_timer.h      |   2 +
+ include/linux/kvm_types.h         |   2 +
+ virt/kvm/arm/arm.c                |   5 +
+ virt/kvm/arm/hypercalls.c         | 146 ++++++++++++++++++++++++++++++
+ 5 files changed, 162 insertions(+)
 
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 827162b1fabf..c6bc1fc8ee00 100644
+index 52fbc823ff8c..827162b1fabf 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -48,6 +48,7 @@
- #define KVM_REQ_SLEEP \
- 	KVM_ARCH_REQ_FLAGS(0, KVM_REQUEST_WAIT | KVM_REQUEST_NO_WAKEUP)
- #define KVM_REQ_IRQ_PENDING	KVM_ARCH_REQ(1)
-+#define KVM_REQ_RECORD_STEAL	KVM_ARCH_REQ(2)
+@@ -80,6 +80,13 @@ struct kvm_arch {
  
- DECLARE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
- 
-@@ -86,6 +87,8 @@ struct kvm_arch {
- 
- 		gpa_t lpt_page;
- 		u32 lpt_fpv;
+ 	/* Mandated version of PSCI */
+ 	u32 psci_version;
 +
-+		gpa_t st_base;
- 	} pvtime;
++	struct kvm_arch_pvtime {
++		void *pv_page;
++
++		gpa_t lpt_page;
++		u32 lpt_fpv;
++	} pvtime;
  };
  
-@@ -307,6 +310,12 @@ struct kvm_vcpu_arch {
- 	/* True when deferrable sysregs are loaded on the physical CPU,
- 	 * see kvm_vcpu_load_sysregs and kvm_vcpu_put_sysregs. */
- 	bool sysregs_loaded_on_cpu;
+ #define KVM_NR_MEM_OBJS     40
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 6502feb9524b..c8cdd96052e0 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -92,6 +92,8 @@ void kvm_timer_init_vhe(void);
+ 
+ bool kvm_arch_timer_get_input_level(int vintid);
+ 
++int kvm_arm_update_lpt_sequence(struct kvm *kvm);
 +
-+	/* Guest PV state */
-+	struct {
-+		u64 steal;
-+		u64 last_steal;
-+	} steal;
- };
+ #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
+ #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
  
- /* vcpu_arch flags field values: */
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index 47b23bf617c7..92676920d671 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -40,6 +40,7 @@ config KVM
- 	select IRQ_BYPASS_MANAGER
- 	select HAVE_KVM_IRQ_BYPASS
- 	select HAVE_KVM_VCPU_RUN_PID_CHANGE
-+	select SCHEDSTATS
- 	---help---
- 	  Support hosting virtualized guest machines.
- 	  We don't support KVM with 16K page tables yet, due to the multiple
-diff --git a/include/kvm/arm_hypercalls.h b/include/kvm/arm_hypercalls.h
-index e5f7f81196b6..2e03e993ad64 100644
---- a/include/kvm/arm_hypercalls.h
-+++ b/include/kvm/arm_hypercalls.h
-@@ -7,6 +7,7 @@
- #include <asm/kvm_emulate.h>
+diff --git a/include/linux/kvm_types.h b/include/linux/kvm_types.h
+index 8bf259dae9f6..fd3a2caabeb2 100644
+--- a/include/linux/kvm_types.h
++++ b/include/linux/kvm_types.h
+@@ -49,6 +49,8 @@ typedef unsigned long  gva_t;
+ typedef u64            gpa_t;
+ typedef u64            gfn_t;
  
- int kvm_hvc_call_handler(struct kvm_vcpu *vcpu);
-+int kvm_update_stolen_time(struct kvm_vcpu *vcpu);
- 
- static inline u32 smccc_get_function(struct kvm_vcpu *vcpu)
- {
++#define GPA_INVALID    -1
++
+ typedef unsigned long  hva_t;
+ typedef u64            hpa_t;
+ typedef u64            hfn_t;
 diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 4c6355f21352..d4ba21d3e7a5 100644
+index 23774970c9df..4c6355f21352 100644
 --- a/virt/kvm/arm/arm.c
 +++ b/virt/kvm/arm/arm.c
-@@ -32,8 +32,6 @@
- #include <linux/irqbypass.h>
- #include <linux/sched/stat.h>
- #include <trace/events/kvm.h>
--#include <kvm/arm_pmu.h>
--#include <kvm/arm_psci.h>
+@@ -148,6 +148,9 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
+ 	kvm->arch.max_vcpus = vgic_present ?
+ 				kvm_vgic_get_max_vcpus() : KVM_MAX_VCPUS;
  
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -52,6 +50,10 @@
- #include <asm/kvm_coproc.h>
- #include <asm/sections.h>
- 
-+#include <kvm/arm_hypercalls.h>
-+#include <kvm/arm_pmu.h>
-+#include <kvm/arm_psci.h>
++	/* Set the PV Time addresses to invalid values */
++	kvm->arch.pvtime.lpt_page = GPA_INVALID;
 +
- #ifdef REQUIRES_VIRT
- __asm__(".arch_extension	virt");
- #endif
-@@ -150,6 +152,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
- 
- 	/* Set the PV Time addresses to invalid values */
- 	kvm->arch.pvtime.lpt_page = GPA_INVALID;
-+	kvm->arch.pvtime.st_base = GPA_INVALID;
- 
  	return ret;
  out_free_stage2_pgd:
-@@ -386,6 +389,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_timer_vcpu_load(vcpu);
- 	kvm_vcpu_load_sysregs(vcpu);
- 	kvm_arch_vcpu_load_fp(vcpu);
-+	kvm_make_request(KVM_REQ_RECORD_STEAL, vcpu);
+ 	kvm_free_stage2_pgd(kvm);
+@@ -587,6 +590,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
  
- 	if (single_task_running())
- 		vcpu_clear_wfe_traps(vcpu);
-@@ -634,6 +638,15 @@ static void vcpu_req_sleep(struct kvm_vcpu *vcpu)
- 	}
- }
+ 	ret = kvm_arm_pmu_v3_enable(vcpu);
  
-+static void vcpu_req_record_steal(struct kvm_vcpu *vcpu)
-+{
-+	int idx;
++	kvm_arm_update_lpt_sequence(kvm);
 +
-+	idx = srcu_read_lock(&vcpu->kvm->srcu);
-+	kvm_update_stolen_time(vcpu);
-+	srcu_read_unlock(&vcpu->kvm->srcu, idx);
-+}
-+
- static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
- {
- 	return vcpu->arch.target >= 0;
-@@ -650,6 +663,9 @@ static void check_vcpu_requests(struct kvm_vcpu *vcpu)
- 		 * that a VCPU sees new virtual interrupts.
- 		 */
- 		kvm_check_request(KVM_REQ_IRQ_PENDING, vcpu);
-+
-+		if (kvm_check_request(KVM_REQ_RECORD_STEAL, vcpu))
-+			vcpu_req_record_steal(vcpu);
- 	}
+ 	return ret;
  }
  
 diff --git a/virt/kvm/arm/hypercalls.c b/virt/kvm/arm/hypercalls.c
-index fdb1880ab4c6..513f2285b29a 100644
+index ba13b798f0f8..fdb1880ab4c6 100644
 --- a/virt/kvm/arm/hypercalls.c
 +++ b/virt/kvm/arm/hypercalls.c
-@@ -150,6 +150,73 @@ static int kvm_hypercall_time_lpt(struct kvm_vcpu *vcpu)
- 	smccc_set_retval(vcpu, ret, 0, 0, 0);
- 	return 1;
- }
+@@ -2,6 +2,7 @@
+ // Copyright (C) 2018 Arm Ltd.
+ 
+ #include <linux/arm-smccc.h>
++#include <linux/highmem.h>
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_emulate.h>
+@@ -10,6 +11,145 @@
+ #include <kvm/arm_hypercalls.h>
+ #include <kvm/arm_psci.h>
+ 
++#include <clocksource/arm_arch_timer.h>
 +
-+static struct pvclock_vcpu_stolen_time_info *pvtime_get_st(
-+		struct kvm_vcpu *vcpu)
++/*
++ * Returns ((u128)dividend << 64) / divisor
++ * Precondition: dividend < divisor
++ */
++static u64 shift64_div(u32 dividend, u32 divisor)
 +{
-+	void *pv_page = vcpu->kvm->arch.pvtime.pv_page;
-+	struct pvclock_vcpu_stolen_time_info *st;
++	u64 high = (u64)dividend << 32;
++	u64 low;
++	u64 rem;
 +
-+	if (!pv_page)
-+		return NULL;
++	WARN_ON(dividend >= divisor);
 +
-+	st = pv_page + PAGE_SIZE;
++	rem = do_div(high, divisor);
++	low = rem << 32;
++	do_div(low, divisor);
 +
-+	return &st[kvm_vcpu_get_idx(vcpu)];
++	return (high << 32) | low;
 +}
 +
-+int kvm_update_stolen_time(struct kvm_vcpu *vcpu)
++/*
++ * Calculate the relative offset of each vCPU's timer and convert that to the
++ * new timer rate.
++ */
++static void update_vtimer_cval(struct kvm *kvm, u32 previous_rate)
 +{
-+	u64 steal;
-+	struct pvclock_vcpu_stolen_time_info *kaddr;
++	u32 current_rate = arch_timer_get_rate();
++	u64 current_time = kvm_phys_timer_read();
++	int i;
++	struct kvm_vcpu *vcpu;
++	u64 rel_cval;
 +
-+	if (vcpu->kvm->arch.pvtime.st_base == GPA_INVALID)
-+		return -ENOTSUPP;
++	/* Early out if there's nothing to do */
++	if (likely(previous_rate == current_rate))
++		return;
 +
-+	kaddr = pvtime_get_st(vcpu);
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++		u64 cntvct;
++		u64 new_cntvct;
 +
-+	if (!kaddr)
-+		return -ENOTSUPP;
++		/*
++		 * The vtimer should not be already loaded as this function is
++		 * only called on the first run of the first VCPU before any
++		 * timers are loaded.
++		 */
++		if (WARN_ON(vtimer->loaded))
++			continue;
 +
-+	kaddr->revision = 0;
-+	kaddr->attributes = 0;
++		cntvct = current_time - vtimer->cntvoff;
++		new_cntvct = mul_u64_u32_div(cntvct, current_rate,
++					     previous_rate);
++		vtimer->cntvoff = current_time - new_cntvct;
 +
-+	/* Let's do the local bookkeeping */
-+	steal = vcpu->arch.steal.steal;
-+	steal += current->sched_info.run_delay - vcpu->arch.steal.last_steal;
-+	vcpu->arch.steal.last_steal = current->sched_info.run_delay;
-+	vcpu->arch.steal.steal = steal;
++		rel_cval = vtimer->cnt_cval - cntvct;
 +
-+	/* Now write out the value to the shared page */
-+	WRITE_ONCE(kaddr->stolen_time, cpu_to_le64(steal));
++		rel_cval = mul_u64_u32_div(rel_cval, current_rate,
++					   previous_rate);
++
++		vtimer->cnt_cval = new_cntvct + rel_cval;
++	}
++}
++
++int kvm_arm_update_lpt_sequence(struct kvm *kvm)
++{
++	struct pvclock_vm_time_info *pvclock;
++	u64 lpt_ipa = kvm->arch.pvtime.lpt_page;
++	u64 native_freq, pv_freq, scale_mult, div_by_pv_freq_mult;
++	u64 shift = 0;
++	u64 sequence_number = 0;
++
++	if (lpt_ipa == GPA_INVALID)
++		return -EINVAL;
++
++	/* Page address must be 64 byte aligned */
++	if (lpt_ipa & 63)
++		return -EINVAL;
++
++	pvclock = kvm->arch.pvtime.pv_page;
++
++
++	if (!pvclock)
++		return -EINVAL;
++
++	mutex_lock(&kvm->lock);
++
++	sequence_number = le64_to_cpu(pvclock->sequence_number);
++	native_freq = le64_to_cpu(pvclock->native_freq);
++
++	if (native_freq) {
++		/*
++		 * The VM has been migrated, so update the sequence number
++		 * and correct the compare for the timer if the frequency has
++		 * changed
++		 */
++		sequence_number = sequence_number + 2;
++		update_vtimer_cval(kvm, native_freq);
++	}
++
++	native_freq = arch_timer_get_rate();
++	pv_freq = kvm->arch.pvtime.lpt_fpv;
++
++	if (pv_freq >= native_freq)
++		shift = ilog2(pv_freq / native_freq) + 1;
++
++	WARN_ON(native_freq > U32_MAX);
++	/* scale_mult = (pv_freq << 64) / (native_freq << shift) */
++	scale_mult = shift64_div(pv_freq, native_freq << shift);
++	/* div_by_pv_freq_mult = (1 << 64) / pv_freq */
++	div_by_pv_freq_mult = shift64_div(1, pv_freq);
++
++	pvclock->sequence_number = cpu_to_le64(sequence_number);
++	pvclock->native_freq = cpu_to_le64(native_freq);
++	pvclock->pv_freq = cpu_to_le64(pv_freq);
++	pvclock->shift = cpu_to_le32(shift);
++	pvclock->scale_mult = cpu_to_le64(scale_mult);
++	pvclock->div_by_pv_freq_mult = cpu_to_le64(div_by_pv_freq_mult);
++
++	mutex_unlock(&kvm->lock);
 +
 +	return 0;
 +}
 +
-+static int kvm_hypercall_stolen_time(struct kvm_vcpu *vcpu)
++static int kvm_hypercall_time_lpt(struct kvm_vcpu *vcpu)
 +{
-+	u64 ret;
-+	int err;
++	u32 flags;
++	u64 ret = vcpu->kvm->arch.pvtime.lpt_page;
 +
-+	/*
-+	 * Start counting stolen time from the time the guest requests
-+	 * the feature enabled.
-+	 */
-+	vcpu->arch.steal.steal = 0;
-+	vcpu->arch.steal.last_steal = current->sched_info.run_delay;
++	flags = smccc_get_arg1(vcpu);
 +
-+	err = kvm_update_stolen_time(vcpu);
-+
-+	if (err)
-+		ret = SMCCC_RET_NOT_SUPPORTED;
-+	else
-+		ret = vcpu->kvm->arch.pvtime.st_base +
-+			(sizeof(struct pvclock_vcpu_stolen_time_info) *
-+			 kvm_vcpu_get_idx(vcpu));
++	if (flags) {
++		/* Currently no support for any flags */
++		ret = PV_VM_TIME_INVALID_PARAMETERS;
++	}
 +
 +	smccc_set_retval(vcpu, ret, 0, 0, 0);
 +	return 1;
@@ -241,19 +256,18 @@ index fdb1880ab4c6..513f2285b29a 100644
  int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
  {
  	u32 func_id = smccc_get_function(vcpu);
-@@ -191,12 +258,15 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+@@ -49,8 +189,14 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ 	case ARM_SMCCC_HV_PV_FEATURES:
+ 		feature = smccc_get_arg1(vcpu);
  		switch (feature) {
- 		case ARM_SMCCC_HV_PV_FEATURES:
- 		case ARM_SMCCC_HV_PV_TIME_LPT:
-+		case ARM_SMCCC_HV_PV_TIME_ST:
- 			val = SMCCC_RET_SUCCESS;
- 			break;
++		case ARM_SMCCC_HV_PV_FEATURES:
++		case ARM_SMCCC_HV_PV_TIME_LPT:
++			val = SMCCC_RET_SUCCESS;
++			break;
  		}
  		break;
- 	case ARM_SMCCC_HV_PV_TIME_LPT:
- 		return kvm_hypercall_time_lpt(vcpu);
-+	case ARM_SMCCC_HV_PV_TIME_ST:
-+		return kvm_hypercall_stolen_time(vcpu);
++	case ARM_SMCCC_HV_PV_TIME_LPT:
++		return kvm_hypercall_time_lpt(vcpu);
  	default:
  		return kvm_psci_call(vcpu);
  	}
