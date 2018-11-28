@@ -1,10 +1,10 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 28 Nov 2018 13:48:57 -0800
-Subject: [GIT PULL 3/4] bcm2835-drivers-next-2018-11-27
-In-Reply-To: <20181127211301.30296-3-eric@anholt.net>
+Date: Wed, 28 Nov 2018 13:49:24 -0800
+Subject: [GIT PULL 4/4] bcm2835-dt-next-2018-11-27
+In-Reply-To: <20181127211301.30296-4-eric@anholt.net>
 References: <20181127211301.30296-1-eric@anholt.net>
- <20181127211301.30296-3-eric@anholt.net>
-Message-ID: <43207cc2-da5d-863f-babd-9ce89722141e@gmail.com>
+ <20181127211301.30296-4-eric@anholt.net>
+Message-ID: <c117f72c-b72e-06c9-9c17-fb9bb4daf064@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,20 +19,19 @@ On 11/27/18 1:13 PM, Eric Anholt wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://github.com/anholt/linux tags/bcm2835-drivers-next-2018-11-27
+>   git://github.com/anholt/linux tags/bcm2835-dt-next-2018-11-27
 > 
-> for you to fetch changes up to 502b431cda801645fd73857f7b47a4666de3cb62:
+> for you to fetch changes up to 703c605fac82d580822dc39f5eff9e2fe66ed63d:
 > 
->   firmware: raspberrypi: Switch to SPDX identifier (2018-11-21 14:33:11 +0100)
+>   ARM: dts: bcm2835-rpi-zero: Switch to SPDX identifier (2018-11-13 19:32:28 +0100)
 > 
 > ----------------------------------------------------------------
-> This pull request adds SPDX to BCM2835 drivers, and fixes some bugs in
-> the firmware driver (silently hanging if the VPU doesn't respond to a
-> mailbox transaction, and undersized buffers in the firmware property
-> transactions for tags that aren't used yet in the upstream).
+> This pull request adds a compatible string to the DT necessary for the
+> firmware and VCHI driver to coordinate on using the correct cache line
+> size for the platform.
 > 
 > ----------------------------------------------------------------
 
-Merged into drivers/next, thanks Eric.
+Merged into devicetree/next, thanks Eric!
 -- 
 Florian
