@@ -1,35 +1,28 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 28 Nov 2018 10:37:02 -0800
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Nov 2018 19:42:50 +0100
 Subject: [PATCH] clk: renesas: Mark rza2_cpg_clk_register static
-Message-ID: <20181128183702.231609-1-sboyd@kernel.org>
+In-Reply-To: <20181128183702.231609-1-sboyd@kernel.org>
+References: <20181128183702.231609-1-sboyd@kernel.org>
+Message-ID: <CAMuHMdXk8Uoqw05uEqUvXfzQjdgLHLPEDqVvAMETE6BDDHyybw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is only used in this file, so mark it static to silence a sparse
-warning.
+On Wed, Nov 28, 2018 at 7:37 PM Stephen Boyd <sboyd@kernel.org> wrote:
+> This is only used in this file, so mark it static to silence a sparse
+> warning.
+>
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Stephen Boyd <sboyd@kernel.org>
 
-Cc: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Stephen Boyd <sboyd@kernel.org>
----
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-I've applied this to clk-renesas branch already, just not pushed out
-yet.
+Gr{oetje,eeting}s,
 
- drivers/clk/renesas/r7s9210-cpg-mssr.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+                        Geert
 
-diff --git a/drivers/clk/renesas/r7s9210-cpg-mssr.c b/drivers/clk/renesas/r7s9210-cpg-mssr.c
-index e0793a9eb668..57c49fe88295 100644
---- a/drivers/clk/renesas/r7s9210-cpg-mssr.c
-+++ b/drivers/clk/renesas/r7s9210-cpg-mssr.c
-@@ -155,7 +155,7 @@ static void __init r7s9210_update_clk_table(struct clk *extal_clk,
- 	}
- }
- 
--struct clk * __init rza2_cpg_clk_register(struct device *dev,
-+static struct clk * __init rza2_cpg_clk_register(struct device *dev,
- 	const struct cpg_core_clk *core, const struct cpg_mssr_info *info,
- 	struct clk **clks, void __iomem *base,
- 	struct raw_notifier_head *notifiers)
 -- 
-Sent by a computer through tubes
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
