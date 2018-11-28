@@ -1,47 +1,30 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Wed, 28 Nov 2018 08:47:05 -0800
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <20181128074117.GA21126@lst.de>
-References: <20181122140320.24080-1-hch@lst.de>
- <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
- <20181122170715.GI30658@n2100.armlinux.org.uk>
- <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
- <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
- <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
- <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
-Message-ID: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 28 Nov 2018 09:04:46 -0800
+Subject: [PATCH] arm64: dts: rockchip: Add 32k clk on rk3399-gru
+In-Reply-To: <6602824.AOVt5XvbUN@diego>
+References: <20181127232331.49628-1-dbasehore@chromium.org>
+ <CAD=FV=WJCvt-Ez_F+gTJaLWnOOY2J0fXxgq8vy0ojKoHv+AQ7w@mail.gmail.com>
+ <6602824.AOVt5XvbUN@diego>
+Message-ID: <CAD=FV=UwOndHQeQyj+cj8-eFTmR2jDAM=XrQpNCegH4FAUkK4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 11:41 PM Christoph Hellwig <hch@lst.de> wrote:
+Hi,
+
+On Wed, Nov 28, 2018 at 5:46 AM Heiko St?bner <heiko@sntech.de> wrote:
+> > Possibly Heiko would re-sort this for you himself when applying the
+> > change if he agrees with my understanding of the conventions.
 >
-> On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
-> > Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
-> > instead of the old 1 is as bool true.  The callers should all be fine,
-> > although I'd have to audit them.  Still wouldn't help with being able to
-> > return different errors.
->
-> Any opinions?  I'd really like to make some forward progress on this
-> series.
+> We hashed out the dt-conventions somewhat together during veyron
+> times, so I'd be surprised if we didn't agree on them :-D .
 
-So I do think that yes, dma_mapping_error() should return an error
-code, not 0/1.
+You never know!  I make stupid mistakes all the time.
 
-But I was really hoping that the individual drivers themselves could
-return error codes. Right now the patch-series has code like this:
 
-      ret = needs_bounce(dev, dma_addr, size);
-      if (ret < 0)
--         return ARM_MAPPING_ERROR;
-+         return DMA_MAPPING_ERROR;
+> In any case, I've adapted the commit message to add the Silego part,
+> moved the clock to the correct position and applied the result with
+> your Reviewed-by for 4.21.
 
-which while it all makes sense in the context of this patch-series, I
-*really* think it would have been so much nicer to return the error
-code 'ret' instead (which in this case is -E2BIG).
+Thank you much!
 
-I don't think this is a huge deal, but ERR_PTR() has been hugely
-successful elsewhere. And I'm not hugely convinced about all these
-"any address can be valid" arguments. How the hell do you generate a
-random dma address in the last page that isn't even page-aligned?
-
-                     Linus
+-Doug
