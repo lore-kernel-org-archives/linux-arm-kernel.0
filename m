@@ -1,30 +1,95 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 28 Nov 2018 09:04:46 -0800
-Subject: [PATCH] arm64: dts: rockchip: Add 32k clk on rk3399-gru
-In-Reply-To: <6602824.AOVt5XvbUN@diego>
-References: <20181127232331.49628-1-dbasehore@chromium.org>
- <CAD=FV=WJCvt-Ez_F+gTJaLWnOOY2J0fXxgq8vy0ojKoHv+AQ7w@mail.gmail.com>
- <6602824.AOVt5XvbUN@diego>
-Message-ID: <CAD=FV=UwOndHQeQyj+cj8-eFTmR2jDAM=XrQpNCegH4FAUkK4A@mail.gmail.com>
+From: aisheng.dong@nxp.com (Aisheng DONG)
+Date: Wed, 28 Nov 2018 17:18:47 +0000
+Subject: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+In-Reply-To: <1542809234-539-1-git-send-email-aisheng.dong@nxp.com>
+References: <1542809234-539-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <AM0PR04MB42110579601320F59219CB9E80D10@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Gently Ping...
 
-On Wed, Nov 28, 2018 at 5:46 AM Heiko St?bner <heiko@sntech.de> wrote:
-> > Possibly Heiko would re-sort this for you himself when applying the
-> > change if he agrees with my understanding of the conventions.
->
-> We hashed out the dt-conventions somewhat together during veyron
-> times, so I'd be surprised if we didn't agree on them :-D .
-
-You never know!  I make stupid mistakes all the time.
-
-
-> In any case, I've adapted the commit message to add the Silego part,
-> moved the clock to the correct position and applied the result with
-> your Reviewed-by for 4.21.
-
-Thank you much!
-
--Doug
+> -----Original Message-----
+> From: Aisheng DONG
+> Sent: Wednesday, November 21, 2018 10:12 PM
+> To: linux-clk at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; sboyd at kernel.org;
+> mturquette at baylibre.com; shawnguo at kernel.org; Fabio Estevam
+> <fabio.estevam@nxp.com>; dl-linux-imx <linux-imx@nxp.com>;
+> kernel at pengutronix.de; Aisheng DONG <aisheng.dong@nxp.com>
+> Subject: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+> 
+> This patch series adds i.MX8QXP clock support which is based on the clock
+> service provided by SCU firmware.
+> 
+> Note: It depends on SCU driver which has already been merged by Shawn.
+> So this patch series could go through Shawn's tree as well.
+> 
+> ChangeLog:
+> v7->v8:
+>  * add more kernel doc for lpcg and scu clock structures
+>  * remove one unneccessry reg checking
+> v6->v7:
+>  * use struct_size()
+>  * remove MODULE_ macros
+>  * add more kernel docs/code comments
+>  * other small improvements
+>  * update reviewed-by tags
+>  * add the missing PATCH 1 in V6
+> v5->v6:
+>  * simply the driver a lot by re-orgnizing the driver into a few clock types:
+>    scu clock (merge scu divider/gate/mux) and scu gpr lock which accessing is
+>    through SCU protocol and LPCG clock which is directly accessible by CPU.
+>  * LPCG clock is separate from SCU clock, gpr clock is still not used
+>    and will be added later.
+>  * remove old year license as the code is totally rewritten
+>  * scu mux support will be added later as it's also still not used.
+> v4->v5:
+>  Address all Stephen and Sascha's review comments, see details in each patch
+> v3->v4:
+>  * scu headfile path update
+>  * no functionality change
+> v2->v3:
+>  * structures/enums name update with imx_sc prefix
+>  * no functionality change
+> v1->v2:
+>  * structure and enums name update
+>  * api usage update due to api change
+>  * no functionality change
+> 
+> Dong Aisheng (7):
+>   clk: imx: add configuration option for mmio clks
+>   clk: imx: add scu clock common part
+>   dt-bindings: clock: imx8qxp: add SCU clock IDs
+>   clk: imx: add imx8qxp clk driver
+>   dt-bindings: clock: add imx8qxp lpcg clock binding
+>   clk: imx: add lpcg clock support
+>   clk: imx: add imx8qxp lpcg driver
+> 
+>  .../devicetree/bindings/clock/imx8qxp-lpcg.txt     |  51 ++++
+>  arch/arm/mach-imx/Kconfig                          |  11 +
+>  drivers/clk/Kconfig                                |   1 +
+>  drivers/clk/imx/Kconfig                            |   9 +
+>  drivers/clk/imx/Makefile                           |   8 +-
+>  drivers/clk/imx/clk-imx8qxp-lpcg.c                 | 216
+> +++++++++++++++
+>  drivers/clk/imx/clk-imx8qxp-lpcg.h                 | 102 ++++++++
+>  drivers/clk/imx/clk-imx8qxp.c                      | 153 +++++++++++
+>  drivers/clk/imx/clk-lpcg-scu.c                     | 113 ++++++++
+>  drivers/clk/imx/clk-scu.c                          | 267
+> +++++++++++++++++++
+>  drivers/clk/imx/clk-scu.h                          |  24 ++
+>  include/dt-bindings/clock/imx8qxp-clock.h          | 289
+> +++++++++++++++++++++
+>  12 files changed, 1243 insertions(+), 1 deletion(-)  create mode 100644
+> Documentation/devicetree/bindings/clock/imx8qxp-lpcg.txt
+>  create mode 100644 drivers/clk/imx/Kconfig  create mode 100644
+> drivers/clk/imx/clk-imx8qxp-lpcg.c
+>  create mode 100644 drivers/clk/imx/clk-imx8qxp-lpcg.h
+>  create mode 100644 drivers/clk/imx/clk-imx8qxp.c  create mode 100644
+> drivers/clk/imx/clk-lpcg-scu.c  create mode 100644 drivers/clk/imx/clk-scu.c
+> create mode 100644 drivers/clk/imx/clk-scu.h  create mode 100644
+> include/dt-bindings/clock/imx8qxp-clock.h
+> 
+> --
+> 2.7.4
