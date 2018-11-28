@@ -1,402 +1,368 @@
 From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:27 +0000
-Subject: [PATCH 12/12] KVM: arm64: Provide a PV_TIME device to user space
+Date: Wed, 28 Nov 2018 14:45:22 +0000
+Subject: [PATCH 07/12] clocksource: arm_arch_timer: Use paravirtualized LPT
 In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
 References: <20181128144527.44710-1-steven.price@arm.com>
-Message-ID: <20181128144527.44710-13-steven.price@arm.com>
+Message-ID: <20181128144527.44710-8-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow user space to inform the KVM host where in the physical memory
-map the paravirtualized time structures should be located.
+Enable paravirtualized time to be used in a KVM guest if the host
+supports it. This allows the guest to derive a counter which is clocked
+at a persistent rate even when the guest is migrated.
 
-A single device is created which provides two base addresses. One
-is the base of the Live Physical Time (LPT) structure shared with
-the guest. This must be 64 bytes long.
+If we discover that the system supports SMCCC v1.1 then we probe to
+determine whether the hypervisor supports paravirtualized features and
+finally whether it supports "Live Physical Time" reporting. If so a
+shared structure is made available to the guest containing coefficients
+to calculate the derived clock.
 
-The other is the base of an array of Stolen Time (ST) structures,
-one for each VCPU. There must be (64 * total number of VCPUs) bytes
-of memory available at this location.
+The guest kernel uses the coefficients to present a clock to user space
+that is always clocked at the same rate whenever the guest is running
+('live'), even if the physical clock changes (due to the guest being
+migrated).
 
-The addresses are given in terms of the physical address visible to
-the guest and must be 64 byte aligned. The memory should be marked as
-reserved to the guest to stop it allocating it for other purposes.
-
-A method is also provided to change the paravirtualized clock
-frequency seen by a guest. This can only be changed before the guest
-has been started, otherwise the guest will become confused.
+The existing workaround framework for CNTVCT is used to disable the VDSO
+and trap user space accesses to the timer registers so we can present the
+derived clock.
 
 Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- arch/arm64/include/asm/kvm_mmu.h  |   2 +
- arch/arm64/include/uapi/asm/kvm.h |   8 +
- arch/arm64/kvm/Makefile           |   1 +
- include/uapi/linux/kvm.h          |   2 +
- virt/kvm/arm/mmu.c                |  44 ++++++
- virt/kvm/arm/pvtime.c             | 243 ++++++++++++++++++++++++++++++
- 6 files changed, 300 insertions(+)
- create mode 100644 virt/kvm/arm/pvtime.c
+ arch/arm64/include/asm/arch_timer.h  |  32 ++++-
+ arch/arm64/kernel/cpuinfo.c          |   2 +-
+ drivers/clocksource/arm_arch_timer.c | 176 ++++++++++++++++++++++++++-
+ 3 files changed, 204 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 658657367f2f..3c266521223a 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -167,6 +167,8 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm);
- void kvm_free_stage2_pgd(struct kvm *kvm);
- int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 			  phys_addr_t pa, unsigned long size, bool writable);
-+int kvm_phys_addr_memremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size, bool writable);
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index f2a234d6516c..ec0e7250c453 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -20,12 +20,14 @@
+ #define __ASM_ARCH_TIMER_H
  
- int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ #include <asm/barrier.h>
++#include <asm/pvclock-abi.h>
+ #include <asm/sysreg.h>
  
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index 97c3478ee6e7..157bd8d7ec82 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -307,6 +307,14 @@ struct kvm_vcpu_events {
- #define KVM_PSCI_RET_INVAL		PSCI_RET_INVALID_PARAMS
- #define KVM_PSCI_RET_DENIED		PSCI_RET_DENIED
+ #include <linux/bug.h>
+ #include <linux/init.h>
+ #include <linux/jump_label.h>
+ #include <linux/smp.h>
++#include <linux/static_key.h>
+ #include <linux/types.h>
  
-+/* Device Control API: PV_TIME */
-+#define KVM_DEV_ARM_PV_TIME_PADDR	0
-+#define  KVM_DEV_ARM_PV_TIME_LPT	0
-+#define  KVM_DEV_ARM_PV_TIME_ST		1
-+#define KVM_DEV_ARM_PV_TIME_FREQUENCY	1
-+#define KVM_DEV_ARM_PV_TIME_STATE_SIZE	2
-+#define KVM_DEV_ARM_PV_TIME_STATE	3
+ #include <clocksource/arm_arch_timer.h>
+@@ -79,6 +81,19 @@ DECLARE_PER_CPU(const struct arch_timer_erratum_workaround *,
+ 	_val;								\
+ })
+ 
++void pvclock_reg_write_cntv_tval_el0(u32 val);
++extern struct static_key_false arch_counter_cntfrq_ool_enabled;
++extern u64 pvclock_get_cntfrq(void);
++extern struct static_key_false arch_counter_cntvct_ool_enabled;
++extern u64 pvclock_get_cntvct(void);
 +
- #endif
++static __always_inline void __write_cntv_tval_el0(u32 val)
++{
++	if (static_branch_unlikely(&arch_counter_cntvct_ool_enabled))
++		return pvclock_reg_write_cntv_tval_el0(val);
++	write_sysreg(val, cntv_tval_el0);
++}
++
+ /*
+  * These register accessors are marked inline so the compiler can
+  * nicely work out which register we want, and chuck away the rest of
+@@ -102,7 +117,7 @@ void arch_timer_reg_write_cp15(int access, enum arch_timer_reg reg, u32 val)
+ 			write_sysreg(val, cntv_ctl_el0);
+ 			break;
+ 		case ARCH_TIMER_REG_TVAL:
+-			write_sysreg(val, cntv_tval_el0);
++			__write_cntv_tval_el0(val);
+ 			break;
+ 		}
+ 	}
+@@ -134,7 +149,10 @@ u32 arch_timer_reg_read_cp15(int access, enum arch_timer_reg reg)
  
- #endif /* __ARM_KVM_H__ */
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 45bb68f6c161..a3f064f0a51d 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -16,6 +16,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/kvm_main.o $(KVM)/coalesced_mmio.o $(KVM)/e
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arm.o $(KVM)/arm/mmu.o $(KVM)/arm/mmio.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/psci.o $(KVM)/arm/perf.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hypercalls.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/pvtime.o
- 
- kvm-$(CONFIG_KVM_ARM_HOST) += inject_fault.o regmap.o va_layout.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
-diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-index 2b7a652c9fa4..494f7ad7987e 100644
---- a/include/uapi/linux/kvm.h
-+++ b/include/uapi/linux/kvm.h
-@@ -1198,6 +1198,8 @@ enum kvm_device_type {
- #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
- 	KVM_DEV_TYPE_ARM_VGIC_ITS,
- #define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
-+	KVM_DEV_TYPE_ARM_PV_TIME,
-+#define KVM_DEV_TYPE_ARM_PV_TIME	KVM_DEV_TYPE_ARM_PV_TIME
- 	KVM_DEV_TYPE_MAX,
- };
- 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 5eca48bdb1a6..17ec31c40039 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1227,6 +1227,50 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
- 	return ret;
+ static inline u32 arch_timer_get_cntfrq(void)
+ {
+-	return read_sysreg(cntfrq_el0);
++	if (static_branch_unlikely(&arch_counter_cntfrq_ool_enabled))
++		return pvclock_get_cntfrq();
++	else
++		return read_sysreg(cntfrq_el0);
  }
  
-+/**
-+ * kvm_phys_addr_memremap - map a memory range to guest IPA
-+ *
-+ * @kvm:	The KVM pointer
-+ * @guest_ipa:	The IPA at which to insert the mapping
-+ * @pa:		The physical address of the memory
-+ * @size:	The size of the mapping
-+ */
-+int kvm_phys_addr_memremap(struct kvm *kvm, phys_addr_t guest_ipa,
-+			  phys_addr_t pa, unsigned long size, bool writable)
-+{
-+	phys_addr_t addr, end;
-+	int ret = 0;
-+	unsigned long pfn;
-+	struct kvm_mmu_memory_cache cache = { 0, };
-+
-+	end = (guest_ipa + size + PAGE_SIZE - 1) & PAGE_MASK;
-+	pfn = __phys_to_pfn(pa);
-+
-+	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
-+		pte_t pte = pfn_pte(pfn, PAGE_S2);
-+
-+		if (writable)
-+			pte = kvm_s2pte_mkwrite(pte);
-+
-+		ret = mmu_topup_memory_cache(&cache,
-+					     kvm_mmu_cache_min_pages(kvm),
-+					     KVM_NR_MEM_OBJS);
-+		if (ret)
-+			goto out;
-+		spin_lock(&kvm->mmu_lock);
-+		ret = stage2_set_pte(kvm, &cache, addr, &pte, 0);
-+		spin_unlock(&kvm->mmu_lock);
-+		if (ret)
-+			goto out;
-+
-+		pfn++;
-+	}
-+
-+out:
-+	mmu_free_memory_cache(&cache);
-+	return ret;
-+}
-+
- static bool transparent_hugepage_adjust(kvm_pfn_t *pfnp, phys_addr_t *ipap)
+ static inline u32 arch_timer_get_cntkctl(void)
+@@ -154,12 +172,20 @@ static inline u64 arch_counter_get_cntpct(void)
+ 	return arch_timer_reg_read_stable(cntpct_el0);
+ }
+ 
+-static inline u64 arch_counter_get_cntvct(void)
++static inline u64 __arch_counter_get_cntvct(void)
  {
- 	kvm_pfn_t pfn = *pfnp;
-diff --git a/virt/kvm/arm/pvtime.c b/virt/kvm/arm/pvtime.c
-new file mode 100644
-index 000000000000..16efa7e70424
---- /dev/null
-+++ b/virt/kvm/arm/pvtime.c
-@@ -0,0 +1,243 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (C) 2018 Arm Ltd.
+ 	isb();
+ 	return arch_timer_reg_read_stable(cntvct_el0);
+ }
+ 
++static inline u64 arch_counter_get_cntvct(void)
++{
++	if (static_branch_unlikely(&arch_counter_cntvct_ool_enabled))
++		return pvclock_get_cntvct();
++	else
++		return __arch_counter_get_cntvct();
++}
 +
-+#include <linux/kvm_host.h>
-+#include <asm/kvm_mmu.h>
-+
-+/* We currently only support PV time on ARM64 */
+ static inline int arch_timer_arch_init(void)
+ {
+ 	return 0;
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index bcc2831399cb..74410727829d 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -324,7 +324,7 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
+ 
+ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ {
+-	info->reg_cntfrq = arch_timer_get_cntfrq();
++	info->reg_cntfrq = read_cpuid(CNTFRQ_EL0);
+ 	/*
+ 	 * Use the effective value of the CTR_EL0 than the raw value
+ 	 * exposed by the CPU. CTR_E0.IDC field value must be interpreted
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 9a7d4dc00b6e..1991d5044496 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -11,6 +11,7 @@
+ 
+ #define pr_fmt(fmt)	"arm_arch_timer: " fmt
+ 
++#include <linux/arm-smccc.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/device.h>
+@@ -23,6 +24,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/io.h>
++#include <linux/psci.h>
++#include <linux/reboot.h>
+ #include <linux/slab.h>
+ #include <linux/sched/clock.h>
+ #include <linux/sched_clock.h>
+@@ -86,6 +89,170 @@ static int __init early_evtstrm_cfg(char *buf)
+ }
+ early_param("clocksource.arm_arch_timer.evtstrm", early_evtstrm_cfg);
+ 
 +#ifdef CONFIG_ARM64
++/* Paravirtualised time is only supported for 64 bit */
++static struct pvclock_vm_time_info *pvclock_vm_time_info;
 +
-+static int max_stolen_size(void)
++DEFINE_STATIC_KEY_FALSE(arch_counter_cntvct_ool_enabled);
++EXPORT_SYMBOL_GPL(arch_counter_cntvct_ool_enabled);
++DEFINE_STATIC_KEY_FALSE(arch_counter_cntfrq_ool_enabled);
++EXPORT_SYMBOL_GPL(arch_counter_cntfrq_ool_enabled);
++
++static inline u64 native_to_pv_cycles(const struct pvclock_vm_time_info *info,
++		u64 cnt)
 +{
-+	int size = KVM_MAX_VCPUS * sizeof(struct pvclock_vcpu_stolen_time_info);
++	u32 shift = le32_to_cpu(info->shift);
++	u64 scale_mult = le64_to_cpu(info->scale_mult);
 +
-+	return ALIGN(size, PAGE_SIZE);
++	cnt <<= shift;
++	return mul_u64_u64_shr(scale_mult, cnt, 64);
 +}
 +
-+static int kvm_arm_pvtime_create(struct kvm_device *dev, u32 type)
++static inline u64 pv_to_native_cycles(const struct pvclock_vm_time_info *info,
++		u64 cnt)
 +{
-+	int size_required;
-+	struct kvm_arch_pvtime *pvtime = &dev->kvm->arch.pvtime;
++	u64 native_freq = le64_to_cpu(info->native_freq);
++	u64 pv_freq = le64_to_cpu(info->pv_freq);
++	u64 div_by_pv_freq_mult = le64_to_cpu(info->div_by_pv_freq_mult);
 +
-+	/*
-+	 * We require 1 page for LPT and a pvclock_vcpu_stolen_time_info
-+	 * structure per VCPU.
-+	 */
-+	size_required = PAGE_SIZE + max_stolen_size();
-+
-+	pvtime->lpt_fpv = arch_timer_get_rate();
-+	pvtime->pv_page = alloc_pages_exact(size_required,
-+					    GFP_KERNEL | __GFP_ZERO);
-+
-+	if (!pvtime->pv_page)
-+		return -ENOMEM;
-+
-+	return 0;
++	cnt = native_freq * cnt + pv_freq - 1;
++	return mul_u64_u64_shr(div_by_pv_freq_mult, cnt, 64);
 +}
 +
-+static void kvm_arm_pvtime_destroy(struct kvm_device *dev)
++u64 pvclock_get_cntvct(void)
 +{
-+	struct kvm_arch_pvtime *pvtime = &dev->kvm->arch.pvtime;
++	u64 cval;
++	__le64 seq_begin, seq_end;
 +
-+	pvtime->lpt_page = GPA_INVALID;
-+	pvtime->st_base = GPA_INVALID;
-+	free_pages_exact(pvtime->pv_page, PAGE_SIZE + max_stolen_size());
++	do {
++		seq_begin = READ_ONCE(pvclock_vm_time_info->sequence_number);
++
++		barrier();
++
++		cval = __arch_counter_get_cntvct();
++		cval = native_to_pv_cycles(pvclock_vm_time_info, cval);
++
++		barrier();
++		seq_end = READ_ONCE(pvclock_vm_time_info->sequence_number);
++	} while (unlikely(seq_begin != seq_end));
++
++	return cval;
 +}
 +
-+static int pvtime_map_pages(struct kvm *kvm, gpa_t guest_paddr,
-+			    int offset, int size)
++u64 pvclock_get_cntfrq(void)
 +{
-+	struct kvm_arch_pvtime *pvtime = &kvm->arch.pvtime;
-+
-+	return kvm_phys_addr_memremap(kvm, guest_paddr,
-+			virt_to_phys(pvtime->pv_page + offset),
-+			size, false);
++	return le64_to_cpu(pvclock_vm_time_info->pv_freq);
 +}
 +
-+static int pvtime_save_state(struct kvm *kvm, u64 type, void __user *user)
++static void arch_timer_pvclock_init(void)
 +{
-+	void *source;
-+	size_t size;
++	struct arm_smccc_res res;
++	void *kaddr;
 +
-+	switch (type) {
-+	case KVM_DEV_ARM_PV_TIME_LPT:
-+		source = kvm->arch.pvtime.pv_page;
-+		size = sizeof(struct pvclock_vm_time_info);
-+		break;
-+	case KVM_DEV_ARM_PV_TIME_ST:
-+		source = kvm->arch.pvtime.pv_page + PAGE_SIZE;
-+		size = sizeof(struct pvclock_vcpu_stolen_time_info) *
-+			atomic_read(&kvm->online_vcpus);
-+		break;
-+	default:
-+		return -ENXIO;
++	if (psci_ops.smccc_version < SMCCC_VERSION_1_1)
++		return;
++
++	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++		      ARM_SMCCC_HV_PV_FEATURES, &res);
++
++	if (res.a0 != SMCCC_RET_SUCCESS)
++		return;
++
++	arm_smccc_1_1(ARM_SMCCC_HV_PV_FEATURES, ARM_SMCCC_HV_PV_TIME_LPT, &res);
++
++	if ((s32)res.a0 < 0)
++		return;
++
++	arm_smccc_1_1(ARM_SMCCC_HV_PV_TIME_LPT, 0, &res);
++
++	if ((s64)res.a0 < 0)
++		return;
++
++	kaddr = memremap(res.a0,
++			sizeof(struct pvclock_vm_time_info),
++			MEMREMAP_WB);
++
++	if (!kaddr) {
++		pr_warn("Failed to map LPT structure for paravirtualized clock\n");
++		return;
 +	}
 +
-+	if (copy_to_user(user, source, size))
-+		return -EFAULT;
-+	return 0;
++	pvclock_vm_time_info = kaddr;
++
++	static_branch_enable(&arch_counter_cntvct_ool_enabled);
++	static_branch_enable(&arch_counter_cntfrq_ool_enabled);
++
++	pr_info("Using paravirtualized clock\n");
 +}
 +
-+static int pvtime_restore_state(struct kvm *kvm, u64 type, void __user *user)
++static inline bool pvclock_trap_cntvct(void)
 +{
-+	void *dest;
-+	size_t size;
++	return static_branch_unlikely(&arch_counter_cntvct_ool_enabled);
++}
 +
-+	switch (type) {
-+	case KVM_DEV_ARM_PV_TIME_LPT:
-+		dest = kvm->arch.pvtime.pv_page;
-+		size = sizeof(struct pvclock_vm_time_info);
-+		break;
-+	case KVM_DEV_ARM_PV_TIME_ST:
-+		dest = kvm->arch.pvtime.pv_page + PAGE_SIZE;
-+		size = sizeof(struct pvclock_vcpu_stolen_time_info) *
-+			atomic_read(&kvm->online_vcpus);
-+		break;
-+	default:
-+		return -ENXIO;
++static inline void arch_timer_reg_write_cntv_tval(u32 val,
++						  struct arch_timer *timer)
++{
++	__le64 seq_begin, seq_end;
++
++	if (!static_branch_unlikely(&arch_counter_cntvct_ool_enabled)) {
++		writel_relaxed(val, timer->base + CNTV_TVAL);
++		return;
 +	}
 +
-+	if (copy_from_user(dest, user, size))
-+		return -EFAULT;
++	do {
++		u32 n_val;
 +
-+	return 0;
++		seq_begin = READ_ONCE(pvclock_vm_time_info->sequence_number);
++
++		barrier();
++
++		n_val = pv_to_native_cycles(pvclock_vm_time_info, val);
++
++		writel_relaxed(n_val, timer->base + CNTV_TVAL);
++		barrier();
++
++		seq_end = READ_ONCE(pvclock_vm_time_info->sequence_number);
++	} while (unlikely(seq_begin != seq_end));
 +}
 +
-+static int kvm_arm_pvtime_set_attr(struct kvm_device *dev,
-+				   struct kvm_device_attr *attr)
++void pvclock_reg_write_cntv_tval_el0(u32 val)
 +{
-+	struct kvm_arch_pvtime *pvtime = &dev->kvm->arch.pvtime;
-+	u64 __user *user = (u64 __user *)attr->addr;
-+	u64 paddr;
-+	u32 frequency;
-+	int ret;
++	__le64 seq_begin, seq_end;
 +
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PV_TIME_PADDR:
-+		if (get_user(paddr, user))
-+			return -EFAULT;
-+		if (paddr & 63)
-+			return -EINVAL;
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_PV_TIME_LPT:
-+			if (pvtime->lpt_page != GPA_INVALID)
-+				return -EEXIST;
-+			ret = pvtime_map_pages(dev->kvm, paddr, 0, PAGE_SIZE);
-+			if (ret)
-+				return ret;
-+			pvtime->lpt_page = paddr;
-+			return kvm_arm_update_lpt_sequence(dev->kvm);
-+		case KVM_DEV_ARM_PV_TIME_ST:
-+			if (pvtime->st_base != GPA_INVALID)
-+				return -EEXIST;
-+			ret = pvtime_map_pages(dev->kvm, paddr, PAGE_SIZE,
-+					max_stolen_size());
-+			if (ret)
-+				return ret;
-+			pvtime->st_base = paddr;
-+			return 0;
-+		}
-+		break;
-+	case KVM_DEV_ARM_PV_TIME_FREQUENCY:
-+		if (attr->attr != KVM_DEV_ARM_PV_TIME_LPT)
-+			break;
-+		if (get_user(frequency, user))
-+			return -EFAULT;
-+		pvtime->lpt_fpv = frequency;
-+		return kvm_arm_update_lpt_sequence(dev->kvm);
-+	case KVM_DEV_ARM_PV_TIME_STATE_SIZE:
-+		return -EPERM;
-+	case KVM_DEV_ARM_PV_TIME_STATE:
-+		return pvtime_restore_state(dev->kvm, attr->attr, user);
-+	}
-+	return -ENXIO;
++	do {
++		u32 n_val;
++
++		seq_begin = READ_ONCE(pvclock_vm_time_info->sequence_number);
++
++		barrier();
++
++		n_val = pv_to_native_cycles(pvclock_vm_time_info, val);
++
++		write_sysreg(n_val, cntv_tval_el0);
++		barrier();
++
++		seq_end = READ_ONCE(pvclock_vm_time_info->sequence_number);
++	} while (unlikely(seq_begin != seq_end));
 +}
 +
-+static int kvm_arm_pvtime_get_attr(struct kvm_device *dev,
-+				   struct kvm_device_attr *attr)
++#else /* CONFIG_ARM64 */
++static void arch_timer_pvclock_init(void)
 +{
-+	u64 __user *user = (u64 __user *)attr->addr;
-+	u32 size;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PV_TIME_PADDR:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_PV_TIME_LPT:
-+			if (put_user(dev->kvm->arch.pvtime.lpt_page, user))
-+				return -EFAULT;
-+			return 0;
-+		case KVM_DEV_ARM_PV_TIME_ST:
-+			if (put_user(dev->kvm->arch.pvtime.st_base, user))
-+				return -EFAULT;
-+			return 0;
-+		}
-+		break;
-+	case KVM_DEV_ARM_PV_TIME_FREQUENCY:
-+		if (attr->attr != KVM_DEV_ARM_PV_TIME_LPT)
-+			break;
-+		if (put_user(dev->kvm->arch.pvtime.lpt_fpv, user))
-+			return -EFAULT;
-+		return 0;
-+	case KVM_DEV_ARM_PV_TIME_STATE_SIZE:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_PV_TIME_LPT:
-+			size = sizeof(struct pvclock_vm_time_info);
-+			break;
-+		case KVM_DEV_ARM_PV_TIME_ST:
-+			size = sizeof(struct pvclock_vcpu_stolen_time_info);
-+			size *= atomic_read(&dev->kvm->online_vcpus);
-+			break;
-+		default:
-+			return -ENXIO;
-+		}
-+		if (put_user(size, user))
-+			return -EFAULT;
-+		return 0;
-+	case KVM_DEV_ARM_PV_TIME_STATE:
-+		return pvtime_save_state(dev->kvm, attr->attr, user);
-+	}
-+	return -ENXIO;
 +}
 +
-+static int kvm_arm_pvtime_has_attr(struct kvm_device *dev,
-+				   struct kvm_device_attr *attr)
++static inline bool pvclock_trap_cntvct(void)
 +{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_PV_TIME_PADDR:
-+	case KVM_DEV_ARM_PV_TIME_STATE_SIZE:
-+	case KVM_DEV_ARM_PV_TIME_STATE:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_PV_TIME_LPT:
-+		case KVM_DEV_ARM_PV_TIME_ST:
-+			return 0;
-+		}
-+		break;
-+	case KVM_DEV_ARM_PV_TIME_FREQUENCY:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_PV_TIME_LPT:
-+			return 0;
-+		}
-+		break;
-+	}
-+	return -ENXIO;
++	return false;
 +}
 +
-+static const struct kvm_device_ops pvtime_ops = {
-+	"Arm PV time",
-+	.create = kvm_arm_pvtime_create,
-+	.destroy = kvm_arm_pvtime_destroy,
-+	.set_attr = kvm_arm_pvtime_set_attr,
-+	.get_attr = kvm_arm_pvtime_get_attr,
-+	.has_attr = kvm_arm_pvtime_has_attr
-+};
-+
-+static int __init kvm_pvtime_init(void)
++static inline void arch_timer_reg_write_cntv_tval(u32 val,
++						 struct arch_timer *timer)
 +{
-+	kvm_register_device_ops(&pvtime_ops, KVM_DEV_TYPE_ARM_PV_TIME);
-+
-+	return 0;
++	writel_relaxed(val, timer->base + CNTV_TVAL);
 +}
++#endif /* CONFIG_ARM64 */
 +
-+late_initcall(kvm_pvtime_init);
+ /*
+  * Architected system timer support.
+  */
+@@ -111,7 +278,7 @@ void arch_timer_reg_write(int access, enum arch_timer_reg reg, u32 val,
+ 			writel_relaxed(val, timer->base + CNTV_CTL);
+ 			break;
+ 		case ARCH_TIMER_REG_TVAL:
+-			writel_relaxed(val, timer->base + CNTV_TVAL);
++			arch_timer_reg_write_cntv_tval(val, timer);
+ 			break;
+ 		}
+ 	} else {
+@@ -589,6 +756,7 @@ static bool arch_timer_this_cpu_has_cntvct_wa(void)
+ #define erratum_set_next_event_tval_phys(...)		({BUG(); 0;})
+ #define erratum_handler(fn, r, ...)			({false;})
+ #define arch_timer_this_cpu_has_cntvct_wa()		({false;})
 +
-+#endif
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
+ static __always_inline irqreturn_t timer_handler(const int access,
+@@ -815,7 +983,7 @@ static void arch_counter_set_user_access(void)
+ 	 * need to be workaround. The vdso may have been already
+ 	 * disabled though.
+ 	 */
+-	if (arch_timer_this_cpu_has_cntvct_wa())
++	if (pvclock_trap_cntvct() || arch_timer_this_cpu_has_cntvct_wa())
+ 		pr_info("CPU%d: Trapping CNTVCT access\n", smp_processor_id());
+ 	else
+ 		cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+@@ -1222,6 +1390,8 @@ static int __init arch_timer_of_init(struct device_node *np)
+ 
+ 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
+ 
++	arch_timer_pvclock_init();
++
+ 	rate = arch_timer_get_cntfrq();
+ 	arch_timer_of_configure_rate(rate, np);
+ 
+@@ -1552,6 +1722,8 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ 
+ 	arch_timer_kvm_info.virtual_irq = arch_timer_ppi[ARCH_TIMER_VIRT_PPI];
+ 
++	arch_timer_pvclock_init();
++
+ 	/*
+ 	 * When probing via ACPI, we have no mechanism to override the sysreg
+ 	 * CNTFRQ value. This *must* be correct.
 -- 
 2.19.2
