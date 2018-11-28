@@ -1,55 +1,43 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:10 +0100
-Subject: [PATCH v4 06/20] DT: marvell,mmp2: fix TWSI2
-In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
-References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-7-lkundrak@v3.sk>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 28 Nov 2018 10:00:06 -0800
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181128174545.GJ30658@n2100.armlinux.org.uk>
+References: <20181122140320.24080-1-hch@lst.de>
+ <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
+ <20181122170715.GI30658@n2100.armlinux.org.uk>
+ <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+ <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
+ <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+ <20181128174545.GJ30658@n2100.armlinux.org.uk>
+Message-ID: <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marvell keeps their MMP2 datasheet secret, but there are good clues
-that TWSI2 is not on 0xd4025000 on that platform, not does it use
-IRQ 58. In fact, the IRQ 58 on MMP2 seems to be a signal processor:
+On Wed, Nov 28, 2018 at 9:45 AM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> > I don't think this is a huge deal, but ERR_PTR() has been hugely
+> > successful elsewhere. And I'm not hugely convinced about all these
+> > "any address can be valid" arguments. How the hell do you generate a
+> > random dma address in the last page that isn't even page-aligned?
+>
+> kmalloc() a 64-byte buffer, dma_map_single() that buffer.
 
-   arch/arm/mach-mmp/irqs.h:#define IRQ_MMP2_MSP  58
+No.
 
-I'm taking a somewhat educated guess that is probably a copy & paste
-error from PXA168 or PXA910 and that the real controller in fact hides
-at address 0xd4031000 and uses an interrupt line multiplexed via IRQ 17.
+You already cannot do that kmalloc(), exactly because of ERR_PTR().
 
-I'm also copying some properties from TWSI1 that were missing or
-incorrect.
+Not all memory is accessible even to the kernel. If you have memory
+that shows up in the last page of phys_addr_t, you just mark it
+reserved at boot-time.
 
-Tested on a OLPC XO 1.75 machine, where the RTC is on TWSI2.
+Which is what we ALREADY do for these exact reasons. If the DMA
+mappings means that you'd need to add one more page to that list of
+reserved pages, then so be it.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Tested-by: Pavel Machek <pavel@ucw.cz>
----
- arch/arm/boot/dts/mmp2.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+The whole argument of "every possible piece of memory is DMA'able" is
+just wrong.
 
-diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 1120fe6abbdc..c5787eea57c7 100644
---- a/arch/arm/boot/dts/mmp2.dtsi
-+++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -257,12 +257,15 @@
- 				status = "disabled";
- 			};
- 
--			twsi2: i2c at d4025000 {
-+			twsi2: i2c at d4031000 {
- 				compatible = "mrvl,mmp-twsi";
--				reg = <0xd4025000 0x1000>;
--				interrupts = <58>;
-+				reg = <0xd4031000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <0>;
- 				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
- 				resets = <&soc_clocks MMP2_CLK_TWSI1>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				status = "disabled";
- 			};
- 
--- 
-2.19.1
+                Linus
