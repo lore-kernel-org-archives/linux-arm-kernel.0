@@ -1,37 +1,27 @@
-From: maarten.lankhorst@linux.intel.com (Maarten Lankhorst)
-Date: Wed, 28 Nov 2018 08:17:04 +0100
-Subject: [PATCH] drm/fbdev: Make skip_vt_switch the default
-In-Reply-To: <20181127173424.301-1-daniel.vetter@ffwll.ch>
-References: <20181127170952.28507-1-daniel.vetter@ffwll.ch>
- <20181127173424.301-1-daniel.vetter@ffwll.ch>
-Message-ID: <3d406677-9d7d-6d8d-85af-1cfb253d1838@linux.intel.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Wed, 28 Nov 2018 08:41:17 +0100
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181123065511.GA17856@lst.de>
+References: <20181122140320.24080-1-hch@lst.de>
+ <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
+ <20181122170715.GI30658@n2100.armlinux.org.uk>
+ <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+ <20181123065511.GA17856@lst.de>
+Message-ID: <20181128074117.GA21126@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Op 27-11-18 om 18:34 schreef Daniel Vetter:
-> KMS drivers really should all be able to restore their display state
-> on resume without fbcon helping out. So make this the default.
->
-> Since I'm not entirely foolish, make it only a default, which drivers
-> can still override. That way when the inevitable regression report
-> happens I can fix things up with a one-liner plus FIXME comment that
-> someone should fix up the suspend/resume code in that driver.
->
-> But at least all new drivers won't be broken by accident as soon as
-> you turn off fbcon because "suspend/resume worked when I tested it".
->
-> v2: Keep this for radeon because of
->
-> commit 18c437caa5b18a235dd65cec224eab54bebcee65
-> Author: Alex Deucher <alexander.deucher@amd.com>
-> Date:   Tue Nov 14 17:19:29 2017 -0500
->
->     Revert "drm/radeon: dont switch vt on suspend"
->
-> Thanks to Michel D?nzer for pointing this one out.
+On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
+> On Thu, Nov 22, 2018 at 09:55:25AM -0800, Linus Torvalds wrote:
+> > No, the big immediate benefit of allowing "return -EINVAL" etc is
+> > simply legibility and error avoidance.
+> 
+> Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
+> instead of the old 1 is as bool true.  The callers should all be fine,
+> although I'd have to audit them.  Still wouldn't help with being able to
+> return different errors.
 
-Maybe just reload the gamma lut on resume for radeon, instead of relying on fbcon?
-
-Otherwise patch looks sane, would be nice if radeon was fixed instead of worked around.
-
-Reviewed-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+Any opinions?  I'd really like to make some forward progress on this
+series.
