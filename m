@@ -1,48 +1,68 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 29 Nov 2018 01:33:19 +0300
-Subject: [PATCH v5 09/17] clocksource: sun4i: add a compatible for suniv
+Date: Thu, 29 Nov 2018 01:33:13 +0300
+Subject: [PATCH v5 03/17] ARM: sunxi: add Allwinner ARMv5 SoCs
 In-Reply-To: <cover.1543443475.git.mesihkilinc@gmail.com>
 References: <cover.1543443475.git.mesihkilinc@gmail.com>
-Message-ID: <274bfd74bf3817065b6e5bdc733edecc520449b6.1543443475.git.mesihkilinc@gmail.com>
+Message-ID: <459a13de210c96de1a719552164fbc8aa3d0de4c.1543443475.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The suniv (new F-series) chip has a timer with less functionality than
-the A10 timer, e.g. it has only 3 channels.
-
-Add a new compatible for it. As we didn't use the extra channels on A10
-either now, the code needn't to be changed.
-
-The suniv chip is based on ARM926EJ-S CPU, thus it has no architecture timer.
-
-Register sun4i_timer as sched_clock on it.
+Add option for Allwinner ARMv5 SoCs and SoC F1C100s (which has a die
+used for many new F-series products, including F1C100A, F1C100s, F1C200s,
+F1C500, F1C600).
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/sun4i_timer.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ arch/arm/mach-sunxi/Kconfig | 13 ++++++++++++-
+ arch/arm/mach-sunxi/sunxi.c | 10 ++++++++++
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clocksource/sun4i_timer.c b/drivers/clocksource/sun4i_timer.c
-index 6e0180a..65f38f6 100644
---- a/drivers/clocksource/sun4i_timer.c
-+++ b/drivers/clocksource/sun4i_timer.c
-@@ -186,7 +186,8 @@ static int __init sun4i_timer_init(struct device_node *node)
- 	 */
- 	if (of_machine_is_compatible("allwinner,sun4i-a10") ||
- 	    of_machine_is_compatible("allwinner,sun5i-a13") ||
--	    of_machine_is_compatible("allwinner,sun5i-a10s"))
-+	    of_machine_is_compatible("allwinner,sun5i-a10s") ||
-+	    of_machine_is_compatible("allwinner,suniv-f1c100s"))
- 		sched_clock_register(sun4i_timer_sched_read, 32,
- 				     timer_of_rate(&to));
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index 185c573..7fa6a3d 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -1,6 +1,6 @@
+ menuconfig ARCH_SUNXI
+ 	bool "Allwinner SoCs"
+-	depends on ARCH_MULTI_V7
++	depends on ARCH_MULTI_V5 || ARCH_MULTI_V7
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select CLKSRC_MMIO
+ 	select GENERIC_IRQ_CHIP
+@@ -61,4 +61,15 @@ config ARCH_SUNXI_MC_SMP
  
-@@ -218,3 +219,5 @@ static int __init sun4i_timer_init(struct device_node *node)
- }
- TIMER_OF_DECLARE(sun4i, "allwinner,sun4i-a10-timer",
- 		       sun4i_timer_init);
-+TIMER_OF_DECLARE(suniv, "allwinner,suniv-f1c100s-timer",
-+		       sun4i_timer_init);
+ endif
+ 
++if ARCH_MULTI_V5
++
++config MACH_SUNIV
++	bool "Allwinner ARMv5 F-series (suniv) SoCs support"
++	default ARCH_SUNXI
++	help
++	  Support for Allwinner suniv ARMv5 SoCs.
++	  (F1C100A, F1C100s, F1C200s, F1C500, F1C600)
++
++endif
++
+ endif
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index de4b0e9..155cd9e 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -101,3 +101,13 @@ static const char * const sun9i_board_dt_compat[] = {
+ DT_MACHINE_START(SUN9I_DT, "Allwinner sun9i Family")
+ 	.dt_compat	= sun9i_board_dt_compat,
+ MACHINE_END
++
++static const char * const suniv_board_dt_compat[] = {
++	"allwinner,suniv-f1c100s",
++	NULL,
++};
++
++DT_MACHINE_START(SUNIV_DT, "Allwinner suniv Family")
++	.dt_compat	= suniv_board_dt_compat,
++MACHINE_END
++
 -- 
 2.7.4
