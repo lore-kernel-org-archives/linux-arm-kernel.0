@@ -1,104 +1,61 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 29 Nov 2018 00:48:40 +0200
-Subject: [PATCH 1/2] dt-bindings: gpio: lpc18xx: describe interrupt
- controllers of GPIO controller
-In-Reply-To: <20181128224841.3646-1-vz@mleia.com>
-References: <20181128224841.3646-1-vz@mleia.com>
-Message-ID: <20181128224841.3646-2-vz@mleia.com>
+From: shuahkhan@gmail.com (Shuah Khan)
+Date: Wed, 28 Nov 2018 16:01:10 -0700
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181128194708.GP30658@n2100.armlinux.org.uk>
+References: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+ <20181128174545.GJ30658@n2100.armlinux.org.uk>
+ <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
+ <20181128.112717.149234960284639699.davem@davemloft.net>
+ <20181128194708.GP30658@n2100.armlinux.org.uk>
+Message-ID: <CAKocOOO2jELMaVh85m3V562ewCBDRUMJ1q_xoq7DgvUiagpTjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From LPC18xx and LPC43xx User Manuals the GPIO controller consists of
-the following weakly connected blocks:
-* GPIO pin interrupt block at 0x40087000,
-* GPIO GROUP0 interrupt block at 0x40088000,
-* GPIO GROUP1 interrupt block at 0x40089000,
-* GPIO port block at 0x400F4000.
+On Wed, Nov 28, 2018 at 12:48 PM Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+>
+> On Wed, Nov 28, 2018 at 11:27:17AM -0800, David Miller wrote:
+> > From: Linus Torvalds <torvalds@linux-foundation.org>
+> > Date: Wed, 28 Nov 2018 10:00:06 -0800
+> >
+> > > Not all memory is accessible even to the kernel. If you have memory
+> > > that shows up in the last page of phys_addr_t, you just mark it
+> > > reserved at boot-time.
+> >
+> > It's not the physical memory at the end that needs to be reserved.
+> >
+> > It's the IOMMU mapping arena.
+>
+> True, if and only if you have an IOMMU.
+>
+> Where there isn't an IOMMU, then we'd have to reserve every page that
+> that translates to a bus address in the top 4K of dma_addr_t on any
+> bus in the system - that means knowing early in the kernel
+> initialisation about all buses in the system so we can detect and
+> reserve these pages.
+>
 
-While all 4 sub-controller blocks have their own I/O addresses, moreover
-all 3 interrupt blocks are APB0 peripherals and high-speed GPIO block is
-an AHB slave, according to the hardware manual interrupt controllers and
-GPIO controller block are seen as a single device, all 4 sub-controllers
-have the shared reset signal RGU #28 and the same shared clock to access
-registers CLK_Mx_GPIO on CCU1.
+The arch and platform differences/confusion as to "what is DMA error
+value" is the reason why dma_mapping_error is part dma ops. I
+understand that iy would make sense to reduce the overhead of an
+additional call, however, I am not sure if would be trivial change to
+address this.
 
-The change adds descriptions of the currently missing interrupt controller
-blocks found on GPIO controller, new added properties are 'reg-names',
-'resets', 'interrupt-controller' and '#interrupt-cells', also the example
-is updated to reflect the changes in device tree binding description.
+I was down this path of trying to address the missing mapping error
+checks a few years ago and introduced dma_mapping_error checks in the
+DMA DEBUG API. As you might already know that there is no common
+definition for the mapping error.
 
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
- .../bindings/gpio/nxp,lpc1850-gpio.txt        | 38 ++++++++++++++-----
- 1 file changed, 29 insertions(+), 9 deletions(-)
+Quick look at the defines shows:
 
-diff --git a/Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt b/Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt
-index eb7cdd69e10b..627efc78ecf2 100644
---- a/Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt
-+++ b/Documentation/devicetree/bindings/gpio/nxp,lpc1850-gpio.txt
-@@ -3,12 +3,24 @@ NXP LPC18xx/43xx GPIO controller Device Tree Bindings
- 
- Required properties:
- - compatible		: Should be "nxp,lpc1850-gpio"
--- reg			: Address and length of the register set for the device
--- clocks		: Clock specifier (see clock bindings for details)
--- gpio-controller	: Marks the device node as a GPIO controller.
--- #gpio-cells 		: Should be two
--			  - First cell is the GPIO line number
--			  - Second cell is used to specify polarity
-+- reg			: List of addresses and lengths of the GPIO controller
-+			  register sets
-+- reg-names		: Should be "gpio", "gpio-pin-ic", "gpio-group0-ic" and
-+			  "gpio-gpoup1-ic"
-+- clocks		: Phandle and clock specifier pair for GPIO controller
-+- resets		: Phandle and reset specifier pair for GPIO controller
-+- gpio-controller	: Marks the device node as a GPIO controller
-+- #gpio-cells 		: Should be two:
-+			  - The first cell is the GPIO line number
-+			  - The second cell is used to specify polarity
-+- interrupt-controller	: Marks the device node as an interrupt controller
-+- #interrupt-cells	: Should be two:
-+			  - The first cell is an interrupt number within
-+			    0..9 range, for GPIO pin interrupts it is equal
-+			    to 'nxp,gpio-pin-interrupt' property value of
-+			    GPIO pin configuration, 8 is for GPIO GROUP0
-+			    interrupt, 9 is for GPIO GROUP1 interrupt
-+			  - The second cell is used to specify interrupt type
- 
- Optional properties:
- - gpio-ranges		: Mapping between GPIO and pinctrl
-@@ -19,21 +31,29 @@ Example:
- 
- gpio: gpio at 400f4000 {
- 	compatible = "nxp,lpc1850-gpio";
--	reg = <0x400f4000 0x4000>;
-+	reg = <0x400f4000 0x4000>, <0x40087000 0x1000>,
-+	      <0x40088000 0x1000>, <0x40089000 0x1000>;
-+	reg-names = "gpio", "gpio-pin-ic",
-+		    "gpio-group0-ic", "gpio-gpoup1-ic";
- 	clocks = <&ccu1 CLK_CPU_GPIO>;
-+	resets = <&rgu 28>;
- 	gpio-controller;
- 	#gpio-cells = <2>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
- 	gpio-ranges =	<&pinctrl LPC_GPIO(0,0)  LPC_PIN(0,0)  2>,
- 			...
- 			<&pinctrl LPC_GPIO(7,19) LPC_PIN(f,5)  7>;
- };
- 
- gpio_joystick {
--	compatible = "gpio-keys-polled";
-+	compatible = "gpio-keys";
- 	...
- 
--	button at 0 {
-+	button0 {
- 		...
-+		interrupt-parent = <&gpio>;
-+		interrupts = <1 IRQ_TYPE_EDGE_BOTH>;
- 		gpios = <&gpio LPC_GPIO(4,8) GPIO_ACTIVE_LOW>;
- 	};
- };
--- 
-2.17.1
+#define CALGARY_MAPPING_ERROR 0
+#define S390_MAPPING_ERROR  (~(dma_addr_t) 0x0)
+#define SPARC_MAPPING_ERROR (~(dma_addr_t)0x0)
+
+This is the reason why there is a arch or in some cases bus specific
+mapping_error ops is needed.
+We could unify this and fix all these first. I haven't looked at the
+patch set closely, maybe you are already doing this.
+
+thanks,
+-- Shuah
