@@ -1,31 +1,59 @@
-From: nathanj439@gmail.com (Nathan Jones)
-Date: Wed, 28 Nov 2018 12:39:29 -0500
-Subject: [PATCH] ARM: dma-mapping: fix potential uninitialized return
-Message-ID: <20181128173929.3050-1-nathanj439@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Nov 2018 17:45:45 +0000
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+References: <20181122140320.24080-1-hch@lst.de>
+ <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
+ <20181122170715.GI30658@n2100.armlinux.org.uk>
+ <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+ <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
+ <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+Message-ID: <20181128174545.GJ30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If neither of the if() statements fire then the return value is
-uninitialized. In the worst case it returns 0 which means the caller
-will think the function succeeded.
+On Wed, Nov 28, 2018 at 08:47:05AM -0800, Linus Torvalds wrote:
+> On Tue, Nov 27, 2018 at 11:41 PM Christoph Hellwig <hch@lst.de> wrote:
+> >
+> > On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
+> > > Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
+> > > instead of the old 1 is as bool true.  The callers should all be fine,
+> > > although I'd have to audit them.  Still wouldn't help with being able to
+> > > return different errors.
+> >
+> > Any opinions?  I'd really like to make some forward progress on this
+> > series.
+> 
+> So I do think that yes, dma_mapping_error() should return an error
+> code, not 0/1.
+> 
+> But I was really hoping that the individual drivers themselves could
+> return error codes. Right now the patch-series has code like this:
+> 
+>       ret = needs_bounce(dev, dma_addr, size);
+>       if (ret < 0)
+> -         return ARM_MAPPING_ERROR;
+> +         return DMA_MAPPING_ERROR;
+> 
+> which while it all makes sense in the context of this patch-series, I
+> *really* think it would have been so much nicer to return the error
+> code 'ret' instead (which in this case is -E2BIG).
+> 
+> I don't think this is a huge deal, but ERR_PTR() has been hugely
+> successful elsewhere. And I'm not hugely convinced about all these
+> "any address can be valid" arguments. How the hell do you generate a
+> random dma address in the last page that isn't even page-aligned?
 
-Signed-off-by: Nathan Jones <nathanj439@gmail.com>
----
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+kmalloc() a 64-byte buffer, dma_map_single() that buffer.  If you
+have RAM that maps to a _bus_ address in the top page of 4GB of a
+32-bit bus address, then you lose.  Simples.
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 661fe48ab78d..78de138aa66d 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -829,7 +829,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
- 		 unsigned long attrs)
- {
--	int ret;
-+	int ret = -ENXIO;
- 	unsigned long nr_vma_pages = vma_pages(vma);
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
+Subsystems like I2C, SPI, USB etc all deal with small kmalloc'd
+buffers and their drivers make use of DMA.
+
 -- 
-2.19.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
