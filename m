@@ -1,131 +1,150 @@
 From: mesihkilinc@gmail.com (Mesih Kilinc)
-Date: Thu, 29 Nov 2018 01:33:10 +0300
-Subject: [PATCH v5 00/17] initial support for "suniv" Allwinner new ARM9 SoC
-Message-ID: <cover.1543443475.git.mesihkilinc@gmail.com>
+Date: Thu, 29 Nov 2018 01:33:15 +0300
+Subject: [PATCH v5 05/17] irqchip/sun4i: Add a struct to hold global variables
+In-Reply-To: <cover.1543443475.git.mesihkilinc@gmail.com>
+References: <cover.1543443475.git.mesihkilinc@gmail.com>
+Message-ID: <2a0d6976464548ba2c17f818835ec671968f0040.1543443475.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fifth version of patchset for Allwinner ARMv5 F1C100s
-SoC. Addressed comments from Maxime Ripard and Rob Herring, added signatures.
+In order to support different chips, IC specific data should be hold in
+a struct. This patch moves irq_base and irq_domain global variables to
+struct.
 
-Changes since v4:
-- Patch "dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl"
-  - This patch applied for 4.21.
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - This patch applied for 4.21.
-- Patch "dt-bindings: clock: Add Allwinner suniv F1C100s CCU"
-  - Fixed license identifier position
-  - Added DMA fields.
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Added DMA reset and clock support.
-- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - Remove dt-binding headers. 
-  - Fix uart0 pin label.
-- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
-  - Fix uart0 pin label.
+Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+ drivers/irqchip/irq-sun4i.c | 64 +++++++++++++++++++++++++++------------------
+ 1 file changed, 38 insertions(+), 26 deletions(-)
 
-Changes since v3:
-- Patch "ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs"
-  - Remove CONFIG_ARCH_SUNXI_Vx. Use ARCH_MULTI_Vx to differentiate SoC's
-  - Change KConfig ARCH_SUNXI selection: 'select' to 'default'. 
-- Patch "irqchip/sun4i: Add a struct to hold global variables"
-  - Split irq_sun4i.c changes to 3 patch.
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - pinctrl-suniv-f1c100s: remove: disable_strict_mode = true
-- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - suniv-f1c100s.dtsi: remove unnecessary componenets.
-  - Instead of patching drivers, add original compatible string with 
-f1c100s compatibles.
-  - Add Acked-by signatures.
-
-Changes since v2:
-- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
-  - Move SUN4I_TIMER option to ARCH_SUNXI
-  - Added help text for MACH_SUNIV
-- Patch "irqchip/sun4i: add support for suniv interrupt controller"
-  - Defined sunxi_irq_chip_data struct and used it to differentiate
-    registers between different chips.
-- Patch " ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - Removed unnecessary fake clock.
-  - Fixed compatible strings.
-
-Changes since v1:
-- Patch "ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate ARMv5/v7
-  Allwinner SoCs"
-  - Instead of using a common bool config use a common menuconfig. 
-  - Use ARCH_MULTI_V7 to differentiate V7 SoCs.
-  - Addressed comment from Julian Calaby
-- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
-  - Use ARCH_MULTI_V5 to differentiate V5 SoCs.
-  - removed "allwinner,suniv" board compatible string
-  - Added dt-bindings
-- Patch "irqchip/sun4i: add support for suniv interrupt controller"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-ic" to "allwinner,suniv-f1c100s-ic"
-- Patch "clocksource: sun4i: add a compatible for suniv"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-timer" to "allwinner,suniv-f1c100s-timer"
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - Added dt-bindings
-  - Renamed suniv-pinctrl to suniv-f1c100s-pinctrl
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Added dt-bindings
-  - Renamed suniv-ccu to suniv-f1c100s-ccu
-- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
-  - Addressed comment from Rask Ingemann Lambertsen
-
-Thanks!
-
-Mesih Kilinc (17):
-  ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs
-  dt-bindings: arm: Add new Allwinner ARMv5 F1C100s SoC
-  ARM: sunxi: add Allwinner ARMv5 SoCs
-  dt-bindings: interrupt-controller: Add suniv interrupt-controller
-  irqchip/sun4i: Add a struct to hold global variables
-  irqchip/sun4i: Move IC specific register offsets to struct
-  irqchip/sun4i: Add support for Allwinner ARMv5 F1C100s
-  dt-bindings: timer: Add Allwinner suniv timer
-  clocksource: sun4i: add a compatible for suniv
-  dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl
-  pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)
-  dt-bindings: clock: Add Allwinner suniv F1C100s CCU
-  clk: sunxi-ng: add support for suniv F1C100s SoC
-  dt-bindings: sram: Add Allwinner suniv F1C100s
-  dt-bindings: watchdog: Add Allwinner ARMv5 F1C100s wdt
-  ARM: dts: suniv: add initial DTSI file for F1C100s
-  ARM: suniv: f1c100s: add device tree for Lichee Pi Nano
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- .../interrupt-controller/allwinner,sun4i-ic.txt    |   4 +-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- .../devicetree/bindings/sram/sunxi-sram.txt        |   4 +
- .../bindings/timer/allwinner,sun4i-timer.txt       |   4 +-
- .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |  26 +
- arch/arm/boot/dts/suniv-f1c100s.dtsi               | 147 ++++++
- arch/arm/mach-sunxi/Kconfig                        |  19 +-
- arch/arm/mach-sunxi/sunxi.c                        |  10 +
- drivers/clk/sunxi-ng/Kconfig                       |   5 +
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c           | 541 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h           |  34 ++
- drivers/clocksource/sun4i_timer.c                  |   5 +-
- drivers/irqchip/irq-sun4i.c                        | 106 ++--
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c      | 416 ++++++++++++++++
- include/dt-bindings/clock/suniv-ccu-f1c100s.h      |  70 +++
- include/dt-bindings/reset/suniv-ccu-f1c100s.h      |  38 ++
- 23 files changed, 1408 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
- create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
- create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
-
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index e3e5b91..0c32506 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -31,8 +31,12 @@
+ #define SUN4I_IRQ_ENABLE_REG(x)		(0x40 + 0x4 * x)
+ #define SUN4I_IRQ_MASK_REG(x)		(0x50 + 0x4 * x)
+ 
+-static void __iomem *sun4i_irq_base;
+-static struct irq_domain *sun4i_irq_domain;
++struct sun4i_irq_chip_data {
++	void __iomem *irq_base;
++	struct irq_domain *irq_domain;
++};
++
++static struct sun4i_irq_chip_data *irq_ic_data;
+ 
+ static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs);
+ 
+@@ -43,7 +47,7 @@ static void sun4i_irq_ack(struct irq_data *irqd)
+ 	if (irq != 0)
+ 		return; /* Only IRQ 0 / the ENMI needs to be acked */
+ 
+-	writel(BIT(0), sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0));
++	writel(BIT(0), irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(0));
+ }
+ 
+ static void sun4i_irq_mask(struct irq_data *irqd)
+@@ -53,9 +57,9 @@ static void sun4i_irq_mask(struct irq_data *irqd)
+ 	int reg = irq / 32;
+ 	u32 val;
+ 
+-	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	val = readl(irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
+ 	writel(val & ~(1 << irq_off),
+-	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
+ }
+ 
+ static void sun4i_irq_unmask(struct irq_data *irqd)
+@@ -65,9 +69,9 @@ static void sun4i_irq_unmask(struct irq_data *irqd)
+ 	int reg = irq / 32;
+ 	u32 val;
+ 
+-	val = readl(sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	val = readl(irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
+ 	writel(val | (1 << irq_off),
+-	       sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(reg));
++	       irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(reg));
+ }
+ 
+ static struct irq_chip sun4i_irq_chip = {
+@@ -95,35 +99,41 @@ static const struct irq_domain_ops sun4i_irq_ops = {
+ static int __init sun4i_of_init(struct device_node *node,
+ 				struct device_node *parent)
+ {
+-	sun4i_irq_base = of_iomap(node, 0);
+-	if (!sun4i_irq_base)
++	irq_ic_data = kzalloc(sizeof(struct sun4i_irq_chip_data), GFP_KERNEL);
++	if (!irq_ic_data) {
++		pr_err("kzalloc failed!\n");
++		return -ENOMEM;
++	}
++
++	irq_ic_data->irq_base = of_iomap(node, 0);
++	if (!irq_ic_data->irq_base)
+ 		panic("%pOF: unable to map IC registers\n",
+ 			node);
+ 
+ 	/* Disable all interrupts */
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(0));
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(1));
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_ENABLE_REG(2));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(0));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(1));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_ENABLE_REG(2));
+ 
+ 	/* Unmask all the interrupts, ENABLE_REG(x) is used for masking */
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(0));
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(1));
+-	writel(0, sun4i_irq_base + SUN4I_IRQ_MASK_REG(2));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(0));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(1));
++	writel(0, irq_ic_data->irq_base + SUN4I_IRQ_MASK_REG(2));
+ 
+ 	/* Clear all the pending interrupts */
+-	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0));
+-	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(1));
+-	writel(0xffffffff, sun4i_irq_base + SUN4I_IRQ_PENDING_REG(2));
++	writel(0xffffffff, irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(0));
++	writel(0xffffffff, irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(1));
++	writel(0xffffffff, irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(2));
+ 
+ 	/* Enable protection mode */
+-	writel(0x01, sun4i_irq_base + SUN4I_IRQ_PROTECTION_REG);
++	writel(0x01, irq_ic_data->irq_base + SUN4I_IRQ_PROTECTION_REG);
+ 
+ 	/* Configure the external interrupt source type */
+-	writel(0x00, sun4i_irq_base + SUN4I_IRQ_NMI_CTRL_REG);
++	writel(0x00, irq_ic_data->irq_base + SUN4I_IRQ_NMI_CTRL_REG);
+ 
+-	sun4i_irq_domain = irq_domain_add_linear(node, 3 * 32,
++	irq_ic_data->irq_domain = irq_domain_add_linear(node, 3 * 32,
+ 						 &sun4i_irq_ops, NULL);
+-	if (!sun4i_irq_domain)
++	if (!irq_ic_data->irq_domain)
+ 		panic("%pOF: unable to create IRQ domain\n", node);
+ 
+ 	set_handle_irq(sun4i_handle_irq);
+@@ -146,13 +156,15 @@ static void __exception_irq_entry sun4i_handle_irq(struct pt_regs *regs)
+ 	 * the extra check in the common case of 1 hapening after having
+ 	 * read the vector-reg once.
+ 	 */
+-	hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
++	hwirq = readl(irq_ic_data->irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
+ 	if (hwirq == 0 &&
+-		  !(readl(sun4i_irq_base + SUN4I_IRQ_PENDING_REG(0)) & BIT(0)))
++		  !(readl(irq_ic_data->irq_base + SUN4I_IRQ_PENDING_REG(0)) &
++			  BIT(0)))
+ 		return;
+ 
+ 	do {
+-		handle_domain_irq(sun4i_irq_domain, hwirq, regs);
+-		hwirq = readl(sun4i_irq_base + SUN4I_IRQ_VECTOR_REG) >> 2;
++		handle_domain_irq(irq_ic_data->irq_domain, hwirq, regs);
++		hwirq = readl(irq_ic_data->irq_base +
++				SUN4I_IRQ_VECTOR_REG) >> 2;
+ 	} while (hwirq != 0);
+ }
 -- 
 2.7.4
