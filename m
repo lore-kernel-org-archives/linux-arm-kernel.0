@@ -1,197 +1,38 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 28 Nov 2018 13:58:11 -0800
+Date: Wed, 28 Nov 2018 13:58:46 -0800
 Subject: [PATCH 3/6] clk: mvebu: add CPU clock driver for Armada 7K/8K
-In-Reply-To: <87y39tufwe.fsf@bootlin.com>
+In-Reply-To: <87wooymqo3.fsf@bootlin.com>
 References: <20180922181709.13007-1-gregory.clement@bootlin.com>
  <20180922181709.13007-4-gregory.clement@bootlin.com>
  <153980089252.5275.819540708953283855@swboyd.mtv.corp.google.com>
- <87y39tufwe.fsf@bootlin.com>
-Message-ID: <154344229160.88331.11927813448117578247@swboyd.mtv.corp.google.com>
+ <87y39tufwe.fsf@bootlin.com> <87wooymqo3.fsf@bootlin.com>
+Message-ID: <154344232606.88331.9141020759033189289@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-11-15 15:22:59)
->  On mer., oct. 17 2018, Stephen Boyd <sboyd@kernel.org> wrote:
+Quoting Gregory CLEMENT (2018-11-27 08:27:40)
+> Hi Stephen,
+>  
+>  On ven., nov. 16 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
 > 
-> > Quoting Gregory CLEMENT (2018-09-22 11:17:06)
-> >> + * @cluster: Cluster clock controller index
-> >> + * @clk_name: Cluster clock controller name
-> >> + * @dev : Cluster clock device
-> >> + * @hw: HW specific structure of Cluster clock controller
-> >> + * @pll_cr_base: CA72MP2 Register base (Device Sample at Reset register)
-> >> + */
-> >> +struct ap_cpu_clk {
-> >> +       int cluster;
+> >>> +static int ap_cpu_clock_probe(struct platform_device *pdev)
+> >>> +{
+> >>> +       int ret, nclusters = 0, cluster_index = 0;
+> >>> +       struct device *dev = &pdev->dev;
+> >>> +       struct device_node *dn, *np = dev->of_node;
+> >>> +       struct ap_cpu_clk *ap_cpu_clk;
+> >>> +       struct regmap *regmap;
+> >>> +
+> >>> +       regmap = syscon_node_to_regmap(np->parent);
+> >>
+> >> Can we just call dev_get_remap() on pdev->dev.parent?
 > >
-> > unsigned?
+> > we could do regmap = dev_get_regmap(pdev->dev.parent, NULL); instead of
+> > this line. But is it really better?
 > 
-> I don't expect to have so many clusters that a signed int would be too
-> short :)
+> Actually we can't, because we really depend on a syscon and at this
+> moment there is no regmap. It is the syscon_node_to_regmap function which
+> creates this regmap when needed.
 > 
-> Actually I used int to let the compiler choose what ever he wants.
-> 
-> But if you really want I can use a unsigned int
 
-It's not just about opening up a wider range of values. It's also about
-being more explicit with the type by indicating a negative value is
-impossible/doesn't make sense for the code. So yes please, change it to
-unsigned int.
-
-> 
-> >
-> >> +       const char *clk_name;
-> >> +       struct device *dev;
-> >> +       struct clk_hw hw;
-> >> +       struct regmap *pll_cr_base;
-> >> +};
-> >> +
-> >> +static struct clk **cluster_clks;
-> >> +static struct clk_onecell_data clk_data;
-> >
-> > Can you give these some better names that are ap_cpu specific? Grepping
-> > for clk_data will make lots of hits otherwise because they're so
-> > generic.
-> 
-> OK I will try to be more creative ;)
-
-Thanks.
-
-> >> +                          BIT(AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET),
-> >> +                          BIT(AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET));
-> >> +
-> >> +
-> >> +       /* 4. Wait for stabilizing CPU Clock */
-> >> +       do {
-> >> +               regmap_read(clk->pll_cr_base,
-> >> +                           AP806_CA72MP2_0_PLL_SR_REG_OFFSET,
-> >> +                           &reg);
-> >> +       } while (!(reg & BIT(clk->cluster * AP806_CA72MP2_0_PLL_RATIO_STATE)));
-> >
-> > Use regmap_read_poll_timeout() API here and give some large timeout
-> > value so that we don't get stuck waiting here forever?
-> 
-> Indeed regmap_read_poll_timeout() seems a nice improvement
-> 
-> >
-> >> +
-> >> +       /* 5. Clear Reload ratio */
-> >
-> > I'm not sure we really need these comments. They're just saying what the
-> > code is doing, so they don't add much value.
-> 
-> Actually, these 5 steps directly come from the datasheet.
-
-Ok, still doesn't mean we need to copy the datasheet into code comments
-though.
-
-> 
-> >
-> >> +       regmap_update_bits(clk->pll_cr_base, cpu_ratio_reg,
-> >> +                          BIT(AP806_PLL_CR_0_CPU_CLK_RELOAD_RATIO_OFFSET), 0);
-> >> +
-> >> +       return 0;
-> >> +}
-> >> +
-> >> +
-> >> +static long ap_cpu_clk_round_rate(struct clk_hw *hw, unsigned long rate,
-> >> +                                unsigned long *parent_rate)
-> >> +{
-> >> +       int divider = *parent_rate / rate;
-> >> +
-> >> +       if (divider > APN806_MAX_DIVIDER)
-> >> +               divider = APN806_MAX_DIVIDER;
-> >
-> >       divider = min(divider, APN806_MAX_DIVIDER);
-> 
-> OK
-> >
-> >> +
-> >> +       return *parent_rate / divider;
-> >> +}
-> >> +
-> >> +static const struct clk_ops ap_cpu_clk_ops = {
-> >> +       .recalc_rate    = ap_cpu_clk_recalc_rate,
-> >> +       .round_rate     = ap_cpu_clk_round_rate,
-> >> +       .set_rate       = ap_cpu_clk_set_rate,
-> >> +};
-> >> +
-> >> +static int ap_cpu_clock_probe(struct platform_device *pdev)
-> >> +{
-> >> +       int ret, nclusters = 0, cluster_index = 0;
-> >> +       struct device *dev = &pdev->dev;
-> >> +       struct device_node *dn, *np = dev->of_node;
-> >> +       struct ap_cpu_clk *ap_cpu_clk;
-> >> +       struct regmap *regmap;
-> >> +
-> >> +       regmap = syscon_node_to_regmap(np->parent);
-> >
-> > Can we just call dev_get_remap() on pdev->dev.parent?
-> 
-> we could do regmap = dev_get_regmap(pdev->dev.parent, NULL); instead of
-> this line. But is it really better?
-
-It allows us to ignore 'syscon' in this driver and drop the include of
-that header file? 
-
-> 
-> >
-> >> +       if (IS_ERR(regmap)) {
-> >> +               pr_err("cannot get pll_cr_base regmap\n");
-> >> +               return PTR_ERR(regmap);
-> >> +       }
-> >> +
-> >> +       /*
-> >> +        * AP806 has 4 cpus and DFS for AP806 is controlled per
-> >> +        * cluster (2 CPUs per cluster), cpu0 and cpu1 are fixed to
-> >> +        * cluster0 while cpu2 and cpu3 are fixed to cluster1 whether
-> >> +        * they are enabled or not.  Since cpu0 is the boot cpu, then
-> >> +        * cluster0 must exist.  If cpu2 or cpu3 is enabled, cluster1
-> >> +        * will exist and the cluster number is 2; otherwise the
-> >> +        * cluster number is 1.
-> >> +        */
-> >> +       nclusters = 1;
-> >> +       for_each_node_by_type(dn, "cpu") {
-> >
-> > Isn't there some sort of for_each_cpu_node() API that can be used
-> > here?
-> 
-> Not when I wrote the code but since v4.20-rc1 we have
-> for_each_of_cpu_node(). So I am going to use it now.
-
-Awesome!
-
-> >
-> >> +               cluster_index >>= APN806_CLUSTER_NUM_OFFSET;
-> >> +
-> >> +               /* Initialize once for one cluster */
-> >> +               if (cluster_clks[cluster_index])
-> >> +                       continue;
-> >> +
-> >> +               parent = of_clk_get(np, cluster_index);
-> >> +               if (IS_ERR(parent)) {
-> >> +                       dev_err(dev, "Could not get the clock parent\n");
-> >> +                       return -EINVAL;
-> >> +               }
-> >> +               parent_name =  __clk_get_name(parent);
-> >> +               clk_name[12] += cluster_index;
-> >> +               ap_cpu_clk[cluster_index].clk_name =
-> >> +                       ap_cp_unique_name(dev, np->parent, clk_name);
-> >> +               ap_cpu_clk[cluster_index].cluster = cluster_index;
-> >> +               ap_cpu_clk[cluster_index].pll_cr_base = regmap;
-> >> +               ap_cpu_clk[cluster_index].hw.init = &init;
-> >> +               ap_cpu_clk[cluster_index].dev = dev;
-> >> +
-> >> +               init.name = ap_cpu_clk[cluster_index].clk_name;
-> >> +               init.ops = &ap_cpu_clk_ops;
-> >> +               init.num_parents = 1;
-> >> +               init.parent_names = &parent_name;
-> >> +               init.flags = CLK_GET_RATE_NOCACHE;
-> >
-> > Can you add a comment why we need NOCACHE here? It isn't clear why this
-> > is important.
-> 
-> I think there was the idea that the clock rate could be modified by
-> something else that the clk driver, but now I am not sure it is the
-> case. I will check it and either add a comment or just remove it.
-
-Ok.
+Ah ok. Nevermind then.
