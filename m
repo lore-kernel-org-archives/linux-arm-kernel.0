@@ -1,88 +1,74 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:18 +0100
-Subject: [PATCH v4 14/20] ARM: mmp/mmp2: use cpu_is_pj4() instead of
- cpu_is_mmp2()
+Date: Wed, 28 Nov 2018 18:53:14 +0100
+Subject: [PATCH v4 10/20] DT: marvell,mmp2: Add SSP controllers
 In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-15-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-11-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMP2 platform uses the PJ4 CPU. The cpu_is_mmp2() macro is thus
-actually not useful at all and moreover gives the wrong result on
-MACH_MMP2_DT.
+Despite Marvel keeps their base addresses secret there's a good chance
+they're actually correct.
 
-The actual problem I aim to fix is that on a device-tree enabled system,
-the timer ends up being initialized incorrectly. In fact, it ticks like
-at rate that's 1/100 slower or so.
-
-Perhaps the other cpu_is_mmp2() uses are more benign, but still useless.
+SSP1 and SSP3 bases were taken from OLPC 1.75: OpenFirmware and kernel
+respectively. SSP2 and SSP4 addresses are from James Cameron who actually
+has a copy of the data sheet.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
----
- arch/arm/mach-mmp/cputype.h | 9 ---------
- arch/arm/mach-mmp/mmp2.c    | 2 +-
- arch/arm/mach-mmp/pm-mmp2.c | 2 +-
- arch/arm/mach-mmp/time.c    | 2 +-
- 4 files changed, 3 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/cputype.h b/arch/arm/mach-mmp/cputype.h
-index 446edaeb78a7..405dbbbbbcdd 100644
---- a/arch/arm/mach-mmp/cputype.h
-+++ b/arch/arm/mach-mmp/cputype.h
-@@ -44,13 +44,4 @@ static inline int cpu_is_pxa910(void)
- #define cpu_is_pxa910()	(0)
- #endif
+---
+Changes since v2:
+- Added SSP2 and SSP4 (thanks James Cameron <quozl@laptop.org>)
+
+Changes since v1:
+- Dropped the aliases
+
+ arch/arm/boot/dts/mmp2.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+index 0c5a51b98c3f..ee03e0846740 100644
+--- a/arch/arm/boot/dts/mmp2.dtsi
++++ b/arch/arm/boot/dts/mmp2.dtsi
+@@ -346,6 +346,38 @@
+ 				resets = <&soc_clocks MMP2_CLK_RTC>;
+ 				status = "disabled";
+ 			};
++
++			ssp1: ssp at d4035000 {
++				compatible = "marvell,mmp2-ssp";
++				reg = <0xd4035000 0x1000>;
++				clocks = <&soc_clocks MMP2_CLK_SSP0>;
++				interrupts = <0>;
++				status = "disabled";
++			};
++
++			ssp2: ssp at d4036000 {
++				compatible = "marvell,mmp2-ssp";
++				reg = <0xd4036000 0x1000>;
++				clocks = <&soc_clocks MMP2_CLK_SSP1>;
++				interrupts = <1>;
++				status = "disabled";
++			};
++
++			ssp3: ssp at d4037000 {
++				compatible = "marvell,mmp2-ssp";
++				reg = <0xd4037000 0x1000>;
++				clocks = <&soc_clocks MMP2_CLK_SSP2>;
++				interrupts = <20>;
++				status = "disabled";
++			};
++
++			ssp4: ssp at d4039000 {
++				compatible = "marvell,mmp2-ssp";
++				reg = <0xd4039000 0x1000>;
++				clocks = <&soc_clocks MMP2_CLK_SSP3>;
++				interrupts = <21>;
++				status = "disabled";
++			};
+ 		};
  
--#ifdef CONFIG_CPU_MMP2
--static inline int cpu_is_mmp2(void)
--{
--	return (((read_cpuid_id() >> 8) & 0xff) == 0x58);
--}
--#else
--#define cpu_is_mmp2()	(0)
--#endif
--
- #endif /* __ASM_MACH_CPUTYPE_H */
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index afba5460cdaf..b670fafedeac 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -104,7 +104,7 @@ void __init mmp2_init_irq(void)
- 
- static int __init mmp2_init(void)
- {
--	if (cpu_is_mmp2()) {
-+	if (cpu_is_pj4()) {
- #ifdef CONFIG_CACHE_TAUROS2
- 		tauros2_init(0);
- #endif
-diff --git a/arch/arm/mach-mmp/pm-mmp2.c b/arch/arm/mach-mmp/pm-mmp2.c
-index 17699be3bc3d..bcd5111ffb37 100644
---- a/arch/arm/mach-mmp/pm-mmp2.c
-+++ b/arch/arm/mach-mmp/pm-mmp2.c
-@@ -220,7 +220,7 @@ static int __init mmp2_pm_init(void)
- {
- 	uint32_t apcr;
- 
--	if (!cpu_is_mmp2())
-+	if (!cpu_is_pj4())
- 		return -EIO;
- 
- 	suspend_set_ops(&mmp2_pm_ops);
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 96ad1db0b04b..0f49ac579a17 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -163,7 +163,7 @@ static void __init timer_config(void)
- 
- 	__raw_writel(0x0, mmp_timer_base + TMR_CER); /* disable */
- 
--	ccr &= (cpu_is_mmp2()) ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
-+	ccr &= (cpu_is_pj4()) ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
- 		(TMR_CCR_CS_0(3) | TMR_CCR_CS_1(3));
- 	__raw_writel(ccr, mmp_timer_base + TMR_CCR);
- 
+ 		soc_clocks: clocks{
 -- 
 2.19.1
