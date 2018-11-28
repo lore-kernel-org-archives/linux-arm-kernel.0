@@ -1,53 +1,40 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Tue, 27 Nov 2018 20:37:38 -0800
-Subject: [PATCH v2 3/3] dt-bindings: reset: imx7: Document usage on i.MX8MQ
- SoCs
-In-Reply-To: <20181128043738.12714-1-andrew.smirnov@gmail.com>
-References: <20181128043738.12714-1-andrew.smirnov@gmail.com>
-Message-ID: <20181128043738.12714-4-andrew.smirnov@gmail.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 28 Nov 2018 05:20:57 +0000
+Subject: [PATCH V2 0/4] Add i.MX system controller RTC driver
+Message-ID: <1543382119-2918-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver now supports i.MX8MQ, so update bindings accordingly.
+NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
+system controller, the system controller is in charge of system
+power, clock and secure RTC etc. management, Linux kernel
+has to communicate with system controller via MU (message unit)
+IPC to do RTC operation.
 
-Cc: p.zabel at pengutronix.de
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: cphealy at gmail.com
-Cc: l.stach at pengutronix.de
-Cc: Leonard Crestez <leonard.crestez@nxp.com>
-Cc: "A.s. Dong" <aisheng.dong@nxp.com>
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: Rob Herring <robh@kernel.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-imx at nxp.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- Documentation/devicetree/bindings/reset/fsl,imx7-src.txt | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Since the RTC set time MUST to be done in secure EL3 mode (required
+by system controller firmware) and ALARM functions needs to be done
+with general MU IRQ handle, these are NOT ready NOW, so this patch
+ONLY supports RTC read time for now.
 
-diff --git a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-index 1ab1d109318e..2ecf33815d18 100644
---- a/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-+++ b/Documentation/devicetree/bindings/reset/fsl,imx7-src.txt
-@@ -5,7 +5,9 @@ Please also refer to reset.txt in this directory for common reset
- controller binding usage.
- 
- Required properties:
--- compatible: Should be "fsl,imx7d-src", "syscon"
-+- compatible:
-+	- For i.MX7 SoCs should be "fsl,imx7d-src", "syscon"
-+	- For i.MX8MQ SoCs should be "fsl,imx8mq-src", "syscon"
- - reg: should be register base and length as documented in the
-   datasheet
- - interrupts: Should contain SRC interrupt
-@@ -44,4 +46,5 @@ Example:
- 
- 
- For list of all valid reset indicies see
--<dt-bindings/reset/imx7-reset.h>
-+<dt-bindings/reset/imx7-reset.h> for i.MX7 and
-+<dt-bindings/reset/imx8mq-reset.h> for i.MX8MQ
+Note that this patch set is based on [V4,5/5] defconfig: arm64: add imx8qxp support,
+https://patchwork.kernel.org/patch/10677315/
+
+Anson Huang (4):
+  dt-bindings: rtc: add binding doc for i.MX system controller RTC
+    driver
+  rtc: add i.MX system controller RTC support
+  defconfig: arm64: add i.MX system controller RTC support
+  ARM64: dts: imx: add i.MX8QXP system controller RTC support
+
+ .../devicetree/bindings/rtc/rtc-imx-sc.txt         |  10 ++
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |   4 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/rtc/Kconfig                                |   6 ++
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-imx-sc.c                           | 107 +++++++++++++++++++++
+ 6 files changed, 129 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
+ create mode 100644 drivers/rtc/rtc-imx-sc.c
+
 -- 
-2.19.1
+2.7.4
