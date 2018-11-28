@@ -1,29 +1,61 @@
 From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Nov 2018 14:40:30 +0100
-Subject: [PATCH 26/77] ARM: dts: sun6i: Fix Display Engine DTC warnings
-In-Reply-To: <CAGb2v66yU6T0EdMKRBhMPHg2LGyWKUvEnB_kwCrMFV8TdoKQvA@mail.gmail.com>
+Date: Wed, 28 Nov 2018 14:59:31 +0100
+Subject: [PATCH 58/77] ARM: dts: sun8i: a23/a33: Remove redundant MMC
+ pinmux tuning
+In-Reply-To: <CAGb2v67H0pAODp2dixSi-cjhMiBcc_YwoKkCxf4msZ4522A88A@mail.gmail.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <5787dbe557d085e65ea01bfb0360143d0df7c8b7.1543321707.git-series.maxime.ripard@bootlin.com>
- <CAGb2v66yU6T0EdMKRBhMPHg2LGyWKUvEnB_kwCrMFV8TdoKQvA@mail.gmail.com>
-Message-ID: <20181128134030.5k5s63kh7kmz4kpg@flea>
+ <d856497c2ad879816c6f944128bc62371f604f7a.1543321707.git-series.maxime.ripard@bootlin.com>
+ <CAGb2v67H0pAODp2dixSi-cjhMiBcc_YwoKkCxf4msZ4522A88A@mail.gmail.com>
+Message-ID: <20181128135931.dpmuqpzz5wayucv3@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 07:41:51PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+Hi,
+
+On Wed, Nov 28, 2018 at 08:36:33PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 > >
-> > Our display engine endpoints trigger some DTC warnings due to the fact that
-> > we're having a single endpoint that doesn't need any reg property, and
-> > since we don't have a reg property, we don't need the address-cells and
-> > size-cells properties anymore.
+> > Some boards override the MMC pin muxing settings in order to enable the
+> > pull-ups and change the drive strength to a value higher than the default.
 > >
-> > Fix those
+> > While this was needed in the earlier days, this is now the default setting
+> > for those pins, and therefore we don't need those board-specific settings
+> > anymore.
 > >
 > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 4 ----
+> >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts | 4 ----
+> >  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        | 4 ----
+> >  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts        | 7 -------
+> >  arch/arm/boot/dts/sun8i-q8-common.dtsi                | 4 ----
+> >  arch/arm/boot/dts/sun8i-r16-parrot.dts                | 5 -----
+> >  6 files changed, 28 deletions(-)
+> >
 > 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> [...]
+> 
+> > diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> > index b343153948f4..7e006d0fbf27 100644
+> > --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> > +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+> > @@ -151,13 +151,6 @@
+> >         status = "okay";
+> >  };
+> >
+> > -&mmc2_8bit_pins {
+> > -       /* Increase drive strength for DDR modes */
+> > -       drive-strength = <40>;
+> 
+> This is not the default. Maybe we should make it the default?
 
-Applied, thanks!
+IIRC, you looked into the emmc standard some time ago, and you
+concluded that the default was 30mA.
+
+I don't really want to make it the default if only a couple of boards
+need it though. I've droped that part from the patch.
+
+Thanks!
 Maxime
 
 -- 
@@ -36,4 +68,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 228 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/730047f3/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/8b1e2841/attachment.sig>
