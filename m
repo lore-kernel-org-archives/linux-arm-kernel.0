@@ -1,159 +1,74 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:20 +0100
-Subject: [PATCH v4 16/20] ARM: mmp/mmp2: dt: enable the clock
+Date: Wed, 28 Nov 2018 18:53:09 +0100
+Subject: [PATCH v4 05/20] DT: marvell,mmp2: add MMC controllers
 In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-17-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-6-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device-tree booted MMP2 needs to enable the timer clock, otherwise
-it would stop ticking when the boot finishes.
-
-It can also use the clock rate from the clk, the non-DT boards need to
-keep using the hardcoded rates.
+There's apparently four of them on a MMP2.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 
 ---
-Changes since v2:
-- Wording improvement, whitespace fix and an ack from Pavel
+Changes since v3:
+- Fixed the mmc4 node name
 
 Changes since v1:
-- Made the clock optional, to keep compatibility with DTs without it
+- The controllers seem to be on AXI bus, not APB. Move them.
+- Remove aliases.
 
- arch/arm/mach-mmp/common.h |  2 +-
- arch/arm/mach-mmp/mmp2.c   |  2 +-
- arch/arm/mach-mmp/pxa168.c |  2 +-
- arch/arm/mach-mmp/time.c   | 32 ++++++++++++++++++++------------
- 4 files changed, 23 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/mmp2.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm/mach-mmp/common.h b/arch/arm/mach-mmp/common.h
-index 7e284d9c429f..5ac2851ef5d3 100644
---- a/arch/arm/mach-mmp/common.h
-+++ b/arch/arm/mach-mmp/common.h
-@@ -2,7 +2,7 @@
- #include <linux/reboot.h>
- #define ARRAY_AND_SIZE(x)	(x), ARRAY_SIZE(x)
- 
--extern void timer_init(int irq);
-+extern void timer_init(int irq, unsigned long rate);
- 
- extern void __init mmp_map_io(void);
- extern void mmp_restart(enum reboot_mode, const char *);
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index b670fafedeac..8717de7d0757 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -134,7 +134,7 @@ void __init mmp2_timer_init(void)
- 	clk_rst = APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(1);
- 	__raw_writel(clk_rst, APBC_TIMERS);
- 
--	timer_init(IRQ_MMP2_TIMER1);
-+	timer_init(IRQ_MMP2_TIMER1, 6500000);
- }
- 
- /* on-chip devices */
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 0f5f16fb8c66..77a358165a56 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -79,7 +79,7 @@ void __init pxa168_timer_init(void)
- 	/* 3.25MHz, bus/functional clock enabled, release reset */
- 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
- 
--	timer_init(IRQ_PXA168_TIMER1);
-+	timer_init(IRQ_PXA168_TIMER1, 6500000);
- }
- 
- void pxa168_clear_keypad_wakeup(void)
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 0f49ac579a17..007b94a92923 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
-+#include <linux/clk.h>
- 
- #include <linux/io.h>
- #include <linux/irq.h>
-@@ -38,12 +39,6 @@
- #include "cputype.h"
- #include "clock.h"
- 
--#ifdef CONFIG_CPU_MMP2
--#define MMP_CLOCK_FREQ		6500000
--#else
--#define MMP_CLOCK_FREQ		3250000
--#endif
--
- #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
- 
- #define MAX_DELTA		(0xfffffffe)
-@@ -189,19 +184,18 @@ static struct irqaction timer_irq = {
- 	.dev_id		= &ckevt,
- };
- 
--void __init timer_init(int irq)
-+void __init timer_init(int irq, unsigned long rate)
- {
- 	timer_config();
- 
--	sched_clock_register(mmp_read_sched_clock, 32, MMP_CLOCK_FREQ);
-+	sched_clock_register(mmp_read_sched_clock, 32, rate);
- 
- 	ckevt.cpumask = cpumask_of(0);
- 
- 	setup_irq(irq, &timer_irq);
- 
--	clocksource_register_hz(&cksrc, MMP_CLOCK_FREQ);
--	clockevents_config_and_register(&ckevt, MMP_CLOCK_FREQ,
--					MIN_DELTA, MAX_DELTA);
-+	clocksource_register_hz(&cksrc, rate);
-+	clockevents_config_and_register(&ckevt, rate, MIN_DELTA, MAX_DELTA);
- }
- 
- #ifdef CONFIG_OF
-@@ -213,7 +207,9 @@ static const struct of_device_id mmp_timer_dt_ids[] = {
- void __init mmp_dt_init_timer(void)
- {
- 	struct device_node *np;
-+	struct clk *clk;
- 	int irq, ret;
-+	unsigned long rate;
- 
- 	np = of_find_matching_node(NULL, mmp_timer_dt_ids);
- 	if (!np) {
-@@ -221,6 +217,18 @@ void __init mmp_dt_init_timer(void)
- 		goto out;
- 	}
- 
-+	clk = of_clk_get(np, 0);
-+	if (!IS_ERR(clk)) {
-+		ret = clk_prepare_enable(clk);
-+		if (ret)
-+			goto out;
-+		rate = clk_get_rate(clk) / 2;
-+	} else if (cpu_is_pj4()) {
-+		rate = 6500000;
-+	} else {
-+		rate = 3250000;
-+	}
+diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+index 4743a1288280..1120fe6abbdc 100644
+--- a/arch/arm/boot/dts/mmp2.dtsi
++++ b/arch/arm/boot/dts/mmp2.dtsi
+@@ -117,6 +117,42 @@
+ 				reg-names = "mux status", "mux mask";
+ 				mrvl,intc-nr-irqs = <2>;
+ 			};
 +
- 	irq = irq_of_parse_and_map(np, 0);
- 	if (!irq) {
- 		ret = -EINVAL;
-@@ -231,7 +239,7 @@ void __init mmp_dt_init_timer(void)
- 		ret = -ENOMEM;
- 		goto out;
- 	}
--	timer_init(irq);
-+	timer_init(irq, rate);
- 	return;
- out:
- 	pr_err("Failed to get timer from device tree with error:%d\n", ret);
++			mmc1: mmc at d4280000 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4280000 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH0>;
++				clock-names = "io";
++				interrupts = <39>;
++				status = "disabled";
++			};
++
++			mmc2: mmc at d4280800 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4280800 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH1>;
++				clock-names = "io";
++				interrupts = <52>;
++				status = "disabled";
++			};
++
++			mmc3: mmc at d4281000 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4281000 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH2>;
++				clock-names = "io";
++				interrupts = <53>;
++				status = "disabled";
++			};
++
++			mmc4: mmc at d4281800 {
++				compatible = "mrvl,pxav3-mmc";
++				reg = <0xd4281800 0x120>;
++				clocks = <&soc_clocks MMP2_CLK_SDH3>;
++				clock-names = "io";
++				interrupts = <54>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		apb at d4000000 {	/* APB */
 -- 
 2.19.1
