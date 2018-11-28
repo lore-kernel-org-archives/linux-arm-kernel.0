@@ -1,38 +1,54 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Wed, 28 Nov 2018 15:43:30 +0800
-Subject: [PATCH v3] spi: mediatek: Add bindings for mediatek MT7629 soc
- platform
-Message-ID: <1543391010-23554-1-git-send-email-leilk.liu@mediatek.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 28 Nov 2018 07:51:22 +0000
+Subject: [PATCH] arm64: Use a raw spinlock in __install_bp_hardening_cb()
+In-Reply-To: <20181127153521.29182-1-james.morse@arm.com>
+References: <20181127153521.29182-1-james.morse@arm.com>
+Message-ID: <867egxskqt.wl-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a DT binding documentation for the MT7629 soc.
+On Tue, 27 Nov 2018 15:35:21 +0000,
+James Morse <james.morse@arm.com> wrote:
+> 
+> __install_bp_hardening_cb() is called via stop_machine() as part
+> of the cpu_enable callback. To force each CPU to take its turn
+> when allocating slots, they take a spinlock.
+> 
+> With the RT patches applied, the spinlock becomes a mutex,
+> and we get warnings about sleeping while in stop_machine():
+> | [    0.319176] CPU features: detected: RAS Extension Support
+> | [    0.319950] BUG: scheduling while atomic: migration/3/36/0x00000002
+> | [    0.319955] Modules linked in:
+> | [    0.319958] Preemption disabled at:
+> | [    0.319969] [<ffff000008181ae4>] cpu_stopper_thread+0x7c/0x108
+> | [    0.319973] CPU: 3 PID: 36 Comm: migration/3 Not tainted 4.19.1-rt3-00250-g330fc2c2a880 #2
+> | [    0.319975] Hardware name: linux,dummy-virt (DT)
+> | [    0.319976] Call trace:
+> | [    0.319981]  dump_backtrace+0x0/0x148
+> | [    0.319983]  show_stack+0x14/0x20
+> | [    0.319987]  dump_stack+0x80/0xa4
+> | [    0.319989]  __schedule_bug+0x94/0xb0
+> | [    0.319991]  __schedule+0x510/0x560
+> | [    0.319992]  schedule+0x38/0xe8
+> | [    0.319994]  rt_spin_lock_slowlock_locked+0xf0/0x278
+> | [    0.319996]  rt_spin_lock_slowlock+0x5c/0x90
+> | [    0.319998]  rt_spin_lock+0x54/0x58
+> | [    0.320000]  enable_smccc_arch_workaround_1+0xdc/0x260
+> | [    0.320001]  __enable_cpu_capability+0x10/0x20
+> | [    0.320003]  multi_cpu_stop+0x84/0x108
+> | [    0.320004]  cpu_stopper_thread+0x84/0x108
+> | [    0.320008]  smpboot_thread_fn+0x1e8/0x2b0
+> | [    0.320009]  kthread+0x124/0x128
+> | [    0.320010]  ret_from_fork+0x10/0x18
+> 
+> Switch this to a raw spinlock, as we know this is only called with
+> IRQs masked.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
-v3:
-remove cover-letter.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-v2:
-remove "mediatek,mt7629-spi" compatible according Matthias's advice.
+	M.
 
-v1:
-This series are based on 4.20-rc1 and provide two patches to support mt7629 IC.
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index 7940940..69c3567 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -6,6 +6,7 @@ Required properties:
-     - mediatek,mt2712-spi: for mt2712 platforms
-     - mediatek,mt6589-spi: for mt6589 platforms
-     - mediatek,mt7622-spi: for mt7622 platforms
-+    - "mediatek,mt7629-spi", "mediatek,mt7622-spi": for mt7629 platforms
-     - mediatek,mt8135-spi: for mt8135 platforms
-     - mediatek,mt8173-spi: for mt8173 platforms
-     - mediatek,mt8183-spi: for mt8183 platforms
 -- 
-1.7.9.5
+Jazz is not dead, it just smell funny.
