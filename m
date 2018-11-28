@@ -1,39 +1,55 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:13 +0100
-Subject: [PATCH v4 09/20] DT: marvell,mmp2: add USB OTG host controller
+Date: Wed, 28 Nov 2018 18:53:10 +0100
+Subject: [PATCH v4 06/20] DT: marvell,mmp2: fix TWSI2
 In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-10-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-7-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Marvell keeps their MMP2 datasheet secret, but there are good clues
+that TWSI2 is not on 0xd4025000 on that platform, not does it use
+IRQ 58. In fact, the IRQ 58 on MMP2 seems to be a signal processor:
+
+   arch/arm/mach-mmp/irqs.h:#define IRQ_MMP2_MSP  58
+
+I'm taking a somewhat educated guess that is probably a copy & paste
+error from PXA168 or PXA910 and that the real controller in fact hides
+at address 0xd4031000 and uses an interrupt line multiplexed via IRQ 17.
+
+I'm also copying some properties from TWSI1 that were missing or
+incorrect.
+
+Tested on a OLPC XO 1.75 machine, where the RTC is on TWSI2.
+
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Pavel Machek <pavel@ucw.cz>
+Tested-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm/boot/dts/mmp2.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/mmp2.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index 57f6248f17cd..0c5a51b98c3f 100644
+index 1120fe6abbdc..c5787eea57c7 100644
 --- a/arch/arm/boot/dts/mmp2.dtsi
 +++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -125,6 +125,17 @@
+@@ -257,12 +257,15 @@
  				status = "disabled";
  			};
  
-+			usb_otg0: usb-otg at d4208000 {
-+				compatible = "marvell,pxau2o-ehci";
-+				reg = <0xd4208000 0x200>;
-+				interrupts = <44>;
-+				clocks = <&soc_clocks MMP2_CLK_USB>;
-+				clock-names = "USBCLK";
-+				phys = <&usb_otg_phy0>;
-+				phy-names = "usb";
-+				status = "disabled";
-+			};
-+
- 			mmc1: mmc at d4280000 {
- 				compatible = "mrvl,pxav3-mmc";
- 				reg = <0xd4280000 0x120>;
+-			twsi2: i2c at d4025000 {
++			twsi2: i2c at d4031000 {
+ 				compatible = "mrvl,mmp-twsi";
+-				reg = <0xd4025000 0x1000>;
+-				interrupts = <58>;
++				reg = <0xd4031000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <0>;
+ 				clocks = <&soc_clocks MMP2_CLK_TWSI1>;
+ 				resets = <&soc_clocks MMP2_CLK_TWSI1>;
++				#address-cells = <1>;
++				#size-cells = <0>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.19.1
