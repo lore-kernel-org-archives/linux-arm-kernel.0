@@ -1,78 +1,45 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Nov 2018 16:43:03 +0100
-Subject: [PATCH 58/77] ARM: dts: sun8i: a23/a33: Remove redundant MMC
- pinmux tuning
-In-Reply-To: <CAGb2v66M4G_cgCF6oYq2yU-2T=GRiDRHPEDnkM4Wv9g6bKF0qA@mail.gmail.com>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <d856497c2ad879816c6f944128bc62371f604f7a.1543321707.git-series.maxime.ripard@bootlin.com>
- <CAGb2v67H0pAODp2dixSi-cjhMiBcc_YwoKkCxf4msZ4522A88A@mail.gmail.com>
- <20181128135931.dpmuqpzz5wayucv3@flea>
- <CAGb2v66M4G_cgCF6oYq2yU-2T=GRiDRHPEDnkM4Wv9g6bKF0qA@mail.gmail.com>
-Message-ID: <20181128154303.rjqinarqlmyww7vq@flea>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 28 Nov 2018 09:44:02 -0600
+Subject: [GIT PULL 1/2] ARM: socfpga: updates for v4.20
+Message-ID: <20181128154403.12872-1-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 10:30:55PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Nov 28, 2018 at 9:59 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > On Wed, Nov 28, 2018 at 08:36:33PM +0800, Chen-Yu Tsai wrote:
-> > > On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > > >
-> > > > Some boards override the MMC pin muxing settings in order to enable the
-> > > > pull-ups and change the drive strength to a value higher than the default.
-> > > >
-> > > > While this was needed in the earlier days, this is now the default setting
-> > > > for those pins, and therefore we don't need those board-specific settings
-> > > > anymore.
-> > > >
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 4 ----
-> > > >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts | 4 ----
-> > > >  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        | 4 ----
-> > > >  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts        | 7 -------
-> > > >  arch/arm/boot/dts/sun8i-q8-common.dtsi                | 4 ----
-> > > >  arch/arm/boot/dts/sun8i-r16-parrot.dts                | 5 -----
-> > > >  6 files changed, 28 deletions(-)
-> > > >
-> > >
-> > > [...]
-> > >
-> > > > diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > > index b343153948f4..7e006d0fbf27 100644
-> > > > --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > > +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > > @@ -151,13 +151,6 @@
-> > > >         status = "okay";
-> > > >  };
-> > > >
-> > > > -&mmc2_8bit_pins {
-> > > > -       /* Increase drive strength for DDR modes */
-> > > > -       drive-strength = <40>;
-> > >
-> > > This is not the default. Maybe we should make it the default?
-> >
-> > IIRC, you looked into the emmc standard some time ago, and you
-> > concluded that the default was 30mA.
-> >
-> > I don't really want to make it the default if only a couple of boards
-> > need it though. I've droped that part from the patch.
-> 
-> IIRC you have both boards that have it? Could you test dropping
-> the drive strength down to 30 mA?
+Hi Arnd, Kevin, and Olof:
 
-I think I still do, I'll try to find the time to test this.
+Please pull in these SoCFPGA updates for v5.0.
 
-Thanks!
-Maxime
+Thanks,
+Dinh
 
--- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/4d05cb50/attachment.sig>
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+
+are available in the Git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_updates_for_v5.0
+
+for you to fetch changes up to fbc125afdc5048cb027002147a0e0def7c18573a:
+
+  ARM: socfpga: Turn on ARM errata for L2 cache (2018-11-28 09:23:11 -0600)
+
+----------------------------------------------------------------
+SoCFPGA updates for v5.0
+- Split Kconfig options for debug UART on Cyclone5
+- Remove unused functions from socfpga platform code
+- Turn on ARM and PL310 errata for SOCFPGA ARMv7 platform
+
+----------------------------------------------------------------
+Cl?ment P?ron (2):
+      ARM: debug: enable UART1 for socfpga Cyclone5
+      ARM: socfpga: Clean unused functions
+
+Dinh Nguyen (1):
+      ARM: socfpga: Turn on ARM errata for L2 cache
+
+ arch/arm/Kconfig.debug          | 23 ++++++++++++++++-------
+ arch/arm/mach-socfpga/Kconfig   |  7 +++++++
+ arch/arm/mach-socfpga/core.h    |  2 --
+ arch/arm/mach-socfpga/socfpga.c |  2 +-
+ 4 files changed, 24 insertions(+), 10 deletions(-)
