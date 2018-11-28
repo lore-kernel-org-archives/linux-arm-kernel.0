@@ -1,63 +1,206 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Nov 2018 09:02:33 +0000
-Subject: [PATCH v3 3/4] iio: adc: add STMPE ADC devicetree bindings
-In-Reply-To: <20181123142411.8921-3-dev@pschenker.ch>
-References: <20181123142411.8921-1-dev@pschenker.ch>
- <20181123142411.8921-3-dev@pschenker.ch>
-Message-ID: <20181128090233.GQ4272@dell>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 28 Nov 2018 09:03:59 +0000
+Subject: [PATCH V2 2/4] rtc: add i.MX system controller RTC support
+In-Reply-To: <20181128100040.4072d8e4@karo-electronics.de>
+References: <1543382119-2918-1-git-send-email-Anson.Huang@nxp.com>
+ <1543382119-2918-3-git-send-email-Anson.Huang@nxp.com>
+ <20181128100040.4072d8e4@karo-electronics.de>
+Message-ID: <DB3PR0402MB3916A593FAD5254AB0E3CC54F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Nov 2018, Philippe Schenker wrote:
+Hi, Lothar
 
-> From: Stefan Agner <stefan@agner.ch>
+Best Regards!
+Anson Huang
+
+> -----Original Message-----
+> From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
+> Sent: 2018?11?28? 17:01
+> To: Anson Huang <anson.huang@nxp.com>
+> Cc: a.zummo at towertech.it; alexandre.belloni at bootlin.com;
+> robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; Aisheng DONG <aisheng.dong@nxp.com>; Andy Gross
+> <andy.gross@linaro.org>; arnd at arndb.de; horms+renesas at verge.net.au;
+> heiko at sntech.de; bjorn.andersson at linaro.org; enric.balletbo at collabora.com;
+> amit.kucheria at linaro.org; ezequiel at collabora.com; olof at lixom.net;
+> shawnguo at kernel.org; linux-rtc at vger.kernel.org; devicetree at vger.kernel.org;
+> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> dl-linux-imx <linux-imx@nxp.com>
+> Subject: Re: [PATCH V2 2/4] rtc: add i.MX system controller RTC support
 > 
-> This adds the devicetree bindings for the STMPE ADC.
+> Hi,
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
-> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
-> ---
+> On Wed, 28 Nov 2018 05:21:11 +0000 Anson Huang wrote:
+> > i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+> > inside, the system controller is in charge of controlling power, clock
+> > and secure rtc etc..
+> >
+> > This patch adds i.MX system controller RTC driver support, Linux
+> > kernel has to communicate with system controller via MU (message unit)
+> > IPC to set/get RTC time and other alarm functions, since the RTC set
+> > time needs to be done in secure EL3 mode (required by system
+> > controller firmware) and alarm functions needs to be done with general
+> > MU IRQ handle, these depend on other components which are NOT ready,
+> > so this patch ONLY enables the RTC time read.
+> >
+> > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> > ---
+> > changes since V1:
+> > 	- sort module in Makefile alphabetically;
+> > 	- remove boiler plate license text;
+> > 	- use devm_rtc_allocate_device and rtc_register_device to register the
+> RTC.
+> >  drivers/rtc/Kconfig      |   6 +++
+> >  drivers/rtc/Makefile     |   1 +
+> >  drivers/rtc/rtc-imx-sc.c | 107
+> > +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 114 insertions(+)
+> >  create mode 100644 drivers/rtc/rtc-imx-sc.c
+> >
+> > diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig index
+> > a819ef0..3b9642e 100644
+> > --- a/drivers/rtc/Kconfig
+> > +++ b/drivers/rtc/Kconfig
+> > @@ -1677,6 +1677,12 @@ config RTC_DRV_SNVS
+> >  	   This driver can also be built as a module, if so, the module
+> >  	   will be called "rtc-snvs".
+> >
+> > +config RTC_DRV_IMX_SC
+> > +	tristate "NXP i.MX System Controller RTC support"
+> > +	help
+> > +	   If you say yes here you get support for the NXP i.MX System
+> > +	   Controller RTC module.
+> > +
+> >  config RTC_DRV_SIRFSOC
+> >  	tristate "SiRFSOC RTC"
+> >  	depends on ARCH_SIRF
+> > diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile index
+> > 290c173..f97c05e 100644
+> > --- a/drivers/rtc/Makefile
+> > +++ b/drivers/rtc/Makefile
+> > @@ -75,6 +75,7 @@ obj-$(CONFIG_RTC_DRV_GOLDFISH)	+=
+> rtc-goldfish.o
+> >  obj-$(CONFIG_RTC_DRV_HID_SENSOR_TIME) += rtc-hid-sensor-time.o
+> >  obj-$(CONFIG_RTC_DRV_HYM8563)	+= rtc-hym8563.o
+> >  obj-$(CONFIG_RTC_DRV_IMXDI)	+= rtc-imxdi.o
+> > +obj-$(CONFIG_RTC_DRV_IMX_SC)	+= rtc-imx-sc.o
+> >  obj-$(CONFIG_RTC_DRV_ISL12022)	+= rtc-isl12022.o
+> >  obj-$(CONFIG_RTC_DRV_ISL12026)	+= rtc-isl12026.o
+> >  obj-$(CONFIG_RTC_DRV_ISL1208)	+= rtc-isl1208.o
+> > diff --git a/drivers/rtc/rtc-imx-sc.c b/drivers/rtc/rtc-imx-sc.c new
+> > file mode 100644 index 0000000..7212e38
+> > --- /dev/null
+> > +++ b/drivers/rtc/rtc-imx-sc.c
+> > @@ -0,0 +1,107 @@
+> > +// SPDX-License-Identifier: GPL-2.0+
+> > +/*
+> > + * Copyright 2018 NXP.
+> > + */
+> > +
+> > +#include <linux/init.h>
+> > +#include <linux/io.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/firmware/imx/sci.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/rtc.h>
+> > +
+> > +#define IMX_SC_TIMER_FUNC_GET_RTC_SEC1970	9
+> > +#define IMX_SC_TIMER_FUNC_SET_RTC_TIME		6
+> > +
+> > +struct imx_sc_ipc *rtc_ipc_handle;
+> > +struct rtc_device *rtc;
+> > +
+> Shouldn't these be static?
+> A generic name like 'rtc' as a global variable name is definitely a very bad idea.
+
+Agreed, will improve them in V3 patch set.
+
 > 
-> Changes in v3:
->  - Reformatted documentation for touchscreen to use tabs and have a better
->    overview of the settings.
->  - Added note which adc-settings will take precedence.
->  - changed typo in sample-time setting from 144 clocks to 124 clocks, as stated
->    in the datasheet.
+> > +struct imx_sc_msg_req_timer_get_rtc_time {
+> > +	struct imx_sc_rpc_msg hdr;
+> > +} __packed;
+> > +
+> > +struct imx_sc_msg_resp_timer_get_rtc_time {
+> > +	struct imx_sc_rpc_msg hdr;
+> > +	u32 time;
+> > +} __packed;
+> > +
+> > +static int imx_sc_rtc_read_time(struct device *dev, struct rtc_time
+> > +*tm) {
+> > +	struct imx_sc_msg_resp_timer_get_rtc_time *resp;
+> > +	struct imx_sc_msg_req_timer_get_rtc_time msg;
+> > +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> > +	int ret;
+> > +
+> > +	hdr->ver = IMX_SC_RPC_VERSION;
+> > +	hdr->svc = IMX_SC_RPC_SVC_TIMER;
+> > +	hdr->func = IMX_SC_TIMER_FUNC_GET_RTC_SEC1970;
+> > +	hdr->size = 1;
+> > +
+> > +	ret = imx_scu_call_rpc(rtc_ipc_handle, &msg, true);
+> > +	if (ret) {
+> > +		pr_err("read rtc time failed, ret %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	resp = (struct imx_sc_msg_resp_timer_get_rtc_time *)&msg;
+> > +	rtc_time_to_tm(resp->time, tm);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct rtc_class_ops imx_sc_rtc_ops = {
+> > +	.read_time = imx_sc_rtc_read_time,
+> > +};
+> > +
+> > +static int imx_sc_rtc_probe(struct platform_device *pdev) {
+> > +	int ret;
+> > +
+> > +	ret = imx_scu_get_handle(&rtc_ipc_handle);
+> > +	if (ret) {
+> > +		if (ret == -EPROBE_DEFER)
+> > +			return ret;
+> > +
+> > +		dev_err(&pdev->dev, "failed to get ipc handle: %d!\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	rtc = devm_rtc_allocate_device(&pdev->dev);
+> > +	if (IS_ERR(rtc)) {
+> > +		ret = PTR_ERR(rtc);
+> > +		return ret;
+> > +	}
+> > +
+> > +	rtc->ops = &imx_sc_rtc_ops;
+> > +	rtc->range_min = 0;
+> > +	rtc->range_max = U32_MAX;
+> > +
+> > +	ret = rtc_register_device(rtc);
+> > +	if (ret) {
+> > +		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id imx_sc_dt_ids[] = {
+> > +	{ .compatible = "nxp,imx8qxp-sc-rtc", },
+> > +	{},
+> s/{},/{}/
+> The trailing comma is usually added to make patches that add more entries to
+> the array simpler and help avoid patch conflicts.
+> Since the empty entry MUST be the LAST entry in this array the comma should
+> NOT be added here. Without the comma, adding new entries after the EOL
+> marker will generate a compile error.
+
+Thanks for review, will improve it in V3 patch set.
+
+Anson.
+
 > 
-> Changes in v2:
->  - Moved the bindings for ADC to the overlying mfd.
->  - Reformatted for better readability
 > 
->  .../devicetree/bindings/iio/adc/stmpe-adc.txt | 21 +++++++
->  .../bindings/input/touchscreen/stmpe.txt      | 60 ++++++++++++-------
->  .../devicetree/bindings/mfd/stmpe.txt         | 28 ++++++---
->  3 files changed, 80 insertions(+), 29 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
-[...]
-
-> diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
-> index c797c05cd3c2..d4408a417193 100644
-> --- a/Documentation/devicetree/bindings/mfd/stmpe.txt
-> +++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
-> @@ -4,15 +4,29 @@ STMPE is an MFD device which may expose the following inbuilt devices: gpio,
->  keypad, touchscreen, adc, pwm, rotator.
->  
->  Required properties:
-> - - compatible                   : "st,stmpe[610|801|811|1600|1601|2401|2403]"
-> - - reg                          : I2C/SPI address of the device
-> + - compatible			: "st,stmpe[610|801|811|1600|1601|2401|2403]"
-> + - reg				: I2C/SPI address of the device
-
-Formatting changes should be completed in a separate patch.
-
-Here they only serve to obscure the real changes you have made.
-
-Please split the formatting changes out and re-submit.
-
--- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Lothar Wa?mann
