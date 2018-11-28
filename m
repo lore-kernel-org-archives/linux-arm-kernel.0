@@ -1,54 +1,176 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 28 Nov 2018 14:43:37 +0000
-Subject: [PATCH v2 10/10] irqchip/gic-v3-its: Initialize MSIs with
- subsys_initcalls
-In-Reply-To: <20181128144240.28727-1-rrichter@cavium.com>
-References: <20181128144240.28727-1-rrichter@cavium.com>
-Message-ID: <20181128144240.28727-11-rrichter@cavium.com>
+From: steven.price@arm.com (Steven Price)
+Date: Wed, 28 Nov 2018 14:45:19 +0000
+Subject: [PATCH 04/12] arm/arm64: Make use of the SMCCC 1.1 wrapper
+In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
+References: <20181128144527.44710-1-steven.price@arm.com>
+Message-ID: <20181128144527.44710-5-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ITS is initialized with with the subsys_initcall now, we don't
-need to enable ITS children earlier. Due to the use of irq_domain_
-request_host_*() there are no order dependencies when initializing irq
-domains.
+Rather than directly choosing which function to use based on
+psci_ops.conduit, use the new arm_smccc_1_1 wrapper instead.
 
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+In some cases we still need to do some operations based on the
+conduit, but the code duplication is removed.
+
+Signed-off-by: Steven Price <steven.price@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c   | 2 +-
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 2 +-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mm/proc-v7-bugs.c     | 46 +++++++++++++++------------------
+ arch/arm64/kernel/cpu_errata.c | 47 +++++++++-------------------------
+ 2 files changed, 32 insertions(+), 61 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-index 81dfc534ded8..f6df5ea16aef 100644
---- a/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c
-@@ -111,4 +111,4 @@ static int __init its_fsl_mc_msi_init(void)
- 	return 0;
+diff --git a/arch/arm/mm/proc-v7-bugs.c b/arch/arm/mm/proc-v7-bugs.c
+index 5544b82a2e7a..c24d32d3589d 100644
+--- a/arch/arm/mm/proc-v7-bugs.c
++++ b/arch/arm/mm/proc-v7-bugs.c
+@@ -78,39 +78,33 @@ static void cpu_v7_spectre_init(void)
+ 	case ARM_CPU_PART_CORTEX_A57:
+ 	case ARM_CPU_PART_CORTEX_A72: {
+ 		struct arm_smccc_res res;
++		int conduit;
+ 
+ 		if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+ 			break;
+ 
+-		switch (psci_ops.conduit) {
+-		case PSCI_CONDUIT_HVC:
+-			arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+-			if ((int)res.a0 != 0)
+-				break;
++		conduit = arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++					ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++
++		if ((int)res.a0 == 0) {
+ 			if (processor.switch_mm != cpu_v7_hvc_switch_mm && cpu)
+ 				goto bl_error;
+-			per_cpu(harden_branch_predictor_fn, cpu) =
+-				call_hvc_arch_workaround_1;
+-			processor.switch_mm = cpu_v7_hvc_switch_mm;
+-			spectre_v2_method = "hypervisor";
+-			break;
+-
+-		case PSCI_CONDUIT_SMC:
+-			arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-					  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+-			if ((int)res.a0 != 0)
++			switch (conduit) {
++			case PSCI_CONDUIT_HVC:
++				per_cpu(harden_branch_predictor_fn, cpu) =
++					call_hvc_arch_workaround_1;
++				processor.switch_mm = cpu_v7_hvc_switch_mm;
++				spectre_v2_method = "hypervisor";
+ 				break;
+-			if (processor.switch_mm != cpu_v7_smc_switch_mm && cpu)
+-				goto bl_error;
+-			per_cpu(harden_branch_predictor_fn, cpu) =
+-				call_smc_arch_workaround_1;
+-			processor.switch_mm = cpu_v7_smc_switch_mm;
+-			spectre_v2_method = "firmware";
+-			break;
+-
+-		default:
+-			break;
++			case PSCI_CONDUIT_SMC:
++				per_cpu(harden_branch_predictor_fn, cpu) =
++					call_smc_arch_workaround_1;
++				processor.switch_mm = cpu_v7_smc_switch_mm;
++				spectre_v2_method = "firmware";
++				break;
++			default:
++				break;
++			}
+ 		}
+ 	}
+ #endif
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a509e35132d2..6266284cc801 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -234,12 +234,14 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+ 	if (psci_ops.smccc_version == SMCCC_VERSION_1_0)
+ 		return;
+ 
++	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++				ARM_SMCCC_ARCH_WORKAROUND_1, &res);
++
++	if ((int)res.a0 < 0)
++		return;
++
+ 	switch (psci_ops.conduit) {
+ 	case PSCI_CONDUIT_HVC:
+-		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+-		if ((int)res.a0 < 0)
+-			return;
+ 		cb = call_hvc_arch_workaround_1;
+ 		/* This is a guest, no need to patch KVM vectors */
+ 		smccc_start = NULL;
+@@ -247,10 +249,6 @@ enable_smccc_arch_workaround_1(const struct arm64_cpu_capabilities *entry)
+ 		break;
+ 
+ 	case PSCI_CONDUIT_SMC:
+-		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-				  ARM_SMCCC_ARCH_WORKAROUND_1, &res);
+-		if ((int)res.a0 < 0)
+-			return;
+ 		cb = call_smc_arch_workaround_1;
+ 		smccc_start = __smccc_workaround_1_smc_start;
+ 		smccc_end = __smccc_workaround_1_smc_end;
+@@ -343,6 +341,8 @@ void __init arm64_enable_wa2_handling(struct alt_instr *alt,
+ 
+ void arm64_set_ssbd_mitigation(bool state)
+ {
++	int conduit;
++
+ 	if (this_cpu_has_cap(ARM64_SSBS)) {
+ 		if (state)
+ 			asm volatile(SET_PSTATE_SSBS(0));
+@@ -351,19 +351,9 @@ void arm64_set_ssbd_mitigation(bool state)
+ 		return;
+ 	}
+ 
+-	switch (psci_ops.conduit) {
+-	case PSCI_CONDUIT_HVC:
+-		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+-		break;
+-
+-	case PSCI_CONDUIT_SMC:
+-		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+-		break;
++	conduit = arm_smccc_1_1(ARM_SMCCC_ARCH_WORKAROUND_2, state, NULL);
+ 
+-	default:
+-		WARN_ON_ONCE(1);
+-		break;
+-	}
++	WARN_ON_ONCE(conduit == PSCI_CONDUIT_NONE);
  }
  
--early_initcall(its_fsl_mc_msi_init);
-+subsys_initcall(its_fsl_mc_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index 7d7366d55d34..9c4a0ebdab0b 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -215,4 +215,4 @@ static int __init its_pci_msi_init(void)
- 	its_pci_acpi_msi_init();
- 	return 0;
- }
--early_initcall(its_pci_msi_init);
-+subsys_initcall(its_pci_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 1f2849bc58c4..76f8a2e85375 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -201,4 +201,4 @@ static int __init its_pmsi_init(void)
- 	its_pmsi_acpi_init();
- 	return 0;
- }
--early_initcall(its_pmsi_init);
-+subsys_initcall(its_pmsi_init);
+ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+@@ -385,21 +375,8 @@ static bool has_ssbd_mitigation(const struct arm64_cpu_capabilities *entry,
+ 		return false;
+ 	}
+ 
+-	switch (psci_ops.conduit) {
+-	case PSCI_CONDUIT_HVC:
+-		arm_smccc_1_1_hvc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+-		break;
+-
+-	case PSCI_CONDUIT_SMC:
+-		arm_smccc_1_1_smc(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
+-				  ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+-		break;
+-
+-	default:
+-		ssbd_state = ARM64_SSBD_UNKNOWN;
+-		return false;
+-	}
++	arm_smccc_1_1(ARM_SMCCC_ARCH_FEATURES_FUNC_ID,
++		      ARM_SMCCC_ARCH_WORKAROUND_2, &res);
+ 
+ 	val = (s32)res.a0;
+ 
 -- 
-2.11.0
+2.19.2
