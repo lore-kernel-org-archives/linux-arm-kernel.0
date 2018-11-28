@@ -1,75 +1,43 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 28 Nov 2018 22:34:57 +0100
-Subject: [PATCH v4 14/20] ARM: mmp/mmp2: use cpu_is_pj4() instead of
- cpu_is_mmp2()
-In-Reply-To: <20181128175324.163202-15-lkundrak@v3.sk>
+Date: Wed, 28 Nov 2018 22:39:06 +0100
+Subject: [PATCH v4 0/20] MMP platform fixes
+In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
- <20181128175324.163202-15-lkundrak@v3.sk>
-Message-ID: <CAK8P3a2=itOMfHax1rpJEUKfBKeU=-hPnn1yA3V4r3Q9Hfhz8g@mail.gmail.com>
+Message-ID: <CAK8P3a0jN1PBy1oKHrx5abX4OKHVxjgevbUcXbUDPbU+VdvUPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 6:54 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
+On Wed, Nov 28, 2018 at 6:53 PM Lubomir Rintel <lkundrak@v3.sk> wrote:
 >
-> The MMP2 platform uses the PJ4 CPU. The cpu_is_mmp2() macro is thus
-> actually not useful at all and moreover gives the wrong result on
-> MACH_MMP2_DT.
+> Hi,
 >
-> The actual problem I aim to fix is that on a device-tree enabled system,
-> the timer ends up being initialized incorrectly. In fact, it ticks like
-> at rate that's 1/100 slower or so.
+> this series contains contains a bunch of MMP2 platform fixes.
 >
-> Perhaps the other cpu_is_mmp2() uses are more benign, but still useless.
+> Previous spins of the patch set were sent out over the course of last
+> three months to the MMP platform maintainers, with Arnd and
+> linux-arm-kernel at lists.infradead.org on copy.
+>
+> Unfortunatelly, MMP maintainers (Eric Miao and Haojian Zhuang) don't
+> seem to respond anymore. That's a shame, because the MMP2 support seems to
+> in need for some love. The DT/multiplatform kernels can't even boot without
+> 14/20, 15/20 and perhaps more.
+>
+> I'm wondering if this cat gen in via the arm-soc tree? Would it be
+> appropriate if I followed up with a MAINTAINERS update in that case?
 
-I think we still need the helper. If it's broken on some platforms,
-it has to be fixed instead.
+Yes, sounds good to me. I looked through the series again, and
+found one patch that seems wrong to me. Everything else should
+just go in.
 
-> @@ -104,7 +104,7 @@ void __init mmp2_init_irq(void)
->
->  static int __init mmp2_init(void)
->  {
-> -       if (cpu_is_mmp2()) {
-> +       if (cpu_is_pj4()) {
->  #ifdef CONFIG_CACHE_TAUROS2
->                 tauros2_init(0);
->  #endif
-> diff --git a/arch/arm/mach-mmp/pm-mmp2.c b/arch/arm/mach-mmp/pm-mmp2.c
-> index 17699be3bc3d..bcd5111ffb37 100644
-> --- a/arch/arm/mach-mmp/pm-mmp2.c
-> +++ b/arch/arm/mach-mmp/pm-mmp2.c
-> @@ -220,7 +220,7 @@ static int __init mmp2_pm_init(void)
->  {
->         uint32_t apcr;
->
-> -       if (!cpu_is_mmp2())
-> +       if (!cpu_is_pj4())
->                 return -EIO;
->
->         suspend_set_ops(&mmp2_pm_ops);
+Patches that are purely bugfixes should probably also get backported
+to stable kernels, so please add a 'Cc: stable at vger.kernel.org' tag
+in the changelog for things that are required to make older kernels
+work correctly (as opposed to adding features that were never supposed
+to work), and describe in the changelog which kernel versions should
+see that backport.
 
-These are both regular initcalls. On a multiplatform kernel, they
-will be called unconditionally, and the cpu_is_mmp2() has to
-guard code that would be wrong on other SoCs, including those
-with a pj4 CPU (Armada XP, Dove, Berlin).
+> The patch set has been tested on an OLPC XO-1.75 laptop.
 
-> diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-> index 96ad1db0b04b..0f49ac579a17 100644
-> --- a/arch/arm/mach-mmp/time.c
-> +++ b/arch/arm/mach-mmp/time.c
-> @@ -163,7 +163,7 @@ static void __init timer_config(void)
->
->         __raw_writel(0x0, mmp_timer_base + TMR_CER); /* disable */
->
-> -       ccr &= (cpu_is_mmp2()) ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
-> +       ccr &= (cpu_is_pj4()) ? (TMR_CCR_CS_0(0) | TMR_CCR_CS_1(0)) :
->                 (TMR_CCR_CS_0(3) | TMR_CCR_CS_1(3));
->         __raw_writel(ccr, mmp_timer_base + TMR_CCR);
->
-
-This looks correct, here we just need to ensure we are not on pj1.
-Note: we should probably rename 'timer_init' to something that
-that has 'mmp' in the name, the current name conflicts with
-a function of the same name in mach-davinci, which is not yet
-multiplatform, but hopefully will be one day.
+Excellent!
 
         Arnd
