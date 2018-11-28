@@ -1,39 +1,47 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Nov 2018 17:45:04 +0100
-Subject: [PATCH 2/2] arm64: preempt: Provide our own implementation of
- asm/preempt.h
-In-Reply-To: <20181128164058.GB2131@hirez.programming.kicks-ass.net>
-References: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
- <1543347902-21170-3-git-send-email-will.deacon@arm.com>
- <CAKv+Gu9s-=M-mU+249-X1jQ7_Z60vWO1cXK1AP0CwKCmaQQSdg@mail.gmail.com>
- <20181128164058.GB2131@hirez.programming.kicks-ass.net>
-Message-ID: <CAKv+Gu_RC6mRqZXfm7Zyhn6KTh-svAZP0bNKa+xQdMa8LOf7PQ@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 28 Nov 2018 08:47:05 -0800
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <20181128074117.GA21126@lst.de>
+References: <20181122140320.24080-1-hch@lst.de>
+ <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
+ <20181122170715.GI30658@n2100.armlinux.org.uk>
+ <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+ <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
+Message-ID: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Nov 2018 at 17:41, Peter Zijlstra <peterz@infradead.org> wrote:
+On Tue, Nov 27, 2018 at 11:41 PM Christoph Hellwig <hch@lst.de> wrote:
 >
-> On Wed, Nov 28, 2018 at 04:35:42PM +0100, Ard Biesheuvel wrote:
-> > On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
-> > >
-> > > The asm-generic/preempt.h implementation doesn't make use of the
-> > > PREEMPT_NEED_RESCHED flag, since this can interact badly with load/store
-> > > architectures which rely on the preempt_count word being unchanged across
-> > > an interrupt.
-> > >
-> > > However, since we're a 64-bit architecture and the preempt count is
-> > > only 32 bits wide, we can simply pack it next to the resched flag and
-> > > load the whole thing in one go, so that a dec-and-test operation doesn't
-> > > need to load twice.
-> > >
-> >
-> > Since the actual preempt count is a lot narrower than 32 bits, x86
-> > just uses bit 31.
-> >
-> > So what is the reason for using two different words?
+> On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
+> > Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
+> > instead of the old 1 is as bool true.  The callers should all be fine,
+> > although I'd have to audit them.  Still wouldn't help with being able to
+> > return different errors.
 >
-> See commit:
->
->   ba1f14fbe709 ("sched: Remove PREEMPT_NEED_RESCHED from generic code")
+> Any opinions?  I'd really like to make some forward progress on this
+> series.
 
-Yup, that clears it up - thanks.
+So I do think that yes, dma_mapping_error() should return an error
+code, not 0/1.
+
+But I was really hoping that the individual drivers themselves could
+return error codes. Right now the patch-series has code like this:
+
+      ret = needs_bounce(dev, dma_addr, size);
+      if (ret < 0)
+-         return ARM_MAPPING_ERROR;
++         return DMA_MAPPING_ERROR;
+
+which while it all makes sense in the context of this patch-series, I
+*really* think it would have been so much nicer to return the error
+code 'ret' instead (which in this case is -E2BIG).
+
+I don't think this is a huge deal, but ERR_PTR() has been hugely
+successful elsewhere. And I'm not hugely convinced about all these
+"any address can be valid" arguments. How the hell do you generate a
+random dma address in the last page that isn't even page-aligned?
+
+                     Linus
