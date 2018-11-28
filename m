@@ -1,27 +1,27 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 28 Nov 2018 09:20:02 +0000
+Date: Wed, 28 Nov 2018 09:21:56 +0000
 Subject: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
  support
-In-Reply-To: <20181128101230.435bfbeb@ipc1.ka-ro>
+In-Reply-To: <20181128091943.GB8952@piout.net>
 References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
  <1543311334-8807-5-git-send-email-Anson.Huang@nxp.com>
  <20181128100420.0c9a721a@karo-electronics.de>
  <DB3PR0402MB3916FFD700313BF684CF32AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <20181128101230.435bfbeb@ipc1.ka-ro>
-Message-ID: <DB3PR0402MB391643B7E4591A3EF5FCA8AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <20181128091943.GB8952@piout.net>
+Message-ID: <DB3PR0402MB39168AC8DB69B81C51CE63C2F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Lothar
+
 
 Best Regards!
 Anson Huang
 
 > -----Original Message-----
-> From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
-> Sent: 2018?11?28? 17:13
+> From: Alexandre Belloni [mailto:alexandre.belloni at bootlin.com]
+> Sent: 2018?11?28? 17:20
 > To: Anson Huang <anson.huang@nxp.com>
-> Cc: a.zummo at towertech.it; alexandre.belloni at bootlin.com;
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>; a.zummo at towertech.it;
 > robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
 > will.deacon at arm.com; Aisheng DONG <aisheng.dong@nxp.com>; Andy Gross
 > <andy.gross@linaro.org>; arnd at arndb.de; horms+renesas at verge.net.au;
@@ -33,41 +33,7 @@ Anson Huang
 > Subject: Re: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller
 > RTC support
 > 
-> Anson Huang <anson.huang@nxp.com> wrote:
-> 
-> > Hi, Lothar
-> >
-> > Best Regards!
-> > Anson Huang
-> >
-> > > -----Original Message-----
-> > > From: Lothar Wa?mann [mailto:LW at KARO-electronics.de]
-> > > Sent: 2018?11?28? 17:04
-> > > To: Anson Huang <anson.huang@nxp.com>
-> > > Cc: a.zummo at towertech.it; alexandre.belloni at bootlin.com;
-> > > robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> > > will.deacon at arm.com; Aisheng DONG <aisheng.dong@nxp.com>; Andy
-> Gross
-> > > <andy.gross@linaro.org>; arnd at arndb.de; horms+renesas at verge.net.au;
-> > > heiko at sntech.de; bjorn.andersson at linaro.org;
-> > > enric.balletbo at collabora.com; amit.kucheria at linaro.org;
-> > > ezequiel at collabora.com; olof at lixom.net; shawnguo at kernel.org;
-> > > linux-rtc at vger.kernel.org; devicetree at vger.kernel.org;
-> > > linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > > dl-linux-imx <linux-imx@nxp.com>
-> > > Subject: Re: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system
-> > > controller RTC support
-> > >
-> > > Hi,
-> > >
-> > > On Tue, 27 Nov 2018 09:41:46 +0000 Anson Huang wrote:
-> > > > Add i.MX8QXP system controller RTC support.
-> > > >
-> > > > Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
-> > > > ---
-> > > >  arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 4 ++++
-> > > >  1 file changed, 4 insertions(+)
-> > > >
+> On 28/11/2018 09:06:27+0000, Anson Huang wrote:
 > > > > diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
 > > > b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
 > > > > index 9155d45..ef57db6 100644
@@ -88,30 +54,22 @@ Anson Huang
 > default in soc dtsi?
 > > Like wdog etc..
 > >
-> What about existing users (if there are any), which would have a new device
-> appearing when updating the DTB?
+> 
+> I guess the point is that you may not want it enabled, even if it should always
+> be working. enabling it by default would affect the RTC ordering for example.
 
-This i.MX8QXP is a new SoC on the way to upstream, no old dtb used, so is it OK to keep it enabled
-by default and aligned with all previous i.MX SoCs' RTC implementation? If we disable it
-here, we have to enable it in all boards dtb. So if it is NOT very critical, is it OK to keep
-it enabled by default here? Thanks.
+i.MX SoCs ONLY have 1 RTC. And RTC are always enabled by default for all i.MX
+SoCs, so do we have to disable it here and enable it in board dts?
 
-Anson
+Anson.
 
 > 
 > 
-> Lothar Wa?mann
 > --
-> ___________________________________________________________
-> 
-> Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-> Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-> Gesch?ftsf?hrer: Matthias Kaussen
-> Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-> 
-> https://emea01.safelinks.protection.outlook.com/?url=www.karo-electronics.d
-> e&amp;data=02%7C01%7Canson.huang%40nxp.com%7C12fb8e546a0e46d03
-> 72408d65511a43f%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0%7C
-> 636789931600483807&amp;sdata=SVZjpvYsi9XAM7CGt8sHZ5mt8rPRa%2FPl
-> 75EQvHTod%2Bg%3D&amp;reserved=0 | info at karo-electronics.de
-> ___________________________________________________________
+> Alexandre Belloni, Bootlin
+> Embedded Linux and Kernel engineering
+> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fbootl
+> in.com&amp;data=02%7C01%7Canson.huang%40nxp.com%7C0586fd10d6ff4
+> 5d03f4308d65512a864%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C0
+> %7C636789935951215703&amp;sdata=Hs1AXXoZMMKl8inOXFs8xXNXQ9EJG
+> gtphyTNhFvMiTE%3D&amp;reserved=0
