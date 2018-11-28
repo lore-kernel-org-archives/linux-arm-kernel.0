@@ -1,37 +1,38 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Nov 2018 09:31:11 +0000
-Subject: [PATCH 07/14] dt-bindings: mfd: axp20x: Add software based
- soft_start for AXP209 LDO3
-In-Reply-To: <20181126165822.GJ9715@sirena.org.uk>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
- <2cd75ee27982f3be0d86104d80eaa13efeb2c65d.1543245984.git-series.plaes@plaes.org>
- <20181126165822.GJ9715@sirena.org.uk>
-Message-ID: <20181128093111.GZ4272@dell>
+From: alexandre.belloni@bootlin.com (Alexandre Belloni)
+Date: Wed, 28 Nov 2018 10:33:45 +0100
+Subject: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
+ support
+In-Reply-To: <DB3PR0402MB39168AC8DB69B81C51CE63C2F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
+ <1543311334-8807-5-git-send-email-Anson.Huang@nxp.com>
+ <20181128100420.0c9a721a@karo-electronics.de>
+ <DB3PR0402MB3916FFD700313BF684CF32AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+ <20181128091943.GB8952@piout.net>
+ <DB3PR0402MB39168AC8DB69B81C51CE63C2F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+Message-ID: <20181128093345.GC8952@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 26 Nov 2018, Mark Brown wrote:
-
-> On Mon, Nov 26, 2018 at 05:27:48PM +0200, Priit Laes wrote:
+On 28/11/2018 09:21:56+0000, Anson Huang wrote:
+> > > This module is NOT depending on any board design, should it be enabled by
+> > default in soc dtsi?
+> > > Like wdog etc..
+> > >
+> > 
+> > I guess the point is that you may not want it enabled, even if it should always
+> > be working. enabling it by default would affect the RTC ordering for example.
 > 
-> > +- regulator-soft-start:	enable the output at the lowest possible voltage and
-> > +			only then set the desired voltage
-> > +			AXP20x/LDO3
+> i.MX SoCs ONLY have 1 RTC. And RTC are always enabled by default for all i.MX
+> SoCs, so do we have to disable it here and enable it in board dts?
 > 
-> This is a generic property, there is no need to document it in each
-> device binding.
 
-It's not unwelcome here though.
+I would say that most of the i.MX based boards include another RTC
+because the SoC one consumes way too much power.
 
-Particularly with such a nicely written up commit messages.
-
-I'll leave it up to you, but it's fine by me.
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+Note that I don't care too much whether it is enabled by default, I
+was simply explaining why you may want to disable it by default.
 
 -- 
-Lee Jones [???]
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
