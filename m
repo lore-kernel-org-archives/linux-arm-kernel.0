@@ -1,21 +1,19 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 19:40:32 +0800
-Subject: [PATCH 23/77] ARM: dts: sun6i: Change framebuffer node names to
- avoid warnings
-In-Reply-To: <92add4869d5738cf12766e3ca7ee379d3177397b.1543321707.git-series.maxime.ripard@bootlin.com>
+Date: Wed, 28 Nov 2018 19:40:48 +0800
+Subject: [PATCH 24/77] ARM: dts: sun6i: Change clock node names to avoid
+ warnings
+In-Reply-To: <f38aee5e3754b101f9cf776ab42a880e0d57ffbf.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <92add4869d5738cf12766e3ca7ee379d3177397b.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v656w-p9gEkqfR0V_YSO+mpr51qR3oRybS3z8bhpwsXiow@mail.gmail.com>
+ <f38aee5e3754b101f9cf776ab42a880e0d57ffbf.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v67CmqbwtVkf9jKdd5+dj8d8w7O9eS5fUfa0BGjVYnBCtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> The simple-framebuffer nodes have a unit address, but no reg property which
-> generates a warning when compiling it with DTC.
->
-> Change the simple-framebuffer node names so that there is no warnings on
-> this anymore.
+> Our oscillators clock names have a unit address, but no reg property, which
+> generates a warning in DTC. Change these names to remove those unit
+> addresses.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
