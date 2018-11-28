@@ -1,96 +1,120 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 28 Nov 2018 14:25:54 +0100
-Subject: [PATCH] pci: imx6: support kernels built in Thumb-2 mode
-Message-ID: <20181128132554.28139-1-stefan@agner.ch>
+From: k.konieczny@partner.samsung.com (Kamil Konieczny)
+Date: Wed, 28 Nov 2018 14:31:12 +0100
+Subject: [PATCH 4/4] clk: samsung: exynos5433: add imem clock
+In-Reply-To: <5BF5520A.5050500@samsung.com>
+References: <20181121120509.18892-1-k.konieczny@partner.samsung.com>
+ <CGME20181121120524eucas1p166a26857df78947c9e08f0fb8dbf75e4@eucas1p1.samsung.com>
+ <20181121120509.18892-5-k.konieczny@partner.samsung.com>
+ <5BF5520A.5050500@samsung.com>
+Message-ID: <29a0412e-1209-b633-8a10-f6db8eb8af09@partner.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a fault handler which handles reads in Thumb-2 mode. Install
-the appropriate handler depending on which mode the kernel has
-been built. This avoids an "Unhandled fault: external abort on
-non-linefetch (0x1008) at 0xf0a80000" during boot on a device
-with a PCIe switch connected.
+Hi,
 
-Link: https://lore.kernel.org/linux-pci/20181126161645.8177-1-stefan at agner.ch/
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
-FWIW, I found this manual helpful to write the code below:
-http://hermes.wings.cs.wisc.edu/files/Thumb-2SupplementReferenceManual.pdf#page=43&zoom=100,0,66
+Thank you for your review, see below for answers and questions.
 
---
-Stefan
+On 21.11.2018 13:39, Chanwoo Choi wrote:
+> Hi,
+> 
+> On 2018? 11? 21? 21:05, Kamil Konieczny wrote:
+>> Add imem clock for exynos5433.
+> 
+> It is diffcult to understand the meaning of 'imem' without the description.
+> Please add more detailed description as the patch2 description.
+> 
 
- drivers/pci/controller/dwc/pci-imx6.c | 37 ++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+Will this be enough for description:
 
-diff --git a/drivers/pci/controller/dwc/pci-imx6.c b/drivers/pci/controller/dwc/pci-imx6.c
-index 69f86234f7c0..683deb74d69f 100644
---- a/drivers/pci/controller/dwc/pci-imx6.c
-+++ b/drivers/pci/controller/dwc/pci-imx6.c
-@@ -29,6 +29,7 @@
- #include <linux/reset.h>
- #include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
-+#include <asm/opcodes.h>
- 
- #include "pcie-designware.h"
- 
-@@ -299,6 +300,37 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
- 	return 1;
- }
- 
-+static int imx6q_pcie_abort_handler_thumb2(unsigned long addr,
-+		unsigned int fsr, struct pt_regs *regs)
-+{
-+	unsigned long pc = instruction_pointer(regs);
-+	unsigned long instr = *(unsigned long *)pc;
-+	unsigned long thumb2_instr = __mem_to_opcode_thumb16(instr);
-+	int reg = thumb2_instr & 7;
-+
-+	if (!__opcode_is_thumb16(instr & 0x0000ffffUL))
-+		return 1;
-+
-+	/* Load word/byte and halfword immediate offset */
-+	if (((thumb2_instr & 0xe800) == 0x6800) ||
-+	    ((thumb2_instr & 0xf800) == 0x8800)) {
-+		unsigned long val;
-+
-+		if (thumb2_instr & 0x1000)
-+			val = 0xff;
-+		else if (thumb2_instr & 0x8000)
-+			val = 0xffff;
-+		else
-+			val = 0xffffffffUL;
-+
-+		regs->uregs[reg] = val;
-+		regs->ARM_pc += 2;
-+		return 0;
-+	}
-+
-+	return 1;
-+}
-+
- static int imx6_pcie_attach_pd(struct device *dev)
- {
- 	struct imx6_pcie *imx6_pcie = dev_get_drvdata(dev);
-@@ -1069,6 +1101,8 @@ static struct platform_driver imx6_pcie_driver = {
- 
- static int __init imx6_pcie_init(void)
- {
-+	bool thumb2 = IS_ENABLED(CONFIG_THUMB2_KERNEL);
-+
- 	/*
- 	 * Since probe() can be deferred we need to make sure that
- 	 * hook_fault_code is not called after __init memory is freed
-@@ -1076,7 +1110,8 @@ static int __init imx6_pcie_init(void)
- 	 * we can install the handler here without risking it
- 	 * accessing some uninitialized driver state.
- 	 */
--	hook_fault_code(8, imx6q_pcie_abort_handler, SIGBUS, 0,
-+	hook_fault_code(8, thumb2 ? imx6q_pcie_abort_handler_thumb2 :
-+			imx6q_pcie_abort_handler, SIGBUS, 0,
- 			"external abort on non-linefetch");
- 
- 	return platform_driver_register(&imx6_pcie_driver);
+Add imem clock for exynos5433. This will enable to use crypto Security
+SubSystem (in short SSS) and SlimSSS IP blocks.
+
+What do you think ?
+
+>> Signed-off-by: Kamil Konieczny <k.konieczny@partner.samsung.com>
+>> ---
+>>  drivers/clk/samsung/clk-exynos5433.c   | 123 +++++++++++++++++++++++++
+>>  include/dt-bindings/clock/exynos5433.h |  55 +++++++++++
+>>  2 files changed, 178 insertions(+)
+>>
+>> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+>> index 24c3360db65b..db29cbd1fbdc 100644
+>> --- a/drivers/clk/samsung/clk-exynos5433.c
+>> +++ b/drivers/clk/samsung/clk-exynos5433.c
+>> @@ -2345,6 +2345,129 @@ static const struct samsung_cmu_info fsys_cmu_info __initconst = {
+>>  	.clk_name		= "aclk_fsys_200",
+>>  };
+>>  
+>> +/*
+>> + * Register offset definitions for CMU_IMEM
+>> + *
+>> + */
+>> +
+> 
+> Remove unneeded blank line.
+
+ok
+
+> 
+>> +#define ENABLE_ACLK_IMEM			0x0800
+>> +#define ENABLE_ACLK_IMEM_SSS			0x0808
+>> +#define ENABLE_ACLK_IMEM_SLIMSSS		0x080c
+>> +#define ENABLE_PCLK_IMEM			0x0900
+>> +#define ENABLE_PCLK_IMEM_SSS			0x0904
+>> +#define ENABLE_PCLK_IMEM_SLIMSSS		0x0908
+> 
+> When I checked the registers of IMEM block, there are more registers as following:
+> Why do you implement the clocks for only six registers?
+
+I added only those that will be used by crypto block (aes and hash block).
+I can add all of them in version 2.
+
+> CLK_ENABLE_ACLK_IMEM			0x0800
+> 
+> CLK_ENABLE_ACLK_IMEM_SECURE_INT_MEM	0x0804
+> 
+> CLK_ENABLE_ACLK_IMEM_SECURE_SSS		0x0808
+> 
+> CLK_ENABLE_ACLK_IMEM_SECURE_SLIMSSS	0x080C
+> 
+> CLK_ENABLE_ACLK_IMEM_SECURE_RTIC	0x0810
+> 
+> CLK_ENABLE_ACLK_IMEM_SECURE_SMMU_SSS	0x0814
+> [...]
+> 
+>> +
+>> +static const unsigned long imem_clk_regs[] __initconst = {
+>> +ENABLE_ACLK_IMEM,
+>> +ENABLE_ACLK_IMEM_SSS,
+>> +ENABLE_ACLK_IMEM_SLIMSSS,
+>> +ENABLE_PCLK_IMEM,
+>> +ENABLE_PCLK_IMEM_SSS,
+>> +ENABLE_PCLK_IMEM_SLIMSSS,
+> 
+> Add a tab in front of registers.
+> 
+
+ok
+
+>> [...]
+>> +static void __init exynos5433_cmu_imem_init(struct device_node *np)
+>> +{
+>> +	samsung_cmu_register_one(np, &imem_cmu_info);
+>> +}
+>> +
+>> +CLK_OF_DECLARE(exynos5433_cmu_imem, "samsung,exynos5433-cmu-imem",
+>> +		exynos5433_cmu_imem_init);
+> 
+> Except for "samsmung,exynos5433-cmu-atlas/apollo", the remained clock blocks
+> were added to exynos5433_cmu_of_match[] table for power management.
+> 
+> If there is no any h/w issue, add the new entry to exynos5433_cmu_of_match for imem block.
+
+ok, I will add this.
+
+>> [...]
+
 -- 
-2.19.1
+Best regards,
+Kamil Konieczny
+Samsung R&D Institute Poland
