@@ -1,48 +1,20 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 11:03:43 +0800
-Subject: [PATCH 04/77] ARM: dts: sun5i: Fix display pipeline endpoint
- warnings in DTC
-In-Reply-To: <78b27a15e3e8c08ad565055a137d1954d5b0bb99.1543321707.git-series.maxime.ripard@bootlin.com>
+Date: Wed, 28 Nov 2018 11:04:39 +0800
+Subject: [PATCH 05/77] ARM: dts: sun5i: Change clock node names to avoid
+ warnings
+In-Reply-To: <f46c0b69240d050a52ef2ca4c6c4a73f3f587974.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <78b27a15e3e8c08ad565055a137d1954d5b0bb99.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v64CueKNnrFmbikFh2UrCch4jFvs1Qn_6w6kjC06StayLA@mail.gmail.com>
+ <f46c0b69240d050a52ef2ca4c6c4a73f3f587974.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v67DjRA8hf4PnK_Ep9FP-w1LdL9X9e+5Dhtt0-FwCWeThw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> Since most of the display IPs have a single endpoint, having a reg
-> property, a unit-address and #address-cells and #size-cells will emit a
-> warning.
->
-> Let's remove those.
+> Our oscillators clock names have a unit address, but no reg property, which
+> generates a warning in DTC. Change these names to remove those unit
+> addresses.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
->  arch/arm/boot/dts/sun5i.dtsi | 25 +++++--------------------
->  1 file changed, 5 insertions(+), 20 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
-> index 14a7d1cf89b4..3e7b251ce7a6 100644
-> --- a/arch/arm/boot/dts/sun5i.dtsi
-> +++ b/arch/arm/boot/dts/sun5i.dtsi
 
-[...]
-
-> @@ -726,12 +720,9 @@
->                                 #size-cells = <0>;
->
->                                 fe0_out: port at 1 {
-> -                                       #address-cells = <1>;
-> -                                       #size-cells = <0>;
->                                         reg = <1>;
->
-> -                                       fe0_out_be0: endpoint at 0 {
-> -                                               reg = <0>;
-
-Removing this breaks the code used to parse the graph to get the backend's ID.
-The code expects a reg property to be present. We need to fix it.
-
-The rest of the changes should be fine though.
-
-ChenYu
+Acked-by: Chen-Yu Tsai <wens@csie.org>
