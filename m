@@ -1,89 +1,63 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 28 Nov 2018 10:01:46 +0100
-Subject: [PATCH 0/2] arm64: Only call into preempt_schedule() if
- need_resched()
-In-Reply-To: <20181128085640.GX2131@hirez.programming.kicks-ass.net>
-References: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
- <20181128085640.GX2131@hirez.programming.kicks-ass.net>
-Message-ID: <20181128090146.GF2149@hirez.programming.kicks-ass.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Nov 2018 09:02:33 +0000
+Subject: [PATCH v3 3/4] iio: adc: add STMPE ADC devicetree bindings
+In-Reply-To: <20181123142411.8921-3-dev@pschenker.ch>
+References: <20181123142411.8921-1-dev@pschenker.ch>
+ <20181123142411.8921-3-dev@pschenker.ch>
+Message-ID: <20181128090233.GQ4272@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 09:56:40AM +0100, Peter Zijlstra wrote:
-> On Tue, Nov 27, 2018 at 07:45:00PM +0000, Will Deacon wrote:
-> > Hi all,
-> > 
-> > This pair of patches improves our preempt_enable() implementation slightly
-> > on arm64 by making the resulting call to preempt_schedule() conditional
-> > on need_resched(), which is tracked in bit 32 of the preempt count. The
-> > logic is inverted so that we can detect the preempt count going to zero
-> > and need_resched being set with a single CBZ instruction.
-> 
-> >   40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
-> >   44:   910003fd        mov     x29, sp
-> >   48:   d5384101        mrs     x1, sp_el0
-> >   4c:   f9400820        ldr     x0, [x1, #16]
-> 
-> We load x0 which is a u64, right?
-> 
-> >   50:   d1000400        sub     x0, x0, #0x1
-> >   54:   b9001020        str     w0, [x1, #16]
-> 
-> But we store w0, which is the low u32, such as to not touch the high
-> word which contains the preempt bit.
-> 
-> >   58:   b4000060        cbz     x0, 64 <will+0x24>
-> >   5c:   a8c17bfd        ldp     x29, x30, [sp], #16
-> >   60:   d65f03c0        ret
-> >   64:   94000000        bl      0 <preempt_schedule>
-> >   68:   a8c17bfd        ldp     x29, x30, [sp], #16
-> >   6c:   d65f03c0        ret
-> 
-> Why not?
-> 
->    58:   b4000060        cbnz    x0, 60 <will+0x24>
->    5c:   94000000        bl      0 <preempt_schedule>
->    60:   a8c17bfd        ldp     x29, x30, [sp], #16
->    64:   d65f03c0        ret
-> 
-> which seems shorter.
-> 
-> 
-> So it's still early, and I haven't finished (or really even started) my
-> pot 'o tea, but what about:
-> 
-> 
-> 	ldr x0, [x1, #16]	// seees the high bit set -- no preempt needed
-> 	sub x0, x0, #1
-> 
-> 	<interrupt>
-> 	  ...
-> 	  resched_curr()
-> 	    set_tsk_need_resched();
-> 	    set_preempt_need_resched();
-> 	</interrupt> // sees preempt_count != 0, does not preempt
-> 
-> 	str w0, [x1, #16] // stores preempt_count == 0
-> 	cbnz x0, 1f // taken, we still observe the high word from before
-> 
-> 1:	ret
-> 
-> 
-> Which then ends with preempt_count==0, need_resched==0 and no actual
-> preemption afaict.
-> 
-> Can you use mis-matched ll x0 / sc w0 to do this same thing and detector
-> the intermediate write on the high word?
+On Fri, 23 Nov 2018, Philippe Schenker wrote:
 
-That is, something along these here lines:
+> From: Stefan Agner <stefan@agner.ch>
+> 
+> This adds the devicetree bindings for the STMPE ADC.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Max Krummenacher <max.krummenacher@toradex.com>
+> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+> ---
+> 
+> Changes in v3:
+>  - Reformatted documentation for touchscreen to use tabs and have a better
+>    overview of the settings.
+>  - Added note which adc-settings will take precedence.
+>  - changed typo in sample-time setting from 144 clocks to 124 clocks, as stated
+>    in the datasheet.
+> 
+> Changes in v2:
+>  - Moved the bindings for ADC to the overlying mfd.
+>  - Reformatted for better readability
+> 
+>  .../devicetree/bindings/iio/adc/stmpe-adc.txt | 21 +++++++
+>  .../bindings/input/touchscreen/stmpe.txt      | 60 ++++++++++++-------
+>  .../devicetree/bindings/mfd/stmpe.txt         | 28 ++++++---
+>  3 files changed, 80 insertions(+), 29 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/stmpe-adc.txt
+[...]
 
-1:	ldxr x0, [x1, #16]
-	sub  x0, x0, #1
-	stxr w1, w0, [x1, #16]
-	cbnz w1, 1b
+> diff --git a/Documentation/devicetree/bindings/mfd/stmpe.txt b/Documentation/devicetree/bindings/mfd/stmpe.txt
+> index c797c05cd3c2..d4408a417193 100644
+> --- a/Documentation/devicetree/bindings/mfd/stmpe.txt
+> +++ b/Documentation/devicetree/bindings/mfd/stmpe.txt
+> @@ -4,15 +4,29 @@ STMPE is an MFD device which may expose the following inbuilt devices: gpio,
+>  keypad, touchscreen, adc, pwm, rotator.
+>  
+>  Required properties:
+> - - compatible                   : "st,stmpe[610|801|811|1600|1601|2401|2403]"
+> - - reg                          : I2C/SPI address of the device
+> + - compatible			: "st,stmpe[610|801|811|1600|1601|2401|2403]"
+> + - reg				: I2C/SPI address of the device
 
-	cbnz x0, 2f
-	bl   preempt_schedule
-2:	ret
+Formatting changes should be completed in a separate patch.
 
-can that work?
+Here they only serve to obscure the real changes you have made.
+
+Please split the formatting changes out and re-submit.
+
+-- 
+Lee Jones [???]
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
