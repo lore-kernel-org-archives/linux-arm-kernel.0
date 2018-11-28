@@ -1,61 +1,69 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 22:30:55 +0800
-Subject: [PATCH 58/77] ARM: dts: sun8i: a23/a33: Remove redundant MMC
- pinmux tuning
-In-Reply-To: <20181128135931.dpmuqpzz5wayucv3@flea>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <d856497c2ad879816c6f944128bc62371f604f7a.1543321707.git-series.maxime.ripard@bootlin.com>
- <CAGb2v67H0pAODp2dixSi-cjhMiBcc_YwoKkCxf4msZ4522A88A@mail.gmail.com>
- <20181128135931.dpmuqpzz5wayucv3@flea>
-Message-ID: <CAGb2v66M4G_cgCF6oYq2yU-2T=GRiDRHPEDnkM4Wv9g6bKF0qA@mail.gmail.com>
+From: rrichter@cavium.com (Robert Richter)
+Date: Wed, 28 Nov 2018 14:43:02 +0000
+Subject: [PATCH v2 00/10] irqdomain, gic-v3-its: Implement late irq domain
+ initialization
+Message-ID: <20181128144240.28727-1-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 9:59 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> On Wed, Nov 28, 2018 at 08:36:33PM +0800, Chen-Yu Tsai wrote:
-> > On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> > >
-> > > Some boards override the MMC pin muxing settings in order to enable the
-> > > pull-ups and change the drive strength to a value higher than the default.
-> > >
-> > > While this was needed in the earlier days, this is now the default setting
-> > > for those pins, and therefore we don't need those board-specific settings
-> > > anymore.
-> > >
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> > > ---
-> > >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2407pxe03.dts | 4 ----
-> > >  arch/arm/boot/dts/sun8i-a23-polaroid-mid2809pxe04.dts | 4 ----
-> > >  arch/arm/boot/dts/sun8i-a33-inet-d978-rev2.dts        | 4 ----
-> > >  arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts        | 7 -------
-> > >  arch/arm/boot/dts/sun8i-q8-common.dtsi                | 4 ----
-> > >  arch/arm/boot/dts/sun8i-r16-parrot.dts                | 5 -----
-> > >  6 files changed, 28 deletions(-)
-> > >
-> >
-> > [...]
-> >
-> > > diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > index b343153948f4..7e006d0fbf27 100644
-> > > --- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > +++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-> > > @@ -151,13 +151,6 @@
-> > >         status = "okay";
-> > >  };
-> > >
-> > > -&mmc2_8bit_pins {
-> > > -       /* Increase drive strength for DDR modes */
-> > > -       drive-strength = <40>;
-> >
-> > This is not the default. Maybe we should make it the default?
->
-> IIRC, you looked into the emmc standard some time ago, and you
-> concluded that the default was 30mA.
->
-> I don't really want to make it the default if only a couple of boards
-> need it though. I've droped that part from the patch.
+This patch series is a rework of the gic-v3-its initialization. It is
+in preparation of a further series that uses CMA memory allocation for
+ITS tables. For this the CMA framework must be available and thus ITS
+needs to be initialized after the arch_initcalls. This requires two
+major reworks.
 
-IIRC you have both boards that have it? Could you test dropping
-the drive strength down to 30 mA?
+First we must remove all irq domain init order dependencies (patches
+#1-#5), second the ITS initialization must be split into an early
+probe and a later init part (patches #6-#10).
 
-ChenYu
+Patch #1 introduces a new interface to request an irq domain, see the
+patch description for details. In patches #2-#5 all ITS related irq
+domains are converted to use the new interface. There are no order
+dependencies for parent and client irq domain initialization anymore
+which allows us to initialize all ITS irq domains in the same initcall
+(moving to the later subsys_initcall). Note that I do not have fsl
+hardware available, the code should work, but is only carefully
+reviewed and compile tested, please test on that hardware.
+
+The remaining patches #6-#10 are an incremental rework of the ITS
+initialization, basically splitting probe and init (patch #7) and
+separating it from gic-v3 code (patch #8). Patches #9 and #10 change
+initcall levels for various drivers.
+
+Patches have been tested with Cavium ThunderX and ThunderX2. I have an
+implementation of CMA ITS table allocation on top of this series
+available, I will send out patches for this in a couple of days.
+
+v2:
+ * fix check for domain match in irq_domain_handle_requests()
+ * add comment that describes this check in irq_domain_handle_
+   requests()
+
+Robert Richter (10):
+  irqdomain: Add interface to request an irq domain
+  irqchip/gic-v3-its-platform-msi: Remove domain init order dependencies
+  irqchip/irq-gic-v3-its-pci-msi: Remove domain init order dependencies
+  irqchip/irq-gic-v3-its-fsl-mc-msi: Remove domain init order
+    dependencies
+  fsl-mc/dprc-driver: Remove domain init order dependencies
+  irqchip/gic-v3-its: Initialize its nodes in probe order
+  irqchip/gic-v3-its: Split probing from its node initialization
+  irqchip/gic-v3-its: Decouple its initialization from gic
+  irqchip/gic-v3-its: Initialize its nodes later
+  irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
+
+ drivers/bus/fsl-mc/dprc-driver.c              |  41 +++++++
+ drivers/bus/fsl-mc/fsl-mc-msi.c               |   6 +-
+ drivers/irqchip/irq-gic-v3-its-fsl-mc-msi.c   |  49 +++++---
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      |  68 ++++++-----
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c |  56 +++++++--
+ drivers/irqchip/irq-gic-v3-its.c              | 160 ++++++++++++++++---------
+ drivers/irqchip/irq-gic-v3.c                  |  12 +-
+ include/linux/cpuhotplug.h                    |   1 +
+ include/linux/irqchip/arm-gic-v3.h            |   5 +-
+ include/linux/irqdomain.h                     |  15 +++
+ kernel/irq/irqdomain.c                        | 163 ++++++++++++++++++++++++++
+ 11 files changed, 446 insertions(+), 130 deletions(-)
+
+-- 
+2.11.0
