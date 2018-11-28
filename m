@@ -1,83 +1,37 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:11 +0100
-Subject: [PATCH v4 07/20] DT: marvell,mmp2: add more TWSI controllers
+Date: Wed, 28 Nov 2018 18:53:12 +0100
+Subject: [PATCH v4 08/20] DT: marvell,mmp2: add OTG PHY
 In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-8-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-9-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've gotten the base addresses, clocks and interrupts from an rusty and old
-out-of-tree driver. I haven't actually checked against the datasheet, since
-that one is reserved for the Marvell inner circle.
-
-Tested with an accelerometer on TWSI6 on an OLPC XO 1.75 machine.
+The USB OTG PHY chip. To be used by the OTG controller.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm/boot/dts/mmp2.dtsi | 49 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 49 insertions(+)
+ arch/arm/boot/dts/mmp2.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
-index c5787eea57c7..c48d17a38d6b 100644
+index c48d17a38d6b..57f6248f17cd 100644
 --- a/arch/arm/boot/dts/mmp2.dtsi
 +++ b/arch/arm/boot/dts/mmp2.dtsi
-@@ -269,6 +269,55 @@
- 				status = "disabled";
+@@ -118,6 +118,13 @@
+ 				mrvl,intc-nr-irqs = <2>;
  			};
  
-+			twsi3: i2c at d4032000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4032000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <1>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI2>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI2>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++			usb_otg_phy0: usb-otg-phy at d4207000 {
++				compatible = "marvell,mmp2-usb-phy";
++				reg = <0xd4207000 0x40>;
++				#phy-cells = <0>;
 +				status = "disabled";
 +			};
 +
-+			twsi4: i2c at d4033000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4033000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <2>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI3>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI3>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+
-+			twsi5: i2c at d4033800 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4033800 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <3>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI4>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI4>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
-+			twsi6: i2c at d4034000 {
-+				compatible = "mrvl,mmp-twsi";
-+				reg = <0xd4034000 0x1000>;
-+				interrupt-parent = <&intcmux17>;
-+				interrupts = <4>;
-+				clocks = <&soc_clocks MMP2_CLK_TWSI5>;
-+				resets = <&soc_clocks MMP2_CLK_TWSI5>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
-+			};
-+
- 			rtc: rtc at d4010000 {
- 				compatible = "mrvl,mmp-rtc";
- 				reg = <0xd4010000 0x1000>;
+ 			mmc1: mmc at d4280000 {
+ 				compatible = "mrvl,pxav3-mmc";
+ 				reg = <0xd4280000 0x120>;
 -- 
 2.19.1
