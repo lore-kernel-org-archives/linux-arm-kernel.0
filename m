@@ -1,106 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Nov 2018 14:03:04 +0100
-Subject: [PATCH 02/16] ARM: dts: r8a77470: Add I2C[0123] support
+Date: Wed, 28 Nov 2018 14:03:05 +0100
+Subject: [PATCH 03/16] ARM: dts: r8a77470: Add SDHI0 support
 In-Reply-To: <cover.1543409901.git.horms+renesas@verge.net.au>
 References: <cover.1543409901.git.horms+renesas@verge.net.au>
-Message-ID: <4f94af57237ad1c9c6328b468fd8fbbd19c2fb78.1543409901.git.horms+renesas@verge.net.au>
+Message-ID: <15aa5a95e820e8183aa34535131e7c97789b8504.1543409901.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Add device tree nodes for the I2C[0123] controllers. Also, add
-the aliases node.
+RZ/G1C comes with two different types of IP for the SDHI
+interfaces, SDHI0 and SDHI2 share the same IP type, and
+such an IP is also compatible with the one found in R-Car
+Gen2. SDHI1 IP on the other hand is compatible with R-Car
+Gen3 with internal DMA.
+This patch completes the SDHI support of the R-Car Gen2
+compatible IPs, including fixing the max-frequency
+definition of SDHI2, as it turns out there is a bug in
+Section 1.3.9 of the RZ/G1C Hardware User's Manual (Rev.
+1.00 Oct. 2017).
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a77470.dtsi | 64 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+ arch/arm/boot/dts/r8a77470.dtsi | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
-index 9ec78d3d0ca8..9611a936e1b8 100644
+index 9611a936e1b8..ab2e0223f8a1 100644
 --- a/arch/arm/boot/dts/r8a77470.dtsi
 +++ b/arch/arm/boot/dts/r8a77470.dtsi
-@@ -14,6 +14,14 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	aliases {
-+		i2c0 = &i2c0;
-+		i2c1 = &i2c1;
-+		i2c2 = &i2c2;
-+		i2c3 = &i2c3;
-+		i2c4 = &i2c4;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -237,6 +245,62 @@
- 			reg = <0 0xe6300000 0 0x20000>;
+@@ -490,6 +490,21 @@
+ 			status = "disabled";
  		};
  
-+		i2c0: i2c at e6508000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77470",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6508000 0 0x40>;
-+			interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 931>;
++		sdhi0: sd at ee100000 {
++			compatible = "renesas,sdhi-r8a77470",
++				     "renesas,rcar-gen2-sdhi";
++			reg = <0 0xee100000 0 0x328>;
++			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 314>;
++			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
++			       <&dmac1 0xcd>, <&dmac1 0xce>;
++			dma-names = "tx", "rx", "tx", "rx";
++			max-frequency = <156000000>;
 +			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 931>;
-+			i2c-scl-internal-delay-ns = <6>;
++			resets = <&cpg 314>;
 +			status = "disabled";
 +		};
 +
-+		i2c1: i2c at e6518000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77470",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6518000 0 0x40>;
-+			interrupts = <GIC_SPI 288 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 930>;
-+			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 930>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at e6530000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77470",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6530000 0 0x40>;
-+			interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 929>;
-+			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 929>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
-+		i2c3: i2c at e6540000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,i2c-r8a77470",
-+				     "renesas,rcar-gen2-i2c";
-+			reg = <0 0xe6540000 0 0x40>;
-+			interrupts = <GIC_SPI 290 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 928>;
-+			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 928>;
-+			i2c-scl-internal-delay-ns = <6>;
-+			status = "disabled";
-+		};
-+
- 		i2c4: i2c at e6520000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+ 		sdhi2: sd at ee160000 {
+ 			compatible = "renesas,sdhi-r8a77470",
+ 				     "renesas,rcar-gen2-sdhi";
+@@ -499,7 +514,7 @@
+ 			dmas = <&dmac0 0xd3>, <&dmac0 0xd4>,
+ 			       <&dmac1 0xd3>, <&dmac1 0xd4>;
+ 			dma-names = "tx", "rx", "tx", "rx";
+-			max-frequency = <97500000>;
++			max-frequency = <78000000>;
+ 			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
+ 			resets = <&cpg 312>;
+ 			status = "disabled";
 -- 
 2.11.0
