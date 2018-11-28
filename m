@@ -1,50 +1,64 @@
-From: Samuel.Li@amd.com (Li, Samuel)
-Date: Wed, 28 Nov 2018 16:00:42 +0000
-Subject: [PATCH] drm/fbdev: Make skip_vt_switch the default
-In-Reply-To: <20181128082057.GH4266@phenom.ffwll.local>
-References: <20181127170952.28507-1-daniel.vetter@ffwll.ch>
- <20181127173424.301-1-daniel.vetter@ffwll.ch>
- <3d406677-9d7d-6d8d-85af-1cfb253d1838@linux.intel.com>
- <20181128082057.GH4266@phenom.ffwll.local>
-Message-ID: <7a37ad7d-7706-7fe6-5b7a-5b867a87e8ed@amd.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 28 Nov 2018 16:05:52 +0000 (GMT)
+Subject: Applied "spi: mediatek: add spi support for mt7629 IC" to the spi tree
+In-Reply-To: <1542703268-17285-3-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <20181128160552.7DDA5112521B@debutante.sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Samuel Li <samuel.li@amd.com>
+The patch
 
+   spi: mediatek: add spi support for mt7629 IC
 
+has been applied to the spi tree at
 
-On 2018-11-28 3:20 a.m., Daniel Vetter wrote:
-> On Wed, Nov 28, 2018 at 08:17:04AM +0100, Maarten Lankhorst wrote:
->> Op 27-11-18 om 18:34 schreef Daniel Vetter:
->>> KMS drivers really should all be able to restore their display state
->>> on resume without fbcon helping out. So make this the default.
->>>
->>> Since I'm not entirely foolish, make it only a default, which drivers
->>> can still override. That way when the inevitable regression report
->>> happens I can fix things up with a one-liner plus FIXME comment that
->>> someone should fix up the suspend/resume code in that driver.
->>>
->>> But at least all new drivers won't be broken by accident as soon as
->>> you turn off fbcon because "suspend/resume worked when I tested it".
->>>
->>> v2: Keep this for radeon because of
->>>
->>> commit 18c437caa5b18a235dd65cec224eab54bebcee65
->>> Author: Alex Deucher <alexander.deucher@amd.com>
->>> Date:   Tue Nov 14 17:19:29 2017 -0500
->>>
->>>     Revert "drm/radeon: dont switch vt on suspend"
->>>
->>> Thanks to Michel D?nzer for pointing this one out.
->>
->> Maybe just reload the gamma lut on resume for radeon, instead of relying on fbcon?
-> 
-> It also caused random sound issues and other fun. Also, afaiui radeon does
-> load the lut. Except because of timing or bad luck, it doesn't work
-> reliably, and the vt switch doing it a 2nd time helps out.
-> -Daniel
-> 
->> Otherwise patch looks sane, would be nice if radeon was fixed instead of worked around.
->>
->> Reviewed-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 942779c6f1f899bc54332f7bb67666244f3f6d6c Mon Sep 17 00:00:00 2001
+From: Leilk Liu <leilk.liu@mediatek.com>
+Date: Tue, 20 Nov 2018 16:41:08 +0800
+Subject: [PATCH] spi: mediatek: add spi support for mt7629 IC
+
+this patch add support for mt7629 IC.
+
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-mt65xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 9ee1fe968a2d..0cce6f0ba824 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -150,6 +150,9 @@ static const struct of_device_id mtk_spi_of_match[] = {
+ 	{ .compatible = "mediatek,mt7622-spi",
+ 		.data = (void *)&mt7622_compat,
+ 	},
++	{ .compatible = "mediatek,mt7629-spi",
++		.data = (void *)&mt7622_compat,
++	},
+ 	{ .compatible = "mediatek,mt8135-spi",
+ 		.data = (void *)&mtk_common_compat,
+ 	},
+-- 
+2.19.0.rc2
