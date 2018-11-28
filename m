@@ -1,79 +1,120 @@
-From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:18 +0000
-Subject: [PATCH 03/12] arm/arm64: Provide a wrapper for SMCCC 1.1 calls
-In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
-Message-ID: <20181128144527.44710-4-steven.price@arm.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 28 Nov 2018 15:01:28 +0000
+Subject: [RFC PATCH v2 1/3] drivers: amba: Updates to component
+ identification for driver matching.
+In-Reply-To: <69964a55-733a-0e45-7584-70c56ad52c2b@arm.com>
+References: <20181128101423.15961-1-mike.leach@linaro.org>
+ <20181128101423.15961-2-mike.leach@linaro.org>
+ <16a3cb27-bc7c-36ff-d8fd-bac17f5fc28d@arm.com>
+ <69964a55-733a-0e45-7584-70c56ad52c2b@arm.com>
+Message-ID: <CAJ9a7Vjv0fN=26Y5A17v2N6=qZP+2QYVbgJXA_Kee5D4vxn7gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SMCCC 1.1 calls may use either HVC or SMC depending on the PSCI
-conduit. Rather than coding this in every call site provide a macro
-which uses the correct instruction. The macro also handles the case
-where no PSCI conduit is configured returning a not supported error
-in res, along with returning the conduit used for the call.
+HI Suzuki
+On Wed, 28 Nov 2018 at 10:55, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>
+>
+>
+> On 28/11/2018 10:44, Suzuki K Poulose wrote:
+> > Hi Mike,
+> >
+> > On 28/11/2018 10:14, Mike Leach wrote:
+> >> The CoreSight specification (ARM IHI 0029E), updates the ID register
+> >> requirements for components on an AMBA bus, to cover both traditional
+> >> ARM Primecell type devices, and newer CoreSight and other components.
+> >>
+> >> The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
+> >> cases to uniquely identify components. CoreSight components related to
+> >> a single function can share Peripheral ID values, and must be further
+> >> identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
+> >> PMU and Debug hardware of the A35 all share the same PID.
+> >>
+> >> Bits 11:8 of the CID are defined to be the device class.
+> >> Class 0xF remains for PrimeCell and legacy components.
+> >> Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
+> >> Class 0x0, 0x1, 0xB, 0xE define components that do not have driver
+> >> support
+> >> at present.
+> >> Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
+> >>
+> >> The specification futher defines which classes of device use the standard
+> >> CID/PID pair, and when additional ID registers are required.
+> >>
+> >> The patches provide an update of amba_device and matching code to handle
+> >> the additional registers required for the Class 0x9 (CoreSight) UCI.
+> >> The *data pointer in the amba_id is used by the driver to provide
+> >> extended
+> >> ID register values for matching.
+> >>
+> >> CoreSight components where PID/CID pair is currently sufficient for
+> >> unique identification need not provide this additional information.
+> >>
+> >> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> >> ---
+> >>   drivers/amba/bus.c       | 49 +++++++++++++++++++++++++++++++++-------
+> >>   include/linux/amba/bus.h | 32 ++++++++++++++++++++++++++
+> >>   2 files changed, 73 insertions(+), 8 deletions(-)
+> >>
+> >> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> >> index 41b706403ef7..387ee8f7720b 100644
+> >> --- a/drivers/amba/bus.c
+> >> +++ b/drivers/amba/bus.c
+> >> @@ -26,19 +26,40 @@
+> >>   #define to_amba_driver(d)    container_of(d, struct amba_driver, drv)
+> >> -static const struct amba_id *
+> >> -amba_lookup(const struct amba_id *table, struct amba_device *dev)
+> >> +/* called on periphid match and class 0x9 coresight device. */
+> >> +static int
+> >> +amba_cs_uci_id_match(const struct amba_id *table, struct amba_device
+> >> *dev)
+> >>   {
+> >>       int ret = 0;
+> >> +    struct amba_cs_uci_id *uci;
+> >> +
+> >> +    uci = table->data;
+> >> +
+> >> +    /* no table data - return match on periphid */
+> >> +    if (!uci)
+> >> +        return 1;
+>
+> Additionally, I see that the DEVARCH defines bit 20 to specify if the
+> register is valid or not. So, do you think we should check if the device
+> has the devarch set and the driver has not provided a matching UCI data
+> and WARN us to detect such problems in the future ?
+>
+> i.e,
+>
+>         if (!uci) {
+>                 WARN(dev->uci.devarch & UCI_DEVARCH_PRESENT,
+>                      "Missing UCI match data for PID: %08x, devarch: %08x\n",
+>                         dev->periphid, dev->uci.devarch);
+>                 return 1;
+>         }
+>
 
-This allow us to remove some duplicated code and will be useful later
-when adding paravirtualized time hypervisor calls.
+I hadn't considered this, but I am trying to get this patch set not to
+break existing values.
+There are currently SoCs that have CS devices that all uniquely
+identify themselves using the CID / PID values, which also implement
+DEVARCH.
+(e.g. DB410 Dragonboard has DEVARCH in the ETMv4, but also has unique
+PID for the ETMs - so has but does not need UCI for driver binding)
 
-Signed-off-by: Steven Price <steven.price@arm.com>
----
- include/linux/arm-smccc.h | 44 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+I'd rather avoid a slew of new warnings on stuff that currently works
+and allow UCI to work when required on newer silicon.
 
-diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-index 18863d56273c..b047009e7a0a 100644
---- a/include/linux/arm-smccc.h
-+++ b/include/linux/arm-smccc.h
-@@ -311,5 +311,49 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
- #define SMCCC_RET_NOT_SUPPORTED			-1
- #define SMCCC_RET_NOT_REQUIRED			-2
- 
-+/* Like arm_smccc_1_1* but always returns SMCCC_RET_NOT_SUPPORTED.
-+ * Used when the PSCI conduit is not defined. The empty asm statement
-+ * avoids compiler warnings about unused variables.
-+ */
-+#define __fail_smccc_1_1(...)						\
-+	do {								\
-+		__declare_args(__count_args(__VA_ARGS__), __VA_ARGS__);	\
-+		asm ("" __constraints(__count_args(__VA_ARGS__)));	\
-+		if (___res)						\
-+			___res->a0 = SMCCC_RET_NOT_SUPPORTED;		\
-+	} while (0)
-+
-+/*
-+ * arm_smccc_1_1() - make an SMCCC v1.1 compliant call
-+ *
-+ * This is a variadic macro taking one to eight source arguments, and
-+ * an optional return structure.
-+ *
-+ * @a0-a7: arguments passed in registers 0 to 7
-+ * @res: result values from registers 0 to 3
-+ *
-+ * This macro will make either an HVC call or an SMC call depending on the
-+ * current PSCI conduit. If no valid conduit is available then -1
-+ * (SMCCC_RET_NOT_SUPPORTED) is returned in @res.a0 (if supplied).
-+ *
-+ * The return value also provides the conduit that was used.
-+ */
-+#define arm_smccc_1_1(...) ({						\
-+		int method = psci_ops.conduit;				\
-+		switch (method) {					\
-+		case PSCI_CONDUIT_HVC:					\
-+			arm_smccc_1_1_hvc(__VA_ARGS__);			\
-+			break;						\
-+		case PSCI_CONDUIT_SMC:					\
-+			arm_smccc_1_1_smc(__VA_ARGS__);			\
-+			break;						\
-+		default:						\
-+			__fail_smccc_1_1(__VA_ARGS__);			\
-+			method = PSCI_CONDUIT_NONE;			\
-+			break;						\
-+		}							\
-+		method;							\
-+	})
-+
- #endif /*__ASSEMBLY__*/
- #endif /*__LINUX_ARM_SMCCC_H*/
+Cheers
+
+Mike
+
+>
+> Cheers
+> Suzuki
+
+
+
 -- 
-2.19.2
+Mike Leach
+Principal Engineer, ARM Ltd.
+Manchester Design Centre. UK
