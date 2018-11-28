@@ -1,57 +1,63 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Nov 2018 17:45:45 +0000
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
-References: <20181122140320.24080-1-hch@lst.de>
- <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
- <20181122170715.GI30658@n2100.armlinux.org.uk>
- <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
- <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
- <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
- <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
- <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
-Message-ID: <20181128174545.GJ30658@n2100.armlinux.org.uk>
+Date: Wed, 28 Nov 2018 17:47:29 +0000
+Subject: [PATCH] ARM: dma-mapping: fix potential uninitialized return
+In-Reply-To: <20181128173929.3050-1-nathanj439@gmail.com>
+References: <20181128173929.3050-1-nathanj439@gmail.com>
+Message-ID: <20181128174729.GK30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 08:47:05AM -0800, Linus Torvalds wrote:
-> On Tue, Nov 27, 2018 at 11:41 PM Christoph Hellwig <hch@lst.de> wrote:
-> >
-> > On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
-> > > Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
-> > > instead of the old 1 is as bool true.  The callers should all be fine,
-> > > although I'd have to audit them.  Still wouldn't help with being able to
-> > > return different errors.
-> >
-> > Any opinions?  I'd really like to make some forward progress on this
-> > series.
+On Wed, Nov 28, 2018 at 12:39:29PM -0500, Nathan Jones wrote:
+> If neither of the if() statements fire then the return value is
+> uninitialized. In the worst case it returns 0 which means the caller
+> will think the function succeeded.
 > 
-> So I do think that yes, dma_mapping_error() should return an error
-> code, not 0/1.
-> 
-> But I was really hoping that the individual drivers themselves could
-> return error codes. Right now the patch-series has code like this:
-> 
->       ret = needs_bounce(dev, dma_addr, size);
->       if (ret < 0)
-> -         return ARM_MAPPING_ERROR;
-> +         return DMA_MAPPING_ERROR;
-> 
-> which while it all makes sense in the context of this patch-series, I
-> *really* think it would have been so much nicer to return the error
-> code 'ret' instead (which in this case is -E2BIG).
-> 
-> I don't think this is a huge deal, but ERR_PTR() has been hugely
-> successful elsewhere. And I'm not hugely convinced about all these
-> "any address can be valid" arguments. How the hell do you generate a
-> random dma address in the last page that isn't even page-aligned?
+> Signed-off-by: Nathan Jones <nathanj439@gmail.com>
 
-kmalloc() a 64-byte buffer, dma_map_single() that buffer.  If you
-have RAM that maps to a _bus_ address in the top page of 4GB of a
-32-bit bus address, then you lose.  Simples.
+This needs a fixes tag, since this bug was introduced by:
 
-Subsystems like I2C, SPI, USB etc all deal with small kmalloc'd
-buffers and their drivers make use of DMA.
+commit 1655cf8829d82d367d8fdb5cb58e5885d7d2a391
+Author: Vladimir Murzin <vladimir.murzin@arm.com>
+Date:   Wed May 24 11:24:32 2017 +0100
+
+    ARM: dma-mapping: Remove traces of NOMMU code
+
+    DMA operations for NOMMU case have been just factored out into
+    separate compilation unit, so don't keep dead code.
+
+    Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+    Tested-by: Andras Szemzo <sza@esh.hu>
+    Tested-by: Alexandre TORGUE <alexandre.torgue@st.com>
+    Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+    Acked-by: Arnd Bergmann <arnd@arndb.de>
+    Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+    Signed-off-by: Christoph Hellwig <hch@lst.de>
+
+> ---
+>  arch/arm/mm/dma-mapping.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> index 661fe48ab78d..78de138aa66d 100644
+> --- a/arch/arm/mm/dma-mapping.c
+> +++ b/arch/arm/mm/dma-mapping.c
+> @@ -829,7 +829,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>  		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>  		 unsigned long attrs)
+>  {
+> -	int ret;
+> +	int ret = -ENXIO;
+>  	unsigned long nr_vma_pages = vma_pages(vma);
+>  	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>  	unsigned long pfn = dma_to_pfn(dev, dma_addr);
+> -- 
+> 2.19.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
