@@ -1,21 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 16:19:55 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Enable pcie
-In-Reply-To: <31f5fa5e281b53f10dc25d8abe20ccaa569ad86e.1542739826.git.leonard.crestez@nxp.com>
-References: <31f5fa5e281b53f10dc25d8abe20ccaa569ad86e.1542739826.git.leonard.crestez@nxp.com>
-Message-ID: <20181128081953.GI20643@dragon>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 28 Nov 2018 09:20:57 +0100
+Subject: [PATCH] drm/fbdev: Make skip_vt_switch the default
+In-Reply-To: <3d406677-9d7d-6d8d-85af-1cfb253d1838@linux.intel.com>
+References: <20181127170952.28507-1-daniel.vetter@ffwll.ch>
+ <20181127173424.301-1-daniel.vetter@ffwll.ch>
+ <3d406677-9d7d-6d8d-85af-1cfb253d1838@linux.intel.com>
+Message-ID: <20181128082057.GH4266@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 06:57:06PM +0000, Leonard Crestez wrote:
-> The imx6qdl-sabreauto boards have a pcie slot so let's enable it.
+On Wed, Nov 28, 2018 at 08:17:04AM +0100, Maarten Lankhorst wrote:
+> Op 27-11-18 om 18:34 schreef Daniel Vetter:
+> > KMS drivers really should all be able to restore their display state
+> > on resume without fbcon helping out. So make this the default.
+> >
+> > Since I'm not entirely foolish, make it only a default, which drivers
+> > can still override. That way when the inevitable regression report
+> > happens I can fix things up with a one-liner plus FIXME comment that
+> > someone should fix up the suspend/resume code in that driver.
+> >
+> > But at least all new drivers won't be broken by accident as soon as
+> > you turn off fbcon because "suspend/resume worked when I tested it".
+> >
+> > v2: Keep this for radeon because of
+> >
+> > commit 18c437caa5b18a235dd65cec224eab54bebcee65
+> > Author: Alex Deucher <alexander.deucher@amd.com>
+> > Date:   Tue Nov 14 17:19:29 2017 -0500
+> >
+> >     Revert "drm/radeon: dont switch vt on suspend"
+> >
+> > Thanks to Michel D?nzer for pointing this one out.
 > 
-> Tested on imx6dl-sabreauto with an atk9k wifi card; scanning works.
-> 
-> There are unhandled differences for imx6qp but imx6qp-sabreauto.dts
-> already contains a snippet explicitly disabling the &pcie node so that
-> can be dealt with later.
-> 
-> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
+> Maybe just reload the gamma lut on resume for radeon, instead of relying on fbcon?
 
-Applied, thanks.
+It also caused random sound issues and other fun. Also, afaiui radeon does
+load the lut. Except because of timing or bad luck, it doesn't work
+reliably, and the vt switch doing it a 2nd time helps out.
+-Daniel
+
+> Otherwise patch looks sane, would be nice if radeon was fixed instead of worked around.
+> 
+> Reviewed-by: Maarten Lankhorst <maarten.lankhorst@linux.intel.com>
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
