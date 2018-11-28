@@ -1,24 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 11:34:37 +0800
-Subject: [PATCH 12/77] ARM: dts: sun5i: Change pinctrl nodes to avoid
- warning
-In-Reply-To: <96b9e11cde1c12e1bc05a5d60e0381f7ac25cd89.1543321707.git-series.maxime.ripard@bootlin.com>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <96b9e11cde1c12e1bc05a5d60e0381f7ac25cd89.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v66KJFsO3Z3dVjEMMWGS98trhVEZRLSLnSxUEhXWFTkLew@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 28 Nov 2018 12:02:13 +0800
+Subject: [PATCH v2 3/3] regulator: mcp16502: add regulator driver for
+ MCP16502
+In-Reply-To: <1543335937-12689-4-git-send-email-andrei.stefanescu@microchip.com>
+References: <1543335937-12689-4-git-send-email-andrei.stefanescu@microchip.com>
+Message-ID: <201811281205.lpne37p2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
->
-> All our pinctrl nodes were using a node name convention with a unit-address
-> to differentiate the different muxing options. However, since those nodes
-> didn't have a reg property, they were generating warnings in DTC.
->
-> In order to accomodate for this, convert the old nodes to the syntax we've
-> been using for the new SoCs, including removing the letter suffix of the
-> node labels to the bank of those pins to make things more readable.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
+Hi Andrei.Stefanescu,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Thank you for the patch! Perhaps something to improve:
+
+[auto build test WARNING on regulator/for-next]
+[also build test WARNING on v4.20-rc4 next-20181127]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Andrei-Stefanescu-microchip-com/add-support-for-MCP16502-PMIC/20181128-041809
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+
+
+coccinelle warnings: (new ones prefixed by >>)
+
+>> drivers/regulator/mcp16502.c:530:3-8: No need to set .owner here. The core will do it.
+
+Please review and possibly fold the followup patch.
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
