@@ -1,74 +1,177 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 28 Nov 2018 09:56:40 +0100
-Subject: [PATCH 0/2] arm64: Only call into preempt_schedule() if
- need_resched()
-In-Reply-To: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
-References: <1543347902-21170-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20181128085640.GX2131@hirez.programming.kicks-ass.net>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 28 Nov 2018 10:00:40 +0100
+Subject: [PATCH V2 2/4] rtc: add i.MX system controller RTC support
+In-Reply-To: <1543382119-2918-3-git-send-email-Anson.Huang@nxp.com>
+References: <1543382119-2918-1-git-send-email-Anson.Huang@nxp.com>
+ <1543382119-2918-3-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <20181128100040.4072d8e4@karo-electronics.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 07:45:00PM +0000, Will Deacon wrote:
-> Hi all,
+Hi,
+
+On Wed, 28 Nov 2018 05:21:11 +0000 Anson Huang wrote:
+> i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+> inside, the system controller is in charge of controlling power,
+> clock and secure rtc etc..
 > 
-> This pair of patches improves our preempt_enable() implementation slightly
-> on arm64 by making the resulting call to preempt_schedule() conditional
-> on need_resched(), which is tracked in bit 32 of the preempt count. The
-> logic is inverted so that we can detect the preempt count going to zero
-> and need_resched being set with a single CBZ instruction.
+> This patch adds i.MX system controller RTC driver support,
+> Linux kernel has to communicate with system controller via MU
+> (message unit) IPC to set/get RTC time and other alarm functions,
+> since the RTC set time needs to be done in secure EL3 mode (required
+> by system controller firmware) and alarm functions needs to be done
+> with general MU IRQ handle, these depend on other components which
+> are NOT ready, so this patch ONLY enables the RTC time read.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+> ---
+> changes since V1:
+> 	- sort module in Makefile alphabetically;
+> 	- remove boiler plate license text;
+> 	- use devm_rtc_allocate_device and rtc_register_device to register the RTC.
+>  drivers/rtc/Kconfig      |   6 +++
+>  drivers/rtc/Makefile     |   1 +
+>  drivers/rtc/rtc-imx-sc.c | 107 +++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 114 insertions(+)
+>  create mode 100644 drivers/rtc/rtc-imx-sc.c
+> 
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index a819ef0..3b9642e 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1677,6 +1677,12 @@ config RTC_DRV_SNVS
+>  	   This driver can also be built as a module, if so, the module
+>  	   will be called "rtc-snvs".
+>  
+> +config RTC_DRV_IMX_SC
+> +	tristate "NXP i.MX System Controller RTC support"
+> +	help
+> +	   If you say yes here you get support for the NXP i.MX System
+> +	   Controller RTC module.
+> +
+>  config RTC_DRV_SIRFSOC
+>  	tristate "SiRFSOC RTC"
+>  	depends on ARCH_SIRF
+> diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
+> index 290c173..f97c05e 100644
+> --- a/drivers/rtc/Makefile
+> +++ b/drivers/rtc/Makefile
+> @@ -75,6 +75,7 @@ obj-$(CONFIG_RTC_DRV_GOLDFISH)	+= rtc-goldfish.o
+>  obj-$(CONFIG_RTC_DRV_HID_SENSOR_TIME) += rtc-hid-sensor-time.o
+>  obj-$(CONFIG_RTC_DRV_HYM8563)	+= rtc-hym8563.o
+>  obj-$(CONFIG_RTC_DRV_IMXDI)	+= rtc-imxdi.o
+> +obj-$(CONFIG_RTC_DRV_IMX_SC)	+= rtc-imx-sc.o
+>  obj-$(CONFIG_RTC_DRV_ISL12022)	+= rtc-isl12022.o
+>  obj-$(CONFIG_RTC_DRV_ISL12026)	+= rtc-isl12026.o
+>  obj-$(CONFIG_RTC_DRV_ISL1208)	+= rtc-isl1208.o
+> diff --git a/drivers/rtc/rtc-imx-sc.c b/drivers/rtc/rtc-imx-sc.c
+> new file mode 100644
+> index 0000000..7212e38
+> --- /dev/null
+> +++ b/drivers/rtc/rtc-imx-sc.c
+> @@ -0,0 +1,107 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * Copyright 2018 NXP.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/firmware/imx/sci.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/rtc.h>
+> +
+> +#define IMX_SC_TIMER_FUNC_GET_RTC_SEC1970	9
+> +#define IMX_SC_TIMER_FUNC_SET_RTC_TIME		6
+> +
+> +struct imx_sc_ipc *rtc_ipc_handle;
+> +struct rtc_device *rtc;
+> +
+Shouldn't these be static?
+A generic name like 'rtc' as a global variable name is definitely a very
+bad idea.
 
->   40:   a9bf7bfd        stp     x29, x30, [sp, #-16]!
->   44:   910003fd        mov     x29, sp
->   48:   d5384101        mrs     x1, sp_el0
->   4c:   f9400820        ldr     x0, [x1, #16]
+> +struct imx_sc_msg_req_timer_get_rtc_time {
+> +	struct imx_sc_rpc_msg hdr;
+> +} __packed;
+> +
+> +struct imx_sc_msg_resp_timer_get_rtc_time {
+> +	struct imx_sc_rpc_msg hdr;
+> +	u32 time;
+> +} __packed;
+> +
+> +static int imx_sc_rtc_read_time(struct device *dev, struct rtc_time *tm)
+> +{
+> +	struct imx_sc_msg_resp_timer_get_rtc_time *resp;
+> +	struct imx_sc_msg_req_timer_get_rtc_time msg;
+> +	struct imx_sc_rpc_msg *hdr = &msg.hdr;
+> +	int ret;
+> +
+> +	hdr->ver = IMX_SC_RPC_VERSION;
+> +	hdr->svc = IMX_SC_RPC_SVC_TIMER;
+> +	hdr->func = IMX_SC_TIMER_FUNC_GET_RTC_SEC1970;
+> +	hdr->size = 1;
+> +
+> +	ret = imx_scu_call_rpc(rtc_ipc_handle, &msg, true);
+> +	if (ret) {
+> +		pr_err("read rtc time failed, ret %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	resp = (struct imx_sc_msg_resp_timer_get_rtc_time *)&msg;
+> +	rtc_time_to_tm(resp->time, tm);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct rtc_class_ops imx_sc_rtc_ops = {
+> +	.read_time = imx_sc_rtc_read_time,
+> +};
+> +
+> +static int imx_sc_rtc_probe(struct platform_device *pdev)
+> +{
+> +	int ret;
+> +
+> +	ret = imx_scu_get_handle(&rtc_ipc_handle);
+> +	if (ret) {
+> +		if (ret == -EPROBE_DEFER)
+> +			return ret;
+> +
+> +		dev_err(&pdev->dev, "failed to get ipc handle: %d!\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	rtc = devm_rtc_allocate_device(&pdev->dev);
+> +	if (IS_ERR(rtc)) {
+> +		ret = PTR_ERR(rtc);
+> +		return ret;
+> +	}
+> +
+> +	rtc->ops = &imx_sc_rtc_ops;
+> +	rtc->range_min = 0;
+> +	rtc->range_max = U32_MAX;
+> +
+> +	ret = rtc_register_device(rtc);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to register rtc: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id imx_sc_dt_ids[] = {
+> +	{ .compatible = "nxp,imx8qxp-sc-rtc", },
+> +	{},
+s/{},/{}/
+The trailing comma is usually added to make patches that add more
+entries to the array simpler and help avoid patch conflicts.
+Since the empty entry MUST be the LAST entry in this array the comma
+should NOT be added here. Without the comma, adding new entries after
+the EOL marker will generate a compile error.
 
-We load x0 which is a u64, right?
 
->   50:   d1000400        sub     x0, x0, #0x1
->   54:   b9001020        str     w0, [x1, #16]
-
-But we store w0, which is the low u32, such as to not touch the high
-word which contains the preempt bit.
-
->   58:   b4000060        cbz     x0, 64 <will+0x24>
->   5c:   a8c17bfd        ldp     x29, x30, [sp], #16
->   60:   d65f03c0        ret
->   64:   94000000        bl      0 <preempt_schedule>
->   68:   a8c17bfd        ldp     x29, x30, [sp], #16
->   6c:   d65f03c0        ret
-
-Why not?
-
-   58:   b4000060        cbnz    x0, 60 <will+0x24>
-   5c:   94000000        bl      0 <preempt_schedule>
-   60:   a8c17bfd        ldp     x29, x30, [sp], #16
-   64:   d65f03c0        ret
-
-which seems shorter.
-
-
-So it's still early, and I haven't finished (or really even started) my
-pot 'o tea, but what about:
-
-
-	ldr x0, [x1, #16]	// seees the high bit set -- no preempt needed
-	sub x0, x0, #1
-
-	<interrupt>
-	  ...
-	  resched_curr()
-	    set_tsk_need_resched();
-	    set_preempt_need_resched();
-	</interrupt> // sees preempt_count != 0, does not preempt
-
-	str w0, [x1, #16] // stores preempt_count == 0
-	cbnz x0, 1f // taken, we still observe the high word from before
-
-1:	ret
-
-
-Which then ends with preempt_count==0, need_resched==0 and no actual
-preemption afaict.
-
-Can you use mis-matched ll x0 / sc w0 to do this same thing and detector
-the intermediate write on the high word?
+Lothar Wa?mann
