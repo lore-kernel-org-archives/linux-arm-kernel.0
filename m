@@ -1,32 +1,39 @@
 From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 28 Nov 2018 05:21:26 +0000
-Subject: [PATCH V2 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
- support
-In-Reply-To: <1543382119-2918-1-git-send-email-Anson.Huang@nxp.com>
-References: <1543382119-2918-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1543382119-2918-5-git-send-email-Anson.Huang@nxp.com>
+Date: Wed, 28 Nov 2018 05:58:07 +0000
+Subject: [PATCH V2 0/4] Add i.MX System Controller thermal driver support
+Message-ID: <1543384349-2851-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX8QXP system controller RTC support.
+i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+inside, the system controller is in charge of controlling power,
+clock and thermal sensors etc..
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+This patch adds i.MX system controller thermal driver support,
+Linux kernel has to communicate with system controller via MU
+(message unit) IPC to get each thermal sensor's temperature,
+it supports multiple sensors which are passed from device tree,
+please see the binding doc for details.
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 9155d45..ef57db6 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -433,4 +433,8 @@
- 		#size-cells = <1>;
- 		ranges = <0x5f000000 0x0 0x5f000000 0x1000000>;
- 	};
-+
-+	rtc: rtc {
-+		compatible = "nxp,imx8qxp-sc-rtc";
-+	};
- };
+Note that this patch set is based on [V4,5/5] defconfig: arm64: add imx8qxp support,
+https://patchwork.kernel.org/patch/10677315/
+
+Anson Huang (4):
+  dt-bindings: thermal: add binding doc for i.MX system controller
+    thermal driver
+  thermal: imx_sc: add i.MX system controller thermal support
+  defconfig: arm64: add i.MX system controller thermal support
+  ARM64: dts: imx: add i.MX8QXP thermal support
+
+ .../devicetree/bindings/thermal/imx-sc-thermal.txt |  33 ++++
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |  27 +++
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |  11 ++
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/imx_sc_thermal.c                   | 201 +++++++++++++++++++++
+ 6 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/imx-sc-thermal.txt
+ create mode 100644 drivers/thermal/imx_sc_thermal.c
+
 -- 
 2.7.4
