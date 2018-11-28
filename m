@@ -1,229 +1,48 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 11:00:12 +0800
-Subject: [PATCH v2 4/4] ARM: dts: Add stmpe-adc driver to relevant
- devicetrees
-In-Reply-To: <20181119102528.2830-4-dev@pschenker.ch>
-References: <20181119102528.2830-1-dev@pschenker.ch>
- <20181119102528.2830-4-dev@pschenker.ch>
-Message-ID: <20181128030011.GG20643@dragon>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Nov 2018 11:03:43 +0800
+Subject: [PATCH 04/77] ARM: dts: sun5i: Fix display pipeline endpoint
+ warnings in DTC
+In-Reply-To: <78b27a15e3e8c08ad565055a137d1954d5b0bb99.1543321707.git-series.maxime.ripard@bootlin.com>
+References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
+ <78b27a15e3e8c08ad565055a137d1954d5b0bb99.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v64CueKNnrFmbikFh2UrCch4jFvs1Qn_6w6kjC06StayLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 19, 2018 at 11:25:28AM +0100, Philippe Schenker wrote:
-> From: Philippe Schenker <philippe.schenker@toradex.com>
-> 
-> Activate the stmpe-adc driver as found on Apalis/Colibri iMX6/T30 modules
-
-iMX6 and T30 changes need to be separate patches.
-
-Shawn
-
-> 
-> Signed-off-by: Philippe Schenker <philippe.schenker@toradex.com>
+On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Since most of the display IPs have a single endpoint, having a reg
+> property, a unit-address and #address-cells and #size-cells will emit a
+> warning.
+>
+> Let's remove those.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 > ---
-> 
-> Changes in v2:
->  - Put common ADC settings in mfd
-> 
->  arch/arm/boot/dts/imx6qdl-apalis.dtsi  | 22 ++++++++++++++--------
->  arch/arm/boot/dts/imx6qdl-colibri.dtsi | 23 +++++++++++++++--------
->  arch/arm/boot/dts/tegra30-apalis.dtsi  | 22 ++++++++++++++--------
->  arch/arm/boot/dts/tegra30-colibri.dtsi | 22 ++++++++++++++--------
->  4 files changed, 57 insertions(+), 32 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> index 3dc99dd8dde1..8db476d8978d 100644
-> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
-> @@ -331,11 +331,18 @@
->  		id = <0>;
->  		blocks = <0x5>;
->  		irq-trigger = <0x1>;
-> +		/* 3.25 MHz ADC clock speed */
-> +		st,adc-freq = <1>;
-> +		/* 12-bit ADC */
-> +		st,mod-12b = <1>;
-> +		/* internal ADC reference */
-> +		st,ref-sel = <0>;
-> +		/* ADC converstion time: 80 clocks */
-> +		st,sample-time = <4>;
-> +		/* forbid to use ADC channels 3-0 (touch) */
->  
->  		stmpe_touchscreen {
->  			compatible = "st,stmpe-ts";
-> -			/* 3.25 MHz ADC clock speed */
-> -			st,adc-freq = <1>;
->  			/* 8 sample average control */
->  			st,ave-ctrl = <3>;
->  			/* 7 length fractional part in z */
-> @@ -345,17 +352,16 @@
->  			 * current limit value
->  			 */
->  			st,i-drive = <1>;
-> -			/* 12-bit ADC */
-> -			st,mod-12b = <1>;
-> -			/* internal ADC reference */
-> -			st,ref-sel = <0>;
-> -			/* ADC converstion time: 80 clocks */
-> -			st,sample-time = <4>;
->  			/* 1 ms panel driver settling time */
->  			st,settling = <3>;
->  			/* 5 ms touch detect interrupt delay */
->  			st,touch-det-delay = <5>;
->  		};
-> +
-> +		stmpe_adc {
-> +			compatible = "st,stmpe-adc";
-> +			st,norequest-mask = <0x0F>;
-> +		};
->  	};
->  };
->  
-> diff --git a/arch/arm/boot/dts/imx6qdl-colibri.dtsi b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-> index 87e15e7cb32b..2e303d79c7f8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-colibri.dtsi
-> @@ -262,11 +262,18 @@
->  		id = <0>;
->  		blocks = <0x5>;
->  		irq-trigger = <0x1>;
-> +		/* 3.25 MHz ADC clock speed */
-> +		st,adc-freq = <1>;
-> +		/* 12-bit ADC */
-> +		st,mod-12b = <1>;
-> +		/* internal ADC reference */
-> +		st,ref-sel = <0>;
-> +		/* ADC converstion time: 80 clocks */
-> +		st,sample-time = <4>;
-> +		/* forbid to use ADC channels 3-0 (touch) */
->  
->  		stmpe_touchscreen {
->  			compatible = "st,stmpe-ts";
-> -			/* 3.25 MHz ADC clock speed */
-> -			st,adc-freq = <1>;
->  			/* 8 sample average control */
->  			st,ave-ctrl = <3>;
->  			/* 7 length fractional part in z */
-> @@ -276,17 +283,17 @@
->  			 * current limit value
->  			 */
->  			st,i-drive = <1>;
-> -			/* 12-bit ADC */
-> -			st,mod-12b = <1>;
-> -			/* internal ADC reference */
-> -			st,ref-sel = <0>;
-> -			/* ADC converstion time: 80 clocks */
-> -			st,sample-time = <4>;
->  			/* 1 ms panel driver settling time */
->  			st,settling = <3>;
->  			/* 5 ms touch detect interrupt delay */
->  			st,touch-det-delay = <5>;
->  		};
-> +
-> +		stmpe_adc {
-> +			compatible = "st,stmpe-adc";
-> +			/* 3.25 MHz ADC clock speed */
-> +			st,norequest-mask = <0x0F>;
-> +		};
->  	};
->  };
->  
-> diff --git a/arch/arm/boot/dts/tegra30-apalis.dtsi b/arch/arm/boot/dts/tegra30-apalis.dtsi
-> index 7f112f192fe9..850b0d13549a 100644
-> --- a/arch/arm/boot/dts/tegra30-apalis.dtsi
-> +++ b/arch/arm/boot/dts/tegra30-apalis.dtsi
-> @@ -976,11 +976,18 @@
->  			id = <0>;
->  			blocks = <0x5>;
->  			irq-trigger = <0x1>;
-> +			/* 3.25 MHz ADC clock speed */
-> +			st,adc-freq = <1>;
-> +			/* 12-bit ADC */
-> +			st,mod-12b = <1>;
-> +			/* internal ADC reference */
-> +			st,ref-sel = <0>;
-> +			/* ADC converstion time: 80 clocks */
-> +			st,sample-time = <4>;
-> +			/* forbid to use ADC channels 3-0 (touch) */
->  
->  			stmpe_touchscreen {
->  				compatible = "st,stmpe-ts";
-> -				/* 3.25 MHz ADC clock speed */
-> -				st,adc-freq = <1>;
->  				/* 8 sample average control */
->  				st,ave-ctrl = <3>;
->  				/* 7 length fractional part in z */
-> @@ -990,17 +997,16 @@
->  				 * current limit value
->  				 */
->  				st,i-drive = <1>;
-> -				/* 12-bit ADC */
-> -				st,mod-12b = <1>;
-> -				/* internal ADC reference */
-> -				st,ref-sel = <0>;
-> -				/* ADC converstion time: 80 clocks */
-> -				st,sample-time = <4>;
->  				/* 1 ms panel driver settling time */
->  				st,settling = <3>;
->  				/* 5 ms touch detect interrupt delay */
->  				st,touch-det-delay = <5>;
->  			};
-> +
-> +			stmpe_adc {
-> +				compatible = "st,stmpe-adc";
-> +				st,norequest-mask = <0x0F>;
-> +			};
->  		};
->  
->  		/*
-> diff --git a/arch/arm/boot/dts/tegra30-colibri.dtsi b/arch/arm/boot/dts/tegra30-colibri.dtsi
-> index 35af03ca9e90..1f9198bb24ff 100644
-> --- a/arch/arm/boot/dts/tegra30-colibri.dtsi
-> +++ b/arch/arm/boot/dts/tegra30-colibri.dtsi
-> @@ -845,11 +845,18 @@
->  			id = <0>;
->  			blocks = <0x5>;
->  			irq-trigger = <0x1>;
-> +			/* 3.25 MHz ADC clock speed */
-> +			st,adc-freq = <1>;
-> +			/* 12-bit ADC */
-> +			st,mod-12b = <1>;
-> +			/* internal ADC reference */
-> +			st,ref-sel = <0>;
-> +			/* ADC converstion time: 80 clocks */
-> +			st,sample-time = <4>;
-> +			/* forbid to use ADC channels 3-0 (touch) */
->  
->  			stmpe_touchscreen {
->  				compatible = "st,stmpe-ts";
-> -				/* 3.25 MHz ADC clock speed */
-> -				st,adc-freq = <1>;
->  				/* 8 sample average control */
->  				st,ave-ctrl = <3>;
->  				/* 7 length fractional part in z */
-> @@ -859,17 +866,16 @@
->  				 * current limit value
->  				 */
->  				st,i-drive = <1>;
-> -				/* 12-bit ADC */
-> -				st,mod-12b = <1>;
-> -				/* internal ADC reference */
-> -				st,ref-sel = <0>;
-> -				/* ADC converstion time: 80 clocks */
-> -				st,sample-time = <4>;
->  				/* 1 ms panel driver settling time */
->  				st,settling = <3>;
->  				/* 5 ms touch detect interrupt delay */
->  				st,touch-det-delay = <5>;
->  			};
-> +
-> +			stmpe_adc {
-> +				compatible = "st,stmpe-adc";
-> +				st,norequest-mask = <0x0F>;
-> +			};
->  		};
->  
->  		/*
-> -- 
-> 2.19.1
-> 
+>  arch/arm/boot/dts/sun5i.dtsi | 25 +++++--------------------
+>  1 file changed, 5 insertions(+), 20 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+> index 14a7d1cf89b4..3e7b251ce7a6 100644
+> --- a/arch/arm/boot/dts/sun5i.dtsi
+> +++ b/arch/arm/boot/dts/sun5i.dtsi
+
+[...]
+
+> @@ -726,12 +720,9 @@
+>                                 #size-cells = <0>;
+>
+>                                 fe0_out: port at 1 {
+> -                                       #address-cells = <1>;
+> -                                       #size-cells = <0>;
+>                                         reg = <1>;
+>
+> -                                       fe0_out_be0: endpoint at 0 {
+> -                                               reg = <0>;
+
+Removing this breaks the code used to parse the graph to get the backend's ID.
+The code expects a reg property to be present. We need to fix it.
+
+The rest of the changes should be fine though.
+
+ChenYu
