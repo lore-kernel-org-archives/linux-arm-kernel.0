@@ -1,92 +1,40 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Nov 2018 10:56:39 +0100
-Subject: [PATCH 09/14] regulator: dts: add full voltage range to LDO4 on
- the Lime2
-In-Reply-To: <20181127093852.2iavgo4xipjnu25l@flea>
-References: <cover.156212c9c5df493e098556cad9793a07dcab5e32.1543245984.git-series.plaes@plaes.org>
- <0b1aa5b28cb5efe17c04150a181ef1fa4027bc55.1543245984.git-series.plaes@plaes.org>
- <20181127093852.2iavgo4xipjnu25l@flea>
-Message-ID: <20181128095639.t4ogsk6ovyu2yaxu@flea>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 28 Nov 2018 09:57:15 +0000
+Subject: [PATCH V3 0/4] Add i.MX system controller RTC driver
+Message-ID: <1543398696-3140-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 10:38:52AM +0100, Maxime Ripard wrote:
-> On Mon, Nov 26, 2018 at 05:27:50PM +0200, Priit Laes wrote:
-> > From: Olliver Schinagl <oliver@schinagl.nl>
-> > 
-> > With commit b43776d65a33b46092 ("ARM: dts: sunxi: Use axp209.dtsi for
-> > Olinuxino Lime2") we force them an arbitrary 2.8 volts. Granted, for
-> > LDO3 this may be less arbitrary, but for LDO4 this is just wrong.
-> > 
-> > In the defense of LDO3, LDO3 is the regulator that feeds port bank E,
-> > which has no other purpose then a CSI/TS interface, however the case
-> > may still be, that the connected IO may be just as well be 3.3 volts.
-> > The big misnomer is however, that the schematic names GPIO-2 pin4
-> > LDO3_2.8V, rather then VDD-CSI0 or similar.
-> > 
-> > This is much worse for LDO4 however, which is not referenced on any
-> > pin, is now set to 2.8 volts, but port bank G can also support various
-> > other peripherals such as UARTS etc.
-> > 
-> > By having 2.8 volts however for LDO4, we thus now have peripherals that
-> > no longer function properly all of the time.
-> > 
-> > Ideally, we want to set a supply voltage for each port bank, but the
-> > monolithic nature of the sunxi pinctroller currently prevents this and
-> > as such, the board should at least configure the LDO4 with the proper
-> > ranges.
-> > 
-> > Until we can set the consumer at the port bank level, a child
-> > device-tree has to do something like:
-> > 
-> > &reg_ldo4 {
-> >     regulator-min-microvolt = <3300000>;
-> >     regulator-max-microvolt = <3300000>;
-> > };
-> > 
-> > While doing this the same way results in the same solution currently,
-> > we force the hack into the final devicetree rather then having it wrong
-> > at the board level.
-> > 
-> > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> > Signed-off-by: Priit Laes <plaes@plaes.org>
-> > ---
-> >  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > index ffafe97..1b9867f 100644
-> > --- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > +++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-> > @@ -250,9 +250,10 @@
-> >  };
-> >  
-> >  &reg_ldo4 {
-> > -	regulator-min-microvolt = <2800000>;
-> > -	regulator-max-microvolt = <2800000>;
-> > -	regulator-name = "vddio-csi1";
-> > +	regulator-always-on;
-> > +	regulator-min-microvolt = <1250000>;
-> > +	regulator-max-microvolt = <3300000>;
-> > +	regulator-name = "vdd-io-pg";
-> 
-> As we discussed on the U-Boot ML already, this shouldn't be made
-> always-on but tied to the consumer device (the pinctrl one) instead.
+NXP i.MX8QXP is an ARMv8 SoC with a Cortex-M4 core inside as
+system controller, the system controller is in charge of system
+power, clock and secure RTC etc. management, Linux kernel
+has to communicate with system controller via MU (message unit)
+IPC to do RTC operation.
 
-Can you test that patch (not tested):
-http://code.bulix.org/h02vha-514284?raw
+Since the RTC set time MUST to be done in secure EL3 mode (required
+by system controller firmware) and ALARM functions needs to be done
+with general MU IRQ handle, these are NOT ready NOW, so this patch
+ONLY supports RTC read time for now.
 
-Thanks!
-Maxime
+Note that this patch set is based on [V4,5/5] defconfig: arm64: add imx8qxp support,
+https://patchwork.kernel.org/patch/10677315/
+
+Anson Huang (4):
+  rtc: add i.MX system controller RTC support
+  dt-bindings: rtc: add binding doc for i.MX system controller RTC
+    driver
+  defconfig: arm64: add i.MX system controller RTC support
+  ARM64: dts: imx: add i.MX8QXP system controller RTC support
+
+ .../devicetree/bindings/rtc/rtc-imx-sc.txt         |  10 ++
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |   4 +
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/rtc/Kconfig                                |   6 ++
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-imx-sc.c                           | 104 +++++++++++++++++++++
+ 6 files changed, 126 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-imx-sc.txt
+ create mode 100644 drivers/rtc/rtc-imx-sc.c
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/229f9de5/attachment.sig>
+2.7.4
