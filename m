@@ -1,14 +1,14 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 10:46:26 +0800
-Subject: [PATCH 2/6] ARM: dts: ls1021a: Add all CPUs in cooling maps
-In-Reply-To: <4e3e13854a25a2c59a8202872191be329ae4d5f1.1542362000.git.viresh.kumar@linaro.org>
-References: <cover.1542362000.git.viresh.kumar@linaro.org>
- <4e3e13854a25a2c59a8202872191be329ae4d5f1.1542362000.git.viresh.kumar@linaro.org>
-Message-ID: <20181128024625.GD20643@dragon>
+Date: Wed, 28 Nov 2018 10:46:51 +0800
+Subject: [PATCH 03/10] ARM64: dts: fsl: Add all CPUs in cooling maps
+In-Reply-To: <c92e66ea7e0692b13c8088d0a554acfeacf74cf4.1542362530.git.viresh.kumar@linaro.org>
+References: <cover.1542362530.git.viresh.kumar@linaro.org>
+ <c92e66ea7e0692b13c8088d0a554acfeacf74cf4.1542362530.git.viresh.kumar@linaro.org>
+Message-ID: <20181128024650.GE20643@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 16, 2018 at 03:31:11PM +0530, Viresh Kumar wrote:
+On Fri, Nov 16, 2018 at 03:34:26PM +0530, Viresh Kumar wrote:
 > Each CPU can (and does) participate in cooling down the system but the
 > DT only captures a handful of them, normally CPU0, in the cooling maps.
 > Things work by chance currently as under normal circumstances its the
