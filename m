@@ -1,49 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 28 Nov 2018 13:50:57 +0100
-Subject: [PATCH 01/16] ARM: dts: r9a06g032: Add pinctrl node
-In-Reply-To: <2b421730228e2ac6e49c3202e4f7ef79a65da71c.1543236456.git.horms+renesas@verge.net.au>
-References: <cover.1543236456.git.horms+renesas@verge.net.au>
- <2b421730228e2ac6e49c3202e4f7ef79a65da71c.1543236456.git.horms+renesas@verge.net.au>
-Message-ID: <20181128125057.dwf7qae323yv64ma@verge.net.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 28 Nov 2018 20:38:42 +0800
+Subject: [PATCH 64/77] ARM: dts: sun8i: a23/a33: Remove underscores from
+ nodes names
+In-Reply-To: <a63e38a6c93909fe248ffb52d98d47cb4c16ea81.1543321707.git-series.maxime.ripard@bootlin.com>
+References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
+ <a63e38a6c93909fe248ffb52d98d47cb4c16ea81.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v65jFcaTgD=QhuYrsOMCfqUeYLFWmjKHGC-gy47Za=3XVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 26, 2018 at 01:54:03PM +0100, Simon Horman wrote:
-> From: Phil Edworthy <phil.edworthy@renesas.com>
-> 
-> This provides a pinctrl driver for the Renesas R9A06G032 SoC
-> 
-> Based on a patch originally written by Michel Pollet at Renesas.
-> 
-> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-> Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
+>
+> Some GPIO pinctrl nodes cannot be easily removed, because they would also
+> change the pin configuration, for example to add a pull resistor or change
+> the current delivered by the pin.
+>
+> Those nodes still have underscores and unit-addresses in their node names
+> in our DTs, so adjust their name to remove the warnings. Use that occasion
+> to also fix some poorly chosen node-names.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
-The tag above is garbled. I will fix this and repost this pull-request.
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->  arch/arm/boot/dts/r9a06g032.dtsi | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-> index eaf94976ed6d..2322268bc862 100644
-> --- a/arch/arm/boot/dts/r9a06g032.dtsi
-> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
-> @@ -165,6 +165,14 @@
->  			status = "disabled";
->  		};
->  
-> +		pinctrl: pin-controller at 40067000 {
-> +			compatible = "renesas,r9a06g032-pinctrl", "renesas,rzn1-pinctrl";
-> +			reg = <0x40067000 0x1000>, <0x51000000 0x480>;
-> +			clocks = <&sysctrl R9A06G032_HCLK_PINCONFIG>;
-> +			clock-names = "bus";
-> +			status = "okay";
-> +		};
-> +
->  		gic: gic at 44101000 {
->  			compatible = "arm,cortex-a7-gic", "arm,gic-400";
->  			interrupt-controller;
-> -- 
-> 2.11.0
-> 
+Acked-by: Chen-Yu Tsai <wens@csie.org>
