@@ -1,41 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Nov 2018 14:03:18 +0100
-Subject: [PATCH 16/16] ARM: dts: r9a06g032: Correct the GIC DT node name
+Date: Wed, 28 Nov 2018 14:03:13 +0100
+Subject: [PATCH 11/16] ARM: dts: r8a77470: Add CMT SoC specific support
 In-Reply-To: <cover.1543409901.git.horms+renesas@verge.net.au>
 References: <cover.1543409901.git.horms+renesas@verge.net.au>
-Message-ID: <673df60a880f060e3e94920c7b5f7a9ed8aa65f2.1543409901.git.horms+renesas@verge.net.au>
+Message-ID: <8129890823855fedab15bc0df1f89beaac5653db.1543409901.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <phil.edworthy@renesas.com>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Harmless mistake, but it's incorrect. The DT spec provides recommendations
-for the node names:
-"The name of a node should be somewhat generic, reflecting the function
-of the device and not its precise programming model. If appropriate, the
-name should be one of the following choices:
-...
-interrupt-controller"
+Add CMT[01] support to r8a77470 SoC DT.
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r9a06g032.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a77470.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
-index 2322268bc862..4c1ab49c7d39 100644
---- a/arch/arm/boot/dts/r9a06g032.dtsi
-+++ b/arch/arm/boot/dts/r9a06g032.dtsi
-@@ -173,7 +173,7 @@
- 			status = "okay";
+diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
+index 0a7ca2ff4dc4..5c0e48d0449a 100644
+--- a/arch/arm/boot/dts/r8a77470.dtsi
++++ b/arch/arm/boot/dts/r8a77470.dtsi
+@@ -615,6 +615,38 @@
+ 			compatible = "renesas,prr";
+ 			reg = <0 0xff000044 0 4>;
  		};
++
++		cmt0: timer at ffca0000 {
++			compatible = "renesas,r8a77470-cmt0",
++				     "renesas,rcar-gen2-cmt0";
++			reg = <0 0xffca0000 0 0x1004>;
++			interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 124>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
++			resets = <&cpg 124>;
++			status = "disabled";
++		};
++
++		cmt1: timer at e6130000 {
++			compatible = "renesas,r8a77470-cmt1",
++				     "renesas,rcar-gen2-cmt1";
++			reg = <0 0xe6130000 0 0x1004>;
++			interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 329>;
++			clock-names = "fck";
++			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
++			resets = <&cpg 329>;
++			status = "disabled";
++		};
+ 	};
  
--		gic: gic at 44101000 {
-+		gic: interrupt-controller at 44101000 {
- 			compatible = "arm,cortex-a7-gic", "arm,gic-400";
- 			interrupt-controller;
- 			#interrupt-cells = <3>;
+ 	timer {
 -- 
 2.11.0
