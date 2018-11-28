@@ -1,68 +1,80 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 27 Nov 2018 16:25:31 -0800
-Subject: [PATCH v2] soc: bcm: brcmstb: Don't leak device tree node
- reference
-In-Reply-To: <CAEExFWut2Vu0e+j1U8_1PS683DtMMi7FVD6X=LfwwE63DT7Syg@mail.gmail.com>
-References: <20181124145223.29208-1-tiny.windzz@gmail.com>
- <CAEExFWut2Vu0e+j1U8_1PS683DtMMi7FVD6X=LfwwE63DT7Syg@mail.gmail.com>
-Message-ID: <78dec05e-c936-4dbc-de8f-969c20ff6587@gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 27 Nov 2018 16:39:50 -0800
+Subject: [PATCH v2] x86_64,
+ vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
+In-Reply-To: <20181127232916.GG1824@MiWiFi-R3L-srv>
+References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
+ <20181121113944.GD27797@zn.tnic>
+ <CAGXu5jKYxgLPD4YonGSXjECJS=c18rxWmuFC1eeUJK9fLeTxcg@mail.gmail.com>
+ <20181127232916.GG1824@MiWiFi-R3L-srv>
+Message-ID: <CAGXu5jJzVMmqJ9JvFqDhDx=QShiWisWO0bY49cD5r-7By5dxFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 27, 2018 at 3:29 PM, Baoquan He <bhe@redhat.com> wrote:
+> On 11/27/18 at 02:16pm, Kees Cook wrote:
+>> Why is KERNELOFFSET= not sufficient?
+>>
+>> See commit b6085a865762 ("x86, kaslr: export offset in VMCOREINFO ELF notes")
+>>
+>> +       vmcoreinfo_append_str("KERNELOFFSET=%lx\n",
+>> +                             (unsigned long)&_text - __START_KERNEL);
+>
+> KERNELOFFSET is virtual address delta after kernel text KASLR, namely
+> the offset from the original default kernel text virtual address,
+> 0xffffffff88000000.
+>
+> While after memory region KASLR in kernel_randomize_memory(), the
+> starting address of the direct mapping of physical memory, PAGE_OFFSET,
+> is changed too. We need get it to analyze memory in makedumpfile/crash.
+> Currently we deduce it from elf program segment of kcore:
+> Program Headers:
+>   Type           Offset             VirtAddr           PhysAddr
+>                  FileSiz            MemSiz              Flags  Align
+> ......
+>
+>   LOAD           0x00000a62c0004000 0xffff8a62c0001000 0x0000000000001000
+>                  0x000000000009c000 0x000000000009c000  RWE    1000
+>
+> page_offset = 0xffff8a62c0001000 - 0x0000000000001000;
+> Since we put the direct mapping segments at the bottom part of kcore, we
+> can always get page_offset right.
+>
+> Thanks
+> Baoquan
+>
+>>
+>> -Kees
+>>
+>> >> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
+>> >> index 4c8acdfdc5a7..6161d77c5bfb 100644
+>> >> --- a/arch/x86/kernel/machine_kexec_64.c
+>> >> +++ b/arch/x86/kernel/machine_kexec_64.c
+>> >> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
+>> >>       VMCOREINFO_SYMBOL(init_top_pgt);
+>> >>       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
+>> >>                       pgtable_l5_enabled());
+>> >> +#ifdef CONFIG_RANDOMIZE_BASE
 
+Okay, gotcha. In that case, shouldn't this be CONFIG_RANDOMIZE_MEMORY?
 
-On 11/26/18 6:42 AM, Frank Lee wrote:
-> On Sat, Nov 24, 2018 at 10:52 PM Yangtao Li <tiny.windzz@gmail.com> wrote:
+-Kees
+
+>> >> +     VMCOREINFO_NUMBER(page_offset_base);
+>> >> +#endif
+>> >>
+>> >>  #ifdef CONFIG_NUMA
+>> >>       VMCOREINFO_SYMBOL(node_data);
 >>
->> of_find_node_by_path() acquires a reference to the node returned by it
->> and that reference needs to be dropped by its caller. soc_is_brcmstb()
->> doesn't do that, so fix it.
->>
->> [treding: slightly rewrite to avoid inline comparison]
->>
->> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
->> ---
->> Changes in v2:
->> -update changelog
->> -slightly rewrite to avoid inline comparison
->> ---
->>  drivers/soc/bcm/brcmstb/common.c | 6 +++++-
->>  1 file changed, 5 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
->> index 14185451901d..bf9123f727e8 100644
->> --- a/drivers/soc/bcm/brcmstb/common.c
->> +++ b/drivers/soc/bcm/brcmstb/common.c
->> @@ -31,13 +31,17 @@ static const struct of_device_id brcmstb_machine_match[] = {
->>
->>  bool soc_is_brcmstb(void)
->>  {
->> +       const struct of_device_id *match;
->>         struct device_node *root;
->>
->>         root = of_find_node_by_path("/");
->>         if (!root)
->>                 return false;
->>
->> -       return of_match_node(brcmstb_machine_match, root) != NULL;
->> +       match = of_match_node(brcmstb_machine_match, root);
->> +       of_node_put(root);
->> +
->> +       return match != NULL;
->>  }
->>
->>  u32 brcmstb_get_family_id(void)
 >> --
->> 2.17.0
+>> Kees Cook
 >>
-> Hi Florian:
-> 
-> How about this ?
+>> _______________________________________________
+>> kexec mailing list
+>> kexec at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/kexec
 
-This looks better, I will add:
 
-Fixes: d52fad262041 ("soc: add stubs for brcmstb SoC's")
 
-while applying the patch.
 -- 
-Florian
+Kees Cook
