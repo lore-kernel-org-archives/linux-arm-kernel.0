@@ -1,123 +1,169 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Wed, 28 Nov 2018 07:54:00 +0800
-Subject: [PATCH v2 03/11] clk: mediatek: Disable tuner_en before change
- PLL rate
-In-Reply-To: <CAGp9Lzro5YHCYqzOWFJJa4g75odf6yK52cean_aS3p2STOtJYg@mail.gmail.com>
-References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
- <20181127034254.24721-5-weiyi.lu@mediatek.com>
- <CAGp9Lzro5YHCYqzOWFJJa4g75odf6yK52cean_aS3p2STOtJYg@mail.gmail.com>
-Message-ID: <CANMq1KB4tt9jdmE+LJXfji=QXC9-6wuhXWjJPkpNfo6hEMXH=A@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 27 Nov 2018 16:23:08 -0800
+Subject: Adding a Basic DT for the Linksys ea6500 v2 wireless home router
+In-Reply-To: <CACE8ZKYCyDx_E+3sLpjQSV6xrFxGyrYwEfhEO=QZPGpm3jsBrQ@mail.gmail.com>
+References: <CACE8ZKbUhFyWg5oK1B8+aWAa0tdqKf5Kokj80+8x1X2EUaA_DQ@mail.gmail.com>
+ <CACE8ZKZEpQjOW6CSvUuM9xhjtkSCF0bYxcfQ3htSabC=rVJcTA@mail.gmail.com>
+ <86f391e5-9e38-c8b0-4753-4646c322c9bc@hauke-m.de>
+ <CACE8ZKb5CxEBAdCdGAhwaQHC9_nHBjTTVwxdDOXRayqgz0FK5g@mail.gmail.com>
+ <CACE8ZKYCyDx_E+3sLpjQSV6xrFxGyrYwEfhEO=QZPGpm3jsBrQ@mail.gmail.com>
+Message-ID: <5a6a30cf-1d93-7232-e607-3919b86bbdff@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 4:37 AM Sean Wang <sean.wang@kernel.org> wrote:
->
-> Weiyi Lu <weiyi.lu@mediatek.com> ? 2018?11?26? ?? ??7:45???
-> >
-> > From: Owen Chen <owen.chen@mediatek.com>
-> >
-> > PLLs with tuner_en bit, such as APLL1, need to disable
-> > tuner_en before apply new frequency settings, or the new frequency
-> > settings (pcw) will not be applied.
-> > The tuner_en bit will be disabled during changing PLL rate
-> > and be restored after new settings applied.
->
-> It looks like a bug fix. If so, you should add a fixes tag and even cc
-> stable tree
->
-> >
-> > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
-> > ---
-> >  drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
-> >  1 file changed, 31 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> > index 1db161aced31..81400601f107 100644
-> > --- a/drivers/clk/mediatek/clk-pll.c
-> > +++ b/drivers/clk/mediatek/clk-pll.c
-> > @@ -27,7 +27,7 @@
-> >  #define CON0_BASE_EN           BIT(0)
-> >  #define CON0_PWR_ON            BIT(0)
-> >  #define CON0_ISO_EN            BIT(1)
-> > -#define CON0_PCW_CHG           BIT(31)
-> > +#define CON1_PCW_CHG           BIT(31)
->
-> it seems like an unnecessary change
 
-Below, you have:
-con1 |= CON1_PCW_CHG;
 
-Presumably PCW_CHG is on BIT(31) of CON1(?), so I think this is a good
-change. Maybe this needs to be a separate patch, though?
+On 11/26/18 4:49 PM, Ren? Kjellerup wrote:
+> To the broadcom kernel maintainers, (for BCM4708 CPUs)
+> 
+> I just want to add a little attention to this patch again...
+> let me know if there's any concerns and I will try to address highlighted issues
+> as soon as possible.
+> 
+> I've been running the development builds of OpenWrt kernels, where
+> this patch has
+> been included, on my Linksys EA6500v2 router for the past months,
+> updating as new
+> builds are available. With only the on board BCM4360 chip (5GHz WiFi) is being
+> disabled, has so far been stable for my use case.
 
-> >
-> >  #define AUDPLL_TUNER_EN                BIT(31)
-> >
-> > @@ -97,9 +97,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> >  {
-> >         u32 con1, val;
-> >         int pll_en;
-> > +       u32 tuner_en = 0;
-> > +       u32 tuner_en_mask;
-> > +       void __iomem *tuner_en_addr = NULL;
-> >
-> >         pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
-> >
-> > +       /* disable tuner */
->
-> similar code pieces are ready on mtk_pll_[un]prepare. maybe we can add
-> common tuner operations for them to reuse.
->
-> > +       if (pll->tuner_en_addr) {
-> > +               tuner_en_addr = pll->tuner_en_addr;
-> > +               tuner_en_mask = BIT(pll->data->tuner_en_bit);
-> > +       } else if (pll->tuner_addr) {
-> > +               tuner_en_addr = pll->tuner_addr;
-> > +               tuner_en_mask = AUDPLL_TUNER_EN;
-> > +       }
-> > +
-> > +       if (tuner_en_addr) {
-> > +               val = readl(tuner_en_addr);
-> > +               tuner_en = val & tuner_en_mask;
-> > +
-> > +               if (tuner_en) {
-> > +                       val &= ~tuner_en_mask;
-> > +                       writel(val, tuner_en_addr);
-> > +               }
-> > +       }
-> > +
-> >         /* set postdiv */
-> >         val = readl(pll->pd_addr);
-> >         val &= ~(POSTDIV_MASK << pll->data->pd_shift);
-> > @@ -120,12 +142,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
-> >         con1 = readl(pll->base_addr + REG_CON1);
-> >
-> >         if (pll_en)
-> > -               con1 |= CON0_PCW_CHG;
-> > +               con1 |= CON1_PCW_CHG;
-> >
-> >         writel(con1, pll->base_addr + REG_CON1);
-> >         if (pll->tuner_addr)
-> >                 writel(con1 + 1, pll->tuner_addr);
-> >
-> > +       /* restore tuner_en */
-> > +       if (tuner_en_addr && tuner_en) {
->
-> if (tuner_en) is sufficient
->
-> > +               val = readl(tuner_en_addr);
-> > +               val |= tuner_en_mask;
-> > +               writel(val, tuner_en_addr);
-> > +       }
-> > +
-> >         if (pll_en)
-> >                 udelay(20);
-> >  }
-> > --
-> > 2.18.0
-> >
-> >
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+(Please no top posting). Your submission did make it through patchwork
+and looks okay, I will run build tests and queue it up for 4.21 if
+everything looks good. Thanks.
+
+> 
+> thank you for the consideration
+> Rene (aka Katana_Steel)
+> 
+> On Mon, Oct 8, 2018 at 9:34 AM Ren? Kjellerup <rk.katana.steel@gmail.com> wrote:
+>>
+>> Hi Hauke,
+>>
+>> Updated the file header per your suggestion.
+>>
+>> From e97c15ef78d2535c23f32ebbec43bced72b5eaf7 Mon Sep 17 00:00:00 2001
+>> From: Rene Kjellerup <rk.katana.steel@gmail.com>
+>> Date: Mon, 1 Oct 2018 14:11:56 -0700
+>> Subject: [PATCH] ARM: dts: BCM5301X: Add basic DT for Linksys EA6500 V2
+>>
+>> It's wireless home router based on BCM4708A0 with BCM4360 + BCM4331
+>> wireless chipsets. The 5GHz chip currently isn't supported only due
+>> to missing compatible firmware.
+>>
+>> the DTS here was based on the Linksys EA6300 V1 DTS, only changing
+>> the model strings
+>>
+>> Signed-off-by: Rene Kjellerup <rk.katana.steel@gmail.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile                      |  1 +
+>>  arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts | 47 +++++++++++++++++++++++++
+>>  2 files changed, 48 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index b5bd3de87c33..adf8f28f5e44 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -88,6 +88,7 @@ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>      bcm4708-asus-rt-ac68u.dtb \
+>>      bcm4708-buffalo-wzr-1750dhp.dtb \
+>>      bcm4708-linksys-ea6300-v1.dtb \
+>> +    bcm4708-linksys-ea6500-v2.dtb \
+>>      bcm4708-luxul-xap-1510.dtb \
+>>      bcm4708-luxul-xwc-1000.dtb \
+>>      bcm4708-netgear-r6250.dtb \
+>> diff --git a/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+>> b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+>> new file mode 100644
+>> index 000000000000..8a434d2a4b72
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/bcm4708-linksys-ea6500-v2.dts
+>> @@ -0,0 +1,47 @@
+>> +// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+>> +/*
+>> + * Copyright (C) 2017 Rafa? Mi?ecki <rafal@milecki.pl>
+>> + * Copyright (C) 2018 Rene Kjellerup <rk.katana.steel@gmail.com>
+>> + *
+>> + * this DTS was originally based on bcm4708-linksys-ea6300-v1.dts
+>> + */
+>> +
+>> +/dts-v1/;
+>> +
+>> +#include "bcm4708.dtsi"
+>> +#include "bcm5301x-nand-cs0-bch8.dtsi"
+>> +
+>> +/ {
+>> +    compatible = "linksys,ea6500-v2", "brcm,bcm4708";
+>> +    model = "Linksys EA6500 V2";
+>> +
+>> +    chosen {
+>> +        bootargs = "console=ttyS0,115200";
+>> +    };
+>> +
+>> +    memory {
+>> +        reg = <0x00000000 0x08000000>;
+>> +    };
+>> +
+>> +    gpio-keys {
+>> +        compatible = "gpio-keys";
+>> +        #address-cells = <1>;
+>> +        #size-cells = <0>;
+>> +
+>> +        wps {
+>> +            label = "WPS";
+>> +            linux,code = <KEY_WPS_BUTTON>;
+>> +            gpios = <&chipcommon 7 GPIO_ACTIVE_LOW>;
+>> +        };
+>> +
+>> +        restart {
+>> +            label = "Reset";
+>> +            linux,code = <KEY_RESTART>;
+>> +            gpios = <&chipcommon 11 GPIO_ACTIVE_LOW>;
+>> +        };
+>> +    };
+>> +};
+>> +
+>> +&usb3_phy {
+>> +    status = "okay";
+>> +};
+>> --
+>> 2.16.4
+>>
+>> On Sun, Oct 7, 2018 at 2:08 PM Hauke Mehrtens <hauke@hauke-m.de> wrote:
+>>>
+>>> On 10/04/2018 11:08 PM, Ren? Kjellerup wrote:
+>>>> Hi Hauke,
+>>>>
+>>>> thank you for suggesting adding the dts patch to mainline kernel,
+>>>> so here it is.
+>>>> I feel Rafal technically still have the copyrights, this is pretty
+>>>> much just a few string updates for the ea6500v2. However with this
+>>>> dts in latest OpenWrt 18.06 loads and installs on my device.
+>>>>
+>>>> I will be available to do more testing should it be required.
+>>>>
+>>>> Regrads
+>>>> Rene Kjellerup
+>>>> --
+>>>> -- as life grows older, I gain experience.
+>>>> -- http://www.alchemiestick.net/
+>>>>
+>>>
+>>> Hi Rene,
+>>>
+>>> Please send you patch inline in the mail and not as an attachment, I
+>>> would suggest to use "git send-email" for sending the patch.
+>>>
+>>> Adding Rafal as copyright owner is ok, like you did it now. You could
+>>> mention in the file header on which dts file this is based.
+>>>
+>>> Hauke
+>>>
+>>
+>>
+>> --
+>> -- as life grows older, I gain experience.
+>> -- http://www.alchemiestick.net/apps/
+
+-- 
+Florian
