@@ -1,18 +1,23 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 11:29:53 +0800
-Subject: [PATCH 13/77] ARM: dts: sun5i: a10s: Fix HDMI output DTC warning
-In-Reply-To: <8279817bd2db6a38dbc27aaef9eb3eb63dcae46c.1543321707.git-series.maxime.ripard@bootlin.com>
+Date: Wed, 28 Nov 2018 11:34:37 +0800
+Subject: [PATCH 12/77] ARM: dts: sun5i: Change pinctrl nodes to avoid
+ warning
+In-Reply-To: <96b9e11cde1c12e1bc05a5d60e0381f7ac25cd89.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <8279817bd2db6a38dbc27aaef9eb3eb63dcae46c.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v67sWoGwSm_LCvSTmeu6ksFnXJJNZQNfMt6=gOy0cF+Yqw@mail.gmail.com>
+ <96b9e11cde1c12e1bc05a5d60e0381f7ac25cd89.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v66KJFsO3Z3dVjEMMWGS98trhVEZRLSLnSxUEhXWFTkLew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> Our HDMI output endpoint on the A10s DTSI has a warning under DTC: "graph
-> node has single child node 'endpoint', #address-cells/#size-cells are not
-> necessary". Fix this by removing those properties.
+> All our pinctrl nodes were using a node name convention with a unit-address
+> to differentiate the different muxing options. However, since those nodes
+> didn't have a reg property, they were generating warnings in DTC.
+>
+> In order to accomodate for this, convert the old nodes to the syntax we've
+> been using for the new SoCs, including removing the letter suffix of the
+> node labels to the bank of those pins to make things more readable.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
