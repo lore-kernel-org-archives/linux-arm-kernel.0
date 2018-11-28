@@ -1,44 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Nov 2018 14:03:10 +0100
-Subject: [PATCH 08/16] ARM: dts: r8a77470: Add watchdog support to SoC dtsi
+Date: Wed, 28 Nov 2018 14:03:09 +0100
+Subject: [PATCH 07/16] ARM: dts: r8a7740, emev2,
+ sh73a0: Include SoC name in DTSI
 In-Reply-To: <cover.1543409901.git.horms+renesas@verge.net.au>
 References: <cover.1543409901.git.horms+renesas@verge.net.au>
-Message-ID: <dc7bf8795d848890641387d98c5e1324d397e9c8.1543409901.git.horms+renesas@verge.net.au>
+Message-ID: <fb09bf59f081940a5bc5109aed184e63b2abdd67.1543409901.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-This patch adds watchdog support to the r8a77470 SoC dtsi.
+Update the R-Mobile A1 (r8a7740), Emma Mobile EV2 (emev2) and
+SH-Mobile AG5 (sh72a0) DTSI to include product name.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-[simon: moved node to preserve sort order]
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+[simon: squashed similar patches]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a77470.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/emev2.dtsi   | 2 +-
+ arch/arm/boot/dts/r8a7740.dtsi | 2 +-
+ arch/arm/boot/dts/sh73a0.dtsi  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
-index 6ac7f467065e..a703b74cc1f9 100644
---- a/arch/arm/boot/dts/r8a77470.dtsi
-+++ b/arch/arm/boot/dts/r8a77470.dtsi
-@@ -79,6 +79,16 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		rwdt: watchdog at e6020000 {
-+			compatible = "renesas,r8a77470-wdt",
-+				     "renesas,rcar-gen2-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 402>;
-+			status = "disabled";
-+		};
-+
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a77470",
- 				     "renesas,rcar-gen2-gpio";
+diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
+index 373ea8720769..67d86012a85c 100644
+--- a/arch/arm/boot/dts/emev2.dtsi
++++ b/arch/arm/boot/dts/emev2.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the EMEV2 SoC
++ * Device Tree Source for the Emma Mobile EV2 SoC
+  *
+  * Copyright (C) 2012 Renesas Solutions Corp.
+  */
+diff --git a/arch/arm/boot/dts/r8a7740.dtsi b/arch/arm/boot/dts/r8a7740.dtsi
+index 383cba68dbba..12ffe73bf2bc 100644
+--- a/arch/arm/boot/dts/r8a7740.dtsi
++++ b/arch/arm/boot/dts/r8a7740.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the r8a7740 SoC
++ * Device Tree Source for the R-Mobile A1 (R8A77400) SoC
+  *
+  * Copyright (C) 2012 Renesas Solutions Corp.
+  */
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index e8f0a07c4564..33836990b102 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -1,6 +1,6 @@
+ // SPDX-License-Identifier: GPL-2.0
+ /*
+- * Device Tree Source for the SH73A0 SoC
++ * Device Tree Source for the SH-Mobile AG5 (R8A73A00/SH73A0) SoC
+  *
+  * Copyright (C) 2012 Renesas Solutions Corp.
+  */
 -- 
 2.11.0
