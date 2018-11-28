@@ -1,86 +1,138 @@
 From: steven.price@arm.com (Steven Price)
-Date: Wed, 28 Nov 2018 14:45:15 +0000
-Subject: [PATCH 00/12] arm64: Paravirtualized time support
-Message-ID: <20181128144527.44710-1-steven.price@arm.com>
+Date: Wed, 28 Nov 2018 14:45:20 +0000
+Subject: [PATCH 05/12] KVM: arm64: Implement PV_FEATURES call
+In-Reply-To: <20181128144527.44710-1-steven.price@arm.com>
+References: <20181128144527.44710-1-steven.price@arm.com>
+Message-ID: <20181128144527.44710-6-steven.price@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add support for paravirtualized time for Arm64 guests and
-KVM hosts following the specification in Arm's document DEN 0057A:
+This provides a mechanism for querying which paravirtualized features
+are available in this hypervisor.
 
-https://developer.arm.com/docs/den0057/a
+Also add the header file which defines the ABI for the paravirtualized
+clock features we're about to add.
 
-It implements support for Live Physical Time (LPT) which provides the
-guest with a method to derive a stable counter of time during which the
-guest is executing even when the guest is being migrated between hosts
-with different physical counter frequencies.
-
-It also implements support for stolen time, allowing the guest to
-identify time when it is forcibly not executing.
-
-Patch 1 provides some documentation
-Patches 2-4, 8 and 11 provide some refactoring of existing code
-Patch 5 implements the new PV_FEATURES discovery mechanism
-Patches 6-7 implement live physical time
-Patches 9-10 implement stolen time
-Patch 12 adds the 'PV_TIME' device for user space to enable the features
-
-Christoffer Dall (2):
-  KVM: arm/arm64: Factor out hypercall handling from PSCI code
-  KVM: Export mark_page_dirty_in_slot
-
-Steven Price (10):
-  KVM: arm64: Document PV-time interface
-  arm/arm64: Provide a wrapper for SMCCC 1.1 calls
-  arm/arm64: Make use of the SMCCC 1.1 wrapper
-  KVM: arm64: Implement PV_FEATURES call
-  KVM: arm64: Support Live Physical Time reporting
-  clocksource: arm_arch_timer: Use paravirtualized LPT
-  KVM: arm64: Support stolen time reporting via shared page
-  arm64: Retrieve stolen time as paravirtualized guest
-  KVM: Allow kvm_device_ops to be const
-  KVM: arm64: Provide a PV_TIME device to user space
-
- Documentation/virtual/kvm/arm/pvtime.txt | 169 ++++++++++++++
- arch/arm/kvm/Makefile                    |   2 +-
- arch/arm/kvm/handle_exit.c               |   2 +-
- arch/arm/mm/proc-v7-bugs.c               |  46 ++--
- arch/arm64/include/asm/arch_timer.h      |  32 ++-
- arch/arm64/include/asm/kvm_host.h        |  16 ++
- arch/arm64/include/asm/kvm_mmu.h         |   2 +
- arch/arm64/include/asm/pvclock-abi.h     |  32 +++
- arch/arm64/include/uapi/asm/kvm.h        |   8 +
- arch/arm64/kernel/Makefile               |   1 +
- arch/arm64/kernel/cpu_errata.c           |  47 +---
- arch/arm64/kernel/cpuinfo.c              |   2 +-
- arch/arm64/kernel/kvm.c                  | 156 +++++++++++++
- arch/arm64/kvm/Kconfig                   |   1 +
- arch/arm64/kvm/Makefile                  |   2 +
- arch/arm64/kvm/handle_exit.c             |   4 +-
- drivers/clocksource/arm_arch_timer.c     | 176 ++++++++++++++-
- include/kvm/arm_arch_timer.h             |   2 +
- include/kvm/arm_hypercalls.h             |  44 ++++
- include/kvm/arm_psci.h                   |   2 +-
- include/kvm/arm_pv.h                     |  28 +++
- include/linux/arm-smccc.h                |  45 ++++
- include/linux/cpuhotplug.h               |   1 +
- include/linux/kvm_host.h                 |   5 +-
- include/linux/kvm_types.h                |   2 +
- include/uapi/linux/kvm.h                 |   2 +
- virt/kvm/arm/arm.c                       |  25 +-
- virt/kvm/arm/hypercalls.c                | 276 +++++++++++++++++++++++
- virt/kvm/arm/mmu.c                       |  44 ++++
- virt/kvm/arm/psci.c                      |  76 +------
- virt/kvm/arm/pvtime.c                    | 243 ++++++++++++++++++++
- virt/kvm/kvm_main.c                      |  12 +-
- 32 files changed, 1348 insertions(+), 157 deletions(-)
- create mode 100644 Documentation/virtual/kvm/arm/pvtime.txt
+Signed-off-by: Steven Price <steven.price@arm.com>
+---
+ arch/arm64/include/asm/pvclock-abi.h | 32 ++++++++++++++++++++++++++++
+ include/kvm/arm_pv.h                 | 28 ++++++++++++++++++++++++
+ include/linux/arm-smccc.h            |  1 +
+ virt/kvm/arm/hypercalls.c            |  9 ++++++++
+ 4 files changed, 70 insertions(+)
  create mode 100644 arch/arm64/include/asm/pvclock-abi.h
- create mode 100644 arch/arm64/kernel/kvm.c
- create mode 100644 include/kvm/arm_hypercalls.h
  create mode 100644 include/kvm/arm_pv.h
- create mode 100644 virt/kvm/arm/hypercalls.c
- create mode 100644 virt/kvm/arm/pvtime.c
 
+diff --git a/arch/arm64/include/asm/pvclock-abi.h b/arch/arm64/include/asm/pvclock-abi.h
+new file mode 100644
+index 000000000000..64ce041c8922
+--- /dev/null
++++ b/arch/arm64/include/asm/pvclock-abi.h
+@@ -0,0 +1,32 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright (C) 2018 Arm Ltd. */
++
++#ifndef __ASM_PVCLOCK_ABI_H
++#define __ASM_PVCLOCK_ABI_H
++
++#include <kvm/arm_pv.h>
++
++struct pvclock_vm_time_info {
++	__le32 revision;
++	__le32 attributes;
++	__le64 sequence_number;
++	__le64 scale_mult;
++	__le32 shift;
++	__le32 reserved;
++	__le64 native_freq;
++	__le64 pv_freq;
++	__le64 div_by_pv_freq_mult;
++} __packed;
++
++struct pvclock_vcpu_stolen_time_info {
++	__le32 revision;
++	__le32 attributes;
++	__le64 stolen_time;
++	/* Structure must be 64 byte aligned, pad to that size */
++	u8 padding[48];
++} __packed;
++
++#define PV_VM_TIME_NOT_SUPPORTED	-1
++#define PV_VM_TIME_INVALID_PARAMETERS	-2
++
++#endif
+diff --git a/include/kvm/arm_pv.h b/include/kvm/arm_pv.h
+new file mode 100644
+index 000000000000..19d2dafff31a
+--- /dev/null
++++ b/include/kvm/arm_pv.h
+@@ -0,0 +1,28 @@
++/* SPDX-License-Identifier: GPL-2.0
++ * Copyright (C) 2018 Arm Ltd.
++ */
++
++#ifndef __KVM_ARM_PV_H
++#define __KVM_ARM_PV_H
++
++#include <linux/arm-smccc.h>
++
++#define ARM_SMCCC_HV_PV_FEATURES					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
++			   ARM_SMCCC_SMC_64,			\
++			   ARM_SMCCC_OWNER_HYP_STANDARD,	\
++			   0x20)
++
++#define ARM_SMCCC_HV_PV_TIME_LPT					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
++			   ARM_SMCCC_SMC_64,			\
++			   ARM_SMCCC_OWNER_HYP_STANDARD,	\
++			   0x21)
++
++#define ARM_SMCCC_HV_PV_TIME_ST					\
++	ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL,			\
++			   ARM_SMCCC_SMC_64,			\
++			   ARM_SMCCC_OWNER_HYP_STANDARD,	\
++			   0x22)
++
++#endif /* __KVM_ARM_PV_H */
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+index b047009e7a0a..4e0866cc48c0 100644
+--- a/include/linux/arm-smccc.h
++++ b/include/linux/arm-smccc.h
+@@ -54,6 +54,7 @@
+ #define ARM_SMCCC_OWNER_SIP		2
+ #define ARM_SMCCC_OWNER_OEM		3
+ #define ARM_SMCCC_OWNER_STANDARD	4
++#define ARM_SMCCC_OWNER_HYP_STANDARD	5
+ #define ARM_SMCCC_OWNER_TRUSTED_APP	48
+ #define ARM_SMCCC_OWNER_TRUSTED_APP_END	49
+ #define ARM_SMCCC_OWNER_TRUSTED_OS	50
+diff --git a/virt/kvm/arm/hypercalls.c b/virt/kvm/arm/hypercalls.c
+index 153aa7642100..ba13b798f0f8 100644
+--- a/virt/kvm/arm/hypercalls.c
++++ b/virt/kvm/arm/hypercalls.c
+@@ -5,6 +5,7 @@
+ #include <linux/kvm_host.h>
+ 
+ #include <asm/kvm_emulate.h>
++#include <asm/pvclock-abi.h>
+ 
+ #include <kvm/arm_hypercalls.h>
+ #include <kvm/arm_psci.h>
+@@ -40,6 +41,14 @@ int kvm_hvc_call_handler(struct kvm_vcpu *vcpu)
+ 				break;
+ 			}
+ 			break;
++		case ARM_SMCCC_HV_PV_FEATURES:
++			val = SMCCC_RET_SUCCESS;
++			break;
++		}
++		break;
++	case ARM_SMCCC_HV_PV_FEATURES:
++		feature = smccc_get_arg1(vcpu);
++		switch (feature) {
+ 		}
+ 		break;
+ 	default:
 -- 
 2.19.2
