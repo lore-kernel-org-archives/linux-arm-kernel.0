@@ -1,31 +1,34 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Wed, 28 Nov 2018 18:56:18 +0000
-Subject: [PATCH] pci: imx6: support kernels built in Thumb-2 mode
-In-Reply-To: <ff476784-b79e-18bf-5870-4365c8377deb@arm.com>
-References: <20181128132554.28139-1-stefan@agner.ch>
- <ff476784-b79e-18bf-5870-4365c8377deb@arm.com>
-Message-ID: <1543431377.18519.94.camel@impinj.com>
+From: nathanj439@gmail.com (Nathan Jones)
+Date: Wed, 28 Nov 2018 13:59:10 -0500
+Subject: [PATCH v2] ARM: dma-mapping: fix potential uninitialized return
+In-Reply-To: <20181128173929.3050-1-nathanj439@gmail.com>
+References: <20181128173929.3050-1-nathanj439@gmail.com>
+Message-ID: <20181128185910.5778-1-nathanj439@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2018-11-28 at 16:16 +0000, Robin Murphy wrote:
-> 
-> >   
-> > +static int imx6q_pcie_abort_handler_thumb2(unsigned long addr,
-> > +		unsigned int fsr, struct pt_regs *regs)
-> > +{
-> > +	unsigned long pc = instruction_pointer(regs);
-> > +	unsigned long instr = *(unsigned long *)pc;
-> > +	unsigned long thumb2_instr = __mem_to_opcode_thumb16(instr);
-> > +	int reg = thumb2_instr & 7;
-> > +
-> > +	if (!__opcode_is_thumb16(instr & 0x0000ffffUL))
-> > +		return 1;
-> 
-> There are plenty of 32-bit Thumb encodings of various LDR/STR variants, 
-> and I doubt we can guarantee that the offset, target register, and/or 
-> addressing mode for a config space access will *always* suit the 
-> (relatively limited) 16-bit ones.
+If neither of the if() statements fire then the return value is
+uninitialized. In the worst case it returns 0 which means the caller
+will think the function succeeded.
 
-It might be the case that PLD/PLI, 32-bit thumb2 instructions, could
-trigger an abort too.
+Fixes: 1655cf8829d8 ("ARM: dma-mapping: Remove traces of NOMMU code")
+Signed-off-by: Nathan Jones <nathanj439@gmail.com>
+---
+ arch/arm/mm/dma-mapping.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 661fe48ab78d..78de138aa66d 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -829,7 +829,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+ 		 unsigned long attrs)
+ {
+-	int ret;
++	int ret = -ENXIO;
+ 	unsigned long nr_vma_pages = vma_pages(vma);
+ 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
+-- 
+2.19.1
