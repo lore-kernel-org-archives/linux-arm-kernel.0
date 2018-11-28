@@ -1,89 +1,62 @@
-From: alexandre.belloni@bootlin.com (Alexandre Belloni)
-Date: Wed, 28 Nov 2018 20:29:01 +0100
-Subject: [PATCH] iio: adc: Replace license text w/ SPDX identifier
-In-Reply-To: <20181128175312.9634-1-matheus.bernardino@usp.br>
-References: <20181128175312.9634-1-matheus.bernardino@usp.br>
-Message-ID: <20181128192901.GG8952@piout.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 28 Nov 2018 19:31:57 +0000
+Subject: remove the ->mapping_error method from dma_map_ops V2
+In-Reply-To: <CAHk-=whcbiSxSUprsKjVPEdN5-+o8WnTGiKxEV-+HbKNDs=iNA@mail.gmail.com>
+References: <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
+ <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
+ <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
+ <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
+ <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
+ <20181128174545.GJ30658@n2100.armlinux.org.uk>
+ <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
+ <20181128180841.GM30658@n2100.armlinux.org.uk>
+ <CAHk-=whcbiSxSUprsKjVPEdN5-+o8WnTGiKxEV-+HbKNDs=iNA@mail.gmail.com>
+Message-ID: <20181128193157.GO30658@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Nov 28, 2018 at 11:19:15AM -0800, Linus Torvalds wrote:
+> On Wed, Nov 28, 2018, 10:08 Russell King - ARM Linux <linux@armlinux.org.uk
+> wrote:
+> 
+> > >
+> > > You already cannot do that kmalloc(), exactly because of ERR_PTR().
+> >
+> > I'm very sorry, but I think you are confused.
+> >
+> > kmalloc() returns a _virtual_ address, which quite rightly must not be
+> > in the top 4K of 4GB, exactly due to ERR_PTR().  That is fine.
+> >
+> > However, that is a completely different kettle of fish from a physical
+> > or DMA address - neither of which are virtual addresses.
+> >
+> 
+> You cut away the part that showed that I'm not in the least confused.
+> 
+> Let me just paste it back in here:
+> 
+>   "Which is what we ALREADY do for these exact reasons. If the DMA
+> mappings means that you'd need to add one more page to that list of
+> reserved pages, then so be it."
 
-On 28/11/2018 15:53:12-0200, Matheus Tavares wrote:
-> diff --git a/drivers/iio/adc/exynos_adc.c b/drivers/iio/adc/exynos_adc.c
-> index f10443f92e4c..9f9c186e2135 100644
-> --- a/drivers/iio/adc/exynos_adc.c
-> +++ b/drivers/iio/adc/exynos_adc.c
-> @@ -1,3 +1,4 @@
-> +// SPDX-License-Identifier: GPL-2.0+
->  /*
->   *  exynos_adc.c - Support for ADC in EXYNOS SoCs
->   *
-> @@ -5,16 +6,6 @@
->   *
->   *  Copyright (C) 2013 Naveen Krishna Chatradhi <ch.naveen@samsung.com>
->   *
-> - *  This program is free software; you can redistribute it and/or modify
-> - *  it under the terms of the GNU General Public License as published by
-> - *  the Free Software Foundation; either version 2 of the License, or
-> - *  (at your option) any later version.
-> - *
-> - *  This program is distributed in the hope that it will be useful,
-> - *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - *  GNU General Public License for more details.
-> - *
->   *  You should have received a copy of the GNU General Public License
->   *  along with this program; if not, write to the Free Software
->   *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+We're not talking about just one more page.  We're talking about
+_every_ page that _may_ map to a bus address in the range of 4GB - 4K
+(a point I've already made earlier in this discussion.)
 
-You forgot to remove some of the boilerplate here.
+It's not just about physical addresses, it's about bus addresses,
+and there are buses out there that have a translation between physical
+address and bus address without IOMMUs and the like.
 
-> diff --git a/drivers/iio/adc/hx711.c b/drivers/iio/adc/hx711.c
-> index 36b59d8957fb..894d49843854 100644
-> --- a/drivers/iio/adc/hx711.c
-> +++ b/drivers/iio/adc/hx711.c
-> @@ -1,13 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0+
->  /*
->   * HX711: analog to digital converter for weight sensor module
->   *
->   * Copyright (c) 2016 Andreas Klinger <ak@it-klinger.de>
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - *
->   * This program is distributed in the hope that it will be useful,
->   * but WITHOUT ANY WARRANTY; without even the implied warranty of
->   * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+Can we know ahead of time about all these translations?  It means
+moving that information out of various bus drivers into core
+architecture code (yuck, when you have multiple different platforms)
+or into DT (which means effectively breaking every damn platform
+that's using older DT files) - something that we don't have to do
+today.
 
-and here
-
-> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
-> index 729becb2d3d9..f5299c9bdbde 100644
-> --- a/drivers/iio/adc/meson_saradc.c
-> +++ b/drivers/iio/adc/meson_saradc.c
-> @@ -1,12 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * Amlogic Meson Successive Approximation Register (SAR) A/D Converter
->   *
->   * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->   *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
->   * You should have received a copy of the GNU General Public License
->   * along with this program. If not, see <http://www.gnu.org/licenses/>.
-
-and here.
-
->   */
+I remain 100% opposed to your idea.
 
 -- 
-Alexandre Belloni, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
