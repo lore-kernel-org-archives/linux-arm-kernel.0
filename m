@@ -1,71 +1,131 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 27 Nov 2018 16:42:36 -0800
-Subject: [PATCH] arm64: dts: rockchip: Add 32k clk on rk3399-gru
-In-Reply-To: <20181127232331.49628-1-dbasehore@chromium.org>
-References: <20181127232331.49628-1-dbasehore@chromium.org>
-Message-ID: <CAD=FV=WJCvt-Ez_F+gTJaLWnOOY2J0fXxgq8vy0ojKoHv+AQ7w@mail.gmail.com>
+From: sean.wang@kernel.org (Sean Wang)
+Date: Tue, 27 Nov 2018 16:58:57 -0800
+Subject: [PATCH v2 03/11] clk: mediatek: Disable tuner_en before change
+ PLL rate
+In-Reply-To: <CANMq1KB4tt9jdmE+LJXfji=QXC9-6wuhXWjJPkpNfo6hEMXH=A@mail.gmail.com>
+References: <20181127034254.24721-1-weiyi.lu@mediatek.com>
+ <20181127034254.24721-5-weiyi.lu@mediatek.com>
+ <CAGp9Lzro5YHCYqzOWFJJa4g75odf6yK52cean_aS3p2STOtJYg@mail.gmail.com>
+ <CANMq1KB4tt9jdmE+LJXfji=QXC9-6wuhXWjJPkpNfo6hEMXH=A@mail.gmail.com>
+Message-ID: <CAGp9LzqfgLa03p-bEOQaT2qtuOEqUL3e04nDS38TbZ2-2Ohauw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 27, 2018 at 3:23 PM Derek Basehore <dbasehore@chromium.org> wrote:
 >
-> This adds the 32k clock to the RK3399 Gru board file. Even though it's
-> not directly used, muxes will end up traversing the entire clk tree on
-> calls to determine_rate if it doesn't exist. This is because the 32k
-> clk is listed as a possible parent on some clks. Since the clk doesn't
-> know about the 32k clk (it was never registered), it triggers a global
-> search for it. This can happen about 40 times per second, which isn't
-> great for power.
-
-I seem to remember Heiko requesting something be added to the commit
-message.  Ah yes, he said:
-
-> That would also be a great part of the commit message, like
-> "...on Gru boards the 32kHz clock gets produced by a Silego oscillator"
-> or so when you move it over to rk3399-gru.dtsi .
-
-Presumably Heiko could add that to the commit message when he applies
-the patch, so maybe wait to see if he wants you to respin it?
-
-
-> Signed-off-by: Derek Basehore <dbasehore@chromium.org>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+> On Wed, Nov 28, 2018 at 4:37 AM Sean Wang <sean.wang@kernel.org> wrote:
+> >
+> > Weiyi Lu <weiyi.lu@mediatek.com> ? 2018?11?26? ?? ??7:45???
+> > >
+> > > From: Owen Chen <owen.chen@mediatek.com>
+> > >
+> > > PLLs with tuner_en bit, such as APLL1, need to disable
+> > > tuner_en before apply new frequency settings, or the new frequency
+> > > settings (pcw) will not be applied.
+> > > The tuner_en bit will be disabled during changing PLL rate
+> > > and be restored after new settings applied.
+> >
+> > It looks like a bug fix. If so, you should add a fixes tag and even cc
+> > stable tree
+> >
+> > >
+> > > Signed-off-by: Owen Chen <owen.chen@mediatek.com>
+> > > ---
+> > >  drivers/clk/mediatek/clk-pll.c | 33 +++++++++++++++++++++++++++++++--
+> > >  1 file changed, 31 insertions(+), 2 deletions(-)
+> > >
+> > > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> > > index 1db161aced31..81400601f107 100644
+> > > --- a/drivers/clk/mediatek/clk-pll.c
+> > > +++ b/drivers/clk/mediatek/clk-pll.c
+> > > @@ -27,7 +27,7 @@
+> > >  #define CON0_BASE_EN           BIT(0)
+> > >  #define CON0_PWR_ON            BIT(0)
+> > >  #define CON0_ISO_EN            BIT(1)
+> > > -#define CON0_PCW_CHG           BIT(31)
+> > > +#define CON1_PCW_CHG           BIT(31)
+> >
+> > it seems like an unnecessary change
 >
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index ca07f6032200..a07aa4c570c0 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -14,6 +14,13 @@
->                 stdout-path = "serial2:115200n8";
->         };
+> Below, you have:
+> con1 |= CON1_PCW_CHG;
 >
-> +       ap_rtc_clk: ap-rtc-clk {
-> +               compatible = "fixed-clock";
-> +               clock-frequency = <32768>;
-> +               clock-output-names = "xin32k";
-> +               #clock-cells = <0>;
-> +       };
-> +
->         /*
->          * Power Tree
+> Presumably PCW_CHG is on BIT(31) of CON1(?), so I think this is a good
+> change. Maybe this needs to be a separate patch, though?
+>
 
-Really this should be below the power tree, AKA right above
-"gpio-keys".  Convention has typically been that only "special" nodes
-like "chosen" go all the way at the top here.  Then the power tree
-(parents first), then other nodes.
+Sure, for me it's not easily understood why the change is necessary
+from the description. If it's really another fixup, it should be moved
+to a separate patch or add more explanations about that in the same
+patch.
 
-In the Chrome OS tree we had an "/* END REGULATORS */ comment to try
-to separate out the power tree from the rest of the nodes, but I guess
-Heiko didn't like that when this went upstream so now you just have to
-know the convention.  :-P
-
-Possibly Heiko would re-sort this for you himself when applying the
-change if he agrees with my understanding of the conventions.
-
-Other than my nits:
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> > >
+> > >  #define AUDPLL_TUNER_EN                BIT(31)
+> > >
+> > > @@ -97,9 +97,31 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > >  {
+> > >         u32 con1, val;
+> > >         int pll_en;
+> > > +       u32 tuner_en = 0;
+> > > +       u32 tuner_en_mask;
+> > > +       void __iomem *tuner_en_addr = NULL;
+> > >
+> > >         pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+> > >
+> > > +       /* disable tuner */
+> >
+> > similar code pieces are ready on mtk_pll_[un]prepare. maybe we can add
+> > common tuner operations for them to reuse.
+> >
+> > > +       if (pll->tuner_en_addr) {
+> > > +               tuner_en_addr = pll->tuner_en_addr;
+> > > +               tuner_en_mask = BIT(pll->data->tuner_en_bit);
+> > > +       } else if (pll->tuner_addr) {
+> > > +               tuner_en_addr = pll->tuner_addr;
+> > > +               tuner_en_mask = AUDPLL_TUNER_EN;
+> > > +       }
+> > > +
+> > > +       if (tuner_en_addr) {
+> > > +               val = readl(tuner_en_addr);
+> > > +               tuner_en = val & tuner_en_mask;
+> > > +
+> > > +               if (tuner_en) {
+> > > +                       val &= ~tuner_en_mask;
+> > > +                       writel(val, tuner_en_addr);
+> > > +               }
+> > > +       }
+> > > +
+> > >         /* set postdiv */
+> > >         val = readl(pll->pd_addr);
+> > >         val &= ~(POSTDIV_MASK << pll->data->pd_shift);
+> > > @@ -120,12 +142,19 @@ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+> > >         con1 = readl(pll->base_addr + REG_CON1);
+> > >
+> > >         if (pll_en)
+> > > -               con1 |= CON0_PCW_CHG;
+> > > +               con1 |= CON1_PCW_CHG;
+> > >
+> > >         writel(con1, pll->base_addr + REG_CON1);
+> > >         if (pll->tuner_addr)
+> > >                 writel(con1 + 1, pll->tuner_addr);
+> > >
+> > > +       /* restore tuner_en */
+> > > +       if (tuner_en_addr && tuner_en) {
+> >
+> > if (tuner_en) is sufficient
+> >
+> > > +               val = readl(tuner_en_addr);
+> > > +               val |= tuner_en_mask;
+> > > +               writel(val, tuner_en_addr);
+> > > +       }
+> > > +
+> > >         if (pll_en)
+> > >                 udelay(20);
+> > >  }
+> > > --
+> > > 2.18.0
+> > >
+> > >
+> > > _______________________________________________
+> > > Linux-mediatek mailing list
+> > > Linux-mediatek at lists.infradead.org
+> > > http://lists.infradead.org/mailman/listinfo/linux-mediatek
