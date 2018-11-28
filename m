@@ -1,37 +1,121 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Nov 2018 14:49:07 +0100
-Subject: [PATCH 35/77] ARM: dts: sun7i: Remove skeleton and memory to
- avoid warnings
-In-Reply-To: <CAGb2v65oBc5PL7m_690PPo0XM18Z3ycreRBShBdwMSe6UYOGaw@mail.gmail.com>
-References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <1da5c4b912ccb84e0d1873843410c6f8d282258c.1543321707.git-series.maxime.ripard@bootlin.com>
- <CAGb2v65oBc5PL7m_690PPo0XM18Z3ycreRBShBdwMSe6UYOGaw@mail.gmail.com>
-Message-ID: <20181128134907.h3k4x4jtavhqrqkc@flea>
+From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
+Date: Wed, 28 Nov 2018 19:20:51 +0530
+Subject: [PATCH v3 00/15] Add initial RDA8810PL SoC and Orange Pi boards
+ support
+Message-ID: <20181128135106.9255-1-manivannan.sadhasivam@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 07:54:00PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Nov 27, 2018 at 8:46 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
-> >
-> > Using skeleton.dtsi will create a memory node that will generate a warning
-> > in DTC. However, that node will be created by the bootloader, so we can
-> > just remove it entirely in order to remove that warning.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+Hello,
 
-Applied, thanks!
-Maxime
+This patchset adds initial RDA8810PL SoC and Orange Pi boards (2G IoT and
+i96) support. RDA8810PL is an ARM Cortex A5 based SoC with Vivante's GC860
+GPU. The SoC has been added as a new ARM sub architecture with myself
+and Andreas as the maintainers.
+
+More information about the boards can be found in below links:
+
+1. Orange Pi 2G-IoT - http://www.orangepi.org/OrangePi2GIOT/
+2. Orange Pi i96 - https://www.96boards.org/product/orangepi-i96/
+
+This patchset is based on the initial revision sent out by Andreas long
+back (http://lists.infradead.org/pipermail/linux-arm-kernel/2017-June/515951.html).
+
+I have extended his patchset with proper irqchip and UART drivers. Now,
+boards can boot into initramfs with console at UART2.
+
+Thanks,
+Mani
+
+Changes in v3:
+
+As per Marc's review:
+
+* Removed unused header and defines from irqchip driver.
+* Removed setting flow handlers from set_type callback.
+* Minor code cleanups.
+
+As per Arnd's review:
+
+* Modified the UART indexes to start from 1 to match the SoC numbering
+* Enabled exposed UARTs (all 3 on both boards)
+* Modified the serial aliases as per board numbering
+
+* Added Greg's Reviewed-by tag for serial driver.
+
+Changes in v2:
+
+* Used readl/writel_relaxed calls for both irqchip and timer drivers as
+  per Marc's review.
+* Implemented the logic to prevent counter wrapping during read as
+  suggested by Marc.
+* Used the timer-of API as per Daniel's suggestion.
+* Added description about the timer in both commit log and driver.
+* Changed the Vendor name for RDA to Unisoc Communications Inc.
+* Removed the soc node level and cleaned up devicetrees as per Rob's
+  review.
+* Merged interrupt controller DT patch to SoC.
+* Moved aliases to board dts as per Arnd's suggestion.
+* Removed RDA Micro support mail address and used Unisoc one and added
+  my missing signed off by tag as per Andreas's comments.
+
+Andreas F?rber (4):
+  dt-bindings: Add RDA Micro vendor prefix
+  dt-bindings: arm: Document RDA8810PL and reference boards
+  ARM: Prepare RDA8810PL SoC
+  dt-bindings: serial: Document RDA Micro UART
+
+Manivannan Sadhasivam (11):
+  dt-bindings: interrupt-controller: Document RDA8810PL intc
+  arm: dts: Add devicetree for RDA8810PL SoC
+  arm: dts: Add devicetree for OrangePi 2G IoT board
+  arm: dts: Add devicetree for OrangePi i96 board
+  irqchip: Add RDA8810PL interrupt driver
+  dt-bindings: timer: Document RDA8810PL SoC timer
+  arm: dts: rda8810pl: Add timer support
+  clocksource: Add clock driver for RDA8810PL SoC
+  arm: dts: rda8810pl: Add interrupt support for UART
+  tty: serial: Add RDA8810PL UART driver
+  MAINTAINERS: Add entry for RDA Micro SoC architecture
+
+ .../admin-guide/kernel-parameters.txt         |   6 +
+ Documentation/devicetree/bindings/arm/rda.txt |  17 +
+ .../interrupt-controller/rda,8810pl-intc.txt  |  61 ++
+ .../bindings/serial/rda,8810pl-uart.txt       |  15 +
+ .../bindings/timer/rda,8810pl-timer.txt       |  21 +
+ .../devicetree/bindings/vendor-prefixes.txt   |   1 +
+ MAINTAINERS                                   |  14 +
+ arch/arm/Kconfig                              |   2 +
+ arch/arm/Makefile                             |   1 +
+ arch/arm/boot/dts/Makefile                    |   3 +
+ .../boot/dts/rda8810pl-orangepi-2g-iot.dts    |  50 ++
+ arch/arm/boot/dts/rda8810pl-orangepi-i96.dts  |  50 ++
+ arch/arm/boot/dts/rda8810pl.dtsi              |  99 +++
+ arch/arm/mach-rda/Kconfig                     |   9 +
+ arch/arm/mach-rda/Makefile                    |   1 +
+ drivers/clocksource/Kconfig                   |   8 +
+ drivers/clocksource/Makefile                  |   1 +
+ drivers/clocksource/timer-rda.c               | 195 ++++
+ drivers/irqchip/Kconfig                       |   4 +
+ drivers/irqchip/Makefile                      |   1 +
+ drivers/irqchip/irq-rda-intc.c                | 107 +++
+ drivers/tty/serial/Kconfig                    |  19 +
+ drivers/tty/serial/Makefile                   |   1 +
+ drivers/tty/serial/rda-uart.c                 | 831 ++++++++++++++++++
+ include/uapi/linux/serial_core.h              |   3 +
+ 25 files changed, 1520 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rda.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/rda,8810pl-intc.txt
+ create mode 100644 Documentation/devicetree/bindings/serial/rda,8810pl-uart.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/rda,8810pl-timer.txt
+ create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-2g-iot.dts
+ create mode 100644 arch/arm/boot/dts/rda8810pl-orangepi-i96.dts
+ create mode 100644 arch/arm/boot/dts/rda8810pl.dtsi
+ create mode 100644 arch/arm/mach-rda/Kconfig
+ create mode 100644 arch/arm/mach-rda/Makefile
+ create mode 100644 drivers/clocksource/timer-rda.c
+ create mode 100644 drivers/irqchip/irq-rda-intc.c
+ create mode 100644 drivers/tty/serial/rda-uart.c
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/15a0655d/attachment.sig>
+2.17.1
