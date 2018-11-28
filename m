@@ -1,38 +1,43 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Wed, 28 Nov 2018 11:29:28 -0700
-Subject: [PATCH 0/1] drm/msm/a6xx: Add interconnect support
-Message-ID: <20181128182929.19925-1-jcrouse@codeaurora.org>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Wed, 28 Nov 2018 18:53:15 +0100
+Subject: [PATCH v4 11/20] irqchip/mmp: only touch the PJ4 & FIQ bits on
+ enable/disable
+In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
+References: <20181128175324.163202-1-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-12-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I heard at LPC that there was some confusion that the OPP bindings [1]
-were needed to land interconnect support. They aren't.
+On an OLPC XO 1.75 machine, the "security processor" handles the GPIO 71
+and 72 interrupts. Don't reset the "route to SP" bit (4).
 
-There is a two step process for the SDM845 GPU. First we need a vote (any vote)
-because the default bus settings are way too bad for any reasonable
-performance.
+I'm just assuming the bit 4 is the "route to SP" bit -- it fixes the
+SP-based keyboard for me and <mach-mmp/regs-icu.h> defines
+ICU_INT_ROUTE_SP_IRQ to be 1 << 4. When asked for a data sheet, Marvell
+was not helpful.
 
-The next step after that would be to scale the bus request based on the
-frequency in order to save power. For that we *do* need a solution but that
-can be calmly discussed separately.
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Acked-by: Pavel Machek <pavel@ucw.cz>
 
-This patch accommodates the first step. It cranks the bus to max for GPU
-activity and turns it off when the GPU goes to sleep. Hopefully this can
-alleviate the confusion and help interconnect land that much quicker.
-After that, we can calmly re-introduce the OPP discussion.
+---
+Changes since v1:
+- Adjusted wording & ack from Pavel
 
-This patch depends on interconnect support [2].
+ drivers/irqchip/irq-mmp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-[1] https://patchwork.kernel.org/patch/10577303/
-[2] https://patchwork.kernel.org/patch/10701287/
-
-Jordan Crouse (1):
-  drm/msm/a6xx: Add support for an interconnect path
-
- drivers/gpu/drm/msm/adreno/a6xx_gmu.c   | 20 ++++++++++++++++++++
- drivers/gpu/drm/msm/adreno/adreno_gpu.c |  9 +++++++++
- drivers/gpu/drm/msm/msm_gpu.h           |  3 +++
- 3 files changed, 32 insertions(+)
-
+diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
+index 25f32e1d7764..1ed38f9f1d0a 100644
+--- a/drivers/irqchip/irq-mmp.c
++++ b/drivers/irqchip/irq-mmp.c
+@@ -190,7 +190,7 @@ static const struct mmp_intc_conf mmp_conf = {
+ static const struct mmp_intc_conf mmp2_conf = {
+ 	.conf_enable	= 0x20,
+ 	.conf_disable	= 0x0,
+-	.conf_mask	= 0x7f,
++	.conf_mask	= 0x60,
+ };
+ 
+ static void __exception_irq_entry mmp_handle_irq(struct pt_regs *regs)
 -- 
-2.18.0
+2.19.1
