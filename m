@@ -1,65 +1,125 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 28 Nov 2018 18:08:41 +0000
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
-References: <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
- <20181122170715.GI30658@n2100.armlinux.org.uk>
- <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
- <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
- <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
- <20181123065511.GA17856@lst.de> <20181128074117.GA21126@lst.de>
- <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
- <20181128174545.GJ30658@n2100.armlinux.org.uk>
- <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
-Message-ID: <20181128180841.GM30658@n2100.armlinux.org.uk>
+From: georgi.djakov@linaro.org (Georgi Djakov)
+Date: Wed, 28 Nov 2018 20:18:04 +0200
+Subject: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
+In-Reply-To: <5d16a4a57ed5529299d7b73e13a249add00b1afe.camel@perches.com>
+References: <20181127180349.29997-1-georgi.djakov@linaro.org>
+ <20181127180349.29997-2-georgi.djakov@linaro.org>
+ <5d16a4a57ed5529299d7b73e13a249add00b1afe.camel@perches.com>
+Message-ID: <82026d31-39e8-08f1-761b-c0b3ccf8ce20@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 10:00:06AM -0800, Linus Torvalds wrote:
-> On Wed, Nov 28, 2018 at 9:45 AM Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> >
-> > > I don't think this is a huge deal, but ERR_PTR() has been hugely
-> > > successful elsewhere. And I'm not hugely convinced about all these
-> > > "any address can be valid" arguments. How the hell do you generate a
-> > > random dma address in the last page that isn't even page-aligned?
-> >
-> > kmalloc() a 64-byte buffer, dma_map_single() that buffer.
+Hi Joe,
+
+On 11/27/18 20:35, Joe Perches wrote:
+> On Tue, 2018-11-27 at 20:03 +0200, Georgi Djakov wrote:
+>> This patch introduces a new API to get requirements and configure the
+>> interconnect buses across the entire chipset to fit with the current
+>> demand.
 > 
-> No.
+> trivial notes:
 > 
-> You already cannot do that kmalloc(), exactly because of ERR_PTR().
+>> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
+> []
+>> +static int apply_constraints(struct icc_path *path)
+>> +{
+>> +	struct icc_node *next, *prev = NULL;
+>> +	int ret = -EINVAL;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < path->num_nodes; i++, prev = next) {
+>> +		struct icc_provider *p;
+>> +
+>> +		next = path->reqs[i].node;
+>> +		/*
+>> +		 * Both endpoints should be valid master-slave pairs of the
+>> +		 * same interconnect provider that will be configured.
+>> +		 */
+>> +		if (!prev || next->provider != prev->provider)
+>> +			continue;
+>> +
+>> +		p = next->provider;
+>> +
+>> +		/* set the constraints */
+>> +		ret = p->set(prev, next);
+>> +		if (ret)
+>> +			goto out;
+>> +	}
+>> +out:
+>> +	return ret;
+>> +}
+> 
+> The use of ", prev = next" appears somewhat tricky code.
+> Perhaps move the assignment of prev to the bottom of the loop.
+> Perhaps the temporary p assignment isn't useful either.
+> 
+>> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+>> +{
+> []
+>> +	ret = apply_constraints(path);
+>> +	if (ret)
+>> +		pr_debug("interconnect: error applying constraints (%d)", ret);
+> 
+> Ideally all pr_<foo> formats should end in '\n'
+> 
+>> +static struct icc_node *icc_node_create_nolock(int id)
+>> +{
+>> +	struct icc_node *node;
+>> +
+>> +	/* check if node already exists */
+>> +	node = node_find(id);
+>> +	if (node)
+>> +		goto out;
+>> +
+>> +	node = kzalloc(sizeof(*node), GFP_KERNEL);
+>> +	if (!node) {
+>> +		node = ERR_PTR(-ENOMEM);
+>> +		goto out;
+> 
+> Generally, this code appears to overly rely on goto when
+> direct returns could be more readable.
+> 
+>> +	}
+>> +
+>> +	id = idr_alloc(&icc_idr, node, id, id + 1, GFP_KERNEL);
+>> +	if (WARN(id < 0, "couldn't get idr")) {
+> 
+> This seems to unnecessarily hide the id < 0 test in a WARN
+> 
+> Why is this a WARN and not a simpler
+> 	if (id < 0) {
+> 		[ pr_err(...); or WARN(1, ...); ]
+> 
+>> +		kfree(node);
+>> +		node = ERR_PTR(id);
+>> +		goto out;
+>> +	}
+>> +
+>> +	node->id = id;
+>> +
+>> +out:
+>> +	return node;
+>> +}
 
-I'm very sorry, but I think you are confused.
+Thank you for helping to improve the code. The above suggestions make it 
+cleaner indeed.
 
-kmalloc() returns a _virtual_ address, which quite rightly must not be
-in the top 4K of 4GB, exactly due to ERR_PTR().  That is fine.
+> []
+>> diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
+> []
+>> +/* macros for converting to icc units */
+>> +#define bps_to_icc(x)	(1)
+>> +#define kBps_to_icc(x)	(x)
+> []
+>> +#define MBps_to_icc(x)	(x * 1000)
+>> +#define GBps_to_icc(x)	(x * 1000 * 1000)
+>> +#define kbps_to_icc(x)	(x / 8 + ((x) % 8 ? 1 : 0))
+>> +#define Mbps_to_icc(x)	(x * 1000 / 8 )
+>> +#define Gbps_to_icc(x)	(x * 1000 * 1000 / 8)
+> 
+> The last 5 macros should parenthesize x
 
-However, that is a completely different kettle of fish from a physical
-or DMA address - neither of which are virtual addresses.
+Oops.. obviously i forgot to run checkpatch --strict. Will fix!
 
-Now, say we have 1GB of RAM which starts at 0xc0000000 _physical_.
-The kernel is configured with a 2GB/2GB user/kernel split, which means
-all 1GB of RAM is mapped as lowmem from 0x80000000 to 0xbfffffff
-inclusive.  This means kmalloc() can return any address in that range.
-
-ERR_PTR() will work correctly on any of those pointers, meaning that
-none of them will be seen as an error.
-
-However, map any virtual address in the range of 0xbffff000 to
-0xbfffffff into DMA space, and the resulting DMA address could well
-be in the range of 0xfffff000 to 0xffffffff - precisely the range
-of addresses that you are advocating to be used for error codes.
-
-> The whole argument of "every possible piece of memory is DMA'able" is
-> just wrong.
-
-I'm very sorry, but I do not buy your argument - you are conflating
-virtual addresses which ERR_PTR() deals in with physical and bus
-addresses - and if you persist down this route, you will cause
-regressions.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+BR,
+Georgi
