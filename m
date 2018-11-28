@@ -1,40 +1,103 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 28 Nov 2018 09:30:22 -0700
-Subject: [PATCH] coresight: fix spelling mistake "deffered" -> "deferred"
-In-Reply-To: <20181127140356.26626-1-colin.king@canonical.com>
-References: <20181127140356.26626-1-colin.king@canonical.com>
-Message-ID: <CANLsYkzyHiD0NXn6jOpJg7Ho3G83dqTX9N-8BsNUtxNRiXS3Fw@mail.gmail.com>
+From: Steve.Capper@arm.com (Steve Capper)
+Date: Wed, 28 Nov 2018 16:31:25 +0000
+Subject: [PATCH V3 2/5] arm64: mm: Introduce DEFAULT_MAP_WINDOW
+In-Reply-To: <20181127170931.GC3563@arrakis.emea.arm.com>
+References: <20181114133920.7134-1-steve.capper@arm.com>
+ <20181114133920.7134-3-steve.capper@arm.com>
+ <20181127170931.GC3563@arrakis.emea.arm.com>
+Message-ID: <20181128163115.GA20432@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Nov 2018 at 07:03, Colin King <colin.king@canonical.com> wrote:
->
-> From: Colin Ian King <colin.king@canonical.com>
->
-> There is a spelling mistake in the dev_info error message, fix it.
->
-> Signed-off-by: Colin Ian King <colin.king@canonical.com>
-> ---
->  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-> index 35d6f9709274..ef339ff22090 100644
-> --- a/drivers/hwtracing/coresight/coresight-stm.c
-> +++ b/drivers/hwtracing/coresight/coresight-stm.c
-> @@ -856,7 +856,7 @@ static int stm_probe(struct amba_device *adev, const struct amba_id *id)
->
->         if (stm_register_device(dev, &drvdata->stm, THIS_MODULE)) {
->                 dev_info(dev,
-> -                        "stm_register_device failed, probing deffered\n");
-> +                        "stm_register_device failed, probing deferred\n");
->                 return -EPROBE_DEFER;
->         }
->
+On Tue, Nov 27, 2018 at 05:09:32PM +0000, Catalin Marinas wrote:
+> Hi Steve,
 
-Applied - thanks,
-Mathieu
+Hi Catalin,
 
-> --
-> 2.19.1
->
+> 
+> On Wed, Nov 14, 2018 at 01:39:17PM +0000, Steve Capper wrote:
+> > diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> > index 3e2091708b8e..da41a2655b69 100644
+> > --- a/arch/arm64/include/asm/processor.h
+> > +++ b/arch/arm64/include/asm/processor.h
+> > @@ -25,6 +25,9 @@
+> >  #define USER_DS		(TASK_SIZE_64 - 1)
+> >  
+> >  #ifndef __ASSEMBLY__
+> > +
+> > +#define DEFAULT_MAP_WINDOW_64	(UL(1) << VA_BITS)
+> > +
+> >  #ifdef __KERNEL__
+> 
+> That's a strange place to place DEFAULT_MAP_WINDOW_64. Did you have any
+> #include dependency issues? If yes, we could look at cleaning them up,
+> maybe moving these definitions into a separate file.
+> 
+> (also, if you do a clean-up I don't think we need __KERNEL__ anymore)
+> 
+
+Okay, I will investigate cleaning this up.
+
+> >  
+> >  #include <linux/build_bug.h>
+> > @@ -51,13 +54,16 @@
+> >  				TASK_SIZE_32 : TASK_SIZE_64)
+> >  #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+> >  				TASK_SIZE_32 : TASK_SIZE_64)
+> > +#define DEFAULT_MAP_WINDOW	(test_thread_flag(TIF_32BIT) ? \
+> > +				TASK_SIZE_32 : DEFAULT_MAP_WINDOW_64)
+> >  #else
+> >  #define TASK_SIZE		TASK_SIZE_64
+> > +#define DEFAULT_MAP_WINDOW	DEFAULT_MAP_WINDOW_64
+> >  #endif /* CONFIG_COMPAT */
+> >  
+> > -#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
+> > +#define TASK_UNMAPPED_BASE	(PAGE_ALIGN(DEFAULT_MAP_WINDOW / 4))
+> > +#define STACK_TOP_MAX		DEFAULT_MAP_WINDOW_64
+> >  
+> > -#define STACK_TOP_MAX		TASK_SIZE_64
+> >  #ifdef CONFIG_COMPAT
+> >  #define AARCH32_VECTORS_BASE	0xffff0000
+> >  #define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
+> > diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> > index 9d9582cac6c4..e5a1dc0beef9 100644
+> > --- a/arch/arm64/mm/init.c
+> > +++ b/arch/arm64/mm/init.c
+> > @@ -609,7 +609,7 @@ void __init mem_init(void)
+> >  	 * detected at build time already.
+> >  	 */
+> >  #ifdef CONFIG_COMPAT
+> > -	BUILD_BUG_ON(TASK_SIZE_32			> TASK_SIZE_64);
+> > +	BUILD_BUG_ON(TASK_SIZE_32			> DEFAULT_MAP_WINDOW_64);
+> >  #endif
+> 
+> Since you are at this, can you please remove the useless white space (I
+> guess it was there before when we had more BUILD_BUG_ONs).
+> 
+
+Sure thing.
+
+> > diff --git a/drivers/firmware/efi/libstub/arm-stub.c b/drivers/firmware/efi/libstub/arm-stub.c
+> > index 30ac0c975f8a..d1ec7136e3e1 100644
+> > --- a/drivers/firmware/efi/libstub/arm-stub.c
+> > +++ b/drivers/firmware/efi/libstub/arm-stub.c
+> > @@ -33,7 +33,7 @@
+> >  #define EFI_RT_VIRTUAL_SIZE	SZ_512M
+> >  
+> >  #ifdef CONFIG_ARM64
+> > -# define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE_64
+> > +# define EFI_RT_VIRTUAL_LIMIT	DEFAULT_MAP_WINDOW_64
+> >  #else
+> >  # define EFI_RT_VIRTUAL_LIMIT	TASK_SIZE
+> >  #endif
+> 
+> Just curious, would anything happen if we leave this to TASK_SIZE_64?
+> 
+
+Then it doesn't compile :-). TASK_SIZE_64 is a variable that is outside
+the EFI stub's knowledge (and indeed is initialised after the stub has
+already executed).
+
+Cheers,
+-- 
+Steve
