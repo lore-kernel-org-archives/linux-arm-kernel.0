@@ -1,158 +1,131 @@
-From: jae.hyun.yoo@linux.intel.com (Jae Hyun Yoo)
-Date: Wed, 28 Nov 2018 16:30:03 -0600
-Subject: [PATCH i2c-next v9 5/5] i2c: aspeed: Add bus idle waiting logic
- for multi-master use cases
-In-Reply-To: <20181128215434.GA1666@kunai>
-References: <20181030210917.32711-1-jae.hyun.yoo@linux.intel.com>
- <20181030210917.32711-6-jae.hyun.yoo@linux.intel.com>
- <20181128215434.GA1666@kunai>
-Message-ID: <2772b86e-6ffb-e289-40f2-f96d11b82349@linux.intel.com>
+From: mesihkilinc@gmail.com (Mesih Kilinc)
+Date: Thu, 29 Nov 2018 01:33:10 +0300
+Subject: [PATCH v5 00/17] initial support for "suniv" Allwinner new ARM9 SoC
+Message-ID: <cover.1543443475.git.mesihkilinc@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2018 3:54 PM, Wolfram Sang wrote:
-> On Tue, Oct 30, 2018 at 02:09:16PM -0700, Jae Hyun Yoo wrote:
->> In multi-master environment, this driver's master cannot know
->> exactly when a peer master sends data to this driver's slave so a
->> case can be happened that this master tries to send data through
->> the master_xfer function but slave data from peer master is still
->> being processed by this driver.
-> 
-> So, that I get this correct: your IP core cannot detect a bus busy state
-> when its own slave address is acessed? Well, I know HW can have bugs,
-> but I still wonder because a bus is busy as soon as another START has
-> been detected, independent of which device is going to be accessed.
-> 
-> Even if so, why can't you use a mutex to prevent any master_xfer while
-> slave_xfer is ongoing?
-> 
-> Shouldn't that be enough according to the above description? Why do you
-> need the delay? I might be missing something...
-> 
+This is the fifth version of patchset for Allwinner ARMv5 F1C100s
+SoC. Addressed comments from Maxime Ripard and Rob Herring, added signatures.
 
-This IP has a bus busy state bit which can cover master and slave
-operations but in case of slave operation, the bit is cleared little
-bit earlier than its actual completion so it's the reason why I made
-this patch. I agree with you that it still has a weak point since
-the bus can be changed to busy state immediately just after finishing
-the busy waiting delay.
+Changes since v4:
+- Patch "dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl"
+  - This patch applied for 4.21.
+- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
+  - This patch applied for 4.21.
+- Patch "dt-bindings: clock: Add Allwinner suniv F1C100s CCU"
+  - Fixed license identifier position
+  - Added DMA fields.
+- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
+  - Added DMA reset and clock support.
+- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
+  - Remove dt-binding headers. 
+  - Fix uart0 pin label.
+- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
+  - Fix uart0 pin label.
 
-As you suggested, I'll try to implement it using a mutex instead of
-using delay. Thanks a lot for your comment.
+Changes since v3:
+- Patch "ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs"
+  - Remove CONFIG_ARCH_SUNXI_Vx. Use ARCH_MULTI_Vx to differentiate SoC's
+  - Change KConfig ARCH_SUNXI selection: 'select' to 'default'. 
+- Patch "irqchip/sun4i: Add a struct to hold global variables"
+  - Split irq_sun4i.c changes to 3 patch.
+- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
+  - pinctrl-suniv-f1c100s: remove: disable_strict_mode = true
+- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
+  - suniv-f1c100s.dtsi: remove unnecessary componenets.
+  - Instead of patching drivers, add original compatible string with 
+f1c100s compatibles.
+  - Add Acked-by signatures.
 
-Jae
+Changes since v2:
+- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
+  - Move SUN4I_TIMER option to ARCH_SUNXI
+  - Added help text for MACH_SUNIV
+- Patch "irqchip/sun4i: add support for suniv interrupt controller"
+  - Defined sunxi_irq_chip_data struct and used it to differentiate
+    registers between different chips.
+- Patch " ARM: dts: suniv: add initial DTSI file for F1C100s"
+  - Removed unnecessary fake clock.
+  - Fixed compatible strings.
 
->> To prevent any state corruption in the case, this patch adds
->> checking code if any slave operation is ongoing and it waits up to
->> the bus timeout duration before starting a master_xfer operation.
->>
->> Signed-off-by: Jae Hyun Yoo <jae.hyun.yoo@linux.intel.com>
->> Reviewed-by: Brendan Higgins <brendanhiggins@google.com>
->> ---
->>   drivers/i2c/busses/i2c-aspeed.c | 55 ++++++++++++++++++++++++---------
->>   1 file changed, 40 insertions(+), 15 deletions(-)
->>
->> diff --git a/drivers/i2c/busses/i2c-aspeed.c b/drivers/i2c/busses/i2c-aspeed.c
->> index 833b6b6a4c7e..30c3ab3a4844 100644
->> --- a/drivers/i2c/busses/i2c-aspeed.c
->> +++ b/drivers/i2c/busses/i2c-aspeed.c
->> @@ -12,6 +12,7 @@
->>   
->>   #include <linux/clk.h>
->>   #include <linux/completion.h>
->> +#include <linux/delay.h>
->>   #include <linux/err.h>
->>   #include <linux/errno.h>
->>   #include <linux/i2c.h>
->> @@ -115,6 +116,9 @@
->>   /* 0x18 : I2CD Slave Device Address Register   */
->>   #define ASPEED_I2CD_DEV_ADDR_MASK			GENMASK(6, 0)
->>   
->> +/* Busy checking */
->> +#define ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US		(10 * 1000)
->> +
->>   enum aspeed_i2c_master_state {
->>   	ASPEED_I2C_MASTER_INACTIVE,
->>   	ASPEED_I2C_MASTER_START,
->> @@ -156,6 +160,8 @@ struct aspeed_i2c_bus {
->>   	int				cmd_err;
->>   	/* Protected only by i2c_lock_bus */
->>   	int				master_xfer_result;
->> +	/* Multi-master */
->> +	bool				multi_master;
->>   #if IS_ENABLED(CONFIG_I2C_SLAVE)
->>   	struct i2c_client		*slave;
->>   	enum aspeed_i2c_slave_state	slave_state;
->> @@ -596,27 +602,44 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
->>   	return irq_remaining ? IRQ_NONE : IRQ_HANDLED;
->>   }
->>   
->> +static int aspeed_i2c_check_bus_busy(struct aspeed_i2c_bus *bus)
->> +{
->> +	unsigned long timeout;
->> +
->> +	if (bus->multi_master) {
->> +		might_sleep();
->> +		/* Initialize it only when multi_master is set */
->> +		timeout = jiffies + bus->adap.timeout;
->> +	}
->> +
->> +	for (;;) {
->> +		if (!(readl(bus->base + ASPEED_I2C_CMD_REG) &
->> +		      ASPEED_I2CD_BUS_BUSY_STS))
->> +#if IS_ENABLED(CONFIG_I2C_SLAVE)
->> +			if (bus->slave_state == ASPEED_I2C_SLAVE_STOP)
->> +#endif
->> +				return 0;
->> +		if (!bus->multi_master)
->> +			break;
->> +		if (time_after(jiffies, timeout))
->> +			break;
->> +		usleep_range((ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US >> 2) + 1,
->> +			     ASPEED_I2C_BUS_BUSY_CHECK_INTERVAL_US);
->> +	}
->> +
->> +	return aspeed_i2c_recover_bus(bus);
->> +}
->> +
->>   static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
->>   				  struct i2c_msg *msgs, int num)
->>   {
->>   	struct aspeed_i2c_bus *bus = i2c_get_adapdata(adap);
->>   	unsigned long time_left, flags;
->> -	int ret = 0;
->>   
->> -	spin_lock_irqsave(&bus->lock, flags);
->> -	bus->cmd_err = 0;
->> -
->> -	/* If bus is busy, attempt recovery. We assume a single master
->> -	 * environment.
->> -	 */
->> -	if (readl(bus->base + ASPEED_I2C_CMD_REG) & ASPEED_I2CD_BUS_BUSY_STS) {
->> -		spin_unlock_irqrestore(&bus->lock, flags);
->> -		ret = aspeed_i2c_recover_bus(bus);
->> -		if (ret)
->> -			return ret;
->> -		spin_lock_irqsave(&bus->lock, flags);
->> -	}
->> +	if (aspeed_i2c_check_bus_busy(bus))
->> +		return -EAGAIN;
->>   
->> +	spin_lock_irqsave(&bus->lock, flags);
->>   	bus->cmd_err = 0;
->>   	bus->msgs = msgs;
->>   	bus->msgs_index = 0;
->> @@ -827,7 +850,9 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
->>   	if (ret < 0)
->>   		return ret;
->>   
->> -	if (!of_property_read_bool(pdev->dev.of_node, "multi-master"))
->> +	if (of_property_read_bool(pdev->dev.of_node, "multi-master"))
->> +		bus->multi_master = true;
->> +	else
->>   		fun_ctrl_reg |= ASPEED_I2CD_MULTI_MASTER_DIS;
->>   
->>   	/* Enable Master Mode */
->> -- 
->> 2.19.1
->>
+Changes since v1:
+- Patch "ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate ARMv5/v7
+  Allwinner SoCs"
+  - Instead of using a common bool config use a common menuconfig. 
+  - Use ARCH_MULTI_V7 to differentiate V7 SoCs.
+  - Addressed comment from Julian Calaby
+- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
+  - Use ARCH_MULTI_V5 to differentiate V5 SoCs.
+  - removed "allwinner,suniv" board compatible string
+  - Added dt-bindings
+- Patch "irqchip/sun4i: add support for suniv interrupt controller"
+  - Added dt-bindings
+  - Changed "allwinner,suniv-ic" to "allwinner,suniv-f1c100s-ic"
+- Patch "clocksource: sun4i: add a compatible for suniv"
+  - Added dt-bindings
+  - Changed "allwinner,suniv-timer" to "allwinner,suniv-f1c100s-timer"
+- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
+  - Added dt-bindings
+  - Renamed suniv-pinctrl to suniv-f1c100s-pinctrl
+- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
+  - Added dt-bindings
+  - Renamed suniv-ccu to suniv-f1c100s-ccu
+- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
+  - Addressed comment from Rask Ingemann Lambertsen
+
+Thanks!
+
+Mesih Kilinc (17):
+  ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs
+  dt-bindings: arm: Add new Allwinner ARMv5 F1C100s SoC
+  ARM: sunxi: add Allwinner ARMv5 SoCs
+  dt-bindings: interrupt-controller: Add suniv interrupt-controller
+  irqchip/sun4i: Add a struct to hold global variables
+  irqchip/sun4i: Move IC specific register offsets to struct
+  irqchip/sun4i: Add support for Allwinner ARMv5 F1C100s
+  dt-bindings: timer: Add Allwinner suniv timer
+  clocksource: sun4i: add a compatible for suniv
+  dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl
+  pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)
+  dt-bindings: clock: Add Allwinner suniv F1C100s CCU
+  clk: sunxi-ng: add support for suniv F1C100s SoC
+  dt-bindings: sram: Add Allwinner suniv F1C100s
+  dt-bindings: watchdog: Add Allwinner ARMv5 F1C100s wdt
+  ARM: dts: suniv: add initial DTSI file for F1C100s
+  ARM: suniv: f1c100s: add device tree for Lichee Pi Nano
+
+ Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
+ .../interrupt-controller/allwinner,sun4i-ic.txt    |   4 +-
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ .../devicetree/bindings/sram/sunxi-sram.txt        |   4 +
+ .../bindings/timer/allwinner,sun4i-timer.txt       |   4 +-
+ .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   1 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |  26 +
+ arch/arm/boot/dts/suniv-f1c100s.dtsi               | 147 ++++++
+ arch/arm/mach-sunxi/Kconfig                        |  19 +-
+ arch/arm/mach-sunxi/sunxi.c                        |  10 +
+ drivers/clk/sunxi-ng/Kconfig                       |   5 +
+ drivers/clk/sunxi-ng/Makefile                      |   1 +
+ drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c           | 541 +++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h           |  34 ++
+ drivers/clocksource/sun4i_timer.c                  |   5 +-
+ drivers/irqchip/irq-sun4i.c                        | 106 ++--
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c      | 416 ++++++++++++++++
+ include/dt-bindings/clock/suniv-ccu-f1c100s.h      |  70 +++
+ include/dt-bindings/reset/suniv-ccu-f1c100s.h      |  38 ++
+ 23 files changed, 1408 insertions(+), 33 deletions(-)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
+ create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
+ create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
+
+-- 
+2.7.4
