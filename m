@@ -1,61 +1,100 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 17:29:59 +0800
-Subject: [PATCH 02/15] dt-bindings: rtc: sun6i-rtc: Add compatible strings for
- pre-H6 variants
-In-Reply-To: <20181128093013.24442-1-wens@csie.org>
-References: <20181128093013.24442-1-wens@csie.org>
-Message-ID: <20181128093013.24442-3-wens@csie.org>
+Date: Wed, 28 Nov 2018 17:29:57 +0800
+Subject: [PATCH 00/15] rtc: sun6i: clock rework and pre-H6 SoC support
+Message-ID: <20181128093013.24442-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While doing Bluetooth enablement for various boards based on various
-Allwinner SoCs, minor differences in the RTC modules were found. These
-include a lack of an external clock output (A31), different internal
-oscillator frequencies (H3/H5/A64/V3/V3s), different regulator voltage
-settings (H5/H6), and the presence of miscellaneous registers unrelated
-to the RTC (A64/R40/H5/H6). The datasheet also describes different number
-of registers for non-volatile storage, though based on actual experiments
-the actual number is the same across the board.
+Hi everyone,
 
-This patch adds a list of all pre-H6 variants, grouped by the internal
-oscillator's clock rate, regulator settings, and the presence of the
-external clock output. Combinations are introduced for the variants that
-have miscellaneous registers.
+This series was started as part of enabling Bluetooth on various
+Allwinner SBCs. The bluetooth controller requires a precise 32.768 kHz
+clock fed to it to correctly detect the frequency of its main oscillator.
+This clock signal is provided by the RTC, either directly from a special
+pin on the SoC, or some clock output function from the clock controllers.
+I found that the clock-related properties of the RTC on later SoCs were
+incorrect or missing.
 
-The RTC block in the H6 also handles the 24 MHz DCXO. This will require
-more device tree binding changes and will be done later.
+This series reworks the compatible strings and clock parts of the device
+tree bindings for sun6i-rtc. Currently we assume most Allwinner SoCs use
+the same sun6i-rtc variant, when in fact they do not. The differences
+that matter with regards to clocks are a) the A31 does not have an extra
+external output for the RTC 32K clock, while most of the others do;
+b) the clock frequency of the internal RC oscillator is different on
+some SoCs; c) on the H6 the RTC also handles the 24 MHz DCXO, which
+feeds the system HOSC. The last difference, and by extension the H6, are
+not covered in this series.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- .../devicetree/bindings/rtc/sun6i-rtc.txt        | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Patch 1 cleans up the clock-related section of the RTC device tree
+binding. This would make it easier to read and easier to add additional
+clocks.
 
-diff --git a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt b/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
-index d3e96459fc66..b1eaa443347d 100644
---- a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
-+++ b/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
-@@ -3,7 +3,21 @@
- RTC controller for the Allwinner A31
- 
- Required properties:
--- compatible	: Should be "allwinner,sun6i-a31-rtc"
-+- compatible	: Should be one of the following combinations:
-+		    - "allwinner,sun6i-a31-rtc"
-+		    - "allwinner,sun8i-a23-rtc"
-+		    - "allwinner,sun8i-h3-rtc"
-+		    - "allwinner,sun8i-r40-rtc", "allwinner,sun8i-h3-rtc"
-+		    - "allwinner,sun8i-v3-rtc"
-+		    - "allwinner,sun50i-a64-rtc", "allwinner,sun8i-h3-rtc"
-+		    - "allwinner,sun50i-h5-rtc"
-+
-+		  Where there are two or more compatible strings, this
-+		  denotes the hardware covered by the most specific one
-+		  is backward-compatible with the latter ones, and the
-+		  implementation for the latter ones can be used, albeit
-+		  with reduced functionality.
-+
- - reg		: physical base address of the controller and length of
- 		  memory mapped region.
- - interrupts	: IRQ lines for the RTC alarm 0 and alarm 1, in that order.
+Patch 2 adds compatible strings for all identified variants introduced
+prior to the H6.
+
+Patch 3 deprecates the external clock output for the A31. The A31 does
+not have this output, so it's introduction and usage was an error.
+
+Patch 4 adds a clock output for the RTC's internal oscillator to the
+device tree binding. This feeds the PRCM in some SoCs.
+
+Patch 5 adds a default clock name for the LOSC to the RTC driver.
+
+Patch 6 adds support for different hardware variants to the RTC driver.
+
+Patch 7 adds support for all known pre-H6 variants.
+
+Patch 8 exposes the RTC's internal oscillator through the device tree.
+
+Patch 9 makes the R40's CCU use the LOSC from the RTC module, instead of
+its own internal oscillator.
+
+Patch 10 through 15 adds an RTC node or fixes up the RTC device node
+address ranges, clock properties, names of existing clocks, and adds
+accuracy properties for the external fixed oscillators.
+
+The clock names require fixing because the sunxi clock driver implicitly
+depends on the HOSC and LOSC being named "osc24M" and "osc32k". The
+"fixes" to the clock hierarchy introduced in this series means the names
+must also be shuffled around or the in kernel representation would be
+incorrect. This has been the case since the sunxi-ng drivers were
+introduced. There are plans to address this, but the code is still in its
+early stages.
+
+Please have a look.
+
+Thanks
+ChenYu
+
+Chen-Yu Tsai (15):
+  dt-bindings: rtc: sun6i-rtc: Rewrite clock outputs as a list
+  dt-bindings: rtc: sun6i-rtc: Add compatible strings for pre-H6
+    variants
+  dt-bindings: rtc: sun6i-rtc: Deprecate external clock output for A31
+  dt-bindings: rtc: sun6i-rtc: Export internal RC oscillator
+  rtc: sun6i: Add default clock name for LOSC
+  rtc: sun6i: Add support for different variants
+  rtc: sun6i: Add support for all known pre-H6 variants
+  rtc: sun6i: Expose internal oscillator through device tree
+  clk: sunxi-ng: r40: Force LOSC parent to RTC LOSC output
+  ARM: dts: sun8i: a23/a33: Fix up RTC device node
+  ARM: dts: sunxi: h3/h5: Add clock accuracy for external oscillators
+  ARM: dts: sunxi: h3/h5: Fix up RTC device node and clock references
+  ARM: dts: sun8i: r40: Add clock accuracy for external oscillators
+  ARM: dts: sun8i: r40: Add RTC device node
+  arm64: dts: allwinner: a64: Fix up RTC device node and clock
+    references
+
+ .../devicetree/bindings/rtc/sun6i-rtc.txt     |  31 ++++-
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi          |   6 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi               |   4 +
+ arch/arm/boot/dts/sun8i-r40.dtsi              |  18 ++-
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi            |  28 ++---
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi |  22 ++--
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi  |   4 +
+ drivers/clk/sunxi-ng/ccu-sun8i-r40.c          |  11 ++
+ drivers/rtc/rtc-sun6i.c                       | 117 ++++++++++++++++--
+ 9 files changed, 188 insertions(+), 53 deletions(-)
+
 -- 
 2.20.0.rc1
