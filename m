@@ -1,54 +1,35 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:22 +0100
-Subject: [PATCH v4 18/20] ARM: mmp: add an instance of pxa-usb-phy to ttc_dkb
- and aspenite
-In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
-References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-19-lkundrak@v3.sk>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 28 Nov 2018 10:37:02 -0800
+Subject: [PATCH] clk: renesas: Mark rza2_cpg_clk_register static
+Message-ID: <20181128183702.231609-1-sboyd@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will replace the *_pdata.phy_{de,}init()
+This is only used in this file, so mark it static to silence a sparse
+warning.
 
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-
+Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Stephen Boyd <sboyd@kernel.org>
 ---
-Changes since v1:
-- Squashed patches with ttc_dkb and aspenite changes together.
 
- arch/arm/mach-mmp/aspenite.c | 4 ++++
- arch/arm/mach-mmp/ttc_dkb.c  | 4 ++++
- 2 files changed, 8 insertions(+)
+I've applied this to clk-renesas branch already, just not pushed out
+yet.
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 6c2ebf01893a..23f99976b5f5 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -256,6 +256,10 @@ static void __init common_init(void)
- 	/* off-chip devices */
- 	platform_device_register(&smc91x_device);
+ drivers/clk/renesas/r7s9210-cpg-mssr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/renesas/r7s9210-cpg-mssr.c b/drivers/clk/renesas/r7s9210-cpg-mssr.c
+index e0793a9eb668..57c49fe88295 100644
+--- a/drivers/clk/renesas/r7s9210-cpg-mssr.c
++++ b/drivers/clk/renesas/r7s9210-cpg-mssr.c
+@@ -155,7 +155,7 @@ static void __init r7s9210_update_clk_table(struct clk *extal_clk,
+ 	}
+ }
  
-+#if IS_ENABLED(CONFIG_PHY_PXA_USB)
-+	platform_device_register(&pxa168_device_usb_phy);
-+#endif
-+
- #if IS_ENABLED(CONFIG_USB_EHCI_MV)
- 	pxa168_add_usb_host(&pxa168_sph_pdata);
- #endif
-diff --git a/arch/arm/mach-mmp/ttc_dkb.c b/arch/arm/mach-mmp/ttc_dkb.c
-index c7897fb2b6da..767dcb23ee1c 100644
---- a/arch/arm/mach-mmp/ttc_dkb.c
-+++ b/arch/arm/mach-mmp/ttc_dkb.c
-@@ -282,6 +282,10 @@ static void __init ttc_dkb_init(void)
- 				 sizeof(struct pxa_gpio_platform_data));
- 	platform_add_devices(ARRAY_AND_SIZE(ttc_dkb_devices));
- 
-+#if IS_ENABLED(CONFIG_PHY_PXA_USB)
-+	platform_device_register(&pxa168_device_usb_phy);
-+#endif
-+
- #if IS_ENABLED(CONFIG_USB_MV_UDC)
- 	pxa168_device_u2o.dev.platform_data = &ttc_usb_pdata;
- 	platform_device_register(&pxa168_device_u2o);
+-struct clk * __init rza2_cpg_clk_register(struct device *dev,
++static struct clk * __init rza2_cpg_clk_register(struct device *dev,
+ 	const struct cpg_core_clk *core, const struct cpg_mssr_info *info,
+ 	struct clk **clks, void __iomem *base,
+ 	struct raw_notifier_head *notifiers)
 -- 
-2.19.1
+Sent by a computer through tubes
