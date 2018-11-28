@@ -1,149 +1,49 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 28 Nov 2018 14:52:01 +0200
-Subject: [PATCH 4/4] ARM: dts: am335x: Move l4 child devices to probe them
- with ti-sysc
-In-Reply-To: <20181127161625.GR53235@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <20180925000545.22931-5-tony@atomide.com>
- <612b09a4-5007-39bf-becb-66fdca9d6d41@ti.com>
- <20181127161625.GR53235@atomide.com>
-Message-ID: <e1f4e272-32aa-1a28-6919-fd8a92f80ce8@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 28 Nov 2018 13:50:57 +0100
+Subject: [PATCH 01/16] ARM: dts: r9a06g032: Add pinctrl node
+In-Reply-To: <2b421730228e2ac6e49c3202e4f7ef79a65da71c.1543236456.git.horms+renesas@verge.net.au>
+References: <cover.1543236456.git.horms+renesas@verge.net.au>
+ <2b421730228e2ac6e49c3202e4f7ef79a65da71c.1543236456.git.horms+renesas@verge.net.au>
+Message-ID: <20181128125057.dwf7qae323yv64ma@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 26, 2018 at 01:54:03PM +0100, Simon Horman wrote:
+> From: Phil Edworthy <phil.edworthy@renesas.com>
+> 
+> This provides a pinctrl driver for the Renesas R9A06G032 SoC
+> 
+> Based on a patch originally written by Michel Pollet at Renesas.
+> 
+> Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+> Geert Uytterhoeven <geert+renesas@glider.be>
 
+The tag above is garbled. I will fix this and repost this pull-request.
 
-On 27/11/2018 18.16, Tony Lindgren wrote:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [181127 13:01]:
->> Reverting this patch in linux-next makes audio working again on am335x
->> (bb white + audio cape) :o
->>
->> Without revert the McASP FIFO would constantly underflow.
-> 
-> Thanks for testing. Hmm the dts change looks right. And
-> am3_l3s_clkctrl_regs[] has CLKF_SW_SUP for the mcasp fcks.
-> And there are no opt clocks to enable according to the TRM.
-> 
->> Memcpy test via dmatest works with EDMA
-> 
-> OK. Can you please test if the following partial revert
-> also works or is there maybe a dependency to some other
-> device?
-
-It works, thanks:
-Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-
-> 
-> Regards,
-> 
-> Tony
-> 
-> 8< ------------------
-> From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Tue, 27 Nov 2018 08:11:48 -0800
-> Subject: [PATCH] ARM: dts: Revert am335x mcasp ti-sysc changes
-> 
-> Without this McASP FIFO would constantly underflow. EDMA
-> test via dmatest works though.
-> 
-> Let's revert the change for now until we know the root cause.
-> 
-> Reported-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
->  arch/arm/boot/dts/am33xx-l4.dtsi | 28 ++--------------------------
->  arch/arm/boot/dts/am33xx.dtsi    | 29 +++++++++++++++++++++++++++++
->  2 files changed, 31 insertions(+), 26 deletions(-)
+>  arch/arm/boot/dts/r9a06g032.dtsi | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/am33xx-l4.dtsi b/arch/arm/boot/dts/am33xx-l4.dtsi
-> --- a/arch/arm/boot/dts/am33xx-l4.dtsi
-> +++ b/arch/arm/boot/dts/am33xx-l4.dtsi
-> @@ -1056,19 +1056,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges = <0x0 0x38000 0x2000>;
-> -
-> -			mcasp0: mcasp at 0 {
-> -				compatible = "ti,am33xx-mcasp-audio";
-> -				reg = <0x0 0x2000>,
-> -				      <0x46000000 0x400000>;
-> -				reg-names = "mpu", "dat";
-> -				interrupts = <80>, <81>;
-> -				interrupt-names = "tx", "rx";
-> -				status = "disabled";
-> -				dmas = <&edma 8 2>,
-> -					<&edma 9 2>;
-> -				dma-names = "tx", "rx";
-> -			};
-> +			status = "disabled";
+> diff --git a/arch/arm/boot/dts/r9a06g032.dtsi b/arch/arm/boot/dts/r9a06g032.dtsi
+> index eaf94976ed6d..2322268bc862 100644
+> --- a/arch/arm/boot/dts/r9a06g032.dtsi
+> +++ b/arch/arm/boot/dts/r9a06g032.dtsi
+> @@ -165,6 +165,14 @@
+>  			status = "disabled";
 >  		};
 >  
->  		target-module at 3c000 {			/* 0x4803c000, ap 20 32.0 */
-> @@ -1086,19 +1074,7 @@
->  			#address-cells = <1>;
->  			#size-cells = <1>;
->  			ranges = <0x0 0x3c000 0x2000>;
-> -
-> -			mcasp1: mcasp at 0 {
-> -				compatible = "ti,am33xx-mcasp-audio";
-> -				reg = <0x0 0x2000>,
-> -				      <0x46400000 0x400000>;
-> -				reg-names = "mpu", "dat";
-> -				interrupts = <82>, <83>;
-> -				interrupt-names = "tx", "rx";
-> -				status = "disabled";
-> -				dmas = <&edma 10 2>,
-> -					<&edma 11 2>;
-> -				dma-names = "tx", "rx";
-> -			};
-> +			status = "disabled";
->  		};
->  
->  		target-module at 40000 {			/* 0x48040000, ap 22 1e.0 */
-> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-> --- a/arch/arm/boot/dts/am33xx.dtsi
-> +++ b/arch/arm/boot/dts/am33xx.dtsi
-> @@ -440,7 +440,36 @@
->  			       <&edma 5 0>;
->  			dma-names = "tx", "rx";
->  		};
-> +
-> +		mcasp0: mcasp at 48038000 {
-> +			compatible = "ti,am33xx-mcasp-audio";
-> +			ti,hwmods = "mcasp0";
-> +			reg = <0x48038000 0x2000>,
-> +			      <0x46000000 0x400000>;
-> +			reg-names = "mpu", "dat";
-> +			interrupts = <80>, <81>;
-> +			interrupt-names = "tx", "rx";
-> +			status = "disabled";
-> +			dmas = <&edma 8 2>,
-> +				<&edma 9 2>;
-> +			dma-names = "tx", "rx";
+> +		pinctrl: pin-controller at 40067000 {
+> +			compatible = "renesas,r9a06g032-pinctrl", "renesas,rzn1-pinctrl";
+> +			reg = <0x40067000 0x1000>, <0x51000000 0x480>;
+> +			clocks = <&sysctrl R9A06G032_HCLK_PINCONFIG>;
+> +			clock-names = "bus";
+> +			status = "okay";
 > +		};
 > +
-> +		mcasp1: mcasp at 4803c000 {
-> +			compatible = "ti,am33xx-mcasp-audio";
-> +			ti,hwmods = "mcasp1";
-> +			reg = <0x4803C000 0x2000>,
-> +			      <0x46400000 0x400000>;
-> +			reg-names = "mpu", "dat";
-> +			interrupts = <82>, <83>;
-> +			interrupt-names = "tx", "rx";
-> +			status = "disabled";
-> +			dmas = <&edma 10 2>,
-> +				<&edma 11 2>;
-> +			dma-names = "tx", "rx";
-> +		};
->  	};
-> +
->  };
->  
->  #include "am33xx-l4.dtsi"
+>  		gic: gic at 44101000 {
+>  			compatible = "arm,cortex-a7-gic", "arm,gic-400";
+>  			interrupt-controller;
+> -- 
+> 2.11.0
 > 
-
-- P?ter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
