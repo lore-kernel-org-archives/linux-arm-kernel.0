@@ -1,80 +1,71 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 27 Nov 2018 16:39:50 -0800
-Subject: [PATCH v2] x86_64,
- vmcoreinfo: Append 'page_offset_base' to vmcoreinfo
-In-Reply-To: <20181127232916.GG1824@MiWiFi-R3L-srv>
-References: <1542318469-13699-1-git-send-email-bhsharma@redhat.com>
- <20181121113944.GD27797@zn.tnic>
- <CAGXu5jKYxgLPD4YonGSXjECJS=c18rxWmuFC1eeUJK9fLeTxcg@mail.gmail.com>
- <20181127232916.GG1824@MiWiFi-R3L-srv>
-Message-ID: <CAGXu5jJzVMmqJ9JvFqDhDx=QShiWisWO0bY49cD5r-7By5dxFg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 27 Nov 2018 16:42:36 -0800
+Subject: [PATCH] arm64: dts: rockchip: Add 32k clk on rk3399-gru
+In-Reply-To: <20181127232331.49628-1-dbasehore@chromium.org>
+References: <20181127232331.49628-1-dbasehore@chromium.org>
+Message-ID: <CAD=FV=WJCvt-Ez_F+gTJaLWnOOY2J0fXxgq8vy0ojKoHv+AQ7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 27, 2018 at 3:29 PM, Baoquan He <bhe@redhat.com> wrote:
-> On 11/27/18 at 02:16pm, Kees Cook wrote:
->> Why is KERNELOFFSET= not sufficient?
->>
->> See commit b6085a865762 ("x86, kaslr: export offset in VMCOREINFO ELF notes")
->>
->> +       vmcoreinfo_append_str("KERNELOFFSET=%lx\n",
->> +                             (unsigned long)&_text - __START_KERNEL);
->
-> KERNELOFFSET is virtual address delta after kernel text KASLR, namely
-> the offset from the original default kernel text virtual address,
-> 0xffffffff88000000.
->
-> While after memory region KASLR in kernel_randomize_memory(), the
-> starting address of the direct mapping of physical memory, PAGE_OFFSET,
-> is changed too. We need get it to analyze memory in makedumpfile/crash.
-> Currently we deduce it from elf program segment of kcore:
-> Program Headers:
->   Type           Offset             VirtAddr           PhysAddr
->                  FileSiz            MemSiz              Flags  Align
-> ......
->
->   LOAD           0x00000a62c0004000 0xffff8a62c0001000 0x0000000000001000
->                  0x000000000009c000 0x000000000009c000  RWE    1000
->
-> page_offset = 0xffff8a62c0001000 - 0x0000000000001000;
-> Since we put the direct mapping segments at the bottom part of kcore, we
-> can always get page_offset right.
->
-> Thanks
-> Baoquan
->
->>
->> -Kees
->>
->> >> diff --git a/arch/x86/kernel/machine_kexec_64.c b/arch/x86/kernel/machine_kexec_64.c
->> >> index 4c8acdfdc5a7..6161d77c5bfb 100644
->> >> --- a/arch/x86/kernel/machine_kexec_64.c
->> >> +++ b/arch/x86/kernel/machine_kexec_64.c
->> >> @@ -356,6 +356,9 @@ void arch_crash_save_vmcoreinfo(void)
->> >>       VMCOREINFO_SYMBOL(init_top_pgt);
->> >>       vmcoreinfo_append_str("NUMBER(pgtable_l5_enabled)=%d\n",
->> >>                       pgtable_l5_enabled());
->> >> +#ifdef CONFIG_RANDOMIZE_BASE
+Hi,
 
-Okay, gotcha. In that case, shouldn't this be CONFIG_RANDOMIZE_MEMORY?
+On Tue, Nov 27, 2018 at 3:23 PM Derek Basehore <dbasehore@chromium.org> wrote:
+>
+> This adds the 32k clock to the RK3399 Gru board file. Even though it's
+> not directly used, muxes will end up traversing the entire clk tree on
+> calls to determine_rate if it doesn't exist. This is because the 32k
+> clk is listed as a possible parent on some clks. Since the clk doesn't
+> know about the 32k clk (it was never registered), it triggers a global
+> search for it. This can happen about 40 times per second, which isn't
+> great for power.
 
--Kees
+I seem to remember Heiko requesting something be added to the commit
+message.  Ah yes, he said:
 
->> >> +     VMCOREINFO_NUMBER(page_offset_base);
->> >> +#endif
->> >>
->> >>  #ifdef CONFIG_NUMA
->> >>       VMCOREINFO_SYMBOL(node_data);
->>
->> --
->> Kees Cook
->>
->> _______________________________________________
->> kexec mailing list
->> kexec at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/kexec
+> That would also be a great part of the commit message, like
+> "...on Gru boards the 32kHz clock gets produced by a Silego oscillator"
+> or so when you move it over to rk3399-gru.dtsi .
+
+Presumably Heiko could add that to the commit message when he applies
+the patch, so maybe wait to see if he wants you to respin it?
 
 
+> Signed-off-by: Derek Basehore <dbasehore@chromium.org>
+> ---
+>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> index ca07f6032200..a07aa4c570c0 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -14,6 +14,13 @@
+>                 stdout-path = "serial2:115200n8";
+>         };
+>
+> +       ap_rtc_clk: ap-rtc-clk {
+> +               compatible = "fixed-clock";
+> +               clock-frequency = <32768>;
+> +               clock-output-names = "xin32k";
+> +               #clock-cells = <0>;
+> +       };
+> +
+>         /*
+>          * Power Tree
 
--- 
-Kees Cook
+Really this should be below the power tree, AKA right above
+"gpio-keys".  Convention has typically been that only "special" nodes
+like "chosen" go all the way at the top here.  Then the power tree
+(parents first), then other nodes.
+
+In the Chrome OS tree we had an "/* END REGULATORS */ comment to try
+to separate out the power tree from the rest of the nodes, but I guess
+Heiko didn't like that when this went upstream so now you just have to
+know the convention.  :-P
+
+Possibly Heiko would re-sort this for you himself when applying the
+change if he agrees with my understanding of the conventions.
+
+Other than my nits:
+
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
