@@ -1,76 +1,99 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Wed, 28 Nov 2018 10:03:01 +0000
-Subject: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller RTC
- support
-In-Reply-To: <20181128095823.GE8952@piout.net>
-References: <1543311334-8807-1-git-send-email-Anson.Huang@nxp.com>
- <1543311334-8807-5-git-send-email-Anson.Huang@nxp.com>
- <20181128100420.0c9a721a@karo-electronics.de>
- <DB3PR0402MB3916FFD700313BF684CF32AAF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <20181128091943.GB8952@piout.net>
- <DB3PR0402MB39168AC8DB69B81C51CE63C2F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <20181128093345.GC8952@piout.net>
- <DB3PR0402MB3916DE94D437DC51435D00CEF5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
- <20181128095823.GE8952@piout.net>
-Message-ID: <DB3PR0402MB39164C9E9A7DC29C6D451AC0F5D10@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 28 Nov 2018 11:08:19 +0100
+Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+In-Reply-To: <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
+Message-ID: <20181128100819.GA20723@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-Best Regards!
-Anson Huang
-
-> -----Original Message-----
-> From: Alexandre Belloni [mailto:alexandre.belloni at bootlin.com]
-> Sent: 2018?11?28? 17:58
-> To: Anson Huang <anson.huang@nxp.com>
-> Cc: Lothar Wa??mann <LW@KARO-electronics.de>; a.zummo at towertech.it;
-> robh+dt at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; Aisheng DONG <aisheng.dong@nxp.com>; Andy Gross
-> <andy.gross@linaro.org>; arnd at arndb.de; horms+renesas at verge.net.au;
-> heiko at sntech.de; bjorn.andersson at linaro.org; enric.balletbo at collabora.com;
-> amit.kucheria at linaro.org; ezequiel at collabora.com; olof at lixom.net;
-> shawnguo at kernel.org; linux-rtc at vger.kernel.org; devicetree at vger.kernel.org;
-> linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> dl-linux-imx <linux-imx@nxp.com>
-> Subject: Re: [PATCH 4/4] ARM64: dts: imx: add i.MX8QXP system controller
-> RTC support
+On Wed, Nov 28, 2018 at 09:43:29AM +0000, Jon Hunter wrote:
 > 
-> On 28/11/2018 09:41:22+0000, Anson Huang wrote:
-> > > > i.MX SoCs ONLY have 1 RTC. And RTC are always enabled by default
-> > > > for all i.MX SoCs, so do we have to disable it here and enable it in board
-> dts?
-> > > >
-> > >
-> > > I would say that most of the i.MX based boards include another RTC
-> > > because the SoC one consumes way too much power.
-> > >
-> > > Note that I don't care too much whether it is enabled by default, I
-> > > was simply explaining why you may want to disable it by default.
-> >
-> > OK, this system controller RTC is a little different, it is controlled
-> > by system controller firmware, and system controller firmware will
-> > always select the best one for its user(Linux kernel) if there are other RTCs
-> available, so I think we can keep it enabled by default for now. Thanks.
-> >
+> On 12/11/2018 15:18, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> > 
+> > The mailbox framework supports blocking transfers via completions for
+> > clients that can sleep. In order to support blocking transfers in cases
+> > where the transmission is not permitted to sleep, add a new ->flush()
+> > callback that controller drivers can implement to busy loop until the
+> > transmission has been completed. This will automatically be called when
+> > available and interrupts are disabled for clients that request blocking
+> > transfers.
+> > 
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/mailbox/mailbox.c          | 8 ++++++++
+> >  include/linux/mailbox_controller.h | 4 ++++
+> >  2 files changed, 12 insertions(+)
+> > 
+> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> > index 674b35f402f5..0eaf21259874 100644
+> > --- a/drivers/mailbox/mailbox.c
+> > +++ b/drivers/mailbox/mailbox.c
+> > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> >  		unsigned long wait;
+> >  		int ret;
+> >  
+> > +		if (irqs_disabled() && chan->mbox->ops->flush) {
+> > +			ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
+> > +			if (ret < 0)
+> > +				tx_tick(chan, ret);
+> > +
+> > +			return ret;
+> > +		}
 > 
-> Do you mean that the plan is to push support for the external RTCs (e.g.
-> the i2c ones) to the M4 firmware?
-
-As far as I know, currently there is no such plan/support in system controller (M4) firmware,
-and if there are external RTCs, like some PMICs have RTC inside, yes, M4 will
-control it and Linux kernel (AP) does NOT need to care about which RTC is used,
-same IPC API will be used I think.
-
-Anson.
-
+> It seems to me that if mbox_send_message() is called from an atomic
+> context AND tx_block is true, then if 'flush' is not populated this
+> should be an error condition as we do not wish to call
+> wait_for_completion from an atomic context.
 > 
-> --
-> Alexandre Belloni, Bootlin
-> Embedded Linux and Kernel engineering
-> https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fbootl
-> in.com&amp;data=02%7C01%7Canson.huang%40nxp.com%7C015fe8a15f364
-> 066a6a608d655181d03%7C686ea1d3bc2b4c6fa92cd99c5c301635%7C0%7C
-> 0%7C636789959398815495&amp;sdata=wmgVepaMjZyc7dJQ0x8cLSaQUlshs
-> 6jKCjBdgC4FoYg%3D&amp;reserved=0
+> I understand that there is some debate about adding such flush support,
+> but irrespective of the above change, it seems to me that if the
+> mbox_send_message() can be called from an atomic context (which it
+> appears to), then it should be detecting if someone is trying to do so
+> with 'tx_block' set as this should be an error.
+> 
+> Furthermore, if the underlying mailbox driver can support sending a
+> message from an atomic context and busy wait until it is done, surely
+> the mailbox framework should provide a means to support this?
+> 
+> Now it could be possible for the underlying mailbox driver to detect we
+> are in an atomic context and if the 'tx_block' is set do the right thing
+> by busy waiting until the message is sent. However, the problem with
+> that is, that for the mbox_send_message() to ensure the right thing is
+> done, it needs to check that 'tx_done' is set in the case of a blocking
+> transfer in an atomic context. At that point you may as well add the
+> flush operator as I think it is more implicit/clear.
+
+Heh, interesting timing, I just sent out v3 of this series with a
+slightly different solution. Basically what v3 implements is explicit
+flushing of the mailbox via a new function called mbox_flush().
+
+I originally liked the idea of "hiding" the flush operation in the
+mbox_send_message() function, but the more I look at the new explicit
+flush solution, the more I prefer it. One reason why I prefer it is
+because it no longer has the slightly odd "irqs_disabled()" check that
+always made me a bit uneasy. The other advantage of the explicit flush
+is that it becomes completely opt-in for both mailbox providers and
+consumers. Furthermore the consumer should always know if it can be
+called in atomic context or not, so none of these code paths should
+have to be "clever" and check at runtime whether or not interrupts are
+enabled. If the consumer knows that it will be called in atomic context
+it can just unconditionally flush the mailbox.
+
+Also, it nicely addresses the concern about erroring out if the provider
+doesn't support flushing. The new mbox_flush() API returns -ENOTSUPP if
+called on a mailbox channel provided by a driver that doesn't implement
+->flush().
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/43125f83/attachment.sig>
