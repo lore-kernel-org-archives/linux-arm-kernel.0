@@ -1,27 +1,100 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 28 Nov 2018 09:27:24 -0800
-Subject: [PATCH V2 7/7] mmc: bcm2835: Properly handle
- dmaengine_prep_slave_sg
-In-Reply-To: <1541967839-2847-8-git-send-email-stefan.wahren@i2se.com>
-References: <1541967839-2847-1-git-send-email-stefan.wahren@i2se.com>
- <1541967839-2847-8-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87y39d5czn.fsf@anholt.net>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 28 Nov 2018 17:28:16 +0000
+Subject: [PATCH 8/9] iommu: arm-smmu: make it explicitly non-modular
+In-Reply-To: <20181128152445.GH14659@windriver.com>
+References: <1543271498-28966-1-git-send-email-paul.gortmaker@windriver.com>
+ <1543271498-28966-9-git-send-email-paul.gortmaker@windriver.com>
+ <755c95d7-882c-0dec-207e-20bf8f22b159@arm.com>
+ <20181128152445.GH14659@windriver.com>
+Message-ID: <d952cb5e-b524-5eea-1729-4d579f637152@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On 28/11/2018 15:24, Paul Gortmaker wrote:
+> [Re: [PATCH 8/9] iommu: arm-smmu: make it explicitly non-modular] On 28/11/2018 (Wed 12:42) Robin Murphy wrote:
+> 
+>> Hi Paul,
+>>
+>> On 26/11/2018 22:31, Paul Gortmaker wrote:
+> 
+> [...]
+> 
+>>> We add a moduleparam.h include since the file does actually declare
+>>> some module parameters, and leaving them as such is the easiest way
+>>> currently to remain backwards compatible with existing use cases.
+> 
+> [...]
+> 
+> 
+>> Is it worth introducing builtin_param() and friends for this sort of thing,
+>> to echo the *_platform_driver() helpers? It seems like that could be
+>> justifiable under the motivation described in the cover letter.
+> 
+> I've definitely gone back and looked at this a few times when coming
+> across the few corner cases like these, to remind myself why I didn't do
+> it already.
+> 
+> We'd not want to replicate all the module_param stuff as an instance of
+> builtin_param() because we already have setup() and setup_param() in
+> init.h -- however they don't do the file name in the param - hence the
+> reason it isn't a direct swap in replacement.
+> 
+> So, it would become some more complex refactoring of moduleparam.h into
+> say bootparam.h - to reduce code/macro duplication, while at the same
+> time being aware of existing setup_param stuff and making something like
+> a new setup_param_named() that is consistent with existing setup fcns.
+> 
+> And based on past experience, there will be reviewers who don't see the
+> value in the distinction and simply reply with two words "why bother?".
+> 
+> Not impossible, but not as simple as the builtin_platform_driver and
+> similar wrappers that I've already added to mainline.  You've made we
+> want to go have another look at it again, but in the meantime we can do
+> what I've done here, and circle around later to update the few instances
+> of moduleparam in non-modules once/if the refactoring I describe above
+> works out and is accepted in mainline.
 
-> In case dmaengine_prep_slave_sg fails we need to call dma_unmap_sg.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Sure, I definitely agree with doing a first pass like this to sweep up 
+all the cruft and audit the module_param users at the same time, then 
+considering a robust refactoring once we've got a clear idea of how many 
+users actually need it.
 
-This series is:
+TBH, at this point I was thinking along the lines of a simple:
 
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/0d646466/attachment.sig>
+#ifndef MODULE
+#define builtin_param(name, type, perm)			\
+	module_param(name, type, perm)
+#define builtin_param_named(name, name, type, perrm)	\
+	module_param_named(name, name, type, perm)
+#endif
+
+still in moduleparam.h, purely so that the intent can be made really 
+clear in driver code and it's more searchable than just comments. But 
+yeah, even that would probably be objectionable to many.
+
+>> Otherwise, the changes look reasonable. I still hold out hope that one day
+>> we'll be able to make IOMMU drivers modular (it can work with minimal hacks
+>> today, but it's far from robust in general), but for now I agree this makes
+>> sense (and it'll be easy enough to revert for playing with further hacks).
+> 
+> I totally agree - I've had similar discussions with the DMA maintainers,
+> and if being modular can be made to work and has a use case - great!
+> 
+> But it should be a conscious decision, since nobody writes a new driver
+> from scratch; they copy one that is "close" as a template and then go
+> from there.  Which leads to a good percentage of drivers having hints
+> of modular stuff when there is no intent of them ever being modular.
+> 
+>> With the title fixed up as Joerg asked,
+>>
+>> Acked-by: Robin Murphy <robin.murphy@arm.com>
+> 
+> Thanks for the feedback/review.  Will re-send with updated titles before
+> the week is finished and a good chance for additional feedback has elapsed.
+
+Great! There's probably some more subtleties that could be tidied up 
+when the driver is truly non-removable, but I can take a look at that 
+myself once this patch has gone in.
+
+Cheers,
+Robin.
