@@ -1,19 +1,23 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 28 Nov 2018 20:30:34 +0800
-Subject: [PATCH 62/77] ARM: dts: sun8i: a23/a33: Remove card detect pull-up
-In-Reply-To: <7e71c2b672d2a007a6a98bfa0945da402e31c8ed.1543321707.git-series.maxime.ripard@bootlin.com>
+Date: Wed, 28 Nov 2018 20:33:22 +0800
+Subject: [PATCH 63/77] ARM: dts: sun8i: a23/a33: Change pinctrl nodes to
+ avoid warning
+In-Reply-To: <0808e07332c6fafa9a998d1c4ad1d710a3094750.1543321707.git-series.maxime.ripard@bootlin.com>
 References: <cover.9a6e7d31e872acad71b4bc7f9edfc24ab01c22c3.1543321707.git-series.maxime.ripard@bootlin.com>
- <7e71c2b672d2a007a6a98bfa0945da402e31c8ed.1543321707.git-series.maxime.ripard@bootlin.com>
-Message-ID: <CAGb2v65m_C1zyJ1m1Lvf5YSov3RKXZ3nb98KRO3oXse2z284SQ@mail.gmail.com>
+ <0808e07332c6fafa9a998d1c4ad1d710a3094750.1543321707.git-series.maxime.ripard@bootlin.com>
+Message-ID: <CAGb2v66sg3ZrppVdU9TLYBXhX0BmaOBjAurPp+OiBG4NHwxBQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Nov 27, 2018 at 8:47 PM Maxime Ripard <maxime.ripard@bootlin.com> wrote:
 >
-> Boards usually have an external pull-up on the card-detect signal, so
-> there's no need to add another one.
+> All our pinctrl nodes were using a node name convention with a unit-address
+> to differentiate the different muxing options. However, since those nodes
+> didn't have a reg property, they were generating warnings in DTC.
 >
-> This also removes a DTC warning.
+> In order to accomodate for this, convert the old nodes to the syntax we've
+> been using for the new SoCs, including removing the letter suffix of the
+> node labels to the bank of those pins to make things more readable.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@bootlin.com>
 
