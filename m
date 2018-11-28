@@ -1,27 +1,38 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Wed, 28 Nov 2018 08:41:17 +0100
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <20181123065511.GA17856@lst.de>
-References: <20181122140320.24080-1-hch@lst.de>
- <CAHk-=wh=_T=A53+o4zLNbKio43LGqVDb0KCbWPDvAg54bRDmWw@mail.gmail.com>
- <20181122170715.GI30658@n2100.armlinux.org.uk>
- <CAHk-=wgfGzXuDAKFQPdzMib3QCRHfSTsy5=gLU-WCoya+Ym+1A@mail.gmail.com>
- <11829e3c-7302-f821-cf5c-863e5267a17b@arm.com>
- <CAHk-=whxf0zqutExPr_j1A625Z3gcL6k_ABzKo1BtzN4F93hkA@mail.gmail.com>
- <20181123065511.GA17856@lst.de>
-Message-ID: <20181128074117.GA21126@lst.de>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Wed, 28 Nov 2018 15:43:30 +0800
+Subject: [PATCH v3] spi: mediatek: Add bindings for mediatek MT7629 soc
+ platform
+Message-ID: <1543391010-23554-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 23, 2018 at 07:55:11AM +0100, Christoph Hellwig wrote:
-> On Thu, Nov 22, 2018 at 09:55:25AM -0800, Linus Torvalds wrote:
-> > No, the big immediate benefit of allowing "return -EINVAL" etc is
-> > simply legibility and error avoidance.
-> 
-> Well, I can tweak the last patch to return -EINVAL from dma_mapping_error
-> instead of the old 1 is as bool true.  The callers should all be fine,
-> although I'd have to audit them.  Still wouldn't help with being able to
-> return different errors.
+This patch adds a DT binding documentation for the MT7629 soc.
 
-Any opinions?  I'd really like to make some forward progress on this
-series.
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+v3:
+remove cover-letter.
+
+v2:
+remove "mediatek,mt7629-spi" compatible according Matthias's advice.
+
+v1:
+This series are based on 4.20-rc1 and provide two patches to support mt7629 IC.
+---
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index 7940940..69c3567 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -6,6 +6,7 @@ Required properties:
+     - mediatek,mt2712-spi: for mt2712 platforms
+     - mediatek,mt6589-spi: for mt6589 platforms
+     - mediatek,mt7622-spi: for mt7622 platforms
++    - "mediatek,mt7629-spi", "mediatek,mt7622-spi": for mt7629 platforms
+     - mediatek,mt8135-spi: for mt8135 platforms
+     - mediatek,mt8173-spi: for mt8173 platforms
+     - mediatek,mt8183-spi: for mt8183 platforms
+-- 
+1.7.9.5
