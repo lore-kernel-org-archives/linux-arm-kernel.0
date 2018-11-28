@@ -1,172 +1,99 @@
 From: mike.leach@linaro.org (Mike Leach)
-Date: Wed, 28 Nov 2018 10:14:21 +0000
-Subject: [RFC PATCH v2 1/3] drivers: amba: Updates to component identification
- for driver matching.
+Date: Wed, 28 Nov 2018 10:14:23 +0000
+Subject: [RFC PATCH v2 3/3] amba: coresight: Driver test for new CoreSight UCI
+ matching
 In-Reply-To: <20181128101423.15961-1-mike.leach@linaro.org>
 References: <20181128101423.15961-1-mike.leach@linaro.org>
-Message-ID: <20181128101423.15961-2-mike.leach@linaro.org>
+Message-ID: <20181128101423.15961-4-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CoreSight specification (ARM IHI 0029E), updates the ID register
-requirements for components on an AMBA bus, to cover both traditional
-ARM Primecell type devices, and newer CoreSight and other components.
+This patch adds in logging and modifications to amba driver, etmv4 driver
+and DB410C device tree to allow testing of the new UCI component matching
+algorithm used for certain class of components on an AMBA bus.
 
-The Peripheral ID (PID) / Component ID (CID) pair is extended in certain
-cases to uniquely identify components. CoreSight components related to
-a single function can share Peripheral ID values, and must be further
-identified using a Unique Component Identifier (UCI). e.g. the ETM, CTI,
-PMU and Debug hardware of the A35 all share the same PID.
-
-Bits 11:8 of the CID are defined to be the device class.
-Class 0xF remains for PrimeCell and legacy components.
-Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-at present.
-Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-
-The specification futher defines which classes of device use the standard
-CID/PID pair, and when additional ID registers are required.
-
-The patches provide an update of amba_device and matching code to handle
-the additional registers required for the Class 0x9 (CoreSight) UCI.
-The *data pointer in the amba_id is used by the driver to provide extended
-ID register values for matching.
-
-CoreSight components where PID/CID pair is currently sufficient for
-unique identification need not provide this additional information.
+Test only - not intended for upstream.
 
 Signed-off-by: Mike Leach <mike.leach@linaro.org>
 ---
- drivers/amba/bus.c       | 49 +++++++++++++++++++++++++++++++++-------
- include/linux/amba/bus.h | 32 ++++++++++++++++++++++++++
- 2 files changed, 73 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi         |  9 +++++++++
+ drivers/amba/bus.c                            | 13 ++++++++++++-
+ drivers/hwtracing/coresight/coresight-etm4x.c |  3 ++-
+ 3 files changed, 23 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index d302d8d639a1..c8b503a63b2c 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1368,6 +1368,15 @@
+ 			};
+ 		};
+ 
++		/* add an as yet unsupported CTI for UCI test - CPU-0 */
++		cti at 858000 {
++			compatible = "arm,coresight-cti", "arm,primecell";
++			reg = <0x858000 0x1000>;
++
++			clocks = <&rpmcc RPM_QDSS_CLK>;
++			clock-names = "apb_pclk";
++		};
++
+ 		venus: video-codec at 1d00000 {
+ 			compatible = "qcom,msm8916-venus";
+ 			reg = <0x01d00000 0xff000>;
 diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index 41b706403ef7..387ee8f7720b 100644
+index 387ee8f7720b..ccc2bb4a98b8 100644
 --- a/drivers/amba/bus.c
 +++ b/drivers/amba/bus.c
-@@ -26,19 +26,40 @@
- 
- #define to_amba_driver(d)	container_of(d, struct amba_driver, drv)
- 
--static const struct amba_id *
--amba_lookup(const struct amba_id *table, struct amba_device *dev)
-+/* called on periphid match and class 0x9 coresight device. */
-+static int
-+amba_cs_uci_id_match(const struct amba_id *table, struct amba_device *dev)
+@@ -32,19 +32,30 @@ amba_cs_uci_id_match(const struct amba_id *table, struct amba_device *dev)
  {
  	int ret = 0;
-+	struct amba_cs_uci_id *uci;
-+
-+	uci = table->data;
-+
-+	/* no table data - return match on periphid */
-+	if (!uci)
-+		return 1;
-+
-+	if (uci->devarch) {
-+		ret = (dev->uci.devtype == uci->devtype) &&
-+		       ((dev->uci.devarch & uci->devarch_mask) == uci->devarch);
-+	} else {
-+		/* devtype only if devarch set to 0 */
-+		ret = dev->uci.devtype == uci->devtype;
+ 	struct amba_cs_uci_id *uci;
++	struct device *adev; /* device for test logging */
+ 
+ 	uci = table->data;
++	adev = &dev->dev;
+ 
+ 	/* no table data - return match on periphid */
+-	if (!uci)
++	if (!uci) {
++		dev_info(adev, "uci_match: no UCI, use periphID\n");
+ 		return 1;
 +	}
-+	return ret;
-+}
  
-+static const struct amba_id *
-+amba_lookup(const struct amba_id *table, struct amba_device *dev)
-+{
- 	while (table->mask) {
--		ret = (dev->periphid & table->mask) == table->id;
--		if (ret)
--			break;
-+		if (((dev->periphid & table->mask) == table->id) &&
-+			((dev->cid != CORESIGHT_CID) ||
-+			 (amba_cs_uci_id_match(table, dev))))
-+			return table;
- 		table++;
+ 	if (uci->devarch) {
+ 		ret = (dev->uci.devtype == uci->devtype) &&
+ 		       ((dev->uci.devarch & uci->devarch_mask) == uci->devarch);
++		dev_info(adev, "device: devtype[%x]; devarch[%x];\n",
++			 dev->uci.devtype, dev->uci.devarch);
++		dev_info(adev, "uci_match: devtype[%x]; devarch[%x]; (%s)\n",
++			 uci->devtype, uci->devarch,
++			 ret ? "match" : "no match");
+ 	} else {
+ 		/* devtype only if devarch set to 0 */
+ 		ret = dev->uci.devtype == uci->devtype;
++		dev_info(adev, "uci_match: devtype-only[%x]; (%s)\n",
++			 uci->devtype, ret ? "match" : "no match");
  	}
--
--	return ret ? table : NULL;
-+	return NULL;
+ 	return ret;
  }
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 2fb8054e43ab..4dfc41c37447 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -1090,11 +1090,12 @@ static struct amba_cs_uci_id uci_id_etm4[] = {
+ 	}
  
- static int amba_match(struct device *dev, struct device_driver *drv)
-@@ -399,10 +420,22 @@ static int amba_device_try_add(struct amba_device *dev, struct resource *parent)
- 			cid |= (readl(tmp + size - 0x10 + 4 * i) & 255) <<
- 				(i * 8);
- 
-+		if (cid == CORESIGHT_CID) {
-+			/* set the base to the start of the last 4k block */
-+			void __iomem *csbase = tmp + size - 4096;
-+
-+			dev->uci.devarch =
-+				readl(csbase + UCI_REG_DEVARCH_OFFSET);
-+			dev->uci.devtype =
-+				readl(csbase + UCI_REG_DEVTYPE_OFFSET) & 0xff;
-+		}
-+
- 		amba_put_disable_pclk(dev);
- 
--		if (cid == AMBA_CID || cid == CORESIGHT_CID)
-+		if (cid == AMBA_CID || cid == CORESIGHT_CID) {
- 			dev->periphid = pid;
-+			dev->cid = cid;
-+		}
- 
- 		if (!dev->periphid)
- 			ret = -ENODEV;
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index d143c13bed26..ff0ce0587ee9 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -25,6 +25,36 @@
- #define AMBA_CID	0xb105f00d
- #define CORESIGHT_CID	0xb105900d
- 
-+/*
-+ * CoreSight Architecture specification updates the ID specification
-+ * for components on the AMBA bus. (ARM IHI 0029E)
-+ *
-+ * Bits 11:8 of the CID are the device class.
-+ *
-+ * Class 0xF remains for PrimeCell and legacy components. (AMBA_CID above)
-+ * Class 0x9 defines the component as CoreSight (CORESIGHT_CID above)
-+ * Class 0x0, 0x1, 0xB, 0xE define components that do not have driver support
-+ * at present.
-+ * Class 0x2-0x8,0xA and 0xD-0xD are presently reserved.
-+ *
-+ * Remaining CID bits stay as 0xb105-00d
-+ */
-+
-+/*
-+ * Class 0x9 components use additional values to form a Unique Component
-+ * Identifier (UCI), where peripheral ID values are identical for different
-+ * components. Passed to the amba bus code from the component driver via
-+ * the amba_id->data pointer.
-+ */
-+struct amba_cs_uci_id {
-+	unsigned int devarch;
-+	unsigned int devarch_mask;
-+	unsigned int devtype;
-+};
-+
-+#define UCI_REG_DEVTYPE_OFFSET	0xFCC
-+#define UCI_REG_DEVARCH_OFFSET	0xFBC
-+
- struct clk;
- 
- struct amba_device {
-@@ -32,6 +62,8 @@ struct amba_device {
- 	struct resource		res;
- 	struct clk		*pclk;
- 	unsigned int		periphid;
-+	unsigned int		cid;
-+	struct amba_cs_uci_id	uci;
- 	unsigned int		irq[AMBA_NR_IRQS];
- 	char			*driver_override;
+ static const struct amba_id etm4_ids[] = {
+-	ETM4x_AMBA_ID(0x000bb95d),		/* Cortex-A53 */
++	ETM4x_AMBA_UCI_ID(0x000bb95d),	/* C-A53 - UCI optional for test */
+ 	ETM4x_AMBA_ID(0x000bb95e),		/* Cortex-A57 */
+ 	ETM4x_AMBA_ID(0x000bb95a),		/* Cortex-A72 */
+ 	ETM4x_AMBA_ID(0x000bb959),		/* Cortex-A73 */
+ 	ETM4x_AMBA_UCI_ID(0x000bb9da),		/* Cortex-A35 */
++	ETM4x_AMBA_UCI_ID(0x000bb9a8),	/* CTI PID A53 - test fail UCI match */
+ 	{},
  };
+ 
 -- 
 2.19.1
