@@ -1,18 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 28 Nov 2018 16:17:32 +0800
-Subject: [PATCH 1/4] ARM: dts: imx6ul-ccimx6ulsom: Add memory node to
- board dts
-In-Reply-To: <1542729585-9330-1-git-send-email-festevam@gmail.com>
-References: <1542729585-9330-1-git-send-email-festevam@gmail.com>
-Message-ID: <20181128081730.GH20643@dragon>
+Date: Wed, 28 Nov 2018 16:19:55 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabreauto: Enable pcie
+In-Reply-To: <31f5fa5e281b53f10dc25d8abe20ccaa569ad86e.1542739826.git.leonard.crestez@nxp.com>
+References: <31f5fa5e281b53f10dc25d8abe20ccaa569ad86e.1542739826.git.leonard.crestez@nxp.com>
+Message-ID: <20181128081953.GI20643@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 20, 2018 at 01:59:42PM -0200, Fabio Estevam wrote:
-> Add memory node to board dts.
+On Tue, Nov 20, 2018 at 06:57:06PM +0000, Leonard Crestez wrote:
+> The imx6qdl-sabreauto boards have a pcie slot so let's enable it.
 > 
-> This is done in preparation of removing the memory node from imx6ul.dtsi. 
+> Tested on imx6dl-sabreauto with an atk9k wifi card; scanning works.
 > 
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> There are unhandled differences for imx6qp but imx6qp-sabreauto.dts
+> already contains a snippet explicitly disabling the &pcie node so that
+> can be dealt with later.
+> 
+> Signed-off-by: Leonard Crestez <leonard.crestez@nxp.com>
 
-Applied all, thanks.
+Applied, thanks.
