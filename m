@@ -1,61 +1,114 @@
-From: shuahkhan@gmail.com (Shuah Khan)
-Date: Wed, 28 Nov 2018 16:01:10 -0700
-Subject: remove the ->mapping_error method from dma_map_ops V2
-In-Reply-To: <20181128194708.GP30658@n2100.armlinux.org.uk>
-References: <CAHk-=wg5+rXK8dpjkSmK7tuz29VfxVWNEwmTVYB409mmyLkeew@mail.gmail.com>
- <20181128174545.GJ30658@n2100.armlinux.org.uk>
- <CAHk-=whnz4Kty6cas11bc2Gh=9zTzeeRS2k=dV9Hfc4B=xnHkQ@mail.gmail.com>
- <20181128.112717.149234960284639699.davem@davemloft.net>
- <20181128194708.GP30658@n2100.armlinux.org.uk>
-Message-ID: <CAKocOOO2jELMaVh85m3V562ewCBDRUMJ1q_xoq7DgvUiagpTjQ@mail.gmail.com>
+From: vilhelm.gray@gmail.com (William Breathitt Gray)
+Date: Thu, 29 Nov 2018 08:03:50 +0900
+Subject: [PATCH] iio: adc: Replace license text w/ SPDX identifier
+In-Reply-To: <20181128175312.9634-1-matheus.bernardino@usp.br>
+References: <20181128175312.9634-1-matheus.bernardino@usp.br>
+Message-ID: <20181128230350.GA3332@icarus>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 12:48 PM Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
->
-> On Wed, Nov 28, 2018 at 11:27:17AM -0800, David Miller wrote:
-> > From: Linus Torvalds <torvalds@linux-foundation.org>
-> > Date: Wed, 28 Nov 2018 10:00:06 -0800
-> >
-> > > Not all memory is accessible even to the kernel. If you have memory
-> > > that shows up in the last page of phys_addr_t, you just mark it
-> > > reserved at boot-time.
-> >
-> > It's not the physical memory at the end that needs to be reserved.
-> >
-> > It's the IOMMU mapping arena.
->
-> True, if and only if you have an IOMMU.
->
-> Where there isn't an IOMMU, then we'd have to reserve every page that
-> that translates to a bus address in the top 4K of dma_addr_t on any
-> bus in the system - that means knowing early in the kernel
-> initialisation about all buses in the system so we can detect and
-> reserve these pages.
->
+On Wed, Nov 28, 2018 at 03:53:12PM -0200, Matheus Tavares wrote:
+> From: Lucas Santos <ilucas.ms@gmail.com>
+> 
+> This patch removes all license boilerplate texts from the .c and .h
+> files at drivers/iio/adc/ and, instead, adds the proper SPDX license
+> identifiers.
+> 
+> Signed-off-by: Lucas Santos <ilucas.ms@gmail.com>
+> Signed-off-by: Matheus Tavares <matheus.bernardino@usp.br>
+> ---
+>  drivers/iio/adc/ad7266.c             |  3 +--
+>  drivers/iio/adc/ad7291.c             |  3 +--
+>  drivers/iio/adc/ad7298.c             |  3 +--
+>  drivers/iio/adc/ad7766.c             |  3 +--
+>  drivers/iio/adc/ad7791.c             |  3 +--
+>  drivers/iio/adc/ad7793.c             |  3 +--
+>  drivers/iio/adc/ad7887.c             |  3 +--
+>  drivers/iio/adc/ad7923.c             |  3 +--
+>  drivers/iio/adc/ad799x.c             |  5 +----
+>  drivers/iio/adc/ad_sigma_delta.c     |  3 +--
+>  drivers/iio/adc/aspeed_adc.c         |  6 +-----
+>  drivers/iio/adc/at91-sama5d2_adc.c   | 10 +---------
+>  drivers/iio/adc/at91_adc.c           |  3 +--
+>  drivers/iio/adc/axp20x_adc.c         |  5 +----
+>  drivers/iio/adc/axp288_adc.c         | 13 +------------
+>  drivers/iio/adc/bcm_iproc_adc.c      | 13 +------------
+>  drivers/iio/adc/berlin2-adc.c        |  5 +----
+>  drivers/iio/adc/cc10001_adc.c        |  6 +-----
+>  drivers/iio/adc/cpcap-adc.c          | 10 +---------
+>  drivers/iio/adc/da9150-gpadc.c       |  6 +-----
+>  drivers/iio/adc/dln2-adc.c           |  5 +----
+>  drivers/iio/adc/ep93xx_adc.c         |  5 +----
+>  drivers/iio/adc/exynos_adc.c         | 11 +----------
+>  drivers/iio/adc/fsl-imx25-gcq.c      |  5 +----
+>  drivers/iio/adc/hi8435.c             |  6 +-----
+>  drivers/iio/adc/hx711.c              |  6 +-----
+>  drivers/iio/adc/imx7d_adc.c          |  6 +-----
+>  drivers/iio/adc/ina2xx-adc.c         |  7 +------
+>  drivers/iio/adc/lp8788_adc.c         |  5 +----
+>  drivers/iio/adc/lpc18xx_adc.c        |  5 +----
+>  drivers/iio/adc/lpc32xx_adc.c        | 15 +--------------
+>  drivers/iio/adc/ltc2471.c            |  3 +--
+>  drivers/iio/adc/ltc2485.c            |  5 +----
+>  drivers/iio/adc/ltc2497.c            |  3 +--
+>  drivers/iio/adc/max1027.c            |  5 +----
+>  drivers/iio/adc/max1118.c            |  5 +----
+>  drivers/iio/adc/max1363.c            |  5 +----
+>  drivers/iio/adc/mcp320x.c            |  5 +----
+>  drivers/iio/adc/mcp3422.c            |  6 +-----
+>  drivers/iio/adc/men_z188_adc.c       |  5 +----
+>  drivers/iio/adc/meson_saradc.c       |  5 +----
+>  drivers/iio/adc/mt6577_auxadc.c      | 10 +---------
+>  drivers/iio/adc/mxs-lradc-adc.c      | 11 +----------
+>  drivers/iio/adc/nau7802.c            |  3 +--
+>  drivers/iio/adc/palmas_gpadc.c       |  5 +----
+>  drivers/iio/adc/qcom-pm8xxx-xoadc.c  |  1 +
+>  drivers/iio/adc/qcom-spmi-iadc.c     | 10 +---------
+>  drivers/iio/adc/qcom-spmi-vadc.c     | 10 +---------
+>  drivers/iio/adc/rockchip_saradc.c    | 11 +----------
+>  drivers/iio/adc/spear_adc.c          |  3 +--
+>  drivers/iio/adc/stx104.c             | 10 +---------
+>  drivers/iio/adc/sun4i-gpadc-iio.c    |  5 +----
+>  drivers/iio/adc/ti-adc081c.c         |  5 +----
+>  drivers/iio/adc/ti-adc0832.c         |  5 +----
+>  drivers/iio/adc/ti-adc084s021.c      |  5 +----
+>  drivers/iio/adc/ti-adc108s102.c      | 10 +---------
+>  drivers/iio/adc/ti-adc12138.c        |  5 +----
+>  drivers/iio/adc/ti-ads1015.c         |  5 +----
+>  drivers/iio/adc/ti-ads8688.c         |  5 +----
+>  drivers/iio/adc/ti-tlc4541.c         |  5 +----
+>  drivers/iio/adc/ti_am335x_adc.c      | 10 +---------
+>  drivers/iio/adc/twl4030-madc.c       | 16 +---------------
+>  drivers/iio/adc/twl6030-gpadc.c      | 16 +---------------
+>  drivers/iio/adc/vf610_adc.c          | 15 +--------------
+>  drivers/iio/adc/viperboard_adc.c     |  7 +------
+>  drivers/iio/adc/xilinx-xadc-core.c   |  3 +--
+>  drivers/iio/adc/xilinx-xadc-events.c |  3 +--
+>  drivers/iio/adc/xilinx-xadc.h        |  3 +--
+>  68 files changed, 68 insertions(+), 361 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/stx104.c b/drivers/iio/adc/stx104.c
+> index 0662ca199eb0..f9d0aaae836f 100644
+> --- a/drivers/iio/adc/stx104.c
+> +++ b/drivers/iio/adc/stx104.c
+> @@ -1,15 +1,7 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * IIO driver for the Apex Embedded Systems STX104
+>   * Copyright (C) 2016 William Breathitt Gray
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License, version 2, as
+> - * published by the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of
+> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> - * General Public License for more details.
+>   */
+>  #include <linux/bitops.h>
+>  #include <linux/device.h>
 
-The arch and platform differences/confusion as to "what is DMA error
-value" is the reason why dma_mapping_error is part dma ops. I
-understand that iy would make sense to reduce the overhead of an
-additional call, however, I am not sure if would be trivial change to
-address this.
+For stx104.c:
 
-I was down this path of trying to address the missing mapping error
-checks a few years ago and introduced dma_mapping_error checks in the
-DMA DEBUG API. As you might already know that there is no common
-definition for the mapping error.
-
-Quick look at the defines shows:
-
-#define CALGARY_MAPPING_ERROR 0
-#define S390_MAPPING_ERROR  (~(dma_addr_t) 0x0)
-#define SPARC_MAPPING_ERROR (~(dma_addr_t)0x0)
-
-This is the reason why there is a arch or in some cases bus specific
-mapping_error ops is needed.
-We could unify this and fix all these first. I haven't looked at the
-patch set closely, maybe you are already doing this.
-
-thanks,
--- Shuah
+Acked-by: William Breathitt Gray <vilhelm.gray@gmail.com>
