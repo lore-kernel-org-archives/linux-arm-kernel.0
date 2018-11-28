@@ -1,99 +1,58 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 28 Nov 2018 11:08:19 +0100
-Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
- context
-In-Reply-To: <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
-References: <20181112151853.29289-1-thierry.reding@gmail.com>
- <20181112151853.29289-2-thierry.reding@gmail.com>
- <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
-Message-ID: <20181128100819.GA20723@ulmo>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Wed, 28 Nov 2018 10:14:20 +0000
+Subject: [RFC PATCH v2 0/3] Update AMBA driver for enhanced component ID spec
+Message-ID: <20181128101423.15961-1-mike.leach@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 09:43:29AM +0000, Jon Hunter wrote:
-> 
-> On 12/11/2018 15:18, Thierry Reding wrote:
-> > From: Thierry Reding <treding@nvidia.com>
-> > 
-> > The mailbox framework supports blocking transfers via completions for
-> > clients that can sleep. In order to support blocking transfers in cases
-> > where the transmission is not permitted to sleep, add a new ->flush()
-> > callback that controller drivers can implement to busy loop until the
-> > transmission has been completed. This will automatically be called when
-> > available and interrupts are disabled for clients that request blocking
-> > transfers.
-> > 
-> > Signed-off-by: Thierry Reding <treding@nvidia.com>
-> > ---
-> >  drivers/mailbox/mailbox.c          | 8 ++++++++
-> >  include/linux/mailbox_controller.h | 4 ++++
-> >  2 files changed, 12 insertions(+)
-> > 
-> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
-> > index 674b35f402f5..0eaf21259874 100644
-> > --- a/drivers/mailbox/mailbox.c
-> > +++ b/drivers/mailbox/mailbox.c
-> > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
-> >  		unsigned long wait;
-> >  		int ret;
-> >  
-> > +		if (irqs_disabled() && chan->mbox->ops->flush) {
-> > +			ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
-> > +			if (ret < 0)
-> > +				tx_tick(chan, ret);
-> > +
-> > +			return ret;
-> > +		}
-> 
-> It seems to me that if mbox_send_message() is called from an atomic
-> context AND tx_block is true, then if 'flush' is not populated this
-> should be an error condition as we do not wish to call
-> wait_for_completion from an atomic context.
-> 
-> I understand that there is some debate about adding such flush support,
-> but irrespective of the above change, it seems to me that if the
-> mbox_send_message() can be called from an atomic context (which it
-> appears to), then it should be detecting if someone is trying to do so
-> with 'tx_block' set as this should be an error.
-> 
-> Furthermore, if the underlying mailbox driver can support sending a
-> message from an atomic context and busy wait until it is done, surely
-> the mailbox framework should provide a means to support this?
-> 
-> Now it could be possible for the underlying mailbox driver to detect we
-> are in an atomic context and if the 'tx_block' is set do the right thing
-> by busy waiting until the message is sent. However, the problem with
-> that is, that for the mbox_send_message() to ensure the right thing is
-> done, it needs to check that 'tx_done' is set in the case of a blocking
-> transfer in an atomic context. At that point you may as well add the
-> flush operator as I think it is more implicit/clear.
+The latest ARM CoreSight specification updates the component identification
+requirements for all components attached to an AMBA bus. (ARM IHI 0029E)
 
-Heh, interesting timing, I just sent out v3 of this series with a
-slightly different solution. Basically what v3 implements is explicit
-flushing of the mailbox via a new function called mbox_flush().
+This specification defines bits 11:8 in the ComponentID (CID) value as the
+device class. Identification requirements now depend on this class.
+Class 0xF: Traditional components identified by Peripheral ID (PID) only.
+Class 0x9: CoreSight components may be identified by a Universal Component
+Identifier (UCI) consisting of the PID plus CoreSight DevType and DevArch
+values.
 
-I originally liked the idea of "hiding" the flush operation in the
-mbox_send_message() function, but the more I look at the new explicit
-flush solution, the more I prefer it. One reason why I prefer it is
-because it no longer has the slightly odd "irqs_disabled()" check that
-always made me a bit uneasy. The other advantage of the explicit flush
-is that it becomes completely opt-in for both mailbox providers and
-consumers. Furthermore the consumer should always know if it can be
-called in atomic context or not, so none of these code paths should
-have to be "clever" and check at runtime whether or not interrupts are
-enabled. If the consumer knows that it will be called in atomic context
-it can just unconditionally flush the mailbox.
+Current and future ARM CoreSight IP will now use the same PID for
+components on the same function - e.g. the ETM, CTI, PMU and Debug elements
+associated with a core. The first core to use this UCI method is the A35,
+which currently has binding entries in the ETMv4 driver.
 
-Also, it nicely addresses the concern about erroring out if the provider
-doesn't support flushing. The new mbox_flush() API returns -ENOTSUPP if
-called on a mailbox channel provided by a driver that doesn't implement
-->flush().
+This patchset prepares for the addition of the upcoming CTI driver, which
+will need to correctly bind with A35 and future hardware, while overcoming
+the limitation of binding by PID alone, which cannot now work.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/43125f83/attachment.sig>
+The patchset updates the current AMBA Identification mechanism, which was
+already differentiating between 0xF and 0x9 CIDs, to add
+additional UCI compliant tests for the for the 0x9 device class.
+
+Additional UCI structures are provided and added to the ETMv4 driver as
+appropriate.
+
+An additional test patch is provided to test the mechanism on the DB410C
+96boards platform. This is not intended to be upstreamed.
+
+Changes since v1:
+1) simplification of amba_lookup function & other minor fixes
+per suzuki suggestions.
+2) remove spurious whitespace changes.
+3) extended devarch and devarch mask values in etmv4 UCI to include
+architect.
+
+
+Mike Leach (3):
+  drivers: amba: Updates to component identification for driver
+    matching.
+  coresight: etmv4: Update ID register table to add  UCI support
+  amba: coresight: Driver test for new CoreSight UCI  matching
+
+ arch/arm64/boot/dts/qcom/msm8916.dtsi         |  9 +++
+ drivers/amba/bus.c                            | 60 ++++++++++++++++---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 21 ++++++-
+ include/linux/amba/bus.h                      | 32 ++++++++++
+ 4 files changed, 112 insertions(+), 10 deletions(-)
+
+-- 
+2.19.1
