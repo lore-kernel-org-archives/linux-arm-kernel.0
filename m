@@ -1,54 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 28 Nov 2018 14:03:06 +0100
-Subject: [PATCH 04/16] ARM: dts: r8a77470: Add SDHI1 support
+Date: Wed, 28 Nov 2018 14:03:08 +0100
+Subject: [PATCH 06/16] ARM: dts: r8a779[01]: Disable unconnected LVDS encoders
 In-Reply-To: <cover.1543409901.git.horms+renesas@verge.net.au>
 References: <cover.1543409901.git.horms+renesas@verge.net.au>
-Message-ID: <0485da788028ecd525291974c8efe2d072607476.1543409901.git.horms+renesas@verge.net.au>
+Message-ID: <89862542fab10fed8a3c2f9c167622ef4287351d.1543409901.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Althought interface SDHI1 found on the RZ/G1C SoC (a.k.a.
-r8a77470) is compatible with the R-Car Gen3 ones, its OF
-compatibility is restricted to the SoC specific compatible
-string to avoid confusion, as from a more generic perspective
-the RZ/G1C is sharing the most similarities with the R-Car
-Gen2 family of SoCs, and there is a combination of R-Car
-Gen2 compatible SDHI IPs and R-Car Gen3 compatible SDHI IP
-on this specific chip.
-This patch adds the SoC specific part of SDHI1 support, and
-since SDHI1 comes with internal DMA, its DT node looks fairly
-different from SDHI0 and SDHI2.
+The LVDS0 encoder on Koelsh and Porter, and the LVDS1 encoder on Lager,
+are enabled in DT but have no device connected to their output. This
+result in spurious messages being printed to the kernel log such as
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+rcar-du feb00000.display: no connector for encoder /soc/lvds at feb90000, skipping
+
+Fix it by disabling the encoders.
+
+Fixes: 15a1ff30d8f9 ("ARM: dts: r8a7790: Convert to new LVDS DT bindings")
+Fixes: e5c3f4707f39 ("ARM: dts: r8a7791: Convert to new LVDS DT bindings")
+Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a77470.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts   | 2 --
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 --
+ arch/arm/boot/dts/r8a7791-porter.dts  | 2 --
+ 3 files changed, 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a77470.dtsi b/arch/arm/boot/dts/r8a77470.dtsi
-index ab2e0223f8a1..6ac7f467065e 100644
---- a/arch/arm/boot/dts/r8a77470.dtsi
-+++ b/arch/arm/boot/dts/r8a77470.dtsi
-@@ -505,6 +505,17 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 50312e752e2f..7b9508e83d46 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -489,8 +489,6 @@
+ };
  
-+		sdhi1: sd at ee300000 {
-+			compatible = "renesas,sdhi-mmc-r8a77470";
-+			reg = <0 0xee300000 0 0x2000>;
-+			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 313>;
-+			max-frequency = <156000000>;
-+			power-domains = <&sysc R8A77470_PD_ALWAYS_ON>;
-+			resets = <&cpg 313>;
-+			status = "disabled";
-+		};
-+
- 		sdhi2: sd at ee160000 {
- 			compatible = "renesas,sdhi-r8a77470",
- 				     "renesas,rcar-gen2-sdhi";
+ &lvds1 {
+-	status = "okay";
+-
+ 	ports {
+ 		port at 1 {
+ 			lvds_connector: endpoint {
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index ce22db01fbba..e6580aa0cea3 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -479,8 +479,6 @@
+ };
+ 
+ &lvds0 {
+-	status = "okay";
+-
+ 	ports {
+ 		port at 1 {
+ 			lvds_connector: endpoint {
+diff --git a/arch/arm/boot/dts/r8a7791-porter.dts b/arch/arm/boot/dts/r8a7791-porter.dts
+index f02036e5de01..fefdf8238bbe 100644
+--- a/arch/arm/boot/dts/r8a7791-porter.dts
++++ b/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -482,8 +482,6 @@
+ };
+ 
+ &lvds0 {
+-	status = "okay";
+-
+ 	ports {
+ 		port at 1 {
+ 			lvds_connector: endpoint {
 -- 
 2.11.0
