@@ -1,33 +1,83 @@
 From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Wed, 28 Nov 2018 18:53:19 +0100
-Subject: [PATCH v4 15/20] ARM: mmp2: initialize clocks before the timer
+Date: Wed, 28 Nov 2018 18:53:11 +0100
+Subject: [PATCH v4 07/20] DT: marvell,mmp2: add more TWSI controllers
 In-Reply-To: <20181128175324.163202-1-lkundrak@v3.sk>
 References: <20181128175324.163202-1-lkundrak@v3.sk>
-Message-ID: <20181128175324.163202-16-lkundrak@v3.sk>
+Message-ID: <20181128175324.163202-8-lkundrak@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer shall enable its clock.
+I've gotten the base addresses, clocks and interrupts from an rusty and old
+out-of-tree driver. I haven't actually checked against the datasheet, since
+that one is reserved for the Marvell inner circle.
+
+Tested with an accelerometer on TWSI6 on an OLPC XO 1.75 machine.
 
 Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
 Acked-by: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm/mach-mmp/mmp2-dt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/mmp2.dtsi | 49 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
-diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
-index 0341359b24a4..50c5e8b5be3d 100644
---- a/arch/arm/mach-mmp/mmp2-dt.c
-+++ b/arch/arm/mach-mmp/mmp2-dt.c
-@@ -26,8 +26,8 @@ static void __init mmp_init_time(void)
- #ifdef CONFIG_CACHE_TAUROS2
- 	tauros2_init(0);
- #endif
--	mmp_dt_init_timer();
- 	of_clk_init(NULL);
-+	mmp_dt_init_timer();
- }
+diff --git a/arch/arm/boot/dts/mmp2.dtsi b/arch/arm/boot/dts/mmp2.dtsi
+index c5787eea57c7..c48d17a38d6b 100644
+--- a/arch/arm/boot/dts/mmp2.dtsi
++++ b/arch/arm/boot/dts/mmp2.dtsi
+@@ -269,6 +269,55 @@
+ 				status = "disabled";
+ 			};
  
- static const char *const mmp2_dt_board_compat[] __initconst = {
++			twsi3: i2c at d4032000 {
++				compatible = "mrvl,mmp-twsi";
++				reg = <0xd4032000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <1>;
++				clocks = <&soc_clocks MMP2_CLK_TWSI2>;
++				resets = <&soc_clocks MMP2_CLK_TWSI2>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			twsi4: i2c at d4033000 {
++				compatible = "mrvl,mmp-twsi";
++				reg = <0xd4033000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <2>;
++				clocks = <&soc_clocks MMP2_CLK_TWSI3>;
++				resets = <&soc_clocks MMP2_CLK_TWSI3>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++
++			twsi5: i2c at d4033800 {
++				compatible = "mrvl,mmp-twsi";
++				reg = <0xd4033800 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <3>;
++				clocks = <&soc_clocks MMP2_CLK_TWSI4>;
++				resets = <&soc_clocks MMP2_CLK_TWSI4>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
++			twsi6: i2c at d4034000 {
++				compatible = "mrvl,mmp-twsi";
++				reg = <0xd4034000 0x1000>;
++				interrupt-parent = <&intcmux17>;
++				interrupts = <4>;
++				clocks = <&soc_clocks MMP2_CLK_TWSI5>;
++				resets = <&soc_clocks MMP2_CLK_TWSI5>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++				status = "disabled";
++			};
++
+ 			rtc: rtc at d4010000 {
+ 				compatible = "mrvl,mmp-rtc";
+ 				reg = <0xd4010000 0x1000>;
 -- 
 2.19.1
