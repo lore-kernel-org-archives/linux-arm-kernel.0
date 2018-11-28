@@ -1,39 +1,39 @@
-From: maxime.ripard@bootlin.com (Maxime Ripard)
-Date: Wed, 28 Nov 2018 11:28:44 +0100
-Subject: [PATCH 15/15] arm64: dts: allwinner: a64: Fix up RTC device node
- and clock references
-In-Reply-To: <20181128093013.24442-17-wens@csie.org>
-References: <20181128093013.24442-1-wens@csie.org>
- <20181128093013.24442-17-wens@csie.org>
-Message-ID: <20181128102844.vkleeqmryyxs5s4i@flea>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Wed, 28 Nov 2018 09:58:43 +0000
+Subject: [PATCH V3 0/4] Add i.MX System Controller thermal driver support
+Message-ID: <1543398783-3185-1-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 05:30:13PM +0800, Chen-Yu Tsai wrote:
-> The RTC module on the A64 was claimed to be the same as on the A31, when
-> in fact it is not. It is actually compatible to the H3's RTC. The A64's
-> RTC has some extra crypto-related registers which the H3's does not, but
-> the exact function of these is not clear.
-> 
-> This patch fixes the compatible string and clock properties to conform
-> to the updated bindings. The device node for the internal oscillator is
-> removed, as it is internalized into the RTC device. Clock references to
-> the IOSC and LOSC are also fixed.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+i.MX8QXP is an ARMv8 SoC which has a Cortex-M4 system controller
+inside, the system controller is in charge of controlling power,
+clock and thermal sensors etc..
 
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+This patch adds i.MX system controller thermal driver support,
+Linux kernel has to communicate with system controller via MU
+(message unit) IPC to get each thermal sensor's temperature,
+it supports multiple sensors which are passed from device tree,
+please see the binding doc for details.
 
-Maxime
+Note that this patch set is based on [V4,5/5] defconfig: arm64: add imx8qxp support,
+https://patchwork.kernel.org/patch/10677315/
+
+Anson Huang (4):
+  dt-bindings: thermal: add binding doc for i.MX system controller
+    thermal driver
+  thermal: imx_sc: add i.MX system controller thermal support
+  defconfig: arm64: add i.MX system controller thermal support
+  ARM64: dts: imx: add i.MX8QXP thermal support
+
+ .../devicetree/bindings/thermal/imx-sc-thermal.txt |  33 ++++
+ arch/arm64/boot/dts/freescale/imx8qxp.dtsi         |  27 +++
+ arch/arm64/configs/defconfig                       |   1 +
+ drivers/thermal/Kconfig                            |  11 ++
+ drivers/thermal/Makefile                           |   1 +
+ drivers/thermal/imx_sc_thermal.c                   | 201 +++++++++++++++++++++
+ 6 files changed, 274 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/imx-sc-thermal.txt
+ create mode 100644 drivers/thermal/imx_sc_thermal.c
 
 -- 
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 228 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20181128/4cbde7a8/attachment-0001.sig>
+2.7.4
