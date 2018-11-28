@@ -1,38 +1,32 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 28 Nov 2018 13:58:46 -0800
-Subject: [PATCH 3/6] clk: mvebu: add CPU clock driver for Armada 7K/8K
-In-Reply-To: <87wooymqo3.fsf@bootlin.com>
+Date: Wed, 28 Nov 2018 14:00:06 -0800
+Subject: [PATCH 4/6] clk: mvebu: ap806: Fix clock name for the cluster
+In-Reply-To: <87efbbq2i7.fsf@bootlin.com>
 References: <20180922181709.13007-1-gregory.clement@bootlin.com>
- <20180922181709.13007-4-gregory.clement@bootlin.com>
- <153980089252.5275.819540708953283855@swboyd.mtv.corp.google.com>
- <87y39tufwe.fsf@bootlin.com> <87wooymqo3.fsf@bootlin.com>
-Message-ID: <154344232606.88331.9141020759033189289@swboyd.mtv.corp.google.com>
+ <20180922181709.13007-5-gregory.clement@bootlin.com>
+ <153980091588.5275.2414842812770832337@swboyd.mtv.corp.google.com>
+ <87efbbq2i7.fsf@bootlin.com>
+Message-ID: <154344240618.88331.16995563056122948942@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Gregory CLEMENT (2018-11-27 08:27:40)
+Quoting Gregory CLEMENT (2018-11-23 06:42:24)
 > Hi Stephen,
 >  
->  On ven., nov. 16 2018, Gregory CLEMENT <gregory.clement@bootlin.com> wrote:
+>  On mer., oct. 17 2018, Stephen Boyd <sboyd@kernel.org> wrote:
 > 
-> >>> +static int ap_cpu_clock_probe(struct platform_device *pdev)
-> >>> +{
-> >>> +       int ret, nclusters = 0, cluster_index = 0;
-> >>> +       struct device *dev = &pdev->dev;
-> >>> +       struct device_node *dn, *np = dev->of_node;
-> >>> +       struct ap_cpu_clk *ap_cpu_clk;
-> >>> +       struct regmap *regmap;
-> >>> +
-> >>> +       regmap = syscon_node_to_regmap(np->parent);
-> >>
-> >> Can we just call dev_get_remap() on pdev->dev.parent?
+> > Quoting Gregory CLEMENT (2018-09-22 11:17:07)
+> >> Actually, the clocks exposed for the cluster are not the CPU clocks, but
+> >> the PLL clock used as entry clock for the CPU clocks. The CPU clock will
+> >> be managed by a driver submitting in the following patches.
+> >> 
+> >> Signed-off-by: Gregory CLEMENT <gregory.clement@bootlin.com>
 > >
-> > we could do regmap = dev_get_regmap(pdev->dev.parent, NULL); instead of
-> > this line. But is it really better?
+> > Does this need a fixes tag?
 > 
-> Actually we can't, because we really depend on a syscon and at this
-> moment there is no regmap. It is the syscon_node_to_regmap function which
-> creates this regmap when needed.
+> It doesn't fix a regression so I don't thing it needs a fixes tag.
 > 
 
-Ah ok. Nevermind then.
+Would it help anyone who is backporting the stack of patches to support
+this? I would liberally add a Fixes tag here in case it helps anyone
+learn that this was incorrect all along.
