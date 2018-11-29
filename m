@@ -2,91 +2,69 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5AB88C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:30:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B8790C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:37:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 22E0C20989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:30:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 81BC52146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:37:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HkRRj+Ru";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="Y8BqipgP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 22E0C20989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="r161FVxD";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="gU7gbtjH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 81BC52146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:References
-	:In-Reply-To:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=19+GH8ptsBCOd1fEDUV1FxFByxbvGlijLnWLGDe/kI0=; b=HkRRj+Rukgas2/
-	6V4EE1E56WnX9i3gSC+FvpH5DONzjbPhm+UvRSa4R2C6Np+9fxEDt9dbw7PizsUsqvpUxgk5CMXOX
-	avIrP+nVlRqHlzs22vKlq7f0nk84pKtLAD8z6AFFFBHts4xfc1o1xT+pfs+GdgWKRvhpzdNu3y/P3
-	r/l6u+W4vRvumPVj8wDmeGNhVrXQR395rpDX2K4YLJCpE7KwycZ25njL8XO0X3O9YVERiU9VbLuBO
-	R1723/WixkcbXdpN64cxGDtKJ5mgVDrg0ZZvadLRbdyNqTZBr/S0pRTJw4vvTzz+y90e53HlqHzym
-	tpu+UJMz1LdTgx6wwocQ==;
+	List-Owner; bh=U09Hp0S5yl1d5i20rmi078XRFe3NzbqyEo1buiCLNB4=; b=r161FVxDcmhWOn
+	97bLWSW463x8VmSPGz8FwddX2sK9eWjrdN+bZKlVy/AWT+XXjLWNpllOLvITa/EnSS2W9A5oa5q8d
+	hEk6CMKqaP2xJMVjIqUEqSE78zMbcgAizJxshLt2QSWR0qJ0dSAQ5xAV3FGIOGiokdCdhML9U/oq5
+	Bp4djg9sVziVRBxS18gLRO28AwwkHyIJm7dhR+ermCxIJAQCugwOlOZaxxW9AtEHcBu11/7TTrS/K
+	8QChlDN2iRbDO0GVTvDgdS+GOmIGceL3B5QAbb9vnB5ch6q0HJFV+xN7vCSLsOiuZK7lF53/ey6pl
+	p/H53QkvHNLq6Vn+QVBw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSVla-0007fU-Hk; Thu, 29 Nov 2018 23:30:42 +0000
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
+	id 1gSVsT-0001Ha-9y; Thu, 29 Nov 2018 23:37:49 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSVjr-00050s-RT
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 23:28:59 +0000
-Received: by mail-pl1-x642.google.com with SMTP id gn14so1799942plb.10
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 15:28:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=from:to:cc:subject:in-reply-to:references:date:message-id
- :mime-version; bh=sWbxhkFth6vBUM1Snfeosc2LQRu3OThmz1EQOLm+GtE=;
- b=Y8BqipgP0P8KiOPbWRR0HSv3yNvQns2cREminu0kcCwGBNo31c59pVet7RZ95dB5wa
- jupLyKSqWXUE73WuMhQmMGZR0Htfz8nzmeEwx/1RswqBfVmHRyjyX7Fv/aJ4bsI4iW0p
- Qp4PayFkbz9HGnpyJqjMW5R8k4pDpoJF+NOMiykS1yXTSnm3grBJEjRPYS5ZRDxJkpX7
- 8abht64xdiGB7ZrezQ6igmHtw/dsfh6bYRUdZTaaTMrUE0qHh17MOupmmsR4AeBC/C1p
- NfuSDxaVd+1w7/ja2ZauZvTYyg5ACme+60F8bwalj+lPE3TEfF1bz3G60ty9ckD/gb8r
- 7rzQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:in-reply-to:references:date
- :message-id:mime-version;
- bh=sWbxhkFth6vBUM1Snfeosc2LQRu3OThmz1EQOLm+GtE=;
- b=VgZ7O18hXmpll7Zr78uDcVCHV48JBosHV+Pa8IxtzitqfxIHopAT4EjPqHmLKNbKM4
- U/XRqezBKryB9ZrXBCqRiRLAVkLm0WUNlWTzjWZiMFSFlXTChMDqHexZeUIVVi+aAvC2
- 5UAZluqYqkIFluzaZmgKOOO/b4jnsNU9oa5ya3mobtE4VlBb4Ph4NE0MmM8nlVQVbDJ8
- jKDmcD33No6R1jNGf8tTPr7Jb6pWj9uepAzQn8+sC+QFDCVgnU9hohMVCiKwa44nbVBR
- 6MtwtVbMKvsWBUkbS+KIuDv0Adgzj28bZ3TIQx/BwYzFYyoJMZZJCPSjuqbw8+NJY3Ir
- srQA==
-X-Gm-Message-State: AA+aEWaVTPRVHto2QdUiWOSaoP2Npbh80HiS3/1Vu5pzEietDnFLoiI2
- txnAGAzC8axd8QiDYzzzO0GbtQ==
-X-Google-Smtp-Source: AFSGD/X3OKi16ppD27/OdLHWtokaOXJm/Xe01KObh0iafGtVGjCVGpxow+wUi5kFnJ5Ua41K+RIFgw==
-X-Received: by 2002:a17:902:7d82:: with SMTP id
- a2mr3419606plm.163.1543534124838; 
- Thu, 29 Nov 2018 15:28:44 -0800 (PST)
-Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
- [71.197.186.152])
- by smtp.googlemail.com with ESMTPSA id z62sm4484115pfl.33.2018.11.29.15.28.43
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Thu, 29 Nov 2018 15:28:44 -0800 (PST)
-From: Kevin Hilman <khilman@baylibre.com>
-To: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Subject: Re: [PATCH] ARM: multi_v7_defconfig: switch CONFIG_PWM_MESON to
- built-in
-In-Reply-To: <CAFBinCBViZgRrZO16FsRKSGNriSw2_D9+_6ri99_zf++_SuuKg@mail.gmail.com>
-References: <20181114230554.4968-1-martin.blumenstingl@googlemail.com>
- <7hh8g0d8tg.fsf@baylibre.com>
- <CAFBinCBViZgRrZO16FsRKSGNriSw2_D9+_6ri99_zf++_SuuKg@mail.gmail.com>
-Date: Thu, 29 Nov 2018 15:28:42 -0800
-Message-ID: <7hk1kv79at.fsf@baylibre.com>
+ id 1gSVsP-0001Gt-IT
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 23:37:46 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id CEBA120863;
+ Thu, 29 Nov 2018 23:37:34 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543534654;
+ bh=xAypaLrh/aJumtX2Ta2GrzMwv2NIrxoInFLOX84hZsA=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=gU7gbtjHX+SSAcNGsJ35X0ABf61Sql5gkUW8TxBKKDAwDSgq9AwCBHLR83UcXF67Z
+ 1faHn4I1uWBWaVZhmagRbXvI+Qa8qaLbT0YzGQvq0YRX9Th/8BztHt7BqCd0aZwEKs
+ iesPKYr3PKM8k7ELNM67GTxNRj8Gdz1trr7/WPdo=
 MIME-Version: 1.0
+To: Mesih Kilinc <mesihkilinc@gmail.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <20181129063952.623svjr7pti7apah@ThinkPad>
+References: <cover.1543443475.git.mesihkilinc@gmail.com>
+ <cc1357c9272628b4d89af007cead83117d9ba6e9.1543443475.git.mesihkilinc@gmail.com>
+ <154345243603.88331.17915868280143383591@swboyd.mtv.corp.google.com>
+ <20181129063952.623svjr7pti7apah@ThinkPad>
+Message-ID: <154353465409.88331.8677593357765162802@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v5 13/17] clk: sunxi-ng: add support for suniv F1C100s SoC
+Date: Thu, 29 Nov 2018 15:37:34 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_152856_297994_53114BF8 
-X-CRM114-Status: GOOD (  17.52  )
+X-CRM114-CacheID: sfid-20181129_153745_631668_8C25E743 
+X-CRM114-Status: GOOD (  12.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,48 +76,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux@armlinux.org.uk
+Cc: devicetree@vger.kernel.org, Marc Zyngier <marc.zyngier@arm.com>,
+ Julian Calaby <julian.calaby@gmail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-kernel@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, linux-gpio@vger.kernel.org,
+ linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
+ Maxime Ripard <maxime.ripard@free-electrons.com>, Chen-Yu Tsai <wens@csie.org>,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ Icenowy Zheng <icenowy@aosc.io>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Quoting Mesih Kilinc (2018-11-28 22:39:52)
+> On 18/11/28 04:47, Stephen Boyd wrote:
+> > Quoting Mesih Kilinc (2018-11-28 14:33:23)
+> > > diff --git a/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
+> > > new file mode 100644
+> > > index 0000000..d4bc1b8
+> > > --- /dev/null
+> > > +++ b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
+> > > @@ -0,0 +1,541 @@
+> > > +/*
+> > > + * Copyright (c) 2016 Icenowy Zheng <icenowy@aosc.io>
+> > > + *
+> > > + * SPDX-License-Identifier: GPL-2.0
+> > 
+> > Please fix this location.
+> 
+> I am very sorry, I should have been more carefull. Should I resend whole
+> patchset or just resending this patch is enough? 
+> 
 
-> Hi Kevin,
->
-> On Thu, Nov 29, 2018 at 1:30 AM Kevin Hilman <khilman@baylibre.com> wrote:
->>
->> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->>
->> > Some Meson8b boards (Odroid-C1, EC-100) use a PWM regulator which is the
->> > voltage supply of the CPU cores (this regulator is typically called
->> > "VCCK").
->> > Now that we are preparing support for CPU frequency scaling on Meson8,
->> > Meson8b and Meson8m2 we should build the pwm-meson driver into the
->> > kernel so we can configure the CPU voltage early in the boot process.
->>
->> Can you explain a little more why the configuration of CPU voltage
->> cannot wait a bit so this could be properly probed?
->
-> I was under the impression that cpufreq-dt would still initialize even
-> if the regulator is not ready yet. however (after reading the code
-> again) this is clearly NOT the case.
+Just this one? Who do you intend to pick up these patches?
 
-Hmm, a quick look at cpufreq-dt suggests that it should -EPROBE_DEFER if
-the regulator isn't ready yet.  Why doesn't that work?
-
-> there's still a benefit with this change: your Odroid-C1 in your
-> KernelCI lab would also be able to change the CPU frequency (so in
-> case something breaks we could spot it there).
-> will you accept this patch after I updated the description to mention
-> that it's for KernelCI test coverage?
-
-Possibly, but I'd still rather see the dependencies worked out correctly
-so that this can be module, and cpufreq-dt would defer until it's ready.
-
-Kevin
 
 _______________________________________________
 linux-arm-kernel mailing list
