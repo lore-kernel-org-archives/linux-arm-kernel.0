@@ -1,20 +1,27 @@
-From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 28 Nov 2018 16:47:33 -0800
-Subject: [PATCH v5 12/17] dt-bindings: clock: Add Allwinner suniv F1C100s
- CCU
-In-Reply-To: <47d0f466155e3d678d3383655856c1e15e975870.1543443475.git.mesihkilinc@gmail.com>
-References: <cover.1543443475.git.mesihkilinc@gmail.com>
- <47d0f466155e3d678d3383655856c1e15e975870.1543443475.git.mesihkilinc@gmail.com>
-Message-ID: <154345245385.88331.8344308999294645427@swboyd.mtv.corp.google.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 28 Nov 2018 16:49:46 -0800
+Subject: [PATCH 0/2] ARM: dts: meson: add the timer interrupts and clocks
+In-Reply-To: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
+References: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
+Message-ID: <7hzhtsbtcl.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mesih Kilinc (2018-11-28 14:33:22)
-> Add compatiple string for Allwinner suniv F1C100s CCU.
-> Add clock and reset definitions.
-> 
-> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-> Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-> ---
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Acked-by: Stephen Boyd <sboyd@kernel.org>
+> This is a follow-up of my series "meson6_timer: dt-bindings updates"
+> from [0].
+> We were missing the interrupts for timer B, C and D. This is harmless
+> so far because the meson6_timer driver only implements timer A. Timer
+> E doesn't have any interrupt.
+>
+> Additionally the timer IP block has two clock inputs. This also adds
+> them.
+>
+> NOTE: the alias "timer_abcde" was chosen because there's a second
+> timer instance (F..I which are similar to A..D and J which is
+> similar to E).
+
+Queued for v4.21 (branch: v4.21/dt)
+
+Kevin
