@@ -7,17 +7,16 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14457C43610
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:07:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3B277C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:07:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA44720863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:07:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0947220863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:07:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JoCIfkd7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="xMlsxwkk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA44720863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XTIBicRr"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0947220863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,55 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KEmIozCTTvox9x0zo3ZDhkHvVK0Zv7oIX/q3sLgzm9c=; b=JoCIfkd7EGa/S7
-	caV6sSN18tUY08HiBIokMdSEDlSwYE+tB7AmZJc09Cv5nK8g7czXxRn855mttVAvByJlTN3gdGEci
-	q5mIDCA7mRi6RdB/dpBX5eKexaztyeQ83DmFqRHjmtnsAFHD0oglPfB09GJ1OqNqHKuje2YDf51U1
-	ocKPpwvnHnsTvzHxrgB54crOzIz9XAAWxeXbdh6TuSq0SCouyirU4RHkPAlDTHcAjEMGas4sosxTp
-	i/LRAkr6563zesOOIO5GL2gYm++GSTp8rPzYXCZkF8VsWU1l9bPQPRmCXO9v6l3TElXd8qwzY4Z+r
-	f+Gu8jk+j85QAzksmtJQ==;
+	List-Owner; bh=+gJJZw+ibvau4f1inBZDo+6PgfJePXqS6iRcTKUfvJ4=; b=XTIBicRr4PX0TM
+	MM8V8v3Lhj62J5LTq7aYnmFNtLN7SbpF9Rjsa5y5PEw0KQS6NrxLE0nK9qkB8fV+vv8VbGfb4c1aP
+	72yKi4jL8XYrufLE85TcCTwC6MlrnsUUJTR1hAIpdH6B2fnh7fahdT0TkAok7hqpehzI8NhNmqJz0
+	tY8sUZwmje7Y5QodIjOMSoE7NcCgK4zE89OjTuWSggAlVEw65x1KNhVuYF3lhfjTGn39L6+f/nSC9
+	Bm3SVCqexEtuK0mnGKPyFydCFdeR1GaySmLK3K2lVC0vfgTW7XLNGwaJMwopi0X7aC4thUKxeV/1e
+	jegDB79cCDBlj8DEvebA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSPml-0001du-FH; Thu, 29 Nov 2018 17:07:31 +0000
-Received: from merlin.infradead.org ([205.233.59.134])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSPlr-0000wp-96
- for linux-arm-kernel@bombadil.infradead.org; Thu, 29 Nov 2018 17:06:35 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=LKy1mnR1iag5rEhBNfPxj4CFmzb+3trscmHWy5ahZVQ=; b=xMlsxwkk4tSee2UxtRmXE3E55L
- ObR/GpXyBLD0op+l8wK+fuDxy3pZETJUOZxvD8emXCVjJxOEB4mRLepz5VAjH1UjU2JARnp5LsLBV
- x2KfoI2ZYiJFh0yd0z6dP3zxRTkNOXjoaZkpjehDFdONXd23UfwZVnpDexTmusfoVfC8065pmln0K
- 2iSurkYy8+nrgXwAQiW9uFOYdfre5w3ynkT38NfpFpS/YZEpfNFfE0gnCB+LdJNcMT5yiukvAUQY4
- 2BdonGQLptg5l08b/XPVp5zkwN10Yhz1zvNuyY403xQMxuk3o9qi7tkOV0lJabG3ewQw/JSPtrvTc
- Hx4LLLKA==;
-Received: from foss.arm.com ([217.140.101.70])
- by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSPln-0002zH-HV
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:06:32 +0000
+	id 1gSPn0-0001p8-Cu; Thu, 29 Nov 2018 17:07:46 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSPlP-0000NI-HI
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:06:14 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 0A97B15AD;
- Thu, 29 Nov 2018 09:06:26 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E16871596;
+ Thu, 29 Nov 2018 09:05:59 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id EB6C33F59C;
- Thu, 29 Nov 2018 09:06:23 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id CDAFF3F59C;
+ Thu, 29 Nov 2018 09:05:57 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 13/28] arm64: compat: Add missing syscall numbers
-Date: Thu, 29 Nov 2018 17:05:15 +0000
-Message-Id: <20181129170530.37789-14-vincenzo.frascino@arm.com>
+Subject: [PATCH v2 02/28] kernel: Add Monotonic boot time support
+Date: Thu, 29 Nov 2018 17:05:04 +0000
+Message-Id: <20181129170530.37789-3-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181129170530.37789-1-vincenzo.frascino@arm.com>
 References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_120631_666232_39B26A8E 
-X-CRM114-Status: GOOD (  13.32  )
+X-CRM114-CacheID: sfid-20181129_090608_524223_A04C3AFB 
+X-CRM114-Status: GOOD (  13.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,35 +80,30 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vDSO requires gettimeofday and clock_gettime syscalls to implement the
-fallback mechanism.
+Currently, datapage.h has no support for CLOCK_BOOTTIME.
+CLOCK_BOOTTIME is identical to CLOCK_MONOTONIC, but includes
+any time spent in suspend.
 
-This patch adds the missing syscall numbers to unistd.h for arm64.
+This patch adds monotonic boot time support (btm_nsec) to datapage.h.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/include/asm/unistd.h | 3 +++
- 1 file changed, 3 insertions(+)
+ include/vdso/datapage.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index b13ca091f833..a85b30b766a1 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -33,8 +33,11 @@
- #define __NR_compat_exit		1
- #define __NR_compat_read		3
- #define __NR_compat_write		4
-+#define __NR_compat_gettimeofday	78
- #define __NR_compat_sigreturn		119
- #define __NR_compat_rt_sigreturn	173
-+#define __NR_compat_clock_getres	247
-+#define __NR_compat_clock_gettime	263
- 
- /*
-  * The following SVCs are ARM private.
+diff --git a/include/vdso/datapage.h b/include/vdso/datapage.h
+index a02ca170d56e..52189c21d422 100644
+--- a/include/vdso/datapage.h
++++ b/include/vdso/datapage.h
+@@ -32,6 +32,7 @@ struct vdso_data {
+ 	__u64 xtime_coarse_nsec;
+ 	__u64 wtm_clock_sec;	/* Wall to monotonic time */
+ 	__u64 wtm_clock_nsec;
++	__u64 btm_nsec;		/* Monotonic to boot time */
+ 	__u32 tb_seq_count;	/* Timebase sequence counter */
+ 	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
+ 	__u32 cs_shift;		/* Clocksource shift (mono = raw) */
 -- 
 2.19.2
 
