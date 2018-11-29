@@ -1,48 +1,20 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Nov 2018 11:58:00 +0100
-Subject: [PATCH] ARM: dts: msm8660: Mark two GSBI blocks "disabled"
-Message-ID: <20181129105800.13284-1-linus.walleij@linaro.org>
+From: jian.hu@amlogic.com (Jian Hu)
+Date: Thu, 29 Nov 2018 18:59:54 +0800
+Subject: [PATCH 0/2] i2c: meson: add support for Meson G12A SoC i2c controller
+Message-ID: <1543489197-183181-1-git-send-email-jian.hu@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GSBI module complains:
+1)Add G12A SoC i2c compatible string in dt-bindings.
+2)Add compatible and data for G12A I2C controller driver.
 
-gsbi 16500000.gsbi: missing mode configuration
-gsbi: probe of 16500000.gsbi failed with error -22
-gsbi 16600000.gsbi: missing mode configuration
-gsbi: probe of 16600000.gsbi failed with error -22
-gsbi 19800000.gsbi: GSBI port protocol: 2 crci: 0
+Jian Hu (2):
+  dt-bindings: i2c: meson: add Meson G12A SoC i2c compatible string
+  i2c: meson: add support for Meson G12A SoC I2C controller
 
-So we should mark these GSBIs as "disabled" in the SoC
-file by default.
+ Documentation/devicetree/bindings/i2c/i2c-meson.txt | 1 +
+ drivers/i2c/busses/i2c-meson.c                      | 5 +++++
+ 2 files changed, 6 insertions(+)
 
-If boards appear that make use of them, we can simply
-set status = "ok" in the DTS for them.
-
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/qcom-msm8660.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 70698941f64c..9b1cf00d8ca3 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -133,6 +133,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			status = "disabled";
- 
- 			syscon-tcsr = <&tcsr>;
- 
-@@ -167,6 +168,7 @@
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			ranges;
-+			status = "disabled";
- 
- 			syscon-tcsr = <&tcsr>;
- 
 -- 
-2.19.1
+1.9.1
