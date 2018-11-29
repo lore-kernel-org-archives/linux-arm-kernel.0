@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 925FAC43610
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:52:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5A26DC43610
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:52:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6716621019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:52:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F04721019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:52:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hOZJ062I";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="XmLH+XoA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6716621019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bRpjLOys";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CSiWZltn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F04721019
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=25tIrzHA+tQmWgns7HafSRrNGz15RJKpLJvmtj2rZAw=; b=hOZJ062IbsMkFpA39pr1XalGb2
-	13LpWpQoSaTu5wrb/atPFZTDZk9WsE3OADEVI3msqj7kYHNlvbw8hnn5zFgQK+ellSCkAZHQmx1Dk
-	NeVRAtKUCJ6NE0vEtJPitqsUk1NmSYDl3M9+9RafCvBz42IiPYhTBOd4Ge4qHNSDR96gaDFi/o0PC
-	EUWnXhICqPhx3KYaUkkgt2rozk+OlaSNIy96fGC/mh5EWkaAuHn8U22WkI5siwSW2HRtR+Cuv7YhU
-	1R7z4jkEMn7UsXhnC7IgEIAICzx9pZyCD9aRHKcCa2DVhdAjIuRuKdUq94Hlc9FZ50cmfyvxc+WCA
-	6YpvgdJQ==;
+	bh=oKWxQCvREzPAoSqdeHUdXTtnXXO9jK5jdkl2/x1h0IU=; b=bRpjLOysxgPXmyvqvbURIQ+wRw
+	wfGrUczpItOdRaKNwAeRDigamuCutLjoGiw0X/7LMJJ+haQ6cZK+GP69YyLxiMqN36vWIgsSHfdza
+	bnPDYmCCXJLiHJEu+sXySD2pUo4h6jOWSakwsoxcLkQfy8nu+HnAwh0Qe3j0SVM0PUJyyzgEgHqMM
+	VuiVej33AXDq9GgWCuEZM2Y/IIIQqq6UsgdXwfMR+XpowT0T8/9F/NKJdeclKUlIFpnsEl6Y5TyxY
+	XX+aMq7VXgI8p7YCqqI1r7iGriSjU9BVP35T4dqP7qSAzDleq/0/CjO5aldBsmLS8EQaTR7BPeMqc
+	VIn8qoLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQTn-0006Vm-JG; Thu, 29 Nov 2018 17:51:59 +0000
-Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+	id 1gSQU1-0006kr-R3; Thu, 29 Nov 2018 17:52:13 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQPm-0001Ls-09
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:48:02 +0000
-Received: by mail-lf1-x143.google.com with SMTP id c16so2097325lfj.8
+ id 1gSQPp-0001Q4-Hf
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:48:06 +0000
+Received: by mail-lj1-x244.google.com with SMTP id l15-v6so2520824lja.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 09:47:39 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:43 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=0f5FNvFNr+ywaXHgyrdJbA+WYJaJrfnYBdOhsBxudf4=;
- b=XmLH+XoAJtA/XlML6wE1maPOYx/UgMy3QdCOO/C9Bbgo4OSb13ZU3C9qDH+QoTZRxf
- Rke2l20UnNvvrcOTsXud9ZDQpFCo249MLeMQtK5qGGiMWjG0Ge1brJ8dElp8nTQNPGnp
- p/t3f3qeclrknlZT72MhdAwxwbHzyXVyPCRQA=
+ bh=IgJavhFwHTt+c7Cc5oNvleI06smw6L91MXyG+WFxJOs=;
+ b=CSiWZltnAlLzdpYUc1gNl1J+emspCgZO2e02blv0N8vsACNO2aEjoWM/zxVWgKFOrE
+ 6vx2z6Ui/2c0Fuv5GGiX9/da15QuPJJAGfEcryeMjyxdE/mm8/xzUH6OjBPA8HcihktD
+ Gm0ST9kFrA/gO8Sxpq05sccvaHDJ4FMgzyxFM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=0f5FNvFNr+ywaXHgyrdJbA+WYJaJrfnYBdOhsBxudf4=;
- b=SIHOhVfkQGRT5Q4nFSE7IZOfQ+ayqLVYQ4dpPnOUpFcf3O/3BLfCt/sETV+/VGKq2N
- oqP3LJS9W3vKNfx55Wz90MuMYcMTOBxXy8bRQf0t9Gc+3MsFsGQaM3fl1p8zdzwR8viO
- VyCWttTXcESAN68g3Mz+I2lHAL0+YfmIpy913FnHInWNSQA5Y9WsqA/SmCgM5/QU+JVD
- 26G7CHosgTZh/XxmBOmX8hmrk8ocGaHZFblOChW+r9MMYdVgbfx4gmmdy+/wWgbZNzSc
- 4iytSoJeQq3yZQkiSRldJTlkqtXgRW5ZorYON74TRRQ1V5Pnu0Zpp/3tcWdh/Ypfi5rV
- OqqQ==
-X-Gm-Message-State: AA+aEWa7t/nwh4oce1eWjDyjWCCtmjq68YWCDQdyMIiVVjnHp2uzyC9s
- MXOFOmEAPl+GHQdPMcjpuOKBug==
-X-Google-Smtp-Source: AFSGD/Wc/z4ksBJs3vHmhXh16mPBFgtQnbNX6FwOcO14wj444TX9p972mzxxNkllouBu8ScnYN8TbQ==
-X-Received: by 2002:a19:8fce:: with SMTP id s75mr1590227lfk.151.1543513658259; 
- Thu, 29 Nov 2018 09:47:38 -0800 (PST)
+ bh=IgJavhFwHTt+c7Cc5oNvleI06smw6L91MXyG+WFxJOs=;
+ b=p0onn+XuXmD4YeUWF0jlskLQkxu1xsSZ3sKRI/X6kiVQR9zMZMLvMxe+/o7N7HLXV4
+ y9ugxnmBCIYxyMnO1gFn7NzjgKktVEi0JWkdmCW9jNsamvUyKErToVlCUTl+wRre1uOs
+ JUYf75NzpwDAIB3Cqg5lgFwpRRL/dy5t3U0Jzq6JFgFb3TialKW9G0W8k6vaooMn2Z71
+ FtKy2PTQd6P6QWmpteJu91n+pVODvLrMQfAkYH2D4fGVdEvWH/4cf+4MzcM8UhkPfMr5
+ 3vxchfWvCNLDl0AdWpFrKWlMTVgiJGDksSWde4ZCleaWUOB5tJfpTLGguuMlRQ3QvdUH
+ odqQ==
+X-Gm-Message-State: AA+aEWbdiJXw34bx0nJQKya8VhgNVDveyW/uzIGWMM6JYCH5fLuyFlUB
+ Hdmb0lUo9hlQmy9rmxBBXPFkYw==
+X-Google-Smtp-Source: AFSGD/UfIe05lJVzFSG/PvTzE4YY5lDne785Bt93puLTSNvnIF11d0n/xy28bKWTKOUrcHm1iyKeHg==
+X-Received: by 2002:a2e:9b15:: with SMTP id
+ u21-v6mr1683452lji.29.1543513661629; 
+ Thu, 29 Nov 2018 09:47:41 -0800 (PST)
 Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
  [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.36
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.40
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 09:47:37 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:41 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
  Sudeep Holla <sudeep.holla@arm.com>,
  Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
  Mark Rutland <mark.rutland@arm.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v10 17/27] drivers: firmware: psci: Prepare to support PM
- domains
-Date: Thu, 29 Nov 2018 18:46:50 +0100
-Message-Id: <20181129174700.16585-18-ulf.hansson@linaro.org>
+Subject: [PATCH v10 19/27] drivers: firmware: psci: Add hierarchical domain
+ idle states converter
+Date: Thu, 29 Nov 2018 18:46:52 +0100
+Message-Id: <20181129174700.16585-20-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094750_644326_2079CB84 
-X-CRM114-Status: GOOD (  19.66  )
+X-CRM114-CacheID: sfid-20181129_094754_050216_C6ED2961 
+X-CRM114-Status: GOOD (  19.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,123 +113,173 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Following changes are about to implement support for PM domains to PSCI.
-Those changes are mainly going to be implemented in a new separate file,
-hence a couple of the internal PSCI functions needs to be shared to be
-accessible. So, let's do that via adding new PSCI header file.
+If the hierarchical CPU topology is used, but the OS initiated mode isn't
+supported, we rely solely on the regular cpuidle framework to manage the
+idle state selection.
 
-Moreover, the changes deploying support for PM domains, needs to be able to
-switch the PSCI FW into the OS initiated mode. For that reason, let's add a
-new function that deals with this and share it via the new PSCI header
-file.
+For this reason, introduce a new PSCI DT helper function,
+psci_dt_pm_domains_parse_states(), which converts the hierarchically
+described domain idle states, into regular flattened cpuidle states.
+
+During the conversion, let's also insert the converted states into the
+cpuidle driver's array of idle states, as to enables the cpuidle framework
+to manage them.
 
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v10:
-	- New patch. Re-places the earlier patch: "drivers: firmware: psci:
-	  Share a few internal PSCI functions".
+	- New patch.
 
 ---
- drivers/firmware/psci/psci.c | 28 +++++++++++++++++++++-------
- drivers/firmware/psci/psci.h | 14 ++++++++++++++
- 2 files changed, 35 insertions(+), 7 deletions(-)
- create mode 100644 drivers/firmware/psci/psci.h
+ drivers/firmware/psci/psci.h           |   2 +
+ drivers/firmware/psci/psci_pm_domain.c | 108 +++++++++++++++++++++++++
+ 2 files changed, 110 insertions(+)
 
-diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-index 8dbcdecc2ae4..623591b541a4 100644
---- a/drivers/firmware/psci/psci.c
-+++ b/drivers/firmware/psci/psci.c
-@@ -34,6 +34,8 @@
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
+diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
+index 8cf6d7206fab..05af462cc96e 100644
+--- a/drivers/firmware/psci/psci.h
++++ b/drivers/firmware/psci/psci.h
+@@ -13,6 +13,8 @@ int psci_dt_parse_state_node(struct device_node *np, u32 *state);
  
-+#include "psci.h"
+ #ifdef CONFIG_CPU_IDLE
+ int psci_dt_init_pm_domains(struct device_node *np);
++int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
++			struct device_node *cpu_node, u32 *psci_states);
+ #else
+ static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
+ #endif
+diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
+index d0dc38e96f85..6c9d6a644c7f 100644
+--- a/drivers/firmware/psci/psci_pm_domain.c
++++ b/drivers/firmware/psci/psci_pm_domain.c
+@@ -14,6 +14,10 @@
+ #include <linux/pm_domain.h>
+ #include <linux/slab.h>
+ #include <linux/string.h>
++#include <linux/cpuidle.h>
++#include <linux/cpu_pm.h>
 +
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-  * calls it is necessary to use SMC64 to pass or return 64-bit values.
-@@ -90,23 +92,35 @@ static u32 psci_function_id[PSCI_FN_MAX];
- static DEFINE_PER_CPU(u32, domain_state);
- static u32 psci_cpu_suspend_feature;
++#include <asm/cpuidle.h>
  
--static inline u32 psci_get_domain_state(void)
-+u32 psci_get_domain_state(void)
- {
- 	return __this_cpu_read(domain_state);
+ #include "psci.h"
+ 
+@@ -97,6 +101,53 @@ static int psci_pd_parse_states(struct device_node *np,
+ 	return ret;
  }
  
--static inline void psci_set_domain_state(u32 state)
-+void psci_set_domain_state(u32 state)
- {
- 	__this_cpu_write(domain_state, state);
- }
- 
-+bool psci_set_osi_mode(void)
++static int psci_pd_enter_pc(struct cpuidle_device *dev,
++			struct cpuidle_driver *drv, int idx)
 +{
-+	int ret;
-+
-+	ret = invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
-+			PSCI_1_0_SUSPEND_MODE_OSI, 0, 0);
-+	if (ret)
-+		pr_warn("failed to enable OSI mode: %d\n", ret);
-+
-+	return !ret;
++	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, idx);
 +}
 +
- static inline bool psci_has_ext_power_state(void)
++static void psci_pd_enter_s2idle_pc(struct cpuidle_device *dev,
++			struct cpuidle_driver *drv, int idx)
++{
++	psci_pd_enter_pc(dev, drv, idx);
++}
++
++static void psci_pd_convert_states(struct cpuidle_state *idle_state,
++			u32 *psci_state, struct genpd_power_state *state)
++{
++	u32 *state_data = state->data;
++	u64 target_residency_us = state->residency_ns;
++	u64 exit_latency_us = state->power_on_latency_ns +
++			state->power_off_latency_ns;
++
++	*psci_state = *state_data;
++	do_div(target_residency_us, 1000);
++	idle_state->target_residency = target_residency_us;
++	do_div(exit_latency_us, 1000);
++	idle_state->exit_latency = exit_latency_us;
++	idle_state->enter = &psci_pd_enter_pc;
++	idle_state->enter_s2idle = &psci_pd_enter_s2idle_pc;
++	idle_state->flags |= CPUIDLE_FLAG_TIMER_STOP;
++
++	strncpy(idle_state->name, to_of_node(state->fwnode)->name,
++		CPUIDLE_NAME_LEN - 1);
++	strncpy(idle_state->desc, to_of_node(state->fwnode)->name,
++		CPUIDLE_NAME_LEN - 1);
++}
++
++static bool psci_pd_is_provider(struct device_node *np)
++{
++	struct psci_pd_provider *pd_prov, *it;
++
++	list_for_each_entry_safe(pd_prov, it, &psci_pd_providers, link) {
++		if (pd_prov->node == np)
++			return true;
++	}
++
++	return false;
++}
++
+ static int psci_pd_init(struct device_node *np)
  {
- 	return psci_cpu_suspend_feature &
- 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+ 	struct generic_pm_domain *pd;
+@@ -259,4 +310,61 @@ int psci_dt_init_pm_domains(struct device_node *np)
+ 	pr_err("failed to create CPU PM domains ret=%d\n", ret);
+ 	return ret;
  }
- 
--static inline bool psci_has_osi_support(void)
-+bool psci_has_osi_support(void)
- {
- 	return psci_cpu_suspend_feature & PSCI_1_0_OS_INITIATED;
- }
-@@ -285,10 +299,7 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
--#ifdef CONFIG_CPU_IDLE
--static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
--
--static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state)
- {
- 	int err = of_property_read_u32(np, "arm,psci-suspend-param", state);
- 
-@@ -305,6 +316,9 @@ static int psci_dt_parse_state_node(struct device_node *np, u32 *state)
- 	return 0;
- }
- 
-+#ifdef CONFIG_CPU_IDLE
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
 +
- static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
- 			struct device_node *cpu_node, int cpu)
- {
-diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
-new file mode 100644
-index 000000000000..7d9d38fd57e1
---- /dev/null
-+++ b/drivers/firmware/psci/psci.h
-@@ -0,0 +1,14 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
++int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
++			struct device_node *cpu_node, u32 *psci_states)
++{
++	struct genpd_power_state *pd_states;
++	struct of_phandle_args args;
++	int ret, pd_state_count, i, idx, psci_idx = drv->state_count - 2;
++	struct device_node *np = of_node_get(cpu_node);
 +
-+#ifndef __PSCI_H
-+#define __PSCI_H
++	/* Walk the CPU topology to find compatible domain idle states. */
++	while (np) {
++		ret = of_parse_phandle_with_args(np, "power-domains",
++					"#power-domain-cells", 0, &args);
++		of_node_put(np);
++		if (ret)
++			return 0;
 +
-+struct device_node;
++		np = args.np;
 +
-+bool psci_set_osi_mode(void);
-+u32 psci_get_domain_state(void);
-+void psci_set_domain_state(u32 state);
-+bool psci_has_osi_support(void);
-+int psci_dt_parse_state_node(struct device_node *np, u32 *state);
++		/* Verify that the node represents a psci pd provider. */
++		if (!psci_pd_is_provider(np)) {
++			of_node_put(np);
++			return 0;
++		}
 +
-+#endif /* __PSCI_H */
++		/* Parse for compatible domain idle states. */
++		ret = psci_pd_parse_states(np, &pd_states, &pd_state_count);
++		if (ret) {
++			of_node_put(np);
++			return ret;
++		}
++
++		i = 0;
++		idx = drv->state_count;
++		while (i < pd_state_count && idx < CPUIDLE_STATE_MAX) {
++			psci_pd_convert_states(&drv->states[idx + i],
++				&psci_states[idx - 1 + i], &pd_states[i]);
++
++			/*
++			 * In the hierarchical CPU topology the master PM domain
++			 * idle state's DT property, "arm,psci-suspend-param",
++			 * don't contain the bits for the idle state of the CPU.
++			 * Take that into account here.
++			 */
++			psci_states[idx - 1 + i] |= psci_states[psci_idx];
++			pr_debug("psci-power-state %#x index %d\n",
++				psci_states[idx - 1 + i], idx - 1 + i);
++
++			kfree(pd_states[i].data);
++			i++;
++		}
++		drv->state_count += i;
++		kfree(pd_states);
++	}
++
++	return 0;
++}
+ #endif
 -- 
 2.17.1
 
