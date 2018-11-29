@@ -1,81 +1,43 @@
 From: sboyd@kernel.org (Stephen Boyd)
-Date: Wed, 28 Nov 2018 16:41:48 -0800
-Subject: [PATCH v13 0/5] Add i.MX8MQ clock driver
-In-Reply-To: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
-References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <154345210894.88331.8277410833858111600@swboyd.mtv.corp.google.com>
+Date: Wed, 28 Nov 2018 16:47:16 -0800
+Subject: [PATCH v5 13/17] clk: sunxi-ng: add support for suniv F1C100s SoC
+In-Reply-To: <cc1357c9272628b4d89af007cead83117d9ba6e9.1543443475.git.mesihkilinc@gmail.com>
+References: <cover.1543443475.git.mesihkilinc@gmail.com>
+ <cc1357c9272628b4d89af007cead83117d9ba6e9.1543443475.git.mesihkilinc@gmail.com>
+Message-ID: <154345243603.88331.17915868280143383591@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Abel Vesa (2018-11-13 08:19:56)
-> Here is a link to the 12th version:
-> https://lkml.org/lkml/2018/11/7/642
-> 
-> Changes since v12:
->  * replaced the division in clk_pll_recalc_rate in clk-frac
->    with do_div as suggested by Stephen
-> 
-> Abel Vesa (2):
->   clk: imx: Add imx composite clock
->   clk: imx: Add clock driver for i.MX8MQ CCM
-> 
-> Lucas Stach (3):
->   dt-bindings: add binding for i.MX8MQ CCM
->   clk: imx: add fractional PLL output clock
->   clk: imx: Add SCCG PLL type
-> 
+Quoting Mesih Kilinc (2018-11-28 14:33:23)
+> diff --git a/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
+> new file mode 100644
+> index 0000000..d4bc1b8
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
+> @@ -0,0 +1,541 @@
+> +/*
+> + * Copyright (c) 2016 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
 
-I had to apply this set of fixes to silence sparse and smatch warnings
-about things that are not right. Please take a look over things and see
-if it's sane.
+Please fix this location.
 
-diff --git a/drivers/clk/imx/clk-composite-8m.c b/drivers/clk/imx/clk-composite-8m.c
-index bcd31d889584..6d9d3714b4df 100644
---- a/drivers/clk/imx/clk-composite-8m.c
-+++ b/drivers/clk/imx/clk-composite-8m.c
-@@ -127,8 +127,8 @@ struct clk *imx8m_clk_composite_flags(const char *name,
- 					int num_parents, void __iomem *reg,
- 					unsigned long flags)
- {
--	struct clk_hw *hw = NULL, *mux_hw = NULL;
--	struct clk_hw *div_hw = NULL, *gate_hw = NULL;
-+	struct clk_hw *hw = ERR_PTR(-ENOMEM), *mux_hw;
-+	struct clk_hw *div_hw, *gate_hw;
- 	struct clk_divider *div = NULL;
- 	struct clk_gate *gate = NULL;
- 	struct clk_mux *mux = NULL;
-diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
-index a3732be5ad7f..98726206f3c4 100644
---- a/drivers/clk/imx/clk-frac-pll.c
-+++ b/drivers/clk/imx/clk-frac-pll.c
-@@ -14,6 +14,8 @@
- #include <linux/slab.h>
- #include <linux/bitfield.h>
- 
-+#include "clk.h"
-+
- #define PLL_CFG0		0x0
- #define PLL_CFG1		0x4
- 
-@@ -214,7 +216,7 @@ struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
- 	ret = clk_hw_register(NULL, hw);
- 	if (ret) {
- 		kfree(pll);
--		return ERR_CAST(hw);
-+		return ERR_PTR(ret);
- 	}
- 
- 	return hw->clk;
-diff --git a/drivers/clk/imx/clk-sccg-pll.c b/drivers/clk/imx/clk-sccg-pll.c
-index 4666b96bdb3f..ee7752bace89 100644
---- a/drivers/clk/imx/clk-sccg-pll.c
-+++ b/drivers/clk/imx/clk-sccg-pll.c
-@@ -249,7 +249,7 @@ struct clk *imx_clk_sccg_pll(const char *name,
- 	ret = clk_hw_register(NULL, hw);
- 	if (ret) {
- 		kfree(pll);
--		return ERR_CAST(hw);
-+		return ERR_PTR(ret);
- 	}
- 
- 	return hw->clk;
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> diff --git a/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
+> new file mode 100644
+> index 0000000..1da687a
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
+> @@ -0,0 +1,34 @@
+> +/*
+> + * Copyright 2017 Icenowy Zheng <icenowy@aosc.io>
+> + *
+> + * SPDX-License-Identifier: GPL-2.0+
+
+Ditto.
+
+> + */
+> +
