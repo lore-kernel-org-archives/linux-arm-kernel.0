@@ -1,70 +1,64 @@
 From: ebiggers@kernel.org (Eric Biggers)
-Date: Wed, 28 Nov 2018 22:34:22 -0800
-Subject: [PATCH 4/4] crypto: arm64/chacha - add XChaCha12 support
-In-Reply-To: <20181129063422.24307-1-ebiggers@kernel.org>
-References: <20181129063422.24307-1-ebiggers@kernel.org>
-Message-ID: <20181129063422.24307-5-ebiggers@kernel.org>
+Date: Wed, 28 Nov 2018 22:34:18 -0800
+Subject: [PATCH 0/4] crypto: ARM64 NEON optimized XChaCha and NHPoly1305 (for
+ Adiantum)
+Message-ID: <20181129063422.24307-1-ebiggers@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Biggers <ebiggers@google.com>
+Hello,
 
-Now that the ARM64 NEON implementation of ChaCha20 and XChaCha20 has
-been refactored to support varying the number of rounds, add support for
-XChaCha12.  This is identical to XChaCha20 except for the number of
-rounds, which is 12 instead of 20.  This can be used by Adiantum.
+This series optimizes the Adiantum encryption mode for ARM64 by adding
+an ARM64 NEON accelerated implementation of NHPoly1305, specifically the
+NH part; and by modifying the existing ARM64 NEON ChaCha20
+implementation to support XChaCha20 and XChaCha12.
 
-Signed-off-by: Eric Biggers <ebiggers@google.com>
----
- arch/arm64/crypto/Kconfig            |  2 +-
- arch/arm64/crypto/chacha-neon-glue.c | 18 ++++++++++++++++++
- 2 files changed, 19 insertions(+), 1 deletion(-)
+This greatly improves Adiantum performance on ARM64.  For example,
+encrypting 4096-byte messages (single-threaded) on a Raspberry Pi 3
+Model B v1.2, which has a Cortex-A53 processor:
 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index d54ddb8468ef5..d9a523ecdd836 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -101,7 +101,7 @@ config CRYPTO_AES_ARM64_NEON_BLK
- 	select CRYPTO_SIMD
- 
- config CRYPTO_CHACHA20_NEON
--	tristate "ChaCha20 and XChaCha20 stream ciphers using NEON instructions"
-+	tristate "ChaCha20, XChaCha20, and XChaCha12 stream ciphers using NEON instructions"
- 	depends on KERNEL_MODE_NEON
- 	select CRYPTO_BLKCIPHER
- 	select CRYPTO_CHACHA20
-diff --git a/arch/arm64/crypto/chacha-neon-glue.c b/arch/arm64/crypto/chacha-neon-glue.c
-index 4d992029b9121..346eb85498a1e 100644
---- a/arch/arm64/crypto/chacha-neon-glue.c
-+++ b/arch/arm64/crypto/chacha-neon-glue.c
-@@ -161,6 +161,22 @@ static struct skcipher_alg algs[] = {
- 		.setkey			= crypto_chacha20_setkey,
- 		.encrypt		= xchacha_neon,
- 		.decrypt		= xchacha_neon,
-+	}, {
-+		.base.cra_name		= "xchacha12",
-+		.base.cra_driver_name	= "xchacha12-neon",
-+		.base.cra_priority	= 300,
-+		.base.cra_blocksize	= 1,
-+		.base.cra_ctxsize	= sizeof(struct chacha_ctx),
-+		.base.cra_module	= THIS_MODULE,
-+
-+		.min_keysize		= CHACHA_KEY_SIZE,
-+		.max_keysize		= CHACHA_KEY_SIZE,
-+		.ivsize			= XCHACHA_IV_SIZE,
-+		.chunksize		= CHACHA_BLOCK_SIZE,
-+		.walksize		= 4 * CHACHA_BLOCK_SIZE,
-+		.setkey			= crypto_chacha12_setkey,
-+		.encrypt		= xchacha_neon,
-+		.decrypt		= xchacha_neon,
- 	}
- };
- 
-@@ -187,3 +203,5 @@ MODULE_ALIAS_CRYPTO("chacha20");
- MODULE_ALIAS_CRYPTO("chacha20-neon");
- MODULE_ALIAS_CRYPTO("xchacha20");
- MODULE_ALIAS_CRYPTO("xchacha20-neon");
-+MODULE_ALIAS_CRYPTO("xchacha12");
-+MODULE_ALIAS_CRYPTO("xchacha12-neon");
+                           Before            After
+                           ---------         ---------
+adiantum(xchacha12,aes)    44.1 MB/s         82.7 MB/s
+adiantum(xchacha20,aes)    35.5 MB/s         65.7 MB/s
+
+Decryption is the same speed as encryption.
+
+The biggest benefit comes from accelerating XChaCha.  Accelerating NH
+gives a somewhat smaller, but still significant benefit.
+
+Performance on 512-byte inputs is also improved, though that is much
+slower in the first place.  When Adiantium is used with dm-crypt (or
+cryptsetup), we recommend using a 4096-byte sector size.
+
+For comparison, on the same hardware AES-256-XTS encryption is only
+24.5 MB/s and decryption 21.6 MB/s, both using the NEON-bitsliced
+implementation ("xts-aes-neonbs").  That is the fastest AES-256-XTS
+implementation on this processor, since it doesn't have the ARMv8
+Cryptography Extensions.  This is despite Adiantum also being a super-
+pseudorandom permutation (SPRP) over the entire sector, unlike XTS.
+
+Note that XChaCha20 and XChaCha12 can be used for other purposes too.
+
+Eric Biggers (4):
+  crypto: arm64/nhpoly1305 - add NEON-accelerated NHPoly1305
+  crypto: arm64/chacha20 - add XChaCha20 support
+  crypto: arm64/chacha20 - refactor to allow varying number of rounds
+  crypto: arm64/chacha - add XChaCha12 support
+
+ arch/arm64/crypto/Kconfig                     |   7 +-
+ arch/arm64/crypto/Makefile                    |   7 +-
+ ...hacha20-neon-core.S => chacha-neon-core.S} |  89 +++++---
+ arch/arm64/crypto/chacha-neon-glue.c          | 207 ++++++++++++++++++
+ arch/arm64/crypto/chacha20-neon-glue.c        | 133 -----------
+ arch/arm64/crypto/nh-neon-core.S              | 103 +++++++++
+ arch/arm64/crypto/nhpoly1305-neon-glue.c      |  77 +++++++
+ 7 files changed, 457 insertions(+), 166 deletions(-)
+ rename arch/arm64/crypto/{chacha20-neon-core.S => chacha-neon-core.S} (90%)
+ create mode 100644 arch/arm64/crypto/chacha-neon-glue.c
+ delete mode 100644 arch/arm64/crypto/chacha20-neon-glue.c
+ create mode 100644 arch/arm64/crypto/nh-neon-core.S
+ create mode 100644 arch/arm64/crypto/nhpoly1305-neon-glue.c
+
 -- 
 2.19.2
