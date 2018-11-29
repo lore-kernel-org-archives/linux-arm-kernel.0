@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85C88C64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:50:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBB55C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:51:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3880B21019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:50:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A65DC21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:51:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ou4ejYS5";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="qEDRq0IN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3880B21019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ChJBUirl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ZqXITaeP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A65DC21019
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=LZvlwimv8fhliilGRKU7O8ZxdjiJFLpl9ywLOg9jbG8=; b=ou4ejYS5d4uP3P
-	N6V5G0XfIRSwFf7vaUOaqGs7YqamPGwxVvxONDvZN9V93fOfCvc8iMvcgkR14uOnNaYv6QLXWey8s
-	UrD/oSYYl7IXryqFrtRA8hB2eoppCmKxPeNryk/29H1obHMKZZRZ1d7EkFTXyOXvCe6lsicjgvD4V
-	PFO8SDjuFv1QPnK2qMFZb83OrwKIeEsJcvReSAIuNUs7dbY3BTXVELvndMgRJLasayS6mvBg1q+OI
-	qn6J7Y4ehbsw1PZMTCg0YN7YV2P2F022mUKVTukkGiuBB93JeDbz6/iA6pMwfIBATvcaCK+OIE0eq
-	9Ws6RGFv1Ed9xqtafWBA==;
+	List-Owner; bh=6UKi20zLcxKdz/omoChX1ruDOmtpuauF94c6sOdHhag=; b=ChJBUirl8hZlId
+	Y15mdwfEZSiMx3DTcE9aAbxyE8tMqZhxVs38ftZeVEbFnYs/BHnCcHVQn+sPzF77ZfxAo3kYOJ5Mw
+	E50MtIfRi8zKOkhmvSgXe7rLAj+2r0qhk+THhe+m4m2nKbCGf73Igww+fqAV7xxXbKQLqK3nQlgYw
+	hiSFFhCPG4Ae5cr2NEjLg/urraZSusRr+q3db0/4GE3vN/DUbLPRdduEhM70TNAvZyWJ8IWl9VUTl
+	//WdN9iaByB4nq3L5+pgKhWIQSFShmD6xMdW6Hv97gLv2fT/K11wjFoAgmcgjjCxAeXRzxbAcAyQq
+	jGieqnadxyoHPcnR6ZbA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSUCy-0003QW-Rh; Thu, 29 Nov 2018 21:50:52 +0000
+	id 1gSUDj-0003on-Lp; Thu, 29 Nov 2018 21:51:39 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSUCm-0003Fy-HD
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 21:50:42 +0000
+ id 1gSUCm-0003G4-HD
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 21:50:43 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 848E02146F;
- Thu, 29 Nov 2018 21:50:31 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 0C1752146D;
+ Thu, 29 Nov 2018 21:50:36 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543528231;
- bh=A5CyQ98lp3blg1a5CesiwTr0NjgG1h49y1/jgvPs+CU=;
+ s=default; t=1543528236;
+ bh=CSQZ0oJKBdOM2BNQlH009zRFVSc+FKY9DIgf2UlcuRY=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=qEDRq0INmgAhvEotU56n4lyK+cOX9iBgwV79dSz2MEsWgxIyxO0cFfE6dEZqwfSDv
- c3nRYdaQTlS0EYd6NvcgThDht2IWaeZFCwxsezOPJ/64MDHFz5mFsApTO8+X36f4Rn
- aABTBUyGVeTCaIZhYR1ci9Agc51dRt0UN4s0meTc=
+ b=ZqXITaePMrAKfvfKB9NRz/r81/kqSM7Tpns3+5zCaUDJvqFj1E5/J1aPUf3E2BapI
+ aJCw5jpQMRZoMs7gujmfcyFSa9Dizvq7b1kIYnoSoTFgavupgMpYkQPdDVwSNDqYMn
+ +IGywmDGasVEW3UcfASNeMtIhQYxXvUC9s/rk8Dk=
 MIME-Version: 1.0
 To: "A.s. Dong" <aisheng.dong@nxp.com>, Abel Vesa <abel.vesa@nxp.com>,
  Lucas Stach <l.stach@pengutronix.de>, Sascha Hauer <kernel@pengutronix.de>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1542125975-8448-3-git-send-email-abel.vesa@nxp.com>
+In-Reply-To: <1542125975-8448-5-git-send-email-abel.vesa@nxp.com>
 References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
- <1542125975-8448-3-git-send-email-abel.vesa@nxp.com>
-Message-ID: <154352823097.88331.550273153451145891@swboyd.mtv.corp.google.com>
+ <1542125975-8448-5-git-send-email-abel.vesa@nxp.com>
+Message-ID: <154352823547.88331.2399224127958299834@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH v13 2/5] clk: imx: add fractional PLL output clock
-Date: Thu, 29 Nov 2018 13:50:30 -0800
+Subject: Re: [PATCH v13 4/5] clk: imx: Add imx composite clock
+Date: Thu, 29 Nov 2018 13:50:35 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_135040_598257_8CC81402 
-X-CRM114-Status: UNSURE (   9.17  )
+X-CRM114-CacheID: sfid-20181129_135040_753439_59E45713 
+X-CRM114-Status: UNSURE (   8.89  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,17 +90,15 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Abel Vesa (2018-11-13 08:19:58)
-> From: Lucas Stach <l.stach@pengutronix.de>
+Quoting Abel Vesa (2018-11-13 08:20:00)
+> Since a lot of clocks on imx8m are formed by a mux, gate, predivider and
+> divider, the idea here is to combine all of those into one composite clock,
+> but we need to deal with both predivider and divider at the same time and
+> therefore we add the imx8m_clk_composite_divider_ops and register
+> the composite clock with those.
 > 
-> This is a new fractional clock type introduced on i.MX8.
-> 
-> The description of this fractional clock can be found here:
-> 
-> https://www.nxp.com/docs/en/reference-manual/IMX8MDQLQRM.pdf#page=834
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
+> Suggested-by: Sascha Hauer <s.hauer@pengutronix.de>
 > Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
 
