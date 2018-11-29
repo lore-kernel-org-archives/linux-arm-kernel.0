@@ -2,72 +2,85 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+X-Spam-Status: No, score=-9.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,UNWANTED_LANGUAGE_BODY,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C3ACFC43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 20:43:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 013EAC43610
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 20:47:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8AF1E2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 20:43:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B8E232082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 20:47:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wzp9pGWT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8AF1E2082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pmHPQx17";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="CfcQVE/x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B8E232082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YEedktCIKt/tJm+LZPrMGkUePj3XVvXEA2CFlRj54hU=; b=Wzp9pGWTZ3dg/I
-	hHmFM61FxUej6TZf+GKUnbl5HXhzKMhzVJH8Obcz57QurLrjcPYosUZYeUeh9MJfZwJpmZ+zcJJMn
-	JrpAi6WVXxf4lw8xwl1joARVOZPD94qItEU6IE2IV1/c1NSukovH++G+QCuMjAqV7KPkJ90xSgG/K
-	A1IOCAqSPgPV9ZHqpiwsckVI/xUv2YBMsK8dOUBeqR9yWpkk/tIom4d81BQKZQqRMJl/TXVB87E9i
-	IOcIQy5oHhv8XetEYiYKbExkiKRYnkuRxooeNfNF25VRauy2dxrZ7s3dHXf4a/VmQoACsJbaolBMw
-	5QmXKqrHksoF85ZQtuDw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=hXtmIpqRR1U0OVJCN+BTBuEjVlJetqsZI1yAHTGA3xY=; b=pmHPQx17GMrTcF
+	4d25COewvE45ZoJDlF8PpardYr4lds8YkNdxDxFoTeArL5eP61k+L5iK0BbabdRnyZ9gQsrOQ9e02
+	aaRIVIf95bOrdt6bmuunxhfsBnhl/CgCGkdcm6dyC85B0AtG22cjxpxa4VOrcgU7GLIRtbGV+Pv+S
+	esBlR8NBYKfjupHp8OV6SrPVe3NjJQViQYAEStGa/S8Aow8MK62NUPNn/B0DYfpIuePnNxvU6bK6u
+	0hv8afCstHYS4v0+P95MjwrnHMi2KCaMK1joNx1Uxs+5Q7vPJilGlGcFj3h9n5cx3IylWo2FOsugF
+	lg9SqRW1mf7AHxw3g1Eg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gST9R-0005C2-GZ; Thu, 29 Nov 2018 20:43:09 +0000
-Received: from mail-qk1-f195.google.com ([209.85.222.195])
+	id 1gSTDy-0006wi-OP; Thu, 29 Nov 2018 20:47:50 +0000
+Received: from mail-pf1-x441.google.com ([2607:f8b0:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gST9N-0005Bb-UD
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 20:43:07 +0000
-Received: by mail-qk1-f195.google.com with SMTP id y16so1908365qki.7
+ id 1gSTDt-0006vX-TH
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 20:47:47 +0000
+Received: by mail-pf1-x441.google.com with SMTP id b85so1628033pfc.3
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 12:42:54 -0800 (PST)
+ Thu, 29 Nov 2018 12:47:35 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=from:to:cc:subject:date:message-id:mime-version;
+ bh=EWLxQ5KwP7M3FfM+MEr4y7WTl73hNo4Kn+q8VEr1ki0=;
+ b=CfcQVE/xrYBJoeOZouxkJ3W3HJiyXEzX3YAUX4lkIjGXQBZmKz0OAa4YqFkwsjdTWY
+ bo8ChpN3TuzFCspZYphQSnHc5Oev4UlxZEylSprKaNKeerZN6XyvM/YsR8mSqnFEuoGd
+ lOqPW2Rs443AmUmlGD34sfcocXsnoWPNjNgJ5J8tjG8IN4yQ+jK1O0aIqggREBNlSJit
+ TosQm5SL5VhiL7F9ExiCrAPz/SvGZZ5yAs/0lq2E3djx/k62f110D4g557k2Uf9iIX/W
+ w2tHEfiqVqCN4zTMAnqM/MXXTDRZq+qqEvifiVhsXVsERVhN7FEXnrYCMyCF+OpTw39h
+ 4Y2A==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=yfIkpq2yd0BgshyKjmLyezQsO7IAIWlzR8udZ0ePDfQ=;
- b=LGOsWYK6OmkpYbWE9nJms/ibTGtxk192uRk29g81Eh95uJzasFCfmB2MupGWHriu7q
- Fn8tPM5+7NwdXxkh9lps8n794nlioU9DcKlhOzF20l7AK96aQsl0v4dOeP01DfZo1nyW
- uOKtfhAF3bEeM5aDS3ZOwXALSDnWfWQMxtPlOpM3e7QBKbTa6TARhtnMDLHcO56k64ON
- 0gCv6UfKWFlFHSaz1Yt4eeqXCUhITaQ0XpnABXspGjQgotN6ZyAElmJhTZfuP40jy2ML
- ro6Z2L7oUMIjO5ypsZ2GusuGmsAX32iym2+WAJvtU6MYmoqGMLdFWIrddZHLl1WECly7
- gLeQ==
-X-Gm-Message-State: AA+aEWYnfpKvT3TKNWIQS/yciDRdpSbKLIHgO4L7dx6BgDiEgP1LHzxX
- qaJbVERKJ+ErwxhZESYE6R44T0BrVyW9Y47k8LM=
-X-Google-Smtp-Source: AFSGD/Ume9XyA5hHsD9HOi97v4m7eRr/KEP1AuczhlMiTFrpSq/o3rGQhT+IrJWKsisDh0CBcwbzs8THx1mjM/1JbKg=
-X-Received: by 2002:ae9:d8c2:: with SMTP id u185mr2689785qkf.107.1543524173498; 
- Thu, 29 Nov 2018 12:42:53 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version;
+ bh=EWLxQ5KwP7M3FfM+MEr4y7WTl73hNo4Kn+q8VEr1ki0=;
+ b=WOLp0QGUAh+7UFmgoDaaYkI0hjoyQNSVFHmXO+xyQnTniUV5RBs1NcdzTaNP+7OXup
+ t/kfFR3TQkYCenX6pJ9uU7lXBNDjX/lgeY6l7n5RhS/kClTwio4JeWxjsb/uek7wwPvf
+ rpCZtJqKzHgBU/xnqOMtACQXRHhHM7ejbvE9IiaKWe0f/KUHfWo13p0hR/r25xYKHje4
+ VwavMJYAgeNCcJLL1gmWYoUk1gYPkFGwvsvNxqLn7vO1k//dln/zpG+VoZf3z5phfmLn
+ ub3un51UQZkQrQkaM6kxTaRypS0FRMgbdcvUiXbshNJM42Tz42h/Hd2T98NwbBR/8RIM
+ BN7w==
+X-Gm-Message-State: AA+aEWZfp2VTq7TXDLf5fTMQBfzQLe2CfoVQZ+Ifb1L2gwI6xdKvEoEv
+ wOsmlJBCYxe42L6PKWaA7Gu5Bg==
+X-Google-Smtp-Source: AFSGD/Xh5ZEcz3HWolTWxcnkKHEJ5N/FztzaKwuA1BVhlaM49LIACgQGkiHvaMYwCez1z0vM2ScxSg==
+X-Received: by 2002:a62:b15:: with SMTP id t21mr2992026pfi.136.1543524454654; 
+ Thu, 29 Nov 2018 12:47:34 -0800 (PST)
+Received: from localhost (c-71-197-186-152.hsd1.wa.comcast.net.
+ [71.197.186.152]) by smtp.googlemail.com with ESMTPSA id
+ l5-v6sm4408415pfl.73.2018.11.29.12.47.33
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Thu, 29 Nov 2018 12:47:34 -0800 (PST)
+From: Kevin Hilman <khilman@baylibre.com>
+To: arm@kernel.org
+Subject: [GIT PULL] Amlogic SoC drivers for v4.21
+Date: Thu, 29 Nov 2018 12:47:33 -0800
+Message-ID: <7hwoov8vbu.fsf@baylibre.com>
 MIME-Version: 1.0
-References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
- <20181129170530.37789-7-vincenzo.frascino@arm.com>
-In-Reply-To: <20181129170530.37789-7-vincenzo.frascino@arm.com>
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 29 Nov 2018 21:42:35 +0100
-Message-ID: <CAK8P3a1njNBWiMExBevqbT+AuUHdU4T2sc1o1rRTn+Ji=y2SbA@mail.gmail.com>
-Subject: Re: [PATCH v2 06/28] kernel: Define gettimeofday vdso common code
-To: Vincenzo Frascino <vincenzo.frascino@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_124305_971310_268136D0 
-X-CRM114-Status: GOOD (  16.51  )
+X-CRM114-CacheID: sfid-20181129_124745_944288_40FF3179 
+X-CRM114-Status: GOOD (  11.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,106 +92,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch <linux-arch@vger.kernel.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- Ralf Baechle <ralf@linux-mips.org>, Mark Salyzyn <salyzyn@android.com>,
- Paul Burton <paul.burton@mips.com>, Thomas Gleixner <tglx@linutronix.de>,
- Peter Collingbourne <pcc@google.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 6:06 PM Vincenzo Frascino
-<vincenzo.frascino@arm.com> wrote:
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-> +/*
-> + * The definitions below are required to overcome the limitations
-> + * of time_t on 32 bit architectures, which overflows in 2038.
-> + * The new code should use the replacements based on time64_t and
-> + * timespec64.
-> + *
-> + * The abstraction below will be updated once the migration to
-> + * time64_t is complete.
-> + */
-> +#ifdef CONFIG_GENERIC_VDSO_32
-> +#define __vdso_timespec                old_timespec32
-> +#define __vdso_timeval         old_timeval32
-> +#else
-> +#ifdef ENABLE_COMPAT_VDSO
-> +#define __vdso_timespec                old_timespec32
-> +#define __vdso_timeval         old_timeval32
-> +#else
-> +#define __vdso_timespec                __kernel_timespec
-> +#define __vdso_timeval         __kernel_old_timeval
-> +#endif /* CONFIG_COMPAT_VDSO */
-> +#endif /* CONFIG_GENERIC_VDSO_32 */
->
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-Have you considered doing this in the reverse way, by including
-the common parts from multiple implementations (32 and 64
-bit), instead of compiling the same source file multiple
-times with different macros set? I think that would make it
-easier to understand.
+are available in the git repository at:
 
-> +
-> +#ifdef CONFIG_HAVE_ARCH_TIMER
-> +static __always_inline notrace int __do_realtime_or_tai(
-> +               const struct vdso_data *vd,
-> +               struct __vdso_timespec *ts,
-> +               bool is_tai)
-> +{
-> +       u32 seq, cs_mono_mult, cs_shift;
-> +       u64 ns, sec;
-> +       u64 cycle_last, cs_mono_mask;
-> +
-> +       if (vd->use_syscall)
-> +               return -1;
-> +repeat:
+  https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-drivers
 
-Maybe instead of the #ifdef, do it like
+for you to fetch changes up to 2b45ebef39a2caad409f70b22b4a2a41df9815b6:
 
-     if (!IS_ENABLED(CONFIG_HAVE_ARCH_TIMER) ||
-         vd->use_syscall)
-                return -1;
+  soc: amlogic: Add Meson Clock Measure driver (2018-11-28 16:55:35 -0800)
 
-> +static notrace int __cvdso_clock_gettime(clockid_t clock,
-> +                                        struct __vdso_timespec *ts)
-> +{
-> +       const struct vdso_data *vd = __arch_get_vdso_data();
-> +
-> +       if (!__arch_valid_arg(ts))
-> +               return -EFAULT;
-> +
-> +       switch (clock) {
-> +       case CLOCK_REALTIME:
-> +               if (do_realtime(vd, ts))
-> +                       goto fallback;
-> +               break;
-> +       case CLOCK_TAI:
-> +               if (do_tai(vd, ts))
-> +                       goto fallback;
-> +               break;
-> +       case CLOCK_MONOTONIC:
-> +               if (do_monotonic(vd, ts))
-> +                       goto fallback;
-> +               break;
-> +       case CLOCK_MONOTONIC_RAW:
-> +               if (do_monotonic_raw(vd, ts))
-> +                       goto fallback;
-> +               break;
+----------------------------------------------------------------
+Amlogic SoC drivers for v4.21
+- new clock measurement driver and bindings
+- COMPILE_TEST fix
 
-Please sync this up with the latest x86 version in
-arch/x86/entry/vdso/vclock_gettime.c, that version has
-seen a lot of improvements recently, so I'd recommend
-using a copy of that file as the base, and then
-modifying it as needed to make it work on the other
-architectures.
+----------------------------------------------------------------
+Maxime Jourdan (1):
+      drivers: soc: Allow building the amlogic drivers without ARCH_MESON
 
-      Arnd
+Neil Armstrong (2):
+      dt-bindings: amlogic: Add Internal Clock Measurer bindings
+      soc: amlogic: Add Meson Clock Measure driver
+
+ Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt |  18 ++++++
+ drivers/soc/Makefile                                          |   2 +-
+ drivers/soc/amlogic/Kconfig                                   |   8 +++
+ drivers/soc/amlogic/Makefile                                  |   1 +
+ drivers/soc/amlogic/meson-clk-measure.c                       | 350 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 378 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/amlogic/clk-measure.txt
+ create mode 100644 drivers/soc/amlogic/meson-clk-measure.c
 
 _______________________________________________
 linux-arm-kernel mailing list
