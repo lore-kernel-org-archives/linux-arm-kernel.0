@@ -1,27 +1,38 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 28 Nov 2018 16:49:46 -0800
-Subject: [PATCH 0/2] ARM: dts: meson: add the timer interrupts and clocks
-In-Reply-To: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
-References: <20181116204235.3925-1-martin.blumenstingl@googlemail.com>
-Message-ID: <7hzhtsbtcl.fsf@baylibre.com>
+Date: Wed, 28 Nov 2018 16:57:26 -0800
+Subject: [PATCH v3 0/3] Add Amlogic Meson GX SoC Clock Measure Driver
+In-Reply-To: <20181118135024.30720-1-narmstrong@baylibre.com>
+References: <20181118135024.30720-1-narmstrong@baylibre.com>
+Message-ID: <7htvk0bszt.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-> This is a follow-up of my series "meson6_timer: dt-bindings updates"
-> from [0].
-> We were missing the interrupts for timer B, C and D. This is harmless
-> so far because the meson6_timer driver only implements timer A. Timer
-> E doesn't have any interrupt.
+> The Amlogic Meson GX SoCs embeds a clock measurer IP to measure the internal
+> clocks frequencies.
+> The precision is determined by stepping into the duration until the counter
+> overflows.
+> The debugfs shows a pretty summary and each clock can be measured
+> individually aswell.
 >
-> Additionally the timer IP block has two clock inputs. This also adds
-> them.
->
-> NOTE: the alias "timer_abcde" was chosen because there's a second
-> timer instance (F..I which are similar to A..D and J which is
-> similar to E).
+> This patchset includes the dt-bindings, driver and the DT node added to the
+> meson-gx dtsi.
 
-Queued for v4.21 (branch: v4.21/dt)
+Queued for v4.21...
+
+[...]
+
+> Neil Armstrong (3):
+>   dt-bindings: amlogic: Add Internal Clock Measurer bindings
+>   soc: amlogic: Add Meson Clock Measure driver
+
+...on branch v4.21/drivers and...
+
+>   ARM64: dts: meson-gx: Add Internal Clock Measurer node
+
+...on branch v4.21/dt64,
+
+Thanks,
 
 Kevin
