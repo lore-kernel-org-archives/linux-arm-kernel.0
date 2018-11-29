@@ -1,43 +1,50 @@
-From: jrdr.linux@gmail.com (Souptick Joarder)
-Date: Thu, 29 Nov 2018 11:34:34 +0530
-Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
- vm_insert_range
-In-Reply-To: <5480157.mmjlM7ZeET@diego>
-References: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
- <CAFqt6zZy0-dy=a+KDrx7V1-j37pAVmt2r6bOkjgHwiopG-L+xA@mail.gmail.com>
- <5480157.mmjlM7ZeET@diego>
-Message-ID: <CAFqt6zbqjFa-zS7TLx3Tcr3nvsdrbxsrOswWoh5xb_SoxPn98A@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 29 Nov 2018 14:26:14 +0800
+Subject: [PATCH v4] usb/mtu3: power down device ip at setup
+In-Reply-To: <20181129031627.45006-1-hsinyi@chromium.org>
+References: <20181128095358.42498-1-hsinyi@chromium.org>
+ <20181129031627.45006-1-hsinyi@chromium.org>
+Message-ID: <1543472774.32173.114.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 28, 2018 at 8:49 PM Heiko St?bner <heiko@sntech.de> wrote:
->
-> Hi Souptick,
->
-> Am Montag, 26. November 2018, 06:36:42 CET schrieb Souptick Joarder:
-> > On Thu, Nov 15, 2018 at 9:14 PM Souptick Joarder <jrdr.linux@gmail.com>
-> wrote:
-> > > Convert to use vm_insert_range() to map range of kernel
-> > > memory to user vma.
-> > >
-> > > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> >
-> > Any feedback for this patch ?
->
-> sorry, took a bit longer to find time for a test-run.
->
-> Except the missing EXPORT_SYMBOL already pointed out in patch1,
-> my displays are still working on modern (with iommu) and the older
-> (without iommu) Rockchip socs, so
->
-> On rk3188, rk3288, rk3328 and rk3399
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> and in general
-> Acked-by: Heiko Stuebner <heiko@sntech.de>
+hi Hsin-Yi,
 
-Thanks Heiko.
->
->
-> Heiko
->
->
+On Thu, 2018-11-29 at 11:16 +0800, Hsin-Yi, Wang wrote:
+> Originally, when dr_mode is USB_DR_MODE_HOST, it didn't power down device ip,
+> so host ip sleep will fail at ssusb_host_disable.
+> 
+> Power down device ip at ssusb_host_setup.
+> 
+> Signed-off-by: Hsin-Yi, Wang <hsinyi@chromium.org>
+> ---
+> ChangeLog:
+> V3->V4:
+>   *update comment
+> ---
+>  drivers/usb/mtu3/mtu3_plat.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+> index 46551f6d16fd..e086630e41a9 100644
+> --- a/drivers/usb/mtu3/mtu3_plat.c
+> +++ b/drivers/usb/mtu3/mtu3_plat.c
+> @@ -200,6 +200,14 @@ static void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb)
+>  	mtu3_setbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL0, SSUSB_IP_SW_RST);
+>  	udelay(1);
+>  	mtu3_clrbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL0, SSUSB_IP_SW_RST);
+> +
+> +	/*
+> +	 * device ip may be powered on in firmware/BROM stage before entering
+> +	 * kernel stage;
+> +	 * power down device ip, otherwise ip-sleep will fail when working as
+> +	 * host only mode
+> +	 */
+> +	mtu3_setbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL2, SSUSB_IP_DEV_PDN);
+>  }
+>  
+>  /* ignore the error if the clock does not exist */
+
+Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+
+Thanks a lot
