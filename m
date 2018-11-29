@@ -1,57 +1,92 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Nov 2018 08:43:44 +0100
-Subject: [GIT PULL] Versatile Express DTS updates
-Message-ID: <CACRpkdZY8bybYjZ2zZfgWDLfd0o8zkhrpScAQ+z9xTgzsf0=FA@mail.gmail.com>
+From: aisheng.dong@nxp.com (Aisheng DONG)
+Date: Thu, 29 Nov 2018 07:46:41 +0000
+Subject: [PATCH v13 0/5] Add i.MX8MQ clock driver
+In-Reply-To: <154345210894.88331.8277410833858111600@swboyd.mtv.corp.google.com>
+References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
+ <154345210894.88331.8277410833858111600@swboyd.mtv.corp.google.com>
+Message-ID: <AM0PR04MB42117F72B9C4D41C14B96CBD80D20@AM0PR04MB4211.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd at kernel.org]
+[...]
+> >
+> > Changes since v12:
+> >  * replaced the division in clk_pll_recalc_rate in clk-frac
+> >    with do_div as suggested by Stephen
+> >
+> > Abel Vesa (2):
+> >   clk: imx: Add imx composite clock
+> >   clk: imx: Add clock driver for i.MX8MQ CCM
+> >
+> > Lucas Stach (3):
+> >   dt-bindings: add binding for i.MX8MQ CCM
+> >   clk: imx: add fractional PLL output clock
+> >   clk: imx: Add SCCG PLL type
+> >
+> 
+> I had to apply this set of fixes to silence sparse and smatch warnings about
+> things that are not right. Please take a look over things and see if it's sane.
+> 
 
-I agreed with Liviu Dudau (ARM Versatile Express maintainer)
-that I will send the Versatile Express updates to ARM SoC.
+The change looks good to me and tested ok.
+I did not see this patch series in your tree.
+Do you want us to apply your changes and re-send for easy pick up?
 
-This is an update of the DTS files (based on my v7 patch set)
-that forms the base changes for switch Versatile Express reference
-design family over to using DRM with the PL11x driver.
+Regards
+Dong Aisheng
 
-Please pull it in to ARM SoC DTS changes for v4.21!
-
-A corresponding defconfig update activating the new DRM
-driver is coming in a few minutes.
-
-Yours,
-Linus Walleij
-
-The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-
-  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-
-are available in the Git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/vexpress-drm-arm-soc
-
-for you to fetch changes up to f1fe12c8bf33241e04c57a0fc5b25b16ba77ba2d:
-
-  ARM: dts: Modernize the Vexpress PL111 integration (2018-11-29 08:31:41 +0100)
-
-----------------------------------------------------------------
-Versatile Express DTS update for DRM:
-This updates the Versatile Express family DTS files to
-contain the correct and detailed information required
-for the PL11x DRM driver to work properly.
-
-----------------------------------------------------------------
-Linus Walleij (1):
-      ARM: dts: Modernize the Vexpress PL111 integration
-
- arch/arm/boot/dts/vexpress-v2m-rs1.dtsi            | 49 ++++++-----------
- arch/arm/boot/dts/vexpress-v2m.dtsi                | 63 +++++++++++-----------
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts        | 14 +++++
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts         | 14 +++++
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts            | 14 +++++
- arch/arm/boot/dts/vexpress-v2p-ca9.dts             | 43 +++++++--------
- arch/arm64/boot/dts/arm/rtsm_ve-aemv8a.dts         | 23 ++++++++
- arch/arm64/boot/dts/arm/rtsm_ve-motherboard.dtsi   | 37 ++-----------
- .../boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts      | 14 +++++
- 9 files changed, 150 insertions(+), 121 deletions(-)
+> diff --git a/drivers/clk/imx/clk-composite-8m.c
+> b/drivers/clk/imx/clk-composite-8m.c
+> index bcd31d889584..6d9d3714b4df 100644
+> --- a/drivers/clk/imx/clk-composite-8m.c
+> +++ b/drivers/clk/imx/clk-composite-8m.c
+> @@ -127,8 +127,8 @@ struct clk *imx8m_clk_composite_flags(const char
+> *name,
+>  					int num_parents, void __iomem *reg,
+>  					unsigned long flags)
+>  {
+> -	struct clk_hw *hw = NULL, *mux_hw = NULL;
+> -	struct clk_hw *div_hw = NULL, *gate_hw = NULL;
+> +	struct clk_hw *hw = ERR_PTR(-ENOMEM), *mux_hw;
+> +	struct clk_hw *div_hw, *gate_hw;
+>  	struct clk_divider *div = NULL;
+>  	struct clk_gate *gate = NULL;
+>  	struct clk_mux *mux = NULL;
+> diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c index
+> a3732be5ad7f..98726206f3c4 100644
+> --- a/drivers/clk/imx/clk-frac-pll.c
+> +++ b/drivers/clk/imx/clk-frac-pll.c
+> @@ -14,6 +14,8 @@
+>  #include <linux/slab.h>
+>  #include <linux/bitfield.h>
+> 
+> +#include "clk.h"
+> +
+>  #define PLL_CFG0		0x0
+>  #define PLL_CFG1		0x4
+> 
+> @@ -214,7 +216,7 @@ struct clk *imx_clk_frac_pll(const char *name, const
+> char *parent_name,
+>  	ret = clk_hw_register(NULL, hw);
+>  	if (ret) {
+>  		kfree(pll);
+> -		return ERR_CAST(hw);
+> +		return ERR_PTR(ret);
+>  	}
+> 
+>  	return hw->clk;
+> diff --git a/drivers/clk/imx/clk-sccg-pll.c b/drivers/clk/imx/clk-sccg-pll.c index
+> 4666b96bdb3f..ee7752bace89 100644
+> --- a/drivers/clk/imx/clk-sccg-pll.c
+> +++ b/drivers/clk/imx/clk-sccg-pll.c
+> @@ -249,7 +249,7 @@ struct clk *imx_clk_sccg_pll(const char *name,
+>  	ret = clk_hw_register(NULL, hw);
+>  	if (ret) {
+>  		kfree(pll);
+> -		return ERR_CAST(hw);
+> +		return ERR_PTR(ret);
+>  	}
+> 
+>  	return hw->clk;
