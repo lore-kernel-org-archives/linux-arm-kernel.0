@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BB54C5ACC6
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 263E5C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E4324213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:37 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DC91421104
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gFz+Vsji";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="J809RAX0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E4324213A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hymFKSt0";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="WF/uDC6c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC91421104
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=hbjFVp8IIX2AhOg9z3n8qHp+ayN0YhKep0QerJIju8o=; b=gFz+Vsji3mSl5OFbeje7Hb7NR8
-	63bjXVNvTwesSWihmd46h84D8YGfIlxwupxtR2GJ2C93Isv5WaM2HH1LyepOX0Qgz9xEJ7CNnuYdK
-	ozi5psMB83lXtvmLweqc1GOkTol7cgEdk7Hr2U4ymH7KX6IaMKj3jm/44mPjbiZhSTS2hKgcYYKNE
-	JsRha8DjS7NB8LU0IXKBcjxFTqwHSsjYagNdV7xFsull3xv6elh6l2fSVIwrDLpZ3L+ZUeLA7ewuO
-	TGZtGvryl+C42sgfWXVh2So52VydhKX6Fq3npyT8YcuX92HK7rF29XQmXU4KJHQn9aY8ccateQITd
-	uDrA/+1Q==;
+	bh=n1NXSTYUjdGLo1lZxducsN4u+WLm1UXcD2M6xA3PL8k=; b=hymFKSt0bi9EEYyA9a3n5NS5r9
+	uBvHO80q57OJ2guMbEoP9oL52g0FgJR7/SFwmCb7/a6dq0ujW69WCwqZCSbDxJre3V4SlGxqHIpwF
+	Q7dag/ydwcQp8YEGke1mQfBDKySLyWQ9EwnsQgYWrNhH2ZCIDgegxVoBLMyw/zZsbPut208c8uKgR
+	5CsONL1N+phk+jmU1BZV+YlPhpGbsIMVML4sWi4k/xCM2/UwHQGjWNjDdwtJiI9S0LoKSKbBt4EGF
+	idKmun98O3st/VXu4F82Lz9n2RYBbmWII+r22UdIqlwj9bYlFdpjjNE7yEefhppmY1p/AJxY6o+Dx
+	FzLCKI1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQQP-00020z-Hm; Thu, 29 Nov 2018 17:48:29 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gSQQi-0002Jr-Ff; Thu, 29 Nov 2018 17:48:48 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQPM-00016l-16
+ id 1gSQPK-00016h-SV
  for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:26 +0000
-Received: by mail-lj1-x244.google.com with SMTP id x85-v6so2545798ljb.2
+Received: by mail-lf1-x143.google.com with SMTP id f23so2076469lfc.13
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 09:47:13 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=ugu70vqPSlvoBLQ0yLsWszKKKu9c1+r7G0LXkXDasSo=;
- b=J809RAX0UkMu+oLMCaHu/7lOJNiEpEYmhO3qRVV9ftWuS4GfGVd+0if+GWha2/5HqE
- GZmEskLLvfk/z1AJ92479NwriRYoDlF8rcgLIHKVAJsnFrJVsYlsullZUC/H/hI00kkE
- v0FxvLoWmWM4G0XceCHO1vyL0sm4zfZbOPLvc=
+ bh=2OFzyl7DYqM+TKMo2yE9Sged+x4IOY1BMaINc0irzbk=;
+ b=WF/uDC6cto89UDdfBnGrf81NlzZ26+j7fWxzr3FcUZ6bWkeWgWVSaZuoeSFwtlCJcl
+ ngNYcGXO/yOYk1SP4DlEzNaHgCCudJxCxzVB9V/lGel5iAWprOmMJl3y0UydtSlM96+S
+ vrGMzuCnis/xZHu8BwGfiah6JjJ2lyvNiNMLE=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=ugu70vqPSlvoBLQ0yLsWszKKKu9c1+r7G0LXkXDasSo=;
- b=JB2BM3XUlCBKv5byqvUZTUdAQe4Mf3VE4m3O0YA+a0Kab6WKbnaqszWpQLQgjVILOS
- rx8gpYiDsiH2wslLViM+0eoNsv+e96kefQ4WnOEP81imXGDEJkaGPlc7KznR7TZRrx4P
- vTb61DTVOizVcHgkvEVYpL1tiVQk++4kf/KL7/bzhXGaKFp6I7Y4oJqtuwlzMYIRqs+i
- pCGKmjEro2CbLd6JTc067ffMr0Spw/tg/q9po7w40wJG/B3HS85H9IE5dnrLMO6XUKQh
- iNwWqihJxPro6iuEf17Pxc6FfXsAKENTGHfiWrUu43n6Xo//dXGxBAFCjLLhjKSHOXzj
- X6Lg==
-X-Gm-Message-State: AA+aEWZL3trTWb+wOK/S/XFu7ZyMUCTDEfp8Abr6u2PlZ7T3dqGPsmSz
- 4MdqIH2kNaKpVpNnG8DDE6wfrg==
-X-Google-Smtp-Source: AFSGD/UGrlC0yFSw5PotUaeTrNwrutDGPc8atRm/uVrLmAUkuQfNCdn0P/EV8WXivwKFjQxVz0hZDA==
-X-Received: by 2002:a2e:1b47:: with SMTP id
- b68-v6mr1536355ljb.104.1543513631925; 
- Thu, 29 Nov 2018 09:47:11 -0800 (PST)
+ bh=2OFzyl7DYqM+TKMo2yE9Sged+x4IOY1BMaINc0irzbk=;
+ b=cVpmIsi5xvmlVYb21U++PvP8CvESAqNBgKqmwqqxGjU47IFdf+xxXFHmrXPDoZK6rg
+ u3/EmcizGfmRgDno4JWeFxxZAQZoJUUudCf0xiaTisPNoiyAQRvzuO1mh7+OiJV20Iov
+ DK7THyHb6pw/g7IaIL+Ytjpg3VaVmnNc1GtXWXd7CtLxN8P3Fa2uV0H+850/e679+Dkd
+ 4UtS5q/J1UMZcJENgfnaJ8zPX+Ntpt/Q7mx2XrNmMXPTc/+Mc/2EXPMJh6GiwMmJZ8Ww
+ FrlJkHjGQg++/pULZ9D2NANwF2z5KB4V1iNv6EkTAjXSovu5JE348+7Vv2qx39p7ci7C
+ JOqQ==
+X-Gm-Message-State: AA+aEWZxjtTupBZ3tZFhZmysbGcStwqP1Aag4VOZPF+7/dKo73e8YBT0
+ McsnPSNZQnarpyPVqtL+pb2NFg==
+X-Google-Smtp-Source: AFSGD/WcONLGmNXYECO9oNRUxrjzh2zAGhw9wIqkXq80q8IdpwQYFhZTN3X/sVmIELfDUDxcx4LF2Q==
+X-Received: by 2002:a19:2c92:: with SMTP id s140mr1622412lfs.42.1543513630200; 
+ Thu, 29 Nov 2018 09:47:10 -0800 (PST)
 Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
  [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.10
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.08
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 09:47:11 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:09 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
  Sudeep Holla <sudeep.holla@arm.com>,
  Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
  Mark Rutland <mark.rutland@arm.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v10 02/27] PM / Domains: Add support for CPU devices to genpd
-Date: Thu, 29 Nov 2018 18:46:35 +0100
-Message-Id: <20181129174700.16585-3-ulf.hansson@linaro.org>
+Subject: [PATCH v10 01/27] PM / Domains: Add generic data pointer to
+ genpd_power_state struct
+Date: Thu, 29 Nov 2018 18:46:34 +0100
+Message-Id: <20181129174700.16585-2-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094724_068093_3B8874B4 
-X-CRM114-Status: GOOD (  24.89  )
+X-CRM114-CacheID: sfid-20181129_094723_034544_4C3B33E7 
+X-CRM114-Status: GOOD (  19.72  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,21 +112,16 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-To enable a device belonging to a CPU to be attached to a PM domain managed
-by genpd, let's do a few changes to it, as to make it convenient to manage
-the specifics around CPUs.
+Let's add a data pointer to the genpd_power_state struct, to allow a genpd
+backend driver to store per state specific data. In order to introduce the
+pointer, we also need to adopt how genpd frees the allocated data for the
+default genpd_power_state struct, that it may allocate at pm_genpd_init().
 
-To be able to quickly find out what CPUs that are attached to a genpd,
-which typically becomes useful from a genpd governor as following changes
-is about to show, let's add a cpumask to the struct generic_pm_domain. At
-the point when a CPU device gets attached to a genpd, let's update its
-cpumask. Moreover, let's also propagate changes to the cpumask upwards in
-the topology to the master PM domains. In this way, the cpumask for a genpd
-hierarchically reflects all CPUs attached to the topology below it.
-
-Finally, let's make this an opt-in feature, to avoid having to manage CPUs
-and the cpumask for a genpd that doesn't need it. For that reason, let's
-add a new genpd configuration bit, GENPD_FLAG_CPU_DOMAIN.
+More precisely, let's use an internal genpd flag to understand when the
+states needs to be freed by genpd. When freeing the states data in
+genpd_remove(), let's also clear the corresponding genpd->states pointer
+and reset the genpd->state_count. In this way, a genpd backend driver
+becomes aware of when there is state specific data for it to free.
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
@@ -134,181 +129,65 @@ Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
 ---
 
 Changes in v10:
-	- Don't allocate the cpumask when not used.
-	- Simplify the code that updates the cpumask.
-	- Document the GENPD_FLAG_CPU_DOMAIN.
+	- Update the patch allow backend drivers to free the states specific
+	  data during genpd removal. Due to this added complexity, I decided to
+	  keep the patch separate, rather than fold it into the patch that makes
+	  use of the new void pointer, which was suggested by Rafael.
+	- Claim authorship of the patch as lots of changes has been done since
+	  the original pick up from Lina Iyer.
 
 ---
- drivers/base/power/domain.c | 66 ++++++++++++++++++++++++++++++++++++-
- include/linux/pm_domain.h   | 13 ++++++++
- 2 files changed, 78 insertions(+), 1 deletion(-)
+ drivers/base/power/domain.c | 8 ++++++--
+ include/linux/pm_domain.h   | 3 ++-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index e27b91d36a2a..c3ff8e395308 100644
+index 7f38a92b444a..e27b91d36a2a 100644
 --- a/drivers/base/power/domain.c
 +++ b/drivers/base/power/domain.c
-@@ -20,6 +20,7 @@
- #include <linux/sched.h>
- #include <linux/suspend.h>
- #include <linux/export.h>
-+#include <linux/cpu.h>
+@@ -1620,7 +1620,7 @@ static int genpd_set_default_power_state(struct generic_pm_domain *genpd)
  
- #include "power.h"
+ 	genpd->states = state;
+ 	genpd->state_count = 1;
+-	genpd->free = state;
++	genpd->free_state = true;
  
-@@ -126,6 +127,7 @@ static const struct genpd_lock_ops genpd_spin_ops = {
- #define genpd_is_irq_safe(genpd)	(genpd->flags & GENPD_FLAG_IRQ_SAFE)
- #define genpd_is_always_on(genpd)	(genpd->flags & GENPD_FLAG_ALWAYS_ON)
- #define genpd_is_active_wakeup(genpd)	(genpd->flags & GENPD_FLAG_ACTIVE_WAKEUP)
-+#define genpd_is_cpu_domain(genpd)	(genpd->flags & GENPD_FLAG_CPU_DOMAIN)
- 
- static inline bool irq_safe_dev_in_no_sleep_domain(struct device *dev,
- 		const struct generic_pm_domain *genpd)
-@@ -1377,6 +1379,56 @@ static void genpd_free_dev_data(struct device *dev,
- 	dev_pm_put_subsys_data(dev);
+ 	return 0;
  }
- 
-+static void __genpd_update_cpumask(struct generic_pm_domain *genpd,
-+				   int cpu, bool set, unsigned int depth)
-+{
-+	struct gpd_link *link;
-+
-+	if (!genpd_is_cpu_domain(genpd))
-+		return;
-+
-+	list_for_each_entry(link, &genpd->slave_links, slave_node) {
-+		struct generic_pm_domain *master = link->master;
-+
-+		genpd_lock_nested(master, depth + 1);
-+		__genpd_update_cpumask(master, cpu, set, depth + 1);
-+		genpd_unlock(master);
-+	}
-+
-+	if (set)
-+		cpumask_set_cpu(cpu, genpd->cpus);
-+	else
-+		cpumask_clear_cpu(cpu, genpd->cpus);
-+}
-+
-+static void genpd_update_cpumask(struct generic_pm_domain *genpd,
-+				 struct device *dev, bool set)
-+{
-+	int cpu;
-+
-+	if (!genpd_is_cpu_domain(genpd))
-+		return;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (get_cpu_device(cpu) == dev) {
-+			__genpd_update_cpumask(genpd, cpu, set, 0);
-+			return;
-+		}
-+	}
-+}
-+
-+static void genpd_set_cpumask(struct generic_pm_domain *genpd,
-+			      struct device *dev)
-+{
-+	genpd_update_cpumask(genpd, dev, true);
-+}
-+
-+static void genpd_clear_cpumask(struct generic_pm_domain *genpd,
-+				struct device *dev)
-+{
-+	genpd_update_cpumask(genpd, dev, false);
-+}
-+
- static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 			    struct gpd_timing_data *td)
- {
-@@ -1398,6 +1450,8 @@ static int genpd_add_device(struct generic_pm_domain *genpd, struct device *dev,
- 	if (ret)
- 		goto out;
- 
-+	genpd_set_cpumask(genpd, dev);
-+
- 	dev_pm_domain_set(dev, &genpd->domain);
- 
- 	genpd->device_count++;
-@@ -1459,6 +1513,7 @@ static int genpd_remove_device(struct generic_pm_domain *genpd,
- 	if (genpd->detach_dev)
- 		genpd->detach_dev(genpd, dev);
- 
-+	genpd_clear_cpumask(genpd, dev);
- 	dev_pm_domain_set(dev, NULL);
- 
- 	list_del_init(&pdd->list_node);
-@@ -1686,11 +1741,18 @@ int pm_genpd_init(struct generic_pm_domain *genpd,
- 	if (genpd_is_always_on(genpd) && !genpd_status_on(genpd))
- 		return -EINVAL;
- 
-+	if (genpd_is_cpu_domain(genpd) &&
-+	    !zalloc_cpumask_var(&genpd->cpus, GFP_KERNEL))
-+		return -ENOMEM;
-+
- 	/* Use only one "off" state if there were no states declared */
- 	if (genpd->state_count == 0) {
- 		ret = genpd_set_default_power_state(genpd);
--		if (ret)
-+		if (ret) {
-+			if (genpd_is_cpu_domain(genpd))
-+				free_cpumask_var(genpd->cpus);
- 			return ret;
-+		}
- 	} else if (!gov) {
- 		pr_warn("%s : no governor for states\n", genpd->name);
- 	}
-@@ -1736,6 +1798,8 @@ static int genpd_remove(struct generic_pm_domain *genpd)
+@@ -1736,7 +1736,11 @@ static int genpd_remove(struct generic_pm_domain *genpd)
  	list_del(&genpd->gpd_list_node);
  	genpd_unlock(genpd);
  	cancel_work_sync(&genpd->power_off_work);
-+	if (genpd_is_cpu_domain(genpd))
-+		free_cpumask_var(genpd->cpus);
- 	if (genpd->free_state) {
- 		kfree(genpd->states);
- 		genpd->states = NULL;
+-	kfree(genpd->free);
++	if (genpd->free_state) {
++		kfree(genpd->states);
++		genpd->states = NULL;
++		genpd->state_count = 0;
++	}
+ 	pr_debug("%s: removed %s\n", __func__, genpd->name);
+ 
+ 	return 0;
 diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index f9e09bd4152c..5a4673605d22 100644
+index 3b5d7280e52e..f9e09bd4152c 100644
 --- a/include/linux/pm_domain.h
 +++ b/include/linux/pm_domain.h
-@@ -16,6 +16,7 @@
- #include <linux/of.h>
- #include <linux/notifier.h>
- #include <linux/spinlock.h>
-+#include <linux/cpumask.h>
+@@ -69,6 +69,7 @@ struct genpd_power_state {
+ 	s64 residency_ns;
+ 	struct fwnode_handle *fwnode;
+ 	ktime_t idle_time;
++	void *data;
+ };
  
- /*
-  * Flags to control the behaviour of a genpd.
-@@ -42,11 +43,22 @@
-  * GENPD_FLAG_ACTIVE_WAKEUP:	Instructs genpd to keep the PM domain powered
-  *				on, in case any of its attached devices is used
-  *				in the wakeup path to serve system wakeups.
-+ *
-+ * GENPD_FLAG_CPU_DOMAIN:	Instructs genpd that it should expect to get
-+ *				devices attached, which may belong to CPUs or
-+ *				possibly have subdomains with CPUs attached.
-+ *				This flag enables the genpd backend driver to
-+ *				deploy idle power management support for CPUs
-+ *				and groups of CPUs. Note that, the backend
-+ *				driver must then comply with the so called,
-+ *				last-man-standing algorithm, for the CPUs in the
-+ *				PM domain.
-  */
- #define GENPD_FLAG_PM_CLK	 (1U << 0)
- #define GENPD_FLAG_IRQ_SAFE	 (1U << 1)
- #define GENPD_FLAG_ALWAYS_ON	 (1U << 2)
- #define GENPD_FLAG_ACTIVE_WAKEUP (1U << 3)
-+#define GENPD_FLAG_CPU_DOMAIN	 (1U << 4)
- 
- enum gpd_status {
- 	GPD_STATE_ACTIVE = 0,	/* PM domain is active */
-@@ -93,6 +105,7 @@ struct generic_pm_domain {
- 	unsigned int suspended_count;	/* System suspend device counter */
- 	unsigned int prepared_count;	/* Suspend counter of prepared devices */
- 	unsigned int performance_state;	/* Aggregated max performance state */
-+	cpumask_var_t cpus;		/* A cpumask of the attached CPUs */
- 	int (*power_off)(struct generic_pm_domain *domain);
- 	int (*power_on)(struct generic_pm_domain *domain);
- 	unsigned int (*opp_to_performance_state)(struct generic_pm_domain *genpd,
+ struct genpd_lock_ops;
+@@ -110,7 +111,7 @@ struct generic_pm_domain {
+ 	struct genpd_power_state *states;
+ 	unsigned int state_count; /* number of states */
+ 	unsigned int state_idx; /* state that genpd will go to when off */
+-	void *free; /* Free the state that was allocated for default */
++	bool free_state; /* Free the state that was allocated for default */
+ 	ktime_t on_time;
+ 	ktime_t accounting_time;
+ 	const struct genpd_lock_ops *lock_ops;
 -- 
 2.17.1
 
