@@ -1,47 +1,64 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Thu, 29 Nov 2018 12:03:40 +0300
-Subject: [PATCH v6 2/2] PCI: amlogic: Add the Amlogic Meson PCIe
- controller driver
-In-Reply-To: <1542876836-191355-3-git-send-email-hanjie.lin@amlogic.com>
-Message-ID: <20181129090340.GO3073@unbuntlaptop>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 29 Nov 2018 07:27:59 -0200
+Subject: [RFC] ARM: dts: imx7d-nitrogen7: Use mmc-pwrseq to activate the Wifi
+ clock
+Message-ID: <1543483679-1100-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yue,
+In order to turn on the Wifi clock the correct location for describing
+the CLKO2 clock is via a mmc-pwrseq handle, so do it accordingly.
 
-url:    https://github.com/0day-ci/linux/commits/Hanjie-Lin/dt-bindings-PCI-meson-add-DT-bindings-for-Amlogic-Meson-PCIe-controller/20181122-225955
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
-
-smatch warnings:
-drivers/pci/controller/dwc/pci-meson.c:171 meson_pcie_get_mem_shared() error: passing non negative 6 to ERR_PTR
-
-# https://github.com/0day-ci/linux/commit/c882cdc75e49b6de65cd3d95ebf688272af6b5f9
-git remote add linux-review https://github.com/0day-ci/linux
-git remote update linux-review
-git checkout c882cdc75e49b6de65cd3d95ebf688272af6b5f9
-vim +171 drivers/pci/controller/dwc/pci-meson.c
-
-c882cdc75 Yue Wang 2018-11-22  160  
-c882cdc75 Yue Wang 2018-11-22  161  static void __iomem *meson_pcie_get_mem_shared(struct platform_device *pdev,
-c882cdc75 Yue Wang 2018-11-22  162  					       struct meson_pcie *mp,
-c882cdc75 Yue Wang 2018-11-22  163  					       const char *id)
-c882cdc75 Yue Wang 2018-11-22  164  {
-c882cdc75 Yue Wang 2018-11-22  165  	struct device *dev = mp->pci.dev;
-c882cdc75 Yue Wang 2018-11-22  166  	struct resource *res;
-c882cdc75 Yue Wang 2018-11-22  167  
-c882cdc75 Yue Wang 2018-11-22  168  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
-c882cdc75 Yue Wang 2018-11-22  169  	if (!res) {
-c882cdc75 Yue Wang 2018-11-22  170  		dev_err(dev, "No REG resource %s\n", id);
-c882cdc75 Yue Wang 2018-11-22 @171  		return ERR_PTR(ENXIO);
-                                                               ^^^^^
-                                                               -ENXIO
-
-c882cdc75 Yue Wang 2018-11-22  172  	}
-c882cdc75 Yue Wang 2018-11-22  173  
-c882cdc75 Yue Wang 2018-11-22  174  	return devm_ioremap(dev, res->start, resource_size(res));
-c882cdc75 Yue Wang 2018-11-22  175  }
-c882cdc75 Yue Wang 2018-11-22  176  
-
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Hi Gary/Troy,
+
+I don't have access to this board, but I was working on something similar
+for imx7d-pico-pi and needed to add mmc-pwrseq in order to turn on
+the 32kHz clock:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/616048.html
+
+Is the 32kHz clock still needed for the Wifi chip used in the latest
+version of nitrogen7?
+
+What do you think about this patch?
+
+Thanks
+
+ arch/arm/boot/dts/imx7d-nitrogen7.dts | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+index 4fb7e84..9ba9084 100644
+--- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
++++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+@@ -87,13 +87,17 @@
+ 		compatible = "regulator-fixed";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
+-		clocks = <&clks IMX7D_CLKO2_ROOT_DIV>;
+-		clock-names = "slow";
+ 		regulator-name = "reg_wlan";
+ 		startup-delay-us = <70000>;
+ 		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
+ 		enable-active-high;
+ 	};
++
++	usdhc2_pwrseq: usdhc2_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		clocks = <&clks IMX7D_CLKO2_ROOT_DIV>;
++		clock-names = "slow";
++	};
+ };
+ 
+ &adc1 {
+@@ -376,6 +380,7 @@
+ 	bus-width = <4>;
+ 	non-removable;
+ 	vmmc-supply = <&reg_wlan>;
++	mmc-pwrseq = <&usdhc2_pwrseq>;
+ 	cap-power-off-card;
+ 	keep-power-in-suspend;
+ 	status = "okay";
+-- 
+2.7.4
