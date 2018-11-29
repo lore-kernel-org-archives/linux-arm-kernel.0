@@ -1,33 +1,44 @@
-From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
-Date: Thu, 29 Nov 2018 11:53:28 +0900
-Subject: [PATCH v2] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
-In-Reply-To: <93b0cce5-4ceb-14ab-5987-af54f15958f2@linaro.org>
-References: <20181025134344.GZ30658@n2100.armlinux.org.uk>
- <20181121001150.405-1-rafael.tinoco@linaro.org>
- <91776bf8-0d12-1cc4-1ffb-ca3c486aeb0b@linaro.org>
- <93b0cce5-4ceb-14ab-5987-af54f15958f2@linaro.org>
-Message-ID: <20181129025328.GE6379@jagdpanzerIV>
+From: hsinyi@chromium.org (Hsin-Yi, Wang)
+Date: Thu, 29 Nov 2018 11:16:27 +0800
+Subject: [PATCH v4] usb/mtu3: power down device ip at setup
+In-Reply-To: <20181128095358.42498-1-hsinyi@chromium.org>
+References: <20181128095358.42498-1-hsinyi@chromium.org>
+Message-ID: <20181129031627.45006-1-hsinyi@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On (11/27/18 18:33), Rafael David Tinoco wrote:
-> On 11/20/18 10:18 PM, Rafael David Tinoco wrote:
-> > 
-> > Russell,
-> > 
-> > I have tried to place MAX_POSSIBLE_PHYSMEM_BITS in the best available
-> > header for each architecture, considering different paging levels, PAE
-> > existence, and existing similar definitions. Also, I have only
-> > considered those architectures already having "sparsemem.h" header.
-> > 
-> > Would you mind reviewing it ?
-> 
-> Should I re-send the this v2 (as v3) with complete list of
-> get_maintainer.pl ? I was in doubt because I'm touching headers from
-> several archs and I'm not sure who, if it is accepted, would merge it.
+Originally, when dr_mode is USB_DR_MODE_HOST, it didn't power down device ip,
+so host ip sleep will fail at ssusb_host_disable.
 
-Yes, resending and Cc-ing archs' maintainers if the right thing to do.
-It's also possible that they will ask to split the patch and do a
-per-arch change.
+Power down device ip at ssusb_host_setup.
 
-	-ss
+Signed-off-by: Hsin-Yi, Wang <hsinyi@chromium.org>
+---
+ChangeLog:
+V3->V4:
+  *update comment
+---
+ drivers/usb/mtu3/mtu3_plat.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 46551f6d16fd..e086630e41a9 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -200,6 +200,14 @@ static void ssusb_ip_sw_reset(struct ssusb_mtk *ssusb)
+ 	mtu3_setbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL0, SSUSB_IP_SW_RST);
+ 	udelay(1);
+ 	mtu3_clrbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL0, SSUSB_IP_SW_RST);
++
++	/*
++	 * device ip may be powered on in firmware/BROM stage before entering
++	 * kernel stage;
++	 * power down device ip, otherwise ip-sleep will fail when working as
++	 * host only mode
++	 */
++	mtu3_setbits(ssusb->ippc_base, U3D_SSUSB_IP_PW_CTRL2, SSUSB_IP_DEV_PDN);
+ }
+ 
+ /* ignore the error if the clock does not exist */
+-- 
+2.18.1
