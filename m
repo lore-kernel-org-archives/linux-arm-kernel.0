@@ -2,20 +2,21 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74976C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 19:08:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4B22FC43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 19:10:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E61321104
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 19:08:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 20A3F21104
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 19:10:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jKyQ71TW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E61321104
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IajDG6zl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 20A3F21104
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=atomide.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,40 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=se3yFtkmv+XHXZ7ToZyqr20UCNFUGP5V8sm12nl14MQ=; b=jKyQ71TWF/yRcr
-	xTr3pqtSrNEOO/f7fEqusDktgbAzlFNg8TnDrvHmGnneWe/9vB9/DhT3ASpvMn7vSvOg/biBQ/ogA
-	X40eJ6ZvuJvs1gUxasWTAORSiY0AKLSHZCGqX6G4rcTWOc0XFNGUGaecYfZPkAxr0EnVgJDq7NpS3
-	xWoE9+Yxx5/knZ7MqTrumvuhSqTSGGX9ktq07FPm7B6uSnLATUB2BDUG2SXMjxs0v0e+WI1UYr0A5
-	h5CUgKPAyAxblR4DBOsB6fn7LghEpbKrEqRvb63ABNyfoHU0XHjr/ssL0WyWitOcZBPyitXBFlLUM
-	Tgn8NG8/AfKg0HxOzaVg==;
+	List-Owner; bh=WCedGuXHaDufSRM/ZKm/8AU/i9aAG6/2XW5MEujbzC4=; b=IajDG6zl8qQGxF
+	8Va0JKEJCleukVQbsUxt+4oQB1+mzNYHVmHmGGgXPeYyqWmU7sAOsmpMPlfTo2UXgqx5R8c7/4zT/
+	+56lbS7OHJShk6VQUialjI6YSGYPf25MNDk7pasrc3l/BOVW1LS1lxZ8yX6D6kT0/BDeOJGG9hd/e
+	NY/qipKDZxTFeIlQlMWVTmx5tO/kzyBDXPT97qu8SAWAVD6gQobZScJNx3eYdkFUWyUa0mMXEWXyc
+	LJYAb9/9hdbQ/aso+hDzmB//HJgid1nEDjuvjfcui226e7xrh5flx2NGrQEEH0hj+LGhA+KCJrEVF
+	3jMU1R/aQD+1Yx9hWzPw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSRfa-0001kd-R1; Thu, 29 Nov 2018 19:08:14 +0000
+	id 1gSRh9-00022k-8y; Thu, 29 Nov 2018 19:09:51 +0000
 Received: from muru.com ([72.249.23.125])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSRfX-0001k9-RA
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 19:08:13 +0000
+ id 1gSRh5-00022M-G2
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 19:09:48 +0000
 Received: from atomide.com (localhost [127.0.0.1])
- by muru.com (Postfix) with ESMTPS id 465C080EA;
- Thu, 29 Nov 2018 19:08:03 +0000 (UTC)
-Date: Thu, 29 Nov 2018 11:07:58 -0800
+ by muru.com (Postfix) with ESMTPS id 594D780EA;
+ Thu, 29 Nov 2018 19:09:39 +0000 (UTC)
+Date: Thu, 29 Nov 2018 11:09:34 -0800
 From: Tony Lindgren <tony@atomide.com>
-To: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Subject: Re: [PATCH 4/4] ARM: dts: am335x: Move l4 child devices to probe
- them with ti-sysc
-Message-ID: <20181129190758.GW53235@atomide.com>
-References: <20180925000545.22931-1-tony@atomide.com>
- <20180925000545.22931-5-tony@atomide.com>
- <612b09a4-5007-39bf-becb-66fdca9d6d41@ti.com>
- <20181127161625.GR53235@atomide.com>
- <e1f4e272-32aa-1a28-6919-fd8a92f80ce8@ti.com>
+To: Grygorii Strashko <grygorii.strashko@ti.com>
+Subject: Re: [PATCH] ARM: dts: dra7: Move the ti, no-idle quirk on proper gmac
+ node
+Message-ID: <20181129190934.GX53235@atomide.com>
+References: <1543401907-14751-1-git-send-email-t-kristo@ti.com>
+ <1c2e5a69-f0c4-47c6-79d4-a11521b6ecda@ti.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <e1f4e272-32aa-1a28-6919-fd8a92f80ce8@ti.com>
+In-Reply-To: <1c2e5a69-f0c4-47c6-79d4-a11521b6ecda@ti.com>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_110811_919465_C755A0D7 
-X-CRM114-Status: GOOD (  11.30  )
+X-CRM114-CacheID: sfid-20181129_110947_572440_5332DBB3 
+X-CRM114-Status: GOOD (  10.73  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,39 +67,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Dave Gerlach <d-gerlach@ti.com>,
- Keerthy <j-keerthy@ti.com>, Tero Kristo <t-kristo@ti.com>,
- =?utf-8?Q?Beno=C3=AEt?= Cousson <bcousson@baylibre.com>,
+Cc: Tero Kristo <t-kristo@ti.com>, devicetree@vger.kernel.org,
  linux-omap@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [181128 12:50]:
+* Grygorii Strashko <grygorii.strashko@ti.com> [181128 23:11]:
 > 
 > 
-> On 27/11/2018 18.16, Tony Lindgren wrote:
-> > * Peter Ujfalusi <peter.ujfalusi@ti.com> [181127 13:01]:
-> >> Reverting this patch in linux-next makes audio working again on am335x
-> >> (bb white + audio cape) :o
-> >>
-> >> Without revert the McASP FIFO would constantly underflow.
+> On 11/28/18 4:45 AM, Tero Kristo wrote:
+> > Hwmod parses the DT hierarchically from root to search for matching
+> > ti,hwmod property. With the introduction of L4 data, we have two nodes
+> > with the ti,hwmod = "gmac" declaration, and the hwmod core only matches
+> > the first one found, which is the target-module one. This node incorrectly
+> > dropped the ti,no-idle flag, which causes number of problems, like ignoring
+> > errata i877, and also causing an intermittent boot failure on certain dra7
+> > boards.
 > > 
-> > Thanks for testing. Hmm the dts change looks right. And
-> > am3_l3s_clkctrl_regs[] has CLKF_SW_SUP for the mcasp fcks.
-> > And there are no opt clocks to enable according to the TRM.
+> > Fix the issue by moving the ti,no-idle flag to the proper node.
 > > 
-> >> Memcpy test via dmatest works with EDMA
-> > 
-> > OK. Can you please test if the following partial revert
-> > also works or is there maybe a dependency to some other
-> > device?
+> > Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> > Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > ---
+> > FYI: The problem is seen in linux-next.
 > 
-> It works, thanks:
-> Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Thank you.
+> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com> 
 
-OK aplying into omap-for-v4.21/dt-ti-sysc.
+Thanks for catching it, applying into omap-for-v4.21/dt-ti-sysc.
 
 Regards,
 
