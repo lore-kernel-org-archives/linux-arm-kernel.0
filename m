@@ -2,21 +2,20 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E599DC43610
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:13:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C96AEC43610
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:17:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B4868213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:13:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A0F51213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:17:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X2Pdo7WM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B4868213A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oiUJWfoB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A0F51213A2
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,42 +24,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Xo01f/Pw717r3gzjkcMrA5KiB7vhfDocPCtZ52zACfg=; b=X2Pdo7WM68H1FJ
-	g3ChneSW0W+XsyhkzJqpGJh9mzhA6hWtcRN1bdzE36eDIiXQjk9medttSBW0tM/SGQPbdY2BQmeRZ
-	L/UY3D+ssiY9w3uPjXUxNXbtOa/PmJNyMXqGVGmNDw8B3J4yylzyGpan2rOp/h9x7kFHM2/ubqP4U
-	c6MdlR99+ga9qoVowU0q2RpZNuekrwDJjm9S9YOObCqLJf2lnJ6fMH026bH2ppj8FP0D+tq+v2HoI
-	scdeQT/AEU1skXG0DZPsbikpE0m2dNV6hlRpUHz01l9WV2uVhiNLa87FPBcx191YdpJx1u+eikxpY
-	FGBur43HALCJKAQPoJtg==;
+	List-Owner; bh=t1CfEfLMsiZ4Tt+W58fVockJYA8PutjSAtSCEPiE5fc=; b=oiUJWfoBpg/ekc
+	3lg7Mf5eyW1s2rVOF5tfE1aSTOwf4zte3CzbBlWg+WXz9Z60eyXgU0jiiNCVbzmoApxPdl3mkh4cy
+	+uHAvk+orWfxbYVlURn7pn/OudNQu3tt10lJglOaypWC/NI79tDfVFYzDTMDngY5oF4V40x2DUfqy
+	Sg0BR1SeWL4XU3dwBsUo6L6sR1UJeGhmM+37kxbtM9e2RmHqnA0DFT4kRrNwq9tB4BEKil60f0DRV
+	HpGlNCG9jxSZoTvdLRSbGgF78KNE3vTBbQdtsbpyIHL/4c/KcdUyLQs8P5HIBWQu2Twh8QwcznLkc
+	amP+vQN+AwOnTLVFPrLg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQoP-0002s7-L6; Thu, 29 Nov 2018 18:13:17 +0000
+	id 1gSQsC-0004yl-NQ; Thu, 29 Nov 2018 18:17:12 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQoM-0002rI-6o
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 18:13:15 +0000
+ id 1gSQsA-0004ri-CJ
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 18:17:11 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 96B2E80D;
- Thu, 29 Nov 2018 10:13:03 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 814393F575;
- Thu, 29 Nov 2018 10:13:01 -0800 (PST)
-Date: Thu, 29 Nov 2018 18:12:59 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v6 05/24] irqchip/gic-v3: Switch to PMR masking before
- calling IRQ handler
-Message-ID: <20181129181258.jo6s4e7s3zwkp4sk@lakrids.cambridge.arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-6-git-send-email-julien.thierry@arm.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A3E0980D;
+ Thu, 29 Nov 2018 10:16:57 -0800 (PST)
+Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
+ 88E2A3F575; Thu, 29 Nov 2018 10:16:53 -0800 (PST)
+Date: Thu, 29 Nov 2018 18:16:51 +0000
+From: Catalin Marinas <catalin.marinas@arm.com>
+To: Andrey Konovalov <andreyknvl@google.com>
+Subject: Re: [PATCH v8 0/8] arm64: untag user pointers passed to the kernel
+Message-ID: <20181129181650.GG22027@arrakis.emea.arm.com>
+References: <cover.1541687720.git.andreyknvl@google.com>
+ <CAAeHK+w1Qv6owkdWfjbXMFqOA8BURDN5gviw8vpgi3eon1dWmA@mail.gmail.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <1542023835-21446-6-git-send-email-julien.thierry@arm.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+In-Reply-To: <CAAeHK+w1Qv6owkdWfjbXMFqOA8BURDN5gviw8vpgi3eon1dWmA@mail.gmail.com>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_101314_262885_760E0156 
-X-CRM114-Status: GOOD (  21.11  )
+X-CRM114-CacheID: sfid-20181129_101710_453260_6E69A26E 
+X-CRM114-Status: GOOD (  21.28  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,141 +69,66 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: daniel.thompson@linaro.org, Jason Cooper <jason@lakedaemon.net>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Kate Stewart <kstewart@linuxfoundation.org>,
+ "open list:DOCUMENTATION" <linux-doc@vger.kernel.org>,
+ Will Deacon <will.deacon@arm.com>,
+ Linux Memory Management List <linux-mm@kvack.org>,
+ "open list:KERNEL SELFTEST FRAMEWORK" <linux-kselftest@vger.kernel.org>,
+ Chintan Pandya <cpandya@codeaurora.org>, Shuah Khan <shuah@kernel.org>,
+ Ingo Molnar <mingo@kernel.org>, linux-arch <linux-arch@vger.kernel.org>,
+ Jacob Bramley <Jacob.Bramley@arm.com>, Dmitry Vyukov <dvyukov@google.com>,
+ Evgeniy Stepanov <eugenis@google.com>, Kees Cook <keescook@chromium.org>,
+ Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
+ Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>,
+ Kostya Serebryany <kcc@google.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LKML <linux-kernel@vger.kernel.org>,
+ "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>,
+ Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
+ Robin Murphy <robin.murphy@arm.com>,
+ Luc Van Oostenryck <luc.vanoostenryck@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 12, 2018 at 11:56:56AM +0000, Julien Thierry wrote:
-> Mask the IRQ priority through PMR and re-enable IRQs at CPU level,
-> allowing only higher priority interrupts to be received during interrupt
-> handling.
+Hi Andrey,
+
+On Thu, Nov 08, 2018 at 03:48:10PM +0100, Andrey Konovalov wrote:
+> On Thu, Nov 8, 2018 at 3:36 PM, Andrey Konovalov <andreyknvl@google.com> wrote:
+> > Changes in v8:
+> > - Rebased onto 65102238 (4.20-rc1).
+> > - Added a note to the cover letter on why syscall wrappers/shims that untag
+> >   user pointers won't work.
+> > - Added a note to the cover letter that this patchset has been merged into
+> >   the Pixel 2 kernel tree.
+> > - Documentation fixes, in particular added a list of syscalls that don't
+> >   support tagged user pointers.
 > 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/arch_gicv3.h   | 17 +++++++++++++++++
->  arch/arm64/include/asm/arch_gicv3.h | 17 +++++++++++++++++
->  drivers/irqchip/irq-gic-v3.c        | 10 ++++++++++
->  3 files changed, 44 insertions(+)
+> I've changed the documentation to be more specific, please take a look.
 > 
-> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
-> index bef0b5d..f6f485f 100644
-> --- a/arch/arm/include/asm/arch_gicv3.h
-> +++ b/arch/arm/include/asm/arch_gicv3.h
-> @@ -363,5 +363,22 @@ static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
->  
->  #define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
->  
-> +static inline bool gic_prio_masking_enabled(void)
-> +{
-> +	return false;
-> +}
-> +
-> +static inline void gic_pmr_mask_irqs(void)
-> +{
-> +	/* Should not get called. */
-> +	WARN_ON_ONCE(true);
-> +}
-> +
-> +static inline void gic_arch_enable_irqs(void)
-> +{
-> +	/* Should not get called. */
-> +	WARN_ON_ONCE(true);
-> +}
-> +
->  #endif /* !__ASSEMBLY__ */
->  #endif /* !__ASM_ARCH_GICV3_H */
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index 37193e2..3f8d5f4 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -155,5 +155,22 @@ static inline u32 gic_read_rpr(void)
->  #define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
->  #define gits_read_vpendbaser(c)		readq_relaxed(c)
->  
-> +static inline bool gic_prio_masking_enabled(void)
-> +{
-> +	return system_supports_irq_prio_masking();
-> +}
-> +
-> +static inline void gic_pmr_mask_irqs(void)
-> +{
-> +	/* Should not get called yet. */
-> +	WARN_ON_ONCE(true);
-> +}
-> +
-> +static inline void gic_arch_enable_irqs(void)
-> +{
-> +	/* Should not get called yet. */
-> +	WARN_ON_ONCE(true);
-> +}
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ASM_ARCH_GICV3_H */
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 8f87f40..e5d8c14 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -353,6 +353,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
->  	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
->  		int err;
->  
-> +		if (gic_prio_masking_enabled()) {
-> +			gic_pmr_mask_irqs();
-> +			gic_arch_enable_irqs();
-> +		}
+> I haven't done anything about adding a way for the user to find out
+> that the kernel supports this ABI extension. I don't know what would
+> the the preferred way to do this, and we haven't received any comments
+> on that from anybody else. Probing "on some innocuous syscall
+> currently returning -EFAULT on tagged pointer arguments" works though,
+> as you mentioned.
 
-IIUC, if we have two pNMIs, this will allow one to preempt another, e.g.
+We've had some internal discussions and also talked to some people at
+Plumbers. I think the best option is to introduce an AT_FLAGS bit to
+describe the ABI relaxation on tagged pointers. Vincenzo is going to
+propose a patch on top of this series.
 
-	< pNMI#1 asserted >
+> As mentioned in the cover letter, this patchset has been merged into
+> the Pixel 2 kernel tree.
 
-	< CPU takes IRQ exception for pNMI #1>
+I just hope it's not enabled on production kernels, it would introduce
+a user ABI that may differ from what ends up upstream.
 
-	irqnr = gic_read_iar(); // pNMI #1
-
-	< pNMI#2 asserted >
-
-	// masks IRQs at GIC, leaves other pNMIs unmasked
-	gic_pmr_mask_irqs()
-	gic_arch_enable_irqs();
-
-	...
-
-	< CPU takes IRQ exception for pNMI #2 >
-
-... or is that not a problem? Is the NMI code re-entrant?
-
-> +
->  		if (static_branch_likely(&supports_deactivate_key))
->  			gic_write_eoir(irqnr);
->  		else
-> @@ -371,6 +376,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
->  		return;
->  	}
->  	if (irqnr < 16) {
-> +		if (gic_prio_masking_enabled()) {
-> +			gic_pmr_mask_irqs();
-> +			gic_arch_enable_irqs();
-> +		}
-
-Can we pull this above the two cases, or is there a problem with doing
-this for spurious IRQs?
-
-Where is the corresponding unmask of the PMR, and disable of IRQs? It's
-difficult to follow the logic if that's in another patch.
-
-Thanks,
-Mark.
+-- 
+Catalin
 
 _______________________________________________
 linux-arm-kernel mailing list
