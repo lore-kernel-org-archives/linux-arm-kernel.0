@@ -2,84 +2,63 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E975C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 021F8C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 34AAF213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C87E820868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cwaazh3R";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="UaAynCT6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 34AAF213A2
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nx11JyNH"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C87E820868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=H+he6ji7Hdg87ygF8TXf1ATojlt6Q5T8l7MUaPngxG8=; b=cwaazh3R4LeOR1
-	nehJEV525mhNyaG68NWYLWCszQnPaPXM8V9C8I4E/EZITaMFhveX5QCoQd0+IdhSNu31lNFj7X8qM
-	NDrbx1CK/UjqIUx9Y8Z+FnOiECe+e3K/J6MypyfOLUib5fc6abXOEXJqtLuVPLHqWEQHevCBkrt6O
-	bSx4y9jjeW2SoYwm7lHWKzO6wiEla1dWEd1aa95t1abxHJkcM0QoBcfQ8+K4F72Njmpu54oKyTPqc
-	umRnK6jNlgC0GQbt1mn7uTWeFqsQdeEOIg+WPo9mgZj0R91BeTR7qKSbomlM9Vq4lPc/SdI+QMedd
-	i3nWCpPZoJMaZyKEG97Q==;
+	List-Owner; bh=Kz1bLfiyT0QwMrg3ar5iXZo3i6Efa5r0WLnlARGem5Q=; b=nx11JyNHUVYVSY
+	FmjihVMT2zeJ1Si3zB1LhkG82E+fJL3mlE37fRIP92cl432kgevxxRTsfVQWPJvzRjT762HXECgZB
+	TUHLdMjf3Hc40k78JbM+MlkLvTg8XAVk6vt0Aj9EQybHsCV7GBpMT2GVwChAouTQ00tu38joUXysD
+	vm1LmgsSpJIpQfyF5LsDW6SSJmxWPQmaHbChN0pNM11yLGXYUzEZkCgz1r/rIOAo1JXKpkjA/LtBw
+	EeMJ4VJuTDUFoSLP8xIQc3emjCLKfoDfHHhlwAkeY97U3PomVK9ccopZ43L4vELEkjaqzgH4RhuEZ
+	cRtqDYwd+xuUPQg4nu7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSOw1-0005zR-7e; Thu, 29 Nov 2018 16:13:01 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSOvp-0005oq-Ce
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 16:12:50 +0000
-Received: from fllv0034.itg.ti.com ([10.64.40.246])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wATGCX6f037953;
- Thu, 29 Nov 2018 10:12:33 -0600
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1543507954;
- bh=5Itq+h4eyJP0hNnlk49FSrkv/SSC/HBF3GniGrEguSI=;
- h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=UaAynCT6N4Rhni3fjpJQLMivh/ujfdhJXdRVbSqIJ4Bzlb376B5ck9AWZZQowFfys
- 2BSnSI053tUpa2fpiE2hEzcw9YnBHti+oq0y2aCge3rL2YRDGRBQhMm1WP2w3OnOr0
- AuO4D0dnOyEm73SL5WzCvGJC+MjCt9p7T0i7cac0=
-Received: from DLEE108.ent.ti.com (dlee108.ent.ti.com [157.170.170.38])
- by fllv0034.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wATGCXD6126075
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 29 Nov 2018 10:12:33 -0600
-Received: from DLEE105.ent.ti.com (157.170.170.35) by DLEE108.ent.ti.com
- (157.170.170.38) with Microsoft SMTP Server (version=TLS1_2,
- cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 29
- Nov 2018 10:12:33 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE105.ent.ti.com
- (157.170.170.35) with Microsoft SMTP Server (version=TLS1_0,
- cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 29 Nov 2018 10:12:33 -0600
-Received: from a0230074-OptiPlex-7010.india.ti.com (ileax41-snat.itg.ti.com
- [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wATGCQL4019470;
- Thu, 29 Nov 2018 10:12:30 -0600
-From: Faiz Abbas <faiz_abbas@ti.com>
-To: <linux-kernel@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
- <devicetree@vger.kernel.org>, <linux-mmc@vger.kernel.org>
-Subject: [PATCH 1/3] dt-bindings: mmc: sdhci-am654: Document bindings for the
- host controllers on TI's AM654 SOCs
-Date: Thu, 29 Nov 2018 21:45:11 +0530
-Message-ID: <20181129161513.31734-2-faiz_abbas@ti.com>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181129161513.31734-1-faiz_abbas@ti.com>
-References: <20181129161513.31734-1-faiz_abbas@ti.com>
+	id 1gSOwa-0006SD-2e; Thu, 29 Nov 2018 16:13:36 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSOvx-0005oy-CH
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 16:13:03 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id C2E99207AD; Thu, 29 Nov 2018 17:12:45 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
+ [90.88.18.158])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 4034B207AB;
+ Thu, 29 Nov 2018 17:12:45 +0100 (CET)
+Date: Thu, 29 Nov 2018 17:12:45 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>, Jason Cooper
+ <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>, Sebastian Hesselbarth
+ <sebastian.hesselbarth@gmail.com>, Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH 2/6] phy: add A3700 COMPHY support
+Message-ID: <20181129171245.4f683045@xps13>
+In-Reply-To: <20181122210420.14861-3-miquel.raynal@bootlin.com>
+References: <20181122210420.14861-1-miquel.raynal@bootlin.com>
+ <20181122210420.14861-3-miquel.raynal@bootlin.com>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
-X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_081249_509021_5E0DEFF9 
-X-CRM114-Status: GOOD (  15.17  )
+X-CRM114-CacheID: sfid-20181129_081258_296019_C3AC2AD6 
+X-CRM114-Status: GOOD (  18.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,70 +70,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, ulf.hansson@linaro.org, adrian.hunter@intel.com,
- kishon@ti.com, robh+dt@kernel.org, faiz_abbas@ti.com, michal.simek@xilinx.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Grzegorz Jaszczyk <jaz@semihalf.com>, linux-kernel@vger.kernel.org,
+ Evan Wang <xswang@marvell.com>, "Nadav
+ Haklai \(Marvell\)" <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Marcin Wojtas <mw@semihalf.com>, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add binding documentation for mmc host controllers present on TI's AM654
-SOCs
-
-Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
----
- .../devicetree/bindings/mmc/sdhci-am654.txt   | 37 +++++++++++++++++++
- 1 file changed, 37 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-
-diff --git a/Documentation/devicetree/bindings/mmc/sdhci-am654.txt b/Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-new file mode 100644
-index 000000000000..862b93051bfe
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/sdhci-am654.txt
-@@ -0,0 +1,37 @@
-+Device Tree Bindings for the SDHCI Controllers present on TI's AM654 SOCs
-+
-+The bindings follow the mmc[1], clock[2] and interrupt[3] bindings.
-+Only deviations are documented here.
-+
-+  [1] Documentation/devicetree/bindings/mmc/mmc.txt
-+  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+  [3] Documentation/devicetree/bindings/interrupt-controller/interrupts.txt
-+
-+Required Properties:
-+	- compatible: should be "ti,am654-sdhci-5.1"
-+	- reg: Must be two entries.
-+		- The first should be the sdhci register space
-+		- The second should the subsystem/phy register space
-+	- clocks: Handles to the clock inputs.
-+	- clock-names: Tuple including "clk_xin" and "clk_ahb"
-+	- interrupts: Interrupt specifiers
-+	- ti,otap-del-sel: Output Tap Delay select
-+	- ti,trm-icp: DLL trim select
-+	- ti,driver-strength-ohm: driver strength in ohms.
-+				  Valid values are 33, 40, 50, 66 and 100 ohms.
-+
-+Example:
-+
-+	sdhci0: sdhci@4f80000 {
-+		compatible = "ti,am654-sdhci-5.1";
-+		reg = <0x0 0x4f80000 0x0 0x260>, <0x0 0x4f90000 0x0 0x134>;
-+		power-domains = <&k3_pds 47>;
-+		clocks = <&k3_clks 47 0>, <&k3_clks 47 1>;
-+		clock-names = "clk_ahb", "clk_xin";
-+		interrupts = <GIC_SPI 136 IRQ_TYPE_LEVEL_HIGH>;
-+		sdhci-caps-mask = <0x80000007 0x0>;
-+		mmc-ddr-1_8v;
-+		ti,otap-del-sel = <0x2>;
-+		ti,trm-icp = <0x8>;
-+		status = "disabled";
-+	};
--- 
-2.19.2
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGVsbG8sCgpNaXF1ZWwgUmF5bmFsIDxtaXF1ZWwucmF5bmFsQGJvb3RsaW4uY29tPiB3cm90ZSBv
+biBUaHUsIDIyIE5vdiAyMDE4CjIyOjA0OjE2ICswMTAwOgoKPiBBZGQgYSBkcml2ZXIgdG8gc3Vw
+cG9ydCBDT01QSFksIGEgaGFyZHdhcmUgYmxvY2sgcHJvdmlkaW5nIHNoYXJlZAo+IHNlcmRlcyBQ
+SFlzIG9uIE1hcnZlbGwgQXJtYWRhIDM3MDAuIFRoaXMgZHJpdmVyIHVzZXMgU01DIGNhbGxzIGFu
+ZAo+IHJlbHkgb24gaGF2aW5nIGFuIHVwLXRvLWRhdGUgZmlybXdhcmUuCj4gCj4gU0FUQSwgUENp
+ZSBhbmQgVVNCMyBob3N0IG1vZGUgaGF2ZSBiZWVuIHRlc3RlZCBzdWNjZXNzZnVsbHkgd2l0aCBh
+bgo+IEVTUFJFU1NPYmluLiBTR01JSSBtb2RlIGNhbm5vdCBiZSB0ZXN0ZWQgd2l0aCB0aGlzIHBs
+YXRmb3JtLgo+IAo+IENvLURldmVsb3BlZC1ieTogRXZhbiBXYW5nIDx4c3dhbmdAbWFydmVsbC5j
+b20+Cj4gU2lnbmVkLW9mZi1ieTogRXZhbiBXYW5nIDx4c3dhbmdAbWFydmVsbC5jb20+Cj4gU2ln
+bmVkLW9mZi1ieTogTWlxdWVsIFJheW5hbCA8bWlxdWVsLnJheW5hbEBib290bGluLmNvbT4KPiAt
+LS0KClsuLi5dCgo+ICtzdGF0aWMgc3RydWN0IHBoeSAqbXZlYnVfYTM3MDBfY29tcGh5X3hsYXRl
+KHN0cnVjdCBkZXZpY2UgKmRldiwKPiArCQkJCQkgICAgc3RydWN0IG9mX3BoYW5kbGVfYXJncyAq
+YXJncykKPiArewo+ICsJc3RydWN0IG12ZWJ1X2EzNzAwX2NvbXBoeV9sYW5lICpsYW5lOwo+ICsJ
+c3RydWN0IHBoeSAqcGh5Owo+ICsKPiArCWlmIChXQVJOX09OKGFyZ3MtPmFyZ3NbMF0gPj0gTVZF
+QlVfQTM3MDBfQ09NUEhZX1BPUlRTKSkKPiArCQlyZXR1cm4gRVJSX1BUUigtRUlOVkFMKTsKPiAr
+Cj4gKwlwaHkgPSBvZl9waHlfc2ltcGxlX3hsYXRlKGRldiwgYXJncyk7Cj4gKwlpZiAoSVNfRVJS
+KHBoeSkpCj4gKwkJcmV0dXJuIHBoeTsKPiArCj4gKwlsYW5lID0gcGh5X2dldF9kcnZkYXRhKHBo
+eSk7Cj4gKwlpZiAobGFuZS0+cG9ydCA+PSAwKQo+ICsJCXJldHVybiBFUlJfUFRSKC1FQlVTWSk7
+CgpUaGlzIGlzIG5vdCB2YWxpZC4gSXQgd29ya3Mgb25seSB0aGUgZmlyc3QgdGltZSB0aGUgY29u
+c3VtZXIgZ2V0cwphIFBIWSBmb3IgdGhpcyBsYW5lLiBJZiB0aGUgY29uc3VtZXIgcHV0IHRoZSBQ
+SFkgKG1vZHVsZSBpcyB1bmxvYWRlZCkKYW5kIHRoZW4gZ2V0cyB0aGUgUEhZIGFnYWluIChtb2R1
+bGUgaXMgcmUtbG9hZGVkIGEgc2Vjb25kIHRpbWUpLCB0aGUKcG9ydCBpcyBhbHJlYWR5IHNldCB0
+byAhPSAtMSBhbmQgdGhpcyB3aWxsIGV4aXQgd2l0aCBhbiBlcnJvciBhbmQKcHJldmVudCB0aGUg
+bW9kdWxlIHRvIHByb2JlLgoKPiArCj4gKwlsYW5lLT5wb3J0ID0gYXJncy0+YXJnc1swXTsKCkkg
+d2lsbCByZW1vdmUgdGhlIGFib3ZlIGNoZWNrIGFuZCB0cmFuc2Zvcm0gaXQgaW50byBhIHZhbGlk
+ICJwb3J0Igp2YWx1ZSByaWdodCBoZXJlLgoKTm90ZTogdGhlIHNhbWUgYXBwbGllcyB0byB0aGUg
+Y3AxMTAgY29tcGh5IGRyaXZlciBvbiB3aGljaCB0aGUgZHJpdmVyCnN0cnVjdHVyZSBpcyBiYXNl
+ZC4KCj4gKwo+ICsJcmV0dXJuIHBoeTsKPiArfQo+ICsKPiArc3RhdGljIGludCBtdmVidV9hMzcw
+MF9jb21waHlfcHJvYmUoc3RydWN0IHBsYXRmb3JtX2RldmljZSAqcGRldikKPiArewo+ICsJc3Ry
+dWN0IHBoeV9wcm92aWRlciAqcHJvdmlkZXI7Cj4gKwlzdHJ1Y3QgZGV2aWNlX25vZGUgKmNoaWxk
+Owo+ICsKPiArCWZvcl9lYWNoX2F2YWlsYWJsZV9jaGlsZF9vZl9ub2RlKHBkZXYtPmRldi5vZl9u
+b2RlLCBjaGlsZCkgewo+ICsJCXN0cnVjdCBtdmVidV9hMzcwMF9jb21waHlfbGFuZSAqbGFuZTsK
+PiArCQlzdHJ1Y3QgcGh5ICpwaHk7Cj4gKwkJaW50IHJldDsKPiArCQl1MzIgbGFuZV9pZDsKPiAr
+Cj4gKwkJcmV0ID0gb2ZfcHJvcGVydHlfcmVhZF91MzIoY2hpbGQsICJyZWciLCAmbGFuZV9pZCk7
+Cj4gKwkJaWYgKHJldCA8IDApIHsKPiArCQkJZGV2X2VycigmcGRldi0+ZGV2LCAibWlzc2luZyAn
+cmVnJyBwcm9wZXJ0eSAoJWQpXG4iLAo+ICsJCQkJcmV0KTsKPiArCQkJY29udGludWU7Cj4gKwkJ
+fQo+ICsKPiArCQlpZiAobGFuZV9pZCA+PSBNVkVCVV9BMzcwMF9DT01QSFlfTEFORVMpIHsKPiAr
+CQkJZGV2X2VycigmcGRldi0+ZGV2LCAiaW52YWxpZCAncmVnJyBwcm9wZXJ0eVxuIik7Cj4gKwkJ
+CWNvbnRpbnVlOwo+ICsJCX0KPiArCj4gKwkJbGFuZSA9IGRldm1fa3phbGxvYygmcGRldi0+ZGV2
+LCBzaXplb2YoKmxhbmUpLCBHRlBfS0VSTkVMKTsKPiArCQlpZiAoIWxhbmUpCj4gKwkJCXJldHVy
+biAtRU5PTUVNOwo+ICsKPiArCQlwaHkgPSBkZXZtX3BoeV9jcmVhdGUoJnBkZXYtPmRldiwgY2hp
+bGQsCj4gKwkJCQkgICAgICAmbXZlYnVfYTM3MDBfY29tcGh5X29wcyk7Cj4gKwkJaWYgKElTX0VS
+UihwaHkpKQo+ICsJCQlyZXR1cm4gUFRSX0VSUihwaHkpOwo+ICsKPiArCQlsYW5lLT5kZXYgPSAm
+cGRldi0+ZGV2Owo+ICsJCWxhbmUtPm1vZGUgPSBQSFlfTU9ERV9JTlZBTElEOwo+ICsJCWxhbmUt
+PmlkID0gbGFuZV9pZDsKPiArCQlsYW5lLT5wb3J0ID0gLTE7Cj4gKwkJcGh5X3NldF9kcnZkYXRh
+KHBoeSwgbGFuZSk7Cj4gKwl9Cj4gKwo+ICsJcHJvdmlkZXIgPSBkZXZtX29mX3BoeV9wcm92aWRl
+cl9yZWdpc3RlcigmcGRldi0+ZGV2LAo+ICsJCQkJCQkgbXZlYnVfYTM3MDBfY29tcGh5X3hsYXRl
+KTsKPiArCXJldHVybiBQVFJfRVJSX09SX1pFUk8ocHJvdmlkZXIpOwo+ICt9Cj4gKwo+ICtzdGF0
+aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBtdmVidV9hMzcwMF9jb21waHlfb2ZfbWF0Y2hf
+dGFibGVbXSA9IHsKPiArCXsgLmNvbXBhdGlibGUgPSAibWFydmVsbCxjb21waHktYTM3MDAiIH0s
+Cj4gKwl7IH0sCj4gK307Cj4gK01PRFVMRV9ERVZJQ0VfVEFCTEUob2YsIG12ZWJ1X2EzNzAwX2Nv
+bXBoeV9vZl9tYXRjaF90YWJsZSk7Cj4gKwo+ICtzdGF0aWMgc3RydWN0IHBsYXRmb3JtX2RyaXZl
+ciBtdmVidV9hMzcwMF9jb21waHlfZHJpdmVyID0gewo+ICsJLnByb2JlCT0gbXZlYnVfYTM3MDBf
+Y29tcGh5X3Byb2JlLAo+ICsJLmRyaXZlcgk9IHsKPiArCQkubmFtZSA9ICJtdmVidS1hMzcwMC1j
+b21waHkiLAo+ICsJCS5vZl9tYXRjaF90YWJsZSA9IG12ZWJ1X2EzNzAwX2NvbXBoeV9vZl9tYXRj
+aF90YWJsZSwKPiArCX0sCj4gK307Cj4gK21vZHVsZV9wbGF0Zm9ybV9kcml2ZXIobXZlYnVfYTM3
+MDBfY29tcGh5X2RyaXZlcik7Cj4gKwo+ICtNT0RVTEVfQVVUSE9SKCJNaXF1w6hsIFJheW5hbCA8
+bWlxdWVsLnJheW5hbEBib290bGluLmNvbT4iKTsKPiArTU9EVUxFX0RFU0NSSVBUSU9OKCJDb21t
+b24gUEhZIGRyaXZlciBmb3IgQTM3MDAiKTsKPiArTU9EVUxFX0xJQ0VOU0UoIkdQTCB2MiIpOwoK
+ClRoYW5rcywKTWlxdcOobAoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBs
+aXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlz
+dGluZm8vbGludXgtYXJtLWtlcm5lbAo=
