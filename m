@@ -1,55 +1,31 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 29 Nov 2018 10:34:33 +0800
-Subject: [PATCH 2/5] usb: mtu3: enable hardware remote wakeup from L1
- automatically
-In-Reply-To: <e178546b79c3d602736a0db2cbfd76f7588e4022.1543458319.git.chunfeng.yun@mediatek.com>
-References: <e178546b79c3d602736a0db2cbfd76f7588e4022.1543458319.git.chunfeng.yun@mediatek.com>
-Message-ID: <2105ae1c2fede0fd1923e2fdb58ade7b3aa678f6.1543458320.git.chunfeng.yun@mediatek.com>
+From: anson.huang@nxp.com (Anson Huang)
+Date: Thu, 29 Nov 2018 02:37:40 +0000
+Subject: [PATCH V4 3/4] defconfig: arm64: add i.MX system controller thermal
+ support
+In-Reply-To: <1543458696-4741-1-git-send-email-Anson.Huang@nxp.com>
+References: <1543458696-4741-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <1543458696-4741-4-git-send-email-Anson.Huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable hardware remote wakeup from L1 automatically based on the FIFO
-status, instead of manual way.
+This patch enables CONFIG_IMX_SC_THERMAL as module.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 ---
- drivers/usb/mtu3/mtu3_core.c | 10 +++-------
- 1 file changed, 3 insertions(+), 7 deletions(-)
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/usb/mtu3/mtu3_core.c b/drivers/usb/mtu3/mtu3_core.c
-index 3dce5fd9887d..981e4e8c5c13 100644
---- a/drivers/usb/mtu3/mtu3_core.c
-+++ b/drivers/usb/mtu3/mtu3_core.c
-@@ -180,7 +180,7 @@ static void mtu3_intr_enable(struct mtu3 *mtu)
- 	mtu3_writel(mbase, U3D_LV1IESR, value);
- 
- 	/* Enable U2 common USB interrupts */
--	value = SUSPEND_INTR | RESUME_INTR | RESET_INTR | LPM_RESUME_INTR;
-+	value = SUSPEND_INTR | RESUME_INTR | RESET_INTR;
- 	mtu3_writel(mbase, U3D_COMMON_USB_INTR_ENABLE, value);
- 
- 	if (mtu->is_u3_ip) {
-@@ -594,6 +594,8 @@ static void mtu3_regs_init(struct mtu3 *mtu)
- 	mtu3_writel(mbase, U3D_DEVICE_CONF, 0);
- 	/* vbus detected by HW */
- 	mtu3_clrbits(mbase, U3D_MISC_CTRL, VBUS_FRC_EN | VBUS_ON);
-+	/* enable automatical HWRW from L1 */
-+	mtu3_setbits(mbase, U3D_POWER_MANAGEMENT, LPM_HRWE);
- }
- 
- static irqreturn_t mtu3_link_isr(struct mtu3 *mtu)
-@@ -706,12 +708,6 @@ static irqreturn_t mtu3_u2_common_isr(struct mtu3 *mtu)
- 	if (u2comm & RESET_INTR)
- 		mtu3_gadget_reset(mtu);
- 
--	if (u2comm & LPM_RESUME_INTR) {
--		if (!(mtu3_readl(mbase, U3D_POWER_MANAGEMENT) & LPM_HRWE))
--			mtu3_setbits(mbase, U3D_USB20_MISC_CONTROL,
--				     LPM_U3_ACK_EN);
--	}
--
- 	return IRQ_HANDLED;
- }
- 
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index abd80c5..9f12324 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -376,6 +376,7 @@ CONFIG_SENSORS_RASPBERRYPI_HWMON=m
+ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
++CONFIG_IMX_SC_THERMAL=m
+ CONFIG_ROCKCHIP_THERMAL=m
+ CONFIG_RCAR_GEN3_THERMAL=y
+ CONFIG_ARMADA_THERMAL=y
 -- 
-2.19.1
+2.7.4
