@@ -1,81 +1,47 @@
-From: Julien.Thierry@arm.com (Julien Thierry)
-Date: Thu, 29 Nov 2018 09:03:54 +0000
-Subject: [PATCH] arm64: io: specify asm operand width for __iormb()
-In-Reply-To: <20181129041912.5918-1-nick.desaulniers@gmail.com>
-References: <20181129041912.5918-1-nick.desaulniers@gmail.com>
-Message-ID: <fe3cba43-935b-448c-46e9-90ea75593e5b@arm.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Thu, 29 Nov 2018 12:03:40 +0300
+Subject: [PATCH v6 2/2] PCI: amlogic: Add the Amlogic Meson PCIe
+ controller driver
+In-Reply-To: <1542876836-191355-3-git-send-email-hanjie.lin@amlogic.com>
+Message-ID: <20181129090340.GO3073@unbuntlaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Yue,
 
+url:    https://github.com/0day-ci/linux/commits/Hanjie-Lin/dt-bindings-PCI-meson-add-DT-bindings-for-Amlogic-Meson-PCIe-controller/20181122-225955
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/helgaas/pci.git next
 
-On 29/11/18 04:19, Nick Desaulniers wrote:
-> Fixes the warning produced from Clang:
-> ./include/asm-generic/io.h:711:9: warning: value size does not match
-> register size specified by the constraint and modifier
-> [-Wasm-operand-widths]
->         return readl(addr);
->                ^
-> ./arch/arm64/include/asm/io.h:149:58: note: expanded from macro 'readl'
->                                                           ^
-> ./include/asm-generic/io.h:711:9: note: use constraint modifier "w"
-> ./arch/arm64/include/asm/io.h:149:50: note: expanded from macro 'readl'
->                                                   ^
-> ./arch/arm64/include/asm/io.h:118:25: note: expanded from macro '__iormb'
->         asm volatile("eor       %w0, %1, %1\n" \
->                                      ^
+smatch warnings:
+drivers/pci/controller/dwc/pci-meson.c:171 meson_pcie_get_mem_shared() error: passing non negative 6 to ERR_PTR
 
-Why does the "eor %0, %1, %1" become "eor %w0, %1, %1" ?
-The variable passed to the inline assembly for %0 is unsigned long, so
-always 64-bits wide on arm64. Why is clang trying to use a 32-bit
-register for it?
+# https://github.com/0day-ci/linux/commit/c882cdc75e49b6de65cd3d95ebf688272af6b5f9
+git remote add linux-review https://github.com/0day-ci/linux
+git remote update linux-review
+git checkout c882cdc75e49b6de65cd3d95ebf688272af6b5f9
+vim +171 drivers/pci/controller/dwc/pci-meson.c
 
-Although it's not really important since all this is just introducing a
-control dependency, I find it a bit odd.
+c882cdc75 Yue Wang 2018-11-22  160  
+c882cdc75 Yue Wang 2018-11-22  161  static void __iomem *meson_pcie_get_mem_shared(struct platform_device *pdev,
+c882cdc75 Yue Wang 2018-11-22  162  					       struct meson_pcie *mp,
+c882cdc75 Yue Wang 2018-11-22  163  					       const char *id)
+c882cdc75 Yue Wang 2018-11-22  164  {
+c882cdc75 Yue Wang 2018-11-22  165  	struct device *dev = mp->pci.dev;
+c882cdc75 Yue Wang 2018-11-22  166  	struct resource *res;
+c882cdc75 Yue Wang 2018-11-22  167  
+c882cdc75 Yue Wang 2018-11-22  168  	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, id);
+c882cdc75 Yue Wang 2018-11-22  169  	if (!res) {
+c882cdc75 Yue Wang 2018-11-22  170  		dev_err(dev, "No REG resource %s\n", id);
+c882cdc75 Yue Wang 2018-11-22 @171  		return ERR_PTR(ENXIO);
+                                                               ^^^^^
+                                                               -ENXIO
 
-Thanks,
+c882cdc75 Yue Wang 2018-11-22  172  	}
+c882cdc75 Yue Wang 2018-11-22  173  
+c882cdc75 Yue Wang 2018-11-22  174  	return devm_ioremap(dev, res->start, resource_size(res));
+c882cdc75 Yue Wang 2018-11-22  175  }
+c882cdc75 Yue Wang 2018-11-22  176  
 
-> Though we disable Clang's integrated assembler with -no-integrated-as,
-> it still tries to do some validation of assembler constraints.
->
-> While __iormb() is type agnostic to operand widths for argument v, its
-> lone use is to zero'd out via eor (exclusive or).
->
-> Fixes commit 6460d3201471 ("arm64: io: Ensure calls to delay routines
-> are ordered against prior readX()")
-> Link: https://github.com/ClangBuiltLinux/continuous-integration/issues/78
-> Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
-> Reviewed-by: Nathan Chancellor <natechancellor@gmail.com>
-> Signed-off-by: Nick Desaulniers <nick.desaulniers@gmail.com>
-> ---
-> Side note: is it not correct to cite SHAs from linux-next in "Fixes
-> commit ..." lines? I guess we can drop it.
->
-> Link to regression build:
-> https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92799938
->
-> Link to build w/ this patch:
-> https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92935901
->
->
->  arch/arm64/include/asm/io.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index d42d00d8d5b6..dbdebf81162b 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -115,7 +115,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
->   * later instructions. This ensures that a subsequent call to\
->   * udelay() will be ordered due to the ISB in get_cycles().\
->   */\
-> -asm volatile("eor%0, %1, %1\n"\
-> +asm volatile("eor%0, %x1, %x1\n"\
->       "cbnz%0, ."\
->       : "=r" (tmp) : "r" (v) : "memory");\
->  })
->
-
---
-Julien Thierry
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
