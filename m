@@ -4,82 +4,77 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9E299C43610
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:22:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A33C8C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:22:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6A97120989
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:22:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 70B9020863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:22:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHG4cgP4";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="L+A6W0Wp";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="kXYqICyo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6A97120989
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KMBtLQKm";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="BamXlXRb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 70B9020863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=1IJwt/1XtZ5XyCiWpNCbANglnstlovHwsjrVTrxiDhA=; b=aHG4cgP4L+UApWR140XbfEXYeK
-	dDofS2HhmO59L8TZBdqts41isWaxszU2uYkVe7+da1ff15w9a7ygl2IW5sDGR9hGaODoqY7Hix0Vn
-	UZEpNmLvcH5MR6JYqe3itn+DngjD+pUlAkqblG6MVSNred7DBhDbVEcizFdXjloSAUgRvGy4GPMGs
-	OASyglIZyDZm1EP8zFAYzPurbDWOtmTn+LdfqjYhh8at6bEqL1zLirEo6P8tXWOGPMaiIe5MC24qb
-	jmD2ooHEqJ1YneBHxu4QbcFoYjXVWtqCgS0fZ9pUkV97gJHwZu7h+O8yX9KEKIsBZLgDqdmQynyPo
-	f3kVTFFg==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ghvS1D7JDtAezVIewSljf+dPwda59txqeLhx39bQvBc=; b=KMBtLQKmcVJtKM
+	aGe5xTtjOeitOljQvi/SNmn2b9508M4BL42dGnn6Ysv6AnMRa2Y87p9jy38F66BcNutqbvnCK3eWb
+	mqjZnXRQZDadOWSRvah8+K8y6yfCTsaOEPwy2AUdv9ejhZZ8bE5h1Bp7FpD67/lVIGArmx+lcEQaF
+	xozNCn0z42LyZSRJA0gKKjUw2EDs3rO/Lh1WMlAkqAs6gc2M0o4JLHx3jsxDcZx/Kk/lhpGaMnHXN
+	ztyublITaIfRQ9YvEqlnmp580iYxVEQ0vAVYiBZLhnfFU4JDKe2Uv1c7MvBoy2D6KblN91dgiJh0A
+	SaZeR0ECGPiD8z5eMdPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQ0j-0005CR-3q; Thu, 29 Nov 2018 17:21:57 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gSQ1G-0005b9-VY; Thu, 29 Nov 2018 17:22:31 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQ0T-0004r5-QA
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:21:43 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id EE3A761327; Thu, 29 Nov 2018 17:21:30 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543512091;
- bh=NFUgxHICUN5E14dYRFKcVoC/UBmWHlL+Dni+4jISyRo=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=L+A6W0WpHvh5GoTROx4IxanuGJ+be9XHlrBB87eKuqdrDSJQDgik9JZ/O2NcNKTrG
- mcimSwR/sn02sksdYSTj1wQ1HSv2bSm3mdLx/apnu9AZRwsrbmCXTCoGgStBFJ7Hdu
- C7vRzY2+k6zbk7Db6VKplG9ELjUarZv8J6Ot9zfA=
-Received: from jcrouse-lnx.qualcomm.com (i-global254.qualcomm.com
- [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: jcrouse@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id C0C2561330;
- Thu, 29 Nov 2018 17:21:28 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543512089;
- bh=NFUgxHICUN5E14dYRFKcVoC/UBmWHlL+Dni+4jISyRo=;
- h=From:To:Cc:Subject:Date:In-Reply-To:References:From;
- b=kXYqICyo/Yaqt8vRtvDPz6lqw2C93Y0LJYmg2F87wvUDBICX/5NHx0XEQ3/CKWm5Q
- mB8flNpCCimFen0DSCXw4encqJrZaWyf+XAApL60s9rIE+6qFRRPPwilsPDnpgyhYE
- yssOoSdzHGdOy2CWVCqZ1/Py4xbMF9hXB30pchbI=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org C0C2561330
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=jcrouse@codeaurora.org
-From: Jordan Crouse <jcrouse@codeaurora.org>
-To: georgi.djakov@linaro.org
-Subject: [PATCH 1/1] drm/msm/a6xx: Add support for an interconnect path
-Date: Thu, 29 Nov 2018 10:21:24 -0700
-Message-Id: <20181129172124.6851-2-jcrouse@codeaurora.org>
-X-Mailer: git-send-email 2.18.0
-In-Reply-To: <20181129172124.6851-1-jcrouse@codeaurora.org>
-References: <20181129172124.6851-1-jcrouse@codeaurora.org>
+ id 1gSQ0d-0004rD-Ho
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 29 Nov 2018 17:21:51 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
+ References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
+ Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=OnkYXjZ6dDkX1OezkR+3Gzw0tqWU3DgUEzgzP3dgwtk=; b=BamXlXRbjDSVFaAq5W9IMpcYhq
+ cgXLZyWl4c2K0OcnAxff7s3QXt7hqLvPPHqiSvypLifeCKsSE1JV4Bzm/MHgAPSzWRLmNUxCWPQxc
+ wrTSJ3WUNOJzVc3oNY99Q42pm/9FeRtOYUXf3eY6syrjbhVTl+AvnEirRe1bLTPQ3k5kUey3Vt2V1
+ gHWECErhmQQdqqBKkw/4Xjfa6vzD6wW8BUtPasMBwBbcdIMueTkXHktpU+xtlNuHU60kVpuRfKJvI
+ 3WwJBHwNpT1h01U7PGBZyex1MMUGZaX2dV1gEUyS/Rm86WOqQDEfsw/xw7W/rC8aLwUDPlA41O/Cd
+ kBBZEFKA==;
+Received: from foss.arm.com ([217.140.101.70])
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSPmR-0002v7-Ru
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:07:18 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1253D15AB;
+ Thu, 29 Nov 2018 09:07:01 -0800 (PST)
+Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
+ [10.1.196.72])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id F28A43F59C;
+ Thu, 29 Nov 2018 09:06:58 -0800 (PST)
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+To: linux-arch@vger.kernel.org,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2 28/28] mips: Add support for generic vDSO
+Date: Thu, 29 Nov 2018 17:05:30 +0000
+Message-Id: <20181129170530.37789-29-vincenzo.frascino@arm.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181129170530.37789-1-vincenzo.frascino@arm.com>
+References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_092141_890241_1CD1F467 
-X-CRM114-Status: GOOD (  18.00  )
+X-CRM114-CacheID: sfid-20181129_170712_260964_1583CD78 
+X-CRM114-Status: GOOD (  31.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,164 +86,878 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-msm@vger.kernel.org, dri-devel@lists.freedesktop.org,
- freedreno@lists.freedesktop.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Peter Collingbourne <pcc@google.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Try to get the interconnect path for the GPU and vote for the maximum
-bandwidth to support all frequencies. This is needed for performance.
-Later we will want to scale the bandwidth based on the frequency to
-also optimize for power but that will require some device tree
-infrastructure that does not yet exist.
+The mips vDSO library requires some adaptations to use to take advantage
+of the newly introduced generic vDSO library.
 
-v2: Absolute bandwidth values should be in KBps
+This patch introduces the following changes:
+ - Modification of vdso.c to be compliant with the common vdso datapage
+ - Use of lib/vdso for gettimeofday
 
-Signed-off-by: Jordan Crouse <jcrouse@codeaurora.org>
+Cc: Ralf Baechle <ralf@linux-mips.org>
+Cc: Paul Burton <paul.burton@mips.com>
+Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- drivers/gpu/drm/msm/adreno/a6xx_gmu.c   | 20 ++++++++++++++++++++
- drivers/gpu/drm/msm/adreno/adreno_gpu.c |  9 +++++++++
- drivers/gpu/drm/msm/msm_gpu.h           |  3 +++
- 3 files changed, 32 insertions(+)
+ arch/mips/Kconfig                         |   3 +
+ arch/mips/include/asm/vdso.h              |  53 +----
+ arch/mips/include/asm/vdso/gettimeofday.h | 165 +++++++++++++
+ arch/mips/{ => include/asm}/vdso/vdso.h   |   6 +-
+ arch/mips/kernel/vdso.c                   |  56 +++--
+ arch/mips/vdso/Makefile                   |  23 +-
+ arch/mips/vdso/elf.S                      |   2 +-
+ arch/mips/vdso/gettimeofday.c             | 273 ----------------------
+ arch/mips/vdso/sigreturn.S                |   2 +-
+ arch/mips/vdso/vdso.lds.S                 |   1 +
+ arch/mips/vdso/vgettimeofday.c            |  28 +++
+ 11 files changed, 267 insertions(+), 345 deletions(-)
+ create mode 100644 arch/mips/include/asm/vdso/gettimeofday.h
+ rename arch/mips/{ => include/asm}/vdso/vdso.h (90%)
+ delete mode 100644 arch/mips/vdso/gettimeofday.c
+ create mode 100644 arch/mips/vdso/vgettimeofday.c
 
-diff --git a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
-index 546599a7ab05..b96ae2ab04bb 100644
---- a/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
-+++ b/drivers/gpu/drm/msm/adreno/a6xx_gmu.c
-@@ -3,6 +3,7 @@
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index 8272ea4c7264..1bb7ac0c5b2d 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -32,6 +32,7 @@ config MIPS
+ 	select GENERIC_SCHED_CLOCK if !CAVIUM_OCTEON_SOC
+ 	select GENERIC_SMP_IDLE_THREAD
+ 	select GENERIC_TIME_VSYSCALL
++	select GENERIC_GETTIMEOFDAY
+ 	select HANDLE_DOMAIN_IRQ
+ 	select HAVE_ARCH_COMPILER_H
+ 	select HAVE_ARCH_JUMP_LABEL
+@@ -70,6 +71,8 @@ config MIPS
+ 	select HAVE_STACKPROTECTOR
+ 	select HAVE_SYSCALL_TRACEPOINTS
+ 	select HAVE_VIRT_CPU_ACCOUNTING_GEN if 64BIT || !SMP
++	select HAVE_GENERIC_VDSO
++	select HAVE_ARCH_TIMER
+ 	select IRQ_FORCED_THREADING
+ 	select MODULES_USE_ELF_RELA if MODULES && 64BIT
+ 	select MODULES_USE_ELF_REL if MODULES
+diff --git a/arch/mips/include/asm/vdso.h b/arch/mips/include/asm/vdso.h
+index 91bf0c2c265c..4ae362be14b9 100644
+--- a/arch/mips/include/asm/vdso.h
++++ b/arch/mips/include/asm/vdso.h
+@@ -12,6 +12,7 @@
+ #define __ASM_VDSO_H
  
- #include <linux/clk.h>
- #include <linux/pm_opp.h>
-+#include <linux/interconnect.h>
- #include <soc/qcom/cmd-db.h>
+ #include <linux/mm_types.h>
++#include <vdso/datapage.h>
  
- #include "a6xx_gpu.h"
-@@ -63,6 +64,9 @@ static bool a6xx_gmu_gx_is_on(struct a6xx_gmu *gmu)
+ #include <asm/barrier.h>
  
- static void __a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
+@@ -54,12 +55,12 @@ extern struct mips_vdso_image vdso_image_n32;
+ #endif
+ 
+ /**
+- * union mips_vdso_data - Data provided by the kernel for the VDSO.
++ * struct vdso_data - Data provided by the kernel for the VDSO.
+  * @xtime_sec:		Current real time (seconds part).
+  * @xtime_nsec:		Current real time (nanoseconds part, shifted).
+  * @wall_to_mono_sec:	Wall-to-monotonic offset (seconds part).
+  * @wall_to_mono_nsec:	Wall-to-monotonic offset (nanoseconds part).
+- * @seq_count:		Counter to synchronise updates (odd = updating).
++ * @tb_seq_count:		Counter to synchronise updates (odd = updating).
+  * @cs_shift:		Clocksource shift value.
+  * @clock_mode:		Clocksource to use for time functions.
+  * @cs_mult:		Clocksource multiplier value.
+@@ -76,61 +77,23 @@ extern struct mips_vdso_image vdso_image_n32;
+  * for both 64- and 32-bit (for 32-bit userland on 64-bit kernel).
+  */
+ union mips_vdso_data {
+-	struct {
+-		u64 xtime_sec;
+-		u64 xtime_nsec;
+-		u64 wall_to_mono_sec;
+-		u64 wall_to_mono_nsec;
+-		u32 seq_count;
+-		u32 cs_shift;
+-		u8 clock_mode;
+-		u32 cs_mult;
+-		u64 cs_cycle_last;
+-		u64 cs_mask;
+-		s32 tz_minuteswest;
+-		s32 tz_dsttime;
+-	};
+-
++	struct vdso_data data;
+ 	u8 page[PAGE_SIZE];
+ };
+ 
+-static inline u32 vdso_data_read_begin(const union mips_vdso_data *data)
+-{
+-	u32 seq;
+-
+-	while (true) {
+-		seq = READ_ONCE(data->seq_count);
+-		if (likely(!(seq & 1))) {
+-			/* Paired with smp_wmb() in vdso_data_write_*(). */
+-			smp_rmb();
+-			return seq;
+-		}
+-
+-		cpu_relax();
+-	}
+-}
+-
+-static inline bool vdso_data_read_retry(const union mips_vdso_data *data,
+-					u32 start_seq)
+-{
+-	/* Paired with smp_wmb() in vdso_data_write_*(). */
+-	smp_rmb();
+-	return unlikely(data->seq_count != start_seq);
+-}
+-
+-static inline void vdso_data_write_begin(union mips_vdso_data *data)
++static inline void vdso_data_write_begin(struct vdso_data *data)
  {
-+	struct a6xx_gpu *a6xx_gpu = container_of(gmu, struct a6xx_gpu, gmu);
-+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
-+	struct msm_gpu *gpu = &adreno_gpu->base;
- 	int ret;
+-	++data->seq_count;
++	++data->tb_seq_count;
  
- 	gmu_write(gmu, REG_A6XX_GMU_DCVS_ACK_OPTION, 0);
-@@ -85,6 +89,12 @@ static void __a6xx_gmu_set_freq(struct a6xx_gmu *gmu, int index)
- 		dev_err(gmu->dev, "GMU set GPU frequency error: %d\n", ret);
- 
- 	gmu->freq = gmu->gpu_freqs[index];
-+
-+	/*
-+	 * Eventually we will want to scale the path vote with the frequency but
-+	 * for now leave it t at max so that the performance is nominal.
-+	 */
-+	icc_set(gpu->icc_path, 0, 7216000000);
+ 	/* Ensure sequence update is written before other data page values. */
+ 	smp_wmb();
  }
  
- void a6xx_gmu_set_freq(struct msm_gpu *gpu, unsigned long freq)
-@@ -680,6 +690,8 @@ int a6xx_gmu_reset(struct a6xx_gpu *a6xx_gpu)
- 
- int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
+-static inline void vdso_data_write_end(union mips_vdso_data *data)
++static inline void vdso_data_write_end(struct vdso_data *data)
  {
-+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
-+	struct msm_gpu *gpu = &adreno_gpu->base;
- 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
- 	int status, ret;
+ 	/* Ensure data values are written before updating sequence again. */
+ 	smp_wmb();
+-	++data->seq_count;
++	++data->tb_seq_count;
+ }
  
-@@ -695,6 +707,9 @@ int a6xx_gmu_resume(struct a6xx_gpu *a6xx_gpu)
+ #endif /* __ASM_VDSO_H */
+diff --git a/arch/mips/include/asm/vdso/gettimeofday.h b/arch/mips/include/asm/vdso/gettimeofday.h
+new file mode 100644
+index 000000000000..d357e851e034
+--- /dev/null
++++ b/arch/mips/include/asm/vdso/gettimeofday.h
+@@ -0,0 +1,165 @@
++/*
++ * Copyright (C) 2018 ARM Limited
++ * Copyright (C) 2015 Imagination Technologies
++ * Author: Alex Smith <alex.smith@imgtec.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation;  either version 2 of the  License, or (at your
++ * option) any later version.
++ */
++#ifndef __ASM_VDSO_GETTIMEOFDAY_H
++#define __ASM_VDSO_GETTIMEOFDAY_H
++
++#ifndef __ASSEMBLY__
++
++#include <linux/compiler.h>
++#include <linux/time.h>
++
++#include <asm/vdso/vdso.h>
++#include <asm/clocksource.h>
++#include <asm/io.h>
++#include <asm/unistd.h>
++#include <asm/vdso.h>
++
++#ifdef CONFIG_MIPS_CLOCK_VSYSCALL
++
++static __always_inline notrace long gettimeofday_fallback(
++					struct __vdso_timeval *_tv,
++					struct timezone *_tz)
++{
++	register struct timezone *tz asm("a1") = _tz;
++	register struct __vdso_timeval *tv asm("a0") = _tv;
++	register long ret asm("v0");
++	register long nr asm("v0") = __NR_gettimeofday;
++	register long error asm("a3");
++
++	asm volatile(
++	"       syscall\n"
++	: "=r" (ret), "=r" (error)
++	: "r" (tv), "r" (tz), "r" (nr)
++	: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
++	  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
++
++	return error ? -ret : ret;
++}
++
++#else
++
++static __always_inline notrace long gettimeofday_fallback(
++					struct __vdso_timeval *_tv,
++					struct timezone *_tz)
++{
++	return -1;
++}
++
++#endif
++
++static __always_inline notrace long clock_gettime_fallback(
++						clockid_t _clkid,
++						struct __vdso_timespec *_ts)
++{
++	register struct __vdso_timespec *ts asm("a1") = _ts;
++	register clockid_t clkid asm("a0") = _clkid;
++	register long ret asm("v0");
++	register long nr asm("v0") = __NR_clock_gettime;
++	register long error asm("a3");
++
++	asm volatile(
++	"       syscall\n"
++	: "=r" (ret), "=r" (error)
++	: "r" (clkid), "r" (ts), "r" (nr)
++	: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
++	  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
++
++	return error ? -ret : ret;
++}
++
++static __always_inline notrace int clock_getres_fallback(
++						clockid_t _clkid,
++						struct __vdso_timespec *_ts)
++{
++	register struct __vdso_timespec *ts asm("a1") = _ts;
++	register clockid_t clkid asm("a0") = _clkid;
++	register long ret asm("v0");
++	register long nr asm("v0") = __NR_clock_getres;
++	register long error asm("a3");
++
++	asm volatile(
++	"       syscall\n"
++	: "=r" (ret), "=r" (error)
++	: "r" (clkid), "r" (ts), "r" (nr)
++	: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
++	  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
++
++	return error ? -ret : ret;
++}
++
++#ifdef CONFIG_CSRC_R4K
++
++static __always_inline u64 read_r4k_count(void)
++{
++	unsigned int count;
++
++	__asm__ __volatile__(
++	"	.set push\n"
++	"	.set mips32r2\n"
++	"	rdhwr	%0, $2\n"
++	"	.set pop\n"
++	: "=r" (count));
++
++	return count;
++}
++
++#endif
++
++#ifdef CONFIG_CLKSRC_MIPS_GIC
++
++static __always_inline u64 read_gic_count(const struct vdso_data *data)
++{
++	void __iomem *gic = get_gic(data);
++	u32 hi, hi2, lo;
++
++	do {
++		hi = __raw_readl(gic + sizeof(lo));
++		lo = __raw_readl(gic);
++		hi2 = __raw_readl(gic + sizeof(lo));
++	} while (hi2 != hi);
++
++	return (((u64)hi) << 32) + lo;
++}
++
++#endif
++
++static __always_inline notrace u64 clock_get_virtual_counter(void)
++{
++	const struct vdso_data *data = get_vdso_data();
++	u64 cycle_now;
++
++	switch (data->clock_mode) {
++#ifdef CONFIG_CSRC_R4K
++	case VDSO_CLOCK_R4K:
++		cycle_now = read_r4k_count();
++		break;
++#endif
++#ifdef CONFIG_CLKSRC_MIPS_GIC
++	case VDSO_CLOCK_GIC:
++		cycle_now = read_gic_count(data);
++		break;
++#endif
++	default:
++		cycle_now = 0;
++		break;
++	}
++
++	return cycle_now;
++}
++
++static __always_inline notrace const struct vdso_data *__arch_get_vdso_data(void)
++{
++	return get_vdso_data();
++}
++
++#endif /* !__ASSEMBLY__ */
++
++#endif /* __ASM_VDSO_GETTIMEOFDAY_H */
+diff --git a/arch/mips/vdso/vdso.h b/arch/mips/include/asm/vdso/vdso.h
+similarity index 90%
+rename from arch/mips/vdso/vdso.h
+rename to arch/mips/include/asm/vdso/vdso.h
+index cfb1be441dec..048d12fbb925 100644
+--- a/arch/mips/vdso/vdso.h
++++ b/arch/mips/include/asm/vdso/vdso.h
+@@ -72,14 +72,14 @@ static inline unsigned long get_vdso_base(void)
+ 	return addr;
+ }
+ 
+-static inline const union mips_vdso_data *get_vdso_data(void)
++static inline const struct vdso_data *get_vdso_data(void)
+ {
+-	return (const union mips_vdso_data *)(get_vdso_base() - PAGE_SIZE);
++	return (const struct vdso_data *)(get_vdso_base() - PAGE_SIZE);
+ }
+ 
+ #ifdef CONFIG_CLKSRC_MIPS_GIC
+ 
+-static inline void __iomem *get_gic(const union mips_vdso_data *data)
++static inline void __iomem *get_gic(const struct vdso_data *data)
+ {
+ 	return (void __iomem *)data - PAGE_SIZE;
+ }
+diff --git a/arch/mips/kernel/vdso.c b/arch/mips/kernel/vdso.c
+index 48a9c6b90e07..5f280f62dc25 100644
+--- a/arch/mips/kernel/vdso.c
++++ b/arch/mips/kernel/vdso.c
+@@ -26,7 +26,8 @@
+ #include <asm/vdso.h>
+ 
+ /* Kernel-provided data used by the VDSO. */
+-static union mips_vdso_data vdso_data __page_aligned_data;
++static union mips_vdso_data mips_vdso_data __page_aligned_data;
++static struct vdso_data *vdso_data = &mips_vdso_data.data;
+ 
+ /*
+  * Mapping for the VDSO data/GIC pages. The real pages are mapped manually, as
+@@ -72,29 +73,44 @@ subsys_initcall(init_vdso);
+ 
+ void update_vsyscall(struct timekeeper *tk)
+ {
+-	vdso_data_write_begin(&vdso_data);
+-
+-	vdso_data.xtime_sec = tk->xtime_sec;
+-	vdso_data.xtime_nsec = tk->tkr_mono.xtime_nsec;
+-	vdso_data.wall_to_mono_sec = tk->wall_to_monotonic.tv_sec;
+-	vdso_data.wall_to_mono_nsec = tk->wall_to_monotonic.tv_nsec;
+-	vdso_data.cs_shift = tk->tkr_mono.shift;
+-
+-	vdso_data.clock_mode = tk->tkr_mono.clock->archdata.vdso_clock_mode;
+-	if (vdso_data.clock_mode != VDSO_CLOCK_NONE) {
+-		vdso_data.cs_mult = tk->tkr_mono.mult;
+-		vdso_data.cs_cycle_last = tk->tkr_mono.cycle_last;
+-		vdso_data.cs_mask = tk->tkr_mono.mask;
++	vdso_data_write_begin(vdso_data);
++
++	vdso_data->clock_mode = tk->tkr_mono.clock->archdata.vdso_clock_mode;
++#ifdef DISABLE_MIPS_VDSO
++	vdso_data->use_syscall = true;
++#else
++	vdso_data->use_syscall = !tk->tkr_mono.clock->archdata.vdso_direct;
++#endif /* DISABLE_MIPS_VDSO */
++	vdso_data->xtime_coarse_sec = tk->xtime_sec;
++	vdso_data->xtime_coarse_nsec = tk->tkr_mono.xtime_nsec >>
++						tk->tkr_mono.shift;
++	vdso_data->wtm_clock_sec = tk->wall_to_monotonic.tv_sec;
++	vdso_data->wtm_clock_nsec = tk->wall_to_monotonic.tv_nsec;
++
++	if (vdso_data->clock_mode != VDSO_CLOCK_NONE) {
++		vdso_data->cs_cycle_last = tk->tkr_mono.cycle_last;
++		vdso_data->raw_time_sec = tk->raw_sec;
++		vdso_data->raw_time_nsec = tk->tkr_raw.xtime_nsec;
++		vdso_data->xtime_clock_sec = tk->xtime_sec;
++		vdso_data->xtime_clock_nsec = tk->tkr_mono.xtime_nsec;
++		vdso_data->cs_mono_mult = tk->tkr_mono.mult;
++		vdso_data->cs_raw_mult = tk->tkr_raw.mult;
++		vdso_data->cs_shift = tk->tkr_mono.shift;
++		vdso_data->btm_nsec = ktime_to_ns(tk->offs_boot);
++		vdso_data->tai_sec = tk->xtime_sec +
++					tk->tai_offset;
++		vdso_data->cs_mono_mask = tk->tkr_mono.mask;
++		vdso_data->cs_raw_mask = tk->tkr_mono.mask;
+ 	}
+ 
+-	vdso_data_write_end(&vdso_data);
++	vdso_data_write_end(vdso_data);
+ }
+ 
+ void update_vsyscall_tz(void)
+ {
+-	if (vdso_data.clock_mode != VDSO_CLOCK_NONE) {
+-		vdso_data.tz_minuteswest = sys_tz.tz_minuteswest;
+-		vdso_data.tz_dsttime = sys_tz.tz_dsttime;
++	if (vdso_data->clock_mode != VDSO_CLOCK_NONE) {
++		vdso_data->tz_minuteswest = sys_tz.tz_minuteswest;
++		vdso_data->tz_dsttime = sys_tz.tz_dsttime;
+ 	}
+ }
+ 
+@@ -167,7 +183,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 	 */
+ 	if (cpu_has_dc_aliases) {
+ 		base = __ALIGN_MASK(base, shm_align_mask);
+-		base += ((unsigned long)&vdso_data - gic_size) & shm_align_mask;
++		base += ((unsigned long)vdso_data - gic_size) & shm_align_mask;
+ 	}
+ 
+ 	data_addr = base + gic_size;
+@@ -193,7 +209,7 @@ int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
+ 
+ 	/* Map data page. */
+ 	ret = remap_pfn_range(vma, data_addr,
+-			      virt_to_phys(&vdso_data) >> PAGE_SHIFT,
++			      virt_to_phys(vdso_data) >> PAGE_SHIFT,
+ 			      PAGE_SIZE, PAGE_READONLY);
  	if (ret)
  		goto out;
- 
-+	/* Set the bus quota to a reasonable value for boot */
-+	icc_set(gpu->icc_path, 0, 3072000000);
+diff --git a/arch/mips/vdso/Makefile b/arch/mips/vdso/Makefile
+index 58a0315ad743..e38c9a6571a1 100644
+--- a/arch/mips/vdso/Makefile
++++ b/arch/mips/vdso/Makefile
+@@ -1,6 +1,12 @@
+ # SPDX-License-Identifier: GPL-2.0
+ # Objects to go into the VDSO.
+-obj-vdso-y := elf.o gettimeofday.o sigreturn.o
 +
- 	a6xx_gmu_irq_enable(gmu);
- 
- 	/* Check to see if we are doing a cold or warm boot */
-@@ -735,6 +750,8 @@ bool a6xx_gmu_isidle(struct a6xx_gmu *gmu)
- 
- int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
- {
-+	struct adreno_gpu *adreno_gpu = &a6xx_gpu->base;
-+	struct msm_gpu *gpu = &adreno_gpu->base;
- 	struct a6xx_gmu *gmu = &a6xx_gpu->gmu;
- 	u32 val;
- 
-@@ -781,6 +798,9 @@ int a6xx_gmu_stop(struct a6xx_gpu *a6xx_gpu)
- 	/* Tell RPMh to power off the GPU */
- 	a6xx_rpmh_stop(gmu);
- 
-+	/* Remove the bus vote */
-+	icc_set(gpu->icc_path, 0, 0);
++# Absolute relocation type $(ARCH_REL_TYPE_ABS) needs to be defined before
++# the inclusion of generic Makefile.
++ARCH_REL_TYPE_ABS := R_MIPS_JUMP_SLOT|R_MIPS_GLOB_DAT
++include $(srctree)/lib/vdso/Makefile
 +
- 	clk_bulk_disable_unprepare(gmu->nr_clocks, gmu->clocks);
++obj-vdso-y := elf.o vgettimeofday.o sigreturn.o
  
- 	pm_runtime_put_sync(gmu->dev);
-diff --git a/drivers/gpu/drm/msm/adreno/adreno_gpu.c b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
-index 93d70f4a2154..9bab491912cf 100644
---- a/drivers/gpu/drm/msm/adreno/adreno_gpu.c
-+++ b/drivers/gpu/drm/msm/adreno/adreno_gpu.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/pm_opp.h>
- #include <linux/slab.h>
-+#include <linux/interconnect.h>
- #include "adreno_gpu.h"
- #include "msm_gem.h"
- #include "msm_mmu.h"
-@@ -695,6 +696,11 @@ static int adreno_get_pwrlevels(struct device *dev,
+ # Common compiler flags between ABIs.
+ ccflags-vdso := \
+@@ -14,15 +20,23 @@ ifdef CONFIG_CC_IS_CLANG
+ ccflags-vdso += $(filter --target=%,$(KBUILD_CFLAGS))
+ endif
  
- 	DBG("fast_rate=%u, slow_rate=27000000", gpu->fast_rate);
++#
++# The -fno-jump-tables flag only prevents the compiler from generating
++# jump tables but does not prevent the compiler from emitting absolute
++# offsets.
+ cflags-vdso := $(ccflags-vdso) \
+ 	$(filter -W%,$(filter-out -Wa$(comma)%,$(KBUILD_CFLAGS))) \
+ 	-O2 -g -fPIC -fno-strict-aliasing -fno-common -fno-builtin -G 0 \
+-	-DDISABLE_BRANCH_PROFILING \
++	-fno-stack-protector -fno-jump-tables -DDISABLE_BRANCH_PROFILING \
+ 	$(call cc-option, -fno-asynchronous-unwind-tables) \
+ 	$(call cc-option, -fno-stack-protector)
+ aflags-vdso := $(ccflags-vdso) \
+ 	-D__ASSEMBLY__ -Wa,-gdwarf-2
  
-+	/* Check for an interconnect path for the bus */
-+	gpu->icc_path = of_icc_get(dev, "port0");
-+	if (IS_ERR(gpu->icc_path))
-+		gpu->icc_path = NULL;
++ifneq ($(c-gettimeofday-y),)
++CFLAGS_vgettimeofday.o = -include $(c-gettimeofday-y)
++endif
 +
- 	return 0;
- }
+ #
+ # For the pre-R6 code in arch/mips/vdso/vdso.h for locating
+ # the base address of VDSO, the linker will emit a R_MIPS_PC32
+@@ -49,6 +63,8 @@ VDSO_LDFLAGS := \
+ 	$(call cc-ldoption, -Wl$(comma)--hash-style=sysv) \
+ 	$(call cc-ldoption, -Wl$(comma)--build-id)
  
-@@ -733,10 +739,13 @@ int adreno_gpu_init(struct drm_device *drm, struct platform_device *pdev,
- 
- void adreno_gpu_cleanup(struct adreno_gpu *adreno_gpu)
- {
-+	struct msm_gpu *gpu = &adreno_gpu->base;
- 	unsigned int i;
- 
- 	for (i = 0; i < ARRAY_SIZE(adreno_gpu->info->fw); i++)
- 		release_firmware(adreno_gpu->fw[i]);
- 
-+	icc_put(gpu->icc_path);
++CFLAGS_REMOVE_vdso.o = -pg
 +
- 	msm_gpu_cleanup(&adreno_gpu->base);
- }
-diff --git a/drivers/gpu/drm/msm/msm_gpu.h b/drivers/gpu/drm/msm/msm_gpu.h
-index f82bac086666..7b04d1665555 100644
---- a/drivers/gpu/drm/msm/msm_gpu.h
-+++ b/drivers/gpu/drm/msm/msm_gpu.h
-@@ -20,6 +20,7 @@
+ GCOV_PROFILE := n
  
- #include <linux/clk.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/interconnect.h>
+ #
+@@ -96,6 +112,7 @@ $(obj)/vdso.lds: KBUILD_CPPFLAGS := $(ccflags-vdso) $(native-abi)
  
- #include "msm_drv.h"
- #include "msm_fence.h"
-@@ -119,6 +120,8 @@ struct msm_gpu {
- 	struct clk *ebi1_clk, *core_clk, *rbbmtimer_clk;
- 	uint32_t fast_rate;
+ $(obj)/vdso.so.dbg.raw: $(obj)/vdso.lds $(obj-vdso) FORCE
+ 	$(call if_changed,vdsold)
++	$(call if_changed,vdso_check)
  
-+	struct icc_path *icc_path;
+ $(obj)/vdso-image.c: $(obj)/vdso.so.dbg.raw $(obj)/vdso.so.raw \
+                      $(obj)/genvdso FORCE
+@@ -134,6 +151,7 @@ $(obj)/vdso-o32.lds: $(src)/vdso.lds.S FORCE
+ 
+ $(obj)/vdso-o32.so.dbg.raw: $(obj)/vdso-o32.lds $(obj-vdso-o32) FORCE
+ 	$(call if_changed,vdsold)
++	$(call if_changed,vdso_check)
+ 
+ $(obj)/vdso-o32-image.c: VDSO_NAME := o32
+ $(obj)/vdso-o32-image.c: $(obj)/vdso-o32.so.dbg.raw $(obj)/vdso-o32.so.raw \
+@@ -174,6 +192,7 @@ $(obj)/vdso-n32.lds: $(src)/vdso.lds.S FORCE
+ 
+ $(obj)/vdso-n32.so.dbg.raw: $(obj)/vdso-n32.lds $(obj-vdso-n32) FORCE
+ 	$(call if_changed,vdsold)
++	$(call if_changed,vdso_check)
+ 
+ $(obj)/vdso-n32-image.c: VDSO_NAME := n32
+ $(obj)/vdso-n32-image.c: $(obj)/vdso-n32.so.dbg.raw $(obj)/vdso-n32.so.raw \
+diff --git a/arch/mips/vdso/elf.S b/arch/mips/vdso/elf.S
+index 428a1917afc6..c0c85d126094 100644
+--- a/arch/mips/vdso/elf.S
++++ b/arch/mips/vdso/elf.S
+@@ -8,7 +8,7 @@
+  * option) any later version.
+  */
+ 
+-#include "vdso.h"
++#include <asm/vdso/vdso.h>
+ 
+ #include <asm/isa-rev.h>
+ 
+diff --git a/arch/mips/vdso/gettimeofday.c b/arch/mips/vdso/gettimeofday.c
+deleted file mode 100644
+index e22b422f282c..000000000000
+--- a/arch/mips/vdso/gettimeofday.c
++++ /dev/null
+@@ -1,273 +0,0 @@
+-/*
+- * Copyright (C) 2015 Imagination Technologies
+- * Author: Alex Smith <alex.smith@imgtec.com>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
+- */
+-
+-#include "vdso.h"
+-
+-#include <linux/compiler.h>
+-#include <linux/time.h>
+-
+-#include <asm/clocksource.h>
+-#include <asm/io.h>
+-#include <asm/unistd.h>
+-#include <asm/vdso.h>
+-
+-#ifdef CONFIG_MIPS_CLOCK_VSYSCALL
+-
+-static __always_inline long gettimeofday_fallback(struct timeval *_tv,
+-					  struct timezone *_tz)
+-{
+-	register struct timezone *tz asm("a1") = _tz;
+-	register struct timeval *tv asm("a0") = _tv;
+-	register long ret asm("v0");
+-	register long nr asm("v0") = __NR_gettimeofday;
+-	register long error asm("a3");
+-
+-	asm volatile(
+-	"       syscall\n"
+-	: "=r" (ret), "=r" (error)
+-	: "r" (tv), "r" (tz), "r" (nr)
+-	: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
+-	  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
+-
+-	return error ? -ret : ret;
+-}
+-
+-#endif
+-
+-static __always_inline long clock_gettime_fallback(clockid_t _clkid,
+-					   struct timespec *_ts)
+-{
+-	register struct timespec *ts asm("a1") = _ts;
+-	register clockid_t clkid asm("a0") = _clkid;
+-	register long ret asm("v0");
+-	register long nr asm("v0") = __NR_clock_gettime;
+-	register long error asm("a3");
+-
+-	asm volatile(
+-	"       syscall\n"
+-	: "=r" (ret), "=r" (error)
+-	: "r" (clkid), "r" (ts), "r" (nr)
+-	: "$1", "$3", "$8", "$9", "$10", "$11", "$12", "$13",
+-	  "$14", "$15", "$24", "$25", "hi", "lo", "memory");
+-
+-	return error ? -ret : ret;
+-}
+-
+-static __always_inline int do_realtime_coarse(struct timespec *ts,
+-					      const union mips_vdso_data *data)
+-{
+-	u32 start_seq;
+-
+-	do {
+-		start_seq = vdso_data_read_begin(data);
+-
+-		ts->tv_sec = data->xtime_sec;
+-		ts->tv_nsec = data->xtime_nsec >> data->cs_shift;
+-	} while (vdso_data_read_retry(data, start_seq));
+-
+-	return 0;
+-}
+-
+-static __always_inline int do_monotonic_coarse(struct timespec *ts,
+-					       const union mips_vdso_data *data)
+-{
+-	u32 start_seq;
+-	u64 to_mono_sec;
+-	u64 to_mono_nsec;
+-
+-	do {
+-		start_seq = vdso_data_read_begin(data);
+-
+-		ts->tv_sec = data->xtime_sec;
+-		ts->tv_nsec = data->xtime_nsec >> data->cs_shift;
+-
+-		to_mono_sec = data->wall_to_mono_sec;
+-		to_mono_nsec = data->wall_to_mono_nsec;
+-	} while (vdso_data_read_retry(data, start_seq));
+-
+-	ts->tv_sec += to_mono_sec;
+-	timespec_add_ns(ts, to_mono_nsec);
+-
+-	return 0;
+-}
+-
+-#ifdef CONFIG_CSRC_R4K
+-
+-static __always_inline u64 read_r4k_count(void)
+-{
+-	unsigned int count;
+-
+-	__asm__ __volatile__(
+-	"	.set push\n"
+-	"	.set mips32r2\n"
+-	"	rdhwr	%0, $2\n"
+-	"	.set pop\n"
+-	: "=r" (count));
+-
+-	return count;
+-}
+-
+-#endif
+-
+-#ifdef CONFIG_CLKSRC_MIPS_GIC
+-
+-static __always_inline u64 read_gic_count(const union mips_vdso_data *data)
+-{
+-	void __iomem *gic = get_gic(data);
+-	u32 hi, hi2, lo;
+-
+-	do {
+-		hi = __raw_readl(gic + sizeof(lo));
+-		lo = __raw_readl(gic);
+-		hi2 = __raw_readl(gic + sizeof(lo));
+-	} while (hi2 != hi);
+-
+-	return (((u64)hi) << 32) + lo;
+-}
+-
+-#endif
+-
+-static __always_inline u64 get_ns(const union mips_vdso_data *data)
+-{
+-	u64 cycle_now, delta, nsec;
+-
+-	switch (data->clock_mode) {
+-#ifdef CONFIG_CSRC_R4K
+-	case VDSO_CLOCK_R4K:
+-		cycle_now = read_r4k_count();
+-		break;
+-#endif
+-#ifdef CONFIG_CLKSRC_MIPS_GIC
+-	case VDSO_CLOCK_GIC:
+-		cycle_now = read_gic_count(data);
+-		break;
+-#endif
+-	default:
+-		return 0;
+-	}
+-
+-	delta = (cycle_now - data->cs_cycle_last) & data->cs_mask;
+-
+-	nsec = (delta * data->cs_mult) + data->xtime_nsec;
+-	nsec >>= data->cs_shift;
+-
+-	return nsec;
+-}
+-
+-static __always_inline int do_realtime(struct timespec *ts,
+-				       const union mips_vdso_data *data)
+-{
+-	u32 start_seq;
+-	u64 ns;
+-
+-	do {
+-		start_seq = vdso_data_read_begin(data);
+-
+-		if (data->clock_mode == VDSO_CLOCK_NONE)
+-			return -ENOSYS;
+-
+-		ts->tv_sec = data->xtime_sec;
+-		ns = get_ns(data);
+-	} while (vdso_data_read_retry(data, start_seq));
+-
+-	ts->tv_nsec = 0;
+-	timespec_add_ns(ts, ns);
+-
+-	return 0;
+-}
+-
+-static __always_inline int do_monotonic(struct timespec *ts,
+-					const union mips_vdso_data *data)
+-{
+-	u32 start_seq;
+-	u64 ns;
+-	u64 to_mono_sec;
+-	u64 to_mono_nsec;
+-
+-	do {
+-		start_seq = vdso_data_read_begin(data);
+-
+-		if (data->clock_mode == VDSO_CLOCK_NONE)
+-			return -ENOSYS;
+-
+-		ts->tv_sec = data->xtime_sec;
+-		ns = get_ns(data);
+-
+-		to_mono_sec = data->wall_to_mono_sec;
+-		to_mono_nsec = data->wall_to_mono_nsec;
+-	} while (vdso_data_read_retry(data, start_seq));
+-
+-	ts->tv_sec += to_mono_sec;
+-	ts->tv_nsec = 0;
+-	timespec_add_ns(ts, ns + to_mono_nsec);
+-
+-	return 0;
+-}
+-
+-#ifdef CONFIG_MIPS_CLOCK_VSYSCALL
+-
+-/*
+- * This is behind the ifdef so that we don't provide the symbol when there's no
+- * possibility of there being a usable clocksource, because there's nothing we
+- * can do without it. When libc fails the symbol lookup it should fall back on
+- * the standard syscall path.
+- */
+-int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
+-{
+-	const union mips_vdso_data *data = get_vdso_data();
+-	struct timespec ts;
+-	int ret;
+-
+-	ret = do_realtime(&ts, data);
+-	if (ret)
+-		return gettimeofday_fallback(tv, tz);
+-
+-	if (tv) {
+-		tv->tv_sec = ts.tv_sec;
+-		tv->tv_usec = ts.tv_nsec / 1000;
+-	}
+-
+-	if (tz) {
+-		tz->tz_minuteswest = data->tz_minuteswest;
+-		tz->tz_dsttime = data->tz_dsttime;
+-	}
+-
+-	return 0;
+-}
+-
+-#endif /* CONFIG_MIPS_CLOCK_VSYSCALL */
+-
+-int __vdso_clock_gettime(clockid_t clkid, struct timespec *ts)
+-{
+-	const union mips_vdso_data *data = get_vdso_data();
+-	int ret = -1;
+-
+-	switch (clkid) {
+-	case CLOCK_REALTIME_COARSE:
+-		ret = do_realtime_coarse(ts, data);
+-		break;
+-	case CLOCK_MONOTONIC_COARSE:
+-		ret = do_monotonic_coarse(ts, data);
+-		break;
+-	case CLOCK_REALTIME:
+-		ret = do_realtime(ts, data);
+-		break;
+-	case CLOCK_MONOTONIC:
+-		ret = do_monotonic(ts, data);
+-		break;
+-	default:
+-		break;
+-	}
+-
+-	if (ret)
+-		ret = clock_gettime_fallback(clkid, ts);
+-
+-	return ret;
+-}
+diff --git a/arch/mips/vdso/sigreturn.S b/arch/mips/vdso/sigreturn.S
+index 30c6219912ac..c2b05956e4cb 100644
+--- a/arch/mips/vdso/sigreturn.S
++++ b/arch/mips/vdso/sigreturn.S
+@@ -8,7 +8,7 @@
+  * option) any later version.
+  */
+ 
+-#include "vdso.h"
++#include <asm/vdso/vdso.h>
+ 
+ #include <uapi/asm/unistd.h>
+ 
+diff --git a/arch/mips/vdso/vdso.lds.S b/arch/mips/vdso/vdso.lds.S
+index 8df7dd53e8e0..90b2c2785e32 100644
+--- a/arch/mips/vdso/vdso.lds.S
++++ b/arch/mips/vdso/vdso.lds.S
+@@ -99,6 +99,7 @@ VERSION
+ 	global:
+ 		__vdso_clock_gettime;
+ 		__vdso_gettimeofday;
++		__vdso_clock_getres;
+ #endif
+ 	local: *;
+ 	};
+diff --git a/arch/mips/vdso/vgettimeofday.c b/arch/mips/vdso/vgettimeofday.c
+new file mode 100644
+index 000000000000..8da361d919f0
+--- /dev/null
++++ b/arch/mips/vdso/vgettimeofday.c
+@@ -0,0 +1,28 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * ARM64 compat userspace implementations of gettimeofday() and similar.
++ *
++ * Copyright (C) 2018 ARM Limited
++ *
++ */
++#include <linux/time.h>
++#include <linux/types.h>
 +
- 	/* Hang and Inactivity Detection:
- 	 */
- #define DRM_MSM_INACTIVE_PERIOD   66 /* in ms (roughly four frames) */
++notrace int __vdso_clock_gettime(clockid_t clock,
++				 struct __vdso_timespec *ts)
++{
++	return __cvdso_clock_gettime(clock, ts);
++}
++
++notrace int __vdso_gettimeofday(struct __vdso_timeval *tv,
++				struct timezone *tz)
++{
++	return __cvdso_gettimeofday(tv, tz);
++}
++
++notrace int __vdso_clock_getres(clockid_t clock_id,
++				struct __vdso_timespec *res)
++{
++	return __cvdso_clock_getres(clock_id, res);
++}
++
 -- 
-2.18.0
+2.19.2
 
 
 _______________________________________________
