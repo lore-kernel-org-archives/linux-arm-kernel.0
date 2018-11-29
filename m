@@ -2,22 +2,22 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D6242C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:56 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 84699C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:14:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9F32420868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:13:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4F2E420868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 16:14:08 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JAThs62d";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="Rnhkuo+H"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F32420868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MrkmPvpl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ti.com header.i=@ti.com header.b="PRGIF0So"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4F2E420868
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=ti.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Sxdu5vL54r7wW0tcs3H4UEzDJDmkPttnEwqa2Wy5AyM=; b=JAThs62dStZ7O3
-	q9p/6AQSdytLXqjtU5uRpJLgo1CTBhppLtHa0erQKuS2PWGWb3QUq8xTN8KTkpt1b0QtWtrWOKIlE
-	P8nCHLYx63GbJc2b648oKZebCmxv9i9ukdOxaP+i60pZ55mGFp9ZuiYMLEDiNC0RyTTABDvT94MZj
-	Ml+3rMY9Fu48y4T1ZjJ8oPmfRYV3qgEIULZxWX3JvWMdm96z3WDAjILnGgpSoesYOEDdQQpbf+wmo
-	LXjNd7Zg3rjI6Tc8xQgQvxUIXmV8D08FGlPm+bLdgImgwD/FLG+h7sTFS/Qks/Wh+oTo+famxEPaG
-	AoBKPvabIxBZ9hMvAsiw==;
+	List-Owner; bh=+xJ070XbGb+3UgvuEcHHleMuSQIyb9kTGa+vzpMdYuU=; b=MrkmPvplFF2slM
+	riy6Q5VWHunvTjyN/YcQxBI9lVdtnjHPbUlAUhKf7BI7UpJqnH6gsCg8J8DzuaO2Ii6/bvry4gxqw
+	a1CSqSkWBJ13qZuWKkoBAdTZgngWkOWKh1O8XNvCghUaT+TvwDR3MhBrzeeLTXPFYQppbFf+EIihA
+	4b7QaVqF3uEsszqaSWjPGUBNjkMSFRPM7QcJpkMzNvVx5atPrQGk2aySEoLLl2SdjnHG4jUwP9YoK
+	PY05TwgBbXzcbdWE9HeuuqnuM5XpVt0sI92PdD6R/pgoXddbtHeKUXycctqvlJyuEvpBPvLi3RyIx
+	6SRdgQRtzEQDUUZAwnAg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSOwn-0006d7-Vm; Thu, 29 Nov 2018 16:13:49 +0000
-Received: from lelv0143.ext.ti.com ([198.47.23.248])
+	id 1gSOx4-0006sc-GC; Thu, 29 Nov 2018 16:14:06 +0000
+Received: from lelv0142.ext.ti.com ([198.47.23.249])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSOvp-0005ox-Cd
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 16:12:52 +0000
-Received: from fllv0035.itg.ti.com ([10.64.41.0])
- by lelv0143.ext.ti.com (8.15.2/8.15.2) with ESMTP id wATGCeiN037976;
- Thu, 29 Nov 2018 10:12:40 -0600
+ id 1gSOw2-0005q5-7g
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 16:13:06 +0000
+Received: from lelv0266.itg.ti.com ([10.180.67.225])
+ by lelv0142.ext.ti.com (8.15.2/8.15.2) with ESMTP id wATGCbTb100640;
+ Thu, 29 Nov 2018 10:12:37 -0600
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ti.com;
- s=ti-com-17Q1; t=1543507960;
- bh=AcRPiEiPE3Z6lAPo4Hfp2eSVEBF+e/Lhiv08Cv+6Awg=;
+ s=ti-com-17Q1; t=1543507957;
+ bh=0yRXmnEkROLYOSjml1UMGjpoq5LT5a/vpAZ8G2JIsUk=;
  h=From:To:CC:Subject:Date:In-Reply-To:References;
- b=Rnhkuo+HhB+NZ/Ky4mVXZuvF4bcK9EPat3pI9fCkhu4tahbD9o0xq1c5hBsbKwqs5
- a7p/QXoYCXVqcKtLbmD3JAxEqLHDMqWFP54AFmuVaQv2gBv92Mdz4QWrV8S6b7HrRN
- HV6nhF4APbUSRdmylCOp3pmeYmJXRg1FY6usbYWw=
-Received: from DFLE113.ent.ti.com (dfle113.ent.ti.com [10.64.6.34])
- by fllv0035.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wATGCeWH078521
+ b=PRGIF0SoKxahCjuiGRZqsZssO/bjNAZPAHdgmGXinIgB7Wtm9kOMqK+kQTWtvyfOP
+ xXWlOrF4ecWr109aEin/VA+Z/1/HlLQeHvU5YeXHJRlHjfCZl/hJ2pIIU7ojbGZYsY
+ ztJi0g01AtQe7LVgsVKs9f0LtgDprKBrjY25W5HU=
+Received: from DLEE113.ent.ti.com (dlee113.ent.ti.com [157.170.170.24])
+ by lelv0266.itg.ti.com (8.15.2/8.15.2) with ESMTPS id wATGCbk7025567
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=FAIL);
- Thu, 29 Nov 2018 10:12:40 -0600
-Received: from DFLE109.ent.ti.com (10.64.6.30) by DFLE113.ent.ti.com
- (10.64.6.34) with Microsoft SMTP Server (version=TLS1_2,
+ Thu, 29 Nov 2018 10:12:37 -0600
+Received: from DLEE109.ent.ti.com (157.170.170.41) by DLEE113.ent.ti.com
+ (157.170.170.24) with Microsoft SMTP Server (version=TLS1_2,
  cipher=TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256_P256) id 15.1.1591.10; Thu, 29
- Nov 2018 10:12:40 -0600
-Received: from dlep32.itg.ti.com (157.170.170.100) by DFLE109.ent.ti.com
- (10.64.6.30) with Microsoft SMTP Server (version=TLS1_0,
+ Nov 2018 10:12:36 -0600
+Received: from dlep32.itg.ti.com (157.170.170.100) by DLEE109.ent.ti.com
+ (157.170.170.41) with Microsoft SMTP Server (version=TLS1_0,
  cipher=TLS_RSA_WITH_AES_256_CBC_SHA) id 15.1.1591.10 via Frontend Transport;
- Thu, 29 Nov 2018 10:12:40 -0600
+ Thu, 29 Nov 2018 10:12:36 -0600
 Received: from a0230074-OptiPlex-7010.india.ti.com (ileax41-snat.itg.ti.com
  [10.172.224.153])
- by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wATGCQL6019470;
- Thu, 29 Nov 2018 10:12:37 -0600
+ by dlep32.itg.ti.com (8.14.3/8.13.8) with ESMTP id wATGCQL5019470;
+ Thu, 29 Nov 2018 10:12:33 -0600
 From: Faiz Abbas <faiz_abbas@ti.com>
 To: <linux-kernel@vger.kernel.org>, <linux-arm-kernel@lists.infradead.org>,
  <devicetree@vger.kernel.org>, <linux-mmc@vger.kernel.org>
-Subject: [PATCH 3/3] mmc: sdhci_am654: Add Initial Support for AM654 SDHCI
- driver
-Date: Thu, 29 Nov 2018 21:45:13 +0530
-Message-ID: <20181129161513.31734-4-faiz_abbas@ti.com>
+Subject: [PATCH 2/3] dt-bindings: mmc: sdhci-of-arasan: Add deprecated message
+ for am654
+Date: Thu, 29 Nov 2018 21:45:12 +0530
+Message-ID: <20181129161513.31734-3-faiz_abbas@ti.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181129161513.31734-1-faiz_abbas@ti.com>
 References: <20181129161513.31734-1-faiz_abbas@ti.com>
 MIME-Version: 1.0
 X-EXCLAIMER-MD-CONFIG: e1e8a2fd-e40a-4ac6-ac9b-f7e9cc9ee180
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_081249_509008_60E2E699 
-X-CRM114-Status: GOOD (  25.29  )
+X-CRM114-CacheID: sfid-20181129_081303_270003_7257103D 
+X-CRM114-Status: GOOD (  12.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,514 +98,29 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The host controllers on TI's AM654 SOCs are not compatible with
-the phy and consumer model of the sdhci-of-arasan driver. It turns out
-that for optimal operation at higher speeds, a special tuning procedure
-needs to be implemented which involves configuration of platform
-specific phy registers.
-
-Therefore, branch out to a new sdhci_am654 driver and add the phy
-register space with all phy configurations to it. Populate AM654
-specific callbacks to sdhci_ops and add SDHCI_QUIRKS wherever
-applicable.
-
-Only add support for upto High Speed for SD card and upto DDR52 speed
-mode for eMMC. Higher speeds will be added in subsequent patches.
+The "ti,am654-sdhci-5.1" binding has been moved to a new driver. Indicate
+this by a deprecated message.
 
 Signed-off-by: Faiz Abbas <faiz_abbas@ti.com>
 ---
- drivers/mmc/host/Kconfig           |  12 +
- drivers/mmc/host/Makefile          |   1 +
- drivers/mmc/host/sdhci-of-arasan.c |  46 ----
- drivers/mmc/host/sdhci_am654.c     | 376 +++++++++++++++++++++++++++++
- 4 files changed, 389 insertions(+), 46 deletions(-)
- create mode 100644 drivers/mmc/host/sdhci_am654.c
+ Documentation/devicetree/bindings/mmc/arasan,sdhci.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mmc/host/Kconfig b/drivers/mmc/host/Kconfig
-index 1b58739d9744..cfb2eb1a2c32 100644
---- a/drivers/mmc/host/Kconfig
-+++ b/drivers/mmc/host/Kconfig
-@@ -977,3 +977,15 @@ config MMC_SDHCI_OMAP
- 	  If you have a controller with this interface, say Y or M here.
- 
- 	  If unsure, say N.
+diff --git a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+index e2effe17f05e..1edbb049cccb 100644
+--- a/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/arasan,sdhci.txt
+@@ -16,6 +16,10 @@ Required Properties:
+     - "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1": rk3399 eMMC PHY
+       For this device it is strongly suggested to include arasan,soc-ctl-syscon.
+     - "ti,am654-sdhci-5.1", "arasan,sdhci-5.1": TI AM654 MMC PHY
++	Note: This binding has been deprecated and moved to [5].
 +
-+config MMC_SDHCI_AM654
-+	tristate "Support for the SDHCI Controller in TI's AM654 SOCs"
-+	depends on MMC_SDHCI_PLTFM && OF
-+	help
-+	  This selects the Secure Digital Host Controller Interface (SDHCI)
-+	  support present in TI's AM654 SOCs. The controller supports
-+	  SD/MMC/SDIO devices.
++  [5] Documentation/devicetree/bindings/mmc/sdhci-am654.txt
 +
-+	  If you have a controller with this interface, say Y or M here.
-+
-+	  If unsure, say N.
-diff --git a/drivers/mmc/host/Makefile b/drivers/mmc/host/Makefile
-index 720d37777098..5c7770edc431 100644
---- a/drivers/mmc/host/Makefile
-+++ b/drivers/mmc/host/Makefile
-@@ -22,6 +22,7 @@ obj-$(CONFIG_MMC_SDHCI_S3C)	+= sdhci-s3c.o
- obj-$(CONFIG_MMC_SDHCI_SIRF)   	+= sdhci-sirf.o
- obj-$(CONFIG_MMC_SDHCI_F_SDH30)	+= sdhci_f_sdh30.o
- obj-$(CONFIG_MMC_SDHCI_SPEAR)	+= sdhci-spear.o
-+obj-$(CONFIG_MMC_SDHCI_AM654)	+= sdhci_am654.o
- obj-$(CONFIG_MMC_WBSD)		+= wbsd.o
- obj-$(CONFIG_MMC_AU1X)		+= au1xmmc.o
- obj-$(CONFIG_MMC_MTK)		+= mtk-sd.o
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index 142c4b802f31..c9e3e050ccc8 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -231,25 +231,6 @@ static void sdhci_arasan_set_clock(struct sdhci_host *host, unsigned int clock)
- 	}
- }
- 
--static void sdhci_arasan_am654_set_clock(struct sdhci_host *host,
--					 unsigned int clock)
--{
--	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
--	struct sdhci_arasan_data *sdhci_arasan = sdhci_pltfm_priv(pltfm_host);
--
--	if (sdhci_arasan->is_phy_on) {
--		phy_power_off(sdhci_arasan->phy);
--		sdhci_arasan->is_phy_on = false;
--	}
--
--	sdhci_set_clock(host, clock);
--
--	if (clock > PHY_CLK_TOO_SLOW_HZ) {
--		phy_power_on(sdhci_arasan->phy);
--		sdhci_arasan->is_phy_on = true;
--	}
--}
--
- static void sdhci_arasan_hs400_enhanced_strobe(struct mmc_host *mmc,
- 					struct mmc_ios *ios)
- {
-@@ -335,29 +316,6 @@ static struct sdhci_arasan_of_data sdhci_arasan_data = {
- 	.pdata = &sdhci_arasan_pdata,
- };
- 
--static const struct sdhci_ops sdhci_arasan_am654_ops = {
--	.set_clock = sdhci_arasan_am654_set_clock,
--	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
--	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
--	.set_bus_width = sdhci_set_bus_width,
--	.reset = sdhci_arasan_reset,
--	.set_uhs_signaling = sdhci_set_uhs_signaling,
--};
--
--static const struct sdhci_pltfm_data sdhci_arasan_am654_pdata = {
--	.ops = &sdhci_arasan_am654_ops,
--	.quirks = SDHCI_QUIRK_CAP_CLOCK_BASE_BROKEN  |
--		  SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
--		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
--	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN |
--		   SDHCI_QUIRK2_CLOCK_DIV_ZERO_BROKEN |
--		   SDHCI_QUIRK2_CAPS_BIT63_FOR_HS400,
--};
--
--static const struct sdhci_arasan_of_data sdhci_arasan_am654_data = {
--	.pdata = &sdhci_arasan_am654_pdata,
--};
--
- static u32 sdhci_arasan_cqhci_irq(struct sdhci_host *host, u32 intmask)
- {
- 	int cmd_error = 0;
-@@ -520,10 +478,6 @@ static const struct of_device_id sdhci_arasan_of_match[] = {
- 		.compatible = "rockchip,rk3399-sdhci-5.1",
- 		.data = &sdhci_arasan_rk3399_data,
- 	},
--	{
--		.compatible = "ti,am654-sdhci-5.1",
--		.data = &sdhci_arasan_am654_data,
--	},
- 	/* Generic compatible below here */
- 	{
- 		.compatible = "arasan,sdhci-8.9a",
-diff --git a/drivers/mmc/host/sdhci_am654.c b/drivers/mmc/host/sdhci_am654.c
-new file mode 100644
-index 000000000000..6e5be12d5946
---- /dev/null
-+++ b/drivers/mmc/host/sdhci_am654.c
-@@ -0,0 +1,376 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * sdhci_am654.c - SDHCI driver for TI's AM654 SOCs
-+ *
-+ * Copyright (C) 2018 Texas Instruments Incorporated - http://www.ti.com
-+ *
-+ */
-+#include <linux/clk.h>
-+#include <linux/module.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/property.h>
-+#include <linux/regmap.h>
-+
-+#include "sdhci-pltfm.h"
-+
-+/* CTL_CFG Registers */
-+#define CTL_CFG_2		0x14
-+
-+#define SLOTTYPE_MASK		GENMASK(31, 30)
-+#define SLOTTYPE_EMBEDDED	BIT(30)
-+
-+/* PHY Registers */
-+#define PHY_CTRL1	0x100
-+#define PHY_CTRL2	0x104
-+#define PHY_CTRL3	0x108
-+#define PHY_CTRL4	0x10C
-+#define PHY_CTRL5	0x110
-+#define PHY_CTRL6	0x114
-+#define PHY_STAT1	0x130
-+#define PHY_STAT2	0x134
-+
-+#define IOMUX_ENABLE_SHIFT	31
-+#define IOMUX_ENABLE_MASK	BIT(IOMUX_ENABLE_SHIFT)
-+#define OTAPDLYENA_SHIFT	20
-+#define OTAPDLYENA_MASK		BIT(OTAPDLYENA_SHIFT)
-+#define OTAPDLYSEL_SHIFT	12
-+#define OTAPDLYSEL_MASK		GENMASK(15, 12)
-+#define STRBSEL_SHIFT		24
-+#define STRBSEL_MASK		GENMASK(27, 24)
-+#define SEL50_SHIFT		8
-+#define SEL50_MASK		BIT(SEL50_SHIFT)
-+#define SEL100_SHIFT		9
-+#define SEL100_MASK		BIT(SEL100_SHIFT)
-+#define DLL_TRIM_ICP_SHIFT	4
-+#define DLL_TRIM_ICP_MASK	GENMASK(7, 4)
-+#define DR_TY_SHIFT		20
-+#define DR_TY_MASK		GENMASK(22, 20)
-+#define ENDLL_SHIFT		1
-+#define ENDLL_MASK		BIT(ENDLL_SHIFT)
-+#define DLLRDY_SHIFT		0
-+#define DLLRDY_MASK		BIT(DLLRDY_SHIFT)
-+#define PDB_SHIFT		0
-+#define PDB_MASK		BIT(PDB_SHIFT)
-+#define CALDONE_SHIFT		1
-+#define CALDONE_MASK		BIT(CALDONE_SHIFT)
-+#define RETRIM_SHIFT		17
-+#define RETRIM_MASK		BIT(RETRIM_SHIFT)
-+
-+#define DRIVER_STRENGTH_50_OHM	0x0
-+#define DRIVER_STRENGTH_33_OHM	0x1
-+#define DRIVER_STRENGTH_66_OHM	0x2
-+#define DRIVER_STRENGTH_100_OHM	0x3
-+#define DRIVER_STRENGTH_40_OHM	0x4
-+
-+#define CLOCK_TOO_SLOW_HZ	400000
-+
-+static struct regmap_config sdhci_am654_regmap_config = {
-+	.reg_bits = 32,
-+	.val_bits = 32,
-+	.reg_stride = 4,
-+	.fast_io = true,
-+};
-+
-+struct sdhci_am654_data {
-+	struct regmap *base;
-+	struct clk *clk_ahb;
-+	int otap_del_sel;
-+	int trm_icp;
-+	int drv_strength;
-+	bool dll_on;
-+};
-+
-+static void sdhci_am654_set_clock(struct sdhci_host *host, unsigned int clock)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
-+	int sel50, sel100;
-+	u32 mask, val;
-+	int ret;
-+
-+	if (sdhci_am654->dll_on) {
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
-+				   ENDLL_MASK, 0);
-+
-+		sdhci_am654->dll_on = false;
-+	}
-+
-+	sdhci_set_clock(host, clock);
-+
-+	if (clock > CLOCK_TOO_SLOW_HZ) {
-+		/* Setup DLL Output TAP delay */
-+		mask = OTAPDLYENA_MASK | OTAPDLYSEL_MASK;
-+		val = (1 << OTAPDLYENA_SHIFT) |
-+		      (sdhci_am654->otap_del_sel << OTAPDLYSEL_SHIFT);
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL4,
-+				   mask, val);
-+		switch (clock) {
-+		case 200000000:
-+			sel50 = 0;
-+			sel100 = 0;
-+			break;
-+		case 100000000:
-+			sel50 = 0;
-+			sel100 = 1;
-+			break;
-+		default:
-+			sel50 = 1;
-+			sel100 = 0;
-+		}
-+
-+		/* Configure PHY DLL frequency */
-+		mask = SEL50_MASK | SEL100_MASK;
-+		val = (sel50 << SEL50_SHIFT) | (sel100 << SEL100_SHIFT);
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL5,
-+				   mask, val);
-+		/* Configure DLL TRIM */
-+		mask = DLL_TRIM_ICP_MASK;
-+		val = sdhci_am654->trm_icp << DLL_TRIM_ICP_SHIFT;
-+
-+		/* Configure DLL driver strength */
-+		mask |= DR_TY_MASK;
-+		val |= sdhci_am654->drv_strength << DR_TY_SHIFT;
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
-+				   mask, val);
-+		/* Enable DLL */
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
-+				   ENDLL_MASK, 0x1 << ENDLL_SHIFT);
-+		/*
-+		 * Poll for DLL ready. Use a one second timeout.
-+		 * Works in all experiments done so far
-+		 */
-+		ret = regmap_read_poll_timeout(sdhci_am654->base,
-+					 PHY_STAT1, val,
-+					 val & DLLRDY_MASK,
-+					 1000, 1000000);
-+
-+		sdhci_am654->dll_on = true;
-+	}
-+}
-+
-+
-+static void sdhci_am654_set_power(struct sdhci_host *host, unsigned char mode,
-+				  unsigned short vdd)
-+{
-+	if (!IS_ERR(host->mmc->supply.vmmc)) {
-+		struct mmc_host *mmc = host->mmc;
-+
-+		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-+	}
-+	sdhci_set_power_noreg(host, mode, vdd);
-+}
-+
-+struct sdhci_ops sdhci_am654_ops = {
-+	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-+	.get_timeout_clock = sdhci_pltfm_clk_get_max_clock,
-+	.set_uhs_signaling = sdhci_set_uhs_signaling,
-+	.set_bus_width = sdhci_set_bus_width,
-+	.set_power = sdhci_am654_set_power,
-+	.set_clock = sdhci_am654_set_clock,
-+	.reset = sdhci_reset,
-+};
-+
-+static const struct sdhci_pltfm_data sdhci_am654_pdata = {
-+	.ops = &sdhci_am654_ops,
-+	.quirks = SDHCI_QUIRK_INVERTED_WRITE_PROTECT |
-+		  SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12,
-+	.quirks2 = SDHCI_QUIRK2_PRESET_VALUE_BROKEN,
-+};
-+
-+static int sdhci_am654_init(struct sdhci_host *host)
-+{
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_am654_data *sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
-+	u32 ctl_cfg_2 = 0;
-+	u32 val;
-+	int ret;
-+
-+	regmap_read(sdhci_am654->base, PHY_STAT1, &val);
-+	if (~val & CALDONE_MASK) {
-+		/* Calibrate IO lines */
-+		regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
-+				   PDB_MASK, PDB_MASK);
-+		ret = regmap_read_poll_timeout(sdhci_am654->base, PHY_STAT1,
-+					       val, val & CALDONE_MASK, 1, 20);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Enable pins by setting IO mux to 0 */
-+	regmap_update_bits(sdhci_am654->base, PHY_CTRL1,
-+			   IOMUX_ENABLE_MASK, 0);
-+
-+	/* Set slot type based on SD or eMMC */
-+	if (host->mmc->caps & MMC_CAP_NONREMOVABLE)
-+		ctl_cfg_2 = SLOTTYPE_EMBEDDED;
-+
-+	regmap_update_bits(sdhci_am654->base, CTL_CFG_2,
-+			   ctl_cfg_2, SLOTTYPE_MASK);
-+
-+	return sdhci_add_host(host);
-+}
-+
-+static int sdhci_am654_get_of_property(struct platform_device *pdev,
-+					struct sdhci_am654_data *sdhci_am654)
-+{
-+	struct device *dev = &pdev->dev;
-+	int drv_strength;
-+	int ret;
-+
-+	ret = device_property_read_u32(dev, "ti,trm-icp",
-+				       &sdhci_am654->trm_icp);
-+	if (ret)
-+		return ret;
-+
-+	ret = device_property_read_u32(dev, "ti,otap-del-sel",
-+				       &sdhci_am654->otap_del_sel);
-+	if (ret)
-+		return ret;
-+
-+	ret = device_property_read_u32(dev, "ti,driver-strength-ohm",
-+				       &drv_strength);
-+	if (ret)
-+		return ret;
-+
-+	switch (drv_strength) {
-+	case 50:
-+		sdhci_am654->drv_strength = DRIVER_STRENGTH_50_OHM;
-+		break;
-+	case 33:
-+		sdhci_am654->drv_strength = DRIVER_STRENGTH_33_OHM;
-+		break;
-+	case 66:
-+		sdhci_am654->drv_strength = DRIVER_STRENGTH_66_OHM;
-+		break;
-+	case 100:
-+		sdhci_am654->drv_strength = DRIVER_STRENGTH_100_OHM;
-+		break;
-+	case 40:
-+		sdhci_am654->drv_strength = DRIVER_STRENGTH_40_OHM;
-+		break;
-+	default:
-+		dev_err(dev, "Invalid driver strength\n");
-+		return -EINVAL;
-+	}
-+
-+	sdhci_get_of_property(pdev);
-+
-+	return 0;
-+}
-+
-+static int sdhci_am654_probe(struct platform_device *pdev)
-+{
-+	struct sdhci_pltfm_host *pltfm_host;
-+	struct sdhci_am654_data *sdhci_am654;
-+	struct sdhci_host *host;
-+	struct resource *res;
-+	struct clk *clk_xin;
-+	struct device *dev = &pdev->dev;
-+	void __iomem *base;
-+	int ret;
-+
-+	host = sdhci_pltfm_init(pdev, &sdhci_am654_pdata, sizeof(*sdhci_am654));
-+	if (IS_ERR(host))
-+		return PTR_ERR(host);
-+
-+	pltfm_host = sdhci_priv(host);
-+	sdhci_am654 = sdhci_pltfm_priv(pltfm_host);
-+
-+	clk_xin = devm_clk_get(dev, "clk_xin");
-+	if (IS_ERR(clk_xin)) {
-+		dev_err(dev, "clk_xin clock not found.\n");
-+		ret = PTR_ERR(clk_xin);
-+		goto err_pltfm_free;
-+	}
-+
-+	sdhci_am654->clk_ahb = devm_clk_get(dev, "clk_ahb");
-+	if (IS_ERR(sdhci_am654->clk_ahb)) {
-+		dev_err(dev, "clk_ahb clock not found.\n");
-+		ret = PTR_ERR(sdhci_am654->clk_ahb);
-+		goto err_pltfm_free;
-+	}
-+
-+	pltfm_host->clk = clk_xin;
-+
-+	pm_runtime_enable(dev);
-+	ret = pm_runtime_get_sync(dev);
-+	if (ret > 0) {
-+		pm_runtime_put_noidle(dev);
-+		goto pm_runtime_disable;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
-+		goto pm_runtime_put;
-+	}
-+
-+	sdhci_am654->base = devm_regmap_init_mmio(dev, base,
-+						  &sdhci_am654_regmap_config);
-+	if (IS_ERR(sdhci_am654->base)) {
-+		dev_err(dev, "Failed to initialize regmap\n");
-+		ret = PTR_ERR(sdhci_am654->base);
-+		goto pm_runtime_put;
-+	}
-+
-+	ret = sdhci_am654_get_of_property(pdev, sdhci_am654);
-+	if (ret)
-+		goto pm_runtime_put;
-+
-+	ret = mmc_of_parse(host->mmc);
-+	if (ret) {
-+		dev_err(dev, "parsing dt failed (%d)\n", ret);
-+		goto pm_runtime_put;
-+	}
-+
-+	ret = sdhci_am654_init(host);
-+	if (ret)
-+		goto pm_runtime_put;
-+
-+	return 0;
-+
-+pm_runtime_put:
-+	pm_runtime_put_sync(dev);
-+pm_runtime_disable:
-+	pm_runtime_disable(dev);
-+err_pltfm_free:
-+	sdhci_pltfm_free(pdev);
-+	return ret;
-+}
-+
-+static int sdhci_am654_remove(struct platform_device *pdev)
-+{
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	int ret;
-+
-+	sdhci_remove_host(host, true);
-+	ret = pm_runtime_put_sync(&pdev->dev);
-+	if (ret < 0)
-+		return ret;
-+
-+	pm_runtime_disable(&pdev->dev);
-+	sdhci_pltfm_free(pdev);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id sdhci_am654_of_match[] = {
-+	{ .compatible = "ti,am654-sdhci-5.1" },
-+	{ /* sentinel */ }
-+};
-+
-+static struct platform_driver sdhci_am654_driver = {
-+	.driver = {
-+		.name = "sdhci-am654",
-+		.of_match_table = sdhci_am654_of_match,
-+	},
-+	.probe = sdhci_am654_probe,
-+	.remove = sdhci_am654_remove,
-+};
-+
-+module_platform_driver(sdhci_am654_driver);
-+
-+MODULE_DESCRIPTION("Driver for SDHCI Controller on TI's AM654 devices");
-+MODULE_AUTHOR("Faiz Abbas <faiz_abbas@ti.com>");
-+MODULE_LICENSE("GPL");
+   - reg: From mmc bindings: Register location and length.
+   - clocks: From clock bindings: Handles to clock inputs.
+   - clock-names: From clock bindings: Tuple including "clk_xin" and "clk_ahb"
 -- 
 2.19.2
 
