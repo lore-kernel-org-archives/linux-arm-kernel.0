@@ -1,452 +1,284 @@
 From: abel.vesa@nxp.com (Abel Vesa)
-Date: Thu, 29 Nov 2018 09:28:33 +0000
-Subject: [PATCH v14 1/5] dt-bindings: Add binding for i.MX8MQ CCM
+Date: Thu, 29 Nov 2018 09:28:34 +0000
+Subject: [PATCH v14 2/5] clk: imx: Add fractional PLL output clock
 In-Reply-To: <1543483640-4585-1-git-send-email-abel.vesa@nxp.com>
 References: <1543483640-4585-1-git-send-email-abel.vesa@nxp.com>
-Message-ID: <1543483640-4585-2-git-send-email-abel.vesa@nxp.com>
+Message-ID: <1543483640-4585-3-git-send-email-abel.vesa@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lucas Stach <l.stach@pengutronix.de>
 
-This adds the binding for the i.MX8MQ Clock Controller Module.
+This is a new fractional clock type introduced on i.MX8.
+
+The description of this fractional clock can be found here:
+
+https://www.nxp.com/docs/en/reference-manual/IMX8MDQLQRM.pdf#page=834
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- .../devicetree/bindings/clock/imx8mq-clock.txt     |  20 ++
- include/dt-bindings/clock/imx8mq-clock.h           | 395 +++++++++++++++++++++
- 2 files changed, 415 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
- create mode 100644 include/dt-bindings/clock/imx8mq-clock.h
+ drivers/clk/imx/Makefile       |   1 +
+ drivers/clk/imx/clk-frac-pll.c | 223 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/imx/clk.h          |   3 +
+ 3 files changed, 227 insertions(+)
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
 
-diff --git a/Documentation/devicetree/bindings/clock/imx8mq-clock.txt b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+diff --git a/drivers/clk/imx/Makefile b/drivers/clk/imx/Makefile
+index 8c3baa7..4893c1f 100644
+--- a/drivers/clk/imx/Makefile
++++ b/drivers/clk/imx/Makefile
+@@ -6,6 +6,7 @@ obj-y += \
+ 	clk-cpu.o \
+ 	clk-fixup-div.o \
+ 	clk-fixup-mux.o \
++	clk-frac-pll.o \
+ 	clk-gate-exclusive.o \
+ 	clk-gate2.o \
+ 	clk-pllv1.o \
+diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
 new file mode 100644
-index 0000000..52de826
+index 0000000..9872620
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/imx8mq-clock.txt
-@@ -0,0 +1,20 @@
-+* Clock bindings for NXP i.MX8M Quad
-+
-+Required properties:
-+- compatible: Should be "fsl,imx8mq-ccm"
-+- reg: Address and length of the register set
-+- #clock-cells: Should be <1>
-+- clocks: list of clock specifiers, must contain an entry for each required
-+          entry in clock-names
-+- clock-names: should include the following entries:
-+    - "ckil"
-+    - "osc_25m"
-+    - "osc_27m"
-+    - "clk_ext1"
-+    - "clk_ext2"
-+    - "clk_ext3"
-+    - "clk_ext4"
-+
-+The clock consumer should specify the desired clock by having the clock
-+ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx8mq-clock.h
-+for the full list of i.MX8M Quad clock IDs.
-diff --git a/include/dt-bindings/clock/imx8mq-clock.h b/include/dt-bindings/clock/imx8mq-clock.h
-new file mode 100644
-index 0000000..b53be41
---- /dev/null
-+++ b/include/dt-bindings/clock/imx8mq-clock.h
-@@ -0,0 +1,395 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
++++ b/drivers/clk/imx/clk-frac-pll.c
+@@ -0,0 +1,223 @@
++// SPDX-License-Identifier: GPL-2.0
 +/*
-+ * Copyright 2016 Freescale Semiconductor, Inc.
-+ * Copyright 2017 NXP
++ * Copyright 2018 NXP.
++ *
++ * This driver supports the fractional plls found in the imx8m SOCs
++ *
++ * Documentation for this fractional pll can be found at:
++ *   https://www.nxp.com/docs/en/reference-manual/IMX8MDQLQRM.pdf#page=834
 + */
 +
-+#ifndef __DT_BINDINGS_CLOCK_IMX8MQ_H
-+#define __DT_BINDINGS_CLOCK_IMX8MQ_H
++#include <linux/clk-provider.h>
++#include <linux/err.h>
++#include <linux/iopoll.h>
++#include <linux/slab.h>
++#include <linux/bitfield.h>
 +
-+#define IMX8MQ_CLK_DUMMY		0
-+#define IMX8MQ_CLK_32K			1
-+#define IMX8MQ_CLK_25M			2
-+#define IMX8MQ_CLK_27M			3
-+#define IMX8MQ_CLK_EXT1			4
-+#define IMX8MQ_CLK_EXT2			5
-+#define IMX8MQ_CLK_EXT3			6
-+#define IMX8MQ_CLK_EXT4			7
++#include "clk.h"
 +
-+/* ANAMIX PLL clocks */
-+/* FRAC PLLs */
-+/* ARM PLL */
-+#define IMX8MQ_ARM_PLL_REF_SEL		8
-+#define IMX8MQ_ARM_PLL_REF_DIV		9
-+#define IMX8MQ_ARM_PLL			10
-+#define IMX8MQ_ARM_PLL_BYPASS		11
-+#define IMX8MQ_ARM_PLL_OUT		12
++#define PLL_CFG0		0x0
++#define PLL_CFG1		0x4
 +
-+/* GPU PLL */
-+#define IMX8MQ_GPU_PLL_REF_SEL		13
-+#define IMX8MQ_GPU_PLL_REF_DIV		14
-+#define IMX8MQ_GPU_PLL			15
-+#define IMX8MQ_GPU_PLL_BYPASS		16
-+#define IMX8MQ_GPU_PLL_OUT		17
++#define PLL_LOCK_STATUS		BIT(31)
++#define PLL_PD_MASK		BIT(19)
++#define PLL_BYPASS_MASK		BIT(14)
++#define PLL_NEWDIV_VAL		BIT(12)
++#define PLL_NEWDIV_ACK		BIT(11)
++#define PLL_FRAC_DIV_MASK	GENMASK(30, 7)
++#define PLL_INT_DIV_MASK	GENMASK(6, 0)
++#define PLL_OUTPUT_DIV_MASK	GENMASK(4, 0)
++#define PLL_FRAC_DENOM		0x1000000
 +
-+/* VPU PLL */
-+#define IMX8MQ_VPU_PLL_REF_SEL		18
-+#define IMX8MQ_VPU_PLL_REF_DIV		19
-+#define IMX8MQ_VPU_PLL			20
-+#define IMX8MQ_VPU_PLL_BYPASS		21
-+#define IMX8MQ_VPU_PLL_OUT		22
++#define PLL_FRAC_LOCK_TIMEOUT	10000
++#define PLL_FRAC_ACK_TIMEOUT	500000
 +
-+/* AUDIO PLL1 */
-+#define IMX8MQ_AUDIO_PLL1_REF_SEL	23
-+#define IMX8MQ_AUDIO_PLL1_REF_DIV	24
-+#define IMX8MQ_AUDIO_PLL1		25
-+#define IMX8MQ_AUDIO_PLL1_BYPASS	26
-+#define IMX8MQ_AUDIO_PLL1_OUT		27
++struct clk_frac_pll {
++	struct clk_hw	hw;
++	void __iomem	*base;
++};
 +
-+/* AUDIO PLL2 */
-+#define IMX8MQ_AUDIO_PLL2_REF_SEL	28
-+#define IMX8MQ_AUDIO_PLL2_REF_DIV	29
-+#define IMX8MQ_AUDIO_PLL2		30
-+#define IMX8MQ_AUDIO_PLL2_BYPASS	31
-+#define IMX8MQ_AUDIO_PLL2_OUT		32
++#define to_clk_frac_pll(_hw) container_of(_hw, struct clk_frac_pll, hw)
 +
-+/* VIDEO PLL1 */
-+#define IMX8MQ_VIDEO_PLL1_REF_SEL	33
-+#define IMX8MQ_VIDEO_PLL1_REF_DIV	34
-+#define IMX8MQ_VIDEO_PLL1		35
-+#define IMX8MQ_VIDEO_PLL1_BYPASS	36
-+#define IMX8MQ_VIDEO_PLL1_OUT		37
++static int clk_wait_lock(struct clk_frac_pll *pll)
++{
++	u32 val;
 +
-+/* SYS1 PLL */
-+#define IMX8MQ_SYS1_PLL1_REF_SEL	38
-+#define IMX8MQ_SYS1_PLL1_REF_DIV	39
-+#define IMX8MQ_SYS1_PLL1		40
-+#define IMX8MQ_SYS1_PLL1_OUT		41
-+#define IMX8MQ_SYS1_PLL1_OUT_DIV	42
-+#define IMX8MQ_SYS1_PLL2		43
-+#define IMX8MQ_SYS1_PLL2_DIV		44
-+#define IMX8MQ_SYS1_PLL2_OUT		45
++	return readl_poll_timeout(pll->base, val, val & PLL_LOCK_STATUS, 0,
++					PLL_FRAC_LOCK_TIMEOUT);
++}
 +
-+/* SYS2 PLL */
-+#define IMX8MQ_SYS2_PLL1_REF_SEL	46
-+#define IMX8MQ_SYS2_PLL1_REF_DIV	47
-+#define IMX8MQ_SYS2_PLL1		48
-+#define IMX8MQ_SYS2_PLL1_OUT		49
-+#define IMX8MQ_SYS2_PLL1_OUT_DIV	50
-+#define IMX8MQ_SYS2_PLL2		51
-+#define IMX8MQ_SYS2_PLL2_DIV		52
-+#define IMX8MQ_SYS2_PLL2_OUT		53
++static int clk_wait_ack(struct clk_frac_pll *pll)
++{
++	u32 val;
 +
-+/* SYS3 PLL */
-+#define IMX8MQ_SYS3_PLL1_REF_SEL	54
-+#define IMX8MQ_SYS3_PLL1_REF_DIV	55
-+#define IMX8MQ_SYS3_PLL1		56
-+#define IMX8MQ_SYS3_PLL1_OUT		57
-+#define IMX8MQ_SYS3_PLL1_OUT_DIV	58
-+#define IMX8MQ_SYS3_PLL2		59
-+#define IMX8MQ_SYS3_PLL2_DIV		60
-+#define IMX8MQ_SYS3_PLL2_OUT		61
++	/* return directly if the pll is in powerdown or in bypass */
++	if (readl_relaxed(pll->base) & (PLL_PD_MASK | PLL_BYPASS_MASK))
++		return 0;
 +
-+/* DRAM PLL */
-+#define IMX8MQ_DRAM_PLL1_REF_SEL	62
-+#define IMX8MQ_DRAM_PLL1_REF_DIV	63
-+#define IMX8MQ_DRAM_PLL1		64
-+#define IMX8MQ_DRAM_PLL1_OUT		65
-+#define IMX8MQ_DRAM_PLL1_OUT_DIV	66
-+#define IMX8MQ_DRAM_PLL2		67
-+#define IMX8MQ_DRAM_PLL2_DIV		68
-+#define IMX8MQ_DRAM_PLL2_OUT		69
++	/* Wait for the pll's divfi and divff to be reloaded */
++	return readl_poll_timeout(pll->base, val, val & PLL_NEWDIV_ACK, 0,
++					PLL_FRAC_ACK_TIMEOUT);
++}
 +
-+/* SYS PLL DIV */
-+#define IMX8MQ_SYS1_PLL_40M		70
-+#define IMX8MQ_SYS1_PLL_80M		71
-+#define IMX8MQ_SYS1_PLL_100M		72
-+#define IMX8MQ_SYS1_PLL_133M		73
-+#define IMX8MQ_SYS1_PLL_160M		74
-+#define IMX8MQ_SYS1_PLL_200M		75
-+#define IMX8MQ_SYS1_PLL_266M		76
-+#define IMX8MQ_SYS1_PLL_400M		77
-+#define IMX8MQ_SYS1_PLL_800M		78
++static int clk_pll_prepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
 +
-+#define IMX8MQ_SYS2_PLL_50M		79
-+#define IMX8MQ_SYS2_PLL_100M		80
-+#define IMX8MQ_SYS2_PLL_125M		81
-+#define IMX8MQ_SYS2_PLL_166M		82
-+#define IMX8MQ_SYS2_PLL_200M		83
-+#define IMX8MQ_SYS2_PLL_250M		84
-+#define IMX8MQ_SYS2_PLL_333M		85
-+#define IMX8MQ_SYS2_PLL_500M		86
-+#define IMX8MQ_SYS2_PLL_1000M		87
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
 +
-+/* CCM ROOT clocks */
-+/* A53 */
-+#define IMX8MQ_CLK_A53_SRC		88
-+#define IMX8MQ_CLK_A53_CG		89
-+#define IMX8MQ_CLK_A53_DIV		90
-+/* M4 */
-+#define IMX8MQ_CLK_M4_SRC		91
-+#define IMX8MQ_CLK_M4_CG		92
-+#define IMX8MQ_CLK_M4_DIV		93
-+/* VPU */
-+#define IMX8MQ_CLK_VPU_SRC		94
-+#define IMX8MQ_CLK_VPU_CG		95
-+#define IMX8MQ_CLK_VPU_DIV		96
-+/* GPU CORE */
-+#define IMX8MQ_CLK_GPU_CORE_SRC		97
-+#define IMX8MQ_CLK_GPU_CORE_CG		98
-+#define IMX8MQ_CLK_GPU_CORE_DIV		99
-+/* GPU SHADER */
-+#define IMX8MQ_CLK_GPU_SHADER_SRC	100
-+#define IMX8MQ_CLK_GPU_SHADER_CG	101
-+#define IMX8MQ_CLK_GPU_SHADER_DIV	102
++	return clk_wait_lock(pll);
++}
 +
-+/* BUS TYPE */
-+/* MAIN AXI */
-+#define IMX8MQ_CLK_MAIN_AXI		103
-+/* ENET AXI */
-+#define IMX8MQ_CLK_ENET_AXI		104
-+/* NAND_USDHC_BUS */
-+#define IMX8MQ_CLK_NAND_USDHC_BUS	105
-+/* VPU BUS */
-+#define IMX8MQ_CLK_VPU_BUS		106
-+/* DISP_AXI */
-+#define IMX8MQ_CLK_DISP_AXI		107
-+/* DISP APB */
-+#define IMX8MQ_CLK_DISP_APB		108
-+/* DISP RTRM */
-+#define IMX8MQ_CLK_DISP_RTRM		109
-+/* USB_BUS */
-+#define IMX8MQ_CLK_USB_BUS		110
-+/* GPU_AXI */
-+#define IMX8MQ_CLK_GPU_AXI		111
-+/* GPU_AHB */
-+#define IMX8MQ_CLK_GPU_AHB		112
-+/* NOC */
-+#define IMX8MQ_CLK_NOC			113
-+/* NOC_APB */
-+#define IMX8MQ_CLK_NOC_APB		115
++static void clk_pll_unprepare(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
 +
-+/* AHB */
-+#define IMX8MQ_CLK_AHB			116
-+/* AUDIO AHB */
-+#define IMX8MQ_CLK_AUDIO_AHB		117
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_PD_MASK;
++	writel_relaxed(val, pll->base + PLL_CFG0);
++}
 +
-+/* DRAM_ALT */
-+#define IMX8MQ_CLK_DRAM_ALT		118
-+/* DRAM APB */
-+#define IMX8MQ_CLK_DRAM_APB		119
-+/* VPU_G1 */
-+#define IMX8MQ_CLK_VPU_G1		120
-+/* VPU_G2 */
-+#define IMX8MQ_CLK_VPU_G2		121
-+/* DISP_DTRC */
-+#define IMX8MQ_CLK_DISP_DTRC		122
-+/* DISP_DC8000 */
-+#define IMX8MQ_CLK_DISP_DC8000		123
-+/* PCIE_CTRL */
-+#define IMX8MQ_CLK_PCIE1_CTRL		124
-+/* PCIE_PHY */
-+#define IMX8MQ_CLK_PCIE1_PHY		125
-+/* PCIE_AUX */
-+#define IMX8MQ_CLK_PCIE1_AUX		126
-+/* DC_PIXEL */
-+#define IMX8MQ_CLK_DC_PIXEL		127
-+/* LCDIF_PIXEL */
-+#define IMX8MQ_CLK_LCDIF_PIXEL		128
-+/* SAI1~6 */
-+#define IMX8MQ_CLK_SAI1			129
++static int clk_pll_is_prepared(struct clk_hw *hw)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val;
 +
-+#define IMX8MQ_CLK_SAI2			130
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	return (val & PLL_PD_MASK) ? 0 : 1;
++}
 +
-+#define IMX8MQ_CLK_SAI3			131
++static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
++					 unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divff, divfi, divq;
++	u64 temp64 = parent_rate;
 +
-+#define IMX8MQ_CLK_SAI4			132
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	divq = ((val & PLL_OUTPUT_DIV_MASK) + 1) * 2;
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	divff = FIELD_GET(PLL_FRAC_DIV_MASK, val);
++	divfi = val & PLL_INT_DIV_MASK;
 +
-+#define IMX8MQ_CLK_SAI5			133
++	temp64 *= 8;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
++	do_div(temp64, divq);
 +
-+#define IMX8MQ_CLK_SAI6			134
-+/* SPDIF1 */
-+#define IMX8MQ_CLK_SPDIF1		135
-+/* SPDIF2 */
-+#define IMX8MQ_CLK_SPDIF2		136
-+/* ENET_REF */
-+#define IMX8MQ_CLK_ENET_REF		137
-+/* ENET_TIMER */
-+#define IMX8MQ_CLK_ENET_TIMER		138
-+/* ENET_PHY */
-+#define IMX8MQ_CLK_ENET_PHY_REF		139
-+/* NAND */
-+#define IMX8MQ_CLK_NAND			140
-+/* QSPI */
-+#define IMX8MQ_CLK_QSPI			141
-+/* USDHC1 */
-+#define IMX8MQ_CLK_USDHC1		142
-+/* USDHC2 */
-+#define IMX8MQ_CLK_USDHC2		143
-+/* I2C1 */
-+#define IMX8MQ_CLK_I2C1			144
-+/* I2C2 */
-+#define IMX8MQ_CLK_I2C2			145
-+/* I2C3 */
-+#define IMX8MQ_CLK_I2C3			146
-+/* I2C4 */
-+#define IMX8MQ_CLK_I2C4			147
-+/* UART1 */
-+#define IMX8MQ_CLK_UART1		148
-+/* UART2 */
-+#define IMX8MQ_CLK_UART2		149
-+/* UART3 */
-+#define IMX8MQ_CLK_UART3		150
-+/* UART4 */
-+#define IMX8MQ_CLK_UART4		151
-+/* USB_CORE_REF */
-+#define IMX8MQ_CLK_USB_CORE_REF		152
-+/* USB_PHY_REF */
-+#define IMX8MQ_CLK_USB_PHY_REF		163
-+/* ECSPI1 */
-+#define IMX8MQ_CLK_ECSPI1		164
-+/* ECSPI2 */
-+#define IMX8MQ_CLK_ECSPI2		165
-+/* PWM1 */
-+#define IMX8MQ_CLK_PWM1			166
-+/* PWM2 */
-+#define IMX8MQ_CLK_PWM2			167
-+/* PWM3 */
-+#define IMX8MQ_CLK_PWM3			168
-+/* PWM4 */
-+#define IMX8MQ_CLK_PWM4			169
-+/* GPT1 */
-+#define IMX8MQ_CLK_GPT1			170
-+/* WDOG */
-+#define IMX8MQ_CLK_WDOG			171
-+/* WRCLK */
-+#define IMX8MQ_CLK_WRCLK		172
-+/* DSI_CORE */
-+#define IMX8MQ_CLK_DSI_CORE		173
-+/* DSI_PHY */
-+#define IMX8MQ_CLK_DSI_PHY_REF		174
-+/* DSI_DBI */
-+#define IMX8MQ_CLK_DSI_DBI		175
-+/*DSI_ESC */
-+#define IMX8MQ_CLK_DSI_ESC		176
-+/* CSI1_CORE */
-+#define IMX8MQ_CLK_CSI1_CORE		177
-+/* CSI1_PHY */
-+#define IMX8MQ_CLK_CSI1_PHY_REF		178
-+/* CSI_ESC */
-+#define IMX8MQ_CLK_CSI1_ESC		179
-+/* CSI2_CORE */
-+#define IMX8MQ_CLK_CSI2_CORE		170
-+/* CSI2_PHY */
-+#define IMX8MQ_CLK_CSI2_PHY_REF		181
-+/* CSI2_ESC */
-+#define IMX8MQ_CLK_CSI2_ESC		182
-+/* PCIE2_CTRL */
-+#define IMX8MQ_CLK_PCIE2_CTRL		183
-+/* PCIE2_PHY */
-+#define IMX8MQ_CLK_PCIE2_PHY		184
-+/* PCIE2_AUX */
-+#define IMX8MQ_CLK_PCIE2_AUX		185
-+/* ECSPI3 */
-+#define IMX8MQ_CLK_ECSPI3		186
++	return parent_rate * 8 * (divfi + 1) / divq + (unsigned long)temp64;
++}
 +
-+/* CCGR clocks */
-+#define IMX8MQ_CLK_A53_ROOT			187
-+#define IMX8MQ_CLK_DRAM_ROOT			188
-+#define IMX8MQ_CLK_ECSPI1_ROOT			189
-+#define IMX8MQ_CLK_ECSPI2_ROOT			180
-+#define IMX8MQ_CLK_ECSPI3_ROOT			181
-+#define IMX8MQ_CLK_ENET1_ROOT			182
-+#define IMX8MQ_CLK_GPT1_ROOT			193
-+#define IMX8MQ_CLK_I2C1_ROOT			194
-+#define IMX8MQ_CLK_I2C2_ROOT			195
-+#define IMX8MQ_CLK_I2C3_ROOT			196
-+#define IMX8MQ_CLK_I2C4_ROOT			197
-+#define IMX8MQ_CLK_M4_ROOT			198
-+#define IMX8MQ_CLK_PCIE1_ROOT			199
-+#define IMX8MQ_CLK_PCIE2_ROOT			200
-+#define IMX8MQ_CLK_PWM1_ROOT			201
-+#define IMX8MQ_CLK_PWM2_ROOT			202
-+#define IMX8MQ_CLK_PWM3_ROOT			203
-+#define IMX8MQ_CLK_PWM4_ROOT			204
-+#define IMX8MQ_CLK_QSPI_ROOT			205
-+#define IMX8MQ_CLK_SAI1_ROOT			206
-+#define IMX8MQ_CLK_SAI2_ROOT			207
-+#define IMX8MQ_CLK_SAI3_ROOT			208
-+#define IMX8MQ_CLK_SAI4_ROOT			209
-+#define IMX8MQ_CLK_SAI5_ROOT			210
-+#define IMX8MQ_CLK_SAI6_ROOT			212
-+#define IMX8MQ_CLK_UART1_ROOT			213
-+#define IMX8MQ_CLK_UART2_ROOT			214
-+#define IMX8MQ_CLK_UART3_ROOT			215
-+#define IMX8MQ_CLK_UART4_ROOT			216
-+#define IMX8MQ_CLK_USB1_CTRL_ROOT		217
-+#define IMX8MQ_CLK_USB2_CTRL_ROOT		218
-+#define IMX8MQ_CLK_USB1_PHY_ROOT		219
-+#define IMX8MQ_CLK_USB2_PHY_ROOT		220
-+#define IMX8MQ_CLK_USDHC1_ROOT			221
-+#define IMX8MQ_CLK_USDHC2_ROOT			222
-+#define IMX8MQ_CLK_WDOG1_ROOT			223
-+#define IMX8MQ_CLK_WDOG2_ROOT			224
-+#define IMX8MQ_CLK_WDOG3_ROOT			225
-+#define IMX8MQ_CLK_GPU_ROOT			226
-+#define IMX8MQ_CLK_HEVC_ROOT			227
-+#define IMX8MQ_CLK_AVC_ROOT			228
-+#define IMX8MQ_CLK_VP9_ROOT			229
-+#define IMX8MQ_CLK_HEVC_INTER_ROOT		230
-+#define IMX8MQ_CLK_DISP_ROOT			231
-+#define IMX8MQ_CLK_HDMI_ROOT			232
-+#define IMX8MQ_CLK_HDMI_PHY_ROOT		233
-+#define IMX8MQ_CLK_VPU_DEC_ROOT			234
-+#define IMX8MQ_CLK_CSI1_ROOT			235
-+#define IMX8MQ_CLK_CSI2_ROOT			236
-+#define IMX8MQ_CLK_RAWNAND_ROOT			237
-+#define IMX8MQ_CLK_SDMA1_ROOT			238
-+#define IMX8MQ_CLK_SDMA2_ROOT			239
-+#define IMX8MQ_CLK_VPU_G1_ROOT			240
-+#define IMX8MQ_CLK_VPU_G2_ROOT			241
++static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long *prate)
++{
++	u64 parent_rate = *prate;
++	u32 divff, divfi;
++	u64 temp64;
 +
-+/* SCCG PLL GATE */
-+#define IMX8MQ_SYS1_PLL_OUT			232
-+#define IMX8MQ_SYS2_PLL_OUT			243
-+#define IMX8MQ_SYS3_PLL_OUT			244
-+#define IMX8MQ_DRAM_PLL_OUT			245
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 = rate - divfi * parent_rate;
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
 +
-+#define IMX8MQ_GPT_3M_CLK			246
++	temp64 = parent_rate;
++	temp64 *= divff;
++	do_div(temp64, PLL_FRAC_DENOM);
 +
-+#define IMX8MQ_CLK_IPG_ROOT			247
-+#define IMX8MQ_CLK_IPG_AUDIO_ROOT		248
-+#define IMX8MQ_CLK_SAI1_IPG			249
-+#define IMX8MQ_CLK_SAI2_IPG			250
-+#define IMX8MQ_CLK_SAI3_IPG			251
-+#define IMX8MQ_CLK_SAI4_IPG			252
-+#define IMX8MQ_CLK_SAI5_IPG			253
-+#define IMX8MQ_CLK_SAI6_IPG			254
++	return (parent_rate * divfi + temp64) / 2;
++}
 +
-+/* DSI AHB/IPG clocks */
-+/* rxesc clock */
-+#define IMX8MQ_CLK_DSI_AHB			255
-+/* txesc clock */
-+#define IMX8MQ_CLK_DSI_IPG_DIV                  256
++/*
++ * To simplify the clock calculation, we can keep the 'PLL_OUTPUT_VAL' at zero
++ * (means the PLL output will be divided by 2). So the PLL output can use
++ * the below formula:
++ * pllout = parent_rate * 8 / 2 * DIVF_VAL;
++ * where DIVF_VAL = 1 + DIVFI + DIVFF / 2^24.
++ */
++static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
++			    unsigned long parent_rate)
++{
++	struct clk_frac_pll *pll = to_clk_frac_pll(hw);
++	u32 val, divfi, divff;
++	u64 temp64 = parent_rate;
++	int ret;
 +
-+#define IMX8MQ_CLK_TMU_ROOT			265
++	parent_rate *= 8;
++	rate *= 2;
++	divfi = rate / parent_rate;
++	temp64 *= rate - divfi;
++	temp64 *= PLL_FRAC_DENOM;
++	do_div(temp64, parent_rate);
++	divff = temp64;
 +
-+/* Display root clocks */
-+#define IMX8MQ_CLK_DISP_AXI_ROOT		266
-+#define IMX8MQ_CLK_DISP_APB_ROOT		267
-+#define IMX8MQ_CLK_DISP_RTRM_ROOT		268
++	val = readl_relaxed(pll->base + PLL_CFG1);
++	val &= ~(PLL_FRAC_DIV_MASK | PLL_INT_DIV_MASK);
++	val |= (divff << 7) | (divfi - 1);
++	writel_relaxed(val, pll->base + PLL_CFG1);
 +
-+#define IMX8MQ_CLK_OCOTP_ROOT			269
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~0x1f;
++	writel_relaxed(val, pll->base + PLL_CFG0);
 +
-+#define IMX8MQ_CLK_DRAM_ALT_ROOT		270
-+#define IMX8MQ_CLK_DRAM_CORE			271
++	/* Set the NEV_DIV_VAL to reload the DIVFI and DIVFF */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val |= PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
 +
-+#define IMX8MQ_CLK_MU_ROOT			272
-+#define IMX8MQ_VIDEO2_PLL_OUT			273
++	ret = clk_wait_ack(pll);
 +
-+#define IMX8MQ_CLK_CLKO2			274
++	/* clear the NEV_DIV_VAL */
++	val = readl_relaxed(pll->base + PLL_CFG0);
++	val &= ~PLL_NEWDIV_VAL;
++	writel_relaxed(val, pll->base + PLL_CFG0);
 +
-+#define IMX8MQ_CLK_NAND_USDHC_BUS_RAWNAND_CLK	275
++	return ret;
++}
 +
-+#define IMX8MQ_CLK_END				276
-+#endif /* __DT_BINDINGS_CLOCK_IMX8MQ_H */
++static const struct clk_ops clk_frac_pll_ops = {
++	.prepare	= clk_pll_prepare,
++	.unprepare	= clk_pll_unprepare,
++	.is_prepared	= clk_pll_is_prepared,
++	.recalc_rate	= clk_pll_recalc_rate,
++	.round_rate	= clk_pll_round_rate,
++	.set_rate	= clk_pll_set_rate,
++};
++
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base)
++{
++	struct clk_init_data init;
++	struct clk_frac_pll *pll;
++	struct clk_hw *hw;
++	int ret;
++
++	pll = kzalloc(sizeof(*pll), GFP_KERNEL);
++	if (!pll)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &clk_frac_pll_ops;
++	init.flags = 0;
++	init.parent_names = &parent_name;
++	init.num_parents = 1;
++
++	pll->base = base;
++	pll->hw.init = &init;
++
++	hw = &pll->hw;
++
++	ret = clk_hw_register(NULL, hw);
++	if (ret) {
++		kfree(pll);
++		return ERR_PTR(ret);
++	}
++
++	return hw->clk;
++}
+diff --git a/drivers/clk/imx/clk.h b/drivers/clk/imx/clk.h
+index 5895e223..44a1f14 100644
+--- a/drivers/clk/imx/clk.h
++++ b/drivers/clk/imx/clk.h
+@@ -27,6 +27,9 @@ struct clk *imx_clk_pllv1(enum imx_pllv1_type type, const char *name,
+ struct clk *imx_clk_pllv2(const char *name, const char *parent,
+ 		void __iomem *base);
+ 
++struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
++			     void __iomem *base);
++
+ enum imx_pllv3_type {
+ 	IMX_PLLV3_GENERIC,
+ 	IMX_PLLV3_SYS,
 -- 
 2.7.4
