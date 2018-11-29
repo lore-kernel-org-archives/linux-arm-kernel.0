@@ -1,95 +1,71 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 29 Nov 2018 12:09:31 +0100
-Subject: [PATCH 2/2] ARM: shmobile: R-Mobile: Move pm-rmobile to
- drivers/soc/renesas/
-In-Reply-To: <20181129110931.11783-1-geert+renesas@glider.be>
-References: <20181129110931.11783-1-geert+renesas@glider.be>
-Message-ID: <20181129110931.11783-3-geert+renesas@glider.be>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 29 Nov 2018 12:12:08 +0100
+Subject: [PATCH 3/3] PCI: imx: Add support for i.MX8MQ
+In-Reply-To: <CAHQ1cqEGABcH3EG9yGo7Ns2fPR1s_u1YPtFoKRjUh50=aa=J2Q@mail.gmail.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+ <20181117181225.10737-4-andrew.smirnov@gmail.com>
+ <ce2ac1a880ce2a7a39f0e42b5059676daa748e52.camel@nxp.com>
+ <CAHQ1cqH6LT4GsxUchrmVG1m3fqawgyUjxdHvh=SzxhBiQOd8eg@mail.gmail.com>
+ <1543313169.2507.39.camel@pengutronix.de>
+ <VI1PR04MB5533DE497786CD80D4FE0941EED00@VI1PR04MB5533.eurprd04.prod.outlook.com>
+ <CAHQ1cqEGABcH3EG9yGo7Ns2fPR1s_u1YPtFoKRjUh50=aa=J2Q@mail.gmail.com>
+Message-ID: <1543489928.2507.59.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pm-rmobile driver is really a driver for the System Controller
-(SYSC) found in R-Mobile SoCs.  An equivalent driver for R-Car SoCs is
-already located under drivers/soc/renesas/.
+Am Dienstag, den 27.11.2018, 13:14 -0800 schrieb Andrey Smirnov:
+> On Tue, Nov 27, 2018 at 2:46 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > 
+> > On 11/27/18 12:06 PM, Lucas Stach wrote:
+> > > Hi Andrey,
+> > > 
+> > > Am Montag, den 26.11.2018, 10:24 -0800 schrieb Andrey Smirnov:
+> > > > On Tue, Nov 20, 2018 at 2:49 AM Leonard Crestez <leonard.crestez@nxp.com> wrote:
+> > > > > 
+> > > > > On Sat, 2018-11-17 at 10:12 -0800, Andrey Smirnov wrote:
+> > > > > > @@ -921,7 +1004,28 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+> > > > > > -?????case IMX7D:
+> > > > > > +?????case IMX8MQ:
+> > > > > > +?????????????if (of_property_read_u32(node, "fsl,iomux-gpr1x",
+> > > > > > +??????????????????????????????????????&imx6_pcie->gpr1x)) {
+> > > > > > +?????????????????????dev_err(dev, "Failed to get GPR1x address\n");
+> > > > > > +?????????????????????return -EINVAL;
+> > > > > > +?????????????}
+> > > > > 
+> > > > > This is for distinguishing multiple controllers on the SOC but other
+> > > > > registers and bits might differ. Isn't it preferable to have a property
+> > > > > for controller id instead of adding many registers to DT?
+> > > > 
+> > > > I liked encoding necessary info in DT directly slightly better than
+> > > > encoding abstract ID and then decoding it further in the driver code.
+> > > > OTOH, I am not really attached to that path. Lucas, can you comment on
+> > > > this please?
+> > > 
+> > > Yes, after rereading the patch with this in mind I agree that having
+> > > the GPR offset on DT directly is IMO the better approach than an
+> > > abstract ID.
+> > 
+> > But it's not a single offset, for example the device_type (EP/RC) has
+> > bits for the two controllers side-by-side in GPR12.
+> > 
+> 
+> Playing devil's advocate for a bit:
+> 
+> More specifically, currently the following per-controller bits need to
+> be configured:
+> 
+> - Location of the "device type" field within GPR12
+> - GPR register to use to control PCIn_CLKREQ_B_OVERRIDE_EN and
+> PCIn_CLKREQ_B_OVERRIDE_EN (GPR14 vs GPR16)
+> - Now that Philip spoke against PCIE_CTRL_APPS_CLK_REQ being exposed
+> via reset controller driver, we need to know which SRC register to use
+> to control that bit (SRC_PCIEPHY_RCR vs. SRC_PCIE2_RCR)
 
-Hence move the pm-rmobile driver from arch/arm/mach-shmobile/ to
-drivers/soc/renesas/, and rename it to rmobile-sysc.
+If if we need a lot of different GPR offsets, I revise my earlier
+opinion. We certainly don't want lots of bit offsets and masks in the
+DT. The whole GPR thing is ugly, but I would rather hide this in the
+driver code, keyed by compatible and a controller id property, where we
+can change things without any worries about DT backward compatibility.
 
-Enable compile-testing on non-ARM and non-R-Mobile SoCs.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/mach-shmobile/Kconfig                             | 5 -----
- arch/arm/mach-shmobile/Makefile                            | 1 -
- drivers/soc/renesas/Kconfig                                | 7 ++++++-
- drivers/soc/renesas/Makefile                               | 1 +
- .../pm-rmobile.c => drivers/soc/renesas/rmobile-sysc.c     | 0
- 5 files changed, 7 insertions(+), 7 deletions(-)
- rename arch/arm/mach-shmobile/pm-rmobile.c => drivers/soc/renesas/rmobile-sysc.c (100%)
-
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 9b798c9dffe4e94a..3683d6f109730ee7 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,9 +1,4 @@
- # SPDX-License-Identifier: GPL-2.0
--config PM_RMOBILE
--	bool
--	select PM
--	select PM_GENERIC_DOMAINS
--
- menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs"
- 	depends on ARCH_MULTI_V7 && MMU
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 5591646cb9bbfd33..f7bf17b7abaef7a9 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -35,7 +35,6 @@ smp-$(CONFIG_ARCH_EMEV2)	+= smp-emev2.o headsmp-scu.o platsmp-scu.o
- 
- # PM objects
- obj-$(CONFIG_SUSPEND)		+= suspend.o
--obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
- obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
- 
- # Framework support
-diff --git a/drivers/soc/renesas/Kconfig b/drivers/soc/renesas/Kconfig
-index fe7f58616cdd6cf7..4d8012e1205c5a7f 100644
---- a/drivers/soc/renesas/Kconfig
-+++ b/drivers/soc/renesas/Kconfig
-@@ -34,9 +34,11 @@ config ARCH_RCAR_GEN3
- 
- config ARCH_RMOBILE
- 	bool
--	select PM_RMOBILE
-+	select PM
-+	select PM_GENERIC_DOMAINS
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
-+	select SYSC_RMOBILE
- 
- config ARCH_RZN1
- 	bool
-@@ -297,4 +299,7 @@ config RST_RCAR
- config SYSC_RCAR
- 	bool "R-Car System Controller support" if COMPILE_TEST
- 
-+config SYSC_RMOBILE
-+	bool "R-Mobile System Controller support" if COMPILE_TEST
-+
- endif # SOC_RENESAS
-diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-index 3bdd7dbc38a9c7a3..00764d5a60b33dfe 100644
---- a/drivers/soc/renesas/Makefile
-+++ b/drivers/soc/renesas/Makefile
-@@ -27,3 +27,4 @@ endif
- # Family
- obj-$(CONFIG_RST_RCAR)		+= rcar-rst.o
- obj-$(CONFIG_SYSC_RCAR)		+= rcar-sysc.o
-+obj-$(CONFIG_SYSC_RMOBILE)	+= rmobile-sysc.o
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/drivers/soc/renesas/rmobile-sysc.c
-similarity index 100%
-rename from arch/arm/mach-shmobile/pm-rmobile.c
-rename to drivers/soc/renesas/rmobile-sysc.c
--- 
-2.17.1
+Regards,
+Lucas
