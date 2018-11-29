@@ -1,33 +1,81 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 28 Nov 2018 16:35:03 -0800
-Subject: [PATCH 01/10] ARM64: dts: amlogic: Add all CPUs in cooling maps
-In-Reply-To: <2778d0d4813cc56be851719846afecbab5f2e657.1542362530.git.viresh.kumar@linaro.org>
-References: <cover.1542362530.git.viresh.kumar@linaro.org>
- <2778d0d4813cc56be851719846afecbab5f2e657.1542362530.git.viresh.kumar@linaro.org>
-Message-ID: <7hd0qod8lk.fsf@baylibre.com>
+From: sboyd@kernel.org (Stephen Boyd)
+Date: Wed, 28 Nov 2018 16:41:48 -0800
+Subject: [PATCH v13 0/5] Add i.MX8MQ clock driver
+In-Reply-To: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
+References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
+Message-ID: <154345210894.88331.8277410833858111600@swboyd.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Viresh Kumar <viresh.kumar@linaro.org> writes:
+Quoting Abel Vesa (2018-11-13 08:19:56)
+> Here is a link to the 12th version:
+> https://lkml.org/lkml/2018/11/7/642
+> 
+> Changes since v12:
+>  * replaced the division in clk_pll_recalc_rate in clk-frac
+>    with do_div as suggested by Stephen
+> 
+> Abel Vesa (2):
+>   clk: imx: Add imx composite clock
+>   clk: imx: Add clock driver for i.MX8MQ CCM
+> 
+> Lucas Stach (3):
+>   dt-bindings: add binding for i.MX8MQ CCM
+>   clk: imx: add fractional PLL output clock
+>   clk: imx: Add SCCG PLL type
+> 
 
-> Each CPU can (and does) participate in cooling down the system but the
-> DT only captures a handful of them, normally CPU0, in the cooling maps.
-> Things work by chance currently as under normal circumstances its the
-> first CPU of each cluster which is used by the operating systems to
-> probe the cooling devices. But as soon as this CPU ordering changes and
-> any other CPU is used to bring up the cooling device, we will start
-> seeing failures.
->
-> Also the DT is rather incomplete when we list only one CPU in the
-> cooling maps, as the hardware doesn't have any such limitations.
->
-> Update cooling maps to include all devices affected by individual trip
-> points.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+I had to apply this set of fixes to silence sparse and smatch warnings
+about things that are not right. Please take a look over things and see
+if it's sane.
 
-Queued for v4.21,
-
-Thanks!
-
-Kevin
+diff --git a/drivers/clk/imx/clk-composite-8m.c b/drivers/clk/imx/clk-composite-8m.c
+index bcd31d889584..6d9d3714b4df 100644
+--- a/drivers/clk/imx/clk-composite-8m.c
++++ b/drivers/clk/imx/clk-composite-8m.c
+@@ -127,8 +127,8 @@ struct clk *imx8m_clk_composite_flags(const char *name,
+ 					int num_parents, void __iomem *reg,
+ 					unsigned long flags)
+ {
+-	struct clk_hw *hw = NULL, *mux_hw = NULL;
+-	struct clk_hw *div_hw = NULL, *gate_hw = NULL;
++	struct clk_hw *hw = ERR_PTR(-ENOMEM), *mux_hw;
++	struct clk_hw *div_hw, *gate_hw;
+ 	struct clk_divider *div = NULL;
+ 	struct clk_gate *gate = NULL;
+ 	struct clk_mux *mux = NULL;
+diff --git a/drivers/clk/imx/clk-frac-pll.c b/drivers/clk/imx/clk-frac-pll.c
+index a3732be5ad7f..98726206f3c4 100644
+--- a/drivers/clk/imx/clk-frac-pll.c
++++ b/drivers/clk/imx/clk-frac-pll.c
+@@ -14,6 +14,8 @@
+ #include <linux/slab.h>
+ #include <linux/bitfield.h>
+ 
++#include "clk.h"
++
+ #define PLL_CFG0		0x0
+ #define PLL_CFG1		0x4
+ 
+@@ -214,7 +216,7 @@ struct clk *imx_clk_frac_pll(const char *name, const char *parent_name,
+ 	ret = clk_hw_register(NULL, hw);
+ 	if (ret) {
+ 		kfree(pll);
+-		return ERR_CAST(hw);
++		return ERR_PTR(ret);
+ 	}
+ 
+ 	return hw->clk;
+diff --git a/drivers/clk/imx/clk-sccg-pll.c b/drivers/clk/imx/clk-sccg-pll.c
+index 4666b96bdb3f..ee7752bace89 100644
+--- a/drivers/clk/imx/clk-sccg-pll.c
++++ b/drivers/clk/imx/clk-sccg-pll.c
+@@ -249,7 +249,7 @@ struct clk *imx_clk_sccg_pll(const char *name,
+ 	ret = clk_hw_register(NULL, hw);
+ 	if (ret) {
+ 		kfree(pll);
+-		return ERR_CAST(hw);
++		return ERR_PTR(ret);
+ 	}
+ 
+ 	return hw->clk;
