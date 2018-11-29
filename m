@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33436C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2766EC43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F3B0D21019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F185B21019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u6tyVU6N";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Bd0qIXUo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F3B0D21019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nHwhzMt8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AlPyEsAy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F185B21019
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=yybPxWZO/KhBW1OTZNYSuBN6cavTXHL+guLGe75HPSA=; b=u6tyVU6NdKwNurIb0nRwZa+7Nn
-	5OP66kv25NZNZ3p+fV2i3arZxRWgLSSpcp08AThxiy5HnK79H6YwqawL2ip2hdc/jzhjgkJJkDm+U
-	vLelILiLRoKDhA5PSUPLPmfvSThEUdiuyUpRGNpqt+RLu5Av/HPK2cgxuQZYv3NkGHijnwk6MAePj
-	AllT2gieuU1//aVdU6u2pea8935mFif1/qXMweADLN/fWTh7QevMvAOa68oJ2FkCzXZwQFRbg/FxO
-	N3Jtu0NFA3dGgNxSCtzwAJFmQ0Zwj88H+XpCH+uAPgABq2Lmfa0FU8kIZmiSBNKAbjDuqYq0gMVUt
-	Jr8IlX8Q==;
+	bh=228ST6uDOUKpr6OZCE5ALMGbc7ERdexyu0uETAT4dJs=; b=nHwhzMt8l9SXBpyBw23XZntmCf
+	PeVRsukuYgpP7MfjBOPXd2aRljgWe27in67imNLWCSFU9jFusWDNKef4gHp3W8f22Vz7u1DF56pV5
+	IdPIoTVxaxms6X82zV9sGrTfCtGiPGc6kRgVgk77xVIO/BIU17VYgfkVMq1ocJTciluyMxSMOSxsL
+	ZAlaIIT/cMMB7kc+j4BVQsP8W8l7gOKgrxzvK+s2CWxVbtzBsfRLhmuVGQ8NetBVeVD/FoVlOTm6M
+	6cHSGBuzyEqY1P9Z7cVJzQshMeGyR3mEOuEr+zk/PSIYWzICYBvPrhtAoObtg8EproajWoi6M8t8Z
+	12mA5bXA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQWn-0000Gg-AV; Thu, 29 Nov 2018 17:55:05 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gSQX4-0001YV-As; Thu, 29 Nov 2018 17:55:22 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQPU-00016v-IX
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:38 +0000
-Received: by mail-lf1-x144.google.com with SMTP id f23so2076922lfc.13
+ id 1gSQPb-0001Di-6o
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:47 +0000
+Received: by mail-lj1-x244.google.com with SMTP id z80-v6so2520744ljb.8
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 09:47:22 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:32 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=GHVkWH3PSWyA/cWKlkRJqeV/OFZetQXn2GZtzBG/OUI=;
- b=Bd0qIXUoNE817ai3HRpnThklH0wMCE/mlCss7tY0ZMJQu/RMVZP851QMoOYySBQEd2
- mEQ06t46GXwZVqcrZtRsDj/admhdsTMjYhu6F8WdNMNgeuZYdXY+iLagQIw3oe87sTki
- s/tCdK3NWK58gBap3Uzx1VWgQBXoftGQryias=
+ bh=jX+qyQO49fWmt2xQpGUjw4NJQ/8bkzUinDH9qdTMnUA=;
+ b=AlPyEsAyB5TTJCSeRQDcqsvnIKB/rMfm0oTmlQA7hqOgZ6aMDexyWveeYmPE2QdbmV
+ BmJIUeVUEo68Z1RYBp5Q7w/uSp5wPfc9ZHJqQtiE1cMsCCV0zIMnnI1fU3CrzA3sf76y
+ BhqVyyrcH5tH2VK3YAUp3EhPfLgCuB7n6fgBg=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=GHVkWH3PSWyA/cWKlkRJqeV/OFZetQXn2GZtzBG/OUI=;
- b=t8q6pzFe6puH5W2bfhlW3gikH2v+SFksXIV44J0nSpnSaow2rwzxAOMFBKf0zho799
- BQSCCV9fN2jM/RWhqt0D5ktSPxQKBwYsXrCKPIOtoOAmpsPLIjcGOIf1D/6nsbllJPMb
- jAI0DEsGrN2oR2VtWrvoAOI7+0E8fQMSzbmV+cYThS0fH1wlrOWlIcV7OYnJ/YUablEr
- 3I7slguOHcow3i8+docEGrlvzV5Gf1tKvTgfxidkF0GRHZY7x5RrODePM9KF8Uu3rAm5
- LXB+C28ix75kU0ypAwK6xSi/J68pcWtkkujlJWzN7hFQXspM86tdn6N82DHwoIgq1oP2
- +65g==
-X-Gm-Message-State: AA+aEWbqaGrs3LM8BI6zb1TuC+iOopeNG0/uiWU9FZHKawL+tQDRmCSD
- wE3wdul30kEi5GWqvHPjM6cWdA==
-X-Google-Smtp-Source: AFSGD/UDRbZWKmQpM2ZYNMWO+bDSpejpjTcM2x/gl7uSYN52LEkq5NFPz8ifaAHNr7UXis+YGI7bDA==
-X-Received: by 2002:a19:d90c:: with SMTP id q12mr1603187lfg.24.1543513641080; 
- Thu, 29 Nov 2018 09:47:21 -0800 (PST)
+ bh=jX+qyQO49fWmt2xQpGUjw4NJQ/8bkzUinDH9qdTMnUA=;
+ b=GqkL3W32La9DtemHKClgHseF+vKrGWUjHCgJ05sSiY9OlMJZomrO+OC9Yn3kfNhlVp
+ jFowo7yXV+SAKRXZViFMkK5H1z5YJuFUb1oiYewzkxUNUh5ery1D6gooDvGy2lJa4Dsn
+ NUS+wgkPRoQ4BfcHxSm2pK0L0HwKgxwiaWLCLLRNqUa74Nec7PBz5gPPxgyzA79IbO1A
+ SpHM1UJwqDYKGPDXnmJH9cjHaRRYoHQXNuDUuVaUrwbiI/aURsr0jffWeEocTGWfXriN
+ M+Ej7eW7a/OGvGib847mzuOeODWPBWMxWzCiDZrbsNmRCPgMX9rIzbzJvngrvUWgR4+0
+ jkYg==
+X-Gm-Message-State: AA+aEWYrArr7oaDbNQJZcuzlKqWdwiTxuzvXHlDmyu9GTHvirRGb24xF
+ +mCEKCVC9WsI6F2WlxRIw0r/Sw==
+X-Google-Smtp-Source: AFSGD/WMXNnYmUDhhw+Xfxe6yvJ/i67+Rv4G+K+ZK1l5/jdsO6I8LilxuZCD2yTIfDMQsHofrPEMgw==
+X-Received: by 2002:a2e:5b93:: with SMTP id
+ m19-v6mr1512841lje.115.1543513651192; 
+ Thu, 29 Nov 2018 09:47:31 -0800 (PST)
 Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
  [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.19
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.29
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 09:47:20 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:30 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
  Sudeep Holla <sudeep.holla@arm.com>,
  Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
  Mark Rutland <mark.rutland@arm.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v10 07/27] cpuidle: dt: Support hierarchical CPU idle states
-Date: Thu, 29 Nov 2018 18:46:40 +0100
-Message-Id: <20181129174700.16585-8-ulf.hansson@linaro.org>
+Subject: [PATCH v10 13/27] drivers: firmware: psci: Support hierarchical CPU
+ idle states
+Date: Thu, 29 Nov 2018 18:46:46 +0100
+Message-Id: <20181129174700.16585-14-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094732_753232_8C14672B 
-X-CRM114-Status: GOOD (  13.92  )
+X-CRM114-CacheID: sfid-20181129_094740_117201_8ED9D6D8 
+X-CRM114-Status: GOOD (  14.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,9 +118,8 @@ From: Lina Iyer <lina.iyer@linaro.org>
 Currently CPU's idle states are represented in a flattened model, via the
 "cpu-idle-states" binding from within the CPU's device nodes.
 
-Support the hierarchical layout during parsing and validating of the CPU's
-idle states. This is simply done by calling the new OF helper,
-of_get_cpu_state_node().
+Support the hierarchical layout, simply by converting to calling the new OF
+helper, of_get_cpu_state_node().
 
 Cc: Lina Iyer <ilina@codeaurora.org>
 Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
@@ -131,27 +132,17 @@ Changes in v10:
 	- None.
 
 ---
- drivers/cpuidle/dt_idle_states.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ drivers/firmware/psci/psci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/cpuidle/dt_idle_states.c b/drivers/cpuidle/dt_idle_states.c
-index 53342b7f1010..13f9b7cd32d1 100644
---- a/drivers/cpuidle/dt_idle_states.c
-+++ b/drivers/cpuidle/dt_idle_states.c
-@@ -118,8 +118,7 @@ static bool idle_state_valid(struct device_node *state_node, unsigned int idx,
- 	for (cpu = cpumask_next(cpumask_first(cpumask), cpumask);
- 	     cpu < nr_cpu_ids; cpu = cpumask_next(cpu, cpumask)) {
- 		cpu_node = of_cpu_device_node_get(cpu);
--		curr_state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
--						   idx);
-+		curr_state_node = of_get_cpu_state_node(cpu_node, idx);
- 		if (state_node != curr_state_node)
- 			valid = false;
+diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+index cbfc936d251c..631e20720a22 100644
+--- a/drivers/firmware/psci/psci.c
++++ b/drivers/firmware/psci/psci.c
+@@ -300,7 +300,7 @@ static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
+ 		return -ENOMEM;
  
-@@ -176,7 +175,7 @@ int dt_init_idle_driver(struct cpuidle_driver *drv,
- 	cpu_node = of_cpu_device_node_get(cpumask_first(cpumask));
- 
- 	for (i = 0; ; i++) {
+ 	for (i = 0; i < num_state_nodes; i++) {
 -		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
 +		state_node = of_get_cpu_state_node(cpu_node, i);
  		if (!state_node)
