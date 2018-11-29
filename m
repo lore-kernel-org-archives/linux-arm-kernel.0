@@ -1,43 +1,43 @@
-From: tiny.windzz@gmail.com (Frank Lee)
-Date: Thu, 29 Nov 2018 13:56:29 +0800
-Subject: [PATCH] clk: nomadik: Change to use DEFINE_SHOW_ATTRIBUTE macro
-In-Reply-To: <154344317086.88331.8296424241716107824@swboyd.mtv.corp.google.com>
-References: <20181123150600.27445-1-tiny.windzz@gmail.com>
- <154344291239.88331.14159206270303255502@swboyd.mtv.corp.google.com>
- <154344317086.88331.8296424241716107824@swboyd.mtv.corp.google.com>
-Message-ID: <CAEExFWtOR9JVdVnp_S6NHJypX_C=bhZueXq4QmzHL4Pu9+5SMw@mail.gmail.com>
+From: jrdr.linux@gmail.com (Souptick Joarder)
+Date: Thu, 29 Nov 2018 11:34:34 +0530
+Subject: [PATCH 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
+ vm_insert_range
+In-Reply-To: <5480157.mmjlM7ZeET@diego>
+References: <20181115154826.GA27948@jordon-HP-15-Notebook-PC>
+ <CAFqt6zZy0-dy=a+KDrx7V1-j37pAVmt2r6bOkjgHwiopG-L+xA@mail.gmail.com>
+ <5480157.mmjlM7ZeET@diego>
+Message-ID: <CAFqt6zbqjFa-zS7TLx3Tcr3nvsdrbxsrOswWoh5xb_SoxPn98A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2018 at 6:12 AM Stephen Boyd <sboyd@kernel.org> wrote:
+On Wed, Nov 28, 2018 at 8:49 PM Heiko St?bner <heiko@sntech.de> wrote:
 >
-> Quoting Stephen Boyd (2018-11-28 14:08:32)
-> > Quoting Yangtao Li (2018-11-23 07:06:00)
-> > > Use macro to simplify the code.
+> Hi Souptick,
+>
+> Am Montag, 26. November 2018, 06:36:42 CET schrieb Souptick Joarder:
+> > On Thu, Nov 15, 2018 at 9:14 PM Souptick Joarder <jrdr.linux@gmail.com>
+> wrote:
+> > > Convert to use vm_insert_range() to map range of kernel
+> > > memory to user vma.
 > > >
-> > > Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
-> > > ---
+> > > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
 > >
-> > Applied to clk-next
-> >
+> > Any feedback for this patch ?
 >
-> Except this doesn't compile. I fixed it, but please actually compile
-> your patches before sending next time.
-Sorry, I will pay attention next time.
+> sorry, took a bit longer to find time for a test-run.
+>
+> Except the missing EXPORT_SYMBOL already pointed out in patch1,
+> my displays are still working on modern (with iommu) and the older
+> (without iommu) Rockchip socs, so
+>
+> On rk3188, rk3288, rk3328 and rk3399
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> and in general
+> Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-MBR,
-Yangtao
+Thanks Heiko.
 >
-> diff --git a/drivers/clk/clk-nomadik.c b/drivers/clk/clk-nomadik.c
-> index e331634d34df..a95aa96f4a68 100644
-> --- a/drivers/clk/clk-nomadik.c
-> +++ b/drivers/clk/clk-nomadik.c
-> @@ -455,7 +455,7 @@ static const char * const src_clk_names[] = {
->         "RNGCCLK   ",
->  };
 >
-> -static int nomadik_src_clk_show(struct seq_file *s, void *what)
-> +static int nomadik_src_clk_debugfs_show(struct seq_file *s, void *what)
->  {
->         int i;
->         u32 src_pcksr0 = readl(src_base + SRC_PCKSR0);
+> Heiko
+>
+>
