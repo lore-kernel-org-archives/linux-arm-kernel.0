@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2D2B8C169D4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:47:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AA678C5ACC6
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F23FE21104
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:47:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7AC6521104
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:48:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jmDEODE1";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="Vyz98YEC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F23FE21104
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H++aTNv8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CxUDChM/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7AC6521104
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,65 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=00TX3QVwlTr0njIQLGJ5iF4WqvfSFqx/3Ui8M6hcBAM=; b=jmDEODE1KYI75iXpYvWJ8tixbA
-	5spHC5Ly/Zbywy44cjKyigB0JD/jvEryfMvCS1ipSy3Ne/jWbZyUrx5T2itgWClFHiW8eUREgwgKx
-	uYv1ZV/VQ03bCc5F4kCL2y6MypjeHgVI6ojYm74pOVk5Q0MRadofmqobkoGZX6cW/HxvGxNV9+tcc
-	X69CXpJtC7k+2D4AECcRNuCjgEd2yc5Fgq/vhNMfhrQ7NafO+U8TGwIpfgM8jf2V2/DVnT6NBdkWu
-	pCkkL4bSXWeyt3eMFJydAv7NlzcAlJFDQ/U+IeCzUGmyN1CeXiGZX0p6scU0dozqF4hle1x95729r
-	UEhdEuNg==;
+	bh=3w6w6IUL4bMWKYujpA4ncTf1djAaFIpEzFS8Ejf3WQM=; b=H++aTNv8TXU8FpWfc8XkobMyCd
+	h3WUaT2xOcgxGZ71OCbgg1LAK7FmAe0eHIDHD+OvWsVGCXInlRkIvirxTeVi2GyCcQI1N7P79kblT
+	AxCbXlnEDrhBwjIlWPafht3FZu2E8tNfsIaIdnP+RjinH1gtqR69Is2gMi7Uco231pLJZH0ElgX01
+	+uNRMb0viZL9J1AOdZE6AEN4X6pL6+S+euSJITGLjoMgD34CCEe1zGA5Ugaes+BGb5V1QeIklCSUp
+	aIB56n/9xvOXKYoWZHjbSD5wbRHfK6PVzvwiQb4Ved/iu32RneW8q47FyhTrIH/bjGnTM9Rq69VLa
+	XO+pMajw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQPa-0001Jy-Of; Thu, 29 Nov 2018 17:47:38 +0000
+	id 1gSQQA-0001ns-A2; Thu, 29 Nov 2018 17:48:14 +0000
 Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQPK-00016t-Lv
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:24 +0000
-Received: by mail-lf1-x144.google.com with SMTP id c16so2096575lfj.8
+ id 1gSQPK-00016m-Lw
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:25 +0000
+Received: by mail-lf1-x144.google.com with SMTP id i26so2122473lfc.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 09:47:19 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=wHLi6pu6OM2Azv5/kwu0Ob81t5zQUxyFdokpJxjiCqo=;
- b=Vyz98YECSi26BpZm6Fp/koCfwpQEh6q8wR8+PqOvcBGBXMSORNNtVp8FIuvTmApdcA
- spVnS5Ly4vqUn8gMTVIymJbdrSm8Q5GZxfWR3dHMwGi4ZSC/6CFOisGBsLX4Cpc7HN+J
- /E9X/oXoPnaWxskiSk/Mkicq7TZn5s598XYVM=
+ bh=We8CaGvJmbhYNYzrL7xua655X98bhiXXYfxMtnIUbcg=;
+ b=CxUDChM/RBvhrA31XzUsCNP+4FezP+eXEflQmQnd54XH4DLPYar6y05JtbZh1VkOR9
+ SkqR/CZFgNzntsxd4Oe81r1RyldMKKKEpGM2IwKlpysWwwEyVbXW691jkPCx5rLzQP/r
+ x2cpT4wVVole1llA1ynH/xIBV8qW3U8BBRoCI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=wHLi6pu6OM2Azv5/kwu0Ob81t5zQUxyFdokpJxjiCqo=;
- b=I8RsAS9z/Rx+RvypDWfof7aH4XOWKIMaNZZCsJRy7RiMRHntaV6QmhB9n1fnB4SGx1
- mK4MPcEcCZdhjbTCJitCXtdCsRRUIArzkeUp5HHZUu5awz3prB1dH6HkvIX700y6fxls
- pv6OUDEDKraUdyvLyGzWAwN3URor1awODL2nZE0Fm4VqzIz66X2oAncgUAwThc7lwq9t
- LTBw+jqAXKAShDWmpOLLhMg6qCo9iTdz/YvrpJKYsvDO3Fo4fhWdCTkfEHHqmJY2FEDD
- NOFun5NjWdgze5D6T5JeoTNI3Y2txPy41YGMlzj2P+DNMLTL3wo8U99BQdHfiDkk8UhR
- SwCQ==
-X-Gm-Message-State: AA+aEWaPnlDXUUnFNJzzsqARXLKRUMrYtAGh3P/fdCgPISQEWnrJWXBu
- 4D6tfPmOrEXSwJD9/j+e9kGxwQ==
-X-Google-Smtp-Source: AFSGD/W7C32Dqw7iLR/IU7LYrqadO8+82qTRlLuRMFSRsZK67JfSbWWo94wTBDjlbA9G3WID43cSSw==
-X-Received: by 2002:a19:f204:: with SMTP id q4mr1713196lfh.133.1543513637387; 
- Thu, 29 Nov 2018 09:47:17 -0800 (PST)
+ bh=We8CaGvJmbhYNYzrL7xua655X98bhiXXYfxMtnIUbcg=;
+ b=ber2S9rx+hrrlcthy4TFLyF3SmuSy2VMU+aYCvm4raOrHXZ95VCV+PonbrbKTq+dLi
+ NvZIIvWNl+cPXsxkkj651MxiZDsx5ELgk8CIhU3zFu/l35ubussDI4o++cnFaP430sgY
+ WrX2c6Qm0dznkESQGCBXWaR5IfbnY1/F6UsHWt81NICoRYbJZbwzvcq9EesqQFuaUtIu
+ p/Ff10kA2W4DBhbdtNmbj/dE8VbPEj9uJ4JenndzZ9S2VAPA7FwajuIFD0Wh5bOaRxSX
+ TauhZhqL3Tr/avSihvxUsIOkk+zFEpbhT/hZ2/ZpwT5tnQaPJ2OxeyBq4my6FNuAYWP9
+ y9CA==
+X-Gm-Message-State: AA+aEWadg2PouC5495XsUVRPMQeN7u7AJLI6wmvmleLb8RUFFpFDhpvA
+ Ag1uLWaE+jvgshLy6QWYi4dEuA==
+X-Google-Smtp-Source: AFSGD/X5ijktJZyrJe4NVc5D4Xj3iZjspHtp3e2YPqQ10kRYH3SesOqeSLOZT9YaqgkfpSVEiZRWsQ==
+X-Received: by 2002:a19:6806:: with SMTP id d6mr1607974lfc.48.1543513633779;
+ Thu, 29 Nov 2018 09:47:13 -0800 (PST)
 Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
  [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.15
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.12
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 09:47:16 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:13 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
  Sudeep Holla <sudeep.holla@arm.com>,
  Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
  Mark Rutland <mark.rutland@arm.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v10 05/27] dt: psci: Update DT bindings to support
- hierarchical PSCI states
-Date: Thu, 29 Nov 2018 18:46:38 +0100
-Message-Id: <20181129174700.16585-6-ulf.hansson@linaro.org>
+Subject: [PATCH v10 03/27] timer: Export next wakeup time of a CPU
+Date: Thu, 29 Nov 2018 18:46:36 +0100
+Message-Id: <20181129174700.16585-4-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
 In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
 References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094722_730635_64385C4B 
-X-CRM114-Status: GOOD (  13.52  )
+X-CRM114-CacheID: sfid-20181129_094722_733552_E46C2B12 
+X-CRM114-Status: GOOD (  15.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,10 +101,11 @@ Cc: Ulf Hansson <ulf.hansson@linaro.org>,
  Geert Uytterhoeven <geert+renesas@glider.be>,
  Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
  Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org,
- Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- Lina Iyer <lina.iyer@linaro.org>, linux-arm-msm@vger.kernel.org,
+ Lina Iyer <ilina@codeaurora.org>, Frederic Weisbecker <fweisbec@gmail.com>,
+ Tony Lindgren <tony@atomide.com>, Lina Iyer <lina.iyer@linaro.org>,
+ linux-arm-msm@vger.kernel.org, Thomas Gleixner <tglx@linutronix.de>,
  "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+ Ingo Molnar <mingo@kernel.org>, linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
@@ -114,208 +114,82 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 From: Lina Iyer <lina.iyer@linaro.org>
 
-Update DT bindings to represent hierarchical CPU and CPU PM domain idle
-states for PSCI. Also update the PSCI examples to clearly show how
-flattened and hierarchical idle states can be represented in DT.
+Knowing the sleep duration of CPUs, is known to be needed while selecting
+the most energy efficient idle state for a CPU or a group of CPUs.
 
+However, to be able to compute the sleep duration, we need to know at what
+time the next expected wakeup is for the CPU. Therefore, let's export this
+information via a new function, tick_nohz_get_next_wakeup(). Following
+changes make use of it.
+
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
 Cc: Lina Iyer <ilina@codeaurora.org>
+Cc: Frederic Weisbecker <fweisbec@gmail.com>
+Cc: Ingo Molnar <mingo@kernel.org>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 Co-developed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-Reviewed-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
 
-Change in V10:
-	- Clarified that the new hierarchical representation is orthogonal to
-	  OS-initiated vs platform-coordinated PSCI CPU suspend mode.
-	- Clarified the representation for "arm,psci-suspend-param" in regards
-	  to the flattened vs hierarchical model.
-	- Added power-domain-names property to the CPU nodes, as to avoid
-	  future churns, if ever multiple power-domains specifiers.
+Changes in v10:
+	- Updated function header of tick_nohz_get_next_wakeup().
 
 ---
- .../devicetree/bindings/arm/psci.txt          | 166 ++++++++++++++++++
- 1 file changed, 166 insertions(+)
+ include/linux/tick.h     |  8 ++++++++
+ kernel/time/tick-sched.c | 13 +++++++++++++
+ 2 files changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/psci.txt b/Documentation/devicetree/bindings/arm/psci.txt
-index a2c4f1d52492..e6d3553c8df8 100644
---- a/Documentation/devicetree/bindings/arm/psci.txt
-+++ b/Documentation/devicetree/bindings/arm/psci.txt
-@@ -105,7 +105,173 @@ Case 3: PSCI v0.2 and PSCI v0.1.
- 		...
- 	};
+diff --git a/include/linux/tick.h b/include/linux/tick.h
+index 55388ab45fd4..e48f6b26b425 100644
+--- a/include/linux/tick.h
++++ b/include/linux/tick.h
+@@ -125,6 +125,7 @@ extern bool tick_nohz_idle_got_tick(void);
+ extern ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next);
+ extern unsigned long tick_nohz_get_idle_calls(void);
+ extern unsigned long tick_nohz_get_idle_calls_cpu(int cpu);
++extern ktime_t tick_nohz_get_next_wakeup(int cpu);
+ extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
+ extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
  
-+ARM systems can have multiple cores sometimes in hierarchical arrangement.
-+This often, but not always, maps directly to the processor power topology of
-+the system. Individual nodes in a topology have their own specific power states
-+and can be better represented in DT hierarchically.
+@@ -151,6 +152,13 @@ static inline ktime_t tick_nohz_get_sleep_length(ktime_t *delta_next)
+ 	*delta_next = TICK_NSEC;
+ 	return *delta_next;
+ }
 +
-+For these cases, the definitions of the idle states for the CPUs and the CPU
-+topology, must conform to the domain idle state specification [3]. The domain
-+idle states themselves, must be compatible with the defined 'domain-idle-state'
-+binding [1], and also need to specify the arm,psci-suspend-param property for
-+each idle state.
++static inline ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	/* Next wake up is the tick period, assume it starts now */
++	return ktime_add(ktime_get(), TICK_NSEC);
++}
 +
-+DT allows representing CPUs and CPU idle states in two different ways -
+ static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
+ static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
+ 
+diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
+index 69e673b88474..7a9166506503 100644
+--- a/kernel/time/tick-sched.c
++++ b/kernel/time/tick-sched.c
+@@ -1089,6 +1089,19 @@ unsigned long tick_nohz_get_idle_calls(void)
+ 	return ts->idle_calls;
+ }
+ 
++/**
++ * tick_nohz_get_next_wakeup - return the next wake up of the CPU
++ * @cpu: the particular CPU to get next wake up for
++ *
++ * Called for idle CPUs only.
++ */
++ktime_t tick_nohz_get_next_wakeup(int cpu)
++{
++	struct clock_event_device *dev = per_cpu(tick_cpu_device.evtdev, cpu);
 +
-+The flattened model as given in Example 1, lists CPU's idle states followed by
-+the domain idle state that the CPUs may choose. Note that the idle states are
-+all compatible with "arm,idle-state". Additionally, for the domain idle state
-+the "arm,psci-suspend-param" represents a superset of the CPU's idle state.
++	return dev->next_event;
++}
 +
-+Example 2 represents the hierarchical model of CPUs and domain idle states.
-+CPUs define their domain provider in their psci DT node. The domain controls
-+the power to the CPU and possibly other h/w blocks that would enter an idle
-+state along with the CPU. The CPU's idle states may therefore be considered as
-+the domain's idle states and have the compatible "arm,idle-state". Such domains
-+may also be embedded within another domain that may represent common h/w blocks
-+between these CPUs. The idle states of the CPU topology shall be represented as
-+the domain's idle states. Note that for the domain idle state, the
-+"arm,psci-suspend-param" represents idle states hierarchically.
-+
-+In PSCI firmware v1.0, the OS-Initiated mode is introduced. However, the
-+flattened vs hierarchical DT representation is orthogonal to the OS-Initiated
-+vs the platform-coordinated PSCI CPU suspend modes, thus should be considered
-+independent of each other.
-+
-+The hierarchical representation helps and makes it easy to implement OSI mode
-+and OS implementations may choose to mandate it. For the default platform-
-+coordinated mode, both representations are viable options.
-+
-+Example 1: Flattened representation of CPU and domain idle states
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu@0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
-+					  <&CLUSTER_PWRDN>;
-+		};
-+
-+		CPU1: cpu@1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+			cpu-idle-states = <&CPU_PWRDN>, <&CLUSTER_RET>,
-+					  <&CLUSTER_PWRDN>;
-+		};
-+
-+		idle-states {
-+			CPU_PWRDN: cpu-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0000001>;
-+				entry-latency-us = <10>;
-+				exit-latency-us = <10>;
-+				min-residency-us = <100>;
-+			};
-+
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000011>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWRDN: cluster-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x1000031>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+Example 2: Hierarchical representation of CPU and domain idle states
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		CPU0: cpu@0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+			power-domains = <&CPU_PD0>;
-+			power-domain-names = "psci";
-+		};
-+
-+		CPU1: cpu@1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x100>;
-+			enable-method = "psci";
-+			power-domains = <&CPU_PD1>;
-+			power-domain-names = "psci";
-+		};
-+
-+		idle-states {
-+			CPU_PWRDN: cpu-power-down {
-+				compatible = "arm,idle-state";
-+				arm,psci-suspend-param = <0x0000001>;
-+				entry-latency-us = <10>;
-+				exit-latency-us = <10>;
-+				min-residency-us = <100>;
-+			};
-+
-+			CLUSTER_RET: cluster-retention {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000010>;
-+				entry-latency-us = <500>;
-+				exit-latency-us = <500>;
-+				min-residency-us = <2000>;
-+			};
-+
-+			CLUSTER_PWRDN: cluster-power-down {
-+				compatible = "domain-idle-state";
-+				arm,psci-suspend-param = <0x1000030>;
-+				entry-latency-us = <2000>;
-+				exit-latency-us = <2000>;
-+				min-residency-us = <6000>;
-+			};
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+
-+		CPU_PD0: cpu-pd0 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CPU_PWRDN>;
-+			power-domains = <&CLUSTER_PD>;
-+		};
-+
-+		CPU_PD1: cpu-pd1 {
-+			#power-domain-cells = <0>;
-+			domain-idle-states =  <&CPU_PWRDN>;
-+			power-domains = <&CLUSTER_PD>;
-+		};
-+
-+		CLUSTER_PD: cluster-pd {
-+			#power-domain-cells = <0>;
-+			domain-idle-states = <&CLUSTER_RET>, <&CLUSTER_PWRDN>;
-+		};
-+	};
-+
- [1] Kernel documentation - ARM idle states bindings
-     Documentation/devicetree/bindings/arm/idle-states.txt
- [2] Power State Coordination Interface (PSCI) specification
-     http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
-+[3]. PM Domains description
-+    Documentation/devicetree/bindings/power/power_domain.txt
+ static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
+ {
+ #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
 -- 
 2.17.1
 
