@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 83135C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:25:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B79F6C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:25:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 548E920863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:25:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7715520863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:25:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JhNYz7tm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Xjl8DIhg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 548E920863
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YPg4ZOlw";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="SJm6Shy+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7715520863
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=YEqlF0cpS3lS3JICcL3EsDFGxOLkpQ/bRskgQOhI7b0=; b=JhNYz7tm/WWd8w
-	4vE5VQrs/6LEQ26KtUY2DQpc2+6d9fk2/Cctt44UN1zhiR1j0xzZLv9nmZzSF8YnY5e6Bvst6DDg2
-	O5CXX5ovHI29FCzpTBrZyd5qCVU9GK/6xGkQp3lawgY8GCbpco9E6ctaMkLWC0lvw4AKOCMmmvJoZ
-	Ph4RTylcPnzZhYY907Sdq8+jCMidZ+SQKVQq08GRRkd1Li8FIj3BtYcO2eMBpne/4HqfmCfN2vTCj
-	KIL/eCggbVFImyESFPWf7Pp5BhY1OK7a2FYMXV8v1h4W1rLhugve+VrTE0ri8dCsAGp6GU6htxYXZ
-	3afJA8v56PhquZspbIHw==;
+	List-Owner; bh=D2v6bhi3dUh5kkZUGb8ByFBek957WJvL3AnlIaFj1q0=; b=YPg4ZOlwgPwYcq
+	sjUgYABBImbojpNUWWg0y6oKluLtL/r+2qPPlny0ZrtWtj+JFg4XO8KsZdLf/OpZ6EHW7cbhZg/36
+	T5I1+upPMq+4gCzGEb/irLB/96rPCrBSYSHywMJJzvceY9ZEM2YB6/nryOuQzvjrgzsjFPRMq8KW3
+	aS/Ka/R3l+9JM+ZDU4gv/vuCrJjN7gQxIEyViWP7vmhWwx/0Vret7t70NsIo71X5/gYaGrC9EQNoC
+	Zj5E4UXEzGKhfCPggaNF6my7LOr6WraZbvaGKP44lOxBpwEymj60DLxajbijnjmaImDWRgk911M58
+	0YN3mTxIU5NTuvPXuHjA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQ41-0000A9-0F; Thu, 29 Nov 2018 17:25:21 +0000
+	id 1gSQ4E-0000jv-Sb; Thu, 29 Nov 2018 17:25:34 +0000
 Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQ0i-0004pU-7X
- for linux-arm-kernel@bombadil.infradead.org; Thu, 29 Nov 2018 17:21:56 +0000
+ id 1gSQ0k-0004pU-DB
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 29 Nov 2018 17:21:58 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ev+DQCWVoq702s7y/VDFKpVunattzdY406oXKLGFSYw=; b=Xjl8DIhgZix3Dnm/Rqa8a4REDb
- zw4zOzWmgXHM9YTgzmGBUOAcVvHLp9gMnh5y/0gIMoO7afLbFALirDuKRqLgbErFRlrQE555M/pfk
- Zmi1x8zm/ATyvRf1bAbIvH7HB8RVfQVN9f6fiBdFSaPi1E2ALHgDVShsvXbhspGBIyEKdfWbM7pjm
- 6e8i8A9PzaZ1c1DypL4EB7oHa8bdHkcDM1LQ69ilSz/p6T1agz67g+rCL3yz7g8na3vwfD2+AvMdB
- 21183X39LgX9DhgnvmvrgzJxpWo8pFMiOU0UsLxsBmZ+JWeiQRFYgc/LMPVEhUyvdAX5zNuJCgBF8
- oNGGlKlQ==;
+ bh=SARPDdke6+qxC+U8Uxe3SeCSArOfv6H2EKwmxNcbqBs=; b=SJm6Shy+Ll0StSPGsr4eGqqQ76
+ O/4BAqMowezuvIOK5PkEcPq/Gi+u/B3awvw0z2wVtOCqrKHA4Ydtt49QnAWpIL9YJ17ydhY+Al4vw
+ 5Tr1N5o2+ayw/HeDWXEG8EpeVbMs4QmQ2RQaFzFG3FQbJrom/1Enx/X7t+OErCdaGuLRSEaJFsdBx
+ w6dJDpBd2n6ShlhlM1Rjp3hpPaR6R14jV9LU7Jl+ykEPHOi+4CxhEcYfrSr7eELSbuj02xdouUJE8
+ RdrCJVdRDZogG4SKCPexf2WLoRpMIPC7iJSiLvt57NBOxakCvnsMCz2bqT1YpIKGD9XOQRpKRJwbh
+ ZX6D0FfQ==;
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSPlu-0002ny-3q
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:06:40 +0000
+ id 1gSPlm-0002ny-VQ
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:06:32 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B073A15AB;
- Thu, 29 Nov 2018 09:06:37 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B050615BE;
+ Thu, 29 Nov 2018 09:06:30 -0800 (PST)
 Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
  [10.1.196.72])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9D0263F59C;
- Thu, 29 Nov 2018 09:06:35 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9B0633F59C;
+ Thu, 29 Nov 2018 09:06:28 -0800 (PST)
 From: Vincenzo Frascino <vincenzo.frascino@arm.com>
 To: linux-arch@vger.kernel.org,
 	linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 18/28] arm64: Refactor vDSO code
-Date: Thu, 29 Nov 2018 17:05:20 +0000
-Message-Id: <20181129170530.37789-19-vincenzo.frascino@arm.com>
+Subject: [PATCH v2 15/28] arm64: compat: Generate asm offsets for signals
+Date: Thu, 29 Nov 2018 17:05:17 +0000
+Message-Id: <20181129170530.37789-16-vincenzo.frascino@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181129170530.37789-1-vincenzo.frascino@arm.com>
 References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_170638_443724_2C1B0659 
-X-CRM114-Status: GOOD (  23.32  )
+X-CRM114-CacheID: sfid-20181129_170631_160557_375BAD33 
+X-CRM114-Status: GOOD (  10.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,282 +97,76 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Most of the code for initializing the vDSOs in arm64 and compat will
-be in common, hence a refactor of the current code is required to avoid
-duplication and simplify maintainability.
+This patch updates asm-offsets for arm64 to generate the correct offsets
+for compat signals.
 
-This patch refactors vdso.c to simplify the implementation of arm64 vDSO
-compat (which will be pushed with a future patch).
+They will be useful for the implementation of the compat sigreturn
+trampolines in vDSO context.
 
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
 ---
- arch/arm64/kernel/vdso.c | 208 +++++++++++++++++++++++++--------------
- 1 file changed, 135 insertions(+), 73 deletions(-)
+ arch/arm64/include/asm/signal32.h | 14 +++++++++++++-
+ arch/arm64/kernel/asm-offsets.c   |  6 ++++++
+ 2 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 8903087cca4c..f8020db654db 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -40,7 +40,30 @@
- #include <asm/vdso.h>
+diff --git a/arch/arm64/include/asm/signal32.h b/arch/arm64/include/asm/signal32.h
+index 1f05268f4c6d..a6fd7be1b22a 100644
+--- a/arch/arm64/include/asm/signal32.h
++++ b/arch/arm64/include/asm/signal32.h
+@@ -52,7 +52,7 @@ struct compat_ucontext {
+ 	compat_stack_t			uc_stack;
+ 	struct compat_sigcontext	uc_mcontext;
+ 	compat_sigset_t			uc_sigmask;
+-	int 				__unused[32 - (sizeof(compat_sigset_t) / sizeof(int))];
++	int				__unused[32 - (sizeof(compat_sigset_t) / sizeof(int))];
+ 	compat_ulong_t			uc_regspace[128] __attribute__((__aligned__(8)));
+ };
  
- extern char vdso_start[], vdso_end[];
--static unsigned long vdso_pages __ro_after_init;
-+
-+/* vdso_lookup arch_index */
-+enum arch_vdso_type {
-+	ARM64_VDSO = 0,
-+};
-+
-+struct __vdso_lookup_t {
-+	const char *name;
-+	const char *vdso_code_start;
-+	const char *vdso_code_end;
-+	unsigned long vdso_pages;
-+	/* Data Mapping */
-+	struct vm_special_mapping *dm;
-+	/* Code Mapping */
-+	struct vm_special_mapping *cm;
-+};
-+
-+static struct __vdso_lookup_t vdso_lookup[2] __ro_after_init = {
-+	{
-+		.name = "vdso",
-+		.vdso_code_start = vdso_start,
-+		.vdso_code_end = vdso_end,
-+	},
-+};
+@@ -66,6 +66,18 @@ struct compat_rt_sigframe {
+ 	struct compat_sigframe sig;
+ };
  
- /*
-  * The vDSO data page.
-@@ -51,6 +74,106 @@ static union {
- } vdso_data_store __page_aligned_data;
- struct vdso_data *vdso_data = &vdso_data_store.data;
- 
-+static int __vdso_remap(enum arch_vdso_type arch_index,
-+			const struct vm_special_mapping *sm,
-+			struct vm_area_struct *new_vma)
-+{
-+	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
-+	unsigned long vdso_size = vdso_lookup[arch_index].vdso_code_end -
-+				  vdso_lookup[arch_index].vdso_code_start;
++/* Macros for asm-offsets.c */
++#define OFFSET_OF_COMPAT_SIGFRAME_REGS (				\
++			offsetof(struct compat_sigframe, uc) +		\
++			offsetof(struct compat_ucontext, uc_mcontext) +	\
++			offsetof(struct compat_sigcontext, arm_r0))
 +
-+	if (vdso_size != new_size)
-+		return -EINVAL;
++#define OFFSET_OF_COMPAT_RT_SIGFRAME_REGS (				\
++			offsetof(struct compat_rt_sigframe, sig) +	\
++			offsetof(struct compat_sigframe, uc) +		\
++			offsetof(struct compat_ucontext, uc_mcontext) +	\
++			offsetof(struct compat_sigcontext, arm_r0))
 +
-+	current->mm->context.vdso = (void *)new_vma->vm_start;
-+
-+	return 0;
-+}
-+
-+static int __vdso_init(enum arch_vdso_type arch_index)
-+{
-+	int i;
-+	struct page **vdso_pagelist;
-+	unsigned long pfn;
-+
-+	if (memcmp(vdso_lookup[arch_index].vdso_code_start, "\177ELF", 4)) {
-+		pr_err("vDSO is not a valid ELF object!\n");
-+		return -EINVAL;
-+	}
-+
-+	vdso_lookup[arch_index].vdso_pages = (
-+			vdso_lookup[arch_index].vdso_code_end -
-+			vdso_lookup[arch_index].vdso_code_start) >>
-+			PAGE_SHIFT;
-+	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
-+		vdso_lookup[arch_index].name,
-+		vdso_lookup[arch_index].vdso_pages + 1,
-+		vdso_lookup[arch_index].vdso_pages,
-+		vdso_lookup[arch_index].vdso_code_start, 1L, vdso_data);
-+
-+	/* Allocate the vDSO pagelist, plus a page for the data. */
-+	vdso_pagelist = kcalloc(vdso_lookup[arch_index].vdso_pages + 1,
-+				sizeof(struct page *),
-+				GFP_KERNEL);
-+	if (vdso_pagelist == NULL)
-+		return -ENOMEM;
-+
-+	/* Grab the vDSO data page. */
-+	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
-+
-+
-+	/* Grab the vDSO code pages. */
-+	pfn = sym_to_pfn(vdso_lookup[arch_index].vdso_code_start);
-+
-+	for (i = 0; i < vdso_lookup[arch_index].vdso_pages; i++)
-+		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
-+
-+	vdso_lookup[arch_index].dm->pages = &vdso_pagelist[0];
-+	vdso_lookup[arch_index].cm->pages = &vdso_pagelist[1];
-+
-+	return 0;
-+}
-+
-+static int __setup_additional_pages(enum arch_vdso_type arch_index,
-+				    struct mm_struct *mm,
-+				    struct linux_binprm *bprm,
-+				    int uses_interp)
-+{
-+	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
-+	void *ret;
-+
-+	vdso_text_len = vdso_lookup[arch_index].vdso_pages << PAGE_SHIFT;
-+	/* Be sure to map the data page */
-+	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
-+
-+	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
-+	if (IS_ERR_VALUE(vdso_base)) {
-+		ret = ERR_PTR(vdso_base);
-+		goto up_fail;
-+	}
-+
-+	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
-+				       VM_READ|VM_MAYREAD,
-+				       vdso_lookup[arch_index].dm);
-+	if (IS_ERR(ret))
-+		goto up_fail;
-+
-+	vdso_base += PAGE_SIZE;
-+	mm->context.vdso = (void *)vdso_base;
-+	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
-+				       VM_READ|VM_EXEC|
-+				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
-+				       vdso_lookup[arch_index].cm);
-+	if (IS_ERR(ret))
-+		goto up_fail;
-+
-+	return 0;
-+
-+up_fail:
-+	mm->context.vdso = NULL;
-+	return PTR_ERR(ret);
-+}
-+
- #ifdef CONFIG_COMPAT
- /*
-  * Create and map the vectors page for AArch32 tasks.
-@@ -61,7 +184,7 @@ struct vdso_data *vdso_data = &vdso_data_store.data;
-  * 1 - sigreturn code
-  */
- static struct page *aarch32_vdso_pages[2] __ro_after_init;
--static const struct vm_special_mapping aarch32_vdso_spec[2] = {
-+static struct vm_special_mapping aarch32_vdso_spec[2] __ro_after_init = {
- 	{
- 		/* Must be named [vectors] for compatibility with arm. */
- 		.name	= "[vectors]",
-@@ -201,15 +324,7 @@ int aarch32_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
- static int vdso_mremap(const struct vm_special_mapping *sm,
- 		struct vm_area_struct *new_vma)
- {
--	unsigned long new_size = new_vma->vm_end - new_vma->vm_start;
--	unsigned long vdso_size = vdso_end - vdso_start;
--
--	if (vdso_size != new_size)
--		return -EINVAL;
--
--	current->mm->context.vdso = (void *)new_vma->vm_start;
--
--	return 0;
-+	return __vdso_remap(ARM64_VDSO, sm, new_vma);
- }
- 
- static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
-@@ -224,39 +339,10 @@ static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
- 
- static int __init vdso_init(void)
- {
--	int i;
--	struct page **vdso_pagelist;
--	unsigned long pfn;
-+	vdso_lookup[ARM64_VDSO].dm = &vdso_spec[0];
-+	vdso_lookup[ARM64_VDSO].cm = &vdso_spec[1];
- 
--	if (memcmp(vdso_start, "\177ELF", 4)) {
--		pr_err("vDSO is not a valid ELF object!\n");
--		return -EINVAL;
--	}
--
--	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
--	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
--		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
--
--	/* Allocate the vDSO pagelist, plus a page for the data. */
--	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
--				GFP_KERNEL);
--	if (vdso_pagelist == NULL)
--		return -ENOMEM;
--
--	/* Grab the vDSO data page. */
--	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
--
--
--	/* Grab the vDSO code pages. */
--	pfn = sym_to_pfn(vdso_start);
--
--	for (i = 0; i < vdso_pages; i++)
--		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
--
--	vdso_spec[0].pages = &vdso_pagelist[0];
--	vdso_spec[1].pages = &vdso_pagelist[1];
--
--	return 0;
-+	return __vdso_init(ARM64_VDSO);
- }
- arch_initcall(vdso_init);
- 
-@@ -264,43 +350,19 @@ int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				int uses_interp)
- {
- 	struct mm_struct *mm = current->mm;
--	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
--	void *ret;
--
--	vdso_text_len = vdso_pages << PAGE_SHIFT;
--	/* Be sure to map the data page */
--	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
-+	int ret;
- 
- 	if (down_write_killable(&mm->mmap_sem))
- 		return -EINTR;
--	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
--	if (IS_ERR_VALUE(vdso_base)) {
--		ret = ERR_PTR(vdso_base);
--		goto up_fail;
--	}
--	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
--				       VM_READ|VM_MAYREAD,
--				       &vdso_spec[0]);
--	if (IS_ERR(ret))
--		goto up_fail;
--
--	vdso_base += PAGE_SIZE;
--	mm->context.vdso = (void *)vdso_base;
--	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
--				       VM_READ|VM_EXEC|
--				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
--				       &vdso_spec[1]);
--	if (IS_ERR(ret))
--		goto up_fail;
- 
-+	ret = __setup_additional_pages(ARM64_VDSO,
-+				       mm,
-+				       bprm,
-+				       uses_interp);
- 
- 	up_write(&mm->mmap_sem);
--	return 0;
- 
--up_fail:
--	mm->context.vdso = NULL;
--	up_write(&mm->mmap_sem);
--	return PTR_ERR(ret);
-+	return ret;
- }
- 
- #define VDSO_PRECISION_MASK	~(0xFF00ULL<<48)
+ int compat_setup_frame(int usig, struct ksignal *ksig, sigset_t *set,
+ 		       struct pt_regs *regs);
+ int compat_setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 06cfd2363a86..4f8317c23908 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -30,6 +30,7 @@
+ #include <asm/fixmap.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
++#include <asm/signal32.h>
+ #include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <linux/kbuild.h>
+@@ -81,6 +82,11 @@ int main(void)
+   DEFINE(S_STACKFRAME,		offsetof(struct pt_regs, stackframe));
+   DEFINE(S_FRAME_SIZE,		sizeof(struct pt_regs));
+   BLANK();
++#ifdef CONFIG_COMPAT
++  DEFINE(COMPAT_SIGFRAME_REGS_OFFSET,		OFFSET_OF_COMPAT_SIGFRAME_REGS);
++  DEFINE(COMPAT_RT_SIGFRAME_REGS_OFFSET,	OFFSET_OF_COMPAT_RT_SIGFRAME_REGS);
++  BLANK();
++#endif
+   DEFINE(MM_CONTEXT_ID,		offsetof(struct mm_struct, context.id.counter));
+   BLANK();
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
 -- 
 2.19.2
 
