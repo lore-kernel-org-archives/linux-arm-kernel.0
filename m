@@ -1,62 +1,72 @@
-From: nick.desaulniers@gmail.com (Nick Desaulniers)
-Date: Wed, 28 Nov 2018 20:19:10 -0800
-Subject: [PATCH] arm64: io: specify asm operand width for __iormb()
-Message-ID: <20181129041912.5918-1-nick.desaulniers@gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 28 Nov 2018 23:23:36 -0600
+Subject: [PATCH v2 01/10] mailbox: Support blocking transfers in atomic
+ context
+In-Reply-To: <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
+References: <20181112151853.29289-1-thierry.reding@gmail.com>
+ <20181112151853.29289-2-thierry.reding@gmail.com>
+ <0545f5e1-1740-2129-9d0e-5c950bd9bf74@nvidia.com>
+Message-ID: <CABb+yY1u24JYO68f74qSJ1RpqidJ4H7cnP1Sy=RdqcBHru5XQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixes the warning produced from Clang:
-./include/asm-generic/io.h:711:9: warning: value size does not match
-register size specified by the constraint and modifier
-[-Wasm-operand-widths]
-        return readl(addr);
-               ^
-./arch/arm64/include/asm/io.h:149:58: note: expanded from macro 'readl'
-                                                          ^
-./include/asm-generic/io.h:711:9: note: use constraint modifier "w"
-./arch/arm64/include/asm/io.h:149:50: note: expanded from macro 'readl'
-                                                  ^
-./arch/arm64/include/asm/io.h:118:25: note: expanded from macro '__iormb'
-        asm volatile("eor       %w0, %1, %1\n" \
-                                     ^
-Though we disable Clang's integrated assembler with -no-integrated-as,
-it still tries to do some validation of assembler constraints.
+On Wed, Nov 28, 2018 at 3:43 AM Jon Hunter <jonathanh@nvidia.com> wrote:
+>
+>
+> On 12/11/2018 15:18, Thierry Reding wrote:
+> > From: Thierry Reding <treding@nvidia.com>
+> >
+> > The mailbox framework supports blocking transfers via completions for
+> > clients that can sleep. In order to support blocking transfers in cases
+> > where the transmission is not permitted to sleep, add a new ->flush()
+> > callback that controller drivers can implement to busy loop until the
+> > transmission has been completed. This will automatically be called when
+> > available and interrupts are disabled for clients that request blocking
+> > transfers.
+> >
+> > Signed-off-by: Thierry Reding <treding@nvidia.com>
+> > ---
+> >  drivers/mailbox/mailbox.c          | 8 ++++++++
+> >  include/linux/mailbox_controller.h | 4 ++++
+> >  2 files changed, 12 insertions(+)
+> >
+> > diff --git a/drivers/mailbox/mailbox.c b/drivers/mailbox/mailbox.c
+> > index 674b35f402f5..0eaf21259874 100644
+> > --- a/drivers/mailbox/mailbox.c
+> > +++ b/drivers/mailbox/mailbox.c
+> > @@ -267,6 +267,14 @@ int mbox_send_message(struct mbox_chan *chan, void *mssg)
+> >               unsigned long wait;
+> >               int ret;
+> >
+> > +             if (irqs_disabled() && chan->mbox->ops->flush) {
+> > +                     ret = chan->mbox->ops->flush(chan, chan->cl->tx_tout);
+> > +                     if (ret < 0)
+> > +                             tx_tick(chan, ret);
+> > +
+> > +                     return ret;
+> > +             }
+>
+> It seems to me that if mbox_send_message() is called from an atomic
+> context AND tx_block is true, then if 'flush' is not populated this
+> should be an error condition as we do not wish to call
+> wait_for_completion from an atomic context.
+>
+> I understand that there is some debate about adding such flush support,
+> but irrespective of the above change, it seems to me that if the
+> mbox_send_message() can be called from an atomic context (which it
+> appears to), then it should be detecting if someone is trying to do so
+> with 'tx_block' set as this should be an error.
+>
+Layers within kernel space have to trust each other. A badly written
+client can break the consumer in so many ways, we can not catch every
+possibility.
 
-While __iormb() is type agnostic to operand widths for argument v, its
-lone use is to zero'd out via eor (exclusive or).
+> Furthermore, if the underlying mailbox driver can support sending a
+> message from an atomic context and busy wait until it is done, surely
+> the mailbox framework should provide a means to support this?
+>
+Being able to put the message on bus in atomic context is a feature -
+which we do support. But busy-waiting in a loop is not a feature, and
+we don't want to encourage that.
 
-Fixes commit 6460d3201471 ("arm64: io: Ensure calls to delay routines
-are ordered against prior readX()")
-Link: https://github.com/ClangBuiltLinux/continuous-integration/issues/78
-Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
-Reviewed-by: Nathan Chancellor <natechancellor@gmail.com>
-Signed-off-by: Nick Desaulniers <nick.desaulniers@gmail.com>
----
-Side note: is it not correct to cite SHAs from linux-next in "Fixes
-commit ..." lines? I guess we can drop it.
-
-Link to regression build:
-https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92799938
-
-Link to build w/ this patch:
-https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92935901
-
-
- arch/arm64/include/asm/io.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index d42d00d8d5b6..dbdebf81162b 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -115,7 +115,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- 	 * later instructions. This ensures that a subsequent call to	\
- 	 * udelay() will be ordered due to the ISB in get_cycles().	\
- 	 */								\
--	asm volatile("eor	%0, %1, %1\n"				\
-+	asm volatile("eor	%0, %x1, %x1\n"				\
- 		     "cbnz	%0, ."					\
- 		     : "=r" (tmp) : "r" (v) : "memory");		\
- })
--- 
-2.17.1
+Cheers!
