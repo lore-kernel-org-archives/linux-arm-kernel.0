@@ -1,60 +1,47 @@
 From: houlong.wei@mediatek.com (Houlong Wei)
-Date: Thu, 29 Nov 2018 11:37:07 +0800
-Subject: [PATCH v27 0/2] MediaTek MT8173 CMDQ support
-Message-ID: <1543462629-32746-1-git-send-email-houlong.wei@mediatek.com>
+Date: Thu, 29 Nov 2018 11:37:08 +0800
+Subject: [PATCH v27 1/2] arm64: dts: mt8173: Add GCE node
+In-Reply-To: <1543462629-32746-1-git-send-email-houlong.wei@mediatek.com>
+References: <1543462629-32746-1-git-send-email-houlong.wei@mediatek.com>
+Message-ID: <1543462629-32746-2-git-send-email-houlong.wei@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the device node of the GCE hardware for CMDQ module.
 
-This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-to help write registers with critical time limitation, such as
-updating display configuration during the vblank. It controls Global
-Command Engine (GCE) hardware to achieve this requirement.
+Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+Signed-off-by: HS Liao <hs.liao@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-Changes since v26:
- -rebase on v4.20-rc1
- -add comment to explain why cmdq_buf_size is increased in case of
-  appending command failure
-Changes since v25:
- -Replace WARN_ON() with WARN_ONCE() and add debug information.
-Changes since v24:
- -move WARN_ON() into cmdq_pkt_append_command() from outside
-Changes since v23:
- -rebase on v4.19-rc1
- -revise return value of cmdq_mbox_create()
- -revise cmdq_pkt_create()
- -add MODULE_LICENSE() for mtk-cmdq-helper.c
- -adjust functions order in mtk-cmdq.h
-Changes since v22:
- -remove properties 'timeout' and 'thread-num' from device tree
- -move timer from CMDQ driver to CMDQ helper
- -move dma unmap from CMDQ driver to CMDQ helper
- -config thread number in CMDQ match table
- -remove reallocate mechanism and let client specify the cmdq buffer size
- -let client specify the timeout time
-Changes since v21:
- -rebase on v4.18-rc1
- -remove subsys code and event id definition from mtk-cmdq-helper.c
- -add mt8173-gce.h to define the subsys code and envent id
-Changes since v20:
- -rebase on v4.15-rc1
- -move dma_map_single outside of spinlock
-Changes since v19:
- -rebase to v4.10-rc2
-
-Houlong Wei (2):
-  arm64: dts: mt8173: Add GCE node
-  soc: mediatek: Add Mediatek CMDQ helper
-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |  10 +
- drivers/soc/mediatek/Kconfig             |  12 +
- drivers/soc/mediatek/Makefile            |   1 +
- drivers/soc/mediatek/mtk-cmdq-helper.c   | 300 +++++++++++++++++++++++
- include/linux/soc/mediatek/mtk-cmdq.h    | 133 ++++++++++
- 5 files changed, 456 insertions(+)
- create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
- create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index abd2f15..412ffd4 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -18,6 +18,7 @@
+ #include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset/mt8173-resets.h>
++#include <dt-bindings/gce/mt8173-gce.h>
+ #include "mt8173-pinfunc.h"
+ 
+ / {
+@@ -521,6 +522,15 @@
+ 			status = "disabled";
+ 		};
+ 
++		gce: mailbox at 10212000 {
++			compatible = "mediatek,mt8173-gce";
++			reg = <0 0x10212000 0 0x1000>;
++			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infracfg CLK_INFRA_GCE>;
++			clock-names = "gce";
++			#mbox-cells = <3>;
++		};
++
+ 		mipi_tx0: mipi-dphy at 10215000 {
+ 			compatible = "mediatek,mt8173-mipi-tx";
+ 			reg = <0 0x10215000 0 0x1000>;
 -- 
-2.19.1
+1.7.9.5
