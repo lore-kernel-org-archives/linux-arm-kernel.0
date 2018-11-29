@@ -2,64 +2,86 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BFC3DC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:41:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 95439C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:42:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8E42C2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:41:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BFB620989
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:42:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifCB/MXe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8E42C2145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gYhCcQJb";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="PtfqTHsx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BFB620989
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:Message-ID:
-	In-Reply-To:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Iqo9UUNRZO6qnD59CriF+4CyGhsdXn2iuww+B7N73oM=; b=ifCB/MXeWf9MHn
-	ko64b/bKDhm21ncI8x2eXhZxOxJWy+o2Xjbgkf+RZLUuiAqVTJWMzf27h3fjp+Nkt1TQOf+hC9u0R
-	MiAYuXTArfLCRV9lQ0kTZpWnMS/XSC/2KWc2+t2KxrE3I11nd8laVeIrRtARiLnrhdCBoheGjDs95
-	V4Z3jOEfVd76qYruXEdLM1CtWu1+AeLz6pzp/s/BMgM8gkO2ZE8rJ8WUj+7Ng5Z4G3ZvmkcQD8kH6
-	+jhHxt3f2Bw1SQ568tcJCNKAdkgQnQdgKsE+mf9jkgqKA14PdP5A3qa7DBfHgHzvxVr3AJc0E+TNg
-	3809F7F49GQIHFmhX88Q==;
+	List-Owner; bh=Kn1D2BTocRhJSRgJ1mwrORWfVIUk3merFaiK4GhcVTg=; b=gYhCcQJb+xUuBS
+	+AdtHc+q8VFzYOjJdk9JNjgK3QnEe6Qo9kCqD4Krbfi1hjVmybk9UL+5KzTLC9ZcBCwRp4j7TEUlk
+	WefEGGGILaRn4dXPq8q2Exp4VeUoBkbs58DRgr9V8o9P4/auOoZxOitYcL/G6+h0QBE0c7jlhFrqU
+	wlPZ0i4nr4PLGLKr/8zBU7EFkiM1kMVd1X89daQl7HG7G/21OeXqCMdahJnq9WiNcV+wFTJW1Yha0
+	wnu9uhi5ikw5AfoS3XbPFPmkNJ4yiidDyeWm2UCiOarI7G9PgJtAftRjPW28avOThBaDev853pYAA
+	bsE2Eh0yBk41g7Sv8+WQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSUzn-0005wn-U8; Thu, 29 Nov 2018 22:41:19 +0000
-Received: from galois.linutronix.de ([2a01:7a0:2:106d:700::1])
+	id 1gSV1H-0006Hn-2A; Thu, 29 Nov 2018 22:42:51 +0000
+Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSUzk-0005wJ-HI
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 22:41:17 +0000
-Received: from p4fea46ac.dip0.t-ipconnect.de ([79.234.70.172] helo=nanos)
- by Galois.linutronix.de with esmtpsa (TLS1.2:DHE_RSA_AES_256_CBC_SHA256:256)
- (Exim 4.80) (envelope-from <tglx@linutronix.de>)
- id 1gSUzY-0001sU-8k; Thu, 29 Nov 2018 23:41:04 +0100
-Date: Thu, 29 Nov 2018 23:41:03 +0100 (CET)
-From: Thomas Gleixner <tglx@linutronix.de>
-To: Vincenzo Frascino <vincenzo.frascino@arm.com>
-Subject: Re: [PATCH v2 04/28] kernel: Add masks support for Raw and NTP
- time
-In-Reply-To: <20181129170530.37789-5-vincenzo.frascino@arm.com>
-Message-ID: <alpine.DEB.2.21.1811292339240.1657@nanos.tec.linutronix.de>
-References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
- <20181129170530.37789-5-vincenzo.frascino@arm.com>
-User-Agent: Alpine 2.21 (DEB 202 2017-01-01)
+ id 1gSV1E-0006FE-42
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 22:42:49 +0000
+Received: by mail-oi1-x243.google.com with SMTP id x23so3130883oix.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 29 Nov 2018 14:42:37 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=AjC9mgriRN0LP5/i352ByFedKXXyljq0Tw1jexu8YxI=;
+ b=PtfqTHsxl6T1aNf0xojBdLJL2v9MbOIxqkmi4EBvOIsB6/VNvqeZXyexp3+NuL/5VZ
+ UphWUEJCTG5j+lozKPie/tnYgMcaqEL39/ZVqJ8TSBMcpOYnFnwOtn560U04O15uWFwP
+ 0oolYz+G70vSSLEB9DHVm6eGFlnmvBGrXN/cQ=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=AjC9mgriRN0LP5/i352ByFedKXXyljq0Tw1jexu8YxI=;
+ b=QQCPO7s+nYxfobLuYGd/k48yKo/QvftU+FLRmw0obWC6pRAJIlkL2tEJyMgK65s63S
+ y7cl9WBCwtA4oKt/2Vi6fP+da2t7aCKS0ZeN02O8/zgloGHAXk+WtMuHP7SgFSqDhq3V
+ a8rEHJunyxKJhtKMbgxwBVvPwdzOlkLK5GHpsh8EenDj5PDP1zmH/hhRe6n+sQBlMUMN
+ 47kZ9aAGM0Pec6GHxc/z1VEZmJQ+BbRMewQGcvdVFCRIrnBiXdIwo6F92ienpclq+Ol7
+ BHs6gkSGZAMDbaAkhJcdt0kEQJTpactVYQEHIjeubpkyAyjKd3EW207klNPz4bfJ+RpZ
+ K5pw==
+X-Gm-Message-State: AA+aEWbX8gzRkiAk7aHrZx4yvyCn2w+xcI+i1eHE6idRzdoyYM06qy2t
+ VQnYAD6tDmOEeBmuSQ3La5ukCQ==
+X-Google-Smtp-Source: AFSGD/V/06Xq6gnWR7jgDlscc4uygAlxATa8cSpa9hZ+lbm/T3kTLecXbfMv00/Cc9Fm634nupYJWA==
+X-Received: by 2002:aca:e495:: with SMTP id b143mr1864251oih.286.1543531356404; 
+ Thu, 29 Nov 2018 14:42:36 -0800 (PST)
+Received: from localhost ([2600:1700:141:4960:d408:b2c2:72bf:467a])
+ by smtp.gmail.com with ESMTPSA id y17sm2507709oie.41.2018.11.29.14.42.35
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 29 Nov 2018 14:42:35 -0800 (PST)
+Date: Thu, 29 Nov 2018 16:42:34 -0600
+From: Andy Gross <andy.gross@linaro.org>
+To: Stephen Boyd <swboyd@chromium.org>
+Subject: Re: [PATCH] drm: msm: Check cmd_db_read_aux_data() for failure
+Message-ID: <20181129224234.GD32306@hector.attlocal.net>
+References: <20181129163826.178670-1-swboyd@chromium.org>
+ <20181129223600.GC32306@hector.attlocal.net>
 MIME-Version: 1.0
-X-Linutronix-Spam-Score: -1.0
-X-Linutronix-Spam-Level: -
-X-Linutronix-Spam-Status: No , -1.0 points, 5.0 required, ALL_TRUSTED=-1,
- SHORTCIRCUIT=-0.0001
+Content-Disposition: inline
+In-Reply-To: <20181129223600.GC32306@hector.attlocal.net>
+User-Agent: Mutt/1.5.23.1 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_144116_716468_83611191 
-X-CRM114-Status: GOOD (  17.95  )
+X-CRM114-CacheID: sfid-20181129_144248_159449_FACA61AA 
+X-CRM114-Status: GOOD (  12.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,49 +93,46 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
- Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
- Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
- Peter Collingbourne <pcc@google.com>, linux-arm-kernel@lists.infradead.org
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>, kbuild test robot <lkp@intel.com>,
+ linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Evan Green <evgreen@chromium.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Jordan Crouse <jcrouse@codeaurora.org>, Rob Clark <robdclark@gmail.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 29 Nov 2018, Vincenzo Frascino wrote:
+On Thu, Nov 29, 2018 at 04:36:00PM -0600, Andy Gross wrote:
+> On Thu, Nov 29, 2018 at 08:38:26AM -0800, Stephen Boyd wrote:
+> > We need to check the call to cmd_db_read_aux_data() for the error case,
+> > so that we don't continue and use potentially uninitialized values for
+> > 'pri_count' and 'sec_count'. Otherwise, we get the following compiler
+> > warnings:
+> > 
+> >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c: In function 'a6xx_gmu_rpmh_arc_votes_init.isra.12':
+> >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c:943:12: warning: 'pri_count' is used uninitialized in this function [-Wuninitialized]
+> >      pri_count >>= 1;
+> >                ^~~
+> >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c:948:12: warning: 'sec_count' may be used uninitialized in this function
+> > [-Wmaybe-uninitialized]
+> >      sec_count >>= 1;
+> >                ^~~
+> > 
+> > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> > Reported-by: kbuild test robot <lkp@intel.com>
+> > Cc: Jordan Crouse <jcrouse@codeaurora.org>
+> > Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > Cc: Evan Green <evgreen@chromium.org>
+> > Cc: Jordan Crouse <jcrouse@codeaurora.org>
+> > Cc: Rob Clark <robdclark@gmail.com>
+> > Fixes: ed3cafa79ea7 ("soc: qcom: cmd-db: Stop memcpy()ing in cmd_db_read_aux_data()")
+> > Signed-off-by: Stephen Boyd <swboyd@chromium.org>
 
-> Depending on the clocksource selected there can be supported a
-> different resolution hence we require a mask to be applied to the
-> time calculation.
-> 
-> This patch exposes the mask in the datapage for Raw and NTP adjusted
-> clock.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
-> ---
->  include/vdso/datapage.h | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/include/vdso/datapage.h b/include/vdso/datapage.h
-> index d50a108afaed..0a7bdccf5773 100644
-> --- a/include/vdso/datapage.h
-> +++ b/include/vdso/datapage.h
-> @@ -34,6 +34,8 @@ struct vdso_data {
->  	__u64 wtm_clock_nsec;
->  	__u64 btm_nsec;		/* Monotonic to boot time */
->  	__u64 tai_sec;		/* International Atomic Time */
-> +	__u64 cs_mono_mask;	/* NTP-adjusted clocksource mask */
-> +	__u64 cs_raw_mask;	/* Raw clocksource mask */
+On second thought, this needs to go through drm tree.
 
-And why would they be different? The core timekeeper has them duplicated
-purely for access pattern optimization and simplicity.
-
-Thanks,
-
-	tglx
+Reviewed-by: Andy Gross <andy.gross@linaro.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
