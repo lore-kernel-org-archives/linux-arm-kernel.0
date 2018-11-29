@@ -1,67 +1,58 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 29 Nov 2018 10:14:29 +0000
-Subject: [PATCH v2] ARM: dma-mapping: fix potential uninitialized return
-In-Reply-To: <401b58b2-fb17-dc83-f898-c10cafdc5413@arm.com>
-References: <20181128173929.3050-1-nathanj439@gmail.com>
- <20181128185910.5778-1-nathanj439@gmail.com>
- <401b58b2-fb17-dc83-f898-c10cafdc5413@arm.com>
-Message-ID: <20181129101428.GQ30658@n2100.armlinux.org.uk>
+From: rozmanro@gmail.com (Roman Rozman)
+Date: Thu, 29 Nov 2018 12:20:48 +0200
+Subject: I2c eeprom file missing - SFP module
+Message-ID: <CAEHvULmcFk5Z3kLRY-MF6vRVNms9q91X8k3MCq7aLXC4SRgyXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 29, 2018 at 09:50:59AM +0000, Vladimir Murzin wrote:
-> On 11/28/18 6:59 PM, Nathan Jones wrote:
-> > If neither of the if() statements fire then the return value is
-> > uninitialized. In the worst case it returns 0 which means the caller
-> > will think the function succeeded.
-> 
-> "ret" is updated indirectly via:
-> 
->         if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
->                 return ret;
+Hi all,
+I have some linux kernel & SFP/I2C driver issue.
+I am using a buildroot linux kernel for an embedded board.
 
-I'm afraid you are wrong - "ret" really is used uninitialised.
+I need to be able to read the eeprom file of the SFP
+i2c device:/sys/class/i2c-adapter/i2c-1/1-0050/eeprom
 
-dma_mmap_from_dev_coherent() calls __dma_mmap_from_coherent(), and
-there is a top-function-level if statement:
 
-static int __dma_mmap_from_coherent(struct dma_coherent_mem *mem,
-                struct vm_area_struct *vma, void *vaddr, size_t size, int *ret)
-{
-        if (mem && vaddr >= mem->virt_base && vaddr + size <=
-                   (mem->virt_base + (mem->size << PAGE_SHIFT))) {
-		... path that sets *ret ...
-		return 1;
-        }
-        return 0;
-}
+1. working case:
 
-If that if statement is true, then yes, ret will be initialised, and
-dma_mmap_from_dev_coherent() will return 1.  We will take that
-"return ret" statement in __arm_dma_mmap() and everything is fine.
+When SFP module is inserted in my development unit board from the
+start (before the kernel loads up) then when startup completed i can
+see and read the eeprom file in the path:
+/sys/class/i2c-adapter/i2c-1/1-0050/eeprom
 
-If that if statement is false, then the function returns zero without
-setting "ret" to anything, and we continue processing __arm_dma_mmap().
-The next statements are:
+kernel prints on startup shows the i2c device scan result:
 
-        if (off < nr_pages && nr_vma_pages <= (nr_pages - off)) {
-                ret = remap_pfn_range(vma, vma->vm_start,
-                                      pfn + off,
-                                      vma->vm_end - vma->vm_start,
-                                      vma->vm_page_prot);
-        }
+i2c /dev entires driver
+at24 - 1-0050: 256 byte 24c02 EEPROM, writable, 1 bytes/write
+at24 - 1-0052: 3278 byte 24c256 EEPROM, writable, 1 bytes/write
 
-        return ret;
 
-So, if _this_ if statement is also false, then we get to "return ret"
-but ret has not been initialised by anything.
+2. not working case:
 
-Therefore, 'ret' does need initialisation, since as of your commit,
-there is a path through the code where it is used uninitialised.
+If there is no SFP module inserted on startup,and kernel completes the
+boot procces, then when i'm inserting the SFP module in,i observe that
+the path:
+/sys/class/i2c-adapter/i2c-1/1-0050/ DOESN'T include the eeprom file.
 
-Hence, Nathan's patch is correct.
+the folder exists & includes:
+modalias,name,of_node,power,subsystem,ueventbut no eeprom file.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+The device tree part of the sfp-eeprom code:
+
+&i2c0 {
+ ...
+  sfp_eeprom at 50 {
+ compatible = "at,24c02";
+ reg = 0x50 ;
+ };
+
+
+I expect the SFP driver to be responsible for the trigger that should
+happen once the SFP module is inserted, and should trigger the i2c
+devices scan which will result in creation of eeprom file.
+
+Would like to ask you what am i missing ? some binding code from sfp
+driver to trigger the i2c scan or something?
+
+Thanks in advance,
+Roman.
