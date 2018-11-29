@@ -7,54 +7,58 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 40AFCC43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:05:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 72CBAC43610
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:06:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0FD1A20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:05:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 45039213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:06:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="J+jj2kWe"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FD1A20863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bp.renesas.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="neZBibjn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45039213A2
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=FSTsGJ6ejDwzgeoL0WxeC7SwL93Z2XK0EaEigmTk1SI=; b=J+j
-	j2kWegkbFrs9TI1w1CsCV8CldtqgtZ4+rUbblfYxctGg1xNTx4xTuWkVllcFKH5h3y6Aw/EB8ycKo
-	9f59ILqh6IQhg/a1h/a+Zov2uGPb156frFlClBeAV6lslRoQanKp8fqMI+BnDRBHfUMHvJKnmjII6
-	HafReBbNfcVXLukBe227uZ1TrSoShlW1lNV/XDY0n/aCY6PXQi7ZNeP9fYUEDYIioCgYVOoFhDHXG
-	4oDpvLda6JpafCHO250/tytvcCrsPWN9i/XCxNJWTNl4shYpcKpML+sH3oG9yVfm+X+KkQI32MnHe
-	CyyLLjHXMnBhnWqRgZOpqd9rv3qydaA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lTixTRHrcqYTEwetcHhEFCGQZwAxqnVozY//ipRvDRk=; b=neZBibjnLDwMhf
+	l0KOAlBi9Sw5nv7Odcfevf7ze+y1zJpiVvSgX2GYPeLdWMe05ZEIQqLjSoOxqI2eweRaDgVqxcAiS
+	ps74HWjDd7RC0BnfAbOVceW2NI6/pmISLK+bsz79nZTmNDINg59qOjzyk6XhQv6WiNCpR1C+R2MLP
+	FFR73yD+HHe8lNllva2dHuEQ9Hs9MbEmJ0ru8CCKAfxZgSfpTt+2kskdskpyYqntaeGx7BDknHwb6
+	HFQSH6octHl8q/qYE84DisMiTsJIQjDdbSl3y7YsPu0qaYbkkvaP88rEwSepU1rObwF/flET2ebSr
+	b+3mf96Q3yG9PyAXvwPA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSPl9-0000Do-Tq; Thu, 29 Nov 2018 17:05:51 +0000
-Received: from relmlor2.renesas.com ([210.160.252.172]
- helo=relmlie6.idc.renesas.com)
+	id 1gSPlb-0000h2-AS; Thu, 29 Nov 2018 17:06:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSPl6-0000Ch-C3
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:05:50 +0000
-Received: from unknown (HELO relmlir6.idc.renesas.com) ([10.200.68.152])
- by relmlie6.idc.renesas.com with ESMTP; 30 Nov 2018 02:05:33 +0900
-Received: from be1yocto.ree.adwin.renesas.com (unknown [172.29.43.62])
- by relmlir6.idc.renesas.com (Postfix) with ESMTP id 7809C40A1430;
- Fri, 30 Nov 2018 02:05:31 +0900 (JST)
-From: Biju Das <biju.das@bp.renesas.com>
-To: Simon Horman <horms@verge.net.au>
-Subject: [PATCH v2 3/4] ARM: shmobile: Enable NXP pcf85363 rtc in
- shmobile_defconfig
-Date: Thu, 29 Nov 2018 16:57:06 +0000
-Message-Id: <1543510626-33570-1-git-send-email-biju.das@bp.renesas.com>
-X-Mailer: git-send-email 2.7.4
+ id 1gSPlP-0000KV-Ff
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:06:14 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 8FEDEEBD;
+ Thu, 29 Nov 2018 09:05:57 -0800 (PST)
+Received: from e119884-lin.cambridge.arm.com (e119884-lin.cambridge.arm.com
+ [10.1.196.72])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7BD073F59C;
+ Thu, 29 Nov 2018 09:05:55 -0800 (PST)
+From: Vincenzo Frascino <vincenzo.frascino@arm.com>
+To: linux-arch@vger.kernel.org,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2 01/28] kernel: Standardize vdso_datapage
+Date: Thu, 29 Nov 2018 17:05:03 +0000
+Message-Id: <20181129170530.37789-2-vincenzo.frascino@arm.com>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181129170530.37789-1-vincenzo.frascino@arm.com>
+References: <20181129170530.37789-1-vincenzo.frascino@arm.com>
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_090548_513177_D000644F 
-X-CRM114-Status: UNSURE (   9.81  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181129_090608_271192_E4F06677 
+X-CRM114-Status: GOOD (  18.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,43 +70,87 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabrizio Castro <fabrizio.castro@bp.renesas.com>,
- Chris Paterson <Chris.Paterson2@renesas.com>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Magnus Damm <magnus.damm@gmail.com>, Russell King <linux@armlinux.org.uk>,
- Biju Das <biju.das@bp.renesas.com>, linux-renesas-soc@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Arnd Bergmann <arnd@arndb.de>, Catalin Marinas <catalin.marinas@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ Russell King <linux@armlinux.org.uk>, Ralf Baechle <ralf@linux-mips.org>,
+ Mark Salyzyn <salyzyn@android.com>, Paul Burton <paul.burton@mips.com>,
+ Thomas Gleixner <tglx@linutronix.de>, Peter Collingbourne <pcc@google.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The iWave RZ/G1C SBC supports RTC (NXP pcf85263). To increase hardware
-support enable the driver in the shmobile_defconfig multiplatform
-configuration.
+In an effort to unify the common code for managing the vdso library in
+between all the architectures that support it, this patch tries to
+provide a common format for the vdso datapage.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
----
-V1-->V2 no change.
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+As a result of this, this patch moves vdso_datapage.h from arm64 private
+includes to general includes (include/vdso) and to avoid possible conflicts
+replaces the header guard.
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 9e5a5ad..fdac4e4 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -177,6 +177,7 @@ CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_RS5C372=y
-+CONFIG_RTC_DRV_PCF85363=y
- CONFIG_RTC_DRV_BQ32K=y
- CONFIG_RTC_DRV_S35390A=y
- CONFIG_RTC_DRV_RX8581=y
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Vincenzo Frascino <vincenzo.frascino@arm.com>
+---
+ include/vdso/datapage.h | 48 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+ create mode 100644 include/vdso/datapage.h
+
+diff --git a/include/vdso/datapage.h b/include/vdso/datapage.h
+new file mode 100644
+index 000000000000..a02ca170d56e
+--- /dev/null
++++ b/include/vdso/datapage.h
+@@ -0,0 +1,48 @@
++/*
++ * Copyright (C) 2012 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __VDSO_DATAPAGE_H
++#define __VDSO_DATAPAGE_H
++
++#ifdef __KERNEL__
++
++#ifndef __ASSEMBLY__
++
++#include <linux/types.h>
++
++struct vdso_data {
++	__u64 cs_cycle_last;	/* Timebase at clocksource init */
++	__u64 raw_time_sec;	/* Raw time */
++	__u64 raw_time_nsec;
++	__u64 xtime_clock_sec;	/* Kernel time */
++	__u64 xtime_clock_nsec;
++	__u64 xtime_coarse_sec;	/* Coarse time */
++	__u64 xtime_coarse_nsec;
++	__u64 wtm_clock_sec;	/* Wall to monotonic time */
++	__u64 wtm_clock_nsec;
++	__u32 tb_seq_count;	/* Timebase sequence counter */
++	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
++	__u32 cs_shift;		/* Clocksource shift (mono = raw) */
++	__u32 cs_raw_mult;	/* Raw clocksource multiplier */
++	__u32 tz_minuteswest;	/* Whacky timezone stuff */
++	__u32 tz_dsttime;
++	__u32 use_syscall;
++};
++
++#endif /* !__ASSEMBLY__ */
++
++#endif /* __KERNEL__ */
++
++#endif /* __VDSO_DATAPAGE_H */
 -- 
-2.7.4
+2.19.2
 
 
 _______________________________________________
