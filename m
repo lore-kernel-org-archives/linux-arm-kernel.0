@@ -1,72 +1,33 @@
-From: anson.huang@nxp.com (Anson Huang)
-Date: Thu, 29 Nov 2018 02:37:47 +0000
-Subject: [PATCH V4 4/4] ARM64: dts: imx: add i.MX8QXP thermal support
-In-Reply-To: <1543458696-4741-1-git-send-email-Anson.Huang@nxp.com>
-References: <1543458696-4741-1-git-send-email-Anson.Huang@nxp.com>
-Message-ID: <1543458696-4741-5-git-send-email-Anson.Huang@nxp.com>
+From: sergey.senozhatsky.work@gmail.com (Sergey Senozhatsky)
+Date: Thu, 29 Nov 2018 11:53:28 +0900
+Subject: [PATCH v2] mm/zsmalloc.c: Fix zsmalloc 32-bit PAE support
+In-Reply-To: <93b0cce5-4ceb-14ab-5987-af54f15958f2@linaro.org>
+References: <20181025134344.GZ30658@n2100.armlinux.org.uk>
+ <20181121001150.405-1-rafael.tinoco@linaro.org>
+ <91776bf8-0d12-1cc4-1ffb-ca3c486aeb0b@linaro.org>
+ <93b0cce5-4ceb-14ab-5987-af54f15958f2@linaro.org>
+Message-ID: <20181129025328.GE6379@jagdpanzerIV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i.MX8QXP CPU thermal zone support.
+On (11/27/18 18:33), Rafael David Tinoco wrote:
+> On 11/20/18 10:18 PM, Rafael David Tinoco wrote:
+> > 
+> > Russell,
+> > 
+> > I have tried to place MAX_POSSIBLE_PHYSMEM_BITS in the best available
+> > header for each architecture, considering different paging levels, PAE
+> > existence, and existing similar definitions. Also, I have only
+> > considered those architectures already having "sparsemem.h" header.
+> > 
+> > Would you mind reviewing it ?
+> 
+> Should I re-send the this v2 (as v3) with complete list of
+> get_maintainer.pl ? I was in doubt because I'm touching headers from
+> several archs and I'm not sure who, if it is accepted, would merge it.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
-ChangeLog:
-V3->V4:
-  *move the tsens node to inside of SCU node as it is belonging to SCU.
----
- arch/arm64/boot/dts/freescale/imx8qxp.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+Yes, resending and Cc-ing archs' maintainers if the right thing to do.
+It's also possible that they will ask to split the patch and do a
+per-arch change.
 
-diff --git a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-index 9b08688..48f622c 100644
---- a/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-+++ b/arch/arm64/boot/dts/freescale/imx8qxp.dtsi
-@@ -9,6 +9,7 @@
- #include <dt-bindings/firmware/imx/rsrc.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/pads-imx8qxp.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- #include "imx8-ca35.dtsi"
- 
-@@ -87,6 +88,12 @@
- 		rtc: rtc {
- 			compatible = "fsl,imx8qxp-sc-rtc";
- 		};
-+
-+		tsens: thermal-sensor {
-+			compatible = "fsl,imx8qxp-sc-thermal";
-+			tsens-num = <1>;
-+			#thermal-sensor-cells = <1>;
-+		};
- 	};
- 
- 	adma_subsys: bus at 59000000 {
-@@ -410,4 +417,24 @@
- 		#size-cells = <1>;
- 		ranges = <0x5f000000 0x0 0x5f000000 0x1000000>;
- 	};
-+
-+	thermal_zones: thermal-zones {
-+		cpu-thermal0 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <2000>;
-+			thermal-sensors = <&tsens 355>;
-+			trips {
-+				cpu_alert0: trip0 {
-+					temperature = <107000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_crit0: trip1 {
-+					temperature = <127000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+	};
- };
--- 
-2.7.4
+	-ss
