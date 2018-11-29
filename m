@@ -2,64 +2,107 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6C9F8C43610
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:25:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 48A55C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:31:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 44061213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:25:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 224EE213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 18:31:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HkUK1Xd0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 44061213A2
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HNBwyIcj";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="qA8u7dp6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="E6m0EYyl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 224EE213A2
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Po/PEDZPXS1qEdqfHjbDvTO9GeyVOMcTklmo3Ty45ak=; b=HkUK1Xd05Iu8Yd
-	foCO33vI5merHt+ncPUjkd7yaIpeWVVCE1viBbNBridnfxHjzdijtJPRf5glAOjA2KnCqfqlLcx0Z
-	eKJih8OtLgn1x5p10WAczcq9a38ohotbuFyxILCJ3oHms+V89kURX4okFjgpgDFbr6Vo3X4ivZ82+
-	0O4BZu5U0+yqZYMInV2NuXjBVF3VlJAfSbHoyLmlrQZLnRV9FC23YcTDrvbQfAffkj6UveNi+GVVG
-	7OoYqGoyFg5WWHkNJW7Fpun0cWoa4Y0i1f4QW1bgmf+tuDmSZyFNYsqDRPxLrzq+RSOABvXWoe0g8
-	fbFGClIeTMXSLbEEI23Q==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=rwrHprbmeB4Fxv9ofLbpFEkqqLJ7O7kMKHSxSW8kZwo=; b=HNBwyIcjrb1daNdpaCxCKiwQ+W
+	8kYQGv9kv5sGf37BsgHEkN0nI70NKfyQyWR/nxvEB5N7Q71zjF2fDg9cgGzNsghSyC6YNCmCOGfzi
+	jtQNQvKyQgPtP+CLcVfJHvujqBdF1khELWGaTD+VMMnlV3MOG5F2oJ5rRMv4t8/CyA4lFiCFFg2cv
+	m5nNNSaIZ642AtF5JsuH4Kfq6wEVi5s2LVEjGZ2rSAJ1NLGTSG+ebK0/cf401DnqST2MJx1Wkyl7B
+	ZM9Z8R9DCA3ubQvefZfR/MR4N73xk1Blp1KTI2bwmzGTxJTORqd7Sql6fnqj7zD/0KA0KNwMQMEfB
+	0CEiSZ4A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQzr-0000U1-TC; Thu, 29 Nov 2018 18:25:07 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQzo-0008Bd-UC
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 18:25:06 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A201780D;
- Thu, 29 Nov 2018 10:24:54 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 8846C3F575; Thu, 29 Nov 2018 10:24:50 -0800 (PST)
-Date: Thu, 29 Nov 2018 18:24:48 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Andrey Konovalov <andreyknvl@google.com>
-Subject: Re: [PATCH v8 3/8] arm64: untag user addresses in access_ok and
- __uaccess_mask_ptr
-Message-ID: <20181129182446.GJ22027@arrakis.emea.arm.com>
-References: <cover.1541687720.git.andreyknvl@google.com>
- <b23c2374235a33328817f2586cc055c69d91a2ec.1541687720.git.andreyknvl@google.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <b23c2374235a33328817f2586cc055c69d91a2ec.1541687720.git.andreyknvl@google.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+	id 1gSR5z-00035k-2M; Thu, 29 Nov 2018 18:31:27 +0000
+Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSR5w-00035b-Jm
+ for linux-arm-kernel@bombadil.infradead.org; Thu, 29 Nov 2018 18:31:24 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=merlin.20170209; h=References:In-Reply-To:Message-Id:Date:
+ Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Type:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=3t2vyFxKLnIeRsykykXv6/9Q0Qsu6Nz8v2F0owXov5U=; b=qA8u7dp6N6MZZbu1BYOp0ie5F
+ F17OZ6S9O6GqrylAwN07+GuBl9FgwrS3HWO5Nt2/N+RtxMf+oBxs/02ljfqa2+wn6RJnvacpunvPq
+ r+0Oemtp3YgrEHG7PPTNn/fCAG8gpW7aRVoAN7f2cbmjaSlbZ96ranM+7NYrFqjFYjH5DuRxS/FNz
+ YmDlfzBVaDwHyQo8RiZ7Bp6ZBFDIfN4917OpV5IJf1FsMtKzua6sl7uoqCKzy9u9ZQztqnBpavibc
+ rzMkrq5UVTlfyfscIq6mQcoAcSUp2LhAYK8ASzT/XRnli8LWyxXCTjxMxxvDcpvki8HQXC8k1afmw
+ CEXnOy2yA==;
+Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+ by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSQPu-0003oZ-NV
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:48:00 +0000
+Received: by mail-lj1-x242.google.com with SMTP id c19-v6so2531395lja.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 29 Nov 2018 09:47:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=3t2vyFxKLnIeRsykykXv6/9Q0Qsu6Nz8v2F0owXov5U=;
+ b=E6m0EYylUq2Ibxx2zDTr+getdoAXAblt6NGSV5xnZi+anl5A9e/0htj8QZMpMF512l
+ AiV1KScgBl/lv5TQptuE8nTGJrfWqH+rbUj9OP94f7ViYYpIkOCdbPfmx5cVlgvm0xTc
+ KI2xBQgpTUrEt020geOSiKICiHi1PKWxfnZGs=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=3t2vyFxKLnIeRsykykXv6/9Q0Qsu6Nz8v2F0owXov5U=;
+ b=A8kOqL8wNDywty0kKUrOi4Q/fEbZUEBIxMU5dqZNZoeCIH8YEnRnkRqe+6PeWGjf7N
+ mj+HPL6V4dxE976K+3wJe/FXG6b9m/phIwQ9NcrhzLuDkasA/+g1z7FgvjsbkSpwqbAe
+ pykQf7J4ucal+m2WEtJipRH3aLFHbk93jTa6cZclxg3/m55OEQG+ifVKcKQUIy9Msofr
+ sJZaLi9IRIhiclugnWF1VLX5sO0OjMl8yz8lg3F/N9rHZcJjpAZlhsHJaa0QHtn1Yj+H
+ Jdz+tuOKaGrAwUAT9RwCBDt7ptvtjNgjilZF3DATI088qQlSHTEduhavPQRqZG/xiwr3
+ gY9g==
+X-Gm-Message-State: AA+aEWbwtQiZDwBhipC0BK9zkRA1kuqJUfckXWyyBhM5qupMRzf47ozA
+ 9KP5wr5Jtgp0aXJUYBFGQCH+4A==
+X-Google-Smtp-Source: AFSGD/UWoMttAcw7++cNF/9mzFJwLwWDB8IZ1w4ykCERuAaM1HAR5F/wdmCVK3YlklPIHBfdzF9PKg==
+X-Received: by 2002:a2e:1551:: with SMTP id 17-v6mr1736107ljv.68.1543513665097; 
+ Thu, 29 Nov 2018 09:47:45 -0800 (PST)
+Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
+ [158.174.22.210])
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.43
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 29 Nov 2018 09:47:44 -0800 (PST)
+From: Ulf Hansson <ulf.hansson@linaro.org>
+To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
+ Sudeep Holla <sudeep.holla@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Mark Rutland <mark.rutland@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
+Subject: [PATCH v10 21/27] drivers: firmware: psci: Add a helper to attach a
+ CPU to its PM domain
+Date: Thu, 29 Nov 2018 18:46:54 +0100
+Message-Id: <20181129174700.16585-22-ulf.hansson@linaro.org>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_102504_992973_E2225145 
-X-CRM114-Status: GOOD (  12.87  )
+X-CRM114-CacheID: sfid-20181129_124758_823214_C3E8A544 
+X-CRM114-Status: GOOD (  18.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,38 +114,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Kate Stewart <kstewart@linuxfoundation.org>, linux-doc@vger.kernel.org,
- Will Deacon <will.deacon@arm.com>, Kostya Serebryany <kcc@google.com>,
- linux-kselftest@vger.kernel.org, Chintan Pandya <cpandya@codeaurora.org>,
- Shuah Khan <shuah@kernel.org>, Ingo Molnar <mingo@kernel.org>,
- linux-arch@vger.kernel.org, Jacob Bramley <Jacob.Bramley@arm.com>,
- Dmitry Vyukov <dvyukov@google.com>, Evgeniy Stepanov <eugenis@google.com>,
- Kees Cook <keescook@chromium.org>, Ruben Ayrapetyan <Ruben.Ayrapetyan@arm.com>,
- Ramana Radhakrishnan <Ramana.Radhakrishnan@arm.com>,
- linux-arm-kernel@lists.infradead.org, linux-mm@kvack.org,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>, linux-kernel@vger.kernel.org,
- Luc Van Oostenryck <luc.vanoostenryck@gmail.com>,
- Lee Smith <Lee.Smith@arm.com>, Andrew Morton <akpm@linux-foundation.org>,
- Robin Murphy <robin.murphy@arm.com>,
- "Kirill A . Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org,
+ Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
+ linux-arm-msm@vger.kernel.org,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 08, 2018 at 03:36:10PM +0100, Andrey Konovalov wrote:
-> copy_from_user (and a few other similar functions) are used to copy data
-> from user memory into the kernel memory or vice versa. Since a user can
-> provided a tagged pointer to one of the syscalls that use copy_from_user,
-> we need to correctly handle such pointers.
-> 
-> Do this by untagging user pointers in access_ok and in __uaccess_mask_ptr,
-> before performing access validity checks.
-> 
-> Signed-off-by: Andrey Konovalov <andreyknvl@google.com>
+Introduce a new PSCI DT helper function, psci_dt_attach_cpu(), which takes
+a CPU number as an in-parameter and attaches the CPU's struct device to its
+corresponding PM domain. Additionally, the helper prepares the CPU to be
+power managed via runtime PM, which is the last step needed to enable the
+interaction with the PM domain through the runtime PM callbacks.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
+
+Changes in v10:
+	- New patch: Replaces "PM / Domains: Add helper functions to
+	  attach/detach CPUs to/from genpd".
+
+---
+ drivers/firmware/psci/psci.h           |  1 +
+ drivers/firmware/psci/psci_pm_domain.c | 19 +++++++++++++++++++
+ 2 files changed, 20 insertions(+)
+
+diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
+index 05af462cc96e..fbc9980dee69 100644
+--- a/drivers/firmware/psci/psci.h
++++ b/drivers/firmware/psci/psci.h
+@@ -15,6 +15,7 @@ int psci_dt_parse_state_node(struct device_node *np, u32 *state);
+ int psci_dt_init_pm_domains(struct device_node *np);
+ int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
+ 			struct device_node *cpu_node, u32 *psci_states);
++int psci_dt_attach_cpu(int cpu);
+ #else
+ static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
+ #endif
+diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
+index 6c9d6a644c7f..b0fa7da8a0ce 100644
+--- a/drivers/firmware/psci/psci_pm_domain.c
++++ b/drivers/firmware/psci/psci_pm_domain.c
+@@ -12,8 +12,10 @@
+ #include <linux/device.h>
+ #include <linux/kernel.h>
+ #include <linux/pm_domain.h>
++#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
+ #include <linux/string.h>
++#include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpu_pm.h>
+ 
+@@ -367,4 +369,21 @@ int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
+ 
+ 	return 0;
+ }
++
++int psci_dt_attach_cpu(int cpu)
++{
++	struct device *dev = get_cpu_device(cpu);
++	int ret;
++
++	ret = dev_pm_domain_attach(dev, true);
++	if (ret)
++		return ret;
++
++	pm_runtime_irq_safe(dev);
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	return 0;
++}
+ #endif
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
