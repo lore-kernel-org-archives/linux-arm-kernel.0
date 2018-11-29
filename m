@@ -2,80 +2,86 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8C634C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:31:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAF65C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:31:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 56C1D20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:31:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88F7C20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 22:31:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tm1w2meD";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="SA4K1Rqj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 56C1D20863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oEvQuymp";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="PzJlm9D9";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="SfR3fjPT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88F7C20863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=XQjTrKpPcd4aoAz2EaUwbq4qGn+8+OEwlF4A/XUa+yg=; b=tm1
-	w2meDH3GCglLZ1ollXtawOqt/bWdTiz0MdA/BfPWzu2d3EKztpxK4VTxYGJ1Kv2C1LP6NbChys5pY
-	vAtPU6Z9EX1KBpukxEAEHsGRsFz0yDBlXTcMxuBXRIkcx872heEShDGbKMQcy7mbVtfrpug62j6be
-	rQEI3j5mPyi++XB0/RX6tSOJxflHzw2pZYUHyo8u9IUOcNZEIJF4BcyDTULjs/rml+K2aeq8S/emg
-	RLCu52i6o8VnrmFUbWe5CShnsqJAr4eLhquLo5qW4FKRtTl4ZiQTxfEZVJee4UDWXchZ1A7rwGDO7
-	JVHgPuMFsDFcuuYuyp8HsxwFBtG4jdg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
+	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=aXpn63lnxS5BqcFrYigutlvrBaArZVj2bQJ7UwJ28rU=; b=oEvQuymp/6GwBz1qbasvssFVN
+	RTJcslwalMnyQLA41EbMznXk2ow68+yj1mTkXZKCNSbzPTJXRYlOhPBooCoQSKIocIIx6sucuiCdB
+	H1tjppeCDMDw5WvTU/v2MefDiP0RjVewOl1BIdUK/Q4JMIIUdkkjW5V032t13w1pxXW6zpJDe+NlS
+	JYIzlK07/ACBXoKnAWlxtfuPLc04fEuER7RlpeOBEkaUZinqFDd/S1xXRhB6gAPJI+t/6SHbcOJ2r
+	FQX2z8oXi+/6TfaY2JaEsxX/lUw2fr1FKtfm+rw4B67pgzdYHZYs1fsEGbVDjOHC5AgwEeG7o4soC
+	mrEfL3tsQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSUqH-0001fF-86; Thu, 29 Nov 2018 22:31:29 +0000
-Received: from mail-ot1-x344.google.com ([2607:f8b0:4864:20::344])
+	id 1gSUqb-0001vR-Hy; Thu, 29 Nov 2018 22:31:49 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSUqE-0001eW-US
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 22:31:28 +0000
-Received: by mail-ot1-x344.google.com with SMTP id t5so3378012otk.1
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 14:31:16 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=6rPh/rh1j/B5PJ7a0qP/YC8Qynn+4nZWm4wlGneDPew=;
- b=SA4K1Rqjmg548jntNTLRoJWTKq3auGH3O0bbUEwFmLjcdGOikv0ZlUnK5Kz3EL6PQx
- ZDTB0lEmh9TCpBCuH9RsDxWA+m2XTjwBOlo8/DplSvwQO69dCeIzD6uD9Osj+syzXh5r
- 7yAbjv9rp9u8Hd7jvGWNyYgkz347Pv4en9oa8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=6rPh/rh1j/B5PJ7a0qP/YC8Qynn+4nZWm4wlGneDPew=;
- b=otyZA4fuFVSnzY49ahaXeDwabp0MfryOsXjz1jY943kMvu93TcErWI5X0MXF8gPNHR
- x16bh/rveV83JzSS58YyMxcOAWi6p8G60p/oa+dIiuOl1vm6h8J1mIYjDpI34JC539HS
- FogewrxK5QHtvNEOZX55sV5qYCn1tMi6HHvFGgiIJcv4vwpeGoAEqMUa2VDDTIxP31dH
- 5ymmoQxgWTFWUmqmVU2Ugd9/7EvAwTS0GnR8QQt6hlKXlMaCFwxcFiwDX7LpEIO/NdOX
- 1xLhiIo1U90wkfx3Av1oE04+7NTN09LagdJ5F7VEPPTxi3NZ8w7OVMTb/4kB1bOByhdg
- dq9A==
-X-Gm-Message-State: AA+aEWbHAC/o+O7a0Ra1twdK79JKtkn8f+wqvzl+rnmnLyjvcGjsuv+T
- lky+Qb3TcwP5Dc6FrntKaE2gow==
-X-Google-Smtp-Source: AFSGD/XaifEk7OzJSHf+bDrVKQP6AM6h20i33Wtmg+FN6+ty/puE1hKccobrja/fPGPA+KouGwMjLw==
-X-Received: by 2002:a9d:6d81:: with SMTP id x1mr1917023otp.17.1543530675368;
- Thu, 29 Nov 2018 14:31:15 -0800 (PST)
-Received: from localhost ([2600:1700:141:4960:d408:b2c2:72bf:467a])
- by smtp.gmail.com with ESMTPSA id l20sm1057777otp.47.2018.11.29.14.31.14
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 14:31:14 -0800 (PST)
-From: Andy Gross <andy.gross@linaro.org>
-To: arm@kernel.org
-Subject: [PATCH] MAINTAINERS: Remove unused Qualcomm SoC mailing list
-Date: Thu, 29 Nov 2018 16:31:06 -0600
-Message-Id: <1543530666-32141-1-git-send-email-andy.gross@linaro.org>
-X-Mailer: git-send-email 2.7.4
+ id 1gSUqY-0001lc-0l
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 22:31:48 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id BA0E160F39; Thu, 29 Nov 2018 22:31:33 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543530694;
+ bh=6QI9GzHy5W/rpC3wWSi9pIaVvqv2/0se3/BeRtPEkjo=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=PzJlm9D9TZGW30lbHYcorEOu56GmdEKc734A6YRtaGwqXytVe545u9TLK/bdMVOUS
+ ZpyXJuxrcNrZnE+3W/FRK0P4SWTypxlPjTsH+/ExZWqn6g1VkQ6XJetBx9QgzNE5Lz
+ a704TRfGbg3xl9EipoMqBlT0+8aLQpWcBuij7gtQ=
+Received: from localhost (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ (Authenticated sender: ilina@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 5E64060CEC;
+ Thu, 29 Nov 2018 22:31:31 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543530691;
+ bh=6QI9GzHy5W/rpC3wWSi9pIaVvqv2/0se3/BeRtPEkjo=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=SfR3fjPT/tq81Xlf/qxHcDAFqYsuZvKb5pSTQHAi17uJNbFi+ws8bFvSXRMVikD+e
+ yiC8KLKivatkmbammW6b2Es4UpfLEmaTxTNTrp011DrFwF4XViIwU96D6e1D7zhgnH
+ A9OoXFz8chR2T4IYOon5KpkizUg1cQ9zGZ3nOHvg=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 5E64060CEC
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=ilina@codeaurora.org
+Date: Thu, 29 Nov 2018 15:31:30 -0700
+From: Lina Iyer <ilina@codeaurora.org>
+To: Ulf Hansson <ulf.hansson@linaro.org>
+Subject: Re: [PATCH v10 24/27] drivers: firmware: psci: Support CPU hotplug
+ for the hierarchical model
+Message-ID: <20181129223130.GH18262@codeaurora.org>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
+ <20181129174700.16585-25-ulf.hansson@linaro.org>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181129174700.16585-25-ulf.hansson@linaro.org>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_143126_984846_1567226E 
-X-CRM114-Status: GOOD (  12.61  )
+X-CRM114-CacheID: sfid-20181129_143146_110172_76232830 
+X-CRM114-Status: GOOD (  19.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,40 +93,179 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
- linux-kernel@vger.kernel.org, Andy Gross <andy.gross@linaro.org>,
- Kevin Hilman <khilman@baylibre.com>, Olof Johansson <olof@lixom.net>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>, linux-pm@vger.kernel.org,
+ Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
+ linux-arm-msm@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
+ linux-kernel@vger.kernel.org, Tony Lindgren <tony@atomide.com>,
+ Sudeep Holla <sudeep.holla@arm.com>,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
  linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This patch removes the linux-soc mailing list from the Qualcomm SoC
-entry.  We use the linux-msm and there is no need to have the second
-one and this clears the list for use by others.
+Hi Ulf,
 
-Signed-off-by: Andy Gross <andy.gross@linaro.org>
----
- MAINTAINERS | 1 -
- 1 file changed, 1 deletion(-)
+On Thu, Nov 29 2018 at 10:50 -0700, Ulf Hansson wrote:
+>When the hierarchical CPU topology is used and when a CPU has been put
+>offline (hotplug), that same CPU prevents its PM domain and thus also
+>potential master PM domains, from being powered off. This is because genpd
+>observes the CPU's struct device to remain being active from a runtime PM
+>point of view.
+>
+>To deal with this, let's decrease the runtime PM usage count by calling
+>pm_runtime_put_sync_suspend() of the CPU's struct device when putting it
+>offline. Consequentially, we must then increase the runtime PM usage for
+>the CPU, while putting it online again.
+>
+>Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+>---
+>
+>Changes in v10:
+>	- Make it work when the hierarchical CPU topology is used, which may be
+>	  used both for OSI and PC mode.
+>	- Rework the code to prevent "BUG: sleeping function called from
+>	  invalid context".
+>---
+> drivers/firmware/psci/psci.c | 20 ++++++++++++++++++++
+> 1 file changed, 20 insertions(+)
+>
+>diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
+>index b03bccce0a5d..f62c4963eb62 100644
+>--- a/drivers/firmware/psci/psci.c
+>+++ b/drivers/firmware/psci/psci.c
+>@@ -15,6 +15,7 @@
+>
+> #include <linux/acpi.h>
+> #include <linux/arm-smccc.h>
+>+#include <linux/cpu.h>
+> #include <linux/cpuidle.h>
+> #include <linux/errno.h>
+> #include <linux/linkage.h>
+>@@ -199,9 +200,20 @@ static int psci_cpu_suspend(u32 state, unsigned long entry_point)
+>
+> static int psci_cpu_off(u32 state)
+> {
+>+	struct device *dev;
+> 	int err;
+> 	u32 fn;
+>
+>+	/*
+>+	 * When the hierarchical CPU topology is used, decrease the runtime PM
+>+	 * usage count for the current CPU, as to allow other parts in the
+>+	 * topology to enter low power states.
+>+	 */
+>+	if (psci_dt_topology) {
+>+		dev = get_cpu_device(smp_processor_id());
+>+		pm_runtime_put_sync_suspend(dev);
+>+	}
+>+
+> 	fn = psci_function_id[PSCI_FN_CPU_OFF];
+> 	err = invoke_psci_fn(fn, state, 0, 0);
+> 	return psci_to_linux_errno(err);
+>@@ -209,6 +221,7 @@ static int psci_cpu_off(u32 state)
+>
+> static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+> {
+>+	struct device *dev;
+> 	int err;
+> 	u32 fn;
+>
+>@@ -216,6 +229,13 @@ static int psci_cpu_on(unsigned long cpuid, unsigned long entry_point)
+> 	err = invoke_psci_fn(fn, cpuid, entry_point, 0);
+> 	/* Clear the domain state to start fresh. */
+> 	psci_set_domain_state(0);
+>+
+>+	/* Increase runtime PM usage count if the hierarchical CPU toplogy. */
+>+	if (!err && psci_dt_topology) {
+>+		dev = get_cpu_device(cpuid);
+>+		pm_runtime_get_sync(dev);
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f485597..be25ffe 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1922,7 +1922,6 @@ ARM/QUALCOMM SUPPORT
- M:	Andy Gross <andy.gross@linaro.org>
- M:	David Brown <david.brown@linaro.org>
- L:	linux-arm-msm@vger.kernel.org
--L:	linux-soc@vger.kernel.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/soc/qcom/
- F:	arch/arm/boot/dts/qcom-*.dts
--- 
-2.7.4
+I booted with a single CPU on my SDM845 device and when I tried to
+online CPU1 and I see a crash.
 
+# echo 1 > /sys/devices/system/cpu/cpu1/online                                                 
+                                                     
+[   86.339204] Unable to handle kernel NULL pointer dereference at virtual address 0000000000000188       
+[   86.340195] Detected VIPT I-cache on CPU1                                                              
+[   86.348075] Mem abort info:                                                                            
+[   86.348092] GICv3: CPU1: found redistributor 100 region 0:0x0000000017a80000                           
+[   86.352125]   ESR = 0x96000006                                                                         
+[   86.352194] CPU1: Booted secondary processor 0x0000000100 [0x517f803c]                                 
+[   86.354956]   Exception class = DABT (current EL), IL = 32 bits                                        
+[   86.377700]   SET = 0, FnV = 0                                                                         
+[   86.380788]   EA = 0, S1PTW = 0                                                                        
+[   86.383967] Data abort info:                                                                           
+[   86.386882]   ISV = 0, ISS = 0x00000006                                                                
+[   86.390760]   CM = 0, WnR = 0                                                                          
+[   86.393755] user pgtable: 4k pages, 48-bit VAs, pgdp = (____ptrval____)                                
+[   86.400430] [0000000000000188] pgd=00000001f5233003, pud=00000001f5234003, pmd=0000000000000000        
+[   86.409203] Internal error: Oops: 96000006 [#1] PREEMPT SMP                                            
+[   86.414824] Modules linked in:                                                                         
+[   86.417915] CPU: 0 PID: 1533 Comm: sh Not tainted 4.20.0-rc3-30359-gff2e21952bd5 #782                  
+[   86.425807] Hardware name: Qualcomm Technologies, Inc. SDM845 MTP (DT)                                 
+[   86.432387] pstate: 80400005 (Nzcv daif +PAN -UAO)                                                     
+[   86.437233] pc : __pm_runtime_resume+0x20/0x74                                                         
+[   86.441720] lr : psci_cpu_on+0x84/0x90                                                                 
+[   86.445498] sp : ffff00000db43a10                                                                      
+[   86.448842] x29: ffff00000db43a10 x28: ffff80017562b500                                                
+[   86.454200] x27: ffff000009159000 x26: 0000000000000055                                                
+[   86.459556] x25: 0000000000000000 x24: ffff0000092c4bc8                                                
+[   86.464913] x23: ffff000008fb8000 x22: ffff00000916a000                                                
+[   86.470269] x21: 0000000000000100 x20: ffff000009314190                                                
+[   86.475625] x19: 0000000000000000 x18: 0000000000000000                                                
+[   86.480979] x17: 0000000000000000 x16: 0000000000000000                                                
+[   86.486334] x15: 0000000000000000 x14: ffff000009162600                                                
+[   86.491690] x13: 0000000000000300 x12: 0000000000000010                                                
+[   86.497047] x11: ffffffffffffffff x10: ffffffffffffffff                                                
+[   86.502399] x9 : 0000000000000001 x8 : 0000000000000000                                                
+[   86.507753] x7 : 0000000000000000 x6 : 0000000000000000                                                
+[   86.513108] x5 : 0000000000000000 x4 : 0000000000000000                                                
+[   86.518463] x3 : 0000000000000188 x2 : 0000800174385000                                                
+[   86.523820] x1 : 0000000000000004 x0 : 0000000000000000                                                
+[   86.529175] Process sh (pid: 1533, stack limit = 0x(____ptrval____))                                   
+[   86.535585] Call trace:                                                                                
+[   86.538063]  __pm_runtime_resume+0x20/0x74                                                             
+[   86.542197]  psci_cpu_on+0x84/0x90                                                                     
+[   86.545639]  cpu_psci_cpu_boot+0x3c/0x6c                                                               
+[   86.549593]  __cpu_up+0x68/0x210                                                                       
+[   86.552852]  bringup_cpu+0x30/0xe0                                                                     
+[   86.556293]  cpuhp_invoke_callback+0x84/0x1e0                                                          
+[   86.560689]  _cpu_up+0xe0/0x1d0                                                                        
+[   86.563862]  do_cpu_up+0x90/0xb0                                                                       
+[   86.567118]  cpu_up+0x10/0x18                                                                          
+[   86.570113]  cpu_subsys_online+0x44/0x98                                                               
+[   86.574079]  device_online+0x68/0xac                                                                   
+[   86.577685]  online_store+0xa8/0xb4                                                                    
+[   86.581202]  dev_attr_store+0x18/0x28                                                                  
+[   86.584908]  sysfs_kf_write+0x40/0x48                                                                  
+[   86.588606]  kernfs_fop_write+0xcc/0x1cc                                                               
+[   86.592563]  __vfs_write+0x40/0x16c                                                                    
+[   86.596078]  vfs_write+0xa8/0x1a0                                                                      
+[   86.599424]  ksys_write+0x58/0xbc                                                                      
+[   86.602768]  __arm64_sys_write+0x18/0x20                                                               
+[   86.606733]  el0_svc_common+0x94/0xf0                                                                  
+[   86.610433]  el0_svc_handler+0x24/0x80                                                                 
+[   86.614215]  el0_svc+0x8/0x7c0                                                                         
+[   86.617300] Code: aa0003f3 361000e1 91062263 f9800071 (885f7c60)                                       
+[   86.623447] ---[ end trace 4573c3c0e0761290 ]---                                                       
+
+>+	}
+>+
+> 	return psci_to_linux_errno(err);
+> }
+>
+>-- 
+>2.17.1
+>
+
+Thanks,
+Lina
 
 _______________________________________________
 linux-arm-kernel mailing list
