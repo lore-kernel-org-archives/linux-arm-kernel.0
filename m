@@ -2,22 +2,23 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 79F6AC43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 14:55:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 112D1C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 14:59:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4BD332081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 14:55:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D63E62082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 14:59:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CAUfTu6i";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=ffwll.ch header.i=@ffwll.ch header.b="V5wTcec0"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4BD332081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ffwll.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="e3IeVJNa";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="ZRfd4Tu2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D63E62082F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=i8NH1guPVqUp4cgEv51Q9WOMhVox09Kqi49RIS7g4cw=; b=CAUfTu6iHCUqL1
-	px8MS7cO77mh9X3OU2x2CxdAe98MgL0iapbM6GeTZajV+x6Xxxx+gQu9VSQMkJnj2Mp1FYe2MZ8Gh
-	xkFL+tmKylsPWCxeE2OoAYbzIkvrL1sLh3jp6gpEpf50NXyuH+0ZH8GhKnEQ8nxpMSbgxZRfV4CD2
-	gNSabKb/VxZhw6JMdV1kGY1uBxnVZGnGhwOyZgcCd5Pd7HvM7SvJUZv/RkIlrUkrqkNsDOkWX8HJa
-	AsIZwqWTk8sq/SNjpHRJt9+HX7mf8gUZLsUNmUszQMANFJ25YRtZGQODnxDVrD6puKlXFyhL5fGwl
-	fZQzDpxVG11zOmI0QcBA==;
+	List-Owner; bh=i/VuaqzUOFWeWvUZUwNtpSpmQeChXDp4VsZRXRKiQ+s=; b=e3IeVJNaJDGLy/
+	yP8LIwdmPxjdBAEtYoaz2Jdc/6uYphedVTv4Fm4Q5AB/9zrDh9a6WZ1eC7W1L490xkUuGwB47cKSx
+	5YT7K8KmkyGy2UvDmaR7gkCdWxt8DFBiLPGpyR4rot7mPArAEo/mLhP1vbTpMpCF6OuHeLm5qcr2w
+	43GbbhoIvkVqJK9gQOE9hOwt92IXHDtgLskehlfz8P4oqvNwMkh6MsO4V975ttZGv3jhDf9SAsgSn
+	bVMyp0UVvVnuu4vGb03MeEM8ZZ7dqYesJ12xe2AxNE40nKgaD8u4G17icYs3EGgDd4UCsXv4/6eJ9
+	R6CC8TfC+bEPKDpHVz2A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSNjO-0001Qh-Q4; Thu, 29 Nov 2018 14:55:54 +0000
-Received: from mail-io1-xd42.google.com ([2607:f8b0:4864:20::d42])
+	id 1gSNmg-0001mO-2I; Thu, 29 Nov 2018 14:59:18 +0000
+Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSNjK-0001Oy-Tr
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 14:55:52 +0000
-Received: by mail-io1-xd42.google.com with SMTP id f6so1811278iob.1
+ id 1gSNmd-0001lz-BO
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 14:59:16 +0000
+Received: by mail-wm1-x341.google.com with SMTP id y139so2562379wmc.5
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 06:55:40 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=ffwll.ch; s=google;
+ Thu, 29 Nov 2018 06:59:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=zltmiCUlVco/OMj6WMOtVnqUWC0sd0wXJjHaa3DT8Ro=;
- b=V5wTcec0hhJjeUWi2Q740IfROGJIYTELR2rd8+dLmffCGPeZpQMFmi9dqyGY7D72Zw
- RWvWuGi2OY+OLSikRtN5CVmwp0IflTtek+mFwc1GAJk2pKuIGn2lZ7kufu2cu8qcgrzA
- XpDWqgsXr7+C4P3pUGDKXo8I1oIAK7G49Ihcs=
+ :cc; bh=6Lv88a6LqVd6a4OpZOUstQv29AsneZZR8f8JATJXgBc=;
+ b=ZRfd4Tu23kO4YrMM1wLyLvhQjwZyu64KNDM2smlt31mRYEAy0km+Fbkc72Z7vCnFVj
+ mUnRTx88+Gea4LLkerbmp6JeLOjbdc8zR8QUzKSXuyIDORn3XiziB8/vk0vHDXXEwkZX
+ /jM4dnxZDi7zMIR6rYyMcKdbLNV+XxtAsacr4stj7keSSNxAxtxkGW1mQcaYdPynkH5p
+ qXkvRyNYgo16OHOEBBWNX+J8X1SL32252jj3VbmU6j9DaIq3fTDyy7K2L73M3HEq4ZuO
+ nfUoGd73/4dTdBNRGZng8sm/N5VI9FMdwJnoTtKvHCXIWDuaE25VpyCXzHAAPbd0WXcR
+ Duzw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=zltmiCUlVco/OMj6WMOtVnqUWC0sd0wXJjHaa3DT8Ro=;
- b=VPQCeGOJL26iXNgFSwVLvzyydSRTz21ZXEIr+yVOh6wnI46ttFsnFDsfagLH1l5HbL
- qcq48CMj1vfk+huZYFQTuvjuPJlIesTPf+Ux0KNAkYlnIcRCqItzRUv5ckkRF9BRlYFg
- NSTFPz9Ry+pGoKbZZHwDbHq2lFPh2MeY28txKBpwTrJ5sDK3mIDxMPBR/qT1JF8u4nAi
- r2mJn/6zFdu8lfKw7zOD59f3x9cDWxmQf6b3Ri5nS8kTpu5QW6pLcgbTZUOFgx03MvOX
- +CvmHK1CwBqMNPcyEFw653NN0dgsah90QRZ9+u0/k+z6iOExQnFrs2O/yhIGrfKWtgE5
- mdZg==
-X-Gm-Message-State: AA+aEWaUag7/BsCzGmQZLlM5Gy7vPr//913r7A9MLB03368O8tv72q88
- I6MewGX5ebRL228KclucnWLmLeL9h5USCNtngS+eoQ==
-X-Google-Smtp-Source: AFSGD/WORmHTU40LHiSoYvEcp5Yjz7OJkhXJCIDbSmkmMi8iTkUUs9bN4CzbB4Yilzxly7ZRQsfX9skW2PxPyeQAaVs=
-X-Received: by 2002:a6b:4001:: with SMTP id k1mr1582174ioa.34.1543503339523;
- Thu, 29 Nov 2018 06:55:39 -0800 (PST)
+ bh=6Lv88a6LqVd6a4OpZOUstQv29AsneZZR8f8JATJXgBc=;
+ b=qGALNhvphgc1UwlQtyqUqtyCk+J1a7K0jz81VhNH0lS7TRo+oe5Vn02x+sG9+e7OLa
+ lgqhJchjKTI+lQ618QP1gjBUalA3Gyy6aNfV3C8wCUM0stvQzdC3F7KdXopSn616ywF9
+ Te3x52EOvn1WDfui/LzidlId7miP4UfXDWcQKVkj0IRv3gHRu41t7znOcGTKjoR5EykM
+ zpa6b+sbJ4xVurX4iEr9PNpQM1AJ2onP7iaR14IZFp35lMP6o0vio4Vf5IDt45YdCMeP
+ vi7/FMpeD2yFPVjruFWKP9DpsjmF+/EY2YLseH8WLuKpXdt+YSIfnbA0BdwCJ+nDqwu4
+ wO8w==
+X-Gm-Message-State: AA+aEWZtPktwdq8WHZ1ImD3mz4gcMSDhLzavZ7VatvBE11qj8OoAXqSH
+ pBqnmS+lMW3XKRS7sOMhOhNxfHXTyrXROYw57t4=
+X-Google-Smtp-Source: AFSGD/UaNfE4orQLVXI7+1X0xAfpGUXuYNHNbttpxCnCGOaoBP/9N4F9s3Zzoq5SVOtOgyz5xGS8ijRO/Wj5WEw2VVc=
+X-Received: by 2002:a1c:96ce:: with SMTP id y197mr2148122wmd.36.1543503543608; 
+ Thu, 29 Nov 2018 06:59:03 -0800 (PST)
 MIME-Version: 1.0
-References: <20181115221634.22715-1-greenfoo@gluegarage.com>
- <CACRpkdZmTSo02yQeU=qe9WyJMXEq76CNmc2kkFEHuwdo=HKPJw@mail.gmail.com>
- <20181121094233.GN4266@phenom.ffwll.local>
- <CACRpkdaXUFwSiQnMqv2WBXr2ytn7kx3CeAuamkj9ZYU1C6bpnw@mail.gmail.com>
- <20181126141241.GM4266@phenom.ffwll.local>
- <CACRpkdYmBSVKBvu=YOV87zWK8WCC+pcn9ux_W4VEYwzRzexQ_A@mail.gmail.com>
-In-Reply-To: <CACRpkdYmBSVKBvu=YOV87zWK8WCC+pcn9ux_W4VEYwzRzexQ_A@mail.gmail.com>
-From: Daniel Vetter <daniel@ffwll.ch>
-Date: Thu, 29 Nov 2018 15:55:28 +0100
-Message-ID: <CAKMK7uF9Q-LySAXg=kT9B-ueFR9qhr_B0N3y1g1D_OTc-+Vbdg@mail.gmail.com>
-Subject: Re: [PATCH 0/9] drm: remove deprecated functions
-To: Linus Walleij <linus.walleij@linaro.org>
+References: <20181128173929.3050-1-nathanj439@gmail.com>
+ <20181128185910.5778-1-nathanj439@gmail.com>
+ <401b58b2-fb17-dc83-f898-c10cafdc5413@arm.com>
+In-Reply-To: <401b58b2-fb17-dc83-f898-c10cafdc5413@arm.com>
+From: Nathan Jones <nathanj439@gmail.com>
+Date: Thu, 29 Nov 2018 09:58:46 -0500
+Message-ID: <CACTmSTzQeJiR8S57zYcu+YWbnMdo9Eb9Bei4gfmHyFOrzoWiZw@mail.gmail.com>
+Subject: Re: [PATCH v2] ARM: dma-mapping: fix potential uninitialized return
+To: vladimir.murzin@arm.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_065550_967404_D92FA5C3 
-X-CRM114-Status: GOOD (  17.63  )
+X-CRM114-CacheID: sfid-20181129_065915_416367_1E148D83 
+X-CRM114-Status: GOOD (  18.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,79 +91,59 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Haneen Mohammed <hamohammed.sa@gmail.com>,
- Alexandre Belloni <alexandre.belloni@bootlin.com>,
- Gilles Muller <Gilles.Muller@lip6.fr>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Andrzej Hajda <a.hajda@samsung.com>, Gerd Hoffmann <kraxel@redhat.com>,
- cocci@systeme.lip6.fr, Marek Vasut <marex@denx.de>,
- Archit Taneja <architt@codeaurora.org>, Jonathan Corbet <corbet@lwn.net>,
- Linux Doc Mailing List <linux-doc@vger.kernel.org>,
- Alexey Brodkin <abrodkin@synopsys.com>, Dave Airlie <airlied@linux.ie>,
- Ludovic Desroches <ludovic.desroches@microchip.com>, greenfoo@gluegarage.com,
- Russell King <linux+etnaviv@armlinux.org.uk>,
- Nicolas Palix <nicolas.palix@imag.fr>,
- Maarten Lankhorst <maarten.lankhorst@linux.intel.com>,
- etnaviv@lists.freedesktop.org, Boris Brezillon <boris.brezillon@bootlin.com>,
- Christian Gmeiner <christian.gmeiner@gmail.com>,
- Stefan Agner <stefan@agner.ch>, "open list:VIRTIO CORE,
- NET..." <virtualization@lists.linux-foundation.org>,
- Sean Paul <sean@poorly.run>, Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Michal Marek <michal.lkml@markovi.net>,
- Laurent Pinchart <Laurent.pinchart@ideasonboard.com>,
- Julia Lawall <Julia.Lawall@lip6.fr>,
- "open list:DRM DRIVERS FOR RENESAS" <linux-renesas-soc@vger.kernel.org>,
- Kieran Bingham <kieran.bingham+renesas@ideasonboard.com>,
- Shawn Guo <shawnguo@kernel.org>, Lucas Stach <l.stach@pengutronix.de>
+Cc: linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 3:45 PM Linus Walleij <linus.walleij@linaro.org> wrote:
+On Thu, Nov 29, 2018 at 4:51 AM Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 >
-> On Mon, Nov 26, 2018 at 3:12 PM Daniel Vetter <daniel@ffwll.ch> wrote:
-> > On Sat, Nov 24, 2018 at 10:17:13PM +0100, Linus Walleij wrote:
+> On 11/28/18 6:59 PM, Nathan Jones wrote:
+> > If neither of the if() statements fire then the return value is
+> > uninitialized. In the worst case it returns 0 which means the caller
+> > will think the function succeeded.
 >
-> > > It was especially scary.
-> > >
-> > > But I think I managed to apply the patches and push the
-> > > branch now.
+> "ret" is updated indirectly via:
+>
+>         if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
+>                 return ret;
+>
+> I assume that it was found with static analyzer or like this, in such case
+> please, provide output produced by the tool.
+
+No, I had some bad code which was passing a wrong length and receiving the
+strange error code.
+
+>
 > >
-> > Except when you're racing with someone else you should only see conflicts
-> > with stuff you've just pushed. Or if someone forgot to fix up their mess.
-> > What was the conflict?
+> > Fixes: 1655cf8829d8 ("ARM: dma-mapping: Remove traces of NOMMU code")
 >
-> dim push-branches was complaining that one of the commits was
-> missing the proper committer sign-off, it was the bottom commit under
-> mine (IIRC "drm/atomic-helper: WARN if fake_commit->hw_done is not
-> completed as expected")
-> and dim update-branches seemed to rebase and fix up my patches
-> and then everything was fine.
-
-This sounds like you (or dim?) accidentaly amended that commit (which
-changes the committer and results in the warning), and a rebase would
-indeed have fixed that. If the first patch conflicts this can happen
-because dim apply-branch doesn't bail out correctly. Or at least did
-in the past, I recently fixed that in
-
-commit ee299e510ae468aab27610bcbc4fdd4de932f74b
-Author: Daniel Vetter <daniel.vetter@ffwll.ch>
-Date:   Wed Oct 17 08:53:00 2018 +0200
-
-    dim: make apply-patch fail again
-
-> I just felt slightly out of control :D
-
-If your dim didn't have the above commit and you had a conflict it's
-all explained. Otherwise I'm not sure what's been going on ...
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+> I'll leave it up to Russell.
+>
+> Cheers
+> Vladimir
+>
+> > Signed-off-by: Nathan Jones <nathanj439@gmail.com>
+> > ---
+> >  arch/arm/mm/dma-mapping.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+> > index 661fe48ab78d..78de138aa66d 100644
+> > --- a/arch/arm/mm/dma-mapping.c
+> > +++ b/arch/arm/mm/dma-mapping.c
+> > @@ -829,7 +829,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> >                void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> >                unsigned long attrs)
+> >  {
+> > -     int ret;
+> > +     int ret = -ENXIO;
+> >       unsigned long nr_vma_pages = vma_pages(vma);
+> >       unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> >       unsigned long pfn = dma_to_pfn(dev, dma_addr);
+> >
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
