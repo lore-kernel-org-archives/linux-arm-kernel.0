@@ -2,85 +2,75 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4838DC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:38:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D59E6C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:40:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0161D20863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:38:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A238C20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:40:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qUbwV5h9";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="FGqPIK9U"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0161D20863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GP3VcXSe";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=wdc.com header.i=@wdc.com header.b="rH3PTbLn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A238C20863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=wdc.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=yp0yWZ9I3L7TMlNqpQ5F4imIaynP6jrUEGkgptDifN8=; b=qUbwV5h966iCJi
-	a5CjN7C5Mf/9C4L3yknZSI00PCsxA4zpZaq1GgOoDJpYFnpwSfGRKW7ya5SxM8cCkN452Bv0Zq0S1
-	KcAQc5/oxBZUTqhXg1WZ6+VeLo8WBHa1cxPJzOkKhHHPyvSgf7X0H4Zs84txa3adLh/AqdkiqEQ0Z
-	oOjYcf88spuFePZizQiRfeWnj17yuj+gillIsjvjn0sKMo7e2qpxFxrhCqhejAcWnrMs+h373mngt
-	n89DBETD+KsLYLdvCTfUxBOH4TRxzyqbfRrqOkyVZZaArmshu51du/eXt2M6Xx2kwc2AY8dEQNF4P
-	9NH/wYBne3FE+0AcZhWw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=ZyJoW5ILNReBVo4otughKQqtA4C/RvytxKTX1Xo+wnA=; b=GP3VcXSez2jDl+4iA9Z61fWaiD
+	xSlcWCU0wvcyUJjqUHmiVF1QEyv2T3xrHI+oy0ABxr53YjBH2NW3LjsynR2fyO+DxWaTQm6wekGer
+	hyYpKTSXPwJB6ZBF7NfzQuFB8uocKMGfCmAuod45Ihu5mIaZzXaItoiU48cR2Qg6if+m8uGOE5dx3
+	OkdXNCvY/gl5i6dB+3YCM5RXEApmNtDAMRMZPsTEylQVQQx5qjt0UqAzadJ2A82OiJamXudvbGib9
+	7QrmYoGoyMeSL0LS9C0VCsr491+FQROD3wvCIVo5Xozl/0ZiCjFpJbPeF7hqVqLZcUMgfCXmomuXv
+	2PMoJ93A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSVsv-0001ZF-P5; Thu, 29 Nov 2018 23:38:17 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
+	id 1gSVug-0002IE-5K; Thu, 29 Nov 2018 23:40:06 +0000
+Received: from esa2.hgst.iphmx.com ([68.232.143.124])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSVso-0001Ry-6y; Thu, 29 Nov 2018 23:38:12 +0000
-Received: by mail-ot1-x342.google.com with SMTP id t5so3520332otk.1;
- Thu, 29 Nov 2018 15:37:59 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=googlemail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=eQrn+Srwf0zuHQUeLfDQuJmZiLKRQB0d3wk46MwrBnM=;
- b=FGqPIK9U655mw3w98R+fkmqgdVm92JZ3Cngf0mpMXhzOr5nFwhgG3ldP0z7Rzcu6KV
- xtsJa/A0AsM5XjRg9S5hA9naAVqqx+d2wm12LJPRE3QoDNui4eYPZ0k+c1Jqm80wrgHH
- yxQi8lH3o2v3e8/lgVHt83nNJavX9XVHRr+hqQMwRcz01SuRVwcMpf0vxRve8N8iiMS/
- XFpsZ6WWJBuyEMaUeAu8hdSjjxh+bsNA+iI9H81vne8LYhT4OqMMk5FECZ6sR2Fg4GcV
- 3/hOg5vJBRnRIU1FtBV04bT2BpEQWh+cdfCasSv0icmDHxJiihXqvG1R97UOo/k3tVhO
- fJXg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=eQrn+Srwf0zuHQUeLfDQuJmZiLKRQB0d3wk46MwrBnM=;
- b=AbSJfSsYA3XIJ6JBXRVsirgDjZQIZrkDSqRIDJX4EAaV6/dHugFxHTQ76tbyXPUtzG
- ywY8+N8JvGpW9OoXHW06xwjf5ZIDbNZhcTjNb7scga4OIpp7dP2JaturD7AEmRXW+xFw
- 83qVBf/IDnsywvdz0FT8mNwm4XQbGrPU1jItIVa9KF5X5nKgxt7ImfdANusEl8zTfHh9
- +2uRSgwIa1OF0jN5pPcLGOX/YE5BhvDK7UcpZDyPTp/x/bmw4wDDaVFzI0XyYTGdCL/R
- 2cwwwxtB9YDLD+uXA5kwUWAOfu18233+TLBFVPq/YXjnM5zYOe6PdqkFd0diE8NPXUAc
- hXvQ==
-X-Gm-Message-State: AA+aEWb/fK9VIb2bKd5lR2REnnKTd+kYqe1W08/13nHMHwGlXKaTSivW
- dqDSOjphqcBwUqKKVubknwJUGekZJYp7aUqxMiU=
-X-Google-Smtp-Source: AFSGD/VZCGMLGl5XAzDB0sU26vZ7NWPkmJVYRT9VDcH0VRYOUcH7uy2vxfgzXJFjh2GgTJP8qxpGUB6Obnq+PyWTTv4=
-X-Received: by 2002:a9d:a48:: with SMTP id 66mr2238865otg.308.1543534679125;
- Thu, 29 Nov 2018 15:37:59 -0800 (PST)
-MIME-Version: 1.0
-References: <20181114230554.4968-1-martin.blumenstingl@googlemail.com>
- <7hh8g0d8tg.fsf@baylibre.com>
- <CAFBinCBViZgRrZO16FsRKSGNriSw2_D9+_6ri99_zf++_SuuKg@mail.gmail.com>
- <7hk1kv79at.fsf@baylibre.com>
-In-Reply-To: <7hk1kv79at.fsf@baylibre.com>
-From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Date: Fri, 30 Nov 2018 00:37:48 +0100
-Message-ID: <CAFBinCB8r+5tGKxfsPMapayxmDuWOi=WihvvdxS=UxcnpeYqdQ@mail.gmail.com>
-Subject: Re: [PATCH] ARM: multi_v7_defconfig: switch CONFIG_PWM_MESON to
- built-in
-To: khilman@baylibre.com
+ id 1gSVja-0004vE-U3; Thu, 29 Nov 2018 23:28:42 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=simple/simple;
+ d=wdc.com; i=@wdc.com; q=dns/txt; s=dkim.wdc.com;
+ t=1543534309; x=1575070309;
+ h=from:to:cc:subject:date:message-id:in-reply-to: references;
+ bh=AYMd4SewaG0Q02XlqjXMaFjc2G4H12uRnUc4XgGDUec=;
+ b=rH3PTbLn514XuN3Afdd+io8Q0wE1GgIAbrJiP5+K5EhKuqy92rs20Nf/
+ z35QBu07p8nWgO4Jsii/7b61Z0+hXmN8xv353jAsfbbtIEPAoE0ilfzIh
+ lrAqI1jlXsHc7UqXO6IKax9jjmcA7ppvSzqW089+SQzpYjOit5+CLdsRq
+ yzcNvknSnyjPwU2TlofCc1zYEgNOUbnduyt8DpSiTxaScBDHbb7oakr8c
+ AjUuaW9cK+VlXg51vHGOFl829k0XsGcDLX5ei4OqUZgyCFxCfySZgfN9X
+ ZRQOEFOimXnfwoFefmMkgrCzkgkqHTw1McR8b63VoqrE+62s1kqazeUDs w==;
+X-IronPort-AV: E=Sophos;i="5.56,296,1539619200"; d="scan'208";a="193267105"
+Received: from h199-255-45-15.hgst.com (HELO uls-op-cesaep02.wdc.com)
+ ([199.255.45.15])
+ by ob1.hgst.iphmx.com with ESMTP; 30 Nov 2018 07:31:35 +0800
+Received: from uls-op-cesaip02.wdc.com ([10.248.3.37])
+ by uls-op-cesaep02.wdc.com with ESMTP; 29 Nov 2018 15:11:26 -0800
+Received: from jedi-01.sdcorp.global.sandisk.com (HELO
+ jedi-01.int.fusionio.com) ([10.11.143.218])
+ by uls-op-cesaip02.wdc.com with ESMTP; 29 Nov 2018 15:28:29 -0800
+From: Atish Patra <atish.patra@wdc.com>
+To: linux-kernel@vger.kernel.org
+Subject: [RFT PATCH v1 1/4] Documentation: DT: arm: add support for sockets
+ defining package boundaries
+Date: Thu, 29 Nov 2018 15:28:17 -0800
+Message-Id: <1543534100-3654-2-git-send-email-atish.patra@wdc.com>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1543534100-3654-1-git-send-email-atish.patra@wdc.com>
+References: <1543534100-3654-1-git-send-email-atish.patra@wdc.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_153810_337149_020F8A07 
-X-CRM114-Status: GOOD (  21.64  )
+X-CRM114-CacheID: sfid-20181129_152839_052065_BB747313 
+X-CRM114-Status: GOOD (  15.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,68 +82,175 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-amlogic@lists.infradead.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux@armlinux.org.uk
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "Rafael J. Wysocki" <rafael@kernel.org>,
+ "Peter Zijlstra \(Intel\)" <peterz@infradead.org>,
+ Catalin Marinas <catalin.marinas@arm.com>, Palmer Dabbelt <palmer@sifive.com>,
+ Will Deacon <will.deacon@arm.com>, Atish Patra <atish.patra@wdc.com>,
+ linux-riscv@lists.infradead.org, Morten Rasmussen <morten.rasmussen@arm.com>,
+ Juri Lelli <juri.lelli@arm.com>, Dmitriy Cherkasov <dmitriy@oss-tech.org>,
+ Anup Patel <anup@brainfault.org>, Ingo Molnar <mingo@kernel.org>,
+ devicetree@vger.kernel.org, Albert Ou <aou@eecs.berkeley.edu>,
+ Rob Herring <robh+dt@kernel.org>, Thomas Gleixner <tglx@linutronix.de>,
+ "moderated list:ARM64 PORT AARCH64 ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>,
+ Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ Jeremy Linton <jeremy.linton@arm.com>, Sudeep Holla <sudeep.holla@arm.com>
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Kevin,
+From: Sudeep Holla <sudeep.holla@arm.com>
 
-On Fri, Nov 30, 2018 at 12:28 AM Kevin Hilman <khilman@baylibre.com> wrote:
->
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
->
-> > Hi Kevin,
-> >
-> > On Thu, Nov 29, 2018 at 1:30 AM Kevin Hilman <khilman@baylibre.com> wrote:
-> >>
-> >> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-> >>
-> >> > Some Meson8b boards (Odroid-C1, EC-100) use a PWM regulator which is the
-> >> > voltage supply of the CPU cores (this regulator is typically called
-> >> > "VCCK").
-> >> > Now that we are preparing support for CPU frequency scaling on Meson8,
-> >> > Meson8b and Meson8m2 we should build the pwm-meson driver into the
-> >> > kernel so we can configure the CPU voltage early in the boot process.
-> >>
-> >> Can you explain a little more why the configuration of CPU voltage
-> >> cannot wait a bit so this could be properly probed?
-> >
-> > I was under the impression that cpufreq-dt would still initialize even
-> > if the regulator is not ready yet. however (after reading the code
-> > again) this is clearly NOT the case.
->
-> Hmm, a quick look at cpufreq-dt suggests that it should -EPROBE_DEFER if
-> the regulator isn't ready yet.  Why doesn't that work?
-sorry for not being clear:
-I was under the impression that cpufreq-dt wouldn't handle -EPROBE_DEFER.
-I'm not sure why I assumed that. As you already said: deferred probing
-of the regulator works fine.
+The current ARM DT topology description provides the operating system
+with a topological view of the system that is based on leaf nodes
+representing either cores or threads (in an SMT system) and a
+hierarchical set of cluster nodes that creates a hierarchical topology
+view of how those cores and threads are grouped.
 
-> > there's still a benefit with this change: your Odroid-C1 in your
-> > KernelCI lab would also be able to change the CPU frequency (so in
-> > case something breaks we could spot it there).
-> > will you accept this patch after I updated the description to mention
-> > that it's for KernelCI test coverage?
->
-> Possibly, but I'd still rather see the dependencies worked out correctly
-> so that this can be module, and cpufreq-dt would defer until it's ready.
-KernelCI shows multiple "pwm-regulator regulator-vcck: Failed to get
-PWM: -517" messages on Odroid-C1.
-however, what I failed to notice so far is that there's a
-"pwm-regulator: supplied by regulator-dummy" at the end of the boot
-process. does this mean that the Odroid-C1 in your KernelCI lab can
-load kernel modules? in that case this patch can be ignored.
+However this hierarchical representation of clusters does not allow to
+describe what topology level actually represents the physical package or
+the socket boundary, which is a key piece of information to be used by
+an operating system to optimize resource allocation and scheduling.
 
-(I will still send a PWM regulator related patch: that "Failed to get
-PWM: -517" message is very noisy and we typically suppress that in
-other drivers)
+Lets add a new "socket" node type in the cpu-map node to describe the
+same.
 
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ Documentation/devicetree/bindings/arm/topology.txt | 52 ++++++++++++++++------
+ 1 file changed, 39 insertions(+), 13 deletions(-)
 
-Regards
-Martin
+diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+index de9eb048..66848355 100644
+--- a/Documentation/devicetree/bindings/arm/topology.txt
++++ b/Documentation/devicetree/bindings/arm/topology.txt
+@@ -9,6 +9,7 @@ ARM topology binding description
+ In an ARM system, the hierarchy of CPUs is defined through three entities that
+ are used to describe the layout of physical CPUs in the system:
+ 
++- socket
+ - cluster
+ - core
+ - thread
+@@ -63,21 +64,23 @@ nodes are listed.
+ 
+ 	The cpu-map node's child nodes can be:
+ 
+-	- one or more cluster nodes
++	- one or more cluster nodes or
++	- one or more socket nodes in a multi-socket system
+ 
+ 	Any other configuration is considered invalid.
+ 
+-The cpu-map node can only contain three types of child nodes:
++The cpu-map node can only contain 4 types of child nodes:
+ 
++- socket node
+ - cluster node
+ - core node
+ - thread node
+ 
+ whose bindings are described in paragraph 3.
+ 
+-The nodes describing the CPU topology (cluster/core/thread) can only
+-be defined within the cpu-map node and every core/thread in the system
+-must be defined within the topology.  Any other configuration is
++The nodes describing the CPU topology (socket/cluster/core/thread) can
++only be defined within the cpu-map node and every core/thread in the
++system must be defined within the topology.  Any other configuration is
+ invalid and therefore must be ignored.
+ 
+ ===========================================
+@@ -85,26 +88,44 @@ invalid and therefore must be ignored.
+ ===========================================
+ 
+ cpu-map child nodes must follow a naming convention where the node name
+-must be "clusterN", "coreN", "threadN" depending on the node type (ie
+-cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes which
+-are siblings within a single common parent node must be given a unique and
++must be "socketN", "clusterN", "coreN", "threadN" depending on the node type
++(ie socket/cluster/core/thread) (where N = {0, 1, ...} is the node number; nodes
++which are siblings within a single common parent node must be given a unique and
+ sequential N value, starting from 0).
+ cpu-map child nodes which do not share a common parent node can have the same
+ name (ie same number N as other cpu-map child nodes at different device tree
+ levels) since name uniqueness will be guaranteed by the device tree hierarchy.
+ 
+ ===========================================
+-3 - cluster/core/thread node bindings
++3 - socket/cluster/core/thread node bindings
+ ===========================================
+ 
+-Bindings for cluster/cpu/thread nodes are defined as follows:
++Bindings for socket/cluster/cpu/thread nodes are defined as follows:
++
++- socket node
++
++	 Description: must be declared within a cpu-map node, one node
++		      per physical socket in the system. A system can
++		      contain single or multiple physical socket.
++		      The association of sockets and NUMA nodes is beyond
++		      the scope of this bindings, please refer [2] for
++		      NUMA bindings.
++
++	This node is optional for a single socket system.
++
++	The socket node name must be "socketN" as described in 2.1 above.
++	A socket node can not be a leaf node.
++
++	A socket node's child nodes must be one or more cluster nodes.
++
++	Any other configuration is considered invalid.
+ 
+ - cluster node
+ 
+ 	 Description: must be declared within a cpu-map node, one node
+ 		      per cluster. A system can contain several layers of
+-		      clustering and cluster nodes can be contained in parent
+-		      cluster nodes.
++		      clustering within a single physical socket and cluster
++		      nodes can be contained in parent cluster nodes.
+ 
+ 	The cluster node name must be "clusterN" as described in 2.1 above.
+ 	A cluster node can not be a leaf node.
+@@ -164,13 +185,15 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+ 4 - Example dts
+ ===========================================
+ 
+-Example 1 (ARM 64-bit, 16-cpu system, two clusters of clusters):
++Example 1 (ARM 64-bit, 16-cpu system, two clusters of clusters in a single
++physical socket):
+ 
+ cpus {
+ 	#size-cells = <0>;
+ 	#address-cells = <2>;
+ 
+ 	cpu-map {
++		socket0 {
+ 			cluster0 {
+ 				cluster0 {
+ 					core0 {
+@@ -253,6 +276,7 @@ cpus {
+ 				};
+ 			};
+ 		};
++	};
+ 
+ 	CPU0: cpu@0 {
+ 		device_type = "cpu";
+@@ -473,3 +497,5 @@ cpus {
+ ===============================================================================
+ [1] ARM Linux kernel documentation
+     Documentation/devicetree/bindings/arm/cpus.txt
++[2] Devicetree NUMA binding description
++    Documentation/devicetree/bindings/numa.txt
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
