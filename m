@@ -2,21 +2,21 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FC4AC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:52:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1B1E4C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:53:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3FD3B21019
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:52:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DD1A721019
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 21:53:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uM4RX04O";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="ybPTvHHz"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3FD3B21019
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d7xzHoun";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="CtgX4N4Y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DD1A721019
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,46 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gQf5qqtUMYFJAbCgjIfsXpN4i9fWCM1HAlyisQJHu04=; b=uM4RX04Ot7FlQN
-	btOIEp7U7G5OkOKElvFtmyEg8WYyePXmhEtuN6JnJybW2E5xNgA/5TpaHfzXLbHNPb8k3cwSf9Wdx
-	oKzLPIW0Wlq/MGO1UzR8itZ3kLF2PPnMd166hP9K9/HWF2hNouSMxHH1XxXGXJoR7LPM/89ILY3sK
-	57ulkRlizpOvFDOfgb4/TRX/uRkSz+cdZQRS2gwzwDThgM3Cu58jqp278ts16FH1TJjLVbh9AEdnB
-	ymiyNylLdR+XrAuMpM81F45reI8Ha4uSEgkNFw0Xi9xFgBUPzqOLSumnkBnjnzLc/wYCULx8Ulx8o
-	JJ3VF6k7cQApf0dhNTtQ==;
+	List-Owner; bh=qJUcI/8xPdcF5qj9dqsqakVMP6mEhCgDWLwYgzU51RU=; b=d7xzHounqyqwGc
+	CLVbBOZ99cjCJQRByDiSYDAzO8DYHXzoUgUD8Unfc5MIy6VOF5vntGJYQ6N8cXu0M+T5mkfpN43Ny
+	o53uIiczuyGqUlX4zr35VnkJtZcwm5PJlFCB+7gjBg+r6iKXFt6wFHuMjFMn4KOne1r7n8Ztn09+s
+	zwdPALANEytC3cgca8fGgacgTQok5XBoZPf+of9/6GQ4G1TNzIqn1B1CNKUwz7zMg8ZB9fKHsUUJd
+	nE94gW400GHAphlJ8Y0LO5vuVZDukR75hVhkVSoBPfiJFaW8RbZlore3DGv/+Zp2DxNJYLZ2ZkZxg
+	Hy+Q2H4IkaR1a/v7FJ7Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSUEN-0004VV-0c; Thu, 29 Nov 2018 21:52:19 +0000
+	id 1gSUFc-00050a-Du; Thu, 29 Nov 2018 21:53:36 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSUDL-0003hM-TO
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 21:51:19 +0000
+ id 1gSUFP-0004tY-6R
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 21:53:24 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2827521019;
- Thu, 29 Nov 2018 21:51:05 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id B087F21019;
+ Thu, 29 Nov 2018 21:53:12 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543528265;
- bh=qsEDmw2EjV+cE5P+2S+AvdpnpQQ6ZLjFtSihyjsKzH0=;
+ s=default; t=1543528392;
+ bh=DDsEsUVR0mi/NXo7wJUn/+RkolkAFvJLZqQzLztUorA=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=ybPTvHHzhYjdgC87Gsd1XNAfhsit/SQMs/+yR+mS/l0FEjLBb0zJAxZ+5wNqzUf//
- PhpDwaKd8tl3c/SbK+EMqEn7sSHsRidjnitBSdj+f3ezt9rUkLGuyLqgpdFI/qXpsF
- JFw4SKEPR02Q3NgtooD9csR6YxZP0eKUvrkHhqlM=
+ b=CtgX4N4Yay+NNywiwifwUSQ7F5PmD/eeIm0DyfsYqD9IYAxiPA7TElJ8ZR98quQs7
+ 6JMai34WOvo5vDA1TomBX4nFRR5LXA98pYQ1WXuXKwwKTWs8JMYkcNAs0Ug+NicTWL
+ S7helIFeeXxLEaSBXtcnLskFhH41/MC1aWTi89fw=
 MIME-Version: 1.0
-To: Abel Vesa <abel.vesa@nxp.com>, Aisheng DONG <aisheng.dong@nxp.com>,
- Lucas Stach <l.stach@pengutronix.de>, Sascha Hauer <kernel@pengutronix.de>
+To: Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <AM0PR04MB42117F72B9C4D41C14B96CBD80D20@AM0PR04MB4211.eurprd04.prod.outlook.com>
-References: <1542125975-8448-1-git-send-email-abel.vesa@nxp.com>
- <154345210894.88331.8277410833858111600@swboyd.mtv.corp.google.com>
- <AM0PR04MB42117F72B9C4D41C14B96CBD80D20@AM0PR04MB4211.eurprd04.prod.outlook.com>
-Message-ID: <154352826457.88331.16669625591730377740@swboyd.mtv.corp.google.com>
+In-Reply-To: <20181128183702.231609-1-sboyd@kernel.org>
+References: <20181128183702.231609-1-sboyd@kernel.org>
+Message-ID: <154352839199.88331.15535776216408804452@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: RE: [PATCH v13 0/5] Add i.MX8MQ clock driver
-Date: Thu, 29 Nov 2018 13:51:04 -0800
+Subject: Re: [PATCH] clk: renesas: Mark rza2_cpg_clk_register static
+Date: Thu, 29 Nov 2018 13:53:11 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_135116_049383_48591B15 
-X-CRM114-Status: GOOD (  12.20  )
+X-CRM114-CacheID: sfid-20181129_135323_259612_A2F7E11B 
+X-CRM114-Status: UNSURE (   6.83  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,50 +75,23 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
- Abel Vesa <abel.vesa@nxp.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Michael Turquette <mturquette@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: linux-renesas-soc@vger.kernel.org,
+ Geert Uytterhoeven <geert+renesas@glider.be>, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Aisheng DONG (2018-11-28 23:46:41)
-> > -----Original Message-----
-> > From: Stephen Boyd [mailto:sboyd@kernel.org]
-> [...]
-> > >
-> > > Changes since v12:
-> > >  * replaced the division in clk_pll_recalc_rate in clk-frac
-> > >    with do_div as suggested by Stephen
-> > >
-> > > Abel Vesa (2):
-> > >   clk: imx: Add imx composite clock
-> > >   clk: imx: Add clock driver for i.MX8MQ CCM
-> > >
-> > > Lucas Stach (3):
-> > >   dt-bindings: add binding for i.MX8MQ CCM
-> > >   clk: imx: add fractional PLL output clock
-> > >   clk: imx: Add SCCG PLL type
-> > >
-> > 
-> > I had to apply this set of fixes to silence sparse and smatch warnings about
-> > things that are not right. Please take a look over things and see if it's sane.
-> > 
+Quoting Stephen Boyd (2018-11-28 10:37:02)
+> This is only used in this file, so mark it static to silence a sparse
+> warning.
 > 
-> The change looks good to me and tested ok.
-> I did not see this patch series in your tree.
-> Do you want us to apply your changes and re-send for easy pick up?
-> 
+> Cc: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Stephen Boyd <sboyd@kernel.org>
+> ---
 
-I applied this version and my fixes. I'll just mark v14 as superseded.
-Thanks for testing!
+Applied to clk-next
 
 
 _______________________________________________
