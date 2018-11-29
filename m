@@ -2,86 +2,91 @@ Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 336A6C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8B9B8C43441
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 04A38213A2
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5C478213A2
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:55:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NAKb9r0h";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="cjRkAYcx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 04A38213A2
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gERWKbyC";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="iEOSQK3L"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C478213A2
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=UjDJoBk6Nyb84eJP0XZxaxVscJkMaxmnHygzDNIZrmk=; b=NAK
-	b9r0hiX1R5kBUG2R8ku+j69qRhaRyPZgni/7Ord7otBYEgkwsWchQz/PIIAFDArGvKC8N1fCvq018
-	1+RuQ9ubpfNbo6A8myjpBoIlnQOcAYsU/t2Ax/ZQLPeAYysJq1IpKR3zmApAhl+MI+1B1akjRkUE5
-	6gaZdv5Etg6AxhW3PvxFcAVUECqDosHpW1u4Dbs4kMuJwQHSOjS1H/uDj5G5nh7/FcwnIEUkyDXAv
-	PdcDmhEtTDOqhXyHNkTIsYWAYcsHdmSY6uC5x2CJO3nhCf7XpGGaJkXgUJoGZ8vV5e1j1hdK5zwF7
-	3CQFTsonoYsoLAbJrS7wOlGihGKNLOQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=EtWYxgvbulAPZjWYc+3xSLqyedib10X8YmWQHvPiKL4=; b=gERWKbyCcwKauDBGZvNvI6kg55
+	+9d1r83I59s0kjSPzwrZIgvPXEId9wC0W3Yjv6NzFEoccJ5+A7dEEMliBRqh+HabE7pFqqnA2+c4T
+	axhUf4dwdf1Dhdh5yWg/sbXz+oYPi7VXWnwH23SWR3JqogEbaERAE7IAOA98INnpNHGLSn8p/4Gw2
+	buNYrh+1mFtCQCQoe8L4T7K4YLglgUNo1fs0Y7PwV1Wb/GftrTAOkK/tQq4QO6MzojwVsVo0Xbhfu
+	v2W4GcZ+szcDyssjTo63kuVU6QLVppM9kwqVIMF9yn+TpXFUcZy2WMsaFCpxAJ3v7aE4FCfO59JEx
+	Zlb5mGtg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQWj-0000BN-Iz; Thu, 29 Nov 2018 17:55:01 +0000
-Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+	id 1gSQWl-0000CI-Ai; Thu, 29 Nov 2018 17:55:03 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQPK-00016Y-MJ
+ id 1gSQPM-00017z-Fb
  for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:26 +0000
-Received: by mail-lf1-x144.google.com with SMTP id l10so2095524lfh.9
+Received: by mail-lj1-x244.google.com with SMTP id l15-v6so2520120lja.9
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 09:47:10 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:24 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id;
- bh=Ah0MzEFLiAebhgGCxaTOnP2NoihwEgVHVQARU010jgY=;
- b=cjRkAYcxlwPkS+DphqxfX14Hrs0Ze/xOzzcpnv5fh0gkO6SXqrnsua6azAt2dQpWiy
- R/a5q48a/EEwNdakpPMOpX0wpBdJdFu5C3oDliseBLah6XoHfKqjjWMtyx0mkl0PQtT3
- R0qAIy8s61hBIV//ooOKMR/ozsjSxFRqARh6I=
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=2+/Zg5CnveDZt6Y9DJWaO1vjEPhkATmRTkbujkSrrhk=;
+ b=iEOSQK3L6vH/uOYYq+9t3pvIzAUY7UHAKzKIcFHnTZJEOxlNO/oikkLhR4EVwmumAc
+ IR1XEudU9idovUSdmo1vxpLNMJEHWCjwyfFGtbZ0CeTN9dbq/4hh3UC4Wc9zpBltMazF
+ G0dFliU25cJCtVXS/hBWoMX5uPYpX9qscltpU=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=Ah0MzEFLiAebhgGCxaTOnP2NoihwEgVHVQARU010jgY=;
- b=seTIYDlR/ooSdtCZ294/gE5UiZ4gtipqFz7ijzoneXWxDzSTe2hJbwd7JQZmwXB28V
- s9dRtfohTDw5UGaxiJS8h/9iRFC+NexEwydWC9SJmlxabGJvBntIv2xA0sdT+gNBmUPF
- TNvvMkeIug9WKDUAjZeWNH22YD4WhWTqxMeuT7JWen9DMQ0FS9ZBEw83ipV+PRwMJIZ+
- +6hfkDRto4FU8qlVtXkRCkrZ4sTLcL+woOtz9TD/k3RrYNcbkv23NsvlIz3PWPbLizKA
- ppxMwbYz0Iu47dggJGk5F0UWH6GVe22JxwLd8VaNdkQBawWLQAJG0xv8kVv8XGVEO+w1
- 6VWQ==
-X-Gm-Message-State: AA+aEWYQRDqmu2BiJUpJB4agHWrjAIkz11zkiDgLAZhR7Jyfwj7OF5mJ
- ysGoW+V9/gdCDaauy4BE4Cumqw==
-X-Google-Smtp-Source: AFSGD/X5nDjSI31ktjUY344OXaV3l4VkV/AONaDnwyjpdNrpbl7DbUpF2CYR6nFbSep6F2QJWOHzYw==
-X-Received: by 2002:a19:750a:: with SMTP id y10mr1623514lfe.43.1543513628271; 
- Thu, 29 Nov 2018 09:47:08 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=2+/Zg5CnveDZt6Y9DJWaO1vjEPhkATmRTkbujkSrrhk=;
+ b=AQnlCoQrnl6d0M/mUFwViQDU+LwV+DtpH5gwaHXN3U30Yr29daQrMQuXeofHJEqU85
+ HCeGEfiN9MdqPvUlMEwjdCrgsJMLX6aYrh0AOyqeTpxZAxHd5i3MC3oZJM/81hW2ZpiB
+ d+BlAzFeChLFn+0PA5qnHM9vYNQY54b809D3MWh5qZVYNbEh9vPjbh6jiFODDymBN8Ww
+ Vi1nSDwRG9SDdP/l1JWHSy2b0Ai05NJY+22KhF3tIL6KCwLgUFjLGu6fbjLJx2qdsOWZ
+ lhrdfDMsaHGuCAi8XbwQALK75MWj/PuaeiR6fnl0L5dCtRAn/2dKOhpGLirmDo4+wKyz
+ goSA==
+X-Gm-Message-State: AA+aEWYPk8L6332zXlr7F0vRRc4hXAlla1sNZjdwzZxPj0MwpQ4ja/I9
+ eVDCtb1s2KW1p/j+5NricYxz+g==
+X-Google-Smtp-Source: AFSGD/Xvkon2TF8iGxwU58DFFLy/SGEybzfzgTkfgjGfzUCOI7vqWKeP0Zb6u3Yyoq4tmsx3lkVgMA==
+X-Received: by 2002:a2e:97d7:: with SMTP id
+ m23-v6mr1886895ljj.18.1543513642839; 
+ Thu, 29 Nov 2018 09:47:22 -0800 (PST)
 Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
  [158.174.22.210])
- by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.06
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.21
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 09:47:07 -0800 (PST)
+ Thu, 29 Nov 2018 09:47:22 -0800 (PST)
 From: Ulf Hansson <ulf.hansson@linaro.org>
 To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
  Sudeep Holla <sudeep.holla@arm.com>,
  Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
  Mark Rutland <mark.rutland@arm.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
-Subject: [PATCH v10 00/27] PM / Domains: Support hierarchical CPU arrangement
- (PSCI/ARM)
-Date: Thu, 29 Nov 2018 18:46:33 +0100
-Message-Id: <20181129174700.16585-1-ulf.hansson@linaro.org>
+Subject: [PATCH v10 08/27] ARM/ARM64: cpuidle: Let back-end init ops take the
+ driver as input
+Date: Thu, 29 Nov 2018 18:46:41 +0100
+Message-Id: <20181129174700.16585-9-ulf.hansson@linaro.org>
 X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094722_749466_9B1936E5 
-X-CRM114-Status: GOOD (  26.67  )
+X-CRM114-CacheID: sfid-20181129_094724_808675_8F677BA2 
+X-CRM114-Status: GOOD (  23.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,13 +98,15 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>,
+Cc: David Brown <david.brown@linaro.org>, Ulf Hansson <ulf.hansson@linaro.org>,
  Vincent Guittot <vincent.guittot@linaro.org>,
  Geert Uytterhoeven <geert+renesas@glider.be>,
  Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org,
- Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
- linux-arm-msm@vger.kernel.org,
+ Viresh Kumar <viresh.kumar@linaro.org>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Lina Iyer <ilina@codeaurora.org>,
+ Russell King <linux@armlinux.org.uk>, Tony Lindgren <tony@atomide.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, linux-arm-msm@vger.kernel.org,
+ Andy Gross <andy.gross@linaro.org>,
  "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
  linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
@@ -108,178 +115,241 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Over the years this series have been iterated and discussed at various Linux
-conferences and LKML. In this new v10, a quite significant amount of changes
-have been made to address comments from v8 and v9. A summary is available
-below, although let's start with a brand new clarification of the motivation
-behind this series.
+To allow arch back-end init ops to operate on the cpuidle driver for the
+corresponding CPU, let's pass along a pointer to the struct cpuidle_driver*
+and forward it the relevant layers of callbacks for ARM/ARM64.
 
-For ARM64/ARM based platforms CPUs are often arranged in a hierarchical manner.
-From a CPU idle state perspective, this means some states may be shared among a
-group of CPUs (aka CPU cluster).
+Following changes for the PSCI firmware driver starts making use of this.
 
-To deal with idle management of a group of CPUs, sometimes the kernel needs to
-be involved to manage the last-man standing algorithm, simply because it can't
-rely solely on power management FWs to deal with this. Depending on the
-platform, of course.
-
-There are a couple of typical scenarios for when the kernel needs to be in
-control, dealing with synchronization of when the last CPU in a cluster is about
-to enter a deep idle state.
-
-1)
-The kernel needs to carry out so called last-man activities before the
-CPU cluster can enter a deep idle state. This may for example involve to
-configure external logics for wakeups, as the GIC may no longer be functional
-once a deep cluster idle state have been entered. Likewise, these operations
-may need to be restored, when the first CPU wakes up.
-
-2)
-Other more generic I/O devices, such as an MMC controller for example, may be a
-part of the same power domain as the CPU cluster, due to a shared power-rail.
-For these scenarios, when the MMC controller is in use dealing with an MMC
-request, a deeper idle state of the CPU cluster may needs to be temporarily
-disabled. This is needed to retain the MMC controller in a functional state,
-else it may loose its register-context in the middle of serving a request.
-
-In this series, we are extending the generic PM domain (aka genpd) to be used
-for also CPU devices. Hence the goal is to re-use much of its current code to
-help us manage the last-man standing synchronization. Moreover, as we already
-use genpd to model power domains for generic I/O devices, both 1) and 2) can be
-address with its help.
-
-Moreover, to address these problems for ARM64 DT based platforms, we are
-deploying support for genpd and runtime PM to the PSCI FW driver - and finally
-we make some updates to two ARM64 DTBs, as to deploy the new PSCI CPU topology
-layout.
-
-The series has been tested on the QCOM 410c dragonboard and the Hisilicon Hikey
-board. You may also find the code at:
-
-git.linaro.org/people/ulf.hansson/linux-pm.git next
-
-Kind regards
-Ulf Hansson
-
+Cc: Lina Iyer <ilina@codeaurora.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: David Brown <david.brown@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+---
 
 Changes in v10:
- - Quite significant changes have been to the PSCI driver deployment. According
-   to an agreement with Lorenzo, the hierarchical CPU layout for PSCI should be
-   orthogonal to whether the PSCI FW supports OSI or not. This has been taken
-   care of in this version.
- - Drop the generic attach/detach helpers of CPUs to genpd, instead make that
-   related code internal to PSCI, for now.
- - Fix "BUG: sleeping for invalid context" for hotplug, as reported by Raju.
- - Addressed various comments from version 8 and 9.
- - Clarified changelogs and re-wrote the cover-letter to better explain the
-   motivations behind these changes.
+	- New patch!
 
-Changes in v9:
- - Collect only a subset from the changes in v8.
- - Patch 3 is new, documenting existing genpd flags. Future wise, this means
-when a new genpd flag is invented, we must also properly document it.
- - No changes have been made to the patches picked from v8.
- - Dropped the text from v8 cover-letter[1], to avoid confusion. When posting v10
-(or whatever the next version containing the rest becomes), I am going re-write
-the cover-letter to clarify, more exactly, the problems this series intends to
-solve. The earlier text was simply too vague.
+I am seeking an ack from relevant maintainers. Please ping me if you need
+further information about the hole series.
 
-[1]
-https://lwn.net/Articles/758091/
+Thanks!
+Ulf Hanssson
 
-Changes in v8:
- - Added some tags for reviews and acks.
- - Cleanup timer patch (patch6) according to comments from Rafael.
- - Rebased series on top of v4.18rc1 - it applied cleanly, except for patch 5.
- - While adopting patch 5 to new genpd changes, I took the opportunity to
-   improve the new function description a bit.
- - Corrected malformed SPDX-License-Identifier in patch20.
+---
+ arch/arm/include/asm/cpuidle.h   | 4 ++--
+ arch/arm/kernel/cpuidle.c        | 5 +++--
+ arch/arm64/include/asm/cpu_ops.h | 4 +++-
+ arch/arm64/include/asm/cpuidle.h | 6 ++++--
+ arch/arm64/kernel/cpuidle.c      | 6 +++---
+ drivers/cpuidle/cpuidle-arm.c    | 2 +-
+ drivers/firmware/psci.c          | 7 ++++---
+ drivers/soc/qcom/spm.c           | 3 ++-
+ include/linux/psci.h             | 4 +++-
+ 9 files changed, 25 insertions(+), 16 deletions(-)
 
-Changes in v7:
- - Addressed comments concerning the PSCI changes from Mark Rutland, which moves
-   the psci firmware driver to a new firmware subdir and change to force PSCI PC
-   mode during boot to cope with kexec'ed booted kernels.
- - Added some maintainers in cc for the timer/nohz patches.
- - Minor update to the new genpd governor, taking into account the state's
-   poweroff latency while validating the sleep duration time.
- - Addressed a problem pointed out by Geert Uytterhoeven, around calling
-   pm_runtime_get|put() for CPUs that has not been attached to a CPU PM domain.
- - Re-based on Linus' latest master.
-
-
-Lina Iyer (5):
-  timer: Export next wakeup time of a CPU
-  dt: psci: Update DT bindings to support hierarchical PSCI states
-  cpuidle: dt: Support hierarchical CPU idle states
-  drivers: firmware: psci: Support hierarchical CPU idle states
-  arm64: dts: Convert to the hierarchical CPU topology layout for
-    MSM8916
-
-Ulf Hansson (22):
-  PM / Domains: Add generic data pointer to genpd_power_state struct
-  PM / Domains: Add support for CPU devices to genpd
-  PM / Domains: Add genpd governor for CPUs
-  of: base: Add of_get_cpu_state_node() to get idle states for a CPU
-    node
-  ARM/ARM64: cpuidle: Let back-end init ops take the driver as input
-  drivers: firmware: psci: Move psci to separate directory
-  MAINTAINERS: Update files for PSCI
-  drivers: firmware: psci: Split psci_dt_cpu_init_idle()
-  drivers: firmware: psci: Simplify state node parsing
-  drivers: firmware: psci: Simplify error path of psci_dt_init()
-  drivers: firmware: psci: Announce support for OS initiated suspend
-    mode
-  drivers: firmware: psci: Prepare to use OS initiated suspend mode
-  drivers: firmware: psci: Prepare to support PM domains
-  drivers: firmware: psci: Add support for PM domains using genpd
-  drivers: firmware: psci: Add hierarchical domain idle states converter
-  drivers: firmware: psci: Introduce psci_dt_topology_init()
-  drivers: firmware: psci: Add a helper to attach a CPU to its PM domain
-  drivers: firmware: psci: Attach the CPU's device to its PM domain
-  drivers: firmware: psci: Manage runtime PM in the idle path for CPUs
-  drivers: firmware: psci: Support CPU hotplug for the hierarchical
-    model
-  arm64: kernel: Respect the hierarchical CPU topology in DT for PSCI
-  arm64: dts: hikey: Convert to the hierarchical CPU topology layout
-
- .../devicetree/bindings/arm/psci.txt          | 166 ++++++++
- MAINTAINERS                                   |   2 +-
- arch/arm/include/asm/cpuidle.h                |   4 +-
- arch/arm/kernel/cpuidle.c                     |   5 +-
- arch/arm64/boot/dts/hisilicon/hi6220.dtsi     |  87 +++-
- arch/arm64/boot/dts/qcom/msm8916.dtsi         |  57 ++-
- arch/arm64/include/asm/cpu_ops.h              |   4 +-
- arch/arm64/include/asm/cpuidle.h              |   6 +-
- arch/arm64/kernel/cpuidle.c                   |   6 +-
- arch/arm64/kernel/setup.c                     |   3 +
- drivers/base/power/domain.c                   |  74 +++-
- drivers/base/power/domain_governor.c          |  61 ++-
- drivers/cpuidle/cpuidle-arm.c                 |   2 +-
- drivers/cpuidle/dt_idle_states.c              |   5 +-
- drivers/firmware/Kconfig                      |  15 +-
- drivers/firmware/Makefile                     |   3 +-
- drivers/firmware/psci/Kconfig                 |  13 +
- drivers/firmware/psci/Makefile                |   4 +
- drivers/firmware/{ => psci}/psci.c            | 240 ++++++++---
- drivers/firmware/psci/psci.h                  |  23 ++
- drivers/firmware/{ => psci}/psci_checker.c    |   0
- drivers/firmware/psci/psci_pm_domain.c        | 389 ++++++++++++++++++
- drivers/of/base.c                             |  35 ++
- drivers/soc/qcom/spm.c                        |   3 +-
- include/linux/of.h                            |   8 +
- include/linux/pm_domain.h                     |  19 +-
- include/linux/psci.h                          |   6 +-
- include/linux/tick.h                          |   8 +
- include/uapi/linux/psci.h                     |   5 +
- kernel/time/tick-sched.c                      |  13 +
- 30 files changed, 1163 insertions(+), 103 deletions(-)
- create mode 100644 drivers/firmware/psci/Kconfig
- create mode 100644 drivers/firmware/psci/Makefile
- rename drivers/firmware/{ => psci}/psci.c (76%)
- create mode 100644 drivers/firmware/psci/psci.h
- rename drivers/firmware/{ => psci}/psci_checker.c (100%)
- create mode 100644 drivers/firmware/psci/psci_pm_domain.c
-
+diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+index 6b2ff7243b4b..bee0a7847733 100644
+--- a/arch/arm/include/asm/cpuidle.h
++++ b/arch/arm/include/asm/cpuidle.h
+@@ -32,7 +32,7 @@ struct device_node;
+ 
+ struct cpuidle_ops {
+ 	int (*suspend)(unsigned long arg);
+-	int (*init)(struct device_node *, int cpu);
++	int (*init)(struct cpuidle_driver *, struct device_node *, int cpu);
+ };
+ 
+ struct of_cpuidle_method {
+@@ -47,6 +47,6 @@ struct of_cpuidle_method {
+ 
+ extern int arm_cpuidle_suspend(int index);
+ 
+-extern int arm_cpuidle_init(int cpu);
++extern int arm_cpuidle_init(struct cpuidle_driver *drv, int cpu);
+ 
+ #endif
+diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+index fda5579123a8..43778c9b373d 100644
+--- a/arch/arm/kernel/cpuidle.c
++++ b/arch/arm/kernel/cpuidle.c
+@@ -122,6 +122,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+ 
+ /**
+  * arm_cpuidle_init() - Initialize cpuidle_ops for a specific cpu
++ * @drv: the drv to be initialized
+  * @cpu: the cpu to be initialized
+  *
+  * Initialize the cpuidle ops with the device for the cpu and then call
+@@ -137,7 +138,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+  *  -ENXIO if the HW reports a failure or a misconfiguration,
+  *  -ENOMEM if the HW report an memory allocation failure 
+  */
+-int __init arm_cpuidle_init(int cpu)
++int __init arm_cpuidle_init(struct cpuidle_driver *drv, int cpu)
+ {
+ 	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
+ 	int ret;
+@@ -147,7 +148,7 @@ int __init arm_cpuidle_init(int cpu)
+ 
+ 	ret = arm_cpuidle_read_ops(cpu_node, cpu);
+ 	if (!ret)
+-		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
++		ret = cpuidle_ops[cpu].init(drv, cpu_node, cpu);
+ 
+ 	of_node_put(cpu_node);
+ 
+diff --git a/arch/arm64/include/asm/cpu_ops.h b/arch/arm64/include/asm/cpu_ops.h
+index 8f03446cf89f..8db870c29f1b 100644
+--- a/arch/arm64/include/asm/cpu_ops.h
++++ b/arch/arm64/include/asm/cpu_ops.h
+@@ -19,6 +19,8 @@
+ #include <linux/init.h>
+ #include <linux/threads.h>
+ 
++struct cpuidle_driver;
++
+ /**
+  * struct cpu_operations - Callback operations for hotplugging CPUs.
+  *
+@@ -58,7 +60,7 @@ struct cpu_operations {
+ 	int		(*cpu_kill)(unsigned int cpu);
+ #endif
+ #ifdef CONFIG_CPU_IDLE
+-	int		(*cpu_init_idle)(unsigned int);
++	int		(*cpu_init_idle)(struct cpuidle_driver *, unsigned int);
+ 	int		(*cpu_suspend)(unsigned long);
+ #endif
+ };
+diff --git a/arch/arm64/include/asm/cpuidle.h b/arch/arm64/include/asm/cpuidle.h
+index 3c5ddb429ea2..3fd3efb61649 100644
+--- a/arch/arm64/include/asm/cpuidle.h
++++ b/arch/arm64/include/asm/cpuidle.h
+@@ -4,11 +4,13 @@
+ 
+ #include <asm/proc-fns.h>
+ 
++struct cpuidle_driver;
++
+ #ifdef CONFIG_CPU_IDLE
+-extern int arm_cpuidle_init(unsigned int cpu);
++extern int arm_cpuidle_init(struct cpuidle_driver *drv, unsigned int cpu);
+ extern int arm_cpuidle_suspend(int index);
+ #else
+-static inline int arm_cpuidle_init(unsigned int cpu)
++static inline int arm_cpuidle_init(struct cpuidle_driver *drv, unsigned int cpu)
+ {
+ 	return -EOPNOTSUPP;
+ }
+diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+index f2d13810daa8..aaf9dc5cb87a 100644
+--- a/arch/arm64/kernel/cpuidle.c
++++ b/arch/arm64/kernel/cpuidle.c
+@@ -18,13 +18,13 @@
+ #include <asm/cpuidle.h>
+ #include <asm/cpu_ops.h>
+ 
+-int arm_cpuidle_init(unsigned int cpu)
++int arm_cpuidle_init(struct cpuidle_driver *drv, unsigned int cpu)
+ {
+ 	int ret = -EOPNOTSUPP;
+ 
+ 	if (cpu_ops[cpu] && cpu_ops[cpu]->cpu_suspend &&
+ 			cpu_ops[cpu]->cpu_init_idle)
+-		ret = cpu_ops[cpu]->cpu_init_idle(cpu);
++		ret = cpu_ops[cpu]->cpu_init_idle(drv, cpu);
+ 
+ 	return ret;
+ }
+@@ -51,7 +51,7 @@ int arm_cpuidle_suspend(int index)
+ 
+ int acpi_processor_ffh_lpi_probe(unsigned int cpu)
+ {
+-	return arm_cpuidle_init(cpu);
++	return arm_cpuidle_init(NULL, cpu);
+ }
+ 
+ int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 3a407a3ef22b..39413973b21d 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -106,7 +106,7 @@ static int __init arm_idle_init_cpu(int cpu)
+ 	 * Call arch CPU operations in order to initialize
+ 	 * idle states suspend back-end specific data
+ 	 */
+-	ret = arm_cpuidle_init(cpu);
++	ret = arm_cpuidle_init(drv, cpu);
+ 
+ 	/*
+ 	 * Allow the initialization to continue for other CPUs, if the reported
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index c80ec1d03274..878c4dcf0118 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -270,7 +270,8 @@ static int __init psci_features(u32 psci_func_id)
+ #ifdef CONFIG_CPU_IDLE
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
+ 
+-static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
++static int psci_dt_cpu_init_idle(struct cpuidle_driver *drv,
++			struct device_node *cpu_node, int cpu)
+ {
+ 	int i, ret, count = 0;
+ 	u32 *psci_states;
+@@ -371,7 +372,7 @@ static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
+ }
+ #endif
+ 
+-int psci_cpu_init_idle(unsigned int cpu)
++int psci_cpu_init_idle(struct cpuidle_driver *drv, unsigned int cpu)
+ {
+ 	struct device_node *cpu_node;
+ 	int ret;
+@@ -390,7 +391,7 @@ int psci_cpu_init_idle(unsigned int cpu)
+ 	if (!cpu_node)
+ 		return -ENODEV;
+ 
+-	ret = psci_dt_cpu_init_idle(cpu_node, cpu);
++	ret = psci_dt_cpu_init_idle(drv, cpu_node, cpu);
+ 
+ 	of_node_put(cpu_node);
+ 
+diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+index 53807e839664..6e967f0a8608 100644
+--- a/drivers/soc/qcom/spm.c
++++ b/drivers/soc/qcom/spm.c
+@@ -208,7 +208,8 @@ static const struct of_device_id qcom_idle_state_match[] __initconst = {
+ 	{ },
+ };
+ 
+-static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
++static int __init qcom_cpuidle_init(struct cpuidle_driver *drv,
++			struct device_node *cpu_node, int cpu)
+ {
+ 	const struct of_device_id *match_id;
+ 	struct device_node *state_node;
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 8b1b3b5935ab..4f29a3bff379 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -20,9 +20,11 @@
+ #define PSCI_POWER_STATE_TYPE_STANDBY		0
+ #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
+ 
++struct cpuidle_driver;
++
+ bool psci_tos_resident_on(int cpu);
+ 
+-int psci_cpu_init_idle(unsigned int cpu);
++int psci_cpu_init_idle(struct cpuidle_driver *drv, unsigned int cpu);
+ int psci_cpu_suspend_enter(unsigned long index);
+ 
+ enum psci_conduit {
 -- 
 2.17.1
 
