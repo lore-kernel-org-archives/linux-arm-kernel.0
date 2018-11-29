@@ -1,171 +1,81 @@
-From: paul.kocialkowski@bootlin.com (Paul Kocialkowski)
-Date: Thu, 29 Nov 2018 10:00:48 +0100
-Subject: [PATCH v2 1/1] media: cedrus: Remove global IRQ spin lock from the
- driver
-In-Reply-To: <20181129090048.16482-1-paul.kocialkowski@bootlin.com>
-References: <20181129090048.16482-1-paul.kocialkowski@bootlin.com>
-Message-ID: <20181129090048.16482-2-paul.kocialkowski@bootlin.com>
+From: Julien.Thierry@arm.com (Julien Thierry)
+Date: Thu, 29 Nov 2018 09:03:54 +0000
+Subject: [PATCH] arm64: io: specify asm operand width for __iormb()
+In-Reply-To: <20181129041912.5918-1-nick.desaulniers@gmail.com>
+References: <20181129041912.5918-1-nick.desaulniers@gmail.com>
+Message-ID: <fe3cba43-935b-448c-46e9-90ea75593e5b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We initially introduced a spin lock to ensure that the VPU registers
-are not accessed concurrently between our setup function and IRQ
-handler. The V4L2 M2M API ensures that only one decoding job runs at a
-time, so the interrupt signaling the end of decoding will not occur
-while the next picture is being configured.
 
-Spurious interrupts are taken care of in the handler, by checking that
-we have a valid M2M context and a decoding status available before
-marking the buffers as done.
 
-In addition, holding a spin lock could be problematic if non-atomic
-operations are required in the setup process for future codec support.
+On 29/11/18 04:19, Nick Desaulniers wrote:
+> Fixes the warning produced from Clang:
+> ./include/asm-generic/io.h:711:9: warning: value size does not match
+> register size specified by the constraint and modifier
+> [-Wasm-operand-widths]
+>         return readl(addr);
+>                ^
+> ./arch/arm64/include/asm/io.h:149:58: note: expanded from macro 'readl'
+>                                                           ^
+> ./include/asm-generic/io.h:711:9: note: use constraint modifier "w"
+> ./arch/arm64/include/asm/io.h:149:50: note: expanded from macro 'readl'
+>                                                   ^
+> ./arch/arm64/include/asm/io.h:118:25: note: expanded from macro '__iormb'
+>         asm volatile("eor       %w0, %1, %1\n" \
+>                                      ^
 
-As a result, remove the global IRQ spin lock.
+Why does the "eor %0, %1, %1" become "eor %w0, %1, %1" ?
+The variable passed to the inline assembly for %0 is unsigned long, so
+always 64-bits wide on arm64. Why is clang trying to use a 32-bit
+register for it?
 
-Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
----
- drivers/staging/media/sunxi/cedrus/cedrus.c       |  1 -
- drivers/staging/media/sunxi/cedrus/cedrus.h       |  2 --
- drivers/staging/media/sunxi/cedrus/cedrus_dec.c   |  9 ---------
- drivers/staging/media/sunxi/cedrus/cedrus_hw.c    | 13 +------------
- drivers/staging/media/sunxi/cedrus/cedrus_video.c |  5 -----
- 5 files changed, 1 insertion(+), 29 deletions(-)
+Although it's not really important since all this is just introducing a
+control dependency, I find it a bit odd.
 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
-index f7f46fbc2bcf..928edc01bc46 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
-@@ -281,7 +281,6 @@ static int cedrus_probe(struct platform_device *pdev)
- 	dev->dec_ops[CEDRUS_CODEC_MPEG2] = &cedrus_dec_ops_mpeg2;
- 
- 	mutex_init(&dev->dev_mutex);
--	spin_lock_init(&dev->irq_lock);
- 
- 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
- 	if (ret) {
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.h b/drivers/staging/media/sunxi/cedrus/cedrus.h
-index 3f61248c57ac..3acfdcf83691 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus.h
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus.h
-@@ -105,8 +105,6 @@ struct cedrus_dev {
- 
- 	/* Device file mutex */
- 	struct mutex		dev_mutex;
--	/* Interrupt spinlock */
--	spinlock_t		irq_lock;
- 
- 	void __iomem		*base;
- 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-index e40180a33951..6c5e310a7cf7 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
-@@ -28,7 +28,6 @@ void cedrus_device_run(void *priv)
- 	struct cedrus_dev *dev = ctx->dev;
- 	struct cedrus_run run = { 0 };
- 	struct media_request *src_req;
--	unsigned long flags;
- 
- 	run.src = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
- 	run.dst = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
-@@ -39,8 +38,6 @@ void cedrus_device_run(void *priv)
- 	if (src_req)
- 		v4l2_ctrl_request_setup(src_req, &ctx->hdl);
- 
--	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
--
- 	switch (ctx->src_fmt.pixelformat) {
- 	case V4L2_PIX_FMT_MPEG2_SLICE:
- 		run.mpeg2.slice_params = cedrus_find_control_data(ctx,
-@@ -55,16 +52,10 @@ void cedrus_device_run(void *priv)
- 
- 	dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
- 
--	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
--
- 	/* Complete request(s) controls if needed. */
- 
- 	if (src_req)
- 		v4l2_ctrl_request_complete(src_req, &ctx->hdl);
- 
--	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
--
- 	dev->dec_ops[ctx->current_codec]->trigger(ctx);
--
--	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
- }
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_hw.c b/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
-index 32adbcbe6175..0662906aab57 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
-@@ -122,24 +122,17 @@ static irqreturn_t cedrus_irq(int irq, void *data)
- 	struct vb2_v4l2_buffer *src_buf, *dst_buf;
- 	enum vb2_buffer_state state;
- 	enum cedrus_irq_status status;
--	unsigned long flags;
--
--	spin_lock_irqsave(&dev->irq_lock, flags);
- 
- 	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
- 	if (!ctx) {
- 		v4l2_err(&dev->v4l2_dev,
- 			 "Instance released before the end of transaction\n");
--		spin_unlock_irqrestore(&dev->irq_lock, flags);
--
- 		return IRQ_NONE;
- 	}
- 
- 	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
--	if (status == CEDRUS_IRQ_NONE) {
--		spin_unlock_irqrestore(&dev->irq_lock, flags);
-+	if (status == CEDRUS_IRQ_NONE)
- 		return IRQ_NONE;
--	}
- 
- 	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
- 	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
-@@ -150,8 +143,6 @@ static irqreturn_t cedrus_irq(int irq, void *data)
- 	if (!src_buf || !dst_buf) {
- 		v4l2_err(&dev->v4l2_dev,
- 			 "Missing source and/or destination buffers\n");
--		spin_unlock_irqrestore(&dev->irq_lock, flags);
--
- 		return IRQ_HANDLED;
- 	}
- 
-@@ -163,8 +154,6 @@ static irqreturn_t cedrus_irq(int irq, void *data)
- 	v4l2_m2m_buf_done(src_buf, state);
- 	v4l2_m2m_buf_done(dst_buf, state);
- 
--	spin_unlock_irqrestore(&dev->irq_lock, flags);
--
- 	return IRQ_WAKE_THREAD;
- }
- 
-diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_video.c b/drivers/staging/media/sunxi/cedrus/cedrus_video.c
-index 5c5fce678b93..8721b4a7d496 100644
---- a/drivers/staging/media/sunxi/cedrus/cedrus_video.c
-+++ b/drivers/staging/media/sunxi/cedrus/cedrus_video.c
-@@ -380,18 +380,13 @@ static void cedrus_queue_cleanup(struct vb2_queue *vq, u32 state)
- {
- 	struct cedrus_ctx *ctx = vb2_get_drv_priv(vq);
- 	struct vb2_v4l2_buffer *vbuf;
--	unsigned long flags;
- 
- 	for (;;) {
--		spin_lock_irqsave(&ctx->dev->irq_lock, flags);
--
- 		if (V4L2_TYPE_IS_OUTPUT(vq->type))
- 			vbuf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
- 		else
- 			vbuf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
- 
--		spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
--
- 		if (!vbuf)
- 			return;
- 
--- 
-2.19.1
+Thanks,
+
+> Though we disable Clang's integrated assembler with -no-integrated-as,
+> it still tries to do some validation of assembler constraints.
+>
+> While __iormb() is type agnostic to operand widths for argument v, its
+> lone use is to zero'd out via eor (exclusive or).
+>
+> Fixes commit 6460d3201471 ("arm64: io: Ensure calls to delay routines
+> are ordered against prior readX()")
+> Link: https://github.com/ClangBuiltLinux/continuous-integration/issues/78
+> Suggested-by: Nathan Chancellor <natechancellor@gmail.com>
+> Reviewed-by: Nathan Chancellor <natechancellor@gmail.com>
+> Signed-off-by: Nick Desaulniers <nick.desaulniers@gmail.com>
+> ---
+> Side note: is it not correct to cite SHAs from linux-next in "Fixes
+> commit ..." lines? I guess we can drop it.
+>
+> Link to regression build:
+> https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92799938
+>
+> Link to build w/ this patch:
+> https://travis-ci.com/ClangBuiltLinux/continuous-integration/builds/92935901
+>
+>
+>  arch/arm64/include/asm/io.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+> index d42d00d8d5b6..dbdebf81162b 100644
+> --- a/arch/arm64/include/asm/io.h
+> +++ b/arch/arm64/include/asm/io.h
+> @@ -115,7 +115,7 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+>   * later instructions. This ensures that a subsequent call to\
+>   * udelay() will be ordered due to the ISB in get_cycles().\
+>   */\
+> -asm volatile("eor%0, %1, %1\n"\
+> +asm volatile("eor%0, %x1, %x1\n"\
+>       "cbnz%0, ."\
+>       : "=r" (tmp) : "r" (v) : "memory");\
+>  })
+>
+
+--
+Julien Thierry
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
