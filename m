@@ -4,62 +4,88 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 38D92C43441
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:45:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5443BC41536
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:47:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0048221104
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:45:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 25E162145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 17:47:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bf40w+s6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0048221104
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Y0GyocKM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="kQ6AMKNV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25E162145D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pXjfZd5BxO9k6pbp/3A9P5WKzU728zxik0JTQ3sx1DA=; b=bf40w+s6XumOpK
-	idh8A3XyTsY24NPH/QRTdhBUM/B9voeUNK5qRq/if56wlbwXObiVMX8y3d6xQsx5ZnOuU7cPCi8+t
-	ZxHYG0tGOVhGwhK4NpIYWCRzqwT0crUgz89PX8kHeGSYoS9BEoqM4iKrlDx8PnHQjDOnXieTMeXsq
-	1xq9R86SfsvdlyUcFq9ALpVIBUV7Y9OOkeiBWg3bZz+Veo1f5k0AgwBJe57cW3U736GAicvU+y/Ty
-	e8RISEogPNnj4RbQMarq2dNmNQWSy9YJq7hskDX7AIlMEbqg3l2bTGfAsLskCowHRgu1IZDne9WSu
-	s52FZX7+8OCbd6q+RE+Q==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=ny9TC4iOhRklHyaT0O9UACIXdhbDAqDABVAURkRmNIA=; b=Y0GyocKMxN0Pr9iEOayfwqlCC8
+	ykAMQwNXqndInudWEUQmF0iA3U9LALNjnaFajXJeZN1yBymGe4DFxuu2IM+KXVJ5TRUMhK0rZK47o
+	whjwMUd+40thyVFyxIXw5HlOVV7AzsbpIKMb7csUoLUBJCL9/R/uHYK75vtabNLXJ9h75NuueGBhK
+	+erX/klszCwPEcuXaX04gjxnBpF8Jok+Du7Jr4CAj4/nq9V50DTxzrkaVOS/GyZ5XqMV0i47ylXVi
+	d9BTyUyrV6gvH7+4lU8AidQsg0AU5p3PydO6QDCOQvqp9Se0f1ObvBSqee+CU6T1jtZuMqn5moh4X
+	a/Vazdgg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSQN2-0007t6-BR; Thu, 29 Nov 2018 17:45:00 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSQMu-0007di-V8
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:44:54 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4FDA580D;
- Thu, 29 Nov 2018 09:44:41 -0800 (PST)
-Received: from lakrids.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 82A783F575;
- Thu, 29 Nov 2018 09:44:39 -0800 (PST)
-Date: Thu, 29 Nov 2018 17:44:37 +0000
-From: Mark Rutland <mark.rutland@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v6 08/24] arm64: Unmask PMR before going idle
-Message-ID: <20181129174436.avqjydyzvv6ubnjd@lakrids.cambridge.arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-9-git-send-email-julien.thierry@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1542023835-21446-9-git-send-email-julien.thierry@arm.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+	id 1gSQPO-00018m-S8; Thu, 29 Nov 2018 17:47:26 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSQPK-00016u-MN
+ for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 17:47:24 +0000
+Received: by mail-lf1-x144.google.com with SMTP id a16so2110314lfg.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 29 Nov 2018 09:47:20 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=Ypw3E2cISa9isgMf/o7XITSEw9/wZqS4XM12LoMTkow=;
+ b=kQ6AMKNVLBIpJnHJzhxVxBdeq6p4dRybfKd57cLFV+11FP5f2nQ2zAotum0p+il6Iz
+ Iu7IU385nMt69p6FNuUzimW1rcCMaGJIqXsH8MraCfMA4Cd+Bk9a2R6nL72vE6dH/Cfp
+ jQdnCajc65WnxPqJTNJ8OVFtAPOEQ2cqKOa5k=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=Ypw3E2cISa9isgMf/o7XITSEw9/wZqS4XM12LoMTkow=;
+ b=OxCQpzD9AW01IQgFSIRF3Zpe73pmheJz89/UCpmjfR8fnQn/oOR6d9i2k7JubxQLDc
+ Q5a6qYVocFzG5nwyxHl6zt+ILnI2qRcVlpcP0pyeb9Fn3eNc6YEWiMyTkKYQrmj9nYOU
+ tzrrr+ULtEIHAofi64oJ5cSjLjX+uhnpABtvy9Tn7wDsAvUoVllJgu/g1U9tGf1/fhak
+ 5E8H0UZK7vEifoD5ucs/TXdW5OPNtRaFi1RI7eUP0QMzrIxbGWLpGvvT5UeZ32BNkCMV
+ VgSbwxrll+kBxsZqXO4cQekvBlgs82CVXDzDYrVJSUOF8o4tLigfTf9VnOtT+ojhKh3V
+ v/og==
+X-Gm-Message-State: AA+aEWYUBo59gehSAH7+3QZQlvmFb592ShETRZo3p4fBUHuDJrVaTBP3
+ OMII5a3lmuzWJl0FmpBrUXNQnw==
+X-Google-Smtp-Source: AFSGD/WGJvop+182h8FNuMwezP92yqweV+YNjAIn/s145RayhnjXYyQ8qAfoLBs5uYoyAD30ooBrkw==
+X-Received: by 2002:a19:6a13:: with SMTP id u19mr1590988lfu.46.1543513639324; 
+ Thu, 29 Nov 2018 09:47:19 -0800 (PST)
+Received: from localhost.localdomain (h-158-174-22-210.NA.cust.bahnhof.se.
+ [158.174.22.210])
+ by smtp.gmail.com with ESMTPSA id j76-v6sm393983ljb.12.2018.11.29.09.47.17
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 29 Nov 2018 09:47:18 -0800 (PST)
+From: Ulf Hansson <ulf.hansson@linaro.org>
+To: "Rafael J . Wysocki" <rjw@rjwysocki.net>,
+ Sudeep Holla <sudeep.holla@arm.com>,
+ Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
+ Mark Rutland <mark.rutland@arm.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>, linux-pm@vger.kernel.org
+Subject: [PATCH v10 06/27] of: base: Add of_get_cpu_state_node() to get idle
+ states for a CPU node
+Date: Thu, 29 Nov 2018 18:46:39 +0100
+Message-Id: <20181129174700.16585-7-ulf.hansson@linaro.org>
+X-Mailer: git-send-email 2.17.1
+In-Reply-To: <20181129174700.16585-1-ulf.hansson@linaro.org>
+References: <20181129174700.16585-1-ulf.hansson@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_094453_014675_95470F46 
-X-CRM114-Status: GOOD (  23.58  )
+X-CRM114-CacheID: sfid-20181129_094722_743248_E95F28A8 
+X-CRM114-Status: GOOD (  20.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,158 +97,134 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: daniel.thompson@linaro.org, marc.zyngier@arm.com, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
- james.morse@arm.com, joel@joelfernandes.org,
+Cc: devicetree@vger.kernel.org, Ulf Hansson <ulf.hansson@linaro.org>,
+ Vincent Guittot <vincent.guittot@linaro.org>,
+ Geert Uytterhoeven <geert+renesas@glider.be>,
+ Kevin Hilman <khilman@kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Viresh Kumar <viresh.kumar@linaro.org>, linux-kernel@vger.kernel.org,
+ Lina Iyer <ilina@codeaurora.org>, Tony Lindgren <tony@atomide.com>,
+ Rob Herring <robh+dt@kernel.org>, linux-arm-msm@vger.kernel.org,
+ "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
  linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 12, 2018 at 11:56:59AM +0000, Julien Thierry wrote:
-> CPU does not received signals for interrupts with a priority masked by
-> ICC_PMR_EL1. This means the CPU might not come back from a WFI
-> instruction.
-> 
-> Make sure ICC_PMR_EL1 does not mask interrupts when doing a WFI.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/mm/proc.S | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
-> 
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index 2c75b0b..3c7064c 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -20,6 +20,7 @@
->  
->  #include <linux/init.h>
->  #include <linux/linkage.h>
-> +#include <linux/irqchip/arm-gic-v3.h>
->  #include <asm/assembler.h>
->  #include <asm/asm-offsets.h>
->  #include <asm/hwcap.h>
-> @@ -53,10 +54,27 @@
->   *	cpu_do_idle()
->   *
->   *	Idle the processor (wait for interrupt).
-> + *
-> + *	If the CPU supports priority masking we must do additional work to
-> + *	ensure that interrupts are not masked at the PMR (because the core will
-> + *	not wake up if we block the wake up signal in the interrupt controller).
->   */
->  ENTRY(cpu_do_idle)
-> +alternative_if_not ARM64_HAS_IRQ_PRIO_MASKING
-> +	dsb	sy				// WFI may enter a low-power mode
-> +	wfi
-> +	ret
-> +alternative_else
-> +	mrs	x0, daif			// save I bit
-> +	msr	daifset, #2			// set I bit
-> +	mrs_s	x1, SYS_ICC_PMR_EL1		// save PMR
-> +alternative_endif
-> +	mov	x2, #GIC_PRIO_IRQON
-> +	msr_s	SYS_ICC_PMR_EL1, x2		// unmask PMR
->  	dsb	sy				// WFI may enter a low-power mode
+The CPU's idle state nodes are currently parsed at the common cpuidle DT
+library, but also when initializing back-end data for the arch specific CPU
+operations, as in the PSCI driver case.
 
-Is the DSB SY sufficient and necessary to synchronise the update of
-SYS_ICC_PMR_EL1? We don't need an ISB too?
+To avoid open-coding, let's introduce of_get_cpu_state_node(), which takes
+the device node for the CPU and the index to the requested idle state node,
+as in-parameters. In case a corresponding idle state node is found, it
+returns the node with the refcount incremented for it, else it returns
+NULL.
 
->  	wfi
-> +	msr_s	SYS_ICC_PMR_EL1, x1		// restore PMR
+Moreover, for ARM, there are two generic methods, to describe the CPU's
+idle states, either via the flattened description through the
+"cpu-idle-states" binding [1] or via the hierarchical layout, using the
+"power-domains" and the "domain-idle-states" bindings [2]. Hence, let's
+take both options into account.
 
-Likewise, we don't need any barriers here before we poke DAIF?
+[1]
+Documentation/devicetree/bindings/arm/idle-states.txt
+[2]
+Documentation/devicetree/bindings/arm/psci.txt
 
-> +	msr	daif, x0			// restore I bit
->  	ret
->  ENDPROC(cpu_do_idle)
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree@vger.kernel.org
+Cc: Lina Iyer <ilina@codeaurora.org>
+Suggested-by: Sudeep Holla <sudeep.holla@arm.com>
+Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
 
-If we build without CONFIG_ARM64_PSEUDO_NMI surely we don't want to emit
-the alternative?
+Changes in v10:
+	- None.
 
-How about we move this to C, and have something like the below?
+---
+ drivers/of/base.c  | 35 +++++++++++++++++++++++++++++++++++
+ include/linux/of.h |  8 ++++++++
+ 2 files changed, 43 insertions(+)
 
-For the !CONFIG_ARM64_PSEUDO_NMI case it generates identical assembly to the
-existing cpu_do_idle(). Note that I've assumed we don't need barriers, which
-(as above) I'm not certain of.
-
-Thanks,
-Mark.
-
----->8----
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 7f1628effe6d..ccd2ad8c5e2f 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -73,6 +73,40 @@ EXPORT_SYMBOL_GPL(pm_power_off);
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 09692c9b32a7..8f6974a22006 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -429,6 +429,41 @@ int of_cpu_node_to_id(struct device_node *cpu_node)
+ }
+ EXPORT_SYMBOL(of_cpu_node_to_id);
  
- void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
- 
-+static inline void __cpu_do_idle(void)
-+{
-+       /* WFI may enter a low-power mode */
-+       dsb(sy);
-+       wfi();
-+}
-+
-+/*
-+ * When using priority masking we need to take extra care, etc.
++/**
++ * of_get_cpu_state_node - Get CPU's idle state node at the given index
++ *
++ * @cpu_node: The device node for the CPU
++ * @index: The index in the list of the idle states
++ *
++ * Two generic methods can be used to describe a CPU's idle states, either via
++ * a flattened description through the "cpu-idle-states" binding or via the
++ * hierarchical layout, using the "power-domains" and the "domain-idle-states"
++ * bindings. This function check for both and returns the idle state node for
++ * the requested index.
++ *
++ * In case and idle state node is found at index, the refcount incremented for
++ * it, so call of_node_put() on it when done. Returns NULL if not found.
 + */
-+static inline void __cpu_do_idle_irqprio(void)
++struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
++					  int index)
 +{
-+       unsigned long flags = arch_local_irq_save();
-+       unsigned long pmr = gic_read_pmr();
++	struct of_phandle_args args;
++	int err;
 +
-+       gic_write_pmr(GIC_PRIO_IRQON);
++	err = of_parse_phandle_with_args(cpu_node, "power-domains",
++					"#power-domain-cells", 0, &args);
++	if (!err) {
++		struct device_node *state_node =
++			of_parse_phandle(args.np, "domain-idle-states", index);
 +
-+       __cpu_do_idle();
++		of_node_put(args.np);
++		return state_node;
++	}
 +
-+       gic_write_pmr(pmr);
-+       arch_local_irq_enable();
++	return of_parse_phandle(cpu_node, "cpu-idle-states", index);
 +}
++EXPORT_SYMBOL(of_get_cpu_state_node);
 +
-+/*
-+ * Idle the processor (wait for interrupt).
-+ */
-+void cpu_do_idle(void)
-+{
-+       if (system_uses_irq_prio_masking())
-+               __cpu_do_idle_irqprio();
-+       else
-+               __cpu_do_idle();
-+}
-+
- /*
-  * This is our default idle handler.
-  */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 03646e6a2ef4..38c0171e52e2 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -49,17 +49,6 @@
- 
- #define MAIR(attr, mt) ((attr) << ((mt) * 8))
- 
--/*
-- *     cpu_do_idle()
-- *
-- *     Idle the processor (wait for interrupt).
-- */
--ENTRY(cpu_do_idle)
--       dsb     sy                              // WFI may enter a low-power mode
--       wfi
--       ret
--ENDPROC(cpu_do_idle)
--
- #ifdef CONFIG_CPU_PM
  /**
-  * cpu_do_suspend - save CPU registers context
+  * __of_device_is_compatible() - Check if the node matches given constraints
+  * @device: pointer to node
+diff --git a/include/linux/of.h b/include/linux/of.h
+index a5aee3c438ad..f9f0c65c095c 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -348,6 +348,8 @@ extern const void *of_get_property(const struct device_node *node,
+ 				int *lenp);
+ extern struct device_node *of_get_cpu_node(int cpu, unsigned int *thread);
+ extern struct device_node *of_get_next_cpu_node(struct device_node *prev);
++extern struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
++						 int index);
  
+ #define for_each_property_of_node(dn, pp) \
+ 	for (pp = dn->properties; pp != NULL; pp = pp->next)
+@@ -762,6 +764,12 @@ static inline struct device_node *of_get_next_cpu_node(struct device_node *prev)
+ 	return NULL;
+ }
+ 
++static inline struct device_node *of_get_cpu_state_node(struct device_node *cpu_node,
++					int index)
++{
++	return NULL;
++}
++
+ static inline int of_n_addr_cells(struct device_node *np)
+ {
+ 	return 0;
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
