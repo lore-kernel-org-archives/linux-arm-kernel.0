@@ -2,67 +2,62 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,FSL_HELO_FAKE,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D4EEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:58:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E4BCC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:59:45 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E2C162146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:58:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 42EAB2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:59:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IWPxsmbL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="mdz86olg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2C162146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mJjfITH5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 42EAB2146D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=AH6PG7T4s2zanLUMvTZDIQGMr4Bb7dg2SEg92mUh8gc=; b=IWPxsmbL+rjyV2
-	v6EFXK1p7O1Wef2Z11/gYsJedUWzMY9Ot6X5zC6DXDaGxFFgP1FHTaJ/UiuYID9XyOFzfPQ9rsZzL
-	LzmeUKFGLPdKRcPqmMDVAoEuNVMBnLxwShauj+jIANO/vY2ZtLt/4Uw4K25ycpW2/lhSwTTtOpfY3
-	VRWY8O+aVL964bp9o9SqYlTyRE/Jzr/62ouUIoLNiJdx/qvPiEXFy4kJfHVJBMKUnhtpew2eTDyAR
-	FUeHCLnEHq6EnQlu6EJ/5Z1j/vGzuTQtzBw1WYKSomRj5eNP3C90JE0G+IoD7az4Eh24pU3jZSJBb
-	Pkiqx6GumaG2CrIf9I4Q==;
+	List-Owner; bh=CDFOczM4gPFvzwpY0+SCw53TiWcx4eKhpGYCVemYdB0=; b=mJjfITH54WMYDw
+	MsqHdYEZID5Dh/7HqRgTUI57M/pGltFDPKjQ0bnWr1lWznuMUwomxMWx36Fbh8PP9f+86wTFfrNNY
+	kPAoeX7CLyRVCFzA+p3sbGiUg3Vhl++PCrlwAKkdg6w9HBuUVWI23O0Hit/fycJnx1fFCrzYEEP3I
+	MvqGh7mMHlbFXqepg2jfw/O01158+zGXd+HxjMdOBbG8cqn4y/+Xp3B6RkMmt/ylu6pcsnQc6Vpzr
+	b0I6UimVrS8BNCGnpDkZeeuO5XkiXb5r4q8ynZ7PCQ1a5meFhm0tuF8LUtDgUWcqstwq1GpdddjVX
+	meoO0IccyCiTjYdR43ig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSn3y-00053K-OE; Fri, 30 Nov 2018 17:58:50 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSn3Q-0004rY-C7
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:58:22 +0000
-Received: from gmail.com (unknown [104.132.1.85])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4853620834;
- Fri, 30 Nov 2018 17:58:05 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543600685;
- bh=YUM7HXgxbQCLX+SU5jHzJJ4IAUHEHp/OdtRCPJKsd3s=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=mdz86olgqb9M71SDZhKF6VOHFdRrw0sGasaXR2hPtLLNmAvS06Fyu80MalgNEc97/
- mrtytNm6xwsNljiAfhBamOtR87Rdqqnwu5vkq/KdC1UM5cLL7JvYdQ8jJtM4kR56wX
- eRaJLoCn6LQ95FzreSi0ouABnsfkVQMIZLihfV50=
-Date: Fri, 30 Nov 2018 09:58:03 -0800
-From: Eric Biggers <ebiggers@kernel.org>
-To: linux-crypto@vger.kernel.org, Herbert Xu <herbert@gondor.apana.org.au>
-Subject: Re: [PATCH v4 00/14] crypto: Adiantum support
-Message-ID: <20181130175802.GB135453@gmail.com>
-References: <20181117012631.23528-1-ebiggers@kernel.org>
+	id 1gSn4k-0005Pq-7k; Fri, 30 Nov 2018 17:59:38 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSn4B-00056q-4a
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:59:07 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 897A920DA7; Fri, 30 Nov 2018 18:58:51 +0100 (CET)
+Received: from localhost (87-231-134-186.rev.numericable.fr [87.231.134.186])
+ by mail.bootlin.com (Postfix) with ESMTPSA id DFDC720745;
+ Fri, 30 Nov 2018 18:58:37 +0100 (CET)
+From: Gregory CLEMENT <gregory.clement@bootlin.com>
+To: Ding Tao <miyatsu@qq.com>
+Subject: Re: [PATCH 2/2] arm64: dts: marvell: armada-37xx: Enable emmc on
+ espressobin
+References: <20181026115028.193203-1-miyatsu@qq.com>
+ <20181026115028.193203-2-miyatsu@qq.com>
+Date: Fri, 30 Nov 2018 18:58:38 +0100
+In-Reply-To: <20181026115028.193203-2-miyatsu@qq.com> (Ding Tao's message of
+ "Fri, 26 Oct 2018 11:50:28 +0000")
+Message-ID: <874lbymoq9.fsf@bootlin.com>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/25.2 (gnu/linux)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181117012631.23528-1-ebiggers@kernel.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_095816_570319_8A0896EF 
-X-CRM114-Status: GOOD (  11.76  )
+X-CRM114-CacheID: sfid-20181130_095903_689666_07D8C50C 
+X-CRM114-Status: GOOD (  16.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,41 +69,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "Jason A . Donenfeld" <Jason@zx2c4.com>, Greg Kaiser <gkaiser@google.com>,
- Tomer Ashur <tomer.ashur@esat.kuleuven.be>,
- Samuel Neves <samuel.c.p.neves@gmail.com>, linux-kernel@vger.kernel.org,
- linux-fscrypt@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Paul Crowley <paulcrowley@google.com>
+Cc: mark.rutland@arm.com, andrew@lunn.ch, jason@lakedaemon.net,
+ devicetree@vger.kernel.org, linux-kernel@vger.kernel.org, robh+dt@kernel.org,
+ linux-arm-kernel@lists.infradead.org, sebastian.hesselbarth@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 16, 2018 at 05:26:17PM -0800, Eric Biggers wrote:
-> 
-> Therefore, we (well, Paul Crowley did the real work) designed a new
-> encryption mode, Adiantum.  In essence, Adiantum makes it secure to use
-> the ChaCha stream cipher for disk encryption.  Adiantum is specified by
-> our paper here: https://eprint.iacr.org/2018/720.pdf ("Adiantum:
-> length-preserving encryption for entry-level processors").  Reference
-> code and test vectors are here: https://github.com/google/adiantum.
-> Most of the high-level concepts of Adiantum are not new; similar
-> existing modes include XCB, HCTR, and HCH.  Adiantum and these modes are
-> true wide-block modes (tweakable super-pseudorandom permutations), so
-> they actually provide a stronger notion of security than XTS.
-> 
+Hi Ding,
+ 
+ On ven., oct. 26 2018, Ding Tao <miyatsu@qq.com> wrote:
 
-In case anyone is interested: Paul and I have made some improvements to the
-Adiantum paper and have updated the preprint at the above link.  The algorithm
-is still the same, but explanations have been improved and the proof has been
-redone using a different technique that is easier to follow.  It also matches
-the version that will be published in IACR Transactions on Symmetric Cryptology
-(ToSC) Volume 2018 Issue 4.
+> The ESPRESSObin board has a emmc interface available on U11, let's
+> enable it.
 
-All versions of our paper can be found at https://eprint.iacr.org/2018/720, and
-the .tex source is at https://github.com/google/adiantum/tree/master/specification.
 
-- Eric
+Applied on mvebu/dt64 for now, but what happen if U11 is not populated?
+
+Thanks,
+
+Gregory
+
+>
+> Signed-off-by: Ding Tao <miyatsu@qq.com>
+> ---
+>  .../dts/marvell/armada-3720-espressobin.dts    | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> index 3ab25ad402b9..ee05aabbba88 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> +++ b/arch/arm64/boot/dts/marvell/armada-3720-espressobin.dts
+> @@ -60,6 +60,24 @@
+>  	cd-gpios = <&gpionb 3 GPIO_ACTIVE_LOW>;
+>  	marvell,pad-type = "sd";
+>  	vqmmc-supply = <&vcc_sd_reg1>;
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sdio_pins>;
+> +	status = "okay";
+> +};
+> +
+> +/* U11 */
+> +&sdhci0 {
+> +	non-removable;
+> +	bus-width = <8>;
+> +	mmc-ddr-1_8v;
+> +	mmc-hs400-1_8v;
+> +	marvell,xenon-emmc;
+> +	marvell,xenon-tun-count = <9>;
+> +	marvell,pad-type = "fixed-1-8v";
+> +
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc_pins>;
+>  	status = "okay";
+>  };
+>  
+> -- 
+> 2.17.1
+>
+>
+>
+
+-- 
+Gregory Clement, Bootlin
+Embedded Linux and Kernel engineering
+http://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
