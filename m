@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23D05C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:01:00 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C64D2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:01:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BFC7A2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:00:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 94DA02082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:01:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wo25MdLO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BFC7A2082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BGWqTKeP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 94DA02082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XE6pPRkS6jLG8h3lUh8wJIB/BBZ+hpL8m5dSfAV/pXk=; b=Wo25MdLOQTqjMR
-	uRYcv96QLl8+KqsFaEFaJfaQIsA9Ov9gyco6CntQ3B5vUQ2+EdeczZejanA4wqXS6jMZl9QTTkjIq
-	KMB9dVog6QwKWOgdkL88PiV7J7Eu116Y95R3K9owxwlt8NB095KOAFLhO91TE9U/HgEdZS/2fqg3+
-	or5klF9TfkSYbsSWjasVD0M6xvE1FrLoacVfWUcKvH65+b3QoCU20wVsl+PSjEVkBrJeNxIkeP3l+
-	7p9SYiNezXOeFUXGy6J/nc4T2yTp512jAqIAknVMTyAt4To5Uld/6Lik8zpyZmG6D2Sx7s13b1Eh4
-	oi1WZ362EmSa54kXYv/A==;
+	List-Owner; bh=GYH1m2KqOF5p7QXfve/e9tHnEyQKtZvhOiMyug9DtEk=; b=BGWqTKePKxeEEF
+	cND/ERRyu8q9mmTPb1JCOP8IO8VXaUjv8FqUVTaL+7c2Oem8gVndP7oEpnRbGEQ1rqqKwlQUTF9s9
+	fOIpIppD1Qn0LrkmjrsX1KNLrLSlrtN4abXpQMQKFS9dy0CV/+NLQgyBpnJ5WCHq00SVmXQ0RGjw7
+	lzQ5ylNlOwnmqEPspqtars0ZqbVGYZSC0rmq4zYz/0PTDFY7nwxRPmvMRip/bRbLAGz/ovZTottWd
+	/Kim1ST2NCHQ8vH7iYtV4mLeH/0tcHbm5KgIX8xyz4NdsSBuJbioHvp2woZlY6HsEHDad4Na+7Cz5
+	8NRAS3ZsXBgfCYgUxmkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSdjL-00035L-I3; Fri, 30 Nov 2018 08:00:55 +0000
+	id 1gSdje-0003La-DS; Fri, 30 Nov 2018 08:01:14 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSdhq-0000Ub-CZ
+ id 1gSdhq-0000Uj-CY
  for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:59:24 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 5AD065FDD9; Fri, 30 Nov 2018 15:58:55 +0800 (CST)
+ id 60E0F5FDF9; Fri, 30 Nov 2018 15:58:55 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 5/6] [DO NOT MERGE] ARM: dts: sunxi: bananapi-m2p: Add HDF5640
- camera module
-Date: Fri, 30 Nov 2018 15:58:48 +0800
-Message-Id: <20181130075849.16941-6-wens@csie.org>
+Subject: [PATCH 6/6] [DO NOT MERGE] ARM: dts: sunxi: libretech-all-h3-cc: Add
+ HDF5640 camera module
+Date: Fri, 30 Nov 2018 15:58:49 +0800
+Message-Id: <20181130075849.16941-7-wens@csie.org>
 X-Mailer: git-send-email 2.20.0.rc1
 In-Reply-To: <20181130075849.16941-1-wens@csie.org>
 References: <20181130075849.16941-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_235922_785561_3C297EE0 
-X-CRM114-Status: GOOD (  11.86  )
+X-CRM114-CacheID: sfid-20181129_235923_309710_867C7610 
+X-CRM114-Status: GOOD (  11.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,19 +75,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Bananapi M2+ comes with an optional sensor based on the ov5640 from
-Omnivision. Enable the support for it in the DT.
+The Libretech ALL-H3-CC is compatible with the Orange Pi's camera sensor
+module. This module itself features a detachable camera sensor module
+ribbon connector, which is populated with a GC2035 sensor by default.
+The connector is also compatible with Bananapi's HDF5640 camera module,
+which features an OV5640 sensor. The Orange Pi module however does not
+activate the auto focus feature of the HDF5640 module.
+
+Enable the camera by enabling the CSI controller, I2C control bus, and
+adding needed regulator supplies. As the schematics for the module are
+not available, the regulators and GPIO lines controlling them are just
+an educated guess.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi | 87 +++++++++++++++++++
- 1 file changed, 87 insertions(+)
+ .../boot/dts/sunxi-libretech-all-h3-cc.dtsi   | 81 +++++++++++++++++++
+ 1 file changed, 81 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-index b3283aeb5b7d..d97a98acf378 100644
---- a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-+++ b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
-@@ -89,6 +89,42 @@
+diff --git a/arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi b/arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi
+index 1eadc132390c..3252e1af59cd 100644
+--- a/arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi
++++ b/arch/arm/boot/dts/sunxi-libretech-all-h3-cc.dtsi
+@@ -52,6 +52,36 @@
  		};
  	};
  
@@ -98,7 +107,7 @@ index b3283aeb5b7d..d97a98acf378 100644
 +		regulator-max-microvolt = <2800000>;
 +		startup-delay-us = <200>; /* 50 us + board delays */
 +		enable-active-high;
-+		gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
++		gpio = <&r_pio 0 0 GPIO_ACTIVE_HIGH>; /* PL0 */
 +	};
 +
 +	reg_cam_dovdd: cam-dovdd {
@@ -106,15 +115,9 @@ index b3283aeb5b7d..d97a98acf378 100644
 +		regulator-name = "csi-dovdd";
 +		regulator-min-microvolt = <2800000>;
 +		regulator-max-microvolt = <2800000>;
-+		/*
-+		 * This regulator also powers the pull-ups for the I2C bus.
-+		 * For some reason, if this is turned off, subsequent use
-+		 * of the I2C bus, even when turned on, does not work.
-+		 */
 +		startup-delay-us = <200>; /* 50 us + board delays */
-+		regulator-always-on;
 +		enable-active-high;
-+		gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
++		gpio = <&r_pio 0 0 GPIO_ACTIVE_HIGH>; /* PL0 */
 +	};
 +
 +	reg_cam_dvdd: cam-dvdd {
@@ -124,14 +127,14 @@ index b3283aeb5b7d..d97a98acf378 100644
 +		regulator-max-microvolt = <1500000>;
 +		startup-delay-us = <200>; /* 50 us + board delays */
 +		enable-active-high;
-+		gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
++		gpio = <&r_pio 0 1 GPIO_ACTIVE_HIGH>; /* PL1 */
 +	};
 +
- 	reg_gmac_3v3: gmac-3v3 {
- 		      compatible = "regulator-fixed";
- 		      regulator-name = "gmac-3v3";
-@@ -106,6 +142,26 @@
- 	};
+ 	reg_vcc1v2: vcc1v2 {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vcc1v2";
+@@ -128,6 +158,26 @@
+ 	cpu-supply = <&reg_vdd_cpux>;
  };
  
 +&csi {
@@ -157,7 +160,7 @@ index b3283aeb5b7d..d97a98acf378 100644
  &de {
  	status = "okay";
  };
-@@ -149,6 +205,37 @@
+@@ -165,6 +215,37 @@
  	};
  };
  
@@ -172,8 +175,8 @@ index b3283aeb5b7d..d97a98acf378 100644
 +		clocks = <&ccu CLK_CSI_MCLK>;
 +		clock-names = "xclk";
 +
-+		reset-gpios = <&pio 4 14 GPIO_ACTIVE_LOW>; /* PE14 */
-+		powerdown-gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>; /* PE15 */
++		powerdown-gpios = <&pio 4 14 GPIO_ACTIVE_HIGH>; /* PE14 */
++		reset-gpios = <&pio 4 15 GPIO_ACTIVE_LOW>; /* PE15 */
 +		AVDD-supply = <&reg_cam_avdd>;
 +		DOVDD-supply = <&reg_cam_dovdd>;
 +		DVDD-supply = <&reg_cam_dvdd>;
