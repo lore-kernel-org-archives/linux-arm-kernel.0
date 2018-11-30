@@ -2,120 +2,87 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B213FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:03:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C06DDC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:05:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 88B372082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:03:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9626620867
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:05:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PJYAAkV4";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="h3UH+gBy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88B372082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rOG+CXJ4";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nPPwxdEy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9626620867
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+cc1kgC8ccQw8NtZyFrBmOGmMS2FZlZZcx0s3K49U+w=; b=PJYAAkV4HpmSJN
-	a7W2wTJQoMZYv4BGx+zs6P9fZaZqd2UbJfA8A9/Phm+prJ11FzThp4mKqMdJHcdjl+nVmpME2rmrk
-	C2zPJUdEZ9gPE2meCn9vvilELLO6njYu1q9k/vmGpTHWSO9ItNSf/EAY6TiFbLjYZndkmBQvcvOp+
-	wNYWqqkhkjXDBr3mx1q4hFqWOLh3Gph9oHVGe/lkYbwNR3CeTcQgCtlGTjzS9bAZ1U8PFNSm7ldxy
-	HiD1eqtPHqUtBKNzrLpxgIOgRO2skdci8N1zkrjXxBQDgWHSoc3rKRayGovNAUeHXJOiUxh4/7VJ+
-	zYOt05nZSDzjTDJfeMzw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=OTnQK9/rySYFRTNiaSfvazZMjkJRKabCAW1FSSlbYYs=; b=rOG+CXJ4Hq9CLJ
+	tELEZF4CpgsU8zblTd8JrNueR+vUW8Yg26myoOZsne+Gn3SxEPKu9bxE8bHyTWPYH9wtEY3xzw9k6
+	GikGdYI726mK/eSo7qTJd4ktmZndwEi2hVgkIsFB6+uSzD4fGFqwvzfUUd+ih3kP9Q+IunQWUsqR8
+	vuvaUqXayHZ3GaGztOI1gWmn4jODVnEcm9gTE72m1LTK9kZsBpXZjSC9xOMZfgI/CZtnErvb84Ogo
+	/6MS5IFPme3aGUQW/wmNzrCa65qEe49d0SqB7HnpoPHBLTcQmg+OCcMgQGwfejSlgbetg/+4tzagI
+	GOY1X+FRVYcE549UFNBA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSn8P-00083o-0C; Fri, 30 Nov 2018 18:03:25 +0000
-Received: from mail-db3eur04on0617.outbound.protection.outlook.com
- ([2a01:111:f400:fe0c::617]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gSnAI-0001In-3N; Fri, 30 Nov 2018 18:05:22 +0000
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSn8L-0007vr-NB
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 18:03:23 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=K3kEk1C8/SgQbZwJ1++jlvB7u9Z2vYsVOD893tXJU7s=;
- b=h3UH+gByKEyyZT+oqmEkSH1DlUm8x+LcNwzyHNtRTIbndu+PrqgCCtJdSVGGBirXXXFbGrX03tfscQA7n3jIIx0xMaAQWUV3QU7QZU8mHSzBdhuV8Aofv+aaRTDzVLuC7RY/UZy2B0utyCNCGZW9IsB6UQLUPp+kOQoN6wagF/U=
-Received: from DB7PR08MB3209.eurprd08.prod.outlook.com (52.134.110.159) by
- DB7PR08MB3067.eurprd08.prod.outlook.com (52.134.110.21) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1361.19; Fri, 30 Nov 2018 18:03:07 +0000
-Received: from DB7PR08MB3209.eurprd08.prod.outlook.com
- ([fe80::dd06:f986:fcee:10f1]) by DB7PR08MB3209.eurprd08.prod.outlook.com
- ([fe80::dd06:f986:fcee:10f1%2]) with mapi id 15.20.1382.020; Fri, 30 Nov 2018
- 18:03:07 +0000
-From: Catalin Marinas <Catalin.Marinas@arm.com>
-To: Julien Thierry <Julien.Thierry@arm.com>
-Subject: Re: [PATCH v6 01/24] arm64: Remove unused daif related
- functions/macros
-Thread-Topic: [PATCH v6 01/24] arm64: Remove unused daif related
- functions/macros
-Thread-Index: AQHUen7kuoTAE0DrWkWubNs+XKJLmaVouOSA
-Date: Fri, 30 Nov 2018 18:03:07 +0000
-Message-ID: <20181130180305.GK43329@arrakis.emea.arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-2-git-send-email-julien.thierry@arm.com>
-In-Reply-To: <1542023835-21446-2-git-send-email-julien.thierry@arm.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.10.1 (2018-07-13)
-x-originating-ip: [217.140.106.54]
-x-clientproxiedby: CWLP265CA0273.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:401:5c::21) To DB7PR08MB3209.eurprd08.prod.outlook.com
- (2603:10a6:5:1e::31)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Catalin.Marinas@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB7PR08MB3067;
- 6:01I1zbUARUdmnA0g9o60DZqi/hktgzeN1W0oYz8vISjB89qO5Z7Yqqzgec+pz3UVqjreA4c81V5UR/H5wb7TFfaQ8MJkqyK1/QFheasXfNkdO9IeiD5lJCPWPUaxZQs7FaFquAv9iEaggAnYrHdaKgGuHflKGwWuyfo90nAxDKBWDNqVDp2W8S+e+C0q0ihQj5ibXuyhTji3Ytdx2Gp55MJ8eXTel3zQe8r4bYcwZI1/s3Ry5WeDYScpORWjFCWl3WHb1gx67jZ2VsA76cO1bdjBc8aYbm9xYa0QXN2WtTNedLAkShaRm3p1NCm+KNUZfTc6c0WaNEllCvLBeOBO9390QIB6h2MBhq037u5qjvuM8cDiCKRZqGqobWLP/moOg0mH/wjcG8VF0x4LREluIaykwshdBFbx/fnEOelj4gQHquNt3+XhmojkhIXnEgWhkW4m5QLd5nK+TenKX2/cZw==;
- 5:VHbE+M3zTuuXdPrHdgKJocVLjnmqI9AjdQpcgDS3Tg+Ed72iOciO+PLpNpl6iOcI2TKcaYjelCryy97dwv76cZ/APLdFEexzFe00euB5PGA0MKOKHdzSZtTOx6vf98KUtJBg4x0EXCZRPKk+OL6MWjxsiU63ZbD/zA3Dqff0BNU=;
- 7:gpGuxYXMXKY/sR5hZjJhk/MAtdPsrpqY+tDN/BBce+2/bWifyY4/SxOEaEAGMcbwzJLTwNyd16nAeDJgQK6292yuVmQ/tGdutEeU9jsY+oAmj3ycvnpX9BtefDtAhuq0cGWit47JvJ7T8RSar8mCow==
-x-ms-office365-filtering-correlation-id: ba288146-9bd0-4975-6e51-08d656ee14fa
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB7PR08MB3067; 
-x-ms-traffictypediagnostic: DB7PR08MB3067:
-x-microsoft-antispam-prvs: <DB7PR08MB3067D1B848E4C0FED5E6F15AF2D30@DB7PR08MB3067.eurprd08.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3231453)(999002)(944501410)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:DB7PR08MB3067; BCL:0; PCL:0; RULEID:; SRVR:DB7PR08MB3067; 
-x-forefront-prvs: 087223B4DA
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(366004)(376002)(346002)(396003)(189003)(199004)(40434004)(102836004)(25786009)(106356001)(6512007)(81156014)(53936002)(97736004)(81166006)(99286004)(8936002)(8676002)(229853002)(5660300001)(14454004)(476003)(7736002)(4326008)(486006)(446003)(305945005)(11346002)(6862004)(1076002)(71190400001)(6246003)(71200400001)(44832011)(54906003)(386003)(33656002)(58126008)(6116002)(6636002)(3846002)(256004)(76176011)(6506007)(2906002)(6486002)(86362001)(72206003)(478600001)(5024004)(14444005)(316002)(52116002)(66066001)(26005)(186003)(68736007)(6436002)(105586002)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR08MB3067;
- H:DB7PR08MB3209.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: Jk3fdMM89zN4B5SdKxn4j3Egw7gPtPnq7DXIKNXosXU3ocuJ5Z7ErdcGCEUo7jRo3BFIebrr4U7nt8HYYSVuVNAYy3Ns5SqtaYYXisHdF6rbm15lvyUPHIbsJlFC4AmID/eaDW+1D5ETiaXx3q10tw8fwuXcw9VLqCZdwVQeQGOroG430bam1EQpTVPNPY1fSEUZBsS0nfYGQYCztNh8w45NV1qhAioHyuUmClxDStCR0KSQWiFXgN4qoDIaJqxWTcGw3XfphBBJ5gt9SUneafe0xO8xVpzjNs59DBChbq8aBuYVCi/I8zFN9pCwKtLRBnKyaxxbrEDsfiQ56wCZiBJQWM4jJTev0LhNUPw4bm0=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <8E47A73C5E5BFA4080A03A2DA6E8E1E4@eurprd08.prod.outlook.com>
+ id 1gSnAE-0000wy-BN
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 18:05:19 +0000
+Received: by mail-lf1-x143.google.com with SMTP id b20so4724230lfa.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 30 Nov 2018 10:05:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=ORrA66Jnsk2VmedMEWnNRYYi8IYilYtn+Su4c6IixN8=;
+ b=nPPwxdEyQj9sT80fPOn1XnDy5MqcfYBpqUJtSnxw6qdjPA4FuoKb6khtnFcvGL9yNa
+ fdVgdo9DErlTwps69SF5LsXM8X4dOlCizYSqDJoWgig4YXBEBGcLLgaND7haU1WIpw5U
+ new5dGxAOtgOEoW66tBtzzfu/Ft4ZNKSvKmoOh72DaL9h2Gchhz36b+GCeCIMjGj0ihd
+ 6XeozdlpyaxO30Q+zRLFkQG5xT4GFuU00/xM5GwORovr3l/AxgIsq25xihjYoREIQQ00
+ mEXAbWpx/gYsBrHw8TATZRR7gxwew2U4eQaM3MKcBuM/Vso4szC+isavFPv26as/gbK8
+ /HzA==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=ORrA66Jnsk2VmedMEWnNRYYi8IYilYtn+Su4c6IixN8=;
+ b=UiNajO4r9muR6++yLokKvyIwcFX9MD04//KIQ948GCI3GDIpfycPJKu7XdKXzmRc/E
+ /EXfXCa8YgjrB5TEZ1kQ3TORfesRUoHcxyCJZeKW1I9LWTWL4S58BJ2V6KAk0jQawZkZ
+ wLBPaSkJNhe8uJGSOYo0DEI6U5HR/QfvopBv8cNwVSFmnJYwkEFloYENVOgFOycLaXy2
+ /QwFGQqJFtx5xJbh3Jk7MaVf67r+r+0K+2lyILjeJFxM2/ugjeTC61+JF1qTRLHgD5SF
+ wocrzHbz1Ro3i1taOJG3Skgf3g2vkoIK0B18iAhEF6v9uaB08qOjtvq5JnSigikAxTNI
+ X9Jw==
+X-Gm-Message-State: AA+aEWbhdoi5V5flTNUepH+LebLL87nAUGzTI2v9NeUlwmY5oE8/yr9y
+ /zDD5Rq81XftUYfk9Dhuc+A=
+X-Google-Smtp-Source: AFSGD/VnLu/Gc48tTZjyAcqkqZJHYLTSydEi5RyJxIX3CKuyV6rPMYw0AR9uz1fkoMIKxYFhN0cfEw==
+X-Received: by 2002:a19:ee08:: with SMTP id g8mr4332600lfb.72.1543601105901;
+ Fri, 30 Nov 2018 10:05:05 -0800 (PST)
+Received: from localhost.localdomain
+ ([2a02:a315:5445:5300:dd88:5bb0:9191:dab2])
+ by smtp.googlemail.com with ESMTPSA id q6sm922199lfh.52.2018.11.30.10.05.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 30 Nov 2018 10:05:05 -0800 (PST)
+From: =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+To: kgene@kernel.org, krzk@kernel.org, robh+dt@kernel.org, mark.rutland@arm.com
+Subject: [PATCH] ARM: dts: s5pv210: Add s5p-jpeg codec node.
+Date: Fri, 30 Nov 2018 19:04:23 +0100
+Message-Id: <20181130180423.9421-1-pawel.mikolaj.chmiel@gmail.com>
+X-Mailer: git-send-email 2.17.1
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: ba288146-9bd0-4975-6e51-08d656ee14fa
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Nov 2018 18:03:07.7103 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR08MB3067
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_100321_754199_593DFB50 
-X-CRM114-Status: GOOD (  12.82  )
+X-CRM114-CacheID: sfid-20181130_100518_418005_D14907DF 
+X-CRM114-Status: GOOD (  10.90  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,33 +94,27 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "daniel.thompson@linaro.org" <daniel.thompson@linaro.org>,
- Marc Zyngier <Marc.Zyngier@arm.com>, Will Deacon <Will.Deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Christoffer Dall <Christoffer.Dall@arm.com>, James Morse <James.Morse@arm.com>,
- "joel@joelfernandes.org" <joel@joelfernandes.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: devicetree@vger.kernel.org, linux-samsung-soc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ =?UTF-8?q?Pawe=C5=82=20Chmiel?= <pawel.mikolaj.chmiel@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 12, 2018 at 11:56:52AM +0000, Julien Thierry wrote:
-> There are some helpers to modify PSR.[DAIF] bits that are not referenced
-> anywhere. The less these bits are available outside of local_irq_*
-> functions the better.
->
-> Get rid of those unused helpers.
->
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhpcyBjb21taXQgYWRkcyBub2RlIGZvciBzNXAtanBlZyBjb2RlYywKd2hpY2ggaXMgcHJlc2Vu
+dCBpbiBTNVBWMjEwIFNPQy4KClNpZ25lZC1vZmYtYnk6IFBhd2XFgiBDaG1pZWwgPHBhd2VsLm1p
+a29sYWouY2htaWVsQGdtYWlsLmNvbT4KLS0tCiBhcmNoL2FybS9ib290L2R0cy9zNXB2MjEwLmR0
+c2kgfCA5ICsrKysrKysrKwogMSBmaWxlIGNoYW5nZWQsIDkgaW5zZXJ0aW9ucygrKQoKZGlmZiAt
+LWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL3M1cHYyMTAuZHRzaSBiL2FyY2gvYXJtL2Jvb3QvZHRz
+L3M1cHYyMTAuZHRzaQppbmRleCA3NWY0NTRhMjEwZDYuLjEyZWFjODkzMGVhYyAxMDA2NDQKLS0t
+IGEvYXJjaC9hcm0vYm9vdC9kdHMvczVwdjIxMC5kdHNpCisrKyBiL2FyY2gvYXJtL2Jvb3QvZHRz
+L3M1cHYyMTAuZHRzaQpAQCAtNjI3LDYgKzYyNywxNSBAQAogCQkJCXNhbXN1bmcsbGNkLXdiOwog
+CQkJfTsKIAkJfTsKKworCQlqcGVnX2NvZGVjOiBqcGVnLWNvZGVjQGZiNjAwMDAwIHsKKwkJCWNv
+bXBhdGlibGUgPSAic2Ftc3VuZyxzNXB2MjEwLWpwZWciOworCQkJcmVnID0gPDB4ZmI2MDAwMDAg
+MHgxMDAwPjsKKwkJCWludGVycnVwdC1wYXJlbnQgPSA8JnZpYzI+OworCQkJaW50ZXJydXB0cyA9
+IDw4PjsKKwkJCWNsb2NrcyA9IDwmY2xvY2tzIENMS19KUEVHPjsKKwkJCWNsb2NrLW5hbWVzID0g
+ImpwZWciOworCQl9OwogCX07CiB9OwogCi0tIAoyLjE3LjEKCgpfX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlz
+dApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJh
+ZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
