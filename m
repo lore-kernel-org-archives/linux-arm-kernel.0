@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E08C0C64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:05:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BE15C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:06:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B013B20673
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:05:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5A58520673
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:06:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VhV+YrJQ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B013B20673
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IUzH5w+I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5A58520673
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,40 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
 	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=q/qbC3cZKFYhesfTlM0Y+YNpBOjx89bH4wMJyZEAb7w=; b=VhV+YrJQDuPIEGCt1nYvaLKAY
-	MO7+P7IFW4ovo3oVqrJ043qTl08b6zJGAlBk6lansYLhYPwROSjq6PB9Na6kSRsSmNRJ7zOZo60b8
-	vDVy3yCEd6q5ie2LIjPEwk7ytcGLVvChEgbjGdpwv5F43tP0Aiu9lzaHTrtpjvXsk68PCsfJUDH3j
-	Sbaozac3MHICDsTUs+/8wa1OE6RiEHUnOHoRFs27xNz+H6mnVDRTM/KJ4glCDfZYoBrPOtfcJ9KPZ
-	wbz3Yy9sogJgigC7QOsFT+wA1Gj/xXpi71TYFJQPmcAXrAvo4NmtXHn2jjRdO/1Sk00bnsxW683p4
-	wiJRMYYwA==;
+	 bh=OLrDHsNyv1uYTwdJcAMp5So5AWW08PY4P9h8k4LaSyA=; b=IUzH5w+IB2pwZoGqqvyeJ3gnj
+	zgHy0N0FOtvlWISG4sWA6dMANCB3oUFEeM+LHk+gnjVsq21rMi3RdPyTHtCEB5KicGm4S6SJi4S6n
+	cGdCcRJMeHBzmjiUjWiwxgPejpDREHRI2SxVqido2VL9DWWQKnRQLVLTZZqLw98LW7DYNXeKdrXMW
+	jB2nR1pIT+saHWffv6CPPzGZfpVA6YAnPvjVnKb0c+Fdz9Oe0WNYUW3nqc2MOn1GvxtICrOkFna/9
+	c/kgglQCgu0qJDqa2V/NjWiow4NJkFtG7nfO+08zltD2ptEjodaIiEfVPV5nWy4uA8v86KUwaeo9d
+	Sq5IdpLjg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSo6A-0001nu-5I; Fri, 30 Nov 2018 19:05:10 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gSo7E-00038N-Pz; Fri, 30 Nov 2018 19:06:16 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSo5w-0001Kl-Cu
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 19:04:57 +0000
+ id 1gSo6J-0001oZ-J9
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 19:05:29 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2B611165C;
- Fri, 30 Nov 2018 11:04:44 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 47728165C;
+ Fri, 30 Nov 2018 11:05:09 -0800 (PST)
 Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C7AFA3F575;
- Fri, 30 Nov 2018 11:04:42 -0800 (PST)
-Subject: Re: [PATCH 1/9] dma-direct: provide page based alloc/free helpers
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E19EC3F575;
+ Fri, 30 Nov 2018 11:05:07 -0800 (PST)
+Subject: Re: [PATCH 3/9] dma-mapping: move the remap helpers to a separate file
 To: Christoph Hellwig <hch@lst.de>, iommu@lists.linux-foundation.org
 References: <20181105121931.13481-1-hch@lst.de>
- <20181105121931.13481-2-hch@lst.de>
+ <20181105121931.13481-4-hch@lst.de>
 From: Robin Murphy <robin.murphy@arm.com>
-Message-ID: <3b6439f3-fb7e-aaf7-01b9-b0fb03a27a69@arm.com>
-Date: Fri, 30 Nov 2018 19:04:41 +0000
+Message-ID: <eec8d6ba-d41a-51d4-d5ed-39982fed095d@arm.com>
+Date: Fri, 30 Nov 2018 19:05:06 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181105121931.13481-2-hch@lst.de>
+In-Reply-To: <20181105121931.13481-4-hch@lst.de>
 Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_110456_449655_D239A7D8 
-X-CRM114-Status: GOOD (  23.36  )
+X-CRM114-CacheID: sfid-20181130_110520_528121_294EF058 
+X-CRM114-Status: GOOD (  29.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,109 +81,293 @@ Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 On 05/11/2018 12:19, Christoph Hellwig wrote:
-> Some architectures support remapping highmem into DMA coherent
-> allocations.  To use the common code for them we need variants of
-> dma_direct_{alloc,free}_pages that do not use kernel virtual addresses.
+> The dma remap code only really makes sense for not cache coherent
+> architectures,
 
-FWIW it's as much about non-cacheable remapping of lowmem as it is about 
-highmem. Regardless, the diff looks OK to me.
+And coherent ones with highmem, presumably? That can at least be the 
+case on 32-bit Arm, where coherent LPAE systems do exist (e.g. Calxeda 
+Midway).
+
+> and currently is only used by arm, arm64 and xtensa.
+> Split it out into a separate file with a separate Kconfig symbol,
+> which gets the right copyright notice given that this code was
+> written by Laura Abbott working for Code Aurora at that point.
+
+Ignoring the further super-nitpick that the comments got subtle grammar 
+fixes in some places but not others,
 
 Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
 > Signed-off-by: Christoph Hellwig <hch@lst.de>
+> Acked-by: Laura Abbott <labbott@redhat.com>
 > ---
->   include/linux/dma-direct.h |  3 +++
->   kernel/dma/direct.c        | 32 ++++++++++++++++++++++----------
->   2 files changed, 25 insertions(+), 10 deletions(-)
+>   arch/arm/Kconfig     |  1 +
+>   arch/arm64/Kconfig   |  1 +
+>   arch/csky/Kconfig    |  1 +
+>   arch/xtensa/Kconfig  |  1 +
+>   kernel/dma/Kconfig   |  4 ++
+>   kernel/dma/Makefile  |  2 +-
+>   kernel/dma/mapping.c | 84 ------------------------------------------
+>   kernel/dma/remap.c   | 88 ++++++++++++++++++++++++++++++++++++++++++++
+>   8 files changed, 97 insertions(+), 85 deletions(-)
+>   create mode 100644 kernel/dma/remap.c
 > 
-> diff --git a/include/linux/dma-direct.h b/include/linux/dma-direct.h
-> index bd73e7a91410..5a7a3bbb912f 100644
-> --- a/include/linux/dma-direct.h
-> +++ b/include/linux/dma-direct.h
-> @@ -67,6 +67,9 @@ void *dma_direct_alloc_pages(struct device *dev, size_t size,
->   		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs);
->   void dma_direct_free_pages(struct device *dev, size_t size, void *cpu_addr,
->   		dma_addr_t dma_addr, unsigned long attrs);
-> +struct page *__dma_direct_alloc_pages(struct device *dev, size_t size,
-> +		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs);
-> +void __dma_direct_free_pages(struct device *dev, size_t size, struct page *page);
->   dma_addr_t dma_direct_map_page(struct device *dev, struct page *page,
->   		unsigned long offset, size_t size, enum dma_data_direction dir,
->   		unsigned long attrs);
-> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
-> index 22a12ab5a5e9..680287779b0a 100644
-> --- a/kernel/dma/direct.c
-> +++ b/kernel/dma/direct.c
-> @@ -103,14 +103,13 @@ static bool dma_coherent_ok(struct device *dev, phys_addr_t phys, size_t size)
->   			min_not_zero(dev->coherent_dma_mask, dev->bus_dma_mask);
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 91be74d8df65..3b2852df6eb3 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -30,6 +30,7 @@ config ARM
+>   	select CPU_PM if (SUSPEND || CPU_IDLE)
+>   	select DCACHE_WORD_ACCESS if HAVE_EFFICIENT_UNALIGNED_ACCESS
+>   	select DMA_DIRECT_OPS if !MMU
+> +	select DMA_REMAP if MMU
+>   	select EDAC_SUPPORT
+>   	select EDAC_ATOMIC_SCRUB
+>   	select GENERIC_ALLOCATOR
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 787d7850e064..5d065acb6d10 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -82,6 +82,7 @@ config ARM64
+>   	select CRC32
+>   	select DCACHE_WORD_ACCESS
+>   	select DMA_DIRECT_OPS
+> +	select DMA_REMAP
+>   	select EDAC_SUPPORT
+>   	select FRAME_POINTER
+>   	select GENERIC_ALLOCATOR
+> diff --git a/arch/csky/Kconfig b/arch/csky/Kconfig
+> index cb64f8dacd08..8a30e006a845 100644
+> --- a/arch/csky/Kconfig
+> +++ b/arch/csky/Kconfig
+> @@ -9,6 +9,7 @@ config CSKY
+>   	select CLKSRC_OF
+>   	select DMA_DIRECT_OPS
+>   	select DMA_NONCOHERENT_OPS
+> +	select DMA_REMAP
+>   	select IRQ_DOMAIN
+>   	select HANDLE_DOMAIN_IRQ
+>   	select DW_APB_TIMER_OF
+> diff --git a/arch/xtensa/Kconfig b/arch/xtensa/Kconfig
+> index d29b7365da8d..239bfb16c58b 100644
+> --- a/arch/xtensa/Kconfig
+> +++ b/arch/xtensa/Kconfig
+> @@ -11,6 +11,7 @@ config XTENSA
+>   	select CLONE_BACKWARDS
+>   	select COMMON_CLK
+>   	select DMA_DIRECT_OPS
+> +	select DMA_REMAP if MMU
+>   	select GENERIC_ATOMIC64
+>   	select GENERIC_CLOCKEVENTS
+>   	select GENERIC_IRQ_SHOW
+> diff --git a/kernel/dma/Kconfig b/kernel/dma/Kconfig
+> index 645c7a2ecde8..c92e08173ed8 100644
+> --- a/kernel/dma/Kconfig
+> +++ b/kernel/dma/Kconfig
+> @@ -51,3 +51,7 @@ config SWIOTLB
+>   	bool
+>   	select DMA_DIRECT_OPS
+>   	select NEED_DMA_MAP_STATE
+> +
+> +config DMA_REMAP
+> +	depends on MMU
+> +	bool
+> diff --git a/kernel/dma/Makefile b/kernel/dma/Makefile
+> index 7d581e4eea4a..f4feeceb8020 100644
+> --- a/kernel/dma/Makefile
+> +++ b/kernel/dma/Makefile
+> @@ -7,4 +7,4 @@ obj-$(CONFIG_DMA_DIRECT_OPS)		+= direct.o
+>   obj-$(CONFIG_DMA_VIRT_OPS)		+= virt.o
+>   obj-$(CONFIG_DMA_API_DEBUG)		+= debug.o
+>   obj-$(CONFIG_SWIOTLB)			+= swiotlb.o
+> -
+> +obj-$(CONFIG_DMA_REMAP)			+= remap.o
+> diff --git a/kernel/dma/mapping.c b/kernel/dma/mapping.c
+> index 58dec7a92b7b..dfbc3deb95cd 100644
+> --- a/kernel/dma/mapping.c
+> +++ b/kernel/dma/mapping.c
+> @@ -262,87 +262,3 @@ int dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
+>   #endif /* !CONFIG_ARCH_NO_COHERENT_DMA_MMAP */
 >   }
->   
-> -void *dma_direct_alloc_pages(struct device *dev, size_t size,
-> +struct page *__dma_direct_alloc_pages(struct device *dev, size_t size,
->   		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
->   {
->   	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->   	int page_order = get_order(size);
->   	struct page *page = NULL;
->   	u64 phys_mask;
-> -	void *ret;
->   
->   	if (attrs & DMA_ATTR_NO_WARN)
->   		gfp |= __GFP_NOWARN;
-> @@ -150,11 +149,22 @@ void *dma_direct_alloc_pages(struct device *dev, size_t size,
->   		}
->   	}
->   
-> +	return page;
-> +}
-> +
-> +void *dma_direct_alloc_pages(struct device *dev, size_t size,
-> +		dma_addr_t *dma_handle, gfp_t gfp, unsigned long attrs)
-> +{
-> +	struct page *page;
-> +	void *ret;
-> +
-> +	page = __dma_direct_alloc_pages(dev, size, dma_handle, gfp, attrs);
->   	if (!page)
->   		return NULL;
-> +
->   	ret = page_address(page);
->   	if (force_dma_unencrypted()) {
-> -		set_memory_decrypted((unsigned long)ret, 1 << page_order);
-> +		set_memory_decrypted((unsigned long)ret, 1 << get_order(size));
->   		*dma_handle = __phys_to_dma(dev, page_to_phys(page));
->   	} else {
->   		*dma_handle = phys_to_dma(dev, page_to_phys(page));
-> @@ -163,20 +173,22 @@ void *dma_direct_alloc_pages(struct device *dev, size_t size,
->   	return ret;
->   }
->   
+>   EXPORT_SYMBOL(dma_common_mmap);
+> -
+> -#ifdef CONFIG_MMU
+> -static struct vm_struct *__dma_common_pages_remap(struct page **pages,
+> -			size_t size, unsigned long vm_flags, pgprot_t prot,
+> -			const void *caller)
+> -{
+> -	struct vm_struct *area;
+> -
+> -	area = get_vm_area_caller(size, vm_flags, caller);
+> -	if (!area)
+> -		return NULL;
+> -
+> -	if (map_vm_area(area, prot, pages)) {
+> -		vunmap(area->addr);
+> -		return NULL;
+> -	}
+> -
+> -	return area;
+> -}
+> -
 > -/*
-> - * NOTE: this function must never look at the dma_addr argument, because we want
-> - * to be able to use it as a helper for iommu implementations as well.
+> - * remaps an array of PAGE_SIZE pages into another vm_area
+> - * Cannot be used in non-sleeping contexts
 > - */
-> +void __dma_direct_free_pages(struct device *dev, size_t size, struct page *page)
-> +{
-> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> -void *dma_common_pages_remap(struct page **pages, size_t size,
+> -			unsigned long vm_flags, pgprot_t prot,
+> -			const void *caller)
+> -{
+> -	struct vm_struct *area;
+> -
+> -	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> -	if (!area)
+> -		return NULL;
+> -
+> -	area->pages = pages;
+> -
+> -	return area->addr;
+> -}
+> -
+> -/*
+> - * remaps an allocated contiguous region into another vm_area.
+> - * Cannot be used in non-sleeping contexts
+> - */
+> -
+> -void *dma_common_contiguous_remap(struct page *page, size_t size,
+> -			unsigned long vm_flags,
+> -			pgprot_t prot, const void *caller)
+> -{
+> -	int i;
+> -	struct page **pages;
+> -	struct vm_struct *area;
+> -
+> -	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> -	if (!pages)
+> -		return NULL;
+> -
+> -	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+> -		pages[i] = nth_page(page, i);
+> -
+> -	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> -
+> -	kfree(pages);
+> -
+> -	if (!area)
+> -		return NULL;
+> -	return area->addr;
+> -}
+> -
+> -/*
+> - * unmaps a range previously mapped by dma_common_*_remap
+> - */
+> -void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+> -{
+> -	struct vm_struct *area = find_vm_area(cpu_addr);
+> -
+> -	if (!area || (area->flags & vm_flags) != vm_flags) {
+> -		WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
+> -		return;
+> -	}
+> -
+> -	unmap_kernel_range((unsigned long)cpu_addr, PAGE_ALIGN(size));
+> -	vunmap(cpu_addr);
+> -}
+> -#endif
+> diff --git a/kernel/dma/remap.c b/kernel/dma/remap.c
+> new file mode 100644
+> index 000000000000..456f7cc3414d
+> --- /dev/null
+> +++ b/kernel/dma/remap.c
+> @@ -0,0 +1,88 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (c) 2014 The Linux Foundation
+> + */
+> +#include <linux/dma-mapping.h>
+> +#include <linux/slab.h>
+> +#include <linux/vmalloc.h>
 > +
-> +	if (!dma_release_from_contiguous(dev, page, count))
-> +		__free_pages(page, get_order(size));
+> +static struct vm_struct *__dma_common_pages_remap(struct page **pages,
+> +			size_t size, unsigned long vm_flags, pgprot_t prot,
+> +			const void *caller)
+> +{
+> +	struct vm_struct *area;
+> +
+> +	area = get_vm_area_caller(size, vm_flags, caller);
+> +	if (!area)
+> +		return NULL;
+> +
+> +	if (map_vm_area(area, prot, pages)) {
+> +		vunmap(area->addr);
+> +		return NULL;
+> +	}
+> +
+> +	return area;
 > +}
 > +
->   void dma_direct_free_pages(struct device *dev, size_t size, void *cpu_addr,
->   		dma_addr_t dma_addr, unsigned long attrs)
->   {
-> -	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->   	unsigned int page_order = get_order(size);
->   
->   	if (force_dma_unencrypted())
->   		set_memory_encrypted((unsigned long)cpu_addr, 1 << page_order);
-> -	if (!dma_release_from_contiguous(dev, virt_to_page(cpu_addr), count))
-> -		free_pages((unsigned long)cpu_addr, page_order);
-> +	__dma_direct_free_pages(dev, size, virt_to_page(cpu_addr));
->   }
->   
->   void *dma_direct_alloc(struct device *dev, size_t size,
+> +/*
+> + * remaps an array of PAGE_SIZE pages into another vm_area
+> + * Cannot be used in non-sleeping contexts
+> + */
+> +void *dma_common_pages_remap(struct page **pages, size_t size,
+> +			unsigned long vm_flags, pgprot_t prot,
+> +			const void *caller)
+> +{
+> +	struct vm_struct *area;
+> +
+> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> +	if (!area)
+> +		return NULL;
+> +
+> +	area->pages = pages;
+> +
+> +	return area->addr;
+> +}
+> +
+> +/*
+> + * Remaps an allocated contiguous region into another vm_area.
+> + * Cannot be used in non-sleeping contexts
+> + */
+> +void *dma_common_contiguous_remap(struct page *page, size_t size,
+> +			unsigned long vm_flags,
+> +			pgprot_t prot, const void *caller)
+> +{
+> +	int i;
+> +	struct page **pages;
+> +	struct vm_struct *area;
+> +
+> +	pages = kmalloc(sizeof(struct page *) << get_order(size), GFP_KERNEL);
+> +	if (!pages)
+> +		return NULL;
+> +
+> +	for (i = 0; i < (size >> PAGE_SHIFT); i++)
+> +		pages[i] = nth_page(page, i);
+> +
+> +	area = __dma_common_pages_remap(pages, size, vm_flags, prot, caller);
+> +
+> +	kfree(pages);
+> +
+> +	if (!area)
+> +		return NULL;
+> +	return area->addr;
+> +}
+> +
+> +/*
+> + * Unmaps a range previously mapped by dma_common_*_remap
+> + */
+> +void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
+> +{
+> +	struct vm_struct *area = find_vm_area(cpu_addr);
+> +
+> +	if (!area || (area->flags & vm_flags) != vm_flags) {
+> +		WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
+> +		return;
+> +	}
+> +
+> +	unmap_kernel_range((unsigned long)cpu_addr, PAGE_ALIGN(size));
+> +	vunmap(cpu_addr);
+> +}
 > 
 
 _______________________________________________
