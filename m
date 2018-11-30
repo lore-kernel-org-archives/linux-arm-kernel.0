@@ -2,21 +2,22 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5CAECC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:03:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2CB3AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:04:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2ACA121473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:03:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EDDE12145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:04:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Cmb2C37G";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="06nqnrTf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2ACA121473
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="l4soamDx";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="iu2spBN/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="w8Aj0Rrs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EDDE12145D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=FN1UxNY2XCIZJgB0hbyoJoB1w13AVpIv07HXioTTNC0=; b=Cmb2C37GZqmi7O
-	PK+enkM04aNXMPhuktfeC8WnJ1oazPHPFW+1+Y2KiafEk59+SIHuL60Iq/Hosui55CgZs4Ilsr/T4
-	MXx/B2NNTjwNEyU7PFkDKjL0+Bpgp64esDOeaqVkHE/zHI0oVz1X20FxfxqOSN1zXvKgk03PWvalI
-	eAR1eFzxZTY0MmT8G6U8dY0z0XIeGh4m5Ta/uPSkRU3YCS/3LlhudxYlfhYiEYBaLLZcdedTa00Tj
-	dcLrfPsKF3I168GbopGjf4/hVq5XNJQAGhibwYhBgHuhcn7KpCw6l3jG0BJBrKzYPYmRdbEORjPzn
-	mZEhDXVne8KfUYtuBI0g==;
+	List-Owner; bh=jUQvuW40VzASSCQHuWc6A57Q164ecWroMA//MwKQS24=; b=l4soamDx5MlEqc
+	zSeltizC5krHwSDfBS0yRwSfTGFeRcCoXtEvymlDm6vb8dLSv3Gu8DGP6ortINTVBNo1joRD5X3Ui
+	686z6b1O+oh8CpPfh9BMsTM2csEQnhNL3tKxSjhfz7GhOBFTIqyP2ICOlnw5lk3BA7pwdI17BswCh
+	b9kn/ZrF6NuPFRCqgXxWQYQFJhlCwlZhbFmgkrhL+PaAus/to0phDWMql3lwSC4JcVx/tXRw4Qk7H
+	V0uYpZCn5tZ73iOU48sTLIMdz+md197WUZeSfOd6RS1Av9ueCuBNdHx0+U5j+U9ker6TAoWi0frbn
+	BUftdVkuYau8F9ZIR5aw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gScpy-0003Fx-3f; Fri, 30 Nov 2018 07:03:42 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gScqY-0003eB-RQ; Fri, 30 Nov 2018 07:04:18 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gScpv-0003A2-A0; Fri, 30 Nov 2018 07:03:40 +0000
+ id 1gScpz-0003Dj-DS; Fri, 30 Nov 2018 07:03:43 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Date:Subject:Message-ID:References:Cc:
+ In-Reply-To:From:To:Content-Transfer-Encoding:MIME-Version:Content-Type:
+ Sender:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+ Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=FpU+sXY1T/Zpbt+sSPXWrQNW5KLWFluYs/jM2zIdhjM=; b=iu2spBN/TjNCGReJYNZMVYtZUb
+ +OSLvyAmAJ8HgvdyedO/GcgmeCyLcCaURhyhH/Ywu31M/DbwRM4nr2jCf+vTEnL0F42Sk6mYWaJtU
+ 5wOLcri2xgCuTWCAve60R0Fquyr0WvwSll2ohbdxXI/qevgKCx3M7gDs39f0qtlzVcj49psB3DNeC
+ DEP/Uv4UltFOBFhA9CGnpC4W467l1tOJ6970irqwDOUa5JHNGDSYwAlSpuOKuawEcvp9ijpTeCT9f
+ gwdci1YBY1lDjqlzia8bmjwoplsIKRoETjpctKNNeC64cRk2FKzMH9MxIqEqIeLUgxfdElfnx1VH7
+ tMzwOMwA==;
+Received: from mail.kernel.org ([198.145.29.99])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gScbn-0003Rh-SY; Fri, 30 Nov 2018 06:49:05 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id AC3A12145D;
- Fri, 30 Nov 2018 07:03:28 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 6066420863;
+ Fri, 30 Nov 2018 06:48:52 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543561408;
- bh=RkKCI7Pxt7bx3MBwO+HtfwrHSzsfYZtr5xl/nny+qBE=;
+ s=default; t=1543560532;
+ bh=FpU+sXY1T/Zpbt+sSPXWrQNW5KLWFluYs/jM2zIdhjM=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=06nqnrTff+RccCtByMEXZoCjJlHmqOGCacHXWQ9tPpdybTG4HxGG+vgshuNOta7gX
- u5Fa1hxGSFZ/qPoDLzve73sou4Sfm28v/Bll6FTyJMiZtkMldq3DsnHUWC+Yfs/+Aw
- zoqrWbr+zYXyl/kryH3aQphSkNpkJ3QgELI2d9qk=
+ b=w8Aj0RrsuijrqNJGUYuBPmCezhOECIqT98CdDUBbu2lvJDCNlwgrdhiVx/1m1rD9a
+ pPoZFrUUl+cR+/oxDdl+S6XUGw9ZVP6kLgXa7lcepOpZW+dwp7F54rI7+PZEgUegsh
+ PuEEPUYiLeu2wTAMwMdKwbtj8iEme0ZgXbz2/aWE=
 MIME-Version: 1.0
-To: Rob Herring <robh+dt@kernel.org>
+To: matthias.bgg@gmail.com, matthias.bgg@kernel.org, mturquette@baylibre.com
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <CAL_JsqJuZAr7ndznrUu0cuM7DpB5A7ixjJ+vZ97s5G4xz0sVow@mail.gmail.com>
-References: <20181106183609.207702-1-sboyd@kernel.org>
- <20181106183609.207702-2-sboyd@kernel.org>
- <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
- <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
- <154353772392.88331.16937191244549721858@swboyd.mtv.corp.google.com>
- <CAL_JsqJuZAr7ndznrUu0cuM7DpB5A7ixjJ+vZ97s5G4xz0sVow@mail.gmail.com>
-Message-ID: <154356140759.88331.15666344779026803117@swboyd.mtv.corp.google.com>
+In-Reply-To: <20181116180901.17737-4-matthias.bgg@kernel.org>
+References: <20181116180901.17737-1-matthias.bgg@kernel.org>
+ <20181116180901.17737-4-matthias.bgg@kernel.org>
+Message-ID: <154356053181.88331.12262289931983027816@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH 1/4] of/device: Add a way to probe drivers by match data
-Date: Thu, 29 Nov 2018 23:03:27 -0800
+Subject: Re: [PATCH v2 3/3] clk: mediatek: Mark bus and DRAM related clocks as
+ critical
+Date: Thu, 29 Nov 2018 22:48:51 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_230339_370015_9985A6A6 
-X-CRM114-Status: GOOD (  12.77  )
+X-CRM114-CacheID: sfid-20181130_064904_045014_2FA8ECD9 
+X-CRM114-Status: GOOD (  11.56  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,56 +90,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
- Michael Turquette <mturquette@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Frank Rowand <frowand.list@gmail.com>, linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: sean.wang@kernel.org, linux-kernel@vger.kernel.org,
+ linux-mediatek@lists.infradead.org, jasu@njomotys.info,
+ linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Rob Herring (2018-11-29 17:01:54)
-> On Thu, Nov 29, 2018 at 6:28 PM Stephen Boyd <sboyd@kernel.org> wrote:
-> >
-> > Quoting Stephen Boyd (2018-11-07 10:37:31)
-> > > appropriate structure with to_platform_device() or to_i2c_client()?
-> > >
-> > > So the example would become
-> > >
-> > >   struct of_driver_probe_func {
-> > >         int (*probe)(struct device *dev);
-> > >   };
-> > >
-> > >   struct of_driver_probe_func mtk_probes[] = {
-> > >         mtk_probe1,
-> > >         mtk_probe2,
-> > >         mtk_probe3,
-> > >   };
-> > >
-> > >   struct platform_driver mtk_driver = {
-> > >         .driver = {
-> > >                 .name = "mtk-foo";
-> > >                 .of_match_table = mtk_match_table,
-> > >                 .of_probes = &mtk_probes;
-> > >         },
-> > >   };
-> > >
-> > > And the probe functions might need to container_of() the device pointer
-> > > to get the struct they know they need. The probe function could also be
-> > > added to of_device_id and then we would have to look and see if that
-> > > pointer is populated when the device is matched in generic device code.
-> > >
-> >
-> > I guess I'll go down the path of extending the of_device_id structure?
+Quoting matthias.bgg@kernel.org (2018-11-16 10:09:01)
+> From: Jasper Mattsson <jasu@njomotys.info>
 > 
-> Unfortunately, I don't think you can change of_device_id as it's part
-> of the kernel ABI.
+> This marks MUXes axi_sel and ddrphycfg_sel as well as gates
+> infra_dramc_f26m and infra_dramc_b_f26m as with CLK_IS_CRITICAL.
+> 
+> Fixes: 96596aa06628 ("clk: mediatek: add clk support for MT6797")
+> Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
 
-Ok. Then I'll go down the path of making it a parallel array?
+Can you add comments in the commit text and in the code about why the
+CLK_IS_CRITICAL flag is added to these clks? It makes it easier to
+figure out why the flag is there months from now when we all forget
 
 
 _______________________________________________
