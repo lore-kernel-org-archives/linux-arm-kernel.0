@@ -2,64 +2,66 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-14.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6A223C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:39:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D432BC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:40:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E65020834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:39:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A558A20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:40:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Sez5/kFK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E65020834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ELeJ8nb/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="KV/v+OWf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A558A20834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=oOaST7Ii/AImFz69vKb3bt4HhtjmmFKTqqSHZGVpS9c=; b=Sez5/kFKOK1h7c
-	hfNPk6oDuytn7MstJpUZGNP/28Q2yMhema066e/Jf5vbdeDi9HM2R7CoddkR2adG/8fvqKFL/fGNh
-	Xtkfx0srLDu7d6szkxOENm/ML20UpLlBcfR7nwXEsxA3YrwqoZfkxNcbzbzQSnrxR9PCNg/iypLsf
-	8KPdLY2YdTRtYPnrX5q/Kle4NRU5Qn0g1Zxh4izUlfsKfiyYZtyEYsN4ohzl3s5m4YDSeIbY8QEbu
-	Me/3WA0iX0wDaNyBZBOizNDX/QxXwWbd7/53qt16Zve/UUcM32VpyuBMIFDXTkD2471LnEvJw/7FR
-	bwTXqduvX3RQSgG2c1yw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=cj3u++wqh06sLwf64SDgrLRWF4zOzeUWkGox8xxXZiM=; b=ELeJ8nb/DSKgcU
+	UtQpvgaGFsyc5w17xurEqN6O8P3LsYDvootd9GUZtP1qf8Ru8EJMS3pHNMF9uxQdYsCoKemwZVmDO
+	cKGjUNpfyyphbISFkfFK61u0qqFse3BizTatyCRVFhRROs9p8YJgpYfbXBWgTRavmvJUuu3eEgsUe
+	aLbq+jP3euqB89NYSpMftJe5Wh/0dj/VuJ/8uFwQrFBdrpROmYfbqMgTmZJin9YGIbHoT/7egUohB
+	/EmbJSG6zs3AOrVFz8ovX370tnz42vAuZf/Yk0ELNJakIqk2+l2o/v6WRzCiUAW34wGzkjH9WTFJm
+	ClSmxn9IKCADjibYWhKA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSktS-0008VR-9T; Fri, 30 Nov 2018 15:39:50 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSksc-0007bd-Ss
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:39:01 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id E007C20CFB; Fri, 30 Nov 2018 16:38:57 +0100 (CET)
-Received: from localhost.localdomain (unknown [91.224.148.103])
- by mail.bootlin.com (Postfix) with ESMTPSA id 8D74120CFC;
- Fri, 30 Nov 2018 16:38:40 +0100 (CET)
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: Gregory Clement <gregory.clement@bootlin.com>,
- Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Jens Axboe <axboe@kernel.dk>, Hans de Goede <hdegoede@redhat.com>
-Subject: [PATCH v2 4/6] ata: ahci: mvebu: add Armada 3700 initialization
- needed for S2RAM
-Date: Fri, 30 Nov 2018 16:38:31 +0100
-Message-Id: <20181130153833.11421-5-miquel.raynal@bootlin.com>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181130153833.11421-1-miquel.raynal@bootlin.com>
-References: <20181130153833.11421-1-miquel.raynal@bootlin.com>
+	id 1gSkti-0000Tl-9O; Fri, 30 Nov 2018 15:40:06 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSksj-0007ap-4r
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:39:07 +0000
+Received: from dragon (61-216-91-114.HINET-IP.hinet.net [61.216.91.114])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 3B8AC2145D;
+ Fri, 30 Nov 2018 15:38:51 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543592334;
+ bh=QP65E0XbDs/czhu2Ulw7q84wqKOQrUr0O1uSD5z2LHU=;
+ h=Date:From:To:Cc:Subject:From;
+ b=KV/v+OWfCIjZlIlLznwSDvH9I5LhDSlqZSTgQuAqCWuYy0fbWaZwW7D+68AbyCdHV
+ a0lR6Ev/1MwXm2C5M4AqNDerEs5Ld0Zjv+aJFj8AoQHNCDzKCoYLDTMszdi4GrOWoJ
+ VK7GfxXnTyo04Uy/DTBItSEELtRpRXEfCu1SbDr0=
+Date: Fri, 30 Nov 2018 23:38:25 +0800
+From: Shawn Guo <shawnguo@kernel.org>
+To: arm@kernel.org
+Subject: [GIT PULL] i.MX fixes for 4.20, round 2
+Message-ID: <20181130153822.GA16590@dragon>
 MIME-Version: 1.0
+Content-Disposition: inline
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_073859_256298_37B7C51F 
-X-CRM114-Status: GOOD (  17.73  )
+X-CRM114-CacheID: sfid-20181130_073905_458163_B4C48A2E 
+X-CRM114-Status: UNSURE (   8.28  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,124 +73,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-pm@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Miquel Raynal <miquel.raynal@bootlin.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, linux-imx@nxp.com,
+ kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-A3700 comphy initialization is done in the firmware (TF-A). Looking at
-the SATA PHY initialization routine, there is a comment about "vendor
-specific" registers. Two registers are mentioned. They are not
-initialized there in the firmware because they are AHCI related, while
-the firmware at this location does only PHY configuration. The
-solution to avoid doing such initialization is relying on U-Boot.
+The following changes since commit 1ad9fb750a104f51851c092edd7b3553f0218428:
 
-While this work at boot time, U-Boot is definitely not going to run
-during a resume after suspending to RAM.
+  ARM: dts: imx6sx-sdb: Fix enet phy regulator (2018-11-05 10:11:04 +0800)
 
-Two possible solutions were considered:
-* Fixing the firmware.
-* Fixing the kernel driver.
+are available in the Git repository at:
 
-The first solution would take ages to propagate, while the second
-solution is easy to implement as the driver as been a little bit
-reworked to prepare for such platform configuration. Hence, this patch
-adds an Armada 3700 configuration function to set these two registers
-both at boot time (in the probe) and after a suspend (in the resume
-path).
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.20-2
 
-Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
----
- drivers/ata/ahci_mvebu.c | 31 +++++++++++++++++++++----------
- 1 file changed, 21 insertions(+), 10 deletions(-)
+for you to fetch changes up to 512cab3e7e0be11234f965d9898936dce2325382:
 
-diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
-index 7839a5df1fd2..761d67c5bc31 100644
---- a/drivers/ata/ahci_mvebu.c
-+++ b/drivers/ata/ahci_mvebu.c
-@@ -30,6 +30,7 @@
- 
- struct ahci_mvebu_plat_data {
- 	int (*plat_config)(struct ahci_host_priv *hpriv);
-+	unsigned int flags;
- };
- 
- static void ahci_mvebu_mbus_config(struct ahci_host_priv *hpriv,
-@@ -82,6 +83,19 @@ static int ahci_mvebu_armada_380_config(struct ahci_host_priv *hpriv)
- 	return rc;
- }
- 
-+static int ahci_mvebu_armada_3700_config(struct ahci_host_priv *hpriv)
-+{
-+	u32 reg;
-+
-+	writel(0, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_ADDR);
-+
-+	reg = readl(hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
-+	reg |= BIT(6);
-+	writel(reg, hpriv->mmio + AHCI_VENDOR_SPECIFIC_0_DATA);
-+
-+	return 0;
-+}
-+
- /**
-  * ahci_mvebu_stop_engine
-  *
-@@ -148,8 +162,7 @@ static int ahci_mvebu_resume(struct platform_device *pdev)
- 	struct ahci_host_priv *hpriv = host->private_data;
- 	const struct ahci_mvebu_plat_data *pdata = hpriv->plat_data;
- 
--	if (pdata->plat_config)
--		pdata->plat_config(hpriv);
-+	pdata->plat_config(hpriv);
- 
- 	return ahci_platform_resume_host(&pdev->dev);
- }
-@@ -179,7 +192,7 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 	if (!pdata)
- 		return -EINVAL;
- 
--	hpriv = ahci_platform_get_resources(pdev, 0);
-+	hpriv = ahci_platform_get_resources(pdev, pdata->flags);
- 	if (IS_ERR(hpriv))
- 		return PTR_ERR(hpriv);
- 
-@@ -191,12 +204,9 @@ static int ahci_mvebu_probe(struct platform_device *pdev)
- 
- 	hpriv->stop_engine = ahci_mvebu_stop_engine;
- 
--	pdata = hpriv->plat_data;
--	if (pdata->plat_config) {
--		rc = pdata->plat_config(hpriv);
--		if (rc)
--			goto disable_resources;
--	}
-+	rc = pdata->plat_config(hpriv);
-+	if (rc)
-+		goto disable_resources;
- 
- 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_mvebu_port_info,
- 				     &ahci_platform_sht);
-@@ -215,7 +225,8 @@ static const struct ahci_mvebu_plat_data ahci_mvebu_armada_380_plat_data = {
- };
- 
- static const struct ahci_mvebu_plat_data ahci_mvebu_armada_3700_plat_data = {
--	.plat_config = NULL,
-+	.plat_config = ahci_mvebu_armada_3700_config,
-+	.flags = AHCI_HFLAG_MANAGE_PHYS,
- };
- 
- static const struct of_device_id ahci_mvebu_of_match[] = {
--- 
-2.19.1
+  ARM: dts: imx51-zii-rdu1: Remove EEPROM node (2018-11-19 22:35:45 +0800)
 
+----------------------------------------------------------------
+i.MX fixes for 4.20, round 2:
+ - Reomve non-existing EEPROM device from imx51-zii-rdu1 board.
+   It was added by mistake.
+
+----------------------------------------------------------------
+Fabio Estevam (1):
+      ARM: dts: imx51-zii-rdu1: Remove EEPROM node
+
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 ------
+ 1 file changed, 6 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
