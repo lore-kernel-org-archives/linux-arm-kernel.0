@@ -2,68 +2,89 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2601BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 02:31:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 00E07C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 02:35:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E42352081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 02:31:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C550520863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 02:35:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="O+BthmHJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E42352081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ckbrr0o6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="PnI5jtzs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C550520863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=i9KBeR8DwQwCttTE5ZRcgxemJs41YXYi9azzmx5e2gw=; b=O+BthmHJIPtySf
-	eDMzICj/zjzox72yp3OaVVpxfL5VnWzW8pehOWQgZpZd7jfEza6iNTmjbEFtsTP1Q1KR6y1u2Lg0W
-	ITDWVo7qb893zxctTrCIPnMaLZvjazBAozMzb1xPFIVPlp/N1oiZ1IwhpSd19UFeSBCau7P3sfP8w
-	BT88QenbyRKn6rQ5NpGDNjpddXuiEkmFSvI4+723B+/guiuf2ATruVluHtPmyHaEXooUb4cEKsD/1
-	7YaImBhrLS9st0V4FLwQVRS1Uu6px/d3VJpUZmxLKL3Smr+8t60PNaljO1Dg7C55xCMaLkR3iKBxh
-	+5fgXYnKWUyu/1QuV64Q==;
+	List-Owner; bh=h/EYJE4eksceRzyYSwaTBvLLoQQdP30wvxOEH+SDFvE=; b=ckbrr0o6fsGU4r
+	IT5bok53qtyk800lzYcg10iv/EHwHJermYvGx+xl0ssjvVqQpJLXF9UGN40R5bX7Sm1wJPzSu4wfW
+	AjtEMCQmKlTxxPvzfPeeXg/wUmqIBwx+Nsb0p9/LjvOCSE/qVrsKqBiAY3mqCeGSN7MbRR9POhoms
+	kTBm9Ys3az1ubzXdjKD4AEAAa+ksVyI3ZMnQ1ieZ5mzALvAiIQilnumvpdM+8HqQ1vn9d7Vsfd1PL
+	kNbd+uDLhBtW3kRWwrJfAn2OdwhUMk7UBlfQbj7ZBx4VFdAJCSwNAdnn0TTKXprZ6lWhdKWMc08ER
+	FryHyMcfifVAFrmzgg/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSYaY-00074i-OD; Fri, 30 Nov 2018 02:31:30 +0000
-Received: from [1.203.163.81] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSYaU-00073M-Mg; Fri, 30 Nov 2018 02:31:29 +0000
-X-UUID: e502bc003ce848efb427af08f1479f7f-20181130
-X-UUID: e502bc003ce848efb427af08f1479f7f-20181130
-Received: from mtkcas32.mediatek.inc [(172.27.4.250)] by mailgw02.mediatek.com
- (envelope-from <honghui.zhang@mediatek.com>)
- (mailgw01.mediatek.com ESMTP with TLS)
- with ESMTP id 1413464676; Fri, 30 Nov 2018 10:31:01 +0800
-Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31DR.mediatek.inc
- (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
- Fri, 30 Nov 2018 10:30:59 +0800
-Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
- (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Fri, 30 Nov 2018 10:30:59 +0800
-Message-ID: <1543545059.3753.4.camel@mhfsdcap03>
-Subject: Re: [PATCH v2] PCI: mediatek: Use
- devm_of_pci_get_host_bridge_resources() to parse DT
-From: Honghui Zhang <honghui.zhang@mediatek.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Date: Fri, 30 Nov 2018 10:30:59 +0800
-In-Reply-To: <20181129113324.GA27228@e107981-ln.cambridge.arm.com>
-References: <1541645815-30340-1-git-send-email-honghui.zhang@mediatek.com>
- <20181129113324.GA27228@e107981-ln.cambridge.arm.com>
-X-Mailer: Evolution 3.2.3-0ubuntu6 
+	id 1gSYe2-0008Gn-QM; Fri, 30 Nov 2018 02:35:06 +0000
+Received: from mail-oi1-x242.google.com ([2607:f8b0:4864:20::242])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSYdx-0007kx-JY
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 02:35:04 +0000
+Received: by mail-oi1-x242.google.com with SMTP id t204so3517414oie.7
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 29 Nov 2018 18:34:51 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=8Axev834yRx7ZCsXLYPXHnuu+iX1TwQTTk8ffcEj8EM=;
+ b=PnI5jtzsxX6GMx107ZR///Vr6HkkS3DNK2VL9AyqB+G8NhwWtA6W2JbAwMChk3Mn4j
+ RLni/JWJDBks6rn7gxrqH16wCKIcqy6VCsjcmZhxBJwShjE7M+wzf1/go16Smcu4PYI0
+ hU1ncZ2+f+EIIvx2z2S29ROecmSPXRe2gQZmM=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=8Axev834yRx7ZCsXLYPXHnuu+iX1TwQTTk8ffcEj8EM=;
+ b=bX9TALGTDFme0lp7dvyqcA8bhCKOuHHHB+sJz30v0I1w9EQBT629DbB2fYAGYHCWQy
+ Ur2A+2orXgoyFYOoUOQcDs+uCkDxP++rAGhueTUImHKRGPdZjCc24Phn1Kt+FukAL4Om
+ +56ebsOffA2/pePp/2aRkTakrqSmeEXwTs4Kvp/SwkDVQOrdvGQ6LZXmVissieRW3/qO
+ AdXEbnuYs7Zv+3y+OIEgv364/bvLoIXy8gxGbi+oUwPcQ8sX1hgVHUkmvYoVveRoJCEz
+ rKFfau3cQrm1b4ecBs9hKYeEv97zHtIKw0DrlbpJKBF7DnBSWsBLPMqrKj/i6GswcZAs
+ zquQ==
+X-Gm-Message-State: AA+aEWZpZSjQOvXA1X9g7DyTVXnAVR0s6nezeSceaki3giLDQqC31xjL
+ xfj0CiEt/BYrjnVcmumV+XN6QQ==
+X-Google-Smtp-Source: AFSGD/W2q9tuqcqhgbUUiQn4OTFvXTLTR6C7YoDnEuuTx5QR0L5zJHgxNTx0i6n/UW3yHKwKh4Zvyw==
+X-Received: by 2002:aca:3141:: with SMTP id x62mr2264244oix.194.1543545290233; 
+ Thu, 29 Nov 2018 18:34:50 -0800 (PST)
+Received: from localhost ([2600:1700:141:4960:d408:b2c2:72bf:467a])
+ by smtp.gmail.com with ESMTPSA id e42sm4863102oth.36.2018.11.29.18.34.48
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 29 Nov 2018 18:34:49 -0800 (PST)
+Date: Thu, 29 Nov 2018 20:34:47 -0600
+From: Andy Gross <andy.gross@linaro.org>
+To: Stephen Rothwell <sfr@canb.auug.org.au>
+Subject: Re: [PATCH] drm: msm: Check cmd_db_read_aux_data() for failure
+Message-ID: <20181130023447.GE32306@hector.attlocal.net>
+References: <20181129163826.178670-1-swboyd@chromium.org>
+ <20181129223600.GC32306@hector.attlocal.net>
+ <20181129224234.GD32306@hector.attlocal.net>
+ <20181130131201.6fc91dcd@canb.auug.org.au>
 MIME-Version: 1.0
-X-MTK: N
+Content-Disposition: inline
+In-Reply-To: <20181130131201.6fc91dcd@canb.auug.org.au>
+User-Agent: Mutt/1.5.23.1 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_183127_211113_9C747357 
-X-CRM114-Status: GOOD (  19.96  )
+X-CRM114-CacheID: sfid-20181129_183502_784486_39853E07 
+X-CRM114-Status: GOOD (  15.95  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,196 +96,60 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- jianjun.wang@mediatek.com, linux-mediatek@lists.infradead.org,
- bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
+Cc: Rob Clark <robdclark@gmail.com>, kbuild test robot <lkp@intel.com>,
+ linux-arm-msm@vger.kernel.org, linux-kernel@vger.kernel.org,
+ Evan Green <evgreen@chromium.org>, Stephen Boyd <swboyd@chromium.org>,
+ Jordan Crouse <jcrouse@codeaurora.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 2018-11-29 at 11:33 +0000, Lorenzo Pieralisi wrote:
-> On Thu, Nov 08, 2018 at 10:56:55AM +0800, honghui.zhang@mediatek.com wrote:
-> > From: Honghui Zhang <honghui.zhang@mediatek.com>
-> > 
-> > Use the devm_of_pci_get_host_bridge_resources() API in place of the PCI OF
-> > DT parser.
-> > 
-> > Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> > ---
-> >  drivers/pci/controller/pcie-mediatek.c | 98 +++++++++-------------------------
-> >  1 file changed, 24 insertions(+), 74 deletions(-)
-> > 
-> > diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> > index 2a1f97c..0590a93 100644
-> > --- a/drivers/pci/controller/pcie-mediatek.c
-> > +++ b/drivers/pci/controller/pcie-mediatek.c
-> > @@ -197,11 +197,7 @@ struct mtk_pcie_port {
-> >   * @dev: pointer to PCIe device
-> >   * @base: IO mapped register base
-> >   * @free_ck: free-run reference clock
-> > - * @io: IO resource
-> > - * @pio: PIO resource
-> >   * @mem: non-prefetchable memory resource
-> > - * @busn: bus range
-> > - * @offset: IO / Memory offset
-> >   * @ports: pointer to PCIe port information
-> >   * @soc: pointer to SoC-dependent operations
-> >   */
-> > @@ -210,14 +206,7 @@ struct mtk_pcie {
-> >  	void __iomem *base;
-> >  	struct clk *free_ck;
-> >  
-> > -	struct resource io;
-> > -	struct resource pio;
-> >  	struct resource mem;
-> > -	struct resource busn;
-> > -	struct {
-> > -		resource_size_t mem;
-> > -		resource_size_t io;
-> > -	} offset;
-> >  	struct list_head ports;
-> >  	const struct mtk_pcie_soc *soc;
-> >  };
-> > @@ -1045,55 +1034,43 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
-> >  {
-> >  	struct device *dev = pcie->dev;
-> >  	struct device_node *node = dev->of_node, *child;
-> > -	struct of_pci_range_parser parser;
-> > -	struct of_pci_range range;
-> > -	struct resource res;
-> >  	struct mtk_pcie_port *port, *tmp;
-> > +	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> > +	struct list_head *windows = &host->windows;
-> > +	struct resource_entry *win, *tmp_win;
-> > +	resource_size_t io_base;
-> >  	int err;
-> >  
-> > -	if (of_pci_range_parser_init(&parser, node)) {
-> > -		dev_err(dev, "missing \"ranges\" property\n");
-> > -		return -EINVAL;
-> > -	}
-> > +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> > +						    windows, &io_base);
-> > +	if (err)
-> > +		return err;
-> >  
-> > -	for_each_of_pci_range(&parser, &range) {
-> > -		err = of_pci_range_to_resource(&range, node, &res);
-> > -		if (err < 0)
-> > -			return err;
-> > +	err = devm_request_pci_bus_resources(dev, windows);
-> > +	if (err < 0)
-> > +		return err;
-> >  
-> > -		switch (res.flags & IORESOURCE_TYPE_BITS) {
-> > +	/* Get the I/O and memory ranges from DT */
-> > +	resource_list_for_each_entry_safe(win, tmp_win, windows) {
-> > +		switch (resource_type(win->res)) {
-> >  		case IORESOURCE_IO:
-> > -			pcie->offset.io = res.start - range.pci_addr;
-> > -
-> > -			memcpy(&pcie->pio, &res, sizeof(res));
-> > -			pcie->pio.name = node->full_name;
-> > -
-> > -			pcie->io.start = range.cpu_addr;
-> > -			pcie->io.end = range.cpu_addr + range.size - 1;
-> > -			pcie->io.flags = IORESOURCE_MEM;
-> > -			pcie->io.name = "I/O";
-> > -
-> > -			memcpy(&res, &pcie->io, sizeof(res));
-> > +			err = devm_pci_remap_iospace(dev, win->res, io_base);
-> > +			if (err) {
-> > +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> > +					 err, win->res);
-> > +				resource_list_destroy_entry(win);
-> > +			}
-> >  			break;
-> > -
-> >  		case IORESOURCE_MEM:
-> > -			pcie->offset.mem = res.start - range.pci_addr;
-> > -
-> > -			memcpy(&pcie->mem, &res, sizeof(res));
-> > +			memcpy(&pcie->mem, win->res, sizeof(*win->res));
-> >  			pcie->mem.name = "non-prefetchable";
-> >  			break;
-> > +		case IORESOURCE_BUS:
-> > +			host->busnr = win->res->start;
-> > +			break;
-> >  		}
-> >  	}
-> >  
-> > -	err = of_pci_parse_bus_range(node, &pcie->busn);
-> > -	if (err < 0) {
-> > -		dev_err(dev, "failed to parse bus ranges property: %d\n", err);
-> > -		pcie->busn.name = node->name;
-> > -		pcie->busn.start = 0;
-> > -		pcie->busn.end = 0xff;
-> > -		pcie->busn.flags = IORESOURCE_BUS;
-> > -	}
-> > -
-> >  	for_each_available_child_of_node(node, child) {
-> >  		int slot;
-> >  
-> > @@ -1125,28 +1102,6 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
-> >  	return 0;
-> >  }
-> >  
-> > -static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-> > -{
-> > -	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> > -	struct list_head *windows = &host->windows;
-> > -	struct device *dev = pcie->dev;
-> > -	int err;
-> > -
-> > -	pci_add_resource_offset(windows, &pcie->pio, pcie->offset.io);
-> > -	pci_add_resource_offset(windows, &pcie->mem, pcie->offset.mem);
-> > -	pci_add_resource(windows, &pcie->busn);
-> > -
-> > -	err = devm_request_pci_bus_resources(dev, windows);
-> > -	if (err < 0)
-> > -		return err;
-> > -
-> > -	err = devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
-> > -	if (err < 0)
-> > -		return err;
-> > -
-> > -	return 0;
-> > -}
-> > -
-> >  static int mtk_pcie_probe(struct platform_device *pdev)
-> >  {
-> >  	struct device *dev = &pdev->dev;
-> > @@ -1169,11 +1124,6 @@ static int mtk_pcie_probe(struct platform_device *pdev)
-> >  	if (err)
-> >  		return err;
-> >  
-> > -	err = mtk_pcie_request_resources(pcie);
-> > -	if (err)
-> > -		goto put_resources;
-> > -
-> > -	host->busnr = pcie->busn.start;
-> >  	host->dev.parent = pcie->dev;
-> >  	host->ops = pcie->soc->ops;
-> >  	host->map_irq = of_irq_parse_and_map_pci;
+On Fri, Nov 30, 2018 at 01:12:01PM +1100, Stephen Rothwell wrote:
+> Hi Andy,
 > 
-> I would prefer having all the host initialization carried out in a
-> single function. I appreciate you may need to reintroduce a temporary
-> busnumber value or reshuffle the code to do that, sorry for asking to
-> change it again but I do not want to see the struct pci_host_bridge
-> variables initialization scattered around, it is confusing.
+> On Thu, 29 Nov 2018 16:42:34 -0600 Andy Gross <andy.gross@linaro.org> wrote:
+> >
+> > On Thu, Nov 29, 2018 at 04:36:00PM -0600, Andy Gross wrote:
+> > > On Thu, Nov 29, 2018 at 08:38:26AM -0800, Stephen Boyd wrote:  
+> > > > We need to check the call to cmd_db_read_aux_data() for the error case,
+> > > > so that we don't continue and use potentially uninitialized values for
+> > > > 'pri_count' and 'sec_count'. Otherwise, we get the following compiler
+> > > > warnings:
+> > > > 
+> > > >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c: In function 'a6xx_gmu_rpmh_arc_votes_init.isra.12':
+> > > >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c:943:12: warning: 'pri_count' is used uninitialized in this function [-Wuninitialized]
+> > > >      pri_count >>= 1;
+> > > >                ^~~
+> > > >    drivers/gpu/drm/msm/adreno/a6xx_gmu.c:948:12: warning: 'sec_count' may be used uninitialized in this function
+> > > > [-Wmaybe-uninitialized]
+> > > >      sec_count >>= 1;
+> > > >                ^~~
+> > > > 
+> > > > Reported-by: Stephen Rothwell <sfr@canb.auug.org.au>
+> > > > Reported-by: kbuild test robot <lkp@intel.com>
+> > > > Cc: Jordan Crouse <jcrouse@codeaurora.org>
+> > > > Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > > > Cc: Evan Green <evgreen@chromium.org>
+> > > > Cc: Jordan Crouse <jcrouse@codeaurora.org>
+> > > > Cc: Rob Clark <robdclark@gmail.com>
+> > > > Fixes: ed3cafa79ea7 ("soc: qcom: cmd-db: Stop memcpy()ing in cmd_db_read_aux_data()")
+> > > > Signed-off-by: Stephen Boyd <swboyd@chromium.org>  
+> > 
+> > On second thought, this needs to go through drm tree.
 > 
-Okay, I will change it in the next version, and I will ask Ryder for
-review internally and if it's OK with him I will add his ack directly in
-the next version.
+> Why?  The commit that introduces the warnings is only in the qcom
 
-Thanks.
+Sorry, I wasn't thinking it through earlier.  Yes, due to the two patches in our
+tree changing the API, this needs to go through my tree.  I asked Rob to ack
+it so I could take it in.  He did that and now it's been added to my pull and
+also pushed to -next.
 
-> Thanks,
-> Lorenzo
+Sorry for the confusion on my part.
 
-
+Andy
 
 _______________________________________________
 linux-arm-kernel mailing list
