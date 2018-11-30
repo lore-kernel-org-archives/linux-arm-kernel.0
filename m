@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-14.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_NEOMUTT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA6EEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:58:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 860D7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:58:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 521EA20663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:58:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 52CB520663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:58:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BoQQwIOM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="pGnmcXez"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 521EA20663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FCpxrEmb";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="HfMLbMEE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 52CB520663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +26,67 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=20r+BbMLBA+GJr7zyR3OPszWprpphV94HJX4J1E5D+s=; b=BoQQwIOM7bcAG9
-	ppEGWJzV5qX5kJ1nM8ip1fGjPIciM4vTjMX8oDTO3mMSShyqLIPjtoM8sO2ybiUdIKyW/7GhDHaJm
-	x6rDSPg+QXJIXdnGNic5DkK+3WTMneKZDEYupgtB5iOvclZJ/pNwZEsnSY9nU0YHl8EcXJePqlE6+
-	F2NfnZ/+dXBQSZax2TDmBTcVkybCuwDUSwDEPQTRma1v/dxVmb0+Rk3ENgpbCxOOey5gkL+llhUXN
-	TvYf9H5Y+NNUAMhP+r8nWAwFQKeteL3tNw0ziQKAkedeHcaK/emL5pTVK4PLiK+EAR+HA3dFde9IV
-	/PFscVy8qbFvttxihKzw==;
+	List-Owner; bh=KdayxDJwflOZdXqC0RD6NVn9tlHy8ywF271Adixsr90=; b=FCpxrEmbATsesP
+	M0L3mgi2XqTgURadtTGy0ARd7ETnIr9PXiazP/axDU9VjzFQt7s6plyQeIsVPFjaCjO8qzWGj3I0D
+	8Z2oHP4E8P6qULuPjYum6d4QQah0iu7o6kmYnz2C4ZlSdFQlURnX3cTd5FNfxuSmKeysQDIjVRucX
+	JGmSXImxh4U1lZBV6wb/nBIpaRpTJu0dIYUTxPT1zD6OGgPVhQMrV3qZdDVPR7QN/xTYtQ0dCQo+r
+	HpU72eLSxGr5wbx5x4iUIYAOQCQ9yKNdjnxsBQ7MlK7Eg0iQ0iqPBBm9WEVsDTTLLPfnW02ab2tA3
+	3PpaxyR8hB1hvHdEO2zQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSsfr-0003Ou-Vl; Fri, 30 Nov 2018 23:58:20 +0000
-Received: from mail-lj1-x242.google.com ([2a00:1450:4864:20::242])
+	id 1gSsg9-0003fT-53; Fri, 30 Nov 2018 23:58:37 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSseg-00025u-Qe
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:57:09 +0000
-Received: by mail-lj1-x242.google.com with SMTP id t9-v6so6470500ljh.6
+ id 1gSsej-00028R-87
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:57:12 +0000
+Received: by mail-lf1-x144.google.com with SMTP id e26so5349409lfc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 15:56:56 -0800 (PST)
+ Fri, 30 Nov 2018 15:56:58 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=5TsFCodeO/xalrAQ1MKFeXfgx98HEQr+Za7lCNzItHs=;
- b=pGnmcXezM/oS3TA18Jsv3LaL8Bd4vwywi438BgPNns9oyKjt9CRyiR9F1KzTUVKeKG
- PelCHnHF9/78SaD8YNgUqPMKfUHMqIwRIGDNWMimRODlYZC1/9tgvtMe81LJEoXiDlzZ
- oX2Q8etH58TPYsLzAHeUFiLUM18tIfLXe0E7oBWaYtSEfqF8fz9BvpKhlJSicsFbvgoz
- 4k/ArnQn143pEhzkzKFjBmxSsorM+mAK4rfE62Sy1OotXKSRO1Oo2vnodTo1ixzGCWTG
- Q//waLVx/XkV7lf8kUEHj1r0cxqFJOpIzep6uDFDTuE/K39hH3CRSZpuqsOctNL3P7do
- ip2Q==
+ bh=doiXlpRHq2PK2qKLGk6Plou58jqVj+fSYIX210nUrYM=;
+ b=HfMLbMEEkb0+GdiSBusuGScvHNzz6y5rlBLT/U2/6dG+W84qCXnjUw2Wh2V+Z904l/
+ nT2QeWSGGcKZDnzTrXhQjUo5ymTKvPpeqMPJrUm+UgQl00OPGdCPohpxrNyOSd5r+IiY
+ lWHs07VvV4ohi2WQTMQ+oJPHkD+1z4ZK/HTXgqn4JcN8TQODWmo11pX/Lqx0qREqZuoz
+ 3gwoHTcDSC2b1pfKavjS5UnmwpKNnuNd+YtuX1/42ExE7tWxP2Ll2Pjna35BpE4C1Wpo
+ 4BMErqGs4sxy9kfU16hw3vBIrT7Q73Wk3+1FD76wdeHs+BKhAPNfivVmeIkMVWVdaQaD
+ D50g==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=5TsFCodeO/xalrAQ1MKFeXfgx98HEQr+Za7lCNzItHs=;
- b=WaIyOa4+bz5OkxELEYD/XnCBtfn2uCmGNKAWuuRfXveAQjxyo1gG2p2c/PkKi5NYro
- eWnKlHLVSyDGCRulLjEDCrIhUlNKbdZrD4JMD4Cq4QhefSmNqTP5T4K8ujkSuJZvL1Cz
- gIf5Xz5mf+xvcqQIRsrF63QxtwOueqWr4rYLzNqbS82b8jRFURMl8MVD77W7Z9NZbHbC
- Rs5dYbJx/eHKP/4Qv77FcXScJ6W/NoNhTJMHKHVAYxfal9mmwP//Em9nn1se39/B0vkR
- /WrNlRFUURjeLppjz6eYeVm77rSvR7UsfTI83YYxRcJIDwAA0zPYs7aGUQLU0tivlQmZ
- MUTw==
-X-Gm-Message-State: AA+aEWYEgS3B1/tnrdNysRZ8YPg/fYs/slCFraE1b8QfqIkTwJPySHnS
- WPoK0M6pofI+gC/VR2np4KD8xw==
-X-Google-Smtp-Source: AFSGD/WP4EicExFcbyXQtL0eqgctNPPtIetJf0IV32B1y7dZz6Wy0T6ZEiZG9gKktbm82Yvt+WLizQ==
-X-Received: by 2002:a2e:8449:: with SMTP id
- u9-v6mr5526756ljh.121.1543622215065; 
- Fri, 30 Nov 2018 15:56:55 -0800 (PST)
+ bh=doiXlpRHq2PK2qKLGk6Plou58jqVj+fSYIX210nUrYM=;
+ b=TQzL8ikUZcxQ+v845pGvzuW4kXcPEgI7GSTkbokEZHjfqZvCtJ88WR+r5I7PjItWo1
+ 6V8OYjL7oLhQPcmw4Co71ZI7X0/ZhL5CNSmXFcJrl7gfcvb7mrfjbpzOnop1rykOThrd
+ 11TljH/MoqbTsJtVYdnW60xFIGci/s3vZaIZy/fyLFsmCOcQJvEjlUhMWsC48rWPmXyx
+ jlgPm1WNuCY/6RoeaDv5iiQfr/N3yoDujXS9ZdMXqZZw9wSqeSNSHFfZBbl/mGmVSnZk
+ Gbkpqb4wJOQS36vRt0lasoenvyz/m1jRAQ/n4+CZOTJXeSThsInJvddTJCuC6TAvhgBp
+ 6U/Q==
+X-Gm-Message-State: AA+aEWb2XUdbHGDvYrW7zjvXZIFFk+uExA5DuofZkjuIxYsWLsSxB4yE
+ NEOIhLDQUA3M3j5JnWTAp5ApYQ==
+X-Google-Smtp-Source: AFSGD/Wp+WJtuq7xmuGnrqr8ZcPSvRc2v19zu+7wz5RAoluIUq4N7PfPQi2nykmPLT5wHJBD9LI3MA==
+X-Received: by 2002:a19:7919:: with SMTP id u25mr4478666lfc.18.1543622216985; 
+ Fri, 30 Nov 2018 15:56:56 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id m63-v6sm1143895lje.81.2018.11.30.15.56.53
+ by smtp.gmail.com with ESMTPSA id t18sm1013524lft.93.2018.11.30.15.56.55
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 30 Nov 2018 15:56:54 -0800 (PST)
-Date: Fri, 30 Nov 2018 15:17:05 -0800
+ Fri, 30 Nov 2018 15:56:55 -0800 (PST)
+Date: Fri, 30 Nov 2018 15:17:45 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Linus Walleij <linus.walleij@linaro.org>
-Subject: Re: [GIT PULL] Versatile Express DTS updates
-Message-ID: <20181130231705.vvmyim2a75hpkzay@localhost>
-References: <CACRpkdZY8bybYjZ2zZfgWDLfd0o8zkhrpScAQ+z9xTgzsf0=FA@mail.gmail.com>
+To: Tony Lindgren <tony@atomide.com>
+Subject: Re: [GIT PULL 3/4] dts changes for omaps for v4.21
+Message-ID: <20181130231745.myseygxlf6oarfx2@localhost>
+References: <pull-1543521343-338334@atomide.com>
+ <pull-1543521343-338334@atomide.com-3>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CACRpkdZY8bybYjZ2zZfgWDLfd0o8zkhrpScAQ+z9xTgzsf0=FA@mail.gmail.com>
+In-Reply-To: <pull-1543521343-338334@atomide.com-3>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_155707_681647_81513CC0 
-X-CRM114-Status: GOOD (  17.30  )
+X-CRM114-CacheID: sfid-20181130_155709_464850_57737766 
+X-CRM114-Status: GOOD (  13.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,32 +98,15 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>, arm-soc <arm@kernel.org>,
- Liviu Dudau <Liviu.Dudau@arm.com>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>,
- Sudeep Holla <Sudeep.Holla@arm.com>
+Cc: linux-omap@vger.kernel.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 08:43:44AM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> I agreed with Liviu Dudau (ARM Versatile Express maintainer)
-> that I will send the Versatile Express updates to ARM SoC.
-> 
-> This is an update of the DTS files (based on my v7 patch set)
-> that forms the base changes for switch Versatile Express reference
-> design family over to using DRM with the PL11x driver.
-> 
-> Please pull it in to ARM SoC DTS changes for v4.21!
-> 
-> A corresponding defconfig update activating the new DRM
-> driver is coming in a few minutes.
-> 
-> Yours,
-> Linus Walleij
+On Thu, Nov 29, 2018 at 11:57:42AM -0800, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
 > The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 > 
@@ -131,18 +114,18 @@ On Thu, Nov 29, 2018 at 08:43:44AM +0100, Linus Walleij wrote:
 > 
 > are available in the Git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/vexpress-drm-arm-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.21/dt-signed
 > 
-> for you to fetch changes up to f1fe12c8bf33241e04c57a0fc5b25b16ba77ba2d:
+> for you to fetch changes up to 0ec47be539e323ef4919fd63ea2f4162bf74892e:
 > 
->   ARM: dts: Modernize the Vexpress PL111 integration (2018-11-29 08:31:41 +0100)
+>   ARM: dts: am437x-gp-evm: Add sleep state for beeper pins (2018-11-19 10:32:43 -0800)
 > 
 > ----------------------------------------------------------------
-> Versatile Express DTS update for DRM:
-> This updates the Versatile Express family DTS files to
-> contain the correct and detailed information required
-> for the PL11x DRM driver to work properly.
+> Device tree changes for omaps for v4.21 merge window
+> 
+> These changes mostly configure pinctrl for am437x-gp-evm. There is
+> also non-critical fix for a comment for Clang, and we enable earlycon
+> for am3517-evm.
 
 Merged, thanks!
 
