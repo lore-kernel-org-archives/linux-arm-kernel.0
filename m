@@ -2,21 +2,21 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AB64CC64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:24:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D717EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:28:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 79E8020834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:24:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9C1422081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:28:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hv8Vj4Z6";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="dV6LAhZD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79E8020834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AVnNPGTK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="2wbqaKRJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9C1422081C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9YiL8fVlgdXLMZejKPaxuD6Kf6Sho3ZFaH50zq+AoUs=; b=Hv8Vj4Z6Fm42t9
-	mOzdh4QSO8wKVKal5CbWJWZdxn9gsGsTNYoguvpy/y4sIJ7t6+ABh7IOW2BqnXeh4VpXSgBAeUqN4
-	Bcn1VarLP5+/oqt4FB4EgT04z9ACOUpCpp3YhqabC2r+JqTgrD2UYKx+ARJfb7TJBGRT69UTP/6nm
-	Qq2BAsEMrobglsw3g3GMZlmIakXEN8Tf2xWwJNOHyINHOtc3fI8x/lchraJpN8k0A6pbfNOvNEhwD
-	O7f2lnZIhyopKBnPimGngaFRMFlcBcpLM3PSfmAuqaZelvubX2vaesPRMBn77tmVzLGX/u8v519IN
-	AFoH9gACn4xqZiQxk2sQ==;
+	List-Owner; bh=/VkELfPoTV7FYxQWKwPFJWvnNwLh45PhrRX3c3GQJxQ=; b=AVnNPGTKAbd8Rw
+	cs21pytOtbsBFm2VMuui87N1a5qq3Oliu3Nyji7HYshdH84Wavq1h2Yxj/3VrS1/sL+XWtH0C05zo
+	LFvAwc/pVirCANH6I337HeQcKnAiw3dd7BMlmg+1Tip5mEjFVMvgKj0RutxD3yeqCsc2a5kChlA3u
+	rjKl6x++mP8rn7Zhk+RBgzNV/OMEI3fugVAY1GF+KMOEGnxAuvSbnrT+8sFvVNb0cJ7yYI9TgITL0
+	wmd2oQvo2b1cQUI3v4X4yyXCy6/DcV4pFrBekbOsjb1AE7wzg84/e1PWOm6Fywi+1oNcUY44FlQti
+	ZvwHUU2bKBs416QP+aZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSWbK-00020V-3h; Fri, 30 Nov 2018 00:24:10 +0000
+	id 1gSWfy-0003hj-Ra; Fri, 30 Nov 2018 00:28:58 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSWbH-0001yt-0M
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 00:24:08 +0000
+ id 1gSWfv-0003gw-8L; Fri, 30 Nov 2018 00:28:56 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 42F6820834;
- Fri, 30 Nov 2018 00:23:56 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 8A0E72081C;
+ Fri, 30 Nov 2018 00:28:44 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543537436;
- bh=yqFUDKxdhkCSdoOfGf067LjqLpeskD0HSr6L5zeDJfM=;
+ s=default; t=1543537724;
+ bh=1tV5SDAr69cUs1iDQjfHJLRQ6J6D7Js/d801NobftGg=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=dV6LAhZDIyJyrOkjlnQiGvXRjslhitcnHMh2uwwiHVuG8gU8OYmlrfTAMjf9XwQJL
- tTW5d14SoMOgxMCs3LAGra8dm29zs4yl9f7IrsB/PwW7nqC631E8fYNgmlzkrN/0QD
- p45JtECm476vcRdf++duOP8d2ipnizwykBQiniSI=
+ b=2wbqaKRJzdFhGgTm3xX3QHwUPHJXBvCnhDUHHlgd8ov4irUpPejrWTxU8DNS8ACOP
+ xUyWwgLO2myyrMsjyDG+Sv2I3/KgFW2BBr0EOWzPKD9cZoejSA9+BQA1c98tEndPIk
+ ecBPUp4sY20CAoLdBPwy0LokzegYfZxRHZ+oBzAA=
 MIME-Version: 1.0
-To: avifishman70@gmail.com, brendanhiggins@google.com, linux@armlinux.org.uk, 
- mark.rutland@arm.com, mturquette@baylibre.com, raltherr@google.com,
- robh+dt@kernel.org, sboyd@codeaurora.org, tali.perry1@gmail.com,
- tmaimon77@gmail.com
+To: Rob Herring <robh+dt@kernel.org>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20181111134712.318321-2-tali.perry1@gmail.com>
-References: <20181111134712.318321-1-tali.perry1@gmail.com>
- <20181111134712.318321-2-tali.perry1@gmail.com>
-Message-ID: <154353743563.88331.13076671872913666949@swboyd.mtv.corp.google.com>
+In-Reply-To: <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
+References: <20181106183609.207702-1-sboyd@kernel.org>
+ <20181106183609.207702-2-sboyd@kernel.org>
+ <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
+ <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
+Message-ID: <154353772392.88331.16937191244549721858@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH v1 1/1] clk: npcm7xx: get fixed clocks from DT
-Date: Thu, 29 Nov 2018 16:23:55 -0800
+Subject: Re: [PATCH 1/4] of/device: Add a way to probe drivers by match data
+Date: Thu, 29 Nov 2018 16:28:43 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_162407_097292_FC280ACD 
-X-CRM114-Status: GOOD (  25.97  )
+X-CRM114-CacheID: sfid-20181129_162855_449805_0FAEFEB7 
+X-CRM114-Status: GOOD (  10.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,250 +75,48 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, openbmc@lists.ozlabs.org,
- linux-kernel@vger.kernel.org, Tali Perry <tali.perry1@gmail.com>,
- Wei Yongjun <weiyongjun1@huawei.com>, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
+ Michael Turquette <mturquette@baylibre.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
+ Frank Rowand <frowand.list@gmail.com>, linux-clk <linux-clk@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting tali.perry1@gmail.com (2018-11-11 05:47:12)
-> From: Tali Perry <tali.perry1@gmail.com>
+Quoting Stephen Boyd (2018-11-07 10:37:31)
+> appropriate structure with to_platform_device() or to_i2c_client()?
 > 
-> Nuvoton NPCM7XX Clock Controller
-> fix base address and of_clk_get_by_name error handling.
->     Also update error messages to be more informative.
->     
->     In case clk_base allocation is erronoeous the return value is null.
->     Also fix handling of of_clk_get_by_name returns an error. 
->     Print a better error message pointing to the dt-binding documention.
+> So the example would become
 > 
-> This patch is re-submitted since it was already pushed to main 
-> (just the diff, without the full driver which is already in 
-> master branch.)
+>   struct of_driver_probe_func {
+>         int (*probe)(struct device *dev);
+>   };
 > 
+>   struct of_driver_probe_func mtk_probes[] = {
+>         mtk_probe1,
+>         mtk_probe2,
+>         mtk_probe3,
+>   };
 > 
-> Signed-off-by: Tali Perry <tali.perry1@gmail.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+>   struct platform_driver mtk_driver = {
+>         .driver = {
+>                 .name = "mtk-foo";
+>                 .of_match_table = mtk_match_table,
+>                 .of_probes = &mtk_probes;
+>         },
+>   };
+> 
+> And the probe functions might need to container_of() the device pointer
+> to get the struct they know they need. The probe function could also be
+> added to of_device_id and then we would have to look and see if that
+> pointer is populated when the device is matched in generic device code.
 > 
 
-I don't know what's going on with this patch. Is it something new? Can
-you break it up into logical changes and submit them with proper commit
-text? The signoff chain is also odd. Can you follow
-Documentation/process/submitting-patches.rst?
-
-> ---
->  drivers/clk/clk-npcm7xx.c | 99 +++++++++++++++++++++++++++++++++++------------
->  1 file changed, 75 insertions(+), 24 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-npcm7xx.c b/drivers/clk/clk-npcm7xx.c
-> index 740af90a9508..91a937720f4e 100644
-> --- a/drivers/clk/clk-npcm7xx.c
-> +++ b/drivers/clk/clk-npcm7xx.c
-> @@ -7,17 +7,26 @@
->   * Copyright (C) 2018 Nuvoton Technologies tali.perry@nuvoton.com
->   */
->  
-> -#include <linux/module.h>
-> -#include <linux/clk-provider.h>
-> -#include <linux/io.h>
-> -#include <linux/kernel.h>
-> -#include <linux/of.h>
-> -#include <linux/of_address.h>
-> -#include <linux/slab.h>
-> -#include <linux/err.h>
-> -#include <linux/bitfield.h>
-> -
-> -#include <dt-bindings/clock/nuvoton,npcm7xx-clock.h>
-> +
-> +
-> +
-> + #include <linux/module.h>
-> + #include <linux/clk.h>
-> + #include <linux/clk-provider.h>
-> + #include <linux/device.h>
-> + #include <linux/io.h>
-> + #include <linux/kernel.h>
-> + #include <linux/of.h>
-> + #include <linux/of_device.h>
-> + #include <linux/of_platform.h>
-> + #include <linux/of_address.h>
-> + #include <linux/platform_device.h>
-> + #include <linux/slab.h>
-> + #include <linux/err.h>
-> + #include <linux/rational.h>
-> + #include <linux/bitfield.h>
-> + #include <dt-bindings/clock/nuvoton,npcm7xx-clock.h>
-
-Is any of this hunk necessary or relevant to the subject of this patch?
-
-> +
->  
->  struct npcm7xx_clk_pll {
-> @@ -44,7 +56,8 @@ static unsigned long npcm7xx_clk_pll_recalc_rate(struct clk_hw *hw,
->         u64 ret;
->  
->         if (parent_rate == 0) {
-> -               pr_err("%s: parent rate is zero", __func__);
-> +               pr_err("%s: parent rate is zero. reg=%x\n", __func__,
-> +                       (u32)(pll->pllcon));
-
-Maybe you should print clk name instead of register?
-
->                 return 0;
->         }
->  
-> @@ -61,13 +74,12 @@ static unsigned long npcm7xx_clk_pll_recalc_rate(struct clk_hw *hw,
->         return ret;
->  }
->  
-> -static const struct clk_ops npcm7xx_clk_pll_ops = {
-> +const struct clk_ops npcm7xx_clk_pll_ops = {
-
-Why?
-
->         .recalc_rate = npcm7xx_clk_pll_recalc_rate,
->  };
->  
-> -static struct clk_hw *
-> -npcm7xx_clk_register_pll(void __iomem *pllcon, const char *name,
-> -                        const char *parent_name, unsigned long flags)
-> +static struct clk_hw *npcm7xx_clk_register_pll(void __iomem *pllcon,
-> +               const char *name, const char *parent_name, unsigned long flags)
->  {
->         struct npcm7xx_clk_pll *pll;
->         struct clk_init_data init;
-> @@ -78,7 +90,8 @@ npcm7xx_clk_register_pll(void __iomem *pllcon, const char *name,
->         if (!pll)
->                 return ERR_PTR(-ENOMEM);
->  
-> -       pr_debug("%s reg, name=%s, p=%s\n", __func__, name, parent_name);
-> +       pr_debug("%s reg, reg=0x%x, name=%s, p=%s\n",
-> +               __func__, (unsigned int)pllcon, name, parent_name);
-
-What's going on here? Why cast?
-
->  
->         init.name = name;
->         init.ops = &npcm7xx_clk_pll_ops;
-> @@ -544,9 +557,11 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
->         void __iomem *clk_base;
->         struct resource res;
->         struct clk_hw *hw;
-> +       struct clk *clk;
->         int ret;
->         int i;
->  
-> +       clk_base = NULL;
-
-Why?
-
->         ret = of_address_to_resource(clk_np, 0, &res);
->         if (ret) {
->                 pr_err("%s: failed to get resource, ret %d\n", clk_np->name,
-> @@ -560,14 +575,44 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
->  
->         npcm7xx_clk_data = kzalloc(sizeof(*npcm7xx_clk_data->hws) *
->                 NPCM7XX_NUM_CLOCKS + sizeof(npcm7xx_clk_data), GFP_KERNEL);
-> -       if (!npcm7xx_clk_data)
-> +
-> +       npcm7xx_clk_data->num = 0;
-
-kzalloc already does that initialization to 0 for you.
-
-> +
-> +       if (!npcm7xx_clk_data->hws) {
-> +               pr_err("Can't alloc npcm7xx_clk_data\n");
-
-We don't need allocation error messages.
-
->                 goto npcm7xx_init_np_err;
-> +       }
->  
->         npcm7xx_clk_data->num = NPCM7XX_NUM_CLOCKS;
->  
->         for (i = 0; i < NPCM7XX_NUM_CLOCKS; i++)
->                 npcm7xx_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
->  
-> +       /* Read fixed clocks. These 3 clocks must be defined in DT */
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_REFCLK);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("failed to find external REFCLK on device tree, err=%ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +               goto npcm7xx_init_fail_no_clk_on_dt;
-> +       }
-> +
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_SYSBYPCK);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("failed to find external SYSBYPCK on device tree, err=%ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +               goto npcm7xx_init_fail_no_clk_on_dt;
-> +       }
-> +
-> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_MCBYPCK);
-> +       if (IS_ERR(clk)) {
-> +               pr_err("failed to find external MCBYPCK on device tree, err=%ld\n",
-> +                       PTR_ERR(clk));
-> +               clk_put(clk);
-> +               goto npcm7xx_init_fail_no_clk_on_dt;
-> +       }
-
-I assume the DTS is not shipped?
-
-> +
->         /* Register plls */
->         for (i = 0; i < ARRAY_SIZE(npcm7xx_plls); i++) {
->                 const struct npcm7xx_clk_pll_data *pll_data = &npcm7xx_plls[i];
-> @@ -584,16 +629,16 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
->         }
->  
->         /* Register fixed dividers */
-> -       hw = clk_hw_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
-> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
-
-This is going backwards. Please use clk_hw APIs.
-
->                         NPCM7XX_CLK_S_PLL1, 0, 1, 2);
-> -       if (IS_ERR(hw)) {
-> +       if (IS_ERR(clk)) {
->                 pr_err("npcm7xx_clk: Can't register fixed div\n");
->                 goto npcm7xx_init_fail;
->         }
->  
-> -       hw = clk_hw_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
-> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
->                         NPCM7XX_CLK_S_PLL2, 0, 1, 2);
-> -       if (IS_ERR(hw)) {
-> +       if (IS_ERR(clk)) {
->                 pr_err("npcm7xx_clk: Can't register div2\n");
->                 goto npcm7xx_init_fail;
->         }
-> @@ -646,11 +691,17 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
->  
->         return;
->  
-> +npcm7xx_init_fail_no_clk_on_dt:
-> +       pr_err("see Documentation/devicetree/bindings/clock/");
-> +       pr_err("nuvoton,npcm750-clk.txt  for details\n");
->  npcm7xx_init_fail:
-> -       kfree(npcm7xx_clk_data->hws);
-> +       if (npcm7xx_clk_data->num)
-> +               kfree(npcm7xx_clk_data->hws);
->  npcm7xx_init_np_err:
-> -       iounmap(clk_base);
-> +       if (clk_base != NULL)
-> +               iounmap(clk_base);
->  npcm7xx_init_error:
->         of_node_put(clk_np);
-> +       pr_err("clk setup fail\n");
-
-Is this hunk of changes related to the subject of this patch? I don't
-think it is, so it just leads to more confusion.
+I guess I'll go down the path of extending the of_device_id structure?
 
 
 _______________________________________________
