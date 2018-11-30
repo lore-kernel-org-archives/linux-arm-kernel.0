@@ -2,21 +2,20 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F0447C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 03:38:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 62B94C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 03:56:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C22102086B
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 03:38:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2F4432145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 03:56:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bpzNpghJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C22102086B
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fuPXiLg/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2F4432145D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,64 +24,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=4ezMoeRuNZxt31CzPmaJLVWJwP+Kl9rb1HOkdW7Cpsg=; b=bpzNpghJgTDVuG
-	XPjhEMbok9XaeHeXfiE00iLgEhpI+tFwuLSJ11CHyhthLJd6azJDXZTIh11hRO1EOkPJzvXPz/j08
-	e/X0tBgxnEgwuEVDmqA7zCpFz4WH01M2xqvCDfirjwb9QDSC51sPmcVqVU9vBcO9lO9jK8rwsSJKi
-	SlmZE7F6QFr7V5kKMzwXQ+Usj4N2R8NFObUU1g5/iuy6daJjGBoljuDsPyc9MGuCbKB7Cwa/CSwTZ
-	OQuT5mOq9MCuS79I4iztDDWgBOT/oo/mcCEWqsPYEG7mXV24GwNAhzmcH0R2k/Aitn6d6Iq6Hs5pI
-	Zykm/7FcsSCUtSyeZXtQ==;
+	List-Owner; bh=g1cpo+GBnc/JioEMTGdB6zQgWY7SjSvJEeV1fbi+8hg=; b=fuPXiLg/wogkxN
+	7zzgYz50WDsLB7irxi4n+KlGhTz+WlXZuJUAxzaI7pwcdXU+Ryfbh8mZxFQrIWKHbY+qYe2OK1I+D
+	RsZjbBTy5JkjF/t5hJyuIthvY5PXFRVM3DA91DE2HFf8h4+3DqklyWBVUkQjkfgxmnw29BTRpE3al
+	5YIe28b+xAF+oB855gxrBOtJQv2yBYXlW5UtsAaPAa59h3TvNV0UQYlTtZpwjTynvykVq5lmMj+Hs
+	5NyL2C4lq6/39M33v1wy2q2CTYhXHBFM8jfA8e2DM9CaeAoV2EjrmYKvnU35DVeEgQrrXDsjzDjbh
+	CZ9rZAimlhLAr6r1OqaQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSZdm-0003Kt-E5; Fri, 30 Nov 2018 03:38:54 +0000
-Received: from mail-ed1-f67.google.com ([209.85.208.67])
+	id 1gSZuY-0001U6-4h; Fri, 30 Nov 2018 03:56:14 +0000
+Received: from mail-ed1-f65.google.com ([209.85.208.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSZdj-0003Ju-98
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 03:38:52 +0000
-Received: by mail-ed1-f67.google.com with SMTP id h50so3703811ede.5
+ id 1gSZuV-0001TO-7j
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 03:56:12 +0000
+Received: by mail-ed1-f65.google.com with SMTP id r27so3738023eda.0
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 19:38:40 -0800 (PST)
+ Thu, 29 Nov 2018 19:56:00 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=mG8evtSjAEIqTCabuI83P9ZLeSo+48+408z67jqVjIw=;
- b=kgnn1nOjnXztRNolKOgLdQ2JhHbl+lCtIzderq5FNN06O/h7ZN3Ol/kZO7tcPudVNg
- 1X95uE7Kw1DtILx7VE7U4O9hQrqedpEJ7+PNS10Pmj5/jgWCJwujvQRhYoNBsCaeISUn
- n8cf9SPQ7KGyfg7eLMWM8V9ZJ+rUTXUe2Q7TOOKVjbDp50oT9lsci9TF+sbAb2KVj5Xx
- VKsNpdTv2ns8D+qMQWiGo0TmKP6j2ABn/RvSp+73ogDK5QGCDUDKtVlSwDVZY0bnFPbY
- QFpl9l0IC+rdlD3/pw6Xu975laAclPL2vKhP2muJzm5IX1qPlFlv6VQRy51Xt4ngstD+
- ZfGw==
-X-Gm-Message-State: AA+aEWZmXBNhGiYekfn4c7gIp9R1SWIzUOZn5aD0gS1Nd/c/8BFuogNj
- zhOKNEKi3YRuYbeEYXSCzzgDmN3ZFGo=
-X-Google-Smtp-Source: AFSGD/Ub40GYx6INHfCdLGUJOfT6bi1iRabgrFwsVV+cgvkgsfGCGnEfAMFC9fcTwINE7achToOA1w==
-X-Received: by 2002:a50:d5dc:: with SMTP id g28mr3704911edj.226.1543549118614; 
- Thu, 29 Nov 2018 19:38:38 -0800 (PST)
-Received: from mail-wr1-f50.google.com (mail-wr1-f50.google.com.
- [209.85.221.50])
- by smtp.gmail.com with ESMTPSA id v20-v6sm599141ejr.46.2018.11.29.19.38.38
+ bh=rtVlvmxu/HbPwX1djWwZgBZo6Exl0kkMIvLIu0XvI7s=;
+ b=trAa+YCRoBCUznoMsc6cAP3kXnrUDZ5mCF7P1afFgRTLGrQ0QSYz1CQBxvqBV95KQF
+ Nz8VZek7cdCDNiHlSK/c+T3QmywAgnP7tN4FttpsR34NKbpx328PsSHTE4m8TgnwRcuD
+ wrOygSo6dCh3nnKS4jzG7lZU62yvOtEO1J68Zq2A7jxH2S21elTypIGH8z5esrY5J/7w
+ BskvX6INIQmY05RrCeH32YT74yzSoTrbS70hn/ab9DcaeyTV5GSO/G0+K91yEgwfg7bz
+ 3g1PoLnh6gf7112JOb7LCoO/IGp0y27RJJl6+uXuOhQIA9aiSYHn8U5RapysBpC41aSY
+ xZTw==
+X-Gm-Message-State: AA+aEWYZAXVdGoTMi+PSx1Bs6s5M05PEUP3fn69hFuIz15ZjFrhsCZLk
+ zSKw0HfsiqIh8B5rvRLFrt3lmHu1aS8=
+X-Google-Smtp-Source: AFSGD/W9p8knaR3j/97Qcg8+X7mdwLDik1HfDUSsoPsBpnaw+q57UvCKcPjFg9e+TmDJITv7NSOutQ==
+X-Received: by 2002:a17:906:1604:: with SMTP id
+ m4-v6mr3405284ejd.167.1543550159333; 
+ Thu, 29 Nov 2018 19:55:59 -0800 (PST)
+Received: from mail-wm1-f50.google.com (mail-wm1-f50.google.com.
+ [209.85.128.50])
+ by smtp.gmail.com with ESMTPSA id dc5-v6sm618687ejb.53.2018.11.29.19.55.58
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 19:38:38 -0800 (PST)
-Received: by mail-wr1-f50.google.com with SMTP id r10so3879577wrs.10
+ Thu, 29 Nov 2018 19:55:58 -0800 (PST)
+Received: by mail-wm1-f50.google.com with SMTP id q26so4265961wmf.5
  for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 19:38:38 -0800 (PST)
-X-Received: by 2002:a5d:5208:: with SMTP id j8mr3628272wrv.188.1543549117778; 
- Thu, 29 Nov 2018 19:38:37 -0800 (PST)
+ Thu, 29 Nov 2018 19:55:58 -0800 (PST)
+X-Received: by 2002:a1c:2382:: with SMTP id j124mr3896642wmj.14.1543550158329; 
+ Thu, 29 Nov 2018 19:55:58 -0800 (PST)
 MIME-Version: 1.0
-References: <20181115145013.3378-1-paul.kocialkowski@bootlin.com>
- <20181115145013.3378-8-paul.kocialkowski@bootlin.com>
- <CAGb2v64t6t3Bwf4nc8gQWRDkdv4zGRF1-+Q7snqX6bkEVqirvA@mail.gmail.com>
-In-Reply-To: <CAGb2v64t6t3Bwf4nc8gQWRDkdv4zGRF1-+Q7snqX6bkEVqirvA@mail.gmail.com>
+References: <20181128093013.24442-1-wens@csie.org>
+ <20181128093013.24442-11-wens@csie.org>
+ <154344054442.88331.8887745218976145062@swboyd.mtv.corp.google.com>
+In-Reply-To: <154344054442.88331.8887745218976145062@swboyd.mtv.corp.google.com>
 From: Chen-Yu Tsai <wens@csie.org>
-Date: Fri, 30 Nov 2018 11:38:23 +0800
-X-Gmail-Original-Message-ID: <CAGb2v65yNKnqbeQmUYjMzDtydYL=7kxmtPrAEEU9U=a5XbMiFg@mail.gmail.com>
-Message-ID: <CAGb2v65yNKnqbeQmUYjMzDtydYL=7kxmtPrAEEU9U=a5XbMiFg@mail.gmail.com>
-Subject: Re: [PATCH 07/15] arm64: dts: allwinner: h5: Add system-control node
- with SRAM C1
-To: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Date: Fri, 30 Nov 2018 11:55:44 +0800
+X-Gmail-Original-Message-ID: <CAGb2v64cER=qU2e_jnZemVfYbtQFNk+ev1MFBQDQu86f98X2dw@mail.gmail.com>
+Message-ID: <CAGb2v64cER=qU2e_jnZemVfYbtQFNk+ev1MFBQDQu86f98X2dw@mail.gmail.com>
+Subject: Re: [PATCH 09/15] clk: sunxi-ng: r40: Force LOSC parent to RTC LOSC
+ output
+To: Maxime Ripard <maxime.ripard@bootlin.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_193851_321009_1510C1AA 
-X-CRM114-Status: GOOD (  24.46  )
+X-CRM114-CacheID: sfid-20181129_195611_282691_35FA0CE5 
+X-CRM114-Status: GOOD (  16.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,94 +94,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devel@driverdev.osuosl.org, devicetree <devicetree@vger.kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- linux-kernel <linux-kernel@vger.kernel.org>, Hans Verkuil <hverkuil@xs4all.nl>,
- linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
- Sakari Ailus <sakari.ailus@linux.intel.com>,
- Mark Rutland <mark.rutland@arm.com>,
- Mauro Carvalho Chehab <mchehab@kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Alessandro Zummo <a.zummo@towertech.it>, alexandre.belloni@bootlin.com,
+ devicetree <devicetree@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
+ Mike Turquette <mturquette@baylibre.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, linux-sunxi@googlegroups.com,
+ Rob Herring <robh+dt@kernel.org>, linux-clk <linux-clk@vger.kernel.org>,
  linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+ linux-rtc@vger.kernel.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 16, 2018 at 12:52 AM Chen-Yu Tsai <wens@csie.org> wrote:
+On Thu, Nov 29, 2018 at 5:29 AM Stephen Boyd <sboyd@kernel.org> wrote:
 >
-> On Thu, Nov 15, 2018 at 10:50 PM Paul Kocialkowski
-> <paul.kocialkowski@bootlin.com> wrote:
+> Quoting Chen-Yu Tsai (2018-11-28 01:30:07)
+> > On the R40, in addition to a mux between the RTC's own RC oscillator and
+> > an external 32768 Hz crystal, which are muxed inside the RTC module, the
+> > CCU also has its own RC oscillator, which runs at around 2 MHz, and can
+> > be muxed with the LOSC output from the RTC. This muxed output is called
+> > "SYS 32K" in the module clock diagram, but otherwise referred to as the
+> > LOSC throughout the CCU documentation.
 > >
-> > Add the H5-specific system control node description to its device-tree
-> > with support for the SRAM C1 section, that will be used by the video
-> > codec node later on.
+> > The RC oscillator is not very accurate, even though it has an undocumented
+> > calibration function. We really want a precise clock at 32768 Hz,
+> > instead of something at around 32 KHz. This patch forces the SYS 32K
+> > clock to use the RTC output as its parent, and doesn't bother
+> > registering the internal oscillator nor a clock mux.
 > >
-> > Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi | 22 ++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > index b41dc1aab67d..c2d14b22b8c1 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> > @@ -94,6 +94,28 @@
-> >         };
-> >
-> >         soc {
-> > +               system-control@1c00000 {
-> > +                       compatible = "allwinner,sun50i-h5-system-control";
-> > +                       reg = <0x01c00000 0x1000>;
-> > +                       #address-cells = <1>;
-> > +                       #size-cells = <1>;
-> > +                       ranges;
-> > +
-> > +                       sram_c1: sram@1d00000 {
-> > +                               compatible = "mmio-sram";
-> > +                               reg = <0x01d00000 0x80000>;
 >
-> I'll try to check this one tomorrow.
->
-> I did find something interesting on the H3: there also seems to be SRAM at
-> 0x01dc0000 to 0x01dcfeff , again mapped by the same bits as SRAM C1.
->
-> And on the A33, the SRAM C1 range is 0x01d00000 to 0x01d478ff.
->
-> This was found by mapping the SRAM to the CPU, then using devmem to poke
-> around the register range. If there's SRAM, the first read would typically
-> return random data, and a subsequent write to it would set some value that
-> would be read back correctly. If there's no SRAM, a read either returns 0x0
-> or some random data that can't be overwritten.
->
-> You might want to check the other SoCs.
+> Acked-by: Stephen Boyd <sboyd@kernel.org>
 
-This range seems to contain stuff other than SRAM, possibly fixed lookup
-tables. Since this is entirely unknown, lets just stick to the known full
-range instead.
-
-ChenYu
-
-> > +                               #address-cells = <1>;
-> > +                               #size-cells = <1>;
-> > +                               ranges = <0 0x01d00000 0x80000>;
-> > +
-> > +                               ve_sram: sram-section@0 {
-> > +                                       compatible = "allwinner,sun50i-h5-sram-c1",
-> > +                                                    "allwinner,sun4i-a10-sram-c1";
-> > +                                       reg = <0x000000 0x80000>;
-> > +                               };
-> > +                       };
-> > +               };
-> > +
-> >                 mali: gpu@1e80000 {
-> >                         compatible = "allwinner,sun50i-h5-mali", "arm,mali-450";
-> >                         reg = <0x01e80000 0x30000>;
-> > --
-> > 2.19.1
-> >
+Merged with acks from Maxime and Stephen.
 
 _______________________________________________
 linux-arm-kernel mailing list
