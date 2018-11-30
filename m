@@ -4,18 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 121F9C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:22:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E4949C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:24:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D262820868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:22:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B059020868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:24:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ijyKBPNx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D262820868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D9HkurDa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B059020868
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,37 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=b19JWerwcF9L9OG7k7IyRlS+/39pktFZrrxcf5hi2BY=; b=ijyKBPNxoYOc7N
-	7JnWIREvhOyUsS9ZO+5VjaQZp1RylJz5s6MtBTHXim5qJ8YplCQU/wNDrwgjeHJVzZEq6Hr0DS2kO
-	5c2DAV71h24yli4oKpeNHjdC33C89cBiEZo1yAwr52/vL7qUIPnYYYOIDj9nkDv4Fcg1wSzwtxc1u
-	L+HrQFD+K2ZsLm1CFet8NrEaPDHSTGLCXiYRXj/kZub6SDbJMgxwVYX3BV8eQ1TkdAf14IelyuGva
-	/OO3WoMb5NlPiYI1qEIk5WsVAKSi5XsqesmiS6/eJZJh0f1/0gJk2JU5DK0jZS7AlN1fGoNJfEH6q
-	/gpAw4oU8VJyJKylY4pA==;
+	List-Owner; bh=P7hc3eDScLGIeLwF6vsxDl9SWsXgJ6ivzlVbC+HjWII=; b=D9HkurDaAGOxua
+	AItuneEXCuE9RUlZ7Nnfb1LYSBnay9UbHGhNH+TR3JSlFzAjqToLprRCQ/TyPQFGmyTcPJFy6AphN
+	GrRboZldFYYFSzTHOV4N8Yf//qu0wTIenMsKwGw13x708IPLTbj30juX150/pYKRvkibhElWL3LPO
+	1suRswACUIn4RbCCitZxMpIZuNkQHFRpnJUEZ04TEBMZRS8u8VN1To7WuE2SDeel00ybsSW3qiZxR
+	rmpcVyuostUX5x0DufhmmvhmvBWY7yMmWaUQVg4AOA2mucx3IrV2tuIqpkPreAEwiPlTUW395wZNV
+	VbGpG14hCknhyKZ7hsMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSkcf-0000UX-La; Fri, 30 Nov 2018 15:22:29 +0000
+	id 1gSkeF-00016D-R7; Fri, 30 Nov 2018 15:24:07 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSkcc-0000Rg-LD
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:22:28 +0000
+ id 1gSkeC-0000vC-1k
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:24:05 +0000
 Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
  [66.24.56.78])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 8724C20868;
- Fri, 30 Nov 2018 15:22:15 +0000 (UTC)
-Date: Fri, 30 Nov 2018 10:22:14 -0500
+ by mail.kernel.org (Postfix) with ESMTPSA id E997320868;
+ Fri, 30 Nov 2018 15:23:52 +0000 (UTC)
+Date: Fri, 30 Nov 2018 10:23:51 -0500
 From: Steven Rostedt <rostedt@goodmis.org>
 To: Anders Roxell <anders.roxell@linaro.org>
-Subject: Re: [PATCH 2/3] tracing: instruct KCOV not to track tracing files
-Message-ID: <20181130102214.21e1f8f6@gandalf.local.home>
-In-Reply-To: <20181130150935.27493-1-anders.roxell@linaro.org>
-References: <20181130150935.27493-1-anders.roxell@linaro.org>
+Subject: Re: [PATCH 3/3] arm64: ftrace: add cond_resched() to func
+ ftrace_make_(call|nop)
+Message-ID: <20181130102351.61045b21@gandalf.local.home>
+In-Reply-To: <20181130150956.27620-1-anders.roxell@linaro.org>
+References: <20181130150956.27620-1-anders.roxell@linaro.org>
 X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_072226_718516_30DFF455 
-X-CRM114-Status: GOOD (  16.19  )
+X-CRM114-CacheID: sfid-20181130_072404_105392_097C620F 
+X-CRM114-Status: GOOD (  16.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,52 +76,60 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 30 Nov 2018 16:09:35 +0100
+On Fri, 30 Nov 2018 16:09:56 +0100
 Anders Roxell <anders.roxell@linaro.org> wrote:
 
-> When we have KCOV enabled and running ftrace startup tests we end up in
-> a softlockup. Kcov and ftrace tracing each other makes it really slow:
-> 
-> [  275.141388] Testing tracer wakeup_dl:  PASSED
-> [  304.738345] Testing tracer function_graph:
-> [  716.236822] watchdog: BUG: soft lockup - CPU#0 stuck for 21s! [ksoftirqd/0:9]
-> 
-> Rework so that we don't let KCOV look at tracing files. Could probably
-> be more selective here, but in in general letting KCOV and ftrace check
-> each isn't the best idea.
+> Both of those functions end up calling ftrace_modify_code(), which is
+> expensive because it changes the page tables and flush caches.
+> Microseconds add up because this is called in a loop for each dyn_ftrace
+> record, and this triggers the softlockup watchdog unless we let it sleep
+> occasionally.
+> Rework so that we call cond_resched() before going into the
+> ftrace_modify_code() function.
 > 
 > Co-developed-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
-> ---
->  kernel/trace/Makefile | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/kernel/trace/Makefile b/kernel/trace/Makefile
-> index f81dadbc7c4a..c7c73b976103 100644
-> --- a/kernel/trace/Makefile
-> +++ b/kernel/trace/Makefile
-> @@ -6,6 +6,11 @@ ifdef CONFIG_FUNCTION_TRACER
->  ORIG_CFLAGS := $(KBUILD_CFLAGS)
->  KBUILD_CFLAGS = $(subst $(CC_FLAGS_FTRACE),,$(ORIG_CFLAGS))
->  
-> +# If instrumentation of this dir is enabled, the function tracer gets really
-> +# slow. Probably could be more selective here, but note that files related
-> +# to tracing.shouldn't be traced anyway.
-> +KCOV_INSTRUMENT		:= n
-> +
 
-The entire directory is also set to not be traced by function tracing,
-which also is a bit overkill, as there's functions in this directory
-that can (and probably should) be.
-
-Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+I'm fine with this patch, but I'm not placing an ack on this patch
+just because I don't know the repercussions of such a change. I'll let
+you folks take full responsibility ;-)
 
 -- Steve
+ 
 
->  ifdef CONFIG_FTRACE_SELFTEST
->  # selftest needs instrumentation
->  CFLAGS_trace_selftest_dynamic.o = $(CC_FLAGS_FTRACE)
+> ---
+>  arch/arm64/kernel/ftrace.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index de1a397d2d3f..9da38da58df7 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -130,6 +130,11 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+>  	old = aarch64_insn_gen_nop();
+>  	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
+>  
+> +	/* This function can take a long time when sanitizers are enabled, so
+> +	 * lets make sure we allow RCU processing.
+> +	 */
+> +	cond_resched();
+> +
+>  	return ftrace_modify_code(pc, old, new, true);
+>  }
+>  
+> @@ -188,6 +193,11 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
+>  
+>  	new = aarch64_insn_gen_nop();
+>  
+> +	/* This function can take a long time when sanitizers are enabled, so
+> +	 * lets make sure we allow RCU processing.
+> +	 */
+> +	cond_resched();
+> +
+>  	return ftrace_modify_code(pc, old, new, validate);
+>  }
+>  
 
 
 _______________________________________________
