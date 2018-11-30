@@ -2,21 +2,21 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 187CEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:27:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3FECC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DEAE92082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:27:18 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1AD92146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o7flD/vo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEAE92082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JF81sygY"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1AD92146D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,25 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zKH5oePH2jZvUAOPk4KjY36s1bXlYycbdx+qr/Som4c=; b=o7flD/vo13uQTT
-	o5VtQnp9VZjMB9Zh1tWAFcX/HGbwvFGE6psBI2PmtTd6nWoZdOqouMvcHvdYrAX2eg+3x3PI6TBJy
-	wbvYsfhUVb01XAgHv0dAP792ub2xm4JRLGtYsZh/hd2vjSHbjj6tB0kmJn0MLwHdQLWFr22X12F87
-	W97/23PLC3eKDp3K7QrpD/GNysEWJFMsTfDuAwDPTNkE3EJcWWIoqoRw5ROLW0ub5rPVTWt+a/uyU
-	0Y/P4k1RGHUr6DgxP1Jxrrj3/4zfP+PJwFuXj5WDCBMkHff9CUjfaKX5m8XOEx6+0ViaERqhBwlHh
-	Y9BtTM36oTC+fjIGUL5w==;
+	List-Owner; bh=QaCQs9vQu2+GpTF2ajJn4pwCGoV/Z1BGJE6Te1G9Xy0=; b=JF81sygYT/mvqA
+	Us5mGijn8RsabfHYmBzoyOyQSfOD11PPDse6+RxP/D7rKIR0rzx4BoZ/+ysiRX+pXVnlvF4ypYZv+
+	5eNoJ8CFc+rA+djjRifxIg9Gvjd6lAd07gRjFvauFdt6sexKeIm4aOo/w5WSHb48vbujnOtS/tQET
+	QbFlwOgpG1XuAM/3+bKoZP0XmFv2JyLoEfdvs7s+dXiQk+qGX6qUd6OCZ49Auyj/MFo84ltYGu4KR
+	PdGhdNyfaDLb6nAzTPey8WgVChiLSkNXs+45K3ZqGRBKWrrpG9tNdncxfb1VJr/OEPWn3hbgqlAW1
+	+yDTqQ6s91f5V4zMLzKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSip6-00010A-Ok; Fri, 30 Nov 2018 13:27:12 +0000
+	id 1gSiqV-0001pU-Jl; Fri, 30 Nov 2018 13:28:39 +0000
 Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSilD-0004Ng-7K; Fri, 30 Nov 2018 13:23:11 +0000
+ id 1gSilw-0004zL-AT; Fri, 30 Nov 2018 13:23:56 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: iommu@lists.linux-foundation.org
-Subject: [PATCH 04/23] powerpc/iommu: remove the mapping_error dma_map_ops
- method
-Date: Fri, 30 Nov 2018 14:22:12 +0100
-Message-Id: <20181130132231.16512-5-hch@lst.de>
+Subject: [PATCH 19/23] iommu/vt-d: remove the mapping_error dma_map_ops method
+Date: Fri, 30 Nov 2018 14:22:27 +0100
+Message-Id: <20181130132231.16512-20-hch@lst.de>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181130132231.16512-1-hch@lst.de>
 References: <20181130132231.16512-1-hch@lst.de>
@@ -72,210 +71,65 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The powerpc iommu code already returns (~(dma_addr_t)0x0) on mapping
-failures, so we can switch over to returning DMA_MAPPING_ERROR and let
+Return DMA_MAPPING_ERROR instead of 0 on a dma mapping failure and let
 the core dma-mapping code handle the rest.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- arch/powerpc/include/asm/iommu.h     |  4 ----
- arch/powerpc/kernel/dma-iommu.c      |  6 ------
- arch/powerpc/kernel/iommu.c          | 28 ++++++++++++++--------------
- arch/powerpc/platforms/cell/iommu.c  |  1 -
- arch/powerpc/platforms/pseries/vio.c |  3 +--
- 5 files changed, 15 insertions(+), 27 deletions(-)
+ drivers/iommu/intel-iommu.c | 12 +++---------
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
-diff --git a/arch/powerpc/include/asm/iommu.h b/arch/powerpc/include/asm/iommu.h
-index 35db0cbc9222..55312990d1d2 100644
---- a/arch/powerpc/include/asm/iommu.h
-+++ b/arch/powerpc/include/asm/iommu.h
-@@ -143,8 +143,6 @@ struct scatterlist;
+diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+index 66b4444398ae..0ad67d65bbce 100644
+--- a/drivers/iommu/intel-iommu.c
++++ b/drivers/iommu/intel-iommu.c
+@@ -3617,7 +3617,7 @@ static dma_addr_t __intel_map_page(struct device *dev, struct page *page,
  
- #ifdef CONFIG_PPC64
+ 	domain = get_valid_domain_for_dev(dev);
+ 	if (!domain)
+-		return 0;
++		return DMA_MAPPING_ERROR;
  
--#define IOMMU_MAPPING_ERROR		(~(dma_addr_t)0x0)
--
- static inline void set_iommu_table_base(struct device *dev,
- 					struct iommu_table *base)
- {
-@@ -242,8 +240,6 @@ static inline int __init tce_iommu_bus_notifier_init(void)
- }
- #endif /* !CONFIG_IOMMU_API */
- 
--int dma_iommu_mapping_error(struct device *dev, dma_addr_t dma_addr);
--
- #else
- 
- static inline void *get_iommu_table_base(struct device *dev)
-diff --git a/arch/powerpc/kernel/dma-iommu.c b/arch/powerpc/kernel/dma-iommu.c
-index f9fe2080ceb9..5ebacf0fe41a 100644
---- a/arch/powerpc/kernel/dma-iommu.c
-+++ b/arch/powerpc/kernel/dma-iommu.c
-@@ -106,11 +106,6 @@ static u64 dma_iommu_get_required_mask(struct device *dev)
- 	return mask;
+ 	iommu = domain_get_iommu(domain);
+ 	size = aligned_nrpages(paddr, size);
+@@ -3655,7 +3655,7 @@ static dma_addr_t __intel_map_page(struct device *dev, struct page *page,
+ 		free_iova_fast(&domain->iovad, iova_pfn, dma_to_mm_pfn(size));
+ 	pr_err("Device %s request: %zx@%llx dir %d --- failed\n",
+ 		dev_name(dev), size, (unsigned long long)paddr, dir);
+-	return 0;
++	return DMA_MAPPING_ERROR;
  }
  
--int dma_iommu_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ static dma_addr_t intel_map_page(struct device *dev, struct page *page,
+@@ -3756,7 +3756,7 @@ static void *intel_alloc_coherent(struct device *dev, size_t size,
+ 
+ 	*dma_handle = __intel_map_page(dev, page, 0, size, DMA_BIDIRECTIONAL,
+ 				       dev->coherent_dma_mask);
+-	if (*dma_handle)
++	if (*dma_handle != DMA_MAPPING_ERROR)
+ 		return page_address(page);
+ 	if (!dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT))
+ 		__free_pages(page, order);
+@@ -3865,11 +3865,6 @@ static int intel_map_sg(struct device *dev, struct scatterlist *sglist, int nele
+ 	return nelems;
+ }
+ 
+-static int intel_mapping_error(struct device *dev, dma_addr_t dma_addr)
 -{
--	return dma_addr == IOMMU_MAPPING_ERROR;
+-	return !dma_addr;
 -}
 -
- struct dma_map_ops dma_iommu_ops = {
- 	.alloc			= dma_iommu_alloc_coherent,
- 	.free			= dma_iommu_free_coherent,
-@@ -121,6 +116,5 @@ struct dma_map_ops dma_iommu_ops = {
- 	.map_page		= dma_iommu_map_page,
- 	.unmap_page		= dma_iommu_unmap_page,
- 	.get_required_mask	= dma_iommu_get_required_mask,
--	.mapping_error		= dma_iommu_mapping_error,
- };
- EXPORT_SYMBOL(dma_iommu_ops);
-diff --git a/arch/powerpc/kernel/iommu.c b/arch/powerpc/kernel/iommu.c
-index f0dc680e659a..ca7f73488c62 100644
---- a/arch/powerpc/kernel/iommu.c
-+++ b/arch/powerpc/kernel/iommu.c
-@@ -197,11 +197,11 @@ static unsigned long iommu_range_alloc(struct device *dev,
- 	if (unlikely(npages == 0)) {
- 		if (printk_ratelimit())
- 			WARN_ON(1);
--		return IOMMU_MAPPING_ERROR;
-+		return DMA_MAPPING_ERROR;
- 	}
- 
- 	if (should_fail_iommu(dev))
--		return IOMMU_MAPPING_ERROR;
-+		return DMA_MAPPING_ERROR;
- 
- 	/*
- 	 * We don't need to disable preemption here because any CPU can
-@@ -277,7 +277,7 @@ static unsigned long iommu_range_alloc(struct device *dev,
- 		} else {
- 			/* Give up */
- 			spin_unlock_irqrestore(&(pool->lock), flags);
--			return IOMMU_MAPPING_ERROR;
-+			return DMA_MAPPING_ERROR;
- 		}
- 	}
- 
-@@ -309,13 +309,13 @@ static dma_addr_t iommu_alloc(struct device *dev, struct iommu_table *tbl,
- 			      unsigned long attrs)
- {
- 	unsigned long entry;
--	dma_addr_t ret = IOMMU_MAPPING_ERROR;
-+	dma_addr_t ret = DMA_MAPPING_ERROR;
- 	int build_fail;
- 
- 	entry = iommu_range_alloc(dev, tbl, npages, NULL, mask, align_order);
- 
--	if (unlikely(entry == IOMMU_MAPPING_ERROR))
--		return IOMMU_MAPPING_ERROR;
-+	if (unlikely(entry == DMA_MAPPING_ERROR))
-+		return DMA_MAPPING_ERROR;
- 
- 	entry += tbl->it_offset;	/* Offset into real TCE table */
- 	ret = entry << tbl->it_page_shift;	/* Set the return dma address */
-@@ -327,12 +327,12 @@ static dma_addr_t iommu_alloc(struct device *dev, struct iommu_table *tbl,
- 
- 	/* tbl->it_ops->set() only returns non-zero for transient errors.
- 	 * Clean up the table bitmap in this case and return
--	 * IOMMU_MAPPING_ERROR. For all other errors the functionality is
-+	 * DMA_MAPPING_ERROR. For all other errors the functionality is
- 	 * not altered.
- 	 */
- 	if (unlikely(build_fail)) {
- 		__iommu_free(tbl, ret, npages);
--		return IOMMU_MAPPING_ERROR;
-+		return DMA_MAPPING_ERROR;
- 	}
- 
- 	/* Flush/invalidate TLB caches if necessary */
-@@ -477,7 +477,7 @@ int ppc_iommu_map_sg(struct device *dev, struct iommu_table *tbl,
- 		DBG("  - vaddr: %lx, size: %lx\n", vaddr, slen);
- 
- 		/* Handle failure */
--		if (unlikely(entry == IOMMU_MAPPING_ERROR)) {
-+		if (unlikely(entry == DMA_MAPPING_ERROR)) {
- 			if (!(attrs & DMA_ATTR_NO_WARN) &&
- 			    printk_ratelimit())
- 				dev_info(dev, "iommu_alloc failed, tbl %p "
-@@ -544,7 +544,7 @@ int ppc_iommu_map_sg(struct device *dev, struct iommu_table *tbl,
- 	 */
- 	if (outcount < incount) {
- 		outs = sg_next(outs);
--		outs->dma_address = IOMMU_MAPPING_ERROR;
-+		outs->dma_address = DMA_MAPPING_ERROR;
- 		outs->dma_length = 0;
- 	}
- 
-@@ -562,7 +562,7 @@ int ppc_iommu_map_sg(struct device *dev, struct iommu_table *tbl,
- 			npages = iommu_num_pages(s->dma_address, s->dma_length,
- 						 IOMMU_PAGE_SIZE(tbl));
- 			__iommu_free(tbl, vaddr, npages);
--			s->dma_address = IOMMU_MAPPING_ERROR;
-+			s->dma_address = DMA_MAPPING_ERROR;
- 			s->dma_length = 0;
- 		}
- 		if (s == outs)
-@@ -776,7 +776,7 @@ dma_addr_t iommu_map_page(struct device *dev, struct iommu_table *tbl,
- 			  unsigned long mask, enum dma_data_direction direction,
- 			  unsigned long attrs)
- {
--	dma_addr_t dma_handle = IOMMU_MAPPING_ERROR;
-+	dma_addr_t dma_handle = DMA_MAPPING_ERROR;
- 	void *vaddr;
- 	unsigned long uaddr;
- 	unsigned int npages, align;
-@@ -796,7 +796,7 @@ dma_addr_t iommu_map_page(struct device *dev, struct iommu_table *tbl,
- 		dma_handle = iommu_alloc(dev, tbl, vaddr, npages, direction,
- 					 mask >> tbl->it_page_shift, align,
- 					 attrs);
--		if (dma_handle == IOMMU_MAPPING_ERROR) {
-+		if (dma_handle == DMA_MAPPING_ERROR) {
- 			if (!(attrs & DMA_ATTR_NO_WARN) &&
- 			    printk_ratelimit())  {
- 				dev_info(dev, "iommu_alloc failed, tbl %p "
-@@ -868,7 +868,7 @@ void *iommu_alloc_coherent(struct device *dev, struct iommu_table *tbl,
- 	io_order = get_iommu_order(size, tbl);
- 	mapping = iommu_alloc(dev, tbl, ret, nio_pages, DMA_BIDIRECTIONAL,
- 			      mask >> tbl->it_page_shift, io_order, 0);
--	if (mapping == IOMMU_MAPPING_ERROR) {
-+	if (mapping == DMA_MAPPING_ERROR) {
- 		free_pages((unsigned long)ret, order);
- 		return NULL;
- 	}
-diff --git a/arch/powerpc/platforms/cell/iommu.c b/arch/powerpc/platforms/cell/iommu.c
-index 12352a58072a..af2a3c15e0ec 100644
---- a/arch/powerpc/platforms/cell/iommu.c
-+++ b/arch/powerpc/platforms/cell/iommu.c
-@@ -654,7 +654,6 @@ static const struct dma_map_ops dma_iommu_fixed_ops = {
- 	.dma_supported  = dma_suported_and_switch,
- 	.map_page       = dma_fixed_map_page,
- 	.unmap_page     = dma_fixed_unmap_page,
--	.mapping_error	= dma_iommu_mapping_error,
+ static const struct dma_map_ops intel_dma_ops = {
+ 	.alloc = intel_alloc_coherent,
+ 	.free = intel_free_coherent,
+@@ -3877,7 +3872,6 @@ static const struct dma_map_ops intel_dma_ops = {
+ 	.unmap_sg = intel_unmap_sg,
+ 	.map_page = intel_map_page,
+ 	.unmap_page = intel_unmap_page,
+-	.mapping_error = intel_mapping_error,
+ 	.dma_supported = dma_direct_supported,
  };
  
- static void cell_dma_dev_setup(struct device *dev)
-diff --git a/arch/powerpc/platforms/pseries/vio.c b/arch/powerpc/platforms/pseries/vio.c
-index 88f1ad1d6309..a29ad7db918a 100644
---- a/arch/powerpc/platforms/pseries/vio.c
-+++ b/arch/powerpc/platforms/pseries/vio.c
-@@ -519,7 +519,7 @@ static dma_addr_t vio_dma_iommu_map_page(struct device *dev, struct page *page,
- {
- 	struct vio_dev *viodev = to_vio_dev(dev);
- 	struct iommu_table *tbl;
--	dma_addr_t ret = IOMMU_MAPPING_ERROR;
-+	dma_addr_t ret = DMA_MAPPING_ERROR;
- 
- 	tbl = get_iommu_table_base(dev);
- 	if (vio_cmo_alloc(viodev, roundup(size, IOMMU_PAGE_SIZE(tbl)))) {
-@@ -625,7 +625,6 @@ static const struct dma_map_ops vio_dma_mapping_ops = {
- 	.unmap_page        = vio_dma_iommu_unmap_page,
- 	.dma_supported     = vio_dma_iommu_dma_supported,
- 	.get_required_mask = vio_dma_get_required_mask,
--	.mapping_error	   = dma_iommu_mapping_error,
- };
- 
- /**
 -- 
 2.19.1
 
