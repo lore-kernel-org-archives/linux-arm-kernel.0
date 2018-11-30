@@ -7,18 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 075F5C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:39:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 660F3C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:53:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id C7E712080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:39:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 369142082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:53:35 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sQeMoZIV";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hHEqAsC+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7E712080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gcxfk5iz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 369142082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,60 +25,43 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=GSCEYsW9xKdm20SO0S4VJx+CENiB6p3wZ4/d9AfvKSw=; b=sQeMoZIVO9zmyT
-	YVgbxFZMWNyty/bs2S19XYTAgeN224bHlszk04CawQFQ0uwSkfCEBBx9Yod6qylBatt8e+msQdMAL
-	bO1sYz2ky5+s3Py2w+ZBRag45HULZwal7xpkWYOxybEb2MYiHKf7IXnHNtmzoNcSX1McE2jJY8pFb
-	TM4bX9PHf9sKQM8b6ybFoSKyHYZh4co1wJZTfm8i0VQ20lefPvpsD63BCSMg5umXZgJL3sy470Fs+
-	RxW8yTp7jb4bD0fWiugwiBtQqMuXbi+tY9jAMarZaqM29Gp74ZizMaf9GpcXcfO7BrUSQrLVbAKF0
-	8Q7npVRW+6ILIsQLbuqg==;
+	List-Owner; bh=gPWa8VpOTtt/QX3bBuDrEHJtErPpBgOAcu419LUkoNo=; b=gcxfk5izcvZX1W
+	i98myLWG1T0S+Qe7/31ccknD6jsjE+xcG1cXR39btx51VbukAet4e0m+xSyj0wBEwuAw7ACWXp7im
+	MRwg3AN5RSLQ8qJkI7Hkj2TskS8s3MGvsA1+VQuxzOoCinjiMWMA9878iNGQrGbBG8afvdgwXxHta
+	y6lyrLqMDvBb3jJ8B1QgUOgeLLiKarxT0h9YfvUkuVDdBugFRIkWrYc04wJEvQGsPNzH02Y7+ltNJ
+	F6lbtUuyeGXyNXoK/zclF+maM9aidux4zsMLKeuw3uvFLX3K3cHxu1Nr+xNIqDenLRE0mwEmqXK8D
+	/BeouXBR5+igbeVZxfrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSpYv-0007eJ-FI; Fri, 30 Nov 2018 20:38:57 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gSpn2-00050O-Hc; Fri, 30 Nov 2018 20:53:32 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSpYq-0007di-V9
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 20:38:54 +0000
-Received: by mail-wr1-x442.google.com with SMTP id 96so6517056wrb.2
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 12:38:42 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=N23ecysPLPuVwmWPBcYm2Kn7j5y448PatwAcTMxhNL8=;
- b=hHEqAsC+FCyhjQYwQS3NvtNtmh91/JZLVR5VRaYy2KAGJ+2dNDME2+DA0nfQnH6XsZ
- EtbPnY7ZiFr9TjPIsHdawd02KSKen9/WY3wzp0vwlq/G/HZU9o1tR1yzTuT7tdjXvDpn
- lr1k2D0gO72XxnKhsGqSLDjp8i+8le7003ENs=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :content-transfer-encoding;
- bh=N23ecysPLPuVwmWPBcYm2Kn7j5y448PatwAcTMxhNL8=;
- b=roBqTBgLuQQidRE8Ujq7d3tu5d5xJIKpg3qEwcjGi/ADEqc3XsjAi/pzmS5JzRdtlg
- 0h6z2hy8SMT+dQ36zekpuZGJAQzpk+kHfDkw4/TbnPaEe7PGlHqnHGlUSeVAGbe15Lzb
- FdT4V2z4mCY/KWRZ/PzEF1HGHphn1KLmkkqmZk16Nd8GKOllJTv19JkrakxALF5+e6TA
- 5a2aCzeMy9t8HE62yp8/eI6jOZw5qO0Tqm3VisvwAYKaIsfvxqhgIGwGgAFyg7gds7fw
- OqD40w2cvwgkWPIEHfHo+sj39hZ8j7tQ0Fi+C0YfD/751eFpL3fxFINbWte+ABfXAxUs
- LpJg==
-X-Gm-Message-State: AA+aEWZyc/PssOJD55ci8MpIcDqAwLaDBlzOQ5uxGSMLNQiMy9zCOwDG
- JZwmqemSeb4/bdQvxozMpfrmnw==
-X-Google-Smtp-Source: AFSGD/Vzt7NhQPkGvGtax5OCWiQyZcAQ49EhWaLCbOXmpGvAHOz27xUifXE1axo7FRKlgtjAM2z4nw==
-X-Received: by 2002:adf:9521:: with SMTP id 30mr5811622wrs.192.1543610320670; 
- Fri, 30 Nov 2018 12:38:40 -0800 (PST)
-Received: from harold.home ([2a01:cb1d:112:6f00:d895:e032:7b00:86cd])
- by smtp.gmail.com with ESMTPSA id r76-v6sm137643wmb.21.2018.11.30.12.38.39
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 30 Nov 2018 12:38:39 -0800 (PST)
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-To: linux-crypto@vger.kernel.org
-Subject: [RFC/RFT PATCH] crypto: arm64/chacha - optimize for arbitrary length
- inputs
-Date: Fri, 30 Nov 2018 21:38:11 +0100
-Message-Id: <20181130203811.30269-1-ard.biesheuvel@linaro.org>
+ id 1gSpmy-0004z6-JB
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 20:53:30 +0000
+Received: from dude.hi.pengutronix.de ([2001:67c:670:100:1d::7])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gSpmj-0005mp-Rm; Fri, 30 Nov 2018 21:53:13 +0100
+Received: from ukl by dude.hi.pengutronix.de with local (Exim 4.91)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gSpmj-0004uL-2d; Fri, 30 Nov 2018 21:53:13 +0100
+From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
+To: Peter Chen <Peter.Chen@nxp.com>,
+	Shawn Guo <shawnguo@kernel.org>
+Subject: [PATCH] usb: chipidea: imx: unify over-current polarity handling
+Date: Fri, 30 Nov 2018 21:53:09 +0100
+Message-Id: <20181130205309.17232-1-u.kleine-koenig@pengutronix.de>
 X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::7
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_123853_012041_61B0F1D4 
-X-CRM114-Status: GOOD (  14.83  )
+X-CRM114-CacheID: sfid-20181130_125328_803863_A1ED61BB 
+X-CRM114-Status: GOOD (  18.00  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,406 +73,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: herbert@gondor.apana.org.au, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Martin Willi <martin@strongswan.org>, linux-kernel@vger.kernel.org,
- Eric Biggers <ebiggers@kernel.org>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Fabio Estevam <fabio.estevam@nxp.com>, linux-usb@vger.kernel.org,
+ kernel@pengutronix.de, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Update the 4-way NEON ChaCha routine so it can handle input of any
-length >64 bytes in its entirety, rather than having to call into
-the 1-way routine and/or do memcpy()s via temp buffers to handle the
-tail of a ChaCha invocation that is not a multiple of 256 bytes.
-
-On inputs that are a multiple of 256 bytes (and thus in tcrypt
-benchmarks), performance drops by around 1% on Cortex-A57, while
-performance for inputs drawn randomly from the range [64, 1024+64)
-increases by around 30% (using ChaCha20). On Cortex-A72, performance
-gains are similar. On Cortex-A53, performance improves but only by 5%.
-
-Cc: Eric Biggers <ebiggers@kernel.org>
-Cc: Martin Willi <martin@strongswan.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-Test program after the patch. 
-
- arch/arm64/crypto/chacha-neon-core.S | 185 ++++++++++++++++++--
- arch/arm64/crypto/chacha-neon-glue.c |  36 ++--
- 2 files changed, 188 insertions(+), 33 deletions(-)
-
-diff --git a/arch/arm64/crypto/chacha-neon-core.S b/arch/arm64/crypto/chacha-neon-core.S
-index 75b4e06cee79..45ffc51cb437 100644
---- a/arch/arm64/crypto/chacha-neon-core.S
-+++ b/arch/arm64/crypto/chacha-neon-core.S
-@@ -19,6 +19,7 @@
-  */
- 
- #include <linux/linkage.h>
-+#include <asm/cache.h>
- 
- 	.text
- 	.align		6
-@@ -164,6 +165,7 @@ ENTRY(chacha_4block_xor_neon)
- 	// x1: 4 data blocks output, o
- 	// x2: 4 data blocks input, i
- 	// w3: nrounds
-+	// x4: byte count
- 
- 	//
- 	// This function encrypts four consecutive ChaCha blocks by loading
-@@ -177,11 +179,11 @@ ENTRY(chacha_4block_xor_neon)
- 	ld1		{v30.4s-v31.4s}, [x9]
- 
- 	// x0..15[0-3] = s0..3[0..3]
--	mov		x4, x0
--	ld4r		{ v0.4s- v3.4s}, [x4], #16
--	ld4r		{ v4.4s- v7.4s}, [x4], #16
--	ld4r		{ v8.4s-v11.4s}, [x4], #16
--	ld4r		{v12.4s-v15.4s}, [x4]
-+	mov		x8, x0
-+	ld4r		{ v0.4s- v3.4s}, [x8], #16
-+	ld4r		{ v4.4s- v7.4s}, [x8], #16
-+	ld4r		{ v8.4s-v11.4s}, [x8], #16
-+	ld4r		{v12.4s-v15.4s}, [x8]
- 
- 	// x12 += counter values 0-3
- 	add		v12.4s, v12.4s, v30.4s
-@@ -425,24 +427,47 @@ ENTRY(chacha_4block_xor_neon)
- 	zip1		v30.4s, v14.4s, v15.4s
- 	zip2		v31.4s, v14.4s, v15.4s
- 
-+	mov		x3, #64
-+	subs		x5, x4, #64
-+	add		x6, x5, x2
-+	csel		x3, x3, xzr, ge
-+	csel		x2, x2, x6, ge
-+
- 	// interleave 64-bit words in state n, n+2
- 	zip1		v0.2d, v16.2d, v18.2d
- 	zip2		v4.2d, v16.2d, v18.2d
- 	zip1		v8.2d, v17.2d, v19.2d
- 	zip2		v12.2d, v17.2d, v19.2d
--	ld1		{v16.16b-v19.16b}, [x2], #64
-+	ld1		{v16.16b-v19.16b}, [x2], x3
-+
-+	subs		x6, x4, #128
-+	ccmp		x3, xzr, #4, lt
-+	add		x7, x6, x2
-+	csel		x3, x3, xzr, eq
-+	csel		x2, x2, x7, eq
- 
- 	zip1		v1.2d, v20.2d, v22.2d
- 	zip2		v5.2d, v20.2d, v22.2d
- 	zip1		v9.2d, v21.2d, v23.2d
- 	zip2		v13.2d, v21.2d, v23.2d
--	ld1		{v20.16b-v23.16b}, [x2], #64
-+	ld1		{v20.16b-v23.16b}, [x2], x3
-+
-+	subs		x7, x4, #192
-+	ccmp		x3, xzr, #4, lt
-+	add		x8, x7, x2
-+	csel		x3, x3, xzr, eq
-+	csel		x2, x2, x8, eq
- 
- 	zip1		v2.2d, v24.2d, v26.2d
- 	zip2		v6.2d, v24.2d, v26.2d
- 	zip1		v10.2d, v25.2d, v27.2d
- 	zip2		v14.2d, v25.2d, v27.2d
--	ld1		{v24.16b-v27.16b}, [x2], #64
-+	ld1		{v24.16b-v27.16b}, [x2], x3
-+
-+	subs		x8, x4, #256
-+	ccmp		x3, xzr, #4, lt
-+	add		x9, x8, x2
-+	csel		x2, x2, x9, eq
- 
- 	zip1		v3.2d, v28.2d, v30.2d
- 	zip2		v7.2d, v28.2d, v30.2d
-@@ -451,29 +476,167 @@ ENTRY(chacha_4block_xor_neon)
- 	ld1		{v28.16b-v31.16b}, [x2]
- 
- 	// xor with corresponding input, write to output
-+	tbnz		x5, #63, 0f
- 	eor		v16.16b, v16.16b, v0.16b
- 	eor		v17.16b, v17.16b, v1.16b
- 	eor		v18.16b, v18.16b, v2.16b
- 	eor		v19.16b, v19.16b, v3.16b
-+	st1		{v16.16b-v19.16b}, [x1], #64
-+
-+	tbnz		x6, #63, 1f
- 	eor		v20.16b, v20.16b, v4.16b
- 	eor		v21.16b, v21.16b, v5.16b
--	st1		{v16.16b-v19.16b}, [x1], #64
- 	eor		v22.16b, v22.16b, v6.16b
- 	eor		v23.16b, v23.16b, v7.16b
-+	st1		{v20.16b-v23.16b}, [x1], #64
-+
-+	tbnz		x7, #63, 2f
- 	eor		v24.16b, v24.16b, v8.16b
- 	eor		v25.16b, v25.16b, v9.16b
--	st1		{v20.16b-v23.16b}, [x1], #64
- 	eor		v26.16b, v26.16b, v10.16b
- 	eor		v27.16b, v27.16b, v11.16b
--	eor		v28.16b, v28.16b, v12.16b
- 	st1		{v24.16b-v27.16b}, [x1], #64
-+
-+	tbnz		x8, #63, 3f
-+	eor		v28.16b, v28.16b, v12.16b
- 	eor		v29.16b, v29.16b, v13.16b
- 	eor		v30.16b, v30.16b, v14.16b
- 	eor		v31.16b, v31.16b, v15.16b
- 	st1		{v28.16b-v31.16b}, [x1]
- 
- 	ret
-+
-+	// fewer than 64 bytes of in/output
-+0:	adr		x12, .Lpermute
-+	add		x12, x12, x5
-+	sub		x2, x1, #64
-+	add		x1, x1, x5
-+	add		x13, x12, #64
-+	ld1		{v8.16b}, [x12]
-+	ld1		{v9.16b}, [x13]
-+	movi		v10.16b, #16
-+
-+	ld1		{v16.16b-v19.16b}, [x2]
-+	tbl		v4.16b, {v0.16b-v3.16b}, v8.16b
-+	tbx		v20.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v5.16b, {v0.16b-v3.16b}, v8.16b
-+	tbx		v21.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v6.16b, {v0.16b-v3.16b}, v8.16b
-+	tbx		v22.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v7.16b, {v0.16b-v3.16b}, v8.16b
-+	tbx		v23.16b, {v16.16b-v19.16b}, v9.16b
-+
-+	eor		v20.16b, v20.16b, v4.16b
-+	eor		v21.16b, v21.16b, v5.16b
-+	eor		v22.16b, v22.16b, v6.16b
-+	eor		v23.16b, v23.16b, v7.16b
-+	st1		{v20.16b-v23.16b}, [x1]
-+	ret
-+
-+	// fewer than 128 bytes of in/output
-+1:	adr		x12, .Lpermute
-+	add		x12, x12, x6
-+	add		x1, x1, x6
-+	add		x13, x12, #64
-+	ld1		{v8.16b}, [x12]
-+	ld1		{v9.16b}, [x13]
-+	movi		v10.16b, #16
-+	tbl		v0.16b, {v4.16b-v7.16b}, v8.16b
-+	tbx		v20.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v1.16b, {v4.16b-v7.16b}, v8.16b
-+	tbx		v21.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v2.16b, {v4.16b-v7.16b}, v8.16b
-+	tbx		v22.16b, {v16.16b-v19.16b}, v9.16b
-+	add		v8.16b, v8.16b, v10.16b
-+	add		v9.16b, v9.16b, v10.16b
-+	tbl		v3.16b, {v4.16b-v7.16b}, v8.16b
-+	tbx		v23.16b, {v16.16b-v19.16b}, v9.16b
-+
-+	eor		v20.16b, v20.16b, v0.16b
-+	eor		v21.16b, v21.16b, v1.16b
-+	eor		v22.16b, v22.16b, v2.16b
-+	eor		v23.16b, v23.16b, v3.16b
-+	st1		{v20.16b-v23.16b}, [x1]
-+	ret
-+
-+	// fewer than 192 bytes of in/output
-+2:	adr		x12, .Lpermute
-+	add		x12, x12, x7
-+	add		x1, x1, x7
-+	add		x13, x12, #64
-+	ld1		{v4.16b}, [x12]
-+	ld1		{v5.16b}, [x13]
-+	movi		v6.16b, #16
-+	tbl		v0.16b, {v8.16b-v11.16b}, v4.16b
-+	tbx		v24.16b, {v20.16b-v23.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v1.16b, {v8.16b-v11.16b}, v4.16b
-+	tbx		v25.16b, {v20.16b-v23.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v2.16b, {v8.16b-v11.16b}, v4.16b
-+	tbx		v26.16b, {v20.16b-v23.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v3.16b, {v8.16b-v11.16b}, v4.16b
-+	tbx		v27.16b, {v20.16b-v23.16b}, v5.16b
-+
-+	eor		v24.16b, v24.16b, v0.16b
-+	eor		v25.16b, v25.16b, v1.16b
-+	eor		v26.16b, v26.16b, v2.16b
-+	eor		v27.16b, v27.16b, v3.16b
-+	st1		{v24.16b-v27.16b}, [x1]
-+	ret
-+
-+	// fewer than 256 bytes of in/output
-+3:	adr		x12, .Lpermute
-+	add		x12, x12, x8
-+	add		x1, x1, x8
-+	add		x13, x12, #64
-+	ld1		{v4.16b}, [x12]
-+	ld1		{v5.16b}, [x13]
-+	movi		v6.16b, #16
-+	tbl		v0.16b, {v12.16b-v15.16b}, v4.16b
-+	tbx		v28.16b, {v24.16b-v27.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v1.16b, {v12.16b-v15.16b}, v4.16b
-+	tbx		v29.16b, {v24.16b-v27.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v2.16b, {v12.16b-v15.16b}, v4.16b
-+	tbx		v30.16b, {v24.16b-v27.16b}, v5.16b
-+	add		v4.16b, v4.16b, v6.16b
-+	add		v5.16b, v5.16b, v6.16b
-+	tbl		v3.16b, {v12.16b-v15.16b}, v4.16b
-+	tbx		v31.16b, {v24.16b-v27.16b}, v5.16b
-+
-+	eor		v28.16b, v28.16b, v0.16b
-+	eor		v29.16b, v29.16b, v1.16b
-+	eor		v30.16b, v30.16b, v2.16b
-+	eor		v31.16b, v31.16b, v3.16b
-+	st1		{v28.16b-v31.16b}, [x1]
-+	ret
- ENDPROC(chacha_4block_xor_neon)
- 
- CTRINC:	.word		0, 1, 2, 3
- ROT8:	.word		0x02010003, 0x06050407, 0x0a09080b, 0x0e0d0c0f
-+
-+	.align		L1_CACHE_SHIFT
-+	.set		.Lpermute, . + 64
-+	.set		.Li, 0
-+	.rept		192
-+	.byte		(.Li - 64)
-+	.set		.Li, .Li + 1
-+	.endr
-diff --git a/arch/arm64/crypto/chacha-neon-glue.c b/arch/arm64/crypto/chacha-neon-glue.c
-index 346eb85498a1..458d9b36cf9d 100644
---- a/arch/arm64/crypto/chacha-neon-glue.c
-+++ b/arch/arm64/crypto/chacha-neon-glue.c
-@@ -32,41 +32,33 @@
- asmlinkage void chacha_block_xor_neon(u32 *state, u8 *dst, const u8 *src,
- 				      int nrounds);
- asmlinkage void chacha_4block_xor_neon(u32 *state, u8 *dst, const u8 *src,
--				       int nrounds);
-+				       int nrounds, int bytes);
- asmlinkage void hchacha_block_neon(const u32 *state, u32 *out, int nrounds);
- 
- static void chacha_doneon(u32 *state, u8 *dst, const u8 *src,
--			  unsigned int bytes, int nrounds)
-+			  int bytes, int nrounds)
- {
- 	u8 buf[CHACHA_BLOCK_SIZE];
- 
--	while (bytes >= CHACHA_BLOCK_SIZE * 4) {
-+	if (bytes < CHACHA_BLOCK_SIZE) {
-+		memcpy(buf, src, bytes);
- 		kernel_neon_begin();
--		chacha_4block_xor_neon(state, dst, src, nrounds);
-+		chacha_block_xor_neon(state, buf, buf, nrounds);
-+		kernel_neon_end();
-+		memcpy(dst, buf, bytes);
-+		return;
-+	}
-+
-+	while (bytes > 0) {
-+		kernel_neon_begin();
-+		chacha_4block_xor_neon(state, dst, src, nrounds,
-+				       min(bytes, CHACHA_BLOCK_SIZE * 4));
- 		kernel_neon_end();
- 		bytes -= CHACHA_BLOCK_SIZE * 4;
- 		src += CHACHA_BLOCK_SIZE * 4;
- 		dst += CHACHA_BLOCK_SIZE * 4;
- 		state[12] += 4;
- 	}
--
--	if (!bytes)
--		return;
--
--	kernel_neon_begin();
--	while (bytes >= CHACHA_BLOCK_SIZE) {
--		chacha_block_xor_neon(state, dst, src, nrounds);
--		bytes -= CHACHA_BLOCK_SIZE;
--		src += CHACHA_BLOCK_SIZE;
--		dst += CHACHA_BLOCK_SIZE;
--		state[12]++;
--	}
--	if (bytes) {
--		memcpy(buf, src, bytes);
--		chacha_block_xor_neon(state, buf, buf, nrounds);
--		memcpy(dst, buf, bytes);
--	}
--	kernel_neon_end();
- }
- 
- static int chacha_neon_stream_xor(struct skcipher_request *req,
--- 
-2.19.1
-
-
-#include <stdlib.h>
-#include <string.h>
-
-extern void chacha_4block_xor_neon(unsigned int *state, unsigned char *dst,
-				   unsigned char *src, int rounds, int bytes);
-
-extern void chacha_block_xor_neon(unsigned int *state, unsigned char *dst,
-				  unsigned char *src, int rounds);
-
-int main(void)
-{
-	static char buf[1024];
-	unsigned int state[64];
-
-	srand(20181130);
-
-	for (int i = 0; i < 10 * 1000 * 1000; i++) {
-		int l = 64 + rand() % (1024 - 64);
-
-#ifdef NEW
-		while (l > 0) {
-			chacha_4block_xor_neon(state, buf, buf, 20,
-					       l > 256 ? 256 : l);
-			l -= 256;
-		}
-#else
-		while (l >= 256) {
-			chacha_4block_xor_neon(state, buf, buf, 20, 256);
-			l -= 256;
-		}
-		while (l >= 64) {
-			chacha_block_xor_neon(state, buf, buf, 20);
-			l -= 64;
-		}
-		if (l > 0) {
-			unsigned char tmp[64];
-
-			memcpy(tmp, buf, l);
-			chacha_block_xor_neon(state, tmp, tmp, 20);
-			memcpy(buf, tmp, l);
-		}
-#endif
-	}
-
-	return 0;
-}
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhlIHN0YXR1cyBxdW8gaXM6CiAtIG9uIGkuTVgyNSB0aGUgb3ZlcmN1cnJlbnQgcG9sYXJpdHkg
+aXMgYWx3YXlzIGV4cGxpY2l0bHkgY29uZmlndXJlZCBhcwogICBhY3RpdmUgaGlnaCB3aGljaCBt
+YXRjaGVzIHRoZSByZXNldCBkZWZhdWx0LgogLSBvbiBpLk1YNiBhbmQgaS5NWDcgdGhlIG92ZXJj
+dXJyZW50IHBvbGFyaXR5IGlzIGFjdGl2ZSBoaWdoIGFmdGVyCiAgIHJlc2V0LiB1c2JtaXNjX2lt
+eDZxX2luaXQoKSBhbmQgdXNibWlzY19pbXg3ZF9pbml0KCkga2VlcCB0aGUgY3VycmVudAogICBz
+dGF0ZSAocHJvYmFibHkgYXMgc2V0dXAgYnkgdGhlIGJvb3Rsb2FkZXIgb3Igc3RpbGwgdGhlIHJl
+c2V0CiAgIGRlZmF1bHQpIHVubGVzcyB0aGUgcG9sYXJpdHkgaXMgZXhwbGljaXRseSBjb25maWd1
+cmVkIGFzIGFjdGl2ZSBoaWdoCiAgIHdoaWNoIHRoZW4gaXMgY29uZmlndXJlZC4gKFNvIGlmIHRo
+ZSBwaW4gaXMgYWN0aXZlIGxvdyBhbmQgdGhlCiAgIGJvb3Rsb2FkZXIgZGlkbid0IHNldCB0aGlz
+IHVwIHRoZSBjb25maWd1cmF0aW9uIGlzIHdyb25nLikKClRvIGltcHJvdmUgdGhlIHNpdHVhdGlv
+biBhbHdheXMgY29uZmlndXJlIHRoZSByZXNldCBkZWZhdWx0IHZhbHVlIHVubGVzcwp0aGUgZGV2
+aWNlIHRyZWUgY29uZmlndXJlcyB0aGUgcG9sYXJpdHkgKGFuZCB0aGVuIHVzZSB0aGlzIG9uZSku
+CgpOb3RlIHRoYXQgYXMgdGhlIHJlc2V0IGRlZmF1bHQgaXMgYWN0aXZlIGhpZ2ggb24gYWxsIHBs
+YXRmb3JtcyB0aGVyZSBpcwpubyBuZWVkIHRvIGNoZWNrIGZvciB0aGUgcHJlc2VuY2Ugb2YgIm92
+ZXItY3VycmVudC1hY3RpdmUtaGlnaCIuIEluIHRoZQphYnNlbmNlIG9mICJvdmVyLWN1cnJlbnQt
+YWN0aXZlLWxvdyIgaXQgZG9lc24ndCBtYXR0ZXIgaWYgYWN0aXZlIGhpZ2ggaXMKY29uZmlndXJl
+ZCBiZWNhdXNlIHRoYXQncyB0aGUgZGVmYXVsdCBvciBiZWNhdXNlIGl0IGlzIGNvbmZpZ3VyZWQK
+ZXhwbGljaXRseS4KClNpZ25lZC1vZmYtYnk6IFV3ZSBLbGVpbmUtS8O2bmlnIDx1LmtsZWluZS1r
+b2VuaWdAcGVuZ3V0cm9uaXguZGU+Ci0tLQogLi4uL2RldmljZXRyZWUvYmluZGluZ3MvdXNiL2Np
+LWhkcmMtdXNiMi50eHQgIHwgIDEgKwogZHJpdmVycy91c2IvY2hpcGlkZWEvY2lfaGRyY19pbXgu
+YyAgICAgICAgICAgIHwgIDkgKysrKy0KIGRyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14
+LmggICAgICAgICAgICB8ICA0ICstCiBkcml2ZXJzL3VzYi9jaGlwaWRlYS91c2JtaXNjX2lteC5j
+ICAgICAgICAgICAgfCAzOSArKysrKysrKysrKysrKysrKy0tCiA0IGZpbGVzIGNoYW5nZWQsIDQ2
+IGluc2VydGlvbnMoKyksIDcgZGVsZXRpb25zKC0pCgpkaWZmIC0tZ2l0IGEvRG9jdW1lbnRhdGlv
+bi9kZXZpY2V0cmVlL2JpbmRpbmdzL3VzYi9jaS1oZHJjLXVzYjIudHh0IGIvRG9jdW1lbnRhdGlv
+bi9kZXZpY2V0cmVlL2JpbmRpbmdzL3VzYi9jaS1oZHJjLXVzYjIudHh0CmluZGV4IDBlMDMzNDRl
+MmU4Yi4uYjczM2I3YzRiZmRjIDEwMDY0NAotLS0gYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUv
+YmluZGluZ3MvdXNiL2NpLWhkcmMtdXNiMi50eHQKKysrIGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0
+cmVlL2JpbmRpbmdzL3VzYi9jaS1oZHJjLXVzYjIudHh0CkBAIC04Myw2ICs4Myw3IEBAIGkubXgg
+c3BlY2lmaWMgcHJvcGVydGllcwogLSBkaXNhYmxlLW92ZXItY3VycmVudDogZGlzYWJsZSBvdmVy
+IGN1cnJlbnQgZGV0ZWN0CiAtIG92ZXItY3VycmVudC1hY3RpdmUtaGlnaDogb3ZlciBjdXJyZW50
+IHNpZ25hbCBwb2xhcml0eSBpcyBoaWdoIGFjdGl2ZSwKICAgdHlwaWNhbGx5IG92ZXIgY3VycmVu
+dCBzaWduYWwgcG9sYXJpdHkgaXMgbG93IGFjdGl2ZS4KKy0gb3Zlci1jdXJyZW50LWFjdGl2ZS1s
+b3c6IG92ZXIgY3VycmVudCBzaWduYWwgcG9sYXJpdHkgaXMgbG93IGFjdGl2ZS4KIC0gZXh0ZXJu
+YWwtdmJ1cy1kaXZpZGVyOiBlbmFibGVzIG9mZi1jaGlwIHJlc2lzdG9yIGRpdmlkZXIgZm9yIFZi
+dXMKIAogRXhhbXBsZToKZGlmZiAtLWdpdCBhL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNf
+aW14LmMgYi9kcml2ZXJzL3VzYi9jaGlwaWRlYS9jaV9oZHJjX2lteC5jCmluZGV4IDVmNGE4MTU3
+ZmFkOC4uMzUyYmQwYmZlMTYxIDEwMDY0NAotLS0gYS9kcml2ZXJzL3VzYi9jaGlwaWRlYS9jaV9o
+ZHJjX2lteC5jCisrKyBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmMKQEAgLTE0
+MSw4ICsxNDEsMTMgQEAgc3RhdGljIHN0cnVjdCBpbXhfdXNibWlzY19kYXRhICp1c2JtaXNjX2dl
+dF9pbml0X2RhdGEoc3RydWN0IGRldmljZSAqZGV2KQogCWlmIChvZl9maW5kX3Byb3BlcnR5KG5w
+LCAiZGlzYWJsZS1vdmVyLWN1cnJlbnQiLCBOVUxMKSkKIAkJZGF0YS0+ZGlzYWJsZV9vYyA9IDE7
+CiAKLQlpZiAob2ZfZmluZF9wcm9wZXJ0eShucCwgIm92ZXItY3VycmVudC1hY3RpdmUtaGlnaCIs
+IE5VTEwpKQotCQlkYXRhLT5vY19wb2xhcml0eSA9IDE7CisJLyoKKwkgKiBObyBuZWVkIHRvIGNo
+ZWNrIGZvciAib3Zlci1jdXJyZW50LWFjdGl2ZS1oaWdoIiBhcyB0aGlzIGlzIHRoZSByZXNldAor
+CSAqIGRlZmF1bHQgZm9yIGFsbCBwbGF0Zm9ybXMgYW5kIHRoaXMgaXMgY29uZmlndXJlZCB1bmxl
+c3MgImFjdGl2ZS1sb3ciCisJICogaXMgc3BlY2lmaWVkLgorCSAqLworCWlmIChvZl9maW5kX3By
+b3BlcnR5KG5wLCAib3Zlci1jdXJyZW50LWFjdGl2ZS1sb3ciLCBOVUxMKSkKKwkJZGF0YS0+b2Nf
+cG9sYXJpdHlfbG93ID0gMTsKIAogCWlmIChvZl9maW5kX3Byb3BlcnR5KG5wLCAiZXh0ZXJuYWwt
+dmJ1cy1kaXZpZGVyIiwgTlVMTCkpCiAJCWRhdGEtPmV2ZG8gPSAxOwpkaWZmIC0tZ2l0IGEvZHJp
+dmVycy91c2IvY2hpcGlkZWEvY2lfaGRyY19pbXguaCBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2Np
+X2hkcmNfaW14LmgKaW5kZXggZDY2NmM5ZjAzNmJhLi5kZmZhMzRmMzc3N2QgMTAwNjQ0Ci0tLSBh
+L2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmgKKysrIGIvZHJpdmVycy91c2IvY2hp
+cGlkZWEvY2lfaGRyY19pbXguaApAQCAtMTcsNyArMTcsOSBAQCBzdHJ1Y3QgaW14X3VzYm1pc2Nf
+ZGF0YSB7CiAJaW50IGluZGV4OwogCiAJdW5zaWduZWQgaW50IGRpc2FibGVfb2M6MTsgLyogb3Zl
+ciBjdXJyZW50IGRldGVjdCBkaXNhYmxlZCAqLwotCXVuc2lnbmVkIGludCBvY19wb2xhcml0eTox
+OyAvKiBvdmVyIGN1cnJlbnQgcG9sYXJpdHkgaWYgb2MgZW5hYmxlZCAqLworCS8qIG92ZXIgY3Vy
+cmVudCBwb2xhcml0eSBsb3cgaWYgb2MgZW5hYmxlZCAqLworCXVuc2lnbmVkIGludCBvY19wb2xh
+cml0eV9sb3c6MTsKKwogCXVuc2lnbmVkIGludCBldmRvOjE7IC8qIHNldCBleHRlcm5hbCB2YnVz
+IGRpdmlkZXIgb3B0aW9uICovCiAJdW5zaWduZWQgaW50IHVscGk6MTsgLyogY29ubmVjdGVkIHRv
+IGFuIFVMUEkgcGh5ICovCiB9OwpkaWZmIC0tZ2l0IGEvZHJpdmVycy91c2IvY2hpcGlkZWEvdXNi
+bWlzY19pbXguYyBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMKaW5kZXggOWY0
+YTAxODVkZDYwLi44OWMxYTBjNDhmODAgMTAwNjQ0Ci0tLSBhL2RyaXZlcnMvdXNiL2NoaXBpZGVh
+L3VzYm1pc2NfaW14LmMKKysrIGIvZHJpdmVycy91c2IvY2hpcGlkZWEvdXNibWlzY19pbXguYwpA
+QCAtMTI2LDYgKzEyNiwxNSBAQCBzdGF0aWMgaW50IHVzYm1pc2NfaW14MjVfaW5pdChzdHJ1Y3Qg
+aW14X3VzYm1pc2NfZGF0YSAqZGF0YSkKIAkJdmFsICY9IH4oTVgyNV9PVEdfU0lDX01BU0sgfCBN
+WDI1X09UR19QUF9CSVQpOwogCQl2YWwgfD0gKE1YMjVfRUhDSV9JTlRFUkZBQ0VfRElGRl9VTkkg
+JiBNWDI1X0VIQ0lfSU5URVJGQUNFX01BU0spIDw8IE1YMjVfT1RHX1NJQ19TSElGVDsKIAkJdmFs
+IHw9IChNWDI1X09UR19QTV9CSVQgfCBNWDI1X09UR19PQ1BPTF9CSVQpOworCisJCS8qCisJCSAq
+IHJlc2V0IGRlZmF1bHQgZm9yIE1YMjVfT1RHX09DUE9MX0JJVCBpcyBzZXQgKGkuZS4gYWN0aXZl
+CisJCSAqIGhpZ2gpLiBTbyBvbmx5IHVuc2V0IGlmIGV4cGxpY2l0bHkgY29uZmlndXJlZCBhbmQg
+a2VlcCBzZXQKKwkJICogb3RoZXJ3aXNlLgorCQkgKi8KKwkJaWYgKGRhdGEtPm9jX3BvbGFyaXR5
+X2xvdykKKwkJCXZhbCAmPSB+TVgyNV9PVEdfT0NQT0xfQklUOworCiAJCXdyaXRlbCh2YWwsIHVz
+Ym1pc2MtPmJhc2UpOwogCQlicmVhazsKIAljYXNlIDE6CkBAIC0xMzUsNiArMTQ0LDE0IEBAIHN0
+YXRpYyBpbnQgdXNibWlzY19pbXgyNV9pbml0KHN0cnVjdCBpbXhfdXNibWlzY19kYXRhICpkYXRh
+KQogCQl2YWwgfD0gKE1YMjVfSDFfUE1fQklUIHwgTVgyNV9IMV9PQ1BPTF9CSVQgfCBNWDI1X0gx
+X1RMTF9CSVQgfAogCQkJTVgyNV9IMV9VU0JURV9CSVQgfCBNWDI1X0gxX0lQUFVFX0RPV05fQklU
+KTsKIAorCQkvKgorCQkgKiByZXNldCBkZWZhdWx0IGZvciBNWDI1X0gxX09DUE9MX0JJVCBpcyBz
+ZXQgKGkuZS4gYWN0aXZlCisJCSAqIGhpZ2gpLiBTbyBvbmx5IHVuc2V0IGlmIGV4cGxpY2l0bHkg
+Y29uZmlndXJlZCBhbmQga2VlcCBzZXQKKwkJICogb3RoZXJ3aXNlLgorCQkgKi8KKwkJaWYgKGRh
+dGEtPm9jX3BvbGFyaXR5X2xvdykKKwkJCXZhbCAmPSB+TVgyNV9IMV9PQ1BPTF9CSVQ7CisKIAkJ
+d3JpdGVsKHZhbCwgdXNibWlzYy0+YmFzZSk7CiAKIAkJYnJlYWs7CkBAIC0zNDAsOSArMzU3LDE2
+IEBAIHN0YXRpYyBpbnQgdXNibWlzY19pbXg2cV9pbml0KHN0cnVjdCBpbXhfdXNibWlzY19kYXRh
+ICpkYXRhKQogCXJlZyA9IHJlYWRsKHVzYm1pc2MtPmJhc2UgKyBkYXRhLT5pbmRleCAqIDQpOwog
+CWlmIChkYXRhLT5kaXNhYmxlX29jKSB7CiAJCXJlZyB8PSBNWDZfQk1fT1ZFUl9DVVJfRElTOwot
+CX0gZWxzZSBpZiAoZGF0YS0+b2NfcG9sYXJpdHkgPT0gMSkgewotCQkvKiBIaWdoIGFjdGl2ZSAq
+LworCX0gZWxzZSB7CiAJCXJlZyAmPSB+KE1YNl9CTV9PVkVSX0NVUl9ESVMgfCBNWDZfQk1fT1ZF
+Ul9DVVJfUE9MQVJJVFkpOworCisJCS8qCisJCSAqIHJlc2V0IGRlZmF1bHQgZm9yIE1YNl9CTV9P
+VkVSX0NVUl9QT0xBUklUWSBpcyB1bnNldCAoaS5lLgorCQkgKiBhY3RpdmUgaGlnaCkuIFNvIG9u
+bHkgc2V0IGlmIGV4cGxpY2l0bHkgY29uZmlndXJlZCBhbmQga2VlcAorCQkgKiBjbGVhciBvdGhl
+cndpc2UuCisJCSAqLworCQlpZiAoZGF0YS0+b2NfcG9sYXJpdHlfbG93KQorCQkJcmVnIHw9IE1Y
+Nl9CTV9PVkVSX0NVUl9QT0xBUklUWTsKIAl9CiAJd3JpdGVsKHJlZywgdXNibWlzYy0+YmFzZSAr
+IGRhdGEtPmluZGV4ICogNCk7CiAKQEAgLTQ0Miw5ICs0NjYsMTYgQEAgc3RhdGljIGludCB1c2Jt
+aXNjX2lteDdkX2luaXQoc3RydWN0IGlteF91c2JtaXNjX2RhdGEgKmRhdGEpCiAJcmVnID0gcmVh
+ZGwodXNibWlzYy0+YmFzZSk7CiAJaWYgKGRhdGEtPmRpc2FibGVfb2MpIHsKIAkJcmVnIHw9IE1Y
+Nl9CTV9PVkVSX0NVUl9ESVM7Ci0JfSBlbHNlIGlmIChkYXRhLT5vY19wb2xhcml0eSA9PSAxKSB7
+Ci0JCS8qIEhpZ2ggYWN0aXZlICovCisJfSBlbHNlIHsKIAkJcmVnICY9IH4oTVg2X0JNX09WRVJf
+Q1VSX0RJUyB8IE1YNl9CTV9PVkVSX0NVUl9QT0xBUklUWSk7CisKKwkJLyoKKwkJICogcmVzZXQg
+ZGVmYXVsdCBmb3IgTVg2X0JNX09WRVJfQ1VSX1BPTEFSSVRZIGlzIHVuc2V0IChpLmUuCisJCSAq
+IGFjdGl2ZSBoaWdoKS4gU28gb25seSBzZXQgaWYgZXhwbGljaXRseSBjb25maWd1cmVkIGFuZCBr
+ZWVwCisJCSAqIGNsZWFyIG90aGVyd2lzZS4KKwkJICovCisJCWlmIChkYXRhLT5vY19wb2xhcml0
+eV9sb3cpCisJCQlyZWcgfD0gTVg2X0JNX09WRVJfQ1VSX1BPTEFSSVRZOwogCX0KIAl3cml0ZWwo
+cmVnLCB1c2JtaXNjLT5iYXNlKTsKIAotLSAKMi4xOS4xCgoKX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
+bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
+YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
