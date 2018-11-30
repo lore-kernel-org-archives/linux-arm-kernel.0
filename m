@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D07B4C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DFC3C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A23502145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4544220834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="unnIOdHj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A23502145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OWsw+rJN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4544220834
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,36 +26,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=RFFCiTZdVvf07El6yAW6GNE2B2MmRm7MqpJllIVnbwA=; b=unnIOdHj/s1XKVOHv54/xOdqBf
-	Zd6jJrPqLAXRakDrOit1tKTcGamHfJYlg+wI8zz8HCVfAebomgNu3mHfpn2DXeNaOcIaOZApRr1J5
-	6MlQ0mhAlWM0T2x2qMJ/ktVwvSpslvI/PRP77qvBw0Za8YffeqLuGUSxjHU8+pKlOMF6KUquilAE7
-	791ZfbhYbiYj3ub9AZ4OU8v8YwR0fhKMGH6TOzOHjoPS/CzoAU7or0ydeko9Fw9kiL0wi+Yrqgujz
-	fsG1N0tnU0Zlds2sS7jA8Tb15hei7WIcYKd31hE5BCncqV/Lop7xmPJTbHXv9EY0JxUVlnF7CzrPG
-	wviid8Yw==;
+	bh=ATk2Q6ujiwjUez1urg6tI6oCFm+BcqLkrfWak4bTkkY=; b=OWsw+rJN7YRCMgflt7CCAggilC
+	T6Cnu5dffG+u177vdmwXseHYixKJw9mhISSf1/H0PcUO5dYp2bKiHf30xbwIUKfyUJOmGHccajklA
+	OpItS742bA/d9Ow2kYv26G236fyVaUjDrXegE8Wfbv7OqyNJ1nZPPnmDwB1tLYep0uRe0wspiqme8
+	7gunE0bkCXV9onm0n6HHH8DFqtpQNQuKOLbjP5TaHx/3qYfL6hk06V1dfLwAVW6RK/kX3P3tXZvby
+	q+6O6efwY8/OIQmdSGK6QLw9WV0ty9lMgHhiv2vogTY9oRcEgKmELewqSW4KeapcJoesk0K49nfL+
+	dlkdQJYA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSmRq-0000Qm-TT; Fri, 30 Nov 2018 17:19:26 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gSmS3-0000bk-8R; Fri, 30 Nov 2018 17:19:39 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSmR3-00088s-Ht
+ id 1gSmR3-00087y-Hv
  for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:18:40 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4763C1682;
- Fri, 30 Nov 2018 09:18:34 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 954F31596;
+ Fri, 30 Nov 2018 09:18:28 -0800 (PST)
 Received: from en101.cambridge.arm.com (en101.cambridge.arm.com [10.1.196.93])
  by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- C11C63F5A0; Fri, 30 Nov 2018 09:18:32 -0800 (PST)
+ EBDD53F5A0; Fri, 30 Nov 2018 09:18:26 -0800 (PST)
 From: Suzuki K Poulose <suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 4/7] arm64: capabilities: Speed up capability lookup
-Date: Fri, 30 Nov 2018 17:18:03 +0000
-Message-Id: <1543598286-2663-5-git-send-email-suzuki.poulose@arm.com>
+Subject: [PATCH v2 1/7] arm64: capabilities: Merge entries for
+ ARM64_WORKAROUND_CLEAN_CACHE
+Date: Fri, 30 Nov 2018 17:18:00 +0000
+Message-Id: <1543598286-2663-2-git-send-email-suzuki.poulose@arm.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
 References: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_091837_782626_F7F5B1A5 
-X-CRM114-Status: GOOD (  18.92  )
+X-CRM114-CacheID: sfid-20181130_091837_778218_5B9214CC 
+X-CRM114-Status: GOOD (  15.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,107 +71,133 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: mark.rutland@arm.com, vladimir.murzin@arm.com,
  Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org, dave.martin@arm.com
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Andre Przywara <andre.przywara@arm.com>, dave.martin@arm.com
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We maintain two separate tables of capabilities, errata and features,
-which decide the system capabilities. We iterate over each of these
-tables for various operations (e.g, detection, verification etc.).
-We do not have a way to map a system "capability" to its entry,
-(i.e, cap -> struct arm64_cpu_capabilities) which is needed for
-this_cpu_has_cap(). So we iterate over the table one by one to
-find the entry and then do the operation. Also, this prevents
-us from optimizing the way we "enable" the capabilities on the
-CPUs, where we now issue a stop_machine() for each available
-capability.
+We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
 
-One solution is to merge the two tables into a single table,
-sorted by the capability. But this is has the following
-disadvantages:
-  - We loose the "classification" of an errata vs. feature
-  - It is quite easy to make a mistake when adding an entry,
-    unless we sort the table at runtime.
+1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
+2) ARM Errata 819472 on A53 r0p[01]
 
-So we maintain a list of pointers to the capability entry, sorted
-by the "cap number" in a separate array, initialized at boot time.
-The only restriction is that we can have one "entry" per capability.
-While at it, remove the duplicate declaration of arm64_errata table.
+Both have the same work around. Merge these entries to avoid
+duplicate entries for a single capability. Add a new Kconfig
+entry to control the "capability" entry to make it easier
+to handle combinations of the CONFIGs.
 
-Reviewed-by: Vladimiri Murzin <vladimir.murzin@arm.com>
-Tested-by: Vladimiri Murzin <vladimir.murzin@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andre Przywara <andre.przywara@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig               |  7 +++++++
+ arch/arm64/include/asm/cputype.h |  1 +
+ arch/arm64/kernel/cpu_errata.c   | 28 ++++++++++++++++------------
+ 3 files changed, 24 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index aec5ecb..6a2563b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -52,6 +52,7 @@ unsigned int compat_elf_hwcap2 __read_mostly;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 787d785..ad69e15 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -313,9 +313,13 @@ menu "Kernel Features"
  
- DECLARE_BITMAP(cpu_hwcaps, ARM64_NCAPS);
- EXPORT_SYMBOL(cpu_hwcaps);
-+static struct arm64_cpu_capabilities const __ro_after_init *cpu_hwcaps_ptrs[ARM64_NCAPS];
+ menu "ARM errata workarounds via the alternatives framework"
  
- /*
-  * Flag to indicate if we have computed the system wide
-@@ -518,6 +519,29 @@ static void __init init_cpu_ftr_reg(u32 sys_reg, u64 new)
- }
- 
- extern const struct arm64_cpu_capabilities arm64_errata[];
-+static const struct arm64_cpu_capabilities arm64_features[];
++config ARM64_WORKAROUND_CLEAN_CACHE
++	def_bool n
 +
-+static void __init
-+init_cpu_hwcaps_indirect_list_from_array(const struct arm64_cpu_capabilities *caps)
-+{
-+	for (; caps->matches; caps++) {
-+		if (WARN(caps->capability > ARM64_NCAPS,
-+			"Invalid capability %d\n", caps->capability))
-+			continue;
-+		if (WARN(cpu_hwcaps_ptrs[caps->capability],
-+			"Duplicate entry for capability %d\n",
-+			caps->capability))
-+			continue;
-+		cpu_hwcaps_ptrs[caps->capability] = caps;
-+	}
-+}
-+
-+static void __init init_cpu_hwcaps_indirect_list(void)
-+{
-+	init_cpu_hwcaps_indirect_list_from_array(arm64_features);
-+	init_cpu_hwcaps_indirect_list_from_array(arm64_errata);
-+}
-+
- static void __init setup_boot_cpu_capabilities(void);
- 
- void __init init_cpu_features(struct cpuinfo_arm64 *info)
-@@ -564,6 +588,12 @@ void __init init_cpu_features(struct cpuinfo_arm64 *info)
+ config ARM64_ERRATUM_826319
+ 	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
+ 	default y
++	select ARM64_WORKAROUND_CLEAN_CACHE
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+ 	  erratum 826319 on Cortex-A53 parts up to r0p2 with an AMBA 4 ACE or
+@@ -337,6 +341,7 @@ config ARM64_ERRATUM_826319
+ config ARM64_ERRATUM_827319
+ 	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
+ 	default y
++	select ARM64_WORKAROUND_CLEAN_CACHE
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+ 	  erratum 827319 on Cortex-A53 parts up to r0p2 with an AMBA 5 CHI
+@@ -358,6 +363,7 @@ config ARM64_ERRATUM_827319
+ config ARM64_ERRATUM_824069
+ 	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
+ 	default y
++	select ARM64_WORKAROUND_CLEAN_CACHE
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+ 	  erratum 824069 on Cortex-A53 parts up to r0p2 when it is connected
+@@ -380,6 +386,7 @@ config ARM64_ERRATUM_824069
+ config ARM64_ERRATUM_819472
+ 	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
+ 	default y
++	select ARM64_WORKAROUND_CLEAN_CACHE
+ 	help
+ 	  This option adds an alternative code sequence to work around ARM
+ 	  erratum 819472 on Cortex-A53 parts up to r0p1 with an L2 cache
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 12f93e4d..2e26375 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -151,6 +151,7 @@ struct midr_range {
+ 		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
  	}
  
- 	/*
-+	 * Initialize the indirect array of CPU hwcaps capabilities pointers
-+	 * before we handle the boot CPU below.
-+	 */
-+	init_cpu_hwcaps_indirect_list();
-+
-+	/*
- 	 * Detect and enable early CPU capabilities based on the boot CPU,
- 	 * after we have initialised the CPU feature infrastructure.
- 	 */
-@@ -1750,8 +1780,6 @@ static void __init mark_const_caps_ready(void)
- 	static_branch_enable(&arm64_const_caps_ready);
- }
++#define MIDR_REV_RANGE(m, v, r_min, r_max) MIDR_RANGE(m, v, r_min, v, r_max)
+ #define MIDR_ALL_VERSIONS(m) MIDR_RANGE(m, 0, 0, 0xf, 0xf)
  
--extern const struct arm64_cpu_capabilities arm64_errata[];
--
- bool this_cpu_has_cap(unsigned int cap)
- {
- 	return (__this_cpu_has_cap(arm64_features, cap) ||
+ static inline bool is_midr_in_range(u32 midr, struct midr_range const *range)
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index a509e351..be1a8bc 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -570,24 +570,28 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
+ 
+ #endif
+ 
+-const struct arm64_cpu_capabilities arm64_errata[] = {
++#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
++static const struct midr_range workaround_clean_cache[] = {
+ #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_827319) || \
+ 	defined(CONFIG_ARM64_ERRATUM_824069)
+-	{
+-	/* Cortex-A53 r0p[012] */
+-		.desc = "ARM errata 826319, 827319, 824069",
+-		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
+-		.cpu_enable = cpu_enable_cache_maint_trap,
+-	},
++	/* Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069 */
++	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
++#endif
++#ifdef	CONFIG_ARM64_ERRATUM_819472
++	/* Cortex-A53 r0p[01] : ARM errata 819472 */
++	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
++#endif
++	{},
++};
+ #endif
+-#ifdef CONFIG_ARM64_ERRATUM_819472
++
++const struct arm64_cpu_capabilities arm64_errata[] = {
++#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
+ 	{
+-	/* Cortex-A53 r0p[01] */
+-		.desc = "ARM errata 819472",
++		.desc = "ARM errata 826319, 827319, 824069, 819472",
+ 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
+-		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
++		ERRATA_MIDR_RANGE_LIST(workaround_clean_cache),
+ 		.cpu_enable = cpu_enable_cache_maint_trap,
+ 	},
+ #endif
 -- 
 2.7.4
 
