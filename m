@@ -2,21 +2,22 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 93A58C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:00:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8CA92C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:01:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4FC242081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:00:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5C53B2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:01:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZGIFDg/+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4FC242081C
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wy+BbBxF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5C53B2081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -24,88 +25,42 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=R6ja4OzLOv04tFF2N2FlmnrUSBdJ9rMwq5dabBVLdHM=; b=ZGIFDg/+qZHNL3
-	cZtQhKWQDWZRxntG3NsvFOGkFRjyiO8OCsKCTLceBH2CiWE7xEle5/DfMuLQjPIelPlFRX/MXrgwl
-	In9vrAVkUb9D1A7Rr70w0DIiqHGFqe2ZyhQCowZVHUtE1Rl9AEdmnTtAQtSPs4aBLKC9sIQ/MJikc
-	yeS/D0aE8SRqVnCh1JqWCEWaToHSlhnoBR84iQCsOCpfbXC+nkiFYp2CC1F3bBgClmT+T5oD45qD/
-	rokcR5xrIhUEP0wVEcUUDB8rvY7T0M7k/4CR1EzMsTgOC81O3K8Gkvn4BPHfQOYznqb12LoFrmVoB
-	QN1peOF+NmOkS36hujYw==;
+	List-Owner; bh=5rsZum6dGVVJujQZjTu324e3SuzJ9EQcNbsjM9IVx98=; b=Wy+BbBxFBj1ZEB
+	onUia/zb6YbceOAT7pCQL2ML/hEV47MaBy6pNWPdi2CY+7tKH47zi9TxyDyDcJnwDXT0gO2REZrJU
+	SsJcGd3b813kRbVcubHVOpwQTPQquUBsNL5zo7ZCqTiGcQRcPHh9v58XEzna2v/FMWt2IcrE+BIOM
+	h9R0mz2QPEiPS0yPX8vELKw4JM4B4dbOX1PyOIXCaIzeT29xlL0xlPmot+ZNLrnQ5aH4Nn+JTtWMK
+	/Zw7pRUzpl82YOrSUfS+dYJ8o9gAGmAlt9Cb8wZYDN6bChlNIF9t4bm50PHOmd46qUZhS4cIA1OJs
+	+6SvjuSeIkpr3aqUlPWA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSeeq-0002wx-8J; Fri, 30 Nov 2018 09:00:20 +0000
-Received: from smtp.nue.novell.com ([195.135.221.5])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSeei-0001hF-Sl; Fri, 30 Nov 2018 09:00:18 +0000
-Received: from ziggy.stardust ([37.223.145.41])
- by smtp.nue.novell.com with ESMTP (TLS encrypted);
- Fri, 30 Nov 2018 09:59:56 +0100
-Subject: Re: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
- mmsys clocks
-To: Stephen Boyd <sboyd@kernel.org>, Matthias Brugger
- <matthias.bgg@gmail.com>, Rob Herring <robh@kernel.org>
-References: <20181116125449.23581-1-matthias.bgg@kernel.org>
- <20181116125449.23581-9-matthias.bgg@kernel.org>
- <20181116231522.GA18006@bogus>
- <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
- <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
- <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
- <458178ac-c0fc-9671-7fc8-ed2d6f61424c@suse.com>
- <154356023767.88331.18401188808548429052@swboyd.mtv.corp.google.com>
-From: Matthias Brugger <mbrugger@suse.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=mbrugger@suse.com; prefer-encrypt=mutual; keydata=
- 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
- UXI+r2JwH1CJjrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <a229bfc7-683f-5b0d-7b71-54f934de6214@suse.com>
-Date: Fri, 30 Nov 2018 09:59:51 +0100
+	id 1gSefX-0003Go-1f; Fri, 30 Nov 2018 09:01:03 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSefU-0003FO-69
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 09:01:01 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C899415AB;
+ Fri, 30 Nov 2018 01:00:49 -0800 (PST)
+Received: from [10.1.29.146] (e121487-lin.cambridge.arm.com [10.1.29.146])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E7A3E3F5A0;
+ Fri, 30 Nov 2018 01:00:48 -0800 (PST)
+Subject: Re: [PATCH v2] ARM: dma-mapping: fix potential uninitialized return
+To: Nathan Jones <nathanj439@gmail.com>
+References: <20181128173929.3050-1-nathanj439@gmail.com>
+ <20181128185910.5778-1-nathanj439@gmail.com>
+ <401b58b2-fb17-dc83-f898-c10cafdc5413@arm.com>
+ <CACTmSTzQeJiR8S57zYcu+YWbnMdo9Eb9Bei4gfmHyFOrzoWiZw@mail.gmail.com>
+From: Vladimir Murzin <vladimir.murzin@arm.com>
+Message-ID: <984681e6-738b-a93b-5f4e-87970a2fe50d@arm.com>
+Date: Fri, 30 Nov 2018 09:00:46 +0000
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <154356023767.88331.18401188808548429052@swboyd.mtv.corp.google.com>
+In-Reply-To: <CACTmSTzQeJiR8S57zYcu+YWbnMdo9Eb9Bei4gfmHyFOrzoWiZw@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_010013_392687_8048B60E 
-X-CRM114-Status: GOOD (  21.25  )
+X-CRM114-CacheID: sfid-20181130_010100_228192_516EC6AE 
+X-CRM114-Status: GOOD (  18.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,107 +72,71 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Sean Wang <sean.wang@kernel.org>, David Airlie <airlied@linux.ie>,
- Michael Turquette <mturquette@baylibre.com>,
- Sean Wang <sean.wang@mediatek.com>, Stephen Boyd <sboyd@codeaurora.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- dri-devel <dri-devel@lists.freedesktop.org>,
- Ulrich Hecht <ulrich.hecht+renesas@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
- Randy Dunlap <rdunlap@infradead.org>,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- Philipp Zabel <p.zabel@pengutronix.de>, matthias.bgg@kernel.org,
- CK Hu <ck.hu@mediatek.com>, linux-mediatek@lists.infradead.org,
- linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: linux@armlinux.org.uk, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 30/11/2018 07:43, Stephen Boyd wrote:
-> Quoting Matthias Brugger (2018-11-21 09:09:52)
+On 11/29/18 2:58 PM, Nathan Jones wrote:
+> On Thu, Nov 29, 2018 at 4:51 AM Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 >>
+>> On 11/28/18 6:59 PM, Nathan Jones wrote:
+>>> If neither of the if() statements fire then the return value is
+>>> uninitialized. In the worst case it returns 0 which means the caller
+>>> will think the function succeeded.
 >>
->> On 21/11/2018 17:46, Stephen Boyd wrote:
->>> Quoting Rob Herring (2018-11-19 11:15:16)
->>>> On Sun, Nov 18, 2018 at 11:12 AM Matthias Brugger
->>>> <matthias.bgg@gmail.com> wrote:
->>>>> On 11/17/18 12:15 AM, Rob Herring wrote:
->>>>>> On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg@kernel.org wrote:
->>>>>>> -    #clock-cells = <1>;
->>>>>>> +
->>>>>>> +    mmsys_clk: clock-controller@14000000 {
->>>>>>> +            compatible = "mediatek,mt2712-mmsys-clk";
->>>>>>> +            #clock-cells = <1>;
->>>>>>
->>>>>> This goes against the general direction of not defining separate nodes
->>>>>> for providers with no resources.
->>>>>>
->>>>>> Why do you need this and what does it buy if you have to continue to
->>>>>> support the existing chips?
->>>>>>
->>>>>
->>>>> It would show explicitly that the mmsys block is used to probe two
->>>>> drivers, one for the gpu and one for the clocks. Otherwise that is
->>>>> hidden in the drm driver code. I think it is cleaner to describe that in
->>>>> the device tree.
->>>>
->>>> No, that's maybe cleaner for the driver implementation in the Linux
->>>> kernel. What about other OS's or when Linux drivers and subsystems
->>>> needs change? Cleaner for DT is design bindings that reflect the h/w.
->>>> Hardware is sometimes just messy.
->>>>
+>> "ret" is updated indirectly via:
+>>
+>>         if (dma_mmap_from_dev_coherent(dev, vma, cpu_addr, size, &ret))
+>>                 return ret;
+>>
+>> I assume that it was found with static analyzer or like this, in such case
+>> please, provide output produced by the tool.
+> 
+> No, I had some bad code which was passing a wrong length and receiving the
+> strange error code.
+
+Sorry for dragging you into that. If you put statement above into commit log,
+feel free to add
+
+Acked-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+Thanks
+Vladimir
+
+> 
+>>
 >>>
->>> I agree. I fail to see what this patch series is doing besides changing
->>> driver probe and device creation methods and making a backwards
->>> incompatible change to DT. Is there any other benefit here?
+>>> Fixes: 1655cf8829d8 ("ARM: dma-mapping: Remove traces of NOMMU code")
+>>
+>> I'll leave it up to Russell.
+>>
+>> Cheers
+>> Vladimir
+>>
+>>> Signed-off-by: Nathan Jones <nathanj439@gmail.com>
+>>> ---
+>>>  arch/arm/mm/dma-mapping.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+>>> index 661fe48ab78d..78de138aa66d 100644
+>>> --- a/arch/arm/mm/dma-mapping.c
+>>> +++ b/arch/arm/mm/dma-mapping.c
+>>> @@ -829,7 +829,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+>>>                void *cpu_addr, dma_addr_t dma_addr, size_t size,
+>>>                unsigned long attrs)
+>>>  {
+>>> -     int ret;
+>>> +     int ret = -ENXIO;
+>>>       unsigned long nr_vma_pages = vma_pages(vma);
+>>>       unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
+>>>       unsigned long pfn = dma_to_pfn(dev, dma_addr);
 >>>
 >>
->> You are referring whole series?
->> Citing the cover letter:
->> "MMSYS in Mediatek SoCs has some registers to control clock gates (which is
->> used in the clk driver) and some registers to set the routing and enable
->> the differnet (sic!) blocks of the display subsystem.
->>
->> Up to now both drivers, clock and drm are probed with the same device tree
->> compatible. But only the first driver get probed, which in effect breaks
->> graphics on mt8173 and mt2701.
-> 
-> Ouch!
 > 
 
-Yes :)
-
->>
->> This patch uses a platform device registration in the DRM driver, which
->> will trigger the probe of the corresponding clock driver. It was tested on the
->> bananapi-r2 and the Acer R13 Chromebook."
-> 
-> Alright, please don't add nodes in DT just to make device drivers probe.
-> Instead, register clks from the drm driver or create a child platform
-> device for the clk bits purely in the drm driver and have that probe the
-> associated clk driver from there.
-> 
-
-I'll make the other SoCs probe via a child platform device from the drm driver,
-as already done in 2/12 and 3/12.
-
-Regards,
-Matthias
-
->>
->> DT is broken right now, because two drivers rely on the same node, which gets
->> consumed just once. The new DT introduced does not break anything because it is
->> only used for boards that: "[..] are not available to the general public
->> (mt2712e) or only have the mmsys clock driver part implemented (mt6797)."
-> 
-> Ok, so backwards compatibility is irrelevant then. Sounds fine to me.
-> 
-> 
 
 _______________________________________________
 linux-arm-kernel mailing list
