@@ -2,62 +2,63 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-3.7 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8DFC3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0EAFC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:20:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4544220834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:19:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D5EC206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:20:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OWsw+rJN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4544220834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XPTLyLLs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D5EC206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=ATk2Q6ujiwjUez1urg6tI6oCFm+BcqLkrfWak4bTkkY=; b=OWsw+rJN7YRCMgflt7CCAggilC
-	T6Cnu5dffG+u177vdmwXseHYixKJw9mhISSf1/H0PcUO5dYp2bKiHf30xbwIUKfyUJOmGHccajklA
-	OpItS742bA/d9Ow2kYv26G236fyVaUjDrXegE8Wfbv7OqyNJ1nZPPnmDwB1tLYep0uRe0wspiqme8
-	7gunE0bkCXV9onm0n6HHH8DFqtpQNQuKOLbjP5TaHx/3qYfL6hk06V1dfLwAVW6RK/kX3P3tXZvby
-	q+6O6efwY8/OIQmdSGK6QLw9WV0ty9lMgHhiv2vogTY9oRcEgKmELewqSW4KeapcJoesk0K49nfL+
-	dlkdQJYA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=L5nma+NVaH99U75yB0JYWk0ASGI2TvsAJruVi7wzl5k=; b=XPTLyLLs0FdZg2
+	f5HW4f6IO0hEU9L6QrGfIQo0z1BFQfUMBOpo805KbJ4FdrUwwoquRYS8oo021TjhQAbWLrkVsNhQl
+	YirKpCawVj60zsCiP1LmoMfpZBBl/zitQQ39+VSN6xo7/CDHGM92pLgAt3GSqABsg6MPMwPukQsMe
+	eIcaEAQaEw3KjVhMiBuvVVAhmPEgC82C/AOgOAEkvPasyPNR5oASldd2XXpgYEhY5YX0tasM8CpY9
+	MdIhuzcXeSq8bmlCsMgHAcAfmp1c3FeLSFmWuqa9fJOtbKBW0zpWVojIc0iBgItnZh9ng/gQX/94+
+	RBuSdoFuSbUyid6jLwKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSmS3-0000bk-8R; Fri, 30 Nov 2018 17:19:39 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSmR3-00087y-Hv
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:18:40 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 954F31596;
- Fri, 30 Nov 2018 09:18:28 -0800 (PST)
-Received: from en101.cambridge.arm.com (en101.cambridge.arm.com [10.1.196.93])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id
- EBDD53F5A0; Fri, 30 Nov 2018 09:18:26 -0800 (PST)
-From: Suzuki K Poulose <suzuki.poulose@arm.com>
-To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH v2 1/7] arm64: capabilities: Merge entries for
- ARM64_WORKAROUND_CLEAN_CACHE
-Date: Fri, 30 Nov 2018 17:18:00 +0000
-Message-Id: <1543598286-2663-2-git-send-email-suzuki.poulose@arm.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
-References: <1543598286-2663-1-git-send-email-suzuki.poulose@arm.com>
+	id 1gSmSt-0002hk-EW; Fri, 30 Nov 2018 17:20:31 +0000
+Received: from smtp04.smtpout.orange.fr ([80.12.242.126]
+ helo=smtp.smtpout.orange.fr)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSmRK-0008Ce-Km
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:19:01 +0000
+Received: from belgarion ([90.89.234.36]) by mwinf5d60 with ME
+ id 6HJf1z00N0nnJME03HJg6z; Fri, 30 Nov 2018 18:18:41 +0100
+X-ME-Helo: belgarion
+X-ME-Auth: amFyem1pay5yb2JlcnRAb3JhbmdlLmZy
+X-ME-Date: Fri, 30 Nov 2018 18:18:41 +0100
+X-ME-IP: 90.89.234.36
+From: Robert Jarzmik <robert.jarzmik@free.fr>
+To: Russell King <rmk+kernel@armlinux.org.uk>
+Subject: Re: [PATCH 6/8] ARM: pxa/lubbock: switch PCMCIA to MAX1600 library
+References: <E1gRxlD-0001vC-E0@rmk-PC.armlinux.org.uk>
+X-URL: http://belgarath.falguerolles.org/
+Date: Fri, 30 Nov 2018 18:18:39 +0100
+In-Reply-To: <E1gRxlD-0001vC-E0@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Wed, 28 Nov 2018 11:12:03 +0000")
+Message-ID: <87y39axz4g.fsf@belgarion.home>
+User-Agent: Gnus/5.130008 (Ma Gnus v0.8) Emacs/24.5 (gnu/linux)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_091837_778218_5B9214CC 
-X-CRM114-Status: GOOD (  15.59  )
+X-CRM114-CacheID: sfid-20181130_091855_926224_8D329032 
+X-CRM114-Status: GOOD (  14.35  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,138 +70,32 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, vladimir.murzin@arm.com,
- Suzuki K Poulose <suzuki.poulose@arm.com>, catalin.marinas@arm.com,
- will.deacon@arm.com, linux-kernel@vger.kernel.org,
- Andre Przywara <andre.przywara@arm.com>, dave.martin@arm.com
-MIME-Version: 1.0
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>,
+ Kristoffer Ericson <kristoffer.ericson@gmail.com>,
+ Dominik Brodowski <linux@dominikbrodowski.net>,
+ Daniel Mack <daniel@zonque.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-We have two entries for ARM64_WORKAROUND_CLEAN_CACHE capability :
+Russell King <rmk+kernel@armlinux.org.uk> writes:
 
-1) ARM Errata 826319, 827319, 824069, 819472 on A53 r0p[012]
-2) ARM Errata 819472 on A53 r0p[01]
+> As Lubbock now provides GPIOs via gpiolib for controlling the socket
+> power, we can use the MAX1600 driver.  Switch Lubbock to use this
+> driver, which simplifies the code.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Tested-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-Both have the same work around. Merge these entries to avoid
-duplicate entries for a single capability. Add a new Kconfig
-entry to control the "capability" entry to make it easier
-to handle combinations of the CONFIGs.
+The test is only a read of the CIS of a PCCard in the PCMCIA slot, not actual
+access to the storage.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andre Przywara <andre.przywara@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/Kconfig               |  7 +++++++
- arch/arm64/include/asm/cputype.h |  1 +
- arch/arm64/kernel/cpu_errata.c   | 28 ++++++++++++++++------------
- 3 files changed, 24 insertions(+), 12 deletions(-)
+Cheers.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 787d785..ad69e15 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -313,9 +313,13 @@ menu "Kernel Features"
- 
- menu "ARM errata workarounds via the alternatives framework"
- 
-+config ARM64_WORKAROUND_CLEAN_CACHE
-+	def_bool n
-+
- config ARM64_ERRATUM_826319
- 	bool "Cortex-A53: 826319: System might deadlock if a write cannot complete until read data is accepted"
- 	default y
-+	select ARM64_WORKAROUND_CLEAN_CACHE
- 	help
- 	  This option adds an alternative code sequence to work around ARM
- 	  erratum 826319 on Cortex-A53 parts up to r0p2 with an AMBA 4 ACE or
-@@ -337,6 +341,7 @@ config ARM64_ERRATUM_826319
- config ARM64_ERRATUM_827319
- 	bool "Cortex-A53: 827319: Data cache clean instructions might cause overlapping transactions to the interconnect"
- 	default y
-+	select ARM64_WORKAROUND_CLEAN_CACHE
- 	help
- 	  This option adds an alternative code sequence to work around ARM
- 	  erratum 827319 on Cortex-A53 parts up to r0p2 with an AMBA 5 CHI
-@@ -358,6 +363,7 @@ config ARM64_ERRATUM_827319
- config ARM64_ERRATUM_824069
- 	bool "Cortex-A53: 824069: Cache line might not be marked as clean after a CleanShared snoop"
- 	default y
-+	select ARM64_WORKAROUND_CLEAN_CACHE
- 	help
- 	  This option adds an alternative code sequence to work around ARM
- 	  erratum 824069 on Cortex-A53 parts up to r0p2 when it is connected
-@@ -380,6 +386,7 @@ config ARM64_ERRATUM_824069
- config ARM64_ERRATUM_819472
- 	bool "Cortex-A53: 819472: Store exclusive instructions might cause data corruption"
- 	default y
-+	select ARM64_WORKAROUND_CLEAN_CACHE
- 	help
- 	  This option adds an alternative code sequence to work around ARM
- 	  erratum 819472 on Cortex-A53 parts up to r0p1 with an L2 cache
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index 12f93e4d..2e26375 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -151,6 +151,7 @@ struct midr_range {
- 		.rv_max = MIDR_CPU_VAR_REV(v_max, r_max),	\
- 	}
- 
-+#define MIDR_REV_RANGE(m, v, r_min, r_max) MIDR_RANGE(m, v, r_min, v, r_max)
- #define MIDR_ALL_VERSIONS(m) MIDR_RANGE(m, 0, 0, 0xf, 0xf)
- 
- static inline bool is_midr_in_range(u32 midr, struct midr_range const *range)
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index a509e351..be1a8bc 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -570,24 +570,28 @@ static const struct midr_range arm64_harden_el2_vectors[] = {
- 
- #endif
- 
--const struct arm64_cpu_capabilities arm64_errata[] = {
-+#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
-+static const struct midr_range workaround_clean_cache[] = {
- #if	defined(CONFIG_ARM64_ERRATUM_826319) || \
- 	defined(CONFIG_ARM64_ERRATUM_827319) || \
- 	defined(CONFIG_ARM64_ERRATUM_824069)
--	{
--	/* Cortex-A53 r0p[012] */
--		.desc = "ARM errata 826319, 827319, 824069",
--		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
--		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
--		.cpu_enable = cpu_enable_cache_maint_trap,
--	},
-+	/* Cortex-A53 r0p[012]: ARM errata 826319, 827319, 824069 */
-+	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 2),
-+#endif
-+#ifdef	CONFIG_ARM64_ERRATUM_819472
-+	/* Cortex-A53 r0p[01] : ARM errata 819472 */
-+	MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
-+#endif
-+	{},
-+};
- #endif
--#ifdef CONFIG_ARM64_ERRATUM_819472
-+
-+const struct arm64_cpu_capabilities arm64_errata[] = {
-+#ifdef CONFIG_ARM64_WORKAROUND_CLEAN_CACHE
- 	{
--	/* Cortex-A53 r0p[01] */
--		.desc = "ARM errata 819472",
-+		.desc = "ARM errata 826319, 827319, 824069, 819472",
- 		.capability = ARM64_WORKAROUND_CLEAN_CACHE,
--		ERRATA_MIDR_REV_RANGE(MIDR_CORTEX_A53, 0, 0, 1),
-+		ERRATA_MIDR_RANGE_LIST(workaround_clean_cache),
- 		.cpu_enable = cpu_enable_cache_maint_trap,
- 	},
- #endif
--- 
-2.7.4
-
+--
+Robert
 
 _______________________________________________
 linux-arm-kernel mailing list
