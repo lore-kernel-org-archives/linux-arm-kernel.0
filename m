@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-7.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 50C87C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:59:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A57DDC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:59:37 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1CA6920663
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:59:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 68EFB20663
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:59:37 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SVoCOOnI";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="AwxSbRTg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1CA6920663
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="c7zk4lso";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="fgA9Mxzn"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 68EFB20663
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,67 +25,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XMuDJrEw+8DG3Pwq8pwttsAKyd6eysL8zV6BUBvEphA=; b=SVoCOOnIYeqpqu
-	nEiBYbikl4CVrnuPIIcgkdpEhtp+n6EukA+aT8Mts+7ONIUK9UtVCdCXvKxzkHh4Mwsq1MqhCK/4R
-	tfuaA3JhSb1LX8U6xo3e2RAYL19oTdnGgckQvxZ6NX2Zf/qaVC9MArB/oM/HeJsoGAhhuEaNgRRSQ
-	GtLD/itIqpK2eP3FjIa14++RSS7KBx0SY5JdcLpyAfUebY/McFFS4v52ELeD+jxUt/ucSbEH1GNW1
-	cOzmDHgoe3zB0IAuUFQiEGFy7hlZTq34PcKuGOR8+QJFKaY8SElFehSrfMXHotGTXFxhA2L0coxbY
-	dBkp0gJs4NEENdM0L95g==;
+	List-Owner; bh=VbPd2GMg28aprsuiLE94pThuTUQViJrurlSlXjvaQSQ=; b=c7zk4lsoOrD/1p
+	lZDYU2p7IEIGr4KQSLml009f/l9kBa3ncBs6352+mTRtn7jh98DiuEuiPIzLReEvdzABstCbl89xg
+	neeuzDd/pW3MZLf+FhEpeFhtmbygrUB8dQeVlmm6lmfOeguXJ2QrWbAXwkW13qD4zpHrlZEX3V9ns
+	6CF20Brs8bQGjOGQ6PhWl9Ohnd8nEjopLS5HVoE5bfgNc1YsiMwLurw5+yv5ez0ZFTpZsZ7I8zU0H
+	w9H+hdi4j6HiYZKvCWFEyJjxfF6wWT+LFSTufCsUftNI9VMrEXvGSZ2OWiIztYwYrE+/eE47Zy6wU
+	T0GY8y5jixIflPZzJ1PQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSsgt-0004Fx-IS; Fri, 30 Nov 2018 23:59:23 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gSsh4-0004OZ-09; Fri, 30 Nov 2018 23:59:34 +0000
+Received: from mail-lf1-x12d.google.com ([2a00:1450:4864:20::12d])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSses-0002Jl-9e
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:57:25 +0000
-Received: by mail-lj1-x243.google.com with SMTP id t9-v6so6470719ljh.6
+ id 1gSsex-0002Oo-0o
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:57:32 +0000
+Received: by mail-lf1-x12d.google.com with SMTP id p6so5337612lfc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 15:57:08 -0800 (PST)
+ Fri, 30 Nov 2018 15:57:12 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=R8dg54ykK/+h+02bmkBpdQMFlN/31oi3+2h5CrXiM4o=;
- b=AwxSbRTgpxYwSjOkrdsy/13fuf7QOf4qr6V8Nz2O0xhfW7YRCi1cN2Vw+uqV4Wapov
- Q62da8gor5Dy770MZG6TucYKo0z+wqqqb2+TdEiHwZpLMKBmcrCrvkDaqrIsoPTP5V/Z
- wQKfdCedJz3p0Hl6rfJ8Q79PE7LCWYLj00atakic8bhDZ2avVFiph6wWQAByvGYYq6Oj
- OlX7eWyWe+58GN846J79vOwviIfBuplrzDClwWVB3Gef/uqFlkOgPQCIPsLTxEa7WLwp
- ySiEZKgz3PWeZGtMY00K69WWbioz/ZLYdihkyxTFEPxwlq4WKzNDCAyofv4heXOB9bVf
- uisw==
+ bh=SRUg4teIsAzKhA2GzqFrwwTPvHJ/4TlCsX9XzJBGB40=;
+ b=fgA9MxznYKgmasQJl87t7RiJZ8uA8Bpzi/fBpMMc2I56uFQ01Rz04hcM6KARW6oqLz
+ mosUbgfcOd98Fx4IeXcybSmAqXd3Y07+uIZ1okmSBKRBf1E5vu+7KIxLNmhzUC6gMMnZ
+ sscsQ5lvsKZR/IgJnSKYQrGMFd2yxFOmZpWJdekDi+LXYPQK7Y5BbD4VEn6k62xjOiI9
+ dUG/vdaIVKl3yQkvzGPNkHAaDvz6YDtBb4uiZQ3PPjejncyrGAyZDjU3oEj/EviTgffz
+ 9vdM2h2QoCvtCw+XYQ/9lE0ZlUW+k0AWGPrqEnq6OLeAJR3PBDr2gXD7enQ2VqWCvUC8
+ 4Mrg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=R8dg54ykK/+h+02bmkBpdQMFlN/31oi3+2h5CrXiM4o=;
- b=KtmYxdn2FaBd75UapTwvXKhQ0g/6xPSesPW9QoSQIo+dFo63vPtHOMmn6nYuNgQ4D8
- M5tL/4fVk2+LRIIefrJY4wtzh0ERHwORSqrF4SQ/f8h1lMN4cyrBzHE6xCZnj12Npumn
- +i7nmywzk+So0d8Sahd7m6TJ+w0NqfdfIJCmEzPgz5mYulpCd/QycQfCU3CR4FmAWi8d
- uQhaYL0jzLdb1p40QhUqtVifZJgl9BrgGOjUD1Zl8AA4yiRDQedm7nMQcDA35ljnqLvp
- gcdTB+N0C8RlkLaYewlTJ22YNVzyUSTkTfAKj+DRe8EGD1TDa3OXSznv1Mdb5xU+aNQo
- MqZA==
-X-Gm-Message-State: AA+aEWZcdEWcONSr9JHkkvFF8gDE4KxOuQMQcwwJO1oxOm5Y3DXqY4q9
- xNhRIGldqYkui1IdAka6vn0HNQ==
-X-Google-Smtp-Source: AFSGD/WieTcBo0lOhUWLOgI8WEb1hZqhop1O2hEcNmC+ONM8WokwdogXC6Pe8Pwm/NLLU7Kq3ND1rw==
-X-Received: by 2002:a2e:3218:: with SMTP id
- y24-v6mr5569834ljy.157.1543622226381; 
- Fri, 30 Nov 2018 15:57:06 -0800 (PST)
+ bh=SRUg4teIsAzKhA2GzqFrwwTPvHJ/4TlCsX9XzJBGB40=;
+ b=plZMJlNqoUCzLBM0/dXyEebcydGDxA7E0KH6CVxHSxVAX7vWGOIsd2CpJO0MotWWJ/
+ 7G0c34Edg+lDlcfog8avPGWpDihmoljrYDljvFfcFP5kxgMD4wbPJKmPWsL4ZTHu9bpc
+ Gkz90A5AqoBesLhQFXMM2SCJ2vcU4/L0j/+29c2sor/6LnQqz7nGXXU3qCGBAFpYQN1A
+ Ym2GXPSY91P77zhYBbSRJZR88wGQP1Trn1rZdX2MVioD2iOqXIcw7rwBShdgO5JpnKax
+ Yp/UE3EnKmx/8ZJeqWhhNUFlMtnwQVXujAwOfLuLQerAwGME0VFEPCGENytPdHYATajJ
+ XrZA==
+X-Gm-Message-State: AA+aEWbU5a1RRpjIbYWGBNwgO7TQywuvy9rR41ACOWmJI43zMsDT3O8z
+ m/NJRkwXApMu8vkE2TY6Ag+MXg==
+X-Google-Smtp-Source: AFSGD/Xagp7p1T7PVDYOyorH8s+A7bwy54Qhe/6JVG/PfxPW1bhEpnt7GQa3ncMymx1m/iL+HPSrGA==
+X-Received: by 2002:a19:2106:: with SMTP id h6mr4603498lfh.29.1543622231008;
+ Fri, 30 Nov 2018 15:57:11 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id g17sm1140693lfj.36.2018.11.30.15.57.03
+ by smtp.gmail.com with ESMTPSA id n16sm1034940lfl.35.2018.11.30.15.57.09
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 30 Nov 2018 15:57:04 -0800 (PST)
-Date: Fri, 30 Nov 2018 15:20:40 -0800
+ Fri, 30 Nov 2018 15:57:09 -0800 (PST)
+Date: Fri, 30 Nov 2018 15:38:45 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH] ARM: dts: aspeed: add missing memory unit-address
-Message-ID: <20181130232040.z4i4sm5dsycxbmlu@localhost>
-References: <20181130015251.20754-1-robh@kernel.org>
+To: Masahiro Yamada <yamada.masahiro@socionext.com>
+Subject: Re: [PATCH] ARM: multi_v7_defconfig: enable CONFIG_UNIPHIER_MDMAC
+Message-ID: <20181130233845.ynd6dwf45jdh6hbr@localhost>
+References: <1543374243-29475-1-git-send-email-yamada.masahiro@socionext.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181130015251.20754-1-robh@kernel.org>
+In-Reply-To: <1543374243-29475-1-git-send-email-yamada.masahiro@socionext.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_155718_421773_E597850A 
-X-CRM114-Status: GOOD (  12.86  )
+X-CRM114-CacheID: sfid-20181130_155723_500634_3729BBA9 
+X-CRM114-Status: GOOD (  12.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,39 +96,31 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, linux-aspeed@lists.ozlabs.org,
- Andrew Jeffery <andrew@aj.id.au>, arm@kernel.org,
- Joel Stanley <joel@jms.id.au>, linux-arm-kernel@lists.infradead.org
+Cc: linux-kernel@vger.kernel.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Arnd Bergmann <arnd@arndb.de>,
+ Russell King <linux@armlinux.org.uk>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 07:52:51PM -0600, Rob Herring wrote:
-> The base aspeed-g5.dtsi already defines a '/memory@80000000' node, so
-> '/memory' in the board files create a duplicate node. We're probably
-> getting lucky that the bootloader fixes up the memory node that the
-> kernel ends up using. Add the unit-address so it's merged with the base
-> node.
+On Wed, Nov 28, 2018 at 12:04:03PM +0900, Masahiro Yamada wrote:
+> Enable the UniPhier MIO DMAC driver. This is used as the DMA engine
+> for accelerating the SD/eMMC controller drivers.
 > 
-> Found with DT json-schema checks.
-> 
-> Cc: Joel Stanley <joel@jms.id.au>
-> Cc: Andrew Jeffery <andrew@aj.id.au>
-> Cc: devicetree@vger.kernel.org
-> Cc: linux-arm-kernel@lists.infradead.org
-> Cc: linux-aspeed@lists.ozlabs.org
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
-> Might be better to just remove the node altogether from the SoC dtsi 
-> file. It's only saving the device_type definition.
+> 
+> The insertion context was decided by savedefconfig on next-20181127.
 
-Since I'm sweeping DT pull requests right now, and this is pretty
-straightforward, I've applied it to next/dt directly.
+If we apply it now, there's a risk someone will accidentally drop it since the
+config option is coming in through a different tree.
+
+So, please resend this before -rc1 so we can include it towards the end of the
+merge window. Thanks!
 
 
 -Olof
-
 
 _______________________________________________
 linux-arm-kernel mailing list
