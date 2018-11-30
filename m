@@ -2,21 +2,21 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E9DDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:10:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 79719C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:10:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6496420867
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:10:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4C9C620867
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:10:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RDlUvSdi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6496420867
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WGEoooYp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4C9C620867
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zonque.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,37 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=nbhH3kTnEp92YPocdsYOaLy+Ul8Avtm1LAMNZfvKlJw=; b=RDlUvSdiUDesdt
-	aTcEkGKONnPkIouzzndXnr56FViT1qNs1XTj2LcvXF71nmCwruNIsjCLATdatlnuATyZZMy+8y+Yw
-	c1FoPfRd0EMB2YHmCyupwCpaK7Z87Y5kWnNtFaxj8xocVf+WhwGlGassr9y/FIQ24/qGf7lvE/Bkq
-	Ym+8s/Q78ZUD/92Gr6PZetrjzy4OB5KcoCgjVtAb8OJLj14TvA7mWJQ8oxgxDWQ67h1MwXuZuGI73
-	6YVZZICgobYEQP3ZOP/n/wOTZHoBTFm53+5oJwOwvh/oHpNDbX+gY52V8TjzHA49N4tR/kgwrnOlg
-	7lzczt0rQLIXxd+ghxNw==;
+	List-Owner; bh=MvcuYj9QQqyHY6KGuxUFFLbb2tKutCmgFglMgFezAm8=; b=WGEoooYpTCfQI9
+	Ar6LuWvbX+zRsCtdXaH3z53j8/7GbG/xfbtRWBUzOzpz4y6ITP9ri9VZoMdOivG75vVbiWf44ugdv
+	lsQ7jeeTWDMR5bTKAOw4hxWgb1Uen+N9YUjN2Iv7/9ZnZzboatTz8w48aXgVhVTwEewo51Yh+YkMa
+	L+xOKJWiUJWg7BvVu0ltnVw1KIO8RSUanbuuiO1epAXSsSFqMCc28XjBkFSmoOn+aZYbxuApuK0lM
+	MCX0DhS5gZUdyt7Ql75il6Ly5e3h+8vX7JeL93+use32imNrwDX1a3doH+PHoU7Sf73b/MM0nuxx/
+	uehAASLAkeP3xGFnIa5g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSnF0-0003vN-0M; Fri, 30 Nov 2018 18:10:14 +0000
-Received: from mail.bugwerft.de ([2a03:6000:1011::59])
+	id 1gSnF3-0003y4-MX; Fri, 30 Nov 2018 18:10:17 +0000
+Received: from mail.bugwerft.de ([46.23.86.59])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSn1M-0003E8-Si
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:56:10 +0000
+ id 1gSn1W-0003FM-F5
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:56:22 +0000
 Received: from localhost.localdomain (pD95EF9A6.dip0.t-ipconnect.de
  [217.94.249.166])
- by mail.bugwerft.de (Postfix) with ESMTPSA id C275C2C459A;
- Fri, 30 Nov 2018 17:55:39 +0000 (UTC)
+ by mail.bugwerft.de (Postfix) with ESMTPSA id 565032C459D;
+ Fri, 30 Nov 2018 17:55:41 +0000 (UTC)
 From: Daniel Mack <daniel@zonque.org>
 To: robert.jarzmik@free.fr,
 	haojian.zhuang@gmail.com
-Subject: [PATCH 3/7] ARM: dts: pxa2xx: fix hwuart memory range
-Date: Fri, 30 Nov 2018 18:55:39 +0100
-Message-Id: <20181130175543.32628-4-daniel@zonque.org>
+Subject: [PATCH 6/7] ARM: dts: pxa3xx: clean up pxa3xx clock controller node
+ name
+Date: Fri, 30 Nov 2018 18:55:42 +0100
+Message-Id: <20181130175543.32628-7-daniel@zonque.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181130175543.32628-1-daniel@zonque.org>
 References: <20181130175543.32628-1-daniel@zonque.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_095609_057437_4EC64F71 
-X-CRM114-Status: UNSURE (   9.51  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181130_095619_261647_8C3E7977 
+X-CRM114-Status: GOOD (  10.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,30 +74,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The memory range for the hwuart is at 0x41600000, not 0x41100000.
-This also solves a conflict with the MMC controller node.
+The clock controller node does not need a unit slave designator as it does
+not have a reg property. Also, remove the underscore from the name.
 
 Signed-off-by: Daniel Mack <daniel@zonque.org>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/pxa3xx.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index 7d3dfa8259f8..30e77ebbcc4d 100644
---- a/arch/arm/boot/dts/pxa2xx.dtsi
-+++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -117,9 +117,9 @@
- 			status = "disabled";
- 		};
+diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
+index de49e7f666c0..6131491ab5e7 100644
+--- a/arch/arm/boot/dts/pxa3xx.dtsi
++++ b/arch/arm/boot/dts/pxa3xx.dtsi
+@@ -292,7 +292,7 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
--		hwuart: serial@41100000 {
-+		hwuart: serial@41600000 {
- 			compatible = "mrvl,pxa-uart";
--			reg = <0x41100000 0x30>;
-+			reg = <0x41600000 0x30>;
- 			interrupts = <7>;
- 			status = "disabled";
- 		};
+-		clks: pxa3xx_clks@41300004 {
++		clks: clocks {
+ 			compatible = "marvell,pxa300-clocks";
+ 			#clock-cells = <1>;
+ 			status = "okay";
 -- 
 2.19.2
 
