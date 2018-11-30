@@ -2,77 +2,76 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA020C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 01:02:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7EC54C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 01:06:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7378420868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 01:02:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 429382082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 01:06:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tTZxx3E2";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xzKkLNSm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7378420868
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ocQesvKq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 429382082F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cR3oNUD1wfFCSnJf/Y1VYuOkK7vsqZQ4ZZ/P2EWjaO4=; b=tTZxx3E2mBDS/V
-	2NcsBjep8SWMaQ9myBDs62Doi72tc2/WuVlPUtW/2au0cw6WpwxO7/TCZo8+NVqscpoGvTmCIkhNl
-	iqGFxa7nuPSSUGhYM1TEx2fmuumTXwUathI7F+U+FWysGCx14fPVvjJkno1tYzwdsnUv5bcdqwOrA
-	5TczbWc0I6pVX7CNzsrSA5UYyaBNZH0e2lTNLuydeuTsBM4jMAo2uxT6txy5PZ7xk12aMm/dMf2we
-	scXtnEOKWmemxvYCKYy+TKUzOTb9CJsCbZN/nCiLjLi8fDvk7e+MD5lduXpBsg7DY14f2ZhmG6Wbz
-	0KOKg3QyoL9LW+Y1gGTQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=yLCzsluCe425gpvZ88qTh+Q1ITTgJAQlpEc8JQXMTWg=; b=ocQesvKqd+6GYv
+	u13j1AXJtUO28vwaxoUrUMbeH4EoJJVjMkFcfAqFfa20R1a6EZANQwYaQzpRKlzCImm8igtACeP9J
+	YLxqBP+0dzgcy6tGWeY/apUMYc5k6qMqB8YatsZlvtv2/lvlxy0R+PJcWHcllX5lCvlo65GckQDci
+	RNYTrXU7p20JcipC/4CHa5FU5vQfZDDIb7lnQC5+Mw6TUzFAdGTf/ontYyWz6CMCWTOOCOOydX+tr
+	NfFg6NnYS1RIIw+fwpv+qIiCp6EQIHv4qKJd6GTTg7Cyma0XL/5Kwd1/D1ix3pHp91NMNO41F26Oo
+	xkLSmav6rCi7XaV1S+1Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSXCH-0006Ng-CI; Fri, 30 Nov 2018 01:02:21 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gSXFr-00088Z-N8; Fri, 30 Nov 2018 01:06:03 +0000
+Received: from mail-oi1-f195.google.com ([209.85.167.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSXCE-0006Ma-IO; Fri, 30 Nov 2018 01:02:19 +0000
-Received: from mail-qt1-f182.google.com (mail-qt1-f182.google.com
- [209.85.160.182])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 673A72146D;
- Fri, 30 Nov 2018 01:02:07 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543539727;
- bh=KK5k0pzTObpUzakdBmfER3QGnjqssQrfk33KN4O3inQ=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=xzKkLNSmukAla+88rHZKmE9E9a5zQjmrR8tYLKMW5kZ/7MED1cPChm2mVFe2vSJKP
- KSBR5L9uZQAYSa+7myQwmEsG4pxKpRNRdNkbVBIJ/QzH04S+nvus99Ghmptzs8zuVf
- 10UVArGMwCbWI7Rh83mOt2jFJpbEh34pZBw+DYrU=
-Received: by mail-qt1-f182.google.com with SMTP id z16so4251847qtq.4;
- Thu, 29 Nov 2018 17:02:07 -0800 (PST)
-X-Gm-Message-State: AA+aEWZoD3PgjJhEuMI9YfdFpmn3OXIoi/NcQlYlACJnPfjqfGe+Em5A
- MGtfeXGpMzdWzw5w7IU1uQBht7uLak/vl/7rTQ==
-X-Google-Smtp-Source: AFSGD/W4VOgcKPF/a6OCA+UTYMqM4yLrPXG5MeJ/ZLol2DMMUoCzh2YzzYeIybG+ZCUNMgCpofrw+HdO5X8RLw6T/+8=
-X-Received: by 2002:a0c:8c8a:: with SMTP id p10mr3723310qvb.218.1543539726606; 
- Thu, 29 Nov 2018 17:02:06 -0800 (PST)
+ id 1gSXFo-00088C-FI
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 01:06:01 +0000
+Received: by mail-oi1-f195.google.com with SMTP id y23so3396015oia.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Thu, 29 Nov 2018 17:05:49 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=5bq1A+7sN43Im2BAwgIO1cEPT8jUvdcCM6xL/pu12Uc=;
+ b=ThVJncQSgSGF7F+vrdD1IADun3Nwkw1L9l1jIOkdF31AcE5WDcRqve6fki+wT/9nMi
+ rtT8gfoCT5Ed0inNDVDtxnWBVe7dFvd7hOf7GplnyYcs1rFAHdVkJCosJVD7yA07hWpZ
+ qrYFZxfI3Mnb+S7x+YQQr8yPjzuPgezpBtDNbkAtedsZOobqfpVYszlqW2/8QulYkr3n
+ tjG39pl0EB5zKPSeyyI3emCW/zBSvEu4JppChK+2HkhrM88a9CYJdz0jqYU7iKUKFSba
+ Msio9QZA9GLb0y2hK/nmJb83+Pe2dRxDhG79SjWcwWJcq3oZqDhp3LGrTV5NiDu6GK/Y
+ 2cxg==
+X-Gm-Message-State: AA+aEWYFxs15SwV3TKJ6Qwdch1OFfivzyTfZWSNUAO27ipBs38sdrqQP
+ rKintLj+S2P2a2PFGsWf1qdmVss=
+X-Google-Smtp-Source: AFSGD/XqZYnopAJgUJ8EyIvrUoI2edKnItBJTrtJ8TysQpamISJHX5MwgfTXDEgFUqqyt0hch8ZswA==
+X-Received: by 2002:aca:b4c5:: with SMTP id d188mr2255428oif.309.1543539948677; 
+ Thu, 29 Nov 2018 17:05:48 -0800 (PST)
+Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.googlemail.com with ESMTPSA id r9sm2556165otq.81.2018.11.29.17.05.47
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Thu, 29 Nov 2018 17:05:48 -0800 (PST)
+From: Rob Herring <robh@kernel.org>
+To: Linus Walleij <linus.walleij@linaro.org>,
+	arm@kernel.org
+Subject: [PATCH] ARM: dts: realview-pbx: Fix duplicate regulator nodes
+Date: Thu, 29 Nov 2018 19:05:47 -0600
+Message-Id: <20181130010547.24757-1-robh@kernel.org>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-References: <20181106183609.207702-1-sboyd@kernel.org>
- <20181106183609.207702-2-sboyd@kernel.org>
- <CAL_JsqLvKWcJUYDyWOg3rMeEWv7JV4zw7-YkOUWiL5rfXgVRvQ@mail.gmail.com>
- <154161585170.88331.1822872519370217248@swboyd.mtv.corp.google.com>
- <154353772392.88331.16937191244549721858@swboyd.mtv.corp.google.com>
-In-Reply-To: <154353772392.88331.16937191244549721858@swboyd.mtv.corp.google.com>
-From: Rob Herring <robh+dt@kernel.org>
-Date: Thu, 29 Nov 2018 19:01:54 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJuZAr7ndznrUu0cuM7DpB5A7ixjJ+vZ97s5G4xz0sVow@mail.gmail.com>
-Message-ID: <CAL_JsqJuZAr7ndznrUu0cuM7DpB5A7ixjJ+vZ97s5G4xz0sVow@mail.gmail.com>
-Subject: Re: [PATCH 1/4] of/device: Add a way to probe drivers by match data
-To: Stephen Boyd <sboyd@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_170218_634973_29D3C8A9 
-X-CRM114-Status: GOOD (  13.73  )
+X-CRM114-CacheID: sfid-20181129_170600_511933_8A633C50 
+X-CRM114-Status: GOOD (  13.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,55 +83,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Ryder Lee <ryder.lee@mediatek.com>,
- Michael Turquette <mturquette@baylibre.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- linux-mediatek@lists.infradead.org, Matthias Brugger <matthias.bgg@gmail.com>,
- Frank Rowand <frowand.list@gmail.com>, linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 6:28 PM Stephen Boyd <sboyd@kernel.org> wrote:
->
-> Quoting Stephen Boyd (2018-11-07 10:37:31)
-> > appropriate structure with to_platform_device() or to_i2c_client()?
-> >
-> > So the example would become
-> >
-> >   struct of_driver_probe_func {
-> >         int (*probe)(struct device *dev);
-> >   };
-> >
-> >   struct of_driver_probe_func mtk_probes[] = {
-> >         mtk_probe1,
-> >         mtk_probe2,
-> >         mtk_probe3,
-> >   };
-> >
-> >   struct platform_driver mtk_driver = {
-> >         .driver = {
-> >                 .name = "mtk-foo";
-> >                 .of_match_table = mtk_match_table,
-> >                 .of_probes = &mtk_probes;
-> >         },
-> >   };
-> >
-> > And the probe functions might need to container_of() the device pointer
-> > to get the struct they know they need. The probe function could also be
-> > added to of_device_id and then we would have to look and see if that
-> > pointer is populated when the device is matched in generic device code.
-> >
->
-> I guess I'll go down the path of extending the of_device_id structure?
+There's a bug in dtc in checking for duplicate node names when there's
+another section (e.g. "/ { };"). In this case, skeleton.dtsi provides
+another section. Upon removal of skeleton.dtsi, the dtb fails to build
+due to a duplicate node 'fixedregulator@0'. As both nodes were pretty
+much the same 3.3V fixed regulator, it hasn't really mattered. Fix this
+by renaming the nodes to something unique. In the process, drop the
+unit-address which shouldn't be present wtihout reg property.
 
-Unfortunately, I don't think you can change of_device_id as it's part
-of the kernel ABI.
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Rob Herring <robh@kernel.org>
+---
+ arch/arm/boot/dts/arm-realview-pbx.dtsi | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-Rob
+diff --git a/arch/arm/boot/dts/arm-realview-pbx.dtsi b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+index a5676697ff3b..916a97734f84 100644
+--- a/arch/arm/boot/dts/arm-realview-pbx.dtsi
++++ b/arch/arm/boot/dts/arm-realview-pbx.dtsi
+@@ -44,7 +44,7 @@
+ 	};
+ 
+ 	/* The voltage to the MMC card is hardwired at 3.3V */
+-	vmmc: fixedregulator@0 {
++	vmmc: regulator-vmmc {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "vmmc";
+ 		regulator-min-microvolt = <3300000>;
+@@ -52,7 +52,7 @@
+ 		regulator-boot-on;
+         };
+ 
+-	veth: fixedregulator@0 {
++	veth: regulator-veth {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "veth";
+ 		regulator-min-microvolt = <3300000>;
+@@ -567,4 +567,3 @@
+ 		};
+ 	};
+ };
+-
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
