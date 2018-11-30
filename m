@@ -2,137 +2,89 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,URIBL_SBL,URIBL_SBL_A,USER_AGENT_MUTT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A3EAC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:01:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 05FEEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:11:04 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 649BB20867
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:01:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C76782082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:11:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AU5Lkn27"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 649BB20867
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linux.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lhA0RFk6";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="VNmRP4Jf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C76782082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=roeck-us.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:Reply-To:List-Subscribe:List-Help:
-	List-Post:List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date
-	:Message-ID:From:References:To:Subject:Content-ID:Content-Description:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=aRayIZV63TCVZhErwRDfT5nDKo9e9WCVZwwHOsp51rQ=; b=AU5Lkn27fjPbMH
-	KsrotAWtETwISGINWHcaRzNp1PwHDStA9Ch/vv3YntdwRRAjjn5rL0ramU1hImXWvyvIIv4aNECmq
-	EeLCXh8ggHZZrlkin9mfpP6RKVr1kDKvOhHiKK2dFeXBp+kOhcI8OTk8mEO0fLsrSy828OM0gyZUO
-	DAsUrWaYLBeznkLHi1s3Co/TCFXN3N+XWd7m3l+ijVApMQWLQM0ooi9H4Rnnrk7Lm3laRHPoFRju7
-	C4NGjgOvFloH3ehOweQyZNCYtjq5/9RO3Y2zipry4Uin/1FMM5BnwCNXWyosl3hzy6UNBwMN0ytVT
-	hL/EDCdhysDOny+NfjdA==;
+	List-Owner; bh=2AncjNTf4MFUYEU9bbvuJkVf+2FKgxPANDK/utsiti0=; b=lhA0RFk6hw53UG
+	p1FbXLdx6HWFhpxWMwRWbfp4WvHNhWR9z/7u//zyJ0dZFDoXarL4bqH/3e+JNF+Yq0zJz8Kka9Dwz
+	vQc7K4qSzLK+A/ohXBmCmxczkLGVwcXfJDCiOC31sVakeZLB4yl5aykA/bOuEOveJM3AVJ8WemJgA
+	84gmVSClrArzpDEPg/PKeYuPq+8TbIuwMZzZUVOsZp8cIvmXWBDMMoiueiw6FG7zjIYj9tVvirJLW
+	NDXGaaAgeDl7cPAr/E0auXRw1pKgPrMmX+J5vgwtRzmHuv7RjqWN504fJoTU06agC8sfH5maOlevE
+	4nyyzF8kv9/czBSE+X8w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSqr6-000877-2Z; Fri, 30 Nov 2018 22:01:48 +0000
-Received: from mail-lj1-f193.google.com ([209.85.208.193])
+	id 1gSr01-0004aP-NA; Fri, 30 Nov 2018 22:11:01 +0000
+Received: from mail-pl1-x643.google.com ([2607:f8b0:4864:20::643])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSqr2-00086A-BQ
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 22:01:46 +0000
-Received: by mail-lj1-f193.google.com with SMTP id v15-v6so6281273ljh.13
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 14:01:34 -0800 (PST)
+ id 1gSqzy-0004ZM-Q6; Fri, 30 Nov 2018 22:11:00 +0000
+Received: by mail-pl1-x643.google.com with SMTP id z23so3453915plo.0;
+ Fri, 30 Nov 2018 14:10:47 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=sender:date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=8GtRRzOY5ATBepJOAl3pdQm5CD35g8XR46WHt4Phzwk=;
+ b=VNmRP4Jf/WUiQArq4cztsnDKdxyg6HK0TOoAiK+VupSjSAj3+/Aa2fY0ebWLOMbrPP
+ 7f+8X7rVhKViHbmEWwUrg08hDUkyrXFpg3mWd3DMb7MVo0L432M/WJ3fpCeK0f/1986z
+ xqRJqjv5qE5IEGgwx7ZFj9qW4DqhTFb9DpHXrgqjiqaRPFWOEAjXdd/indg3BM8TVsmd
+ NEpV62XgQi/9D4JLrykijkORTP8PPT8SWPxUlnQszmibdk6mxAOuLrpQfTkzOfbANXFV
+ isF/nwAJWefqlF7S4sAposgZyCxDD1sVzOihL/CU+rj9xl9jQu3wC9TNmlbWfCrV3syy
+ xDeQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:reply-to:subject:to:cc:references:from:openpgp
- :autocrypt:message-id:date:user-agent:mime-version:in-reply-to
- :content-language:content-transfer-encoding;
- bh=BvwrW1E0+IMYqbljGqTZhNaspXRHMGF9KCRKQyaaKYk=;
- b=fSxOeBEfpMJf8rQRX2005pg7ZsZJwz8TpPI1J8VhJUCEEyU6yh1YzRe63mZ+n2n4Yx
- bennDkJ0JSWrZm2jqdTmBbIutwrvMOTRfayNKVsFRZWXWKskeH0J/K3n5plg245ZNUtW
- XodZmzBQjY756YlaoPEn9n6gHF86gbbod8BVoTZJTVBHld2fUj/LXxKj5uy1w+vKfWco
- 2Y4WgwC1jD+WaaiqWYiEsqg58h7z6vVA2+vLHmpzV2QguSFs7WpH6V6oUiVvBnMt06uT
- m+yjASuPqLfyRDCdJJ/eUjAq/RbESwfEpghMc0hNyOGy6zKxLKvjW0qluTGp5IKWGgMG
- dOZA==
-X-Gm-Message-State: AA+aEWYW/HgzVthBFgimQyEBp9TVrMV++xkb2aCrkZIOBQxDFQYKU2tD
- CiKTnd5l/NkuqcMlsWJhCak=
-X-Google-Smtp-Source: AFSGD/X/HfCaT330a2LvTgVbbSNBR1VAqHtv8rL4YIxEQU4QVJyhewHz6AoPcCchB0/3x4Fynp5lEg==
-X-Received: by 2002:a2e:9a84:: with SMTP id p4-v6mr4891878lji.73.1543615292295; 
- Fri, 30 Nov 2018 14:01:32 -0800 (PST)
-Received: from [192.168.1.183] (128-68-180-112.broadband.corbina.ru.
- [128.68.180.112])
- by smtp.gmail.com with ESMTPSA id s24sm986777lfc.30.2018.11.30.14.01.30
+ h=x-gm-message-state:sender:date:from:to:cc:subject:message-id
+ :references:mime-version:content-disposition:in-reply-to:user-agent;
+ bh=8GtRRzOY5ATBepJOAl3pdQm5CD35g8XR46WHt4Phzwk=;
+ b=bNmhx+uPDES6Pb+IEsPSRh6WWhwbnnRUZOeL4KVFRMgl3SJitqxSsf+q9oi1W+hR5O
+ DRmDut/tsiT/DCNlK5a9cUU7tm8ZBkd6bN5pX5fwNOhmlYCfUzKhK+N7zp4MQOz5ON3n
+ SPpm4MO8QYy4quHwkij7/jjRPSMXqFotQJUIRepMvo1hftB2PQ2nRYtxom5U0tHYiXRf
+ rExJmgsjdpPpCr8+p3lWHoWzhkhsKkhGxRJjBdi2vrPANj7HRUsEoUeF7S3WM6QxZvCs
+ YCrbBjNmuasRLeKxCQAYZwT6ONYRtHSMqhFOMiksBzlUNocnt19cDHE4W8WtMM9oK50F
+ ElmQ==
+X-Gm-Message-State: AA+aEWY8mchmVqBtxILjfZhlijSRQD7Ri9agikiWn7P/GB/2bV6QejRK
+ PFu4FISu8Nc7aVtpzoERALcWyht3
+X-Google-Smtp-Source: AFSGD/VLPrrukpTH+doI3MggCumkxSIZWSDSxZZESjYDfeefoStFr1UZ/4zdWZUB7nAXWE3NbsccgQ==
+X-Received: by 2002:a17:902:201:: with SMTP id 1mr7244045plc.62.1543615847140; 
+ Fri, 30 Nov 2018 14:10:47 -0800 (PST)
+Received: from localhost ([2600:1700:e321:62f0:329c:23ff:fee3:9d7c])
+ by smtp.gmail.com with ESMTPSA id 202sm11973496pfy.87.2018.11.30.14.10.44
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 30 Nov 2018 14:01:31 -0800 (PST)
-Subject: Re: [PATCH 1/1] stackleak: Register the 'stackleak_cleanup' pass
- before the 'mach' pass
-To: Kees Cook <keescook@chromium.org>
-References: <1543583987-27948-1-git-send-email-alex.popov@linux.com>
- <CAGXu5jJ7LmHRJJxtH2HD4XEu5hPLtAe=koJbaCmqF9qoSw=sVw@mail.gmail.com>
- <CAGXu5jKcRLcAg7r-E-9LMjK0YisLJp2TVYoiBwE+4ctYzi5wkg@mail.gmail.com>
-From: Alexander Popov <alex.popov@linux.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=alex.popov@linux.com; prefer-encrypt=mutual; keydata=
- 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
- jXz/74kjFsyRgZA+d6a1pGtOwITEBxtxxg==
-Message-ID: <4ba60677-4a69-755c-2507-13793830ccd5@linux.com>
-Date: Sat, 1 Dec 2018 01:01:29 +0300
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Fri, 30 Nov 2018 14:10:45 -0800 (PST)
+Date: Fri, 30 Nov 2018 14:10:44 -0800
+From: Guenter Roeck <linux@roeck-us.net>
+To: Eric Anholt <eric@anholt.net>
+Subject: Re: [PATCH v3 2/5] bcm2835-pm: Move bcm2835-watchdog's DT probe to
+ an MFD.
+Message-ID: <20181130221044.GA15333@roeck-us.net>
+References: <20181130202743.20585-1-eric@anholt.net>
+ <20181130202743.20585-3-eric@anholt.net>
 MIME-Version: 1.0
-In-Reply-To: <CAGXu5jKcRLcAg7r-E-9LMjK0YisLJp2TVYoiBwE+4ctYzi5wkg@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181130202743.20585-3-eric@anholt.net>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_140144_395567_148CBDDC 
-X-CRM114-Status: GOOD (  16.80  )
+X-CRM114-CacheID: sfid-20181130_141058_843815_C9FB414D 
+X-CRM114-Status: GOOD (  26.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -144,56 +96,246 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Reply-To: alex.popov@linux.com
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Kernel Hardening <kernel-hardening@lists.openwall.com>,
- Peter Zijlstra <peterz@infradead.org>,
- Richard Sandiford <richard.sandiford@arm.com>,
- Dave Hansen <dave.hansen@linux.intel.com>, Will Deacon <will.deacon@arm.com>,
- Alexei Starovoitov <ast@kernel.org>, "H. Peter Anvin" <hpa@zytor.com>,
- Ingo Molnar <mingo@kernel.org>, Tycho Andersen <tycho@tycho.ws>,
- Emese Revfy <re.emese@gmail.com>, Laura Abbott <labbott@redhat.com>,
- Segher Boessenkool <segher@kernel.crashing.org>, Jann Horn <jannh@google.com>,
- amonakov@ispras.ru, Steven Rostedt <rostedt@goodmis.org>,
- Borislav Petkov <bp@alien8.de>, Andy Lutomirski <luto@kernel.org>,
- Thomas Gleixner <tglx@linutronix.de>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Florian Weimer <fweimer@redhat.com>, gcc@gcc.gnu.org,
- Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- LKML <linux-kernel@vger.kernel.org>, "David S. Miller" <davem@davemloft.net>,
- Masami Hiramatsu <mhiramat@kernel.org>, Thomas Garnier <thgarnie@google.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Florian Fainelli <f.fainelli@gmail.com>, linux-watchdog@vger.kernel.org,
+ Stefan Wahren <stefan.wahren@i2se.com>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, bcm-kernel-feedback-list@broadcom.com,
+ linux-rpi-kernel@lists.infradead.org,
+ Wim Van Sebroeck <wim@linux-watchdog.org>,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMzAuMTEuMjAxOCAyMDoxMiwgS2VlcyBDb29rIHdyb3RlOgo+IE9uIEZyaSwgTm92IDMwLCAy
-MDE4IGF0IDk6MDkgQU0gS2VlcyBDb29rIDxrZWVzY29va0BjaHJvbWl1bS5vcmc+IHdyb3RlOgo+
-Pgo+PiBPbiBGcmksIE5vdiAzMCwgMjAxOCBhdCA1OjIwIEFNIEFsZXhhbmRlciBQb3BvdiA8YWxl
-eC5wb3BvdkBsaW51eC5jb20+IHdyb3RlOgo+Pj4KPj4+IEN1cnJlbnRseSB0aGUgJ3N0YWNrbGVh
-a19jbGVhbnVwJyBwYXNzIGRlbGV0aW5nIGEgQ0FMTCBpbnNuIGlzIGV4ZWN1dGVkCj4+PiBhZnRl
-ciB0aGUgJ3JlbG9hZCcgcGFzcy4gVGhhdCBhbGxvd3MgZ2NjIHRvIGRvIHNvbWUgd2VpcmQgb3B0
-aW1pemF0aW9uIGluCj4+PiBmdW5jdGlvbiBwcm9sb2d1ZXMgYW5kIGVwaWxvZ3Vlcywgd2hpY2gg
-YXJlIGdlbmVyYXRlZCBsYXRlciBbMV0uCj4+Pgo+Pj4gTGV0J3MgYXZvaWQgdGhhdCBieSByZWdp
-c3RlcmluZyB0aGUgJ3N0YWNrbGVha19jbGVhbnVwJyBwYXNzIGJlZm9yZQo+Pj4gdGhlICdtYWNo
-JyBwYXNzLCB3aGljaCBwZXJmb3JtcyB0aGUgbWFjaGluZSBkZXBlbmRlbnQgY29kZSB0cmFuc2Zv
-cm1hdGlvbnMuCj4+PiBJdCdzIHRoZSBtb21lbnQgd2hlbiB0aGUgc3RhY2sgZnJhbWUgc2l6ZSBp
-cyBmaW5hbCBhbmQgZnVuY3Rpb24gcHJvbG9ndWVzCj4+PiBhbmQgZXBpbG9ndWVzIGFyZSBhbHJl
-YWR5IGdlbmVyYXRlZC4KPj4+Cj4+PiBbMV0gaHR0cHM6Ly93d3cub3BlbndhbGwuY29tL2xpc3Rz
-L2tlcm5lbC1oYXJkZW5pbmcvMjAxOC8xMS8yMy8yCj4+Pgo+Pj4gUmVwb3J0ZWQtYnk6IGtidWls
-ZCB0ZXN0IHJvYm90IDxsa3BAaW50ZWwuY29tPgo+Pj4gU2lnbmVkLW9mZi1ieTogQWxleGFuZGVy
-IFBvcG92IDxhbGV4LnBvcG92QGxpbnV4LmNvbT4KPj4KPj4gVGhhbmtzLCBhcHBsaWVkIQo+IAo+
-IEVlaywgbm8sIHRoaXMgaXMgYnJlYWtpbmcgbXkgYnVpbGQgYmFkbHk6Cj4gCj4gKioqIFdBUk5J
-TkcgKioqIHRoZXJlIGFyZSBhY3RpdmUgcGx1Z2lucywgZG8gbm90IHJlcG9ydCB0aGlzIGFzIGEg
-YnVnCj4gdW5sZXNzIHlvdSBjYW4gcmVwcm9kdWNlIGl0IHdpdGhvdXQgZW5hYmxpbmcgYW55IHBs
-dWdpbnMuCj4gRXZlbnQgICAgICAgICAgICAgICAgICAgICAgICAgICAgfCBQbHVnaW5zCj4gUExV
-R0lOX1NUQVJUX1VOSVQgICAgICAgICAgICAgICAgfCBzdGFja2xlYWtfcGx1Z2luCj4ga2VybmVs
-L2V4aXQuYzogSW4gZnVuY3Rpb24g4oCYcmVsZWFzZV90YXNr4oCZOgo+IGtlcm5lbC9leGl0LmM6
-MjI4OjE6IGludGVybmFsIGNvbXBpbGVyIGVycm9yOiBTZWdtZW50YXRpb24gZmF1bHQKPiAgfQo+
-IAo+IEZhaWxpbmcgd2l0aDoKPiAKPiBnY2MgKFVidW50dSA3LjMuMC0xNnVidW50dTMpIDcuMy4w
-CgpOaWNlLi4uIEkgZG9uJ3QgcmVwcm9kdWNlIGl0IHdpdGggZ2NjLTcuMyBidWlsdCBmcm9tIHNv
-dXJjZS4KSSdsbCBpbnZlc3RpZ2F0ZSB0aGlzLCByZXR1cm4gd2l0aCBkZXRhaWxzIGFuZCB3ZSds
-bCBkZWNpZGUgd2hhdCB0byBkby4KClRoYW5rcywKQWxleGFuZGVyCgpfX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcg
-bGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmlu
-ZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+On Fri, Nov 30, 2018 at 12:27:40PM -0800, Eric Anholt wrote:
+> The PM block that the wdt driver was binding to actually has multiple
+> features we want to expose (power domains, reset, watchdog).  Move the
+> DT attachment to a MFD driver and make WDT probe against MFD.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+
+For watchdog:
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
+> ---
+> 
+> v3: don't reset bcm2835_power_off_wdt on remove, drop pm driver's
+>     empty remove, sort includes, add a "static".
+> 
+>  arch/arm/mach-bcm/Kconfig      |  1 +
+>  drivers/mfd/Makefile           |  1 +
+>  drivers/mfd/bcm2835-pm.c       | 64 ++++++++++++++++++++++++++++++++++
+>  drivers/watchdog/bcm2835_wdt.c | 26 +++++---------
+>  include/linux/mfd/bcm2835-pm.h | 13 +++++++
+>  5 files changed, 88 insertions(+), 17 deletions(-)
+>  create mode 100644 drivers/mfd/bcm2835-pm.c
+>  create mode 100644 include/linux/mfd/bcm2835-pm.h
+> 
+> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+> index 25aac6ee2ab1..95242c2162a2 100644
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -167,6 +167,7 @@ config ARCH_BCM2835
+>  	select BCM2835_TIMER
+>  	select PINCTRL
+>  	select PINCTRL_BCM2835
+> +	select MFD_CORE
+>  	help
+>  	  This enables support for the Broadcom BCM2835 and BCM2836 SoCs.
+>  	  This SoC is used in the Raspberry Pi and Roku 2 devices.
+> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> index 12980a4ad460..ee6fb6af655e 100644
+> --- a/drivers/mfd/Makefile
+> +++ b/drivers/mfd/Makefile
+> @@ -10,6 +10,7 @@ obj-$(CONFIG_MFD_88PM805)	+= 88pm805.o 88pm80x.o
+>  obj-$(CONFIG_MFD_ACT8945A)	+= act8945a.o
+>  obj-$(CONFIG_MFD_SM501)		+= sm501.o
+>  obj-$(CONFIG_MFD_ASIC3)		+= asic3.o tmio_core.o
+> +obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835-pm.o
+>  obj-$(CONFIG_MFD_BCM590XX)	+= bcm590xx.o
+>  obj-$(CONFIG_MFD_BD9571MWV)	+= bd9571mwv.o
+>  cros_ec_core-objs		:= cros_ec.o
+> diff --git a/drivers/mfd/bcm2835-pm.c b/drivers/mfd/bcm2835-pm.c
+> new file mode 100644
+> index 000000000000..53839e6a81e7
+> --- /dev/null
+> +++ b/drivers/mfd/bcm2835-pm.c
+> @@ -0,0 +1,64 @@
+> +// SPDX-License-Identifier: GPL-2.0+
+> +/*
+> + * PM MFD driver for Broadcom BCM2835
+> + *
+> + * This driver binds to the PM block and creates the MFD device for
+> + * the WDT driver.
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/bcm2835-pm.h>
+> +#include <linux/mfd/core.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/types.h>
+> +#include <linux/watchdog.h>
+> +
+> +static const struct mfd_cell bcm2835_pm_devs[] = {
+> +	{ .name = "bcm2835-wdt" },
+> +};
+> +
+> +static int bcm2835_pm_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *res;
+> +	struct device *dev = &pdev->dev;
+> +	struct bcm2835_pm *pm;
+> +
+> +	pm = devm_kzalloc(dev, sizeof(*pm), GFP_KERNEL);
+> +	if (!pm)
+> +		return -ENOMEM;
+> +	platform_set_drvdata(pdev, pm);
+> +
+> +	pm->dev = dev;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	pm->base = devm_ioremap_resource(dev, res);
+> +	if (IS_ERR(pm->base))
+> +		return PTR_ERR(pm->base);
+> +
+> +	return devm_mfd_add_devices(dev, -1,
+> +				    bcm2835_pm_devs, ARRAY_SIZE(bcm2835_pm_devs),
+> +				    NULL, 0, NULL);
+> +}
+> +
+> +static const struct of_device_id bcm2835_pm_of_match[] = {
+> +	{ .compatible = "brcm,bcm2835-pm-wdt", },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835_pm_of_match);
+> +
+> +static struct platform_driver bcm2835_pm_driver = {
+> +	.probe		= bcm2835_pm_probe,
+> +	.driver = {
+> +		.name =	"bcm2835-pm",
+> +		.of_match_table = bcm2835_pm_of_match,
+> +	},
+> +};
+> +module_platform_driver(bcm2835_pm_driver);
+> +
+> +MODULE_AUTHOR("Eric Anholt <eric@anholt.net>");
+> +MODULE_DESCRIPTION("Driver for Broadcom BCM2835 PM MFD");
+> +MODULE_LICENSE("GPL");
+> diff --git a/drivers/watchdog/bcm2835_wdt.c b/drivers/watchdog/bcm2835_wdt.c
+> index ed05514cc2dc..1834524ae373 100644
+> --- a/drivers/watchdog/bcm2835_wdt.c
+> +++ b/drivers/watchdog/bcm2835_wdt.c
+> @@ -12,6 +12,7 @@
+>  
+>  #include <linux/delay.h>
+>  #include <linux/types.h>
+> +#include <linux/mfd/bcm2835-pm.h>
+>  #include <linux/module.h>
+>  #include <linux/io.h>
+>  #include <linux/watchdog.h>
+> @@ -47,6 +48,8 @@ struct bcm2835_wdt {
+>  	spinlock_t		lock;
+>  };
+>  
+> +static struct bcm2835_wdt *bcm2835_power_off_wdt;
+> +
+>  static unsigned int heartbeat;
+>  static bool nowayout = WATCHDOG_NOWAYOUT;
+>  
+> @@ -148,10 +151,7 @@ static struct watchdog_device bcm2835_wdt_wdd = {
+>   */
+>  static void bcm2835_power_off(void)
+>  {
+> -	struct device_node *np =
+> -		of_find_compatible_node(NULL, NULL, "brcm,bcm2835-pm-wdt");
+> -	struct platform_device *pdev = of_find_device_by_node(np);
+> -	struct bcm2835_wdt *wdt = platform_get_drvdata(pdev);
+> +	struct bcm2835_wdt *wdt = bcm2835_power_off_wdt;
+>  	u32 val;
+>  
+>  	/*
+> @@ -169,7 +169,7 @@ static void bcm2835_power_off(void)
+>  
+>  static int bcm2835_wdt_probe(struct platform_device *pdev)
+>  {
+> -	struct resource *res;
+> +	struct bcm2835_pm *pm = dev_get_drvdata(pdev->dev.parent);
+>  	struct device *dev = &pdev->dev;
+>  	struct bcm2835_wdt *wdt;
+>  	int err;
+> @@ -181,10 +181,7 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>  
+>  	spin_lock_init(&wdt->lock);
+>  
+> -	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	wdt->base = devm_ioremap_resource(dev, res);
+> -	if (IS_ERR(wdt->base))
+> -		return PTR_ERR(wdt->base);
+> +	wdt->base = pm->base;
+>  
+>  	watchdog_set_drvdata(&bcm2835_wdt_wdd, wdt);
+>  	watchdog_init_timeout(&bcm2835_wdt_wdd, heartbeat, dev);
+> @@ -211,8 +208,10 @@ static int bcm2835_wdt_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
+>  
+> -	if (pm_power_off == NULL)
+> +	if (pm_power_off == NULL) {
+>  		pm_power_off = bcm2835_power_off;
+> +		bcm2835_power_off_wdt = wdt;
+> +	}
+>  
+>  	dev_info(dev, "Broadcom BCM2835 watchdog timer");
+>  	return 0;
+> @@ -226,18 +225,11 @@ static int bcm2835_wdt_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id bcm2835_wdt_of_match[] = {
+> -	{ .compatible = "brcm,bcm2835-pm-wdt", },
+> -	{},
+> -};
+> -MODULE_DEVICE_TABLE(of, bcm2835_wdt_of_match);
+> -
+>  static struct platform_driver bcm2835_wdt_driver = {
+>  	.probe		= bcm2835_wdt_probe,
+>  	.remove		= bcm2835_wdt_remove,
+>  	.driver = {
+>  		.name =		"bcm2835-wdt",
+> -		.of_match_table = bcm2835_wdt_of_match,
+>  	},
+>  };
+>  module_platform_driver(bcm2835_wdt_driver);
+> diff --git a/include/linux/mfd/bcm2835-pm.h b/include/linux/mfd/bcm2835-pm.h
+> new file mode 100644
+> index 000000000000..b7d0ee1feffa
+> --- /dev/null
+> +++ b/include/linux/mfd/bcm2835-pm.h
+> @@ -0,0 +1,13 @@
+> +/* SPDX-License-Identifier: GPL-2.0+ */
+> +
+> +#ifndef BCM2835_MFD_PM_H
+> +#define BCM2835_MFD_PM_H
+> +
+> +#include <linux/regmap.h>
+> +
+> +struct bcm2835_pm {
+> +	struct device *dev;
+> +	void __iomem *base;
+> +};
+> +
+> +#endif /* BCM2835_MFD_PM_H */
+> -- 
+> 2.20.0.rc1
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
