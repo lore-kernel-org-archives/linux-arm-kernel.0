@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D1A0C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:38 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 56101C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F2A12082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2773D2146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bWUHSdB+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F2A12082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OYjuVuum"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2773D2146D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,37 +25,36 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lLgLy6Y/DoXbuMYYda6rnzpBbrXHMhkOg+OA5bGC4Fk=; b=bWUHSdB+ZlpwhO
-	2TI09vz1LGAE2XCDf0id/kDyPNpQ/16BrEupdqi8iy7XLPX2BDKak+AG7ibdqLKiPEKzmshTp1tl2
-	i4iY1WkezLMNEsdixG899eZWE+pbtdbMoIbyadBfXvxF3AON3R4rkPSDe2QZiNzljVoj18Ic5W/Iy
-	sJ2+hkQeQ3bB5O7O5O2gyitRTH2LXlUKq3TF46VlKJDuzzhEaIYmqFIJy8Rkwvy0YQhE/FqhaL43o
-	GzoxsoAuzuyxRIxpMoyOpl2kct1Mtlmw0UwFXaJVM82Yy4k/lqP6HMe5M/kxD+ix7DjwOhcMz6plJ
-	5c1/ugGQmVnB8bfHOJgw==;
+	List-Owner; bh=TAqPXQ5DLlw6VOjC+BpnitXqKl/6dfY2flXuMQw9KXc=; b=OYjuVuump4HcSN
+	Rtfx+R83gnJtQ7hbL3MfjrgVtQZzqq4jPB61riXqwZz29zueMyPh6a+XP7AeAFBzcdsXYHy7zr75q
+	rlH0gFFVFnGnmlgGgkdjfRicDpbaBDZp0lrtYeqk7xH5cH/rbaKVCq5+KYYZ3gRghXu56brF5/Vv5
+	7jbXdYogPIPLHXBcI8Yt7aGxm95tYdC0vdMOS5tjJAIJOmm8riaR6zMomh03+eHTwg0HKqZ1yUUk1
+	iOrhS6m3uP4cpID+15qK+u6ER4m8znPCjtYi9oFsMXnwPXb4pfZbM9KZyWor7V7bRYzfkOwnQC6Zo
+	4cG+QqzJ26+7ITWjRFOg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSdhx-0000jW-15; Fri, 30 Nov 2018 07:59:29 +0000
+	id 1gSdiF-00011G-QS; Fri, 30 Nov 2018 07:59:47 +0000
 Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSdhd-0000S2-7L
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:59:10 +0000
+ id 1gSdhd-0000S0-7P
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:59:12 +0000
 Received: by wens.csie.org (Postfix, from userid 1000)
- id 4F2665FD85; Fri, 30 Nov 2018 15:58:55 +0800 (CST)
+ id 494BC5FD57; Fri, 30 Nov 2018 15:58:55 +0800 (CST)
 From: Chen-Yu Tsai <wens@csie.org>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
  Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
-Subject: [PATCH 3/6] ARM: dts: sunxi: h3/h5: Drop A31 fallback compatible for
- CSI controller
-Date: Fri, 30 Nov 2018 15:58:46 +0800
-Message-Id: <20181130075849.16941-4-wens@csie.org>
+Subject: [PATCH 2/6] media: sun6i: Add H3 compatible
+Date: Fri, 30 Nov 2018 15:58:45 +0800
+Message-Id: <20181130075849.16941-3-wens@csie.org>
 X-Mailer: git-send-email 2.20.0.rc1
 In-Reply-To: <20181130075849.16941-1-wens@csie.org>
 References: <20181130075849.16941-1-wens@csie.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_235909_426470_7C1E9A98 
-X-CRM114-Status: GOOD (  12.12  )
+X-CRM114-CacheID: sfid-20181129_235909_537353_DAE0646E 
+X-CRM114-Status: GOOD (  10.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,28 +80,25 @@ time-multiplexed BT.656. Since the H3 is a reduced version, it cannot
 "fallback" to a compatible that implements more features than it
 supports.
 
-Drop the A31 fallback compatible.
+Add a compatible string entry for the H3.
 
-Fixes: f89120b6f554 ("ARM: dts: sun8i: Add the H3/H5 CSI controller")
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sunxi-h3-h5.dtsi | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/sunxi-h3-h5.dtsi b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-index 0d9e9eac518c..c9c9ec71945f 100644
---- a/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-+++ b/arch/arm/boot/dts/sunxi-h3-h5.dtsi
-@@ -752,8 +752,7 @@
- 		};
+diff --git a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+index 6950585edb5a..ee882b66a5ea 100644
+--- a/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
++++ b/drivers/media/platform/sunxi/sun6i-csi/sun6i_csi.c
+@@ -893,6 +893,7 @@ static int sun6i_csi_remove(struct platform_device *pdev)
  
- 		csi: camera@1cb0000 {
--			compatible = "allwinner,sun8i-h3-csi",
--				     "allwinner,sun6i-a31-csi";
-+			compatible = "allwinner,sun8i-h3-csi";
- 			reg = <0x01cb0000 0x1000>;
- 			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&ccu CLK_BUS_CSI>,
+ static const struct of_device_id sun6i_csi_of_match[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-csi", },
++	{ .compatible = "allwinner,sun8i-h3-csi", },
+ 	{ .compatible = "allwinner,sun8i-v3s-csi", },
+ 	{},
+ };
 -- 
 2.20.0.rc1
 
