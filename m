@@ -2,77 +2,63 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F40A0C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:01:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B38ABC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:05:06 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A869420834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:01:25 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 88AB220673
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 19:05:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="U1OyT3+q";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="WV+xOH8M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A869420834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cRw5ITtt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 88AB220673
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MXNNAfeZlozCJSNeDPrEkz4o56FGYOn2fg3CDkTf8p0=; b=U1OyT3+qZPuelr
-	1Vr955EvN3s64rWaLIrztfnFZqnSV/ZukiMLRMHlmNOBI8PLmMs7ewVV1Qyk7hLT6CJ+v2idVEc8g
-	PsrmRMLAnitjVrUxiJadmksvv6lAsy5ptXUCdV90wx7rM8vdZPWu6Fuyx6cT6imRZICwRiXmZpb2E
-	SOLuzuE40vy+yO7xA3S9swsdoVfew7jV65UoKCcS7/KVYmEMRRPBMW2FM2TKz818QyDX/GQYzBWSM
-	sf4qThDqTvDslO9FM5S866IRYW3I7R0Qel9XhOJ5IcAGsbAi9d8z/0jw48Nq1w2C8WvchUE8TQ2zq
-	VAZ+P7Vi7EBczbhpgnNA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=YK5CyZpru//506dkEDzNUYVS1F4MIKzUquukRc9UNoc=; b=cRw5ITttPgNNhne/Zq5fyixN/
+	kFHbZHEfGDPeLboUbUdwJ0XnaHpxUQJsSSKgCm6q+d7pseF2qqEKwn6XsCkMIyJfjHPKnpb+AvaWG
+	Qfld7UQwkHmsQgDdmLlrtrG2uGuPdPl+Nyujfyv0xW79i1ADcCJDtoeeeL2Tzel+yd3zGRv+DZhjq
+	LQq6W3obiAaU1ZK19E8MJdZk8XYvRm6C+EzW9Y/uTG8pkSjHQYT6GVPW1xDuUlazkRY7GWEq5tdgW
+	0P3nRV7D7RYqMUrJTQ2MKB2wozvUSBxW9CUlC6vKaWWstDCP7TxtZvsiG2W+Ob+mLovTv9NT02k27
+	SPt6gNGKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSo2V-0000r6-66; Fri, 30 Nov 2018 19:01:23 +0000
-Received: from pandora.armlinux.org.uk
- ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSo2R-0000qH-FJ
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 19:01:20 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
- MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=cgLqnsGOzZTpWIhpPCkX25BM43oTGYD8p0WI42VHhW0=; b=WV+xOH8M2NgemEIYzcxbfR8HW
- wv2yBSh9Tg7I8OZ1D6HJIoI3rSnIDzOiGa7bCDPW9b+KSjr8tqybiMXhYx8OWyPub6AQEm/IE/a53
- L/3F5NlzZEAOqKdVF7Z/D2MoP70TuvG//jhW+3AYISsLcY2uegAbo+0fK0gNvjuMfo18E=;
-Received: from n2100.armlinux.org.uk
- ([fd8f:7570:feb6:1:214:fdff:fe10:4f86]:56909)
- by pandora.armlinux.org.uk with esmtpsa
- (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
- (envelope-from <linux@armlinux.org.uk>)
- id 1gSo1t-0001V7-5s; Fri, 30 Nov 2018 19:00:45 +0000
-Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
- (envelope-from <linux@n2100.armlinux.org.uk>)
- id 1gSo1k-0002CJ-Ur; Fri, 30 Nov 2018 19:00:37 +0000
-Date: Fri, 30 Nov 2018 19:00:31 +0000
-From: Russell King - ARM Linux <linux@armlinux.org.uk>
-To: Miquel Raynal <miquel.raynal@bootlin.com>
-Subject: Re: [PATCH v2 2/8] phy: mvebu-cp110-comphy: fix port check in
- ->xlate()
-Message-ID: <20181130190031.GH30658@n2100.armlinux.org.uk>
-References: <20181130144743.675-1-miquel.raynal@bootlin.com>
- <20181130144743.675-3-miquel.raynal@bootlin.com>
+	id 1gSo5z-0001MQ-Hb; Fri, 30 Nov 2018 19:04:59 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSo5w-0001L9-Kt
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 19:04:57 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 925231682;
+ Fri, 30 Nov 2018 11:04:54 -0800 (PST)
+Received: from [10.1.196.75] (e110467-lin.cambridge.arm.com [10.1.196.75])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 33D683F575;
+ Fri, 30 Nov 2018 11:04:52 -0800 (PST)
+Subject: Re: [PATCH 2/9] dma-direct: reject highmem pages from
+ dma_alloc_from_contiguous
+To: Christoph Hellwig <hch@lst.de>, iommu@lists.linux-foundation.org
+References: <20181105121931.13481-1-hch@lst.de>
+ <20181105121931.13481-3-hch@lst.de>
+From: Robin Murphy <robin.murphy@arm.com>
+Message-ID: <e479a766-07c0-c319-0d91-318aaafdf7bc@arm.com>
+Date: Fri, 30 Nov 2018 19:04:51 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181130144743.675-3-miquel.raynal@bootlin.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181105121931.13481-3-hch@lst.de>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_110119_515021_9998DB5C 
-X-CRM114-Status: GOOD (  22.42  )
+X-CRM114-CacheID: sfid-20181130_110456_745727_CD97986A 
+X-CRM114-Status: GOOD (  21.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,59 +70,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Marcin Wojtas <mw@semihalf.com>, Jason Cooper <jason@lakedaemon.net>,
- devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
- Grzegorz Jaszczyk <jaz@semihalf.com>,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
- Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Guo Ren <ren_guo@c-sky.com>, Laura Abbott <labbott@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 03:47:37PM +0100, Miquel Raynal wrote:
-> So far the PHY ->xlate() callback was checking if the port was
-> "invalid" before continuing, meaning that the port has not been used
-> yet. This check is not correct as there is no opposite call to
-> ->xlate() once the PHY is released by the user and the port will
-> remain "valid" after the first phy_get()/phy_put() calls. Hence, if
-> this driver is built as a module, inserted, removed and inserted
-> again, the PHY will appear busy and the second probe will fail.
+On 05/11/2018 12:19, Christoph Hellwig wrote:
+> dma_alloc_from_contiguous can return highmem pages depending on the
+> setup, which a plain non-remapping DMA allocator can't handle.  Detect
+> this case and try the normal page allocator instead.
+
+...except the actual implementation is "Detect this case and fail the 
+entire allocation if so".
+
+Again, the diff itself makes sense, so given an accurate commit message,
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
 > 
-> To fix this, just drop the faulty check and instead verify that the
-> port number is valid (ie. in the possible range).
-> 
-> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> Signed-off-by: Christoph Hellwig <hch@lst.de>
 > ---
->  drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>   kernel/dma/direct.c | 12 ++++++++++++
+>   1 file changed, 12 insertions(+)
 > 
-> diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> index 31b9a1c18345..a40b876ff214 100644
-> --- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> +++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
-> @@ -567,9 +567,9 @@ static struct phy *mvebu_comphy_xlate(struct device *dev,
->  		return phy;
->  
->  	lane = phy_get_drvdata(phy);
-> -	if (lane->port >= 0)
-> -		return ERR_PTR(-EBUSY);
->  	lane->port = args->args[0];
-> +	if (lane->port >= MVEBU_COMPHY_PORTS)
-> +		return ERR_PTR(-EINVAL);
-
-Shouldn't we validate args->args[0] before doing anything?
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
-According to speedtest.net: 11.9Mbps down 500kbps up
+> diff --git a/kernel/dma/direct.c b/kernel/dma/direct.c
+> index 680287779b0a..c49849bcced6 100644
+> --- a/kernel/dma/direct.c
+> +++ b/kernel/dma/direct.c
+> @@ -162,6 +162,18 @@ void *dma_direct_alloc_pages(struct device *dev, size_t size,
+>   	if (!page)
+>   		return NULL;
+>   
+> +	if (PageHighMem(page)) {
+> +		/*
+> +		 * Depending on the cma= arguments and per-arch setup
+> +		 * dma_alloc_from_contiguous could return highmem pages.
+> +		 * Without remapping there is no way to return them here,
+> +		 * so log an error and fail.
+> +		 */
+> +		dev_info(dev, "Rejecting highmem page from CMA.\n");
+> +		__dma_direct_free_pages(dev, size, page);
+> +		return NULL;
+> +	}
+> +
+>   	ret = page_address(page);
+>   	if (force_dma_unencrypted()) {
+>   		set_memory_decrypted((unsigned long)ret, 1 << get_order(size));
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
