@@ -2,22 +2,23 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.4 required=3.0 tests=DATE_IN_PAST_03_06,
+X-Spam-Status: No, score=-13.4 required=3.0 tests=DATE_IN_PAST_03_06,
 	DKIMWL_WL_HIGH,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+	INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D11CEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:56:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CAA9EC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:57:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6684020834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:56:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8ECF220834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 22:57:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ldp6fm0h";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="SC1Lf6aD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6684020834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NO6Liniy";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="CMP08eMG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8ECF220834
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,68 +27,66 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rCYPPYlKh1pOCadd2i7nGvhDee3/YePuR/O/QB3RLXE=; b=Ldp6fm0hjndGu3
-	WETPJ3hpzy25e/eRurA9fRIgCPHh7hya6jp4LGRYOaKNwM0XxllzwA574VJzkG9hmnx8nO+hl6htg
-	IXF3mgPCuXlj9uAipxKNOM2rCNDc+QSpCGK23nGDc2DcaHDqnIYjLzNs50AHU8d3bg0y0I5oOhNAr
-	0I3gUsxqeI4uU0EEG3AyPgAwBQQQbwJ0tgKJdkcFvYLLAGUCxLjm99bZApO/rPA5DOE/PX3QUJX3V
-	jALolXxq7jLrP8coO5wCJjry38UqDnAIl9SAO2dAX0lDGPyyfgWw7uUH8RVS+MX4Fk7BUa1EZ5CQL
-	JUfg9lYHtR2Qs5ThnHZQ==;
+	List-Owner; bh=rxBKmLhNJIGij1OkAV17m8/Ak7zio5W/fIyoXFRx8JE=; b=NO6LiniyKZnmrY
+	MaDcNvD+F25nMdCq7wRYLIwOnN+o0ArlZgdDcLjxpyfypbZ4Mcwua1VhDt9WqqsQPwQaV8hB6nHnE
+	Rx+KPpZsKXEg94L+gRZL02OwScJv0NNYHPsv4yEtuhcU00LpeavNfSgnam44zoPfcXiCVLmn2CFL4
+	LJ2UMhsHIoBzBvXUIjZuxlngmxlX9U1IBsV5LVMz46j5TKmCNVf2d9DWnNyJ1jNHSAXvi9NY7jra/
+	FpOuPGr25R4rPzUtYq2QWWbc06Ltx3shqZmz9VBfgoUNeIT9vnvTXES31fl5qEYt5v/G8+lBbF6tz
+	0aNUA4yusFNp9oRNf8ag==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSriK-00046T-44; Fri, 30 Nov 2018 22:56:48 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gSrjC-0004VU-IG; Fri, 30 Nov 2018 22:57:42 +0000
+Received: from mail-lf1-x144.google.com ([2a00:1450:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSri6-0003v9-Uk
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 22:56:36 +0000
-Received: by mail-lj1-x243.google.com with SMTP id x85-v6so6407665ljb.2
+ id 1gSriA-0003vA-K9
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 22:56:42 +0000
+Received: by mail-lf1-x144.google.com with SMTP id e26so5280519lfc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 14:56:25 -0800 (PST)
+ Fri, 30 Nov 2018 14:56:28 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=D2hp/Ir0gBlnqWcUXzziRNf+Jis9t1VhUFTTdvJjBRc=;
- b=SC1Lf6aDLPjRP0JOUQoUj1dytI3cZdU5eDX1AxmL025ahvjfNxiC9+hqH6zA6KsDj+
- yQzEH0lOl332nbvYrSuopMgodlP+XrHkayXTEkhdtaSxpmPiujcZ1pRCKatLBIFjgYpD
- F6oA/3oqvvWacuukkqVquHuiWeCG1Pr032pbeiPygpObRjBF43ic/eLKcICxCr4gD5LO
- Wjt8J0BEJTzD1UGiO8g3Xyhas5e2LSy0voSlzD5Pkl9UCifkgUU4JzB8DhQVSynw12jX
- CGljiNu8k8fEulyz6NWdt1PKXpeSqVEpBD48xfBNeULmrasehxkxJ89zmdLL60Ps3/1o
- bPiQ==
+ bh=CRaczM14x8jN2CGA32OyRSnI3OnYrZYJ8H64Fo/XgsY=;
+ b=CMP08eMG1ImxNQPqDq6Dz1EVM6Gn69gv14Orf1Cp9uUyfGOcJxwrje5SQrueUWQ40f
+ SfYoPSBYk4+HG9UzDLiZiFKholiBpLJBLtG6S2HCp2jMI8a4XTpurG5XOVcinvQIkj3X
+ JbefcIF5uBrLxF0rPDIGXzI67l4Eu1JXpRQgbaAH5LJ7fCVOAHPWd7DiNi6/ByCyWOe7
+ 02m0kKTce0hMp6Oy+bRXF8fVWZlaWuSQr/VUVnHNNe36OKDlDWVZqwvx4nWUdJMCX8lJ
+ hoPltMmRGie/qv1ULtFIjJ6+dj4fdT04Mci70mdv5hkOBc92lHGpuihSXHcdlaX5PNHI
+ RcGg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=D2hp/Ir0gBlnqWcUXzziRNf+Jis9t1VhUFTTdvJjBRc=;
- b=VcZw3miLWHzJSYvJYakW27ieaHQpLqS7zv6t3ZjaMGg/wu8vNROrIJWsaCpuL2bPB/
- GyIy04T0QcXFoFtFzZEjRJ04FHX7ZUGost+IkZu9BO9DytK4XE+h+onbDeiSyCuYGrTW
- 7/AfEgH11S+R4xU5/b0hUj4LE7zOLcmhi/spne0PhyDCEChTlienxVLCRZ6aaGH6XTFJ
- 7fdo/CNobed+OdHGbE+CAKvJjxI7JzTFApDfjjjTlQlmos7k8sxvkIzRJLbyWO094bIy
- wrc56g34mh3Iz30k6okDm+QJXS620yBV5uMpWQM2v722yWMB/F2qU3U4T464b3pWeodS
- qF+Q==
-X-Gm-Message-State: AA+aEWYPwmYGaBQim4ylgqUbhQCGPneE2bnVbWVxtxi4accTCPFv9cRT
- K0q0KHsgaCHlyagXeBh6MlZPbQ==
-X-Google-Smtp-Source: AFSGD/VbTI/4U1VT41i7x5ClnS7JN+PeiNmFfZw/R0ZuiILEih03rWq9gADRYveyGS/GzhN/cfpVHA==
-X-Received: by 2002:a2e:9603:: with SMTP id v3-v6mr4293247ljh.15.1543618584252; 
- Fri, 30 Nov 2018 14:56:24 -0800 (PST)
+ bh=CRaczM14x8jN2CGA32OyRSnI3OnYrZYJ8H64Fo/XgsY=;
+ b=cVKtb+b7yDM1vcW6k7/B31P8+eRzkzc6M7yaTFM4xXn5pAPWru5u4rg/IM55Hlzy7t
+ iD9/BwsivIiqbYPIRyY4gufFpqW2CG7r/hvecifMm4kN4Xx9xfeipNe5iPARbl78Jxgg
+ lV1py0WxOQsPPZqdrfkWfNDrYwmCuC2x5gQRfyo2onn+GaLwk0SlBfkW5KfiN8MTEqw/
+ yBkC7yFM6aeAQ9a/LuPwwobryekwITy0g3utiJpo0o/DwKn4ZPh0n+d8y2szwtNUvWsY
+ FpzQB+8C2jcuAbj/c2XEjHfOK5jARuWmDjOEU28UL1e7M8X24YFSfpSOyqFHAAtaASgi
+ XjdQ==
+X-Gm-Message-State: AA+aEWb6JiS0xsC16eLWgUIW7DsnuZatS7/IahOAAwjUubfkaUPyFu8S
+ PJvdcZMi/t/E4IusPJtBro2/3w==
+X-Google-Smtp-Source: AFSGD/Xytu2S9QiwctTNlf6nYW5Fpz9uarqPX9iu2oP71QRDFwBrfFMWbIxHXuBNsUWhpOTpRJYEeQ==
+X-Received: by 2002:a19:5f1e:: with SMTP id t30mr4465906lfb.76.1543618586569; 
+ Fri, 30 Nov 2018 14:56:26 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id f8sm1143749lfe.72.2018.11.30.14.56.22
+ by smtp.gmail.com with ESMTPSA id k68-v6sm1013616ljb.35.2018.11.30.14.56.24
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 30 Nov 2018 14:56:22 -0800 (PST)
-Date: Fri, 30 Nov 2018 11:48:18 -0800
+ Fri, 30 Nov 2018 14:56:25 -0800 (PST)
+Date: Fri, 30 Nov 2018 11:49:19 -0800
 From: Olof Johansson <olof@lixom.net>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [GIT PULL] sprd dts for kernel v4.20-rc1
-Message-ID: <20181130194818.7v5ysbwkoq6buzko@localhost>
-References: <1539854253-4784-1-git-send-email-chunyan.zhang@unisoc.com>
- <20181102183246.r5xxwsic2mxwihsi@localhost>
- <CAL_Jsq+HFPnzw4Fo3rLRMxber8_itGZ=LjnUeyvvDOt4_txm3g@mail.gmail.com>
+To: Alexandre Belloni <alexandre.belloni@bootlin.com>
+Subject: Re: [GIT PULL] ARM: at91: fixes for 4.20
+Message-ID: <20181130194919.rah6fxh6jcaiadea@localhost>
+References: <20181121111623.GA10372@piout.net>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <CAL_Jsq+HFPnzw4Fo3rLRMxber8_itGZ=LjnUeyvvDOt4_txm3g@mail.gmail.com>
+In-Reply-To: <20181121111623.GA10372@piout.net>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_145635_072190_315C212B 
-X-CRM114-Status: GOOD (  17.53  )
+X-CRM114-CacheID: sfid-20181130_145638_853541_72BC5BA2 
+X-CRM114-Status: GOOD (  14.26  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,51 +98,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>,
- Lyra Zhang <zhang.lyra@gmail.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- chunyan.zhang@unisoc.com, ARM-SoC Maintainers <arm@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Arnd Bergmann <arnd@arndb.de>, linux-kernel@vger.kernel.org,
+ Ludovic Desroches <ludovic.desroches@microchip.com>, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 09:18:34AM -0600, Rob Herring wrote:
-> On Fri, Nov 2, 2018 at 1:50 PM Olof Johansson <olof@lixom.net> wrote:
-> >
-> > On Thu, Oct 18, 2018 at 05:17:33PM +0800, Chunyan Zhang wrote:
-> > > Hi Arnd,
-> > >
-> > > For 4.20-rc1 there's one patch only for sprd devicetree, please pull from my git tree:
-> > >
-> > > https://github.com/lyrazhang/linux.git m-v4.19-rc1
-> > >
-> > > Please let me know if there's some problem.
-> > >
-> > > Thanks,
-> > > Chunyan
-> > >
-> > > ----------------------------------------------------------------
-> > >
-> > > Suzuki K Poulose (1):
-> > >   arm64: dts: sc9836/sc9860: Update coresight bindings for hardware
-> > >     ports
-> > >
-> > >  arch/arm64/boot/dts/sprd/sc9836.dtsi |  78 +++++++------
-> > >  arch/arm64/boot/dts/sprd/sc9860.dtsi | 215 ++++++++++++++++++-----------------
-> > >  2 files changed, 151 insertions(+), 142 deletions(-)
-> >
-> > Hi,
-> >
-> > This came in right before the merge window so it wasn't included since
-> > it's more of a cleanup. Please resend it after -rc1 is out and we'll be
-> > happy to queue it up for 4.21.
+On Wed, Nov 21, 2018 at 12:16:23PM +0100, Alexandre Belloni wrote:
+> Arnd, Olof,
 > 
-> I'm enabling by default the DT warnings that this fixes, so please pull it in.
+> A simple DT fix that is necessary to get reliable access to the NAND on
+> sama5d2 based boards.
+> 
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> 
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/at91/linux tags/at91-4.20-fixes
+> 
+> for you to fetch changes up to 4ab7ca092c3c7ac8b16aa28eba723a8868f82f14:
+> 
+>   ARM: dts: at91: sama5d2: use the divided clock for SMC (2018-11-21 11:50:32 +0100)
 
-It was merged on November 13.
+Merged, thanks.
 
 
 -Olof
