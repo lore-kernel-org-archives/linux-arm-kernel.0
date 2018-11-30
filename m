@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 41E56C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F822C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0D0AA20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DF69C20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qEV3H7Yr"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0D0AA20834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oWcbj7tb"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF69C20834
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X9cf2ra9Xf/cD5kIzS97stViW9lcIBAMWQXSO90T44c=; b=qEV3H7YrVKw931
-	cApC01lmMGd6qorWXS2wHj+8tmx3xYuxZOGseHw0I5mvO8TPdzUmy9p1JXaRVAqgV14ki3XWxVgj1
-	wkPW69q5obbWvSGf1G8A1FTr7bFd/xCg8jNc6A58MfN27hxifUgN0KsxlaVJ83ohUrKS9UFLzKAi8
-	OmDWHp+qYaGC0T8riMn5TX2FBv2RWaE1zcpceRrE5XtvJ4fatpPe4/7c+TWYlLpcIpR+MjVSWxIis
-	rD34gkJIZwCCmY+zCyQsEYbCdZeJCGiP84TYJT/Vk39NG9r1/Hi4n5zsX8Bbg2W0oQuojDkIBKH4O
-	b8xjsDrzUiRPJA+i2R4A==;
+	List-Owner; bh=RDIsEqAAO9mbN2zk29Cx50L73tievzQzL8yT7Y9P2mo=; b=oWcbj7tbrRNidW
+	JzEeZT7goaB1qtEfrcXe2P5btuN0arAoabINcKlKyzYAWhwh+7icGmmGxn8xUMkI7RUGzeZf/E1ZE
+	TeoCCF0c2reihQm+glHpN/BDfaLA24QTgWCvz+JYpOY+B1m0w4zBzxK4uFUZjcHiQSwdp2zA1rkhA
+	6yRZ0W7oDxj7T9fl8Lwv+fTcDtKqo3qI9fFanT2ja4e8Kx80XWwQ2DMf7axhCLxlqGSve14XhG3y6
+	pkztEVmMUYy49wSsecp8Txj72FLAog48NXH/cYbdbXzQuKsXFecb/xd36wzG0ld/3AC9+omwGjEfo
+	6I7ewKbrvQp/l05ugFJw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSirR-0002Zj-6O; Fri, 30 Nov 2018 13:29:37 +0000
+	id 1gSirh-0002tW-LT; Fri, 30 Nov 2018 13:29:53 +0000
 Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSilq-0004u8-CK; Fri, 30 Nov 2018 13:23:50 +0000
+ id 1gSim8-0005Bp-BI; Fri, 30 Nov 2018 13:24:08 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: iommu@lists.linux-foundation.org
-Subject: [PATCH 17/23] iommu: remove the mapping_error dma_map_ops method
-Date: Fri, 30 Nov 2018 14:22:25 +0100
-Message-Id: <20181130132231.16512-18-hch@lst.de>
+Subject: [PATCH 23/23] dma-mapping: return an error code from dma_mapping_error
+Date: Fri, 30 Nov 2018 14:22:31 +0100
+Message-Id: <20181130132231.16512-24-hch@lst.de>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181130132231.16512-1-hch@lst.de>
 References: <20181130132231.16512-1-hch@lst.de>
@@ -71,96 +71,32 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Return DMA_MAPPING_ERROR instead of 0 on a dma mapping failure and let
-the core dma-mapping code handle the rest.
-
-Note that the existing code used AMD_IOMMU_MAPPING_ERROR to check from
-a 0 return from the IOVA allocator, which is replaced with an explicit
-0 as in the implementation and other users of that interface.
+Currently dma_mapping_error returns a boolean as int, with 1 meaning
+error.  This is rather unusual and many callers have to convert it to
+errno value.  The callers are highly inconsistent with error codes
+ranging from -ENOMEM over -EIO, -EINVAL and -EFAULT ranging to -EAGAIN.
+Return -ENOMEM which seems to be what the largest number of callers
+convert it to, and which also matches the typical error case where
+we are out of resources.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/iommu/amd_iommu.c | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+ include/linux/dma-mapping.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
-index 1167ff0416cf..c5d6c7c42b0a 100644
---- a/drivers/iommu/amd_iommu.c
-+++ b/drivers/iommu/amd_iommu.c
-@@ -55,8 +55,6 @@
- #include "amd_iommu_types.h"
- #include "irq_remapping.h"
- 
--#define AMD_IOMMU_MAPPING_ERROR	0
--
- #define CMD_SET_TYPE(cmd, t) ((cmd)->data[1] |= ((t) << 28))
- 
- #define LOOP_TIMEOUT	100000
-@@ -2339,7 +2337,7 @@ static dma_addr_t __map_single(struct device *dev,
- 	paddr &= PAGE_MASK;
- 
- 	address = dma_ops_alloc_iova(dev, dma_dom, pages, dma_mask);
--	if (address == AMD_IOMMU_MAPPING_ERROR)
-+	if (!address)
- 		goto out;
- 
- 	prot = dir2prot(direction);
-@@ -2376,7 +2374,7 @@ static dma_addr_t __map_single(struct device *dev,
- 
- 	dma_ops_free_iova(dma_dom, address, pages);
- 
--	return AMD_IOMMU_MAPPING_ERROR;
-+	return DMA_MAPPING_ERROR;
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index 2adef56c6069..b5bd25fc1f81 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -576,7 +576,7 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	debug_dma_mapping_error(dev, dma_addr);
+ 	if (dma_addr == DMA_MAPPING_ERROR)
+-		return 1;
++		return -ENOMEM;
+ 	return 0;
  }
  
- /*
-@@ -2427,7 +2425,7 @@ static dma_addr_t map_page(struct device *dev, struct page *page,
- 	if (PTR_ERR(domain) == -EINVAL)
- 		return (dma_addr_t)paddr;
- 	else if (IS_ERR(domain))
--		return AMD_IOMMU_MAPPING_ERROR;
-+		return DMA_MAPPING_ERROR;
- 
- 	dma_mask = *dev->dma_mask;
- 	dma_dom = to_dma_ops_domain(domain);
-@@ -2504,7 +2502,7 @@ static int map_sg(struct device *dev, struct scatterlist *sglist,
- 	npages = sg_num_pages(dev, sglist, nelems);
- 
- 	address = dma_ops_alloc_iova(dev, dma_dom, npages, dma_mask);
--	if (address == AMD_IOMMU_MAPPING_ERROR)
-+	if (address == DMA_MAPPING_ERROR)
- 		goto out_err;
- 
- 	prot = dir2prot(direction);
-@@ -2627,7 +2625,7 @@ static void *alloc_coherent(struct device *dev, size_t size,
- 	*dma_addr = __map_single(dev, dma_dom, page_to_phys(page),
- 				 size, DMA_BIDIRECTIONAL, dma_mask);
- 
--	if (*dma_addr == AMD_IOMMU_MAPPING_ERROR)
-+	if (*dma_addr == DMA_MAPPING_ERROR)
- 		goto out_free;
- 
- 	return page_address(page);
-@@ -2678,11 +2676,6 @@ static int amd_iommu_dma_supported(struct device *dev, u64 mask)
- 	return check_device(dev);
- }
- 
--static int amd_iommu_mapping_error(struct device *dev, dma_addr_t dma_addr)
--{
--	return dma_addr == AMD_IOMMU_MAPPING_ERROR;
--}
--
- static const struct dma_map_ops amd_iommu_dma_ops = {
- 	.alloc		= alloc_coherent,
- 	.free		= free_coherent,
-@@ -2691,7 +2684,6 @@ static const struct dma_map_ops amd_iommu_dma_ops = {
- 	.map_sg		= map_sg,
- 	.unmap_sg	= unmap_sg,
- 	.dma_supported	= amd_iommu_dma_supported,
--	.mapping_error	= amd_iommu_mapping_error,
- };
- 
- static int init_reserved_iova_ranges(void)
 -- 
 2.19.1
 
