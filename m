@@ -2,56 +2,63 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D1E1AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:20:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 03408C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:22:47 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 877B120834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:20:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C60F220834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:22:46 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EndgpdxE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 877B120834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NsUyAGB8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C60F220834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:From:Date:
-	Message-Id:Subject:To:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=uP30Fw0cnLVP5c/PFppnD3h/sJJgBK+g+dLxW4LwB5I=; b=End
-	gpdxEzdXZcgE60pEaUzIjEMBK9LiARAp0RtOm9ojBdkqjhb/tWGchzpXuSkbOJqlDGZTdTMrWA8P2
-	CIcs5Lbk5K1qMYTo0tiXYP9d1aMVllXgNLjOgs4IGG48TfTqQ4K1mHKu6hInwFg5ypHlbeFElg9lD
-	jn2nfvvQtU2/xAoEcI7eMCmrSifECGE2gdDcoXXwde5NNTKVwotQmjjs/W5gCJMYuOxVishVThc/f
-	629VgINhuXKDmUdNES4lP3Uf/BPW76oGvC9D3sxexxcww2UV84QYqXlrIlceZc+OJcUUtUPN2w/GP
-	mg5P+cZFvkWJf8LSk5jVfPHFl9mqadQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=XLz5MRf6EFUKxYBuo7T5x6ADxfAtztJTHCtekofRP2Q=; b=NsUyAGB8kMuOrz
+	/kXMnzHdQ50SDUu+ewGaa3Ye/90LCI/lJIVySvG8TQtAj1YeHcFb9lj6GvAUJk5NGQNSs3m4OgYwz
+	34Qc1EZxzb2bx875kui26drfjVL3jeDVBiIcO9GJrRMEmaxC/TwPPmuju1YSGtNzL2a7SMb3s0osN
+	zWPcYDm8U7sPluep5dWtZMYOEEFxeqIV7cflgyrlCdXeaFpRsCrf3NHh7LybRpAOdrlq8e5Igij6f
+	tVyLQa1FUxtWFoo37fJUc7ebSB9GqZ8YAYOiCzGBkF8twn7yAUCPN7Z/9EvBjv83fMjzw32ywh714
+	L60L8rIWHNY7LfbYGoSQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSlWu-0002Ol-4N; Fri, 30 Nov 2018 16:20:36 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSlWp-0002NA-KH
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 16:20:34 +0000
-Received: by newverein.lst.de (Postfix, from userid 2005)
- id 83FE767357; Fri, 30 Nov 2018 17:20:15 +0100 (CET)
-To: Will Deacon <will.deacon@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Julien Thierry <julien.thierry@arm.com>,
- Steven Rostedt <rostedt@goodmis.org>, Josh Poimboeuf <jpoimboe@redhat.com>,
- Ingo Molnar <mingo@redhat.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Arnd Bergmann <arnd@arndb.de>, AKASHI Takahiro <takahiro.akashi@linaro.org>
-Subject: [PATCH v5] arm64: implement ftrace with regs
-Message-Id: <20181130162015.83FE767357@newverein.lst.de>
-Date: Fri, 30 Nov 2018 17:20:15 +0100 (CET)
-From: duwe@lst.de (Torsten Duwe)
+	id 1gSlYw-0002lx-99; Fri, 30 Nov 2018 16:22:42 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSlYt-0002kp-3b
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 16:22:40 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1659BA78;
+ Fri, 30 Nov 2018 08:22:28 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 887E03F5AF;
+ Fri, 30 Nov 2018 08:22:24 -0800 (PST)
+Date: Fri, 30 Nov 2018 16:22:15 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Xiaowei Bao <xiaowei.bao@nxp.com>
+Subject: Re: [PATCHv2 5/6] pci: layerscape: Add the EP mode support.
+Message-ID: <20181130162214.GA23332@e107981-ln.cambridge.arm.com>
+References: <20181105084653.26597-1-xiaowei.bao@nxp.com>
+ <20181105084653.26597-5-xiaowei.bao@nxp.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181105084653.26597-5-xiaowei.bao@nxp.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_082031_964890_336223CF 
-X-CRM114-Status: GOOD (  27.02  )
+X-CRM114-CacheID: sfid-20181130_082239_156552_522220F5 
+X-CRM114-Status: GOOD (  19.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -63,552 +70,215 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: live-patching@vger.kernel.org, linux-kernel@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: mark.rutland@arm.com, roy.zang@nxp.com, linuxppc-dev@lists.ozlabs.org,
+ arnd@arndb.de, devicetree@vger.kernel.org, gregkh@linuxfoundation.org,
+ kstewart@linuxfoundation.org, niklas.cassel@axis.com,
+ linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org, kishon@ti.com,
+ minghuan.Lian@nxp.com, robh+dt@kernel.org, cyrille.pitchen@free-electrons.com,
+ linux-arm-kernel@lists.infradead.org, pombredanne@nexb.com,
+ bhelgaas@google.com, leoyang.li@nxp.com, shawnguo@kernel.org,
+ shawn.lin@rock-chips.com, mingkai.hu@nxp.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Use -fpatchable-function-entry (gcc8) to add 2 NOPs at the beginning
-of each function. Replace the first NOP thus generated with a quick LR
-saver (move it to scratch reg x9), so the 2nd replacement insn, the call
-to ftrace, does not clobber the value. Ftrace will then generate the
-standard stack frames.
+On Mon, Nov 05, 2018 at 04:46:52PM +0800, Xiaowei Bao wrote:
+> Add the PCIe EP mode support for layerscape platform.
+> 
+> Signed-off-by: Xiaowei Bao <xiaowei.bao@nxp.com>
+> ---
+> v2:
+>  - remove the EP mode check function.
+> 
+>  drivers/pci/controller/dwc/Makefile            |    2 +-
+>  drivers/pci/controller/dwc/pci-layerscape-ep.c |  147 ++++++++++++++++++++++++
+>  2 files changed, 148 insertions(+), 1 deletions(-)
+>  create mode 100644 drivers/pci/controller/dwc/pci-layerscape-ep.c
+> 
+> diff --git a/drivers/pci/controller/dwc/Makefile b/drivers/pci/controller/dwc/Makefile
+> index 5d2ce72..b26d617 100644
+> --- a/drivers/pci/controller/dwc/Makefile
+> +++ b/drivers/pci/controller/dwc/Makefile
+> @@ -8,7 +8,7 @@ obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
+>  obj-$(CONFIG_PCI_IMX6) += pci-imx6.o
+>  obj-$(CONFIG_PCIE_SPEAR13XX) += pcie-spear13xx.o
+>  obj-$(CONFIG_PCI_KEYSTONE) += pci-keystone-dw.o pci-keystone.o
+> -obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o
+> +obj-$(CONFIG_PCI_LAYERSCAPE) += pci-layerscape.o pci-layerscape-ep.o
+>  obj-$(CONFIG_PCIE_QCOM) += pcie-qcom.o
+>  obj-$(CONFIG_PCIE_ARMADA_8K) += pcie-armada8k.o
+>  obj-$(CONFIG_PCIE_ARTPEC6) += pcie-artpec6.o
+> diff --git a/drivers/pci/controller/dwc/pci-layerscape-ep.c b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+> new file mode 100644
+> index 0000000..289618b
+> --- /dev/null
+> +++ b/drivers/pci/controller/dwc/pci-layerscape-ep.c
+> @@ -0,0 +1,147 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * PCIe controller EP driver for Freescale Layerscape SoCs
+> + *
+> + * Copyright (C) 2018 NXP Semiconductor.
+> + *
+> + * Author: Xiaowei Bao <xiaowei.bao@nxp.com>
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_pci.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/of_address.h>
+> +#include <linux/pci.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/resource.h>
+> +
+> +#include "pcie-designware.h"
+> +
+> +#define PCIE_DBI2_OFFSET		0x1000	/* DBI2 base address*/
+> +
+> +struct ls_pcie_ep {
+> +	struct dw_pcie		*pci;
+> +};
 
-Note that patchable-function-entry in GCC disables IPA-RA, which means
-ABI register calling conventions are obeyed *and* scratch registers
-such as x9 are available.
+I am not really sure why you need an additional struct.
 
-Introduce and handle an ftrace_regs_trampoline for module PLTs, together
-with ftrace_trampoline, and double the size of this special section
-if .text.ftrace_trampoline is present in the module.
+> +#define to_ls_pcie_ep(x)	dev_get_drvdata((x)->dev)
 
-Signed-off-by: Torsten Duwe <duwe@suse.de>
+Unused.
 
----
+> +
+> +static int ls_pcie_establish_link(struct dw_pcie *pci)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct dw_pcie_ops ls_pcie_ep_ops = {
+> +	.start_link = ls_pcie_establish_link,
+> +};
+> +
+> +static const struct of_device_id ls_pcie_ep_of_match[] = {
+> +	{ .compatible = "fsl,ls-pcie-ep",},
+> +	{ },
+> +};
+> +
+> +static void ls_pcie_ep_init(struct dw_pcie_ep *ep)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+> +	struct pci_epc *epc = ep->epc;
+> +	enum pci_barno bar;
+> +
+> +	for (bar = BAR_0; bar <= BAR_5; bar++)
+> +		dw_pcie_ep_reset_bar(pci, bar);
+> +
+> +	epc->features |= EPC_FEATURE_NO_LINKUP_NOTIFIER;
+> +}
+> +
+> +static int ls_pcie_ep_raise_irq(struct dw_pcie_ep *ep, u8 func_no,
+> +				  enum pci_epc_irq_type type, u16 interrupt_num)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+> +
+> +	switch (type) {
+> +	case PCI_EPC_IRQ_LEGACY:
+> +		return dw_pcie_ep_raise_legacy_irq(ep, func_no);
+> +	case PCI_EPC_IRQ_MSI:
+> +		return dw_pcie_ep_raise_msi_irq(ep, func_no, interrupt_num);
+> +	case PCI_EPC_IRQ_MSIX:
+> +		return dw_pcie_ep_raise_msix_irq(ep, func_no, interrupt_num);
+> +	default:
+> +		dev_err(pci->dev, "UNKNOWN IRQ type\n");
+> +	}
+> +
+> +	return 0;
 
-As reliable stack traces are still being discussed, here is
-dynamic ftrace with regs only, which has a value of its own.
-I can see Mark has broken down an earlier version into smaller
-patches; just let me know if you prefer that.
+So if it falls through to the default, we log an error but return 0 ? This
+does not make much sense.
 
-[Changes from v4]
+I know you probably copy/pasted code from DWC platform, that code must
+be fixed too I suppose.
 
-* include Ard's feedback and pending changes:
-  - ADR/ADRP veneers
-  - ftrace_trampolines[2]
-  - add a .req for fp, just in case
-  - comment on the pt_regs.stackframe[2] mapping
-* include Mark's ftrace cleanup
-  - GLOBAL()
-  - prepare_ftrace_return(pc, &lr, fp)
+Lorenzo
 
----
- arch/arm64/Kconfig                    |    2 
- arch/arm64/Makefile                   |    4 +
- arch/arm64/include/asm/assembler.h    |    1 
- arch/arm64/include/asm/ftrace.h       |   13 +++
- arch/arm64/include/asm/module.h       |    3 
- arch/arm64/kernel/Makefile            |    6 -
- arch/arm64/kernel/entry-ftrace.S      |  130 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/ftrace.c            |  125 +++++++++++++++++++++++++-------
- arch/arm64/kernel/module-plts.c       |    3 
- arch/arm64/kernel/module.c            |    2 
- drivers/firmware/efi/libstub/Makefile |    3 
- include/asm-generic/vmlinux.lds.h     |    1 
- include/linux/compiler_types.h        |    4 +
- 13 files changed, 261 insertions(+), 36 deletions(-)
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -125,6 +125,8 @@ config ARM64
- 	select HAVE_DEBUG_KMEMLEAK
- 	select HAVE_DMA_CONTIGUOUS
- 	select HAVE_DYNAMIC_FTRACE
-+	select HAVE_DYNAMIC_FTRACE_WITH_REGS \
-+		if $(cc-option,-fpatchable-function-entry=2)
- 	select HAVE_EFFICIENT_UNALIGNED_ACCESS
- 	select HAVE_FTRACE_MCOUNT_RECORD
- 	select HAVE_FUNCTION_TRACER
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -79,6 +79,10 @@ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
- KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
- endif
- 
-+ifeq ($(CONFIG_DYNAMIC_FTRACE_WITH_REGS),y)
-+  CC_FLAGS_FTRACE := -fpatchable-function-entry=2
-+endif
-+
- # Default value
- head-y		:= arch/arm64/kernel/head.o
- 
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -17,6 +17,19 @@
- #define MCOUNT_ADDR		((unsigned long)_mcount)
- #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
- 
-+/*
-+ * DYNAMIC_FTRACE_WITH_REGS is implemented by adding 2 NOPs at the beginning
-+ * of each function, with the second NOP actually calling ftrace. In contrary
-+ * to a classic _mcount call, the call instruction to be modified is thus
-+ * the second one, and not the only one.
-+ */
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+#define ARCH_SUPPORTS_FTRACE_OPS 1
-+#define REC_IP_BRANCH_OFFSET AARCH64_INSN_SIZE
-+#else
-+#define REC_IP_BRANCH_OFFSET 0
-+#endif
-+
- #ifndef __ASSEMBLY__
- #include <linux/compat.h>
- 
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -7,9 +7,9 @@ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(
- AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- CFLAGS_armv8_deprecated.o := -I$(src)
- 
--CFLAGS_REMOVE_ftrace.o = -pg
--CFLAGS_REMOVE_insn.o = -pg
--CFLAGS_REMOVE_return_address.o = -pg
-+CFLAGS_REMOVE_ftrace.o = -pg $(CC_FLAGS_FTRACE)
-+CFLAGS_REMOVE_insn.o = -pg $(CC_FLAGS_FTRACE)
-+CFLAGS_REMOVE_return_address.o = -pg $(CC_FLAGS_FTRACE)
- 
- # Object file lists.
- arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -13,7 +13,8 @@ cflags-$(CONFIG_X86)		+= -m$(BITS) -D__K
- 
- # arm64 uses the full KBUILD_CFLAGS so it's necessary to explicitly
- # disable the stackleak plugin
--cflags-$(CONFIG_ARM64)		:= $(subst -pg,,$(KBUILD_CFLAGS)) -fpie \
-+cflags-$(CONFIG_ARM64)		:= $(filter-out -pg $(CC_FLAGS_FTRACE)\
-+				  ,$(KBUILD_CFLAGS)) -fpie \
- 				   $(DISABLE_STACKLEAK_PLUGIN)
- cflags-$(CONFIG_ARM)		:= $(subst -pg,,$(KBUILD_CFLAGS)) \
- 				   -fno-builtin -fpic -mno-single-pic-base
---- a/arch/arm64/kernel/entry-ftrace.S
-+++ b/arch/arm64/kernel/entry-ftrace.S
-@@ -13,6 +13,8 @@
- #include <asm/assembler.h>
- #include <asm/ftrace.h>
- #include <asm/insn.h>
-+#include <asm/asm-offsets.h>
-+#include <asm/assembler.h>
- 
- /*
-  * Gcc with -pg will put the following code in the beginning of each function:
-@@ -122,6 +124,7 @@ skip_ftrace_call:			// }
- ENDPROC(_mcount)
- 
- #else /* CONFIG_DYNAMIC_FTRACE */
-+#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
- /*
-  * _mcount() is used to build the kernel with -pg option, but all the branch
-  * instructions to _mcount() are replaced to NOP initially at kernel start up,
-@@ -159,6 +162,124 @@ GLOBAL(ftrace_graph_call)		// ftrace_gra
- 
- 	mcount_exit
- ENDPROC(ftrace_caller)
-+#else /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
-+
-+/*
-+ * Since no -pg or similar compiler flag is used, there should really be
-+ * no reference to _mcount; so do not define one. Only some value for
-+ * MCOUNT_ADDR is needed for comparison. Let it point here to have some
-+ * sort of magic value that can be recognised when debugging.
-+ */
-+GLOBAL(_mcount)
-+	ret	/* make it differ from regs caller */
-+
-+ENTRY(ftrace_regs_caller)
-+	/* callee's preliminary stack frame: */
-+	stp	fp, x9, [sp, #-16]!
-+	mov	fp, sp
-+
-+	/* our stack frame: */
-+	stp	fp, lr, [sp, #-S_FRAME_SIZE]!
-+	add	x9, sp, #16	/* offset to pt_regs */
-+
-+	/* along with the _common code below, dump the complete
-+	 * register set for inspection.
-+	 */
-+	stp	x10, x11, [x9, #S_X10]
-+	stp	x12, x13, [x9, #S_X12]
-+	stp	x14, x15, [x9, #S_X14]
-+	stp	x16, x17, [x9, #S_X16]
-+	stp	x18, x19, [x9, #S_X18]
-+	stp	x20, x21, [x9, #S_X20]
-+	stp	x22, x23, [x9, #S_X22]
-+	stp	x24, x25, [x9, #S_X24]
-+	stp	x26, x27, [x9, #S_X26]
-+
-+	b	ftrace_common
-+ENDPROC(ftrace_regs_caller)
-+
-+ENTRY(ftrace_caller)
-+	/* callee's preliminary stack frame: */
-+	stp	fp, x9, [sp, #-16]!
-+	mov	fp, sp
-+
-+	/* our stack frame: */
-+	stp	fp, lr, [sp, #-S_FRAME_SIZE]!
-+	add	x9, sp, #16	/* offset to pt_regs */
-+
-+ftrace_common:
-+	/*
-+	 * At this point we have 2 new stack frames, and x9 pointing
-+	 * at a pt_regs which we can populate as needed. At least the
-+	 * argument registers need to be preserved, see
-+	 * ftrace_common_return below. pt_regs at x9 is layed out so
-+	 * that pt_regs.stackframe[] (last 16 bytes) maps to the
-+	 * preliminary frame we created for the callee.
-+	 */
-+
-+	/* save function arguments */
-+	stp	x0, x1, [x9]
-+	stp	x2, x3, [x9, #S_X2]
-+	stp	x4, x5, [x9, #S_X4]
-+	stp	x6, x7, [x9, #S_X6]
-+	str	x8, [x9, #S_X8]
-+
-+	ldr	x0, [fp]
-+	stp	x28, x0, [x9, #S_X28]	/* FP in pt_regs + "our" x28 */
-+
-+	/* The program counter just after the ftrace call site */
-+	str	lr, [x9, #S_PC]
-+	/* The stack pointer as it was on ftrace_caller entry... */
-+	add	x28, fp, #16
-+	str	x28, [x9, #S_SP]
-+	/* The link Register at callee entry */
-+	ldr	x28, [fp, 8]
-+	str	x28, [x9, #S_LR]	/* to pt_regs.r[30] */
-+
-+	ldr_l	x2, function_trace_op, x0
-+	ldr	x1, [fp, #8]
-+	sub	x0, lr, #8	/* function entry == IP */
-+	mov	x3, x9		/* pt_regs are @x9 */
-+
-+	mov	fp, sp
-+
-+GLOBAL(ftrace_call)
-+	bl	ftrace_stub
-+
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+GLOBAL(ftrace_graph_call)		// ftrace_graph_caller();
-+	nop				// If enabled, this will be replaced
-+					// "b ftrace_graph_caller"
-+#endif
-+
-+/*
-+ * GCC's patchable-function-entry implicitly disables IPA-RA,
-+ * so all non-argument registers are either scratch / dead
-+ * or callee-saved (within the ftrace framework). Function
-+ * arguments of the call we are intercepting right now however
-+ * need to be preserved in any case.
-+ */
-+ftrace_common_return:
-+	add	x9, sp, #16	/* advance to pt_regs for restore */
-+
-+	ldp	x0, x1, [x9]
-+	ldp	x2, x3, [x9, #S_X2]
-+	ldp	x4, x5, [x9, #S_X4]
-+	ldp	x6, x7, [x9, #S_X6]
-+	ldr	x8, [x9, #S_X8]
-+
-+	ldp	x28, fp, [x9, #S_X28]
-+
-+	ldr	lr, [x9, #S_LR]
-+	ldr	x9, [x9, #S_PC]
-+	/* clean up both frames, ours and callee preliminary */
-+	add	sp, sp, #S_FRAME_SIZE + 16
-+
-+	ret	x9
-+
-+ENDPROC(ftrace_caller)
-+
-+#endif /* CONFIG_DYNAMIC_FTRACE_WITH_REGS */
- #endif /* CONFIG_DYNAMIC_FTRACE */
- 
- ENTRY(ftrace_stub)
-@@ -176,12 +297,21 @@ ENDPROC(ftrace_stub)
-  * and run return_to_handler() later on its exit.
-  */
- ENTRY(ftrace_graph_caller)
-+#ifndef CONFIG_DYNAMIC_FTRACE_WITH_REGS
- 	mcount_get_pc		  x0	//     function's pc
- 	mcount_get_lr_addr	  x1	//     pointer to function's saved lr
- 	mcount_get_parent_fp	  x2	//     parent's fp
- 	bl	prepare_ftrace_return	// prepare_ftrace_return(pc, &lr, fp)
- 
- 	mcount_exit
-+#else
-+	add	x9, sp, #16	/* advance to pt_regs to gather args */
-+	ldr	x0, [x9, #S_PC]		   /* pc */
-+	add	x1, x9, #S_LR		   /* &lr */
-+	ldr	x2, [x9, #S_STACKFRAME]	   /* fp */
-+	bl	prepare_ftrace_return
-+	b	ftrace_common_return
-+#endif
- ENDPROC(ftrace_graph_caller)
- 
- /*
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -65,18 +65,66 @@ int ftrace_update_ftrace_func(ftrace_fun
- 	return ftrace_modify_code(pc, 0, new, false);
- }
- 
-+#ifdef CONFIG_ARM64_MODULE_PLTS
-+static int install_ftrace_trampoline(struct module *mod, unsigned long *addr)
-+{
-+	struct plt_entry trampoline, *mod_trampoline;
-+
-+	/* Iterate over
-+	 * mod->arch.ftrace_trampolines[MOD_ARCH_NR_FTRACE_TRAMPOLINES]
-+	 * The assignment to various ftrace functions happens here.
-+	 */
-+	if (*addr == FTRACE_ADDR)
-+		mod_trampoline = &mod->arch.ftrace_trampolines[0];
-+	else if (*addr == FTRACE_REGS_ADDR)
-+		mod_trampoline = &mod->arch.ftrace_trampolines[1];
-+	else
-+		return -EINVAL;
-+
-+	trampoline = get_plt_entry(*addr, mod_trampoline);
-+
-+	if (!plt_entries_equal(mod_trampoline, &trampoline)) {
-+
-+			/* point the trampoline at our ftrace entry point */
-+			module_disable_ro(mod);
-+			*mod_trampoline = trampoline;
-+			module_enable_ro(mod, true);
-+
-+			/* update trampoline before patching in the branch */
-+			smp_wmb();
-+		}
-+	*addr = (unsigned long)(void *)mod_trampoline;
-+
-+	return 0;
-+}
-+#endif
-+
-+/*
-+ * Ftrace with regs generates the tracer calls as close as possible to
-+ * the function entry; no stack frame has been set up at that point.
-+ * In order to make another call e.g to ftrace_caller, the LR must be
-+ * saved from being overwritten.
-+ * Between two functions, and with IPA-RA turned off, the scratch registers
-+ * are available, so move the LR to x9 before calling into ftrace.
-+ * "mov x9, lr" is officially aliased from "orr x9, xzr, lr".
-+ */
-+#define QUICK_LR_SAVE aarch64_insn_gen_logical_shifted_reg( \
-+			AARCH64_INSN_REG_9, AARCH64_INSN_REG_ZR, \
-+			AARCH64_INSN_REG_LR, 0, AARCH64_INSN_VARIANT_64BIT, \
-+			AARCH64_INSN_LOGIC_ORR)
-+
- /*
-  * Turn on the call to ftrace_caller() in instrumented function
-  */
- int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- {
--	unsigned long pc = rec->ip;
-+	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
-+	int ret;
- 	u32 old, new;
- 	long offset = (long)pc - (long)addr;
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
- #ifdef CONFIG_ARM64_MODULE_PLTS
--		struct plt_entry trampoline;
- 		struct module *mod;
- 
- 		/*
-@@ -96,54 +144,65 @@ int ftrace_make_call(struct dyn_ftrace *
- 		if (WARN_ON(!mod))
- 			return -EINVAL;
- 
--		/*
--		 * There is only one ftrace trampoline per module. For now,
--		 * this is not a problem since on arm64, all dynamic ftrace
--		 * invocations are routed via ftrace_caller(). This will need
--		 * to be revisited if support for multiple ftrace entry points
--		 * is added in the future, but for now, the pr_err() below
--		 * deals with a theoretical issue only.
--		 */
--		trampoline = get_plt_entry(addr, mod->arch.ftrace_trampoline);
--		if (!plt_entries_equal(mod->arch.ftrace_trampoline,
--				       &trampoline)) {
--			if (!plt_entries_equal(mod->arch.ftrace_trampoline,
--					       &(struct plt_entry){})) {
--				pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
--				return -EINVAL;
--			}
--
--			/* point the trampoline to our ftrace entry point */
--			module_disable_ro(mod);
--			*mod->arch.ftrace_trampoline = trampoline;
--			module_enable_ro(mod, true);
--
--			/* update trampoline before patching in the branch */
--			smp_wmb();
-+		/* Check against our well-known list of ftrace entry points */
-+		if (addr == FTRACE_ADDR || addr == FTRACE_REGS_ADDR) {
-+			ret = install_ftrace_trampoline(mod, &addr);
-+			if (ret < 0)
-+				return ret;
- 		}
--		addr = (unsigned long)(void *)mod->arch.ftrace_trampoline;
-+		else
-+			return -EINVAL;
-+
- #else /* CONFIG_ARM64_MODULE_PLTS */
- 		return -EINVAL;
- #endif /* CONFIG_ARM64_MODULE_PLTS */
- 	}
- 
- 	old = aarch64_insn_gen_nop();
-+	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS)) {
-+		new = QUICK_LR_SAVE;
-+		ret = ftrace_modify_code(pc - AARCH64_INSN_SIZE,
-+					 old, new, true);
-+		if (ret)
-+			return ret;
-+	}
- 	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
- 
- 	return ftrace_modify_code(pc, old, new, true);
- }
- 
-+#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-+int ftrace_modify_call(struct dyn_ftrace *rec, unsigned long old_addr,
-+			unsigned long addr)
-+{
-+	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
-+	u32 old, new;
-+
-+	old = aarch64_insn_gen_branch_imm(pc, old_addr, true);
-+	new = aarch64_insn_gen_branch_imm(pc, addr, true);
-+
-+	return ftrace_modify_code(pc, old, new, true);
-+}
-+#endif
-+
- /*
-  * Turn off the call to ftrace_caller() in instrumented function
-  */
- int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
- 		    unsigned long addr)
- {
--	unsigned long pc = rec->ip;
-+	unsigned long pc = rec->ip + REC_IP_BRANCH_OFFSET;
- 	bool validate = true;
-+	int ret;
- 	u32 old = 0, new;
- 	long offset = (long)pc - (long)addr;
- 
-+	/* -fpatchable-function-entry= does not generate a profiling call
-+	 *  initially; the NOPs are already there.
-+	 */
-+	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS) && addr == MCOUNT_ADDR)
-+		return 0;
-+
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
- #ifdef CONFIG_ARM64_MODULE_PLTS
- 		u32 replaced;
-@@ -188,7 +247,15 @@ int ftrace_make_nop(struct module *mod,
- 
- 	new = aarch64_insn_gen_nop();
- 
--	return ftrace_modify_code(pc, old, new, validate);
-+	ret = ftrace_modify_code(pc, old, new, validate);
-+	if (ret)
-+		return ret;
-+	if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE_WITH_REGS)) {
-+		old = QUICK_LR_SAVE;
-+		ret = ftrace_modify_code(pc - AARCH64_INSN_SIZE,
-+					 old, new, true);
-+	}
-+	return ret;
- }
- 
- void arch_ftrace_update_code(int command)
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -113,6 +113,7 @@
- #define MCOUNT_REC()	. = ALIGN(8);				\
- 			__start_mcount_loc = .;			\
- 			KEEP(*(__mcount_loc))			\
-+			KEEP(*(__patchable_function_entries))	\
- 			__stop_mcount_loc = .;
- #else
- #define MCOUNT_REC()
---- a/include/linux/compiler_types.h
-+++ b/include/linux/compiler_types.h
-@@ -223,8 +223,12 @@ struct ftrace_likely_data {
- #if defined(CC_USING_HOTPATCH) && !defined(__CHECKER__)
- #define notrace			__attribute__((hotpatch(0, 0)))
- #else
-+#if defined(CONFIG_ARM64) && defined(CONFIG_DYNAMIC_FTRACE_WITH_REGS)
-+#define notrace __attribute__((patchable_function_entry(0)))
-+#else
- #define notrace			__attribute__((no_instrument_function))
- #endif
-+#endif
- 
- /*
-  * it doesn't make sense on ARM (currently the only user of __naked)
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -32,7 +32,8 @@ struct mod_arch_specific {
- 	struct mod_plt_sec	init;
- 
- 	/* for CONFIG_DYNAMIC_FTRACE */
--	struct plt_entry 	*ftrace_trampoline;
-+	struct plt_entry 	*ftrace_trampolines;
-+#define MOD_ARCH_NR_FTRACE_TRAMPOLINES	2
- };
- #endif
- 
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -451,7 +451,7 @@ int module_finalize(const Elf_Ehdr *hdr,
- #ifdef CONFIG_ARM64_MODULE_PLTS
- 		if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
- 		    !strcmp(".text.ftrace_trampoline", secstrs + s->sh_name))
--			me->arch.ftrace_trampoline = (void *)s->sh_addr;
-+			me->arch.ftrace_trampolines = (void *)s->sh_addr;
- #endif
- 	}
- 
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -323,7 +323,8 @@ int module_frob_arch_sections(Elf_Ehdr *
- 		tramp->sh_type = SHT_NOBITS;
- 		tramp->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
- 		tramp->sh_addralign = __alignof__(struct plt_entry);
--		tramp->sh_size = sizeof(struct plt_entry);
-+		tramp->sh_size = MOD_ARCH_NR_FTRACE_TRAMPOLINES
-+				 * sizeof(struct plt_entry);
- 	}
- 
- 	return 0;
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -159,6 +159,7 @@
- /*
-  * Register aliases.
-  */
-+fp	.req	x29		// frame pointer
- lr	.req	x30		// link register
- 
- /*
+> +}
+> +
+> +static struct dw_pcie_ep_ops pcie_ep_ops = {
+> +	.ep_init = ls_pcie_ep_init,
+> +	.raise_irq = ls_pcie_ep_raise_irq,
+> +};
+> +
+> +static int __init ls_add_pcie_ep(struct ls_pcie_ep *pcie,
+> +					struct platform_device *pdev)
+> +{
+> +	struct dw_pcie *pci = pcie->pci;
+> +	struct device *dev = pci->dev;
+> +	struct dw_pcie_ep *ep;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	ep = &pci->ep;
+> +	ep->ops = &pcie_ep_ops;
+> +
+> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "addr_space");
+> +	if (!res)
+> +		return -EINVAL;
+> +
+> +	ep->phys_base = res->start;
+> +	ep->addr_size = resource_size(res);
+> +
+> +	ret = dw_pcie_ep_init(ep);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize endpoint\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int __init ls_pcie_ep_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct dw_pcie *pci;
+> +	struct ls_pcie_ep *pcie;
+> +	struct resource *dbi_base;
+> +	int ret;
+> +
+> +	pcie = devm_kzalloc(dev, sizeof(*pcie), GFP_KERNEL);
+> +	if (!pcie)
+> +		return -ENOMEM;
+> +
+> +	pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> +	if (!pci)
+> +		return -ENOMEM;
+> +
+> +	dbi_base = platform_get_resource_byname(pdev, IORESOURCE_MEM, "regs");
+> +	pci->dbi_base = devm_pci_remap_cfg_resource(dev, dbi_base);
+> +	if (IS_ERR(pci->dbi_base))
+> +		return PTR_ERR(pci->dbi_base);
+> +
+> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_OFFSET;
+> +	pci->dev = dev;
+> +	pci->ops = &ls_pcie_ep_ops;
+> +	pcie->pci = pci;
+> +
+> +	platform_set_drvdata(pdev, pcie);
+> +
+> +	ret = ls_add_pcie_ep(pcie, pdev);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver ls_pcie_ep_driver = {
+> +	.driver = {
+> +		.name = "layerscape-pcie-ep",
+> +		.of_match_table = ls_pcie_ep_of_match,
+> +		.suppress_bind_attrs = true,
+> +	},
+> +};
+> +builtin_platform_driver_probe(ls_pcie_ep_driver, ls_pcie_ep_probe);
+> -- 
+> 1.7.1
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
