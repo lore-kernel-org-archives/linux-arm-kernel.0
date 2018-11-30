@@ -2,80 +2,52 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DF17CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:30:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 44B53C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:31:11 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B137720834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:30:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1691A20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:31:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dk4qF8ir";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ZYpPqkXU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B137720834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iu2E7jeL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1691A20834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=2qWhHYzGIcL4tsYAI3ggGoYh7bFMWGHTGW+utfxHayA=; b=dk4qF8irIhn0hC
-	4rTZmgHiY3B+c2ogOUQib9Qq4gnms8E4onUivjQU2X1o+pOR2GKB7LduDCS99lfHLHBc42dXqMhD7
-	K2SZ+GeyTRneGZqPzbPktulpPkUwUWMtYxCF1bHKcalSiWmpgH0oebhrMlicRzYjxsJnZGDI52ajm
-	n73eNThHjgFW10anHn/7FrlpSMk0qXbm09SEcTrw5WytV0bWazJREzzZfdwgzYLWkTPayhjIoX+KF
-	adEuiabM/stBK0ZCwQPopJX0Ay/L9dQRSDQxGPfsHwb2E8JfDO10ZwWvTcw2xS+eGvoZPs006SorJ
-	WSvK0yDICSidRFc+JhiA==;
+	List-Owner; bh=7X1kJ5kHDjVMOQgpxvYWoFkChtOxhi8ZrDm+1jv7JNI=; b=iu2E7jeLHI0pQH
+	rXL/CDsvk8zXv5WIduNmOpYtj/voXWnm8nFSuhycEYYyBZx0yuIBlsZeRviawGZQgyqCVGGwnGXAu
+	+IMDO0qZnWXko34PzmnFcRdniTfYg8mf2b5rVLE/XgteCTXHGNZ+E9U6TEE0M1yy4lmm+VcIzCHwu
+	ZRsffpoRD5udvZ2NVaSJlXpXEoa8U8S59u0FdLGNI31RBmTzAYPZ9w5R1ut/S8uwcHSugs7A/MuhR
+	detf1fOojeeACx46g5uzwC416rUW4BVawLUgknFxkTJmtl3fYkGucEUuRomB10NwScEMbgfE4h1Iw
+	CADkmX8PPX8zbPkLTfjQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSisL-0004av-SI; Fri, 30 Nov 2018 13:30:33 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSimc-0005Wj-Ns
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 13:25:17 +0000
-Received: by mail-it1-x142.google.com with SMTP id x124so1978163itd.1
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 05:24:28 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=aUwrGEaE794VcSyPe8DKD9ri2UW1S8KPy+ph3Jh9G6Y=;
- b=ZYpPqkXUHEqKZpjlf3cB2T4sqTynqqE3ACNyaCL4StTYsXDMiOBEix/SZjs++eW+mJ
- JvFfxLMjlZPCCpUsosOqY4sgQHPckz39onr1nMaxEGEkjaJX29yL1/esWaT/N5ys2IjJ
- pfBzMf/OqcRj38umL4AnBMLsxBUmBi3jsrMws=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=aUwrGEaE794VcSyPe8DKD9ri2UW1S8KPy+ph3Jh9G6Y=;
- b=N+TwNdO5JPWnbR2jZEWIoatl6juX8f9028TAfOfAzj8Ty6hcMn7HgPh/TIAYt/7CQE
- RprTepb9ecNYp9sUgUZNwpgYEaR2tlZDk9zMBlmVcWLCVcAipEO4oBjxWpn3gqaja81R
- rWO5kXz3YuR/4LimQSR2YV1TTjB9TJBsmwGdW9Qj9ZP3D9IgVA/r8jQtmwDNqrZpXLBX
- dhr6T6kmagvD0ESgzRtxMTutQysBqpF1tTUg83s9+jjtxatH3K2bOiPZtA++qmekBEar
- 30RqV4lImHRhv9fDfewU2i5MoBwHe7AMEWr+ZIrNzEDfv3E0hS/8QVcpdO3IhI1A3FJ1
- yg2Q==
-X-Gm-Message-State: AA+aEWbyjE7Fyk4uaDOjSUXrbELtVgfJ6+CSDT7hXbuC75QrjWf1vsUQ
- o5vJx1hNpOqhyblCXtrIF5bzusmEDZ6w0QNNRp15ltds
-X-Google-Smtp-Source: AFSGD/Ul9MQGPUQu3Za/e3AvQ4isv+wWgFWZ3U0xt2URjz1b/2ujUZi2lpqOsp+i4HlppuhHy/jcVOT7eA2d82PUR04=
-X-Received: by 2002:a24:710:: with SMTP id f16mr4562738itf.121.1543584267745; 
- Fri, 30 Nov 2018 05:24:27 -0800 (PST)
+	id 1gSiss-0005DL-Cb; Fri, 30 Nov 2018 13:31:06 +0000
+Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
+ helo=localhost)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSilz-00052l-B0; Fri, 30 Nov 2018 13:23:59 +0000
+From: Christoph Hellwig <hch@lst.de>
+To: iommu@lists.linux-foundation.org
+Subject: [PATCH 20/23] iommu/dma-iommu: remove the mapping_error dma_map_ops
+ method
+Date: Fri, 30 Nov 2018 14:22:28 +0100
+Message-Id: <20181130132231.16512-21-hch@lst.de>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181130132231.16512-1-hch@lst.de>
+References: <20181130132231.16512-1-hch@lst.de>
 MIME-Version: 1.0
-References: <e2130285-6e51-f1c9-7b91-6b0467a15de6@free.fr>
- <CAKv+Gu-cms32Vun16bdM+n_OkH7w7knf45S3eGhVjbG3VdFgbA@mail.gmail.com>
- <44c18e70-e4d9-5e4d-1326-aa1f88a16315@arm.com>
-In-Reply-To: <44c18e70-e4d9-5e4d-1326-aa1f88a16315@arm.com>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Fri, 30 Nov 2018 14:24:16 +0100
-Message-ID: <CAKv+Gu82Dzyc_WvhvVhdJe7n+rTF4LgwiRENofmgPHHND-gjVA@mail.gmail.com>
-Subject: Re: Unexpected variation in SYS_ID_AA64MMFR0_EL1
-To: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_052439_426061_7E452835 
-X-CRM114-Status: GOOD (  15.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,52 +59,172 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, marc.w.gonzalez@free.fr,
- Catalin Marinas <catalin.marinas@arm.com>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Dave Martin <Dave.Martin@arm.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
+Cc: linux-arch@vger.kernel.org, linux-alpha@vger.kernel.org,
+ linux-ia64@vger.kernel.org, linux-parisc@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, Joerg Roedel <joro@8bytes.org>,
+ x86@kernel.org, Robin Murphy <robin.murphy@arm.com>,
+ linux-kernel@vger.kernel.org, Jon Mason <jdmason@kudzu.us>,
+ xen-devel@lists.xenproject.org, David Woodhouse <dwmw2@infradead.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 30 Nov 2018 at 14:23, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
->
->
->
-> On 30/11/2018 13:12, Ard Biesheuvel wrote:
-> > On Fri, 30 Nov 2018 at 13:15, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
-> >>
-> >> Hello,
-> >>
-> >> On an APQ8098-based system, for cores 4-7 (little cores?), the kernel prints:
-> >>
-> >> [    0.179055] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1.
-> >> Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
-> >>
-> >> TGran16, [23:20]
-> >>      Support for 16KB memory translation granule size:
-> >>          0x1     Indicates that the 16KB granule is supported.
-> >>
-> >> Since this is a pr_warn, I get the feeling something is not quite right.
-> >> Is there something to fix? Is it a problem that the big and little cores
-> >> don't support exactly the same granule sizes?
-> >>
-> >
-> > That looks like a false positive to me. We should only care about the
-> > page size we are running with.
->
-> Unless you run a VM, which is going to use 16K translation.
+Return DMA_MAPPING_ERROR instead of 0 on a dma mapping failure and let
+the core dma-mapping code handle the rest.
 
-Good point.
+Signed-off-by: Christoph Hellwig <hch@lst.de>
+---
+ arch/arm64/mm/dma-mapping.c |  7 +++----
+ drivers/iommu/dma-iommu.c   | 23 ++++++++---------------
+ include/linux/dma-iommu.h   |  1 -
+ 3 files changed, 11 insertions(+), 20 deletions(-)
 
-> But this may be
-> fine with the current kernels, where we emulate the SANITISED registers
-> for the guests.
->
-> Cheers
-> Suzuki
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index fdc26ea5036c..4cc70029cf8d 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -397,7 +397,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 			return NULL;
+ 
+ 		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
+-		if (iommu_dma_mapping_error(dev, *handle)) {
++		if (*handle == DMA_MAPPING_ERROR) {
+ 			if (coherent)
+ 				__free_pages(page, get_order(size));
+ 			else
+@@ -414,7 +414,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 			return NULL;
+ 
+ 		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
+-		if (iommu_dma_mapping_error(dev, *handle)) {
++		if (*handle == DMA_MAPPING_ERROR) {
+ 			dma_release_from_contiguous(dev, page,
+ 						    size >> PAGE_SHIFT);
+ 			return NULL;
+@@ -574,7 +574,7 @@ static dma_addr_t __iommu_map_page(struct device *dev, struct page *page,
+ 	dma_addr_t dev_addr = iommu_dma_map_page(dev, page, offset, size, prot);
+ 
+ 	if (!coherent && !(attrs & DMA_ATTR_SKIP_CPU_SYNC) &&
+-	    !iommu_dma_mapping_error(dev, dev_addr))
++	    dev_addr != DMA_MAPPING_ERROR)
+ 		__dma_map_area(page_address(page) + offset, size, dir);
+ 
+ 	return dev_addr;
+@@ -657,7 +657,6 @@ static const struct dma_map_ops iommu_dma_ops = {
+ 	.sync_sg_for_device = __iommu_sync_sg_for_device,
+ 	.map_resource = iommu_dma_map_resource,
+ 	.unmap_resource = iommu_dma_unmap_resource,
+-	.mapping_error = iommu_dma_mapping_error,
+ };
+ 
+ static int __init __iommu_dma_init(void)
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index d1b04753b204..60c7e9e9901e 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -32,8 +32,6 @@
+ #include <linux/scatterlist.h>
+ #include <linux/vmalloc.h>
+ 
+-#define IOMMU_MAPPING_ERROR	0
+-
+ struct iommu_dma_msi_page {
+ 	struct list_head	list;
+ 	dma_addr_t		iova;
+@@ -523,7 +521,7 @@ void iommu_dma_free(struct device *dev, struct page **pages, size_t size,
+ {
+ 	__iommu_dma_unmap(iommu_get_dma_domain(dev), *handle, size);
+ 	__iommu_dma_free_pages(pages, PAGE_ALIGN(size) >> PAGE_SHIFT);
+-	*handle = IOMMU_MAPPING_ERROR;
++	*handle = DMA_MAPPING_ERROR;
+ }
+ 
+ /**
+@@ -556,7 +554,7 @@ struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+ 	dma_addr_t iova;
+ 	unsigned int count, min_size, alloc_sizes = domain->pgsize_bitmap;
+ 
+-	*handle = IOMMU_MAPPING_ERROR;
++	*handle = DMA_MAPPING_ERROR;
+ 
+ 	min_size = alloc_sizes & -alloc_sizes;
+ 	if (min_size < PAGE_SIZE) {
+@@ -649,11 +647,11 @@ static dma_addr_t __iommu_dma_map(struct device *dev, phys_addr_t phys,
+ 
+ 	iova = iommu_dma_alloc_iova(domain, size, dma_get_mask(dev), dev);
+ 	if (!iova)
+-		return IOMMU_MAPPING_ERROR;
++		return DMA_MAPPING_ERROR;
+ 
+ 	if (iommu_map(domain, iova, phys - iova_off, size, prot)) {
+ 		iommu_dma_free_iova(cookie, iova, size);
+-		return IOMMU_MAPPING_ERROR;
++		return DMA_MAPPING_ERROR;
+ 	}
+ 	return iova + iova_off;
+ }
+@@ -694,7 +692,7 @@ static int __finalise_sg(struct device *dev, struct scatterlist *sg, int nents,
+ 
+ 		s->offset += s_iova_off;
+ 		s->length = s_length;
+-		sg_dma_address(s) = IOMMU_MAPPING_ERROR;
++		sg_dma_address(s) = DMA_MAPPING_ERROR;
+ 		sg_dma_len(s) = 0;
+ 
+ 		/*
+@@ -737,11 +735,11 @@ static void __invalidate_sg(struct scatterlist *sg, int nents)
+ 	int i;
+ 
+ 	for_each_sg(sg, s, nents, i) {
+-		if (sg_dma_address(s) != IOMMU_MAPPING_ERROR)
++		if (sg_dma_address(s) != DMA_MAPPING_ERROR)
+ 			s->offset += sg_dma_address(s);
+ 		if (sg_dma_len(s))
+ 			s->length = sg_dma_len(s);
+-		sg_dma_address(s) = IOMMU_MAPPING_ERROR;
++		sg_dma_address(s) = DMA_MAPPING_ERROR;
+ 		sg_dma_len(s) = 0;
+ 	}
+ }
+@@ -858,11 +856,6 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ 	__iommu_dma_unmap(iommu_get_dma_domain(dev), handle, size);
+ }
+ 
+-int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+-{
+-	return dma_addr == IOMMU_MAPPING_ERROR;
+-}
+-
+ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 		phys_addr_t msi_addr, struct iommu_domain *domain)
+ {
+@@ -882,7 +875,7 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
+ 		return NULL;
+ 
+ 	iova = __iommu_dma_map(dev, msi_addr, size, prot, domain);
+-	if (iommu_dma_mapping_error(dev, iova))
++	if (iova == DMA_MAPPING_ERROR)
+ 		goto out_free_page;
+ 
+ 	INIT_LIST_HEAD(&msi_page->list);
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index e8ca5e654277..e760dc5d1fa8 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -69,7 +69,6 @@ dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
+ 		size_t size, enum dma_data_direction dir, unsigned long attrs);
+ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir, unsigned long attrs);
+-int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ 
+ /* The DMA API isn't _quite_ the whole story, though... */
+ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg);
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
