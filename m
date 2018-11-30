@@ -2,51 +2,62 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1F822C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABA29C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:30:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DF69C20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:29:56 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6B92820834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:30:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oWcbj7tb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF69C20834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oha80FVJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B92820834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RDIsEqAAO9mbN2zk29Cx50L73tievzQzL8yT7Y9P2mo=; b=oWcbj7tbrRNidW
-	JzEeZT7goaB1qtEfrcXe2P5btuN0arAoabINcKlKyzYAWhwh+7icGmmGxn8xUMkI7RUGzeZf/E1ZE
-	TeoCCF0c2reihQm+glHpN/BDfaLA24QTgWCvz+JYpOY+B1m0w4zBzxK4uFUZjcHiQSwdp2zA1rkhA
-	6yRZ0W7oDxj7T9fl8Lwv+fTcDtKqo3qI9fFanT2ja4e8Kx80XWwQ2DMf7axhCLxlqGSve14XhG3y6
-	pkztEVmMUYy49wSsecp8Txj72FLAog48NXH/cYbdbXzQuKsXFecb/xd36wzG0ld/3AC9+omwGjEfo
-	6I7ewKbrvQp/l05ugFJw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=h1iX4Wpkda2cO5BeyiA5ZM/IwHxDPjrGqwEAxzuwk1k=; b=Oha80FVJ99xJ7yBqNX61ZN5ps
+	qeKBPgWD34+x5H7I2TOCAwovc/WUrBT9HMmYYFw2uPaNoC8dK4GTF/LZ0uF8ZMWirSR26faxDXhkE
+	ZwQ6pZC9m6LdYNfj/G0NSj25t4IRLA8pAoBqbDCdNwlZcJyS5jQ2p1w6OIKttIH3mv3noZvGVAWD5
+	1KXqKI9tyoSxjEfssMwqozVQYzoMsgRpTKoZb98/SOLLQMiXYQyIHK09PomI7Dr1YHx+4dSNlCleS
+	j6aCIooB/ZB1RIEXndbcruBzVmx/uCWfDn1zvPWDhzOLy31jvdMWct8u3vhd7oC6fGY6eH746640u
+	FylO+UZSA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSirh-0002tW-LT; Fri, 30 Nov 2018 13:29:53 +0000
-Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
- helo=localhost)
- by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSim8-0005Bp-BI; Fri, 30 Nov 2018 13:24:08 +0000
-From: Christoph Hellwig <hch@lst.de>
-To: iommu@lists.linux-foundation.org
-Subject: [PATCH 23/23] dma-mapping: return an error code from dma_mapping_error
-Date: Fri, 30 Nov 2018 14:22:31 +0100
-Message-Id: <20181130132231.16512-24-hch@lst.de>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181130132231.16512-1-hch@lst.de>
-References: <20181130132231.16512-1-hch@lst.de>
+	id 1gSis2-0003bJ-Da; Fri, 30 Nov 2018 13:30:14 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSili-0004gm-SR
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 13:24:07 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D091AA78;
+ Fri, 30 Nov 2018 05:23:30 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9C59E3F5A0;
+ Fri, 30 Nov 2018 05:23:29 -0800 (PST)
+Subject: Re: Unexpected variation in SYS_ID_AA64MMFR0_EL1
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>, marc.w.gonzalez@free.fr
+References: <e2130285-6e51-f1c9-7b91-6b0467a15de6@free.fr>
+ <CAKv+Gu-cms32Vun16bdM+n_OkH7w7knf45S3eGhVjbG3VdFgbA@mail.gmail.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <44c18e70-e4d9-5e4d-1326-aa1f88a16315@arm.com>
+Date: Fri, 30 Nov 2018 13:23:28 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
+In-Reply-To: <CAKv+Gu-cms32Vun16bdM+n_OkH7w7knf45S3eGhVjbG3VdFgbA@mail.gmail.com>
+Content-Language: en-US
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181130_052343_087778_B39F9586 
+X-CRM114-Status: GOOD (  15.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -58,48 +69,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arch@vger.kernel.org, linux-alpha@vger.kernel.org,
- linux-ia64@vger.kernel.org, linux-parisc@vger.kernel.org,
- Linus Torvalds <torvalds@linux-foundation.org>, Joerg Roedel <joro@8bytes.org>,
- x86@kernel.org, Robin Murphy <robin.murphy@arm.com>,
- linux-kernel@vger.kernel.org, Jon Mason <jdmason@kudzu.us>,
- xen-devel@lists.xenproject.org, David Woodhouse <dwmw2@infradead.org>,
- linux-arm-kernel@lists.infradead.org,
- Marek Szyprowski <m.szyprowski@samsung.com>
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Dave Martin <Dave.Martin@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Currently dma_mapping_error returns a boolean as int, with 1 meaning
-error.  This is rather unusual and many callers have to convert it to
-errno value.  The callers are highly inconsistent with error codes
-ranging from -ENOMEM over -EIO, -EINVAL and -EFAULT ranging to -EAGAIN.
-Return -ENOMEM which seems to be what the largest number of callers
-convert it to, and which also matches the typical error case where
-we are out of resources.
 
-Signed-off-by: Christoph Hellwig <hch@lst.de>
----
- include/linux/dma-mapping.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index 2adef56c6069..b5bd25fc1f81 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -576,7 +576,7 @@ static inline int dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- {
- 	debug_dma_mapping_error(dev, dma_addr);
- 	if (dma_addr == DMA_MAPPING_ERROR)
--		return 1;
-+		return -ENOMEM;
- 	return 0;
- }
- 
--- 
-2.19.1
+On 30/11/2018 13:12, Ard Biesheuvel wrote:
+> On Fri, 30 Nov 2018 at 13:15, Marc Gonzalez <marc.w.gonzalez@free.fr> wrote:
+>>
+>> Hello,
+>>
+>> On an APQ8098-based system, for cores 4-7 (little cores?), the kernel prints:
+>>
+>> [    0.179055] CPU features: SANITY CHECK: Unexpected variation in SYS_ID_AA64MMFR0_EL1.
+>> Boot CPU: 0x00000000001122, CPU4: 0x00000000101122
+>>
+>> TGran16, [23:20]
+>>      Support for 16KB memory translation granule size:
+>>          0x1     Indicates that the 16KB granule is supported.
+>>
+>> Since this is a pr_warn, I get the feeling something is not quite right.
+>> Is there something to fix? Is it a problem that the big and little cores
+>> don't support exactly the same granule sizes?
+>>
+> 
+> That looks like a false positive to me. We should only care about the
+> page size we are running with.
 
+Unless you run a VM, which is going to use 16K translation. But this may be
+fine with the current kernels, where we emulate the SANITISED registers
+for the guests.
+
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
