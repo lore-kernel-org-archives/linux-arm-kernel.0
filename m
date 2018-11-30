@@ -2,67 +2,58 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72F0EC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:50:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5739BC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:55:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 40DC22145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:50:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 26F9E2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:55:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="i52Kmdri";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="KaXYtILW"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 40DC22145D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ohb1UKls"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 26F9E2145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
-	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tl0PTkCvWCnxMUdbl5OXoe4LzgplGJJxF3StJqjFjgo=; b=i52Kmdri7hCQK7
-	uVpM5htCGyfWwwbkh6E+EFJ3gan3n+URLc9f92qtD4pt9IM2YpvgUPByI9ZM4kUU5yjqc1lL0UvhD
-	4p9zxzgsxKOpykHWR6BvJgVRPJnVTvORBOCVRUymxn4AD2/hFJgZ1OfzutxHbdiDJkmuv/N7jj7wN
-	w6L76zYKFUa4lYaZD8qGWAshzfu8xlbGc+MA7SUe/AO/qlH6/HudZPSlY6kNnW9X85DGlgDwDiLna
-	BAI4ATzS6JToy8SYKVUZpff9BYb1owJpzKLwvEDNVusi9c47eFLfFQfNLj5Vn7p0a+2/nlGzle85w
-	Vu4f5DjsWGsAcSKP+fwg==;
+	List-Owner; bh=Y9ujymDbr1nb8TCdTAOXJOroKbNzimnhstIeLGtMFVo=; b=ohb1UKlsqfaNHa
+	CRQ4YEO4JuiAvVXPiTklCTjsjkNRA/T0/JcMEWJ1FAK1X4Bz6ztokkSnll6t/ddHCzkiqpB3BoVU4
+	csXSoVD/IsFYctuiDAQLBU0PUmNZXGGfYPQGBTq63KvnwJ3d07y3Ku2VcX04a3XQ/cXydJlIsxwkO
+	HPCZcYvU0UklOfNQ1FYhCjEK5wyW0hI01XUyFRgymuCKGVr05BUh7Lj0DerSCX3W4zkul/1f3IK5E
+	wg+xBllA6F0yvsnjGAfxWGtJBC1wxrba/7/YxRD0w7wwThiLSOdQvqNEzQ0F52xqrZgZgTY9EY8B5
+	0jjiiZvhZff5TTnAYASQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gScd9-0006pr-22; Fri, 30 Nov 2018 06:50:27 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gSchf-00084K-TP; Fri, 30 Nov 2018 06:55:07 +0000
+Received: from antares.kleine-koenig.org ([94.130.110.236])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gScd6-0006pU-E1; Fri, 30 Nov 2018 06:50:25 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id D637F2145D;
- Fri, 30 Nov 2018 06:50:13 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543560614;
- bh=uvbD7ONAjHKZogEDPFuxmFpPduuGqYSxQpj8/l1hj6E=;
- h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=KaXYtILWKLJlvg4M64ESm9twD/iL7ft2+f77A/JTtdsjUUhQaUlSPWP1uQKBCt5wJ
- umGVb6YQHL8vw717L5fPU8wBmzJj/eFYsbQUNAdzriUx1Eox4FyXQ8Fzfo6Yic0Hgz
- mLx2SaCXcqZerWX0XObZFA0C049rf/jph/TuEOG4=
+ id 1gScae-00042h-23
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 06:47:55 +0000
+Received: by antares.kleine-koenig.org (Postfix, from userid 1000)
+ id 879034ADA06; Fri, 30 Nov 2018 07:47:40 +0100 (CET)
+From: =?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?= <u.kleine-koenig@pengutronix.de>
+To: Mark Brown <broonie@kernel.org>,
+	Robin Gong <yibin.gong@nxp.com>
+Subject: [PATCH v3 1/5] spi: imx: add a device specific prepare_message
+ callback
+Date: Fri, 30 Nov 2018 07:47:05 +0100
+Message-Id: <20181130064709.6998-2-u.kleine-koenig@pengutronix.de>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181130064709.6998-1-u.kleine-koenig@pengutronix.de>
+References: <20181130064709.6998-1-u.kleine-koenig@pengutronix.de>
 MIME-Version: 1.0
-To: matthias.bgg@gmail.com, matthias.bgg@kernel.org, mturquette@baylibre.com
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20181116180901.17737-3-matthias.bgg@kernel.org>
-References: <20181116180901.17737-1-matthias.bgg@kernel.org>
- <20181116180901.17737-3-matthias.bgg@kernel.org>
-Message-ID: <154356061291.88331.179492557229227536@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.7
-Subject: Re: [PATCH v2 2/3] clk: mediatek: Add flags to mtk_gate
-Date: Thu, 29 Nov 2018 22:50:12 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_225024_549865_46B17CEE 
-X-CRM114-Status: UNSURE (   6.34  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181129_224752_413053_F13E11F5 
+X-CRM114-Status: GOOD (  12.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,30 +65,103 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: sean.wang@kernel.org, linux-kernel@vger.kernel.org,
- linux-mediatek@lists.infradead.org, jasu@njomotys.info,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Marek Vasut <marex@denx.de>, linux-arm-kernel@lists.infradead.org,
+ NXP Linux Team <linux-imx@nxp.com>, kernel@pengutronix.de,
+ linux-spi@vger.kernel.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting matthias.bgg@kernel.org (2018-11-16 10:09:00)
-> From: Jasper Mattsson <jasu@njomotys.info>
-> 
-> This is required to mark gates as CLK_IS_CRITICAL.
-> 
-> Fixes: 96596aa06628 ("clk: mediatek: add clk support for MT6797")
-> Signed-off-by: Jasper Mattsson <jasu@njomotys.info>
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
-
-These other two look ok to me. I'll apply them to the clk tree and wait
-to merge to clk-next in case someone from Mediatek wants to review these
-changes.
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+VGhpcyBpcyBqdXN0IHByZXBhcmF0b3J5IHdvcmsgd2hpY2ggYWxsb3dzIHRvIG1vdmUgc29tZSBp
+bml0aWFsaXNhdGlvbgp0aGF0IGN1cnJlbnRseSBpcyBkb25lIGluIHRoZSBwZXIgdHJhbnNmZXIg
+aG9vayAuY29uZmlnIHRvIGFuIGVhcmxpZXIKcG9pbnQgaW4gdGltZSBpbiB0aGUgbmV4dCBmZXcg
+cGF0Y2hlcy4gVGhlcmUgaXMgbm8gY2hhbmdlIGluIGJlaGF2aW91cgppbnRyb2R1Y2VkIGJ5IHRo
+aXMgcGF0Y2guCgpTaWduZWQtb2ZmLWJ5OiBVd2UgS2xlaW5lLUvDtm5pZyA8dS5rbGVpbmUta29l
+bmlnQHBlbmd1dHJvbml4LmRlPgotLS0KIGRyaXZlcnMvc3BpL3NwaS1pbXguYyB8IDQwICsrKysr
+KysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKysrKy0KIDEgZmlsZSBjaGFuZ2VkLCAzOSBp
+bnNlcnRpb25zKCspLCAxIGRlbGV0aW9uKC0pCgpkaWZmIC0tZ2l0IGEvZHJpdmVycy9zcGkvc3Bp
+LWlteC5jIGIvZHJpdmVycy9zcGkvc3BpLWlteC5jCmluZGV4IGRkMWNlMTJhYTM4Ni4uYzdkYjQy
+ZDZiM2JjIDEwMDY0NAotLS0gYS9kcml2ZXJzL3NwaS9zcGktaW14LmMKKysrIGIvZHJpdmVycy9z
+cGkvc3BpLWlteC5jCkBAIC01OSw2ICs1OSw3IEBAIHN0cnVjdCBzcGlfaW14X2RhdGE7CiAKIHN0
+cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0YSB7CiAJdm9pZCAoKmludGN0cmwpKHN0cnVjdCBzcGlf
+aW14X2RhdGEgKiwgaW50KTsKKwlpbnQgKCpwcmVwYXJlX21lc3NhZ2UpKHN0cnVjdCBzcGlfaW14
+X2RhdGEgKiwgc3RydWN0IHNwaV9tZXNzYWdlICopOwogCWludCAoKmNvbmZpZykoc3RydWN0IHNw
+aV9kZXZpY2UgKik7CiAJdm9pZCAoKnRyaWdnZXIpKHN0cnVjdCBzcGlfaW14X2RhdGEgKik7CiAJ
+aW50ICgqcnhfYXZhaWxhYmxlKShzdHJ1Y3Qgc3BpX2lteF9kYXRhICopOwpAQCAtNDg2LDYgKzQ4
+NywxMiBAQCBzdGF0aWMgdm9pZCBteDUxX2Vjc3BpX2Rpc2FibGUoc3RydWN0IHNwaV9pbXhfZGF0
+YSAqc3BpX2lteCkKIAl3cml0ZWwoY3RybCwgc3BpX2lteC0+YmFzZSArIE1YNTFfRUNTUElfQ1RS
+TCk7CiB9CiAKK3N0YXRpYyBpbnQgbXg1MV9lY3NwaV9wcmVwYXJlX21lc3NhZ2Uoc3RydWN0IHNw
+aV9pbXhfZGF0YSAqc3BpX2lteCwKKwkJCQkgICAgICBzdHJ1Y3Qgc3BpX21lc3NhZ2UgKm1zZykK
+K3sKKwlyZXR1cm4gMDsKK30KKwogc3RhdGljIGludCBteDUxX2Vjc3BpX2NvbmZpZyhzdHJ1Y3Qg
+c3BpX2RldmljZSAqc3BpKQogewogCXN0cnVjdCBzcGlfaW14X2RhdGEgKnNwaV9pbXggPSBzcGlf
+bWFzdGVyX2dldF9kZXZkYXRhKHNwaS0+bWFzdGVyKTsKQEAgLTY1OSw2ICs2NjYsMTIgQEAgc3Rh
+dGljIHZvaWQgbXgzMV90cmlnZ2VyKHN0cnVjdCBzcGlfaW14X2RhdGEgKnNwaV9pbXgpCiAJd3Jp
+dGVsKHJlZywgc3BpX2lteC0+YmFzZSArIE1YQ19DU1BJQ1RSTCk7CiB9CiAKK3N0YXRpYyBpbnQg
+bXgzMV9wcmVwYXJlX21lc3NhZ2Uoc3RydWN0IHNwaV9pbXhfZGF0YSAqc3BpX2lteCwKKwkJCQlz
+dHJ1Y3Qgc3BpX21lc3NhZ2UgKm1zZykKK3sKKwlyZXR1cm4gMDsKK30KKwogc3RhdGljIGludCBt
+eDMxX2NvbmZpZyhzdHJ1Y3Qgc3BpX2RldmljZSAqc3BpKQogewogCXN0cnVjdCBzcGlfaW14X2Rh
+dGEgKnNwaV9pbXggPSBzcGlfbWFzdGVyX2dldF9kZXZkYXRhKHNwaS0+bWFzdGVyKTsKQEAgLTc1
+NSw2ICs3NjgsMTIgQEAgc3RhdGljIHZvaWQgbXgyMV90cmlnZ2VyKHN0cnVjdCBzcGlfaW14X2Rh
+dGEgKnNwaV9pbXgpCiAJd3JpdGVsKHJlZywgc3BpX2lteC0+YmFzZSArIE1YQ19DU1BJQ1RSTCk7
+CiB9CiAKK3N0YXRpYyBpbnQgbXgyMV9wcmVwYXJlX21lc3NhZ2Uoc3RydWN0IHNwaV9pbXhfZGF0
+YSAqc3BpX2lteCwKKwkJCQlzdHJ1Y3Qgc3BpX21lc3NhZ2UgKm1zZykKK3sKKwlyZXR1cm4gMDsK
+K30KKwogc3RhdGljIGludCBteDIxX2NvbmZpZyhzdHJ1Y3Qgc3BpX2RldmljZSAqc3BpKQogewog
+CXN0cnVjdCBzcGlfaW14X2RhdGEgKnNwaV9pbXggPSBzcGlfbWFzdGVyX2dldF9kZXZkYXRhKHNw
+aS0+bWFzdGVyKTsKQEAgLTgyNCw2ICs4NDMsMTIgQEAgc3RhdGljIHZvaWQgbXgxX3RyaWdnZXIo
+c3RydWN0IHNwaV9pbXhfZGF0YSAqc3BpX2lteCkKIAl3cml0ZWwocmVnLCBzcGlfaW14LT5iYXNl
+ICsgTVhDX0NTUElDVFJMKTsKIH0KIAorc3RhdGljIGludCBteDFfcHJlcGFyZV9tZXNzYWdlKHN0
+cnVjdCBzcGlfaW14X2RhdGEgKnNwaV9pbXgsCisJCQkgICAgICAgc3RydWN0IHNwaV9tZXNzYWdl
+ICptc2cpCit7CisJcmV0dXJuIDA7Cit9CisKIHN0YXRpYyBpbnQgbXgxX2NvbmZpZyhzdHJ1Y3Qg
+c3BpX2RldmljZSAqc3BpKQogewogCXN0cnVjdCBzcGlfaW14X2RhdGEgKnNwaV9pbXggPSBzcGlf
+bWFzdGVyX2dldF9kZXZkYXRhKHNwaS0+bWFzdGVyKTsKQEAgLTg1OCw2ICs4ODMsNyBAQCBzdGF0
+aWMgdm9pZCBteDFfcmVzZXQoc3RydWN0IHNwaV9pbXhfZGF0YSAqc3BpX2lteCkKIAogc3RhdGlj
+IHN0cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0YSBpbXgxX2NzcGlfZGV2dHlwZV9kYXRhID0gewog
+CS5pbnRjdHJsID0gbXgxX2ludGN0cmwsCisJLnByZXBhcmVfbWVzc2FnZSA9IG14MV9wcmVwYXJl
+X21lc3NhZ2UsCiAJLmNvbmZpZyA9IG14MV9jb25maWcsCiAJLnRyaWdnZXIgPSBteDFfdHJpZ2dl
+ciwKIAkucnhfYXZhaWxhYmxlID0gbXgxX3J4X2F2YWlsYWJsZSwKQEAgLTg3MSw2ICs4OTcsNyBA
+QCBzdGF0aWMgc3RydWN0IHNwaV9pbXhfZGV2dHlwZV9kYXRhIGlteDFfY3NwaV9kZXZ0eXBlX2Rh
+dGEgPSB7CiAKIHN0YXRpYyBzdHJ1Y3Qgc3BpX2lteF9kZXZ0eXBlX2RhdGEgaW14MjFfY3NwaV9k
+ZXZ0eXBlX2RhdGEgPSB7CiAJLmludGN0cmwgPSBteDIxX2ludGN0cmwsCisJLnByZXBhcmVfbWVz
+c2FnZSA9IG14MjFfcHJlcGFyZV9tZXNzYWdlLAogCS5jb25maWcgPSBteDIxX2NvbmZpZywKIAku
+dHJpZ2dlciA9IG14MjFfdHJpZ2dlciwKIAkucnhfYXZhaWxhYmxlID0gbXgyMV9yeF9hdmFpbGFi
+bGUsCkBAIC04ODUsNiArOTEyLDcgQEAgc3RhdGljIHN0cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0
+YSBpbXgyMV9jc3BpX2RldnR5cGVfZGF0YSA9IHsKIHN0YXRpYyBzdHJ1Y3Qgc3BpX2lteF9kZXZ0
+eXBlX2RhdGEgaW14MjdfY3NwaV9kZXZ0eXBlX2RhdGEgPSB7CiAJLyogaS5teDI3IGNzcGkgc2hh
+cmVzIHRoZSBmdW5jdGlvbnMgd2l0aCBpLm14MjEgb25lICovCiAJLmludGN0cmwgPSBteDIxX2lu
+dGN0cmwsCisJLnByZXBhcmVfbWVzc2FnZSA9IG14MjFfcHJlcGFyZV9tZXNzYWdlLAogCS5jb25m
+aWcgPSBteDIxX2NvbmZpZywKIAkudHJpZ2dlciA9IG14MjFfdHJpZ2dlciwKIAkucnhfYXZhaWxh
+YmxlID0gbXgyMV9yeF9hdmFpbGFibGUsCkBAIC04OTgsNiArOTI2LDcgQEAgc3RhdGljIHN0cnVj
+dCBzcGlfaW14X2RldnR5cGVfZGF0YSBpbXgyN19jc3BpX2RldnR5cGVfZGF0YSA9IHsKIAogc3Rh
+dGljIHN0cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0YSBpbXgzMV9jc3BpX2RldnR5cGVfZGF0YSA9
+IHsKIAkuaW50Y3RybCA9IG14MzFfaW50Y3RybCwKKwkucHJlcGFyZV9tZXNzYWdlID0gbXgzMV9w
+cmVwYXJlX21lc3NhZ2UsCiAJLmNvbmZpZyA9IG14MzFfY29uZmlnLAogCS50cmlnZ2VyID0gbXgz
+MV90cmlnZ2VyLAogCS5yeF9hdmFpbGFibGUgPSBteDMxX3J4X2F2YWlsYWJsZSwKQEAgLTkxMiw2
+ICs5NDEsNyBAQCBzdGF0aWMgc3RydWN0IHNwaV9pbXhfZGV2dHlwZV9kYXRhIGlteDMxX2NzcGlf
+ZGV2dHlwZV9kYXRhID0gewogc3RhdGljIHN0cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0YSBpbXgz
+NV9jc3BpX2RldnR5cGVfZGF0YSA9IHsKIAkvKiBpLm14MzUgYW5kIGxhdGVyIGNzcGkgc2hhcmVz
+IHRoZSBmdW5jdGlvbnMgd2l0aCBpLm14MzEgb25lICovCiAJLmludGN0cmwgPSBteDMxX2ludGN0
+cmwsCisJLnByZXBhcmVfbWVzc2FnZSA9IG14MzFfcHJlcGFyZV9tZXNzYWdlLAogCS5jb25maWcg
+PSBteDMxX2NvbmZpZywKIAkudHJpZ2dlciA9IG14MzFfdHJpZ2dlciwKIAkucnhfYXZhaWxhYmxl
+ID0gbXgzMV9yeF9hdmFpbGFibGUsCkBAIC05MjUsNiArOTU1LDcgQEAgc3RhdGljIHN0cnVjdCBz
+cGlfaW14X2RldnR5cGVfZGF0YSBpbXgzNV9jc3BpX2RldnR5cGVfZGF0YSA9IHsKIAogc3RhdGlj
+IHN0cnVjdCBzcGlfaW14X2RldnR5cGVfZGF0YSBpbXg1MV9lY3NwaV9kZXZ0eXBlX2RhdGEgPSB7
+CiAJLmludGN0cmwgPSBteDUxX2Vjc3BpX2ludGN0cmwsCisJLnByZXBhcmVfbWVzc2FnZSA9IG14
+NTFfZWNzcGlfcHJlcGFyZV9tZXNzYWdlLAogCS5jb25maWcgPSBteDUxX2Vjc3BpX2NvbmZpZywK
+IAkudHJpZ2dlciA9IG14NTFfZWNzcGlfdHJpZ2dlciwKIAkucnhfYXZhaWxhYmxlID0gbXg1MV9l
+Y3NwaV9yeF9hdmFpbGFibGUsCkBAIC05NDAsNiArOTcxLDcgQEAgc3RhdGljIHN0cnVjdCBzcGlf
+aW14X2RldnR5cGVfZGF0YSBpbXg1MV9lY3NwaV9kZXZ0eXBlX2RhdGEgPSB7CiAKIHN0YXRpYyBz
+dHJ1Y3Qgc3BpX2lteF9kZXZ0eXBlX2RhdGEgaW14NTNfZWNzcGlfZGV2dHlwZV9kYXRhID0gewog
+CS5pbnRjdHJsID0gbXg1MV9lY3NwaV9pbnRjdHJsLAorCS5wcmVwYXJlX21lc3NhZ2UgPSBteDUx
+X2Vjc3BpX3ByZXBhcmVfbWVzc2FnZSwKIAkuY29uZmlnID0gbXg1MV9lY3NwaV9jb25maWcsCiAJ
+LnRyaWdnZXIgPSBteDUxX2Vjc3BpX3RyaWdnZXIsCiAJLnJ4X2F2YWlsYWJsZSA9IG14NTFfZWNz
+cGlfcnhfYXZhaWxhYmxlLApAQCAtMTQ5Miw3ICsxNTI0LDEzIEBAIHNwaV9pbXhfcHJlcGFyZV9t
+ZXNzYWdlKHN0cnVjdCBzcGlfbWFzdGVyICptYXN0ZXIsIHN0cnVjdCBzcGlfbWVzc2FnZSAqbXNn
+KQogCQlyZXR1cm4gcmV0OwogCX0KIAotCXJldHVybiAwOworCXJldCA9IHNwaV9pbXgtPmRldnR5
+cGVfZGF0YS0+cHJlcGFyZV9tZXNzYWdlKHNwaV9pbXgsIG1zZyk7CisJaWYgKHJldCkgeworCQlj
+bGtfZGlzYWJsZShzcGlfaW14LT5jbGtfaXBnKTsKKwkJY2xrX2Rpc2FibGUoc3BpX2lteC0+Y2xr
+X3Blcik7CisJfQorCisJcmV0dXJuIHJldDsKIH0KIAogc3RhdGljIGludAotLSAKMi4xOS4yCgoK
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJt
+LWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3Jn
+Cmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtl
+cm5lbAo=
