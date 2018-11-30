@@ -2,72 +2,59 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 12F03C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:16:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D34AAC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:17:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D952E206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:16:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A263A206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:17:42 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BS3nUuEk";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="fPpvutzv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D952E206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jLnj8SID"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A263A206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
-	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QGZjFUxDtYtGrJ/ThNWuSzqFgjXASgkhXLOYcsuKoSA=; b=BS3nUuEkQLxP8t
-	dJNOef5OtWlMGBTy9GMZAuPglKBYhw9vRweqmT5RYde+3Qi3YZVlnXqY7XiZyxaRnSRAWAF90x7z1
-	C7H9VNqmamSgabgPoufly5bl1EVwjU73GbQsO5GjAUl2uYHPfF56nwYY8ebuF3C8lp/zz47lFoRJp
-	HDBBYAa1mXgyd4UeTpVF/MedTdTTk+E0emK+UJLOv97e4/w01hNM/4G304/C7L9wNsrWPZjXpuknw
-	hfQ+VCzi2R4uWobLszAWXgqDtUoSyR1gy+tJkA8ZXYFjxvxjiI/MLVyQPvY2HNN5GeVxzVmdVZiND
-	0pu+ZSrdBdiUFbSAHn7A==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=WWIf47bWKiNg32m07P/+ElNgGDFQJVC8R9WYVARNGNw=; b=jLnj8SIDMBG/2A
+	OUXQrxc42RMhCuSu4AnP0XtzR8vCww9pU5AvXnkbkSp5FZmSYmsA++lWbd9Bwj83Dy+31sGwVacT2
+	IHEvDyrkFwsZl5eyTxwYUv0Z6TNDpxA4UYz8gzsbILjOvsyB8X+XOM3MPdylqd7eT4WynetGYaAj9
+	LvxL3EahfBa30hO3U1b1nHfZrTuiWx/JWFItS2Jzm9mQubrYwh1r/0SHZsKCP/6GpuvtgHWqLFYsF
+	K2B+NJYIsFdtnxBreC7K1N15Fq7cYlBPIgcnOd6tLhaxDt5054Ht8vuxo5N+Bd2GUJSLk7mI2OmTf
+	YBqs+aWZ4QxtTOOJTEDA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSdyq-0001UC-S6; Fri, 30 Nov 2018 08:16:56 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSdyi-0001Ds-N8
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:16:50 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 19E51206B7;
- Fri, 30 Nov 2018 08:16:38 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543565798;
- bh=TO0T4SzivIpQeoHDCzPgm4w+v6PSc+ghOTE5fXmyclY=;
- h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=fPpvutzv6AwMQy1Lou+YmR74oqGJbrhqB9cNpbEJn8kLBzdKp7QLzC+Md5CaubC4h
- v6fkO1ysqfP3Nh8fndksxbVi9bfe1b0ybSyHkVqaqe8kBjAglW6Zu3fizBslVRN00s
- rpLuoLbqDESVckWFCMyu7DMOaSexMjuF9yku1Dik=
+	id 1gSdzU-0001px-1H; Fri, 30 Nov 2018 08:17:36 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSdzN-0001mk-SI
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:17:33 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id BC27C207AB; Fri, 30 Nov 2018 09:17:18 +0100 (CET)
+Received: from localhost.localdomain
+ (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr [90.88.18.158])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 6C00C20711;
+ Fri, 30 Nov 2018 09:17:18 +0100 (CET)
+From: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+To: linux-media@vger.kernel.org, devel@driverdev.osuosl.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org
+Subject: [PATCH v3] media: cedrus: Remove global IRQ spin lock from the driver
+Date: Fri, 30 Nov 2018 09:16:17 +0100
+Message-Id: <20181130081617.28710-1-paul.kocialkowski@bootlin.com>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-To: "Sugaya, Taichi" <sugaya.taichi@socionext.com>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
- <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
- <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
-Message-ID: <154356579701.88331.5043467509900444879@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.7
-Subject: Re: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
- description
-Date: Fri, 30 Nov 2018 00:16:37 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_001648_972571_37917B5A 
-X-CRM114-Status: GOOD (  17.56  )
+X-CRM114-CacheID: sfid-20181130_001730_188002_5F45497A 
+X-CRM114-Status: GOOD (  14.18  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,51 +66,188 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
+Cc: Hans Verkuil <hverkuil@xs4all.nl>,
+ Sakari Ailus <sakari.ailus@linux.intel.com>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Jiri Slaby <jslaby@suse.com>,
- Thomas Gleixner <tglx@linutronix.de>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+ Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-UXVvdGluZyBTdWdheWEsIFRhaWNoaSAoMjAxOC0xMS0yOSAwNDoyNDo1MSkKPiBPbiAyMDE4LzEx
-LzI4IDExOjAxLCBTdGVwaGVuIEJveWQgd3JvdGU6Cj4gPiBRdW90aW5nIFN1Z2F5YSBUYWljaGkg
-KDIwMTgtMTEtMTggMTc6MDE6MDcpCj4gPj4gICBjcmVhdGUgbW9kZSAxMDA2NDQgRG9jdW1lbnRh
-dGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL3NvYy9zb2Npb25leHQvc29jaW9uZXh0LG0xMHYudHh0
-Cj4gPj4KPiA+PiBkaWZmIC0tZ2l0IGEvRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdz
-L3NvYy9zb2Npb25leHQvc29jaW9uZXh0LG0xMHYudHh0IGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0
-cmVlL2JpbmRpbmdzL3NvYy9zb2Npb25leHQvc29jaW9uZXh0LG0xMHYudHh0Cj4gPj4gbmV3IGZp
-bGUgbW9kZSAxMDA2NDQKPiA+PiBpbmRleCAwMDAwMDAwLi5mNWQ5MDZjCj4gPj4gLS0tIC9kZXYv
-bnVsbAo+ID4+ICsrKyBiL0RvY3VtZW50YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy9zb2Mvc29j
-aW9uZXh0L3NvY2lvbmV4dCxtMTB2LnR4dAo+ID4+IEBAIC0wLDAgKzEsMTIgQEAKPiA+PiArU29j
-aW9uZXh0IE0xMFYgU01QIHRyYW1wb2xpbmUgZHJpdmVyIGJpbmRpbmcKPiA+PiArCj4gPj4gK1Ro
-aXMgaXMgYSBkcml2ZXIgdG8gd2FpdCBmb3Igc3ViLWNvcmVzIHdoaWxlIGJvb3QgcHJvY2Vzcy4K
-PiA+PiArCj4gPj4gKy0gY29tcGF0aWJsZTogc2hvdWxkIGJlICJzb2Npb25leHQsc21wLXRyYW1w
-b2xpbmUiCj4gPj4gKy0gcmVnOiBzaG91bGQgYmUgPDB4NEMwMDAxMDAgMHgxMDA+Cj4gPj4gKwo+
-ID4+ICtFWEFNUExFCj4gPj4gKyAgICAgICB0cmFtcG9saW5lOiB0cmFtcG9saW5lQDB4NEMwMDAx
-MDAgewo+ID4gRHJvcCB0aGUgMHggcGFydCBvZiB1bml0IGFkZHJlc3Nlcy4KPiAKPiBPa2F5Lgo+
-IAo+IAo+ID4+ICsgICAgICAgICAgICAgICBjb21wYXRpYmxlID0gInNvY2lvbmV4dCxzbXAtdHJh
-bXBvbGluZSI7Cj4gPj4gKyAgICAgICAgICAgICAgIHJlZyA9IDwweDRDMDAwMTAwIDB4MTAwPjsK
-PiA+IExvb2tzIGxpa2UgYSBzb2Z0d2FyZSBjb25zdHJ1Y3QsIHdoaWNoIHdlIHdvdWxkbid0IHdh
-bnQgdG8gcHV0IGludG8gRFQKPiA+IHRoaXMgd2F5LiBEVCBkb2Vzbid0IGRlc2NyaWJlIGRyaXZl
-cnMuCj4gV2Ugd291bGQgbGlrZSB0byB1c2UgdGhpcyBub2RlIG9ubHkgZ2V0dGluZyB0aGUgYWRk
-cmVzcyBvZiB0aGUgCj4gdHJhbXBvbGluZSBhcmVhCj4gaW4gd2hpY2ggc3ViLWNvcmVzIHdhaXQu
-wqAgKFRoZXkgaGF2ZSBmaW5pc2hlZCB0byBnbyB0byB0aGlzIGFyZWEgaW4gcHJldmlvdXMKPiBi
-b290bG9hZGVyIHByb2Nlc3MuKQoKSXMgdGhpcyBhcmVhIHBhcnQgb2YgbWVtb3J5LCBvciBhIHNw
-ZWNpYWwgU1JBTT8gSWYgaXQncyBwYXJ0IG9mIG1lbW9yeSwKSSB3b3VsZCBleHBlY3QgdGhpcyBu
-b2RlIHRvIGJlIHVuZGVyIHRoZSByZXNlcnZlZC1tZW1vcnkgbm9kZSBhbmQKcG9pbnRlZCB0byBi
-eSBzb21lIG90aGVyIG5vZGUgdGhhdCB1c2VzIHRoaXMgcmVnaW9uLiBDb3VsZCBldmVuIGJlIHRo
-ZQpDUFUgbm9kZXMuCgo+IAo+IFNvIHNob3VsZCB3ZSBlbWJlZCB0aGUgY29uc3RhbnQgdmFsdWUg
-aW4gc291cmNlIGNvZGVzIGluc3RlYWQgb2YgZ2V0dGluZyAKPiBmcm9tCj4gRFQgYmVjYXVzZSB0
-aGUgYWRkcmVzcyBpcyBjb25zdGFudCBhdCB0aGUgbW9tZW50PyBPciBpcyB0aGVyZSBvdGhlciAK
-PiBhcHByb2FjaD8KPiAKCklmIGl0J3MgY29uc3RhbnQgdGhlbiB0aGF0IGFsc28gd29ya3MuIFdo
-eSBkb2VzIGl0IG5lZWQgdG8gY29tZSBmcm9tIERUCmF0IGFsbCB0aGVuPwoKCl9fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFp
-bGluZyBsaXN0CmxpbnV4LWFybS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlz
-dHMuaW5mcmFkZWFkLm9yZy9tYWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+We initially introduced a spin lock to ensure that the VPU registers
+are not accessed concurrently between our setup function and IRQ
+handler. The V4L2 M2M API ensures that only one decoding job runs at a
+time, so the interrupt signaling the end of decoding will not occur
+while the next picture is being configured.
+
+Spurious interrupts are taken care of in the handler, by checking that
+we have a valid M2M context and a decoding status available before
+marking the buffers as done.
+
+In addition, holding a spin lock could be problematic if non-atomic
+operations are required in the setup process for future codec support.
+
+As a result, remove the global IRQ spin lock.
+
+Signed-off-by: Paul Kocialkowski <paul.kocialkowski@bootlin.com>
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+---
+Changes since v2:
+* Rebased on top of the next media tree.
+
+Changes since v1:
+* Reworked commit message as suggested by Maxime.
+
+ drivers/staging/media/sunxi/cedrus/cedrus.c       |  1 -
+ drivers/staging/media/sunxi/cedrus/cedrus.h       |  2 --
+ drivers/staging/media/sunxi/cedrus/cedrus_dec.c   |  9 ---------
+ drivers/staging/media/sunxi/cedrus/cedrus_hw.c    | 13 +------------
+ drivers/staging/media/sunxi/cedrus/cedrus_video.c |  5 -----
+ 5 files changed, 1 insertion(+), 29 deletions(-)
+
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.c b/drivers/staging/media/sunxi/cedrus/cedrus.c
+index da790db450d2..edb04a696d70 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus.c
++++ b/drivers/staging/media/sunxi/cedrus/cedrus.c
+@@ -279,7 +279,6 @@ static int cedrus_probe(struct platform_device *pdev)
+ 	dev->dec_ops[CEDRUS_CODEC_MPEG2] = &cedrus_dec_ops_mpeg2;
+ 
+ 	mutex_init(&dev->dev_mutex);
+-	spin_lock_init(&dev->irq_lock);
+ 
+ 	ret = v4l2_device_register(&pdev->dev, &dev->v4l2_dev);
+ 	if (ret) {
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus.h b/drivers/staging/media/sunxi/cedrus/cedrus.h
+index 3f61248c57ac..3acfdcf83691 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus.h
++++ b/drivers/staging/media/sunxi/cedrus/cedrus.h
+@@ -105,8 +105,6 @@ struct cedrus_dev {
+ 
+ 	/* Device file mutex */
+ 	struct mutex		dev_mutex;
+-	/* Interrupt spinlock */
+-	spinlock_t		irq_lock;
+ 
+ 	void __iomem		*base;
+ 
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+index e40180a33951..6c5e310a7cf7 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
++++ b/drivers/staging/media/sunxi/cedrus/cedrus_dec.c
+@@ -28,7 +28,6 @@ void cedrus_device_run(void *priv)
+ 	struct cedrus_dev *dev = ctx->dev;
+ 	struct cedrus_run run = { 0 };
+ 	struct media_request *src_req;
+-	unsigned long flags;
+ 
+ 	run.src = v4l2_m2m_next_src_buf(ctx->fh.m2m_ctx);
+ 	run.dst = v4l2_m2m_next_dst_buf(ctx->fh.m2m_ctx);
+@@ -39,8 +38,6 @@ void cedrus_device_run(void *priv)
+ 	if (src_req)
+ 		v4l2_ctrl_request_setup(src_req, &ctx->hdl);
+ 
+-	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+-
+ 	switch (ctx->src_fmt.pixelformat) {
+ 	case V4L2_PIX_FMT_MPEG2_SLICE:
+ 		run.mpeg2.slice_params = cedrus_find_control_data(ctx,
+@@ -55,16 +52,10 @@ void cedrus_device_run(void *priv)
+ 
+ 	dev->dec_ops[ctx->current_codec]->setup(ctx, &run);
+ 
+-	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+-
+ 	/* Complete request(s) controls if needed. */
+ 
+ 	if (src_req)
+ 		v4l2_ctrl_request_complete(src_req, &ctx->hdl);
+ 
+-	spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+-
+ 	dev->dec_ops[ctx->current_codec]->trigger(ctx);
+-
+-	spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+ }
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_hw.c b/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
+index 493e65b17b30..243592a5425e 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
++++ b/drivers/staging/media/sunxi/cedrus/cedrus_hw.c
+@@ -105,24 +105,17 @@ static irqreturn_t cedrus_irq(int irq, void *data)
+ 	struct vb2_v4l2_buffer *src_buf, *dst_buf;
+ 	enum vb2_buffer_state state;
+ 	enum cedrus_irq_status status;
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&dev->irq_lock, flags);
+ 
+ 	ctx = v4l2_m2m_get_curr_priv(dev->m2m_dev);
+ 	if (!ctx) {
+ 		v4l2_err(&dev->v4l2_dev,
+ 			 "Instance released before the end of transaction\n");
+-		spin_unlock_irqrestore(&dev->irq_lock, flags);
+-
+ 		return IRQ_NONE;
+ 	}
+ 
+ 	status = dev->dec_ops[ctx->current_codec]->irq_status(ctx);
+-	if (status == CEDRUS_IRQ_NONE) {
+-		spin_unlock_irqrestore(&dev->irq_lock, flags);
++	if (status == CEDRUS_IRQ_NONE)
+ 		return IRQ_NONE;
+-	}
+ 
+ 	dev->dec_ops[ctx->current_codec]->irq_disable(ctx);
+ 	dev->dec_ops[ctx->current_codec]->irq_clear(ctx);
+@@ -133,8 +126,6 @@ static irqreturn_t cedrus_irq(int irq, void *data)
+ 	if (!src_buf || !dst_buf) {
+ 		v4l2_err(&dev->v4l2_dev,
+ 			 "Missing source and/or destination buffers\n");
+-		spin_unlock_irqrestore(&dev->irq_lock, flags);
+-
+ 		return IRQ_HANDLED;
+ 	}
+ 
+@@ -146,8 +137,6 @@ static irqreturn_t cedrus_irq(int irq, void *data)
+ 	v4l2_m2m_buf_done(src_buf, state);
+ 	v4l2_m2m_buf_done(dst_buf, state);
+ 
+-	spin_unlock_irqrestore(&dev->irq_lock, flags);
+-
+ 	v4l2_m2m_job_finish(ctx->dev->m2m_dev, ctx->fh.m2m_ctx);
+ 
+ 	return IRQ_HANDLED;
+diff --git a/drivers/staging/media/sunxi/cedrus/cedrus_video.c b/drivers/staging/media/sunxi/cedrus/cedrus_video.c
+index 5c5fce678b93..8721b4a7d496 100644
+--- a/drivers/staging/media/sunxi/cedrus/cedrus_video.c
++++ b/drivers/staging/media/sunxi/cedrus/cedrus_video.c
+@@ -380,18 +380,13 @@ static void cedrus_queue_cleanup(struct vb2_queue *vq, u32 state)
+ {
+ 	struct cedrus_ctx *ctx = vb2_get_drv_priv(vq);
+ 	struct vb2_v4l2_buffer *vbuf;
+-	unsigned long flags;
+ 
+ 	for (;;) {
+-		spin_lock_irqsave(&ctx->dev->irq_lock, flags);
+-
+ 		if (V4L2_TYPE_IS_OUTPUT(vq->type))
+ 			vbuf = v4l2_m2m_src_buf_remove(ctx->fh.m2m_ctx);
+ 		else
+ 			vbuf = v4l2_m2m_dst_buf_remove(ctx->fh.m2m_ctx);
+ 
+-		spin_unlock_irqrestore(&ctx->dev->irq_lock, flags);
+-
+ 		if (!vbuf)
+ 			return;
+ 
+-- 
+2.19.1
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
