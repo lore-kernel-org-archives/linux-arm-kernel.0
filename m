@@ -2,61 +2,61 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4949C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:24:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 31544C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:32:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B059020868
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:24:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id F16ED20868
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:32:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D9HkurDa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B059020868
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=goodmis.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CE5nI23c"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F16ED20868
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=P7hc3eDScLGIeLwF6vsxDl9SWsXgJ6ivzlVbC+HjWII=; b=D9HkurDaAGOxua
-	AItuneEXCuE9RUlZ7Nnfb1LYSBnay9UbHGhNH+TR3JSlFzAjqToLprRCQ/TyPQFGmyTcPJFy6AphN
-	GrRboZldFYYFSzTHOV4N8Yf//qu0wTIenMsKwGw13x708IPLTbj30juX150/pYKRvkibhElWL3LPO
-	1suRswACUIn4RbCCitZxMpIZuNkQHFRpnJUEZ04TEBMZRS8u8VN1To7WuE2SDeel00ybsSW3qiZxR
-	rmpcVyuostUX5x0DufhmmvhmvBWY7yMmWaUQVg4AOA2mucx3IrV2tuIqpkPreAEwiPlTUW395wZNV
-	VbGpG14hCknhyKZ7hsMQ==;
+	List-Owner; bh=AmH8f/j+yzS2+iQeQMWMp8SS5doEN+OEJYTYEpU23q0=; b=CE5nI23cJH58im
+	fh51/WDJw900MLrOXXrEaksZFmVOZvQqkyPdkru92uQr9OOvA+RgJQDLg+MKwFYHQ38Fa6q4IUvn2
+	UPWMA1++7PEiW6ZRgmKhlDiCmpqhzsQi2BS+wXoGxkBUhMlc7IB4z1ef1p3vkbVOtHd5wR3AWjcr3
+	GWuqP/gaQJktwab/ccpqxcci3gVol5oRPXXvCyhEexV7ZQEYKbu+TeiVQFaRYnMdCdiCZSMVKeUJZ
+	XSekcdc8J2cT53n91ukIeUdXtkywkHmcw61bc2BSfgj0/w3kBuQ0HsE8lYtbPT6HgIbMz7/Q7Ghj0
+	9Hh85O9GZ/28GLGMvA+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSkeF-00016D-R7; Fri, 30 Nov 2018 15:24:07 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSkeC-0000vC-1k
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:24:05 +0000
-Received: from gandalf.local.home (cpe-66-24-56-78.stny.res.rr.com
- [66.24.56.78])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id E997320868;
- Fri, 30 Nov 2018 15:23:52 +0000 (UTC)
-Date: Fri, 30 Nov 2018 10:23:51 -0500
-From: Steven Rostedt <rostedt@goodmis.org>
-To: Anders Roxell <anders.roxell@linaro.org>
-Subject: Re: [PATCH 3/3] arm64: ftrace: add cond_resched() to func
- ftrace_make_(call|nop)
-Message-ID: <20181130102351.61045b21@gandalf.local.home>
-In-Reply-To: <20181130150956.27620-1-anders.roxell@linaro.org>
-References: <20181130150956.27620-1-anders.roxell@linaro.org>
-X-Mailer: Claws Mail 3.16.0 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gSkmg-0004Wb-7e; Fri, 30 Nov 2018 15:32:50 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSkmc-0004VB-Ul
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:32:48 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id C3F72207B0; Fri, 30 Nov 2018 16:32:36 +0100 (CET)
+Received: from localhost.localdomain (unknown [91.224.148.103])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 116A920CFA;
+ Fri, 30 Nov 2018 16:32:26 +0100 (CET)
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Michael Turquette <mturquette@baylibre.com>,
+ Stephen Boyd <sboyd@kernel.org>, Russell King <linux@armlinux.org.uk>
+Subject: [PATCH v2 3/4] clk: mvebu: armada-37xx-tbg: fill the device entry
+ when registering the clocks
+Date: Fri, 30 Nov 2018 16:32:13 +0100
+Message-Id: <20181130153214.9058-4-miquel.raynal@bootlin.com>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181130153214.9058-1-miquel.raynal@bootlin.com>
+References: <20181130153214.9058-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_072404_105392_097C620F 
-X-CRM114-Status: GOOD (  16.94  )
+X-CRM114-CacheID: sfid-20181130_073247_141520_57EB8BEF 
+X-CRM114-Status: GOOD (  14.54  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,68 +68,56 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: keescook@chromium.org, Arnd Bergmann <arnd@arndb.de>,
- catalin.marinas@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org
+Cc: Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 30 Nov 2018 16:09:56 +0100
-Anders Roxell <anders.roxell@linaro.org> wrote:
+So far the clk_hw_register_fixed_factor() calls are not providing any
+device structure. While doing so is harmless for regular use, the
+missing device structure may be a problem for suspend to RAM support.
 
-> Both of those functions end up calling ftrace_modify_code(), which is
-> expensive because it changes the page tables and flush caches.
-> Microseconds add up because this is called in a loop for each dyn_ftrace
-> record, and this triggers the softlockup watchdog unless we let it sleep
-> occasionally.
-> Rework so that we call cond_resched() before going into the
-> ftrace_modify_code() function.
-> 
-> Co-developed-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+Since, device links have been added to clocks, links created during
+probe will enforce the suspend/resume orders. When the device is
+missing during the registration, no link can be established, hence the
+order between parent and child clocks are not enforced.
 
-I'm fine with this patch, but I'm not placing an ack on this patch
-just because I don't know the repercussions of such a change. I'll let
-you folks take full responsibility ;-)
+Adding the device structure here will create a link between the 4 TBG
+clocks (registered by this driver) and:
+* their parent clock: XTAL,
+* their child clocks: several 'periph' clock.
 
--- Steve
- 
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/clk/mvebu/armada-37xx-tbg.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-> ---
->  arch/arm64/kernel/ftrace.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-> index de1a397d2d3f..9da38da58df7 100644
-> --- a/arch/arm64/kernel/ftrace.c
-> +++ b/arch/arm64/kernel/ftrace.c
-> @@ -130,6 +130,11 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
->  	old = aarch64_insn_gen_nop();
->  	new = aarch64_insn_gen_branch_imm(pc, addr, AARCH64_INSN_BRANCH_LINK);
->  
-> +	/* This function can take a long time when sanitizers are enabled, so
-> +	 * lets make sure we allow RCU processing.
-> +	 */
-> +	cond_resched();
-> +
->  	return ftrace_modify_code(pc, old, new, true);
->  }
->  
-> @@ -188,6 +193,11 @@ int ftrace_make_nop(struct module *mod, struct dyn_ftrace *rec,
->  
->  	new = aarch64_insn_gen_nop();
->  
-> +	/* This function can take a long time when sanitizers are enabled, so
-> +	 * lets make sure we allow RCU processing.
-> +	 */
-> +	cond_resched();
-> +
->  	return ftrace_modify_code(pc, old, new, validate);
->  }
->  
+diff --git a/drivers/clk/mvebu/armada-37xx-tbg.c b/drivers/clk/mvebu/armada-37xx-tbg.c
+index ee272d4d8c24..78de057a2406 100644
+--- a/drivers/clk/mvebu/armada-37xx-tbg.c
++++ b/drivers/clk/mvebu/armada-37xx-tbg.c
+@@ -116,8 +116,10 @@ static int armada_3700_tbg_clock_probe(struct platform_device *pdev)
+ 		name = tbg[i].name;
+ 		mult = tbg_get_mult(reg, &tbg[i]);
+ 		div = tbg_get_div(reg, &tbg[i]);
+-		hw_tbg_data->hws[i] = clk_hw_register_fixed_factor(NULL, name,
+-						parent_name, 0, mult, div);
++		hw_tbg_data->hws[i] = clk_hw_register_fixed_factor(dev, name,
++								   parent_name,
++								   0, mult,
++								   div);
+ 		if (IS_ERR(hw_tbg_data->hws[i]))
+ 			dev_err(dev, "Can't register TBG clock %s\n", name);
+ 	}
+-- 
+2.19.1
 
 
 _______________________________________________
