@@ -2,119 +2,75 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AF95AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:24:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C8E81C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:25:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7EC1720863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:24:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 99FA32146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:25:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SPsNDq2Y";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="qfzswyTf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7EC1720863
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Rd92ckZB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="tgMlZJ1I"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 99FA32146F
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Boy/zp4h8BbImWoHkKzDMobd69oB+ewuNBAW3Nr4neU=; b=SPsNDq2YXmLe97
-	1ulxJHqhKvTWFrf2eg9KrfdSlCs5HMW1+wWlJu+6j3c52qZPTT8ScIUgZATi+I8/OWlVLZOzrsd1x
-	1oPU93un1Rqnwea27jtwmAnqQf05bJzMMHDXAnwZVUP4UnvAXGvYNgLAWyP0mnnlZubPYKE7LYNF3
-	MHFIm5070xwQERUeXwAJSnkSwWPs8PfHNhunjTSD4D2bB/huqWdg1D+ttlq7TjjGWy3vGDjw7Wi4r
-	/mwBrgV6L31TlByDq6O05s9FNvEQPLyToDvmnDhelWvgPEAQkNGcrEIfvTgpJTp3t0kcK3B2d7OMK
-	yeUprtjlfDZUXNJxcDkw==;
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=M1x4taKwWto1w4TJXrsnfTlla5WGQOVK7IfQLF4Kz9k=; b=Rd92ckZBWKOxs6
+	20lcs7PnGF6TCD9g/KRBObQoUO8ON5pG8abtsuaolUJLFItFBnXbT6YvhgpGxs4qLbUjcJk/hdJa3
+	UActIKZg2t8WeaXwGXnhjkAVDGM190fQEwkL0w6jbqdYn7E9NUZZHRQSNLwBOew0om9KqeJwO0eS3
+	yAeg5+To4GsKO3wc5eW9BBpHV8Yar70nG5O0cxnfbiy4atXZeE9mUCrFpKmRftmTuODJTibJLOYHf
+	CUoLxo6SOLORlrABDAasyL7MGNX0d1Gqn69peE9nZu3ABJhOY1Qbee+arYISlzjkLBlbCcIuerIod
+	mRfMAhszup9qo/oRY4VA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSd9g-0003Bj-As; Fri, 30 Nov 2018 07:24:04 +0000
-Received: from mail-eopbgr60074.outbound.protection.outlook.com ([40.107.6.74]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gSdAw-0004i1-6T; Fri, 30 Nov 2018 07:25:22 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSd9c-0003B0-Ll
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:24:02 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=BSXDf49YLzeK/sSz8wwIF2c0rbTTjmJdkmLQdcKUdvo=;
- b=qfzswyTfInP4lztCP2IzI8qvTxl+J26sZVqZU2la20QEY1o6lgDN+YPqOb7GXrG2hs1gUBvU4Jp0w2fEgqkNWuj/rcJLX70hXKRPK2h9KeqlHoqn6r+WEnCaHC4kT14eg92oWnKF62IVeff+ofmVNe7LE2sUuW1L9FenFUPirBE=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3945.eurprd04.prod.outlook.com (52.134.65.149) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1361.14; Fri, 30 Nov 2018 07:23:47 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%2]) with mapi id 15.20.1361.019; Fri, 30 Nov 2018
- 07:23:47 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, "mturquette@baylibre.com"
- <mturquette@baylibre.com>, "sboyd@kernel.org" <sboyd@kernel.org>,
- "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
-Thread-Topic: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
-Thread-Index: AQHUiH2hWlHF6oLZCESale1T/3ahbg==
-Date: Fri, 30 Nov 2018 07:23:47 +0000
-Message-ID: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR01CA0034.apcprd01.prod.exchangelabs.com
- (2603:1096:203:3e::22) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3945;
- 6:cgNr8UY5+sSAmOACdnxN63mB+3px6orWU5n8aedB/z7MwiZS0x5Mo1AtQLmCYz9DuNb3WosyXGGZvbr9gKjj9av5nDciSUwWNsnkft6z9pm1o5B2X2X965oVC5mdsSS/Z9tAlp764UVpB34De/slewYHLciX92VQyYNUwFJFbFsNNPenNzMSUzzDXcblhY3cXEwUadmVUJZFs5dVIbfnWbM9ATpopW26Ij/YoJeRo0kqDQEZedoo8DB66qZS5B/Shss5iyt4fTmaXINew/O/WiyL/rIGUr2HM2tPqV6xkz9KoWAcRUNxZBxjZ9855FqCrc6zMj7DKBKBupNO1sO67dSLsR0mDIvJTdYCBm+dva9zpeVyeKdH2DXIr3s6uJzb3m2AfnHpeKxD/RZ6PlLUGgyxSa8PaqdM3zSHmm/ecv7zAbpmxAnYnXf0PzexwRrH24b0DMJJJj2CCEujTRmTrg==;
- 5:ead+WvbZO0h23amTaPLpAP8967cNL9v5cwHa1pkPSR8s51qDfLB2aJYsuzSd5I4es8dfiXlpim7cbLKv+pu+/Gs8JD0/g6dB5XxcZxgs7kCG0nJalADCBBJfiT5xu2hQaUJeyFbRdeX8Xe8TyOxS7EUQpuIM3bs1LL7iqZexffY=;
- 7:DrG4/hBy/XNSrVBlKk0cO6VpOGQJNw6SNQEm3p8eb15Grg+XTNRKANzMpXt5dwH97/B89rxLJ7wyuFNpHKZ76eQkizTFnTVJ0xM1cz1E/egtEdXPlldSpjYlxONNO3INflW3XoP4ltjtAkcEcfRb7w==
-x-ms-office365-filtering-correlation-id: 289746cb-e7fd-41e1-acc8-08d65694c415
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3945; 
-x-ms-traffictypediagnostic: DB3PR0402MB3945:
-x-microsoft-antispam-prvs: <DB3PR0402MB39459DCC0805FD5DFA298072F5D30@DB3PR0402MB3945.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(10201501046)(3002001)(3231453)(999002)(944501410)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3945; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3945; 
-x-forefront-prvs: 087223B4DA
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(396003)(376002)(39860400002)(346002)(199004)(189003)(5660300001)(66066001)(305945005)(7736002)(97736004)(478600001)(99286004)(71200400001)(71190400001)(86362001)(575784001)(52116002)(2201001)(25786009)(2906002)(6436002)(6486002)(6116002)(3846002)(6506007)(386003)(486006)(2616005)(36756003)(476003)(6512007)(106356001)(105586002)(53936002)(186003)(14454004)(4326008)(256004)(26005)(14444005)(81166006)(81156014)(2501003)(316002)(8936002)(102836004)(68736007)(50226002)(8676002)(110136005)(32563001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3945;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 7CUYaiGAYY+/uAqetqUvKplM9Tq+eCvT9+/cpa900R32ErdZlv4t9GaD34LN1pyCcNT5WpF3lTJItkBfyhMPa8/Uu58ASFR5F/58F3gAr/0xaMxs3BFRlylsI2gYiVCqlSzK14pznlVJItS2mNbHfYUMNOvhZSdajjfRHgiKakuv3qgVfZqYG1I/NYj3IQLolYyytoLcUfTIstqChm9Nr9ZrvxiqDpHiF+rzv0Rlh/c4njxpSdEeF9PPuRzocF8CdFvNpkkQtyuXkzIKTRDoMiF9kfK4UU49EQY2su6wznIJKJizPt/0u7vYUP3IIH+iN/gfj/uF5vvANxvLYtLFVNmVl5oaUnDsKd5+SRWuKIE=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gSdAt-0004hL-Ax
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:25:20 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id CAB2A20863;
+ Fri, 30 Nov 2018 07:25:08 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543562708;
+ bh=fq1oEIovxHpkJ1uMug5WWBHXM47wP0Jfq5qx+KHDIaE=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=tgMlZJ1ITqkEwtUGEn5hZ32PcgonirgUmeij8uXcWm24H5uxYO1eyX5QmARSolMby
+ c81/3QMQDS1ZTqgjHuQ7tUOvm4RV/sePlmsdlh5RldsMcNYCdxLOnNXvud2lTOU4px
+ mDhgpskDfywmoE3wAMSHCoe65OZ2SEa3mnDspac4=
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 289746cb-e7fd-41e1-acc8-08d65694c415
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Nov 2018 07:23:47.0501 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3945
+To: "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ Anson Huang <anson.huang@nxp.com>, Fabio Estevam <fabio.estevam@nxp.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
+References: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
+Message-ID: <154356270811.88331.17520386069332746427@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
+Date: Thu, 29 Nov 2018 23:25:08 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_232400_712780_829CC62F 
-X-CRM114-Status: GOOD (  12.03  )
+X-CRM114-CacheID: sfid-20181129_232519_437423_00F622D9 
+X-CRM114-Status: UNSURE (   6.44  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -132,42 +88,15 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Same as other i.MX6 SoCs, ensure unused MMDC channel's
-handshake is bypassed, this is to make sure no request
-signal will be generated when periphe_clk_sel is changed
-or SRC warm reset is triggered.
+Quoting Anson Huang (2018-11-29 23:23:47)
+> Same as other i.MX6 SoCs, ensure unused MMDC channel's
+> handshake is bypassed, this is to make sure no request
+> signal will be generated when periphe_clk_sel is changed
+> or SRC warm reset is triggered.
+> 
+> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx6sl.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
-index 6fcfbbd..e13d881 100644
---- a/drivers/clk/imx/clk-imx6sl.c
-+++ b/drivers/clk/imx/clk-imx6sl.c
-@@ -17,6 +17,8 @@
- 
- #include "clk.h"
- 
-+#define CCDR				0x4
-+#define BM_CCM_CCDR_MMDC_CH0_MASK	(1 << 17)
- #define CCSR			0xc
- #define BM_CCSR_PLL1_SW_CLK_SEL	(1 << 2)
- #define CACRR			0x10
-@@ -411,6 +413,10 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
- 	clks[IMX6SL_CLK_USDHC3]       = imx_clk_gate2("usdhc3",       "usdhc3_podf",       base + 0x80, 6);
- 	clks[IMX6SL_CLK_USDHC4]       = imx_clk_gate2("usdhc4",       "usdhc4_podf",       base + 0x80, 8);
- 
-+	/* Ensure the MMDC CH0 handshake is bypassed */
-+	writel_relaxed(readl_relaxed(base + CCDR) |
-+		BM_CCM_CCDR_MMDC_CH0_MASK, base + CCDR);
-+
- 	imx_check_clocks(clks, ARRAY_SIZE(clks));
- 
- 	clk_data.clks = clks;
--- 
-2.7.4
+Does this need a fixes tag?
 
 
 _______________________________________________
