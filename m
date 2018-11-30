@@ -2,62 +2,67 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9465DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 11:01:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01D95C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 11:03:53 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 633CC2146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 11:01:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7D632146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 11:03:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qkx+CmPm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 633CC2146D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UYh7In7f"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7D632146D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xPfJ6qVzyWALQr739wggU/qAUzf0MK5g42GY++imUiI=; b=Qkx+CmPmiUVjdf
-	UL1Dmn+NW/8lZWGlbEmIqjoPz1SZw7VkA6zp8UhJSN2i1oc2/wOZbNEJEXs770M1zMD3EvLID8GEc
-	09bi9fzQ+SU77DIBT9iflXhRYfbtoQgdlb4A52/D+bDyDA8X50X46hNH0JrqngAIut74s7kktajeP
-	9vWr6EafkRSAaEOYww4B0it90Jp9C3pi7GAGmXQmEntkZeqtKgaDgpfMkz0BbWFDZgtVuTwSlzZsB
-	Sx/1iyJPGms3+U2Oj1j89E+R2XOYRuHVQlEtrBRZ8NOZ1+DeuCqhhrLmm0iTCOseKCiT5267A63XL
-	nWDZ4wA0XxV8q+/orPWA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=ePx6tW97OYCeGm8yuBT6aTn6Qk4yikU+jzXJ704r0h8=; b=UYh7In7fyvcpfM
+	oLmQ7kQayZCCJGNb7VzsMjrNy0C4zF9GCgDCr8iQ0TRYb/AtHlT5NZ18Wadw9mdSft3+S0lzxv3Jl
+	9UpTpJtlNQ9BWJtzKioET5y0zyCDwRz4c9h9bYpGSwceMtMTCJHSlsZJxbNtp0T2sZ/SwgURgMojd
+	sk6W4sZ77Y9N65QA3XvE9/O74Kzt63bZG0X674gHhiEz0gwHn10yTwYOe2QLkGSPR3SYWAn7dARrQ
+	GBCfYhDeUv0wFmQexIoSeOC13AG8L4YiVU2rmwTH7hnG2MzYaBsJLaq4r8+s2SLu1smSf4LO/hAFf
+	OiYz4jE7oabBCeedPQAQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSgXi-00087p-SH; Fri, 30 Nov 2018 11:01:06 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gSgaN-000075-1q; Fri, 30 Nov 2018 11:03:51 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSgXf-0007vl-2N; Fri, 30 Nov 2018 11:01:04 +0000
+ id 1gSgaF-000066-6P
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 11:03:48 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 40E6E80D;
- Fri, 30 Nov 2018 03:00:52 -0800 (PST)
-Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
- [10.1.197.40])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 702F03F59C;
- Fri, 30 Nov 2018 03:00:50 -0800 (PST)
-Date: Fri, 30 Nov 2018 11:00:45 +0000
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-To: honghui.zhang@mediatek.com
-Subject: Re: [PATCH v3] PCI: mediatek: Use
- devm_of_pci_get_host_bridge_resources() to parse DT
-Message-ID: <20181130102829.GA16394@e107981-ln.cambridge.arm.com>
-References: <1543548780-3912-1-git-send-email-honghui.zhang@mediatek.com>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id B17CA80D;
+ Fri, 30 Nov 2018 03:03:32 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C742E3F59C;
+ Fri, 30 Nov 2018 03:03:30 -0800 (PST)
+Subject: Re: [PATCH v6 06/24] arm64: ptrace: Provide definitions for PMR values
+To: Daniel Thompson <daniel.thompson@linaro.org>
+References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
+ <1542023835-21446-7-git-send-email-julien.thierry@arm.com>
+ <20181129164013.qmmwhbygjkh5lwx5@lakrids.cambridge.arm.com>
+ <79145359-3594-3dac-1123-cec552c2b13e@arm.com>
+ <20181130103811.lushdja552xevghm@holly.lan>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <01c117c9-2236-6cb6-d555-09298ef5dfd2@arm.com>
+Date: Fri, 30 Nov 2018 11:03:29 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.8.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1543548780-3912-1-git-send-email-honghui.zhang@mediatek.com>
-User-Agent: Mutt/1.5.24 (2015-08-30)
+In-Reply-To: <20181130103811.lushdja552xevghm@holly.lan>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_030103_122122_3C0EB1DE 
-X-CRM114-Status: GOOD (  20.61  )
+X-CRM114-CacheID: sfid-20181130_030343_250415_8C243075 
+X-CRM114-Status: GOOD (  30.23  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,192 +74,149 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org, ryder.lee@mediatek.com,
- linux-pci@vger.kernel.org, linux-kernel@vger.kernel.org,
- jianjun.wang@mediatek.com, linux-mediatek@lists.infradead.org,
- bhelgaas@google.com, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>, marc.zyngier@arm.com,
+ catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
+ linux-kernel@vger.kernel.org, james.morse@arm.com,
+ Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 11:33:00AM +0800, honghui.zhang@mediatek.com wrote:
-> From: Honghui Zhang <honghui.zhang@mediatek.com>
-> 
-> Use the devm_of_pci_get_host_bridge_resources() API in place of the PCI OF
-> DT parser.
-> 
-> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
-> Acked-by: Ryder Lee <ryder.lee@mediatek.com>
-> ---
->  drivers/pci/controller/pcie-mediatek.c | 101 +++++++++------------------------
->  1 file changed, 27 insertions(+), 74 deletions(-)
 
-Applied to pci/mediatek for v4.21, thanks.
 
-Lorenzo
-
-> diff --git a/drivers/pci/controller/pcie-mediatek.c b/drivers/pci/controller/pcie-mediatek.c
-> index 2a1f97c..6917aec 100644
-> --- a/drivers/pci/controller/pcie-mediatek.c
-> +++ b/drivers/pci/controller/pcie-mediatek.c
-> @@ -197,29 +197,20 @@ struct mtk_pcie_port {
->   * @dev: pointer to PCIe device
->   * @base: IO mapped register base
->   * @free_ck: free-run reference clock
-> - * @io: IO resource
-> - * @pio: PIO resource
->   * @mem: non-prefetchable memory resource
-> - * @busn: bus range
-> - * @offset: IO / Memory offset
->   * @ports: pointer to PCIe port information
->   * @soc: pointer to SoC-dependent operations
-> + * @busnr: root bus number
->   */
->  struct mtk_pcie {
->  	struct device *dev;
->  	void __iomem *base;
->  	struct clk *free_ck;
->  
-> -	struct resource io;
-> -	struct resource pio;
->  	struct resource mem;
-> -	struct resource busn;
-> -	struct {
-> -		resource_size_t mem;
-> -		resource_size_t io;
-> -	} offset;
->  	struct list_head ports;
->  	const struct mtk_pcie_soc *soc;
-> +	unsigned int busnr;
->  };
->  
->  static void mtk_pcie_subsys_powerdown(struct mtk_pcie *pcie)
-> @@ -1045,55 +1036,43 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
->  {
->  	struct device *dev = pcie->dev;
->  	struct device_node *node = dev->of_node, *child;
-> -	struct of_pci_range_parser parser;
-> -	struct of_pci_range range;
-> -	struct resource res;
->  	struct mtk_pcie_port *port, *tmp;
-> +	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> +	struct list_head *windows = &host->windows;
-> +	struct resource_entry *win, *tmp_win;
-> +	resource_size_t io_base;
->  	int err;
->  
-> -	if (of_pci_range_parser_init(&parser, node)) {
-> -		dev_err(dev, "missing \"ranges\" property\n");
-> -		return -EINVAL;
-> -	}
-> +	err = devm_of_pci_get_host_bridge_resources(dev, 0, 0xff,
-> +						    windows, &io_base);
-> +	if (err)
-> +		return err;
->  
-> -	for_each_of_pci_range(&parser, &range) {
-> -		err = of_pci_range_to_resource(&range, node, &res);
-> -		if (err < 0)
-> -			return err;
-> +	err = devm_request_pci_bus_resources(dev, windows);
-> +	if (err < 0)
-> +		return err;
->  
-> -		switch (res.flags & IORESOURCE_TYPE_BITS) {
-> +	/* Get the I/O and memory ranges from DT */
-> +	resource_list_for_each_entry_safe(win, tmp_win, windows) {
-> +		switch (resource_type(win->res)) {
->  		case IORESOURCE_IO:
-> -			pcie->offset.io = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->pio, &res, sizeof(res));
-> -			pcie->pio.name = node->full_name;
-> -
-> -			pcie->io.start = range.cpu_addr;
-> -			pcie->io.end = range.cpu_addr + range.size - 1;
-> -			pcie->io.flags = IORESOURCE_MEM;
-> -			pcie->io.name = "I/O";
-> -
-> -			memcpy(&res, &pcie->io, sizeof(res));
-> +			err = devm_pci_remap_iospace(dev, win->res, io_base);
-> +			if (err) {
-> +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> +					 err, win->res);
-> +				resource_list_destroy_entry(win);
-> +			}
->  			break;
-> -
->  		case IORESOURCE_MEM:
-> -			pcie->offset.mem = res.start - range.pci_addr;
-> -
-> -			memcpy(&pcie->mem, &res, sizeof(res));
-> +			memcpy(&pcie->mem, win->res, sizeof(*win->res));
->  			pcie->mem.name = "non-prefetchable";
->  			break;
-> +		case IORESOURCE_BUS:
-> +			pcie->busnr = win->res->start;
-> +			break;
->  		}
->  	}
->  
-> -	err = of_pci_parse_bus_range(node, &pcie->busn);
-> -	if (err < 0) {
-> -		dev_err(dev, "failed to parse bus ranges property: %d\n", err);
-> -		pcie->busn.name = node->name;
-> -		pcie->busn.start = 0;
-> -		pcie->busn.end = 0xff;
-> -		pcie->busn.flags = IORESOURCE_BUS;
-> -	}
-> -
->  	for_each_available_child_of_node(node, child) {
->  		int slot;
->  
-> @@ -1125,28 +1104,6 @@ static int mtk_pcie_setup(struct mtk_pcie *pcie)
->  	return 0;
->  }
->  
-> -static int mtk_pcie_request_resources(struct mtk_pcie *pcie)
-> -{
-> -	struct pci_host_bridge *host = pci_host_bridge_from_priv(pcie);
-> -	struct list_head *windows = &host->windows;
-> -	struct device *dev = pcie->dev;
-> -	int err;
-> -
-> -	pci_add_resource_offset(windows, &pcie->pio, pcie->offset.io);
-> -	pci_add_resource_offset(windows, &pcie->mem, pcie->offset.mem);
-> -	pci_add_resource(windows, &pcie->busn);
-> -
-> -	err = devm_request_pci_bus_resources(dev, windows);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	err = devm_pci_remap_iospace(dev, &pcie->pio, pcie->io.start);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	return 0;
-> -}
-> -
->  static int mtk_pcie_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -1169,11 +1126,7 @@ static int mtk_pcie_probe(struct platform_device *pdev)
->  	if (err)
->  		return err;
->  
-> -	err = mtk_pcie_request_resources(pcie);
-> -	if (err)
-> -		goto put_resources;
-> -
-> -	host->busnr = pcie->busn.start;
-> +	host->busnr = pcie->busnr;
->  	host->dev.parent = pcie->dev;
->  	host->ops = pcie->soc->ops;
->  	host->map_irq = of_irq_parse_and_map_pci;
-> -- 
-> 2.6.4
+On 30/11/18 10:38, Daniel Thompson wrote:
+> On Fri, Nov 30, 2018 at 08:53:47AM +0000, Julien Thierry wrote:
+>>
+>>
+>> On 29/11/18 16:40, Mark Rutland wrote:
+>>> On Mon, Nov 12, 2018 at 11:56:57AM +0000, Julien Thierry wrote:
+>>>> Introduce fixed values for PMR that are going to be used to mask and
+>>>> unmask interrupts by priority. These values are chosent in such a way
+>>>
+>>> Nit: s/chosent/chosen/
+>>>
+>>>> that a single bit (GIC_PMR_UNMASKED_BIT) encodes the information whether
+>>>> interrupts are masked or not.
+>>>
+>>> There's no GIC_PMR_UNMASKED_BIT in this patch. Should that be
+>>> GIC_PRIO_STATUS_BIT?
+>>>
+>>
+>> Yep, forgot to update the commit message when renaming, thanks.
+>>
+>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>>> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>> Cc: Oleg Nesterov <oleg@redhat.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> ---
+>>>>  arch/arm64/include/asm/ptrace.h | 6 ++++++
+>>>>  1 file changed, 6 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>>>> index fce22c4..ce6998c 100644
+>>>> --- a/arch/arm64/include/asm/ptrace.h
+>>>> +++ b/arch/arm64/include/asm/ptrace.h
+>>>> @@ -25,6 +25,12 @@
+>>>>  #define CurrentEL_EL1		(1 << 2)
+>>>>  #define CurrentEL_EL2		(2 << 2)
+>>>>  
+>>>> +/* PMR values used to mask/unmask interrupts */
+>>>> +#define GIC_PRIO_IRQON		0xf0
+>>>> +#define GIC_PRIO_STATUS_SHIFT	6
+>>>> +#define GIC_PRIO_STATUS_BIT	(1 << GIC_PRIO_STATUS_SHIFT)
+>>>> +#define GIC_PRIO_IRQOFF		(GIC_PRIO_IRQON ^ GIC_PRIO_STATUS_BIT)
+>>>
+>>> Could you elaborate on the GIC priority logic a bit?
+>>>
+>>
+>> Yes, I'll give details below.
+>>
+>>> Are lower numbers higher priority?
+>>>
+>>
+>> Yes, that is the case.
+>>
+>>> Are there restrictions on valid PMR values?
+>>>
+>>
+>> Yes, there are at most 8 priority bits but implementations are free to
+>> implement a number of priority bits:
+>> - between 5 and 8 when GIC runs two security states (bits [7:3] always
+>> being implemented and [2:0] being optional), but non-secure side is
+>> always deprived or the lowest implemented bit
+>> - between 4 and 8 when GIC runs only one security state (bits [7:4]
+>> implemented, bits [3:0] optional)
+>>
+>> This is detailed in section 4.8 "Interrupt prioritization" of the GICv3
+>> architecture specification.
+>>
+>> So Linux should always be able to see bits [7:4].
+>>
+>>> IIUC GIC_PRIO_IRQOFF is 0xb0 (aka 0b10110000), which seems a little
+>>> surprising. I'd have expected that we'd use the most signficant bit.
+>>>
+>>
+>> So, re-reading the GICv3 spec, I believe this sparked from a confusion...
+>>
+>> The idea was that the GICv3 specification would recommend to keep
+>> non-secure group-1 interrupts at a lower priority that group-0 (and
+>> secure group-1 interrupts) interrupts, and to do so the idea was to
+>> always keep bit[7] == 1 for non-secure group-1.
+>>
+>> So, we would need to have priority bit[7] == 1 for both normal
+>> interrupts and pseudo-NMIs, and using the most significant bit to mask
+>> would mean masking pseudo-NMIs as well.
+>>
+>> However, I only find mention of this in the notes of section 4.8.6
+>> "Software accesses of interrupt priority". The section only applies to
+>> GIC with two security states, and the recommendation of writing
+>> non-secure group-1 priorities with bit[7] == 1 is only directed at
+>> writes from the secure side. From the non-secure side, the GIC already
+>> does some magic to enforce that the value kept in the distributor has
+>> bit[7] == 1.
+>>
+>> So, I believe that from the non-secure point of view, we could define
+>> pseudo-NMI priority as e.g. 0x40 (which the GIC will convert to 0xa0)
+>> and use the most significant bit of PMR to mask normal interrupts which
+>> would be more intuitive.
+>>
+>> Marc, as GIC expert do you agree with this? Or is there a reason we
+>> should keep bit[7] == 1 for non-secure group-1 priorities?
 > 
+> I think selecting bit 6 dates back to when I was working on this.
+> 
+> I originally used bit 7 but switched due to problems on the FVP at the
+> time (my memory is a little hazy here but it felt like it wasn't
+> doing the magic shift properly when running in non-secure mode).
+> 
+
+If you were using boot-wrapper, that might have been the case as
+SCR_EL3.FIQ is not getting set.
+
+The fun bit is that under this configuration the magic bit still happens
+for non-secure accesses to priorities configured in the
+distributor/redistributor, but it disables the magic for non-secure PMR
+and RPR accesses. So you can easily end up masking too much stuff when
+writting to PMR when SCR_EL1.FIQ is cleared if you don't realize that
+what non-secure sees in the distributor is not aligned with what will be
+masked by PMR or presented in RPR.
+
+> Once the patchset was running on real hardware I kept on with bit 6 
+> figuring that, given the magic shift from non-secure mode is a little
+> odd, it would remain furtile soil for future silicon bugs (I was
+> watching a lot of patches go past on the ML working round bugs in
+> non-Arm GIC implementations and ended up feeling rather paranoid
+> about things like that).
+> 
+> 
+> Daniel.
+> 
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
