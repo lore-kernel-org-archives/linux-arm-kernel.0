@@ -2,23 +2,22 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=unavailable
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1BEBDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 10:38:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 01A6EC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 10:50:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E14252146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 10:38:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C80B920863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 10:50:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="a5U+K0MG";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="gFgIH9NI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E14252146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="LkrIQeXa"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C80B920863
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,66 +25,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=19kXTwvmceUZFPqmc5qfHLZNEVACsOCjM+n5Q6qi6ag=; b=a5U+K0MG5Fb3aV
-	X/vmQc4KhuBFbJOkahaNBR7+p9Cx5WFgM2VeYSSkoudbalG+tfxY/nbxtplp8olUtBng0Vt6oFI7u
-	6VFUP2bsY3OyWFuoy2XqRU0i4E4ExEJQ34s6ma9nYiuKMsTiYLcjR3iuYIOyEf1lV38kiZs9KVFW8
-	uLLonHr0f5e/2QoNhPVgd73R2BFghuCcWwaTq6pKovpBYMNL3m6xcXdmJOiGOVx+JzhAJEFOdpOdb
-	+z9AJxb1ZqNe9fYgbIdlnEWwNtgDGjbK4Ex0QVZbrwJ/ZycHOZ18M37lgXLkK8BCdLjeZ6gGJH7NC
-	Wj3rq5i43QFMNsAo+OKQ==;
+	List-Owner; bh=byny+1uEOpBXN8jgMcj+bLKVYSJ2NskcDWVuoSOQ+o8=; b=LkrIQeXaFWQdtJ
+	qsLYnDx6mh8QD6/b0KfizkW2qqMnib+jSVfEbMqQINB1nRaaLScQqqyZn/ndOOZ4GM4n83gWY5sqX
+	MyRaO+TEXL34glLRKTVY+nQst2jST1DmpFkVNqb+4imxYlYZVLcJWJ1PYjbX8dltiNY+xNjjlG8vv
+	iaceZLG1VHp6ZK4Vz/XDFVisaQreNpMt+xCR8ii9zPSWF+IRoz7WAhmpK3oHnpu1/kKpxV7FY0iZE
+	0D6Y2lK2Bk3Rgq0TGekDKc5lyT+yPAO1+neaZqgMPxpNwxxm3DUJa5QGYgO+2ClUVtrBnyJmmshaQ
+	lXqydblIkthNS3gyVVZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSgBt-0007sV-1y; Fri, 30 Nov 2018 10:38:33 +0000
-Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
+	id 1gSgNk-0004F6-Lx; Fri, 30 Nov 2018 10:50:48 +0000
+Received: from mail-lj1-f196.google.com ([209.85.208.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSgBp-0007rb-DJ
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 10:38:30 +0000
-Received: by mail-wr1-x441.google.com with SMTP id x10so4767919wrs.8
+ id 1gSgNg-0004Dv-Cf
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 10:50:46 +0000
+Received: by mail-lj1-f196.google.com with SMTP id k19-v6so4553112lji.11
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 02:38:15 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=YuAYie91ImB2WqhzRLQtsGktOjfWDck7ib2uKUhKWk8=;
- b=gFgIH9NIsrKPu4CrMlRZghehBrZiMOZqhSxt0ewudz67pV2cQrV+ZQ4Mw8Yepi+g/o
- fVkYbA++JZDEnMW0waks60/09pkLS11rSVbemb+Mh/0B89v4yqFykAGnNkf6iI3cf5vg
- aAuLRASyxYpPfqMZ8z1G2+pOEczd6VtBG0UzM=
+ Fri, 30 Nov 2018 02:50:32 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=YuAYie91ImB2WqhzRLQtsGktOjfWDck7ib2uKUhKWk8=;
- b=sW/F2p8xQo8Pln/jNA4oNXi1BKq4z1FU++Gre45pSUaKO4sVvMB72RL0XfPjlx5Fcf
- uKyXb9HhH1nRuObVPsUneRyv6erYhndb9dZJznQzJYyWhppmZXao4Nnxx09TAZQOIoYl
- H3QMisPyULCQCjwEcixeZD9X06LD6JT1sQNh4mawT89WhKadtHhfGN48BhK7dnQlehmT
- 84qzQFWsAVu/6fD2lyGTncPomwhyleTun2pSqkLncOV0Ee6J3BtBRt3hXNmH3Fsd4zLm
- Ndh1BrBXBS4GaHkBCzUmRs42AhZNjScn3XzaHKuGtRsiawDZfI0nQQoKjwYuSugcmd4r
- n7ZA==
-X-Gm-Message-State: AA+aEWadIobGvCZPzsmQ/LouVu1lwn3la6XNYYtGVoEj1Mvsl6GCmlaZ
- 4vRvru2yz0CVisvc6526ye5IoA==
-X-Google-Smtp-Source: AFSGD/WkUKNxAatJkQjgvBh3Ku3X41HHm4y2x6cmb45ldwyYqz1xSLV4l/+L1kYXNA1dAO0+JHOz3Q==
-X-Received: by 2002:adf:80a9:: with SMTP id 38mr4173858wrl.137.1543574294290; 
- Fri, 30 Nov 2018 02:38:14 -0800 (PST)
-Received: from holly.lan (cpc141214-aztw34-2-0-cust773.18-1.cable.virginm.net.
- [86.9.19.6])
- by smtp.gmail.com with ESMTPSA id t5sm4639724wmg.43.2018.11.30.02.38.12
+ bh=daG1XJ3xEPZRYjxjHEIMiZ2KfFhva5k8E7JnZvAC+Oo=;
+ b=oMGrNwbTVZFLwlpK3lRqavVp9ImPcWpXRM9mLkU5EK8ECUHj1bf/NMpfX0K1B/8JDe
+ IamvArZGzo6VuBAXuUdMD3wKxgyB5rYcWlMWZOpWRsxfuGv4UOS5kx6snNpLBJGpMp/4
+ 0PL93Jz9zalad6rMw/WOGxci0GHDtnuvvZBXEFRb3huoSLRGCqRzVg0srmjiv19eLhzX
+ 2v9tnvNaeO6c2M10sWvFtQ5KxaGNz30LFpqCTs+OxHOUyGtxAI4bl0dFBP8ubtiWwKN9
+ Z/k/jNdIzACb7uoWW+z2eeVJa7jK+aEjkcE4fTpNsn8Fuk5oVHRioHwwLzZIMX9BjEgv
+ ADEg==
+X-Gm-Message-State: AA+aEWaeoLnyDaz/7awa9S5PqGZmYkMXGUKSawNbd78ympcxisBZ0Tnd
+ kLB5pz++8lIutOA+nsZ8YSE=
+X-Google-Smtp-Source: AFSGD/XFPJ1MMWBlTqXBpTiP9WCmLCT4QKpGGG+olHyyiMLUAlROfdFfvehxLuxm1UY3PtnHFDGMbQ==
+X-Received: by 2002:a2e:2281:: with SMTP id
+ i123-v6mr3117217lji.154.1543575031301; 
+ Fri, 30 Nov 2018 02:50:31 -0800 (PST)
+Received: from localhost.localdomain (84-253-205-125.bb.dnainternet.fi.
+ [84.253.205.125])
+ by smtp.gmail.com with ESMTPSA id s127sm753225lfe.8.2018.11.30.02.50.28
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 30 Nov 2018 02:38:13 -0800 (PST)
-Date: Fri, 30 Nov 2018 10:38:11 +0000
-From: Daniel Thompson <daniel.thompson@linaro.org>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v6 06/24] arm64: ptrace: Provide definitions for PMR values
-Message-ID: <20181130103811.lushdja552xevghm@holly.lan>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-7-git-send-email-julien.thierry@arm.com>
- <20181129164013.qmmwhbygjkh5lwx5@lakrids.cambridge.arm.com>
- <79145359-3594-3dac-1123-cec552c2b13e@arm.com>
+ Fri, 30 Nov 2018 02:50:30 -0800 (PST)
+Date: Fri, 30 Nov 2018 12:50:22 +0200
+From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: Re: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and
+ provider registrations
+Message-ID: <20181130105022.GA15388@localhost.localdomain>
+References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <79145359-3594-3dac-1123-cec552c2b13e@arm.com>
-User-Agent: NeoMutt/20180716
+In-Reply-To: <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
+User-Agent: Mutt/1.9.2 (2017-12-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_023829_451995_05392FD0 
-X-CRM114-Status: GOOD (  29.10  )
+X-CRM114-CacheID: sfid-20181130_025044_427505_31F555A2 
+X-CRM114-Status: GOOD (  33.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -97,130 +90,178 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, marc.zyngier@arm.com,
- catalin.marinas@arm.com, will.deacon@arm.com, christoffer.dall@arm.com,
- linux-kernel@vger.kernel.org, james.morse@arm.com,
- Oleg Nesterov <oleg@redhat.com>, joel@joelfernandes.org,
- linux-arm-kernel@lists.infradead.org
+Cc: linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Daniel Kurtz <djkurtz@chromium.org>, Sebastian Reichel <sre@kernel.org>,
+ David Brown <david.brown@linaro.org>, Lee Jones <lee.jones@linaro.org>,
+ linux-clk@vger.kernel.org, Rob Herring <robh@kernel.org>,
+ Jonathan Corbet <corbet@lwn.net>, Andrey Smirnov <andrew.smirnov@gmail.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ Russell King <linux@armlinux.org.uk>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>, Andy Gross <andy.gross@linaro.org>,
+ Huang Shijie <sjhuang@iluvatar.ai>, Guenter Roeck <linux@roeck-us.net>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ linux-arm-msm@vger.kernel.org, linux-soc@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Akshu Agrawal <akshu.agrawal@amd.com>, mazziesaccount@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 08:53:47AM +0000, Julien Thierry wrote:
-> 
-> 
-> On 29/11/18 16:40, Mark Rutland wrote:
-> > On Mon, Nov 12, 2018 at 11:56:57AM +0000, Julien Thierry wrote:
-> >> Introduce fixed values for PMR that are going to be used to mask and
-> >> unmask interrupts by priority. These values are chosent in such a way
-> > 
-> > Nit: s/chosent/chosen/
-> > 
-> >> that a single bit (GIC_PMR_UNMASKED_BIT) encodes the information whether
-> >> interrupts are masked or not.
-> > 
-> > There's no GIC_PMR_UNMASKED_BIT in this patch. Should that be
-> > GIC_PRIO_STATUS_BIT?
-> > 
-> 
-> Yep, forgot to update the commit message when renaming, thanks.
-> 
-> >> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> >> Suggested-by: Daniel Thompson <daniel.thompson@linaro.org>
-> >> Cc: Oleg Nesterov <oleg@redhat.com>
-> >> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/ptrace.h | 6 ++++++
-> >>  1 file changed, 6 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> >> index fce22c4..ce6998c 100644
-> >> --- a/arch/arm64/include/asm/ptrace.h
-> >> +++ b/arch/arm64/include/asm/ptrace.h
-> >> @@ -25,6 +25,12 @@
-> >>  #define CurrentEL_EL1		(1 << 2)
-> >>  #define CurrentEL_EL2		(2 << 2)
-> >>  
-> >> +/* PMR values used to mask/unmask interrupts */
-> >> +#define GIC_PRIO_IRQON		0xf0
-> >> +#define GIC_PRIO_STATUS_SHIFT	6
-> >> +#define GIC_PRIO_STATUS_BIT	(1 << GIC_PRIO_STATUS_SHIFT)
-> >> +#define GIC_PRIO_IRQOFF		(GIC_PRIO_IRQON ^ GIC_PRIO_STATUS_BIT)
-> > 
-> > Could you elaborate on the GIC priority logic a bit?
-> > 
-> 
-> Yes, I'll give details below.
-> 
-> > Are lower numbers higher priority?
-> > 
-> 
-> Yes, that is the case.
-> 
-> > Are there restrictions on valid PMR values?
-> > 
-> 
-> Yes, there are at most 8 priority bits but implementations are free to
-> implement a number of priority bits:
-> - between 5 and 8 when GIC runs two security states (bits [7:3] always
-> being implemented and [2:0] being optional), but non-secure side is
-> always deprived or the lowest implemented bit
-> - between 4 and 8 when GIC runs only one security state (bits [7:4]
-> implemented, bits [3:0] optional)
-> 
-> This is detailed in section 4.8 "Interrupt prioritization" of the GICv3
-> architecture specification.
-> 
-> So Linux should always be able to see bits [7:4].
-> 
-> > IIUC GIC_PRIO_IRQOFF is 0xb0 (aka 0b10110000), which seems a little
-> > surprising. I'd have expected that we'd use the most signficant bit.
-> > 
-> 
-> So, re-reading the GICv3 spec, I believe this sparked from a confusion...
-> 
-> The idea was that the GICv3 specification would recommend to keep
-> non-secure group-1 interrupts at a lower priority that group-0 (and
-> secure group-1 interrupts) interrupts, and to do so the idea was to
-> always keep bit[7] == 1 for non-secure group-1.
-> 
-> So, we would need to have priority bit[7] == 1 for both normal
-> interrupts and pseudo-NMIs, and using the most significant bit to mask
-> would mean masking pseudo-NMIs as well.
-> 
-> However, I only find mention of this in the notes of section 4.8.6
-> "Software accesses of interrupt priority". The section only applies to
-> GIC with two security states, and the recommendation of writing
-> non-secure group-1 priorities with bit[7] == 1 is only directed at
-> writes from the secure side. From the non-secure side, the GIC already
-> does some magic to enforce that the value kept in the distributor has
-> bit[7] == 1.
-> 
-> So, I believe that from the non-secure point of view, we could define
-> pseudo-NMI priority as e.g. 0x40 (which the GIC will convert to 0xa0)
-> and use the most significant bit of PMR to mask normal interrupts which
-> would be more intuitive.
-> 
-> Marc, as GIC expert do you agree with this? Or is there a reason we
-> should keep bit[7] == 1 for non-secure group-1 priorities?
+Hello Stephen,
 
-I think selecting bit 6 dates back to when I was working on this.
+Thanks a bunch for taking the time and reviewing this!
 
-I originally used bit 7 but switched due to problems on the FVP at the
-time (my memory is a little hazy here but it felt like it wasn't
-doing the magic shift properly when running in non-secure mode).
+On Fri, Nov 30, 2018 at 12:54:10AM -0800, Stephen Boyd wrote:
+> Quoting Matti Vaittinen (2018-11-13 03:55:58)
+> > With MFD devices the clk properties may be contained in MFD (parent) DT
+> > node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
+> > subdevice not to MFD device (parent). Add
+> > devm_of_clk_add_hw_provider_parent to tackle this issue.
+> > 
+> > Also clkdev registration lacks of managed registration functions and it
+> > seems few drivers do not drop clkdev lookups at exit. Add
+> > devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
+> > releasing at exit.
+> 
+> Please split this into clkdev and non-clkdev devm functionality.
+Allright. I'll split this to two patches.
 
-Once the patchset was running on real hardware I kept on with bit 6 
-figuring that, given the magic shift from non-secure mode is a little
-odd, it would remain furtile soil for future silicon bugs (I was
-watching a lot of patches go past on the ML working round bugs in
-non-Arm GIC implementations and ended up feeling rather paranoid
-about things like that).
+> > --- a/Documentation/driver-model/devres.txt
+> > +++ b/Documentation/driver-model/devres.txt
+> > @@ -238,6 +238,9 @@ CLOCK
+> >    devm_clk_put()
+> >    devm_clk_hw_register()
+> >    devm_of_clk_add_hw_provider()
+> > +  devm_of_clk_add_parent_hw_provider()
+> > +  devm_clk_hw_register_clkdev()
+> > +  devm_clk_release_clkdev()
+> 
+> The 'release' or non-common functions shouldn't be documented here.
+So I will drop the line mentioning devm_clk_release_clkdev()
 
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index af011974d4ec..9bb921eb90f6 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+> >         of_clk_del_provider(*(struct device_node **)res);
+> >  }
+> >  
+> > -int devm_of_clk_add_hw_provider(struct device *dev,
+> > +static int __devm_of_clk_add_hw_provider(struct device *dev,
+> >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> >                                               void *data),
+> > -                       void *data)
+> > +                       struct device_node *of_node, void *data)
+> >  {
+> > -       struct device_node **ptr, *np;
+> > +       struct device_node **ptr;
+> >         int ret;
+> >  
+> >         ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
+> > @@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> >         if (!ptr)
+> >                 return -ENOMEM;
+> >  
+> > -       np = dev->of_node;
+> > -       ret = of_clk_add_hw_provider(np, get, data);
+> > +       *ptr = of_node;
+> > +       ret = of_clk_add_hw_provider(of_node, get, data);
+> >         if (!ret) {
+> > -               *ptr = np;
+> 
+> Why is this moved outside of the if condition?
+I completely removed the local variable np and just unconditionally set
+the allocated devres to point at the node (if allocation succeeded). We
+could of course only do this if the provider registration succeeded and
+save one assignment - but I guess I intended to remove the curly braces
+and thus decided to go for one liner after if. But apparently I didn't
+remove the braces O_o. Well, I can put the assignment inside the
+condition if you prefer that.
 
-Daniel.
+> In fact, why isn't just
+> the first line in this hunk deleted and passed to this function as
+> struct device_node *np?
+
+I am sorry but I don't quite follow your suggestion here. Do you mean we
+could just pass the struct device_node *np in devres_add()? I thought
+the pointer passed to devress_add() should be allocated using
+devres_alloc. Can you please elaborate what you mean?
+
+> 
+> >                 devres_add(dev, ptr);
+> >         } else {
+> >                 devres_free(ptr);
+> > @@ -3917,8 +3916,25 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> >  
+> >         return ret;
+> >  }
+> 
+> Nitpick: Add a newline here.
+
+Will do.
+
+> 
+> > +int devm_of_clk_add_hw_provider(struct device *dev,
+> > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > +                                             void *data),
+> > +                       void *data)
+> > +{
+> > +       return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
+> > +}
+> >  EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
+> >  
+> > +int devm_of_clk_add_parent_hw_provider(struct device *dev,
+> > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > +                                             void *data),
+> > +                       void *data)
+> > +{
+> > +       return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
+> 
+> I'm wondering if we can somehow auto-detect this in
+> devm_of_clk_add_hw_provider() by looking for #clock-cells in the node.
+> If it isn't there, then we go to the parent node and look for a
+> #clock-cells property there in the DT node for that device. Does that
+> make sense? Then there isn't any new API and we can attach the lifetime
+> of the devm registration to the presence of the property indicating this
+> is a clk controller or not.
+
+Huh. I don't know why but building this kind of logic in core is a bit
+scary to me. I guess I can try implementing something like this - but I
+am not really a fan of this. (Accidentally) omit the #clock-cells from
+node and we go to parent node - I am a novice on this area but this
+sounds like a potential hazard to me. I believe the driver should know
+if it's properties should be in own or parent node - and if they are
+not, then there should be no guessing but error. The lifetime is topic
+where I would like to get information from you who know the kernel
+better than I do =) But I guess the parent node is there at least as
+long as the child device is alive. So for me the life time of
+get-callback is more crucial - but as I said, I don't understand the
+kernel in details so you probably know it better than me. But please let
+me know your final take on this and I will follow the guidance =)
+
+> 
+> > +                                            data);
+> > +}
+> > +EXPORT_SYMBOL_GPL(devm_of_clk_add_parent_hw_provider);
+> 
+> Can we get some kernel doc on these functions?
+Sure. I will add the doc. Reason why I didn't do it is that the current
+devm_of_clk_add_hw_provider() did not have doc. But I'll add that in
+next patch.
+
+> > +       rval = devres_release(dev, devm_clkdev_release,
+> > +                             &devm_clk_match_clkdev, cl);
+> 
+> Nitpick: Drop & on functions taken as pointers.
+Ok. Will do.
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
 
 _______________________________________________
 linux-arm-kernel mailing list
