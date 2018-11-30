@@ -2,118 +2,76 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E61EC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:00:21 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1D9F4C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:00:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6265E2146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:00:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E76872146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:00:49 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ScrdlvP8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armh.onmicrosoft.com header.i=@armh.onmicrosoft.com header.b="qQUdXI4S"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6265E2146D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PihOs9wY";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="fR6nWM3w"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E76872146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Content-ID:In-Reply-To:
-	References:Message-ID:Date:Subject:To:From:Reply-To:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=I1oGQ+cjicGvzdyETvBHHvXrSLv78hOQYZYs6FL8SOk=; b=ScrdlvP8qsve7D
-	sZ3iH0kz1VqXezrpD8ol01iKfqsWaSAIw/2DLdpjWFaSeXgSAX0QRoxV80E5Z9nBPLFtjnuUV4M+7
-	15qZGtB7qSyWVd12fws7HqXWhGQSbks5mnzTtVDkLA4y+9jmXRH1vAC5KChV9ngFd4DhwqQW942K0
-	c0EaZgNshguag59blXKAs3QCA/InGVKGGF2h5lAL3NRg4ZuiehkhH2TmDosTzLRhks1u2GWwXkjwz
-	zwBTc8bsjLerxUiMJ4PtDhP1XJGMmcJC6fEl/pnyADWxwwW0T6o/9adXxYx99V7MKc2lTHxZVgZWd
-	lAHGqkJLuYqzGRQrorKg==;
+	List-Owner; bh=vFFCzsEMzoyR/FVtOn60uuT8FxRFrjms0YqO4yz3Dq4=; b=PihOs9wYmxB98S
+	kATlC9+P3zvpvzupxJr5JK85No8Z3Hlw0sag8Pj5CBk/mWHST/tZ44zjelHhkp3s6K7m+wabenMiU
+	R1t6J7fftvXFDsbuHwzkiCs5pqwufxF912i58TNI2HJ/tK0ZP+n1d45Q1feVTHv2ItI0tb8hNgtvK
+	Dp1CXhU+9Oyr/H+hD7W0dSMGgVoUKrX1P7pXxUtLhE150umrKxGFFX+yAbpckFK+7nFXTU83iPIC0
+	wfGTsHLhfeNHnyL6fXy5iTYpIMz4VgUoECuWRHJqctKhaF6jpQg4Lcp3/25OCXYWWWiM2NTG/jqgI
+	CPw4VHM0UIX5auCttgwg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSn5O-0006zA-Kc; Fri, 30 Nov 2018 18:00:18 +0000
-Received: from mail-eopbgr30087.outbound.protection.outlook.com ([40.107.3.87]
- helo=EUR03-AM5-obe.outbound.protection.outlook.com)
+	id 1gSn5q-0007IC-BI; Fri, 30 Nov 2018 18:00:46 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSn5J-0005ev-Ne
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 18:00:16 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=armh.onmicrosoft.com; 
- s=selector1-arm-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=z1fYnj+NUjHme1VvcAaGdRPmL0mrcqfVwffV4z7Uy24=;
- b=qQUdXI4S+5YFtZvCO33Th5n3UCj382dcD4JbTpt1U9NQ0TRkQ9581qpSQwODpUigV4+p0oE4dNam4iZgd6aGOdZp7Zb6SzFd2hihr8N+O8Sk38BbPNCh3rnjVXyZt55UZAzEGEUAUfVUyrbFhdZx96ZUv24nVUetQaPUgdq3mDw=
-Received: from DB7PR08MB3209.eurprd08.prod.outlook.com (52.134.110.159) by
- DB7PR08MB3067.eurprd08.prod.outlook.com (52.134.110.21) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1361.19; Fri, 30 Nov 2018 17:59:59 +0000
-Received: from DB7PR08MB3209.eurprd08.prod.outlook.com
- ([fe80::dd06:f986:fcee:10f1]) by DB7PR08MB3209.eurprd08.prod.outlook.com
- ([fe80::dd06:f986:fcee:10f1%2]) with mapi id 15.20.1382.020; Fri, 30 Nov 2018
- 17:59:59 +0000
-From: Catalin Marinas <Catalin.Marinas@arm.com>
-To: Steve Capper <Steve.Capper@arm.com>
-Subject: Re: [PATCH V3 4/5] arm64: mm: introduce 52-bit userspace support
-Thread-Topic: [PATCH V3 4/5] arm64: mm: introduce 52-bit userspace support
-Thread-Index: AQHUfB+DVQD7LOHUykiMmpZH+DICTKVotMOA
-Date: Fri, 30 Nov 2018 17:59:59 +0000
-Message-ID: <20181130175956.GJ43329@arrakis.emea.arm.com>
-References: <20181114133920.7134-1-steve.capper@arm.com>
- <20181114133920.7134-5-steve.capper@arm.com>
-In-Reply-To: <20181114133920.7134-5-steve.capper@arm.com>
-Accept-Language: en-GB, en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-user-agent: Mutt/1.10.1 (2018-07-13)
-x-originating-ip: [217.140.106.54]
-x-clientproxiedby: LO2P265CA0317.GBRP265.PROD.OUTLOOK.COM
- (2603:10a6:600:a4::17) To DB7PR08MB3209.eurprd08.prod.outlook.com
- (2603:10a6:5:1e::31)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=Catalin.Marinas@arm.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB7PR08MB3067;
- 6:OhLvMSxiIgh0rwB6ogpMCfcOSoOS6PHR6+ZEe7RqRK0ZQ2ykE0zkM/VEHAYbHLMPt1UvvklGtt0OA2fErtm8bnxs2y3yp7V1Z5J51GiCNc/mgn1xXTSDoddJA40dItKiMv4e8lfSvy+5dN55QA0CO1/32kquijuu4VcdmUy8mtn1I4xxtjafVyH4MBRRRKU8WgFDeUObyjI52KNizWVb3Eem9lT2L3IEsWAw5WWKdrHd3I8gVPm5lyNknEAVZ6g2B1ll0IsogDXgmFFQ85N5HX6M+SdvTBumldIo8H8uRGeiFCe3nyRz4T5HHxcKEIaIKxsNsnTWO42vtlHtjXmJ57GnEacAL3gFh1mU3uFtzrhrIU6S15DtsUEVILvXS4gJgkwgjMMgmMrE8BdaL0mFgsO0qH0hqRXvTh1qtNJLf8Ari5WEMAdSYvealb+NYS05Ai0nU/xOcHjawc5H1f2a1A==;
- 5:FcLPukWtA9UeDP5I3C2mxRD78iPWCZ+QvqiVzArBMrKgz6o3Fr+57n/MGA369khCm/6OZ2NKs4OkTpRpiUGT7WXbD7yinIRyY0d4ce4oidp+2kTBU1t+gXCBHjh9ca6SEabIJYtqPqMIGhRl7k7QMEFKdbA2MY6JNm3oRa0YZbw=;
- 7:F2WQYpv54IzQvjrTdHWHA1cPqEu02ijUADOul884dIi7UQnyvtny8JM/kzr8PfgE5aBjO6IzKGtjzC/nSHxuWvAg6Cyyg5Iw1O/KCYyVnfTd+fjL0aAmQJdN5HbaSvaxCpOJOIIMg5+7wPuUICISlQ==
-x-ms-office365-filtering-correlation-id: 54221fa1-708f-4cef-04ed-08d656eda4c6
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB7PR08MB3067; 
-x-ms-traffictypediagnostic: DB7PR08MB3067:
-x-ld-processed: f34e5979-57d9-4aaa-ad4d-b122a662184d,ExtAddr
-x-microsoft-antispam-prvs: <DB7PR08MB30674B9E0F71063D2E0764C1F2D30@DB7PR08MB3067.eurprd08.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3231453)(999002)(944501410)(52105112)(10201501046)(3002001)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:DB7PR08MB3067; BCL:0; PCL:0; RULEID:; SRVR:DB7PR08MB3067; 
-x-forefront-prvs: 087223B4DA
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(366004)(376002)(346002)(396003)(189003)(199004)(40434004)(102836004)(25786009)(106356001)(6512007)(81156014)(53936002)(97736004)(81166006)(99286004)(8936002)(8676002)(229853002)(5660300001)(14454004)(476003)(7736002)(4326008)(486006)(446003)(305945005)(11346002)(6862004)(1076002)(71190400001)(6246003)(71200400001)(44832011)(54906003)(386003)(33656002)(58126008)(6116002)(6636002)(3846002)(256004)(76176011)(6506007)(2906002)(6486002)(86362001)(72206003)(478600001)(5024004)(14444005)(316002)(52116002)(66066001)(26005)(186003)(68736007)(6436002)(105586002)(18370500001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR08MB3067;
- H:DB7PR08MB3209.eurprd08.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: arm.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: eSuv19cTlEbL3p3tjqeCK56QnkpRWTjP19AWsZNmdADCUIDI5VMO9sULr5K5bOJIRidw56392l124a/QiEEpRM+DwHuYRzfk2f5hiOfoVb3MVjjHibDyvbjuy1A2hYQ1AgkpP+3sKT6oR/H3y6XmttIuhy1v5+n913KGuqle+etrMsLylG58ku08SaCsDHGYTUFU2dj5m8DCgu16KSrrUxETywkxoJ5LMofZCropKYeo5pei7+9xe7f4QXlW8I/JqnwLv61qDQ/zgl28RttFMF07pqimK2E7wyp/W9dYybeq9CzDfzTey0m/YINXo4vZqTqhdG9mg6zD7BlwI2Zx3T752s6J1tbYhhXewfi0lx4=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
-Content-ID: <3BA8EACF337C7D42AD098D6042E872A6@eurprd08.prod.outlook.com>
+ id 1gSn5Y-0006z8-7Q; Fri, 30 Nov 2018 18:00:31 +0000
+Received: from mail-qt1-f169.google.com (mail-qt1-f169.google.com
+ [209.85.160.169])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id BF146214D9;
+ Fri, 30 Nov 2018 18:00:17 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543600817;
+ bh=/QpuGKJw2ddCeYOK3BoT6q8Eh45edi10/QgSRj8sg4I=;
+ h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
+ b=fR6nWM3wBm1dMxNyAUPSbwdj1Q+K/XNmHKVIxb+tfplFWTz5Hf9UQePJG9BlCS+qO
+ Bf+tw27Vw48FA0mSJiQ4QVwrMDXC1EEGZj3XbJh6TVqZe+eC0hdOB2ibCvO4cXY5VB
+ hS0wpOT5xwQYG6bMvsnZX/wBPyPmQm8uSOExBHd4=
+Received: by mail-qt1-f169.google.com with SMTP id e5so6832092qtr.12;
+ Fri, 30 Nov 2018 10:00:17 -0800 (PST)
+X-Gm-Message-State: AA+aEWYPokI2d0A3SZH4tplYlLEe2u/fu7912lSP+lWzdo/nK7hRiqaW
+ x/HMIzLMXwnGNmcUilUSIJIMuEAzDwBfskX1dQ==
+X-Google-Smtp-Source: AFSGD/UiLGFEHfl3xFMRQ6BqqrGeqaokngd70FI9UTO2I8nWvpdwvFH4mj26CvCmZOH7gYUq10ZoErtWi8ZQJGhpW+0=
+X-Received: by 2002:ac8:6b18:: with SMTP id w24mr6546459qts.144.1543600816930; 
+ Fri, 30 Nov 2018 10:00:16 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: arm.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 54221fa1-708f-4cef-04ed-08d656eda4c6
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Nov 2018 17:59:59.4307 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: f34e5979-57d9-4aaa-ad4d-b122a662184d
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR08MB3067
+References: <20181005165848.3474-1-robh@kernel.org>
+ <20181005165848.3474-13-robh@kernel.org>
+ <035ae23f-3c92-ffd9-0753-abbd604c5c02@xilinx.com>
+In-Reply-To: <035ae23f-3c92-ffd9-0753-abbd604c5c02@xilinx.com>
+From: Rob Herring <robh@kernel.org>
+Date: Fri, 30 Nov 2018 12:00:05 -0600
+X-Gmail-Original-Message-ID: <CAL_JsqJJkcbxvfbVVOTPb5gavPgypO-Cd05C6qpvbvPMd1G81g@mail.gmail.com>
+Message-ID: <CAL_JsqJJkcbxvfbVVOTPb5gavPgypO-Cd05C6qpvbvPMd1G81g@mail.gmail.com>
+Subject: Re: [PATCH 12/36] dt-bindings: arm: Convert cpu binding to json-schema
+To: Michal Simek <michal.simek@xilinx.com>, Mark Rutland <mark.rutland@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_100014_538812_CF3F12BC 
-X-CRM114-Status: GOOD (  16.32  )
+X-CRM114-CacheID: sfid-20181130_100028_481823_B78523CD 
+X-CRM114-Status: GOOD (  16.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -125,49 +83,70 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "linux-mm@kvack.org" <linux-mm@kvack.org>,
- "ard.biesheuvel@linaro.org" <ard.biesheuvel@linaro.org>,
- Will Deacon <Will.Deacon@arm.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "jcm@redhat.com" <jcm@redhat.com>
+Cc: devicetree@vger.kernel.org, Kumar Gala <kumar.gala@linaro.org>,
+ Grant Likely <glikely@secretlab.ca>, Arnd Bergmann <arnd@arndb.de>,
+ Tom Rini <trini@konsulko.com>, Frank Rowand <frowand.list@gmail.com>,
+ Linus Walleij <linus.walleij@linaro.org>,
+ Pantelis Antoniou <pantelis.antoniou@konsulko.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Matthias Brugger <matthias.bgg@gmail.com>, Mark Brown <broonie@kernel.org>,
+ Geert Uytterhoeven <geert@linux-m68k.org>, Jonathan Cameron <jic23@kernel.org>,
+ Olof Johansson <olof@lixom.net>, linux-mediatek@lists.infradead.org,
+ linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Nov 14, 2018 at 01:39:19PM +0000, Steve Capper wrote:
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 50b1ef8584c0..19736520b724 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -616,11 +616,21 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
->  #define pgd_ERROR(pgd)__pgd_error(__FILE__, __LINE__, pgd_val(pgd))
+On Thu, Nov 8, 2018 at 2:49 AM Michal Simek <michal.simek@xilinx.com> wrote:
 >
->  /* to find an entry in a page-table-directory */
-> -#define pgd_index(addr)(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
-> +#define pgd_index(addr, ptrs)(((addr) >> PGDIR_SHIFT) & ((ptrs) - 1))
-> +#define _pgd_offset_raw(pgd, addr, ptrs) ((pgd) + pgd_index(addr, ptrs))
-> +#define pgd_offset_raw(pgd, addr)(_pgd_offset_raw(pgd, addr, PTRS_PER_PGD))
+> Hi Rob,
 >
-> -#define pgd_offset_raw(pgd, addr)((pgd) + pgd_index(addr))
-> +static inline pgd_t *pgd_offset(const struct mm_struct *mm, unsigned long addr)
-> +{
-> +pgd_t *ret;
-> +
-> +if (IS_ENABLED(CONFIG_ARM64_52BIT_VA) && (mm != &init_mm))
-> +ret = _pgd_offset_raw(mm->pgd, addr, 1ULL << (vabits_user - PGDIR_SHIFT));
+> On 05. 10. 18 18:58, Rob Herring wrote:
+> > Convert ARM CPU binding to DT schema format using json-schema.
+> >
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> > Cc: devicetree@vger.kernel.org
+> > Cc: linux-arm-kernel@lists.infradead.org
+> > Cc: linux-mediatek@lists.infradead.org
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > ---
+> >  .../devicetree/bindings/arm/cpus.txt          | 490 -----------------
+> >  .../devicetree/bindings/arm/cpus.yaml         | 503 ++++++++++++++++++
+> >  2 files changed, 503 insertions(+), 490 deletions(-)
+> >  delete mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+> >  create mode 100644 Documentation/devicetree/bindings/arm/cpus.yaml
 
-I think we can make this a constant since the additional 4 bits of the
-user address should be 0 on a 48-bit VA. Once we get the 52-bit kernel
-VA supported, we can probably revert back to a single macro.
+[...]
 
-Another option is to change  PTRS_PER_PGD etc. to cover the whole
-52-bit, including the swapper_pg_dir, but with offsetting the TTBR1_EL1
-setting to keep the 48-bit kernel VA (for the time being).
+> I have take a look at xilinx part of this and try to build it for arm64
+> platforms and I see errors coming from this cpu description.
+> /root/linux/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dt.yaml:
+> cpu@0:compatible: ['arm,cortex-a53', 'arm,armv8'] is too long
+> /root/linux/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dt.yaml:
+> cpu@0:compatible: Additional items are not allowed ('arm,armv8' was
+> unexpected)
 
---
-Catalin
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+Thanks for actually giving this a spin!
+
+> Based on grep this is used in a lot of places
+> compatible = "arm,cortex-a53", "arm,armv8";
+>
+> Should this be moved to just simple?
+> compatible = "arm,cortex-a53";
+
+I'd normally go with the majority which would be to keep it. However,
+'arm,armv8' is of questionable value, isn't actually documented, and
+doesn't exist for any other version of the architecture. So we should
+kill it IMO.
+
+Paging Mark Rutland and other arm folks...
+
+Rob
 
 _______________________________________________
 linux-arm-kernel mailing list
