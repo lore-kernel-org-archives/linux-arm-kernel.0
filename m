@@ -2,65 +2,49 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80B4EC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:21:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0FA1DC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:23:08 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 508732082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:21:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A33F32082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:23:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GNGXYLYq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 508732082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Agi31L2a"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A33F32082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=7NMzKAp3dtWf0sb4W7XGe7j2mzjM8tM3GzujzWf0fJU=; b=GNGXYLYqh8MMnU
-	8vEnoyEr72jp5jzsfHrxKsYmyZ/7MunwuK+9xSYXSX8OBpX4Ktbz5hyXkydV7QRrACCNZG6DwL9y5
-	EpOxyXRkI6mb1v8cQkaWIrJu/DnAJsftlfsmOSPhbvQPX0hM8fiXIuDRTm4Iw0zYTLT3AABMD03fQ
-	QnDLVZ0nGmmbIwVflcSChhQ7KJuP6TwKaX2GrOhtvO71tveb1k5Xa0wv1Gr1FbfKikdCg6RWNUL95
-	44R1Z2CFkCOs2+ZCC1SNan+wENjGwM5PHAg51VM8QfEqxlnHft01owRe7cMT+B1+8Hctjh8DS7VPY
-	stZqXpdQ2exxHgUsMyQg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=J0ZP61D38CMInK80oANe6JPAFK0n5NUCuX6eHI8UhrM=; b=Agi31L2aO1CH96
+	RXIxwCEKSwNgq1k8vShv/obIvpCxGn7iEQW12HOYenUFIIaeL1LuwUL62DoscSgFk4S83KEDvPj4C
+	AbA34yuBqxvqSK4kS7ZbVAjotVCqtTfnKbv7U43+xTI3X0hs5OCb2tx7DiXTuU84V1puYSkeDq5Bh
+	9tkg3bkr+tiDe0ms4MkDQSaYYHYSDS+5OlBp0VmSdi6IdRDj02henlOZAYbcBx40ea2XrZoUsJohh
+	gx62cJSjJDVydf9zI9QqZMHuCdOykXmbg716HDois03gNWtCoNeG/D+r9v5mdQAcvYjA7SYcruoGr
+	3JE6dPpUcm8bQnRKagvw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSijs-0003qb-JE; Fri, 30 Nov 2018 13:21:48 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSij1-0002vh-UM; Fri, 30 Nov 2018 13:20:59 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 771351596;
- Fri, 30 Nov 2018 05:20:55 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 4755E3F5A0;
- Fri, 30 Nov 2018 05:20:55 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 175601AE12D3; Fri, 30 Nov 2018 13:21:14 +0000 (GMT)
-Date: Fri, 30 Nov 2018 13:21:14 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Subject: Re: [PATCH v16 15/16] arm64: kexec_file: add kernel signature
- verification support
-Message-ID: <20181130132113.GE9000@arm.com>
-References: <20181115055254.2812-1-takahiro.akashi@linaro.org>
- <20181115055254.2812-16-takahiro.akashi@linaro.org>
+	id 1gSil5-0004H7-E6; Fri, 30 Nov 2018 13:23:03 +0000
+Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
+ helo=localhost)
+ by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSil1-0004Ge-1e; Fri, 30 Nov 2018 13:22:59 +0000
+From: Christoph Hellwig <hch@lst.de>
+To: iommu@lists.linux-foundation.org
+Subject: remove the ->mapping_error method from dma_map_ops V3
+Date: Fri, 30 Nov 2018 14:22:08 +0100
+Message-Id: <20181130132231.16512-1-hch@lst.de>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181115055254.2812-16-takahiro.akashi@linaro.org>
-User-Agent: Mutt/1.5.23 (2014-03-12)
-X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_052056_257710_77BD7E52 
-X-CRM114-Status: GOOD (  22.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,99 +56,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: prudo@linux.ibm.com, herbert@gondor.apana.org.au, bhe@redhat.com,
- ard.biesheuvel@linaro.org, catalin.marinas@arm.com, bhsharma@redhat.com,
- heiko.carstens@de.ibm.com, linux-kernel@vger.kernel.org, dhowells@redhat.com,
- arnd@arndb.de, linux-arm-kernel@lists.infradead.org, kexec@lists.infradead.org,
- schwidefsky@de.ibm.com, james.morse@arm.com, dyoung@redhat.com,
- davem@davemloft.net, vgoyal@redhat.com
+Cc: linux-arch@vger.kernel.org, linux-alpha@vger.kernel.org,
+ linux-ia64@vger.kernel.org, linux-parisc@vger.kernel.org,
+ Linus Torvalds <torvalds@linux-foundation.org>, Joerg Roedel <joro@8bytes.org>,
+ x86@kernel.org, Robin Murphy <robin.murphy@arm.com>,
+ linux-kernel@vger.kernel.org, Jon Mason <jdmason@kudzu.us>,
+ xen-devel@lists.xenproject.org, David Woodhouse <dwmw2@infradead.org>,
+ linux-arm-kernel@lists.infradead.org,
+ Marek Szyprowski <m.szyprowski@samsung.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 15, 2018 at 02:52:54PM +0900, AKASHI Takahiro wrote:
-> With this patch, kernel verification can be done without IMA security
-> subsystem enabled. Turn on CONFIG_KEXEC_VERIFY_SIG instead.
-> 
-> On x86, a signature is embedded into a PE file (Microsoft's format) header
-> of binary. Since arm64's "Image" can also be seen as a PE file as far as
-> CONFIG_EFI is enabled, we adopt this format for kernel signing.
-> 
-> You can create a signed kernel image with:
->     $ sbsign --key ${KEY} --cert ${CERT} Image
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Reviewed-by: James Morse <james.morse@arm.com>
-> ---
->  arch/arm64/Kconfig              | 24 ++++++++++++++++++++++++
->  arch/arm64/kernel/kexec_image.c | 17 +++++++++++++++++
->  2 files changed, 41 insertions(+)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 93dc4d36d6db..11f3e1a00588 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -867,6 +867,30 @@ config KEXEC_FILE
->  	  for kernel and initramfs as opposed to list of segments as
->  	  accepted by previous system call.
->  
-> +config KEXEC_VERIFY_SIG
-> +	bool "Verify kernel signature during kexec_file_load() syscall"
-> +	depends on KEXEC_FILE
-> +	help
-> +	  Select this option to verify a signature with loaded kernel
-> +	  image. If configured, any attempt of loading a image without
-> +	  valid signature will fail.
-> +
-> +	  In addition to that option, you need to enable signature
-> +	  verification for the corresponding kernel image type being
-> +	  loaded in order for this to work.
-> +
-> +config KEXEC_IMAGE_VERIFY_SIG
-> +	bool "Enable Image signature verification support"
-> +	default y
-> +	depends on KEXEC_VERIFY_SIG
-> +	depends on EFI && SIGNED_PE_FILE_VERIFICATION
-> +	help
-> +	  Enable Image signature verification support.
-> +
-> +comment "Support for PE file signature verification disabled"
-> +	depends on KEXEC_VERIFY_SIG
-> +	depends on !EFI || !SIGNED_PE_FILE_VERIFICATION
-> +
->  config CRASH_DUMP
->  	bool "Build kdump crash kernel"
->  	help
-> diff --git a/arch/arm64/kernel/kexec_image.c b/arch/arm64/kernel/kexec_image.c
-> index 9f0d8b5d62d3..d1c6c54c22e3 100644
-> --- a/arch/arm64/kernel/kexec_image.c
-> +++ b/arch/arm64/kernel/kexec_image.c
-> @@ -12,7 +12,9 @@
->  #include <linux/errno.h>
->  #include <linux/kernel.h>
->  #include <linux/kexec.h>
-> +#include <linux/pe.h>
->  #include <linux/string.h>
-> +#include <linux/verification.h>
->  #include <asm/byteorder.h>
->  #include <asm/cpufeature.h>
->  #include <asm/image.h>
-> @@ -29,6 +31,10 @@ static int image_probe(const char *kernel_buf, unsigned long kernel_len)
->  				sizeof(h->magic)))
->  		return -EINVAL;
->  
-> +	pr_debug("PE format: %s\n",
-> +			memcmp(&((struct mz_hdr *)h)->magic, "MZ", 2) ?
-> +							"no" : "yes");
-> 
+Error reporting for the dma_map_single and dma_map_page operations is
+currently a mess.  Both APIs directly return the dma_addr_t to be used for
+the DMA, with a magic error escape that is specific to the instance and
+checked by another method provided.  This has a few downsides:
 
-Is this hunk really necessary? I'd prefer not to commit pr_debug()
-invocations.
+ - the error check is easily forgotten and a __must_check marker doesn't
+   help as the value always is consumed anyway
+ - the error checking requires another indirect call, which have gotten
+   incredibly expensive
+ - a lot of code is wasted on implementing these methods
 
-Will
+The historical reason for this is that people thought DMA mappings would
+not fail when the API was created, which sounds like a really bad
+assumption in retrospective, and then we tried to cram error handling
+onto it later on.
+
+There basically are two variants:  the error code is 0 because the
+implementation will never return 0 as a valid DMA address, or the error
+code is all-F as the implementation won't ever return an address that
+high.  The old AMD GART is the only one not falling into these two camps
+as it picks sort of a relative zero relative to where it is mapped.
+
+The 0 return doesn't work for direct mappings that have ram at address
+zero and a lot of IOMMUs that start allocating bus space from address
+zero, so we can't consolidate on that, but I think we can move everyone
+to all-Fs, which the patch here does.  The reason for that is that
+there is only one way to ever get this address: by doing a 1-byte long,
+1-byte aligned mapping, but all our mappings are not only longer but
+generally aligned, and the mappings have to keep at least the basic
+alignment.
+
+A git tree is also available here:
+
+    git://git.infradead.org/users/hch/misc.git dma-mapping-error.3
+
+Gitweb:
+
+    http://git.infradead.org/users/hch/misc.git/shortlog/refs/heads/dma-mapping-error.3
+
+Changes since v2:
+ - fix a compile error in the ia64 sba_iommu driver
+ - return an errno value from dma_mapping_error
+
+Changes since v1:
+ - dropped the signature change
+ - split into multiple patches
+ - fixed the iova allocator return check in amd-iommu
+ - remove EMERGENCY_PAGES in amd_gart and calgary
 
 _______________________________________________
 linux-arm-kernel mailing list
