@@ -2,69 +2,84 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
 	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4BA3C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:31:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A4663C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:32:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1AE02146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:31:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 705752146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:32:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RIQfyzsi";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="d6ov26Lm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1AE02146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sAvS0Ylt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 705752146D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
-	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fH7wGZmUuqeLym9OmOqa6sZnE6N52Hhv7jqP+UUX1Y4=; b=RIQfyzsiSsA/K8
-	v3OOCjC3uSBIIHsRWlCYxsk3j0z0JGDz4236FLZKogBU28RM9qPUjy+mUZzU7mzrLjt9N9ugSn2bf
-	7ycgBvdL10g9f5s7Nxm053f8MELOPgyPRPsdZzhrQThnYtyPhrIXFGL4UR51JDpS23lVqfPp5XAWX
-	0Tx5ERxZx87A1dCe7rWoy2qR0VRwLE4T6nSam/jbc/v48Wnpzt1P81d4+OwVCYOGnFL7GmiFSTjfs
-	cQMmo2HS+Ynz4M4eMykXltlYdxeZKKHcMuDdt5hG2s47T+rgdPmfsRzE7phmtmEYQDBjvyxp5WxoT
-	tk0Xbc7zgeNaHrTLDqlQ==;
+	List-Owner; bh=AgT6EQP4IAKUN6Q1UOfVIl5G9ubD7RD0c5eGP1UeCUY=; b=sAvS0YltYNLVeK
+	XpgB5TcdwR7rqnT2VIS0jxlseKu/yirm9HAVOMonl6Z31t0FxwBj2XkcE15TgzR3OY3lkH6KM6edN
+	tun07ZrQFzTvbhCVvbWoGw+jU6/KA9PWAIJdnIX6KuzTm9zO6fEG6n72f34RNWgWHFSKaasZ+oMPP
+	gLFjg+LOQHhNJmwsR/Eyou880E/+dNeg0BOK8ZnlrhThcBg555xxbzPI0Bh+Dn01nb+j+P68vn7gu
+	UF6giQcXgnVvmBs1irOnJculGw8wIfHELjHKxxDLesz2B7lSIXq0rkKYqGrqFcN/BBte++QRIvVtu
+	P2OjZ9WWyzVhE4fcQXkg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSeDJ-0007vn-Ip; Fri, 30 Nov 2018 08:31:53 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gSeDp-0008HB-KX; Fri, 30 Nov 2018 08:32:25 +0000
+Received: from mail-ed1-f67.google.com ([209.85.208.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSeDF-0007tF-LV
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:31:51 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 289A02146D;
- Fri, 30 Nov 2018 08:31:39 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543566699;
- bh=Ym/r0XtDXljhM9nbyq98/dadFcQArhTvMbg8fMAeoHA=;
- h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=d6ov26LmS/Mn0c6Pn/cwU4haNAFIj9ASYkQX9lEWHTiOS5/c/jgFMTiS0mNR7Kn6/
- XgZsHmdsm6eG8yJPSznYMB/7Wyq9xvgzSstsoNc0onEjU2rh6+mq5rpQ+fVgi17DPw
- ehRt5oUGas1Bn6R5OkweQnktqcCkdfc/KaCt6no8=
+ id 1gSeDI-0007tq-Rt
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:31:55 +0000
+Received: by mail-ed1-f67.google.com with SMTP id z28so4129918edi.8
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 30 Nov 2018 00:31:42 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=PAwLI8BVj1J9LsaQ30t5cKZmbwB1RAtw/ugevLNd0Lk=;
+ b=AiKBUCajJ2ABFFykjP5VkfbRfLGCraoO4WmqjgGRLqhj3cnwI+3HzJgqg7Fv/uZVNz
+ CS27felc0N7e8WUFhvqRf3cVCH2DRnoinQmI2s63aXogG+/BMJpP4UHKXluQstwd8Tlr
+ dR+jB0IlskHuSFQS2OPewB5yvd4HjuflwXCDN94pmPGogGD/bRWgvrS+AlVU8Mgyy6T9
+ AlFbRZmueLVuJqqNvUXLFRCfgEcTv7hysvtBKzsQ5ID3CBQS6cJ8jt/c4AtIfpofWD/y
+ 9mu6rdyjwYG88Rloy8dXCFajS6BRnLqd+IwRJzMpHE3dK6yfLovHeadxK7VtcadaJtyp
+ fHvg==
+X-Gm-Message-State: AA+aEWbc+51nAQ7KNXE5Y7AbBUhxJkFdNOFdGJixzRdJEKd8aLDAyHcB
+ vGF05qDoM+to9vo9hAcHYk5BHyLPrQI=
+X-Google-Smtp-Source: AFSGD/WpEVM1l6tztYFzFPOqd/ibS+MdUp29J4ZTP9GpE3HVrDbjsvSUYl2ZzOYndK/F/85FVOoDDw==
+X-Received: by 2002:a50:8eea:: with SMTP id x39mr4310754edx.177.1543566700671; 
+ Fri, 30 Nov 2018 00:31:40 -0800 (PST)
+Received: from mail-wm1-f47.google.com (mail-wm1-f47.google.com.
+ [209.85.128.47])
+ by smtp.gmail.com with ESMTPSA id t21-v6sm709522ejk.33.2018.11.30.00.31.40
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 30 Nov 2018 00:31:40 -0800 (PST)
+Received: by mail-wm1-f47.google.com with SMTP id q26so4763743wmf.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 30 Nov 2018 00:31:40 -0800 (PST)
+X-Received: by 2002:a1c:91d1:: with SMTP id t200mr4539936wmd.111.1543566699694; 
+ Fri, 30 Nov 2018 00:31:39 -0800 (PST)
 MIME-Version: 1.0
-To: Sugaya Taichi <sugaya.taichi@socionext.com>, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-clk@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-serial@vger.kernel.org
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-8-git-send-email-sugaya.taichi@socionext.com>
-Message-ID: <154356669840.88331.4455990896653868594@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.7
-Subject: Re: [PATCH 07/14] clock: milbeaut: Add Milbeaut M10V clock control
-Date: Fri, 30 Nov 2018 00:31:38 -0800
+References: <20181120175211.3913-1-oskari@lemmela.net>
+In-Reply-To: <20181120175211.3913-1-oskari@lemmela.net>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Fri, 30 Nov 2018 16:31:28 +0800
+X-Gmail-Original-Message-ID: <CAGb2v65Bwve25jwdGHHK9j03RxQ3tKwme51762DjyQK2femG6g@mail.gmail.com>
+Message-ID: <CAGb2v65Bwve25jwdGHHK9j03RxQ3tKwme51762DjyQK2femG6g@mail.gmail.com>
+Subject: Re: [PATCH v6 0/8] AXP8x3 AC and battery power supply support
+To: Sebastian Reichel <sre@kernel.org>, Lee Jones <lee.jones@linaro.org>,
+ oskari@lemmela.net
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_003149_749751_C0D74A3E 
-X-CRM114-Status: GOOD (  22.51  )
+X-CRM114-CacheID: sfid-20181130_003152_912174_2CB2914B 
+X-CRM114-Status: GOOD (  13.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,454 +92,71 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Sugaya Taichi <sugaya.taichi@socionext.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, Jiri Slaby <jslaby@suse.com>,
- Thomas Gleixner <tglx@linutronix.de>
+ devicetree <devicetree@vger.kernel.org>,
+ Quentin Schulz <quentin.schulz@bootlin.com>,
+ "open list:THERMAL" <linux-pm@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>,
+ Vasily Khoruzhick <anarsoul@gmail.com>, Rob Herring <robh+dt@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Sugaya Taichi (2018-11-18 17:01:12)
-> Add Milbeaut M10V clock ( including PLL ) control.
+On Wed, Nov 21, 2018 at 1:52 AM Oskari Lemmela <oskari@lemmela.net> wrote:
+>
+> AXP813 AC power supply support with input current and
+> voltage limiting support.
+>
+> AXP803 AC and battery power supply support.
+>
+> Changes in v6:
+> * Collected tags
+> * Rebase to master
+> * Dropped AXP803 compatible patches
+>
+> Changes in v5:
+> * Return correct input current limit for values 0x6 and 0x7
+> * Add specific compatibles for AXP803
+> * Change commit messages
+> * Add Vasily Khoruzhick Pinebook DTS patch
+>
+> Changes in v4:
+> * Change order of axp20x-gpio in axp20x.c
+> * Fix indentation and spaces to tabs in axp20x.c
+>
+> Changes in v3:
+> * Reorder ac_power_supply DT node
+> * Rename axp20x_ac_power_set_property function
+> * Split mfd commit
+>
+> Changes in v2:
+> * Reuse axp813 compatibles for axp803
+> * Refactor axp20x_ac_power.c
+>
+>
+> Oskari Lemmela (7):
+>   dt-bindings: power: supply: axp20x: add AXP813 AC power DT binding
+>   ARM: dts: axp81x: add AC power supply subnode
+>   arm64: dts: allwinner: axp803: add AC and battery power supplies
+>   arm64: dts: allwinner: a64: sopine-baseboard: enable power supplies
+>   power: supply: add AC power supply driver for AXP813
+>   mfd: axp20x: Add AC power supply cell for AXP813
+>   mfd: axp20x: Add supported cells for AXP803
+>
+> Vasily Khoruzhick (1):
+>   arm64: dts: allwinner: a64: pinebook: enable power supplies
 
-Please give some more details here.
+Since this series has been fully reviewed, and the devices it
+adds/enables aren't critical, i.e. won't cause the system to fail
+if the drivers are missing, I've merged the dts patches for 4.21.
 
-> 
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
-> ---
->  drivers/clk/Makefile   |   1 +
->  drivers/clk/clk-m10v.c | 671 +++++++++++++++++++++++++++++++++++++++++++++++++
+Hopefully Sebastian and Lee will get around to merging the driver
+patches.
 
-And this is different from Uniphier? Maybe we need a socionext
-directory under drivers/clk/.
-
->  2 files changed, 672 insertions(+)
->  create mode 100644 drivers/clk/clk-m10v.c
-> 
-> diff --git a/drivers/clk/clk-m10v.c b/drivers/clk/clk-m10v.c
-> new file mode 100644
-> index 0000000..aa92a69
-> --- /dev/null
-> +++ b/drivers/clk/clk-m10v.c
-> @@ -0,0 +1,671 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2018 Socionext Inc.
-> + * Copyright (C) 2016 Linaro Ltd.
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
-
-Is this include used?
-
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of.h>
-> +#include <linux/spinlock.h>
-> +
-> +#define CLKSEL1                0x0
-> +#define CLKSEL(n)      (((n) - 1) * 4 + CLKSEL1)
-> +
-> +#define PLLCNT1                0x30
-> +#define PLLCNT(n)      (((n) - 1) * 4 + PLLCNT1)
-> +
-> +#define CLKSTOP1       0x54
-> +#define CLKSTOP(n)     (((n) - 1) * 4 + CLKSTOP1)
-> +
-> +#define CRSWR          0x8c
-> +#define CRRRS          0x90
-> +#define CRRSM          0x94
-> +
-> +#define to_m10v_mux(_hw)       container_of(_hw, struct m10v_mux, hw)
-> +#define to_m10v_gate(_hw)      container_of(_hw, struct m10v_gate, hw)
-> +#define to_m10v_div(_hw)       container_of(_hw, struct m10v_div, hw)
-> +#define to_m10v_pll(_hw)       container_of(_hw, struct m10v_pll, hw)
-> +
-> +static void __iomem *clk_base;
-> +static struct device_node *np_top;
-> +static DEFINE_SPINLOCK(crglock);
-
-Please make more specific names for these global variables by prefixing
-with m10v_. Also consider getting rid of the iomem and np_top globals
-entirely and associate those with clks differently.
-
-> +
-> +static __init void __iomem *m10v_clk_iomap(void)
-> +{
-> +       if (clk_base)
-> +               return clk_base;
-> +
-> +       np_top = of_find_compatible_node(NULL, NULL,
-> +                       "socionext,milbeaut-m10v-clk-regs");
-> +       if (!np_top) {
-> +               pr_err("%s: CLK iomap failed!\n", __func__);
-
-We haven't iomapped yet though.
-
-> +               return NULL;
-> +       }
-> +
-> +       clk_base = of_iomap(np_top, 0);
-> +       of_node_put(np_top);
-
-Would be nicer to use platform_device APIs instead of OF ones.
-
-> +
-> +       return clk_base;
-> +}
-> +
-> +struct m10v_mux {
-> +       struct clk_hw hw;
-> +       const char *cname;
-> +       u32 parent;
-> +};
-> +
-> +static u8 m10v_mux_get_parent(struct clk_hw *hw)
-> +{
-> +       struct m10v_mux *mcm = to_m10v_mux(hw);
-> +       struct clk_hw *parent;
-> +       int i;
-> +
-> +       i = clk_hw_get_num_parents(hw);
-> +       while (i--) {
-> +               parent = clk_hw_get_parent_by_index(hw, i);
-> +               if (clk_hw_get_rate(parent))
-> +                       break;
-> +       }
-> +
-> +       if (i < 0) {
-> +               pr_info("%s:%s no parent?!\n",
-> +                       __func__, mcm->cname);
-> +               i = 0;
-> +       }
-> +
-> +       return i;
-> +}
-> +
-> +static int m10v_mux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +       struct m10v_mux *mcm = to_m10v_mux(hw);
-> +
-> +       mcm->parent = index;
-> +       return 0;
-> +}
-> +
-> +static const struct clk_ops m10v_mux_ops = {
-> +       .get_parent = m10v_mux_get_parent,
-> +       .set_parent = m10v_mux_set_parent,
-> +       .determine_rate = __clk_mux_determine_rate,
-> +};
-> +
-> +void __init m10v_clk_mux_setup(struct device_node *node)
-> +{
-> +       const char *clk_name = node->name;
-> +       struct clk_init_data init;
-> +       const char **parent_names;
-> +       struct m10v_mux *mcm;
-> +       struct clk *clk;
-> +       int i, parents;
-> +
-> +       if (!m10v_clk_iomap())
-> +               return;
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +       parents = of_clk_get_parent_count(node);
-> +       if (parents < 2) {
-> +               pr_err("%s: not a mux\n", clk_name);
-
-How is this possible?
-
-> +               return;
-> +       }
-> +
-> +       parent_names = kzalloc((sizeof(char *) * parents), GFP_KERNEL);
-> +       if (!parent_names)
-> +               return;
-> +
-> +       for (i = 0; i < parents; i++)
-> +               parent_names[i] = of_clk_get_parent_name(node, i);
-
-This is of_clk_parent_fill().
-
-> +
-> +       mcm = kzalloc(sizeof(*mcm), GFP_KERNEL);
-> +       if (!mcm)
-> +               goto err_mcm;
-> +
-> +       init.name = clk_name;
-> +       init.ops = &m10v_mux_ops;
-> +       init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
-
-Please don't use CLK_IS_BASIC unless you need it.
-
-> +       init.num_parents = parents;
-> +       init.parent_names = parent_names;
-> +
-> +       mcm->cname = clk_name;
-> +       mcm->parent = 0;
-> +       mcm->hw.init = &init;
-> +
-> +       clk = clk_register(NULL, &mcm->hw);
-> +       if (IS_ERR(clk))
-> +               goto err_clk;
-> +
-> +       of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +       return;
-> +
-> +err_clk:
-> +       kfree(mcm);
-> +err_mcm:
-> +       kfree(parent_names);
-> +}
-> +CLK_OF_DECLARE(m10v_clk_mux, "socionext,milbeaut-m10v-clk-mux",
-> +                       m10v_clk_mux_setup);
-
-Any chance you can use a platform driver?
-
-> +
-> +struct m10v_pll {
-> +       struct clk_hw hw;
-> +       const char *cname;
-> +       const struct clk_ops ops;
-> +       u32 offset;
-> +       u32 div, mult;
-> +       bool ro;
-> +};
-> +
-> +#define ST     1
-> +#define SEL    2
-> +
-> +static void _mpg_enable(struct clk_hw *hw, unsigned int enable)
-> +{
-> +       struct m10v_pll *mpg = to_m10v_pll(hw);
-> +       unsigned long flags;
-> +       u32 val;
-> +
-> +       if (mpg->ro) {
-> +               pr_debug("%s:%d %s: read-only\n",
-> +                        __func__, __LINE__, mpg->cname);
-> +               return;
-> +       }
-> +
-> +       spin_lock_irqsave(&crglock, flags);
-> +
-> +       val = readl(clk_base + PLLCNT(SEL));
-> +       if (enable)
-> +               val |= BIT(mpg->offset);
-> +       else
-> +               val &= ~BIT(mpg->offset);
-> +       writel(val, clk_base + PLLCNT(SEL));
-> +
-> +       spin_unlock_irqrestore(&crglock, flags);
-> +}
-> +
-> +static int mpg_enable(struct clk_hw *hw)
-> +{
-> +       _mpg_enable(hw, 1);
-> +       return 0;
-> +}
-> +
-> +static void mpg_disable(struct clk_hw *hw)
-> +{
-> +       _mpg_enable(hw, 0);
-> +}
-> +
-> +static int mpg_is_enabled(struct clk_hw *hw)
-> +{
-> +       struct m10v_pll *mpg = to_m10v_pll(hw);
-> +
-> +       return readl(clk_base + PLLCNT(SEL)) & (1 << mpg->offset);
-> +}
-> +
-> +static void _mpg_prepare(struct clk_hw *hw, unsigned int on)
-> +{
-> +       struct m10v_pll *mpg = to_m10v_pll(hw);
-> +       unsigned long flags;
-> +       u32 val;
-> +
-> +       if (mpg->ro) {
-
-Should have different RO ops for read-only clks.
-
-> +               pr_debug("%s:%d %s: read-only\n",
-> +                        __func__, __LINE__, mpg->cname);
-> +               return;
-> +       }
-> +
-> +       val = readl(clk_base + PLLCNT(ST));
-> +       if (!on == !(val & BIT(mpg->offset)))
-> +               return;
-> +
-> +       /* disable */
-
-Please remove obvious comments.
-
-> +       mpg_disable(hw);
-> +
-> +       spin_lock_irqsave(&crglock, flags);
-> +
-> +       val = readl(clk_base + PLLCNT(ST));
-> +       if (on)
-> +               val |= BIT(mpg->offset);
-> +       else
-> +               val &= ~BIT(mpg->offset);
-> +       writel(val, clk_base + PLLCNT(ST));
-> +
-> +       spin_unlock_irqrestore(&crglock, flags);
-> +
-> +       udelay(on ? 200 : 10);
-> +}
-> +
-> +static int mpg_prepare(struct clk_hw *hw)
-> +{
-> +       _mpg_prepare(hw, 1);
-> +       return 0;
-> +}
-> +
-> +static void mpg_unprepare(struct clk_hw *hw)
-> +{
-> +       _mpg_prepare(hw, 0);
-> +}
-> +
-> +static int mpg_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                               unsigned long prate)
-> +{
-
-Why is this implemented then?
-
-> +       return 0;
-> +}
-> +
-> +static unsigned long mpg_recalc_rate(struct clk_hw *hw,
-> +               unsigned long prate)
-> +{
-> +       struct m10v_pll *mpg = to_m10v_pll(hw);
-> +       unsigned long long rate = prate;
-> +
-> +       if (mpg_is_enabled(hw)) {
-> +               rate = (unsigned long long)prate * mpg->mult;
-> +               do_div(rate, mpg->div);
-> +       }
-> +
-> +       return (unsigned long)rate;
-> +}
-> +
-> +static long mpg_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                               unsigned long *prate)
-> +{
-> +       struct m10v_pll *mpg = to_m10v_pll(hw);
-> +       unsigned long long temp_rate = (unsigned long long)*prate * mpg->mult;
-> +
-> +       if (mpg->ro)
-> +               return mpg_recalc_rate(hw, *prate);
-> +
-> +       return do_div(temp_rate, mpg->div);
-
-There shouldn't be round_rate implemented at all if the device is
-'read-only' or can't change frequency because set_rate op is empty.
-
-> +}
-> +
-[..]
-> +
-> +static void mdc_set_div(struct m10v_div *mdc, u32 div)
-> +{
-> +       u32 off, shift, val;
-> +
-> +       off = mdc->offset / 32 * 4;
-> +       shift = mdc->offset % 32;
-> +
-> +       val = readl(clk_base + CLKSEL1 + off);
-> +       val &= ~(mdc->mask << shift);
-> +       val |= (div << shift);
-> +       writel(val, clk_base + CLKSEL1 + off);
-> +
-> +       if (mdc->waitdchreq) {
-> +               unsigned int count = 250;
-> +
-> +               writel(1, clk_base + CLKSEL(11));
-> +
-> +               do {
-> +                       udelay(1);
-> +               } while (--count && readl(clk_base + CLKSEL(11)) & 1);
-
-Use readl_poll_timeout()?
-
-> +
-> +               if (!count)
-> +                       pr_err("%s:%s CLK(%d) couldn't stabilize\n",
-> +                               __func__, mdc->cname, mdc->offset);
-> +       }
-> +}
-> +
-[...]
-> +
-> +void __init m10v_clk_gate_setup(struct device_node *node)
-> +{
-> +       const char *clk_name = node->name;
-> +       struct clk_init_data init;
-> +       const char *parent_name;
-> +       struct m10v_gate *mgc;
-> +       struct clk *clk;
-> +       u32 offset;
-> +       int ret;
-> +
-> +       if (!m10v_clk_iomap())
-> +               return;
-> +
-> +       of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +       ret = of_property_read_u32(node, "offset", &offset);
-> +       if (ret) {
-> +               pr_err("%s: missing 'offset' property\n", clk_name);
-> +               return;
-> +       }
-> +
-> +       parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +       mgc = kzalloc(sizeof(*mgc), GFP_KERNEL);
-> +       if (!mgc)
-> +               return;
-> +
-> +       init.name = clk_name;
-> +       init.ops = &m10v_gate_ops;
-> +       init.flags = CLK_IS_BASIC | CLK_SET_RATE_PARENT;
-> +       init.parent_names = &parent_name;
-> +       init.num_parents = 1;
-> +
-> +       mgc->cname = clk_name;
-> +       mgc->offset = offset;
-> +       mgc->hw.init = &init;
-> +       if (of_get_property(node, "read-only", NULL))
-> +               mgc->ro = true;
-> +
-> +       clk = clk_register(NULL, &mgc->hw);
-
-Please use clk_hw based registration and provider APIs.
-
-> +       if (IS_ERR(clk))
-> +               kfree(mgc);
-> +       else
-> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +CLK_OF_DECLARE(m10v_clk_gate, "socionext,milbeaut-m10v-clk-gate",
-> +               m10v_clk_gate_setup);
-> -- 
-
-I suspect this driver will significantly change so I'm not reviewing
-any further until it's sent again.
-
+Thanks.
+ChenYu
 
 _______________________________________________
 linux-arm-kernel mailing list
