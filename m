@@ -2,59 +2,56 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DAFCFC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:55:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 60684C65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD3BA2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:55:54 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2B8872082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:59:17 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IT19t31E"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD3BA2082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hofr.at
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="huM/8VVQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B8872082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=OBnSPtZkQ0UnKRDTJzZbP7yMjaQRc78mu25EnS46SXo=; b=IT19t31EeQ9JEr
-	ZS/ZGqDXJXU0/eUbExJFDb65CPIGTBx8T46DoT8BbbycFayGZoH10jSuPpnXS3XEqX/d3v5kN7HkQ
-	jiM1FGQYqcU+rj8O0pdnnVhNKwsMq/7SQx561dMzfvXfOHZKSDeZH26Z9pdNX48ftM/U/jYBVqYUb
-	JbFF+0FoNgIKO6LrLqBLufDr5WuD/j+by/O9Cg7EV3KL+NT9Q2KOHm8EUSKihqBV1dfwr3M7dRBu0
-	Bu35BYOAHYMxQs51bDljpdQ+Sp1yZbuL88z686YOTjhrLcZP7H50ZiS5QgY5sWL4CCwOowggtnz/Y
-	APPxFM5r8kmvqHnoj1qw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=o9r+NsymzOuxlj6hDHWy+dAiDlxFu53xP3n6i5kLye0=; b=huM/8VVQewY6DM
+	qm2/YuX5Vv16LlHcMgEoreVpPzHiRHK6JHJsVWmCN4prpkkLpQOF/Rl8ucaGwcRaj+uvM6ei9c9Vg
+	vu8dTD5pRQD9QxZ44Mkrf7d0aR4ljvpaq1cnQG+LZ/QQhtnKFx6dySXdMjal36Y5AFtMV9wwpycUb
+	vFGdiQHfmdJ0lug/oWaZ5/kHm6926KJwDmds7LMYH1AhnYd7pZqN9+W6XDH0/8NkhBUYZRKNMULjX
+	y8nZIMgL0RXEztgQlEorkYOQ8jjiniqHIgsFAyAqsG7KgXvyZnsUK2+nyxagX/VGglah/tZxWhSvB
+	weiVZbOI2iiMrQW2G9YQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSdeT-0008ID-AL; Fri, 30 Nov 2018 07:55:53 +0000
-Received: from 178.115.242.59.static.drei.at ([178.115.242.59]
- helo=mail.osadl.at)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSdeO-0008HT-CV
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:55:50 +0000
-Received: by mail.osadl.at (Postfix, from userid 1001)
- id 3F7E25C099D; Fri, 30 Nov 2018 07:54:53 +0000 (UTC)
-Date: Fri, 30 Nov 2018 08:54:53 +0100
-From: Nicholas Mc Guire <der.herr@hofr.at>
-To: Stephen Boyd <sboyd@kernel.org>
-Subject: Re: [PATCH V2] clk: zynq: do not allow kmalloc failure
-Message-ID: <20181130075453.GB2456@osadl.at>
-References: <1542803310-32673-1-git-send-email-hofrat@osadl.org>
- <154353512315.88331.4548631955021366823@swboyd.mtv.corp.google.com>
+	id 1gSdhh-0000Uz-72; Fri, 30 Nov 2018 07:59:13 +0000
+Received: from mirror2.csie.ntu.edu.tw ([140.112.30.76] helo=wens.csie.org)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSdhd-0000S3-7M
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:59:10 +0000
+Received: by wens.csie.org (Postfix, from userid 1000)
+ id 3AE2D5FB8C; Fri, 30 Nov 2018 15:58:55 +0800 (CST)
+From: Chen-Yu Tsai <wens@csie.org>
+To: Yong Deng <yong.deng@magewell.com>,
+ Mauro Carvalho Chehab <mchehab@kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>
+Subject: [PATCH 0/6] media: sun6i: Separate H3 compatible from A31
+Date: Fri, 30 Nov 2018 15:58:43 +0800
+Message-Id: <20181130075849.16941-1-wens@csie.org>
+X-Mailer: git-send-email 2.20.0.rc1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <154353512315.88331.4548631955021366823@swboyd.mtv.corp.google.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_235548_624887_3DD79860 
-X-CRM114-Status: GOOD (  12.50  )
+X-CRM114-CacheID: sfid-20181129_235909_528095_003CE2C1 
+X-CRM114-Status: GOOD (  10.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,51 +63,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Rob Herring <robh@kernel.org>, Michael Turquette <mturquette@baylibre.com>,
- Michal Simek <michal.simek@xilinx.com>, linux-kernel@vger.kernel.org,
- Nicholas Mc Guire <hofrat@osadl.org>, linux-clk@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: devicetree@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-media@vger.kernel.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 03:45:23PM -0800, Stephen Boyd wrote:
-> Quoting Nicholas Mc Guire (2018-11-21 04:28:30)
-> > The kmalloc here is small (< 16 bytes) and occurs during initialization
-> > during system startup here (can not be built as module) thus if this
-> > kmalloc failed it is an indication of something more serious going on
-> > and it is fine to hang the system here rather than cause some harder
-> > to understand error by dereferencing NULL.
-> > =
+The CSI (camera sensor interface) controller found on the H3 (and H5)
+is a reduced version of the one found on the A31. It only has 1 channel,
+instead of 4 channels supporting time-multiplexed BT.656 on the A31.
+Since the H3 is a reduced version, it cannot "fallback" to a compatible
+that implements more features than it supports.
 
-> > Explicitly checking would not make that much sense here as the only
-> > possible reaction would be would BUG() here anyway.
-> > =
+This series separates support for the H3 variant from the A31 variant.
 
-> > Signed-off-by: Nicholas Mc Guire <hofrat@osadl.org>
-> > Fixes: 0ee52b157b8e ("clk: zynq: Add clock controller driver")
-> > Acked-by: Michal Simek <michal.simek@xilinx.com>
-> > ---
-> =
+Patches 1 ~ 3 separate H3 CSI from A31 CSI in the bindings, driver, and
+device tree, respectively.
 
-> Nak. We don't have any __GFP_NOFAIL in drivers/clk and I don't see a
-> reason why we would want it here either. Just handle the failure, or
-> don't care if this is so critical to system boot.
->
-It was not motivated by the criticality but by the low probability
-and cluttering the code for this case did not seem good to me.
-Effectively handling it here means BUG() - so more or less
-the same result that hanging it on __GFP_NOFAIL if allocation
-was not possible would cause.
+Patch 4 adds a pinmux setting for the MCLK (master clock). Some camera
+sensors use the master clock from the SoC instead of a standalone
+crystal.
 
-Not clear what the objection to __GFP_NOFAIL here is - my understanding
-was that it is intended precisely for cases like this - but
-I=B4ll send a V2 handling it with BUG_ON(!clk_name) if that is prefered.
+Patches 5 and 6 are examples of using a camera sensor with an SBC.
+Since the modules are detachable, these changes should not be merged.
+They should be implemented as overlays instead.
+
+Please have a look.
+
+In addition, I found that the first frame captured seems to always be
+incomplete, with either parts cropped, out of position, or missing
+color components.
+
+Regards
+ChenYu
 
 
-thx!
-hofrat
+Chen-Yu Tsai (6):
+  media: dt-bindings: media: sun6i: Separate H3 compatible from A31
+  media: sun6i: Add H3 compatible
+  ARM: dts: sunxi: h3/h5: Drop A31 fallback compatible for CSI
+    controller
+  ARM: dts: sunxi: h3-h5: Add pinmux setting for CSI MCLK on PE1
+  [DO NOT MERGE] ARM: dts: sunxi: bananapi-m2p: Add HDF5640 camera
+    module
+  [DO NOT MERGE] ARM: dts: sunxi: libretech-all-h3-cc: Add HDF5640
+    camera module
+
+ .../devicetree/bindings/media/sun6i-csi.txt   |  2 +-
+ arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi | 87 +++++++++++++++++++
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi            |  8 +-
+ .../boot/dts/sunxi-libretech-all-h3-cc.dtsi   | 81 +++++++++++++++++
+ .../platform/sunxi/sun6i-csi/sun6i_csi.c      |  1 +
+ 5 files changed, 176 insertions(+), 3 deletions(-)
+
+-- 
+2.20.0.rc1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
