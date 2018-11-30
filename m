@@ -2,21 +2,21 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D3FECC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6EE34C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A1AD92146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 374D520834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 13:28:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JF81sygY"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1AD92146D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D9/aZ16y"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 374D520834
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,24 +25,24 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=QaCQs9vQu2+GpTF2ajJn4pwCGoV/Z1BGJE6Te1G9Xy0=; b=JF81sygYT/mvqA
-	Us5mGijn8RsabfHYmBzoyOyQSfOD11PPDse6+RxP/D7rKIR0rzx4BoZ/+ysiRX+pXVnlvF4ypYZv+
-	5eNoJ8CFc+rA+djjRifxIg9Gvjd6lAd07gRjFvauFdt6sexKeIm4aOo/w5WSHb48vbujnOtS/tQET
-	QbFlwOgpG1XuAM/3+bKoZP0XmFv2JyLoEfdvs7s+dXiQk+qGX6qUd6OCZ49Auyj/MFo84ltYGu4KR
-	PdGhdNyfaDLb6nAzTPey8WgVChiLSkNXs+45K3ZqGRBKWrrpG9tNdncxfb1VJr/OEPWn3hbgqlAW1
-	+yDTqQ6s91f5V4zMLzKw==;
+	List-Owner; bh=wno2t22u3NTOcd/UiONrfkITlRtl0Z+y10PiZc20hBI=; b=D9/aZ16yddowoF
+	EWUPlv1YzByqYb4T2xmGwroirtyO95AGq4tLypbwN0UHRhV5d+AaWmlSU5mrt7NNSSrtUG3/FG9E5
+	XqBVCZQWIjW7Khm26HNkB+fdrYS/GcYqg+VWakIuQ4RSbt2unudTK8K7yaMDxzYJVIJua7jdsjKS6
+	Ip4a6LpksLbgmpww/QbhFz4FVI8hI5sbAY1Lo2aM1jql1PPxVOUo1RonABn9XWMj5bPR4YQI3Bak7
+	0QMSuPnBX4Q0xbT6KkXFrYibybnSu28Jjv2R4WRUDX+2RK4QEWrUQuP7m9P0s6P0MO+L7dl7gMxtx
+	A3bpE84POLXkLS/NmeBg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSiqV-0001pU-Jl; Fri, 30 Nov 2018 13:28:39 +0000
+	id 1gSiqf-0001yI-1d; Fri, 30 Nov 2018 13:28:49 +0000
 Received: from 089144206221.atnat0015.highway.bob.at ([89.144.206.221]
  helo=localhost)
  by bombadil.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSilw-0004zL-AT; Fri, 30 Nov 2018 13:23:56 +0000
+ id 1gSilt-0004wY-A1; Fri, 30 Nov 2018 13:23:53 +0000
 From: Christoph Hellwig <hch@lst.de>
 To: iommu@lists.linux-foundation.org
-Subject: [PATCH 19/23] iommu/vt-d: remove the mapping_error dma_map_ops method
-Date: Fri, 30 Nov 2018 14:22:27 +0100
-Message-Id: <20181130132231.16512-20-hch@lst.de>
+Subject: [PATCH 18/23] iommu/intel: small map_page cleanup
+Date: Fri, 30 Nov 2018 14:22:26 +0100
+Message-Id: <20181130132231.16512-19-hch@lst.de>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181130132231.16512-1-hch@lst.de>
 References: <20181130132231.16512-1-hch@lst.de>
@@ -71,65 +71,55 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Return DMA_MAPPING_ERROR instead of 0 on a dma mapping failure and let
-the core dma-mapping code handle the rest.
+Pass the page + offset to the low-level __iommu_map_single helper
+(which gets renamed to fit the new calling conventions) as both
+callers have the page at hand.
 
 Signed-off-by: Christoph Hellwig <hch@lst.de>
 ---
- drivers/iommu/intel-iommu.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
+ drivers/iommu/intel-iommu.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 66b4444398ae..0ad67d65bbce 100644
+index 41a4b8808802..66b4444398ae 100644
 --- a/drivers/iommu/intel-iommu.c
 +++ b/drivers/iommu/intel-iommu.c
-@@ -3617,7 +3617,7 @@ static dma_addr_t __intel_map_page(struct device *dev, struct page *page,
- 
- 	domain = get_valid_domain_for_dev(dev);
- 	if (!domain)
--		return 0;
-+		return DMA_MAPPING_ERROR;
- 
- 	iommu = domain_get_iommu(domain);
- 	size = aligned_nrpages(paddr, size);
-@@ -3655,7 +3655,7 @@ static dma_addr_t __intel_map_page(struct device *dev, struct page *page,
- 		free_iova_fast(&domain->iovad, iova_pfn, dma_to_mm_pfn(size));
- 	pr_err("Device %s request: %zx@%llx dir %d --- failed\n",
- 		dev_name(dev), size, (unsigned long long)paddr, dir);
--	return 0;
-+	return DMA_MAPPING_ERROR;
+@@ -3597,9 +3597,11 @@ static int iommu_no_mapping(struct device *dev)
+ 	return 0;
  }
  
- static dma_addr_t intel_map_page(struct device *dev, struct page *page,
-@@ -3756,7 +3756,7 @@ static void *intel_alloc_coherent(struct device *dev, size_t size,
+-static dma_addr_t __intel_map_single(struct device *dev, phys_addr_t paddr,
+-				     size_t size, int dir, u64 dma_mask)
++static dma_addr_t __intel_map_page(struct device *dev, struct page *page,
++				   unsigned long offset, size_t size, int dir,
++				   u64 dma_mask)
+ {
++	phys_addr_t paddr = page_to_phys(page) + offset;
+ 	struct dmar_domain *domain;
+ 	phys_addr_t start_paddr;
+ 	unsigned long iova_pfn;
+@@ -3661,8 +3663,7 @@ static dma_addr_t intel_map_page(struct device *dev, struct page *page,
+ 				 enum dma_data_direction dir,
+ 				 unsigned long attrs)
+ {
+-	return __intel_map_single(dev, page_to_phys(page) + offset, size,
+-				  dir, *dev->dma_mask);
++	return __intel_map_page(dev, page, offset, size, dir, *dev->dma_mask);
+ }
  
- 	*dma_handle = __intel_map_page(dev, page, 0, size, DMA_BIDIRECTIONAL,
- 				       dev->coherent_dma_mask);
--	if (*dma_handle)
-+	if (*dma_handle != DMA_MAPPING_ERROR)
+ static void intel_unmap(struct device *dev, dma_addr_t dev_addr, size_t size)
+@@ -3753,9 +3754,8 @@ static void *intel_alloc_coherent(struct device *dev, size_t size,
+ 		return NULL;
+ 	memset(page_address(page), 0, size);
+ 
+-	*dma_handle = __intel_map_single(dev, page_to_phys(page), size,
+-					 DMA_BIDIRECTIONAL,
+-					 dev->coherent_dma_mask);
++	*dma_handle = __intel_map_page(dev, page, 0, size, DMA_BIDIRECTIONAL,
++				       dev->coherent_dma_mask);
+ 	if (*dma_handle)
  		return page_address(page);
  	if (!dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT))
- 		__free_pages(page, order);
-@@ -3865,11 +3865,6 @@ static int intel_map_sg(struct device *dev, struct scatterlist *sglist, int nele
- 	return nelems;
- }
- 
--static int intel_mapping_error(struct device *dev, dma_addr_t dma_addr)
--{
--	return !dma_addr;
--}
--
- static const struct dma_map_ops intel_dma_ops = {
- 	.alloc = intel_alloc_coherent,
- 	.free = intel_free_coherent,
-@@ -3877,7 +3872,6 @@ static const struct dma_map_ops intel_dma_ops = {
- 	.unmap_sg = intel_unmap_sg,
- 	.map_page = intel_map_page,
- 	.unmap_page = intel_unmap_page,
--	.mapping_error = intel_mapping_error,
- 	.dma_supported = dma_direct_supported,
- };
- 
 -- 
 2.19.1
 
