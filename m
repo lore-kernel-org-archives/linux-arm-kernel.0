@@ -1,95 +1,71 @@
-Return-Path: <SRS0=tmGn=OI=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AA521C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:55:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AB64CC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:24:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6E56620673
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Thu, 29 Nov 2018 23:55:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 79E8020834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 00:24:24 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gTuAAXoF";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=boundarydevices-com.20150623.gappssmtp.com header.i=@boundarydevices-com.20150623.gappssmtp.com header.b="yjvvCwqL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6E56620673
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=boundarydevices.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Hv8Vj4Z6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="dV6LAhZD"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 79E8020834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8R41hujSga3MMTafeZDraog5Mo+TuPQ0m+xzqBoGISg=; b=gTuAAXoFfV66Oa
-	+4yKJuj7WvDJV1AFjW0cza36jMrGDG2vZ/4po+A4vcMYPfRlzBCnYNnKe8Y4UaBc0HceM0LxYfrZo
-	I8bgiSipV7EUKWwTF2oRcN4z7CBiQfzt3KwK0xU191SCOLwscuMuDfXtaLwJa+jMwlrny4JORd/Dg
-	A2Y6V77DQGAC3MdjsDRfXkBJ2Q+zx8X4XiubVpmiRtJnZ3wNMy7ut61e1TwDuPfaICc9dO21H0+77
-	Xczwe4spaLjMpVSy6KE/jMlSocg5h9SUlwwP3pAIpDwpBcyaxGlRt7+8Rz3xXgDui+z7rteAYqIhb
-	AG6smQd7WLOwF5I8hJxQ==;
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=9YiL8fVlgdXLMZejKPaxuD6Kf6Sho3ZFaH50zq+AoUs=; b=Hv8Vj4Z6Fm42t9
+	mOzdh4QSO8wKVKal5CbWJWZdxn9gsGsTNYoguvpy/y4sIJ7t6+ABh7IOW2BqnXeh4VpXSgBAeUqN4
+	Bcn1VarLP5+/oqt4FB4EgT04z9ACOUpCpp3YhqabC2r+JqTgrD2UYKx+ARJfb7TJBGRT69UTP/6nm
+	Qq2BAsEMrobglsw3g3GMZlmIakXEN8Tf2xWwJNOHyINHOtc3fI8x/lchraJpN8k0A6pbfNOvNEhwD
+	O7f2lnZIhyopKBnPimGngaFRMFlcBcpLM3PSfmAuqaZelvubX2vaesPRMBn77tmVzLGX/u8v519IN
+	AFoH9gACn4xqZiQxk2sQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSW9q-0000H6-QL; Thu, 29 Nov 2018 23:55:46 +0000
-Received: from mail-oi1-x243.google.com ([2607:f8b0:4864:20::243])
+	id 1gSWbK-00020V-3h; Fri, 30 Nov 2018 00:24:10 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSW9m-0000GZ-Oo
- for linux-arm-kernel@lists.infradead.org; Thu, 29 Nov 2018 23:55:44 +0000
-Received: by mail-oi1-x243.google.com with SMTP id b141so3235524oii.12
- for <linux-arm-kernel@lists.infradead.org>;
- Thu, 29 Nov 2018 15:55:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=boundarydevices-com.20150623.gappssmtp.com; s=20150623;
- h=subject:to:cc:references:from:message-id:date:user-agent
- :mime-version:in-reply-to:content-language:content-transfer-encoding;
- bh=d79MsVFGqxEoTfGQAqoOsqoI7NKmRdcTrjmSX5SBMNU=;
- b=yjvvCwqLxF0Q7GhZ1VhZwcLGK78BCD1SYwaA5ZE0kw6oyT2KWm44LDD2OMTitFvi7U
- gxozC4HTmMgzKzT2DOH3/KKcdXCSmRzQlkO/bUztdZou/EP5VVLM9xusmLAoU3mVJeyH
- uCjmYNPz2JivCjkJk/5a+DGpkpEdGWzOb/rZ6quzJa8tcw3kqf5BAUuHCIL1HE+/J8v0
- gGLOo3IA3dTcUXJKPf5DmFyqlHdXcvarvw/rUZL6tFjJc8NfwDECZHqZ9J6ftgT8kLo1
- aml1eBtPLC9R3nA156UE35NvE4TA2EZdjaPOgHA5ZLC21I7XrrXjizJr+4L0FgXaOWW7
- 0cGQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:message-id:date
- :user-agent:mime-version:in-reply-to:content-language
- :content-transfer-encoding;
- bh=d79MsVFGqxEoTfGQAqoOsqoI7NKmRdcTrjmSX5SBMNU=;
- b=UgD/oeWJtdItdPZDJz/cT++VLrTC+qos9+5qFh7Js2VmuWPVq9SU/fIxdiO3iGV4Ba
- M3CbuAu9Hix8PBfuBMkuO+uE31tKH4popJSOZ5WK1Azlv8eYF9zIuB/yiqmR6IuCuJNI
- w1Fxd6x6CWJvxXO173D7z/8x+IZnxv0jHacT7ysPwGicraohfoZuW4eWXniuy67fFt0e
- gXHtxn5bE/c5qLELsudE8PsKslDg0Ukrleull5TXxO9iF5nwvNykNjBiDFjZ1ZhPxc9d
- 0e92BxAS1CHD7GK/3Yvx0MvCQryxl6U/PoE+23xxdDz61nhreiARZzCwoWHRlRKzz7HF
- yApg==
-X-Gm-Message-State: AA+aEWYyMH4VT4CcFLeRU6bTP6UsmmV0/VAjevJgR7uGVRIYt+ef0CY1
- uO3/gRymtaUHb7L3HiuwqEPJ1lUShUE=
-X-Google-Smtp-Source: AFSGD/XDGvWGQhYh+z+zX22XeoHHlJb4yA1Jlnxynql7C/n/GoHq3/mrpMcvs0QA+lw2HF/idGNXvQ==
-X-Received: by 2002:aca:a805:: with SMTP id r5mr2182602oie.5.1543535730548;
- Thu, 29 Nov 2018 15:55:30 -0800 (PST)
-Received: from [192.168.0.19] (wsip-174-76-17-244.oc.oc.cox.net.
- [174.76.17.244])
- by smtp.googlemail.com with ESMTPSA id m2sm1809670otp.34.2018.11.29.15.55.29
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Thu, 29 Nov 2018 15:55:29 -0800 (PST)
-Subject: Re: [RFC] ARM: dts: imx7d-nitrogen7: Use mmc-pwrseq to activate the
- Wifi clock
-To: Fabio Estevam <festevam@gmail.com>, shawnguo@kernel.org
-References: <1543483679-1100-1-git-send-email-festevam@gmail.com>
-From: Troy Kisky <troy.kisky@boundarydevices.com>
-Message-ID: <2ac11212-b695-4e45-049d-c686c6b08f08@boundarydevices.com>
-Date: Thu, 29 Nov 2018 15:55:28 -0800
-User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
+ id 1gSWbH-0001yt-0M
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 00:24:08 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 42F6820834;
+ Fri, 30 Nov 2018 00:23:56 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543537436;
+ bh=yqFUDKxdhkCSdoOfGf067LjqLpeskD0HSr6L5zeDJfM=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=dV6LAhZDIyJyrOkjlnQiGvXRjslhitcnHMh2uwwiHVuG8gU8OYmlrfTAMjf9XwQJL
+ tTW5d14SoMOgxMCs3LAGra8dm29zs4yl9f7IrsB/PwW7nqC631E8fYNgmlzkrN/0QD
+ p45JtECm476vcRdf++duOP8d2ipnizwykBQiniSI=
 MIME-Version: 1.0
-In-Reply-To: <1543483679-1100-1-git-send-email-festevam@gmail.com>
-Content-Language: en-US
+To: avifishman70@gmail.com, brendanhiggins@google.com, linux@armlinux.org.uk, 
+ mark.rutland@arm.com, mturquette@baylibre.com, raltherr@google.com,
+ robh+dt@kernel.org, sboyd@codeaurora.org, tali.perry1@gmail.com,
+ tmaimon77@gmail.com
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <20181111134712.318321-2-tali.perry1@gmail.com>
+References: <20181111134712.318321-1-tali.perry1@gmail.com>
+ <20181111134712.318321-2-tali.perry1@gmail.com>
+Message-ID: <154353743563.88331.13076671872913666949@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v1 1/1] clk: npcm7xx: get fixed clocks from DT
+Date: Thu, 29 Nov 2018 16:23:55 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_155542_884384_9DDB462F 
-X-CRM114-Status: GOOD (  23.59  )
+X-CRM114-CacheID: sfid-20181129_162407_097292_FC280ACD 
+X-CRM114-Status: GOOD (  25.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -101,75 +77,250 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: gary.bisson@boundarydevices.com, linux-arm-kernel@lists.infradead.org
+Cc: devicetree@vger.kernel.org, openbmc@lists.ozlabs.org,
+ linux-kernel@vger.kernel.org, Tali Perry <tali.perry1@gmail.com>,
+ Wei Yongjun <weiyongjun1@huawei.com>, linux-clk@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 11/29/2018 1:27 AM, Fabio Estevam wrote:
-> In order to turn on the Wifi clock the correct location for describing
-> the CLKO2 clock is via a mmc-pwrseq handle, so do it accordingly.
+Quoting tali.perry1@gmail.com (2018-11-11 05:47:12)
+> From: Tali Perry <tali.perry1@gmail.com>
 > 
-> Signed-off-by: Fabio Estevam <festevam@gmail.com>
+> Nuvoton NPCM7XX Clock Controller
+> fix base address and of_clk_get_by_name error handling.
+>     Also update error messages to be more informative.
+>     
+>     In case clk_base allocation is erronoeous the return value is null.
+>     Also fix handling of of_clk_get_by_name returns an error. 
+>     Print a better error message pointing to the dt-binding documention.
+> 
+> This patch is re-submitted since it was already pushed to main 
+> (just the diff, without the full driver which is already in 
+> master branch.)
+> 
+> 
+> Signed-off-by: Tali Perry <tali.perry1@gmail.com>
+> Reviewed-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+
+I don't know what's going on with this patch. Is it something new? Can
+you break it up into logical changes and submit them with proper commit
+text? The signoff chain is also odd. Can you follow
+Documentation/process/submitting-patches.rst?
+
 > ---
-> Hi Gary/Troy,
+>  drivers/clk/clk-npcm7xx.c | 99 +++++++++++++++++++++++++++++++++++------------
+>  1 file changed, 75 insertions(+), 24 deletions(-)
 > 
-> I don't have access to this board, but I was working on something similar
-> for imx7d-pico-pi and needed to add mmc-pwrseq in order to turn on
-> the 32kHz clock:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/616048.html
-> 
-> Is the 32kHz clock still needed for the Wifi chip used in the latest
-> version of nitrogen7?
-> 
-> What do you think about this patch?
-> 
-> Thanks
-> 
->  arch/arm/boot/dts/imx7d-nitrogen7.dts | 9 +++++++--
->  1 file changed, 7 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> index 4fb7e84..9ba9084 100644
-> --- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> +++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
-> @@ -87,13 +87,17 @@
->  		compatible = "regulator-fixed";
->  		regulator-min-microvolt = <3300000>;
->  		regulator-max-microvolt = <3300000>;
-> -		clocks = <&clks IMX7D_CLKO2_ROOT_DIV>;
-> -		clock-names = "slow";
-
-Yes, since mainline does not know about a clock in a fixed regulator, your patch is needed.
-
-Acked-by: Troy Kisky <troy.kisky@boundarydevices.com>
-
-
-Thanks
->  		regulator-name = "reg_wlan";
->  		startup-delay-us = <70000>;
->  		gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
->  		enable-active-high;
->  	};
+> diff --git a/drivers/clk/clk-npcm7xx.c b/drivers/clk/clk-npcm7xx.c
+> index 740af90a9508..91a937720f4e 100644
+> --- a/drivers/clk/clk-npcm7xx.c
+> +++ b/drivers/clk/clk-npcm7xx.c
+> @@ -7,17 +7,26 @@
+>   * Copyright (C) 2018 Nuvoton Technologies tali.perry@nuvoton.com
+>   */
+>  
+> -#include <linux/module.h>
+> -#include <linux/clk-provider.h>
+> -#include <linux/io.h>
+> -#include <linux/kernel.h>
+> -#include <linux/of.h>
+> -#include <linux/of_address.h>
+> -#include <linux/slab.h>
+> -#include <linux/err.h>
+> -#include <linux/bitfield.h>
+> -
+> -#include <dt-bindings/clock/nuvoton,npcm7xx-clock.h>
 > +
-> +	usdhc2_pwrseq: usdhc2_pwrseq {
-> +		compatible = "mmc-pwrseq-simple";
-> +		clocks = <&clks IMX7D_CLKO2_ROOT_DIV>;
-> +		clock-names = "slow";
-> +	};
+> +
+> +
+> + #include <linux/module.h>
+> + #include <linux/clk.h>
+> + #include <linux/clk-provider.h>
+> + #include <linux/device.h>
+> + #include <linux/io.h>
+> + #include <linux/kernel.h>
+> + #include <linux/of.h>
+> + #include <linux/of_device.h>
+> + #include <linux/of_platform.h>
+> + #include <linux/of_address.h>
+> + #include <linux/platform_device.h>
+> + #include <linux/slab.h>
+> + #include <linux/err.h>
+> + #include <linux/rational.h>
+> + #include <linux/bitfield.h>
+> + #include <dt-bindings/clock/nuvoton,npcm7xx-clock.h>
+
+Is any of this hunk necessary or relevant to the subject of this patch?
+
+> +
+>  
+>  struct npcm7xx_clk_pll {
+> @@ -44,7 +56,8 @@ static unsigned long npcm7xx_clk_pll_recalc_rate(struct clk_hw *hw,
+>         u64 ret;
+>  
+>         if (parent_rate == 0) {
+> -               pr_err("%s: parent rate is zero", __func__);
+> +               pr_err("%s: parent rate is zero. reg=%x\n", __func__,
+> +                       (u32)(pll->pllcon));
+
+Maybe you should print clk name instead of register?
+
+>                 return 0;
+>         }
+>  
+> @@ -61,13 +74,12 @@ static unsigned long npcm7xx_clk_pll_recalc_rate(struct clk_hw *hw,
+>         return ret;
+>  }
+>  
+> -static const struct clk_ops npcm7xx_clk_pll_ops = {
+> +const struct clk_ops npcm7xx_clk_pll_ops = {
+
+Why?
+
+>         .recalc_rate = npcm7xx_clk_pll_recalc_rate,
 >  };
 >  
->  &adc1 {
-> @@ -376,6 +380,7 @@
->  	bus-width = <4>;
->  	non-removable;
->  	vmmc-supply = <&reg_wlan>;
-> +	mmc-pwrseq = <&usdhc2_pwrseq>;
->  	cap-power-off-card;
->  	keep-power-in-suspend;
->  	status = "okay";
-> 
+> -static struct clk_hw *
+> -npcm7xx_clk_register_pll(void __iomem *pllcon, const char *name,
+> -                        const char *parent_name, unsigned long flags)
+> +static struct clk_hw *npcm7xx_clk_register_pll(void __iomem *pllcon,
+> +               const char *name, const char *parent_name, unsigned long flags)
+>  {
+>         struct npcm7xx_clk_pll *pll;
+>         struct clk_init_data init;
+> @@ -78,7 +90,8 @@ npcm7xx_clk_register_pll(void __iomem *pllcon, const char *name,
+>         if (!pll)
+>                 return ERR_PTR(-ENOMEM);
+>  
+> -       pr_debug("%s reg, name=%s, p=%s\n", __func__, name, parent_name);
+> +       pr_debug("%s reg, reg=0x%x, name=%s, p=%s\n",
+> +               __func__, (unsigned int)pllcon, name, parent_name);
+
+What's going on here? Why cast?
+
+>  
+>         init.name = name;
+>         init.ops = &npcm7xx_clk_pll_ops;
+> @@ -544,9 +557,11 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+>         void __iomem *clk_base;
+>         struct resource res;
+>         struct clk_hw *hw;
+> +       struct clk *clk;
+>         int ret;
+>         int i;
+>  
+> +       clk_base = NULL;
+
+Why?
+
+>         ret = of_address_to_resource(clk_np, 0, &res);
+>         if (ret) {
+>                 pr_err("%s: failed to get resource, ret %d\n", clk_np->name,
+> @@ -560,14 +575,44 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+>  
+>         npcm7xx_clk_data = kzalloc(sizeof(*npcm7xx_clk_data->hws) *
+>                 NPCM7XX_NUM_CLOCKS + sizeof(npcm7xx_clk_data), GFP_KERNEL);
+> -       if (!npcm7xx_clk_data)
+> +
+> +       npcm7xx_clk_data->num = 0;
+
+kzalloc already does that initialization to 0 for you.
+
+> +
+> +       if (!npcm7xx_clk_data->hws) {
+> +               pr_err("Can't alloc npcm7xx_clk_data\n");
+
+We don't need allocation error messages.
+
+>                 goto npcm7xx_init_np_err;
+> +       }
+>  
+>         npcm7xx_clk_data->num = NPCM7XX_NUM_CLOCKS;
+>  
+>         for (i = 0; i < NPCM7XX_NUM_CLOCKS; i++)
+>                 npcm7xx_clk_data->hws[i] = ERR_PTR(-EPROBE_DEFER);
+>  
+> +       /* Read fixed clocks. These 3 clocks must be defined in DT */
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_REFCLK);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("failed to find external REFCLK on device tree, err=%ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +               goto npcm7xx_init_fail_no_clk_on_dt;
+> +       }
+> +
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_SYSBYPCK);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("failed to find external SYSBYPCK on device tree, err=%ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +               goto npcm7xx_init_fail_no_clk_on_dt;
+> +       }
+> +
+> +       clk = of_clk_get_by_name(clk_np, NPCM7XX_CLK_S_MCBYPCK);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("failed to find external MCBYPCK on device tree, err=%ld\n",
+> +                       PTR_ERR(clk));
+> +               clk_put(clk);
+> +               goto npcm7xx_init_fail_no_clk_on_dt;
+> +       }
+
+I assume the DTS is not shipped?
+
+> +
+>         /* Register plls */
+>         for (i = 0; i < ARRAY_SIZE(npcm7xx_plls); i++) {
+>                 const struct npcm7xx_clk_pll_data *pll_data = &npcm7xx_plls[i];
+> @@ -584,16 +629,16 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+>         }
+>  
+>         /* Register fixed dividers */
+> -       hw = clk_hw_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
+> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL1_DIV2,
+
+This is going backwards. Please use clk_hw APIs.
+
+>                         NPCM7XX_CLK_S_PLL1, 0, 1, 2);
+> -       if (IS_ERR(hw)) {
+> +       if (IS_ERR(clk)) {
+>                 pr_err("npcm7xx_clk: Can't register fixed div\n");
+>                 goto npcm7xx_init_fail;
+>         }
+>  
+> -       hw = clk_hw_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
+> +       clk = clk_register_fixed_factor(NULL, NPCM7XX_CLK_S_PLL2_DIV2,
+>                         NPCM7XX_CLK_S_PLL2, 0, 1, 2);
+> -       if (IS_ERR(hw)) {
+> +       if (IS_ERR(clk)) {
+>                 pr_err("npcm7xx_clk: Can't register div2\n");
+>                 goto npcm7xx_init_fail;
+>         }
+> @@ -646,11 +691,17 @@ static void __init npcm7xx_clk_init(struct device_node *clk_np)
+>  
+>         return;
+>  
+> +npcm7xx_init_fail_no_clk_on_dt:
+> +       pr_err("see Documentation/devicetree/bindings/clock/");
+> +       pr_err("nuvoton,npcm750-clk.txt  for details\n");
+>  npcm7xx_init_fail:
+> -       kfree(npcm7xx_clk_data->hws);
+> +       if (npcm7xx_clk_data->num)
+> +               kfree(npcm7xx_clk_data->hws);
+>  npcm7xx_init_np_err:
+> -       iounmap(clk_base);
+> +       if (clk_base != NULL)
+> +               iounmap(clk_base);
+>  npcm7xx_init_error:
+>         of_node_put(clk_np);
+> +       pr_err("clk setup fail\n");
+
+Is this hunk of changes related to the subject of this patch? I don't
+think it is, so it just leads to more confusion.
 
 
 _______________________________________________
