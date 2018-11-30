@@ -2,64 +2,117 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85B49C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:31:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F829C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:38:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 57E0520863
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:31:14 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 30D0F2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 07:38:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DTZH4Tfa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 57E0520863
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tKmBuBt/";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="AMQT3Vi1"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 30D0F2145D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=YV9CdCmRgdTQZsWWtm1su5DEMH2vqu5RPDxHQauYAgA=; b=DTZH4TfaeiFsbwsmtr1XoBttB
-	++4DU536ung92dxB7TFumvC4yivFlALjkLZRolACZI+G6TOsvsK1yLhzBwNuUMsm5lyXZotNVDzkC
-	CccxmzJJEurNVIx8UImNOkycERL5AQnPDc+B0cxqx4nofvBWGOWfmrrFpQrpwFmEELCPWbt0r+gdz
-	1oVBArF6YBaP5ziMkkQC6sxz+ZSaYijzFB7OtTpKLUTzkrg731zuOG9MiniUix4NO2XbiqWqXZLef
-	vEAjN7D0FpltGAstoy56eEnRKomdnhdAjjYs5MUrRigAUINleATqtzcnmyS7Ix6pCDFlfA0P4ZCLS
-	UJeuqwRzw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=LmzKFIjBeMJcg/sVeXn6QIRLsROuokVnMuw6Ald5L4E=; b=tKmBuBt/eenF1D
+	CCL/IpngTZRF95eoMt70fq5PzJ5K9PGJ5LK+tL1wL5c+QhpyII0Sf4EFJwBpnvOA0afGHW8F+jDv7
+	CLXgYGsO/Cvy6V3u1aJPPjfetsrAb7nPH8iiMCHixlvUrdN3lgl7uZr0Tl7IAa/9TZsZoeRkVjErl
+	vLOG2JyJxvJt1EO3rTIIGfSLaOHfMZ8Xo6cWHCMQ1NhqgPTxa0gjsbyxseYgtavbPsjzT3MrZtcnW
+	6WoSc3pcfzxriM1qQpbAB0kCOUUHfD9MECSPHT6w3AxYspMe64z1eEsKVsuVcjSc0guv274AG/4PR
+	8S4d/EYKeLt9aTpW2dMA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSdGU-00071a-4P; Fri, 30 Nov 2018 07:31:06 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSdGP-00070o-1f
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:31:03 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id CCBBC207B0; Fri, 30 Nov 2018 08:30:47 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
- [90.88.18.158])
- by mail.bootlin.com (Postfix) with ESMTPSA id 939BD20742;
- Fri, 30 Nov 2018 08:30:47 +0100 (CET)
-Date: Fri, 30 Nov 2018 08:30:47 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Jernej =?utf-8?Q?=C5=A0krabec?= <jernej.skrabec@gmail.com>
-Subject: Re: [linux-sunxi] [PATCH v2 2/2] media: cedrus: Add H264 decoding
- support
-Message-ID: <20181130073047.auafqe3rzdqfs32d@flea>
-References: <20181115145650.9827-1-maxime.ripard@bootlin.com>
- <2826880.kP3DS59ZBy@jernej-laptop>
- <20181127155028.5ukw3g6zjbnvarbp@flea>
- <6005903.5qHflpuMbl@jernej-laptop>
+	id 1gSdNl-00017e-Vn; Fri, 30 Nov 2018 07:38:38 +0000
+Received: from mail-he1eur02on0618.outbound.protection.outlook.com
+ ([2a01:111:f400:fe05::618]
+ helo=EUR02-HE1-obe.outbound.protection.outlook.com)
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSdNj-00016Z-4K
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 07:38:36 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=JS9M2PXZFUcg1IPsMM2TKYx4pko+MX7oC/KjZEUy25E=;
+ b=AMQT3Vi126TlYcgw/MCjNJ61AQooQFPiKnZe2kXAb/Y8Q094sXSCNqaaCHjGDFdOCbqBE/Tu4aol4EQQ9X8VM8UDoH7OZCUe3C50Yjbe7rdExTnu6/2On9jjhjUgM/zcM+/nbySnFCTrmkH0ItJQDHCQjoHp9acboFfSXni4GAg=
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
+ DB3PR0402MB3724.eurprd04.prod.outlook.com (52.134.66.147) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.21; Fri, 30 Nov 2018 07:38:20 +0000
+Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
+ ([fe80::adf8:f49d:deb4:58fd%2]) with mapi id 15.20.1361.019; Fri, 30 Nov 2018
+ 07:38:20 +0000
+From: Anson Huang <anson.huang@nxp.com>
+To: Stephen Boyd <sboyd@kernel.org>, "kernel@pengutronix.de"
+ <kernel@pengutronix.de>, "linux-arm-kernel@lists.infradead.org"
+ <linux-arm-kernel@lists.infradead.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>, "linux-kernel@vger.kernel.org"
+ <linux-kernel@vger.kernel.org>, "mturquette@baylibre.com"
+ <mturquette@baylibre.com>, "s.hauer@pengutronix.de" <s.hauer@pengutronix.de>, 
+ "shawnguo@kernel.org" <shawnguo@kernel.org>, Fabio Estevam
+ <fabio.estevam@nxp.com>
+Subject: RE: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
+Thread-Topic: [PATCH] clk: imx6sl: ensure MMDC CH0 handshake is bypassed
+Thread-Index: AQHUiH2hWlHF6oLZCESale1T/3ahbqVn6qkAgAAB0CA=
+Date: Fri, 30 Nov 2018 07:37:14 +0000
+Message-ID: <DB3PR0402MB3916F9DC4C054747211EB90FF5D30@DB3PR0402MB3916.eurprd04.prod.outlook.com>
+References: <1543562288-28638-1-git-send-email-Anson.Huang@nxp.com>
+ <154356270811.88331.17520386069332746427@swboyd.mtv.corp.google.com>
+In-Reply-To: <154356270811.88331.17520386069332746427@swboyd.mtv.corp.google.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=anson.huang@nxp.com; 
+x-originating-ip: [119.31.174.66]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3724;
+ 6:EHFgUGF65GQdb5KPEnmV2UdpbEoJwNLYxuzerhQnmJrGMX8TLPCI3A7hhFylX5I0Ozq9+NteyyXxxUB9aZW0LgRJWeNhbYYPRgJFGJQF+OelqiCYOKH6LpC8+l7dcWPsOHwN4yy2xQ3GY1Zw526WIT1d43yIoHDvC+08MqFEb+cpohIA6xwucqN2eQW3MPOU9PI3TY4foT7a1i2DCb3zgrwLO1VyfYCHVbbUP6iJ2I69i92sLMbGNMP9x6gB0gse3lwP0DqNZPacHbJ/hWUwcdfOnGXlpdq2WGXpzfmRkFPzXNdTjgLiB5JPV10xfWgnghIadN3ASJIsaKK6bH4Z0TZ3kdYT0E42zHk8SjkDyuEzpsNpiVyKNcdI5afWW4yDADaH9z20jj+JFrpmYcBvWLfQ+sTa0scv5b3V5nniVThVahpXrOhIZQp26ofxyP93DNMa9/WtaZFuUCpbfeJ4Yw==;
+ 5:0gefIf/kInzy28O8aNrZSBbUeTCbxhva/36WA6EUf9fUwiC0iCts6Bu7YfsY9irDyaGGCo6td8/+HJlEGmQikbA4Ozf25S6yMIzhQ+oXEkEIYQkzRD4hzuAJnSE4ZPGLNwgwi6+hBAcmyzFwwP3zwTr2TMy0tji1GR4TWCicHWw=;
+ 7:C3wDr7Sxjv+wsF3olYDhqaeRNb8aaE4fhNd/AUWGFmLvYX9lvhrD5ml9QgzTOS70Z+C6l+Sz4MWccKlQK9mWbbhfKuFBs1WI62jB0E8XKZelq3Q6EwjB2o+3mj/lAZ7Pxw7cFhnZPpDFfX7MPWYmdg==
+x-ms-office365-filtering-correlation-id: 67c7cb12-5dab-4f38-60f7-08d65696cd22
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DB3PR0402MB3724; 
+x-ms-traffictypediagnostic: DB3PR0402MB3724:
+x-microsoft-antispam-prvs: <DB3PR0402MB3724704BB5657020DDAFA2EAF5D30@DB3PR0402MB3724.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(3231453)(999002)(944501463)(52105112)(93006095)(93001095)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
+ SRVR:DB3PR0402MB3724; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3724; 
+x-forefront-prvs: 087223B4DA
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(396003)(376002)(346002)(136003)(366004)(39860400002)(199004)(189003)(13464003)(11346002)(44832011)(446003)(476003)(486006)(5660300001)(71190400001)(71200400001)(6666004)(256004)(14444005)(81156014)(81166006)(8676002)(8936002)(478600001)(86362001)(2201001)(6506007)(25786009)(14454004)(33656002)(68736007)(3846002)(6116002)(26005)(186003)(106356001)(105586002)(7696005)(99286004)(53546011)(316002)(2906002)(76176011)(102836004)(2501003)(97736004)(4001150100001)(7736002)(74316002)(305945005)(53936002)(6246003)(4326008)(6436002)(6636002)(229853002)(55016002)(9686003)(110136005)(66066001)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3724;
+ H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: q6wpoqofUmt2wO63WaHN3qeiYI6NyTwqvHuQxgBCGQxTaMwoc0LxcEqbHh30G+XwzEmpXTIBPY6W9h4ZmI1t1+3RGL2hGv1gDy2JfrsGPjcjTt4KoYGf1VMpN4AED5YsWyyW6XuJ5qEG7OHTqwfwzivNPTImp/K6jadvZFarBY6KHfPL07IBfW0sY35vTWAIEOI8FBHQ9jAHGPdPTKkaoyzUiumQTbpvTChbHs800IRuQXhkA8IVxrTurBGAPzvJKMoRyvild+DNedl+IQV1igGS8Zk3ZaVVdMDnZAl5lWhhUc4V7/LPv8/ZTn+FEjD8kXZiAzHSwA2RWff6OhpDrMxpEHr+Du0I1AWH6cBCzBc=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-In-Reply-To: <6005903.5qHflpuMbl@jernej-laptop>
-User-Agent: NeoMutt/20180716
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 67c7cb12-5dab-4f38-60f7-08d65696cd22
+X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Nov 2018 07:37:14.6629 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3724
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_233101_359457_DF2B5A48 
-X-CRM114-Status: GOOD (  22.70  )
+X-CRM114-CacheID: sfid-20181129_233835_174909_23C689AE 
+X-CRM114-Status: GOOD (  14.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,200 +124,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, acourbot@chromium.org,
- linux-kernel@vger.kernel.org, jenskuske@gmail.com,
- Chen-Yu Tsai <wens@csie.org>, tfiga@chromium.org,
- Paul Kocialkowski <paul.kocialkowski@bootlin.com>,
- linux-sunxi@googlegroups.com, hans.verkuil@cisco.com,
- Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
- sakari.ailus@linux.intel.com, nicolas.dufresne@collabora.com,
- posciak@chromium.org, linux-media@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============8802566275485956851=="
+Cc: dl-linux-imx <linux-imx@nxp.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
---===============8802566275485956851==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="cc6r7wwwz2glmnhj"
-Content-Disposition: inline
-
-
---cc6r7wwwz2glmnhj
-Content-Type: text/plain; charset=utf-8
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Tue, Nov 27, 2018 at 05:30:00PM +0100, Jernej =C5=A0krabec wrote:
-> > > > +static void _cedrus_write_ref_list(struct cedrus_ctx *ctx,
-> > > > +				   struct cedrus_run *run,
-> > > > +				   const u8 *ref_list, u8 num_ref,
-> > > > +				   enum cedrus_h264_sram_off sram)
-> > > > +{
-> > > > +	const struct v4l2_ctrl_h264_decode_param *decode =3D
-> > > > run->h264.decode_param; +	struct vb2_queue *cap_q =3D
-> > > > &ctx->fh.m2m_ctx->cap_q_ctx.q;
-> > > > +	struct cedrus_dev *dev =3D ctx->dev;
-> > > > +	u32 sram_array[CEDRUS_MAX_REF_IDX / sizeof(u32)];
-> > > > +	unsigned int size, i;
-> > > > +
-> > > > +	memset(sram_array, 0, sizeof(sram_array));
-> > > > +
-> > > > +	for (i =3D 0; i < num_ref; i +=3D 4) {
-> > > > +		unsigned int j;
-> > > > +
-> > > > +		for (j =3D 0; j < 4; j++) {
-> > >=20
-> > > I don't think you have to complicate with two loops here.
-> > > cedrus_h264_write_sram() takes void* and it aligns to 4 anyway. So as=
- long
-> > > input buffer is multiple of 4 (u8[CEDRUS_MAX_REF_IDX] qualifies for t=
-hat),
-> > > you can use single for loop with "u8 sram_array[CEDRUS_MAX_REF_IDX]".
-> > > This should make code much more readable.
-> >=20
-> > This wasn't really about the alignment, but in order to get the
-> > offsets in the u32 and the array more easily.
-> >=20
-> > Breaking out the loop will make that computation less easy on the eye,
-> > so I guess it's very subjective.
-> >=20
->=20
-> For some strange reason, code below fixes decoding issue from one of my t=
-est=20
-> samples. This is what I actually meant with 1 loop approach:
-
-Do you have that test sample somewhere accessible?
-
-> static void _cedrus_write_ref_list(struct cedrus_ctx *ctx,
-> 				   struct cedrus_run *run,
-> 				   const u8 *ref_list, u8 num_ref,
-> 				   enum cedrus_h264_sram_off sram)
-> {
-> 	const struct v4l2_ctrl_h264_decode_param *decode =3D run->h264.decode_pa=
-ram;
-> 	struct vb2_queue *cap_q =3D &ctx->fh.m2m_ctx->cap_q_ctx.q;
-> 	struct cedrus_dev *dev =3D ctx->dev;
-> 	u8 sram_array[CEDRUS_MAX_REF_IDX];
-> 	unsigned int i;
->=20
-> 	memset(sram_array, 0, sizeof(sram_array));
-> 	num_ref =3D min(num_ref, (u8)CEDRUS_MAX_REF_IDX);
->=20
-> 	for (i =3D 0; i < num_ref; i++) {
-> 		const struct v4l2_h264_dpb_entry *dpb;
-> 		const struct cedrus_buffer *cedrus_buf;
-> 		const struct vb2_v4l2_buffer *ref_buf;
-> 		unsigned int position;
-> 		int buf_idx;
-> 		u8 dpb_idx;
->=20
-> 		dpb_idx =3D ref_list[i];
-> 		dpb =3D &decode->dpb[dpb_idx];
->=20
-> 		if (!(dpb->flags & V4L2_H264_DPB_ENTRY_FLAG_ACTIVE))
-> 			continue;
->=20
-> 		buf_idx =3D vb2_find_tag(cap_q, dpb->tag, 0);
-> 		if (buf_idx < 0)
-> 			continue;
->=20
-> 		ref_buf =3D to_vb2_v4l2_buffer(ctx->dst_bufs[buf_idx]);
-> 		cedrus_buf =3D vb2_v4l2_to_cedrus_buffer(ref_buf);
-> 		position =3D cedrus_buf->codec.h264.position;
->=20
-> 		sram_array[i] |=3D position << 1;
-> 		if (ref_buf->field =3D=3D V4L2_FIELD_BOTTOM)
-> 			sram_array[i] |=3D BIT(0);
-> 	}
->=20
-> 	cedrus_h264_write_sram(dev, sram, &sram_array, num_ref);
-> }
->=20
-> IMO this code is easier to read.
-
-INdeed, thanks!
-
-> > > > +			const struct v4l2_h264_dpb_entry *dpb;
-> > > > +			const struct cedrus_buffer *cedrus_buf;
-> > > > +			const struct vb2_v4l2_buffer *ref_buf;
-> > > > +			unsigned int position;
-> > > > +			int buf_idx;
-> > > > +			u8 ref_idx =3D i + j;
-> > > > +			u8 dpb_idx;
-> > > > +
-> > > > +			if (ref_idx >=3D num_ref)
-> > > > +				break;
-> > > > +
-> > > > +			dpb_idx =3D ref_list[ref_idx];
-> > > > +			dpb =3D &decode->dpb[dpb_idx];
-> > > > +
-> > > > +			if (!(dpb->flags & V4L2_H264_DPB_ENTRY_FLAG_ACTIVE))
-> > > > +				continue;
-> > > > +
-> > > > +			buf_idx =3D vb2_find_tag(cap_q, dpb->tag, 0);
-> > > > +			if (buf_idx < 0)
-> > > > +				continue;
-> > > > +
-> > > > +			ref_buf =3D to_vb2_v4l2_buffer(ctx->dst_bufs[buf_idx]);
-> > > > +			cedrus_buf =3D vb2_v4l2_to_cedrus_buffer(ref_buf);
-> > > > +			position =3D cedrus_buf->codec.h264.position;
-> > > > +
-> > > > +			sram_array[i] |=3D position << (j * 8 + 1);
-> > > > +			if (ref_buf->field =3D=3D V4L2_FIELD_BOTTOM)
-> > >=20
-> > > You newer set above flag to buffer so this will be always false.
-> >=20
-> > As far as I know, the field is supposed to be set by the userspace.
->=20
-> How? I thought that only flags at queueing buffers can be set and there i=
-s no=20
-> bottom/top flag.
-
-https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/buffer.html#c.v4l2_buff=
-er
-
-"Indicates the field order of the image in the buffer, see
-v4l2_field. This field is not used when the buffer contains VBI
-data. Drivers must set it when type refers to a capture stream,
-applications when it refers to an output stream."
-
-My understanding is that the application should set it, since we'll
-use the output stream's buffer here. But I might very well be wrong
-about it :/
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---cc6r7wwwz2glmnhj
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXADnJwAKCRDj7w1vZxhR
-xTuYAQCEtGfmiUuTm93fk/hrPJWU/f/FFB088sTduq+8++H61wEA5anWdMhWub1M
-AWZzg6ZguMdHkZkIT/ArhF3hHekzrwM=
-=oxTm
------END PGP SIGNATURE-----
-
---cc6r7wwwz2glmnhj--
-
-
---===============8802566275485956851==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============8802566275485956851==--
-
+SGksIFN0ZXBoZW4NCg0KQmVzdCBSZWdhcmRzIQ0KQW5zb24gSHVhbmcNCg0KPiAtLS0tLU9yaWdp
+bmFsIE1lc3NhZ2UtLS0tLQ0KPiBGcm9tOiBTdGVwaGVuIEJveWQgW21haWx0bzpzYm95ZEBrZXJu
+ZWwub3JnXQ0KPiBTZW50OiAyMDE45bm0MTHmnIgzMOaXpSAxNToyNQ0KPiBUbzoga2VybmVsQHBl
+bmd1dHJvbml4LmRlOyBsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmc7DQo+IGxp
+bnV4LWNsa0B2Z2VyLmtlcm5lbC5vcmc7IGxpbnV4LWtlcm5lbEB2Z2VyLmtlcm5lbC5vcmc7DQo+
+IG10dXJxdWV0dGVAYmF5bGlicmUuY29tOyBzLmhhdWVyQHBlbmd1dHJvbml4LmRlOyBzaGF3bmd1
+b0BrZXJuZWwub3JnOw0KPiBBbnNvbiBIdWFuZyA8YW5zb24uaHVhbmdAbnhwLmNvbT47IEZhYmlv
+IEVzdGV2YW0NCj4gPGZhYmlvLmVzdGV2YW1AbnhwLmNvbT4NCj4gQ2M6IGRsLWxpbnV4LWlteCA8
+bGludXgtaW14QG54cC5jb20+DQo+IFN1YmplY3Q6IFJlOiBbUEFUQ0hdIGNsazogaW14NnNsOiBl
+bnN1cmUgTU1EQyBDSDAgaGFuZHNoYWtlIGlzIGJ5cGFzc2VkDQo+IA0KPiBRdW90aW5nIEFuc29u
+IEh1YW5nICgyMDE4LTExLTI5IDIzOjIzOjQ3KQ0KPiA+IFNhbWUgYXMgb3RoZXIgaS5NWDYgU29D
+cywgZW5zdXJlIHVudXNlZCBNTURDIGNoYW5uZWwncyBoYW5kc2hha2UgaXMNCj4gPiBieXBhc3Nl
+ZCwgdGhpcyBpcyB0byBtYWtlIHN1cmUgbm8gcmVxdWVzdCBzaWduYWwgd2lsbCBiZSBnZW5lcmF0
+ZWQNCj4gPiB3aGVuIHBlcmlwaGVfY2xrX3NlbCBpcyBjaGFuZ2VkIG9yIFNSQyB3YXJtIHJlc2V0
+IGlzIHRyaWdnZXJlZC4NCj4gPg0KPiA+IFNpZ25lZC1vZmYtYnk6IEFuc29uIEh1YW5nIDxBbnNv
+bi5IdWFuZ0BueHAuY29tPg0KPiANCj4gRG9lcyB0aGlzIG5lZWQgYSBmaXhlcyB0YWc/DQoNCk5v
+cm1hbGx5IHRoaXMgYml0IGlzIDFiJzEgYnkgcmVzZXQsIGJ1dCBkdXJpbmcgb3VyIGRldmVsb3Bt
+ZW50LCBpdCB1c2VkIHRvIGJlDQpvdmVyd3JpdHRlbiBpbiB1LWJvb3QgYW5kIGxlYWQgdG8gc29t
+ZSBjbG9jayBvcGVyYXRpb24gZmFpbCBpbiBMaW51eCBrZXJuZWwsIHRoYXQgaXMgd2h5IHdlIGVu
+c3VyZSBpdA0KaW4gY2xvY2sgZHJpdmVyIGVhcmx5IHBoYXNlLiBJTU8sIGl0IHNob3VsZCBiZSBP
+SyB0byBub3QgYWRkIGEgZml4IHRhZywgc2luY2UgaXQgaXMganVzdA0KdG8gbWFrZSBzdXJlIHRo
+ZSBzZXR0aW5nIGlzIGNvcnJlY3QgYW5kIE5PVCBkZXBlbmRzIG9uIHRoZSBoYXJkd2FyZSByZXNl
+dCB2YWx1ZSB3aGljaA0KY291bGQgYmUgY2hhbmdlZCBpbiB1LWJvb3QuDQoNCkFuc29uLg0KDQpf
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0t
+a2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcK
+aHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2Vy
+bmVsCg==
