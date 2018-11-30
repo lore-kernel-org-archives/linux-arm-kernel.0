@@ -2,67 +2,63 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 33A2CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:26:35 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7DF8C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:31:36 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 06B0D20673
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:26:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7A05B20673
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 18:31:36 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eOkJzBpI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 06B0D20673
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lfvr5epB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7A05B20673
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=gGwvl6mPQPZLr1pqh9+NsxTqM+c+1oPHIT39mm1Xk08=; b=eOkJzBpIUaumqQ
-	7ladErAkrlF31TpDF+Xm5dBCibh6XSPkmSBAWBpNjQ+PI4uzx9xkt+pMPveuDEuEQyLfxtqoaihB1
-	rB9MdaXwFCEExy86GmIUo+Xtiq5MnCLubbSzWPVxKX+/DjCqXwzMiSpt36QGnE3mBxlpv+Ydr8J/h
-	h9/hR2zbuoLDc4PPPbqHrIew+lMXyU/c2DFxIanS4SEH9Ic882PG0Jrn7IqSI402rfkJH6jQYc8EX
-	0H+wHAOYmj3qAZHdO03obrdq8YGQr4Ku/8mTgdhiuWJLPCa6W1+kRJCwh+7omzqA3dmDru/s0v2Ws
-	WkPAaGBOophyArxVlrDQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=T5nKEpU9Y/Zb/f/I38FqM0EP3cwAWxDvLgSYphpQDm0=; b=Lfvr5epBPHJA7c
+	/95baH4K6axNYjiSvS5SJJvL3M7abo7l/m6dmxYt+szN89cjfE6TQwbs/YaVH3WoS3AdNmyWZ3kTn
+	5JxaCXYumAERrbzDzkwQnHBOw8XQOvk4KyV5tf2FTVTMqOqleOmh01dmHF63mc7xnsQ/np1vpuxmn
+	l9/98H+mV1iwLBvDiDBZurOHPJ10ZM5eg7CT7slbpzJ8O+NlIXxnSm5JI5UcF0+mLStCoCj1A15uG
+	+ua1Z3KDXHHC98fMn0BfbxhqIrgfm05vMzEAnZR4LGAde6+ocXmW5SZyHfntxbC8l58ETUIkfgD1N
+	k9EQzyL7/WUXeCuMLgig==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSnUh-0001SS-7Q; Fri, 30 Nov 2018 18:26:27 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gSnZf-0003M6-2p; Fri, 30 Nov 2018 18:31:35 +0000
+Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSnUd-0001RU-QS
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 18:26:25 +0000
+ id 1gSnZb-0003Lg-Fp
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 18:31:32 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 129F9165C;
- Fri, 30 Nov 2018 10:26:11 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D5DA83F575;
- Fri, 30 Nov 2018 10:26:10 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id B8FAC1AE0FA2; Fri, 30 Nov 2018 18:26:29 +0000 (GMT)
-Date: Fri, 30 Nov 2018 18:26:29 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Subject: Re: [PATCH v4 2/2] arm64/bpf: don't allocate BPF JIT programs in
- module memory
-Message-ID: <20181130182629.GA16085@arm.com>
-References: <20181123221804.440-1-ard.biesheuvel@linaro.org>
- <20181123221804.440-3-ard.biesheuvel@linaro.org>
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1EA23165C;
+ Fri, 30 Nov 2018 10:31:16 -0800 (PST)
+Received: from [10.1.196.105] (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 74F533F575;
+ Fri, 30 Nov 2018 10:31:15 -0800 (PST)
+Subject: Re: [PATCH] firmware: arm_sdei: fix wrong of_node_put() in init
+ function
+To: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+References: <20181126121536.28739-1-nsaenzjulienne@suse.de>
+From: James Morse <james.morse@arm.com>
+Message-ID: <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
+Date: Fri, 30 Nov 2018 18:31:13 +0000
+User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.0
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181123221804.440-3-ard.biesheuvel@linaro.org>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181126121536.28739-1-nsaenzjulienne@suse.de>
+Content-Language: en-GB
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_102623_875768_4F5F1F1D 
-X-CRM114-Status: GOOD (  23.72  )
+X-CRM114-CacheID: sfid-20181130_103131_535684_7BA57663 
+X-CRM114-Status: GOOD (  17.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,83 +70,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Daniel Borkmann <daniel@iogearbox.net>,
- Eric Dumazet <eric.dumazet@gmail.com>, Jann Horn <jannh@google.com>,
- Catalin Marinas <catalin.marinas@arm.com>, linux-kernel@vger.kernel.org,
- Alexei Starovoitov <ast@kernel.org>, netdev@vger.kernel.org,
- Arnd Bergmann <arnd@arndb.de>, Jessica Yu <jeyu@kernel.org>,
- Rick Edgecombe <rick.p.edgecombe@intel.com>,
- "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org,
- Kees Cook <keescook@chromium.org>
+Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 23, 2018 at 11:18:04PM +0100, Ard Biesheuvel wrote:
-> The arm64 module region is a 128 MB region that is kept close to
-> the core kernel, in order to ensure that relative branches are
-> always in range. So using the same region for programs that do
-> not have this restriction is wasteful, and preferably avoided.
+Hi Nicolas,
+
+On 26/11/2018 12:15, Nicolas Saenz Julienne wrote:
+> After finding a "firmware" dt node arm_sdei tries to match it's
+> compatible string with it. To do so it's calling of_find_matching_node()
+> which already takes care of decreasing the refcount on the "firmware"
+> node. We are then incorrectly decreasing the refcount on that node
+> again.
 > 
-> Now that the core BPF JIT code permits the alloc/free routines to
-> be overridden, implement them by vmalloc()/vfree() calls from a
-> dedicated 128 MB region set aside for BPF programs. This ensures
-> that BPF programs are still in branching range of each other, which
-> is something the JIT currently depends upon (and is not guaranteed
-> when using module_alloc() on KASLR kernels like we do currently).
-> It also ensures that placement of BPF programs does not correlate
-> with the placement of the core kernel or modules, making it less
-> likely that leaking the former will reveal the latter.
+> This patch removes the unwarranted call to of_node_put().
 > 
-> This also solves an issue under KASAN, where shadow memory is
-> needlessly allocated for all BPF programs (which don't require KASAN
-> shadow pages since they are not KASAN instrumented)
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Fixes: ad6eb31ef903 ("firmware: arm_sdei: Add driver for Software Delegated Exceptions")
+> Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+
+
+Thanks!, I agree this is unwarranted.
+Is there a tool that picks these up? I remember sparse giving me a headache, but
+I don't remember this one... I probably cargo-culted it from somewhere else.
+
+Acked-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
+
+
 > ---
->  arch/arm64/include/asm/memory.h |  5 ++++-
->  arch/arm64/net/bpf_jit_comp.c   | 13 +++++++++++++
->  2 files changed, 17 insertions(+), 1 deletion(-)
+>  drivers/firmware/arm_sdei.c | 1 -
+>  1 file changed, 1 deletion(-)
 > 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index b96442960aea..ee20fc63899c 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -62,8 +62,11 @@
->  #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
->  	(UL(1) << (VA_BITS - 1)) + 1)
->  #define KIMAGE_VADDR		(MODULES_END)
-> +#define BPF_JIT_REGION_START	(VA_START + KASAN_SHADOW_SIZE)
-> +#define BPF_JIT_REGION_SIZE	(SZ_128M)
-> +#define BPF_JIT_REGION_END	(BPF_JIT_REGION_START + BPF_JIT_REGION_SIZE)
->  #define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
-> -#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
-> +#define MODULES_VADDR		(BPF_JIT_REGION_END)
->  #define MODULES_VSIZE		(SZ_128M)
->  #define VMEMMAP_START		(PAGE_OFFSET - VMEMMAP_SIZE)
->  #define PCI_IO_END		(VMEMMAP_START - SZ_2M)
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index a6fdaea07c63..76c2ab40c02d 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -940,3 +940,16 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
->  					   tmp : orig_prog);
->  	return prog;
->  }
-> +
-> +void *bpf_jit_alloc_exec(unsigned long size)
-> +{
-> +	return __vmalloc_node_range(size, PAGE_SIZE, BPF_JIT_REGION_START,
-> +				    BPF_JIT_REGION_END, GFP_KERNEL,
-> +				    PAGE_KERNEL_EXEC, 0, NUMA_NO_NODE,
-> +				    __builtin_return_address(0));
+> diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+> index 1ea71640fdc2..dffb47c6b480 100644
+> --- a/drivers/firmware/arm_sdei.c
+> +++ b/drivers/firmware/arm_sdei.c
+> @@ -1017,7 +1017,6 @@ static bool __init sdei_present_dt(void)
+>  		return false;
+>  
+>  	np = of_find_matching_node(fw_np, sdei_of_match);
+> -	of_node_put(fw_np);
+>  	if (!np)
+>  		return false;
+>  
+> 
 
-I guess we'll want VM_IMMEDIATE_UNMAP here if Rich gets that merged. In the
-meantime, I wonder if it's worth zeroing the region in bpf_jit_free_exec()?
-(although we'd need the size information...).
-
-Will
 
 _______________________________________________
 linux-arm-kernel mailing list
