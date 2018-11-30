@@ -7,64 +7,79 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C5A0AC64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:29:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 075F5C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:39:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 959BA2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:29:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C7E712080A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 20:39:04 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KzQijbmj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 959BA2145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=anholt.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sQeMoZIV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="hHEqAsC+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C7E712080A
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BdMWLoKM5V3t4KE+wSr0bGX3V1N5VcAHc5mmyoJiRuc=; b=KzQijbmjKAouKp
-	2fPkdC8+4ow7Ql+7CkgYgiZquuchdjTNh6jv7BYMZFxCLgfgTm6aktI6tjm91Ns54PO8OtLprFIDf
-	XEfXeEE08AGC67UPpNXSrZYusSiFuXRYqZ1lXlq76cZlmuLsPlwr+rxoL4EnXWSHu7KNzAKN4mjCo
-	cDRKe5t59mdUZUyfWau6kBth0arYeC64ALuE1sUwExtwoMfepYgH9Asklto0iPezrzKHTf5v0Qh9P
-	v42qurJ2Psv6qAWxYUGwJW1FGThLPf1ns214+T+mWzKfrKT4tReqkoDXGnkrBE2hZWyyC3mGwKaDD
-	+x/4s531vbemgguFLQAg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=GSCEYsW9xKdm20SO0S4VJx+CENiB6p3wZ4/d9AfvKSw=; b=sQeMoZIVO9zmyT
+	YVgbxFZMWNyty/bs2S19XYTAgeN224bHlszk04CawQFQ0uwSkfCEBBx9Yod6qylBatt8e+msQdMAL
+	bO1sYz2ky5+s3Py2w+ZBRag45HULZwal7xpkWYOxybEb2MYiHKf7IXnHNtmzoNcSX1McE2jJY8pFb
+	TM4bX9PHf9sKQM8b6ybFoSKyHYZh4co1wJZTfm8i0VQ20lefPvpsD63BCSMg5umXZgJL3sy470Fs+
+	RxW8yTp7jb4bD0fWiugwiBtQqMuXbi+tY9jAMarZaqM29Gp74ZizMaf9GpcXcfO7BrUSQrLVbAKF0
+	8Q7npVRW+6ILIsQLbuqg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSpPm-0002fl-Es; Fri, 30 Nov 2018 20:29:30 +0000
-Received: from anholt.net ([50.246.234.109])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSpOW-0001Vq-LJ; Fri, 30 Nov 2018 20:28:20 +0000
-Received: from localhost (localhost [127.0.0.1])
- by anholt.net (Postfix) with ESMTP id EF55810A150B;
- Fri, 30 Nov 2018 12:27:53 -0800 (PST)
-X-Virus-Scanned: Debian amavisd-new at anholt.net
-Received: from anholt.net ([127.0.0.1])
- by localhost (kingsolver.anholt.net [127.0.0.1]) (amavisd-new, port 10024)
- with LMTP id S_f16oxcLygD; Fri, 30 Nov 2018 12:27:52 -0800 (PST)
-Received: from eliezer.anholt.net (localhost [127.0.0.1])
- by anholt.net (Postfix) with ESMTP id 2AD9510A1570;
- Fri, 30 Nov 2018 12:27:45 -0800 (PST)
-Received: by eliezer.anholt.net (Postfix, from userid 1000)
- id 7B1C82FE2D75; Fri, 30 Nov 2018 12:27:43 -0800 (PST)
-From: Eric Anholt <eric@anholt.net>
-To: Florian Fainelli <f.fainelli@gmail.com>, devicetree@vger.kernel.org,
- Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Wim Van Sebroeck <wim@linux-watchdog.org>,
- Guenter Roeck <linux@roeck-us.net>, linux-watchdog@vger.kernel.org
-Subject: [PATCH v3 5/5] ARM: bcm283x: Switch V3D over to using the PM driver
- instead of firmware.
-Date: Fri, 30 Nov 2018 12:27:43 -0800
-Message-Id: <20181130202743.20585-6-eric@anholt.net>
-X-Mailer: git-send-email 2.20.0.rc1
-In-Reply-To: <20181130202743.20585-1-eric@anholt.net>
-References: <20181130202743.20585-1-eric@anholt.net>
+	id 1gSpYv-0007eJ-FI; Fri, 30 Nov 2018 20:38:57 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSpYq-0007di-V9
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 20:38:54 +0000
+Received: by mail-wr1-x442.google.com with SMTP id 96so6517056wrb.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 30 Nov 2018 12:38:42 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=N23ecysPLPuVwmWPBcYm2Kn7j5y448PatwAcTMxhNL8=;
+ b=hHEqAsC+FCyhjQYwQS3NvtNtmh91/JZLVR5VRaYy2KAGJ+2dNDME2+DA0nfQnH6XsZ
+ EtbPnY7ZiFr9TjPIsHdawd02KSKen9/WY3wzp0vwlq/G/HZU9o1tR1yzTuT7tdjXvDpn
+ lr1k2D0gO72XxnKhsGqSLDjp8i+8le7003ENs=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=N23ecysPLPuVwmWPBcYm2Kn7j5y448PatwAcTMxhNL8=;
+ b=roBqTBgLuQQidRE8Ujq7d3tu5d5xJIKpg3qEwcjGi/ADEqc3XsjAi/pzmS5JzRdtlg
+ 0h6z2hy8SMT+dQ36zekpuZGJAQzpk+kHfDkw4/TbnPaEe7PGlHqnHGlUSeVAGbe15Lzb
+ FdT4V2z4mCY/KWRZ/PzEF1HGHphn1KLmkkqmZk16Nd8GKOllJTv19JkrakxALF5+e6TA
+ 5a2aCzeMy9t8HE62yp8/eI6jOZw5qO0Tqm3VisvwAYKaIsfvxqhgIGwGgAFyg7gds7fw
+ OqD40w2cvwgkWPIEHfHo+sj39hZ8j7tQ0Fi+C0YfD/751eFpL3fxFINbWte+ABfXAxUs
+ LpJg==
+X-Gm-Message-State: AA+aEWZyc/PssOJD55ci8MpIcDqAwLaDBlzOQ5uxGSMLNQiMy9zCOwDG
+ JZwmqemSeb4/bdQvxozMpfrmnw==
+X-Google-Smtp-Source: AFSGD/Vzt7NhQPkGvGtax5OCWiQyZcAQ49EhWaLCbOXmpGvAHOz27xUifXE1axo7FRKlgtjAM2z4nw==
+X-Received: by 2002:adf:9521:: with SMTP id 30mr5811622wrs.192.1543610320670; 
+ Fri, 30 Nov 2018 12:38:40 -0800 (PST)
+Received: from harold.home ([2a01:cb1d:112:6f00:d895:e032:7b00:86cd])
+ by smtp.gmail.com with ESMTPSA id r76-v6sm137643wmb.21.2018.11.30.12.38.39
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Fri, 30 Nov 2018 12:38:39 -0800 (PST)
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+To: linux-crypto@vger.kernel.org
+Subject: [RFC/RFT PATCH] crypto: arm64/chacha - optimize for arbitrary length
+ inputs
+Date: Fri, 30 Nov 2018 21:38:11 +0100
+Message-Id: <20181130203811.30269-1-ard.biesheuvel@linaro.org>
+X-Mailer: git-send-email 2.19.1
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_122813_743888_23C02630 
-X-CRM114-Status: GOOD (  13.42  )
+X-CRM114-CacheID: sfid-20181130_123853_012041_61B0F1D4 
+X-CRM114-Status: GOOD (  14.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,72 +91,404 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Stefan Wahren <stefan.wahren@i2se.com>, linux-kernel@vger.kernel.org,
- Eric Anholt <eric@anholt.net>, bcm-kernel-feedback-list@broadcom.com,
- linux-rpi-kernel@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: herbert@gondor.apana.org.au, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
+ Martin Willi <martin@strongswan.org>, linux-kernel@vger.kernel.org,
+ Eric Biggers <ebiggers@kernel.org>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The GRAFX domain only contains V3D, and this driver should be the only
-accessor of V3D (firmware usage gets disabled when V3D is in the DT),
-so we can safely make Linux control the GRAFX and GRAFX_V3D power
-domains.
+Update the 4-way NEON ChaCha routine so it can handle input of any
+length >64 bytes in its entirety, rather than having to call into
+the 1-way routine and/or do memcpy()s via temp buffers to handle the
+tail of a ChaCha invocation that is not a multiple of 256 bytes.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
+On inputs that are a multiple of 256 bytes (and thus in tcrypt
+benchmarks), performance drops by around 1% on Cortex-A57, while
+performance for inputs drawn randomly from the range [64, 1024+64)
+increases by around 30% (using ChaCha20). On Cortex-A72, performance
+gains are similar. On Cortex-A53, performance improves but only by 5%.
+
+Cc: Eric Biggers <ebiggers@kernel.org>
+Cc: Martin Willi <martin@strongswan.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ----
- arch/arm/boot/dts/bcm283x.dtsi     | 4 +++-
- 2 files changed, 3 insertions(+), 5 deletions(-)
+Test program after the patch. 
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index cb2d6d78a7fb..21a930148709 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -87,10 +87,6 @@
- 	power-domains = <&power RPI_POWER_DOMAIN_USB>;
- };
+ arch/arm64/crypto/chacha-neon-core.S | 185 ++++++++++++++++++--
+ arch/arm64/crypto/chacha-neon-glue.c |  36 ++--
+ 2 files changed, 188 insertions(+), 33 deletions(-)
+
+diff --git a/arch/arm64/crypto/chacha-neon-core.S b/arch/arm64/crypto/chacha-neon-core.S
+index 75b4e06cee79..45ffc51cb437 100644
+--- a/arch/arm64/crypto/chacha-neon-core.S
++++ b/arch/arm64/crypto/chacha-neon-core.S
+@@ -19,6 +19,7 @@
+  */
  
--&v3d {
--	power-domains = <&power RPI_POWER_DOMAIN_V3D>;
--};
+ #include <linux/linkage.h>
++#include <asm/cache.h>
+ 
+ 	.text
+ 	.align		6
+@@ -164,6 +165,7 @@ ENTRY(chacha_4block_xor_neon)
+ 	// x1: 4 data blocks output, o
+ 	// x2: 4 data blocks input, i
+ 	// w3: nrounds
++	// x4: byte count
+ 
+ 	//
+ 	// This function encrypts four consecutive ChaCha blocks by loading
+@@ -177,11 +179,11 @@ ENTRY(chacha_4block_xor_neon)
+ 	ld1		{v30.4s-v31.4s}, [x9]
+ 
+ 	// x0..15[0-3] = s0..3[0..3]
+-	mov		x4, x0
+-	ld4r		{ v0.4s- v3.4s}, [x4], #16
+-	ld4r		{ v4.4s- v7.4s}, [x4], #16
+-	ld4r		{ v8.4s-v11.4s}, [x4], #16
+-	ld4r		{v12.4s-v15.4s}, [x4]
++	mov		x8, x0
++	ld4r		{ v0.4s- v3.4s}, [x8], #16
++	ld4r		{ v4.4s- v7.4s}, [x8], #16
++	ld4r		{ v8.4s-v11.4s}, [x8], #16
++	ld4r		{v12.4s-v15.4s}, [x8]
+ 
+ 	// x12 += counter values 0-3
+ 	add		v12.4s, v12.4s, v30.4s
+@@ -425,24 +427,47 @@ ENTRY(chacha_4block_xor_neon)
+ 	zip1		v30.4s, v14.4s, v15.4s
+ 	zip2		v31.4s, v14.4s, v15.4s
+ 
++	mov		x3, #64
++	subs		x5, x4, #64
++	add		x6, x5, x2
++	csel		x3, x3, xzr, ge
++	csel		x2, x2, x6, ge
++
+ 	// interleave 64-bit words in state n, n+2
+ 	zip1		v0.2d, v16.2d, v18.2d
+ 	zip2		v4.2d, v16.2d, v18.2d
+ 	zip1		v8.2d, v17.2d, v19.2d
+ 	zip2		v12.2d, v17.2d, v19.2d
+-	ld1		{v16.16b-v19.16b}, [x2], #64
++	ld1		{v16.16b-v19.16b}, [x2], x3
++
++	subs		x6, x4, #128
++	ccmp		x3, xzr, #4, lt
++	add		x7, x6, x2
++	csel		x3, x3, xzr, eq
++	csel		x2, x2, x7, eq
+ 
+ 	zip1		v1.2d, v20.2d, v22.2d
+ 	zip2		v5.2d, v20.2d, v22.2d
+ 	zip1		v9.2d, v21.2d, v23.2d
+ 	zip2		v13.2d, v21.2d, v23.2d
+-	ld1		{v20.16b-v23.16b}, [x2], #64
++	ld1		{v20.16b-v23.16b}, [x2], x3
++
++	subs		x7, x4, #192
++	ccmp		x3, xzr, #4, lt
++	add		x8, x7, x2
++	csel		x3, x3, xzr, eq
++	csel		x2, x2, x8, eq
+ 
+ 	zip1		v2.2d, v24.2d, v26.2d
+ 	zip2		v6.2d, v24.2d, v26.2d
+ 	zip1		v10.2d, v25.2d, v27.2d
+ 	zip2		v14.2d, v25.2d, v27.2d
+-	ld1		{v24.16b-v27.16b}, [x2], #64
++	ld1		{v24.16b-v27.16b}, [x2], x3
++
++	subs		x8, x4, #256
++	ccmp		x3, xzr, #4, lt
++	add		x9, x8, x2
++	csel		x2, x2, x9, eq
+ 
+ 	zip1		v3.2d, v28.2d, v30.2d
+ 	zip2		v7.2d, v28.2d, v30.2d
+@@ -451,29 +476,167 @@ ENTRY(chacha_4block_xor_neon)
+ 	ld1		{v28.16b-v31.16b}, [x2]
+ 
+ 	// xor with corresponding input, write to output
++	tbnz		x5, #63, 0f
+ 	eor		v16.16b, v16.16b, v0.16b
+ 	eor		v17.16b, v17.16b, v1.16b
+ 	eor		v18.16b, v18.16b, v2.16b
+ 	eor		v19.16b, v19.16b, v3.16b
++	st1		{v16.16b-v19.16b}, [x1], #64
++
++	tbnz		x6, #63, 1f
+ 	eor		v20.16b, v20.16b, v4.16b
+ 	eor		v21.16b, v21.16b, v5.16b
+-	st1		{v16.16b-v19.16b}, [x1], #64
+ 	eor		v22.16b, v22.16b, v6.16b
+ 	eor		v23.16b, v23.16b, v7.16b
++	st1		{v20.16b-v23.16b}, [x1], #64
++
++	tbnz		x7, #63, 2f
+ 	eor		v24.16b, v24.16b, v8.16b
+ 	eor		v25.16b, v25.16b, v9.16b
+-	st1		{v20.16b-v23.16b}, [x1], #64
+ 	eor		v26.16b, v26.16b, v10.16b
+ 	eor		v27.16b, v27.16b, v11.16b
+-	eor		v28.16b, v28.16b, v12.16b
+ 	st1		{v24.16b-v27.16b}, [x1], #64
++
++	tbnz		x8, #63, 3f
++	eor		v28.16b, v28.16b, v12.16b
+ 	eor		v29.16b, v29.16b, v13.16b
+ 	eor		v30.16b, v30.16b, v14.16b
+ 	eor		v31.16b, v31.16b, v15.16b
+ 	st1		{v28.16b-v31.16b}, [x1]
+ 
+ 	ret
++
++	// fewer than 64 bytes of in/output
++0:	adr		x12, .Lpermute
++	add		x12, x12, x5
++	sub		x2, x1, #64
++	add		x1, x1, x5
++	add		x13, x12, #64
++	ld1		{v8.16b}, [x12]
++	ld1		{v9.16b}, [x13]
++	movi		v10.16b, #16
++
++	ld1		{v16.16b-v19.16b}, [x2]
++	tbl		v4.16b, {v0.16b-v3.16b}, v8.16b
++	tbx		v20.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v5.16b, {v0.16b-v3.16b}, v8.16b
++	tbx		v21.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v6.16b, {v0.16b-v3.16b}, v8.16b
++	tbx		v22.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v7.16b, {v0.16b-v3.16b}, v8.16b
++	tbx		v23.16b, {v16.16b-v19.16b}, v9.16b
++
++	eor		v20.16b, v20.16b, v4.16b
++	eor		v21.16b, v21.16b, v5.16b
++	eor		v22.16b, v22.16b, v6.16b
++	eor		v23.16b, v23.16b, v7.16b
++	st1		{v20.16b-v23.16b}, [x1]
++	ret
++
++	// fewer than 128 bytes of in/output
++1:	adr		x12, .Lpermute
++	add		x12, x12, x6
++	add		x1, x1, x6
++	add		x13, x12, #64
++	ld1		{v8.16b}, [x12]
++	ld1		{v9.16b}, [x13]
++	movi		v10.16b, #16
++	tbl		v0.16b, {v4.16b-v7.16b}, v8.16b
++	tbx		v20.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v1.16b, {v4.16b-v7.16b}, v8.16b
++	tbx		v21.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v2.16b, {v4.16b-v7.16b}, v8.16b
++	tbx		v22.16b, {v16.16b-v19.16b}, v9.16b
++	add		v8.16b, v8.16b, v10.16b
++	add		v9.16b, v9.16b, v10.16b
++	tbl		v3.16b, {v4.16b-v7.16b}, v8.16b
++	tbx		v23.16b, {v16.16b-v19.16b}, v9.16b
++
++	eor		v20.16b, v20.16b, v0.16b
++	eor		v21.16b, v21.16b, v1.16b
++	eor		v22.16b, v22.16b, v2.16b
++	eor		v23.16b, v23.16b, v3.16b
++	st1		{v20.16b-v23.16b}, [x1]
++	ret
++
++	// fewer than 192 bytes of in/output
++2:	adr		x12, .Lpermute
++	add		x12, x12, x7
++	add		x1, x1, x7
++	add		x13, x12, #64
++	ld1		{v4.16b}, [x12]
++	ld1		{v5.16b}, [x13]
++	movi		v6.16b, #16
++	tbl		v0.16b, {v8.16b-v11.16b}, v4.16b
++	tbx		v24.16b, {v20.16b-v23.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v1.16b, {v8.16b-v11.16b}, v4.16b
++	tbx		v25.16b, {v20.16b-v23.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v2.16b, {v8.16b-v11.16b}, v4.16b
++	tbx		v26.16b, {v20.16b-v23.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v3.16b, {v8.16b-v11.16b}, v4.16b
++	tbx		v27.16b, {v20.16b-v23.16b}, v5.16b
++
++	eor		v24.16b, v24.16b, v0.16b
++	eor		v25.16b, v25.16b, v1.16b
++	eor		v26.16b, v26.16b, v2.16b
++	eor		v27.16b, v27.16b, v3.16b
++	st1		{v24.16b-v27.16b}, [x1]
++	ret
++
++	// fewer than 256 bytes of in/output
++3:	adr		x12, .Lpermute
++	add		x12, x12, x8
++	add		x1, x1, x8
++	add		x13, x12, #64
++	ld1		{v4.16b}, [x12]
++	ld1		{v5.16b}, [x13]
++	movi		v6.16b, #16
++	tbl		v0.16b, {v12.16b-v15.16b}, v4.16b
++	tbx		v28.16b, {v24.16b-v27.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v1.16b, {v12.16b-v15.16b}, v4.16b
++	tbx		v29.16b, {v24.16b-v27.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v2.16b, {v12.16b-v15.16b}, v4.16b
++	tbx		v30.16b, {v24.16b-v27.16b}, v5.16b
++	add		v4.16b, v4.16b, v6.16b
++	add		v5.16b, v5.16b, v6.16b
++	tbl		v3.16b, {v12.16b-v15.16b}, v4.16b
++	tbx		v31.16b, {v24.16b-v27.16b}, v5.16b
++
++	eor		v28.16b, v28.16b, v0.16b
++	eor		v29.16b, v29.16b, v1.16b
++	eor		v30.16b, v30.16b, v2.16b
++	eor		v31.16b, v31.16b, v3.16b
++	st1		{v28.16b-v31.16b}, [x1]
++	ret
+ ENDPROC(chacha_4block_xor_neon)
+ 
+ CTRINC:	.word		0, 1, 2, 3
+ ROT8:	.word		0x02010003, 0x06050407, 0x0a09080b, 0x0e0d0c0f
++
++	.align		L1_CACHE_SHIFT
++	.set		.Lpermute, . + 64
++	.set		.Li, 0
++	.rept		192
++	.byte		(.Li - 64)
++	.set		.Li, .Li + 1
++	.endr
+diff --git a/arch/arm64/crypto/chacha-neon-glue.c b/arch/arm64/crypto/chacha-neon-glue.c
+index 346eb85498a1..458d9b36cf9d 100644
+--- a/arch/arm64/crypto/chacha-neon-glue.c
++++ b/arch/arm64/crypto/chacha-neon-glue.c
+@@ -32,41 +32,33 @@
+ asmlinkage void chacha_block_xor_neon(u32 *state, u8 *dst, const u8 *src,
+ 				      int nrounds);
+ asmlinkage void chacha_4block_xor_neon(u32 *state, u8 *dst, const u8 *src,
+-				       int nrounds);
++				       int nrounds, int bytes);
+ asmlinkage void hchacha_block_neon(const u32 *state, u32 *out, int nrounds);
+ 
+ static void chacha_doneon(u32 *state, u8 *dst, const u8 *src,
+-			  unsigned int bytes, int nrounds)
++			  int bytes, int nrounds)
+ {
+ 	u8 buf[CHACHA_BLOCK_SIZE];
+ 
+-	while (bytes >= CHACHA_BLOCK_SIZE * 4) {
++	if (bytes < CHACHA_BLOCK_SIZE) {
++		memcpy(buf, src, bytes);
+ 		kernel_neon_begin();
+-		chacha_4block_xor_neon(state, dst, src, nrounds);
++		chacha_block_xor_neon(state, buf, buf, nrounds);
++		kernel_neon_end();
++		memcpy(dst, buf, bytes);
++		return;
++	}
++
++	while (bytes > 0) {
++		kernel_neon_begin();
++		chacha_4block_xor_neon(state, dst, src, nrounds,
++				       min(bytes, CHACHA_BLOCK_SIZE * 4));
+ 		kernel_neon_end();
+ 		bytes -= CHACHA_BLOCK_SIZE * 4;
+ 		src += CHACHA_BLOCK_SIZE * 4;
+ 		dst += CHACHA_BLOCK_SIZE * 4;
+ 		state[12] += 4;
+ 	}
 -
- &hdmi {
- 	power-domains = <&power RPI_POWER_DOMAIN_HDMI>;
- 	status = "okay";
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index bd5be68b4561..ce7bc9cc43ae 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -3,6 +3,7 @@
- #include <dt-bindings/clock/bcm2835-aux.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/soc/bcm2835-pm.h>
+-	if (!bytes)
+-		return;
+-
+-	kernel_neon_begin();
+-	while (bytes >= CHACHA_BLOCK_SIZE) {
+-		chacha_block_xor_neon(state, dst, src, nrounds);
+-		bytes -= CHACHA_BLOCK_SIZE;
+-		src += CHACHA_BLOCK_SIZE;
+-		dst += CHACHA_BLOCK_SIZE;
+-		state[12]++;
+-	}
+-	if (bytes) {
+-		memcpy(buf, src, bytes);
+-		chacha_block_xor_neon(state, buf, buf, nrounds);
+-		memcpy(dst, buf, bytes);
+-	}
+-	kernel_neon_end();
+ }
  
- /* firmware-provided startup stubs live here, where the secondary CPUs are
-  * spinning.
-@@ -120,7 +121,7 @@
- 			#interrupt-cells = <2>;
- 		};
- 
--		watchdog@7e100000 {
-+		pm: watchdog@7e100000 {
- 			compatible = "brcm,bcm2835-pm", "brcm,bcm2835-pm-wdt";
- 			#power-domain-cells = <1>;
- 			#reset-cells = <1>;
-@@ -637,6 +638,7 @@
- 			compatible = "brcm,bcm2835-v3d";
- 			reg = <0x7ec00000 0x1000>;
- 			interrupts = <1 10>;
-+			power-domains = <&pm BCM2835_POWER_DOMAIN_GRAFX_V3D>;
- 		};
- 
- 		vc4: gpu {
+ static int chacha_neon_stream_xor(struct skcipher_request *req,
 -- 
-2.20.0.rc1
+2.19.1
 
+
+#include <stdlib.h>
+#include <string.h>
+
+extern void chacha_4block_xor_neon(unsigned int *state, unsigned char *dst,
+				   unsigned char *src, int rounds, int bytes);
+
+extern void chacha_block_xor_neon(unsigned int *state, unsigned char *dst,
+				  unsigned char *src, int rounds);
+
+int main(void)
+{
+	static char buf[1024];
+	unsigned int state[64];
+
+	srand(20181130);
+
+	for (int i = 0; i < 10 * 1000 * 1000; i++) {
+		int l = 64 + rand() % (1024 - 64);
+
+#ifdef NEW
+		while (l > 0) {
+			chacha_4block_xor_neon(state, buf, buf, 20,
+					       l > 256 ? 256 : l);
+			l -= 256;
+		}
+#else
+		while (l >= 256) {
+			chacha_4block_xor_neon(state, buf, buf, 20, 256);
+			l -= 256;
+		}
+		while (l >= 64) {
+			chacha_block_xor_neon(state, buf, buf, 20);
+			l -= 64;
+		}
+		if (l > 0) {
+			unsigned char tmp[64];
+
+			memcpy(tmp, buf, l);
+			chacha_block_xor_neon(state, tmp, tmp, 20);
+			memcpy(buf, tmp, l);
+		}
+#endif
+	}
+
+	return 0;
+}
 
 _______________________________________________
 linux-arm-kernel mailing list
