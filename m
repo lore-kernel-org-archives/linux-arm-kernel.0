@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0177DC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:56:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8A4A7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:56:59 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AEF6720834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:56:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 530AB20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 17:56:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oobuG8WV"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AEF6720834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QZXFqecC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 530AB20834
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zonque.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,36 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=L+m1eAe48oh2SZVcFzGWUjirVXDKeYHneioeHFuDjxY=; b=oobuG8WVBK5Cq4
-	iFvkWQaYoqpm/qZ/LjYXim6S73MR+hBBijwzxc7uHIEX3uwDTs//YxHaTgKHXxM1qPoUrcasItHm4
-	PkP3tME8EW01B9DnMxhzb5wbSiVYyDLxGPv+WjN8MbZ+IUoDojM6pGzfeCt3CCwaQVTlnqQCDRX9b
-	aLhXOJXxKdBX1CfwsyrX/Otqzh8wNDn2t4as6DrB/FeYe3kRpFh0jUPueQPujNp5MWJRsM433bGT4
-	tgZRIIqWtnb+i6aUzkWdnx9i4DZMXPbF+TmqYL4sIc3q/3A+9n31uzVyBGrsDBXwTAmHRw1DiD2da
-	O3VbZa+9uvQl1xouNi2A==;
+	List-Owner; bh=ViuPsW0hyvAmtciDpx2Y+xHLDrdKFm8t9t7swyztS+Q=; b=QZXFqecCzLt+fB
+	r1mo4+xV7m8Xp10yGuKwmq5D+kpM9E7CKU0jWQ8hhbMtZePSwXcuC94qdCy/jNbubE/mabLfJSrsE
+	FVktkudo03H4qdWYz7rpHOKd2i61PXRIp9mptfTTT7RUNy9x9i8T7stCtWfPYR2a0HL+F+YmCuZNT
+	ZyRmn233qKkC6XXI7hAXD/6y7su26iPuuv8Cl9S/3YnhPDjBxIhUIVsrMz6dxzY199zcmSVnw0uDM
+	pZ/7YNBdeBguF9jHQUqc7HC5h3XFLab0vJKj2pmJmmCu4TfTVnRNoWg4gLhgzrOVZvAVqIKPiK5/L
+	Lry3yyXj2ZGfqZf7Tg7g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSn1Y-0003OO-Mf; Fri, 30 Nov 2018 17:56:20 +0000
+	id 1gSn23-0003lW-IT; Fri, 30 Nov 2018 17:56:51 +0000
 Received: from mail.bugwerft.de ([46.23.86.59])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSn1K-0003EB-AF
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:56:07 +0000
+ id 1gSn1K-0003E5-AH
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 17:56:09 +0000
 Received: from localhost.localdomain (pD95EF9A6.dip0.t-ipconnect.de
  [217.94.249.166])
- by mail.bugwerft.de (Postfix) with ESMTPSA id 507302C459B;
- Fri, 30 Nov 2018 17:55:40 +0000 (UTC)
+ by mail.bugwerft.de (Postfix) with ESMTPSA id C27272C4597;
+ Fri, 30 Nov 2018 17:55:38 +0000 (UTC)
 From: Daniel Mack <daniel@zonque.org>
 To: robert.jarzmik@free.fr,
 	haojian.zhuang@gmail.com
-Subject: [PATCH 4/7] ARM: dts: pxa: merge &pxa3xx_ohci with &usb0
-Date: Fri, 30 Nov 2018 18:55:40 +0100
-Message-Id: <20181130175543.32628-5-daniel@zonque.org>
+Subject: [PATCH 1/7] ARM: dts: pxa2xx: drop #address-cells and #size-cells
+ from /cpus
+Date: Fri, 30 Nov 2018 18:55:37 +0100
+Message-Id: <20181130175543.32628-2-daniel@zonque.org>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181130175543.32628-1-daniel@zonque.org>
 References: <20181130175543.32628-1-daniel@zonque.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_095606_493528_3290A6AF 
-X-CRM114-Status: GOOD (  10.51  )
+X-CRM114-CacheID: sfid-20181130_095606_696803_F5420CDD 
+X-CRM114-Status: UNSURE (   8.71  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,46 +75,27 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Both pxa3xx.dtsi and pxa2xx.dtsi define a node for the USB controller. Merge
-them, and get rid of the one in pxa3xx.dtsi.
+PXA is single-core only, so this node will not have enumerable children.
+Drop the #address-cells and #size-cells properties to squelch a dtc warning.
 
 Signed-off-by: Daniel Mack <daniel@zonque.org>
 ---
- arch/arm/boot/dts/pxa2xx.dtsi | 1 +
- arch/arm/boot/dts/pxa3xx.dtsi | 8 --------
- 2 files changed, 1 insertion(+), 8 deletions(-)
+ arch/arm/boot/dts/pxa2xx.dtsi | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/pxa2xx.dtsi b/arch/arm/boot/dts/pxa2xx.dtsi
-index 30e77ebbcc4d..c00b1115f2a7 100644
+index 080d5c5169b5..7d3dfa8259f8 100644
 --- a/arch/arm/boot/dts/pxa2xx.dtsi
 +++ b/arch/arm/boot/dts/pxa2xx.dtsi
-@@ -138,6 +138,7 @@
- 			compatible = "marvell,pxa-ohci";
- 			reg = <0x4c000000 0x10000>;
- 			interrupts = <3>;
-+			clocks = <&clks CLK_USBH>;
- 			status = "disabled";
- 		};
+@@ -43,8 +43,6 @@
+ 	};
  
-diff --git a/arch/arm/boot/dts/pxa3xx.dtsi b/arch/arm/boot/dts/pxa3xx.dtsi
-index eb3223e85f9a..eb9443208578 100644
---- a/arch/arm/boot/dts/pxa3xx.dtsi
-+++ b/arch/arm/boot/dts/pxa3xx.dtsi
-@@ -202,14 +202,6 @@
- 			status = "disabled";
- 		};
- 
--		pxa3xx_ohci: usb@4c000000 {
--			compatible = "marvell,pxa-ohci";
--			reg = <0x4c000000 0x10000>;
--			interrupts = <3>;
--			clocks = <&clks CLK_USBH>;
--			status = "disabled";
--		};
--
- 		pwm0: pwm@40b00000 {
- 			compatible = "marvell,pxa270-pwm";
- 			reg = <0x40b00000 0x10>;
+ 	cpus {
+-		#address-cells = <0>;
+-		#size-cells = <0>;
+ 		cpu {
+ 			compatible = "marvell,xscale";
+ 			device_type = "cpu";
 -- 
 2.19.2
 
