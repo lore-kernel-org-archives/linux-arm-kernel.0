@@ -2,65 +2,68 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 04929C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:18:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 63AC0C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:25:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CA5C820673
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:18:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 35EEB20863
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 09:25:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="T00EbaY1"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA5C820673
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EJHJF1y1";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="0XVAg7js"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 35EEB20863
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DiiXviIoEsyn9kn6cVudfCuNxB+SJ5dOHgXDgVMIZxI=; b=T00EbaY1Q7Z2Ly
-	gN50qDjPm/i07It/CJ6fUEFDiEnWAdBM3VZHn4fr537+K3LzY7v9s7Vm78t5sIv7inRgnAI/kVLCt
-	PoT5OCezeuVNc586l+3qOv6GFIvh88+1IAyK/EsCRkfo/OgsOEvk4OOFCMM36EGcaHc/hbDg8kRk5
-	WQfcXoxdsuUfw8646bCRdirUMT1VBAs2g9z9dE6bRccn5NxQrZCxj4aIo2aAR/LxCwsTgn5XdCv+V
-	4+NkXM5wB7xZIMbsYHOlMagHILPfqrbxmfd+gD5R6GjJYvja2Pz9N2O0a0lpAfyXM1gP17G0Vue/f
-	evD+6TBxQnfWS0URtlvg==;
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=1I9Dtwwink23M92DBqogmRty/cZHT6X72CxXtiNA3bU=; b=EJHJF1y1PgaZWI
+	yGCJD+HQpLiz/nkHtbt1nC+hsDtAix/qPPi5Rjma1gyIW7vq+a3+29e+7kPgl0Bsq1RRsUIgu231X
+	kQhe2LZxieh04Y4y9Mcsb85Oo+slHl0EUv1ZxtR62Pui+G2NC59ekzmFBAFZMm8Gx+00x1iHo2YZd
+	OO9Hthr02RgOAA7QYbhPMGRpSyq8jdJjrVF3iiNNgIRtvqpv3tu2pP4l4g3UpjkU+ie5Tzb2ODx+l
+	MEOjW4U0nwB0JsOAkk9/nbbk/AteDkVjQ256resaelZG0AsDbmdl1LjgG5cmMh04aLLpNVHr7h3Cu
+	kgHEQZu/M5IvYQy6EtLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSewG-0000hS-FQ; Fri, 30 Nov 2018 09:18:20 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSewD-0000gP-3w
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 09:18:18 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 98E9115AB;
- Fri, 30 Nov 2018 01:18:06 -0800 (PST)
-Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9946C3F59C;
- Fri, 30 Nov 2018 01:18:04 -0800 (PST)
-Subject: Re: [PATCH v6 05/24] irqchip/gic-v3: Switch to PMR masking before
- calling IRQ handler
-To: Mark Rutland <mark.rutland@arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-6-git-send-email-julien.thierry@arm.com>
- <20181129181258.jo6s4e7s3zwkp4sk@lakrids.cambridge.arm.com>
-From: Julien Thierry <julien.thierry@arm.com>
-Message-ID: <c135f7a3-ec3e-4ca2-3ef0-0d2eb845a615@arm.com>
-Date: Fri, 30 Nov 2018 09:18:03 +0000
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.8.0
+	id 1gSf2w-00049l-IZ; Fri, 30 Nov 2018 09:25:14 +0000
+Received: from mail.kernel.org ([198.145.29.99])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSf2s-0002jw-UJ
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 09:25:12 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 4B7E920863;
+ Fri, 30 Nov 2018 09:24:58 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543569898;
+ bh=Fo35libfAVNgS5fOv7nF4RFOKa3eu31VoDU7+zsoRUk=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=0XVAg7jsl3K4IewcJSRnsG8dzHyupS1dhNmdjF/C1V7bS4gIj/hlyscTR6GFv//h0
+ bbwWsRNFR+sNIbH5uAxBKyiY42cWBzwRHMdA6io/D6yMKnISBoy7DI0v1eOrdsT/uU
+ 6sUQ1Kwzwd3ywa8tMPCKgeM1rkzhhBbNGWpJ9/MI=
 MIME-Version: 1.0
-In-Reply-To: <20181129181258.jo6s4e7s3zwkp4sk@lakrids.cambridge.arm.com>
-Content-Language: en-US
+To: Michael Turquette <mturquette@baylibre.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ Russell King <linux@armlinux.org.uk>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <20181122212212.16039-1-miquel.raynal@bootlin.com>
+References: <20181122212212.16039-1-miquel.raynal@bootlin.com>
+Message-ID: <154356989722.88331.10134203618475749179@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH 0/2] Link consumer with clock driver
+Date: Fri, 30 Nov 2018 01:24:57 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_011817_170309_A4B1EB07 
-X-CRM114-Status: GOOD (  26.51  )
+X-CRM114-CacheID: sfid-20181130_012511_026034_388DBDE7 
+X-CRM114-Status: GOOD (  18.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,183 +75,65 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: daniel.thompson@linaro.org, Jason Cooper <jason@lakedaemon.net>,
- marc.zyngier@arm.com, catalin.marinas@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Thomas Gleixner <tglx@linutronix.de>,
+Cc: Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Quoting Miquel Raynal (2018-11-22 13:22:10)
+> Hello,
+> 
+> While working on suspend to RAM feature, I ran into troubles multiple
+> times when clocks where not suspending/resuming at the desired time. I
+> had a look at the core and I think the same logic as in the
+> regulator's core may be applied here to (very easily) fix this issue:
+> using device links.
 
-
-On 29/11/18 18:12, Mark Rutland wrote:
-> On Mon, Nov 12, 2018 at 11:56:56AM +0000, Julien Thierry wrote:
->> Mask the IRQ priority through PMR and re-enable IRQs at CPU level,
->> allowing only higher priority interrupts to be received during interrupt
->> handling.
->>
->> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/include/asm/arch_gicv3.h   | 17 +++++++++++++++++
->>  arch/arm64/include/asm/arch_gicv3.h | 17 +++++++++++++++++
->>  drivers/irqchip/irq-gic-v3.c        | 10 ++++++++++
->>  3 files changed, 44 insertions(+)
->>
->> diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
->> index bef0b5d..f6f485f 100644
->> --- a/arch/arm/include/asm/arch_gicv3.h
->> +++ b/arch/arm/include/asm/arch_gicv3.h
->> @@ -363,5 +363,22 @@ static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
->>  
->>  #define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
->>  
->> +static inline bool gic_prio_masking_enabled(void)
->> +{
->> +	return false;
->> +}
->> +
->> +static inline void gic_pmr_mask_irqs(void)
->> +{
->> +	/* Should not get called. */
->> +	WARN_ON_ONCE(true);
->> +}
->> +
->> +static inline void gic_arch_enable_irqs(void)
->> +{
->> +	/* Should not get called. */
->> +	WARN_ON_ONCE(true);
->> +}
->> +
->>  #endif /* !__ASSEMBLY__ */
->>  #endif /* !__ASM_ARCH_GICV3_H */
->> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
->> index 37193e2..3f8d5f4 100644
->> --- a/arch/arm64/include/asm/arch_gicv3.h
->> +++ b/arch/arm64/include/asm/arch_gicv3.h
->> @@ -155,5 +155,22 @@ static inline u32 gic_read_rpr(void)
->>  #define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
->>  #define gits_read_vpendbaser(c)		readq_relaxed(c)
->>  
->> +static inline bool gic_prio_masking_enabled(void)
->> +{
->> +	return system_supports_irq_prio_masking();
->> +}
->> +
->> +static inline void gic_pmr_mask_irqs(void)
->> +{
->> +	/* Should not get called yet. */
->> +	WARN_ON_ONCE(true);
->> +}
->> +
->> +static inline void gic_arch_enable_irqs(void)
->> +{
->> +	/* Should not get called yet. */
->> +	WARN_ON_ONCE(true);
->> +}
->> +
->>  #endif /* __ASSEMBLY__ */
->>  #endif /* __ASM_ARCH_GICV3_H */
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index 8f87f40..e5d8c14 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -353,6 +353,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
->>  	if (likely(irqnr > 15 && irqnr < 1020) || irqnr >= 8192) {
->>  		int err;
->>  
->> +		if (gic_prio_masking_enabled()) {
->> +			gic_pmr_mask_irqs();
->> +			gic_arch_enable_irqs();
->> +		}
-> 
-> IIUC, if we have two pNMIs, this will allow one to preempt another, e.g.
-> 
-> 	< pNMI#1 asserted >
-> 
-> 	< CPU takes IRQ exception for pNMI #1>
-> 
-> 	irqnr = gic_read_iar(); // pNMI #1
-> 
-> 	< pNMI#2 asserted >
-> 
-> 	// masks IRQs at GIC, leaves other pNMIs unmasked
-> 	gic_pmr_mask_irqs()
-> 	gic_arch_enable_irqs();
-> 
-> 	...
-> 
-> 	< CPU takes IRQ exception for pNMI #2 >
-> 
-> ... or is that not a problem? Is the NMI code re-entrant?
-
-At this patch stage, the GICv3 handling code is not supporting
-pseudo-NMIs yet, only using interrupt priorities.
-
-I introduce this in patch 18: irqchip/gic-v3: Handle pseudo-NMIs.
-
-And yes, this would be an issue but only after gic_write_eoir. Once an
-interrupt is running, its priority becomes the running priority and only
-an interrupt with higher priority can preempt it. When we do the eoir,
-the running priority is dropped meaning any interrupt can preempt (if
-PSR.I is cleared and its priority is not masked by PMR).
-
-What is done in the later patch for pseudo-NMIs is that we don't switch
-to PMR masking and leave the I bit set since we don't want anything to
-preempt it.
+Thanks! I've wanted to add device links to the clk framework for a while
+now but haven't gotten around to it. Can you expand on the scenario that
+you've run into where you need this?
 
 > 
->> +
->>  		if (static_branch_likely(&supports_deactivate_key))
->>  			gic_write_eoir(irqnr);
->>  		else
->> @@ -371,6 +376,11 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
->>  		return;
->>  	}
->>  	if (irqnr < 16) {
->> +		if (gic_prio_masking_enabled()) {
->> +			gic_pmr_mask_irqs();
->> +			gic_arch_enable_irqs();
->> +		}
+> The only additional change I had to do was to always (when available)
+> populate the device entry of the core clock structure so that it could
+> be used later. This is the purpose of patch 1. Patch 2 actually adds
+> support for device links.
+
+That's fine. We should do it into clk_core all the time for other
+reasons too.
+
 > 
-> Can we pull this above the two cases, or is there a problem with doing
-> this for spurious IRQs?
+> As I am not used to hack into the clock subsystem I might have missed
+> something big preventing such change but so far I could not see
+> anything wrong with it. As this touches core code, I am of course
+> entirely open to suggestions.
 > 
 
-So the reason I split this is to avoid doing it for NMIs. Otherwise we
-would mask PMR, clear PSR.I and once we know we have an NMI set PSR.I again.
+Two questions:
 
-An alternative to it would be to check whether we have an NMI before we
-know the type of interrupt we have, which would be unnecessary for IPIs
-and of course spurious interrupts.
+ 1) Do device links work if we make a loop between devices? I'm thinking
+ of the case where we have two clock controllers that provide clks to
+ each other and could potentially register some clks and then clk_get()
+ the ones they depend on. I suspect loops don't work and so we need to
+ be aware of this and somehow prevent it.
 
-Maybe I can always mask PMR and clear PSR.I (after the interrupt ack) at
-this stage and then do the necessary modifications once pseudo-NMI
-handling code is added?
+ 2) Do we need to link clk consumers to anything besides the device
+ providing the clk they get from clk_get()? Put another way, do we need
+ to make links through the clk tree and any potential parent clks of
+ whatever the device is using at the time. Would clk tree changing
+ topology because some new parent is chosen need to affect
+ suspend/resume ordering? Or would that all need to be handled by clk
+ framework figuring out the ordering of the tree at suspend/resume time
+ and suspending clock controller drivers in the right order?
 
-> Where is the corresponding unmask of the PMR, and disable of IRQs? It's
-> difficult to follow the logic if that's in another patch.
-> 
-In patch 7: arm64: Make PMR part of task context
 
-The arch/arm64 code becomes responsible for saving/restoring the value
-of PMR upon exception entry/return.
-
-I'm not really sure whether it makes sense to merge both patches though.
-Would explaining that PMR will get restored on irq return in the commit
-message be sufficient?
-
-Thanks,
-
--- 
-Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
