@@ -2,124 +2,73 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CBE35C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:32:06 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6F15AC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:44:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8EBDB2146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:32:06 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 33CA42146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 06:44:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gmK9ypnq";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="v9XLgoq4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8EBDB2146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="NzL+GrlV";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="bcGabfnU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 33CA42146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=fTo/75T1CyXLyzWFLZ+t+l/PUZ6cEgzRR5fl+DuJjqc=; b=gmK9ypnq66ENNq
-	YEAQwSW33CUnILtFLO0BPUz/cQpLGX4eWM0rLwlDVeoHZDwFNXehsmBVLNSDGz+NCMyziUe1sufBK
-	g+yItkYlUif+Qjf/ZHGRqRkb36n3ZNpayZMIHPtoJLyJal48xxCiUlYN7hSBMyneotgTJ3wI4qoMY
-	BEe/LvdarIjQ7VSRpx83IZjtKWyq816B43NKkHag7W5LJF++nd6V71kJq2EVLpCWSvEmd/lTZ0wQe
-	DDbw192XX4ruZEKHpxHiP8NDAJRb+JhrVhOBcaQxCzuhKJ6ETxr5JKPSzxJZtbtk22HMDblnJ4O82
-	qzRCCnGgv0cGWn7pk0LQ==;
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=qxd8brKOq3UCD1SCAObD9a6omeUbxOrp7jAko+s9zq0=; b=NzL+GrlVpdYrTJ
+	0Sw+LfAHJB1H2GcYrhsAkOSTEZtD4cRJZmpObjDfnlEJVgXeW1qBKEPHDGGrXfDY5x2s+Nx6zZp7s
+	tdKdF+mlm1pZsqExNyONjR2F8wUQRkaOiLyEbZxCvcaNaK6X5Vo/0DeNZnkztf3GXFjGCRDVqUWvK
+	XmX0LH3j78MQzo8stFO18j32hIsLTelilE9wJUge0qFykue4ehq+2fGqdJvLsBFeoa6jJhzMdfBQ2
+	54cSYXYNzXLrKduHyOns/pKFy982InkTIjk2/nSpDrm4gxUgpNhYyycTT+Kyo/34JcXnH7ilvy5WY
+	li/eTlNcUIjTwxRizDHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gScLL-0007PE-Bg; Fri, 30 Nov 2018 06:32:03 +0000
-Received: from mail-eopbgr60077.outbound.protection.outlook.com ([40.107.6.77]
- helo=EUR04-DB3-obe.outbound.protection.outlook.com)
+	id 1gScX7-0002Dy-Sf; Fri, 30 Nov 2018 06:44:13 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gScLH-0007OO-QM
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 06:32:01 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=Bu/qb46ekv56Q+RDPZJlJ71X/sRzl6D9D51RJDz1Pw8=;
- b=v9XLgoq43sj3LSycI1U5p5/rhl7BjbUOQ+V9qh1gZj8dN0wMcLWCCHwn3gd8S9VUP+8H+2lagLiRILzz2Z92RGE6torUEjrArT1+IeF9UD/OQbrw3tA6Lrjt3I3iG+cb5TT/tj07hz9n/eCFn8K++Nzq99HrjyCKnB8+thS4D9E=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3740.eurprd04.prod.outlook.com (52.134.71.11) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1294.26; Fri, 30 Nov 2018 06:31:40 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%2]) with mapi id 15.20.1361.019; Fri, 30 Nov 2018
- 06:31:40 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, "mturquette@baylibre.com"
- <mturquette@baylibre.com>, "sboyd@kernel.org" <sboyd@kernel.org>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>, "mark.rutland@arm.com"
- <mark.rutland@arm.com>, "clement.peron@devialet.com"
- <clement.peron@devialet.com>, "colin.didier@devialet.com"
- <colin.didier@devialet.com>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-clk@vger.kernel.org"
- <linux-clk@vger.kernel.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>, "devicetree@vger.kernel.org"
- <devicetree@vger.kernel.org>
-Subject: [PATCH] clk: imx6q: add DCICx clocks gate
-Thread-Topic: [PATCH] clk: imx6q: add DCICx clocks gate
-Thread-Index: AQHUiHZayy0bOZrqdkiTFRZiNvil4w==
-Date: Fri, 30 Nov 2018 06:31:40 +0000
-Message-ID: <1543559158-2891-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK2PR02CA0217.apcprd02.prod.outlook.com
- (2603:1096:201:20::29) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3740;
- 6:7dqeWfKHy1/W8jQjPYdiI4kjWAGhIpTu57a0YK60b0QRzw/VtbeaiirE3GKOtHa355kV7Me0Psf54bDGtgMY2sO4407fVjw0JZZYXMRH07hs6TBaAajJ0lCcStvavwsJEGAiuxNZ04v3vFvD3f4LIpNnjy+N/KYU6VBe/klDMNgg2P7vO9R3ZiTz1sz+vWE2RxghRqhma7tf1G6ohGa/o4bqTSY6Qv6qg2/tVeb4TLomFk10qP4161XtaAOKQGHP0w7/KvvHfImyiDoaLkbvN7QXx/+F3VczvVMq/1CaaAw3MtZh9xqOFolUcDQvofTbi5W5uoTHVz1nQ6+osB00kSifsrp++Isuq0NbIlVoc/UvVL7P5O0UGb2BJJonI1EVIQN/3SYFBU1dRG4pWnzN4VYnSFJPTCfVZTgkT+K/HdnRb7RNOUBWiMXT0XFPKEc/YqVyaiR4Dmyd+6LwnGQVAA==;
- 5:LuiFjVRl7UiQ6azee//O6byNh+/vcFyxvimNVj4MDYgJ3TwIb/Lt4cr/kiA9ju0ye96mjcxWcM2PiLORc51XcB9Hdaie3ZuE3RwnDDWMPgcSneSDNIYTfnZB5JnB4OZeoKPkqaei31F7JYi/0IrgcdG2958ArNcL12jSfbapkfY=;
- 7:kKQHQ9N7GJcbM0S5aoC/5JIzOWO1bQn61zGTKLYKX2KeaPswJl5YPAERTTnGTnEhi707pMFRHtC7PobUNZm0h7qfzaQ2aKlpng9GMOByVjYNcOYs4YuSp6FaNNEWxtZNrUkejg7JJ53w4DZrDs51Vw==
-x-ms-office365-filtering-correlation-id: 3dec7e35-b6f8-4f9b-1bcf-08d6568d7c9b
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3740; 
-x-ms-traffictypediagnostic: DB3PR0402MB3740:
-x-microsoft-antispam-prvs: <DB3PR0402MB3740A9F60AE06ED068C0ACD2F5D30@DB3PR0402MB3740.eurprd04.prod.outlook.com>
-x-exchange-antispam-report-test: UriScan:(185117386973197);
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3002001)(10201501046)(3231453)(999002)(944501410)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123564045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3740; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3740; 
-x-forefront-prvs: 087223B4DA
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(39860400002)(136003)(346002)(376002)(366004)(396003)(189003)(199004)(486006)(476003)(256004)(81166006)(53936002)(14444005)(81156014)(6512007)(2906002)(5660300001)(97736004)(3846002)(2501003)(68736007)(14454004)(8676002)(71190400001)(71200400001)(26005)(6486002)(6436002)(50226002)(8936002)(2616005)(110136005)(316002)(478600001)(99286004)(86362001)(102836004)(6506007)(186003)(52116002)(2201001)(7736002)(25786009)(305945005)(386003)(575784001)(105586002)(106356001)(66066001)(6116002)(36756003)(4326008)(7416002)(32563001)(921003)(1121003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3740;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: tfC3qwgx3/csFPxlZs6RmK/1GQxW3GY4SsEBChFmwqlQGAoTe+Mujvv9Zsp8brB87zTVxavm9VgKSdOANuET4N7Qpr7UklfFO19IBftzZakjHlsoQe3kJGOuppym+hKQ2LlelTXIba5B/Qs3bkB8ILWTQtZqbIOcAfcdwF75WRnDh1PXpU1f3MnyayogGD4AvJWbcc+KW5rHwb+VXPCT9lWTPoKwHHMifwOhzqkh1/Xy7bGYL1Sc6ZkecwhbiKLv03mhqyuCN0s9xlYoXFFX4aq6RZfrHD4GYwhHfDON1YsI04h7f/9kFHI/j1vGt2MPw+vW8NBQmeP0AG3usWfqcwLrK8FIGC5HujnwSrZcS4I=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gScX5-0002Cj-51; Fri, 30 Nov 2018 06:44:12 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 624CA20863;
+ Fri, 30 Nov 2018 06:43:58 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543560238;
+ bh=1KbS/H6E5H0W1qh4RtVpQWod+3yOS5qydDBCJ/kE3fQ=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=bcGabfnUaY7qhe71t8JtmyGOqInchiNtzvyFGGQ87JC6XIEOm7Ll9N2KALe382057
+ vfB+KM2zou0sWmD+Wu0NaoZBeueD0J9hL+YEJyKoWPIJWZwk9iPrBfrCWjntSMX00/
+ 3XY35oXIolDpVSO+IwkIOJS+U2kTMDijrSxd0b88=
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 3dec7e35-b6f8-4f9b-1bcf-08d6568d7c9b
-X-MS-Exchange-CrossTenant-originalarrivaltime: 30 Nov 2018 06:31:40.5890 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3740
+To: Matthias Brugger <matthias.bgg@gmail.com>,
+ Matthias Brugger <mbrugger@suse.com>, Rob Herring <robh@kernel.org>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <458178ac-c0fc-9671-7fc8-ed2d6f61424c@suse.com>
+References: <20181116125449.23581-1-matthias.bgg@kernel.org>
+ <20181116125449.23581-9-matthias.bgg@kernel.org>
+ <20181116231522.GA18006@bogus>
+ <2a23e407-4cd4-2e2b-97a5-4e2bb96846e0@gmail.com>
+ <CAL_JsqKJQwfDJbpmwW+oCxiDkSp5+6mG-uoURmCQVEMP_jFOEg@mail.gmail.com>
+ <154281878765.88331.10581984256202566195@swboyd.mtv.corp.google.com>
+ <458178ac-c0fc-9671-7fc8-ed2d6f61424c@suse.com>
+Message-ID: <154356023767.88331.18401188808548429052@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v5 08/12] dt-bindings: mediatek: Change the binding for
+ mmsys clocks
+Date: Thu, 29 Nov 2018 22:43:57 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181129_223159_856743_C9D40221 
-X-CRM114-Status: GOOD (  13.10  )
+X-CRM114-CacheID: sfid-20181129_224411_245528_F6E11190 
+X-CRM114-Status: GOOD (  24.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -131,51 +80,92 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Sean Wang <sean.wang@kernel.org>, David Airlie <airlied@linux.ie>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Sean Wang <sean.wang@mediatek.com>, Stephen Boyd <sboyd@codeaurora.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ dri-devel <dri-devel@lists.freedesktop.org>,
+ Ulrich Hecht <ulrich.hecht+renesas@gmail.com>, Chen-Yu Tsai <wens@csie.org>,
+ Randy Dunlap <rdunlap@infradead.org>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Philipp Zabel <p.zabel@pengutronix.de>, matthias.bgg@kernel.org,
+ CK Hu <ck.hu@mediatek.com>, linux-mediatek@lists.infradead.org,
+ linux-clk <linux-clk@vger.kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On i.MX6QP/i.MX6Q/i.MX6DL, there are DCIC1/DCIC2 clocks
-gate in CCM_CCGR0 register, add them into clock tree for
-clock management.
+Quoting Matthias Brugger (2018-11-21 09:09:52)
+> 
+> 
+> On 21/11/2018 17:46, Stephen Boyd wrote:
+> > Quoting Rob Herring (2018-11-19 11:15:16)
+> >> On Sun, Nov 18, 2018 at 11:12 AM Matthias Brugger
+> >> <matthias.bgg@gmail.com> wrote:
+> >>> On 11/17/18 12:15 AM, Rob Herring wrote:
+> >>>> On Fri, Nov 16, 2018 at 01:54:45PM +0100, matthias.bgg@kernel.org wrote:
+> >>>>> -    #clock-cells = <1>;
+> >>>>> +
+> >>>>> +    mmsys_clk: clock-controller@14000000 {
+> >>>>> +            compatible = "mediatek,mt2712-mmsys-clk";
+> >>>>> +            #clock-cells = <1>;
+> >>>>
+> >>>> This goes against the general direction of not defining separate nodes
+> >>>> for providers with no resources.
+> >>>>
+> >>>> Why do you need this and what does it buy if you have to continue to
+> >>>> support the existing chips?
+> >>>>
+> >>>
+> >>> It would show explicitly that the mmsys block is used to probe two
+> >>> drivers, one for the gpu and one for the clocks. Otherwise that is
+> >>> hidden in the drm driver code. I think it is cleaner to describe that in
+> >>> the device tree.
+> >>
+> >> No, that's maybe cleaner for the driver implementation in the Linux
+> >> kernel. What about other OS's or when Linux drivers and subsystems
+> >> needs change? Cleaner for DT is design bindings that reflect the h/w.
+> >> Hardware is sometimes just messy.
+> >>
+> > 
+> > I agree. I fail to see what this patch series is doing besides changing
+> > driver probe and device creation methods and making a backwards
+> > incompatible change to DT. Is there any other benefit here?
+> > 
+> 
+> You are referring whole series?
+> Citing the cover letter:
+> "MMSYS in Mediatek SoCs has some registers to control clock gates (which is
+> used in the clk driver) and some registers to set the routing and enable
+> the differnet (sic!) blocks of the display subsystem.
+> 
+> Up to now both drivers, clock and drm are probed with the same device tree
+> compatible. But only the first driver get probed, which in effect breaks
+> graphics on mt8173 and mt2701.
 
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
----
- drivers/clk/imx/clk-imx6q.c               | 2 ++
- include/dt-bindings/clock/imx6qdl-clock.h | 4 +++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+Ouch!
 
-diff --git a/drivers/clk/imx/clk-imx6q.c b/drivers/clk/imx/clk-imx6q.c
-index bbe0c60..31a9d94 100644
---- a/drivers/clk/imx/clk-imx6q.c
-+++ b/drivers/clk/imx/clk-imx6q.c
-@@ -737,6 +737,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
- 	clk[IMX6QDL_CLK_CAN1_SERIAL]  = imx_clk_gate2("can1_serial",   "can_root",          base + 0x68, 16);
- 	clk[IMX6QDL_CLK_CAN2_IPG]     = imx_clk_gate2("can2_ipg",      "ipg",               base + 0x68, 18);
- 	clk[IMX6QDL_CLK_CAN2_SERIAL]  = imx_clk_gate2("can2_serial",   "can_root",          base + 0x68, 20);
-+	clk[IMX6QDL_CLK_DCIC1]        = imx_clk_gate2("dcic1",         "ipu1_podf",         base + 0x68, 24);
-+	clk[IMX6QDL_CLK_DCIC2]        = imx_clk_gate2("dcic2",         "ipu2_podf",         base + 0x68, 26);
- 	clk[IMX6QDL_CLK_ECSPI1]       = imx_clk_gate2("ecspi1",        "ecspi_root",        base + 0x6c, 0);
- 	clk[IMX6QDL_CLK_ECSPI2]       = imx_clk_gate2("ecspi2",        "ecspi_root",        base + 0x6c, 2);
- 	clk[IMX6QDL_CLK_ECSPI3]       = imx_clk_gate2("ecspi3",        "ecspi_root",        base + 0x6c, 4);
-diff --git a/include/dt-bindings/clock/imx6qdl-clock.h b/include/dt-bindings/clock/imx6qdl-clock.h
-index 87b068f..b3cef29 100644
---- a/include/dt-bindings/clock/imx6qdl-clock.h
-+++ b/include/dt-bindings/clock/imx6qdl-clock.h
-@@ -274,6 +274,8 @@
- #define IMX6QDL_CLK_EPIT1			261
- #define IMX6QDL_CLK_EPIT2			262
- #define IMX6QDL_CLK_MMDC_P0_IPG			263
--#define IMX6QDL_CLK_END				264
-+#define IMX6QDL_CLK_DCIC1			264
-+#define IMX6QDL_CLK_DCIC2			265
-+#define IMX6QDL_CLK_END				266
- 
- #endif /* __DT_BINDINGS_CLOCK_IMX6QDL_H */
--- 
-2.7.4
+> 
+> This patch uses a platform device registration in the DRM driver, which
+> will trigger the probe of the corresponding clock driver. It was tested on the
+> bananapi-r2 and the Acer R13 Chromebook."
+
+Alright, please don't add nodes in DT just to make device drivers probe.
+Instead, register clks from the drm driver or create a child platform
+device for the clk bits purely in the drm driver and have that probe the
+associated clk driver from there.
+
+> 
+> DT is broken right now, because two drivers rely on the same node, which gets
+> consumed just once. The new DT introduced does not break anything because it is
+> only used for boards that: "[..] are not available to the general public
+> (mt2712e) or only have the mmsys clock driver part implemented (mt6797)."
+
+Ok, so backwards compatibility is irrelevant then. Sounds fine to me.
 
 
 _______________________________________________
