@@ -2,81 +2,59 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D5FBC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:42:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 71808C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:47:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5DCDB2146D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:42:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 425A12146F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 08:47:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ucCfdLCC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="V2mIHmb2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5DCDB2146D
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="X4hmvdkI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 425A12146F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cisese4oXPXUU3Paj1hSfmqgKkdgZv1BOez2YLaYNk8=; b=ucCfdLCCTePZrX
-	b7xHTZdiQz+ai1uQi+PFLxqnNp2qAt1NVY+NEOJ3rFB+pj6WZTHSqUau0Z6rzT8N2rXIkXOwuBjVT
-	PX2/aU10A5/tsZWObDW/u+Q2c+ifbcQTP2Pg7k6UgS9WZVpK3Q5hDQzBJqztmaL1F3r1CxfEoUCEm
-	EXLhNTSBM8dURIIRJewslHyCBccKT/OiOlh0Rr5umPe5BwkkMC8PjheXHqiM8adpUZEMEr90dPjiR
-	f7nt/YYlM2rQFJG0+4Sc3u4tLZMp6iF5nEUA8lMOAgx+F7uzckrMuoqyhLDP+ri9eVckOttmlipnI
-	RtDTX2iqQzvxKwcomhLQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=t02VgMsNjvl+W6Uh3U0dJAR4oCJZOKV1Jg3nX9gTIe8=; b=X4hmvdkIbgawx4ldDSRvTLDhO
+	m4mgiUbv5Ekp6eOFha3XvSKWFCf+A5h/3B0Gus0qJqtcfPe0syW42fxg1HIlrCt/biB2E/VPy8ojj
+	d12CaojDSTWO3eu6pWAv8IC5UrPIJIqZmGkks+wy5/5xq9hbuF7I8bahHYB/WYuar5DSc514SViKP
+	CvrWS3V+fYZUrmudqsBXSLbxte3qXWlNFXYri8XRyRtpo8jPXuo4JaHUi78Odg+UvsDTgf5zciThh
+	q5R9lAZ7ARZZWYtLCuWvS2/e0h9lfFvzBcoQ2Jo4YyjElbMX1S+jeo8ZFV83lpNC8X/Akvhan06Wp
+	pwngqcp6g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSeNb-0003kq-DL; Fri, 30 Nov 2018 08:42:31 +0000
-Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSeNY-0003k7-4S
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:42:29 +0000
-Received: by mail-io1-xd41.google.com with SMTP id k7so3894899iob.6
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 00:42:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=6UQj9/ofQF1LkxuMSdefZmFTN7UIoHYWf6D0IeaxWro=;
- b=V2mIHmb2gwi1FZiAObFwBosHhdpVkloWVvMA+VDBneIVnduNkNw0wEFFOtVn0LrwS8
- m8OfbhbER2gS+NlGKS8/ZMMqIYHJcpd7vwPVxnrED6BVco/P25MJ8Jl4aJH4T1uC8pE3
- EhPoyCVFBW+HQgLyhLo6RL6nlC2kZZtArS5LQ=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=6UQj9/ofQF1LkxuMSdefZmFTN7UIoHYWf6D0IeaxWro=;
- b=cZsz46hzL38Ts5U2TAZqq36iqi8hlWPE2BwdNFM20K4zcMLa/d0V+z35taORJip1Xh
- vhM9o0Roy9jUXG7edQttZrlUvbRUP+bPtwhaiq4YDLIL6Gc7BryWWP+isv9eYYsMSki1
- ofYMYPWgVaerQ40BjbBzKrXtWMVxCVpM+eP+tNkQJWmlqEYKj133HnwlrLwIvQHgB0GO
- drI5idHh01Y+ICtdx2SorUSudl9W9Nvtmj1HdAXgsywcs0mBwvLxF3k9pdVJu0X71N2u
- MTtfDw+q+nrKu9uR0q9UjqiTA3mDCfOCpGkQhyVk/DBGLFpTia/XetrXRjC1gJWzStlB
- dxLg==
-X-Gm-Message-State: AA+aEWYkPCD5zdQAA9KZwzliWc1aoqyp+XLVLb9dlsGJ4S1oKISVQNqU
- 67wIUJoxFo/7UX8p/9KvTpcUBMVBk8ih+N9IV+HiRQ==
-X-Google-Smtp-Source: AFSGD/XAmQNXWa+CEftp5LzgDIQkcImJGbHvskWu7TA1lIYZlyIQE+kZm+6EID96HbWsiRE8Qsy/8JrjewcLDOip2Z8=
-X-Received: by 2002:a6b:5d01:: with SMTP id r1mr3747222iob.170.1543567336350; 
- Fri, 30 Nov 2018 00:42:16 -0800 (PST)
+	id 1gSeSK-0005gW-95; Fri, 30 Nov 2018 08:47:24 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gSeSG-0005fp-KQ
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 08:47:22 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id C5D0B20741; Fri, 30 Nov 2018 09:47:08 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
+ [90.88.18.158])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 6FE67206D8;
+ Fri, 30 Nov 2018 09:47:08 +0100 (CET)
+Date: Fri, 30 Nov 2018 09:47:08 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Chen-Yu Tsai <wens@csie.org>
+Subject: Re: [PATCH 0/6] media: sun6i: Separate H3 compatible from A31
+Message-ID: <20181130084708.rbggq5y3f2c5w7vu@flea>
+References: <20181130075849.16941-1-wens@csie.org>
 MIME-Version: 1.0
-References: <20181127001534.24075-1-ard.biesheuvel@linaro.org>
- <nycvar.YSQ.7.76.1811291742340.3623@knanqh.ubzr>
-In-Reply-To: <nycvar.YSQ.7.76.1811291742340.3623@knanqh.ubzr>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Fri, 30 Nov 2018 09:42:05 +0100
-Message-ID: <CAKv+Gu-kSnndPqmC4_+JOUPbMk4cGmtTktS9WE+Z8_mse9y-2Q@mail.gmail.com>
-Subject: Re: [RFC/RFT PATCH v2] ARM: smp: add support for per-task stack
- canaries
-To: Nicolas Pitre <nicolas.pitre@linaro.org>, Kees Cook <keescook@chromium.org>
+In-Reply-To: <20181130075849.16941-1-wens@csie.org>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_004228_255891_865EB2D2 
-X-CRM114-Status: GOOD (  26.30  )
+X-CRM114-CacheID: sfid-20181130_004720_804902_EE2197AB 
+X-CRM114-Status: GOOD (  17.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,98 +66,86 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Arnd Bergmann <arnd@arndb.de>,
- Kernel Hardening <kernel-hardening@lists.openwall.com>,
- Russell King <linux@armlinux.org.uk>, Emese Revfy <re.emese@gmail.com>,
- Laura Abbott <labbott@redhat.com>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Rob Herring <robh+dt@kernel.org>,
+ Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============1935361999822379362=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, 29 Nov 2018 at 23:58, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
->
-> On Tue, 27 Nov 2018, Ard Biesheuvel wrote:
->
-> > On ARM, we currently only change the value of the stack canary when
-> > switching tasks if the kernel was built for UP. On SMP kernels, this
-> > is impossible since the stack canary value is obtained via a global
-> > symbol reference, which means
-> > a) all running tasks on all CPUs must use the same value
-> > b) we can only modify the value when no kernel stack frames are live
-> >    on any CPU, which is effectively never.
-> >
-> > So instead, use a GCC plugin to add a RTL pass that replaces each
-> > reference to the address of the __stack_chk_guard symbol with an
-> > expression that produces the address of the 'stack_canary' field
-> > that is added to struct thread_info. This way, each task will use
-> > its own randomized value.
-> >
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Kees Cook <keescook@chromium.org>
-> > Cc: Emese Revfy <re.emese@gmail.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Laura Abbott <labbott@redhat.com>
-> > Cc: kernel-hardening@lists.openwall.com
-> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > ---
-> > v2:
-> > - adopt powerpc Makefile approach to pass stack canary offset and thread
-> >   size to the plugin as command line arguments
-> > - depend on !XIP_DEFLATED_DATA
-> >
-> >  arch/arm/Kconfig                              |  16 +++
-> >  arch/arm/Makefile                             |  11 +++
-> >  arch/arm/boot/compressed/Makefile             |   1 +
-> >  arch/arm/include/asm/stackprotector.h         |  12 ++-
-> >  arch/arm/include/asm/thread_info.h            |   3 +
-> >  arch/arm/kernel/asm-offsets.c                 |   1 +
-> >  arch/arm/kernel/process.c                     |   6 +-
-> >  scripts/Makefile.gcc-plugins                  |   6 ++
-> >  scripts/gcc-plugins/Kconfig                   |   4 +
-> >  scripts/gcc-plugins/arm_ssp_per_task_plugin.c | 103 ++++++++++++++++++++
-> >  10 files changed, 160 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 91be74d8df65..6142e83b45da 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1810,6 +1810,22 @@ config XEN
-> >       help
-> >         Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
-> >
-> > +config STACKPROTECTOR_PER_TASK
-> > +     bool "Use a unique stack canary value for each task"
-> > +     depends on GCC_PLUGINS && STACKPROTECTOR && SMP && !XIP_DEFLATED_DATA
-> > +     select GCC_PLUGIN_ARM_SSP_PER_TASK
-> > +     help
-> > +       Due to the fact that GCC uses an ordinary symbol reference from
-> > +       which to load the value of the stack canary, this value can only
-> > +       change at reboot time on SMP systems, and all tasks running in the
-> > +       kernel's address space are forced to use the same canary value for
-> > +       the entire duration that the system is up.
-> > +
-> > +       Enable this option to switch to a different method that uses a
-> > +       different canary value for each task.
-> > +
-> > +       This is not enabled by default since it relies on a GCC plugin.
->
-> Why wouldn't you default it to y and let the dependencies disable it
-> when not met?
->
-> Other than that:
->
-> Acked-by: Nicolas Pitre <nico@linaro.org>
->
 
-Thanks Nico.
+--===============1935361999822379362==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="l27y7yu4kizrcwqt"
+Content-Disposition: inline
 
-I wasn't sure about enabling it by default, though. Perhaps Kees has
-any insights?
+
+--l27y7yu4kizrcwqt
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Fri, Nov 30, 2018 at 03:58:43PM +0800, Chen-Yu Tsai wrote:
+> The CSI (camera sensor interface) controller found on the H3 (and H5)
+> is a reduced version of the one found on the A31. It only has 1 channel,
+> instead of 4 channels supporting time-multiplexed BT.656 on the A31.
+> Since the H3 is a reduced version, it cannot "fallback" to a compatible
+> that implements more features than it supports.
+>=20
+> This series separates support for the H3 variant from the A31 variant.
+>=20
+> Patches 1 ~ 3 separate H3 CSI from A31 CSI in the bindings, driver, and
+> device tree, respectively.
+>=20
+> Patch 4 adds a pinmux setting for the MCLK (master clock). Some camera
+> sensors use the master clock from the SoC instead of a standalone
+> crystal.
+>=20
+> Patches 5 and 6 are examples of using a camera sensor with an SBC.
+> Since the modules are detachable, these changes should not be merged.
+> They should be implemented as overlays instead.
+>=20
+> Please have a look.
+>=20
+> In addition, I found that the first frame captured seems to always be
+> incomplete, with either parts cropped, out of position, or missing
+> color components.
+
+For the first 4 patches,
+Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--l27y7yu4kizrcwqt
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAD5DAAKCRDj7w1vZxhR
+xauvAP4issrQ4ZQs2FKhnrnSC1e5aHrpRt9yMYST6XBEX3tNIwD/WUtRUNxlN5GK
+gwcfuhO9WrkqAxQhilUqJ4LX5m69qwA=
+=ng2d
+-----END PGP SIGNATURE-----
+
+--l27y7yu4kizrcwqt--
+
+
+--===============1935361999822379362==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1935361999822379362==--
+
