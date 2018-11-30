@@ -2,63 +2,72 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E4800C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:51:11 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E5A6C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:00:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9CBF620867
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 15:51:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5EE282146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 16:00:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="KgjwrPG7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9CBF620867
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=huawei.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p9+jCawv";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="htDJUmv6"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5EE282146D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=upUI7/T0wi/hivi5PPirwpN/u7sCmqK3RlaBIc8+vS4=; b=KgjwrPG7+OcHRY
-	q2Z2Wxsr5MUjU4h5eQZNuO0BosMKz6/YaXQFa8cTgrQS8QiAoWV7njcfWK/3OK3ywIRK+MBpSdana
-	US6M1937VSO4pi8hsw4oqr+Zo1b9GB3NmGqkt/0B9oSHLZfNokI9WvZEmUumzpzA1DjgSSZ6W9kZ2
-	6bxfkhl0fb4g2HEDq+1JKZ4I4FK9/e6st6FmXmwaW1B4ah1VKvNwIl18DDpeAf2sIrqWAMCEIBO4J
-	t6XyPr+8NCllPrXxnTbg2h+FZsdTUPRKrzXKj47dtzmz/sxIy13AZKDH4BgDqgs0o7njvAgnx6PYn
-	0GMOZd6/5/gFSf2xauiA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=U6a2lLxbs3gy68s5kNtjoGkA57X8Y38KG8F/R9nEHyU=; b=p9+jCawv387w9jklfhrPrCfRM
+	N5whzbmPQRkBZbXferVaOD5e6Ds7aYbCqH3GSDE422dWO+l7cvBWqe+F24n2dknXTDn1o0UeF5xro
+	dwg3KMeBwmvCd304jiEBeVfQ5KC/ers0y16JtdIuUWNvMFuPH4sL1bf4h0MLM9Aw1Fyv/UN9OdbIa
+	0JLJZd1Ivqns17YOmT4Eeef2OaFN61oYtqhpzYiqjBggoHAMbwH5uSOtLjZeFWFwpG5k4naGICdOu
+	hWG8jTLMRwuRe3A7l3gvW0ljL9PBrjLBGt4AyEeUmQCsniGBgTXuXgSju0WR7AAuqCn3OZiw6q9pJ
+	Mbv4rroIg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSl4K-00073t-LD; Fri, 30 Nov 2018 15:51:04 +0000
-Received: from szxga04-in.huawei.com ([45.249.212.190] helo=huawei.com)
+	id 1gSlDN-0003Q6-Mq; Fri, 30 Nov 2018 16:00:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSl37-0004jg-9a
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 15:49:53 +0000
-Received: from DGGEMS404-HUB.china.huawei.com (unknown [172.30.72.59])
- by Forcepoint Email with ESMTP id 669EEC1AC3C97;
- Fri, 30 Nov 2018 23:49:34 +0800 (CST)
-Received: from S00345302A-PC.china.huawei.com (10.202.227.237) by
- DGGEMS404-HUB.china.huawei.com (10.3.19.204) with Microsoft SMTP Server id
- 14.3.408.0; Fri, 30 Nov 2018 23:49:28 +0800
-From: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-To: <lorenzo.pieralisi@arm.com>, <robin.murphy@arm.com>
-Subject: [PATCH v5 4/4] perf/smmuv3_pmu: Enable HiSilicon Erratum 162001800
- quirk
-Date: Fri, 30 Nov 2018 15:47:51 +0000
-Message-ID: <20181130154751.28580-5-shameerali.kolothum.thodi@huawei.com>
-X-Mailer: git-send-email 2.12.0.windows.1
-In-Reply-To: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
-References: <20181130154751.28580-1-shameerali.kolothum.thodi@huawei.com>
+ id 1gSlDA-00025A-3R
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 16:00:13 +0000
+Received: from [192.168.0.109] (cpe-174-109-247-98.nc.res.rr.com
+ [174.109.247.98])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 7383320867;
+ Fri, 30 Nov 2018 15:59:59 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543593601;
+ bh=4qlII825xNUpRHgMnW1yIPhJogC4Kpu0TeOslesnxCs=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=htDJUmv6XXoILmYZ9zAKdJII0H9gkoYel97tzjryuPgJ3hnybvF7Bl8LqTHciJQlR
+ 1RrTe6UtQR23sLjuhxkkNXbwidL/zEC98fxNZ1o2pP2nzk91kvqwB4TvbS+60ZGWud
+ 03/45UKeE5HL8qkrhsahkCQC+XLSrlgGYiOz4iGg=
+Subject: Re: [PATCH] dmaengine: remove DBGFS_FUNC_DECL()
+To: Yangtao Li <tiny.windzz@gmail.com>, dan.j.williams@intel.com,
+ vkoul@kernel.org, sudeep.dutt@intel.com, ashutosh.dixit@intel.com,
+ daniel@zonque.org, haojian.zhuang@gmail.com, robert.jarzmik@free.fr,
+ andy.gross@linaro.org, david.brown@linaro.org
+References: <20181130154249.3222-1-tiny.windzz@gmail.com>
+From: Sinan Kaya <okaya@kernel.org>
+Message-ID: <25087bc1-950d-b75a-1594-9f0d969dd59d@kernel.org>
+Date: Fri, 30 Nov 2018 10:59:34 -0500
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-X-Originating-IP: [10.202.227.237]
-X-CFilter-Loop: Reflected
+In-Reply-To: <20181130154249.3222-1-tiny.windzz@gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_074949_704332_BA4F95FF 
-X-CRM114-Status: GOOD (  18.37  )
+X-CRM114-CacheID: sfid-20181130_080012_162938_56938A6B 
+X-CRM114-Status: GOOD (  11.67  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -70,190 +79,29 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, vkilari@codeaurora.org, neil.m.leeder@gmail.com,
- jean-philippe.brucker@arm.com, pabba@codeaurora.org, john.garry@huawei.com,
- will.deacon@arm.com, rruigrok@codeaurora.org, linuxarm@huawei.com,
- linux-kernel@vger.kernel.org, linux-acpi@vger.kernel.org, guohanjun@huawei.com,
+Cc: dmaengine@vger.kernel.org, linux-arm-msm@vger.kernel.org,
+ linux-soc@vger.kernel.org, linux-kernel@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-HiSilicon erratum 162001800 describes the limitation of
-SMMUv3 PMCG implementation on HiSilicon Hip08 platforms.
+On 11/30/2018 10:42 AM, Yangtao Li wrote:
+> We already have the DEFINE_SHOW_ATTRIBUTE,There is no need to define
+> such a macro,so remove DBGFS_FUNC_DECL.Also use macro to simplify some
+> code.
+> 
+> Signed-off-by: Yangtao Li<tiny.windzz@gmail.com>
+> ---
+>   drivers/dma/amba-pl08x.c     | 14 ++------------
+>   drivers/dma/mic_x100_dma.c   | 22 +++-------------------
+>   drivers/dma/pxa_dma.c        | 24 ++++++++++++------------
+>   drivers/dma/qcom/hidma_dbg.c | 33 ++++++---------------------------
 
-On these platforms, the PMCG event counter registers
-(SMMU_PMCG_EVCNTRn) are read only and as a result it
-is not possible to set the initial counter period value
-on event monitor start.
+Acked-by: Sinan Kaya <okaya@kernel.org> for drivers/dma/qcom/hidma_dbg.c
 
-To work around this, the current value of the counter
-is read and used for delta calculations. OEM information
-from ACPI header is used to identify the affected hardware
-platforms.
-
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
----
- drivers/acpi/arm64/iort.c     | 30 +++++++++++++++++++++++++++---
- drivers/perf/arm_smmuv3_pmu.c | 35 +++++++++++++++++++++++++++++------
- include/linux/acpi_iort.h     |  3 +++
- 3 files changed, 59 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 2da08e1..d174379 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -1364,6 +1364,22 @@ static void __init arm_smmu_v3_pmcg_init_resources(struct resource *res,
- 				       ACPI_EDGE_SENSITIVE, &res[2]);
- }
- 
-+static struct acpi_platform_list pmcg_evcntr_rdonly_list[] __initdata = {
-+	/* HiSilicon Erratum 162001800 */
-+	{"HISI  ", "HIP08   ", 0, ACPI_SIG_IORT, greater_than_or_equal},
-+	{ }
-+};
-+
-+static int __init arm_smmu_v3_pmcg_add_platdata(struct platform_device *pdev)
-+{
-+	u32 options = 0;
-+
-+	if (acpi_match_platform_list(pmcg_evcntr_rdonly_list) >= 0)
-+		options |= IORT_PMCG_EVCNTR_RDONLY;
-+
-+	return platform_device_add_data(pdev, &options, sizeof(options));
-+}
-+
- struct iort_dev_config {
- 	const char *name;
- 	int (*dev_init)(struct acpi_iort_node *node);
-@@ -1374,6 +1390,7 @@ struct iort_dev_config {
- 				     struct acpi_iort_node *node);
- 	void (*dev_set_proximity)(struct device *dev,
- 				    struct acpi_iort_node *node);
-+	int (*dev_add_platdata)(struct platform_device *pdev);
- };
- 
- static const struct iort_dev_config iort_arm_smmu_v3_cfg __initconst = {
-@@ -1395,6 +1412,7 @@ static const struct iort_dev_config iort_arm_smmu_v3_pmcg_cfg __initconst = {
- 	.name = "arm-smmu-v3-pmu",
- 	.dev_count_resources = arm_smmu_v3_pmcg_count_resources,
- 	.dev_init_resources = arm_smmu_v3_pmcg_init_resources,
-+	.dev_add_platdata	= arm_smmu_v3_pmcg_add_platdata,
- };
- 
- static __init const struct iort_dev_config *iort_get_dev_cfg(
-@@ -1455,10 +1473,16 @@ static int __init iort_add_platform_device(struct acpi_iort_node *node,
- 		goto dev_put;
- 
- 	/*
--	 * Add a copy of IORT node pointer to platform_data to
--	 * be used to retrieve IORT data information.
-+	 * Platform devices based on PMCG nodes uses platform_data to
-+	 * pass quirk flags to the driver. For others, add a copy of
-+	 * IORT node pointer to platform_data to be used to retrieve
-+	 * IORT data information.
- 	 */
--	ret = platform_device_add_data(pdev, &node, sizeof(node));
-+	if (ops->dev_add_platdata)
-+		ret = ops->dev_add_platdata(pdev);
-+	else
-+		ret = platform_device_add_data(pdev, &node, sizeof(node));
-+
- 	if (ret)
- 		goto dev_put;
- 
-diff --git a/drivers/perf/arm_smmuv3_pmu.c b/drivers/perf/arm_smmuv3_pmu.c
-index 71d10a0..02107a1 100644
---- a/drivers/perf/arm_smmuv3_pmu.c
-+++ b/drivers/perf/arm_smmuv3_pmu.c
-@@ -35,6 +35,7 @@
-  */
- 
- #include <linux/acpi.h>
-+#include <linux/acpi_iort.h>
- #include <linux/bitfield.h>
- #include <linux/bitops.h>
- #include <linux/cpuhotplug.h>
-@@ -111,6 +112,7 @@ struct smmu_pmu {
- 	struct device *dev;
- 	void __iomem *reg_base;
- 	void __iomem *reloc_base;
-+	u32 options;
- 	u64 counter_present_mask;
- 	u64 counter_mask;
- };
-@@ -224,12 +226,25 @@ static void smmu_pmu_set_period(struct smmu_pmu *smmu_pmu,
- 	u32 idx = hwc->idx;
- 	u64 new;
- 
--	/*
--	 * We limit the max period to half the max counter value of the counter
--	 * size, so that even in the case of extreme interrupt latency the
--	 * counter will (hopefully) not wrap past its initial value.
--	 */
--	new = smmu_pmu->counter_mask >> 1;
-+	if (smmu_pmu->options & IORT_PMCG_EVCNTR_RDONLY) {
-+		/*
-+		 * On platforms that require this quirk, if the counter starts
-+		 * at < half_counter value and wraps, the current logic of
-+		 * handling the overflow may not work. It is expected that,
-+		 * those platforms will have full 64 counter bits implemented
-+		 * so that such a possibility is remote(eg: HiSilicon HIP08).
-+		 */
-+		new = smmu_pmu_counter_get_value(smmu_pmu, idx);
-+	} else {
-+		/*
-+		 * We limit the max period to half the max counter value
-+		 * of the counter size, so that even in the case of extreme
-+		 * interrupt latency the counter will (hopefully) not wrap
-+		 * past its initial value.
-+		 */
-+		new = smmu_pmu->counter_mask >> 1;
-+		smmu_pmu_counter_set_value(smmu_pmu, idx, new);
-+	}
- 
- 	local64_set(&hwc->prev_count, new);
- 	smmu_pmu_counter_set_value(smmu_pmu, idx, new);
-@@ -670,6 +685,12 @@ static void smmu_pmu_reset(struct smmu_pmu *smmu_pmu)
- 		       smmu_pmu->reloc_base + SMMU_PMCG_OVSCLR0);
- }
- 
-+static void smmu_pmu_get_acpi_options(struct smmu_pmu *smmu_pmu)
-+{
-+	smmu_pmu->options = *(u32 *)dev_get_platdata(smmu_pmu->dev);
-+	dev_notice(smmu_pmu->dev, "option mask 0x%x\n", smmu_pmu->options);
-+}
-+
- static int smmu_pmu_probe(struct platform_device *pdev)
- {
- 	struct smmu_pmu *smmu_pmu;
-@@ -749,6 +770,8 @@ static int smmu_pmu_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
-+	smmu_pmu_get_acpi_options(smmu_pmu);
-+
- 	/* Pick one CPU to be the preferred one to use */
- 	smmu_pmu->on_cpu = get_cpu();
- 	WARN_ON(irq_set_affinity(smmu_pmu->irq, cpumask_of(smmu_pmu->on_cpu)));
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 38cd77b..4a7ae69 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -26,6 +26,9 @@
- #define IORT_IRQ_MASK(irq)		(irq & 0xffffffffULL)
- #define IORT_IRQ_TRIGGER_MASK(irq)	((irq >> 32) & 0xffffffffULL)
- 
-+/* PMCG node option or quirk flags */
-+#define IORT_PMCG_EVCNTR_RDONLY		(1 << 0)
-+
- int iort_register_domain_token(int trans_id, phys_addr_t base,
- 			       struct fwnode_handle *fw_node);
- void iort_deregister_domain_token(int trans_id);
--- 
-2.7.4
-
+>   4 files changed, 23 insertions(+), 70 deletions(-)
 
 
 _______________________________________________
