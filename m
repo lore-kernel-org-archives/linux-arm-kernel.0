@@ -2,66 +2,91 @@ Return-Path: <SRS0=AWyS=OJ=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-14.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F2406C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:39:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7E12FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:57:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD20B20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:39:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 309C121473
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Fri, 30 Nov 2018 23:57:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OkIx8cZb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD20B20834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hedonline.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fWPQlEUf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="aQ4tCcsm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 309C121473
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=CgqM5Nef6SxRPPEz/FcTPTKpMa5gQz5XNxAQnTiY/zI=; b=OkIx8cZbqKIU6C
-	bms7NRBDDNf+dKagdfe3lYBfsa/sY0LjMj7zYuZ9m/2gZamLOH84RBZginXDhjnpOd8w+ck+hOuRE
-	BAYEbUTdQs3irnN/D7CiBUOY9bdytqM2QxnmHF2dUWkMnnbz0O5T//G956hkBZwW/rs3FkaqyikYC
-	k6vNhyIcDB9ISyaBzszeT1kCRhlvTx8fRTV72O6Jfr5zFusuuS0AjpeHqYsgAmoCNXptJxemSpk/J
-	udMW9zWZisZoKaS4K1XJFdiWkkGfPvinlJtExWu5M4ThR8qm0pameSk+Zu6cn+KBAn55E0Gwnr6yj
-	Qn2O1g8tcNVvqpDYlH+w==;
+	List-Owner; bh=TrJJw2dL/shOcJvuMrJeZi0ioAoY4hP/GSj3Q/b8cbI=; b=fWPQlEUfukNfs7
+	8AFkla8KNECYfwy6I4QgxbOgSWfExW3GVQyyXVcqqU2s+Np8nrpbVXdhhy7KeqL+qltyVJdDDseCo
+	I7mj+2JhobtuSrq8aEMkgJnkqmb/uxH+Ea/8nXXTB2BijoEz7jTlGX4snoMeeeqPgqCAVpKRl5X1a
+	mH3V/3N+HhD0IWhItNiCuwzAl/40con9toWPRKb7Y8RClvkWPpjFP+X6shw8Q0ZOTTyynuonE3SJy
+	Y2daf3Ut2LPm702PLzuaKokTr5WihM+Kcarb4MFTfI0LO0dsEaV/PWrXb4A1StC6hjLuMvmaUdxe8
+	UWKZa1M7m6tLjp+5TYuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSsNk-0004Jw-RV; Fri, 30 Nov 2018 23:39:36 +0000
-Received: from mail.hedonline.com ([12.133.124.242]
- helo=HED-Exchange.hed.local)
+	id 1gSseV-000250-GW; Fri, 30 Nov 2018 23:56:55 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSsNh-0004J7-5j
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:39:34 +0000
-Received: from HED-EXCHANGE.hed.local ([fe80::4dca:ec11:8ab6:1fd3]) by
- HED-Exchange.hed.local ([fe80::4dca:ec11:8ab6:1fd3%21]) with mapi id
- 14.03.0319.002; Fri, 30 Nov 2018 17:39:14 -0600
-From: Matthew Starr <mstarr@hedonline.com>
-To: =?iso-8859-1?Q?Uwe_Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>,
- Fabio Estevam <festevam@gmail.com>
-Subject: RE: [PATCH] usb: chipidea: imx: unify over-current polarity handling
-Thread-Topic: [PATCH] usb: chipidea: imx: unify over-current polarity handling
-Thread-Index: AQHUiPH+Y7xFqbucCkiliBsV1+l8L6VpO7eA//+3QoA=
-Date: Fri, 30 Nov 2018 23:39:13 +0000
-Message-ID: <3C8219BAE02B894A9C69304A12E8AA06CA27C632@HED-Exchange.hed.local>
-References: <20181130205309.17232-1-u.kleine-koenig@pengutronix.de>
- <CAOMZO5AE2Z6+7pYf6CaU0NK8TGBk+WtBBauLHZ-14w-_HLuX1g@mail.gmail.com>
- <20181130213445.5rvhkjukv4od6old@pengutronix.de>
-In-Reply-To: <20181130213445.5rvhkjukv4od6old@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [192.168.1.90]
+ id 1gSseR-00022x-2r
+ for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:56:52 +0000
+Received: by mail-lj1-x243.google.com with SMTP id g11-v6so6486263ljk.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Fri, 30 Nov 2018 15:56:40 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=lixom-net.20150623.gappssmtp.com; s=20150623;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:in-reply-to:user-agent;
+ bh=/U05v4x8kz7gyrldg3yn/ryCle6aZDE8tNaCodrHs/s=;
+ b=aQ4tCcsmJjG3tHWM8PMF7EaBoawjZBVVQKjoGaUFxyiB9Q64aUbxspIYOtlTcI+CvX
+ eQtq1HaRDokVDfRYflH4YNQ5spuOaqmH13n5I3gYvTJM5NvcEtbJBsMZdIbrkU4xhSf9
+ L3SIbXc7yjFaH1zz/0xfa/aXFHa6ehg4MkXiLd01M6yO1JN2UdrPFjAjqt0CiewY906r
+ X34npryhGM7fb2o2541nDo8+ory6ADheHVudYAkqAAPQzuJ63Sv1Dm14QdOZ8R6CpTzI
+ lXox1OpG+MGeg4w7ewi85norC5RVYp7YnLCkQGswtRh8NRmQFEc6bDzaH2iur9S2clWH
+ urWw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=/U05v4x8kz7gyrldg3yn/ryCle6aZDE8tNaCodrHs/s=;
+ b=HSzO3pi3ft3B/S7amsKnRISXHIG089aVTnAHSv3WlOlC0FabMU1xnHW88gFzezX4Yg
+ qXB6tmHU1PPsMiwLD+yniXQWv9T2Tw0Vac1G1Gm2xJGu8M2s6DSVwSj5CFaEYlyMd4yu
+ D/EeRMdwH/a13OfzEp98yD/QVqDPiRfu1rMBNcAnGKr1aNI34PGx/LxWT0Hzj2nSj3Cb
+ uGn2LpbCMmMpo0SpNU8NUXk5HwcbhWQ7HQyIg6ewmUpFH4zTj+7O3MZmqAvDwGZbVrPm
+ 4sHmAzlr054YFeSGjClRmAQnLnoNaeqd+77SMF/aQQMxaKaEPVpIUkCWeCMzbXwpZNAv
+ 8MUg==
+X-Gm-Message-State: AA+aEWbcKrhPXwT+cHd31L3scyrJL54qV/JjvO+YFF9CFgVgMN8vOKye
+ +0318krNyXyThVPT7BMdCsLm6SR4VDsFIg==
+X-Google-Smtp-Source: AFSGD/VbE7l5TNWwTZwnVOJxaoei3kQdDyC/kV0KRS9COVFfBTIEAyPCtKDQm5aarFwVq4HZarowYQ==
+X-Received: by 2002:a2e:9a84:: with SMTP id p4-v6mr5035622lji.73.1543622198590; 
+ Fri, 30 Nov 2018 15:56:38 -0800 (PST)
+Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
+ by smtp.gmail.com with ESMTPSA id w9sm1037676lfc.66.2018.11.30.15.56.37
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Fri, 30 Nov 2018 15:56:37 -0800 (PST)
+Date: Fri, 30 Nov 2018 15:03:51 -0800
+From: Olof Johansson <olof@lixom.net>
+To: Heiko Stuebner <heiko@sntech.de>
+Subject: Re: [GIT PULL 2/3] Rockchip dts32 updates for 4.21
+Message-ID: <20181130230351.okuiq275nxonfsvv@localhost>
+References: <49803144.2ZsBJmaiIN@phil>
+ <14719034.CB54cPrm89@phil>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <14719034.CB54cPrm89@phil>
+User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_153933_211931_3DD64D0D 
-X-CRM114-Status: GOOD (  17.18  )
+X-CRM114-CacheID: sfid-20181130_155651_250220_2BE8DA47 
+X-CRM114-Status: GOOD (  12.88  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,87 +98,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Peter Chen <Peter.Chen@nxp.com>, USB list <linux-usb@vger.kernel.org>,
- Sascha Hauer <kernel@pengutronix.de>, Fabio Estevam <fabio.estevam@nxp.com>,
- Shawn Guo <shawnguo@kernel.org>, "moderated list:ARM/FREESCALE IMX / MXC ARM
- ARCHITECTURE" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: linux-rockchip@lists.infradead.org, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-> -----Original Message-----
-> From: Uwe Kleine-K=F6nig [mailto:u.kleine-koenig@pengutronix.de]
-> Sent: Friday, November 30, 2018 3:35 PM
-> =
+On Mon, Nov 26, 2018 at 11:06:38AM +0100, Heiko Stuebner wrote:
+> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+> 
+>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.21-rockchip-dts32-1
+> 
+> for you to fetch changes up to 99935bd4b5b4558beb069222e6d6143fe5830d64:
+> 
+>   ARM: dts: rockchip: Add all CPUs in cooling maps (2018-11-19 14:45:07 +0100)
 
-> Hello Fabio,
-> =
-
-> On Fri, Nov 30, 2018 at 07:16:39PM -0200, Fabio Estevam wrote:
-> > [Adding Matt]
-> >
-> > On Fri, Nov 30, 2018 at 6:53 PM Uwe Kleine-K=F6nig
-> > <u.kleine-koenig@pengutronix.de> wrote:
-> > >
-> > > The status quo is:
-> > >  - on i.MX25 the overcurrent polarity is always explicitly configured=
- as
-> > >    active high which matches the reset default.
-> > >  - on i.MX6 and i.MX7 the overcurrent polarity is active high after
-> > >    reset. usbmisc_imx6q_init() and usbmisc_imx7d_init() keep the curr=
-ent
-> > >    state (probably as setup by the bootloader or still the reset
-> > >    default) unless the polarity is explicitly configured as active hi=
-gh
-> > >    which then is configured. (So if the pin is active low and the
-> > >    bootloader didn't set this up the configuration is wrong.)
-> > >
-> > > To improve the situation always configure the reset default value unl=
-ess
-> > > the device tree configures the polarity (and then use this one).
-> > >
-> > > Note that as the reset default is active high on all platforms there =
-is
-> > > no need to check for the presence of "over-current-active-high". In t=
-he
-> > > absence of "over-current-active-low" it doesn't matter if active high=
- is
-> > > configured because that's the default or because it is configured
-> > > explicitly.
-> > >
-> > > Signed-off-by: Uwe Kleine-K=F6nig <u.kleine-koenig@pengutronix.de>
-> >
-> > It seems that Matt is also interested in adding the
-> > 'over-current-active-low' property:
-> > https://patchwork.kernel.org/patch/10701311/
-> =
-
-> Looking at Matt's patch I noticed that I applied my patch on an old
-> kernel version (4.14) :-|
-> =
-
-> But I think Matt's patch is broken because in usbmisc_imx6q_init() in
-> the last else branch MX6_BM_OVER_CUR_POLARITY isn't cleared. Other
-> than
-> that they don't look that different semantically.
-> =
-
-> I will respin my patch on Monday.
-> =
+Merged, thanks!
 
 
-Uwe,
-
-You are correct that I missed the clearing of MX6_BM_OVER_CUR_POLARITY.
-
-Also I don't see any reason why that last else that should clear MX6_BM_OVE=
-R_CUR_POLARITY and MX6_BM_OVER_CUR_DIS shouldn't also be in the usbmisc_imx=
-7d_init function too.
-
-I just resubmitted my patch based on 4.20-rc4 with the mentioned changes.
-
-Matt Starr
+-Olof
 
 _______________________________________________
 linux-arm-kernel mailing list
