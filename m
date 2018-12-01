@@ -2,64 +2,60 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.8 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 82B93C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 13:40:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 607A9C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 13:50:01 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 4D28B20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 13:40:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E93AB20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 13:50:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f7tXg4Up"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4D28B20834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dKH+Q6b0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E93AB20834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=zonque.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
-	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6maOInaynlUiHaoS9YDueI+/0VYcace2eZjwOQ5YW3w=; b=f7tXg4Up+CxRtU
-	ObXpw8skL2CeA7xVUdkDQ3ABgLPqaWLG5sJ23I50Fz67n9X9fes3nJp3CqmoQ7dyySJWHkuZ/bnaI
-	3W8EhcEwPYwU6V06llAjVCHTlDDzTzBI/9exUw+mQRd5mOUx4WEM3tdNkknN2f6BDH2Bu4QuILEfm
-	RIrSrTAUrsv/y4MLuJ5GfPVob/8V032aGZheKT8hVydvj2T1n5BAkVjFn/mICFJz/dKf7Dx6t6iwJ
-	PPap12BPUBFseWFPs47icFgkTKqg4J0nqD4U3ms/iJC3hmH8h+oNUJdx0IH8mGmweHtd5leEGGftO
-	QZrbWvMWYzjbG+RBys0g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=fJoYlXTyCTfGaGpaQZjn62OFY5BX5hFz64bsYwvwxE4=; b=dKH+Q6b0LyBr6dR+Nr35YHsOq
+	UGSb71NADa95KHvT+ailBFKm2B37TQD0rw5Ln8p6RDxvSszLJRGudw4DI0J30MJQgzeq/J2tjHku9
+	3Q6vSeL31XB+c06rCHsq3CRLLk+auPwx/3XaG9QXxH37OIAdpkEoO9nqXp/aXHqAneuG/ADh2TU0i
+	eXo9BvV3/3UOG+cldMOorJETcFQtf2z5S6ababETA5JhmXp4CGPKf85sI0ugUGfCR1WWYClmvgv34
+	hKgpfB6yoBpBkdE7yVOdahkADrQ76FGxuYmTP9tnhyDgq2PzoruWmvduM6FcvF3aU6x46yqJpZQmB
+	/3Domko3g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gT5VM-0006rK-PI; Sat, 01 Dec 2018 13:40:20 +0000
-Received: from smtp04.smtpout.orange.fr ([80.12.242.126]
- helo=smtp.smtpout.orange.fr)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gT5NC-00032f-VO
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 13:32:02 +0000
-Received: from belgarion ([90.89.234.36]) by mwinf5d39 with ME
- id 6dXi1z00K0nnJME03dXiJ9; Sat, 01 Dec 2018 14:31:43 +0100
-X-ME-Helo: belgarion
-X-ME-Auth: amFyem1pay5yb2JlcnRAb3JhbmdlLmZy
-X-ME-Date: Sat, 01 Dec 2018 14:31:43 +0100
-X-ME-IP: 90.89.234.36
-From: Robert Jarzmik <robert.jarzmik@free.fr>
-To: Daniel Mack <daniel@zonque.org>
-Subject: Re: [PATCH 3/7] ARM: dts: pxa2xx: fix hwuart memory range
+	id 1gT5ee-0008N4-Ox; Sat, 01 Dec 2018 13:49:56 +0000
+Received: from mail.bugwerft.de ([46.23.86.59])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gT5eb-0008Mc-5N
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 13:49:54 +0000
+Received: from [192.168.178.170] (p57BC9ACB.dip0.t-ipconnect.de
+ [87.188.154.203])
+ by mail.bugwerft.de (Postfix) with ESMTPSA id 582612C47AF;
+ Sat,  1 Dec 2018 13:49:23 +0000 (UTC)
+Subject: Re: [PATCH 4/7] ARM: dts: pxa: merge &pxa3xx_ohci with &usb0
+To: Robert Jarzmik <robert.jarzmik@free.fr>
 References: <20181130175543.32628-1-daniel@zonque.org>
- <20181130175543.32628-4-daniel@zonque.org>
-X-URL: http://belgarath.falguerolles.org/
-Date: Sat, 01 Dec 2018 14:31:42 +0100
-In-Reply-To: <20181130175543.32628-4-daniel@zonque.org> (Daniel Mack's message
- of "Fri, 30 Nov 2018 18:55:39 +0100")
-Message-ID: <878t19xtj5.fsf@belgarion.home>
-User-Agent: Gnus/5.130008 (Ma Gnus v0.8) Emacs/24.5 (gnu/linux)
+ <20181130175543.32628-5-daniel@zonque.org> <87lg59xtkq.fsf@belgarion.home>
+From: Daniel Mack <daniel@zonque.org>
+Message-ID: <8f6aa1b2-b154-dbdd-9c0c-76ba882f7933@zonque.org>
+Date: Sat, 1 Dec 2018 14:49:40 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.0
 MIME-Version: 1.0
+In-Reply-To: <87lg59xtkq.fsf@belgarion.home>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_053156_251072_16B62569 
-X-CRM114-Status: GOOD (  14.13  )
+X-CRM114-CacheID: sfid-20181201_054953_340035_9D0B3623 
+X-CRM114-Status: GOOD (  13.45  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,23 +69,33 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: devicetree@vger.kernel.org, robh+dt@kernel.org,
  linux-arm-kernel@lists.infradead.org, haojian.zhuang@gmail.com
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Daniel Mack <daniel@zonque.org> writes:
+On 1/12/2018 2:30 PM, Robert Jarzmik wrote:
+> Daniel Mack <daniel@zonque.org> writes:
+> 
+>> Both pxa3xx.dtsi and pxa2xx.dtsi define a node for the USB controller. Merge
+>> them, and get rid of the one in pxa3xx.dtsi.
+>>
+>> Signed-off-by: Daniel Mack <daniel@zonque.org>
+> Excellent, but can be even better :)
+> Could you please address as well pxa27x.dtsi ?
+> 
+> As a matter of fact, this was already discussed here :
+> https://patchwork.kernel.org/patch/8375421/
+> 
+> So the proper solution might be a bit different, as if you look at the thread I
+> put up there, pxa25x doesn't have an USB host controller.
 
-> The memory range for the hwuart is at 0x41600000, not 0x41100000.
-> This also solves a conflict with the MMC controller node.
->
-> Signed-off-by: Daniel Mack <daniel@zonque.org>
-Applied to pxa/dt, thanks.
+Ah, okay. Thanks for the pointer. Will send a new patch, just ignore 
+this one please.
 
-Cheers.
 
---
-Robert
+Thanks,
+Daniel
 
 _______________________________________________
 linux-arm-kernel mailing list
