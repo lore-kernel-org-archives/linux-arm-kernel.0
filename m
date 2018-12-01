@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 177DFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 11:02:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75AE3C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 11:54:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D58312081D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 11:02:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 388D82146D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 11:54:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Z5k+XKY3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="VDJw3KYI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D58312081D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="m4bmvkM6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="YOv3KAxA"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 388D82146D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,60 +26,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=4vPxd/c8uMUGpTBGLeKuOB0C43OqlfUnJHc1q2iDTvE=; b=Z5k+XKY35qGafm
-	WJmfzrnrTpnpJ1rHXAKzkkDvRRyt7Gj40PELByH57LwKfcEBitKB6W48mMnjQxodLsC2y9WY+W2/b
-	grJ7Qj5LVNCwsYJ50Bct6lLd9OwQ9OlgC0zJW1Z+1DYk0nAiGfUuyP/d+OQH+RqREJDxkDXdqhJXi
-	4Nz9dtQy0jHdCz8WEkeiyj10UL06UAr9DB6xYX4PYGAi3hJhJxlCoWKSE9JPPY3EEk27JZa/7F4rH
-	9gi1HCntVa4p3cY0n77M/ZQ/tTrxQUWa30jQXAm+w0SKT6QsESwMzqd0wIPE/8K0usoDUI0vgDBSG
-	Y49dxnm7P1rLGXDKjFTg==;
+	List-Owner; bh=qiVQxvXOAAV5CVLaPbn17uRLN5E/KEQxFxW7/xQnkO0=; b=m4bmvkM6I3qV5i
+	siFlK5YkJYr3M2lfrKGm0vgU+WHLGXY75FlXwoNqmeEspgQFZoB7RgKdAU/NXZObdp+CTky1eXalP
+	ETxC57x7e+Md5/3mkbmmhXdddDvac46bVHRxHX/NXOQC3djGzThEWoDP6Tx7z4bwPntfO24B+GdFa
+	Ls8uQDB8IV05oKb1uSEneBOnwx7bcq8j/+U6mcb/2+S6W1xgkXaqVUsjcptfd34xZOfh+qAqjS3Tz
+	aPf4rnN9L94z5gHI3bsTofQ/E5+OIScM4ivnmcm7WusLTscSarVd6mtGhhHRjKfRO9nxAjipd3ryu
+	sIt1vOc/uYOA1VxrpM5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gT32B-0007CJ-M7; Sat, 01 Dec 2018 11:02:03 +0000
+	id 1gT3qn-0005xU-Ui; Sat, 01 Dec 2018 11:54:21 +0000
 Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gT329-0007Bp-42
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 11:02:02 +0000
-Received: by mail-wm1-x343.google.com with SMTP id q26so1299447wmf.5
+ id 1gT3qk-0005x0-CI
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 11:54:19 +0000
+Received: by mail-wm1-x343.google.com with SMTP id s14so1414782wmh.1
  for <linux-arm-kernel@lists.infradead.org>;
- Sat, 01 Dec 2018 03:01:48 -0800 (PST)
+ Sat, 01 Dec 2018 03:54:07 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=pgxjcCZc9WjXCokd01RxR9GXzZIs2JBPDxDL9QyuihI=;
- b=VDJw3KYIHzCI+0Mgzhx5w4b+wdy2ap/R6Xe1uafYEMY/58MFL+yl3nQjpGlrZeM4ec
- EgIe7FrSYCuHdv7mjJpOjdEX/0RJMiJBbnQjo9tyuPjq752ou+ndXPdK2CFrRnGH0RN0
- phPnidvyvC3nhOjCs6Ybp/c7sT+Kreigm/1vc=
+ bh=+uoJzSNA38HtSt1FqPvh9QAYPAyVJM9J0mgd2Tm+gAQ=;
+ b=YOv3KAxAkXJLBEb7X5ZjtnT05TeCYZYfgo9a2Q09qUmsmHHMfa+IlJUDIQjG+a8EkM
+ E4SImtE7ZCQHljrg+eJdijvSdDgdb/Zb754JZxqmmG1hAbPmRtkGWUmxNcHkYkAjmSLQ
+ OXk3lt+nRNJUKzdzqKaVadxJRpGV0uz8OqJiM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
  :content-transfer-encoding;
- bh=pgxjcCZc9WjXCokd01RxR9GXzZIs2JBPDxDL9QyuihI=;
- b=c2iS15Ba5wbvVqi1W5lZmY4W98iIx/scF8k2KeBq4FYlUQ2kvn6AeTn1cZhdmCe0+0
- gROZeUUuGy0NY5fuMqi1+Rz1JEgYhbZawZ3YaTzX5CWMWQbslKvddXRJUtK37qDaGJMj
- Mcskhl37F06Ocs6Gm31gwZdMQzjojvMn3FUNtXqclaLRTTmLpLTuYAsib+kL9G09S5iy
- iDaTznft8Kfd3xMzFlFlpn15pjTiP1kqaklC8vLdW0kn2mXHpb26ckCw6UAXn1+HhFQI
- i+toxHKn2q7Nx0Ul7I+IPTUmmJo+mJ1/BD1D5sxgqKSWK03qoXTKzK0zExzDFTJ91gRR
- AVqw==
-X-Gm-Message-State: AA+aEWYF36FBxhGHbYKFxal4zgMWtIm0EL28uEJA49GFgFav86L7mbwD
- p3ks4kiiYsTi+PHiyF+RDEAtTWcZg2Q=
-X-Google-Smtp-Source: AFSGD/X8GDuQJ0f/50lk4InOLdfCWFyDROa7ccwTtYy5KDcXv8E6ULpriv9RYCVxzwCHSE9OxEX+rg==
-X-Received: by 2002:a7b:cb09:: with SMTP id u9mr2024010wmj.8.1543662107216;
- Sat, 01 Dec 2018 03:01:47 -0800 (PST)
+ bh=+uoJzSNA38HtSt1FqPvh9QAYPAyVJM9J0mgd2Tm+gAQ=;
+ b=t9DIofgrwjLUsmqiUJcSmTKUq9pIFyJU3XzduNd7eFBCAwa3KbJR9JNFRt5vDlITCw
+ lNFz2PY3sJT+VqZk/FZmQQUrq8YFRH/UqLf+WNSis61Rd9bqSF+d1nmoIhxs8mtfC/jS
+ uBjNKS6ty7vCUWErV/n6VqLNCr2p4pQEqGsqOrrKApRQEq1fhbn0tE2mvYWlOHqsKkFy
+ NP61oNVYY6sZDzcnmI+MgH6InrDq3Hcn5bq048H+JdnBCu54rJCeuBfnqaSrLeKbRrtw
+ 6lzh3f/na1gmEbxkeH57SjoU+HW8pJCt4bWQeJ5RNaBtx55Sq1KRyHz1bB6ccyG9NB/N
+ lKiA==
+X-Gm-Message-State: AA+aEWYnTrXGJBrGCfbGT6LMu4dM/S42ppnF54BNUuoyq/DZ7AP4z8XM
+ FhJVp/xDlKiSSz1MIKor8rpWGgFSzbQ=
+X-Google-Smtp-Source: AFSGD/V7GkkAaxZQLt7VewWwoA8mcJqw0DzjkpwR2p2kATBR/i+Rh7uwZ7MdJQMVWdMi6VpNNBxVZg==
+X-Received: by 2002:a1c:93ca:: with SMTP id v193mr2160905wmd.82.1543665246195; 
+ Sat, 01 Dec 2018 03:54:06 -0800 (PST)
 Received: from harold.home ([2a01:cb1d:112:6f00:edfb:24ff:63d6:53d9])
- by smtp.gmail.com with ESMTPSA id o15sm8217904wrp.12.2018.12.01.03.01.46
+ by smtp.gmail.com with ESMTPSA id q2sm7591156wru.56.2018.12.01.03.54.03
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sat, 01 Dec 2018 03:01:46 -0800 (PST)
+ Sat, 01 Dec 2018 03:54:04 -0800 (PST)
 From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
-Subject: [PATCH] arm64/mm: use correct operators for string comparison in
- cache.S
-Date: Sat,  1 Dec 2018 12:01:44 +0100
-Message-Id: <20181201110144.15970-1-ard.biesheuvel@linaro.org>
+Subject: [RFT PATCH] arm64: relocatable: build the kernel as a proper shared
+ library
+Date: Sat,  1 Dec 2018 12:53:24 +0100
+Message-Id: <20181201115324.20847-1-ard.biesheuvel@linaro.org>
 X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_030201_176966_6BC37FF1 
-X-CRM114-Status: GOOD (  11.74  )
+X-CRM114-CacheID: sfid-20181201_035418_416507_9173A375 
+X-CRM114-Status: GOOD (  13.83  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,72 +91,122 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: catalin.marinas@arm.com, will.deacon@arm.com,
+Cc: catalin.marinas@arm.com, Peter Smith <peter.smith@linaro.org>,
+ Nick Desaulniers <ndesaulniers@google.com>, will.deacon@arm.com,
  Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The GAS directives that are currently being used in dcache_by_line_op
-rely on assembler behavior that is not documented, and probably not
-guaranteed to produce the correct behavior going forward.
+readelf complains about the section layout of vmlinux when building
+with CONFIG_RELOCATABLE=y (for KASLR):
 
-Currently, we end up with some undefined symbols in cache.o:
+  readelf: Warning: [21]: Link field (0) should index a symtab section.
+  readelf: Warning: [21]: Info field (0) should index a relocatable section.
 
-$ nm arch/arm64/mm/cache.o
-	 ...
-	 U civac
-	 ...
-	 U cvac
-	 U cvap
-	 U cvau
+Also, it seems that our use of '-pie -shared' is contradictory, and
+thus ambiguous. In general, the way KASLR is wired up at the moment
+is highly tailored to how ld.bfd happens to implement (and conflate)
+PIE executables and shared libraries, so given the current effort to
+support other toolchains, let's fix some of these issues as well.
 
-This is due to the fact that the comparisons used to select the
-operation type in the dcache_by_line_op macro are comparing symbols
-not strings, and even though it seems that GAS is doing the right
-thing here (undefined symbols by the same name are equal to each
-other), it seems unwise to rely on this.
+- Drop the -pie linker argument and just leave -shared. In ld.bfd,
+  the differences between them are unclear (except for the ELF type
+  of the produced image [0]) but lld chokes on seeing both at the
+  same time.
 
-So let's provide some definitions that are guaranteed to be distinct,
-and make them local so they don't pollute the gobal symbol space.
+- Rename the .rela output section to .rela.dyn, as is customary for
+  shared libraries and PIE executables.
 
+- Don't discard the .dynamic, .dynsym, .dynstr and .hash sections.
+  Instead, make sure that they are [mostly] empty by marking all
+  symbols as local, and emit them into the .init segment.
+
+These changes only affect the ELF image, and produce the same binary
+image, with the exception of a couple of bytes of .init data for the
+empty .dynsym and .dynstr sections.
+
+[0] b9dce7f1ba01 ("arm64: kernel: force ET_DYN ELF type for ...")
+
+Cc: Nick Desaulniers <ndesaulniers@google.com>
+Cc: Peter Smith <peter.smith@linaro.org>
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/include/asm/assembler.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm64/Makefile             |  2 +-
+ arch/arm64/kernel/vmlinux.lds.S | 30 ++++++++++++++++++++++++------
+ 2 files changed, 25 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 6142402c2eb4..d11c32df85c2 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -377,19 +377,24 @@ alternative_endif
-  * 	size:		size of the region
-  * 	Corrupts:	kaddr, size, tmp1, tmp2
-  */
-+	.set	.Lcvau,  0
-+	.set	.Lcvac,  1
-+	.set	.Lcvap,  2
-+	.set	.Lcivac, 3
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 6cb9fc7e9382..7221494bcf60 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -18,7 +18,7 @@ ifeq ($(CONFIG_RELOCATABLE), y)
+ # Pass --no-apply-dynamic-relocs to restore pre-binutils-2.27 behaviour
+ # for relative relocs, since this leads to better Image compression
+ # with the relocation offsets always being zero.
+-LDFLAGS_vmlinux		+= -pie -shared -Bsymbolic \
++LDFLAGS_vmlinux		+= -shared -Bsymbolic \
+ 			$(call ld-option, --no-apply-dynamic-relocs)
+ endif
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 03b00007553d..9ba4016090b1 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -98,8 +98,6 @@ SECTIONS
+ 		EXIT_CALL
+ 		*(.discard)
+ 		*(.discard.*)
+-		*(.interp .dynamic)
+-		*(.dynsym .dynstr .hash)
+ 	}
+ 
+ 	. = KIMAGE_VADDR + TEXT_OFFSET;
+@@ -192,12 +190,25 @@ SECTIONS
+ 
+ 	PERCPU_SECTION(L1_CACHE_BYTES)
+ 
+-	.rela : ALIGN(8) {
++#ifdef CONFIG_RELOCATABLE
++	.rela.dyn : ALIGN(8) {
+ 		*(.rela .rela*)
+ 	}
+-
+-	__rela_offset	= ABSOLUTE(ADDR(.rela) - KIMAGE_VADDR);
+-	__rela_size	= SIZEOF(.rela);
++	.dynamic : {
++		*(.dynamic)
++	}
++	.dynsym : ALIGN(8) {
++		*(.dynsym)
++	}
++	.dynstr : {
++		*(.dynstr)
++	}
++	.hash : {
++		*(.hash)
++	}
++	__rela_offset	= ABSOLUTE(ADDR(.rela.dyn) - KIMAGE_VADDR);
++	__rela_size	= SIZEOF(.rela.dyn);
++#endif
+ 
+ 	. = ALIGN(SEGMENT_ALIGN);
+ 	__initdata_end = .;
+@@ -244,6 +255,13 @@ SECTIONS
+ 	HEAD_SYMBOLS
+ }
+ 
++#ifdef CONFIG_RELOCATABLE
++VERSION {
++	/* mark all symbols as local so they are not listed in .dynsym */
++	{ local: *; };
++}
++#endif
 +
- 	.macro dcache_by_line_op op, domain, kaddr, size, tmp1, tmp2
- 	dcache_line_size \tmp1, \tmp2
- 	add	\size, \kaddr, \size
- 	sub	\tmp2, \tmp1, #1
- 	bic	\kaddr, \kaddr, \tmp2
- 9998:
--	.if	(\op == cvau || \op == cvac)
-+	.if	(.L\op == .Lcvau || .L\op == .Lcvac)
- alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
- 	dc	\op, \kaddr
- alternative_else
- 	dc	civac, \kaddr
- alternative_endif
--	.elseif	(\op == cvap)
-+	.elseif	(.L\op == .Lcvap)
- alternative_if ARM64_HAS_DCPOP
- 	sys 3, c7, c12, 1, \kaddr	// dc cvap
- alternative_else
+ /*
+  * The HYP init code and ID map text can't be longer than a page each,
+  * and should not cross a page boundary.
 -- 
 2.19.2
 
