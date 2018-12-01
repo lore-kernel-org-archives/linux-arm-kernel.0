@@ -4,19 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5556C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:21:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E5820C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:23:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 912C32082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:21:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C0EB62082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:23:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mvefJSjE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 912C32082F
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FYgf4luF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C0EB62082F
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=windriver.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +24,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=W8Sl3QxVYFtQAnIlzhF2oxZFBiMvee9UyRNNcdIQlG0=; b=mvefJSjE0+58QN
-	csvDye8KHWmxocjByh9949cLB1EB/L1eTBfJzYswxg2I80BY2Bk7KrNG6W792zUt6reFcvIlv6cGl
-	uR4jjWbrgj7uCRveRolx4AUE9xZIUm8bmurf40hXOhMZRYVVsNNdFHqqhYhxygqYIQVeL7tUgTwmj
-	+PBQlLeVmkZ0d3WPhJYmiO1OBxxclmmnLp3xbsVq+aojo8w+J1tlpFUkqesusj+zgYY/0hvHUKHhw
-	0QPkYbA0D6fx0it/kyG8tNvskz5gymP+1d09Isn1a9OEifHPdn5QZcrqjrfEhcNYKmVPivddIbWHg
-	Q/lARKDKTmeE0WKCn64A==;
+	List-Owner; bh=2gJwvkkZ1dumELIjPLzavY0hpZ95nJStUoPRbYoKsaI=; b=FYgf4luFUIayuJ
+	ZBoJDiS+3vBNOEQycpLDXI1JotGnIiV33VzIUPdK019Ze6qLW7qXY391UhUEVJGAtZ5fB0hFG6W72
+	IlBsl0v5QODoehfVUtMLlwgb8AyxSLIH31Xh/a+Qg7o9u4mvfWaf8ESSLanMZDWjaWj8ZTN43snKc
+	Dv0f0Y1aSWgHA5q8cBUd2GhMDTx/79Aj5UuuB7FSa75lt+mTwGKxymFR4kEUv2DU9mGeCEIKtPxFG
+	dGFu29eG0GMbFUpRKc+DSrW8SHMCKv8vnSxijLohOPcjY/DgOxEpRDJbYaLrIPDZLIAMvFbrAxT64
+	40iJjGSVGB+5vjX0R9jg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTApO-0001U5-S5; Sat, 01 Dec 2018 19:21:22 +0000
+	id 1gTAr9-0001wG-1n; Sat, 01 Dec 2018 19:23:11 +0000
 Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTApM-0001TQ-3s; Sat, 01 Dec 2018 19:21:21 +0000
+ id 1gTAr6-0001vb-6R
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 19:23:09 +0000
 Received: from ALA-HCA.corp.ad.wrs.com (ala-hca.corp.ad.wrs.com
  [147.11.189.40])
- by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id wB1JJh9V005396
+ by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id wB1JLVBU005428
  (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
- Sat, 1 Dec 2018 11:19:53 -0800
+ Sat, 1 Dec 2018 11:22:07 -0800
 Received: from yow-cube1.wrs.com (128.224.56.98) by ALA-HCA.corp.ad.wrs.com
  (147.11.189.40) with Microsoft SMTP Server id 14.3.408.0; Sat, 1 Dec 2018
- 11:19:32 -0800
+ 11:21:54 -0800
 From: Paul Gortmaker <paul.gortmaker@windriver.com>
 To: Joerg Roedel <joro@8bytes.org>
-Subject: [PATCH 2/9] iommu/rockchip: Make it explicitly non-modular
-Date: Sat, 1 Dec 2018 14:19:10 -0500
-Message-ID: <1543691957-17608-3-git-send-email-paul.gortmaker@windriver.com>
+Subject: [PATCH 9/9] iommu/arm-smmu: Make arm-smmu-v3 explicitly non-modular
+Date: Sat, 1 Dec 2018 14:19:17 -0500
+Message-ID: <1543691957-17608-10-git-send-email-paul.gortmaker@windriver.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543691957-17608-1-git-send-email-paul.gortmaker@windriver.com>
 References: <1543691957-17608-1-git-send-email-paul.gortmaker@windriver.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_112120_176131_51B555C2 
-X-CRM114-Status: GOOD (  15.84  )
+X-CRM114-CacheID: sfid-20181201_112308_261762_2BA4E152 
+X-CRM114-Status: GOOD (  18.47  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,12 +68,10 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Simon Xue <xxm@rock-chips.com>, linux-rockchip@lists.infradead.org,
- Jeffy Chen <jeffy.chen@rock-chips.com>, linux-kernel@vger.kernel.org,
- Daniel Kurtz <djkurtz@chromium.org>,
+Cc: Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
  Paul Gortmaker <paul.gortmaker@windriver.com>,
  iommu@lists.linux-foundation.org, linux-arm-kernel@lists.infradead.org,
- Heiko Stuebner <heiko@sntech.de>
+ Robin Murphy <robin.murphy@arm.com>, Nate Watterson <nwatters@codeaurora.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -81,79 +79,113 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 The Kconfig currently controlling compilation of this code is:
 
-drivers/iommu/Kconfig:config ROCKCHIP_IOMMU
-drivers/iommu/Kconfig:  bool "Rockchip IOMMU Support"
+drivers/iommu/Kconfig:config ARM_SMMU_V3
+drivers/iommu/Kconfig:  bool "ARM Ltd. System MMU Version 3 (SMMUv3) Support"
 
 ...meaning that it currently is not being built as a module by anyone.
 
-The bind/unbind/remove was already explicitly disabled in commit
-98b72b94def9 ("iommu/rockchip: Prohibit unbind and remove").
-
-Lets remove the remaining traces of  modular infrastructure, so that
+Lets remove the modular code that is essentially orphaned, so that
 when reading the driver there is no doubt it is builtin-only.
 
-Since module_init was not in use by this code, the init ordering
-remains unchanged with this commit.
+Since module_platform_driver() uses the same init level priority as
+builtin_platform_driver() the init ordering remains unchanged with
+this commit.
+
+We explicitly disallow a driver unbind, since that doesn't have a
+sensible use case anyway, but unlike most drivers, we can't delete the
+function tied to the ".remove" field.  This is because as of commit
+7aa8619a66ae ("iommu/arm-smmu-v3: Implement shutdown method") the
+.remove function was given a one line wrapper and re-used to provide a
+.shutdown service.  So we delete the wrapper and re-name the function
+from remove to shutdown.
+
+We add a moduleparam.h include since the file does actually declare
+some module parameters, and leaving them as such is the easiest way
+currently to remain backwards compatible with existing use cases.
 
 Also note that MODULE_DEVICE_TABLE is a no-op for non-modular code.
 
 We also delete the MODULE_LICENSE tag etc. since all that information
-was (or is now) contained at the top of the file in the comments.
+is already contained at the top of the file in the comments.
 
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Simon Xue <xxm@rock-chips.com>
-Cc: Daniel Kurtz <djkurtz@chromium.org>
-Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
-Cc: iommu@lists.linux-foundation.org
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Nate Watterson <nwatters@codeaurora.org>
 Cc: linux-arm-kernel@lists.infradead.org
-Cc: linux-rockchip@lists.infradead.org
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+Cc: iommu@lists.linux-foundation.org
+Acked-by: Robin Murphy <robin.murphy@arm.com>
 Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- drivers/iommu/rockchip-iommu.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 25 +++++++++----------------
+ 1 file changed, 9 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index ad3e2b97469e..c9ba9f377f63 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -1,4 +1,9 @@
- /*
-+ * IOMMU API for Rockchip
-+ *
-+ * Module Authors:	Simon Xue <xxm@rock-chips.com>
-+ *			Daniel Kurtz <djkurtz@chromium.org>
-+ *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
-@@ -17,7 +22,7 @@
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 6947ccf26512..1189c06079d4 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -20,7 +20,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
  #include <linux/iopoll.h>
- #include <linux/list.h>
- #include <linux/mm.h>
 -#include <linux/module.h>
 +#include <linux/init.h>
++#include <linux/moduleparam.h>
+ #include <linux/msi.h>
  #include <linux/of.h>
- #include <linux/of_iommu.h>
- #include <linux/of_platform.h>
-@@ -1281,7 +1286,6 @@ static const struct of_device_id rk_iommu_dt_ids[] = {
- 	{ .compatible = "rockchip,iommu" },
- 	{ /* sentinel */ }
- };
--MODULE_DEVICE_TABLE(of, rk_iommu_dt_ids);
+ #include <linux/of_address.h>
+@@ -356,6 +357,10 @@
+ #define MSI_IOVA_BASE			0x8000000
+ #define MSI_IOVA_LENGTH			0x100000
  
- static struct platform_driver rk_iommu_driver = {
- 	.probe = rk_iommu_probe,
-@@ -1299,8 +1303,3 @@ static int __init rk_iommu_init(void)
- 	return platform_driver_register(&rk_iommu_driver);
++/*
++ * not really modular, but the easiest way to keep compat with existing
++ * bootargs behaviour is to continue using module_param_named here.
++ */
+ static bool disable_bypass = 1;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+@@ -2928,37 +2933,25 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	return 0;
  }
- subsys_initcall(rk_iommu_init);
+ 
+-static int arm_smmu_device_remove(struct platform_device *pdev)
++static void arm_smmu_device_shutdown(struct platform_device *pdev)
+ {
+ 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+ 
+ 	arm_smmu_device_disable(smmu);
 -
--MODULE_DESCRIPTION("IOMMU API for Rockchip");
--MODULE_AUTHOR("Simon Xue <xxm@rock-chips.com> and Daniel Kurtz <djkurtz@chromium.org>");
--MODULE_ALIAS("platform:rockchip-iommu");
+-	return 0;
+-}
+-
+-static void arm_smmu_device_shutdown(struct platform_device *pdev)
+-{
+-	arm_smmu_device_remove(pdev);
+ }
+ 
+ static const struct of_device_id arm_smmu_of_match[] = {
+ 	{ .compatible = "arm,smmu-v3", },
+ 	{ },
+ };
+-MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
+ 
+ static struct platform_driver arm_smmu_driver = {
+ 	.driver	= {
+ 		.name		= "arm-smmu-v3",
+ 		.of_match_table	= of_match_ptr(arm_smmu_of_match),
++		.suppress_bind_attrs = true,
+ 	},
+ 	.probe	= arm_smmu_device_probe,
+-	.remove	= arm_smmu_device_remove,
+ 	.shutdown = arm_smmu_device_shutdown,
+ };
+-module_platform_driver(arm_smmu_driver);
+-
+-MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+-MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
 -MODULE_LICENSE("GPL v2");
++builtin_platform_driver(arm_smmu_driver);
 -- 
 2.7.4
 
