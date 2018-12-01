@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8BC92C64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:47:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8D47BC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:47:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5B42C20867
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:47:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5BC142147C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:47:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ttZtrbRU";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="A7LzCfW8"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5B42C20867
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mr1FYvE9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="Ruqiq1Dy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5BC142147C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,69 +26,70 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=hcdmPg6FpJWKTcLDvxmaz5dFZ5EG4EvCOeldmZ58RYs=; b=ttZtrbRU4btVJ1
-	9EI2+Rppl5/bfmAynT3X2O8c9TfjxZBVeQi2GlicVtxHO0IAwZpQCT4h4pCztKs+hBC19U++aJ/UL
-	/B9Ce8Z/+bWGJemLbbL70MJI+kXdc7snGEadcFHOdxgX1C+P7urhAzxriwlrbxxAsANP42df7ULGN
-	VtqhIDNhuR88SwKez4L81z5s6P3a7hHMLWvYAllhyPR2CnPPgNKPdnEGMu8tSuyCd0eF4ktFGErge
-	vpFHDud75rdswGo4ruC5qmwF+Adhuu2ZNrjjoItXYHl/n5RAUrtl+IPtKDepSOYpgaXJ6NGUofuW4
-	hHyFq2xjBScwmy50QCNQ==;
+	List-Owner; bh=tu3OMY7/4v4M21l7HTS5jONorncU5Ayf5ZkOeTPAoMY=; b=mr1FYvE9pV0JW8
+	0Q+atpQkE4nTq/9XUHvjlFZ+bzEbIBhfqNTv5E3rawdJlSXHMTtz43h7qkeTHIP67gRnVJkMf/2C8
+	Ci55Lgt9mXiOzVaO+tdmvrCeweS1Ofsr/LsSOAEHAHlj0URnY5vLd5fTacKNSThzcM4Det49dA1Ue
+	OfS6Ysttyx5C0e5YKqaQpTzDW3qPcBtdfUlzM8HsFjA2RS6M/XTF+v970v51bIkUbOLw22WtpLIVl
+	nHnQiTmkT7AGy/nj+X8imp7VyRWEMsEZVkx6b0IxNo/DLHovtJRMFhifaiq1tiacGQpIi8d1cCBdE
+	f2K8rjTywSsDPVzJ5NTw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gStRG-0001DP-FI; Sat, 01 Dec 2018 00:47:18 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gStRm-0001TO-K0; Sat, 01 Dec 2018 00:47:50 +0000
+Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gStRB-0001CD-Uz
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:47:16 +0000
-Received: by mail-lj1-x244.google.com with SMTP id v1-v6so6563903ljd.0
+ id 1gStRg-0001Qk-Oj
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:47:48 +0000
+Received: by mail-lj1-x241.google.com with SMTP id c19-v6so6544297lja.5
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:47:03 -0800 (PST)
+ Fri, 30 Nov 2018 16:47:34 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=kUwgOG2FwKn73vdyjMJ9x8UdUTas2QjkWsYuqenQdmk=;
- b=A7LzCfW8fURMHCJvh+eCrnoMDst+w2MVobrY/ZRoPlxnsGPWMEUvJXYP77/Y0ZJnSA
- 2Vhypd2U8MDqCiOJmmUADxU5zMOS6bPMoXSseYHpjLXLLJJ8sq/v2roeVEOBMODAFJle
- Znz3Vp4EV3lEU+OabVzWSKhiwqKwKnRyH1oUs=
+ :cc; bh=L9HJj8oQEV2tIq6wjZVCRS3Wb3cxGZvLkl9XqwuIovs=;
+ b=Ruqiq1DyBvh9xaj9BiP5z75PTptbcHbQONvqi+pMje/q/DqwwsYLPi2Th6rcv/HcZ4
+ UnKF5svkrTajzSW/r7RytDnCa5u2OTWKiuYcEFlrzjE+iAZpvj8gwYbX8gwsh7gkIKQv
+ S4wiHnuF2P76oCPhdifJrPnIGnF+NqO8QolOQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=kUwgOG2FwKn73vdyjMJ9x8UdUTas2QjkWsYuqenQdmk=;
- b=eHqKqe8DPORe+G6SxGhjEiju1N18jy9MwbuxttT3+Bx4RT5WqukhjuDqp253qb/atS
- yRBAghYFNiEDrmaE9z0PoU76hpVOiBdIyqgnN1dRNk+Rbf1iZWiI1otRjOPajXapptJM
- nblyrW2n+3mTU8GI5JjGyWQR22aS9vO9weze0kG9indWVaKjV0bT+o0MHq8HwYCPkiBA
- E7TaeK3wMAxuJQ36EA8nCZbdzCoIxXEc/90ng+bulycXIKU5XoiioEgnOz+TAlUnB3Kl
- MfIq5DQ0Iqn/f2FDNxGgLBqGhThcd06t4lxX/Z4pTHINj+4IQ0WxP/3ArlmI0gLU6aD7
- vVYg==
-X-Gm-Message-State: AA+aEWZ2XYMHvdBY7TCGKV7zYfhcfUOAx27gUg8kVf+qhS4NNLelnjLM
- EmJOTw7CkE5qNFa9FkMtEnmFYHS01S4=
-X-Google-Smtp-Source: AFSGD/WeB2pZlT/jeR+vMUvQqdW6Zv1S2pmLd1O53leFNR7gyguRS7Hv6SgHUz62MQVcF27B/WQZSg==
-X-Received: by 2002:a2e:7615:: with SMTP id
- r21-v6mr4934886ljc.131.1543625222181; 
- Fri, 30 Nov 2018 16:47:02 -0800 (PST)
-Received: from mail-lj1-f181.google.com (mail-lj1-f181.google.com.
- [209.85.208.181])
- by smtp.gmail.com with ESMTPSA id y12-v6sm1036191ljy.76.2018.11.30.16.47.01
+ bh=L9HJj8oQEV2tIq6wjZVCRS3Wb3cxGZvLkl9XqwuIovs=;
+ b=Gsl+FIWHc7NTjlqXnU5uhAWLmx3RE/lHBohwgdf19aiUPKIblUff+mLG8r2wkpb0hW
+ n6p3KnngP7sWLf9STYtM4gVB4M747wcKTYNdqciHbeNhN6aM2ObaE/tQFrG0vwKVpRG6
+ +ZYPMS+9/CBsuoXZ1UNBmwp4RjmwASrKFIhNw06G83KgI+BgizI3smmFpIJEAND1dlfw
+ 92Z+Vno+06cy/KJfv3Pbrzf+ZO6xZbrhL2Rz+0lzmHtdTtst89bDeEd8JOoaRPOA9vk5
+ MwUP8Hh1IsLmj7yOTJpdCDeCDNuoRUMh0sL3v62xw4e43s0n+DgRIMmHDCuiDWWIV6KC
+ 8Oyg==
+X-Gm-Message-State: AA+aEWb5wM5/YGM0vceELRNlb05Cm+BVgrD+VQIf4d4yModO13O7Wjge
+ rTgpp8BJSWnXPFdR81u3lz1D0FYh/8w=
+X-Google-Smtp-Source: AFSGD/Xk8A9EmsUYme1X0zuZJkSy2yoBwkdKMcpv2PrswsU6wuFL6j5TsU1FQo9H37JTbZYcixw9Gw==
+X-Received: by 2002:a2e:5356:: with SMTP id
+ t22-v6mr4956841ljd.26.1543625252896; 
+ Fri, 30 Nov 2018 16:47:32 -0800 (PST)
+Received: from mail-lj1-f177.google.com (mail-lj1-f177.google.com.
+ [209.85.208.177])
+ by smtp.gmail.com with ESMTPSA id 13-v6sm1023470ljj.49.2018.11.30.16.47.32
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 30 Nov 2018 16:47:01 -0800 (PST)
-Received: by mail-lj1-f181.google.com with SMTP id u6-v6so6560748ljd.1
+ Fri, 30 Nov 2018 16:47:32 -0800 (PST)
+Received: by mail-lj1-f177.google.com with SMTP id z80-v6so6532632ljb.8
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:47:01 -0800 (PST)
-X-Received: by 2002:a2e:501:: with SMTP id 1-v6mr5641242ljf.74.1543624747961; 
- Fri, 30 Nov 2018 16:39:07 -0800 (PST)
+ Fri, 30 Nov 2018 16:47:32 -0800 (PST)
+X-Received: by 2002:a2e:45d:: with SMTP id 90-v6mr5132083lje.110.1543624788281; 
+ Fri, 30 Nov 2018 16:39:48 -0800 (PST)
 MIME-Version: 1.0
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-3-georgi.djakov@linaro.org>
-In-Reply-To: <20181127180349.29997-3-georgi.djakov@linaro.org>
+ <20181127180349.29997-7-georgi.djakov@linaro.org>
+In-Reply-To: <20181127180349.29997-7-georgi.djakov@linaro.org>
 From: Evan Green <evgreen@chromium.org>
-Date: Fri, 30 Nov 2018 16:38:31 -0800
-X-Gmail-Original-Message-ID: <CAE=gft5z0=Rp_+jj2JTKF4Kn-RB6AK0Ke1ByUuRwrZHwvNDcCg@mail.gmail.com>
-Message-ID: <CAE=gft5z0=Rp_+jj2JTKF4Kn-RB6AK0Ke1ByUuRwrZHwvNDcCg@mail.gmail.com>
-Subject: Re: [PATCH v10 2/7] dt-bindings: Introduce interconnect binding
+Date: Fri, 30 Nov 2018 16:39:11 -0800
+X-Gmail-Original-Message-ID: <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
+Message-ID: <CAE=gft4XEqkL4oON=Q1oji=AoYeEdL5DFjy3h6hN6uFR9oRA4A@mail.gmail.com>
+Subject: Re: [PATCH v10 6/7] arm64: dts: sdm845: Add interconnect provider DT
+ nodes
 To: georgi.djakov@linaro.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_164714_676269_1209440F 
-X-CRM114-Status: GOOD (  20.44  )
+X-CRM114-CacheID: sfid-20181130_164744_930819_4393538E 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -117,86 +118,39 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> This binding is intended to represent the relations between the interconnect
-> controllers (providers) and consumer device nodes. It will allow creating links
-> between consumers and interconnect paths (exposed by interconnect providers).
+> From: David Dai <daidavid1@codeaurora.org>
 >
+> Add RSC (Resource State Coordinator) provider
+> dictating network-on-chip interconnect bus performance
+> found on SDM845-based platforms.
+>
+> Signed-off-by: David Dai <daidavid1@codeaurora.org>
 > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->  .../bindings/interconnect/interconnect.txt    | 60 +++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/interconnect.txt
+>  arch/arm64/boot/dts/qcom/sdm845.dtsi | 5 +++++
+>  1 file changed, 5 insertions(+)
 >
-> diff --git a/Documentation/devicetree/bindings/interconnect/interconnect.txt b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> new file mode 100644
-> index 000000000000..6775c07e1574
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/interconnect.txt
-> @@ -0,0 +1,60 @@
-> +Interconnect Provider Device Tree Bindings
-> +=========================================
+> diff --git a/arch/arm64/boot/dts/qcom/sdm845.dtsi b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> index b72bdb0a31a5..856d33604e9c 100644
+> --- a/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/sdm845.dtsi
+> @@ -1324,6 +1324,11 @@
+>                                 compatible = "qcom,sdm845-rpmh-clk";
+>                                 #clock-cells = <1>;
+>                         };
 > +
-> +The purpose of this document is to define a common set of generic interconnect
-> +providers/consumers properties.
-> +
-> +
-> += interconnect providers =
-> +
-> +The interconnect provider binding is intended to represent the interconnect
-> +controllers in the system. Each provider registers a set of interconnect
-> +nodes, which expose the interconnect related capabilities of the interconnect
-> +to consumer drivers. These capabilities can be throughput, latency, priority
-> +etc. The consumer drivers set constraints on interconnect path (or endpoints)
-> +depending on the use case. Interconnect providers can also be interconnect
-> +consumers, such as in the case where two network-on-chip fabrics interface
-> +directly.
-> +
-> +Required properties:
-> +- compatible : contains the interconnect provider compatible string
-> +- #interconnect-cells : number of cells in a interconnect specifier needed to
-> +                       encode the interconnect node id
-> +
-> +Example:
-> +
-> +               snoc: interconnect@580000 {
-> +                       compatible = "qcom,msm8916-snoc";
-> +                       #interconnect-cells = <1>;
-> +                       reg = <0x580000 0x14000>;
-> +                       clock-names = "bus_clk", "bus_a_clk";
-> +                       clocks = <&rpmcc RPM_SMD_SNOC_CLK>,
-> +                                <&rpmcc RPM_SMD_SNOC_A_CLK>;
-> +               };
-> +
-> +
-> += interconnect consumers =
-> +
-> +The interconnect consumers are device nodes which dynamically express their
-> +bandwidth requirements along interconnect paths they are connected to. There
-> +can be multiple interconnect providers on a SoC and the consumer may consume
-> +multiple paths from different providers depending on use case and the
-> +components it has to interact with.
-> +
-> +Required properties:
-> +interconnects : Pairs of phandles and interconnect provider specifier to denote
-> +               the edge source and destination ports of the interconnect path.
-> +
-> +Optional properties:
-> +interconnect-names : List of interconnect path name strings sorted in the same
-> +                    order as the interconnects property. Consumers drivers will use
-> +                    interconnect-names to match interconnect paths with interconnect
-> +                    specifier pairs.
-> +
-> +Example:
-> +
-> +       sdhci@7864000 {
-> +               ...
-> +               interconnects = <&pnoc MASTER_SDCC_1 &bimc SLAVE_EBI_CH0>;
-> +               interconnect-names = "sdhc-ddr";
-> +       };
+> +                       qnoc: qnoc {
+> +                               compatible = "qcom,sdm845-rsc-hlos";
+> +                               #interconnect-cells = <1>;
+> +                       };
 
-Reviewed-by: Evan Green <evgreen@chromium.org>
+Should we alphabetize this node above rpmhcc?
+
+>                 };
+>
+>                 intc: interrupt-controller@17a00000 {
 
 _______________________________________________
 linux-arm-kernel mailing list
