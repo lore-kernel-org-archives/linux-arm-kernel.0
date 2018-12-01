@@ -2,83 +2,113 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 23745C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 10:09:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BACE6C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 10:52:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E30312081D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 10:09:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 80C812081D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 10:52:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C6DOffmA";
-	dkim=fail reason="signature verification failed" (4096-bit key) header.d=lemmela.net header.i=@lemmela.net header.b="HdwFqe9z"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E30312081D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lemmela.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="nz4N6nvs";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="bW8IYoPq"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 80C812081D
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=kO7O1dKXWTfWeZwEL6SwMjhQ9otszi4fAtEOYGXobPA=; b=C6DOffmAuyo8qhmZVxwXsEfhEb
-	aqm9LIWxSVnkEID4Gicw8V30I7LTOY9bQJLA+hz5kCSka5LKWV+MyjX0aKzdCOtunALQ6K0AZVkb4
-	TtN3Ftl8m5WECG0yP1hjK3EjOdAoM0xsWx2aMmd6GkKdCHO7E6gEEliNMq0gK9bIrTVgY+z7jMTXH
-	jCYGcq/CJ7uKwBXELsKBVKs6VlvW9XLARxrL8kTANZT8e68Gv9jwGPOhT/m+wld6a1/wdfgSC8pir
-	sddxMmeGsQvsQRVHAb5XO9GzJgoSm+5FSKFwy4/dROkGWdIx91Vae0CTUDTCYvKK0NAGO+0tysrNX
-	mrXHiflA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=/J8eUGguUIr6Rc+3aIZGjwktaPX/sq8fCc+hNLLERFA=; b=nz4N6nvstnSIKV
+	p67Wv5qL1rXO0aUSuxkRwCjFDB5TiQnBJpjpAtlfm8tkaAzWq5mjxo8b3vrErfN3anXq9wb4yqZw6
+	woOArJqnqPDK0A9a/FthBwFXn+qISYh1N4dDpJWL9UxaVhL4YNlNorgka8ULL5wDu8nBW4BdsH9jw
+	Iv7bu2rdja9E5V+AQlgyGqpUMxQeuCQC36aF9lGhPUNtGhgl5k05vIUT4WCIE/H6fOH7iBeifcuRR
+	f6DCiFnm/ADvZPjrDNtlWv8Qt2RFzm4TfN71fBzUUXUFseewt0X10NsjxDVvPdleVqyh19x2cXknQ
+	8Cder1exXx2KFmJfA85g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gT2Db-0004fC-F9; Sat, 01 Dec 2018 10:09:47 +0000
-Received: from mail1.kuutio.org ([2001:41d0:401:3100::431a])
+	id 1gT2sw-0002Kt-3d; Sat, 01 Dec 2018 10:52:30 +0000
+Received: from mail-am5eur03on062e.outbound.protection.outlook.com
+ ([2a01:111:f400:fe08::62e]
+ helo=EUR03-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gT2DB-0004Bt-22; Sat, 01 Dec 2018 10:09:23 +0000
-Received: from localhost (localhost [127.0.0.1])
- by mail1.kuutio.org (Postfix) with ESMTP id 68A621F99C;
- Sat,  1 Dec 2018 11:09:06 +0100 (CET)
-Authentication-Results: mail1.kuutio.org (amavisd-new);
- dkim=pass (4096-bit key) reason="pass (just generated, assumed good)"
- header.d=lemmela.net
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=lemmela.net; h=
- references:in-reply-to:x-mailer:message-id:date:date:subject
- :subject:from:from:received:received; s=dkim; t=1543658944; x=
- 1546250945; bh=Zd/AWxIfbWdt/qWvfiCuUYpYVi3/kqdU2pohdc2Cix4=; b=H
- dwFqe9z7LbbDSVYpvN61g8vY6l8sfAIY1b9NI64Ub/19+FkVmyrSb96pxjWcccJb
- eYuYVK9H8VopRqBM2vAjp3i3qfiiCGKDzlIcJohBHQ3dD/hfZ3vG7EPaxKGoRODZ
- iILKhPq+7cNSUqqG4kvTnkvDHJI/uKeBl2Smjp/iWzF9ITSb/2/PNGC0qGzecXFR
- L6VEr6VomNKzfhMFVvfKLx56Bor1Nv4JefVcAlU+vCVTr3FeKkeyv7Yeh77lKy0p
- HCUIVEBcFVOu9Eas4l0OH1tbsWN85ADZCTYNLmJyZ1lPDWWMg1zZxue99OZdZ5vg
- Mx9l+cRh52OpNghDtOFnxSAX+Nr/4ikeRJiNG5X4UjLDFIxtV5CRd7kyJWR3Q/Cv
- WXxZpYm9ZgFCDp/O/GIQ7zP2LHHEu6Xh51fnn4WnyYqLCehRD7f0/7HxwHUXsCBt
- +SJ167dgJWLhoGGCfQu3CEaBKOyuuLiU557qDqQestl18ifM5ltc66mg7KUVcJ3A
- kzFqtDpgTxT4cGz6TUJm7/ROj61lcbgqPnjnLWzFQiHGafxk4vP51F0B77xwVI1w
- 8X8O1ekjrLEVkzv1h6giAuXgeFzCUj5tpzlmfKIHCm5FVwYKU3tvbAcjZoM75zZ2
- rE0M0Zucqdxjjmv8jHaXDCRdosUJJ0AsS4rAMQYiNI=
-X-Virus-Scanned: amavisd-new at kuutio.org
-Received: from mail1.kuutio.org ([127.0.0.1])
- by localhost (mail1.kuutio.org [127.0.0.1]) (amavisd-new, port 10024)
- with LMTP id HN7-eesPge4d; Sat,  1 Dec 2018 11:09:04 +0100 (CET)
-Received: from build.kuutio.org (unknown [IPv6:2001:998:13:e4::69])
- by mail1.kuutio.org (Postfix) with ESMTPSA id 2F3911F955;
- Sat,  1 Dec 2018 11:09:04 +0100 (CET)
-From: Oskari Lemmela <oskari@lemmela.net>
-To: Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
- Heiko Stuebner <heiko@sntech.de>
-Subject: [PATCH 1/2] arm64: dts: rockchip: rockpro64 fix regulator gpios
-Date: Sat,  1 Dec 2018 12:08:16 +0200
-Message-Id: <20181201100817.20688-2-oskari@lemmela.net>
-X-Mailer: git-send-email 2.17.1
-In-Reply-To: <20181201100817.20688-1-oskari@lemmela.net>
-References: <20181201100817.20688-1-oskari@lemmela.net>
+ id 1gT2ss-0002Jt-7I
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 10:52:28 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=yhGepzEr5W0YkU5Ih5k1tb3XICCxH+dbv015txoDE9s=;
+ b=bW8IYoPq1Yb3CYafW3E86fCk613YIJWfuCPc7WRlj7QkLH5cHp/V12QH/+EAXM2HBqvlRTHuT5byc8H61i1E+4/KY1ERNJ593jynADD4ePND7QbHaEj2Ihc/62b1kGvbA97un66hGO5zVWkHoI+ZfVqbT491mSa0ip/fm8KoE/Y=
+Received: from AM6PR0402MB3654.eurprd04.prod.outlook.com (52.133.28.145) by
+ AM6PR0402MB3622.eurprd04.prod.outlook.com (52.133.20.23) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1361.20; Sat, 1 Dec 2018 10:52:09 +0000
+Received: from AM6PR0402MB3654.eurprd04.prod.outlook.com
+ ([fe80::c46b:915c:7a03:123d]) by AM6PR0402MB3654.eurprd04.prod.outlook.com
+ ([fe80::c46b:915c:7a03:123d%3]) with mapi id 15.20.1339.036; Sat, 1 Dec 2018
+ 10:52:09 +0000
+From: Abel Vesa <abel.vesa@nxp.com>
+To: Sascha Hauer <kernel@pengutronix.de>, Lucas Stach
+ <l.stach@pengutronix.de>, Aisheng DONG <aisheng.dong@nxp.com>, Stephen Boyd
+ <sboyd@kernel.org>
+Subject: [PATCH v15 0/5] Add i.MX8MQ clock driver
+Thread-Topic: [PATCH v15 0/5] Add i.MX8MQ clock driver
+Thread-Index: AQHUiWPogHN0ujLDD0W0yi6RhMS+ow==
+Date: Sat, 1 Dec 2018 10:52:09 +0000
+Message-ID: <1543661502-18573-1-git-send-email-abel.vesa@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-clientproxiedby: AM6PR0402CA0017.eurprd04.prod.outlook.com
+ (2603:10a6:209::30) To AM6PR0402MB3654.eurprd04.prod.outlook.com
+ (2603:10a6:209:19::17)
+x-originating-ip: [95.76.156.53]
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=abel.vesa@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM6PR0402MB3622;
+ 6:DUNCsAPeDs86IeGRIxKXPzA2nIUgtLR8J7SkKgYGMyZ8+Qo5bu1dty3TzWlKwu/q/xpXC6pr2kENysM2sEhF/vY92N09UygTl1iUTPwGQg32lhTLXpcHnQzOE8JRafNUDEgCi3FWovg9+8hE98jOq7s8prN0hlzobXq4l6S6z3ljntJF/cpzlNdx1XHH4pfvfpzJ9Hz3f2XTjbha9GH7csi7MonkY9g9X88G9x4BKf+7FFBLUFqVhP8h/+rnyKi0Z39qX917BjGQ8wi2wPoWmbFRjuGOm2BNsi9GXwVnyiky80ICMNrZhqdSxKu57zk1zJ9VH4pERoRBQl10K400QXPmUj4RT/GSv2Tt43qtH3BDK9c9LzjCYyrhhfnznKrvf9Zigky2aYShBTSkz78eavLMy8jnmXgGbiMsFzmJDEYowdvPH/dI9gx6HeRy6GzMHVResHX1Dy7i+5R/1l/+gQ==;
+ 5:/qJIzbhDiIVZgIbAKHaZYKo/K5f9E3zigWmgdfEqIkl/61hC1cAZki6KEwBCEj3ohumukX2MvGWV8VIxN1B+jWtBlNNI9+Uxj7VuJ/aArN5JYphuUz3/s3RpJ9hvz+YpCreiMxjXczkR5BirxK3FnCEMKj84/gVR4u+z3d3abLc=;
+ 7:6LmjMobH8g6wcQjDwcdV7Mm2PkAxqTClcvxqMDQ+IUqkYdXB9r5S2oMiBT0tWazizyq/25YapP3xXTzilwoQkrvtV0CatlcB9y/3xgKCmbZv/ZzZBPr8YxV0JhE/+svOCE7WmORsoNypOvjY0ln7qA==
+x-ms-office365-filtering-correlation-id: b5bd2c18-908b-4874-203c-08d6577b0a63
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:AM6PR0402MB3622; 
+x-ms-traffictypediagnostic: AM6PR0402MB3622:
+x-microsoft-antispam-prvs: <AM6PR0402MB36224D356E1B52974FBA9CA7F6AC0@AM6PR0402MB3622.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(3231454)(999002)(944501410)(52105112)(93006095)(93001095)(10201501046)(3002001)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(20161123562045)(20161123558120)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(201708071742011)(7699051)(76991095);
+ SRVR:AM6PR0402MB3622; BCL:0; PCL:0; RULEID:; SRVR:AM6PR0402MB3622; 
+x-forefront-prvs: 087396016C
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(366004)(39860400002)(136003)(396003)(346002)(376002)(189003)(199004)(305945005)(53936002)(316002)(52116002)(99286004)(54906003)(3846002)(6116002)(86362001)(6512007)(106356001)(6306002)(110136005)(966005)(81156014)(81166006)(8676002)(2906002)(14454004)(476003)(2616005)(105586002)(256004)(8936002)(478600001)(66066001)(71200400001)(44832011)(486006)(97736004)(6486002)(6436002)(14444005)(26005)(186003)(102836004)(7416002)(5660300001)(71190400001)(4326008)(36756003)(68736007)(7736002)(386003)(6506007)(25786009);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM6PR0402MB3622;
+ H:AM6PR0402MB3654.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: HJ0yQyMWHLVmah5ApABemGTV2gtPqY/4/yziwpJechAVYq+OpE33XqrNwdtL3l5iFY4EmuIg1Jq81Qy0ZT1aNbY0U+nBwhVL+j+2XWILTMwrdmAZ7B30vWI33NgEIUmOMiQKRGSgpASKF0KoUjQSiwE3nEQ9xVkaOlouF0clqLT3bA5xhbR9PoJ67pt8+656ZKrjnwSQdF0FeG8PpGjgDoqEUSkaa+72tdvXMs+y3Redh+9/LcJj3lygCg+ma9hRPXQdAtcEuVM/gAr/mgsL2KdyEpnQMI/DrPrL0DZYDrpzNfcNczToRWytKmAj5vzwM+PcoKhTFVDItaXeV4BBzsYInQzXV5hW+ufLn750CkQ=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
+MIME-Version: 1.0
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: b5bd2c18-908b-4874-203c-08d6577b0a63
+X-MS-Exchange-CrossTenant-originalarrivaltime: 01 Dec 2018 10:52:09.3085 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM6PR0402MB3622
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_020921_386311_84900BB3 
-X-CRM114-Status: GOOD (  11.90  )
+X-CRM114-CacheID: sfid-20181201_025226_328700_DD19FC56 
+X-CRM114-Status: GOOD (  12.96  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,105 +120,64 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Akash Gajjar <Akash_Gajjar@mentor.com>,
- linux-kernel@vger.kernel.org, linux-rockchip@lists.infradead.org,
- Oskari Lemmela <oskari@lemmela.net>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+Cc: Mark Rutland <mark.rutland@arm.com>, Rob Herring <robh@kernel.org>,
+ Abel Vesa <abel.vesa@nxp.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Michael Turquette <mturquette@baylibre.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Abel Vesa <abelvesa@linux.com>, dl-linux-imx <linux-imx@nxp.com>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
+ "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rockpro64 is not able boot if GPIO1_C1 pin is pulled high
-before loading linux kernel.
+Unfortunately, there was a problem with some divisions by 64-bit values
+in the Fractional PLL which led to a link failuire on arm32.
+That has been fixed now without any kind of functionality changes.
 
-In rockpro64 GPIO1_C1 pin is connected vdd_cpu_b regulator
-VSEL pin. Pin should be pulled down in normal operation and
-pulled high in suspend.
+Though the v14 has made it to clk-next, due to the arm32 build failure,
+this patch series had to be dropped until the failure gets fixed.
 
-PMIC LDO_REG2 is connected to touch panel connector.
-Rename regulator and set it to correct voltage.
+Stephen, please take this in one more time and sorry for all the trouble
+caused by this series. Thanks for all the support.
 
-PCIe power is controller by GPIO1_D0.
+Here is a link to the 14th version:
 
-Schematics can be downloaded from:
-http://files.pine64.org/doc/rockpro64/rockpro64_v21-SCH.pdf
+https://lkml.org/lkml/2018/11/29/767
 
-Signed-off-by: Oskari Lemmela <oskari@lemmela.net>
----
- .../boot/dts/rockchip/rk3399-rockpro64.dts    | 20 +++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+Changes since v14:
+ * fixed all the divisions by 64-bit by replacing with do_divs in clk-frac-pll
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts b/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-index 1d35f5406b5e..5bd4d69914bd 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-rockpro64.dts
-@@ -97,7 +97,7 @@
- 	vcc3v3_pcie: vcc3v3-pcie-regulator {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio1 RK_PC1 GPIO_ACTIVE_HIGH>;
-+		gpio = <&gpio1 RK_PD0 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pcie_pwr_en>;
- 		regulator-name = "vcc3v3_pcie";
-@@ -293,12 +293,12 @@
- 				};
- 			};
- 
--			vcc2v8_dvp: LDO_REG2 {
--				regulator-name = "vcc2v8_dvp";
-+			vcc3v0_touch: LDO_REG2 {
-+				regulator-name = "vcc3v0_touch";
- 				regulator-always-on;
- 				regulator-boot-on;
--				regulator-min-microvolt = <2800000>;
--				regulator-max-microvolt = <2800000>;
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3000000>;
- 				regulator-state-mem {
- 					regulator-off-in-suspend;
- 				};
-@@ -397,7 +397,9 @@
- 	vdd_cpu_b: regulator@40 {
- 		compatible = "silergy,syr827";
- 		reg = <0x40>;
--		fcs,suspend-voltage-selector = <0>;
-+		fcs,suspend-voltage-selector = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vsel1_gpio>;
- 		regulator-name = "vdd_cpu_b";
- 		regulator-min-microvolt = <712500>;
- 		regulator-max-microvolt = <1500000>;
-@@ -415,6 +417,8 @@
- 		compatible = "silergy,syr828";
- 		reg = <0x41>;
- 		fcs,suspend-voltage-selector = <1>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&vsel2_gpio>;
- 		regulator-name = "vdd_gpu";
- 		regulator-min-microvolt = <712500>;
- 		regulator-max-microvolt = <1500000>;
-@@ -519,7 +523,7 @@
- 
- 	pcie {
- 		pcie_pwr_en: pcie-pwr-en {
--			rockchip,pins = <1 RK_PC1 RK_FUNC_GPIO &pcfg_pull_none>;
-+			rockchip,pins = <1 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
- 		};
- 	};
- 
-@@ -529,7 +533,7 @@
- 		};
- 
- 		vsel1_gpio: vsel1-gpio {
--			rockchip,pins = <1 RK_PC2 RK_FUNC_GPIO &pcfg_pull_down>;
-+			rockchip,pins = <1 RK_PC1 RK_FUNC_GPIO &pcfg_pull_down>;
- 		};
- 
- 		vsel2_gpio: vsel2-gpio {
+Abel Vesa (2):
+  clk: imx: Add imx composite clock
+  clk: imx: Add clock driver for i.MX8MQ CCM
+
+Lucas Stach (3):
+  dt-bindings: Add binding for i.MX8MQ CCM
+  clk: imx: Add fractional PLL output clock
+  clk: imx: Add SCCG PLL type
+
+ .../devicetree/bindings/clock/imx8mq-clock.txt     |  20 +
+ drivers/clk/imx/Makefile                           |   6 +-
+ drivers/clk/imx/clk-composite-8m.c                 | 178 +++++++
+ drivers/clk/imx/clk-frac-pll.c                     | 232 ++++++++
+ drivers/clk/imx/clk-imx8mq.c                       | 589 +++++++++++++++++++++
+ drivers/clk/imx/clk-sccg-pll.c                     | 256 +++++++++
+ drivers/clk/imx/clk.h                              |  64 +++
+ include/dt-bindings/clock/imx8mq-clock.h           | 395 ++++++++++++++
+ 8 files changed, 1739 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx8mq-clock.txt
+ create mode 100644 drivers/clk/imx/clk-composite-8m.c
+ create mode 100644 drivers/clk/imx/clk-frac-pll.c
+ create mode 100644 drivers/clk/imx/clk-imx8mq.c
+ create mode 100644 drivers/clk/imx/clk-sccg-pll.c
+ create mode 100644 include/dt-bindings/clock/imx8mq-clock.h
+
 -- 
-2.17.1
+2.7.4
 
 
 _______________________________________________
