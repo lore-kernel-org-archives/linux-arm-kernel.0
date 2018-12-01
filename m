@@ -4,19 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C400FC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D5BB7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:46:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 914802145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9D21720867
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:46:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q2K15oEr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="TIZxmPfJ"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 914802145D
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ItavO8d5";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="dlbYqHUn";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="dFLi4bze"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D21720867
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,69 +26,85 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6efMRyU+Q5ZSewErugM97f+/nrliBHw2yy827lhFFJ8=; b=q2K15oErvUY2gP
-	O5ygtCbi89bvvM+Ym4kXOIqwo1ro62JjyGrjt/vXRlenNkKER7zLe0oddi/FJdBDLSO5AT/AGIysn
-	0Lr58JysL8/MqG9ce8zqeG5JZU0BUOfu64IMDUUxrmRpop1M3HFn/qXZ62v8yQBQ507JkG+IjkpbI
-	7qIlAT5eTSGvqKK4m3aUYs27ufgdPFFeU/5A10H+JiNw/bDOk32mB7UaVfmfnszkt0G8i+SABqDiP
-	+bYEc8weStjxIFnUxY9koc5xsUhNMEOhxoHNOCxKSuGpvTuAu5cRxTh0DkG/+XsQeCbv2Wg7yP/mi
-	hQDlntPdurnZI4R0BEww==;
+	List-Owner; bh=o0R4RjxXiHYn8yqFVgbnd5PQ8qzUdnskQV7NJQLG8S0=; b=ItavO8d5zlIyZ9
+	LVOiCh+7F9pFkAgd6GMf5gFRaAngYZ5Zw9/AG59rFq9dGTFJ1HeRRS6FL0l/dVvsX78IqEOkrpOPb
+	B8JrfsX3x6W9MS6JoWjg12X4kbQdAQJrIaHMIIJalOeKRa/q/r0FqzvrGbduZQYAadFbkRzN1kO1J
+	pwWFdrRYZV3AADrSQWA172jElKtLQi2fhoFSxigM+8MAypGv7nrb5nRHJ9HEBP8gX6V1lFYmlRMIZ
+	ny0WBqGAkUVPXr66ABsBsSKA2C/Mivfw5X1IbtAyMN0DDTbiHxKUThJWqs0dISBDdAVCVfaVrZCLB
+	SshjNjHTgM9fajP236Hg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gStPe-0000Sh-Jg; Sat, 01 Dec 2018 00:45:38 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gStQI-0000oV-OW; Sat, 01 Dec 2018 00:46:18 +0000
+Received: from casper.infradead.org ([85.118.1.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gStPK-00082G-9B
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:45:22 +0000
-Received: by mail-lf1-x142.google.com with SMTP id p6so5384997lfc.1
+ id 1gStPr-0000hb-Nr
+ for linux-arm-kernel@bombadil.infradead.org; Sat, 01 Dec 2018 00:45:51 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=Content-Type:Cc:To:Subject:Message-ID:
+ Date:From:In-Reply-To:References:MIME-Version:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=4itWQf5jcI2FQ6LzytrCcTth3VN6lWlS/82esdeH/kQ=; b=dlbYqHUntDaDcX9USDl+MP2Et
+ nTDDsQLumCafayEkDXgXH9iVojNTbzAGOb60uvZwd5cBKZSnmUqDrl7JugmjhmfiFBJDQ8TtWCWUr
+ p60FbAM1Jg27dNjyD9ZKHbR3A1enbQ1hSV7Y9Yl9+vwq6A97KgiFgb2G7uipvEOrc/K01p5Naskhk
+ 08VnMG1AyeFJWScXD92ivuZXxhvrPeX6jyGHiysH+K4eY6tKwnXEc+yG47t2848BaYfqp99wTWTs6
+ 9zdlYwTjHsnnrCP5k0TADaa2jVxmtu8OV2lpuYbw3FOTvALa4tDvxH09RBDqMLyeHQlx5LXSoRFy+
+ 34VIiwHIw==;
+Received: from mail-lf1-x143.google.com ([2a00:1450:4864:20::143])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gStPm-0003h5-RP
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:45:49 +0000
+Received: by mail-lf1-x143.google.com with SMTP id e26so5397024lfc.2
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:45:08 -0800 (PST)
+ Fri, 30 Nov 2018 16:45:35 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=mhmAcOfQHba7jsByZTi1TgDT9pcdTkIHC+NZgrhuRHg=;
- b=TIZxmPfJFbaNypWYoxkmT7u0IVQMKTmwtE7J+QMhCk/Z+8baz4+ZF51fWhiwYwp5mf
- 2QxIOGE3EmUWTZxW8NXE3rek2uH5buBY2CNYhAzhOBit4GItPdfAM0NmB+LDyV7olbrM
- aWaLNAeZrx3dGsUR2SxQoc1Zgj7L+hdF+6RmI=
+ :cc; bh=4itWQf5jcI2FQ6LzytrCcTth3VN6lWlS/82esdeH/kQ=;
+ b=dFLi4bzeryMDW2gozr3dybSManbBPby/R8Xs5/eOZQYc2Cv8nR4iiJ0FXvt0VziayG
+ kmvbL8LGQIqXhHGp5YyVGT052OyKkq5jaD/54cjei8abpglAUGiLp8OYjqoEz33xXrGY
+ Jx+b13vDUbDLYj6XVtYpYlrMJTHueh6d+jGx4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=mhmAcOfQHba7jsByZTi1TgDT9pcdTkIHC+NZgrhuRHg=;
- b=TbEbUotk9Eqb1MFD87FwSkv8j1qrJMl7uvfpBIxyj3XFmcPrXnfxsMSL/Z2yfnLjW9
- o9P+kK9GekY7NsyDP6pXw9rowsbtu3xCv4IV+dKc7N7vUd0+zZ3q7wM8W6KvukoWxKmH
- y+0Ld+gE2/wDkCIGnf5SesWiIcRiYHjNr5wLid4aEeIyI7S+dEkGCHzBtcrUM9yhDc7S
- W0hiSoeW7vUeYZPL2GS4OBRv6gnWVcyUV0uPdoRfKxgBtm6ytCCZPuQ1fIFL6Dy+k9II
- NTequEPbP3EETcD59Ke+Gm1gDhC6S+k96jQnQeXkOUkzy8dA33QFvQCt+ZdwQ3oV8M/a
- ym0Q==
-X-Gm-Message-State: AA+aEWZofsem9lOWw7M9uPpmF9996WY+AP8LDJoH/KjT9qxIXGqDBd9d
- VSV7rTmcvwiocy5mTzXMWWtPLkGt07I=
-X-Google-Smtp-Source: AFSGD/XGck5rdMNwCIAdwL3IPcgG5A06K4gcfVOP1xO+mgQ8NuVyoZbtD8E2PrWoMJWxIl6IKhphzg==
-X-Received: by 2002:a19:ee08:: with SMTP id g8mr4901864lfb.72.1543625106319;
- Fri, 30 Nov 2018 16:45:06 -0800 (PST)
-Received: from mail-lf1-f45.google.com (mail-lf1-f45.google.com.
- [209.85.167.45])
- by smtp.gmail.com with ESMTPSA id r27-v6sm1070815lja.65.2018.11.30.16.45.06
+ bh=4itWQf5jcI2FQ6LzytrCcTth3VN6lWlS/82esdeH/kQ=;
+ b=jUYAOOPSMRz/PP/4mDP6S9eK8YwG6Rd+DZjUunV4KmDS034f1eO+YR6cHAZ0SVVITF
+ nTr2pj0gBYIpNgxrbjY/7sk03BSeRcCtTQunSo9k9S5Gu4lf3jWzsZFxSMf0LMp4A54X
+ qOIoxdo3r3KNf4LYCboyYsLP+UxVbBVJZBBTsaK/AoNmw2mz/xK92SN0sNPtYge7roQ2
+ W3UyD6GHyhmFlJWv646H56tFXrNwGRoTXG1C2jPSwYsqudocFxZiFzFvNVkT+a1gtAfh
+ J5n83Ho1hIAu5x4UtTEo8hGDI9zXQfxHV8Mc9N3GrarPJ7DGzMyH2qgbm3KnIppF5d3c
+ Eapw==
+X-Gm-Message-State: AA+aEWZzBXM3kfqCltnMsbxhbfot6jzWuSksKo3IXwjAYvM/pV4JLAZp
+ 1UabmFBfZwqPTmhpZdYbkJLOJ9wZfKs=
+X-Google-Smtp-Source: AFSGD/XvMFedZnIC+pliPTDyX7uM4Fb8JPcvIqHkA2NZIChghOy1j+lloS1wjz7ZoKyg4RpCvrEdpQ==
+X-Received: by 2002:a19:2b54:: with SMTP id r81mr5053319lfr.34.1543625134089; 
+ Fri, 30 Nov 2018 16:45:34 -0800 (PST)
+Received: from mail-lj1-f177.google.com (mail-lj1-f177.google.com.
+ [209.85.208.177])
+ by smtp.gmail.com with ESMTPSA id m1sm1076692lfb.56.2018.11.30.16.45.33
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 30 Nov 2018 16:45:06 -0800 (PST)
-Received: by mail-lf1-f45.google.com with SMTP id u18so5358573lff.10
+ Fri, 30 Nov 2018 16:45:33 -0800 (PST)
+Received: by mail-lj1-f177.google.com with SMTP id u6-v6so6559040ljd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:45:06 -0800 (PST)
-X-Received: by 2002:a19:1bca:: with SMTP id b193mr4641734lfb.153.1543624776451; 
- Fri, 30 Nov 2018 16:39:36 -0800 (PST)
+ Fri, 30 Nov 2018 16:45:33 -0800 (PST)
+X-Received: by 2002:a2e:880a:: with SMTP id
+ x10-v6mr5547506ljh.174.1543624729442; 
+ Fri, 30 Nov 2018 16:38:49 -0800 (PST)
 MIME-Version: 1.0
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-6-georgi.djakov@linaro.org>
-In-Reply-To: <20181127180349.29997-6-georgi.djakov@linaro.org>
+ <20181127180349.29997-2-georgi.djakov@linaro.org>
+In-Reply-To: <20181127180349.29997-2-georgi.djakov@linaro.org>
 From: Evan Green <evgreen@chromium.org>
-Date: Fri, 30 Nov 2018 16:39:00 -0800
-X-Gmail-Original-Message-ID: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
-Message-ID: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
-Subject: Re: [PATCH v10 5/7] interconnect: qcom: Add sdm845 interconnect
- provider driver
+Date: Fri, 30 Nov 2018 16:38:12 -0800
+X-Gmail-Original-Message-ID: <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
+Message-ID: <CAE=gft5jWZgzRTNB4m0ES+g=rpjACYWVissmEQ+pgPGKEffgog@mail.gmail.com>
+Subject: Re: [PATCH v10 1/7] interconnect: Add generic on-chip interconnect API
 To: georgi.djakov@linaro.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_164519_076559_06683E86 
-X-CRM114-Status: GOOD (  21.16  )
+X-CRM114-CacheID: sfid-20181201_004547_084025_B7A6A63D 
+X-CRM114-Status: GOOD (  43.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,120 +133,471 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
+On Tue, Nov 27, 2018 at 10:03 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> From: David Dai <daidavid1@codeaurora.org>
+> This patch introduces a new API to get requirements and configure the
+> interconnect buses across the entire chipset to fit with the current
+> demand.
 >
-> Introduce Qualcomm SDM845 specific provider driver using the
-> interconnect framework.
+> The API is using a consumer/provider-based model, where the providers are
+> the interconnect buses and the consumers could be various drivers.
+> The consumers request interconnect resources (path) between endpoints and
+> set the desired constraints on this data flow path. The providers receive
+> requests from consumers and aggregate these requests for all master-slave
+> pairs on that path. Then the providers configure each participating in the
+> topology node according to the requested data flow path, physical links and
+
+Strange word ordering. Consider something like: "Then the providers
+configure each node participating in the topology"
+
+...Or a slightly different flavor: "Then the providers configure each
+node along the path to support a bandwidth that satisfies all
+bandwidth requests that cross through that node".
+
+> constraints. The topology could be complicated and multi-tiered and is SoC
+> specific.
 >
-> Signed-off-by: David Dai <daidavid1@codeaurora.org>
 > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
+> Reviewed-by: Evan Green <evgreen@chromium.org>
+
+This already has my reviewed by, and I still stand by it, but I
+couldn't help finding some nits anyway. Sorry :)
+
 > ---
->  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
->  drivers/interconnect/Kconfig                  |   5 +
->  drivers/interconnect/Makefile                 |   1 +
->  drivers/interconnect/qcom/Kconfig             |  13 +
->  drivers/interconnect/qcom/Makefile            |   5 +
->  drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
->  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
->  7 files changed, 1027 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
->  create mode 100644 drivers/interconnect/qcom/Kconfig
->  create mode 100644 drivers/interconnect/qcom/Makefile
->  create mode 100644 drivers/interconnect/qcom/sdm845.c
->  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
+>  Documentation/interconnect/interconnect.rst |  94 ++++
+>  drivers/Kconfig                             |   2 +
+>  drivers/Makefile                            |   1 +
+>  drivers/interconnect/Kconfig                |  10 +
+>  drivers/interconnect/Makefile               |   5 +
+>  drivers/interconnect/core.c                 | 569 ++++++++++++++++++++
+>  include/linux/interconnect-provider.h       | 125 +++++
+>  include/linux/interconnect.h                |  51 ++
+>  8 files changed, 857 insertions(+)
+>  create mode 100644 Documentation/interconnect/interconnect.rst
+>  create mode 100644 drivers/interconnect/Kconfig
+>  create mode 100644 drivers/interconnect/Makefile
+>  create mode 100644 drivers/interconnect/core.c
+>  create mode 100644 include/linux/interconnect-provider.h
+>  create mode 100644 include/linux/interconnect.h
 >
-> diff --git a/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+...
+> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
 > new file mode 100644
-> index 000000000000..d45150e99665
+> index 000000000000..3ae8e5a58969
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
-> @@ -0,0 +1,24 @@
-> +Qualcomm SDM845 Network-On-Chip interconnect driver binding
-> +-----------------------------------------------------------
+> +++ b/drivers/interconnect/core.c
+> @@ -0,0 +1,569 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Interconnect framework core driver
+> + *
+> + * Copyright (c) 2018, Linaro Ltd.
+> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+> + */
 > +
-> +SDM845 interconnect providers support system bandwidth requirements through
-> +RPMh hardware accelerators known as Bus Clock Manager(BCM). The provider is able
-> +to communicate with the BCM through the Resource State Coordinator(RSC)
-> +associated with each execution environment. Provider nodes must reside within
-> +an RPMh device node pertaining to their RSC and each provider maps to
-> +a single RPMh resource.
+> +#include <linux/device.h>
+> +#include <linux/idr.h>
+> +#include <linux/init.h>
+> +#include <linux/interconnect.h>
+> +#include <linux/interconnect-provider.h>
+> +#include <linux/list.h>
+> +#include <linux/module.h>
+> +#include <linux/mutex.h>
+> +#include <linux/slab.h>
+> +#include <linux/overflow.h>
 > +
-> +Required properties :
-> +- compatible : shall contain only one of the following:
-> +                       "qcom,sdm845-rsc-hlos"
-
-I wonder if maybe hlos isn't necessary. Unless you somehow imagine
-secure mode would have a device tree entry in here as well? Probably
-not.
-
-> +- #interconnect-cells : should contain 1
+> +static DEFINE_IDR(icc_idr);
+> +static LIST_HEAD(icc_providers);
+> +static DEFINE_MUTEX(icc_lock);
 > +
-> +Examples:
-> +
-> +apps_rsc: rsc {
-> +               qnoc: qnoc-rsc-hlos {
-> +                       compatible = "qcom,sdm845-rsc-hlos";
-> +                       #interconnect-cells = <1>;
-> +               };
+> +/**
+> + * struct icc_req - constraints that are attached to each node
+> + * @req_node: entry in list of requests for the particular @node
+> + * @node: the interconnect node to which this constraint applies
+> + * @dev: reference to the device that sets the constraints
+> + * @avg_bw: an integer describing the average bandwidth in kBps
+> + * @peak_bw: an integer describing the peak bandwidth in kBps
+> + */
+> +struct icc_req {
+> +       struct hlist_node req_node;
+> +       struct icc_node *node;
+> +       struct device *dev;
+> +       u32 avg_bw;
+> +       u32 peak_bw;
 > +};
 > +
-...
-> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
-> new file mode 100644
-> index 000000000000..1678de91ca52
-> --- /dev/null
-> +++ b/drivers/interconnect/qcom/sdm845.c
-> @@ -0,0 +1,836 @@
-...
+> +/**
+> + * struct icc_path - interconnect path structure
+> + * @num_nodes: number of hops (nodes)
+> + * @reqs: array of the requests applicable to this path of nodes
+> + */
+> +struct icc_path {
+> +       size_t num_nodes;
+> +       struct icc_req reqs[];
+> +};
 > +
-> +static void tcs_list_gen(struct list_head *bcm_list,
-> +                        struct tcs_cmd *tcs_list, int *n)
-
-We could make the prototype of this function be:
-
-static void tcs_list_gen(struct list_head *bcm_list,
-        struct tcs_cmd tcs_list[SDM845_MAX_VCD], int n[SDM845_MAX_VCD])
-
-which would catch errors if somebody later passed in an array that
-wasn't the right size, since we blindly memset below.
-
+> +static struct icc_node *node_find(const int id)
 > +{
-> +       struct qcom_icc_bcm *bcm;
-> +       bool commit;
-> +       size_t idx = 0, batch = 0, cur_vcd_size = 0;
-> +
-> +       memset(n, 0, sizeof(int) * SDM845_MAX_VCD);
-> +
-> +       list_for_each_entry(bcm, bcm_list, list) {
-> +               commit = false;
-> +               cur_vcd_size++;
-> +               if ((list_is_last(&bcm->list, bcm_list)) ||
-> +                   bcm->aux_data.vcd != list_next_entry(bcm, list)->aux_data.vcd) {
-> +                       commit = true;
-> +                       cur_vcd_size = 0;
-> +               }
-> +               tcs_cmd_gen(&tcs_list[idx], bcm->vote_x, bcm->vote_y,
-> +                           bcm->addr, commit);
-> +               idx++;
-> +               n[batch]++;
-> +               /*
-> +                * Batch the BCMs in such a way that we do not split them in
-> +                * multiple payloads when they are under the same VCD. This is
-> +                * to ensure that every BCM is committed since we only set the
-> +                * commit bit on the last BCM request of every VCD.
-> +                */
-> +               if (n[batch] >= MAX_RPMH_PAYLOAD) {
-> +                       if (!commit) {
-> +                               n[batch] -= cur_vcd_size;
-> +                               n[batch + 1] = cur_vcd_size;
-> +                       }
-> +                       batch++;
-> +               }
-> +       }
+> +       return idr_find(&icc_idr, id);
 > +}
 > +
+> +static struct icc_path *path_init(struct device *dev, struct icc_node *dst,
+> +                                 ssize_t num_nodes)
+> +{
+> +       struct icc_node *node = dst;
+> +       struct icc_path *path;
+> +       int i;
+> +
+> +       path = kzalloc(struct_size(path, reqs, num_nodes), GFP_KERNEL);
+> +       if (!path)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       path->num_nodes = num_nodes;
+> +
+> +       for (i = num_nodes - 1; i >= 0; i--) {
+> +               node->provider->users++;
+> +               hlist_add_head(&path->reqs[i].req_node, &node->req_list);
+> +               path->reqs[i].node = node;
+> +               path->reqs[i].dev = dev;
+> +               /* reference to previous node was saved during path traversal */
+> +               node = node->reverse;
+> +       }
+> +
+> +       return path;
+> +}
+> +
+> +static struct icc_path *path_find(struct device *dev, struct icc_node *src,
+> +                                 struct icc_node *dst)
+> +{
+> +       struct icc_path *path = ERR_PTR(-EPROBE_DEFER);
+> +       struct icc_node *n, *node = NULL;
+> +       struct list_head traverse_list;
+> +       struct list_head edge_list;
+> +       struct list_head visited_list;
+> +       size_t i, depth = 1;
+> +       bool found = false;
+> +
+> +       INIT_LIST_HEAD(&traverse_list);
+> +       INIT_LIST_HEAD(&edge_list);
+> +       INIT_LIST_HEAD(&visited_list);
+> +
+> +       list_add(&src->search_list, &traverse_list);
+> +       src->reverse = NULL;
+> +
+> +       do {
+> +               list_for_each_entry_safe(node, n, &traverse_list, search_list) {
+> +                       if (node == dst) {
+> +                               found = true;
+> +                               list_splice_init(&edge_list, &visited_list);
+> +                               list_splice_init(&traverse_list, &visited_list);
+> +                               break;
+> +                       }
+> +                       for (i = 0; i < node->num_links; i++) {
+> +                               struct icc_node *tmp = node->links[i];
+> +
+> +                               if (!tmp) {
+> +                                       path = ERR_PTR(-ENOENT);
+> +                                       goto out;
+> +                               }
+> +
+> +                               if (tmp->is_traversed)
+> +                                       continue;
+> +
+> +                               tmp->is_traversed = true;
+> +                               tmp->reverse = node;
+> +                               list_add_tail(&tmp->search_list, &edge_list);
+> +                       }
+> +               }
+> +
+> +               if (found)
+> +                       break;
+> +
+> +               list_splice_init(&traverse_list, &visited_list);
+> +               list_splice_init(&edge_list, &traverse_list);
+> +
+> +               /* count the hops including the source */
+> +               depth++;
+> +
+> +       } while (!list_empty(&traverse_list));
+> +
+> +out:
+> +
+> +       /* reset the traversed state */
+> +       list_for_each_entry_reverse(n, &visited_list, search_list)
+> +               n->is_traversed = false;
+> +
+> +       if (found)
+> +               path = path_init(dev, dst, depth);
+> +
+> +       return path;
+> +}
+> +
+> +/*
+> + * We want the path to honor all bandwidth requests, so the average and peak
+> + * bandwidth requirements from each consumer are aggregated at each node.
+> + * The aggregation is platform specific, so each platform can customize it by
+> + * implementing it's own aggregate() function.
+
+Grammar police: remove the apostrophe in its.
+
+> + */
+> +
+> +static int aggregate_requests(struct icc_node *node)
+> +{
+> +       struct icc_provider *p = node->provider;
+> +       struct icc_req *r;
+> +
+> +       node->avg_bw = 0;
+> +       node->peak_bw = 0;
+> +
+> +       hlist_for_each_entry(r, &node->req_list, req_node)
+> +               p->aggregate(node, r->avg_bw, r->peak_bw,
+> +                            &node->avg_bw, &node->peak_bw);
+> +
+> +       return 0;
+> +}
+> +
+> +static int apply_constraints(struct icc_path *path)
+> +{
+> +       struct icc_node *next, *prev = NULL;
+> +       int ret = -EINVAL;
+> +       int i;
+> +
+> +       for (i = 0; i < path->num_nodes; i++, prev = next) {
+> +               struct icc_provider *p;
+> +
+> +               next = path->reqs[i].node;
+> +               /*
+> +                * Both endpoints should be valid master-slave pairs of the
+> +                * same interconnect provider that will be configured.
+> +                */
+> +               if (!prev || next->provider != prev->provider)
+> +                       continue;
+
+I wonder if we should explicitly ban paths where we bounce through an
+odd number of nodes within one provider. Otherwise, set() won't be
+called on all nodes in the path. Or, if we wanted to support those
+kinds of topologies, you could call set with one of the nodes set to
+NULL to represent either the ingress or egress bandwidth to this NoC.
+This doesn't necessarily need to be addressed in this series, but is
+something that other providers might bump into when implementing their
+topologies.
+
+> +
+> +               p = next->provider;
+> +
+> +               /* set the constraints */
+> +               ret = p->set(prev, next);
+> +               if (ret)
+> +                       goto out;
+> +       }
+> +out:
+> +       return ret;
+> +}
+> +
+...
+> +
+> +/**
+> + * icc_link_destroy() - destroy a link between two nodes
+> + * @src: pointer to source node
+> + * @dst: pointer to destination node
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_link_destroy(struct icc_node *src, struct icc_node *dst)
+> +{
+> +       struct icc_node **new;
+> +       size_t slot;
+> +       int ret = 0;
+> +
+> +       if (IS_ERR_OR_NULL(src))
+> +               return -EINVAL;
+> +
+> +       if (IS_ERR_OR_NULL(dst))
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&icc_lock);
+> +
+> +       for (slot = 0; slot < src->num_links; slot++)
+> +               if (src->links[slot] == dst)
+> +                       break;
+> +
+> +       if (WARN_ON(slot == src->num_links)) {
+> +               ret = -ENXIO;
+> +               goto out;
+> +       }
+> +
+> +       src->links[slot] = src->links[--src->num_links];
+> +
+> +       new = krealloc(src->links,
+> +                      (src->num_links) * sizeof(*src->links),
+
+These parentheses aren't needed.
+
+> +                      GFP_KERNEL);
+> +       if (new)
+> +               src->links = new;
+> +
+> +out:
+> +       mutex_unlock(&icc_lock);
+> +
+> +       return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_link_destroy);
+> +
+> +/**
+> + * icc_node_add() - add interconnect node to interconnect provider
+> + * @node: pointer to the interconnect node
+> + * @provider: pointer to the interconnect provider
+> + */
+> +void icc_node_add(struct icc_node *node, struct icc_provider *provider)
+> +{
+> +       mutex_lock(&icc_lock);
+> +
+> +       node->provider = provider;
+> +       list_add_tail(&node->node_list, &provider->nodes);
+> +
+> +       mutex_unlock(&icc_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(icc_node_add);
+> +
+> +/**
+> + * icc_node_del() - delete interconnect node from interconnect provider
+> + * @node: pointer to the interconnect node
+> + */
+> +void icc_node_del(struct icc_node *node)
+> +{
+> +       mutex_lock(&icc_lock);
+> +
+> +       list_del(&node->node_list);
+> +
+> +       mutex_unlock(&icc_lock);
+> +}
+> +EXPORT_SYMBOL_GPL(icc_node_del);
+> +
+> +/**
+> + * icc_provider_add() - add a new interconnect provider
+> + * @provider: the interconnect provider that will be added into topology
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_provider_add(struct icc_provider *provider)
+> +{
+> +       if (WARN_ON(!provider->set))
+> +               return -EINVAL;
+> +
+> +       mutex_lock(&icc_lock);
+> +
+> +       INIT_LIST_HEAD(&provider->nodes);
+> +       list_add_tail(&provider->provider_list, &icc_providers);
+> +
+> +       mutex_unlock(&icc_lock);
+> +
+> +       dev_dbg(provider->dev, "interconnect provider added to topology\n");
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_provider_add);
+> +
+> +/**
+> + * icc_provider_del() - delete previously added interconnect provider
+> + * @provider: the interconnect provider that will be removed from topology
+> + *
+> + * Return: 0 on success, or an error code otherwise
+> + */
+> +int icc_provider_del(struct icc_provider *provider)
+> +{
+> +       mutex_lock(&icc_lock);
+> +       if (provider->users) {
+> +               pr_warn("interconnect provider still has %d users\n",
+> +                       provider->users);
+> +               mutex_unlock(&icc_lock);
+> +               return -EBUSY;
+> +       }
+> +
+> +       if (!list_empty(&provider->nodes)) {
+> +               pr_warn("interconnect provider still has nodes\n");
+> +               mutex_unlock(&icc_lock);
+> +               return -EBUSY;
+> +       }
+> +
+> +       list_del(&provider->provider_list);
+> +       mutex_unlock(&icc_lock);
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(icc_provider_del);
+> +
+> +MODULE_AUTHOR("Georgi Djakov <georgi.djakov@linaro.org");
+
+This is missing the closing >
+
+> +MODULE_DESCRIPTION("Interconnect Driver Core");
+> +MODULE_LICENSE("GPL v2");
+...
+> diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
+> new file mode 100644
+> index 000000000000..04b2966ded9f
+> --- /dev/null
+> +++ b/include/linux/interconnect.h
+> @@ -0,0 +1,51 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (c) 2018, Linaro Ltd.
+> + * Author: Georgi Djakov <georgi.djakov@linaro.org>
+> + */
+> +
+> +#ifndef __LINUX_INTERCONNECT_H
+> +#define __LINUX_INTERCONNECT_H
+> +
+> +#include <linux/mutex.h>
+> +#include <linux/types.h>
+> +
+> +/* macros for converting to icc units */
+> +#define bps_to_icc(x)  (1)
+> +#define kBps_to_icc(x) (x)
+> +#define MBps_to_icc(x) (x * 1000)
+> +#define GBps_to_icc(x) (x * 1000 * 1000)
+> +#define kbps_to_icc(x) (x / 8 + ((x) % 8 ? 1 : 0))
+> +#define Mbps_to_icc(x) (x * 1000 / 8 )
+
+Remove extra space before )
+
+> +#define Gbps_to_icc(x) (x * 1000 * 1000 / 8)
+> +
+> +struct icc_path;
+> +struct device;
+> +
+> +#if IS_ENABLED(CONFIG_INTERCONNECT)
+> +
+> +struct icc_path *icc_get(struct device *dev, const int src_id,
+> +                        const int dst_id);
+> +void icc_put(struct icc_path *path);
+> +int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
+> +
+> +#else
+> +
+> +static inline struct icc_path *icc_get(struct device *dev, const int src_id,
+> +                                      const int dst_id)
+> +{
+> +       return NULL;
+> +}
+> +
+> +static inline void icc_put(struct icc_path *path)
+> +{
+> +}
+> +
+> +static inline int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw)
+> +{
+> +       return 0;
+
+Should this really succeed?
+
+> +}
+> +
+> +#endif /* CONFIG_INTERCONNECT */
+> +
+> +#endif /* __LINUX_INTERCONNECT_H */
 
 _______________________________________________
 linux-arm-kernel mailing list
