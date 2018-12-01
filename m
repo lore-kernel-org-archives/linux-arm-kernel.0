@@ -2,61 +2,78 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B0F49C64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:23:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BD824C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:39:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6CEEE2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:23:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 985CE2081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:39:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AFKKe64M"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6CEEE2082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=windriver.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PVhl0uhB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 985CE2081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0e1KjWouS9NW21wgVB6TCWKgmEW2kxRqI1ARb3YAZfY=; b=AFKKe64MZUIC6r
-	syDpzBb9VLNYKt9isX5DxBBEEwwe9krrmHqMxud490Jd1aZeLKPiYlh0ju8Yc/hkzMhZLvRTf7Ynz
-	JEDWd2LwZDmzfr3KpXVJ1+X5H5F7nEZm21HeYBbRz8klH91AOLeYPhrBo/hgalsxRULYM3/elZ989
-	pZ2PpDQEpB8OI4mRVT6jO3RP/fYE+gJnvHAFqlh7OsRAyaSlVdvH4AwHv7Ac8/eJQaHfljj3w0ejW
-	+z2DKHqmYmpQvPAMxBsPhArBTXuApsIRRomNY7ZbxjaQY43pg+0GCRSegs2UywvlW8g4MNsGtxm37
-	6LllGutXk61Gpg1NkWTQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=rIroTyVS7g7uwMW0rFTTlQlPsm9BtKyF90uT8lWPc1s=; b=PVhl0uhBFo2Siy
+	XvPGmiveJC2IMnhk62i9leIaXbIxgge7Bawn8ihU+CqICsIQf0aIT3chl9uLlVNQ5JbTXHe1OT+BN
+	mQeUpN+vGIRHiANK0eC+t7OhclBqnWq2dnsq1Yh1Idxde8O+5CtVy+YEZON31PMw5qiaZjRNjBfeI
+	cMcb4ouNaTh78/n4pvK4p6F46VuhFOqfyOuv+Tcd63wl8evJ6RyzfCvxPst/GHuxVQRP/NRmvoYWK
+	2Ezub/39vLUpe2OoaroaSEZozPbniNrTzrFLPLbAmElrPMh1bMrM4y0UVsbcag8DIaAaRO2vRMUAJ
+	ZwCVBYLZ7H+sbl7z14Rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTArH-00024R-4s; Sat, 01 Dec 2018 19:23:19 +0000
-Received: from mail5.windriver.com ([192.103.53.11] helo=mail5.wrs.com)
+	id 1gTB6r-0006uf-Ni; Sat, 01 Dec 2018 19:39:25 +0000
+Received: from mail-qt1-f195.google.com ([209.85.160.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTAr6-0001vX-6P
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 19:23:09 +0000
-Received: from ALA-HCA.corp.ad.wrs.com (ala-hca.corp.ad.wrs.com
- [147.11.189.40])
- by mail5.wrs.com (8.15.2/8.15.2) with ESMTPS id wB1JLVBT005428
- (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
- Sat, 1 Dec 2018 11:21:42 -0800
-Received: from yow-cube1.wrs.com (128.224.56.98) by ALA-HCA.corp.ad.wrs.com
- (147.11.189.40) with Microsoft SMTP Server id 14.3.408.0; Sat, 1 Dec 2018
- 11:21:21 -0800
-From: Paul Gortmaker <paul.gortmaker@windriver.com>
-To: Joerg Roedel <joro@8bytes.org>
-Subject: [PATCH 8/9] iommu/arm-smmu: Make arm-smmu explicitly non-modular
-Date: Sat, 1 Dec 2018 14:19:16 -0500
-Message-ID: <1543691957-17608-9-git-send-email-paul.gortmaker@windriver.com>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1543691957-17608-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1543691957-17608-1-git-send-email-paul.gortmaker@windriver.com>
+ id 1gTB6p-0006tD-0c
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 19:39:24 +0000
+Received: by mail-qt1-f195.google.com with SMTP id z16so9698301qtq.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Sat, 01 Dec 2018 11:39:12 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :organization:content-transfer-encoding;
+ bh=/ajnalSAA6pd9cW5HRXqO/GPHHuYdwVc+EbjogDyZtI=;
+ b=Zq4OeEPJgq4xjbeIsbw2aaaZwKG52ADdNbgjmoi/2qquRd5rKVmx4HQgMs4zcZRVKW
+ pM6YCL+AkXogxqklA4y1WItjjeudwsqS/SxCotYcm0za5gCpj1QHBfWpAOQjmd1nYl9W
+ 60+dX3FQZttpjxcwKbgLClliOYqtKfMeKL079KuO1qLZq6X4TwrbKC/Pw8rPwp7DEZdu
+ vHYz3vUiULf2QqqW7VFQjEn0levLn0ZK3CxlPiouMC6IXx9tMteFK8rv/5XR75lnZfRX
+ pqwhmpwvS/Z3533yMKDOt2NQ5jDGjoP3spA9LMYL9p5lcnCTDYoSDTIQyOwYm1Pm3Ui7
+ 6Cbg==
+X-Gm-Message-State: AA+aEWYIfXop4tG546y3ywAAS7UVqLDW+j7NTQgu40IYolqiAnc/FDG/
+ tO0PeAt/0F3oVBJ3Q37mWsR2nYLf
+X-Google-Smtp-Source: AFSGD/VPt0mp7nkAy3KLr5rj3bVYHTGTfmpkxYTtFIP9ppgFTeptsxFd70aTN3hwGzwFH1XeXdEbrg==
+X-Received: by 2002:ad4:40c9:: with SMTP id x9mr10295990qvp.165.1543693151188; 
+ Sat, 01 Dec 2018 11:39:11 -0800 (PST)
+Received: from localhost.localdomain ([181.220.65.91])
+ by smtp.gmail.com with ESMTPSA id r1sm5386421qte.28.2018.12.01.11.39.06
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Sat, 01 Dec 2018 11:39:10 -0800 (PST)
+Received: by localhost.localdomain (sSMTP sendmail emulation);
+ Sat, 01 Dec 2018 17:39:04 -0200
+From: Otavio Salvador <otavio@ossystems.com.br>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable ATH10K SDIO support
+Date: Sat,  1 Dec 2018 17:38:58 -0200
+Message-Id: <20181201193858.20738-1-otavio@ossystems.com.br>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
+Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_112308_262002_2E84DA72 
-X-CRM114-Status: GOOD (  19.59  )
+X-CRM114-CacheID: sfid-20181201_113923_059637_0FEEBF5E 
+X-CRM114-Status: GOOD (  11.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -68,140 +85,41 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- Paul Gortmaker <paul.gortmaker@windriver.com>,
- iommu@lists.linux-foundation.org, linux-arm-kernel@lists.infradead.org,
- Robin Murphy <robin.murphy@arm.com>, Nate Watterson <nwatters@codeaurora.org>
+Cc: Otavio Salvador <otavio@ossystems.com.br>,
+ Sascha Hauer <s.hauer@pengutronix.de>, Russell King <linux@armlinux.org.uk>,
+ linux-kernel@vger.kernel.org, NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The Kconfig currently controlling compilation of this code is:
+The use of ATH10K WiFi is becoming common in i.MX based boards,
+especially on new designs, so enable the driver support as module so
+it can be used out of box.
 
-drivers/iommu/Kconfig:config ARM_SMMU
-drivers/iommu/Kconfig:  bool "ARM Ltd. System MMU (SMMU) Support"
-
-...meaning that it currently is not being built as a module by anyone.
-
-Lets remove the modular code that is essentially orphaned, so that
-when reading the driver there is no doubt it is builtin-only.
-
-Since module_platform_driver() uses the same init level priority as
-builtin_platform_driver() the init ordering remains unchanged with
-this commit.
-
-We explicitly disallow a driver unbind, since that doesn't have a
-sensible use case anyway, but unlike most drivers, we can't delete the
-function tied to the ".remove" field.  This is because as of commit
-7aa8619a66ae ("iommu/arm-smmu-v3: Implement shutdown method") the
-.remove function was given a one line wrapper and re-used to provide a
-.shutdown service.  So we delete the wrapper and re-name the function
-from remove to shutdown.
-
-We add a moduleparam.h include since the file does actually declare
-some module parameters, and leaving them as such is the easiest way
-currently to remain backwards compatible with existing use cases.
-
-We also delete the MODULE_LICENSE tag etc. since all that information
-is already contained at the top of the file in the comments.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Nate Watterson <nwatters@codeaurora.org>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: iommu@lists.linux-foundation.org
-Acked-by: Robin Murphy <robin.murphy@arm.com>
-Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
 ---
- drivers/iommu/arm-smmu.c | 32 +++++++++++++-------------------
- 1 file changed, 13 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 5a28ae892504..4a2e143fdf52 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -41,7 +41,8 @@
- #include <linux/io-64-nonatomic-hi-lo.h>
- #include <linux/iommu.h>
- #include <linux/iopoll.h>
--#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/moduleparam.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
-@@ -101,6 +102,10 @@
- #define MSI_IOVA_LENGTH			0x100000
- 
- static int force_stage;
-+/*
-+ * not really modular, but the easiest way to keep compat with existing
-+ * bootargs behaviour is to continue using module_param() here.
-+ */
- module_param(force_stage, int, S_IRUGO);
- MODULE_PARM_DESC(force_stage,
- 	"Force SMMU mappings to be installed at a particular stage of translation. A value of '1' or '2' forces the corresponding stage. All other values are ignored (i.e. no stage is forced). Note that selecting a specific stage will disable support for nested translation.");
-@@ -1964,7 +1969,6 @@ static const struct of_device_id arm_smmu_of_match[] = {
- 	{ .compatible = "cavium,smmu-v2", .data = &cavium_smmuv2 },
- 	{ },
- };
--MODULE_DEVICE_TABLE(of, arm_smmu_of_match);
- 
- #ifdef CONFIG_ACPI
- static int acpi_smmu_get_data(u32 model, struct arm_smmu_device *smmu)
-@@ -2224,24 +2228,18 @@ static int arm_smmu_legacy_bus_init(void)
- }
- device_initcall_sync(arm_smmu_legacy_bus_init);
- 
--static int arm_smmu_device_remove(struct platform_device *pdev)
-+static void arm_smmu_device_shutdown(struct platform_device *pdev)
- {
- 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
- 
- 	if (!smmu)
--		return -ENODEV;
-+		return;
- 
- 	if (!bitmap_empty(smmu->context_map, ARM_SMMU_MAX_CBS))
- 		dev_err(&pdev->dev, "removing device with active domains!\n");
- 
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
--	return 0;
--}
--
--static void arm_smmu_device_shutdown(struct platform_device *pdev)
--{
--	arm_smmu_device_remove(pdev);
- }
- 
- static int __maybe_unused arm_smmu_pm_resume(struct device *dev)
-@@ -2256,16 +2254,12 @@ static SIMPLE_DEV_PM_OPS(arm_smmu_pm_ops, NULL, arm_smmu_pm_resume);
- 
- static struct platform_driver arm_smmu_driver = {
- 	.driver	= {
--		.name		= "arm-smmu",
--		.of_match_table	= of_match_ptr(arm_smmu_of_match),
--		.pm		= &arm_smmu_pm_ops,
-+		.name			= "arm-smmu",
-+		.of_match_table		= of_match_ptr(arm_smmu_of_match),
-+		.pm			= &arm_smmu_pm_ops,
-+		.suppress_bind_attrs	= true,
- 	},
- 	.probe	= arm_smmu_device_probe,
--	.remove	= arm_smmu_device_remove,
- 	.shutdown = arm_smmu_device_shutdown,
- };
--module_platform_driver(arm_smmu_driver);
--
--MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
--MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
--MODULE_LICENSE("GPL v2");
-+builtin_platform_driver(arm_smmu_driver);
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index beba46d2ec13..d36a606d6205 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -159,6 +159,8 @@ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_CDC_EEM=m
+ CONFIG_USB_NET_SMSC95XX=y
+ CONFIG_USB_NET_MCS7830=y
++CONFIG_ATH10K=m
++CONFIG_ATH10K_SDIO=m
+ CONFIG_BRCMFMAC=m
+ CONFIG_MWIFIEX=m
+ CONFIG_MWIFIEX_SDIO=m
 -- 
-2.7.4
+2.19.2
 
 
 _______________________________________________
