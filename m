@@ -2,84 +2,69 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.5 required=3.0 tests=DKIMWL_WL_HIGH,
-	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
-	MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-10.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4C827C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:25:14 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 331ABC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:28:12 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DE7C520834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:25:13 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EA70420834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:28:11 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YIvmRRrG";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="PPfR41lG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DE7C520834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g9+a1PiL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="Wy7u0n8x"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EA70420834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=MNJVO+R73/2NarJtcwuJVBNeu+2lAFXLpcc2akgkq5g=; b=YIvmRRrGoH033V
-	Qir3KO10GeifSzTG4IS3Y9eAiyM+rAes35s26K93bz58Ez5AsOQzt/m+ZIG890JzvqRpDSk+TjpO6
-	hXLaL82jllSbtSzaB2h79KEaJzdaNhnGbgRR1r62+1HkQ5xBASaAOapm9RgTMrT23h/6D9K+U0jc6
-	Rz8n7hkM7e3oafBnbBdtdpaj3c9A56RhuBtofnTRZX6vTh1IQfgq5GBSkVHhDNM7Qg6i95tLO13hH
-	8FosDWMnHR2IWzM1QRIKRWXgIzmNn0PZRZmuUEk4uIXtrzU4i2okw9UXmZt02iA20YtB8RGEgexyy
-	i1Yx8O1KbDu55di3di4g==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=n6rRVIJactp8BGVldJiNUm60hbaLIuxLgtDt7cJyjD0=; b=g9+
+	a1PiLKZEoV6XvMvbPUNB1E3hfId/ZuIZjxvaJXPFBhPsrBMSlMZ6VLiln3roVarz1g7PyaI71SwTq
+	Qf6VnzOH5S15ppE6idHRraMVPseIADlE5JCJQ03TJOQBXVbSWLjYfnjPmBelLT3c5gNy9LFzIUkQ4
+	xszmPibZ+2Cc/WW67gTYcOuzWnxQ0/ThZsh6fG17Yf6pHTjb6sRwSnoIfK9X1lbZXmAm4RfmEC4bq
+	IZkvyBf0sY/EbW+AhtG40oDWvoId7VCwEnEQV4CAdCYwhdaTo7Ao7kPFq/E0pKbEr+SvoscB4235D
+	rASIBPTEW8JmfrDASDpkxL3QeJ5q7zA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSt5l-0000H7-Rw; Sat, 01 Dec 2018 00:25:05 +0000
-Received: from mail-pl1-x641.google.com ([2607:f8b0:4864:20::641])
+	id 1gSt8k-0001Yo-G2; Sat, 01 Dec 2018 00:28:10 +0000
+Received: from conuserg-08.nifty.com ([210.131.2.75])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSt5i-0008I0-JW
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:25:04 +0000
-Received: by mail-pl1-x641.google.com with SMTP id k8so3554445pls.11
- for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:24:52 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=8ARodUjDQIAu1n8gb1ZRTXEIs0TaLCuLUFVpSRJ1eGI=;
- b=PPfR41lGMAp60tBskpllfE+t7J5LKRkjAPgnNPqGucgvXxJDOlJmQG3vqC7E4Jbkvu
- zjwYCaV7K5Ebor7a3Y2MnylrZwHPGy2LbMpxSKTH7eUGvBOpgxpGPywgkZLCf9PrSybc
- UH7AW+EQC4oT0URHFovWkIOPiG5OJaD0SDm+/MwLr58i1ufK7aUEVyyRlZt53tGp5PQB
- 0XWBTpp1r0T61nLHagf7GU2J5LYmpTtNw5z+OdWVchfzEIcENJ0YdGjcmGJcQO140lRQ
- 7yMhyqnP0jETYgXSLS71aPVI20pJ1dSSnAESCjtNzsWS3CNRNAh0NyDtlYRXIBaxyN8P
- XY8g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=8ARodUjDQIAu1n8gb1ZRTXEIs0TaLCuLUFVpSRJ1eGI=;
- b=YGAhScc4gmqkwg9oBGdholSHZyRBJVIyM267Zw94e0uoePYg5u9ne+zwDslAtr8kVg
- rFJcEb0JOFKqjVIuRJHaPfS77dYQyV2gXqtDxvpUM3fpOLE2iVTzs69muZmBhIj0xmyp
- NJ3Vauoo8/UKuci/CEOClNXsKCYopNjAT1LeP0Dv+4OHM1PuhV35fCq7RFeGE4j6lmtO
- XPh63K59mPEzoBovClpQAMS6B5MR+gzhebiWK4IBzr/jNBr8bzkjh3zcSdvFa85WbVXk
- 3Ij9cR8lQycT7Y7Z3zDAz4Ux6AeCn7oZKbtfEeS0/q4DssUv/ZBsZxuM/K/qTAaTgH1n
- SzsQ==
-X-Gm-Message-State: AA+aEWbWaDgIC6i0mQg3t8naFUJ9YIFIVA3wSn4sr6PVlZgiR+A22Vz2
- nun5tDsSPOtCI03QgXMByTpLAspu8Mo4sCFPTaFIU/WT8oy0qA==
-X-Google-Smtp-Source: AFSGD/UQgsPB+hiAmZJkdZ1wuAFvlvIea00kgT9rP/rsyGCPvyvxEuwqBY4AEojXt+2PsN1TekLN8TN0TlRAVvftKkY=
-X-Received: by 2002:a17:902:29ab:: with SMTP id
- h40mr7556799plb.238.1543623891523; 
- Fri, 30 Nov 2018 16:24:51 -0800 (PST)
-MIME-Version: 1.0
-References: <CAKwvOd=uhn-PUs==kVGnXg4W6UwuGvSn+EWUzK4Q8wMr9mzFpA@mail.gmail.com>
- <CAKv+Gu9OJ_N+mhdUbZ89kQT=-coqmAEWihVziWTQ3uFDOw1zzQ@mail.gmail.com>
-In-Reply-To: <CAKv+Gu9OJ_N+mhdUbZ89kQT=-coqmAEWihVziWTQ3uFDOw1zzQ@mail.gmail.com>
-From: Nick Desaulniers <ndesaulniers@google.com>
-Date: Fri, 30 Nov 2018 16:24:40 -0800
-Message-ID: <CAKwvOdk8a=x945wNecxmoO+kPSmfbAi7Qa8U1RE0RN51eCX2MQ@mail.gmail.com>
-Subject: Re: LLD and CONFIG_RELOCATABLE
-To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+ id 1gSt8h-0001YF-G1
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:28:09 +0000
+Received: from grover.tkatk1.zaq.ne.jp (zaqdadce369.zaq.ne.jp
+ [218.220.227.105]) (authenticated)
+ by conuserg-08.nifty.com with ESMTP id wB10RbUH028422;
+ Sat, 1 Dec 2018 09:27:37 +0900
+DKIM-Filter: OpenDKIM Filter v2.10.3 conuserg-08.nifty.com wB10RbUH028422
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
+ s=dec2015msa; t=1543624058;
+ bh=HRZCOfVhmMCh+LM9JPpkzG1F8H/g9338tefVQ7sAm+U=;
+ h=From:To:Cc:Subject:Date:From;
+ b=Wy7u0n8xdeJaTVrAA4/BBGWwoDe1omx7m+aWF/Sp4DKlaq8mqSAT/VCHkeQwSfG4z
+ UpnKiYHaLWxrufTChqBngIDdI2a62xfr/DGM1UQPLHsmcb1BOiXGDc3YioOoGzYqJb
+ ELyDJZJ7B6Gh8BC3BJe3GNcEU9CiFswlndUU/U2OUKUd59NtVoXyi/AnZxhILXhWVe
+ tqfUn/yOJ55vFUnYFmIsYfk/ZlluccV/k3E/hD1dsVLputURQeBbG04tx9Rv4eQLgo
+ p0QB/dToB/j7uOARF3V5yUOncYlc334eS4TNosHxdcZFugO1hHl948Ty9+jHEw6/qL
+ jI2K9Yw6O+/Yg==
+X-Nifty-SrcIP: [218.220.227.105]
+From: Masahiro Yamada <yamada.masahiro@socionext.com>
+To: linux-kbuild@vger.kernel.org
+Subject: [PATCH] kbuild: move .SECONDARY special target to Kbuild.include
+Date: Sat,  1 Dec 2018 09:27:15 +0900
+Message-Id: <1543624035-4479-1-git-send-email-yamada.masahiro@socionext.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_162502_707285_EEE441E0 
-X-CRM114-Status: GOOD (  15.51  )
+X-CRM114-CacheID: sfid-20181130_162807_882017_871E2682 
+X-CRM114-Status: UNSURE (   9.50  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -91,55 +76,93 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: "Jason A . Donenfeld" <Jason@zx2c4.com>,
+ Michal Marek <michal.lkml@markovi.net>,
+ Herbert Xu <herbert@gondor.apana.org.au>,
+ Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
+ linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>, linux-crypto@vger.kernel.org,
+ "David S. Miller" <davem@davemloft.net>, linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 2:18 AM Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
->
-> On Thu, 29 Nov 2018 at 21:50, Nick Desaulniers <ndesaulniers@google.com> wrote:
-> >
-> > Hi Ard,
-> > I'm hitting a few different issues trying to link
-> > CONFIG_RANDOMIZE_BASE=y (KASLR, selects CONFIG_RELOCATABLE) arm64
-> > kernels with LLD (LLVM's linker).  I've filed a bug:
-> > https://bugs.llvm.org/show_bug.cgi?id=39810, and am getting feedback
-> > from various LLVM folks, but thought you might be able to provide more
-> > insights?
-> >
->
-> The -pie -shared thing can be dropped, I suppose, given that it only
-> affects debugging of KASLR kernels, and since the patch in question
-> clearly shows that ld.bfd also changed from ET_DYN to ET_EXEC for PIE
-> targets, and so it is obviously a gdb issue. So I'll ack a patch that
-> reverts that.
+In commit 54a702f70589 ("kbuild: mark $(targets) as .SECONDARY and
+remove .PRECIOUS markers"), I missed one important feature of the
+.SECONDARY target:
 
-Thanks! By https://bugs.llvm.org/show_bug.cgi?id=39810#c15, it seems
-that -pie can be dropped.  I'll queue that up for a set of patches for
-linking arm64 with CONFIG_RELOCATABLE=y and lld once I have it all
-working.  I've added your suggested by to that patch, but will wait to
-send a series once we've worked through the 3-4 issues.
+  .SECONDARY with no prerequisites causes all targets to be treated
+   as secondary.
 
-> As for the __efistub_ prefixes, I wonder if we still need that after
-> 1212f7a16af492d59304ba3abccbcc5b5e41423e ("scripts/kallsyms: filter
-> arm64's __efistub_ symbols")
+Kbuild's policy is, "Do not delete any intermediate files."
+So, just move it to scripts/Kbuild.include, with no prerequisites.
 
-Thanks for the patch in:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2018-November/616512.html
+Note:
+If an intermediate file is generated by $(call if_changed,...), you
+still need to add it to "targets" so its .*.cmd file is included.
 
-This will simplify things (and uncovered another bug in lld).
+The arm/arm64 crypto files are generated by $(call cmd,shipped),
+so they do not need to be added to "targets", but need to be added
+to "clean-files" so "make clean" can properly clean them away.
 
-> So i think discarding sections intended for the loader is the only
-> remaining issue, and that is something the LLD people will hopefully
-> fix?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-The lld devs and I think so.  Thanks for your help, I appreciate it!
+ arch/arm/crypto/Makefile   | 2 +-
+ arch/arm64/crypto/Makefile | 2 +-
+ scripts/Kbuild.include     | 3 +++
+ scripts/Makefile.build     | 4 ----
+ 4 files changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/crypto/Makefile b/arch/arm/crypto/Makefile
+index bd5bcee..89f88ab 100644
+--- a/arch/arm/crypto/Makefile
++++ b/arch/arm/crypto/Makefile
+@@ -65,4 +65,4 @@ $(src)/sha512-core.S_shipped: $(src)/sha512-armv4.pl
+ 	$(call cmd,perl)
+ endif
+ 
+-targets += sha256-core.S sha512-core.S
++clean-files += sha256-core.S sha512-core.S
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index f476fed..860d931 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -75,4 +75,4 @@ $(src)/sha512-core.S_shipped: $(src)/sha512-armv8.pl
+ 	$(call cmd,perlasm)
+ endif
+ 
+-targets += sha256-core.S sha512-core.S
++clean-files += sha256-core.S sha512-core.S
+diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+index bb01555..0454916 100644
+--- a/scripts/Kbuild.include
++++ b/scripts/Kbuild.include
+@@ -393,3 +393,6 @@ endef
+ 
+ # delete partially updated (i.e. corrupted) files on error
+ .DELETE_ON_ERROR:
++
++# do not delete intermediate files automatically
++.SECONDARY:
+diff --git a/scripts/Makefile.build b/scripts/Makefile.build
+index a8e7ba9..604096a 100644
+--- a/scripts/Makefile.build
++++ b/scripts/Makefile.build
+@@ -546,8 +546,4 @@ $(shell mkdir -p $(obj-dirs))
+ endif
+ endif
+ 
+-# Some files contained in $(targets) are intermediate artifacts.
+-# We never want them to be removed automatically.
+-.SECONDARY: $(targets)
+-
+ .PHONY: $(PHONY)
 -- 
-Thanks,
-~Nick Desaulniers
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
