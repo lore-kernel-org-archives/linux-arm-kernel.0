@@ -2,21 +2,21 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-6.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 92A47C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C400FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:48 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5919320867
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 914802145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:45:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YNXE+kMr";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="iDhQfYA+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5919320867
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="q2K15oEr";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=chromium.org header.i=@chromium.org header.b="TIZxmPfJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 914802145D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=chromium.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,70 +25,69 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1J8cCo6NTYeQKxAoNzfGj7loS6a8gJHPp8S8Cw6M6f0=; b=YNXE+kMry/V/Wi
-	++U3lGzxtSiG/BPpVlzu+Ke5dwEKrd00tpGsZOovG7t8L4w2a0jp5Ad9c0TNRWr/Ej+rn9coW4iPy
-	0iPYrgytcivd74bXD3i/NGU8VoHU226G0EQzCZfQ3/bhyhSgXWFqb8RhM+69ezdD+yh26RrRuwhcU
-	R1eWPJtGBf0f8r4C9yNoAH9SWPm0UZ5CtQYOQJ5MJqKZBws1ou4tTPlYikQhXyzPfY8ojY9/cgEJ0
-	hDTSM3JCAX2piE57INWNuvtlUY6KRokkMPzCn2lLqacni2KhbKxVi0133bn31tJG1k3sTNHfsUEuU
-	jJUHrWKrxSLkCaI2wfCg==;
+	List-Owner; bh=6efMRyU+Q5ZSewErugM97f+/nrliBHw2yy827lhFFJ8=; b=q2K15oErvUY2gP
+	O5ygtCbi89bvvM+Ym4kXOIqwo1ro62JjyGrjt/vXRlenNkKER7zLe0oddi/FJdBDLSO5AT/AGIysn
+	0Lr58JysL8/MqG9ce8zqeG5JZU0BUOfu64IMDUUxrmRpop1M3HFn/qXZ62v8yQBQ507JkG+IjkpbI
+	7qIlAT5eTSGvqKK4m3aUYs27ufgdPFFeU/5A10H+JiNw/bDOk32mB7UaVfmfnszkt0G8i+SABqDiP
+	+bYEc8weStjxIFnUxY9koc5xsUhNMEOhxoHNOCxKSuGpvTuAu5cRxTh0DkG/+XsQeCbv2Wg7yP/mi
+	hQDlntPdurnZI4R0BEww==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gStPS-0000Gi-JG; Sat, 01 Dec 2018 00:45:26 +0000
-Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
+	id 1gStPe-0000Sh-Jg; Sat, 01 Dec 2018 00:45:38 +0000
+Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gStPA-0007AO-J9
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:45:10 +0000
-Received: by mail-lj1-x244.google.com with SMTP id u6-v6so6558248ljd.1
+ id 1gStPK-00082G-9B
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:45:22 +0000
+Received: by mail-lf1-x142.google.com with SMTP id p6so5384997lfc.1
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:44:57 -0800 (PST)
+ Fri, 30 Nov 2018 16:45:08 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=chromium.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=UD6TIdHtwPYHyPraYlY6EfBE20VicGPgtEp08k6yp8w=;
- b=iDhQfYA+ZnBx5PEjUC1WPtrfI7Xjt5/Ys66e89tiREQIk1TBgFoQuc7SATPeGb6odr
- UrgtnNpTpCTL6QTKKU5BWmwe3T6jiNL6s3OP5FUeELJ6wfrDSBx9ZKKrztvM05hnMZyw
- OqdpH7bwLsm10N9sG8UUmnsDBj9QAwlT9pquM=
+ :cc; bh=mhmAcOfQHba7jsByZTi1TgDT9pcdTkIHC+NZgrhuRHg=;
+ b=TIZxmPfJFbaNypWYoxkmT7u0IVQMKTmwtE7J+QMhCk/Z+8baz4+ZF51fWhiwYwp5mf
+ 2QxIOGE3EmUWTZxW8NXE3rek2uH5buBY2CNYhAzhOBit4GItPdfAM0NmB+LDyV7olbrM
+ aWaLNAeZrx3dGsUR2SxQoc1Zgj7L+hdF+6RmI=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=UD6TIdHtwPYHyPraYlY6EfBE20VicGPgtEp08k6yp8w=;
- b=lSMOjTRRnTc3+LpkalpSztNehSS0nFsyeJtMaM1aAjqB1h2Et5xA4+AB7VjaWObHjG
- c34qyfJwgJIA1vQZmS9zRUHU0sRFtwvPI+e3QNz5SmZbCN4eGes0v2mg6R2I0VgkEQTP
- 1QdgFYg+7xJX3J5442yRWhT84y9csN+ES7s0u1Uoji4u0Vni3xQuPA3ft9RmCUCbxvcw
- siNcYJHD9CrKO5mjROHcwKI1LmvhoCOWwDmErpcjpiREv2Pl4P5RzeBHc5vVBtWQrB0u
- No+0pGcYCvNa1wEbnGeP0Q/X8R5ebr+buXVqhRoCDuCz2xnSxwyZH16/fhyuhZgFbko9
- DYXg==
-X-Gm-Message-State: AA+aEWZMRYhKr4MGZiwdkwhZ6YMxap6M2vGvyiADVuM7X+KJusfYlLIo
- OEcnwYnclSAn9B37jA6hwWAr4KtDwt0=
-X-Google-Smtp-Source: AFSGD/WNjuG8d90jdiM2+PbIyXsLVcA/q6Bhic0yBR4MtGutD5xpbfc7kur7Y6RZPYkyZDVje6W2yQ==
-X-Received: by 2002:a2e:97d7:: with SMTP id
- m23-v6mr2544656ljj.18.1543625095924; 
- Fri, 30 Nov 2018 16:44:55 -0800 (PST)
-Received: from mail-lj1-f170.google.com (mail-lj1-f170.google.com.
- [209.85.208.170])
- by smtp.gmail.com with ESMTPSA id j76-v6sm1062924ljb.12.2018.11.30.16.44.55
+ bh=mhmAcOfQHba7jsByZTi1TgDT9pcdTkIHC+NZgrhuRHg=;
+ b=TbEbUotk9Eqb1MFD87FwSkv8j1qrJMl7uvfpBIxyj3XFmcPrXnfxsMSL/Z2yfnLjW9
+ o9P+kK9GekY7NsyDP6pXw9rowsbtu3xCv4IV+dKc7N7vUd0+zZ3q7wM8W6KvukoWxKmH
+ y+0Ld+gE2/wDkCIGnf5SesWiIcRiYHjNr5wLid4aEeIyI7S+dEkGCHzBtcrUM9yhDc7S
+ W0hiSoeW7vUeYZPL2GS4OBRv6gnWVcyUV0uPdoRfKxgBtm6ytCCZPuQ1fIFL6Dy+k9II
+ NTequEPbP3EETcD59Ke+Gm1gDhC6S+k96jQnQeXkOUkzy8dA33QFvQCt+ZdwQ3oV8M/a
+ ym0Q==
+X-Gm-Message-State: AA+aEWZofsem9lOWw7M9uPpmF9996WY+AP8LDJoH/KjT9qxIXGqDBd9d
+ VSV7rTmcvwiocy5mTzXMWWtPLkGt07I=
+X-Google-Smtp-Source: AFSGD/XGck5rdMNwCIAdwL3IPcgG5A06K4gcfVOP1xO+mgQ8NuVyoZbtD8E2PrWoMJWxIl6IKhphzg==
+X-Received: by 2002:a19:ee08:: with SMTP id g8mr4901864lfb.72.1543625106319;
+ Fri, 30 Nov 2018 16:45:06 -0800 (PST)
+Received: from mail-lf1-f45.google.com (mail-lf1-f45.google.com.
+ [209.85.167.45])
+ by smtp.gmail.com with ESMTPSA id r27-v6sm1070815lja.65.2018.11.30.16.45.06
  for <linux-arm-kernel@lists.infradead.org>
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Fri, 30 Nov 2018 16:44:55 -0800 (PST)
-Received: by mail-lj1-f170.google.com with SMTP id t9-v6so6531990ljh.6
+ Fri, 30 Nov 2018 16:45:06 -0800 (PST)
+Received: by mail-lf1-f45.google.com with SMTP id u18so5358573lff.10
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 16:44:55 -0800 (PST)
-X-Received: by 2002:a2e:5152:: with SMTP id
- b18-v6mr4451636lje.88.1543624736801; 
- Fri, 30 Nov 2018 16:38:56 -0800 (PST)
+ Fri, 30 Nov 2018 16:45:06 -0800 (PST)
+X-Received: by 2002:a19:1bca:: with SMTP id b193mr4641734lfb.153.1543624776451; 
+ Fri, 30 Nov 2018 16:39:36 -0800 (PST)
 MIME-Version: 1.0
 References: <20181127180349.29997-1-georgi.djakov@linaro.org>
- <20181127180349.29997-4-georgi.djakov@linaro.org>
-In-Reply-To: <20181127180349.29997-4-georgi.djakov@linaro.org>
+ <20181127180349.29997-6-georgi.djakov@linaro.org>
+In-Reply-To: <20181127180349.29997-6-georgi.djakov@linaro.org>
 From: Evan Green <evgreen@chromium.org>
-Date: Fri, 30 Nov 2018 16:38:20 -0800
-X-Gmail-Original-Message-ID: <CAE=gft5Z7-Ri07iZesq57bqLpsStvJF3y_TSm+Cz=h-pGqJzyw@mail.gmail.com>
-Message-ID: <CAE=gft5Z7-Ri07iZesq57bqLpsStvJF3y_TSm+Cz=h-pGqJzyw@mail.gmail.com>
-Subject: Re: [PATCH v10 3/7] interconnect: Allow endpoints translation via DT
+Date: Fri, 30 Nov 2018 16:39:00 -0800
+X-Gmail-Original-Message-ID: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+Message-ID: <CAE=gft4tO96n0vAubo1_vvcTO4yarDcTNOTuL6cLpmLDDNxrfA@mail.gmail.com>
+Subject: Re: [PATCH v10 5/7] interconnect: qcom: Add sdm845 interconnect
+ provider driver
 To: georgi.djakov@linaro.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_164508_658320_C0FF2B27 
-X-CRM114-Status: GOOD (  31.50  )
+X-CRM114-CacheID: sfid-20181130_164519_076559_06683E86 
+X-CRM114-Status: GOOD (  21.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -119,293 +118,118 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 On Tue, Nov 27, 2018 at 10:04 AM Georgi Djakov <georgi.djakov@linaro.org> wrote:
 >
-> Currently we support only platform data for specifying the interconnect
-> endpoints. As now the endpoints are hard-coded into the consumer driver
-> this may lead to complications when a single driver is used by multiple
-> SoCs, which may have different interconnect topology.
-> To avoid cluttering the consumer drivers, introduce a translation function
-> to help us get the board specific interconnect data from device-tree.
+> From: David Dai <daidavid1@codeaurora.org>
 >
+> Introduce Qualcomm SDM845 specific provider driver using the
+> interconnect framework.
+>
+> Signed-off-by: David Dai <daidavid1@codeaurora.org>
 > Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
->  drivers/interconnect/core.c           | 156 ++++++++++++++++++++++++++
->  include/linux/interconnect-provider.h |  17 +++
->  include/linux/interconnect.h          |   7 ++
->  3 files changed, 180 insertions(+)
+>  .../bindings/interconnect/qcom,sdm845.txt     |  24 +
+>  drivers/interconnect/Kconfig                  |   5 +
+>  drivers/interconnect/Makefile                 |   1 +
+>  drivers/interconnect/qcom/Kconfig             |  13 +
+>  drivers/interconnect/qcom/Makefile            |   5 +
+>  drivers/interconnect/qcom/sdm845.c            | 836 ++++++++++++++++++
+>  .../dt-bindings/interconnect/qcom,sdm845.h    | 143 +++
+>  7 files changed, 1027 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+>  create mode 100644 drivers/interconnect/qcom/Kconfig
+>  create mode 100644 drivers/interconnect/qcom/Makefile
+>  create mode 100644 drivers/interconnect/qcom/sdm845.c
+>  create mode 100644 include/dt-bindings/interconnect/qcom,sdm845.h
 >
-> diff --git a/drivers/interconnect/core.c b/drivers/interconnect/core.c
-> index 3ae8e5a58969..ebc42ef9fa46 100644
-> --- a/drivers/interconnect/core.c
-> +++ b/drivers/interconnect/core.c
-> @@ -15,6 +15,7 @@
->  #include <linux/module.h>
->  #include <linux/mutex.h>
->  #include <linux/slab.h>
-> +#include <linux/of.h>
->  #include <linux/overflow.h>
->
->  static DEFINE_IDR(icc_idr);
-> @@ -193,6 +194,159 @@ static int apply_constraints(struct icc_path *path)
->         return ret;
->  }
->
-> +/* of_icc_xlate_onecell() - Xlate function using a single index.
+> diff --git a/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+> new file mode 100644
+> index 000000000000..d45150e99665
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interconnect/qcom,sdm845.txt
+> @@ -0,0 +1,24 @@
+> +Qualcomm SDM845 Network-On-Chip interconnect driver binding
+> +-----------------------------------------------------------
+> +
+> +SDM845 interconnect providers support system bandwidth requirements through
+> +RPMh hardware accelerators known as Bus Clock Manager(BCM). The provider is able
+> +to communicate with the BCM through the Resource State Coordinator(RSC)
+> +associated with each execution environment. Provider nodes must reside within
+> +an RPMh device node pertaining to their RSC and each provider maps to
+> +a single RPMh resource.
+> +
+> +Required properties :
+> +- compatible : shall contain only one of the following:
+> +                       "qcom,sdm845-rsc-hlos"
 
-It would be nice if translate were spelled out instead of xlate in the
-description portion (throughout).
+I wonder if maybe hlos isn't necessary. Unless you somehow imagine
+secure mode would have a device tree entry in here as well? Probably
+not.
 
-> + * @spec: OF phandle args to map into an interconnect node.
-> + * @data: private data (pointer to struct icc_onecell_data)
-> + *
-> + * This is a generic xlate function that can be used to model simple
-> + * interconnect providers that have one device tree node and provide
-> + * multiple interconnect nodes. A single cell is used as an index into
-> + * an array of icc nodes specified in the icc_onecell_data struct when
-> + * registering the provider.
-> + */
-> +struct icc_node *of_icc_xlate_onecell(struct of_phandle_args *spec,
-> +                                     void *data)
-> +{
-> +       struct icc_onecell_data *icc_data = data;
-> +       unsigned int idx = spec->args[0];
+> +- #interconnect-cells : should contain 1
 > +
-> +       if (idx >= icc_data->num_nodes) {
-> +               pr_err("%s: invalid index %u\n", __func__, idx);
-> +               return ERR_PTR(-EINVAL);
-> +       }
+> +Examples:
 > +
-> +       return icc_data->nodes[idx];
-> +}
-> +EXPORT_SYMBOL_GPL(of_icc_xlate_onecell);
-> +
-> +/**
-> + * of_icc_get_from_provider() - Look-up interconnect node
-> + * @spec: OF phandle args to use for look-up
-> + *
-> + * Looks for interconnect provider under the node specified by @spec and if
-> + * found, uses xlate function of the provider to map phandle args to node.
-> + *
-> + * Returns a valid pointer to struct icc_node on success or ERR_PTR()
-> + * on failure.
-> + */
-> +static struct icc_node *of_icc_get_from_provider(struct of_phandle_args *spec)
-> +{
-> +       struct icc_node *node = ERR_PTR(-EPROBE_DEFER);
-> +       struct icc_provider *provider;
-> +
-> +       if (!spec)
-> +               return ERR_PTR(-EINVAL);
-> +
-> +       mutex_lock(&icc_lock);
-> +       list_for_each_entry(provider, &icc_providers, provider_list) {
-> +               if (provider->dev->of_node == spec->np)
-> +                       node = provider->xlate(spec, provider->data);
-> +               if (!IS_ERR(node))
-> +                       break;
-> +       }
-> +       mutex_unlock(&icc_lock);
-> +
-> +       return node;
-> +}
-> +
-> +/**
-> + * of_icc_get() - get a path handle from a DT node based on name
-> + * @dev: device pointer for the consumer device
-> + * @name: interconnect path name
-> + *
-> + * This function will search for a path two endpoints and return an
-
-path between two endpoints
-
-> + * icc_path handle on success. Use icc_put() to release constraints when
-> + * they are not needed anymore.
-> + * If the interconnect API is disabled, NULL is returned and the consumer
-> + * drivers will still build. Drivers are free to handle this specifically,
-> + * but they don't have to. NULL is also returned when the "interconnects"
-
-I'm not sure the sentence starting with "Drivers are free" adds much.
-Also, you mention that null is returned when the interconnect API is
-disabled both above and below. We probably only need it once.
-
-> + * DT property is missing.
-> + *
-> + * Return: icc_path pointer on success or ERR_PTR() on error. NULL is returned
-> + * when the API is disabled or the "interconnects" DT property is missing.
-> + */
-> +struct icc_path *of_icc_get(struct device *dev, const char *name)
-> +{
-> +       struct icc_path *path = ERR_PTR(-EPROBE_DEFER);
-> +       struct icc_node *src_node, *dst_node;
-> +       struct device_node *np = NULL;
-> +       struct of_phandle_args src_args, dst_args;
-> +       int idx = 0;
-> +       int ret;
-> +
-> +       if (!dev || !dev->of_node)
-> +               return ERR_PTR(-ENODEV);
-> +
-> +       np = dev->of_node;
-> +
-> +       /*
-> +        * When the consumer DT node do not have "interconnects" property
-> +        * return a NULL path to skip setting constraints.
-> +        */
-> +       if (!of_find_property(np, "interconnects", NULL))
-> +               return NULL;
-> +
-> +       /*
-> +        * We use a combination of phandle and specifier for endpoint. For now
-> +        * lets support only global ids and extend this is the future if needed
-
-s/is the future/in the future/
-
-> +        * without breaking DT compatibility.
-> +        */
-> +       if (name) {
-> +               idx = of_property_match_string(np, "interconnect-names", name);
-> +               if (idx < 0)
-> +                       return ERR_PTR(idx);
-> +       }
-> +
-> +       ret = of_parse_phandle_with_args(np, "interconnects",
-> +                                        "#interconnect-cells", idx * 2,
-> +                                        &src_args);
-> +       if (ret)
-> +               return ERR_PTR(ret);
-> +
-> +       of_node_put(src_args.np);
-> +
-> +       if (!src_args.args_count || src_args.args_count > 1)
-
-This could be src_args.argc_count != 1
-
-> +               return ERR_PTR(-EINVAL);
-> +
-> +       ret = of_parse_phandle_with_args(np, "interconnects",
-> +                                        "#interconnect-cells", idx * 2 + 1,
-> +                                        &dst_args);
-> +       if (ret)
-> +               return ERR_PTR(ret);
-> +
-> +       of_node_put(dst_args.np);
-> +
-> +       if (!dst_args.args_count || dst_args.args_count > 1)
-
-Similarly, this could be dst_args.args_count != 1
-
-> +               return ERR_PTR(-EINVAL);
-> +
-> +       src_node = of_icc_get_from_provider(&src_args);
-> +
-> +       if (IS_ERR(src_node)) {
-> +               if (PTR_ERR(src_node) != -EPROBE_DEFER)
-> +                       dev_err(dev, "error finding src node: %ld\n",
-> +                               PTR_ERR(src_node));
-> +               return ERR_CAST(src_node);
-> +       }
-> +
-> +       dst_node = of_icc_get_from_provider(&dst_args);
-> +
-> +       if (IS_ERR(dst_node)) {
-> +               if (PTR_ERR(dst_node) != -EPROBE_DEFER)
-> +                       dev_err(dev, "error finding dst node: %ld\n",
-> +                               PTR_ERR(dst_node));
-> +               return ERR_CAST(dst_node);
-> +       }
-> +
-> +       mutex_lock(&icc_lock);
-> +       path = path_find(dev, src_node, dst_node);
-> +       if (IS_ERR(path))
-> +               dev_err(dev, "%s: invalid path=%ld\n", __func__, PTR_ERR(path));
-> +       mutex_unlock(&icc_lock);
-> +
-> +       return path;
-> +}
-> +EXPORT_SYMBOL_GPL(of_icc_get);
-> +
->  /**
->   * icc_set() - set constraints on an interconnect path between two endpoints
->   * @path: reference to the path returned by icc_get()
-> @@ -521,6 +675,8 @@ int icc_provider_add(struct icc_provider *provider)
->  {
->         if (WARN_ON(!provider->set))
->                 return -EINVAL;
-> +       if (WARN_ON(!provider->xlate))
-> +               return -EINVAL;
->
->         mutex_lock(&icc_lock);
->
-> diff --git a/include/linux/interconnect-provider.h b/include/linux/interconnect-provider.h
-> index 78208a754181..63caccadc2db 100644
-> --- a/include/linux/interconnect-provider.h
-> +++ b/include/linux/interconnect-provider.h
-> @@ -12,6 +12,21 @@
->  #define icc_units_to_bps(bw)  ((bw) * 1000ULL)
->
->  struct icc_node;
-> +struct of_phandle_args;
-> +
-> +/**
-> + * struct icc_onecell_data - driver data for onecell interconnect providers
-> + *
-> + * @num_nodes: number of nodes in this device
-> + * @nodes: array of pointers to the nodes in this device
-> + */
-> +struct icc_onecell_data {
-> +       unsigned int num_nodes;
-> +       struct icc_node *nodes[];
+> +apps_rsc: rsc {
+> +               qnoc: qnoc-rsc-hlos {
+> +                       compatible = "qcom,sdm845-rsc-hlos";
+> +                       #interconnect-cells = <1>;
+> +               };
 > +};
 > +
-> +struct icc_node *of_icc_xlate_onecell(struct of_phandle_args *spec,
-> +                                     void *data);
->
->  /**
->   * struct icc_provider - interconnect provider (controller) entity that might
-> @@ -21,6 +36,7 @@ struct icc_node;
->   * @nodes: internal list of the interconnect provider nodes
->   * @set: pointer to device specific set operation function
->   * @aggregate: pointer to device specific aggregate operation function
-> + * @xlate: provider-specific callback for mapping nodes from phandle arguments
->   * @dev: the device this interconnect provider belongs to
->   * @users: count of active users
->   * @data: pointer to private data
-> @@ -31,6 +47,7 @@ struct icc_provider {
->         int (*set)(struct icc_node *src, struct icc_node *dst);
->         int (*aggregate)(struct icc_node *node, u32 avg_bw, u32 peak_bw,
->                          u32 *agg_avg, u32 *agg_peak);
-> +       struct icc_node* (*xlate)(struct of_phandle_args *spec, void *data);
->         struct device           *dev;
->         int                     users;
->         void                    *data;
-> diff --git a/include/linux/interconnect.h b/include/linux/interconnect.h
-> index 04b2966ded9f..41f7ecc2f20f 100644
-> --- a/include/linux/interconnect.h
-> +++ b/include/linux/interconnect.h
-> @@ -26,6 +26,7 @@ struct device;
->
->  struct icc_path *icc_get(struct device *dev, const int src_id,
->                          const int dst_id);
-> +struct icc_path *of_icc_get(struct device *dev, const char *name);
->  void icc_put(struct icc_path *path);
->  int icc_set(struct icc_path *path, u32 avg_bw, u32 peak_bw);
->
-> @@ -37,6 +38,12 @@ static inline struct icc_path *icc_get(struct device *dev, const int src_id,
->         return NULL;
->  }
->
-> +static inline struct icc_path *of_icc_get(struct device *dev,
-> +                                         const char *name)
+...
+> diff --git a/drivers/interconnect/qcom/sdm845.c b/drivers/interconnect/qcom/sdm845.c
+> new file mode 100644
+> index 000000000000..1678de91ca52
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/sdm845.c
+> @@ -0,0 +1,836 @@
+...
+> +
+> +static void tcs_list_gen(struct list_head *bcm_list,
+> +                        struct tcs_cmd *tcs_list, int *n)
+
+We could make the prototype of this function be:
+
+static void tcs_list_gen(struct list_head *bcm_list,
+        struct tcs_cmd tcs_list[SDM845_MAX_VCD], int n[SDM845_MAX_VCD])
+
+which would catch errors if somebody later passed in an array that
+wasn't the right size, since we blindly memset below.
+
 > +{
-> +       return NULL;
+> +       struct qcom_icc_bcm *bcm;
+> +       bool commit;
+> +       size_t idx = 0, batch = 0, cur_vcd_size = 0;
+> +
+> +       memset(n, 0, sizeof(int) * SDM845_MAX_VCD);
+> +
+> +       list_for_each_entry(bcm, bcm_list, list) {
+> +               commit = false;
+> +               cur_vcd_size++;
+> +               if ((list_is_last(&bcm->list, bcm_list)) ||
+> +                   bcm->aux_data.vcd != list_next_entry(bcm, list)->aux_data.vcd) {
+> +                       commit = true;
+> +                       cur_vcd_size = 0;
+> +               }
+> +               tcs_cmd_gen(&tcs_list[idx], bcm->vote_x, bcm->vote_y,
+> +                           bcm->addr, commit);
+> +               idx++;
+> +               n[batch]++;
+> +               /*
+> +                * Batch the BCMs in such a way that we do not split them in
+> +                * multiple payloads when they are under the same VCD. This is
+> +                * to ensure that every BCM is committed since we only set the
+> +                * commit bit on the last BCM request of every VCD.
+> +                */
+> +               if (n[batch] >= MAX_RPMH_PAYLOAD) {
+> +                       if (!commit) {
+> +                               n[batch] -= cur_vcd_size;
+> +                               n[batch + 1] = cur_vcd_size;
+> +                       }
+> +                       batch++;
+> +               }
+> +       }
 > +}
 > +
->  static inline void icc_put(struct icc_path *path)
->  {
->  }
-
-With these nits fixed:
-
-Reviewed-by: Evan Green <evgreen@chromium.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
