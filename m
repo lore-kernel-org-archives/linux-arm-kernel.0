@@ -2,108 +2,82 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.5 required=3.0 tests=DKIMWL_WL_HIGH,
+	DKIM_ADSP_CUSTOM_MED,DKIM_SIGNED,DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,
+	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4A7FDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:13:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 15A8CC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:21:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 07FC520673
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:13:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CD25D20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 00:21:12 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qEZ4N+SO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="jfcyVoUV";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="YR3+/Cpd"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 07FC520673
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OT5N38+B";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=google.com header.i=@google.com header.b="rCOxYHJ2"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD25D20834
+Authentication-Results: mail.kernel.org; dmarc=fail (p=reject dis=none) header.from=google.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=V32pKeyhScu/adh5qYzQ4Cbl3RLGfTK/a5Wr3zbtD6U=; b=qEZ4N+SOTmM18/
-	mPrTl2ymPnJti4fJRwPDICwB09gjIKMEAwp5vvl7aPRXAkMIH8iqcmjFIPT/UrFm/gct/3H+xCZAr
-	YSk4hqe45L4D6mCAcmt+3ocNEws/JVnFSChd4o0TIfTcy8TAMIM8r0ViFF4TYpCdH3QnonG2A4JSB
-	KmlFnxYgg53xi/MqnN1/E0KqxHiiGIwcAjQD1lyS1C3TgaRiE8MdoKhfqGQtLhYUau/OSxhB177Bc
-	fu0JsdGsd2fEzpfAUiVhK+m9Zs8xEaLc4sqJZ3lmBm3jyffcNz8RteJs2O+a7sjTn6qqsjRaoXE2Z
-	1kKPOOs569xhlxH0gnxw==;
+	List-Owner; bh=DJXYATrkZUCsrapj2aqx7rxVJQffB5oYXrSkUvhSKJ8=; b=OT5N38+Boj33yc
+	qQ3P5f/fTgI6X8PjUW48V9mY3USpqp9kkon9vf9yO2Ce0ZfUPIDSlqtqD9FhdjcmjfzAn57PT7RAN
+	ZjHeGSjm5q0zJfE3wUC05gqkF5tS+z3e1Mf+Gnhdal0ZYQAMqD0eIKQ/NZ2CrMqiOcM2gp3lEPywe
+	CAgRnfYpC37MMWPFvF/rZhiHTBqmY76hu4acT0VWe3GheH5lyRmzu5g2U984vca4H0aA08iPiSeTY
+	VwtApneHN3hxe91ayiTfLeZIC0iMcBUJ7NjXAOL/KmKYRTqnA3fkcTlLdVh80LYAE3SGshyzWpAC5
+	zDMwUL0OoQ12ulOm1lBQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gSsu4-0004oA-V2; Sat, 01 Dec 2018 00:13:00 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gSt1y-0007y1-S4; Sat, 01 Dec 2018 00:21:10 +0000
+Received: from mail-pf1-x444.google.com ([2607:f8b0:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSstu-0004WB-DJ
- for linux-arm-kernel@bombadil.infradead.org; Sat, 01 Dec 2018 00:12:50 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=W5t3HZoYLRFMDy2bY8gUWHcnmXAX0dJvgxyM8JSpx8w=; b=jfcyVoUVWeIYY7lon27V6EBLk
- Pop3Oq1JugIP5o+SbW3sb6sslGE1zZD1/IEWhUAAfuPkr9eQ7atOumfGawfXwBsukSq3KBVLvgS+x
- QLOUxF29CpHQ1MQpcQeoRCaRz2D9L0oZoP/AOX/bFWlKLqs7x+lJRik1yV7cg0QoH+E8yFGuI92Ye
- a2lsCJ+tStTetTKOqm9+zncNN1Aq7QeHnPgfkqS7fM/MWXNScEz3P4KLtYbc6h+284Lr3fSipB2jW
- 8nRXsPuVAQeBUY8ViZQwjpqgjh0qIh/9SRgZCBHfWHXa3Gy1VImGY2bNVpDq2N9VuwepdTcBsF1Qn
- F61rWXz+g==;
-Received: from mail-lj1-x241.google.com ([2a00:1450:4864:20::241])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gSsfG-00023n-I1
- for linux-arm-kernel@lists.infradead.org; Fri, 30 Nov 2018 23:57:44 +0000
-Received: by mail-lj1-x241.google.com with SMTP id t9-v6so6471241ljh.6
+ id 1gSt1w-0007xE-1B
+ for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 00:21:09 +0000
+Received: by mail-pf1-x444.google.com with SMTP id g62so3563086pfd.12
  for <linux-arm-kernel@lists.infradead.org>;
- Fri, 30 Nov 2018 15:57:31 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=lixom-net.20150623.gappssmtp.com; s=20150623;
- h=date:from:to:cc:subject:message-id:references:mime-version
- :content-disposition:in-reply-to:user-agent;
- bh=W5t3HZoYLRFMDy2bY8gUWHcnmXAX0dJvgxyM8JSpx8w=;
- b=YR3+/CpdK/J6OJgiZA0T/CiZqCr/6GW0jzHCb+rbRfh2uFv4gt7AhZHBavqxJQ9WNZ
- 3CKK44ca9cV/XKokONM4C02xIYovmmfWIl3KBIbqpuOJ2CveNC0kD9jHZ0h2EOXCPSR7
- SW0Qgs+umfHkyP73OArIMZcfVVZQM8Qj/Zv+SspyF4TYDg5uc57my5JoP+wUsI1f+Whw
- +OH0L1aEfcjszrSTV70wL41T8I5q4mW8HREURZL1tFZRWF/oWIylxTWC5r9RVM/UXyHK
- EcGOChCoFUqiDxXvPnZ1GObe3qt0OSylvE50d+A6Tc38FBw4Tb6XfkBODqqAQi0/arIg
- HtZQ==
+ Fri, 30 Nov 2018 16:20:54 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=google.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=IK8pBXwWXw/gPWwnM7bo5e6EnorLixIBnHwfVaDQ64U=;
+ b=rCOxYHJ2j97elgHUTYybQgmmCE/GHwWFetapG+BkHlJIgH3qPWfqcQNCeYKOnKODnk
+ 1L1SlT/NPk2ZktF+2LdCkV8JAJvT4KwgzBSNxUR94c6+OrBGmfiBO/q+wHut5pO8iAtq
+ 6jQ3x28NpKPpMxf5EpCMwQd7dT70elryNcrYDoDDpJueURNjHjGNpHjGKWBXrdGD0kSn
+ ojtVi7g4T5o5iQUqT30m96kzRxji67VEQvL8ksUcxw20qMnKWwsyiiuC5VUUxrMF8Nt3
+ CugJBfnfMD7KeZHqdSuNpJF7O6iHTJ0GKzS7PG8eJgK1l3MO+X37sLRNeGEUSosW1+eR
+ ZKDQ==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=W5t3HZoYLRFMDy2bY8gUWHcnmXAX0dJvgxyM8JSpx8w=;
- b=hEwHdvATNVdd4guq96yaqpUO2nu2RQ8SmQeLzti10AeIzEfRKdl5T9zaCSjmgY+vgE
- Xz+XxI1LBdx6TN2jFouXf9kMIl1MhCJ0uyQNh206h+17lqLFRIrQtH/pbABMHC9pcmYW
- pwA+AtOBsusR9cZcsUdxlzo7W4rTY/AFYSQXu1sjZkMHBQhFw4JAuGcTNgSdt8d2YxUH
- vlF5Gq+l5FoxSDyNR/sbRX4yaCO86j3BcwUliRIn5d+Mfm1eERYSwW0JZXCJQEEDj/KW
- LM80nvuFJE2x3L4egMMF6ZOyh3l8ab6UOgqLrr6Zwd5T2C5AW1rgdTBDbcclRiaf+xEE
- iObA==
-X-Gm-Message-State: AA+aEWY6j/WOOcdZReqY/hCkKD8GzyJ5LguidBhdL6m+VvENXKt+Igo8
- IzHC3SlvPFxoZMjoyNXgf4PsayeG/ru9yw==
-X-Google-Smtp-Source: AFSGD/VuZWop6H2jwdnuAGbF+xlRY++ZNkm/M65wjyM5P1uf4mWRsD7N537VROEoW7qYDKVxyN9xhQ==
-X-Received: by 2002:a2e:4a19:: with SMTP id
- x25-v6mr4850961lja.19.1543622250250; 
- Fri, 30 Nov 2018 15:57:30 -0800 (PST)
-Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id p19-v6sm1041676ljb.47.2018.11.30.15.57.29
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Fri, 30 Nov 2018 15:57:29 -0800 (PST)
-Date: Fri, 30 Nov 2018 15:51:07 -0800
-From: Olof Johansson <olof@lixom.net>
-To: Tony Lindgren <tony@atomide.com>
-Subject: Re: [GIT PULL 1/4] soc changes for omaps for v4.21
-Message-ID: <20181130235107.wvtp52bdbs33feky@localhost>
-References: <pull-1543521343-338334@atomide.com>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=IK8pBXwWXw/gPWwnM7bo5e6EnorLixIBnHwfVaDQ64U=;
+ b=tvVH/ObCrOHygF1UB0dIom8AZW7LBT/vlTXh7mWdgLSkWasaw5DZAFF77JkLyPDHz2
+ h900CqJhAgdrixKu4ev2IoiU1gcy4fOzGJFJjSHn3HHfCCYRc0npZ3GQmaOZIyHMbaYU
+ xq5SKnDvh1KV8xkjKX0oATDLwU4sTm4bF30Nefehl5KZnTo79EhscaKr+nYwXYwGIV9r
+ khwP+tq7RQDOgvsBgXI2HsRJjBvDkknxXlIZbUPY2pdCZ/EA6mgqkocSWhUScVuQ9GPy
+ Z2MhxRMMckDrhQ4oNhAxtiiDQXnIKFQSbjGkCNfzMnqOK4T2+CRnTIBgwPpN1F4h8UgP
+ kqOg==
+X-Gm-Message-State: AA+aEWa6P2kzf8g01zD5wqVxbrK+auudqBVnVF7mB2oFxRkszi/TSpER
+ ZQ+fK1x9VGymDtW5/aoEo5ipqsRz6tD/Mm0yOXk49w==
+X-Google-Smtp-Source: AFSGD/UA+AdbqsU7LsK7R+vtC5fB8PpaZR/8l6R5h5wqbpwOk22Er4MwHYDTfPVErm8s4hqL3PDX0dXMKRAlzEJGoYs=
+X-Received: by 2002:a63:e156:: with SMTP id h22mr5330813pgk.255.1543623653481; 
+ Fri, 30 Nov 2018 16:20:53 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <pull-1543521343-338334@atomide.com>
-User-Agent: NeoMutt/20170113 (1.7.2)
+References: <20181130113558.15198-1-ard.biesheuvel@linaro.org>
+In-Reply-To: <20181130113558.15198-1-ard.biesheuvel@linaro.org>
+From: Nick Desaulniers <ndesaulniers@google.com>
+Date: Fri, 30 Nov 2018 16:20:42 -0800
+Message-ID: <CAKwvOdnZKatfVa=dDSBbkrhfJPhsaD_FxVt4YYAvHMQOUimPeg@mail.gmail.com>
+Subject: Re: [PATCH] arm64: drop linker script hack to hide __efistub_ symbols
+To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181130_235742_597604_43C83E3D 
-X-CRM114-Status: GOOD (  15.21  )
+X-CRM114-CacheID: sfid-20181130_162108_083331_0862C667 
+X-CRM114-Status: GOOD (  18.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,46 +89,111 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-omap@vger.kernel.org, arm@kernel.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ Will Deacon <will.deacon@arm.com>, LKML <linux-kernel@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29, 2018 at 11:57:40AM -0800, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
-> 
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-> 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.21/soc-signed
-> 
-> for you to fetch changes up to b76455335447fa8b73ebc0ca768e46ee74fcd329:
-> 
->   ARM: OMAP2+: timer: Remove obsolete inclusion of <asm/smp_twd.h> (2018-11-19 10:06:36 -0800)
-> 
-> ----------------------------------------------------------------
-> SoC changes for omaps for v4.21 merge window
-> 
-> Few more non-critical section annotation fixes for Clang and
-> remove obsolete timer header inclusion.
-> 
-> ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: OMAP2+: timer: Remove obsolete inclusion of <asm/smp_twd.h>
-> 
-> Nathan Chancellor (2):
->       ARM: OMAP2+: hwmod: Fix some section annotations
->       ARM: OMAP2+: prm44xx: Fix section annotation on omap44xx_prm_enable_io_wakeup
+On Fri, Nov 30, 2018 at 3:36 AM Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> Commit 1212f7a16af4 ("scripts/kallsyms: filter arm64's __efistub_
+> symbols") updated the kallsyms code to filter out symbols with
+> the __efistub_ prefix explicitly, so we no longer require the
+> hack in our linker script to emit them as absolute symbols.
+>
+> Cc: Nick Desaulniers <ndesaulniers@google.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Merged, thanks!
+Tested-by: Nick Desaulniers <ndesaulniers@google.com>
+
+Tested linking with bfd and booting in qemu.  Thanks Ard!  lld still
+has some further bugs for us to work out, but this should help
+simplify things for us.
+
+> ---
+>  arch/arm64/kernel/image.h | 46 +++++++++++++++------------------------
+>  1 file changed, 18 insertions(+), 28 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/image.h b/arch/arm64/kernel/image.h
+> index a820ed07fb80..8da289dc843a 100644
+> --- a/arch/arm64/kernel/image.h
+> +++ b/arch/arm64/kernel/image.h
+> @@ -75,16 +75,6 @@
+>
+>  __efistub_stext_offset = stext - _text;
+>
+> -/*
+> - * Prevent the symbol aliases below from being emitted into the kallsyms
+> - * table, by forcing them to be absolute symbols (which are conveniently
+> - * ignored by scripts/kallsyms) rather than section relative symbols.
+> - * The distinction is only relevant for partial linking, and only for symbols
+> - * that are defined within a section declaration (which is not the case for
+> - * the definitions below) so the resulting values will be identical.
+> - */
+> -#define KALLSYMS_HIDE(sym)     ABSOLUTE(sym)
+> -
+>  /*
+>   * The EFI stub has its own symbol namespace prefixed by __efistub_, to
+>   * isolate it from the kernel proper. The following symbols are legally
+> @@ -94,28 +84,28 @@ __efistub_stext_offset = stext - _text;
+>   * linked at. The routines below are all implemented in assembler in a
+>   * position independent manner
+>   */
+> -__efistub_memcmp               = KALLSYMS_HIDE(__pi_memcmp);
+> -__efistub_memchr               = KALLSYMS_HIDE(__pi_memchr);
+> -__efistub_memcpy               = KALLSYMS_HIDE(__pi_memcpy);
+> -__efistub_memmove              = KALLSYMS_HIDE(__pi_memmove);
+> -__efistub_memset               = KALLSYMS_HIDE(__pi_memset);
+> -__efistub_strlen               = KALLSYMS_HIDE(__pi_strlen);
+> -__efistub_strnlen              = KALLSYMS_HIDE(__pi_strnlen);
+> -__efistub_strcmp               = KALLSYMS_HIDE(__pi_strcmp);
+> -__efistub_strncmp              = KALLSYMS_HIDE(__pi_strncmp);
+> -__efistub_strrchr              = KALLSYMS_HIDE(__pi_strrchr);
+> -__efistub___flush_dcache_area  = KALLSYMS_HIDE(__pi___flush_dcache_area);
+> +__efistub_memcmp               = __pi_memcmp;
+> +__efistub_memchr               = __pi_memchr;
+> +__efistub_memcpy               = __pi_memcpy;
+> +__efistub_memmove              = __pi_memmove;
+> +__efistub_memset               = __pi_memset;
+> +__efistub_strlen               = __pi_strlen;
+> +__efistub_strnlen              = __pi_strnlen;
+> +__efistub_strcmp               = __pi_strcmp;
+> +__efistub_strncmp              = __pi_strncmp;
+> +__efistub_strrchr              = __pi_strrchr;
+> +__efistub___flush_dcache_area  = __pi___flush_dcache_area;
+>
+>  #ifdef CONFIG_KASAN
+> -__efistub___memcpy             = KALLSYMS_HIDE(__pi_memcpy);
+> -__efistub___memmove            = KALLSYMS_HIDE(__pi_memmove);
+> -__efistub___memset             = KALLSYMS_HIDE(__pi_memset);
+> +__efistub___memcpy             = __pi_memcpy;
+> +__efistub___memmove            = __pi_memmove;
+> +__efistub___memset             = __pi_memset;
+>  #endif
+>
+> -__efistub__text                        = KALLSYMS_HIDE(_text);
+> -__efistub__end                 = KALLSYMS_HIDE(_end);
+> -__efistub__edata               = KALLSYMS_HIDE(_edata);
+> -__efistub_screen_info          = KALLSYMS_HIDE(screen_info);
+> +__efistub__text                        = _text;
+> +__efistub__end                 = _end;
+> +__efistub__edata               = _edata;
+> +__efistub_screen_info          = screen_info;
+>
+>  #endif
+>
+> --
+> 2.19.1
+>
 
 
--Olof
+-- 
+Thanks,
+~Nick Desaulniers
 
 _______________________________________________
 linux-arm-kernel mailing list
