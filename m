@@ -2,59 +2,57 @@ Return-Path: <SRS0=4WgJ=OK=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.0 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.5 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0CA4CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 17:05:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD4CAC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:20:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CD35A206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 17:05:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B3CF52082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sat,  1 Dec 2018 19:20:14 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u1GxIFRy"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CD35A206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lst.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q3lJFKEh"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B3CF52082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=windriver.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rdAAH8mRUITXnpJe2qj3MgiFh9ZChFNdZYagBFPivZc=; b=u1GxIFRyGZcmkq
-	CGv85PapI2xQshzRD1Bw2pysId/+qVHolnmoKDvGDDryFmoZiya1qIhfHapjNXkjcT/Bgb+Z5nBzD
-	ddjqe2otvm5SYborVrZTSGsl/8ExQFUK2uRlzNjKrVMo9yUz92ttunzrQkcrXxeFueL0nyzfTDAM+
-	a7RA0yKZYJzjHpf5+oUhTzBrDQ7U2f0SXF4dXWUzF/lSCYtlf/TKZ9SwRYxmkAyaMsSSX0foWK/5r
-	ZXC4iudFDbT6cRpPej0Zh7epZmyrn8fBpKYOsDacspVm6/SRNDpSze8OrgCX1HzZirK84fTXw9iTa
-	W5KoscctHbP7ShIoDJmw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=LpGSnRlg2nIJKuXUSw2j1H+ihx0G7D5lm/8SPrHAS4w=; b=Q3lJFKEhUVTseO
+	H8684ET00dvB9P80fMJzdJEHtt32U3bRpwBoqzd3qZWLDNPI9uXyPhjNPvrsQEoSuha89kxRe7QaM
+	SSwslJrI2naKmxKg2Chth2azkN3iRsg4u+ChlodzoK+WtZVeSYLSN5sxv8KDqz63Hc1BdfyJQaR+i
+	ybfxra0YzPVimfYQvRspnhj0dy/zqs8FAv8v4f7Bsz8XAtBUY9SpRJufhtSGLuJ60cVNQW4I6tBjY
+	JQ8qprMqZiYtOIPNKGbtcN3OPC8aKdYPlmAF3hoPimyJ9ICeBULL42vYPtI+ayyA0GjPL6lE/g2ET
+	yXUzTCnxtuUilgOinUTA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gT8hm-0000gB-Ri; Sat, 01 Dec 2018 17:05:22 +0000
-Received: from verein.lst.de ([213.95.11.211] helo=newverein.lst.de)
+	id 1gTAoF-00012S-LM; Sat, 01 Dec 2018 19:20:11 +0000
+Received: from mail.windriver.com ([147.11.1.11])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gT8hj-0000Jz-Of
- for linux-arm-kernel@lists.infradead.org; Sat, 01 Dec 2018 17:05:21 +0000
-Received: by newverein.lst.de (Postfix, from userid 2407)
- id 5A0AF6732A; Sat,  1 Dec 2018 18:05:06 +0100 (CET)
-Date: Sat, 1 Dec 2018 18:05:06 +0100
-From: Christoph Hellwig <hch@lst.de>
-To: Robin Murphy <robin.murphy@arm.com>
-Subject: Re: [PATCH 6/9] dma-remap: support DMA_ATTR_NO_KERNEL_MAPPING
-Message-ID: <20181201170506.GE20912@lst.de>
-References: <20181105121931.13481-1-hch@lst.de>
- <20181105121931.13481-7-hch@lst.de>
- <e993440c-53bf-8071-b1b6-06d022d39e4e@arm.com>
+ id 1gTAo9-00088q-1S; Sat, 01 Dec 2018 19:20:09 +0000
+Received: from ALA-HCA.corp.ad.wrs.com ([147.11.189.40])
+ by mail.windriver.com (8.15.2/8.15.1) with ESMTPS id wB1JJSY8025132
+ (version=TLSv1 cipher=AES128-SHA bits=128 verify=FAIL);
+ Sat, 1 Dec 2018 11:19:28 -0800 (PST)
+Received: from yow-cube1.wrs.com (128.224.56.98) by ALA-HCA.corp.ad.wrs.com
+ (147.11.189.40) with Microsoft SMTP Server id 14.3.408.0; Sat, 1 Dec 2018
+ 11:19:27 -0800
+From: Paul Gortmaker <paul.gortmaker@windriver.com>
+To: Joerg Roedel <joro@8bytes.org>
+Subject: [PATCH v2 0/9] iommu: clean up/remove modular stuff from non-modules.
+Date: Sat, 1 Dec 2018 14:19:08 -0500
+Message-ID: <1543691957-17608-1-git-send-email-paul.gortmaker@windriver.com>
+X-Mailer: git-send-email 2.7.4
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <e993440c-53bf-8071-b1b6-06d022d39e4e@arm.com>
-User-Agent: Mutt/1.5.17 (2007-11-01)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_090519_948869_49DC8594 
-X-CRM114-Status: GOOD (  13.20  )
+X-CRM114-CacheID: sfid-20181201_112005_263004_6078DA18 
+X-CRM114-Status: GOOD (  14.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -66,50 +64,126 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
- iommu@lists.linux-foundation.org, Guo Ren <ren_guo@c-sky.com>,
- Laura Abbott <labbott@redhat.com>, Christoph Hellwig <hch@lst.de>,
- linux-arm-kernel@lists.infradead.org
+Cc: Heiko Stuebner <heiko@sntech.de>, Will Deacon <will.deacon@arm.com>,
+ Daniel Kurtz <djkurtz@chromium.org>,
+ Paul Gortmaker <paul.gortmaker@windriver.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Alexandre Courbot <gnurou@gmail.com>, Simon Xue <xxm@rock-chips.com>,
+ Rob Clark <robdclark@gmail.com>, linux-rockchip@lists.infradead.org,
+ linux-tegra@vger.kernel.org, Stephen Warren <swarren@wwwdotorg.org>,
+ linux-arm-msm@vger.kernel.org, Jeffy Chen <jeffy.chen@rock-chips.com>,
+ linux-mediatek@lists.infradead.org,
+ Stepan Moskovchenko <stepanm@codeaurora.org>,
+ Honghui Zhang <honghui.zhang@mediatek.com>,
+ Matthias Brugger <matthias.bgg@gmail.com>,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ iommu@lists.linux-foundation.org, Robin Murphy <robin.murphy@arm.com>,
+ Nate Watterson <nwatters@codeaurora.org>, Hiroshi Doyu <hdoyu@nvidia.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 07:05:40PM +0000, Robin Murphy wrote:
-> On 05/11/2018 12:19, Christoph Hellwig wrote:
->> Do not waste vmalloc space on allocations that do not require a mapping
->> into the kernel address space.
->>
->> Signed-off-by: Christoph Hellwig <hch@lst.de>
->> ---
->>   kernel/dma/remap.c | 11 +++++++++--
->>   1 file changed, 9 insertions(+), 2 deletions(-)
->>
->> diff --git a/kernel/dma/remap.c b/kernel/dma/remap.c
->> index 8f1fca34b894..10a545126b0b 100644
->> --- a/kernel/dma/remap.c
->> +++ b/kernel/dma/remap.c
->> @@ -200,7 +200,8 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->>     	size = PAGE_ALIGN(size);
->>   -	if (!gfpflags_allow_blocking(flags)) {
->> +	if (!gfpflags_allow_blocking(flags) &&
->> +	    !(attrs & DMA_ATTR_NO_KERNEL_MAPPING)) {
->>   		ret = dma_alloc_from_pool(size, &page, flags);
->>   		if (!ret)
->>   			return NULL;
->> @@ -215,6 +216,9 @@ void *arch_dma_alloc(struct device *dev, size_t size, dma_addr_t *dma_handle,
->>   	/* remove any dirty cache lines on the kernel alias */
->>   	arch_dma_prep_coherent(page, size);
->>   +	if (attrs & DMA_ATTR_NO_KERNEL_MAPPING)
->> +		return page; /* opaqueue cookie */
->
-> Best to preempt the inevitable patch fixing that typo in 3 months' time. 
-> Otherwise,
+The work here represents a scan over the iommu dir, looking for files/drivers
+that have nothing to do with a modular use case, but are using modular
+infrastructure regardless.
 
-Thanks,
+We are trying to make driver code consistent with the Makefiles/Kconfigs that
+control them.  This means not using modular functions/macros for drivers that
+can never be built as a module.  I've done this in other subsystem dirs
+already, and some of this has already happened in drivers/iommu by others;
+such as 98b72b94def9 ("iommu/rockchip: Prohibit unbind and remove").
 
-fixed.
+Using modular infrastructure in non-modules might seem harmless, but some
+of the downfalls this leads to are:
+
+ (1) it is easy to accidentally write unused module_exit and remove code
+ (2) it can be misleading when reading the source, thinking it can be
+     modular when the Makefile and/or Kconfig prohibit it
+ (3) it requires the include of the module.h header file which in turn
+     includes nearly everything else, thus adding to CPP overhead.
+ (4) it gets copied/replicated into other drivers and spreads quickly.
+
+The last two commits (arm-smmu related ones) deserve an extra mention,
+and I put them at the end in case they want to be deferred for later or
+altered.  Normally a "module-ectomy" allows us to delete the ".remove"
+function, as per the rockchip commit above, but ...
+
+A kexec commit (7aa8619a66ae) tried to improve reliability by trying to
+shutdown the iommu in the compromised/crashing kernel, but of course the
+better solution is to have the recovery kernel be able to handle all of
+the possible initial conditions.  It appears this was done later in the
+commit b63b3439b856 - but I don't know if that means relying on an
+orderly shutdown is no longer required - I don't have the platform and
+am only going on what is in git history.
+
+So, as the kexec commit recycled the ".remove" handle to also be the
+".shutdown" handle, in this series the remove function was renamed to
+shutdown, and the ".remove" handle was deleted.  This was IMHO the most
+back compatible way to make this update.  If the reliance on the
+compromised kernel to run ".shutdown" is no longer necessary, then it
+can be removed in a future change.
+
+Patches were build tested on top of next-20181128 for ARM, ARM64, x86-64
+on an allyesconfig.
+
+Paul.
+
+---
+
+[ v2: use recommended iommu subject format, add Acks, trivial tweaks. ]
+
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Daniel Kurtz <djkurtz@chromium.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Hiroshi Doyu <hdoyu@nvidia.com>
+Cc: Honghui Zhang <honghui.zhang@mediatek.com>
+Cc: Jeffy Chen <jeffy.chen@rock-chips.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Nate Watterson <nwatters@codeaurora.org>
+Cc: Rob Clark <robdclark@gmail.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Simon Xue <xxm@rock-chips.com>
+Cc: Stepan Moskovchenko <stepanm@codeaurora.org>
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: iommu@lists.linux-foundation.org
+Cc: linux-arm-kernel@lists.infradead.org
+Cc: linux-arm-msm@vger.kernel.org
+Cc: linux-mediatek@lists.infradead.org
+Cc: linux-rockchip@lists.infradead.org
+Cc: linux-tegra@vger.kernel.org
+
+Paul Gortmaker (9):
+  iommu: audit and remove any unnecessary uses of module.h
+  iommu/rockchip: Make it explicitly non-modular
+  iommu/msm: Make it explicitly non-modular
+  iommu/mediatek: Make it explicitly non-modular
+  iommu/ipmmu-vmsa: Make it explicitly non-modular
+  iommu/qcom: Make it explicitly non-modular
+  iommu/tegra: Make it explicitly non-modular
+  iommu/arm-smmu: Make arm-smmu explicitly non-modular
+  iommu/arm-smmu: Make arm-smmu-v3 explicitly non-modular
+
+ drivers/iommu/arm-smmu-v3.c    | 25 +++++++++----------------
+ drivers/iommu/arm-smmu.c       | 32 +++++++++++++-------------------
+ drivers/iommu/iommu-sysfs.c    |  2 +-
+ drivers/iommu/iommu.c          |  3 ++-
+ drivers/iommu/ipmmu-vmsa.c     | 18 +++---------------
+ drivers/iommu/msm_iommu.c      | 13 +++----------
+ drivers/iommu/mtk_iommu_v1.c   | 15 +++------------
+ drivers/iommu/qcom_iommu.c     | 16 ++--------------
+ drivers/iommu/rockchip-iommu.c | 13 ++++++-------
+ drivers/iommu/tegra-gart.c     | 37 +++++++------------------------------
+ 10 files changed, 49 insertions(+), 125 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
