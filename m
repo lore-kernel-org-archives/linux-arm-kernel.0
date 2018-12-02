@@ -5,19 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 27052C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:41:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3C1CEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:47:38 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1AFE20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:41:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 08AFA20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:47:38 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zh5Gs5nM";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="CbLgmbQX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1AFE20851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="PCrsAs8G";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="HJVCvp1Z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 08AFA20892
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,56 +26,56 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=9KV6g8f+lXWKLkMUX4JKHEWl+13/y8N40G5BtvUUCPY=; b=Zh5Gs5nMNhlFYr
-	5VYwJmXUtj3+PAvYhLFdFRdSjLMvpUEZfzS5npWVfk/FYvfo5xAF5d7sxcsWpSspK2+ndeezpnAIK
-	VDoITC2JeGXMvo8JzZTwtmdF0K6R18yhtkLMqBYZhevjcn1F/9YUvKgtGSDy8rcWX2agPCM690oyf
-	3P55fv5FhCQghwW4EAT4hccL23AxZ8mznbUcQJs6Z91zTKKprw6pc3mVRRL6ltDRX+CLba2YenqY+
-	BF87+RH1eGth7IaOxLE8TRb2MdbI8612bJWZjGxukWoQJc0keAEIqy3vIfdbUJiVxM5LE2I6aMhtX
-	cqI56pgIul/+xbWtotPg==;
+	List-Owner; bh=ygLfweq5FPGmP9gaPpt7+aQ1uuA3K1YGn1ssKdbWmmk=; b=PCrsAs8GtiAZJW
+	qGJSqH1qAg+BKElTvJzw1y/hGOTxj9jQqSWFwSofXP2f68zRwZWYBM0CbkP3eD4sz73qUPN3E9yK9
+	kr4XHdsGfwaFPAuOwW1UI/K1SxNxZELGxWP2x6SMNLH+4NuS/C1SneKzPOJucGIXKcAPTcCvSwNZj
+	4bxPhcbipwMfGAuPoiP3l6o7BYFVf9AJIY/9BtpmS8idDsNBezN6+dMESufU7SMPjpvolevr5mXNN
+	YVaYsjIvMlv3+kOaMnpHh8bV0K3Yq+ku8qHzvDm2PJpSI+VKhIgjB443mp05LzNZ84+yKkapoGAEp
+	4d2ZRDpxfm0zDxl/BQ+w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTXcf-000264-EP; Sun, 02 Dec 2018 19:41:45 +0000
-Received: from mail-pg1-x543.google.com ([2607:f8b0:4864:20::543])
+	id 1gTXiJ-0004Z5-Vo; Sun, 02 Dec 2018 19:47:35 +0000
+Received: from mail-ed1-x541.google.com ([2a00:1450:4864:20::541])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTXca-00024r-VH; Sun, 02 Dec 2018 19:41:43 +0000
-Received: by mail-pg1-x543.google.com with SMTP id w6so4703498pgl.6;
- Sun, 02 Dec 2018 11:41:30 -0800 (PST)
+ id 1gTXiG-0004Xu-1M; Sun, 02 Dec 2018 19:47:34 +0000
+Received: by mail-ed1-x541.google.com with SMTP id f23so8960621edb.3;
+ Sun, 02 Dec 2018 11:47:21 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=PWqF3tMaWLmDxYGNgvdYHYOXwtyqYXJ5fdLlu6YJzVI=;
- b=CbLgmbQX4viZbfrfxqNX6tdwjz1Owi/rSQTCjizJ9LWlSaJVdhsBWbT6addt8p7GBV
- O9bmGgpkBE65tYs5QzAArxqpNAsCexDwMNrmyEQWIbYBf4IJ8JfBcvQWfbrk/fUMmfPl
- jc5Pms1OCoexXM/VXdRC4W8+Ad219emheTquiIwY2YsfUDcnbFh8c2usuIjKhgl7Vt6+
- LuN+dvwRAAS0Il9BcDoDS9qCksmhB3usAfmjjETaCxRf3MYw+PYLpuUDWyN+r3xJ3DPu
- QU4xW409mZlmkSXQdiav079qYnGYm8+wo5WlG6SfVCgPrX6IYiq8b1b+OzZnrxCgc362
- hHfg==
+ bh=Vla8uBSZUkPFDG7ZJBxr9yKrfY2d7vmchRDMnstFLbs=;
+ b=HJVCvp1Z0oliL+jbdmMfe5ndEiQo5Buo5WmcutrIeEIg/WpRcQsRooRJERc4kcNWPu
+ ZCoDchTxncIegohV6e9ySMx6HSis9bmexKw4CCAp/exyKWIkNqZSMEB19CTMmUXHN3nW
+ w00BfRSOnsp7lWbfCQRN4R40nHp8a0J1UHQfo5IO78P2dzYmiohG29xxk77avobw0kYm
+ +kM5TCUJZnYgrEyCcktUB4CDaBPu1/8hxMrCc1PZGHYdL9CQRos+qCIcqYxPg9wlrIZP
+ 0CNQRMWmdzRXeXDfWjdepJS3wqttBzXcL8h5Q0l1nqL+NRRLrbmuEWv524gcThpUDNO2
+ P7PA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=PWqF3tMaWLmDxYGNgvdYHYOXwtyqYXJ5fdLlu6YJzVI=;
- b=iDtcpwQCxQsDhR3gO1zRygOtdZ2qcwUKKt5yMjxpCYwxr3YBOxKkyO0T+9FXROD98p
- ZyROV+IIiUmn508I5X9sPqz4kkVEt1kEu5gbiWooI1uHYe4ejNyPBc/U/HKuIUyFooo3
- RXM0kZGQivtE2VkdaOr43730MLVBUW5UTalLUIx8In7aWN9O/0IfCSxOTZlrYmpJH1Ce
- /Csj01+e+B9tEPtWViQuGl98u//awHw/TVg4o+afsHA/VWX39RVAJwdJO/pOJOVMcMhl
- ZTRh76RHI469oPNpgMvEF5u67rEP5IxlGKKx+PI6QwzcQNB0elg5LAFQ1siaI9Izl3T8
- rkAw==
-X-Gm-Message-State: AA+aEWb0v8hgqkqZP8taDpibfF7unM6H8uodKfuVoK04uh0kz7gAjL6n
- n1oIgNRSNgA2BJdy8th/WbkW9rsm
-X-Google-Smtp-Source: AFSGD/W+RDCIThzvp4nDKR5IXO+Z+cqRUvKatzS6qPO5A2O3znWiFGM3JkLhJ3IgBDseZuzDgmLIwg==
-X-Received: by 2002:aa7:87ce:: with SMTP id i14mr13154120pfo.20.1543779688610; 
- Sun, 02 Dec 2018 11:41:28 -0800 (PST)
+ bh=Vla8uBSZUkPFDG7ZJBxr9yKrfY2d7vmchRDMnstFLbs=;
+ b=XkCzuIsGaK2jmqaTS8H6HpO9of8xUQR0w+RkXz3o9QtDZa13YXPvd5BubdV+HsdZsz
+ a+qt2PD1yOBHyLVUYyku2anldN2RiWejwU9CDQftJaBxfBermvtXo4LoUYJgWMJDUl41
+ 2OLXJihbp1Ht+xHheBqmgrKSHEj8JavoVwDEEi/t3e6Qda4n7bBhD5bMKVNo4C5I9rv3
+ FImpQoO9SoKaok7AJejY2eYUu1ihAOnaOGzXVXOyV1M977H4QB2OiNuenPghADEYLczX
+ 9eUeMmLZFk95+GQ6Y5Rz7iMWpQdk+paCU4cNx/zjUxTNLnQZHzSV49pcpXnhEvsi94aX
+ E69g==
+X-Gm-Message-State: AA+aEWZENDTJZ6+GwZS5Wu9V4XtTaOvey3HPV830kS9Qi92xPe5DkVh9
+ zez9iYBY44/wtogy+KHTiAo=
+X-Google-Smtp-Source: AFSGD/UJiSiNz8s66R+psmIB0tIhaGwrIJfbopQ9KAf5JJver8lbEaqjIudrOKPnRzVvqdu4jZ8p9w==
+X-Received: by 2002:a50:a246:: with SMTP id 64mr12516862edl.43.1543780040689; 
+ Sun, 02 Dec 2018 11:47:20 -0800 (PST)
 Received: from ziggy.stardust ([93.176.147.153])
- by smtp.gmail.com with ESMTPSA id f64sm40364226pfh.0.2018.12.02.11.41.25
+ by smtp.gmail.com with ESMTPSA id n16-v6sm1828026eja.6.2018.12.02.11.47.18
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 02 Dec 2018 11:41:27 -0800 (PST)
-Subject: Re: [PATCH] MAINTAINERS: mediatek: Update SoC entry
-To: arnd@arndb.de, gregkh@linuxfoundation.org, mchehab+samsung@kernel.org,
- davem@davemloft.net, akpm@linux-foundation.org
-References: <20181016145758.12995-1-matthias.bgg@gmail.com>
+ Sun, 02 Dec 2018 11:47:20 -0800 (PST)
+Subject: Re: [PATCH v27 1/2] arm64: dts: mt8173: Add GCE node
+To: Houlong Wei <houlong.wei@mediatek.com>
+References: <1543462629-32746-1-git-send-email-houlong.wei@mediatek.com>
+ <1543462629-32746-2-git-send-email-houlong.wei@mediatek.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -121,16 +121,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  XM8DY1aFdU79pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp
  3mlIFZ6fsEKIAN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHc
  UXI+r2JwH1CJjrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <2529be64-7737-6237-7558-fb15dd22b513@gmail.com>
-Date: Sun, 2 Dec 2018 20:39:13 +0100
+Message-ID: <99c858af-f9dd-0fa6-6554-a624d71a1967@gmail.com>
+Date: Sun, 2 Dec 2018 20:47:18 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.0
 MIME-Version: 1.0
-In-Reply-To: <20181016145758.12995-1-matthias.bgg@gmail.com>
+In-Reply-To: <1543462629-32746-2-git-send-email-houlong.wei@mediatek.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_114141_010561_0792A1F6 
-X-CRM114-Status: GOOD (  15.04  )
+X-CRM114-CacheID: sfid-20181202_114732_078098_0A1AC9B8 
+X-CRM114-Status: GOOD (  18.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -142,8 +142,18 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: arm-soc <arm@kernel.org>, linux-mediatek@lists.infradead.org,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Daniel Kurtz <djkurtz@chromium.org>, Monica Wang <monica.wang@mediatek.com>,
+ enzhu.wang@mediatek.com, Jiaguang Zhang <jiaguang.zhang@mediatek.com>,
+ Nicolas Boichat <drinkcat@chromium.org>, Jassi Brar <jassisinghbrar@gmail.com>,
+ HS Liao <hs.liao@mediatek.com>, Bibby Hsieh <bibby.hsieh@mediatek.com>,
+ YT Shen <yt.shen@mediatek.com>, devicetree@vger.kernel.org,
+ kendrick.hsu@mediatek.com, Sascha Hauer <kernel@pengutronix.de>,
+ Daoyuan Huang <daoyuan.huang@mediatek.com>,
+ Sascha Hauer <s.hauer@pengutronix.de>, CK HU <ck.hu@mediatek.com>,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, srv_heupstream@mediatek.com,
+ linux-kernel@vger.kernel.org, Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>,
+ ginny.chen@mediatek.com, Philipp Zabel <p.zabel@pengutronix.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
@@ -151,45 +161,48 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 
 
-On 16/10/2018 16:57, Matthias Brugger wrote:
-> Add IRC channel and URL of the wiki.
-> Also add soc drivers folder and regex to catch more
-> mediatek components.
+On 29/11/2018 04:37, Houlong Wei wrote:
+> This patch adds the device node of the GCE hardware for CMDQ module.
 > 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
 > ---
-
-Any comments on this patch?
-Through which tree should it go?
-
-Regards,
-Matthias
-
->  MAINTAINERS | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 6ac000cc006d..66782dad6487 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1676,13 +1676,17 @@ ARM/Mediatek SoC support
->  M:	Matthias Brugger <matthias.bgg@gmail.com>
->  L:	linux-arm-kernel@lists.infradead.org (moderated for non-subscribers)
->  L:	linux-mediatek@lists.infradead.org (moderated for non-subscribers)
-> +W:	https://mtk.bcnfs.org/
-> +C:	irc://chat.freenode.net/linux-mediatek
->  S:	Maintained
->  F:	arch/arm/boot/dts/mt6*
->  F:	arch/arm/boot/dts/mt7*
->  F:	arch/arm/boot/dts/mt8*
->  F:	arch/arm/mach-mediatek/
->  F:	arch/arm64/boot/dts/mediatek/
-> +F:	drivers/soc/mediatek/
->  N:	mtk
-> +N:	mt[678]
->  K:	mediatek
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index abd2f15..412ffd4 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+
+Applied to v4.20-next/dts64
+
+Thanks a lot, it was a long journey :)
+
+> @@ -18,6 +18,7 @@
+>  #include <dt-bindings/phy/phy.h>
+>  #include <dt-bindings/power/mt8173-power.h>
+>  #include <dt-bindings/reset/mt8173-resets.h>
+> +#include <dt-bindings/gce/mt8173-gce.h>
+>  #include "mt8173-pinfunc.h"
 >  
->  ARM/Mediatek USB3 PHY DRIVER
+>  / {
+> @@ -521,6 +522,15 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		gce: mailbox@10212000 {
+> +			compatible = "mediatek,mt8173-gce";
+> +			reg = <0 0x10212000 0 0x1000>;
+> +			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
+> +			clocks = <&infracfg CLK_INFRA_GCE>;
+> +			clock-names = "gce";
+> +			#mbox-cells = <3>;
+> +		};
+> +
+>  		mipi_tx0: mipi-dphy@10215000 {
+>  			compatible = "mediatek,mt8173-mipi-tx";
+>  			reg = <0 0x10215000 0 0x1000>;
 > 
 
 _______________________________________________
