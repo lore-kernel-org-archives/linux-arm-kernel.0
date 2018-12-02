@@ -8,17 +8,17 @@ X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E940AC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:27:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 16BC4C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:27:46 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 677B720881
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:27:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C464B20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:27:45 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lj31RIzN";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="aNUqTPbs"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 677B720881
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kenV4aiZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="T2skOmWU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C464B20851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,65 +28,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=wPMgTj9zl1IKMXhHHDCqwloEHTBe2hJr0B1AsLPJKIk=; b=Lj31RIzNtix7WLd0axyj5dEJFJ
-	Iaso/+LcmLjPMNKUVWNHNjoLYYDsil2zjxULeiTZoB8/Nn7g4IcvyhnTiV7vC9ChWTVvNi1K9tOcW
-	IeFGGhJjYqLjj3Seth44V+4JUTox62jTYzXJxw477ZdI7fJHtXlbEQ57m02HVj36aj6FOh1lmqDlJ
-	FAOmU6r/51UWPI8b1yfdrhAX/W1Pjfnww/mPDlVEr/gqFC3bf+kEr3a43fgX8Ng/fhF5I7XBbaFpv
-	XhM8mHWV4GRny0BDhfibdxK1DIkpleecvG/55QmP3CffNgKpKkenIL98FNdzswrBgZCrrRmWcVgY8
-	uJZRsKwQ==;
+	bh=N0XFMomDPta1Rs+Dt2cAbXh2CCi+NY5s4wteCQqm3k8=; b=kenV4aiZrFmM1mkHY3udVIOEP4
+	GhGlpF/87/W+BVl0n4PxoQIei81dPFuWBw/AxWs+osncdKYXHdOOYhjZp5/gt3XBGVGWKeWxX4bp5
+	tfpn6meDWHszNfpyQWPf78/WpTrq95UPiL1rZpJ+BJ9KuTetB2u3jQv97vYIQIvJC+jq9FzGZwNmt
+	r6dMsHDVYOFGifw2jj9ZByhOExAY/UIA/BDQ9hoheDYBPs+QyIWZbp9mFcIrvim5pehrNqPsvJXNO
+	PoZJd9QN3p5xH7w0dhs8CVFQRGdnqiw2q361WilDPonfprP0a3O/bH+V7OMMumN8fQN07sbIQ+xTl
+	L/YWQNFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTYKr-0006FO-6u; Sun, 02 Dec 2018 20:27:25 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gTYL7-0006X5-GM; Sun, 02 Dec 2018 20:27:41 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTYIF-00024U-47
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:24:52 +0000
-Received: by mail-wm1-x341.google.com with SMTP id g67so3664658wmd.2
+ id 1gTYID-0002Dw-Ti
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:24:51 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so10054864wrw.5
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 12:24:32 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:40 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=b3VT8ipXM4GVCZfalW4x+w8+g6CzhWh2u23wr46Xid4=;
- b=aNUqTPbso6m71CsDPncXaS+OD9GjWDC8sdZNTC5QUXKn5NR3XXevF+2rH7Kos/bZgq
- +HVpsXGjnXO2I61hUE4benHItT6tIgyGNYqMeOrS7HdRZDYkxBLH0YmGqR89wOjYPiYg
- lfcZW2ruOVm9y+auWUQAr2VxlodOPgEwepwWk9qtvg2QDO9jmtNi28noUbpf2ErVxw1h
- LTrD1SKoxVMDkwsfKbjMAIw1KrP7fX/A2Hl6v2VORzADCh8qMCUOCo93k48Tm2mwp7Iw
- ZgGnMqXIq+wMz3Qk9Yeb0iKaFTxrrksbYq/f09V/EuRZ+k2zyvheFhCgKrOkV31prfTK
- 6dlg==
+ bh=9WG2eU/ejG4wAWToKoueA27/6ygzN1rLZLWAo8LIhNE=;
+ b=T2skOmWUlvAkqf6eBm9og5ZfS9jT1KI23fo/nbKhhS856UmFfaUb8HwHgXouxyXthM
+ sqoQ7sQP2T4sVDfkt+m/FOjxKdEwXC4uMOTqofGMZYfg3pHItllfWhd26mB9eeFbg1FC
+ nN8elPRFBkCLS6+x3mMhqyVYB4IsnEhDMk/0nXmBVrB1rp60vpT4pxOmsdScTjjoTt0g
+ y78LIjXNmm/ATEgZSit7wigak9HNNVPqEVJRruahzGnjCn0FOLQ6vzdxjgLU1ywH5ecz
+ BitLT4LVFASPkDx3Wt9iVEtDFmlGMWFDqasRXxj9y8vnUwe9x/Y/fMBNhUSVPS8aSJwF
+ OL0w==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=b3VT8ipXM4GVCZfalW4x+w8+g6CzhWh2u23wr46Xid4=;
- b=h9nJ9QdOdRYp6yOBrFVjp3r/ZmYfPP6Qyv+O4xUioJ0yHHRJsjB8ZqB1dvPa77FW9t
- RApxShjR0Ou6iLkvpp9zDMPN8Vhre5nQZnRMHjmu44H3yW1lIKTt99kfdysHwRc8XQUn
- T0lxqqPxnmWtk/9IpVxQRG8WfuIvfyEssHNoW4xCtYNxqqvU+6AB87PF35r6E14ZCScb
- XnPlMRhAt1weuWijJ9uQ6VKASrtgoJrGN7ehXEzYMfAwPMlxdrSqSwfK35B/Yqe5Arz4
- /EIYmCFG2HOPAqG9Yq4w6PNFiLXCiYSruAPBxV6eYLvu4OFtDF/KyowWsR9hz7NuIrD7
- PMUQ==
-X-Gm-Message-State: AA+aEWaBVsle3mu4Gsd/gWzWNTqMAXexliRuzWtZjVJCE08GSU+czBts
- RKQKWND6zkO2wHprnY8yQqg=
-X-Google-Smtp-Source: AFSGD/VH0g5NGCrKj4K3ZKMdWMNXZ10pqp0zr3BBq6RdMbSLXd+fpFXumiuxq4rbqS8pJkeiQZPd7A==
-X-Received: by 2002:a1c:2807:: with SMTP id
- o7-v6mr5699286wmo.138.1543782271634; 
- Sun, 02 Dec 2018 12:24:31 -0800 (PST)
+ bh=9WG2eU/ejG4wAWToKoueA27/6ygzN1rLZLWAo8LIhNE=;
+ b=G3hU8vOjJ8sw44mJYUAL4E4PtsELhP9Yk+jpEeNMwi9AnxxmhpzKJDcAWZW8zyjgS8
+ x62MZRD6ZomQwFzzsmF8A50JoSEB7ZO4ndkY9Pl3qx6Jy6itXCKpRwHNvfCCcS/PNQhC
+ L30TYJl7SoVE31JcIrp+WjemOwzabHepzg/MbEKqnr93KC5+5y72J8P9Ay2wxF3/XKvn
+ dM9v9/41YrPUX8QYNek6MZRdQFZWuCEFzCek2xBFpbMAb73zBX60hAfu4l8Qd+FJvtJz
+ NngftVq7W3PnOWiFuWtZYTuhi9OVUtzaRdgqz1V5D6IWymqsP9+Xxdp3EgB08jDOcRxV
+ QkhA==
+X-Gm-Message-State: AA+aEWZDv5LnxVWxMx/I8O5T5EsHjvnIpW0WLMLqTiECts0SaLevKa66
+ q+M/efd+9TJzwgk1yOS1l5U=
+X-Google-Smtp-Source: AFSGD/XRntLJPSM0w/Zsn7h1n0X9PgvCcz+6P5fwxaPwEuoO7d0rpyeQLePdNF9RAuMCz6TteCsl2Q==
+X-Received: by 2002:adf:82e4:: with SMTP id 91mr12176031wrc.131.1543782278799; 
+ Sun, 02 Dec 2018 12:24:38 -0800 (PST)
 Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.29
+ by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.37
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 12:24:31 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:38 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-gpio@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v6 12/17] dt-bindings: clock: Add Allwinner suniv F1C100s CCU
-Date: Sun,  2 Dec 2018 23:23:46 +0300
-Message-Id: <963e6608b509ae7a83966c76b9d0fc7d8bf1c07b.1543781680.git.mesihkilinc@gmail.com>
+Subject: [PATCH v6 16/17] ARM: dts: suniv: add initial DTSI file for F1C100s
+Date: Sun,  2 Dec 2018 23:23:50 +0300
+Message-Id: <dafe3e548064535cfc32934c079b53a5c45fcd48.1543781680.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <cover.1543781680.git.mesihkilinc@gmail.com>
 References: <cover.1543781680.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_122443_926307_D64C3458 
-X-CRM114-Status: GOOD (  15.22  )
+X-CRM114-CacheID: sfid-20181202_122442_901926_04BE2C2C 
+X-CRM114-Status: GOOD (  15.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,152 +111,169 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add compatiple string for Allwinner suniv F1C100s CCU.
-Add clock and reset definitions.
+F1C100s is one product with the suniv die, which has a 32MiB co-packaged
+DDR1 DRAM chip. As we have the support for suniv pin controller and CCU now, add a
+initial DTSI for it.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
-Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
-Acked-by: Stephen Boyd <sboyd@kernel.org>
 ---
- .../devicetree/bindings/clock/sunxi-ccu.txt        |  1 +
- include/dt-bindings/clock/suniv-ccu-f1c100s.h      | 70 ++++++++++++++++++++++
- include/dt-bindings/reset/suniv-ccu-f1c100s.h      | 38 ++++++++++++
- 3 files changed, 109 insertions(+)
- create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
- create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
+ arch/arm/boot/dts/suniv-f1c100s.dtsi | 147 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 147 insertions(+)
+ create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-index 47d2e90..e3bd88a 100644
---- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-@@ -22,6 +22,7 @@ Required properties :
- 		- "allwinner,sun50i-h5-ccu"
- 		- "allwinner,sun50i-h6-ccu"
- 		- "allwinner,sun50i-h6-r-ccu"
-+		- "allwinner,suniv-f1c100s-ccu"
- 		- "nextthing,gr8-ccu"
- 
- - reg: Must contain the registers base address and length
-diff --git a/include/dt-bindings/clock/suniv-ccu-f1c100s.h b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
+diff --git a/arch/arm/boot/dts/suniv-f1c100s.dtsi b/arch/arm/boot/dts/suniv-f1c100s.dtsi
 new file mode 100644
-index 0000000..f5ac155
+index 0000000..aff5f90
 --- /dev/null
-+++ b/include/dt-bindings/clock/suniv-ccu-f1c100s.h
-@@ -0,0 +1,70 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ *
-+ * Copyright (c) 2018 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
++++ b/arch/arm/boot/dts/suniv-f1c100s.dtsi
+@@ -0,0 +1,147 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * Copyright 2018 Icenowy Zheng <icenowy@aosc.io>
++ * Copyright 2018 Mesih Kilinc <mesihkilinc@gmail.com>
 + */
 +
-+#ifndef _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
-+#define _DT_BINDINGS_CLK_SUNIV_F1C100S_H_
++#include <dt-bindings/clock/suniv-ccu-f1c100s.h>
++#include <dt-bindings/reset/suniv-ccu-f1c100s.h>
 +
-+#define CLK_CPU			11
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&intc>;
 +
-+#define CLK_BUS_DMA		14
-+#define CLK_BUS_MMC0		15
-+#define CLK_BUS_MMC1		16
-+#define CLK_BUS_DRAM		17
-+#define CLK_BUS_SPI0		18
-+#define CLK_BUS_SPI1		19
-+#define CLK_BUS_OTG		20
-+#define CLK_BUS_VE		21
-+#define CLK_BUS_LCD		22
-+#define CLK_BUS_DEINTERLACE	23
-+#define CLK_BUS_CSI		24
-+#define CLK_BUS_TVD		25
-+#define CLK_BUS_TVE		26
-+#define CLK_BUS_DE_BE		27
-+#define CLK_BUS_DE_FE		28
-+#define CLK_BUS_CODEC		29
-+#define CLK_BUS_SPDIF		30
-+#define CLK_BUS_IR		31
-+#define CLK_BUS_RSB		32
-+#define CLK_BUS_I2S0		33
-+#define CLK_BUS_I2C0		34
-+#define CLK_BUS_I2C1		35
-+#define CLK_BUS_I2C2		36
-+#define CLK_BUS_PIO		37
-+#define CLK_BUS_UART0		38
-+#define CLK_BUS_UART1		39
-+#define CLK_BUS_UART2		40
++	clocks {
++		osc24M: clk-24M {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
 +
-+#define CLK_MMC0		41
-+#define CLK_MMC0_SAMPLE		42
-+#define CLK_MMC0_OUTPUT		43
-+#define CLK_MMC1		44
-+#define CLK_MMC1_SAMPLE		45
-+#define CLK_MMC1_OUTPUT		46
-+#define CLK_I2S			47
-+#define CLK_SPDIF		48
++		osc32k: clk-32k {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
++	};
 +
-+#define CLK_USB_PHY0		49
++	cpus {
++		cpu {
++			compatible = "arm,arm926ej-s";
++			device_type = "cpu";
++		};
++	};
 +
-+#define CLK_DRAM_VE		50
-+#define CLK_DRAM_CSI		51
-+#define CLK_DRAM_DEINTERLACE	52
-+#define CLK_DRAM_TVD		53
-+#define CLK_DRAM_DE_FE		54
-+#define CLK_DRAM_DE_BE		55
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
 +
-+#define CLK_DE_BE		56
-+#define CLK_DE_FE		57
-+#define CLK_TCON		58
-+#define CLK_DEINTERLACE		59
-+#define CLK_TVE2_CLK		60
-+#define CLK_TVE1_CLK		61
-+#define CLK_TVD			62
-+#define CLK_CSI			63
-+#define CLK_VE			64
-+#define CLK_CODEC		65
-+#define CLK_AVS			66
++		sram-controller@1c00000 {
++			compatible = "allwinner,suniv-f1c100s-system-control",
++				     "allwinner,sun4i-a10-system-control";
++			reg = <0x01c00000 0x30>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
 +
-+#endif
-diff --git a/include/dt-bindings/reset/suniv-ccu-f1c100s.h b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-new file mode 100644
-index 0000000..6a4b438
---- /dev/null
-+++ b/include/dt-bindings/reset/suniv-ccu-f1c100s.h
-@@ -0,0 +1,38 @@
-+/* SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ *
-+ * Copyright (C) 2018 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ */
++			sram_d: sram@10000 {
++				compatible = "mmio-sram";
++				reg = <0x00010000 0x1000>;
++				#address-cells = <1>;
++				#size-cells = <1>;
++				ranges = <0 0x00010000 0x1000>;
 +
-+#ifndef _DT_BINDINGS_RST_SUNIV_F1C100S_H_
-+#define _DT_BINDINGS_RST_SUNIV_F1C100S_H_
++				otg_sram: sram-section@0 {
++					compatible = "allwinner,suniv-f1c100s-sram-d",
++						     "allwinner,sun4i-a10-sram-d";
++					reg = <0x0000 0x1000>;
++					status = "disabled";
++				};
++			};
++		};
 +
-+#define RST_USB_PHY0		0
-+#define RST_BUS_DMA		1
-+#define RST_BUS_MMC0		2
-+#define RST_BUS_MMC1		3
-+#define RST_BUS_DRAM		4
-+#define RST_BUS_SPI0		5
-+#define RST_BUS_SPI1		6
-+#define RST_BUS_OTG		7
-+#define RST_BUS_VE		8
-+#define RST_BUS_LCD		9
-+#define RST_BUS_DEINTERLACE	10
-+#define RST_BUS_CSI		11
-+#define RST_BUS_TVD		12
-+#define RST_BUS_TVE		13
-+#define RST_BUS_DE_BE		14
-+#define RST_BUS_DE_FE		15
-+#define RST_BUS_CODEC		16
-+#define RST_BUS_SPDIF		17
-+#define RST_BUS_IR		18
-+#define RST_BUS_RSB		19
-+#define RST_BUS_I2S0		20
-+#define RST_BUS_I2C0		21
-+#define RST_BUS_I2C1		22
-+#define RST_BUS_I2C2		23
-+#define RST_BUS_UART0		24
-+#define RST_BUS_UART1		25
-+#define RST_BUS_UART2		26
++		ccu: clock@1c20000 {
++			compatible = "allwinner,suniv-f1c100s-ccu";
++			reg = <0x01c20000 0x400>;
++			clocks = <&osc24M>, <&osc32k>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
 +
-+#endif /* _DT_BINDINGS_RST_SUNIV_F1C100S_H_ */
++		intc: interrupt-controller@1c20400 {
++			compatible = "allwinner,suniv-f1c100s-ic";
++			reg = <0x01c20400 0x400>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		pio: pinctrl@1c20800 {
++			compatible = "allwinner,suniv-f1c100s-pinctrl";
++			reg = <0x01c20800 0x400>;
++			interrupts = <38>, <39>, <40>;
++			clocks = <&ccu 37>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			#gpio-cells = <3>;
++
++			uart0_pe_pins: uart0-pe-pins {
++				pins = "PE0", "PE1";
++				function = "uart0";
++			};
++		};
++
++		timer@1c20c00 {
++			compatible = "allwinner,suniv-f1c100s-timer";
++			reg = <0x01c20c00 0x90>;
++			interrupts = <13>;
++			clocks = <&osc24M>;
++		};
++
++		wdt: watchdog@1c20ca0 {
++			compatible = "allwinner,suniv-f1c100s-wdt",
++				     "allwinner,sun4i-a10-wdt";
++			reg = <0x01c20ca0 0x20>;
++		};
++
++		uart0: serial@1c25000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25000 0x400>;
++			interrupts = <1>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 38>;
++			resets = <&ccu 24>;
++			status = "disabled";
++		};
++
++		uart1: serial@1c25400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25400 0x400>;
++			interrupts = <2>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 39>;
++			resets = <&ccu 25>;
++			status = "disabled";
++		};
++
++		uart2: serial@1c25800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c25800 0x400>;
++			interrupts = <3>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu 40>;
++			resets = <&ccu 26>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 2.7.4
 
