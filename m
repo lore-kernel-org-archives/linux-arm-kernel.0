@@ -2,81 +2,81 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-10.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1413CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:48:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 870ABC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:57:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D017020851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:48:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 553C920834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:57:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TIHMV/lu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="T0G7LyLt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D017020851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="I6qRr0iZ";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="YfkQO8X/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 553C920834
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	Message-ID:References:To:From:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1ihnhUC0W4uxno5fktKuyRZp8pTKOktRawS/wyMdTnU=; b=TIHMV/lu9oXwrs
-	d571jGKQ5RQkqyT3muivF+XwvjUny8YT9PJhJswzVXlNPr/05831+znoLHHi339pjEFNt37v+P91x
-	mGSqC19YYVUQEu1enCT6HzJE8GNOX0Tm/SYZ0v2jOimV84HiMKmvsljM8yLx0P6oiyBfCRCKa8DSH
-	/0oW96qfHp1mFDnN7YAHEjQylXaKD46pfQMwCBH5YQK4NpVpLMtKlsVCVTCJTg6vSYiCu/IXaUTcf
-	1b/szlGZnmobs+vZgyP0QJULmjzrVzLpftCg0T4Is0dgfsa5bm2dO+mifZ7VCoXYbAPpMn6euFJ24
-	fjOw5dAY8kKx0okbLvuQ==;
+	List-Owner; bh=AoA4Q+1LxcT9ItKRVYuVi8CiW/xHvIAH7qwhks2lx0s=; b=I6qRr0iZrfNiAX
+	BNcp0h4bi/+qj5Q78fcK4U7GN9cst+XN3CpdwRoBTfe4olAY0eAdQLW9SdW9VYay316X/PLvaWN/g
+	TIvQVqnlPih4rzpoFsz5ruVwAYKdF+dYALhJ4WD42OFCuXIxgul5sg/0S5Qcnwgv3TsaeidV4dmnL
+	9BjEvRcXFMp6HDuVv1EWTNSYH1yi2L5LvXMJZplum/KxpWP7qZQmOcFYiVxQ1o+Z8HpPZayiJkqQj
+	X9+yxvpEKgJpczgrWbShG3Vbu96HU3bfEIc/y5XQVKLCtrXrHbe8bpgJz/py+1Xs+mdUa7vTappn2
+	Tikty0NbRHyiKcBiKcqQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTXie-0004th-Fr; Sun, 02 Dec 2018 19:47:56 +0000
+	id 1gTXrg-00087u-6M; Sun, 02 Dec 2018 19:57:16 +0000
 Received: from mail-ed1-x542.google.com ([2a00:1450:4864:20::542])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTXiZ-0004d8-0D; Sun, 02 Dec 2018 19:47:53 +0000
-Received: by mail-ed1-x542.google.com with SMTP id y56so8911939edd.11;
- Sun, 02 Dec 2018 11:47:40 -0800 (PST)
+ id 1gTXrc-000871-Bv; Sun, 02 Dec 2018 19:57:13 +0000
+Received: by mail-ed1-x542.google.com with SMTP id o10so8927895edt.13;
+ Sun, 02 Dec 2018 11:57:02 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
+ h=subject:from:to:cc:references:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=hyZyF9GQ1xqzTmMsHX2JOnraF+CGzvULpqgyXQAI7jw=;
- b=T0G7LyLtXLOIWWiZ4X/qhYyiwbh2kcp/txdXpmqm0nyiAKGlM3FLrwMLMSMymj1+pL
- 6n7TQ6EEQnlksiFAe7kAfjEzpnnwrAhAXYeaRr9eaJy5RCmV7w7k+re6gqOx9mxOHweD
- 1eyAKMUGfFtBJk30dFLS6v9WCfQqAWNzWUQ8lzvJY2W7A5iwskLKFVw0MJXnQ0fBrxk5
- RrY1uNhKsl/icpqIHEC68qSLdc55AKYoTPx7Ev8SwAGXx/dv6ze2NR54zxsZRsRDpdDz
- 1qynoa5MGyB8aPDUN55DdEWfEisoJXfj4LVzWkA9VQ48WKH4JBETwL0T6vC9Muae0bPg
- v/sw==
+ bh=8MHVvAsabTkcIa8zDnpkWJMj8BIxD4hQPN/IhFTJqRU=;
+ b=YfkQO8X/Cm4NcJbjwZsWCpSu0zzeKT5H8Xbb49efK5AOH0GlXizkOMHNY3/HIPECpv
+ FWztMPTRop7AiMoQBjEsMVFXbul6Y1YMFt4zU8DZsSavG+mk+WgxcqFlq9uauJdoql8y
+ bO0GmLADRB+9vOGfMgNNkkZ4yohq+fQhhVv54kaGj5xXkZM3Md49bK+uGs6QaLUMCNMQ
+ 5x7sFbbJ8yGLe04e2iZiKkVXE4UZFkOI4Pgv7dXxOF0i3MVuTvP+ra8e7LF37VTa3LHi
+ 4iPWGa+FWUZFbTkfSRpUNnm9UX9l3mj3C53Od+FM8tuWaYQ57o3r5924xkhWycI0nMl2
+ FDKA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
+ h=x-gm-message-state:subject:from:to:cc:references:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=hyZyF9GQ1xqzTmMsHX2JOnraF+CGzvULpqgyXQAI7jw=;
- b=BeE4Zc25/GWYgDJKfNSCC4Xks9KU5LIODbJfOVmQ3Pa+ie37GDNmy3SWIwFkVBlGKA
- rgmlJGd3fW8dR4sXAqhp7R40wUulHFYuhd0dJRkSlapifcFflUYNu/8zF3mHlXWo7LWO
- cu5cF9GvmRe/Joc1x+YVgu6IybjzYZAQlLvYCCJGu2yMa54iE6sP6tFoy01udjSyQAXd
- 1dw/DPQsvr8kvocBWl8Y67R8aepcX/NwTAZ8/bIviaoYSblwk8cql+SLoTrrq9jRDq+g
- uE/iw3x3hp7wjaYEfpjnyOgt3SZduLpu764FMGlWcCgLtOsAkDorI5Ov7apo6Lbi2OZJ
- 2SQQ==
-X-Gm-Message-State: AA+aEWYEbHK504CltMW+zV+wEO14qXWRihHxLkaSzw84UMaCmeXlZ3Ws
- Ju9QcUAzKf3w6dwgohLyRrmSPG3p7aI=
-X-Google-Smtp-Source: AFSGD/Vx+W+8ml/oaQZU0JbLC3Z2qv4STrmrDfx4V0QaSI6kKLDXbLwSoZQPe+/RkiuS0O96POWtpQ==
-X-Received: by 2002:a50:a5e2:: with SMTP id b31mr12157642edc.5.1543780058908; 
- Sun, 02 Dec 2018 11:47:38 -0800 (PST)
+ bh=8MHVvAsabTkcIa8zDnpkWJMj8BIxD4hQPN/IhFTJqRU=;
+ b=HyP71TPG7M/3mdEZ5tbuBrZTWmxQ5+kmU41ZBnaR7fVP7XHpuhLPCtUO2afMV9Qbo/
+ EQI7dSXgg4rvCSgUmn+STHcDIrTMQJRfevhgeYLAarxBTooV684dRr3BaBTu2DLfpQgp
+ 1oQCPzPzroV8E8gcfD8btJ/snkteYvhnOk7oMD/n9EMgEqg+Wak73K79hqIaw1BsVScT
+ TlSRgt8S1c/qB4k/bwzl4WZSWZ0GD623wynEZD3e/kuXZpTxnf8CLSfwRx6wx1rqdhEU
+ cQoOeTAvP/BjKCNTKXLs8yEwcnGMBEPY5A1VrL0HAdyyCXcVwHQrt/t29kFWDKkCZA/v
+ y6dg==
+X-Gm-Message-State: AA+aEWZi49503LjU769PNZq9eypSw8zsFAplWUoRornSlPN3tWBb/euJ
+ kVcZI4v54Vp3OMpRB4LDL2ZtKe5y2MI=
+X-Google-Smtp-Source: AFSGD/Xk3zO4cFOL+UMoD8HYvjYL1HWA655WKsUxexTN/DgjkMNrcC8yMyjDdNpsgeMx8rkKQeCogQ==
+X-Received: by 2002:aa7:c5d0:: with SMTP id h16mr12516928eds.107.1543780620816; 
+ Sun, 02 Dec 2018 11:57:00 -0800 (PST)
 Received: from ziggy.stardust ([93.176.147.153])
- by smtp.gmail.com with ESMTPSA id g3sm3382431edc.63.2018.12.02.11.47.36
+ by smtp.gmail.com with ESMTPSA id e26-v6sm1854302ejb.29.2018.12.02.11.56.59
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 02 Dec 2018 11:47:38 -0800 (PST)
-Subject: Re: [PATCH v27 2/2] soc: mediatek: Add Mediatek CMDQ helper
-To: Houlong Wei <houlong.wei@mediatek.com>
-References: <1543462629-32746-1-git-send-email-houlong.wei@mediatek.com>
- <1543462629-32746-3-git-send-email-houlong.wei@mediatek.com>
+ Sun, 02 Dec 2018 11:57:00 -0800 (PST)
+Subject: Re: [GIT PULL] arm: mediatek: DT fixes for v4.20
 From: Matthias Brugger <matthias.bgg@gmail.com>
+To: arm-soc <arm@kernel.org>
+References: <d131fdd3-663c-9a5b-4296-94f2635f8c41@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  xsFNBFP1zgUBEAC21D6hk7//0kOmsUrE3eZ55kjc9DmFPKIz6l4NggqwQjBNRHIMh04BbCMY
@@ -121,16 +121,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  XM8DY1aFdU79pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp
  3mlIFZ6fsEKIAN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHc
  UXI+r2JwH1CJjrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <c83a5c67-4470-7242-f1e4-8692ee146cea@gmail.com>
-Date: Sun, 2 Dec 2018 20:47:36 +0100
+Message-ID: <5e3371a7-e4a3-49cc-b517-20902a5e2ed4@gmail.com>
+Date: Sun, 2 Dec 2018 20:56:59 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.0
 MIME-Version: 1.0
-In-Reply-To: <1543462629-32746-3-git-send-email-houlong.wei@mediatek.com>
+In-Reply-To: <d131fdd3-663c-9a5b-4296-94f2635f8c41@gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_114751_054896_816052A5 
-X-CRM114-Status: GOOD (  26.52  )
+X-CRM114-CacheID: sfid-20181202_115712_435899_4844F2EC 
+X-CRM114-Status: GOOD (  20.49  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -142,521 +142,72 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Daniel Kurtz <djkurtz@chromium.org>, Monica Wang <monica.wang@mediatek.com>,
- enzhu.wang@mediatek.com, Jiaguang Zhang <jiaguang.zhang@mediatek.com>,
- Nicolas Boichat <drinkcat@chromium.org>, Jassi Brar <jassisinghbrar@gmail.com>,
- HS Liao <hs.liao@mediatek.com>, Bibby Hsieh <bibby.hsieh@mediatek.com>,
- YT Shen <yt.shen@mediatek.com>, devicetree@vger.kernel.org,
- kendrick.hsu@mediatek.com, Sascha Hauer <kernel@pengutronix.de>,
- Daoyuan Huang <daoyuan.huang@mediatek.com>,
- Sascha Hauer <s.hauer@pengutronix.de>, CK HU <ck.hu@mediatek.com>,
- Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
- linux-arm-kernel@lists.infradead.org, srv_heupstream@mediatek.com,
- linux-kernel@vger.kernel.org, Dennis-YC Hsieh <dennis-yc.hsieh@mediatek.com>,
- ginny.chen@mediatek.com, Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Ryder Lee <ryder.lee@mediatek.com>,
+ "moderated list:ARM/Mediatek SoC support"
+ <linux-mediatek@lists.infradead.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi all,
 
-
-On 29/11/2018 04:37, Houlong Wei wrote:
-> Add Mediatek CMDQ helper to create CMDQ packet and assemble GCE op code.
+On 26/11/2018 11:34, Matthias Brugger wrote:
+> Hi Olof,
+> Hi Arnd,
 > 
-> Signed-off-by: Houlong Wei <houlong.wei@mediatek.com>
-> Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> ---
->  drivers/soc/mediatek/Kconfig           |   12 ++
->  drivers/soc/mediatek/Makefile          |    1 +
->  drivers/soc/mediatek/mtk-cmdq-helper.c |  300 ++++++++++++++++++++++++++++++++
->  include/linux/soc/mediatek/mtk-cmdq.h  |  133 ++++++++++++++
->  4 files changed, 446 insertions(+)
->  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
->  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
+> There two issues with the mt7622 based boards in the current v4.20-rc cycle.
+> Could you please pull the following fixes for the issues.
 > 
+> Thanks,
+> Matthias
 
-Now part of v4.20-next/soc
+I just saw, that this is not part of armsoc-fixes [1]
+Does it fall through the cracks or are there any comments?
 
-Thanks a lot!
+Regards,
+Matthias
 
-> diff --git a/drivers/soc/mediatek/Kconfig b/drivers/soc/mediatek/Kconfig
-> index a7d0667..17bd759 100644
-> --- a/drivers/soc/mediatek/Kconfig
-> +++ b/drivers/soc/mediatek/Kconfig
-> @@ -4,6 +4,18 @@
->  menu "MediaTek SoC drivers"
->  	depends on ARCH_MEDIATEK || COMPILE_TEST
->  
-> +config MTK_CMDQ
-> +	tristate "MediaTek CMDQ Support"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select MAILBOX
-> +	select MTK_CMDQ_MBOX
-> +	select MTK_INFRACFG
-> +	help
-> +	  Say yes here to add support for the MediaTek Command Queue (CMDQ)
-> +	  driver. The CMDQ is used to help read/write registers with critical
-> +	  time limitation, such as updating display configuration during the
-> +	  vblank.
-> +
->  config MTK_INFRACFG
->  	bool "MediaTek INFRACFG Support"
->  	select REGMAP
-> diff --git a/drivers/soc/mediatek/Makefile b/drivers/soc/mediatek/Makefile
-> index 12998b0..64ce5ee 100644
-> --- a/drivers/soc/mediatek/Makefile
-> +++ b/drivers/soc/mediatek/Makefile
-> @@ -1,3 +1,4 @@
-> +obj-$(CONFIG_MTK_CMDQ) += mtk-cmdq-helper.o
->  obj-$(CONFIG_MTK_INFRACFG) += mtk-infracfg.o
->  obj-$(CONFIG_MTK_PMIC_WRAP) += mtk-pmic-wrap.o
->  obj-$(CONFIG_MTK_SCPSYS) += mtk-scpsys.o
-> diff --git a/drivers/soc/mediatek/mtk-cmdq-helper.c b/drivers/soc/mediatek/mtk-cmdq-helper.c
-> new file mode 100644
-> index 0000000..ff9fef5
-> --- /dev/null
-> +++ b/drivers/soc/mediatek/mtk-cmdq-helper.c
-> @@ -0,0 +1,300 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +//
-> +// Copyright (c) 2018 MediaTek Inc.
-> +
-> +#include <linux/completion.h>
-> +#include <linux/errno.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/module.h>
-> +#include <linux/mailbox_controller.h>
-> +#include <linux/soc/mediatek/mtk-cmdq.h>
-> +
-> +#define CMDQ_ARG_A_WRITE_MASK	0xffff
-> +#define CMDQ_WRITE_ENABLE_MASK	BIT(0)
-> +#define CMDQ_EOC_IRQ_EN		BIT(0)
-> +#define CMDQ_EOC_CMD		((u64)((CMDQ_CODE_EOC << CMDQ_OP_CODE_SHIFT)) \
-> +				<< 32 | CMDQ_EOC_IRQ_EN)
-> +
-> +static void cmdq_client_timeout(struct timer_list *t)
-> +{
-> +	struct cmdq_client *client = from_timer(client, t, timer);
-> +
-> +	dev_err(client->client.dev, "cmdq timeout!\n");
-> +}
-> +
-> +struct cmdq_client *cmdq_mbox_create(struct device *dev, int index, u32 timeout)
-> +{
-> +	struct cmdq_client *client;
-> +
-> +	client = kzalloc(sizeof(*client), GFP_KERNEL);
-> +	if (!client)
-> +		return (struct cmdq_client *)-ENOMEM;
-> +
-> +	client->timeout_ms = timeout;
-> +	if (timeout != CMDQ_NO_TIMEOUT) {
-> +		spin_lock_init(&client->lock);
-> +		timer_setup(&client->timer, cmdq_client_timeout, 0);
-> +	}
-> +	client->pkt_cnt = 0;
-> +	client->client.dev = dev;
-> +	client->client.tx_block = false;
-> +	client->chan = mbox_request_channel(&client->client, index);
-> +
-> +	if (IS_ERR(client->chan)) {
-> +		long err;
-> +
-> +		dev_err(dev, "failed to request channel\n");
-> +		err = PTR_ERR(client->chan);
-> +		kfree(client);
-> +
-> +		return ERR_PTR(err);
-> +	}
-> +
-> +	return client;
-> +}
-> +EXPORT_SYMBOL(cmdq_mbox_create);
-> +
-> +void cmdq_mbox_destroy(struct cmdq_client *client)
-> +{
-> +	if (client->timeout_ms != CMDQ_NO_TIMEOUT) {
-> +		spin_lock(&client->lock);
-> +		del_timer_sync(&client->timer);
-> +		spin_unlock(&client->lock);
-> +	}
-> +	mbox_free_channel(client->chan);
-> +	kfree(client);
-> +}
-> +EXPORT_SYMBOL(cmdq_mbox_destroy);
-> +
-> +struct cmdq_pkt *cmdq_pkt_create(struct cmdq_client *client, size_t size)
-> +{
-> +	struct cmdq_pkt *pkt;
-> +	struct device *dev;
-> +	dma_addr_t dma_addr;
-> +
-> +	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
-> +	if (!pkt)
-> +		return ERR_PTR(-ENOMEM);
-> +	pkt->va_base = kzalloc(size, GFP_KERNEL);
-> +	if (!pkt->va_base) {
-> +		kfree(pkt);
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +	pkt->buf_size = size;
-> +	pkt->cl = (void *)client;
-> +
-> +	dev = client->chan->mbox->dev;
-> +	dma_addr = dma_map_single(dev, pkt->va_base, pkt->buf_size,
-> +				  DMA_TO_DEVICE);
-> +	if (dma_mapping_error(dev, dma_addr)) {
-> +		dev_err(dev, "dma map failed, size=%u\n", (u32)(u64)size);
-> +		kfree(pkt->va_base);
-> +		kfree(pkt);
-> +		return ERR_PTR(-ENOMEM);
-> +	}
-> +
-> +	pkt->pa_base = dma_addr;
-> +
-> +	return pkt;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_create);
-> +
-> +void cmdq_pkt_destroy(struct cmdq_pkt *pkt)
-> +{
-> +	struct cmdq_client *client = (struct cmdq_client *)pkt->cl;
-> +
-> +	dma_unmap_single(client->chan->mbox->dev, pkt->pa_base, pkt->buf_size,
-> +			 DMA_TO_DEVICE);
-> +	kfree(pkt->va_base);
-> +	kfree(pkt);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_destroy);
-> +
-> +static int cmdq_pkt_append_command(struct cmdq_pkt *pkt, enum cmdq_code code,
-> +				   u32 arg_a, u32 arg_b)
-> +{
-> +	u64 *cmd_ptr;
-> +
-> +	if (unlikely(pkt->cmd_buf_size + CMDQ_INST_SIZE > pkt->buf_size)) {
-> +		/*
-> +		 * In the case of allocated buffer size (pkt->buf_size) is used
-> +		 * up, the real required size (pkt->cmdq_buf_size) is still
-> +		 * increased, so that the user knows how much memory should be
-> +		 * ultimately allocated after appending all commands and
-> +		 * flushing the command packet. Therefor, the user can call
-> +		 * cmdq_pkt_create() again with the real required buffer size.
-> +		 */
-> +		pkt->cmd_buf_size += CMDQ_INST_SIZE;
-> +		WARN_ONCE(1, "%s: buffer size %u is too small !\n",
-> +			__func__, (u32)pkt->buf_size);
-> +		return -ENOMEM;
-> +	}
-> +	cmd_ptr = pkt->va_base + pkt->cmd_buf_size;
-> +	(*cmd_ptr) = (u64)((code << CMDQ_OP_CODE_SHIFT) | arg_a) << 32 | arg_b;
-> +	pkt->cmd_buf_size += CMDQ_INST_SIZE;
-> +
-> +	return 0;
-> +}
-> +
-> +int cmdq_pkt_write(struct cmdq_pkt *pkt, u32 value, u32 subsys, u32 offset)
-> +{
-> +	u32 arg_a = (offset & CMDQ_ARG_A_WRITE_MASK) |
-> +		    (subsys << CMDQ_SUBSYS_SHIFT);
-> +
-> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WRITE, arg_a, value);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_write);
-> +
-> +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u32 value,
-> +			u32 subsys, u32 offset, u32 mask)
-> +{
-> +	u32 offset_mask = offset;
-> +	int err = 0;
-> +
-> +	if (mask != 0xffffffff) {
-> +		err = cmdq_pkt_append_command(pkt, CMDQ_CODE_MASK, 0, ~mask);
-> +		offset_mask |= CMDQ_WRITE_ENABLE_MASK;
-> +	}
-> +	err |= cmdq_pkt_write(pkt, value, subsys, offset_mask);
-> +
-> +	return err;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_write_mask);
-> +
-> +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event)
-> +{
-> +	u32 arg_b;
-> +
-> +	if (event >= CMDQ_MAX_EVENT)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * WFE arg_b
-> +	 * bit 0-11: wait value
-> +	 * bit 15: 1 - wait, 0 - no wait
-> +	 * bit 16-27: update value
-> +	 * bit 31: 1 - update, 0 - no update
-> +	 */
-> +	arg_b = CMDQ_WFE_UPDATE | CMDQ_WFE_WAIT | CMDQ_WFE_WAIT_VALUE;
-> +
-> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event, arg_b);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_wfe);
-> +
-> +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event)
-> +{
-> +	if (event >= CMDQ_MAX_EVENT)
-> +		return -EINVAL;
-> +
-> +	return cmdq_pkt_append_command(pkt, CMDQ_CODE_WFE, event,
-> +				       CMDQ_WFE_UPDATE);
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_clear_event);
-> +
-> +static int cmdq_pkt_finalize(struct cmdq_pkt *pkt)
-> +{
-> +	int err;
-> +
-> +	/* insert EOC and generate IRQ for each command iteration */
-> +	err = cmdq_pkt_append_command(pkt, CMDQ_CODE_EOC, 0, CMDQ_EOC_IRQ_EN);
-> +
-> +	/* JUMP to end */
-> +	err |= cmdq_pkt_append_command(pkt, CMDQ_CODE_JUMP, 0, CMDQ_JUMP_PASS);
-> +
-> +	return err;
-> +}
-> +
-> +static void cmdq_pkt_flush_async_cb(struct cmdq_cb_data data)
-> +{
-> +	struct cmdq_pkt *pkt = (struct cmdq_pkt *)data.data;
-> +	struct cmdq_task_cb *cb = &pkt->cb;
-> +	struct cmdq_client *client = (struct cmdq_client *)pkt->cl;
-> +
-> +	if (client->timeout_ms != CMDQ_NO_TIMEOUT) {
-> +		unsigned long flags = 0;
-> +
-> +		spin_lock_irqsave(&client->lock, flags);
-> +		if (--client->pkt_cnt == 0)
-> +			del_timer(&client->timer);
-> +		else
-> +			mod_timer(&client->timer, jiffies +
-> +				  msecs_to_jiffies(client->timeout_ms));
-> +		spin_unlock_irqrestore(&client->lock, flags);
-> +	}
-> +
-> +	dma_sync_single_for_cpu(client->chan->mbox->dev, pkt->pa_base,
-> +				pkt->cmd_buf_size, DMA_TO_DEVICE);
-> +	if (cb->cb) {
-> +		data.data = cb->data;
-> +		cb->cb(data);
-> +	}
-> +}
-> +
-> +int cmdq_pkt_flush_async(struct cmdq_pkt *pkt, cmdq_async_flush_cb cb,
-> +			 void *data)
-> +{
-> +	int err;
-> +	unsigned long flags = 0;
-> +	struct cmdq_client *client = (struct cmdq_client *)pkt->cl;
-> +
-> +	err = cmdq_pkt_finalize(pkt);
-> +	if (err < 0)
-> +		return err;
-> +
-> +	pkt->cb.cb = cb;
-> +	pkt->cb.data = data;
-> +	pkt->async_cb.cb = cmdq_pkt_flush_async_cb;
-> +	pkt->async_cb.data = pkt;
-> +
-> +	dma_sync_single_for_device(client->chan->mbox->dev, pkt->pa_base,
-> +				   pkt->cmd_buf_size, DMA_TO_DEVICE);
-> +
-> +	if (client->timeout_ms != CMDQ_NO_TIMEOUT) {
-> +		spin_lock_irqsave(&client->lock, flags);
-> +		if (client->pkt_cnt++ == 0)
-> +			mod_timer(&client->timer, jiffies +
-> +				  msecs_to_jiffies(client->timeout_ms));
-> +		spin_unlock_irqrestore(&client->lock, flags);
-> +	}
-> +
-> +	mbox_send_message(client->chan, pkt);
-> +	/* We can send next packet immediately, so just call txdone. */
-> +	mbox_client_txdone(client->chan, 0);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_flush_async);
-> +
-> +struct cmdq_flush_completion {
-> +	struct completion cmplt;
-> +	bool err;
-> +};
-> +
-> +static void cmdq_pkt_flush_cb(struct cmdq_cb_data data)
-> +{
-> +	struct cmdq_flush_completion *cmplt;
-> +
-> +	cmplt = (struct cmdq_flush_completion *)data.data;
-> +	if (data.sta != CMDQ_CB_NORMAL)
-> +		cmplt->err = true;
-> +	else
-> +		cmplt->err = false;
-> +	complete(&cmplt->cmplt);
-> +}
-> +
-> +int cmdq_pkt_flush(struct cmdq_pkt *pkt)
-> +{
-> +	struct cmdq_flush_completion cmplt;
-> +	int err;
-> +
-> +	init_completion(&cmplt.cmplt);
-> +	err = cmdq_pkt_flush_async(pkt, cmdq_pkt_flush_cb, &cmplt);
-> +	if (err < 0)
-> +		return err;
-> +	wait_for_completion(&cmplt.cmplt);
-> +
-> +	return cmplt.err ? -EFAULT : 0;
-> +}
-> +EXPORT_SYMBOL(cmdq_pkt_flush);
-> +
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/linux/soc/mediatek/mtk-cmdq.h b/include/linux/soc/mediatek/mtk-cmdq.h
-> new file mode 100644
-> index 0000000..54ade13
-> --- /dev/null
-> +++ b/include/linux/soc/mediatek/mtk-cmdq.h
-> @@ -0,0 +1,133 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
-> +/*
-> + * Copyright (c) 2018 MediaTek Inc.
-> + *
-> + */
-> +
-> +#ifndef __MTK_CMDQ_H__
-> +#define __MTK_CMDQ_H__
-> +
-> +#include <linux/mailbox_client.h>
-> +#include <linux/mailbox/mtk-cmdq-mailbox.h>
-> +#include <linux/timer.h>
-> +
-> +#define CMDQ_NO_TIMEOUT		0xffffffffu
-> +
-> +/** cmdq event maximum */
-> +#define CMDQ_MAX_EVENT				0x3ff
-> +
-> +struct cmdq_pkt;
-> +
-> +struct cmdq_client {
-> +	spinlock_t lock;
-> +	u32 pkt_cnt;
-> +	struct mbox_client client;
-> +	struct mbox_chan *chan;
-> +	struct timer_list timer;
-> +	u32 timeout_ms; /* in unit of microsecond */
-> +};
-> +
-> +/**
-> + * cmdq_mbox_create() - create CMDQ mailbox client and channel
-> + * @dev:	device of CMDQ mailbox client
-> + * @index:	index of CMDQ mailbox channel
-> + * @timeout:	timeout of a pkt execution by GCE, in unit of microsecond, set
-> + *		CMDQ_NO_TIMEOUT if a timer is not used.
-> + *
-> + * Return: CMDQ mailbox client pointer
-> + */
-> +struct cmdq_client *cmdq_mbox_create(struct device *dev, int index,
-> +				     u32 timeout);
-> +
-> +/**
-> + * cmdq_mbox_destroy() - destroy CMDQ mailbox client and channel
-> + * @client:	the CMDQ mailbox client
-> + */
-> +void cmdq_mbox_destroy(struct cmdq_client *client);
-> +
-> +/**
-> + * cmdq_pkt_create() - create a CMDQ packet
-> + * @client:	the CMDQ mailbox client
-> + * @size:	required CMDQ buffer size
-> + *
-> + * Return: CMDQ packet pointer
-> + */
-> +struct cmdq_pkt *cmdq_pkt_create(struct cmdq_client *client, size_t size);
-> +
-> +/**
-> + * cmdq_pkt_destroy() - destroy the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + */
-> +void cmdq_pkt_destroy(struct cmdq_pkt *pkt);
-> +
-> +/**
-> + * cmdq_pkt_write() - append write command to the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + * @value:	the specified target register value
-> + * @subsys:	the CMDQ sub system code
-> + * @offset:	register offset from CMDQ sub system
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + */
-> +int cmdq_pkt_write(struct cmdq_pkt *pkt, u32 value, u32 subsys, u32 offset);
-> +
-> +/**
-> + * cmdq_pkt_write_mask() - append write command with mask to the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + * @value:	the specified target register value
-> + * @subsys:	the CMDQ sub system code
-> + * @offset:	register offset from CMDQ sub system
-> + * @mask:	the specified target register mask
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + */
-> +int cmdq_pkt_write_mask(struct cmdq_pkt *pkt, u32 value,
-> +			u32 subsys, u32 offset, u32 mask);
-> +
-> +/**
-> + * cmdq_pkt_wfe() - append wait for event command to the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + * @event:	the desired event type to "wait and CLEAR"
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + */
-> +int cmdq_pkt_wfe(struct cmdq_pkt *pkt, u32 event);
-> +
-> +/**
-> + * cmdq_pkt_clear_event() - append clear event command to the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + * @event:	the desired event to be cleared
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + */
-> +int cmdq_pkt_clear_event(struct cmdq_pkt *pkt, u32 event);
-> +
-> +/**
-> + * cmdq_pkt_flush_async() - trigger CMDQ to asynchronously execute the CMDQ
-> + *                          packet and call back at the end of done packet
-> + * @pkt:	the CMDQ packet
-> + * @cb:		called at the end of done packet
-> + * @data:	this data will pass back to cb
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + *
-> + * Trigger CMDQ to asynchronously execute the CMDQ packet and call back
-> + * at the end of done packet. Note that this is an ASYNC function. When the
-> + * function returned, it may or may not be finished.
-> + */
-> +int cmdq_pkt_flush_async(struct cmdq_pkt *pkt, cmdq_async_flush_cb cb,
-> +			 void *data);
-> +
-> +/**
-> + * cmdq_pkt_flush() - trigger CMDQ to execute the CMDQ packet
-> + * @pkt:	the CMDQ packet
-> + *
-> + * Return: 0 for success; else the error code is returned
-> + *
-> + * Trigger CMDQ to execute the CMDQ packet. Note that this is a
-> + * synchronous flush function. When the function returned, the recorded
-> + * commands have been done.
-> + */
-> +int cmdq_pkt_flush(struct cmdq_pkt *pkt);
-> +
-> +#endif	/* __MTK_CMDQ_H__ */
+
+[1]
+https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git/log/?h=armsoc-fixes
+
+
+> ----
+> 
+> The following changes since commit 9ff01193a20d391e8dbce4403dd5ef87c7eaaca6:
+> 
+>   Linux 4.20-rc3 (2018-11-18 13:33:44 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/matthias.bgg/linux.git/
+> tags/v4.19-next-fixes
+> 
+> for you to fetch changes up to ce68cc6fad893eb33b69ef7ec186233a51696236:
+> 
+>   arm64: dts: mt7622: Drop the general purpose timer node (2018-11-26 11:19:19
+> +0100)
+> 
+> ----------------------------------------------------------------
+> DT mt7622:
+> - kernelci awaits a working stdout-path.
+>   Fix the path for reference board and bananapi-r64
+> - general propouse timer has issues with clocks that didn't
+>   get probed early. Delete the DT node as the timer isn't
+>   need, a ARM arch timer exists on the system.
+> 
+> ----------------------------------------------------------------
+> Ryder Lee (3):
+>       arm64: dts: mt7622: fix no more console output on rfb1
+>       arm64: dts: mt7622: fix no more console output on BPI-R64 board
+>       arm64: dts: mt7622: Drop the general purpose timer node
+> 
+>  arch/arm64/boot/dts/mediatek/mt7622-bananapi-bpi-r64.dts |  7 ++++++-
+>  arch/arm64/boot/dts/mediatek/mt7622-rfb1.dts             |  7 ++++++-
+>  arch/arm64/boot/dts/mediatek/mt7622.dtsi                 | 10 ----------
+>  3 files changed, 12 insertions(+), 12 deletions(-)
 > 
 
 _______________________________________________
