@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.4 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 58D9BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 06:18:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54F43C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 06:19:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 25E0B206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 06:18:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 21A7E206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 06:19:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RJXAc/35";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Ob52eAyb"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 25E0B206B7
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="JzL2UqWM";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="Uy2BvgZZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 21A7E206B7
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,64 +26,63 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
 	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=Loy8BRpAHtcpXHPkVZSW+j0QVNFil9xaFXoMXhsn+1M=; b=RJXAc/35c/MveB
-	g6d6grTeu+tygcaDaLqD/mu7aFWeysZG9rHLjOXEVXe+z/XcPvM9FWfvx0oDlS19C8Igt6vxiosQo
-	yj2IlKUjpAqowzCb52aKiepVG2Q4zVESwpPT5bCUl6suXpH85JdTPBuyBnPyVHwBWpW75jqQW5V2Y
-	udFWyVaBOxTqbmQnFIn3akKHozHxNuclvYvUWKSBPVSvh0jbqlHBRbvhhC9nWPyqjvftvMKfcs8kb
-	Bu8Y8bnb1CN9X7bkQjYPWv8T3/a9XaJFk0jLLTwl5mtLkR/jGrmHf91BFYxwUu8i/hfplklbSWpa1
-	4QIFXvfndQzLNZQOaKzg==;
+	List-Owner; bh=xZk8hOjUlTR9IlM12AognHsJl7P1bIz51rWxTqY8ZBM=; b=JzL2UqWMoMpOeY
+	mKsF6MMYy4IhUwXA6vz/nJDAELp5EnvMFbz+S4c2kFfK0MXv4QdM/7tEp1ZiWM2ZU20BgtXxtmPs9
+	e6hfWFjA/0Jns1gPDiXlQBPPv8E7LjvGXp5yxaLqxC5yG95osnsTuRCU/470V1cugwLtzn0MZF4gj
+	8bGUlNrW5gl6+YeZfKWutuStYwd6d5bNTUJaVCPQkbOnimEqUwmNljjwrGDMOje1bUU1m11Ymnrw2
+	HahGnHe3q4TiD9dZGzoAfON+bz7GFPFczK6W6Ui6A8a2ok5kvDgeu7UaKzw92NgNmBxbFH/2W+kou
+	kEURIaRkQ9BGj2OQQ20Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTL5F-0002Uf-TC; Sun, 02 Dec 2018 06:18:25 +0000
-Received: from mail-pg1-x542.google.com ([2607:f8b0:4864:20::542])
+	id 1gTL6H-0002rM-JM; Sun, 02 Dec 2018 06:19:29 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTL5D-0002RS-L0
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 06:18:24 +0000
-Received: by mail-pg1-x542.google.com with SMTP id g189so4284963pgc.5
- for <linux-arm-kernel@lists.infradead.org>;
- Sat, 01 Dec 2018 22:18:13 -0800 (PST)
+ id 1gTL6D-0002mn-A8; Sun, 02 Dec 2018 06:19:26 +0000
+Received: by mail-pl1-x644.google.com with SMTP id t13so4805719ply.13;
+ Sat, 01 Dec 2018 22:19:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=date:from:to:cc:subject:message-id:mime-version:content-disposition
- :user-agent; bh=pFA19XQqRIOonXczeaJc1JMDfCxsc2SPHw+vTN0jttk=;
- b=Ob52eAybZ+ukSyGdY8U/Z1jdhXxFQFle/dMi4Et2nQndtm7MZ2i4ONnKsVDEIcjDDz
- 9W38WqOW1p9mt0J7xkQxfLmLL/jnq1/LcrLmoOqnc9m337jYRgsykPHqvssdhQ8pmZqy
- AcyrBFinNSivTuQmUI01wz1gKLQW9G1svEowGTi2+SAQF6CW3SbPSPNlOgF5HsoRXG/R
- 9K9JQ52ZvaqN5BHcgkhczNdO8IQ5qGjOakvBGCY0Sm0g3u6hbovABd7E77bu2Yv2l4eb
- Ba8iBaRv7cN2h5YB8JO3+4IihJv60g16Rfz+y3KC66wo+3y0mJ60ov/ncoRJ0hAIFPOQ
- x9gA==
+ :user-agent; bh=ng6k7XN2+E7qu+YJG+ewVaHjUak4Dnv0s5kVr6uQuLI=;
+ b=Uy2BvgZZkqOXNK7hWBYo3ARMJUfASECRH1vDxiNUgHBWwBso/Dw5MVQ3h240LKOn9r
+ NhpjK25eGn1477k5XxEo8EOyY+Y9o+E/DUJKbzrcAxAiamgY14sFBQ5e4pPJJZIPgx0x
+ NzFau/vgdlUWyYjWlRMcagejTL6DGAwAmAsSxpCb68yXr9XBuwp/SaCrwZvvzqcGm0L3
+ 4PgcxWbXzJwKYve3R9DhlAzPDVVBxKO/xslBA5HeS47vJGvTrlgakEwa4L493x3uvLwo
+ PdxNdGZOUlyPHJ+JMUkdbANMZcGvWiGUFFuBO0DsdK/adiQyQW7EAu9QSeBXHtYH1PiP
+ vFeg==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
  :content-disposition:user-agent;
- bh=pFA19XQqRIOonXczeaJc1JMDfCxsc2SPHw+vTN0jttk=;
- b=Y2zCwt05u2hboKVbK9v74sGkDbgu4r5RyfzwTF+Aazs2/fcQWZLJrsELMaofZT67aY
- Arh/eVemejv7mzD8rdaa/xXZDiy6TrxEpKj5NaJZSIixm0YNPVEgWZ21W63X1duJsNEB
- FdUiUUPf43tTNrQa/uUoNZoaPytdYjz9rh3XxTL/KioS2GkbkLefMDaf31YMXYnXxzBX
- /Yyjd/xIhxkViCpyniSHgMiTX1YzwOZCjA5aWYEUCL+djEn76Lr3JGmKc/gwQPLCepuI
- AsqfsIcAHw2pLl546sMcare6X9I9EZUQcjyNLqVkiT295utmlYrp25S2kuo7nieXbq4D
- wxhw==
-X-Gm-Message-State: AA+aEWb6n040qduni6Rw9xdcIqWYWuKxS/UGiXx7bn3qPttECc/3fTEu
- uR92FXjprhUZSJ0uxj/DLtc=
-X-Google-Smtp-Source: AFSGD/UHCJICHgiE0m052Ybq6CARBcS+P92LNUcrBDatOdJIiC6ahi3tnqCNt66ImpC9ArLD+LG41w==
-X-Received: by 2002:a62:546:: with SMTP id 67mr11166313pff.99.1543731493182;
- Sat, 01 Dec 2018 22:18:13 -0800 (PST)
+ bh=ng6k7XN2+E7qu+YJG+ewVaHjUak4Dnv0s5kVr6uQuLI=;
+ b=YYXgrEgVE0Hx/agaICeIIgsdXZXb7hprEcRiyLyaB/GkdWurwCONUcYEuwOIsqHZX1
+ QH7mzHKYof6G85I0dFpY31cTbuEHMomJJrn4BDjYyQ6Q0BW4eHv8BbVfn0AVbcgeG/IG
+ n8BhuE7CSFdFdRuDHYAllzUKcqvSxLpxdTcLxoMjJstKOYzzD068b+YUvftVhsh3eXCj
+ tXXhMEByLwhLTeeUQrr46EM4GH57pm3VcjaAR9ve1sPD45shxZ7SAE5oz/oroubWTtCe
+ NE9E3fc8m+iFmdtpcg+RJD26r2Rmxjjp40wM8gQXS9YeqHonFpYOC4UQQkt57Sg8pPEX
+ Zfuw==
+X-Gm-Message-State: AA+aEWaiEou4twM9pauvWKQ3FgOHOlu4XPRyqYHGj45dSCBnaa8QO4n4
+ 9bS57vIjlGdWPDfvJfLySZ4URaWz
+X-Google-Smtp-Source: AFSGD/WRNjFD6zB7/hjn8Xn+aoz1dyOHhd/PEH2NIgt7PDmUyJF+fZfXXjivwgpQAMMMOqZJ+B9xkw==
+X-Received: by 2002:a17:902:e085:: with SMTP id
+ cb5mr11348736plb.24.1543731551018; 
+ Sat, 01 Dec 2018 22:19:11 -0800 (PST)
 Received: from jordon-HP-15-Notebook-PC ([103.227.99.148])
- by smtp.gmail.com with ESMTPSA id g15sm46055783pfj.131.2018.12.01.22.18.11
+ by smtp.gmail.com with ESMTPSA id n73sm14870007pfj.148.2018.12.01.22.19.09
  (version=TLS1 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sat, 01 Dec 2018 22:18:12 -0800 (PST)
-Date: Sun, 2 Dec 2018 11:51:56 +0530
+ Sat, 01 Dec 2018 22:19:10 -0800 (PST)
+Date: Sun, 2 Dec 2018 11:52:55 +0530
 From: Souptick Joarder <jrdr.linux@gmail.com>
 To: akpm@linux-foundation.org, willy@infradead.org, mhocko@suse.com,
- stefanr@s5r6.in-berlin.de
-Subject: [PATCH v2 3/9] drivers/firewire/core-iso.c: Convert to use
+ hjc@rock-chips.com, heiko@sntech.de, airlied@linux.ie
+Subject: [PATCH v2 4/9] drm/rockchip/rockchip_drm_gem.c: Convert to use
  vm_insert_range
-Message-ID: <20181202062156.GA3131@jordon-HP-15-Notebook-PC>
+Message-ID: <20181202062255.GA3159@jordon-HP-15-Notebook-PC>
 MIME-Version: 1.0
 Content-Disposition: inline
 User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181201_221823_693443_E198EB3E 
-X-CRM114-Status: GOOD (  12.69  )
+X-CRM114-CacheID: sfid-20181201_221925_411873_9CD992BF 
+X-CRM114-Status: GOOD (  14.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,48 +94,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-mm@kvack.org, linux1394-devel@lists.sourceforge.net,
- linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: linux-mm@kvack.org, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert to use vm_insert_range to map range of kernel memory
-to user vma.
+Convert to use vm_insert_range() to map range of kernel
+memory to user vma.
 
 Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-Reviewed-by: Matthew Wilcox <willy@infradead.org>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/firewire/core-iso.c | 15 ++-------------
- 1 file changed, 2 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 20 ++------------------
+ 1 file changed, 2 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/firewire/core-iso.c b/drivers/firewire/core-iso.c
-index 35e784c..7bf28bb 100644
---- a/drivers/firewire/core-iso.c
-+++ b/drivers/firewire/core-iso.c
-@@ -107,19 +107,8 @@ int fw_iso_buffer_init(struct fw_iso_buffer *buffer, struct fw_card *card,
- int fw_iso_buffer_map_vma(struct fw_iso_buffer *buffer,
- 			  struct vm_area_struct *vma)
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index a8db758..2cb83bb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -221,26 +221,10 @@ static int rockchip_drm_gem_object_mmap_iommu(struct drm_gem_object *obj,
+ 					      struct vm_area_struct *vma)
  {
--	unsigned long uaddr;
--	int i, err;
+ 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+-	unsigned int i, count = obj->size >> PAGE_SHIFT;
+ 	unsigned long user_count = vma_pages(vma);
+-	unsigned long uaddr = vma->vm_start;
+-	unsigned long offset = vma->vm_pgoff;
+-	unsigned long end = user_count + offset;
+-	int ret;
 -
--	uaddr = vma->vm_start;
--	for (i = 0; i < buffer->page_count; i++) {
--		err = vm_insert_page(vma, uaddr, buffer->pages[i]);
--		if (err)
--			return err;
--
+-	if (user_count == 0)
+-		return -ENXIO;
+-	if (end > count)
+-		return -ENXIO;
+ 
+-	for (i = offset; i < end; i++) {
+-		ret = vm_insert_page(vma, uaddr, rk_obj->pages[i]);
+-		if (ret)
+-			return ret;
 -		uaddr += PAGE_SIZE;
 -	}
 -
 -	return 0;
-+	return vm_insert_range(vma, vma->vm_start, buffer->pages,
-+				buffer->page_count);
++	return vm_insert_range(vma, vma->vm_start, rk_obj->pages,
++				user_count);
  }
  
- void fw_iso_buffer_destroy(struct fw_iso_buffer *buffer,
+ static int rockchip_drm_gem_object_mmap_dma(struct drm_gem_object *obj,
 -- 
 1.9.1
 
