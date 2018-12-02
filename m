@@ -2,91 +2,88 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,
+	SPF_PASS,USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0BD7C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:44:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 57FB2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:55:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9D3D22081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:44:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1090820881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:55:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="g1/+gK6z";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="JSKA9RSv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9D3D22081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="URSjpNO0";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=googlemail.com header.i=@googlemail.com header.b="Rx8SBlLC"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1090820881
 Authentication-Results: mail.kernel.org; dmarc=fail (p=quarantine dis=none) header.from=googlemail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6D5TB0H3wa1CLuekUk2fwwuscRraiVAQ81e1KTCauQI=; b=g1/+gK6zlMrxpJ
-	pOh4RcDWaVouQXcytBIB2FPPrRV6PtEj910ax9/hdVtR5LzVOaE4x6MgC0w0j0Grit9QEZh7RNz4G
-	HkGU+1qsd0E3FVcPldJo8uh8ZS3/iqizbNzmFSJAz5HfX4pjshHo5lQfWRHkPWtGT6Y5l5L2S6aPZ
-	MzzMkKgWWBKjeH6++yBQ+rp9SIzzc9+uqWhMB/WurgrwBu+JuWCWsH83sRz6yL6/4tgcUbLc0zvhR
-	nbqF1via9EhmDwL8/rHcbRkAQAqCIChUhpsCd+sLdFV0YSVdTojPyBhZGC3KQmiIBqBLZV1cyuKAJ
-	CsRMxuCgbwuDAdsgpsGg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=oi2IC/45cOxZBfFr551QHe7UNpS2aPe7W6HU44w0tes=; b=URSjpNO0vUzwyf
+	vy1TFeKdOiXUVn4Um7eQ5Qw4m/3ZlCSiQQUH3z27o0CBh89eqi5G5uuZGHCp6Z/Qj/pvgBJBGK2s3
+	w6dcXeD7ikcNXMMLmtiW4PI/HNnL0LE/8odjpuRaIPJRjNCp4xsmhKdOKOnA3xZEw8OWjhLUM7LUN
+	2DgnOqgGkssI9hWiHtqv3C/2kMsGZwjuzg3cjT6nYVB1Fg3URTD6iOmq7SyeOKZbS1R+6qV2If4Z1
+	bsqspxrYWwPhmjgHcljeKLRHJZnBgUbi3p8GM8hfo9GkmQ4k4RYQR9le5YWzMBiP6EaWu0H5wpiWb
+	voC/BbtmtxJoWdlUvGyw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTZX6-0005X0-6f; Sun, 02 Dec 2018 21:44:08 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gTZht-0001jc-Uw; Sun, 02 Dec 2018 21:55:17 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTZVt-00040G-CA; Sun, 02 Dec 2018 21:43:25 +0000
-Received: by mail-wr1-x443.google.com with SMTP id u3so10161410wrs.3;
- Sun, 02 Dec 2018 13:42:42 -0800 (PST)
+ id 1gTZVp-0003y3-Ed; Sun, 02 Dec 2018 21:42:58 +0000
+Received: by mail-wr1-x444.google.com with SMTP id r10so10137635wrs.10;
+ Sun, 02 Dec 2018 13:42:39 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=googlemail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=CuvFY+6dLlBT+VFi6SS4U4OErEC3e8Zy5c3H92jpjM0=;
- b=JSKA9RSvnMAhuPPi2c6Ro8dgQVzIgO1uEYf9+jD+dK1wkKrDWTlRRKgxF4vt3imjmN
- 82104UQlovWlodX85f22q/VL43jeH6HsRwqzaQB9/srov+3G5gwWzDdp3bNgaQ//B8oe
- 9kEjlgcnMU+arF3qAgESSup98ntbjjjB9b++uQdKGArAvAHQ6Xyk80Yp2IJOtHUVAgDi
- /Ilp+hOSPXbSnheGwnDEmQeygJYqr4NNk6QouULijpyPuCpnlTgLvH/WOq5Cj/ZAmftQ
- 5VrtIvV+PnjAn2lcjjluTJW57WVo/RU/kBKeXw37xVZeGcGttMVMkMOzN3+0FC7UJG53
- yR0g==
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=v1FNrPYfWMF3/vBQtyNC2xejvYpCaQUsX5uXu6fwKsI=;
+ b=Rx8SBlLChYpA1IXqetgitpRqkTb9nY7sFJpn4/5eFmjAUhTnHQu0BtA0E5rhCjJ0zu
+ e8NJfHczroVmvcedNvlnmUHyYngPz4kY1hf/sig+ts7nfW+x6//TDUqE7WGOhk/oIlpo
+ Qsn0a4LJw4yf7HKokuxFg7XzP1PC1vCZ7gQJmSDLeJjjBbZU8jVToqR/76d2REnZFkXw
+ yXmN2GqcX1Sn8Agzdv2eUgxudO6ClNxn7YDdoYKHnCsP/M6vk+GlOX3mtVO9GPhmKRT8
+ 71pthcQA8nDnXGItjDZwl/YG1usCxpAiO0+6oMNXcfJPVSW//uaHkPJSqEBr/VQPfEx+
+ EQvw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=CuvFY+6dLlBT+VFi6SS4U4OErEC3e8Zy5c3H92jpjM0=;
- b=rM82nYdxr3IoJiWU9TBnaQri4aDSYMVXqX2BLbYixpe3rqnmt1NxHYnY0/miJlH18r
- o9I642/akv888S1QqA3R6rL1qYb+7Ni/mY5T48tCmyvHyQGRD7KtMpugYKMtshdpW7M9
- 7S4nl4FYfaNTWO8X4rWTeNbG5vk9TYgUAlhNDLkdpVBINhYJE5TZUywnKEsIoTpgw6Gw
- SeX5IlCXvKxfZ5z8NG9oZAxvbDamSBNQJ5juGDY1Ry9cXjlkosjHCZ0z6GgEhVYaLbSd
- AXuU+03U8KPuoDsytZge4MStZZqYY06TELYMfo0bD7aR3LwA4uQ8jc6TmlaJSR1NYn4K
- PlWQ==
-X-Gm-Message-State: AA+aEWb+lKZdmuGxMFON8sxNrFvsZv50rgXDRm69F60Nn8lVL/PQieds
- iNomsY6aJ5X07DcY1VJ9Y2DxaAG2
-X-Google-Smtp-Source: AFSGD/W3FTfxealTTzWPoWdHT7fPnHOWIGCqUD4jam+6M5L2sXGj2tOcW3EpV3u5HVOARypW7mjPWA==
-X-Received: by 2002:adf:e911:: with SMTP id f17mr12507680wrm.126.1543786960864; 
- Sun, 02 Dec 2018 13:42:40 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=v1FNrPYfWMF3/vBQtyNC2xejvYpCaQUsX5uXu6fwKsI=;
+ b=eNbXBWzDD8l0B5dIZHey50RAJzEbmv5HyYbgSSMFLQ9KPGSZbJ0D5yi50sVWvApfqK
+ kmuuC0Xz7ls3YUt5VvIQHRzONfLlgMXOA+7B3Ek2EXaUhUnb1DqLWGuqjlsLTVUFFDsr
+ OyxiOWwdMB6EVvc5PUjqriZHID9l3SJSl2EvJgELPLO9RC24l0OvTj2l2YhZvlZ6GbDa
+ hMKCm2f3sAx7gkVyhP9NsV+cc8mHArUWG1YR0giTinGe2zWWvNKPlmzEqfSVk2KLS4Q0
+ VGKjUFWq6lfYfxVUzThVFXi9grRCzsCZjvVRub6duISJoJB/05/smAv777FFf6APh0I2
+ Q+eQ==
+X-Gm-Message-State: AA+aEWYRQnQ6GaFJLtkIu016UYYEKJLZ0gq8495vTLXMY+ruF7OueALi
+ 1OdGMZSrE9Ypm3f4q8E+PwqI/XfC
+X-Google-Smtp-Source: AFSGD/Xf5ccIaKr/r81nR0nHttMVPKYxQP8sDDbrOT9k1N+ZAW62Nih0l5FYNS30Ircux4C5dbThkQ==
+X-Received: by 2002:adf:900f:: with SMTP id h15mr11731230wrh.18.1543786957114; 
+ Sun, 02 Dec 2018 13:42:37 -0800 (PST)
 Received: from blackbox.darklights.net
  (p200300DCD73FBA00B1CC0EB38CD20A4E.dip0.t-ipconnect.de.
  [2003:dc:d73f:ba00:b1cc:eb3:8cd2:a4e])
- by smtp.googlemail.com with ESMTPSA id a18sm13073110wrp.13.2018.12.02.13.42.39
+ by smtp.googlemail.com with ESMTPSA id a18sm13073110wrp.13.2018.12.02.13.42.35
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 02 Dec 2018 13:42:40 -0800 (PST)
+ Sun, 02 Dec 2018 13:42:36 -0800 (PST)
 From: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 To: linux-amlogic@lists.infradead.org, jbrunet@baylibre.com,
  narmstrong@baylibre.com
-Subject: [PATCH 3/3] clk: meson: meson8b: add the read-only video clock trees
-Date: Sun,  2 Dec 2018 22:42:20 +0100
-Message-Id: <20181202214220.7715-4-martin.blumenstingl@googlemail.com>
+Subject: [PATCH 0/3] - clk: meson8b: add the (read-only) video clock trees
+Date: Sun,  2 Dec 2018 22:42:17 +0100
+Message-Id: <20181202214220.7715-1-martin.blumenstingl@googlemail.com>
 X-Mailer: git-send-email 2.19.2
-In-Reply-To: <20181202214220.7715-1-martin.blumenstingl@googlemail.com>
-References: <20181202214220.7715-1-martin.blumenstingl@googlemail.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_134254_283712_C40805E7 
-X-CRM114-Status: GOOD (  19.15  )
+X-CRM114-CacheID: sfid-20181202_134250_165613_9295903C 
+X-CRM114-Status: GOOD (  15.94  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,993 +103,213 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add all clocks to give us the final video clocks within the Meson8,
-Meson8b and Meson8m2 SoCs. The final video clocks are:
-- cts_enct
-- cts_encl
-- cts_encp
-- cts_enci
-- cts_vdac0
-- hdmi_tx_pixel
-- hdmi_sys
+This is the Meson8b variant of Neil's series from [0] called "- clk:
+meson: Add video clocks path".
+GXBB and newer use a -- vid_pll divider IP block which doesn't exist on
+the 32-bit SoCs. Instead the 32-bit SoCs use three simple dividers,
+a few muxes and some fixed dividers.
 
-Add multiple clocks in between which are needed to implement these
-clocks:
-- Opposed to GXBB there is no pre-multiplier for the PLL input. The
-  assumption here is that the multiplier is required to achieve the HDMI
-  2.0 clock rates (which are up to twice the rate of the HDMI 1.4
-  rates).
-- The main PLL is called "HDMI PLL" or "HPLL" in the datasheet. Rename
-  our existing "vid_pll_dco" to "hdmi_pll_dco". The actual VID_PLL clock
-  also exists further down the tree.
-- Rename the existing "vid_pll" clock (which is the OD divider at
-  HHI_VID_PLL_CNTL[17:16]) to "hdmi_pll_lvds_out" to match the naming
-  from the datasheet.
-- Add the second OD divider called "hdmi_pll_hdmi_out" at
-  HHI_VID_PLL_CNTL[19:18].
-- Add the "vid_pll_in_sel" which can choose between "hdmi_pll_dco" and
-  another parent. However, the second parent is not use on Amlogic's
-  3.10 kernel for HDMI or CVBS output so just leave a TODO in the code.
-- Add the "vid_pll_in_en" which is located after "vid_pll_in_sel"
-  according to the datasheet.
-- Add "vid_pll_pre_div" which is used for divide-by-5 and divide-by-6 in
-  Amlogic's 3.10 kernel sources.
-- Add "vid_pll_post_div" which divides the output of "vid_pll_pre_div"
-  further down. The Amlogic 3.10 kernel configures this as divide-by-2
-  with "vid_pll_pre_div" being configured as divide-by-5 to achieve a
-  total divider of 10.
-- Add the real "vid_pll" clock which selects between "vid_pll_pre_div",
-  "vid_pll_post_div" and a third "vid_pll_pre_div_mult7_div2" (which is
-  "vid_pll_pre_div" divided by 3.5). The latter is not supported yet
-  because it's not used in Amlogic's 3.10 kernel. The "vid_pll" clock
-  rate can also be measured by clkmsr to check whether this
-  implementation is correct.
-- Add "vid_pll_final_div" which is a post-divider for "vid_pll" and it's
-  used as input for "vclk" and "vclk2"
-- Add the two symmetric "vclk" and "vclk" clock trees, each with a
-  divide-by-1, divide-by-2, divide-by-4, divide-by-6 and divide-by-12
-  clock and a divider for each clock.
-- Add the "cts_enct", "cts_encp" and "hdmi_tx_pixel" clocks which each
-  have their own gate and can select between any of the five "vclk"
-  dividers.
-- Add the "cts_encl" and "cts_vdac0" clocks which each have their own
-  gate and can select between any of the five "vclk2" dividers.
+I used Neil's GXBB patches as initial reference, together with Amlogic's
+3.10 kernel sources (drivers/amlogic/display/vout/enc_clk_config.c): [1]
 
-The "hdmi_sys" clock is a different than these video clocks. It takes
-"xtal" as input (there are three more but unknown parents). Add this
-clock as well as it's used by the HDMI controller. Amlogic's 3.10 kernel
-always configures this as "xtal divided by 1", so we can ignore the
-other parents for now.
+With Jianxin's help I was able to get the clock tree into a state where
+the code is now able to recalculate the frequencies of the video clocks.
+I am using the clock measurer as "expected" values, together with the
+data from enc_clk_config.c where all the dividers are documented. My
+test protocol on Meson8b and Meson8m2 is attached below.
 
-This was tested on Meson8b and Meson8m2 boards by comparing the common
-clock framework output with the clock measurer output. The following
-video modes were first set in u-boot (by running "video dev open $mode")
-before booting Linux:
-4K2K30HZ (only supported by Meson8m2, not tested on Meson8b):
-- vid_pll: 297000000Hz
-- cts_encp: 297000000Hz
-- hdmi_tx_pixel: 297000000Hz
-1080P:
-- vid_pll: 148500000Hz
-- cts_encp: 148500000Hz
-- hdmi_tx_pixel: 148500000Hz
-720P:
-- vid_pll: 148500000Hz
-- cts_encp: 148500000Hz
-- hdmi_tx_pixel: 74250000Hz
-480P:
-- vid_pll: 216000000Hz
-- cts_encp: 54000000Hz
-- hdmi_tx_pixel: 27000000Hz
+One note for all brave people who look at enc_clk_config.c from
+Amlogic's 3.10 kernel: some frequencies seem to be doubled there.
+VMODE_1080P is defined with hpll_clk_out = 2970, but it's only using
+the following PLL parameters: M = 61, N = 1, FRAC = 3584. At first I
+though that there's a pre-multiplier like on GXBB, but after digging
+deeper into the code I don't believe that pre-multiplier exists. The
+reason for this is for example VMODE_1080P_30HZ which uses
+hpll_clk_out = 1485 with the same PLL parameters as 2970 MHz. However,
+since the current code can recalculate the frequencies correctly I will
+leave it to a future patch to solve this "frequency doubling" - more
+work is needed anyways for actually changing the PLL's frequency (as
+there are many bits in HHI_VID_PLL_CNTL2, HHI_VID_PLL_CNTL3,
+HHI_VID_PLL_CNTL4 and HHI_VID_PLL_CNTL5 which the Amlogic 3.10 kernel
+is changing together with the M/N/FRAC values.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
----
- drivers/clk/meson/meson8b.c | 739 +++++++++++++++++++++++++++++++++++-
- drivers/clk/meson/meson8b.h |  53 ++-
- 2 files changed, 782 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
-index 0f3f4759fc92..950d0e548c75 100644
---- a/drivers/clk/meson/meson8b.c
-+++ b/drivers/clk/meson/meson8b.c
-@@ -120,7 +120,7 @@ static struct clk_regmap meson8b_fixed_pll = {
- 	},
- };
- 
--static struct clk_regmap meson8b_vid_pll_dco = {
-+static struct clk_regmap meson8b_hdmi_pll_dco = {
- 	.data = &(struct meson_clk_pll_data){
- 		.en = {
- 			.reg_off = HHI_VID_PLL_CNTL,
-@@ -154,14 +154,15 @@ static struct clk_regmap meson8b_vid_pll_dco = {
- 		},
- 	},
- 	.hw.init = &(struct clk_init_data){
--		.name = "vid_pll_dco",
-+		/* sometimes also called "HPLL" or "HPLL PLL" */
-+		.name = "hdmi_pll_dco",
- 		.ops = &meson_clk_pll_ro_ops,
- 		.parent_names = (const char *[]){ "xtal" },
- 		.num_parents = 1,
- 	},
- };
- 
--static struct clk_regmap meson8b_vid_pll = {
-+static struct clk_regmap meson8b_hdmi_pll_lvds_out = {
- 	.data = &(struct clk_regmap_div_data){
- 		.offset = HHI_VID_PLL_CNTL,
- 		.shift = 16,
-@@ -169,9 +170,25 @@ static struct clk_regmap meson8b_vid_pll = {
- 		.flags = CLK_DIVIDER_POWER_OF_TWO,
- 	},
- 	.hw.init = &(struct clk_init_data){
--		.name = "vid_pll",
-+		.name = "hdmi_pll_lvds_out",
-+		.ops = &clk_regmap_divider_ro_ops,
-+		.parent_names = (const char *[]){ "hdmi_pll_dco" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_pll_hdmi_out = {
-+	.data = &(struct clk_regmap_div_data){
-+		.offset = HHI_VID_PLL_CNTL,
-+		.shift = 18,
-+		.width = 2,
-+		.flags = CLK_DIVIDER_POWER_OF_TWO,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_pll_hdmi_out",
- 		.ops = &clk_regmap_divider_ro_ops,
--		.parent_names = (const char *[]){ "vid_pll_dco" },
-+		.parent_names = (const char *[]){ "hdmi_pll_dco" },
- 		.num_parents = 1,
- 		.flags = CLK_SET_RATE_PARENT,
- 	},
-@@ -930,6 +947,632 @@ static struct clk_regmap meson8b_l2_dram_clk_gate = {
- 	},
- };
- 
-+static struct clk_regmap meson8b_vid_pll_in_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_DIVIDER_CNTL,
-+		.mask = 0x1,
-+		.shift = 15,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll_in_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		/*
-+		 * TODO: depending on the SoC there is also a second parent:
-+		 * Meson8: unknown
-+		 * Meson8b: hdmi_pll_dco
-+		 * Meson8m2: vid2_pll
-+		 */
-+		.parent_names = (const char *[]){ "hdmi_pll_dco" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vid_pll_in_en = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_DIVIDER_CNTL,
-+		.bit_idx = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll_in_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vid_pll_in_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vid_pll_pre_div = {
-+	.data = &(struct clk_regmap_div_data){
-+		.offset =  HHI_VID_DIVIDER_CNTL,
-+		.shift = 4,
-+		.width = 3,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll_pre_div",
-+		.ops = &clk_regmap_divider_ro_ops,
-+		.parent_names = (const char *[]){ "vid_pll_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vid_pll_post_div = {
-+	.data = &(struct clk_regmap_div_data){
-+		.offset =  HHI_VID_DIVIDER_CNTL,
-+		.shift = 12,
-+		.width = 3,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll_post_div",
-+		.ops = &clk_regmap_divider_ro_ops,
-+		.parent_names = (const char *[]){ "vid_pll_pre_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vid_pll = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_DIVIDER_CNTL,
-+		.mask = 0x3,
-+		.shift = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		/* TODO: parent 0x2 is vid_pll_pre_div_mult7_div2 */
-+		.parent_names = (const char *[]){ "vid_pll_pre_div",
-+						  "vid_pll_post_div" },
-+		.num_parents = 2,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vid_pll_final_div = {
-+	.data = &(struct clk_regmap_div_data){
-+		.offset =  HHI_VID_CLK_DIV,
-+		.shift = 0,
-+		.width = 8,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vid_pll_final_div",
-+		.ops = &clk_regmap_divider_ro_ops,
-+		.parent_names = (const char *[]){ "vid_pll" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static const char * const meson8b_vclk_mux_parents[] = {
-+	"vid_pll_final_div", "fclk_div4", "fclk_div3", "fclk_div5",
-+	"vid_pll_final_div", "fclk_div7", "mpll1"
-+};
-+
-+static struct clk_regmap meson8b_vclk_in_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_CLK_CNTL,
-+		.mask = 0x7,
-+		.shift = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_in_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vclk_in_en = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_in_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_in_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vclk_div1_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 0,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div1_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk_div2_div = {
-+	.mult = 1,
-+	.div = 2,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div2",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk_div2_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 1,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div2_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_div2" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk_div4_div = {
-+	.mult = 1,
-+	.div = 4,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div4",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk_div4_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 2,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div4_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_div4" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk_div6_div = {
-+	.mult = 1,
-+	.div = 6,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div6",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk_div6_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 3,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div6_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_div6" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk_div12_div = {
-+	.mult = 1,
-+	.div = 12,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div12",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk_div12_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.bit_idx = 4,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk_div12_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk_div12" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vclk2_in_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VIID_CLK_CNTL,
-+		.mask = 0x7,
-+		.shift = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_in_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vclk2_clk_in_en = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_in_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_vclk2_div1_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 0,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div1_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk2_div2_div = {
-+	.mult = 1,
-+	.div = 2,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div2",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk2_div2_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 1,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div2_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_div2" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk2_div4_div = {
-+	.mult = 1,
-+	.div = 4,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div4",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk2_div4_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 2,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div4_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_div4" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk2_div6_div = {
-+	.mult = 1,
-+	.div = 6,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div6",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk2_div6_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 3,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div6_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_div6" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_fixed_factor meson8b_vclk2_div12_div = {
-+	.mult = 1,
-+	.div = 12,
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div12",
-+		.ops = &clk_fixed_factor_ops,
-+		.parent_names = (const char *[]){ "vclk2_in_en" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	}
-+};
-+
-+static struct clk_regmap meson8b_vclk2_div12_div_gate = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.bit_idx = 4,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "vclk2_div12_en",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "vclk2_div12" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static const char * const meson8b_vclk_enc_mux_parents[] = {
-+	"vclk_div1_en", "vclk_div2_en", "vclk_div4_en", "vclk_div6_en",
-+	"vclk_div12_en",
-+};
-+
-+static struct clk_regmap meson8b_cts_enct_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.mask = 0xf,
-+		.shift = 20,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_enct_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_enct = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 1,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_enct",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "cts_enct_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_encp_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.mask = 0xf,
-+		.shift = 24,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_encp_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_encp = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 2,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_encp",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "cts_encp_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_enci_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VID_CLK_DIV,
-+		.mask = 0xf,
-+		.shift = 28,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_enci_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_enci = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 0,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_enci",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "cts_enci_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_tx_pixel_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_HDMI_CLK_CNTL,
-+		.mask = 0xf,
-+		.shift = 16,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_tx_pixel_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_tx_pixel = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 5,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_tx_pixel",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "hdmi_tx_pixel_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static const char * const meson8b_vclk2_enc_mux_parents[] = {
-+	"vclk2_div1_en", "vclk2_div2_en", "vclk2_div4_en", "vclk2_div6_en",
-+	"vclk2_div12_en",
-+};
-+
-+static struct clk_regmap meson8b_cts_encl_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.mask = 0xf,
-+		.shift = 12,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_encl_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk2_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk2_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_encl = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 3,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_encl",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "cts_encl_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_vdac0_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_VIID_CLK_DIV,
-+		.mask = 0xf,
-+		.shift = 28,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_vdac0_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		.parent_names = meson8b_vclk2_enc_mux_parents,
-+		.num_parents = ARRAY_SIZE(meson8b_vclk2_enc_mux_parents),
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_cts_vdac0 = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_VID_CLK_CNTL2,
-+		.bit_idx = 4,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "cts_vdac0",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "cts_vdac0_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_sys_sel = {
-+	.data = &(struct clk_regmap_mux_data){
-+		.offset = HHI_HDMI_CLK_CNTL,
-+		.mask = 0x3,
-+		.shift = 9,
-+		.flags = CLK_MUX_ROUND_CLOSEST,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_sys_sel",
-+		.ops = &clk_regmap_mux_ro_ops,
-+		/* FIXME: all other parents are unknown */
-+		.parent_names = (const char *[]){ "xtal" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_NO_REPARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_sys_div = {
-+	.data = &(struct clk_regmap_div_data){
-+		.offset = HHI_HDMI_CLK_CNTL,
-+		.shift = 0,
-+		.width = 7,
-+	},
-+	.hw.init = &(struct clk_init_data){
-+		.name = "hdmi_sys_div",
-+		.ops = &clk_regmap_divider_ro_ops,
-+		.parent_names = (const char *[]){ "hdmi_sys_sel" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
-+static struct clk_regmap meson8b_hdmi_sys = {
-+	.data = &(struct clk_regmap_gate_data){
-+		.offset = HHI_HDMI_CLK_CNTL,
-+		.bit_idx = 8,
-+	},
-+	.hw.init = &(struct clk_init_data) {
-+		.name = "hdmi_sys",
-+		.ops = &clk_regmap_gate_ro_ops,
-+		.parent_names = (const char *[]){ "hdmi_sys_div" },
-+		.num_parents = 1,
-+		.flags = CLK_SET_RATE_PARENT,
-+	},
-+};
-+
- /* Everything Else (EE) domain gates */
- 
- static MESON_GATE(meson8b_ddr, HHI_GCLK_MPEG0, 0);
-@@ -1129,7 +1772,7 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
- 		[CLKID_NAND_DIV]	    = &meson8b_nand_clk_div.hw,
- 		[CLKID_NAND_CLK]	    = &meson8b_nand_clk_gate.hw,
- 		[CLKID_PLL_FIXED_DCO]	    = &meson8b_fixed_pll_dco.hw,
--		[CLKID_PLL_VID_DCO]	    = &meson8b_vid_pll_dco.hw,
-+		[CLKID_HDMI_PLL_DCO]	    = &meson8b_hdmi_pll_dco.hw,
- 		[CLKID_PLL_SYS_DCO]	    = &meson8b_sys_pll_dco.hw,
- 		[CLKID_CPU_CLK_DIV2]	    = &meson8b_cpu_clk_div2.hw,
- 		[CLKID_CPU_CLK_DIV3]	    = &meson8b_cpu_clk_div3.hw,
-@@ -1146,6 +1789,50 @@ static struct clk_hw_onecell_data meson8b_hw_onecell_data = {
- 		[CLKID_AXI]		    = &meson8b_axi_clk_gate.hw,
- 		[CLKID_L2_DRAM_SEL]	    = &meson8b_l2_dram_clk_sel.hw,
- 		[CLKID_L2_DRAM]		    = &meson8b_l2_dram_clk_gate.hw,
-+		[CLKID_HDMI_PLL_LVDS_OUT]   = &meson8b_hdmi_pll_lvds_out.hw,
-+		[CLKID_HDMI_PLL_HDMI_OUT]   = &meson8b_hdmi_pll_hdmi_out.hw,
-+		[CLKID_VID_PLL_IN_SEL]	    = &meson8b_vid_pll_in_sel.hw,
-+		[CLKID_VID_PLL_IN_EN]	    = &meson8b_vid_pll_in_en.hw,
-+		[CLKID_VID_PLL_PRE_DIV]	    = &meson8b_vid_pll_pre_div.hw,
-+		[CLKID_VID_PLL_POST_DIV]    = &meson8b_vid_pll_post_div.hw,
-+		[CLKID_VID_PLL_FINAL_DIV]   = &meson8b_vid_pll_final_div.hw,
-+		[CLKID_VCLK_IN_SEL]	    = &meson8b_vclk_in_sel.hw,
-+		[CLKID_VCLK_IN_EN]	    = &meson8b_vclk_in_en.hw,
-+		[CLKID_VCLK_DIV1]	    = &meson8b_vclk_div1_gate.hw,
-+		[CLKID_VCLK_DIV2_DIV]	    = &meson8b_vclk_div2_div.hw,
-+		[CLKID_VCLK_DIV2]	    = &meson8b_vclk_div2_div_gate.hw,
-+		[CLKID_VCLK_DIV4_DIV]	    = &meson8b_vclk_div4_div.hw,
-+		[CLKID_VCLK_DIV4]	    = &meson8b_vclk_div4_div_gate.hw,
-+		[CLKID_VCLK_DIV6_DIV]	    = &meson8b_vclk_div6_div.hw,
-+		[CLKID_VCLK_DIV6]	    = &meson8b_vclk_div6_div_gate.hw,
-+		[CLKID_VCLK_DIV12_DIV]	    = &meson8b_vclk_div12_div.hw,
-+		[CLKID_VCLK_DIV12]	    = &meson8b_vclk_div12_div_gate.hw,
-+		[CLKID_VCLK2_IN_SEL]	    = &meson8b_vclk2_in_sel.hw,
-+		[CLKID_VCLK2_IN_EN]	    = &meson8b_vclk2_clk_in_en.hw,
-+		[CLKID_VCLK2_DIV1]	    = &meson8b_vclk2_div1_gate.hw,
-+		[CLKID_VCLK2_DIV2_DIV]	    = &meson8b_vclk2_div2_div.hw,
-+		[CLKID_VCLK2_DIV2]	    = &meson8b_vclk2_div2_div_gate.hw,
-+		[CLKID_VCLK2_DIV4_DIV]	    = &meson8b_vclk2_div4_div.hw,
-+		[CLKID_VCLK2_DIV4]	    = &meson8b_vclk2_div4_div_gate.hw,
-+		[CLKID_VCLK2_DIV6_DIV]	    = &meson8b_vclk2_div6_div.hw,
-+		[CLKID_VCLK2_DIV6]	    = &meson8b_vclk2_div6_div_gate.hw,
-+		[CLKID_VCLK2_DIV12_DIV]	    = &meson8b_vclk2_div12_div.hw,
-+		[CLKID_VCLK2_DIV12]	    = &meson8b_vclk2_div12_div_gate.hw,
-+		[CLKID_CTS_ENCT_SEL]	    = &meson8b_cts_enct_sel.hw,
-+		[CLKID_CTS_ENCT]	    = &meson8b_cts_enct.hw,
-+		[CLKID_CTS_ENCP_SEL]	    = &meson8b_cts_encp_sel.hw,
-+		[CLKID_CTS_ENCP]	    = &meson8b_cts_encp.hw,
-+		[CLKID_CTS_ENCI_SEL]	    = &meson8b_cts_enci_sel.hw,
-+		[CLKID_CTS_ENCI]	    = &meson8b_cts_enci.hw,
-+		[CLKID_HDMI_TX_PIXEL_SEL]   = &meson8b_hdmi_tx_pixel_sel.hw,
-+		[CLKID_HDMI_TX_PIXEL]	    = &meson8b_hdmi_tx_pixel.hw,
-+		[CLKID_CTS_ENCL_SEL]	    = &meson8b_cts_encl_sel.hw,
-+		[CLKID_CTS_ENCL]	    = &meson8b_cts_encl.hw,
-+		[CLKID_CTS_VDAC0_SEL]	    = &meson8b_cts_vdac0_sel.hw,
-+		[CLKID_CTS_VDAC0]	    = &meson8b_cts_vdac0.hw,
-+		[CLKID_HDMI_SYS_SEL]	    = &meson8b_hdmi_sys_sel.hw,
-+		[CLKID_HDMI_SYS_DIV]	    = &meson8b_hdmi_sys_div.hw,
-+		[CLKID_HDMI_SYS]	    = &meson8b_hdmi_sys.hw,
- 		[CLK_NR_CLKS]		    = NULL,
- 	},
- 	.num = CLK_NR_CLKS,
-@@ -1239,7 +1926,6 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
- 	&meson8b_mpll1_div,
- 	&meson8b_mpll2_div,
- 	&meson8b_fixed_pll,
--	&meson8b_vid_pll,
- 	&meson8b_sys_pll,
- 	&meson8b_cpu_in_sel,
- 	&meson8b_cpu_scale_div,
-@@ -1255,7 +1941,7 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
- 	&meson8b_nand_clk_div,
- 	&meson8b_nand_clk_gate,
- 	&meson8b_fixed_pll_dco,
--	&meson8b_vid_pll_dco,
-+	&meson8b_hdmi_pll_dco,
- 	&meson8b_sys_pll_dco,
- 	&meson8b_abp_clk_sel,
- 	&meson8b_abp_clk_gate,
-@@ -1265,6 +1951,43 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
- 	&meson8b_axi_clk_gate,
- 	&meson8b_l2_dram_clk_sel,
- 	&meson8b_l2_dram_clk_gate,
-+	&meson8b_hdmi_pll_lvds_out,
-+	&meson8b_hdmi_pll_hdmi_out,
-+	&meson8b_vid_pll_in_sel,
-+	&meson8b_vid_pll_in_en,
-+	&meson8b_vid_pll_pre_div,
-+	&meson8b_vid_pll_post_div,
-+	&meson8b_vid_pll,
-+	&meson8b_vid_pll_final_div,
-+	&meson8b_vclk_in_sel,
-+	&meson8b_vclk_in_en,
-+	&meson8b_vclk_div1_gate,
-+	&meson8b_vclk_div2_div_gate,
-+	&meson8b_vclk_div4_div_gate,
-+	&meson8b_vclk_div6_div_gate,
-+	&meson8b_vclk_div12_div_gate,
-+	&meson8b_vclk2_in_sel,
-+	&meson8b_vclk2_clk_in_en,
-+	&meson8b_vclk2_div1_gate,
-+	&meson8b_vclk2_div2_div_gate,
-+	&meson8b_vclk2_div4_div_gate,
-+	&meson8b_vclk2_div6_div_gate,
-+	&meson8b_vclk2_div12_div_gate,
-+	&meson8b_cts_enct_sel,
-+	&meson8b_cts_enct,
-+	&meson8b_cts_encp_sel,
-+	&meson8b_cts_encp,
-+	&meson8b_cts_enci_sel,
-+	&meson8b_cts_enci,
-+	&meson8b_hdmi_tx_pixel_sel,
-+	&meson8b_hdmi_tx_pixel,
-+	&meson8b_cts_encl_sel,
-+	&meson8b_cts_encl,
-+	&meson8b_cts_vdac0_sel,
-+	&meson8b_cts_vdac0,
-+	&meson8b_hdmi_sys_sel,
-+	&meson8b_hdmi_sys_div,
-+	&meson8b_hdmi_sys,
- };
- 
- static const struct meson8b_clk_reset_line {
-diff --git a/drivers/clk/meson/meson8b.h b/drivers/clk/meson/meson8b.h
-index e953923792d7..87fba739af81 100644
---- a/drivers/clk/meson/meson8b.h
-+++ b/drivers/clk/meson/meson8b.h
-@@ -19,16 +19,21 @@
-  *
-  * [0] http://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
-  */
-+#define HHI_VIID_CLK_DIV		0x128 /* 0x4a offset in data sheet */
-+#define HHI_VIID_CLK_CNTL		0x12c /* 0x4b offset in data sheet */
- #define HHI_GCLK_MPEG0			0x140 /* 0x50 offset in data sheet */
- #define HHI_GCLK_MPEG1			0x144 /* 0x51 offset in data sheet */
- #define HHI_GCLK_MPEG2			0x148 /* 0x52 offset in data sheet */
- #define HHI_GCLK_OTHER			0x150 /* 0x54 offset in data sheet */
- #define HHI_GCLK_AO			0x154 /* 0x55 offset in data sheet */
- #define HHI_SYS_CPU_CLK_CNTL1		0x15c /* 0x57 offset in data sheet */
-+#define HHI_VID_CLK_DIV			0x164 /* 0x59 offset in data sheet */
- #define HHI_MPEG_CLK_CNTL		0x174 /* 0x5d offset in data sheet */
- #define HHI_VID_CLK_CNTL		0x17c /* 0x5f offset in data sheet */
-+#define HHI_VID_CLK_CNTL2		0x194 /* 0x65 offset in data sheet */
- #define HHI_VID_DIVIDER_CNTL		0x198 /* 0x66 offset in data sheet */
- #define HHI_SYS_CPU_CLK_CNTL0		0x19c /* 0x67 offset in data sheet */
-+#define HHI_HDMI_CLK_CNTL		0x1cc /* 0x73 offset in data sheet */
- #define HHI_NAND_CLK_CNTL		0x25c /* 0x97 offset in data sheet */
- #define HHI_MPLL_CNTL			0x280 /* 0xa0 offset in data sheet */
- #define HHI_SYS_PLL_CNTL		0x300 /* 0xc0 offset in data sheet */
-@@ -77,7 +82,7 @@
- #define CLKID_NAND_SEL		110
- #define CLKID_NAND_DIV		111
- #define CLKID_PLL_FIXED_DCO	113
--#define CLKID_PLL_VID_DCO	114
-+#define CLKID_HDMI_PLL_DCO	114
- #define CLKID_PLL_SYS_DCO	115
- #define CLKID_CPU_CLK_DIV2	116
- #define CLKID_CPU_CLK_DIV3	117
-@@ -90,8 +95,52 @@
- #define CLKID_PERIPH_SEL	125
- #define CLKID_AXI_SEL		127
- #define CLKID_L2_DRAM_SEL	129
-+#define CLKID_HDMI_PLL_LVDS_OUT	131
-+#define CLKID_HDMI_PLL_HDMI_OUT	132
-+#define CLKID_VID_PLL_IN_SEL	133
-+#define CLKID_VID_PLL_IN_EN	134
-+#define CLKID_VID_PLL_PRE_DIV	135
-+#define CLKID_VID_PLL_POST_DIV	136
-+#define CLKID_VID_PLL_FINAL_DIV	137
-+#define CLKID_VCLK_IN_SEL	138
-+#define CLKID_VCLK_IN_EN	139
-+#define CLKID_VCLK_DIV1		140
-+#define CLKID_VCLK_DIV2_DIV	141
-+#define CLKID_VCLK_DIV2		142
-+#define CLKID_VCLK_DIV4_DIV	143
-+#define CLKID_VCLK_DIV4		144
-+#define CLKID_VCLK_DIV6_DIV	145
-+#define CLKID_VCLK_DIV6		146
-+#define CLKID_VCLK_DIV12_DIV	147
-+#define CLKID_VCLK_DIV12	148
-+#define CLKID_VCLK2_IN_SEL	149
-+#define CLKID_VCLK2_IN_EN	150
-+#define CLKID_VCLK2_DIV1	151
-+#define CLKID_VCLK2_DIV2_DIV	152
-+#define CLKID_VCLK2_DIV2	153
-+#define CLKID_VCLK2_DIV4_DIV	154
-+#define CLKID_VCLK2_DIV4	155
-+#define CLKID_VCLK2_DIV6_DIV	156
-+#define CLKID_VCLK2_DIV6	157
-+#define CLKID_VCLK2_DIV12_DIV	158
-+#define CLKID_VCLK2_DIV12	159
-+#define CLKID_CTS_ENCT_SEL	160
-+#define CLKID_CTS_ENCT		161
-+#define CLKID_CTS_ENCP_SEL	162
-+#define CLKID_CTS_ENCP		163
-+#define CLKID_CTS_ENCI_SEL	164
-+#define CLKID_CTS_ENCI		165
-+#define CLKID_HDMI_TX_PIXEL_SEL	166
-+#define CLKID_HDMI_TX_PIXEL	167
-+#define CLKID_CTS_ENCL_SEL	168
-+#define CLKID_CTS_ENCL		169
-+#define CLKID_CTS_VDAC0_SEL	170
-+#define CLKID_CTS_VDAC0		171
-+#define CLKID_HDMI_SYS_SEL	172
-+#define CLKID_HDMI_SYS_DIV	173
-+#define CLKID_HDMI_SYS		174
- 
--#define CLK_NR_CLKS		131
-+#define CLK_NR_CLKS		175
- 
- /*
-  * include the CLKID and RESETID that have
+[0] https://patchwork.kernel.org/cover/10670657/
+[1] https://github.com/endlessm/linux-meson/blob/cd4096c3ff4eb5b8a8a5581bb46508601c5470dc/drivers/amlogic/display/vout/enc_clk_config.c
+
+
+1080P / Meson8b Odroid-C1
+- u-boot:
+-- odroidc#video dev open 1080P
+-- mode = 8 vic = 16
+-- set HDMI vic: 16
+-- mode is: 8
+-- viu chan = 1
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 148497596 +/-4807Hz
+-- encp 148497596 +/-4807Hz
+-- encl 0 +/-3125Hz
+-- hdmi_ch0_tmds 148500000 +/-4807Hz
+-- hdmi_tx_pixel 148497596 +/-4807Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1485000000 0 0 50000
+-- vid_pll 0 0 0 148500000 0 0 50000
+-- cts_encp 0 0 0 148500000 0 0 50000
+-- cts_encl 0 0 0 148500000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 148500000 0 0 50000
+
+720P / Meson8b Odroid-C1
+- u-boot:
+-- odroidc#video dev open 720P
+-- mode = 6 vic = 4
+-- set HDMI vic: 4
+-- mode is: 6
+-- viu chan = 1
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 148497596 +/-4807Hz
+-- encp 148497596 +/-4807Hz
+-- encl 0 +/-3125Hz
+-- hdmi_ch0_tmds 74250000 +/-3125Hz
+-- hdmi_tx_pixel 74248438 +/-3125Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1485000000 0 0 50000
+-- vid_pll 0 0 0 148500000 0 0 50000
+-- cts_encp 0 0 0 148500000 0 0 50000
+-- cts_encl 0 0 0 148500000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 74250000 0 0 50000
+
+480P / Meson8b Odroid-C1
+- u-boot:
+-- odroidc#video dev open 480P
+-- mode = 2 vic = 3
+-- set HDMI vic: 3
+-- mode is: 2
+-- viu chan = 1
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 215996528 +/-6944Hz
+-- encp 53998438 +/-3125Hz
+-- encl 0 +/-3125Hz
+-- hdmi_ch0_tmds 26998438 +/-3125Hz
+-- hdmi_tx_pixel 27000000 +/-3125Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1080000000 0 0 50000
+-- vid_pll 0 0 0 216000000 0 0 50000
+-- cts_encp 0 0 0 54000000 0 0 50000
+-- cts_encl 0 0 0 54000000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 27000000 0 0 50000
+
+
+4K2K30HZ / Meson8m2 M8S
+- u-boot:
+-- m8m2_n200_v1#video dev open 4K2K30HZ
+-- mode = 13 vic = 68
+-- set HDMI vic: 68
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 297000000 +/-10416Hz
+-- encp 296989583 +/-10416Hz
+-- encl 296989583 +/-10416Hz
+-- hdmi_ch0_tmds 296984375 +/-10416Hz
+-- hdmi_tx_pixel 296979167 +/-10416Hz
+-- hdmi_sys 23998438 +/-3125Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1485000000 0 0 50000
+-- vid_pll 0 0 0 297000000 0 0 50000
+-- cts_encp 0 0 0 297000000 0 0 50000
+-- cts_encl 0 0 0 297000000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 297000000 0 0 50000
+-- hdmi_sys 0 0 0 24000000 0 0 50000
+
+1080P / Meson8m2 M8S
+- u-boot:
+-- m8m2_n200_v1#video dev open 1080P
+-- mode = 8 vic = 16
+-- set HDMI vic: 16
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 148500000 +/-4807Hz
+-- encp 148500000 +/-4807Hz
+-- encl 148497596 +/-4807Hz
+-- hdmi_ch0_tmds 148497596 +/-4807Hz
+-- hdmi_tx_pixel 148497596 +/-4807Hz
+-- hdmi_sys 24000000 +/-3125Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1485000000 0 0 50000
+-- vid_pll 0 0 0 148500000 0 0 50000
+-- cts_encp 0 0 0 148500000 0 0 50000
+-- cts_encl 0 0 0 148500000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 148500000 0 0 50000
+-- hdmi_sys 0 0 0 24000000 0 0 50000
+
+720P / Meson8m2 M8S
+- u-boot:
+-- m8m2_n200_v1#video dev open 720P
+-- mode = 6 vic = 4
+-- set HDMI vic: 4
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- clkmsr:
+-- vid_pll 148500000 +/-4807Hz
+-- encp 148500000 +/-4807Hz
+-- encl 148497596 +/-4807Hz
+-- hdmi_ch0_tmds 74248438 +/-3125Hz
+-- hdmi_tx_pixel 74248438 +/-3125Hz
+-- hdmi_sys 24000000 +/-3125Hz
+- clk:
+-- hdmi_pll_dco 0 0 0 1485000000 0 0 50000
+-- vid_pll 0 0 0 148500000 0 0 50000
+-- cts_encp 0 0 0 148500000 0 0 50000
+-- cts_encl 0 0 0 148500000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 74250000 0 0 50000
+-- hdmi_sys 0 0 0 24000000 0 0 50000
+
+480P / Meson8m2 M8S
+- u-boot:
+-- m8m2_n200_v1#video dev open 480P
+-- mode = 2 vic = 3
+-- set HDMI vic: 3
+-- config HPLL
+-- config HPLL done
+-- reconfig packet setting done
+- - clkmsr:
+-- vid_pll 215996528 +/-6944Hz
+-- encp 54000000 +/-3125Hz
+-- encl 53998438 +/-3125Hz
+-- hdmi_ch0_tmds 27000000 +/-3125Hz
+-- hdmi_tx_pixel 27000000 +/-3125Hz
+-- hdmi_sys 24000000 +/-3125Hz
+- - clk:
+-- hdmi_pll_dco 0 0 0 1080000000 0 0 50000
+-- vid_pll 0 0 0 216000000 0 0 50000
+-- cts_encp 0 0 0 54000000 0 0 50000
+-- cts_encl 0 0 0 54000000 0 0 50000
+-- hdmi_tx_pixel 0 0 0 27000000 0 0 50000
+-- hdmi_sys 0 0 0 24000000 0 0 50000
+
+
+Martin Blumenstingl (3):
+  - clk: meson: meson8b: fix the offset of -- vid_pll_dco's N value
+  - clk: meson: meson8b: add the fractional divider for -- vid_pll_dco
+  - clk: meson: meson8b: add the read-only video clock trees
+
+ drivers/clk/meson/meson8b.c | 746 +++++++++++++++++++++++++++++++++++-
+ drivers/clk/meson/meson8b.h |  54 ++-
+ 2 files changed, 789 insertions(+), 11 deletions(-)
+
 -- 
 2.19.2
 
