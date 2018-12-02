@@ -2,23 +2,22 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EF84AC64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:57:46 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 55D37C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:02:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD8DF20834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 19:57:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 212A220834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:02:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Fn5R7ZBY";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="CTpJKB3Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD8DF20834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cIXxq76/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="pDAUm7kV"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 212A220834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,57 +25,60 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DmXq1N9IvLanc96GuUL/k86gMlS4ovbgNJ77UtCBlrE=; b=Fn5R7ZBYOYzOH5
-	7uojhyOMx8FY08rGfd29QOuUI4MpJcuZJ6jQkzlMQlI0s5GAuj1B9+afC2VSkY4AQemu7kPxO8CQf
-	hndr3QRyE3hkJCZ9xEjOm/GcDzTeBJRNk15ufkM6yX9JEvB5aiGPDAbjwvaWPrsXRVvoZQhlL5iFy
-	xjYcin/nZFwNfTxbo1q3g/YZJMQxznbtU3aly0KaGknszOGHqOdHXZ4fHyQqIytRQRM9Fg8WKyVyY
-	lJKfsiA3Uvq4McfmjqBBDOeJEv2J67hf4NdAUfF1OpyHVebWOixdY0gNRITD0qr15CULDnhS1BFGm
-	7eJUxjoU+QM58IVfTirQ==;
+	List-Owner; bh=e+WBN7XPFSXRpjsETOh9lSwjS7eHeaFgftFKzoB7VuE=; b=cIXxq76/T7tPWg
+	jB26QZ+co0LAsvQbT9pBa+9TCXjkjWKT/N7XMgLtrYN308wI0K3KYb7lj2c3OlUQ/h+qIlhp74fn8
+	X3i/YUGuQXp+hQvZbPcRo8I5uqFy9Cvcxhr/hwa0Y5YLPHTy4OZonr5flcQdJSM52lKy6XipG3ZqX
+	/z02GYzSECticzIYhC5vvaDIVqO2NcbG06IDE5bOzQaoNp4XPBVHIySJkgum5Yn1Gl//a6eMMge5s
+	7pj5fo7S6qPn1cz7JegKnL9cHqZ0CzvRGDLHCLjPFcnEFo8cRCsVRqWO8lV2100AmTfAxbbVfpM/O
+	2smWDoZxDlISy06DBXgw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTXs5-0000CM-Ru; Sun, 02 Dec 2018 19:57:41 +0000
-Received: from mail-io1-xd43.google.com ([2607:f8b0:4864:20::d43])
+	id 1gTXwb-00025h-7r; Sun, 02 Dec 2018 20:02:21 +0000
+Received: from mail-io1-xd41.google.com ([2607:f8b0:4864:20::d41])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTXs0-0008JR-PY
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 19:57:39 +0000
-Received: by mail-io1-xd43.google.com with SMTP id o5so2716399iop.12
+ id 1gTXwY-00023Y-CF
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:02:19 +0000
+Received: by mail-io1-xd41.google.com with SMTP id n9so8695702ioh.7
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 11:57:26 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ Sun, 02 Dec 2018 12:02:07 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=oT7FrA4WVZh5UlWYxwLUSym9qcZhgcaFyM9+h+p+4jg=;
- b=CTpJKB3YGC4bp2rlPMaeT8VuTK5k9ROBhfPSoqxZ1FHwm4QVerpZLlwcQnTkASTcul
- sjg+FBUwib/bsrKw3qVCDl/bfs0+juqCAkqK9Kl9vinEAu96fFI8ki8Sq0q31V0S2jSE
- RwJ4FDp8RPV5m5RVGGEpW78HZMyE1gJ4m/EaI=
+ :cc; bh=6bLEXPScqafBgvmyyxDn7aE/051nLKxY7a8aCT/ZmLo=;
+ b=pDAUm7kVtaTNqx7B5VYFVgcPfP+a2yJBT/ZY+C1SeAkgwz2Sr015CtoRqzkCCs6yko
+ 5hQm6SbvDpmOxzwRtgk9j/5FGIy2QoWjbLtmh9KxSk0C4yTKEdnKq9z9mNCoRkdl/rad
+ iE4wJirqCD2HZpeSLllJ+FhTX1ewzrVkOq3awwSttHLQDmMSqvU18vJCPaAy5PytgDG+
+ 46+eO/dbNHeQaWCgmqAXrrH3TyFRvc0VDKfVobn3XI9C7q3RmJEzfeuE3m5dmALmGbIf
+ 0tafHGzts9kYglB+2avJRb4FN/7nTMW+Yr2sxUDgditPLUVlFxRT8GnkyuD7RwihOvh1
+ RAkw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=oT7FrA4WVZh5UlWYxwLUSym9qcZhgcaFyM9+h+p+4jg=;
- b=QQk6e9xrb/mHSpNQDBo4FLnSRQCwlwuuS/svVvrBFo5/7pfYgTpFd09EgiTavL5W3P
- /f/huInv8SMnNGn+mbmU9tk9+VBQrilvqqczJiz7FPD71snrO9fHCKLx+Dbbe85v7r2D
- uvXdgZmYUe7/lt/OiUcliXcgRSS/sN+RMYFooSnW3YxBS3yUYqzS2ALim1hHoCvpQ/ck
- S0Odi3vmCD6JTVjZswuwOmxSdSxBhHIVcX5pKD8fvZxK5WMTaEFNqxcB9tvU1bg3i4Qv
- rDYnV8oCHKiYTsP5C5zQcyD3jfGn6whFs+ZtjtpnGOPFHDPYiqzJOXev6WoqsMKJaLfD
- eDIw==
-X-Gm-Message-State: AA+aEWaGBvp7notUytA+9CKGqnGlInLbCMQBUbsifkxRj2oPylu6JtIP
- P+rQ7/oG+PJoNF4o6DG8iKH6x1QlB/yOnmVQePIxEw==
-X-Google-Smtp-Source: AFSGD/UtTWzAH6yL5S52y/nXXTJLJoPRB9clu9tZ6Xmb9dMgLgnwQqPACd5dbbsQfLw4PG5OL9xU9l2iZcQ45Y+JXhQ=
-X-Received: by 2002:a6b:5d01:: with SMTP id r1mr11118003iob.170.1543780645075; 
- Sun, 02 Dec 2018 11:57:25 -0800 (PST)
+ bh=6bLEXPScqafBgvmyyxDn7aE/051nLKxY7a8aCT/ZmLo=;
+ b=Fwi+v1TOmcrOScnJUDWAUs385RzR+nMycFDW+rU+gmbf0FXzdspxwfjAZdS97fBxAn
+ D23n9D5g73Pat6wDl8x4Exkh6D+252Idzlv8KFwxTc9XS86Z64nAoJG0cEGv2WtiJBbz
+ xairz/GpSu4lMSvbBvbg7ITQnNOtl2geZTEsQi0jtO4sqcXpZvSLPr2WrT+1ppGDpPGm
+ Po6o+CRnJr01fmBFqHDwzqz/RqXQi9vYMbq6PQ2ixraHCi4UDpWZUBLGw6jc/XgbisEP
+ 4AKU583iJs+SFQzt8OXh7TRTkghFNhvhRAiUXqZ5GMsnyJ1UNadpcVLDYyOA0DfXdGry
+ jmog==
+X-Gm-Message-State: AA+aEWZYAfWFGHB4oid151Jewe/F1BklYZ9+bretq00eIFzpx0TLOwj/
+ j5qjy2shZ/eaOcVu3YUY0vGS7slpsTezflGM77y98Q==
+X-Google-Smtp-Source: AFSGD/WMETQUdwLN5IEJ11V6JF2o8lzl0QCIWZ1zGPh0I78zdlkkwoLI3G9ClzyiLy2/biyEyuwAGdGUHxPeeUTpAYo=
+X-Received: by 2002:a6b:1414:: with SMTP id 20mr11563608iou.140.1543780926158; 
+ Sun, 02 Dec 2018 12:02:06 -0800 (PST)
 MIME-Version: 1.0
-References: <20181130203811.30269-1-ard.biesheuvel@linaro.org>
-In-Reply-To: <20181130203811.30269-1-ard.biesheuvel@linaro.org>
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Sun, 2 Dec 2018 20:57:13 +0100
-Message-ID: <CAKv+Gu8zFDS_hJSB916h7eni2t8Occ0-2U_eSayZDAz-=ApwQg@mail.gmail.com>
-Subject: Re: [RFC/RFT PATCH] crypto: arm64/chacha - optimize for arbitrary
- length inputs
-To: "open list:HARDWARE RANDOM NUMBER GENERATOR CORE"
- <linux-crypto@vger.kernel.org>
+References: <d131fdd3-663c-9a5b-4296-94f2635f8c41@gmail.com>
+ <5e3371a7-e4a3-49cc-b517-20902a5e2ed4@gmail.com>
+In-Reply-To: <5e3371a7-e4a3-49cc-b517-20902a5e2ed4@gmail.com>
+From: Olof Johansson <olof@lixom.net>
+Date: Sun, 2 Dec 2018 12:01:54 -0800
+Message-ID: <CAOesGMimqGGL+3Dd8tyyJpb506j9-tJZP0FeSCkvKwuUGWAmAg@mail.gmail.com>
+Subject: Re: [GIT PULL] arm: mediatek: DT fixes for v4.20
+To: Matthias Brugger <matthias.bgg@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_115736_833278_7E9FB338 
-X-CRM114-Status: GOOD (  17.58  )
+X-CRM114-CacheID: sfid-20181202_120218_410747_CCF44D0A 
+X-CRM114-Status: GOOD (  13.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,439 +90,44 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Eric Biggers <ebiggers@kernel.org>, Martin Willi <martin@strongswan.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Herbert Xu <herbert@gondor.apana.org.au>
+Cc: ARM-SoC Maintainers <arm@kernel.org>,
+ "moderated list:ARM/Mediatek SoC..." <linux-mediatek@lists.infradead.org>,
+ Ryder Lee <ryder.lee@mediatek.com>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, 30 Nov 2018 at 21:38, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On Sun, Dec 2, 2018 at 11:57 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
 >
-> Update the 4-way NEON ChaCha routine so it can handle input of any
-> length >64 bytes in its entirety, rather than having to call into
-> the 1-way routine and/or do memcpy()s via temp buffers to handle the
-> tail of a ChaCha invocation that is not a multiple of 256 bytes.
+> Hi all,
 >
-> On inputs that are a multiple of 256 bytes (and thus in tcrypt
-> benchmarks), performance drops by around 1% on Cortex-A57, while
-> performance for inputs drawn randomly from the range [64, 1024+64)
-> increases by around 30% (using ChaCha20). On Cortex-A72, performance
-> gains are similar. On Cortex-A53, performance improves but only by 5%.
+> On 26/11/2018 11:34, Matthias Brugger wrote:
+> > Hi Olof,
+> > Hi Arnd,
+> >
+> > There two issues with the mt7622 based boards in the current v4.20-rc cycle.
+> > Could you please pull the following fixes for the issues.
+> >
+> > Thanks,
+> > Matthias
 >
-> Cc: Eric Biggers <ebiggers@kernel.org>
-> Cc: Martin Willi <martin@strongswan.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> Test program after the patch.
->
+> I just saw, that this is not part of armsoc-fixes [1]
+> Does it fall through the cracks or are there any comments?
 
-Perhaps a better benchmark below: I added 1472 byte blocks to the
-tcrypt template (which should reflect the VPN case IIUC), and that
-gives me (before/after)
+Hi,
 
-tcrypt: test 0 (256 bit key, 16 byte blocks): 2848103 operations in 1
-seconds (45569648 bytes)
-tcrypt: test 1 (256 bit key, 64 byte blocks): 2840030 operations in 1
-seconds (181761920 bytes)
-tcrypt: test 2 (256 bit key, 256 byte blocks): 1408404 operations in 1
-seconds (360551424 bytes)
-tcrypt: test 3 (256 bit key, 1024 byte blocks): 390180 operations in 1
-seconds (399544320 bytes)
-tcrypt: test 4 (256 bit key, 1472 byte blocks): 217175 operations in 1
-seconds (319681600 bytes)
-tcrypt: test 5 (256 bit key, 8192 byte blocks): 49271 operations in 1
-seconds (403628032 bytes)
+I pinged you on IRC, which I'm guessing you didn't see.
 
-tcrypt: test 0 (256 bit key, 16 byte blocks): 2960809 operations in 1
-seconds (47372944 bytes)
-tcrypt: test 1 (256 bit key, 64 byte blocks): 2970977 operations in 1
-seconds (190142528 bytes)
-tcrypt: test 2 (256 bit key, 256 byte blocks): 1404117 operations in 1
-seconds (359453952 bytes)
-tcrypt: test 3 (256 bit key, 1024 byte blocks): 390356 operations in 1
-seconds (399724544 bytes)
-tcrypt: test 4 (256 bit key, 1472 byte blocks): 261865 operations in 1
-seconds (385465280 bytes)
-tcrypt: test 5 (256 bit key, 8192 byte blocks): 49311 operations in 1
-seconds (403955712 bytes)
+Your branch was based on -rc3 when the rest of fixes were on -rc1 for
+this cycle. I asked if I could cherry-pick, but in the end I decided
+to send what we have and just merge it once Linus picks it up (since
+the new branch would be based on -rc4 or 5). So, it's on the list and
+I'll merge it later today or tomorrow.
 
 
->  arch/arm64/crypto/chacha-neon-core.S | 185 ++++++++++++++++++--
->  arch/arm64/crypto/chacha-neon-glue.c |  36 ++--
->  2 files changed, 188 insertions(+), 33 deletions(-)
->
-> diff --git a/arch/arm64/crypto/chacha-neon-core.S b/arch/arm64/crypto/chacha-neon-core.S
-> index 75b4e06cee79..45ffc51cb437 100644
-> --- a/arch/arm64/crypto/chacha-neon-core.S
-> +++ b/arch/arm64/crypto/chacha-neon-core.S
-> @@ -19,6 +19,7 @@
->   */
->
->  #include <linux/linkage.h>
-> +#include <asm/cache.h>
->
->         .text
->         .align          6
-> @@ -164,6 +165,7 @@ ENTRY(chacha_4block_xor_neon)
->         // x1: 4 data blocks output, o
->         // x2: 4 data blocks input, i
->         // w3: nrounds
-> +       // x4: byte count
->
->         //
->         // This function encrypts four consecutive ChaCha blocks by loading
-> @@ -177,11 +179,11 @@ ENTRY(chacha_4block_xor_neon)
->         ld1             {v30.4s-v31.4s}, [x9]
->
->         // x0..15[0-3] = s0..3[0..3]
-> -       mov             x4, x0
-> -       ld4r            { v0.4s- v3.4s}, [x4], #16
-> -       ld4r            { v4.4s- v7.4s}, [x4], #16
-> -       ld4r            { v8.4s-v11.4s}, [x4], #16
-> -       ld4r            {v12.4s-v15.4s}, [x4]
-> +       mov             x8, x0
-> +       ld4r            { v0.4s- v3.4s}, [x8], #16
-> +       ld4r            { v4.4s- v7.4s}, [x8], #16
-> +       ld4r            { v8.4s-v11.4s}, [x8], #16
-> +       ld4r            {v12.4s-v15.4s}, [x8]
->
->         // x12 += counter values 0-3
->         add             v12.4s, v12.4s, v30.4s
-> @@ -425,24 +427,47 @@ ENTRY(chacha_4block_xor_neon)
->         zip1            v30.4s, v14.4s, v15.4s
->         zip2            v31.4s, v14.4s, v15.4s
->
-> +       mov             x3, #64
-> +       subs            x5, x4, #64
-> +       add             x6, x5, x2
-> +       csel            x3, x3, xzr, ge
-> +       csel            x2, x2, x6, ge
-> +
->         // interleave 64-bit words in state n, n+2
->         zip1            v0.2d, v16.2d, v18.2d
->         zip2            v4.2d, v16.2d, v18.2d
->         zip1            v8.2d, v17.2d, v19.2d
->         zip2            v12.2d, v17.2d, v19.2d
-> -       ld1             {v16.16b-v19.16b}, [x2], #64
-> +       ld1             {v16.16b-v19.16b}, [x2], x3
-> +
-> +       subs            x6, x4, #128
-> +       ccmp            x3, xzr, #4, lt
-> +       add             x7, x6, x2
-> +       csel            x3, x3, xzr, eq
-> +       csel            x2, x2, x7, eq
->
->         zip1            v1.2d, v20.2d, v22.2d
->         zip2            v5.2d, v20.2d, v22.2d
->         zip1            v9.2d, v21.2d, v23.2d
->         zip2            v13.2d, v21.2d, v23.2d
-> -       ld1             {v20.16b-v23.16b}, [x2], #64
-> +       ld1             {v20.16b-v23.16b}, [x2], x3
-> +
-> +       subs            x7, x4, #192
-> +       ccmp            x3, xzr, #4, lt
-> +       add             x8, x7, x2
-> +       csel            x3, x3, xzr, eq
-> +       csel            x2, x2, x8, eq
->
->         zip1            v2.2d, v24.2d, v26.2d
->         zip2            v6.2d, v24.2d, v26.2d
->         zip1            v10.2d, v25.2d, v27.2d
->         zip2            v14.2d, v25.2d, v27.2d
-> -       ld1             {v24.16b-v27.16b}, [x2], #64
-> +       ld1             {v24.16b-v27.16b}, [x2], x3
-> +
-> +       subs            x8, x4, #256
-> +       ccmp            x3, xzr, #4, lt
-> +       add             x9, x8, x2
-> +       csel            x2, x2, x9, eq
->
->         zip1            v3.2d, v28.2d, v30.2d
->         zip2            v7.2d, v28.2d, v30.2d
-> @@ -451,29 +476,167 @@ ENTRY(chacha_4block_xor_neon)
->         ld1             {v28.16b-v31.16b}, [x2]
->
->         // xor with corresponding input, write to output
-> +       tbnz            x5, #63, 0f
->         eor             v16.16b, v16.16b, v0.16b
->         eor             v17.16b, v17.16b, v1.16b
->         eor             v18.16b, v18.16b, v2.16b
->         eor             v19.16b, v19.16b, v3.16b
-> +       st1             {v16.16b-v19.16b}, [x1], #64
-> +
-> +       tbnz            x6, #63, 1f
->         eor             v20.16b, v20.16b, v4.16b
->         eor             v21.16b, v21.16b, v5.16b
-> -       st1             {v16.16b-v19.16b}, [x1], #64
->         eor             v22.16b, v22.16b, v6.16b
->         eor             v23.16b, v23.16b, v7.16b
-> +       st1             {v20.16b-v23.16b}, [x1], #64
-> +
-> +       tbnz            x7, #63, 2f
->         eor             v24.16b, v24.16b, v8.16b
->         eor             v25.16b, v25.16b, v9.16b
-> -       st1             {v20.16b-v23.16b}, [x1], #64
->         eor             v26.16b, v26.16b, v10.16b
->         eor             v27.16b, v27.16b, v11.16b
-> -       eor             v28.16b, v28.16b, v12.16b
->         st1             {v24.16b-v27.16b}, [x1], #64
-> +
-> +       tbnz            x8, #63, 3f
-> +       eor             v28.16b, v28.16b, v12.16b
->         eor             v29.16b, v29.16b, v13.16b
->         eor             v30.16b, v30.16b, v14.16b
->         eor             v31.16b, v31.16b, v15.16b
->         st1             {v28.16b-v31.16b}, [x1]
->
->         ret
-> +
-> +       // fewer than 64 bytes of in/output
-> +0:     adr             x12, .Lpermute
-> +       add             x12, x12, x5
-> +       sub             x2, x1, #64
-> +       add             x1, x1, x5
-> +       add             x13, x12, #64
-> +       ld1             {v8.16b}, [x12]
-> +       ld1             {v9.16b}, [x13]
-> +       movi            v10.16b, #16
-> +
-> +       ld1             {v16.16b-v19.16b}, [x2]
-> +       tbl             v4.16b, {v0.16b-v3.16b}, v8.16b
-> +       tbx             v20.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v5.16b, {v0.16b-v3.16b}, v8.16b
-> +       tbx             v21.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v6.16b, {v0.16b-v3.16b}, v8.16b
-> +       tbx             v22.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v7.16b, {v0.16b-v3.16b}, v8.16b
-> +       tbx             v23.16b, {v16.16b-v19.16b}, v9.16b
-> +
-> +       eor             v20.16b, v20.16b, v4.16b
-> +       eor             v21.16b, v21.16b, v5.16b
-> +       eor             v22.16b, v22.16b, v6.16b
-> +       eor             v23.16b, v23.16b, v7.16b
-> +       st1             {v20.16b-v23.16b}, [x1]
-> +       ret
-> +
-> +       // fewer than 128 bytes of in/output
-> +1:     adr             x12, .Lpermute
-> +       add             x12, x12, x6
-> +       add             x1, x1, x6
-> +       add             x13, x12, #64
-> +       ld1             {v8.16b}, [x12]
-> +       ld1             {v9.16b}, [x13]
-> +       movi            v10.16b, #16
-> +       tbl             v0.16b, {v4.16b-v7.16b}, v8.16b
-> +       tbx             v20.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v1.16b, {v4.16b-v7.16b}, v8.16b
-> +       tbx             v21.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v2.16b, {v4.16b-v7.16b}, v8.16b
-> +       tbx             v22.16b, {v16.16b-v19.16b}, v9.16b
-> +       add             v8.16b, v8.16b, v10.16b
-> +       add             v9.16b, v9.16b, v10.16b
-> +       tbl             v3.16b, {v4.16b-v7.16b}, v8.16b
-> +       tbx             v23.16b, {v16.16b-v19.16b}, v9.16b
-> +
-> +       eor             v20.16b, v20.16b, v0.16b
-> +       eor             v21.16b, v21.16b, v1.16b
-> +       eor             v22.16b, v22.16b, v2.16b
-> +       eor             v23.16b, v23.16b, v3.16b
-> +       st1             {v20.16b-v23.16b}, [x1]
-> +       ret
-> +
-> +       // fewer than 192 bytes of in/output
-> +2:     adr             x12, .Lpermute
-> +       add             x12, x12, x7
-> +       add             x1, x1, x7
-> +       add             x13, x12, #64
-> +       ld1             {v4.16b}, [x12]
-> +       ld1             {v5.16b}, [x13]
-> +       movi            v6.16b, #16
-> +       tbl             v0.16b, {v8.16b-v11.16b}, v4.16b
-> +       tbx             v24.16b, {v20.16b-v23.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v1.16b, {v8.16b-v11.16b}, v4.16b
-> +       tbx             v25.16b, {v20.16b-v23.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v2.16b, {v8.16b-v11.16b}, v4.16b
-> +       tbx             v26.16b, {v20.16b-v23.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v3.16b, {v8.16b-v11.16b}, v4.16b
-> +       tbx             v27.16b, {v20.16b-v23.16b}, v5.16b
-> +
-> +       eor             v24.16b, v24.16b, v0.16b
-> +       eor             v25.16b, v25.16b, v1.16b
-> +       eor             v26.16b, v26.16b, v2.16b
-> +       eor             v27.16b, v27.16b, v3.16b
-> +       st1             {v24.16b-v27.16b}, [x1]
-> +       ret
-> +
-> +       // fewer than 256 bytes of in/output
-> +3:     adr             x12, .Lpermute
-> +       add             x12, x12, x8
-> +       add             x1, x1, x8
-> +       add             x13, x12, #64
-> +       ld1             {v4.16b}, [x12]
-> +       ld1             {v5.16b}, [x13]
-> +       movi            v6.16b, #16
-> +       tbl             v0.16b, {v12.16b-v15.16b}, v4.16b
-> +       tbx             v28.16b, {v24.16b-v27.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v1.16b, {v12.16b-v15.16b}, v4.16b
-> +       tbx             v29.16b, {v24.16b-v27.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v2.16b, {v12.16b-v15.16b}, v4.16b
-> +       tbx             v30.16b, {v24.16b-v27.16b}, v5.16b
-> +       add             v4.16b, v4.16b, v6.16b
-> +       add             v5.16b, v5.16b, v6.16b
-> +       tbl             v3.16b, {v12.16b-v15.16b}, v4.16b
-> +       tbx             v31.16b, {v24.16b-v27.16b}, v5.16b
-> +
-> +       eor             v28.16b, v28.16b, v0.16b
-> +       eor             v29.16b, v29.16b, v1.16b
-> +       eor             v30.16b, v30.16b, v2.16b
-> +       eor             v31.16b, v31.16b, v3.16b
-> +       st1             {v28.16b-v31.16b}, [x1]
-> +       ret
->  ENDPROC(chacha_4block_xor_neon)
->
->  CTRINC:        .word           0, 1, 2, 3
->  ROT8:  .word           0x02010003, 0x06050407, 0x0a09080b, 0x0e0d0c0f
-> +
-> +       .align          L1_CACHE_SHIFT
-> +       .set            .Lpermute, . + 64
-> +       .set            .Li, 0
-> +       .rept           192
-> +       .byte           (.Li - 64)
-> +       .set            .Li, .Li + 1
-> +       .endr
-> diff --git a/arch/arm64/crypto/chacha-neon-glue.c b/arch/arm64/crypto/chacha-neon-glue.c
-> index 346eb85498a1..458d9b36cf9d 100644
-> --- a/arch/arm64/crypto/chacha-neon-glue.c
-> +++ b/arch/arm64/crypto/chacha-neon-glue.c
-> @@ -32,41 +32,33 @@
->  asmlinkage void chacha_block_xor_neon(u32 *state, u8 *dst, const u8 *src,
->                                       int nrounds);
->  asmlinkage void chacha_4block_xor_neon(u32 *state, u8 *dst, const u8 *src,
-> -                                      int nrounds);
-> +                                      int nrounds, int bytes);
->  asmlinkage void hchacha_block_neon(const u32 *state, u32 *out, int nrounds);
->
->  static void chacha_doneon(u32 *state, u8 *dst, const u8 *src,
-> -                         unsigned int bytes, int nrounds)
-> +                         int bytes, int nrounds)
->  {
->         u8 buf[CHACHA_BLOCK_SIZE];
->
-> -       while (bytes >= CHACHA_BLOCK_SIZE * 4) {
-> +       if (bytes < CHACHA_BLOCK_SIZE) {
-> +               memcpy(buf, src, bytes);
->                 kernel_neon_begin();
-> -               chacha_4block_xor_neon(state, dst, src, nrounds);
-> +               chacha_block_xor_neon(state, buf, buf, nrounds);
-> +               kernel_neon_end();
-> +               memcpy(dst, buf, bytes);
-> +               return;
-> +       }
-> +
-> +       while (bytes > 0) {
-> +               kernel_neon_begin();
-> +               chacha_4block_xor_neon(state, dst, src, nrounds,
-> +                                      min(bytes, CHACHA_BLOCK_SIZE * 4));
->                 kernel_neon_end();
->                 bytes -= CHACHA_BLOCK_SIZE * 4;
->                 src += CHACHA_BLOCK_SIZE * 4;
->                 dst += CHACHA_BLOCK_SIZE * 4;
->                 state[12] += 4;
->         }
-> -
-> -       if (!bytes)
-> -               return;
-> -
-> -       kernel_neon_begin();
-> -       while (bytes >= CHACHA_BLOCK_SIZE) {
-> -               chacha_block_xor_neon(state, dst, src, nrounds);
-> -               bytes -= CHACHA_BLOCK_SIZE;
-> -               src += CHACHA_BLOCK_SIZE;
-> -               dst += CHACHA_BLOCK_SIZE;
-> -               state[12]++;
-> -       }
-> -       if (bytes) {
-> -               memcpy(buf, src, bytes);
-> -               chacha_block_xor_neon(state, buf, buf, nrounds);
-> -               memcpy(dst, buf, bytes);
-> -       }
-> -       kernel_neon_end();
->  }
->
->  static int chacha_neon_stream_xor(struct skcipher_request *req,
-> --
-> 2.19.1
->
->
-> #include <stdlib.h>
-> #include <string.h>
->
-> extern void chacha_4block_xor_neon(unsigned int *state, unsigned char *dst,
->                                    unsigned char *src, int rounds, int bytes);
->
-> extern void chacha_block_xor_neon(unsigned int *state, unsigned char *dst,
->                                   unsigned char *src, int rounds);
->
-> int main(void)
-> {
->         static char buf[1024];
->         unsigned int state[64];
->
->         srand(20181130);
->
->         for (int i = 0; i < 10 * 1000 * 1000; i++) {
->                 int l = 64 + rand() % (1024 - 64);
->
-> #ifdef NEW
->                 while (l > 0) {
->                         chacha_4block_xor_neon(state, buf, buf, 20,
->                                                l > 256 ? 256 : l);
->                         l -= 256;
->                 }
-> #else
->                 while (l >= 256) {
->                         chacha_4block_xor_neon(state, buf, buf, 20, 256);
->                         l -= 256;
->                 }
->                 while (l >= 64) {
->                         chacha_block_xor_neon(state, buf, buf, 20);
->                         l -= 64;
->                 }
->                 if (l > 0) {
->                         unsigned char tmp[64];
->
->                         memcpy(tmp, buf, l);
->                         chacha_block_xor_neon(state, tmp, tmp, 20);
->                         memcpy(buf, tmp, l);
->                 }
-> #endif
->         }
->
->         return 0;
-> }
+-Olof
 
 _______________________________________________
 linux-arm-kernel mailing list
