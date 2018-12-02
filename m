@@ -2,92 +2,81 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,UNWANTED_LANGUAGE_BODY,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64590C64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:26:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CC7AC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:26:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 237BF2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:26:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C081120834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:26:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YHDqwXd1";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="GFWal4Nx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 237BF2082F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GYo449xl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C081120834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=93Vv+i/c0gwGm8qvRh2kVGCiYEK1lFRbuN4cXeuEGyY=; b=YHDqwXd1y0Ssiv
-	4QSMB/X3rbblnf1++NuKEfM3r37wnA9efZYGfjy0Vc9B18lC6mx1QKyY4jeNkdzIjYd01m12OqDH/
-	h3IWlouYGGe8Bz5aUQu73VYOYUxty3s3N9JOBz8A82rNsAjzrqQ7zTun9jGBGJsXCDcRxFHtqYuYl
-	NJVLvpYSbpK0oIn3enfyD2hQL7njsU2xu9Vi5dMvYlCExlRCnATFdoMUj3iUun7w2in5FYF4jnCf3
-	hXas+KmHs7rFeGJPF+YJLXyRhDPgYrLarMxh0W5KVQbZ1MUwGPcncuDgC3JZK1wXbEWLDbLF7h4uR
-	QDE2uTyNm2L0JsLWmdaw==;
+	List-Owner; bh=GJ8I4mKwWizoGLEtdupYNHR9P7H2VO3ho4q1J+UTAbI=; b=GYo449xl/a+p56
+	ujTqM74MpHNk+cQ295FjCSm6m3llxkIxFlB+3b41jBqg2IU8VTnPArS+8p2NszaI6fJQjTfArWt5n
+	eT5sm+hTFb9URjKDuV2p2QY2zwjGCCKdgdGMzYa3NeO7KPHfkP9KLIBJeQ/yrS+Iaq05trT8jlJpm
+	G/SBKHgCNqC8tcTEwRuezlplvTLVgcN5h6lRD5J/Et78jbjWJKxoA0PGZRtJo3P1j8s86yCx8yhEb
+	QnKK6J8qHi20tSK5m8dgzjjssqF/i03TCshg5IfioYHHZuyly1uEeZQ7gPyhYTVElG8Vk/sXCBo8I
+	6z16Lwn0DFTvijTQ86RA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTZFa-0005Xz-SH; Sun, 02 Dec 2018 21:26:02 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gTZFy-0005u3-JE; Sun, 02 Dec 2018 21:26:26 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTZDX-0001vi-QX
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:24:18 +0000
-Received: by mail-wr1-x443.google.com with SMTP id r10so10113077wrs.10
+ id 1gTZ8a-0007P9-1j
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:19:02 +0000
+Received: by mail-qt1-f193.google.com with SMTP id d18so11643076qto.8
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 13:23:45 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id:mime-version:in-reply-to
- :references:content-transfer-encoding;
- bh=HWZokPuBdYpzFsee6/QVIVgo3x19zZKXHjpnQDK1wdY=;
- b=GFWal4NxLSPfHE0c1YIRgRX5iebLopsW7L47FAJ0FkdEV37Dus7YVdP2CqFe77JPNn
- dtqxwbt14AAgiurqQozeN25JAWIzSR7dMDb+tYGA+zZwkI1psEhkbdnIXe4szi1Z3Oeb
- kDoguk1Icj3vNFztpj2Mnbe8P7e5XLFbH9/Ajyads2mtS+2vw1fI1PSz5JaCPz6vZOkc
- CD4b6bRivWa+hvB2ayUnu3i2uxqXf1FsOWBdeVu5aI6E15PIJBqWUrFYm6qMLQFVXx4x
- C2bELMA4CC5v9CQRqFeND0albeLGzb9pBAS3b9OSSutGHM4Xj/xtzKe38+u+i4b3inL1
- 3Frw==
+ Sun, 02 Dec 2018 13:18:37 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
- :in-reply-to:references:content-transfer-encoding;
- bh=HWZokPuBdYpzFsee6/QVIVgo3x19zZKXHjpnQDK1wdY=;
- b=NTiXTQ6bcUZrTsyf/vxeDAL+N+447zjXGJXXqrrsYplXt8JY+SWGhgXBXWB1oVxwX/
- lTIUczHJrexIGue/CUGn1QQTkX5CugjQl8LBysQniwRTS320lWZNAFSSYArAhLbzxymG
- DzyCSdkNk6Plm8Q6yMX8AD4mDuxJezPV1rHa+lC1oZ0EDVxVjWX3WFv9TJ1TyWNH7bKy
- NYodcgY/Ovrb+pyAPEMnf4di8M7IUerfzXsATq3zJ5FYqG/kAk/0qReJZV2SprtEphhJ
- Ey5Z+DtzCiIUxgQbcDD+VQ4yPN86GYyRkkh+8X31QZ4/IasNDep/iObfSFG8ym3DlM5L
- fmtQ==
-X-Gm-Message-State: AA+aEWYXtDzMkFeza/YrlUoMlNqgeke8GIaiPOcIK6apUk9wrV6jPLDF
- 0oBE8L5/Ggb+sB48vuAjIPw=
-X-Google-Smtp-Source: AFSGD/Wv5rIm9DizyoW1DTtVer/sgByGEvCy8rOCnkleZtCg+rwupuqeYzLEtXWv+dDNaeUw9QwwsA==
-X-Received: by 2002:adf:9b11:: with SMTP id b17mr11958713wrc.168.1543785824340; 
- Sun, 02 Dec 2018 13:23:44 -0800 (PST)
-Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id d2sm9551043wrs.97.2018.12.02.13.23.42
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 13:23:43 -0800 (PST)
-From: Mesih Kilinc <mesihkilinc@gmail.com>
-To: dmaengine@vger.kernel.org, devicetree@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- alsa-devel@alsa-project.org, linux-sunxi@googlegroups.com
-Subject: [RFC PATCH 08/10] ASoC: sun4i-codec: Add support for Allwinner suniv
- F1C100s
-Date: Mon,  3 Dec 2018 00:23:15 +0300
-Message-Id: <697a9cb417b6d77080ebf7ca2fc5b2dc216ce953.1543782328.git.mesihkilinc@gmail.com>
-X-Mailer: git-send-email 2.7.4
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references:mime-version:organization:content-transfer-encoding;
+ bh=ouoF6eZ05m+dNUS6H9NWDRcRubRZYvi8htIcWCJKyK4=;
+ b=J/kLp3EcP4Sz3fnZBcoTRO75HBe5oWoMxC77WL8BkFw50dlAB2p1iVjZXk67cT9Mpg
+ drqiSaanSEqVN0LMngoRAudmvERGL8XZXPp7HsIKy1Q8Qt0zZ5R3b7uch1/+CpZLD4Mk
+ Rq+SRQNMjhZB68YauqA5IWE3MPW/rmoZ6w94Fb9ro51Nw/J1zP8cKA2zG3n8F+sgG5k0
+ ZtN4cps3uyoR7gGnx8fan0WtL43TalR44X5njq309MW+WwSAJ95/8TFGV39CqvnGnokk
+ vcYWIvlQmTj1MO6OrLiSP+ta8ZSAxchw2i/KJeETHBsxIdqInOTTz4zve2AndSSbfTGQ
+ m5XQ==
+X-Gm-Message-State: AA+aEWa8y3qfzUEBdt7Jsjm3qo6F+CyIfk2G0tTNvPUe/mypECx06J5/
+ 92qqD23OTDxhvTINO9qKEg58anT3
+X-Google-Smtp-Source: AFSGD/UnbmEF2E06jq1oCIeZawdsAVcCj1zJP31ALAIWd+znSqUw2TXrE61vcYzGk9Yo3NUzOM88tw==
+X-Received: by 2002:ac8:1889:: with SMTP id s9mr12791955qtj.268.1543785516440; 
+ Sun, 02 Dec 2018 13:18:36 -0800 (PST)
+Received: from localhost.localdomain ([181.220.65.91])
+ by smtp.gmail.com with ESMTPSA id z196sm8971521qkz.37.2018.12.02.13.18.31
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Sun, 02 Dec 2018 13:18:35 -0800 (PST)
+Received: by localhost.localdomain (sSMTP sendmail emulation);
+ Sun, 02 Dec 2018 19:18:29 -0200
+From: Otavio Salvador <otavio@ossystems.com.br>
+To: linux-arm-kernel@lists.infradead.org
+Subject: [PATCH 2/5] ARM: dts: imx6ul-pico-hobbit: Move SoM related part to
+ imx6ul-pico.dtsi
+Date: Sun,  2 Dec 2018 19:18:06 -0200
+Message-Id: <20181202211809.11621-3-otavio@ossystems.com.br>
+X-Mailer: git-send-email 2.19.2
+In-Reply-To: <20181202211809.11621-1-otavio@ossystems.com.br>
+References: <20181202211809.11621-1-otavio@ossystems.com.br>
 MIME-Version: 1.0
-In-Reply-To: <cover.1543782328.git.mesihkilinc@gmail.com>
-References: <cover.1543782328.git.mesihkilinc@gmail.com>
+Organization: O.S. Systems Software LTDA.
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_132357_031835_D8CD0628 
-X-CRM114-Status: GOOD (  14.11  )
+X-CRM114-CacheID: sfid-20181202_131848_821365_CBCF2924 
+X-CRM114-Status: GOOD (  17.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,292 +88,1062 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Mesih Kilinc <mesihkilinc@gmail.com>,
- Mark Brown <broonie@kernel.org>, Takashi Iwai <tiwai@suse.com>,
- Chen-Yu Tsai <wens@csie.org>, Liam Girdwood <lgirdwood@gmail.com>,
- Maxime Ripard <maxime.ripard@bootlin.com>, Vinod Koul <vkoul@kernel.org>,
- Rob Herring <robh+dt@kernel.org>, Jaroslav Kysela <perex@perex.cz>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Otavio Salvador <otavio@ossystems.com.br>, Shawn Guo <shawnguo@kernel.org>,
+ Sascha Hauer <s.hauer@pengutronix.de>, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, NXP Linux Team <linux-imx@nxp.com>,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Fabio Estevam <festevam@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-QWxsd2lubmVyIHN1bml2IEYxQzEwMHMgaGFzIHNpbWlsYXIgYnV0IHByaW1pdGl2ZSBhdWRpbyBj
-b2RlYwpjb21wYXJhcmVkIHRvIHN1bjRpLiBBZGQgc3VwcG9ydCBmb3IgaXQuCgpTaWduZWQtb2Zm
-LWJ5OiBNZXNpaCBLaWxpbmMgPG1lc2loa2lsaW5jQGdtYWlsLmNvbT4KLS0tCiBzb3VuZC9zb2Mv
-c3VueGkvc3VuNGktY29kZWMuYyB8IDM1OCArKysrKysrKysrKysrKysrKysrKysrKysrKysrKysr
-KysrKysrKysrKysKIDEgZmlsZSBjaGFuZ2VkLCAzNTggaW5zZXJ0aW9ucygrKQoKZGlmZiAtLWdp
-dCBhL3NvdW5kL3NvYy9zdW54aS9zdW40aS1jb2RlYy5jIGIvc291bmQvc29jL3N1bnhpL3N1bjRp
-LWNvZGVjLmMKaW5kZXggN2E5Zjg0ZS4uMDhhM2NiMCAxMDA2NDQKLS0tIGEvc291bmQvc29jL3N1
-bnhpL3N1bjRpLWNvZGVjLmMKKysrIGIvc291bmQvc29jL3N1bnhpL3N1bjRpLWNvZGVjLmMKQEAg
-LTQsNiArNCw3IEBACiAgKiBDb3B5cmlnaHQgMjAxNSBNYXhpbWUgUmlwYXJkIDxtYXhpbWUucmlw
-YXJkQGZyZWUtZWxlY3Ryb25zLmNvbT4KICAqIENvcHlyaWdodCAyMDE1IEFkYW0gU2FtcHNvbiA8
-YXRzQG9mZm9nLm9yZz4KICAqIENvcHlyaWdodCAyMDE2IENoZW4tWXUgVHNhaSA8d2Vuc0Bjc2ll
-Lm9yZz4KKyAqIENvcHlyaWdodCAyMDE4IE1lc2loIEtpbGluYyA8bWVzaWhraWxpbmNAZ21haWwu
-Y29tPgogICoKICAqIEJhc2VkIG9uIHRoZSBBbGx3aW5uZXIgU0RLIGRyaXZlciwgcmVsZWFzZWQg
-dW5kZXIgdGhlIEdQTC4KICAqCkBAIC0yMjYsNiArMjI3LDYyIEBACiAKICNkZWZpbmUgU1VONElf
-RE1BX01BWF9CVVJTVAkJCSg4KQogCisvKiBzdW5pdiBzcGVjaWZpYyByZWdpc3RlcnMgKi8KKwor
-I2RlZmluZSBTVU5JVl9ETUFfTUFYX0JVUlNUCQkJKDQpCisKKy8qIENvZGVjIERBQyBkaWdpdGFs
-IGNvbnRyb2xzIGFuZCBGSUZPIHJlZ2lzdGVycyAqLworI2RlZmluZSBTVU5JVl9DT0RFQ19BRENf
-RklGT0MJCQkoMHgxMCkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfQURDX0ZJRk9DX0VOX0FECQkoMjgp
-CisjZGVmaW5lIFNVTklWX0NPREVDX0FEQ19GSUZPUwkJCSgweDE0KQorI2RlZmluZSBTVU5JVl9D
-T0RFQ19BRENfUlhEQVRBCQkJKDB4MTgpCisKKy8qIE91dHB1dCBtaXhlciBhbmQgZ2FpbiBjb250
-cm9scyAqLworI2RlZmluZSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwJCQkoMHgyMCkKKyNkZWZp
-bmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0RBQ0FSRU4JCSgzMSkKKyNkZWZpbmUgU1VOSVZf
-Q09ERUNfT01fREFDQV9DVFJMX0RBQ0FMRU4JCSgzMCkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01f
-REFDQV9DVFJMX1JNSVhFTgkJCSgyOSkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJM
-X0xNSVhFTgkJCSgyOCkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX1JIUFBBTVVU
-RQkJKDI3KQorI2RlZmluZSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfTEhQUEFNVVRFCQkoMjYp
-CisjZGVmaW5lIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9SSFBJUwkJCSgyNSkKKyNkZWZpbmUg
-U1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0xIUElTCQkJKDI0KQorI2RlZmluZSBTVU5JVl9DT0RF
-Q19PTV9EQUNBX0NUUkxfSFBDT01fQ1RMCQkoMjIpCisjZGVmaW5lIFNVTklWX0NPREVDX09NX0RB
-Q0FfQ1RSTF9DT01QVEVOCQkoMjEpCisjZGVmaW5lIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9S
-TUlYTVVURV9NSUNJTgkJKDIwKQorI2RlZmluZSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfUk1J
-WE1VVEVfTElORUlOCSgxOSkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX1JNSVhN
-VVRFX0ZNSU4JCSgxOCkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX1JNSVhNVVRF
-X1JEQUMJCSgxNykKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX1JNSVhNVVRFX0xE
-QUMJCSgxNikKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0hQUEFFTgkJCSgxNSkK
-KyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0xNSVhNVVRFX01JQ0lOCQkoMTIpCisj
-ZGVmaW5lIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9MTUlYTVVURV9MSU5FSU4JKDExKQorI2Rl
-ZmluZSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfTE1JWE1VVEVfRk1JTgkJKDEwKQorI2RlZmlu
-ZSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfTE1JWE1VVEVfTERBQwkJKDkpCisjZGVmaW5lIFNV
-TklWX0NPREVDX09NX0RBQ0FfQ1RSTF9MTUlYTVVURV9SREFDCQkoOCkKKyNkZWZpbmUgU1VOSVZf
-Q09ERUNfT01fREFDQV9DVFJMX0xUTE5NVVRFCQkoNykKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01f
-REFDQV9DVFJMX1JUTE5NVVRFCQkoNikKKyNkZWZpbmUgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJM
-X0hQVk9MCQkJKDApCisKKy8qIEFuYWxvZyBJbnB1dCBNaXhlciBjb250cm9scyAqLworI2RlZmlu
-ZSBTVU5JVl9DT0RFQ19BRENfQUNUTAkJKDB4MjQpCisjZGVmaW5lIFNVTklWX0NPREVDX0FEQ19B
-RENFTgkJKDMxKQorI2RlZmluZSBTVU5JVl9DT0RFQ19BRENfTUlDRwkJKDI0KQorI2RlZmluZSBT
-VU5JVl9DT0RFQ19BRENfTElORUlOVk9MCSgyMSkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfQURDX0FE
-Q0cJCSgxNikKKyNkZWZpbmUgU1VOSVZfQ09ERUNfQURDX0FEQ01JWF9NSUMJKDEzKQorI2RlZmlu
-ZSBTVU5JVl9DT0RFQ19BRENfQURDTUlYX0ZNSU5MCSgxMikKKyNkZWZpbmUgU1VOSVZfQ09ERUNf
-QURDX0FEQ01JWF9GTUlOUgkoMTEpCisjZGVmaW5lIFNVTklWX0NPREVDX0FEQ19BRENNSVhfTElO
-RUlOCSgxMCkKKyNkZWZpbmUgU1VOSVZfQ09ERUNfQURDX0FEQ01JWF9MT1VUCSg5KQorI2RlZmlu
-ZSBTVU5JVl9DT0RFQ19BRENfQURDTUlYX1JPVVQJKDgpCisjZGVmaW5lIFNVTklWX0NPREVDX0FE
-Q19QQVNQRUVEU0VMRUNUCSg3KQorI2RlZmluZSBTVU5JVl9DT0RFQ19BRENfRk1JTlZPTAkJKDQp
-CisjZGVmaW5lIFNVTklWX0NPREVDX0FEQ19NSUNBTVBFTgkoMykKKyNkZWZpbmUgU1VOSVZfQ09E
-RUNfQURDX01JQ0JPT1NUCSgwKQorCisjZGVmaW5lIFNVTklWX0NPREVDX0FEQ19EQkcJCSgweDRj
-KQorCiBzdHJ1Y3Qgc3VuNGlfY29kZWMgewogCXN0cnVjdCBkZXZpY2UJKmRldjsKIAlzdHJ1Y3Qg
-cmVnbWFwCSpyZWdtYXA7CkBAIC0xMTQzLDYgKzEyMDAsMjMzIEBAIHN0YXRpYyBjb25zdCBzdHJ1
-Y3Qgc25kX3NvY19jb21wb25lbnRfZHJpdmVyIHN1bjhpX2EyM19jb2RlY19jb2RlYyA9IHsKIAku
-bm9uX2xlZ2FjeV9kYWlfbmFtaW5nCT0gMSwKIH07CiAKKy8qc3VuaXYgRjFDMTAwcyBjb2RlYyAq
-LworCisvKiBoZWFkcGhvbmUgY29udHJvbHMgKi8KK3N0YXRpYyBjb25zdCBjaGFyICogY29uc3Qg
-c3VuaXZfY29kZWNfaHBfc3JjX2VudW1fdGV4dFtdID0geworCSJEQUMiLCAiTWl4ZXIiLAorfTsK
-Kworc3RhdGljIFNPQ19FTlVNX0RPVUJMRV9ERUNMKHN1bml2X2NvZGVjX2hwX3NyY19lbnVtLAor
-CQkJICAgIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJCSAgICBTVU5JVl9DT0RFQ19PTV9E
-QUNBX0NUUkxfTEhQSVMsCisJCQkgICAgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX1JIUElTLAor
-CQkJICAgIHN1bml2X2NvZGVjX2hwX3NyY19lbnVtX3RleHQpOworCitzdGF0aWMgY29uc3Qgc3Ry
-dWN0IHNuZF9rY29udHJvbF9uZXcgc3VuaXZfY29kZWNfaHBfc3JjW10gPSB7CisJU09DX0RBUE1f
-RU5VTSgiSGVhZHBob25lIFNvdXJjZSBQbGF5YmFjayBSb3V0ZSIsCisJCSAgICAgIHN1bml2X2Nv
-ZGVjX2hwX3NyY19lbnVtKSwKK307CisKKworLyogbWl4ZXIgY29udHJvbHMgKi8KK3N0YXRpYyBj
-b25zdCBzdHJ1Y3Qgc25kX2tjb250cm9sX25ldyBzdW5pdl9jb2RlY19hZGNfbWl4ZXJfY29udHJv
-bHNbXSA9IHsKKwlTT0NfREFQTV9TSU5HTEUoIlJpZ2h0IE91dCBDYXB0dXJlIFN3aXRjaCIsIFNV
-TklWX0NPREVDX0FEQ19BQ1RMLAorCQkJU1VOSVZfQ09ERUNfQURDX0FEQ01JWF9ST1VULCAxLCAw
-KSwKKwlTT0NfREFQTV9TSU5HTEUoIkxlZnQgT3V0IENhcHR1cmUgU3dpdGNoIiwgU1VOSVZfQ09E
-RUNfQURDX0FDVEwsCisJCQlTVU5JVl9DT0RFQ19BRENfQURDTUlYX0xPVVQsIDEsIDApLAorCVNP
-Q19EQVBNX1NJTkdMRSgiTGluZSBJbiBDYXB0dXJlIFN3aXRjaCIsIFNVTklWX0NPREVDX0FEQ19B
-Q1RMLAorCQkJU1VOSVZfQ09ERUNfQURDX0FEQ01JWF9MSU5FSU4sIDEsIDApLAorCVNPQ19EQVBN
-X1NJTkdMRSgiUmlnaHQgRk0gSW4gQ2FwdHVyZSBTd2l0Y2giLCBTVU5JVl9DT0RFQ19BRENfQUNU
-TCwKKwkJCVNVTklWX0NPREVDX0FEQ19BRENNSVhfRk1JTlIsIDEsIDApLAorCVNPQ19EQVBNX1NJ
-TkdMRSgiTGVmdCBGTSBJbiBDYXB0dXJlIFN3aXRjaCIsIFNVTklWX0NPREVDX0FEQ19BQ1RMLAor
-CQkJU1VOSVZfQ09ERUNfQURDX0FEQ01JWF9GTUlOTCwgMSwgMCksCisJU09DX0RBUE1fU0lOR0xF
-KCJNaWMgQ2FwdHVyZSBTd2l0Y2giLCBTVU5JVl9DT0RFQ19BRENfQUNUTCwKKwkJCVNVTklWX0NP
-REVDX0FEQ19BRENNSVhfTUlDLCAxLCAwKSwKK307CisKK3N0YXRpYyBjb25zdCBzdHJ1Y3Qgc25k
-X2tjb250cm9sX25ldyBzdW5pdl9jb2RlY19kYWNfbG1peGVyX2NvbnRyb2xzW10gPSB7CisJU09D
-X0RBUE1fU0lOR0xFKCJSaWdodCBEQUMgUGxheWJhY2sgU3dpdGNoIiwgU1VOSVZfQ09ERUNfT01f
-REFDQV9DVFJMLAorCQkJU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0xNSVhNVVRFX1JEQUMsIDEs
-IDApLAorCVNPQ19EQVBNX1NJTkdMRSgiTGVmdCBEQUMgUGxheWJhY2sgU3dpdGNoIiwgU1VOSVZf
-Q09ERUNfT01fREFDQV9DVFJMLAorCQkJU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0xNSVhNVVRF
-X0xEQUMsIDEsIDApLAorCVNPQ19EQVBNX1NJTkdMRSgiRk0gSW4gUGxheWJhY2sgU3dpdGNoIiwg
-U1VOSVZfQ09ERUNfT01fREFDQV9DVFJMLAorCQkJU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0xN
-SVhNVVRFX0ZNSU4sIDEsIDApLAorCVNPQ19EQVBNX1NJTkdMRSgiTGluZSBJbiBQbGF5YmFjayBT
-d2l0Y2giLCBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwsCisJCQlTVU5JVl9DT0RFQ19PTV9EQUNB
-X0NUUkxfTE1JWE1VVEVfTElORUlOLCAxLCAwKSwKKwlTT0NfREFQTV9TSU5HTEUoIk1pYyBJbiBQ
-bGF5YmFjayBTd2l0Y2giLCBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwsCisJCQlTVU5JVl9DT0RF
-Q19PTV9EQUNBX0NUUkxfTE1JWE1VVEVfTUlDSU4sIDEsIDApLAorfTsKKworc3RhdGljIGNvbnN0
-IHN0cnVjdCBzbmRfa2NvbnRyb2xfbmV3IHN1bml2X2NvZGVjX2RhY19ybWl4ZXJfY29udHJvbHNb
-XSA9IHsKKwlTT0NfREFQTV9TSU5HTEUoIkxlZnQgREFDIFBsYXliYWNrIFN3aXRjaCIsIFNVTklW
-X0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJCVNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9STUlYTVVU
-RV9MREFDLCAxLCAwKSwKKwlTT0NfREFQTV9TSU5HTEUoIlJpZ2h0IERBQyBQbGF5YmFjayBTd2l0
-Y2giLCBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwsCisJCQlTVU5JVl9DT0RFQ19PTV9EQUNBX0NU
-UkxfUk1JWE1VVEVfUkRBQywgMSwgMCksCisJU09DX0RBUE1fU0lOR0xFKCJGTSBJbiBQbGF5YmFj
-ayBTd2l0Y2giLCBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwsCisJCQlTVU5JVl9DT0RFQ19PTV9E
-QUNBX0NUUkxfUk1JWE1VVEVfRk1JTiwgMSwgMCksCisJU09DX0RBUE1fU0lOR0xFKCJMaW5lIElu
-IFBsYXliYWNrIFN3aXRjaCIsIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJCVNVTklWX0NP
-REVDX09NX0RBQ0FfQ1RSTF9STUlYTVVURV9MSU5FSU4sIDEsIDApLAorCVNPQ19EQVBNX1NJTkdM
-RSgiTWljIEluIFBsYXliYWNrIFN3aXRjaCIsIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJ
-CVNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9STUlYTVVURV9NSUNJTiwgMSwgMCksCit9OworCisK
-K3N0YXRpYyBjb25zdCBERUNMQVJFX1RMVl9EQl9TQ0FMRShzdW5pdl9jb2RlY19kdm9sX3NjYWxl
-LCAtNzMwOCwgMTE2LCAwKTsKK3N0YXRpYyBjb25zdCBERUNMQVJFX1RMVl9EQl9TQ0FMRShzdW5p
-dl9jb2RlY19ocF92b2xfc2NhbGUsIC02MzAwLCAxMDAsIDEpOworc3RhdGljIGNvbnN0IERFQ0xB
-UkVfVExWX0RCX1NDQUxFKHN1bml2X2NvZGVjX291dF9taXhlcl9wcmVnYWluX3NjYWxlLAorCQkJ
-CSAgLTQ1MCwgMTUwLCAwKTsKKworc3RhdGljIGNvbnN0IERFQ0xBUkVfVExWX0RCX1JBTkdFKHN1
-bml2X2NvZGVjX21pY19nYWluX3NjYWxlLAorCTAsIDAsIFRMVl9EQl9TQ0FMRV9JVEVNKDAsIDAs
-IDApLAorCTEsIDcsIFRMVl9EQl9TQ0FMRV9JVEVNKDI0MDAsIDMwMCwgMCksCispOworCisKK3N0
-YXRpYyBjb25zdCBzdHJ1Y3Qgc25kX2tjb250cm9sX25ldyBzdW5pdl9jb2RlY19jb2RlY193aWRn
-ZXRzW10gPSB7CisJU09DX1NJTkdMRV9UTFYoIkRBQyBQbGF5YmFjayBWb2x1bWUiLCBTVU40SV9D
-T0RFQ19EQUNfRFBDLAorCQkgICAgICAgU1VONElfQ09ERUNfREFDX0RQQ19EVk9MLCAweDNmLCAx
-LAorCQkgICAgICAgc3VuaXZfY29kZWNfZHZvbF9zY2FsZSksCisJU09DX1NJTkdMRV9UTFYoIkhl
-YWRwaG9uZSBQbGF5YmFjayBWb2x1bWUiLAorCQkgICAgICAgU1VOSVZfQ09ERUNfT01fREFDQV9D
-VFJMLAorCQkgICAgICAgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0hQVk9MLCAweDNmLCAwLAor
-CQkgICAgICAgc3VuaXZfY29kZWNfaHBfdm9sX3NjYWxlKSwKKwlTT0NfRE9VQkxFKCJIZWFkcGhv
-bmUgUGxheWJhY2sgU3dpdGNoIiwKKwkJICAgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMLAorCQkg
-ICBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfTEhQUEFNVVRFLAorCQkgICBTVU5JVl9DT0RFQ19P
-TV9EQUNBX0NUUkxfUkhQUEFNVVRFLCAxLCAwKSwKKwlTT0NfU0lOR0xFX1RMVigiTGluZSBJbiBQ
-bGF5YmFjayBWb2x1bWUiLAorCQkgICAgICAgU1VOSVZfQ09ERUNfQURDX0FDVEwsIFNVTklWX0NP
-REVDX0FEQ19MSU5FSU5WT0wsCisJCSAgICAgICAweDcsIDAsIHN1bml2X2NvZGVjX291dF9taXhl
-cl9wcmVnYWluX3NjYWxlKSwKKwlTT0NfU0lOR0xFX1RMVigiRk0gSW4gUGxheWJhY2sgVm9sdW1l
-IiwKKwkJICAgICAgIFNVTklWX0NPREVDX0FEQ19BQ1RMLCBTVU5JVl9DT0RFQ19BRENfRk1JTlZP
-TCwKKwkJICAgICAgIDB4NywgMCwgc3VuaXZfY29kZWNfb3V0X21peGVyX3ByZWdhaW5fc2NhbGUp
-LAorCVNPQ19TSU5HTEVfVExWKCJNaWMgSW4gUGxheWJhY2sgVm9sdW1lIiwKKwkJICAgICAgIFNV
-TklWX0NPREVDX0FEQ19BQ1RMLCBTVU5JVl9DT0RFQ19BRENfTUlDRywKKwkJICAgICAgIDB4Nywg
-MCwgc3VuaXZfY29kZWNfb3V0X21peGVyX3ByZWdhaW5fc2NhbGUpLAorCisJLyogTWljcm9waG9u
-ZSBBbXAgYm9vc3QgZ2FpbnMgKi8KKwlTT0NfU0lOR0xFX1RMVigiTWljIEJvb3N0IFZvbHVtZSIs
-IFNVTklWX0NPREVDX0FEQ19BQ1RMLAorCQkgICAgICAgU1VOSVZfQ09ERUNfQURDX01JQ0JPT1NU
-LCAweDcsIDAsCisJCSAgICAgICBzdW5pdl9jb2RlY19taWNfZ2Fpbl9zY2FsZSksCisJU09DX1NJ
-TkdMRV9UTFYoIkFEQyBDYXB0dXJlIFZvbHVtZSIsCisJCSAgICAgICBTVU5JVl9DT0RFQ19BRENf
-QUNUTCwgU1VOSVZfQ09ERUNfQURDX0FEQ0csCisJCSAgICAgICAweDcsIDAsIHN1bml2X2NvZGVj
-X291dF9taXhlcl9wcmVnYWluX3NjYWxlKSwKK307CisKK3N0YXRpYyBjb25zdCBzdHJ1Y3Qgc25k
-X3NvY19kYXBtX3dpZGdldCBzdW5pdl9jb2RlY19jb2RlY19kYXBtX3dpZGdldHNbXSA9IHsKKwkv
-KiBNaWNyb3Bob25lIGlucHV0cyAqLworCVNORF9TT0NfREFQTV9JTlBVVCgiTUlDIiksCisKKwkv
-KiBNaWNyb3Bob25lIEJpYXMgKi8KKwkvKiBkZWxldGVkOiBIQklBUywgTUJJQVMgKi8KKworCS8q
-IE1pYyBpbnB1dCBwYXRoICovCisJU05EX1NPQ19EQVBNX1BHQSgiTWljIEFtcGxpZmllciIsIFNV
-TklWX0NPREVDX0FEQ19BQ1RMLAorCQkJIFNVTklWX0NPREVDX0FEQ19NSUNBTVBFTiwgMCwgTlVM
-TCwgMCksCisKKwkvKiBMaW5lIEluICovCisJU05EX1NPQ19EQVBNX0lOUFVUKCJMSU5FSU4iKSwK
-KworCS8qIEZNIEluICovCisJU05EX1NPQ19EQVBNX0lOUFVUKCJGTUlOUiIpLAorCVNORF9TT0Nf
-REFQTV9JTlBVVCgiRk1JTkwiKSwKKworCS8qIERpZ2l0YWwgcGFydHMgb2YgdGhlIEFEQ3MgKi8K
-KwlTTkRfU09DX0RBUE1fU1VQUExZKCJBREMgRW5hYmxlIiwgU1VOSVZfQ09ERUNfQURDX0ZJRk9D
-LAorCQkJICAgIFNVTklWX0NPREVDX0FEQ19GSUZPQ19FTl9BRCwgMCwKKwkJCSAgICBOVUxMLCAw
-KSwKKworCS8qIEFuYWxvZyBwYXJ0cyBvZiB0aGUgQURDcyAqLworCVNORF9TT0NfREFQTV9BREMo
-IkFEQyIsICJDb2RlYyBDYXB0dXJlIiwgU1VOSVZfQ09ERUNfQURDX0FDVEwsCisJCQkgU1VOSVZf
-Q09ERUNfQURDX0FEQ0VOLCAwKSwKKworCS8qIEFEQyBNaXhlcnMgKi8KKwlTT0NfTUlYRVJfQVJS
-QVkoIkFEQyBNaXhlciIsIFNVTklWX0NPREVDX0FEQ19BQ1RMLAorCQkJIFNORF9TT0NfTk9QTSwg
-MCwKKwkJCSBzdW5pdl9jb2RlY19hZGNfbWl4ZXJfY29udHJvbHMpLAorCisJLyogRGlnaXRhbCBw
-YXJ0cyBvZiB0aGUgREFDcyAqLworCVNORF9TT0NfREFQTV9TVVBQTFkoIkRBQyBFbmFibGUiLCBT
-VU40SV9DT0RFQ19EQUNfRFBDLAorCQkJICAgIFNVTjRJX0NPREVDX0RBQ19EUENfRU5fREEsIDAs
-CisJCQkgICAgTlVMTCwgMCksCisKKwkvKiBBbmFsb2cgcGFydHMgb2YgdGhlIERBQ3MgKi8KKwlT
-TkRfU09DX0RBUE1fREFDKCJMZWZ0IERBQyIsICJDb2RlYyBQbGF5YmFjayIsCisJCQkgU1VOSVZf
-Q09ERUNfT01fREFDQV9DVFJMLAorCQkJIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9EQUNBTEVO
-LCAwKSwKKwlTTkRfU09DX0RBUE1fREFDKCJSaWdodCBEQUMiLCAiQ29kZWMgUGxheWJhY2siLAor
-CQkJIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJCSBTVU5JVl9DT0RFQ19PTV9EQUNBX0NU
-UkxfREFDQVJFTiwgMCksCisKKwkvKiBNaXhlcnMgKi8KKwlTT0NfTUlYRVJfQVJSQVkoIkxlZnQg
-TWl4ZXIiLCBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkwsCisJCQlTVU5JVl9DT0RFQ19PTV9EQUNB
-X0NUUkxfTE1JWEVOLCAwLAorCQkJc3VuaXZfY29kZWNfZGFjX2xtaXhlcl9jb250cm9scyksCisJ
-U09DX01JWEVSX0FSUkFZKCJSaWdodCBNaXhlciIsIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwK
-KwkJCVNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTF9STUlYRU4sIDAsCisJCQlzdW5pdl9jb2RlY19k
-YWNfcm1peGVyX2NvbnRyb2xzKSwKKworCS8qIEhlYWRwaG9uZSBvdXRwdXQgcGF0aCAqLworCVNO
-RF9TT0NfREFQTV9NVVgoIkhlYWRwaG9uZSBTb3VyY2UgUGxheWJhY2sgUm91dGUiLAorCQkJIFNO
-RF9TT0NfTk9QTSwgMCwgMCwgc3VuaXZfY29kZWNfaHBfc3JjKSwKKwlTTkRfU09DX0RBUE1fT1VU
-X0RSVigiSGVhZHBob25lIEFtcCIsIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwKKwkJCSAgICAg
-U1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0hQUEFFTiwgMCwgTlVMTCwgMCksCisJU05EX1NPQ19E
-QVBNX1NVUFBMWSgiSFBDT00gUHJvdGVjdGlvbiIsIFNVTklWX0NPREVDX09NX0RBQ0FfQ1RSTCwK
-KwkJCSAgICBTVU5JVl9DT0RFQ19PTV9EQUNBX0NUUkxfQ09NUFRFTiwgMCwgTlVMTCwgMCksCisJ
-U05EX1NPQ19EQVBNX1JFRyhzbmRfc29jX2RhcG1fc3VwcGx5LCAiSFBDT00iLCBTVU5JVl9DT0RF
-Q19PTV9EQUNBX0NUUkwsCisJCQkgU1VOSVZfQ09ERUNfT01fREFDQV9DVFJMX0hQQ09NX0NUTCwg
-MHgzLCAweDMsIDApLAorCVNORF9TT0NfREFQTV9PVVRQVVQoIkhQIiksCit9OworCitzdGF0aWMg
-Y29uc3Qgc3RydWN0IHNuZF9zb2NfZGFwbV9yb3V0ZSBzdW5pdl9jb2RlY19jb2RlY19kYXBtX3Jv
-dXRlc1tdID0geworCS8qIERBQyBSb3V0ZXMgKi8KKwl7ICJMZWZ0IERBQyIsIE5VTEwsICJEQUMg
-RW5hYmxlIiB9LAorCXsgIlJpZ2h0IERBQyIsIE5VTEwsICJEQUMgRW5hYmxlIiB9LAorCisJLyog
-TWljcm9waG9uZSBSb3V0ZXMgKi8KKwl7ICJNaWMgQW1wbGlmaWVyIiwgTlVMTCwgIk1JQyJ9LAor
-CisJLyogTGVmdCBNaXhlciBSb3V0ZXMgKi8KKwl7ICJMZWZ0IE1peGVyIiwgIlJpZ2h0IERBQyBQ
-bGF5YmFjayBTd2l0Y2giLCAiUmlnaHQgREFDIiB9LAorCXsgIkxlZnQgTWl4ZXIiLCAiTGVmdCBE
-QUMgUGxheWJhY2sgU3dpdGNoIiwgIkxlZnQgREFDIiB9LAorCXsgIkxlZnQgTWl4ZXIiLCAiRk0g
-SW4gUGxheWJhY2sgU3dpdGNoIiwgIkZNSU5MIiB9LAorCXsgIkxlZnQgTWl4ZXIiLCAiTGluZSBJ
-biBQbGF5YmFjayBTd2l0Y2giLCAiTElORUlOIiB9LAorCXsgIkxlZnQgTWl4ZXIiLCAiTWljIElu
-IFBsYXliYWNrIFN3aXRjaCIsICJNaWMgQW1wbGlmaWVyIiB9LAorCisJLyogUmlnaHQgTWl4ZXIg
-Um91dGVzICovCisJeyAiUmlnaHQgTWl4ZXIiLCAiTGVmdCBEQUMgUGxheWJhY2sgU3dpdGNoIiwg
-IkxlZnQgREFDIiB9LAorCXsgIlJpZ2h0IE1peGVyIiwgIlJpZ2h0IERBQyBQbGF5YmFjayBTd2l0
-Y2giLCAiUmlnaHQgREFDIiB9LAorCXsgIlJpZ2h0IE1peGVyIiwgIkZNIEluIFBsYXliYWNrIFN3
-aXRjaCIsICJGTUlOUiIgfSwKKwl7ICJSaWdodCBNaXhlciIsICJMaW5lIEluIFBsYXliYWNrIFN3
-aXRjaCIsICJMSU5FSU4iIH0sCisJeyAiUmlnaHQgTWl4ZXIiLCAiTWljIEluIFBsYXliYWNrIFN3
-aXRjaCIsICJNaWMgQW1wbGlmaWVyIiB9LAorCisJLyogQURDIE1peGVyIFJvdXRlcyAqLworCXsg
-IkFEQyBNaXhlciIsICJSaWdodCBPdXQgQ2FwdHVyZSBTd2l0Y2giLCAiUmlnaHQgTWl4ZXIiIH0s
-CisJeyAiQURDIE1peGVyIiwgIkxlZnQgT3V0IENhcHR1cmUgU3dpdGNoIiwgIkxlZnQgTWl4ZXIi
-IH0sCisJeyAiQURDIE1peGVyIiwgIkxpbmUgSW4gQ2FwdHVyZSBTd2l0Y2giLCAiTElORUlOIiB9
-LAorCXsgIkFEQyBNaXhlciIsICJSaWdodCBGTSBJbiBDYXB0dXJlIFN3aXRjaCIsICJGTUlOUiIg
-fSwKKwl7ICJBREMgTWl4ZXIiLCAiTGVmdCBGTSBJbiBDYXB0dXJlIFN3aXRjaCIsICJGTUlOTCIg
-fSwKKwl7ICJBREMgTWl4ZXIiLCAiTWljIENhcHR1cmUgU3dpdGNoIiwgIk1pYyBBbXBsaWZpZXIi
-IH0sCisKKwkvKiBIZWFkcGhvbmUgUm91dGVzICovCisJeyAiSGVhZHBob25lIFNvdXJjZSBQbGF5
-YmFjayBSb3V0ZSIsICJEQUMiLCAiTGVmdCBEQUMiIH0sCisJeyAiSGVhZHBob25lIFNvdXJjZSBQ
-bGF5YmFjayBSb3V0ZSIsICJEQUMiLCAiUmlnaHQgREFDIiB9LAorCXsgIkhlYWRwaG9uZSBTb3Vy
-Y2UgUGxheWJhY2sgUm91dGUiLCAiTWl4ZXIiLCAiTGVmdCBNaXhlciIgfSwKKwl7ICJIZWFkcGhv
-bmUgU291cmNlIFBsYXliYWNrIFJvdXRlIiwgIk1peGVyIiwgIlJpZ2h0IE1peGVyIiB9LAorCXsg
-IkhlYWRwaG9uZSBBbXAiLCBOVUxMLCAiSGVhZHBob25lIFNvdXJjZSBQbGF5YmFjayBSb3V0ZSIg
-fSwKKwl7ICJIUCIsIE5VTEwsICJIZWFkcGhvbmUgQW1wIiB9LAorCXsgIkhQQ09NIiwgTlVMTCwg
-IkhQQ09NIFByb3RlY3Rpb24iIH0sCisKKwkvKiBBREMgUm91dGVzICovCisJeyAiQURDIiwgTlVM
-TCwgIkFEQyBNaXhlciIgfSwKKwl7ICJBREMiLCBOVUxMLCAiQURDIEVuYWJsZSIgfSwKK307CisK
-K3N0YXRpYyBjb25zdCBzdHJ1Y3Qgc25kX3NvY19jb21wb25lbnRfZHJpdmVyIHN1bml2X2NvZGVj
-X2NvZGVjID0geworCS5jb250cm9scwkJPSBzdW5pdl9jb2RlY19jb2RlY193aWRnZXRzLAorCS5u
-dW1fY29udHJvbHMJCT0gQVJSQVlfU0laRShzdW5pdl9jb2RlY19jb2RlY193aWRnZXRzKSwKKwku
-ZGFwbV93aWRnZXRzCQk9IHN1bml2X2NvZGVjX2NvZGVjX2RhcG1fd2lkZ2V0cywKKwkubnVtX2Rh
-cG1fd2lkZ2V0cwk9IEFSUkFZX1NJWkUoc3VuaXZfY29kZWNfY29kZWNfZGFwbV93aWRnZXRzKSwK
-KwkuZGFwbV9yb3V0ZXMJCT0gc3VuaXZfY29kZWNfY29kZWNfZGFwbV9yb3V0ZXMsCisJLm51bV9k
-YXBtX3JvdXRlcwk9IEFSUkFZX1NJWkUoc3VuaXZfY29kZWNfY29kZWNfZGFwbV9yb3V0ZXMpLAor
-CS5pZGxlX2JpYXNfb24JCT0gMSwKKwkudXNlX3BtZG93bl90aW1lCT0gMSwKKwkuZW5kaWFubmVz
-cwkJPSAxLAorCS5ub25fbGVnYWN5X2RhaV9uYW1pbmcJPSAxLAorfTsKKworCiBzdGF0aWMgY29u
-c3Qgc3RydWN0IHNuZF9zb2NfY29tcG9uZW50X2RyaXZlciBzdW40aV9jb2RlY19jb21wb25lbnQg
-PSB7CiAJLm5hbWUgPSAic3VuNGktY29kZWMiLAogfTsKQEAgLTE0MTQsNiArMTY5OCw1NyBAQCBz
-dGF0aWMgc3RydWN0IHNuZF9zb2NfY2FyZCAqc3VuOGlfdjNzX2NvZGVjX2NyZWF0ZV9jYXJkKHN0
-cnVjdCBkZXZpY2UgKmRldikKIAlyZXR1cm4gY2FyZDsKIH07CiAKK3N0YXRpYyBjb25zdCBzdHJ1
-Y3Qgc25kX3NvY19kYXBtX3dpZGdldCBzdW5pdl9jb2RlY19jYXJkX2RhcG1fd2lkZ2V0c1tdID0g
-eworCVNORF9TT0NfREFQTV9IUCgiSGVhZHBob25lIiwgTlVMTCksCisJU05EX1NPQ19EQVBNX0xJ
-TkUoIkxpbmUgSW4iLCBOVUxMKSwKKwlTTkRfU09DX0RBUE1fTElORSgiUmlnaHQgRk0gSW4iLCBO
-VUxMKSwKKwlTTkRfU09DX0RBUE1fTElORSgiTGVmdCBGTSBJbiIsIE5VTEwpLAorCVNORF9TT0Nf
-REFQTV9NSUMoIk1pYyIsIE5VTEwpLAorCVNORF9TT0NfREFQTV9TUEsoIlNwZWFrZXIiLCBzdW40
-aV9jb2RlY19zcGtfZXZlbnQpLAorfTsKKworLyogQ29ubmVjdCBkaWdpdGFsIHNpZGUgZW5hYmxl
-cyB0byBhbmFsb2cgc2lkZSB3aWRnZXRzICovCitzdGF0aWMgY29uc3Qgc3RydWN0IHNuZF9zb2Nf
-ZGFwbV9yb3V0ZSBzdW5pdl9jb2RlY19jYXJkX3JvdXRlc1tdID0geworCS8qIEFEQyBSb3V0ZXMg
-Ki8KKwl7ICJBREMiLCBOVUxMLCAiQURDIEVuYWJsZSIgfSwKKwl7ICJDb2RlYyBDYXB0dXJlIiwg
-TlVMTCwgIkFEQyIgfSwKKworCS8qIERBQyBSb3V0ZXMgKi8KKwl7ICJMZWZ0IERBQyIsIE5VTEws
-ICJEQUMgRW5hYmxlIiB9LAorCXsgIlJpZ2h0IERBQyIsIE5VTEwsICJEQUMgRW5hYmxlIiB9LAor
-CXsgIkxlZnQgREFDIiwgTlVMTCwgIkNvZGVjIFBsYXliYWNrIiB9LAorCXsgIlJpZ2h0IERBQyIs
-IE5VTEwsICJDb2RlYyBQbGF5YmFjayIgfSwKK307CisKKworc3RhdGljIHN0cnVjdCBzbmRfc29j
-X2NhcmQgKnN1bml2X2NvZGVjX2NyZWF0ZV9jYXJkKHN0cnVjdCBkZXZpY2UgKmRldikKK3sKKwlz
-dHJ1Y3Qgc25kX3NvY19jYXJkICpjYXJkOworCWludCByZXQ7CisKKwljYXJkID0gZGV2bV9remFs
-bG9jKGRldiwgc2l6ZW9mKCpjYXJkKSwgR0ZQX0tFUk5FTCk7CisJaWYgKCFjYXJkKQorCQlyZXR1
-cm4gRVJSX1BUUigtRU5PTUVNKTsKKworCWNhcmQtPmRhaV9saW5rID0gc3VuNGlfY29kZWNfY3Jl
-YXRlX2xpbmsoZGV2LCAmY2FyZC0+bnVtX2xpbmtzKTsKKwlpZiAoIWNhcmQtPmRhaV9saW5rKQor
-CQlyZXR1cm4gRVJSX1BUUigtRU5PTUVNKTsKKworCWNhcmQtPmRldgkJPSBkZXY7CisJY2FyZC0+
-bmFtZQkJPSAiRjFDMTAwcyBBdWRpbyBDb2RlYyI7CisJY2FyZC0+ZGFwbV93aWRnZXRzCT0gc3Vu
-aXZfY29kZWNfY2FyZF9kYXBtX3dpZGdldHM7CisJY2FyZC0+bnVtX2RhcG1fd2lkZ2V0cwk9IEFS
-UkFZX1NJWkUoc3VuaXZfY29kZWNfY2FyZF9kYXBtX3dpZGdldHMpOworCWNhcmQtPmRhcG1fcm91
-dGVzCT0gc3VuaXZfY29kZWNfY2FyZF9yb3V0ZXM7CisJY2FyZC0+bnVtX2RhcG1fcm91dGVzCT0g
-QVJSQVlfU0laRShzdW5pdl9jb2RlY19jYXJkX3JvdXRlcyk7CisJY2FyZC0+ZnVsbHlfcm91dGVk
-CT0gdHJ1ZTsKKworCXJldCA9IHNuZF9zb2Nfb2ZfcGFyc2VfYXVkaW9fcm91dGluZyhjYXJkLCAi
-YWxsd2lubmVyLGF1ZGlvLXJvdXRpbmciKTsKKwlpZiAocmV0KQorCQlkZXZfd2FybihkZXYsICJm
-YWlsZWQgdG8gcGFyc2UgYXVkaW8tcm91dGluZzogJWRcbiIsIHJldCk7CisKKwlyZXR1cm4gY2Fy
-ZDsKK307CisKIHN0YXRpYyBjb25zdCBzdHJ1Y3QgcmVnbWFwX2NvbmZpZyBzdW40aV9jb2RlY19y
-ZWdtYXBfY29uZmlnID0gewogCS5yZWdfYml0cwk9IDMyLAogCS5yZWdfc3RyaWRlCT0gNCwKQEAg
-LTE0NTYsNiArMTc5MSwxMyBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IHJlZ21hcF9jb25maWcgc3Vu
-OGlfdjNzX2NvZGVjX3JlZ21hcF9jb25maWcgPSB7CiAJLm1heF9yZWdpc3Rlcgk9IFNVTjhJX0gz
-X0NPREVDX0FEQ19EQkcsCiB9OwogCitzdGF0aWMgY29uc3Qgc3RydWN0IHJlZ21hcF9jb25maWcg
-c3VuaXZfY29kZWNfcmVnbWFwX2NvbmZpZyA9IHsKKwkucmVnX2JpdHMJPSAzMiwKKwkucmVnX3N0
-cmlkZQk9IDQsCisJLnZhbF9iaXRzCT0gMzIsCisJLm1heF9yZWdpc3Rlcgk9IFNVTklWX0NPREVD
-X0FEQ19EQkcsCit9OworCiBzdHJ1Y3Qgc3VuNGlfY29kZWNfcXVpcmtzIHsKIAljb25zdCBzdHJ1
-Y3QgcmVnbWFwX2NvbmZpZyAqcmVnbWFwX2NvbmZpZzsKIAljb25zdCBzdHJ1Y3Qgc25kX3NvY19j
-b21wb25lbnRfZHJpdmVyICpjb2RlYzsKQEAgLTE1NDAsNiArMTg4MiwxNyBAQCBzdGF0aWMgY29u
-c3Qgc3RydWN0IHN1bjRpX2NvZGVjX3F1aXJrcyBzdW44aV92M3NfY29kZWNfcXVpcmtzID0gewog
-CS5kbWFfbWF4X2J1cnN0CT0gU1VONElfRE1BX01BWF9CVVJTVCwKIH07CiAKK3N0YXRpYyBjb25z
-dCBzdHJ1Y3Qgc3VuNGlfY29kZWNfcXVpcmtzIHN1bml2X2YxYzEwMHNfY29kZWNfcXVpcmtzID0g
-eworCS5yZWdtYXBfY29uZmlnCT0gJnN1bml2X2NvZGVjX3JlZ21hcF9jb25maWcsCisJLmNvZGVj
-CQk9ICZzdW5pdl9jb2RlY19jb2RlYywKKwkuY3JlYXRlX2NhcmQJPSBzdW5pdl9jb2RlY19jcmVh
-dGVfY2FyZCwKKwkucmVnX2FkY19maWZvYwk9IFJFR19GSUVMRChTVU5JVl9DT0RFQ19BRENfRklG
-T0MsIDAsIDMxKSwKKwkucmVnX2RhY190eGRhdGEJPSBTVU40SV9DT0RFQ19EQUNfVFhEQVRBLAor
-CS5yZWdfYWRjX3J4ZGF0YQk9IFNVTklWX0NPREVDX0FEQ19SWERBVEEsCisJLmhhc19yZXNldAk9
-IHRydWUsCisJLmRtYV9tYXhfYnVyc3QJPSBTVU5JVl9ETUFfTUFYX0JVUlNULAorfTsKKwogc3Rh
-dGljIGNvbnN0IHN0cnVjdCBvZl9kZXZpY2VfaWQgc3VuNGlfY29kZWNfb2ZfbWF0Y2hbXSA9IHsK
-IAl7CiAJCS5jb21wYXRpYmxlID0gImFsbHdpbm5lcixzdW40aS1hMTAtY29kZWMiLApAQCAtMTU2
-NSw2ICsxOTE4LDEwIEBAIHN0YXRpYyBjb25zdCBzdHJ1Y3Qgb2ZfZGV2aWNlX2lkIHN1bjRpX2Nv
-ZGVjX29mX21hdGNoW10gPSB7CiAJCS5jb21wYXRpYmxlID0gImFsbHdpbm5lcixzdW44aS12M3Mt
-Y29kZWMiLAogCQkuZGF0YSA9ICZzdW44aV92M3NfY29kZWNfcXVpcmtzLAogCX0sCisJeworCQku
-Y29tcGF0aWJsZSA9ICJhbGx3aW5uZXIsc3VuaXYtZjFjMTAwcy1jb2RlYyIsCisJCS5kYXRhID0g
-JnN1bml2X2YxYzEwMHNfY29kZWNfcXVpcmtzLAorCX0sCiAJe30KIH07CiBNT0RVTEVfREVWSUNF
-X1RBQkxFKG9mLCBzdW40aV9jb2RlY19vZl9tYXRjaCk7CkBAIC0xNzQ2LDQgKzIxMDMsNSBAQCBN
-T0RVTEVfQVVUSE9SKCJFbWlsaW8gTMOzcGV6IDxlbWlsaW9AZWxvcGV6LmNvbS5hcj4iKTsKIE1P
-RFVMRV9BVVRIT1IoIkpvbiBTbWlybCA8am9uc21pcmxAZ21haWwuY29tPiIpOwogTU9EVUxFX0FV
-VEhPUigiTWF4aW1lIFJpcGFyZCA8bWF4aW1lLnJpcGFyZEBmcmVlLWVsZWN0cm9ucy5jb20+Iik7
-CiBNT0RVTEVfQVVUSE9SKCJDaGVuLVl1IFRzYWkgPHdlbnNAY3NpZS5vcmc+Iik7CitNT0RVTEVf
-QVVUSE9SKCJNZXNpaCBLaWxpbmMgPG1lc2lraWxpbmNAZ21haWwuY29tPiIpOwogTU9EVUxFX0xJ
-Q0VOU0UoIkdQTCIpOwotLSAKMi43LjQKCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0t
-a2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFp
-bG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
+From: Fabio Estevam <festevam@gmail.com>
+
+imx6ul-pico-hobbit board contains:
+
+- One SoM board (imx6ul pico)
+- One base board (hobbit).
+
+In order to make it easier for adding support for other board variants,
+move the commom SoM part to the imx6ul-pico.dtsi file.
+
+Signed-off-by: Fabio Estevam <festevam@gmail.com>
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
+
+ arch/arm/boot/dts/imx6ul-pico-hobbit.dts | 479 +---------------------
+ arch/arm/boot/dts/imx6ul-pico.dtsi       | 493 +++++++++++++++++++++++
+ 2 files changed, 511 insertions(+), 461 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6ul-pico.dtsi
+
+diff --git a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+index 1bc4fb4b4841..3cc04dd6f341 100644
+--- a/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
++++ b/arch/arm/boot/dts/imx6ul-pico-hobbit.dts
+@@ -7,80 +7,25 @@
+ //	   Tapani Utriainen <tapani@technexion.com>
+ /dts-v1/;
+ 
+-#include "imx6ul.dtsi"
+-
++#include "imx6ul-pico.dtsi"
+ / {
+-	model = "Technexion Pico i.MX6UL Board";
++	model = "TechNexion PICO-IMX6UL and HOBBIT baseboard";
+ 	compatible = "technexion,imx6ul-pico-hobbit", "fsl,imx6ul";
+ 
+-	/* Will be filled by the bootloader */
+-	memory@80000000 {
+-		device_type = "memory";
+-		reg = <0x80000000 0>;
+-	};
+-
+-	chosen {
+-		stdout-path = &uart6;
+-	};
+-
+-	backlight {
+-		compatible = "pwm-backlight";
+-		pwms = <&pwm3 0 5000000>;
+-		brightness-levels = <0 4 8 16 32 64 128 255>;
+-		default-brightness-level = <6>;
+-		status = "okay";
+-	};
+-
+-	reg_2p5v: regulator-2p5v {
+-		compatible = "regulator-fixed";
+-		regulator-name = "2P5V";
+-		regulator-min-microvolt = <2500000>;
+-		regulator-max-microvolt = <2500000>;
+-	};
+-
+-	reg_3p3v: regulator-3p3v {
+-		compatible = "regulator-fixed";
+-		regulator-name = "3P3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-	};
+-
+-	reg_sd1_vmmc: regulator-sd1-vmmc {
+-		compatible = "regulator-fixed";
+-		regulator-name = "VSD_3V3";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+-		enable-active-high;
+-	};
+-
+-	reg_usb_otg_vbus: regulator-usb-otg-vbus {
+-		compatible = "regulator-fixed";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_usb_otg1>;
+-		regulator-name = "usb_otg_vbus";
+-		regulator-min-microvolt = <5000000>;
+-		regulator-max-microvolt = <5000000>;
+-		gpio = <&gpio1 6 0>;
+-	};
++	leds {
++		compatible = "gpio-leds";
+ 
+-	reg_brcm: regulator-brcm {
+-		compatible = "regulator-fixed";
+-		enable-active-high;
+-		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_brcm_reg>;
+-		regulator-name = "brcm_reg";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		startup-delay-us = <200000>;
++		hobbitled {
++			label = "hobbitled";
++			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
++		};
+ 	};
+ 
+ 	sound {
+ 		compatible = "fsl,imx-audio-sgtl5000";
+ 		model = "imx6ul-sgtl5000";
+ 		audio-cpu = <&sai1>;
+-		audio-codec = <&codec>;
++		audio-codec = <&sgtl5000>;
+ 		audio-routing =
+ 			"LINE_IN", "Line In Jack",
+ 			"MIC_IN", "Mic Jack",
+@@ -93,92 +38,6 @@
+ 		#clock-cells = <0>;
+ 		clock-frequency = <24576000>;
+ 	};
+-
+-	leds {
+-		compatible = "gpio-leds";
+-
+-		hobbitled {
+-			label = "hobbitled";
+-			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+-		};
+-	};
+-};
+-
+-&can1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan1>;
+-	status = "okay";
+-};
+-
+-&can2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_flexcan2>;
+-	status = "okay";
+-};
+-
+-&clks {
+-	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
+-	assigned-clock-rates = <786432000>;
+-};
+-
+-&fec2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_enet2>;
+-	phy-mode = "rmii";
+-	phy-handle = <&ethphy1>;
+-	status = "okay";
+-	phy-reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
+-	phy-reset-duration = <1>;
+-
+-	mdio {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		ethphy1: ethernet-phy@1 {
+-			compatible = "ethernet-phy-ieee802.3-c22";
+-			reg = <1>;
+-			max-speed = <100>;
+-			interrupt-parent = <&gpio5>;
+-			interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
+-		};
+-	};
+-};
+-
+-&i2c1 {
+-	clock-frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c1>;
+-	status = "okay";
+-
+-	pmic: pfuze3000@8 {
+-		compatible = "fsl,pfuze3000";
+-		reg = <0x08>;
+-
+-		regulators {
+-			/* VDD_ARM_SOC_IN*/
+-			sw1b_reg: sw1b {
+-				regulator-min-microvolt = <700000>;
+-				regulator-max-microvolt = <1475000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-				regulator-ramp-delay = <6250>;
+-			};
+-
+-			/* DRAM */
+-			sw3a_reg: sw3 {
+-				regulator-min-microvolt = <900000>;
+-				regulator-max-microvolt = <1650000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			/* DRAM */
+-			vref_reg: vrefddr {
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-		};
+-	};
+ };
+ 
+ &i2c2 {
+@@ -187,7 +46,7 @@
+ 	pinctrl-0 = <&pinctrl_i2c2>;
+ 	status = "okay";
+ 
+-	codec: sgtl5000@a {
++	sgtl5000: codec@a {
+ 		reg = <0x0a>;
+ 		compatible = "fsl,sgtl5000";
+ 		clocks = <&sys_mclk>;
+@@ -197,317 +56,15 @@
+ };
+ 
+ &i2c3 {
+-	clock_frequency = <100000>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_i2c3>;
+-	status = "okay";
+-};
+-
+-&lcdif {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_lcdif_dat &pinctrl_lcdif_ctrl>;
+-	display = <&display0>;
+-	status = "okay";
+-
+-	display0: display0 {
+-		bits-per-pixel = <32>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-
+-			timing0: timing0 {
+-				clock-frequency = <33200000>;
+-				hactive = <800>;
+-				vactive = <480>;
+-				hfront-porch = <210>;
+-				hback-porch = <46>;
+-				hsync-len = <1>;
+-				vback-porch = <22>;
+-				vfront-porch = <23>;
+-				vsync-len = <1>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
+-		};
+-	};
+-};
+-
+-&pwm3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pwm3>;
+-	status = "okay";
+-};
+-
+-&pwm7 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pwm7>;
+ 	status = "okay";
+-};
+-
+-&pwm8 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_pwm8>;
+-	status = "okay";
+-};
+-
+-&sai1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_sai1>;
+-	status = "okay";
+-};
+-
+-&uart3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart3>;
+-	uart-has-rtscts;
+-	status = "okay";
+-};
+-
+-&uart6 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_uart6>;
+-	status = "okay";
+-};
+-
+-&usbotg1 {
+-	vbus-supply = <&reg_usb_otg_vbus>;
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usb_otg1_id>;
+-	dr_mode = "otg";
+-	disable-over-current;
+-	status = "okay";
+-};
+-
+-&usbotg2 {
+-	dr_mode = "host";
+-	disable-over-current;
+-	status = "okay";
+-};
+-
+-&usdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc1>;
+-	bus-width = <8>;
+-	no-1-8-v;
+-	non-removable;
+-	keep-power-in-suspend;
+-	status = "okay";
+-};
+-
+-&usdhc2 {  /* Wifi SDIO */
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_usdhc2>;
+-	no-1-8-v;
+-	non-removable;
+-	keep-power-in-suspend;
+-	wakeup-source;
+-	vmmc-supply = <&reg_brcm>;
+-	status = "okay";
+-};
+-
+-&wdog1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_wdog>;
+-	fsl,ext-reset-output;
+-};
+-
+-&iomuxc {
+-	pinctrl_brcm_reg: brcmreggrp {
+-		fsl,pins = <
+-			MX6UL_PAD_NAND_DATA06__GPIO4_IO08	0x10b0	/* WL_REG_ON */
+-			MX6UL_PAD_NAND_DATA04__GPIO4_IO06	0x10b0	/* WL_HOST_WAKE */
+-		>;
+-	};
+-
+-	pinctrl_enet2: enet2grp {
+-		fsl,pins = <
+-			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
+-			MX6UL_PAD_ENET1_TX_EN__ENET2_MDC	0x1b0b0
+-			MX6UL_PAD_ENET2_RX_EN__ENET2_RX_EN	0x1b0b0
+-			MX6UL_PAD_ENET2_RX_ER__ENET2_RX_ER	0x1b0b0
+-			MX6UL_PAD_ENET2_RX_DATA0__ENET2_RDATA00	0x1b0b0
+-			MX6UL_PAD_ENET2_RX_DATA1__ENET2_RDATA01	0x1b0b0
+-			MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN	0x1b0b0
+-			MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00	0x1b0b0
+-			MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01	0x1b0b0
+-			MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001b031
+-			MX6UL_PAD_SNVS_TAMPER6__GPIO5_IO06	0x800
+-			MX6UL_PAD_UART4_TX_DATA__GPIO1_IO28	0x79
+-		>;
+-	};
+-
+-	pinctrl_flexcan1: flexcan1grp {
+-		fsl,pins = <
+-			MX6UL_PAD_ENET1_RX_DATA0__FLEXCAN1_TX	0x1b020
+-			MX6UL_PAD_ENET1_RX_DATA1__FLEXCAN1_RX	0x1b020
+-		>;
+-	};
+-
+-	pinctrl_flexcan2: flexcan2grp {
+-		fsl,pins = <
+-			MX6UL_PAD_ENET1_TX_DATA0__FLEXCAN2_RX	0x1b020
+-			MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX	0x1b020
+-		>;
+-	};
+-
+-	pinctrl_i2c1: i2c1grp {
+-		fsl,pins = <
+-			MX6UL_PAD_GPIO1_IO02__I2C1_SCL		0x4001b8b0
+-			MX6UL_PAD_GPIO1_IO03__I2C1_SDA		0x4001b8b0
+-		>;
+-	};
+-
+-	pinctrl_i2c2: i2c2grp {
+-		fsl,pins = <
+-			MX6UL_PAD_UART5_TX_DATA__I2C2_SCL	0x4001b8b0
+-			MX6UL_PAD_UART5_RX_DATA__I2C2_SDA	0x4001b8b0
+-		>;
+-	};
+-
+-	pinctrl_i2c3: i2c3grp {
+-		fsl,pins = <
+-			MX6UL_PAD_UART1_TX_DATA__I2C3_SCL	0x4001b8b0
+-			MX6UL_PAD_UART1_RX_DATA__I2C3_SDA	0x4001b8b0
+-			>;
+-	};
+-
+-	pinctrl_lcdif_dat: lcdifdatgrp {
+-		fsl,pins = <
+-			MX6UL_PAD_LCD_DATA00__LCDIF_DATA00	0x79
+-			MX6UL_PAD_LCD_DATA01__LCDIF_DATA01	0x79
+-			MX6UL_PAD_LCD_DATA02__LCDIF_DATA02	0x79
+-			MX6UL_PAD_LCD_DATA03__LCDIF_DATA03	0x79
+-			MX6UL_PAD_LCD_DATA04__LCDIF_DATA04	0x79
+-			MX6UL_PAD_LCD_DATA05__LCDIF_DATA05	0x79
+-			MX6UL_PAD_LCD_DATA06__LCDIF_DATA06	0x79
+-			MX6UL_PAD_LCD_DATA07__LCDIF_DATA07	0x79
+-			MX6UL_PAD_LCD_DATA08__LCDIF_DATA08	0x79
+-			MX6UL_PAD_LCD_DATA09__LCDIF_DATA09	0x79
+-			MX6UL_PAD_LCD_DATA10__LCDIF_DATA10	0x79
+-			MX6UL_PAD_LCD_DATA11__LCDIF_DATA11	0x79
+-			MX6UL_PAD_LCD_DATA12__LCDIF_DATA12	0x79
+-			MX6UL_PAD_LCD_DATA13__LCDIF_DATA13	0x79
+-			MX6UL_PAD_LCD_DATA14__LCDIF_DATA14	0x79
+-			MX6UL_PAD_LCD_DATA15__LCDIF_DATA15	0x79
+-			MX6UL_PAD_LCD_DATA16__LCDIF_DATA16	0x79
+-			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17	0x79
+-			MX6UL_PAD_LCD_DATA18__LCDIF_DATA18	0x79
+-			MX6UL_PAD_LCD_DATA19__LCDIF_DATA19	0x79
+-			MX6UL_PAD_LCD_DATA20__LCDIF_DATA20	0x79
+-			MX6UL_PAD_LCD_DATA21__LCDIF_DATA21	0x79
+-			MX6UL_PAD_LCD_DATA22__LCDIF_DATA22	0x79
+-			MX6UL_PAD_LCD_DATA23__LCDIF_DATA23	0x79
+-		>;
+-	};
+-
+-	pinctrl_lcdif_ctrl: lcdifctrlgrp {
+-		fsl,pins = <
+-			MX6UL_PAD_LCD_CLK__LCDIF_CLK		0x79
+-			MX6UL_PAD_LCD_ENABLE__LCDIF_ENABLE	0x79
+-			MX6UL_PAD_LCD_HSYNC__LCDIF_HSYNC	0x79
+-			MX6UL_PAD_LCD_VSYNC__LCDIF_VSYNC	0x79
+-			/* LCD reset */
+-			MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09	0x79
+-		>;
+-	};
+-
+-	pinctrl_pwm3: pwm3grp {
+-		fsl,pins = <
+-			MX6UL_PAD_NAND_ALE__PWM3_OUT		0x110b0
+-		>;
+-	};
+-
+-	pinctrl_pwm7: pwm7grp {
+-		fsl,pins = <
+-			MX6UL_PAD_ENET1_TX_CLK__PWM7_OUT	0x110b0
+-		>;
+-	};
+-
+-	pinctrl_pwm8: pwm8grp {
+-		fsl,pins = <
+-			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT		0x110b0
+-		>;
+-	};
+-
+-	pinctrl_sai1: sai1grp {
+-		fsl,pins = <
+-			MX6UL_PAD_CSI_DATA04__SAI1_TX_SYNC	0x1b0b0
+-			MX6UL_PAD_CSI_DATA05__SAI1_TX_BCLK	0x1b0b0
+-			MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA	0x110b0
+-			MX6UL_PAD_CSI_DATA07__SAI1_TX_DATA	0x1f0b8
+-		>;
+-	};
+-
+-	pinctrl_uart3: uart3grp {
+-		fsl,pins = <
+-			MX6UL_PAD_UART3_TX_DATA__UART3_DCE_TX	0x1b0b0
+-			MX6UL_PAD_UART3_RX_DATA__UART3_DCE_RX	0x1b0b0
+-			MX6UL_PAD_UART3_RTS_B__UART3_DCE_RTS	0x1b0b0
+-			MX6UL_PAD_UART3_CTS_B__UART3_DCE_CTS	0x1b0b0
+-		>;
+-	};
+-
+-	pinctrl_uart5: uart5grp {
+-		fsl,pins = <
+-			MX6UL_PAD_GPIO1_IO04__UART5_DCE_TX	0x1b0b1
+-			MX6UL_PAD_GPIO1_IO05__UART5_DCE_RX	0x1b0b1
+-			MX6UL_PAD_GPIO1_IO08__UART5_DCE_RTS	0x1b0b1
+-			MX6UL_PAD_GPIO1_IO09__UART5_DCE_CTS	0x1b0b1
+-		>;
+-	};
+-
+-	pinctrl_uart6: uart6grp {
+-		fsl,pins = <
+-			MX6UL_PAD_CSI_MCLK__UART6_DCE_TX	0x1b0b1
+-			MX6UL_PAD_CSI_PIXCLK__UART6_DCE_RX	0x1b0b1
+-		>;
+-	};
+-
+-	pinctrl_usb_otg1: usbotg1grp {
+-		fsl,pins = <
+-			MX6UL_PAD_GPIO1_IO06__GPIO1_IO06	0x10b0
+-			>;
+-	};
+-
+-	pinctrl_usb_otg1_id: usbotg1idgrp {
+-		fsl,pins = <
+-			MX6UL_PAD_GPIO1_IO00__ANATOP_OTG1_ID	0x17059
+-		>;
+-	};
+-
+-	pinctrl_usdhc1: usdhc1grp {
+-		fsl,pins = <
+-			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x17059
+-			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x10071
+-			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x17059
+-			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x17059
+-			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x17059
+-			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x17059
+-			MX6UL_PAD_UART1_RTS_B__USDHC1_CD_B	0x03029
+-			MX6UL_PAD_NAND_READY_B__USDHC1_DATA4	0x17059
+-			MX6UL_PAD_NAND_CE0_B__USDHC1_DATA5	0x17059
+-			MX6UL_PAD_NAND_CE1_B__USDHC1_DATA6	0x17059
+-			MX6UL_PAD_NAND_CLE__USDHC1_DATA7	0x17059
+-		>;
+-	};
+-
+-	pinctrl_usdhc2: usdhc2grp {
+-		fsl,pins = <
+-			MX6UL_PAD_NAND_WE_B__USDHC2_CMD		0x17059
+-			MX6UL_PAD_NAND_RE_B__USDHC2_CLK		0x10059
+-			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0	0x17059
+-			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1	0x17059
+-			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2	0x17059
+-			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3	0x17059
+-		>;
+-	};
+ 
+-	pinctrl_wdog: wdoggrp {
+-		fsl,pins = <
+-			MX6UL_PAD_LCD_RESET__WDOG1_WDOG_ANY    0x30b0
+-		>;
++	polytouch: touchscreen@38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <29 IRQ_TYPE_EDGE_FALLING>;
++		reset-gpios = <&gpio4 24 GPIO_ACTIVE_LOW>;
++		touchscreen-size-x = <800>;
++		touchscreen-size-y = <480>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/imx6ul-pico.dtsi b/arch/arm/boot/dts/imx6ul-pico.dtsi
+new file mode 100644
+index 000000000000..89269955440b
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6ul-pico.dtsi
+@@ -0,0 +1,493 @@
++// SPDX-License-Identifier: (GPL-2.0 OR MIT)
++//
++// Copyright 2015 Technexion Ltd.
++//
++// Author: Wig Cheng  <wig.cheng@technexion.com>
++//	   Richard Hu <richard.hu@technexion.com>
++//	   Tapani Utriainen <tapani@technexion.com>
++/dts-v1/;
++
++#include "imx6ul.dtsi"
++
++/ {
++	/* Will be filled by the bootloader */
++	memory@80000000 {
++		device_type = "memory";
++		reg = <0x80000000 0>;
++	};
++
++	chosen {
++		stdout-path = &uart6;
++	};
++
++	backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm3 0 5000000>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		status = "okay";
++	};
++
++	reg_2p5v: regulator-2p5v {
++		compatible = "regulator-fixed";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_sd1_vmmc: regulator-sd1-vmmc {
++		compatible = "regulator-fixed";
++		regulator-name = "VSD_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg_vbus: regulator-usb-otg-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usb_otg1>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 6 0>;
++	};
++
++	reg_brcm: regulator-brcm {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio4 8 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
++	};
++
++	sound {
++		compatible = "fsl,imx-audio-sgtl5000";
++		model = "imx6ul-sgtl5000";
++		audio-cpu = <&sai1>;
++		audio-codec = <&codec>;
++		audio-routing =
++			"LINE_IN", "Line In Jack",
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++	};
++
++	sys_mclk: clock-sys-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++};
++
++&can1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan1>;
++	status = "okay";
++};
++
++&can2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_flexcan2>;
++	status = "okay";
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6UL_CLK_PLL4_AUDIO_DIV>;
++	assigned-clock-rates = <786432000>;
++};
++
++&fec2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet2>;
++	phy-mode = "rmii";
++	phy-handle = <&ethphy1>;
++	status = "okay";
++	phy-reset-gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
++	phy-reset-duration = <1>;
++
++	mdio {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethphy1: ethernet-phy@1 {
++			compatible = "ethernet-phy-ieee802.3-c22";
++			reg = <1>;
++			max-speed = <100>;
++			interrupt-parent = <&gpio5>;
++			interrupts = <6 IRQ_TYPE_LEVEL_LOW>;
++		};
++	};
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	pmic: pfuze3000@8 {
++		compatible = "fsl,pfuze3000";
++		reg = <0x08>;
++
++		regulators {
++			/* VDD_ARM_SOC_IN*/
++			sw1b_reg: sw1b {
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1475000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <6250>;
++			};
++
++			/* DRAM */
++			sw3a_reg: sw3 {
++				regulator-min-microvolt = <900000>;
++				regulator-max-microvolt = <1650000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++
++			/* DRAM */
++			vref_reg: vrefddr {
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	clock_frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&i2c3 {
++	clock_frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++};
++
++&lcdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_lcdif_dat &pinctrl_lcdif_ctrl>;
++	display = <&display0>;
++	status = "okay";
++
++	display0: display0 {
++		bits-per-pixel = <32>;
++		bus-width = <24>;
++
++		display-timings {
++			native-mode = <&timing0>;
++
++			timing0: timing0 {
++				clock-frequency = <33200000>;
++				hactive = <800>;
++				vactive = <480>;
++				hfront-porch = <210>;
++				hback-porch = <46>;
++				hsync-len = <1>;
++				vback-porch = <22>;
++				vfront-porch = <23>;
++				vsync-len = <1>;
++				hsync-active = <0>;
++				vsync-active = <0>;
++				de-active = <1>;
++				pixelclk-active = <0>;
++			};
++		};
++	};
++};
++
++&pwm3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm3>;
++	status = "okay";
++};
++
++&pwm7 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm7>;
++	status = "okay";
++};
++
++&pwm8 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pwm8>;
++	status = "okay";
++};
++
++&sai1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_sai1>;
++	status = "okay";
++};
++
++&uart3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart3>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++&uart6 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart6>;
++	status = "okay";
++};
++
++&usbotg1 {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg1_id>;
++	dr_mode = "otg";
++	disable-over-current;
++	status = "okay";
++};
++
++&usbotg2 {
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1>;
++	bus-width = <8>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	status = "okay";
++};
++
++&usdhc2 {  /* Wifi SDIO */
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc2>;
++	no-1-8-v;
++	non-removable;
++	keep-power-in-suspend;
++	wakeup-source;
++	vmmc-supply = <&reg_brcm>;
++	status = "okay";
++};
++
++&wdog1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_wdog>;
++	fsl,ext-reset-output;
++};
++
++&iomuxc {
++	pinctrl_brcm_reg: brcmreggrp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_DATA06__GPIO4_IO08	0x10b0	/* WL_REG_ON */
++			MX6UL_PAD_NAND_DATA04__GPIO4_IO06	0x10b0	/* WL_HOST_WAKE */
++		>;
++	};
++
++	pinctrl_enet2: enet2grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET1_TX_DATA1__ENET2_MDIO	0x1b0b0
++			MX6UL_PAD_ENET1_TX_EN__ENET2_MDC	0x1b0b0
++			MX6UL_PAD_ENET2_RX_EN__ENET2_RX_EN	0x1b0b0
++			MX6UL_PAD_ENET2_RX_ER__ENET2_RX_ER	0x1b0b0
++			MX6UL_PAD_ENET2_RX_DATA0__ENET2_RDATA00	0x1b0b0
++			MX6UL_PAD_ENET2_RX_DATA1__ENET2_RDATA01	0x1b0b0
++			MX6UL_PAD_ENET2_TX_EN__ENET2_TX_EN	0x1b0b0
++			MX6UL_PAD_ENET2_TX_DATA0__ENET2_TDATA00	0x1b0b0
++			MX6UL_PAD_ENET2_TX_DATA1__ENET2_TDATA01	0x1b0b0
++			MX6UL_PAD_ENET2_TX_CLK__ENET2_REF_CLK2	0x4001b031
++			MX6UL_PAD_SNVS_TAMPER6__GPIO5_IO06	0x800
++			MX6UL_PAD_UART4_TX_DATA__GPIO1_IO28	0x79
++		>;
++	};
++
++	pinctrl_flexcan1: flexcan1grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET1_RX_DATA0__FLEXCAN1_TX	0x1b020
++			MX6UL_PAD_ENET1_RX_DATA1__FLEXCAN1_RX	0x1b020
++		>;
++	};
++
++	pinctrl_flexcan2: flexcan2grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET1_TX_DATA0__FLEXCAN2_RX	0x1b020
++			MX6UL_PAD_ENET1_RX_EN__FLEXCAN2_TX	0x1b020
++		>;
++	};
++
++	pinctrl_i2c1: i2c1grp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO02__I2C1_SCL		0x4001b8b0
++			MX6UL_PAD_GPIO1_IO03__I2C1_SDA		0x4001b8b0
++		>;
++	};
++
++	pinctrl_i2c2: i2c2grp {
++		fsl,pins = <
++			MX6UL_PAD_UART5_TX_DATA__I2C2_SCL	0x4001b8b0
++			MX6UL_PAD_UART5_RX_DATA__I2C2_SDA	0x4001b8b0
++		>;
++	};
++
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6UL_PAD_UART1_TX_DATA__I2C3_SCL	0x4001b8b0
++			MX6UL_PAD_UART1_RX_DATA__I2C3_SDA	0x4001b8b0
++			>;
++	};
++
++	pinctrl_lcdif_dat: lcdifdatgrp {
++		fsl,pins = <
++			MX6UL_PAD_LCD_DATA00__LCDIF_DATA00	0x79
++			MX6UL_PAD_LCD_DATA01__LCDIF_DATA01	0x79
++			MX6UL_PAD_LCD_DATA02__LCDIF_DATA02	0x79
++			MX6UL_PAD_LCD_DATA03__LCDIF_DATA03	0x79
++			MX6UL_PAD_LCD_DATA04__LCDIF_DATA04	0x79
++			MX6UL_PAD_LCD_DATA05__LCDIF_DATA05	0x79
++			MX6UL_PAD_LCD_DATA06__LCDIF_DATA06	0x79
++			MX6UL_PAD_LCD_DATA07__LCDIF_DATA07	0x79
++			MX6UL_PAD_LCD_DATA08__LCDIF_DATA08	0x79
++			MX6UL_PAD_LCD_DATA09__LCDIF_DATA09	0x79
++			MX6UL_PAD_LCD_DATA10__LCDIF_DATA10	0x79
++			MX6UL_PAD_LCD_DATA11__LCDIF_DATA11	0x79
++			MX6UL_PAD_LCD_DATA12__LCDIF_DATA12	0x79
++			MX6UL_PAD_LCD_DATA13__LCDIF_DATA13	0x79
++			MX6UL_PAD_LCD_DATA14__LCDIF_DATA14	0x79
++			MX6UL_PAD_LCD_DATA15__LCDIF_DATA15	0x79
++			MX6UL_PAD_LCD_DATA16__LCDIF_DATA16	0x79
++			MX6UL_PAD_LCD_DATA17__LCDIF_DATA17	0x79
++			MX6UL_PAD_LCD_DATA18__LCDIF_DATA18	0x79
++			MX6UL_PAD_LCD_DATA19__LCDIF_DATA19	0x79
++			MX6UL_PAD_LCD_DATA20__LCDIF_DATA20	0x79
++			MX6UL_PAD_LCD_DATA21__LCDIF_DATA21	0x79
++			MX6UL_PAD_LCD_DATA22__LCDIF_DATA22	0x79
++			MX6UL_PAD_LCD_DATA23__LCDIF_DATA23	0x79
++		>;
++	};
++
++	pinctrl_lcdif_ctrl: lcdifctrlgrp {
++		fsl,pins = <
++			MX6UL_PAD_LCD_CLK__LCDIF_CLK		0x79
++			MX6UL_PAD_LCD_ENABLE__LCDIF_ENABLE	0x79
++			MX6UL_PAD_LCD_HSYNC__LCDIF_HSYNC	0x79
++			MX6UL_PAD_LCD_VSYNC__LCDIF_VSYNC	0x79
++			/* LCD reset */
++			MX6UL_PAD_SNVS_TAMPER9__GPIO5_IO09	0x79
++		>;
++	};
++
++	pinctrl_pwm3: pwm3grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_ALE__PWM3_OUT		0x110b0
++		>;
++	};
++
++	pinctrl_pwm7: pwm7grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET1_TX_CLK__PWM7_OUT	0x110b0
++		>;
++	};
++
++	pinctrl_pwm8: pwm8grp {
++		fsl,pins = <
++			MX6UL_PAD_ENET1_RX_ER__PWM8_OUT		0x110b0
++		>;
++	};
++
++	pinctrl_sai1: sai1grp {
++		fsl,pins = <
++			MX6UL_PAD_CSI_DATA04__SAI1_TX_SYNC	0x1b0b0
++			MX6UL_PAD_CSI_DATA05__SAI1_TX_BCLK	0x1b0b0
++			MX6UL_PAD_CSI_DATA06__SAI1_RX_DATA	0x110b0
++			MX6UL_PAD_CSI_DATA07__SAI1_TX_DATA	0x1f0b8
++		>;
++	};
++
++	pinctrl_uart3: uart3grp {
++		fsl,pins = <
++			MX6UL_PAD_UART3_TX_DATA__UART3_DCE_TX	0x1b0b0
++			MX6UL_PAD_UART3_RX_DATA__UART3_DCE_RX	0x1b0b0
++			MX6UL_PAD_UART3_RTS_B__UART3_DCE_RTS	0x1b0b0
++			MX6UL_PAD_UART3_CTS_B__UART3_DCE_CTS	0x1b0b0
++		>;
++	};
++
++	pinctrl_uart5: uart5grp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO04__UART5_DCE_TX	0x1b0b1
++			MX6UL_PAD_GPIO1_IO05__UART5_DCE_RX	0x1b0b1
++			MX6UL_PAD_GPIO1_IO08__UART5_DCE_RTS	0x1b0b1
++			MX6UL_PAD_GPIO1_IO09__UART5_DCE_CTS	0x1b0b1
++		>;
++	};
++
++	pinctrl_uart6: uart6grp {
++		fsl,pins = <
++			MX6UL_PAD_CSI_MCLK__UART6_DCE_TX	0x1b0b1
++			MX6UL_PAD_CSI_PIXCLK__UART6_DCE_RX	0x1b0b1
++		>;
++	};
++
++	pinctrl_usb_otg1: usbotg1grp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO06__GPIO1_IO06	0x10b0
++			>;
++	};
++
++	pinctrl_usb_otg1_id: usbotg1idgrp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO00__ANATOP_OTG1_ID	0x17059
++		>;
++	};
++
++	pinctrl_usdhc1: usdhc1grp {
++		fsl,pins = <
++			MX6UL_PAD_SD1_CMD__USDHC1_CMD		0x17059
++			MX6UL_PAD_SD1_CLK__USDHC1_CLK		0x10071
++			MX6UL_PAD_SD1_DATA0__USDHC1_DATA0	0x17059
++			MX6UL_PAD_SD1_DATA1__USDHC1_DATA1	0x17059
++			MX6UL_PAD_SD1_DATA2__USDHC1_DATA2	0x17059
++			MX6UL_PAD_SD1_DATA3__USDHC1_DATA3	0x17059
++			MX6UL_PAD_UART1_RTS_B__USDHC1_CD_B	0x03029
++			MX6UL_PAD_NAND_READY_B__USDHC1_DATA4	0x17059
++			MX6UL_PAD_NAND_CE0_B__USDHC1_DATA5	0x17059
++			MX6UL_PAD_NAND_CE1_B__USDHC1_DATA6	0x17059
++			MX6UL_PAD_NAND_CLE__USDHC1_DATA7	0x17059
++		>;
++	};
++
++	pinctrl_usdhc2: usdhc2grp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_WE_B__USDHC2_CMD		0x17059
++			MX6UL_PAD_NAND_RE_B__USDHC2_CLK		0x10059
++			MX6UL_PAD_NAND_DATA00__USDHC2_DATA0	0x17059
++			MX6UL_PAD_NAND_DATA01__USDHC2_DATA1	0x17059
++			MX6UL_PAD_NAND_DATA02__USDHC2_DATA2	0x17059
++			MX6UL_PAD_NAND_DATA03__USDHC2_DATA3	0x17059
++		>;
++	};
++
++	pinctrl_wdog: wdoggrp {
++		fsl,pins = <
++			MX6UL_PAD_LCD_RESET__WDOG1_WDOG_ANY    0x30b0
++		>;
++	};
++};
+-- 
+2.19.2
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
