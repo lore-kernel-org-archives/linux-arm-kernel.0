@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E22BC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id ABDC9C64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DEFF420834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 67B042082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lyA9OHpR";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="lFTO4KWP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEFF420834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="peUjfe3s";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="c/KCqhGM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 67B042082F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,65 +27,65 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=Ykz7MszUT9h/f6U4QlwfNLS56sGnA3IMUBcluOVk2tw=; b=lyA9OHpRTLo8JhxLGBvO0Bevjq
-	aHS9Nbl+rG60nRnxyLrye5lA9sNsHTg3tafp+RmCC2zssnuNhuuNjgEdboHv7HekxN9gAWa8S3kQn
-	8wHTwBrPkC5vuVg7iNpTLK7CzAzRMkIL98irD2Y6NJtZO0WJ3HdLL8GH4B2dH5qxPT44SmG4HfA5P
-	xebvvK+H4FHfG0a4ZdjJLklaaCnX40mNAQagdaMH7YG/B3aeFzS9D5h4WKEKKMOPYRPceqt1I4HET
-	aKfV6OJ8vQiOvCY50+Tn+HvdPt8ERPoA5MNXI+arNzJfVSFPgskrqaFZZDVLc3vTWH13o/O5yb+/t
-	Nl9/PPhg==;
+	bh=YNSHA1PdJ7gmAvd+G1K9AQJmAU93pYw7yAxroWN5PHc=; b=peUjfe3sEkoGnG9c8QvaKNoX0N
+	1vip+iMVSetnVkHrSLJn0E3sJa6AonIiPzAeNTcVriQFcX+PjoFJDbCNlNC6RbNBWr4gsvogwC+WI
+	XIgUhf/SRJidv84XQFGgzVXmgkP9QWLSoISA0Ezr1fTcJkHDLPA9IZ+EQ5xVTwiYEcn1qF/YuC7EV
+	tdNI7zewpICC2tL5rFkEnbxOgU9PdBDBCFiypPMREohYSnYcz5lq3uNp3BC3UyeN5FBFTKFwRrPkm
+	k0EhV57deW+10wkaj8H2SjgkdGW0ajQEt+o9FkRV36j0g5y4EuSmEJSa+WNMJPha9+S5XQVa0AMmo
+	9eSSaRfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTZDn-0002P4-40; Sun, 02 Dec 2018 21:24:11 +0000
-Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
+	id 1gTZE0-0002dW-M3; Sun, 02 Dec 2018 21:24:24 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTZDP-0001tw-96
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:23:52 +0000
-Received: by mail-wm1-x342.google.com with SMTP id y185so5570420wmd.1
+ id 1gTZDR-0001zP-C1
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:23:59 +0000
+Received: by mail-wm1-x343.google.com with SMTP id n190so1324824wmd.0
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 13:23:37 -0800 (PST)
+ Sun, 02 Dec 2018 13:23:49 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=aCJ1z19r/p/cSDddgTolGHUMO2TTDXswzYQqVhNA790=;
- b=lFTO4KWPi9FiaUr9oLQPf9b29u/miq1SdnbmOvssdCKfwBKe6jP5VZUKt6DZHtE5O0
- g0AEQ+DEo17d9kt9sLmE53AApa8n9zRZXC72/QbA3i0+B4duGgsE8begYpV0I0xI7Q7H
- xzasHza3UlZTgppnNk4TtJv0bIRyXMSTV9ry6/5uUcCWTHIi4NZdgKTHBK1FyCC1zAC/
- lZi11nmbF5OGnKw5nJ6j1CF0jECZoL1TO1Yafcrq3kW7ymYMkxRjCzllDa+Bt3QOES88
- 9BwLmVK4clUiQYSzMl+cXooxFGfCBwoiBlyOtL/VtKf+u2njTPBR8rWh55/xT8nroZs0
- OP+Q==
+ bh=321l4njH4VKx1kXcZRO12v94G6OHeKZhCHKTSWfxtGw=;
+ b=c/KCqhGMlJRWoAy0adHmP/uhcwsLnoDcS82IjHwJKQoG/kYnmPB+Y1utTr6x5pAyov
+ f+RUXTAC+rfWumUm2W9df6BQfsDs3soW/+ArqYdu8NLtCjEcgpnnNYneqmev1HIE8Z4R
+ BInFXhhLPNJD/ffVmOKdoQQ20FciNI8VEhOJqbqu9TV9OkCt7IF0C5+3VMwd9ZufYEaB
+ XVwVz7yg06QT5hlhUeUxz3lnjdwRlOSJwgGa8759CeCh8hfnfW5RioAXB3oNeGTrlKRI
+ yN5PW6XrpDvsLYrV6ZsUNt6P3SKJSm7w/e0Nd9be123lDTALFEL9Fb2dEJgG4Zl/Vhrn
+ a0uw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=aCJ1z19r/p/cSDddgTolGHUMO2TTDXswzYQqVhNA790=;
- b=ooy06xaHEShzf4oJyTRH/fn50e6F7qfcqHXRzfjw1PbGEmYjr9KqUTQ+izJMARAufj
- XlkOr35L/smJQeaT9vzHoDERfyD2glgHI1M6aCqfZF4fQGtUmJggai1SpbRsVy33cxfh
- cWP81E761lVW8ugcMHuncIhJuS6IX29QqlmuvAUWievm24+k0pqXoNGf3zl09DMFeEHF
- 6ZciO3Ei0VPs53Qvu/WEmdrky954lf9CRQc2MINIYJxrxg2LI5QuBA0C8wp8XHwZKRx+
- sWSilikF/8cXFdBBNNE0PGSV/4B40nl1DC/5ji42+SgQQcwg/fsvnzSHtoeM7ktB7dfc
- vHWg==
-X-Gm-Message-State: AA+aEWZKszquLG3PbTE9W8tYLsB3aeRKeYeOAqJuegwGXmnqUF+uIcdu
- LultcNkY4Q/Qk/BhETuLeaU=
-X-Google-Smtp-Source: AFSGD/URYtpwGQQ1e0uaq+sdvPfANESyrrrgCsmkZgfNFOHi/ctrQE4YdaN8VQqTCX71llmaosEXTQ==
-X-Received: by 2002:a1c:8fc2:: with SMTP id r185mr5876417wmd.54.1543785815775; 
- Sun, 02 Dec 2018 13:23:35 -0800 (PST)
+ bh=321l4njH4VKx1kXcZRO12v94G6OHeKZhCHKTSWfxtGw=;
+ b=OAzetwI3UtSHxEz8sFhpW11Jhf+2mlbmooq6iH2KhukkzQuzAhqYCIWLmgS30X017+
+ 0S1CwU6QgeTqq0lrBlLEToIs/kTA+a1ySQUvvL1KZdof+0Tpx9LE4KgcPG2S9JG2fQep
+ X6qUil83E1y8oraUEE8AJ2oAdONvYObo6mnRcfkGfH39il5O7knkAHuERAQLqdrWYzcm
+ zr3wThZwYSrpN23Gg8Uole1xUk9T6y/JlNkSR/A4dRkAZUgNvBaL3/DFFIHYExrzVU/e
+ 9J7NmBvoNLkFqlUyFC2NsmKa9+kdykMYCBWq8fvKQa6zquru6G0wL2LPbS6aVWi258ga
+ MtQg==
+X-Gm-Message-State: AA+aEWb6N7+ME11s2+EX7tnILaVl5gLnf0lTSrptbKSO/vBHI86nG2Za
+ ajKjHiytVuMladpe1TomvEQ=
+X-Google-Smtp-Source: AFSGD/UFiJgDOUG3QDNwHWa5gq+EOo3BLWA/KPHD5LPyqkAK+EC7gjFf4e40y2GkJe47hvXvBg5D8A==
+X-Received: by 2002:a1c:1a90:: with SMTP id a138mr6208939wma.109.1543785827957; 
+ Sun, 02 Dec 2018 13:23:47 -0800 (PST)
 Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id d2sm9551043wrs.97.2018.12.02.13.23.34
+ by smtp.gmail.com with ESMTPSA id d2sm9551043wrs.97.2018.12.02.13.23.46
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 13:23:35 -0800 (PST)
+ Sun, 02 Dec 2018 13:23:47 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: dmaengine@vger.kernel.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  alsa-devel@alsa-project.org, linux-sunxi@googlegroups.com
-Subject: [RFC PATCH 03/10] dt-bindings: dmaengine: Add Allwinner suniv F1C100s
- DMA
-Date: Mon,  3 Dec 2018 00:23:10 +0300
-Message-Id: <7322bdfcd38cdcd8ccec56fea25492e4945d498f.1543782328.git.mesihkilinc@gmail.com>
+Subject: [RFC PATCH 10/10] ARM: dts: suniv: f1c100s: Activate Audio Codec for
+ Lichee Pi Nano
+Date: Mon,  3 Dec 2018 00:23:17 +0300
+Message-Id: <11eb58fbfd223e041d03b6cec3363a7d08bdad45.1543782328.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <cover.1543782328.git.mesihkilinc@gmail.com>
 References: <cover.1543782328.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_132347_880102_BB2F612D 
-X-CRM114-Status: GOOD (  12.38  )
+X-CRM114-CacheID: sfid-20181202_132349_881682_B2C749A2 
+X-CRM114-Status: GOOD (  12.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,28 +108,30 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add compatible string for Allwinner suniv F1C100s DMA.
+Allwinner suniv F1C100s now has basic audio codec support. Activate it
+for Lichee Pi Nano board.
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 ---
- Documentation/devicetree/bindings/dma/sun4i-dma.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/dma/sun4i-dma.txt b/Documentation/devicetree/bindings/dma/sun4i-dma.txt
-index 8ad556a..ceeb41e 100644
---- a/Documentation/devicetree/bindings/dma/sun4i-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/sun4i-dma.txt
-@@ -4,7 +4,9 @@ This driver follows the generic DMA bindings defined in dma.txt.
- 
- Required properties:
- 
--- compatible:	Must be "allwinner,sun4i-a10-dma"
-+- compatible:	Should be one of the following:
-+		"allwinner,sun4i-a10-dma"
-+		"allwinner,suniv-f1c100s-dma"
- - reg:		Should contain the registers base address and length
- - interrupts:	Should contain a reference to the interrupt used by this device
- - clocks:	Should contain a reference to the parent AHB clock
+diff --git a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+index a1154e6..7618f8c 100644
+--- a/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
++++ b/arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
+@@ -24,3 +24,11 @@
+ 	pinctrl-0 = <&uart0_pe_pins>;
+ 	status = "okay";
+ };
++
++&codec {
++	allwinner,audio-routing =
++		"Headphone", "HP",
++		"Headphone", "HPCOM",
++		"MIC", "Mic";
++	status = "okay";
++};
 -- 
 2.7.4
 
