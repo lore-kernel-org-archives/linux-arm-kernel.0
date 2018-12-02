@@ -2,85 +2,91 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39010C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1E22BC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 05A5320834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id DEFF420834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 21:24:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GpAClg05";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="SZsJd0ab"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 05A5320834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lyA9OHpR";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="lFTO4KWP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DEFF420834
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=SlYirIHhHMaJW6Nu96NFw2cbRZtEA47PxqZP6wepkjo=; b=GpA
-	Clg05TAhssYCmLf6KAaRZnbvXTpud/FdoAdumrKm5wd2gHTB+ZkInPFbnlt/g4BjczJC5NI2zNof3
-	+q9CBTl1TOl3BwMalHb/5C8rpfQ/eT7v8IydgxCqqIa/fVfTZxM6vk8fLEZwiLhJnG4+3O+IRl7bn
-	BaKRyl2azRM+h4Ix09ob9qYcfVESJu7Mg5IzKQp9Q9jOI1mbgdXDzdXPtH50mhl9a+NV9+HzmWJTD
-	zsg7jUaeAlZ0fgaCwA07ZNP6qBhvzEIz3KAJeNMxERZjLz37e14wmjfdlI0ppckvbnhERsKqGfzxx
-	f7yI3ySqMM083yPlr209XlCfPqUzFJQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=Ykz7MszUT9h/f6U4QlwfNLS56sGnA3IMUBcluOVk2tw=; b=lyA9OHpRTLo8JhxLGBvO0Bevjq
+	aHS9Nbl+rG60nRnxyLrye5lA9sNsHTg3tafp+RmCC2zssnuNhuuNjgEdboHv7HekxN9gAWa8S3kQn
+	8wHTwBrPkC5vuVg7iNpTLK7CzAzRMkIL98irD2Y6NJtZO0WJ3HdLL8GH4B2dH5qxPT44SmG4HfA5P
+	xebvvK+H4FHfG0a4ZdjJLklaaCnX40mNAQagdaMH7YG/B3aeFzS9D5h4WKEKKMOPYRPceqt1I4HET
+	aKfV6OJ8vQiOvCY50+Tn+HvdPt8ERPoA5MNXI+arNzJfVSFPgskrqaFZZDVLc3vTWH13o/O5yb+/t
+	Nl9/PPhg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTZDW-000261-Gc; Sun, 02 Dec 2018 21:23:54 +0000
-Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+	id 1gTZDn-0002P4-40; Sun, 02 Dec 2018 21:24:11 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTZDK-0001tS-9G
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:23:43 +0000
-Received: by mail-wr1-x443.google.com with SMTP id r10so10112769wrs.10
+ id 1gTZDP-0001tw-96
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 21:23:52 +0000
+Received: by mail-wm1-x342.google.com with SMTP id y185so5570420wmd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 13:23:31 -0800 (PST)
+ Sun, 02 Dec 2018 13:23:37 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=y4Pigh91c3qMXMgWaohLTWbgGJ76Vl21itHuMEWGe2Y=;
- b=SZsJd0abWfXSSoJwmX9Qgu7FaiLkulvVrqRj652ySMDdDzG2ea9+jxsPA5ZVeonFph
- je79w+GNz2mqZz4NXHXj9YH7csrodLbBvHksMcm2TZlVrVZiucpklaOZrY/6aJ+rCdKp
- PeXBUSHHAfHxrNM+9i4HQA1DXupT4nekNRa/rK1Yn3Iy8ZqUU13R6fNc9q3C7BPsKIVy
- 5Wheif6BivE/iATa0s5K3nF71SikMN2Oc0A/RsdQ1hVPd/PzMaBCbGENqsiK2txpkpHB
- U/NAnP2G5Ms/n8BGd5BOz7fvcqmQ+LFjehfsN2t4xnzn66Ve9m07FnpWgzIVBtopd6w5
- gImQ==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=aCJ1z19r/p/cSDddgTolGHUMO2TTDXswzYQqVhNA790=;
+ b=lFTO4KWPi9FiaUr9oLQPf9b29u/miq1SdnbmOvssdCKfwBKe6jP5VZUKt6DZHtE5O0
+ g0AEQ+DEo17d9kt9sLmE53AApa8n9zRZXC72/QbA3i0+B4duGgsE8begYpV0I0xI7Q7H
+ xzasHza3UlZTgppnNk4TtJv0bIRyXMSTV9ry6/5uUcCWTHIi4NZdgKTHBK1FyCC1zAC/
+ lZi11nmbF5OGnKw5nJ6j1CF0jECZoL1TO1Yafcrq3kW7ymYMkxRjCzllDa+Bt3QOES88
+ 9BwLmVK4clUiQYSzMl+cXooxFGfCBwoiBlyOtL/VtKf+u2njTPBR8rWh55/xT8nroZs0
+ OP+Q==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=y4Pigh91c3qMXMgWaohLTWbgGJ76Vl21itHuMEWGe2Y=;
- b=qQ5ItBNrQ1p8A5Ndu5WMh8cMTQSmYMCUiciZysv7Z3QEjO4P0RFCTvqf1X251Kr5vY
- lx2C0ruOEkGirXCQXeEFGQdJNdZgOo5eYkwD3DpSToWIRXury79c7tYi6KsXGA4i3JFw
- MTLzLeTUV1GipQK5IcnojoVYJvysG+Ov+vvcXSpr0bFWLZs6Y+Y21wnPheAHsg1z16RN
- aotxrgIoV3xne1fBjveSgQ2Bzk8RD8UO2oNoAEsmGyk64syu2gP3QTSL+ZO5vvxSsX2o
- S9M6P3rSvj1hkqL2UtLdEpDwXKjCwbONgGvxldqd/4Xb4ji3LCo+TU95SkNEwUsUFTRn
- 3zEg==
-X-Gm-Message-State: AA+aEWZ8E1RPT2ANP3IpB30woiCxVYpCOuXvX6HV9Ydulqqne1IxMtgR
- y2qHrADaRjt9rjXXdLfv2lc=
-X-Google-Smtp-Source: AFSGD/URshyVaqMcmEPLl6bVYviO3uoCEO0X9JpSRaRjTrOeIUeSH84v5c29LQm0fjrHKfieStuxVQ==
-X-Received: by 2002:adf:e284:: with SMTP id v4mr7253944wri.26.1543785810325;
- Sun, 02 Dec 2018 13:23:30 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=aCJ1z19r/p/cSDddgTolGHUMO2TTDXswzYQqVhNA790=;
+ b=ooy06xaHEShzf4oJyTRH/fn50e6F7qfcqHXRzfjw1PbGEmYjr9KqUTQ+izJMARAufj
+ XlkOr35L/smJQeaT9vzHoDERfyD2glgHI1M6aCqfZF4fQGtUmJggai1SpbRsVy33cxfh
+ cWP81E761lVW8ugcMHuncIhJuS6IX29QqlmuvAUWievm24+k0pqXoNGf3zl09DMFeEHF
+ 6ZciO3Ei0VPs53Qvu/WEmdrky954lf9CRQc2MINIYJxrxg2LI5QuBA0C8wp8XHwZKRx+
+ sWSilikF/8cXFdBBNNE0PGSV/4B40nl1DC/5ji42+SgQQcwg/fsvnzSHtoeM7ktB7dfc
+ vHWg==
+X-Gm-Message-State: AA+aEWZKszquLG3PbTE9W8tYLsB3aeRKeYeOAqJuegwGXmnqUF+uIcdu
+ LultcNkY4Q/Qk/BhETuLeaU=
+X-Google-Smtp-Source: AFSGD/URYtpwGQQ1e0uaq+sdvPfANESyrrrgCsmkZgfNFOHi/ctrQE4YdaN8VQqTCX71llmaosEXTQ==
+X-Received: by 2002:a1c:8fc2:: with SMTP id r185mr5876417wmd.54.1543785815775; 
+ Sun, 02 Dec 2018 13:23:35 -0800 (PST)
 Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id d2sm9551043wrs.97.2018.12.02.13.23.28
+ by smtp.gmail.com with ESMTPSA id d2sm9551043wrs.97.2018.12.02.13.23.34
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 13:23:29 -0800 (PST)
+ Sun, 02 Dec 2018 13:23:35 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: dmaengine@vger.kernel.org, devicetree@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
  alsa-devel@alsa-project.org, linux-sunxi@googlegroups.com
-Subject: [RFC PATCH 00/10] Add support for DMA and audio codec of F1C100s
-Date: Mon,  3 Dec 2018 00:23:07 +0300
-Message-Id: <cover.1543782328.git.mesihkilinc@gmail.com>
+Subject: [RFC PATCH 03/10] dt-bindings: dmaengine: Add Allwinner suniv F1C100s
+ DMA
+Date: Mon,  3 Dec 2018 00:23:10 +0300
+Message-Id: <7322bdfcd38cdcd8ccec56fea25492e4945d498f.1543782328.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <cover.1543782328.git.mesihkilinc@gmail.com>
+References: <cover.1543782328.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_132342_377328_C48DF5C3 
-X-CRM114-Status: GOOD (  12.25  )
+X-CRM114-CacheID: sfid-20181202_132347_880102_BB2F612D 
+X-CRM114-Status: GOOD (  12.38  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,55 +109,28 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is RFC patchset for Allwinner suniv F1C100s to support DMA and
-audio codec.
+Add compatible string for Allwinner suniv F1C100s DMA.
 
-Allwinner F1C100s has a audio codec that has necessary digital and
-analog parts. It has r-l headphone output and microphone, line, r-l
-FM inputs. ADC can capture any inputs and also output channels via mux.
-Any input channels or DAC samples can feed output channels. 
+Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+---
+ Documentation/devicetree/bindings/dma/sun4i-dma.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Add support for this audio codec.
-
-F1C100s utilizes DMA channels to send and receive ADC-DAC samples. So
-DMA support needed. Patch 1~5 adds support for DMA. Suniv F1C100s has 
-very similar DMA to sun4i. But there is some dissimilarities also. 
-Suniv features a DMA reset bit in clock  control unit. It has smaller 
-number of DMA channels. Several registers has different addresses. 
-It's max burst size is 4 instead of 8. Also DMA endpoint numbers are 
-different.
-
-Patch 6 adds DMA max burst option to sun4i-codec.
-
-Patch 7~8 Add support for suniv F1C100s audio codec.
-
-Patch 9 adds audio codec to suniv-f1c100s.dtsi
-
-Patch 10 adds audio codec support to Lichee Pi Nano board.
+diff --git a/Documentation/devicetree/bindings/dma/sun4i-dma.txt b/Documentation/devicetree/bindings/dma/sun4i-dma.txt
+index 8ad556a..ceeb41e 100644
+--- a/Documentation/devicetree/bindings/dma/sun4i-dma.txt
++++ b/Documentation/devicetree/bindings/dma/sun4i-dma.txt
+@@ -4,7 +4,9 @@ This driver follows the generic DMA bindings defined in dma.txt.
  
-Thanks!
-
-Mesih Kilinc (10):
-  dma-engine: sun4i: Add a quirk to support different chips
-  dma-engine: sun4i: Add has_reset option to quirk
-  dt-bindings: dmaengine: Add Allwinner suniv F1C100s DMA
-  dma-engine: sun4i: Add support for Allwinner suniv F1C100s
-  ARM: dts: suniv: f1c100s: Add support for DMA
-  ASoC: sun4i-codec: Add DMA Max Burst field
-  dt-bindigs: sound: Add Allwinner suniv F1C100s Audio Codec
-  ASoC: sun4i-codec: Add support for Allwinner suniv F1C100s
-  ARM: dts: suniv: f1c100s: Add support for Audio Codec
-  ARM: dts: suniv: f1c100s: Activate Audio Codec for Lichee Pi Nano
-
- .../devicetree/bindings/dma/sun4i-dma.txt          |   4 +-
- .../devicetree/bindings/sound/sun4i-codec.txt      |   5 +
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |   8 +
- arch/arm/boot/dts/suniv-f1c100s.dtsi               |  25 ++
- drivers/dma/Kconfig                                |   4 +-
- drivers/dma/sun4i-dma.c                            | 221 ++++++++++--
- sound/soc/sunxi/sun4i-codec.c                      | 371 ++++++++++++++++++++-
- 7 files changed, 601 insertions(+), 37 deletions(-)
-
+ Required properties:
+ 
+-- compatible:	Must be "allwinner,sun4i-a10-dma"
++- compatible:	Should be one of the following:
++		"allwinner,sun4i-a10-dma"
++		"allwinner,suniv-f1c100s-dma"
+ - reg:		Should contain the registers base address and length
+ - interrupts:	Should contain a reference to the interrupt used by this device
+ - clocks:	Should contain a reference to the parent AHB clock
 -- 
 2.7.4
 
