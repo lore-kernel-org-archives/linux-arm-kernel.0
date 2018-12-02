@@ -2,85 +2,91 @@ Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8F566C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:24:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 06833C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:24:51 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5865620892
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:24:32 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B85B120851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:24:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZUjUWriu";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="E3SuOme7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5865620892
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="H7daSl4V";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="R5Hnrjy5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B85B120851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=7NqHDUeZ/Yg8M8lrKi8zY7yY00fUySjZQITw8Qq4oa4=; b=ZUj
-	UWriukxR3d1edPDAcNqS6990UWpVk+E09qFxplc25tIC8rCV1Q6UWn2PSwSeufVzz+yTLDC7fM/+I
-	NRaXgyj4pXKYpJFun3Cc4M240eHBhofINNTt7Kwg4MDba231wvL71XfBAmI7FOksoy7cN8HSUJCCu
-	9YoEzMhsdTo7hA4wPLZ/JSLt12FGcAJMlXsnkC09JpFowN3VO//sQeiP9rDzkbGvvIxY5IEmYnUYp
-	sPFiGZVcpYpz2x4yFPN4FKWgSnjYdiLb2gJZ0rOTaZTk3JYaHn4lbR/LiPd0DJGMHPA0wvSrLV5HD
-	CpnliAAotGDLU9i2dY6ilMwkwOAZIRA==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=P0XzydDXbA0Rxn/k2MVIMD6ZOdVsrfxH9WUssdKnJV4=; b=H7daSl4VWUvLmrwaabIjcnJhnm
+	PvLe3VBopv1g2nz+L59YH9pprJg/VP1lTbjNwVXHpW16HeApWCpoHW0UPIWDvko7r4qngL2fZ/5y3
+	JWh7kQJj/Yb9z9FbaMBs60expmz+JGJUvyGEVvI7GuHVGcygqqeoQaSirz/28w+VgpR89JpJydp9m
+	UFpc6SwueflqGzayR7tpsheha++6qIhFXjQqTnkebTIfutbqcWPDmydr1b0b9sSiUd5iFq6pVqlSm
+	TnKHf9LoaxZRrm08CIZjDHLHjEAe1obfXmLv9mBgsdpONbrXF9iK1hXBCGOLRkESv3CYGDNTwnaIB
+	c/We+ArA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTYI0-00020X-5x; Sun, 02 Dec 2018 20:24:28 +0000
-Received: from mail-wm1-x344.google.com ([2a00:1450:4864:20::344])
+	id 1gTYIB-0002As-0m; Sun, 02 Dec 2018 20:24:39 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTYHw-0001wA-NG
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:24:26 +0000
-Received: by mail-wm1-x344.google.com with SMTP id n190so1243699wmd.0
+ id 1gTYHx-0001wH-RW
+ for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:24:27 +0000
+Received: by mail-wm1-x342.google.com with SMTP id y1so3691335wmi.3
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 12:24:12 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:13 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=HkUpJ5u4r54RHIDg1gzTLsj/w77aL+J50O3FnhmlJOw=;
- b=E3SuOme7u/a1WA6+Zoz7I5g2kxrWwXZSSOMcXtfXJwbW7e5Ek9lPzdS8BHfNJpV19u
- yzlf9XIPqq4WMCO4/k+J/E2Ut7Z27DT83QRjt8NRUfIWiDrwKNTWgXAn6wluT/nlMOYP
- Ut71ei8dYTXYYKJCuCI6++r6/nEms0UvUr7797l7cW8rgB973CDUV3zjwAl0Ffgy3zga
- qYKxs/QQ2329sjaQp9AK0SYK42w1zSWYFod2EriG82xvi7RyTgfTgKJU/GejQ2+qq4dV
- tmrAH9ZjWEs2z8CX9v5lkSqRAR6DBnTh3QhHI9yvQ7IywptDS2LOIF/daqK5gQ6+beP7
- SpjA==
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=VF0eXPvxEQ8eg24ufuqCwYbc3OHuCombUgJA5hM0DFE=;
+ b=R5Hnrjy5AZQR/YOegp9OG5MwjGVSqr5ylRLfDC9OEFoghKwvtTwpC65Mx1lTqqvD/c
+ L/9bvjQJcCAB17o1b4hoagzj75v2qeCrjzRdpwDR6wc/h8sXAFnUQgGIsOH5i0tcVDFK
+ LtjYP3IzF2/FxO5KQ4c8bMq/qqJfoLI2YlRfvjlYkjOjlzYFCL39kw5SHknsCHnpc+6L
+ pgyX6/1dYQcPsVOVK/d8toQafmzS2hYPftNilLVuousgGFfQ2j3wHYE5uFluuefe3RE+
+ VINLNgJ5qVyui3mq/Gu25YoIzztAAIQLCYAcNZPDoDpgY1AHQmAcqSmn42PWCRdc0OXd
+ roJA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=HkUpJ5u4r54RHIDg1gzTLsj/w77aL+J50O3FnhmlJOw=;
- b=UBNr95of/5McegiscGC3AJWxF/9KpKJx5u9qbWUvoeAk/eNaHIcYeckOtmRSgxdMwM
- PRNYHlzSqceZcErTS4lBRtAAYKQqUL/26+39/g6iOb2hg9UcQ0LkTWdszPptMfb7ywm5
- UWgutMTlc/3PAPm/yNN2wA7o2uMkuxffSjj3SwRa7ayNg85ctxOLpcZLAD6rT6iV3tgL
- TqbwoPQelfDTBhWk5YUJ9XXSZSNjAm8Vt+MdBvQCXQjfrtRIH87NPeVQQQL9nY3IbHUf
- KuYeVdLdKOU+QNPEqijIcfA7FPgf+i+fuHlaPuV9J1IhdB3oUCk3v7cx8Rvuq2KmsDg8
- lw8A==
-X-Gm-Message-State: AA+aEWZP5WLx3fOc+PjCKn4FhCYXYtNhWm/m/NC8T7U838vrIugH1z4Y
- cnrgV8tPsgOeqY4qvw9lbuM=
-X-Google-Smtp-Source: AFSGD/Vc+qGw9tdEbw5X7WMtvAB6XnjcHlyyYSAwEiJgrtbhmzhnL5/P5omnh1nE5cNflXNMosAAWg==
-X-Received: by 2002:a1c:c148:: with SMTP id r69mr5870115wmf.147.1543782250442; 
- Sun, 02 Dec 2018 12:24:10 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=VF0eXPvxEQ8eg24ufuqCwYbc3OHuCombUgJA5hM0DFE=;
+ b=Rkqu0MTQbl83bhsO4E2C5QsiylwNGjubPPGeXkUtKzmlZ6t23mIN7/c8YKRtyh6uN3
+ 63JjKdYTlggwQ4+JhhtfnYCIS4qGIgsxVwcoQXSL1MJAWyP8jpy+24TDAyhCgNb9t4el
+ JUJNUZab2cg9bJoCi/pgjaI48r1IYj1IaJc/91TTFvMOodxdBu4P2N3EDsmck0c3EzvJ
+ uLyjK9b4XbHobECD3VTjK/Cowtq9xAEVwuuMV7uc8RBpU3o9YtMtAioCPM/KdnL45dkk
+ zU655P2WA+m6uc2z6n8QEi/8ohbcz5hBjAAhbWxhqd4rHpIDWu8SYOOCagoET1MtBCc1
+ zVYw==
+X-Gm-Message-State: AA+aEWbT6wlU3nBU/FUgnSSJjk6L/rb+y0oAUfTtVT4ItLQLNzdKfmlI
+ aIwrQF5OzIeUDI4oiZGm43MZDwp3X1E=
+X-Google-Smtp-Source: AFSGD/X8J8uBvA+Atj2GldMyKoLN9X1VZyIrPrn5AEDmQeZ8PFIAwb3OctXByDSlmb+MmGKQBXN9Dg==
+X-Received: by 2002:a1c:f0e:: with SMTP id 14mr5742096wmp.37.1543782252226;
+ Sun, 02 Dec 2018 12:24:12 -0800 (PST)
 Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.08
+ by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 12:24:09 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:11 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-gpio@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v6 00/17] initial support for "suniv" Allwinner new ARM9 SoC
-Date: Sun,  2 Dec 2018 23:23:34 +0300
-Message-Id: <cover.1543781680.git.mesihkilinc@gmail.com>
+Subject: [PATCH v6 01/17] ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7
+ Allwinner SoCs
+Date: Sun,  2 Dec 2018 23:23:35 +0300
+Message-Id: <1a4e6f2b1d6aa5a079e2afb5d1ddf39f830eb8be.1543781680.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
+In-Reply-To: <cover.1543781680.git.mesihkilinc@gmail.com>
+References: <cover.1543781680.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_122424_766940_B77EC5F3 
-X-CRM114-Status: GOOD (  16.19  )
+X-CRM114-CacheID: sfid-20181202_122425_884423_09B5B547 
+X-CRM114-Status: GOOD (  12.08  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,132 +112,40 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is the sixth version of patchset for Allwinner ARMv5 F1C100s
-SoC. Addressed comments from Stephen Boyd, added signatures.
+Allwinner also has some ARMv5 SoCs.
 
-Changes since v5:
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Fixed license identifier position
+In order to add support for them, check ARM_MULTI_V7 before enabling
+ARMv7 SoC's. Add help text for ARCH_SUNXI menuconfig.
 
-Changes since v4:
-- Patch "dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl"
-  - This patch applied for 4.21.
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - This patch applied for 4.21.
-- Patch "dt-bindings: clock: Add Allwinner suniv F1C100s CCU"
-  - Fixed license identifier position
-  - Added DMA fields.
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Added DMA reset and clock support.
-- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - Remove dt-binding headers. 
-  - Fix uart0 pin label.
-- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
-  - Fix uart0 pin label.
+Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+---
+ arch/arm/mach-sunxi/Kconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Changes since v3:
-- Patch "ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs"
-  - Remove CONFIG_ARCH_SUNXI_Vx. Use ARCH_MULTI_Vx to differentiate SoC's
-  - Change KConfig ARCH_SUNXI selection: 'select' to 'default'. 
-- Patch "irqchip/sun4i: Add a struct to hold global variables"
-  - Split irq_sun4i.c changes to 3 patch.
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - pinctrl-suniv-f1c100s: remove: disable_strict_mode = true
-- Patch "ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - suniv-f1c100s.dtsi: remove unnecessary componenets.
-  - Instead of patching drivers, add original compatible string with 
-f1c100s compatibles.
-  - Add Acked-by signatures.
-
-Changes since v2:
-- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
-  - Move SUN4I_TIMER option to ARCH_SUNXI
-  - Added help text for MACH_SUNIV
-- Patch "irqchip/sun4i: add support for suniv interrupt controller"
-  - Defined sunxi_irq_chip_data struct and used it to differentiate
-    registers between different chips.
-- Patch " ARM: dts: suniv: add initial DTSI file for F1C100s"
-  - Removed unnecessary fake clock.
-  - Fixed compatible strings.
-
-Changes since v1:
-- Patch "ARM: add CONFIG_ARCH_SUNXI_V7 for differentiate ARMv5/v7
-  Allwinner SoCs"
-  - Instead of using a common bool config use a common menuconfig. 
-  - Use ARCH_MULTI_V7 to differentiate V7 SoCs.
-  - Addressed comment from Julian Calaby
-- Patch "ARM: sunxi: add Allwinner ARMv5 SoCs"
-  - Use ARCH_MULTI_V5 to differentiate V5 SoCs.
-  - removed "allwinner,suniv" board compatible string
-  - Added dt-bindings
-- Patch "irqchip/sun4i: add support for suniv interrupt controller"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-ic" to "allwinner,suniv-f1c100s-ic"
-- Patch "clocksource: sun4i: add a compatible for suniv"
-  - Added dt-bindings
-  - Changed "allwinner,suniv-timer" to "allwinner,suniv-f1c100s-timer"
-- Patch "pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)"
-  - Added dt-bindings
-  - Renamed suniv-pinctrl to suniv-f1c100s-pinctrl
-- Patch "clk: sunxi-ng: add support for suniv F1C100s SoC"
-  - Added dt-bindings
-  - Renamed suniv-ccu to suniv-f1c100s-ccu
-- Patch "ARM: suniv: f1c100s: add device tree for Lichee Pi Nano"
-  - Addressed comment from Rask Ingemann Lambertsen
-
-Thanks!
-
-Mesih Kilinc (17):
-  ARM: Check ARCH_MULTI_V7 to differentiate ARMv5/v7 Allwinner SoCs
-  dt-bindings: arm: Add new Allwinner ARMv5 F1C100s SoC
-  ARM: sunxi: add Allwinner ARMv5 SoCs
-  dt-bindings: interrupt-controller: Add suniv interrupt-controller
-  irqchip/sun4i: Add a struct to hold global variables
-  irqchip/sun4i: Move IC specific register offsets to struct
-  irqchip/sun4i: Add support for Allwinner ARMv5 F1C100s
-  dt-bindings: timer: Add Allwinner suniv timer
-  clocksource: sun4i: add a compatible for suniv
-  dt-bindings: pinctrl: Add Allwinner suniv F1C100s pinctrl
-  pinctrl: sunxi: add support for suniv F1C100s (newer F-series SoCs)
-  dt-bindings: clock: Add Allwinner suniv F1C100s CCU
-  clk: sunxi-ng: add support for suniv F1C100s SoC
-  dt-bindings: sram: Add Allwinner suniv F1C100s
-  dt-bindings: watchdog: Add Allwinner ARMv5 F1C100s wdt
-  ARM: dts: suniv: add initial DTSI file for F1C100s
-  ARM: suniv: f1c100s: add device tree for Lichee Pi Nano
-
- Documentation/devicetree/bindings/arm/sunxi.txt    |   1 +
- .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
- .../interrupt-controller/allwinner,sun4i-ic.txt    |   4 +-
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- .../devicetree/bindings/sram/sunxi-sram.txt        |   4 +
- .../bindings/timer/allwinner,sun4i-timer.txt       |   4 +-
- .../devicetree/bindings/watchdog/sunxi-wdt.txt     |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts  |  26 +
- arch/arm/boot/dts/suniv-f1c100s.dtsi               | 147 ++++++
- arch/arm/mach-sunxi/Kconfig                        |  19 +-
- arch/arm/mach-sunxi/sunxi.c                        |  10 +
- drivers/clk/sunxi-ng/Kconfig                       |   5 +
- drivers/clk/sunxi-ng/Makefile                      |   1 +
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c           | 541 +++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h           |  34 ++
- drivers/clocksource/sun4i_timer.c                  |   5 +-
- drivers/irqchip/irq-sun4i.c                        | 106 ++--
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c      | 416 ++++++++++++++++
- include/dt-bindings/clock/suniv-ccu-f1c100s.h      |  70 +++
- include/dt-bindings/reset/suniv-ccu-f1c100s.h      |  38 ++
- 23 files changed, 1408 insertions(+), 33 deletions(-)
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s-licheepi-nano.dts
- create mode 100644 arch/arm/boot/dts/suniv-f1c100s.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-suniv-f1c100s.h
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-suniv-f1c100s.c
- create mode 100644 include/dt-bindings/clock/suniv-ccu-f1c100s.h
- create mode 100644 include/dt-bindings/reset/suniv-ccu-f1c100s.h
-
+diff --git a/arch/arm/mach-sunxi/Kconfig b/arch/arm/mach-sunxi/Kconfig
+index d9c8ecf..185c573 100644
+--- a/arch/arm/mach-sunxi/Kconfig
++++ b/arch/arm/mach-sunxi/Kconfig
+@@ -9,9 +9,13 @@ menuconfig ARCH_SUNXI
+ 	select PM_OPP
+ 	select SUN4I_TIMER
+ 	select RESET_CONTROLLER
++	help
++	  Support for Allwinner ARM-based family of processors
+ 
+ if ARCH_SUNXI
+ 
++if ARCH_MULTI_V7
++
+ config MACH_SUN4I
+ 	bool "Allwinner A10 (sun4i) SoCs support"
+ 	default ARCH_SUNXI
+@@ -56,3 +60,5 @@ config ARCH_SUNXI_MC_SMP
+ 	select ARM_CPU_SUSPEND
+ 
+ endif
++
++endif
 -- 
 2.7.4
 
