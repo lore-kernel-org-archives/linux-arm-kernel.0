@@ -5,20 +5,19 @@ X-Spam-Level:
 X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6D92DC64EB4
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:25:01 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id CFBAAC64EB4
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:25:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 32CE920851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:25:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9F15520851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 20:25:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jizWVoaB";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gLGP7GIa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 32CE920851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YGUPg27F";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="gzmdAlgs"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9F15520851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -28,65 +27,64 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=cxZiwJ80YJZipHh/ggt/J8L5IrMcgH49J7DOdvRCHvk=; b=jizWVoaBOAuM15J0/7kQmAsD85
-	snoK/aPry3+vLAetIUMDIc5hyfjTwXXPcq0Rw9QE8VLm6r1ubpV8Bz7qJgaca2OZ2ZKNHdOHiOXeV
-	6pxzT8AolF6aiXLt4qi2q2oul6XCvlhv4i8ub92uF4b+DRjVG6lhzRb9Kfx91R5mE+5J84UIspehP
-	hrKyrpi39jYDG/dhCHLY1jwb2tq2XWbpcl8bomL771WkHFpdtTeczivKisRI8hStdvqdF1YHQbYpi
-	XZvtYLg0ZorpeirUo9wpQTzNH5MCTL82TqNTsYzPGWLuiDJ0YD5l2ck/iv+fOEobbhIB+/iMXiHFH
-	asn+lD9Q==;
+	bh=q2Ha9YRTq2KJTp5nemZM7kGUfyxWju8c5hjdHel5akk=; b=YGUPg27FlGurSqiYpwZ1H98x05
+	SzcL8Yd4V+HMeQEsjL86Z5F3M3wP2KpYJFhQDfK8BgHVBO5Cibk+0JYAw9gL9ZrBV3G7GlFExL/Iu
+	Hz0qmPIaQ+wzQQC9/aXdyE2eLBYWg9BG7bbw7Znl6ywE7xD8NRuprDuRC1Yb43NM8OJ1mcXjHkFQE
+	R9VgDlK/G42QFuxYUfsU49pN3NA3erV+hXiHckVQUH+AlOgpFLAxzEilTXPpHSt7xZ0yGS7oGKAYw
+	WlQt6OZPjTQTMK6rgbX0Cwf3AcNOs0kMPFat2Zi0jaFqLPvIOUTDRiffqcTkN5m/LJoMcM3DDynuM
+	X5BJHsuw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTYIT-0002Xs-KG; Sun, 02 Dec 2018 20:24:57 +0000
-Received: from mail-wm1-x341.google.com ([2a00:1450:4864:20::341])
+	id 1gTYIl-0003Kf-W5; Sun, 02 Dec 2018 20:25:15 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTYHz-0001yD-Fo
+ id 1gTYHz-0001wI-FW
  for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 20:24:28 +0000
-Received: by mail-wm1-x341.google.com with SMTP id f81so1261655wmd.4
+Received: by mail-wr1-x441.google.com with SMTP id 96so10078874wrb.2
  for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 12:24:25 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:15 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=JOM18/2JI/XRqmtoCiSEfwWrBMkMvuRt2TRd7mJVRjI=;
- b=gLGP7GIaVXawVef7RXWc0UwDAdtOX2LMpmP0FaeI+zFg1FlFTMrX3BSsca8bF9a1CP
- htQqoMaoPCjg0ow8siWQ8AlVeUhYf2usojFv1/xQzM3HyX+NjzHZsRfzFLglgq8I6WhV
- Lu2aRcwTs9KJhFKZRXFLZPzOjpMmd3WRDRlfCKkfoJlQZEFbsHB0o1rwDzBBM5L/5lRI
- nwl0tOlgsAp6ghGbmgMpDdmxXDvNwqbpiTPT6hJbOl4Xw/v3TYEbJOQ2L/PswYpJaThS
- t6oRqUfzj03DphaveXQWD9ZJ/jIMeq3r9vF0xUQdlPd9Pln5O2oMXVipr+VHmXwG9bBf
- DJYw==
+ bh=+V2WbDnTTYDb5DheTPlD4ID/xDgu/F+Pl9HjYjs8x9s=;
+ b=gzmdAlgscUYL21LnLlekT5aOUIsAwdn6tX96qbCodW9DGKkZFT40/EKT+Xv9/xMNUl
+ 0Vjuurbizu6q5Xq/a47UvjlY9mUlWaDFYTk+6WWiybiH/lwae5t+Dt3d0TS0MPRqy4iJ
+ le2t5pxPRldKUNTBBuW92urVTjZtLQngeNs49LXoZWqC3mc8q2ATrs18VBN5FiyMdsgg
+ MqylHFQ77uz9jnexx8vdSDvMXjzafQ1YhnhBBmVWGxGWSdwUPsD9AGzZbymjv8dxilJl
+ nUFQgJFc5l5PCVPeyU980UOFkUdfF4VdQQAWta/46S3BYqFgh0emVWYWtk0F+V887dTN
+ hmkA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=JOM18/2JI/XRqmtoCiSEfwWrBMkMvuRt2TRd7mJVRjI=;
- b=l+hJTlhwDndLIX/qC03vsGRslB4GvblHURkfsHxcV9lE5lW9ebT+3tVGr5t7xrzHyK
- fHlfZKXrcNv7Kae3DWBWcWE58G+hInYpJmkgjuYApUQQ7nrql5bUVyJtEFIGpfu/MXuj
- WIFJ0z+ZoDpF3JbQWozGOt8eDh0qxb2Zbt9RRSUYKuDoed8VJYncpBvd93KCIFZ0WFkP
- ZtQ2NP/alooh7dCR6mF6MsMa0fQjldlT2u1Nx7QxnBAOobtoJTjqurL2844Em1vcVdFd
- X5+HoKSqmUvz3LEyh7vvm1bLG0+TWlnQrmf/JHEf/joT6y0q7pHHvfVk4EYLLIJBYjkb
- xEWg==
-X-Gm-Message-State: AA+aEWYOVGNCIxZa4HS151vE6YfrK1s5pqh/n0aEEzJpP/Tp2IylqRki
- vCkL0PcL4892NHnSYzfvwgM=
-X-Google-Smtp-Source: AFSGD/W7QX4J2lsvaA8NvQCdiuL27IRzzpKO6FhpOjj25mfcInqV8rBl40DwmYhmRdkims1AAu47BQ==
-X-Received: by 2002:a1c:3e84:: with SMTP id
- l126-v6mr5546933wma.91.1543782264458; 
- Sun, 02 Dec 2018 12:24:24 -0800 (PST)
+ bh=+V2WbDnTTYDb5DheTPlD4ID/xDgu/F+Pl9HjYjs8x9s=;
+ b=rljlA3VfPe0L2kCXhFv9AQdhtGeIvlz9hX6B/8mVwH0wmFGO3vhYZNvuwJWJTUqEA/
+ wnPMYvi10sq+QwuZu+d+PIYCtnGiYkmb+y8LItFB1g11b33TaZNOAhU9KNBAPoMW6kt6
+ BZiHJg+tS5GwTwkEpyiC4v5yPTYfG2aKB50jWql+7uEOwyU7Djm/pnYpLByIip9Y4V/q
+ B6RZJ0gbqH7cVqHuWXWxVniZ6MP95AxZDdjsIsLS7ReK9qwct8HomVzWumdp5Zu2UOnn
+ o3cFiHwvnyFTv6VkFdLXLOiQ2N0hA5FWAa6+q969xz5wRcada3WIiJhwrq3oEPzD0Hqh
+ oqwQ==
+X-Gm-Message-State: AA+aEWY9znkARZTwxWDWSWkF5Tnv1ECjgAdBTZW9XtgSLhbbqbCIC7dc
+ KhjAN7NSBojleRgRaGdTY/k=
+X-Google-Smtp-Source: AFSGD/UvqSUUDOejX6SjyUwczTcah8rkFmvGhQoVogLPun72q5lzEFpLT8WIyylrx395yFeAiioYlQ==
+X-Received: by 2002:a5d:61c4:: with SMTP id q4mr11112960wrv.308.1543782253959; 
+ Sun, 02 Dec 2018 12:24:13 -0800 (PST)
 Received: from ThinkPad.home ([185.219.177.152])
- by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.22
+ by smtp.gmail.com with ESMTPSA id l3sm14451510wma.44.2018.12.02.12.24.12
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 12:24:23 -0800 (PST)
+ Sun, 02 Dec 2018 12:24:13 -0800 (PST)
 From: Mesih Kilinc <mesihkilinc@gmail.com>
 To: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, linux-clk@vger.kernel.org,
  linux-gpio@vger.kernel.org, linux-sunxi@googlegroups.com
-Subject: [PATCH v6 08/17] dt-bindings: timer: Add Allwinner suniv timer
-Date: Sun,  2 Dec 2018 23:23:42 +0300
-Message-Id: <50f5d37e67d9aaf88c911aa614a7a520a9179996.1543781680.git.mesihkilinc@gmail.com>
+Subject: [PATCH v6 02/17] dt-bindings: arm: Add new Allwinner ARMv5 F1C100s SoC
+Date: Sun,  2 Dec 2018 23:23:36 +0300
+Message-Id: <6fa3cf509379a0888388821eef3e322c014df5b8.1543781680.git.mesihkilinc@gmail.com>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <cover.1543781680.git.mesihkilinc@gmail.com>
 References: <cover.1543781680.git.mesihkilinc@gmail.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_122427_551149_77FAD9C6 
-X-CRM114-Status: GOOD (  12.83  )
+X-CRM114-CacheID: sfid-20181202_122427_522298_D890ECD1 
+X-CRM114-Status: GOOD (  11.61  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -112,31 +110,25 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add compatible string for Allwinner suniv timer which is similar to
-sun4i timer.
+Add new Allwinner ARMv5 F1C100s SoC's compatible string
 
 Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 Acked-by: Maxime Ripard <maxime.ripard@bootlin.com>
 Reviewed-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-index 5c2e235..3da9d51 100644
---- a/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/allwinner,sun4i-timer.txt
-@@ -2,7 +2,9 @@ Allwinner A1X SoCs Timer Controller
- 
- Required properties:
- 
--- compatible : should be "allwinner,sun4i-a10-timer"
-+- compatible : should be one of the following:
-+              "allwinner,sun4i-a10-timer"
-+              "allwinner,suniv-f1c100s-timer"
- - reg : Specifies base physical address and size of the registers.
- - interrupts : The interrupt of the first timer
- - clocks: phandle to the source clock (usually a 24 MHz fixed clock)
+diff --git a/Documentation/devicetree/bindings/arm/sunxi.txt b/Documentation/devicetree/bindings/arm/sunxi.txt
+index e4beec3..f9ddc05 100644
+--- a/Documentation/devicetree/bindings/arm/sunxi.txt
++++ b/Documentation/devicetree/bindings/arm/sunxi.txt
+@@ -18,4 +18,5 @@ using one of the following compatible strings:
+   allwinner,sun8i-v3s
+   allwinner,sun9i-a80
+   allwinner,sun50i-a64
++  allwinner,suniv-f1c100s
+   nextthing,gr8
 -- 
 2.7.4
 
