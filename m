@@ -2,73 +2,88 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CE23BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:46:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25148C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:16 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9943D20864
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:46:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E626D20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OuBzM/oN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9943D20864
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.us
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jBnM5VzM";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="BJ+WSKMK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E626D20850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=3enOsxRXg0aDC6/Ivb7syHqjlhLbaYfwR5Y7UGgSS+g=; b=OuB
-	zM/oNyer0hXhtA8pFe/Kv0gB1k4ut+J5IH3ufL2ZZFXQcUGPQnDt4fK9Ki1qpdpcMIIXUYZfgmbJc
-	lOQuD6UswEr1lEEvvmJyl/Z+Inm5xptMHs87g3CgcDp41b+XZ2COtOH5bmOv8wCisebg/VIj1hRda
-	9vN1q6XFM/6beNcNjvy2CJfWxKJ4qZ23U7MOHk77mARWuvdHXUNgHEyDSPQnSDbiabnH5gjo02dDF
-	J5pvYGj9ptX+TeJB9mP5ZKZRPMX6ENn8vvNCsPspRDO45nLV3sxgvNmk+Q128X2UQr8NaJ9QdlmKK
-	5zwMiewXY5GOzuntie5Uhz63WdPx1SQ==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=mfNCD8nqNPdgOkh07+74s+ji4F4vhJV3OWqz45QR1JI=; b=jBnM5VzMxL1DxgCqemgknbIxOA
+	3OziS+BFOl0xeKlSm9HcCyEPEgVt1RdMfMbU+StkbCF9owXG0kPG7io/MmDKOHWbbVtbFR7arZ4c4
+	kNg1bv5ivPq4/MOmK7hIn9oTm9L8Rsbp6olmBjawck8Oud9Gbg1BfuUz601Ps8OChg7++B0nfkBWj
+	ZNdbCNfU6o7da2QVmyqb2oDmsb5Gmv/lYREmJ0zAuOzIWuTjrAv96ybgETQrLmI9L+RiWKpt2qbZE
+	Nc1lXRAs+IC5U9ik31dIS0HaaxZPf+d22w4+AbGwxE3hW+b9UY3FFBxY/DrwCc1NRBHEbnaKrSMKy
+	Vu8GsS4g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTwyw-0007lR-LJ; Mon, 03 Dec 2018 22:46:26 +0000
-Received: from mout.gmx.net ([212.227.15.18])
+	id 1gTx7S-0002xL-II; Mon, 03 Dec 2018 22:55:14 +0000
+Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTwys-0007k9-TE
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:46:25 +0000
-Received: from qcai.nay.com ([66.187.233.206]) by mail.gmx.com (mrgmx003
- [212.227.17.184]) with ESMTPSA (Nemesis) id 0MMjgF-1gZifp0J7X-008Yqq; Mon, 03
- Dec 2018 23:45:58 +0100
-From: Qian Cai <cai@gmx.us>
-To: mark.rutland@arm.com,
-	marc.zyngier@arm.com
-Subject: [PATCH v2] clocksource/arm_arch_timer: fix a lockdep warning
-Date: Mon,  3 Dec 2018 17:45:21 -0500
-Message-Id: <1543877121-4098-1-git-send-email-cai@gmx.us>
-X-Mailer: git-send-email 1.8.3.1
-X-Provags-ID: V03:K1:mPronifC4t5JDwHNkpMd3JGH1V/ug1P1l6n5sK0eVUFfGALXibc
- eYAsAzr8WfoZ1BceoyjNEyrKxz4YYVnOP+XWmU0IZds02+QOomUDr/J2827elRcX0CvS8v1
- RGnRMSKnFeRPL/ICXplz74d5Jl2iFs3Rdeecp+Lqu670Fn/TEMflkchwNyEzcskq1eqUC4B
- hn2VFTo52enb+HXXyS0iA==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:rZZpkZY15Ng=:Sh0VFLRGZq0mQvNXgR6FD/
- mWOMVEzBekAMLwVKtL51N+6DsmcUxCt0uIXafERRppOA2pBR+iMFoPNN/keIdjyA8YQ/SUBSQ
- j6hHMoUhhujPy1uB/MhEL3vxRMWsT2+w7Zo3ue3TGzBKDElnxZvvbUcTOfLF3Q2k7HTo2H71m
- FLhu4g5Y/2bM6ykX8kfXfmDMkQZDwA5mGjwtypz2XGg6EUjlEu2nxyRTPjRdxQZ5agV3Ze7f4
- zz2ExbrhFQK471YHBL2pVYTdh3ZMeUkdNS2ten5x2RcoE9DUOR0BR733ee8+jbc8j0WAPsHax
- 1ap07/+IT4cN24+j3XtpKvOu7Pb6Gb4DlBRbrZZQzENDFCMx1EGL1B1LsjoR1JRSN8UXT1GDW
- p/w3YYFzOR9AGrt4v8LQzhc8XbvXPoqXS5cWn5EVM7k0NZmQ2wIzjGRojdFoNo+RySMYiN/MG
- /aVG+ElOOStnLyfD+ehplpxH0rwUevAmINm89zUOcM5qaIw0hYCygNh1GFQmdRBccOyr41cT8
- LBWtds1/vp7QtsO9c+JnDKPpyucTeqGUWlU8uuD5Bxsq6COn+05OP9Ctfg2FKWnXwGeppMOEA
- xBUKftRrmFSZQDjOEO0+pdsMTD9s4H61x1AXrOXvJE4xGnmLbI8lXft39cA+PGQHiV0j+WmzA
- LbTcZ0/FqbSCjZRQEyh/YXwa2KE8i8ZHTz4NvbUDffFIh60shbwmNrqmvCqwowil8vWWwq4jm
- NPCmgDJIcgMHAzsohz/sJc1xnosFJ+R7/t7ttHAvjK0t79MPpRPjlZABFDPRNYh1JixgmBOms
- luwdTSFqfUFaysYUlTlH+e/CbmXqkB+sdahroKHoRywCKChFUKdIQZdguODliiiv79739NOIy
- Oj/AJujuPR18D+fSYqInVz0BbZZSX3ezJ2kj6kcps=
+ id 1gTx7O-0001nY-7S
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:55:12 +0000
+Received: by mail-pl1-x644.google.com with SMTP id k8so7204193pls.11
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 14:55:04 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id:in-reply-to:references;
+ bh=ydPIIvwp7JBz3247k2TeCqAjfpttVF2V+RHCfDoclY8=;
+ b=BJ+WSKMKAaHZf2+4NraETCCroz5ZYFkeg7hzQcVhbUvs5kFkaYaHaPovFfb2Dl1o2E
+ 3tM4XYu2uvdnzDFHNw20UtCragB4YutmTQLcBv7NTHRL2V7tWeOZ5hqc0cDsoxuaEwDF
+ IFLPf7+NltDmTQRQXUAumL8Z+dsQLpeLzG6Rg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
+ :references;
+ bh=ydPIIvwp7JBz3247k2TeCqAjfpttVF2V+RHCfDoclY8=;
+ b=jF2hZkRjZmyQBFmM9zjpx1xeEZasEjyvAHpuba4SBUrs3ReY7kJJOPYqjZgyDF/3H6
+ gV9zCQpAkvt/91FZ/YsZqd+cVQmY3lysPy5aZXZvuRgJm0DDh59J+Chg7Ac7dQArw3VX
+ /n2fJn1af2sNhkB7FtlzE1veUzs2g73zxf2yGWVBVVSIQs95TZNF6xbVYR/PEnlmLeG1
+ d/PhwlcXOzC+Ba4wv3OJLhIeRc7SQIKxjn2JyKHsYnp3SRLDh+bBabadbkqVDaoo3Xbb
+ ud/zdDFwOJ/bYD5UK6uJSSmmOcFBgvpW3SLIgQlK+ERlYQ0vFAGtLXAX0J7qPbAUKepI
+ n64Q==
+X-Gm-Message-State: AA+aEWbGL66QkyDyzxhH46VT8FA++l4wHu27Mc931f5r9ksLamzEsesr
+ WDN4/idBo0vY3RBNxs9C1x+4eg==
+X-Google-Smtp-Source: AFSGD/X0pmtSDJa2m49+mPes1pivflZajBQeWuxa06nBHxcJRs0N3lg6W5gdr8GHLrOiLl3o4FCF3w==
+X-Received: by 2002:a17:902:6e16:: with SMTP id
+ u22mr17497150plk.175.1543877703950; 
+ Mon, 03 Dec 2018 14:55:03 -0800 (PST)
+Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
+ [68.147.8.254])
+ by smtp.gmail.com with ESMTPSA id v9sm20933057pfg.144.2018.12.03.14.55.02
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
+ Mon, 03 Dec 2018 14:55:03 -0800 (PST)
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+To: acme@kernel.org,
+	peterz@infradead.org,
+	gregkh@linuxfoundation.org
+Subject: [PATCH v5 3/6] perf/aux: Make perf_event accessible to setup_aux()
+Date: Mon,  3 Dec 2018 15:54:53 -0700
+Message-Id: <1543877696-17174-4-git-send-email-mathieu.poirier@linaro.org>
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_144623_238646_299355F5 
-X-CRM114-Status: GOOD (  10.58  )
+X-CRM114-CacheID: sfid-20181203_145510_277064_1753C89C 
+X-CRM114-Status: GOOD (  17.20  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -80,95 +95,165 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Qian Cai <cai@gmx.us>, peterz@infradead.org, daniel.lezcano@linaro.org,
- linux-kernel@vger.kernel.org, longman@redhat.com, tglx@linutronix.de,
- mingo@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org,
+ alexander.shishkin@linux.intel.com, will.deacon@arm.com,
+ heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
+ mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
+ schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
+ suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Booting this Huawei TaiShan 2280 arm64 server generated this lockdep
-warning.
+When pmu::setup_aux() is called the coresight PMU needs to know which
+sink to use for the session by looking up the information in the
+drv_config field of the hw_perf_event structure.
 
-[    0.000000]  lockdep_assert_cpus_held+0x50/0x60
-[    0.000000]  static_key_enable_cpuslocked+0x30/0xe8
-[    0.000000]  arch_timer_check_ool_workaround+0x128/0x2d0
-[    0.000000]  arch_timer_acpi_init+0x274/0x6ac
-[    0.000000]  acpi_table_parse+0x1ac/0x218
-[    0.000000]  __acpi_probe_device_table+0x164/0x1ec
-[    0.000000]  timer_probe+0x1bc/0x254
-[    0.000000]  time_init+0x44/0x98
-[    0.000000]  start_kernel+0x4ec/0x7d4
+As such simply replace the cpu information by the complete perf_event
+structure and change all affected customers.
 
-This is due to the commit cb538267ea1e ("jump_label/lockdep: Assert we hold
-the hotplug lock for _cpuslocked() operations").
-
-Since it is applying a global workaround to all CPUs here, it did not hold
-any CPU locks in this path.
-
-arch_timer_acpi_init
-  arch_timer_check_ool_workaround(ate_match_acpi_oem_info, table)
-    arch_timer_enable_workaround(wa, local = false)
-      for_each_possible_cpu()
-	per_cpu()
-
-When hot-add a CPU, it will go with a slightly different route.
-
-arch_timer_starting_cpu
-  __arch_timer_setup
-    arch_timer_check_ool_workaround(ate_match_local_cap_id, NULL)
-      arch_timer_enable_workaround(wa, local = true)
-        __this_cpu_write()
-
-Hence, deal with them differently.
-
-Fixes: 450f9689f294 (clocksource/arm_arch_timer: Use
-	static_branch_enable_cpuslocked())
-Signed-off-by: Qian Cai <cai@gmx.us>
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
+ arch/s390/kernel/perf_cpum_sf.c                  | 6 +++---
+ arch/x86/events/intel/bts.c                      | 4 +++-
+ arch/x86/events/intel/pt.c                       | 5 +++--
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 6 +++---
+ drivers/perf/arm_spe_pmu.c                       | 6 +++---
+ include/linux/perf_event.h                       | 2 +-
+ kernel/events/ring_buffer.c                      | 2 +-
+ 7 files changed, 17 insertions(+), 14 deletions(-)
 
-Changes since v1:
-* Fixed the root cause instead of a workaround.
-
- drivers/clocksource/arm_arch_timer.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 9a7d4dc00b6e..81dca7d31d13 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -492,18 +492,21 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
+diff --git a/arch/s390/kernel/perf_cpum_sf.c b/arch/s390/kernel/perf_cpum_sf.c
+index 7bf604ff50a1..df92c2af99b6 100644
+--- a/arch/s390/kernel/perf_cpum_sf.c
++++ b/arch/s390/kernel/perf_cpum_sf.c
+@@ -1600,7 +1600,7 @@ static void aux_sdb_init(unsigned long sdb)
  
- 	if (local) {
- 		__this_cpu_write(timer_unstable_counter_workaround, wa);
-+
-+		/*
-+		 * Use the locked version, as we're called from the CPU
-+		 * hotplug framework. Otherwise, we end-up in
-+		 * deadlock-land.
-+		 */
-+		static_branch_enable_cpuslocked(&arch_timer_read_ool_enabled);
- 	} else {
- 		for_each_possible_cpu(i)
- 			per_cpu(timer_unstable_counter_workaround, i) = wa;
-+		/* A global workaround is not on the CPU hotplug path. */
-+		static_branch_enable(&arch_timer_read_ool_enabled);
+ /*
+  * aux_buffer_setup() - Setup AUX buffer for diagnostic mode sampling
+- * @cpu:	On which to allocate, -1 means current
++ * @event:	Event the buffer is setup for, event->cpu == -1 means current
+  * @pages:	Array of pointers to buffer pages passed from perf core
+  * @nr_pages:	Total pages
+  * @snapshot:	Flag for snapshot mode
+@@ -1612,8 +1612,8 @@ static void aux_sdb_init(unsigned long sdb)
+  *
+  * Return the private AUX buffer structure if success or NULL if fails.
+  */
+-static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
+-			      bool snapshot)
++static void *aux_buffer_setup(struct perf_event *event, void **pages,
++			      int nr_pages, bool snapshot)
+ {
+ 	struct sf_buffer *sfb;
+ 	struct aux_buffer *aux;
+diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
+index 24ffa1e88cf9..7139f6bf27ad 100644
+--- a/arch/x86/events/intel/bts.c
++++ b/arch/x86/events/intel/bts.c
+@@ -77,10 +77,12 @@ static size_t buf_size(struct page *page)
+ }
+ 
+ static void *
+-bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
++bts_buffer_setup_aux(struct perf_event *event, void **pages,
++		     int nr_pages, bool overwrite)
+ {
+ 	struct bts_buffer *buf;
+ 	struct page *page;
++	int cpu = event->cpu;
+ 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
+ 	unsigned long offset;
+ 	size_t size = nr_pages << PAGE_SHIFT;
+diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
+index 3a0aa83cbd07..f7ec5c5fbf0a 100644
+--- a/arch/x86/events/intel/pt.c
++++ b/arch/x86/events/intel/pt.c
+@@ -1104,10 +1104,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
+  * Return:	Our private PT buffer structure.
+  */
+ static void *
+-pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
++pt_buffer_setup_aux(struct perf_event *event, void **pages,
++		    int nr_pages, bool snapshot)
+ {
+ 	struct pt_buffer *buf;
+-	int node, ret;
++	int node, ret, cpu = event->cpu;
+ 
+ 	if (!nr_pages)
+ 		return NULL;
+diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+index abe8249b893b..f21eb28b6782 100644
+--- a/drivers/hwtracing/coresight/coresight-etm-perf.c
++++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+@@ -177,15 +177,15 @@ static void etm_free_aux(void *data)
+ 	schedule_work(&event_data->work);
+ }
+ 
+-static void *etm_setup_aux(int event_cpu, void **pages,
++static void *etm_setup_aux(struct perf_event *event, void **pages,
+ 			   int nr_pages, bool overwrite)
+ {
+-	int cpu;
++	int cpu = event->cpu;
+ 	cpumask_t *mask;
+ 	struct coresight_device *sink;
+ 	struct etm_event_data *event_data = NULL;
+ 
+-	event_data = alloc_event_data(event_cpu);
++	event_data = alloc_event_data(cpu);
+ 	if (!event_data)
+ 		return NULL;
+ 	INIT_WORK(&event_data->work, free_event_data);
+diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
+index 54ec278d2fc4..4dcd7bf14dcc 100644
+--- a/drivers/perf/arm_spe_pmu.c
++++ b/drivers/perf/arm_spe_pmu.c
+@@ -824,10 +824,10 @@ static void arm_spe_pmu_read(struct perf_event *event)
+ {
+ }
+ 
+-static void *arm_spe_pmu_setup_aux(int cpu, void **pages, int nr_pages,
+-				   bool snapshot)
++static void *arm_spe_pmu_setup_aux(struct perf_event *event, void **pages,
++				   int nr_pages, bool snapshot)
+ {
+-	int i;
++	int i, cpu = event->cpu;
+ 	struct page **pglist;
+ 	struct arm_spe_pmu_buf *buf;
+ 
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 8e69b7e309e7..b772ea2441a7 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -420,7 +420,7 @@ struct pmu {
+ 	/*
+ 	 * Set up pmu-private data structures for an AUX area
+ 	 */
+-	void *(*setup_aux)		(int cpu, void **pages,
++	void *(*setup_aux)		(struct perf_event *event, void **pages,
+ 					 int nr_pages, bool overwrite);
+ 					/* optional */
+ 
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index 4a9937076331..857308295f63 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -658,7 +658,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
+ 			goto out;
  	}
  
- 	/*
--	 * Use the locked version, as we're called from the CPU
--	 * hotplug framework. Otherwise, we end-up in deadlock-land.
--	 */
--	static_branch_enable_cpuslocked(&arch_timer_read_ool_enabled);
--
--	/*
- 	 * Don't use the vdso fastpath if errata require using the
- 	 * out-of-line counter accessor. We may change our mind pretty
- 	 * late in the game (with a per-CPU erratum, for example), so
+-	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
++	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
+ 					     overwrite);
+ 	if (!rb->aux_priv)
+ 		goto out;
 -- 
-1.8.3.1
+2.7.4
 
 
 _______________________________________________
