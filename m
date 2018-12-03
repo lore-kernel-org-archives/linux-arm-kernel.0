@@ -2,65 +2,79 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-15.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	MENTIONS_GIT_HOSTING,SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DA8CAC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:33:41 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E6312C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:34:34 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1DB82087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:33:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B387720850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:34:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="azuL6dfG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1DB82087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sUTkteRl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="TNQcOhBw"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B387720850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=obveOgYX1c1jnLsWfWIDr8IukJjO7BwyyxccGUapE8c=; b=azuL6dfGWn+9+m
-	62d5Tuqhfmz6pcOnljwICci3xxioK50MuFV7djhZ7a3+aqRY7plpNOwwHXxukjwZJL21anQbJuExU
-	xw2TKQrajJUQmRrSDidnBPMR+uhMOxK6qoE8ClEgfBQ4PzsdFENN7YuqelXU+S6A1t9uuL0xPvXZL
-	aJRryZnKOCK68+LzppXk5lYjVzIRPvG2MrFEJD4ccOlvzN5eOQosJTG5LKNc4mWu8uJyx37dHOhUG
-	G0Bi7K3TMqf/X/M1l+L7VirDrjYFyAkaf8P3sxzHwCjlEa+GaC6WjcqpuEl5+q4BKlvEhh2wEeLs4
-	rhdsSYTXBcFk/RPRvsAA==;
+	List-Owner; bh=P/AvNY+AFbBmOc/WnLTKIs+UHRpr7z25ouUjgrZIgww=; b=sUTkteRllrRzpc
+	PgJl5wIzHPwgUlaOWbTmHyJ4DZv1XOHJxK44czPSEn0osCHkHFzskgkoLBhRj3Bod34QeLBalwz00
+	7LUZ05h/t+N4jbbs5kiDMoR0h4QtVe/R3wvJRPMvlJ1O4uzfgbSQUnO8ErZdiYn5xl1Cp2nknZVXC
+	4T1uUW8ELJXTCImUg8j3EoRrTqk5AeQlq52Cv4E1klSNs7HqRfXSzcSTY/0NGZIMbltggUr+2WU7N
+	s3kHawbIYnP0uYZ/hAUlhl94e+FZWxxEuV+uM7YxuwyIuqQEzshyoVFdiYavyLR4xcTN1fdIg5o3c
+	J/qZO4YrpSK+4b0ufy8Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTs69-0005V9-9D; Mon, 03 Dec 2018 17:33:33 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTs65-0005NP-0A; Mon, 03 Dec 2018 17:33:31 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D96311682;
- Mon,  3 Dec 2018 09:33:17 -0800 (PST)
-Received: from e107155-lin (e107155-lin.cambridge.arm.com [10.1.196.42])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 56F5D3F59C;
- Mon,  3 Dec 2018 09:33:09 -0800 (PST)
-Date: Mon, 3 Dec 2018 17:33:06 +0000
-From: Sudeep Holla <sudeep.holla@arm.com>
-To: Atish Patra <atish.patra@wdc.com>
-Subject: Re: [RFT PATCH v1 2/4] dt-binding: cpu-topology: Move cpu-map to a
- common binding.
-Message-ID: <20181203173306.GF17883@e107155-lin>
-References: <1543534100-3654-1-git-send-email-atish.patra@wdc.com>
- <1543534100-3654-3-git-send-email-atish.patra@wdc.com>
- <20181203165521.GB17883@e107155-lin>
- <f902086b-09e1-ad85-d191-137708f5b105@wdc.com>
+	id 1gTs77-00061p-MG; Mon, 03 Dec 2018 17:34:33 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTs74-0005zw-AN
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 17:34:31 +0000
+Received: by mail-it1-x141.google.com with SMTP id c9so9834688itj.1
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 09:34:19 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=Cg+48DoFxNYJ/GCLHItJYQDW72U1S3V3i9H+pqbVQ/0=;
+ b=TNQcOhBwOLixilY4XXq/voa3rZQ+h5VmS4r3l7AO/LCAGBY8RGNGIzpC7PNn8qfDdg
+ 8ksipToTExzXSuG2CFDebsNt2l50Yq2RSt5dEBru4WeQYOe0IwDpXGp6+U5oyhksWXIZ
+ GEPhMa7rBT2NU++94LHq5cEvCTi5n+AaeUswc=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Cg+48DoFxNYJ/GCLHItJYQDW72U1S3V3i9H+pqbVQ/0=;
+ b=iGF8g5EHA0O6b3ClFihqjRGRVafHwd+bC50cFp7CRWCFyDbDCUB4hrY2FbmKWeWPjI
+ G8Edlnxd4mL9yx9kEwBJIXn2kEWFVLWkMv/R70/A9t4IlZEIBAH1Nl8tySp/sUUQEKFv
+ YV61LYPC2hCKNQD7smeUDa4e/CKDrheb9KTRtwJds9DXk0uof6JST5+A5a2gC0INj12t
+ ykJLwdBtRcSqCskU65SPXSiFvhYhQMNRkWaiDs3BBSnGfPH0tR8P5n5gSTPFlWNOMjLk
+ VrFbRnxNPZDIj0w5eN1IM+rqMWxvQGeXC54c6GnMXc39Z8gU7GDBPPVQr5hKW9lFXucM
+ JlIg==
+X-Gm-Message-State: AA+aEWZr/bpZO3LyMbDrQumMcOTf6JKyIbZCBQnhzvJt44rzBLN/+YV0
+ dd0E7BzAD+raeGDclO15LRX9JVDDklOH9a1GYHgzQQ==
+X-Google-Smtp-Source: AFSGD/UJY7hy+sIo2ceMWvwRDc0V4Fs0+oXk9Zab7K5odLmRwTc2hHE5T8DrK/FLkUpw17jXORdym/KlWYzU1u+mCNQ=
+X-Received: by 2002:a05:660c:34f:: with SMTP id
+ b15mr8903651itl.146.1543858459010; 
+ Mon, 03 Dec 2018 09:34:19 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <f902086b-09e1-ad85-d191-137708f5b105@wdc.com>
-User-Agent: Mutt/1.9.4 (2018-02-28)
+References: <1543540924-16321-1-git-send-email-leo.yan@linaro.org>
+In-Reply-To: <1543540924-16321-1-git-send-email-leo.yan@linaro.org>
+From: Mathieu Poirier <mathieu.poirier@linaro.org>
+Date: Mon, 3 Dec 2018 10:34:07 -0700
+Message-ID: <CANLsYkxc21RbNft+k_oBA=4ZPCBr_rhYSV2vxiHceyJH3M6jVw@mail.gmail.com>
+Subject: Re: [PATCH] coresight: cpu-debug: Support for CA73 CPUs
+To: Leo Yan <leo.yan@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_093329_056818_A4DCB5CC 
-X-CRM114-Status: GOOD (  23.11  )
+X-CRM114-CacheID: sfid-20181203_093430_362367_D1CE4EFA 
+X-CRM114-Status: GOOD (  17.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,126 +86,49 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- Albert Ou <aou@eecs.berkeley.edu>, Thomas Gleixner <tglx@linutronix.de>,
- Juri Lelli <juri.lelli@arm.com>, Ard Biesheuvel <ard.biesheuvel@linaro.org>,
- Dmitriy Cherkasov <dmitriy@oss-tech.org>, Anup Patel <anup@brainfault.org>,
- Palmer Dabbelt <palmer@sifive.com>, Will Deacon <will.deacon@arm.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Jeremy Linton <jeremy.linton@arm.com>,
- Morten Rasmussen <morten.rasmussen@arm.com>,
- "Peter Zijlstra \(Intel\)" <peterz@infradead.org>,
- Rob Herring <robh+dt@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Catalin Marinas <catalin.marinas@arm.com>,
- "Rafael J. Wysocki" <rafael@kernel.org>,
- "linux-riscv@lists.infradead.org" <linux-riscv@lists.infradead.org>,
- Ingo Molnar <mingo@kernel.org>,
- "moderated list:ARM64 PORT \(AARCH64 ARCHITECTURE\)"
- <linux-arm-kernel@lists.infradead.org>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 09:23:42AM -0800, Atish Patra wrote:
-> On 12/3/18 8:55 AM, Sudeep Holla wrote:
-> > On Thu, Nov 29, 2018 at 03:28:18PM -0800, Atish Patra wrote:
-> > > cpu-map binding can be used to described cpu topology for both
-> > > RISC-V & ARM. It makes more sense to move the binding to document
-> > > to a common place.
-> > > 
-> > > The relevant discussion can be found here.
-> > > https://lkml.org/lkml/2018/11/6/19
-> > > 
-> > 
-> > Looks good to me apart from a minor query below in the example.
-> > 
-> > Reviewed-by: Sudeep Holla <sudeep.holla@arm.com>
-> > 
-> > > Signed-off-by: Atish Patra <atish.patra@wdc.com>
-> > > ---
-> > >   .../{arm/topology.txt => cpu/cpu-topology.txt}     | 81 ++++++++++++++++++----
-> > >   1 file changed, 67 insertions(+), 14 deletions(-)
-> > >   rename Documentation/devicetree/bindings/{arm/topology.txt => cpu/cpu-topology.txt} (86%)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/cpu/cpu-topology.txt
-> > > similarity index 86%
-> > > rename from Documentation/devicetree/bindings/arm/topology.txt
-> > > rename to Documentation/devicetree/bindings/cpu/cpu-topology.txt
-> > > index 66848355..1de6fbce 100644
-> > > --- a/Documentation/devicetree/bindings/arm/topology.txt
-> > > +++ b/Documentation/devicetree/bindings/cpu/cpu-topology.txt
-> > 
-> > [...]
-> > 
-> > > +Example 3: HiFive Unleashed (RISC-V 64 bit, 4 core system)
-> > > +
-> > > +cpus {
-> > > +	#address-cells = <2>;
-> > > +	#size-cells = <2>;
-> > > +	compatible = "sifive,fu540g", "sifive,fu500";
-> > > +	model = "sifive,hifive-unleashed-a00";
-> > > +
-> > > +	...
-> > > +
-> > > +	cpu-map {
-> > > +		cluster0 {
-> > > +			core0 {
-> > > +				cpu = <&L12>;
-> > > +		 	};
-> > > +			core1 {
-> > > +				cpu = <&L15>;
-> > > +			};
-> > > +			core2 {
-> > > +				cpu0 = <&L18>;
-> > > +			};
-> > > +			core3 {
-> > > +				cpu0 = <&L21>;
-> > > +			};
-> > > +		};
-> > > + 	};
-> > > +
-> > > +	L12: cpu@1 {
-> > > +		device_type = "cpu";
-> > > +		compatible = "sifive,rocket0", "riscv";
-> > > +		reg = <0x1>;
-> > > +	}
-> > > +
-> > > +	L15: cpu@2 {
-> > > +		device_type = "cpu";
-> > > +		compatible = "sifive,rocket0", "riscv";
-> > > +		reg = <0x2>;
-> > > +	}
-> > > +	L18: cpu@3 {
-> > > +		device_type = "cpu";
-> > > +		compatible = "sifive,rocket0", "riscv";
-> > > +		reg = <0x3>;
-> > > +	}
-> > > +	L21: cpu@4 {
-> > > +		device_type = "cpu";
-> > > +		compatible = "sifive,rocket0", "riscv";
-> > > +		reg = <0x4>;
-> > > +	}
-> > > +};
-> > 
-> > The labels for the CPUs drew my attention. Is it intentionally random
-> > (or even specific) or just chosen to show anything can be used as labels ?
-> 
-> SiFive generates the device tree from RTL directly. So I am not sure if they
-> assign random numbers or a particular algorithm chooses the label. I tried
-> to put the exact ones that is available publicly.
-> 
-> https://github.com/riscv/riscv-device-tree-doc/blob/master/examples/sifive-hifive_unleashed-microsemi.dts
+On Thu, 29 Nov 2018 at 18:22, Leo Yan <leo.yan@linaro.org> wrote:
+>
+> This patch is to add the AMBA device ID for CA73 CPU, so that CPU debug
+> module can be initialized successfully when a SoC contain CA73 CPUs.
+>
+> This patch has been verified on 96boards Hikey960.
+>
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  drivers/hwtracing/coresight/coresight-cpu-debug.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-cpu-debug.c b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> index 45b2460..e8819d7 100644
+> --- a/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> +++ b/drivers/hwtracing/coresight/coresight-cpu-debug.c
+> @@ -668,6 +668,10 @@ static const struct amba_id debug_ids[] = {
+>                 .id     = 0x000bbd08,
+>                 .mask   = 0x000fffff,
+>         },
+> +       {       /* Debug for Cortex-A73 */
+> +               .id     = 0x000bbd09,
+> +               .mask   = 0x000fffff,
+> +       },
+>         { 0, 0 },
+>  };
+>
 
-Cool, love that. So you don't have the problem I was trying to explain.
-But I still see the possibility of some other RISC-V vendor copy-pasting
-from here ;). Anyways it's left to you.
+I have picked this up - thanks.
 
---
-Regards,
-Sudeep
+Mathieu
+
+> --
+> 2.7.4
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
