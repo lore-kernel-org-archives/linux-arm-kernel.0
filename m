@@ -2,93 +2,66 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 72FECC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:36:53 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 41BE0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:38:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 435A520850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:36:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1443920850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:38:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kmt3W0c7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="LwDBkBhU"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 435A520850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="sWts6ea/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1443920850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
-	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=BtlbfxxOsNOA93agwzYd2hIxhNn5Exv9tTIqcl6i83w=; b=kmt3W0c712M+88
-	WYM9YD/eeFWobJDC1n0CtQlcwSZ4MEuLkDML2YkGmqKCyBnSN17ScYwPbmOYQLs5P2ypt06efFJO+
-	uu1Mu+o/s0eAIwxGx/9ThflYTUvamjXynDKsb2Vrpz8HLZY4hli6idW4bHJlf1U9cYU4HvFI+gzxm
-	zbzMsGLUCSKrE7+mbgYn57URROvizu4Jjm28XixakAwWZTck2dLgpuQLThEuBmzPvBH2rGgQmmWJk
-	zi4TCCpwYlhN5ulteeiglhWLOCJ8xgB6tpXeg/wqMPRwg246xChT7cOiWoLvTl0lnnVlgPK356Tnl
-	U+kV1vMKuKhnSkwnIPdA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=BOz7Po12SP7LNkVK4vJtaSadb4d+usVT2VCX46r585w=; b=sWts6ea/AdGe1G
+	Qy9fXef8GcMoMuP0NbvZ3R2L0cTM+wZhVbLfPrPw1hsBQYJ/BZWbp1k//ky8yy+W4Y4lGseOHESUY
+	yH4jol+K0uraoZYJdLVialoe4eCiiTdNN3n+M8Tg8h15hSqFFPOaEt4WjcewOmdMDkWRTNV0tDHYI
+	NKWgOf9PA6G1CEjbWSl0KswgxpcOo7AalbOVwUXXYFhjlIKGVOiN0pGNYVSOT09HsX98bq1AeqcBx
+	DamuYMt/1ffe3YVBkVSWfDNli4zZJ5kFB1X6dsRoWEY3XWd4kNh4nAa+Lt3MwjcK+DWyLdp18VA7I
+	ogjgSSKxUiPwUdOu+5Bw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlau-0003ED-8k; Mon, 03 Dec 2018 10:36:52 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlap-0003DM-Jy
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:36:50 +0000
-Received: by mail-wm1-x343.google.com with SMTP id f81so2674872wmd.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:36:37 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=baylibre-com.20150623.gappssmtp.com; s=20150623;
- h=message-id:subject:from:to:cc:date:in-reply-to:references
- :user-agent:mime-version:content-transfer-encoding;
- bh=up5LcSgEp00Z28NCqSzII18i1J7FDVHnKHI1LcaQ96Q=;
- b=LwDBkBhUzLzsiQyW8lPHWGQGrmJiUXwE83VXqUAXoDiQphRD14Eq1+67nHQv+UDsAg
- GOmrIccai+Vj9+3iAPibTN94keNWrOXUSPjj6UpPBouRxFrH52WgCfWcaqD6o7MUzHgv
- j2n2BMpFv8vJNbaeJTm2YTfMP9trEJBL6ZJN9ynSb1IqZkAbNd40U5PxPdN7pwILuoXE
- 3IRxGPFPpYqjT+Zp31h3jTpx0fDyNlzrriIRKEi8gB812OqUO5JJVQG9NQxZaEIEsE4d
- a9AmMZcCk+wim8mIQde31fcW+pgno6Oxeo9UeB9ShuroHlP+LaQplnAOwzhLrTGlOjV7
- GG4g==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
- :references:user-agent:mime-version:content-transfer-encoding;
- bh=up5LcSgEp00Z28NCqSzII18i1J7FDVHnKHI1LcaQ96Q=;
- b=Zo8NCCwhMptnv5tABt40M+M0YUyPhDfQRPD9fz7oIdNAZfey3kW7Gyd8qpq1UkX6u5
- KlJanjFnKqUTbzqrZji9jAPK9XjgNq6KB96F3FSBTiKWCZaXnSAdvSoep6R/xw+VXWDl
- Nkv81O0AeL7cySlLexyPJo6Xc+8NZ+NybCGFdWg2N2Ui4q4+RDF3oBw5w3JO3A1vJZjM
- yzzAYlKAmrizDc8hPWBXGf1ei2VAJdSHtfv3iVcEvRahkuJVTYNxWArzeVYBGxbVnrLb
- Cc2G8VSbv39Z8Bqrf3fzqPscjO7wSjal55RqaiJd3Hto8ZAh0E8uh1C6XiQEoIpT/jfY
- 8QNw==
-X-Gm-Message-State: AA+aEWYzoDmATFfNEM0ChjY1FtamLyZqEf8RL70N3sCBI+IZ3PFGKxxr
- wAVyCseqccFuXo6DuvbrgY+gqA==
-X-Google-Smtp-Source: AFSGD/X5ceD2PIej54vdDDlQaNJ8ZL3HBbzxz9hWOEcqHqqKvssWwQElEL1m32OD4ORNQRaqsLLtYA==
-X-Received: by 2002:a1c:9513:: with SMTP id x19mr7527589wmd.112.1543833394984; 
- Mon, 03 Dec 2018 02:36:34 -0800 (PST)
-Received: from boomer.baylibre.com ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
- by smtp.gmail.com with ESMTPSA id
- k26sm3011479wmi.28.2018.12.03.02.36.33
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 03 Dec 2018 02:36:34 -0800 (PST)
-Message-ID: <f2ceff1edcb2c103d0128a838ff630bb3c147bf5.camel@baylibre.com>
-Subject: Re: [PATCH] pinctrl: meson: fix G12A ao pull registers base address
-From: Jerome Brunet <jbrunet@baylibre.com>
-To: Neil Armstrong <narmstrong@baylibre.com>, Xingyu Chen
- <xingyu.chen@amlogic.com>, linus.walleij@linaro.org,
- linux-gpio@vger.kernel.org
-Date: Mon, 03 Dec 2018 11:36:32 +0100
-In-Reply-To: <a240773f-7b05-d950-e5e9-23d7983c7f35@baylibre.com>
-References: <20181203030533.10989-1-xingyu.chen@amlogic.com>
- <a240773f-7b05-d950-e5e9-23d7983c7f35@baylibre.com>
-User-Agent: Evolution 3.30.2 (3.30.2-2.fc29) 
-Mime-Version: 1.0
+	id 1gTlcX-0003t5-Qx; Mon, 03 Dec 2018 10:38:33 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTlcU-0003sV-6T
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:38:31 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4802880D;
+ Mon,  3 Dec 2018 02:38:18 -0800 (PST)
+Received: from [10.1.197.36] (e112298-lin.cambridge.arm.com [10.1.197.36])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 922B03F59C;
+ Mon,  3 Dec 2018 02:38:16 -0800 (PST)
+Subject: Re: [PATCH v6 08/24] arm64: Unmask PMR before going idle
+To: Mark Rutland <mark.rutland@arm.com>
+References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
+ <1542023835-21446-9-git-send-email-julien.thierry@arm.com>
+ <20181129174436.avqjydyzvv6ubnjd@lakrids.cambridge.arm.com>
+ <9f157e6c-531f-8316-c326-27ff013a489e@arm.com>
+ <20181130133719.zw7wcklqayiebgap@lakrids.cambridge.arm.com>
+From: Julien Thierry <julien.thierry@arm.com>
+Message-ID: <8a4cdfa8-14ad-cd06-60fc-8395a689915e@arm.com>
+Date: Mon, 3 Dec 2018 10:38:14 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.8.0
+MIME-Version: 1.0
+In-Reply-To: <20181130133719.zw7wcklqayiebgap@lakrids.cambridge.arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_023647_656647_1C5D4A67 
-X-CRM114-Status: GOOD (  27.29  )
+X-CRM114-CacheID: sfid-20181203_023830_256038_837F4BEC 
+X-CRM114-Status: GOOD (  29.68  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -100,119 +73,144 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: robh@kernel.org, jianxin.pan@amlogic.com,
- martin.blumenstingl@googlemail.com, khilman@baylibre.com,
- linux-kernel@vger.kernel.org, carlo@caione.org,
- linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org
+Cc: daniel.thompson@linaro.org, marc.zyngier@arm.com, catalin.marinas@arm.com,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org, christoffer.dall@arm.com,
+ james.morse@arm.com, joel@joelfernandes.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 2018-12-03 at 11:27 +0100, Neil Armstrong wrote:
-> Hi Xingyu,
+
+
+On 30/11/18 13:37, Mark Rutland wrote:
+> On Fri, Nov 30, 2018 at 10:55:47AM +0000, Julien Thierry wrote:
+>> On 29/11/18 17:44, Mark Rutland wrote:
+>>> On Mon, Nov 12, 2018 at 11:56:59AM +0000, Julien Thierry wrote:
 > 
+>>>> +	mov	x2, #GIC_PRIO_IRQON
+>>>> +	msr_s	SYS_ICC_PMR_EL1, x2		// unmask PMR
+>>>>  	dsb	sy				// WFI may enter a low-power mode
+>>>
+>>> Is the DSB SY sufficient and necessary to synchronise the update of
+>>> SYS_ICC_PMR_EL1? We don't need an ISB too?
+>>
+>> DSB SY is necessary when we unmask interrupts to make sure that the
+>> redistributor sees the update to PMR before we do WFI. My understanding
+>> is that the resdistributor is free to stop forwarding interrupts to the
+>> CPU interface if from its point of view those interrupts don't have a
+>> high enough priority.
+>>
+>> As for the ISB, I don't think we need one because writes to PMR are
+>> self-synchronizing, so the write to PMR should be seen before DSB SY and
+>> wfi.
 > 
-> On 03/12/2018 04:05, Xingyu Chen wrote:
-> > Since Meson G12A SoC, Introduce new ao registers AO_RTI_PULL_UP_EN_REG
-> > and AO_GPIO_O.
-> > 
-> > These bits of controlling output level are remapped to the new register
-> > AO_GPIO_O, and the AO_GPIO_O_EN_N support only controlling output enable.
-> > 
-> > These bits of controlling pull enable are remapped to the new register
-> > AO_RTI_PULL_UP_EN_REG, and the AO_RTI_PULL_UP_REG support only controlling
-> > pull type(up/down).
-> > 
-> > The new layout of ao gpio/pull registers is as follows:
-> > - AO_GPIO_O_EN_N        [offset: 0x9 << 2]
-> > - AO_GPIO_I             [offset: 0xa << 2]
-> > - AO_RTI_PULL_UP_REG    [offset: 0xb << 2]
-> > - AO_RTI_PULL_UP_EN_REG [offset: 0xc << 2]
-> > - AO_GPIO_O             [offset: 0xd << 2]
-> > 
-> > From above, we can see ao GPIO registers region has been separated by the
-> > ao pull registers. In order to ensure the continuity of the region on
-> > software, the ao GPIO and ao pull registers use the same base address, but
-> > can be identified by the offset.
-> > 
-> > Fixes: 29ae0952e85f ("pinctrl: meson-g12a: add pinctrl driver support")
-> > Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> > Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
-> > ---
-> >  drivers/pinctrl/meson/pinctrl-meson.c | 22 ++++++++++++----------
-> >  1 file changed, 12 insertions(+), 10 deletions(-)
-> > 
-> > diff --git a/drivers/pinctrl/meson/pinctrl-meson.c
-> > b/drivers/pinctrl/meson/pinctrl-meson.c
-> > index 53d449076dee..7ff40cd7a0cb 100644
-> > --- a/drivers/pinctrl/meson/pinctrl-meson.c
-> > +++ b/drivers/pinctrl/meson/pinctrl-meson.c
-> > @@ -31,6 +31,9 @@
-> >   * In some cases the register ranges for pull enable and pull
-> >   * direction are the same and thus there are only 3 register ranges.
-> >   *
-> > + * Since Meson G12A SoC, the ao register ranges for gpio, pull enable
-> > + * and pull direction are the same, so there are only 2 register ranges.
-> > + *
-> >   * For the pull and GPIO configuration every bank uses a contiguous
-> >   * set of bits in the register sets described above; the same register
-> >   * can be shared by more banks with different offsets.
-> > @@ -487,23 +490,22 @@ static int meson_pinctrl_parse_dt(struct
-> > meson_pinctrl *pc,
-> >  		return PTR_ERR(pc->reg_mux);
-> >  	}
-> >  
-> > -	pc->reg_pull = meson_map_resource(pc, gpio_np, "pull");
-> > -	if (IS_ERR(pc->reg_pull)) {
-> > -		dev_err(pc->dev, "pull registers not found\n");
-> > -		return PTR_ERR(pc->reg_pull);
-> > +	pc->reg_gpio = meson_map_resource(pc, gpio_np, "gpio");
-> > +	if (IS_ERR(pc->reg_gpio)) {
-> > +		dev_err(pc->dev, "gpio registers not found\n");
-> > +		return PTR_ERR(pc->reg_gpio);
-> >  	}
-> >  
-> > +	pc->reg_pull = meson_map_resource(pc, gpio_np, "pull");
-> > +	/* Use gpio region if pull one is not present */
-> > +	if (IS_ERR(pc->reg_pull))
-> > +		pc->reg_pull = pc->reg_gpio;
-> > +
-> >  	pc->reg_pullen = meson_map_resource(pc, gpio_np, "pull-enable");
-> >  	/* Use pull region if pull-enable one is not present */
-> >  	if (IS_ERR(pc->reg_pullen))
-> >  		pc->reg_pullen = pc->reg_pull;
-> >  
-> > -	pc->reg_gpio = meson_map_resource(pc, gpio_np, "gpio");
-> > -	if (IS_ERR(pc->reg_gpio)) {
-> > -		dev_err(pc->dev, "gpio registers not found\n");
-> > -		return PTR_ERR(pc->reg_gpio);
-> > -	}
-> > -
-> >  	return 0;
-> >  }
-> >  
-> > 
-> Doesn't it need an update of the bindings ?
-
-Going even further, shouldn't we stop trying make multiple regions out of
-this, and have just one ? 
-
-On all the Amlogic SoC we have seen so far, all the regions a very (VERY)
-close to each other. It seems very unlikely that there something unrelated to
-GPIO in between.
-
-It looks like everything is mostly there in the driver to deal with offset, so
-change would be minimal.
-
-Of course, for  DT stability we will need to carry the legacy, but for newer
-SoC, such as the g12, does it really makes sense to have multiple regions ?
-
+> Having looked at ARM IHI 0069D, 8.1.6 "Observability of the effects of
+> accesses to the GIC registers", I think I agree. 
 > 
-> Neil
+> My specific concern was that a CPU might complete the DSB before the
+> MSR, but I think it's clear per the GIC spec it's clear that an ISB is
+> not expected between the MSR and DSB, even if that's unusual.
+> 
+>>>>  	wfi
+>>>> +	msr_s	SYS_ICC_PMR_EL1, x1		// restore PMR
+>>>
+>>> Likewise, we don't need any barriers here before we poke DAIF?
+>>
+>> Here we don't need DSB SY because the value being restored is either:
+>> - GIC_PRIO_IRQON which is the same as the current value, the
+>> redistributor is already aware of it.
+>> - GIC_PRIO_IRQOFF and the self-synchronization of PMR ensures that no
+>> interrupts with priorities lower than the value of PMR can be taken
+>> (this does not require to be seen by the redistributor).
+>>
+>> For the ISB, I have this small doubt about whether it is needed between
+>> WFI and MSR PMR. But there is this bit in the ARM ARM section D12.1.3
+>> "General behavior of accesses to the AArch64 System registers",
+>> subsection "Synchronization requirements for AArch64 System registers":
+>>
+>> "Direct writes using the instructions in Table D11-2 on page D11-2660
+>> require synchronization before software can rely on the effects of
+>> changes to the System registers to affect instructions appearing in
+>> program order after the direct write to the System register. Direct
+>> writes to these registers are not allowed to affect any instructions
+>> appearing in program order before the direct write."
+>>
+>> ICC_PMR_EL1 is part of the mentioned table.
+> 
+> I think that's a defect in the ARM ARM, given it disagrees with the GIC
+> spec.
+> 
+>> And reordering the direct write to PMR before the WFI would definitely
+>> affect the WFI instruction, so my interpretation is that this would
+>> not be allowed by the architecture. So I don't think we need the ISB
+>> either, but my understanding could be wrong.
+> 
+> We already assume that a DSB can't be re-ordered w.r.t. the WFI, so as
+> long as the DSB can't complete before the MSR, I think we're good.
+> 
+>>>
+>>>> +	msr	daif, x0			// restore I bit
+>>>>  	ret
+>>>>  ENDPROC(cpu_do_idle)
+>>>
+>>> If we build without CONFIG_ARM64_PSEUDO_NMI surely we don't want to emit
+>>> the alternative?
+>>>
+>>> How about we move this to C, and have something like the below?
+>>>
+>>> For the !CONFIG_ARM64_PSEUDO_NMI case it generates identical assembly to the
+>>> existing cpu_do_idle(). Note that I've assumed we don't need barriers, which
+>>> (as above) I'm not certain of.
+>>>
+>>> Thanks,
+>>> Mark.
+>>>
+>>> ---->8----
+>>> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+>>> index 7f1628effe6d..ccd2ad8c5e2f 100644
+>>> --- a/arch/arm64/kernel/process.c
+>>> +++ b/arch/arm64/kernel/process.c
+>>> @@ -73,6 +73,40 @@ EXPORT_SYMBOL_GPL(pm_power_off);
+>>>  
+>>>  void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>>>  
+>>> +static inline void __cpu_do_idle(void)
+>>> +{
+>>> +       /* WFI may enter a low-power mode */
+>>> +       dsb(sy);
+>>> +       wfi();
+>>> +}
+>>> +
+>>> +/*
+>>> + * When using priority masking we need to take extra care, etc.
+>>> + */
+>>> +static inline void __cpu_do_idle_irqprio(void)
+>>> +{
+>>> +       unsigned long flags = arch_local_irq_save();
+>>
+>> The issue with this is that in patch 10, arch_local_irq_* functions
+>> toggle PMR rather than PSR.I.
+>>
+>> I could use local_daif_mask but I don't think disabling debug and async
+>> is good. Otherwise and can do a small bit of  inline assembly and have
+>> something like:
+> 
+> Can we factor out the existing arch_local_irq_save() somehow?
 > 
 
+I'm not sure I understand what you're suggesting. Using individual
+accessors for PMR and PSR.I instead of arch_local_irq_save?
 
+I am just a bit concerned about having too many functions to play with
+either (especially since most of the time those functions end up being
+single use).
+
+Thanks,
+
+-- 
+Julien Thierry
 
 _______________________________________________
 linux-arm-kernel mailing list
