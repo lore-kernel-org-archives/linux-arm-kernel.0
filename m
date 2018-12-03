@@ -2,95 +2,100 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94592C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:06:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 784FAC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:11:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6421A20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:06:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 45EFA20851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:11:00 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OlE/KJ2W";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=ossystems-com-br.20150623.gappssmtp.com header.i=@ossystems-com-br.20150623.gappssmtp.com header.b="WkqbY192"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6421A20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ossystems.com.br
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="S+vcYUX5";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ZmFQoVms";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="ZmFQoVms"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 45EFA20851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:In-Reply-To:
-	References:MIME-Version:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Ei+IbyXBaHfc6mW0sJXeK3hYTSol4+vikFBCC5NwgD8=; b=OlE/KJ2WIPgWX8
-	Ht7BgGV3RgJhFAmXSuY2TT43sAyWpsDphJy7xeGioDHYjcTg6lnmLoEYJdsmcDCCIloUnyouvzvSx
-	aJs9fxQeIDHGkB8ZoIjHGwzTFlLKvpaLXCtS5izS4/wRMiQtQAfX9sbe9wUHB5PCeAlBMo7JNoWyM
-	ozyQzi54d6E3kXdniNBmc8FDUAryZ/Yyr7NgxnPLg4GYhFZ8cNzDUI3xolb6VV4WkxGFzkDb6Ov96
-	FcIiW4HZ8+sgp9f+69629su9Jfa2mZI+ah6RHZjhgKHWxUsU+fjRqZbr8fVV42fZQ8gAglffJKN+t
-	P2X1AJzlKvOe9ncybneQ==;
+	List-Owner; bh=ZCklBe7Q78BHGbRJx3exVGuHjsazdWX3Ta8INBQ1dL8=; b=S+vcYUX5tmBoFD
+	69NdPLSEEpfQhpe8iaGpEelmZig5SoauIoej0TZzsmrreVbM5j3QY9zfM9mAzG76ccNP756cBdg1h
+	SSy9OuMdERAHt/FcmY4Es+CiYmLmUStfHhBGVT3K6NK2JNjvri3xDGjX671vs7jjPlX6wOEfGlrte
+	bHD8Pqh0PUdpe1lVXUhtLLqdt3lpWJggj/NeZyTE1t+9OgTjfiloiOhLETuITdCfUj/0ImT924Sp7
+	68FovsN4nqkOrLjboIh06WiSFqUE8x8sOmgrOflYFBLiCTQz0EZQb4roSLmcWnTPv0eUccgli10Ew
+	TZDMOF9D6n+bQpG3HNaA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTwMR-00051n-SM; Mon, 03 Dec 2018 22:06:39 +0000
-Received: from mail-ot1-x336.google.com ([2607:f8b0:4864:20::336])
+	id 1gTwQW-0006fM-L6; Mon, 03 Dec 2018 22:10:52 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTwMK-00050E-UC
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:06:38 +0000
-Received: by mail-ot1-x336.google.com with SMTP id 40so13209117oth.4
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 14:06:22 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=ossystems-com-br.20150623.gappssmtp.com; s=20150623;
- h=from:mime-version:references:in-reply-to:date:message-id:subject:to
- :cc; bh=kPz2fS32xKXYAczV0ZrE8OqocFQwTPzcdpuQFXv/7DE=;
- b=WkqbY1928xqc9iBMKSMXQoQClKb3Xl9KoNZ6qTygB4NaRobJwkrJQNfBEe/uTeAtiV
- 3pRH4j2/VoxXLZhcIid+7flm92kkqQQepM6yNAotHbrz01jWG3wUgTnGvJOZBYOMup7B
- SjDkoFt+xdFBLxeknoxDipEXDNXjUomoQwVtr4Pju4poKrffri0Gv1mHIrf7cAkqPLZC
- p6PWqghXH0wOhK57Ab5uDmnCc6Q+ovSpsj+UtHIuuHGUDrQ90F2dxuNtZJ+NrMTeYDWd
- mR0EXfV2i2Af+uKK4gkQZ9UckM3Mm3rv/g3ks0uQ8vjSuCcDGDGkThIIGrf1zbV/nhqz
- q4QA==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:mime-version:references:in-reply-to:date
- :message-id:subject:to:cc;
- bh=kPz2fS32xKXYAczV0ZrE8OqocFQwTPzcdpuQFXv/7DE=;
- b=owh0f9W4jUzoIqC8CdmIZcMPkkzQDTTcCH1SPZWEvwYpObnmyk9rWP5BEnAXRBUqmO
- 0JynZiSx9CDUkJK/MFps6nbm5ojm/VtgUNsN1SpXoipgexGemFfC355NNdgoGHU3K/fS
- hE5DM5rwpUIc/eNmWau0VcoHrXAlNRFSQHp6Pd17GPCZj1Wb8DCDTJrG6f03y4IKCb7P
- d46H8eWzJmE5d1XggPlkZNnpnnlnt0OYtWlpWL5+WjM0XZHQL8KuGBNR9eD5/+SnuYh4
- 00fp1fQHKEKGjJffcYdrTtuJKhcklaOAyIqDkM94PdvfFGJR1HgzwuBxYJyVlRQMeba1
- MTNQ==
-X-Gm-Message-State: AA+aEWavGdMhk1MwQ2JZDbKWvvPnuoXGMC6yp2bm5gkP+Slxbqhi/tdK
- kcxxMruuU4tDoN3PfUjyVvnl4EJCMHDQ+Q==
-X-Google-Smtp-Source: AFSGD/XVNxldNs+zoRk5YOvpotgrDMK5udzEznP0rkAeNXQCil/nZ/gr3C67rpFXR2edfo1mkvsUig==
-X-Received: by 2002:a9d:871:: with SMTP id 104mr11226186oty.189.1543874780437; 
- Mon, 03 Dec 2018 14:06:20 -0800 (PST)
-Received: from mail-ot1-f54.google.com (mail-ot1-f54.google.com.
- [209.85.210.54])
- by smtp.gmail.com with ESMTPSA id 102sm7257607otj.65.2018.12.03.14.06.19
- for <linux-arm-kernel@lists.infradead.org>
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 14:06:19 -0800 (PST)
-From: Otavio Salvador <otavio.salvador@ossystems.com.br>
-X-Google-Original-From: Otavio Salvador <otavio@ossystems.com.br>
-Received: by mail-ot1-f54.google.com with SMTP id s5so13194890oth.7
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 14:06:19 -0800 (PST)
-X-Received: by 2002:a9d:1b2c:: with SMTP id l41mr10684052otl.1.1543874778760; 
- Mon, 03 Dec 2018 14:06:18 -0800 (PST)
+ id 1gTwQR-0006eh-OT
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:10:50 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id E025160246; Mon,  3 Dec 2018 22:10:36 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543875036;
+ bh=wzzF/+xrkrPLC2bh8Hg4oY4qj9NdTA4BS+gipVPwm8Y=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ZmFQoVmsr+g0neq+Xl7t/bGqXgRtg9U2EQNzw28bsBW1G/yXjbZCbjdAAQmRqyExw
+ QPLW74OrTSkBUAjNZnk1wgLVPcOno6beJnZde5nTGikVrhqu7IvRyrz9ftZppVbH/g
+ jrL+1smgb4w697cHIljqI16DNg8Qi473EAqKp38o=
+Received: from jcrouse-lnx.qualcomm.com (i-global254.qualcomm.com
+ [199.106.103.254])
+ (using TLSv1.2 with cipher DHE-RSA-AES128-SHA (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: jcrouse@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 22C996019F;
+ Mon,  3 Dec 2018 22:10:35 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543875036;
+ bh=wzzF/+xrkrPLC2bh8Hg4oY4qj9NdTA4BS+gipVPwm8Y=;
+ h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
+ b=ZmFQoVmsr+g0neq+Xl7t/bGqXgRtg9U2EQNzw28bsBW1G/yXjbZCbjdAAQmRqyExw
+ QPLW74OrTSkBUAjNZnk1wgLVPcOno6beJnZde5nTGikVrhqu7IvRyrz9ftZppVbH/g
+ jrL+1smgb4w697cHIljqI16DNg8Qi473EAqKp38o=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 22C996019F
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=jcrouse@codeaurora.org
+Date: Mon, 3 Dec 2018 15:10:33 -0700
+From: Jordan Crouse <jcrouse@codeaurora.org>
+To: Jonathan Marek <jonathan@marek.ca>
+Subject: Re: [Freedreno] [PATCH v3 4/4] ARM: dts: imx5: add gpu nodes
+Message-ID: <20181203221032.GA20602@jcrouse-lnx.qualcomm.com>
+Mail-Followup-To: Jonathan Marek <jonathan@marek.ca>,
+ freedreno@lists.freedesktop.org,
+ Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, 
+ festevam@gmail.com, Sascha Hauer <s.hauer@pengutronix.de>,
+ open list <linux-kernel@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>, Chris.Healy@zii.aero,
+ Pengutronix Kernel Team <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ Shawn Guo <shawnguo@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, 
+ NXP Linux Team <linux-imx@nxp.com>
+References: <20181203211816.5129-1-jonathan@marek.ca>
+ <20181203211816.5129-4-jonathan@marek.ca>
 MIME-Version: 1.0
-References: <20181201193858.20738-1-otavio@ossystems.com.br>
-In-Reply-To: <20181201193858.20738-1-otavio@ossystems.com.br>
-Date: Mon, 3 Dec 2018 20:05:53 -0200
-X-Gmail-Original-Message-ID: <CAP9ODKo62r8ZrHTj9mHvjbhMXHhaLxA8Hak3su4-yV0dAxNY-g@mail.gmail.com>
-Message-ID: <CAP9ODKo62r8ZrHTj9mHvjbhMXHhaLxA8Hak3su4-yV0dAxNY-g@mail.gmail.com>
-Subject: Re: [PATCH] ARM: imx_v6_v7_defconfig: Enable ATH10K SDIO support
-To: Otavio Salvador <otavio@ossystems.com.br>
+Content-Disposition: inline
+In-Reply-To: <20181203211816.5129-4-jonathan@marek.ca>
+User-Agent: Mutt/1.5.21 (2010-09-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_140632_967796_EFADA179 
-X-CRM114-Status: GOOD (  12.46  )
+X-CRM114-CacheID: sfid-20181203_141049_220527_04C0BC1B 
+X-CRM114-Status: GOOD (  16.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -102,34 +107,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>, Russell King <linux@armlinux.org.uk>,
- Kernel development list <linux-kernel@vger.kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, festevam@gmail.com,
+ Sascha Hauer <s.hauer@pengutronix.de>,
+ open list <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Chris.Healy@zii.aero, Pengutronix Kernel Team <kernel@pengutronix.de>,
  Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- linux-arm-kernel@lists.infradead.org
+ freedreno@lists.freedesktop.org,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, NXP Linux Team <linux-imx@nxp.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Sat, Dec 1, 2018 at 5:39 PM Otavio Salvador <otavio@ossystems.com.br> wrote:
-> The use of ATH10K WiFi is becoming common in i.MX based boards,
-> especially on new designs, so enable the driver support as module so
-> it can be used out of box.
->
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+On Mon, Dec 03, 2018 at 04:18:16PM -0500, Jonathan Marek wrote:
+> Signed-off-by: Jonathan Marek <jonathan@marek.ca>
+> ---
+>  arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
+>  arch/arm/boot/dts/imx53.dtsi | 17 +++++++++++++++++
+>  2 files changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index 67d462715..e9a7bbce9 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -628,5 +628,22 @@
+>  				clock-names = "ipg", "ahb";
+>  			};
+>  		};
+> +
+> +		gpu: gpu@30000000 {
+> +			compatible = "amd,imageon-200.1", "amd,imageon";
+> +			reg = <0x30000000 0x20000>;
+> +			reg-names = "kgsl_3d0_reg_memory";
+> +			interrupts = <12>;
+> +			interrupt-names = "kgsl_3d0_irq";
+> +			clocks = <&clks IMX5_CLK_GPU3D_GATE>, <&clks IMX5_CLK_GARB_GATE>;
+> +			clock-names = "core_clk", "mem_iface_clk";
+> +
+> +			qcom,gpu-pwrlevels {
+> +				compatible = "qcom,gpu-pwrlevels";
+> +				qcom,gpu-pwrlevel@0 {
+> +					qcom,gpu-freq = <166250000>;
+> +				};
+> +			};
 
-Please ignore this patch for now, the driver did not work on the
-custom board ... once we get it working, I resend the patch.
+There shouldn't be any incremental cost in the source code to use OPP; it should
+just work. And then this won't give us a further reason to keep the legacy
+code around when we decide to dump any pretense of downstream "compatibility".
 
-Sorry for the noise.
+> +		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index 207eb557c..586d45586 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -838,5 +838,22 @@
+>  			reg = <0xf8000000 0x20000>;
+>  			clocks = <&clks IMX5_CLK_OCRAM>;
+>  		};
+> +
+> +		gpu: gpu@30000000 {
+> +			compatible = "amd,imageon-200.0", "amd,imageon";
+> +			reg = <0x30000000 0x20000>;
+> +			reg-names = "kgsl_3d0_reg_memory";
+> +			interrupts = <12>;
+> +			interrupt-names = "kgsl_3d0_irq";
+> +			clocks = <&clks IMX5_CLK_GPU3D_GATE>, <&clks IMX5_CLK_GARB_GATE>;
+> +			clock-names = "core_clk", "mem_iface_clk";
+> +
+> +			qcom,gpu-pwrlevels {
+> +				compatible = "qcom,gpu-pwrlevels";
+> +				qcom,gpu-pwrlevel@0 {
+> +					qcom,gpu-freq = <200000000>;
+> +				};
 
-Best regards
+Same.
+
+> +			};
+
+> +		};
+>  	};
+>  };
+> -- 
+> 2.17.1
 
 -- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9 9981-7854          Mobile: +1 (347) 903-9750
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
 
 _______________________________________________
 linux-arm-kernel mailing list
