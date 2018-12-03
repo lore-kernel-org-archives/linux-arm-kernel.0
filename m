@@ -2,70 +2,80 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9EC47C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:35:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8450AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:54:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7145420850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:35:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 55B5D2073D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:54:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EgkTNJp8";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NKl+1rjE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7145420850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="oL2bO2+G"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 55B5D2073D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
-	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=vOff/M/1sTKi9ehL8mbD7TumKhM4l5yZYj4OVoQIB6c=; b=EgkTNJp8sFR+We
-	uDgUfdCV4JMVJN78MlTL9dclaYnfpCj+daxRf6T5ps6mNTZ0rQpr8ICuo3LhrughUhTNv0lpHtoOZ
-	/jO3Nc6DIwfC1m/QTqm3ENwyrna0e1I2nkJEfx0Ko50hgmTCXg74wN8f8U0wQiepcf9YLo52johc/
-	nUl7+GGpV4Te8rGequwuZDD0JB1W0YVmdgECNK/ZCCC3omFBT3YaNg2ZOqpRdJMcAxpO5YRs74tGt
-	Qt3SdPmDHUzcu2/wi4lfW28blKAlioCVIYUmjsOQfshzLawfRwX3EvetnzMxkijYJ8STKY2VaOZ9A
-	I3L4fUcpQKl/fmXgHTcw==;
+	List-Owner; bh=V7ijZAg7K9M7QiAaEePoDnVpsvBYhCQas+X05hAiHGY=; b=oL2bO2+GQ6hsCk
+	n9r97QxYpF2sbHNFA/m/MR18splpUH9IhNlIwzvPbujNMBdWaRvsCunf6HRnXhYfGBQkcfx8KxwCh
+	QpTsBc1Mc76M2hCtxgA7A1FpWJXkVCeuvVq6Cr9U6WL2bOkU+If40GcfsH+wiHyLy09YiYFxgjNjn
+	DXOelojAu922ohQYLyGnL2bu8JFnnI4VLjLTu8X+9QGmqXeTahWxPC2c6rJQd2HysyOVY5C0IoSR+
+	IYrwQUnrwuFQnUvGsjZqNu6hm9DQgZmhCQtvdExNx1jMQchYz9fJqSPU5WvepGFZD21ijWivpFhbh
+	eu8MnlzJq6XhxG+LVh6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTxkL-0001xf-Or; Mon, 03 Dec 2018 23:35:25 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gTy2P-0007Fh-4X; Mon, 03 Dec 2018 23:54:05 +0000
+Received: from mail-oi1-f196.google.com ([209.85.167.196])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTxkI-0001aJ-7J
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 23:35:23 +0000
-Received: from localhost (unknown [104.132.0.74])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 2EE2420850;
- Mon,  3 Dec 2018 23:35:11 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543880111;
- bh=sUraBo94mptqp8XTw/adaqoZFeEnJjizpj3C2c03q7s=;
- h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=NKl+1rjEoTgBW1k/Bl7CtJTgIxA/fofNrP1rPo69vzJ57999RuuLyvArSNc/jgHYs
- Z2zItscIgcxZc+J34FtQfzjeNFCDML5s7u9NLf9rspVlTgDcxza1tOCoRr1MamsCo4
- rdtxT41CgezmJ/757/oDy6qops+mkAzyLuma1qrw=
+ id 1gTy2M-0007FA-IX
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 23:54:03 +0000
+Received: by mail-oi1-f196.google.com with SMTP id v6so12673177oif.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 15:53:52 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=Vxw/VIEORO8IfiAyKY5LfMRqYKcFHQdzDTPSpZ5mE5M=;
+ b=msBdFYWuMvEkaeWS10okzLC3W7ghjbC557oqRKvrXM8Yv4Qs4A06OmkDJW6FOx7rQk
+ GorfWm7FfZuZF2K5KyONMVYrcnTqZryadTvu/YbOmnw4Cb8ZhNHh+aOHa71XJfXixVwD
+ 6hn+mC7qzGYqR5ioX/HyUPOqeW8nN8CW5ZvAJYI8cTdtglArptVsWOJnFtxxbMQF7a4D
+ B8HxmgmJZLQScWkGJ3+9GIx8RSFfqU12z1KCavVMMuFXlVEt4P2QVdCiGFBWdLnaxTf9
+ nYnpgO3rmeGppO4wTN9beTIYJKC027i7jPUaSJfA0l+n/zluaTuJtenbvkVc5km3deVa
+ x+cQ==
+X-Gm-Message-State: AA+aEWYoYY0PID08h4dIUByHjP1bFSfirNXSadt6zVQq9Nx3fH9GYgwV
+ S/XrKwAGdRmoYr5rAtvNww==
+X-Google-Smtp-Source: AFSGD/VQ69yWBpbvo2SJ+2H8JHmW9vMAQun9s4tvjSQWC7sDqs/9Z4Cy2WOR8gAT3a1iYCaK13y9oQ==
+X-Received: by 2002:aca:be89:: with SMTP id
+ o131mr10771167oif.164.1543881231831; 
+ Mon, 03 Dec 2018 15:53:51 -0800 (PST)
+Received: from localhost (24-155-109-49.dyn.grandenetworks.net.
+ [24.155.109.49])
+ by smtp.gmail.com with ESMTPSA id c23sm6492066otn.21.2018.12.03.15.53.50
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 03 Dec 2018 15:53:50 -0800 (PST)
+Date: Mon, 3 Dec 2018 17:53:50 -0600
+From: Rob Herring <robh@kernel.org>
+To: Russell King <rmk+kernel@armlinux.org.uk>
+Subject: Re: [RFC PATCH 1/6] dt-bindings: phy: Armada 38x common phy bindings
+Message-ID: <20181203235350.GA5486@bogus>
+References: <20181112122933.GD30658@n2100.armlinux.org.uk>
+ <E1gMBMd-00089D-2Q@rmk-PC.armlinux.org.uk>
 MIME-Version: 1.0
-To: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <20181130105022.GA15388@localhost.localdomain>
-References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
- <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
- <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
- <20181130105022.GA15388@localhost.localdomain>
-Message-ID: <154388011043.88331.6461709079501929390@swboyd.mtv.corp.google.com>
-User-Agent: alot/0.7
-Subject: Re: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and
- provider registrations
-Date: Mon, 03 Dec 2018 15:35:10 -0800
+Content-Disposition: inline
+In-Reply-To: <E1gMBMd-00089D-2Q@rmk-PC.armlinux.org.uk>
+User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_153522_327221_AD219502 
-X-CRM114-Status: GOOD (  37.02  )
+X-CRM114-CacheID: sfid-20181203_155402_611936_CB337FD8 
+X-CRM114-Status: GOOD (  12.91  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,174 +87,30 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
- Daniel Kurtz <djkurtz@chromium.org>, Sebastian Reichel <sre@kernel.org>,
- David Brown <david.brown@linaro.org>, Lee Jones <lee.jones@linaro.org>,
- linux-clk@vger.kernel.org, Rob Herring <robh@kernel.org>,
- Jonathan Corbet <corbet@lwn.net>, Andrey Smirnov <andrew.smirnov@gmail.com>,
- "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
- Russell King <linux@armlinux.org.uk>, Krzysztof Kozlowski <krzk@kernel.org>,
- Chanwoo Choi <cw00.choi@samsung.com>, Andy Gross <andy.gross@linaro.org>,
- Huang Shijie <sjhuang@iluvatar.ai>, Guenter Roeck <linux@roeck-us.net>,
- Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
- linux-arm-msm@vger.kernel.org, linux-soc@vger.kernel.org,
- linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
- Akshu Agrawal <akshu.agrawal@amd.com>, mazziesaccount@gmail.com
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ netdev@vger.kernel.org, Gregory Clement <gregory.clement@bootlin.com>,
+ Kishon Vijay Abraham I <kishon@ti.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Thomas Petazzoni <thomas.petazzoni@free-electrons.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Matti Vaittinen (2018-11-30 02:50:22)
-> Hello Stephen,
+On Mon, 12 Nov 2018 12:30:47 +0000, Russell King wrote:
+> Add the Marvell Armada 38x common phy bindings.
 > 
-> Thanks a bunch for taking the time and reviewing this!
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  .../bindings/phy/phy-armada38x-comphy.txt          | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-armada38x-comphy.txt
 > 
-> On Fri, Nov 30, 2018 at 12:54:10AM -0800, Stephen Boyd wrote:
-> > Quoting Matti Vaittinen (2018-11-13 03:55:58)
-> > > With MFD devices the clk properties may be contained in MFD (parent) DT
-> > > node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
-> > > subdevice not to MFD device (parent). Add
-> > > devm_of_clk_add_hw_provider_parent to tackle this issue.
-> > > 
-> > > Also clkdev registration lacks of managed registration functions and it
-> > > seems few drivers do not drop clkdev lookups at exit. Add
-> > > devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
-> > > releasing at exit.
-> > 
-> > Please split this into clkdev and non-clkdev devm functionality.
-> Allright. I'll split this to two patches.
-> 
-> > > --- a/Documentation/driver-model/devres.txt
-> > > +++ b/Documentation/driver-model/devres.txt
-> > > @@ -238,6 +238,9 @@ CLOCK
-> > >    devm_clk_put()
-> > >    devm_clk_hw_register()
-> > >    devm_of_clk_add_hw_provider()
-> > > +  devm_of_clk_add_parent_hw_provider()
-> > > +  devm_clk_hw_register_clkdev()
-> > > +  devm_clk_release_clkdev()
-> > 
-> > The 'release' or non-common functions shouldn't be documented here.
-> So I will drop the line mentioning devm_clk_release_clkdev()
-> 
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index af011974d4ec..9bb921eb90f6 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
-> > >         of_clk_del_provider(*(struct device_node **)res);
-> > >  }
-> > >  
-> > > -int devm_of_clk_add_hw_provider(struct device *dev,
-> > > +static int __devm_of_clk_add_hw_provider(struct device *dev,
-> > >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-> > >                                               void *data),
-> > > -                       void *data)
-> > > +                       struct device_node *of_node, void *data)
-> > >  {
-> > > -       struct device_node **ptr, *np;
-> > > +       struct device_node **ptr;
-> > >         int ret;
-> > >  
-> > >         ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
-> > > @@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
-> > >         if (!ptr)
-> > >                 return -ENOMEM;
-> > >  
-> > > -       np = dev->of_node;
-> > > -       ret = of_clk_add_hw_provider(np, get, data);
-> > > +       *ptr = of_node;
-> > > +       ret = of_clk_add_hw_provider(of_node, get, data);
-> > >         if (!ret) {
-> > > -               *ptr = np;
-> > 
-> > Why is this moved outside of the if condition?
-> I completely removed the local variable np and just unconditionally set
-> the allocated devres to point at the node (if allocation succeeded). We
-> could of course only do this if the provider registration succeeded and
-> save one assignment - but I guess I intended to remove the curly braces
-> and thus decided to go for one liner after if. But apparently I didn't
-> remove the braces O_o. Well, I can put the assignment inside the
-> condition if you prefer that.
-> 
-> > In fact, why isn't just
-> > the first line in this hunk deleted and passed to this function as
-> > struct device_node *np?
-> 
-> I am sorry but I don't quite follow your suggestion here. Do you mean we
-> could just pass the struct device_node *np in devres_add()? I thought
-> the pointer passed to devress_add() should be allocated using
-> devres_alloc. Can you please elaborate what you mean?
 
-I'm just trying to reduce the diff in the patch.
-
-> 
-> > 
-> > >                 devres_add(dev, ptr);
-> > >         } else {
-> > >                 devres_free(ptr);
-[..]
-> > 
-> > > +int devm_of_clk_add_hw_provider(struct device *dev,
-> > > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-> > > +                                             void *data),
-> > > +                       void *data)
-> > > +{
-> > > +       return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
-> > > +}
-> > >  EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
-> > >  
-> > > +int devm_of_clk_add_parent_hw_provider(struct device *dev,
-> > > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-> > > +                                             void *data),
-> > > +                       void *data)
-> > > +{
-> > > +       return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
-> > 
-> > I'm wondering if we can somehow auto-detect this in
-> > devm_of_clk_add_hw_provider() by looking for #clock-cells in the node.
-> > If it isn't there, then we go to the parent node and look for a
-> > #clock-cells property there in the DT node for that device. Does that
-> > make sense? Then there isn't any new API and we can attach the lifetime
-> > of the devm registration to the presence of the property indicating this
-> > is a clk controller or not.
-> 
-> Huh. I don't know why but building this kind of logic in core is a bit
-> scary to me. I guess I can try implementing something like this - but I
-> am not really a fan of this. (Accidentally) omit the #clock-cells from
-> node and we go to parent node - I am a novice on this area but this
-> sounds like a potential hazard to me. I believe the driver should know
-> if it's properties should be in own or parent node - and if they are
-> not, then there should be no guessing but error. The lifetime is topic
-> where I would like to get information from you who know the kernel
-> better than I do =) But I guess the parent node is there at least as
-> long as the child device is alive. So for me the life time of
-> get-callback is more crucial - but as I said, I don't understand the
-> kernel in details so you probably know it better than me. But please let
-> me know your final take on this and I will follow the guidance =)
-
-Please do the magic instead of adding another API. It makes things
-simpler and will work for this case without having to change anything
-besides of_clk_add_provider().
-
-If the DT doesn't have the #clock-cells property in the node being
-registered then calling clk_get() will fail for any consumer devices
-that point to the node with a phandle and clock specifier. I don't
-expect us to get very far into development if that's the case.
-
-Of course, we don't fail in of_clk_add_provider() if there isn't a
-#clock-cells property in the node, we just happily add the node to the
-provider list and carry on. I doubt anyone is failing to specify the DT
-property, but maybe they are, in which case we could keep not failing
-and just add the node of whatever we're called with originally if
-neither the parent or the passed node have the #clock-cells property. I
-wouldn't try to go any higher than one node above the current node and
-look for a #clock-cells though.
-
-If this all still seems scary then don't worry about it, I'll implement
-it myself.
-
+Reviewed-by: Rob Herring <robh@kernel.org>
 
 _______________________________________________
 linux-arm-kernel mailing list
