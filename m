@@ -2,74 +2,66 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.9 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,UNWANTED_LANGUAGE_BODY,
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 26A37C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:22:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 15D27C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:36:42 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id ECE4720834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:22:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D5BAD20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:36:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SCyJH6qa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ECE4720834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mx1FFcag"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D5BAD20834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
-	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=DHQqUh+QAHUCKkKIGOYN4aW5ox9O+KVwpU3/FtFjTRk=; b=SCyJH6qaPCieGI
-	ktrU8doUBAXlobCLceTfWKZ1vQlIujtPdIRwyM7ng6PoZ039S3VBt8nB90lFahcXnXJif6B3Wbige
-	oxj0hXcNDqKmpgNwrEihlSqq8nPJz+5TMtsH5KUv1uO0Y+C9LSO9cvmmfYPCNhXvULwegoX46MJp7
-	/L50NszcwnKEIYL4cgT23iLAZwAK58Bmg7HygHzv3bZAYsw5as8ZMM4PElcj6WoEaTJcX9/Zlfrrw
-	2VKd1GNfOka0C0NV/sdjIVxtWHbpD5Ggvr3yeyi6DMMkCXgZrDl7X79vogsDbkml0L4WqXQTlm1cy
-	6yeCbeUL/JrojUu0t8QQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=w7jtQTf47+7KkJO+6czmfpOZEi/etfNnOdV0CUTSbKc=; b=mx1FFcag36yoG0
+	1eoM043l+WP1D6NcPyJ1ANFHOWiZTuAnAakxneGMbmscETadOOtRbG44MvQwhhed8dM6+x5cqR9F8
+	i3RDdqjYBk0zC5IDwmfFwenv5hoN7SOdvFrpinYCQkd8edY6tBcOoGHzJk6eNnztlG8R4xm65amWN
+	MwnRVeQQ9nezVZxw3iYtFvgoq0pPcqeH6gMmgnNMRmotwOVbclR6U5Pf+1XL3QWbev7LpW2aXC4Bj
+	+ZbzA2Pb60S/irFs6H3pZLGmFj0AiCmKcJwoUtD+zIkZ9HZlHff/02ooB7Lf1dlMlkNHpoxYxejKM
+	93T6eqmLgcUGOXdxxrPQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTmIv-0008NH-Dz; Mon, 03 Dec 2018 11:22:21 +0000
-Received: from mx07-00178001.pphosted.com ([62.209.51.94])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTmIr-0008CB-Rz
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:22:19 +0000
-Received: from pps.filterd (m0046668.ppops.net [127.0.0.1])
- by mx07-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
- wB3BKhEC027083; Mon, 3 Dec 2018 12:22:02 +0100
-Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
- by mx07-00178001.pphosted.com with ESMTP id 2p3uhmh78w-1
- (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
- Mon, 03 Dec 2018 12:22:02 +0100
-Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
- by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 0BBA431;
- Mon,  3 Dec 2018 11:22:02 +0000 (GMT)
-Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
- by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id E4E441606;
- Mon,  3 Dec 2018 11:22:01 +0000 (GMT)
-Received: from localhost (10.75.127.48) by SFHDAG3NODE2.st.com (10.75.127.8)
- with Microsoft SMTP Server (TLS) id 15.0.1347.2; Mon, 3 Dec 2018 12:22:01
- +0100
-From: Alexandre Torgue <alexandre.torgue@st.com>
-To: Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>, Kevin
- Hilman <khilman@baylibre.com>, <arm@kernel.org>,
- <linux-arm-kernel@lists.infradead.org>
-Subject: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer drivers
-Date: Mon, 3 Dec 2018 12:22:01 +0100
-Message-ID: <1543836121-18799-1-git-send-email-alexandre.torgue@st.com>
-X-Mailer: git-send-email 2.7.4
+	id 1gTmWk-0004ne-QL; Mon, 03 Dec 2018 11:36:38 +0000
+Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTmWh-0004lS-Fp; Mon, 03 Dec 2018 11:36:37 +0000
+X-UUID: 9cd2eccea8954489abae62ad8260c66d-20181203
+X-UUID: 9cd2eccea8954489abae62ad8260c66d-20181203
+Received: from mtkmrs01.mediatek.inc [(172.21.131.159)] by
+ mailgw02.mediatek.com (envelope-from <yt.shen@mediatek.com>)
+ (mhqrelay.mediatek.com ESMTP with TLS)
+ with ESMTP id 714875319; Mon, 03 Dec 2018 19:36:28 +0800
+Received: from mtkcas08.mediatek.inc (172.21.101.126) by
+ mtkmbs03n2.mediatek.inc (172.21.101.182) with Microsoft SMTP Server (TLS) id
+ 15.0.1395.4; Mon, 3 Dec 2018 19:36:26 +0800
+Received: from mtkslt301.mediatek.inc (10.21.14.114) by mtkcas08.mediatek.inc
+ (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via
+ Frontend Transport; Mon, 3 Dec 2018 19:36:26 +0800
+From: YT Shen <yt.shen@mediatek.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>
+Subject: [PATCH 4/8] arm64: dts: add spi nodes for MT2712
+Date: Mon, 3 Dec 2018 19:35:58 +0800
+Message-ID: <1543836962-18293-5-git-send-email-yt.shen@mediatek.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1543836962-18293-1-git-send-email-yt.shen@mediatek.com>
+References: <1543836962-18293-1-git-send-email-yt.shen@mediatek.com>
 MIME-Version: 1.0
-X-Originating-IP: [10.75.127.48]
-X-ClientProxiedBy: SFHDAG7NODE2.st.com (10.75.127.20) To SFHDAG3NODE2.st.com
- (10.75.127.8)
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-03_06:, , signatures=0
+X-TM-SNTS-SMTP: E2A0513212962A709977EADCA740F84B8B21384915524F0B04FB52814DD1B4F42000:8
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_032218_285176_CD2F8DA5 
+X-CRM114-CacheID: sfid-20181203_033635_654768_3A56CC1A 
 X-CRM114-Status: UNSURE (   8.63  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
@@ -83,85 +75,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Alexandre Torgue <alexandre.torgue@st.com>,
- Maxime Coquelin <mcoquelin.stm32@gmail.com>
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ srv_heupstream@mediatek.com, linux-kernel@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ YT Shen <yt.shen@mediatek.com>, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: Fabrice Gasnier <fabrice.gasnier@st.com>
-
-This enables drivers for STM32 timer, low power timer and analog hardware
-that can be used on STM32MP1 SoC:
-- Timer & LP Timer MFD core, PWM, trigger & encoder drivers
-- IIO ADC/DAC/DFSDM
-- vrefbuf regu driver (voltage reference buffer).
-
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
-
+Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 65 +++++++++++++++++++++++++++++++
+ 1 file changed, 65 insertions(+)
 
-Hi Arnd, Olof and Kevin,
-
-Can you please merge this patch for v4.21?
-
-Thanks in advance
-Alex
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 1c76168..b2d1f18 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -522,6 +522,7 @@ CONFIG_MFD_TPS65217=y
- CONFIG_MFD_TPS65218=y
- CONFIG_MFD_TPS6586X=y
- CONFIG_MFD_TPS65910=y
-+CONFIG_MFD_STM32_LPTIMER=m
- CONFIG_REGULATOR_ACT8865=y
- CONFIG_REGULATOR_ACT8945A=y
- CONFIG_REGULATOR_ANATOP=y
-@@ -552,6 +553,7 @@ CONFIG_REGULATOR_RK808=y
- CONFIG_REGULATOR_RN5T618=y
- CONFIG_REGULATOR_S2MPS11=y
- CONFIG_REGULATOR_S5M8767=y
-+CONFIG_REGULATOR_STM32_VREFBUF=m
- CONFIG_REGULATOR_TI_ABB=y
- CONFIG_REGULATOR_TPS51632=y
- CONFIG_REGULATOR_TPS62360=y
-@@ -914,14 +916,20 @@ CONFIG_AT91_SAMA5D2_ADC=m
- CONFIG_BERLIN2_ADC=m
- CONFIG_CPCAP_ADC=m
- CONFIG_EXYNOS_ADC=m
-+CONFIG_STM32_ADC_CORE=m
-+CONFIG_STM32_ADC=m
-+CONFIG_STM32_DFSDM_ADC=m
- CONFIG_VF610_ADC=m
- CONFIG_XILINX_XADC=y
-+CONFIG_STM32_LPTIMER_CNT=m
-+CONFIG_STM32_DAC=m
- CONFIG_MPU3050_I2C=y
- CONFIG_CM36651=m
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
- CONFIG_AK8975=y
- CONFIG_IIO_HRTIMER_TRIGGER=y
-+CONFIG_IIO_STM32_LPTIMER_TRIGGER=m
- CONFIG_PWM=y
- CONFIG_PWM_ATMEL=m
- CONFIG_PWM_ATMEL_HLCDC_PWM=m
-@@ -935,6 +943,8 @@ CONFIG_PWM_RENESAS_TPU=y
- CONFIG_PWM_ROCKCHIP=m
- CONFIG_PWM_SAMSUNG=m
- CONFIG_PWM_STI=y
-+CONFIG_PWM_STM32=m
-+CONFIG_PWM_STM32_LP=m
- CONFIG_PWM_SUN4I=y
- CONFIG_PWM_TEGRA=y
- CONFIG_PWM_VT8500=y
+diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+index 7bac8b6..4843376 100644
+--- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
+@@ -463,6 +463,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	spi0: spi@1100a000 {
++		compatible = "mediatek,mt2712-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0x1100a000 0 0x100>;
++		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL2_D4>,
++			 <&topckgen CLK_TOP_SPI_SEL>,
++			 <&pericfg CLK_PERI_SPI0>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		status = "disabled";
++	};
++
+ 	i2c3: i2c@11010000 {
+ 		compatible = "mediatek,mt2712-i2c";
+ 		reg = <0 0x11010000 0 0x90>,
+@@ -508,6 +521,58 @@
+ 		status = "disabled";
+ 	};
+ 
++	spi2: spi@11015000 {
++		compatible = "mediatek,mt2712-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0x11015000 0 0x100>;
++		interrupts = <GIC_SPI 284 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL2_D4>,
++			 <&topckgen CLK_TOP_SPI_SEL>,
++			 <&pericfg CLK_PERI_SPI2>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		status = "disabled";
++	};
++
++	spi3: spi@11016000 {
++		compatible = "mediatek,mt2712-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0x11016000 0 0x100>;
++		interrupts = <GIC_SPI 285 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL2_D4>,
++			 <&topckgen CLK_TOP_SPI_SEL>,
++			 <&pericfg CLK_PERI_SPI3>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		status = "disabled";
++	};
++
++	spi4: spi@10012000 {
++		compatible = "mediatek,mt2712-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0x10012000 0 0x100>;
++		interrupts = <GIC_SPI 286 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL2_D4>,
++			 <&topckgen CLK_TOP_SPI_SEL>,
++			 <&infracfg CLK_INFRA_AO_SPI0>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		status = "disabled";
++	};
++
++	spi5: spi@11018000 {
++		compatible = "mediatek,mt2712-spi";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0 0x11018000 0 0x100>;
++		interrupts = <GIC_SPI 287 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&topckgen CLK_TOP_UNIVPLL2_D4>,
++			 <&topckgen CLK_TOP_SPI_SEL>,
++			 <&pericfg CLK_PERI_SPI5>;
++		clock-names = "parent-clk", "sel-clk", "spi-clk";
++		status = "disabled";
++	};
++
+ 	uart4: serial@11019000 {
+ 		compatible = "mediatek,mt2712-uart",
+ 			     "mediatek,mt6577-uart";
 -- 
-2.7.4
+1.9.1
 
 
 _______________________________________________
