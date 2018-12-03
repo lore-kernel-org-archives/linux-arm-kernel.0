@@ -2,96 +2,65 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 16237C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:33:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E56A2C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:38:05 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DC5AF2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:33:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B655620850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:38:05 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RdxyIF3m";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="QagPSgNx"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DC5AF2087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Eh6PpEBo"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B655620850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=HDd0CK3HjLU0i/DkEixUHQUw/uXbmKwTzj1nVVQhjbA=; b=RdxyIF3mRe+Nko
-	FqqMxAkhqRTPfyufL/NJg6OuEYrjAlguPD2ETtE1Hhtzw9a25006tBJlaKkbG/wqHIjbD7fY7Q3Da
-	cmw+ZrEMTlPfya3/FQD9BDeAdYLkpohjz5CwrV5IvCQktY0HZiWzZ2++/m1Nz/gIY95I7B7gjr52R
-	sH0sTkl2ZC3NSCTvRlaSsZFXCAw9UigTTxZ/TfXJkt4uUygpmcXla7oLn3wGUj/o8GYxNwM092AH7
-	oBURnNHbC5/zD0SDehm3GuJnlctYIJU8QLimsqzLZwZZnuZtFrzBAOpzzJYhwNwDvkHegKJXS+RzX
-	Gx4Qut1aVkiaNfHCvnaQ==;
+	List-Owner; bh=f9Ha5n5LtxRiODTIZmEuTcmEfExtXBVqz7XD3Uxw59A=; b=Eh6PpEBo9iM/mV
+	OFymnyNHfnWPipBzJTKynd0Qrg8v8XRNrt3dwuPNSD9puBJjQi2rgBEtq7beMDnl90ztzdWq2+LMp
+	wztOcGF2ozz8/jOzLV2kQp7E8r/mWzhTSWDExK31fP/iyVKX4kQgIeGpaROiDBzQbw9d5+yCjSclT
+	Pj3JneWrAz3ASbKWxxdU8myvPvMS9k11MOMsIJkyRo9MxbCOmAbEv8/gpLjwg77ge4+BLPu6BNm28
+	Nqrq+L2TvZ4V4OVjp0TuscklaaPKjjt1rs/O2Q58hUM9DZaqqx/u/qMheFimPV0L1/zI4nABbwgO4
+	vkSEIsRcyr1z56ftGpOw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTwlt-0000fH-Rv; Mon, 03 Dec 2018 22:32:57 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTwkY-0007ax-0R
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 22:31:34 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=rQZ8kmJGiAe3meOL8n5CuJdjh4Pdt4Z51xZK+7KE3Xk=; b=QagPSgNxvWVQFpJyMF9rX+rPyX
- sNHaVck/tcCs8Abfzhwb/SohwmLP6eU4DSZeOEEtlKZb85g+MUjbD4rNS3gCr5NtuHeQN0LmTq7vU
- L8MfY7H0s8VPf2AgLacQ2xz/N5cqZzVkLNCBoidfS5OeTimcvItOzc9u3djVZ9DC1bIXJMC7qF0vY
- /92wPnWqqmWt98mYDJIhFcw9UZjw10x4hGanY5MyYgpAZ5kyEh/RyPHhKZBhw/KJm/HA0j0P/Go05
- amRCy+WM6vPEbcwU4Q+Azx+Ja3Wc/6hnAuMVqZg2TEU0PoDWyv4EfNmP+CIPDlLKrS5VKg6m9Tuwg
- 6cV2F2Ug==;
-Received: from mail-ot1-f65.google.com ([209.85.210.65])
- by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvpx-000366-QC
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:07 +0000
-Received: by mail-ot1-f65.google.com with SMTP id f18so13096504otl.11
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:53 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=rQZ8kmJGiAe3meOL8n5CuJdjh4Pdt4Z51xZK+7KE3Xk=;
- b=XR9A081Y+1QYX51e35h6t5eSFEhhg+O1hqtJH5+b4+FF/+O+MNlSqOBPKr74K6nCQm
- sph0+ovwlJJYXEJbdeTPSwDFF8zEYZrEyxJFZf8kdNtMqOx0Lt6wzMZ3JNFcCBsZWDTw
- XCiOhUNS5+iOQ0YqHGBU7OpxkameGqhSHA9cDUDATPb8fbQfyXuoAb1uU7yF6/pAFG+u
- tpeb3Yb8N5q1019Lb110hokW3LkpH3c5hY224BnbPvVp1/sNUJ0QnFi9onL0f5cxWaCr
- NP+VXtxRfIRp2PSgL8CX/omcMmR359KYxM1eUQHTkthWlg9d7V61L9EBN2IhkZmBnQMY
- RS9g==
-X-Gm-Message-State: AA+aEWZUFIW+Gfyp0Qfifyze5SqEaANSmOGA+Bru45+RMFu53WCtYiaM
- Mo4iTBJnC2RBYW2nnb69Gw==
-X-Google-Smtp-Source: AFSGD/XMa0kBRnoWR5AxYuedsAPrfI6e6I59G8+Z57rVk564hdCQ0IkmYLCjev7urA2vAx9c/b5eXA==
-X-Received: by 2002:a9d:346:: with SMTP id 64mr11642597otv.90.1543872772572;
- Mon, 03 Dec 2018 13:32:52 -0800 (PST)
-Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.51
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:51 -0800 (PST)
-From: Rob Herring <robh@kernel.org>
-To: devicetree@vger.kernel.org,
-	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 22/34] dt-bindings: arm: Convert QCom board/soc bindings to
- json-schema
-Date: Mon,  3 Dec 2018 15:32:11 -0600
-Message-Id: <20181203213223.16986-23-robh@kernel.org>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
-References: <20181203213223.16986-1-robh@kernel.org>
+	id 1gTwqo-0003EN-Qm; Mon, 03 Dec 2018 22:38:02 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTwql-0002e7-8h
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:38:00 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id D53B615AD;
+ Mon,  3 Dec 2018 14:37:47 -0800 (PST)
+Received: from localhost (unknown [10.37.6.11])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 3BDCB3F5AF;
+ Mon,  3 Dec 2018 14:37:47 -0800 (PST)
+Date: Mon, 3 Dec 2018 22:37:45 +0000
+From: Andrew Murray <andrew.murray@arm.com>
+To: Will Deacon <will.deacon@arm.com>
+Subject: Re: [PATCH v3 3/4] arm64: arm_pmu: Add support for
+ exclude_host/exclude_guest attributes
+Message-ID: <20181203223744.GD16311@e119886-lin.cambridge.arm.com>
+References: <1542885950-23816-1-git-send-email-andrew.murray@arm.com>
+ <1542885950-23816-4-git-send-email-andrew.murray@arm.com>
+ <20181203150413.GA27232@arm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181203150413.GA27232@arm.com>
+User-Agent: Mutt/1.10.1+81 (426a6c1) (2018-08-26)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_163305_861716_DB667650 
-X-CRM114-Status: GOOD (  17.30  )
+X-CRM114-CacheID: sfid-20181203_143759_319668_6522D1E1 
+X-CRM114-Status: GOOD (  37.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -103,227 +72,186 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Frank Rowand <frowand.list@gmail.com>, David Brown <david.brown@linaro.org>,
- Grant Likely <grant.likely@arm.com>, Andy Gross <andy.gross@linaro.org>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Suzuki K Poulose <suzuki.poulose@arm.com>, Marc Zyngier <marc.zyngier@arm.com>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Julien Thierry <julien.thierry@arm.com>,
+ Christoffer Dall <christoffer.dall@arm.com>, kvmarm@lists.cs.columbia.edu,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert QCom SoC bindings to DT schema format using json-schema.
+On Mon, Dec 03, 2018 at 03:04:14PM +0000, Will Deacon wrote:
+> Hi Andrew,
+> 
+> On Thu, Nov 22, 2018 at 11:25:49AM +0000, Andrew Murray wrote:
+> > Add support for the :G and :H attributes in perf by handling the
+> > exclude_host/exclude_guest event attributes.
+> > 
+> > We notify KVM of counters that we wish to be enabled or disabled on
+> > guest entry/exit and thus defer from starting or stopping :G events
+> > as per the events exclude_host attribute.
+> > 
+> > With both VHE and non-VHE we switch the counters between host/guest
+> > at EL2. We are able to eliminate counters counting host events on
+> > the boundaries of guest entry/exit when using :G by filtering out
+> > EL2 for exclude_host. However when using :H unless exclude_hv is set
+> > on non-VHE then there is a small blackout window at the guest
+> > entry/exit where host events are not captured.
+> > 
+> > Signed-off-by: Andrew Murray <andrew.murray@arm.com>
+> > ---
+> >  arch/arm64/kernel/perf_event.c | 52 ++++++++++++++++++++++++++++++++++++------
+> >  1 file changed, 45 insertions(+), 7 deletions(-)
+> 
+> I've got a cold at the moment, so it could just be that, but I struggled to
+> follow the logic in this patch. Comments below.
+> 
+> > diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+> > index de564ae..e0619ba 100644
+> > --- a/arch/arm64/kernel/perf_event.c
+> > +++ b/arch/arm64/kernel/perf_event.c
+> > @@ -26,6 +26,7 @@
+> >  
+> >  #include <linux/acpi.h>
+> >  #include <linux/clocksource.h>
+> > +#include <linux/kvm_host.h>
+> >  #include <linux/of.h>
+> >  #include <linux/perf/arm_pmu.h>
+> >  #include <linux/platform_device.h>
+> > @@ -647,11 +648,23 @@ static inline int armv8pmu_enable_counter(int idx)
+> >  
+> >  static inline void armv8pmu_enable_event_counter(struct perf_event *event)
+> >  {
+> > +	struct perf_event_attr *attr = &event->attr;
+> >  	int idx = event->hw.idx;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> >  
+> > -	armv8pmu_enable_counter(idx);
+> >  	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_enable_counter(idx - 1);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	if (attr->exclude_host)
+> > +		kvm_clr_set_guest_pmu_events(0, counter_bits);
+> > +	if (attr->exclude_guest)
+> > +		kvm_clr_set_host_pmu_events(0, counter_bits);
+> 
+> Hmm, so if I have both exclude_host and exclude_guest set then we'll set
+> the counter in both events_host_only and events_guest_only, which is weird
+> and probably not what you want.
 
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/qcom.txt          |  57 --------
- .../devicetree/bindings/arm/qcom.yaml         | 125 ++++++++++++++++++
- 2 files changed, 125 insertions(+), 57 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
- create mode 100644 Documentation/devicetree/bindings/arm/qcom.yaml
+perf_event_attr is passed from userspace, whilst the perf tool doesn't allow
+you to set exclude_host and exclude_guest at the same time it's feasiable for
+another user to do so. So indeed the current behaviour wouldn't be expected.
 
-diff --git a/Documentation/devicetree/bindings/arm/qcom.txt b/Documentation/devicetree/bindings/arm/qcom.txt
-deleted file mode 100644
-index ee532e705d6c..000000000000
---- a/Documentation/devicetree/bindings/arm/qcom.txt
-+++ /dev/null
-@@ -1,57 +0,0 @@
--QCOM device tree bindings
---------------------------
--
--Some qcom based bootloaders identify the dtb blob based on a set of
--device properties like SoC and platform and revisions of those components.
--To support this scheme, we encode this information into the board compatible
--string.
--
--Each board must specify a top-level board compatible string with the following
--format:
--
--	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
--
--The 'SoC' and 'board' elements are required. All other elements are optional.
--
--The 'SoC' element must be one of the following strings:
--
--	apq8016
--	apq8074
--	apq8084
--	apq8096
--	msm8916
--	msm8974
--	msm8992
--	msm8994
--	msm8996
--	mdm9615
--	ipq8074
--	sdm845
--
--The 'board' element must be one of the following strings:
--
--	cdp
--	liquid
--	dragonboard
--	mtp
--	sbc
--	hk01
--
--The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
--where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
--as v1. If all versions of the 'board_version' elements match, then a
--wildcard '*' should be used, e.g. 'v*'.
--
--The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
--
--Examples:
--
--	"qcom,msm8916-v1-cdp-pm8916-v2.1"
--
--A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
--2.1.
--
--	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
--
--A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
--foundry 2.
-diff --git a/Documentation/devicetree/bindings/arm/qcom.yaml b/Documentation/devicetree/bindings/arm/qcom.yaml
-new file mode 100644
-index 000000000000..f6316ab66385
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/qcom.yaml
-@@ -0,0 +1,125 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/bindings/arm/qcom.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: QCOM device tree bindings
-+
-+maintainers:
-+  - Stephen Boyd <sboyd@codeaurora.org>
-+
-+description: |
-+  Some qcom based bootloaders identify the dtb blob based on a set of
-+  device properties like SoC and platform and revisions of those components.
-+  To support this scheme, we encode this information into the board compatible
-+  string.
-+
-+  Each board must specify a top-level board compatible string with the following
-+  format:
-+
-+  	compatible = "qcom,<SoC>[-<soc_version>][-<foundry_id>]-<board>[/<subtype>][-<board_version>]"
-+
-+  The 'SoC' and 'board' elements are required. All other elements are optional.
-+
-+  The 'SoC' element must be one of the following strings:
-+
-+  	apq8016
-+  	apq8074
-+  	apq8084
-+  	apq8096
-+  	msm8916
-+  	msm8974
-+  	msm8992
-+  	msm8994
-+  	msm8996
-+  	mdm9615
-+  	ipq8074
-+  	sdm845
-+
-+  The 'board' element must be one of the following strings:
-+
-+  	cdp
-+  	liquid
-+  	dragonboard
-+  	mtp
-+  	sbc
-+  	hk01
-+
-+  The 'soc_version' and 'board_version' elements take the form of v<Major>.<Minor>
-+  where the minor number may be omitted when it's zero, i.e.  v1.0 is the same
-+  as v1. If all versions of the 'board_version' elements match, then a
-+  wildcard '*' should be used, e.g. 'v*'.
-+
-+  The 'foundry_id' and 'subtype' elements are one or more digits from 0 to 9.
-+
-+  Examples:
-+
-+  	"qcom,msm8916-v1-cdp-pm8916-v2.1"
-+
-+  A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
-+  2.1.
-+
-+  	"qcom,apq8074-v2.0-2-dragonboard/1-v0.1"
-+
-+  A dragonboard board v0.1 of subtype 1 with an apq8074 SoC version 2, made in
-+  foundry 2.
-+
-+properties:
-+  compatible:
-+    oneOf:
-+      - items:
-+          - enum:
-+              - qcom,apq8016-sbc
-+          - const: qcom,apq8016
-+
-+      - items:
-+          - enum:
-+              - qcom,apq8064-cm-qs600
-+              - qcom,apq8064-ifc6410
-+          - const: qcom,apq8064
-+
-+      - items:
-+          - enum:
-+              - qcom,apq8074-dragonboard
-+          - const: qcom,apq8074
-+
-+      - items:
-+          - enum:
-+              - qcom,apq8060-dragonboard
-+              - qcom,msm8660-surf
-+          - const: qcom,msm8660
-+
-+      - items:
-+          - enum:
-+              - qcom,apq8084-mtp
-+              - qcom,apq8084-sbc
-+          - const: qcom,apq8084
-+
-+      - items:
-+          - enum:
-+              - qcom,msm8960-cdp
-+          - const: qcom,msm8960
-+
-+      - items:
-+          - const: qcom,msm8916-mtp/1
-+          - const: qcom,msm8916-mtp
-+          - const: qcom,msm8916
-+
-+      - items:
-+          - const: qcom,msm8996-mtp
-+
-+      - items:
-+          - const: qcom,ipq4019
-+
-+      - items:
-+          - enum:
-+              - qcom,ipq8064-ap148
-+          - const: qcom,ipq8064
-+
-+      - items:
-+          - enum:
-+              - qcom,ipq8074-hk01
-+          - const: qcom,ipq8074
-+
-+...
--- 
-2.19.1
+> 
+> I think I'd find it easier to understand if you dropped the "only" suffix on
+> the kvm masks, and you actually made the logic positive so that an event
+> that counts in both host and guest has its bit set in both of the masks.
 
+No problem. This actually fixes a bug when multiple events are enabled.
+
+> 
+> > +
+> > +	if (!attr->exclude_host) {
+> > +		armv8pmu_enable_counter(idx);
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_enable_counter(idx - 1);
+> > +	}
+> >  }
+> >  
+> >  static inline int armv8pmu_disable_counter(int idx)
+> > @@ -664,11 +677,23 @@ static inline int armv8pmu_disable_counter(int idx)
+> >  static inline void armv8pmu_disable_event_counter(struct perf_event *event)
+> >  {
+> >  	struct hw_perf_event *hwc = &event->hw;
+> > +	struct perf_event_attr *attr = &event->attr;
+> >  	int idx = hwc->idx;
+> > +	u32 counter_bits = BIT(ARMV8_IDX_TO_COUNTER(idx));
+> >  
+> >  	if (armv8pmu_event_is_chained(event))
+> > -		armv8pmu_disable_counter(idx - 1);
+> > -	armv8pmu_disable_counter(idx);
+> > +		counter_bits |= BIT(ARMV8_IDX_TO_COUNTER(idx - 1));
+> > +
+> > +	if (attr->exclude_host)
+> > +		kvm_clr_set_guest_pmu_events(counter_bits, 0);
+> > +	if (attr->exclude_guest)
+> > +		kvm_clr_set_host_pmu_events(counter_bits, 0);
+> > +
+> > +	if (!attr->exclude_host) {
+> > +		if (armv8pmu_event_is_chained(event))
+> > +			armv8pmu_disable_counter(idx - 1);
+> > +		armv8pmu_disable_counter(idx);
+> > +	}
+> 
+> It looks like you're relying on the perf_event_attr remaining unchanged
+> between the enable/disable calls for a given event. However, I'm not
+> convinced that's the case -- have you checked that e.g.
+> PERF_EVENT_IOC_MODIFY_ATTRIBUTES can't rewrite the thing behind your
+> back?
+
+Even better - I can unconditionally clear the counter_bits here seeing as the
+event is being disabled.
+
+> 
+> >  }
+> >  
+> >  static inline int armv8pmu_enable_intens(int idx)
+> > @@ -943,16 +968,25 @@ static int armv8pmu_set_event_filter(struct hw_perf_event *event,
+> >  	 * Therefore we ignore exclude_hv in this configuration, since
+> >  	 * there's no hypervisor to sample anyway. This is consistent
+> >  	 * with other architectures (x86 and Power).
+> > +	 *
+> > +	 * To eliminate counting host events on the boundaries of
+> > +	 * guest entry/exit we ensure EL2 is not included in hyp mode
+> > +	 * with !exclude_host.
+> >  	 */
+> >  	if (is_kernel_in_hyp_mode()) {
+> > -		if (!attr->exclude_kernel)
+> > +		if (!attr->exclude_kernel && !attr->exclude_host)
+> >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> 
+> Do you know what perf passes by default here? I'm worried that we're
+> introducing a user-visible change to existing programs by changing this
+> check.
+
+When running 'perf xxx' exclude_guest is set and exclude_host is unset. And the
+opposite when running 'perf kvm xxx'. So for existing users that do not use
+virtualisation then there is no change.
+
+> 
+> >  	} else {
+> > -		if (attr->exclude_kernel)
+> > -			config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> >  		if (!attr->exclude_hv)
+> >  			config_base |= ARMV8_PMU_INCLUDE_EL2;
+> >  	}
+> > +
+> > +	/*
+> > +	 * Filter out !VHE kernels and guest kernels
+> > +	 */
+> > +	if (attr->exclude_kernel)
+> > +		config_base |= ARMV8_PMU_EXCLUDE_EL1;
+> 
+> Why have you moved this hunk?
+
+When guests use perf the guest PMU is emulated by KVM (virt/kvm/arm/pmu) and is
+backed by host perf events, these events always have the exclude_host flag set.
+Therefore to filter these kernel events we need to filter EL1. By moving this
+hunk we ensure guest kernel filtering works even when the host is VHE. (The
+side effect is that we unnecessarily filter EL1 on VHE host kernel events, but
+this has no effect as no-one is using this except any guest.)
+
+Thanks,
+
+Andrew Murray
+
+> 
+> Will
 
 _______________________________________________
 linux-arm-kernel mailing list
