@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 39213C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E583CC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EFE2820851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AD3A820851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ha2TwjFi"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EFE2820851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rtBZXQzG"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD3A820851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +25,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=tC9XAdJvoi2UcVf8VmbND2/sl+ZiAPv+WE52KA0gcp0=; b=ha2TwjFih89U4R
-	OozPN0fb8bkHfgf+44mkrfeJLxyVWfbgcXyUN18GSgCy9v/4s1rdlhyhxSKn5lMpdu6odW/eJTVjt
-	0NzU3Yax9/q/0efXLv2lXVVv5P897QjMbtdu2Vuf+cmyTsYwVbTRH4JytVlmEXB1a1tws72hq2vAU
-	QEquPXwUEcMgi+DrG3eKGwFEzmKV7fdGLSLLwnBC/iooWREmxkdjKscL0gTjGupl9R6lSlJpoSlRd
-	gZuv29EiItvYPYWHTKv8KRZT1hNIS5v1j6kBmI2liv/13YZ2GR0kRtupVLYp9/2kfeUipiul/LevL
-	DMeekTGPgmRXLb5yXMXA==;
+	List-Owner; bh=bsmoQbFZuEI4pxmxw++mcdMjBcewpivdWYKXsCkpfwQ=; b=rtBZXQzGG4zKN3
+	lbs0pQLzF0LaSw+QngASf3DyZt4NbWp4bobBLDvF+Tl8IWT4MjGV3fvvmTSp3/p0oI/rOlbJpUJ9Z
+	NwPT/0qTNo5LZd1yIUGVYg38At1wOq+pL5wLhYQyVX+jIorQ889a8nyALOGOvWkHG6DT37p9UoW2V
+	25Bh6uF+MsFQhbUf0Eu2VjgJU69pgnQLhopG0xrB2Ohm0ky4cI41wtKn2tKPyGFNqMXVA9YPNon5e
+	ZAfr7R6WLbWlm+G1dsNL0AnOQJFdE5xsNIHiaYBCujKs3/HUyVF0hsEgFlXps2ZfiZlfgao7HPntU
+	Hwu1WsYqFVu4zn+XW5/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTvsj-0006Te-Gf; Mon, 03 Dec 2018 21:35:57 +0000
-Received: from mail-ot1-f67.google.com ([209.85.210.67])
+	id 1gTvsw-0006hU-Ar; Mon, 03 Dec 2018 21:36:10 +0000
+Received: from mail-ot1-f68.google.com ([209.85.210.68])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvph-00025Q-31
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:01 +0000
-Received: by mail-ot1-f67.google.com with SMTP id u16so13121079otk.8
+ id 1gTvpc-00021b-4o
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:02 +0000
+Received: by mail-ot1-f68.google.com with SMTP id e12so13137434otl.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:43 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:33 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=D6BtPJozH3JdqfWo6ExZ4oTAyyYCO1tcHStok0oL6cA=;
- b=Q2xSLiu5YEb9+Pdgn+WmLiGnAfAZKtfeAoT9vJ2WDMzR2zZunWMuPIskmYph3vVFne
- rRLky53/3XyXlio3kxXOexpqoDBaLU5QjlmOr+lzVTsGxweuIB/ke1xy0J8OvrOM8akq
- 6PLjEWisTzpmU1s9p4nXbYfh9ppD6zm5kaMB/3BHZezjhZo6UaWFDYmjAwv/RrqKL48+
- jyy70jYSHZChvPQrFoj2NyT4EPLVIxChmrLHuHK2cANQDfhBjd4PR1fFVjXOyshRc6i5
- 6742GuMDmEM59jsyOVO2QBCUKR0yR3rsDJ9nMzbVSXwOHF4eyPOFog/uS1E8V2EJhrol
- FoCQ==
-X-Gm-Message-State: AA+aEWasBBH9ER6ZwrxFw0DopJ/NOX1sshLS2UbvvPC1sOxsNMKLV6vX
- hnf+N974LzW/wy8JyTigng==
-X-Google-Smtp-Source: AFSGD/XQ4hsSXd89C7Zi6ry4uoDS5WunOet0fEkjVlsgrLYEWm/4v6QN9aduORO1V9o9QvgBwYgKUA==
-X-Received: by 2002:a9d:12e3:: with SMTP id g90mr11898303otg.223.1543872762460; 
- Mon, 03 Dec 2018 13:32:42 -0800 (PST)
+ bh=JBdzh5igNzDqLEgQ/x0qGKygetPrx2TSisacJ9NbwDM=;
+ b=nDHRQ6RyVZQszRHBeWmjYk1Oornbca0qc6XfC7EirAfpDbad0gDmeoeMirIrNIVxFz
+ omcW64x9xo11pPa/oCTXVRV+AcE8MW1UHfS5/pFpijk2Q4slFuW7z84hZka55Vn6kB05
+ 46uSXvWzr89kx0h6qPkRaLwmHXaRVcqFPGb9NeOkoCUSiPgo1d+44LKME1T/8GuikHH1
+ 7YHuU617bFPgwpFro9NQsY9GAT8RUgicO/5FVapYAVFvYjfC2RYrWYGSt2nAFCZCTAW3
+ xCd7RNGnAtDP79j7vVlNnBqQkoPjzATbHG+jorbNno3ow8f3PPtvWmo2U1sxtgqQMEsF
+ nyOQ==
+X-Gm-Message-State: AA+aEWZ47KccEs3SIXidkolGRzFD58RcVdr3IvGGIubjbbOomhIzQeOW
+ 1+x7f0V7JUrInpVfhYcw1Q==
+X-Google-Smtp-Source: AFSGD/U+mmGiUexsRNmU93TnmIq902d8xMVaezYT4k9mXkl7aBDX7UB2cG5lIAucILKUmxLOaJFYyA==
+X-Received: by 2002:a9d:2f66:: with SMTP id h93mr11773089otb.165.1543872753053; 
+ Mon, 03 Dec 2018 13:32:33 -0800 (PST)
 Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.41
+ by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.31
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:41 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:32 -0800 (PST)
 From: Rob Herring <robh@kernel.org>
 To: devicetree@vger.kernel.org,
 	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 14/34] dt-bindings: arm: Convert Amlogic board/soc bindings
- to json-schema
-Date: Mon,  3 Dec 2018 15:32:03 -0600
-Message-Id: <20181203213223.16986-15-robh@kernel.org>
+Subject: [PATCH v2 06/34] dt-bindings: timer: Convert ARM timer bindings to
+ json-schema
+Date: Mon,  3 Dec 2018 15:31:55 -0600
+Message-Id: <20181203213223.16986-7-robh@kernel.org>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
 References: <20181203213223.16986-1-robh@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_133249_562018_CF1AB566 
-X-CRM114-Status: GOOD (  15.26  )
+X-CRM114-CacheID: sfid-20181203_133244_939493_817E2421 
+X-CRM114-Status: GOOD (  20.07  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,257 +89,472 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
  arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Frank Rowand <frowand.list@gmail.com>, Grant Likely <grant.likely@arm.com>,
- Kevin Hilman <khilman@baylibre.com>, Carlo Caione <carlo@caione.org>,
+ Frank Rowand <frowand.list@gmail.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Grant Likely <grant.likely@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
  linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert Amlogic SoC bindings to DT schema format using json-schema.
+Convert ARM timers to DT schema format using json-schema.
 
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: devicetree@vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../devicetree/bindings/arm/amlogic.txt       | 109 ------------------
- .../devicetree/bindings/arm/amlogic.yaml      | 109 ++++++++++++++++++
- 2 files changed, 109 insertions(+), 109 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
+ .../bindings/timer/arm,arch_timer.txt         | 112 ----------------
+ .../bindings/timer/arm,arch_timer.yaml        | 103 +++++++++++++++
+ .../bindings/timer/arm,arch_timer_mmio.yaml   | 120 ++++++++++++++++++
+ .../bindings/timer/arm,global_timer.txt       |  27 ----
+ .../bindings/timer/arm,global_timer.yaml      |  46 +++++++
+ 5 files changed, 269 insertions(+), 139 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
+ delete mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer.txt b/Documentation/devicetree/bindings/timer/arm,arch_timer.txt
 deleted file mode 100644
-index f5c8d50a3506..000000000000
---- a/Documentation/devicetree/bindings/arm/amlogic.txt
+index 68301b77e854..000000000000
+--- a/Documentation/devicetree/bindings/timer/arm,arch_timer.txt
 +++ /dev/null
-@@ -1,109 +0,0 @@
--Amlogic MesonX device tree bindings
---------------------------------------------
+@@ -1,112 +0,0 @@
+-* ARM architected timer
 -
--Work in progress statement:
+-ARM cores may have a per-core architected timer, which provides per-cpu timers,
+-or a memory mapped architected timer, which provides up to 8 frames with a
+-physical and optional virtual timer per frame.
 -
--Device tree files and bindings applying to Amlogic SoCs and boards are
--considered "unstable". Any Amlogic device tree binding may change at
--any time. Be sure to use a device tree binary and a kernel image
--generated from the same source tree.
+-The per-core architected timer is attached to a GIC to deliver its
+-per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
+-to deliver its interrupts via SPIs.
 -
--Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
--stable binding/ABI.
+-** CP15 Timer node properties:
 -
-----------------------------------------------------------------
+-- compatible : Should at least contain one of
+-	"arm,armv7-timer"
+-	"arm,armv8-timer"
 -
--Boards with the Amlogic Meson6 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson6"
+-- interrupts : Interrupt list for secure, non-secure, virtual and
+-  hypervisor timers, in that order.
 -
--Boards with the Amlogic Meson8 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8";
+-- clock-frequency : The frequency of the main counter, in Hz. Should be present
+-  only where necessary to work around broken firmware which does not configure
+-  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
+-  strongly discouraged; fix your firmware unless absolutely impossible.
 -
--Boards with the Amlogic Meson8b SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8b";
+-- always-on : a boolean property. If present, the timer is powered through an
+-  always-on power domain, therefore it never loses context.
 -
--Boards with the Amlogic Meson8m2 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson8m2";
+-- fsl,erratum-a008585 : A boolean property. Indicates the presence of
+-  QorIQ erratum A-008585, which says that reading the counter is
+-  unreliable unless the same value is returned by back-to-back reads.
+-  This also affects writes to the tval register, due to the implicit
+-  counter read.
 -
--Boards with the Amlogic Meson GXBaby SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,meson-gxbb";
+-- hisilicon,erratum-161010101 : A boolean property. Indicates the
+-  presence of Hisilicon erratum 161010101, which says that reading the
+-  counters is unreliable in some cases, and reads may return a value 32
+-  beyond the correct value. This also affects writes to the tval
+-  registers, due to the implicit counter read.
 -
--Boards with the Amlogic Meson GXL S905X SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905x", "amlogic,meson-gxl";
+-** Optional properties:
 -
--Boards with the Amlogic Meson GXL S905D SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905d", "amlogic,meson-gxl";
+-- arm,cpu-registers-not-fw-configured : Firmware does not initialize
+-  any of the generic timer CPU registers, which contain their
+-  architecturally-defined reset values. Only supported for 32-bit
+-  systems which follow the ARMv7 architected reset values.
 -
--Boards with the Amlogic Meson GXL S805X SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s805x", "amlogic,meson-gxl";
+-- arm,no-tick-in-suspend : The main counter does not tick when the system is in
+-  low-power system suspend on some SoCs. This behavior does not match the
+-  Architecture Reference Manual's specification that the system counter "must
+-  be implemented in an always-on power domain."
 -
--Boards with the Amlogic Meson GXL S905W SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s905w", "amlogic,meson-gxl";
 -
--Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,s912", "amlogic,meson-gxm";
+-Example:
 -
--Boards with the Amlogic Meson AXG A113D SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,a113d", "amlogic,meson-axg";
+-	timer {
+-		compatible = "arm,cortex-a15-timer",
+-			     "arm,armv7-timer";
+-		interrupts = <1 13 0xf08>,
+-			     <1 14 0xf08>,
+-			     <1 11 0xf08>,
+-			     <1 10 0xf08>;
+-		clock-frequency = <100000000>;
+-	};
 -
--Boards with the Amlogic Meson G12A S905D2 SoC shall have the following properties:
--  Required root node property:
--    compatible: "amlogic,g12a";
+-** Memory mapped timer node properties:
 -
--Board compatible values (alphabetically, grouped by SoC):
+-- compatible : Should at least contain "arm,armv7-timer-mem".
 -
--  - "geniatech,atv1200" (Meson6)
+-- clock-frequency : The frequency of the main counter, in Hz. Should be present
+-  only when firmware has not configured the MMIO CNTFRQ registers.
 -
--  - "minix,neo-x8" (Meson8)
+-- reg : The control frame base address.
 -
--  - "endless,ec100" (Meson8b)
--  - "hardkernel,odroid-c1" (Meson8b)
--  - "tronfy,mxq" (Meson8b)
+-Note that #address-cells, #size-cells, and ranges shall be present to ensure
+-the CPU can address a frame's registers.
 -
--  - "tronsmart,mxiii-plus" (Meson8m2)
+-A timer node has up to 8 frame sub-nodes, each with the following properties:
 -
--  - "amlogic,p200" (Meson gxbb)
--  - "amlogic,p201" (Meson gxbb)
--  - "friendlyarm,nanopi-k2" (Meson gxbb)
--  - "hardkernel,odroid-c2" (Meson gxbb)
--  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
--  - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
--  - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
--  - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
--  - "wetek,hub" (Meson gxbb)
--  - "wetek,play2" (Meson gxbb)
+-- frame-number: 0 to 7.
 -
--  - "amlogic,p212" (Meson gxl s905x)
--  - "hwacom,amazetv" (Meson gxl s905x)
--  - "khadas,vim" (Meson gxl s905x)
--  - "libretech,cc" (Meson gxl s905x)
+-- interrupts : Interrupt list for physical and virtual timers in that order.
+-  The virtual timer interrupt is optional.
 -
--  - "amlogic,p230" (Meson gxl s905d)
--  - "amlogic,p231" (Meson gxl s905d)
+-- reg : The first and second view base addresses in that order. The second view
+-  base address is optional.
 -
--  - "amlogic,p241" (Meson gxl s805x)
+-- status : "disabled" indicates the frame is not available for use. Optional.
 -
--  - "amlogic,p281" (Meson gxl s905w)
--  - "oranth,tx3-mini" (Meson gxl s905w)
+-Example:
 -
--  - "amlogic,q200" (Meson gxm s912)
--  - "amlogic,q201" (Meson gxm s912)
--  - "khadas,vim2" (Meson gxm s912)
--  - "kingnovel,r-box-pro" (Meson gxm S912)
--  - "nexbox,a1" (Meson gxm s912)
--  - "tronsmart,vega-s96" (Meson gxm s912)
+-	timer@f0000000 {
+-		compatible = "arm,armv7-timer-mem";
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-		reg = <0xf0000000 0x1000>;
+-		clock-frequency = <50000000>;
 -
--  - "amlogic,s400" (Meson axg a113d)
+-		frame@f0001000 {
+-			frame-number = <0>
+-			interrupts = <0 13 0x8>,
+-				     <0 14 0x8>;
+-			reg = <0xf0001000 0x1000>,
+-			      <0xf0002000 0x1000>;
+-		};
 -
--  - "amlogic,u200" (Meson g12a s905d2)
-diff --git a/Documentation/devicetree/bindings/arm/amlogic.yaml b/Documentation/devicetree/bindings/arm/amlogic.yaml
+-		frame@f0003000 {
+-			frame-number = <1>
+-			interrupts = <0 15 0x8>;
+-			reg = <0xf0003000 0x1000>;
+-		};
+-	};
+diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml b/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
 new file mode 100644
-index 000000000000..8b4b11194658
+index 000000000000..6deead07728e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic.yaml
-@@ -0,0 +1,109 @@
++++ b/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
+@@ -0,0 +1,103 @@
 +# SPDX-License-Identifier: GPL-2.0
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/arm/amlogic.yaml#
++$id: http://devicetree.org/schemas/timer/arm,arch_timer.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: Amlogic MesonX device tree bindings
++title: ARM architected timer
 +
 +maintainers:
-+  - Neil Armstrong <narmstrong@baylibre.com>
-+  - Carlo Caione <carlo@caione.org>
++  - Marc Zyngier <marc.zyngier@arm.com>
++  - Mark Rutland <mark.rutland@arm.com>
 +description: |+
-+  Work in progress statement:
++  ARM cores may have a per-core architected timer, which provides per-cpu timers,
++  or a memory mapped architected timer, which provides up to 8 frames with a
++  physical and optional virtual timer per frame.
 +
-+  Device tree files and bindings applying to Amlogic SoCs and boards are
-+  considered "unstable". Any Amlogic device tree binding may change at
-+  any time. Be sure to use a device tree binary and a kernel image
-+  generated from the same source tree.
-+
-+  Please refer to Documentation/devicetree/bindings/ABI.txt for a definition of a
-+  stable binding/ABI.
++  The per-core architected timer is attached to a GIC to deliver its
++  per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
++  to deliver its interrupts via SPIs.
 +
 +properties:
-+  $nodename:
-+    const: '/'
 +  compatible:
 +    oneOf:
 +      - items:
 +          - enum:
-+              - geniatech,atv1200
-+          - const: amlogic,meson6
++              - arm,cortex-a15-timer
++          - enum:
++              - arm,armv7-timer
 +      - items:
 +          - enum:
-+              - minix,neo-x8
-+          - const: amlogic,meson8
++            - arm,armv7-timer
 +      - items:
 +          - enum:
-+              - tronsmart,mxiii-plus
-+          - const: amlogic,meson8m2
-+      - items:
-+          - enum:
-+              - endless,ec100
-+              - hardkernel,odroid-c1
-+              - tronfy,mxq
-+          - const: amlogic,meson8b
-+      - items:
-+          - enum:
-+              - amlogic,p200
-+              - amlogic,p201
-+              - friendlyarm,nanopi-k2
-+              - hardkernel,odroid-c2
-+              - nexbox,a95x
-+              - wetek,hub
-+              - wetek,play2
-+          - const: amlogic,meson-gxbb
-+      - items:
-+          - enum:
-+              - tronsmart,vega-s95-pro
-+              - tronsmart,vega-s95-meta
-+              - tronsmart,vega-s95-telos
-+          - const: tronsmart,vega-s95
-+          - const: amlogic,meson-gxbb
-+      - items:
-+          - enum:
-+              - amlogic,p241
-+          - const: amlogic,s805x
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p281
-+              - oranth,tx3-mini
-+          - const: amlogic,s905w
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p212
-+              - hwacom,amazetv
-+              - khadas,vim
-+              - libretech,cc
-+              - nexbox,a95x
-+          - const: amlogic,s905x
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,p230
-+              - amlogic,p231
-+          - const: amlogic,s905d
-+          - const: amlogic,meson-gxl
-+      - items:
-+          - enum:
-+              - amlogic,q200
-+              - amlogic,q201
-+              - khadas,vim2
-+              - kingnovel,r-box-pro
-+              - nexbox,a1
-+              - tronsmart,vega-s96
-+          - const: amlogic,s912
-+          - const: amlogic,meson-gxm
-+      - items:
-+          - enum:
-+              - amlogic,s400
-+          - const: amlogic,a113d
-+          - const: amlogic,meson-axg
-+      - items:
-+          - enum:
-+              - amlogic,u200
-+          - const: amlogic,g12a
++            - arm,armv8-timer
 +
++  interrupts:
++    items:
++      - description: secure timer irq
++      - description: non-secure timer irq
++      - description: virtual timer irq
++      - description: hypervisor timer irq
++
++  clock-frequency:
++    description: The frequency of the main counter, in Hz. Should be present
++      only where necessary to work around broken firmware which does not configure
++      CNTFRQ on all CPUs to a uniform correct value. Use of this property is
++      strongly discouraged; fix your firmware unless absolutely impossible.
++
++  always-on:
++    type: boolean
++    description: If present, the timer is powered through an always-on power
++      domain, therefore it never loses context.
++
++  fsl,erratum-a008585:
++    type: boolean
++    description: Indicates the presence of QorIQ erratum A-008585, which says
++      that reading the counter is unreliable unless the same value is returned
++      by back-to-back reads. This also affects writes to the tval register, due
++      to the implicit counter read.
++
++  hisilicon,erratum-161010101:
++    type: boolean
++    description: Indicates the presence of Hisilicon erratum 161010101, which
++      says that reading the counters is unreliable in some cases, and reads may
++      return a value 32 beyond the correct value. This also affects writes to
++      the tval registers, due to the implicit counter read.
++
++  arm,cpu-registers-not-fw-configured:
++    type: boolean
++    description: Firmware does not initialize any of the generic timer CPU
++      registers, which contain their architecturally-defined reset values. Only
++      supported for 32-bit systems which follow the ARMv7 architected reset
++      values.
++
++  arm,no-tick-in-suspend:
++    type: boolean
++    description: The main counter does not tick when the system is in
++      low-power system suspend on some SoCs. This behavior does not match the
++      Architecture Reference Manual's specification that the system counter "must
++      be implemented in an always-on power domain."
++
++required:
++  - compatible
++
++oneOf:
++  - required:
++      - interrupts
++  - required:
++      - interrupts-extended
++
++examples:
++  - |
++    timer {
++      compatible = "arm,cortex-a15-timer",
++             "arm,armv7-timer";
++      interrupts = <1 13 0xf08>,
++             <1 14 0xf08>,
++             <1 11 0xf08>,
++             <1 10 0xf08>;
++      clock-frequency = <100000000>;
++    };
++
++...
+diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml b/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
+new file mode 100644
+index 000000000000..c4ab59550fc2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
+@@ -0,0 +1,120 @@
++# SPDX-License-Identifier: GPL-2.0
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/timer/arm,arch_timer_mmio.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: ARM memory mapped architected timer
++
++maintainers:
++  - Marc Zyngier <marc.zyngier@arm.com>
++  - Mark Rutland <mark.rutland@arm.com>
++
++description: |+
++  ARM cores may have a memory mapped architected timer, which provides up to 8
++  frames with a physical and optional virtual timer per frame.
++
++  The memory mapped timer is attached to a GIC to deliver its interrupts via SPIs.
++
++properties:
++  compatible:
++    items:
++      - enum:
++        - arm,armv7-timer-mem
++
++  reg:
++    maxItems: 1
++    description: The control frame base address
++
++  '#address-cells':
++    enum: [1, 2]
++
++  '#size-cells':
++    const: 1
++
++  clock-frequency:
++    description: The frequency of the main counter, in Hz. Should be present
++      only where necessary to work around broken firmware which does not configure
++      CNTFRQ on all CPUs to a uniform correct value. Use of this property is
++      strongly discouraged; fix your firmware unless absolutely impossible.
++
++  always-on:
++    type: boolean
++    description: If present, the timer is powered through an always-on power
++      domain, therefore it never loses context.
++
++  arm,cpu-registers-not-fw-configured:
++    type: boolean
++    description: Firmware does not initialize any of the generic timer CPU
++      registers, which contain their architecturally-defined reset values. Only
++      supported for 32-bit systems which follow the ARMv7 architected reset
++      values.
++
++  arm,no-tick-in-suspend:
++    type: boolean
++    description: The main counter does not tick when the system is in
++      low-power system suspend on some SoCs. This behavior does not match the
++      Architecture Reference Manual's specification that the system counter "must
++      be implemented in an always-on power domain."
++
++patternProperties:
++  '^frame@[0-9a-z]*$':
++    description: A timer node has up to 8 frame sub-nodes, each with the following properties.
++    properties:
++      frame-number:
++        allOf:
++          - $ref: "/schemas/types.yaml#/definitions/uint32"
++          - minimum: 0
++            maximum: 7
++
++      interrupts:
++        minItems: 1
++        maxItems: 2
++        items:
++          - description: physical timer irq
++          - description: virtual timer irq
++
++      reg :
++        minItems: 1
++        maxItems: 2
++        items:
++          - description: 1st view base address
++          - description: 2nd optional view base address
++
++    required:
++      - frame-number
++      - interrupts
++      - reg
++
++required:
++  - compatible
++  - reg
++  - '#address-cells'
++  - '#size-cells'
++
++examples:
++  - |
++    timer@f0000000 {
++      compatible = "arm,armv7-timer-mem";
++      #address-cells = <1>;
++      #size-cells = <1>;
++      ranges;
++      reg = <0xf0000000 0x1000>;
++      clock-frequency = <50000000>;
++
++      frame@f0001000 {
++        frame-number = <0>;
++        interrupts = <0 13 0x8>,
++               <0 14 0x8>;
++        reg = <0xf0001000 0x1000>,
++              <0xf0002000 0x1000>;
++      };
++
++      frame@f0003000 {
++        frame-number = <1>;
++        interrupts = <0 15 0x8>;
++        reg = <0xf0003000 0x1000>;
++      };
++    };
++
++...
+diff --git a/Documentation/devicetree/bindings/timer/arm,global_timer.txt b/Documentation/devicetree/bindings/timer/arm,global_timer.txt
+deleted file mode 100644
+index bdae3a818793..000000000000
+--- a/Documentation/devicetree/bindings/timer/arm,global_timer.txt
++++ /dev/null
+@@ -1,27 +0,0 @@
+-
+-* ARM Global Timer
+-	Cortex-A9 are often associated with a per-core Global timer.
+-
+-** Timer node required properties:
+-
+-- compatible : should contain
+-	     * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
+-	     * "arm,cortex-a9-global-timer" for Cortex-A9 global
+-	         timers or any compatible implementation. Note: driver
+-	         supports versions r2p0 and above.
+-
+-- interrupts : One interrupt to each core
+-
+-- reg : Specify the base address and the size of the GT timer
+-	register window.
+-
+-- clocks : Should be phandle to a clock.
+-
+-Example:
+-
+-	timer@2c000600 {
+-		compatible = "arm,cortex-a9-global-timer";
+-		reg = <0x2c000600 0x20>;
+-		interrupts = <1 13 0xf01>;
+-		clocks = <&arm_periph_clk>;
+-	};
+diff --git a/Documentation/devicetree/bindings/timer/arm,global_timer.yaml b/Documentation/devicetree/bindings/timer/arm,global_timer.yaml
+new file mode 100644
+index 000000000000..21c24a8e28fd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/timer/arm,global_timer.yaml
+@@ -0,0 +1,46 @@
++# SPDX-License-Identifier: GPL-2.0
++%YAML 1.2
++---
++$id: http://devicetree.org/schemas/timer/arm,global_timer.yaml#
++$schema: http://devicetree.org/meta-schemas/core.yaml#
++
++title: ARM Global Timer
++
++maintainers:
++  - Stuart Menefy <stuart.menefy@st.com>
++
++description:
++  Cortex-A9 are often associated with a per-core Global timer.
++
++properties:
++  compatible:
++    items:
++      - enum:
++          - arm,cortex-a5-global-timer
++          - arm,cortex-a9-global-timer
++
++    description: driver supports versions r2p0 and above.
++
++  reg:
++    maxItems: 1
++
++  interrupts:
++    maxItems: 1
++
++  clocks:
++    maxItems: 1
++
++required:
++  - compatible
++  - reg
++  - clocks
++
++examples:
++  - |
++    timer@2c000600 {
++      compatible = "arm,cortex-a9-global-timer";
++      reg = <0x2c000600 0x20>;
++      interrupts = <1 13 0xf01>;
++      clocks = <&arm_periph_clk>;
++    };
 +...
 -- 
 2.19.1
