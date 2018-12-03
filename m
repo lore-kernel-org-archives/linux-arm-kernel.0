@@ -4,66 +4,61 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 54E64C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:51:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A191BC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:55:40 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 031DE206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:51:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 73983206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:55:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="p74lH0yT"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 031DE206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uv2t9yFg"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 73983206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Q7yKAyDbVsO+ZTU3in9W3wMBroMKBa6bKzaqMaC6xwE=; b=p74lH0yTf3yPRX
-	YH/UdV8W6XjzLlQP0rB6YHEqcoX3G+Wf3OoVHBsMDlyBck2uAMEtY0whhYolBb6IdOSnOXn5zqtfV
-	9fMBR23k+JDTfZryzJ0UBe+YLYpX6Izoyz2ed0Qzg/tMQkzH0YRjGXM4BY2sRDhKe/GXwsayqwcNC
-	J7da7kF9USdMr3uw04sZSFjBMMG/6oEbJKKfJIzKzfnYZuE2s36iovtuDu9h9yaErg8OWJJOj0bPQ
-	QztUyhb7PfpZmiLCsio31CzvjF8aPO87u7ICRREEdITfCS0Nl6s1dPLnKhMHO2WEop++RNQYg923Y
-	fwFfeer/MBArOVHwofkQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=Wu/oqjWTywPg12CEi2sFrkK5j1IbH9e9qMHOeMGwmIY=; b=uv2t9yFg4L/tMHhnei6hIiEZax
+	QtxNmhNTFDnj1cwYkTO98+5dOOoqj1BfrqNI9ZrPbHyL/j4Osze0Nx8frb0fIACYd6TkfNkcPTfNv
+	M/lAcdsw4+AAOQe6cZR8U6BVuZsoyjx66w+uuNLC2FVvbNzDk0z8Kl6FHox+dEGZC6w/TB+Ubp+0A
+	KqIjKt2BCfFfSrkhLm9kwXBaeL0XtqGnBDJ89bfFN9J0l5SEW5i8NkrThwd5rmyX9SDHQ23Kzr7m0
+	084rJvMBsvDcAtXAlR6zHV/FIqdEfjvtWculLyEfvlW9qvbWW2o/HwPP7ysUU30hHMfsbZMT7R/gk
+	l67mHUMQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTocq-00010E-7J; Mon, 03 Dec 2018 13:51:04 +0000
-Received: from mx1.redhat.com ([209.132.183.28])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTocj-0000vs-6k
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:51:01 +0000
-Received: from smtp.corp.redhat.com (int-mx08.intmail.prod.int.phx2.redhat.com
- [10.5.11.23])
- (using TLSv1.2 with cipher AECDH-AES256-SHA (256/256 bits))
- (No client certificate requested)
- by mx1.redhat.com (Postfix) with ESMTPS id 7FB18307D91A;
- Mon,  3 Dec 2018 13:50:46 +0000 (UTC)
-Received: from kamzik.brq.redhat.com (unknown [10.43.2.160])
- by smtp.corp.redhat.com (Postfix) with ESMTPS id E77A227BA2;
- Mon,  3 Dec 2018 13:50:44 +0000 (UTC)
-Date: Mon, 3 Dec 2018 14:50:42 +0100
-From: Andrew Jones <drjones@redhat.com>
-To: Steven Price <steven.price@arm.com>
-Subject: Re: [PATCH 01/12] KVM: arm64: Document PV-time interface
-Message-ID: <20181203135042.v52wawfz4nc27fna@kamzik.brq.redhat.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
- <20181128144527.44710-2-steven.price@arm.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181128144527.44710-2-steven.price@arm.com>
-User-Agent: NeoMutt/20180716
-X-Scanned-By: MIMEDefang 2.84 on 10.5.11.23
-X-Greylist: Sender IP whitelisted, not delayed by milter-greylist-4.5.16
- (mx1.redhat.com [10.5.110.48]); Mon, 03 Dec 2018 13:50:46 +0000 (UTC)
+	id 1gTohH-0002mK-KG; Mon, 03 Dec 2018 13:55:39 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTohE-0002kf-21
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:55:37 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 58CD2169E;
+ Mon,  3 Dec 2018 05:55:29 -0800 (PST)
+Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
+ [10.72.51.249])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id D32993F614;
+ Mon,  3 Dec 2018 05:55:27 -0800 (PST)
+From: Julien Thierry <julien.thierry@arm.com>
+To: linux-kernel@vger.kernel.org,
+	linux-arm-kernel@lists.infradead.org
+Subject: [PATCH v2 2/2] arm64: uaccess: Implement unsafe accessors
+Date: Mon,  3 Dec 2018 13:55:18 +0000
+Message-Id: <1543845318-24543-3-git-send-email-julien.thierry@arm.com>
+X-Mailer: git-send-email 1.9.1
+In-Reply-To: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
+References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_055059_253216_250BD30A 
-X-CRM114-Status: GOOD (  35.28  )
+X-CRM114-CacheID: sfid-20181203_055536_129263_D15314C4 
+X-CRM114-Status: GOOD (  14.36  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,258 +70,231 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Marc Zyngier <marc.zyngier@arm.com>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- kvmarm@lists.cs.columbia.edu, linux-arm-kernel@lists.infradead.org
+Cc: Julien Thierry <julien.thierry@arm.com>, peterz@infradead.org,
+ catalin.marinas@arm.com, will.deacon@arm.com, mingo@redhat.com,
+ james.morse@arm.com, hpa@zytor.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Wed, Nov 28, 2018 at 02:45:16PM +0000, Steven Price wrote:
-> We introduce a paravirtualization interface for KVM/arm64 based on the
-> "Arm Paravirtualized Time for Arm-Base Systems" specification DEN 0057A.
-> 
-> User space can specify a reserved area of memory for the guest and
-> inform KVM to populate the memory with information on stolen time and
-> Live Physical Time (LPT) that can be used to derive a stable
-> counter/timer for a guest subject to migration between hosts with
-> different counter frequencies.
-> 
-> A hypercall interface is provided for the guest to interrogate the
-> hypervisor's support for this interface and the location of the shared
-> memory structures.
-> 
-> Signed-off-by: Steven Price <steven.price@arm.com>
-> ---
->  Documentation/virtual/kvm/arm/pvtime.txt | 169 +++++++++++++++++++++++
->  1 file changed, 169 insertions(+)
->  create mode 100644 Documentation/virtual/kvm/arm/pvtime.txt
-> 
-> diff --git a/Documentation/virtual/kvm/arm/pvtime.txt b/Documentation/virtual/kvm/arm/pvtime.txt
-> new file mode 100644
-> index 000000000000..1870b904075b
-> --- /dev/null
-> +++ b/Documentation/virtual/kvm/arm/pvtime.txt
-> @@ -0,0 +1,169 @@
-> +Paravirtualized time support for arm64
-> +======================================
-> +
-> +Arm specification DEN0057/A defined a standard for paravirtualised time
-> +support for Aarch64 guests:
-> +
-> +https://developer.arm.com/docs/den0057/a
-> +
-> +KVM/Arm64 implements this specification by providing some hypervisor service
-> +calls to support a paravirtualized guest obtaining a view of the amount of
-> +time stolen from its execution and a concept of Live Physical Time (LPT) which
-> +represents time during which the guest is running and works across migrations.
-> +
-> +Three new SMCCC compatible hypercalls are defined:
-> +
-> +PV_FEATURES 0xC5000020
-> +PV_TIME_LPT 0xC5000021
-> +PV_TIME_ST  0xC5000022
-> +
-> +These are only available in the SMC64/HVC64 calling convention as
-> +paravirtualized time is not available to 32 bit Arm guests.
-> +
-> +PV_FEATURES
-> +    Function ID:  (uint32)  : 0xC5000020
-> +    PV_func_id:   (uint32)  : Either PV_TIME_LPT or PV_TIME_ST
-> +    Return value: (int32)   : NOT_SUPPORTED (-1) or SUCCESS (0) if the relevant
-> +                              PV-time feature is supported by the hypervisor.
+Current implementation of get/put_user_unsafe default to get/put_user
+which toggle PAN before each access, despite having been told by the caller
+that multiple accesses to user memory were about to happen.
 
-What happens when a new guest tries this hypercall on an old host? Why not
-return a bitmap of all supported features so the guest doesn't have to
-do multiple hypercalls to build its bitmap?
+Provide implementations for user_access_begin/end to turn PAN off/on and
+implement unsafe accessors that assume PAN was already turned off.
 
-> +
-> +PV_TIME_LPT
-> +    Function ID:  (uint32)  : 0xC5000021
-> +    Flags:        (uint32)  : Bit[0]: Request migration interrupts
-> +                                      (not currently supported by KVM)
-> +    Return value: (int64)   : IPA of the shared live physical time data
-> +                              structure or negative error code on failure:
-> +                              NOT_SUPPORTED (-1)
-> +                              INVALID_PARAMETERS (-2)
-> +
-> +PV_TIME_ST
-> +    Function ID:  (uint32)  : 0xC5000022
-> +    Return value: (int64)   : IPA of the stolen time data structure for this
-> +                              (V)CPU. On failure:
-> +                              NOT_SUPPORTED (-1)
-> +
-> +Live Physical Time
-> +------------------
-> +
-> +The structure pointed to by the PV_TIME_LPT hypercall is as follows:
-> +
-> +  Field           | Byte Length | Byte Offset | Description
-> +  --------------- | ----------- | ----------- | -------------------------------
-> +  Revision        |      4      |      0      | Must be 0 for this revision
-> +  Attributes      |      4      |      4      | Must be 0
-> +  sequence_number |      8      |      8      | Bit 0: reserved
-> +                  |             |             | Bits 1:63 number of migrations
-> +  scale_mult      |      8      |      16     | Multiplier to scale from native
-> +                  |             |             | frequency to PV frequency
-> +  shift           |      4      |      24     | Shift applied before multiplier
-> +  Reserved        |      4      |      28     | Must be 0
-> +  Fn              |      8      |      32     | Native frequency
-> +  Fpv             |      8      |      40     | Paravirtualized frequency seen
-> +                  |             |             | by guest
-> +  div_by_fpv_mult |      8      |      48     | Multiplier to implement fast
-> +                  |             |             | divide by Fpv
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h  |  2 +
+ arch/arm64/include/asm/uaccess.h | 89 +++++++++++++++++++++++++++++++---------
+ 2 files changed, 71 insertions(+), 20 deletions(-)
 
-Here's kvmclock's struct
-
- struct pvclock_vcpu_time_info {
-        u32   version; 
-        u32   pad0;
-        u64   tsc_timestamp;
-        u64   system_time;
-        u32   tsc_to_system_mul;
-        s8    tsc_shift;
-        u8    flags;
-        u8    pad[2];
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 842fb95..4e6477b 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -108,6 +108,8 @@
+ #define SYS_DC_CSW			sys_insn(1, 0, 7, 10, 2)
+ #define SYS_DC_CISW			sys_insn(1, 0, 7, 14, 2)
+ 
++#define SYS_PSTATE_PAN			sys_reg(3, 0, 4, 2, 3)
++
+ #define SYS_OSDTRRX_EL1			sys_reg(2, 0, 0, 0, 2)
+ #define SYS_MDCCINT_EL1			sys_reg(2, 0, 0, 2, 0)
+ #define SYS_MDSCR_EL1			sys_reg(2, 0, 0, 2, 2)
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index 07c3408..cabfcae 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -233,6 +233,23 @@ static inline void uaccess_enable_not_uao(void)
+ 	__uaccess_enable(ARM64_ALT_PAN_NOT_UAO);
  }
+ 
++#define unsafe_user_region_active	uaccess_region_active
++static inline bool uaccess_region_active(void)
++{
++	if (system_uses_ttbr0_pan()) {
++		u64 ttbr;
++
++		ttbr = read_sysreg(ttbr1_el1);
++		return ttbr & TTBR_ASID_MASK;
++	} else if (cpus_have_const_cap(ARM64_ALT_PAN_NOT_UAO)) {
++		return (read_sysreg(sctlr_el1) & SCTLR_EL1_SPAN) ?
++				false :
++				!read_sysreg_s(SYS_PSTATE_PAN);
++	}
++
++	return false;
++}
++
+ /*
+  * Sanitise a uaccess pointer such that it becomes NULL if above the
+  * current addr_limit.
+@@ -276,11 +293,9 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+ 	: "+r" (err), "=&r" (x)						\
+ 	: "r" (addr), "i" (-EFAULT))
+ 
+-#define __get_user_err(x, ptr, err)					\
++#define __get_user_err_unsafe(x, ptr, err)				\
+ do {									\
+ 	unsigned long __gu_val;						\
+-	__chk_user_ptr(ptr);						\
+-	uaccess_enable_not_uao();					\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+ 		__get_user_asm("ldrb", "ldtrb", "%w", __gu_val, (ptr),  \
+@@ -301,17 +316,26 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
+-	uaccess_disable_not_uao();					\
+ 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
+ } while (0)
+ 
+-#define __get_user_check(x, ptr, err)					\
++#define __get_user_err_check(x, ptr, err)				\
++do {									\
++	__typeof__(x) __gu_dest;					\
++	__chk_user_ptr(ptr);						\
++	uaccess_enable_not_uao();					\
++	__get_user_err_unsafe((__gu_dest), (ptr), (err));		\
++	uaccess_disable_not_uao();					\
++	(x) = __gu_dest;						\
++} while (0)
++
++#define __get_user_err(x, ptr, err, accessor)				\
+ ({									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	if (access_ok(VERIFY_READ, __p, sizeof(*__p))) {		\
+ 		__p = uaccess_mask_ptr(__p);				\
+-		__get_user_err((x), __p, (err));			\
++		accessor((x), __p, (err));				\
+ 	} else {							\
+ 		(x) = 0; (err) = -EFAULT;				\
+ 	}								\
+@@ -319,14 +343,14 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+ 
+ #define __get_user_error(x, ptr, err)					\
+ ({									\
+-	__get_user_check((x), (ptr), (err));				\
++	__get_user_err((x), (ptr), (err), __get_user_err_check);	\
+ 	(void)0;							\
+ })
+ 
+ #define __get_user(x, ptr)						\
+ ({									\
+ 	int __gu_err = 0;						\
+-	__get_user_check((x), (ptr), __gu_err);				\
++	__get_user_err((x), (ptr), __gu_err, __get_user_err_check);	\
+ 	__gu_err;							\
+ })
+ 
+@@ -346,41 +370,46 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+ 	: "+r" (err)							\
+ 	: "r" (x), "r" (addr), "i" (-EFAULT))
+ 
+-#define __put_user_err(x, ptr, err)					\
++#define __put_user_err_unsafe(x, ptr, err)				\
+ do {									\
+-	__typeof__(*(ptr)) __pu_val = (x);				\
+-	__chk_user_ptr(ptr);						\
+-	uaccess_enable_not_uao();					\
+ 	switch (sizeof(*(ptr))) {					\
+ 	case 1:								\
+-		__put_user_asm("strb", "sttrb", "%w", __pu_val, (ptr),	\
++		__put_user_asm("strb", "sttrb", "%w", (x), (ptr),	\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	case 2:								\
+-		__put_user_asm("strh", "sttrh", "%w", __pu_val, (ptr),	\
++		__put_user_asm("strh", "sttrh", "%w", (x), (ptr),	\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	case 4:								\
+-		__put_user_asm("str", "sttr", "%w", __pu_val, (ptr),	\
++		__put_user_asm("str", "sttr", "%w", (x), (ptr),		\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	case 8:								\
+-		__put_user_asm("str", "sttr", "%x", __pu_val, (ptr),	\
++		__put_user_asm("str", "sttr", "%x", (x), (ptr),		\
+ 			       (err), ARM64_HAS_UAO);			\
+ 		break;							\
+ 	default:							\
+ 		BUILD_BUG();						\
+ 	}								\
++} while (0)
++
++#define __put_user_err_check(x, ptr, err)				\
++do {									\
++	__typeof__(*(ptr)) __pu_val = (x);				\
++	__chk_user_ptr(ptr);						\
++	uaccess_enable_not_uao();					\
++	__put_user_err_unsafe(__pu_val, (ptr), (err));			\
+ 	uaccess_disable_not_uao();					\
+ } while (0)
+ 
+-#define __put_user_check(x, ptr, err)					\
++#define __put_user_err(x, ptr, err, accessor)				\
+ ({									\
+ 	__typeof__(*(ptr)) __user *__p = (ptr);				\
+ 	might_fault();							\
+ 	if (access_ok(VERIFY_WRITE, __p, sizeof(*__p))) {		\
+ 		__p = uaccess_mask_ptr(__p);				\
+-		__put_user_err((x), __p, (err));			\
++		accessor((x), __p, (err));				\
+ 	} else	{							\
+ 		(err) = -EFAULT;					\
+ 	}								\
+@@ -388,19 +417,39 @@ static inline void __user *__uaccess_mask_ptr(const void __user *ptr)
+ 
+ #define __put_user_error(x, ptr, err)					\
+ ({									\
+-	__put_user_check((x), (ptr), (err));				\
++	__put_user_err((x), (ptr), (err), __put_user_err_check);	\
+ 	(void)0;							\
+ })
+ 
+ #define __put_user(x, ptr)						\
+ ({									\
+ 	int __pu_err = 0;						\
+-	__put_user_check((x), (ptr), __pu_err);				\
++	__put_user_err((x), (ptr), __pu_err, __put_user_err_check);	\
+ 	__pu_err;							\
+ })
+ 
+ #define put_user	__put_user
+ 
++
++#define user_access_begin()	uaccess_enable_not_uao()
++#define user_access_end()	uaccess_disable_not_uao()
++
++#define unsafe_get_user(x, ptr, err)					\
++do {									\
++	int __gu_err = 0;						\
++	__get_user_err((x), (ptr), __gu_err, __get_user_err_unsafe);	\
++	if (__gu_err != 0)						\
++		goto err;						\
++} while (0)
++
++#define unsafe_put_user(x, ptr, err)					\
++do {									\
++	int __pu_err = 0;						\
++	__put_user_err((x), (ptr), __pu_err, __put_user_err_unsafe);	\
++	if (__pu_err != 0)						\
++		goto err;						\
++} while (0)
++
+ extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
+ #define raw_copy_from_user(to, from, n)					\
+ ({									\
+-- 
+1.9.1
 
- Revision	 =>
- Attributes	 =>
- sequence_number => version
- scale_mult	 => tsc_to_system_mul	(this is reversed, but OK)
- shift		 => tsc_shift           (also reversed)
- Reserved	 =>
- Fn		 => (pvclock doesn't have, but does have system_time)
- Fpv		 =>
- div_by_fpv_mult =>
-
-I haven't thought about this enough yet to be sure kvmclock's fields
-are sufficient, but several look close - although the 'tsc' naming
-isn't nice. Also, the pvclock struct could be extended by adding an
-'extended' flag to 'flags', and then appending more fields.
-
-> +
-> +Where scale_mult is defined as 2^(64-shift) * Fpv / Fn
-> +
-> +The structure will be updated by the hypervisor whenever the guest is migrated
-> +to a new host. It will be present within a reserved region of the normal
-> +memory given to the guest. The guest should not attempt to write into this
-> +memory.
-> +
-> +Stolen Time
-> +-----------
-> +
-> +The structure pointed to by the PV_TIME_ST hypercall is as follows:
-> +
-> +  Field       | Byte Length | Byte Offset | Description
-> +  ----------- | ----------- | ----------- | --------------------------
-> +  Revision    |      4      |      0      | Must be 0 for version 0.1
-> +  Attributes  |      4      |      4      | Must be 0
-> +  Stolen time |      8      |      8      | Stolen time in unsigned
-> +              |             |             | nanoseconds indicating how
-> +              |             |             | much time this VCPU thread
-> +              |             |             | was involuntarily not
-> +              |             |             | running on a physical CPU.
-> +
-> +The structure will be updated by the hypervisor periodically as time is stolen
-> +from the VCPU. It will be present within a reserved region of the normal
-> +memory given to the guest. The guest should not attempt to write into this
-> +memory. There is a structure by VCPU of the guest.
-> +
-> +User space interface
-> +====================
-> +
-> +User space can request that KVM provide the paravirtualized time interface to
-> +a guest by creating a KVM_DEV_TYPE_ARM_PV_TIME device, for example:
-> +
-> +    struct kvm_create_device pvtime_device = {
-> +            .type = KVM_DEV_TYPE_ARM_PV_TIME,
-> +            .attr = 0,
-> +            .flags = 0,
-> +    };
-> +
-> +    pvtime_fd = ioctl(vm_fd, KVM_CREATE_DEVICE, &pvtime_device);
-> +
-> +The guest IPA of the structures must be given to KVM. This is the address of
-> +the LPT structure and the base address of an array of stolen time structures
-> +(one for each VCPU). For example:
-> +
-> +    struct kvm_device_attr lpt_base = {
-> +            .group = KVM_DEV_ARM_PV_TIME_PADDR,
-> +            .attr = KVM_DEV_ARM_PV_TIME_LPT,
-> +            .addr = (u64)(unsigned long)&lpt_paddr
-> +    };
-> +    struct kvm_device_attr st_base = {
-> +            .group = KVM_DEV_ARM_PV_TIME_PADDR,
-> +            .attr = KVM_DEV_ARM_PV_TIME_ST,
-> +            .addr = (u64)(unsigned long)&st_paddr
-> +    };
-> +
-> +    ioctl(pvtime_fd, KVM_SET_DEVICE_ATTR, &lpt_base);
-> +    ioctl(pvtime_fd, KVM_SET_DEVICE_ATTR, &st_base);
-> +
-> +The paravirtualized frequency of the guest can also be set. By default this
-> +will be the counter frequency of the host. However when migrating a guest from
-> +another host, this must be manually set to ensure that the guest sees the same
-> +frequency.
-> +
-> +    u32 frequency;
-> +
-> +    struct kvm_device_attr lpt_freq = {
-> +            .group = KVM_DEV_ARM_PV_TIME_FREQUENCY,
-> +            .attr = KVM_DEV_ARM_PV_TIME_LPT,
-> +            .addr = (u64)(unsigned long)&frequency
-> +    };
-> +
-> +    ioctl(pvtime_fd, KVM_SET_DEVICE_ATTR, &lpt_freq);
-> +
-> +For migration (or save/restore) of a guest it is necessary to save the contents
-> +of the shared pages and later restore them. KVM_DEV_ARM_PV_TIME_STATE_SIZE
-> +provides the size of this data and KVM_DEV_ARM_PV_TIME_STATE allows the state
-> +to be read/written. The state for stolen time and LPT are accessed separately.
-
-I guess there's no harm in userspace accessing these separately, but I
-hope we'll be trying to put all the PV structures on one shared page
-for the guest.
-
-Thanks,
-drew
-
-> +It is also necessary for the physical address and frequency to be set
-> +identically when restoring. The kernel will update the structure on first run
-> +of the vCPU(s) to contain the new coefficients.
-> +
-> +    void *save_state(int fd, u64 attr, u32 *size) {
-> +        struct kvm_device_attr get_size = {
-> +                .group = KVM_DEV_ARM_PV_TIME_STATE_SIZE,
-> +                .attr = attr,
-> +                .addr = (u64)(unsigned long)size
-> +        };
-> +
-> +        ioctl(fd, KVM_GET_DEVICE_ATTR, get_size);
-> +
-> +        void *buffer = malloc(*size);
-> +
-> +        struct kvm_device_attr get_state = {
-> +                .group = KVM_DEV_ARM_PV_TIME_STATE,
-> +                .attr = attr,
-> +                .addr = (u64)(unsigned long)size
-> +        };
-> +
-> +        ioctl(fd, KVM_GET_DEVICE_ATTR, buffer);
-> +    }
-> +
-> +    void *lpt_state = save_state(pvtime_fd, KVM_DEV_ARM_PV_TIME_LPT, &lpt_size);
-> +    void *st_state = save_state(pvtime_fd, KVM_DEV_ARM_PV_TIME_ST, &st_size);
-> +
-> -- 
-> 2.19.2
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm@lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
 
 _______________________________________________
 linux-arm-kernel mailing list
