@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 97FECC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:09:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5F2A2C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:09:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6601820850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:09:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2D61A20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:09:52 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aHIRfFgf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6601820850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="MUSDwdLz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2D61A20850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=jEp/NXC59fZPpCLYaffPfZeMsAJlYpfbdTp1oyCJZrk=; b=aHIRfFgfvOjLbT
-	dS8JZ1ZZhxYN7466yoSFJHJm3mgGgYXhGhKWcTbDVMKIn1eGgIqdTW6d+yh3MoBb4k4N1SZaes6Z1
-	v+UVV5TZMmHCuNceWlB0benLUEJSAkbYE7VDnj4mR+HHKJ1XVaKKUuccwHbgbEeHQQwk6bhjTUCDQ
-	B6Txy02qVeZ+e+r2XWk/6t8Y+y7qCGyjGpnyxQ6rUX0y24a9uzZduCW1f3Iq9VF3vv74BZsN/YrOA
-	AwJdFzro+3ZyLQYQJe3lERYTs2fSLqGTwcBcaEg+4TrYCroS84ul9Hv+r2zGZ5d2VmYSU29vgUYIt
-	2Ke/9VGKSORqfMrU2llQ==;
+	List-Owner; bh=Im3iD8IGHR7mwcBBv1yx0lHsGXtvQ26G+/42wrMIywo=; b=MUSDwdLzP64aQk
+	kzEH7Pfxr/ixqp2KjocDf/4TUQzJHsuRiTJ9E8X1gDduMcS8AtE9t0eacXu2Ap5NUXxsQ/1/0Q8vz
+	dhKHilJRk5B8MmoC3uvrd8hWLc8x+vMjaIE2HWgoJmuQCxlo8D5IgJpc36N8yZaU8gZHAJKG77mC4
+	WKoG7ajueIqfVJDxhl3V8S77lh3xAO1L7OszmTBacCM40sBhmUbcaYAdtoCytQVC7mCzX4UcL9P/d
+	zArkOEMq1fvxxKRRt8jK4EO+cTEqPag8bFDdEHfCDCAgZXPbqnKYbc9qUZyLH0ud+HT/Ab8ZrwdbQ
+	PiE0LAwb6Dq1EHw3x63w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTsf1-0007yK-VM; Mon, 03 Dec 2018 18:09:36 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gTsfG-0008Jz-Lg; Mon, 03 Dec 2018 18:09:50 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTsco-0005NU-Ie
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:07:55 +0000
+ id 1gTsd4-0005Uv-2h
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:08:43 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 09ED2174E;
- Mon,  3 Dec 2018 10:07:16 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 81A67168F;
+ Mon,  3 Dec 2018 10:07:23 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 396EB3F719;
- Mon,  3 Dec 2018 10:07:13 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id B0DCC3F59C;
+ Mon,  3 Dec 2018 10:07:20 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v7 11/25] ACPI / APEI: Move NOTIFY_SEA between the
- estatus-queue and NOTIFY_NMI
-Date: Mon,  3 Dec 2018 18:05:59 +0000
-Message-Id: <20181203180613.228133-12-james.morse@arm.com>
+Subject: [PATCH v7 13/25] KVM: arm/arm64: Add kvm_ras.h to collect kvm
+ specific RAS plumbing
+Date: Mon,  3 Dec 2018 18:06:01 +0000
+Message-Id: <20181203180613.228133-14-james.morse@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181203180613.228133-1-james.morse@arm.com>
 References: <20181203180613.228133-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_100719_988770_FC49ADE8 
-X-CRM114-Status: GOOD (  18.70  )
+X-CRM114-CacheID: sfid-20181203_100734_795331_35D048E0 
+X-CRM114-Status: GOOD (  20.53  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,160 +82,149 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The estatus-queue code is currently hidden by the NOTIFY_NMI #ifdefs.
-Once NOTIFY_SEA starts using the estatus-queue we can stop hiding
-it as each architecture has a user that can't be turned off.
+To split up APEIs in_nmi() path, the caller needs to always be
+in_nmi(). KVM shouldn't have to know about this, pull the RAS plumbing
+out into a header file.
 
-Split the existing CONFIG_HAVE_ACPI_APEI_NMI block in two, and move
-the SEA code into the gap.
+Currently guest synchronous external aborts are claimed as RAS
+notifications by handle_guest_sea(), which is hidden in the arch codes
+mm/fault.c. 32bit gets a dummy declaration in system_misc.h.
 
-This patch moves code around ... and changes the stale comment
-describing why the status queue is necessary: printk() is no
-longer the issue, its the helpers like memory_failure_queue() that
-aren't nmi safe.
+There is going to be more of this in the future if/when the kernel
+supports the SError-based firmware-first notification mechanism and/or
+kernel-first notifications for both synchronous external abort and
+SError. Each of these will come with some Kconfig symbols and a
+handful of header files.
+
+Create a header file for all this.
+
+This patch gives handle_guest_sea() a 'kvm_' prefix, and moves the
+declarations to kvm_ras.h as preparation for a future patch that moves
+the ACPI-specific RAS code out of mm/fault.c.
 
 Signed-off-by: James Morse <james.morse@arm.com>
----
- drivers/acpi/apei/ghes.c | 113 ++++++++++++++++++++-------------------
- 1 file changed, 59 insertions(+), 54 deletions(-)
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 15d94373ba72..00fe4785e469 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -765,66 +765,21 @@ static struct notifier_block ghes_notifier_hed = {
- 	.notifier_call = ghes_notify_hed,
+---
+Changes since v6:
+ * Tinkered with the commit message
+---
+ arch/arm/include/asm/kvm_ras.h       | 14 ++++++++++++++
+ arch/arm/include/asm/system_misc.h   |  5 -----
+ arch/arm64/include/asm/kvm_ras.h     | 11 +++++++++++
+ arch/arm64/include/asm/system_misc.h |  2 --
+ arch/arm64/mm/fault.c                |  2 +-
+ virt/kvm/arm/mmu.c                   |  4 ++--
+ 6 files changed, 28 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/include/asm/kvm_ras.h
+ create mode 100644 arch/arm64/include/asm/kvm_ras.h
+
+diff --git a/arch/arm/include/asm/kvm_ras.h b/arch/arm/include/asm/kvm_ras.h
+new file mode 100644
+index 000000000000..e9577292dfe4
+--- /dev/null
++++ b/arch/arm/include/asm/kvm_ras.h
+@@ -0,0 +1,14 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright (C) 2018 - Arm Ltd */
++
++#ifndef __ARM_KVM_RAS_H__
++#define __ARM_KVM_RAS_H__
++
++#include <linux/types.h>
++
++static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
++{
++	return -1;
++}
++
++#endif /* __ARM_KVM_RAS_H__ */
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index 8e76db83c498..66f6a3ae68d2 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -38,11 +38,6 @@ static inline void harden_branch_predictor(void)
+ 
+ extern unsigned int user_debug;
+ 
+-static inline int handle_guest_sea(phys_addr_t addr, unsigned int esr)
+-{
+-	return -1;
+-}
+-
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
+new file mode 100644
+index 000000000000..6096f0251812
+--- /dev/null
++++ b/arch/arm64/include/asm/kvm_ras.h
+@@ -0,0 +1,11 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/* Copyright (C) 2018 - Arm Ltd */
++
++#ifndef __ARM64_KVM_RAS_H__
++#define __ARM64_KVM_RAS_H__
++
++#include <linux/types.h>
++
++int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
++
++#endif /* __ARM64_KVM_RAS_H__ */
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 0e2a0ecaf484..32693f34f431 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -46,8 +46,6 @@ extern void __show_regs(struct pt_regs *);
+ 
+ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ 
+-int handle_guest_sea(phys_addr_t addr, unsigned int esr);
+-
+ #endif	/* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 7d9571f4ae3d..eeeb576b33d7 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -720,7 +720,7 @@ static const struct fault_info fault_info[] = {
+ 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
  };
  
--#ifdef CONFIG_ACPI_APEI_SEA
--static LIST_HEAD(ghes_sea);
--
--/*
-- * Return 0 only if one of the SEA error sources successfully reported an error
-- * record sent from the firmware.
-- */
--int ghes_notify_sea(void)
--{
--	struct ghes *ghes;
--	int ret = -ENOENT;
--
--	rcu_read_lock();
--	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
--		if (!ghes_proc(ghes))
--			ret = 0;
--	}
--	rcu_read_unlock();
--	return ret;
--}
--
--static void ghes_sea_add(struct ghes *ghes)
--{
--	mutex_lock(&ghes_list_mutex);
--	list_add_rcu(&ghes->list, &ghes_sea);
--	mutex_unlock(&ghes_list_mutex);
--}
--
--static void ghes_sea_remove(struct ghes *ghes)
--{
--	mutex_lock(&ghes_list_mutex);
--	list_del_rcu(&ghes->list);
--	mutex_unlock(&ghes_list_mutex);
--	synchronize_rcu();
--}
--#else /* CONFIG_ACPI_APEI_SEA */
--static inline void ghes_sea_add(struct ghes *ghes) { }
--static inline void ghes_sea_remove(struct ghes *ghes) { }
--#endif /* CONFIG_ACPI_APEI_SEA */
--
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
- /*
-- * printk is not safe in NMI context.  So in NMI handler, we allocate
-- * required memory from lock-less memory allocator
-- * (ghes_estatus_pool), save estatus into it, put them into lock-less
-- * list (ghes_estatus_llist), then delay printk into IRQ context via
-- * irq_work (ghes_proc_irq_work).  ghes_estatus_size_request record
-- * required pool size by all NMI error source.
-+ * Handlers for CPER records may not be NMI safe. For example,
-+ * memory_failure_queue() takes spinlocks and calls schedule_work_on().
-+ * In any NMI-like handler, memory from ghes_estatus_pool is used to save
-+ * estatus, and added to the ghes_estatus_llist. irq_work_queue() causes
-+ * ghes_proc_in_irq() to run in IRQ context where each estatus in
-+ * ghes_estatus_llist is processed.
-+ *
-+ * Memory from the ghes_estatus_pool is also used with the ghes_estatus_cache
-+ * to suppress frequent messages.
-  */
- static struct llist_head ghes_estatus_llist;
- static struct irq_work ghes_proc_irq_work;
- 
--/*
-- * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-- * having only one concurrent reader.
-- */
--static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
--
--static LIST_HEAD(ghes_nmi);
--
- static void ghes_proc_in_irq(struct irq_work *irq_work)
+-int handle_guest_sea(phys_addr_t addr, unsigned int esr)
++int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
  {
- 	struct llist_node *llnode, *next;
-@@ -950,6 +905,56 @@ static int ghes_estatus_queue_notified(struct list_head *rcu_list)
- 
- 	return ret;
+ 	return ghes_notify_sea();
  }
-+#endif /* CONFIG_HAVE_ACPI_APEI_NMI */
-+
-+#ifdef CONFIG_ACPI_APEI_SEA
-+static LIST_HEAD(ghes_sea);
-+
-+/*
-+ * Return 0 only if one of the SEA error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sea(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
-+		if (!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sea_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sea);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sea_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEA */
-+static inline void ghes_sea_add(struct ghes *ghes) { }
-+static inline void ghes_sea_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_ACPI_APEI_SEA */
-+
-+#ifdef CONFIG_HAVE_ACPI_APEI_NMI
-+/*
-+ * NMI may be triggered on any CPU, so ghes_in_nmi is used for
-+ * having only one concurrent reader.
-+ */
-+static atomic_t ghes_in_nmi = ATOMIC_INIT(0);
-+
-+static LIST_HEAD(ghes_nmi);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index 5eca48bdb1a6..f322b66ef975 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -27,10 +27,10 @@
+ #include <asm/kvm_arm.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_mmio.h>
++#include <asm/kvm_ras.h>
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/virt.h>
+-#include <asm/system_misc.h>
  
- static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
- {
+ #include "trace.h"
+ 
+@@ -1703,7 +1703,7 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 * For RAS the host kernel may handle this abort.
+ 		 * There is no need to pass the error into the guest.
+ 		 */
+-		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
++		if (!kvm_handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
+ 			return 1;
+ 
+ 		if (unlikely(!is_iabt)) {
 -- 
 2.19.2
 
