@@ -2,88 +2,84 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 25148C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A98D9C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E626D20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 663B620850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:55:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jBnM5VzM";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="BJ+WSKMK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E626D20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="INJTvGto";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="EjElAK8T"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 663B620850
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=mfNCD8nqNPdgOkh07+74s+ji4F4vhJV3OWqz45QR1JI=; b=jBnM5VzMxL1DxgCqemgknbIxOA
-	3OziS+BFOl0xeKlSm9HcCyEPEgVt1RdMfMbU+StkbCF9owXG0kPG7io/MmDKOHWbbVtbFR7arZ4c4
-	kNg1bv5ivPq4/MOmK7hIn9oTm9L8Rsbp6olmBjawck8Oud9Gbg1BfuUz601Ps8OChg7++B0nfkBWj
-	ZNdbCNfU6o7da2QVmyqb2oDmsb5Gmv/lYREmJ0zAuOzIWuTjrAv96ybgETQrLmI9L+RiWKpt2qbZE
-	Nc1lXRAs+IC5U9ik31dIS0HaaxZPf+d22w4+AbGwxE3hW+b9UY3FFBxY/DrwCc1NRBHEbnaKrSMKy
-	Vu8GsS4g==;
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=GZqpbXwkbJOMm486kgIPIQ0t902t9rRUL+9qOFPJv1Q=; b=INJ
+	TvGtoTvSFRA5Ndcvrb6xtYiLKR4fYC78C0QztEvIwJBWYjYN3WOqjlprWr4PS3CJB7f4oib4xiZui
+	f6EBDDm1onahtvr6Vwx7oeCbw94ThfDlySB2PtuX/nYNRi8bfalGGjGhy21hMcidD9BWnLr0BEmcI
+	JQX7kZX2SGi3IifpBVWfjLFAo91yc6+S483Kku2f55oBPmDW7wVL4eO+O8W0dFzW4TT6Q5mrZt6pX
+	1zGy/GMZUxlry7RYimERvGQBUvf5xN9inw2zeAc3Wu6cm02gN6BBljw8x0NsssiB0/ygSGRfj0kaN
+	4k6lgLB+YsmVgyTuOUnVihHIyw4boUA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTx7S-0002xL-II; Mon, 03 Dec 2018 22:55:14 +0000
+	id 1gTx7c-00036F-Gi; Mon, 03 Dec 2018 22:55:24 +0000
 Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTx7O-0001nY-7S
+ id 1gTx7O-0001da-7T
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:55:12 +0000
-Received: by mail-pl1-x644.google.com with SMTP id k8so7204193pls.11
+Received: by mail-pl1-x644.google.com with SMTP id e5so7217319plb.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 14:55:04 -0800 (PST)
+ Mon, 03 Dec 2018 14:54:59 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=ydPIIvwp7JBz3247k2TeCqAjfpttVF2V+RHCfDoclY8=;
- b=BJ+WSKMKAaHZf2+4NraETCCroz5ZYFkeg7hzQcVhbUvs5kFkaYaHaPovFfb2Dl1o2E
- 3tM4XYu2uvdnzDFHNw20UtCragB4YutmTQLcBv7NTHRL2V7tWeOZ5hqc0cDsoxuaEwDF
- IFLPf7+NltDmTQRQXUAumL8Z+dsQLpeLzG6Rg=
+ h=from:to:cc:subject:date:message-id;
+ bh=ksGSE6Cc9VG/A00Ld7RPZ1CW6RRFzM/pQBtwpovt2X4=;
+ b=EjElAK8T7sc3RlBItuETx3nTXgWFHr9nCABkxA218Abq/dx48F5iaSIeddLSCPX6nq
+ +PQuDPIWvlxSJNwzkIQBGwDXQle5xlG8fOxi9EwD8Ysj6GeW7niyPBHvC1lPLsQcUf++
+ MZw2sN8I+m2IsI/ajfl2KSM38fiILd8Xx2Wkw=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=ydPIIvwp7JBz3247k2TeCqAjfpttVF2V+RHCfDoclY8=;
- b=jF2hZkRjZmyQBFmM9zjpx1xeEZasEjyvAHpuba4SBUrs3ReY7kJJOPYqjZgyDF/3H6
- gV9zCQpAkvt/91FZ/YsZqd+cVQmY3lysPy5aZXZvuRgJm0DDh59J+Chg7Ac7dQArw3VX
- /n2fJn1af2sNhkB7FtlzE1veUzs2g73zxf2yGWVBVVSIQs95TZNF6xbVYR/PEnlmLeG1
- d/PhwlcXOzC+Ba4wv3OJLhIeRc7SQIKxjn2JyKHsYnp3SRLDh+bBabadbkqVDaoo3Xbb
- ud/zdDFwOJ/bYD5UK6uJSSmmOcFBgvpW3SLIgQlK+ERlYQ0vFAGtLXAX0J7qPbAUKepI
- n64Q==
-X-Gm-Message-State: AA+aEWbGL66QkyDyzxhH46VT8FA++l4wHu27Mc931f5r9ksLamzEsesr
- WDN4/idBo0vY3RBNxs9C1x+4eg==
-X-Google-Smtp-Source: AFSGD/X0pmtSDJa2m49+mPes1pivflZajBQeWuxa06nBHxcJRs0N3lg6W5gdr8GHLrOiLl3o4FCF3w==
-X-Received: by 2002:a17:902:6e16:: with SMTP id
- u22mr17497150plk.175.1543877703950; 
- Mon, 03 Dec 2018 14:55:03 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=ksGSE6Cc9VG/A00Ld7RPZ1CW6RRFzM/pQBtwpovt2X4=;
+ b=e1PhAzH5QPnCnCrKZOpe2dYFAw1d7PqaRX6EMowYN0LLXfhTohNo5mUbJ9K7OVy06u
+ b38wjbwCGmUhwu8I5nL9wqVmsalIYQUXmP7+hiWtyq42ntmnMj0VkfkhVFarXqhD01nq
+ k7XaG6LWPYODC3BPBo8P++uFzLcPQoZUmbBtrG7C1tZazCeucfDtllsWFCH9EDKGY2WM
+ stdi6MBx8K+J6SzbyIJj3ROZL1VGwFb2XkT0db5RrVlWX6GLTjaOAwi26SA2z99/tAVz
+ jQsUJb65Q0Btg8nkr6kvZGz92lqNf16Yc1c5I4jtUIJ69YNckvUJEgMz0eKjx+P6Wjst
+ 5dwA==
+X-Gm-Message-State: AA+aEWZsvHLSqArgd+d32EWzYPqvRauh2Fv3QDNuYtGn+CNsv4LsKgWY
+ lH6OBwDvhgI5+NyxNRywHN8/Kw==
+X-Google-Smtp-Source: AFSGD/Ww4eM+LZIWxdpW1D9qjHHHG7bAP0l5nJVoGhm4sibL/3GhitseWLv+7fxMz918qVGiK6mqKQ==
+X-Received: by 2002:a17:902:8a91:: with SMTP id
+ p17mr17698810plo.316.1543877699012; 
+ Mon, 03 Dec 2018 14:54:59 -0800 (PST)
 Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
  [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id v9sm20933057pfg.144.2018.12.03.14.55.02
+ by smtp.gmail.com with ESMTPSA id v9sm20933057pfg.144.2018.12.03.14.54.57
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 03 Dec 2018 14:55:03 -0800 (PST)
+ Mon, 03 Dec 2018 14:54:58 -0800 (PST)
 From: Mathieu Poirier <mathieu.poirier@linaro.org>
 To: acme@kernel.org,
 	peterz@infradead.org,
 	gregkh@linuxfoundation.org
-Subject: [PATCH v5 3/6] perf/aux: Make perf_event accessible to setup_aux()
-Date: Mon,  3 Dec 2018 15:54:53 -0700
-Message-Id: <1543877696-17174-4-git-send-email-mathieu.poirier@linaro.org>
+Subject: [PATCH v5 0/6] perf: Add ioctl for PMU driver configuration 
+Date: Mon,  3 Dec 2018 15:54:50 -0700
+Message-Id: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
 X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_145510_277064_1753C89C 
-X-CRM114-Status: GOOD (  17.20  )
+X-CRM114-CacheID: sfid-20181203_145510_276562_F6360633 
+X-CRM114-Status: GOOD (  15.99  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,151 +103,85 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-When pmu::setup_aux() is called the coresight PMU needs to know which
-sink to use for the session by looking up the information in the
-drv_config field of the hw_perf_event structure.
+In the coresight world there can be more than one sink to aggregate
+trace data generated by CPUs, hence the need for users to select which
+one to use from the perf command line.
 
-As such simply replace the cpu information by the complete perf_event
-structure and change all affected customers.
+Up until now sysfs was used to communicate sink information to the
+kernel but that was never the right way to proceed because it breaks
+when more than one perf session are created at the same time.  The
+situation was manageable when working with per-thread scenarios where
+a single HW trace event is created but in CPU-wide mode a HW trace
+event is created for each CPU that is specified on the perf command
+line, taking us back to the concurrency problem we have when dealing
+with multiple per-thread session.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This work fits in a wider scheme to support CPU-wide trace scenarios on
+CoreSight that is available here [1]. The first step in that venture is
+to address sysfs concurrency issues, which this patchset does.
+
+The main difference with V4 is the usage of a CoreSight sink's HW start
+address (u64) to uniquely identify a sink, negating the need to use the
+component's name (char *).
+
+By using a u64 we can theoretically add the sink information to the
+perf_event_attr structure, avoiding the need to add a new perf ioctl().
+On flip side it would introduce a very specific CoreSight field
+to a structure that is generic.  I have opted for the ioctl() method,
+let me know if you want me to proceed with the latter.
+
+Regards,
+Mathieu
+
+# Before this set: 
+
+root@juno:/home/linaro# perf record -e cs_etm/@20070000.etr/ -C 2,3 sleep 1
+failed to mmap with 12 (Cannot allocate memory)
+
+# After this set:
+
+root@juno:/home/linaro# perf record -e cs_etm/@20070000.etr/ -C 2,3 sleep 1
+[ perf record: Woken up 1 times to write data ]
+[ perf record: Captured and wrote 4.145 MB perf.data ]
+
+[1]. https://git.linaro.org/people/mathieu.poirier/coresight.git/log/?h=cpu-wide-coresight
+
 ---
- arch/s390/kernel/perf_cpum_sf.c                  | 6 +++---
- arch/x86/events/intel/bts.c                      | 4 +++-
- arch/x86/events/intel/pt.c                       | 5 +++--
- drivers/hwtracing/coresight/coresight-etm-perf.c | 6 +++---
- drivers/perf/arm_spe_pmu.c                       | 6 +++---
- include/linux/perf_event.h                       | 2 +-
- kernel/events/ring_buffer.c                      | 2 +-
- 7 files changed, 17 insertions(+), 14 deletions(-)
+Changes for V5:
+. Went from a char * to a u64 for ioctl argument (GKH).
+. Added a better description of the problem being fixed to
+  the cover letter (GKH).
 
-diff --git a/arch/s390/kernel/perf_cpum_sf.c b/arch/s390/kernel/perf_cpum_sf.c
-index 7bf604ff50a1..df92c2af99b6 100644
---- a/arch/s390/kernel/perf_cpum_sf.c
-+++ b/arch/s390/kernel/perf_cpum_sf.c
-@@ -1600,7 +1600,7 @@ static void aux_sdb_init(unsigned long sdb)
- 
- /*
-  * aux_buffer_setup() - Setup AUX buffer for diagnostic mode sampling
-- * @cpu:	On which to allocate, -1 means current
-+ * @event:	Event the buffer is setup for, event->cpu == -1 means current
-  * @pages:	Array of pointers to buffer pages passed from perf core
-  * @nr_pages:	Total pages
-  * @snapshot:	Flag for snapshot mode
-@@ -1612,8 +1612,8 @@ static void aux_sdb_init(unsigned long sdb)
-  *
-  * Return the private AUX buffer structure if success or NULL if fails.
-  */
--static void *aux_buffer_setup(int cpu, void **pages, int nr_pages,
--			      bool snapshot)
-+static void *aux_buffer_setup(struct perf_event *event, void **pages,
-+			      int nr_pages, bool snapshot)
- {
- 	struct sf_buffer *sfb;
- 	struct aux_buffer *aux;
-diff --git a/arch/x86/events/intel/bts.c b/arch/x86/events/intel/bts.c
-index 24ffa1e88cf9..7139f6bf27ad 100644
---- a/arch/x86/events/intel/bts.c
-+++ b/arch/x86/events/intel/bts.c
-@@ -77,10 +77,12 @@ static size_t buf_size(struct page *page)
- }
- 
- static void *
--bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
-+bts_buffer_setup_aux(struct perf_event *event, void **pages,
-+		     int nr_pages, bool overwrite)
- {
- 	struct bts_buffer *buf;
- 	struct page *page;
-+	int cpu = event->cpu;
- 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
- 	unsigned long offset;
- 	size_t size = nr_pages << PAGE_SHIFT;
-diff --git a/arch/x86/events/intel/pt.c b/arch/x86/events/intel/pt.c
-index 3a0aa83cbd07..f7ec5c5fbf0a 100644
---- a/arch/x86/events/intel/pt.c
-+++ b/arch/x86/events/intel/pt.c
-@@ -1104,10 +1104,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
-  * Return:	Our private PT buffer structure.
-  */
- static void *
--pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
-+pt_buffer_setup_aux(struct perf_event *event, void **pages,
-+		    int nr_pages, bool snapshot)
- {
- 	struct pt_buffer *buf;
--	int node, ret;
-+	int node, ret, cpu = event->cpu;
- 
- 	if (!nr_pages)
- 		return NULL;
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index abe8249b893b..f21eb28b6782 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -177,15 +177,15 @@ static void etm_free_aux(void *data)
- 	schedule_work(&event_data->work);
- }
- 
--static void *etm_setup_aux(int event_cpu, void **pages,
-+static void *etm_setup_aux(struct perf_event *event, void **pages,
- 			   int nr_pages, bool overwrite)
- {
--	int cpu;
-+	int cpu = event->cpu;
- 	cpumask_t *mask;
- 	struct coresight_device *sink;
- 	struct etm_event_data *event_data = NULL;
- 
--	event_data = alloc_event_data(event_cpu);
-+	event_data = alloc_event_data(cpu);
- 	if (!event_data)
- 		return NULL;
- 	INIT_WORK(&event_data->work, free_event_data);
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 54ec278d2fc4..4dcd7bf14dcc 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -824,10 +824,10 @@ static void arm_spe_pmu_read(struct perf_event *event)
- {
- }
- 
--static void *arm_spe_pmu_setup_aux(int cpu, void **pages, int nr_pages,
--				   bool snapshot)
-+static void *arm_spe_pmu_setup_aux(struct perf_event *event, void **pages,
-+				   int nr_pages, bool snapshot)
- {
--	int i;
-+	int i, cpu = event->cpu;
- 	struct page **pglist;
- 	struct arm_spe_pmu_buf *buf;
- 
-diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
-index 8e69b7e309e7..b772ea2441a7 100644
---- a/include/linux/perf_event.h
-+++ b/include/linux/perf_event.h
-@@ -420,7 +420,7 @@ struct pmu {
- 	/*
- 	 * Set up pmu-private data structures for an AUX area
- 	 */
--	void *(*setup_aux)		(int cpu, void **pages,
-+	void *(*setup_aux)		(struct perf_event *event, void **pages,
- 					 int nr_pages, bool overwrite);
- 					/* optional */
- 
-diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
-index 4a9937076331..857308295f63 100644
---- a/kernel/events/ring_buffer.c
-+++ b/kernel/events/ring_buffer.c
-@@ -658,7 +658,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
- 			goto out;
- 	}
- 
--	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
-+	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
- 					     overwrite);
- 	if (!rb->aux_priv)
- 		goto out;
+Changes for V4:
+. Made passing of information between ioctl() and PMU simpler.
+
+Mathieu Poirier (6):
+  perf: Introduce ioctl to communicate driver configuration to kernel
+  perf/core: Use ioctl to communicate driver configuration to kernel
+  perf/aux: Make perf_event accessible to setup_aux()
+  coresight: Use PMU driver configuration for sink selection
+  perf tools: Make perf_evsel accessible to PMU driver configuration
+    code
+  perf tools: Use ioctl function to send sink information to kernel
+
+ arch/s390/kernel/perf_cpum_sf.c                  |  6 +-
+ arch/x86/events/intel/bts.c                      |  4 +-
+ arch/x86/events/intel/pt.c                       |  5 +-
+ drivers/hwtracing/coresight/coresight-etm-perf.c | 80 +++++++++++++++++-----
+ drivers/perf/arm_spe_pmu.c                       |  6 +-
+ include/linux/perf_event.h                       | 40 ++++++++++-
+ include/uapi/linux/perf_event.h                  |  1 +
+ kernel/events/core.c                             | 67 +++++++++++++++++++
+ kernel/events/ring_buffer.c                      |  2 +-
+ tools/include/uapi/linux/perf_event.h            |  1 +
+ tools/perf/arch/arm/util/cs-etm.c                | 84 +++++++++++++++++++++++-
+ tools/perf/arch/arm/util/cs-etm.h                |  3 +-
+ tools/perf/util/drv_configs.c                    | 30 ++-------
+ tools/perf/util/evsel.c                          |  6 ++
+ tools/perf/util/evsel.h                          |  1 +
+ tools/perf/util/pmu.h                            |  3 +-
+ 16 files changed, 287 insertions(+), 52 deletions(-)
+
 -- 
 2.7.4
 
