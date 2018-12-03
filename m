@@ -2,79 +2,102 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 537AEC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:54:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D527EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:55:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 222BA20848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:54:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9499B20848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:55:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ckSChnnu";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="XRFT7NNc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 222BA20848
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d6yqJ+bl"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9499B20848
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RwAcEEkPOg6A7jIP16JlQdx/0lJKiAEKdxui0uzPDFk=; b=ckSChnnuTx5oA0
-	ilgCariChGaGts+ZNSQkNQMgqXBk/7GAUkoVA4UXeOo35eImjApIsjPDtB/PqP6LMkHxit3/usVWN
-	PBQvDeAt9bQ+edLeqbmEPcGnXGbygvg+LMq/AQlWizrI/deIzOVqng3V8xPJZtCDOS53q8Ibe4HnQ
-	85vxkAaju9PXTuP2lv1Ldey5AU6M30uPE2JgOdzxD4wNiZq0xjbGlb6pwB0LwadEW3xMeAAajERru
-	7u6oY9k1CcTealwlBxBbN8E5O4+x/Xm1dEHVTc0G9XVOsokaWhhyTBINWXRGqMDZ4J11mBBm2MtVl
-	iisL37MFPHYIeVbL8nVw==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
+	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
+	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
+	:Resent-Message-ID:List-Owner;
+	bh=022kTbbh73GXy3CyPO+0A3NtgEkFHIQX2hMs+acnZkc=; b=d6yqJ+blggfi6VGwqEMSociX70
+	bSOf9Im66goZEqvqJInBF9fyLjzY0PKexP+IoxKIABf/JNOH69tRXLY8HsYB2Ot2WOQgCgeQwjxBP
+	WPuab7HcKNEfZOFiA146iN1nDrVVLJn7xIkI58dplfJRzMewrGaEWJ0Vkw+25XAuwCJTxfY1HzcGG
+	EgPNUY0MfSDyxmmJZSqu6IOEI2aI0TtJB7mRRtlNYQu+VU7uxy7j5PqD+XtlqZPbCbPKBUxQg0/0P
+	I7rMLf5n+t02PehS5J/Axpf8NDWqVlWhtHLXRrgUFTY2dNkeJ/vLnwXZZZiZh3w0SneZLArkAaatU
+	MMQwgvoQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqYH-0004Bf-8m; Mon, 03 Dec 2018 15:54:29 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gTqZA-0005ov-Ny; Mon, 03 Dec 2018 15:55:24 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqY9-0003ir-51
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:54:23 +0000
-Received: from mail-qt1-f174.google.com (mail-qt1-f174.google.com
- [209.85.160.174])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 32ADF20881
- for <linux-arm-kernel@lists.infradead.org>;
- Mon,  3 Dec 2018 15:54:10 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543852450;
- bh=zPkBlPtwUJ4e/hJsU/+mrYF7VvXkV+coF16HNC2xL1A=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=XRFT7NNcurH8Qm8xmevCDaDQd24ZeFhkid1MY/UBtNk/KLlIJdoYWWFkPE2Xohexs
- +8tbs31kuhHZlVTP5BINk+it+qVZ+7GHf21Uey6l/ofxltGApXkqkyVu3Vgq6KWHzD
- ZiHpfahDwlzwIwSbD7oyXStJN+xNxpJwJIXrsLP0=
-Received: by mail-qt1-f174.google.com with SMTP id d18so14252372qto.8
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 07:54:10 -0800 (PST)
-X-Gm-Message-State: AA+aEWZAdm6RhqU+qjaevVDw+Sxyc1fIpW0W7W4+g5vGNt6axjZW7Z4m
- mL/sNMN6VbwB/P1ZYAjyfya8EayFXUw/0hapNA==
-X-Google-Smtp-Source: AFSGD/VWWsrKpQup9mQybfjJ6mMLlZgPdcX0XpE+Rn0txEtmCCKSO3FBTxaCtjBgTyPwzi0zs/hDyZW0mAqI6CB5uHU=
-X-Received: by 2002:ac8:6b18:: with SMTP id w24mr16126319qts.144.1543852449415; 
- Mon, 03 Dec 2018 07:54:09 -0800 (PST)
-MIME-Version: 1.0
-References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
- <20181121033652.12247-7-manivannan.sadhasivam@linaro.org>
-In-Reply-To: <20181121033652.12247-7-manivannan.sadhasivam@linaro.org>
-From: Rob Herring <robh+dt@kernel.org>
-Date: Mon, 3 Dec 2018 09:53:57 -0600
-X-Gmail-Original-Message-ID: <CAL_JsqJ=88ORdgbRDn+VWk9=ydShidqwOxdAMfDbH4W2drnXzA@mail.gmail.com>
-Message-ID: <CAL_JsqJ=88ORdgbRDn+VWk9=ydShidqwOxdAMfDbH4W2drnXzA@mail.gmail.com>
-Subject: Re: [PATCH v2 06/15] arm: dts: Add devicetree for OrangePi 2G IoT
- board
-To: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
- Arnd Bergmann <arnd@arndb.de>, Olof Johansson <olof@lixom.net>
+ id 1gTqS7-0007E8-1N
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:48:09 +0000
+Received: from pps.filterd (m0098421.ppops.net [127.0.0.1])
+ by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wB3FiCTG000730
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 3 Dec 2018 10:47:59 -0500
+Received: from e06smtp04.uk.ibm.com (e06smtp04.uk.ibm.com [195.75.94.100])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2p5680mjjs-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 03 Dec 2018 10:47:58 -0500
+Received: from localhost
+ by e06smtp04.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
+ Mon, 3 Dec 2018 15:47:50 -0000
+Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
+ by e06smtp04.uk.ibm.com (192.168.101.134) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Mon, 3 Dec 2018 15:47:44 -0000
+Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
+ [9.149.105.62])
+ by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wB3FlhRm57606288
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 3 Dec 2018 15:47:43 GMT
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 6931FAE055;
+ Mon,  3 Dec 2018 15:47:43 +0000 (GMT)
+Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 2BADBAE05A;
+ Mon,  3 Dec 2018 15:47:40 +0000 (GMT)
+Received: from rapoport-lnx (unknown [9.148.206.196])
+ by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon,  3 Dec 2018 15:47:40 +0000 (GMT)
+Received: by rapoport-lnx (sSMTP sendmail emulation);
+ Mon, 03 Dec 2018 17:47:39 +0200
+From: Mike Rapoport <rppt@linux.ibm.com>
+To: Andrew Morton <akpm@linux-foundation.org>
+Subject: [PATCH v2 5/6] arch: simplify several early memory allocations
+Date: Mon,  3 Dec 2018 17:47:14 +0200
+X-Mailer: git-send-email 2.7.4
+In-Reply-To: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
+References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
+X-TM-AS-GCONF: 00
+x-cbid: 18120315-0016-0000-0000-00000231613D
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 18120315-0017-0000-0000-0000328966AB
+Message-Id: <1543852035-26634-6-git-send-email-rppt@linux.ibm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-03_09:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1812030148
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_075421_484267_4FF4AFAA 
-X-CRM114-Status: GOOD (  15.33  )
+X-CRM114-CacheID: sfid-20181203_074807_223814_89A85EA2 
+X-CRM114-Status: GOOD (  30.27  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,43 +109,263 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, Jason Cooper <jason@lakedaemon.net>,
- Marc Zyngier <marc.zyngier@arm.com>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Linus Walleij <linus.walleij@linaro.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Amit Kucheria <amit.kucheria@linaro.org>,
- "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
- Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
- overseas.sales@unisoc.com, =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>, zhao_steven@263.net
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
+ Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
+ sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
+ Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
+ Mike Rapoport <rppt@linux.ibm.com>, Mark Salter <msalter@redhat.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
+ openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
+ linux-kernel@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
+ "David S. Miller" <davem@davemloft.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gVHVlLCBOb3YgMjAsIDIwMTggYXQgOTozOCBQTSBNYW5pdmFubmFuIFNhZGhhc2l2YW0KPG1h
-bml2YW5uYW4uc2FkaGFzaXZhbUBsaW5hcm8ub3JnPiB3cm90ZToKPgo+IEFkZCBpbml0aWFsIGRl
-dmljZXRyZWUgc3VwcG9ydCBmb3IgT3JhbmdlUGkgMkcgSW9UIGJvYXJkIGZyb20gWHVubG9uZy4K
-Pgo+IFNpZ25lZC1vZmYtYnk6IEFuZHJlYXMgRsOkcmJlciA8YWZhZXJiZXJAc3VzZS5kZT4KPiBT
-aWduZWQtb2ZmLWJ5OiBNYW5pdmFubmFuIFNhZGhhc2l2YW0gPG1hbml2YW5uYW4uc2FkaGFzaXZh
-bUBsaW5hcm8ub3JnPgo+IC0tLQo+ICBhcmNoL2FybS9ib290L2R0cy9NYWtlZmlsZSAgICAgICAg
-ICAgICAgICAgICAgfCAgMiArCj4gIC4uLi9ib290L2R0cy9yZGE4ODEwcGwtb3JhbmdlcGktMmct
-aW90LmR0cyAgICB8IDQwICsrKysrKysrKysrKysrKysrKysKPiAgMiBmaWxlcyBjaGFuZ2VkLCA0
-MiBpbnNlcnRpb25zKCspCj4gIGNyZWF0ZSBtb2RlIDEwMDY0NCBhcmNoL2FybS9ib290L2R0cy9y
-ZGE4ODEwcGwtb3JhbmdlcGktMmctaW90LmR0cwo+Cj4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jv
-b3QvZHRzL01ha2VmaWxlIGIvYXJjaC9hcm0vYm9vdC9kdHMvTWFrZWZpbGUKPiBpbmRleCBiMGU5
-NjZkNjI1YjkuLmEwZmRhZDhmMTBkZCAxMDA2NDQKPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9N
-YWtlZmlsZQo+ICsrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxlCj4gQEAgLTgwNiw2ICs4
-MDYsOCBAQCBkdGItJChDT05GSUdfQVJDSF9RQ09NKSArPSBcCj4gICAgICAgICBxY29tLW1zbTg5
-NzQtc29ueS14cGVyaWEtY2FzdG9yLmR0YiBcCj4gICAgICAgICBxY29tLW1zbTg5NzQtc29ueS14
-cGVyaWEtaG9uYW1pLmR0YiBcCj4gICAgICAgICBxY29tLW1kbTk2MTUtd3A4NTQ4LW1hbmdvaC1n
-cmVlbi5kdGIKPiArZHRiLSQoQ09ORklHX0FSQ0hfUkRBKSArPSBcCj4gKyAgICAgICByZGE4ODEw
-cGwtb3JhbmdlcGktMmctaW90LmR0Ygo+ICBkdGItJChDT05GSUdfQVJDSF9SRUFMVklFVykgKz0g
-XAoKUXVlc3Rpb24gZm9yIEFybmQvT2xvZjogY2FuIHdlICpwbGVhc2UqIHN0YXJ0IHB1dHRpbmcg
-bmV3IFNvQyBmYW1pbGllcwppbiBzdWItZGlycz8KClJvYgoKX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QK
-bGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRl
-YWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5lbAo=
+There are several early memory allocations in arch/ code that use
+memblock_phys_alloc() to allocate memory, convert the returned physical
+address to the virtual address and then set the allocated memory to zero.
+
+Exactly the same behaviour can be achieved simply by calling
+memblock_alloc(): it allocates the memory in the same way as
+memblock_phys_alloc(), then it performs the phys_to_virt() conversion and
+clears the allocated memory.
+
+Replace the longer sequence with a simpler call to memblock_alloc().
+
+Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+---
+ arch/arm/mm/mmu.c                     |  4 +---
+ arch/c6x/mm/dma-coherent.c            |  9 ++-------
+ arch/nds32/mm/init.c                  | 12 ++++--------
+ arch/powerpc/kernel/setup-common.c    |  4 ++--
+ arch/powerpc/mm/pgtable_32.c          |  4 +---
+ arch/powerpc/mm/ppc_mmu_32.c          |  3 +--
+ arch/powerpc/platforms/powernv/opal.c |  3 +--
+ arch/sparc/kernel/prom_64.c           |  7 ++-----
+ arch/sparc/mm/init_64.c               |  9 +++------
+ arch/unicore32/mm/mmu.c               |  4 +---
+ 10 files changed, 18 insertions(+), 41 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index f5cc1cc..0a04c9a5 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -721,9 +721,7 @@ EXPORT_SYMBOL(phys_mem_access_prot);
+ 
+ static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
+ {
+-	void *ptr = __va(memblock_phys_alloc(sz, align));
+-	memset(ptr, 0, sz);
+-	return ptr;
++	return memblock_alloc(sz, align);
+ }
+ 
+ static void __init *early_alloc(unsigned long sz)
+diff --git a/arch/c6x/mm/dma-coherent.c b/arch/c6x/mm/dma-coherent.c
+index 01305c7..ffc49e2 100644
+--- a/arch/c6x/mm/dma-coherent.c
++++ b/arch/c6x/mm/dma-coherent.c
+@@ -118,8 +118,6 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
+  */
+ void __init coherent_mem_init(phys_addr_t start, u32 size)
+ {
+-	phys_addr_t bitmap_phys;
+-
+ 	if (!size)
+ 		return;
+ 
+@@ -135,11 +133,8 @@ void __init coherent_mem_init(phys_addr_t start, u32 size)
+ 	if (dma_size & (PAGE_SIZE - 1))
+ 		++dma_pages;
+ 
+-	bitmap_phys = memblock_phys_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
+-					  sizeof(long));
+-
+-	dma_bitmap = phys_to_virt(bitmap_phys);
+-	memset(dma_bitmap, 0, dma_pages * PAGE_SIZE);
++	dma_bitmap = memblock_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
++				    sizeof(long));
+ }
+ 
+ static void c6x_dma_sync(struct device *dev, phys_addr_t paddr, size_t size,
+diff --git a/arch/nds32/mm/init.c b/arch/nds32/mm/init.c
+index 131104b..9f19be8 100644
+--- a/arch/nds32/mm/init.c
++++ b/arch/nds32/mm/init.c
+@@ -80,8 +80,7 @@ static void __init map_ram(void)
+ 		}
+ 
+ 		/* Alloc one page for holding PTE's... */
+-		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-		memset(pte, 0, PAGE_SIZE);
++		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 		set_pmd(pme, __pmd(__pa(pte) + _PAGE_KERNEL_TABLE));
+ 
+ 		/* Fill the newly allocated page with PTE'S */
+@@ -113,8 +112,7 @@ static void __init fixedrange_init(void)
+ 	pgd = swapper_pg_dir + pgd_index(vaddr);
+ 	pud = pud_offset(pgd, vaddr);
+ 	pmd = pmd_offset(pud, vaddr);
+-	fixmap_pmd_p = (pmd_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-	memset(fixmap_pmd_p, 0, PAGE_SIZE);
++	fixmap_pmd_p = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	set_pmd(pmd, __pmd(__pa(fixmap_pmd_p) + _PAGE_KERNEL_TABLE));
+ 
+ #ifdef CONFIG_HIGHMEM
+@@ -126,8 +124,7 @@ static void __init fixedrange_init(void)
+ 	pgd = swapper_pg_dir + pgd_index(vaddr);
+ 	pud = pud_offset(pgd, vaddr);
+ 	pmd = pmd_offset(pud, vaddr);
+-	pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-	memset(pte, 0, PAGE_SIZE);
++	pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	set_pmd(pmd, __pmd(__pa(pte) + _PAGE_KERNEL_TABLE));
+ 	pkmap_page_table = pte;
+ #endif /* CONFIG_HIGHMEM */
+@@ -152,8 +149,7 @@ void __init paging_init(void)
+ 	fixedrange_init();
+ 
+ 	/* allocate space for empty_zero_page */
+-	zero_page = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-	memset(zero_page, 0, PAGE_SIZE);
++	zero_page = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	zone_sizes_init();
+ 
+ 	empty_zero_page = virt_to_page(zero_page);
+diff --git a/arch/powerpc/kernel/setup-common.c b/arch/powerpc/kernel/setup-common.c
+index 93ee370..8f6c763 100644
+--- a/arch/powerpc/kernel/setup-common.c
++++ b/arch/powerpc/kernel/setup-common.c
+@@ -459,8 +459,8 @@ void __init smp_setup_cpu_maps(void)
+ 
+ 	DBG("smp_setup_cpu_maps()\n");
+ 
+-	cpu_to_phys_id = __va(memblock_phys_alloc(nr_cpu_ids * sizeof(u32), __alignof__(u32)));
+-	memset(cpu_to_phys_id, 0, nr_cpu_ids * sizeof(u32));
++	cpu_to_phys_id = memblock_alloc(nr_cpu_ids * sizeof(u32),
++					__alignof__(u32));
+ 
+ 	for_each_node_by_type(dn, "cpu") {
+ 		const __be32 *intserv;
+diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
+index bda3c6f..9931e68 100644
+--- a/arch/powerpc/mm/pgtable_32.c
++++ b/arch/powerpc/mm/pgtable_32.c
+@@ -50,9 +50,7 @@ __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
+ 	if (slab_is_available()) {
+ 		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
+ 	} else {
+-		pte = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-		if (pte)
+-			clear_page(pte);
++		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
+ 	}
+ 	return pte;
+ }
+diff --git a/arch/powerpc/mm/ppc_mmu_32.c b/arch/powerpc/mm/ppc_mmu_32.c
+index f6f575b..fddf823 100644
+--- a/arch/powerpc/mm/ppc_mmu_32.c
++++ b/arch/powerpc/mm/ppc_mmu_32.c
+@@ -224,8 +224,7 @@ void __init MMU_init_hw(void)
+ 	 * Find some memory for the hash table.
+ 	 */
+ 	if ( ppc_md.progress ) ppc_md.progress("hash:find piece", 0x322);
+-	Hash = __va(memblock_phys_alloc(Hash_size, Hash_size));
+-	memset(Hash, 0, Hash_size);
++	Hash = memblock_alloc(Hash_size, Hash_size);
+ 	_SDR1 = __pa(Hash) | SDR1_LOW_BITS;
+ 
+ 	Hash_end = (struct hash_pte *) ((unsigned long)Hash + Hash_size);
+diff --git a/arch/powerpc/platforms/powernv/opal.c b/arch/powerpc/platforms/powernv/opal.c
+index beed86f..29ee2ea 100644
+--- a/arch/powerpc/platforms/powernv/opal.c
++++ b/arch/powerpc/platforms/powernv/opal.c
+@@ -171,8 +171,7 @@ int __init early_init_dt_scan_recoverable_ranges(unsigned long node,
+ 	/*
+ 	 * Allocate a buffer to hold the MC recoverable ranges.
+ 	 */
+-	mc_recoverable_range =__va(memblock_phys_alloc(size, __alignof__(u64)));
+-	memset(mc_recoverable_range, 0, size);
++	mc_recoverable_range = memblock_alloc(size, __alignof__(u64));
+ 
+ 	for (i = 0; i < mc_recoverable_range_len; i++) {
+ 		mc_recoverable_range[i].start_addr =
+diff --git a/arch/sparc/kernel/prom_64.c b/arch/sparc/kernel/prom_64.c
+index c37955d..2a17665 100644
+--- a/arch/sparc/kernel/prom_64.c
++++ b/arch/sparc/kernel/prom_64.c
+@@ -34,16 +34,13 @@
+ 
+ void * __init prom_early_alloc(unsigned long size)
+ {
+-	unsigned long paddr = memblock_phys_alloc(size, SMP_CACHE_BYTES);
+-	void *ret;
++	void *ret = memblock_alloc(size, SMP_CACHE_BYTES);
+ 
+-	if (!paddr) {
++	if (!ret) {
+ 		prom_printf("prom_early_alloc(%lu) failed\n", size);
+ 		prom_halt();
+ 	}
+ 
+-	ret = __va(paddr);
+-	memset(ret, 0, size);
+ 	prom_early_allocated += size;
+ 
+ 	return ret;
+diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
+index 3c8aac2..52884f4 100644
+--- a/arch/sparc/mm/init_64.c
++++ b/arch/sparc/mm/init_64.c
+@@ -1089,16 +1089,13 @@ static void __init allocate_node_data(int nid)
+ 	struct pglist_data *p;
+ 	unsigned long start_pfn, end_pfn;
+ #ifdef CONFIG_NEED_MULTIPLE_NODES
+-	unsigned long paddr;
+ 
+-	paddr = memblock_phys_alloc_try_nid(sizeof(struct pglist_data),
+-					    SMP_CACHE_BYTES, nid);
+-	if (!paddr) {
++	NODE_DATA(nid) = memblock_alloc_node(sizeof(struct pglist_data),
++					     SMP_CACHE_BYTES, nid);
++	if (!NODE_DATA(nid)) {
+ 		prom_printf("Cannot allocate pglist_data for nid[%d]\n", nid);
+ 		prom_halt();
+ 	}
+-	NODE_DATA(nid) = __va(paddr);
+-	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+ 
+ 	NODE_DATA(nid)->node_id = nid;
+ #endif
+diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
+index 040a8c2..50d8c1a 100644
+--- a/arch/unicore32/mm/mmu.c
++++ b/arch/unicore32/mm/mmu.c
+@@ -143,9 +143,7 @@ static void __init build_mem_type_table(void)
+ 
+ static void __init *early_alloc(unsigned long sz)
+ {
+-	void *ptr = __va(memblock_phys_alloc(sz, sz));
+-	memset(ptr, 0, sz);
+-	return ptr;
++	return memblock_alloc(sz, sz);
+ }
+ 
+ static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
+-- 
+2.7.4
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
