@@ -2,64 +2,93 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7059BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:07:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D3948C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:19:55 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 41E0220848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:07:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A1B8820834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:19:55 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VyliWCPE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41E0220848
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iFG0TIKr";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=baylibre-com.20150623.gappssmtp.com header.i=@baylibre-com.20150623.gappssmtp.com header.b="uxiizEiF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A1B8820834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=baylibre.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=/1TPSABkBlvdJv51hRt0wO/eYg0dsm+98VE9/J90L5U=; b=VyliWCPEZo+jpUrvDGZ1mQ0M5
-	zjPSJ6JAJ86oiLJPM1K+TEGDcd1eLddDVwNipCEbTntVPGqLbr/8KITNBeI3wOgLhC0zC7bIhUa3L
-	o76L9c6EVnnxxFwxOhpimPlPXA2HjMuN/axBZdvVorhZ8Ls7bIuFkWsOLYe7L3vEARhfYiOJDhEjT
-	dalRawgnr8+E4C/Oqrv6d3DSY1479kTYMc10qKP/bsdf8xhf6AGBTF6Q4+Et1MC8CuvqbKL7CpR5D
-	Z9qyXZikeeFSll2libFEdjnE/0ZqsolubAhSQ2mPh/Rbp4Vz/nC1MO78GPyLCEauBExv3vSnBu8/I
-	DBMp+3toA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Mime-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=z+qV/t9+7kWjvKHbpW3QCuI6z058E5+I7p0o4HwJTv8=; b=iFG0TIKrXTI7d+
+	vrJMgNt5yATff1s+gKRftMjWv5JK8rnJgwjeLFDiNAFOrKxOa8pNXdBo+Y8Qa/IgXlIqSULym6iqZ
+	Q98ktjURJOZrKoA7872DFUYCqhvnkKITHhaE+MFwG7UgO08Dc/wrEU90YWSXjkbMP5oeykNA7rLEB
+	paL0TxSUIo7xz7wph4dT0vwqGldyjYZbUDQMWrfqejknbKHTfKsgwQrx0ghBAokNMKOU/Grn/G0k4
+	ulM3q1wDSXL/qcTgW0kn+R4yo+Uqzzh+VSG+owtU56jd8AJ/plBG3hENRlwvnqPEk6koCg6sctuiD
+	u4hrGywAm2hvi0otACAA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTkBs-00063Q-Ln; Mon, 03 Dec 2018 09:06:56 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTkBb-000629-U4
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:06:42 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id 3623220787; Mon,  3 Dec 2018 10:06:28 +0100 (CET)
-Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
- [90.88.18.158])
- by mail.bootlin.com (Postfix) with ESMTPSA id EEA002071D;
- Mon,  3 Dec 2018 10:06:17 +0100 (CET)
-Date: Mon, 3 Dec 2018 10:06:18 +0100
-From: Maxime Ripard <maxime.ripard@bootlin.com>
-To: Chen-Yu Tsai <wens@csie.org>
-Subject: Re: [PATCH 04/15] dt-bindings: rtc: sun6i-rtc: Export internal RC
- oscillator
-Message-ID: <20181203090618.u4bi3owfpk2kcqik@flea>
-References: <20181128093013.24442-1-wens@csie.org>
- <20181128093013.24442-5-wens@csie.org>
- <20181128103219.b625lttcgoluhgz5@flea>
- <CAGb2v67jPi-RFFkVrzHeh2XHeZV7ZN0tPCE=cOTpd6RQayH_Kg@mail.gmail.com>
-MIME-Version: 1.0
-In-Reply-To: <CAGb2v67jPi-RFFkVrzHeh2XHeZV7ZN0tPCE=cOTpd6RQayH_Kg@mail.gmail.com>
-User-Agent: NeoMutt/20180716
+	id 1gTkOI-0002jo-BP; Mon, 03 Dec 2018 09:19:46 +0000
+Received: from mail-wr1-x443.google.com ([2a00:1450:4864:20::443])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTkOD-0002hL-5B
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:19:42 +0000
+Received: by mail-wr1-x443.google.com with SMTP id v13so11283709wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 01:19:30 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=baylibre-com.20150623.gappssmtp.com; s=20150623;
+ h=message-id:subject:from:to:cc:date:in-reply-to:references
+ :user-agent:mime-version:content-transfer-encoding;
+ bh=+BnCJ5QVg9I98pcBwY5xi5gWUj5V8q8GaqKmWts3Hoo=;
+ b=uxiizEiFZdN2JBo0WJit6A7VBK2FnJfOE5oSabXsIZKUBXUNX2SKJpVotcnDMXG0ix
+ S9w/xvzbnt4KjB6leOMZEEQLHAJz9kRePGFkZ/f4wzVJqYWRWnwxgwtIgMWCkrNfz4rl
+ OzuF4KdIHhdZO33FzOvjLhLb/6aW45+GvoiWQwZWIJ7p7twfH0O4haNljBCw6Dcv1ZyP
+ 897dEI7Vjw7cYPtLLc3mLTiUHdLyCzyLmOXci1nCFKccyZUnJbXCtm0F0Mep/0akKoMo
+ Vcxuk0A8ST0ZRKS9namkwPZHJVSmp3GyXOCn4Bvs30kf5o6fTWGdmnYbt7Oo4FAZTAC9
+ kF6Q==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:message-id:subject:from:to:cc:date:in-reply-to
+ :references:user-agent:mime-version:content-transfer-encoding;
+ bh=+BnCJ5QVg9I98pcBwY5xi5gWUj5V8q8GaqKmWts3Hoo=;
+ b=hfj2XuwNG/o7sJ0YC+SHULIIPSWsgw6aLHnc/kBM3jCT0tPCpJFpJebiQaXLA1jlNW
+ 2cQUV7tu/y/nF7g/ZTyJY6Y3VeWRsRoKQNVgw6PI4XqBLbdi/f8ck51RDWU8jk9MHRKe
+ CRTSDUdooFtmLa3Unk5LSjHnE8FbMuY+8B0YlTCGOS0B1BbEQ5ENOpZs+1xUrOitwwfv
+ 0/8OA0F3TRVaLWsUAZ+d0gAiZwTWfQHz5BEpVzBP8swxvO1SjuEPW4odRnzNNUQ9yJ9S
+ 5MbTfMvtl8rvkXVOICUIuhWmhCxN0PpuQ2KD1mNoYa1xqtjUnEoE81WXZdj4KbffjCUt
+ al1w==
+X-Gm-Message-State: AA+aEWYgYzjaN13sEF+ZS76zM1wUwWCSxJHtLHCQ4dWER+JQmp6cXip0
+ JKS6SXnclc5Y+AoJHAuqjPXvsGxm7V0=
+X-Google-Smtp-Source: AFSGD/WM+fQGnzxJgnI+MLIoGQYgDRg+S+2o+SmT4aAmlqw4iRZBaAH/AgJ0/Tf1Q6z+xTNHHSpg1w==
+X-Received: by 2002:a5d:5089:: with SMTP id a9mr13665052wrt.327.1543828769309; 
+ Mon, 03 Dec 2018 01:19:29 -0800 (PST)
+Received: from boomer.baylibre.com ([2a01:e34:eeb6:4690:106b:bae3:31ed:7561])
+ by smtp.gmail.com with ESMTPSA id
+ a12sm10578258wro.18.2018.12.03.01.19.27
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 03 Dec 2018 01:19:28 -0800 (PST)
+Message-ID: <7a2f88d849ada782de6e27676518d0b9897e30e7.camel@baylibre.com>
+Subject: Re: [PATCH 2/2] irqchip/meson-gpio: Add support for Meson-G12A SoC
+From: Jerome Brunet <jbrunet@baylibre.com>
+To: Xingyu Chen <xingyu.chen@amlogic.com>, Marc Zyngier
+ <marc.zyngier@arm.com>,  Jason Cooper <jason@lakedaemon.net>, Thomas
+ Gleixner <tglx@linutronix.de>, Kevin Hilman <khilman@baylibre.com>
+Date: Mon, 03 Dec 2018 10:19:26 +0100
+In-Reply-To: <20181203061324.36248-3-xingyu.chen@amlogic.com>
+References: <20181203061324.36248-1-xingyu.chen@amlogic.com>
+ <20181203061324.36248-3-xingyu.chen@amlogic.com>
+User-Agent: Evolution 3.30.2 (3.30.2-2.fc29) 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_010640_314325_6C4D3892 
-X-CRM114-Status: GOOD (  26.09  )
+X-CRM114-CacheID: sfid-20181203_011941_197477_75B4AF53 
+X-CRM114-Status: GOOD (  17.74  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,113 +100,69 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Alessandro Zummo <a.zummo@towertech.it>, alexandre.belloni@bootlin.com,
- devicetree <devicetree@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Mike Turquette <mturquette@baylibre.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, linux-sunxi@googlegroups.com,
- Rob Herring <robh+dt@kernel.org>, linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-rtc@vger.kernel.org
-Content-Type: multipart/mixed; boundary="===============0476941539819645742=="
+Cc: Rob Herring <robh@kernel.org>, Jianxin Pan <jianxin.pan@amlogic.com>,
+ linux-kernel@vger.kernel.org, Carlo Caione <carlo@caione.org>,
+ linux-amlogic@lists.infradead.org, linux-arm-kernel@lists.infradead.org,
+ Heiner Kallweit <hkallweit1@gmail.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Mon, 2018-12-03 at 14:13 +0800, Xingyu Chen wrote:
+> The Meson-G12A SoC uses the same GPIO interrupt controller IP block as the
+> other Meson SoCs, A totle of 100 pins can be spied on, which is the sum of:
+> 
+> - 223:100 undefined (no interrupt)
+> - 99:97   3 pins on bank GPIOE
+> - 96:77   20 pins on bank GPIOX
+> - 76:61   16 pins on bank GPIOA
+> - 60:53   8 pins on bank GPIOC
+> - 52:37   16 pins on bank BOOT
+> - 36:28   9 pins on bank GPIOH
+> - 27:12   16 pins on bank GPIOZ
+> - 11:0    12 pins in the AO domain
+> 
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
+> ---
+>  drivers/irqchip/irq-meson-gpio.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/drivers/irqchip/irq-meson-gpio.c b/drivers/irqchip/irq-meson-
+> gpio.c
+> index 7b531fd075b8..971e8dea069a 100644
+> --- a/drivers/irqchip/irq-meson-gpio.c
+> +++ b/drivers/irqchip/irq-meson-gpio.c
+> @@ -67,12 +67,17 @@ static const struct meson_gpio_irq_params axg_params = {
+>  	.nr_hwirq = 100,
+>  };
+>  
+> +static const struct meson_gpio_irq_params g12a_params = {
+> +	.nr_hwirq = 100,
+> +};
+> +
 
---===============0476941539819645742==
-Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="krs5icnvo4odeegk"
-Content-Disposition: inline
+Same comment as on i2c, the g12 seems compatible with the axg.
+Is this patchset patchset really necessary ?
 
-
---krs5icnvo4odeegk
-Content-Type: text/plain; charset=us-ascii
-Content-Disposition: inline
-Content-Transfer-Encoding: quoted-printable
-
-On Wed, Nov 28, 2018 at 07:18:26PM +0800, Chen-Yu Tsai wrote:
-> On Wed, Nov 28, 2018 at 6:33 PM Maxime Ripard <maxime.ripard@bootlin.com>=
- wrote:
-> >
-> > On Wed, Nov 28, 2018 at 05:30:01PM +0800, Chen-Yu Tsai wrote:
-> > > Experiments showed that on at least the H3/H5/A64 the RTC's internal
-> > > oscillator also feeds the CPUS mux in the PRCM.
-> > >
-> > > Export this clock through the device tree, instead of having to use
-> > > a dummy fixed-clock device node, for the PRCM to consume. This will
-> > > properly describe the relationship between the clocks.
-> > >
-> > > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > >  Documentation/devicetree/bindings/rtc/sun6i-rtc.txt | 3 ++-
-> > >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > >
-> > > diff --git a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt b/Do=
-cumentation/devicetree/bindings/rtc/sun6i-rtc.txt
-> > > index 78c4fb472eb7..1bd37faadecb 100644
-> > > --- a/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
-> > > +++ b/Documentation/devicetree/bindings/rtc/sun6i-rtc.txt
-> > > @@ -24,7 +24,7 @@ Required properties:
-> > >
-> > >  Required properties for new device trees
-> > >  - clocks     : phandle to the 32kHz external oscillator
-> > > -- clock-output-names : names of the two clock outputs. See below.
-> > > +- clock-output-names : names of the three clock outputs. See below.
-> > >  - #clock-cells  : must be equal to 1.
-> > >
-> > >  The RTC provides the following clocks at the given indices:
-> > > @@ -32,6 +32,7 @@ The RTC provides the following clocks at the given =
-indices:
-> > >  - 1: LOSC external output, known as X32KFOUT in the datasheet.
-> > >       This clock is not available on the A31 and is deprecated for old
-> > >       device trees still using the "allwinner,sun6i-a31-rtc" compatib=
-le.
-> > > +- 2: InternalOSC, or internal RC oscillator
-> >
-> > It seems to be required only for a few RTC though (H3, H5 and R40?)
->=20
-> IMO there's no harm in exporting it for all SoCs. I still don't know
-> if it's needed for the A31 either. And we don't have documents for the
-> PRCM stuff for any of the SoCs involved.
-
-I'm still a bit worried about this, since that means that we can't
-ever remove it from the DT interface, even though we find out it might
-cause some issues in the future.
-
-If we don't really have a need for it right now, I'd prefer not to
-expose it.
-
-Maxime
-
---=20
-Maxime Ripard, Bootlin
-Embedded Linux and Kernel engineering
-https://bootlin.com
-
---krs5icnvo4odeegk
-Content-Type: application/pgp-signature; name="signature.asc"
-
------BEGIN PGP SIGNATURE-----
-
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXATyCgAKCRDj7w1vZxhR
-xTq/AP9WIRb7HtqNFrFkdfV6uGu037o83NPO7KzWey4u31t85QEAvW7U3/PGul6i
-mu4yDZZYaKjr9keZ6pW1XNH0scK/MwY=
-=nsv4
------END PGP SIGNATURE-----
-
---krs5icnvo4odeegk--
+>  static const struct of_device_id meson_irq_gpio_matches[] = {
+>  	{ .compatible = "amlogic,meson8-gpio-intc", .data = &meson8_params },
+>  	{ .compatible = "amlogic,meson8b-gpio-intc", .data = &meson8b_params
+> },
+>  	{ .compatible = "amlogic,meson-gxbb-gpio-intc", .data = &gxbb_params
+> },
+>  	{ .compatible = "amlogic,meson-gxl-gpio-intc", .data = &gxl_params },
+>  	{ .compatible = "amlogic,meson-axg-gpio-intc", .data = &axg_params },
+> +	{ .compatible = "amlogic,meson-g12a-gpio-intc", .data = &g12a_params
+> },
+>  	{ }
+>  };
+>  
 
 
---===============0476941539819645742==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============0476941539819645742==--
-
