@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C10C1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:31:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8463AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:31:52 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 96760208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:31:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 117F82145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:31:51 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZVoHZ4Xm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="dSDEUUuX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96760208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="j5qTLDSi";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="XAEXhf3p"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 117F82145D
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,55 +26,53 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=skOuCToO1w7y+DMNUo+60YMkE6XsJFNaafmCcMrZn28=; b=ZVoHZ4XmEGfKdP
-	y6X6ctepESE8GWzfOf21q7LaZOfrVFt9jH+r0DAxOHPRHM6DpoSl5t9V1Q27IlHxObN2I+oU1aIjn
-	650m+o3ZsP0FxXM82lh3Vx0hTjmt+aKD7GsRQ3ya2pu0ub88fDGynsp3W/cvIMtikOj8ixcfiGy8R
-	GdjjJRDi78YXXm997DLKyVUD0RNZiGRXarWmwg/kvZJpHrLb+CW7psUDz2RkZIJwjaisjYMReCpKv
-	S77AvqCPcGriDabkNh8Xf5yJysascq+gQe5h15Byz5AYEcy+4GazU9EKl8TvqzGyYgKHXlZqE1B7+
-	YN/fTw4/QcfmOU3YTAFA==;
+	List-Owner; bh=VKdUs0/RBYcIF67Mhdf9AvZMdYg3sktEFG3MN/7qz+c=; b=j5qTLDSiLr+eG+
+	yArNUjIV5wmJps+WwNutoH+knW7bKx9diDKiDg1yOdlVHc9u8KiVOdy++44AvO8u2AA1xZILeQicf
+	P+qmMOQ3RSWnt3ErTVENDQ0FFbaZCzO9Feq4hy/BQEyjBuM7si3DxmzCVAQNrGTyEtEUOUgceddEP
+	sl7tZaFJ/FHATzCcnFKhzFWutdv3b1HfgIFRmONmRGYmZ8YKMFjN33u6KCT7t+Gv8LShd1lg51TxG
+	oVvJKqUFKXk9blj6IWGtJMl0xxRsm6TzQnRxcLOsgJjUq4TUSZ6VQWfPxHy2owfOkPLUkeMvvhzCg
+	cQRviZcSNoyLkttJPnHw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTt0G-0003MB-KG; Mon, 03 Dec 2018 18:31:32 +0000
+	id 1gTt0S-0003Y6-4v; Mon, 03 Dec 2018 18:31:44 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTt08-0003LE-LS
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 18:31:31 +0000
+ id 1gTt0I-0003LE-Dn
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 18:31:34 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
  d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
  References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
  Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=cvoduY6NMUcDYyIXKzYuFn0uayj+J0WpGRWrEtFaJ/A=; b=dSDEUUuXb2LErq2nZ+XcbAEMvi
- Pyc42Y8o5RtQz7NzCFppz/gAmKHSETTp9fHT+stIG1BySlg71K9p/jpdJHgfn58ygLByapE4w5rFg
- SBnnIcMDxsaWPN6Hgridu2Td7JjxthU0WQD7shr5XjsIXbsBL6Y7qPuSTuqr2hUw3jKk7xf82SyPB
- ewPHKnvkUkw5TiYHwGwVmQM5TGTzGkF2vsEb4F5jmtg70ZyM9zG68Nl8gDeS2pnGOK1IoFH+VFVne
- 68ZxUyStLMY6XQyGPJ3RjGnrhonBN8LQSM05A9OVjrqO0Tk+ZZ0erJbx4aYjUJZYu8AWdM0veZErC
- rE35EaxQ==;
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+ bh=gMemP6CVYESD7JPOg7f7tWzOngUpBjOLmcBn3e9J/LM=; b=XAEXhf3pVoMViWZLVYhtTgIgtZ
+ /JaO8o0c8xSEQsC//N+kbuQnHxxhSJfkal9yTRtMbUHit9+6atkPeNvKkOUbH8T2STKWa/bQdL1er
+ 66bZh/F1i2yJg5/4/3H6DtEeyjROFbED3Zsfdrb1XSQ73UmnKsy9ehqN2NIJEsq7SB7veQOVa02RB
+ 3lFtgJlEoIUG1xWYzdj0zY+xtXhI77x9/UQQiUqB7CJOe1SIZTlnmZE5HGE7cqvEDmad97G1kXFln
+ FkA0HMO5P/wG6tbcONy5tVLXM2Mvgkb1Bs9ZNA6F2y2niGvWMUdsg9uQ5kASnwiMwE+VYAuwd7vH7
+ 1kBv5/7A==;
+Received: from foss.arm.com ([217.140.101.70])
  by merlin.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTsd8-0001cn-Uk
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:07:40 +0000
+ id 1gTsdh-0001gl-9m
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:08:18 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3ECF0169E;
- Mon,  3 Dec 2018 10:07:27 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 660F71713;
+ Mon,  3 Dec 2018 10:08:02 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6E9973F59C;
- Mon,  3 Dec 2018 10:07:24 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 950123F59C;
+ Mon,  3 Dec 2018 10:07:59 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v7 14/25] arm64: KVM/mm: Move SEA handling behind a single
- 'claim' interface
-Date: Mon,  3 Dec 2018 18:06:02 +0000
-Message-Id: <20181203180613.228133-15-james.morse@arm.com>
+Subject: [PATCH v7 24/25] firmware: arm_sdei: Add ACPI GHES registration helper
+Date: Mon,  3 Dec 2018 18:06:12 +0000
+Message-Id: <20181203180613.228133-25-james.morse@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181203180613.228133-1-james.morse@arm.com>
 References: <20181203180613.228133-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_130739_183830_B9B97D66 
-X-CRM114-Status: GOOD (  27.77  )
+X-CRM114-CacheID: sfid-20181203_130813_564489_CFDBE2BF 
+X-CRM114-Status: GOOD (  24.06  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,235 +97,174 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-To split up APEIs in_nmi() path, the caller needs to always be
-in_nmi(). Add a helper to do the work and claim the notification.
+APEI's Generic Hardware Error Source structures do not describe
+whether the SDEI event is shared or private, as this information is
+discoverable via the API.
 
-When KVM or the arch code takes an exception that might be a RAS
-notification, it asks the APEI firmware-first code whether it wants
-to claim the exception. A future kernel-first mechanism may be queried
-afterwards, and claim the notification, otherwise we fall through
-to the existing default behaviour.
+GHES needs to know whether an event is normal or critical to avoid
+sharing locks or fixmap entries, but GHES shouldn't have to know about
+the SDEI API.
 
-The NOTIFY_SEA code was merged before considering multiple, possibly
-interacting, NMI-like notifications and the need to consider kernel
-first in the future. Make the 'claiming' behaviour explicit.
-
-Restructuring the APEI code to allow multiple NMI-like notifications
-means any notification that might interrupt interrupts-masked
-code must always be wrapped in nmi_enter()/nmi_exit(). This will
-allow APEI to use in_nmi() to use the right fixmap entries.
-
-Mask SError over this window to prevent an asynchronous RAS error
-arriving and tripping 'nmi_enter()'s BUG_ON(in_nmi()).
+Add a helper to register the GHES using the appropriate normal or
+critical callback.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
-
 ---
-Why does apei_claim_sea() take a pt_regs? This gets used later to take
-APEI by the hand through NMI->IRQ context, depending on what we
-interrupted.
-
-Changes since v6:
- * Moved the voice of the commit message.
- * moved arch_local_save_flags() below the !IS_ENABLED drop-out
- * Moved the dummy declaration into the if-ACPI part of the header instead
-   of if-APEI.
-
 Changes since v4:
- * Made irqs-unmasked comment a lockdep assert.
+ * Moved normal/critical callbacks into the helper, as APEI needs to know.
+ * Tinkered with the commit message.
+ * Dropped Punit's Reviewed-by.
 
 Changes since v3:
- * Removed spurious whitespace change
- * Updated comment in acpi.c to cover SError masking
+ * Removed acpi_disabled() checks that aren't necessary after v2s #ifdef
+   change.
 
 Changes since v2:
- * Added dummy definition for !ACPI and culled IS_ENABLED() checks.
----
- arch/arm64/include/asm/acpi.h      |  4 +++-
- arch/arm64/include/asm/daifflags.h |  1 +
- arch/arm64/include/asm/kvm_ras.h   | 16 ++++++++++++++-
- arch/arm64/kernel/acpi.c           | 31 ++++++++++++++++++++++++++++++
- arch/arm64/mm/fault.c              | 24 +++++------------------
- 5 files changed, 55 insertions(+), 21 deletions(-)
+ * Added header file, thanks kbuild-robot!
+ * changed ifdef to the GHES version to match the fixmap definition
 
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index 709208dfdc8b..4ed19b26ec1a 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -18,6 +18,7 @@
+Changes since v1:
+ * ghes->fixmap_idx variable rename
+---
+ arch/arm64/include/asm/fixmap.h |  4 ++
+ drivers/firmware/arm_sdei.c     | 70 +++++++++++++++++++++++++++++++++
+ include/linux/arm_sdei.h        |  6 +++
+ 3 files changed, 80 insertions(+)
+
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 966dd4bb23f2..f987b8a8f325 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -56,6 +56,10 @@ enum fixed_addresses {
+ 	/* Used for GHES mapping from assorted contexts */
+ 	FIX_APEI_GHES_IRQ,
+ 	FIX_APEI_GHES_SEA,
++#ifdef CONFIG_ARM_SDE_INTERFACE
++	FIX_APEI_GHES_SDEI_NORMAL,
++	FIX_APEI_GHES_SDEI_CRITICAL,
++#endif
+ #endif /* CONFIG_ACPI_APEI_GHES */
  
- #include <asm/cputype.h>
- #include <asm/io.h>
-+#include <asm/ptrace.h>
- #include <asm/smp_plat.h>
- #include <asm/tlbflush.h>
- 
-@@ -99,9 +100,10 @@ static inline u32 get_acpi_id_for_cpu(unsigned int cpu)
- 
- static inline void arch_fix_phys_package_id(int num, u32 slot) { }
- void __init acpi_init_cpus(void);
--
-+int apei_claim_sea(struct pt_regs *regs);
- #else
- static inline void acpi_init_cpus(void) { }
-+static inline int apei_claim_sea(struct pt_regs *regs) { return -ENOENT; }
- #endif /* CONFIG_ACPI */
- 
- #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
-diff --git a/arch/arm64/include/asm/daifflags.h b/arch/arm64/include/asm/daifflags.h
-index 8d91f2233135..fa90779fc752 100644
---- a/arch/arm64/include/asm/daifflags.h
-+++ b/arch/arm64/include/asm/daifflags.h
-@@ -20,6 +20,7 @@
- 
- #define DAIF_PROCCTX		0
- #define DAIF_PROCCTX_NOIRQ	PSR_I_BIT
-+#define DAIF_ERRCTX		(PSR_I_BIT | PSR_A_BIT)
- 
- /* mask/save/unmask/restore all exceptions, including interrupts. */
- static inline void local_daif_mask(void)
-diff --git a/arch/arm64/include/asm/kvm_ras.h b/arch/arm64/include/asm/kvm_ras.h
-index 6096f0251812..8ac6ee77437c 100644
---- a/arch/arm64/include/asm/kvm_ras.h
-+++ b/arch/arm64/include/asm/kvm_ras.h
-@@ -4,8 +4,22 @@
- #ifndef __ARM64_KVM_RAS_H__
- #define __ARM64_KVM_RAS_H__
- 
-+#include <linux/acpi.h>
-+#include <linux/errno.h>
- #include <linux/types.h>
- 
--int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr);
-+#include <asm/acpi.h>
-+
-+/*
-+ * Was this synchronous external abort a RAS notification?
-+ * Returns '0' for errors handled by some RAS subsystem, or -ENOENT.
-+ */
-+static inline int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
-+{
-+	/* apei_claim_sea(NULL) expects to mask interrupts itself */
-+	lockdep_assert_irqs_enabled();
-+
-+	return apei_claim_sea(NULL);
-+}
- 
- #endif /* __ARM64_KVM_RAS_H__ */
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 44e3c351e1ea..803f0494dd3e 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -27,8 +27,10 @@
- #include <linux/smp.h>
- #include <linux/serial_core.h>
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 1ea71640fdc2..4bcbe3a3f597 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -2,6 +2,7 @@
+ // Copyright (C) 2017 Arm Ltd.
+ #define pr_fmt(fmt) "sdei: " fmt
  
 +#include <acpi/ghes.h>
- #include <asm/cputype.h>
- #include <asm/cpu_ops.h>
-+#include <asm/daifflags.h>
- #include <asm/pgtable.h>
- #include <asm/smp_plat.h>
+ #include <linux/acpi.h>
+ #include <linux/arm_sdei.h>
+ #include <linux/arm-smccc.h>
+@@ -32,6 +33,8 @@
+ #include <linux/spinlock.h>
+ #include <linux/uaccess.h>
  
-@@ -256,3 +258,32 @@ pgprot_t __acpi_get_mem_attribute(phys_addr_t addr)
- 		return __pgprot(PROT_NORMAL_NC);
- 	return __pgprot(PROT_DEVICE_nGnRnE);
- }
++#include <asm/fixmap.h>
 +
-+/*
-+ * Claim Synchronous External Aborts as a firmware first notification.
-+ *
-+ * Used by KVM and the arch do_sea handler.
-+ * @regs may be NULL when called from process context.
-+ */
-+int apei_claim_sea(struct pt_regs *regs)
+ /*
+  * The call to use to reach the firmware.
+  */
+@@ -887,6 +890,73 @@ static void sdei_smccc_hvc(unsigned long function_id,
+ 	arm_smccc_hvc(function_id, arg0, arg1, arg2, arg3, arg4, 0, 0, res);
+ }
+ 
++int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
++		       sdei_event_callback *critical_cb)
 +{
-+	int err = -ENOENT;
-+	unsigned long current_flags;
++	int err;
++	u64 result;
++	u32 event_num;
++	sdei_event_callback *cb;
 +
 +	if (!IS_ENABLED(CONFIG_ACPI_APEI_GHES))
++		return -EOPNOTSUPP;
++
++	event_num = ghes->generic->notify.vector;
++	if (event_num == 0) {
++		/*
++		 * Event 0 is reserved by the specification for
++		 * SDEI_EVENT_SIGNAL.
++		 */
++		return -EINVAL;
++	}
++
++	err = sdei_api_event_get_info(event_num, SDEI_EVENT_INFO_EV_PRIORITY,
++				      &result);
++	if (err)
 +		return err;
 +
-+	current_flags = arch_local_save_flags();
++	if (result == SDEI_EVENT_PRIORITY_CRITICAL)
++		cb = critical_cb;
++	else
++		cb = normal_cb;
 +
-+	/*
-+	 * SEA can interrupt SError, mask it and describe this as an NMI so
-+	 * that APEI defers the handling.
-+	 */
-+	local_daif_restore(DAIF_ERRCTX);
-+	nmi_enter();
-+	err = ghes_notify_sea();
-+	nmi_exit();
-+	local_daif_restore(current_flags);
++	err = sdei_event_register(event_num, cb, ghes);
++	if (!err)
++		err = sdei_event_enable(event_num);
 +
 +	return err;
 +}
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index eeeb576b33d7..956afc7d932a 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -18,6 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/extable.h>
- #include <linux/signal.h>
- #include <linux/mm.h>
-@@ -33,6 +34,7 @@
- #include <linux/preempt.h>
- #include <linux/hugetlb.h>
- 
-+#include <asm/acpi.h>
- #include <asm/bug.h>
- #include <asm/cmpxchg.h>
- #include <asm/cpufeature.h>
-@@ -46,8 +48,6 @@
- #include <asm/tlbflush.h>
- #include <asm/traps.h>
- 
--#include <acpi/ghes.h>
--
- struct fault_info {
- 	int	(*fn)(unsigned long addr, unsigned int esr,
- 		      struct pt_regs *regs);
-@@ -630,19 +630,10 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
- 	inf = esr_to_fault_info(esr);
- 
- 	/*
--	 * Synchronous aborts may interrupt code which had interrupts masked.
--	 * Before calling out into the wider kernel tell the interested
--	 * subsystems.
-+	 * Return value ignored as we rely on signal merging.
-+	 * Future patches will make this more robust.
- 	 */
--	if (IS_ENABLED(CONFIG_ACPI_APEI_SEA)) {
--		if (interrupts_enabled(regs))
--			nmi_enter();
--
--		ghes_notify_sea();
--
--		if (interrupts_enabled(regs))
--			nmi_exit();
--	}
-+	apei_claim_sea(regs);
- 
- 	if (esr & ESR_ELx_FnV)
- 		siaddr = NULL;
-@@ -720,11 +711,6 @@ static const struct fault_info fault_info[] = {
- 	{ do_bad,		SIGKILL, SI_KERNEL,	"unknown 63"			},
++
++int sdei_unregister_ghes(struct ghes *ghes)
++{
++	int i;
++	int err;
++	u32 event_num = ghes->generic->notify.vector;
++
++	might_sleep();
++
++	if (!IS_ENABLED(CONFIG_ACPI_APEI_GHES))
++		return -EOPNOTSUPP;
++
++	/*
++	 * The event may be running on another CPU. Disable it
++	 * to stop new events, then try to unregister a few times.
++	 */
++	err = sdei_event_disable(event_num);
++	if (err)
++		return err;
++
++	for (i = 0; i < 3; i++) {
++		err = sdei_event_unregister(event_num);
++		if (err != -EINPROGRESS)
++			break;
++
++		schedule();
++	}
++
++	return err;
++}
++
+ static int sdei_get_conduit(struct platform_device *pdev)
+ {
+ 	const char *method;
+diff --git a/include/linux/arm_sdei.h b/include/linux/arm_sdei.h
+index 942afbd544b7..393899192906 100644
+--- a/include/linux/arm_sdei.h
++++ b/include/linux/arm_sdei.h
+@@ -11,6 +11,7 @@ enum sdei_conduit_types {
+ 	CONDUIT_HVC,
  };
  
--int kvm_handle_guest_sea(phys_addr_t addr, unsigned int esr)
--{
--	return ghes_notify_sea();
--}
--
- asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
- 					 struct pt_regs *regs)
- {
++#include <acpi/ghes.h>
+ #include <asm/sdei.h>
+ 
+ /* Arch code should override this to set the entry point from firmware... */
+@@ -39,6 +40,11 @@ int sdei_event_unregister(u32 event_num);
+ int sdei_event_enable(u32 event_num);
+ int sdei_event_disable(u32 event_num);
+ 
++/* GHES register/unregister helpers */
++int sdei_register_ghes(struct ghes *ghes, sdei_event_callback *normal_cb,
++		       sdei_event_callback *critical_cb);
++int sdei_unregister_ghes(struct ghes *ghes);
++
+ #ifdef CONFIG_ARM_SDE_INTERFACE
+ /* For use by arch code when CPU hotplug notifiers are not appropriate. */
+ int sdei_mask_local_cpu(void);
 -- 
 2.19.2
 
