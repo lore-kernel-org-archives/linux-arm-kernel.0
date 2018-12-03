@@ -2,65 +2,83 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AD743C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:12:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 46004C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:16:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 719F920851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:12:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0FA4120878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:16:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="roHNPqxG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 719F920851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SM1tJ+7r"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0FA4120878
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=lODE7Y24RBP9Zw6FwNskDrfBsw+xFzF6amgjexv/HT0=; b=roHNPqxGL4iclO
-	iH+v29+y6jqLCWrJGjxZEnn822puGZc/TkL/EYSsz27VHOMbtuLq7pUtSM13Cgi147VQk5Lr5BiLR
-	38HBVlwMJg23Kwl3M9pt7g1QmHHgb225QNjGk9uSSShsIxpx4UtEDNOb8CHpy83wE/X60ifUMNEuy
-	ZSZLyIavrDL3IYYRYK74uxOpWzs9DkfmeSBk0qqr5YVWl9i4qhok9Xp3qPaB38JoujvGQlr8cQO3F
-	8l9Quu1/ZoJG1FKh8O1YVMPi2alqwcYdUeSB80uKvalXdO3+7qaudNyLlDvYdJWjhXGX+HwxtspG1
-	QQB+zWGmnXZ/SbAsSY3Q==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=rYbxklCvQw4KPDpLgzQFRecv8wwoU00xNFaqjmmmjlw=; b=SM1tJ+7rOMj4Ky
+	5Gxkq+Uxq/0g2/fprhTDH1C6M1Hry175bf9iDEEWmpTSIaAEoch3XuWTdm1YsA3enXn/eRV2ZGLbA
+	EcuwC8czswAdIIeUs1J/xcnVKWo1fyiIX7BBJVwwZH05IrUVlqCstTJrTvyxl5zuPnfP5YEBgeXss
+	B06UortN6EzpOBcX0mhCWgt5kLrJvUvdE6IB5OzUh01ccIsUDB0k7sSeJigmgZ5L7rXxWwYOWwg9V
+	1bT4uMNjj1AkBBC30FJVfB2R0WUI/U39iaicxv/1QvNfkIejITxOAimACY4fzRx7tDKHqwRRMjIfa
+	tH7sKjvFyn8eI25IzXjw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTn55-0004Uy-0R; Mon, 03 Dec 2018 12:12:07 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTn51-0004Td-0z
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:12:04 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E5449165C;
- Mon,  3 Dec 2018 04:11:50 -0800 (PST)
-Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5DB713F614;
- Mon,  3 Dec 2018 04:11:49 -0800 (PST)
-Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
- user_mem_abort()
-To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-2-punit.agrawal@arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
-Date: Mon, 3 Dec 2018 17:41:55 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gTn9H-0006Tv-0o; Mon, 03 Dec 2018 12:16:27 +0000
+Received: from mail-lj1-f193.google.com ([209.85.208.193])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTn9C-0006SR-QK
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:16:25 +0000
+Received: by mail-lj1-f193.google.com with SMTP id 83-v6so11130257ljf.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 04:16:11 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:in-reply-to:user-agent;
+ bh=yD5iVmypOBQumLl+qGUTl1jKrrZfOHc7K3noc5twFmE=;
+ b=mQnwmsihD94uNB1jbTuG+NS+nz0JuB2vyNfGjryWosNR8BY0PMBnEXKxqceHZlUyOG
+ /U/mOYzXyJlW9JEMelRg3apniOekzo3CSxvANx2a/p5Wi4WCZt8DiHoBXehOJkYJzQMw
+ D0C4/PVMpI56Egs2UWhSCb/YBkRMflFXN7KllvztCQi6wRZy9KkKwcJjRKB7TZCH4t5h
+ S38BHbEr4AnO9d6YB3kXfbQtKNgeupdsVvk+l8QTjyzqHcyWJXL3gC8Vpl7BAUfJgNLc
+ 2qhMiylIdq5c2k+xJvXvyRJpPNhh02mgWZaxygtXVMWkZzB23h9SH43sZoKvmB42bZI0
+ PXYg==
+X-Gm-Message-State: AA+aEWbTfhfYf8Z4iTp3UDVRVf+oJ21Q5k7PtU80VWXY78xU4z7lfXKF
+ MxZ7l5nuJzAMvj13GHFeA+k=
+X-Google-Smtp-Source: AFSGD/V9Gq703U5if+R8Zc+VCdNkNOkpC31SbP76EShumpu2cWwKss7RdnrH21yapoPz4tXab7x5DA==
+X-Received: by 2002:a2e:9dcb:: with SMTP id
+ x11-v6mr10946163ljj.158.1543839369778; 
+ Mon, 03 Dec 2018 04:16:09 -0800 (PST)
+Received: from localhost.localdomain ([213.255.186.46])
+ by smtp.gmail.com with ESMTPSA id d82sm2344923lfd.82.2018.12.03.04.16.07
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 03 Dec 2018 04:16:08 -0800 (PST)
+Date: Mon, 3 Dec 2018 14:16:05 +0200
+From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+To: Stephen Boyd <sboyd@kernel.org>
+Subject: Re: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and
+ provider registrations
+Message-ID: <20181203121605.GC15388@localhost.localdomain>
+References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
+ <20181130105022.GA15388@localhost.localdomain>
 MIME-Version: 1.0
-In-Reply-To: <20181031175745.18650-2-punit.agrawal@arm.com>
-Content-Language: en-US
+Content-Disposition: inline
+In-Reply-To: <20181130105022.GA15388@localhost.localdomain>
+User-Agent: Mutt/1.9.2 (2017-12-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_041203_073685_9D72E283 
-X-CRM114-Status: GOOD (  27.54  )
+X-CRM114-CacheID: sfid-20181203_041623_414915_B9B0638A 
+X-CRM114-Status: GOOD (  35.44  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -72,159 +90,148 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com, will.deacon@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
- punitagrawal@gmail.com, linux-arm-kernel@lists.infradead.org
+Cc: linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Daniel Kurtz <djkurtz@chromium.org>, Sebastian Reichel <sre@kernel.org>,
+ David Brown <david.brown@linaro.org>, Lee Jones <lee.jones@linaro.org>,
+ linux-clk@vger.kernel.org, Rob Herring <robh@kernel.org>,
+ Jonathan Corbet <corbet@lwn.net>, Andrey Smirnov <andrew.smirnov@gmail.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ Russell King <linux@armlinux.org.uk>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>, Andy Gross <andy.gross@linaro.org>,
+ Huang Shijie <sjhuang@iluvatar.ai>, Guenter Roeck <linux@roeck-us.net>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ linux-arm-msm@vger.kernel.org, linux-soc@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Akshu Agrawal <akshu.agrawal@amd.com>, mazziesaccount@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hello Stephen & All,
 
+I created v5 where I fixed obvious issues. I'll send it in few minutes.
+Please note following topics:
 
-On 10/31/2018 11:27 PM, Punit Agrawal wrote:
-> The code for operations such as marking the pfn as dirty, and
-> dcache/icache maintenance during stage 2 fault handling is duplicated
-> between normal pages and PMD hugepages.
+On Fri, Nov 30, 2018 at 12:50:22PM +0200, Matti Vaittinen wrote:
 > 
-> Instead of creating another copy of the operations when we introduce
-> PUD hugepages, let's share them across the different pagesizes.
+> On Fri, Nov 30, 2018 at 12:54:10AM -0800, Stephen Boyd wrote:
+> > Quoting Matti Vaittinen (2018-11-13 03:55:58)
+> > >  
+> > > -int devm_of_clk_add_hw_provider(struct device *dev,
+> > > +static int __devm_of_clk_add_hw_provider(struct device *dev,
+> > >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > >                                               void *data),
+> > > -                       void *data)
+> > > +                       struct device_node *of_node, void *data)
+> > >  {
+> > > -       struct device_node **ptr, *np;
+> > > +       struct device_node **ptr;
+> > >         int ret;
+> > >  
+> > >         ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
+> > > @@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> > >         if (!ptr)
+> > >                 return -ENOMEM;
+> > >  
+> > > -       np = dev->of_node;
+> > > -       ret = of_clk_add_hw_provider(np, get, data);
+> > > +       *ptr = of_node;
+> > > +       ret = of_clk_add_hw_provider(of_node, get, data);
+> > >         if (!ret) {
+> > > -               *ptr = np;
+> > 
+> > Why is this moved outside of the if condition?
+> I completely removed the local variable np and just unconditionally set
+> the allocated devres to point at the node (if allocation succeeded). We
+> could of course only do this if the provider registration succeeded and
+> save one assignment - but I guess I intended to remove the curly braces
+> and thus decided to go for one liner after if. But apparently I didn't
+> remove the braces O_o. Well, I can put the assignment inside the
+> condition if you prefer that.
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
->  1 file changed, 30 insertions(+), 19 deletions(-)
+> > In fact, why isn't just
+> > the first line in this hunk deleted and passed to this function as
+> > struct device_node *np?
 > 
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 5eca48bdb1a6..59595207c5e1 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  			  unsigned long fault_status)
->  {
->  	int ret;
-> -	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
-> +	bool write_fault, exec_fault, writable, force_pte = false;
->  	unsigned long mmu_seq;
->  	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
->  	struct kvm *kvm = vcpu->kvm;
-> @@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	kvm_pfn_t pfn;
->  	pgprot_t mem_type = PAGE_S2;
->  	bool logging_active = memslot_is_logging(memslot);
-> -	unsigned long flags = 0;
-> +	unsigned long vma_pagesize, flags = 0;
+> I am sorry but I don't quite follow your suggestion here. Do you mean we
+> could just pass the struct device_node *np in devres_add()? I thought
+> the pointer passed to devress_add() should be allocated using
+> devres_alloc. Can you please elaborate what you mean?
 
-A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
+I could not really spot what to fix in patched code (see below).
 
->  
->  	write_fault = kvm_is_write_fault(vcpu);
->  	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
-> @@ -1504,10 +1504,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  		return -EFAULT;
->  	}
->  
-> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
-> -		hugetlb = true;
-> +	vma_pagesize = vma_kernel_pagesize(vma);
-> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
->  		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
->  	} else {
-> +		/*
-> +		 * Fallback to PTE if it's not one of the Stage 2
-> +		 * supported hugepage sizes
-> +		 */
-> +		vma_pagesize = PAGE_SIZE;
+static int __devm_of_clk_add_hw_provider(struct device *dev,
+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+					      void *data),
+			struct device_node *of_node, void *data)
+{
+	struct device_node **ptr;
+	int ret;
 
-This seems redundant and should be dropped. vma_kernel_pagesize() here either
-calls hugetlb_vm_op_pagesize (via hugetlb_vm_ops->pagesize) or simply returns
-PAGE_SIZE. The vm_ops path is taken if the QEMU VMA covering any given HVA is
-backed either by HugeTLB pages or simply normal pages. vma_pagesize would
-either has a value of PMD_SIZE (HugeTLB hstate based) or PAGE_SIZE. Hence if
-its not PMD_SIZE it must be PAGE_SIZE which should not be assigned again.
+	ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
+			   GFP_KERNEL);
+	if (!ptr)
+		return -ENOMEM;
 
-> +
->  		/*
->  		 * Pages belonging to memslots that don't have the same
->  		 * alignment for userspace and IPA cannot be mapped using
-> @@ -1573,23 +1579,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	if (mmu_notifier_retry(kvm, mmu_seq))
->  		goto out_unlock;
->  
-> -	if (!hugetlb && !force_pte)
-> -		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
-> +	if (vma_pagesize == PAGE_SIZE && !force_pte) {
-> +		/*
-> +		 * Only PMD_SIZE transparent hugepages(THP) are
-> +		 * currently supported. This code will need to be
-> +		 * updated to support other THP sizes.
-> +		 */
+	*ptr = of_node;
+	ret = of_clk_add_hw_provider(of_node, get, data);
+	if (!ret)
+		devres_add(dev, ptr);
+	else
+		devres_free(ptr);
 
-This comment belongs to transparent_hugepage_adjust() but not here.
+	return ret;
+}
 
-> +		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
-> +			vma_pagesize = PMD_SIZE;
+As far as I understand we need to allocate the ptr using devres_alloc.
+We also need to pass this ptr to of_clk_add_hw_provider - and we must
+assign our node to the *ptr. (I removed the extra braces - this change
+is laso included in v5 but I don't see how we should improve). Can you
+please explain me if you still wish to me change this further?
 
-IIUC transparent_hugepage_adjust() is only getting called here. Instead of
-returning 'true' when it is able to detect a huge page backing and doing
-an adjustment there after, it should rather return THP size (PMD_SIZE) to
-accommodate probable multi size THP support in future .
-
-> +	}
-> +
-> +	if (writable)
-> +		kvm_set_pfn_dirty(pfn);
->  
-> -	if (hugetlb) {
-> +	if (fault_status != FSC_PERM)
-> +		clean_dcache_guest_page(pfn, vma_pagesize);
-> +
-> +	if (exec_fault)
-> +		invalidate_icache_guest_page(pfn, vma_pagesize);
-> +
-> +	if (vma_pagesize == PMD_SIZE) {
->  		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
->  		new_pmd = pmd_mkhuge(new_pmd);
-> -		if (writable) {
-> +		if (writable)
->  			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
-> -			kvm_set_pfn_dirty(pfn);
-> -		}
-> -
-> -		if (fault_status != FSC_PERM)
-> -			clean_dcache_guest_page(pfn, PMD_SIZE);
->  
->  		if (exec_fault) {
->  			new_pmd = kvm_s2pmd_mkexec(new_pmd);
-> -			invalidate_icache_guest_page(pfn, PMD_SIZE);
->  		} else if (fault_status == FSC_PERM) {
->  			/* Preserve execute if XN was already cleared */
->  			if (stage2_is_exec(kvm, fault_ipa))
-> @@ -1602,16 +1618,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  
->  		if (writable) {
->  			new_pte = kvm_s2pte_mkwrite(new_pte);
-> -			kvm_set_pfn_dirty(pfn);
->  			mark_page_dirty(kvm, gfn);
->  		}
->  
-> -		if (fault_status != FSC_PERM)
-> -			clean_dcache_guest_page(pfn, PAGE_SIZE);
-> -
->  		if (exec_fault) {
->  			new_pte = kvm_s2pte_mkexec(new_pte);
-> -			invalidate_icache_guest_page(pfn, PAGE_SIZE);
->  		} else if (fault_status == FSC_PERM) {
->  			/* Preserve execute if XN was already cleared */
->  			if (stage2_is_exec(kvm, fault_ipa))
+> > > +int devm_of_clk_add_parent_hw_provider(struct device *dev,
+> > > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > > +                                             void *data),
+> > > +                       void *data)
+> > > +{
+> > > +       return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
+> > 
+> > I'm wondering if we can somehow auto-detect this in
+> > devm_of_clk_add_hw_provider() by looking for #clock-cells in the node.
+> > If it isn't there, then we go to the parent node and look for a
+> > #clock-cells property there in the DT node for that device. Does that
+> > make sense? Then there isn't any new API and we can attach the lifetime
+> > of the devm registration to the presence of the property indicating this
+> > is a clk controller or not.
 > 
+> Huh. I don't know why but building this kind of logic in core is a bit
+> scary to me. I guess I can try implementing something like this - but I
+> am not really a fan of this. (Accidentally) omit the #clock-cells from
+> node and we go to parent node - I am a novice on this area but this
+> sounds like a potential hazard to me. I believe the driver should know
+> if it's properties should be in own or parent node - and if they are
+> not, then there should be no guessing but error. The lifetime is topic
+> where I would like to get information from you who know the kernel
+> better than I do =) But I guess the parent node is there at least as
+> long as the child device is alive. So for me the life time of
+> get-callback is more crucial - but as I said, I don't understand the
+> kernel in details so you probably know it better than me. But please let
+> me know your final take on this and I will follow the guidance =)
 
-kvm_set_pfn_dirty, clean_dcache_guest_page, invalidate_icache_guest_page
-can all be safely moved before setting the page table entries either as
-PMD or PTE.
+I did not put the 'auto-detection' for provider node in the patch v5 as
+it really gives me bad vibes :) Maybe it is just my pessimistic nature
+but I do expect that problems will arise when we accidentally end up in
+parent node when this is not the purpose. I would rather keep this
+simple by adding one specific API function more - and keeping the
+existing API specific as well. But I can do v5 if you insist on having
+this auto-detection.
+
+-- 
+Matti Vaittinen
+ROHM Semiconductors
+
+~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
 
 _______________________________________________
 linux-arm-kernel mailing list
