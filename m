@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 68A78C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:08:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 53635C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:08:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 3E6AC20850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:08:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2A5E220850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:08:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qa9KP3DH"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3E6AC20850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="IMrFgGKp"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2A5E220850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,38 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3okNjNOeIZFcZEgmpi2l4uBXqNpCwnGAKfR6SvLMG4Q=; b=Qa9KP3DHGf7Cev
-	3ZM2dQMV4smO5YtMQMY7dxRvGQ8RTKOkptpsFFIfzZx3b/ZG6rq3e0r/0LBsMMcrfb0XZJ0m0dftC
-	+fHCBpSYP9Shy4W5bUFD2Q+ak+2TpDgnzXyl/d964RzhqafIXiOE6lAWcY5NeevI61kkdSnP9eubv
-	a/fxWGscMWIIubgEDBxuKnUprlb7OCkIlEKuUkCgPm6L0dcCJEb9hg4rKHM0Odf2D+clJ/v4ulYwn
-	W06dFYDkOmmE+/UkQuMQ0MxeYxXNACTzUNQw4MD0VAg6c9xeb5RRffDsTAGN6CyvcsWMRSq0eHFxN
-	SEdrb+9Tz8i6r0xGO4xg==;
+	List-Owner; bh=dIqJvb69PPxO+W4ImZ15qlNikv6eGnX6xCaooo7bwIs=; b=IMrFgGKpmjGNg/
+	524c4KTRAm8dRdElRRnkb0j1vfd8bGeEARSEmg8f5D5Q+xquWpv6Dr3Dfh+H+10G7Vbavd6nNVyJp
+	l4pTrZ/a1fcSybkiea2jDnvQNhuAVhzgNwR/QSYLIbFSeHILrmRIkdI3i1A5WHdeRtDK7K8jbsvsX
+	O5ym4c1upBA7sbJiz5v84pJDuQpS2GqTslTwhpQtPmgaf9sUT4LP613Us/LAcvt7dFbz0YwJ9wnes
+	CNmdgkjMeAX/7BcE7BiXgj3R9DJYhpOENm1YzddvG6Nl4b857nyZZGrJ+E1kluiXiIrbyaJU9qKWA
+	mDLCH+COkpe/V0wWqfpQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTsdg-0006Iu-CM; Mon, 03 Dec 2018 18:08:12 +0000
+	id 1gTsdw-0006ZV-Ph; Mon, 03 Dec 2018 18:08:28 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTsca-0005AL-QZ
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:07:10 +0000
+ id 1gTsca-00051b-2h
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:07:16 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 14E741713;
- Mon,  3 Dec 2018 10:07:04 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 1EACD169E;
+ Mon,  3 Dec 2018 10:06:57 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 44BA93F719;
- Mon,  3 Dec 2018 10:07:01 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 4E39C3F59C;
+ Mon,  3 Dec 2018 10:06:54 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v7 08/25] ACPI / APEI: Don't update struct ghes' flags in
- read/clear estatus
-Date: Mon,  3 Dec 2018 18:05:56 +0000
-Message-Id: <20181203180613.228133-9-james.morse@arm.com>
+Subject: [PATCH v7 06/25] ACPI / APEI: Don't store CPER records physical
+ address in struct ghes
+Date: Mon,  3 Dec 2018 18:05:54 +0000
+Message-Id: <20181203180613.228133-7-james.morse@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181203180613.228133-1-james.morse@arm.com>
 References: <20181203180613.228133-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_100705_757261_7C8B15DB 
-X-CRM114-Status: GOOD (  14.48  )
+X-CRM114-CacheID: sfid-20181203_100705_791935_68720A13 
+X-CRM114-Status: GOOD (  17.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,77 +81,172 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ghes_read_estatus() sets a flag in struct ghes if the buffer of
-CPER records needs to be cleared once the records have been
-processed. This flag value is a problem if a struct ghes can be
-processed concurrently, as happens at probe time if an NMI arrives
-for the same error source. The NMI clears the flag, meaning the
-interrupted handler may never do the ghes_estatus_clear() work.
+When CPER records are found the address of the records is stashed
+in the struct ghes. Once the records have been processed, this
+address is overwritten with zero so that it won't be processed
+again without being re-populated by firmware.
 
-The GHES_TO_CLEAR flags is only set at the same time as
-buffer_paddr, which is now owned by the caller and passed to
-ghes_clear_estatus(). Use this value as the flag.
+This goes wrong if a struct ghes can be processed concurrently,
+as can happen at probe time when an NMI occurs. If the NMI arrives
+on another CPU, the probing CPU may call ghes_clear_estatus() on the
+records before the handler had finished with them.
+Even on the same CPU, once the interrupted handler is resumed, it
+will call ghes_clear_estatus() on the NMIs records, this memory may
+have already been re-used by firmware.
 
-A non-zero buf_paddr returned by ghes_read_estatus() means
-ghes_clear_estatus() should clear this address. ghes_read_estatus()
-already checks for a read of error_status_address being zero,
-so CPER records cannot be written here.
+Avoid this stashing by letting the caller hold the address. A
+later patch will do away with the use of ghes->flags in the
+read/clear code too.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Borislav Petkov <bp@suse.de>
 
---
-Changes since v6:
- * Added Boris' RB, then:
- * Moved earlier in the series,
- * Tinkered with the commit message,
- * Always cleared buf_paddr on errors in the previous patch, which was
-   previously in here.
 ---
- drivers/acpi/apei/ghes.c | 8 +-------
- include/acpi/ghes.h      | 1 -
- 2 files changed, 1 insertion(+), 8 deletions(-)
+Changes since v6:
+ * Moved earlier in the series
+ * Added buf_adder = 0 on all the error paths, and test for it in
+   ghes_estatus_clear() for extra sanity.
+---
+ drivers/acpi/apei/ghes.c | 40 +++++++++++++++++++++++-----------------
+ include/acpi/ghes.h      |  1 -
+ 2 files changed, 23 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index f7a0ff1c785a..d06456e60318 100644
+index 7c2e9ac140d4..acf0c37e9af9 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -329,8 +329,6 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
- 		return -ENOENT;
+@@ -305,29 +305,30 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
  	}
+ }
  
--	ghes->flags |= GHES_TO_CLEAR;
--
+-static int ghes_read_estatus(struct ghes *ghes)
++static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
+ {
+ 	struct acpi_hest_generic *g = ghes->generic;
+-	u64 buf_paddr;
+ 	u32 len;
+ 	int rc;
+ 
+-	rc = apei_read(&buf_paddr, &g->error_status_address);
++	rc = apei_read(buf_paddr, &g->error_status_address);
+ 	if (rc) {
++		*buf_paddr = 0;
+ 		pr_warn_ratelimited(FW_WARN GHES_PFX
+ "Failed to read error status block address for hardware error source: %d.\n",
+ 				   g->header.source_id);
+ 		return -EIO;
+ 	}
+-	if (!buf_paddr)
++	if (!*buf_paddr)
+ 		return -ENOENT;
+ 
+-	ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
++	ghes_copy_tofrom_phys(ghes->estatus, *buf_paddr,
+ 			      sizeof(*ghes->estatus), 1);
+-	if (!ghes->estatus->block_status)
++	if (!ghes->estatus->block_status) {
++		*buf_paddr = 0;
+ 		return -ENOENT;
++	}
+ 
+-	ghes->buffer_paddr = buf_paddr;
+ 	ghes->flags |= GHES_TO_CLEAR;
+ 
  	rc = -EIO;
- 	len = cper_estatus_len(ghes->estatus);
- 	if (len < sizeof(*ghes->estatus))
-@@ -357,13 +355,9 @@ static int ghes_read_estatus(struct ghes *ghes, u64 *buf_paddr)
- static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr)
+@@ -339,7 +340,7 @@ static int ghes_read_estatus(struct ghes *ghes)
+ 	if (cper_estatus_check_header(ghes->estatus))
+ 		goto err_read_block;
+ 	ghes_copy_tofrom_phys(ghes->estatus + 1,
+-			      buf_paddr + sizeof(*ghes->estatus),
++			      *buf_paddr + sizeof(*ghes->estatus),
+ 			      len - sizeof(*ghes->estatus), 1);
+ 	if (cper_estatus_check(ghes->estatus))
+ 		goto err_read_block;
+@@ -349,17 +350,20 @@ static int ghes_read_estatus(struct ghes *ghes)
+ 	if (rc)
+ 		pr_warn_ratelimited(FW_WARN GHES_PFX
+ 				    "Failed to read error status block!\n");
++
+ 	return rc;
+ }
+ 
+-static void ghes_clear_estatus(struct ghes *ghes)
++static void ghes_clear_estatus(struct ghes *ghes, u64 buf_paddr)
  {
  	ghes->estatus->block_status = 0;
--	if (!(ghes->flags & GHES_TO_CLEAR))
--		return;
--	if (buf_paddr) {
-+	if (buf_paddr)
- 		ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
- 				      sizeof(ghes->estatus->block_status), 0);
--		ghes->flags &= ~GHES_TO_CLEAR;
--	}
+ 	if (!(ghes->flags & GHES_TO_CLEAR))
+ 		return;
+-	ghes_copy_tofrom_phys(ghes->estatus, ghes->buffer_paddr,
+-			      sizeof(ghes->estatus->block_status), 0);
+-	ghes->flags &= ~GHES_TO_CLEAR;
++	if (buf_paddr) {
++		ghes_copy_tofrom_phys(ghes->estatus, buf_paddr,
++				      sizeof(ghes->estatus->block_status), 0);
++		ghes->flags &= ~GHES_TO_CLEAR;
++	}
  }
  
  static void ghes_handle_memory_failure(struct acpi_hest_generic_data *gdata, int sev)
+@@ -678,9 +682,10 @@ static void __ghes_panic(struct ghes *ghes)
+ 
+ static int ghes_proc(struct ghes *ghes)
+ {
++	u64 buf_paddr;
+ 	int rc;
+ 
+-	rc = ghes_read_estatus(ghes);
++	rc = ghes_read_estatus(ghes, &buf_paddr);
+ 	if (rc)
+ 		goto out;
+ 
+@@ -695,7 +700,7 @@ static int ghes_proc(struct ghes *ghes)
+ 	ghes_do_proc(ghes, ghes->estatus);
+ 
+ out:
+-	ghes_clear_estatus(ghes);
++	ghes_clear_estatus(ghes, buf_paddr);
+ 
+ 	if (rc == -ENOENT)
+ 		return rc;
+@@ -910,6 +915,7 @@ static void __process_error(struct ghes *ghes)
+ 
+ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ {
++	u64 buf_paddr;
+ 	struct ghes *ghes;
+ 	int sev, ret = NMI_DONE;
+ 
+@@ -917,8 +923,8 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ 		return ret;
+ 
+ 	list_for_each_entry_rcu(ghes, &ghes_nmi, list) {
+-		if (ghes_read_estatus(ghes)) {
+-			ghes_clear_estatus(ghes);
++		if (ghes_read_estatus(ghes, &buf_paddr)) {
++			ghes_clear_estatus(ghes, buf_paddr);
+ 			continue;
+ 		} else {
+ 			ret = NMI_HANDLED;
+@@ -934,7 +940,7 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+ 			continue;
+ 
+ 		__process_error(ghes);
+-		ghes_clear_estatus(ghes);
++		ghes_clear_estatus(ghes, buf_paddr);
+ 	}
+ 
+ #ifdef CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG
 diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index f82f4a7ddd90..e3f1cddb4ac8 100644
+index cd9ee507d860..f82f4a7ddd90 100644
 --- a/include/acpi/ghes.h
 +++ b/include/acpi/ghes.h
-@@ -13,7 +13,6 @@
-  * estatus: memory buffer for error status block, allocated during
-  * HEST parsing.
-  */
--#define GHES_TO_CLEAR		0x0001
- #define GHES_EXITING		0x0002
- 
- struct ghes {
+@@ -22,7 +22,6 @@ struct ghes {
+ 		struct acpi_hest_generic_v2 *generic_v2;
+ 	};
+ 	struct acpi_hest_generic_status *estatus;
+-	u64 buffer_paddr;
+ 	unsigned long flags;
+ 	union {
+ 		struct list_head list;
 -- 
 2.19.2
 
