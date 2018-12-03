@@ -2,102 +2,85 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D527EC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:55:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id BC634C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:56:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9499B20848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:55:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8C8D920848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:56:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="d6yqJ+bl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9499B20848
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lgFIlo2l"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8C8D920848
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:
-	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=022kTbbh73GXy3CyPO+0A3NtgEkFHIQX2hMs+acnZkc=; b=d6yqJ+blggfi6VGwqEMSociX70
-	bSOf9Im66goZEqvqJInBF9fyLjzY0PKexP+IoxKIABf/JNOH69tRXLY8HsYB2Ot2WOQgCgeQwjxBP
-	WPuab7HcKNEfZOFiA146iN1nDrVVLJn7xIkI58dplfJRzMewrGaEWJ0Vkw+25XAuwCJTxfY1HzcGG
-	EgPNUY0MfSDyxmmJZSqu6IOEI2aI0TtJB7mRRtlNYQu+VU7uxy7j5PqD+XtlqZPbCbPKBUxQg0/0P
-	I7rMLf5n+t02PehS5J/Axpf8NDWqVlWhtHLXRrgUFTY2dNkeJ/vLnwXZZZiZh3w0SneZLArkAaatU
-	MMQwgvoQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=bTMSfnmrZSvJc3JFdRONPlcJ8SmtgPliXyF1sBxcfQA=; b=lgFIlo2lZmaYB8
+	B3t/dIkg9wpbvC2L0rG0q3Nc9/zQqp3uzUe3TbrFv1nxo2isMzS/VOt+U4motcR2jOX3hxXGY++be
+	FZfmWk1J33pPAiHjIH6x72EXc9ZSCwSQ5bOUg7CFdU58UVTT4qw2Qh2brPTUIPvTutgQAiq72tj9W
+	p77aKaGjiDoxXv+9hdjwmr39nBQv1/ulT410WXPRpzqnaSV/qS8OKBX53UHMwF4w8YxIfK5eZXa13
+	WvxqMxbZDNv0QmxoUhwgQyAI5r9ferfCJ91pwtBWL/k6N+O65SgkHNPZOO0Fk/s+TeowWftq7dJiA
+	kmGN3iA0gMnklXrkG1qA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqZA-0005ov-Ny; Mon, 03 Dec 2018 15:55:24 +0000
-Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
- helo=mx0a-001b2d01.pphosted.com)
+	id 1gTqa0-00066O-68; Mon, 03 Dec 2018 15:56:16 +0000
+Received: from mail-ed1-f47.google.com ([209.85.208.47])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqS7-0007E8-1N
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:48:09 +0000
-Received: from pps.filterd (m0098421.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB3FiCTG000730
- for <linux-arm-kernel@lists.infradead.org>; Mon, 3 Dec 2018 10:47:59 -0500
-Received: from e06smtp04.uk.ibm.com (e06smtp04.uk.ibm.com [195.75.94.100])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p5680mjjs-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 03 Dec 2018 10:47:58 -0500
-Received: from localhost
- by e06smtp04.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 3 Dec 2018 15:47:50 -0000
-Received: from b06cxnps4075.portsmouth.uk.ibm.com (9.149.109.197)
- by e06smtp04.uk.ibm.com (192.168.101.134) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 3 Dec 2018 15:47:44 -0000
-Received: from d06av26.portsmouth.uk.ibm.com (d06av26.portsmouth.uk.ibm.com
- [9.149.105.62])
- by b06cxnps4075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB3FlhRm57606288
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 3 Dec 2018 15:47:43 GMT
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 6931FAE055;
- Mon,  3 Dec 2018 15:47:43 +0000 (GMT)
-Received: from d06av26.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 2BADBAE05A;
- Mon,  3 Dec 2018 15:47:40 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.206.196])
- by d06av26.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon,  3 Dec 2018 15:47:40 +0000 (GMT)
-Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 03 Dec 2018 17:47:39 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH v2 5/6] arch: simplify several early memory allocations
-Date: Mon,  3 Dec 2018 17:47:14 +0200
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
-References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
-X-TM-AS-GCONF: 00
-x-cbid: 18120315-0016-0000-0000-00000231613D
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120315-0017-0000-0000-0000328966AB
-Message-Id: <1543852035-26634-6-git-send-email-rppt@linux.ibm.com>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-03_09:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812030148
+ id 1gTqZx-00065U-7s
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:56:14 +0000
+Received: by mail-ed1-f47.google.com with SMTP id h15so11182946edb.4
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 07:56:02 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=OAnxLB+TJ6bHatdarlSwB2K3TfkjfM4vuOINtj6TAao=;
+ b=aNLnR6RPxrHK3iI3q93wFIjLfd5XTHSpC+9n5RrWOKIsVLt3f+F1q7heDwzVZ93euE
+ 8qoC7QzizQjcIWCpeyViHrC9lwyFYhvfLB79p1C3S4j3q6iFJawZJm/w33pJZdYvInQ+
+ PVrRk8tmCRDPQoDidnZBDeUKNIvFrm3zNvi7nxIioLoaC4fz6QsHlfuV1eSAIIrAwbHX
+ Wx9Dj6Roe0lPKFoFb+/Lnr3mhukzjaB0KXnmULN0wffU72eQdJ5jOKl1zYrN4iNlsOuA
+ +KuMWC3QAuJj9AmbdvpYPyYNsnILX01QAn3B1Q8IH/dWAZeUJvANxpFbBwqZLof/1qHE
+ 4e6Q==
+X-Gm-Message-State: AA+aEWY05Ich+rlUo+iemV7IQoxpwP3EsMyHiURU4TqZYv5JCQXYLEv4
+ nyb/PT7CNEqYzEMPwQacdLlj+MHnAnlPgQ==
+X-Google-Smtp-Source: AFSGD/WI2X/n6ERiZlEhg21rnUsrr7bnEshH3f8meqKawE14YUEuL35nRaeRjVo88wWzCn/ide9v2A==
+X-Received: by 2002:a17:906:2083:: with SMTP id
+ 3-v6mr13492007ejq.145.1543852561449; 
+ Mon, 03 Dec 2018 07:56:01 -0800 (PST)
+Received: from mail-wm1-f44.google.com (mail-wm1-f44.google.com.
+ [209.85.128.44])
+ by smtp.gmail.com with ESMTPSA id x10sm3836852edb.58.2018.12.03.07.56.00
+ for <linux-arm-kernel@lists.infradead.org>
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 03 Dec 2018 07:56:01 -0800 (PST)
+Received: by mail-wm1-f44.google.com with SMTP id y139so6378457wmc.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 07:56:00 -0800 (PST)
+X-Received: by 2002:a1c:2382:: with SMTP id j124mr8653160wmj.14.1543852560391; 
+ Mon, 03 Dec 2018 07:56:00 -0800 (PST)
+MIME-Version: 1.0
+References: <20181130053328.24183-1-wens@csie.org>
+ <154356169535.88331.6559008649310425840@swboyd.mtv.corp.google.com>
+In-Reply-To: <154356169535.88331.6559008649310425840@swboyd.mtv.corp.google.com>
+From: Chen-Yu Tsai <wens@csie.org>
+Date: Mon, 3 Dec 2018 23:55:49 +0800
+X-Gmail-Original-Message-ID: <CAGb2v6507htA6HGn2HXgSHyWLp-Ny+XZiGQ1XFHU_CYyHhNYYw@mail.gmail.com>
+Message-ID: <CAGb2v6507htA6HGn2HXgSHyWLp-Ny+XZiGQ1XFHU_CYyHhNYYw@mail.gmail.com>
+Subject: Re: [PATCH] clk: sunxi-ng: h3/h5: Fix CSI_MCLK parent
+To: Stephen Boyd <sboyd@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_074807_223814_89A85EA2 
-X-CRM114-Status: GOOD (  30.27  )
+X-CRM114-CacheID: sfid-20181203_075613_275071_E2D28863 
+X-CRM114-Status: GOOD (  10.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -109,261 +92,28 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
- Mike Rapoport <rppt@linux.ibm.com>, Mark Salter <msalter@redhat.com>,
- Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- linux-kernel@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
- "David S. Miller" <davem@davemloft.net>
-MIME-Version: 1.0
+Cc: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Mike Turquette <mturquette@baylibre.com>,
+ linux-clk <linux-clk@vger.kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-There are several early memory allocations in arch/ code that use
-memblock_phys_alloc() to allocate memory, convert the returned physical
-address to the virtual address and then set the allocated memory to zero.
+On Fri, Nov 30, 2018 at 3:08 PM Stephen Boyd <sboyd@kernel.org> wrote:
+>
+> Quoting Chen-Yu Tsai (2018-11-29 21:33:28)
+> > The third parent of CSI_MCLK is PLL_PERIPH1, not PLL_PERIPH0.
+> > Fix it.
+> >
+> > Fixes: 0577e4853bfb ("clk: sunxi-ng: Add H3 clocks")
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+>
+> Acked-by: Stephen Boyd <sboyd@kernel.org>
 
-Exactly the same behaviour can be achieved simply by calling
-memblock_alloc(): it allocates the memory in the same way as
-memblock_phys_alloc(), then it performs the phys_to_virt() conversion and
-clears the allocated memory.
-
-Replace the longer sequence with a simpler call to memblock_alloc().
-
-Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
----
- arch/arm/mm/mmu.c                     |  4 +---
- arch/c6x/mm/dma-coherent.c            |  9 ++-------
- arch/nds32/mm/init.c                  | 12 ++++--------
- arch/powerpc/kernel/setup-common.c    |  4 ++--
- arch/powerpc/mm/pgtable_32.c          |  4 +---
- arch/powerpc/mm/ppc_mmu_32.c          |  3 +--
- arch/powerpc/platforms/powernv/opal.c |  3 +--
- arch/sparc/kernel/prom_64.c           |  7 ++-----
- arch/sparc/mm/init_64.c               |  9 +++------
- arch/unicore32/mm/mmu.c               |  4 +---
- 10 files changed, 18 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index f5cc1cc..0a04c9a5 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -721,9 +721,7 @@ EXPORT_SYMBOL(phys_mem_access_prot);
- 
- static void __init *early_alloc_aligned(unsigned long sz, unsigned long align)
- {
--	void *ptr = __va(memblock_phys_alloc(sz, align));
--	memset(ptr, 0, sz);
--	return ptr;
-+	return memblock_alloc(sz, align);
- }
- 
- static void __init *early_alloc(unsigned long sz)
-diff --git a/arch/c6x/mm/dma-coherent.c b/arch/c6x/mm/dma-coherent.c
-index 01305c7..ffc49e2 100644
---- a/arch/c6x/mm/dma-coherent.c
-+++ b/arch/c6x/mm/dma-coherent.c
-@@ -118,8 +118,6 @@ void arch_dma_free(struct device *dev, size_t size, void *vaddr,
-  */
- void __init coherent_mem_init(phys_addr_t start, u32 size)
- {
--	phys_addr_t bitmap_phys;
--
- 	if (!size)
- 		return;
- 
-@@ -135,11 +133,8 @@ void __init coherent_mem_init(phys_addr_t start, u32 size)
- 	if (dma_size & (PAGE_SIZE - 1))
- 		++dma_pages;
- 
--	bitmap_phys = memblock_phys_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
--					  sizeof(long));
--
--	dma_bitmap = phys_to_virt(bitmap_phys);
--	memset(dma_bitmap, 0, dma_pages * PAGE_SIZE);
-+	dma_bitmap = memblock_alloc(BITS_TO_LONGS(dma_pages) * sizeof(long),
-+				    sizeof(long));
- }
- 
- static void c6x_dma_sync(struct device *dev, phys_addr_t paddr, size_t size,
-diff --git a/arch/nds32/mm/init.c b/arch/nds32/mm/init.c
-index 131104b..9f19be8 100644
---- a/arch/nds32/mm/init.c
-+++ b/arch/nds32/mm/init.c
-@@ -80,8 +80,7 @@ static void __init map_ram(void)
- 		}
- 
- 		/* Alloc one page for holding PTE's... */
--		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
--		memset(pte, 0, PAGE_SIZE);
-+		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 		set_pmd(pme, __pmd(__pa(pte) + _PAGE_KERNEL_TABLE));
- 
- 		/* Fill the newly allocated page with PTE'S */
-@@ -113,8 +112,7 @@ static void __init fixedrange_init(void)
- 	pgd = swapper_pg_dir + pgd_index(vaddr);
- 	pud = pud_offset(pgd, vaddr);
- 	pmd = pmd_offset(pud, vaddr);
--	fixmap_pmd_p = (pmd_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
--	memset(fixmap_pmd_p, 0, PAGE_SIZE);
-+	fixmap_pmd_p = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	set_pmd(pmd, __pmd(__pa(fixmap_pmd_p) + _PAGE_KERNEL_TABLE));
- 
- #ifdef CONFIG_HIGHMEM
-@@ -126,8 +124,7 @@ static void __init fixedrange_init(void)
- 	pgd = swapper_pg_dir + pgd_index(vaddr);
- 	pud = pud_offset(pgd, vaddr);
- 	pmd = pmd_offset(pud, vaddr);
--	pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
--	memset(pte, 0, PAGE_SIZE);
-+	pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	set_pmd(pmd, __pmd(__pa(pte) + _PAGE_KERNEL_TABLE));
- 	pkmap_page_table = pte;
- #endif /* CONFIG_HIGHMEM */
-@@ -152,8 +149,7 @@ void __init paging_init(void)
- 	fixedrange_init();
- 
- 	/* allocate space for empty_zero_page */
--	zero_page = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
--	memset(zero_page, 0, PAGE_SIZE);
-+	zero_page = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	zone_sizes_init();
- 
- 	empty_zero_page = virt_to_page(zero_page);
-diff --git a/arch/powerpc/kernel/setup-common.c b/arch/powerpc/kernel/setup-common.c
-index 93ee370..8f6c763 100644
---- a/arch/powerpc/kernel/setup-common.c
-+++ b/arch/powerpc/kernel/setup-common.c
-@@ -459,8 +459,8 @@ void __init smp_setup_cpu_maps(void)
- 
- 	DBG("smp_setup_cpu_maps()\n");
- 
--	cpu_to_phys_id = __va(memblock_phys_alloc(nr_cpu_ids * sizeof(u32), __alignof__(u32)));
--	memset(cpu_to_phys_id, 0, nr_cpu_ids * sizeof(u32));
-+	cpu_to_phys_id = memblock_alloc(nr_cpu_ids * sizeof(u32),
-+					__alignof__(u32));
- 
- 	for_each_node_by_type(dn, "cpu") {
- 		const __be32 *intserv;
-diff --git a/arch/powerpc/mm/pgtable_32.c b/arch/powerpc/mm/pgtable_32.c
-index bda3c6f..9931e68 100644
---- a/arch/powerpc/mm/pgtable_32.c
-+++ b/arch/powerpc/mm/pgtable_32.c
-@@ -50,9 +50,7 @@ __ref pte_t *pte_alloc_one_kernel(struct mm_struct *mm, unsigned long address)
- 	if (slab_is_available()) {
- 		pte = (pte_t *)__get_free_page(GFP_KERNEL|__GFP_ZERO);
- 	} else {
--		pte = __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
--		if (pte)
--			clear_page(pte);
-+		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
- 	}
- 	return pte;
- }
-diff --git a/arch/powerpc/mm/ppc_mmu_32.c b/arch/powerpc/mm/ppc_mmu_32.c
-index f6f575b..fddf823 100644
---- a/arch/powerpc/mm/ppc_mmu_32.c
-+++ b/arch/powerpc/mm/ppc_mmu_32.c
-@@ -224,8 +224,7 @@ void __init MMU_init_hw(void)
- 	 * Find some memory for the hash table.
- 	 */
- 	if ( ppc_md.progress ) ppc_md.progress("hash:find piece", 0x322);
--	Hash = __va(memblock_phys_alloc(Hash_size, Hash_size));
--	memset(Hash, 0, Hash_size);
-+	Hash = memblock_alloc(Hash_size, Hash_size);
- 	_SDR1 = __pa(Hash) | SDR1_LOW_BITS;
- 
- 	Hash_end = (struct hash_pte *) ((unsigned long)Hash + Hash_size);
-diff --git a/arch/powerpc/platforms/powernv/opal.c b/arch/powerpc/platforms/powernv/opal.c
-index beed86f..29ee2ea 100644
---- a/arch/powerpc/platforms/powernv/opal.c
-+++ b/arch/powerpc/platforms/powernv/opal.c
-@@ -171,8 +171,7 @@ int __init early_init_dt_scan_recoverable_ranges(unsigned long node,
- 	/*
- 	 * Allocate a buffer to hold the MC recoverable ranges.
- 	 */
--	mc_recoverable_range =__va(memblock_phys_alloc(size, __alignof__(u64)));
--	memset(mc_recoverable_range, 0, size);
-+	mc_recoverable_range = memblock_alloc(size, __alignof__(u64));
- 
- 	for (i = 0; i < mc_recoverable_range_len; i++) {
- 		mc_recoverable_range[i].start_addr =
-diff --git a/arch/sparc/kernel/prom_64.c b/arch/sparc/kernel/prom_64.c
-index c37955d..2a17665 100644
---- a/arch/sparc/kernel/prom_64.c
-+++ b/arch/sparc/kernel/prom_64.c
-@@ -34,16 +34,13 @@
- 
- void * __init prom_early_alloc(unsigned long size)
- {
--	unsigned long paddr = memblock_phys_alloc(size, SMP_CACHE_BYTES);
--	void *ret;
-+	void *ret = memblock_alloc(size, SMP_CACHE_BYTES);
- 
--	if (!paddr) {
-+	if (!ret) {
- 		prom_printf("prom_early_alloc(%lu) failed\n", size);
- 		prom_halt();
- 	}
- 
--	ret = __va(paddr);
--	memset(ret, 0, size);
- 	prom_early_allocated += size;
- 
- 	return ret;
-diff --git a/arch/sparc/mm/init_64.c b/arch/sparc/mm/init_64.c
-index 3c8aac2..52884f4 100644
---- a/arch/sparc/mm/init_64.c
-+++ b/arch/sparc/mm/init_64.c
-@@ -1089,16 +1089,13 @@ static void __init allocate_node_data(int nid)
- 	struct pglist_data *p;
- 	unsigned long start_pfn, end_pfn;
- #ifdef CONFIG_NEED_MULTIPLE_NODES
--	unsigned long paddr;
- 
--	paddr = memblock_phys_alloc_try_nid(sizeof(struct pglist_data),
--					    SMP_CACHE_BYTES, nid);
--	if (!paddr) {
-+	NODE_DATA(nid) = memblock_alloc_node(sizeof(struct pglist_data),
-+					     SMP_CACHE_BYTES, nid);
-+	if (!NODE_DATA(nid)) {
- 		prom_printf("Cannot allocate pglist_data for nid[%d]\n", nid);
- 		prom_halt();
- 	}
--	NODE_DATA(nid) = __va(paddr);
--	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
- 
- 	NODE_DATA(nid)->node_id = nid;
- #endif
-diff --git a/arch/unicore32/mm/mmu.c b/arch/unicore32/mm/mmu.c
-index 040a8c2..50d8c1a 100644
---- a/arch/unicore32/mm/mmu.c
-+++ b/arch/unicore32/mm/mmu.c
-@@ -143,9 +143,7 @@ static void __init build_mem_type_table(void)
- 
- static void __init *early_alloc(unsigned long sz)
- {
--	void *ptr = __va(memblock_phys_alloc(sz, sz));
--	memset(ptr, 0, sz);
--	return ptr;
-+	return memblock_alloc(sz, sz);
- }
- 
- static pte_t * __init early_pte_alloc(pmd_t *pmd, unsigned long addr,
--- 
-2.7.4
-
+Merged for 4.21. Thanks.
 
 _______________________________________________
 linux-arm-kernel mailing list
