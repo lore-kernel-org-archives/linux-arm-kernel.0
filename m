@@ -2,144 +2,64 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-12.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D8620C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:40:26 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3134AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:41:00 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 91C6C20659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:40:26 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 02E2F20659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:40:59 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A8GJF9Xo";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="P6kyEF5W";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="PZmtrG7m"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91C6C20659
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gjfaBdCS"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 02E2F20659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hisilicon.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	In-Reply-To:List-Owner; bh=uVMdS9NBDza8uv5ZAJ8YRyi2z2RmyWE8RJX/3Z3Rqnw=; b=A8
-	GJF9XoJlhr8wbH3J89Z7YO81XBWIeWzmv6vELoXRosJVDW1ZTQ6hnhe/CWUM2VIOBEONdNojsgNlb
-	jr2xYDLnBXVtbqjPiLaafc1ophhryqHffJ/2KQ8Vp87raQdQWxRRJy27Omb6qJOGLabFxBfKj8I1S
-	tsMKkCoJs8+CkhAA1PX5Ql/XXR3PAMVfbLCtX6OMH5tcZonA7l48Z5WnKnZEg9CKuuxy7EXe60enr
-	8A4GUY1YxhC1wBkc129IlX8aX7De/b521BZruprE9Mw7dKA2Y6eN05YqOYWu6wmsz7vrMKtQZitWb
-	A5YigxneCBVm34Wk92wuQf8IaJ8rdu9Q==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=1nsNY0jiGuyIZQtOuTTLmBmzu/G1phrb6twqoreFvic=; b=gjfaBdCS01hESr
+	zVPRXRA+EcmBcSPRDgcGqRnamkXGzp2v2TnA7nt57bpoIPLWWFt1YMCUEzcjctyMeg7EvWijLPa3c
+	OkfHR7V4X0PmroNxVp4jpbtUf+Z+KAYgn0UHYqOfGBg53fdEYP4V+RhEA8MjdKZJesCyGSCECIgQ2
+	gwP5QrZo4Sma+g/Hk8k6HNNGBO7bBADJl7wi0bZOkxxEPpguOkPwHV5UQf/QIfRmfKMFKK7eJrYFl
+	Hklh5s+gffBzFNPIKRj2DxX/jnlwHv1aC75d89PXVpM5TT1od3VWW4t1Ec1925Eao1x3DQ3TQh+Hd
+	zEFyoPXF/PrnDn7Al0Pw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTpOb-0006op-HV; Mon, 03 Dec 2018 14:40:25 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gTpP6-00071g-Mb; Mon, 03 Dec 2018 14:40:56 +0000
+Received: from szxga07-in.huawei.com ([45.249.212.35] helo=huawei.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTpGL-0001lD-Sc
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 14:31:54 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=References:Content-Type:Message-Id:Date
- :Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Transfer-Encoding:
- Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
- Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=xnvwoL8u4q3jdpcw9MomShy0KGKgN6QxlXlHKX/7FTo=; b=P6kyEF5WuuQVm8sTrVLb1a83WL
- DqA/Dr0mhl/j+yClCw2IXRkkXVYzDw1UObszbsMfGE9Iv9mZt490mjDf8wAKtmzuQAFaVbdtbfO7j
- llpXdl0fo6R4NM4kCVaquebtEw13BuaQBYdP5Bh20CKuvBcRm6QY3rkwPEVDVOFnid58rSdo39esD
- Iku1xRvX2/HqhM9auEq8YAHGl1ffqwf8onTiQit6KXJmNf6BLjhPVo+Pl7YxpB8c7VLRM4Yx9zZVH
- zOwc9pypTj6Lt0Rw8YbYX47nPjQKm2ICuJuqf44lMErCLdn1+WHm5gkILTKZp6thWYNBGUYNSdU4U
- Jjy3SRXQ==;
-Received: from mailout1.w1.samsung.com ([210.118.77.11])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTpGH-0007mp-U2
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:31:52 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181203143129euoutp01d1e1c12ec6b9cab0faa9dec1da4173b3~s2Ry2K-NP1512615126euoutp01y
- for <linux-arm-kernel@lists.infradead.org>;
- Mon,  3 Dec 2018 14:31:29 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
- 20181203143129euoutp01d1e1c12ec6b9cab0faa9dec1da4173b3~s2Ry2K-NP1512615126euoutp01y
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1543847489;
- bh=xnvwoL8u4q3jdpcw9MomShy0KGKgN6QxlXlHKX/7FTo=;
- h=From:To:Cc:Subject:Date:References:From;
- b=PZmtrG7mus0DRl7/H+WsXKbsfOxmI0z9Oy5AvidiOmDfR5cnfRswRXUyjp673TSfU
- nek7qQntLHWQqrhAR6TP795CnZhtzeZUS5mnf03rCHuDLgCqY9sK+80ymFQ/3dQ0zK
- k1avNr9zvtZyWoi6c4WL6n31USAPedq1MlybBNE8=
-Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181203143128eucas1p19e2ea9db521aa745ff93977171d5d6f1~s2Rxl0npp1711417114eucas1p1M;
- Mon,  3 Dec 2018 14:31:28 +0000 (GMT)
-Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
- eusmges1new.samsung.com (EUCPMTA) with SMTP id 18.CA.04441.F3E350C5; Mon,  3
- Dec 2018 14:31:27 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
- 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e~s2RwrM_2o0832208322eucas1p2B;
- Mon,  3 Dec 2018 14:31:27 +0000 (GMT)
-Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20181203143127eusmtrp103bf2b3db0d489f291e8c9e5e2ea143c~s2RwalByQ1650116501eusmtrp1c;
- Mon,  3 Dec 2018 14:31:27 +0000 (GMT)
-X-AuditID: cbfec7f2-5e3ff70000001159-9e-5c053e3fe2a1
-Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
- eusmgms2.samsung.com (EUCPMTA) with SMTP id 2E.E8.04128.E3E350C5; Mon,  3
- Dec 2018 14:31:26 +0000 (GMT)
-Received: from AMDC3778.DIGITAL.local (unknown [106.120.51.20]) by
- eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
- 20181203143126eusmtip202d74b9b677be3a30dfbb759f4d9400c~s2Rve22Pf0696906969eusmtip2D;
- Mon,  3 Dec 2018 14:31:25 +0000 (GMT)
-From: Lukasz Luba <l.luba@partner.samsung.com>
-To: linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
- linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
- devicetree@vger.kernel.org
-Subject: [PATCH v2 0/5] devfreq: handle suspend/resume
-Date: Mon,  3 Dec 2018 15:31:10 +0100
-Message-Id: <1543847475-7600-1-git-send-email-l.luba@partner.samsung.com>
-X-Mailer: git-send-email 2.7.4
-X-Brightmail-Tracker: H4sIAAAAAAAAA0VSWUwTURT1dWY6I6EwFgNPtmijBlARE9QXNS6RjzH6oTEGgxosdgQDLbUD
- uGFAiUKVxdQFUlyDCBlrCrWWpoALVqpiKcW4QVAjrhUJUsVoIto6Vf/OOfece8/HpTCph4ik
- dqjyWI1KniMTB+GWzu/dc5YtJTYnDdYidOtaPGquMRKopXmMQE++vCPQOXs3gUrqjGL04KgS
- VQ1+xJDL1UQi58EhEvUVRyP9iXYRMg0+JtBD22kx8lbYAapxXRehK/YBEtU/cYtQ/4FGMRq4
- f8e3o6uXQIfa7SQ6fHmEQEM9z/HlkLG0WgjGcNYAmNpiN84cqxoFTF3bBxFj4rVi5sYZA8lc
- vVjEjHeSzK3hNhFjflSKM5VmHjCNl7+RjNcUuzYkLWiJgs3ZUcBq5i7dGpRlLKkm1DdCd9dU
- uchi4Aw+AiZSkE6G+h+viCMgiJLSjQCWvfaIBfIFwLGWTlwgXgA9rb9EfyMmw3lSGDQAWN70
- WPQv0lf/w0coSkwnQiu/0x+YTNcB2GuN93sw+i4GbZ91fzaF0QvgoOMi5sc4PQNWVoz9wRJ6
- FTz91IgL12Lhs24t5g9DuoKCF6wnAzVSoLmknRRwGPQ4zAEcDbuOlwfCHHSW8WIBF8LSe9aA
- ZzG87XAT/qIYHQ+NtrmCvAJ22m8DvwzpEPj00yS/jPmgzlKNCbIElh2WCu44aC7vCZQJhw2G
- U4HlDOTPleF+u5TeAs28+hiI1f8/dR4AHkSw+Zwyk+XmqdhdiZxcyeWrMhO35SpNwPeBXeOO
- USv42pvRAWgKyIIly9PxzVJCXsDtUXYASGGyyRL1Tp8kUcj37GU1uema/ByW6wBRFC6LkOyb
- 8HKTlM6U57HZLKtmNX+nImpiZDHIoTexDm120YI47wuu39aQOvbWNL+5YE1abfIsYtFwlzrV
- GR86Lfu9O2pc8WZDRuacm/rRlOhf3xRHdQtdwVl30tQrZ2//OdMyZWS96rm2KSZ39XTvxqj9
- /N6YQr7ygi7mQWq3TrvuhDMsO9yaVJ8fEpdaNT6NvpTnSZjqLk2JkclwLks+LwHTcPLfxtgF
- kn0DAAA=
-X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrMIsWRmVeSWpSXmKPExsVy+t/xe7p2dqwxBkcWWlgc3KppsXHGelaL
- 7Ru/sVpc//Kc1WL+kXOsFs2L17NZnOnOteh//JrZ4vz5DewWZ5vesFvcapCxmDVlL5PFpsfX
- WC0u75rDZvG59wijxYzz+5gs1h65y26x9PpFJovbjSvYLO6eOgo04/QlVovWvUfYLdpWf2C1
- eHPhHouDhMe23dtYPdbMW8PoMbvhIovHhP5PjB6L97xk8ti0qpPNY//cNewem5fUe/w7xu5x
- 8N0eJo8tV9tZPPq2rGL0WLH6O7vH501yAXxRejZF+aUlqQoZ+cUltkrRhhZGeoaWFnpGJpZ6
- hsbmsVZGpkr6djYpqTmZZalF+nYJehnrm6ezFuznr5jRf569gfEsTxcjJ4eEgInEpjUL2LsY
- uTiEBJYySix6c5gdIiEmMWnfdihbWOLPtS42iKJPjBLXd6wFSnBwsAnoSexYVQgSFxFYzihx
- /+dssEnMAg+YJTqeb2IF6RYWMJN4fHwJM4jNIqAq0df7DczmFfCUmHNjPQvEBjmJm+c6mScw
- 8ixgZFjFKJJaWpybnltspFecmFtcmpeul5yfu4kRGIHbjv3csoOx613wIUYBDkYlHl6HeJYY
- IdbEsuLK3EOMEhzMSiK8BYVAId6UxMqq1KL8+KLSnNTiQ4ymQMsnMkuJJucDk0NeSbyhqaG5
- haWhubG5sZmFkjjveYPKKCGB9MSS1OzU1ILUIpg+Jg5OqQZGv84lESe6d16vmTibZ6IFn8aX
- NwuOzl0pM/nlfVv9I2eVl+jeOPzzX+fDZRrvdrufaK7PfliUP3vuxDBr5YUvxAuN6t8L1bxQ
- ub/dRYlXT2Qb7yojlYJ5+UVbJycEzt2W8fFfwJ7Ff4p0t1rW3ZPP9hSaHfabN6HMwzp4l0vh
- 7VlO621v+fxpVGIpzkg01GIuKk4EAEf5GybWAgAA
-X-CMS-MailID: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
-X-Msg-Generator: CA
-X-RootMTR: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
-References: <CGME20181203143127eucas1p2604fc066139a32fdffe996212b42b40e@eucas1p2.samsung.com>
+ id 1gTpOz-0006x5-OS
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:40:54 +0000
+Received: from DGGEMS408-HUB.china.huawei.com (unknown [172.30.72.58])
+ by Forcepoint Email with ESMTP id 64BC9C5EBA9BA;
+ Mon,  3 Dec 2018 22:40:29 +0800 (CST)
+Received: from [127.0.0.1] (10.202.226.42) by DGGEMS408-HUB.china.huawei.com
+ (10.3.19.208) with Microsoft SMTP Server id 14.3.408.0; Mon, 3 Dec 2018
+ 22:40:21 +0800
+Subject: Re: [GIT PULL] arm64: dts: hisilicon dts updates for v4.21
+To: Olof Johansson <olof@lixom.net>
+References: <5C000B15.8010400@hisilicon.com>
+ <20181130234652.dfv5onq3s4faweut@localhost>
+From: Wei Xu <xuwei5@hisilicon.com>
+Message-ID: <5C05404A.4070806@hisilicon.com>
+Date: Mon, 3 Dec 2018 14:40:10 +0000
+User-Agent: Mozilla/5.0 (Windows NT 10.0; WOW64; rv:38.0) Gecko/20100101
+ Thunderbird/38.6.0
+MIME-Version: 1.0
+In-Reply-To: <20181130234652.dfv5onq3s4faweut@localhost>
+X-Originating-IP: [10.202.226.42]
+X-CFilter-Loop: Reflected
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_143149_969176_8060DAA0 
-X-CRM114-Status: GOOD (  17.52  )
+X-CRM114-CacheID: sfid-20181203_064052_975199_27860CC9 
+X-CRM114-Status: GOOD (  12.21  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -151,66 +71,112 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, len.brown@intel.com, tony.luck@intel.com,
- keescook@chromium.org, cw00.choi@samsung.com, b.zolnierkie@samsung.com,
- gregkh@linuxfoundation.org, anton@enomsg.org, rjw@rjwysocki.net,
- robh+dt@kernel.org, Lukasz Luba <l.luba@partner.samsung.com>,
- tjakobi@math.uni-bielefeld.de, kyungmin.park@samsung.com,
- myungjoo.ham@samsung.com, kgene@kernel.org, pavel@ucw.cz, ccross@android.com,
- krzk@kernel.org, m.szyprowski@samsung.com
-MIME-Version: 1.0
+Cc: Tangkunshan <tangkunshan@huawei.com>,
+ Viresh Kumar <viresh.kumar@linaro.org>,
+ Linus Walleij <linus.walleij@linaro.org>, Linuxarm <linuxarm@huawei.com>,
+ "haojian.zhuang@linaro.org" <haojian.zhuang@linaro.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ "arm@kernel.org" <arm@kernel.org>, Daode Huang <huangdaode@hisilicon.com>,
+ "Chenxin \(Charles\)" <charles.chenxin@huawei.com>,
+ "zhangfei.gao@linaro.org" <zhangfei.gao@linaro.org>,
+ Zhangyi ac <zhangyi.ac@huawei.com>, jinying@hisilicon.com,
+ Arnd Bergmann <arnd@arndb.de>, John Garry <john.garry@huawei.com>,
+ Jonathan Cameron <Jonathan.Cameron@huawei.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ Salil Mehta <salil.mehta@huawei.com>, Guodong Xu <guodong.xu@linaro.org>,
+ Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>,
+ Leo Yan <leo.yan@linaro.org>, "Liguozhu
+ \(Kenneth\)" <liguozhu@hisilicon.com>, Shiju Jose <shiju.jose@huawei.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi all,
+Hi Olof,
 
-This v2 patch set aims to address the issue with devfreq devices' frequency
-during suspend/resume. It extends suspend/resume by calls to Devfreq
-framework. In the devfreq framework there is a small refactoring to avoid
-code duplication in changging frequency (patch 1) and there are extensions
-for suspending devices. The suspending device has now chance to set proper
-state when the system is going for suspend. This phase is the right place
-to set needed frequences for the next resume process.
+On 2018/11/30 23:46, Olof Johansson wrote:
+> On Thu, Nov 29, 2018 at 03:51:49PM +0000, Wei Xu wrote:
+>> Hi ARM-SoC team,
+>>
+>> Please consider to pull the following changes.
+>> Thanks!
+>>
+>> Best Regards,
+>> Wei
+>>
+>> ---
+>>
+>> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
+>>
+>>   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
+>>
+>> are available in the Git repository at:
+>>
+>>   git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.21
+>>
+>> for you to fetch changes up to 6ad5506ed191eefec7d205245edabb8b5f7e950f:
+>>
+>>   ARM64: dts: hisilicon: Add all CPUs in cooling maps (2018-11-29 10:11:21 +0000)
+>>
+>> ----------------------------------------------------------------
+>> ARM64: DT: Hisilicon SoCs DT updates for 4.21
+>>
+>> * Hi3660 SoC and related boards:
+>>   - Standardize LED labels and triggers for the hikey960 board
+>>   - Add the missing cooling-cells property for the cpu nodes
+>>   - Add all cpus into the cooling maps
+>>
+>> * Hi3670 SoC and related boards:
+>>   - Add clock nodes and update the uart clock
+>>   - Add Pinctrl, GPIO and uart nodes
+>>   - Enable uart and add GPIO line names for the hikey970 board
+>>
+>> * Hi3798 SoC and related boards:
+>>   - Standardize LED labels and triggers for the poplar board
+>>
+>> * Hi6220 SoC and related boards:
+>>   - Standardize LED labels and triggers for the hikey board
+>>   - Add all cpus into the cooling maps
+> 
+> Merged, thanks.
 
-It has been tested on Odroid u3 with Exynos 4412.
+Thanks!
 
-The patch set draws on Tobias Jakobi's work posted ~2 years ago, who tried
-to solve issue with devfreq device's frequency during suspend/resume.
-During the discussion on LKML some corner cases and comments appeared
-related to the design. This patch set address them keeping in mind
-suggestions from Chanwoo Choi.
-Tobias's paches:
-https://www.spinics.net/lists/linux-samsung-soc/msg56602.html 
+> 
+>> ----------------------------------------------------------------
+>> Manivannan Sadhasivam (10):
+>>       arm64: dts: hisilicon: Add clock nodes for Hi3670 SoC
+>>       arm64: dts: hisilicon: Source SoC clock for UART6
+>>       arm64: dts: hisilicon: Add Pinctrl support for HiKey970 board
+>>       arm64: dts: hisilicon: hi3670: Add GPIO controller support
+>>       arm64: dts: hisilicon: hi3670: Add UART nodes
+>>       arm64: dts: hisilicon: hikey970: Enable on-board UARTs
+>>       arm64: dts: hisilicon: hikey970: Add GPIO line names
+>>       arm64: dts: hisilicon: hikey: Standardize LED labels and triggers
+>>       arm64: dts: hisilicon: hikey960: Standardize LED labels and triggers
+>>       arm64: dts: hisilicon: poplar: Standardize LED labels and triggers
+>>
+>> Viresh Kumar (2):
+>>       arm64: dts: hi3660: Add missing cooling device properties for CPUs
+>>       ARM64: dts: hisilicon: Add all CPUs in cooling maps
+> 
+> Nit: Please use the common arm64: and ARM: patch prefixes.
+> 
 
-Changes:
-v2:
-- refactored patchset and merget patch 1 and 3 as suggested by Chanwoo Choi,
-- changed devfreq_{susped|resume}_device functions,
-- added doxygen information for new entres in 'struct devfreq',
-- devfreq_set_target skipped one argument, now resume_freq is set inside,
-- minor changes addresing comments from maintainers regarding the style,
+Got it.
+Sorry for the inconsistent.
+Thanks!
 
-Regards,
-Lukasz Luba
+Best Regards,
+Wei
 
-Lukasz Luba (5):
-  devfreq: refactor set_target frequency function
-  devfreq: add support for suspend/resume of a devfreq device
-  devfreq: add devfreq_suspend/resume() functions
-  drivers: power: suspend: call devfreq suspend/resume
-  arm: dts: exynos4: opp-suspend in DMC and leftbus
-
- arch/arm/boot/dts/exynos4210.dtsi |   2 +
- arch/arm/boot/dts/exynos4412.dtsi |   2 +
- drivers/base/power/main.c         |   3 +
- drivers/devfreq/devfreq.c         | 155 +++++++++++++++++++++++++++++---------
- include/linux/devfreq.h           |  13 ++++
- 5 files changed, 141 insertions(+), 34 deletions(-)
-
--- 
-2.7.4
+> 
+> Thanks,
+> 
+> -Olof
+> 
+> .
+> 
 
 
 _______________________________________________
