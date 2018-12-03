@@ -2,60 +2,80 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-9.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,
+	MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_MUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D4ADC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:26:23 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A7C58C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:36:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1F45620878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:26:23 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7928D20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:36:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OMSbbC5j"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F45620878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WA6bpGvt";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="LZQ7Gfyy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7928D20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
-	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
-	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
-	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=MJEJjpQBd3uk53jh2UV/6aTtpAH1nmOH1KxheMYOwcI=; b=OMSbbC5j3eBL+snEJbR9v5w8V
-	UalRXJF/sawBXubMoFhaAZgywV3rrKA/4xSOQHrCnJmD/qpXHzkLPdVCSsrShgVVD1m5+RRI//suE
-	5Dsd2gY46axOpHM5G8oVnwxOoKkx3tmVk3q78zftUHMCCY+uZGqbUgGmA3zFAn8HvLLZddL2ACHu1
-	EwrCa67Zg/hzmH5QdoPoJMldX2i0DRuV5S4xUTlw5ulco4IMhWwls9YmliZQZMqQTrnmTpZV5TL5M
-	Ck+TsRzQnMfQttf87JbT3SR4yT8eatMyK8P9e8wAKzlm5q9xx9xeUW5yYzAQkbew8/XOhB+TFqPjL
-	J0Q1cmq1w==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=K1MEglyEhgkBQsGMkQ7vZJlejk29y4Q42Uq589gS6+o=; b=WA6bpGvtx+re6U
+	n0TWQ7lI9oGkeBGXYVj72INXABlzj1g7hgvLT7vbGdkJSH+xo7JKpjLk86+9PK5wD0cytTzHqkoEE
+	3nMqcbHpxjcO14A6S+vOn/lajFcS6QRlgCX3wR6drC8nzRcjs8gt3BzUHz9YeSKzOmUuPd/vOfqof
+	2Lao1AlVd8UEPxX4JF0rbDotmGgb7mNIPeOH4H7QPFXzW8r5zGypW7NbVUKPtYfVqacUXNd8/MkMO
+	hvDlmid41nGMLznEo8hRtZYqh26JytAXxSiO9cAoTLvUdJzLcyZFBImrOE/6a1oHhJQtAVAFj6O3v
+	8JmIS+vqzT9FwmvTJYrQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTnIr-0004m0-7s; Mon, 03 Dec 2018 12:26:21 +0000
-Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
+	id 1gTnSQ-0007vw-PL; Mon, 03 Dec 2018 12:36:14 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTnIi-0004lP-TD
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:26:19 +0000
-X-Virus-Scanned: by amavisd-new at test-mx.suse.de
-Received: from relay1.suse.de (unknown [195.135.220.254])
- by mx1.suse.de (Postfix) with ESMTP id E28E5AFA8;
- Mon,  3 Dec 2018 12:25:57 +0000 (UTC)
-Message-ID: <7a75afd030cbd17c986a3ad486aab35ad3418b28.camel@suse.de>
-Subject: Re: [PATCH] firmware: arm_sdei: fix wrong of_node_put() in init
- function
-From: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
-To: James Morse <james.morse@arm.com>
-Date: Mon, 03 Dec 2018 13:25:55 +0100
-In-Reply-To: <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
-References: <20181126121536.28739-1-nsaenzjulienne@suse.de>
- <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
-User-Agent: Evolution 3.30.2 
-Mime-Version: 1.0
+ id 1gTnSO-0007sF-8d
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 12:36:12 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=In-Reply-To:Content-Type:MIME-Version:
+ References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=avbKSFdciR6iqCsc4parxclQe93be93Zo/zusz7rmyU=; b=LZQ7GfyypSod6kg7Kh2SDYIgO
+ dbDDrvi0cdJzH1yaLj81IgngAfbiaZdd0qnSqYeYK+hPfY4mrAEJnc37KNBwoLtT43gH02LA76OkP
+ wggxh2cU7LuWq+X4FJLwXK9nY6lXgQm7QJoQ6TMharhsmCZjl3YfeZfw3WS2SvMBAz6oHGZohv+JL
+ evQzVWpTVjn/lgzTeFqnVxTC3g9Qf9LICeFPlkAuNW2+7JzkEWHNRqDEt3v5CctQ1FVXMt1mqImtJ
+ QtgWk5i8ei6q/nQwh/Hql8EuGM17TeOMwD9Okcdcaudx0bkTc1dfYzEo73K/IAIpJnwdu+yNH6hBY
+ uBU0fSzZw==;
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by casper.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTnDW-0002hh-Oa
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:20:52 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 910E41688;
+ Mon,  3 Dec 2018 04:20:39 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7D72A3F614;
+ Mon,  3 Dec 2018 04:20:37 -0800 (PST)
+Date: Mon, 3 Dec 2018 12:20:34 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Andrey Smirnov <andrew.smirnov@gmail.com>
+Subject: Re: [PATCH 0/3] PCIE support for i.MX8MQ
+Message-ID: <20181203122034.GC8040@e107981-ln.cambridge.arm.com>
+References: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181117181225.10737-1-andrew.smirnov@gmail.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_042613_091914_94DC3CB7 
-X-CRM114-Status: GOOD (  20.85  )
+X-CRM114-CacheID: sfid-20181203_122050_958160_18B23578 
+X-CRM114-Status: GOOD (  16.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -67,116 +87,55 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============4266517354767134616=="
+Cc: "A.s. Dong" <aisheng.dong@nxp.com>, Richard Zhu <hongxing.zhu@nxp.com>,
+ linux-arm-kernel@lists.infradead.org, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Fabio Estevam <fabio.estevam@nxp.com>,
+ linux-imx@nxp.com, bhelgaas@google.com,
+ Leonard Crestez <leonard.crestez@nxp.com>, cphealy@gmail.com,
+ l.stach@pengutronix.de
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+On Sat, Nov 17, 2018 at 10:12:22AM -0800, Andrey Smirnov wrote:
+> 
+> Everyone:
+> 
+> This series contains changes I made in order to enable support of PCIE
+> IP block on i.MX8MQ SoCs (full tree can be found at [github-v0]). This series
+> is _very_ preliminary and by no means is ready for inclusion (it also
+> has some unmet dependencies).  However is should be in OK enough shape
+> to get some early feedback on, which is the intent of this submission.
+> 
+> Specifically, I'd like to get some feedback on whether newly
+> introduced "fsl,iomux-gpr1x" and "fsl,gpr12-device-type" DT
+> properties, added to handle differences between PCIE0 and PCIE1, is a
+> good (acceptable) solution for the problem.
+> 
+> All other feedback is appreciated as well!
+> 
+> Thank you,
+> Andrey Smirnov
+> 
+> [github-v0] https://github.com/ndreys/linux/commits/imx8mq-pcie-v0
+> 
+> Andrey Smirnov (3):
+>   PCI: imx: No-op imx6_setup_phy_mpll() on i.MX7D
+>   PCI: imx: No-op imx6_pcie_reset_phy() on i.MX7D
+>   PCI: imx: Add support for i.MX8MQ
+> 
+>  drivers/pci/controller/dwc/Kconfig    |   2 +-
+>  drivers/pci/controller/dwc/pci-imx6.c | 119 +++++++++++++++++++++++++-
+>  2 files changed, 117 insertions(+), 4 deletions(-)
 
---===============4266517354767134616==
-Content-Type: multipart/signed; micalg="pgp-sha256";
-	protocol="application/pgp-signature"; boundary="=-t7AYbqLg9t8BDYsYLWC5"
+I am expecting you to post of v2 of this series, addressing review
+comments so I will mark these patches with "Changes Requested", please
+let me know if you have any objections.
 
-
---=-t7AYbqLg9t8BDYsYLWC5
-Content-Type: text/plain; charset="UTF-8"
-Content-Transfer-Encoding: quoted-printable
-
-Hi James, thanks for the review!=20
-
-On Fri, 2018-11-30 at 18:31 +0000, James Morse wrote:
-> Hi Nicolas,
->=20
-> On 26/11/2018 12:15, Nicolas Saenz Julienne wrote:
-> > After finding a "firmware" dt node arm_sdei tries to match it's
-> > compatible string with it. To do so it's calling
-> > of_find_matching_node()
-> > which already takes care of decreasing the refcount on the
-> > "firmware"
-> > node. We are then incorrectly decreasing the refcount on that node
-> > again.
-> >=20
-> > This patch removes the unwarranted call to of_node_put().
-> >=20
-> > Fixes: ad6eb31ef903 ("firmware: arm_sdei: Add driver for Software
-> > Delegated Exceptions")
-> > Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
->=20
-> Thanks!, I agree this is unwarranted.
-> Is there a tool that picks these up? I remember sparse giving me a
-> headache, but
-> I don't remember this one... I probably cargo-culted it from
-> somewhere else.
-
-We stumbled upon this one on a test system. TBH I don't really know
-much about these tools so I can't tell. That said, I sent 4 more fixes
-on this bug (one more in drivers/firmware) so there definitively was
-some cargo-culting happening.
-
-Regards,
-Nicolas
-
->=20
-> Acked-by: James Morse <james.morse@arm.com>
->=20
->=20
-> Thanks,
->=20
-> James
->=20
->=20
-> > ---
-> >  drivers/firmware/arm_sdei.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> >=20
-> > diff --git a/drivers/firmware/arm_sdei.c
-> > b/drivers/firmware/arm_sdei.c
-> > index 1ea71640fdc2..dffb47c6b480 100644
-> > --- a/drivers/firmware/arm_sdei.c
-> > +++ b/drivers/firmware/arm_sdei.c
-> > @@ -1017,7 +1017,6 @@ static bool __init sdei_present_dt(void)
-> >  		return false;
-> > =20
-> >  	np =3D of_find_matching_node(fw_np, sdei_of_match);
-> > -	of_node_put(fw_np);
-> >  	if (!np)
-> >  		return false;
-> > =20
-> >=20
-
-
---=-t7AYbqLg9t8BDYsYLWC5
-Content-Type: application/pgp-signature; name="signature.asc"
-Content-Description: This is a digitally signed message part
-Content-Transfer-Encoding: 7bit
-
------BEGIN PGP SIGNATURE-----
-
-iQEzBAABCAAdFiEErOkkGDHCg2EbPcGjlfZmHno8x/4FAlwFINMACgkQlfZmHno8
-x/4MIwgAtHytTe+96hhXYF8/nhxaRJfvz0lYGsmJmhQbfPjpwkDntyvwImjoAvFr
-VqJe0LVkzJ9UgcmJfv5dKnhGkMO5Mb2pG1j8HAnOIwDu1l8JFiJdAOpxIIJoPBvJ
-0wtuGeAqq01Qu0jAqTCqNjPwUe++Mm+Hq8c/R0IHAKe8LVxNj5nCxp31lutZE1hY
-YiqopW+uLORHTBIVVm+K8rg3wYnFf8z5DfmKx/ddwF+exEENo9vt+JxQvTL6/Duk
-VdH+5JkPTS6oTMOKpcJIYc7MUnUrF09O6YzUv3RddsKpjtrJo0qXWBllzs+CAvAX
-Q4IrhMVAb178QBxt83+YJjE1xhAapQ==
-=L/YC
------END PGP SIGNATURE-----
-
---=-t7AYbqLg9t8BDYsYLWC5--
-
-
-
---===============4266517354767134616==
-Content-Type: text/plain; charset="us-ascii"
-MIME-Version: 1.0
-Content-Transfer-Encoding: 7bit
-Content-Disposition: inline
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
---===============4266517354767134616==--
-
-
