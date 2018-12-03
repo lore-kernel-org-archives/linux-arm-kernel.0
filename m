@@ -2,22 +2,22 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
 	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
-	autolearn=ham autolearn_force=no version=3.4.0
+	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 435C4C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 00:41:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 5C0C7C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 01:09:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0302B208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 00:41:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 2617B20834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 01:09:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="UQyk7QHp";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="JvCs/Hfh"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0302B208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HmEBHJS/";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LiRykMz9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2617B20834
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,57 +26,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=DuqHkVn3Nu+3/0PsMc3rpuLqqfoSQCGkC3NpdUwAtws=; b=UQyk7QHpYrMBdI
-	RUnvUQqmgEQn9+9Na/eGyBFhuX/4Rn5DFlRRTFm/vxKev2z8XN7xzpFm/0ivuYU00v9sdVgnddWFs
-	tfLRjHG/JN6ky9D7cY3pbHrlFvqr/osE0x5JRUhM3IixfK5I7p+1f2vuDNXL1LRqbd62WJVuGcXJi
-	AJ7IdVS4a+/O441U2SNsO8Wr1FoM3c9P6liDoJNNtiFZYV64oEQJ76fB4B0QhzEZVlZACfKVsLNUv
-	qgGCDz9t4kp8IVP2q/+x7T4ylQxdVuZZTsY2R3aDSbzWxq2Y3Kp5m2OELraq44k7a4l9stOXHvBTt
-	wjWLAe4vNodH23iKEmcA==;
+	List-Owner; bh=BWbVQTvZiwajstGCrxDKSrWHtwfg5MBc4VZXPyjRZ0w=; b=HmEBHJS/AAgUn6
+	MBEkVkN+OEwXHG0R2RenYgpo/ejflrAwoNsto8RXX3bt3vwTYtHw6U6KNms42sSrQlKAPHyeph29E
+	APAfbRShSW1Ak6ZURpTH/fjD3CHd/IT9JnJ6MlCe0exHIorgg3zB0mAjLESDcu0b9CeSF1hshtR8/
+	lzJsM1doB3koSK1zZklmOArtpwkVlzUlsaX5oDj4KOXE7aY6OyZq8RQKNXFhpf7LvjHzjoaIktIKI
+	DplMU/8SIVc2b6IZr+8prZUSoNMlWybqmYMvKoPXX2RVdEiJJ9slVZt8W/AcEbmemraNXeP6b+8Sa
+	Bnjrw8vu6prm16fien4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTcJB-0001c5-Jm; Mon, 03 Dec 2018 00:41:57 +0000
-Received: from mail-wm1-x336.google.com ([2a00:1450:4864:20::336])
+	id 1gTcjK-0001oy-OE; Mon, 03 Dec 2018 01:08:58 +0000
+Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTcJ7-0001bB-QQ; Mon, 03 Dec 2018 00:41:55 +0000
-Received: by mail-wm1-x336.google.com with SMTP id n190so1548000wmd.0;
- Sun, 02 Dec 2018 16:41:43 -0800 (PST)
+ id 1gTcjG-0001np-CQ; Mon, 03 Dec 2018 01:08:55 +0000
+Received: by mail-wr1-x444.google.com with SMTP id j10so10394102wru.4;
+ Sun, 02 Dec 2018 17:08:43 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
  h=subject:to:cc:references:from:openpgp:autocrypt:message-id:date
  :user-agent:mime-version:in-reply-to:content-language
  :content-transfer-encoding;
- bh=sbJqiDoCNG1jpiM/jk/6p5/Bg/Yy9zN2uS+g9N6XNj4=;
- b=JvCs/Hfh9KC1glwMUW4rQ/BJRI7U4wrHB8EYmhon2rebT9U7CdL5VvqdCnaF01j6eq
- YnUGYgfOtdBJnFWQE+l67Ur7mkbSAWvK6vHL3umpaRH6WMF9bfJEzbKBJDhpWL4CMtt+
- wiw3QwmEPPnKe4WWA+HfKvOsgqGcMkWF+R+NOcnEjdVkOCJ8THIFqI/PmI8U6+vUshVt
- QNEH9d/PtY0KAqls3yWXPOiroi9EpUeNlpiAGV+H8PCc31KJAjjeZ6t4Xn1nW/9NNrMy
- qQPjDUlNcIawjX3wQgiVaigTrD9r9LMeQZYlchvc56GwqEtvmVe7diTgjeewf8DvLNik
- C8YQ==
+ bh=tNCdmIuWxmW3lobrK+PJRQIDhQsTuDR+i++WyT4625g=;
+ b=LiRykMz9cpzi2FcKPzSSAEMgeT+MA3bMAbwBMA05X4O2EyHUFZHK7QXeaHTp3RjLcR
+ 9r/XKg31HmuF6myqu+6smLMEJ6kvsSos9rXRLW0QKU/uZar9GC3uUHyr/rEiImJBBEBS
+ amRJRv3TSc79UUsECbtQbUWvJk1Xvwmtg4h8a8EhicnNYbQE5mYwUWH7E96BW6mBJeM3
+ Um/sKd0hIJ7GICoxRgV+CsEZiQELDz7GG6Z4x1eVLoh+N6bT//WaO1zlZYTMSVVUpMGa
+ fYyczZqwOCGONH2dkW/Ku3qs6vOAzuZR9c3vXyIPBZhCiLJcg0dvw3a0XHwd7JW8WHrp
+ VSOw==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:subject:to:cc:references:from:openpgp:autocrypt
  :message-id:date:user-agent:mime-version:in-reply-to
  :content-language:content-transfer-encoding;
- bh=sbJqiDoCNG1jpiM/jk/6p5/Bg/Yy9zN2uS+g9N6XNj4=;
- b=iJiVS3FoxQI8RNpYlGV2tF8wJbpyNfgmj8Vqhj5OB77bdCrK3NYmFy0PQo13Re8L17
- wGGvDSamG9Tg2EcqGGoBzHAl7aeS1afGXpGGJFPJ5sUDfTII2MgyEbmQYwPJwygb9hPN
- SAZhdfxKDPfxp1MRuFXbmB/BZfaL9g8D5QGFo6/7dYWczc4HJDwtp1QCMNEd5RitYkwa
- sBgXUp2HSCKDtbvsVjum6aUOI/rCk5Hqjvx1+0YIecOeVO6oX+vGaYZ5MykdH96IhbIf
- pOKiV58gVTNrJSOJZ8C/dkJkxfzi6tNddJ5lSh3uAKNi7y88Ll19U8xN9jt4YI8kKHZN
- c9Bw==
-X-Gm-Message-State: AA+aEWbHK9Gozx7J19PTKylB+wXggU0k4eEoJK35GHvD4YcTCpcTe7LT
- +lFH93lYXGEFR4CpK3bkYtuyngSq9+4=
-X-Google-Smtp-Source: AFSGD/X1q/JE5xq1DMoSehvOPSiWNy/ISezLqirOflmXxkoyrsIf3KAdcfzF6pnSB0DlGgCn2ACThw==
-X-Received: by 2002:a1c:af08:: with SMTP id y8mr4831751wme.94.1543797701930;
- Sun, 02 Dec 2018 16:41:41 -0800 (PST)
+ bh=tNCdmIuWxmW3lobrK+PJRQIDhQsTuDR+i++WyT4625g=;
+ b=stBmlDOKNFXR5X+SDkkhhjzy4vNYu3iSziI5ZXQWHf4JmbmBvmUurQQnu3ji8pl7aS
+ LvGBeJzA6nKj1XV50QZyPDl3XeBkSr/eluvu6yRT7YvpPZic3uTRCm3ZJHsCjuSShVWB
+ 8LzBBFB0vL5af5z+NjiMgZXgE+MGGhZuZLz3BHWRCkTHtUvynKZfNU1qtAWzn6newLr1
+ oOx24+121UJt0mjPINCuSxzDNbjd05qeKr24ME4ZvgHhpyiPKh8OpxF5AxL1y1RbRnw4
+ FthkMB6ElCShFaxzh+5mJKI1qPi3WMkrHktoBmAsU4mzDmWa/GNfmG+EisfG3c3LoVF/
+ RWSQ==
+X-Gm-Message-State: AA+aEWYigavBO71sthkpimvt2oFjp20xd0GkTEQ/Z+vxtDyMynTlkP5J
+ O6Li62oWWKczO5eyP1vgF/I=
+X-Google-Smtp-Source: AFSGD/UM3q3nic49M4aLZMO5mwNMdocTujM8S38kU09H4lxRELbTDxIyHyI0/sTUFZzBvRap1kl4og==
+X-Received: by 2002:adf:c505:: with SMTP id q5mr11906766wrf.84.1543799322284; 
+ Sun, 02 Dec 2018 17:08:42 -0800 (PST)
 Received: from ziggy.stardust ([93.176.147.153])
- by smtp.gmail.com with ESMTPSA id q3sm9939205wrn.84.2018.12.02.16.41.40
+ by smtp.gmail.com with ESMTPSA id c3-v6sm4592084wmb.46.2018.12.02.17.08.40
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Sun, 02 Dec 2018 16:41:41 -0800 (PST)
-Subject: Re: [GIT PULL] arm: mediatek: DT fixes for v4.20
-To: Olof Johansson <olof@lixom.net>
-References: <d131fdd3-663c-9a5b-4296-94f2635f8c41@gmail.com>
- <5e3371a7-e4a3-49cc-b517-20902a5e2ed4@gmail.com>
- <CAOesGMimqGGL+3Dd8tyyJpb506j9-tJZP0FeSCkvKwuUGWAmAg@mail.gmail.com>
+ Sun, 02 Dec 2018 17:08:41 -0800 (PST)
+Subject: Re: [PATCH v3 1/4] dt-bindings: pinctrl: Add devicetree bindings for
+ MT6797 SoC Pinctrl
+To: Linus Walleij <linus.walleij@linaro.org>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+References: <20181107174844.5381-1-manivannan.sadhasivam@linaro.org>
+ <20181107174844.5381-2-manivannan.sadhasivam@linaro.org>
+ <CACRpkda25cuiPCe9ouvDDSpFwZ2z=Pm8pK=5jC-7OAcYwPSvvA@mail.gmail.com>
 From: Matthias Brugger <matthias.bgg@gmail.com>
 Openpgp: preference=signencrypt
 Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
@@ -122,16 +124,16 @@ Autocrypt: addr=matthias.bgg@gmail.com; prefer-encrypt=mutual; keydata=
  XM8DY1aFdU79pac005PuhxCWkKTJz3gCmznnoat4GCnL5gy/m0Qk45l4PFqwWXVLo9AQg2Kp
  3mlIFZ6fsEKIAN5hxlbNvNb9V2Zo5bFZjPWPFTxOteM0omUAS+QopwU0yPLLGJVf2iCmItHc
  UXI+r2JwH1CJjrHWeQEI2ucSKsNa8FllDmG/fQ==
-Message-ID: <e10b0801-ffd0-0850-6346-c12a32afb920@gmail.com>
-Date: Mon, 3 Dec 2018 01:41:40 +0100
+Message-ID: <c1f63dd8-1c06-1797-025c-2cd4891d905d@gmail.com>
+Date: Mon, 3 Dec 2018 02:08:35 +0100
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
  Thunderbird/60.3.0
 MIME-Version: 1.0
-In-Reply-To: <CAOesGMimqGGL+3Dd8tyyJpb506j9-tJZP0FeSCkvKwuUGWAmAg@mail.gmail.com>
+In-Reply-To: <CACRpkda25cuiPCe9ouvDDSpFwZ2z=Pm8pK=5jC-7OAcYwPSvvA@mail.gmail.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_164153_875779_D268D622 
-X-CRM114-Status: GOOD (  18.91  )
+X-CRM114-CacheID: sfid-20181202_170854_420521_6CB46052 
+X-CRM114-Status: GOOD (  12.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -143,53 +145,36 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: ARM-SoC Maintainers <arm@kernel.org>,
- "moderated list:ARM/Mediatek SoC..." <linux-mediatek@lists.infradead.org>,
- Ryder Lee <ryder.lee@mediatek.com>,
- Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>
+Cc: sean.wang@kernel.org,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>,
+ "open list:GPIO SUBSYSTEM" <linux-gpio@vger.kernel.org>,
+ Rob Herring <robh+dt@kernel.org>,
+ "moderated list:ARM/Mediatek SoC support" <linux-mediatek@lists.infradead.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi Linus,
 
-
-On 02/12/2018 21:01, Olof Johansson wrote:
-> On Sun, Dec 2, 2018 at 11:57 AM Matthias Brugger <matthias.bgg@gmail.com> wrote:
+On 15/11/2018 11:04, Linus Walleij wrote:
+> On Wed, Nov 7, 2018 at 6:49 PM Manivannan Sadhasivam
+> <manivannan.sadhasivam@linaro.org> wrote:
+> 
+>> Add devicetree bindings for Mediatek MT6797 SoC Pin Controller.
 >>
->> Hi all,
->>
->> On 26/11/2018 11:34, Matthias Brugger wrote:
->>> Hi Olof,
->>> Hi Arnd,
->>>
->>> There two issues with the mt7622 based boards in the current v4.20-rc cycle.
->>> Could you please pull the following fixes for the issues.
->>>
->>> Thanks,
->>> Matthias
->>
->> I just saw, that this is not part of armsoc-fixes [1]
->> Does it fall through the cracks or are there any comments?
+>> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > 
-> Hi,
-> 
-> I pinged you on IRC, which I'm guessing you didn't see.
-
-Sorry, I just realized.
-
-> 
-> Your branch was based on -rc3 when the rest of fixes were on -rc1 for
-> this cycle. I asked if I could cherry-pick, but in the end I decided
-> to send what we have and just merge it once Linus picks it up (since
-> the new branch would be based on -rc4 or 5). So, it's on the list and
-> I'll merge it later today or tomorrow.
+> Patch applied.
 > 
 
-Ok, great. If you want me to prepare a branch based on a different rc, just let
-me know.
+Could you provide a stable tree for me, so that I can take the dts parts?
+I just realized that my build is broken because of the missing dt-bindings
+header file.
 
-Thanks,
+Regards,
 Matthias
 
 _______________________________________________
