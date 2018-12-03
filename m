@@ -2,67 +2,83 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D69AEC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:40:49 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B1AEC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:49:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A93A820850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:40:49 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 3B2AC20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:49:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CIj/wVWm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A93A820850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pTVe+rzY";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="l6xL+Koj";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="FRaQB/Dx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 3B2AC20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:In-Reply-To:
+	Date:References:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=stIG7MOLzk4mWFVwal83MvaHMKZ6NPbPudrSa2yYwVo=; b=CIj/wVWmy7XFQ1
-	Wk5dNTtcb6Q0qFgUdrTxytef9sgxGlY/vCDKwcey17pxiSYR+k9Q/IPG/ExNQMtBOaRkc8n1JLD7z
-	6XDCnq/+WfDlcv/OqfTxUbT9nh0xt2+xaQ1l7IlQZnjtH1GzXBXkVaXjYYXWypnWGvxsFZpht4auo
-	mmye3+IZqOJST59grvGukFDF/5JrOD5KoU1NLBLzfp1Wg3GcHWwQahhysxnsYKVBAIGXUjauqi72a
-	sqFK5RC3GoEmbHlsTpHMta8lHETwoyUCL1eTb0NfnIrm5aumudTpvU/xWE9qEu+ZDC47GUAGg/cwv
-	5BuqW6YJbgyH0cj2qTgw==;
+	List-Owner; bh=1RPnqqhI8w8k5PHWt0SY1ibzDRkBddpcSfLr/pFx0sg=; b=pTVe+rzYCSZlHC
+	ZzpuAkZ6Hj9ZC2m4lnMGK+EJNZecJ+YNQ/EcXWk/dx2Q6Fc2mXf/zDi/fhc2mgVvW6d95rvcrWXM/
+	Hun7oW8c7VOn9vpMtSTIGh5OhwGlnvPb+XK7WlDzDBw2VQ6kRHDoB8o9vR2TbPe3X5R9Q0RwLJss1
+	PJogAEeGTEONek325uU2OymTpIgxdgZf5bey9TLQxiZjjfNm1EIM4DK1B2BJS4VFZXlIOXLUW+xhv
+	P8L78JKjre0KR4rLTf2U9J87mWog/whmK4KN5L8vYz3OTzY1vbv5wrbff0wcIPOJn5A+DB/LGhZDB
+	tJa0+WFnmK9xeulTL/rg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTnWo-0001pr-19; Mon, 03 Dec 2018 12:40:46 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTnWl-0001ou-6o; Mon, 03 Dec 2018 12:40:44 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9B4231688;
- Mon,  3 Dec 2018 04:40:32 -0800 (PST)
-Received: from edgewater-inn.cambridge.arm.com
- (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id 655A03F614;
- Mon,  3 Dec 2018 04:40:32 -0800 (PST)
-Received: by edgewater-inn.cambridge.arm.com (Postfix, from userid 1000)
- id 538511AE1062; Mon,  3 Dec 2018 12:40:52 +0000 (GMT)
-Date: Mon, 3 Dec 2018 12:40:52 +0000
-From: Will Deacon <will.deacon@arm.com>
-To: Rob Herring <robh@kernel.org>
-Subject: Re: [PATCH 12/36] dt-bindings: arm: Convert cpu binding to json-schema
-Message-ID: <20181203124039.GA25097@arm.com>
-References: <20181005165848.3474-1-robh@kernel.org>
- <20181005165848.3474-13-robh@kernel.org>
- <035ae23f-3c92-ffd9-0753-abbd604c5c02@xilinx.com>
- <CAL_JsqJJkcbxvfbVVOTPb5gavPgypO-Cd05C6qpvbvPMd1G81g@mail.gmail.com>
+	id 1gTnf8-0004bu-6B; Mon, 03 Dec 2018 12:49:22 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTnf5-0004Pi-1E; Mon, 03 Dec 2018 12:49:20 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 0467F60913; Mon,  3 Dec 2018 12:49:07 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543841348;
+ bh=9jY/kiaNNMyuigDJmz1eK4j/O9SP9k5USUl2K97IftM=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=l6xL+KojIsTinvJIk1XSKFWGn24xMtUsiayAGBJYErfNR4yTZpJAjHPK31SECRb6A
+ xvCVbsxz5bSjsiBuPUMHyF68lJbCl8KblFrJqbM83+T0m4F07nNSfzr6Xe2+QVhOMC
+ ry+ihdQfyykr7TZG2Nxv25Kk2ukVM86ugGQvmMMo=
+Received: from x230.qca.qualcomm.com (37-33-92-201.bb.dnainternet.fi
+ [37.33.92.201])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: kvalo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 1BC396021A;
+ Mon,  3 Dec 2018 12:49:03 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543841347;
+ bh=9jY/kiaNNMyuigDJmz1eK4j/O9SP9k5USUl2K97IftM=;
+ h=From:To:Cc:Subject:References:Date:In-Reply-To:From;
+ b=FRaQB/Dxl20YvbKVBFdF6t9IbsvG1okIIh8Hlr6mtLQQcBPOV95qJlLpf9VgTodvX
+ qaVZ5FW9ZN2203ZjVpyLkbL7EwLf+KkE3JRtbZXemdIem57N5v7hUu7YNnN7ynJUrh
+ ZhhbZI55AOe+BN45IlH0Eqazd9ypzBglbQ2qHGMM=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 1BC396021A
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=kvalo@codeaurora.org
+From: Kalle Valo <kvalo@codeaurora.org>
+To: Yangtao Li <tiny.windzz@gmail.com>
+Subject: Re: [PATCH] wireless: convert to DEFINE_SHOW_ATTRIBUTE
+References: <20181202093047.11174-1-tiny.windzz@gmail.com>
+Date: Mon, 03 Dec 2018 14:49:01 +0200
+In-Reply-To: <20181202093047.11174-1-tiny.windzz@gmail.com> (Yangtao Li's
+ message of "Sun, 2 Dec 2018 04:30:47 -0500")
+Message-ID: <87d0qig4hu.fsf@codeaurora.org>
+User-Agent: Gnus/5.13 (Gnus v5.13) Emacs/24.5 (gnu/linux)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAL_JsqJJkcbxvfbVVOTPb5gavPgypO-Cd05C6qpvbvPMd1G81g@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_044043_264233_8FD4F790 
-X-CRM114-Status: GOOD (  22.37  )
+X-CRM114-CacheID: sfid-20181203_044919_111322_0FFF034A 
+X-CRM114-Status: GOOD (  10.31  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,75 +90,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Kumar Gala <kumar.gala@linaro.org>, Grant Likely <glikely@secretlab.ca>,
- Arnd Bergmann <arnd@arndb.de>, Tom Rini <trini@konsulko.com>,
- Catalin Marinas <catalin.marinas@arm.com>,
- Linus Walleij <linus.walleij@linaro.org>,
- Frank Rowand <frowand.list@gmail.com>,
- Pantelis Antoniou <pantelis.antoniou@konsulko.com>,
- Michal Simek <michal.simek@xilinx.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Matthias Brugger <matthias.bgg@gmail.com>, Mark Brown <broonie@kernel.org>,
- Geert Uytterhoeven <geert@linux-m68k.org>, Jonathan Cameron <jic23@kernel.org>,
- Olof Johansson <olof@lixom.net>, linux-mediatek@lists.infradead.org,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- linuxppc-dev <linuxppc-dev@lists.ozlabs.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: merez@codeaurora.org, sgruszka@redhat.com, kubakici@wp.pl,
+ netdev@vger.kernel.org, linux-wireless@vger.kernel.org,
+ linux-kernel@vger.kernel.org, joe@perches.com, wil6210@qti.qualcomm.com,
+ linux-mediatek@lists.infradead.org, pizza@shaftnet.org, matthias.bgg@gmail.com,
+ lorenzo.bianconi@redhat.com, davem@davemloft.net,
+ linux-arm-kernel@lists.infradead.org, nbd@nbd.name
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 12:00:05PM -0600, Rob Herring wrote:
-> On Thu, Nov 8, 2018 at 2:49 AM Michal Simek <michal.simek@xilinx.com> wrote:
-> >
-> > Hi Rob,
-> >
-> > On 05. 10. 18 18:58, Rob Herring wrote:
-> > > Convert ARM CPU binding to DT schema format using json-schema.
-> > >
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > > Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> > > Cc: devicetree@vger.kernel.org
-> > > Cc: linux-arm-kernel@lists.infradead.org
-> > > Cc: linux-mediatek@lists.infradead.org
-> > > Signed-off-by: Rob Herring <robh@kernel.org>
-> > > ---
-> > >  .../devicetree/bindings/arm/cpus.txt          | 490 -----------------
-> > >  .../devicetree/bindings/arm/cpus.yaml         | 503 ++++++++++++++++++
-> > >  2 files changed, 503 insertions(+), 490 deletions(-)
-> > >  delete mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
-> > >  create mode 100644 Documentation/devicetree/bindings/arm/cpus.yaml
-> 
-> [...]
-> 
-> > I have take a look at xilinx part of this and try to build it for arm64
-> > platforms and I see errors coming from this cpu description.
-> > /root/linux/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dt.yaml:
-> > cpu@0:compatible: ['arm,cortex-a53', 'arm,armv8'] is too long
-> > /root/linux/arch/arm64/boot/dts/xilinx/zynqmp-zcu100-revC.dt.yaml:
-> > cpu@0:compatible: Additional items are not allowed ('arm,armv8' was
-> > unexpected)
-> 
-> Thanks for actually giving this a spin!
-> 
-> > Based on grep this is used in a lot of places
-> > compatible = "arm,cortex-a53", "arm,armv8";
-> >
-> > Should this be moved to just simple?
-> > compatible = "arm,cortex-a53";
-> 
-> I'd normally go with the majority which would be to keep it. However,
-> 'arm,armv8' is of questionable value, isn't actually documented, and
-> doesn't exist for any other version of the architecture. So we should
-> kill it IMO.
+Yangtao Li <tiny.windzz@gmail.com> writes:
 
-I'd prefer to keep it around, since that's what's used to describe the CPUs
-on the fastmodel iirc.
+> Use DEFINE_SHOW_ATTRIBUTE macro to simplify the code.
+>
+> Signed-off-by: Yangtao Li <tiny.windzz@gmail.com>
+> ---
+>  drivers/net/wireless/ath/wil6210/debugfs.c    | 240 +++---------------
+>  .../wireless/mediatek/mt76/mt76x0/debugfs.c   |  20 +-
+>  .../wireless/mediatek/mt76/mt76x2/debugfs.c   |  38 +--
+>  .../net/wireless/mediatek/mt7601u/debugfs.c   |  40 +--
+>  drivers/net/wireless/st/cw1200/debug.c        |  32 +--
+>  5 files changed, 64 insertions(+), 306 deletions(-)
 
-Will
+This is rather large cleanup so please split these per driver (wil6210,
+mt76 and cw1200).
+
+-- 
+Kalle Valo
 
 _______________________________________________
 linux-arm-kernel mailing list
