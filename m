@@ -4,21 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id CC29CC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 02:45:34 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 49848C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 03:06:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9572920672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 02:45:34 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1592D20881
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 03:06:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="FIa5p15Z";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="wk8yCgzE"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9572920672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="HB3BLavQ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1592D20881
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amlogic.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -26,93 +25,32 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
 	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=EgURWSC1MoC22eyIofhxJT3uRCDqlbeSBw8TH/E1uCU=; b=FIa5p15Z73FAUk
-	6Vw6NKs46+4QYNIpYixRqjKFGRWCE26EOskFc74vSib6YZgc6JkCY2EqEVTKpujQd1P0NUCfWQOw4
-	2pDS39b933Ckxe91QS6jNREfaG97CWGyxyz5NSTL5j/mD06yHTnPI/idL6EcgXsVVcTG92unI748o
-	tGKt3hyn06GoLSxDZE0/oxlSNnHDdRb516RKHeaeuSvg5EEX+fBQ/iipX33WPKAPntqO3jTSy8mwb
-	ODYnuJpFR0LeA+KDm+X4Qq5KHMBbyzKbv0PyJzecvzv7c1lJAqS3wcDBXV8ZdauawSxK3nWkIWtUN
-	lUVkfDmnuF4wRbPhmWMQ==;
+	List-Owner; bh=n2wIoopLHi87SAeK588Sn4jJDA/mfgKmBEJ3qbfHGhQ=; b=HB3BLavQZGKoLj
+	OZ3M1DO4yo4LoZpzUqX8Al1wJZmtCMEgaNhXEgS0ehYBmOg6IaxhAmwQADII/kXX3bs1JwGnxiR7b
+	lIdMsXMYt2H/7JzfKIKhMqxJ7IA9jwf4jkWrvSgdbsOvy/7d935zcwofiEjelU2qvzAEXFGo8AemB
+	d/F+NzBJuYQ+wS3tSpWhY2DVzNT8AaPvMQdd+xzegJ7F2aqVRwawUpCjAD2+GejQklZt8EFAXPs34
+	PpxnCt8o2q20sPObar01ALB465nJVBhBRGHf+X0a1GvvOeXbY5JVk4Wzk/vBjjgGF7YMLjvr9Ubru
+	fWxSGA/UMKvckmZM5dqw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTeEj-00071O-8C; Mon, 03 Dec 2018 02:45:29 +0000
-Received: from mail-eopbgr70081.outbound.protection.outlook.com ([40.107.7.81]
- helo=EUR04-HE1-obe.outbound.protection.outlook.com)
+	id 1gTeZ6-0005a2-1e; Mon, 03 Dec 2018 03:06:32 +0000
+Received: from mail-sh2.amlogic.com ([58.32.228.45])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTeEf-00070a-Q0
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 02:45:27 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=NgnKrEbtHZ/kdCP9oMRJ+9RiYo/9XXKSKqFhAleLYHA=;
- b=wk8yCgzEdicWvVdLO3LGtSOHbdzkzF7SlVrtiSWdZRvIM/Kd93jSQ1LXEyq/5s2/VkOH9NwmN2GwNwoiFTQ2AgsomfaaKV+e+P4SY9EYNE4HYt4kGzlVyW0ucGgorCBWOwj9gN3LhSiEMKY/OtRCufAs3yrf93QjPsQVjC6f4h0=
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com (52.134.72.18) by
- DB3PR0402MB3721.eurprd04.prod.outlook.com (52.134.67.141) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.18; Mon, 3 Dec 2018 02:45:09 +0000
-Received: from DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd]) by DB3PR0402MB3916.eurprd04.prod.outlook.com
- ([fe80::adf8:f49d:deb4:58fd%3]) with mapi id 15.20.1382.020; Mon, 3 Dec 2018
- 02:45:09 +0000
-From: Anson Huang <anson.huang@nxp.com>
-To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
- <s.hauer@pengutronix.de>, "kernel@pengutronix.de" <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, "linux@armlinux.org.uk"
- <linux@armlinux.org.uk>, "linux-arm-kernel@lists.infradead.org"
- <linux-arm-kernel@lists.infradead.org>, "linux-kernel@vger.kernel.org"
- <linux-kernel@vger.kernel.org>
-Subject: [PATCH] ARM: imx: update the cpu power up timing setting
-Thread-Topic: [PATCH] ARM: imx: update the cpu power up timing setting
-Thread-Index: AQHUirI0UtO9K47MFUWyoWpC6YVNRA==
-Date: Mon, 3 Dec 2018 02:45:09 +0000
-Message-ID: <1543804767-17650-1-git-send-email-Anson.Huang@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-mailer: git-send-email 2.7.4
-x-clientproxiedby: HK0PR01CA0047.apcprd01.prod.exchangelabs.com
- (2603:1096:203:3e::35) To DB3PR0402MB3916.eurprd04.prod.outlook.com
- (2603:10a6:8:10::18)
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [119.31.174.66]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; DB3PR0402MB3721;
- 6:EWuwsPB63pCBxGWc0eY6YM2Jg+8iZPZoglwLXEbMl6zwcy4aVoD8XJfc3ss2/LBmagZkxfpWG8lEwIbVAU0Mcp4SGGCC4ZE0oDZlT8VAaPb+91jQjNd0I6GdIG9EbFSVc7aykESWlKVKqowkHRkA+U2p9iQloTUBx0aDMtUbUqHbrWQt6BuIVSDQrAdqRLzAYsBdokt8coQhQgC9Lr7DWdln19H04lLnGaqEKBqYKirL/Z2aoqvwb4Lj77J9yZMiSd4YV8T8yKepyNUheGPiihXtDCEeR0Me7amVD5Ezvb/q0YZErHB+jt5qr12e5SEJyYgAmMUQblIA2a9IUJQnmzD/pjPGhqg4MaCKHujeKpIxEbI3SndjGd+JZHFK93fbmI/tYMVCKbMLfpwJUxZ6WHCm+besCTEduG2g6Jrrq9iOmwIjaZdU45w/KaVmL9M5QTl3T3YsMzaYQc0EAEGaUA==;
- 5:gc++zmeNgsAQLV+MQI30kQnFrZJ82JApZe2fUvnMUbDHa+4n69RfwoNhWJaqDaYAdppUYx+1kPKwth5PXgBxu+EtwBSiUqmJ0qMcaBeyISko62MEYXSYV6wzSck1vgSEt/ZxreqFeusrjLXz1y+nvlTnr7VmzdZJRv4ScaI2nKE=;
- 7:hUGK1rjA4uCucxJ76+/7D5gah/vs6wteJylboUXlIVW6tf5um96gUBojbbYnz7l9EJIfp4MBhs/yB1weuj6a0tQX2A77wdjOaGC6JOqKxrBcIZBjEFOjMh8tEBhtynKAtHL73fbGXWo/uO3Frp919A==
-x-ms-office365-filtering-correlation-id: d3e31897-adc8-4274-c363-08d658c9567a
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:DB3PR0402MB3721; 
-x-ms-traffictypediagnostic: DB3PR0402MB3721:
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=anson.huang@nxp.com; 
-x-microsoft-antispam-prvs: <DB3PR0402MB372137E001B1562723FD7A48F5AE0@DB3PR0402MB3721.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(5005006)(8121501046)(93006095)(93001095)(3002001)(3231455)(999002)(944501493)(52105112)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(20161123558120)(20161123564045)(201708071742011)(7699051)(76991095);
- SRVR:DB3PR0402MB3721; BCL:0; PCL:0; RULEID:; SRVR:DB3PR0402MB3721; 
-x-forefront-prvs: 08756AC3C8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(366004)(136003)(376002)(39860400002)(346002)(396003)(199004)(189003)(6506007)(476003)(2616005)(110136005)(14454004)(97736004)(105586002)(486006)(386003)(478600001)(5660300001)(4326008)(7736002)(316002)(2501003)(66066001)(106356001)(71200400001)(71190400001)(2906002)(8936002)(68736007)(6436002)(3846002)(6116002)(26005)(186003)(50226002)(36756003)(6486002)(6512007)(53936002)(86362001)(2201001)(14444005)(256004)(25786009)(52116002)(99286004)(102836004)(305945005)(81156014)(81166006)(8676002);
- DIR:OUT; SFP:1101; SCL:1; SRVR:DB3PR0402MB3721;
- H:DB3PR0402MB3916.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: KMUpYDJKOXrCXzeC3KbT+0xfraHsJ23QMf1TgXq5jEfTlTwzD1AagVipq6KAuVsu3QfJIlud9kZyKY8q70QLYZV7L6/PmRS56YD0pgseDrj/4gf+On3W+gJSKHqWNreoFWQAbwjI8IbCOIiV0IfwWxbxIftNsGoh6gwUXV2aCkGtwUPsFF5vOvG01tuaDR3hwFi5FAAc+0tARP3/iQD1Ch7hLBiHUjUoTvzg5Ew2MTR+tzEMcLz6Hl+HGTJJ9Q4mGlegsRamAfIV2h9u2P8IDjT4ZoDS+u7dRdbCcY4uHngQTbRAWL+0+TJqOLbiFGHf1P/l+n0EJr+sFkzH+0AOpr4flwS7ygi9isTxMr48vgE=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gTeZ2-0005Z3-3K; Mon, 03 Dec 2018 03:06:29 +0000
+Received: from localhost.localdomain (10.28.8.22) by mail-sh2.amlogic.com
+ (10.18.11.6) with Microsoft SMTP Server id 15.0.1320.4; Mon, 3 Dec 2018
+ 11:05:57 +0800
+From: Xingyu Chen <xingyu.chen@amlogic.com>
+To: <linus.walleij@linaro.org>, <linux-gpio@vger.kernel.org>
+Subject: [PATCH] pinctrl: meson: fix G12A ao pull registers base address
+Date: Mon, 3 Dec 2018 11:05:33 +0800
+Message-ID: <20181203030533.10989-1-xingyu.chen@amlogic.com>
+X-Mailer: git-send-email 2.19.2
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: d3e31897-adc8-4274-c363-08d658c9567a
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Dec 2018 02:45:09.0776 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB3PR0402MB3721
+X-Originating-IP: [10.28.8.22]
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_184525_850887_2D9E1421 
-X-CRM114-Status: GOOD (  14.40  )
+X-CRM114-CacheID: sfid-20181202_190628_140273_9342B943 
+X-CRM114-Status: GOOD (  11.92  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -124,41 +62,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: dl-linux-imx <linux-imx@nxp.com>
+Cc: robh@kernel.org, jianxin.pan@amlogic.com, narmstrong@baylibre.com,
+ martin.blumenstingl@googlemail.com, khilman@baylibre.com,
+ linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ carlo@caione.org, linux-amlogic@lists.infradead.org, xingyu.chen@amlogic.com,
+ jbrunet@baylibre.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-The sw2iso count should cover ARM LDO ramp-up time,
-the MAX ARM LDO ramp-up time may be up to more than
-100us on some boards, this patch sets sw2iso to 0xf
-(~384us) which is the reset value, and it is much
-more safe to cover different boards, since we have
-observed that some customer boards failed with current
-setting of 0x2.
+Since Meson G12A SoC, Introduce new ao registers AO_RTI_PULL_UP_EN_REG
+and AO_GPIO_O.
 
-Fixes: 05136f0897b5 ("ARM: imx: support arm power off in cpuidle for i.mx6sx")
-Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+These bits of controlling output level are remapped to the new register
+AO_GPIO_O, and the AO_GPIO_O_EN_N support only controlling output enable.
+
+These bits of controlling pull enable are remapped to the new register
+AO_RTI_PULL_UP_EN_REG, and the AO_RTI_PULL_UP_REG support only controlling
+pull type(up/down).
+
+The new layout of ao gpio/pull registers is as follows:
+- AO_GPIO_O_EN_N        [offset: 0x9 << 2]
+- AO_GPIO_I             [offset: 0xa << 2]
+- AO_RTI_PULL_UP_REG    [offset: 0xb << 2]
+- AO_RTI_PULL_UP_EN_REG [offset: 0xc << 2]
+- AO_GPIO_O             [offset: 0xd << 2]
+
+From above, we can see ao GPIO registers region has been separated by the
+ao pull registers. In order to ensure the continuity of the region on
+software, the ao GPIO and ao pull registers use the same base address, but
+can be identified by the offset.
+
+Fixes: 29ae0952e85f ("pinctrl: meson-g12a: add pinctrl driver support")
+Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Jianxin Pan <jianxin.pan@amlogic.com>
 ---
- arch/arm/mach-imx/cpuidle-imx6sx.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/meson/pinctrl-meson.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mach-imx/cpuidle-imx6sx.c b/arch/arm/mach-imx/cpuidle-imx6sx.c
-index 243a108..fd0053e 100644
---- a/arch/arm/mach-imx/cpuidle-imx6sx.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6sx.c
-@@ -110,7 +110,7 @@ int __init imx6sx_cpuidle_init(void)
- 	 * except for power up sw2iso which need to be
- 	 * larger than LDO ramp up time.
- 	 */
--	imx_gpc_set_arm_power_up_timing(2, 1);
-+	imx_gpc_set_arm_power_up_timing(0xf, 1);
- 	imx_gpc_set_arm_power_down_timing(1, 1);
+diff --git a/drivers/pinctrl/meson/pinctrl-meson.c b/drivers/pinctrl/meson/pinctrl-meson.c
+index 53d449076dee..7ff40cd7a0cb 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson.c
++++ b/drivers/pinctrl/meson/pinctrl-meson.c
+@@ -31,6 +31,9 @@
+  * In some cases the register ranges for pull enable and pull
+  * direction are the same and thus there are only 3 register ranges.
+  *
++ * Since Meson G12A SoC, the ao register ranges for gpio, pull enable
++ * and pull direction are the same, so there are only 2 register ranges.
++ *
+  * For the pull and GPIO configuration every bank uses a contiguous
+  * set of bits in the register sets described above; the same register
+  * can be shared by more banks with different offsets.
+@@ -487,23 +490,22 @@ static int meson_pinctrl_parse_dt(struct meson_pinctrl *pc,
+ 		return PTR_ERR(pc->reg_mux);
+ 	}
  
- 	return cpuidle_register(&imx6sx_cpuidle_driver, NULL);
+-	pc->reg_pull = meson_map_resource(pc, gpio_np, "pull");
+-	if (IS_ERR(pc->reg_pull)) {
+-		dev_err(pc->dev, "pull registers not found\n");
+-		return PTR_ERR(pc->reg_pull);
++	pc->reg_gpio = meson_map_resource(pc, gpio_np, "gpio");
++	if (IS_ERR(pc->reg_gpio)) {
++		dev_err(pc->dev, "gpio registers not found\n");
++		return PTR_ERR(pc->reg_gpio);
+ 	}
+ 
++	pc->reg_pull = meson_map_resource(pc, gpio_np, "pull");
++	/* Use gpio region if pull one is not present */
++	if (IS_ERR(pc->reg_pull))
++		pc->reg_pull = pc->reg_gpio;
++
+ 	pc->reg_pullen = meson_map_resource(pc, gpio_np, "pull-enable");
+ 	/* Use pull region if pull-enable one is not present */
+ 	if (IS_ERR(pc->reg_pullen))
+ 		pc->reg_pullen = pc->reg_pull;
+ 
+-	pc->reg_gpio = meson_map_resource(pc, gpio_np, "gpio");
+-	if (IS_ERR(pc->reg_gpio)) {
+-		dev_err(pc->dev, "gpio registers not found\n");
+-		return PTR_ERR(pc->reg_gpio);
+-	}
+-
+ 	return 0;
+ }
+ 
 -- 
-2.7.4
+2.19.2
 
 
 _______________________________________________
