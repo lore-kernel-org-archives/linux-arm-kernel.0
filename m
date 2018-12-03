@@ -6,16 +6,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
 	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A43B1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:33:57 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4FEAAC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:34:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 656D720864
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:33:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1B17A20864
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:34:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Oj4CocJv"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 656D720864
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lFFCakL/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1B17A20864
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,57 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=1zyp4QbwiVPAMVhAnAMlgA+MnZ7fYwN7ee/MNa7EJfA=; b=Oj4CocJvA0m/7r
-	SctPD/vmueKelNqUcQdXGRaKz2NCALO5RWQ//9APR9k+CUJe/X4CZaK194k3aRsXifAsF77gmU2uh
-	GVdPJ9/uPO6XEvVf1j9IjqRk6xS9tybhJptZY8ETBI0RtKrfaVC1Ku4qYuxg0QJ9cQm6CsuLmjqtP
-	53VkQWtFexkZD3RnMI+231OLU5W6gbpdqqsE4k8j+oXOaCZW+/LVKKKlqs6XekFmWCe+xniIQ99Z5
-	+DrSApotCWYUqLOYnBCMy9rdSnMw1MHNzvmuZtc0K7wrbxLcAicnp84E+Kt57Fj6az9LUdzFtYKdb
-	EaDM5wdA/otpo35CnjOQ==;
+	List-Owner; bh=za8KdaOxnVOoLX4d5C/m2t/ucW0/UE6sQTfyKs9KxWc=; b=lFFCakL/p90Km2
+	rZSss6TE0GlBqW5FAiQGo2pYmNSHOBROB2hnL/Q/pSFkhKHr3hoL9XAKcXZkAD344GLcGWA97mJek
+	KTN7AaLBvkGLVG6cyEirn8LViDowIumUg1FRgqnySgSwLmxmc7Xubm/SGSSvHt5GL/YmstQypmJ/W
+	Nktr10/ZrdD+q7DWdBgsybViNDp0Y7sqT7NuLYLWqz5Gfg0zCtNz3G1U/P0zvq2pOxRGKjT9ChBiJ
+	DMy6DroRGi7AMD4c71j4mDXOd2SUjho7OGcz/3VqGysnmKfRX4WZ/3aXr2VI/8dV6XfW2XQoK5HUI
+	ubhi6a4TKLGeKRYgjw/A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTvql-0003HX-Nz; Mon, 03 Dec 2018 21:33:55 +0000
-Received: from mail-oi1-f196.google.com ([209.85.167.196])
+	id 1gTvr6-0003h1-Qg; Mon, 03 Dec 2018 21:34:16 +0000
+Received: from mail-ot1-f65.google.com ([209.85.210.65])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvpW-00021e-3J
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:32:41 +0000
-Received: by mail-oi1-f196.google.com with SMTP id t204so12342753oie.7
+ id 1gTvpZ-00021a-PE
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:32:49 +0000
+Received: by mail-ot1-f65.google.com with SMTP id v23so13106389otk.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:36 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:32 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=Th6PgAk+sHhcJGhBAXLbYoXMw1xn7ji2s1MXs2vABtU=;
- b=WnkqItYgRuHcvGdegA1LmteRtKa8c1/d3ApJSjdayIGxNxTsseWBKKiZGzzcDsGvGT
- YLBzpN7Yc/ylXsgU0r86N8RteT7/ecPszkEeDp714pYXn29XEJocDMBgDQDkcLNixfnG
- yJhdV5TKGIpG8xun2Z+HXSlaZYMFvOCj+8BJwnleHMSMUFv+Gzu9uVPnQgI71dj530wj
- zZAWRyUHGraSt5WNSc9pzROZFPNrmcMQPnhQsE6XJZRL3uj4FUs5NYPTpAVoZdzEEXCX
- 68JHyqeo17RoWUnH/kp3KR9FFVr18DIHswsvDaG9TKkROgJajWBE8Xooao2FnBaPSvoL
- Bpvg==
-X-Gm-Message-State: AA+aEWbE1l1XWo1I8K75H7H9wZx18w3PV8SwWNvONWIcakc8VL1prHQw
- eqcY/Hf5hjnlTvoJuEwk8Wg6SR0=
-X-Google-Smtp-Source: AFSGD/UGlypVoMrSIfA19hrK4+wAhTTks5jY5hUOtbo4S5fPBErPGeCODEKoJ1h7AI+3wL/N4+ZqjQ==
-X-Received: by 2002:aca:5bc3:: with SMTP id
- p186mr10567400oib.130.1543872755621; 
- Mon, 03 Dec 2018 13:32:35 -0800 (PST)
+ bh=r8hHjlrgRb6o1Gybi9b4yXPPCrMqQy6hVm/Nzderzac=;
+ b=cHjils106SsAPvhcF75lhnEbEN5mLrGkzB9IqglAZGm1CF1Tnuw8UbR0xVvF/AAodu
+ vyXr5qZ2ACXBFx0M8cCqm/XnjQIHak7VfD/uLlJWcNBsFLPZkciBfQEJrWD+H9qmwV5E
+ lgvPOdV5DBvlpjaxgKhdT+yDV1G89unNkkud58N5lckPHu/wme0C2Ybi5CEbtGIAd8dc
+ weKIOO6abx+uxm6F4TyGne7tkO50Ho46R2nGUeTZ5ZRw5APmJzwE+eCdvs1ctUIziFEz
+ /rPWKusOxGnARcNSBuP9EnZvhZTrIQM3Fx6GeHZbPPP0Ec3o6BZ4blsb6l5pFyXjb7zl
+ HkGQ==
+X-Gm-Message-State: AA+aEWZ82K9nsr24a14nrPN982iHlGsO3NRyPWsalkmE4nQWdoizE83A
+ EI6H7fVSa+mzNYBoQQRYxilSsTk=
+X-Google-Smtp-Source: AFSGD/U1q5zdn1LQBvwIziKGdAO2KoR11z7owggnYBrzJQspi/AhLcah+Bq3pcrKybosnc7TgdH3gA==
+X-Received: by 2002:a9d:6c11:: with SMTP id f17mr10582822otq.38.1543872751944; 
+ Mon, 03 Dec 2018 13:32:31 -0800 (PST)
 Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.34
+ by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.30
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:34 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:31 -0800 (PST)
 From: Rob Herring <robh@kernel.org>
 To: devicetree@vger.kernel.org,
 	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 08/34] dt-bindings: arm: Convert PMU binding to json-schema
-Date: Mon,  3 Dec 2018 15:31:57 -0600
-Message-Id: <20181203213223.16986-9-robh@kernel.org>
+Subject: [PATCH v2 05/34] dt-bindings: i2c: Convert i2c-gpio binding to
+ json-schema
+Date: Mon,  3 Dec 2018 15:31:54 -0600
+Message-Id: <20181203213223.16986-6-robh@kernel.org>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
 References: <20181203213223.16986-1-robh@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_133238_150247_841577CB 
-X-CRM114-Status: GOOD (  19.90  )
+X-CRM114-CacheID: sfid-20181203_133242_267436_4CD785D7 
+X-CRM114-Status: GOOD (  17.39  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,9 +86,8 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Frank Rowand <frowand.list@gmail.com>, Will Deacon <will.deacon@arm.com>,
+Cc: Kumar Gala <kumar.gala@linaro.org>, arm@kernel.org,
+ Sean Hudson <darknighte@darknighte.com>, Frank Rowand <frowand.list@gmail.com>,
  Grant Likely <grant.likely@arm.com>, linuxppc-dev@lists.ozlabs.org,
  linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
@@ -96,191 +95,147 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert ARM PMU binding to DT schema format using json-schema.
+Convert the i2c-gpio binding to DT schema format using json-schema. This
+serves as an example of how to include other schema (i2c-controller.yaml
+in this case).
 
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: devicetree@vger.kernel.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 70 --------------
- .../devicetree/bindings/arm/pmu.yaml          | 91 +++++++++++++++++++
- 2 files changed, 91 insertions(+), 70 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
+ .../devicetree/bindings/i2c/i2c-gpio.txt      | 46 ------------
+ .../devicetree/bindings/i2c/i2c-gpio.yaml     | 73 +++++++++++++++++++
+ 2 files changed, 73 insertions(+), 46 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-gpio.yaml
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-gpio.txt b/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
 deleted file mode 100644
-index 13611a8199bb..000000000000
---- a/Documentation/devicetree/bindings/arm/pmu.txt
+index 38a05562d1d2..000000000000
+--- a/Documentation/devicetree/bindings/i2c/i2c-gpio.txt
 +++ /dev/null
-@@ -1,70 +0,0 @@
--* ARM Performance Monitor Units
--
--ARM cores often have a PMU for counting cpu and cache events like cache misses
--and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
--representation in the device tree should be done as under:-
+@@ -1,46 +0,0 @@
+-Device-Tree bindings for i2c gpio driver
 -
 -Required properties:
--
--- compatible : should be one of
--	"apm,potenza-pmu"
--	"arm,armv8-pmuv3"
--	"arm,cortex-a73-pmu"
--	"arm,cortex-a72-pmu"
--	"arm,cortex-a57-pmu"
--	"arm,cortex-a53-pmu"
--	"arm,cortex-a35-pmu"
--	"arm,cortex-a17-pmu"
--	"arm,cortex-a15-pmu"
--	"arm,cortex-a12-pmu"
--	"arm,cortex-a9-pmu"
--	"arm,cortex-a8-pmu"
--	"arm,cortex-a7-pmu"
--	"arm,cortex-a5-pmu"
--	"arm,arm11mpcore-pmu"
--	"arm,arm1176-pmu"
--	"arm,arm1136-pmu"
--	"brcm,vulcan-pmu"
--	"cavium,thunder-pmu"
--	"qcom,scorpion-pmu"
--	"qcom,scorpion-mp-pmu"
--	"qcom,krait-pmu"
--- interrupts : 1 combined interrupt or 1 per core. If the interrupt is a per-cpu
--               interrupt (PPI) then 1 interrupt should be specified.
+-	- compatible = "i2c-gpio";
+-	- sda-gpios: gpio used for the sda signal, this should be flagged as
+-	  active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
+-	  from <dt-bindings/gpio/gpio.h> since the signal is by definition
+-	  open drain.
+-	- scl-gpios: gpio used for the scl signal, this should be flagged as
+-	  active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
+-	  from <dt-bindings/gpio/gpio.h> since the signal is by definition
+-	  open drain.
 -
 -Optional properties:
+-	- i2c-gpio,scl-output-only: scl as output only
+-	- i2c-gpio,delay-us: delay between GPIO operations (may depend on each platform)
+-	- i2c-gpio,timeout-ms: timeout to get data
 -
--- interrupt-affinity : When using SPIs, specifies a list of phandles to CPU
--                       nodes corresponding directly to the affinity of
--		       the SPIs listed in the interrupts property.
+-Deprecated properties, do not use in new device tree sources:
+-	- gpios: sda and scl gpio, alternative for {sda,scl}-gpios
+-	- i2c-gpio,sda-open-drain: this means that something outside of our
+-	  control has put the GPIO line used for SDA into open drain mode, and
+-	  that something is not the GPIO chip. It is essentially an
+-	  inconsistency flag.
+-	- i2c-gpio,scl-open-drain: this means that something outside of our
+-	  control has put the GPIO line used for SCL into open drain mode, and
+-	  that something is not the GPIO chip. It is essentially an
+-	  inconsistency flag.
 -
--                       When using a PPI, specifies a list of phandles to CPU
--		       nodes corresponding to the set of CPUs which have
--		       a PMU of this type signalling the PPI listed in the
--		       interrupts property, unless this is already specified
--		       by the PPI interrupt specifier itself (in which case
--		       the interrupt-affinity property shouldn't be present).
+-Example nodes:
 -
--                       This property should be present when there is more than
--		       a single SPI.
+-#include <dt-bindings/gpio/gpio.h>
 -
+-i2c@0 {
+-	compatible = "i2c-gpio";
+-	sda-gpios = <&pioA 23 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+-	scl-gpios = <&pioA 24 (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)>;
+-	i2c-gpio,delay-us = <2>;	/* ~100 kHz */
+-	#address-cells = <1>;
+-	#size-cells = <0>;
 -
--- qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
--                     events.
--
--- secure-reg-access : Indicates that the ARMv7 Secure Debug Enable Register
--		      (SDER) is accessible. This will cause the driver to do
--		      any setup required that is only possible in ARMv7 secure
--		      state. If not present the ARMv7 SDER will not be touched,
--		      which means the PMU may fail to operate unless external
--		      code (bootloader or security monitor) has performed the
--		      appropriate initialisation. Note that this property is
--		      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
--		      in Non-secure state.
--
--Example:
--
--pmu {
--        compatible = "arm,cortex-a9-pmu";
--        interrupts = <100 101>;
+-	rv3029c2@56 {
+-		compatible = "rv3029c2";
+-		reg = <0x56>;
+-	};
 -};
-diff --git a/Documentation/devicetree/bindings/arm/pmu.yaml b/Documentation/devicetree/bindings/arm/pmu.yaml
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-gpio.yaml b/Documentation/devicetree/bindings/i2c/i2c-gpio.yaml
 new file mode 100644
-index 000000000000..3ea4abfbf276
+index 000000000000..da6129090a8e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/pmu.yaml
-@@ -0,0 +1,91 @@
++++ b/Documentation/devicetree/bindings/i2c/i2c-gpio.yaml
+@@ -0,0 +1,73 @@
 +# SPDX-License-Identifier: GPL-2.0
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/arm/pmu.yaml#
++$id: http://devicetree.org/schemas/i2c/i2c-gpio.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: ARM Performance Monitor Units
++title: Bindings for GPIO bitbanged I2C
 +
 +maintainers:
-+  - Mark Rutland <mark.rutland@arm.com>
-+  - Will Deacon <will.deacon@arm.com>
++  - Wolfram Sang <wolfram@the-dreams.de>
 +
-+description: |+
-+  ARM cores often have a PMU for counting cpu and cache events like cache misses
-+  and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
-+  representation in the device tree should be done as under:-
++allOf:
++  - $ref: /schemas/i2c/i2c-controller.yaml#
 +
 +properties:
 +  compatible:
-+    oneOf:
-+      - items:
-+          - enum:
-+              - apm,potenza-pmu
-+              - arm,armv8-pmuv3
-+              - arm,cortex-a73-pmu
-+              - arm,cortex-a72-pmu
-+              - arm,cortex-a57-pmu
-+              - arm,cortex-a53-pmu
-+              - arm,cortex-a35-pmu
-+              - arm,cortex-a17-pmu
-+              - arm,cortex-a15-pmu
-+              - arm,cortex-a12-pmu
-+              - arm,cortex-a9-pmu
-+              - arm,cortex-a8-pmu
-+              - arm,cortex-a7-pmu
-+              - arm,cortex-a5-pmu
-+              - arm,arm11mpcore-pmu
-+              - arm,arm1176-pmu
-+              - arm,arm1136-pmu
-+              - brcm,vulcan-pmu
-+              - cavium,thunder-pmu
-+              - qcom,scorpion-pmu
-+              - qcom,scorpion-mp-pmu
-+              - qcom,krait-pmu
-+      - items:
-+          - const: arm,cortex-a7-pmu
-+          - const: arm,cortex-a15-pmu
++    items:
++      - const: i2c-gpio
 +
-+  interrupts:
-+    # Don't know how many CPUs, so no constraints to specify
-+    description: 1 per-cpu interrupt (PPI) or 1 interrupt per core.
-+
-+  interrupt-affinity:
-+    $ref: /schemas/types.yaml#/definitions/phandle-array
++  sda-gpios:
 +    description:
-+      When using SPIs, specifies a list of phandles to CPU
-+      nodes corresponding directly to the affinity of
-+      the SPIs listed in the interrupts property.
++      gpio used for the sda signal, this should be flagged as
++      active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
++      from <dt-bindings/gpio/gpio.h> since the signal is by definition
++      open drain.
++    maxItems: 1
 +
-+      When using a PPI, specifies a list of phandles to CPU
-+      nodes corresponding to the set of CPUs which have
-+      a PMU of this type signalling the PPI listed in the
-+      interrupts property, unless this is already specified
-+      by the PPI interrupt specifier itself (in which case
-+      the interrupt-affinity property shouldn't be present).
++  scl-gpios:
++    description:
++      gpio used for the scl signal, this should be flagged as
++      active high using open drain with (GPIO_ACTIVE_HIGH|GPIO_OPEN_DRAIN)
++      from <dt-bindings/gpio/gpio.h> since the signal is by definition
++      open drain.
++    maxItems: 1
 +
-+      This property should be present when there is more than
-+      a single SPI.
-+
-+  qcom,no-pc-write:
++  i2c-gpio,scl-output-only:
++    description: scl as output only
 +    type: boolean
-+    description:
-+      Indicates that this PMU doesn't support the 0xc and 0xd events.
 +
-+  secure-reg-access:
-+    type: boolean
-+    description:
-+      Indicates that the ARMv7 Secure Debug Enable Register
-+      (SDER) is accessible. This will cause the driver to do
-+      any setup required that is only possible in ARMv7 secure
-+      state. If not present the ARMv7 SDER will not be touched,
-+      which means the PMU may fail to operate unless external
-+      code (bootloader or security monitor) has performed the
-+      appropriate initialisation. Note that this property is
-+      not valid for non-ARMv7 CPUs or ARMv7 CPUs booting Linux
-+      in Non-secure state.
++  i2c-gpio,delay-us:
++    description: delay between GPIO operations (may depend on each platform)
++    $ref: /schemas/types.yaml#/definitions/uint32
++
++  i2c-gpio,timeout-ms:
++    description: timeout to get data
++    $ref: /schemas/types.yaml#/definitions/uint32
++
++  # Deprecated properties, do not use in new device tree sources:
++  gpios:
++    minItems: 2
++    maxItems: 2
++    description: sda and scl gpio, alternative for {sda,scl}-gpios
++
++  i2c-gpio,sda-open-drain:
++    # Generate a warning if present
++    not: true
++    description: this means that something outside of our control has put
++      the GPIO line used for SDA into open drain mode, and that something is
++      not the GPIO chip. It is essentially an inconsistency flag.
++
++  i2c-gpio,scl-open-drain:
++    # Generate a warning if present
++    not: true
++    description: this means that something outside of our control has put the
++      GPIO line used for SCL into open drain mode, and that something is not
++      the GPIO chip. It is essentially an inconsistency flag.
 +
 +required:
 +  - compatible
++  - sda-gpios
++  - scl-gpios
 +
 +...
 -- 
