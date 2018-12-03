@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 30295C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 012F8C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:54 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DF953208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:41 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B6B91208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:53 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qFaxnd+7";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="ATGF942+"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DF953208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wb+Dria3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="f5HgdvRm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6B91208A3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,59 +27,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=U7TnJIu2m9HYsDZ8j3sMVxUHaAM9hfSDn6jzNn89hKU=; b=qFaxnd+7g02HZnxW12UVdLCgJZ
-	5hThM678ql/CsPDo8ofArVJC+JbSkZjEuuhU7Q6omaITJrWtF6pCBnJ8rrbwvzVQ8cq7VgNcoHjAT
-	UviTekLxwkuOagFBN3s48qXDdl7a8FeiGGj3vMUcg2VL2My36RkW6sNPM5SWTxaoF2r19m2gQKfpt
-	Qv26E3fMfQTnHZraxvhwjr3z5UlQEAMrxyo95/qoNh+odpepyz4QmDl1HsX+jjrcgywW+rAf4Dbkw
-	Dx5A/XjjWcw1/hQo+mCdxSuGnmO8vWI1inMNjgJYYBpHZlBxK8f1SzO2/kOQd1Ywgs8HDEMBgjnAY
-	/B/mDUbA==;
+	bh=FPrvRIzEvRz5X8TEFBauruPpwI8sQSbqbWqRekGSias=; b=Wb+Dria35Vq/QzX1krNSq+cfNU
+	u4qD9cdnegHPcfEAu4JU41hJxrBas/zVY3w1ugl1FEp0+TomuJJBohBufRZKjmTSbQMbybO+R+6oG
+	CUAYjjzTkw1MZEJ5Pj22XVvH9snOidhbyu+YdVRvtL013FIPVZOK8jZx9G8MQH1LLfF3ia0DVaUdt
+	wwKpXIBnha6Kkp3vMF0TG3g2eiR/0hSqqxiZCgBaJZHY8sOfsleQ/5QM1/03e/qcRGQ/QWd2njo9v
+	XGXfkOemGYL3VL3WJzNlCmpvKmDWeXSR97TmE9+xzkmdRTDQt0b1hKRCz/n1OYq6lSnCa1uzASyOv
+	W1cgSPLw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTu47-0005DZ-AB; Mon, 03 Dec 2018 19:39:35 +0000
-Received: from mail-ot1-x32c.google.com ([2607:f8b0:4864:20::32c])
+	id 1gTu4M-0005U1-8u; Mon, 03 Dec 2018 19:39:50 +0000
+Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTu3t-0004xj-Dd
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:39:22 +0000
-Received: by mail-ot1-x32c.google.com with SMTP id k98so12807200otk.3
+ id 1gTu3u-0004xs-Na
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:39:26 +0000
+Received: by mail-oi1-x244.google.com with SMTP id a77so12031419oii.5
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 11:39:08 -0800 (PST)
+ Mon, 03 Dec 2018 11:39:11 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=FqslBd5YSGGP8orNNdkiokNGNWuFTZE/RznVkpWqvdE=;
- b=ATGF942+UoUtNMWallSlawc9mR8Ud2eOVKZIW23U1KMhR65++4RvkaPd55Oc13s005
- t06UjdPSpwbvxtCV+w61E360gh11RO6HmUmD9HK8ncfzDsduucvYNKGLbD7fnFOkXFWr
- gLZc0JJGB4jPoIxEqnOPuwzfSX/QztCUlTRIE=
+ bh=q0uTXcZC7CgGiF1z+ovGMxQ4WshXHCU0lPOOgvBHLS8=;
+ b=f5HgdvRmkq/e8B4jAjg/KiKg4lYQXfos1Mhy+1mqB12T5wt7UjKCKSMlRjV6NJKw2o
+ vg9KTWzjuFPZkesGakRLnMjaq9eKGHZA/TNKN8oywZUWldXTg0bcIk/uAJm0AGOMmbU4
+ LqgX0+oOtR6XbP7uc26A+N6OJb6C5HMz20ib4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=FqslBd5YSGGP8orNNdkiokNGNWuFTZE/RznVkpWqvdE=;
- b=Sx82bV3TQZnuVLiJYTwS8ZU6K/PcD8OpFUCJ0SSoRCSBdKtOkcRoBjQiKYea7el2EA
- I78HCIBJ/9Xv2xQSY+dPtVVu17sMpkOnlwqdhwj4FZdlIHZMHSt0mpDwiSGc/tEXUd1H
- TEtD26UCyzalw6SRAx6eZIg41zyE+3/BmAN9QSGBLuDyGyWWwqeFyElVMiYRtn4cEBld
- xKQFGNL1IhwqreRBc9CPvVxiKaOH/Dsqr1htYvxOKsfWuzES3iEC6Qr80sfezeP/X0Ya
- QnBsHNcEVDfWmw7AQ7jm4aCLjot3jhHDyLPM9o5klC9GEOV8telx8KR07HC2jJlAkMmw
- z7yQ==
-X-Gm-Message-State: AA+aEWY0L0HhfWaJ/7bBsiBS+1H/q4D4TbkRDKZ+1EXeY9I/bbnv3ihr
- JdSUCCZZWmgyQxQEeYhDsR2Cxg==
-X-Google-Smtp-Source: AFSGD/XCq2LVFCeaNBMt8q8Q12thYN42O/BBfB6sYMf0GSRuH4aIPZcnylsW7nIcxf6o17hRcItlxg==
-X-Received: by 2002:a9d:600f:: with SMTP id h15mr10641822otj.42.1543865947587; 
- Mon, 03 Dec 2018 11:39:07 -0800 (PST)
+ bh=q0uTXcZC7CgGiF1z+ovGMxQ4WshXHCU0lPOOgvBHLS8=;
+ b=TYkFlc5B4z3IUira4IgAKVZx1jLID0z14nCm4F8lfIQxbMzGf/Op9Tq/eu5lFsUNUi
+ SO+E+rHJlz1t47Yn4alLybhxkOuUe7WS1g+pPAGvagJXZnehewWUBRBsqD5iqN1R+NTn
+ YPTqq6+f7gR/yGdfl1MqarmC3FD3yM6qKlHytNz/1JAzIofsmbj+EgMqopulmb3ricwb
+ rPWdPb4euKyBrLSJDODR8cOvrElhTEEPBnbW5IVWpwrAWEHnTmyuS+xzntbN9J/3cfqx
+ de6MW9xgdhFZqbb7Z0liKf6P/Z/A04BhkEgYvWlpgVPrE7zkPq+iHhs7WWISkG1WlYSk
+ yV0Q==
+X-Gm-Message-State: AA+aEWaQEzdhWHIUcdjo77oaYLmai+C5awgLPE09RG2oGJsCAw+Cm/nR
+ xC6DJZJYaY0INp60PixnfZxWiw==
+X-Google-Smtp-Source: AFSGD/U8tc87YBfVwFW4SsyfbmMWs6bT3c8wmJKuZO++ag18KSKYUBs6iWHNpUp22kAk/2bcB9JKwQ==
+X-Received: by 2002:aca:a648:: with SMTP id p69mr10306397oie.205.1543865950829; 
+ Mon, 03 Dec 2018 11:39:10 -0800 (PST)
 Received: from localhost ([2600:1700:141:4960:60aa:6557:7f4e:5d7d])
- by smtp.gmail.com with ESMTPSA id 52sm26652983oti.30.2018.12.03.11.39.06
+ by smtp.gmail.com with ESMTPSA id j33sm11170309ota.32.2018.12.03.11.39.10
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 11:39:07 -0800 (PST)
+ Mon, 03 Dec 2018 11:39:10 -0800 (PST)
 From: Andy Gross <andy.gross@linaro.org>
 To: arm@kernel.org
-Subject: [GIT PULL] Qualcomm ARM64 DT updates for 4.21
-Date: Mon,  3 Dec 2018 13:39:02 -0600
-Message-Id: <1543865944-3591-2-git-send-email-andy.gross@linaro.org>
+Subject: [GIT PULL] Qualcomm Device Tree updates for 4.21
+Date: Mon,  3 Dec 2018 13:39:04 -0600
+Message-Id: <1543865944-3591-4-git-send-email-andy.gross@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543865944-3591-1-git-send-email-andy.gross@linaro.org>
 References: <1543865944-3591-1-git-send-email-andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_113921_459476_D31C6FD9 
-X-CRM114-Status: GOOD (  17.61  )
+X-CRM114-CacheID: sfid-20181203_113923_006479_A0A4A6D5 
+X-CRM114-Status: GOOD (  15.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,97 +107,46 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-for-4.21
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.21
 
-for you to fetch changes up to 70827d9f6bc4f481fafe790dd6654ba568526768:
+for you to fetch changes up to 972910948fb6f555e83f37bc6172f51984d738a9:
 
-  arm64: dts: qcom: msm8998: Fix compatible of scm node (2018-11-30 07:59:02 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM64 Updates for v4.21
-
-* Add QCS404 base platform and nodes
-* Add QCS404 EVB boards
-* Add external SD and dependencies for MSM8998-mtp
-* Add default scm compatible for MSM8998
-* Fix XO clk name on MSM8998
-* Add prng-ee nodes for SDM845 and MSM8996
-* Add ADC die temp node for pm8998
-* Fix documentation on QCOM ADC sample
+  ARM: dts: qcom: Remove Arrow SD600 eval board (2018-11-28 17:36:41 -0600)
 
 ----------------------------------------------------------------
-Amit Kucheria (5):
-      arm64: dts: msm8916: thermal: split address space into two
-      arm64: dts: msm8916: thermal: Add "qcom,sensors" property
-      arm64: dts: msm8916: Add gpu thermal zone
-      arm64: dts: msm8916: Add camera thermal zone
-      arm64: dts: sdm845: enable tsens thermal zones
+Qualcomm Device Tree Changes for v4.21
 
-Andy Gross (4):
-      Merge tag 'qcom-fixes-for-4.20-rc1' into arm64-for-4.21
-      Merge tag 'qcom-fixes-for-4.20-rc1' into arm64-for-4.21-3
-      Merge branch 'arm64-for-4.21' into arm64-for-4.21-3
-      Merge branch 'qcs404-topic-revised' into arm64-for-4.21-3
+* Add entry for Qualcomm TSENS thermal drivers
+* Update msm8974 thermal entries
+* Fix msm8974 Hammerhead magnetometer gpios
+* Add SoC specific compatibles for SDHC nodes
+* Remove Arrow SD600 eval board
 
-Bjorn Andersson (10):
-      arm64: dts: sdm845-mtp: Reserve reserved gpios
-      arm64: dts: qcom: msm8998: Reserve gpio ranges on MTP
-      arm64: dts: qcom: qcs404: Add reserved-memory regions
-      arm64: dts: qcom: qcs404: Add RPM GLINK related nodes
-      arm64: dts: qcom: qcs404: Add PMS405 RPM regulators
-      arm64: dts: qcom: qcs404: Add TLMM pinctrl node
-      arm64: dts: qcom: qcs404: Add sdcc1 node
-      arm64: dts: qcom: qcs404: Add scm firmware node
-      arm64: dts: qcom: qcs404: Add remoteproc nodes
-      arm64: dts: qcom: msm8998: Fix compatible of scm node
+----------------------------------------------------------------
+Amit Kucheria (3):
+      MAINTAINERS: Add entry for Qualcomm TSENS thermal drivers
+      ARM: dts: msm8974: thermal: split address space into two
+      ARM: dts: msm8974: thermal: Add "qcom,sensors" property
 
-Jeffrey Hugo (4):
-      arm64: dts: qcom: msm8998: correct xo clock name
-      arm64: dts: qcom: msm8998: Add SDCC2
-      arm64: dts: qcom: msm8998-mtp: Add external SD
-      arm64: dts: qcom: msm8998: Add SDC2 control pins
+Andy Gross (1):
+      ARM: dts: qcom: Remove Arrow SD600 eval board
 
-Matthias Kaehlcke (2):
-      dt-bindings: iio: vadc: Add unit address to ADC channel node in example
-      arm64: dts: qcom: pm8998: Add die temperature channel node to the ADC
+Brian Masney (1):
+      ARM: dts: qcom: msm8974-hammerhead: correct gpios property on magnetometer
 
-Vinod Koul (13):
-      arm64: dts: msm8996: add prng-ee node
-      arm64: dts: sdm845: add prng-ee node
-      arm64: dts: qcom: qcs404: add base dts files
-      arm64: dts: qcom: qcs404-evb: add dts files for EVBs
-      arm64: dts: qcom: qcs404: add smp2p nodes
-      arm64: dts: qcom: pms405: add spmi node
-      arm64: dts: qcom: qcs404: add spmi node
-      arm64: dts: qcom: pms405: add rtc node
-      arm64: dts: qcom: pms405: add gpios
-      arm64: dts: qcom: qcs404: add prng-ee node
-      arm64: dts: qcom: qcs404: Add BAM DMA node
-      arm64: dts: qcom: qcs404: Use BAM DMA for serial uart2
-      arm64: dts: qcom: pms405: Add pon and pwrkey nodes
+Douglas Anderson (1):
+      ARM: dts: qcom: Add SoC-specific string for sdhci-msm-v4 nodes
 
- .../devicetree/bindings/iio/adc/qcom,spmi-vadc.txt |   6 +-
- arch/arm64/boot/dts/qcom/Makefile                  |   2 +
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |  47 +-
- arch/arm64/boot/dts/qcom/msm8996.dtsi              |   7 +
- arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi          |  16 +
- arch/arm64/boot/dts/qcom/msm8998-pins.dtsi         |  78 ++++
- arch/arm64/boot/dts/qcom/msm8998.dtsi              |  24 +-
- arch/arm64/boot/dts/qcom/pm8998.dtsi               |   5 +
- arch/arm64/boot/dts/qcom/pms405.dtsi               |  55 +++
- arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts       |  11 +
- arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts       |  11 +
- arch/arm64/boot/dts/qcom/qcs404-evb.dtsi           | 188 ++++++++
- arch/arm64/boot/dts/qcom/qcs404.dtsi               | 490 +++++++++++++++++++++
- arch/arm64/boot/dts/qcom/sdm845-mtp.dts            |   4 +
- arch/arm64/boot/dts/qcom/sdm845.dtsi               | 178 ++++++++
- 15 files changed, 1117 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm64/boot/dts/qcom/msm8998-pins.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/pms405.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-1000.dts
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb-4000.dts
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404-evb.dtsi
- create mode 100644 arch/arm64/boot/dts/qcom/qcs404.dtsi
+ MAINTAINERS                                        |   7 +
+ arch/arm/boot/dts/Makefile                         |   1 -
+ .../dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi    |  53 ---
+ .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 415 ---------------------
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   4 +-
+ .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     |   3 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  12 +-
+ 7 files changed, 17 insertions(+), 478 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi
+ delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
 
 _______________________________________________
 linux-arm-kernel mailing list
