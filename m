@@ -4,20 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 59F05C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 34DF3C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 27F6820850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E497820850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Gg7uD3mC";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Ru6azj1i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27F6820850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="E86uVoRC";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="Ag9O5Qw/"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E497820850
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,73 +25,73 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=pw9BZrdc53eA5nCOuCl+DWXXweHi1NMkn3YF3zp4o2c=; b=Gg7uD3mCSem547
-	RVK2WXbzd2ZKN1O1lUVWscIxHpXT+exlv2iua9Kb1yWcL0N3F0g73bQOrJNrKs7PZEJD9lEqji23n
-	FteI7dgNpuCrhEsCpFkdT7ZsZkQ2iehxsPQCrVm2zCUz2X7P5q9YNKjPZRQxv+NOX+waxggyni/vp
-	tD8vEBlNK3v+ET/H6gbMTUtHMYgC1/qPYUlyYvIbURPT2wIQABLbZaz14QQM4xI4lPWVtFhHfOW42
-	PKWGSneocnZPiozRrQY4eIivqV8c9r2pS1Sp8DEHlAbAK3pay32PKYQrqbF5sE3DCZ5xyf7hLMLf9
-	bbY1hTehCCX51T/dQJOA==;
+	List-Owner; bh=dpEjVyixE5V301muWZ9WLw1gb0hcL0cRwxQAu6531/Q=; b=E86uVoRCMjoKIe
+	O/8R/MqIybc3tGDaCjDU2E7UbMl4ePdqGokbhPu9Pa1HGmW3K57vIVvLBH5ECJ4BJbCRCkj3I51rk
+	s9Vu/41hzeiV5CduRGHcvt6c2yIiHjOKdgkHprcOzS/zpTR8uBEDnZRnVUv8U90zOnWYzN4Tp+Eqt
+	FaClGhlghEY9bZaNIakL7+sL33WRBv8Fhk7bxrweCcugwKCqU7Fup08qk8QkEkqLS+88Cq79HaySS
+	ZVqDevyr6moTrtQM+5LbXLV0QxnfS21vNfg1yLnvhLmAr2zM2Wio5M2xzeAn/mO8LPFi/lLRcJNyd
+	pBQ3DCH2pdOBsXHwT3YQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTw6Z-0006eK-CG; Mon, 03 Dec 2018 21:50:15 +0000
+	id 1gTw6k-0006rb-Bp; Mon, 03 Dec 2018 21:50:26 +0000
 Received: from casper.infradead.org ([85.118.1.10])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTw6X-0005Bu-98
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 21:50:13 +0000
+ id 1gTw6a-0005Bu-De
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 21:50:16 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:Content-Type:
+ MIME-Version:References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=C1hs7k72LLb2iEWqMGzdoCfupHeBs/tEkAC6k/rFIiI=; b=Ru6azj1is0XwklsfCU+Dh+MlMj
- MC/eywWDtQB3C/5Fbx0CLCNOxi4oIk7AHl5qT8Rd2VoM30Gb6Er8aKUno0ZV+9xvd86fKSAb5yQaM
- Tm1bSR26d2UuVhiZCQXBhnVdxGSOe981dEonFqV4IIf/Sh1EF1pGJ3IyA9vOBVDyu5RmA/Q0CydEl
- tV4jfZGIyHJdVjqR3/WEaFRkGhuGu69evXl8bpin0kR1ckwGmBnxlAvHNMg5pSD2bcNBKIHMrjaqw
- KCBf25Fpe0lexIcKX4ZwABwSJmtfXoVf0tfd6Vv5k/oZ64mgBy/xPj21CssHGhMMIiwDwboQbpNsz
- zx0wVM0Q==;
-Received: from mail-oi1-f196.google.com ([209.85.167.196])
+ bh=oC6xtxPGgX0vrAEYZdrzvcerpUBFv1AQjT/XCrxTgx0=; b=Ag9O5Qw/Egzm66DkweklyoxaqB
+ LAua8LNWh6XYCsasEU9E6jA/ELGXaVp8SW3KvOEj6ADmZlre4c4HqOPzDI6mlfJaM4H3HZBV40mE4
+ 1+x6CmH6DTszK7IqOWm2low51tdWnE29S88tIP0PCDV4VctnFJnPizIEFkjMwwqtErImsBFTrOmvU
+ yL4kw0cxRvGgg2eW9cl/AigtUPcXHRqebrNkcBDUQn+nxcpo3wUURENz3txnKpUgRMFsDxkxXIt9p
+ nKSRzGF1B6Wbf1rhKXLzwkeWEUvuMEFVS0xoeamXEq1PA7BFKAK7zGjpIa8KsbgdoaJQ+S9wU7ldI
+ sysRT+zA==;
+Received: from mail-oi1-f195.google.com ([209.85.167.195])
  by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvq3-00016W-3n
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:12 +0000
-Received: by mail-oi1-f196.google.com with SMTP id j21so12344849oii.8
+ id 1gTvpx-000163-LY
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:07 +0000
+Received: by mail-oi1-f195.google.com with SMTP id c206so12387303oib.0
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:33:00 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:55 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=C1hs7k72LLb2iEWqMGzdoCfupHeBs/tEkAC6k/rFIiI=;
- b=WWcFAYnBvyUJ07QMv3eoFUi0eVN8OwmBuI0mdJr/lJLK4G8FlOzxOXt1PdZdceb1aF
- 8AOGpYK8iPRUrxGWIXoF9g/AiDZnC0Yfad+5x0pyGfvQxAQOU2u/1QpReV55dMAT//I9
- CTCzhUksjDrUkjf2rm2dxkkyKVQyEyqowBj9kPzxNP0ceB7hsTTChUuoz7B9D1cTWYnJ
- VPTxpFPrZLAFpD7arzmcTIA5hZfIiiLLqtL3zE3heKxqn6RHYIYWYIRwdMRxKzIaPTgv
- O51AjKmg49JqEun3YTrpFo2YN3tyI51UKiLK5mNFaX9xsUACGHMdB9krRYi+VHkqcH6M
- RXjA==
-X-Gm-Message-State: AA+aEWbKn7zUzYlwNUJbRpiF8UpqUlLXsHQUUoV2tqn6NvaPKxHKIXiP
- 9VvRZLPrWWDoJVxPs9TyOQ==
-X-Google-Smtp-Source: AFSGD/XF/jfO00XsySTH7otrkTH5OwF0eFb0bV+f9h4yYvxwB/+2Vpy36YSSJwTstEYTu374WliBaw==
-X-Received: by 2002:aca:c186:: with SMTP id r128mr11603786oif.52.1543872779723; 
- Mon, 03 Dec 2018 13:32:59 -0800 (PST)
+ bh=oC6xtxPGgX0vrAEYZdrzvcerpUBFv1AQjT/XCrxTgx0=;
+ b=ld1xg8SLSu4FuFpyiHX6HXGQ6PQGbtAq5UuTQKFW8HADKDTTf71vQ4S1pjmYRrn9w7
+ 7DIOWKcuGTkklQNSjEfVUwSDLzHZWZvCa0QMhXjUmxYcE0qDEdHD1hCAvUAXvsGhseU3
+ MwRq/xztuNzLo/dQU2vtJJQ2Hj+UydH2f+MxNis1LTwO7TbrO9kJLcccIlYRBnucSoV4
+ AQdNL0HR4hdjrQuYX4KtyGC3koR6XVTyeJeGAbRwOYMaRmOnCxaBu1P0mIasVqY9GD1R
+ DSWAPoSvdBdw9kzZKexXcJHOrY+u3R+PrUW8pbKDZ5Vbm3kQBk2P56W6S93JYLIEJtiZ
+ LJIA==
+X-Gm-Message-State: AA+aEWYRnaG72Z09CHrfEWf11glSyKutWLQ+LUYRHCL3Zviphrd96AKK
+ 5CjDIrIRPUmEq2g1nZMG5w==
+X-Google-Smtp-Source: AFSGD/U4jSE9cLoojt1F8nCYnEN25i4Ed+nmzggq5QD7npe8dCtWHghkjfbGS0jwVDUPRG4QNPbaww==
+X-Received: by 2002:aca:5b88:: with SMTP id p130mr10394553oib.96.1543872773873; 
+ Mon, 03 Dec 2018 13:32:53 -0800 (PST)
 Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.58
+ by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.52
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:58 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:53 -0800 (PST)
 From: Rob Herring <robh@kernel.org>
 To: devicetree@vger.kernel.org,
 	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 28/34] dt-bindings: arm: Convert SPEAr board/soc bindings
+Subject: [PATCH v2 23/34] dt-bindings: arm: Convert Realtek board/soc bindings
  to json-schema
-Date: Mon,  3 Dec 2018 15:32:17 -0600
-Message-Id: <20181203213223.16986-29-robh@kernel.org>
+Date: Mon,  3 Dec 2018 15:32:12 -0600
+Message-Id: <20181203213223.16986-24-robh@kernel.org>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
 References: <20181203213223.16986-1-robh@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_213311_147520_A11EFBB7 
-X-CRM114-Status: GOOD (  14.37  )
+X-CRM114-CacheID: sfid-20181203_213305_708470_BC06E66B 
+X-CRM114-Status: GOOD (  14.89  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,96 +106,50 @@ List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>,
 Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
  arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
  Frank Rowand <frowand.list@gmail.com>, Grant Likely <grant.likely@arm.com>,
- Viresh Kumar <vireshk@kernel.org>, linuxppc-dev@lists.ozlabs.org,
- Shiraz Hashim <shiraz.linux.kernel@gmail.com>,
+ linuxppc-dev@lists.ozlabs.org,
+ =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert SPEAr SoC bindings to DT schema format using json-schema.
-
-Cc: Viresh Kumar <vireshk@kernel.org>
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/spear.txt         | 26 -------------------
- .../devicetree/bindings/arm/spear.yaml        | 25 ++++++++++++++++++
- 2 files changed, 25 insertions(+), 26 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/arm/spear.txt
- create mode 100644 Documentation/devicetree/bindings/arm/spear.yaml
-
-diff --git a/Documentation/devicetree/bindings/arm/spear.txt b/Documentation/devicetree/bindings/arm/spear.txt
-deleted file mode 100644
-index 0d42949df6c2..000000000000
---- a/Documentation/devicetree/bindings/arm/spear.txt
-+++ /dev/null
-@@ -1,26 +0,0 @@
--ST SPEAr Platforms Device Tree Bindings
-----------------------------------------
--
--Boards with the ST SPEAr600 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear600";
--
--Boards with the ST SPEAr300 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear300";
--
--Boards with the ST SPEAr310 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear310";
--
--Boards with the ST SPEAr320 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear320";
--
--Boards with the ST SPEAr1310 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear1310";
--
--Boards with the ST SPEAr1340 SoC shall have the following properties:
--Required root node property:
--compatible = "st,spear1340";
-diff --git a/Documentation/devicetree/bindings/arm/spear.yaml b/Documentation/devicetree/bindings/arm/spear.yaml
-new file mode 100644
-index 000000000000..f6ec731c9531
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/spear.yaml
-@@ -0,0 +1,25 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/arm/spear.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: ST SPEAr Platforms Device Tree Bindings
-+
-+maintainers:
-+  - Viresh Kumar <vireshk@kernel.org>
-+  - Stefan Roese <sr@denx.de>
-+
-+properties:
-+  $nodename:
-+    const: '/'
-+  compatible:
-+    items:
-+      - enum:
-+          - st,spear600
-+          - st,spear300
-+          - st,spear310
-+          - st,spear320
-+          - st,spear1310
-+          - st,spear1340
-+...
--- 
-2.19.1
-
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Q29udmVydCBSZWFsdGVrIFNvQyBiaW5kaW5ncyB0byBEVCBzY2hlbWEgZm9ybWF0IHVzaW5nIGpz
+b24tc2NoZW1hLgoKQ2M6ICJBbmRyZWFzIEbDpHJiZXIiIDxhZmFlcmJlckBzdXNlLmRlPgpDYzog
+TWFyayBSdXRsYW5kIDxtYXJrLnJ1dGxhbmRAYXJtLmNvbT4KQ2M6IGxpbnV4LWFybS1rZXJuZWxA
+bGlzdHMuaW5mcmFkZWFkLm9yZwpDYzogZGV2aWNldHJlZUB2Z2VyLmtlcm5lbC5vcmcKU2lnbmVk
+LW9mZi1ieTogUm9iIEhlcnJpbmcgPHJvYmhAa2VybmVsLm9yZz4KLS0tCiAuLi4vZGV2aWNldHJl
+ZS9iaW5kaW5ncy9hcm0vcmVhbHRlay50eHQgICAgICAgfCAyMiAtLS0tLS0tLS0tLS0tLS0tLS0K
+IC4uLi9kZXZpY2V0cmVlL2JpbmRpbmdzL2FybS9yZWFsdGVrLnlhbWwgICAgICB8IDIzICsrKysr
+KysrKysrKysrKysrKysKIDIgZmlsZXMgY2hhbmdlZCwgMjMgaW5zZXJ0aW9ucygrKSwgMjIgZGVs
+ZXRpb25zKC0pCiBkZWxldGUgbW9kZSAxMDA2NDQgRG9jdW1lbnRhdGlvbi9kZXZpY2V0cmVlL2Jp
+bmRpbmdzL2FybS9yZWFsdGVrLnR4dAogY3JlYXRlIG1vZGUgMTAwNjQ0IERvY3VtZW50YXRpb24v
+ZGV2aWNldHJlZS9iaW5kaW5ncy9hcm0vcmVhbHRlay55YW1sCgpkaWZmIC0tZ2l0IGEvRG9jdW1l
+bnRhdGlvbi9kZXZpY2V0cmVlL2JpbmRpbmdzL2FybS9yZWFsdGVrLnR4dCBiL0RvY3VtZW50YXRp
+b24vZGV2aWNldHJlZS9iaW5kaW5ncy9hcm0vcmVhbHRlay50eHQKZGVsZXRlZCBmaWxlIG1vZGUg
+MTAwNjQ0CmluZGV4IDk1ODM5ZTE5YWU5Mi4uMDAwMDAwMDAwMDAwCi0tLSBhL0RvY3VtZW50YXRp
+b24vZGV2aWNldHJlZS9iaW5kaW5ncy9hcm0vcmVhbHRlay50eHQKKysrIC9kZXYvbnVsbApAQCAt
+MSwyMiArMCwwIEBACi1SZWFsdGVrIHBsYXRmb3JtcyBkZXZpY2UgdHJlZSBiaW5kaW5ncwotLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0KLQotCi1SVEQxMjk1IFNvQwotPT09
+PT09PT09PT0KLQotUmVxdWlyZWQgcm9vdCBub2RlIHByb3BlcnRpZXM6Ci0KLSAtIGNvbXBhdGli
+bGUgOiAgbXVzdCBjb250YWluICJyZWFsdGVrLHJ0ZDEyOTUiCi0KLQotUm9vdCBub2RlIHByb3Bl
+cnR5IGNvbXBhdGlibGUgbXVzdCBjb250YWluLCBkZXBlbmRpbmcgb24gYm9hcmQ6Ci0KLSAtIE1l
+TEUgVjk6ICJtZWxlLHY5IgotIC0gUHJvQm94MiBBVkE6ICJwcm9ib3gyLGF2YSIKLSAtIFppZG9v
+IFg5UzogInppZG9vLHg5cyIKLQotCi1FeGFtcGxlOgotCi0gICAgY29tcGF0aWJsZSA9ICJ6aWRv
+byx4OXMiLCAicmVhbHRlayxydGQxMjk1IjsKZGlmZiAtLWdpdCBhL0RvY3VtZW50YXRpb24vZGV2
+aWNldHJlZS9iaW5kaW5ncy9hcm0vcmVhbHRlay55YW1sIGIvRG9jdW1lbnRhdGlvbi9kZXZpY2V0
+cmVlL2JpbmRpbmdzL2FybS9yZWFsdGVrLnlhbWwKbmV3IGZpbGUgbW9kZSAxMDA2NDQKaW5kZXgg
+MDAwMDAwMDAwMDAwLi44NGVlOWIyMmVmN2EKLS0tIC9kZXYvbnVsbAorKysgYi9Eb2N1bWVudGF0
+aW9uL2RldmljZXRyZWUvYmluZGluZ3MvYXJtL3JlYWx0ZWsueWFtbApAQCAtMCwwICsxLDIzIEBA
+CisjIFNQRFgtTGljZW5zZS1JZGVudGlmaWVyOiBHUEwtMi4wCislWUFNTCAxLjIKKy0tLQorJGlk
+OiBodHRwOi8vZGV2aWNldHJlZS5vcmcvc2NoZW1hcy9hcm0vcmVhbHRlay55YW1sIworJHNjaGVt
+YTogaHR0cDovL2RldmljZXRyZWUub3JnL21ldGEtc2NoZW1hcy9jb3JlLnlhbWwjCisKK3RpdGxl
+OiBSZWFsdGVrIHBsYXRmb3JtcyBkZXZpY2UgdHJlZSBiaW5kaW5ncworCittYWludGFpbmVyczoK
+KyAgLSBBbmRyZWFzIEbDpHJiZXIgPGFmYWVyYmVyQHN1c2UuZGU+CisKK3Byb3BlcnRpZXM6Cisg
+ICRub2RlbmFtZToKKyAgICBjb25zdDogJy8nCisgIGNvbXBhdGlibGU6CisgICAgIyBSVEQxMjk1
+IFNvQyBiYXNlZCBib2FyZHMKKyAgICBpdGVtczoKKyAgICAgIC0gZW51bToKKyAgICAgICAgICAt
+IG1lbGUsdjkKKyAgICAgICAgICAtIHByb2JveDIsYXZhCisgICAgICAgICAgLSB6aWRvbyx4OXMK
+KyAgICAgIC0gY29uc3Q6IHJlYWx0ZWsscnRkMTI5NQorLi4uCi0tIAoyLjE5LjEKCgpfX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpsaW51eC1hcm0ta2VybmVs
+IG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJhZGVhZC5vcmcKaHR0cDov
+L2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51eC1hcm0ta2VybmVsCg==
