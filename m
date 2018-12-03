@@ -2,86 +2,65 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2C6DDC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:37:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A2088C07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:42:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id F067120672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:37:38 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6FC9120672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:42:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mKFN0AZ8";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="bQT7Rx4R";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="M4+eEr9i"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org F067120672
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dxk4kiTJ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6FC9120672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=8w/uYwJc0dwxiARj8cmv9tdeQdXD5ME0Rs6BqILinKc=; b=mKFN0AZ86msRpP6j9sGh87x3T
-	8z5tbBdGQR1EqQ3jHqUnKrG9K16Vf5k54mVfynzIGFh8B2EiPPTUu3V1+LkYRf2MwE1bjuqoQKS+Y
-	yoYq4keQMew61PrDkcfaxNEHABjb4yWmFqHvwgatuJ3MTqxvtwDK+c/uMMgYhRMbAbVPwD4ZQHoBH
-	Rr0wbKApd752ZlOykLXDvzChxaESHW2xz2idamWLLxq5SekZwPfgfFlLDHT9Ou5bFxLEvznYg23St
-	enccPDZHSfCHRyh6KXUJNqAEdKSYGl7p2EhohTLU2TM6r2cjL5W4IleX8MLUFPqx4JveWok48g8oq
-	Jddj0e+Zg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=R8PokfbzeWPUR7m4AuwyKwX/VG2L4s07ktckJoTiPws=; b=dxk4kiTJ1l6a8n
+	YRUS26DIqz+nK10EWJkfTM32BC3d+o6Rf/wGKiS621WgurlulJBALa4bhUEMeMT2wn46WiJJeQWSW
+	IzjwpGcTyyjTIyyC1m1PIxXW68u6iHsYII0FpBZrcy9G8Ea3ZJ4DmBS5U8ED2mCkNRLiGSPeE2ZNP
+	8vrktt8P8Gs4+SpTXC9aPiJUfzFPCt/a8eMbZXl/ZHTgdENsRTJzAo6Pk1W9GnW6AxzTl6rWN0cSe
+	nphlgF8W1Vf5yHYTDz9lvEZz7MuwPp9v4FcX8OyEAz27ID04q7w+Rdqa84Vz5hxfokOigWsG/MfPS
+	WWl2SxNHRsMir81QP0Xg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTrDy-0001Ak-I8; Mon, 03 Dec 2018 16:37:34 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTrDu-00019x-Pm
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 16:37:32 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id D30CA60B62; Mon,  3 Dec 2018 16:37:19 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543855039;
- bh=7/zAIDdkaHhp6kGoSszoTVtkDWq4Mq29NzKqLvG99P0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=bQT7Rx4RMVmvEXfD0IO5B8nLsvvGwea8XVxS4xk3Q37TftSMsZ1CTILa+7tlmO7oP
- t/P4GXTA7XnYjPXXgkq5+rGOHe33z6n847+qR4C4l4pApRHeQc7rV/aRt6jQDiO4BJ
- vYWIsyqzjQesIMjc2GQHFdD1sqeyLuwBgsJd89bk=
-Received: from localhost (i-global254.qualcomm.com [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- (Authenticated sender: ilina@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 885FE60481;
- Mon,  3 Dec 2018 16:37:18 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543855038;
- bh=7/zAIDdkaHhp6kGoSszoTVtkDWq4Mq29NzKqLvG99P0=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=M4+eEr9iiDKCCNAuFqXh0hy3CKBfpM1RY6m0KNtA2I0Y1HH5C1UsresU7psvjx7ZF
- aVxZt4a06TnC+K6G9X9MOzN97G9AqZEyNonSa54xQeGiRPp1rEu4LqtcmRPj1BJsRD
- YddM4ak9927EKVdJ/CpK9WC/nTYbNU3Fbu7HtpnU=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 885FE60481
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=ilina@codeaurora.org
-Date: Mon, 3 Dec 2018 09:37:17 -0700
-From: Lina Iyer <ilina@codeaurora.org>
-To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: Re: [PATCH v10 18/27] drivers: firmware: psci: Add support for PM
- domains using genpd
-Message-ID: <20181203163717.GN18262@codeaurora.org>
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-19-ulf.hansson@linaro.org>
+	id 1gTrIV-0002nE-47; Mon, 03 Dec 2018 16:42:15 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTrIQ-0002kx-KC; Mon, 03 Dec 2018 16:42:12 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A8EB31682;
+ Mon,  3 Dec 2018 08:41:58 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 6ED583F59C;
+ Mon,  3 Dec 2018 08:41:55 -0800 (PST)
+Date: Mon, 3 Dec 2018 16:41:50 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: Hanjie Lin <hanjie.lin@amlogic.com>,
+	Bjorn Helgaas <bhelgaas@google.com>
+Subject: Re: [PATCH v6 2/2] PCI: amlogic: Add the Amlogic Meson PCIe
+ controller driver
+Message-ID: <20181203164150.GA11855@e107981-ln.cambridge.arm.com>
+References: <1542876836-191355-1-git-send-email-hanjie.lin@amlogic.com>
+ <1542876836-191355-3-git-send-email-hanjie.lin@amlogic.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181129174700.16585-19-ulf.hansson@linaro.org>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <1542876836-191355-3-git-send-email-hanjie.lin@amlogic.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_083730_871889_37ED67EE 
-X-CRM114-Status: GOOD (  22.92  )
+X-CRM114-CacheID: sfid-20181203_084210_675519_40466ACC 
+X-CRM114-Status: GOOD (  17.59  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,172 +72,235 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>, linux-pm@vger.kernel.org,
- Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
- linux-kernel@vger.kernel.org, Tony Lindgren <tony@atomide.com>,
- Sudeep Holla <sudeep.holla@arm.com>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Yixun Lan <yixun.lan@amlogic.com>, Rob Herring <robh@kernel.org>,
+ Jianxin Pan <jianxin.pan@amlogic.com>, Kevin Hilman <khilman@baylibre.com>,
+ Shawn Lin <shawn.lin@rock-chips.com>,
+ Philippe Ombredanne <pombredanne@nexb.com>, linux-pci@vger.kernel.org,
+ linux-kernel@vger.kernel.org, Yue Wang <yue.wang@amlogic.com>,
+ Qiufang Dai <qiufang.dai@amlogic.com>, Jian Hu <jian.hu@amlogic.com>,
+ Liang Yang <liang.yang@amlogic.com>,
+ Cyrille Pitchen <cyrille.pitchen@free-electrons.com>,
+ Gustavo Pimentel <gustavo.pimentel@synopsys.com>,
+ Carlo Caione <carlo@caione.org>, linux-amlogic@lists.infradead.org,
+ linux-arm-kernel@lists.infradead.org, Jerome Brunet <jbrunet@baylibre.com>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29 2018 at 10:49 -0700, Ulf Hansson wrote:
->When the hierarchical CPU topology layout is used in DT, we need to setup
->the corresponding PM domain data structures, as to allow a CPU and a group
->of CPUs to be power managed accordingly. Let's enable this by deploying
->support through the genpd interface.
->
->Additionally, when the OS initiated mode is supported by the PSCI FW, let's
->also parse the domain idle states DT bindings as to make genpd responsible
->for the state selection, when the states are compatible with
->"domain-idle-state". Otherwise, when only Platform Coordinated mode is
->supported, we rely solely on the state selection to be managed through the
->regular cpuidle framework.
->
->If the initialization of the PM domain data structures succeeds and the OS
->initiated mode is supported, we try to switch to it. In case it fails,
->let's fall back into a degraded mode, rather than bailing out and returning
->an error code.
->
->Due to that the OS initiated mode may become enabled, we need to adjust to
->maintain backwards compatibility for a kernel started through a kexec call.
->Do this by explicitly switch to Platform Coordinated mode during boot.
->
->To try to initiate the PM domain data structures, the PSCI driver shall
->call the new function, psci_dt_init_pm_domains(). However, this is done
->from following changes.
->
->Cc: Lina Iyer <ilina@codeaurora.org>
->Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
->Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->---
->
->Changes in V10:
->	- Enable the PM domains to be used for both PC and OSI mode.
->	- Fixup error paths.
->	- Move the management of kexec started kernels into this patch.
->	- Rewrite changelog.
->
->---
-> drivers/firmware/psci/Makefile         |   2 +-
-> drivers/firmware/psci/psci.c           |   7 +-
-> drivers/firmware/psci/psci.h           |   6 +
-> drivers/firmware/psci/psci_pm_domain.c | 262 +++++++++++++++++++++++++
-> 4 files changed, 275 insertions(+), 2 deletions(-)
-> create mode 100644 drivers/firmware/psci/psci_pm_domain.c
->
->diff --git a/drivers/firmware/psci/Makefile b/drivers/firmware/psci/Makefile
->index 1956b882470f..ff300f1fec86 100644
->--- a/drivers/firmware/psci/Makefile
->+++ b/drivers/firmware/psci/Makefile
->@@ -1,4 +1,4 @@
-> # SPDX-License-Identifier: GPL-2.0
-> #
->-obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o
->+obj-$(CONFIG_ARM_PSCI_FW)	+= psci.o psci_pm_domain.o
-> obj-$(CONFIG_ARM_PSCI_CHECKER)	+= psci_checker.o
->diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
->index 623591b541a4..19af2093151b 100644
->--- a/drivers/firmware/psci/psci.c
->+++ b/drivers/firmware/psci/psci.c
->@@ -704,9 +704,14 @@ static int __init psci_1_0_init(struct device_node *np)
-> 	if (err)
-> 		return err;
->
->-	if (psci_has_osi_support())
->+	if (psci_has_osi_support()) {
-> 		pr_info("OSI mode supported.\n");
->
->+		/* Make sure we default to PC mode. */
->+		invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
->+			       PSCI_1_0_SUSPEND_MODE_PC, 0, 0);
->+	}
->+
-> 	return 0;
-> }
->
->diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
->index 7d9d38fd57e1..8cf6d7206fab 100644
->--- a/drivers/firmware/psci/psci.h
->+++ b/drivers/firmware/psci/psci.h
->@@ -11,4 +11,10 @@ void psci_set_domain_state(u32 state);
-> bool psci_has_osi_support(void);
-> int psci_dt_parse_state_node(struct device_node *np, u32 *state);
->
->+#ifdef CONFIG_CPU_IDLE
->+int psci_dt_init_pm_domains(struct device_node *np);
->+#else
->+static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
->+#endif
->+
-> #endif /* __PSCI_H */
->diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
->new file mode 100644
->index 000000000000..d0dc38e96f85
->--- /dev/null
->+++ b/drivers/firmware/psci/psci_pm_domain.c
->@@ -0,0 +1,262 @@
->+// SPDX-License-Identifier: GPL-2.0
->+/*
->+ * PM domains for CPUs via genpd - managed by PSCI.
->+ *
->+ * Copyright (C) 2018 Linaro Ltd.
->+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
->+ *
->+ */
->+
->+#define pr_fmt(fmt) "psci: " fmt
->+
->+#include <linux/device.h>
->+#include <linux/kernel.h>
->+#include <linux/pm_domain.h>
->+#include <linux/slab.h>
->+#include <linux/string.h>
->+
->+#include "psci.h"
->+
->+#ifdef CONFIG_CPU_IDLE
->+
->+struct psci_pd_provider {
->+	struct list_head link;
->+	struct device_node *node;
->+};
->+
->+static LIST_HEAD(psci_pd_providers);
->+static bool osi_mode_enabled;
->+
->+static int psci_pd_power_off(struct generic_pm_domain *pd)
->+{
->+	struct genpd_power_state *state = &pd->states[pd->state_idx];
->+	u32 *pd_state;
->+	u32 composite_pd_state;
->+
->+	/* If we have failed to enable OSI mode, then abort power off. */
->+	if (psci_has_osi_support() && !osi_mode_enabled)
->+		return -EBUSY;
->+
->+	if (!state->data)
->+		return 0;
->+
->+	/* When OSI mode is enabled, set the corresponding domain state. */
->+	pd_state = state->data;
->+	composite_pd_state = *pd_state | psci_get_domain_state();
-This should not be needed. The domain_state should be 0x0 being set
-after coming out of idle.
->+	psci_set_domain_state(composite_pd_state);
-The three lines can be summarized as:
-	psci_set_domain_state(*state->data);
+On Thu, Nov 22, 2018 at 04:53:54PM +0800, Hanjie Lin wrote:
+
+[...]
+
+> +static int meson_pcie_rd_own_conf(struct pcie_port *pp, int where, int size,
+> +				  u32 *val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +
+> +	/*
+> +	 * there is a bug of MESON AXG pcie controller that software can not
+> +	 * programe PCI_CLASS_DEVICE register, so we must return a fake right
+> +	 * value to ensure driver could probe successfully.
+> +	 */
+> +	if (where == PCI_CLASS_REVISION) {
+> +		*val = readl(pci->dbi_base + PCI_CLASS_REVISION);
+> +		/* keep revision id */
+> +		*val &= PCI_CLASS_REVISION_MASK;
+> +		*val |= PCI_CLASS_BRIDGE_PCI << 16;
+> +		return PCIBIOS_SUCCESSFUL;
+> +	}
+
+As I said before, this looks broken. If this code (or other drivers with
+the same broken assumptions, eg dwc/pcie-qcom.c) carries out a, say,
+byte sized config access of eg PCI_CLASS_DEVICE you will get junk out of
+it according to your comment above.
+
+I would like to pick Bjorn's brain on this to see what we can really do
+to fix this (and other) drivers.
 
 Thanks,
-Lina
+Lorenzo
 
+> +	return dw_pcie_read(pci->dbi_base + where, size, val);
+> +}
+> +
+> +static int meson_pcie_wr_own_conf(struct pcie_port *pp, int where,
+> +				  int size, u32 val)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +
+> +	return dw_pcie_write(pci->dbi_base + where, size, val);
+> +}
+> +
+> +static int meson_pcie_link_up(struct dw_pcie *pci)
+> +{
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +	struct device *dev = pci->dev;
+> +	u32 smlh_up = 0;
+> +	u32 ltssm_up = 0;
+> +	u32 rdlh_up = 0;
+> +	u32 speed_okay = 0;
+> +	u32 cnt = 0;
+> +	u32 state12, state17;
+> +
+> +	while (smlh_up == 0 || rdlh_up == 0 || ltssm_up == 0 ||
+> +	       speed_okay == 0) {
+> +		udelay(20);
+> +
+> +		state12 = meson_cfg_readl(mp, PCIE_CFG_STATUS12);
+> +		state17 = meson_cfg_readl(mp, PCIE_CFG_STATUS17);
+> +		smlh_up = IS_SMLH_LINK_UP(state12);
+> +		rdlh_up = IS_RDLH_LINK_UP(state12);
+> +		ltssm_up = IS_LTSSM_UP(state12);
+> +
+> +		if (PM_CURRENT_STATE(state17) < PCIE_GEN3)
+> +			speed_okay = 1;
+> +
+> +		if (smlh_up)
+> +			dev_dbg(dev, "smlh_link_up is on\n");
+> +		if (rdlh_up)
+> +			dev_dbg(dev, "rdlh_link_up is on\n");
+> +		if (ltssm_up)
+> +			dev_dbg(dev, "ltssm_up is on\n");
+> +		if (speed_okay)
+> +			dev_dbg(dev, "speed_okay\n");
+> +
+> +		cnt++;
+> +
+> +		if (cnt >= WAIT_LINKUP_TIMEOUT) {
+> +			dev_err(dev, "Error: Wait linkup timeout.\n");
+> +			return 0;
+> +		}
+> +	}
+> +
+> +	return 1;
+> +}
+> +
+> +static int meson_pcie_host_init(struct pcie_port *pp)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
+> +	struct meson_pcie *mp = to_meson_pcie(pci);
+> +	int ret;
+> +
+> +	ret = meson_pcie_establish_link(mp);
+> +	if (ret)
+> +		return ret;
+> +
+> +	meson_pcie_enable_interrupts(mp);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dw_pcie_host_ops meson_pcie_host_ops = {
+> +	.rd_own_conf = meson_pcie_rd_own_conf,
+> +	.wr_own_conf = meson_pcie_wr_own_conf,
+> +	.host_init = meson_pcie_host_init,
+> +};
+> +
+> +static int meson_add_pcie_port(struct meson_pcie *mp,
+> +			       struct platform_device *pdev)
+> +{
+> +	struct dw_pcie *pci = &mp->pci;
+> +	struct pcie_port *pp = &pci->pp;
+> +	struct device *dev = &pdev->dev;
+> +	int ret;
+> +
+> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
+> +		pp->msi_irq = platform_get_irq(pdev, 0);
+> +		if (pp->msi_irq < 0) {
+> +			dev_err(dev, "failed to get msi irq\n");
+> +			return pp->msi_irq;
+> +		}
+> +	}
+> +
+> +	pp->ops = &meson_pcie_host_ops;
+> +	pci->dbi_base = mp->mem_res.elbi_base;
+> +
+> +	ret = dw_pcie_host_init(pp);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize host\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dw_pcie_ops dw_pcie_ops = {
+> +	.link_up = meson_pcie_link_up,
+> +};
+> +
+> +static int meson_pcie_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct dw_pcie *pci;
+> +	struct meson_pcie *mp;
+> +	int ret;
+> +
+> +	mp = devm_kzalloc(dev, sizeof(*mp), GFP_KERNEL);
+> +	if (!mp)
+> +		return -ENOMEM;
+> +
+> +	pci = &mp->pci;
+> +	pci->dev = dev;
+> +	pci->ops = &dw_pcie_ops;
+> +
+> +	mp->reset_gpio = devm_gpiod_get(dev, "reset", GPIOD_OUT_LOW);
+> +	if (IS_ERR(mp->reset_gpio)) {
+> +		dev_err(dev, "Get reset gpio failed\n");
+> +		return PTR_ERR(mp->reset_gpio);
+> +	}
+> +
+> +	ret = meson_pcie_get_resets(mp);
+> +	if (ret) {
+> +		dev_err(dev, "Get reset resource failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = meson_pcie_get_mems(pdev, mp);
+> +	if (ret) {
+> +		dev_err(dev, "Get memory resource failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	meson_pcie_power_on(mp);
+> +	meson_pcie_reset(mp);
+> +
+> +	ret = meson_pcie_probe_clocks(mp);
+> +	if (ret) {
+> +		dev_err(dev, "Init clock resources failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, mp);
+> +
+> +	ret = meson_add_pcie_port(mp, pdev);
+> +	if (ret < 0) {
+> +		dev_err(dev, "Add PCIE port failed, %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id meson_pcie_of_match[] = {
+> +	{
+> +		.compatible = "amlogic,axg-pcie",
+> +	},
+> +	{},
+> +};
+> +
+> +static struct platform_driver meson_pcie_driver = {
+> +	.probe = meson_pcie_probe,
+> +	.driver = {
+> +		.name = "meson-pcie",
+> +		.of_match_table = meson_pcie_of_match,
+> +	},
+> +};
+> +
+> +builtin_platform_driver(meson_pcie_driver);
+> -- 
+> 2.7.4
+> 
 
 _______________________________________________
 linux-arm-kernel mailing list
