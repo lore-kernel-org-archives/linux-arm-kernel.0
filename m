@@ -4,19 +4,18 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	USER_AGENT_GIT autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E583CC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CFCAC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id AD3A820851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6C7F520851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:36:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rtBZXQzG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AD3A820851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Qg5oJbqc"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6C7F520851
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,57 +24,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bsmoQbFZuEI4pxmxw++mcdMjBcewpivdWYKXsCkpfwQ=; b=rtBZXQzGG4zKN3
-	lbs0pQLzF0LaSw+QngASf3DyZt4NbWp4bobBLDvF+Tl8IWT4MjGV3fvvmTSp3/p0oI/rOlbJpUJ9Z
-	NwPT/0qTNo5LZd1yIUGVYg38At1wOq+pL5wLhYQyVX+jIorQ889a8nyALOGOvWkHG6DT37p9UoW2V
-	25Bh6uF+MsFQhbUf0Eu2VjgJU69pgnQLhopG0xrB2Ohm0ky4cI41wtKn2tKPyGFNqMXVA9YPNon5e
-	ZAfr7R6WLbWlm+G1dsNL0AnOQJFdE5xsNIHiaYBCujKs3/HUyVF0hsEgFlXps2ZfiZlfgao7HPntU
-	Hwu1WsYqFVu4zn+XW5/A==;
+	List-Owner; bh=ex9XcWKdyIa1YfqEYJK/rnVquEOCVlwgPTWbizI+u/w=; b=Qg5oJbqconvly5
+	ZouMjYwT/fik+w7gZ09+yd9YnFj848+qQV6Rzo+/OjubB/jvUx1TtHBed8qcH2qOQmq5qHz3SSK9H
+	QEIuLwTuk1KRZmNp4Y46bmsPz08PJtbod4f0Dq8WnzcUYF4iLyEYMqgIcwK9f+GzNkUFMSwuxakM/
+	N6a5yjEJdi0RNWO8O9Sjl6BBYUFmAGFE4itct4es8zE/YJHqC1x6mgFAO6kIG1NzMRGE+xUCferBc
+	9H4C+ZCqdVKDjekZigCYaga50aiDe5otQxNbiBNf4HL8w1+NThPOWymU0F21hdOd8tt6uD0MKm0z/
+	svm4KzLTGOEhPZwR57Bw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTvsw-0006hU-Ar; Mon, 03 Dec 2018 21:36:10 +0000
-Received: from mail-ot1-f68.google.com ([209.85.210.68])
+	id 1gTvtB-0006zj-UV; Mon, 03 Dec 2018 21:36:25 +0000
+Received: from mail-ot1-f67.google.com ([209.85.210.67])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvpc-00021b-4o
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:02 +0000
-Received: by mail-ot1-f68.google.com with SMTP id e12so13137434otl.5
+ id 1gTvph-00026e-3D
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:03 +0000
+Received: by mail-ot1-f67.google.com with SMTP id u16so13121134otk.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:33 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:44 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=JBdzh5igNzDqLEgQ/x0qGKygetPrx2TSisacJ9NbwDM=;
- b=nDHRQ6RyVZQszRHBeWmjYk1Oornbca0qc6XfC7EirAfpDbad0gDmeoeMirIrNIVxFz
- omcW64x9xo11pPa/oCTXVRV+AcE8MW1UHfS5/pFpijk2Q4slFuW7z84hZka55Vn6kB05
- 46uSXvWzr89kx0h6qPkRaLwmHXaRVcqFPGb9NeOkoCUSiPgo1d+44LKME1T/8GuikHH1
- 7YHuU617bFPgwpFro9NQsY9GAT8RUgicO/5FVapYAVFvYjfC2RYrWYGSt2nAFCZCTAW3
- xCd7RNGnAtDP79j7vVlNnBqQkoPjzATbHG+jorbNno3ow8f3PPtvWmo2U1sxtgqQMEsF
- nyOQ==
-X-Gm-Message-State: AA+aEWZ47KccEs3SIXidkolGRzFD58RcVdr3IvGGIubjbbOomhIzQeOW
- 1+x7f0V7JUrInpVfhYcw1Q==
-X-Google-Smtp-Source: AFSGD/U+mmGiUexsRNmU93TnmIq902d8xMVaezYT4k9mXkl7aBDX7UB2cG5lIAucILKUmxLOaJFYyA==
-X-Received: by 2002:a9d:2f66:: with SMTP id h93mr11773089otb.165.1543872753053; 
- Mon, 03 Dec 2018 13:32:33 -0800 (PST)
+ bh=+0uYgcD111shZCxPVWjIXktAHYqgAFqUOZcPK2YVI38=;
+ b=TxfpWYcOfQ+l6+7XocmpXng3EtMMvmripF9P5v1OWFfJT+FrVyBqVg0Dwk2GqD7SbD
+ nG9Lm/D55tdQxR3u5AQnADmTRSr2tTRrS0YoW7wyzoKdIjRIj5HR4AEt9BQxbHPlFBpW
+ FtVXwUDmk8HkJIMq71gLMK/8iJFouHzsLWko/+/C3sHripdlp7jvWlL9thc8z7HTFC2+
+ EVktgaep4djGHtoz+T7hSje/MFoG8ZNxyS1qJvqAWrCelEPDP05g/DhxNyG+jnsd0fHb
+ Srh3UI/UBoKL/Xhde7716+IwUTQrHLEWINm3Lq2YQUR16zlwbpSX/c+Bc1+ETDjLISSL
+ LbIw==
+X-Gm-Message-State: AA+aEWZ7oezFP9mCKGZyBwLg+N96PJID7HprdfOut7D/alpOPz8WKmm8
+ NhVhk+fhlp4jNbf84o+cwDiUNAM=
+X-Google-Smtp-Source: AFSGD/XBXab5CsrSP95ZpOT1ojWIXGO4faNCG4fK546h4y8gbiPmKpA2pvGjzdCBsx46epOg8LRzeA==
+X-Received: by 2002:a9d:bee:: with SMTP id 101mr11690699oth.120.1543872763948; 
+ Mon, 03 Dec 2018 13:32:43 -0800 (PST)
 Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.31
+ by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.42
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:32 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:43 -0800 (PST)
 From: Rob Herring <robh@kernel.org>
 To: devicetree@vger.kernel.org,
 	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 06/34] dt-bindings: timer: Convert ARM timer bindings to
- json-schema
-Date: Mon,  3 Dec 2018 15:31:55 -0600
-Message-Id: <20181203213223.16986-7-robh@kernel.org>
+Subject: [PATCH v2 15/34] dt-bindings: arm: Convert Atmel board/soc bindings
+ to json-schema
+Date: Mon,  3 Dec 2018 15:32:04 -0600
+Message-Id: <20181203213223.16986-16-robh@kernel.org>
 X-Mailer: git-send-email 2.19.1
 In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
 References: <20181203213223.16986-1-robh@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_133244_939493_817E2421 
-X-CRM114-Status: GOOD (  20.07  )
+X-CRM114-CacheID: sfid-20181203_133249_616805_32D5AFBA 
+X-CRM114-Status: GOOD (  14.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,474 +86,248 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Frank Rowand <frowand.list@gmail.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- Grant Likely <grant.likely@arm.com>, Thomas Gleixner <tglx@linutronix.de>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Kumar Gala <kumar.gala@linaro.org>, arm@kernel.org,
+ Sean Hudson <darknighte@darknighte.com>, Frank Rowand <frowand.list@gmail.com>,
+ Grant Likely <grant.likely@arm.com>, linuxppc-dev@lists.ozlabs.org,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert ARM timers to DT schema format using json-schema.
+Convert Atmel SoC bindings to DT schema format using json-schema.
 
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Nicolas Ferre <nicolas.ferre@microchip.com>
+Cc: Alexandre Belloni <alexandre.belloni@bootlin.com>
 Cc: devicetree@vger.kernel.org
+Cc: linux-arm-kernel@lists.infradead.org
 Signed-off-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/timer/arm,arch_timer.txt         | 112 ----------------
- .../bindings/timer/arm,arch_timer.yaml        | 103 +++++++++++++++
- .../bindings/timer/arm,arch_timer_mmio.yaml   | 120 ++++++++++++++++++
- .../bindings/timer/arm,global_timer.txt       |  27 ----
- .../bindings/timer/arm,global_timer.yaml      |  46 +++++++
- 5 files changed, 269 insertions(+), 139 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
- create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
- delete mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.txt
- create mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.yaml
+ .../devicetree/bindings/arm/atmel-at91.txt    |  72 ----------
+ .../devicetree/bindings/arm/atmel-at91.yaml   | 133 ++++++++++++++++++
+ 2 files changed, 133 insertions(+), 72 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.yaml
 
-diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer.txt b/Documentation/devicetree/bindings/timer/arm,arch_timer.txt
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
 deleted file mode 100644
-index 68301b77e854..000000000000
---- a/Documentation/devicetree/bindings/timer/arm,arch_timer.txt
+index 4bf1b4da7659..000000000000
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
 +++ /dev/null
-@@ -1,112 +0,0 @@
--* ARM architected timer
+@@ -1,72 +0,0 @@
+-Atmel AT91 device tree bindings.
+-================================
 -
--ARM cores may have a per-core architected timer, which provides per-cpu timers,
--or a memory mapped architected timer, which provides up to 8 frames with a
--physical and optional virtual timer per frame.
+-Boards with a SoC of the Atmel AT91 or SMART family shall have the following
+-properties:
 -
--The per-core architected timer is attached to a GIC to deliver its
--per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
--to deliver its interrupts via SPIs.
+-Required root node properties:
+-compatible: must be one of:
+- * "atmel,at91rm9200"
 -
--** CP15 Timer node properties:
+- * "atmel,at91sam9" for SoCs using an ARM926EJ-S core, shall be extended with
+-   the specific SoC family or compatible:
+-    o "atmel,at91sam9260"
+-    o "atmel,at91sam9261"
+-    o "atmel,at91sam9263"
+-    o "atmel,at91sam9x5" for the 5 series, shall be extended with the specific
+-      SoC compatible:
+-       - "atmel,at91sam9g15"
+-       - "atmel,at91sam9g25"
+-       - "atmel,at91sam9g35"
+-       - "atmel,at91sam9x25"
+-       - "atmel,at91sam9x35"
+-    o "atmel,at91sam9g20"
+-    o "atmel,at91sam9g45"
+-    o "atmel,at91sam9n12"
+-    o "atmel,at91sam9rl"
+-    o "atmel,at91sam9xe"
+- * "atmel,sama5" for SoCs using a Cortex-A5, shall be extended with the specific
+-   SoC family:
+-    o "atmel,sama5d2" shall be extended with the specific SoC compatible:
+-       - "atmel,sama5d27"
+-    o "atmel,sama5d3" shall be extended with the specific SoC compatible:
+-       - "atmel,sama5d31"
+-       - "atmel,sama5d33"
+-       - "atmel,sama5d34"
+-       - "atmel,sama5d35"
+-       - "atmel,sama5d36"
+-    o "atmel,sama5d4" shall be extended with the specific SoC compatible:
+-       - "atmel,sama5d41"
+-       - "atmel,sama5d42"
+-       - "atmel,sama5d43"
+-       - "atmel,sama5d44"
 -
--- compatible : Should at least contain one of
--	"arm,armv7-timer"
--	"arm,armv8-timer"
--
--- interrupts : Interrupt list for secure, non-secure, virtual and
--  hypervisor timers, in that order.
--
--- clock-frequency : The frequency of the main counter, in Hz. Should be present
--  only where necessary to work around broken firmware which does not configure
--  CNTFRQ on all CPUs to a uniform correct value. Use of this property is
--  strongly discouraged; fix your firmware unless absolutely impossible.
--
--- always-on : a boolean property. If present, the timer is powered through an
--  always-on power domain, therefore it never loses context.
--
--- fsl,erratum-a008585 : A boolean property. Indicates the presence of
--  QorIQ erratum A-008585, which says that reading the counter is
--  unreliable unless the same value is returned by back-to-back reads.
--  This also affects writes to the tval register, due to the implicit
--  counter read.
--
--- hisilicon,erratum-161010101 : A boolean property. Indicates the
--  presence of Hisilicon erratum 161010101, which says that reading the
--  counters is unreliable in some cases, and reads may return a value 32
--  beyond the correct value. This also affects writes to the tval
--  registers, due to the implicit counter read.
--
--** Optional properties:
--
--- arm,cpu-registers-not-fw-configured : Firmware does not initialize
--  any of the generic timer CPU registers, which contain their
--  architecturally-defined reset values. Only supported for 32-bit
--  systems which follow the ARMv7 architected reset values.
--
--- arm,no-tick-in-suspend : The main counter does not tick when the system is in
--  low-power system suspend on some SoCs. This behavior does not match the
--  Architecture Reference Manual's specification that the system counter "must
--  be implemented in an always-on power domain."
--
--
--Example:
--
--	timer {
--		compatible = "arm,cortex-a15-timer",
--			     "arm,armv7-timer";
--		interrupts = <1 13 0xf08>,
--			     <1 14 0xf08>,
--			     <1 11 0xf08>,
--			     <1 10 0xf08>;
--		clock-frequency = <100000000>;
--	};
--
--** Memory mapped timer node properties:
--
--- compatible : Should at least contain "arm,armv7-timer-mem".
--
--- clock-frequency : The frequency of the main counter, in Hz. Should be present
--  only when firmware has not configured the MMIO CNTFRQ registers.
--
--- reg : The control frame base address.
--
--Note that #address-cells, #size-cells, and ranges shall be present to ensure
--the CPU can address a frame's registers.
--
--A timer node has up to 8 frame sub-nodes, each with the following properties:
--
--- frame-number: 0 to 7.
--
--- interrupts : Interrupt list for physical and virtual timers in that order.
--  The virtual timer interrupt is optional.
--
--- reg : The first and second view base addresses in that order. The second view
--  base address is optional.
--
--- status : "disabled" indicates the frame is not available for use. Optional.
--
--Example:
--
--	timer@f0000000 {
--		compatible = "arm,armv7-timer-mem";
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--		reg = <0xf0000000 0x1000>;
--		clock-frequency = <50000000>;
--
--		frame@f0001000 {
--			frame-number = <0>
--			interrupts = <0 13 0x8>,
--				     <0 14 0x8>;
--			reg = <0xf0001000 0x1000>,
--			      <0xf0002000 0x1000>;
--		};
--
--		frame@f0003000 {
--			frame-number = <1>
--			interrupts = <0 15 0x8>;
--			reg = <0xf0003000 0x1000>;
--		};
--	};
-diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml b/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
+- * "atmel,samv7" for MCUs using a Cortex-M7, shall be extended with the specific
+-   SoC family:
+-    o "atmel,sams70" shall be extended with the specific MCU compatible:
+-       - "atmel,sams70j19"
+-       - "atmel,sams70j20"
+-       - "atmel,sams70j21"
+-       - "atmel,sams70n19"
+-       - "atmel,sams70n20"
+-       - "atmel,sams70n21"
+-       - "atmel,sams70q19"
+-       - "atmel,sams70q20"
+-       - "atmel,sams70q21"
+-    o "atmel,samv70" shall be extended with the specific MCU compatible:
+-       - "atmel,samv70j19"
+-       - "atmel,samv70j20"
+-       - "atmel,samv70n19"
+-       - "atmel,samv70n20"
+-       - "atmel,samv70q19"
+-       - "atmel,samv70q20"
+-    o "atmel,samv71" shall be extended with the specific MCU compatible:
+-       - "atmel,samv71j19"
+-       - "atmel,samv71j20"
+-       - "atmel,samv71j21"
+-       - "atmel,samv71n19"
+-       - "atmel,samv71n20"
+-       - "atmel,samv71n21"
+-       - "atmel,samv71q19"
+-       - "atmel,samv71q20"
+-       - "atmel,samv71q21"
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.yaml b/Documentation/devicetree/bindings/arm/atmel-at91.yaml
 new file mode 100644
-index 000000000000..6deead07728e
+index 000000000000..19431f58b906
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
-@@ -0,0 +1,103 @@
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.yaml
+@@ -0,0 +1,133 @@
 +# SPDX-License-Identifier: GPL-2.0
 +%YAML 1.2
 +---
-+$id: http://devicetree.org/schemas/timer/arm,arch_timer.yaml#
++$id: http://devicetree.org/schemas/arm/atmel-at91.yaml#
 +$schema: http://devicetree.org/meta-schemas/core.yaml#
 +
-+title: ARM architected timer
++title: Atmel AT91 device tree bindings.
 +
 +maintainers:
-+  - Marc Zyngier <marc.zyngier@arm.com>
-+  - Mark Rutland <mark.rutland@arm.com>
-+description: |+
-+  ARM cores may have a per-core architected timer, which provides per-cpu timers,
-+  or a memory mapped architected timer, which provides up to 8 frames with a
-+  physical and optional virtual timer per frame.
++  - Alexandre Belloni <alexandre.belloni@free-electrons.com>
++  - Ludovic Desroches <ludovic.desroches@atmel.com>
 +
-+  The per-core architected timer is attached to a GIC to deliver its
-+  per-processor interrupts via PPIs. The memory mapped timer is attached to a GIC
-+  to deliver its interrupts via SPIs.
++description: |
++  Boards with a SoC of the Atmel AT91 or SMART family shall have the following
 +
 +properties:
++  $nodename:
++    const: '/'
 +  compatible:
 +    oneOf:
 +      - items:
-+          - enum:
-+              - arm,cortex-a15-timer
-+          - enum:
-+              - arm,armv7-timer
++          - const: atmel,at91rm9200
 +      - items:
 +          - enum:
-+            - arm,armv7-timer
++              - olimex,sam9-l9260
++          - enum:
++              - atmel,at91sam9260
++              - atmel,at91sam9261
++              - atmel,at91sam9263
++              - atmel,at91sam9g20
++              - atmel,at91sam9g45
++              - atmel,at91sam9n12
++              - atmel,at91sam9rl
++              - atmel,at91sam9xe
++          - const: atmel,at91sam9
++
 +      - items:
 +          - enum:
-+            - arm,armv8-timer
++              - atmel,at91sam9g15
++              - atmel,at91sam9g25
++              - atmel,at91sam9g35
++              - atmel,at91sam9x25
++              - atmel,at91sam9x35
++          - const: atmel,at91sam9x5
++          - const: atmel,at91sam9
 +
-+  interrupts:
-+    items:
-+      - description: secure timer irq
-+      - description: non-secure timer irq
-+      - description: virtual timer irq
-+      - description: hypervisor timer irq
++      - items:
++          - const: atmel,sama5d27
++          - const: atmel,sama5d2
++          - const: atmel,sama5
 +
-+  clock-frequency:
-+    description: The frequency of the main counter, in Hz. Should be present
-+      only where necessary to work around broken firmware which does not configure
-+      CNTFRQ on all CPUs to a uniform correct value. Use of this property is
-+      strongly discouraged; fix your firmware unless absolutely impossible.
-+
-+  always-on:
-+    type: boolean
-+    description: If present, the timer is powered through an always-on power
-+      domain, therefore it never loses context.
-+
-+  fsl,erratum-a008585:
-+    type: boolean
-+    description: Indicates the presence of QorIQ erratum A-008585, which says
-+      that reading the counter is unreliable unless the same value is returned
-+      by back-to-back reads. This also affects writes to the tval register, due
-+      to the implicit counter read.
-+
-+  hisilicon,erratum-161010101:
-+    type: boolean
-+    description: Indicates the presence of Hisilicon erratum 161010101, which
-+      says that reading the counters is unreliable in some cases, and reads may
-+      return a value 32 beyond the correct value. This also affects writes to
-+      the tval registers, due to the implicit counter read.
-+
-+  arm,cpu-registers-not-fw-configured:
-+    type: boolean
-+    description: Firmware does not initialize any of the generic timer CPU
-+      registers, which contain their architecturally-defined reset values. Only
-+      supported for 32-bit systems which follow the ARMv7 architected reset
-+      values.
-+
-+  arm,no-tick-in-suspend:
-+    type: boolean
-+    description: The main counter does not tick when the system is in
-+      low-power system suspend on some SoCs. This behavior does not match the
-+      Architecture Reference Manual's specification that the system counter "must
-+      be implemented in an always-on power domain."
-+
-+required:
-+  - compatible
-+
-+oneOf:
-+  - required:
-+      - interrupts
-+  - required:
-+      - interrupts-extended
-+
-+examples:
-+  - |
-+    timer {
-+      compatible = "arm,cortex-a15-timer",
-+             "arm,armv7-timer";
-+      interrupts = <1 13 0xf08>,
-+             <1 14 0xf08>,
-+             <1 11 0xf08>,
-+             <1 10 0xf08>;
-+      clock-frequency = <100000000>;
-+    };
-+
-+...
-diff --git a/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml b/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
-new file mode 100644
-index 000000000000..c4ab59550fc2
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
-@@ -0,0 +1,120 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/timer/arm,arch_timer_mmio.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: ARM memory mapped architected timer
-+
-+maintainers:
-+  - Marc Zyngier <marc.zyngier@arm.com>
-+  - Mark Rutland <mark.rutland@arm.com>
-+
-+description: |+
-+  ARM cores may have a memory mapped architected timer, which provides up to 8
-+  frames with a physical and optional virtual timer per frame.
-+
-+  The memory mapped timer is attached to a GIC to deliver its interrupts via SPIs.
-+
-+properties:
-+  compatible:
-+    items:
-+      - enum:
-+        - arm,armv7-timer-mem
-+
-+  reg:
-+    maxItems: 1
-+    description: The control frame base address
-+
-+  '#address-cells':
-+    enum: [1, 2]
-+
-+  '#size-cells':
-+    const: 1
-+
-+  clock-frequency:
-+    description: The frequency of the main counter, in Hz. Should be present
-+      only where necessary to work around broken firmware which does not configure
-+      CNTFRQ on all CPUs to a uniform correct value. Use of this property is
-+      strongly discouraged; fix your firmware unless absolutely impossible.
-+
-+  always-on:
-+    type: boolean
-+    description: If present, the timer is powered through an always-on power
-+      domain, therefore it never loses context.
-+
-+  arm,cpu-registers-not-fw-configured:
-+    type: boolean
-+    description: Firmware does not initialize any of the generic timer CPU
-+      registers, which contain their architecturally-defined reset values. Only
-+      supported for 32-bit systems which follow the ARMv7 architected reset
-+      values.
-+
-+  arm,no-tick-in-suspend:
-+    type: boolean
-+    description: The main counter does not tick when the system is in
-+      low-power system suspend on some SoCs. This behavior does not match the
-+      Architecture Reference Manual's specification that the system counter "must
-+      be implemented in an always-on power domain."
-+
-+patternProperties:
-+  '^frame@[0-9a-z]*$':
-+    description: A timer node has up to 8 frame sub-nodes, each with the following properties.
-+    properties:
-+      frame-number:
-+        allOf:
-+          - $ref: "/schemas/types.yaml#/definitions/uint32"
-+          - minimum: 0
-+            maximum: 7
-+
-+      interrupts:
-+        minItems: 1
-+        maxItems: 2
++      - description: Nattis v2 board with Natte v2 power board
 +        items:
-+          - description: physical timer irq
-+          - description: virtual timer irq
++          - const: axentia,nattis-2
++          - const: axentia,natte-2
++          - const: axentia,linea
++          - const: atmel,sama5d31
++          - const: atmel,sama5d3
++          - const: atmel,sama5
 +
-+      reg :
-+        minItems: 1
-+        maxItems: 2
++      - description: TSE-850 v3 board
 +        items:
-+          - description: 1st view base address
-+          - description: 2nd optional view base address
++          - const: axentia,tse850v3
++          - const: axentia,linea
++          - const: atmel,sama5d31
++          - const: atmel,sama5d3
++          - const: atmel,sama5
 +
-+    required:
-+      - frame-number
-+      - interrupts
-+      - reg
++      - items:
++          - const: axentia,linea
++          - const: atmel,sama5d31
++          - const: atmel,sama5d3
++          - const: atmel,sama5
 +
-+required:
-+  - compatible
-+  - reg
-+  - '#address-cells'
-+  - '#size-cells'
++      - items:
++          - enum:
++              - atmel,sama5d31
++              - atmel,sama5d33
++              - atmel,sama5d34
++              - atmel,sama5d35
++              - atmel,sama5d36
++          - const: atmel,sama5d3
++          - const: atmel,sama5
 +
-+examples:
-+  - |
-+    timer@f0000000 {
-+      compatible = "arm,armv7-timer-mem";
-+      #address-cells = <1>;
-+      #size-cells = <1>;
-+      ranges;
-+      reg = <0xf0000000 0x1000>;
-+      clock-frequency = <50000000>;
++      - items:
++          - enum:
++              - atmel,sama5d41
++              - atmel,sama5d42
++              - atmel,sama5d43
++              - atmel,sama5d44
++          - const: atmel,sama5d4
++          - const: atmel,sama5
 +
-+      frame@f0001000 {
-+        frame-number = <0>;
-+        interrupts = <0 13 0x8>,
-+               <0 14 0x8>;
-+        reg = <0xf0001000 0x1000>,
-+              <0xf0002000 0x1000>;
-+      };
++      - items:
++          - enum:
++              - atmel,sams70j19
++              - atmel,sams70j20
++              - atmel,sams70j21
++              - atmel,sams70n19
++              - atmel,sams70n20
++              - atmel,sams70n21
++              - atmel,sams70q19
++              - atmel,sams70q20
++              - atmel,sams70q21
++          - const: atmel,sams70
++          - const: atmel,samv7
 +
-+      frame@f0003000 {
-+        frame-number = <1>;
-+        interrupts = <0 15 0x8>;
-+        reg = <0xf0003000 0x1000>;
-+      };
-+    };
++      - items:
++          - enum:
++              - atmel,samv70j19
++              - atmel,samv70j20
++              - atmel,samv70n19
++              - atmel,samv70n20
++              - atmel,samv70q19
++              - atmel,samv70q20
++          - const: atmel,samv70
++          - const: atmel,samv7
 +
-+...
-diff --git a/Documentation/devicetree/bindings/timer/arm,global_timer.txt b/Documentation/devicetree/bindings/timer/arm,global_timer.txt
-deleted file mode 100644
-index bdae3a818793..000000000000
---- a/Documentation/devicetree/bindings/timer/arm,global_timer.txt
-+++ /dev/null
-@@ -1,27 +0,0 @@
--
--* ARM Global Timer
--	Cortex-A9 are often associated with a per-core Global timer.
--
--** Timer node required properties:
--
--- compatible : should contain
--	     * "arm,cortex-a5-global-timer" for Cortex-A5 global timers.
--	     * "arm,cortex-a9-global-timer" for Cortex-A9 global
--	         timers or any compatible implementation. Note: driver
--	         supports versions r2p0 and above.
--
--- interrupts : One interrupt to each core
--
--- reg : Specify the base address and the size of the GT timer
--	register window.
--
--- clocks : Should be phandle to a clock.
--
--Example:
--
--	timer@2c000600 {
--		compatible = "arm,cortex-a9-global-timer";
--		reg = <0x2c000600 0x20>;
--		interrupts = <1 13 0xf01>;
--		clocks = <&arm_periph_clk>;
--	};
-diff --git a/Documentation/devicetree/bindings/timer/arm,global_timer.yaml b/Documentation/devicetree/bindings/timer/arm,global_timer.yaml
-new file mode 100644
-index 000000000000..21c24a8e28fd
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/arm,global_timer.yaml
-@@ -0,0 +1,46 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/timer/arm,global_timer.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
++      - items:
++          - enum:
++              - atmel,samv71j19
++              - atmel,samv71j20
++              - atmel,samv71j21
++              - atmel,samv71n19
++              - atmel,samv71n20
++              - atmel,samv71n21
++              - atmel,samv71q19
++              - atmel,samv71q20
++              - atmel,samv71q21
++          - const: atmel,samv71
++          - const: atmel,samv7
 +
-+title: ARM Global Timer
-+
-+maintainers:
-+  - Stuart Menefy <stuart.menefy@st.com>
-+
-+description:
-+  Cortex-A9 are often associated with a per-core Global timer.
-+
-+properties:
-+  compatible:
-+    items:
-+      - enum:
-+          - arm,cortex-a5-global-timer
-+          - arm,cortex-a9-global-timer
-+
-+    description: driver supports versions r2p0 and above.
-+
-+  reg:
-+    maxItems: 1
-+
-+  interrupts:
-+    maxItems: 1
-+
-+  clocks:
-+    maxItems: 1
-+
-+required:
-+  - compatible
-+  - reg
-+  - clocks
-+
-+examples:
-+  - |
-+    timer@2c000600 {
-+      compatible = "arm,cortex-a9-global-timer";
-+      reg = <0x2c000600 0x20>;
-+      interrupts = <1 13 0xf01>;
-+      clocks = <&arm_periph_clk>;
-+    };
 +...
 -- 
 2.19.1
