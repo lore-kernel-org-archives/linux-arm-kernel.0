@@ -7,57 +7,90 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 9A354C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:19:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 2750CC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:24:35 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6B15C20851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:19:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E6232206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 22:24:34 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bDQJnXSk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6B15C20851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wn0rkl1j";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=marek-ca.20150623.gappssmtp.com header.i=@marek-ca.20150623.gappssmtp.com header.b="PHgdoWRL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E6232206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=marek.ca
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=cSK47XMsd7BstWV1twuDRHX4WcxbmeapqntCNBoBf2I=; b=bDQJnXSkUp1ehd
-	gGnB1dWtFpB70PvS5za8IkJonv2jzgJyAnW1Lr19QOjTZx5WSUl3n3BaKyFHUs9CnGu/ijQv8c6yw
-	/cQz9TQLnh4GTOFYNerg66OhcylPss4WBVBiyBh11kuNfz/5FHTVR/kUQ/BocsS7K4Vy5Msb4Qwsw
-	xvXeh1Zp9+7KwAEdQkr/88YwKBrYCT+E5UBMIVowtfNbiEYEUJXGrTUdAm5ZPvI+8bnO+Aqr1RESL
-	4F7XzWB0bquVqOhSQz+5b3thzciHAiV09VgaBW+EezWcGqRXri6JS5ZuCBsEbE6HbwYa2gWsSE2J4
-	6fl1fRNuYyO4ARcghb/Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=uwiufB0uAEZyze/rgK4T5Ez6Pz3EIDbZvo+QMTk7Gh0=; b=Wn0rkl1j23z5IZMdTOZq9X09R
+	dIVCSEC60GdJWFBZYxTJcnC8ZaP/S1oaE+GiB5WWmUXI2DLoalpOPB0n9Shu4yItEal66Kfruiaez
+	wcZsbbOnypO0hBuLjoSM1SfNgm7ptB+okNpavh9dz7M41BDxHpNAJlH5K5zrWEBszPY7NPQExsocA
+	GBgnT+58ZPzKFZPInZm+uPWJQfNNhOUKEc9MQnbM2+bymAXVYmfpzRGsfbwfU8xlafb7fZhwe5Eea
+	VNFsBvCvwnoiG/h6fcJ8kY81W8UN0l94s1tqhZgGWCRycZ7CAXbWHJBeKosmNdZsuylPoBQIylwTX
+	9TU3ySTsA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTwYY-0001M9-JK; Mon, 03 Dec 2018 22:19:10 +0000
-Received: from mail.bootlin.com ([62.4.15.54])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTwYV-0001Ks-0D
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:19:08 +0000
-Received: by mail.bootlin.com (Postfix, from userid 110)
- id C9D6620791; Mon,  3 Dec 2018 23:18:55 +0100 (CET)
-Received: from xps13 (unknown [91.224.148.103])
- by mail.bootlin.com (Postfix) with ESMTPSA id BDCEC207AD;
- Mon,  3 Dec 2018 23:18:44 +0100 (CET)
-Date: Mon, 3 Dec 2018 23:18:44 +0100
-From: Miquel Raynal <miquel.raynal@bootlin.com>
-To: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Subject: Re: [PATCH 05/12] PCI: aardvark: add suspend to RAM support
-Message-ID: <20181203231844.0791bdee@xps13>
-In-Reply-To: <1999610.6DN9RK2Tt3@aspire.rjw.lan>
-References: <20181123141831.8214-1-miquel.raynal@bootlin.com>
- <20181203102708.GA6090@e107981-ln.cambridge.arm.com>
- <20181203163846.494904f9@xps13> <1999610.6DN9RK2Tt3@aspire.rjw.lan>
-Organization: Bootlin
-X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+	id 1gTwdk-0003PC-Jt; Mon, 03 Dec 2018 22:24:32 +0000
+Received: from mail-qk1-x742.google.com ([2607:f8b0:4864:20::742])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTwdh-0003OC-Kw
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:24:31 +0000
+Received: by mail-qk1-x742.google.com with SMTP id d19so8435820qkg.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 14:24:19 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=marek-ca.20150623.gappssmtp.com; s=20150623;
+ h=subject:to:cc:references:from:message-id:date:user-agent
+ :mime-version:in-reply-to:content-language:content-transfer-encoding;
+ bh=5Qg81U+ca65JeAAqq1YakJhxYwuFlumKDwYG7cVu3Tg=;
+ b=PHgdoWRL8TZXfFZNYAig82LEES6/Czv/U+5esE0BmBow2Kocx7ZibBiCsVatbAwMaB
+ Wr7w6lKYr14y+wyNRy76NuInPz9ZF5235l2w8DaPSMCoqFppQ+hXeAAXcobhHUfquPLf
+ CMaxpYo/2Lxn63eianndOOecCrcqfQHognYdAqli3eRLCu+bDsNfkoAHnQtbg3A7+gYn
+ WFUzGvqS89r7h4vSTbpBLPBspIm1xOQeskpxZ8U5m1ohWeoEFDmBqEuJ+qS17cJtcjPh
+ oZy+mSnNL3ugAFgrxkHwfjmlpkck+Qiqazqpeh3oYzpkAbGxJjeFqu99s7KA5PRqwArK
+ rihw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=5Qg81U+ca65JeAAqq1YakJhxYwuFlumKDwYG7cVu3Tg=;
+ b=KN3V3tVplUL8QUsxZFZ89ut0cX7ghfZmOZAyyHLNHsmq4ITBL9eQsW/Wob19HhvjFc
+ yjsEw1L22j02e3uta4Iz8u5xvaSEk/JbM9gZZXNsXWbElkk6VlVwDpI6h1+Dx5XzvTqF
+ pSLSp3SFxlLR3kumEQJ2VY7wHnrgN5akshLcutB2mYTPGvoGVKjUiZ/F1VpNrW27hMbL
+ IE+MjJDQRuqD7n5UlEZJK5LP+UzD64DBmMtmYB0mCMb8eR/wbIxeUPcehpafd2eHI3nI
+ 4RZiLJgUU6rEAcZiwEnK951Uewns4CGPfkJwiNDpLYRfVrY1ENro2G/Pll4dQISFrfJ6
+ J87A==
+X-Gm-Message-State: AA+aEWbfBu0H6DG7ukj8zIzCAm4R1pUgDoYk9DIrJhZmXGgoxTCtukP1
+ 9Tn/QL+Ot6uorpkxNx/MEMu0lg==
+X-Google-Smtp-Source: AFSGD/UpDy6lMDJrG9loWlVpLvJR7kt985EHx0qBJP1XCqaPyFmU5cnT1l4iK2rXeGuQJyDQ1yREwQ==
+X-Received: by 2002:a37:cf9b:: with SMTP id v27mr16179832qkl.160.1543875858364; 
+ Mon, 03 Dec 2018 14:24:18 -0800 (PST)
+Received: from [192.168.0.189] (modemcable014.247-57-74.mc.videotron.ca.
+ [74.57.247.14])
+ by smtp.gmail.com with ESMTPSA id y2sm11441367qtb.88.2018.12.03.14.24.16
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 03 Dec 2018 14:24:17 -0800 (PST)
+Subject: Re: [PATCH v3 4/4] ARM: dts: imx5: add gpu nodes
+To: Fabio Estevam <festevam@gmail.com>
+References: <20181203211816.5129-1-jonathan@marek.ca>
+ <20181203211816.5129-4-jonathan@marek.ca>
+ <CAOMZO5B18DyZ0zvit6AgaueMifnMf2ctSo7pE_XndRpt7+bnLw@mail.gmail.com>
+From: Jonathan marek <jonathan@marek.ca>
+Message-ID: <3e8d1f9e-ffb4-dd6a-0a68-f59b4c1134a0@marek.ca>
+Date: Mon, 3 Dec 2018 17:21:40 -0500
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.8.0
 MIME-Version: 1.0
+In-Reply-To: <CAOMZO5B18DyZ0zvit6AgaueMifnMf2ctSo7pE_XndRpt7+bnLw@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_141907_316246_D4482371 
-X-CRM114-Status: GOOD (  23.23  )
+X-CRM114-CacheID: sfid-20181203_142429_689532_FE4F51AA 
+X-CRM114-Status: GOOD (  23.97  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,63 +102,77 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
- Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>,
- Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
- Antoine Tenart <antoine.tenart@bootlin.com>, linux-pci@vger.kernel.org,
- Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
- Maxime Chevallier <maxime.chevallier@bootlin.com>,
- Nadav Haklai <nadavh@marvell.com>, Rob Herring <robh+dt@kernel.org>,
- Thomas Petazzoni <thomas.petazzoni@bootlin.com>, sudeep.holla@arm.com,
- Bjorn Helgaas <bhelgaas@google.com>, linux-arm-kernel@lists.infradead.org,
- Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ "open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS"
+ <devicetree@vger.kernel.org>, freedreno@lists.freedesktop.org,
+ Sascha Hauer <s.hauer@pengutronix.de>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Chris Healy <Chris.Healy@zii.aero>, Sascha Hauer <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>, NXP Linux Team <linux-imx@nxp.com>
+Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgUmFmYWVsLCBTdGVwaGVuLAoKIlJhZmFlbCBKLiBXeXNvY2tpIiA8cmp3QHJqd3lzb2NraS5u
-ZXQ+IHdyb3RlIG9uIE1vbiwgMDMgRGVjIDIwMTgKMjM6MDA6MjAgKzAxMDA6Cgo+IE9uIE1vbmRh
-eSwgRGVjZW1iZXIgMywgMjAxOCA0OjM4OjQ2IFBNIENFVCBNaXF1ZWwgUmF5bmFsIHdyb3RlOgo+
-ID4gSGkgTG9yZW56bywKPiA+IAo+ID4gTG9yZW56byBQaWVyYWxpc2kgPGxvcmVuem8ucGllcmFs
-aXNpQGFybS5jb20+IHdyb3RlIG9uIE1vbiwgMyBEZWMgMjAxOAo+ID4gMTA6Mjc6MDggKzAwMDA6
-Cj4gPiAgIAo+ID4gPiBbK1JhZmFlbCwgU3VkZWVwXQo+ID4gPiAKPiA+ID4gT24gRnJpLCBOb3Yg
-MjMsIDIwMTggYXQgMDM6MTg6MjRQTSArMDEwMCwgTWlxdWVsIFJheW5hbCB3cm90ZTogIAo+ID4g
-PiA+IEFkZCBzdXNwZW5kIGFuZCByZXN1bWUgY2FsbGJhY2tzLiBUaGUgcHJpb3JpdHkgb2YgdGhl
-c2UgYXJlCj4gPiA+ID4gIl9ub2lycSgpIiwgdG8gd29ya2Fyb3VuZCBlYXJseSBhY2Nlc3MgdG8g
-dGhlIHJlZ2lzdGVycyBkb25lIGJ5IHRoZQo+ID4gPiA+IFBDSSBjb3JlIHRocm91Z2ggdGhlIC0+
-cmVhZCgpLy0+d3JpdGUoKSBjYWxsYmFja3MgYXQgcmVzdW1lIHRpbWUuCj4gPiA+ID4gCj4gPiA+
-ID4gU2lnbmVkLW9mZi1ieTogTWlxdWVsIFJheW5hbCA8bWlxdWVsLnJheW5hbEBib290bGluLmNv
-bT4KPiA+ID4gPiAtLS0KPiA+ID4gPiAgZHJpdmVycy9wY2kvY29udHJvbGxlci9wY2ktYWFyZHZh
-cmsuYyB8IDUyICsrKysrKysrKysrKysrKysrKysrKysrKysrKwo+ID4gPiA+ICAxIGZpbGUgY2hh
-bmdlZCwgNTIgaW5zZXJ0aW9ucygrKQo+ID4gPiA+IAo+ID4gPiA+IGRpZmYgLS1naXQgYS9kcml2
-ZXJzL3BjaS9jb250cm9sbGVyL3BjaS1hYXJkdmFyay5jIGIvZHJpdmVycy9wY2kvY29udHJvbGxl
-ci9wY2ktYWFyZHZhcmsuYwo+ID4gPiA+IGluZGV4IDEwOGIzZjE1YzQxMC4uN2VjZjFhYzQwMzZi
-IDEwMDY0NAo+ID4gPiA+IC0tLSBhL2RyaXZlcnMvcGNpL2NvbnRyb2xsZXIvcGNpLWFhcmR2YXJr
-LmMKPiA+ID4gPiArKysgYi9kcml2ZXJzL3BjaS9jb250cm9sbGVyL3BjaS1hYXJkdmFyay5jCj4g
-PiA+ID4gQEAgLTExMDgsNiArMTEwOCw1NSBAQCBzdGF0aWMgaW50IGFkdmtfcGNpZV9zZXR1cF9j
-bGsoc3RydWN0IGFkdmtfcGNpZSAqcGNpZSkKPiA+ID4gPiAgCXJldHVybiByZXQ7Cj4gPiA+ID4g
-IH0KPiA+ID4gPiAgCj4gPiA+ID4gK3N0YXRpYyBpbnQgX19tYXliZV91bnVzZWQgYWR2a19wY2ll
-X3N1c3BlbmQoc3RydWN0IGRldmljZSAqZGV2KQo+ID4gPiA+ICt7Cj4gPiA+ID4gKwlzdHJ1Y3Qg
-YWR2a19wY2llICpwY2llID0gZGV2X2dldF9kcnZkYXRhKGRldik7Cj4gPiA+ID4gKwo+ID4gPiA+
-ICsJYWR2a19wY2llX2Rpc2FibGVfcGh5KHBjaWUpOwo+ID4gPiA+ICsKPiA+ID4gPiArCWNsa19k
-aXNhYmxlX3VucHJlcGFyZShwY2llLT5jbGspOyAgICAKPiA+ID4gCj4gPiA+IEkgaGF2ZSBub3Rp
-Y2VkIGl0IGlzIGNvbW1vbiBwcmFjdGljZSwgc3RpbGwsIEkgd291bGQgbGlrZSB0byBjaGVjayB3
-aGV0aGVyCj4gPiA+IGl0IGlzIGFsbG93ZWQgdG8gY2FsbCBmdW5jdGlvbnMgdGhhdCBtYXkgc2xl
-ZXAgaW4gYSBOT0lSUSBzdXNwZW5kL3Jlc3VtZQo+ID4gPiBjYWxsYmFjayA/ICAKPiA+IAo+ID4g
-WW91IGFyZSByaWdodCB0aGlzIGlzIHdlaXJkLiBJIGRvdWJsZSBjaGVja2VkIGFuZCBmb3IgaW5z
-dGFuY2UsCj4gPiBwY2llLW1lZGlhdGVrLmMsIHBjaS10ZWdyYS5jIGFuZCBwY2ktaW14Ni5jIGRv
-IHRoZSBleGFjdCBzYW1lIHRoaW5nLiBUaGVyZSBhcmUKPiA+IHByb2JhYmx5IG90aGVyIGNhc2Vz
-IHdoZXJlIGRyaXZlcnMgY2FsbCBmdW5jdGlvbnMgdGhhdCBtYXkgc2xlZXAgZnJvbSBhIE5PSVJR
-Cj4gPiBjb250ZXh0LiBJIGFtIGludGVyZXN0ZWQgdG8ga25vdyBpZiB0aGlzIGlzIHZhbGlkIGFu
-ZCBpZiBub3QsIHdoYXQgaXMgdGhlCj4gPiBhbHRlcm5hdGl2ZT8KPiA+ICAgCj4gCj4gWWVzLCBp
-dCBpcyB2YWxpZC4gIF9ub2lycSBtZWFucyB0aGF0IHRoZSBoaWdoLWxldmVsIGFjdGlvbiBoYW5k
-bGVycyB3aWxsIG5vdCBiZQo+IGludm9rZWQgZm9yIGludGVycnVwdHMgb2NjdXJyaW5nIGR1cmlu
-ZyB0aGF0IHBlcmlvZCwgYnV0IHRoYXQgZG9lc24ndCBhcHBseSB0bwo+IHRpbWVyIGludGVycnVw
-dHMuCj4gCj4gSU9XLCBkb24ndCBleHBlY3QgKnlvdXIqIElSUSBoYW5kbGVyIHRvIGJlIGludm9r
-ZWQgdGhlbiAoaWYgdGhpcyBpcyBub3QgYSB0aW1lcgo+IElSUSksIGJ1dCB5b3UgY2FuIHNsZWVw
-Lgo+IAo+IFRoYW5rcywKPiBSYWZhZWwKPiAKClRoYW5rIHlvdSBib3RoIGZvciB0aGUgZW5saWdo
-dGVubWVudC4KCgpUaGFua3MsCk1pcXXDqGwKCl9fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X19fX19fX19fX19fX19fX19fCmxpbnV4LWFybS1rZXJuZWwgbWFpbGluZyBsaXN0CmxpbnV4LWFy
-bS1rZXJuZWxAbGlzdHMuaW5mcmFkZWFkLm9yZwpodHRwOi8vbGlzdHMuaW5mcmFkZWFkLm9yZy9t
-YWlsbWFuL2xpc3RpbmZvL2xpbnV4LWFybS1rZXJuZWwK
+On 12/03/2018 05:16 PM, Fabio Estevam wrote:
+> Hi Jonathan,
+> 
+> Thanks for working on this. Really nice to see GPU support for mx51/mx53!
+> 
+> On Mon, Dec 3, 2018 at 7:21 PM Jonathan Marek <jonathan@marek.ca> wrote:
+> 
+> Please add a commit log.
+> 
+>> Signed-off-by: Jonathan Marek <jonathan@marek.ca>
+> 
+>> ---
+>>   arch/arm/boot/dts/imx51.dtsi | 17 +++++++++++++++++
+>>   arch/arm/boot/dts/imx53.dtsi | 17 +++++++++++++++++
+>>   2 files changed, 34 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+>> index 67d462715..e9a7bbce9 100644
+>> --- a/arch/arm/boot/dts/imx51.dtsi
+>> +++ b/arch/arm/boot/dts/imx51.dtsi
+>> @@ -628,5 +628,22 @@
+>>                                  clock-names = "ipg", "ahb";
+>>                          };
+>>                  };
+>> +
+>> +               gpu: gpu@30000000 {
+> 
+> We put the peripheral nodes in address order, so this one should go
+> prior to the IPU node.
+> 
+>> +                       compatible = "amd,imageon-200.1", "amd,imageon";
+> 
+> I can't find the dt-bindings for these compatible entries. Have you
+> documented them?
+> 
+
+It is the same as qcom,adreno which is documented here:
+
+Documentation/devicetree/bindings/display/msm/gpu.txt
+
+I guess I should add amd,imageon there.
+
+>> +                       reg = <0x30000000 0x20000>;
+>> +                       reg-names = "kgsl_3d0_reg_memory";
+>> +                       interrupts = <12>;
+>> +                       interrupt-names = "kgsl_3d0_irq";
+>> +                       clocks = <&clks IMX5_CLK_GPU3D_GATE>, <&clks IMX5_CLK_GARB_GATE>;
+>> +                       clock-names = "core_clk", "mem_iface_clk";
+>> +
+>> +                       qcom,gpu-pwrlevels {
+>> +                               compatible = "qcom,gpu-pwrlevels";
+>> +                               qcom,gpu-pwrlevel@0 {
+> 
+> You could drop this @0
+> 
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
