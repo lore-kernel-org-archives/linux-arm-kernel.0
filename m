@@ -2,66 +2,65 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,UNPARSEABLE_RELAY,URIBL_BLOCKED,USER_AGENT_GIT
-	autolearn=unavailable autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C1728C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:35:09 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E20CBC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:37:57 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 911FE2082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:35:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ABD372082F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:37:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EtmLzJIq"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 911FE2082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BwXvRhxx"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ABD372082F
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=+2CIWBr0YU88NEHWAbX1/1An7PtqmTgcfk6VLtM6Bk4=; b=EtmLzJIqBxVP1V
-	xOqQ0FkmaH35rj36OZ5WUjqdwWkaq/YSIg2EOLFW5nyuujHRD9mBzutW/S+q72wLPDFwJwKb483sd
-	IcX16caOi7VcnW61I2Mxi9itA3tbvoEDmefoQ1pSTGnhahJL87Z9xMYYzLJXA1X7wLuADVLCwurBR
-	V0HwPcpBGyIAkHm4xyy5dC/uv367c082T2KpUwPvI1MeE1/yZjUo4Ez1uMWBTBAOnAap8n4949TVK
-	a4g27skQwxUSEva+vOdCFVmYRoETwg8Efe3Gv1P+/RWSo4aOyxMRyTXUWt56hN6IGk3CwdXZsE7T9
-	FSHpJ3u9JDoKze2QWO9Q==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=pLXrdb2FB71gr0Hu9Rqerz4dNKWELUAkwgmK32dlUj8=; b=BwXvRhxxt/wzEyQhMsxAJWhWZ
+	DpnJnbeV05Yuzks+sPpOkLG2bunMWZxm4nLIA8rdfCTmIMhfbYstKy7bH7lDPPa0Gkwq2Ia1X4zJX
+	VLqe86wx6rFFJ5+28ZWsCzkB+It01kqvIJBIzpAncWQaKCbtmNAqqOfzg2cSxK3AH601xSga0hfZ9
+	ZbG34tulLptO+LOm9MnTrqxFaD8XErXQKcyAWEwkS3ii0ARV3o3xNNLKIWus6PlgFjfswwLGVhjcP
+	CIG0sUOEAKQ9rAW5+ba4QdvRkGmZnGsQjd9oFXw1zc5agrEgVzYWiz07e1Dzw/1NnaS2FR8Np3aLl
+	9fjIAOt9g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gToNH-0007p9-6o; Mon, 03 Dec 2018 13:34:59 +0000
-Received: from [210.61.82.184] (helo=mailgw02.mediatek.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gToME-0006c0-D7; Mon, 03 Dec 2018 13:34:03 +0000
-X-UUID: 5787a43f5c434d1baf4ce168db16d43a-20181203
-X-UUID: 5787a43f5c434d1baf4ce168db16d43a-20181203
-Received: from mtkcas06.mediatek.inc [(172.21.101.30)] by mailgw02.mediatek.com
- (envelope-from <qii.wang@mediatek.com>)
- (mhqrelay.mediatek.com ESMTP with TLS)
- with ESMTP id 1362369011; Mon, 03 Dec 2018 21:33:22 +0800
-Received: from MTKCAS06.mediatek.inc (172.21.101.30) by
- mtkmbs08n1.mediatek.inc (172.21.101.55) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Mon, 3 Dec 2018 21:33:15 +0800
-Received: from localhost.localdomain (10.17.3.153) by MTKCAS06.mediatek.inc
- (172.21.101.73) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
- Transport; Mon, 3 Dec 2018 21:33:15 +0800
-From: <qii.wang@mediatek.com>
-To: <wsa@the-dreams.de>
-Subject: [PATCH 5/5] i2c: mediatek: Add i2c compatible for MediaTek MT8183
-Date: Mon, 3 Dec 2018 21:32:54 +0800
-Message-ID: <1543843974-4054-6-git-send-email-qii.wang@mediatek.com>
-X-Mailer: git-send-email 1.7.9.5
-In-Reply-To: <1543843974-4054-1-git-send-email-qii.wang@mediatek.com>
-References: <1543843974-4054-1-git-send-email-qii.wang@mediatek.com>
+	id 1gToQ8-0001Ui-ND; Mon, 03 Dec 2018 13:37:56 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gToQ5-0001Sn-7m
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:37:54 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 5ADA41682;
+ Mon,  3 Dec 2018 05:37:40 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 036293F614;
+ Mon,  3 Dec 2018 05:37:38 -0800 (PST)
+Subject: Re: [PATCH v9 1/8] KVM: arm/arm64: Share common code in
+ user_mem_abort()
+To: Anshuman Khandual <anshuman.khandual@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-2-punit.agrawal@arm.com>
+ <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <8fd34e5f-7d75-4de2-3fee-d6d70805685c@arm.com>
+Date: Mon, 3 Dec 2018 13:37:37 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-X-MTK: N
+In-Reply-To: <ad4b316a-054f-24d9-d32d-8fbe7972b5ad@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_053355_012422_94A6779B 
-X-CRM114-Status: GOOD (  17.56  )
+X-CRM114-CacheID: sfid-20181203_053753_288997_8A821C21 
+X-CRM114-Status: GOOD (  26.81  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -73,376 +72,181 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: devicetree@vger.kernel.org, ryder.lee@mediatek.com, qii.wang@mediatek.com,
- srv_heupstream@mediatek.com, leilk.liu@mediatek.com,
- linux-kernel@vger.kernel.org, linux-mediatek@lists.infradead.org,
- linux-i2c@vger.kernel.org, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: marc.zyngier@arm.com, will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Christoffer Dall <christoffer.dall@arm.com>, punitagrawal@gmail.com,
+ linux-arm-kernel@lists.infradead.org
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-From: qii wang <qii.wang@mediatek.com>
+Hi Anshuman,
 
-Add i2c compatible for MT8183. Compare to 2712 i2c controller, MT8183 has
-different registers, offsets, clock, and multi-user function.
+On 03/12/2018 12:11, Anshuman Khandual wrote:
+> 
+> 
+> On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+>> The code for operations such as marking the pfn as dirty, and
+>> dcache/icache maintenance during stage 2 fault handling is duplicated
+>> between normal pages and PMD hugepages.
+>>
+>> Instead of creating another copy of the operations when we introduce
+>> PUD hugepages, let's share them across the different pagesizes.
+>>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Cc: Christoffer Dall <christoffer.dall@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>   virt/kvm/arm/mmu.c | 49 ++++++++++++++++++++++++++++------------------
+>>   1 file changed, 30 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index 5eca48bdb1a6..59595207c5e1 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1475,7 +1475,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   			  unsigned long fault_status)
+>>   {
+>>   	int ret;
+>> -	bool write_fault, exec_fault, writable, hugetlb = false, force_pte = false;
+>> +	bool write_fault, exec_fault, writable, force_pte = false;
+>>   	unsigned long mmu_seq;
+>>   	gfn_t gfn = fault_ipa >> PAGE_SHIFT;
+>>   	struct kvm *kvm = vcpu->kvm;
+>> @@ -1484,7 +1484,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	kvm_pfn_t pfn;
+>>   	pgprot_t mem_type = PAGE_S2;
+>>   	bool logging_active = memslot_is_logging(memslot);
+>> -	unsigned long flags = 0;
+>> +	unsigned long vma_pagesize, flags = 0;
+> 
+> A small nit s/vma_pagesize/pagesize. Why call it VMA ? Its implicit.
 
-Signed-off-by: qii wang <qii.wang@mediatek.com>
----
- drivers/i2c/busses/i2c-mt65xx.c |  136 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 130 insertions(+), 6 deletions(-)
+May be we could call it mapsize. pagesize is confusing.
 
-diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 428ac99..6b979ab 100644
---- a/drivers/i2c/busses/i2c-mt65xx.c
-+++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -35,17 +35,23 @@
- #include <linux/slab.h>
- 
- #define I2C_RS_TRANSFER			(1 << 4)
-+#define I2C_ARB_LOST			(1 << 3)
- #define I2C_HS_NACKERR			(1 << 2)
- #define I2C_ACKERR			(1 << 1)
- #define I2C_TRANSAC_COMP		(1 << 0)
- #define I2C_TRANSAC_START		(1 << 0)
-+#define I2C_RESUME_ARBIT		(1 << 1)
- #define I2C_RS_MUL_CNFG			(1 << 15)
- #define I2C_RS_MUL_TRIG			(1 << 14)
-+#define I2C_HS_TIME_EN			(1 << 7)
- #define I2C_DCM_DISABLE			0x0000
- #define I2C_IO_CONFIG_OPEN_DRAIN	0x0003
- #define I2C_IO_CONFIG_PUSH_PULL		0x0000
- #define I2C_SOFT_RST			0x0001
- #define I2C_FIFO_ADDR_CLR		0x0001
-+#define I2C_FIFO_ADDR_CLRH		0x0002
-+#define I2C_FIFO_ADDR_CLR_MCH		0x0004
-+#define I2C_HFIFO_DATA			0x8208
- #define I2C_DELAY_LEN			0x0002
- #define I2C_ST_START_CON		0x8001
- #define I2C_FS_START_CON		0x1800
-@@ -76,6 +82,8 @@
- #define I2C_CONTROL_DIR_CHANGE          (0x1 << 4)
- #define I2C_CONTROL_ACKERR_DET_EN       (0x1 << 5)
- #define I2C_CONTROL_TRANSFER_LEN_CHANGE (0x1 << 6)
-+#define I2C_CONTROL_DMAACK_EN           (0x1 << 8)
-+#define I2C_CONTROL_ASYNC_MODE          (0x1 << 9)
- #define I2C_CONTROL_WRAPPER             (0x1 << 0)
- 
- #define I2C_DRV_NAME		"i2c-mt65xx"
-@@ -130,6 +138,15 @@ enum I2C_REGS_OFFSET {
- 	OFFSET_DEBUGCTRL,
- 	OFFSET_TRANSFER_LEN_AUX,
- 	OFFSET_CLOCK_DIV,
-+	/* MT8183 only regs */
-+	OFFSET_LTIMING,
-+	OFFSET_DATA_TIMING,
-+	OFFSET_MCU_INTR,
-+	OFFSET_HW_TIMEOUT,
-+	OFFSET_HFIFO_DATA,
-+	OFFSET_HFIFO_STAT,
-+	OFFSET_MULTI_DMA,
-+	OFFSET_ROLLBACK,
- };
- 
- static const u16 mt_i2c_regs_v1[] = {
-@@ -159,6 +176,39 @@ enum I2C_REGS_OFFSET {
- 	[OFFSET_CLOCK_DIV] = 0x70,
- };
- 
-+static const u16 mt_i2c_regs_v2[] = {
-+	[OFFSET_DATA_PORT] = 0x0,
-+	[OFFSET_SLAVE_ADDR] = 0x4,
-+	[OFFSET_INTR_MASK] = 0x8,
-+	[OFFSET_INTR_STAT] = 0xc,
-+	[OFFSET_CONTROL] = 0x10,
-+	[OFFSET_TRANSFER_LEN] = 0x14,
-+	[OFFSET_TRANSAC_LEN] = 0x18,
-+	[OFFSET_DELAY_LEN] = 0x1c,
-+	[OFFSET_TIMING] = 0x20,
-+	[OFFSET_START] = 0x24,
-+	[OFFSET_EXT_CONF] = 0x28,
-+	[OFFSET_LTIMING] = 0x2c,
-+	[OFFSET_HS] = 0x30,
-+	[OFFSET_IO_CONFIG] = 0x34,
-+	[OFFSET_FIFO_ADDR_CLR] = 0x38,
-+	[OFFSET_DATA_TIMING] = 0x3c,
-+	[OFFSET_MCU_INTR] = 0x40,
-+	[OFFSET_TRANSFER_LEN_AUX] = 0x44,
-+	[OFFSET_CLOCK_DIV] = 0x48,
-+	[OFFSET_HW_TIMEOUT] = 0x4c,
-+	[OFFSET_SOFTRESET] = 0x50,
-+	[OFFSET_HFIFO_DATA] = 0x70,
-+	[OFFSET_DEBUGSTAT] = 0xe0,
-+	[OFFSET_DEBUGCTRL] = 0xe8,
-+	[OFFSET_FIFO_STAT] = 0xf4,
-+	[OFFSET_FIFO_THRESH] = 0xf8,
-+	[OFFSET_HFIFO_STAT] = 0xfc,
-+	[OFFSET_DCM_EN] = 0xf88,
-+	[OFFSET_MULTI_DMA] = 0xf8c,
-+	[OFFSET_ROLLBACK] = 0xf98,
-+};
-+
- struct mtk_i2c_compatible {
- 	const struct i2c_adapter_quirks *quirks;
- 	const u16 *regs;
-@@ -168,6 +218,7 @@ struct mtk_i2c_compatible {
- 	unsigned char aux_len_reg: 1;
- 	unsigned char support_33bits: 1;
- 	unsigned char timing_adjust: 1;
-+	unsigned char dma_sync: 1;
- };
- 
- struct mtk_i2c {
-@@ -181,8 +232,11 @@ struct mtk_i2c {
- 	struct clk *clk_main;		/* main clock for i2c bus */
- 	struct clk *clk_dma;		/* DMA clock for i2c via DMA */
- 	struct clk *clk_pmic;		/* PMIC clock for i2c from PMIC */
-+	struct clk *clk_arb;		/* Arbitrator clock for i2c */
- 	bool have_pmic;			/* can use i2c pins from PMIC */
- 	bool use_push_pull;		/* IO config push-pull mode */
-+	bool share_i3c;			/* share i3c IP*/
-+	u32 ch_offset;			/* i2c multi-user channel offset */
- 
- 	u16 irq_stat;			/* interrupt status */
- 	unsigned int clk_src_div;
-@@ -190,6 +244,7 @@ struct mtk_i2c {
- 	enum mtk_trans_op op;
- 	u16 timing_reg;
- 	u16 high_speed_reg;
-+	u16 ltiming_reg;
- 	unsigned char auto_restart;
- 	bool ignore_restart_irq;
- 	const struct mtk_i2c_compatible *dev_comp;
-@@ -216,6 +271,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 1,
- 	.timing_adjust = 1,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6577_compat = {
-@@ -227,6 +283,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 0,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6589_compat = {
-@@ -238,6 +295,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 0,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt7622_compat = {
-@@ -249,6 +307,7 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 0,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
- };
- 
- static const struct mtk_i2c_compatible mt8173_compat = {
-@@ -259,6 +318,18 @@ struct mtk_i2c {
- 	.aux_len_reg = 1,
- 	.support_33bits = 1,
- 	.timing_adjust = 0,
-+	.dma_sync = 0,
-+};
-+
-+static const struct mtk_i2c_compatible mt8183_compat = {
-+	.regs = mt_i2c_regs_v2,
-+	.pmic_i2c = 0,
-+	.dcm = 0,
-+	.auto_restart = 1,
-+	.aux_len_reg = 1,
-+	.support_33bits = 1,
-+	.timing_adjust = 1,
-+	.dma_sync = 1,
- };
- 
- static const struct of_device_id mtk_i2c_of_match[] = {
-@@ -267,19 +338,20 @@ struct mtk_i2c {
- 	{ .compatible = "mediatek,mt6589-i2c", .data = &mt6589_compat },
- 	{ .compatible = "mediatek,mt7622-i2c", .data = &mt7622_compat },
- 	{ .compatible = "mediatek,mt8173-i2c", .data = &mt8173_compat },
-+	{ .compatible = "mediatek,mt8183-i2c", .data = &mt8183_compat },
- 	{}
- };
- MODULE_DEVICE_TABLE(of, mtk_i2c_of_match);
- 
- static u16 mtk_i2c_readw(struct mtk_i2c *i2c, enum I2C_REGS_OFFSET reg)
- {
--	return readw(i2c->base + i2c->dev_comp->regs[reg]);
-+	return readw(i2c->base + i2c->ch_offset + i2c->dev_comp->regs[reg]);
- }
- 
- static void mtk_i2c_writew(struct mtk_i2c *i2c, u16 val,
- 			   enum I2C_REGS_OFFSET reg)
- {
--	writew(val, i2c->base + i2c->dev_comp->regs[reg]);
-+	writew(val, i2c->base + i2c->ch_offset + i2c->dev_comp->regs[reg]);
- }
- 
- static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
-@@ -299,8 +371,18 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
- 		if (ret)
- 			goto err_pmic;
- 	}
-+
-+	if (i2c->clk_arb) {
-+		ret = clk_prepare_enable(i2c->clk_arb);
-+		if (ret)
-+			goto err_arb;
-+	}
-+
- 	return 0;
- 
-+err_arb:
-+	if (i2c->have_pmic)
-+		clk_disable_unprepare(i2c->clk_pmic);
- err_pmic:
- 	clk_disable_unprepare(i2c->clk_main);
- err_main:
-@@ -311,6 +393,9 @@ static int mtk_i2c_clock_enable(struct mtk_i2c *i2c)
- 
- static void mtk_i2c_clock_disable(struct mtk_i2c *i2c)
- {
-+	if (i2c->clk_arb)
-+		clk_disable_unprepare(i2c->clk_arb);
-+
- 	if (i2c->have_pmic)
- 		clk_disable_unprepare(i2c->clk_pmic);
- 
-@@ -333,11 +418,23 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
- 	if (i2c->dev_comp->dcm)
- 		mtk_i2c_writew(i2c, I2C_DCM_DISABLE, OFFSET_DCM_EN);
- 
--	if (i2c->dev_comp->timing_adjust)
-+	if (i2c->ch_offset)
-+		writew(I2C_RESUME_ARBIT, i2c->base +
-+					 i2c->dev_comp->regs[OFFSET_START]);
-+
-+	if (i2c->dev_comp->timing_adjust && i2c->share_i3c) {
-+		mtk_i2c_writew(i2c, (I2C_DEFAULT_CLK_DIV - 1) |
-+				    (I2C_DEFAULT_CLK_DIV - 1) << 8,
-+				    OFFSET_CLOCK_DIV);
-+		i2c->high_speed_reg |= I2C_HS_TIME_EN;
-+	} else {
- 		mtk_i2c_writew(i2c, I2C_DEFAULT_CLK_DIV - 1, OFFSET_CLOCK_DIV);
-+	}
- 
- 	mtk_i2c_writew(i2c, i2c->timing_reg, OFFSET_TIMING);
- 	mtk_i2c_writew(i2c, i2c->high_speed_reg, OFFSET_HS);
-+	if (i2c->dev_comp->regs == mt_i2c_regs_v2)
-+		mtk_i2c_writew(i2c, i2c->ltiming_reg, OFFSET_LTIMING);
- 
- 	/* If use i2c pin from PMIC mt6397 side, need set PATH_DIR first */
- 	if (i2c->have_pmic)
-@@ -345,6 +442,9 @@ static void mtk_i2c_init_hw(struct mtk_i2c *i2c)
- 
- 	control_reg = I2C_CONTROL_ACKERR_DET_EN |
- 		      I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN;
-+	if (i2c->dev_comp->dma_sync)
-+		control_reg |= I2C_CONTROL_DMAACK_EN | I2C_CONTROL_ASYNC_MODE;
-+
- 	mtk_i2c_writew(i2c, control_reg, OFFSET_CONTROL);
- 	mtk_i2c_writew(i2c, I2C_DELAY_LEN, OFFSET_DELAY_LEN);
- 
-@@ -434,6 +534,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 	unsigned int clk_src;
- 	unsigned int step_cnt;
- 	unsigned int sample_cnt;
-+	unsigned int l_step_cnt;
-+	unsigned int l_sample_cnt;
- 	unsigned int target_speed;
- 	int ret;
- 
-@@ -443,11 +545,11 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 	if (target_speed > MAX_FS_MODE_SPEED) {
- 		/* Set master code speed register */
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, MAX_FS_MODE_SPEED,
--					      &step_cnt, &sample_cnt);
-+					      &l_step_cnt, &l_sample_cnt);
- 		if (ret < 0)
- 			return ret;
- 
--		i2c->timing_reg = (sample_cnt << 8) | step_cnt;
-+		i2c->timing_reg = (l_sample_cnt << 8) | l_step_cnt;
- 
- 		/* Set the high speed mode register */
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
-@@ -457,6 +559,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 
- 		i2c->high_speed_reg = I2C_TIME_DEFAULT_VALUE |
- 			(sample_cnt << 12) | (step_cnt << 8);
-+		i2c->ltiming_reg = (l_sample_cnt << 6) | l_step_cnt |
-+				   (sample_cnt << 12) | (step_cnt << 9);
- 	} else {
- 		ret = mtk_i2c_calculate_speed(i2c, clk_src, target_speed,
- 					      &step_cnt, &sample_cnt);
-@@ -467,6 +571,8 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk)
- 
- 		/* Disable the high speed transaction */
- 		i2c->high_speed_reg = I2C_TIME_CLR_VALUE;
-+
-+		i2c->ltiming_reg = (sample_cnt << 6) | step_cnt;
- 	}
- 
- 	return 0;
-@@ -483,6 +589,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	u16 addr_reg;
- 	u16 start_reg;
- 	u16 control_reg;
-+	u16 fifo_clr_reg;
- 	u16 restart_flag = 0;
- 	u32 reg_4g_mode;
- 	u8 *dma_rd_buf = NULL;
-@@ -521,7 +628,15 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
- 	       I2C_TRANSAC_COMP, OFFSET_INTR_STAT);
- 
--	mtk_i2c_writew(i2c, I2C_FIFO_ADDR_CLR, OFFSET_FIFO_ADDR_CLR);
-+	if (i2c->share_i3c)
-+		fifo_clr_reg = I2C_FIFO_ADDR_CLR | I2C_FIFO_ADDR_CLRH;
-+	if (i2c->ch_offset)
-+		fifo_clr_reg = I2C_FIFO_ADDR_CLR | I2C_FIFO_ADDR_CLR_MCH;
-+
-+	mtk_i2c_writew(i2c, fifo_clr_reg, OFFSET_FIFO_ADDR_CLR);
-+
-+	if ((i2c->speed_hz > MAX_FS_MODE_SPEED) && i2c->share_i3c)
-+		mtk_i2c_writew(i2c, I2C_HFIFO_DATA, OFFSET_HFIFO_DATA);
- 
- 	/* Enable interrupt */
- 	mtk_i2c_writew(i2c, restart_flag | I2C_HS_NACKERR | I2C_ACKERR |
-@@ -817,6 +932,11 @@ static int mtk_i2c_parse_dt(struct device_node *np, struct mtk_i2c *i2c)
- 	if (i2c->clk_src_div == 0)
- 		return -EINVAL;
- 
-+	ret = of_property_read_u32(np, "ch-offset", &i2c->ch_offset);
-+	if (ret < 0)
-+		i2c->ch_offset = 0;
-+
-+	i2c->share_i3c = of_property_read_bool(np, "mediatek,share-i3c");
- 	i2c->have_pmic = of_property_read_bool(np, "mediatek,have-pmic");
- 	i2c->use_push_pull =
- 		of_property_read_bool(np, "mediatek,use-push-pull");
-@@ -884,6 +1004,10 @@ static int mtk_i2c_probe(struct platform_device *pdev)
- 		return PTR_ERR(i2c->clk_dma);
- 	}
- 
-+	i2c->clk_arb = devm_clk_get(&pdev->dev, "arb");
-+	if (IS_ERR(i2c->clk_arb))
-+		i2c->clk_arb = NULL;
-+
- 	clk = i2c->clk_main;
- 	if (i2c->have_pmic) {
- 		i2c->clk_pmic = devm_clk_get(&pdev->dev, "pmic");
--- 
-1.7.9.5
+> 
+>>   
+>>   	write_fault = kvm_is_write_fault(vcpu);
+>>   	exec_fault = kvm_vcpu_trap_is_iabt(vcpu);
+>> @@ -1504,10 +1504,16 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   		return -EFAULT;
+>>   	}
+>>   
+>> -	if (vma_kernel_pagesize(vma) == PMD_SIZE && !logging_active) {
+>> -		hugetlb = true;
+>> +	vma_pagesize = vma_kernel_pagesize(vma);
+>> +	if (vma_pagesize == PMD_SIZE && !logging_active) {
+>>   		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
+>>   	} else {
+>> +		/*
+>> +		 * Fallback to PTE if it's not one of the Stage 2
+>> +		 * supported hugepage sizes
+>> +		 */
+>> +		vma_pagesize = PAGE_SIZE;
+> 
+> This seems redundant and should be dropped. vma_kernel_pagesize() here either
+> calls hugetlb_vm_op_pagesize (via hugetlb_vm_ops->pagesize) or simply returns
+> PAGE_SIZE. The vm_ops path is taken if the QEMU VMA covering any given HVA is
+> backed either by HugeTLB pages or simply normal pages. vma_pagesize would
+> either has a value of PMD_SIZE (HugeTLB hstate based) or PAGE_SIZE. Hence if
+> its not PMD_SIZE it must be PAGE_SIZE which should not be assigned again.
 
+We may want to force using the PTE mappings when logging_active (e.g, migration
+?) to prevent keep tracking of huge pages. So the check is still valid.
+
+
+> 
+>> +
+>>   		/*
+>>   		 * Pages belonging to memslots that don't have the same
+>>   		 * alignment for userspace and IPA cannot be mapped using
+>> @@ -1573,23 +1579,33 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   	if (mmu_notifier_retry(kvm, mmu_seq))
+>>   		goto out_unlock;
+>>   
+>> -	if (!hugetlb && !force_pte)
+>> -		hugetlb = transparent_hugepage_adjust(&pfn, &fault_ipa);
+>> +	if (vma_pagesize == PAGE_SIZE && !force_pte) {
+>> +		/*
+>> +		 * Only PMD_SIZE transparent hugepages(THP) are
+>> +		 * currently supported. This code will need to be
+>> +		 * updated to support other THP sizes.
+>> +		 */
+> 
+> This comment belongs to transparent_hugepage_adjust() but not here.
+
+I think this is relevant here than in thp_adjust, unless we rename
+the function below to something generic, handle_hugepage_adjust().
+
+>> +		if (transparent_hugepage_adjust(&pfn, &fault_ipa))
+>> +			vma_pagesize = PMD_SIZE;
+> 
+> IIUC transparent_hugepage_adjust() is only getting called here. Instead of
+> returning 'true' when it is able to detect a huge page backing and doing
+> an adjustment there after, it should rather return THP size (PMD_SIZE) to
+> accommodate probable multi size THP support in future .
+
+That makes sense.
+
+> 
+>> +	}
+>> +
+>> +	if (writable)
+>> +		kvm_set_pfn_dirty(pfn);
+>>   
+>> -	if (hugetlb) {
+>> +	if (fault_status != FSC_PERM)
+>> +		clean_dcache_guest_page(pfn, vma_pagesize);
+>> +
+>> +	if (exec_fault)
+>> +		invalidate_icache_guest_page(pfn, vma_pagesize);
+>> +
+>> +	if (vma_pagesize == PMD_SIZE) {
+>>   		pmd_t new_pmd = pfn_pmd(pfn, mem_type);
+>>   		new_pmd = pmd_mkhuge(new_pmd);
+>> -		if (writable) {
+>> +		if (writable)
+>>   			new_pmd = kvm_s2pmd_mkwrite(new_pmd);
+>> -			kvm_set_pfn_dirty(pfn);
+>> -		}
+>> -
+>> -		if (fault_status != FSC_PERM)
+>> -			clean_dcache_guest_page(pfn, PMD_SIZE);
+>>   
+>>   		if (exec_fault) {
+>>   			new_pmd = kvm_s2pmd_mkexec(new_pmd);
+>> -			invalidate_icache_guest_page(pfn, PMD_SIZE);
+>>   		} else if (fault_status == FSC_PERM) {
+>>   			/* Preserve execute if XN was already cleared */
+>>   			if (stage2_is_exec(kvm, fault_ipa))
+>> @@ -1602,16 +1618,11 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>>   
+>>   		if (writable) {
+>>   			new_pte = kvm_s2pte_mkwrite(new_pte);
+>> -			kvm_set_pfn_dirty(pfn);
+>>   			mark_page_dirty(kvm, gfn);
+>>   		}
+>>   
+>> -		if (fault_status != FSC_PERM)
+>> -			clean_dcache_guest_page(pfn, PAGE_SIZE);
+>> -
+>>   		if (exec_fault) {
+>>   			new_pte = kvm_s2pte_mkexec(new_pte);
+>> -			invalidate_icache_guest_page(pfn, PAGE_SIZE);
+>>   		} else if (fault_status == FSC_PERM) {
+>>   			/* Preserve execute if XN was already cleared */
+>>   			if (stage2_is_exec(kvm, fault_ipa))
+>>
+> 
+> kvm_set_pfn_dirty, clean_dcache_guest_page, invalidate_icache_guest_page
+> can all be safely moved before setting the page table entries either as
+> PMD or PTE.
+
+I think this is what we do currently. So I assume this is fine.
+
+Cheers
+Suzuki
 
 _______________________________________________
 linux-arm-kernel mailing list
