@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id E1CA8C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A3617C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A018720851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5870220851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:07 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="b4qN8PpC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="qttEOSB6"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A018720851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hWfLz+P6";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="jlRr82vu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5870220851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qq3G3fL92KTmybNdP61popk5zaTg7hGEtBzmbTAfVhY=; b=b4qN8PpCU474Sg
-	cpW5KXxqXEzIuVrvLN3gjac69aG+UpyXpmrMOeLDZmbC89BbMbIhkWvcFwodloSEw2fTRwuoui68j
-	K1NBh1d9zav3AUcODWTeJ334QPEAFn855j+09k13QnjYAyvyaNmkJG80zKZ/gpQlFQeW/uNFtCJQQ
-	YYsrluPC2OBDebb+HOWZ+M2SgjhyxJfoqXHOkvzC1famE+ZCdFL3lAbCryQqU+TEjSuuVBjrPImQV
-	cj5dPJchVKNbCTOKKxTb4++O10yTIA46PXiv48exnZjRnuTcNNyP5SewIUSeHB/s9Eu4qavE+u9HP
-	qZAaemUuhsyUeSgzGBuQ==;
+	List-Owner; bh=uIBqCPWlbd5UzoV6sktqMdztiaTxvQOGg/Pc26SDzLo=; b=hWfLz+P6AOvcLd
+	cj4dix8i/NciUvMo4SWkgYBvKJDd7oOzR6B68H9oO9a8U1rJLHQowGvHEIk2WoHE5yeNjRUsOl6Sl
+	15amkC0LfEtprFOpdERCcdwvBODg66PyZlvQDDdJZkkgOz8fZwazlLM6wObF11O7hVqTQv+FsikCO
+	6Kily9MYfHitxzK2HjKafjC/oowwY3H1xoQa0Cs/4nrgKPqyJP7kgkiomv2RKSg6eb+0YR9FgBG20
+	JO1wk2BVvq4ZdDzYV736No3xgy5hBHo6aWIaUwpAj4e4hBwEla6+CaBXgdAF9vO90leos40Q7LI/V
+	91+Ny3vqBXAGLiQB+urA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlHO-0000E8-SY; Mon, 03 Dec 2018 10:16:42 +0000
-Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
+	id 1gTlHh-0000Qb-U1; Mon, 03 Dec 2018 10:17:01 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlGp-0007zP-3y
+ id 1gTlGq-00082H-7e
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:16:10 +0000
-Received: by mail-wm1-x343.google.com with SMTP id y139so5094938wmc.5
+Received: by mail-wm1-x342.google.com with SMTP id z18so5120151wmc.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:16:01 -0800 (PST)
+ Mon, 03 Dec 2018 02:16:07 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=hgaDQkDoibMUUGBXHBCGeXaaQAL52VCnVF1GrXldIPA=;
- b=qttEOSB6GTEdB2OuW1Pefb35HbJoo1ypye9EEESvp0KQdEXeck7X/4G+NzF6sEtQ42
- lCBi/SoHtLsgVKHmFmKTaf6ZNA7Tx3aLcmdqT7PYckms5U03hBMQM/ZXfVTy5ViRecPf
- /hhgkKie+Sv+Tv+9WkcSPMJN22IFiBeiJDQ4c=
+ bh=Rcmd27QWJ4xmppTvwllwY6JeAM/zSw/3F56Tx3gVCeQ=;
+ b=jlRr82vuqkK0mmH/legr7UuT2SR17Izjlh427s+xfWa7DmENHl9PTVPMRQg+2yZaVu
+ t61q4G+qv5aM+Yho3fsirfrh5a4+/c6/1eUWio8l1K6LoIMCJRu4ILsS+8pk983poCaF
+ QIbIl9qeY5dAErs7Q4rfb9Wl9XjygP+uAHQRo=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=hgaDQkDoibMUUGBXHBCGeXaaQAL52VCnVF1GrXldIPA=;
- b=r0VVnQTcim5smMMkZZyedG4S3DxlGlo2f+3qXD/LGz7hJtEsQIIG0mQKvZHKjrqwrO
- KWNXSWDsetdVJ+n1awCi1dxpYY/VF2K3SLwpo7P2bw6qeVn2ZjkjPdn7+tuDKTiog5Pa
- 6U6UYdQBCEdZR/kdJihqSFHI4wwuEdtttSxTtoGujxe4xdJthIVbCyCvElQ3gFWwFQ/I
- zwZd9GH85fI/m+K9xzYsy+p13/GiJ2sqZJt6MQ80Jbd6xBE+L7P5Cl7HwGBP/lF7Y8cT
- KcYays+OixvI91JwRipZUEcpk5kkxPh56gwOHkmEkdQ1IRM0NcPbmeoR103xbh8m03iC
- LrUw==
-X-Gm-Message-State: AA+aEWa5sT02gElJaFqy21MOKUI6oNCmt4IGONtoDRWqB4d7EiUjv7H6
- BNXnJ8sZ9CLK4EbeIm+7gNWJYA==
-X-Google-Smtp-Source: AFSGD/Xwlld3xeI/VFBtGMFL3KEijSd8n3gf8wwOqT+DCZYgY8B5vXaZDaW2545VwtZiaF1uGzx6sg==
-X-Received: by 2002:a1c:4c10:: with SMTP id z16mr8051912wmf.117.1543832160747; 
- Mon, 03 Dec 2018 02:16:00 -0800 (PST)
+ bh=Rcmd27QWJ4xmppTvwllwY6JeAM/zSw/3F56Tx3gVCeQ=;
+ b=RbQbBv957+enYtmFhFUeRZsj0WZrQ9pGoJinbbcHwNAjn+B0YWHwe1tFN0IYCoc0iE
+ IxIZwrgPRgXbKfWyQnWuRuiWVNxB1DE2BLGAQMr9KhnuHJa+HsegY4t3t4EmO6oEHvWr
+ VqZVxZCrV2jKbVczXPq/e8AQBY+3T5jUJU5e3DX7HaX/E1YFLN/xAv+9Lq5HpwkdhcRe
+ hsd9Sd2mfZvhIyiG0GCEr4fyYXxzODtT6PTaCH9nNLLo5ZUJQph2M1CMr/sJaDi8HjvX
+ DwE0eK3Alzcw0C52P2o5VQcd2fLS809V/IG+o3gALhMR5caDug+VbWCJF682MK0bs/DB
+ hh4w==
+X-Gm-Message-State: AA+aEWbfID1MVhVwT6/So0fdluf3SFo7CjXy0iNjG/PiYY7g9x8nnKAP
+ u6qjVhnO7yfkwi6cgyP4+vGknA==
+X-Google-Smtp-Source: AFSGD/XtKq3es9+911MegfWg8xs36aHwaMEywK0bx9cUOLdLgmGC8tOga7v8E9RG6igPmIUh54Mt9g==
+X-Received: by 2002:a1c:27c6:: with SMTP id n189mr7546256wmn.108.1543832165929; 
+ Mon, 03 Dec 2018 02:16:05 -0800 (PST)
 Received: from localhost.localdomain (conf.hotelmediterraneo.com.
  [2.228.78.71])
- by smtp.gmail.com with ESMTPSA id f192sm5832158wmd.12.2018.12.03.02.15.59
+ by smtp.gmail.com with ESMTPSA id f192sm5832158wmd.12.2018.12.03.02.16.04
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 02:16:00 -0800 (PST)
+ Mon, 03 Dec 2018 02:16:05 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
@@ -78,17 +78,17 @@ To: Maxime Ripard <maxime.ripard@bootlin.com>,
  devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, Lee Jones <lee.jones@linaro.org>,
  linux-sunxi@googlegroups.com
-Subject: [PATCH 5/9] dt-bindings: input: touchscreen: goodix: Document
- vcc-supply property
-Date: Mon,  3 Dec 2018 15:45:43 +0530
-Message-Id: <20181203101547.16835-5-jagan@amarulasolutions.com>
+Subject: [PATCH 9/9] arm64: dts: allwinner: a64-amarula-relic: Add GT5663 CTP
+ node
+Date: Mon,  3 Dec 2018 15:45:47 +0530
+Message-Id: <20181203101547.16835-9-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181203101547.16835-1-jagan@amarulasolutions.com>
 References: <20181203101547.16835-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_021607_183951_00BFE7C4 
-X-CRM114-Status: GOOD (  12.69  )
+X-CRM114-CacheID: sfid-20181203_021608_302736_C1C259FC 
+X-CRM114-Status: GOOD (  13.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -106,28 +106,68 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vcc-supply property is need for some Goodix CTP controller like GT5663
-where 3.3V external pull-up regulator connected via controller VCC pin.
+Add Goodix GT5663 capacitive touch controller node on
+Amarula A64-Relic board.
 
-So, document the same as optional property.
+The CTP connected to board with,
+- SDA, SCK from i2c1
+- GPIO-LD0 as vcc supply
+- PH4 gpio as interrupt pin
+- PH8 gpio as reset pin
+- X and Y axis are inverted
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- Documentation/devicetree/bindings/input/touchscreen/goodix.txt | 1 +
- 1 file changed, 1 insertion(+)
+ .../allwinner/sun50i-a64-amarula-relic.dts    | 29 +++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-index f7e95c52f3c7..604766e347ce 100644
---- a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-+++ b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
-@@ -23,6 +23,7 @@ Optional properties:
-  - touchscreen-inverted-y  : Y axis is inverted (boolean)
-  - touchscreen-swapped-x-y : X and Y axis are swapped (boolean)
-                              (swapping is done after inverting the axis)
-+ - vcc-supply		: 3v3 regulator phandle for controller VCC pin
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+index 9ac6d773188b..913fcdff828e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-amarula-relic.dts
+@@ -88,6 +88,28 @@
+ 	status = "okay";
+ };
  
- Example:
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++
++	touchscreen@5d {
++		compatible = "goodix,gt5663";
++		reg = <0x5d>;
++		vcc-supply = <&reg_ldo_io0>;			/* VCC-CTP: GPIO0-LDO */
++		interrupt-parent = <&pio>;
++		interrupts = <7 4 IRQ_TYPE_EDGE_FALLING>;
++		irq-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>;	/* CTP-INT: PH4 */
++		reset-gpios = <&pio 7 8 GPIO_ACTIVE_HIGH>;	/* CTP-RST: PH8 */
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++	};
++};
++
++&i2c1_pins {
++	bias-pull-up;
++};
++
+ &mmc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+@@ -251,6 +273,13 @@
+ 	regulator-name = "vdd-cpus";
+ };
  
++&reg_ldo_io0 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-ctp";
++	status = "okay";
++};
++
+ &reg_rtc_ldo {
+ 	regulator-name = "vcc-rtc";
+ };
 -- 
 2.18.0.321.gffc6fa0e3
 
