@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 63D44C65BAE
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:44:48 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A28CFC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:46:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 339C620666
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:44:48 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 75AF920666
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:46:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ENKz/teA";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="XA4140bC"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 339C620666
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AwxLnrPL";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="NV/Vv8oK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75AF920666
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,58 +25,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Nt8tBfR06JkpXR+VQxdj55Eb4GQdeuzvqIYiSma2lyo=; b=ENKz/teAs5ywR/
-	I+9z7xpd4Dz5e8lbPkNVdIxigABsTi596CsFBRipvpTsG7RfypOnP7qE8APRDDFta5JrdEn8tHYGH
-	7/v8AEmB98PRbycSOV0CUNILx6RjfQ4sDmQzmQg6F/2YqRybXsgJt7RlczexJpZPUVent3FTB9+eD
-	V8is0DKopA270ox4GHvJn8EOFzvwm3LEFbS5d2ThElnJCH46TdzFaJv2NdlLsK5DrEpD1vSoV7BhK
-	6Y+2fL2TyQFNvClL+z0gJzoZ8N2bPko2hz5E8ovxObyQP5m2ypqvPhRjZ8qlIEFxsDdsG+EXxWlQ9
-	O5hSrXVZ/ix0tLRBxGAw==;
+	List-Owner; bh=fqIUO72LSVvM0M0+q6PB55MWg/QCfD+Q6/6FouZHOxc=; b=AwxLnrPLSE7CS5
+	YIdrIwpB+EmFi0F0OHuU0Z6pLT3rTzMDq9FG8QCBczalSuCE9zPbrSILQDkMxvETUG9j+Do36Tw0M
+	DVjl0r7zC7MRtFWmlMIofYsItrQYmfLrNWA22Mt09UzXkLS4jnIN+KdHXeqWGYci8p4/u+Qq0hek4
+	PbvZw1hCkWNstuBnDnTc028yjgutt0vhCYxk/LvCcT9bEHHt8zrsGGVW3xfdWemwHb7bGwqzXKPYg
+	tISij8ypQE38DKVQWdBVE9vgs5EzRseE+6fMzbKanSo+8QyTCp2Z+SNZ2kbSmUZdctRV12uhm0Z/r
+	lXvcxPEr7AV5IMckoHbg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTkmS-0006Kb-LN; Mon, 03 Dec 2018 09:44:44 +0000
-Received: from mail-it1-x142.google.com ([2607:f8b0:4864:20::142])
+	id 1gTknz-0007s1-KK; Mon, 03 Dec 2018 09:46:19 +0000
+Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTkmQ-0006Jj-9e
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:44:43 +0000
-Received: by mail-it1-x142.google.com with SMTP id g85so8210142ita.3
+ id 1gTknw-0007qx-0X
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:46:17 +0000
+Received: by mail-io1-xd44.google.com with SMTP id n9so1836580ioo.2
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 01:44:31 -0800 (PST)
+ Mon, 03 Dec 2018 01:46:05 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=3Oo32VVsYmPry9+f8DWOR0NGFz2f9fT3cn4yoPNUDcc=;
- b=XA4140bC2ZxcXC2xZ64Iosuza5gH5DtORINToSnfBNJaWMxYt+DAobBRiVkZNi+oPM
- Y/8NZfj6bbDOSPCGIklwiP6ssjlL55lvux56S9EudA1VIz/yd2sjnEZ6ocDGLHy6+icC
- WLe52JhpKZGdGImq2bmpfuLFr5eWHTy/z30Kg=
+ :cc; bh=iX/oVY2dCQZV9wB0dqBOQ1Y9CXOpcurqPsBoTPeFU9A=;
+ b=NV/Vv8oKkJbOGgncyncAly3ZM3ixLFbHtO2wBAZNJkiKfS8NNSJAvawVnaWZpaAEQX
+ Z+nP1lQurEARSabZUKSz6zimgjAtIyFt7dzvJqI3yoO5fcSD/Plmpi4q0nBrbAsbclPM
+ 991fESTLZzEnNM73/aDK8+3eUSVLjuuFKrel4=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=3Oo32VVsYmPry9+f8DWOR0NGFz2f9fT3cn4yoPNUDcc=;
- b=G3o3C/vAf8BPcosewyDNv2v/FAjZBt8aiAZRRiur/ebeEqlxUROvgw8Mw2zQMmxQ6h
- Czm7JWZuHO2gjIyO+hP8xAFb38CkQLDWL4Bzr5y6XovMw8pQjWOExMP+mJuoFgarjQpx
- 0a8/hOYojzt3RBju2pkrblB5KILXcQ2vMap6okMLBLthT+LqqYBjsj+aoYF0thdzrfF8
- gpqFWPvXkvDn2eS72nz4BqkWIILGJc1wGfn7uipzl5kUNoms3V5eCczmn1kM1CV3a+Mi
- /QLgIw53UmT5ZgkQ/J+nrvQ/arCLlw0OB2TbsYZf0TLug7zOL2RUeS8keh14xDiedBgu
- 2KSg==
-X-Gm-Message-State: AA+aEWY9cVA8UoVuWTtEAU8e/4hptF/dxMjtiQs4WO4+cGxMz+6meM6d
- XI4ym63ZjiShSK7cA5q/Fa1nNW2FqTmVJgNGBXCSbA==
-X-Google-Smtp-Source: AFSGD/VQJciOD7xP2xny6eLLvKTKU4UajB7IpGIr6GX9LxJ5o08UYNknI30r5ACp9rbcberi1/Nr8XIB+iKuo0mtfx0=
-X-Received: by 2002:a24:5411:: with SMTP id t17mr6871416ita.32.1543830270402; 
- Mon, 03 Dec 2018 01:44:30 -0800 (PST)
+ bh=iX/oVY2dCQZV9wB0dqBOQ1Y9CXOpcurqPsBoTPeFU9A=;
+ b=hEBfgJNkgzhc7MZHxEzbXj6/RHBxKrQJO5wF4O/Md3xMzMu4eAEisxwkODLmUtxgx5
+ Fv20C2+c4iyliKv/QQVyybRsLEv0eYLzqR11n2TYnhOP9ELlHyF1qLBZlvV9zk1PUGi3
+ lCnZV1U6YhzXzNfUr+HPQAvle7ivlO5aqM3EsE/vunqo/WIrNeWnJZdYymNdi3fg8/tq
+ LWjVumMEUU5AiFmJGmzEyzXwy/Nq7YJ6pECZdnnmhnL1OUo4gQ1KoFEToD8aFTWct51M
+ KO0SQTHkHmN5LSB05LgPk9bwzyln951LnVyAWy+vepVMkRfphonNEBNuDIOMqob8jwCJ
+ aGJw==
+X-Gm-Message-State: AA+aEWb804NuDfO1f8kHDZPdXB9g/wi2l/IvpK39LZRxGVv2lPfY1v5g
+ lmhBWbkk3Ec7/3XwrHbRuZlae0ss6zhRgGDM6Mxu4A==
+X-Google-Smtp-Source: AFSGD/VvDosaN9x1V3PzhUddlNU+hYmKF3M8EwPXRb7DRfo05o2o5+fTkBK3IDds4HzoEe/vUi7ncvBlKICaEGvRjME=
+X-Received: by 2002:a6b:1411:: with SMTP id 17mr13372052iou.252.1543830365247; 
+ Mon, 03 Dec 2018 01:46:05 -0800 (PST)
 MIME-Version: 1.0
 References: <20181130075849.16941-1-wens@csie.org>
- <20181130075849.16941-4-wens@csie.org>
-In-Reply-To: <20181130075849.16941-4-wens@csie.org>
+ <20181130075849.16941-5-wens@csie.org>
+In-Reply-To: <20181130075849.16941-5-wens@csie.org>
 From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 3 Dec 2018 15:14:19 +0530
-Message-ID: <CAMty3ZBFVStHNbYaBxT+Rmy6+g4jtm0cFKk8BL5BDid3c5VW-Q@mail.gmail.com>
-Subject: Re: [PATCH 3/6] ARM: dts: sunxi: h3/h5: Drop A31 fallback compatible
- for CSI controller
+Date: Mon, 3 Dec 2018 15:15:54 +0530
+Message-ID: <CAMty3ZB6p8Uv7abMC8jDHHYwdAeuBen2GPjOhN=wEL7+=DDt3g@mail.gmail.com>
+Subject: Re: [PATCH 4/6] ARM: dts: sunxi: h3-h5: Add pinmux setting for CSI
+ MCLK on PE1
 To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_014442_335528_7ABA6969 
-X-CRM114-Status: GOOD (  12.46  )
+X-CRM114-CacheID: sfid-20181203_014616_056915_19B6CEA6 
+X-CRM114-Status: GOOD (  14.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -99,6 +99,18 @@ Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
+
+On Fri, Nov 30, 2018 at 1:28 PM Chen-Yu Tsai <wens@csie.org> wrote:
+>
+> Some camera modules have the SoC feeding a master clock to the sensor
+> instead of having a standalone crystal. This clock signal is generated
+> from the clock control unit and output from the CSI MCLK function of
+> pin PE1.
+>
+> Add a pinmux setting for it for camera sensors to reference.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
 
 On Fri, Nov 30, 2018 at 1:29 PM Chen-Yu Tsai <wens@csie.org> wrote:
 >
