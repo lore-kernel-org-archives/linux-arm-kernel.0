@@ -2,114 +2,70 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.8 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D7E7CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 857D5C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9375121473
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5238B2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bhchhRPI";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nokia.onmicrosoft.com header.i=@nokia.onmicrosoft.com header.b="WyXQYatc"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9375121473
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nokia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YzPSJEMK"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5238B2145D
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6vOg9Elq5vAK+qpkrpysmOtlczHr4I0ci1CrhtcC5RU=; b=bhchhRPImF3Yaq
-	I2JjEdWa8KALVw4AuKxU7vE0hI9TD28m6pzhbaizwzpJ24V7SfCgrbs30m8NXYTQ4OToPxOH+ZABQ
-	3hVje41tEvd4RZjQt8N8xTr7c7urmTr4VCPdhh31ZYwWJRfOw/EtiDparP1MOyrNEF4OHcgtoAEjh
-	RPnvucMnaFA6/HmTrchULWDyj491AvP9CQQCQCDffypeNnXHhhWgKKDlv42R6i6RSHJcK+TktLipi
-	U6AGso2OosvwU6UdfEi+124GHamq0YmKHJ8wkZ/G8OUiEGjXmmBLA/d2B0X7+mJ9syBpw1tjzJDbZ
-	oVRhrb91TFTYHyyBCNLw==;
+	List-Owner; bh=bOgB4SbVm8dxwbouNr8LsI6wCG+wKMMwPDu+Z3XAKnE=; b=YzPSJEMKPKR93L
+	zG4YJ6q5PFGxH4+YXn2FfnIzVjDK5wXG87FBNl1P08WRkVqhC+53sxuKk/5Kj/tCtswBViLxNlpsD
+	29D3nLXE9SGIRaQV/qlfJUl4d3n6sYHYpNuDVYBJv3MtIqYHZmzuxPLBr1CPKdW38zSCmXdgdFNYB
+	VMrlIUr8kbOTD9PvHoXfgkhYYk+GBFuS76ew4WaHSSHIakPSTnPOX39Kai0GFP2dNSEkvkvYZOwwa
+	ZedW9F8hg8n6VNPjJd6DepyDwYq47JtCPWtAAGeBnCN2jByYi50H189tgo8TKIEz6jS5ZMaCQfGKo
+	pEao7l1IYgVLTDzpgU6A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTkqn-0000Ip-0k; Mon, 03 Dec 2018 09:49:13 +0000
-Received: from mail-eopbgr130105.outbound.protection.outlook.com
- ([40.107.13.105] helo=EUR01-HE1-obe.outbound.protection.outlook.com)
+	id 1gTkrA-0000ha-Tg; Mon, 03 Dec 2018 09:49:36 +0000
+Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTkqg-0008St-Lo
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:49:10 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nokia.onmicrosoft.com; 
- s=selector1-nokia-com;
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=c+XJNvIS9hNzHRZmIhwnFFErXy/WZxiKywxTXaam4HY=;
- b=WyXQYatc6aiaCghd9FxlG2UfX2y2hFASAwexc5+KJHuALRSv5CYHq2oHQt/Qk90BI6lKIlQdUHAhejscTUBjgk/J9rCTR9LWfUW9LUbEQIdMVFIt8yhcgUoZm5kvoDG5Lve/XhMg6KYqmrJ/k8xk7FfQYhporE1EHDeS8CNVl5w=
-Received: from HE1PR0701MB2729.eurprd07.prod.outlook.com (10.168.188.135) by
- HE1PR0701MB2890.eurprd07.prod.outlook.com (10.168.92.139) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1404.8; Mon, 3 Dec 2018 09:48:53 +0000
-Received: from HE1PR0701MB2729.eurprd07.prod.outlook.com
- ([fe80::35b1:90ba:fa:3c77]) by HE1PR0701MB2729.eurprd07.prod.outlook.com
- ([fe80::35b1:90ba:fa:3c77%9]) with mapi id 15.20.1404.016; Mon, 3 Dec 2018
- 09:48:53 +0000
-From: "Sverdlin, Alexander (Nokia - DE/Ulm)" <alexander.sverdlin@nokia.com>
-To: "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>
-Subject: [PATCH] ARM: ftrace/recordmcount: filter relocation types
-Thread-Topic: [PATCH] ARM: ftrace/recordmcount: filter relocation types
-Thread-Index: AQHUiu1metDmHdisl0uh39AjKwn2oA==
-Date: Mon, 3 Dec 2018 09:48:52 +0000
-Message-ID: <20181203094815.7859-1-alexander.sverdlin@nokia.com>
-References: <DM5PR2101MB1032EF6B16414765AA0BAB19FBBE0@DM5PR2101MB1032.namprd21.prod.outlook.com>
-In-Reply-To: <DM5PR2101MB1032EF6B16414765AA0BAB19FBBE0@DM5PR2101MB1032.namprd21.prod.outlook.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [131.228.32.165]
-x-mailer: git-send-email 2.19.2
-x-clientproxiedby: HE1PR0402CA0041.eurprd04.prod.outlook.com
- (2603:10a6:7:7c::30) To HE1PR0701MB2729.eurprd07.prod.outlook.com
- (2603:10a6:3:99::7)
-x-ms-exchange-messagesentrepresentingtype: 1
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; HE1PR0701MB2890;
- 6:8wccQtqnDVtj/70tm48fjk3yyxv/8JkoAoHq6zUVMvWPXT7WYb61SKd9hf3yPR1st54rrv33+JX0gNYH+L4Kg+UGqTcDD/vAzxko4MQedkJvJECBMD+cBzGfJkHN6SNiGSMDFsiCollgdC2vROIe0dEhsrkD4eNQYxATZlb2OSsmCG5RQ2s0q94upF3Oj0J3KNQh2Jx18QAG20pLVlD/2IhTH2EuBScYzIGWAWT2QwhvQmgUpaMiW9eA7/pOoyK/Nv9oBi9ExO0Z840Au3e+gymxLzxD8e6ZIXX9Xu/3dmZ0TAu8DiWEYFMMv0a1UbWzxB1dZ9dGpcFjFAcez0/XcDeaeNSDv5BuuHRk9Ypv5tk/mzHYsA2jsJ67/Al3ccJ0u1Uzt9yRNV86EJrjvgHTr/6C/mbKZxsZEVI8EKFRbVlhfaRpmPKNcWyf3udeXlZx1s8hhXOMtYkoq3k6llWCqQ==;
- 5:2yHSQCIXjP+llcFtJnKRXTTVBkYlXVAfBfMIb/QfwiY0JtaTQdSfvGqSJVGdJZf70HE6wHB8MQp5AnWpeODXr5oD8AHGIlvaFgf6AUE7oRl6HbsBgeefQNRZy6plbwK7bqgLRbfF/h5BiVYZuB47j2PiMV/jV9chDNlxOoSzkk4=;
- 7:dm+wAv5GllihmAIyCmtx+Q+Uhjl0rJCZABCXm0PCcSgI87DthW7Ox1O91z00yAQXINEVfuTO5J7B7nke5picB2hd7t0a+CK3266gHQM9qnW0RBsszlDciKXOX5boqXlmESp/xz3wlyxW5OV3sQw5XA==
-x-ms-office365-filtering-correlation-id: 442aff19-02c6-4ccf-c231-08d6590487f4
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7193020);
- SRVR:HE1PR0701MB2890; 
-x-ms-traffictypediagnostic: HE1PR0701MB2890:
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=alexander.sverdlin@nokia.com; 
-x-microsoft-antispam-prvs: <HE1PR0701MB28908438B82A24A2B75EB71C88AE0@HE1PR0701MB2890.eurprd07.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3002001)(3231455)(999002)(11241501185)(806100)(944501493)(4982022)(52105112)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123558120)(20161123564045)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123562045)(201708071742011)(7699051)(76991095);
- SRVR:HE1PR0701MB2890; BCL:0; PCL:0; RULEID:; SRVR:HE1PR0701MB2890; 
-x-forefront-prvs: 08756AC3C8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10019020)(366004)(376002)(136003)(396003)(39860400002)(346002)(189003)(199004)(486006)(11346002)(446003)(476003)(25786009)(2616005)(86362001)(68736007)(316002)(50226002)(54906003)(8936002)(186003)(99286004)(52116002)(26005)(36756003)(102836004)(386003)(6506007)(97736004)(4326008)(7736002)(53936002)(305945005)(6306002)(6512007)(5640700003)(76176011)(2501003)(575784001)(66066001)(256004)(14444005)(106356001)(105586002)(1076002)(6916009)(6116002)(3846002)(71190400001)(71200400001)(966005)(14454004)(6436002)(2906002)(8676002)(5660300001)(478600001)(81156014)(81166006)(2351001)(6486002);
- DIR:OUT; SFP:1102; SCL:1; SRVR:HE1PR0701MB2890;
- H:HE1PR0701MB2729.eurprd07.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; MX:1; A:1; 
-received-spf: None (protection.outlook.com: nokia.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: C99ILHFKm24T/BmyfcQMy0x0WA75Elc9cJeWY3lFVT7vOyE66Tmm2F3K+TBu1dCgaVD9qUUAT5glYuDKJxtW24tictC9gRjZguWQnd72SwzDiFRkQ6HGtXGMonI/9C3y7qYFCeHge9t34NKbKslALRYVmjdM+N22BfO3iUcP+s+oX0n2xJYPQS6asFdXt7qcwndsljgqcqWcumj9MhdV3WpcYUdaSk9Kxb+yQxEw7PZomxOUe1HgltGzZENujwjp6idf7PMDsQkx6TYJluJ7aUzyzCnBk4IVzqGjnraYsldFnzU5hj/8P036VnO0Qoq+SEi3dHZ5uKJjADHA48nklKC3DNMntuXiDy0YjU1nlSQ=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gTkr1-0000NW-SZ
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:49:34 +0000
+Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
+ by metis.ext.pengutronix.de with esmtps
+ (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gTkqk-0007kI-En; Mon, 03 Dec 2018 10:49:10 +0100
+Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
+ (envelope-from <ukl@pengutronix.de>)
+ id 1gTkqi-0000Mw-3M; Mon, 03 Dec 2018 10:49:08 +0100
+Date: Mon, 3 Dec 2018 10:49:08 +0100
+From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
+To: Hao Zhang <hao5781286@gmail.com>
+Subject: Re: [PATCH v3 6/6] ARM: PWM: add allwinner sun8i R40/T3/V40 PWM
+ support.
+Message-ID: <20181203094908.lga2r56gelaghrej@pengutronix.de>
+References: <20181125162319.GA5422@arx-s1>
+ <20181126213158.q5m5bbwnmewud2gb@pengutronix.de>
 MIME-Version: 1.0
-X-OriginatorOrg: nokia.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 442aff19-02c6-4ccf-c231-08d6590487f4
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Dec 2018 09:48:52.8460 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 5d471751-9675-428d-917b-70f44f9630b0
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: HE1PR0701MB2890
+Content-Disposition: inline
+In-Reply-To: <20181126213158.q5m5bbwnmewud2gb@pengutronix.de>
+User-Agent: NeoMutt/20170113 (1.7.2)
+X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
+X-SA-Exim-Mail-From: ukl@pengutronix.de
+X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
+ SAEximRunCond expanded to false
+X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_014907_406052_06621B04 
-X-CRM114-Status: GOOD (  12.61  )
+X-CRM114-CacheID: sfid-20181203_014928_643443_5031F999 
+X-CRM114-Status: GOOD (  12.66  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -121,136 +77,54 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sasha Levin <Alexander.Levin@microsoft.com>, "Sverdlin,
- Alexander \(Nokia - DE/Ulm\)" <alexander.sverdlin@nokia.com>,
- "stable@vger.kernel.org" <stable@vger.kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
+ linux-gpio@vger.kernel.org, maxime.ripard@bootlin.com, mturquette@baylibre.com,
+ linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
+ linux-pwm@vger.kernel.org, sboyd@kernel.org, wens@csie.org, robh+dt@kernel.org,
+ thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="iso-8859-1"
+Content-Transfer-Encoding: quoted-printable
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Scenario 1, ARMv7:
-==================
+Hello,
 
-If code in arch/arm/kernel/ftrace.c would operate on mcount() pointer
-the following may be generated:
+On Mon, Nov 26, 2018 at 10:31:58PM +0100, Uwe Kleine-K=F6nig wrote:
+> > +static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
+> > +			    struct pwm_state *state)
+> > +{
+> > +[...]
+> > +		clk_rate =3D clk_get_rate(clk);
+> > +		val =3D state->period * clk_rate;
+> > +		do_div(val, NSEC_PER_SEC);
+> > +		if (val <=3D 1) {
+> > +			dev_err(sun8i_pwm->chip.dev,
+> > +				"Period expects a larger value\n");
+> > +			return -EINVAL;
+> > +		}
+> > +
+> > +		/* change clock source to "mux-1" */
+> > +		clk_disable_unprepare(sun8i_pwm->clk);
+> > +		devm_clk_put(sun8i_pwm->chip.dev, sun8i_pwm->clk);
+> > +		sun8i_pwm->clk =3D clk;
+> =
 
-00000230 <prealloc_fixed_plts>:
- 230:   b5f8            push    {r3, r4, r5, r6, r7, lr}
- 232:   b500            push    {lr}
- 234:   f7ff fffe       bl      0 <__gnu_mcount_nc>
-                        234: R_ARM_THM_CALL     __gnu_mcount_nc
- 238:   f240 0600       movw    r6, #0
-                        238: R_ARM_THM_MOVW_ABS_NC      __gnu_mcount_nc
- 23c:   f8d0 1180       ldr.w   r1, [r0, #384]  ; 0x180
+> sun8i_pwm is shared for all 8 PWMs, right? So if you assign mux-1 here
+> for the second mux, how does this influence the first PWM?
 
-FTRACE currently is not able to deal with it:
+To clearify my question:
 
-WARNING: CPU: 0 PID: 0 at .../kernel/trace/ftrace.c:1979 ftrace_bug+0x1ad/0x230()
-...
-CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.4.116-... #1
-...
-[<c0314e3d>] (unwind_backtrace) from [<c03115e9>] (show_stack+0x11/0x14)
-[<c03115e9>] (show_stack) from [<c051a7f1>] (dump_stack+0x81/0xa8)
-[<c051a7f1>] (dump_stack) from [<c0321c5d>] (warn_slowpath_common+0x69/0x90)
-[<c0321c5d>] (warn_slowpath_common) from [<c0321cf3>] (warn_slowpath_null+0x17/0x1c)
-[<c0321cf3>] (warn_slowpath_null) from [<c038ee9d>] (ftrace_bug+0x1ad/0x230)
-[<c038ee9d>] (ftrace_bug) from [<c038f1f9>] (ftrace_process_locs+0x27d/0x444)
-[<c038f1f9>] (ftrace_process_locs) from [<c08915bd>] (ftrace_init+0x91/0xe8)
-[<c08915bd>] (ftrace_init) from [<c0885a67>] (start_kernel+0x34b/0x358)
-[<c0885a67>] (start_kernel) from [<00308095>] (0x308095)
----[ end trace cb88537fdc8fa200 ]---
-ftrace failed to modify [<c031266c>] prealloc_fixed_plts+0x8/0x60
- actual: 44:f2:e1:36
-ftrace record flags: 0
- (0)   expected tramp: c03143e9
+after the first pwm is used and enabled (maybe using mux-0) changing
+sun8i_pwm->clk for the second pwm is broken because then when the first
+pwm is disabled the wrong clock is stopped.
 
-Scenario 2, ARMv4T:
-===================
+Best regards
+Uwe
 
-ftrace: allocating 14435 entries in 43 pages
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 0 at kernel/trace/ftrace.c:2029 ftrace_bug+0x204/0x310
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.19.5 #1
-Hardware name: Cirrus Logic EDB9302 Evaluation Board
-[<c0010a24>] (unwind_backtrace) from [<c000ecb0>] (show_stack+0x20/0x2c)
-[<c000ecb0>] (show_stack) from [<c03c72e8>] (dump_stack+0x20/0x30)
-[<c03c72e8>] (dump_stack) from [<c0021c18>] (__warn+0xdc/0x104)
-[<c0021c18>] (__warn) from [<c0021d7c>] (warn_slowpath_null+0x4c/0x5c)
-[<c0021d7c>] (warn_slowpath_null) from [<c0095360>] (ftrace_bug+0x204/0x310)
-[<c0095360>] (ftrace_bug) from [<c04dabac>] (ftrace_init+0x3b4/0x4d4)
-[<c04dabac>] (ftrace_init) from [<c04cef4c>] (start_kernel+0x20c/0x410)
-[<c04cef4c>] (start_kernel) from [<00000000>] (  (null))
----[ end trace 0506a2f5dae6b341 ]---
-ftrace failed to modify
-[<c000c350>] perf_trace_sys_exit+0x5c/0xe8
- actual:   1e:ff:2f:e1
-Initializing ftrace call sites
-ftrace record flags: 0
- (0)
- expected tramp: c000fb24
+-- =
 
-The analysis for this problem has been already performed previously,
-refer to the link below.
-
-Fix the above problems by allowing only selected reloc types in
-__mcount_loc. The list itself comes from the legacy recordmcount.pl
-script.
-
-Cc: stable@vger.kernel.org
-Link: https://lore.kernel.org/lkml/56961010.6000806@pengutronix.de/
-Fixes: ed60453fa8 ("ARM: 6511/1: ftrace: add ARM support for C version of recordmcount")
-Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
----
- scripts/recordmcount.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
-
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index 895c40e8679f..3b0dcf38fd8b 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -39,6 +39,10 @@
- #define R_AARCH64_ABS64	257
- #endif
- 
-+#define R_ARM_PC24		1
-+#define R_ARM_THM_CALL		10
-+#define R_ARM_CALL		28
-+
- static int fd_map;	/* File descriptor for file being modified. */
- static int mmap_failed; /* Boolean flag. */
- static char gpfx;	/* prefix for global symbol name (sometimes '_') */
-@@ -414,6 +418,18 @@ is_mcounted_section_name(char const *const txtname)
- #define RECORD_MCOUNT_64
- #include "recordmcount.h"
- 
-+static int arm_is_fake_mcount(Elf32_Rel const *rp)
-+{
-+	switch (ELF32_R_TYPE(w(rp->r_info))) {
-+	case R_ARM_THM_CALL:
-+	case R_ARM_CALL:
-+	case R_ARM_PC24:
-+		return 0;
-+	}
-+
-+	return 1;
-+}
-+
- /* 64-bit EM_MIPS has weird ELF64_Rela.r_info.
-  * http://techpubs.sgi.com/library/manuals/4000/007-4658-001/pdf/007-4658-001.pdf
-  * We interpret Table 29 Relocation Operation (Elf64_Rel, Elf64_Rela) [p.40]
-@@ -515,6 +531,7 @@ do_file(char const *const fname)
- 			 altmcount = "__gnu_mcount_nc";
- 			 make_nop = make_nop_arm;
- 			 rel_type_nop = R_ARM_NONE;
-+			 is_fake_mcount32 = arm_is_fake_mcount;
- 			 break;
- 	case EM_AARCH64:
- 			reltype = R_AARCH64_ABS64;
--- 
-2.19.2
-
+Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 
 _______________________________________________
 linux-arm-kernel mailing list
