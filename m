@@ -2,98 +2,73 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B2DF1C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 345A0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:52:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 76CB520850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:50:43 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id EE45D20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:52:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="B0D0Yz11";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="UgDOnigX"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 76CB520850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jOcqI+w0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE45D20850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arndb.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=xfmlWKqVOWObanVB99V/MvVL6XeJizYbtZhP0Ld/6u4=; b=B0D0Yz11d8EeKc
-	6FqxN+AYWjZyXkLRuTQhWf02V7VpfltpMaecbcgO/JWrh8GnwjhiyPdno/144vxsLdz1eYYmTlfN6
-	BMchgluRMnBvloeV8atjdwSC6QD33m4OoX+JnBFxP8iW7/oq7NFOcqQjrXr9bmgxmETkU9idne+0S
-	YBFQJMLOJLduj28+ZsUwDb8Zyiy8ttcBOdbLp5npAh/06D5fxQtnqTkxzh7jEbZjBLxf5dDb/89jX
-	DrPqgp+sgldq2rGHCKKE4kWjNkpZhV4pqs4OVelYmnsVU8q3twQP4Q3dkCsPRzhwqmR8RakYxEt++
-	y7c3O3t+F7mD7hPPtxOA==;
+	List-Owner; bh=x6ZugWrzsswo9289/6pGw9cSVD1KWQjJG5XU3p4Ocn4=; b=jOcqI+w0NxjNiR
+	yE5+nrrwYgXiGzqv0ZC9AohGr0s8WRZ0NvfhyRsT8XPEChXEsZWzCaByXY8hutuw78XmpGzs3gwkQ
+	cjqh2++Uha9TRzHfRueyrIXFEfjZlxchVqSDaAHKbuFigce1cxxUYCve+Scy6tsSNpm7qFZ1WriQc
+	oprwZx90l3euXtAonNnRmazaU+uaT8spqXtaE7+40uSDseHYNM326uPb0Zlz+kCW79tsXf6pKYjkY
+	1ZQ8S4iuGjEhW37ygAWZ5xHPRAzzmLUgJIRtTviRJpk8yotfUfdU69NPnt8N6WZ5fOeTIXtB/iDjE
+	/hkazzkm1C8uDSKKhPVA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTw6z-0007Dw-OL; Mon, 03 Dec 2018 21:50:41 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gTw8e-0007g7-5D; Mon, 03 Dec 2018 21:52:24 +0000
+Received: from mail-qt1-f193.google.com ([209.85.160.193])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTw6a-0006eH-T8
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 21:50:16 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=RoLiDVuqvYANZ1flcAwjENqg+ADf2CNBEHOQ2CuYDWM=; b=UgDOnigXd8VnoUs9GL1VBCUVxx
- f/vNM7AJhd8kE4V/zKIpcYvDFX4Tp4FtXI9dzyzXOsLbORkUuycqI7l5PSN6sKHPHlbqQt4aUgQnG
- EJw10AJBsQeXd6eTBA+5pboPigDKtqkIbzJFC+kB13j/6gRd7wwa175JIH03MiTPZvPnr5l7l4PlF
- /8IivN8xyltQU9jbjLomg01WME3x6MExUQNueM54MkMjGsoSgAnzSJXkr118Lsb8e3ZHyCEVFvRe0
- jYstbckvyu0cuuDo0KI+T3uze03TzmjSGQkdqECXDrP/cDd/Ras0iUfT3R3IlbEDd8TyFBxz9YhwW
- KoMnbz6g==;
-Received: from mail-oi1-f195.google.com ([209.85.167.195])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvpx-000167-Lg
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:33:07 +0000
-Received: by mail-oi1-f195.google.com with SMTP id t204so12343543oie.7
+ id 1gTw8a-0007fQ-Sg
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:52:22 +0000
+Received: by mail-qt1-f193.google.com with SMTP id d18so15695610qto.8
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:57 -0800 (PST)
+ Mon, 03 Dec 2018 13:52:10 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=RoLiDVuqvYANZ1flcAwjENqg+ADf2CNBEHOQ2CuYDWM=;
- b=VF9bkUderJyTU7PlT2BYotSoAh0fpF11ZKaxcsvks+YdveZ1BZ7/WQc64Kx9w26pfU
- Xl2e5mDgcV9islg+RMO3Gmcla46khd1ByYtTQ/8PtZJMhAtC0wD+lrPmbShq6P6Z+cdu
- L75IJmsVIcgQFs1Te+cPKFvu7MgtHTwUzmVX8GUBZb8eSJCk9j778bSbttoo/2LfL88Q
- Rak/JRa2rGLTxZCRjXDxJknRIsbHuZK0uuHQKPOUJCu+CKb1C1GrVreT5Z0KXi7GPEPc
- iFrbTOxwSlNR/v1gAsJvK/4+G0t1hC8LpJSbhV3GtOR6yUBliTWQu6hcqAqRMIkGjthx
- +6dw==
-X-Gm-Message-State: AA+aEWbwmYKm6rJgnUDgWXrAb1snpnZqRCLJgkwqeul1zVj8H/Ml0Et4
- PapTyVkSzUDVmbuggFPSCg==
-X-Google-Smtp-Source: AFSGD/VJlx1PDBZmcmB/SGQ6RsJ+otqbwoIYa3j7R2bskbvkocxhm0ynECKqW7DVQTmQOycr/0tgTQ==
-X-Received: by 2002:aca:5bc3:: with SMTP id
- p186mr10568213oib.130.1543872776478; 
- Mon, 03 Dec 2018 13:32:56 -0800 (PST)
-Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
- [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.55
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:55 -0800 (PST)
-From: Rob Herring <robh@kernel.org>
-To: devicetree@vger.kernel.org,
-	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 25/34] dt-bindings: arm: renesas: Move 'renesas,
- prr' binding to its own doc
-Date: Mon,  3 Dec 2018 15:32:14 -0600
-Message-Id: <20181203213223.16986-26-robh@kernel.org>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
-References: <20181203213223.16986-1-robh@kernel.org>
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=Wz3G1K0Wqct2QY1g8HOnYswKaEU/I5gQsQNRf+imps4=;
+ b=OTPZH2UMFvLGvxmktev49OmTPjovzCV32cdFa+nTGOKtxZflSLgyu/4jJ0nyylfhwS
+ YGjTbWaDRAVmI1UFxnGl3LBlP7bg08HA81zdiZyER5zdYkkHTO2RtCOqMmj5XPxCfhkb
+ 6MFDKgrqza6LpkEA4Xdcx5EaRMgqGPU0JjDTWeeSlyhRY27G1kbCjswAqAII6XMSOVoG
+ oFFt8/N7ctkvs+M+jf3S0XiC8nS1MYv6h6oizLmeI36SHG4f60NWmjLoBh2LnFLf3DxH
+ ZECMZRVJjl0TjUK5axWWe4YJvpp7aqrCU0R3DkQbqbZ/giZE7cySWm1wQPAO+LCGDKpR
+ fGAA==
+X-Gm-Message-State: AA+aEWa5tMWdLLaRGMmixL1ZKxpGQoHtB08X0VSaxct3OV+LZWSL7kur
+ Napn1CMJbl4GjVXK31KjsRWOcN4oefkrEGhAo/E=
+X-Google-Smtp-Source: AFSGD/VZG2VieAMQM8L8JLVwrZC2CJU9F3fdxhqwMdhMSgQv79tym8p9rpuV1A7/MFQXfKzsGg0QxctbqsJi4keAHHw=
+X-Received: by 2002:ac8:7451:: with SMTP id h17mr16754405qtr.319.1543873929119; 
+ Mon, 03 Dec 2018 13:52:09 -0800 (PST)
 MIME-Version: 1.0
+References: <20181130150956.27620-1-anders.roxell@linaro.org>
+ <20181203192228.GC29028@arm.com>
+In-Reply-To: <20181203192228.GC29028@arm.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Mon, 3 Dec 2018 22:51:52 +0100
+Message-ID: <CAK8P3a2gekEqUuvsC-_+ijhiqqff2bK-s2wQfkjn7z-HtNnMDQ@mail.gmail.com>
+Subject: Re: [PATCH 3/3] arm64: ftrace: add cond_resched() to func
+ ftrace_make_(call|nop)
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_213305_709750_2B9FE327 
-X-CRM114-Status: GOOD (  16.65  )
+X-CRM114-CacheID: sfid-20181203_135220_925873_4EB9D5C1 
+X-CRM114-Status: GOOD (  23.10  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,87 +80,89 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Simon Horman <horms@verge.net.au>,
- Kumar Gala <kumar.gala@linaro.org>, arm@kernel.org,
- Sean Hudson <darknighte@darknighte.com>, Frank Rowand <frowand.list@gmail.com>,
- Magnus Damm <magnus.damm@gmail.com>, linux-renesas-soc@vger.kernel.org,
- Grant Likely <grant.likely@arm.com>, linuxppc-dev@lists.ozlabs.org,
- linux-arm-kernel@lists.infradead.org
+Cc: Anders Roxell <anders.roxell@linaro.org>, Kees Cook <keescook@chromium.org>,
+ Catalin Marinas <catalin.marinas@arm.com>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Steven Rostedt <rostedt@goodmis.org>, Ingo Molnar <mingo@redhat.com>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-In preparation to convert board-level bindings to json-schema, move
-various misc SoC bindings out to their own file.
+On Mon, Dec 3, 2018 at 8:22 PM Will Deacon <will.deacon@arm.com> wrote:
+>
+> Hi Anders,
+>
+> On Fri, Nov 30, 2018 at 04:09:56PM +0100, Anders Roxell wrote:
+> > Both of those functions end up calling ftrace_modify_code(), which is
+> > expensive because it changes the page tables and flush caches.
+> > Microseconds add up because this is called in a loop for each dyn_ftrace
+> > record, and this triggers the softlockup watchdog unless we let it sleep
+> > occasionally.
+> > Rework so that we call cond_resched() before going into the
+> > ftrace_modify_code() function.
+> >
+> > Co-developed-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Anders Roxell <anders.roxell@linaro.org>
+> > ---
+> >  arch/arm64/kernel/ftrace.c | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
+>
+> It sounds like you're running into issues with the existing code, but I'd
+> like to understand a bit more about exactly what you're seeing. Which part
+> of the ftrace patching is proving to be expensive?
+>
+> The page table manipulation only happens once per module when using PLTs,
+> and the cache maintenance is just a single line per patch site without an
+> IPI.
+>
+> Is it the loop in ftrace_replace_code() that is causing the hassle?
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: devicetree@vger.kernel.org
-Cc: linux-renesas-soc@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/renesas,prr.txt   | 20 +++++++++++++++++++
- .../devicetree/bindings/arm/shmobile.txt      | 18 -----------------
- 2 files changed, 20 insertions(+), 18 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/renesas,prr.txt
+Yes: with an allmodconfig kernel, the ftrace selftest calls ftrace_replace_code
+to look >40000 through ftrace_make_call/ftrace_make_nop, and these
+end up calling
 
-diff --git a/Documentation/devicetree/bindings/arm/renesas,prr.txt b/Documentation/devicetree/bindings/arm/renesas,prr.txt
-new file mode 100644
-index 000000000000..08e482e953ca
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/renesas,prr.txt
-@@ -0,0 +1,20 @@
-+Renesas Product Register
-+
-+Most Renesas ARM SoCs have a Product Register or Boundary Scan ID Register that
-+allows to retrieve SoC product and revision information.  If present, a device
-+node for this register should be added.
-+
-+Required properties:
-+  - compatible: Must be one of:
-+    "renesas,prr"
-+    "renesas,bsid"
-+  - reg: Base address and length of the register block.
-+
-+
-+Examples
-+--------
-+
-+	prr: chipid@ff000044 {
-+		compatible = "renesas,prr";
-+		reg = <0 0xff000044 0 4>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 58c4256d37a3..5f18ce9cdbb8 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -149,21 +149,3 @@ Boards:
-     compatible = "renesas,v3msk", "renesas,r8a77970"
-   - Wheat (RTP0RC7792ASKB0000JE)
-     compatible = "renesas,wheat", "renesas,r8a7792"
--
--
--Most Renesas ARM SoCs have a Product Register or Boundary Scan ID Register that
--allows to retrieve SoC product and revision information.  If present, a device
--node for this register should be added.
--
--Required properties:
--  - compatible: Must be "renesas,prr" or "renesas,bsid"
--  - reg: Base address and length of the register block.
--
--
--Examples
----------
--
--	prr: chipid@ff000044 {
--		compatible = "renesas,prr";
--		reg = <0 0xff000044 0 4>;
--	};
--- 
-2.19.1
+static int __kprobes __aarch64_insn_write(void *addr, __le32 insn)
+{
+        void *waddr = addr;
+        unsigned long flags = 0;
+        int ret;
 
+        raw_spin_lock_irqsave(&patch_lock, flags);
+        waddr = patch_map(addr, FIX_TEXT_POKE0);
+
+        ret = probe_kernel_write(waddr, &insn, AARCH64_INSN_SIZE);
+
+        patch_unmap(FIX_TEXT_POKE0);
+        raw_spin_unlock_irqrestore(&patch_lock, flags);
+
+        return ret;
+}
+int __kprobes aarch64_insn_patch_text_nosync(void *addr, u32 insn)
+{
+        u32 *tp = addr;
+        int ret;
+
+        /* A64 instructions must be word aligned */
+        if ((uintptr_t)tp & 0x3)
+                return -EINVAL;
+
+        ret = aarch64_insn_write(tp, insn);
+        if (ret == 0)
+                __flush_icache_range((uintptr_t)tp,
+                                     (uintptr_t)tp + AARCH64_INSN_SIZE);
+
+        return ret;
+}
+
+which seems to be where the main cost is. This is with inside of
+qemu, and with lots of debugging options (in particular
+kcov and ubsan) enabled, that make each function call
+more expensive.
+
+       Arnd
 
 _______________________________________________
 linux-arm-kernel mailing list
