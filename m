@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 012F8C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:54 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EC784C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:40:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B6B91208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:53 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id AE0C4208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:40:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Wb+Dria3";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="f5HgdvRm"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B6B91208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cdgqk6N3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="UwcVYPR4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org AE0C4208A3
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -27,59 +27,59 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=FPrvRIzEvRz5X8TEFBauruPpwI8sQSbqbWqRekGSias=; b=Wb+Dria35Vq/QzX1krNSq+cfNU
-	u4qD9cdnegHPcfEAu4JU41hJxrBas/zVY3w1ugl1FEp0+TomuJJBohBufRZKjmTSbQMbybO+R+6oG
-	CUAYjjzTkw1MZEJ5Pj22XVvH9snOidhbyu+YdVRvtL013FIPVZOK8jZx9G8MQH1LLfF3ia0DVaUdt
-	wwKpXIBnha6Kkp3vMF0TG3g2eiR/0hSqqxiZCgBaJZHY8sOfsleQ/5QM1/03e/qcRGQ/QWd2njo9v
-	XGXfkOemGYL3VL3WJzNlCmpvKmDWeXSR97TmE9+xzkmdRTDQt0b1hKRCz/n1OYq6lSnCa1uzASyOv
-	W1cgSPLw==;
+	bh=/rOpKH5aQyTiQJ1c/G0Jmt22r6TNTLagBeUnkfayuSM=; b=cdgqk6N3lPUVsZH5JPvDuCy+T8
+	uVwmU9bCvE1r464dpCCf+8M4i68maqdxJw28owxDJ5GT4IysZMEG0XC/0ySYixLdATDymCM/bl9Xo
+	jeKP3byDKG23CvlJsumd7+sKo2FGSSwb6xZOkTv4mzZIwuJH/KFja+1S/PjpQaY/39HF1NEyj37kF
+	OKkA8OA/6aWw1VErivAl807h5U2jxL/36zGQBRzx4mk5MsDpoInZY6Bh+Is/69ZSK1nR2zs0KhaO2
+	AE7SXYaYV0RBZwUsf4zpxqUeTOIbPLWjZG6Je0+qaTtpJpbrbJ9te2oBNrpeKtVPsVN0Jhvf0hwXq
+	1HqdndZg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTu4M-0005U1-8u; Mon, 03 Dec 2018 19:39:50 +0000
-Received: from mail-oi1-x244.google.com ([2607:f8b0:4864:20::244])
+	id 1gTu4d-0005vS-Ly; Mon, 03 Dec 2018 19:40:07 +0000
+Received: from mail-oi1-x241.google.com ([2607:f8b0:4864:20::241])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTu3u-0004xs-Na
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:39:26 +0000
-Received: by mail-oi1-x244.google.com with SMTP id a77so12031419oii.5
+ id 1gTu3v-0004xq-Mg
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:39:28 +0000
+Received: by mail-oi1-x241.google.com with SMTP id w13so12034480oiw.9
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 11:39:11 -0800 (PST)
+ Mon, 03 Dec 2018 11:39:10 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=q0uTXcZC7CgGiF1z+ovGMxQ4WshXHCU0lPOOgvBHLS8=;
- b=f5HgdvRmkq/e8B4jAjg/KiKg4lYQXfos1Mhy+1mqB12T5wt7UjKCKSMlRjV6NJKw2o
- vg9KTWzjuFPZkesGakRLnMjaq9eKGHZA/TNKN8oywZUWldXTg0bcIk/uAJm0AGOMmbU4
- LqgX0+oOtR6XbP7uc26A+N6OJb6C5HMz20ib4=
+ bh=hYM4DihHngTcygMqlJ/OpJr39UU/+sI4RrKyV1rkS24=;
+ b=UwcVYPR4QnP8KjjJEn4YYqMN4CwAk+iV+hGzAOVbf7QK51slMGpBQNJxRFn+CVSr9k
+ v2QjBVGZJqAm5xvtzpR+bzjQ2q044h2TzTEzMmqMI1INEN0HZmvZ5nrdrCKa4/ghCWqP
+ ygh7DFVRQA9zncz+c6pcRz+qyYr6JNwuCDFXc=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references;
- bh=q0uTXcZC7CgGiF1z+ovGMxQ4WshXHCU0lPOOgvBHLS8=;
- b=TYkFlc5B4z3IUira4IgAKVZx1jLID0z14nCm4F8lfIQxbMzGf/Op9Tq/eu5lFsUNUi
- SO+E+rHJlz1t47Yn4alLybhxkOuUe7WS1g+pPAGvagJXZnehewWUBRBsqD5iqN1R+NTn
- YPTqq6+f7gR/yGdfl1MqarmC3FD3yM6qKlHytNz/1JAzIofsmbj+EgMqopulmb3ricwb
- rPWdPb4euKyBrLSJDODR8cOvrElhTEEPBnbW5IVWpwrAWEHnTmyuS+xzntbN9J/3cfqx
- de6MW9xgdhFZqbb7Z0liKf6P/Z/A04BhkEgYvWlpgVPrE7zkPq+iHhs7WWISkG1WlYSk
- yV0Q==
-X-Gm-Message-State: AA+aEWaQEzdhWHIUcdjo77oaYLmai+C5awgLPE09RG2oGJsCAw+Cm/nR
- xC6DJZJYaY0INp60PixnfZxWiw==
-X-Google-Smtp-Source: AFSGD/U8tc87YBfVwFW4SsyfbmMWs6bT3c8wmJKuZO++ag18KSKYUBs6iWHNpUp22kAk/2bcB9JKwQ==
-X-Received: by 2002:aca:a648:: with SMTP id p69mr10306397oie.205.1543865950829; 
- Mon, 03 Dec 2018 11:39:10 -0800 (PST)
+ bh=hYM4DihHngTcygMqlJ/OpJr39UU/+sI4RrKyV1rkS24=;
+ b=hHkG5VR7/822nsLys+5lvi+q9wA1vYJ0mcOZ2ECean381nE8SFYP/D9IGlFxbLnlLd
+ Kmf/MGuukq1jEEQGfMffBpvPzl0vZ4Oj6mUyyprw7FWGwR4hR0Srr1HcYsPSAzYzqcaf
+ RQkVBgkLm5teGu020AB2pDzhj4RnYGukShhENv05+CtVY27LgY7/qfRv5BrKyhjJrjYe
+ uqJYMbEitQ+6/xdg6MRmV+YlcZ8ugjGS8vqblicM6BYXs6EigrlmgdRAwKatXdLYTi8P
+ ckTCRzfksSQhYrvn+Ens18auicRXNu6+p2EGqUr3EsVUZlyXzgIFHOpQpDLy51WtmNAr
+ UjMA==
+X-Gm-Message-State: AA+aEWa7GC4sa2WSoErVO7rn8iHKrZT5F9oR2HcO+gWeiyJ3K3JPKdWF
+ SY+XZdCYEvcS1guGMI17SWl9csQSW3r0vQ==
+X-Google-Smtp-Source: AFSGD/VAnWtAWcqv1GlP0gPtyZXJuaT7stvu16FqgljC6ePfNsjD3d/oPrYPw/M+mES4Es1ehssCmg==
+X-Received: by 2002:aca:da02:: with SMTP id r2mr10188577oig.66.1543865949268; 
+ Mon, 03 Dec 2018 11:39:09 -0800 (PST)
 Received: from localhost ([2600:1700:141:4960:60aa:6557:7f4e:5d7d])
- by smtp.gmail.com with ESMTPSA id j33sm11170309ota.32.2018.12.03.11.39.10
+ by smtp.gmail.com with ESMTPSA id x9sm4963006otq.73.2018.12.03.11.39.08
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 11:39:10 -0800 (PST)
+ Mon, 03 Dec 2018 11:39:08 -0800 (PST)
 From: Andy Gross <andy.gross@linaro.org>
 To: arm@kernel.org
-Subject: [GIT PULL] Qualcomm Device Tree updates for 4.21
-Date: Mon,  3 Dec 2018 13:39:04 -0600
-Message-Id: <1543865944-3591-4-git-send-email-andy.gross@linaro.org>
+Subject: [GIT PULL] Qualcomm Driver updates for 4.21
+Date: Mon,  3 Dec 2018 13:39:03 -0600
+Message-Id: <1543865944-3591-3-git-send-email-andy.gross@linaro.org>
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543865944-3591-1-git-send-email-andy.gross@linaro.org>
 References: <1543865944-3591-1-git-send-email-andy.gross@linaro.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_113923_006479_A0A4A6D5 
-X-CRM114-Status: GOOD (  15.19  )
+X-CRM114-CacheID: sfid-20181203_113924_092468_4EA3D50A 
+X-CRM114-Status: GOOD (  14.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,46 +107,59 @@ The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.21
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.21
 
-for you to fetch changes up to 972910948fb6f555e83f37bc6172f51984d738a9:
+for you to fetch changes up to b601f73130a375c912d9f2ec93c5f3cea5d6a3da:
 
-  ARM: dts: qcom: Remove Arrow SD600 eval board (2018-11-28 17:36:41 -0600)
-
-----------------------------------------------------------------
-Qualcomm Device Tree Changes for v4.21
-
-* Add entry for Qualcomm TSENS thermal drivers
-* Update msm8974 thermal entries
-* Fix msm8974 Hammerhead magnetometer gpios
-* Add SoC specific compatibles for SDHC nodes
-* Remove Arrow SD600 eval board
+  drm: msm: Check cmd_db_read_aux_data() for failure (2018-11-29 17:41:53 -0600)
 
 ----------------------------------------------------------------
-Amit Kucheria (3):
-      MAINTAINERS: Add entry for Qualcomm TSENS thermal drivers
-      ARM: dts: msm8974: thermal: split address space into two
-      ARM: dts: msm8974: thermal: Add "qcom,sensors" property
+Qualcomm ARM Based Driver Updates for v4.21
 
-Andy Gross (1):
-      ARM: dts: qcom: Remove Arrow SD600 eval board
+* Fix llcc license, includes, and error checks
+* Remove use of memcpy in cmd-db and fix API breakage
+* Add QCS404 compatible to SMD-RPM
+* Minor fixes for QMI
+* Add irq clear handling in QCOM Geni SE during init
 
-Brian Masney (1):
-      ARM: dts: qcom: msm8974-hammerhead: correct gpios property on magnetometer
+----------------------------------------------------------------
+Alok Chauhan (1):
+      soc: qcom: Add irq clear handling during SE init
 
-Douglas Anderson (1):
-      ARM: dts: qcom: Add SoC-specific string for sdhci-msm-v4 nodes
+Arnd Bergmann (1):
+      soc: qcom/llcc: add MODULE_LICENSE tag
 
- MAINTAINERS                                        |   7 +
- arch/arm/boot/dts/Makefile                         |   1 -
- .../dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi    |  53 ---
- .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 415 ---------------------
- arch/arm/boot/dts/qcom-apq8084.dtsi                |   4 +-
- .../dts/qcom-msm8974-lge-nexus5-hammerhead.dts     |   3 +-
- arch/arm/boot/dts/qcom-msm8974.dtsi                |  12 +-
- 7 files changed, 17 insertions(+), 478 deletions(-)
- delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval-pins.dtsi
- delete mode 100644 arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+Arun Kumar Neelakantam (1):
+      soc: qcom: qmi_interface: Limit txn ids to U16_MAX
+
+Bjorn Andersson (1):
+      soc: qcom: smd-rpm: Add QCS404 compatible
+
+Jordan Crouse (1):
+      soc: qcom: llcc-slice: Add error checks for API functions
+
+Niklas Cassel (1):
+      soc: qcom: Drop help text for QCOM_QMI_HELPERS
+
+Stephen Boyd (3):
+      soc: qcom: cmd-db: Remove memcpy()ing from cmd_db_get_header()
+      soc: qcom: cmd-db: Stop memcpy()ing in cmd_db_read_aux_data()
+      drm: msm: Check cmd_db_read_aux_data() for failure
+
+YueHaibing (1):
+      soc: qcom: llcc-slice: Remove duplicated include from llcc-slice.c
+
+ .../devicetree/bindings/soc/qcom/qcom,smd-rpm.txt  |  1 +
+ drivers/gpu/drm/msm/adreno/a6xx_gmu.c              | 59 ++++++--------
+ drivers/soc/qcom/Kconfig                           |  5 --
+ drivers/soc/qcom/cmd-db.c                          | 93 +++++++---------------
+ drivers/soc/qcom/llcc-slice.c                      | 17 +++-
+ drivers/soc/qcom/qcom-geni-se.c                    | 25 +++---
+ drivers/soc/qcom/qmi_interface.c                   |  2 +-
+ drivers/soc/qcom/smd-rpm.c                         |  1 +
+ include/linux/soc/qcom/qmi.h                       |  2 +-
+ include/soc/qcom/cmd-db.h                          | 12 +--
+ 10 files changed, 88 insertions(+), 129 deletions(-)
 
 _______________________________________________
 linux-arm-kernel mailing list
