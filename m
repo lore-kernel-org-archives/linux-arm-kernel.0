@@ -2,64 +2,88 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13F6DC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:25:31 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CB78C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:28:17 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D8E1620848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:25:30 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E04EE2064A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:28:16 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qV90qQzL"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8E1620848
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="SIpmy69z";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="GYsseNZK";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="IGb1JSs4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E04EE2064A
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=XAYGkQYieYaPkMiJ7eGlxLygaYS1J4p/j9GQf1YmriU=; b=qV90qQzLj0Ml+g
-	aXp/afXV7wCRmzaOeVzQfr1TRxCm6CUsn08i0s4Nk2ckV2q+6XuQmt3JHFBtlyn4/+CZ7ZLW6NqGv
-	RjE00qhQb3QizRZSFSf1EVUtlAT4ZVK9U1WLpCRlUORFQvkJnTHdjjNul77sHdZozpWXXzBo/YVve
-	7G65beyLrH7M1qklA50q0rcsIMI98zFcNTxvY2Xjyf5ofVsccHeZZ8QwLrxDh0gMXWugztiKvSiy5
-	wd4UzoQacKBSUTcxdbuRxhB9eIgofnQN4BdH1qL5wu315/Fu6xW8W2c0i+hKz2GYFiXp8xnLHxt2F
-	KK/P7YPPqzMQzPs1zdsg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=vtQdxF4qOj1i871iE10Huk6KXHbQY0QQAozCQIFEeYU=; b=SIpmy69z0Zevqdi8/XJxFgrH1
+	6jQ4lbitN3VEXA1QzNW0BwNCEASpT+XNCKnXICBYyWYETSYIYOGkhFIlOEdOinOnJ1dusgoh/aQc3
+	AscQhJhsEvfY+de+ISJJ2Zn7am2nsAEltLM7+ZunUxhE5sZdektpwfQMQQ/YPsnjklxkIh5BPAHlQ
+	p+aLSNmS7QPT1x6IwjC2AFzg73SWD9FCWT8EV+E603EuPFiWWKur49A5SSCTAdlV28NZPqYldMqX5
+	FHnKzN5Ynn/ctpdaq/mzhPu1xc29iQNJTgBIUxf2N5fUdfk2zDyltvUtKxwosvrUZXxb6pq2mfiAY
+	y5R45u7pg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTq68-0005bo-Ko; Mon, 03 Dec 2018 15:25:24 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTps4-0007Jy-M5
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:11:05 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3EA0C1682;
- Mon,  3 Dec 2018 07:10:42 -0800 (PST)
-Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C37F43F5AF;
- Mon,  3 Dec 2018 07:10:39 -0800 (PST)
-Subject: Re: [PATCH v9 6/8] KVM: arm64: Support handling access faults for PUD
- hugepages
-To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-7-punit.agrawal@arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <26fcfc2c-219a-ce04-457b-cc157301c7d3@arm.com>
-Date: Mon, 3 Dec 2018 20:40:45 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gTq8s-0005yx-V4; Mon, 03 Dec 2018 15:28:14 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTq8p-0005yP-Hr
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:28:13 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id 9E7E06020A; Mon,  3 Dec 2018 15:28:00 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543850880;
+ bh=3dkJaauSq2duYUcsbJj7FOIom+dZiHqh6kKTN0/EAnw=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=GYsseNZKOTKIYqHcp1z0hojY9GNrpxx7H3V3yF3vEVWQiiJu+zaoCc2s8iJBuyfIf
+ TeFE52Q+C70B5K67Z7wle/L4uX1DymlC7OpgTQYPRGM2jpPiLa5LX0cVkYD7nggSCo
+ bOmq26bzy8YzKy9cpmPcFWjmSZmW0dZLkdEvJ4/4=
+Received: from [10.226.60.81] (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: jhugo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id E935E6020A;
+ Mon,  3 Dec 2018 15:27:58 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543850879;
+ bh=3dkJaauSq2duYUcsbJj7FOIom+dZiHqh6kKTN0/EAnw=;
+ h=Subject:To:Cc:References:From:Date:In-Reply-To:From;
+ b=IGb1JSs4A4Hv1VqtiNiPBOjcDDu7EjjPUjU6DLvd5kXWkF9add8bX/X5RxgJ33CpW
+ pYing3ec4felIp2MeBmv2ZUA9CXnij9NUcTV2B5rg0Z4vJi3Zjq47J5aBOIkdqZ53c
+ 2vqds84M1/5ZL1J8yXfcxJdORvPTS85ox7lcdmDQ=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org E935E6020A
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=jhugo@codeaurora.org
+Subject: Re: WIP: UFS on apq8098
+To: Marc Gonzalez <marc.w.gonzalez@free.fr>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Nicolas Dechesne <nicolas.dechesne@linaro.org>,
+ Niklas Cassel <niklas.cassel@linaro.org>, Andy Gross
+ <andy.gross@linaro.org>, Rajendra Nayak <rnayak@codeaurora.org>
+References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
+From: Jeffrey Hugo <jhugo@codeaurora.org>
+Message-ID: <de223e7a-3b60-0566-997f-b607bbc15007@codeaurora.org>
+Date: Mon, 3 Dec 2018 08:27:58 -0700
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181031175745.18650-7-punit.agrawal@arm.com>
+In-Reply-To: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_071053_006876_93D6FD79 
-X-CRM114-Status: GOOD (  21.51  )
+X-CRM114-CacheID: sfid-20181203_072811_630123_C610024B 
+X-CRM114-Status: GOOD (  20.58  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,160 +95,214 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com,
- Catalin Marinas <catalin.marinas@arm.com>, will.deacon@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
- punitagrawal@gmail.com, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: MSM <linux-arm-msm@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 10/31/2018 11:27 PM, Punit Agrawal wrote:
-> In preparation for creating larger hugepages at Stage 2, extend the
-> access fault handling at Stage 2 to support PUD hugepages when
-> encountered.
+On 12/3/2018 8:18 AM, Marc Gonzalez wrote:
+> Hello,
 > 
-> Provide trivial helpers for arm32 to allow sharing of code.
+> I'm trying to enable UFS on apq8098. Just wanted to share my progress
+> so far, in case someone spots any glaring mistakes.
+
+Excellent.  This was down on my todo list.  I'm glad its getting some 
+attention.
+
 > 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
->  arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
->  arch/arm64/include/asm/pgtable.h |  6 ++++++
->  virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
->  4 files changed, 33 insertions(+), 11 deletions(-)
+> (WIP patch provided at message's end.)
 > 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 839a619873d3..fea5e723e3ac 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
->  #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
->  
-> +#define kvm_pud_pfn(pud)	({ BUG(); 0; })
+> rpm_smd_clk_probe() runs successfully, and returns 0.
+> 
+> qcom_qmp_phy_probe() fails:
+> 
+> [    0.913707] qcom-qmp-phy 1da7000.phy: Failed to get clk 'ref': -2
+> [    0.913761] qcom-qmp-phy: probe of 1da7000.phy failed with error -2
+> 
+> ufs_qcom_probe() also fails (which may be caused by PHY failure)
+> 
+> [    2.368486] ufshcd-qcom 1da4000.ufshc: ufshcd_get_vreg: vdd-hba get failed, err=-517
+> [    2.370673] ufshcd-qcom 1da4000.ufshc: Initialization failed
+> [    2.412908] ufshcd-qcom 1da4000.ufshc: ufshcd_pltfrm_init() failed -517
+> 
+> I'll investigate the PHY init.
+> 
+> Regards.
+> 
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
+> index b4276da1fb0d..ad7542f461af 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8998-mtp.dtsi
+> @@ -241,3 +241,26 @@
+>   		};
+>   	};
+>   };
 > +
+> +&ufshc {
+> +	status = "ok";
+> +	vdd-hba-supply = <&gcc UFS_GDSC>;
+> +	vdd-hba-fixed-regulator;
+> +	vcc-supply = <&vreg_l20a_2p95>;
+> +	vccq-supply = <&vreg_l26a_1p2>;
+> +	vccq2-supply = <&vreg_s4a_1p8>;
+> +	vcc-max-microamp = <750000>;
+> +	vccq-max-microamp = <560000>;
+> +	vccq2-max-microamp = <750000>;
+> +};
 > +
->  #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
->  
->  /*
-> @@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
->  	return false;
->  }
->  
-> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
-> +{
-> +	BUG();
-> +	return pud;
-> +}
+> +&ufsphy {
+> +	status = "ok";
+> +	vdda-phy-supply = <&vreg_l1a_0p875>;
+> +	vdda-pll-supply = <&vreg_l2a_1p2>;
+> +	vddp-ref-clk-supply = <&vreg_l26a_1p2>;
+> +	vdda-phy-max-microamp = <51400>;
+> +	vdda-pll-max-microamp = <14600>;
+> +	vddp-ref-clk-max-microamp = <100>;
+> +	vddp-ref-clk-always-on;
+> +};
+> diff --git a/arch/arm64/boot/dts/qcom/msm8998.dtsi b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+> index d291b4713c33..10e7b8a55b8a 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8998.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8998.dtsi
+> @@ -264,6 +264,11 @@
+>   		rpm_requests: rpm-requests {
+>   			compatible = "qcom,rpm-msm8998";
+>   			qcom,glink-channels = "rpm_requests";
 > +
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->  {
->  	pte_val(pte) |= L_PTE_S2_RDWR;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index c755b37b3f92..612032bbb428 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
->  #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
->  
-> +#define kvm_pud_pfn(pud)		pud_pfn(pud)
+> +			rpmcc: qcom,rpmcc {
+> +				compatible = "qcom,rpmcc-msm8998";
+> +				#clock-cells = <1>;
+> +			};
+>   		};
+>   	};
+>   
+> @@ -686,5 +691,79 @@
+>   			redistributor-stride = <0x0 0x20000>;
+>   			interrupts = <GIC_PPI 9 IRQ_TYPE_LEVEL_HIGH>;
+>   		};
 > +
->  #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
->  
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
-> @@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
->  	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
->  }
->  
-> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
-> +{
-> +	return pud_mkyoung(pud);
-> +}
+> +		ufshc: ufshc@1da4000 {
+> +			compatible = "qcom,msm8998-ufshc", "qcom,ufshc",
+> +				     "jedec,ufs-2.0";
+> +			reg = <0x1da4000 0x2500>;
+> +			interrupts = <GIC_SPI 265 IRQ_TYPE_LEVEL_HIGH>;
+> +			phys = <&ufsphy_lanes>;
+> +			phy-names = "ufsphy";
+> +			lanes-per-direction = <2>;
+> +			power-domains = <&gcc UFS_GDSC>;
 > +
->  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
->  
->  #ifdef __PAGETABLE_PMD_FOLDED
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 50b1ef8584c0..f51e2271e6a3 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
->  	return __pte(pud_val(pud));
->  }
->  
-> +static inline pud_t pte_pud(pte_t pte)
-> +{
-> +	return __pud(pte_val(pte));
-> +}
+> +			clock-names =
+> +				"core_clk",
+> +				"bus_aggr_clk",
+> +				"iface_clk",
+> +				"core_clk_unipro",
+> +				"core_clk_ice",
+> +				"ref_clk",
+> +				"tx_lane0_sync_clk",
+> +				"rx_lane0_sync_clk",
+> +				"rx_lane1_sync_clk";
+> +			clocks =
+> +				<&gcc GCC_UFS_AXI_CLK>,
+> +				<&gcc GCC_AGGRE1_UFS_AXI_CLK>,
+> +				<&gcc GCC_UFS_AHB_CLK>,
+> +				<&gcc GCC_UFS_UNIPRO_CORE_CLK>,
+> +				<&gcc GCC_UFS_ICE_CORE_CLK>,
+> +				<&rpmcc 0>,
+> +				<&gcc GCC_UFS_TX_SYMBOL_0_CLK>,
+> +				<&gcc GCC_UFS_RX_SYMBOL_0_CLK>,
+> +				<&gcc GCC_UFS_RX_SYMBOL_1_CLK>;
+> +			freq-table-hz =
+> +				<50000000 200000000>,
+> +				<0 0>,
+> +				<0 0>,
+> +				<37500000 150000000>,
+> +				<75000000 300000000>,
+> +				<0 0>,
+> +				<0 0>,
+> +				<0 0>,
+> +				<0 0>;
 > +
+> +			resets = <&gcc GCC_UFS_BCR>;
 
-Yeah these would be required for PUD based THP when enabled.
+I dunno how much this factors into your issues, but the resets defined 
+in gcc-msm8998.c are wrong.  I'm posting a patch later today.  I know 
+this was a problem for me with USB.
 
->  static inline pmd_t pud_pmd(pud_t pud)
->  {
->  	return __pmd(pud_val(pud));
-> @@ -381,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
->  #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
->  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
->  
-> +#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
->  #define pud_write(pud)		pte_write(pud_pte(pud))
->  
->  #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 8e44dccd1b47..bd749601195f 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1698,6 +1698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->   */
->  static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->  {
-> +	pud_t *pud;
->  	pmd_t *pmd;
->  	pte_t *pte;
->  	kvm_pfn_t pfn;
-> @@ -1707,24 +1708,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
->  
->  	spin_lock(&vcpu->kvm->mmu_lock);
->  
-> -	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
-> -	if (!pmd || pmd_none(*pmd))	/* Nothing there */
-> +	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
->  		goto out;
->  
-> -	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
-> +	if (pud) {		/* HugeTLB */
-> +		*pud = kvm_s2pud_mkyoung(*pud);
-> +		pfn = kvm_pud_pfn(*pud);
-> +		pfn_valid = true;
-> +	} else	if (pmd) {	/* THP, HugeTLB */
->  		*pmd = pmd_mkyoung(*pmd);
->  		pfn = pmd_pfn(*pmd);
->  		pfn_valid = true;
-> -		goto out;
-> +	} else {
-> +		*pte = pte_mkyoung(*pte);	/* Just a page... */
-> +		pfn = pte_pfn(*pte);
-> +		pfn_valid = true;
->  	}
+> +			reset-names = "rst";
+> +
+> +			status = "disabled";
+> +		};
+> +
+> +		ufsphy: phy@1da7000 {
+> +			compatible = "qcom,sdm845-qmp-ufs-phy";
+> +			reg = <0x1da7000 0x18c>;
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			clock-names =
+> +				"ref_clk_src",
+> +				"ref_clk",
+> +				"ref_aux_clk";
+> +			clocks =
+> +				<&rpmcc 0>,
+> +				<&gcc GCC_UFS_CLKREF_CLK>,
+> +				<&gcc GCC_UFS_PHY_AUX_CLK>;
+> +
+> +			status = "disabled";
+> +
+> +			ufsphy_lanes: lanes@1da7400 {
+> +				reg = <0x1da7400 0x108>,
+> +				      <0x1da7600 0x1e0>,
+> +				      <0x1da7c00 0x1dc>,
+> +				      <0x1da7800 0x108>,
+> +				      <0x1da7a00 0x1e0>;
+> +				#phy-cells = <0>;
+> +			};
+> +		};
+>   	};
+>   };
+> diff --git a/drivers/clk/qcom/clk-smd-rpm.c b/drivers/clk/qcom/clk-smd-rpm.c
+> index 850c02a52248..12a0a2d6ec7b 100644
+> --- a/drivers/clk/qcom/clk-smd-rpm.c
+> +++ b/drivers/clk/qcom/clk-smd-rpm.c
+> @@ -611,10 +611,25 @@ static const struct rpm_smd_clk_desc rpm_clk_msm8996 = {
+>   	.num_clks = ARRAY_SIZE(msm8996_clks),
+>   };
+>   
+> +/* msm8998 */
+> +#define LN_BB_CLK1_ID 0x1
+> +DEFINE_CLK_SMD_RPM_XO_BUFFER(msm8998, ln_bb_clk1, ln_bb_a_clk1, LN_BB_CLK1_ID);
+> +
+> +static struct clk_smd_rpm *msm8998_clks[] = {
+> +	[0] = &msm8998_ln_bb_clk1,
+> +	[1] = &msm8998_ln_bb_a_clk1,
+> +};
+> +
+> +static const struct rpm_smd_clk_desc rpm_clk_msm8998 = {
+> +	.clks = msm8998_clks,
+> +	.num_clks = ARRAY_SIZE(msm8998_clks),
+> +};
+> +
+>   static const struct of_device_id rpm_smd_clk_match_table[] = {
+>   	{ .compatible = "qcom,rpmcc-msm8916", .data = &rpm_clk_msm8916 },
+>   	{ .compatible = "qcom,rpmcc-msm8974", .data = &rpm_clk_msm8974 },
+>   	{ .compatible = "qcom,rpmcc-msm8996", .data = &rpm_clk_msm8996 },
+> +	{ .compatible = "qcom,rpmcc-msm8998", .data = &rpm_clk_msm8998 },
+>   	{ }
+>   };
+>   MODULE_DEVICE_TABLE(of, rpm_smd_clk_match_table);
+> 
 
-As mentioned before stage2_get_leaf_entry() is not required for the previous
-patch and handle_access_fault() can definitely do without it. The existing
-page table walker flow is better than this helper which takes like three
-different arguments and makes semantics more complicated than required.
 
+-- 
+Jeffrey Hugo
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
 
 _______________________________________________
 linux-arm-kernel mailing list
