@@ -2,83 +2,91 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A5AF9C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:15:15 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6E2ABC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:16:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 766A120851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:15:15 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 41F9520851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:16:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cfnuqs9d"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 766A120851
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=csie.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Lfu+iUfK";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="RvZno6/0"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 41F9520851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=8Rwo1uqDX0Q/4HlTS39Id46Y2icGKX9bbuTmHFFbxo0=; b=cfnuqs9dCwVuFR
-	4isDzo49ljJBrEaIEyvCc9Lwp0B5GN7jEmRzPTK0PH6p5LIoEWZdaaO5kI+5/KjQQnExR3fXxPALm
-	uVud8SQ4dpZ/fiuB2lHSFqW+A49X4OkrDMoXRX1OL9CjAsAt4Llw+3uuSJaxs0vvBHROFO4ZS6iKJ
-	h2yJx4snIbDJAUB6MIIYWRYRTh3aJav6rd2ZEAz++GicufUlMY+rvDSHmvb8i43lSQg4NUt8Oq9WT
-	25smVPCngu8bREzra+0t/qx4UkvAA0Vx/dAefEx1SV/iTwkclFQWh2yQ7Q+Ftj2LkgGeEfJ0UVMr2
-	Ln/OFSWP/gyIp3oFFrtQ==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=90eDCy+xG/q0mnU4PNItKbQwd9aM7ebhroaj3N3VYEY=; b=Lfu+iUfKHG8d0D
+	w7dk+x4vYQ5Cgn4/+ZTh6SykcrjdJu1Vs3VfmB4ZMRWxcGDfWt211DiRiOKlsKUGu6jZ9qVROydDP
+	lfLrvwma5TEZGGICxJDQlLm1hA7s/2yKztgHZG0/DVdp4AhVXdO8MqUZK1yxm2HkifQ7yK46s1QUu
+	H30g2oJ58SoikAd2EEM/9ed8mjbX5aqETsb2JpXdlPErx2SlwrTC1dyXAMeZqLM4sHFq7dRCuCLWI
+	fn8vcmJVe81E7xE3PB0Qv8bhA4CjU3PD4cimwtsqBzHreacN4HtYzPqnLdAf7euIOXrGrpm7sh5Zs
+	e8R+n+iSlHHFujZqC6Qw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlFy-0007iV-7a; Mon, 03 Dec 2018 10:15:14 +0000
-Received: from mail-ed1-f66.google.com ([209.85.208.66])
+	id 1gTlGt-00086E-1u; Mon, 03 Dec 2018 10:16:11 +0000
+Received: from mail-wm1-x343.google.com ([2a00:1450:4864:20::343])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlFq-0006QL-N1
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:15:12 +0000
-Received: by mail-ed1-f66.google.com with SMTP id b3so10234074ede.1
+ id 1gTlGp-0007ys-3s
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:16:08 +0000
+Received: by mail-wm1-x343.google.com with SMTP id y185so6582100wmd.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:14:56 -0800 (PST)
+ Mon, 03 Dec 2018 02:15:56 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=5GE2KwXHdmFr5oCC22e/Lvz0b5SuqoPfxF8T36urY/E=;
+ b=RvZno6/0JHq/8Xiol/Kt3VuPZ4p/5AvZzsoU6w+UUYJ2GkP/CNSz+D4aPaIaIbydM2
+ Y2IK1Jmq3RW1WfissAlI9ayUVu1GXy0NN0a+CU1olE4c83QNfn3lztxrbLZdJ4cpr9iK
+ YEmDQcjrIhkCt7rF/pEzpix0PFBTpNIYsa6so=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=YEEfeb2bhDBv6eCurl9mR7hSIVGyipoTCFXHjvSDN2M=;
- b=TtXS7hjP0IL9jo9wuGNlFWlsf2k1g8+41G2dvwUsyRtIMaakDMPgnw8cYw5Fw8fgq2
- AYee9RmuRhvqwsd+im/Ic+YGSmvDiZ4XoMSI5JJ0w90TcvMWEMdTTKudkOV2nfcHP6OL
- IZAxebFPVbu4WLPqRjeEvgtadU1TpwvK2wxz1sNpiontTYjSDxpMutiBBlY4ioAAX9Oa
- 5wg0lZorS0b0ohHY6Ep+ntZKskvz9ihs81kyAelJW77MoS47XZntXLFrZLiHFNEkNVh3
- ZlAWV7M48BXzcveUuTOn5rjdeyxXLA65HpjWLu8Dtwn5wsjU+/ySfUiCUCQjYh4jJDgm
- 03WA==
-X-Gm-Message-State: AA+aEWYU8RWg7+ARvRDTR1qAk4YN31qXOdIJ/X+fI+i0HgHM9HRWYlyc
- VGTMTcwOMl1oyhX2FzhBb2WPwm33WGU=
-X-Google-Smtp-Source: AFSGD/W03HzJKE901vUNlJggNNec63jVCCC7pnrpIRk4ntbKhLEO/vz+9bupxurTbIkRfsNATZGe0Q==
-X-Received: by 2002:a50:b172:: with SMTP id l47mr13877578edd.225.1543832094640; 
- Mon, 03 Dec 2018 02:14:54 -0800 (PST)
-Received: from mail-wr1-f45.google.com (mail-wr1-f45.google.com.
- [209.85.221.45])
- by smtp.gmail.com with ESMTPSA id n29sm3735913edd.40.2018.12.03.02.14.54
- for <linux-arm-kernel@lists.infradead.org>
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=5GE2KwXHdmFr5oCC22e/Lvz0b5SuqoPfxF8T36urY/E=;
+ b=ieCRs6kYOqiwyUHRkVepPE4d3lrTiThTW/pXXyLJhoxxR2BUzhYVDcJ6DwSt+TQyxl
+ 1G7kaqZdAj8KmcfZmO70SSzQjTkxhA81Df0wwhEjEnLugJ+iK+bmpa6/zILSneCz9QjY
+ j5WxX7Y/K8tTnHvVhHNC4DNqbCeSrxniMm0gAmSESea+qDyx4LEJ89+gPb1TMBnbhieq
+ 4O3Dgx7sYyK4xrO8Mxwr7HEjDpDFt1i7gxY1eGA6YgdTNtUhPOgM/u/+ANrvFLNbvmgA
+ 94FZGRTcVGRX3WLDJRkcOMeilrqYfiBEcbQsjvIslihk2SoNXiiatWI1QR/ltZruj+Ey
+ zeuw==
+X-Gm-Message-State: AA+aEWZH58HKWszVwGGjZ2Z/BIJOAPmXI+utqNZM/MGxOXsGwtz8LH1P
+ Q4wIf0kBnEcqefGcNCc4/ytKMA==
+X-Google-Smtp-Source: AFSGD/WOhsI5EdV6mfsBy0JoWQcCWF0qkVDxZsqN4qBQohApKBD6fQdYmq6QY1bCO0Zsk3Lry3/Wqg==
+X-Received: by 2002:a1c:99ce:: with SMTP id b197mr1882465wme.75.1543832155599; 
+ Mon, 03 Dec 2018 02:15:55 -0800 (PST)
+Received: from localhost.localdomain (conf.hotelmediterraneo.com.
+ [2.228.78.71])
+ by smtp.gmail.com with ESMTPSA id f192sm5832158wmd.12.2018.12.03.02.15.54
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 02:14:54 -0800 (PST)
-Received: by mail-wr1-f45.google.com with SMTP id v6so11447841wrr.12
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:14:54 -0800 (PST)
-X-Received: by 2002:adf:a1d2:: with SMTP id v18mr12800470wrv.87.1543832093766; 
- Mon, 03 Dec 2018 02:14:53 -0800 (PST)
+ Mon, 03 Dec 2018 02:15:55 -0800 (PST)
+From: Jagan Teki <jagan@amarulasolutions.com>
+To: Maxime Ripard <maxime.ripard@bootlin.com>,
+ Rob Herring <robh+dt@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
+ Dmitry Torokhov <dmitry.torokhov@gmail.com>, linux-input@vger.kernel.org,
+ devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-kernel@vger.kernel.org, Lee Jones <lee.jones@linaro.org>,
+ linux-sunxi@googlegroups.com
+Subject: [PATCH 1/9] dt-bindings: gpio-axp209: Add AXP803 GPIOs compatible (w/
+ AXP813 fallback)
+Date: Mon,  3 Dec 2018 15:45:39 +0530
+Message-Id: <20181203101547.16835-1-jagan@amarulasolutions.com>
+X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 MIME-Version: 1.0
-References: <20181203100747.16442-1-jagan@amarulasolutions.com>
-In-Reply-To: <20181203100747.16442-1-jagan@amarulasolutions.com>
-From: Chen-Yu Tsai <wens@csie.org>
-Date: Mon, 3 Dec 2018 18:14:39 +0800
-X-Gmail-Original-Message-ID: <CAGb2v64B-afrJ=n1td4HsJgtyrr=oxjF3M=pqjuKtp2AU2V0Gw@mail.gmail.com>
-Message-ID: <CAGb2v64B-afrJ=n1td4HsJgtyrr=oxjF3M=pqjuKtp2AU2V0Gw@mail.gmail.com>
-Subject: Re: [PATCH 0/5] media/sun6i: Allwinner A64 CSI support
-To: Jagan Teki <jagan@amarulasolutions.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_021506_757358_3C43261F 
-X-CRM114-Status: GOOD (  14.48  )
+X-CRM114-CacheID: sfid-20181203_021607_177359_44716881 
+X-CRM114-Status: GOOD (  13.57  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -90,42 +98,38 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- Linux Media Mailing List <linux-media@vger.kernel.org>
+Cc: Jagan Teki <jagan@amarulasolutions.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 6:07 PM Jagan Teki <jagan@amarulasolutions.com> wrote:
->
-> This series support CSI on Allwinner A64.
->
-> The CSI controller seems similar to that of in H3, so fallback
-> compatible is used to load the driver.
->
-> Unlike other SoC's A64 has set of GPIO Pin gropus SDA, SCK intead
-> of dedicated I2C controller, so this series used i2c-gpio bitbanging.
->
-> Right now the camera is able to detect, but capture images shows
-> sequence of red, blue line. any suggestion please help.
+AXP803 PMIC has two GPIO's which is similar to the one in
+AXP813 PMIC.
 
-The CSI controller doesn't seem to work properly at the default
-clock rate of 600 MHz. Dropping it down to 300 MHz, the default
-rate used by the BSP, fixes things.
+Add a compatible string for it with AXP813 fallback compatible string, in
+this case the AXP813 driver can be used.
 
-The BSP also tries to use different clock rates (multiples of 108 MHz)
-according to the captured image size. I've not tried this since the
-driver no longer exports sub-device controls, and I currently don't
-know how to handle that to change the resolution.
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+ Documentation/devicetree/bindings/gpio/gpio-axp209.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Regards
-ChenYu
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+index fc42b2caa06d..c8c5d20856c9 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+@@ -12,6 +12,7 @@ Required properties:
+ - compatible: Should be one of:
+ 	- "x-powers,axp209-gpio"
+ 	- "x-powers,axp813-gpio"
++	- "x-powers,axp803-gpio", "x-powers,axp813-gpio"
+ - #gpio-cells: Should be two. The first cell is the pin number and the
+   second is the GPIO flags.
+ - gpio-controller: Marks the device node as a GPIO controller.
+-- 
+2.18.0.321.gffc6fa0e3
+
 
 _______________________________________________
 linux-arm-kernel mailing list
