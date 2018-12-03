@@ -2,72 +2,84 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 74BA3C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:54:07 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DD09EC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:56:13 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 452D920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:54:07 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A059B20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:56:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="fWA9CRst";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="ee7QWVMN"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 452D920850
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="njETe/cB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A059B20850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=redhat.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=UJwq0kELjvYs3SOmQ5rtE45Yxxto4cCOCT0onfXvylQ=; b=fWA9CRstd2zF8y
-	OwUe2oBX3EUVFKZhXjhvOi69zjenJqJLHVLvHXugn9WD4omnFGFZVyKcbdW1QaFU2g/MB6kxkiBUT
-	ghuUkyS35YKZjXNjUddmsEI8LlHSHFtzt+YXpItsglVpemQE3X5pk2ZuYbmxXNthkRmgggIUpOG+E
-	/7pftLhzT2f1A3uYqQDuHZJE9XLcWs4zr05sc65kLSW3NyqlvHRGqkifrVJkLlYBBToxCI0tzy2OQ
-	H/2KsJe3o53TcAl4EuttVjbr4EMlqOBta3IUqw94fgrMN5zUhhxBJjL3K2isSZZJG6T9LDRBAvNud
-	T41fwZOXTvvuZue4dGsw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=WqDAjjWgYGFAC7OntbGLsscQXBOajVxvzZPoY0qpTwI=; b=njETe/cBsoH3aEr+S5QVuQtt9
+	R+KPuT79O2tApmVhxPOgJMv+rsMVKYMe6N3JMp1gV/zw4UpQvaMLtkTvkUkP/4AYIz3WEIBc1u33P
+	0Z+nOay02qXBNlnF0FiJYPtJaUlgWr/8yKHwrmIsQdkTiq9QeRoyI2U7iKiuO5hde/Cv9d5/FlyiM
+	ngwfVzxv9Jp2RZ6CmhpmFGCvvgiWVMDHx0pNZdhHmkNaYEI5Mw9CNmHPAQA2hkEmP/v0D/yv6jm1X
+	tdM1C0bUAtwKwcQKk9TgnQysXqLc4lgYiN5XQNfF76SRAvqSBOBJ9V6nyiNtGTjdT6VpTxBfHJUiV
+	PtH3M31yA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTpbp-0003cy-OA; Mon, 03 Dec 2018 14:54:05 +0000
-Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
+	id 1gTpds-0005Vj-Iy; Mon, 03 Dec 2018 14:56:12 +0000
+Received: from mail-ed1-f66.google.com ([209.85.208.66])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTpbn-0003ch-Sq
- for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 14:54:04 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=In-Reply-To:Content-Type:MIME-Version:
- References:Message-ID:Subject:Cc:To:From:Date:Sender:Reply-To:
- Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
- Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
- List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=ibdjgk9aOMePzUCtSmtUBOMCgEtZrqEYS25EWKhOd/U=; b=ee7QWVMNjPaVO4D3miQSAQhaY
- x9ixFwiD+dxZ/uQQw93/cOlz6GshqiJTMqRjmBiqSRoyPecEv5Ac9HNaGHo4qFZzzr5GEYGDIKHa8
- 9t2jGDrbi4qprPiSZDPqfDB2YfHv7gVPXYPksk/EZ50kt5fVHe/zqsTMKI1kjtsL4yNkIU4EH5xBD
- zTDqiO4KhItqYNY3vnLXZcdjOR9G1OG87a0vMQ1lZWPrMwsoToTg+Fwy4eZ8L4/cp5JhviBnAQ3YF
- GyIOUz0DNqsbkp7RtV54CkM7U2+HAcH+SjpA9kaxmhRGWpjLtF9uLQiCkBK2vvrMGJYpQwhbpW2b8
- BllHAOtfQ==;
-Received: from [190.15.121.82] (helo=quaco.ghostprotocols.net)
- by merlin.infradead.org with esmtpsa (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTpbl-0000PP-Oq; Mon, 03 Dec 2018 14:54:02 +0000
-Received: by quaco.ghostprotocols.net (Postfix, from userid 1000)
- id 3809D40BF1; Mon,  3 Dec 2018 11:53:55 -0300 (-03)
-Date: Mon, 3 Dec 2018 11:53:55 -0300
-From: Arnaldo Carvalho de Melo <acme@kernel.org>
-To: Robert Walker <robert.walker@arm.com>
-Subject: Re: [PATCH v5 RESEND] perf: Support for Arm A32/T32 instruction sets
- in CoreSight trace
-Message-ID: <20181203145355.GA18717@kernel.org>
-References: <1543839526-30348-1-git-send-email-robert.walker@arm.com>
+ id 1gTpdo-0005Ul-S6
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:56:10 +0000
+Received: by mail-ed1-f66.google.com with SMTP id f9so4530462eds.10
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 06:55:58 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:subject:to:cc:references:from:message-id:date
+ :user-agent:mime-version:in-reply-to:content-language
+ :content-transfer-encoding;
+ bh=OXqCRHYkVkZXNFZ2/gMd/fM+paR1Au2ZW6ox8oxBoRM=;
+ b=mFIAlx0ehd36irwJ5nmwts+VrazEPKuvnjvtZdcoA22IQMf9rDw7acBee17gNaKSc3
+ QIFCC6ihleLJ3c3RFfXTYnehpyYSRKND36/jdiBcRphOvcwml5jcJ+fVOoFfmdE563OD
+ /Ng7I4HQ55R4jlFkM+QnarxpwkUcNjQLObSpAkdBRo8XzA9Tuc3jx4WviIQz439wPqmV
+ hl/Rrdl4AszI5I4ukJa9gdlKQYzftquc/Z3OEpMC4jvJfrewhIClA2u1czE5wGqDR/u7
+ XIvpnxuh44DkRM2dIvPH8ZQdWnmwRgsdA7XP76nR5VDzeJAc1c/hxmTlMLMxgnLY9T5+
+ d5DA==
+X-Gm-Message-State: AA+aEWYVpbpYSGF1c+mLZif03UhRlb5Y5L0lvkZnMdrfrlvDctAqI+5E
+ 5JpZgOuA6KNjlERNbyUE/WfLiw==
+X-Google-Smtp-Source: AFSGD/Wdy1N9UqJ7tsy4f5BeSWpvTOVwWGc93UuIvD/ypkqJy4H2zdRY81U7KTVm54pNvOdUcJcv1g==
+X-Received: by 2002:a50:8f86:: with SMTP id y6mr15377367edy.131.1543848956967; 
+ Mon, 03 Dec 2018 06:55:56 -0800 (PST)
+Received: from shalem.localdomain (546A5441.cm-12-3b.dynamic.ziggo.nl.
+ [84.106.84.65])
+ by smtp.gmail.com with ESMTPSA id d5sm3999508edb.48.2018.12.03.06.55.55
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 03 Dec 2018 06:55:56 -0800 (PST)
+Subject: Re: [PATCH v2 1/6] ata: libahci_platform: comply to PHY framework
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+References: <20181130153833.11421-1-miquel.raynal@bootlin.com>
+ <20181130153833.11421-2-miquel.raynal@bootlin.com>
+ <0517746d-3fca-db57-8dca-8976910dad9c@redhat.com>
+ <20181203154635.3c6df0d3@xps13>
+From: Hans de Goede <hdegoede@redhat.com>
+Message-ID: <c57d8bc7-141d-a915-4d5e-8504c522b4fe@redhat.com>
+Date: Mon, 3 Dec 2018 15:55:55 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1543839526-30348-1-git-send-email-robert.walker@arm.com>
-X-Url: http://acmel.wordpress.com
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <20181203154635.3c6df0d3@xps13>
+Content-Language: en-US
+X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
+X-CRM114-CacheID: sfid-20181203_065608_914535_44067E2C 
+X-CRM114-Status: GOOD (  30.62  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -79,297 +91,136 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>,
- Peter Zijlstra <peterz@infradead.org>, CoreSight@lists.linaro.org,
- linux-kernel@vger.kernel.org,
- Alexander Shishkin <alexander.shishkin@linux.intel.com>,
- Ingo Molnar <mingo@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
- Jiri Olsa <jolsa@redhat.com>, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Jason Cooper <jason@lakedaemon.net>, devicetree@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-pm@vger.kernel.org,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
+ Rob Herring <robh+dt@kernel.org>, Jens Axboe <axboe@kernel.dk>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Em Mon, Dec 03, 2018 at 12:18:46PM +0000, Robert Walker escreveu:
-> This patch adds support for generating instruction samples from trace of
-> AArch32 programs using the A32 and T32 instruction sets.
-> 
-> T32 has variable 2 or 4 byte instruction size, so the conversion between
-> addresses and instruction counts requires extra information from the trace
-> decoder, requiring version 0.10.0 of OpenCSD.  A check for the OpenCSD
-> library version has been added to the feature check for OpenCSD.
-> 
-> Signed-off-by: Robert Walker <robert.walker@arm.com>
-> ---
-> 
-> Hi Arnaldo,
-> 
-> Please add this patch to the queue for 4.21 (originally sent as https://lkml.org/lkml/2018/11/9/965)
-> 
-> Mathieu has reviewed it: https://lkml.org/lkml/2018/11/9/1432
+Hi,
 
-Ok, and reading responses to this patch in previous submissions I notice
-that it got some Reviewed-by and Tested-by, please collect those tags
-when reposting, that of course, if the patch contents are the same.
+On 03-12-18 15:46, Miquel Raynal wrote:
+> Hi Hans,
+> 
+> Hans de Goede <hdegoede@redhat.com> wrote on Sun, 2 Dec 2018 14:19:49
+> +0100:
+> 
+>> Hi,
+>>
+>> On 30-11-18 16:38, Miquel Raynal wrote:
+>>> Current implementation of the libahci does not take into account the
+>>> new PHY framework. Correct the situation by adding a call to
+>>> phy_set_mode() before phy_power_on() and by adding calls to
+>>> ahci_platform_enable/disable_phys() at suspend/resume_host() time.
+>>>
+>>> Suggested-by: Grzegorz Jaszczyk <jaz@semihalf.com>
+>>> Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+>>
+>> Much better. Some remarks inline.
+>>
+>>> ---
+>>>    drivers/ata/ahci.h             |  2 ++
+>>>    drivers/ata/libahci_platform.c | 19 ++++++++++++++++++-
+>>>    2 files changed, 20 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+>>> index ef356e70e6de..982638b37fee 100644
+>>> --- a/drivers/ata/ahci.h
+>>> +++ b/drivers/ata/ahci.h
+>>> @@ -254,6 +254,8 @@ enum {
+>>>    	AHCI_HFLAG_IS_MOBILE		= (1 << 25), /* mobile chipset, use
+>>>    							SATA_MOBILE_LPM_POLICY
+>>>    							as default lpm_policy */
+>>> +	AHCI_HFLAG_MANAGE_PHYS		= (1 << 26), /* let the core manage the
+>>> +							PHYs when relevant */
+>>
+>> Using a hflag for this is a good idea, but the MANAGE_PHYS names is a bit
+>> generic, even if this is not set then ahci_platform_enable_resources() will
+>> still enable the phy. So I would name this AHCI_HFLAG_SUSPEND_PHYS to make
+>> clear this only influences suspend/resume behavior.
+> 
+> I understand and will modify the HFLAG name as you suggest.
+> 
+>>
+>> Also see below.
+>>
+>>>    	/* ap->flags bits */
+>>>    > diff --git a/drivers/ata/libahci_platform.c b/drivers/ata/libahci_platform.c
+>>> index 4b900fc659f7..f5a64eb1fea8 100644
+>>> --- a/drivers/ata/libahci_platform.c
+>>> +++ b/drivers/ata/libahci_platform.c
+>>> @@ -56,6 +56,12 @@ static int ahci_platform_enable_phys(struct ahci_host_priv *hpriv)
+>>>    		if (rc)
+>>>    			goto disable_phys;
+>>>    > +		rc = phy_set_mode(hpriv->phys[i], PHY_MODE_SATA);
+>>> +		if (rc) {
+>>> +			phy_exit(hpriv->phys[i]);
+>>> +			goto disable_phys;
+>>> +		}
+>>> +
+>>>    		rc = phy_power_on(hpriv->phys[i]);
+>>>    		if (rc) {
+>>>    			phy_exit(hpriv->phys[i]);
+>>> @@ -378,7 +384,8 @@ static int ahci_platform_get_regulator(struct ahci_host_priv *hpriv, u32 port,
+>>>     * 3) 0 - AHCI_MAX_CLKS clocks, as specified in the devs devicetree node,
+>>>     *    or for non devicetree enabled platforms a single clock
+>>>     * 4) resets, if flags has AHCI_PLATFORM_GET_RESETS (optional)
+>>> - * 5) phys (optional)
+>>> + * 5) phys (optional), PHY handling during suspend/resume will be skipped if the
+>>> + *    flag AHCI_HFLAG_MANAGE_PHYS is missing.
+>>>     *
+>>>     * RETURNS:
+>>>     * The allocated ahci_host_priv on success, otherwise an ERR_PTR value
+>>> @@ -458,6 +465,9 @@ struct ahci_host_priv *ahci_platform_get_resources(struct platform_device *pdev,
+>>>    		}
+>>>    	}
+>>>    > +	if (flags & AHCI_HFLAG_MANAGE_PHYS)
+>>> +		hpriv->flags |= AHCI_HFLAG_MANAGE_PHYS;
+>>> +
+>>>    	hpriv->nports = child_nodes = of_get_child_count(dev->of_node);
+>>>    >   	/*
+>>
+>> Interpreting a flag passed to ahci_platform_get_resources using a
+>> AHCI_HFLAG_* mask is asking for trouble in the future.
+>>
+>> Since you are using a hflag for this, you can just drop this chunk / change
+>> and in the caller of ahci_platform_get_resources() do:
+>>
+>> 	hpriv = ahci_platform_get_resources(pdev, ...);
+>> 	if (IS_ERR(hpriv))
+>> 		...
+>>
+>> 	hpriv->flags |= AHCI_HFLAG_MANAGE_PHYS;
+>>
+>> Settting hflags like this after calling ahci_platform_get_resources()
+>> is already done in several place.
+> 
+> Indeed, this is close to my first draft but after re-reading your
+> previous review I understood you wanted this flag to be passed to
+> ahci_platform_get_resources().
 
-Thanks, applied.
+Yes that was my initial thought, but sine you are using a hflag for
+it that is no longer a good idea.
 
-- Arnaldo
- 
-> Thanks
-> 
-> Robert Walker
-> 
-> 
-> Changes since v4:
->  Formatting of comment block
-> 
->  tools/build/feature/test-libopencsd.c           |  8 +++
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 29 ++++++++++
->  tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 10 ++++
->  tools/perf/util/cs-etm.c                        | 70 +++++++++++--------------
->  4 files changed, 78 insertions(+), 39 deletions(-)
-> 
-> diff --git a/tools/build/feature/test-libopencsd.c b/tools/build/feature/test-libopencsd.c
-> index 5ff1246..d68eb4f 100644
-> --- a/tools/build/feature/test-libopencsd.c
-> +++ b/tools/build/feature/test-libopencsd.c
-> @@ -1,6 +1,14 @@
->  // SPDX-License-Identifier: GPL-2.0
->  #include <opencsd/c_api/opencsd_c_api.h>
->  
-> +/*
-> + * Check OpenCSD library version is sufficient to provide required features
-> + */
-> +#define OCSD_MIN_VER ((0 << 16) | (10 << 8) | (0))
-> +#if !defined(OCSD_VER_NUM) || (OCSD_VER_NUM < OCSD_MIN_VER)
-> +#error "OpenCSD >= 0.10.0 is required"
-> +#endif
-> +
->  int main(void)
->  {
->  	(void)ocsd_get_version();
-> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> index 938def6..5efb616 100644
-> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
-> @@ -263,9 +263,12 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
->  	decoder->tail = 0;
->  	decoder->packet_count = 0;
->  	for (i = 0; i < MAX_BUFFER; i++) {
-> +		decoder->packet_buffer[i].isa = CS_ETM_ISA_UNKNOWN;
->  		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
->  		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
-> +		decoder->packet_buffer[i].instr_count = 0;
->  		decoder->packet_buffer[i].last_instr_taken_branch = false;
-> +		decoder->packet_buffer[i].last_instr_size = 0;
->  		decoder->packet_buffer[i].exc = false;
->  		decoder->packet_buffer[i].exc_ret = false;
->  		decoder->packet_buffer[i].cpu = INT_MIN;
-> @@ -294,11 +297,15 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
->  	decoder->packet_count++;
->  
->  	decoder->packet_buffer[et].sample_type = sample_type;
-> +	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
->  	decoder->packet_buffer[et].exc = false;
->  	decoder->packet_buffer[et].exc_ret = false;
->  	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
->  	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
->  	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
-> +	decoder->packet_buffer[et].instr_count = 0;
-> +	decoder->packet_buffer[et].last_instr_taken_branch = false;
-> +	decoder->packet_buffer[et].last_instr_size = 0;
->  
->  	if (decoder->packet_count == MAX_BUFFER - 1)
->  		return OCSD_RESP_WAIT;
-> @@ -321,8 +328,28 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
->  
->  	packet = &decoder->packet_buffer[decoder->tail];
->  
-> +	switch (elem->isa) {
-> +	case ocsd_isa_aarch64:
-> +		packet->isa = CS_ETM_ISA_A64;
-> +		break;
-> +	case ocsd_isa_arm:
-> +		packet->isa = CS_ETM_ISA_A32;
-> +		break;
-> +	case ocsd_isa_thumb2:
-> +		packet->isa = CS_ETM_ISA_T32;
-> +		break;
-> +	case ocsd_isa_tee:
-> +	case ocsd_isa_jazelle:
-> +	case ocsd_isa_custom:
-> +	case ocsd_isa_unknown:
-> +	default:
-> +		packet->isa = CS_ETM_ISA_UNKNOWN;
-> +	}
-> +
->  	packet->start_addr = elem->st_addr;
->  	packet->end_addr = elem->en_addr;
-> +	packet->instr_count = elem->num_instr_range;
-> +
->  	switch (elem->last_i_type) {
->  	case OCSD_INSTR_BR:
->  	case OCSD_INSTR_BR_INDIRECT:
-> @@ -336,6 +363,8 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
->  		break;
->  	}
->  
-> +	packet->last_instr_size = elem->last_instr_sz;
-> +
->  	return ret;
->  }
->  
-> diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-> index 612b575..9351bd1 100644
-> --- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-> +++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
-> @@ -28,11 +28,21 @@ enum cs_etm_sample_type {
->  	CS_ETM_TRACE_ON = 1 << 1,
->  };
->  
-> +enum cs_etm_isa {
-> +	CS_ETM_ISA_UNKNOWN,
-> +	CS_ETM_ISA_A64,
-> +	CS_ETM_ISA_A32,
-> +	CS_ETM_ISA_T32,
-> +};
-> +
->  struct cs_etm_packet {
->  	enum cs_etm_sample_type sample_type;
-> +	enum cs_etm_isa isa;
->  	u64 start_addr;
->  	u64 end_addr;
-> +	u32 instr_count;
->  	u8 last_instr_taken_branch;
-> +	u8 last_instr_size;
->  	u8 exc;
->  	u8 exc_ret;
->  	int cpu;
-> diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
-> index 73430b7..48ad217 100644
-> --- a/tools/perf/util/cs-etm.c
-> +++ b/tools/perf/util/cs-etm.c
-> @@ -31,14 +31,6 @@
->  
->  #define MAX_TIMESTAMP (~0ULL)
->  
-> -/*
-> - * A64 instructions are always 4 bytes
-> - *
-> - * Only A64 is supported, so can use this constant for converting between
-> - * addresses and instruction counts, calculting offsets etc
-> - */
-> -#define A64_INSTR_SIZE 4
-> -
->  struct cs_etm_auxtrace {
->  	struct auxtrace auxtrace;
->  	struct auxtrace_queues queues;
-> @@ -510,21 +502,17 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
->  	etmq->last_branch_rb->nr = 0;
->  }
->  
-> -static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
-> -{
-> -	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-> -	if (packet->sample_type == CS_ETM_TRACE_ON)
-> -		return 0;
-> +static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
-> +					 u64 addr) {
-> +	u8 instrBytes[2];
->  
-> +	cs_etm__mem_access(etmq, addr, ARRAY_SIZE(instrBytes), instrBytes);
->  	/*
-> -	 * The packet records the execution range with an exclusive end address
-> -	 *
-> -	 * A64 instructions are constant size, so the last executed
-> -	 * instruction is A64_INSTR_SIZE before the end address
-> -	 * Will need to do instruction level decode for T32 instructions as
-> -	 * they can be variable size (not yet supported).
-> +	 * T32 instruction size is indicated by bits[15:11] of the first
-> +	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
-> +	 * denote a 32-bit instruction.
->  	 */
-> -	return packet->end_addr - A64_INSTR_SIZE;
-> +	return ((instrBytes[1] & 0xF8) >= 0xE8) ? 4 : 2;
->  }
->  
->  static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
-> @@ -536,27 +524,32 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
->  	return packet->start_addr;
->  }
->  
-> -static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
-> +static inline
-> +u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
->  {
-> -	/*
-> -	 * Only A64 instructions are currently supported, so can get
-> -	 * instruction count by dividing.
-> -	 * Will need to do instruction level decode for T32 instructions as
-> -	 * they can be variable size (not yet supported).
-> -	 */
-> -	return (packet->end_addr - packet->start_addr) / A64_INSTR_SIZE;
-> +	/* Returns 0 for the CS_ETM_TRACE_ON packet */
-> +	if (packet->sample_type == CS_ETM_TRACE_ON)
-> +		return 0;
-> +
-> +	return packet->end_addr - packet->last_instr_size;
->  }
->  
-> -static inline u64 cs_etm__instr_addr(const struct cs_etm_packet *packet,
-> +static inline u64 cs_etm__instr_addr(struct cs_etm_queue *etmq,
-> +				     const struct cs_etm_packet *packet,
->  				     u64 offset)
->  {
-> -	/*
-> -	 * Only A64 instructions are currently supported, so can get
-> -	 * instruction address by muliplying.
-> -	 * Will need to do instruction level decode for T32 instructions as
-> -	 * they can be variable size (not yet supported).
-> -	 */
-> -	return packet->start_addr + offset * A64_INSTR_SIZE;
-> +	if (packet->isa == CS_ETM_ISA_T32) {
-> +		u64 addr = packet->start_addr;
-> +
-> +		while (offset > 0) {
-> +			addr += cs_etm__t32_instr_size(etmq, addr);
-> +			offset--;
-> +		}
-> +		return addr;
-> +	}
-> +
-> +	/* Assume a 4 byte instruction size (A32/A64) */
-> +	return packet->start_addr + offset * 4;
->  }
->  
->  static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
-> @@ -888,9 +881,8 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
->  	struct cs_etm_auxtrace *etm = etmq->etm;
->  	struct cs_etm_packet *tmp;
->  	int ret;
-> -	u64 instrs_executed;
-> +	u64 instrs_executed = etmq->packet->instr_count;
->  
-> -	instrs_executed = cs_etm__instr_count(etmq->packet);
->  	etmq->period_instructions += instrs_executed;
->  
->  	/*
-> @@ -920,7 +912,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
->  		 * executed, but PC has not advanced to next instruction)
->  		 */
->  		u64 offset = (instrs_executed - instrs_over - 1);
-> -		u64 addr = cs_etm__instr_addr(etmq->packet, offset);
-> +		u64 addr = cs_etm__instr_addr(etmq, etmq->packet, offset);
->  
->  		ret = cs_etm__synth_instruction_sample(
->  			etmq, addr, etm->instructions_sample_period);
-> -- 
-> 2.7.4
+> I do agree that the current form is a bit redundant so I will let users
+> add the flag manually during the probe after the
+> ahci_platform_get_resources() call, as suggested.
 
--- 
+Sounds good, thanks.
 
-- Arnaldo
+Regards,
+
+Hans
+
 
 _______________________________________________
 linux-arm-kernel mailing list
