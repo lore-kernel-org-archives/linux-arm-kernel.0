@@ -1,88 +1,80 @@
-Return-Path: <SRS0=zgA4=OL=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
+Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@kernel.org>
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+X-Spam-Status: No, score=-8.3 required=3.0 tests=DKIM_INVALID,DKIM_SIGNED,
 	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DECD6C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 23:59:33 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75335C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 00:37:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A68162080A
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Sun,  2 Dec 2018 23:59:33 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 445BC20892
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 00:37:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OUKXzfV7";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="U8UGZTQ3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A68162080A
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OX28jpUh";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=armlinux.org.uk header.i=@armlinux.org.uk header.b="k1X9aDSW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 445BC20892
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=armlinux.org.uk
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
-	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=JV1BQoOtT8en9GN2sq8JdlwOpcRIdzgiXL2fI0FguOc=; b=OUK
-	XzfV7y8Accy5URQ3HR3ED8G0muBmwRHjKZi+zz9Ap3w5mfYAOcjS4AWBSKpGwFan0LjWgLZxNzXeP
-	SK0VljqDkY9owJs+mGFYKeEzCkxKmeANDCnFv0qYLixoPVVUMe2FpcELnXo4HpzB92UIhJohL9ExJ
-	EGnqkSaWWzuWA6UvhSw77oJZ9K4/KKWh5SVwZ8gGX82Z5btsKoiz6lIS7fnqF97pqQucDGncuMVE/
-	+4Cnx7p55VyO6p4FhnYLueg3OB7DVQNrPFnGCcJw33olfdAZCtYNVC9gqiqLlDcmaESnwzWsxolE/
-	sy6Q9bIyo3DbcHBVlcOdfEIP4vMWUIA==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=UkZztixsYCcFwEQOZvRGCs0ErARNe5pakUw7TLkFEp0=; b=OX28jpUhuIu2ae
+	lmcdf8fuc6Tb6JcbK6ZOqcqAUGLZKR3jzkU915afv5OpJ08GGOJEvsBpInGELOn1rKHi651Xmlgvb
+	7l7YMz17+HroSpHi89rAO7kGo6abg8Xats8xnu2obr750h2CExwbd/wclh+YA3zio9Fk+40YKFILp
+	6U73KAqrNN8nWiDc4HggmVq4vMNG4zQTtDAphzF1i31J5pHHwanaPzf9nqWQ3t49MceTKaPWIatV/
+	Sjh5TmWGkUVpxn28iUAm3xXGqMz9Hm++K/vbiQAiLIFjAIWhTg9nPg7mU2TZwlPhdaG6qfpvQVo0M
+	6HKcB3+MAw04Vfx1LK4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTbe7-0004Y4-LQ; Sun, 02 Dec 2018 23:59:31 +0000
-Received: from mail-pl1-x644.google.com ([2607:f8b0:4864:20::644])
+	id 1gTcEn-0008TN-De; Mon, 03 Dec 2018 00:37:25 +0000
+Received: from pandora.armlinux.org.uk
+ ([2001:4d48:ad52:3201:214:fdff:fe10:1be6])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTbe4-0004Xb-FJ
- for linux-arm-kernel@lists.infradead.org; Sun, 02 Dec 2018 23:59:29 +0000
-Received: by mail-pl1-x644.google.com with SMTP id b5so5496348plr.4
- for <linux-arm-kernel@lists.infradead.org>;
- Sun, 02 Dec 2018 15:59:17 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=from:to:cc:subject:date:message-id;
- bh=ENpijwMJUe6RF+XM278gSACa0sR12+htgBAYFBYs/wI=;
- b=U8UGZTQ3+iSt9Dsmi+tHpiEi3atZ6OhwQDJHTQZm7kJIs3VVIM2AyUn7Rq7H8bDl7e
- UYmfaq205fKpjJ6vNotr33UaDBpuEY8m01hw14n/yp3x6DkL7kCEOjIOuk3Kway00j5u
- H0OTcN1QQ7LuQMruMVvOK8RanDvrqC8FH94UC3uXdOHzYef+mAwaQUc6SQT6LuVznDCC
- lazX8dU4SboNojrmUOFBWYxPZD82xMsdWdIuqH2NQ9EbdRVPm/teTMqUf0z4hAujiqbw
- bc1IDJJ5NzKmsXSZjhaAB3D8e/Q9StfWStJBqHdQSO8HPMlwtctlv8rNrNUmGHeke5VY
- GKNQ==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id;
- bh=ENpijwMJUe6RF+XM278gSACa0sR12+htgBAYFBYs/wI=;
- b=JTJeAYgpy8veBc9trAWn9erLM9yqn4RDBB+j9Ahh9nVqIbnwCOnEvg2IyCRWhYeXSW
- n9EBo+EPt2nXUHpeJFRRAX0vK0mtKmtC9cZ6Pl/GgRFhDyMFrRQTDqp0iKSsU2sq99eO
- GkDGURWyE1aPs2DjMnJR8uj6h7mfrJNp0I05Zs3hLjT2eA6iUgmnoKdnqurvJ4PA+S7a
- UVUYWI3W8DASi+CY7W4mdoPHlo4a4owYq2aQguXislFpO4uT24IahDBAIiozpEpo/nBg
- 7OQ/2xSBrdplPiO6uiL04Ng6gPIePR4/3jzzk/ZNY0gB36vkQs1D7Dei1i6hrju3jciv
- vb6Q==
-X-Gm-Message-State: AA+aEWb2bEOo5I+hm1ODViOq0I2CEVXLab+HRTmm+Gga0sq+dXpITg/a
- 03T75kC/RZizPf9nAEZpYHo=
-X-Google-Smtp-Source: AFSGD/VENCfalkSWeO7FM5dxcM3z2op7SzucWCC7nMrpCjlwktCIy9Spow3Re7dSsZHWa3zXUu8JGg==
-X-Received: by 2002:a17:902:a03:: with SMTP id
- 3mr13950898plo.112.1543795157410; 
- Sun, 02 Dec 2018 15:59:17 -0800 (PST)
-Received: from localhost.localdomain ([67.139.187.132])
- by smtp.gmail.com with ESMTPSA id l5sm11807147pgp.82.2018.12.02.15.59.16
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Sun, 02 Dec 2018 15:59:16 -0800 (PST)
-From: Dan Haab <riproute@gmail.com>
-X-Google-Original-From: Dan Haab <dan.haab@luxul.com>
-To: Florian Fainelli <f.fainelli@gmail.com>
-Subject: [PATCH] ARM: dts: BCM53573: Relicense Luxul files to the GPL 2.0+ /
- MIT
-Date: Sun,  2 Dec 2018 17:00:15 -0700
-Message-Id: <1543795215-31863-1-git-send-email-dan.haab@luxul.com>
-X-Mailer: git-send-email 1.9.1
+ id 1gTcEj-0008Sq-11
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 00:37:23 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=armlinux.org.uk; s=pandora-2014; h=Sender:In-Reply-To:Content-Type:
+ MIME-Version:References:Message-ID:Subject:Cc:To:From:Date:Reply-To:
+ Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+ Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:
+ List-Help:List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=2mhKkHDQzmkTSLjO/PM/yWQUhAvkse/UqUSuVwjsZgA=; b=k1X9aDSW/AOXv6v28difLNrzQ
+ 1VdSKm77AKO9knMZRcLqyLwHZ6/ZH8MDWleKH7D8oat7qd7BJJD1kQFXz4MvIdDd6+V4xd9TiCom1
+ 3z5B2zDUErGYc5xeq1b6Vt/uoiB51snPhIq6HbA3xNph+BVXzifEpeum22IVk8IdiS8hk=;
+Received: from n2100.armlinux.org.uk
+ ([2002:4e20:1eda:1:214:fdff:fe10:4f86]:42398)
+ by pandora.armlinux.org.uk with esmtpsa
+ (TLSv1.2:ECDHE-RSA-AES128-GCM-SHA256:128) (Exim 4.90_1)
+ (envelope-from <linux@armlinux.org.uk>)
+ id 1gTcDu-0005GD-D8; Mon, 03 Dec 2018 00:36:33 +0000
+Received: from linux by n2100.armlinux.org.uk with local (Exim 4.90_1)
+ (envelope-from <linux@n2100.armlinux.org.uk>)
+ id 1gTcDp-0007rI-Pl; Mon, 03 Dec 2018 00:36:25 +0000
+Date: Mon, 3 Dec 2018 00:36:23 +0000
+From: Russell King - ARM Linux <linux@armlinux.org.uk>
+To: Miquel Raynal <miquel.raynal@bootlin.com>
+Subject: Re: [PATCH v2 2/8] phy: mvebu-cp110-comphy: fix port check in
+ ->xlate()
+Message-ID: <20181203003623.GJ30658@n2100.armlinux.org.uk>
+References: <20181130144743.675-1-miquel.raynal@bootlin.com>
+ <20181130144743.675-3-miquel.raynal@bootlin.com>
+ <20181130190031.GH30658@n2100.armlinux.org.uk>
+ <20181202203509.21b067c4@xps13>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20181202203509.21b067c4@xps13>
+User-Agent: Mutt/1.5.23 (2014-03-12)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_155928_519017_8214D1C2 
-X-CRM114-Status: GOOD (  12.02  )
+X-CRM114-CacheID: sfid-20181202_163721_067701_1C30C75B 
+X-CRM114-Status: GOOD (  27.22  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -94,53 +86,91 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Marcin Wojtas <mw@semihalf.com>, Jason Cooper <jason@lakedaemon.net>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
  Rob Herring <robh+dt@kernel.org>,
- =?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?= <rafal@milecki.pl>,
- Dan Haab <dan.haab@luxul.com>, linux-arm-kernel@lists.infradead.org
-MIME-Version: 1.0
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This matches licensing used by other BCM53573 files and BCM5301X.
+On Sun, Dec 02, 2018 at 08:35:09PM +0100, Miquel Raynal wrote:
+> Hi Russell,
+> 
+> Russell King - ARM Linux <linux@armlinux.org.uk> wrote on Fri, 30 Nov
+> 2018 19:00:31 +0000:
+> 
+> > On Fri, Nov 30, 2018 at 03:47:37PM +0100, Miquel Raynal wrote:
+> > > So far the PHY ->xlate() callback was checking if the port was
+> > > "invalid" before continuing, meaning that the port has not been used
+> > > yet. This check is not correct as there is no opposite call to  
+> > > ->xlate() once the PHY is released by the user and the port will  
+> > > remain "valid" after the first phy_get()/phy_put() calls. Hence, if
+> > > this driver is built as a module, inserted, removed and inserted
+> > > again, the PHY will appear busy and the second probe will fail.
+> > > 
+> > > To fix this, just drop the faulty check and instead verify that the
+> > > port number is valid (ie. in the possible range).
+> > > 
+> > > Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+> > > ---
+> > >  drivers/phy/marvell/phy-mvebu-cp110-comphy.c | 4 ++--
+> > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> > > index 31b9a1c18345..a40b876ff214 100644
+> > > --- a/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> > > +++ b/drivers/phy/marvell/phy-mvebu-cp110-comphy.c
+> > > @@ -567,9 +567,9 @@ static struct phy *mvebu_comphy_xlate(struct device *dev,
+> > >  		return phy;
+> > >  
+> > >  	lane = phy_get_drvdata(phy);
+> > > -	if (lane->port >= 0)
+> > > -		return ERR_PTR(-EBUSY);
+> > >  	lane->port = args->args[0];
+> > > +	if (lane->port >= MVEBU_COMPHY_PORTS)
+> > > +		return ERR_PTR(-EINVAL);  
+> > 
+> > Shouldn't we validate args->args[0] before doing anything?
+> > 
+> 
+> I don't understand your point, there is a check on args->args[0] as
+> we check its value (through lane->port) right after. What do you
+> have in mind?
 
-Signed-off-by: Dan Haab <dan.haab@luxul.com>
----
- arch/arm/boot/dts/bcm47189-luxul-xap-1440.dts | 3 +--
- arch/arm/boot/dts/bcm47189-luxul-xap-810.dts  | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+Right, there is already a check on args->args[0] for it being greater
+than MVEBU_COMPHY_PORTS and returning an error (and in fact warning
+if that is the case).  So in that case, what is the use of the above
+additional test you are proposing to add?  The resulting code ends up
+looking like this:
 
-diff --git a/arch/arm/boot/dts/bcm47189-luxul-xap-1440.dts b/arch/arm/boot/dts/bcm47189-luxul-xap-1440.dts
-index 74c83b0..3902f69 100644
---- a/arch/arm/boot/dts/bcm47189-luxul-xap-1440.dts
-+++ b/arch/arm/boot/dts/bcm47189-luxul-xap-1440.dts
-@@ -1,7 +1,6 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
- /*
-  * Copyright 2017 Luxul Inc.
-- *
-- * Licensed under the ISC license.
-  */
- 
- /dts-v1/;
-diff --git a/arch/arm/boot/dts/bcm47189-luxul-xap-810.dts b/arch/arm/boot/dts/bcm47189-luxul-xap-810.dts
-index 214df18..4a522de 100644
---- a/arch/arm/boot/dts/bcm47189-luxul-xap-810.dts
-+++ b/arch/arm/boot/dts/bcm47189-luxul-xap-810.dts
-@@ -1,7 +1,6 @@
-+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
- /*
-  * Copyright 2017 Luxul Inc.
-- *
-- * Licensed under the ISC license.
-  */
- 
- /dts-v1/;
+	if (WARN_ON(args->args[0] >= MVEBU_COMPHY_PORTS))
+		return ERR_PTR(-EINVAL);
+...
+	lane->port = args->args[0];
++	if (lane->port >= MVEBU_COMPHY_PORTS)
++		return ERR_PTR(-EINVAL);  
+
+which is just silly - the second test can never be evaluated as true,
+and therefore is redundant.
+
+In any case, my point was that in your patch, where you assign
+lane->port and then validate the lane->port value, this is in
+principle the wrong order - the order should always be: validate
+first, then make use.
+
 -- 
-1.9.1
-
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 12.1Mbps down 622kbps up
+According to speedtest.net: 11.9Mbps down 500kbps up
 
 _______________________________________________
 linux-arm-kernel mailing list
