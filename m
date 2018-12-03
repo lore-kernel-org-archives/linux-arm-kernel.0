@@ -4,106 +4,64 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 94B03C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:18:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C68EFC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:21:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 657A52082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:18:47 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 96654206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:21:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rYr64qaF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 657A52082F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EUeD3w8n"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 96654206B7
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=0AhM5lStFRCpV3zG8dL2o5CL1YIRiH9pYv6ZY0YZBmo=; b=rYr64qaFmvbOmR
-	yAO24Xzrd0RRbsfO6AbHGwkCiijeyLK2UAULaghYP9VAYA35KXE1oAnXsaNv4x8+weIGEWpqXOeht
-	TeUnzQDgh4qIsrEFlhw+SD1guls7IIvHEqZ16vNFGu/KUDkTLZi6ABOWRNFy95MDcTjoRoi3UoprQ
-	XDzrSmupzA1oLUXOEm7iI1G6NTEr0bJeCSUWs8s7+nNBFcPNxDQgNZqsv/xFTNfG8wXa2fY4Z9KyJ
-	gTy30gsVh10xneqZhR5g+Hv/uaTGJNJPHOl1fEzo3GBZiqoIzXwYuV5kjEEqF9B2avw2ASKNgtIGO
-	crCXsDgHsn8jK1tpxyOw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=nNm2JrdaVBj5GNQ/UD1vx8SQGnbd1aQcPStCFvr3yi4=; b=EUeD3w8nuqoSL66KJdBlUAmVr
+	pnev7PfsdMO/i/Ia1HNJqVGtLch6I61LZA/uagWN8yPsDJsLviF/WAYJ5Mh/CTjzIkHqhy6IWRiWX
+	7Fh10Yi0IVyQ7Mke7wl/ZGuzHrA1tXFEFLzFq9EIgq7K7uTil3iFaYCTtApFi+PacaOAThzF7mXys
+	Pu1oHf5UeiSF2E0Zg3FyShXVTxqj3xQ1WT81j0dtoWCpffWuutoDGXyQMW4ULjMcZigSf1ZPxQpvL
+	Ucekz6QI5bYFOn1G3BfNNyrne2YeS9pMgPQX0XKl/nqC22PgFuzAdQ67nFcKepEOsGBo9w8YuwdZb
+	ewTJlECMw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTp3a-0003Ks-Nj; Mon, 03 Dec 2018 14:18:42 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gTp6O-0004z4-4s; Mon, 03 Dec 2018 14:21:36 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTp3X-0003K9-H2
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:18:41 +0000
+ id 1gTp6K-0004yD-Uj
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:21:34 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 9D38B1682;
- Mon,  3 Dec 2018 06:18:27 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 8109D3F614; Mon,  3 Dec 2018 06:18:26 -0800 (PST)
-Subject: Re: [PATCH 01/12] KVM: arm64: Document PV-time interface
-To: Andrew Jones <drjones@redhat.com>, Steven Price <steven.price@arm.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
- <20181128144527.44710-2-steven.price@arm.com>
- <20181203135042.v52wawfz4nc27fna@kamzik.brq.redhat.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <4ec62f53-9c3f-14cb-f1bb-c8b9aadb9bdd@arm.com>
-Date: Mon, 3 Dec 2018 14:18:25 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 053341682;
+ Mon,  3 Dec 2018 06:21:19 -0800 (PST)
+Received: from [10.1.196.93] (en101.cambridge.arm.com [10.1.196.93])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 7F0663F614;
+ Mon,  3 Dec 2018 06:21:17 -0800 (PST)
+Subject: Re: [PATCH v9 4/8] KVM: arm64: Support dirty page tracking for PUD
+ hugepages
+To: Anshuman Khandual <anshuman.khandual@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-5-punit.agrawal@arm.com>
+ <0d5f2d45-b09d-d43e-4320-98113d79cb18@arm.com>
+From: Suzuki K Poulose <suzuki.poulose@arm.com>
+Message-ID: <215abd97-7919-25da-7164-9f9465a8d8ba@arm.com>
+Date: Mon, 3 Dec 2018 14:21:16 +0000
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-In-Reply-To: <20181203135042.v52wawfz4nc27fna@kamzik.brq.redhat.com>
+In-Reply-To: <0d5f2d45-b09d-d43e-4320-98113d79cb18@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_061839_575668_DCBD9759 
-X-CRM114-Status: GOOD (  21.62  )
+X-CRM114-CacheID: sfid-20181203_062133_056117_417058ED 
+X-CRM114-Status: GOOD (  22.43  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -115,155 +73,127 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, kvmarm@lists.cs.columbia.edu,
+Cc: marc.zyngier@arm.com, Catalin Marinas <catalin.marinas@arm.com>,
+ will.deacon@arm.com, linux-kernel@vger.kernel.org,
+ Russell King <linux@armlinux.org.uk>, punitagrawal@gmail.com,
  linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Drew,
 
-On 03/12/2018 13:50, Andrew Jones wrote:
-> On Wed, Nov 28, 2018 at 02:45:16PM +0000, Steven Price wrote:
->> We introduce a paravirtualization interface for KVM/arm64 based on the
->> "Arm Paravirtualized Time for Arm-Base Systems" specification DEN 0057A.
+
+On 03/12/2018 14:17, Anshuman Khandual wrote:
+> 
+> 
+> On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+>> In preparation for creating PUD hugepages at stage 2, add support for
+>> write protecting PUD hugepages when they are encountered. Write
+>> protecting guest tables is used to track dirty pages when migrating
+>> VMs.
 >>
->> User space can specify a reserved area of memory for the guest and
->> inform KVM to populate the memory with information on stolen time and
->> Live Physical Time (LPT) that can be used to derive a stable
->> counter/timer for a guest subject to migration between hosts with
->> different counter frequencies.
+>> Also, provide trivial implementations of required kvm_s2pud_* helpers
+>> to allow sharing of code with arm32.
 >>
->> A hypercall interface is provided for the guest to interrogate the
->> hypervisor's support for this interface and the location of the shared
->> memory structures.
->>
->> Signed-off-by: Steven Price <steven.price@arm.com>
+>> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@arm.com>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>> Cc: Russell King <linux@armlinux.org.uk>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
 >> ---
->>  Documentation/virtual/kvm/arm/pvtime.txt | 169 +++++++++++++++++++++++
->>  1 file changed, 169 insertions(+)
->>  create mode 100644 Documentation/virtual/kvm/arm/pvtime.txt
+>>   arch/arm/include/asm/kvm_mmu.h   | 15 +++++++++++++++
+>>   arch/arm64/include/asm/kvm_mmu.h | 10 ++++++++++
+>>   virt/kvm/arm/mmu.c               | 11 +++++++----
+>>   3 files changed, 32 insertions(+), 4 deletions(-)
 >>
->> diff --git a/Documentation/virtual/kvm/arm/pvtime.txt b/Documentation/virtual/kvm/arm/pvtime.txt
->> new file mode 100644
->> index 000000000000..1870b904075b
->> --- /dev/null
->> +++ b/Documentation/virtual/kvm/arm/pvtime.txt
->> @@ -0,0 +1,169 @@
->> +Paravirtualized time support for arm64
->> +======================================
+>> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+>> index e6eff8bf5d7f..37bf85d39607 100644
+>> --- a/arch/arm/include/asm/kvm_mmu.h
+>> +++ b/arch/arm/include/asm/kvm_mmu.h
+>> @@ -87,6 +87,21 @@ void kvm_clear_hyp_idmap(void);
+>>   
+>>   #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+>>   
+>> +/*
+>> + * The following kvm_*pud*() functions are provided strictly to allow
+>> + * sharing code with arm64. They should never be called in practice.
+>> + */
+>> +static inline void kvm_set_s2pud_readonly(pud_t *pud)
+>> +{
+>> +	BUG();
+>> +}
 >> +
->> +Arm specification DEN0057/A defined a standard for paravirtualised time
->> +support for Aarch64 guests:
->> +
->> +https://developer.arm.com/docs/den0057/a
->> +
->> +KVM/Arm64 implements this specification by providing some hypervisor service
->> +calls to support a paravirtualized guest obtaining a view of the amount of
->> +time stolen from its execution and a concept of Live Physical Time (LPT) which
->> +represents time during which the guest is running and works across migrations.
->> +
->> +Three new SMCCC compatible hypercalls are defined:
->> +
->> +PV_FEATURES 0xC5000020
->> +PV_TIME_LPT 0xC5000021
->> +PV_TIME_ST  0xC5000022
->> +
->> +These are only available in the SMC64/HVC64 calling convention as
->> +paravirtualized time is not available to 32 bit Arm guests.
->> +
->> +PV_FEATURES
->> +    Function ID:  (uint32)  : 0xC5000020
->> +    PV_func_id:   (uint32)  : Either PV_TIME_LPT or PV_TIME_ST
->> +    Return value: (int32)   : NOT_SUPPORTED (-1) or SUCCESS (0) if the relevant
->> +                              PV-time feature is supported by the hypervisor.
+>> +static inline bool kvm_s2pud_readonly(pud_t *pud)
+>> +{
+>> +	BUG();
+>> +	return false;
+>> +}
 > 
-> What happens when a new guest tries this hypercall on an old host? Why not
-> return a bitmap of all supported features so the guest doesn't have to
-> do multiple hypercalls to build its bitmap?
+> As arm32 does not support direct manipulation of PUD entries.
+> 
+>> +
+>>   static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>>   {
+>>   	pte_val(pte) |= L_PTE_S2_RDWR;
+>> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+>> index 13d482710292..8da6d1b2a196 100644
+>> --- a/arch/arm64/include/asm/kvm_mmu.h
+>> +++ b/arch/arm64/include/asm/kvm_mmu.h
+>> @@ -251,6 +251,16 @@ static inline bool kvm_s2pmd_exec(pmd_t *pmdp)
+>>   	return !(READ_ONCE(pmd_val(*pmdp)) & PMD_S2_XN);
+>>   }
+>>   
+>> +static inline void kvm_set_s2pud_readonly(pud_t *pudp)
+>> +{
+>> +	kvm_set_s2pte_readonly((pte_t *)pudp);
+>> +}
+>> +
+>> +static inline bool kvm_s2pud_readonly(pud_t *pudp)
+>> +{
+>> +	return kvm_s2pte_readonly((pte_t *)pudp);
+>> +}
+>> +
+>>   #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
+>>   
+>>   #ifdef __PAGETABLE_PMD_FOLDED
+>> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+>> index fb5325f7a1ac..1c669c3c1208 100644
+>> --- a/virt/kvm/arm/mmu.c
+>> +++ b/virt/kvm/arm/mmu.c
+>> @@ -1347,9 +1347,12 @@ static void  stage2_wp_puds(struct kvm *kvm, pgd_t *pgd,
+>>   	do {
+>>   		next = stage2_pud_addr_end(kvm, addr, end);
+>>   		if (!stage2_pud_none(kvm, *pud)) {
+>> -			/* TODO:PUD not supported, revisit later if supported */
+>> -			BUG_ON(stage2_pud_huge(kvm, *pud));
+>> -			stage2_wp_pmds(kvm, pud, addr, next);
+>> +			if (stage2_pud_huge(kvm, *pud)) {
+>> +				if (!kvm_s2pud_readonly(pud))
+>> +					kvm_set_s2pud_readonly(pud);
+>> +			} else {
+>> +				stage2_wp_pmds(kvm, pud, addr, next);
+>> +			}
+> 
+> As this series is enabling PUD related changes in multiple places, it is
+> reasonable to enable PGD level support as well even if it might not be
+> used much at the moment. I dont see much extra code to enable PGD, then
+> why not ? Even just to make the HugeTLB support matrix complete.
 
-A guest doesn't call this directly. It first checks that the service is
-implemented, and only if it is, it can call it. It is the exact same
-mechanism we use for other hypercalls (such as the Spectre mitigation
-services). If the guest bypasses the discovery mechanism, tough.
+Architecturally, we have hugepages at PUD/PMD (Level1 and Level2). PGD
+is a variable level which could be L0 or L1 (when PUD is folded) or L2(when
+PMD is folded). So if we enabled PUD/PMD hugepages, that would make sure
+that the PGD hugepages (i.e, when one of the levels are folded) are supported.
+We don't have L0 huge pages in arm64. Does that make sense ?
+
+Cheers
+Suzuki
+
+
 
 > 
->> +
->> +PV_TIME_LPT
->> +    Function ID:  (uint32)  : 0xC5000021
->> +    Flags:        (uint32)  : Bit[0]: Request migration interrupts
->> +                                      (not currently supported by KVM)
->> +    Return value: (int64)   : IPA of the shared live physical time data
->> +                              structure or negative error code on failure:
->> +                              NOT_SUPPORTED (-1)
->> +                              INVALID_PARAMETERS (-2)
->> +
->> +PV_TIME_ST
->> +    Function ID:  (uint32)  : 0xC5000022
->> +    Return value: (int64)   : IPA of the stolen time data structure for this
->> +                              (V)CPU. On failure:
->> +                              NOT_SUPPORTED (-1)
->> +
->> +Live Physical Time
->> +------------------
->> +
->> +The structure pointed to by the PV_TIME_LPT hypercall is as follows:
->> +
->> +  Field           | Byte Length | Byte Offset | Description
->> +  --------------- | ----------- | ----------- | -------------------------------
->> +  Revision        |      4      |      0      | Must be 0 for this revision
->> +  Attributes      |      4      |      4      | Must be 0
->> +  sequence_number |      8      |      8      | Bit 0: reserved
->> +                  |             |             | Bits 1:63 number of migrations
->> +  scale_mult      |      8      |      16     | Multiplier to scale from native
->> +                  |             |             | frequency to PV frequency
->> +  shift           |      4      |      24     | Shift applied before multiplier
->> +  Reserved        |      4      |      28     | Must be 0
->> +  Fn              |      8      |      32     | Native frequency
->> +  Fpv             |      8      |      40     | Paravirtualized frequency seen
->> +                  |             |             | by guest
->> +  div_by_fpv_mult |      8      |      48     | Multiplier to implement fast
->> +                  |             |             | divide by Fpv
-> 
-> Here's kvmclock's struct
-> 
->  struct pvclock_vcpu_time_info {
->         u32   version; 
->         u32   pad0;
->         u64   tsc_timestamp;
->         u64   system_time;
->         u32   tsc_to_system_mul;
->         s8    tsc_shift;
->         u8    flags;
->         u8    pad[2];
->  }
-> 
->  Revision	 =>
->  Attributes	 =>
->  sequence_number => version
->  scale_mult	 => tsc_to_system_mul	(this is reversed, but OK)
->  shift		 => tsc_shift           (also reversed)
->  Reserved	 =>
->  Fn		 => (pvclock doesn't have, but does have system_time)
->  Fpv		 =>
->  div_by_fpv_mult =>
-> 
-> I haven't thought about this enough yet to be sure kvmclock's fields
-> are sufficient, but several look close - although the 'tsc' naming
-> isn't nice. Also, the pvclock struct could be extended by adding an
-> 'extended' flag to 'flags', and then appending more fields.
-
-One important thing is that this is not a KVM PV time implementation.
-This is something generic for the ARM architecture. Any ARM hypervisor
-should be able to implement this.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
