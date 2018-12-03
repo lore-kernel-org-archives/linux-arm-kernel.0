@@ -2,88 +2,70 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SPF_PASS,URIBL_BLOCKED
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B3678C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:10:28 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9EC47C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:35:30 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 85DEF2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:10:28 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7145420850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 23:35:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="f+MDLeUC";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="AyRvDK8q"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 85DEF2087F
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="EgkTNJp8";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="NKl+1rjE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7145420850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=Sv+iyWF2rUrODpOEt59AeXXS4ZLfFjwz1X85VVSzpsM=; b=f+MDLeUCV8EOQY1D4l8MP+fL+w
-	EaXKGbmMEeQduiYzHCWgBcFjWnO5POY0ULiGqzrPJjkZM2uLCCxUWQP+UryU2HcM0WwcFrzzKtlw3
-	DiE73Jxc21Pp2vXlH2jdbHJz5IVRH1qTPh4IqyAh3JQrkhLF18P57/H06x8QABlazxK+jzdcW24bl
-	It6+iVsNtA9p7oKyDDlTXDx/O58PvJ48xmTOBz+gfNTgG+uubZvu+dzGzlt3QHgwuIyZDk0ovo9x1
-	qPR9evIPXdDxAwCvWvMwW+fNX+McVGQthfdAcw+v8hrPNoBa9ovZMcZPGeW8Yp99Dffzxv/B/jR44
-	NZFp0BCQ==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
+	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=vOff/M/1sTKi9ehL8mbD7TumKhM4l5yZYj4OVoQIB6c=; b=EgkTNJp8sFR+We
+	uDgUfdCV4JMVJN78MlTL9dclaYnfpCj+daxRf6T5ps6mNTZ0rQpr8ICuo3LhrughUhTNv0lpHtoOZ
+	/jO3Nc6DIwfC1m/QTqm3ENwyrna0e1I2nkJEfx0Ko50hgmTCXg74wN8f8U0wQiepcf9YLo52johc/
+	nUl7+GGpV4Te8rGequwuZDD0JB1W0YVmdgECNK/ZCCC3omFBT3YaNg2ZOqpRdJMcAxpO5YRs74tGt
+	Qt3SdPmDHUzcu2/wi4lfW28blKAlioCVIYUmjsOQfshzLawfRwX3EvetnzMxkijYJ8STKY2VaOZ9A
+	I3L4fUcpQKl/fmXgHTcw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTxMB-0001rI-Vv; Mon, 03 Dec 2018 23:10:27 +0000
-Received: from mail-pg1-x541.google.com ([2607:f8b0:4864:20::541])
+	id 1gTxkL-0001xf-Or; Mon, 03 Dec 2018 23:35:25 +0000
+Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTx7W-0002AG-Cc
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 22:55:26 +0000
-Received: by mail-pg1-x541.google.com with SMTP id d72so6390086pga.9
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 14:55:07 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references;
- bh=OR+Emv/hXsuIpqoetjY/PmsPRuVeBGeNKk4nTUUJUzU=;
- b=AyRvDK8qLksuCM5m5xpMuXurPSGg1u+IafeohsJhoxOT3eIogfCW4RPPjunRaMAGwA
- ad0IaHDWj2AA2p2wwYE60jkwPcCr9e70/BHSZiJ8R0M8uR68uXXN15McVkgGA9q+3a1N
- adTO7L8gepdaup8oxHXWsnOfnN8NrfqmKIdbE=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references;
- bh=OR+Emv/hXsuIpqoetjY/PmsPRuVeBGeNKk4nTUUJUzU=;
- b=cwtNITwZ96xsirFGc0WaWaYTwxGDLrtDODEouCi04AVJVoc7noUvjof5dg+KOZczlz
- M7czIBGfzLHDecKmscgb26uQ3onDKSUaT2T5+CioFXQCrUyeI1ycFH2Nz1jr5vzfiE5C
- hEnteooHOs6KXYGSDMJDXCTrT7etu08a+B1PN7neao8cxBENve4QTGVOvVorbVkFTesr
- VFxBnOaLmRpF9r4aXWbZO4SHRfCr3y8qWR+TO8mpsTRcg4SrOkYi3xLpz6IdD9+lPkE8
- KIHuexJaW6vm+4aVWd+sNX0mt7s2J+Qc3nlGVhr8WTaaH+E2iL1XAwlWOzxSsfewh1N9
- 73zg==
-X-Gm-Message-State: AA+aEWaHG7n44dbTXhOHUhdLt4nIuAWELoL7NAJcWsYfUTqEEZRDwyWi
- SoomYv4dP5B199PVv1JcHimDcw==
-X-Google-Smtp-Source: AFSGD/WqU9zQKb3M9Bu2OLXp7VGwfIDOHiVR5Nzl2AFyfU9G7ZhvcbzeW65Xm0Y53rD1knHuUoduMQ==
-X-Received: by 2002:a63:bc02:: with SMTP id q2mr14944296pge.116.1543877707458; 
- Mon, 03 Dec 2018 14:55:07 -0800 (PST)
-Received: from xps15.cg.shawcable.net (S0106002369de4dac.cg.shawcable.net.
- [68.147.8.254])
- by smtp.gmail.com with ESMTPSA id v9sm20933057pfg.144.2018.12.03.14.55.05
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-SHA bits=128/128);
- Mon, 03 Dec 2018 14:55:06 -0800 (PST)
-From: Mathieu Poirier <mathieu.poirier@linaro.org>
-To: acme@kernel.org,
-	peterz@infradead.org,
-	gregkh@linuxfoundation.org
-Subject: [PATCH v5 5/6] perf tools: Make perf_evsel accessible to PMU driver
- configuration code
-Date: Mon,  3 Dec 2018 15:54:55 -0700
-Message-Id: <1543877696-17174-6-git-send-email-mathieu.poirier@linaro.org>
-X-Mailer: git-send-email 2.7.4
-In-Reply-To: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1543877696-17174-1-git-send-email-mathieu.poirier@linaro.org>
+ id 1gTxkI-0001aJ-7J
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 23:35:23 +0000
+Received: from localhost (unknown [104.132.0.74])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
+ (No client certificate requested)
+ by mail.kernel.org (Postfix) with ESMTPSA id 2EE2420850;
+ Mon,  3 Dec 2018 23:35:11 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
+ s=default; t=1543880111;
+ bh=sUraBo94mptqp8XTw/adaqoZFeEnJjizpj3C2c03q7s=;
+ h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
+ b=NKl+1rjEoTgBW1k/Bl7CtJTgIxA/fofNrP1rPo69vzJ57999RuuLyvArSNc/jgHYs
+ Z2zItscIgcxZc+J34FtQfzjeNFCDML5s7u9NLf9rspVlTgDcxza1tOCoRr1MamsCo4
+ rdtxT41CgezmJ/757/oDy6qops+mkAzyLuma1qrw=
+MIME-Version: 1.0
+To: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+From: Stephen Boyd <sboyd@kernel.org>
+In-Reply-To: <20181130105022.GA15388@localhost.localdomain>
+References: <cover.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <ec0d6ee7ea79f0e05041ed3e564b0aadb297ef5f.1542107769.git.matti.vaittinen@fi.rohmeurope.com>
+ <154356805035.88331.16867826308376667832@swboyd.mtv.corp.google.com>
+ <20181130105022.GA15388@localhost.localdomain>
+Message-ID: <154388011043.88331.6461709079501929390@swboyd.mtv.corp.google.com>
+User-Agent: alot/0.7
+Subject: Re: [PATCH v4 1/8] clk: clkdev/of_clk - add managed lookup and
+ provider registrations
+Date: Mon, 03 Dec 2018 15:35:10 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_145519_631625_68FEBE22 
-X-CRM114-Status: GOOD (  19.45  )
+X-CRM114-CacheID: sfid-20181203_153522_327221_AD219502 
+X-CRM114-Status: GOOD (  37.02  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -95,145 +77,173 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, linux-s390@vger.kernel.org,
- alexander.shishkin@linux.intel.com, will.deacon@arm.com,
- heiko.carstens@de.ibm.com, adrian.hunter@intel.com, ast@kernel.org,
- mingo@redhat.com, linux-arm-kernel@lists.infradead.org, hpa@zytor.com,
- schwidefsky@de.ibm.com, namhyung@kernel.org, tglx@linutronix.de,
- suzuki.poulosi@arm.com, jolsa@redhat.com, linux-kernel@vger.kernel.org
-MIME-Version: 1.0
+Cc: linux-doc@vger.kernel.org, Michael Turquette <mturquette@baylibre.com>,
+ Daniel Kurtz <djkurtz@chromium.org>, Sebastian Reichel <sre@kernel.org>,
+ David Brown <david.brown@linaro.org>, Lee Jones <lee.jones@linaro.org>,
+ linux-clk@vger.kernel.org, Rob Herring <robh@kernel.org>,
+ Jonathan Corbet <corbet@lwn.net>, Andrey Smirnov <andrew.smirnov@gmail.com>,
+ "Rafael J. Wysocki" <rafael.j.wysocki@intel.com>,
+ Russell King <linux@armlinux.org.uk>, Krzysztof Kozlowski <krzk@kernel.org>,
+ Chanwoo Choi <cw00.choi@samsung.com>, Andy Gross <andy.gross@linaro.org>,
+ Huang Shijie <sjhuang@iluvatar.ai>, Guenter Roeck <linux@roeck-us.net>,
+ Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>,
+ linux-arm-msm@vger.kernel.org, linux-soc@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org, linux-kernel@vger.kernel.org,
+ Akshu Agrawal <akshu.agrawal@amd.com>, mazziesaccount@gmail.com
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Make the perf_evsel available to the PMU driver configuration code.  That
-way function perf_evsel__run_ioctl() can be used from there and
-information pertaining to the perf_evsel_config_term is still available.
+Quoting Matti Vaittinen (2018-11-30 02:50:22)
+> Hello Stephen,
+> 
+> Thanks a bunch for taking the time and reviewing this!
+> 
+> On Fri, Nov 30, 2018 at 12:54:10AM -0800, Stephen Boyd wrote:
+> > Quoting Matti Vaittinen (2018-11-13 03:55:58)
+> > > With MFD devices the clk properties may be contained in MFD (parent) DT
+> > > node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
+> > > subdevice not to MFD device (parent). Add
+> > > devm_of_clk_add_hw_provider_parent to tackle this issue.
+> > > 
+> > > Also clkdev registration lacks of managed registration functions and it
+> > > seems few drivers do not drop clkdev lookups at exit. Add
+> > > devm_clk_hw_register_clkdev and devm_clk_release_clkdev to ease lookup
+> > > releasing at exit.
+> > 
+> > Please split this into clkdev and non-clkdev devm functionality.
+> Allright. I'll split this to two patches.
+> 
+> > > --- a/Documentation/driver-model/devres.txt
+> > > +++ b/Documentation/driver-model/devres.txt
+> > > @@ -238,6 +238,9 @@ CLOCK
+> > >    devm_clk_put()
+> > >    devm_clk_hw_register()
+> > >    devm_of_clk_add_hw_provider()
+> > > +  devm_of_clk_add_parent_hw_provider()
+> > > +  devm_clk_hw_register_clkdev()
+> > > +  devm_clk_release_clkdev()
+> > 
+> > The 'release' or non-common functions shouldn't be documented here.
+> So I will drop the line mentioning devm_clk_release_clkdev()
+> 
+> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > index af011974d4ec..9bb921eb90f6 100644
+> > > --- a/drivers/clk/clk.c
+> > > +++ b/drivers/clk/clk.c
+> > > @@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
+> > >         of_clk_del_provider(*(struct device_node **)res);
+> > >  }
+> > >  
+> > > -int devm_of_clk_add_hw_provider(struct device *dev,
+> > > +static int __devm_of_clk_add_hw_provider(struct device *dev,
+> > >                         struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > >                                               void *data),
+> > > -                       void *data)
+> > > +                       struct device_node *of_node, void *data)
+> > >  {
+> > > -       struct device_node **ptr, *np;
+> > > +       struct device_node **ptr;
+> > >         int ret;
+> > >  
+> > >         ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
+> > > @@ -3906,10 +3906,9 @@ int devm_of_clk_add_hw_provider(struct device *dev,
+> > >         if (!ptr)
+> > >                 return -ENOMEM;
+> > >  
+> > > -       np = dev->of_node;
+> > > -       ret = of_clk_add_hw_provider(np, get, data);
+> > > +       *ptr = of_node;
+> > > +       ret = of_clk_add_hw_provider(of_node, get, data);
+> > >         if (!ret) {
+> > > -               *ptr = np;
+> > 
+> > Why is this moved outside of the if condition?
+> I completely removed the local variable np and just unconditionally set
+> the allocated devres to point at the node (if allocation succeeded). We
+> could of course only do this if the provider registration succeeded and
+> save one assignment - but I guess I intended to remove the curly braces
+> and thus decided to go for one liner after if. But apparently I didn't
+> remove the braces O_o. Well, I can put the assignment inside the
+> condition if you prefer that.
+> 
+> > In fact, why isn't just
+> > the first line in this hunk deleted and passed to this function as
+> > struct device_node *np?
+> 
+> I am sorry but I don't quite follow your suggestion here. Do you mean we
+> could just pass the struct device_node *np in devres_add()? I thought
+> the pointer passed to devress_add() should be allocated using
+> devres_alloc. Can you please elaborate what you mean?
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- tools/perf/arch/arm/util/cs-etm.c | 22 +++++++++++++++++++++-
- tools/perf/arch/arm/util/cs-etm.h |  3 ++-
- tools/perf/util/drv_configs.c     | 30 +++++++-----------------------
- tools/perf/util/pmu.h             |  3 ++-
- 4 files changed, 32 insertions(+), 26 deletions(-)
+I'm just trying to reduce the diff in the patch.
 
-diff --git a/tools/perf/arch/arm/util/cs-etm.c b/tools/perf/arch/arm/util/cs-etm.c
-index 2f595cd73da6..d8081c2e6d44 100644
---- a/tools/perf/arch/arm/util/cs-etm.c
-+++ b/tools/perf/arch/arm/util/cs-etm.c
-@@ -635,7 +635,7 @@ static int __printf(2, 3) cs_device__print_file(const char *name, const char *fm
- 	return ret;
- }
- 
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
-+static int cs_etm_set_drv_config_term(struct perf_evsel_config_term *term)
- {
- 	int ret;
- 	char enable_sink[ENABLE_SINK_MAX];
-@@ -649,3 +649,23 @@ int cs_etm_set_drv_config(struct perf_evsel_config_term *term)
- 
- 	return 0;
- }
-+
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term)
-+{
-+	int err = 0;
-+	struct perf_evsel_config_term *term;
-+
-+	list_for_each_entry(term, &evsel->config_terms, list) {
-+		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
-+			continue;
-+
-+		err = cs_etm_set_drv_config_term(term);
-+		if (err) {
-+			*err_term = term;
-+			break;
-+		}
-+	}
-+
-+	return err;
-+}
-diff --git a/tools/perf/arch/arm/util/cs-etm.h b/tools/perf/arch/arm/util/cs-etm.h
-index 1a12e64f5127..a3f8dde6ccef 100644
---- a/tools/perf/arch/arm/util/cs-etm.h
-+++ b/tools/perf/arch/arm/util/cs-etm.h
-@@ -10,6 +10,7 @@
- #include "../../util/evsel.h"
- 
- struct auxtrace_record *cs_etm_record_init(int *err);
--int cs_etm_set_drv_config(struct perf_evsel_config_term *term);
-+int cs_etm_set_drv_config(struct perf_evsel *evsel,
-+			  struct perf_evsel_config_term **err_term);
- 
- #endif
-diff --git a/tools/perf/util/drv_configs.c b/tools/perf/util/drv_configs.c
-index eec754243f4d..f7c1bcf08549 100644
---- a/tools/perf/util/drv_configs.c
-+++ b/tools/perf/util/drv_configs.c
-@@ -25,7 +25,6 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
- {
- 	bool found = false;
- 	int err = 0;
--	struct perf_evsel_config_term *term;
- 	struct perf_pmu *pmu = NULL;
- 
- 	while ((pmu = perf_pmu__scan(pmu)) != NULL)
-@@ -34,29 +33,14 @@ perf_evsel__apply_drv_configs(struct perf_evsel *evsel,
- 			break;
- 		}
- 
--	list_for_each_entry(term, &evsel->config_terms, list) {
--		if (term->type != PERF_EVSEL__CONFIG_TERM_DRV_CFG)
--			continue;
-+	/*
-+	 * No need to continue if we didn't get a match or if there is no
-+	 * driver configuration function for this PMU.
-+	 */
-+	if (!found || !pmu->set_drv_config)
-+		return err;
- 
--		/*
--		 * We have a configuration term, report an error if we
--		 * can't find the PMU or if the PMU driver doesn't support
--		 * cmd line driver configuration.
--		 */
--		if (!found || !pmu->set_drv_config) {
--			err = -EINVAL;
--			*err_term = term;
--			break;
--		}
--
--		err = pmu->set_drv_config(term);
--		if (err) {
--			*err_term = term;
--			break;
--		}
--	}
--
--	return err;
-+	return pmu->set_drv_config(evsel, err_term);
- }
- 
- int perf_evlist__apply_drv_configs(struct perf_evlist *evlist,
-diff --git a/tools/perf/util/pmu.h b/tools/perf/util/pmu.h
-index 76fecec7b3f9..47f44394042b 100644
---- a/tools/perf/util/pmu.h
-+++ b/tools/perf/util/pmu.h
-@@ -29,7 +29,8 @@ struct perf_pmu {
- 	struct list_head format;  /* HEAD struct perf_pmu_format -> list */
- 	struct list_head aliases; /* HEAD struct perf_pmu_alias -> list */
- 	struct list_head list;    /* ELEM */
--	int (*set_drv_config)	(struct perf_evsel_config_term *term);
-+	int (*set_drv_config)	(struct perf_evsel *evsel,
-+				 struct perf_evsel_config_term **err_term);
- };
- 
- struct perf_pmu_info {
--- 
-2.7.4
+> 
+> > 
+> > >                 devres_add(dev, ptr);
+> > >         } else {
+> > >                 devres_free(ptr);
+[..]
+> > 
+> > > +int devm_of_clk_add_hw_provider(struct device *dev,
+> > > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > > +                                             void *data),
+> > > +                       void *data)
+> > > +{
+> > > +       return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
+> > > +}
+> > >  EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
+> > >  
+> > > +int devm_of_clk_add_parent_hw_provider(struct device *dev,
+> > > +                       struct clk_hw *(*get)(struct of_phandle_args *clkspec,
+> > > +                                             void *data),
+> > > +                       void *data)
+> > > +{
+> > > +       return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
+> > 
+> > I'm wondering if we can somehow auto-detect this in
+> > devm_of_clk_add_hw_provider() by looking for #clock-cells in the node.
+> > If it isn't there, then we go to the parent node and look for a
+> > #clock-cells property there in the DT node for that device. Does that
+> > make sense? Then there isn't any new API and we can attach the lifetime
+> > of the devm registration to the presence of the property indicating this
+> > is a clk controller or not.
+> 
+> Huh. I don't know why but building this kind of logic in core is a bit
+> scary to me. I guess I can try implementing something like this - but I
+> am not really a fan of this. (Accidentally) omit the #clock-cells from
+> node and we go to parent node - I am a novice on this area but this
+> sounds like a potential hazard to me. I believe the driver should know
+> if it's properties should be in own or parent node - and if they are
+> not, then there should be no guessing but error. The lifetime is topic
+> where I would like to get information from you who know the kernel
+> better than I do =) But I guess the parent node is there at least as
+> long as the child device is alive. So for me the life time of
+> get-callback is more crucial - but as I said, I don't understand the
+> kernel in details so you probably know it better than me. But please let
+> me know your final take on this and I will follow the guidance =)
+
+Please do the magic instead of adding another API. It makes things
+simpler and will work for this case without having to change anything
+besides of_clk_add_provider().
+
+If the DT doesn't have the #clock-cells property in the node being
+registered then calling clk_get() will fail for any consumer devices
+that point to the node with a phandle and clock specifier. I don't
+expect us to get very far into development if that's the case.
+
+Of course, we don't fail in of_clk_add_provider() if there isn't a
+#clock-cells property in the node, we just happily add the node to the
+provider list and carry on. I doubt anyone is failing to specify the DT
+property, but maybe they are, in which case we could keep not failing
+and just add the node of whatever we're called with originally if
+neither the parent or the passed node have the #clock-cells property. I
+wouldn't try to go any higher than one node above the current node and
+look for a #clock-cells though.
+
+If this all still seems scary then don't worry about it, I'll implement
+it myself.
 
 
 _______________________________________________
