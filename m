@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 85B1BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:02:04 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4DEC2C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:03:33 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 593A320848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:02:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1D78220672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:03:33 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GVp1MN6Y"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 593A320848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aMK/qmgZ"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D78220672
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,40 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=5cAWQPDEw5jikZq7MM66ztFXAfNvOMF9TA7aEOpCpXQ=; b=GVp1MN6YKfvJ6heM+CX/yBoGA
-	LKBMhLJD7nPYOf/anSzEUc+dvdZjBSAqBq43S5VE2mb9YjUag9uMW6xryWoUg/fKwIsLAOBwDJXep
-	FWAyLwdgPYBeMDlBqFwumDYbYmkPMTkRtfzQ1iHchE3F1/303RxwBoz2bzZ54Jz0qSwMzke7yDtfS
-	NGdEWAax0MfnUZETq3EED9a5BpdzliE4YJ70SMoGLIIztF2wA2VRNT01FAFBJ+0+4GNhImAjArrIE
-	IzlIIWij06w/qLg6sojhM2EnVwhoEMf//PG2FfokhDRJBu/l2DFHHbByULWlUxK/f8j+dzL/wBXHk
-	HdJuDfHoA==;
+	 bh=RXZ9BWkTSWQFGWoV6wWo/0bV8IK6c8qk2eS3rEIgn8k=; b=aMK/qmgZstrNv4SOu9h1K1umi
+	B+wPy1dALjsJvBgfGZG6dCWwmJy3ayTP+sgzLfQCO7i16GcesrjRdCnm7X1qLD0nABcF/0PjsJpGQ
+	F4SS38BSp07Eiqoojy4hu9EPBRGeTj3j8wbMqFMy+4doiOSN1joWiF38RdYQSeD8gxu9wPPqZeDAc
+	MytW/CnyQvukmhKtdx/yuoWrX4DBLMD4WYvPG9QvFtqHbaXRxByPNueiupn9vTsYx9K5G5IsZTcg0
+	azSeeKsdBO1IXcRpH2UX1gyRdo1RaGbpW0qYe/5WxZN0PHz08WHqqQJY/lqKEeeUSLni6VLPqVZ7v
+	Zy6Vust4Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTk72-00040J-86; Mon, 03 Dec 2018 09:01:56 +0000
+	id 1gTk8Y-0004LJ-KC; Mon, 03 Dec 2018 09:03:30 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTk6v-0003uQ-Ie
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:01:54 +0000
+ id 1gTk8V-0004KH-Le
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:03:29 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 1F50F20D04; Mon,  3 Dec 2018 10:01:38 +0100 (CET)
+ id 95AB82071D; Mon,  3 Dec 2018 10:03:16 +0100 (CET)
 Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
  [90.88.18.158])
- by mail.bootlin.com (Postfix) with ESMTPSA id E61042071D;
- Mon,  3 Dec 2018 10:01:27 +0100 (CET)
-Date: Mon, 3 Dec 2018 10:01:27 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id 5DD7C2039F;
+ Mon,  3 Dec 2018 10:03:06 +0100 (CET)
+Date: Mon, 3 Dec 2018 10:03:06 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Mesih Kilinc <mesihkilinc@gmail.com>
-Subject: Re: [PATCH v6 16/17] ARM: dts: suniv: add initial DTSI file for
- F1C100s
-Message-ID: <20181203090127.enxxh5ah7eehbql7@flea>
+Subject: Re: [PATCH v6 17/17] ARM: suniv: f1c100s: add device tree for Lichee
+ Pi Nano
+Message-ID: <20181203090306.7e6mdjqzj7pmg4gv@flea>
 References: <cover.1543781680.git.mesihkilinc@gmail.com>
- <dafe3e548064535cfc32934c079b53a5c45fcd48.1543781680.git.mesihkilinc@gmail.com>
+ <125b26f154ad1373179d67fcde30df056e883ac8.1543781680.git.mesihkilinc@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <dafe3e548064535cfc32934c079b53a5c45fcd48.1543781680.git.mesihkilinc@gmail.com>
+In-Reply-To: <125b26f154ad1373179d67fcde30df056e883ac8.1543781680.git.mesihkilinc@gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_010149_748998_2C4A3E48 
-X-CRM114-Status: GOOD (  10.99  )
+X-CRM114-CacheID: sfid-20181203_010327_845096_483CA039 
+X-CRM114-Status: UNSURE (   9.93  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,27 +78,26 @@ Cc: devicetree@vger.kernel.org, Marc Zyngier <marc.zyngier@arm.com>,
  linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
  Chen-Yu Tsai <wens@csie.org>, linux-clk@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, Icenowy Zheng <icenowy@aosc.io>
-Content-Type: multipart/mixed; boundary="===============3606474150509331532=="
+Content-Type: multipart/mixed; boundary="===============1321496976003193730=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============3606474150509331532==
+--===============1321496976003193730==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="cgoydzqpbnyatpx4"
+	protocol="application/pgp-signature"; boundary="qeuv22isdg5ditpp"
 Content-Disposition: inline
 
 
---cgoydzqpbnyatpx4
+--qeuv22isdg5ditpp
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-On Sun, Dec 02, 2018 at 11:23:50PM +0300, Mesih Kilinc wrote:
-> F1C100s is one product with the suniv die, which has a 32MiB co-packaged
-> DDR1 DRAM chip. As we have the support for suniv pin controller and CCU n=
-ow, add a
-> initial DTSI for it.
+On Sun, Dec 02, 2018 at 11:23:51PM +0300, Mesih Kilinc wrote:
+> Lichee Pi Nano is a F1C100s board by Lichee Pi.
+>=20
+> Add initial device tree for it.
 >=20
 > Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 
@@ -109,21 +109,21 @@ Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---cgoydzqpbnyatpx4
+--qeuv22isdg5ditpp
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXATw5wAKCRDj7w1vZxhR
-xTinAQCcvx9yH5QtdxwWWx2Y2rIxoGwcqOqhRAbBM4zBC8QANQEAsvPbl/1xiHTe
-xelD3041rB+42b7lFYxJsQEYmJWADwU=
-=6ZNq
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXATxSgAKCRDj7w1vZxhR
+xUp5AQC0GOpF9naIQ2RyuS8Cpunp777Upj+of5X35EZMQAiUIgD/QLkJX2cEBK0/
+de9cOrVnRVdo2JH/sSofml48O95mjQI=
+=PmRk
 -----END PGP SIGNATURE-----
 
---cgoydzqpbnyatpx4--
+--qeuv22isdg5ditpp--
 
 
---===============3606474150509331532==
+--===============1321496976003193730==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -134,5 +134,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============3606474150509331532==--
+--===============1321496976003193730==--
 
