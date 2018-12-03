@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id AFCC0C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:08:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0B9DBC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:08:58 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 7E83320851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:08:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C96D820851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:08:57 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QIL6G+zw";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="PrRwAGZp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7E83320851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BZWiW48+";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="aVmN+pEP"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C96D820851
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=d69i+IrcVutJmK6WAGanbtR7LZWXtvsVkX8yus05M04=; b=QIL6G+zwYhQMcF
-	qzo10HDxKD9st/zoD1Luv91d6c572ihz1oYtYdr9qM4lLsG9hMk6pdNNjMNCA/IdnqEeMOCq5sp5C
-	r0T5C4mSPoPsjeIdXnq8iHo7OkXOalGk37ZCZdUWNxhgeWCaFxGC5RL/zRL/6sL4NUhSW9xL7vo5j
-	9V/ckDCGDwAB5jnSBKWdOo1thnrKZs9U4/KMv03Q9dx575UQo598DqSMWqA0/ZSQKHrSObbpgFYup
-	gw93frm1h4X12UH+7JeaWjhDGkjQRFMlPMamKvDUtia8m7Lpi3eMDM4LUImLMvNDu69xYB0+xxzB4
-	I1iTjPMgW1o+TsNhRAEA==;
+	List-Owner; bh=5PPPVLFJMoC6PtAwHlKsUeRZYgZAqCfQYYzZFzWeK4k=; b=BZWiW48+e3i1Y9
+	DItQ+mMbjZuKJxVZvgvr/x/yFqp6O+Ngh0OMjXSth/eRZ17ANp2kuSG15OBeMtGKi8aim1bGp9Ccz
+	ezG/lP6PkUhg3lhBV38jlIzCjYlnSSY7ftm0lwYmofI9IKsYsF7SV3RTSUYNGrHbRicpMmaxC+3EX
+	YQIkczMB7HwVkgclAggFFCc1DFcC+MuILG/aoVF23dyC/TZFi8jC466XhxrDm5jTxjW9b+ZFEUm01
+	+SB2iOFEkLCNkZGA1nPqmYRI13fiCl19x9meN0iZ6NhMqqZJ5CULziVJaPHjZhSViC7xSQF+SUTkJ
+	XUJuzwa9/Xb7ruY9l1bA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTl9X-0001y0-Tz; Mon, 03 Dec 2018 10:08:35 +0000
-Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
+	id 1gTl9o-0002NW-6I; Mon, 03 Dec 2018 10:08:52 +0000
+Received: from mail-wm1-x342.google.com ([2a00:1450:4864:20::342])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTl96-0001JY-9V
+ id 1gTl97-0001Ly-BK
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:08:10 +0000
-Received: by mail-wr1-x442.google.com with SMTP id 96so11486738wrb.2
+Received: by mail-wm1-x342.google.com with SMTP id z18so5089798wmc.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:07:57 -0800 (PST)
+ Mon, 03 Dec 2018 02:08:01 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=RQOdFC9CjkWwFX8rp28xoDvtflvd5veREOu6vb3xEl4=;
- b=PrRwAGZpg1WSrlH+nDKOti9QiT/ISdGKiiT4vfkKVsyTZVwnWnbKZPr7Obm0IpQlCa
- XabiZsDcWjoAP54MnwGasjqYwpsrdMVThmbNZ97Rz+2QOjIvgzfl8XrfbrchG6syivEf
- EPRkfutL2oPKkSfwvSzTDm2cbN7sz82/gGum8=
+ bh=SaTHXuzdJjMTWekY2/DsirLmYaUh6d39j/40yOw9ADA=;
+ b=aVmN+pEPQpdTu26ytBH6ev469JzbamvV7CCnubiDPyOpmzonabtdr3gd//ELjNxIgM
+ cGOYPfwYML5EoVHTlkG1sAAYiQOBPai3zb+4elxLYiyRImtP/NYnSgIMLs0a01woZb/z
+ o8vORLdcIToa0TyHYyYc+IFw9CPmu207BMDx8=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=RQOdFC9CjkWwFX8rp28xoDvtflvd5veREOu6vb3xEl4=;
- b=Y/tcQzkk9ULZjED5iP4oawmzq3vw3NNt6/FSWOZdeiXKHoutcaL2PlTWuCW2WQ9kwb
- 0LxM5ZRnyzlyRDszcQ6G+Yi++6wMG13cbk2Gty1jaEfEqeNV59bRfbWYB4MkwrIUhi/0
- ATzYbaH8cSqME8Kc0wvh48LlxWwx4EmR3N/38pGfXqvpOaeTsNCLqR/BRWxnMAqtnTFU
- VYliRvROG25IL1YzxhB8xY31/Z4W8w2NP0T4zA5c+7wOyCcvKdMwWys7aMutBhcWFmu7
- pwvuRsj6M7qnzNX+6e7M6ysjzaR5jcE+mWdbAX/lqhMWMtahIW2iNJOsLkqqkwl2rqjZ
- BPzw==
-X-Gm-Message-State: AA+aEWZ5FlrEQ4evg9Ky874S9awszp92J9F4Ky3P+pj4vS2bvJELVnJ3
- yXkIdMdpiAZSriYksBexrtATXA==
-X-Google-Smtp-Source: AFSGD/VPp+6EJ1yRntChb1CpYmwMyPbxm1MNxORzNUzpMr2buG2vPfa1uRSYwFnePbVCUHlq6tSumg==
-X-Received: by 2002:a5d:45d0:: with SMTP id b16mr12686122wrs.86.1543831676559; 
- Mon, 03 Dec 2018 02:07:56 -0800 (PST)
+ bh=SaTHXuzdJjMTWekY2/DsirLmYaUh6d39j/40yOw9ADA=;
+ b=pEAuqQMgIFhHGuIRBsnlM3/+Z6L4eWkf/xVaM1p9Vx9tW03OEnMM1PRfNBHACdpoyJ
+ RY7uOcP/mhI4pvSWZztcmsn8M1KlWZfnaVrdM3DGUGZqwx+m55gGD4S9PQmrUh+a29LT
+ EiGD5/SqhoNm1JfWUglVJ9ubc/b6shuOcQKwjsVT9KQAKAZeg1n8DK6wdrQBOL+h5+Ld
+ EYphrNJBlcA5cfhxUI8kxCGbg4DUK8qWIpMF0AArdgtiRvBTk+iLNHhgTHCw0Cv/DUtK
+ GXOIcEy92T8QRFsxz9hTTHpvEyZYVbA481LIjxrxNXkfSz+yMGZwAO3gEOkH10fJJg4Q
+ iKCA==
+X-Gm-Message-State: AA+aEWbT/k/ImkXz39mINza/5RNOICrWIMY9FmHj0zW+BllRS0md7CZt
+ KBatd7joggHpY1P+cFIEcX2Cnw==
+X-Google-Smtp-Source: AFSGD/XXID2lcNa2SrO9/ABXfaFcfhJBWMw99ZZqav47P2OVn/8dG2m9kDDGnVhHa33Fr1z3Y/KK/A==
+X-Received: by 2002:a1c:b687:: with SMTP id g129mr7464602wmf.59.1543831680419; 
+ Mon, 03 Dec 2018 02:08:00 -0800 (PST)
 Received: from localhost.localdomain (conf.hotelmediterraneo.com.
  [2.228.78.71])
- by smtp.gmail.com with ESMTPSA id n15sm18589236wrt.21.2018.12.03.02.07.55
+ by smtp.gmail.com with ESMTPSA id n15sm18589236wrt.21.2018.12.03.02.07.59
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 02:07:55 -0800 (PST)
+ Mon, 03 Dec 2018 02:07:59 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Yong Deng <yong.deng@magewell.com>,
  Mauro Carvalho Chehab <mchehab@kernel.org>,
@@ -79,17 +79,16 @@ To: Yong Deng <yong.deng@magewell.com>,
  Chen-Yu Tsai <wens@csie.org>, linux-media@vger.kernel.org,
  linux-arm-kernel@lists.infradead.org, devicetree@vger.kernel.org,
  linux-kernel@vger.kernel.org
-Subject: [PATCH 1/5] dt-bindings: media: sun6i: Add A64 CSI compatible (w/ H3
- fallback)
-Date: Mon,  3 Dec 2018 15:37:43 +0530
-Message-Id: <20181203100747.16442-2-jagan@amarulasolutions.com>
+Subject: [PATCH 4/5] arm64: dts: allwinner: a64: Add A64 CSI controller
+Date: Mon,  3 Dec 2018 15:37:46 +0530
+Message-Id: <20181203100747.16442-5-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181203100747.16442-1-jagan@amarulasolutions.com>
 References: <20181203100747.16442-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_020808_388202_4E590885 
-X-CRM114-Status: GOOD (  13.51  )
+X-CRM114-CacheID: sfid-20181203_020809_385982_AE09872D 
+X-CRM114-Status: GOOD (  13.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -107,29 +106,53 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Allwinner A64 CSI has single channel time-multiplexed BT.656
-CMOS sensor interface like H3.
-
-Add a compatible string for it with H3 fallback compatible string,
-in this case the H3 driver can be used.
+Allwinner A64 CSI controller has similar features as like in
+H3, So add support for A64 via H3 fallback.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- Documentation/devicetree/bindings/media/sun6i-csi.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 21 +++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/media/sun6i-csi.txt b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-index cc37cf7fd051..e78cf4f9bc8c 100644
---- a/Documentation/devicetree/bindings/media/sun6i-csi.txt
-+++ b/Documentation/devicetree/bindings/media/sun6i-csi.txt
-@@ -7,6 +7,7 @@ Required properties:
-   - compatible: value must be one of:
-     * "allwinner,sun6i-a31-csi"
-     * "allwinner,sun8i-h3-csi"
-+    * "allwinner,sun50i-a64-csi", "allwinner,sun8i-h3-csi"
-     * "allwinner,sun8i-v3s-csi"
-   - reg: base address and size of the memory-mapped region.
-   - interrupts: interrupt associated to this IP
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 384c417cb7a2..d32ff694ac5c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -532,6 +532,12 @@
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+ 
++			csi_pins: csi-pins {
++				pins = "PE0", "PE2", "PE3", "PE4", "PE5", "PE6",
++				       "PE7", "PE8", "PE9", "PE10", "PE11";
++				function = "csi0";
++			};
++
+ 			i2c0_pins: i2c0_pins {
+ 				pins = "PH0", "PH1";
+ 				function = "i2c0";
+@@ -899,6 +905,21 @@
+ 			status = "disabled";
+ 		};
+ 
++		csi: csi@1cb0000 {
++			compatible = "allwinner,sun50i-a64-csi",
++				     "allwinner,sun8i-h3-csi";
++			reg = <0x01cb0000 0x1000>;
++			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_CSI>,
++				 <&ccu CLK_CSI_SCLK>,
++				 <&ccu CLK_DRAM_CSI>;
++			clock-names = "bus", "mod", "ram";
++			resets = <&ccu RST_BUS_CSI>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&csi_pins>;
++			status = "disabled";
++		};
++
+ 		hdmi: hdmi@1ee0000 {
+ 			compatible = "allwinner,sun50i-a64-dw-hdmi",
+ 				     "allwinner,sun8i-a83t-dw-hdmi";
 -- 
 2.18.0.321.gffc6fa0e3
 
