@@ -2,64 +2,66 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 76EDAC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:56:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 81DCAC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:57:28 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2B2A0206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:56:10 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 54949206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:57:28 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G4EVoxy3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2B2A0206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Q5XlcRNt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 54949206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
-	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
-	In-Reply-To:Message-Id:Date:Subject:To:From:Reply-To:Content-ID:
-	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
-	:Resent-Message-ID:List-Owner;
-	bh=EcYqwgdCeJ3Mfbj1IL/N05YXy4zKRynsjF/adNH9Ey0=; b=G4EVoxy3wIvfOnUS8+hzPzDkK9
-	QPQ/oSxOqZY/tIT9VU5WRim8kR6zAKz01Armd+2AK5xdVTbviy/Dr9DVvHmmQs5v6m5ru7NrzVwi4
-	DYxIiFHgQJzCIiU9d2gBBZaBv9HDDb1QnfPHTEUNWr4q8R1yu5PCKnKq5aqhxJ4e9vgFhjAUh9esJ
-	q/ebhraJzYk8wHrrP8NrKx1WmLSPmLv5UTltsZ/kAWcbsXkMAOHrPfjFYwN+SjLFehL/1wmJs6HVe
-	0cRwUgbZj8cVdNseakJMEEiWPJ+mlqUgDTCfaOLlzHCZiMX94y57HpaVz1ktfANIrZ6XJr/Han/r3
-	36bhotug==;
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=zk3KCmXo/IWcWWi6f7BUdsJcLXLtUWJ5APz3bD1HgJs=; b=Q5XlcRNt3Tg/jf
+	IyeitYexGfUU8CzrLEbvyjqPTPxEx8sKfAwIAtQrxVYNDaqoLp9GEj1SR2oyxdXss/C9gB5TgNu8z
+	p1LRoot5lLXYw4TxUd48Nbk5GCjpdDHeGyg/NoT259Oo7xmfkIDM/OWc91Hahrm6UJhLZBE+JEJat
+	FFs1MACTJ6++bYWiQS/ei+e7AQeOSr/yYgGMVbLZMh3v7ms0WWVmT/uc7hH8dG2dwyesEqr3LbGW+
+	LeRIL9r6VZNvm3QQsXcyd4vOUcr2QZhlSd12FgSiVdQJyKLMEaarVBJG1zn86sIrj3tSz8GOO4u3B
+	xIEdxroOaZO+wYl+onYg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTohi-0003Gh-9K; Mon, 03 Dec 2018 13:56:06 +0000
-Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
- helo=foss.arm.com)
+	id 1gToj0-00043m-7x; Mon, 03 Dec 2018 13:57:26 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTohE-0002kb-24
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:55:43 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 95820168F;
- Mon,  3 Dec 2018 05:55:27 -0800 (PST)
-Received: from e112298-lin.cambridge.arm.com (usa-sjc-imap-foss1.foss.arm.com
- [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPA id E42523F614;
- Mon,  3 Dec 2018 05:55:25 -0800 (PST)
-From: Julien Thierry <julien.thierry@arm.com>
-To: linux-kernel@vger.kernel.org,
-	linux-arm-kernel@lists.infradead.org
-Subject: [RFC PATCH v2 1/2] uaccess: Check no rescheduling function is called
- in unsafe region
-Date: Mon,  3 Dec 2018 13:55:17 +0000
-Message-Id: <1543845318-24543-2-git-send-email-julien.thierry@arm.com>
-X-Mailer: git-send-email 1.9.1
-In-Reply-To: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
-References: <1543845318-24543-1-git-send-email-julien.thierry@arm.com>
+ id 1gToir-0003sS-4K
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:57:24 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 6C24520CFB; Mon,  3 Dec 2018 14:57:01 +0100 (CET)
+Received: from xps13 (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
+ [90.88.18.158])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 9FCE920EB9;
+ Mon,  3 Dec 2018 14:56:22 +0100 (CET)
+Date: Mon, 3 Dec 2018 14:56:22 +0100
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Russell King - ARM Linux <linux@armlinux.org.uk>
+Subject: Re: [PATCH v2 2/8] phy: mvebu-cp110-comphy: fix port check in
+ ->xlate()
+Message-ID: <20181203145622.0d38869d@xps13>
+In-Reply-To: <20181203003623.GJ30658@n2100.armlinux.org.uk>
+References: <20181130144743.675-1-miquel.raynal@bootlin.com>
+ <20181130144743.675-3-miquel.raynal@bootlin.com>
+ <20181130190031.GH30658@n2100.armlinux.org.uk>
+ <20181202203509.21b067c4@xps13>
+ <20181203003623.GJ30658@n2100.armlinux.org.uk>
+Organization: Bootlin
+X-Mailer: Claws Mail 3.17.1 (GTK+ 2.24.32; x86_64-pc-linux-gnu)
+MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_055536_123945_25B2FD06 
-X-CRM114-Status: GOOD (  16.11  )
+X-CRM114-CacheID: sfid-20181203_055723_139549_F6241184 
+X-CRM114-Status: GOOD (  29.87  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,125 +73,79 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Julien Thierry <julien.thierry@arm.com>, peterz@infradead.org,
- catalin.marinas@arm.com, will.deacon@arm.com, mingo@redhat.com,
- james.morse@arm.com, hpa@zytor.com
-MIME-Version: 1.0
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, Andrew Lunn <andrew@lunn.ch>,
+ Marcin Wojtas <mw@semihalf.com>, Jason Cooper <jason@lakedaemon.net>,
+ devicetree@vger.kernel.org, Antoine Tenart <antoine.tenart@bootlin.com>,
+ Grzegorz Jaszczyk <jaz@semihalf.com>,
+ Gregory Clement <gregory.clement@bootlin.com>, linux-kernel@vger.kernel.org,
+ Kishon Vijay Abraham I <kishon@ti.com>, Nadav Haklai <nadavh@marvell.com>,
+ Rob Herring <robh+dt@kernel.org>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-While running a user_access regions, it is not supported to reschedule.
-Add an overridable primitive to indicate whether a user_access region is
-active and check that this is not the case when calling rescheduling
-functions.
-
-Also, add a comment clarifying the behaviour of user_access regions.
-
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
----
- include/linux/kernel.h  |  6 ++++--
- include/linux/uaccess.h | 11 +++++++++++
- kernel/sched/core.c     | 19 +++++++++++++++++++
- 3 files changed, 34 insertions(+), 2 deletions(-)
-
-I'm not sure these are the best locations to check this but I was hoping
-this patch could start the discussion.
-
-Should I move the check? Should I add a config option to conditionally
-build those checks?
-
-diff --git a/include/linux/kernel.h b/include/linux/kernel.h
-index d6aac75..fe0e984 100644
---- a/include/linux/kernel.h
-+++ b/include/linux/kernel.h
-@@ -237,11 +237,13 @@
- struct pt_regs;
- struct user;
-
-+extern void __might_resched(const char *file, int line);
- #ifdef CONFIG_PREEMPT_VOLUNTARY
- extern int _cond_resched(void);
--# define might_resched() _cond_resched()
-+# define might_resched() \
-+	do { __might_resched(__FILE__, __LINE__); _cond_resched(); } while (0)
- #else
--# define might_resched() do { } while (0)
-+# define might_resched() __might_resched(__FILE__, __LINE__)
- #endif
-
- #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
-diff --git a/include/linux/uaccess.h b/include/linux/uaccess.h
-index efe79c1..50adb84 100644
---- a/include/linux/uaccess.h
-+++ b/include/linux/uaccess.h
-@@ -266,6 +266,13 @@ static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
- #define probe_kernel_address(addr, retval)		\
- 	probe_kernel_read(&retval, addr, sizeof(retval))
-
-+/*
-+ * user_access_begin() and user_access_end() define a region where
-+ * unsafe user accessors can be used.
-+ * During execution of this region, no sleeping functions should be called.
-+ * Exceptions and interrupt shall exit the user_access region and re-enter it
-+ * when returning to the interrupted context.
-+ */
- #ifndef user_access_begin
- #define user_access_begin() do { } while (0)
- #define user_access_end() do { } while (0)
-@@ -273,6 +280,10 @@ static inline unsigned long __copy_from_user_inatomic_nocache(void *to,
- #define unsafe_put_user(x, ptr, err) do { if (unlikely(__put_user(x, ptr))) goto err; } while (0)
- #endif
-
-+#ifndef unsafe_user_region_active
-+#define unsafe_user_region_active()	false
-+#endif
-+
- #ifdef CONFIG_HARDENED_USERCOPY
- void usercopy_warn(const char *name, const char *detail, bool to_user,
- 		   unsigned long offset, unsigned long len);
-diff --git a/kernel/sched/core.c b/kernel/sched/core.c
-index 6fedf3a..03f53c8 100644
---- a/kernel/sched/core.c
-+++ b/kernel/sched/core.c
-@@ -3289,6 +3289,13 @@ static inline void schedule_debug(struct task_struct *prev)
- 		__schedule_bug(prev);
- 		preempt_count_set(PREEMPT_DISABLED);
- 	}
-+
-+	if (unlikely(unsafe_user_region_active())) {
-+		printk(KERN_ERR "BUG: scheduling while user_access enabled: %s/%d/0x%08x\n",
-+		       prev->comm, prev->pid, preempt_count());
-+		dump_stack();
-+	}
-+
- 	rcu_sleep_check();
-
- 	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
-@@ -6151,6 +6158,18 @@ void ___might_sleep(const char *file, int line, int preempt_offset)
- EXPORT_SYMBOL(___might_sleep);
- #endif
-
-+void __might_resched(const char *file, int line)
-+{
-+	if (!unsafe_user_region_active())
-+		return;
-+
-+	printk(KERN_ERR
-+		"BUG: rescheduling function called from user access context at %s:%d\n",
-+			file, line);
-+	dump_stack();
-+}
-+EXPORT_SYMBOL(__might_resched);
-+
- #ifdef CONFIG_MAGIC_SYSRQ
- void normalize_rt_tasks(void)
- {
---
-1.9.1
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+SGkgUnVzc2VsbCwKClJ1c3NlbGwgS2luZyAtIEFSTSBMaW51eCA8bGludXhAYXJtbGludXgub3Jn
+LnVrPiB3cm90ZSBvbiBNb24sIDMgRGVjCjIwMTggMDA6MzY6MjMgKzAwMDA6Cgo+IE9uIFN1biwg
+RGVjIDAyLCAyMDE4IGF0IDA4OjM1OjA5UE0gKzAxMDAsIE1pcXVlbCBSYXluYWwgd3JvdGU6Cj4g
+PiBIaSBSdXNzZWxsLAo+ID4gCj4gPiBSdXNzZWxsIEtpbmcgLSBBUk0gTGludXggPGxpbnV4QGFy
+bWxpbnV4Lm9yZy51az4gd3JvdGUgb24gRnJpLCAzMCBOb3YKPiA+IDIwMTggMTk6MDA6MzEgKzAw
+MDA6Cj4gPiAgIAo+ID4gPiBPbiBGcmksIE5vdiAzMCwgMjAxOCBhdCAwMzo0NzozN1BNICswMTAw
+LCBNaXF1ZWwgUmF5bmFsIHdyb3RlOiAgCj4gPiA+ID4gU28gZmFyIHRoZSBQSFkgLT54bGF0ZSgp
+IGNhbGxiYWNrIHdhcyBjaGVja2luZyBpZiB0aGUgcG9ydCB3YXMKPiA+ID4gPiAiaW52YWxpZCIg
+YmVmb3JlIGNvbnRpbnVpbmcsIG1lYW5pbmcgdGhhdCB0aGUgcG9ydCBoYXMgbm90IGJlZW4gdXNl
+ZAo+ID4gPiA+IHlldC4gVGhpcyBjaGVjayBpcyBub3QgY29ycmVjdCBhcyB0aGVyZSBpcyBubyBv
+cHBvc2l0ZSBjYWxsIHRvICAgIAo+ID4gPiA+IC0+eGxhdGUoKSBvbmNlIHRoZSBQSFkgaXMgcmVs
+ZWFzZWQgYnkgdGhlIHVzZXIgYW5kIHRoZSBwb3J0IHdpbGwgICAgCj4gPiA+ID4gcmVtYWluICJ2
+YWxpZCIgYWZ0ZXIgdGhlIGZpcnN0IHBoeV9nZXQoKS9waHlfcHV0KCkgY2FsbHMuIEhlbmNlLCBp
+Zgo+ID4gPiA+IHRoaXMgZHJpdmVyIGlzIGJ1aWx0IGFzIGEgbW9kdWxlLCBpbnNlcnRlZCwgcmVt
+b3ZlZCBhbmQgaW5zZXJ0ZWQKPiA+ID4gPiBhZ2FpbiwgdGhlIFBIWSB3aWxsIGFwcGVhciBidXN5
+IGFuZCB0aGUgc2Vjb25kIHByb2JlIHdpbGwgZmFpbC4KPiA+ID4gPiAKPiA+ID4gPiBUbyBmaXgg
+dGhpcywganVzdCBkcm9wIHRoZSBmYXVsdHkgY2hlY2sgYW5kIGluc3RlYWQgdmVyaWZ5IHRoYXQg
+dGhlCj4gPiA+ID4gcG9ydCBudW1iZXIgaXMgdmFsaWQgKGllLiBpbiB0aGUgcG9zc2libGUgcmFu
+Z2UpLgo+ID4gPiA+IAo+ID4gPiA+IFNpZ25lZC1vZmYtYnk6IE1pcXVlbCBSYXluYWwgPG1pcXVl
+bC5yYXluYWxAYm9vdGxpbi5jb20+Cj4gPiA+ID4gLS0tCj4gPiA+ID4gIGRyaXZlcnMvcGh5L21h
+cnZlbGwvcGh5LW12ZWJ1LWNwMTEwLWNvbXBoeS5jIHwgNCArKy0tCj4gPiA+ID4gIDEgZmlsZSBj
+aGFuZ2VkLCAyIGluc2VydGlvbnMoKyksIDIgZGVsZXRpb25zKC0pCj4gPiA+ID4gCj4gPiA+ID4g
+ZGlmZiAtLWdpdCBhL2RyaXZlcnMvcGh5L21hcnZlbGwvcGh5LW12ZWJ1LWNwMTEwLWNvbXBoeS5j
+IGIvZHJpdmVycy9waHkvbWFydmVsbC9waHktbXZlYnUtY3AxMTAtY29tcGh5LmMKPiA+ID4gPiBp
+bmRleCAzMWI5YTFjMTgzNDUuLmE0MGI4NzZmZjIxNCAxMDA2NDQKPiA+ID4gPiAtLS0gYS9kcml2
+ZXJzL3BoeS9tYXJ2ZWxsL3BoeS1tdmVidS1jcDExMC1jb21waHkuYwo+ID4gPiA+ICsrKyBiL2Ry
+aXZlcnMvcGh5L21hcnZlbGwvcGh5LW12ZWJ1LWNwMTEwLWNvbXBoeS5jCj4gPiA+ID4gQEAgLTU2
+Nyw5ICs1NjcsOSBAQCBzdGF0aWMgc3RydWN0IHBoeSAqbXZlYnVfY29tcGh5X3hsYXRlKHN0cnVj
+dCBkZXZpY2UgKmRldiwKPiA+ID4gPiAgCQlyZXR1cm4gcGh5Owo+ID4gPiA+ICAKPiA+ID4gPiAg
+CWxhbmUgPSBwaHlfZ2V0X2RydmRhdGEocGh5KTsKPiA+ID4gPiAtCWlmIChsYW5lLT5wb3J0ID49
+IDApCj4gPiA+ID4gLQkJcmV0dXJuIEVSUl9QVFIoLUVCVVNZKTsKPiA+ID4gPiAgCWxhbmUtPnBv
+cnQgPSBhcmdzLT5hcmdzWzBdOwo+ID4gPiA+ICsJaWYgKGxhbmUtPnBvcnQgPj0gTVZFQlVfQ09N
+UEhZX1BPUlRTKQo+ID4gPiA+ICsJCXJldHVybiBFUlJfUFRSKC1FSU5WQUwpOyAgICAKPiA+ID4g
+Cj4gPiA+IFNob3VsZG4ndCB3ZSB2YWxpZGF0ZSBhcmdzLT5hcmdzWzBdIGJlZm9yZSBkb2luZyBh
+bnl0aGluZz8KPiA+ID4gICAKPiA+IAo+ID4gSSBkb24ndCB1bmRlcnN0YW5kIHlvdXIgcG9pbnQs
+IHRoZXJlIGlzIGEgY2hlY2sgb24gYXJncy0+YXJnc1swXSBhcwo+ID4gd2UgY2hlY2sgaXRzIHZh
+bHVlICh0aHJvdWdoIGxhbmUtPnBvcnQpIHJpZ2h0IGFmdGVyLiBXaGF0IGRvIHlvdQo+ID4gaGF2
+ZSBpbiBtaW5kPyAgCj4gCj4gUmlnaHQsIHRoZXJlIGlzIGFscmVhZHkgYSBjaGVjayBvbiBhcmdz
+LT5hcmdzWzBdIGZvciBpdCBiZWluZyBncmVhdGVyCj4gdGhhbiBNVkVCVV9DT01QSFlfUE9SVFMg
+YW5kIHJldHVybmluZyBhbiBlcnJvciAoYW5kIGluIGZhY3Qgd2FybmluZwo+IGlmIHRoYXQgaXMg
+dGhlIGNhc2UpLiAgU28gaW4gdGhhdCBjYXNlLCB3aGF0IGlzIHRoZSB1c2Ugb2YgdGhlIGFib3Zl
+Cj4gYWRkaXRpb25hbCB0ZXN0IHlvdSBhcmUgcHJvcG9zaW5nIHRvIGFkZD8gIFRoZSByZXN1bHRp
+bmcgY29kZSBlbmRzIHVwCj4gbG9va2luZyBsaWtlIHRoaXM6Cj4gCj4gCWlmIChXQVJOX09OKGFy
+Z3MtPmFyZ3NbMF0gPj0gTVZFQlVfQ09NUEhZX1BPUlRTKSkKPiAJCXJldHVybiBFUlJfUFRSKC1F
+SU5WQUwpOwo+IC4uLgo+IAlsYW5lLT5wb3J0ID0gYXJncy0+YXJnc1swXTsKPiArCWlmIChsYW5l
+LT5wb3J0ID49IE1WRUJVX0NPTVBIWV9QT1JUUykKPiArCQlyZXR1cm4gRVJSX1BUUigtRUlOVkFM
+KTsgIAo+IAo+IHdoaWNoIGlzIGp1c3Qgc2lsbHkgLSB0aGUgc2Vjb25kIHRlc3QgY2FuIG5ldmVy
+IGJlIGV2YWx1YXRlZCBhcyB0cnVlLAo+IGFuZCB0aGVyZWZvcmUgaXMgcmVkdW5kYW50Lgo+IAo+
+IEluIGFueSBjYXNlLCBteSBwb2ludCB3YXMgdGhhdCBpbiB5b3VyIHBhdGNoLCB3aGVyZSB5b3Ug
+YXNzaWduCj4gbGFuZS0+cG9ydCBhbmQgdGhlbiB2YWxpZGF0ZSB0aGUgbGFuZS0+cG9ydCB2YWx1
+ZSwgdGhpcyBpcyBpbgo+IHByaW5jaXBsZSB0aGUgd3Jvbmcgb3JkZXIgLSB0aGUgb3JkZXIgc2hv
+dWxkIGFsd2F5cyBiZTogdmFsaWRhdGUKPiBmaXJzdCwgdGhlbiBtYWtlIHVzZS4KPiAKCllvdSBh
+cmUgcmlnaHQsIHRoaXMgdGVzdCBpcyByZWR1bmRhbnQ7IEkgZm9yZ290IGFib3V0IHRoZSBmaXJz
+dApjaGVjay4gSSB3aWxsIGp1c3QgZHJvcCB0aGVzZSBhZGRpdGlvbmFsIHR3byBsaW5lcyBhbmQg
+anVzdCBkbzoKCiAgICAgICAgICAgICAgICBbLi4uXQogICAgICAgICAgICAgICAgbGFuZS0+cG9y
+dCA9IGFyZ3MtPmFyZ3NbMF07CgogICAgICAgICAgICAgICAgcmV0dXJuIDA7CiAgICAgICAgfQoK
+VGhhbmtzLApNaXF1w6hsCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fXwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxp
+c3RzLmluZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0
+aW5mby9saW51eC1hcm0ta2VybmVsCg==
