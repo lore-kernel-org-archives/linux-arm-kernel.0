@@ -2,89 +2,95 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id C2AF3C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:44 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 54829C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:21 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9165820850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:44 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 238C620661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:21 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxQtplFd";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="mWbxjGPS";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="GMeZ0ut7"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9165820850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DLMm4wus"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 238C620661
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
-	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=sYK1pI4pAv3gA3eSwQddeKfE0OJ93faTKx5tPxSaMk8=; b=gxQtplFdhTykbcBcriXi+DnXu
-	Fm/xmHIPEj5xQjDqVoA1eZJax5i1/nbrLWKZViRbdpo0oEwncOXWaw0DoWZoCJqKTCqBni1q2kJi7
-	1UcUc2ikTN1hxGhL7xBGC2hZlJyCZG2AiI5/+iRZszEsbmb6BNDKc6LfgNqgPYfG8UQa8OtzBexX4
-	jjrhSAqE0MQ3bStvP8TGKIU2Yrb/bhMOOx7AIFiPNVG18yODUOi2HklnCI6+fob7ZLPGKGyryODBs
-	fGsaN21u9et/ZWLPwHB4G/cuYIwtAnchpW/OsvOCr1qrGXtUWDJgDtxPqF876WpSy+CKr59/jjgZs
-	8ya55BnKw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=7nM0jauBvb3kq5CxNXbbvW5TdHAoVGV0jkSvTdp+qW4=; b=DLM
+	m4wusCHk1BqmlssNgZ6G9u1iNPfoByHfNwWX13do8LPY4v/Zfkj94GhJ874yapv2Bl9D+pa9D0Ozq
+	E2cJBKyzK5terPdgE1PWnbMfjg565RX0R2iQHAg0GzqLx5+xWhJqsCspFUaty/kM/8p+0e1OOFg0t
+	0ZFQ0FQ8UpBDXiB6MQEMgURAZ6BQ03t/uuDwxfj8g8e4mdqFZyloo5UCN68Lm5uQTh33qt7wy2GLE
+	XnCySC79QQNKMUOMNNfL1kAjnf3jB9Sz4bc8fODJbrHtzav3fzYEJkSBH6j9yMRZfg6VqVVApxv5P
+	84wMiy0rpcrZDz0SZTZ7XBoz/Hn4DdQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqRj-0006yz-51; Mon, 03 Dec 2018 15:47:43 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
+	id 1gTqS9-0007IB-WE; Mon, 03 Dec 2018 15:48:10 +0000
+Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
+ helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqRd-0006vg-4c
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:47:40 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id B778D60D88; Mon,  3 Dec 2018 15:47:23 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543852046;
- bh=Q2Ix7u7rkdNw4QGnrtaZ9DbhIPrmveYq44quMcCyzuE=;
- h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
- b=mWbxjGPSFB75H6tpL+k7NrIXrP6HXxxgdIeN7BKBcc48O0pzUT5eesp7wuiZ7Wisr
- /E3UMWVHCIzOiKkI9d7aNQUrirhjvudy77d/EWuoQUz8VpNpTDPKeiyKRYcysxpnfj
- bA1LSO/G3f+6O6XTjcUeMOsqT6WJrMvK8zI+3IBU=
-Received: from [10.226.60.81] (i-global254.qualcomm.com [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
- (No client certificate requested)
- (Authenticated sender: jhugo@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 8920061312;
- Mon,  3 Dec 2018 15:47:20 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543852041;
- bh=Q2Ix7u7rkdNw4QGnrtaZ9DbhIPrmveYq44quMcCyzuE=;
- h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
- b=GMeZ0ut72AMXANSHemAwfyMnWEfj+Le6Mpm4IToaYZmY3Ywp2iiroMji5KsyO5okf
- +ClW7Ig8Jtqad6XKLRW5/RXeiCh0Z2+HP2VUOB2Vt2Uxf6m9IPFqlcUrrbvUtM0HED
- ceFmPQDabTH6uxASGgHgvSW7FBlAi+YQyy3BSHHo=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 8920061312
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=jhugo@codeaurora.org
-Subject: Re: WIP: UFS on apq8098
-From: Jeffrey Hugo <jhugo@codeaurora.org>
-To: Marc Gonzalez <marc.w.gonzalez@free.fr>,
- Bjorn Andersson <bjorn.andersson@linaro.org>,
- Nicolas Dechesne <nicolas.dechesne@linaro.org>,
- Niklas Cassel <niklas.cassel@linaro.org>, Andy Gross
- <andy.gross@linaro.org>, Rajendra Nayak <rnayak@codeaurora.org>
-References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
- <de223e7a-3b60-0566-997f-b607bbc15007@codeaurora.org>
-Message-ID: <7d588806-5699-2d87-e95e-f1388de01a74@codeaurora.org>
-Date: Mon, 3 Dec 2018 08:47:20 -0700
-User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.1
-MIME-Version: 1.0
-In-Reply-To: <de223e7a-3b60-0566-997f-b607bbc15007@codeaurora.org>
-Content-Language: en-US
+ id 1gTqRz-0006yG-6o
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:48:07 +0000
+Received: from pps.filterd (m0098421.ppops.net [127.0.0.1])
+ by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
+ wB3FiEDg000854
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 3 Dec 2018 10:47:39 -0500
+Received: from e06smtp01.uk.ibm.com (e06smtp01.uk.ibm.com [195.75.94.97])
+ by mx0a-001b2d01.pphosted.com with ESMTP id 2p5680mh2f-1
+ (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 03 Dec 2018 10:47:38 -0500
+Received: from localhost
+ by e06smtp01.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ Violators will be prosecuted
+ for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
+ Mon, 3 Dec 2018 15:47:29 -0000
+Received: from b06cxnps3074.portsmouth.uk.ibm.com (9.149.109.194)
+ by e06smtp01.uk.ibm.com (192.168.101.131) with IBM ESMTP SMTP Gateway:
+ Authorized Use Only! Violators will be prosecuted; 
+ (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
+ Mon, 3 Dec 2018 15:47:22 -0000
+Received: from d06av21.portsmouth.uk.ibm.com (d06av21.portsmouth.uk.ibm.com
+ [9.149.105.232])
+ by b06cxnps3074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wB3FlLYn40697962
+ (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
+ Mon, 3 Dec 2018 15:47:21 GMT
+Received: from d06av21.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 6881952057;
+ Mon,  3 Dec 2018 15:47:21 +0000 (GMT)
+Received: from rapoport-lnx (unknown [9.148.206.196])
+ by d06av21.portsmouth.uk.ibm.com (Postfix) with ESMTPS id 2E7DF52059;
+ Mon,  3 Dec 2018 15:47:18 +0000 (GMT)
+Received: by rapoport-lnx (sSMTP sendmail emulation);
+ Mon, 03 Dec 2018 17:47:17 +0200
+From: Mike Rapoport <rppt@linux.ibm.com>
+To: Andrew Morton <akpm@linux-foundation.org>
+Subject: [PATCH v2 0/6] memblock: simplify several early memory allocation
+Date: Mon,  3 Dec 2018 17:47:09 +0200
+X-Mailer: git-send-email 2.7.4
+X-TM-AS-GCONF: 00
+x-cbid: 18120315-4275-0000-0000-000002EB6064
+X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
+x-cbparentid: 18120315-4276-0000-0000-000037F8646A
+Message-Id: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-03_09:, , signatures=0
+X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
+ priorityscore=1501
+ malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
+ clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
+ mlxlogscore=762 adultscore=0 classifier=spam adjust=0 reason=mlx
+ scancount=1 engine=8.0.1-1810050000 definitions=main-1812030148
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_074737_221451_AB257278 
-X-CRM114-Status: GOOD (  17.63  )
+X-CRM114-CacheID: sfid-20181203_074759_530599_E9B4B8E6 
+X-CRM114-Status: GOOD (  23.69  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -96,160 +102,97 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: MSM <linux-arm-msm@vger.kernel.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
-Content-Transfer-Encoding: base64
-Content-Type: text/plain; charset="utf-8"; Format="flowed"
+Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
+ Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
+ sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
+ Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
+ Mike Rapoport <rppt@linux.ibm.com>, Mark Salter <msalter@redhat.com>,
+ Arnd Bergmann <arnd@arndb.de>,
+ Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
+ openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
+ linux-kernel@vger.kernel.org, linuxppc-dev@lists.ozlabs.org,
+ "David S. Miller" <davem@davemloft.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-T24gMTIvMy8yMDE4IDg6MjcgQU0sIEplZmZyZXkgSHVnbyB3cm90ZToKPiBPbiAxMi8zLzIwMTgg
-ODoxOCBBTSwgTWFyYyBHb256YWxleiB3cm90ZToKPj4gSGVsbG8sCj4+Cj4+IEknbSB0cnlpbmcg
-dG8gZW5hYmxlIFVGUyBvbiBhcHE4MDk4LiBKdXN0IHdhbnRlZCB0byBzaGFyZSBteSBwcm9ncmVz
-cwo+PiBzbyBmYXIsIGluIGNhc2Ugc29tZW9uZSBzcG90cyBhbnkgZ2xhcmluZyBtaXN0YWtlcy4K
-PiAKPiBFeGNlbGxlbnQuwqAgVGhpcyB3YXMgZG93biBvbiBteSB0b2RvIGxpc3QuwqAgSSdtIGds
-YWQgaXRzIGdldHRpbmcgc29tZSAKPiBhdHRlbnRpb24uCj4gCj4+Cj4+IChXSVAgcGF0Y2ggcHJv
-dmlkZWQgYXQgbWVzc2FnZSdzIGVuZC4pCj4+Cj4+IHJwbV9zbWRfY2xrX3Byb2JlKCkgcnVucyBz
-dWNjZXNzZnVsbHksIGFuZCByZXR1cm5zIDAuCj4+Cj4+IHFjb21fcW1wX3BoeV9wcm9iZSgpIGZh
-aWxzOgo+Pgo+PiBbwqDCoMKgIDAuOTEzNzA3XSBxY29tLXFtcC1waHkgMWRhNzAwMC5waHk6IEZh
-aWxlZCB0byBnZXQgY2xrICdyZWYnOiAtMgo+PiBbwqDCoMKgIDAuOTEzNzYxXSBxY29tLXFtcC1w
-aHk6IHByb2JlIG9mIDFkYTcwMDAucGh5IGZhaWxlZCB3aXRoIGVycm9yIC0yCj4+Cj4+IHVmc19x
-Y29tX3Byb2JlKCkgYWxzbyBmYWlscyAod2hpY2ggbWF5IGJlIGNhdXNlZCBieSBQSFkgZmFpbHVy
-ZSkKPj4KPj4gW8KgwqDCoCAyLjM2ODQ4Nl0gdWZzaGNkLXFjb20gMWRhNDAwMC51ZnNoYzogdWZz
-aGNkX2dldF92cmVnOiB2ZGQtaGJhIGdldCAKPj4gZmFpbGVkLCBlcnI9LTUxNwo+PiBbwqDCoMKg
-IDIuMzcwNjczXSB1ZnNoY2QtcWNvbSAxZGE0MDAwLnVmc2hjOiBJbml0aWFsaXphdGlvbiBmYWls
-ZWQKPj4gW8KgwqDCoCAyLjQxMjkwOF0gdWZzaGNkLXFjb20gMWRhNDAwMC51ZnNoYzogdWZzaGNk
-X3BsdGZybV9pbml0KCkgZmFpbGVkIAo+PiAtNTE3Cj4+Cj4+IEknbGwgaW52ZXN0aWdhdGUgdGhl
-IFBIWSBpbml0Lgo+Pgo+PiBSZWdhcmRzLgo+Pgo+Pgo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02
-NC9ib290L2R0cy9xY29tL21zbTg5OTgtbXRwLmR0c2kgCj4+IGIvYXJjaC9hcm02NC9ib290L2R0
-cy9xY29tL21zbTg5OTgtbXRwLmR0c2kKPj4gaW5kZXggYjQyNzZkYTFmYjBkLi5hZDc1NDJmNDYx
-YWYgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LW10cC5k
-dHNpCj4+ICsrKyBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LW10cC5kdHNpCj4+
-IEBAIC0yNDEsMyArMjQxLDI2IEBACj4+IMKgwqDCoMKgwqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDC
-oMKgIH07Cj4+IMKgIH07Cj4+ICsKPj4gKyZ1ZnNoYyB7Cj4+ICvCoMKgwqAgc3RhdHVzID0gIm9r
-IjsKPj4gK8KgwqDCoCB2ZGQtaGJhLXN1cHBseSA9IDwmZ2NjIFVGU19HRFNDPjsKPj4gK8KgwqDC
-oCB2ZGQtaGJhLWZpeGVkLXJlZ3VsYXRvcjsKPj4gK8KgwqDCoCB2Y2Mtc3VwcGx5ID0gPCZ2cmVn
-X2wyMGFfMnA5NT47Cj4+ICvCoMKgwqAgdmNjcS1zdXBwbHkgPSA8JnZyZWdfbDI2YV8xcDI+Owo+
-PiArwqDCoMKgIHZjY3EyLXN1cHBseSA9IDwmdnJlZ19zNGFfMXA4PjsKPj4gK8KgwqDCoCB2Y2Mt
-bWF4LW1pY3JvYW1wID0gPDc1MDAwMD47Cj4+ICvCoMKgwqAgdmNjcS1tYXgtbWljcm9hbXAgPSA8
-NTYwMDAwPjsKPj4gK8KgwqDCoCB2Y2NxMi1tYXgtbWljcm9hbXAgPSA8NzUwMDAwPjsKPj4gK307
-Cj4+ICsKPj4gKyZ1ZnNwaHkgewo+PiArwqDCoMKgIHN0YXR1cyA9ICJvayI7Cj4+ICvCoMKgwqAg
-dmRkYS1waHktc3VwcGx5ID0gPCZ2cmVnX2wxYV8wcDg3NT47Cj4+ICvCoMKgwqAgdmRkYS1wbGwt
-c3VwcGx5ID0gPCZ2cmVnX2wyYV8xcDI+Owo+PiArwqDCoMKgIHZkZHAtcmVmLWNsay1zdXBwbHkg
-PSA8JnZyZWdfbDI2YV8xcDI+Owo+PiArwqDCoMKgIHZkZGEtcGh5LW1heC1taWNyb2FtcCA9IDw1
-MTQwMD47Cj4+ICvCoMKgwqAgdmRkYS1wbGwtbWF4LW1pY3JvYW1wID0gPDE0NjAwPjsKPj4gK8Kg
-wqDCoCB2ZGRwLXJlZi1jbGstbWF4LW1pY3JvYW1wID0gPDEwMD47Cj4+ICvCoMKgwqAgdmRkcC1y
-ZWYtY2xrLWFsd2F5cy1vbjsKPj4gK307Cj4+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2Jvb3Qv
-ZHRzL3Fjb20vbXNtODk5OC5kdHNpIAo+PiBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204
-OTk4LmR0c2kKPj4gaW5kZXggZDI5MWI0NzEzYzMzLi4xMGU3YjhhNTViOGEgMTAwNjQ0Cj4+IC0t
-LSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LmR0c2kKPj4gKysrIGIvYXJjaC9h
-cm02NC9ib290L2R0cy9xY29tL21zbTg5OTguZHRzaQo+PiBAQCAtMjY0LDYgKzI2NCwxMSBAQAo+
-PiDCoMKgwqDCoMKgwqDCoMKgwqAgcnBtX3JlcXVlc3RzOiBycG0tcmVxdWVzdHMgewo+PiDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInFjb20scnBtLW1zbTg5OTgiOwo+
-PiDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBxY29tLGdsaW5rLWNoYW5uZWxzID0gInJwbV9y
-ZXF1ZXN0cyI7Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcnBtY2M6IHFjb20scnBt
-Y2Mgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAicWNv
-bSxycG1jYy1tc204OTk4IjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjY2xv
-Y2stY2VsbHMgPSA8MT47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIH07Cj4+IMKgwqDCoMKg
-wqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDCoMKgIH07Cj4+IEBAIC02ODYsNSArNjkxLDc5IEBACj4+
-IMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZGlzdHJpYnV0b3Itc3RyaWRlID0gPDB4MCAw
-eDIwMDAwPjsKPj4gwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNf
-UFBJIDkgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+IMKgwqDCoMKgwqDCoMKgwqDCoCB9Owo+PiAr
-Cj4+ICvCoMKgwqDCoMKgwqDCoCB1ZnNoYzogdWZzaGNAMWRhNDAwMCB7Cj4+ICvCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAicWNvbSxtc204OTk4LXVmc2hjIiwgInFjb20sdWZz
-aGMiLAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAiamVkZWMs
-dWZzLTIuMCI7Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZyA9IDwweDFkYTQwMDAgMHgy
-NTAwPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNfU1BJIDI2
-NSBJUlFfVFlQRV9MRVZFTF9ISUdIPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcGh5cyA9
-IDwmdWZzcGh5X2xhbmVzPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcGh5LW5hbWVzID0g
-InVmc3BoeSI7Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGxhbmVzLXBlci1kaXJlY3Rpb24g
-PSA8Mj47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHBvd2VyLWRvbWFpbnMgPSA8JmdjYyBV
-RlNfR0RTQz47Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgY2xvY2stbmFtZXMgPQo+
-PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICJjb3JlX2NsayIsCj4+ICvCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgImJ1c19hZ2dyX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqAgImlmYWNlX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqAgImNvcmVfY2xrX3VuaXBybyIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqAgImNvcmVfY2xrX2ljZSIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAg
-InJlZl9jbGsiLAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICJ0eF9sYW5lMF9z
-eW5jX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJ4X2xhbmUwX3N5
-bmNfY2xrIiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAicnhfbGFuZTFfc3lu
-Y19jbGsiOwo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPQo+PiArwqDCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmZ2NjIEdDQ19VRlNfQVhJX0NMSz4sCj4+ICvCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX0FHR1JFMV9VRlNfQVhJX0NMSz4sCj4+
-ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19BSEJfQ0xLPiwK
-Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCA8JmdjYyBHQ0NfVUZTX1VOSVBST19D
-T1JFX0NMSz4sCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VG
-U19JQ0VfQ09SRV9DTEs+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmcnBt
-Y2MgMD4sCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19U
-WF9TWU1CT0xfMF9DTEs+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmZ2Nj
-IEdDQ19VRlNfUlhfU1lNQk9MXzBfQ0xLPiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoCA8JmdjYyBHQ0NfVUZTX1JYX1NZTUJPTF8xX0NMSz47Cj4+ICvCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgIGZyZXEtdGFibGUtaHogPQo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-IDw1MDAwMDAwMCAyMDAwMDAwMDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-IDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwzNzUwMDAwMCAxNTAwMDAwMDA+LAo+PiArwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDw3NTAwMDAwMCAzMDAwMDAwMDA+LAo+PiArwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDww
-IDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+Owo+PiArCj4+ICvC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlc2V0cyA9IDwmZ2NjIEdDQ19VRlNfQkNSPjsKPiAKPiBJ
-IGR1bm5vIGhvdyBtdWNoIHRoaXMgZmFjdG9ycyBpbnRvIHlvdXIgaXNzdWVzLCBidXQgdGhlIHJl
-c2V0cyBkZWZpbmVkIAo+IGluIGdjYy1tc204OTk4LmMgYXJlIHdyb25nLsKgIEknbSBwb3N0aW5n
-IGEgcGF0Y2ggbGF0ZXIgdG9kYXkuwqAgSSBrbm93IAo+IHRoaXMgd2FzIGEgcHJvYmxlbSBmb3Ig
-bWUgd2l0aCBVU0IuCj4gCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlc2V0LW5hbWVzID0g
-InJzdCI7Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgc3RhdHVzID0gImRpc2FibGVk
-IjsKPj4gK8KgwqDCoMKgwqDCoMKgIH07Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgIHVmc3BoeTog
-cGh5QDFkYTcwMDAgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInFj
-b20sc2RtODQ1LXFtcC11ZnMtcGh5IjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcmVnID0g
-PDB4MWRhNzAwMCAweDE4Yz47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICNhZGRyZXNzLWNl
-bGxzID0gPDE+Owo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwxPjsK
-Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcmFuZ2VzOwo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoCBjbG9jay1uYW1lcyA9Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJl
-Zl9jbGtfc3JjIiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAicmVmX2NsayIs
-Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJlZl9hdXhfY2xrIjsKPj4gK8Kg
-wqDCoMKgwqDCoMKgwqDCoMKgwqAgY2xvY2tzID0KPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoCA8JnJwbWNjIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwm
-Z2NjIEdDQ19VRlNfQ0xLUkVGX0NMSz4sCgpBbHNvLCAiR0NDX1VGU19DTEtSRUZfQ0xLIiBpcyBu
-b3QgZGVmaW5lZCBpbiAKaW5jbHVkZS9kdC1iaW5kaW5ncy9jbG9jay9xY29tLGdjYy1tc204OTk4
-Lmggd2hpY2ggaXMgcHJvYmFibHkgdGhlIGNhdXNlIApvZiB5b3VyIC0yIGVycm9yIGxpc3RlZCBh
-Ym92ZS4KCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19Q
-SFlfQVVYX0NMSz47Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgc3RhdHVzID0gImRp
-c2FibGVkIjsKPj4gKwo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCB1ZnNwaHlfbGFuZXM6IGxh
-bmVzQDFkYTc0MDAgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZyA9IDww
-eDFkYTc0MDAgMHgxMDg+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgIDwweDFkYTc2MDAgMHgxZTA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgIDwweDFkYTdjMDAgMHgxZGM+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwweDFkYTc4MDAgMHgxMDg+LAo+PiArwqDCoMKgwqDC
-oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwweDFkYTdhMDAgMHgxZTA+Owo+PiAr
-wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICNwaHktY2VsbHMgPSA8MD47Cj4+ICvCoMKg
-wqDCoMKgwqDCoMKgwqDCoMKgIH07Cj4+ICvCoMKgwqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDCoMKg
-IH07Cj4+IMKgIH07Cj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2Nsay9xY29tL2Nsay1zbWQtcnBt
-LmMgCj4+IGIvZHJpdmVycy9jbGsvcWNvbS9jbGstc21kLXJwbS5jCj4+IGluZGV4IDg1MGMwMmE1
-MjI0OC4uMTJhMGEyZDZlYzdiIDEwMDY0NAo+PiAtLS0gYS9kcml2ZXJzL2Nsay9xY29tL2Nsay1z
-bWQtcnBtLmMKPj4gKysrIGIvZHJpdmVycy9jbGsvcWNvbS9jbGstc21kLXJwbS5jCj4+IEBAIC02
-MTEsMTAgKzYxMSwyNSBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IHJwbV9zbWRfY2xrX2Rlc2MgCj4+
-IHJwbV9jbGtfbXNtODk5NiA9IHsKPj4gwqDCoMKgwqDCoCAubnVtX2Nsa3MgPSBBUlJBWV9TSVpF
-KG1zbTg5OTZfY2xrcyksCj4+IMKgIH07Cj4+ICsvKiBtc204OTk4ICovCj4+ICsjZGVmaW5lIExO
-X0JCX0NMSzFfSUQgMHgxCj4+ICtERUZJTkVfQ0xLX1NNRF9SUE1fWE9fQlVGRkVSKG1zbTg5OTgs
-IGxuX2JiX2NsazEsIGxuX2JiX2FfY2xrMSwgCj4+IExOX0JCX0NMSzFfSUQpOwo+PiArCj4+ICtz
-dGF0aWMgc3RydWN0IGNsa19zbWRfcnBtICptc204OTk4X2Nsa3NbXSA9IHsKPj4gK8KgwqDCoCBb
-MF0gPSAmbXNtODk5OF9sbl9iYl9jbGsxLAo+PiArwqDCoMKgIFsxXSA9ICZtc204OTk4X2xuX2Ji
-X2FfY2xrMSwKPj4gK307Cj4+ICsKPj4gK3N0YXRpYyBjb25zdCBzdHJ1Y3QgcnBtX3NtZF9jbGtf
-ZGVzYyBycG1fY2xrX21zbTg5OTggPSB7Cj4+ICvCoMKgwqAgLmNsa3MgPSBtc204OTk4X2Nsa3Ms
-Cj4+ICvCoMKgwqAgLm51bV9jbGtzID0gQVJSQVlfU0laRShtc204OTk4X2Nsa3MpLAo+PiArfTsK
-Pj4gKwo+PiDCoCBzdGF0aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBycG1fc21kX2Nsa19t
-YXRjaF90YWJsZVtdID0gewo+PiDCoMKgwqDCoMKgIHsgLmNvbXBhdGlibGUgPSAicWNvbSxycG1j
-Yy1tc204OTE2IiwgLmRhdGEgPSAmcnBtX2Nsa19tc204OTE2IH0sCj4+IMKgwqDCoMKgwqAgeyAu
-Y29tcGF0aWJsZSA9ICJxY29tLHJwbWNjLW1zbTg5NzQiLCAuZGF0YSA9ICZycG1fY2xrX21zbTg5
-NzQgfSwKPj4gwqDCoMKgwqDCoCB7IC5jb21wYXRpYmxlID0gInFjb20scnBtY2MtbXNtODk5NiIs
-IC5kYXRhID0gJnJwbV9jbGtfbXNtODk5NiB9LAo+PiArwqDCoMKgIHsgLmNvbXBhdGlibGUgPSAi
-cWNvbSxycG1jYy1tc204OTk4IiwgLmRhdGEgPSAmcnBtX2Nsa19tc204OTk4IH0sCj4+IMKgwqDC
-oMKgwqAgeyB9Cj4+IMKgIH07Cj4+IMKgIE1PRFVMRV9ERVZJQ0VfVEFCTEUob2YsIHJwbV9zbWRf
-Y2xrX21hdGNoX3RhYmxlKTsKPj4KPiAKPiAKCgotLSAKSmVmZnJleSBIdWdvClF1YWxjb21tIERh
-dGFjZW50ZXIgVGVjaG5vbG9naWVzIGFzIGFuIGFmZmlsaWF0ZSBvZiBRdWFsY29tbSAKVGVjaG5v
-bG9naWVzLCBJbmMuClF1YWxjb21tIFRlY2hub2xvZ2llcywgSW5jLiBpcyBhIG1lbWJlciBvZiB0
-aGUKQ29kZSBBdXJvcmEgRm9ydW0sIGEgTGludXggRm91bmRhdGlvbiBDb2xsYWJvcmF0aXZlIFBy
-b2plY3QuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
-aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
-ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
-eC1hcm0ta2VybmVsCg==
+Hi,
+
+These patches simplify some of the early memory allocations by replacing
+usage of older memblock APIs with newer and shinier ones.
+
+Quite a few places in the arch/ code allocated memory using a memblock API
+that returns a physical address of the allocated area, then converted this
+physical address to a virtual one and then used memset(0) to clear the
+allocated range.
+
+More recent memblock APIs do all the three steps in one call and their
+usage simplifies the code.
+
+It's important to note that regardless of API used, the core allocation is
+nearly identical for any set of memblock allocators: first it tries to find
+a free memory with all the constraints specified by the caller and then
+falls back to the allocation with some or all constraints disabled.
+
+The first three patches perform the conversion of call sites that have
+exact requirements for the node and the possible memory range.
+
+The fourth patch is a bit one-off as it simplifies openrisc's
+implementation of pte_alloc_one_kernel(), and not only the memblock usage.
+
+The fifth patch takes care of simpler cases when the allocation can be
+satisfied with a simple call to memblock_alloc().
+
+The sixth patch removes one-liner wrappers for memblock_alloc on arm and
+unicore32, as suggested by Christoph.
+
+v2:
+* added Ack from Stafford Horne for openrisc changes
+* entirely drop early_alloc wrappers on arm and unicore32, as per Christoph
+Hellwig
+
+Mike Rapoport (6):
+  powerpc: prefer memblock APIs returning virtual address
+  microblaze: prefer memblock API returning virtual address
+  sh: prefer memblock APIs returning virtual address
+  openrisc: simplify pte_alloc_one_kernel()
+  arch: simplify several early memory allocations
+  arm, unicore32: remove early_alloc*() wrappers
+
+ arch/arm/mm/mmu.c                      | 13 +++----------
+ arch/c6x/mm/dma-coherent.c             |  9 ++-------
+ arch/microblaze/mm/init.c              |  5 +++--
+ arch/nds32/mm/init.c                   | 12 ++++--------
+ arch/openrisc/mm/ioremap.c             | 11 ++++-------
+ arch/powerpc/kernel/paca.c             | 14 ++++++--------
+ arch/powerpc/kernel/setup-common.c     |  4 ++--
+ arch/powerpc/kernel/setup_64.c         | 21 ++++++++++-----------
+ arch/powerpc/mm/hash_utils_64.c        |  6 +++---
+ arch/powerpc/mm/pgtable-book3e.c       |  8 ++------
+ arch/powerpc/mm/pgtable-book3s64.c     |  5 +----
+ arch/powerpc/mm/pgtable-radix.c        | 24 +++++++++---------------
+ arch/powerpc/mm/pgtable_32.c           |  4 +---
+ arch/powerpc/mm/ppc_mmu_32.c           |  3 +--
+ arch/powerpc/platforms/pasemi/iommu.c  |  5 +++--
+ arch/powerpc/platforms/powernv/opal.c  |  3 +--
+ arch/powerpc/platforms/pseries/setup.c | 11 +++++++----
+ arch/powerpc/sysdev/dart_iommu.c       |  5 +++--
+ arch/sh/mm/init.c                      | 18 +++++-------------
+ arch/sh/mm/numa.c                      |  5 ++---
+ arch/sparc/kernel/prom_64.c            |  7 ++-----
+ arch/sparc/mm/init_64.c                |  9 +++------
+ arch/unicore32/mm/mmu.c                | 14 ++++----------
+ 23 files changed, 81 insertions(+), 135 deletions(-)
+
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
