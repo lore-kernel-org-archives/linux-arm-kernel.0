@@ -2,22 +2,22 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
-	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-7.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 391CEC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:18:02 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 744C0C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:18:18 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 050D220850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:18:01 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 29ED92064A
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:18:18 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="L4F8CVAc";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="vwqSr7T9"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 050D220850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dxG9/L0Z";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="zVConGsy"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 29ED92064A
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,66 +26,68 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
 	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Sh8SPiFft0Ivl3eY5aNtMJ15DTUOD0IRD009ua/o6wk=; b=L4F8CVAcl1VQDL
-	XD/n10B5fliS00Av5pCWp3+LB69V0acUXTnxagtbsOc/HWhD9FEi59SP848h3W6U3GLLPie/Tzhkx
-	Kal7hJjmrCYfN8AhkScheGXjbVxFehnJCYkMLNwVLnc7gXuKrFjO6mXxoSaWCCYrKFrJmDK2fVSl/
-	mKTcmOvSZ4gDJrpWHvyTOgHiivppyrGEDY/6762qgnYpPLi4YRBoS6RWOAyKV9iFam2JXL0ahH82J
-	h72DaIVHbGoSIuK3t+YoQeuq5iSoEel5SsKR6/vK4nvTHo26IuAp9DlVw3obo5DkzkOqfxmaf+9Oh
-	pS/MqRpnfEasAvzWNOtA==;
+	List-Owner; bh=jmvUgBCDLX47IRfTxs5QHW6EPw+JV88Y1fLhWB0tVnc=; b=dxG9/L0ZOJ2wfD
+	FGR4aAnl22oeaqpN8C9qNDk0MIxg4sm6cT7e9rI1OJPhnQ45o5RmMl6pDfjQVoam1eRb8wcd1ufEK
+	4TjgFdVonJZlR/RUK7+BmLMEkf4MJoMBkBon64eD99REqBId3qbCbgcZL7U9io7WigFeawYpNY2H5
+	uEeNkchSAlI9feTILYdGLCyU8tyqgX/YRmFpg886sTUJH0JCBYbctGMdCw0AVmSAhEDqH/ZEqpsIo
+	l8WzpWT15TjulZPbCPMjMbijUmVlv1CPEnzFPk24i/Pw1opLOqEigBCMV5WTI+IPbSyUbjx1r3JAL
+	iyMWSDdF0ozELnr0y/Tw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTvbK-0002TZ-6k; Mon, 03 Dec 2018 21:17:58 +0000
-Received: from mail-lf1-x142.google.com ([2a00:1450:4864:20::142])
+	id 1gTvbY-0002jA-Te; Mon, 03 Dec 2018 21:18:12 +0000
+Received: from mail-lj1-x244.google.com ([2a00:1450:4864:20::244])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvaf-0001kc-Kb
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:17:18 +0000
-Received: by mail-lf1-x142.google.com with SMTP id u18so10301336lff.10
+ id 1gTvaj-0001ke-KX
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:17:25 +0000
+Received: by mail-lj1-x244.google.com with SMTP id s5-v6so12789031ljd.12
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:17:07 -0800 (PST)
+ Mon, 03 Dec 2018 13:17:09 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=lixom-net.20150623.gappssmtp.com; s=20150623;
  h=date:from:to:cc:subject:message-id:references:mime-version
  :content-disposition:in-reply-to:user-agent;
- bh=QkfT95mg/1cSwkGFVSOtAuPkF+d4KB99daTJhVVOTDs=;
- b=vwqSr7T9XiA1pyEuSEXP2Ci3LFhDWPUlKOqNoZPC1yfAAfLMPGNxP0mVoJjxSr9UJ0
- sScSVY2Cbo5cA5y2Yb2BYT/F4hqtZ3BGNQVcNCFlT+oLrpDTdem0BMBuLP29wbnd8aA+
- KJhwUbyqd/aQ4MLca4fltf9mKyoMTX7VsQkHFfvIhGYsfSqAVcWn4ARjZ+i71H/j9Rnu
- u2NlxOPTPqUMkKuvkq8XbOny/00VDGp2EKyrUsx7lvF1UQ3zrwi2VCkr/9YrHecce+Mg
- re9gD8YYvZJ9Mj1Wn60fLtw1Yhaa4u+EtN7mQYwhFJrrblxQgHvZNoFvRMGGUhDsKJfH
- OJpA==
+ bh=gB0TldqL5uwTG2DFr0qqq+TTA9iyQ3KtjGVNsaMFYPk=;
+ b=zVConGsyinHhzN1VPkX/y/EWEjN+nJ/Sw8QLkYZFPHrnHtTOYfc7yu/LCPiBHGZc2a
+ QEmcDLPbWdTYK506DwyGaoy4RczP1yNj379KgsGlcwv+YppvuulqioPAVRNdintqZi9g
+ xYqll/YZa6PROkCNjWCK92vxs/60A/FLFHM3IG5OwyrgpBJskCecUFZStW7RewjOgH35
+ yXUANBZcM6XvIZsVK5zgIPg7RFQVtbKqkFwu29QmnL/hBzvMv5Jph1E7Md0a6ap50cO0
+ OsJ073X3964iEROt63S7uLkNnIRzhVk1zIYf7CAS38z5LpAdjxt1/rCp4AWr3RjmZN3J
+ AufA==
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:date:from:to:cc:subject:message-id:references
  :mime-version:content-disposition:in-reply-to:user-agent;
- bh=QkfT95mg/1cSwkGFVSOtAuPkF+d4KB99daTJhVVOTDs=;
- b=c38XpA73rb33ShSdDRHilaDHhzteYFu3OZt/z1HIjAobhZRxokh4JQzw4ln+t1nS/c
- Th998cmwtgFUsZWmCSJ68peW7Li3tCGBPLuIRutLC8OdWBFa91oYnPzzP9lr+Kn60ZNG
- zO2F2pS1TB1QcyzldjkkMJNwY4xRfOysdRJAwJYDKUmtq6SYNyR7S8CWY14ZsN/AN8ij
- rC1vVGqt58IM5jy//3wOF5sIagduglrHLGCnNcLcfu5ndmhT+R7RcZf5QncobMQZxCSP
- c+e5lQ6GbBry/FAzFuNT/9mH8C1JgzxHumyBovcH5beY3hj9KYKSBA1MsY+lNglxL+V6
- TBIA==
-X-Gm-Message-State: AA+aEWbD46dHj8Pl+pxcMn8wZgwmIin31utLZ9vf1JUoeb+AllpPe6K9
- 5dK++wUNlTcN/izZQFUWajWTbHm0OCOtYA==
-X-Google-Smtp-Source: AFSGD/XuGd6RbEBfcdPm//jyo11YUSNBkleRjJ+7HP3W+NHshLNuzVgzPCJa3r842gI15aXy+AKf9w==
-X-Received: by 2002:a19:8fce:: with SMTP id s75mr9815816lfk.151.1543871825737; 
- Mon, 03 Dec 2018 13:17:05 -0800 (PST)
+ bh=gB0TldqL5uwTG2DFr0qqq+TTA9iyQ3KtjGVNsaMFYPk=;
+ b=VGbeTt0z2r++xfZNF18gNILCHjHzZeQvobdlf50T2ofmDVRvxxptRMpaZw5o7k8Nli
+ ehj5bVMNN8i2Geyu0yN/SkkJedNkQY61RofyzOcEz1mElPxeYZcZIuK22juAKd/VgSCx
+ vN/gjG3H6Pr15BlOLeBgTkkzzmafdlE0O4hRlS1ps/71zCtbmQy8do3eIKcAKOvx1fJX
+ 9Dm7qkPiyDZsXk3VeSOivHW/rCzoVztXhY1NxjaDlYRQ8J2V/inAIo/iXAJZquIW/jrn
+ Mb4Nm0n4B+yp7ku8gTQ++WiuHN9RsYOI9WJ5Qaciqrb754lNFM5lhOMgdjbGcv7iNVQA
+ oCrQ==
+X-Gm-Message-State: AA+aEWYh2qo6hSZwIUhLa3fcCgvZUzyR+TtNSMp1aOpK5FXKPh5jLyHK
+ mJNptg4YAJLhDOFLsgIN8u0itg==
+X-Google-Smtp-Source: AFSGD/WnGKcXCg9ZyMgJDgwObS8UlD5AsRLoKeEM5d4kGhwU+XS+g0/pedd6CaYqTG+ZMISPeLZ1Cw==
+X-Received: by 2002:a2e:92:: with SMTP id
+ e18-v6mr11883905lji.130.1543871827953; 
+ Mon, 03 Dec 2018 13:17:07 -0800 (PST)
 Received: from localhost (h85-30-9-151.cust.a3fiber.se. [85.30.9.151])
- by smtp.gmail.com with ESMTPSA id y24-v6sm2668451ljd.20.2018.12.03.13.17.04
+ by smtp.gmail.com with ESMTPSA id l21-v6sm2725017lji.6.2018.12.03.13.17.06
  (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 03 Dec 2018 13:17:04 -0800 (PST)
-Date: Mon, 3 Dec 2018 12:57:23 -0800
+ Mon, 03 Dec 2018 13:17:06 -0800 (PST)
+Date: Mon, 3 Dec 2018 12:58:55 -0800
 From: Olof Johansson <olof@lixom.net>
 To: Alexandre Torgue <alexandre.torgue@st.com>
-Subject: Re: [GIT PULL] STM32 DT changes for v4.21 #1
-Message-ID: <20181203205723.3cpirmlvalo2i2cj@localhost>
-References: <3fb58758-a67f-3a0f-72d2-abbfd71b6ae0@st.com>
+Subject: Re: [PATCH] ARM: multi_v7_defconfig: enable STM32 analog & timer
+ drivers
+Message-ID: <20181203205855.c6j3sskitgdqxrd7@localhost>
+References: <1543836121-18799-1-git-send-email-alexandre.torgue@st.com>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <3fb58758-a67f-3a0f-72d2-abbfd71b6ae0@st.com>
+In-Reply-To: <1543836121-18799-1-git-send-email-alexandre.torgue@st.com>
 User-Agent: NeoMutt/20170113 (1.7.2)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_131717_677447_90F39378 
-X-CRM114-Status: GOOD (  15.31  )
+X-CRM114-CacheID: sfid-20181203_131722_097895_CA778786 
+X-CRM114-Status: GOOD (  13.19  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -98,37 +100,32 @@ List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
 Cc: Maxime Coquelin <mcoquelin.stm32@gmail.com>,
- Kevin Hilman <khilman@baylibre.com>, arm-soc <arm@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- Arnd Bergmann <arnd@arndb.de>
+ Kevin Hilman <khilman@baylibre.com>, arm@kernel.org,
+ linux-arm-kernel@lists.infradead.org, Arnd Bergmann <arnd@arndb.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 12:18:17PM +0100, Alexandre Torgue wrote:
+On Mon, Dec 03, 2018 at 12:22:01PM +0100, Alexandre Torgue wrote:
+> From: Fabrice Gasnier <fabrice.gasnier@st.com>
+> 
+> This enables drivers for STM32 timer, low power timer and analog hardware
+> that can be used on STM32MP1 SoC:
+> - Timer & LP Timer MFD core, PWM, trigger & encoder drivers
+> - IIO ADC/DAC/DFSDM
+> - vrefbuf regu driver (voltage reference buffer).
+> 
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Signed-off-by: Alexandre Torgue <alexandre.torgue@st.com>
+> 
+> ---
+> 
 > Hi Arnd, Olof and Kevin,
 > 
-> Please consider this first round of STM32 DT updates for v4.21.
-> 
-> Thanks.
-> Alex
-> 
-> The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
-> 
->   Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> stm32-dt-for-v4.21-1
-> 
-> for you to fetch changes up to 8914b63bab3c43a529316ba2858137bc57b74fa1:
-> 
->   ARM: dts: stm32: add thermal sensor support on STM32MP157c (2018-12-03
-> 10:43:26 +0100)
+> Can you please merge this patch for v4.21?
 
-I think you might have missed pushing the tag to the remote?
+Applied to next/defconfig. Thanks!
 
 
 -Olof
