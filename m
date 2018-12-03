@@ -4,132 +4,87 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D196C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:49:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B2E1C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:53:29 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 561A5208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:49:17 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 27DBE20848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 17:53:29 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Bwo3I4lB";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="jo0Xn6yB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 561A5208A3
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TA6dNVhL";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=lixom-net.20150623.gappssmtp.com header.i=@lixom-net.20150623.gappssmtp.com header.b="MHjzkQ5D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 27DBE20848
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lixom.net
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:References:In-Reply-To:MIME-Version:
-	Date:Message-ID:From:To:Subject:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rRfkq1a9aPQw2tfMRuTdMzzJp3iYhrKGmS8TCVX8r/U=; b=Bwo3I4lBHFRaHI
-	MJdFvMbT2IRIfa03GCn/odB3puOf/2RhpEbkqDgiLd6lk23x9MB+agJq8eXtTjIBjxvzFPnAkOpUx
-	wLhAnIzYcS6+q1D6G8fGg7u+Le4iQSm/0UjtwvQg3O3q53EDFsP9C/ff9pLBXE41hesSo1A96JrmQ
-	IwrtMtkSf57wnfIeVlpHmiWkFdJW7WWFjVXevJQHqceMB7g0kJj3qLylu1JALPwQqv0jmVtOn7rNp
-	ngvVxCgBfwvRMV7NaQcV2VK1cWItL5UAGTsVjyIlZLNwvagBdUJ+FaI7FPiA+0X8HV3jkwoS/0c2d
-	4V7sYKuF9n7585+FzOfg==;
+	List-Owner; bh=lvuvQuQnXpbzALWtQUoGpR/jpT+LYMUsmx+Ebubcy5A=; b=TA6dNVhLkbOCL5
+	xu0nUZLlYIRCGfBsFDnNarpyj2GGehOPmTUpkMfLKl1oke2DzNLbhZWys41oJrVDjCjlZDOK/j5nN
+	YSIKz0CE5lNP0bz2W0oGEcDzYv5+PXZe6dYFPXqvxEhsT3dYG9h+NW7sHRvEmy1LWZQFGn//YMkin
+	VVdkiqWkZyM64ujt79KYQRaoU6qJeomtrzswV4rrqqjVv8a7I9QpPRlIuLoWyTGjJu/1zlzA/SmPD
+	85899pPu46KVIAOOQL/B/AA0+Y1s1B8FKk5z1YUoVcMHf4Y5XDdeinE/vGIzkL3VZE/jfEuQW6ac3
+	2bV/NpaQaezIwBUSSuiw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTsLJ-0004uv-FY; Mon, 03 Dec 2018 17:49:13 +0000
-Received: from mailout2.w1.samsung.com ([210.118.77.12])
+	id 1gTsPO-0007Di-T1; Mon, 03 Dec 2018 17:53:26 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTsLF-0004tg-JP
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 17:49:11 +0000
-Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
- by mailout2.w1.samsung.com (KnoxPortal) with ESMTP id
- 20181203174857euoutp023ece51f06d047dc39c185bcdef3e2ccb~s4_MuHAGz1128811288euoutp02M
+ id 1gTsPL-0007Ce-9V
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 17:53:25 +0000
+Received: by mail-it1-x141.google.com with SMTP id a6so9899514itl.4
  for <linux-arm-kernel@lists.infradead.org>;
- Mon,  3 Dec 2018 17:48:57 +0000 (GMT)
-DKIM-Filter: OpenDKIM Filter v2.11.0 mailout2.w1.samsung.com
- 20181203174857euoutp023ece51f06d047dc39c185bcdef3e2ccb~s4_MuHAGz1128811288euoutp02M
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
- s=mail20170921; t=1543859337;
- bh=mOmZh3Z/m/kJ3Yd/yIjuwdALOmvNaT4nyk+GK7Xb6js=;
- h=Subject:To:Cc:From:Date:In-Reply-To:References:From;
- b=jo0Xn6yBUtn1I6F8jxdePOUHJRXyXvf9N/XKH5N2LiLtoIVxqRzwFHBpZ2ZwRodYZ
- B9OvuWyNVBNeGJs/BGRlPUCJ8x+oaZ/p7Fr86Gtbu5qwzdrap0j8495kyv+5GAEXid
- aea8enb8BqFvWU1VVPabX81Xmu9S2WnoD89y+e28=
-Received: from eusmges2new.samsung.com (unknown [203.254.199.244]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTP id
- 20181203174855eucas1p106747a52af5b1d5dc66c90037d344f4a~s4_LR_NhN1176411764eucas1p1L;
- Mon,  3 Dec 2018 17:48:55 +0000 (GMT)
-Received: from eucas1p2.samsung.com ( [182.198.249.207]) by
- eusmges2new.samsung.com (EUCPMTA) with SMTP id 30.37.04294.78C650C5; Mon,  3
- Dec 2018 17:48:55 +0000 (GMT)
-Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
- eucas1p1.samsung.com (KnoxPortal) with ESMTPA id
- 20181203174854eucas1p1698fc72786a5ead752c25b67b465f592~s4_KlMbjS1176011760eucas1p1L;
- Mon,  3 Dec 2018 17:48:54 +0000 (GMT)
-Received: from eusmgms1.samsung.com (unknown [182.198.249.179]) by
- eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
- 20181203174854eusmtrp1224141bf793d15b5de4fb4aac1a13eba~s4_KViv_a1122611226eusmtrp1Z;
- Mon,  3 Dec 2018 17:48:54 +0000 (GMT)
-X-AuditID: cbfec7f4-84fff700000010c6-fb-5c056c87d5e9
-Received: from eusmtip1.samsung.com ( [203.254.199.221]) by
- eusmgms1.samsung.com (EUCPMTA) with SMTP id 7C.E7.04284.68C650C5; Mon,  3
- Dec 2018 17:48:54 +0000 (GMT)
-Received: from [106.120.51.20] (unknown [106.120.51.20]) by
- eusmtip1.samsung.com (KnoxPortal) with ESMTPA id
- 20181203174853eusmtip1ea8b34ad9fddccd27b045795cd35eab8~s4_JeKBw73123231232eusmtip1V;
- Mon,  3 Dec 2018 17:48:53 +0000 (GMT)
-Subject: Re: [PATCH v2 5/5] arm: dts: exynos4: opp-suspend in DMC and leftbus
-To: Krzysztof Kozlowski <krzk@kernel.org>
-From: Lukasz Luba <l.luba@partner.samsung.com>
-Message-ID: <fed94fcf-74f4-a6e4-1405-12fb67ed5c9f@partner.samsung.com>
-Date: Mon, 3 Dec 2018 18:48:52 +0100
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
- Thunderbird/60.2.1
+ Mon, 03 Dec 2018 09:53:12 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=lixom-net.20150623.gappssmtp.com; s=20150623;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc:content-transfer-encoding;
+ bh=jrZm1EVRc3lEWmoL1Qrzl/u0xfvJ16xasMcx5rZfWPM=;
+ b=MHjzkQ5D55rQRC09jOgOH9wq3Rk8bQbipn5cgUcx8cJ2yq/xkBw6vmZ4xp9wVcrYXH
+ LsOTTGFCmVLohXxqhbWUEE8ABkEMr2Kt+MklKzDjtf6svGiVDoQMzrJ8YbAr2WfpJUFa
+ TaljyRsAWVWbpXiRRY7aj1xRG0BRLCKfbOz7yluoANdSIJ9z8L3FDaJ25unZYv9jfk/g
+ nX951/4yFCd8XqjUsxHXA05AG85dxUhRNTl3viQtVepsk+lx4ph4UV5ianzUTj0O0sDl
+ bSCfyWM11/7T/mavxDwIc6sNxyJ/bGQMtO5SWu956TQFsNEH4MoA33xisPFyrP+oxLYy
+ rB1w==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc:content-transfer-encoding;
+ bh=jrZm1EVRc3lEWmoL1Qrzl/u0xfvJ16xasMcx5rZfWPM=;
+ b=JNbYVHt3pJTGFTtlSGzQKvRigtUp+EcPXf2R9AFwaGaDis6pvdqSYWoExXwMRxW+TV
+ hB10UTzr0VoGBeSgVK8YZSOAx6HDo0idsGTxVk1bE4GLsT4Q92Vsh2U89U7qsuQtERaM
+ v1SOq0Wk+DDhyIITPOetb2z3wp8MNnHg3/hx2+bWDy3D3Eakd8DL1N/mRe+nVlXI2CO/
+ QRRDGAD0N0eQ1LpmUKiOOUb9fc5FUWzxIiAEdo6bYOT6VwYuM1Xn4lNz/QlQWKPQ7yP1
+ Llg9c5t/xwpXw/8JMMipzzyP3aTXyxcLjXdlkhAk7pMHQw6o1pE23xRbeb/F6iF2kZdo
+ tX5w==
+X-Gm-Message-State: AA+aEWZruRgwYVAJwIb+nV5hvWWenIaiMKiR6cb0pCAHXiDSUYhj+ago
+ /1OI7p/9Obcg3VAPYsS/lDDHJD7+R/F6nCdy1SLavg==
+X-Google-Smtp-Source: AFSGD/U3dYAM8cLPdIisk0V1q1bwKif+eSHDkiHenUVaNNbJIsqarq0U51ofWMatd8hPL+qciP6UMdEiKInK5xMqsWI=
+X-Received: by 2002:a24:ce42:: with SMTP id v63mr8519661itg.136.1543859591740; 
+ Mon, 03 Dec 2018 09:53:11 -0800 (PST)
 MIME-Version: 1.0
-In-Reply-To: <20181203172251.GA15124@kozik-lap>
-Content-Language: en-US
-X-Brightmail-Tracker: H4sIAAAAAAAAA02SWUwUWRSGvVV1qwpiM0WLcgJmTDqauERQ0XgTl4iaSY0vTiY+uGCkhRIM
- NEIXuEdRIw2MSKs4YIviGrHZpFlFEMESQiM2rUHc0HFwF9QIDuOGQ1lthrfvnPOfe/4/uTyt
- z2UD+PVxiZI5zhhrYL2ZyqaPrqmWWBw2rb7KjzRUTCKlOSWYVJX+g0ln/3NM8pQbmOw5XcKS
- 63+YSGb3a5q4XBc40ra7hyO2rDqKOLpvY3KrJpclfRkKIjmuyxQpUro4crbTTZH7u/JZ0uW8
- NrTfehOTvXUKR1IK3mHS0/6QWeAvVl6qxGLh8UIkHk12M6I18z0ST9e+pESHPY0V648VcmLZ
- mZ3iYBMnlndYGHF/uR2J+QUDnNjn+Pk33UrvuZFS7PqNkjl4frh3dNYVFxOvjNncetKKk9E1
- 33TkxYMwE+pvptHpyJvXC/kIMl89pbSiH0HG5wzPpA/B28xa/GNl4OEJz+AcgsOlDUgrehHc
- +fSaTUc8P0pYCs+6x6sLfsIk6Pw6gFUNLRQzUOPsRKqGFYKg2p6ganTCL5BRXE+pzAjjoeXx
- 30jl0cJySH1UwGoaX2g58oRR2UsIhlNt7d/7tOAP957kURqPg6re3O/mQHjAg3v3AKO5XgwX
- nVmsxqPgVXM5p/FYaD20z6ORoS3V7tFsB0tLtUczB642u7HqmR4KU1ITrCIIoXDwWaiGPnCn
- 11dz4AMHK7Npra2D1BS99sZEKN/XTmk8Bs4V/slZkcE2LJdtWBbbsCy2/8+eQIwd+UtJsilK
- kmfESZuCZKNJToqLCorYYHKgoT/bOtjcX41qvqxtRAKPDCN1OQtxmB4bN8pbTI0IeNrgp4tP
- YML0ukjjlq2SecMac1KsJDeiQJ4x+Ou2jfhrlV6IMiZKMZIUL5l/TCneKyAZWT7/tEr6trKo
- 492ypQ7p6cXSgHn4QG1EXUL2rLcTdzQom8I7/h09J+9bd0eaUwldcmTFnrLz49jBkK7QAz5f
- A13LQt5Y8IcJiY8Xle1fkXYoZut9xdqkRBa9qL2+esTeHTFyz2SfqJDFFb9Kdy/luJ2zs60h
- Bcbfm3cFrouukxtTjk8xMHK0cfpk2iwb/wPbcZVqrwMAAA==
-X-Brightmail-Tracker: H4sIAAAAAAAAA02SbUhTYRiGfc/3osFxar5YVq76YdBs6txrlERQnH4IYUWhlo08zHAfujMj
- C3IVaa1MrX7oXGof0lqmOWtKpqYtpcymRjMKxVLRMqOyHFFarhH474L7vnh44GZwiYMMYw7p
- jLxBp9JIqUVE91zX4Lp8DZm6/tb0CtR+PxLVl9aRqLF+hkQD38dJVOl6QaJT1+so9PycFhWN
- TOLI7b5Lo56Tn2hkudyCIceIh0QvH1gpNF3oAqjU3YqhO65BGlUP9GHo7QkbhQafPZn3u/tJ
- dLrFRaP8219I9Kl3iNgcyjmbnSRXU1EDuHJTH8EVF30D3PWHHzDOYT9LcW1Xamiu4UYeN9dJ
- c/deFRDchXt2wNlue2lu2rF8hzhZttGgzzHyKzP0gnGTNEWOomXyeCSLjo2XyWOU+zZEK6RR
- CRvTec2hw7whKuGALOPyIzeR5VpypPtqMWkCTwLNQMRANhZ6h6pwM1jESNhqAL3nx3B/sARe
- bG2k/RwEf3vMlL80CeDsTBnlC4LYRPh4zPOvFMxGwoFZL+kr4WwtAYc7m2m/cRKDntmvmBkw
- DMXKYJM92yeI2W2wsLYN8zHBroZP370HPg5h98KeD7XA3wmET8tGCR+L2Ch4raf332GcjYMV
- De9wP4fCN6OVmJ9XwMYpK14MJJYFumWBYlmgWBYoVYCwg2A+R9CqtYJcJqi0Qo5OLTuo1zrA
- /F6cnT8bmkB//c4OwDJAulhcuoVMlZCqw0KutgNABpcGi7OyiVSJOF2Ve5Q36NMMORpe6ACK
- +edK8LCQg/r59emMaXKFXIni5coYZUwckoaK3etzkyWsWmXkM3k+izf89zBGFGYCWaJeoeqX
- ZHf1Yz1WPt6bNzGTGMGF3tze9nmq5utrq+lmQFFXYlnz+HGzInyYWNMa8KNknzicC7ga4fpz
- adhaAI89mNhauColOeJ7vj2uz65opz7uFyXtYTMjnRcnL4U02EaWLdWY4dszy4cYm73ctqsk
- Kd/TUucdE3HquFhWSggZKvla3CCo/gIReISaRQMAAA==
-X-CMS-MailID: 20181203174854eucas1p1698fc72786a5ead752c25b67b465f592
-X-Msg-Generator: CA
-X-RootMTR: 20181203143135eucas1p165fe6183ae90de7906f9683cb41ff4c1
-X-EPHeader: CA
-CMS-TYPE: 201P
-X-CMS-RootMailID: 20181203143135eucas1p165fe6183ae90de7906f9683cb41ff4c1
-References: <1543847475-7600-1-git-send-email-l.luba@partner.samsung.com>
- <CGME20181203143135eucas1p165fe6183ae90de7906f9683cb41ff4c1@eucas1p1.samsung.com>
- <1543847475-7600-6-git-send-email-l.luba@partner.samsung.com>
- <20181203172251.GA15124@kozik-lap>
+References: <20181121033652.12247-1-manivannan.sadhasivam@linaro.org>
+ <20181121033652.12247-7-manivannan.sadhasivam@linaro.org>
+ <CAL_JsqJ=88ORdgbRDn+VWk9=ydShidqwOxdAMfDbH4W2drnXzA@mail.gmail.com>
+ <CAOesGMgSxwcmBLDvxsvcCJ9-NvJ3-wK8fZBZV2ZNuzAa1idi3w@mail.gmail.com>
+ <CAL_JsqLZY_5rZ35YSGeH7wmEZoLP1TjG+0n4BWGiUBwOFSq-Vw@mail.gmail.com>
+In-Reply-To: <CAL_JsqLZY_5rZ35YSGeH7wmEZoLP1TjG+0n4BWGiUBwOFSq-Vw@mail.gmail.com>
+From: Olof Johansson <olof@lixom.net>
+Date: Mon, 3 Dec 2018 09:53:00 -0800
+Message-ID: <CAOesGMi=qFB0jTTAzTYxBduYf_7RVwOZkKNjckpqg6tbd3sPow@mail.gmail.com>
+Subject: Re: [PATCH v2 06/15] arm: dts: Add devicetree for OrangePi 2G IoT
+ board
+To: Rob Herring <robh+dt@kernel.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_094909_777111_941ECD9A 
-X-CRM114-Status: GOOD (  20.99  )
+X-CRM114-CacheID: sfid-20181203_095323_336852_88A9581E 
+X-CRM114-Status: GOOD (  21.17  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -141,112 +96,62 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, anton@enomsg.org, len.brown@intel.com, pavel@ucw.cz,
- m.szyprowski@samsung.com, linux-samsung-soc@vger.kernel.org,
- b.zolnierkie@samsung.com, cw00.choi@samsung.com, myungjoo.ham@samsung.com,
- devicetree@vger.kernel.org, keescook@chromium.org, linux-pm@vger.kernel.org,
- robh+dt@kernel.org, linux-arm-kernel@lists.infradead.org, tony.luck@intel.com,
- gregkh@linuxfoundation.org, rjw@rjwysocki.net, linux-kernel@vger.kernel.org,
- tjakobi@math.uni-bielefeld.de, kyungmin.park@samsung.com, kgene@kernel.org,
- ccross@android.com
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: DTML <devicetree@vger.kernel.org>, Jason Cooper <jason@lakedaemon.net>,
+ Arnd Bergmann <arnd@arndb.de>, Marc Zyngier <marc.zyngier@arm.com>,
+ Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
+ LinusW <linus.walleij@linaro.org>, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ Amit Kucheria <amit.kucheria@linaro.org>, linux-serial@vger.kernel.org,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
+ overseas.sales@unisoc.com, =?UTF-8?Q?Andreas_F=C3=A4rber?= <afaerber@suse.de>,
+ Linux ARM Mailing List <linux-arm-kernel@lists.infradead.org>,
+ zhao_steven@263.net
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Krzysztof,
-
-On 12/3/18 6:22 PM, Krzysztof Kozlowski wrote:
-> On Mon, Dec 03, 2018 at 03:31:15PM +0100, Lukasz Luba wrote:
->> Mark the state for devfreq device while entring suspend/resume process.
->>
->> The patch is based on earlier work by Tobias Jakobi.
->>
->> Suggested-by: Tobias Jakobi <tjakobi@math.uni-bielefeld.de>
->> Suggested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Signed-off-by: Lukasz Luba <l.luba@partner.samsung.com>
->> ---
->>   arch/arm/boot/dts/exynos4210.dtsi | 2 ++
->>   arch/arm/boot/dts/exynos4412.dtsi | 2 ++
->>   2 files changed, 4 insertions(+)
-> 
-> Thanks, applied with some minor commit msg changes. In general, please
-> take care about title prefix (git log --oneline
-> arch/arm/boot/dts/exynos*) and always explain why you are doing this.
-Thank you that you have applied and for the hint.
-
-> You just mentioned "what" but that is pretty obvious by looking at
-> commit contents. The commit msg should answer why these should be marked
-> as opp-suspend and why these values were chosen.
-> 
-> The cover letter just briefly describes "issue with devfreq devices' frequency
-> during suspend/resume"... but what issue?
-In the cover letter there is sentence:
-'The suspending device has now chance to set proper
-state when the system is going for suspend. This phase is the right place
-to set needed frequences for the next resume process.'
-Generally speaking, there is a need of setting the right
-frequency/voltage, because we need that frequency during resume,
-i.e. for booting CPUs (which are poked earlier during resume than the 
-buses in this design).
-
-Regards,
-Lukasz
-
-
-> 
-> Best regards,
-> Krzysztof
-> 
->>
->> diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
->> index b6091c2..4429b72 100644
->> --- a/arch/arm/boot/dts/exynos4210.dtsi
->> +++ b/arch/arm/boot/dts/exynos4210.dtsi
->> @@ -298,6 +298,7 @@
->>   			opp-400000000 {
->>   				opp-hz = /bits/ 64 <400000000>;
->>   				opp-microvolt = <1150000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->> @@ -367,6 +368,7 @@
->>   			};
->>   			opp-200000000 {
->>   				opp-hz = /bits/ 64 <200000000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   	};
->> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
->> index 51f72f0..908c0c4 100644
->> --- a/arch/arm/boot/dts/exynos4412.dtsi
->> +++ b/arch/arm/boot/dts/exynos4412.dtsi
->> @@ -432,6 +432,7 @@
->>   			opp-400000000 {
->>   				opp-hz = /bits/ 64 <400000000>;
->>   				opp-microvolt = <1050000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->> @@ -520,6 +521,7 @@
->>   			opp-200000000 {
->>   				opp-hz = /bits/ 64 <200000000>;
->>   				opp-microvolt = <1000000>;
->> +				opp-suspend;
->>   			};
->>   		};
->>   
->> -- 
->> 2.7.4
->>
-> 
-> 
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gTW9uLCBEZWMgMywgMjAxOCBhdCA5OjIxIEFNIFJvYiBIZXJyaW5nIDxyb2JoK2R0QGtlcm5l
+bC5vcmc+IHdyb3RlOgo+Cj4gT24gTW9uLCBEZWMgMywgMjAxOCBhdCAxMToxMSBBTSBPbG9mIEpv
+aGFuc3NvbiA8b2xvZkBsaXhvbS5uZXQ+IHdyb3RlOgo+ID4KPiA+IE9uIE1vbiwgRGVjIDMsIDIw
+MTggYXQgNzo1NCBBTSBSb2IgSGVycmluZyA8cm9iaCtkdEBrZXJuZWwub3JnPiB3cm90ZToKPiA+
+ID4KPiA+ID4gT24gVHVlLCBOb3YgMjAsIDIwMTggYXQgOTozOCBQTSBNYW5pdmFubmFuIFNhZGhh
+c2l2YW0KPiA+ID4gPG1hbml2YW5uYW4uc2FkaGFzaXZhbUBsaW5hcm8ub3JnPiB3cm90ZToKPiA+
+ID4gPgo+ID4gPiA+IEFkZCBpbml0aWFsIGRldmljZXRyZWUgc3VwcG9ydCBmb3IgT3JhbmdlUGkg
+MkcgSW9UIGJvYXJkIGZyb20gWHVubG9uZy4KPiA+ID4gPgo+ID4gPiA+IFNpZ25lZC1vZmYtYnk6
+IEFuZHJlYXMgRsOkcmJlciA8YWZhZXJiZXJAc3VzZS5kZT4KPiA+ID4gPiBTaWduZWQtb2ZmLWJ5
+OiBNYW5pdmFubmFuIFNhZGhhc2l2YW0gPG1hbml2YW5uYW4uc2FkaGFzaXZhbUBsaW5hcm8ub3Jn
+Pgo+ID4gPiA+IC0tLQo+ID4gPiA+ICBhcmNoL2FybS9ib290L2R0cy9NYWtlZmlsZSAgICAgICAg
+ICAgICAgICAgICAgfCAgMiArCj4gPiA+ID4gIC4uLi9ib290L2R0cy9yZGE4ODEwcGwtb3Jhbmdl
+cGktMmctaW90LmR0cyAgICB8IDQwICsrKysrKysrKysrKysrKysrKysKPiA+ID4gPiAgMiBmaWxl
+cyBjaGFuZ2VkLCA0MiBpbnNlcnRpb25zKCspCj4gPiA+ID4gIGNyZWF0ZSBtb2RlIDEwMDY0NCBh
+cmNoL2FybS9ib290L2R0cy9yZGE4ODEwcGwtb3JhbmdlcGktMmctaW90LmR0cwo+ID4gPiA+Cj4g
+PiA+ID4gZGlmZiAtLWdpdCBhL2FyY2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxlIGIvYXJjaC9hcm0v
+Ym9vdC9kdHMvTWFrZWZpbGUKPiA+ID4gPiBpbmRleCBiMGU5NjZkNjI1YjkuLmEwZmRhZDhmMTBk
+ZCAxMDA2NDQKPiA+ID4gPiAtLS0gYS9hcmNoL2FybS9ib290L2R0cy9NYWtlZmlsZQo+ID4gPiA+
+ICsrKyBiL2FyY2gvYXJtL2Jvb3QvZHRzL01ha2VmaWxlCj4gPiA+ID4gQEAgLTgwNiw2ICs4MDYs
+OCBAQCBkdGItJChDT05GSUdfQVJDSF9RQ09NKSArPSBcCj4gPiA+ID4gICAgICAgICBxY29tLW1z
+bTg5NzQtc29ueS14cGVyaWEtY2FzdG9yLmR0YiBcCj4gPiA+ID4gICAgICAgICBxY29tLW1zbTg5
+NzQtc29ueS14cGVyaWEtaG9uYW1pLmR0YiBcCj4gPiA+ID4gICAgICAgICBxY29tLW1kbTk2MTUt
+d3A4NTQ4LW1hbmdvaC1ncmVlbi5kdGIKPiA+ID4gPiArZHRiLSQoQ09ORklHX0FSQ0hfUkRBKSAr
+PSBcCj4gPiA+ID4gKyAgICAgICByZGE4ODEwcGwtb3JhbmdlcGktMmctaW90LmR0Ygo+ID4gPiA+
+ICBkdGItJChDT05GSUdfQVJDSF9SRUFMVklFVykgKz0gXAo+ID4gPgo+ID4gPiBRdWVzdGlvbiBm
+b3IgQXJuZC9PbG9mOiBjYW4gd2UgKnBsZWFzZSogc3RhcnQgcHV0dGluZyBuZXcgU29DIGZhbWls
+aWVzCj4gPiA+IGluIHN1Yi1kaXJzPwo+ID4KPiA+IEkgdGhpbmsgd2UncmUgYXQgYSBwb2ludCB3
+aGVyZSBpdCdzIGJlY29taW5nIHF1aXRlIGF3a3dhcmQgdG8ga2VlcCBpdAo+ID4gaW4gYSBmbGF0
+IGRpcmVjdG9yeSwgeWVzLgo+ID4KPiA+IEJlc3Qgd2F5IHRvIGhhbmRsZSB0aGlzIGlzIHVzdWFs
+bHkgcmlnaHQgYmVmb3JlIHRoZSBjbG9zaW5nIG9mIGEgbWVyZ2UKPiA+IHdpbmRvdywgc28gbGV0
+J3MgZG8gaXQgdGhlbi4gSXQnbGwgYmUgYSBjb25mbGljdC1yaWRkZW4gbWVzcyBpZiB3ZSB0cnkK
+PiA+IHRvIHN0YWdlIHNvbWV0aGluZyBpbiAtbmV4dCwgc28gSSdkIHJhdGhlciBqdXN0IGRvIGl0
+IGRpcmVjdGx5IGluIG91cgo+ID4gdHJlZSBhcyBhIG9uZS1zaG90IHRoaW5nLgo+Cj4gV2hpbGUg
+SSdkIGxpa2UgdG8gc2VlIHRoZSB3aG9sZSB0aGluZyBjb252ZXJ0ZWQsIEkgd2FzIG9ubHkgYXNr
+aW5nCj4gYWJvdXQgdGhpcyBvbmUgcGxhdGZvcm0uIFRoYXQgc2hvdWxkIGJlIGRvYWJsZSBub3cs
+IHJpZ2h0PwoKSSdkIHJhdGhlciBhcHBseSB0aGlzIHRvIGN1cnJlbnQgc2NoZW1lIGFuZCB0aGVu
+IG1vdmUgZXZlcnl0aGluZyBvbmNlLAppbnN0ZWFkIG9mIGhhdmluZyBtYWludGFpbmVycyBnbyAi
+T2gsIEkgZ3Vlc3MgSSBuZWVkIHRvIG1vdmUgbWluZSIgYW5kCndlIGVuZCB1cCB3aXRoIGFuIG9u
+c2xhdWdodCBvZiBjb25mbGljdGluZyBwdWxsIHJlcXVlc3RzIHRvIG1vdmUKdGhpbmdzIGFwYXJ0
+LgoKCi1PbG9mCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
+XwpsaW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmlu
+ZnJhZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9s
+aW51eC1hcm0ta2VybmVsCg==
