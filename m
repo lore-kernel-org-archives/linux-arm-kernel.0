@@ -2,68 +2,87 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A503CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:50 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1CF2AC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:12:24 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 574CD214DB
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:50 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C6C87214C1
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:12:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifHxTPJl";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vCIHZajF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 574CD214DB
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kVO66eI3";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="dvhyiJnN"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C6C87214C1
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:From:To:
-	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=GNy6Om7FTR406fKBr+r+ISYDhDnxwb7h1aONma1qnNE=; b=ifHxTPJl/DRUZ6
-	dXZrU7bzxneOahu57xVZ8h5DpNA2mST0LyU6FmVkTdUyHIfAOC2M1EBI0uVhdeW35s+08VYf0vxnf
-	Ev7U4Tyu6A8xqUIl9kcF0m1iyU8B12U8Mjrk3iEpqW/EkmpqKrXPjgk1n9ju+z8mahHMyBhU2MgSD
-	0LZtLaE3pMf+T3jCQkghGHVCMj+746dK4pNfom8XBUWKrdgQ8bQS4PigPSY6Do8br8LS2RhHJ9ABJ
-	SMfdwy+X3nYQrTw4cRJpKyTaMYdIDda88pIMW9BiJ0pBu9eRQx7EPrT9HySvgeElLFBhOPXHQWg1s
-	JGW6Wo4/OPv+M784ttFQ==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=uBk/p8tAuJCOnSmSBp5U/IvVJRRfW75Al51PEN8Z48Q=; b=kVO66eI3s2kMHy
+	ikvclResJtThWwDKyngGk60cnor6SCZwTzZeZ4arYqNgf7xYSdPUefSU7OpadiZd2EihFdtWwjj58
+	y4R7L53eX5hxRP1U+evMijFMmZHGYEU7hMCULc1rUsH3l7yx8mUvHofd8DK8KTUNwC6Sqb09qf2Zk
+	iDfjMrRMsFBnQiTSkXjuVdOrvCOp2v1vkXK6iZZq4RkUPQR6zZXn4Gg+KTyf4ZQtBavUjadWWCrlt
+	f7IEVTfKy9hiaEN/5dztDFq90zonglTrUqtZIzdMAALRlWorrHxS8HS5wwleQWCsaJe2o0PlEj1vh
+	MpHX7rCw99NFaVy/oQ1A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTm1v-0007mN-Nc; Mon, 03 Dec 2018 11:04:47 +0000
-Received: from mail.kernel.org ([198.145.29.99])
+	id 1gTm9D-0002k7-NT; Mon, 03 Dec 2018 11:12:19 +0000
+Received: from mail-wr1-x442.google.com ([2a00:1450:4864:20::442])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTm1n-0007fG-68
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:04:45 +0000
-Received: from localhost (unknown [62.119.166.9])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 1385F214C1;
- Mon,  3 Dec 2018 11:04:27 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543835068;
- bh=ISUevNvxuXR39vwbmgIFrEl8mBYFOosqbxED40nSFJ0=;
- h=Subject:To:Cc:From:Date:From;
- b=vCIHZajFJoi66WF+WT8KzmfLZAckd3kqt/szTB64AN81jzhiSWpHHFUg92zFzriWr
- dF9OJ4Vp+WnyZtfbk0fETTPjj0B/8J21rXjPnLmPA+hRWveVpJjP1w6ylojYxSqM99
- 65CBI0vZBo4O3GgwKCDkXBrU1nl4NQA+OhcARYL4=
-Subject: Patch "ARM: function_graph: Simplify with function_graph_enter()" has
- been added to the 4.9-stable tree
-To: gregkh@linuxfoundation.org, linux-arm-kernel@lists.infradead.org,
- linux@armlinux.org.uk, mhiramat@kernel.org, rostedt@goodmis.org,
- stable@kernel.org
-From: <gregkh@linuxfoundation.org>
-Date: Mon, 03 Dec 2018 12:02:22 +0100
-Message-ID: <1543834942253217@kroah.com>
+ id 1gTm95-0002hM-Hx
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:12:17 +0000
+Received: by mail-wr1-x442.google.com with SMTP id v13so11688217wrw.5
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 03:12:00 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=date:from:to:cc:subject:message-id:references:mime-version
+ :content-disposition:content-transfer-encoding:in-reply-to
+ :user-agent; bh=ktUki5kKJlm/XmPAGAnl3nsGbYvkH58XDa+bCIEGDSA=;
+ b=dvhyiJnN79G36fOq8Jbr9jStyIkajdH+3jAxBehMDVZU2+6pAqozBohllEpwzpKkQE
+ Xcgv+aVroch6dZkRG1pP0WUw07IZf49+bW2sHeLdDLRxyXcAOeeu80PkVZrkexY7Iyg8
+ W8DlKRxVnmJEyGw6xr2I/RULiEViEQ6lqTxb8=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:references
+ :mime-version:content-disposition:content-transfer-encoding
+ :in-reply-to:user-agent;
+ bh=ktUki5kKJlm/XmPAGAnl3nsGbYvkH58XDa+bCIEGDSA=;
+ b=iBtRpQr+ebHQA8EwFWwkEHTJnk/dxohp+2CsG1/eNTKlt0jWGomDc/+ilqySoa0r2Y
+ 7g+kc6hSYmqvuR/j1c6gnxKn5SzCCdJ/uZQoYjHHsMt+jrOvZYdCsb1SFQYzbCkR3Czw
+ KcKaGsKI7fC5CBCbUdKQLQLNHomXGGEpkuZDbzDgLBJkXpY2EySnBALEWjjcJpYf0aYg
+ MCaiRhzIy5D6+OCNMgrsJJp6aECIjDZ8qph5H/0RIwz2AB/2AGfqLoUw8S+hfPcZAIVt
+ Ny7Pw7cQ+QEgUer/h9XhqZ6F+Oj/Y0Smldz58d5xTz+pacoFmbuzRpA20PuwZBIyRP4r
+ 4hkg==
+X-Gm-Message-State: AA+aEWZ0Ua0r+MNPM0ITtEts9bxZdQqy+6hmbhbfmD5K0PhOc2mQQnpw
+ 3NU5CdaT2JLCiCYBTlq9zgHnlw==
+X-Google-Smtp-Source: AFSGD/UQgtjzPoIMAI5ke2+cdHd+peu67uwYD12+PDWb12nZdTkxGE29XUpFNaNaK2hNLZUAONzDiQ==
+X-Received: by 2002:adf:b190:: with SMTP id q16mr13751325wra.95.1543835518902; 
+ Mon, 03 Dec 2018 03:11:58 -0800 (PST)
+Received: from dell ([2.31.167.218])
+ by smtp.gmail.com with ESMTPSA id 14sm14448771wmv.36.2018.12.03.03.11.58
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Mon, 03 Dec 2018 03:11:58 -0800 (PST)
+Date: Mon, 3 Dec 2018 11:11:56 +0000
+From: Lee Jones <lee.jones@linaro.org>
+To: Yangtao Li <tiny.windzz@gmail.com>
+Subject: Re: [PATCH] mfd: convert to DEFINE_SHOW_ATTRIBUTE
+Message-ID: <20181203111156.GJ26661@dell>
+References: <20181202021710.9307-1-tiny.windzz@gmail.com>
 MIME-Version: 1.0
-X-stable: commit
-X-Patchwork-Hint: ignore 
+Content-Disposition: inline
+In-Reply-To: <20181202021710.9307-1-tiny.windzz@gmail.com>
+User-Agent: Mutt/1.9.4 (2018-02-28)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_030439_266980_917474A9 
-X-CRM114-Status: GOOD (  12.80  )
+X-CRM114-CacheID: sfid-20181203_031211_592142_D34690E8 
+X-CRM114-Status: GOOD (  11.13  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,114 +94,25 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stable-commits@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linus.walleij@linaro.org, linux-kernel@vger.kernel.org,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-This is a note to let you know that I've just added the patch titled
-
-    ARM: function_graph: Simplify with function_graph_enter()
-
-to the 4.9-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     arm-function_graph-simplify-with-function_graph_enter.patch
-and it can be found in the queue-4.9 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
-
-
-From f1f5b14afd7cce39e6a9b25c685e1ea34c231096 Mon Sep 17 00:00:00 2001
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
-Date: Sun, 18 Nov 2018 17:19:26 -0500
-Subject: ARM: function_graph: Simplify with function_graph_enter()
-
-From: Steven Rostedt (VMware) <rostedt@goodmis.org>
-
-commit f1f5b14afd7cce39e6a9b25c685e1ea34c231096 upstream.
-
-The function_graph_enter() function does the work of calling the function
-graph hook function and the management of the shadow stack, simplifying the
-work done in the architecture dependent prepare_ftrace_return().
-
-Have ARM use the new code, and remove the shadow stack management as well as
-having to set up the trace structure.
-
-This is needed to prepare for a fix of a design bug on how the curr_ret_stack
-is used.
-
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: stable@kernel.org
-Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
-Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
----
- arch/arm/kernel/ftrace.c |   17 +----------------
- 1 file changed, 1 insertion(+), 16 deletions(-)
-
---- a/arch/arm/kernel/ftrace.c
-+++ b/arch/arm/kernel/ftrace.c
-@@ -199,9 +199,7 @@ void prepare_ftrace_return(unsigned long
- 			   unsigned long frame_pointer)
- {
- 	unsigned long return_hooker = (unsigned long) &return_to_handler;
--	struct ftrace_graph_ent trace;
- 	unsigned long old;
--	int err;
- 
- 	if (unlikely(atomic_read(&current->tracing_graph_pause)))
- 		return;
-@@ -209,21 +207,8 @@ void prepare_ftrace_return(unsigned long
- 	old = *parent;
- 	*parent = return_hooker;
- 
--	trace.func = self_addr;
--	trace.depth = current->curr_ret_stack + 1;
--
--	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace)) {
-+	if (function_graph_enter(old, self_addr, frame_pointer, NULL))
- 		*parent = old;
--		return;
--	}
--
--	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
--				       frame_pointer, NULL);
--	if (err == -EBUSY) {
--		*parent = old;
--		return;
--	}
- }
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
-
-
-Patches currently in stable-queue which might be from rostedt@goodmis.org are
-
-queue-4.9/function_graph-create-function_graph_enter-to-consolidate-architecture-code.patch
-queue-4.9/sh-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/function_graph-move-return-callback-before-update-of-curr_ret_stack.patch
-queue-4.9/function_graph-use-new-curr_ret_depth-to-manage-depth-instead-of-curr_ret_stack.patch
-queue-4.9/sparc-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/parisc-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/x86-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/function_graph-reverse-the-order-of-pushing-the-ret_stack-and-the-callback.patch
-queue-4.9/arm-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/function_graph-make-ftrace_push_return_trace-static.patch
-queue-4.9/arm64-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/s390-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/microblaze-function_graph-simplify-with-function_graph_enter.patch
-queue-4.9/function_graph-have-profiler-use-curr_ret_stack-and-not-depth.patch
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gU2F0LCAwMSBEZWMgMjAxOCwgWWFuZ3RhbyBMaSB3cm90ZToKCj4gVXNlIERFRklORV9TSE9X
+X0FUVFJJQlVURSBtYWNybyB0byBzaW1wbGlmeSB0aGUgY29kZS4KPiAKPiBTaWduZWQtb2ZmLWJ5
+OiBZYW5ndGFvIExpIDx0aW55LndpbmR6ekBnbWFpbC5jb20+Cj4gLS0tCj4gIGRyaXZlcnMvbWZk
+L2FiMzEwMC1jb3JlLmMgfCAxNSArKy0tLS0tLS0tLS0tLS0KPiAgZHJpdmVycy9tZmQvYWIzMTAw
+LW90cC5jICB8IDE2ICsrKy0tLS0tLS0tLS0tLS0KPiAgZHJpdmVycy9tZmQvdHBzNjUwMTAuYyAg
+ICB8IDE0ICsrLS0tLS0tLS0tLS0tCj4gIDMgZmlsZXMgY2hhbmdlZCwgNyBpbnNlcnRpb25zKCsp
+LCAzOCBkZWxldGlvbnMoLSkKCkxvb2tzIG9rYXkgdG8gbWU6CgogIEZvciBteSBvd24gcmVmZXJl
+bmNlOgogICAgQWNrZWQtZm9yLU1GRC1ieTogTGVlIEpvbmVzIDxsZWUuam9uZXNAbGluYXJvLm9y
+Zz4KCkxpbnVzLAoKICBBbnl0aGluZyB0byBhZGQ/CgotLSAKTGVlIEpvbmVzIFvmnY7nkLzmlq9d
+CkxpbmFybyBTZXJ2aWNlcyBUZWNobmljYWwgTGVhZApMaW5hcm8ub3JnIOKUgiBPcGVuIHNvdXJj
+ZSBzb2Z0d2FyZSBmb3IgQVJNIFNvQ3MKRm9sbG93IExpbmFybzogRmFjZWJvb2sgfCBUd2l0dGVy
+IHwgQmxvZwoKX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18K
+bGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZy
+YWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGlu
+dXgtYXJtLWtlcm5lbAo=
