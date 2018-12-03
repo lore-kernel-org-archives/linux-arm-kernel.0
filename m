@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED
 	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13B3EC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:17:32 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8ABAEC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:17:39 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DFD552145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:17:31 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6265A2145D
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:17:39 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="izjDgb8I";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="lTjU/FGn"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DFD552145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="eN5Rz6vB";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="xDNL//A4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6265A2145D
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=Bxn+QrJQxk038fAmNRz6DjuOxSXpGd2c7qZN9Jrp2DA=; b=izjDgb8IV2nmt8
-	LJW2EQuvCgWZyC+IJVGa1xPBWKAvYuUJSOyjWedgdmFkeGgaelQwGs7hBvc0Zw7HKMhEdVDDDnSkH
-	+L6ZP0aezojtMFSi3VdTrCH7rhDnPq6GjrtUJ9ub707tWqNXxO8SCEsb/zF8TuqQcgr0uIH8Sydif
-	GOHiqjFV+4NJcBLuAQ2dZmYcma4v/2RFMyJtbEqKV2xb0bgLxo2OIuN0CHoSAydnqXlnPgIw/EbjQ
-	l7WpSPtuxuiO2M1srXC6WcRdDgVFkyPTSRuAtM5XUJyu8o0DCj70S+A5iW0CYJJrihxa362inM4fA
-	7GA6TrjHFmFB2fhXOnTQ==;
+	List-Owner; bh=Y7oWtj/U7aQdgcUaCHYXF1U6EWku9mxID1KbKpHu4HE=; b=eN5Rz6vBkNtcZO
+	gFPlOz/6tlBsErcgpYYz3zwgqSre7Jb+Ywqj2qbhH3DvvqTr6ZMb47fjX/Dn9Bx0PjUPeV7oTYjL8
+	nKLsEp3qpQ2WmPFTlE7iiVPvN96FwktD7qsHqw6U7jnXj+MOhkXMJBuDD4VbFxcrqVzxDmMdaBp92
+	hsk22kgvtF7t9hsOK2m+JYyYlxBPi6RMtehRDYGyldCOJQGyGC0fWbvZrg2PIVFusqg9h4wnsEcDV
+	P6DzYzLjX2ZvWfc1hVdMKuLvBmFHiGMvvf5uK7EAKCY5V701npZnlt7vxdz/K09foFA96hbLjo1xP
+	ezKsO+hPNctKZ0zlVtfA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTsmd-0001CZ-59; Mon, 03 Dec 2018 18:17:27 +0000
+	id 1gTsmn-0001LF-Pe; Mon, 03 Dec 2018 18:17:37 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTsma-0001Bc-8C
+ id 1gTsma-0001Bg-89
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:17:25 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 40CB920850;
- Mon,  3 Dec 2018 18:17:13 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id E46EE2145D;
+ Mon,  3 Dec 2018 18:17:21 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543861033;
- bh=ajgUZD92b+ch3w55pfZ0R2fecM+83e/WCZe50Lt23hg=;
+ s=default; t=1543861042;
+ bh=Gz0q+3HLJGmzZXUZsmSrTR5rxjQKIBk1iD5tMCpMBXE=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=lTjU/FGnBYqnUSv/ZK4n/WfTEeHMhN5uI71d/MTmrueQg+T3ZOPTT9UfjZVqD3oRB
- mJmd+b7gLE4zZlOAZN10yUNEvJE/06J2C1PGOdyy7FLnGsDzSFqkzgXRBvJfozzu06
- CxQcbRXVeFKfL3hTvjLvqs+wLWn91GnCZsZxeiTg=
+ b=xDNL//A4uKCN0iJEXNQ5BjFYamH+N1L/AA9VTF2xk0UFumlQH/8p2y+lDn57JUEGy
+ 2bq8I2PCTgkkOeWQcKqnylg0pjDWFmtE9+AFKIvxsalyhv5YS5/uH093fth//XGxEP
+ oUVEk+bN14UtuKCsC8dFzZwQ+94wwXldzSdpQB+g=
 MIME-Version: 1.0
 To: Abel Vesa <abel.vesa@nxp.com>, Aisheng DONG <aisheng.dong@nxp.com>,
  Lucas Stach <l.stach@pengutronix.de>, Sascha Hauer <kernel@pengutronix.de>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1543661502-18573-2-git-send-email-abel.vesa@nxp.com>
+In-Reply-To: <1543661502-18573-4-git-send-email-abel.vesa@nxp.com>
 References: <1543661502-18573-1-git-send-email-abel.vesa@nxp.com>
- <1543661502-18573-2-git-send-email-abel.vesa@nxp.com>
-Message-ID: <154386103244.88331.15633232004889732875@swboyd.mtv.corp.google.com>
+ <1543661502-18573-4-git-send-email-abel.vesa@nxp.com>
+Message-ID: <154386104135.88331.11110647498955664003@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH v15 1/5] dt-bindings: Add binding for i.MX8MQ CCM
-Date: Mon, 03 Dec 2018 10:17:12 -0800
+Subject: Re: [PATCH v15 3/5] clk: imx: Add SCCG PLL type
+Date: Mon, 03 Dec 2018 10:17:21 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_101724_355322_20DFF737 
-X-CRM114-Status: UNSURE (   8.09  )
+X-CRM114-CacheID: sfid-20181203_101724_354783_C7D30A14 
+X-CRM114-Status: UNSURE (   9.58  )
 X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
@@ -90,14 +90,18 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting Abel Vesa (2018-12-01 02:52:10)
+Quoting Abel Vesa (2018-12-01 02:52:13)
 > From: Lucas Stach <l.stach@pengutronix.de>
 > 
-> This adds the binding for the i.MX8MQ Clock Controller Module.
+> The SCCG is a new PLL type introduced on i.MX8.
+> 
+> The description of this SCCG clock can be found here:
+> 
+> https://www.nxp.com/docs/en/reference-manual/IMX8MDQLQRM.pdf#page=834
 > 
 > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 > Signed-off-by: Abel Vesa <abel.vesa@nxp.com>
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Reviewed-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
 
 Applied to clk-next
