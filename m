@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4CB26C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:55:08 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A0E96C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:56:32 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1BD5820848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:55:08 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7449420848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:56:32 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AY5jCMpA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1BD5820848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hxG6U2h5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7449420848
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
 	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=68Vy/YuqFn8jFtWUd2xI/480YCaK35kl8ZogAW6YuaY=; b=AY5jCMpASQfNsFuohcHcCD5ao
-	liKtN6bXjraVtUOWh4XXN+TBkGXdHMS2tSMIsTvcwqRo4dNTtcJPbTgqjOW8I68BG8s7I/CZ65jH8
-	0ErcikPRs8yjCCixg8O+cWJW2FPoWIjhEeSGA04r7FJ94+mSYbC5CmKynK02a0kComuc0M6mj4co8
-	Ww9fwYZqnBnq1nbizghOQqmUDQb+fTYxJXvnXqFAuDAxLrk+39+0hjBE9YHHL0zRHDIJ4vxDJotzT
-	ctfRdIpPXTurDgA+0gDPDv7h9kug8wNPIR97VEGbsgPn7+QQHHzbL49rt5NxDZxIkqemev81qQyU4
-	Wwhl8TXGQ==;
+	 bh=KPitT3Y/e4zfmr5kmAc9fPtIS6P3Ig5qSldo2dp7bdU=; b=hxG6U2h5eVQGHJF2dsyyKMlTq
+	4niHuZ5CGPJAAS6oGfaXcR4OUHoazq+yUgwL2W8E4NjIO66JwpSqPKXHT3rq+zjQhDXK1OAFBwlJj
+	xkRvbUDzPXFDTzaD+1bv76gAuDwIJcWJ2O8oosOlRvGxgkGy0SjYa7LtD/JIpQniyfwQU5XQcHIgw
+	yyEox2cUrXY2keDyNF/uOg5PYZdoMeT3WXqGpSmKcMkgQbdVg0BhpImNFAZBSxtbCTrWMT+dJp0O1
+	KwnCHVkcZRpEDiGcA7YgXAFuQIIm9flXajLNzQrv/jA1xUnMHFe3KUZuAYATQBqRbNvYF7d1Z/Aho
+	Au3MnSv5A==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlsZ-0002pb-2s; Mon, 03 Dec 2018 10:55:07 +0000
+	id 1gTltp-0003sN-OW; Mon, 03 Dec 2018 10:56:25 +0000
 Received: from mail.bootlin.com ([62.4.15.54])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlsT-00027v-Rd
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:55:05 +0000
+ id 1gTltm-0003oW-K1
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:56:24 +0000
 Received: by mail.bootlin.com (Postfix, from userid 110)
- id 8E8EA20747; Mon,  3 Dec 2018 11:54:50 +0100 (CET)
+ id 886F920750; Mon,  3 Dec 2018 11:56:11 +0100 (CET)
 Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
  [90.88.18.158])
- by mail.bootlin.com (Postfix) with ESMTPSA id 4D9DE2039F;
- Mon,  3 Dec 2018 11:54:40 +0100 (CET)
-Date: Mon, 3 Dec 2018 11:54:40 +0100
+ by mail.bootlin.com (Postfix) with ESMTPSA id 52F7120742;
+ Mon,  3 Dec 2018 11:56:01 +0100 (CET)
+Date: Mon, 3 Dec 2018 11:56:01 +0100
 From: Maxime Ripard <maxime.ripard@bootlin.com>
 To: Mesih Kilinc <mesihkilinc@gmail.com>
-Subject: Re: [RFC PATCH 01/10] dma-engine: sun4i: Add a quirk to support
- different chips
-Message-ID: <20181203105440.jxy6ue75ic2fc5t5@flea>
+Subject: Re: [RFC PATCH 04/10] dma-engine: sun4i: Add support for Allwinner
+ suniv F1C100s
+Message-ID: <20181203105601.mls67gdr4wu4sqvy@flea>
 References: <cover.1543782328.git.mesihkilinc@gmail.com>
- <864e28404a31ba24094f74fd060d11c16562e965.1543782328.git.mesihkilinc@gmail.com>
+ <df1e5fbb2b04b0e5d392ce988d04a39f1d8e5f8d.1543782328.git.mesihkilinc@gmail.com>
 MIME-Version: 1.0
-In-Reply-To: <864e28404a31ba24094f74fd060d11c16562e965.1543782328.git.mesihkilinc@gmail.com>
+In-Reply-To: <df1e5fbb2b04b0e5d392ce988d04a39f1d8e5f8d.1543782328.git.mesihkilinc@gmail.com>
 User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_025502_224185_C9DB73B3 
-X-CRM114-Status: GOOD (  26.19  )
+X-CRM114-CacheID: sfid-20181203_025622_925351_CF296D0F 
+X-CRM114-Status: GOOD (  22.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -76,400 +76,165 @@ Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
  linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
  dmaengine@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
  Jaroslav Kysela <perex@perex.cz>, linux-arm-kernel@lists.infradead.org
-Content-Type: multipart/mixed; boundary="===============7202718486371905029=="
+Content-Type: multipart/mixed; boundary="===============1889716852315626218=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
---===============7202718486371905029==
+--===============1889716852315626218==
 Content-Type: multipart/signed; micalg=pgp-sha256;
-	protocol="application/pgp-signature"; boundary="kzmbnq5naxbvf7yw"
+	protocol="application/pgp-signature"; boundary="immwmaskuc6nscn3"
 Content-Disposition: inline
 
 
---kzmbnq5naxbvf7yw
+--immwmaskuc6nscn3
 Content-Type: text/plain; charset=us-ascii
 Content-Disposition: inline
 Content-Transfer-Encoding: quoted-printable
 
-Hi,
-
-(you don't really need the RFC tag. RFC tags are usually meant to ask
-comments on the general approach, not the implementation).
-
-On Mon, Dec 03, 2018 at 12:23:08AM +0300, Mesih Kilinc wrote:
-> Allwinner suniv F1C100s has similar DMA engine to sun4i. Several
-> registers has different addresses. Total dma channels, endpoint counts
-> and max burst counts are also different.
->=20
-> In order to support F1C100s add a quirk structure to hold IC specific
-> data.
+On Mon, Dec 03, 2018 at 12:23:11AM +0300, Mesih Kilinc wrote:
+> DMA of Allwinner suniv F1C100s is similar to sun4i. It has 4 NDMA, 4
+> DDMA channels and endpoints are different. Also F1C100s has reset bit
+> for DMA in CCU. Add support for it.
 >=20
 > Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
 > ---
->  drivers/dma/sun4i-dma.c | 138 +++++++++++++++++++++++++++++++++++++-----=
-------
->  1 file changed, 106 insertions(+), 32 deletions(-)
+>  drivers/dma/Kconfig     |  4 ++--
+>  drivers/dma/sun4i-dma.c | 60 +++++++++++++++++++++++++++++++++++++++++++=
+++++++
+>  2 files changed, 62 insertions(+), 2 deletions(-)
 >=20
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index de511db..f8a65d2 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -163,8 +163,8 @@ config DMA_SA11X0
+> =20
+>  config DMA_SUN4I
+>  	tristate "Allwinner A10 DMA SoCs support"
+> -	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I
+> -	default (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I)
+> +	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNIV
+> +	default (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNIV)
+>  	select DMA_ENGINE
+>  	select DMA_VIRTUAL_CHANNELS
+>  	help
 > diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
-> index f4ed3f1..e86b424 100644
+> index d267ff9..c0452c9 100644
 > --- a/drivers/dma/sun4i-dma.c
 > +++ b/drivers/dma/sun4i-dma.c
-> @@ -16,6 +16,7 @@
->  #include <linux/interrupt.h>
->  #include <linux/module.h>
->  #include <linux/of_dma.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> @@ -34,6 +35,8 @@
+> @@ -36,7 +36,11 @@
 >  #define SUN4I_DMA_CFG_SRC_ADDR_MODE(mode)	((mode) << 5)
 >  #define SUN4I_DMA_CFG_SRC_DRQ_TYPE(type)	(type)
 > =20
-> +#define SUN4I_MAX_BURST	8
+> +#define SUNIV_DMA_CFG_DST_DATA_WIDTH(width)	((width) << 24)
+> +#define SUNIV_DMA_CFG_SRC_DATA_WIDTH(width)	((width) << 8)
 > +
+>  #define SUN4I_MAX_BURST	8
+> +#define SUNIV_MAX_BURST	4
+> =20
 >  /** Normal DMA register values **/
 > =20
->  /* Normal DMA source/destination data request type values */
-> @@ -126,6 +129,32 @@
->  	 SUN4I_DDMA_PARA_DST_WAIT_CYCLES(2) |				\
->  	 SUN4I_DDMA_PARA_SRC_WAIT_CYCLES(2))
+> @@ -44,6 +48,9 @@
+>  #define SUN4I_NDMA_DRQ_TYPE_SDRAM		0x16
+>  #define SUN4I_NDMA_DRQ_TYPE_LIMIT		(0x1F + 1)
 > =20
-> +/*
-> + * Hardware channels / ports representation
-> + *
-> + * The hardware is used in several SoCs, with differing numbers
-> + * of channels and endpoints. This structure ties those numbers
-> + * to a certain compatible string.
-> + */
-> +struct sun4i_dma_config {
-> +	u32 ndma_nr_max_channels;
-> +	u32 ndma_nr_max_vchans;
+> +#define SUNIV_NDMA_DRQ_TYPE_SDRAM		0x11
+> +#define SUNIV_NDMA_DRQ_TYPE_LIMIT		(0x17 + 1)
 > +
-> +	u32 ddma_nr_max_channels;
-> +	u32 ddma_nr_max_vchans;
-> +
-> +	u32 dma_nr_max_channels;
-> +
-> +        void (*set_dst_data_width)(u32 *p_cfg, s8 data_width);
-> +        void (*set_src_data_width)(u32 *p_cfg, s8 data_width);
-
-This should be indented with tabs, not spaces.
-
-> +	int (*convert_burst)(u32 maxburst);
-> +
-> +	u8 ndma_drq_sdram;
-> +	u8 ddma_drq_sdram;
-> +
-> +	u8 max_burst;
-
-You'd be better off using a bitmask wit hthe supported bursts, like
-we're doing in sun6i-dma.
-
-> +};
-> +
->  struct sun4i_dma_pchan {
->  	/* Register base of channel */
->  	void __iomem			*base;
-> @@ -163,7 +192,7 @@ struct sun4i_dma_contract {
->  };
+>  /** Normal DMA register layout **/
 > =20
->  struct sun4i_dma_dev {
-> -	DECLARE_BITMAP(pchans_used, SUN4I_DMA_NR_MAX_CHANNELS);
-> +	unsigned long *pchans_used;
->  	struct dma_device		slave;
->  	struct sun4i_dma_pchan		*pchans;
->  	struct sun4i_dma_vchan		*vchans;
-> @@ -171,6 +200,7 @@ struct sun4i_dma_dev {
->  	struct clk			*clk;
->  	int				irq;
->  	spinlock_t			lock;
-> +	const struct sun4i_dma_config *cfg;
-
-This should be aligned to the rest of the members, using tabs.
-
->  };
+>  /* Dedicated DMA source/destination address mode values */
+> @@ -57,6 +64,9 @@
+>  #define SUN4I_NDMA_CFG_BYTE_COUNT_MODE_REMAIN	BIT(15)
+>  #define SUN4I_NDMA_CFG_SRC_NON_SECURE		BIT(6)
 > =20
->  static struct sun4i_dma_dev *to_sun4i_dma_dev(struct dma_device *dev)
-> @@ -193,7 +223,17 @@ static struct device *chan2dev(struct dma_chan *chan)
->  	return &chan->dev->device;
+> +#define SUNIV_NDMA_CFG_CONT_MODE		BIT(29)
+> +#define SUNIV_NDMA_CFG_WAIT_STATE(n)		((n) << 26)
+> +
+>  /** Dedicated DMA register values **/
+> =20
+>  /* Dedicated DMA source/destination address mode values */
+> @@ -69,6 +79,9 @@
+>  #define SUN4I_DDMA_DRQ_TYPE_SDRAM		0x1
+>  #define SUN4I_DDMA_DRQ_TYPE_LIMIT		(0x1F + 1)
+> =20
+> +#define SUNIV_DDMA_DRQ_TYPE_SDRAM		0x1
+> +#define SUNIV_DDMA_DRQ_TYPE_LIMIT		(0x9 + 1)
+> +
+>  /** Dedicated DMA register layout **/
+> =20
+>  /* Dedicated DMA configuration register layout */
+> @@ -122,6 +135,11 @@
+>  #define SUN4I_DMA_NR_MAX_VCHANS						\
+>  	(SUN4I_NDMA_NR_MAX_VCHANS + SUN4I_DDMA_NR_MAX_VCHANS)
+> =20
+> +#define SUNIV_NDMA_NR_MAX_CHANNELS	4
+> +#define SUNIV_DDMA_NR_MAX_CHANNELS	4
+> +#define SUNIV_NDMA_NR_MAX_VCHANS	(24 * 2 - 1)
+> +#define SUNIV_DDMA_NR_MAX_VCHANS	10
+> +
+>  /* This set of SUN4I_DDMA timing parameters were found experimentally wh=
+ile
+>   * working with the SPI driver and seem to make it behave correctly */
+>  #define SUN4I_DDMA_MAGIC_SPI_PARAMETERS \
+> @@ -236,6 +254,16 @@ static void set_src_data_width_a10(u32 *p_cfg, s8 da=
+ta_width)
+>  	*p_cfg |=3D SUN4I_DMA_CFG_SRC_DATA_WIDTH(data_width);
 >  }
 > =20
-> -static int convert_burst(u32 maxburst)
-> +static void set_dst_data_width_a10(u32 *p_cfg, s8 data_width)
+> +static void set_dst_data_width_f1c100s(u32 *p_cfg, s8 data_width)
 > +{
-> +	*p_cfg |=3D SUN4I_DMA_CFG_DST_DATA_WIDTH(data_width);
+> +	*p_cfg |=3D SUNIV_DMA_CFG_DST_DATA_WIDTH(data_width);
 > +}
 > +
-> +static void set_src_data_width_a10(u32 *p_cfg, s8 data_width)
+> +static void set_src_data_width_f1c100s(u32 *p_cfg, s8 data_width)
 > +{
-> +	*p_cfg |=3D SUN4I_DMA_CFG_SRC_DATA_WIDTH(data_width);
+> +	*p_cfg |=3D SUNIV_DMA_CFG_SRC_DATA_WIDTH(data_width);
 > +}
 > +
-> +static int convert_burst_a10(u32 maxburst)
+>  static int convert_burst_a10(u32 maxburst)
 >  {
 >  	if (maxburst > 8)
->  		return -EINVAL;
-> @@ -226,15 +266,15 @@ static struct sun4i_dma_pchan *find_and_use_pchan(s=
-truct sun4i_dma_dev *priv,
->  	int i, max;
+> @@ -245,6 +273,15 @@ static int convert_burst_a10(u32 maxburst)
+>  	return (maxburst >> 2);
+>  }
 > =20
->  	/*
-> -	 * pchans 0-SUN4I_NDMA_NR_MAX_CHANNELS are normal, and
-> -	 * SUN4I_NDMA_NR_MAX_CHANNELS+ are dedicated ones
-> +	 * pchans 0-priv->cfg->ndma_nr_max_channels are normal, and
-> +	 * priv->cfg->ndma_nr_max_channels+ are dedicated ones
-
-This should be next to the structure you just created.
-
->  	 */
->  	if (vchan->is_dedicated) {
-> -		i =3D SUN4I_NDMA_NR_MAX_CHANNELS;
-> -		max =3D SUN4I_DMA_NR_MAX_CHANNELS;
-> +		i =3D priv->cfg->ndma_nr_max_channels;
-> +		max =3D priv->cfg->dma_nr_max_channels;
->  	} else {
->  		i =3D 0;
-> -		max =3D SUN4I_NDMA_NR_MAX_CHANNELS;
-> +		max =3D priv->cfg->ndma_nr_max_channels;
->  	}
-> =20
->  	spin_lock_irqsave(&priv->lock, flags);
-> @@ -437,6 +477,7 @@ generate_ndma_promise(struct dma_chan *chan, dma_addr=
-_t src, dma_addr_t dest,
->  		      size_t len, struct dma_slave_config *sconfig,
->  		      enum dma_transfer_direction direction)
->  {
-> +	struct sun4i_dma_dev *priv =3D to_sun4i_dma_dev(chan->device);
->  	struct sun4i_dma_promise *promise;
->  	int ret;
-> =20
-> @@ -460,13 +501,13 @@ generate_ndma_promise(struct dma_chan *chan, dma_ad=
-dr_t src, dma_addr_t dest,
->  		sconfig->src_addr_width, sconfig->dst_addr_width);
-> =20
->  	/* Source burst */
-> -	ret =3D convert_burst(sconfig->src_maxburst);
-> +	ret =3D priv->cfg->convert_burst(sconfig->src_maxburst);
->  	if (ret < 0)
->  		goto fail;
->  	promise->cfg |=3D SUN4I_DMA_CFG_SRC_BURST_LENGTH(ret);
-> =20
->  	/* Destination burst */
-> -	ret =3D convert_burst(sconfig->dst_maxburst);
-> +	ret =3D priv->cfg->convert_burst(sconfig->dst_maxburst);
->  	if (ret < 0)
->  		goto fail;
->  	promise->cfg |=3D SUN4I_DMA_CFG_DST_BURST_LENGTH(ret);
-> @@ -475,13 +516,13 @@ generate_ndma_promise(struct dma_chan *chan, dma_ad=
-dr_t src, dma_addr_t dest,
->  	ret =3D convert_buswidth(sconfig->src_addr_width);
->  	if (ret < 0)
->  		goto fail;
-> -	promise->cfg |=3D SUN4I_DMA_CFG_SRC_DATA_WIDTH(ret);
-> +	priv->cfg->set_src_data_width(&promise->cfg, ret);
-> =20
->  	/* Destination bus width */
->  	ret =3D convert_buswidth(sconfig->dst_addr_width);
->  	if (ret < 0)
->  		goto fail;
-> -	promise->cfg |=3D SUN4I_DMA_CFG_DST_DATA_WIDTH(ret);
-> +	priv->cfg->set_dst_data_width(&promise->cfg, ret);
-> =20
->  	return promise;
-> =20
-> @@ -503,6 +544,7 @@ static struct sun4i_dma_promise *
->  generate_ddma_promise(struct dma_chan *chan, dma_addr_t src, dma_addr_t =
-dest,
->  		      size_t len, struct dma_slave_config *sconfig)
->  {
-> +	struct sun4i_dma_dev *priv =3D to_sun4i_dma_dev(chan->device);
->  	struct sun4i_dma_promise *promise;
->  	int ret;
-> =20
-> @@ -517,13 +559,13 @@ generate_ddma_promise(struct dma_chan *chan, dma_ad=
-dr_t src, dma_addr_t dest,
->  		SUN4I_DDMA_CFG_BYTE_COUNT_MODE_REMAIN;
-> =20
->  	/* Source burst */
-> -	ret =3D convert_burst(sconfig->src_maxburst);
-> +	ret =3D priv->cfg->convert_burst(sconfig->src_maxburst);
->  	if (ret < 0)
->  		goto fail;
->  	promise->cfg |=3D SUN4I_DMA_CFG_SRC_BURST_LENGTH(ret);
-> =20
->  	/* Destination burst */
-> -	ret =3D convert_burst(sconfig->dst_maxburst);
-> +	ret =3D priv->cfg->convert_burst(sconfig->dst_maxburst);
->  	if (ret < 0)
->  		goto fail;
->  	promise->cfg |=3D SUN4I_DMA_CFG_DST_BURST_LENGTH(ret);
-> @@ -532,13 +574,13 @@ generate_ddma_promise(struct dma_chan *chan, dma_ad=
-dr_t src, dma_addr_t dest,
->  	ret =3D convert_buswidth(sconfig->src_addr_width);
->  	if (ret < 0)
->  		goto fail;
-> -	promise->cfg |=3D SUN4I_DMA_CFG_SRC_DATA_WIDTH(ret);
-> +	priv->cfg->set_src_data_width(&promise->cfg, ret);
-> =20
->  	/* Destination bus width */
->  	ret =3D convert_buswidth(sconfig->dst_addr_width);
->  	if (ret < 0)
->  		goto fail;
-> -	promise->cfg |=3D SUN4I_DMA_CFG_DST_DATA_WIDTH(ret);
-> +	priv->cfg->set_dst_data_width(&promise->cfg, ret);
-> =20
->  	return promise;
-> =20
-> @@ -615,6 +657,7 @@ static struct dma_async_tx_descriptor *
->  sun4i_dma_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest,
->  			  dma_addr_t src, size_t len, unsigned long flags)
->  {
-> +	struct sun4i_dma_dev *priv =3D to_sun4i_dma_dev(chan->device);
->  	struct sun4i_dma_vchan *vchan =3D to_sun4i_dma_vchan(chan);
->  	struct dma_slave_config *sconfig =3D &vchan->cfg;
->  	struct sun4i_dma_promise *promise;
-> @@ -631,8 +674,8 @@ sun4i_dma_prep_dma_memcpy(struct dma_chan *chan, dma_=
-addr_t dest,
->  	 */
->  	sconfig->src_addr_width =3D DMA_SLAVE_BUSWIDTH_4_BYTES;
->  	sconfig->dst_addr_width =3D DMA_SLAVE_BUSWIDTH_4_BYTES;
-> -	sconfig->src_maxburst =3D 8;
-> -	sconfig->dst_maxburst =3D 8;
-> +	sconfig->src_maxburst =3D priv->cfg->max_burst;
-> +	sconfig->dst_maxburst =3D priv->cfg->max_burst;
-> =20
->  	if (vchan->is_dedicated)
->  		promise =3D generate_ddma_promise(chan, src, dest, len, sconfig);
-> @@ -647,11 +690,13 @@ sun4i_dma_prep_dma_memcpy(struct dma_chan *chan, dm=
-a_addr_t dest,
-> =20
->  	/* Configure memcpy mode */
->  	if (vchan->is_dedicated) {
-> -		promise->cfg |=3D SUN4I_DMA_CFG_SRC_DRQ_TYPE(SUN4I_DDMA_DRQ_TYPE_SDRAM=
-) |
-> -				SUN4I_DMA_CFG_DST_DRQ_TYPE(SUN4I_DDMA_DRQ_TYPE_SDRAM);
-> +		promise->cfg |=3D
-> +			SUN4I_DMA_CFG_SRC_DRQ_TYPE(priv->cfg->ddma_drq_sdram) |
-> +			SUN4I_DMA_CFG_DST_DRQ_TYPE(priv->cfg->ddma_drq_sdram);
->  	} else {
-> -		promise->cfg |=3D SUN4I_DMA_CFG_SRC_DRQ_TYPE(SUN4I_NDMA_DRQ_TYPE_SDRAM=
-) |
-> -				SUN4I_DMA_CFG_DST_DRQ_TYPE(SUN4I_NDMA_DRQ_TYPE_SDRAM);
-> +		promise->cfg |=3D
-> +			SUN4I_DMA_CFG_SRC_DRQ_TYPE(priv->cfg->ndma_drq_sdram) |
-> +			SUN4I_DMA_CFG_DST_DRQ_TYPE(priv->cfg->ndma_drq_sdram);
->  	}
-> =20
->  	/* Fill the contract with our only promise */
-> @@ -666,6 +711,7 @@ sun4i_dma_prep_dma_cyclic(struct dma_chan *chan, dma_=
-addr_t buf, size_t len,
->  			  size_t period_len, enum dma_transfer_direction dir,
->  			  unsigned long flags)
->  {
-> +	struct sun4i_dma_dev *priv =3D to_sun4i_dma_dev(chan->device);
->  	struct sun4i_dma_vchan *vchan =3D to_sun4i_dma_vchan(chan);
->  	struct dma_slave_config *sconfig =3D &vchan->cfg;
->  	struct sun4i_dma_promise *promise;
-> @@ -701,7 +747,7 @@ sun4i_dma_prep_dma_cyclic(struct dma_chan *chan, dma_=
-addr_t buf, size_t len,
->  	if (dir =3D=3D DMA_MEM_TO_DEV) {
->  		src =3D buf;
->  		dest =3D sconfig->dst_addr;
-> -		endpoints =3D SUN4I_DMA_CFG_SRC_DRQ_TYPE(SUN4I_NDMA_DRQ_TYPE_SDRAM) |
-> +		endpoints =3D SUN4I_DMA_CFG_SRC_DRQ_TYPE(priv->cfg->ndma_drq_sdram) |
->  			    SUN4I_DMA_CFG_DST_DRQ_TYPE(vchan->endpoint) |
->  			    SUN4I_DMA_CFG_DST_ADDR_MODE(SUN4I_NDMA_ADDR_MODE_IO);
->  	} else {
-> @@ -709,7 +755,7 @@ sun4i_dma_prep_dma_cyclic(struct dma_chan *chan, dma_=
-addr_t buf, size_t len,
->  		dest =3D buf;
->  		endpoints =3D SUN4I_DMA_CFG_SRC_DRQ_TYPE(vchan->endpoint) |
->  			    SUN4I_DMA_CFG_SRC_ADDR_MODE(SUN4I_NDMA_ADDR_MODE_IO) |
-> -			    SUN4I_DMA_CFG_DST_DRQ_TYPE(SUN4I_NDMA_DRQ_TYPE_SDRAM);
-> +			    SUN4I_DMA_CFG_DST_DRQ_TYPE(priv->cfg->ndma_drq_sdram);
->  	}
-> =20
->  	/*
-> @@ -772,6 +818,7 @@ sun4i_dma_prep_slave_sg(struct dma_chan *chan, struct=
- scatterlist *sgl,
->  			unsigned int sg_len, enum dma_transfer_direction dir,
->  			unsigned long flags, void *context)
->  {
-> +	struct sun4i_dma_dev *priv =3D to_sun4i_dma_dev(chan->device);
->  	struct sun4i_dma_vchan *vchan =3D to_sun4i_dma_vchan(chan);
->  	struct dma_slave_config *sconfig =3D &vchan->cfg;
->  	struct sun4i_dma_promise *promise;
-> @@ -797,11 +844,11 @@ sun4i_dma_prep_slave_sg(struct dma_chan *chan, stru=
-ct scatterlist *sgl,
->  	if (vchan->is_dedicated) {
->  		io_mode =3D SUN4I_DDMA_ADDR_MODE_IO;
->  		linear_mode =3D SUN4I_DDMA_ADDR_MODE_LINEAR;
-> -		ram_type =3D SUN4I_DDMA_DRQ_TYPE_SDRAM;
-> +		ram_type =3D priv->cfg->ddma_drq_sdram;
->  	} else {
->  		io_mode =3D SUN4I_NDMA_ADDR_MODE_IO;
->  		linear_mode =3D SUN4I_NDMA_ADDR_MODE_LINEAR;
-> -		ram_type =3D SUN4I_NDMA_DRQ_TYPE_SDRAM;
-> +		ram_type =3D priv->cfg->ndma_drq_sdram;
->  	}
-> =20
->  	if (dir =3D=3D DMA_MEM_TO_DEV)
-> @@ -1130,6 +1177,10 @@ static int sun4i_dma_probe(struct platform_device =
-*pdev)
->  	if (!priv)
->  		return -ENOMEM;
-> =20
-> +	priv->cfg =3D of_device_get_match_data(&pdev->dev);
-> +	if (!priv->cfg)
-> +		return -ENODEV;
+> +static int convert_burst_f1c100s(u32 maxburst)
+> +{
+> +	if (maxburst > 4)
+> +		return -EINVAL;
 > +
->  	res =3D platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	priv->base =3D devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(priv->base))
-> @@ -1178,23 +1229,26 @@ static int sun4i_dma_probe(struct platform_device=
- *pdev)
-> =20
->  	priv->slave.dev =3D &pdev->dev;
-> =20
-> -	priv->pchans =3D devm_kcalloc(&pdev->dev, SUN4I_DMA_NR_MAX_CHANNELS,
-> +	priv->pchans =3D devm_kcalloc(&pdev->dev, priv->cfg->dma_nr_max_channel=
-s,
->  				    sizeof(struct sun4i_dma_pchan), GFP_KERNEL);
->  	priv->vchans =3D devm_kcalloc(&pdev->dev, SUN4I_DMA_NR_MAX_VCHANS,
->  				    sizeof(struct sun4i_dma_vchan), GFP_KERNEL);
-> -	if (!priv->vchans || !priv->pchans)
-> +	priv->pchans_used =3D devm_kcalloc(&pdev->dev,
-> +			BITS_TO_LONGS(priv->cfg->dma_nr_max_channels),
-> +			sizeof(unsigned long), GFP_KERNEL);
+> +	/* 1 -> 0, 4 -> 1 */
+> +	return (maxburst >> 2);
+> +}
+> +
 
-I'm not sure we really need a dynamic allocation here. Just keep the
-bitmap, and use the bigger size.
-
-Thanks!
-Maxime
+This is essentially the same function than for the A10, with a
+different limit. Like a was saying, use a bitmask for the supported
+bursts length, and test whether the burst is supported against that
+mask. You won't have to duplicate those functions anymore.
 
 --=20
 Maxime Ripard, Bootlin
 Embedded Linux and Kernel engineering
 https://bootlin.com
 
---kzmbnq5naxbvf7yw
+--immwmaskuc6nscn3
 Content-Type: application/pgp-signature; name="signature.asc"
 
 -----BEGIN PGP SIGNATURE-----
 
-iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAULcAAKCRDj7w1vZxhR
-xTSWAP9QOg4x7/ccG0wWsCikWJNVgUsiaz8x3lC+zHtbqBoJMAD/aWdaSn0KQo4i
-jEsodKmVyMSSC/cRWU+Ayw1fYhzpgAo=
-=HFAR
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAULwQAKCRDj7w1vZxhR
+xXM9AQCkIKWTdXxm4LCl/5nVIOZKIp6u/PbWWMqL+4KcPQ4ABgEAojRzWG8BVMQo
+NKf61vkYE2EF634JjHR8VK2R8PGHMQU=
+=vmM+
 -----END PGP SIGNATURE-----
 
---kzmbnq5naxbvf7yw--
+--immwmaskuc6nscn3--
 
 
---===============7202718486371905029==
+--===============1889716852315626218==
 Content-Type: text/plain; charset="us-ascii"
 MIME-Version: 1.0
 Content-Transfer-Encoding: 7bit
@@ -480,5 +245,5 @@ linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
---===============7202718486371905029==--
+--===============1889716852315626218==--
 
