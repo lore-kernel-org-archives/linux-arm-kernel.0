@@ -2,81 +2,84 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id A28CFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:46:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B5332C65BAF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:47:56 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 75AF920666
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:46:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 8828620666
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:47:56 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AwxLnrPL";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="NV/Vv8oK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 75AF920666
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qbTGlyuT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8828620666
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=st.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fqIUO72LSVvM0M0+q6PB55MWg/QCfD+Q6/6FouZHOxc=; b=AwxLnrPLSE7CS5
-	YIdrIwpB+EmFi0F0OHuU0Z6pLT3rTzMDq9FG8QCBczalSuCE9zPbrSILQDkMxvETUG9j+Do36Tw0M
-	DVjl0r7zC7MRtFWmlMIofYsItrQYmfLrNWA22Mt09UzXkLS4jnIN+KdHXeqWGYci8p4/u+Qq0hek4
-	PbvZw1hCkWNstuBnDnTc028yjgutt0vhCYxk/LvCcT9bEHHt8zrsGGVW3xfdWemwHb7bGwqzXKPYg
-	tISij8ypQE38DKVQWdBVE9vgs5EzRseE+6fMzbKanSo+8QyTCp2Z+SNZ2kbSmUZdctRV12uhm0Z/r
-	lXvcxPEr7AV5IMckoHbg==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=prsnzDQQnMk61EIuVQredws5GbDKR5uNRXxPdCaQewc=; b=qbTGlyuTAfpuoiVqOH+AqqVlJ
+	QzIFqVTD8ei/fod+pwP5ybww/V/6g9KX8I4uphJBjdpNiscX8oSaGvH33/T4qb2DL0m+JNM2wp+BC
+	L3GhX3djFO7iKaGIYwLEczhMs8XN0Yu7SrMOWMtlSJ9sY8rBaa9ZoJo9+r8KcxLOYLJex2SsJFnT4
+	7Qn4itg5mIm6kVGCJqiQqx6+0dpbSCu4ifbW3pZrFxTEiqVbyUPtC2UcfbbFKXvYqAW7TT99CKt11
+	maskQq3XGYkUwHOQy999oeXg11HaxeITZhVSDbnfyKRhDrA9I2QeoH5O3huRudVBUvWOykbi2UxmH
+	1IeN0ARow==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTknz-0007s1-KK; Mon, 03 Dec 2018 09:46:19 +0000
-Received: from mail-io1-xd44.google.com ([2607:f8b0:4864:20::d44])
+	id 1gTkpV-0008At-2a; Mon, 03 Dec 2018 09:47:53 +0000
+Received: from mx08-00178001.pphosted.com ([91.207.212.93]
+ helo=mx07-00178001.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTknw-0007qx-0X
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:46:17 +0000
-Received: by mail-io1-xd44.google.com with SMTP id n9so1836580ioo.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 01:46:05 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=amarulasolutions.com; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=iX/oVY2dCQZV9wB0dqBOQ1Y9CXOpcurqPsBoTPeFU9A=;
- b=NV/Vv8oKkJbOGgncyncAly3ZM3ixLFbHtO2wBAZNJkiKfS8NNSJAvawVnaWZpaAEQX
- Z+nP1lQurEARSabZUKSz6zimgjAtIyFt7dzvJqI3yoO5fcSD/Plmpi4q0nBrbAsbclPM
- 991fESTLZzEnNM73/aDK8+3eUSVLjuuFKrel4=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=iX/oVY2dCQZV9wB0dqBOQ1Y9CXOpcurqPsBoTPeFU9A=;
- b=hEBfgJNkgzhc7MZHxEzbXj6/RHBxKrQJO5wF4O/Md3xMzMu4eAEisxwkODLmUtxgx5
- Fv20C2+c4iyliKv/QQVyybRsLEv0eYLzqR11n2TYnhOP9ELlHyF1qLBZlvV9zk1PUGi3
- lCnZV1U6YhzXzNfUr+HPQAvle7ivlO5aqM3EsE/vunqo/WIrNeWnJZdYymNdi3fg8/tq
- LWjVumMEUU5AiFmJGmzEyzXwy/Nq7YJ6pECZdnnmhnL1OUo4gQ1KoFEToD8aFTWct51M
- KO0SQTHkHmN5LSB05LgPk9bwzyln951LnVyAWy+vepVMkRfphonNEBNuDIOMqob8jwCJ
- aGJw==
-X-Gm-Message-State: AA+aEWb804NuDfO1f8kHDZPdXB9g/wi2l/IvpK39LZRxGVv2lPfY1v5g
- lmhBWbkk3Ec7/3XwrHbRuZlae0ss6zhRgGDM6Mxu4A==
-X-Google-Smtp-Source: AFSGD/VvDosaN9x1V3PzhUddlNU+hYmKF3M8EwPXRb7DRfo05o2o5+fTkBK3IDds4HzoEe/vUi7ncvBlKICaEGvRjME=
-X-Received: by 2002:a6b:1411:: with SMTP id 17mr13372052iou.252.1543830365247; 
- Mon, 03 Dec 2018 01:46:05 -0800 (PST)
+ id 1gTkpR-0008AH-Mi
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:47:51 +0000
+Received: from pps.filterd (m0046661.ppops.net [127.0.0.1])
+ by mx08-00178001.pphosted.com (8.16.0.27/8.16.0.27) with SMTP id
+ wB39kRiQ011781; Mon, 3 Dec 2018 10:47:30 +0100
+Received: from beta.dmz-eu.st.com (beta.dmz-eu.st.com [164.129.1.35])
+ by mx08-00178001.pphosted.com with ESMTP id 2p3wt688m6-1
+ (version=TLSv1 cipher=ECDHE-RSA-AES256-SHA bits=256 verify=NOT);
+ Mon, 03 Dec 2018 10:47:30 +0100
+Received: from zeta.dmz-eu.st.com (zeta.dmz-eu.st.com [164.129.230.9])
+ by beta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 476233A;
+ Mon,  3 Dec 2018 09:47:29 +0000 (GMT)
+Received: from Webmail-eu.st.com (sfhdag3node2.st.com [10.75.127.8])
+ by zeta.dmz-eu.st.com (STMicroelectronics) with ESMTP id 1020512AF;
+ Mon,  3 Dec 2018 09:47:29 +0000 (GMT)
+Received: from [10.201.21.58] (10.75.127.44) by SFHDAG3NODE2.st.com
+ (10.75.127.8) with Microsoft SMTP Server (TLS) id 15.0.1347.2; Mon, 3 Dec
+ 2018 10:47:28 +0100
+Subject: Re: [PATCH 3/3] ARM: dts: stm32: add thermal sensor support on
+ STM32MP157c
+To: David HERNANDEZ SANCHEZ <david.hernandezsanchez@st.com>, Zhang Rui
+ <rui.zhang@intel.com>, Eduardo Valentin <edubezval@gmail.com>,
+ Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>
+References: <1538734081-26585-1-git-send-email-david.hernandezsanchez@st.com>
+ <1538734081-26585-4-git-send-email-david.hernandezsanchez@st.com>
+From: Alexandre Torgue <alexandre.torgue@st.com>
+Message-ID: <5feb7b44-aff0-1d53-bdf6-79e06dcb3a2f@st.com>
+Date: Mon, 3 Dec 2018 10:47:27 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-References: <20181130075849.16941-1-wens@csie.org>
- <20181130075849.16941-5-wens@csie.org>
-In-Reply-To: <20181130075849.16941-5-wens@csie.org>
-From: Jagan Teki <jagan@amarulasolutions.com>
-Date: Mon, 3 Dec 2018 15:15:54 +0530
-Message-ID: <CAMty3ZB6p8Uv7abMC8jDHHYwdAeuBen2GPjOhN=wEL7+=DDt3g@mail.gmail.com>
-Subject: Re: [PATCH 4/6] ARM: dts: sunxi: h3-h5: Add pinmux setting for CSI
- MCLK on PE1
-To: Chen-Yu Tsai <wens@csie.org>
+In-Reply-To: <1538734081-26585-4-git-send-email-david.hernandezsanchez@st.com>
+Content-Language: en-US
+X-Originating-IP: [10.75.127.44]
+X-ClientProxiedBy: SFHDAG1NODE1.st.com (10.75.127.1) To SFHDAG3NODE2.st.com
+ (10.75.127.8)
+X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
+ definitions=2018-12-03_05:, , signatures=0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_014616_056915_19B6CEA6 
-X-CRM114-Status: GOOD (  14.62  )
+X-CRM114-CacheID: sfid-20181203_014750_031403_73C675EC 
+X-CRM114-Status: GOOD (  13.70  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -88,45 +91,35 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- devicetree <devicetree@vger.kernel.org>,
- Maxime Ripard <maxime.ripard@bootlin.com>,
- linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
- Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
- linux-media <linux-media@vger.kernel.org>
-Content-Type: text/plain; charset="us-ascii"
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-stm32@st-md-mailman.stormreply.com"
+ <linux-stm32@st-md-mailman.stormreply.com>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
+ "linux-pm@vger.kernel.org" <linux-pm@vger.kernel.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Fri, Nov 30, 2018 at 1:28 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> Some camera modules have the SoC feeding a master clock to the sensor
-> instead of having a standalone crystal. This clock signal is generated
-> from the clock control unit and output from the CSI MCLK function of
-> pin PE1.
->
-> Add a pinmux setting for it for camera sensors to reference.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+Hi David,
 
-On Fri, Nov 30, 2018 at 1:29 PM Chen-Yu Tsai <wens@csie.org> wrote:
->
-> The CSI controller found on the H3 (and H5) is a reduced version of the
-> one found on the A31. It only has 1 channel, instead of 4 channels for
-> time-multiplexed BT.656. Since the H3 is a reduced version, it cannot
-> "fallback" to a compatible that implements more features than it
-> supports.
->
-> Drop the A31 fallback compatible.
->
-> Fixes: f89120b6f554 ("ARM: dts: sun8i: Add the H3/H5 CSI controller")
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
+On 10/5/18 12:08 PM, David HERNANDEZ SANCHEZ wrote:
+> Add configuration on DT for thermal sensor driver
+> 
+> Signed-off-by: David Hernandez Sanchez <david.hernandezsanchez@st.com>
+> 
+> diff --git a/arch/arm/boot/dts/stm32mp157c.dtsi 
+> b/arch/arm/boot/dts/stm32mp157c.dtsi
+> index 661be94..e90b9f6 100644
+> --- a/arch/arm/boot/dts/stm32mp157c.dtsi
+> +++ b/arch/arm/boot/dts/stm32mp157c.dtsi
+> @@ -84,6 +84,31 @@
 
-Reviewed-by: Jagan Teki <jagan@amarulasolutions.com>
+Applied on stm32-next.
+
+Thanks.
+Alex
 
 _______________________________________________
 linux-arm-kernel mailing list
