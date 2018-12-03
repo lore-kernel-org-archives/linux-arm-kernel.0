@@ -2,120 +2,67 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	UNPARSEABLE_RELAY autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 566E8C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 08:43:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 75BE2C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 08:43:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 1D99F20659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 08:43:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 01CC020659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 08:43:41 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BSAasg1q";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="Gb/GQkcp"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1D99F20659
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="RCv77GiW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 01CC020659
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=mediatek.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Date:To:From:Subject:Message-ID:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=SMbZaj9p66Vl3titrZsJe+sSyryRaGJp2wl4A4TC18c=; b=BSAasg1qBXPkzM
-	NP0jKiQ6kIDsuJ3o84sMI7XNV4m8kjRMPr+RUTQEbrlcIbq26UA5jQEDIS1nFcd2QcO9EpemDkY2A
-	L0jlq8OntYumklIg7n4LgYHZcwSxkE9JFEXzh8ZUqmlPz9idicC0NrezhZVgGBzSR1VF2B4QqhMyW
-	Ae99GC6m+nuybRVx3Fb4nRd3/PIe0rDn57u8aLk/AvpTgU13DknblsTwtB4Bp78Yo5ax8NOns9CfZ
-	Fr9BpIFR7u3pO+wcSo/5FR1KBT/3GUlc7yC2wZLa3e6lYQMVtYjua25jFn7MNab2ek6frdUxWHZgT
-	/bW7+H72fQsMev3TJVRQ==;
+	List-Owner; bh=D/anJ3zjuhxumIzdL/pud3mCmJQn/lrCtkML8OR6s80=; b=RCv77GiWr40dyX
+	xlvhGDOuuidJlJlV1B2gP7/T8PKo0y1hfRCRgjpNXAWXAvyWNxmYoDxkS+1KZPeu8MF2zLLCSAH4H
+	Y8kfdu6Y4x0fHAmHVwX5CoatvTPkMnWmCd4DUWbq1/cNBtwy2Udr0cie6kO8lJ0NdV0FoErmko9o/
+	GtbL3Fh9Z6Bup0UpHoqNJfcJpKJ68y365SpnwgvG7sgPjGRq4/GJkR4Eg4IgIFNitG3hIbbVtQzMV
+	mKX5GHFjL7UkKRMS2DZuO03S1BG5vtu+j0IryuvtfiwKcC0y//4/Uc/1Gfg9D0Z3ajg34VR0H6xRf
+	ZrcG4AP/hKObz+4BM2eQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTjp0-0001Kx-Dp; Mon, 03 Dec 2018 08:43:18 +0000
-Received: from mail-db5eur03on061e.outbound.protection.outlook.com
- ([2a01:111:f400:fe0a::61e]
- helo=EUR03-DB5-obe.outbound.protection.outlook.com)
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTjmT-0006k0-2N; Mon, 03 Dec 2018 08:41:10 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=ba50Ajsom308Fg+wGmvSmyjyiBF/sabuHpSIY8OQ4rk=;
- b=Gb/GQkcpTf+8xIoxW4IUCWmYfPInjIzcqbv6XKU/2vmjbExnOFrD5Krg1msq/jkQ7WlTEi3PETWNu4RAaznIywtYbdN7V54DQj4n85zCC1/unCwZ/qlmFIvIOt4nc9NPmAyqLyswVJM0KN0If2ZA/Dk1Btx6yRW72k+zNbQLlhM=
-Received: from VI1PR04MB5726.eurprd04.prod.outlook.com (20.178.127.24) by
- VI1PR04MB4718.eurprd04.prod.outlook.com (20.177.48.159) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.22; Mon, 3 Dec 2018 08:39:29 +0000
-Received: from VI1PR04MB5726.eurprd04.prod.outlook.com
- ([fe80::595a:9890:8397:5d51]) by VI1PR04MB5726.eurprd04.prod.outlook.com
- ([fe80::595a:9890:8397:5d51%4]) with mapi id 15.20.1382.020; Mon, 3 Dec 2018
- 08:39:29 +0000
-From: Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>
-To: "linux-mtd@lists.infradead.org" <linux-mtd@lists.infradead.org>,
- "boris.brezillon@bootlin.com" <boris.brezillon@bootlin.com>,
- "broonie@kernel.org" <broonie@kernel.org>, "marek.vasut@gmail.com"
- <marek.vasut@gmail.com>, "vigneshr@ti.com" <vigneshr@ti.com>,
- "linux-spi@vger.kernel.org" <linux-spi@vger.kernel.org>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>
-Subject: [PATCH v5 4/7] mtd: spi-nor: add octal read flag for flash
- mt35xu512aba
-Thread-Topic: [PATCH v5 4/7] mtd: spi-nor: add octal read flag for flash
- mt35xu512aba
-Thread-Index: AQHUiuOxFPwCvKBFZESsU4tLrDaSzQ==
-Date: Mon, 3 Dec 2018 08:39:24 +0000
-Message-ID: <1543826226-30898-5-git-send-email-yogeshnarayan.gaur@nxp.com>
-References: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-In-Reply-To: <1543826226-30898-1-git-send-email-yogeshnarayan.gaur@nxp.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-clientproxiedby: SG2PR04CA0143.apcprd04.prod.outlook.com
- (2603:1096:3:16::27) To VI1PR04MB5726.eurprd04.prod.outlook.com
- (2603:10a6:803:e4::24)
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=yogeshnarayan.gaur@nxp.com; 
-x-ms-exchange-messagesentrepresentingtype: 1
-x-originating-ip: [14.143.30.134]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; VI1PR04MB4718;
- 6:VnZjg6QPTpyxHX2ok7qXWy9il1KqKdYYK0kPEv3vsyuc9BkgZQwon/jwGmTNZcI+VtMoJKsOkaLbivLDUC5UHKOtpAcewBjBWSfzj+GTnJae8olwZuk9fc3ajAPHxRmgXGcrOoaTmaXO+A0C2CpLe3BwIRsSwtb02j1jcOb4YiEm/uZz3hekpSOwcCM/qRWxLrP7byVpFEh8O4ZhogotZJow7CGMqnUF0C6g7rzXNKolZhEHjKPdxB8nOMu3RsoGkT5tjRnBerqN0i5e81KEpE9ACr8VPRwEnxTNls8s9DCvSZRmazA+fTyPTULSJFjQvZMGU/AHW1hX2TtC+NHNkupVcI1vUDjG4WsCh8GHOj21TngeqMR7yyNt5tcsP70eOoQvb95X3g+uCk62Spz+h0nkT8JF+xw7Ezc18lYhtbsG7gogSze1Qh2HXrEs6jDWvjLX85jPm0XGqNnjaqTpOw==;
- 5:pCmNL92N4r1kx3jbekIYmixOgEdTFUSeVHnx0nlsodxQbIaLbiYnTMx/wWhfGw3XFlUJhPnf1ToyEmbBV+nNQKWXTYhQ0mzlP75GwXmd+rnAVdwN6lyCJdLF+F3fC6uCoZKIH0//KLCoagdjArGfSH/SxVWprk/61ZGCkdEfU4E=;
- 7:m2ld70cdQK15U5SovBy0FWdgq0a9VCjN9cxKVQZzt7HPgg+OvHeIOuZ/C/r9bTh4tBUk3xi2K6ckPPLa3vL4DkNEkE1kRoQNVApR2Ig+tvdG0CJP3fsMknsKyarWLe0t8eCVKCZk42Z0F2mzfOIMwQ==
-x-ms-office365-filtering-correlation-id: 16318705-d4e6-4aa4-d5a3-08d658fad403
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(7168020)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:VI1PR04MB4718; 
-x-ms-traffictypediagnostic: VI1PR04MB4718:
-x-microsoft-antispam-prvs: <VI1PR04MB4718CBF5FAB6AEC9A5BA04C699AE0@VI1PR04MB4718.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231455)(999002)(944501493)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123560045)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:VI1PR04MB4718; BCL:0; PCL:0; RULEID:; SRVR:VI1PR04MB4718; 
-x-forefront-prvs: 08756AC3C8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(346002)(376002)(396003)(136003)(366004)(39860400002)(199004)(189003)(7736002)(99286004)(6486002)(76176011)(305945005)(6512007)(6506007)(53936002)(66066001)(386003)(105586002)(106356001)(68736007)(256004)(71190400001)(71200400001)(5660300001)(110136005)(55236004)(14444005)(54906003)(7416002)(14454004)(86362001)(478600001)(6116002)(3846002)(25786009)(186003)(6666004)(2201001)(2501003)(97736004)(2906002)(81156014)(81166006)(6436002)(8676002)(4326008)(486006)(78486014)(36756003)(102836004)(52116002)(26005)(39060400002)(2616005)(8936002)(446003)(11346002)(316002)(476003);
- DIR:OUT; SFP:1101; SCL:1; SRVR:VI1PR04MB4718;
- H:VI1PR04MB5726.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 8NdIX4mKYmczFGmNl67NTebkLGS302lH4ymOy7ho1bj9kd+f+8yYpeV8aqoaKA7dBjXlEuSqweqHwWiViO3EGbo//S/X13SFpJXw2V0hIRB3kSiXlrAYZA6ChEhrxLgYvpZr1tu+9Vef6dnal/QPqaBX0rEzJZHoqpWp4/wqzxLLaEiieKPfSxhhoFM+sT4NcLHLLTYiWARc9x1GEZd0Ij/mJ1t47Lz/r78ilAS/bN0zsNxHUFPtkqvBUnrz1PGEA3OXOSTHuTbK1PmkKAUNs94hxB3KCjqw3uidPNqKBoSYFj+wAurhOIr2IGFE/oEsWh/2TfJRdWquQcgdwD39FqVb9KXuj2LcVqgbT1InT3k=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+	id 1gTjpH-0001d6-UY; Mon, 03 Dec 2018 08:43:35 +0000
+Received: from [1.203.163.78] (helo=mailgw01.mediatek.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTjn6-0007J6-Vb; Mon, 03 Dec 2018 08:41:49 +0000
+X-UUID: da55362b01fa484f8601ad5104561662-20181203
+X-UUID: da55362b01fa484f8601ad5104561662-20181203
+Received: from mtkcas35.mediatek.inc [(172.27.4.250)] by mailgw01.mediatek.com
+ (envelope-from <yong.wu@mediatek.com>)
+ (mailgw01.mediatek.com ESMTP with TLS)
+ with ESMTP id 1700383168; Mon, 03 Dec 2018 16:40:53 +0800
+Received: from MTKCAS32.mediatek.inc (172.27.4.184) by MTKMBS31DR.mediatek.inc
+ (172.27.6.102) with Microsoft SMTP Server (TLS) id 15.0.1395.4;
+ Mon, 3 Dec 2018 16:40:51 +0800
+Received: from [10.17.3.153] (10.17.3.153) by MTKCAS32.mediatek.inc
+ (172.27.4.170) with Microsoft SMTP Server id 15.0.1395.4 via Frontend
+ Transport; Mon, 3 Dec 2018 16:40:51 +0800
+Message-ID: <1543826451.23023.35.camel@mhfsdcap03>
+Subject: Re: [PATCH v3 13/15] memory: mtk-smi: Get rid of need_larbid
+From: Yong Wu <yong.wu@mediatek.com>
+To: Matthias Brugger <matthias.bgg@gmail.com>
+Date: Mon, 3 Dec 2018 16:40:51 +0800
+In-Reply-To: <21767ceb-1db5-045f-06ac-29c57f1a74a5@gmail.com>
+References: <1542422142-30688-1-git-send-email-yong.wu@mediatek.com>
+ <1542422142-30688-14-git-send-email-yong.wu@mediatek.com>
+ <21767ceb-1db5-045f-06ac-29c57f1a74a5@gmail.com>
+X-Mailer: Evolution 3.2.3-0ubuntu6 
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 16318705-d4e6-4aa4-d5a3-08d658fad403
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Dec 2018 08:39:25.0379 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: VI1PR04MB4718
+X-MTK: N
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_004041_542504_499D566E 
-X-CRM114-Status: GOOD (  12.45  )
+X-CRM114-CacheID: sfid-20181203_004121_998689_BB910B06 
+X-CRM114-Status: GOOD (  15.12  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -127,56 +74,73 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
- "robh@kernel.org" <robh@kernel.org>,
- Yogesh Narayan Gaur <yogeshnarayan.gaur@nxp.com>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "frieder.schrempf@exceet.de" <frieder.schrempf@exceet.de>,
- "computersforpeace@gmail.com" <computersforpeace@gmail.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
+Cc: youlin.pei@mediatek.com, devicetree@vger.kernel.org,
+ Nicolas Boichat <drinkcat@chromium.org>, srv_heupstream@mediatek.com,
+ arnd@arndb.de, Joerg Roedel <joro@8bytes.org>,
+ Will Deacon <will.deacon@arm.com>, linux-kernel@vger.kernel.org,
+ Tomasz Figa <tfiga@google.com>, iommu@lists.linux-foundation.org, Rob
+ Herring <robh+dt@kernel.org>, linux-mediatek@lists.infradead.org,
+ yingjoe.chen@mediatek.com, YT.shen@mediatek.com,
+ Arvind Yadav <arvind.yadav.cs@gmail.com>, Robin Murphy <robin.murphy@arm.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Add octal read flag for flash mt35xu512aba.
-This flash, mt35xu512aba, is only complaint to SFDP JESD216B and does
-not seem to support newer JESD216C standard that provides auto
-detection of Octal mode capabilities and opcodes. Therefore, this
-capability is manually added using new SPI_NOR_OCTAL_READ flag.
+On Mon, 2018-12-03 at 00:04 +0100, Matthias Brugger wrote:
+> 
+> On 17/11/2018 03:35, Yong Wu wrote:
+> > The "mediatek,larb-id" has already been parsed in MTK IOMMU driver.
+> > It's no need to parse it again in SMI driver. Only clean some codes.
+> > This patch is fit for all the current mt2701, mt2712, mt7623, mt8173
+> > and mt8183.
+> 
+> I'm trying to understand why we need the mediatek,larb-id at all. From what I
+> understand as long as the mediatek larbs described in the iommu are ordered
+> (larb0, larb1, larb2, etc) we actually get the same value as defined by
+> mediatek,larb-id. At least this holds for all present implementations.
+> 
+> On the other hand I don't see where the mtk_iommu_v1 driver actually parses the
+> larb-id, can you please help to understand:
+> 
+> 1) why we need the larb-id at all
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Signed-off-by: Yogesh Gaur <yogeshnarayan.gaur@nxp.com>
----
-Changes for v5:
-- Modified string 'octo' with 'octal'.
-Changes for v4:
-- None
-Changes for v3:
-- Modified string 'octal' with 'octo'.
-Changes for v2:
-- Incorporated review comments of Boris and Vignesh
+Actually only mt2712 which have 2 M4U HW need "mediatek,larb-id".
 
- drivers/mtd/spi-nor/spi-nor.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+This is larbs in the m4u0/1 dtsi node of mt2712:
+m4u0 { mediatek,larbs = <&larb0 &larb1 &larb2 &larb3 &larb6>;}
+m4u1 { mediatek,larbs = <&larb4 &larb5 &larb7>;}
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 7a2176d..41ba90b 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -1413,7 +1413,8 @@ static const struct flash_info spi_nor_ids[] = {
- 	/* Micron */
- 	{
- 		"mt35xu512aba", INFO(0x2c5b1a, 0, 128 * 1024, 512,
--			SECT_4K | USE_FSR | SPI_NOR_4B_OPCODES)
-+			SECT_4K | USE_FSR | SPI_NOR_OCTAL_READ |
-+			SPI_NOR_4B_OPCODES)
- 	},
- 
- 	/* PMC */
--- 
-2.7.4
+the id don't increase one by one, M4U have to get the larbid with the
+help of "mediatek,larb-id".
+
+(The m4u/smi dtsi patch of mt2712 will be send with some other modules,
+maybe in this week.)
+
+
+> 2) how this will work if we do not parse the larb-id for v1 iommu at all
+
+As you said above and I also have wrote that the larbid "must sort
+according to the local arbiter index" in the "mediatek,larbs"
+description of dt-binding. All the M4U except mt2712 could ignore
+"mediatek,larb-id". the v1 iommu also should be ok.
+
+I'm not sure whether we should change [1], if only reserving mt2712
+there, we also should change the dtsi file of mt2701 and mt7623.or keep
+it as is.
+
+[1]
+https://elixir.bootlin.com/linux/v4.20-rc1/source/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt#L20
+
+> 
+> Thanks a lot,
+> Matthias
+> 
+> > 
+
+[snip]
+
 
 
 _______________________________________________
