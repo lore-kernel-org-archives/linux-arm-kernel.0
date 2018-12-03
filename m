@@ -2,22 +2,23 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
-	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
-	INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,
-	USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-14.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PULL_REQUEST,
+	MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2FD15C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:35:05 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D1889C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EE3CB2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:35:04 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 887BB208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:39:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="GzeJNLgf"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EE3CB2087F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=gmx.us
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="iapV0ASI";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="R6d2vWC+"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 887BB208A3
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
@@ -25,51 +26,57 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
 	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
 	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
-	References:List-Owner; bh=1cDTm0ESRS6DUlFNA8+SPZ6XXds+aBnAUICkuJ8quhI=; b=Gze
-	JNLgfls2pJUkVBJ/XNHo7cZ2WLwcMOsRU/5o58ZveG0qdUUaBAFQlrr8TUyxPl36DLnay/N2ZXH5a
-	cU1WaLEIrwBz52zTTgTRMAufYLsHA04GuBnuRbGg7jrl/IQmsdkta2HZ4yrYguUWOVa14mPHTUI79
-	AkTSiybHLfv7n2EY2BrRnz/L78yQq+2T2mN7eSaL0vWn3hXrfa0J2L+1hwJZn11BqAiPdkvTj57qb
-	AkMb8wAUmCQqcFQjvZv3njdPj5dEFW6O/PjsRHfXGSyhTjXcc1dc0CPP6ZOJUijpBFr+tYj3dTaeq
-	OgNkKwQwSdVNx34CVe1hSLqUu2/Ompw==;
+	References:List-Owner; bh=I1lqI9VBnZczHn23QAOh9QFHwIZa508T9PLYLAwh9T0=; b=iap
+	V0ASIy8oBIXs5qo1HTpdPoQRIt+Mv8AbKI5BdpUyTQD5VFoEOk2vHFNZWKl+Q9+0+DA7tZTcvzqx2
+	ySx8HeeS6mYiMM51KI4Pqp7fVPgddlPtSC4AJoEH0nLPWf0sZ+/0NQ5DgMuvPkqw2nlIWe4IoOMa4
+	KJ1xhlx1xh57kuW8Rpcr5Q+oyk0Wu7BZajvwxofp5QzaS5nPmgugna4ykrejJWuISFHEC3xlIaJok
+	dY7aYiYC+pXWAWDFQgfhk4dhmzb7iRizT8qO9ImuXswExeEpNN70SpNTHpi92ybrKhQL/bEGHAC0h
+	HdAGZBT3/PCJNjz5MFAmqK3u54EkUGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTtzi-0003DS-Iy; Mon, 03 Dec 2018 19:35:02 +0000
-Received: from mout.gmx.net ([212.227.17.21])
+	id 1gTu3u-0004z2-C7; Mon, 03 Dec 2018 19:39:22 +0000
+Received: from mail-oi1-x232.google.com ([2607:f8b0:4864:20::232])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTtzc-0002qz-H8
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:35:00 +0000
-Received: from qcai.nay.com ([66.187.233.206]) by mail.gmx.com (mrgmx102
- [212.227.17.174]) with ESMTPSA (Nemesis) id 0LrZOj-1hUIBS2GRp-013KJH; Mon, 03
- Dec 2018 20:34:28 +0100
-From: Qian Cai <cai@gmx.us>
-To: mark.rutland@arm.com,
-	marc.zyngier@arm.com
-Subject: [PATCH] clocksource/arm_arch_timer: fix a lockdep warning
-Date: Mon,  3 Dec 2018 14:33:44 -0500
-Message-Id: <1543865624-17301-1-git-send-email-cai@gmx.us>
-X-Mailer: git-send-email 1.8.3.1
-X-Provags-ID: V03:K1:T3JKhvsLTMlt02j5Xa/ivotfktyAs09MImuJwRehiTtilHpq/Sl
- QHFV3W8gGDf7joKXtImhbLUdJsrVUi2F/KgHBBqkzZmuIBJ54g5ETCslpgRs82y200AxAQh
- CXM+QmcpkrWpS6EUpnKBVccVQPvnq0X+dDVV8uR1zh2x57Vnmm8P+ETqB00KeIeD8oK7pjX
- 21ltqjUqt9HYPmQEFm4tQ==
-X-UI-Out-Filterresults: notjunk:1;V03:K0:TZBS9a4/07Y=:mipIW+jv6ooWBP2gnLQdzF
- 6dyRZuIDBmmIni7UM8zxefWxNaSPNyfPNPAEy2QLwGPdSKZvF7OZsCeLiAgCsukWToUP3rGK1
- nTqQLWVezoVvXaI/hpyb3fhFRPRzKKA91lvba8hBsH23yGrklAo5SHfB/4tLK3rIp7nv6HN6D
- VBh+s1dqQvlJ/QhZETzlqcvvyVVH6b3nHx/J2ddFsAHz5PlapEdG6AiTWAyl7IAIKVQ3JbZFi
- W4XF27cg+P5EQPUHcL0tiPlQ9WAOsYxijTSSg8UxtDcMy8P49QCR/9sHUu5FqUHheYUgJtUCu
- lf2Yu75arT9vbQqt9xFwcZUwZpNLD+GyjyvWyI4i8At/4dSoQaLHv676L0k9cmnU2vek0+2MJ
- z0gq1ttUsn35dIs+9aXBqut2iVygEzRDlxJAEQbPNMMKCPerU6QqQJ20bvJtCUL/mx0l/BXvv
- OKesVyqODlTArqP8QURaPwkhF+59HjC+UyL2abs3L76OmgZlqX85WZS/SGTVfoytkDtaPZeaZ
- BxRR4+lCo3OXG7dlDqNY9+lgG4lvfKLuqxrCJ/bjqhXiQFcLLWAohtU/SJdDMnoiPXvDP5OeJ
- +lc+56Z1yVSN1QQVILC5u42feTJXLBYFtPxsdXrNFCNouuyVz0YadCyp9o1wOtqXCtbNicDn1
- +EtX1JwFKqXUJ2Bd1PSZwSt0FPJAOq3jjEQ4XfplT5kitOk39lW2mcBCYtRj+CpR6v29vqrwt
- nLhxBK2UGnv1R/5iIkYyJKa1gWasTk7pKw09KWvLpKo7vAAwGlLy0LPbObLzJpQBQZKmne1lO
- 6y5WbthM7HbH3YC89/kOSJgtm77o2M/w+5HOKJIke0XdbaYhyxM+A0gxFoK1B6FZDTiB5R/MN
- /15opRrc/Hw9MAAM++jH8g3wV/MzKRZbmY2Gq9Y/Y=
+ id 1gTu3q-0004xh-Pd
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:39:20 +0000
+Received: by mail-oi1-x232.google.com with SMTP id b141so12018396oii.12
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 11:39:06 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=from:to:cc:subject:date:message-id;
+ bh=rzZ4Z4g1iHRPQPhD0xL6IPj3S6QAk7xPJjkU/WFj4eY=;
+ b=R6d2vWC+IjRZrsNQTQXsfwNRX8kv8QLQuUc1hnguTCyTgZAl5S0R2p941V8f1EYY+S
+ mjkbQdu1/rVGSXJwzuSlm3RMHdQdoWkZMGkTE389sd7z2g3z3WI8lVaW5hWBSsDCnFMK
+ gLOP5vh9I0eHPgfZBLkVJ9r84q9oMqzILeQcg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:from:to:cc:subject:date:message-id;
+ bh=rzZ4Z4g1iHRPQPhD0xL6IPj3S6QAk7xPJjkU/WFj4eY=;
+ b=PJs3c2IP20A38gXnekRk61MtXaDStpkt8jHRKe0b6ScjOWszxKejerdXjRzjjhbxxO
+ CJBOrEkfStBDLVC7TtoBHNy13ptGj35WmjnAtF8lm3ee8b3AfU75HXuizw1iRmh7Grxq
+ L6M1PJ4Fhm6Juay8JEKg++2n1PnLeYQMQiGvGYaxosolU4WEJucJkBBtqJUOxcvN6TPJ
+ fhTPkG6yN9X7NqQ1Bk6EQE19fArs498s5JoSpcUly7i+pdMmthzD/Mt4XEXwugGZwU7G
+ H9YNV+UoA4PSy8c7OxvtBrF+A8Fpd0zQJFO+pUsIq/QH8AfCZLOgFQ6eI/jfuv7E4TaP
+ gzfg==
+X-Gm-Message-State: AA+aEWYs4EjMBVG2BOO2u/D1KZm8WFxXjKMo3zX/iJ4psP35/HDRip4g
+ Vxtd2PFvjGGXxXEdAHhJ2A8FJg==
+X-Google-Smtp-Source: AFSGD/UOYYYAfP+i6lYzlUaflNn3MH3OmgMEQWnSyEQZoNSstrT9/DsNH9o8Dwho0IVxi/8HgCRUNg==
+X-Received: by 2002:aca:47c6:: with SMTP id
+ u189mr11027765oia.250.1543865945859; 
+ Mon, 03 Dec 2018 11:39:05 -0800 (PST)
+Received: from localhost ([2600:1700:141:4960:60aa:6557:7f4e:5d7d])
+ by smtp.gmail.com with ESMTPSA id 30sm6756458ots.52.2018.12.03.11.39.04
+ (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
+ Mon, 03 Dec 2018 11:39:05 -0800 (PST)
+From: Andy Gross <andy.gross@linaro.org>
+To: arm@kernel.org
+Subject: [GIT PULL] Qualcomm ARM64 Defconfig updates for 4.21
+Date: Mon,  3 Dec 2018 13:39:01 -0600
+Message-Id: <1543865944-3591-1-git-send-email-andy.gross@linaro.org>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_113458_653774_F855B56C 
-X-CRM114-Status: UNSURE (   9.13  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181203_113918_833570_9459C1E8 
+X-CRM114-Status: GOOD (  10.37  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,68 +88,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Qian Cai <cai@gmx.us>, peterz@infradead.org, daniel.lezcano@linaro.org,
- linux-kernel@vger.kernel.org, longman@redhat.com, tglx@linutronix.de,
- mingo@kernel.org, linux-arm-kernel@lists.infradead.org
+Cc: Arnd Bergmann <arnd@arndb.de>, linux-arm-msm@vger.kernel.org,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Kevin Hilman <khilman@baylibre.com>, Olof Johansson <olof@lixom.net>,
+ linux-arm-kernel@lists.infradead.org
 MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Booting this Huawei TaiShan 2280 arm64 server generated this lockdep
-warning.
+The following changes since commit 651022382c7f8da46cb4872a545ee1da6d097d2a:
 
-[    0.000000]  lockdep_assert_cpus_held+0x50/0x60
-[    0.000000]  static_key_enable_cpuslocked+0x30/0xe8
-[    0.000000]  arch_timer_check_ool_workaround+0x128/0x2d0
-[    0.000000]  arch_timer_acpi_init+0x274/0x6ac
-[    0.000000]  acpi_table_parse+0x1ac/0x218
-[    0.000000]  __acpi_probe_device_table+0x164/0x1ec
-[    0.000000]  timer_probe+0x1bc/0x254
-[    0.000000]  time_init+0x44/0x98
-[    0.000000]  start_kernel+0x4ec/0x7d4
+  Linux 4.20-rc1 (2018-11-04 15:37:52 -0800)
 
-This is due to the commit cb538267ea1e ("jump_label/lockdep: Assert we hold
-the hotplug lock for _cpuslocked() operations"). Therefore, it will check
-if it is really in the CPU hotplug path or not, and work around this
-problem by using cpus_read_trylock(). The chance of not getting the read
-lock is very small. If that happens, it will report a lockdep warning at
-most.
+are available in the git repository at:
 
-Signed-off-by: Qian Cai <cai@gmx.us>
----
- drivers/clocksource/arm_arch_timer.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-arm64-defconfig-for-4.21
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 9a7d4dc..5c9acbd 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -497,11 +497,20 @@ void arch_timer_enable_workaround(const struct arch_timer_erratum_workaround *wa
- 			per_cpu(timer_unstable_counter_workaround, i) = wa;
- 	}
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+	i = 0;
-+
- 	/*
- 	 * Use the locked version, as we're called from the CPU
- 	 * hotplug framework. Otherwise, we end-up in deadlock-land.
- 	 */
-+	i = cpus_read_trylock();
- 	static_branch_enable_cpuslocked(&arch_timer_read_ool_enabled);
-+	if (i)
-+		cpus_read_unlock();
-+#else
-+	static_branch_enable(&arch_timer_read_ool_enabled);
-+#endif
- 
- 	/*
- 	 * Don't use the vdso fastpath if errata require using the
--- 
-1.8.3.1
+for you to fetch changes up to b0bd6f1c03b4670f3e4b2a328e47adb9f2f1684e:
 
+  arm64: defconfig: Enable GCC and PINCTRL for MSM8998 (2018-11-30 15:12:46 -0600)
+
+----------------------------------------------------------------
+Qualcomm ARM64 Based defconfig Updates for v4.21
+
+* Enable Qualcomm QCS404 platform options
+* Enable Qualcomm MSM8998 clock and pinctrl
+* Enable Qualcomm SDM845 options
+* Add remoteproc related configs
+
+----------------------------------------------------------------
+Bjorn Andersson (4):
+      arm64: defconfig: Enable QCS404 configs
+      arm64: defconfig: Enable some qcom remoteproc configs
+      arm64: defconfig: Enable core Qualcomm SDM845 options
+      arm64: defconfig: Enable GCC and PINCTRL for MSM8998
+
+ arch/arm64/configs/defconfig | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 _______________________________________________
 linux-arm-kernel mailing list
