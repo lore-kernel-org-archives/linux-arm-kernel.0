@@ -2,111 +2,82 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
+	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
+	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
+	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id BA490C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:10:36 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id F29E5C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:22:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 8A66D206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:10:36 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id B958320848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:22:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kzk7PLyW";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="U8eUTUaa"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 8A66D206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o5PC6GNO";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nhtBZibI"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B958320848
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ggwVSTg5ovWh5Y4QIVVxLmjYV79Fvm7i2eHeoRM5u7c=; b=Kzk7PLyW152fOe
-	nbwXPDgA3KHdFqfpjiqLcqY2qvK9TApoq8SUEwnUTwQzp0npvOrheIlvNGpgyiQP1Vcu6Wj5zgFy8
-	TvJpsxqCJA+8SMTHACiLnbQZPWFxmcbYmH7tXo6mNQ+7WV2UbHtyI+OQBaf+WB3meL27OvEol6DaB
-	piwb5N6kZSiOSpWKQwUieRg+p9PbRwg0XybAFd5xOxsRkWe8HdY2oAdVOEdqdbrNvQT/3uYYIX9xM
-	o7CvSjffI2k4Rj2mq06tUrTCWaE6wLfSTR/zO0sLvMoDHz6Iexyr1/aLWSAvRLhIdeR3NDckW1sR5
-	CHC1xDx00zGDybmnjmzw==;
+	List-Owner; bh=3MAuvA0304bgEmuWy6QexVBdiaBAJ19WS08CyuQk4oI=; b=o5PC6GNOlIPy6P
+	eSdn0uCx8jLK5XpdK4pVLx6X1I5ZEXh27rhXZZ/X4ylCp71HMnaWRhFemBidEY0cdsUYvydYKp9lZ
+	+Us0aMiDkFetMfEx8u0p5011BGmUa5ccjoIOsUSpQjg6Vhr0UfffxIhX3L0hvVgxxmJVwwKEJuB72
+	1IY/BP2O3jYgLUE6jxA/nU5aatpEnK12Rw+dpV0ouSmMpq2EOglghYMzBLTbT8teuSQUTwfBoC+W5
+	8993EQAmWwyk6gLQ4vjWIsx0VwKmcwcr2gl4Lx5e5dDezXs9HTutSTFXQklkIRFS6Wk2Kajwaf8Yj
+	26EOLV2/ft/4Jz5juogg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTfZ1-0004KV-5A; Mon, 03 Dec 2018 04:10:31 +0000
-Received: from mail-eopbgr140049.outbound.protection.outlook.com
- ([40.107.14.49] helo=EUR01-VE1-obe.outbound.protection.outlook.com)
+	id 1gTfkK-0007Ek-Kc; Mon, 03 Dec 2018 04:22:12 +0000
+Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTfYw-0004JV-UQ
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 04:10:28 +0000
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
- h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
- bh=1VF/JJr10I6dCNqztlApa1rHKPuQQ/0zr3cOFx4vrXs=;
- b=U8eUTUaa9CVrnSCgTX25qen3AlbiqxzNjD7JDxWZNmo5y0N8szSn8tFjgPHu0VKHubFFWtjypwSE+uaXMa3ZrbGDPCAZ5NT6mhMOIH5gop0o4mIboIouOh71jQ+cCJS/G06czlV6bcuBtXStuHIVC2mxkJM+VTfEzIrC3VuqDyc=
-Received: from HE1PR04MB1497.eurprd04.prod.outlook.com (10.163.176.23) by
- HE1PR04MB2092.eurprd04.prod.outlook.com (10.166.67.150) with Microsoft SMTP
- Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
- 15.20.1382.22; Mon, 3 Dec 2018 04:10:12 +0000
-Received: from HE1PR04MB1497.eurprd04.prod.outlook.com
- ([fe80::dc32:150f:5344:715]) by HE1PR04MB1497.eurprd04.prod.outlook.com
- ([fe80::dc32:150f:5344:715%6]) with mapi id 15.20.1382.020; Mon, 3 Dec 2018
- 04:10:12 +0000
-From: Xiaowei Bao <xiaowei.bao@nxp.com>
-To: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Subject: RE: [PATCHv2 3/6] PCI: layerscape: Add the EP mode support
-Thread-Topic: [PATCHv2 3/6] PCI: layerscape: Add the EP mode support
-Thread-Index: AQHUdOS7xREHtKuFEEy03v3yUiY2kaVoTIwAgARFSNA=
-Date: Mon, 3 Dec 2018 04:10:12 +0000
-Message-ID: <HE1PR04MB1497E4A26E7902E5EAB15D36F5AE0@HE1PR04MB1497.eurprd04.prod.outlook.com>
-References: <20181105084653.26597-1-xiaowei.bao@nxp.com>
- <20181105084653.26597-3-xiaowei.bao@nxp.com>
- <20181130105512.GB17598@e107981-ln.cambridge.arm.com>
-In-Reply-To: <20181130105512.GB17598@e107981-ln.cambridge.arm.com>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-authentication-results: spf=none (sender IP is )
- smtp.mailfrom=xiaowei.bao@nxp.com; 
-x-originating-ip: [119.31.174.73]
-x-ms-publictraffictype: Email
-x-microsoft-exchange-diagnostics: 1; HE1PR04MB2092;
- 6:4ieG2ja+zPmg3jfM97MYeH5+jEXF7S1ieBxTyhHvsMP8O+NXawLzZc4vy4UKfkE8RqvKUXqA/JKOXs9VlS91rTGz0pnhKmj2rkks7QShrwSG0w43an0IC3vG2HW8Mgm6YuOoJfGLVgbuhLZO2wp7ZPnwwlDf9d3/+AB76MzYa6VNPEtRDAyX0AOT0erLgjt1aThF2n8Faby0ULQpz2guPAoI0XrwqmTrY5isMaMev3TCNWk9hGqgeSM02TclBcgKCDwquIMzCxqSWw4fQhy5IhnHuvtjWT9M6A0gl35Ki+D+9Qtokx5hhHNmmjTrWm5JBmIjOQNYhIVExQXME/WUwcFgeymBj1rt7M18jLeFia2J2zO4vd1guGJwvTSYpCK9BsXInM3ca7qPzUyFcRFmecOZ/XWACFyIAeba17/HTujLsBnXjvQWnr0zAl9wiqSYtszHn9VrjHo9qbNL3lfIYw==;
- 5:Kjpoo2wriJDbt33/EUeA2xl86GpQBjtLke6gUOgipRV40BMRaGHJKZgCntnjGwsrZYpdlOIu0rXzd+Pk5BqBJJaDtsoy0jmQpWbkzOKU6WzYvWT0bN7TlWHuk51JCi1nHr/QmgLeEwqv47FbnP7yU8FG48mUVNBSqZ0E2MbAW4Q=;
- 7:65AZYObMIiHN9Uji7IRc9B/0Jgrdzd6MqOfJi2fBtJt5U92hXkGKAUv2dbeKXh17p0SGXDoPgF51chHUa6c1/9VEwSvDL54A6+GTNATiO5hIbSIwL57LVyeWyP2Fr1amM9V+NX9SLvvYo9l58WOMDw==
-x-ms-office365-filtering-correlation-id: 6f451ce7-201f-4fd9-a68a-08d658d538f7
-x-ms-office365-filtering-ht: Tenant
-x-microsoft-antispam: BCL:0; PCL:0;
- RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
- SRVR:HE1PR04MB2092; 
-x-ms-traffictypediagnostic: HE1PR04MB2092:
-x-microsoft-antispam-prvs: <HE1PR04MB2092E4B59D879837AC572FA5F5AE0@HE1PR04MB2092.eurprd04.prod.outlook.com>
-x-ms-exchange-senderadcheck: 1
-x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
- RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(93006095)(93001095)(3231455)(999002)(944501493)(52105112)(3002001)(10201501046)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123560045)(20161123564045)(20161123558120)(201708071742011)(7699051)(76991095);
- SRVR:HE1PR04MB2092; BCL:0; PCL:0; RULEID:; SRVR:HE1PR04MB2092; 
-x-forefront-prvs: 08756AC3C8
-x-forefront-antispam-report: SFV:NSPM;
- SFS:(10009020)(396003)(136003)(346002)(39860400002)(366004)(376002)(13464003)(199004)(189003)(106356001)(25786009)(6916009)(478600001)(229853002)(68736007)(81166006)(105586002)(81156014)(71200400001)(71190400001)(8936002)(74316002)(2906002)(5660300001)(4326008)(186003)(7416002)(26005)(6506007)(53546011)(102836004)(6116002)(7696005)(6246003)(76176011)(3846002)(33656002)(6436002)(476003)(55016002)(54906003)(446003)(14454004)(11346002)(53936002)(99286004)(97736004)(486006)(256004)(14444005)(316002)(8676002)(305945005)(66066001)(9686003)(7736002)(44832011)(86362001);
- DIR:OUT; SFP:1101; SCL:1; SRVR:HE1PR04MB2092;
- H:HE1PR04MB1497.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
- PTR:InfoNoRecords; A:1; MX:1; 
-received-spf: None (protection.outlook.com: nxp.com does not designate
- permitted sender hosts)
-x-microsoft-antispam-message-info: 777hPKlyW73gVRvMPkFUesGwGaOd3s81KUR2T1T6OVM+q//ij0pO8H0zEbWEMmv4Yl4EQd9wUEz0wCV6cJdNYkWSjURLbposu4Esw95Q2QDpohvVBqI7+P4IfGwCC+7etvi8Gui/9ebn+edTbwANTUo3+IIO3/+XpQxKHObwBXOgMezHW30kxH7sfGtowVp/WC/jRFs/eWSti12FQNjYHVTJg0ZjtVMnswkrke9m7ob/BKPSah7Mr4RKPWc+Uzp9gSBzKSgtLlJ1cOS1/aQQAR9ZAPMJhkrwMou+WKUbMd75+1RstwFlJMCAk/OHKQ8YbQdwnhkOZsCf5RJEe+QhICNjRWwpYR0/Go1yBVFo/dQ=
-spamdiagnosticoutput: 1:99
-spamdiagnosticmetadata: NSPM
+ id 1gTfkH-0007Dm-7G; Mon, 03 Dec 2018 04:22:10 +0000
+Received: by mail-lj1-x243.google.com with SMTP id v1-v6so10048113ljd.0;
+ Sun, 02 Dec 2018 20:21:58 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=SYCAqsoUZtLwLDlDfp6OtymT17dsOHDXcRiDcCLSAAI=;
+ b=nhtBZibIwnBkPDHJCbP4PMmNHMC+hiwcwr8/1k8ga5Sa94daTE5kR2ylsNtJ+WtuWX
+ vi8JsMjhfolq2sXSmYCU4pYFsgI7iElOBqAPbJZEu5BZThXXOWrM6uSz8ybFxIjUXrQO
+ qfKX9UjocO3UbX66fUOUff0DRTmVTBfapCxbvoLq1kB6/jVnMQ/bgXyMgoE+TSOjkSwA
+ StdMUVUi3E8wkOM9ibp9H4LqFJqe9Sa6/SeON6fsguiNgph3EZevdAYdC0Di6jhurgiJ
+ ZEI1SQdsjs+0WCFseHxPJ+rzczhClEwUUA3de/d0wax+aruFf9NX5IqUtZkpvZAlrGsc
+ Eodw==
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=SYCAqsoUZtLwLDlDfp6OtymT17dsOHDXcRiDcCLSAAI=;
+ b=QAtGE5N0FPsMfIAZvoGdJMayPRKNai+sZXak9k6L2+jQzili+3Ypd0RVVcx0L53qXI
+ ZFPsJx2E9sAuPRNvO2+0xPnvLHfJ8010mDQ4dbisjvGzFN5fjRvyBUaTZQxXh2l1NHuy
+ t9BbPPRnfbeLCTGmkT5Ig8cbN5n5NS0cXmub4lPej7sq5NC9ySskfEUoPG4uuBJj1aPA
+ 24443vimrylUDY+ibsl71dlr9i3VfT2EACbsVYC5FFaER4XcF/pi1j1aYUi7ZdPfVMSp
+ /yv4f6XB1stJv01dF+xrErQ2evoYiqQcGI5G923EWqzYzyZhCQRupHiI0HGbG6m6vSpR
+ ZJPA==
+X-Gm-Message-State: AA+aEWY2bnFWNNQNi8FsaSK0osXcSndSfJeQPVpXf+JNKClpDpbsXkHy
+ LSHNgxjuTgApe+jdSSipf7bgTZbTMc7RMLlxrRk=
+X-Google-Smtp-Source: AFSGD/ULEaU52DpGnoEB0+B391rVIknIq95m9aFt1PWmOEugtipxjN1gDll5xHanHFuNsFuqFVfAnPwwh/hYD9vnflk=
+X-Received: by 2002:a2e:630a:: with SMTP id
+ x10-v6mr8707628ljb.11.1543810916221; 
+ Sun, 02 Dec 2018 20:21:56 -0800 (PST)
 MIME-Version: 1.0
-X-OriginatorOrg: nxp.com
-X-MS-Exchange-CrossTenant-Network-Message-Id: 6f451ce7-201f-4fd9-a68a-08d658d538f7
-X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Dec 2018 04:10:12.3884 (UTC)
-X-MS-Exchange-CrossTenant-fromentityheader: Hosted
-X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
-X-MS-Exchange-Transport-CrossTenantHeadersStamped: HE1PR04MB2092
+References: <20181202061944.GA3094@jordon-HP-15-Notebook-PC>
+ <20181202111313.GC6959@rapoport-lnx>
+In-Reply-To: <20181202111313.GC6959@rapoport-lnx>
+From: Souptick Joarder <jrdr.linux@gmail.com>
+Date: Mon, 3 Dec 2018 09:51:45 +0530
+Message-ID: <CAFqt6zbvyaPF3tUA1-=RsfSM14p7Rx5NgQqAeW5-JUfd+NrJ2g@mail.gmail.com>
+Subject: Re: [PATCH v2 1/9] mm: Introduce new vm_insert_range API
+To: rppt@linux.ibm.com
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_201026_992168_FDA40F1F 
-X-CRM114-Status: GOOD (  17.63  )
+X-CRM114-CacheID: sfid-20181202_202209_272242_F79BC98C 
+X-CRM114-Status: GOOD (  28.86  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -118,71 +89,154 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>, Roy Zang <roy.zang@nxp.com>,
- "arnd@arndb.de" <arnd@arndb.de>,
- "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
- "gregkh@linuxfoundation.org" <gregkh@linuxfoundation.org>,
- "kstewart@linuxfoundation.org" <kstewart@linuxfoundation.org>,
- "linuxppc-dev@lists.ozlabs.org" <linuxppc-dev@lists.ozlabs.org>,
- "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- "kishon@ti.com" <kishon@ti.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
- "robh+dt@kernel.org" <robh+dt@kernel.org>,
- "cyrille.pitchen@free-electrons.com" <cyrille.pitchen@free-electrons.com>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>,
- "pombredanne@nexb.com" <pombredanne@nexb.com>,
- "bhelgaas@google.com" <bhelgaas@google.com>, Leo Li <leoyang.li@nxp.com>,
- "shawnguo@kernel.org" <shawnguo@kernel.org>,
- "shawn.lin@rock-chips.com" <shawn.lin@rock-chips.com>,
- Mingkai Hu <mingkai.hu@nxp.com>
-Content-Type: text/plain; charset="gb2312"
-Content-Transfer-Encoding: base64
+Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
+ Peter Zijlstra <peterz@infradead.org>, dri-devel@lists.freedesktop.org,
+ linux-kernel@vger.kernel.org, Linux-MM <linux-mm@kvack.org>,
+ linux1394-devel@lists.sourceforge.net,
+ Marek Szyprowski <m.szyprowski@samsung.com>,
+ Stephen Rothwell <sfr@canb.auug.org.au>, oleksandr_andrushchenko@epam.com,
+ joro@8bytes.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
+ Matthew Wilcox <willy@infradead.org>, airlied@linux.ie,
+ linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org,
+ treding@nvidia.com, linux-media@vger.kernel.org,
+ Kees Cook <keescook@chromium.org>, pawel@osciak.com,
+ Rik van Riel <riel@surriel.com>, iommu@lists.linux-foundation.org,
+ rppt@linux.vnet.ibm.com, Boris Ostrovsky <boris.ostrovsky@oracle.com>,
+ mchehab@kernel.org, iamjoonsoo.kim@lge.com, vbabka@suse.cz,
+ Juergen Gross <jgross@suse.com>, hjc@rock-chips.com, xen-devel@lists.xen.org,
+ Kyungmin Park <kyungmin.park@samsung.com>, stefanr@s5r6.in-berlin.de,
+ Andrew Morton <akpm@linux-foundation.org>, robin.murphy@arm.com,
+ "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-SGkgTG9yZW56bywNCg0KLS0tLS1PcmlnaW5hbCBNZXNzYWdlLS0tLS0NCkZyb206IExvcmVuem8g
-UGllcmFsaXNpIDxsb3JlbnpvLnBpZXJhbGlzaUBhcm0uY29tPiANClNlbnQ6IDIwMTjE6jEx1MIz
-MMjVIDE4OjU1DQpUbzogWGlhb3dlaSBCYW8gPHhpYW93ZWkuYmFvQG54cC5jb20+DQpDYzogYmhl
-bGdhYXNAZ29vZ2xlLmNvbTsgcm9iaCtkdEBrZXJuZWwub3JnOyBtYXJrLnJ1dGxhbmRAYXJtLmNv
-bTsgc2hhd25ndW9Aa2VybmVsLm9yZzsgTGVvIExpIDxsZW95YW5nLmxpQG54cC5jb20+OyBraXNo
-b25AdGkuY29tOyBhcm5kQGFybmRiLmRlOyBncmVna2hAbGludXhmb3VuZGF0aW9uLm9yZzsgTS5o
-LiBMaWFuIDxtaW5naHVhbi5saWFuQG54cC5jb20+OyBNaW5na2FpIEh1IDxtaW5na2FpLmh1QG54
-cC5jb20+OyBSb3kgWmFuZyA8cm95LnphbmdAbnhwLmNvbT47IGtzdGV3YXJ0QGxpbnV4Zm91bmRh
-dGlvbi5vcmc7IGN5cmlsbGUucGl0Y2hlbkBmcmVlLWVsZWN0cm9ucy5jb207IHBvbWJyZWRhbm5l
-QG5leGIuY29tOyBzaGF3bi5saW5Acm9jay1jaGlwcy5jb207IG5pa2xhcy5jYXNzZWxAYXhpcy5j
-b207IGxpbnV4LXBjaUB2Z2VyLmtlcm5lbC5vcmc7IGRldmljZXRyZWVAdmdlci5rZXJuZWwub3Jn
-OyBsaW51eC1rZXJuZWxAdmdlci5rZXJuZWwub3JnOyBsaW51eC1hcm0ta2VybmVsQGxpc3RzLmlu
-ZnJhZGVhZC5vcmc7IGxpbnV4cHBjLWRldkBsaXN0cy5vemxhYnMub3JnDQpTdWJqZWN0OiBSZTog
-W1BBVENIdjIgMy82XSBQQ0k6IGxheWVyc2NhcGU6IEFkZCB0aGUgRVAgbW9kZSBzdXBwb3J0DQoN
-Ck9uIE1vbiwgTm92IDA1LCAyMDE4IGF0IDA0OjQ2OjUwUE0gKzA4MDAsIFhpYW93ZWkgQmFvIHdy
-b3RlOg0KPiBBZGQgdGhlIEVQIG1vZGUgc3VwcG9ydC4NCj4gDQo+IFNpZ25lZC1vZmYtYnk6IFhp
-YW93ZWkgQmFvIDx4aWFvd2VpLmJhb0BueHAuY29tPg0KPiAtLS0NCj4gdjI6DQo+ICAtIEFkZCB0
-aGUgU29DIHNwZWNpZmljIGNvbXBhdGlibGVzLg0KPiANCj4gIC4uLi9kZXZpY2V0cmVlL2JpbmRp
-bmdzL3BjaS9sYXllcnNjYXBlLXBjaS50eHQgICAgIHwgICAgMyArKysNCj4gIDEgZmlsZXMgY2hh
-bmdlZCwgMyBpbnNlcnRpb25zKCspLCAwIGRlbGV0aW9ucygtKQ0KDQpXcm9uZyBjb21taXQgJFNV
-QkpFQ1QsIHRoaXMgaXMgbm90IFBDSSBjb2RlLCBpdCBpcyBhIERUIGJpbmRpbmcgdXBkYXRlLCBJ
-IHdpbGwgaGF2ZSBhIGxvb2sgYXQgdGhlIHJlc3Qgb2YgdGhlIHNlcmllcyB0byBzZWUgaWYgSSBj
-YW4gdXBkYXRlIHRoaXMgcGF0Y2ggb3IgeW91IHdpbGwgZG8gaXQgd2l0aCB0aGUgbmV4dCByZXNw
-aW4uDQoNCkxvcmVuem8NCltYaWFvd2VpIEJhb10gSEkgTG9yZW56bywgdGhhbmtzIGEgbG90LCBJ
-IHdpbGwgc2VuZCBWMyBwYXRjaCB0byBtb2RpZnkgdGhlIGNvbW1pdHMuIA0KDQo+IGRpZmYgLS1n
-aXQgYS9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2xheWVyc2NhcGUtcGNp
-LnR4dCANCj4gYi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2xheWVyc2Nh
-cGUtcGNpLnR4dA0KPiBpbmRleCA2NmRmMWU4Li45YzA5MGM3IDEwMDY0NA0KPiAtLS0gYS9Eb2N1
-bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2xheWVyc2NhcGUtcGNpLnR4dA0KPiAr
-KysgYi9Eb2N1bWVudGF0aW9uL2RldmljZXRyZWUvYmluZGluZ3MvcGNpL2xheWVyc2NhcGUtcGNp
-LnR4dA0KPiBAQCAtMTMsMTIgKzEzLDE1IEBAIGluZm9ybWF0aW9uLg0KPiAgDQo+ICBSZXF1aXJl
-ZCBwcm9wZXJ0aWVzOg0KPiAgLSBjb21wYXRpYmxlOiBzaG91bGQgY29udGFpbiB0aGUgcGxhdGZv
-cm0gaWRlbnRpZmllciBzdWNoIGFzOg0KPiArICBSQyBtb2RlOg0KPiAgICAgICAgICAiZnNsLGxz
-MTAyMWEtcGNpZSIsICJzbnBzLGR3LXBjaWUiDQo+ICAgICAgICAgICJmc2wsbHMyMDgwYS1wY2ll
-IiwgImZzbCxsczIwODVhLXBjaWUiLCAic25wcyxkdy1wY2llIg0KPiAgICAgICAgICAiZnNsLGxz
-MjA4OGEtcGNpZSINCj4gICAgICAgICAgImZzbCxsczEwODhhLXBjaWUiDQo+ICAgICAgICAgICJm
-c2wsbHMxMDQ2YS1wY2llIg0KPiAgICAgICAgICAiZnNsLGxzMTAxMmEtcGNpZSINCj4gKyAgRVAg
-bW9kZToNCj4gKyAgICAgICAgImZzbCxsczEwNDZhLXBjaWUtZXAiLCAiZnNsLGxzLXBjaWUtZXAi
-DQo+ICAtIHJlZzogYmFzZSBhZGRyZXNzZXMgYW5kIGxlbmd0aHMgb2YgdGhlIFBDSWUgY29udHJv
-bGxlciByZWdpc3RlciBibG9ja3MuDQo+ICAtIGludGVycnVwdHM6IEEgbGlzdCBvZiBpbnRlcnJ1
-cHQgb3V0cHV0cyBvZiB0aGUgY29udHJvbGxlci4gTXVzdCBjb250YWluIGFuDQo+ICAgIGVudHJ5
-IGZvciBlYWNoIGVudHJ5IGluIHRoZSBpbnRlcnJ1cHQtbmFtZXMgcHJvcGVydHkuDQo+IC0tDQo+
-IDEuNy4xDQo+IA0KX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19f
-X18KbGludXgtYXJtLWtlcm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5p
-bmZyYWRlYWQub3JnCmh0dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8v
-bGludXgtYXJtLWtlcm5lbAo=
+Hi Mike,
+
+On Sun, Dec 2, 2018 at 4:43 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
+>
+> On Sun, Dec 02, 2018 at 11:49:44AM +0530, Souptick Joarder wrote:
+> > Previouly drivers have their own way of mapping range of
+> > kernel pages/memory into user vma and this was done by
+> > invoking vm_insert_page() within a loop.
+> >
+> > As this pattern is common across different drivers, it can
+> > be generalized by creating a new function and use it across
+> > the drivers.
+> >
+> > vm_insert_range is the new API which will be used to map a
+> > range of kernel memory/pages to user vma.
+> >
+> > This API is tested by Heiko for Rockchip drm driver, on rk3188,
+> > rk3288, rk3328 and rk3399 with graphics.
+> >
+> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
+> > Reviewed-by: Matthew Wilcox <willy@infradead.org>
+> > Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  include/linux/mm_types.h |  3 +++
+> >  mm/memory.c              | 38 ++++++++++++++++++++++++++++++++++++++
+> >  mm/nommu.c               |  7 +++++++
+> >  3 files changed, 48 insertions(+)
+> >
+> > diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
+> > index 5ed8f62..15ae24f 100644
+> > --- a/include/linux/mm_types.h
+> > +++ b/include/linux/mm_types.h
+> > @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
+> >  extern void tlb_finish_mmu(struct mmu_gather *tlb,
+> >                               unsigned long start, unsigned long end);
+> >
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count);
+> > +
+>
+> This seem to belong to include/linux/mm.h, near vm_insert_page()
+
+Ok, I will change it. Apart from this change does it looks good ?
+
+>
+> >  static inline void init_tlb_flush_pending(struct mm_struct *mm)
+> >  {
+> >       atomic_set(&mm->tlb_flush_pending, 0);
+> > diff --git a/mm/memory.c b/mm/memory.c
+> > index 15c417e..84ea46c 100644
+> > --- a/mm/memory.c
+> > +++ b/mm/memory.c
+> > @@ -1478,6 +1478,44 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
+> >  }
+> >
+> >  /**
+> > + * vm_insert_range - insert range of kernel pages into user vma
+> > + * @vma: user vma to map to
+> > + * @addr: target user address of this page
+> > + * @pages: pointer to array of source kernel pages
+> > + * @page_count: number of pages need to insert into user vma
+> > + *
+> > + * This allows drivers to insert range of kernel pages they've allocated
+> > + * into a user vma. This is a generic function which drivers can use
+> > + * rather than using their own way of mapping range of kernel pages into
+> > + * user vma.
+> > + *
+> > + * If we fail to insert any page into the vma, the function will return
+> > + * immediately leaving any previously-inserted pages present.  Callers
+> > + * from the mmap handler may immediately return the error as their caller
+> > + * will destroy the vma, removing any successfully-inserted pages. Other
+> > + * callers should make their own arrangements for calling unmap_region().
+> > + *
+> > + * Context: Process context. Called by mmap handlers.
+> > + * Return: 0 on success and error code otherwise
+> > + */
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count)
+> > +{
+> > +     unsigned long uaddr = addr;
+> > +     int ret = 0, i;
+> > +
+> > +     for (i = 0; i < page_count; i++) {
+> > +             ret = vm_insert_page(vma, uaddr, pages[i]);
+> > +             if (ret < 0)
+> > +                     return ret;
+> > +             uaddr += PAGE_SIZE;
+> > +     }
+> > +
+> > +     return ret;
+> > +}
+> > +EXPORT_SYMBOL(vm_insert_range);
+> > +
+> > +/**
+> >   * vm_insert_page - insert single page into user vma
+> >   * @vma: user vma to map to
+> >   * @addr: target user address of this page
+> > diff --git a/mm/nommu.c b/mm/nommu.c
+> > index 749276b..d6ef5c7 100644
+> > --- a/mm/nommu.c
+> > +++ b/mm/nommu.c
+> > @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
+> >  }
+> >  EXPORT_SYMBOL(vm_insert_page);
+> >
+> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
+> > +                     struct page **pages, unsigned long page_count)
+> > +{
+> > +     return -EINVAL;
+> > +}
+> > +EXPORT_SYMBOL(vm_insert_range);
+> > +
+> >  /*
+> >   *  sys_brk() for the most part doesn't need the global kernel
+> >   *  lock, except when an application is doing something nasty
+> > --
+> > 1.9.1
+> >
+>
+> --
+> Sincerely yours,
+> Mike.
+>
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
