@@ -2,20 +2,21 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS
-	autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14F2BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:24:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 13F6DC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:25:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D236620834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:24:02 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8E1620848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:25:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="tKZQ3dey"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D236620834
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="qV90qQzL"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8E1620848
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -24,87 +25,41 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
 	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
 	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=VNfGHpJb5sbHcyvAuZCkSPGEiqqA+X3INkVpdu+ZVyM=; b=tKZQ3deyLuNOFM
-	RoSn6zUXVRlzjFX/Pd65jBEqwV+V6h6ODqDshc2Vh88eTinN5DjAMC8f3al2GxSjv/WEOFdpknLmE
-	6dHYr1Tp4Qj/Ngn0k/PKatXtwuUjMLCWg9qgJhPiR7v9+rwnsEN1gzkUD1rbvfSeAfzA3KXWV6X3n
-	UJTBXQ5nL5PiPI+Gqc/gwh4WpJgiCT7nZ1IiX0Bx7HK6pHYGnJh9frVYeY21zWA5dlIKo8GW/a8pN
-	KG4lONz84Ef5305aZJGWcL10lzAEd4gQSTXAtcX8PU6a8kueizlGIMbG8ghNFv3f0rdDGZiXPvGNO
-	xCHaXSVdAFBfSd96jhzQ==;
+	List-Owner; bh=XAYGkQYieYaPkMiJ7eGlxLygaYS1J4p/j9GQf1YmriU=; b=qV90qQzLj0Ml+g
+	aXp/afXV7wCRmzaOeVzQfr1TRxCm6CUsn08i0s4Nk2ckV2q+6XuQmt3JHFBtlyn4/+CZ7ZLW6NqGv
+	RjE00qhQb3QizRZSFSf1EVUtlAT4ZVK9U1WLpCRlUORFQvkJnTHdjjNul77sHdZozpWXXzBo/YVve
+	7G65beyLrH7M1qklA50q0rcsIMI98zFcNTxvY2Xjyf5ofVsccHeZZ8QwLrxDh0gMXWugztiKvSiy5
+	wd4UzoQacKBSUTcxdbuRxhB9eIgofnQN4BdH1qL5wu315/Fu6xW8W2c0i+hKz2GYFiXp8xnLHxt2F
+	KK/P7YPPqzMQzPs1zdsg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTq4k-000444-Tx; Mon, 03 Dec 2018 15:23:58 +0000
+	id 1gTq68-0005bo-Ko; Mon, 03 Dec 2018 15:25:24 +0000
 Received: from foss.arm.com ([217.140.101.70])
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTq4h-00043D-4v
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:23:56 +0000
+ id 1gTps4-0007Jy-M5
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:11:05 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 990BF1682;
- Mon,  3 Dec 2018 07:23:44 -0800 (PST)
-Received: from [10.1.196.62] (usa-sjc-imap-foss1.foss.arm.com [10.72.51.249])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 779433F5AF; Mon,  3 Dec 2018 07:23:43 -0800 (PST)
-Subject: Re: [PATCH 01/12] KVM: arm64: Document PV-time interface
-To: Andrew Jones <drjones@redhat.com>
-References: <20181128144527.44710-1-steven.price@arm.com>
- <20181128144527.44710-2-steven.price@arm.com>
- <20181203135042.v52wawfz4nc27fna@kamzik.brq.redhat.com>
- <4ec62f53-9c3f-14cb-f1bb-c8b9aadb9bdd@arm.com>
- <20181203151636.scziollrzpulbdke@kamzik.brq.redhat.com>
-From: Marc Zyngier <marc.zyngier@arm.com>
-Openpgp: preference=signencrypt
-Autocrypt: addr=marc.zyngier@arm.com; prefer-encrypt=mutual; keydata=
- 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
-Organization: ARM Ltd
-Message-ID: <389b6206-1e29-16a3-1aa1-5a79b83683c5@arm.com>
-Date: Mon, 3 Dec 2018 15:23:41 +0000
-User-Agent: Mozilla/5.0 (X11; Linux aarch64; rv:60.0) Gecko/20100101
- Thunderbird/60.3.0
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 3EA0C1682;
+ Mon,  3 Dec 2018 07:10:42 -0800 (PST)
+Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C37F43F5AF;
+ Mon,  3 Dec 2018 07:10:39 -0800 (PST)
+Subject: Re: [PATCH v9 6/8] KVM: arm64: Support handling access faults for PUD
+ hugepages
+To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-7-punit.agrawal@arm.com>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <26fcfc2c-219a-ce04-457b-cc157301c7d3@arm.com>
+Date: Mon, 3 Dec 2018 20:40:45 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-In-Reply-To: <20181203151636.scziollrzpulbdke@kamzik.brq.redhat.com>
+In-Reply-To: <20181031175745.18650-7-punit.agrawal@arm.com>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_072355_204436_7B9AA91D 
-X-CRM114-Status: GOOD (  13.79  )
+X-CRM114-CacheID: sfid-20181203_071053_006876_93D6FD79 
+X-CRM114-Status: GOOD (  21.51  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -116,84 +71,160 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Catalin Marinas <catalin.marinas@arm.com>,
- Will Deacon <will.deacon@arm.com>, kvmarm@lists.cs.columbia.edu,
- linux-arm-kernel@lists.infradead.org, Steven Price <steven.price@arm.com>
+Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com,
+ Catalin Marinas <catalin.marinas@arm.com>, will.deacon@arm.com,
+ Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
+ punitagrawal@gmail.com, Russell King <linux@armlinux.org.uk>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On 03/12/2018 15:16, Andrew Jones wrote:
-> On Mon, Dec 03, 2018 at 02:18:25PM +0000, Marc Zyngier wrote:
->> On 03/12/2018 13:50, Andrew Jones wrote:
->>> On Wed, Nov 28, 2018 at 02:45:16PM +0000, Steven Price wrote:
->>>> +The structure pointed to by the PV_TIME_LPT hypercall is as follows:
->>>> +
->>>> +  Field           | Byte Length | Byte Offset | Description
->>>> +  --------------- | ----------- | ----------- | -------------------------------
->>>> +  Revision        |      4      |      0      | Must be 0 for this revision
->>>> +  Attributes      |      4      |      4      | Must be 0
->>>> +  sequence_number |      8      |      8      | Bit 0: reserved
->>>> +                  |             |             | Bits 1:63 number of migrations
->>>> +  scale_mult      |      8      |      16     | Multiplier to scale from native
->>>> +                  |             |             | frequency to PV frequency
->>>> +  shift           |      4      |      24     | Shift applied before multiplier
->>>> +  Reserved        |      4      |      28     | Must be 0
->>>> +  Fn              |      8      |      32     | Native frequency
->>>> +  Fpv             |      8      |      40     | Paravirtualized frequency seen
->>>> +                  |             |             | by guest
->>>> +  div_by_fpv_mult |      8      |      48     | Multiplier to implement fast
->>>> +                  |             |             | divide by Fpv
->>>
->>> Here's kvmclock's struct
->>>
->>>  struct pvclock_vcpu_time_info {
->>>         u32   version; 
->>>         u32   pad0;
->>>         u64   tsc_timestamp;
->>>         u64   system_time;
->>>         u32   tsc_to_system_mul;
->>>         s8    tsc_shift;
->>>         u8    flags;
->>>         u8    pad[2];
->>>  }
->>>
->>>  Revision	 =>
->>>  Attributes	 =>
->>>  sequence_number => version
->>>  scale_mult	 => tsc_to_system_mul	(this is reversed, but OK)
->>>  shift		 => tsc_shift           (also reversed)
->>>  Reserved	 =>
->>>  Fn		 => (pvclock doesn't have, but does have system_time)
->>>  Fpv		 =>
->>>  div_by_fpv_mult =>
->>>
->>> I haven't thought about this enough yet to be sure kvmclock's fields
->>> are sufficient, but several look close - although the 'tsc' naming
->>> isn't nice. Also, the pvclock struct could be extended by adding an
->>> 'extended' flag to 'flags', and then appending more fields.
->>
->> One important thing is that this is not a KVM PV time implementation.
->> This is something generic for the ARM architecture. Any ARM hypervisor
->> should be able to implement this.
->>
+
+
+On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+> In preparation for creating larger hugepages at Stage 2, extend the
+> access fault handling at Stage 2 to support PUD hugepages when
+> encountered.
 > 
-> I agree with that, but xen also uses the same pvclock structure on x86.
+> Provide trivial helpers for arm32 to allow sharing of code.
+> 
+> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   |  9 +++++++++
+>  arch/arm64/include/asm/kvm_mmu.h |  7 +++++++
+>  arch/arm64/include/asm/pgtable.h |  6 ++++++
+>  virt/kvm/arm/mmu.c               | 22 +++++++++++-----------
+>  4 files changed, 33 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 839a619873d3..fea5e723e3ac 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -85,6 +85,9 @@ void kvm_clear_hyp_idmap(void);
+>  #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
+>  #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
+>  
+> +#define kvm_pud_pfn(pud)	({ BUG(); 0; })
+> +
+> +
+>  #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
+>  
+>  /*
+> @@ -108,6 +111,12 @@ static inline bool kvm_s2pud_exec(pud_t *pud)
+>  	return false;
+>  }
+>  
+> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+> +{
+> +	BUG();
+> +	return pud;
+> +}
+> +
+>  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+>  {
+>  	pte_val(pte) |= L_PTE_S2_RDWR;
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index c755b37b3f92..612032bbb428 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -187,6 +187,8 @@ void kvm_clear_hyp_idmap(void);
+>  #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
+>  #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
+>  
+> +#define kvm_pud_pfn(pud)		pud_pfn(pud)
+> +
+>  #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
+>  
+>  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
+> @@ -266,6 +268,11 @@ static inline bool kvm_s2pud_exec(pud_t *pudp)
+>  	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
+>  }
+>  
+> +static inline pud_t kvm_s2pud_mkyoung(pud_t pud)
+> +{
+> +	return pud_mkyoung(pud);
+> +}
+> +
+>  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
+>  
+>  #ifdef __PAGETABLE_PMD_FOLDED
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 50b1ef8584c0..f51e2271e6a3 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -314,6 +314,11 @@ static inline pte_t pud_pte(pud_t pud)
+>  	return __pte(pud_val(pud));
+>  }
+>  
+> +static inline pud_t pte_pud(pte_t pte)
+> +{
+> +	return __pud(pte_val(pte));
+> +}
+> +
 
-Which makes sense.
+Yeah these would be required for PUD based THP when enabled.
 
-Each architecture has a way to express its PV time based on its own
-requirements, and I'd expect Xen on arm64 to use the ARM data structure
-(/me eyes the Xen/ARM maintainer...). I thought that what you were
-advocating was to use the x86 layout on ARM, which didn't make complete
-sense to me.
+>  static inline pmd_t pud_pmd(pud_t pud)
+>  {
+>  	return __pmd(pud_val(pud));
+> @@ -381,6 +386,7 @@ static inline int pmd_protnone(pmd_t pmd)
+>  #define pfn_pmd(pfn,prot)	__pmd(__phys_to_pmd_val((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot))
+>  #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+>  
+> +#define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
+>  #define pud_write(pud)		pte_write(pud_pte(pud))
+>  
+>  #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
+> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+> index 8e44dccd1b47..bd749601195f 100644
+> --- a/virt/kvm/arm/mmu.c
+> +++ b/virt/kvm/arm/mmu.c
+> @@ -1698,6 +1698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>   */
+>  static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+>  {
+> +	pud_t *pud;
+>  	pmd_t *pmd;
+>  	pte_t *pte;
+>  	kvm_pfn_t pfn;
+> @@ -1707,24 +1708,23 @@ static void handle_access_fault(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa)
+>  
+>  	spin_lock(&vcpu->kvm->mmu_lock);
+>  
+> -	pmd = stage2_get_pmd(vcpu->kvm, NULL, fault_ipa);
+> -	if (!pmd || pmd_none(*pmd))	/* Nothing there */
+> +	if (!stage2_get_leaf_entry(vcpu->kvm, fault_ipa, &pud, &pmd, &pte))
+>  		goto out;
+>  
+> -	if (pmd_thp_or_huge(*pmd)) {	/* THP, HugeTLB */
+> +	if (pud) {		/* HugeTLB */
+> +		*pud = kvm_s2pud_mkyoung(*pud);
+> +		pfn = kvm_pud_pfn(*pud);
+> +		pfn_valid = true;
+> +	} else	if (pmd) {	/* THP, HugeTLB */
+>  		*pmd = pmd_mkyoung(*pmd);
+>  		pfn = pmd_pfn(*pmd);
+>  		pfn_valid = true;
+> -		goto out;
+> +	} else {
+> +		*pte = pte_mkyoung(*pte);	/* Just a page... */
+> +		pfn = pte_pfn(*pte);
+> +		pfn_valid = true;
+>  	}
 
-Thanks,
+As mentioned before stage2_get_leaf_entry() is not required for the previous
+patch and handle_access_fault() can definitely do without it. The existing
+page table walker flow is better than this helper which takes like three
+different arguments and makes semantics more complicated than required.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
 
 _______________________________________________
 linux-arm-kernel mailing list
