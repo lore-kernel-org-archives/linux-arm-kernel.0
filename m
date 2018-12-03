@@ -6,17 +6,17 @@ X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 5242BC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:31:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 22BACC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:32:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 235DD2081C
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:31:59 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E9CA22081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 19:32:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="rnf0XeMs";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="YcwJF6eo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 235DD2081C
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G0aP5Cbd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="LZ3SS/sE"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E9CA22081C
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,47 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:Date:Subject:Message-ID:References:
 	In-Reply-To:From:To:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=fqyUVuMJOS5SEGbeFwrPCiNwpYdyP0Xdbm8NgX5MwXY=; b=rnf0XeMsMM0/UB
-	z6XafCQMd4pH8vkTsejHv/b2CRw05VP4CB8QTqEppO9XmTYHIL9LxjX0zqwBb6pjLX/MmL1yjC0gH
-	rfjlFfrptHb8i3o5JIi0w5oirZr8NeeUz27uNOMwiEjmS/MrcRd4N+cspyGHWBC71qGuWlaTYiPVE
-	j6he+YEWuDndDw+v9OA7KSk+GttNABkBPLiqR/p09pvE4ETOIGt9AWVD063/4jN/jQKgflbwVnJ94
-	ZShso7cAfgomGmsc0mQcswYCZWK4jOShuJGFlZMAkgrv6MtKeia8Ln6DUO3MRhaxUQAHeO2LP75GV
-	TEsXZnY3g2CaRt/qAFZw==;
+	List-Owner; bh=N31ol7sdMzTe2y0I331CVXOAMRLApDlX3LXOq50lHpY=; b=G0aP5CbdBlj+Vu
+	LQBNWkGDJJ6ilYyiUawhs/TxRSartM54qe1zdvbo+ybJrbpKd4pphok1hHQYL0JEirAXgccCCm77K
+	s5dftqkNKH35CD9ownZOYEQivbkWYu6hIWqXtHi1D/u2wzcdEyxmw52Nr9wnkqHcTcKup28jqe+kO
+	lw564mrbE+A7W2+m9oC0dRVQ7oLhxbK1KTkHEky6mjfgWVH5PV4W5qF/C9xrGqqOIxBa4sBrpfi6m
+	PNiyA/rpqgnJ1YcW+k8YpAz7jTlKjsaWIycREXEo38bu5qB1oW3c9BPF9U4M/L7HxeMg3vdxn8ibo
+	NxlMD461UcVQgetXmt8g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTtwj-00008Q-7Y; Mon, 03 Dec 2018 19:31:57 +0000
+	id 1gTtws-0000H1-3E; Mon, 03 Dec 2018 19:32:06 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTtwg-00006V-5H
+ id 1gTtwg-00006U-5G
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 19:31:55 +0000
 Received: from localhost (unknown [104.132.0.74])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4ADF1214C1;
- Mon,  3 Dec 2018 19:31:50 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 1A5812146D;
+ Mon,  3 Dec 2018 19:31:48 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543865510;
- bh=bldWNC99dcFF5C40l8XYzy0m18NN3EPMGPB0pi5SepQ=;
+ s=default; t=1543865508;
+ bh=/tu1B3Tvpt5e9OWM4uOsnuS5dI/SkfzdXsllXp+AuSM=;
  h=To:From:In-Reply-To:Cc:References:Subject:Date:From;
- b=YcwJF6eobsBrG/PE6dZ5q+fmyDg3as1PLv/1vrUHpcticoIjqZ4CTbC/5I2sdzGhV
- bq6kR88w5XtV+sqxNUGvFUjeo9xo9s3n+IVWCICD2sXaBFNB2pmm75NTSuDTlg1uIr
- tp+HYi3QeywLVyH47niTgcXfAND4xLiXAF+GOuuI=
+ b=LZ3SS/sE7WdlrSOAvvai2uJz+RrR6ISX2hCvwVxIDjDCJnTF4HMLJmUwIXwRdEL/g
+ hNkBrB0kpEuDuVoO6UeqHwsv3za+SlCs2jaxJg4MrC+bBxhOQ8qvhxk9rj1oM+yfCc
+ d3MGfJ+pa7GgWl/b5hqAFSn8yo/6oa9cLnHpY41s=
 MIME-Version: 1.0
 To: "A.s. Dong" <aisheng.dong@nxp.com>,
  "linux-clk@vger.kernel.org" <linux-clk@vger.kernel.org>
 From: Stephen Boyd <sboyd@kernel.org>
-In-Reply-To: <1542200198-3017-3-git-send-email-aisheng.dong@nxp.com>
+In-Reply-To: <1542200198-3017-2-git-send-email-aisheng.dong@nxp.com>
 References: <1542200198-3017-1-git-send-email-aisheng.dong@nxp.com>
- <1542200198-3017-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <154386550973.88331.6413976100924685018@swboyd.mtv.corp.google.com>
+ <1542200198-3017-2-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <154386550758.88331.8573266036365450221@swboyd.mtv.corp.google.com>
 User-Agent: alot/0.7
-Subject: Re: [PATCH V6 2/9] clk: fractional-divider: add
- CLK_FRAC_DIVIDER_ZERO_BASED flag support
-Date: Mon, 03 Dec 2018 11:31:49 -0800
+Subject: Re: [PATCH V6 1/9] clk: imx: add gatable clock divider support
+Date: Mon, 03 Dec 2018 11:31:47 -0800
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_113154_222326_0B82ABC1 
-X-CRM114-Status: UNSURE (   7.65  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181203_113154_262706_B32812F4 
+X-CRM114-Status: GOOD (  13.42  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,19 +87,34 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Quoting A.s. Dong (2018-11-14 05:01:39)
-> Adding CLK_FRAC_DIVIDER_ZERO_BASED flag to indicate the numerator and
-> denominator value in register are start from 0.
+Quoting A.s. Dong (2018-11-14 05:01:35)
+> For dividers with zero indicating clock is disabled, instead of giving a
+> warning each time like "clkx: Zero divisor and CLK_DIVIDER_ALLOW_ZERO not
+> set" in exist code, we'd like to introduce enable/disable function for it.
+> e.g.
+> 000b - Clock disabled
+> 001b - Divide by 1
+> 010b - Divide by 2
+> ...
 > 
-> This can be used to support frac dividers like below:
-> Divider output clock = Divider input clock x [(frac +1) / (div +1)]
-> where frac/div in register is:
-> 000b - Divide by 1.
-> 001b - Divide by 2.
-> 010b - Divide by 3.
+> Set rate when the clk is disabled will cache the rate request and only
+> when the clk is enabled will the driver actually program the hardware to
+> have the requested divider value. Similarly, when the clk is disabled we'll
+> write a 0 there, but when the clk is enabled we'll restore whatever rate
+> (divider) was chosen last.
+> 
+> It does mean that recalc rate will be sort of odd, because when the clk is
+> off it will return 0, and when the clk is on it will return the right rate.
+> So to make things work, we'll need to return the cached rate in recalc rate
+> when the clk is off and read the hardware when the clk is on.
+> 
+> NOTE for the default off divider, the recalc rate will still return 0 as
+> there's still no proper preset rate. Enable such divider will give user
+> a reminder error message.
 > 
 > Cc: Stephen Boyd <sboyd@codeaurora.org>
 > Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 > 
 > ---
