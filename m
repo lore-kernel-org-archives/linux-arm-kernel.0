@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6B3ECC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:06:55 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A2DFC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:10 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 43BA2208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:06:55 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E1100208A3
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:09 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="hd+cFFEg"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 43BA2208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OSslkpPt"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1100208A3
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,38 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=KX2Abx7Zq0QAPD/UIRmDuknI1XgjjfH63Ty6RzSiwFc=; b=hd+cFFEgvf0Lwq
-	gp0Xi2KjIUxqDpwD2fJPVZahyW6COcp9TwktUoCN1c/PpCubI762tgTy5yi5eTFV6EK5R/MBpBaqd
-	XiA4yjHYRT/zaGNPayhwLj+d1qv0Lwna9f4907s1kkBZxvZ27SViJ4iTZo6PqRtfrEcJVQb37Zqg+
-	wi81+BGTSFdA/UzuzLDobSKNC00Vw94ttdbnnlbrqCA+V2JhGURzdosQHSUhM60G7jEY+t+9Yhd09
-	wAAa8Im/X4v0/wsjX5niMqqaLlAQWw3anMqjb5ymfvwrJH6+UvWOMZL1RUMXMJtrnKCQtwJon7k1H
-	1XZlt1+0oAjfGgDOiHiQ==;
+	List-Owner; bh=p4KOFg5ZY3P82//DpAo8nl16BoJ6Wxt3nxte8dMzUdM=; b=OSslkpPtwXiCwW
+	HBrQxKy8Vxtrl1UIXRbWJ5K6IBMeTo0wjYD5zU8hGmLI6cY/BUnAArT6i7+M63Yz5O18JG4vQRaW+
+	fE2EeamN4JALdU0CvTVAH+4XBwRQymoOu0cOfR09wrCTr0yvV1PYXcqu5rjNSoJjmgMvWevlK1e3T
+	9ncEsl2PmQayuT3VqAsGR+gXQN602mddP1JbS2GyatRpxMueamwNw/VIuTfnhDS/s9XU4ujXFlVS0
+	XV3nu/P1njGOidnjh4KwQY3otoZ+Ld0rWOqqWSBgKyVaXysWWIch0pGU0dFTycGRPZy+GGEsoFNz8
+	98kcZFQsrWUkJpcepKVQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTscQ-0004xD-27; Mon, 03 Dec 2018 18:06:54 +0000
-Received: from foss.arm.com ([217.140.101.70])
+	id 1gTsca-00058p-La; Mon, 03 Dec 2018 18:07:04 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTscL-0004lT-N1
+ id 1gTscL-0004ib-Mw
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:06:51 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id E6CA7168F;
- Mon,  3 Dec 2018 10:06:42 -0800 (PST)
-Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 22BD73F59C;
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 483B21682;
  Mon,  3 Dec 2018 10:06:39 -0800 (PST)
+Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 78B303F59C;
+ Mon,  3 Dec 2018 10:06:36 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v7 02/25] ACPI / APEI: Remove silent flag from
- ghes_read_estatus()
-Date: Mon,  3 Dec 2018 18:05:50 +0000
-Message-Id: <20181203180613.228133-3-james.morse@arm.com>
+Subject: [PATCH v7 01/25] ACPI / APEI: Don't wait to serialise with oops
+ messages when panic()ing
+Date: Mon,  3 Dec 2018 18:05:49 +0000
+Message-Id: <20181203180613.228133-2-james.morse@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181203180613.228133-1-james.morse@arm.com>
 References: <20181203180613.228133-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_100649_870803_0BF2D670 
-X-CRM114-Status: GOOD (  14.29  )
+X-CRM114-CacheID: sfid-20181203_100649_871531_8A30126A 
+X-CRM114-Status: GOOD (  14.09  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -81,82 +82,51 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Subsequent patches will split up ghes_read_estatus(), at which
-point passing around the 'silent' flag gets annoying. This is to
-suppress prink() messages, which prior to commit 42a0bb3f7138
-("printk/nmi: generic solution for safe printk in NMI"), were
-unsafe in NMI context.
+oops_begin() exists to group printk() messages with the oops message
+printed by die(). To reach this caller we know that platform firmware
+took this error first, then notified the OS via NMI with a 'panic'
+severity.
 
-This is no longer necessary, remove the flag. printk() messages
-are batched in a per-cpu buffer and printed via irq-work, or a call
-back from panic().
+Don't wait for another CPU to release the die-lock before panic()ing,
+our only goal is to print this fatal error and panic().
 
+This code is always called in_nmi(), and since commit 42a0bb3f7138
+("printk/nmi: generic solution for safe printk in NMI"), it has been
+safe to call printk() from this context. Messages are batched in a
+per-cpu buffer and printed via irq-work, or a call back from panic().
+
+Link: https://patchwork.kernel.org/patch/10313555/
+Acked-by: Borislav Petkov <bp@suse.de>
 Signed-off-by: James Morse <james.morse@arm.com>
+
 ---
 Changes since v6:
- * Moved earlier in the series,
+ * Capitals in patch subject
  * Tinkered with the commit message.
- * switched to pr_warn_ratelimited() to shut checkpatch up
-
-shutup checkpatch
 ---
- drivers/acpi/apei/ghes.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+ drivers/acpi/apei/ghes.c | 2 --
+ 1 file changed, 2 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index ab2dae6fc7e4..e8503c7d721f 100644
+index 02c6fd9caff7..ab2dae6fc7e4 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -324,7 +324,7 @@ static void ghes_copy_tofrom_phys(void *buffer, u64 paddr, u32 len,
- 	}
- }
+@@ -33,7 +33,6 @@
+ #include <linux/interrupt.h>
+ #include <linux/timer.h>
+ #include <linux/cper.h>
+-#include <linux/kdebug.h>
+ #include <linux/platform_device.h>
+ #include <linux/mutex.h>
+ #include <linux/ratelimit.h>
+@@ -947,7 +946,6 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
  
--static int ghes_read_estatus(struct ghes *ghes, int silent)
-+static int ghes_read_estatus(struct ghes *ghes)
- {
- 	struct acpi_hest_generic *g = ghes->generic;
- 	u64 buf_paddr;
-@@ -333,8 +333,7 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
- 
- 	rc = apei_read(&buf_paddr, &g->error_status_address);
- 	if (rc) {
--		if (!silent && printk_ratelimit())
--			pr_warning(FW_WARN GHES_PFX
-+		pr_warn_ratelimited(FW_WARN GHES_PFX
- "Failed to read error status block address for hardware error source: %d.\n",
- 				   g->header.source_id);
- 		return -EIO;
-@@ -366,9 +365,9 @@ static int ghes_read_estatus(struct ghes *ghes, int silent)
- 	rc = 0;
- 
- err_read_block:
--	if (rc && !silent && printk_ratelimit())
--		pr_warning(FW_WARN GHES_PFX
--			   "Failed to read error status block!\n");
-+	if (rc)
-+		pr_warn_ratelimited(FW_WARN GHES_PFX
-+				    "Failed to read error status block!\n");
- 	return rc;
- }
- 
-@@ -700,7 +699,7 @@ static int ghes_proc(struct ghes *ghes)
- {
- 	int rc;
- 
--	rc = ghes_read_estatus(ghes, 0);
-+	rc = ghes_read_estatus(ghes);
- 	if (rc)
- 		goto out;
- 
-@@ -937,7 +936,7 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
- 		return ret;
- 
- 	list_for_each_entry_rcu(ghes, &ghes_nmi, list) {
--		if (ghes_read_estatus(ghes, 1)) {
-+		if (ghes_read_estatus(ghes)) {
- 			ghes_clear_estatus(ghes);
- 			continue;
- 		} else {
+ 		sev = ghes_severity(ghes->estatus->error_severity);
+ 		if (sev >= GHES_SEV_PANIC) {
+-			oops_begin();
+ 			ghes_print_queued_estatus();
+ 			__ghes_panic(ghes);
+ 		}
 -- 
 2.19.2
 
