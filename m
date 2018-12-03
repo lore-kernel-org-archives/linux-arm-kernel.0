@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2C5AEC07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id A503CC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:50 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EF5EF214C1
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:21 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 574CD214DB
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:04:50 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="QspL8gun";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="fAHhrRdk"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EF5EF214C1
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ifHxTPJl";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="vCIHZajF"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 574CD214DB
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,45 +25,45 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:From:To:
 	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
 	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=yMJuV6vALEtQEVvXj+/Uo9WLcCIhXzEjqCEXxNRM3c0=; b=QspL8gun7edcVA
-	BOLBduhv86hNPaNqCVUlgZH48PVxu7z+GAYLskwKLaQiLDelVo3frb1ETVqSvPvhm3x2DzpcGomLJ
-	u4xkZzxOzNZh4ezHXPxclsYKNAYHxUwKMBjWeWS5BVHaT31fgPTxnwu1W46nNjta1vi8ZGXWwbyuq
-	gxB2q0ryJTvhQQsgAXmU/b5VZMrpbZTTMG9lmM6uyo5+eDvhC+99qHOABRLPuiA+NCOsJA8xKj6BD
-	IRJ0chhGPTydtEzIDQmtFmcEX+26l3sGlrcYvrpTVE2QuWAmK/Ug3Valc47zMB2feX+vhoDSDEPFq
-	DexJCt9vuDB4i/4jiAZQ==;
+	List-Owner; bh=GNy6Om7FTR406fKBr+r+ISYDhDnxwb7h1aONma1qnNE=; b=ifHxTPJl/DRUZ6
+	dXZrU7bzxneOahu57xVZ8h5DpNA2mST0LyU6FmVkTdUyHIfAOC2M1EBI0uVhdeW35s+08VYf0vxnf
+	Ev7U4Tyu6A8xqUIl9kcF0m1iyU8B12U8Mjrk3iEpqW/EkmpqKrXPjgk1n9ju+z8mahHMyBhU2MgSD
+	0LZtLaE3pMf+T3jCQkghGHVCMj+746dK4pNfom8XBUWKrdgQ8bQS4PigPSY6Do8br8LS2RhHJ9ABJ
+	SMfdwy+X3nYQrTw4cRJpKyTaMYdIDda88pIMW9BiJ0pBu9eRQx7EPrT9HySvgeElLFBhOPXHQWg1s
+	JGW6Wo4/OPv+M784ttFQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTm1U-0007UO-Rd; Mon, 03 Dec 2018 11:04:20 +0000
+	id 1gTm1v-0007mN-Nc; Mon, 03 Dec 2018 11:04:47 +0000
 Received: from mail.kernel.org ([198.145.29.99])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTm1R-0007Tm-0P
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:04:19 +0000
+ id 1gTm1n-0007fG-68
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:04:45 +0000
 Received: from localhost (unknown [62.119.166.9])
  (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
  (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 5AEFA214C1;
- Mon,  3 Dec 2018 11:04:04 +0000 (UTC)
+ by mail.kernel.org (Postfix) with ESMTPSA id 1385F214C1;
+ Mon,  3 Dec 2018 11:04:27 +0000 (UTC)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543835046;
- bh=daTBcwl39wwQBXBkFyo+09FTbQLAU7lPNv1bGhpJzpM=;
+ s=default; t=1543835068;
+ bh=ISUevNvxuXR39vwbmgIFrEl8mBYFOosqbxED40nSFJ0=;
  h=Subject:To:Cc:From:Date:From;
- b=fAHhrRdkVL6mCziZza9L4xHx7d6umk4HhjDGeTDtfUKenAjmaZbD47S2Tdb2jtP+c
- VtmVcNUBqRhq3O/8q9V6nqfkDmzYcWYX8Hl/s/cdKhJpb+iDxNkMr/WV59F5N3NVZ7
- ISMn9tnH96qbX3QUw7dDkbQvWgFddY0218/sKeEo=
-Subject: Patch "arm64: function_graph: Simplify with function_graph_enter()"
- has been added to the 4.9-stable tree
-To: catalin.marinas@arm.com, gregkh@linuxfoundation.org,
- linux-arm-kernel@lists.infradead.org, mhiramat@kernel.org, rostedt@goodmis.org,
- stable@kernel.org, will.deacon@arm.com
+ b=vCIHZajFJoi66WF+WT8KzmfLZAckd3kqt/szTB64AN81jzhiSWpHHFUg92zFzriWr
+ dF9OJ4Vp+WnyZtfbk0fETTPjj0B/8J21rXjPnLmPA+hRWveVpJjP1w6ylojYxSqM99
+ 65CBI0vZBo4O3GgwKCDkXBrU1nl4NQA+OhcARYL4=
+Subject: Patch "ARM: function_graph: Simplify with function_graph_enter()" has
+ been added to the 4.9-stable tree
+To: gregkh@linuxfoundation.org, linux-arm-kernel@lists.infradead.org,
+ linux@armlinux.org.uk, mhiramat@kernel.org, rostedt@goodmis.org,
+ stable@kernel.org
 From: <gregkh@linuxfoundation.org>
 Date: Mon, 03 Dec 2018 12:02:22 +0100
-Message-ID: <154383494215123@kroah.com>
+Message-ID: <1543834942253217@kroah.com>
 MIME-Version: 1.0
 X-stable: commit
 X-Patchwork-Hint: ignore 
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_030417_080858_0391780F 
-X-CRM114-Status: GOOD (  12.23  )
+X-CRM114-CacheID: sfid-20181203_030439_266980_917474A9 
+X-CRM114-Status: GOOD (  12.80  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -84,82 +84,85 @@ Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.o
 
 This is a note to let you know that I've just added the patch titled
 
-    arm64: function_graph: Simplify with function_graph_enter()
+    ARM: function_graph: Simplify with function_graph_enter()
 
 to the 4.9-stable tree which can be found at:
     http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
 The filename of the patch is:
-     arm64-function_graph-simplify-with-function_graph_enter.patch
+     arm-function_graph-simplify-with-function_graph_enter.patch
 and it can be found in the queue-4.9 subdirectory.
 
 If you, or anyone else, feels it should not be added to the stable tree,
 please let <stable@vger.kernel.org> know about it.
 
 
-From 01e0ab2c4ff12358f15a856fd1a7bbea0670972b Mon Sep 17 00:00:00 2001
+From f1f5b14afd7cce39e6a9b25c685e1ea34c231096 Mon Sep 17 00:00:00 2001
 From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
-Date: Sun, 18 Nov 2018 17:21:51 -0500
-Subject: arm64: function_graph: Simplify with function_graph_enter()
+Date: Sun, 18 Nov 2018 17:19:26 -0500
+Subject: ARM: function_graph: Simplify with function_graph_enter()
 
 From: Steven Rostedt (VMware) <rostedt@goodmis.org>
 
-commit 01e0ab2c4ff12358f15a856fd1a7bbea0670972b upstream.
+commit f1f5b14afd7cce39e6a9b25c685e1ea34c231096 upstream.
 
 The function_graph_enter() function does the work of calling the function
 graph hook function and the management of the shadow stack, simplifying the
 work done in the architecture dependent prepare_ftrace_return().
 
-Have arm64 use the new code, and remove the shadow stack management as well as
+Have ARM use the new code, and remove the shadow stack management as well as
 having to set up the trace structure.
 
 This is needed to prepare for a fix of a design bug on how the curr_ret_stack
 is used.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
 Cc: linux-arm-kernel@lists.infradead.org
 Cc: stable@kernel.org
 Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
-Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
 Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 
 ---
- arch/arm64/kernel/ftrace.c |   15 +--------------
- 1 file changed, 1 insertion(+), 14 deletions(-)
+ arch/arm/kernel/ftrace.c |   17 +----------------
+ 1 file changed, 1 insertion(+), 16 deletions(-)
 
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -117,8 +117,6 @@ void prepare_ftrace_return(unsigned long
+--- a/arch/arm/kernel/ftrace.c
++++ b/arch/arm/kernel/ftrace.c
+@@ -199,9 +199,7 @@ void prepare_ftrace_return(unsigned long
+ 			   unsigned long frame_pointer)
  {
- 	unsigned long return_hooker = (unsigned long)&return_to_handler;
- 	unsigned long old;
+ 	unsigned long return_hooker = (unsigned long) &return_to_handler;
 -	struct ftrace_graph_ent trace;
+ 	unsigned long old;
 -	int err;
  
  	if (unlikely(atomic_read(&current->tracing_graph_pause)))
  		return;
-@@ -130,18 +128,7 @@ void prepare_ftrace_return(unsigned long
- 	 */
+@@ -209,21 +207,8 @@ void prepare_ftrace_return(unsigned long
  	old = *parent;
+ 	*parent = return_hooker;
  
 -	trace.func = self_addr;
 -	trace.depth = current->curr_ret_stack + 1;
 -
 -	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace))
+-	if (!ftrace_graph_entry(&trace)) {
++	if (function_graph_enter(old, self_addr, frame_pointer, NULL))
+ 		*parent = old;
 -		return;
+-	}
 -
 -	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
 -				       frame_pointer, NULL);
--	if (err == -EBUSY)
+-	if (err == -EBUSY) {
+-		*parent = old;
 -		return;
--	else
-+	if (!function_graph_enter(old, self_addr, frame_pointer, NULL))
- 		*parent = return_hooker;
+-	}
  }
  
+ #ifdef CONFIG_DYNAMIC_FTRACE
 
 
 Patches currently in stable-queue which might be from rostedt@goodmis.org are
