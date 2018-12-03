@@ -2,68 +2,62 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DE61C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:59:17 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DBCF1C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:01:25 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1EAB2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:59:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ACC59214D9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:01:25 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="siXTAORz";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=kernel.org header.i=@kernel.org header.b="WMbXQfgS"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1EAB2145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=linuxfoundation.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="t1bKFO3z"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACC59214D9
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:From:To:
-	Subject:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
-	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
-	List-Owner; bh=vBfgjkM5jSkqK3agoec13xinpEbWOt2YTLfWoYSuTlA=; b=siXTAORzRkzgz2
-	dNXH3UN7FD6QzG8ZLAi/M2jR2nP6VzpEWATQS++9csHIe9Klq+DwsQD2OXZCJvzfHoUqx0+FY68t6
-	bxrABshZ1m19oEb0nfA8qRR2pNI1xLejFpdhFJhk9Mo1vFDiPxW0Sk6xaTyt4IbQvfHwfijj0S2OZ
-	VdrGs58RKdV0qYlglrxX5WX2tKT6gU5hXT0k9SbZnylDGk1L+rp+2mag9rM5/H2FWcT/nhEHUIl9p
-	Ff5urQH45xV+0H11uf8Ez/rezEf6EiG4Bb9A7x00KRu/cCtFjRbGxjgwF28uYcwEQa1zjdUUrroh3
-	Tk101U8zINobO2zAb7Zw==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=ItK4y3HLb3P1me/vcUanq4XV+TiyySA4wzI60EJCohY=; b=t1bKFO3zd3LV9MoiqdY/1rzCD
+	Q6yd67OHrepIXlnXZR2v4AeoGYZjm97nk8YKXKk+Hwpztey1Mv2+5x7LE3bmPu2a0xXkvv956laK0
+	lmdw8Ku24QTf60fu2vS9OIoLQqq12qW/YHpn89lef5j8RhoZeKKEKIS+E6g4Gx4qWIguVNh936nRX
+	f1uw8zXlBiAaPa/cy6zBsNI3GMKNPlTIjXr3DsJ872XKHPgn3dzbeV8fewFFUxfkQUByh+4h08Yj2
+	ceBr6UjUi3L4Xmmh5t1kpyybXfqQ8U5k+pW3mQ3Cd+YFMZczYAUL24EKBaZ/CLMk1G4/+FRNk6NPe
+	EBjzrTwcg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlwZ-0004sv-Eu; Mon, 03 Dec 2018 10:59:15 +0000
-Received: from mail.kernel.org ([198.145.29.99])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlwV-0004ix-MS
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:59:13 +0000
-Received: from localhost (unknown [62.119.166.9])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- by mail.kernel.org (Postfix) with ESMTPSA id 4585820848;
- Mon,  3 Dec 2018 10:58:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=kernel.org;
- s=default; t=1543834741;
- bh=4+cStPaZNm8fgrdhNf9DPwpvo7EBEgMTZ+xMsSUdux4=;
- h=Subject:To:Cc:From:Date:From;
- b=WMbXQfgS/VHJ5+450KP+6jDhLa9uNBcZAdjWb3Wn8z1Licgc7KrWd7DpyzeZedgjf
- WE2lC/Yk+vYnge1hftZGlnP/+zVRQxLmrjyNPfSLOBQ/vnWS+9qHL7Fp1METxWbti+
- AN/vgROVo55o/e22/IZaFgsViwLPwRvaoVtCPG4w=
-Subject: Patch "arm64: function_graph: Simplify with function_graph_enter()"
- has been added to the 4.14-stable tree
-To: catalin.marinas@arm.com, gregkh@linuxfoundation.org,
- linux-arm-kernel@lists.infradead.org, mhiramat@kernel.org, rostedt@goodmis.org,
- stable@kernel.org, will.deacon@arm.com
-From: <gregkh@linuxfoundation.org>
-Date: Mon, 03 Dec 2018 11:58:31 +0100
-Message-ID: <154383471112563@kroah.com>
+	id 1gTlyV-0006Rt-Lf; Mon, 03 Dec 2018 11:01:15 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTlyS-0006R3-Hy
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:01:14 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 5D61C206A1; Mon,  3 Dec 2018 12:01:01 +0100 (CET)
+Received: from localhost (aaubervilliers-681-1-63-158.w90-88.abo.wanadoo.fr
+ [90.88.18.158])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 272DA206FF;
+ Mon,  3 Dec 2018 12:00:51 +0100 (CET)
+Date: Mon, 3 Dec 2018 12:00:51 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Mesih Kilinc <mesihkilinc@gmail.com>
+Subject: Re: [RFC PATCH 04/10] dma-engine: sun4i: Add support for Allwinner
+ suniv F1C100s
+Message-ID: <20181203110051.gp2ajxrmflvlyx7k@flea>
+References: <cover.1543782328.git.mesihkilinc@gmail.com>
+ <df1e5fbb2b04b0e5d392ce988d04a39f1d8e5f8d.1543782328.git.mesihkilinc@gmail.com>
 MIME-Version: 1.0
-X-stable: commit
-X-Patchwork-Hint: ignore 
+In-Reply-To: <df1e5fbb2b04b0e5d392ce988d04a39f1d8e5f8d.1543782328.git.mesihkilinc@gmail.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_025911_762738_C66069E5 
-X-CRM114-Status: GOOD (  12.23  )
+X-CRM114-CacheID: sfid-20181203_030112_865193_EA0374A6 
+X-CRM114-Status: GOOD (  18.16  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -75,113 +69,160 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: stable-commits@vger.kernel.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
+ alsa-devel@alsa-project.org, Vinod Koul <vkoul@kernel.org>,
+ Mark Brown <broonie@kernel.org>, Takashi Iwai <tiwai@suse.com>,
+ linux-kernel@vger.kernel.org, Liam Girdwood <lgirdwood@gmail.com>,
+ linux-sunxi@googlegroups.com, Rob Herring <robh+dt@kernel.org>,
+ dmaengine@vger.kernel.org, Chen-Yu Tsai <wens@csie.org>,
+ Jaroslav Kysela <perex@perex.cz>, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============1588599985605323213=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
 
-This is a note to let you know that I've just added the patch titled
-
-    arm64: function_graph: Simplify with function_graph_enter()
-
-to the 4.14-stable tree which can be found at:
-    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
-
-The filename of the patch is:
-     arm64-function_graph-simplify-with-function_graph_enter.patch
-and it can be found in the queue-4.14 subdirectory.
-
-If you, or anyone else, feels it should not be added to the stable tree,
-please let <stable@vger.kernel.org> know about it.
+--===============1588599985605323213==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="ncgakdes6smr5r7x"
+Content-Disposition: inline
 
 
-From 01e0ab2c4ff12358f15a856fd1a7bbea0670972b Mon Sep 17 00:00:00 2001
-From: "Steven Rostedt (VMware)" <rostedt@goodmis.org>
-Date: Sun, 18 Nov 2018 17:21:51 -0500
-Subject: arm64: function_graph: Simplify with function_graph_enter()
+--ncgakdes6smr5r7x
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
 
-From: Steven Rostedt (VMware) <rostedt@goodmis.org>
+On Mon, Dec 03, 2018 at 12:23:11AM +0300, Mesih Kilinc wrote:
+> DMA of Allwinner suniv F1C100s is similar to sun4i. It has 4 NDMA, 4
+> DDMA channels and endpoints are different. Also F1C100s has reset bit
+> for DMA in CCU. Add support for it.
+>=20
+> Signed-off-by: Mesih Kilinc <mesihkilinc@gmail.com>
+> ---
+>  drivers/dma/Kconfig     |  4 ++--
+>  drivers/dma/sun4i-dma.c | 60 +++++++++++++++++++++++++++++++++++++++++++=
+++++++
+>  2 files changed, 62 insertions(+), 2 deletions(-)
+>=20
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index de511db..f8a65d2 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -163,8 +163,8 @@ config DMA_SA11X0
+> =20
+>  config DMA_SUN4I
+>  	tristate "Allwinner A10 DMA SoCs support"
+> -	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I
+> -	default (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I)
+> +	depends on MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNIV
+> +	default (MACH_SUN4I || MACH_SUN5I || MACH_SUN7I || MACH_SUNIV)
+>  	select DMA_ENGINE
+>  	select DMA_VIRTUAL_CHANNELS
+>  	help
+> diff --git a/drivers/dma/sun4i-dma.c b/drivers/dma/sun4i-dma.c
+> index d267ff9..c0452c9 100644
+> --- a/drivers/dma/sun4i-dma.c
+> +++ b/drivers/dma/sun4i-dma.c
+> @@ -36,7 +36,11 @@
+>  #define SUN4I_DMA_CFG_SRC_ADDR_MODE(mode)	((mode) << 5)
+>  #define SUN4I_DMA_CFG_SRC_DRQ_TYPE(type)	(type)
+> =20
+> +#define SUNIV_DMA_CFG_DST_DATA_WIDTH(width)	((width) << 24)
+> +#define SUNIV_DMA_CFG_SRC_DATA_WIDTH(width)	((width) << 8)
+> +
+>  #define SUN4I_MAX_BURST	8
+> +#define SUNIV_MAX_BURST	4
+> =20
+>  /** Normal DMA register values **/
+> =20
+> @@ -44,6 +48,9 @@
+>  #define SUN4I_NDMA_DRQ_TYPE_SDRAM		0x16
+>  #define SUN4I_NDMA_DRQ_TYPE_LIMIT		(0x1F + 1)
+> =20
+> +#define SUNIV_NDMA_DRQ_TYPE_SDRAM		0x11
+> +#define SUNIV_NDMA_DRQ_TYPE_LIMIT		(0x17 + 1)
 
-commit 01e0ab2c4ff12358f15a856fd1a7bbea0670972b upstream.
+Also, you're not using that define anywhere
 
-The function_graph_enter() function does the work of calling the function
-graph hook function and the management of the shadow stack, simplifying the
-work done in the architecture dependent prepare_ftrace_return().
+> +
+>  /** Normal DMA register layout **/
+> =20
+>  /* Dedicated DMA source/destination address mode values */
+> @@ -57,6 +64,9 @@
+>  #define SUN4I_NDMA_CFG_BYTE_COUNT_MODE_REMAIN	BIT(15)
+>  #define SUN4I_NDMA_CFG_SRC_NON_SECURE		BIT(6)
+> =20
+> +#define SUNIV_NDMA_CFG_CONT_MODE		BIT(29)
+> +#define SUNIV_NDMA_CFG_WAIT_STATE(n)		((n) << 26)
+> +
 
-Have arm64 use the new code, and remove the shadow stack management as well as
-having to set up the trace structure.
+Or those two.
 
-This is needed to prepare for a fix of a design bug on how the curr_ret_stack
-is used.
+>  /** Dedicated DMA register values **/
+> =20
+>  /* Dedicated DMA source/destination address mode values */
+> @@ -69,6 +79,9 @@
+>  #define SUN4I_DDMA_DRQ_TYPE_SDRAM		0x1
+>  #define SUN4I_DDMA_DRQ_TYPE_LIMIT		(0x1F + 1)
+> =20
+> +#define SUNIV_DDMA_DRQ_TYPE_SDRAM		0x1
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: linux-arm-kernel@lists.infradead.org
-Cc: stable@kernel.org
-Fixes: 03274a3ffb449 ("tracing/fgraph: Adjust fgraph depth before calling trace return callback")
-Acked-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
-Signed-off-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
-Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+This is the same value
 
----
- arch/arm64/kernel/ftrace.c |   15 +--------------
- 1 file changed, 1 insertion(+), 14 deletions(-)
+> +#define SUNIV_DDMA_DRQ_TYPE_LIMIT		(0x9 + 1)
+> +
 
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -216,8 +216,6 @@ void prepare_ftrace_return(unsigned long
- {
- 	unsigned long return_hooker = (unsigned long)&return_to_handler;
- 	unsigned long old;
--	struct ftrace_graph_ent trace;
--	int err;
- 
- 	if (unlikely(atomic_read(&current->tracing_graph_pause)))
- 		return;
-@@ -229,18 +227,7 @@ void prepare_ftrace_return(unsigned long
- 	 */
- 	old = *parent;
- 
--	trace.func = self_addr;
--	trace.depth = current->curr_ret_stack + 1;
--
--	/* Only trace if the calling function expects to */
--	if (!ftrace_graph_entry(&trace))
--		return;
--
--	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
--				       frame_pointer, NULL);
--	if (err == -EBUSY)
--		return;
--	else
-+	if (!function_graph_enter(old, self_addr, frame_pointer, NULL))
- 		*parent = return_hooker;
- }
- 
+And this one isn't used
+
+>  /** Dedicated DMA register layout **/
+> =20
+>  /* Dedicated DMA configuration register layout */
+> @@ -122,6 +135,11 @@
+>  #define SUN4I_DMA_NR_MAX_VCHANS						\
+>  	(SUN4I_NDMA_NR_MAX_VCHANS + SUN4I_DDMA_NR_MAX_VCHANS)
+> =20
+> +#define SUNIV_NDMA_NR_MAX_CHANNELS	4
+> +#define SUNIV_DDMA_NR_MAX_CHANNELS	4
+> +#define SUNIV_NDMA_NR_MAX_VCHANS	(24 * 2 - 1)
+> +#define SUNIV_DDMA_NR_MAX_VCHANS	10
+> +
+
+I'm not sure we need those, you can just use the raw value in the
+structure.
+
+Also, how was the number of vchans calculated?
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--ncgakdes6smr5r7x
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAUM4wAKCRDj7w1vZxhR
+xXvaAP4q0IVo0aBkrqfLNgNJsPqTB0H7lp/ABFeB2ABnUXJ0zAEAnXU+pZY9h+L6
+wwNQloZ6VxSY9N62QCnBZ+elsCfZSw8=
+=VKIv
+-----END PGP SIGNATURE-----
+
+--ncgakdes6smr5r7x--
 
 
-Patches currently in stable-queue which might be from rostedt@goodmis.org are
-
-queue-4.14/function_graph-create-function_graph_enter-to-consolidate-architecture-code.patch
-queue-4.14/sh-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/function_graph-move-return-callback-before-update-of-curr_ret_stack.patch
-queue-4.14/function_graph-use-new-curr_ret_depth-to-manage-depth-instead-of-curr_ret_stack.patch
-queue-4.14/sparc-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/parisc-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/x86-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/powerpc-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/function_graph-reverse-the-order-of-pushing-the-ret_stack-and-the-callback.patch
-queue-4.14/arm-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/mips-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/function_graph-make-ftrace_push_return_trace-static.patch
-queue-4.14/arm64-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/s390-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/microblaze-function_graph-simplify-with-function_graph_enter.patch
-queue-4.14/function_graph-have-profiler-use-curr_ret_stack-and-not-depth.patch
+--===============1588599985605323213==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============1588599985605323213==--
+
