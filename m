@@ -2,79 +2,59 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_GIT autolearn=unavailable
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 3CA31C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:18:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 3F3BEC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:19:41 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0F1FF20878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:18:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0F6AE20878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:19:40 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="cVLJBj/A"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F1FF20878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ciLuUJTB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0F6AE20878
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=t0Y0XmYIKFkE7miw8HhxUmG9GIjWpuyqHLtgUI9lVdg=; b=cVLJBj/ATLeWb8
-	rGvjZNjrF4LA5QjtCVCemhHyH7KPC0pbwIjVuerqHBukkTP3BEpCQoaqW0IPKLHQuy+lphnr0wNhF
-	VV9LO8KYfI9F///qp/ZUydUMJqKZtdL85gE9+RcUmsAA67KDROoHz+RpMcAlOyk3qZlPZikfmvLG1
-	6oPUM/qst8mu+6TkB/qtAd14w2Vxym8c/X4iDkC5gvlDLIqfmR05hxBIotT8L0bDrlnTggL0Vo78Q
-	7LhI1whrDHmbmpX6qW/d9BDoQA8me+vlPayvzkOxeNBjltZELU0VUw2kXoDraudt+s6/jCbmvscES
-	rEgtco3t5o6aolhoUqsQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:Message-Id:Date:
+	Subject:To:From:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:
+	References:List-Owner; bh=12+Mo2V7/YHSKL85Ewwssq4PPzmfBkyLP84XawSZRYc=; b=ciL
+	uUJTByz3qkG1zD/NRA+GMN+7Byzyn2KH1mhlW5sOnfcLhEcn267BA9Xwx9KGGisBrWjIotAd8BK3o
+	/FSH7iLGznlhd4o1qUzau5nIVP87iuUj4E9nHDKeDM6ARlSME3x0VXstpkdY83NdHhyMd7FrwDQoQ
+	vzCTzYtZJZo70n7CXDmTggZbtJu3fUAv1pS26p5RmeDhBsVGSpx1YT6xa6Pq8SCitqJ44d93bKbT7
+	hzkQsn+xZvzMh+0R5p7l/KPd35rGBNMMkuSEDQfo3T8UIojJF5vJJGyfTxBbrH1jNLmhgdwLgVrfe
+	bSSnaiw1HZmPUPgvOylEXp+bXK41JPg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTnBe-0007Wp-Ju; Mon, 03 Dec 2018 12:18:54 +0000
-Received: from mail-lj1-f194.google.com ([209.85.208.194])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTnBZ-0007TQ-B7
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:18:52 +0000
-Received: by mail-lj1-f194.google.com with SMTP id t9-v6so11137802ljh.6
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 04:18:39 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=VuiEaW0Oj53yp3q4uxN2C3Fqx50TMkjVvsBbGOjHZUY=;
- b=qJH36OOPvA+8KnXUnn6ZOX6TA93P9hBf/QKGEFe/diremRDjqoEKoRhKHJsYT0j8yi
- jC6cNc+1Z/ysNZF6J+cRVlA959xBdu4JVmpALzaM49rG7v8msc4YVlJBeG+Sjhyf2XTf
- 63Fxc8BqWa3AMUR4qHpIkktCNQZIRmwGYU5rC4vhzgOfqKURVFTGg+BgLlJxG3mW1pxH
- hD+r22EJRnMVRlFnxYBSNYsIi8qwKMzPebBCVyzqyxA3Y66ioq5aWz9OJZBqOfpPCNHp
- z/t3p5pw4L3AXQcL/VdrW99vJCiTbcsI/adxB80mu/wzQVWpbM6zjyY/OG7PbsKjmqno
- JsGw==
-X-Gm-Message-State: AA+aEWaUOk+giEUhG0McxmPgnYTiNUSiR/NfK9GBFq2EYWIEPQ9RCDxh
- oVMNo8B0+4a2x9yG63FenBo=
-X-Google-Smtp-Source: AFSGD/XA0By5ECSehpqZO8rpWGHa5fzid7ZDNrkXSvC063FdQgEuCV198/ybPvKkV2wyFX5cxcZkuQ==
-X-Received: by 2002:a2e:9b52:: with SMTP id
- o18-v6mr9879341ljj.108.1543839517681; 
- Mon, 03 Dec 2018 04:18:37 -0800 (PST)
-Received: from localhost.localdomain ([213.255.186.46])
- by smtp.gmail.com with ESMTPSA id h85-v6sm2478439ljf.68.2018.12.03.04.18.36
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 03 Dec 2018 04:18:37 -0800 (PST)
-Date: Mon, 3 Dec 2018 14:18:24 +0200
-From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-To: mazziesaccount@gmail.com, matti.vaittinen@fi.rohmeurope.com
-Subject: [PATCH v5 2/9] clk: of_clk - add managed provider registrations
-Message-ID: <72d98b6f8deca66d4182c37669ec4421977922b3.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+	id 1gTnCM-0007nt-0E; Mon, 03 Dec 2018 12:19:38 +0000
+Received: from foss.arm.com ([217.140.101.70])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTnCI-0007n5-Ai
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:19:36 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C2438165C;
+ Mon,  3 Dec 2018 04:19:21 -0800 (PST)
+Received: from e111474-lin.manchester.arm.com (e111474-lin.manchester.arm.com
+ [10.32.99.110])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 9B1D53F614;
+ Mon,  3 Dec 2018 04:19:19 -0800 (PST)
+From: Robert Walker <robert.walker@arm.com>
+To: Arnaldo Carvalho de Melo <acme@kernel.org>
+Subject: [PATCH v5 RESEND] perf: Support for Arm A32/T32 instruction sets in
+ CoreSight trace
+Date: Mon,  3 Dec 2018 12:18:46 +0000
+Message-Id: <1543839526-30348-1-git-send-email-robert.walker@arm.com>
+X-Mailer: git-send-email 2.7.4
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_041849_378427_4E0A8A25 
-X-CRM114-Status: GOOD (  19.06  )
+X-CRM114-CacheID: sfid-20181203_041934_380205_96F9854A 
+X-CRM114-Status: GOOD (  21.60  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,180 +66,287 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: david.brown@linaro.org, linux-clk@vger.kernel.org, b.zolnierkie@samsung.com,
- sboyd@kernel.org, linux-kernel@vger.kernel.org, mturquette@baylibre.com,
- rafael.j.wysocki@intel.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
- krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
- djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
- andy.gross@linaro.org, andrew.smirnov@gmail.com, lee.jones@linaro.org,
- sjhuang@iluvatar.ai, linux-arm-kernel@lists.infradead.org
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>,
+ Peter Zijlstra <peterz@infradead.org>, CoreSight@lists.linaro.org,
+ linux-kernel@vger.kernel.org,
+ Alexander Shishkin <alexander.shishkin@linux.intel.com>,
+ Ingo Molnar <mingo@redhat.com>, Namhyung Kim <namhyung@kernel.org>,
+ Robert Walker <robert.walker@arm.com>, Jiri Olsa <jolsa@redhat.com>,
+ linux-arm-kernel@lists.infradead.org
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-With MFD devices the clk properties may be contained in MFD (parent) DT
-node. Current devm_of_clk_add_hw_provider assumes the clk is bound to MFD
-subdevice not to MFD device (parent). Add
-devm_of_clk_add_hw_provider_parent to tackle this issue.
+This patch adds support for generating instruction samples from trace of
+AArch32 programs using the A32 and T32 instruction sets.
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+T32 has variable 2 or 4 byte instruction size, so the conversion between
+addresses and instruction counts requires extra information from the trace
+decoder, requiring version 0.10.0 of OpenCSD.  A check for the OpenCSD
+library version has been added to the feature check for OpenCSD.
+
+Signed-off-by: Robert Walker <robert.walker@arm.com>
 ---
- Documentation/driver-model/devres.txt |  1 +
- drivers/clk/clk.c                     | 65 ++++++++++++++++++++++++++++++-----
- include/linux/clk-provider.h          | 11 ++++++
- 3 files changed, 68 insertions(+), 9 deletions(-)
 
-diff --git a/Documentation/driver-model/devres.txt b/Documentation/driver-model/devres.txt
-index dbf14326243b..97c9c575b2af 100644
---- a/Documentation/driver-model/devres.txt
-+++ b/Documentation/driver-model/devres.txt
-@@ -238,6 +238,7 @@ CLOCK
-   devm_clk_put()
-   devm_clk_hw_register()
-   devm_of_clk_add_hw_provider()
-+  devm_of_clk_add_parent_hw_provider()
-   devm_clk_hw_register_clkdev()
+Hi Arnaldo,
+
+Please add this patch to the queue for 4.21 (originally sent as https://lkml.org/lkml/2018/11/9/965)
+
+Mathieu has reviewed it: https://lkml.org/lkml/2018/11/9/1432
+
+Thanks
+
+Robert Walker
+
+
+Changes since v4:
+ Formatting of comment block
+
+ tools/build/feature/test-libopencsd.c           |  8 +++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.c | 29 ++++++++++
+ tools/perf/util/cs-etm-decoder/cs-etm-decoder.h | 10 ++++
+ tools/perf/util/cs-etm.c                        | 70 +++++++++++--------------
+ 4 files changed, 78 insertions(+), 39 deletions(-)
+
+diff --git a/tools/build/feature/test-libopencsd.c b/tools/build/feature/test-libopencsd.c
+index 5ff1246..d68eb4f 100644
+--- a/tools/build/feature/test-libopencsd.c
++++ b/tools/build/feature/test-libopencsd.c
+@@ -1,6 +1,14 @@
+ // SPDX-License-Identifier: GPL-2.0
+ #include <opencsd/c_api/opencsd_c_api.h>
  
- DMA
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index af011974d4ec..30beb60bd8f9 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -3893,12 +3893,12 @@ static void devm_of_clk_release_provider(struct device *dev, void *res)
- 	of_clk_del_provider(*(struct device_node **)res);
- }
- 
--int devm_of_clk_add_hw_provider(struct device *dev,
-+static int __devm_of_clk_add_hw_provider(struct device *dev,
- 			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
- 					      void *data),
--			void *data)
-+			struct device_node *of_node, void *data)
++/*
++ * Check OpenCSD library version is sufficient to provide required features
++ */
++#define OCSD_MIN_VER ((0 << 16) | (10 << 8) | (0))
++#if !defined(OCSD_VER_NUM) || (OCSD_VER_NUM < OCSD_MIN_VER)
++#error "OpenCSD >= 0.10.0 is required"
++#endif
++
+ int main(void)
  {
--	struct device_node **ptr, *np;
-+	struct device_node **ptr;
- 	int ret;
+ 	(void)ocsd_get_version();
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+index 938def6..5efb616 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.c
+@@ -263,9 +263,12 @@ static void cs_etm_decoder__clear_buffer(struct cs_etm_decoder *decoder)
+ 	decoder->tail = 0;
+ 	decoder->packet_count = 0;
+ 	for (i = 0; i < MAX_BUFFER; i++) {
++		decoder->packet_buffer[i].isa = CS_ETM_ISA_UNKNOWN;
+ 		decoder->packet_buffer[i].start_addr = CS_ETM_INVAL_ADDR;
+ 		decoder->packet_buffer[i].end_addr = CS_ETM_INVAL_ADDR;
++		decoder->packet_buffer[i].instr_count = 0;
+ 		decoder->packet_buffer[i].last_instr_taken_branch = false;
++		decoder->packet_buffer[i].last_instr_size = 0;
+ 		decoder->packet_buffer[i].exc = false;
+ 		decoder->packet_buffer[i].exc_ret = false;
+ 		decoder->packet_buffer[i].cpu = INT_MIN;
+@@ -294,11 +297,15 @@ cs_etm_decoder__buffer_packet(struct cs_etm_decoder *decoder,
+ 	decoder->packet_count++;
  
- 	ptr = devres_alloc(devm_of_clk_release_provider, sizeof(*ptr),
-@@ -3906,19 +3906,62 @@ int devm_of_clk_add_hw_provider(struct device *dev,
- 	if (!ptr)
- 		return -ENOMEM;
+ 	decoder->packet_buffer[et].sample_type = sample_type;
++	decoder->packet_buffer[et].isa = CS_ETM_ISA_UNKNOWN;
+ 	decoder->packet_buffer[et].exc = false;
+ 	decoder->packet_buffer[et].exc_ret = false;
+ 	decoder->packet_buffer[et].cpu = *((int *)inode->priv);
+ 	decoder->packet_buffer[et].start_addr = CS_ETM_INVAL_ADDR;
+ 	decoder->packet_buffer[et].end_addr = CS_ETM_INVAL_ADDR;
++	decoder->packet_buffer[et].instr_count = 0;
++	decoder->packet_buffer[et].last_instr_taken_branch = false;
++	decoder->packet_buffer[et].last_instr_size = 0;
  
--	np = dev->of_node;
--	ret = of_clk_add_hw_provider(np, get, data);
--	if (!ret) {
--		*ptr = np;
-+	*ptr = of_node;
-+	ret = of_clk_add_hw_provider(of_node, get, data);
-+	if (!ret)
- 		devres_add(dev, ptr);
--	} else {
-+	else
- 		devres_free(ptr);
--	}
+ 	if (decoder->packet_count == MAX_BUFFER - 1)
+ 		return OCSD_RESP_WAIT;
+@@ -321,8 +328,28 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
  
+ 	packet = &decoder->packet_buffer[decoder->tail];
+ 
++	switch (elem->isa) {
++	case ocsd_isa_aarch64:
++		packet->isa = CS_ETM_ISA_A64;
++		break;
++	case ocsd_isa_arm:
++		packet->isa = CS_ETM_ISA_A32;
++		break;
++	case ocsd_isa_thumb2:
++		packet->isa = CS_ETM_ISA_T32;
++		break;
++	case ocsd_isa_tee:
++	case ocsd_isa_jazelle:
++	case ocsd_isa_custom:
++	case ocsd_isa_unknown:
++	default:
++		packet->isa = CS_ETM_ISA_UNKNOWN;
++	}
++
+ 	packet->start_addr = elem->st_addr;
+ 	packet->end_addr = elem->en_addr;
++	packet->instr_count = elem->num_instr_range;
++
+ 	switch (elem->last_i_type) {
+ 	case OCSD_INSTR_BR:
+ 	case OCSD_INSTR_BR_INDIRECT:
+@@ -336,6 +363,8 @@ cs_etm_decoder__buffer_range(struct cs_etm_decoder *decoder,
+ 		break;
+ 	}
+ 
++	packet->last_instr_size = elem->last_instr_sz;
++
  	return ret;
  }
-+
-+/**
-+ * devm_of_clk_add_hw_provider() - Managed clk provider node registration
-+ * @dev: Device acting as the clock provider. Used for DT node and lifetime.
-+ * @get: callback for decoding clk_hw
-+ * @data: context pointer for @get callback.
-+ *
-+ * Returns 0 on success or an errno on failure.
-+ *
-+ * Registers clock provider for given device's node. Provider is automatically
-+ * released at device exit.
-+ */
-+int devm_of_clk_add_hw_provider(struct device *dev,
-+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+					      void *data),
-+			void *data)
-+{
-+	return __devm_of_clk_add_hw_provider(dev, get, dev->of_node, data);
-+}
- EXPORT_SYMBOL_GPL(devm_of_clk_add_hw_provider);
  
-+/**
-+ * devm_of_clk_add_parent_hw_provider() - Managed clk provider node registration
-+ * @dev: Device acting as the clock provider. Provider's DT node is parent node.
-+ * @get: callback for decoding clk_hw
-+ * @data: context pointer for @get callback.
-+ *
-+ * Returns 0 on success or an errno on failure.
-+ *
-+ * Registers clock provider for given device's parent node. Usable in cases
-+ * where it really is the parent node that contains the provider information.
-+ * Typical use-cases are MFD devices where the MFD sub-device is handling
-+ * actual clock HW but the MFD node (parent) is containing the clock
-+ * information.
-+ *
-+ * Provider is automatically released at device exit.
-+ */
-+int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+					      void *data),
-+			void *data)
-+{
-+	return __devm_of_clk_add_hw_provider(dev, get, dev->parent->of_node,
-+					     data);
-+}
-+EXPORT_SYMBOL_GPL(devm_of_clk_add_parent_hw_provider);
+diff --git a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+index 612b575..9351bd1 100644
+--- a/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
++++ b/tools/perf/util/cs-etm-decoder/cs-etm-decoder.h
+@@ -28,11 +28,21 @@ enum cs_etm_sample_type {
+ 	CS_ETM_TRACE_ON = 1 << 1,
+ };
+ 
++enum cs_etm_isa {
++	CS_ETM_ISA_UNKNOWN,
++	CS_ETM_ISA_A64,
++	CS_ETM_ISA_A32,
++	CS_ETM_ISA_T32,
++};
 +
- /**
-  * of_clk_del_provider() - Remove a previously registered clock provider
-  * @np: Device node pointer associated with clock provider
-@@ -3950,6 +3993,10 @@ static int devm_clk_provider_match(struct device *dev, void *res, void *data)
- 	return *np == data;
+ struct cs_etm_packet {
+ 	enum cs_etm_sample_type sample_type;
++	enum cs_etm_isa isa;
+ 	u64 start_addr;
+ 	u64 end_addr;
++	u32 instr_count;
+ 	u8 last_instr_taken_branch;
++	u8 last_instr_size;
+ 	u8 exc;
+ 	u8 exc_ret;
+ 	int cpu;
+diff --git a/tools/perf/util/cs-etm.c b/tools/perf/util/cs-etm.c
+index 73430b7..48ad217 100644
+--- a/tools/perf/util/cs-etm.c
++++ b/tools/perf/util/cs-etm.c
+@@ -31,14 +31,6 @@
+ 
+ #define MAX_TIMESTAMP (~0ULL)
+ 
+-/*
+- * A64 instructions are always 4 bytes
+- *
+- * Only A64 is supported, so can use this constant for converting between
+- * addresses and instruction counts, calculting offsets etc
+- */
+-#define A64_INSTR_SIZE 4
+-
+ struct cs_etm_auxtrace {
+ 	struct auxtrace auxtrace;
+ 	struct auxtrace_queues queues;
+@@ -510,21 +502,17 @@ static inline void cs_etm__reset_last_branch_rb(struct cs_etm_queue *etmq)
+ 	etmq->last_branch_rb->nr = 0;
  }
  
-+/**
-+ * devm_of_clk_del_provider() - Remove clock provider registered using devm
-+ * @dev: Device to whose lifetime the clock provider was bound
-+ */
- void devm_of_clk_del_provider(struct device *dev)
+-static inline u64 cs_etm__last_executed_instr(struct cs_etm_packet *packet)
+-{
+-	/* Returns 0 for the CS_ETM_TRACE_ON packet */
+-	if (packet->sample_type == CS_ETM_TRACE_ON)
+-		return 0;
++static inline int cs_etm__t32_instr_size(struct cs_etm_queue *etmq,
++					 u64 addr) {
++	u8 instrBytes[2];
+ 
++	cs_etm__mem_access(etmq, addr, ARRAY_SIZE(instrBytes), instrBytes);
+ 	/*
+-	 * The packet records the execution range with an exclusive end address
+-	 *
+-	 * A64 instructions are constant size, so the last executed
+-	 * instruction is A64_INSTR_SIZE before the end address
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
++	 * T32 instruction size is indicated by bits[15:11] of the first
++	 * 16-bit word of the instruction: 0b11101, 0b11110 and 0b11111
++	 * denote a 32-bit instruction.
+ 	 */
+-	return packet->end_addr - A64_INSTR_SIZE;
++	return ((instrBytes[1] & 0xF8) >= 0xE8) ? 4 : 2;
+ }
+ 
+ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+@@ -536,27 +524,32 @@ static inline u64 cs_etm__first_executed_instr(struct cs_etm_packet *packet)
+ 	return packet->start_addr;
+ }
+ 
+-static inline u64 cs_etm__instr_count(const struct cs_etm_packet *packet)
++static inline
++u64 cs_etm__last_executed_instr(const struct cs_etm_packet *packet)
  {
+-	/*
+-	 * Only A64 instructions are currently supported, so can get
+-	 * instruction count by dividing.
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
+-	 */
+-	return (packet->end_addr - packet->start_addr) / A64_INSTR_SIZE;
++	/* Returns 0 for the CS_ETM_TRACE_ON packet */
++	if (packet->sample_type == CS_ETM_TRACE_ON)
++		return 0;
++
++	return packet->end_addr - packet->last_instr_size;
+ }
+ 
+-static inline u64 cs_etm__instr_addr(const struct cs_etm_packet *packet,
++static inline u64 cs_etm__instr_addr(struct cs_etm_queue *etmq,
++				     const struct cs_etm_packet *packet,
+ 				     u64 offset)
+ {
+-	/*
+-	 * Only A64 instructions are currently supported, so can get
+-	 * instruction address by muliplying.
+-	 * Will need to do instruction level decode for T32 instructions as
+-	 * they can be variable size (not yet supported).
+-	 */
+-	return packet->start_addr + offset * A64_INSTR_SIZE;
++	if (packet->isa == CS_ETM_ISA_T32) {
++		u64 addr = packet->start_addr;
++
++		while (offset > 0) {
++			addr += cs_etm__t32_instr_size(etmq, addr);
++			offset--;
++		}
++		return addr;
++	}
++
++	/* Assume a 4 byte instruction size (A32/A64) */
++	return packet->start_addr + offset * 4;
+ }
+ 
+ static void cs_etm__update_last_branch_rb(struct cs_etm_queue *etmq)
+@@ -888,9 +881,8 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 	struct cs_etm_auxtrace *etm = etmq->etm;
+ 	struct cs_etm_packet *tmp;
  	int ret;
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 60c51871b04b..a6663f084cf1 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -916,6 +916,10 @@ int devm_of_clk_add_hw_provider(struct device *dev,
- 			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
- 						 void *data),
- 			   void *data);
-+int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data);
- void of_clk_del_provider(struct device_node *np);
- void devm_of_clk_del_provider(struct device *dev);
- struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
-@@ -953,6 +957,13 @@ static inline int devm_of_clk_add_hw_provider(struct device *dev,
- {
- 	return 0;
- }
-+static inline int devm_of_clk_add_parent_hw_provider(struct device *dev,
-+			   struct clk_hw *(*get)(struct of_phandle_args *clkspec,
-+						 void *data),
-+			   void *data)
-+{
-+	return 0;
-+}
- static inline void of_clk_del_provider(struct device_node *np) {}
- static inline void devm_of_clk_del_provider(struct device *dev) {}
- static inline struct clk *of_clk_src_simple_get(
+-	u64 instrs_executed;
++	u64 instrs_executed = etmq->packet->instr_count;
+ 
+-	instrs_executed = cs_etm__instr_count(etmq->packet);
+ 	etmq->period_instructions += instrs_executed;
+ 
+ 	/*
+@@ -920,7 +912,7 @@ static int cs_etm__sample(struct cs_etm_queue *etmq)
+ 		 * executed, but PC has not advanced to next instruction)
+ 		 */
+ 		u64 offset = (instrs_executed - instrs_over - 1);
+-		u64 addr = cs_etm__instr_addr(etmq->packet, offset);
++		u64 addr = cs_etm__instr_addr(etmq, etmq->packet, offset);
+ 
+ 		ret = cs_etm__synth_instruction_sample(
+ 			etmq, addr, etm->instructions_sample_period);
 -- 
-2.14.3
+2.7.4
 
-
--- 
-Matti Vaittinen
-ROHM Semiconductors
-
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
 
 _______________________________________________
 linux-arm-kernel mailing list
