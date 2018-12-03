@@ -7,17 +7,17 @@ X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 06B20C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 20:04:30 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B4928C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 20:06:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CABF420848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 20:04:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 83B572087F
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 20:06:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gcXIUD2X";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="S9RmZEpB"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CABF420848
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="pGjix9LF";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="fFEnIRfi"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 83B572087F
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,58 +26,58 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
 	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=keo+sT2fbZMqFTwhipDuYnKGDfIYFuPx4NON+7UkVYI=; b=gcXIUD2X55mQlC
-	uTTEZJ/2WgTe0VLSCawa55ir73ZePuTIp1F8MeUmUl6PO0BryyR19Xa1kPUh9obA+y3JvxFwwuvkK
-	fhSvZDLyFV/JAvQnwl5YzldIKWPRdYfC9C1klGywiAMwnjfaJurVBbQ3wGDBHlrvidv3eGdkXdmee
-	4nEO02Z3maXu7+ATeJ0xADkb+jwDEfH9tLTfFdZ/76qn6PyO2V02q5YSZZQMdWidZMiOsmqO5xT6k
-	BZ2aBHoRcNVuzMAQ9zTMhIoGSnoOMePP7c656CPknifNLBM4ZVGZdnbKGmYh9PW9+bXDcJubHfoIM
-	23lUHWZTPkB341ABIaIA==;
+	List-Owner; bh=5Gj9I4u0My2WAU5WRQHa2Kc6qHYbKTfWTY5xTpsoKfY=; b=pGjix9LF3GM5Bi
+	xf7KJiQYPhl1IBiZEiAepGNGCnh8NJjR4B4kckixnEL32YH/mBLARB2P/BcQuFjIBbIiuZ3teKJJI
+	nII5sdmcdDOod1zoYDIdzw9NX67kkcapLrpwWJmT1n6wnxMmfFFGOh/7Ad/MNAnnhVozKndGlO5ZK
+	lEE/lgOfpI2RH4bu2CPy03LJo/dsORPA7mv13DMxNSr43qnBmdQBObdBq7z6Tk6xlGmiEBOKLuNua
+	z3eaRRTeW7DIMAGgFoh4CCrVcNxD8gGgrOfjd02i8KknvX6bpnrXvGgOgrN4viLnE0ztdBDHcJs2w
+	/mB1UaJIAdsvcbcTztfg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTuSA-0007XD-Vl; Mon, 03 Dec 2018 20:04:26 +0000
-Received: from mail-vk1-xa43.google.com ([2607:f8b0:4864:20::a43])
+	id 1gTuTy-0000e7-IQ; Mon, 03 Dec 2018 20:06:18 +0000
+Received: from mail-it1-x144.google.com ([2607:f8b0:4864:20::144])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTuS7-0007WM-JB
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 20:04:25 +0000
-Received: by mail-vk1-xa43.google.com with SMTP id j23so3213933vke.13
+ id 1gTuTv-0000dK-IM
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 20:06:17 +0000
+Received: by mail-it1-x144.google.com with SMTP id c9so10631891itj.1
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 12:04:12 -0800 (PST)
+ Mon, 03 Dec 2018 12:06:05 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
  h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=bf+z+8qehLYtJhnusBsqq29RivmbzznY8dlUEsV+e1I=;
- b=S9RmZEpBZosF5Ig8wF96BidnqcdsnIYuovzaRdhHxyRph1huFrZEa1TLi5Tyr+pyUY
- n2hI/0rGQlKRABTh3iviTjxzeUdh9CrBQKsmCrmwnaulJlaBLj5Ze2JcOS0HxG0f4KYf
- LdjQEvr5i3CLXc4Deq1zvigks0gdz4/qrk4rQ=
+ :cc; bh=8MuAW2wYrnSpr7RW3J4Vo9qLQIWIcepPDrYMFFF3sQE=;
+ b=fFEnIRfi5YkkUkRBdjsNHxmhjdmo/ziDwlwkW8gdHQ5BnL/jEfgjopJA69y9tFYUks
+ 0QboPyY9AKTOZchijzuIUaAvsvuqxWJRceNNVHUjq9onh5WDpD1G3YXYXGI45yGMZoWq
+ 83sDUN5++w5osGDuu8Vs8+VwvhjFcWGfUZoXQ=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:mime-version:references:in-reply-to:from:date
  :message-id:subject:to:cc;
- bh=bf+z+8qehLYtJhnusBsqq29RivmbzznY8dlUEsV+e1I=;
- b=ehgLhBgR55O469OGufBEu0k12Pd2NKCJnWTEleCWp0U2hMrzz+OFgop2YWY87s6xmN
- ge/0o5WD6R4cFZVhRxy4j7vin+DNZZOSVSqo8BIE3g9W5M25t9L6v7dSo6ueOe9BRaHU
- JzaffWrajm3iFIYOwBZNWiNHYIq+denlLASd9sn6+/nUhqJynMxJFiVdSbTakz5ldCRh
- 6INQJiV4TyK1ks9Bgl/VUHOjmacxWIfEdoL4sBbiP6c0hgYXL/qgPdtjriciiHk0ADV/
- ZKT8tFL0N0qc6AD4SdqdS+DQDAQ3ykVzGKudwZlbbxEpLE4QkyeWpOp+PeaHi8gZzddn
- ko2g==
-X-Gm-Message-State: AA+aEWarSbQTYDmPWzVlXqF1cezGgs9Y4s8pbBVjbNoADHHcBHzgu39/
- r8aWxAup72HjiqoLhodu55RB1eygMfo2692vsQoEjQ==
-X-Google-Smtp-Source: AFSGD/VqsMkoS+d5KW1fgwCS8gkZHXWUtSkJ5Da40hElfzok71B0w/4SY57HcnD1KOdvGlQ46K5Kt6A1p5Oc58QhIf4=
-X-Received: by 2002:a1f:1881:: with SMTP id 123mr7504408vky.40.1543867451014; 
- Mon, 03 Dec 2018 12:04:11 -0800 (PST)
+ bh=8MuAW2wYrnSpr7RW3J4Vo9qLQIWIcepPDrYMFFF3sQE=;
+ b=Wxju+wyW2IDJ7SfQuDic6wjSbui5qXzAs9IV+KQjBSrwfn1/zLpX8xhOMshlICoehI
+ 7csgS0/Joq+WyFrghMhtuO7Y9q3KXbHTmI1AjiKzRlL/uZ64UMsIp4UduQnz4Dae7eBF
+ a5IJmc7ZRFwHAE02KcZXRUQ/zdx2UaH+Ul4DdYZkawH9j1DsPIVUoNlmhSXxX/K654Kq
+ kO4jpTu6N4rA2bzJvwIsqDReSOVInWCt5JxCfGfu6roFrmzfnRIE+T1LOPwsumcdxpMT
+ 40VQDa0T14K5M+BqKQ7pjykKCrC6fgaP6JvAuJari3t7b7TTn6922bgU38l+tIa76rV0
+ +uMg==
+X-Gm-Message-State: AA+aEWaDUFB7sK1/6yphuNdWrX457UykZ/CE5j/rOdwcc/ynwcSVwTnF
+ 9dP7Hu7W1F/Uo/qrQ87fvMrpHQ98hfUWAMomNRSzNVki
+X-Google-Smtp-Source: AFSGD/U3eP5kEDjeM63Sy5qrNlPN3brESbbrjxREIvocXgzQIodgkzbBN6rh2qGFx1TaJu3pwRIqO64bVGhP2DMI2+Q=
+X-Received: by 2002:a05:660c:4b:: with SMTP id
+ p11mr9465968itk.71.1543867564341; 
+ Mon, 03 Dec 2018 12:06:04 -0800 (PST)
 MIME-Version: 1.0
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-19-ulf.hansson@linaro.org>
- <20181203163717.GN18262@codeaurora.org>
-In-Reply-To: <20181203163717.GN18262@codeaurora.org>
-From: Ulf Hansson <ulf.hansson@linaro.org>
-Date: Mon, 3 Dec 2018 21:03:34 +0100
-Message-ID: <CAPDyKFq1EQcwDqf737=t5OyhiTQ_RNyxO8rUaVShYPiN8ow3yw@mail.gmail.com>
-Subject: Re: [PATCH v10 18/27] drivers: firmware: psci: Add support for PM
- domains using genpd
-To: Lina Iyer <ilina@codeaurora.org>
+References: <20181128010901.1052-1-liuyun01@kylinos.cn>
+ <20181203192310.GG29028@arm.com>
+In-Reply-To: <20181203192310.GG29028@arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Mon, 3 Dec 2018 21:05:52 +0100
+Message-ID: <CAKv+Gu_CwVt_-HDvaV+VBaFzA+u3RqBKhd9c7tOkGQxC8pZMjQ@mail.gmail.com>
+Subject: Re: [PATCH v5 1/2] arm64/neon: add workaround for ambiguous C99
+ stdint.h types
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_120423_638990_67510A97 
-X-CRM114-Status: GOOD (  26.93  )
+X-CRM114-CacheID: sfid-20181203_120615_609822_00F6C00A 
+X-CRM114-Status: GOOD (  28.46  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,177 +89,88 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>,
- Linux PM <linux-pm@vger.kernel.org>, Stephen Boyd <sboyd@kernel.org>,
- Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm <linux-arm-msm@vger.kernel.org>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J. Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
- Tony Lindgren <tony@atomide.com>, Sudeep Holla <sudeep.holla@arm.com>,
- "Raju P.L.S.S.S.N" <rplsssn@codeaurora.org>,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: linux-block@vger.kernel.org, Catalin Marinas <catalin.marinas@arm.com>,
+ liuyun01 <liuyun01@kylinos.cn>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, 3 Dec 2018 at 17:37, Lina Iyer <ilina@codeaurora.org> wrote:
+On Mon, 3 Dec 2018 at 20:22, Will Deacon <will.deacon@arm.com> wrote:
 >
-> On Thu, Nov 29 2018 at 10:49 -0700, Ulf Hansson wrote:
-> >When the hierarchical CPU topology layout is used in DT, we need to setup
-> >the corresponding PM domain data structures, as to allow a CPU and a group
-> >of CPUs to be power managed accordingly. Let's enable this by deploying
-> >support through the genpd interface.
+> On Wed, Nov 28, 2018 at 09:09:00AM +0800, Jackie Liu wrote:
+> > In a way similar to ARM commit 09096f6a0ee2 ("ARM: 7822/1: add workaround
+> > for ambiguous C99 stdint.h types"), this patch redefines the macros that
+> > are used in stdint.h so its definitions of uint64_t and int64_t are
+> > compatible with those of the kernel.
 > >
-> >Additionally, when the OS initiated mode is supported by the PSCI FW, let's
-> >also parse the domain idle states DT bindings as to make genpd responsible
-> >for the state selection, when the states are compatible with
-> >"domain-idle-state". Otherwise, when only Platform Coordinated mode is
-> >supported, we rely solely on the state selection to be managed through the
-> >regular cpuidle framework.
+> > This patch comes from: https://patchwork.kernel.org/patch/3540001/
+> > Wrote by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > >
-> >If the initialization of the PM domain data structures succeeds and the OS
-> >initiated mode is supported, we try to switch to it. In case it fails,
-> >let's fall back into a degraded mode, rather than bailing out and returning
-> >an error code.
+> > We mark this file as a private file and don't have to override asm/types.h
 > >
-> >Due to that the OS initiated mode may become enabled, we need to adjust to
-> >maintain backwards compatibility for a kernel started through a kexec call.
-> >Do this by explicitly switch to Platform Coordinated mode during boot.
+> > Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
+> > ---
+> >  arch/arm64/include/asm/neon-intrinsics.h | 34 ++++++++++++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 arch/arm64/include/asm/neon-intrinsics.h
 > >
-> >To try to initiate the PM domain data structures, the PSCI driver shall
-> >call the new function, psci_dt_init_pm_domains(). However, this is done
-> >from following changes.
-> >
-> >Cc: Lina Iyer <ilina@codeaurora.org>
-> >Co-developed-by: Lina Iyer <lina.iyer@linaro.org>
-> >Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >---
-> >
-> >Changes in V10:
-> >       - Enable the PM domains to be used for both PC and OSI mode.
-> >       - Fixup error paths.
-> >       - Move the management of kexec started kernels into this patch.
-> >       - Rewrite changelog.
-> >
-> >---
-> > drivers/firmware/psci/Makefile         |   2 +-
-> > drivers/firmware/psci/psci.c           |   7 +-
-> > drivers/firmware/psci/psci.h           |   6 +
-> > drivers/firmware/psci/psci_pm_domain.c | 262 +++++++++++++++++++++++++
-> > 4 files changed, 275 insertions(+), 2 deletions(-)
-> > create mode 100644 drivers/firmware/psci/psci_pm_domain.c
-> >
-> >diff --git a/drivers/firmware/psci/Makefile b/drivers/firmware/psci/Makefile
-> >index 1956b882470f..ff300f1fec86 100644
-> >--- a/drivers/firmware/psci/Makefile
-> >+++ b/drivers/firmware/psci/Makefile
-> >@@ -1,4 +1,4 @@
-> > # SPDX-License-Identifier: GPL-2.0
-> > #
-> >-obj-$(CONFIG_ARM_PSCI_FW)     += psci.o
-> >+obj-$(CONFIG_ARM_PSCI_FW)     += psci.o psci_pm_domain.o
-> > obj-$(CONFIG_ARM_PSCI_CHECKER)        += psci_checker.o
-> >diff --git a/drivers/firmware/psci/psci.c b/drivers/firmware/psci/psci.c
-> >index 623591b541a4..19af2093151b 100644
-> >--- a/drivers/firmware/psci/psci.c
-> >+++ b/drivers/firmware/psci/psci.c
-> >@@ -704,9 +704,14 @@ static int __init psci_1_0_init(struct device_node *np)
-> >       if (err)
-> >               return err;
-> >
-> >-      if (psci_has_osi_support())
-> >+      if (psci_has_osi_support()) {
-> >               pr_info("OSI mode supported.\n");
-> >
-> >+              /* Make sure we default to PC mode. */
-> >+              invoke_psci_fn(PSCI_1_0_FN_SET_SUSPEND_MODE,
-> >+                             PSCI_1_0_SUSPEND_MODE_PC, 0, 0);
-> >+      }
-> >+
-> >       return 0;
-> > }
-> >
-> >diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
-> >index 7d9d38fd57e1..8cf6d7206fab 100644
-> >--- a/drivers/firmware/psci/psci.h
-> >+++ b/drivers/firmware/psci/psci.h
-> >@@ -11,4 +11,10 @@ void psci_set_domain_state(u32 state);
-> > bool psci_has_osi_support(void);
-> > int psci_dt_parse_state_node(struct device_node *np, u32 *state);
-> >
-> >+#ifdef CONFIG_CPU_IDLE
-> >+int psci_dt_init_pm_domains(struct device_node *np);
-> >+#else
-> >+static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
-> >+#endif
-> >+
-> > #endif /* __PSCI_H */
-> >diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
-> >new file mode 100644
-> >index 000000000000..d0dc38e96f85
-> >--- /dev/null
-> >+++ b/drivers/firmware/psci/psci_pm_domain.c
-> >@@ -0,0 +1,262 @@
-> >+// SPDX-License-Identifier: GPL-2.0
-> >+/*
-> >+ * PM domains for CPUs via genpd - managed by PSCI.
-> >+ *
-> >+ * Copyright (C) 2018 Linaro Ltd.
-> >+ * Author: Ulf Hansson <ulf.hansson@linaro.org>
-> >+ *
-> >+ */
-> >+
-> >+#define pr_fmt(fmt) "psci: " fmt
-> >+
-> >+#include <linux/device.h>
-> >+#include <linux/kernel.h>
-> >+#include <linux/pm_domain.h>
-> >+#include <linux/slab.h>
-> >+#include <linux/string.h>
-> >+
-> >+#include "psci.h"
-> >+
-> >+#ifdef CONFIG_CPU_IDLE
-> >+
-> >+struct psci_pd_provider {
-> >+      struct list_head link;
-> >+      struct device_node *node;
-> >+};
-> >+
-> >+static LIST_HEAD(psci_pd_providers);
-> >+static bool osi_mode_enabled;
-> >+
-> >+static int psci_pd_power_off(struct generic_pm_domain *pd)
-> >+{
-> >+      struct genpd_power_state *state = &pd->states[pd->state_idx];
-> >+      u32 *pd_state;
-> >+      u32 composite_pd_state;
-> >+
-> >+      /* If we have failed to enable OSI mode, then abort power off. */
-> >+      if (psci_has_osi_support() && !osi_mode_enabled)
-> >+              return -EBUSY;
-> >+
-> >+      if (!state->data)
-> >+              return 0;
-> >+
-> >+      /* When OSI mode is enabled, set the corresponding domain state. */
-> >+      pd_state = state->data;
-> >+      composite_pd_state = *pd_state | psci_get_domain_state();
-> This should not be needed. The domain_state should be 0x0 being set
-> after coming out of idle.
-> >+      psci_set_domain_state(composite_pd_state);
-> The three lines can be summarized as:
->         psci_set_domain_state(*state->data);
+> > diff --git a/arch/arm64/include/asm/neon-intrinsics.h b/arch/arm64/include/asm/neon-intrinsics.h
+> > new file mode 100644
+> > index 0000000..e378766
+> > --- /dev/null
+> > +++ b/arch/arm64/include/asm/neon-intrinsics.h
+> > @@ -0,0 +1,34 @@
+> > +#ifndef _NEON_INTRINSICS_H
+> > +#define _NEON_INTRINSICS_H
+>
+> We tend to name these with an __ASM_ prefix, so it should be:
+>
+> #ifndef __ASM_NEON_INTRINSICS_H
+>
+> That said, I notice that the commit you refer to for arch/arm/ actually
+> places this stuff under uapi/. Is that needed?
+>
 
-Sure, let me change accordingly and thanks for spotting this!
+No, it doesn't. It creates asm/types.h which has been moved into uap/
+at a later date (which I guess means we're stuck with it). In
+hindsight, it would have been better for ARM to create a neon
+instrinsics header file such as this one, since the override is only
+needed when you include <arm_neon.h>.
 
-Kind regards
-Uffe
+> > +#include <asm-generic/int-ll64.h>
+> > +
+> > +/*
+> > + * For Aarch64, there is some ambiguity in the definition of the types below
+> > + * between the kernel and GCC itself. This is usually not a big deal, but it
+> > + * causes trouble when including GCC's version of 'stdint.h' (this is the file
+> > + * that gets included when you #include <stdint.h> on a -ffreestanding build).
+> > + * As this file also gets included implicitly when including 'arm_neon.h' (the
+> > + * NEON intrinsics support header), we need the following to work around the
+> > + * issue if we want to use NEON intrinsics in the kernel.
+> > + */
+>
+> Could you elaborate on what the ambiguities / conflicts in the types are
+> please? I think you can also remove the sentence about directly including
+> stdint on a freestanding build, since it doesn't seem relevant to the
+> kernel afaict (we only pull it in via arm_neon.h).
+>
+
+In the kernel, u64/s64 are [un]signed long long, not [un]signed long.
+So by redefining these macros to the former, we can force gcc-stdint.h
+to define uint64_t / in64_t in a compatible manner.
+
+> > +
+> > +#ifdef __INT64_TYPE__
+> > +#undef __INT64_TYPE__
+> > +#define __INT64_TYPE__               __signed__ long long
+>
+> Do we need this __signed__ part?
+>
+
+No that seems redundant to me.
 
 _______________________________________________
 linux-arm-kernel mailing list
