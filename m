@@ -2,64 +2,89 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1DC73C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:12 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id C2AF3C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:44 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D7C6420850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:11 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9165820850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:47:44 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mj09tw9f"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D7C6420850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gxQtplFd";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="mWbxjGPS";
+	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="GMeZ0ut7"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9165820850
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=X2qjnIOPxJ8s/rsoGLIdwhxp248jgvFGFeo/cKYJBms=; b=mj09tw9fa0U/vB
-	YAOf+2qDRsXfrZwbK7AZPZR0xgMjPdeK3qFNWhIB3YAB2DWIMfjAWVtB5Qvtew9BxuZze4h0PX+xH
-	V09UMWwKzL0GxgaJAyQ7R/r44tHC+i1PncATh2N6hftfHcsbeiWv1k0Eui1h2ZhTC5pOwQstns5FH
-	NDsQADNn3BapISOQj7ESmw+EW7oryuQM5d6eauESdBz/E3IfOX21rVGC7++oDXpeXxO3ZNQdvsqYB
-	2BStCuTFyo+v2fPUq1ECPchTcrkVjIvQZqgTCHiWadySw3qZdK5iZo9utP8j07ajAzW+GnWJ8SQS7
-	JNSVRT/guB+jwDVevuog==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:References:
+	To:From:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=sYK1pI4pAv3gA3eSwQddeKfE0OJ93faTKx5tPxSaMk8=; b=gxQtplFdhTykbcBcriXi+DnXu
+	Fm/xmHIPEj5xQjDqVoA1eZJax5i1/nbrLWKZViRbdpo0oEwncOXWaw0DoWZoCJqKTCqBni1q2kJi7
+	1UcUc2ikTN1hxGhL7xBGC2hZlJyCZG2AiI5/+iRZszEsbmb6BNDKc6LfgNqgPYfG8UQa8OtzBexX4
+	jjrhSAqE0MQ3bStvP8TGKIU2Yrb/bhMOOx7AIFiPNVG18yODUOi2HklnCI6+fob7ZLPGKGyryODBs
+	fGsaN21u9et/ZWLPwHB4G/cuYIwtAnchpW/OsvOCr1qrGXtUWDJgDtxPqF876WpSy+CKr59/jjgZs
+	8ya55BnKw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqRB-0006dP-Uw; Mon, 03 Dec 2018 15:47:09 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqR3-0006cI-AJ
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:47:07 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id C15E41682;
- Mon,  3 Dec 2018 07:46:50 -0800 (PST)
-Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id C2D243F5AF;
- Mon,  3 Dec 2018 07:46:48 -0800 (PST)
-Subject: Re: [PATCH v9 8/8] KVM: arm64: Add support for creating PUD hugepages
- at stage 2
-To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-9-punit.agrawal@arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <3c37af59-6936-20fb-b3a3-eaa10f3ada53@arm.com>
-Date: Mon, 3 Dec 2018 21:16:54 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
+	id 1gTqRj-0006yz-51; Mon, 03 Dec 2018 15:47:43 +0000
+Received: from smtp.codeaurora.org ([198.145.29.96])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTqRd-0006vg-4c
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:47:40 +0000
+Received: by smtp.codeaurora.org (Postfix, from userid 1000)
+ id B778D60D88; Mon,  3 Dec 2018 15:47:23 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543852046;
+ bh=Q2Ix7u7rkdNw4QGnrtaZ9DbhIPrmveYq44quMcCyzuE=;
+ h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
+ b=mWbxjGPSFB75H6tpL+k7NrIXrP6HXxxgdIeN7BKBcc48O0pzUT5eesp7wuiZ7Wisr
+ /E3UMWVHCIzOiKkI9d7aNQUrirhjvudy77d/EWuoQUz8VpNpTDPKeiyKRYcysxpnfj
+ bA1LSO/G3f+6O6XTjcUeMOsqT6WJrMvK8zI+3IBU=
+Received: from [10.226.60.81] (i-global254.qualcomm.com [199.106.103.254])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ (Authenticated sender: jhugo@smtp.codeaurora.org)
+ by smtp.codeaurora.org (Postfix) with ESMTPSA id 8920061312;
+ Mon,  3 Dec 2018 15:47:20 +0000 (UTC)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
+ s=default; t=1543852041;
+ bh=Q2Ix7u7rkdNw4QGnrtaZ9DbhIPrmveYq44quMcCyzuE=;
+ h=Subject:From:To:Cc:References:Date:In-Reply-To:From;
+ b=GMeZ0ut72AMXANSHemAwfyMnWEfj+Le6Mpm4IToaYZmY3Ywp2iiroMji5KsyO5okf
+ +ClW7Ig8Jtqad6XKLRW5/RXeiCh0Z2+HP2VUOB2Vt2Uxf6m9IPFqlcUrrbvUtM0HED
+ ceFmPQDabTH6uxASGgHgvSW7FBlAi+YQyy3BSHHo=
+DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 8920061312
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ dmarc=none (p=none dis=none) header.from=codeaurora.org
+Authentication-Results: pdx-caf-mail.web.codeaurora.org;
+ spf=none smtp.mailfrom=jhugo@codeaurora.org
+Subject: Re: WIP: UFS on apq8098
+From: Jeffrey Hugo <jhugo@codeaurora.org>
+To: Marc Gonzalez <marc.w.gonzalez@free.fr>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Nicolas Dechesne <nicolas.dechesne@linaro.org>,
+ Niklas Cassel <niklas.cassel@linaro.org>, Andy Gross
+ <andy.gross@linaro.org>, Rajendra Nayak <rnayak@codeaurora.org>
+References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
+ <de223e7a-3b60-0566-997f-b607bbc15007@codeaurora.org>
+Message-ID: <7d588806-5699-2d87-e95e-f1388de01a74@codeaurora.org>
+Date: Mon, 3 Dec 2018 08:47:20 -0700
+User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
-In-Reply-To: <20181031175745.18650-9-punit.agrawal@arm.com>
+In-Reply-To: <de223e7a-3b60-0566-997f-b607bbc15007@codeaurora.org>
 Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_074701_367202_1B82E78B 
-X-CRM114-Status: GOOD (  32.07  )
+X-CRM114-CacheID: sfid-20181203_074737_221451_AB257278 
+X-CRM114-Status: GOOD (  17.63  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,364 +96,160 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com,
- Catalin Marinas <catalin.marinas@arm.com>, will.deacon@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
- punitagrawal@gmail.com, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: MSM <linux-arm-msm@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
+Content-Transfer-Encoding: base64
+Content-Type: text/plain; charset="utf-8"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-
-
-On 10/31/2018 11:27 PM, Punit Agrawal wrote:
-> KVM only supports PMD hugepages at stage 2. Now that the various page
-> handling routines are updated, extend the stage 2 fault handling to
-> map in PUD hugepages.
-> 
-> Addition of PUD hugepage support enables additional page sizes (e.g.,
-> 1G with 4K granule) which can be useful on cores that support mapping
-> larger block sizes in the TLB entries.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h         |  20 +++++
->  arch/arm/include/asm/stage2_pgtable.h  |   5 ++
->  arch/arm64/include/asm/kvm_mmu.h       |  16 ++++
->  arch/arm64/include/asm/pgtable-hwdef.h |   2 +
->  arch/arm64/include/asm/pgtable.h       |   2 +
->  virt/kvm/arm/mmu.c                     | 104 +++++++++++++++++++++++--
->  6 files changed, 143 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index e62f0913ce7d..6336319a0d5b 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -84,11 +84,14 @@ void kvm_clear_hyp_idmap(void);
->  
->  #define kvm_pfn_pte(pfn, prot)	pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)	pfn_pmd(pfn, prot)
-> +#define kvm_pfn_pud(pfn, prot)	(__pud(0))
-
-This makes sense. Was not enabled before and getting added here.
-
->  
->  #define kvm_pud_pfn(pud)	({ BUG(); 0; })
->  
->  
->  #define kvm_pmd_mkhuge(pmd)	pmd_mkhuge(pmd)
-> +/* No support for pud hugepages */
-> +#define kvm_pud_mkhuge(pud)	( {BUG(); pud; })
->  
->  /*
->   * The following kvm_*pud*() functions are provided strictly to allow
-> @@ -105,6 +108,23 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
->  	return false;
->  }
->  
-> +static inline void kvm_set_pud(pud_t *pud, pud_t new_pud)
-> +{
-> +	BUG();
-> +}
-> +
-> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-> +{
-> +	BUG();
-> +	return pud;
-> +}
-> +
-> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-> +{
-> +	BUG();
-> +	return pud;
-> +}
-> +
-
-But the previous patches have been adding some of these helpers
-as well. Needs consolidation.
-
->  static inline bool kvm_s2pud_exec(pud_t *pud)
->  {
->  	BUG();
-> diff --git a/arch/arm/include/asm/stage2_pgtable.h b/arch/arm/include/asm/stage2_pgtable.h
-> index f6a7ea805232..f9017167a8d1 100644
-> --- a/arch/arm/include/asm/stage2_pgtable.h
-> +++ b/arch/arm/include/asm/stage2_pgtable.h
-> @@ -68,4 +68,9 @@ stage2_pmd_addr_end(struct kvm *kvm, phys_addr_t addr, phys_addr_t end)
->  #define stage2_pmd_table_empty(kvm, pmdp)	kvm_page_empty(pmdp)
->  #define stage2_pud_table_empty(kvm, pudp)	false
->  
-> +static inline bool kvm_stage2_has_pud(struct kvm *kvm)
-> +{
-> +	return false;
-> +}
->
-
-Makes sense. Disabled on arm32.
-
- +
->  #endif	/* __ARM_S2_PGTABLE_H_ */
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 9f941f70775c..8af4b1befa42 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -184,12 +184,16 @@ void kvm_clear_hyp_idmap(void);
->  #define kvm_mk_pgd(pudp)					\
->  	__pgd(__phys_to_pgd_val(__pa(pudp)) | PUD_TYPE_TABLE)
->  
-> +#define kvm_set_pud(pudp, pud)		set_pud(pudp, pud)
-> +
->  #define kvm_pfn_pte(pfn, prot)		pfn_pte(pfn, prot)
->  #define kvm_pfn_pmd(pfn, prot)		pfn_pmd(pfn, prot)
-> +#define kvm_pfn_pud(pfn, prot)		pfn_pud(pfn, prot)
->  
->  #define kvm_pud_pfn(pud)		pud_pfn(pud)
->  
->  #define kvm_pmd_mkhuge(pmd)		pmd_mkhuge(pmd)
-> +#define kvm_pud_mkhuge(pud)		pud_mkhuge(pud)
->  
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->  {
-> @@ -203,6 +207,12 @@ static inline pmd_t kvm_s2pmd_mkwrite(pmd_t pmd)
->  	return pmd;
->  }
->  
-> +static inline pud_t kvm_s2pud_mkwrite(pud_t pud)
-> +{
-> +	pud_val(pud) |= PUD_S2_RDWR;
-> +	return pud;
-> +}
-> +
->  static inline pte_t kvm_s2pte_mkexec(pte_t pte)
->  {
->  	pte_val(pte) &= ~PTE_S2_XN;
-> @@ -215,6 +225,12 @@ static inline pmd_t kvm_s2pmd_mkexec(pmd_t pmd)
->  	return pmd;
->  }
->  
-> +static inline pud_t kvm_s2pud_mkexec(pud_t pud)
-> +{
-> +	pud_val(pud) &= ~PUD_S2_XN;
-> +	return pud;
-> +}
-> +
-
-Should not these be consolidated in previous patches ?
-
->  static inline void kvm_set_s2pte_readonly(pte_t *ptep)
->  {
->  	pteval_t old_pteval, pteval;
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 336e24cddc87..6f1c187f1c86 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -193,6 +193,8 @@
->  #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->  #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
->  
-> +#define PUD_S2_RDONLY		(_AT(pudval_t, 1) << 6)   /* HAP[2:1] */
-> +#define PUD_S2_RDWR		(_AT(pudval_t, 3) << 6)   /* HAP[2:1] */
->  #define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
-
-All PUD related HW page table definitions should have been added
-at once in one of the preparatory patches.
-
->  
->  /*
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index bb0f3f17a7a9..576128635f3c 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -390,6 +390,8 @@ static inline int pmd_protnone(pmd_t pmd)
->  #define pud_mkyoung(pud)	pte_pud(pte_mkyoung(pud_pte(pud)))
->  #define pud_write(pud)		pte_write(pud_pte(pud))
->  
-> +#define pud_mkhuge(pud)		(__pud(pud_val(pud) & ~PUD_TABLE_BIT))
-> +
-
-All new pud_* definitions should have come together at once as well. 
-
->  #define __pud_to_phys(pud)	__pte_to_phys(pud_pte(pud))
->  #define __phys_to_pud_val(phys)	__phys_to_pte_val(phys)
->  #define pud_pfn(pud)		((__pud_to_phys(pud) & PUD_MASK) >> PAGE_SHIFT)
-
-
-
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 3893ea6a50bf..2dcff38868d4 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -115,6 +115,25 @@ static void stage2_dissolve_pmd(struct kvm *kvm, phys_addr_t addr, pmd_t *pmd)
->  	put_page(virt_to_page(pmd));
->  }
->  
-> +/**
-> + * stage2_dissolve_pud() - clear and flush huge PUD entry
-> + * @kvm:	pointer to kvm structure.
-> + * @addr:	IPA
-> + * @pud:	pud pointer for IPA
-> + *
-> + * Function clears a PUD entry, flushes addr 1st and 2nd stage TLBs. Marks all
-> + * pages in the range dirty.
-> + */
-> +static void stage2_dissolve_pud(struct kvm *kvm, phys_addr_t addr, pud_t *pudp)
-> +{
-> +	if (!stage2_pud_huge(kvm, *pudp))
-> +		return;
-> +
-> +	stage2_pud_clear(kvm, pudp);
-> +	kvm_tlb_flush_vmid_ipa(kvm, addr);
-> +	put_page(virt_to_page(pudp));
-> +}
-> +
->  static int mmu_topup_memory_cache(struct kvm_mmu_memory_cache *cache,
->  				  int min, int max)
->  {
-> @@ -1022,7 +1041,7 @@ static pmd_t *stage2_get_pmd(struct kvm *kvm, struct kvm_mmu_memory_cache *cache
->  	pmd_t *pmd;
->  
->  	pud = stage2_get_pud(kvm, cache, addr);
-> -	if (!pud)
-> +	if (!pud || stage2_pud_huge(kvm, *pud))
->  		return NULL;
->  
->  	if (stage2_pud_none(kvm, *pud)) {
-> @@ -1083,6 +1102,36 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->  	return 0;
->  }
->  
-> +static int stage2_set_pud_huge(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
-> +			       phys_addr_t addr, const pud_t *new_pudp)
-> +{
-> +	pud_t *pudp, old_pud;
-> +
-> +	pudp = stage2_get_pud(kvm, cache, addr);
-> +	VM_BUG_ON(!pudp);
-> +
-> +	old_pud = *pudp;
-> +
-> +	/*
-> +	 * A large number of vcpus faulting on the same stage 2 entry,
-> +	 * can lead to a refault due to the
-> +	 * stage2_pud_clear()/tlb_flush(). Skip updating the page
-> +	 * tables if there is no change.
-> +	 */
-> +	if (pud_val(old_pud) == pud_val(*new_pudp))
-> +		return 0;
-> +
-> +	if (stage2_pud_present(kvm, old_pud)) {
-> +		stage2_pud_clear(kvm, pudp);
-> +		kvm_tlb_flush_vmid_ipa(kvm, addr);
-> +	} else {
-> +		get_page(virt_to_page(pudp));
-> +	}
-> +
-> +	kvm_set_pud(pudp, *new_pudp);
-> +	return 0;
-> +}
-> +
->  /*
->   * stage2_get_leaf_entry - walk the stage2 VM page tables and return
->   * true if a valid and present leaf-entry is found. A pointer to the
-> @@ -1149,6 +1198,7 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->  			  phys_addr_t addr, const pte_t *new_pte,
->  			  unsigned long flags)
->  {
-> +	pud_t *pud;
->  	pmd_t *pmd;
->  	pte_t *pte, old_pte;
->  	bool iomap = flags & KVM_S2PTE_FLAG_IS_IOMAP;
-> @@ -1157,7 +1207,31 @@ static int stage2_set_pte(struct kvm *kvm, struct kvm_mmu_memory_cache *cache,
->  	VM_BUG_ON(logging_active && !cache);
->  
->  	/* Create stage-2 page table mapping - Levels 0 and 1 */
-> -	pmd = stage2_get_pmd(kvm, cache, addr);
-> +	pud = stage2_get_pud(kvm, cache, addr);
-> +	if (!pud) {
-> +		/*
-> +		 * Ignore calls from kvm_set_spte_hva for unallocated
-> +		 * address ranges.
-> +		 */
-> +		return 0;
-> +	}
-> +
-> +	/*
-> +	 * While dirty page logging - dissolve huge PUD, then continue
-> +	 * on to allocate page.
-> +	 */
-> +	if (logging_active)
-> +		stage2_dissolve_pud(kvm, addr, pud);
-> +
-> +	if (stage2_pud_none(kvm, *pud)) {
-> +		if (!cache)
-> +			return 0; /* ignore calls from kvm_set_spte_hva */
-> +		pmd = mmu_memory_cache_alloc(cache);
-> +		stage2_pud_populate(kvm, pud, pmd);
-> +		get_page(virt_to_page(pud));
-> +	}
-> +
-> +	pmd = stage2_pmd_offset(kvm, pud, addr);
->  	if (!pmd) {
->  		/*
->  		 * Ignore calls from kvm_set_spte_hva for unallocated
-> @@ -1557,12 +1631,19 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	}
->  
->  	vma_pagesize = vma_kernel_pagesize(vma);
-> -	if (vma_pagesize == PMD_SIZE && !logging_active) {
-> -		gfn = (fault_ipa & PMD_MASK) >> PAGE_SHIFT;
-> +	/*
-> +	 * PUD level may not exist for a VM but PMD is guaranteed to
-> +	 * exist.
-> +	 */
-> +	if ((vma_pagesize == PMD_SIZE ||
-> +	     (vma_pagesize == PUD_SIZE && kvm_stage2_has_pud(kvm))) &&
-> +	    !logging_active) {
-
-This can be better and wrapped in a helper. Probably arm64 definition
-for the helper should check on (PUD_SIZE || PMD_SIZE) but for arm32
-it should just check on PMD_SIZE alone. But this is optional.
-
-> +		gfn = (fault_ipa & huge_page_mask(hstate_vma(vma))) >> PAGE_SHIFT;
->  	} else {
->  		/*
->  		 * Fallback to PTE if it's not one of the Stage 2
-> -		 * supported hugepage sizes
-> +		 * supported hugepage sizes or the corresponding level
-> +		 * doesn't exist
->  		 */
->  		vma_pagesize = PAGE_SIZE;
->  
-> @@ -1661,7 +1742,18 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	needs_exec = exec_fault ||
->  		(fault_status == FSC_PERM && stage2_is_exec(kvm, fault_ipa));
->  
-> -	if (vma_pagesize == PMD_SIZE) {
-> +	if (vma_pagesize == PUD_SIZE) {
-> +		pud_t new_pud = kvm_pfn_pud(pfn, mem_type);
-> +
-> +		new_pud = kvm_pud_mkhuge(new_pud);
-> +		if (writable)
-> +			new_pud = kvm_s2pud_mkwrite(new_pud);
-> +
-> +		if (needs_exec)
-> +			new_pud = kvm_s2pud_mkexec(new_pud);
-> +
-> +		ret = stage2_set_pud_huge(kvm, memcache, fault_ipa, &new_pud);
-> +	} else if (vma_pagesize == PMD_SIZE) {
-
-Ran some memory intensive tests on guests with these patches in place but
-will continue experimenting and looking for more details in here.
-
-_______________________________________________
-linux-arm-kernel mailing list
-linux-arm-kernel@lists.infradead.org
-http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+T24gMTIvMy8yMDE4IDg6MjcgQU0sIEplZmZyZXkgSHVnbyB3cm90ZToKPiBPbiAxMi8zLzIwMTgg
+ODoxOCBBTSwgTWFyYyBHb256YWxleiB3cm90ZToKPj4gSGVsbG8sCj4+Cj4+IEknbSB0cnlpbmcg
+dG8gZW5hYmxlIFVGUyBvbiBhcHE4MDk4LiBKdXN0IHdhbnRlZCB0byBzaGFyZSBteSBwcm9ncmVz
+cwo+PiBzbyBmYXIsIGluIGNhc2Ugc29tZW9uZSBzcG90cyBhbnkgZ2xhcmluZyBtaXN0YWtlcy4K
+PiAKPiBFeGNlbGxlbnQuwqAgVGhpcyB3YXMgZG93biBvbiBteSB0b2RvIGxpc3QuwqAgSSdtIGds
+YWQgaXRzIGdldHRpbmcgc29tZSAKPiBhdHRlbnRpb24uCj4gCj4+Cj4+IChXSVAgcGF0Y2ggcHJv
+dmlkZWQgYXQgbWVzc2FnZSdzIGVuZC4pCj4+Cj4+IHJwbV9zbWRfY2xrX3Byb2JlKCkgcnVucyBz
+dWNjZXNzZnVsbHksIGFuZCByZXR1cm5zIDAuCj4+Cj4+IHFjb21fcW1wX3BoeV9wcm9iZSgpIGZh
+aWxzOgo+Pgo+PiBbwqDCoMKgIDAuOTEzNzA3XSBxY29tLXFtcC1waHkgMWRhNzAwMC5waHk6IEZh
+aWxlZCB0byBnZXQgY2xrICdyZWYnOiAtMgo+PiBbwqDCoMKgIDAuOTEzNzYxXSBxY29tLXFtcC1w
+aHk6IHByb2JlIG9mIDFkYTcwMDAucGh5IGZhaWxlZCB3aXRoIGVycm9yIC0yCj4+Cj4+IHVmc19x
+Y29tX3Byb2JlKCkgYWxzbyBmYWlscyAod2hpY2ggbWF5IGJlIGNhdXNlZCBieSBQSFkgZmFpbHVy
+ZSkKPj4KPj4gW8KgwqDCoCAyLjM2ODQ4Nl0gdWZzaGNkLXFjb20gMWRhNDAwMC51ZnNoYzogdWZz
+aGNkX2dldF92cmVnOiB2ZGQtaGJhIGdldCAKPj4gZmFpbGVkLCBlcnI9LTUxNwo+PiBbwqDCoMKg
+IDIuMzcwNjczXSB1ZnNoY2QtcWNvbSAxZGE0MDAwLnVmc2hjOiBJbml0aWFsaXphdGlvbiBmYWls
+ZWQKPj4gW8KgwqDCoCAyLjQxMjkwOF0gdWZzaGNkLXFjb20gMWRhNDAwMC51ZnNoYzogdWZzaGNk
+X3BsdGZybV9pbml0KCkgZmFpbGVkIAo+PiAtNTE3Cj4+Cj4+IEknbGwgaW52ZXN0aWdhdGUgdGhl
+IFBIWSBpbml0Lgo+Pgo+PiBSZWdhcmRzLgo+Pgo+Pgo+PiBkaWZmIC0tZ2l0IGEvYXJjaC9hcm02
+NC9ib290L2R0cy9xY29tL21zbTg5OTgtbXRwLmR0c2kgCj4+IGIvYXJjaC9hcm02NC9ib290L2R0
+cy9xY29tL21zbTg5OTgtbXRwLmR0c2kKPj4gaW5kZXggYjQyNzZkYTFmYjBkLi5hZDc1NDJmNDYx
+YWYgMTAwNjQ0Cj4+IC0tLSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LW10cC5k
+dHNpCj4+ICsrKyBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LW10cC5kdHNpCj4+
+IEBAIC0yNDEsMyArMjQxLDI2IEBACj4+IMKgwqDCoMKgwqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDC
+oMKgIH07Cj4+IMKgIH07Cj4+ICsKPj4gKyZ1ZnNoYyB7Cj4+ICvCoMKgwqAgc3RhdHVzID0gIm9r
+IjsKPj4gK8KgwqDCoCB2ZGQtaGJhLXN1cHBseSA9IDwmZ2NjIFVGU19HRFNDPjsKPj4gK8KgwqDC
+oCB2ZGQtaGJhLWZpeGVkLXJlZ3VsYXRvcjsKPj4gK8KgwqDCoCB2Y2Mtc3VwcGx5ID0gPCZ2cmVn
+X2wyMGFfMnA5NT47Cj4+ICvCoMKgwqAgdmNjcS1zdXBwbHkgPSA8JnZyZWdfbDI2YV8xcDI+Owo+
+PiArwqDCoMKgIHZjY3EyLXN1cHBseSA9IDwmdnJlZ19zNGFfMXA4PjsKPj4gK8KgwqDCoCB2Y2Mt
+bWF4LW1pY3JvYW1wID0gPDc1MDAwMD47Cj4+ICvCoMKgwqAgdmNjcS1tYXgtbWljcm9hbXAgPSA8
+NTYwMDAwPjsKPj4gK8KgwqDCoCB2Y2NxMi1tYXgtbWljcm9hbXAgPSA8NzUwMDAwPjsKPj4gK307
+Cj4+ICsKPj4gKyZ1ZnNwaHkgewo+PiArwqDCoMKgIHN0YXR1cyA9ICJvayI7Cj4+ICvCoMKgwqAg
+dmRkYS1waHktc3VwcGx5ID0gPCZ2cmVnX2wxYV8wcDg3NT47Cj4+ICvCoMKgwqAgdmRkYS1wbGwt
+c3VwcGx5ID0gPCZ2cmVnX2wyYV8xcDI+Owo+PiArwqDCoMKgIHZkZHAtcmVmLWNsay1zdXBwbHkg
+PSA8JnZyZWdfbDI2YV8xcDI+Owo+PiArwqDCoMKgIHZkZGEtcGh5LW1heC1taWNyb2FtcCA9IDw1
+MTQwMD47Cj4+ICvCoMKgwqAgdmRkYS1wbGwtbWF4LW1pY3JvYW1wID0gPDE0NjAwPjsKPj4gK8Kg
+wqDCoCB2ZGRwLXJlZi1jbGstbWF4LW1pY3JvYW1wID0gPDEwMD47Cj4+ICvCoMKgwqAgdmRkcC1y
+ZWYtY2xrLWFsd2F5cy1vbjsKPj4gK307Cj4+IGRpZmYgLS1naXQgYS9hcmNoL2FybTY0L2Jvb3Qv
+ZHRzL3Fjb20vbXNtODk5OC5kdHNpIAo+PiBiL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204
+OTk4LmR0c2kKPj4gaW5kZXggZDI5MWI0NzEzYzMzLi4xMGU3YjhhNTViOGEgMTAwNjQ0Cj4+IC0t
+LSBhL2FyY2gvYXJtNjQvYm9vdC9kdHMvcWNvbS9tc204OTk4LmR0c2kKPj4gKysrIGIvYXJjaC9h
+cm02NC9ib290L2R0cy9xY29tL21zbTg5OTguZHRzaQo+PiBAQCAtMjY0LDYgKzI2NCwxMSBAQAo+
+PiDCoMKgwqDCoMKgwqDCoMKgwqAgcnBtX3JlcXVlc3RzOiBycG0tcmVxdWVzdHMgewo+PiDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInFjb20scnBtLW1zbTg5OTgiOwo+
+PiDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBxY29tLGdsaW5rLWNoYW5uZWxzID0gInJwbV9y
+ZXF1ZXN0cyI7Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcnBtY2M6IHFjb20scnBt
+Y2Mgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAicWNv
+bSxycG1jYy1tc204OTk4IjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjY2xv
+Y2stY2VsbHMgPSA8MT47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIH07Cj4+IMKgwqDCoMKg
+wqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDCoMKgIH07Cj4+IEBAIC02ODYsNSArNjkxLDc5IEBACj4+
+IMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZGlzdHJpYnV0b3Itc3RyaWRlID0gPDB4MCAw
+eDIwMDAwPjsKPj4gwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNf
+UFBJIDkgSVJRX1RZUEVfTEVWRUxfSElHSD47Cj4+IMKgwqDCoMKgwqDCoMKgwqDCoCB9Owo+PiAr
+Cj4+ICvCoMKgwqDCoMKgwqDCoCB1ZnNoYzogdWZzaGNAMWRhNDAwMCB7Cj4+ICvCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgIGNvbXBhdGlibGUgPSAicWNvbSxtc204OTk4LXVmc2hjIiwgInFjb20sdWZz
+aGMiLAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAiamVkZWMs
+dWZzLTIuMCI7Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZyA9IDwweDFkYTQwMDAgMHgy
+NTAwPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgaW50ZXJydXB0cyA9IDxHSUNfU1BJIDI2
+NSBJUlFfVFlQRV9MRVZFTF9ISUdIPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcGh5cyA9
+IDwmdWZzcGh5X2xhbmVzPjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcGh5LW5hbWVzID0g
+InVmc3BoeSI7Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIGxhbmVzLXBlci1kaXJlY3Rpb24g
+PSA8Mj47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHBvd2VyLWRvbWFpbnMgPSA8JmdjYyBV
+RlNfR0RTQz47Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgY2xvY2stbmFtZXMgPQo+
+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICJjb3JlX2NsayIsCj4+ICvCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgImJ1c19hZ2dyX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgwqAgImlmYWNlX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqAgImNvcmVfY2xrX3VuaXBybyIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqAgImNvcmVfY2xrX2ljZSIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAg
+InJlZl9jbGsiLAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICJ0eF9sYW5lMF9z
+eW5jX2NsayIsCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJ4X2xhbmUwX3N5
+bmNfY2xrIiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAicnhfbGFuZTFfc3lu
+Y19jbGsiOwo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjbG9ja3MgPQo+PiArwqDCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmZ2NjIEdDQ19VRlNfQVhJX0NMSz4sCj4+ICvCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX0FHR1JFMV9VRlNfQVhJX0NMSz4sCj4+
+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19BSEJfQ0xLPiwK
+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCA8JmdjYyBHQ0NfVUZTX1VOSVBST19D
+T1JFX0NMSz4sCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VG
+U19JQ0VfQ09SRV9DTEs+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmcnBt
+Y2MgMD4sCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19U
+WF9TWU1CT0xfMF9DTEs+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwmZ2Nj
+IEdDQ19VRlNfUlhfU1lNQk9MXzBfQ0xLPiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoCA8JmdjYyBHQ0NfVUZTX1JYX1NZTUJPTF8xX0NMSz47Cj4+ICvCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgIGZyZXEtdGFibGUtaHogPQo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+IDw1MDAwMDAwMCAyMDAwMDAwMDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+IDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwzNzUwMDAwMCAxNTAwMDAwMDA+LAo+PiArwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDw3NTAwMDAwMCAzMDAwMDAwMDA+LAo+PiArwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgIDwwIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDww
+IDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwwIDA+Owo+PiArCj4+ICvC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlc2V0cyA9IDwmZ2NjIEdDQ19VRlNfQkNSPjsKPiAKPiBJ
+IGR1bm5vIGhvdyBtdWNoIHRoaXMgZmFjdG9ycyBpbnRvIHlvdXIgaXNzdWVzLCBidXQgdGhlIHJl
+c2V0cyBkZWZpbmVkIAo+IGluIGdjYy1tc204OTk4LmMgYXJlIHdyb25nLsKgIEknbSBwb3N0aW5n
+IGEgcGF0Y2ggbGF0ZXIgdG9kYXkuwqAgSSBrbm93IAo+IHRoaXMgd2FzIGEgcHJvYmxlbSBmb3Ig
+bWUgd2l0aCBVU0IuCj4gCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlc2V0LW5hbWVzID0g
+InJzdCI7Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgc3RhdHVzID0gImRpc2FibGVk
+IjsKPj4gK8KgwqDCoMKgwqDCoMKgIH07Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgIHVmc3BoeTog
+cGh5QDFkYTcwMDAgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCBjb21wYXRpYmxlID0gInFj
+b20sc2RtODQ1LXFtcC11ZnMtcGh5IjsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcmVnID0g
+PDB4MWRhNzAwMCAweDE4Yz47Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICNhZGRyZXNzLWNl
+bGxzID0gPDE+Owo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAjc2l6ZS1jZWxscyA9IDwxPjsK
+Pj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgcmFuZ2VzOwo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoCBjbG9jay1uYW1lcyA9Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJl
+Zl9jbGtfc3JjIiwKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCAicmVmX2NsayIs
+Cj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgInJlZl9hdXhfY2xrIjsKPj4gK8Kg
+wqDCoMKgwqDCoMKgwqDCoMKgwqAgY2xvY2tzID0KPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqDCoCA8JnJwbWNjIDA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwm
+Z2NjIEdDQ19VRlNfQ0xLUkVGX0NMSz4sCgpBbHNvLCAiR0NDX1VGU19DTEtSRUZfQ0xLIiBpcyBu
+b3QgZGVmaW5lZCBpbiAKaW5jbHVkZS9kdC1iaW5kaW5ncy9jbG9jay9xY29tLGdjYy1tc204OTk4
+Lmggd2hpY2ggaXMgcHJvYmFibHkgdGhlIGNhdXNlIApvZiB5b3VyIC0yIGVycm9yIGxpc3RlZCBh
+Ym92ZS4KCj4+ICvCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqAgPCZnY2MgR0NDX1VGU19Q
+SFlfQVVYX0NMSz47Cj4+ICsKPj4gK8KgwqDCoMKgwqDCoMKgwqDCoMKgwqAgc3RhdHVzID0gImRp
+c2FibGVkIjsKPj4gKwo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoCB1ZnNwaHlfbGFuZXM6IGxh
+bmVzQDFkYTc0MDAgewo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIHJlZyA9IDww
+eDFkYTc0MDAgMHgxMDg+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgIDwweDFkYTc2MDAgMHgxZTA+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgIDwweDFkYTdjMDAgMHgxZGM+LAo+PiArwqDCoMKgwqDCoMKgwqDCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwweDFkYTc4MDAgMHgxMDg+LAo+PiArwqDCoMKgwqDC
+oMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgIDwweDFkYTdhMDAgMHgxZTA+Owo+PiAr
+wqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgwqDCoMKgICNwaHktY2VsbHMgPSA8MD47Cj4+ICvCoMKg
+wqDCoMKgwqDCoMKgwqDCoMKgIH07Cj4+ICvCoMKgwqDCoMKgwqDCoCB9Owo+PiDCoMKgwqDCoMKg
+IH07Cj4+IMKgIH07Cj4+IGRpZmYgLS1naXQgYS9kcml2ZXJzL2Nsay9xY29tL2Nsay1zbWQtcnBt
+LmMgCj4+IGIvZHJpdmVycy9jbGsvcWNvbS9jbGstc21kLXJwbS5jCj4+IGluZGV4IDg1MGMwMmE1
+MjI0OC4uMTJhMGEyZDZlYzdiIDEwMDY0NAo+PiAtLS0gYS9kcml2ZXJzL2Nsay9xY29tL2Nsay1z
+bWQtcnBtLmMKPj4gKysrIGIvZHJpdmVycy9jbGsvcWNvbS9jbGstc21kLXJwbS5jCj4+IEBAIC02
+MTEsMTAgKzYxMSwyNSBAQCBzdGF0aWMgY29uc3Qgc3RydWN0IHJwbV9zbWRfY2xrX2Rlc2MgCj4+
+IHJwbV9jbGtfbXNtODk5NiA9IHsKPj4gwqDCoMKgwqDCoCAubnVtX2Nsa3MgPSBBUlJBWV9TSVpF
+KG1zbTg5OTZfY2xrcyksCj4+IMKgIH07Cj4+ICsvKiBtc204OTk4ICovCj4+ICsjZGVmaW5lIExO
+X0JCX0NMSzFfSUQgMHgxCj4+ICtERUZJTkVfQ0xLX1NNRF9SUE1fWE9fQlVGRkVSKG1zbTg5OTgs
+IGxuX2JiX2NsazEsIGxuX2JiX2FfY2xrMSwgCj4+IExOX0JCX0NMSzFfSUQpOwo+PiArCj4+ICtz
+dGF0aWMgc3RydWN0IGNsa19zbWRfcnBtICptc204OTk4X2Nsa3NbXSA9IHsKPj4gK8KgwqDCoCBb
+MF0gPSAmbXNtODk5OF9sbl9iYl9jbGsxLAo+PiArwqDCoMKgIFsxXSA9ICZtc204OTk4X2xuX2Ji
+X2FfY2xrMSwKPj4gK307Cj4+ICsKPj4gK3N0YXRpYyBjb25zdCBzdHJ1Y3QgcnBtX3NtZF9jbGtf
+ZGVzYyBycG1fY2xrX21zbTg5OTggPSB7Cj4+ICvCoMKgwqAgLmNsa3MgPSBtc204OTk4X2Nsa3Ms
+Cj4+ICvCoMKgwqAgLm51bV9jbGtzID0gQVJSQVlfU0laRShtc204OTk4X2Nsa3MpLAo+PiArfTsK
+Pj4gKwo+PiDCoCBzdGF0aWMgY29uc3Qgc3RydWN0IG9mX2RldmljZV9pZCBycG1fc21kX2Nsa19t
+YXRjaF90YWJsZVtdID0gewo+PiDCoMKgwqDCoMKgIHsgLmNvbXBhdGlibGUgPSAicWNvbSxycG1j
+Yy1tc204OTE2IiwgLmRhdGEgPSAmcnBtX2Nsa19tc204OTE2IH0sCj4+IMKgwqDCoMKgwqAgeyAu
+Y29tcGF0aWJsZSA9ICJxY29tLHJwbWNjLW1zbTg5NzQiLCAuZGF0YSA9ICZycG1fY2xrX21zbTg5
+NzQgfSwKPj4gwqDCoMKgwqDCoCB7IC5jb21wYXRpYmxlID0gInFjb20scnBtY2MtbXNtODk5NiIs
+IC5kYXRhID0gJnJwbV9jbGtfbXNtODk5NiB9LAo+PiArwqDCoMKgIHsgLmNvbXBhdGlibGUgPSAi
+cWNvbSxycG1jYy1tc204OTk4IiwgLmRhdGEgPSAmcnBtX2Nsa19tc204OTk4IH0sCj4+IMKgwqDC
+oMKgwqAgeyB9Cj4+IMKgIH07Cj4+IMKgIE1PRFVMRV9ERVZJQ0VfVEFCTEUob2YsIHJwbV9zbWRf
+Y2xrX21hdGNoX3RhYmxlKTsKPj4KPiAKPiAKCgotLSAKSmVmZnJleSBIdWdvClF1YWxjb21tIERh
+dGFjZW50ZXIgVGVjaG5vbG9naWVzIGFzIGFuIGFmZmlsaWF0ZSBvZiBRdWFsY29tbSAKVGVjaG5v
+bG9naWVzLCBJbmMuClF1YWxjb21tIFRlY2hub2xvZ2llcywgSW5jLiBpcyBhIG1lbWJlciBvZiB0
+aGUKQ29kZSBBdXJvcmEgRm9ydW0sIGEgTGludXggRm91bmRhdGlvbiBDb2xsYWJvcmF0aXZlIFBy
+b2plY3QuCgpfX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwps
+aW51eC1hcm0ta2VybmVsIG1haWxpbmcgbGlzdApsaW51eC1hcm0ta2VybmVsQGxpc3RzLmluZnJh
+ZGVhZC5vcmcKaHR0cDovL2xpc3RzLmluZnJhZGVhZC5vcmcvbWFpbG1hbi9saXN0aW5mby9saW51
+eC1hcm0ta2VybmVsCg==
