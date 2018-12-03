@@ -2,64 +2,64 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 909D2C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:48:40 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 14733C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:50:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5DEF42082F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:48:40 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D8854206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 13:50:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TpH6yHly";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=lunn.ch header.i=@lunn.ch header.b="d2ZxDrIM"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5DEF42082F
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=lunn.ch
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="WVlxYE8D"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D8854206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=NVaWwn2VTFZ4SVOI2tfP5XxGBp+9ITuUVKtdY4WeqO0=; b=TpH6yHlyxiU1IA
-	5yi8lwrL6TrLRzhOeISgnBHgf9cXwtDw/BOLwf+83S51G7VWGPfCcrIgsnY6uR9QL630BHj68/76G
-	TRDBdyskuGVlhzkeZslUURmMbY0jKlTyLQmIS+7mrLn0iD7ixEwBu9yZuR08E39dtP7tR1yCKgASb
-	jlxwT9FrGlWvyBGcPRdhqYPPf5hdZrHalHmqy4hGIV+EZwN9jT1MATVXvXlgl4tWNwiPyaZdiPuhJ
-	QzvPKauicNVEDaCjIWEa/Ue99JPIbKPb8od3pqH7oXnOg6Hqbpglkmd3rdlbbjeOr4G4mOeeGo/wY
-	sjYWhOOVPiYVJ7ZQBSOA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=A5xmMbp+DXrKG6yzQ7KPKkA9mNcRKKZlz9FfuN28RKw=; b=WVlxYE8D52fB+N
+	mCThNWExp8LyNWwCJ8IkgaEYSTq+4ojFKagY90udTPY+SOCgyY4vXPQpifnB8yjadMRGzES3HkMyh
+	h8mGMBARtTKFkH1dBdbrhp3CwaedlKV4kghV//9yLWMUZeqQ2bTAxd0Hem0VQ2wpCwGiyoHY6ieOE
+	pdxBfalGjUvjqMZ3aCm5o8lp0t5tLQWBijid0uRn8PXa+hhXUROHj9sjc8Fwf+y5vjOVPw3uQ5UPe
+	YHkQKTq1+MfwsLN2ybZ4Asik+zH1Ts8GcLy/So0Qkwdx4vgqUMUg3lGwYJ93Gfa9m71dF+6itcy/P
+	4QLFM5WNbGd1j9XPWUFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gToaP-00072r-CR; Mon, 03 Dec 2018 13:48:33 +0000
-Received: from vps0.lunn.ch ([185.16.172.187])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gToaL-0006vU-Uy
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:48:31 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed; d=lunn.ch;
- s=20171124; 
- h=In-Reply-To:Content-Type:MIME-Version:References:Message-ID:Subject:Cc:To:From:Date;
- bh=9yxsFlXY5EARcEf+3IDbJitDBkRbTtpKl039mzjVRpw=; 
- b=d2ZxDrIMAb/2pQvPiDy06G9ZSWyGaFlq0GVP/tqUe0DmSCzSaR38RIeB54Hl3pwJj4WKVOJsHQde9rXEWlMfbhPzEWMpmN2cK5l0skdRg/Umq9/VrBHNf8noIW21+6c7KRRzuH701frnf5mqKZ7iZXCB8i8pKl/rqqOPY6qBc4k=;
-Received: from andrew by vps0.lunn.ch with local (Exim 4.84_2)
- (envelope-from <andrew@lunn.ch>)
- id 1gToa7-0000HI-Ae; Mon, 03 Dec 2018 14:48:15 +0100
-Date: Mon, 3 Dec 2018 14:48:15 +0100
-From: Andrew Lunn <andrew@lunn.ch>
-To: Roman Rozman <rozmanro@gmail.com>
-Subject: Re: Sfp PRESENT driver indication to user space
-Message-ID: <20181203134815.GE31655@lunn.ch>
-References: <CAEHvULkCgpHd-BKKbpqB=TPnOGX9i6OfgBO5kHPvt3PAeqZ5sw@mail.gmail.com>
+	id 1gToc7-0000Ir-UV; Mon, 03 Dec 2018 13:50:19 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gToc3-0007v4-8n
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 13:50:17 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id A72581682;
+ Mon,  3 Dec 2018 05:50:04 -0800 (PST)
+Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 5B6E83F614;
+ Mon,  3 Dec 2018 05:50:02 -0800 (PST)
+Subject: Re: [PATCH v9 3/8] KVM: arm/arm64: Introduce helpers to manipulate
+ page table entries
+To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
+References: <20181031175745.18650-1-punit.agrawal@arm.com>
+ <20181031175745.18650-4-punit.agrawal@arm.com>
+From: Anshuman Khandual <anshuman.khandual@arm.com>
+Message-ID: <396402d5-fddf-ab72-01c4-80dd1a0d4d44@arm.com>
+Date: Mon, 3 Dec 2018 19:20:08 +0530
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
+ Thunderbird/52.9.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <CAEHvULkCgpHd-BKKbpqB=TPnOGX9i6OfgBO5kHPvt3PAeqZ5sw@mail.gmail.com>
-User-Agent: Mutt/1.5.23 (2014-03-12)
+In-Reply-To: <20181031175745.18650-4-punit.agrawal@arm.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_054830_146276_98329D00 
-X-CRM114-Status: UNSURE (   8.22  )
-X-CRM114-Notice: Please train this message.
+X-CRM114-CacheID: sfid-20181203_055015_526851_52A4C6EA 
+X-CRM114-Status: GOOD (  15.29  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,27 +71,33 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-arm-kernel@lists.infradead.org
+Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com,
+ Catalin Marinas <catalin.marinas@arm.com>, will.deacon@arm.com,
+ linux-kernel@vger.kernel.org, Russell King <linux@armlinux.org.uk>,
+ punitagrawal@gmail.com, linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 03, 2018 at 11:59:21AM +0200, Roman Rozman wrote:
-> Hi all,
+
+
+On 10/31/2018 11:27 PM, Punit Agrawal wrote:
+> Introduce helpers to abstract architectural handling of the conversion
+> of pfn to page table entries and marking a PMD page table entry as a
+> block entry.
+
+Why is this necessary ? we would still need to access PMD, PUD as is
+without any conversion. IOW KVM knows the breakdown of the page table
+at various levels. Is this something required from generic KVM code ?
+  
 > 
-> Would like to ask what is the best way to receive an indication in
-> user space upon SFP module INSERT/PRESENT.
+> The helpers are introduced in preparation for supporting PUD hugepages
+> at stage 2 - which are supported on arm64 but do not exist on arm.
 
-Hi Roman
-
-The proper way to do this is via some sort of netlink notification,
-for insert/remove. The SFP driver can send them in its state machine.
-
-What are you interested in doing? Maybe there is a simpler way which
-does not require adding new code.
-
-     Andrew
+Some of these patches (including the earlier two) are good on it's
+own. Do we have still mention in commit message about the incoming PUD
+enablement as the reason for these cleanup patches ?
 
 _______________________________________________
 linux-arm-kernel mailing list
