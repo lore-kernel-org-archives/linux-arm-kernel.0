@@ -2,82 +2,114 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-6.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,
-	SPF_PASS autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id F29E5C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:22:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 7D86FC65BAE
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 05:20:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B958320848
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 04:22:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 4DDF721473
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 05:20:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="o5PC6GNO";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="nhtBZibI"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B958320848
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="u77AlT1D";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="EPdfuVFW"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 4DDF721473
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=3MAuvA0304bgEmuWy6QexVBdiaBAJ19WS08CyuQk4oI=; b=o5PC6GNOlIPy6P
-	eSdn0uCx8jLK5XpdK4pVLx6X1I5ZEXh27rhXZZ/X4ylCp71HMnaWRhFemBidEY0cdsUYvydYKp9lZ
-	+Us0aMiDkFetMfEx8u0p5011BGmUa5ccjoIOsUSpQjg6Vhr0UfffxIhX3L0hvVgxxmJVwwKEJuB72
-	1IY/BP2O3jYgLUE6jxA/nU5aatpEnK12Rw+dpV0ouSmMpq2EOglghYMzBLTbT8teuSQUTwfBoC+W5
-	8993EQAmWwyk6gLQ4vjWIsx0VwKmcwcr2gl4Lx5e5dDezXs9HTutSTFXQklkIRFS6Wk2Kajwaf8Yj
-	26EOLV2/ft/4Jz5juogg==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=5HgkDryZdJxsIxfAhstxtyJCEHzs++3tCkp5tFtCXko=; b=u77AlT1D4mpyAJ
+	WPSYy3AgAjcuDnr1HXDmdvK4F9ZrpXlJONtmJBzDbhbAfYfcOYwV/88bBkcsubcBwNSrSwzdkiJNB
+	enLdd+hHPjU9CYxSbKrJPQh8L29Ef8icpjtbOm0+vtIxtd4WDz51t+fEFdRUkuPnN6iATEJ95GViq
+	Z+p+QN5Adwc2L0/D/XdXyZ7eKc63KHCmMHR1X/vWgn2JNGT8H1XlsaEjJx6VmkT4Bn8EZK4pM14/D
+	aji1N2WM3Sa4C7gnEU2ShzQLYZDwvsO1c8uZ5OX28SmcfTrcmE1aPMyPyChnNqpIUsMy89ZTd6uAL
+	TtSAIzxsabETfpH9pnZw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTfkK-0007Ek-Kc; Mon, 03 Dec 2018 04:22:12 +0000
-Received: from mail-lj1-x243.google.com ([2a00:1450:4864:20::243])
+	id 1gTges-0000Ur-MU; Mon, 03 Dec 2018 05:20:38 +0000
+Received: from mail-am5eur02on0602.outbound.protection.outlook.com
+ ([2a01:111:f400:fe07::602]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTfkH-0007Dm-7G; Mon, 03 Dec 2018 04:22:10 +0000
-Received: by mail-lj1-x243.google.com with SMTP id v1-v6so10048113ljd.0;
- Sun, 02 Dec 2018 20:21:58 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=SYCAqsoUZtLwLDlDfp6OtymT17dsOHDXcRiDcCLSAAI=;
- b=nhtBZibIwnBkPDHJCbP4PMmNHMC+hiwcwr8/1k8ga5Sa94daTE5kR2ylsNtJ+WtuWX
- vi8JsMjhfolq2sXSmYCU4pYFsgI7iElOBqAPbJZEu5BZThXXOWrM6uSz8ybFxIjUXrQO
- qfKX9UjocO3UbX66fUOUff0DRTmVTBfapCxbvoLq1kB6/jVnMQ/bgXyMgoE+TSOjkSwA
- StdMUVUi3E8wkOM9ibp9H4LqFJqe9Sa6/SeON6fsguiNgph3EZevdAYdC0Di6jhurgiJ
- ZEI1SQdsjs+0WCFseHxPJ+rzczhClEwUUA3de/d0wax+aruFf9NX5IqUtZkpvZAlrGsc
- Eodw==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=SYCAqsoUZtLwLDlDfp6OtymT17dsOHDXcRiDcCLSAAI=;
- b=QAtGE5N0FPsMfIAZvoGdJMayPRKNai+sZXak9k6L2+jQzili+3Ypd0RVVcx0L53qXI
- ZFPsJx2E9sAuPRNvO2+0xPnvLHfJ8010mDQ4dbisjvGzFN5fjRvyBUaTZQxXh2l1NHuy
- t9BbPPRnfbeLCTGmkT5Ig8cbN5n5NS0cXmub4lPej7sq5NC9ySskfEUoPG4uuBJj1aPA
- 24443vimrylUDY+ibsl71dlr9i3VfT2EACbsVYC5FFaER4XcF/pi1j1aYUi7ZdPfVMSp
- /yv4f6XB1stJv01dF+xrErQ2evoYiqQcGI5G923EWqzYzyZhCQRupHiI0HGbG6m6vSpR
- ZJPA==
-X-Gm-Message-State: AA+aEWY2bnFWNNQNi8FsaSK0osXcSndSfJeQPVpXf+JNKClpDpbsXkHy
- LSHNgxjuTgApe+jdSSipf7bgTZbTMc7RMLlxrRk=
-X-Google-Smtp-Source: AFSGD/ULEaU52DpGnoEB0+B391rVIknIq95m9aFt1PWmOEugtipxjN1gDll5xHanHFuNsFuqFVfAnPwwh/hYD9vnflk=
-X-Received: by 2002:a2e:630a:: with SMTP id
- x10-v6mr8707628ljb.11.1543810916221; 
- Sun, 02 Dec 2018 20:21:56 -0800 (PST)
+ id 1gTgeo-0000Qh-Ax
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 05:20:35 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=YeDWku8nAbBO8EjCDYmGbe09MmohXnWfN6ck3hSKghE=;
+ b=EPdfuVFWjsMP8FSVZOir9IqHF1OeEBIDoYuNaWGylzjXzJeV9Cf1rRMMcJOvj+fiKOw2wfk3SYH+htnlcN81Ni7SsCJFOocyhqdoViWPQ8bJkCVI1/BsT68yqkr+ytAjWcr2581Z5frpBF3z54bdq2XuImO07hDO0ZGRLJ4TFMI=
+Received: from DB7PR04MB4618.eurprd04.prod.outlook.com (52.135.138.152) by
+ DB7PR04MB4138.eurprd04.prod.outlook.com (52.135.130.147) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.19; Mon, 3 Dec 2018 05:20:16 +0000
+Received: from DB7PR04MB4618.eurprd04.prod.outlook.com
+ ([fe80::28ab:d6bc:2c00:a54b]) by DB7PR04MB4618.eurprd04.prod.outlook.com
+ ([fe80::28ab:d6bc:2c00:a54b%5]) with mapi id 15.20.1382.020; Mon, 3 Dec 2018
+ 05:20:16 +0000
+From: Joakim Zhang <qiangqing.zhang@nxp.com>
+To: "shawnguo@kernel.org" <shawnguo@kernel.org>, "s.hauer@pengutronix.de"
+ <s.hauer@pengutronix.de>
+Subject: [PATCH RESEND V2 0/4] ARM: dts: imx: Add flexcan stop mode wake
+Thread-Topic: [PATCH RESEND V2 0/4] ARM: dts: imx: Add flexcan stop mode wake
+Thread-Index: AQHUisff/FIFl8alIUGJHUeqllbD9Q==
+Date: Mon, 3 Dec 2018 05:20:16 +0000
+Message-ID: <20181203051753.1532-1-qiangqing.zhang@nxp.com>
+Accept-Language: en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+x-mailer: git-send-email 2.17.1
+x-clientproxiedby: SG2PR03CA0094.apcprd03.prod.outlook.com
+ (2603:1096:4:7c::22) To DB7PR04MB4618.eurprd04.prod.outlook.com
+ (2603:10a6:5:36::24)
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=qiangqing.zhang@nxp.com; 
+x-ms-exchange-messagesentrepresentingtype: 1
+x-originating-ip: [92.121.68.129]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; DB7PR04MB4138;
+ 6:Xh1UolDrR6ChUqCikew8ErFvNcf6DQczrux6kFDiwSbBUvscZKH0aGRH1qXqLXANe/18Tmw09xb0DFHbzXthB9AkxLRm66x+48ROhT64CJJaUXaFAvI4/4bN6zecW1TFiDf75Hsw6NMbNQWSWiajRXx0nokEYR+xqw9rVKvW5hazPq/9g1xNXH2XW48TcPw5Ai9DIsObji3vQDGqql61/ZVba+vccM+BhAV+5e53jloqbvxGGIcUjOMtRzmEKzsjw9v54ClVfYHzglXfNgdK0CexEMctPr1NM2NbPbKNYFXO13hNv40NA9UDVWxAK1rknqBZWG9pJwvJ8XAP6TQdfsPHHK31bzRysAekXA2ofUCSbEgPABi7Ix2jk//Kumq06466BxdoVGZGSX2yJvp7cHilVqFU5XdKIxyWU5+TQddGZlxGafw2XZGKSLfDSwWfMTBEW/sMQ8FY0J8xYHe8Zw==;
+ 5:8TDKB6i/KA458SijZAAdcaxp0mErSHUJVh8ysxCoKEODWYKGyYBGq5vK0h35QcMaTUCKEIJMP30vKt5YT1GUuRgMMRXtWzxgh8zi6F7UXw4zcZmrYRhw+JYOL45u1C0gYES1+yujGMJZPkSlJgVxluUI9qDk0LeI9w22+L57I7c=;
+ 7:+Pc7AZEDM81gM15Qp3GK6Ju+3tCzy47lWbePaWZfN1q7hT4pHRAJuPStkTiv37tsHwegIptBRQGSTgYiaVtFcpn8eZjqN7qRSJLeMbgYKRCGoq0btJ1RKLeV3RxCJA28S970202zyln25ZAQ/lcRcQ==
+x-ms-office365-filtering-correlation-id: db4700d9-d859-4b1e-57c7-08d658df0222
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(5600074)(711020)(4618075)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(2017052603328)(7153060)(7193020);
+ SRVR:DB7PR04MB4138; 
+x-ms-traffictypediagnostic: DB7PR04MB4138:
+x-microsoft-antispam-prvs: <DB7PR04MB4138D442EEE9BE949840AAF1E6AE0@DB7PR04MB4138.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3002001)(93006095)(93001095)(3231455)(999002)(944501493)(52105112)(6055026)(148016)(149066)(150057)(6041310)(20161123560045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123558120)(20161123564045)(20161123562045)(201708071742011)(7699051)(76991095);
+ SRVR:DB7PR04MB4138; BCL:0; PCL:0; RULEID:; SRVR:DB7PR04MB4138; 
+x-forefront-prvs: 08756AC3C8
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(346002)(396003)(136003)(39860400002)(376002)(366004)(189003)(199004)(54534003)(6512007)(2906002)(81156014)(478600001)(8676002)(6486002)(110136005)(14454004)(486006)(81166006)(476003)(2616005)(71190400001)(53936002)(25786009)(6436002)(316002)(68736007)(54906003)(4326008)(50226002)(86362001)(2501003)(186003)(8936002)(66066001)(105586002)(106356001)(7736002)(97736004)(5660300001)(305945005)(14444005)(102836004)(52116002)(99286004)(217873002)(6506007)(386003)(3846002)(6116002)(71200400001)(256004)(26005)(36756003)(1076002);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:DB7PR04MB4138;
+ H:DB7PR04MB4618.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; MX:1; A:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: KD/755YGNhZmStBBSce+V6CR0sMUvbv937wSqA78cElTQ6wuNVJp5OFgZMrbyNrWbQCn+idb/8RoJztofGEQmdFdXfzo/xLOXsSFt5cb0qP6T5/FHzooxlFTLsDVnVaYJukFmIkjrA5UZyUZBlfW6piPq/b1aUBhk9U9BWTnTieoMzmS+4x19TJb/rDdgkRqUFCNCaZs+8bmCGwKUjp68kKJb+D0yH9pk25wdo/Rkj08R9tr8bm6Bn/TsxeYjiNSU0+P5Z+xkmJLtnvCMIdcHEFNY69BiH7grdrgsSdrFxAcxGDKOqSX0n8gXx8ez6mXr3curOp8Ck5/qmJmLss/K1A1cpZJt7SFocnd0zkl9I0=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-References: <20181202061944.GA3094@jordon-HP-15-Notebook-PC>
- <20181202111313.GC6959@rapoport-lnx>
-In-Reply-To: <20181202111313.GC6959@rapoport-lnx>
-From: Souptick Joarder <jrdr.linux@gmail.com>
-Date: Mon, 3 Dec 2018 09:51:45 +0530
-Message-ID: <CAFqt6zbvyaPF3tUA1-=RsfSM14p7Rx5NgQqAeW5-JUfd+NrJ2g@mail.gmail.com>
-Subject: Re: [PATCH v2 1/9] mm: Introduce new vm_insert_range API
-To: rppt@linux.ibm.com
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: db4700d9-d859-4b1e-57c7-08d658df0222
+X-MS-Exchange-CrossTenant-originalarrivaltime: 03 Dec 2018 05:20:16.0333 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: DB7PR04MB4138
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181202_202209_272242_F79BC98C 
-X-CRM114-Status: GOOD (  28.86  )
+X-CRM114-CacheID: sfid-20181202_212034_374282_38BE48A1 
+X-CRM114-Status: UNSURE (   9.15  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,152 +121,45 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, Heiko Stuebner <heiko@sntech.de>,
- Peter Zijlstra <peterz@infradead.org>, dri-devel@lists.freedesktop.org,
- linux-kernel@vger.kernel.org, Linux-MM <linux-mm@kvack.org>,
- linux1394-devel@lists.sourceforge.net,
- Marek Szyprowski <m.szyprowski@samsung.com>,
- Stephen Rothwell <sfr@canb.auug.org.au>, oleksandr_andrushchenko@epam.com,
- joro@8bytes.org, Russell King - ARM Linux <linux@armlinux.org.uk>,
- Matthew Wilcox <willy@infradead.org>, airlied@linux.ie,
- linux-arm-kernel@lists.infradead.org, linux-rockchip@lists.infradead.org,
- treding@nvidia.com, linux-media@vger.kernel.org,
- Kees Cook <keescook@chromium.org>, pawel@osciak.com,
- Rik van Riel <riel@surriel.com>, iommu@lists.linux-foundation.org,
- rppt@linux.vnet.ibm.com, Boris Ostrovsky <boris.ostrovsky@oracle.com>,
- mchehab@kernel.org, iamjoonsoo.kim@lge.com, vbabka@suse.cz,
- Juergen Gross <jgross@suse.com>, hjc@rock-chips.com, xen-devel@lists.xen.org,
- Kyungmin Park <kyungmin.park@samsung.com>, stefanr@s5r6.in-berlin.de,
- Andrew Morton <akpm@linux-foundation.org>, robin.murphy@arm.com,
- "Kirill A. Shutemov" <kirill.shutemov@linux.intel.com>
+Cc: "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Joakim Zhang <qiangqing.zhang@nxp.com>, dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Mike,
+This patchset intends to add flexcan stop mode wakeup support on IMX6/7 platforms.
 
-On Sun, Dec 2, 2018 at 4:43 PM Mike Rapoport <rppt@linux.ibm.com> wrote:
->
-> On Sun, Dec 02, 2018 at 11:49:44AM +0530, Souptick Joarder wrote:
-> > Previouly drivers have their own way of mapping range of
-> > kernel pages/memory into user vma and this was done by
-> > invoking vm_insert_page() within a loop.
-> >
-> > As this pattern is common across different drivers, it can
-> > be generalized by creating a new function and use it across
-> > the drivers.
-> >
-> > vm_insert_range is the new API which will be used to map a
-> > range of kernel memory/pages to user vma.
-> >
-> > This API is tested by Heiko for Rockchip drm driver, on rk3188,
-> > rk3288, rk3328 and rk3399 with graphics.
-> >
-> > Signed-off-by: Souptick Joarder <jrdr.linux@gmail.com>
-> > Reviewed-by: Matthew Wilcox <willy@infradead.org>
-> > Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  include/linux/mm_types.h |  3 +++
-> >  mm/memory.c              | 38 ++++++++++++++++++++++++++++++++++++++
-> >  mm/nommu.c               |  7 +++++++
-> >  3 files changed, 48 insertions(+)
-> >
-> > diff --git a/include/linux/mm_types.h b/include/linux/mm_types.h
-> > index 5ed8f62..15ae24f 100644
-> > --- a/include/linux/mm_types.h
-> > +++ b/include/linux/mm_types.h
-> > @@ -523,6 +523,9 @@ extern void tlb_gather_mmu(struct mmu_gather *tlb, struct mm_struct *mm,
-> >  extern void tlb_finish_mmu(struct mmu_gather *tlb,
-> >                               unsigned long start, unsigned long end);
-> >
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count);
-> > +
->
-> This seem to belong to include/linux/mm.h, near vm_insert_page()
+ChangeLog:
+V1->V2:
+	*update stop mode property(stop-mode -> fsl,stop-mode).
 
-Ok, I will change it. Apart from this change does it looks good ?
+Hi Shawn,
+   This property has been merged both flexcan bindings doc and kernel
+   driver.
 
->
-> >  static inline void init_tlb_flush_pending(struct mm_struct *mm)
-> >  {
-> >       atomic_set(&mm->tlb_flush_pending, 0);
-> > diff --git a/mm/memory.c b/mm/memory.c
-> > index 15c417e..84ea46c 100644
-> > --- a/mm/memory.c
-> > +++ b/mm/memory.c
-> > @@ -1478,6 +1478,44 @@ static int insert_page(struct vm_area_struct *vma, unsigned long addr,
-> >  }
-> >
-> >  /**
-> > + * vm_insert_range - insert range of kernel pages into user vma
-> > + * @vma: user vma to map to
-> > + * @addr: target user address of this page
-> > + * @pages: pointer to array of source kernel pages
-> > + * @page_count: number of pages need to insert into user vma
-> > + *
-> > + * This allows drivers to insert range of kernel pages they've allocated
-> > + * into a user vma. This is a generic function which drivers can use
-> > + * rather than using their own way of mapping range of kernel pages into
-> > + * user vma.
-> > + *
-> > + * If we fail to insert any page into the vma, the function will return
-> > + * immediately leaving any previously-inserted pages present.  Callers
-> > + * from the mmap handler may immediately return the error as their caller
-> > + * will destroy the vma, removing any successfully-inserted pages. Other
-> > + * callers should make their own arrangements for calling unmap_region().
-> > + *
-> > + * Context: Process context. Called by mmap handlers.
-> > + * Return: 0 on success and error code otherwise
-> > + */
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count)
-> > +{
-> > +     unsigned long uaddr = addr;
-> > +     int ret = 0, i;
-> > +
-> > +     for (i = 0; i < page_count; i++) {
-> > +             ret = vm_insert_page(vma, uaddr, pages[i]);
-> > +             if (ret < 0)
-> > +                     return ret;
-> > +             uaddr += PAGE_SIZE;
-> > +     }
-> > +
-> > +     return ret;
-> > +}
-> > +EXPORT_SYMBOL(vm_insert_range);
-> > +
-> > +/**
-> >   * vm_insert_page - insert single page into user vma
-> >   * @vma: user vma to map to
-> >   * @addr: target user address of this page
-> > diff --git a/mm/nommu.c b/mm/nommu.c
-> > index 749276b..d6ef5c7 100644
-> > --- a/mm/nommu.c
-> > +++ b/mm/nommu.c
-> > @@ -473,6 +473,13 @@ int vm_insert_page(struct vm_area_struct *vma, unsigned long addr,
-> >  }
-> >  EXPORT_SYMBOL(vm_insert_page);
-> >
-> > +int vm_insert_range(struct vm_area_struct *vma, unsigned long addr,
-> > +                     struct page **pages, unsigned long page_count)
-> > +{
-> > +     return -EINVAL;
-> > +}
-> > +EXPORT_SYMBOL(vm_insert_range);
-> > +
-> >  /*
-> >   *  sys_brk() for the most part doesn't need the global kernel
-> >   *  lock, except when an application is doing something nasty
-> > --
-> > 1.9.1
-> >
->
-> --
-> Sincerely yours,
-> Mike.
->
+Best Regards,
+Joakim Zhang
+
+Aisheng Dong (4):
+  ARM: dts: imx6sx: Add flexcan stop mode wakeup support
+  ARM: dts: imx6qdl: Add flexcan stop mode wakeup support
+  ARM: dts: imx6ul: Add flexcan stop mode wakeup support
+  ARM: dts: imx7s: Add flexcan stop mode wakeup support
+
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+ arch/arm/boot/dts/imx6sx.dtsi  | 2 ++
+ arch/arm/boot/dts/imx6ul.dtsi  | 2 ++
+ arch/arm/boot/dts/imx7s.dtsi   | 2 ++
+ 4 files changed, 8 insertions(+)
+
+-- 
+2.17.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
