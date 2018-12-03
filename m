@@ -2,80 +2,60 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 8FAA6C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:24:16 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 4D4ADC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:26:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 6152120878
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:24:16 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 1F45620878
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 12:26:23 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="aFv7SDC4"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6152120878
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OMSbbC5j"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 1F45620878
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.de
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=/VuToHyTkWGTWXpdIIQdwnPWVoIXQvI4T56hUc95aYM=; b=aFv7SDC4sVKtF4
-	wgEa8i2FfHDPL1nq6PtLNgJjTNqbFYRG5VZ5Y4thIE4uAVAAViYH+TPajcM0Gj808s656aPlQYOnK
-	Y0keaabLBeJOx4XCtBLk9sMUCWtggZysKJ2yxSFI9/j3mvatlENkZtlASzHfop0P26Aoash7HvHuA
-	Dlz7o/moLH/g83Va+6+6o/RttfsQX5Jt1nDO20VtvntSsa5g5L4cbmlvEbI5Mk3XP9jZccJZHX1bE
-	KOzQJ4ni3VCm3eCSeH4MEi2GUcCNhayf73oOtzoQZmroymYmcqNqHGiHHC/O7zpWQC/sijryruh7g
-	JT+2CurwtejIrmS+r1gA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	Mime-Version:References:In-Reply-To:Date:To:From:Subject:Message-ID:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=MJEJjpQBd3uk53jh2UV/6aTtpAH1nmOH1KxheMYOwcI=; b=OMSbbC5j3eBL+snEJbR9v5w8V
+	UalRXJF/sawBXubMoFhaAZgywV3rrKA/4xSOQHrCnJmD/qpXHzkLPdVCSsrShgVVD1m5+RRI//suE
+	5Dsd2gY46axOpHM5G8oVnwxOoKkx3tmVk3q78zftUHMCCY+uZGqbUgGmA3zFAn8HvLLZddL2ACHu1
+	EwrCa67Zg/hzmH5QdoPoJMldX2i0DRuV5S4xUTlw5ulco4IMhWwls9YmliZQZMqQTrnmTpZV5TL5M
+	Ck+TsRzQnMfQttf87JbT3SR4yT8eatMyK8P9e8wAKzlm5q9xx9xeUW5yYzAQkbew8/XOhB+TFqPjL
+	J0Q1cmq1w==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTnGp-0002tE-FW; Mon, 03 Dec 2018 12:24:15 +0000
-Received: from mail-lj1-f193.google.com ([209.85.208.193])
+	id 1gTnIr-0004m0-7s; Mon, 03 Dec 2018 12:26:21 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTnGj-0002rx-3i
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:24:13 +0000
-Received: by mail-lj1-f193.google.com with SMTP id v1-v6so11183473ljd.0
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 04:23:58 -0800 (PST)
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:date:from:to:cc:subject:message-id:references
- :mime-version:content-disposition:in-reply-to:user-agent;
- bh=L3IcBOcMebSegDE2suDRtzdIfDfjoFDzHLWatOf7pRc=;
- b=j8n1TR2edzsHJGnQu1Z6SI8f4f4qaJovqUzYrxRRBWnN/3r/CSLPvMkvGuWdK9WW2y
- qGm1AjQyybuTzLqNrZnqNcbP6e9A+joalD+bsX5BxoE8vR3xB1xZGrD8cBJPKOLB3XYs
- nGGKYhaJxgQw4IVqH2odSYKp02Opc1q2Ff99eOCxJRpqzFU6rkUzBieKiZdsYZyRS+Pp
- rNjttJEsMChR7KEtD3l9uUa2hu3Zv+vHCQwSAjfAESABbtouvfqVBFvzn0+zKTj7/QsS
- nEVwkipi+fwQxE93pPQ0KgtZoOKbahgk1sC9PqL46FtiuaqJiwiQjUxu13WsFMuGJkOc
- Fyqw==
-X-Gm-Message-State: AA+aEWYNmFn+x0pI4bGwh3mZpnQln98e7gf+GNKY6EpXQI9YIFQjl5RS
- mJRBpkdDZ1UbARMzz1M3NAY=
-X-Google-Smtp-Source: AFSGD/W+ahtDp3KH0WT3OuHcaqjTmG8XYhWE4G4B62ekVjbHPEE1Vbep23gig1Bmq5eHfclZDz4PuQ==
-X-Received: by 2002:a2e:8ec8:: with SMTP id
- e8-v6mr9863359ljl.162.1543839837418; 
- Mon, 03 Dec 2018 04:23:57 -0800 (PST)
-Received: from localhost.localdomain ([213.255.186.46])
- by smtp.gmail.com with ESMTPSA id v5-v6sm2477864lje.78.2018.12.03.04.23.55
- (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
- Mon, 03 Dec 2018 04:23:56 -0800 (PST)
-Date: Mon, 3 Dec 2018 14:23:43 +0200
-From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
-To: mazziesaccount@gmail.com, matti.vaittinen@fi.rohmeurope.com
-Subject: [PATCH v5 9/9] clk: bd718x7: Initial support for ROHM
- bd71837/bd71847 PMIC clock
-Message-ID: <3bb96772e26833fe121fd99ea53eca616c2955be.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-References: <cover.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <cover.1543837442.git.matti.vaittinen@fi.rohmeurope.com>
-User-Agent: Mutt/1.9.2 (2017-12-15)
+ id 1gTnIi-0004lP-TD
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 12:26:19 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay1.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id E28E5AFA8;
+ Mon,  3 Dec 2018 12:25:57 +0000 (UTC)
+Message-ID: <7a75afd030cbd17c986a3ad486aab35ad3418b28.camel@suse.de>
+Subject: Re: [PATCH] firmware: arm_sdei: fix wrong of_node_put() in init
+ function
+From: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+To: James Morse <james.morse@arm.com>
+Date: Mon, 03 Dec 2018 13:25:55 +0100
+In-Reply-To: <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
+References: <20181126121536.28739-1-nsaenzjulienne@suse.de>
+ <08d6b9e6-7aa0-9342-193b-1ce6e0417f77@arm.com>
+User-Agent: Evolution 3.30.2 
+Mime-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_042409_148274_88448FAD 
-X-CRM114-Status: GOOD (  18.89  )
+X-CRM114-CacheID: sfid-20181203_042613_091914_94DC3CB7 
+X-CRM114-Status: GOOD (  20.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,208 +67,116 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: david.brown@linaro.org, linux-clk@vger.kernel.org, b.zolnierkie@samsung.com,
- sboyd@kernel.org, linux-kernel@vger.kernel.org, mturquette@baylibre.com,
- rafael.j.wysocki@intel.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
- krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
- djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
- andy.gross@linaro.org, andrew.smirnov@gmail.com, lee.jones@linaro.org,
- sjhuang@iluvatar.ai, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: linux-kernel@vger.kernel.org, linux-arm-kernel@lists.infradead.org
+Content-Type: multipart/mixed; boundary="===============4266517354767134616=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-ROHM bd71837 and bd71847 contain 32768Hz clock gate. Support the clock
-using generic clock framework. Note, only bd71837 is tested but bd71847
-should be identical what comes to clk parts.
 
-Signed-off-by: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
----
- drivers/clk/Kconfig       |   7 +++
- drivers/clk/Makefile      |   1 +
- drivers/clk/clk-bd718x7.c | 131 ++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 139 insertions(+)
- create mode 100644 drivers/clk/clk-bd718x7.c
-
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 81cdb4eaca07..2dc12bf75b1b 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -283,6 +283,13 @@ config COMMON_CLK_STM32H7
- 	---help---
- 	  Support for stm32h7 SoC family clocks
- 
-+config COMMON_CLK_BD718XX
-+	tristate "Clock driver for ROHM BD718x7 PMIC"
-+	depends on MFD_ROHM_BD718XX
-+	help
-+	  This driver supports ROHM BD71837 and ROHM BD71847
-+	  PMICs clock gates.
-+
- source "drivers/clk/actions/Kconfig"
- source "drivers/clk/bcm/Kconfig"
- source "drivers/clk/hisilicon/Kconfig"
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index 72be7a38cff1..a47430b387db 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -21,6 +21,7 @@ endif
- obj-$(CONFIG_MACH_ASM9260)		+= clk-asm9260.o
- obj-$(CONFIG_COMMON_CLK_AXI_CLKGEN)	+= clk-axi-clkgen.o
- obj-$(CONFIG_ARCH_AXXIA)		+= clk-axm5516.o
-+obj-$(CONFIG_COMMON_CLK_BD718XX)	+= clk-bd718x7.o
- obj-$(CONFIG_COMMON_CLK_CDCE706)	+= clk-cdce706.o
- obj-$(CONFIG_COMMON_CLK_CDCE925)	+= clk-cdce925.o
- obj-$(CONFIG_ARCH_CLPS711X)		+= clk-clps711x.o
-diff --git a/drivers/clk/clk-bd718x7.c b/drivers/clk/clk-bd718x7.c
-new file mode 100644
-index 000000000000..df5f1068ce8e
---- /dev/null
-+++ b/drivers/clk/clk-bd718x7.c
-@@ -0,0 +1,131 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (C) 2018 ROHM Semiconductors
-+// bd71837.c  -- ROHM BD71837MWV clock driver
-+
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/init.h>
-+#include <linux/err.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/mfd/rohm-bd718x7.h>
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/regmap.h>
-+
-+struct bd718xx_clk {
-+	struct clk_hw hw;
-+	u8 reg;
-+	u8 mask;
-+	struct platform_device *pdev;
-+	struct bd718xx *mfd;
-+};
-+
-+static int bd71837_clk_set(struct clk_hw *hw, int status)
-+{
-+	struct bd718xx_clk *c = container_of(hw, struct bd718xx_clk, hw);
-+
-+	return regmap_update_bits(c->mfd->regmap, c->reg, c->mask, status);
-+}
-+
-+static void bd71837_clk_disable(struct clk_hw *hw)
-+{
-+	int rv;
-+	struct bd718xx_clk *c = container_of(hw, struct bd718xx_clk, hw);
-+
-+	rv = bd71837_clk_set(hw, 0);
-+	if (rv)
-+		dev_dbg(&c->pdev->dev, "Failed to disable 32K clk (%d)\n", rv);
-+}
-+
-+static int bd71837_clk_enable(struct clk_hw *hw)
-+{
-+	return bd71837_clk_set(hw, 1);
-+}
-+
-+static int bd71837_clk_is_enabled(struct clk_hw *hw)
-+{
-+	int enabled;
-+	int rval;
-+	struct bd718xx_clk *c = container_of(hw, struct bd718xx_clk, hw);
-+
-+	rval = regmap_read(c->mfd->regmap, c->reg, &enabled);
-+
-+	if (rval)
-+		return rval;
-+
-+	return enabled & c->mask;
-+}
-+
-+static const struct clk_ops bd71837_clk_ops = {
-+	.prepare = &bd71837_clk_enable,
-+	.unprepare = &bd71837_clk_disable,
-+	.is_prepared = &bd71837_clk_is_enabled,
-+};
-+
-+static int bd71837_clk_probe(struct platform_device *pdev)
-+{
-+	struct bd718xx_clk *c;
-+	int rval = -ENOMEM;
-+	const char *parent_clk;
-+	struct device *parent = pdev->dev.parent;
-+	struct bd718xx *mfd = dev_get_drvdata(parent);
-+	struct clk_init_data init = {
-+		.name = "bd718xx-32k-out",
-+		.ops = &bd71837_clk_ops,
-+	};
-+
-+	c = devm_kzalloc(&pdev->dev, sizeof(*c), GFP_KERNEL);
-+	if (!c)
-+		return -ENOMEM;
-+
-+	init.num_parents = 1;
-+	parent_clk = of_clk_get_parent_name(parent->of_node, 0);
-+
-+	init.parent_names = &parent_clk;
-+	if (!parent_clk) {
-+		dev_err(&pdev->dev, "No parent clk found\n");
-+		return -EINVAL;
-+	}
-+
-+	c->reg = BD718XX_REG_OUT32K;
-+	c->mask = BD718XX_OUT32K_EN;
-+	c->mfd = mfd;
-+	c->pdev = pdev;
-+	c->hw.init = &init;
-+
-+	of_property_read_string_index(parent->of_node,
-+				      "clock-output-names", 0, &init.name);
-+
-+	rval = devm_clk_hw_register(&pdev->dev, &c->hw);
-+	if (!rval) {
-+		rval = devm_clk_hw_register_clkdev(&pdev->dev,
-+						   &c->hw, init.name, NULL);
-+		if (rval)
-+			dev_warn(&pdev->dev, "Failed to register clkdev\n");
-+		if (parent->of_node) {
-+			rval = devm_of_clk_add_parent_hw_provider(&pdev->dev,
-+					     of_clk_hw_simple_get, &c->hw);
-+			if (rval)
-+				dev_err(&pdev->dev,
-+					"adding clk provider failed\n");
-+		}
-+	} else {
-+		dev_err(&pdev->dev, "failed to register 32K clk");
-+	}
-+
-+	return rval;
-+}
-+
-+static struct platform_driver bd71837_clk = {
-+	.driver = {
-+		.name = "bd718xx-clk",
-+	},
-+	.probe = bd71837_clk_probe,
-+};
-+
-+module_platform_driver(bd71837_clk);
-+
-+MODULE_AUTHOR("Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>");
-+MODULE_DESCRIPTION("BD71837 chip clk driver");
-+MODULE_LICENSE("GPL");
--- 
-2.14.3
+--===============4266517354767134616==
+Content-Type: multipart/signed; micalg="pgp-sha256";
+	protocol="application/pgp-signature"; boundary="=-t7AYbqLg9t8BDYsYLWC5"
 
 
--- 
-Matti Vaittinen
-ROHM Semiconductors
+--=-t7AYbqLg9t8BDYsYLWC5
+Content-Type: text/plain; charset="UTF-8"
+Content-Transfer-Encoding: quoted-printable
 
-~~~ "I don't think so," said Rene Descartes.  Just then, he vanished ~~~
+Hi James, thanks for the review!=20
+
+On Fri, 2018-11-30 at 18:31 +0000, James Morse wrote:
+> Hi Nicolas,
+>=20
+> On 26/11/2018 12:15, Nicolas Saenz Julienne wrote:
+> > After finding a "firmware" dt node arm_sdei tries to match it's
+> > compatible string with it. To do so it's calling
+> > of_find_matching_node()
+> > which already takes care of decreasing the refcount on the
+> > "firmware"
+> > node. We are then incorrectly decreasing the refcount on that node
+> > again.
+> >=20
+> > This patch removes the unwarranted call to of_node_put().
+> >=20
+> > Fixes: ad6eb31ef903 ("firmware: arm_sdei: Add driver for Software
+> > Delegated Exceptions")
+> > Signed-off-by: Nicolas Saenz Julienne <nsaenzjulienne@suse.de>
+>=20
+> Thanks!, I agree this is unwarranted.
+> Is there a tool that picks these up? I remember sparse giving me a
+> headache, but
+> I don't remember this one... I probably cargo-culted it from
+> somewhere else.
+
+We stumbled upon this one on a test system. TBH I don't really know
+much about these tools so I can't tell. That said, I sent 4 more fixes
+on this bug (one more in drivers/firmware) so there definitively was
+some cargo-culting happening.
+
+Regards,
+Nicolas
+
+>=20
+> Acked-by: James Morse <james.morse@arm.com>
+>=20
+>=20
+> Thanks,
+>=20
+> James
+>=20
+>=20
+> > ---
+> >  drivers/firmware/arm_sdei.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> >=20
+> > diff --git a/drivers/firmware/arm_sdei.c
+> > b/drivers/firmware/arm_sdei.c
+> > index 1ea71640fdc2..dffb47c6b480 100644
+> > --- a/drivers/firmware/arm_sdei.c
+> > +++ b/drivers/firmware/arm_sdei.c
+> > @@ -1017,7 +1017,6 @@ static bool __init sdei_present_dt(void)
+> >  		return false;
+> > =20
+> >  	np =3D of_find_matching_node(fw_np, sdei_of_match);
+> > -	of_node_put(fw_np);
+> >  	if (!np)
+> >  		return false;
+> > =20
+> >=20
+
+
+--=-t7AYbqLg9t8BDYsYLWC5
+Content-Type: application/pgp-signature; name="signature.asc"
+Content-Description: This is a digitally signed message part
+Content-Transfer-Encoding: 7bit
+
+-----BEGIN PGP SIGNATURE-----
+
+iQEzBAABCAAdFiEErOkkGDHCg2EbPcGjlfZmHno8x/4FAlwFINMACgkQlfZmHno8
+x/4MIwgAtHytTe+96hhXYF8/nhxaRJfvz0lYGsmJmhQbfPjpwkDntyvwImjoAvFr
+VqJe0LVkzJ9UgcmJfv5dKnhGkMO5Mb2pG1j8HAnOIwDu1l8JFiJdAOpxIIJoPBvJ
+0wtuGeAqq01Qu0jAqTCqNjPwUe++Mm+Hq8c/R0IHAKe8LVxNj5nCxp31lutZE1hY
+YiqopW+uLORHTBIVVm+K8rg3wYnFf8z5DfmKx/ddwF+exEENo9vt+JxQvTL6/Duk
+VdH+5JkPTS6oTMOKpcJIYc7MUnUrF09O6YzUv3RddsKpjtrJo0qXWBllzs+CAvAX
+Q4IrhMVAb178QBxt83+YJjE1xhAapQ==
+=L/YC
+-----END PGP SIGNATURE-----
+
+--=-t7AYbqLg9t8BDYsYLWC5--
+
+
+
+--===============4266517354767134616==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============4266517354767134616==--
+
+
