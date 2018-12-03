@@ -2,64 +2,144 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id EBB66C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:37:22 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D8620C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:40:26 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id BD13420659
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:37:22 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 91C6C20659
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 14:40:26 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="DhKqCUdl"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org BD13420659
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="A8GJF9Xo";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="P6kyEF5W";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=samsung.com header.i=@samsung.com header.b="PZmtrG7m"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 91C6C20659
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=partner.samsung.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
-	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
-	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rM5/iDC5bx0eDWnVVwDEQO1oVBA6HDL65LfzSoj0L+w=; b=DhKqCUdl40JQee
-	vjUVw4sDfbYW2XxlJtijcZVoIbtOCNOwSzWqJ21anI9RiP5fUr/CJ7nK2/sH5h5GkmGP8n2oHgpQ8
-	ZzsCW1ygw0kMZ0WjCozmYFMKmnEEGnrj7+Wq3VDHETFhuLeoLOo/5LLYqBYOWdCl5hmF6qePRrRos
-	lHewtvIl2QdDa4nRk/OX5MOXC0BV3acu+TFffTZytqC3cScWJ0mnp8uRyCrZI2dW+9tYCuEeZWBYO
-	DTaq9xK+uYKDQ4G4Wppp3Mg6Cd14bSVuQ0M+MzjStuiO58TaT2T1NfF74QIfMBcMkDl8xj2ELgiNq
-	sEgHWe76xb2CSd6qsCrQ==;
+	Content-Transfer-Encoding:Content-Type:MIME-Version:Cc:List-Subscribe:
+	List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:References:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	In-Reply-To:List-Owner; bh=uVMdS9NBDza8uv5ZAJ8YRyi2z2RmyWE8RJX/3Z3Rqnw=; b=A8
+	GJF9XoJlhr8wbH3J89Z7YO81XBWIeWzmv6vELoXRosJVDW1ZTQ6hnhe/CWUM2VIOBEONdNojsgNlb
+	jr2xYDLnBXVtbqjPiLaafc1ophhryqHffJ/2KQ8Vp87raQdQWxRRJy27Omb6qJOGLabFxBfKj8I1S
+	tsMKkCoJs8+CkhAA1PX5Ql/XXR3PAMVfbLCtX6OMH5tcZonA7l48Z5WnKnZEg9CKuuxy7EXe60enr
+	8A4GUY1YxhC1wBkc129IlX8aX7De/b521BZruprE9Mw7dKA2Y6eN05YqOYWu6wmsz7vrMKtQZitWb
+	A5YigxneCBVm34Wk92wuQf8IaJ8rdu9Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTpLd-00058f-7Y; Mon, 03 Dec 2018 14:37:21 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTpLZ-00058F-RN
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:37:19 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 6653D1682;
- Mon,  3 Dec 2018 06:37:07 -0800 (PST)
-Received: from [10.1.37.145] (p8cg001049571a15.cambridge.arm.com [10.1.37.145])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 8A6C83F5AF;
- Mon,  3 Dec 2018 06:37:05 -0800 (PST)
-Subject: Re: [PATCH v9 5/8] KVM: arm64: Support PUD hugepage in
- stage2_is_exec()
-To: Punit Agrawal <punit.agrawal@arm.com>, kvmarm@lists.cs.columbia.edu
-References: <20181031175745.18650-1-punit.agrawal@arm.com>
- <20181031175745.18650-6-punit.agrawal@arm.com>
-From: Anshuman Khandual <anshuman.khandual@arm.com>
-Message-ID: <ab23d99f-32fe-99d1-a255-89ef9028d660@arm.com>
-Date: Mon, 3 Dec 2018 20:07:06 +0530
-User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101
- Thunderbird/52.9.1
-MIME-Version: 1.0
-In-Reply-To: <20181031175745.18650-6-punit.agrawal@arm.com>
-Content-Language: en-US
+	id 1gTpOb-0006op-HV; Mon, 03 Dec 2018 14:40:25 +0000
+Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTpGL-0001lD-Sc
+ for linux-arm-kernel@bombadil.infradead.org; Mon, 03 Dec 2018 14:31:54 +0000
+DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
+ d=infradead.org; s=casper.20170209; h=References:Content-Type:Message-Id:Date
+ :Subject:Cc:To:From:Sender:Reply-To:MIME-Version:Content-Transfer-Encoding:
+ Content-ID:Content-Description:Resent-Date:Resent-From:Resent-Sender:
+ Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:List-Id:List-Help:
+ List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
+ bh=xnvwoL8u4q3jdpcw9MomShy0KGKgN6QxlXlHKX/7FTo=; b=P6kyEF5WuuQVm8sTrVLb1a83WL
+ DqA/Dr0mhl/j+yClCw2IXRkkXVYzDw1UObszbsMfGE9Iv9mZt490mjDf8wAKtmzuQAFaVbdtbfO7j
+ llpXdl0fo6R4NM4kCVaquebtEw13BuaQBYdP5Bh20CKuvBcRm6QY3rkwPEVDVOFnid58rSdo39esD
+ Iku1xRvX2/HqhM9auEq8YAHGl1ffqwf8onTiQit6KXJmNf6BLjhPVo+Pl7YxpB8c7VLRM4Yx9zZVH
+ zOwc9pypTj6Lt0Rw8YbYX47nPjQKm2ICuJuqf44lMErCLdn1+WHm5gkILTKZp6thWYNBGUYNSdU4U
+ Jjy3SRXQ==;
+Received: from mailout1.w1.samsung.com ([210.118.77.11])
+ by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTpGH-0007mp-U2
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 14:31:52 +0000
+Received: from eucas1p2.samsung.com (unknown [182.198.249.207])
+ by mailout1.w1.samsung.com (KnoxPortal) with ESMTP id
+ 20181203143129euoutp01d1e1c12ec6b9cab0faa9dec1da4173b3~s2Ry2K-NP1512615126euoutp01y
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon,  3 Dec 2018 14:31:29 +0000 (GMT)
+DKIM-Filter: OpenDKIM Filter v2.11.0 mailout1.w1.samsung.com
+ 20181203143129euoutp01d1e1c12ec6b9cab0faa9dec1da4173b3~s2Ry2K-NP1512615126euoutp01y
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=samsung.com;
+ s=mail20170921; t=1543847489;
+ bh=xnvwoL8u4q3jdpcw9MomShy0KGKgN6QxlXlHKX/7FTo=;
+ h=From:To:Cc:Subject:Date:References:From;
+ b=PZmtrG7mus0DRl7/H+WsXKbsfOxmI0z9Oy5AvidiOmDfR5cnfRswRXUyjp673TSfU
+ nek7qQntLHWQqrhAR6TP795CnZhtzeZUS5mnf03rCHuDLgCqY9sK+80ymFQ/3dQ0zK
+ k1avNr9zvtZyWoi6c4WL6n31USAPedq1MlybBNE8=
+Received: from eusmges1new.samsung.com (unknown [203.254.199.242]) by
+ eucas1p1.samsung.com (KnoxPortal) with ESMTP id
+ 20181203143128eucas1p19e2ea9db521aa745ff93977171d5d6f1~s2Rxl0npp1711417114eucas1p1M;
+ Mon,  3 Dec 2018 14:31:28 +0000 (GMT)
+Received: from eucas1p1.samsung.com ( [182.198.249.206]) by
+ eusmges1new.samsung.com (EUCPMTA) with SMTP id 18.CA.04441.F3E350C5; Mon,  3
+ Dec 2018 14:31:27 +0000 (GMT)
+Received: from eusmtrp1.samsung.com (unknown [182.198.249.138]) by
+ eucas1p2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e~s2RwrM_2o0832208322eucas1p2B;
+ Mon,  3 Dec 2018 14:31:27 +0000 (GMT)
+Received: from eusmgms2.samsung.com (unknown [182.198.249.180]) by
+ eusmtrp1.samsung.com (KnoxPortal) with ESMTP id
+ 20181203143127eusmtrp103bf2b3db0d489f291e8c9e5e2ea143c~s2RwalByQ1650116501eusmtrp1c;
+ Mon,  3 Dec 2018 14:31:27 +0000 (GMT)
+X-AuditID: cbfec7f2-5e3ff70000001159-9e-5c053e3fe2a1
+Received: from eusmtip2.samsung.com ( [203.254.199.222]) by
+ eusmgms2.samsung.com (EUCPMTA) with SMTP id 2E.E8.04128.E3E350C5; Mon,  3
+ Dec 2018 14:31:26 +0000 (GMT)
+Received: from AMDC3778.DIGITAL.local (unknown [106.120.51.20]) by
+ eusmtip2.samsung.com (KnoxPortal) with ESMTPA id
+ 20181203143126eusmtip202d74b9b677be3a30dfbb759f4d9400c~s2Rve22Pf0696906969eusmtip2D;
+ Mon,  3 Dec 2018 14:31:25 +0000 (GMT)
+From: Lukasz Luba <l.luba@partner.samsung.com>
+To: linux-arm-kernel@lists.infradead.org, linux-samsung-soc@vger.kernel.org,
+ linux-kernel@vger.kernel.org, linux-pm@vger.kernel.org,
+ devicetree@vger.kernel.org
+Subject: [PATCH v2 0/5] devfreq: handle suspend/resume
+Date: Mon,  3 Dec 2018 15:31:10 +0100
+Message-Id: <1543847475-7600-1-git-send-email-l.luba@partner.samsung.com>
+X-Mailer: git-send-email 2.7.4
+X-Brightmail-Tracker: H4sIAAAAAAAAA0VSWUwTURT1dWY6I6EwFgNPtmijBlARE9QXNS6RjzH6oTEGgxosdgQDLbUD
+ uGFAiUKVxdQFUlyDCBlrCrWWpoALVqpiKcW4QVAjrhUJUsVoIto6Vf/OOfece8/HpTCph4ik
+ dqjyWI1KniMTB+GWzu/dc5YtJTYnDdYidOtaPGquMRKopXmMQE++vCPQOXs3gUrqjGL04KgS
+ VQ1+xJDL1UQi58EhEvUVRyP9iXYRMg0+JtBD22kx8lbYAapxXRehK/YBEtU/cYtQ/4FGMRq4
+ f8e3o6uXQIfa7SQ6fHmEQEM9z/HlkLG0WgjGcNYAmNpiN84cqxoFTF3bBxFj4rVi5sYZA8lc
+ vVjEjHeSzK3hNhFjflSKM5VmHjCNl7+RjNcUuzYkLWiJgs3ZUcBq5i7dGpRlLKkm1DdCd9dU
+ uchi4Aw+AiZSkE6G+h+viCMgiJLSjQCWvfaIBfIFwLGWTlwgXgA9rb9EfyMmw3lSGDQAWN70
+ WPQv0lf/w0coSkwnQiu/0x+YTNcB2GuN93sw+i4GbZ91fzaF0QvgoOMi5sc4PQNWVoz9wRJ6
+ FTz91IgL12Lhs24t5g9DuoKCF6wnAzVSoLmknRRwGPQ4zAEcDbuOlwfCHHSW8WIBF8LSe9aA
+ ZzG87XAT/qIYHQ+NtrmCvAJ22m8DvwzpEPj00yS/jPmgzlKNCbIElh2WCu44aC7vCZQJhw2G
+ U4HlDOTPleF+u5TeAs28+hiI1f8/dR4AHkSw+Zwyk+XmqdhdiZxcyeWrMhO35SpNwPeBXeOO
+ USv42pvRAWgKyIIly9PxzVJCXsDtUXYASGGyyRL1Tp8kUcj37GU1uema/ByW6wBRFC6LkOyb
+ 8HKTlM6U57HZLKtmNX+nImpiZDHIoTexDm120YI47wuu39aQOvbWNL+5YE1abfIsYtFwlzrV
+ GR86Lfu9O2pc8WZDRuacm/rRlOhf3xRHdQtdwVl30tQrZ2//OdMyZWS96rm2KSZ39XTvxqj9
+ /N6YQr7ygi7mQWq3TrvuhDMsO9yaVJ8fEpdaNT6NvpTnSZjqLk2JkclwLks+LwHTcPLfxtgF
+ kn0DAAA=
+X-Brightmail-Tracker: H4sIAAAAAAAAA+NgFjrMIsWRmVeSWpSXmKPExsVy+t/xe7p2dqwxBkcWWlgc3KppsXHGelaL
+ 7Ru/sVpc//Kc1WL+kXOsFs2L17NZnOnOteh//JrZ4vz5DewWZ5vesFvcapCxmDVlL5PFpsfX
+ WC0u75rDZvG59wijxYzz+5gs1h65y26x9PpFJovbjSvYLO6eOgo04/QlVovWvUfYLdpWf2C1
+ eHPhHouDhMe23dtYPdbMW8PoMbvhIovHhP5PjB6L97xk8ti0qpPNY//cNewem5fUe/w7xu5x
+ 8N0eJo8tV9tZPPq2rGL0WLH6O7vH501yAXxRejZF+aUlqQoZ+cUltkrRhhZGeoaWFnpGJpZ6
+ hsbmsVZGpkr6djYpqTmZZalF+nYJehnrm6ezFuznr5jRf569gfEsTxcjJ4eEgInEpjUL2LsY
+ uTiEBJYySix6c5gdIiEmMWnfdihbWOLPtS42iKJPjBLXd6wFSnBwsAnoSexYVQgSFxFYzihx
+ /+dssEnMAg+YJTqeb2IF6RYWMJN4fHwJM4jNIqAq0df7DczmFfCUmHNjPQvEBjmJm+c6mScw
+ 8ixgZFjFKJJaWpybnltspFecmFtcmpeul5yfu4kRGIHbjv3csoOx613wIUYBDkYlHl6HeJYY
+ IdbEsuLK3EOMEhzMSiK8BYVAId6UxMqq1KL8+KLSnNTiQ4ymQMsnMkuJJucDk0NeSbyhqaG5
+ haWhubG5sZmFkjjveYPKKCGB9MSS1OzU1ILUIpg+Jg5OqQZGv84lESe6d16vmTibZ6IFn8aX
+ NwuOzl0pM/nlfVv9I2eVl+jeOPzzX+fDZRrvdrufaK7PfliUP3vuxDBr5YUvxAuN6t8L1bxQ
+ ub/dRYlXT2Qb7yojlYJ5+UVbJycEzt2W8fFfwJ7Ff4p0t1rW3ZPP9hSaHfabN6HMwzp4l0vh
+ 7VlO621v+fxpVGIpzkg01GIuKk4EAEf5GybWAgAA
+X-CMS-MailID: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
+X-Msg-Generator: CA
+X-RootMTR: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
+X-EPHeader: CA
+CMS-TYPE: 201P
+X-CMS-RootMailID: 20181203143127eucas1p2604fc066139a32fdffe996212b42b40e
+References: <CGME20181203143127eucas1p2604fc066139a32fdffe996212b42b40e@eucas1p2.samsung.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_063717_898802_5BD69856 
-X-CRM114-Status: GOOD (  24.78  )
+X-CRM114-CacheID: sfid-20181203_143149_969176_8060DAA0 
+X-CRM114-Status: GOOD (  17.52  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -71,169 +151,67 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: suzuki.poulose@arm.com, marc.zyngier@arm.com,
- Catalin Marinas <catalin.marinas@arm.com>, will.deacon@arm.com,
- Christoffer Dall <christoffer.dall@arm.com>, linux-kernel@vger.kernel.org,
- punitagrawal@gmail.com, Russell King <linux@armlinux.org.uk>,
- linux-arm-kernel@lists.infradead.org
+Cc: mark.rutland@arm.com, len.brown@intel.com, tony.luck@intel.com,
+ keescook@chromium.org, cw00.choi@samsung.com, b.zolnierkie@samsung.com,
+ gregkh@linuxfoundation.org, anton@enomsg.org, rjw@rjwysocki.net,
+ robh+dt@kernel.org, Lukasz Luba <l.luba@partner.samsung.com>,
+ tjakobi@math.uni-bielefeld.de, kyungmin.park@samsung.com,
+ myungjoo.ham@samsung.com, kgene@kernel.org, pavel@ucw.cz, ccross@android.com,
+ krzk@kernel.org, m.szyprowski@samsung.com
+MIME-Version: 1.0
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
+Hi all,
 
+This v2 patch set aims to address the issue with devfreq devices' frequency
+during suspend/resume. It extends suspend/resume by calls to Devfreq
+framework. In the devfreq framework there is a small refactoring to avoid
+code duplication in changging frequency (patch 1) and there are extensions
+for suspending devices. The suspending device has now chance to set proper
+state when the system is going for suspend. This phase is the right place
+to set needed frequences for the next resume process.
 
-On 10/31/2018 11:27 PM, Punit Agrawal wrote:
-> In preparation for creating PUD hugepages at stage 2, add support for
-> detecting execute permissions on PUD page table entries. Faults due to
-> lack of execute permissions on page table entries is used to perform
-> i-cache invalidation on first execute.
-> 
-> Provide trivial implementations of arm32 helpers to allow sharing of
-> code.
-> 
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/include/asm/kvm_mmu.h         |  6 +++
->  arch/arm64/include/asm/kvm_mmu.h       |  5 +++
->  arch/arm64/include/asm/pgtable-hwdef.h |  2 +
->  virt/kvm/arm/mmu.c                     | 53 +++++++++++++++++++++++---
->  4 files changed, 61 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 37bf85d39607..839a619873d3 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -102,6 +102,12 @@ static inline bool kvm_s2pud_readonly(pud_t *pud)
->  	return false;
->  }
->  
-> +static inline bool kvm_s2pud_exec(pud_t *pud)
-> +{
-> +	BUG();
-> +	return false;
-> +}
-> +
->  static inline pte_t kvm_s2pte_mkwrite(pte_t pte)
->  {
->  	pte_val(pte) |= L_PTE_S2_RDWR;
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 8da6d1b2a196..c755b37b3f92 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -261,6 +261,11 @@ static inline bool kvm_s2pud_readonly(pud_t *pudp)
->  	return kvm_s2pte_readonly((pte_t *)pudp);
->  }
->  
-> +static inline bool kvm_s2pud_exec(pud_t *pudp)
-> +{
-> +	return !(READ_ONCE(pud_val(*pudp)) & PUD_S2_XN);
-> +}
-> +
->  #define hyp_pte_table_empty(ptep) kvm_page_empty(ptep)
->  
->  #ifdef __PAGETABLE_PMD_FOLDED
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 1d7d8da2ef9b..336e24cddc87 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -193,6 +193,8 @@
->  #define PMD_S2_RDWR		(_AT(pmdval_t, 3) << 6)   /* HAP[2:1] */
->  #define PMD_S2_XN		(_AT(pmdval_t, 2) << 53)  /* XN[1:0] */
->  
-> +#define PUD_S2_XN		(_AT(pudval_t, 2) << 53)  /* XN[1:0] */
-> +
->  /*
->   * Memory Attribute override for Stage-2 (MemAttr[3:0])
->   */
-> diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-> index 1c669c3c1208..8e44dccd1b47 100644
-> --- a/virt/kvm/arm/mmu.c
-> +++ b/virt/kvm/arm/mmu.c
-> @@ -1083,23 +1083,66 @@ static int stage2_set_pmd_huge(struct kvm *kvm, struct kvm_mmu_memory_cache
->  	return 0;
->  }
->  
-> -static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> +/*
-> + * stage2_get_leaf_entry - walk the stage2 VM page tables and return
-> + * true if a valid and present leaf-entry is found. A pointer to the
-> + * leaf-entry is returned in the appropriate level variable - pudpp,
-> + * pmdpp, ptepp.
-> + */
-> +static bool stage2_get_leaf_entry(struct kvm *kvm, phys_addr_t addr,
-> +				  pud_t **pudpp, pmd_t **pmdpp, pte_t **ptepp)
->  {
-> +	pud_t *pudp;
->  	pmd_t *pmdp;
->  	pte_t *ptep;
->  
-> -	pmdp = stage2_get_pmd(kvm, NULL, addr);
-> +	*pudpp = NULL;
-> +	*pmdpp = NULL;
-> +	*ptepp = NULL;
-> +
-> +	pudp = stage2_get_pud(kvm, NULL, addr);
-> +	if (!pudp || stage2_pud_none(kvm, *pudp) || !stage2_pud_present(kvm, *pudp))
-> +		return false;
-> +
-> +	if (stage2_pud_huge(kvm, *pudp)) {
-> +		*pudpp = pudp;
-> +		return true;
-> +	}
-> +
-> +	pmdp = stage2_pmd_offset(kvm, pudp, addr);
->  	if (!pmdp || pmd_none(*pmdp) || !pmd_present(*pmdp))
->  		return false;
->  
-> -	if (pmd_thp_or_huge(*pmdp))
-> -		return kvm_s2pmd_exec(pmdp);
-> +	if (pmd_thp_or_huge(*pmdp)) {
-> +		*pmdpp = pmdp;
-> +		return true;
-> +	}
->  
->  	ptep = pte_offset_kernel(pmdp, addr);
->  	if (!ptep || pte_none(*ptep) || !pte_present(*ptep))
->  		return false;
->  
-> -	return kvm_s2pte_exec(ptep);
-> +	*ptepp = ptep;
-> +	return true;
-> +}
-> +
-> +static bool stage2_is_exec(struct kvm *kvm, phys_addr_t addr)
-> +{
-> +	pud_t *pudp;
-> +	pmd_t *pmdp;
-> +	pte_t *ptep;
-> +	bool found;
-> +
-> +	found = stage2_get_leaf_entry(kvm, addr, &pudp, &pmdp, &ptep);
-> +	if (!found)
-> +		return false;
-> +
-> +	if (pudp)
-> +		return kvm_s2pud_exec(pudp);
-> +	else if (pmdp)
-> +		return kvm_s2pmd_exec(pmdp);
-> +	else
-> +		return kvm_s2pte_exec(ptep);
->  }
+It has been tested on Odroid u3 with Exynos 4412.
 
-stage2_get_leaf_entry() is not really necessary as a separate function.
-It determines leaf entry and just return a true/false. At those 'true'
-return points it can just return kvm_s2XXX_exec() directly. Passing
-three  different pointers as arguments and checking for them being
-non-NULL upon return and doing a simple return then seems like a lot
-without much reason. stage2_is_exec() can just be expanded to add PUD
-support.
+The patch set draws on Tobias Jakobi's work posted ~2 years ago, who tried
+to solve issue with devfreq device's frequency during suspend/resume.
+During the discussion on LKML some corner cases and comments appeared
+related to the design. This patch set address them keeping in mind
+suggestions from Chanwoo Choi.
+Tobias's paches:
+https://www.spinics.net/lists/linux-samsung-soc/msg56602.html 
+
+Changes:
+v2:
+- refactored patchset and merget patch 1 and 3 as suggested by Chanwoo Choi,
+- changed devfreq_{susped|resume}_device functions,
+- added doxygen information for new entres in 'struct devfreq',
+- devfreq_set_target skipped one argument, now resume_freq is set inside,
+- minor changes addresing comments from maintainers regarding the style,
+
+Regards,
+Lukasz Luba
+
+Lukasz Luba (5):
+  devfreq: refactor set_target frequency function
+  devfreq: add support for suspend/resume of a devfreq device
+  devfreq: add devfreq_suspend/resume() functions
+  drivers: power: suspend: call devfreq suspend/resume
+  arm: dts: exynos4: opp-suspend in DMC and leftbus
+
+ arch/arm/boot/dts/exynos4210.dtsi |   2 +
+ arch/arm/boot/dts/exynos4412.dtsi |   2 +
+ drivers/base/power/main.c         |   3 +
+ drivers/devfreq/devfreq.c         | 155 +++++++++++++++++++++++++++++---------
+ include/linux/devfreq.h           |  13 ++++
+ 5 files changed, 141 insertions(+), 34 deletions(-)
+
+-- 
+2.7.4
+
 
 _______________________________________________
 linux-arm-kernel mailing list
