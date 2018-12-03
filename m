@@ -2,67 +2,66 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
+	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=ham autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 0D6D9C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:10:59 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id AAD37C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:11:27 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id D341220834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:10:58 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 7D6C620834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 16:11:27 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uJO05DBj"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D341220834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=hedonline.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="VyvSo9Y8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 7D6C620834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=ravnborg.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
-	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=f0y+YhUJ4NAt8AvJAgFKYDqT+Uh5ITiWAvuUp99oCdU=; b=uJO05DBj1B0pDB
-	CH2f4+fvFewFHmXMLSQqXWM/AesiIiTOPSebQD0mPs/f6kHdEvlvQDgbgXy2dRBv0x+xMBol55STB
-	uLc3wRLh9gnodId2VyDCGBdkczploz2nIYfw2xEWKZF2t8Y+YA71Yv0S2CtKir/vXxIiWDbgrXVYb
-	PFKF2e/BGI7F885bwZzuomg9Xj0om1nakj2m3N/q5Ni4sDaYWptrpjSC4Y7PQUbpV8Ag19hJzbJ0+
-	tA2MZ/YDw7+ucOznuU7ZJa83riVpcN6qmNQIGF+kA0fCPhTiCH3EObTpUVatiJ68hXioUKEh57IBq
-	1jIkIfhBpBaFMKH9OP6w==;
+	List-Owner; bh=gF5hJLY/t6IqHRXte7C4M+MJF2BGc/HCAGcOXGGPdfA=; b=VyvSo9Y8+KUbQQ
+	gBW6kxIxrjHCcFeV5RDL/Ua1YVqIJGMNAAPQDxJi9u1xee6vX8mqHqlEqUQCMc2YOBhVY39gIrVtX
+	y9y3bVgWNM3+U6PA9l4l3HydfTwm0/QXSWR5T7t9xpLcaV/1XPWo8Yq/GKa3GxfSGZ1bZbAEnFRQP
+	whGzzfRdv2UIZTdo7X+3ylW+sDE8WWu5jt6xvwKceqMEK+LhKz0PlOjtG/TK4biZOm7VPL963fyPc
+	Lot79QQ+GuRMBVAWDcx3xWdnkqnntZ4y4nX8t/rOHwVtPgXvOj14lfmiakIhu9BCWB9oW5fvOgDu/
+	MYen+CCt9EMgOFqSIjQg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqoA-0005g7-Gm; Mon, 03 Dec 2018 16:10:54 +0000
-Received: from mail.hedonline.com ([12.133.124.242]
- helo=HED-Exchange.hed.local)
+	id 1gTqof-00065v-NW; Mon, 03 Dec 2018 16:11:25 +0000
+Received: from asavdk4.altibox.net ([109.247.116.15])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqo7-0005ej-Lf
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 16:10:53 +0000
-Received: from HED-EXCHANGE.hed.local ([fe80::4dca:ec11:8ab6:1fd3]) by
- HED-Exchange.hed.local ([fe80::4dca:ec11:8ab6:1fd3%21]) with mapi id
- 14.03.0319.002; Mon, 3 Dec 2018 10:10:38 -0600
-From: Matthew Starr <mstarr@hedonline.com>
-To: =?utf-8?B?VXdlIEtsZWluZS1Lw7ZuaWc=?= <u.kleine-koenig@pengutronix.de>,
- Peter Chen <Peter.Chen@nxp.com>, Shawn Guo <shawnguo@kernel.org>
-Subject: RE: [PATCH v2 1/3] usb: chipidea: imx: support configuring for
- active low oc signal
-Thread-Topic: [PATCH v2 1/3] usb: chipidea: imx: support configuring for
- active low oc signal
-Thread-Index: AQHUioa230vFiD6FAECpU2nSp2BimqVtLtgg
-Date: Mon, 3 Dec 2018 16:10:37 +0000
-Message-ID: <3C8219BAE02B894A9C69304A12E8AA06CA27CE67@HED-Exchange.hed.local>
-References: <20181202213325.26017-1-u.kleine-koenig@pengutronix.de>
-In-Reply-To: <20181202213325.26017-1-u.kleine-koenig@pengutronix.de>
-Accept-Language: en-US
-Content-Language: en-US
-X-MS-Has-Attach: 
-X-MS-TNEF-Correlator: 
-x-originating-ip: [192.168.1.90]
+ id 1gTqoc-000602-1L
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 16:11:24 +0000
+Received: from ravnborg.org (unknown [158.248.194.18])
+ (using TLSv1.2 with cipher ECDHE-RSA-AES128-GCM-SHA256 (128/128 bits))
+ (No client certificate requested)
+ by asavdk4.altibox.net (Postfix) with ESMTPS id 5A86C804EA;
+ Mon,  3 Dec 2018 17:10:54 +0100 (CET)
+Date: Mon, 3 Dec 2018 17:10:52 +0100
+From: Sam Ravnborg <sam@ravnborg.org>
+To: Mike Rapoport <rppt@linux.ibm.com>
+Subject: Re: [PATCH v2 3/6] sh: prefer memblock APIs returning virtual address
+Message-ID: <20181203161052.GA4244@ravnborg.org>
+References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
+ <1543852035-26634-4-git-send-email-rppt@linux.ibm.com>
 MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1543852035-26634-4-git-send-email-rppt@linux.ibm.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+X-CMAE-Score: 0
+X-CMAE-Analysis: v=2.3 cv=UpRNyd4B c=1 sm=1 tr=0
+ a=UWs3HLbX/2nnQ3s7vZ42gw==:117 a=UWs3HLbX/2nnQ3s7vZ42gw==:17
+ a=kj9zAlcOel0A:10 a=VnNF1IyMAAAA:8 a=FTNaidAvUsMVHdn4hVIA:9
+ a=9GetFJ8xNGreKwwT:21 a=sKQTW2iCjVXyVLe6:21 a=CjuIK1q_8ugA:10
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_081051_761118_F653316C 
-X-CRM114-Status: GOOD (  24.41  )
+X-CRM114-CacheID: sfid-20181203_081122_249247_CBC6277A 
+X-CRM114-Status: GOOD (  18.78  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -74,120 +73,81 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>,
- "linux-usb@vger.kernel.org" <linux-usb@vger.kernel.org>,
- "kernel@pengutronix.de" <kernel@pengutronix.de>,
- "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="utf-8"
-Content-Transfer-Encoding: base64
+Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
+ Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
+ Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
+ sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
+ Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
+ Yoshinori Sato <ysato@users.sourceforge.jp>,
+ Michael Ellerman <mpe@ellerman.id.au>, Russell King <linux@armlinux.org.uk>,
+ Mark Salter <msalter@redhat.com>, Arnd Bergmann <arnd@arndb.de>,
+ Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
+ openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
+ Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
+ linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
+ linux-kernel@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
+ linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-PiAtLS0tLU9yaWdpbmFsIE1lc3NhZ2UtLS0tLQ0KPiBGcm9tOiBVd2UgS2xlaW5lLUvDtm5pZyBb
-bWFpbHRvOnUua2xlaW5lLWtvZW5pZ0BwZW5ndXRyb25peC5kZV0NCj4gU2VudDogU3VuZGF5LCBE
-ZWNlbWJlciAwMiwgMjAxOCAzOjMzIFBNDQo+IA0KPiBUaGUgc3RhdHVzIHF1byBvbiBpLk1YNiBp
-cyB0aGF0IGlmICJvdmVyLWN1cnJlbnQtYWN0aXZlLWhpZ2giIGlzDQo+IHNwZWNpZmllZCBpbiB0
-aGUgZGV2aWNlIHRyZWUgdGhpcyBpcyBjb25maWd1cmVkIGFzIGV4cGVjdGVkLiBJZg0KPiB0aGUg
-cHJvcGVydHkgaXMgbWlzc2luZyBwb2xhcml0eSBpc24ndCBjaGFuZ2VkIGFuZCBzbyB0aGUNCj4g
-cG9sYXJpdHkgaXMga2VwdCBhcyBzZXR1cCBieSB0aGUgYm9vdGxvYWRlci4gUmVzZXQgZGVmYXVs
-dCBpcw0KPiBhY3RpdmUgaGlnaCwgc28gYWN0aXZlIGxvdyBjYW4gb25seSBiZSB1c2VkIHdpdGgg
-aGVscCBieSB0aGUNCj4gYm9vdGxvYWRlci4gT24gaS5NWDcgaXQgaXMgc2ltaWxhciwgYnV0IHRo
-ZXJlIGRpc2FibGluZyBvZg0KPiBvdmVyIGN1cnJlbnQgZGV0ZWN0aW9uIGhhcyBhIHNpbWlsYXIg
-aW5jb25zaXN0ZW5jeS4NCj4gDQo+IFRoaXMgcGF0Y2ggaW50cm9kdWNlcyBhIG5ldyBwcm9wZXJ0
-eSB0aGF0IGFsbG93cyB0byBleHBsaWNpdGx5DQo+IGNvbmZpZ3VyZSBmb3IgYWN0aXZlIGxvdyBv
-dmVyIGN1cnJlbnQgZGV0ZWN0aW9uIGFuZCBjb25zaXN0ZW50bHkNCj4gc2V0cyB0aGlzIHVwLiBJ
-biB0aGUgYWJzZW5jZSBvZiBhbiBleHBsaWNpdCBjb25maWd1cmF0aW9uIHRoZQ0KPiBiaXQgaXMg
-a2VwdCBhcyBpcy4gT24gaS5NWDcgb3ZlciBjdXJyZW50IGRldGVjdGlvbiBpcyB1c2VkIHVubGVz
-cw0KPiBkaXNhYmxlZCBpbiB0aGUgZGV2aWNlIHRyZWUuDQo+IA0KPiBTaWduZWQtb2ZmLWJ5OiBV
-d2UgS2xlaW5lLUvDtm5pZyA8dS5rbGVpbmUta29lbmlnQHBlbmd1dHJvbml4LmRlPg0KPiAtLS0N
-Cj4gIC4uLi9kZXZpY2V0cmVlL2JpbmRpbmdzL3VzYi9jaS1oZHJjLXVzYjIudHh0ICB8ICA1ICsr
-LS0NCj4gIGRyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmMgICAgICAgICAgICB8ICA5
-ICsrKystLQ0KPiAgZHJpdmVycy91c2IvY2hpcGlkZWEvY2lfaGRyY19pbXguaCAgICAgICAgICAg
-IHwgIDggKysrKystDQo+ICBkcml2ZXJzL3VzYi9jaGlwaWRlYS91c2JtaXNjX2lteC5jICAgICAg
-ICAgICAgfCAyOCArKysrKysrKysrKysrKy0tLS0tDQo+ICA0IGZpbGVzIGNoYW5nZWQsIDM4IGlu
-c2VydGlvbnMoKyksIDEyIGRlbGV0aW9ucygtKQ0KPiANCj4gZGlmZiAtLWdpdCBhL0RvY3VtZW50
-YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy91c2IvY2ktaGRyYy11c2IyLnR4dCBiL0RvY3VtZW50
-YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy91c2IvY2ktaGRyYy11c2IyLnR4dA0KPiBpbmRleCA1
-MjllNTE4NzlmYjIuLmMzMmY2ZTk4M2NmNiAxMDA2NDQNCj4gLS0tIGEvRG9jdW1lbnRhdGlvbi9k
-ZXZpY2V0cmVlL2JpbmRpbmdzL3VzYi9jaS1oZHJjLXVzYjIudHh0DQo+ICsrKyBiL0RvY3VtZW50
-YXRpb24vZGV2aWNldHJlZS9iaW5kaW5ncy91c2IvY2ktaGRyYy11c2IyLnR4dA0KPiBAQCAtODcs
-OCArODcsOSBAQCBpLm14IHNwZWNpZmljIHByb3BlcnRpZXMNCj4gIC0gZnNsLHVzYm1pc2M6IHBo
-YW5kbGVyIG9mIG5vbi1jb3JlIHJlZ2lzdGVyIGRldmljZSwgd2l0aCBvbmUNCj4gICAgYXJndW1l
-bnQgdGhhdCBpbmRpY2F0ZSB1c2IgY29udHJvbGxlciBpbmRleA0KPiAgLSBkaXNhYmxlLW92ZXIt
-Y3VycmVudDogZGlzYWJsZSBvdmVyIGN1cnJlbnQgZGV0ZWN0DQo+IC0tIG92ZXItY3VycmVudC1h
-Y3RpdmUtaGlnaDogb3ZlciBjdXJyZW50IHNpZ25hbCBwb2xhcml0eSBpcyBoaWdoIGFjdGl2ZSwN
-Cj4gLSAgdHlwaWNhbGx5IG92ZXIgY3VycmVudCBzaWduYWwgcG9sYXJpdHkgaXMgbG93IGFjdGl2
-ZS4NCj4gKy0gb3Zlci1jdXJyZW50LWFjdGl2ZS1sb3c6IG92ZXIgY3VycmVudCBzaWduYWwgcG9s
-YXJpdHkgaXMgYWN0aXZlIGxvdy4NCj4gKy0gb3Zlci1jdXJyZW50LWFjdGl2ZS1oaWdoOiBvdmVy
-IGN1cnJlbnQgc2lnbmFsIHBvbGFyaXR5IGlzIGFjdGl2ZSBoaWdoLg0KPiArICBJdCdzIHJlY29t
-bWVuZGVkIHRvIHNwZWNpZnkgdGhlIG92ZXIgY3VycmVudCBwb2xhcml0eS4NCj4gIC0gZXh0ZXJu
-YWwtdmJ1cy1kaXZpZGVyOiBlbmFibGVzIG9mZi1jaGlwIHJlc2lzdG9yIGRpdmlkZXIgZm9yIFZi
-dXMNCj4gDQo+ICBFeGFtcGxlOg0KPiBkaWZmIC0tZ2l0IGEvZHJpdmVycy91c2IvY2hpcGlkZWEv
-Y2lfaGRyY19pbXguYyBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmMNCj4gaW5k
-ZXggMDliMzdjMGQwNzVkLi44MGI0ZTRlZjliNjggMTAwNjQ0DQo+IC0tLSBhL2RyaXZlcnMvdXNi
-L2NoaXBpZGVhL2NpX2hkcmNfaW14LmMNCj4gKysrIGIvZHJpdmVycy91c2IvY2hpcGlkZWEvY2lf
-aGRyY19pbXguYw0KPiBAQCAtMTM1LDggKzEzNSwxMyBAQCBzdGF0aWMgc3RydWN0IGlteF91c2Jt
-aXNjX2RhdGEgKnVzYm1pc2NfZ2V0X2luaXRfZGF0YShzdHJ1Y3QgZGV2aWNlICpkZXYpDQo+ICAJ
-aWYgKG9mX2ZpbmRfcHJvcGVydHkobnAsICJkaXNhYmxlLW92ZXItY3VycmVudCIsIE5VTEwpKQ0K
-PiAgCQlkYXRhLT5kaXNhYmxlX29jID0gMTsNCj4gDQo+IC0JaWYgKG9mX2ZpbmRfcHJvcGVydHko
-bnAsICJvdmVyLWN1cnJlbnQtYWN0aXZlLWhpZ2giLCBOVUxMKSkNCj4gLQkJZGF0YS0+b2NfcG9s
-YXJpdHkgPSAxOw0KPiArCWlmIChvZl9maW5kX3Byb3BlcnR5KG5wLCAib3Zlci1jdXJyZW50LWFj
-dGl2ZS1oaWdoIiwgTlVMTCkpIHsNCj4gKwkJZGF0YS0+b2NfcG9sX2FjdGl2ZV9sb3cgPSAwOw0K
-PiArCQlkYXRhLT5vY19wb2xfY29uZmlndXJlZCA9IDE7DQo+ICsJfSBlbHNlIGlmIChvZl9maW5k
-X3Byb3BlcnR5KG5wLCAib3Zlci1jdXJyZW50LWFjdGl2ZS1sb3ciLCBOVUxMKSkgew0KPiArCQlk
-YXRhLT5vY19wb2xfYWN0aXZlX2xvdyA9IDE7DQo+ICsJCWRhdGEtPm9jX3BvbF9jb25maWd1cmVk
-ID0gMTsNCj4gKwl9DQoNClNpbmNlIGJvdGggb3Zlci1jdXJyZW50LWFjdGl2ZS1oaWdoIGFuZCBv
-dmVyLWN1cnJlbnQtYWN0aXZlLWxvdyBjYW4gYmUgZW5hYmxlZCwgdGhlIGVycm9yIGNhc2Ugb2Yg
-d2hlbiBib3RoIGFyZSBpbiB0aGUgZGV2aWNlIHRyZWUgaXMgbm90IGNvdmVyZWQgaGVyZS4gIEFu
-IGVycm9yIG9yIHdhcm5pbmcgc2hvdWxkIGJlIGdpdmVuLiAgQWxzbyBpbiB0aGlzIGNhc2UgdGhl
-IHNhZmVzdCB0aGluZyB0byBkbyB3b3VsZCBiZSB0byBsZWF2ZSB0aGUgT0MgcG9sYXJpdHkgYml0
-IGFsb25lIGFuZCBsZWF2ZSBpdCB0aGUgd2F5IGl0IHdhcyBzZXQgYnkgdGhlIGJvb3Rsb2FkZXIu
-DQoNCk1hdHQgU3RhcnINCg0KPiANCj4gIAlpZiAob2ZfZmluZF9wcm9wZXJ0eShucCwgImV4dGVy
-bmFsLXZidXMtZGl2aWRlciIsIE5VTEwpKQ0KPiAgCQlkYXRhLT5ldmRvID0gMTsNCj4gZGlmZiAt
-LWdpdCBhL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmggYi9kcml2ZXJzL3VzYi9j
-aGlwaWRlYS9jaV9oZHJjX2lteC5oDQo+IGluZGV4IDIwNDI3NWY0NzU3My4uNjQwNzIxZmVmMGQ3
-IDEwMDY0NA0KPiAtLS0gYS9kcml2ZXJzL3VzYi9jaGlwaWRlYS9jaV9oZHJjX2lteC5oDQo+ICsr
-KyBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL2NpX2hkcmNfaW14LmgNCj4gQEAgLTExLDcgKzExLDEz
-IEBAIHN0cnVjdCBpbXhfdXNibWlzY19kYXRhIHsNCj4gIAlpbnQgaW5kZXg7DQo+IA0KPiAgCXVu
-c2lnbmVkIGludCBkaXNhYmxlX29jOjE7IC8qIG92ZXIgY3VycmVudCBkZXRlY3QgZGlzYWJsZWQg
-Ki8NCj4gLQl1bnNpZ25lZCBpbnQgb2NfcG9sYXJpdHk6MTsgLyogb3ZlciBjdXJyZW50IHBvbGFy
-aXR5IGlmIG9jIGVuYWJsZWQgKi8NCj4gKw0KPiArCS8qIHRydWUgaWYgb3Zlci1jdXJyZW50IHBv
-bGFyaXR5IGlzIGFjdGl2ZSBsb3cgKi8NCj4gKwl1bnNpZ25lZCBpbnQgb2NfcG9sX2FjdGl2ZV9s
-b3c6MTsNCj4gKw0KPiArCS8qIHRydWUgaWYgZHQgc3BlY2lmaWVzIHBvbGFyaXR5ICovDQo+ICsJ
-dW5zaWduZWQgaW50IG9jX3BvbF9jb25maWd1cmVkOjE7DQo+ICsNCj4gIAl1bnNpZ25lZCBpbnQg
-ZXZkbzoxOyAvKiBzZXQgZXh0ZXJuYWwgdmJ1cyBkaXZpZGVyIG9wdGlvbiAqLw0KPiAgCXVuc2ln
-bmVkIGludCB1bHBpOjE7IC8qIGNvbm5lY3RlZCB0byBhbiBVTFBJIHBoeSAqLw0KPiAgfTsNCj4g
-ZGlmZiAtLWdpdCBhL2RyaXZlcnMvdXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMgYi9kcml2ZXJz
-L3VzYi9jaGlwaWRlYS91c2JtaXNjX2lteC5jDQo+IGluZGV4IGRlZjgwZmY1NDdlNC4uNGE4ZGUx
-YjM3ZjY3IDEwMDY0NA0KPiAtLS0gYS9kcml2ZXJzL3VzYi9jaGlwaWRlYS91c2JtaXNjX2lteC5j
-DQo+ICsrKyBiL2RyaXZlcnMvdXNiL2NoaXBpZGVhL3VzYm1pc2NfaW14LmMNCj4gQEAgLTM0MCwx
-MSArMzQwLDE3IEBAIHN0YXRpYyBpbnQgdXNibWlzY19pbXg2cV9pbml0KHN0cnVjdCBpbXhfdXNi
-bWlzY19kYXRhICpkYXRhKQ0KPiAgCXJlZyA9IHJlYWRsKHVzYm1pc2MtPmJhc2UgKyBkYXRhLT5p
-bmRleCAqIDQpOw0KPiAgCWlmIChkYXRhLT5kaXNhYmxlX29jKSB7DQo+ICAJCXJlZyB8PSBNWDZf
-Qk1fT1ZFUl9DVVJfRElTOw0KPiAtCX0gZWxzZSBpZiAoZGF0YS0+b2NfcG9sYXJpdHkgPT0gMSkg
-ew0KPiAtCQkvKiBIaWdoIGFjdGl2ZSAqLw0KPiAtCQlyZWcgJj0gfihNWDZfQk1fT1ZFUl9DVVJf
-RElTIHwgTVg2X0JNX09WRVJfQ1VSX1BPTEFSSVRZKTsNCj4gIAl9IGVsc2Ugew0KPiAtCQlyZWcg
-Jj0gfihNWDZfQk1fT1ZFUl9DVVJfRElTKTsNCj4gKwkJcmVnICY9IH5NWDZfQk1fT1ZFUl9DVVJf
-RElTOw0KPiArDQo+ICsJCS8qDQo+ICsJCSAqIElmIHRoZSBwb2xhcml0eSBpcyBub3QgY29uZmln
-dXJlZCBrZWVwIGl0IGFzIHNldHVwIGJ5IHRoZQ0KPiArCQkgKiBib290bG9hZGVyLg0KPiArCQkg
-Ki8NCj4gKwkJaWYgKGRhdGEtPm9jX3BvbF9jb25maWd1cmVkICYmIGRhdGEtPm9jX3BvbF9hY3Rp
-dmVfbG93KQ0KPiArCQkJcmVnIHw9IE1YNl9CTV9PVkVSX0NVUl9QT0xBUklUWTsNCj4gKwkJZWxz
-ZSBpZiAoZGF0YS0+b2NfcG9sX2NvbmZpZ3VyZWQpDQo+ICsJCQlyZWcgJj0gfk1YNl9CTV9PVkVS
-X0NVUl9QT0xBUklUWTsNCj4gIAl9DQo+ICAJd3JpdGVsKHJlZywgdXNibWlzYy0+YmFzZSArIGRh
-dGEtPmluZGV4ICogNCk7DQo+IA0KPiBAQCAtNDQ0LDkgKzQ1MCwxNyBAQCBzdGF0aWMgaW50IHVz
-Ym1pc2NfaW14N2RfaW5pdChzdHJ1Y3QgaW14X3VzYm1pc2NfZGF0YSAqZGF0YSkNCj4gIAlyZWcg
-PSByZWFkbCh1c2JtaXNjLT5iYXNlKTsNCj4gIAlpZiAoZGF0YS0+ZGlzYWJsZV9vYykgew0KPiAg
-CQlyZWcgfD0gTVg2X0JNX09WRVJfQ1VSX0RJUzsNCj4gLQl9IGVsc2UgaWYgKGRhdGEtPm9jX3Bv
-bGFyaXR5ID09IDEpIHsNCj4gLQkJLyogSGlnaCBhY3RpdmUgKi8NCj4gLQkJcmVnICY9IH4oTVg2
-X0JNX09WRVJfQ1VSX0RJUyB8IE1YNl9CTV9PVkVSX0NVUl9QT0xBUklUWSk7DQo+ICsJfSBlbHNl
-IHsNCj4gKwkJcmVnICY9IH5NWDZfQk1fT1ZFUl9DVVJfRElTOw0KPiArDQo+ICsJCS8qDQo+ICsJ
-CSAqIElmIHRoZSBwb2xhcml0eSBpcyBub3QgY29uZmlndXJlZCBrZWVwIGl0IGFzIHNldHVwIGJ5
-IHRoZQ0KPiArCQkgKiBib290bG9hZGVyLg0KPiArCQkgKi8NCj4gKwkJaWYgKGRhdGEtPm9jX3Bv
-bF9jb25maWd1cmVkICYmIGRhdGEtPm9jX3BvbF9hY3RpdmVfbG93KQ0KPiArCQkJcmVnIHw9IE1Y
-Nl9CTV9PVkVSX0NVUl9QT0xBUklUWTsNCj4gKwkJZWxzZSBpZiAoZGF0YS0+b2NfcG9sX2NvbmZp
-Z3VyZWQpDQo+ICsJCQlyZWcgJj0gfk1YNl9CTV9PVkVSX0NVUl9QT0xBUklUWTsNCj4gIAl9DQo+
-ICAJd3JpdGVsKHJlZywgdXNibWlzYy0+YmFzZSk7DQo+IA0KPiAtLQ0KPiAyLjE5LjINCg0KX19f
-X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX18KbGludXgtYXJtLWtl
-cm5lbCBtYWlsaW5nIGxpc3QKbGludXgtYXJtLWtlcm5lbEBsaXN0cy5pbmZyYWRlYWQub3JnCmh0
-dHA6Ly9saXN0cy5pbmZyYWRlYWQub3JnL21haWxtYW4vbGlzdGluZm8vbGludXgtYXJtLWtlcm5l
-bAo=
+Hi Mike.
+
+On Mon, Dec 03, 2018 at 05:47:12PM +0200, Mike Rapoport wrote:
+> Rather than use the memblock_alloc_base that returns a physical address and
+> then convert this address to the virtual one, use appropriate memblock
+> function that returns a virtual address.
+> 
+> There is a small functional change in the allocation of then NODE_DATA().
+> Instead of panicing if the local allocation failed, the non-local
+> allocation attempt will be made.
+> 
+> Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+> ---
+>  arch/sh/mm/init.c | 18 +++++-------------
+>  arch/sh/mm/numa.c |  5 ++---
+>  2 files changed, 7 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/sh/mm/init.c b/arch/sh/mm/init.c
+> index c8c13c77..3576b5f 100644
+> --- a/arch/sh/mm/init.c
+> +++ b/arch/sh/mm/init.c
+> @@ -192,24 +192,16 @@ void __init page_table_range_init(unsigned long start, unsigned long end,
+>  void __init allocate_pgdat(unsigned int nid)
+>  {
+>  	unsigned long start_pfn, end_pfn;
+> -#ifdef CONFIG_NEED_MULTIPLE_NODES
+> -	unsigned long phys;
+> -#endif
+>  
+>  	get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
+>  
+>  #ifdef CONFIG_NEED_MULTIPLE_NODES
+> -	phys = __memblock_alloc_base(sizeof(struct pglist_data),
+> -				SMP_CACHE_BYTES, end_pfn << PAGE_SHIFT);
+> -	/* Retry with all of system memory */
+> -	if (!phys)
+> -		phys = __memblock_alloc_base(sizeof(struct pglist_data),
+> -					SMP_CACHE_BYTES, memblock_end_of_DRAM());
+> -	if (!phys)
+> +	NODE_DATA(nid) = memblock_alloc_try_nid_nopanic(
+> +				sizeof(struct pglist_data),
+> +				SMP_CACHE_BYTES, MEMBLOCK_LOW_LIMIT,
+> +				MEMBLOCK_ALLOC_ACCESSIBLE, nid);
+> +	if (!NODE_DATA(nid))
+>  		panic("Can't allocate pgdat for node %d\n", nid);
+> -
+> -	NODE_DATA(nid) = __va(phys);
+> -	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
+The new code will always assign NODE_DATA(nid), where the old
+code only assigned NODE_DATA(nid) in the good case.
+I dunno if this is an issue, just noticed the difference and
+wanted to point it out.
+
+	Sam
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel@lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
