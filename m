@@ -4,20 +4,20 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 13B73C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:58 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id EBE05C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:18:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DA4AF2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:17:57 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 9A8A020848
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 10:18:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="af51muoh";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="ctOtaMPG"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DA4AF2145D
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lJNGiyTd";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="qC8oqrq5"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9A8A020848
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,51 +26,51 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=qNZpq6+dhIPKU9to5WfyrcXcN6Wzc2Eoyw7vANnwqXM=; b=af51muohSka3Sg
-	iEZD8VwN12B+MuklIODwlYfX35UBTSlF9EpYB4F76Rcu7pxNoPHSN27H5eU9ctZFIG+16Md+ZYA6r
-	tdzaLUh9F2p8P5zEO9zEsqJxdX25IzhA2yCKvwwFTCdxQoCtt71Y30RD9gumz5KBwMG7MQNdDyUGz
-	QShjCTe5BvquzeZeAlyppE2HwKN6k0StOiBfHuK7dD75UTH0AKPNqRWrfVtogLxGR+9ifs28Y6NY/
-	u6tOyNwzuYLc8Kj6mCAfEsqUJZzToZHXfuSpB6iEjPFPKzolrptSv+xMyDSyxNBhnzBGCM1tk7pcw
-	g7bamEs2YH/dqwMqeoAw==;
+	List-Owner; bh=sApwpzEd8ZHqqCtMG/S3vpcdwFPF5yTwmiIGCPqfc+0=; b=lJNGiyTdLKWy+m
+	pJloFXE1k3BNdwq51CH8ryTRBtZfIwJUntT3900e89asoA6b5q4VnZfA7UlB4aXgDVo84Gx4g9LIP
+	vIIIv36DelLWXiSZB93ZWRsIGEcGNI2hHz502iSq7xWpBSETHaBJqkgryTrItsBs/pE00MVsTRWN4
+	Fmc0nUiiIsQfT87ImmNjPyC/Zg74TvBUwG4ABYWUymzw7jghqIrKgvDvJY67EWI8TnXUdQ2dSWyQ0
+	1T4Ara94l4yge9wicpnGpnS8frHFMF40LdPcfJF+VsWIhEj9iRZ71XmJs6Ec8WGOvAXtgmFEtyECO
+	Mq43aJ80hEvLYAa0EtLQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTlIW-0001Nf-Nq; Mon, 03 Dec 2018 10:17:52 +0000
-Received: from mail-wr1-x444.google.com ([2a00:1450:4864:20::444])
+	id 1gTlIs-0001k2-1y; Mon, 03 Dec 2018 10:18:14 +0000
+Received: from mail-wr1-x441.google.com ([2a00:1450:4864:20::441])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTlGr-0007zZ-M3
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:16:13 +0000
-Received: by mail-wr1-x444.google.com with SMTP id x10so11479306wrs.8
+ id 1gTlGw-0007zx-SX
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 10:16:19 +0000
+Received: by mail-wr1-x441.google.com with SMTP id r10so11461865wrs.10
  for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 02:16:03 -0800 (PST)
+ Mon, 03 Dec 2018 02:16:04 -0800 (PST)
 DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=amarulasolutions.com; s=google;
  h=from:to:cc:subject:date:message-id:in-reply-to:references
  :mime-version:content-transfer-encoding;
- bh=MX6hF1WvT6/jnjg/Hvxrw/jbX1gmvj02z43j9IhctPk=;
- b=ctOtaMPGCmFOsRrqLmlS+E6Vf5lZ8qOMRYKnnfunQTf7jPddBD4Q5tt6umguIojCEq
- svzBj6FKXHKdjaclTZh12ET5K/gRPnVZLmEl1EYH7z9QIKUQ5QYGqsHgSQVKfgyKZaqw
- BCRT0CB1J7fK1u+aQQ6PLGAMYUdPKWUF/rHVU=
+ bh=sYIR92ZSRt6P2LabORDc+r2SZD6NGN2vTfFdELLfLf4=;
+ b=qC8oqrq55XITG+IaBKgDlrqKba/eWXMICT8ZW/Rcc4w4V6RiseMUjyfrfmbtTpyUDd
+ 0mBjZRf+m3qaDu0DTvoS/QChJeSM09sBOq9ACkMw0YHJ6WxFEYFT8xBCcWPVTdkEU7AA
+ dTa0Ib7KnK7tI8rzBqeja78V/ZEzDQy+/L0sM=
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
  h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
  :references:mime-version:content-transfer-encoding;
- bh=MX6hF1WvT6/jnjg/Hvxrw/jbX1gmvj02z43j9IhctPk=;
- b=RIx3P4Dt6R/jfKZkqu1pg0KLquUhAi+XpGfygjXvPCAEivyAsAIXZ4LthpLmNj1Ys3
- hLpVatyQJctnBgJ8vtC3ExzlF975H8sUHVueEGqVZ7TO9AZN519eUvrUV8MkjykUe2kr
- 84uq5SCROUXeh+z5IS/FpNyoGlutibAEf2F2841S35iDxwCNwLcLaZy9Kg1Lg6u7PmXd
- Qydp2tEjIbMMteoHjtLqWrlZMbA+MhGL3J1emZtIP0fhhq/DKWVadt+/VWn4aMLkzGaP
- yLFH0/CfrzKIMdWwK5JP7eRKndS3y3gX8AGJpTzPLm9U4jbhBeSlJYe1Rg9il88daAfJ
- kaBA==
-X-Gm-Message-State: AA+aEWbas2F2lFjrGyZtKZd6IG31SwVUAlldenTuG2z7P+inmQzN6QzB
- ISRq5WQuuhe75ORNI2yd2pqHUg==
-X-Google-Smtp-Source: AFSGD/XZrkrloQ5/rvxj/0OMNRHVR0EheGpmH5OuudxmqmlBlo2LoDkZaoKHippBpsUviaxdeZIqzA==
-X-Received: by 2002:a5d:448f:: with SMTP id j15mr9244659wrq.108.1543832161996; 
- Mon, 03 Dec 2018 02:16:01 -0800 (PST)
+ bh=sYIR92ZSRt6P2LabORDc+r2SZD6NGN2vTfFdELLfLf4=;
+ b=Vl6Us8dpYMa9UXGaOiM+GsVbp69KC8ZaKvw9NyCpE9CCaazGAHaU3aRhxYq0cZYWkL
+ HIqCgfSz5i4auhXepFl4Nm3WOLxfxoJIv5+m73AKNqQ4U6e7jdsLXbgW2av8UMFh61Nn
+ ajC1IqzcGl+Ax0Mf+to8unUasgENmxg41/ib0o+vite2Hcc85MxTNB2+CWFSovLhpNBf
+ mT+iDw1ec0zxSwS+XBHlw2bg2al6/iZoSuyUu5DwXdNvTWZBpCLBLYAuG28eBdogxh1N
+ NXMGrIuIl0PD1JhYON1nend1+/qhIpNiM+FcNt7JPljQhk17aDUtg9HDuaT6GE4DvS4K
+ E/eQ==
+X-Gm-Message-State: AA+aEWb0TdVJ6972rsfuSAoKi/J6W2BhRyQIPVSEl5bSBoxtzruw7YDS
+ QKnLnzdmvhYCEtLbOAGXuqFs/A==
+X-Google-Smtp-Source: AFSGD/Vm4W738LcPT1s/CT/dGj4WK/IiXywz4IEpkGYPcV0L5ZaqAwwt1Y6p2GtyZ5p6627XpfOOdg==
+X-Received: by 2002:adf:83a7:: with SMTP id 36mr13550244wre.13.1543832163368; 
+ Mon, 03 Dec 2018 02:16:03 -0800 (PST)
 Received: from localhost.localdomain (conf.hotelmediterraneo.com.
  [2.228.78.71])
- by smtp.gmail.com with ESMTPSA id f192sm5832158wmd.12.2018.12.03.02.16.00
+ by smtp.gmail.com with ESMTPSA id f192sm5832158wmd.12.2018.12.03.02.16.02
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 02:16:01 -0800 (PST)
+ Mon, 03 Dec 2018 02:16:02 -0800 (PST)
 From: Jagan Teki <jagan@amarulasolutions.com>
 To: Maxime Ripard <maxime.ripard@bootlin.com>,
  Rob Herring <robh+dt@kernel.org>, Chen-Yu Tsai <wens@csie.org>,
@@ -78,16 +78,17 @@ To: Maxime Ripard <maxime.ripard@bootlin.com>,
  devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  linux-kernel@vger.kernel.org, Lee Jones <lee.jones@linaro.org>,
  linux-sunxi@googlegroups.com
-Subject: [PATCH 6/9] Input: goodix - Add vcc-supply regulator support
-Date: Mon,  3 Dec 2018 15:45:44 +0530
-Message-Id: <20181203101547.16835-6-jagan@amarulasolutions.com>
+Subject: [PATCH 7/9] dt-bindings: input: touchscreen: goodix: Add GT5663
+ compatible
+Date: Mon,  3 Dec 2018 15:45:45 +0530
+Message-Id: <20181203101547.16835-7-jagan@amarulasolutions.com>
 X-Mailer: git-send-email 2.18.0.321.gffc6fa0e3
 In-Reply-To: <20181203101547.16835-1-jagan@amarulasolutions.com>
 References: <20181203101547.16835-1-jagan@amarulasolutions.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_021609_724829_1B1309CF 
-X-CRM114-Status: GOOD (  17.03  )
+X-CRM114-CacheID: sfid-20181203_021615_422247_ED6614BE 
+X-CRM114-Status: GOOD (  11.77  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -105,132 +106,44 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-vcc-supply property is need for some Goodix CTP controller like GT5663
-where 3.3V external pull-up regulator connected via controller VCC pin.
+GT5663 is capacitive touch controller with customized smart wakeup gestures,
+the existing goodix driver will work by phandle vcc-supply regulator.
 
-So, enable the regulator for those it attached the vcc-supply.
+So, document compatible and example node for the same.
 
 Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- drivers/input/touchscreen/goodix.c | 39 ++++++++++++++++++++++++++----
- 1 file changed, 34 insertions(+), 5 deletions(-)
+ .../bindings/input/touchscreen/goodix.txt           | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/input/touchscreen/goodix.c b/drivers/input/touchscreen/goodix.c
-index f2d9c2c41885..7adcf1491609 100644
---- a/drivers/input/touchscreen/goodix.c
-+++ b/drivers/input/touchscreen/goodix.c
-@@ -27,6 +27,7 @@
- #include <linux/delay.h>
- #include <linux/irq.h>
- #include <linux/interrupt.h>
-+#include <linux/regulator/consumer.h>
- #include <linux/slab.h>
- #include <linux/acpi.h>
- #include <linux/of.h>
-@@ -47,6 +48,7 @@ struct goodix_ts_data {
- 	struct touchscreen_properties prop;
- 	unsigned int max_touch_num;
- 	unsigned int int_trigger_type;
-+	struct regulator *vcc;
- 	struct gpio_desc *gpiod_int;
- 	struct gpio_desc *gpiod_rst;
- 	u16 id;
-@@ -58,6 +60,7 @@ struct goodix_ts_data {
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
+index 604766e347ce..1898d3dde8e1 100644
+--- a/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
++++ b/Documentation/devicetree/bindings/input/touchscreen/goodix.txt
+@@ -3,6 +3,7 @@ Device tree bindings for Goodix GT9xx series touchscreen controller
+ Required properties:
  
- #define GOODIX_GPIO_INT_NAME		"irq"
- #define GOODIX_GPIO_RST_NAME		"reset"
-+#define GOODIX_VCC_CTP_NAME		"vcc"
+  - compatible		: Should be "goodix,gt1151"
++				 or "goodix,gt5663"
+ 				 or "goodix,gt911"
+ 				 or "goodix,gt9110"
+ 				 or "goodix,gt912"
+@@ -42,3 +43,15 @@ Example:
  
- #define GOODIX_MAX_HEIGHT		4096
- #define GOODIX_MAX_WIDTH		4096
-@@ -525,12 +528,24 @@ static int goodix_get_gpio_config(struct goodix_ts_data *ts)
- {
- 	int error;
- 	struct device *dev;
-+	struct regulator *regulator;
- 	struct gpio_desc *gpiod;
- 
- 	if (!ts->client)
- 		return -EINVAL;
- 	dev = &ts->client->dev;
- 
-+	regulator = devm_regulator_get(dev, GOODIX_VCC_CTP_NAME);
-+	if (IS_ERR(regulator)) {
-+		error = PTR_ERR(regulator);
-+		if (error != -EPROBE_DEFER)
-+			dev_err(dev, "Failed to get vcc regulator: %d\n",
-+				error);
-+		return error;
-+	}
+ 		/* ... */
+ 	};
 +
-+	ts->vcc = regulator;
-+
- 	/* Get the interrupt GPIO pin number */
- 	gpiod = devm_gpiod_get_optional(dev, GOODIX_GPIO_INT_NAME, GPIOD_IN);
- 	if (IS_ERR(gpiod)) {
-@@ -786,25 +801,34 @@ static int goodix_ts_probe(struct i2c_client *client,
- 	if (error)
- 		return error;
- 
-+	/* power the controller */
-+	if (ts->vcc) {
-+		error = regulator_enable(ts->vcc);
-+		if (error) {
-+			dev_err(&client->dev, "Controller fail to enable vcc\n");
-+			return error;
-+		}
-+	}
-+
- 	if (ts->gpiod_int && ts->gpiod_rst) {
- 		/* reset the controller */
- 		error = goodix_reset(ts);
- 		if (error) {
- 			dev_err(&client->dev, "Controller reset failed.\n");
--			return error;
-+			goto error;
- 		}
- 	}
- 
- 	error = goodix_i2c_test(client);
- 	if (error) {
- 		dev_err(&client->dev, "I2C communication failure: %d\n", error);
--		return error;
-+		goto error;
- 	}
- 
- 	error = goodix_read_version(ts);
- 	if (error) {
- 		dev_err(&client->dev, "Read version failed.\n");
--		return error;
-+		goto error;
- 	}
- 
- 	ts->chip = goodix_get_chip_data(ts->id);
-@@ -823,17 +847,22 @@ static int goodix_ts_probe(struct i2c_client *client,
- 			dev_err(&client->dev,
- 				"Failed to invoke firmware loader: %d\n",
- 				error);
--			return error;
-+			goto error;
- 		}
- 
- 		return 0;
- 	} else {
- 		error = goodix_configure_dev(ts);
- 		if (error)
--			return error;
-+			goto error;
- 	}
- 
- 	return 0;
-+
-+error:
-+	if (ts->vcc)
-+		regulator_disable(ts->vcc);
-+	return error;
- }
- 
- static int goodix_ts_remove(struct i2c_client *client)
++	touchscreen@5d {
++		compatible = "goodix,gt5663";
++		reg = <0x5d>;
++		vcc-supply = <&reg_ldo_io0>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 4 IRQ_TYPE_EDGE_FALLING>;
++		irq-gpios = <&pio 7 4 GPIO_ACTIVE_HIGH>;	/* CTP-INT: PH4 */
++		reset-gpios = <&pio 7 8 GPIO_ACTIVE_HIGH>;	/* CTP-RST: PH8 */
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
++	};
 -- 
 2.18.0.321.gffc6fa0e3
 
