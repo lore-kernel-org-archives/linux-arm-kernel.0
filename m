@@ -4,19 +4,19 @@ X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 X-Spam-Level: 
 X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 6FFECC04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:24 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 83F1FC07E85
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:43 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 354D920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5700520661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 15:48:43 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CQpBUvs2"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 354D920850
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Ki6RlhvU"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5700520661
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -26,78 +26,78 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	References:In-Reply-To:Date:Subject:To:From:Reply-To:Content-ID:
 	Content-Description:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc
 	:Resent-Message-ID:List-Owner;
-	bh=NC81JrZGKnwM5813x/dRBbLojVceXcTii/YHCCaaBF8=; b=CQpBUvs2L3CxtoUO7AUBb6XC/m
-	OfYfoQJA4FWDPWhpnhvxeYpPpjeIqCM86+YF+U4yzuFx7+dUAs8R8aJ0f5ct4+UTVk+LzSxZ2Ndjo
-	W/xhsesoV8cTxcUXDE+LP0GijesxYqsbWgL9vdazVsnZIsBCirDjwRJ0QrhVH9EUrSl1jlNzbqtQO
-	X0RDfyb95a5AUiMo4ZGNEsliOPMpILL/pBE3hf7GKGcET6xOHT4XIVIQXDxPp70zdA04Ag7Uq4qe4
-	D9QgBcNSDTFfdbhkHKtIfRbj6TdZhSsOD+F4C6C4ztQRZ+xsKd+r6GTfZ/WS9JuoCw2Z8P6MSrfEm
-	ivhV1BGg==;
+	bh=hjCHmRaymmN7UBdqXDDiTCJgmywNwz9zvnVXMhYzdXM=; b=Ki6RlhvUL88RUJ+0LNLmqT0Ky5
+	AqO1NkwugNc7QinjjHblLfVfQowft4hAmbbrGzrMxBVRwNSF1v/E90NZEvavkYGsqIktv+whH/cX2
+	oU0WLarzuF+3D6saoVO4oQlvJHqSbiTI39hmsgyOHWU14d1efmGMp16ew1bsagoePucDVy54foTdu
+	6Kv4dOL5Fsd3ykErVgJQ6ELHcRV1mAMPxWBhRIL8kb5bHOR+CJjyLeuEJ9vhYyMY7SnJ4PT5IyJ2z
+	eqX74T9C1r1LEzzutZ28d8UuJ5egTbN2021+ww5heeB5sYuZ6yMfi/iPy7zWmal0mQ0bszemrp7dm
+	c1wu3w2g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTqSM-0007To-8Y; Mon, 03 Dec 2018 15:48:22 +0000
+	id 1gTqSd-0007iy-L4; Mon, 03 Dec 2018 15:48:39 +0000
 Received: from mx0b-001b2d01.pphosted.com ([148.163.158.5]
  helo=mx0a-001b2d01.pphosted.com)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTqS7-0007Bh-1Q
+ id 1gTqS7-0007D7-1M
  for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 15:48:08 +0000
-Received: from pps.filterd (m0098420.ppops.net [127.0.0.1])
+Received: from pps.filterd (m0098419.ppops.net [127.0.0.1])
  by mx0b-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB3FiDFK064773
- for <linux-arm-kernel@lists.infradead.org>; Mon, 3 Dec 2018 10:47:56 -0500
-Received: from e06smtp02.uk.ibm.com (e06smtp02.uk.ibm.com [195.75.94.98])
- by mx0b-001b2d01.pphosted.com with ESMTP id 2p56u7tatk-1
+ wB3FiuQM044900
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 3 Dec 2018 10:47:58 -0500
+Received: from e06smtp07.uk.ibm.com (e06smtp07.uk.ibm.com [195.75.94.103])
+ by mx0b-001b2d01.pphosted.com with ESMTP id 2p56rfaukv-1
  (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Mon, 03 Dec 2018 10:47:55 -0500
+ for <linux-arm-kernel@lists.infradead.org>; Mon, 03 Dec 2018 10:47:56 -0500
 Received: from localhost
- by e06smtp02.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
+ by e06smtp07.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
  Violators will be prosecuted
  for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Mon, 3 Dec 2018 15:47:44 -0000
-Received: from b06cxnps3075.portsmouth.uk.ibm.com (9.149.109.195)
- by e06smtp02.uk.ibm.com (192.168.101.132) with IBM ESMTP SMTP Gateway:
+ Mon, 3 Dec 2018 15:47:48 -0000
+Received: from b06cxnps4074.portsmouth.uk.ibm.com (9.149.109.196)
+ by e06smtp07.uk.ibm.com (192.168.101.137) with IBM ESMTP SMTP Gateway:
  Authorized Use Only! Violators will be prosecuted; 
  (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Mon, 3 Dec 2018 15:47:36 -0000
-Received: from d06av24.portsmouth.uk.ibm.com (d06av24.portsmouth.uk.ibm.com
- [9.149.105.60])
- by b06cxnps3075.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB3FlZJg49676318
+ Mon, 3 Dec 2018 15:47:40 -0000
+Received: from d06av25.portsmouth.uk.ibm.com (d06av25.portsmouth.uk.ibm.com
+ [9.149.105.61])
+ by b06cxnps4074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
+ wB3Fldqi393682
  (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Mon, 3 Dec 2018 15:47:35 GMT
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 3522342047;
- Mon,  3 Dec 2018 15:47:35 +0000 (GMT)
-Received: from d06av24.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id E966142045;
- Mon,  3 Dec 2018 15:47:31 +0000 (GMT)
+ Mon, 3 Dec 2018 15:47:39 GMT
+Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 53C3211C050;
+ Mon,  3 Dec 2018 15:47:39 +0000 (GMT)
+Received: from d06av25.portsmouth.uk.ibm.com (unknown [127.0.0.1])
+ by IMSVA (Postfix) with ESMTP id 13B0611C05E;
+ Mon,  3 Dec 2018 15:47:36 +0000 (GMT)
 Received: from rapoport-lnx (unknown [9.148.206.196])
- by d06av24.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Mon,  3 Dec 2018 15:47:31 +0000 (GMT)
+ by d06av25.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
+ Mon,  3 Dec 2018 15:47:35 +0000 (GMT)
 Received: by rapoport-lnx (sSMTP sendmail emulation);
- Mon, 03 Dec 2018 17:47:31 +0200
+ Mon, 03 Dec 2018 17:47:35 +0200
 From: Mike Rapoport <rppt@linux.ibm.com>
 To: Andrew Morton <akpm@linux-foundation.org>
-Subject: [PATCH v2 3/6] sh: prefer memblock APIs returning virtual address
-Date: Mon,  3 Dec 2018 17:47:12 +0200
+Subject: [PATCH v2 4/6] openrisc: simplify pte_alloc_one_kernel()
+Date: Mon,  3 Dec 2018 17:47:13 +0200
 X-Mailer: git-send-email 2.7.4
 In-Reply-To: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
 References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
 X-TM-AS-GCONF: 00
-x-cbid: 18120315-0008-0000-0000-0000029C39CF
+x-cbid: 18120315-0028-0000-0000-00000325602D
 X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120315-0009-0000-0000-000022069463
-Message-Id: <1543852035-26634-4-git-send-email-rppt@linux.ibm.com>
+x-cbparentid: 18120315-0029-0000-0000-000023E164D7
+Message-Id: <1543852035-26634-5-git-send-email-rppt@linux.ibm.com>
 X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
  definitions=2018-12-03_09:, , signatures=0
 X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
  priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
+ malwarescore=0 suspectscore=2 phishscore=0 bulkscore=0 spamscore=0
  clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=924 adultscore=0 classifier=spam adjust=0 reason=mlx
+ mlxlogscore=840 adultscore=0 classifier=spam adjust=0 reason=mlx
  scancount=1 engine=8.0.1-1810050000 definitions=main-1812030148
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_074807_203365_2C2EA824 
-X-CRM114-Status: GOOD (  21.99  )
+X-CRM114-CacheID: sfid-20181203_074807_209778_911D0CEB 
+X-CRM114-Status: GOOD (  22.24  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -130,70 +130,45 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Rather than use the memblock_alloc_base that returns a physical address and
-then convert this address to the virtual one, use appropriate memblock
-function that returns a virtual address.
+The pte_alloc_one_kernel() function allocates a page using
+__get_free_page(GFP_KERNEL) when mm initialization is complete and
+memblock_phys_alloc() on the earlier stages. The physical address of the
+page allocated with memblock_phys_alloc() is converted to the virtual
+address and in the both cases the allocated page is cleared using
+clear_page().
 
-There is a small functional change in the allocation of then NODE_DATA().
-Instead of panicing if the local allocation failed, the non-local
-allocation attempt will be made.
+The code is simplified by replacing __get_free_page() with
+get_zeroed_page() and by replacing memblock_phys_alloc() with
+memblock_alloc().
 
 Signed-off-by: Mike Rapoport <rppt@linux.ibm.com>
+Acked-by: Stafford Horne <shorne@gmail.com>
 ---
- arch/sh/mm/init.c | 18 +++++-------------
- arch/sh/mm/numa.c |  5 ++---
- 2 files changed, 7 insertions(+), 16 deletions(-)
+ arch/openrisc/mm/ioremap.c | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/sh/mm/init.c b/arch/sh/mm/init.c
-index c8c13c77..3576b5f 100644
---- a/arch/sh/mm/init.c
-+++ b/arch/sh/mm/init.c
-@@ -192,24 +192,16 @@ void __init page_table_range_init(unsigned long start, unsigned long end,
- void __init allocate_pgdat(unsigned int nid)
+diff --git a/arch/openrisc/mm/ioremap.c b/arch/openrisc/mm/ioremap.c
+index c969752..cfef989 100644
+--- a/arch/openrisc/mm/ioremap.c
++++ b/arch/openrisc/mm/ioremap.c
+@@ -123,13 +123,10 @@ pte_t __ref *pte_alloc_one_kernel(struct mm_struct *mm,
  {
- 	unsigned long start_pfn, end_pfn;
--#ifdef CONFIG_NEED_MULTIPLE_NODES
--	unsigned long phys;
--#endif
+ 	pte_t *pte;
  
- 	get_pfn_range_for_nid(nid, &start_pfn, &end_pfn);
+-	if (likely(mem_init_done)) {
+-		pte = (pte_t *) __get_free_page(GFP_KERNEL);
+-	} else {
+-		pte = (pte_t *) __va(memblock_phys_alloc(PAGE_SIZE, PAGE_SIZE));
+-	}
++	if (likely(mem_init_done))
++		pte = (pte_t *)get_zeroed_page(GFP_KERNEL);
++	else
++		pte = memblock_alloc(PAGE_SIZE, PAGE_SIZE);
  
- #ifdef CONFIG_NEED_MULTIPLE_NODES
--	phys = __memblock_alloc_base(sizeof(struct pglist_data),
--				SMP_CACHE_BYTES, end_pfn << PAGE_SHIFT);
--	/* Retry with all of system memory */
--	if (!phys)
--		phys = __memblock_alloc_base(sizeof(struct pglist_data),
--					SMP_CACHE_BYTES, memblock_end_of_DRAM());
--	if (!phys)
-+	NODE_DATA(nid) = memblock_alloc_try_nid_nopanic(
-+				sizeof(struct pglist_data),
-+				SMP_CACHE_BYTES, MEMBLOCK_LOW_LIMIT,
-+				MEMBLOCK_ALLOC_ACCESSIBLE, nid);
-+	if (!NODE_DATA(nid))
- 		panic("Can't allocate pgdat for node %d\n", nid);
--
--	NODE_DATA(nid) = __va(phys);
--	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
- #endif
- 
- 	NODE_DATA(nid)->node_start_pfn = start_pfn;
-diff --git a/arch/sh/mm/numa.c b/arch/sh/mm/numa.c
-index 830e8b3..c4bde61 100644
---- a/arch/sh/mm/numa.c
-+++ b/arch/sh/mm/numa.c
-@@ -41,9 +41,8 @@ void __init setup_bootmem_node(int nid, unsigned long start, unsigned long end)
- 	__add_active_range(nid, start_pfn, end_pfn);
- 
- 	/* Node-local pgdat */
--	NODE_DATA(nid) = __va(memblock_alloc_base(sizeof(struct pglist_data),
--					     SMP_CACHE_BYTES, end));
--	memset(NODE_DATA(nid), 0, sizeof(struct pglist_data));
-+	NODE_DATA(nid) = memblock_alloc_node(sizeof(struct pglist_data),
-+					     SMP_CACHE_BYTES, nid);
- 
- 	NODE_DATA(nid)->node_start_pfn = start_pfn;
- 	NODE_DATA(nid)->node_spanned_pages = end_pfn - start_pfn;
+-	if (pte)
+-		clear_page(pte);
+ 	return pte;
+ }
 -- 
 2.7.4
 
