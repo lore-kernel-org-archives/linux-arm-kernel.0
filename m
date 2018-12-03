@@ -2,82 +2,65 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-3.9 required=3.0 tests=DKIM_ADSP_CUSTOM_MED,
-	DKIM_SIGNED,DKIM_VALID,FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,
-	HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DDEE4C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:42:42 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 153ACC04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:59:23 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 9FB5920834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:42:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CA3D1206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 11:59:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="TL0Z0WY/";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=gmail.com header.i=@gmail.com header.b="LcuIxjvR"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 9FB5920834
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=gmail.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="uP23gc4N"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CA3D1206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=sznFsgfFRE9XtW7yBXOYlv/tasDeUllauDF+ebP293o=; b=TL0Z0WY/HtQlFB
-	Or2r9/SpqFpgDjtLVmNs6sN8eKvxiWM04ab3foUtGpvrekFhOOuKUBRmF+lfogey5It0KUAyca8jd
-	xEzHU0eJOWKa+HpZ6MER7X4H6LPs4oy5EX8JZ5NTfpywCue6xAwPOm210R237zAdBHBcQz2zeAUXw
-	uJkjD9OZHOgVU40QQw/ycREBjaketTzlOLIphcgMw/GAozS37rcTHNFPllNwNCjoIMO8S38Mj9AjG
-	vB6dL/zttAKITcfD69ynRFWiQ9vWe5yddUerLpVksthSjiVidqUEMKCF/7G06TYSWhtwDD+OVeVeI
-	I/I2RWfXGF46T6s5lUaA==;
+	List-Owner; bh=8g3D51P/0dAmekAuOBHAXMRaxfiF2WwQJJ5kcwtWczg=; b=uP23gc4N3DFFNN
+	+aSpmEll8FQWuaPASEZLP1xvq8syvh/icuS0XfApAQvD9KLhX1FyMZEAF/drIIrGByqphEXYiBUNf
+	K7TGLA1cye6jpr5gqIGMa5O/ysxH4/q8eVlH2WDqbHkHpnugWkAOpyjyQE5z9dhYBo5xj14030vxF
+	4NRGjS6HUf0Ug4rGfi/bhVYZMosfdnlS6EQ4bF9pOy4O7DMNnemhImfXq+yrxlGxoZStqmQIG3MPf
+	GRtq20ygcFS5/9cdQBdyrRLgzaX3X4Gi7DyrJtYWkDgASfUGwvhRwvnqGBqfegI3rUw/FUQXiJ/Sp
+	kZOcFbzRgZHQ7wnBFu+g==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTmcY-0000zm-O8; Mon, 03 Dec 2018 11:42:38 +0000
-Received: from mail-ot1-x342.google.com ([2607:f8b0:4864:20::342])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTmcV-0000z0-Le
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:42:36 +0000
-Received: by mail-ot1-x342.google.com with SMTP id 81so11289783otj.2
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 03:42:25 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=gmail.com; s=20161025;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=2WtzCc7AgTuIPm8d6x2VuZKjqnIwdGuXPFknWJoEers=;
- b=LcuIxjvRUiqwQejzTumi5yXTkKjn+SksN8B4AgCCeBMiUOc+U19co/6Ay0Hfvw/zt3
- EgdwtwK7YqeyV0EUsHWR8/0SBxXZ0bWwU2PdGyk363v2stDcLK9F1L9L63SsZW5bE0j/
- 8ftxhHJIAfRMGD+qGDkU9rYCbZOe+rWkzB9nWoMf1RnAbztROX54i58pijc224UFCwjV
- nbj0TELbuSeer0UW7Rb23BYY0zGp0v2PT77w1G7zkK43f1PY+kpPitRRDYJQ6DJPRyFN
- 8ev5sdgy0NB2XVseytyZBAytGBFL3XRc7J+3lxTDOiCvu7hX8Mxd9leEEoaArmrmHv/6
- Hzlg==
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=2WtzCc7AgTuIPm8d6x2VuZKjqnIwdGuXPFknWJoEers=;
- b=TueAUFMOMmoDB3rn5zrNPLnkkIQSYWlWtnKuZsZaAajkP7I6/zWYOxH8jD0kfQHD0/
- +pqZnk5NShRhYxGEFcu1dXcRn+/AYLeaSDXagOZMhMmoouS25eVegVT7Vqkb9fItHN4V
- 5M9VqrWuAHPIjUskhUx/wHnHVcLiQ8BaNYuz2J2NsA/9wmSl9eYGb/JEb7dYdgOp1VFO
- FislxhPEfYqZxmfVyNNWdTRA8/NhMHxrV3ar46F6aNLa8gt0Z2KbVH1o4PDucFsejPY5
- L7vpYo6MMjvv+cq2yPB2OszNCS3kPB6P8pe+2vCiQu0biHxrqK7WD4PN3kOS7+swsrqn
- DjeA==
-X-Gm-Message-State: AA+aEWZt2t2BABXtZM3TF7Z1Amcpq0FQjD8M34XiKQ0O9UWD4T3Gu7Nt
- nUh0ky64/1WjU7wv7eF4u+Cu8bz9ZmX1U+xrHJk=
-X-Google-Smtp-Source: AFSGD/UySL6cSKHhgQYnEHIwvmq+CKebPJXBJgM2FHMsaUvpc6PmX8oQLlm0qci7cezPGVd1EOd+3U9tqTf8gWmGKRQ=
-X-Received: by 2002:a9d:7285:: with SMTP id t5mr10360972otj.228.1543837344547; 
- Mon, 03 Dec 2018 03:42:24 -0800 (PST)
+	id 1gTmsc-0007Ii-4Y; Mon, 03 Dec 2018 11:59:14 +0000
+Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
+ helo=foss.arm.com)
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gTmsY-0007I3-PQ
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 11:59:12 +0000
+Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 4AD81165C;
+ Mon,  3 Dec 2018 03:58:55 -0800 (PST)
+Received: from e107981-ln.cambridge.arm.com (e107981-ln.cambridge.arm.com
+ [10.1.197.40])
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id E3F2A3F59C;
+ Mon,  3 Dec 2018 03:58:52 -0800 (PST)
+Date: Mon, 3 Dec 2018 11:58:50 +0000
+From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+To: "Z.q. Hou" <zhiqiang.hou@nxp.com>,
+ Subrahmanya Lingappa <l.subrahmanya@mobiveil.co.in>
+Subject: Re: [PATCH 00/23] PCI: refactor the Mobiveil driver and add PCIe
+ support for NXP LX SoCs
+Message-ID: <20181203115850.GB8040@e107981-ln.cambridge.arm.com>
+References: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
 MIME-Version: 1.0
-References: <1543804767-17650-1-git-send-email-Anson.Huang@nxp.com>
-In-Reply-To: <1543804767-17650-1-git-send-email-Anson.Huang@nxp.com>
-From: Fabio Estevam <festevam@gmail.com>
-Date: Mon, 3 Dec 2018 09:42:26 -0200
-Message-ID: <CAOMZO5Bc2z9mtWN5HDDbLggryEaxF6eay2Wnu8AdBSBNFZSmXw@mail.gmail.com>
-Subject: Re: [PATCH] ARM: imx: update the cpu power up timing setting
-To: Yongcai Huang <anson.huang@nxp.com>
+Content-Disposition: inline
+In-Reply-To: <20181106131807.29951-1-Zhiqiang.Hou@nxp.com>
+User-Agent: Mutt/1.5.24 (2015-08-30)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_034235_709720_21E41F8C 
-X-CRM114-Status: GOOD (  11.94  )
+X-CRM114-CacheID: sfid-20181203_035910_839190_E6CED166 
+X-CRM114-Status: GOOD (  19.32  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -89,32 +72,93 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Sascha Hauer <s.hauer@pengutronix.de>,
- Russell King - ARM Linux <linux@armlinux.org.uk>,
- linux-kernel <linux-kernel@vger.kernel.org>,
- NXP Linux Team <linux-imx@nxp.com>, Sascha Hauer <kernel@pengutronix.de>,
- Fabio Estevam <fabio.estevam@nxp.com>, Shawn Guo <shawnguo@kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: "mark.rutland@arm.com" <mark.rutland@arm.com>,
+ "devicetree@vger.kernel.org" <devicetree@vger.kernel.org>,
+ Xiaowei Bao <xiaowei.bao@nxp.com>,
+ "linux-pci@vger.kernel.org" <linux-pci@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
+ Leo Li <leoyang.li@nxp.com>, "M.h. Lian" <minghuan.lian@nxp.com>,
+ "robh+dt@kernel.org" <robh+dt@kernel.org>, Mingkai Hu <mingkai.hu@nxp.com>,
+ "bhelgaas@google.com" <bhelgaas@google.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Dec 3, 2018 at 12:45 AM Anson Huang <anson.huang@nxp.com> wrote:
->
-> The sw2iso count should cover ARM LDO ramp-up time,
-> the MAX ARM LDO ramp-up time may be up to more than
-> 100us on some boards, this patch sets sw2iso to 0xf
-> (~384us) which is the reset value, and it is much
-> more safe to cover different boards, since we have
-> observed that some customer boards failed with current
-> setting of 0x2.
->
-> Fixes: 05136f0897b5 ("ARM: imx: support arm power off in cpuidle for i.mx6sx")
-> Signed-off-by: Anson Huang <Anson.Huang@nxp.com>
+On Tue, Nov 06, 2018 at 01:19:03PM +0000, Z.q. Hou wrote:
+> From: Hou Zhiqiang <Zhiqiang.Hou@nxp.com>
+> 
+> This patch set is aim to refactor the Mobiveil driver and add
+> PCIe support for NXP LX series SoCs.
+> 
+> Hou Zhiqiang (23):
+>   PCI: mobiveil: uniform the register accessors
+>   PCI: mobiveil: format the code without function change
+>   PCI: mobiveil: correct the returned error number
+>   PCI: mobiveil: remove flag MSI_FLAG_MULTI_PCI_MSI
+>   PCI: mobiveil: correct PCI base address in MEM/IO outbound windows
+>   PCI: mobiveil: replace the resource list iteration function
+>   PCI: mobiveil: use WIN_NUM_0 explicitly for CFG outbound window
+>   PCI: mobiveil: use the 1st inbound window for MEM inbound transactions
+>   PCI: mobiveil: correct the inbound/outbound window setup routine
+>   PCI: mobiveil: fix the INTx process error
+>   PCI: mobiveil: only fixup the Class Code field
+>   PCI: mobiveil: move out the link up waiting from mobiveil_host_init
+>   PCI: mobiveil: move irq chained handler setup out of DT parse
+>   PCI: mobiveil: initialize Primary/Secondary/Subordinate bus number
+>   dt-bindings: pci: mobiveil: change gpio_slave and apb_csr to optional
+>   PCI: mobiveil: refactor the Mobiveil driver
+>   PCI: mobiveil: continue to initialize the host upon no PCIe link
+>   PCI: mobiveil: disabled IB and OB windows set by bootloader
+>   PCI: mobiveil: add Byte and Half-Word width register accessors
+>   PCI: mobiveil: change prototype of function mobiveil_host_init
+>   dt-bindings: pci: Add NXP LX SoCs PCIe controller
+>   PCI: mobiveil: add PCIe RC driver for NXP LX series SoCs
+>   arm64: dts: freescale: lx2160a: add pcie DT nodes
+> 
+>  .../devicetree/bindings/pci/lx-pci.txt        |  52 ++
+>  .../devicetree/bindings/pci/mobiveil-pcie.txt |   2 +
+>  MAINTAINERS                                   |  10 +-
+>  .../arm64/boot/dts/freescale/fsl-lx2160a.dtsi | 157 ++++
+>  drivers/pci/controller/Kconfig                |  11 +-
+>  drivers/pci/controller/Makefile               |   2 +-
+>  drivers/pci/controller/mobiveil/Kconfig       |  34 +
+>  drivers/pci/controller/mobiveil/Makefile      |   5 +
+>  drivers/pci/controller/mobiveil/pci-lx.c      | 222 +++++
+>  .../controller/mobiveil/pcie-mobiveil-host.c  | 622 +++++++++++++
+>  .../controller/mobiveil/pcie-mobiveil-plat.c  |  54 ++
+>  .../pci/controller/mobiveil/pcie-mobiveil.c   | 245 +++++
+>  .../pci/controller/mobiveil/pcie-mobiveil.h   | 221 +++++
+>  drivers/pci/controller/pcie-mobiveil.c        | 861 ------------------
+>  14 files changed, 1625 insertions(+), 873 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/lx-pci.txt
+>  create mode 100644 drivers/pci/controller/mobiveil/Kconfig
+>  create mode 100644 drivers/pci/controller/mobiveil/Makefile
+>  create mode 100644 drivers/pci/controller/mobiveil/pci-lx.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-host.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil-plat.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.c
+>  create mode 100644 drivers/pci/controller/mobiveil/pcie-mobiveil.h
+>  delete mode 100644 drivers/pci/controller/pcie-mobiveil.c
 
-Reviewed-by: Fabio Estevam <festevam@gmail.com>
+Subrahmanya,
+
+for the records, this is the driver *you* are maintaining, aren't you ?
+
+We ask developers to be added to the MAINTAINERS list in order to hold
+them accountable, merging a driver upstream means that you need to
+actively maintain it, which in turn means reviewing series affecting
+its code, like this one.
+
+I will have a look too but it is your responsibility to review these
+patches and ACK them accordingly.
+
+So I strongly suggest you start doing it please.
+
+Thanks,
+Lorenzo
 
 _______________________________________________
 linux-arm-kernel mailing list
