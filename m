@@ -2,70 +2,82 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no
 	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 857D5C04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:39 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 9CB09C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:52:20 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 5238B2145D
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:49:39 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 6359020834
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 09:52:20 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YzPSJEMK"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5238B2145D
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=pengutronix.de
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G5l7CiJG";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=amarulasolutions.com header.i=@amarulasolutions.com header.b="KHwOLNe9"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 6359020834
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=amarulasolutions.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bOgB4SbVm8dxwbouNr8LsI6wCG+wKMMwPDu+Z3XAKnE=; b=YzPSJEMKPKR93L
-	zG4YJ6q5PFGxH4+YXn2FfnIzVjDK5wXG87FBNl1P08WRkVqhC+53sxuKk/5Kj/tCtswBViLxNlpsD
-	29D3nLXE9SGIRaQV/qlfJUl4d3n6sYHYpNuDVYBJv3MtIqYHZmzuxPLBr1CPKdW38zSCmXdgdFNYB
-	VMrlIUr8kbOTD9PvHoXfgkhYYk+GBFuS76ew4WaHSSHIakPSTnPOX39Kai0GFP2dNSEkvkvYZOwwa
-	ZedW9F8hg8n6VNPjJd6DepyDwYq47JtCPWtAAGeBnCN2jByYi50H189tgo8TKIEz6jS5ZMaCQfGKo
-	pEao7l1IYgVLTDzpgU6A==;
+	List-Owner; bh=dtNTXUHaHEHN+4D3bh1dkjSDb/Tqo9aJmaiq/55SUYk=; b=G5l7CiJGZxTPWI
+	USxE89zKZOyNmnlmnXdf1K0scnD18+2cQitZu87tEWcReW5IEaJ6ryGRyeA3V2Ybl0GNQl2Lw4H3B
+	/z3SCvvqiDWfE7visoHRPnCu4M9wofXnMs5fx1l7U34PYeVJfO2nBRr7T2Hg0enU7G5XWEIJK6t90
+	Cm2oj87z/VO5WmtTVmUvS10db6qnOMBGDG12owPKGYlmE29LI0OT8XYBaqEXnFPaCGXYacwD4jhgu
+	fFsxk0fhDSITjhs5QsMU7Oz6f83zK2eE5aUVYQYZFPK8o/ciQN5w8frSmDt8iBP1JZKNu4vfcEOD1
+	wbDTXGMkp8TguvzmYNFA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTkrA-0000ha-Tg; Mon, 03 Dec 2018 09:49:36 +0000
-Received: from metis.ext.pengutronix.de ([2001:67c:670:201:290:27ff:fe1d:cc33])
+	id 1gTktl-0002Mh-8w; Mon, 03 Dec 2018 09:52:17 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTkr1-0000NW-SZ
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:49:34 +0000
-Received: from ptx.hi.pengutronix.de ([2001:67c:670:100:1d::c0])
- by metis.ext.pengutronix.de with esmtps
- (TLS1.2:ECDHE_RSA_AES_256_GCM_SHA384:256) (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gTkqk-0007kI-En; Mon, 03 Dec 2018 10:49:10 +0100
-Received: from ukl by ptx.hi.pengutronix.de with local (Exim 4.89)
- (envelope-from <ukl@pengutronix.de>)
- id 1gTkqi-0000Mw-3M; Mon, 03 Dec 2018 10:49:08 +0100
-Date: Mon, 3 Dec 2018 10:49:08 +0100
-From: Uwe =?iso-8859-1?Q?Kleine-K=F6nig?= <u.kleine-koenig@pengutronix.de>
-To: Hao Zhang <hao5781286@gmail.com>
-Subject: Re: [PATCH v3 6/6] ARM: PWM: add allwinner sun8i R40/T3/V40 PWM
- support.
-Message-ID: <20181203094908.lga2r56gelaghrej@pengutronix.de>
-References: <20181125162319.GA5422@arx-s1>
- <20181126213158.q5m5bbwnmewud2gb@pengutronix.de>
+ id 1gTkth-0002LL-Ic
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 09:52:15 +0000
+Received: by mail-it1-x141.google.com with SMTP id i7so8257808iti.2
+ for <linux-arm-kernel@lists.infradead.org>;
+ Mon, 03 Dec 2018 01:52:03 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=amarulasolutions.com; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=qlA+Ve7B0ClpzM1pZ9TLkwyLB5aC59cq0OOd3p7iTDU=;
+ b=KHwOLNe9jToVnytNapGRrK8uBcRyJB7uVy8FlJn8uhIVd52smg8Yx5x7/6eRlmOPVg
+ AYPvZkKdX0XKxs7/rDMvdJPOHI11hv4c8WhWt0VgncYAjyjMvkjyw16zOThL6cd+PBIb
+ KIsbEOgM41lW3adQafkRadYQb32J4dNmHnNTk=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=qlA+Ve7B0ClpzM1pZ9TLkwyLB5aC59cq0OOd3p7iTDU=;
+ b=A9BMvvFsvN1X9r49QzXLBNxbJ1g+4EAhNRQP06e9kHykyjaoY6NLDVhCC+Sja6TjNs
+ 5r1CPLSY/iLDcUZcIEy+I8OWx4AU7iOMGfdbzamiKrPaCw+ye9gciPdBY3JbKEq1IIjd
+ DH76GBTF7bCXyPFXUG3/Kqm6RrbSUzxRLxNE0vWir3TQQhhwXATvD08Cz9BeZ/BQbtFK
+ DE7WxwPuUMMAzlLjWhV3Zpn01i8w/gFXJEuG206nhwCHgEJIl29fHQ6WGuBRNX0qk2C8
+ EahrJoQ1W8/T994opRYlhns72+pHOrGaQps0GHgROt7UiwTBfCCtDIYh71hui7RhyRPo
+ UALw==
+X-Gm-Message-State: AA+aEWYbFPJEBKzqIcR/3DCIct9nidPU1tn4r1dpzSGugWukmfq1JzEH
+ u70NY2zZbVIlBjk03TlTSMBClNMRVeejkh9pyYMTHg==
+X-Google-Smtp-Source: AFSGD/VSuBnkXddzpk+LOXKAE6/jzMC+dF5S8T4A9Nkvdk2RIzi0lduFAHRO3/G52qKhdWprKhjcwVkVSl2Z4IkWaWc=
+X-Received: by 2002:a24:10cb:: with SMTP id 194mr7446972ity.173.1543830722223; 
+ Mon, 03 Dec 2018 01:52:02 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181126213158.q5m5bbwnmewud2gb@pengutronix.de>
-User-Agent: NeoMutt/20170113 (1.7.2)
-X-SA-Exim-Connect-IP: 2001:67c:670:100:1d::c0
-X-SA-Exim-Mail-From: ukl@pengutronix.de
-X-SA-Exim-Scanned: No (on metis.ext.pengutronix.de);
- SAEximRunCond expanded to false
-X-PTX-Original-Recipient: linux-arm-kernel@lists.infradead.org
+References: <20181130075849.16941-1-wens@csie.org>
+ <20181130075849.16941-6-wens@csie.org>
+In-Reply-To: <20181130075849.16941-6-wens@csie.org>
+From: Jagan Teki <jagan@amarulasolutions.com>
+Date: Mon, 3 Dec 2018 15:21:50 +0530
+Message-ID: <CAMty3ZAuBM0s3eNhQBySSaUrUAkiF=Hk+Ab=gsN=QucLJv0zyw@mail.gmail.com>
+Subject: Re: [PATCH 5/6] [DO NOT MERGE] ARM: dts: sunxi: bananapi-m2p: Add
+ HDF5640 camera module
+To: Chen-Yu Tsai <wens@csie.org>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_014928_643443_5031F999 
-X-CRM114-Status: GOOD (  12.66  )
+X-CRM114-CacheID: sfid-20181203_015213_622525_FAF5A274 
+X-CRM114-Status: GOOD (  18.82  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -77,54 +89,94 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: mark.rutland@arm.com, devicetree@vger.kernel.org,
- linux-gpio@vger.kernel.org, maxime.ripard@bootlin.com, mturquette@baylibre.com,
- linux-sunxi@googlegroups.com, linux-kernel@vger.kernel.org,
- linux-pwm@vger.kernel.org, sboyd@kernel.org, wens@csie.org, robh+dt@kernel.org,
- thierry.reding@gmail.com, linux-arm-kernel@lists.infradead.org
-Content-Type: text/plain; charset="iso-8859-1"
-Content-Transfer-Encoding: quoted-printable
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ devicetree <devicetree@vger.kernel.org>,
+ Maxime Ripard <maxime.ripard@bootlin.com>,
+ linux-kernel <linux-kernel@vger.kernel.org>, Rob Herring <robh+dt@kernel.org>,
+ Yong Deng <yong.deng@magewell.com>, Mauro Carvalho Chehab <mchehab@kernel.org>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>,
+ linux-media <linux-media@vger.kernel.org>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hello,
+On Fri, Nov 30, 2018 at 1:29 PM Chen-Yu Tsai <wens@csie.org> wrote:
+>
+> The Bananapi M2+ comes with an optional sensor based on the ov5640 from
+> Omnivision. Enable the support for it in the DT.
+>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi | 87 +++++++++++++++++++
+>  1 file changed, 87 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
+> index b3283aeb5b7d..d97a98acf378 100644
+> --- a/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
+> +++ b/arch/arm/boot/dts/sunxi-bananapi-m2-plus.dtsi
+> @@ -89,6 +89,42 @@
+>                 };
+>         };
+>
+> +       reg_cam_avdd: cam-avdd {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "csi-avdd";
+> +               regulator-min-microvolt = <2800000>;
+> +               regulator-max-microvolt = <2800000>;
+> +               startup-delay-us = <200>; /* 50 us + board delays */
+> +               enable-active-high;
+> +               gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
+> +       };
+> +
+> +       reg_cam_dovdd: cam-dovdd {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "csi-dovdd";
+> +               regulator-min-microvolt = <2800000>;
+> +               regulator-max-microvolt = <2800000>;
+> +               /*
+> +                * This regulator also powers the pull-ups for the I2C bus.
+> +                * For some reason, if this is turned off, subsequent use
+> +                * of the I2C bus, even when turned on, does not work.
+> +                */
+> +               startup-delay-us = <200>; /* 50 us + board delays */
+> +               regulator-always-on;
+> +               enable-active-high;
+> +               gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
+> +       };
+> +
+> +       reg_cam_dvdd: cam-dvdd {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "csi-dvdd";
+> +               regulator-min-microvolt = <1500000>;
+> +               regulator-max-microvolt = <1500000>;
+> +               startup-delay-us = <200>; /* 50 us + board delays */
+> +               enable-active-high;
+> +               gpio = <&pio 3 14 GPIO_ACTIVE_HIGH>; /* PD14 */
+> +       };
+> +
+>         reg_gmac_3v3: gmac-3v3 {
+>                       compatible = "regulator-fixed";
+>                       regulator-name = "gmac-3v3";
+> @@ -106,6 +142,26 @@
+>         };
+>  };
+>
+> +&csi {
+> +       status = "okay";
+> +
+> +       port {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               /* Parallel bus endpoint */
+> +               csi_from_ov5640: endpoint {
+> +                       remote-endpoint = <&ov5640_to_csi>;
+> +                       bus-width = <8>;
+> +                       data-shift = <2>;
 
-On Mon, Nov 26, 2018 at 10:31:58PM +0100, Uwe Kleine-K=F6nig wrote:
-> > +static int sun8i_pwm_config(struct sun8i_pwm_chip *sun8i_pwm, u8 ch,
-> > +			    struct pwm_state *state)
-> > +{
-> > +[...]
-> > +		clk_rate =3D clk_get_rate(clk);
-> > +		val =3D state->period * clk_rate;
-> > +		do_div(val, NSEC_PER_SEC);
-> > +		if (val <=3D 1) {
-> > +			dev_err(sun8i_pwm->chip.dev,
-> > +				"Period expects a larger value\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		/* change clock source to "mux-1" */
-> > +		clk_disable_unprepare(sun8i_pwm->clk);
-> > +		devm_clk_put(sun8i_pwm->chip.dev, sun8i_pwm->clk);
-> > +		sun8i_pwm->clk =3D clk;
-> =
-
-> sun8i_pwm is shared for all 8 PWMs, right? So if you assign mux-1 here
-> for the second mux, how does this influence the first PWM?
-
-To clearify my question:
-
-after the first pwm is used and enabled (maybe using mux-0) changing
-sun8i_pwm->clk for the second pwm is broken because then when the first
-pwm is disabled the wrong clock is stopped.
-
-Best regards
-Uwe
-
--- =
-
-Pengutronix e.K.                           | Uwe Kleine-K=F6nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+If I'm not wrong, the data-shift is not available in sun6i at-least in
+conf register.
 
 _______________________________________________
 linux-arm-kernel mailing list
