@@ -7,16 +7,16 @@ X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
 	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1A2DFC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:10 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 02DF3C04EB9
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id E1100208A3
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:09 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id C00B720850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 18:07:30 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="OSslkpPt"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E1100208A3
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="lZauBChd"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org C00B720850
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
@@ -25,39 +25,39 @@ DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
 	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=p4KOFg5ZY3P82//DpAo8nl16BoJ6Wxt3nxte8dMzUdM=; b=OSslkpPtwXiCwW
-	HBrQxKy8Vxtrl1UIXRbWJ5K6IBMeTo0wjYD5zU8hGmLI6cY/BUnAArT6i7+M63Yz5O18JG4vQRaW+
-	fE2EeamN4JALdU0CvTVAH+4XBwRQymoOu0cOfR09wrCTr0yvV1PYXcqu5rjNSoJjmgMvWevlK1e3T
-	9ncEsl2PmQayuT3VqAsGR+gXQN602mddP1JbS2GyatRpxMueamwNw/VIuTfnhDS/s9XU4ujXFlVS0
-	XV3nu/P1njGOidnjh4KwQY3otoZ+Ld0rWOqqWSBgKyVaXysWWIch0pGU0dFTycGRPZy+GGEsoFNz8
-	98kcZFQsrWUkJpcepKVQ==;
+	List-Owner; bh=P9hs3DSZj5KF+Yuob98hNoO2LkH3z2mOZX+pazxsFgM=; b=lZauBChdNsygrm
+	DDNxaB5RDvUgkpS06b9MEDBNJZF1LjtEWIv7I4vINF20RHxGWarM7cOWucyG581djf1xoq6CVicyU
+	Ldln94RqbSj9brY185NWy5TdeQ5UGgYOma/Pn6HJpOE+NXs5up0GBCXGOsMeutv1dEXUcuJuoDP6k
+	6CP7eFg5kkdGajVk/ClwGdeXJ6SX4aswuUw2cMP9N+2kAiUXfXj7uIZzocx64h1VyuoDUD1hvcJz3
+	N6QmafpO92GGrVKDYiUJl8rjcMtzuloyWCQTD0WKNd1yRGxxPjQP/iiycXqXs8aX8qeMhx+DFXNLm
+	I505shBymcqK3LtqgC6Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTsca-00058p-La; Mon, 03 Dec 2018 18:07:04 +0000
+	id 1gTscs-0005Qn-9t; Mon, 03 Dec 2018 18:07:22 +0000
 Received: from usa-sjc-mx-foss1.foss.arm.com ([217.140.101.70]
  helo=foss.arm.com)
  by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTscL-0004ib-Mw
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:06:51 +0000
+ id 1gTscM-0004uH-DK
+ for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 18:06:53 +0000
 Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 483B21682;
- Mon,  3 Dec 2018 10:06:39 -0800 (PST)
+ by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 108D11713;
+ Mon,  3 Dec 2018 10:06:50 -0800 (PST)
 Received: from eglon.cambridge.arm.com (eglon.cambridge.arm.com [10.1.196.105])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 78B303F59C;
- Mon,  3 Dec 2018 10:06:36 -0800 (PST)
+ by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id 404C33F59C;
+ Mon,  3 Dec 2018 10:06:47 -0800 (PST)
 From: James Morse <james.morse@arm.com>
 To: linux-acpi@vger.kernel.org
-Subject: [PATCH v7 01/25] ACPI / APEI: Don't wait to serialise with oops
- messages when panic()ing
-Date: Mon,  3 Dec 2018 18:05:49 +0000
-Message-Id: <20181203180613.228133-2-james.morse@arm.com>
+Subject: [PATCH v7 04/25] ACPI / APEI: Make hest.c manage the estatus memory
+ pool
+Date: Mon,  3 Dec 2018 18:05:52 +0000
+Message-Id: <20181203180613.228133-5-james.morse@arm.com>
 X-Mailer: git-send-email 2.19.2
 In-Reply-To: <20181203180613.228133-1-james.morse@arm.com>
 References: <20181203180613.228133-1-james.morse@arm.com>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_100649_871531_8A30126A 
-X-CRM114-Status: GOOD (  14.09  )
+X-CRM114-CacheID: sfid-20181203_100650_717348_3F489A85 
+X-CRM114-Status: GOOD (  18.40  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,51 +82,133 @@ Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-oops_begin() exists to group printk() messages with the oops message
-printed by die(). To reach this caller we know that platform firmware
-took this error first, then notified the OS via NMI with a 'panic'
-severity.
+ghes.c has a memory pool it uses for the estatus cache and the estatus
+queue. The cache is initialised when registering the platform driver.
+For the queue, an NMI-like notification has to grow/shrink the pool
+as it is registered and unregistered.
 
-Don't wait for another CPU to release the die-lock before panic()ing,
-our only goal is to print this fatal error and panic().
+This is all pretty noisy when adding new NMI-like notifications, it
+would be better to replace this with a static pool size based on the
+number of users.
 
-This code is always called in_nmi(), and since commit 42a0bb3f7138
-("printk/nmi: generic solution for safe printk in NMI"), it has been
-safe to call printk() from this context. Messages are batched in a
-per-cpu buffer and printed via irq-work, or a call back from panic().
+As a precursor, move the call that creates the pool from ghes_init(),
+into hest.c. Later this will take the number of ghes entries and
+consolidate the queue allocations.
+Remove ghes_estatus_pool_exit() as hest.c doesn't have anywhere to put
+this.
 
-Link: https://patchwork.kernel.org/patch/10313555/
-Acked-by: Borislav Petkov <bp@suse.de>
+The pool is now initialised as part of ACPI's subsys_initcall():
+(acpi_init(), acpi_scan_init(), acpi_pci_root_init(), acpi_hest_init())
+Before this patch it happened later as a GHES specific device_initcall().
+
 Signed-off-by: James Morse <james.morse@arm.com>
-
 ---
-Changes since v6:
- * Capitals in patch subject
- * Tinkered with the commit message.
----
- drivers/acpi/apei/ghes.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/acpi/apei/ghes.c | 33 ++++++---------------------------
+ drivers/acpi/apei/hest.c |  5 +++++
+ include/acpi/ghes.h      |  2 ++
+ 3 files changed, 13 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 02c6fd9caff7..ab2dae6fc7e4 100644
+index c15264f2dc4b..78058adb2574 100644
 --- a/drivers/acpi/apei/ghes.c
 +++ b/drivers/acpi/apei/ghes.c
-@@ -33,7 +33,6 @@
- #include <linux/interrupt.h>
- #include <linux/timer.h>
- #include <linux/cper.h>
--#include <linux/kdebug.h>
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/ratelimit.h>
-@@ -947,7 +946,6 @@ static int ghes_notify_nmi(unsigned int cmd, struct pt_regs *regs)
+@@ -162,26 +162,16 @@ static void ghes_iounmap_irq(void)
+ 	clear_fixmap(FIX_APEI_GHES_IRQ);
+ }
  
- 		sev = ghes_severity(ghes->estatus->error_severity);
- 		if (sev >= GHES_SEV_PANIC) {
--			oops_begin();
- 			ghes_print_queued_estatus();
- 			__ghes_panic(ghes);
- 		}
+-static int ghes_estatus_pool_init(void)
++static int ghes_estatus_pool_expand(unsigned long len); //temporary
++
++int ghes_estatus_pool_init(void)
+ {
+ 	ghes_estatus_pool = gen_pool_create(GHES_ESTATUS_POOL_MIN_ALLOC_ORDER, -1);
+ 	if (!ghes_estatus_pool)
+ 		return -ENOMEM;
+-	return 0;
+-}
+ 
+-static void ghes_estatus_pool_free_chunk(struct gen_pool *pool,
+-					      struct gen_pool_chunk *chunk,
+-					      void *data)
+-{
+-	vfree((void *)chunk->start_addr);
+-}
+-
+-static void ghes_estatus_pool_exit(void)
+-{
+-	gen_pool_for_each_chunk(ghes_estatus_pool,
+-				ghes_estatus_pool_free_chunk, NULL);
+-	gen_pool_destroy(ghes_estatus_pool);
++	return ghes_estatus_pool_expand(GHES_ESTATUS_CACHE_AVG_SIZE *
++					GHES_ESTATUS_CACHE_ALLOCED_MAX);
+ }
+ 
+ static int ghes_estatus_pool_expand(unsigned long len)
+@@ -1225,18 +1215,9 @@ static int __init ghes_init(void)
+ 
+ 	ghes_nmi_init_cxt();
+ 
+-	rc = ghes_estatus_pool_init();
+-	if (rc)
+-		goto err;
+-
+-	rc = ghes_estatus_pool_expand(GHES_ESTATUS_CACHE_AVG_SIZE *
+-				      GHES_ESTATUS_CACHE_ALLOCED_MAX);
+-	if (rc)
+-		goto err_pool_exit;
+-
+ 	rc = platform_driver_register(&ghes_platform_driver);
+ 	if (rc)
+-		goto err_pool_exit;
++		goto err;
+ 
+ 	rc = apei_osc_setup();
+ 	if (rc == 0 && osc_sb_apei_support_acked)
+@@ -1249,8 +1230,6 @@ static int __init ghes_init(void)
+ 		pr_info(GHES_PFX "Failed to enable APEI firmware first mode.\n");
+ 
+ 	return 0;
+-err_pool_exit:
+-	ghes_estatus_pool_exit();
+ err:
+ 	return rc;
+ }
+diff --git a/drivers/acpi/apei/hest.c b/drivers/acpi/apei/hest.c
+index b1e9f81ebeea..da5fabaeb48f 100644
+--- a/drivers/acpi/apei/hest.c
++++ b/drivers/acpi/apei/hest.c
+@@ -32,6 +32,7 @@
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
+ #include <acpi/apei.h>
++#include <acpi/ghes.h>
+ 
+ #include "apei-internal.h"
+ 
+@@ -200,6 +201,10 @@ static int __init hest_ghes_dev_register(unsigned int ghes_count)
+ 	if (!ghes_arr.ghes_devs)
+ 		return -ENOMEM;
+ 
++	rc = ghes_estatus_pool_init();
++	if (rc)
++		goto out;
++
+ 	rc = apei_hest_parse(hest_parse_ghes, &ghes_arr);
+ 	if (rc)
+ 		goto err;
+diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
+index 82cb4eb225a4..46ef5566e052 100644
+--- a/include/acpi/ghes.h
++++ b/include/acpi/ghes.h
+@@ -52,6 +52,8 @@ enum {
+ 	GHES_SEV_PANIC = 0x3,
+ };
+ 
++int ghes_estatus_pool_init(void);
++
+ /* From drivers/edac/ghes_edac.c */
+ 
+ #ifdef CONFIG_EDAC_GHES
 -- 
 2.19.2
 
