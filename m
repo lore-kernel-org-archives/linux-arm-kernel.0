@@ -2,79 +2,74 @@ Return-Path: <SRS0=0OAT=OM=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,INCLUDES_PATCH,MAILING_LIST_MULTI,SIGNED_OFF_BY,SPF_PASS,
-	URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-9.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,MAILING_LIST_MULTI,MENTIONS_GIT_HOSTING,SPF_PASS,USER_AGENT_GIT
+	autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 14968C07E85
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:32:43 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id DB55EC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:33:03 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id CF37A2087F
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:32:42 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 792FB214DA
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Mon,  3 Dec 2018 21:33:03 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Kp5nIxbF"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CF37A2087F
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bWImtYFB"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 792FB214DA
 Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=kernel.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=zvrfbD38biWOnLsEPnS6j1MXyEjwoeKOMZYNfC1uFgM=; b=Kp5nIxbFxn21cw
-	oKPSimVvDh+gvDy6HgZui4vV4mu2Qns/Likq0+QFR+qHdS2dCTS3TrDCPSnHghnlvNA23dY+cC0qU
-	8b6sQgnzt/nScCCRKZlWFzOyY5ld9+QlwdtzEII/blbkPfmzun2pylr3NMrhxyi1HoTTJVgGE7Du0
-	BtQXucE32hzbRcTDEmLlLdf7giBSQSC/pwc/mbr38D0whb/PYReWEFvJlYu/hUt3Ccc8YCVI0J6VG
-	erI/Hv7/gZvqB7gTNmlusHl8QCxEYjfYZGudIL/ne3BAdGmGtBihFbifKNE0Xh87FKM7kEeMiaXfJ
-	jUNl3cu/sMsRugwJdYxw==;
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-Id:Date:Subject:To
+	:From:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=ECG/TVr/EDdYres9K718CGq1y7TN7EcZKdCHQ/HFAyM=; b=bWImtYFBPzXfJX
+	1ROMPs1wc5ScVs89CR5ffldbeGwBvTZm0l+vDXHCFiLaJKgM02obSylX9Xn+Y0v/6hCQjwGeSpP+F
+	j4PLzyUQT/w6ZsU0umTdUaNSBad2/4G7ZQPUqjgu77L6e1Gvb4kFNMQAJgJxC8VHgdAHlPnLh93j8
+	B9ft4c7IoXAeIjfHYZ2JmwzFSQYGUAdnP6Iz82C7fOWZrmLG63XMhx/MSMVXpSjWdrhrZPM40qjE/
+	WW6bfb3H8JnupJ1N85BpJVlFowpt9jiAdk+AVlvWuwq1RPT5dWNpkTYBMRyX1Q/fLz6kRRwoM498a
+	Ht5Mu+yDWDsopMeFlwQA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gTvpY-00023B-TZ; Mon, 03 Dec 2018 21:32:40 +0000
+	id 1gTvpo-0002JJ-Qw; Mon, 03 Dec 2018 21:32:56 +0000
 Received: from mail-oi1-f195.google.com ([209.85.167.195])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTvpV-00021i-FL
- for linux-arm-kernel@lists.infradead.org; Mon, 03 Dec 2018 21:32:39 +0000
-Received: by mail-oi1-f195.google.com with SMTP id u18so12338814oie.10
- for <linux-arm-kernel@lists.infradead.org>;
- Mon, 03 Dec 2018 13:32:37 -0800 (PST)
+ id 1gTvpV-00021R-7p; Mon, 03 Dec 2018 21:32:39 +0000
+Received: by mail-oi1-f195.google.com with SMTP id m6so12330380oig.11;
+ Mon, 03 Dec 2018 13:32:26 -0800 (PST)
 X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
  d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=dA8AGvBGRvCAkyd4n1eYxm6anA991HhNOhSBUn8M78I=;
- b=dUTOl1pX6AyDL/NpaAP4sUW8CfoaH9Ce24wu3In6cyZuZu4YVCOhwv2mlaDQJWe0A1
- UA1lk3iSXUdYZv8yAlGHE5DF6Jsz3z9rXHUbfyy1FqFLxHXVTV5pmUaICKhJ6wBYa028
- kZvMxbXgZRqQNUXPGal7JwJ26Rikz9/VX7EzhPC/MPy/y6KZY1INS+wLAKZAqgIPpz27
- S9j0W8bYvDpzaRXSGDOkcme/Vfb7ed/vz/lZiZqHXH4Lpigm8pUl3ca7hbwYqM6tcICp
- /711uAObzDiMZglr4SFaxq88XiJRAs/pgS6LGgDBIYZ54NR88AEdHHajo1Q902Kx9ean
- UBCg==
-X-Gm-Message-State: AA+aEWaCZVuqhR5kH4WzjwNzWE1ae+lgX+pkRZcqocsPL42uMcNAf/o9
- m+1L4etcvFeKyJVAtDF02g==
-X-Google-Smtp-Source: AFSGD/UG0m2oZjAAxU9bkpVHVIEgRwOTW4AGda95iB0ms+QZC4pij4WLOTnmyLIvrZdJpXnjjXzS/g==
-X-Received: by 2002:a54:4d81:: with SMTP id y1mr11227097oix.18.1543872756778; 
- Mon, 03 Dec 2018 13:32:36 -0800 (PST)
+ h=x-gm-message-state:from:to:cc:subject:date:message-id:mime-version
+ :content-transfer-encoding;
+ bh=kPJl8Pm7ZcOKwW846HHdQooRTxxkgNCV5FyHgwbALNM=;
+ b=kG6jHnofHsiGZfPsWK+89CWkApI2plMayasdiwII942SVbu6SYtyGTOGJQhEjzl6yS
+ FpWFZaFotMrRAvku2PGtAlns3Qe2a/Hn97k3k6YVHUFBxTnUDHLBnZTJci3lc2oyQtlD
+ Cxg+sn1IhYZ2t4H9PolTCXAMJUbw0X0AemC/3IGcSrg+i56QkkGVQZo0KFqgwKOLgj3k
+ L7q4rGkM290l7CkAhmjAJqQFTcny3bFZwcn1/0w0DXotJ2bX+vMb7yNdXPbvhFbFQlWP
+ oJWXmO2aKY9n5o7VIaK5ojOnuOOXDElibdPPSROkM5scv8gcMIn+vty/4mWQhfUAQnmC
+ PXSA==
+X-Gm-Message-State: AA+aEWag8NuLykZUlcAgEcswUPaSStGNhb0jMjTMuVeDuDFOjMvW3xHK
+ MbGmipkIVi/sVa2TSqEtmQ==
+X-Google-Smtp-Source: AFSGD/WVj0pF9gZSFmJhEvEDv85aXRYTL9y7ZOW11KnyGcPAe1VwL6yGo7ypFqLTfUpB40kDZzQkbA==
+X-Received: by 2002:aca:db41:: with SMTP id s62mr10385288oig.349.1543872745950; 
+ Mon, 03 Dec 2018 13:32:25 -0800 (PST)
 Received: from xps15.herring.priv (24-155-109-49.dyn.grandenetworks.net.
  [24.155.109.49])
- by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.35
+ by smtp.googlemail.com with ESMTPSA id c78sm8545501oig.30.2018.12.03.13.32.23
  (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Mon, 03 Dec 2018 13:32:36 -0800 (PST)
+ Mon, 03 Dec 2018 13:32:25 -0800 (PST)
 From: Rob Herring <robh@kernel.org>
 To: devicetree@vger.kernel.org,
 	linux-kernel@vger.kernel.org
-Subject: [PATCH v2 09/34] dt-bindings: arm: Convert primecell binding to
- json-schema
-Date: Mon,  3 Dec 2018 15:31:58 -0600
-Message-Id: <20181203213223.16986-10-robh@kernel.org>
+Subject: [PATCH v2 00/34] Devicetree schema
+Date: Mon,  3 Dec 2018 15:31:49 -0600
+Message-Id: <20181203213223.16986-1-robh@kernel.org>
 X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181203213223.16986-1-robh@kernel.org>
-References: <20181203213223.16986-1-robh@kernel.org>
 MIME-Version: 1.0
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_133237_510939_03E99FB9 
-X-CRM114-Status: GOOD (  16.43  )
+X-CRM114-CacheID: sfid-20181203_133237_278320_577A9CDA 
+X-CRM114-Status: GOOD (  21.64  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -86,124 +81,299 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, Kumar Gala <kumar.gala@linaro.org>,
- arm@kernel.org, Sean Hudson <darknighte@darknighte.com>,
- Frank Rowand <frowand.list@gmail.com>, Grant Likely <grant.likely@arm.com>,
- linuxppc-dev@lists.ozlabs.org, linux-arm-kernel@lists.infradead.org
+Cc: Mark Rutland <mark.rutland@arm.com>,
+ Alexandre Belloni <alexandre.belloni@bootlin.com>,
+ Heiko Stuebner <heiko@sntech.de>, Sean Hudson <darknighte@darknighte.com>,
+ Neil Armstrong <narmstrong@baylibre.com>, Sekhar Nori <nsekhar@ti.com>,
+ Patrice Chotard <patrice.chotard@st.com>, David Brown <david.brown@linaro.org>,
+ Grant Likely <grant.likely@arm.com>,
+ Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>,
+ Frank Rowand <frowand.list@gmail.com>, linux-renesas-soc@vger.kernel.org,
+ Kumar Gala <kumar.gala@linaro.org>, Kevin Hilman <khilman@kernel.org>,
+ Viresh Kumar <vireshk@kernel.org>, Daniel Lezcano <daniel.lezcano@linaro.org>,
+ Magnus Damm <magnus.damm@gmail.com>, Michal Simek <michal.simek@xilinx.com>,
+ Jonathan Hunter <jonathanh@nvidia.com>, linux-rockchip@lists.infradead.org,
+ arm@kernel.org, Andy Gross <andy.gross@linaro.org>,
+ Tsahee Zidenberg <tsahee@annapurnalabs.com>, linux-tegra@vger.kernel.org,
+ linux-kbuild@vger.kernel.org, Will Deacon <will.deacon@arm.com>,
+ Simon Horman <horms@verge.net.au>, linux-mediatek@lists.infradead.org,
+ Matthias Brugger <matthias.bgg@gmail.com>, linux-amlogic@lists.infradead.org,
+ Thomas Gleixner <tglx@linutronix.de>,
+ Shiraz Hashim <shiraz.linux.kernel@gmail.com>,
+ linux-arm-kernel@lists.infradead.org, Barry Song <baohua@kernel.org>,
+ Michal Marek <michal.lkml@markovi.net>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Shawn Guo <shawnguo@kernel.org>,
+ Antoine Tenart <antoine.tenart@free-electrons.com>,
+ Tony Prisk <linux@prisktech.co.nz>, Dinh Nguyen <dinguyen@kernel.org>,
+ Thierry Reding <thierry.reding@gmail.com>, Carlo Caione <carlo@caione.org>,
+ Jun Nie <jun.nie@linaro.org>, linux-oxnas@groups.io,
+ linuxppc-dev@lists.ozlabs.org,
+ =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Convert ARM Primecell binding to DT schema format using json-schema.
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree@vger.kernel.org
-Signed-off-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/arm/primecell.txt     | 46 -------------------
- .../devicetree/bindings/arm/primecell.yaml    | 36 +++++++++++++++
- 2 files changed, 36 insertions(+), 46 deletions(-)
+The current DT binding documentation is not ideal as it is just free form
+text with at most only a loose structure. This makes reviewing bindings a
+manual process. The bindings are often duplicating information that's
+already defined elsewhere and missing information one would need to
+validate a DTS file. The examples in binding documents are not built and
+a source of lots of typos sometimes found in review and sometimes not.
+Secondly, there's no verification that DTS files match what the
+documentation says. While dtc does do some checking (and has gained more
+recently), it can't do per binding checks as it would have to understand
+thousands of compatible strings to match on.
+
+There's been a number of proposals over the years to address validation.
+They've all suffered from inventing their own validation language and the
+effort it would take to fully define and flush out a validation language.
+Enter json-schema. The language has a defined specification, maps well to
+DT data, and there are numerous existing tools which can be leveraged.
+The actual DT schema doc files are stored as YAML using only a JSON
+compatible subset. YAML is considered more human readable allowing
+comments for example.
+
+This series adds the build support, some documentation, and converts
+some bindings (mostly ARM board/soc bindings). The tools, core schema,
+and meta-schema are in a separate repository[1]. This might eventually
+be integrated with dtc or added to the kernel, but for now I plan to
+keep it separate.
+
+This series is available here[2]. The branch also has a doc2yaml script
+which can help convert binding files. It's not perfect, but works pretty
+well considering the input is free form text.
+
+My plan is to merge this initial support for v4.21. There's not yet any
+requirement that new bindings be submitted using the schema. I think that
+should wait a bit until after this gets a bit more exposure. I do have
+some tooling in place to test submitted patches and update DT patchwork
+with the result.
+
+
+SoC maintainers,
+The board/soc bindings can go thru your trees if there are conflicts (if
+any SoC or board is added). It shouldn't matter if they go in separately
+from the build support. shmobile, rockchip, fsl and amlogic already have
+conflicts with next. Otherwise, I can take them via the DT tree.
+
+Rob
+
+
+v2:
+ - Rebase to v4.20-rc2
+ - Add some missing Xilinx boards (from Michal Simek)
+ - Add ability to validate with a single specified schema using
+   the DT_SCHEMA_FILES variable.
+ - Add back some dropped comments for board names
+ - Various maintainer fixes
+ - Rework ARM PMU interrupts schema.
+ - Updates to ARM CPU vendor specific properties.
+ - Add i2c-gpio conversion to json-schema. Serves as example of including
+   another schema (i2c-controller.yaml)
+ - Set license on schema files to GPL-2.0
+ - Improvements to writing-schema.md and annotated example.
+
+
+[1] https://github.com/robherring/yaml-bindings
+[2] git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git yaml-bindings-v2
+
+Michal Simek (1):
+  dt-bindings: arm: Add missing Xilinx boards
+
+Rob Herring (33):
+  kbuild: Add support for DT binding schema checks
+  dt-bindings: Add a writing DT schemas how-to and annotated example
+  dt-bindings: Convert trivial-devices.txt to json-schema
+  dt-bindings: altera: Convert clkmgr binding to json-schema
+  dt-bindings: i2c: Convert i2c-gpio binding to json-schema
+  dt-bindings: timer: Convert ARM timer bindings to json-schema
+  dt-bindings: arm: Convert cpu binding to json-schema
+  dt-bindings: arm: Convert PMU binding to json-schema
+  dt-bindings: arm: Convert primecell binding to json-schema
+  dt-bindings: arm: Convert Actions Semi bindings to jsonschema
+  dt-bindings: arm: Convert Alpine board/soc bindings to json-schema
+  dt-bindings: arm: Convert Altera board/soc bindings to json-schema
+  dt-bindings: arm: amlogic: Move 'amlogic,meson-gx-ao-secure' binding
+    to its own file
+  dt-bindings: arm: Convert Amlogic board/soc bindings to json-schema
+  dt-bindings: arm: Convert Atmel board/soc bindings to json-schema
+  dt-bindings: arm: Convert Calxeda board/soc bindings to json-schema
+  dt-bindings: arm: Convert TI davinci board/soc bindings to json-schema
+  dt-bindings: arm: Convert FSL board/soc bindings to json-schema
+  dt-bindings: arm: Convert MediaTek board/soc bindings to json-schema
+  dt-bindings: arm: Convert TI nspire board/soc bindings to json-schema
+  dt-bindings: arm: Convert Oxford Semi board/soc bindings to
+    json-schema
+  dt-bindings: arm: Convert QCom board/soc bindings to json-schema
+  dt-bindings: arm: Convert Realtek board/soc bindings to json-schema
+  dt-bindings: arm: Convert Rockchip board/soc bindings to json-schema
+  dt-bindings: arm: renesas: Move 'renesas,prr' binding to its own doc
+  dt-bindings: arm: Convert Renesas board/soc bindings to json-schema
+  dt-bindings: arm: Convert CSR SiRF board/soc bindings to json-schema
+  dt-bindings: arm: Convert SPEAr board/soc bindings to json-schema
+  dt-bindings: arm: Convert ST STi board/soc bindings to json-schema
+  dt-bindings: arm: Convert Tegra board/soc bindings to json-schema
+  dt-bindings: arm: Convert VIA board/soc bindings to json-schema
+  dt-bindings: arm: Convert Xilinx board/soc bindings to json-schema
+  dt-bindings: arm: Convert ZTE board/soc bindings to json-schema
+
+ .gitignore                                    |   1 +
+ Documentation/Makefile                        |   2 +-
+ Documentation/devicetree/bindings/.gitignore  |   1 +
+ Documentation/devicetree/bindings/Makefile    |  33 ++
+ .../devicetree/bindings/arm/actions.txt       |  56 --
+ .../devicetree/bindings/arm/actions.yaml      |  38 ++
+ .../devicetree/bindings/arm/al,alpine.txt     |  16 -
+ .../devicetree/bindings/arm/al,alpine.yaml    |  21 +
+ .../devicetree/bindings/arm/altera.txt        |  14 -
+ .../devicetree/bindings/arm/altera.yaml       |  20 +
+ .../arm/altera/socfpga-clk-manager.txt        |  11 -
+ .../arm/altera/socfpga-clk-manager.yaml       |  31 ++
+ .../devicetree/bindings/arm/amlogic.txt       | 138 -----
+ .../devicetree/bindings/arm/amlogic.yaml      | 109 ++++
+ .../amlogic/amlogic,meson-gx-ao-secure.txt    |  28 +
+ .../devicetree/bindings/arm/armadeus.txt      |   6 -
+ .../devicetree/bindings/arm/atmel-at91.txt    |  72 ---
+ .../devicetree/bindings/arm/atmel-at91.yaml   | 133 +++++
+ Documentation/devicetree/bindings/arm/bhf.txt |   6 -
+ .../devicetree/bindings/arm/calxeda.txt       |  15 -
+ .../devicetree/bindings/arm/calxeda.yaml      |  22 +
+ .../bindings/arm/compulab-boards.txt          |  25 -
+ .../devicetree/bindings/arm/cpus.txt          | 490 -----------------
+ .../devicetree/bindings/arm/cpus.yaml         | 507 ++++++++++++++++++
+ .../devicetree/bindings/arm/davinci.txt       |  25 -
+ Documentation/devicetree/bindings/arm/fsl.txt | 229 --------
+ .../devicetree/bindings/arm/fsl.yaml          | 214 ++++++++
+ .../devicetree/bindings/arm/i2se.txt          |  22 -
+ .../devicetree/bindings/arm/mediatek.txt      |  79 ---
+ .../devicetree/bindings/arm/mediatek.yaml     |  85 +++
+ .../devicetree/bindings/arm/nspire.txt        |  14 -
+ .../devicetree/bindings/arm/olimex.txt        |  10 -
+ .../devicetree/bindings/arm/oxnas.txt         |  14 -
+ .../devicetree/bindings/arm/oxnas.yaml        |  25 +
+ Documentation/devicetree/bindings/arm/pmu.txt |  70 ---
+ .../devicetree/bindings/arm/pmu.yaml          |  91 ++++
+ .../devicetree/bindings/arm/primecell.txt     |  46 --
+ .../devicetree/bindings/arm/primecell.yaml    |  36 ++
+ .../devicetree/bindings/arm/qcom.txt          |  57 --
+ .../devicetree/bindings/arm/qcom.yaml         | 125 +++++
+ .../devicetree/bindings/arm/realtek.txt       |  22 -
+ .../devicetree/bindings/arm/realtek.yaml      |  23 +
+ .../devicetree/bindings/arm/renesas,prr.txt   |  20 +
+ .../devicetree/bindings/arm/rockchip.txt      | 240 ---------
+ .../devicetree/bindings/arm/rockchip.yaml     | 251 +++++++++
+ .../devicetree/bindings/arm/shmobile.txt      | 169 ------
+ .../devicetree/bindings/arm/shmobile.yaml     | 218 ++++++++
+ .../devicetree/bindings/arm/sirf.txt          |  11 -
+ .../devicetree/bindings/arm/sirf.yaml         |  27 +
+ .../devicetree/bindings/arm/spear.txt         |  26 -
+ .../devicetree/bindings/arm/spear.yaml        |  25 +
+ Documentation/devicetree/bindings/arm/sti.txt |  23 -
+ .../devicetree/bindings/arm/sti.yaml          |  23 +
+ .../devicetree/bindings/arm/technologic.txt   |  23 -
+ .../devicetree/bindings/arm/tegra.txt         |  65 ---
+ .../devicetree/bindings/arm/tegra.yaml        | 101 ++++
+ .../devicetree/bindings/arm/ti/nspire.yaml    |  24 +
+ .../bindings/arm/ti/ti,davinci.yaml           |  26 +
+ .../devicetree/bindings/arm/vt8500.txt        |  22 -
+ .../devicetree/bindings/arm/vt8500.yaml       |  23 +
+ .../devicetree/bindings/arm/xilinx.txt        |  83 ---
+ .../devicetree/bindings/arm/xilinx.yaml       | 114 ++++
+ Documentation/devicetree/bindings/arm/zte.txt |  14 -
+ .../devicetree/bindings/arm/zte.yaml          |  26 +
+ .../devicetree/bindings/example-schema.yaml   | 170 ++++++
+ .../devicetree/bindings/i2c/i2c-gpio.txt      |  46 --
+ .../devicetree/bindings/i2c/i2c-gpio.yaml     |  73 +++
+ .../bindings/timer/arm,arch_timer.txt         | 112 ----
+ .../bindings/timer/arm,arch_timer.yaml        | 103 ++++
+ .../bindings/timer/arm,arch_timer_mmio.yaml   | 120 +++++
+ .../bindings/timer/arm,global_timer.txt       |  27 -
+ .../bindings/timer/arm,global_timer.yaml      |  46 ++
+ .../devicetree/bindings/trivial-devices.txt   | 190 -------
+ .../devicetree/bindings/trivial-devices.yaml  | 392 ++++++++++++++
+ Documentation/devicetree/writing-schema.md    | 130 +++++
+ Makefile                                      |  11 +-
+ scripts/Makefile.lib                          |  24 +-
+ 77 files changed, 3487 insertions(+), 2493 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/.gitignore
+ create mode 100644 Documentation/devicetree/bindings/Makefile
+ delete mode 100644 Documentation/devicetree/bindings/arm/actions.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/actions.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/al,alpine.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/al,alpine.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/altera.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-clk-manager.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/amlogic.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic.yaml
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/amlogic,meson-gx-ao-secure.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/armadeus.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/atmel-at91.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/bhf.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/calxeda.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/calxeda.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/compulab-boards.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/cpus.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpus.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/davinci.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/fsl.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/fsl.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/mediatek.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/nspire.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/olimex.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/oxnas.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/oxnas.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/pmu.yaml
  delete mode 100644 Documentation/devicetree/bindings/arm/primecell.txt
  create mode 100644 Documentation/devicetree/bindings/arm/primecell.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/qcom.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/qcom.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/realtek.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/realtek.yaml
+ create mode 100644 Documentation/devicetree/bindings/arm/renesas,prr.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/shmobile.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/shmobile.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/sirf.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/sirf.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/spear.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/spear.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/sti.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/sti.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/technologic.txt
+ delete mode 100644 Documentation/devicetree/bindings/arm/tegra.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/tegra.yaml
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/nspire.yaml
+ create mode 100644 Documentation/devicetree/bindings/arm/ti/ti,davinci.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/vt8500.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/vt8500.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/xilinx.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/xilinx.yaml
+ delete mode 100644 Documentation/devicetree/bindings/arm/zte.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/zte.yaml
+ create mode 100644 Documentation/devicetree/bindings/example-schema.yaml
+ delete mode 100644 Documentation/devicetree/bindings/i2c/i2c-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-gpio.yaml
+ delete mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer.yaml
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,arch_timer_mmio.yaml
+ delete mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/arm,global_timer.yaml
+ delete mode 100644 Documentation/devicetree/bindings/trivial-devices.txt
+ create mode 100644 Documentation/devicetree/bindings/trivial-devices.yaml
+ create mode 100644 Documentation/devicetree/writing-schema.md
 
-diff --git a/Documentation/devicetree/bindings/arm/primecell.txt b/Documentation/devicetree/bindings/arm/primecell.txt
-deleted file mode 100644
-index 0df6acacfaea..000000000000
---- a/Documentation/devicetree/bindings/arm/primecell.txt
-+++ /dev/null
-@@ -1,46 +0,0 @@
--* ARM Primecell Peripherals
--
--ARM, Ltd. Primecell peripherals have a standard id register that can be used to
--identify the peripheral type, vendor, and revision. This value can be used for
--driver matching.
--
--Required properties:
--
--- compatible : should be a specific name for the peripheral and
--               "arm,primecell".  The specific name will match the ARM
--               engineering name for the logic block in the form: "arm,pl???"
--
--Optional properties:
--
--- arm,primecell-periphid : Value to override the h/w value with
--- clocks : From common clock binding. First clock is phandle to clock for apb
--	pclk. Additional clocks are optional and specific to those peripherals.
--- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
--- dmas : From common DMA binding. If present, refers to one or more dma channels.
--- dma-names : From common DMA binding, needs to match the 'dmas' property.
--              Devices with exactly one receive and transmit channel shall name
--              these "rx" and "tx", respectively.
--- pinctrl-<n> : Pinctrl states as described in bindings/pinctrl/pinctrl-bindings.txt
--- pinctrl-names : Names corresponding to the numbered pinctrl states
--- interrupts : one or more interrupt specifiers
--- interrupt-names : names corresponding to the interrupts properties
--
--Example:
--
--serial@fff36000 {
--	compatible = "arm,pl011", "arm,primecell";
--	arm,primecell-periphid = <0x00341011>;
--
--	clocks = <&pclk>;
--	clock-names = "apb_pclk";
--
--	dmas = <&dma-controller 4>, <&dma-controller 5>;
--	dma-names = "rx", "tx";	
--
--	pinctrl-0 = <&uart0_default_mux>, <&uart0_default_mode>;
--	pinctrl-1 = <&uart0_sleep_mode>;
--	pinctrl-names = "default","sleep";
--
--	interrupts = <0 11 0x4>;
--};
--
-diff --git a/Documentation/devicetree/bindings/arm/primecell.yaml b/Documentation/devicetree/bindings/arm/primecell.yaml
-new file mode 100644
-index 000000000000..5aae37f1c563
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/primecell.yaml
-@@ -0,0 +1,36 @@
-+# SPDX-License-Identifier: GPL-2.0
-+%YAML 1.2
-+---
-+$id: http://devicetree.org/schemas/arm/primecell.yaml#
-+$schema: http://devicetree.org/meta-schemas/core.yaml#
-+
-+title: ARM Primecell Peripherals
-+
-+maintainers:
-+  - Rob Herring <robh@kernel.org>
-+
-+description: |+
-+  ARM, Ltd. Primecell peripherals have a standard id register that can be used to
-+  identify the peripheral type, vendor, and revision. This value can be used for
-+  driver matching.
-+
-+properties:
-+  compatible:
-+    contains:
-+      const: arm,primecell
-+    description:
-+      Should be a specific name for the peripheral followed by "arm,primecell".
-+      The specific name will match the ARM engineering name for the logic block
-+      in the form "arm,pl???"
-+
-+  arm,primecell-periphid:
-+    $ref: /schemas/types.yaml#/definitions/uint32
-+    description: Value to override the h/w ID value
-+  clocks:
-+    minItems: 1
-+    maxItems: 32
-+  clock-names:
-+    contains:
-+      const: apb_pclk
-+    additionalItems: true
-+...
--- 
+--
 2.19.1
-
 
 _______________________________________________
 linux-arm-kernel mailing list
