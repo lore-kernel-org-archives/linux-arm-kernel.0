@@ -2,86 +2,59 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	USER_AGENT_MUTT autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 1C7EDC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:46:13 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 8E467C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:48:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id DCA4220834
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:46:12 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 63440206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 18:48:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="AZP1IqKb";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="CiRdQNWV";
-	dkim=fail reason="key not found in DNS" (0-bit key) header.d=codeaurora.org header.i=@codeaurora.org header.b="btzc5G+3"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org DCA4220834
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=codeaurora.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="dn/kQUyz"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 63440206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:Message-ID:
-	Subject:To:From:Date:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=kAOUvOlwVzRVWz3Dv9ou+j0SSohM8kf7Rb9ZUFepgsc=; b=AZP1IqKbeFSCjKBon0GBgf0Im
-	MLix+GXXJiaj1i9Ly+c+zgrjIRVgrQmvoUqNLed+79qO6VdtyDzEiVIomHfJ54CMbb9ZG45b0nHNj
-	ra/lHMZhnjlO/DmunymaP4GcmdaZU5VIECEiqX3FGiVAcWSlfE5JG8qpO0XpMuMBJRVzqb6K+w0X1
-	rN5jkO8uP0aDtka2q7bMWA5YZslJvWHhMH9Glzynp7NcuTC3yVV8gnR7PRYPBM1rzPGuBayKGkWrx
-	HpiGo3IKuqMxbA4DIaRTkFl6W867nzCEyPPmgAUIQF5jwbOqZtP/xlXGurrMpsAIae4AJMxhVFsyF
-	ch7mC7CUA==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
+	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=yyRn6gb7MdbScRh5KNNIgl9Ol/12KFSnPHVsBpegwRU=; b=dn/kQUyz3at4L+
+	nykzd3esAaZmhbFHZ3nl9YlQ/VPNOUhOK7+obMrhh3ftVEwYyITO1QXrTW8MmOKfNebaFWN2Cvwkw
+	gmgSNANHS5n1vFrOo2xSUE+lPZB2zVlSGFhcRdE0VV/qOBzqormDYBUNb6Y5/h2awe2TrguZMCxR9
+	SZxKRAhp9EpJExVUptINfd2RherO+1CnAB2iq3lcDV5AwQftCuf0UCsr6xLfIqpZflJbhQ4Z4o3OZ
+	kTbxcbf0WqgNoEzU6QpZrrXICNrorALOs4FIAmDjQgnbumYyzetqS1OsjL/I5sYbAk28gPTrDK5f8
+	+9f4d0VOQY3cG/7Fka0Q==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUFhy-0003C6-At; Tue, 04 Dec 2018 18:46:10 +0000
-Received: from smtp.codeaurora.org ([198.145.29.96])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUFhu-0003Ad-G1
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 18:46:07 +0000
-Received: by smtp.codeaurora.org (Postfix, from userid 1000)
- id A76F660B12; Tue,  4 Dec 2018 18:45:55 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543949155;
- bh=ZLGTIeBFFVX1ZNJJ5w0lXe7Xj+C8O0WjP0rfloUjyvU=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=CiRdQNWVuVWhcbGfTBKiRC2eVeELWng4b+7X+2XOmzPVao0sAdJsIWTPYXGclau/9
- h1t1SdAm05aX93ZK5mX6PZ2hLNtZ2tlOEKfsNO0tOdL4ujfmbQCPQ/5fiukbDX1AVC
- 9rOpaiSVrp2HM7WmP9YguAm7XNpWZ5STW30B6m6U=
-Received: from localhost (i-global254.qualcomm.com [199.106.103.254])
- (using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
- (No client certificate requested)
- (Authenticated sender: ilina@smtp.codeaurora.org)
- by smtp.codeaurora.org (Postfix) with ESMTPSA id 61A406014B;
- Tue,  4 Dec 2018 18:45:54 +0000 (UTC)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=codeaurora.org;
- s=default; t=1543949154;
- bh=ZLGTIeBFFVX1ZNJJ5w0lXe7Xj+C8O0WjP0rfloUjyvU=;
- h=Date:From:To:Cc:Subject:References:In-Reply-To:From;
- b=btzc5G+3S6o/GN/hS89p4Zk4ssf9cnb3VaolKX11/58z3GS5YILrCmYzHqy0kIGkp
- UafFlXdbusfbGnGp8kv/H7gQEm6HwOI8YEShvdf9D3PbHBpEdmwmOk4I34Ywx43eHT
- 0OTKtL66oFbkmgd0M8K/G/Jw+mHsuMWIkbBVAw2k=
-DMARC-Filter: OpenDMARC Filter v1.3.2 smtp.codeaurora.org 61A406014B
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- dmarc=none (p=none dis=none) header.from=codeaurora.org
-Authentication-Results: pdx-caf-mail.web.codeaurora.org;
- spf=none smtp.mailfrom=ilina@codeaurora.org
-Date: Tue, 4 Dec 2018 11:45:53 -0700
-From: Lina Iyer <ilina@codeaurora.org>
-To: Ulf Hansson <ulf.hansson@linaro.org>
-Subject: Re: [PATCH v10 21/27] drivers: firmware: psci: Add a helper to
- attach a CPU to its PM domain
-Message-ID: <20181204184553.GO18262@codeaurora.org>
-References: <20181129174700.16585-1-ulf.hansson@linaro.org>
- <20181129174700.16585-22-ulf.hansson@linaro.org>
+	id 1gUFjz-0003b1-Q3; Tue, 04 Dec 2018 18:48:15 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUFju-0003Zd-O7
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 18:48:13 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 41578207AD; Tue,  4 Dec 2018 19:47:56 +0100 (CET)
+Received: from localhost (rytm-gw1.ter1.ncp1.par.cust.as8218.eu [83.167.32.99])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 189A72074D;
+ Tue,  4 Dec 2018 19:47:46 +0100 (CET)
+Date: Tue, 4 Dec 2018 19:47:45 +0100
+From: Alexandre Belloni <alexandre.belloni@bootlin.com>
+To: Rob Herring <robh@kernel.org>
+Subject: Re: Moving ARM dts files
+Message-ID: <20181204184745.GS8952@piout.net>
+References: <20181204183649.GA5716@bogus>
 MIME-Version: 1.0
 Content-Disposition: inline
-In-Reply-To: <20181129174700.16585-22-ulf.hansson@linaro.org>
+In-Reply-To: <20181204183649.GA5716@bogus>
 User-Agent: Mutt/1.10.1 (2018-07-13)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_104606_580055_3B838987 
-X-CRM114-Status: GOOD (  14.63  )
+X-CRM114-CacheID: sfid-20181204_104810_931239_60A0A4B5 
+X-CRM114-Status: GOOD (  18.84  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,95 +66,105 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>,
- Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>,
- Vincent Guittot <vincent.guittot@linaro.org>,
- Geert Uytterhoeven <geert+renesas@glider.be>, linux-pm@vger.kernel.org,
- Stephen Boyd <sboyd@kernel.org>, Viresh Kumar <viresh.kumar@linaro.org>,
- linux-arm-msm@vger.kernel.org, Daniel Lezcano <daniel.lezcano@linaro.org>,
- "Rafael J . Wysocki" <rjw@rjwysocki.net>, Kevin Hilman <khilman@kernel.org>,
- linux-kernel@vger.kernel.org, Tony Lindgren <tony@atomide.com>,
- Sudeep Holla <sudeep.holla@arm.com>,
- "Raju P . L . S . S . S . N" <rplsssn@codeaurora.org>,
- linux-arm-kernel@lists.infradead.org
+Cc: Andrew Lunn <andrew@lunn.ch>, Tony Lindgren <tony@atomide.com>,
+ Linus Walleij <linus.walleij@linaro.org>, Liviu Dudau <liviu.dudau@arm.com>,
+ Masahiro Yamada <yamada.masahiro@socionext.com>,
+ Thierry Reding <thierry.reding@gmail.com>,
+ Florian Fainelli <f.fainelli@gmail.com>, Kevin Hilman <khilman@kernel.org>,
+ Gregory Clement <gregory.clement@bootlin.com>,
+ Michal Simek <michal.simek@xilinx.com>, Krzysztof Kozlowski <krzk@kernel.org>,
+ arm@kernel.org, Joel Stanley <joel@jms.id.au>,
+ Andy Gross <andy.gross@linaro.org>, devicetree@vger.kernel.org,
+ Jason Cooper <jason@lakedaemon.net>, Simon Horman <horms@verge.net.au>,
+ linux-arm-kernel@lists.infradead.org,
+ Maxime Coquelin <mcoquelin.stm32@gmail.com>, Shawn Guo <shawnguo@kernel.org>,
+ Andreas =?iso-8859-1?Q?F=E4rber?= <afaerber@suse.de>,
+ Daniel Mack <daniel@zonque.org>
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Thu, Nov 29 2018 at 10:50 -0700, Ulf Hansson wrote:
->Introduce a new PSCI DT helper function, psci_dt_attach_cpu(), which takes
->a CPU number as an in-parameter and attaches the CPU's struct device to its
->corresponding PM domain. Additionally, the helper prepares the CPU to be
->power managed via runtime PM, which is the last step needed to enable the
->interaction with the PM domain through the runtime PM callbacks.
->
->Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
->---
->
->Changes in v10:
->	- New patch: Replaces "PM / Domains: Add helper functions to
->	  attach/detach CPUs to/from genpd".
->
->---
-> drivers/firmware/psci/psci.h           |  1 +
-> drivers/firmware/psci/psci_pm_domain.c | 19 +++++++++++++++++++
-> 2 files changed, 20 insertions(+)
->
->diff --git a/drivers/firmware/psci/psci.h b/drivers/firmware/psci/psci.h
->index 05af462cc96e..fbc9980dee69 100644
->--- a/drivers/firmware/psci/psci.h
->+++ b/drivers/firmware/psci/psci.h
->@@ -15,6 +15,7 @@ int psci_dt_parse_state_node(struct device_node *np, u32 *state);
-> int psci_dt_init_pm_domains(struct device_node *np);
-> int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
-> 			struct device_node *cpu_node, u32 *psci_states);
->+int psci_dt_attach_cpu(int cpu);
-> #else
-> static inline int psci_dt_init_pm_domains(struct device_node *np) { return 0; }
-> #endif
->diff --git a/drivers/firmware/psci/psci_pm_domain.c b/drivers/firmware/psci/psci_pm_domain.c
->index 6c9d6a644c7f..b0fa7da8a0ce 100644
->--- a/drivers/firmware/psci/psci_pm_domain.c
->+++ b/drivers/firmware/psci/psci_pm_domain.c
->@@ -12,8 +12,10 @@
-> #include <linux/device.h>
-> #include <linux/kernel.h>
-> #include <linux/pm_domain.h>
->+#include <linux/pm_runtime.h>
-> #include <linux/slab.h>
-> #include <linux/string.h>
->+#include <linux/cpu.h>
-> #include <linux/cpuidle.h>
-> #include <linux/cpu_pm.h>
->
->@@ -367,4 +369,21 @@ int psci_dt_pm_domains_parse_states(struct cpuidle_driver *drv,
->
-> 	return 0;
-> }
->+
->+int psci_dt_attach_cpu(int cpu)
->+{
->+	struct device *dev = get_cpu_device(cpu);
->+	int ret;
->+
->+	ret = dev_pm_domain_attach(dev, true);
->+	if (ret)
->+		return ret;
->+
->+	pm_runtime_irq_safe(dev);
->+	pm_runtime_get_noresume(dev);
->+	pm_runtime_set_active(dev);
-You would want to set this only if the CPU is online. Otherwise we will
-not power down the domain, if the CPU was never brought online.
->+	pm_runtime_enable(dev);
->+
->+	return 0;
->+}
-> #endif
->-- 
->2.17.1
->
+Hello Rob,
+
+On 04/12/2018 12:36:49-0600, Rob Herring wrote:
+> Olof, Arnd,
+> 
+> I've put together a script to move the dts files and update the 
+> makefiles. It doesn't handle files not following a common prefix which 
+> isn't many and some includes within the dts files will need some fixups 
+> by hand.
+> 
+> MAINTAINERS will also need updating.
+> 
+> A few questions:
+> 
+> Do we want to move absolutely everything to subdirs? There's quite a 
+> few platforms with only 1-2 platforms. I haven't added these to the 
+> list yet, but can.
+> 
+> Do any vendors need another level of directories? davinci, omap, nspire, 
+> etc. for TI for example.
+> 
+> What to do with armv7m.dtsi? I guess it should remain and we just fixup 
+> the include. There may be a few other cross vendor things.
+> 
+> 
+> Sub-arch maintainers, 
+> 'vendor_map' below is the mapping of file prefix to new subdirectory 
+> (the SoC vendor prefix). Please comment if there are any issues.
+> 
+> Rob
+> 
+> 8<-----------------------------------------------------------
+> #!/usr/bin/env python3
+> 
+> import os
+> import re
+> from git import Git
+> import glob
+> 
+> vendor_map = {
+>     'imx': 'fsl',
+>     'ls': 'fsl',
+>     'vf': 'fsl',
+>     'qcom': 'qcom',
+>     'am3' : 'ti',
+>     'am4' : 'ti',
+>     'am5' : 'ti',
+>     'da' : 'ti',
+>     'dm' : 'ti',
+>     'dra' : 'ti',
+>     'keystone' : 'ti',
+>     'omap' : 'ti',
+>     'nspire' : 'ti',
+>     'armada' : 'marvell',
+>     'berlin' : 'marvell',
+>     'dove' : 'marvell',
+>     'kirkwood' : 'marvell',
+>     'orion' : 'marvell',
+>     'pxa' : 'marvell',
+>     'mvebu' : 'marvell',
+>     'mmp2' : 'marvell',
+>     'arm-' : 'arm',
+>     'integ' : 'arm',
+>     've' : 'arm',
+>     'aspeed' : 'aspeed',
+>     'at91' : 'atmel',
+>     'sama' : 'atmel',
+
+Unfortunately, we have many boards without a proper prefix. Wouldn't it
+be better to use arch/arm/boot/dts/Makefile and map dtb-$(CONFIG_*) to a
+vendor directory?
+
+This way you would be sure to not miss any. This would also ease the
+creation of subdirs if we decide to do that.
+
+
+-- 
+Alexandre Belloni, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
 
 _______________________________________________
 linux-arm-kernel mailing list
