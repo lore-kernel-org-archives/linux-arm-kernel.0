@@ -2,62 +2,69 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED,USER_AGENT_MUTT autolearn=ham autolearn_force=no
-	version=3.4.0
+X-Spam-Status: No, score=-0.9 required=3.0 tests=DKIM_SIGNED,DKIM_VALID,
+	FREEMAIL_FORGED_FROMDOMAIN,FREEMAIL_FROM,HEADER_FROM_DIFFERENT_DOMAINS,
+	MAILING_LIST_MULTI,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 37941C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:09:29 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id E425FC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:12:31 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 0747920661
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:09:29 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id ACD7320661
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:12:31 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="jX7gO8pP"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0747920661
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=arm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="G1ARTIE4"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org ACD7320661
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=free.fr
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=rDrMpFurGEzVgZ1SyutuSquPVkdO4At1yaOXB3SwnkI=; b=jX7gO8pPhu45VG
-	wO4Cnk9gBUohKSdK/oSLnPEGLQ/EEtCV28I6iUVpxihTRfalnOpguIUM8B43Uriz4AvYda+rsqg4+
-	CVdXS/SnDg8+XwFLkJ9RdpL7nozW7EST1Iv+gI1vYUialeG9gvrismvjPT1+Gyq8WzIDFm6gxOv6U
-	gDTCAmcobPZaqtsJq4IDs67fo6Qjeqz4l1RYbajGpnYYpgV4+uonF9fxAmA9GvVjUArlmz9uJUpo/
-	/NLOMGdut7vT8l8nrLffkNR0viiPZjJQG0dBWvOQl1BePoJZw4bW5ApwL3ESlch0nXDpO4LtoVX3F
-	K974D+URxghahEPygdJA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=EBiYSwiyo2W/Wax1SaERf9163t7bPwjYK9lyykTwOOM=; b=G1ARTIE40ceZzi
+	1EnWUZsD5lps5GHIUYKFIpfnvf4P7JHSToS+YebSNIcwMZrzVHmIgdo9p7xJibF3FDnnA6F9StobK
+	bwf29GSNkZGo7qm1zwvAwfvSbuXBg3ovkHU/JVb+NAuFcmVhvPZqDcWUNuymyWQS9T5bxpnGlEzLa
+	IIat1Lzp/bdI/Bc+pY6ycRYRkPE7TwN7yBQkKHdW5MF8X2PEhPzyXqV3R/CW6yYyHOu6gB8/B0oDK
+	vYsZ+37vMCnxZYyTv5PWd+guHHuQnM4QP9KG5H+BNA4GSc/cQyu5fuZfTUik4+6EeRXq/JrleeZr6
+	IUhmyRmpMaIigQq6qdGg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUECN-0001po-LO; Tue, 04 Dec 2018 17:09:27 +0000
-Received: from foss.arm.com ([217.140.101.70])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUECK-0001oY-J3
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:09:25 +0000
-Received: from usa-sjc-imap-foss1.foss.arm.com (unknown [10.72.51.249])
- by usa-sjc-mx-foss1.foss.arm.com (Postfix) with ESMTP id 2D348A78;
- Tue,  4 Dec 2018 09:09:13 -0800 (PST)
-Received: from arrakis.emea.arm.com (arrakis.cambridge.arm.com [10.1.196.113])
- by usa-sjc-imap-foss1.foss.arm.com (Postfix) with ESMTPSA id
- 605CF3F614; Tue,  4 Dec 2018 09:09:11 -0800 (PST)
-Date: Tue, 4 Dec 2018 17:09:08 +0000
-From: Catalin Marinas <catalin.marinas@arm.com>
-To: Julien Thierry <julien.thierry@arm.com>
-Subject: Re: [PATCH v6 07/24] arm64: Make PMR part of task context
-Message-ID: <20181204170908.GB19210@arrakis.emea.arm.com>
-References: <1542023835-21446-1-git-send-email-julien.thierry@arm.com>
- <1542023835-21446-8-git-send-email-julien.thierry@arm.com>
+	id 1gUEFI-0003k0-Rs; Tue, 04 Dec 2018 17:12:28 +0000
+Received: from smtp3-g21.free.fr ([212.27.42.3])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUEFE-0003jQ-69
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:12:26 +0000
+Received: from [192.168.108.68] (unknown [213.36.7.13])
+ (Authenticated sender: marc.w.gonzalez)
+ by smtp3-g21.free.fr (Postfix) with ESMTPSA id 8263C13F88E;
+ Tue,  4 Dec 2018 18:11:56 +0100 (CET)
+Subject: Re: WIP: UFS on apq8098
+To: Jeffrey Hugo <jhugo@codeaurora.org>,
+ Bjorn Andersson <bjorn.andersson@linaro.org>,
+ Nicolas Dechesne <nicolas.dechesne@linaro.org>,
+ Niklas Cassel <niklas.cassel@linaro.org>, Andy Gross <andy.gross@linaro.org>
+References: <ab9c8bec-35be-9e01-a567-bc2e4b2bef87@free.fr>
+ <2b186a33-aea2-629c-6fbf-aefe16ff7b0a@free.fr>
+ <bc40674c-9be7-3e5e-9409-42aa8bb0b376@free.fr>
+ <ec633e12-b6c1-5de9-690c-a58b8ecdb2b8@free.fr>
+ <48b1a7ce-afb7-18d3-6855-69196972d640@codeaurora.org>
+ <a4c0c2e1-09d8-c48f-d434-6147c047c3a8@free.fr>
+ <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
+From: Marc Gonzalez <marc.w.gonzalez@free.fr>
+Message-ID: <0c189977-62dd-3539-3b5c-233773682e69@free.fr>
+Date: Tue, 4 Dec 2018 18:11:56 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.2.1
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <1542023835-21446-8-git-send-email-julien.thierry@arm.com>
-User-Agent: Mutt/1.10.1 (2018-07-13)
+In-Reply-To: <d99567c7-9c1c-6d7e-6dd1-2930b82db7d8@codeaurora.org>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_090924_627154_2EB7CB94 
-X-CRM114-Status: GOOD (  11.95  )
+X-CRM114-CacheID: sfid-20181204_091224_539672_404900C3 
+X-CRM114-Status: UNSURE (   6.25  )
+X-CRM114-Notice: Please train this message.
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -69,51 +76,198 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: daniel.thompson@linaro.org, marc.zyngier@arm.com, will.deacon@arm.com,
- linux-kernel@vger.kernel.org, christoffer.dall@arm.com, james.morse@arm.com,
- joel@joelfernandes.org, Dave Martin <Dave.Martin@arm.com>,
- linux-arm-kernel@lists.infradead.org
+Cc: MSM <linux-arm-msm@vger.kernel.org>,
+ Linux ARM <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Mon, Nov 12, 2018 at 11:56:58AM +0000, Julien Thierry wrote:
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 039144e..eb8120e 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -249,6 +249,12 @@ alternative_else_nop_endif
->  	msr	sp_el0, tsk
->  	.endif
->  
-> +	/* Save pmr */
-> +alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-> +	mrs_s	x20, SYS_ICC_PMR_EL1
-> +	str	x20, [sp, #S_PMR_SAVE]
-> +alternative_else_nop_endif
-> +
->  	/*
->  	 * Registers that may be useful after this macro is invoked:
->  	 *
-> @@ -269,6 +275,13 @@ alternative_else_nop_endif
->  	/* No need to restore UAO, it will be restored from SPSR_EL1 */
->  	.endif
->  
-> +	/* Restore pmr */
-> +alternative_if ARM64_HAS_IRQ_PRIO_MASKING
-> +	ldr	x20, [sp, #S_PMR_SAVE]
-> +	msr_s	SYS_ICC_PMR_EL1, x20
-> +	dsb	sy
-> +alternative_else_nop_endif
+On 04/12/2018 18:05, Jeffrey Hugo wrote:
 
-What's this DSB for? If it's needed, please add a comment.
+> mount -t debugfs none /sys/kernel/debug
 
-I would have expected an ISB (or none at all as we are going to return
-from an exception).
+Doh!
 
--- 
-Catalin
+# cat /sys/kernel/debug/clk/clk_summary 
+                                 enable  prepare  protect                                duty
+   clock                          count    count    count        rate   accuracy phase  cycle
+---------------------------------------------------------------------------------------------
+ gcc_usb_phy_cfg_ahb2phy_clk          0        0        0           0          0     0  50000
+ gcc_usb3_phy_pipe_clk                0        0        0           0          0     0  50000
+ gcc_usb30_sleep_clk                  0        0        0           0          0     0  50000
+ gcc_ufs_unipro_core_clk              0        0        0           0          0     0  50000
+ gcc_ufs_tx_symbol_0_clk              0        0        0           0          0     0  50000
+ gcc_ufs_rx_symbol_1_clk              0        0        0           0          0     0  50000
+ gcc_ufs_rx_symbol_0_clk              0        0        0           0          0     0  50000
+ gcc_ufs_phy_aux_clk                  0        0        0           0          0     0  50000
+ gcc_ufs_ice_core_clk                 0        0        0           0          0     0  50000
+ gcc_ufs_ahb_clk                      0        0        0           0          0     0  50000
+ gcc_tsif_inactivity_timers_clk       0        0        0           0          0     0  50000
+ gcc_tsif_ahb_clk                     0        0        0           0          0     0  50000
+ gcc_sdcc4_ahb_clk                    0        0        0           0          0     0  50000
+ gcc_sdcc2_ahb_clk                    0        0        0           0          0     0  50000
+ gcc_prng_ahb_clk                     0        0        0           0          0     0  50000
+ gcc_pdm_xo4_clk                      0        0        0           0          0     0  50000
+ gcc_pdm_ahb_clk                      0        0        0           0          0     0  50000
+ gcc_pcie_0_slv_axi_clk               0        0        0           0          0     0  50000
+ gcc_pcie_0_pipe_clk                  0        0        0           0          0     0  50000
+ gcc_pcie_0_mstr_axi_clk              0        0        0           0          0     0  50000
+ gcc_pcie_0_cfg_ahb_clk               0        0        0           0          0     0  50000
+ gcc_mss_at_clk                       0        0        0           0          0     0  50000
+ gcc_mmss_sys_noc_axi_clk             0        0        0           0          0     0  50000
+ gcc_mmss_qm_core_clk                 0        0        0           0          0     0  50000
+ gcc_mmss_qm_ahb_clk                  0        0        0           0          0     0  50000
+ gcc_mmss_noc_cfg_ahb_clk             0        0        0           0          0     0  50000
+ gcc_lpass_trig_clk                   0        0        0           0          0     0  50000
+ gcc_lpass_at_clk                     1        1        0           0          0     0  50000
+ gcc_hmss_trig_clk                    0        0        0           0          0     0  50000
+ gcc_hmss_dvm_bus_clk                 1        1        0           0          0     0  50000
+ gcc_hmss_at_clk                      0        0        0           0          0     0  50000
+ gcc_gpu_snoc_dvm_gfx_clk             0        0        0           0          0     0  50000
+ gcc_gpu_cfg_ahb_clk                  0        0        0           0          0     0  50000
+ gcc_gpu_bimc_gfx_src_clk             0        0        0           0          0     0  50000
+ gcc_gpu_bimc_gfx_clk                 0        0        0           0          0     0  50000
+ gcc_blsp2_sleep_clk                  0        0        0           0          0     0  50000
+ gcc_blsp2_ahb_clk                    3        3        0           0          0     0  50000
+ gcc_blsp1_sleep_clk                  0        0        0           0          0     0  50000
+ gcc_blsp1_ahb_clk                    0        0        0           0          0     0  50000
+ gcc_bimc_mss_q6_axi_clk              0        0        0           0          0     0  50000
+ gcc_bimc_hmss_axi_clk                0        0        0           0          0     0  50000
+ gcc_apss_qdss_tsctr_div8_clk         0        0        0           0          0     0  50000
+ gcc_apss_qdss_tsctr_div2_clk         0        0        0           0          0     0  50000
+ gcc_aggre1_noc_xo_clk                0        0        0           0          0     0  50000
+ sleep_clk                            0        0        0       32764          0     0  50000
+ xo                                   1        1        0    19200000          0     0  50000
+    gcc_rx1_usb2_clkref_clk           0        0        0    19200000          0     0  50000
+    gcc_pcie_clkref_clk               0        0        0    19200000          0     0  50000
+    gcc_ufs_clkref_clk                0        0        0    19200000          0     0  50000
+    gcc_hdmi_clkref_clk               0        0        0    19200000          0     0  50000
+    gcc_usb3_clkref_clk               0        0        0    19200000          0     0  50000
+    usb3_phy_aux_clk_src              0        0        0     1200000          0     0  50000
+       gcc_usb3_phy_aux_clk           0        0        0     1200000          0     0  50000
+    usb30_mock_utmi_clk_src           0        0        0    19200000          0     0  50000
+       gcc_usb30_mock_utmi_clk        0        0        0    19200000          0     0  50000
+    tsif_ref_clk_src                  0        0        0    19200000          0     0  50000
+       gcc_tsif_ref_clk               0        0        0    19200000          0     0  50000
+    sdcc4_apps_clk_src                0        0        0    19200000          0     0  50000
+       gcc_sdcc4_apps_clk             0        0        0    19200000          0     0  50000
+    sdcc2_apps_clk_src                0        0        0    19200000          0     0  50000
+       gcc_sdcc2_apps_clk             0        0        0    19200000          0     0  50000
+    pdm2_clk_src                      0        0        0    19200000          0     0  50000
+       gcc_pdm2_clk                   0        0        0    19200000          0     0  50000
+    pcie_aux_clk_src                  0        0        0    19200000          0     0  50000
+       gcc_pcie_0_aux_clk             0        0        0    19200000          0     0  50000
+       gcc_pcie_phy_aux_clk           0        0        0    19200000          0     0  50000
+    hmss_rbcpr_clk_src                0        0        0    19200000          0     0  50000
+       gcc_hmss_rbcpr_clk             0        0        0    19200000          0     0  50000
+    hmss_ahb_clk_src                  0        0        0    19200000          0     0  50000
+       gcc_hmss_ahb_clk               0        0        0    19200000          0     0  50000
+    gpll4                             0        0        0   384000000          0     0  50000
+       gpll4_out_test                 0        0        0   384000000          0     0  50000
+       gpll4_out_odd                  0        0        0   384000000          0     0  50000
+       gpll4_out_main                 0        0        0   384000000          0     0  50000
+       gpll4_out_even                 0        0        0   384000000          0     0  50000
+    gpll3                             0        0        0   921600000          0     0  50000
+       gpll3_out_test                 0        0        0   921600000          0     0  50000
+       gpll3_out_odd                  0        0        0   921600000          0     0  50000
+       gpll3_out_main                 0        0        0   921600000          0     0  50000
+       gpll3_out_even                 0        0        0   921600000          0     0  50000
+    gpll2                             0        0        0  1286400000          0     0  50000
+       gpll2_out_test                 0        0        0  1286400000          0     0  50000
+       gpll2_out_odd                  0        0        0  1286400000          0     0  50000
+       gpll2_out_main                 0        0        0  1286400000          0     0  50000
+       gpll2_out_even                 0        0        0  1286400000          0     0  50000
+    gpll1                             0        0        0  1056000000          0     0  50000
+       gpll1_out_test                 0        0        0  1056000000          0     0  50000
+       gpll1_out_odd                  0        0        0  1056000000          0     0  50000
+       gpll1_out_main                 0        0        0  1056000000          0     0  50000
+       gpll1_out_even                 0        0        0  1056000000          0     0  50000
+    gpll0                             0        0        0   595200000          0     0  50000
+       gpll0_out_test                 0        0        0   595200000          0     0  50000
+       gpll0_out_odd                  0        0        0   595200000          0     0  50000
+       gpll0_out_main                 0        0        0   595200000          0     0  50000
+          usb30_master_clk_src        0        0        0   119040000          0     0  50000
+             gcc_aggre1_usb3_axi_clk       0        0        0   119040000          0     0  50000
+             gcc_cfg_noc_usb3_axi_clk       0        0        0   119040000          0     0  50000
+             gcc_usb30_master_clk       0        0        0   119040000          0     0  50000
+          ufs_axi_clk_src             0        0        0   198400000          0     0  50000
+             gcc_aggre1_ufs_axi_clk       0        0        0   198400000          0     0  50000
+             gcc_ufs_axi_clk          0        0        0   198400000          0     0  50000
+       gpll0_out_even                 0        0        0   595200000          0     0  50000
+    gp3_clk_src                       0        0        0    19200000          0     0  50000
+       gcc_gp3_clk                    0        0        0    19200000          0     0  50000
+    gp2_clk_src                       0        0        0    19200000          0     0  50000
+       gcc_gp2_clk                    0        0        0    19200000          0     0  50000
+    gp1_clk_src                       0        0        0    19200000          0     0  50000
+       gcc_gp1_clk                    0        0        0    19200000          0     0  50000
+    blsp2_uart3_apps_clk_src          0        0        0    19200000          0     0  50000
+       gcc_blsp2_uart3_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_uart2_apps_clk_src          1        1        0     1843200          0     0  50000
+       gcc_blsp2_uart2_apps_clk       3        3        0     1843200          0     0  50000
+    blsp2_uart1_apps_clk_src          0        0        0    19200000          0     0  50000
+       gcc_blsp2_uart1_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup6_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup6_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup6_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup6_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup5_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup5_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup5_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup5_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup4_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup4_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup4_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup4_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup3_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup3_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup3_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup3_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup2_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup2_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup2_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup2_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup1_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup1_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp2_qup1_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp2_qup1_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_uart3_apps_clk_src          0        0        0    19200000          0     0  50000
+       gcc_blsp1_uart3_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_uart2_apps_clk_src          0        0        0    19200000          0     0  50000
+       gcc_blsp1_uart2_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_uart1_apps_clk_src          0        0        0    19200000          0     0  50000
+       gcc_blsp1_uart1_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup6_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup6_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup6_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup6_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup5_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup5_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup5_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup5_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup4_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup4_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup4_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup4_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup3_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup3_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup3_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup3_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup2_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup2_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup2_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup2_i2c_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup1_spi_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup1_spi_apps_clk       0        0        0    19200000          0     0  50000
+    blsp1_qup1_i2c_apps_clk_src       0        0        0    19200000          0     0  50000
+       gcc_blsp1_qup1_i2c_apps_clk       0        0        0    19200000          0     0  50000
+ ln_bb_a_clk1                         0        0        0           0          0     0  50000
+ ln_bb_clk1                           0        0        0           0          0     0  50000
+
+
+There is no clock summary in 4.4 to compare the downstream kernel?
+
+Regards.
 
 _______________________________________________
 linux-arm-kernel mailing list
