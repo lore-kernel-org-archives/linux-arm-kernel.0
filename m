@@ -2,75 +2,77 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id D0540C04EBF
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:31:19 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 25827C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:32:14 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id A274821527
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:31:19 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id E2B6820851
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:32:13 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XLzohYsO"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A274821527
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="ZHrdKHf8"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org E2B6820851
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=fi.rohmeurope.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
-	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
-	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
-	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
-	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
-	 bh=F4iNusJx9inx31T3fE559FnNA5DayMB2ZEiKavxtl+4=; b=XLzohYsOhqBGaCPutZciFNVKo
-	5PwzYID6OVXXVKewqeDoab/o4nLAWv3Z27MQEcmNfmVLwZ5PmFZ2DMIjWoeYomhe+al23ATgnXCWN
-	tMWza+TCigIN/1hE0/5eMKvLSO+c6/wLkWE1kBwqTsgTv8VoJbFhfEeNCtxXay00uigUP5MAwI2PH
-	yOmxGOt1d0izTvWe1xmyNJYtlcK+os9R1Z6ka/Q3ppaJc7nNIc6oD51oyCw8oUekcKOQynd4qM9DR
-	zTEAQFjeODFyemhQIxd5TXNfSHKvABxZY0AEKE9Kho66qiSauWpNSZ95GAbThMvGGqFVIjMm7wDIl
-	6FNWV58MQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
+	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:Message-ID:Subject:To:From
+	:Date:Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
+	Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:In-Reply-To:References:
+	List-Owner; bh=NcPRZEV02by60eN0LjqXG/bppAfNciYDzdt1/YOeM3E=; b=ZHrdKHf8TyOFZv
+	Y8RSIRTBAPmFLckuyoIk/EpIG+IfQ/vpGxyuEnvWWXQbnLCxax7aSFqKjHYmXQW7VIt8DHnxfZfiU
+	bDtQn76Nci2w96VuvKCJG+E/Qfeawu+3x4y1lDnVz4A6V0G1Mb6umoLe9jyLqi7ku5ElEjVbdyB18
+	X6UiKohcviWjRk4NykDg7v+l4lgfphxViozfhTIKIXUwduoYiWkUc8xB6WCv2uZj4rTTMBGJ5kuOf
+	7BnIo56DmV84zBjnZwQO+6ICQDFHzaCYhP7cidjFed52r5LNTSSEOep4HPVhFS45M4jDAqpSDhz50
+	NS1vZndbwuNrz4k3tTrA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8v0-0006tA-NJ; Tue, 04 Dec 2018 11:31:10 +0000
-Received: from mx.socionext.com ([202.248.49.38])
- by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8uw-0006rd-Ua
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:31:08 +0000
-Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
- by mx.socionext.com with ESMTP; 04 Dec 2018 20:30:55 +0900
-Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
- by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 70D3460062;
- Tue,  4 Dec 2018 20:30:55 +0900 (JST)
-Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
- Tue, 4 Dec 2018 20:30:55 +0900
-Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
- by iyokan.css.socionext.com (Postfix) with ESMTP id B8C3A4036C;
- Tue,  4 Dec 2018 20:30:54 +0900 (JST)
-Received: from [127.0.0.1] (unknown [10.213.119.83])
- by yuzu.css.socionext.com (Postfix) with ESMTP id 9156B120304;
- Tue,  4 Dec 2018 20:30:54 +0900 (JST)
-Subject: Re: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
- description
-To: Rob Herring <robh+dt@kernel.org>
-References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
- <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
- <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
- <154356579701.88331.5043467509900444879@swboyd.mtv.corp.google.com>
- <f5917f71-f15b-a92d-649c-e3f5f5f10698@socionext.com>
- <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
-From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
-Message-ID: <90b00858-6e9e-8f7c-f6d4-b35e5daa6eee@socionext.com>
-Date: Tue, 4 Dec 2018 20:30:53 +0900
-User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
- Thunderbird/60.3.2
+	id 1gU8w0-0007FO-GM; Tue, 04 Dec 2018 11:32:12 +0000
+Received: from mail-lf1-f66.google.com ([209.85.167.66])
+ by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gU8vx-0007Dl-8i
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:32:11 +0000
+Received: by mail-lf1-f66.google.com with SMTP id a16so11685311lfg.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 03:31:58 -0800 (PST)
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:date:from:to:cc:subject:message-id:mime-version
+ :content-disposition:user-agent;
+ bh=kjxNwEyz1R+Ns0y3pp8C4CCcoiI7PvRqDsKN5BrbHUk=;
+ b=kppMuXwjaTEqQeASKybjUW8GmjAMAh/R2D2ga34L88AHJCugTnw2Mi0CpNLEJrQiUi
+ zyabR5Up8IkC7tNionf6bNwAPiPUHwrTBNbkGHsv9SdNnaG7A3LVU5wzuwKhHjgQUuyy
+ ARzoYK3FNh3qZC1JZYXdDHz8zq9p105wORfmyewXzSt+Mk84RmwXb4J0QdnFibAjk8KS
+ rIilB77+ycbXwPeZGIM+znLl3L/AGxfIMvOHuffGbe74oMsWxo+xyFqEAIp/CeRunRFC
+ EURiwLcQErhvP2YMOcjRNRFLbphyoYfBR9Bv9Is1a6niD/9kFOFjWwUvdnwfg8GysIhO
+ /KOA==
+X-Gm-Message-State: AA+aEWZedkn5G+Ob37cusIPXaHYKYMM+qbuRbIGRbtQfUBLgSf1rfQSr
+ y0CgmMQac77/QdszNlW6ATk=
+X-Google-Smtp-Source: AFSGD/VmLf0/AhVGVPyJT0ZFp9HAzxv0/M59T0QSMyFi77qrPnq/ONJAUvK8xm+OI33Zg4Kw5KS8yg==
+X-Received: by 2002:a19:e01e:: with SMTP id x30mr11007203lfg.89.1543923117153; 
+ Tue, 04 Dec 2018 03:31:57 -0800 (PST)
+Received: from localhost.localdomain ([213.255.186.46])
+ by smtp.gmail.com with ESMTPSA id c22-v6sm3105410lji.89.2018.12.04.03.31.55
+ (version=TLS1_2 cipher=ECDHE-RSA-CHACHA20-POLY1305 bits=256/256);
+ Tue, 04 Dec 2018 03:31:56 -0800 (PST)
+Date: Tue, 4 Dec 2018 13:31:43 +0200
+From: Matti Vaittinen <matti.vaittinen@fi.rohmeurope.com>
+To: mazziesaccount@gmail.com, matti.vaittinen@fi.rohmeurope.com
+Subject: [PATCH v6 00/10] clk: clkdev/of_clk - add managed lookup and
+ provider registrations
+Message-ID: <cover.1543922403.git.matti.vaittinen@fi.rohmeurope.com>
 MIME-Version: 1.0
-In-Reply-To: <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
-Content-Language: en-US
+Content-Disposition: inline
+User-Agent: Mutt/1.9.2 (2017-12-15)
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_033107_247977_9D56C6F6 
-X-CRM114-Status: GOOD (  25.48  )
+X-CRM114-CacheID: sfid-20181204_033209_305485_E1A4DB48 
+X-CRM114-Status: GOOD (  20.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -82,108 +84,120 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
- Masami Hiramatsu <masami.hiramatsu@linaro.org>,
- Stephen Boyd <sboyd@kernel.org>,
- Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
- Michael Turquette <mturquette@baylibre.com>,
- Daniel Lezcano <daniel.lezcano@linaro.org>,
- "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
- Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
- Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
- linux-clk <linux-clk@vger.kernel.org>,
- "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
- <linux-arm-kernel@lists.infradead.org>
+Cc: david.brown@linaro.org, linux-clk@vger.kernel.org, b.zolnierkie@samsung.com,
+ sboyd@kernel.org, linux-kernel@vger.kernel.org, mturquette@baylibre.com,
+ rafael.j.wysocki@intel.com, linux-doc@vger.kernel.org, linux@armlinux.org.uk,
+ krzk@kernel.org, akshu.agrawal@amd.com, cw00.choi@samsung.com,
+ djkurtz@chromium.org, pavel@ucw.cz, pombredanne@nexb.com,
+ andy.gross@linaro.org, andrew.smirnov@gmail.com, sjhuang@iluvatar.ai,
+ linux-arm-kernel@lists.infradead.org
+Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
-Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi
+Series add bd71837/bd71837 PMIC clock support + managed interfaces
 
-On 2018/12/04 0:49, Rob Herring wrote:
-> On Mon, Dec 3, 2018 at 1:42 AM Sugaya, Taichi
-> <sugaya.taichi@socionext.com> wrote:
->>
->> Hi,
->>
->> On 2018/11/30 17:16, Stephen Boyd wrote:
->>> Quoting Sugaya, Taichi (2018-11-29 04:24:51)
->>>> On 2018/11/28 11:01, Stephen Boyd wrote:
->>>>> Quoting Sugaya Taichi (2018-11-18 17:01:07)
->>>>>>     create mode 100644 Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>>
->>>>>> diff --git a/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>> new file mode 100644
->>>>>> index 0000000..f5d906c
->>>>>> --- /dev/null
->>>>>> +++ b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
->>>>>> @@ -0,0 +1,12 @@
->>>>>> +Socionext M10V SMP trampoline driver binding
->>>>>> +
->>>>>> +This is a driver to wait for sub-cores while boot process.
->>>>>> +
->>>>>> +- compatible: should be "socionext,smp-trampoline"
->>>>>> +- reg: should be <0x4C000100 0x100>
->>>>>> +
->>>>>> +EXAMPLE
->>>>>> +       trampoline: trampoline@0x4C000100 {
->>>>> Drop the 0x part of unit addresses.
->>>>
->>>> Okay.
->>>>
->>>>
->>>>>> +               compatible = "socionext,smp-trampoline";
->>>>>> +               reg = <0x4C000100 0x100>;
->>>>> Looks like a software construct, which we wouldn't want to put into DT
->>>>> this way. DT doesn't describe drivers.
->>>> We would like to use this node only getting the address of the
->>>> trampoline area
->>>> in which sub-cores wait.  (They have finished to go to this area in previous
->>>> bootloader process.)
->>>
->>> Is this area part of memory, or a special SRAM? If it's part of memory,
->>> I would expect this node to be under the reserved-memory node and
->>> pointed to by some other node that uses this region. Could even be the
->>> CPU nodes.
->>
->> Yes, 0x4C000100 is a part of memory under the reserved-memory node. So
->> we would like to use the SRAM ( allocated 0x00000000 ) area instead.
->> BTW, sorry, the trampoline address of this example is simply wrong.  We
->> were going to use a part of the SRAM from the beginning.
->>
->>>
->>>>
->>>> So should we embed the constant value in source codes instead of getting
->>>> from
->>>> DT because the address is constant at the moment? Or is there other
->>>> approach?
->>>>
->>>
->>> If it's constant then that also works. Why does it need to come from DT
->>> at all then?
->>
->> We think it is not good to embed constant value in driver codes and do
->> not have another way...
->> Are there better ways?
-> 
-> If this is just memory, can you use the standard spin-table binding in
-> the DT spec? There are some requirements like 64-bit values even on
-> 32-bit machines (though this gets violated).
+Few clk drivers appear to be leaking clkdev lookup registrations at
+driver remove. The patch series adds devm versions of lookup
+registrations and cleans up few drivers. Driver clean-up patches have
+not been tested as I lack the HW. All testing and comments if
+driver/device removal is even possible for changed drivers is highly
+appreciated. If removal is not possible I will gladly drop the patches
+from series - although leaking lookups may serve as bad example for new
+developers =)
 
-The spin-table seems to be used on only 64-bit arch. Have it ever worked 
-on 32-bit machine?
-And I would like not to use it because avoid violation.
+Patch 10 adds support for clock gate in ROHM bd71837 and bd71847 PMICs.
+This change is included in the series because it depends on new managed
+interfaces introduced in this series.
 
-Thanks
-Sugaya Taichi
+bd718x7 driver and devm interfaces are tested on BeagleBoneBlack and 
+bd71837 break-out board. Clk area register interface of bd71847 is
+identical to bd71837.
 
+Changed drivers are:
+clk-max77686, clk-st, clk-hi655x, rk808, clk-twl6040
+and apcs-msm8916. New driver is clk-bd718x7
 
-> 
-> Rob
-> 
+This series has been discussed for a while now. For those who want to
+see whole discussion:
 
+The bd71837 driver was originally proposed here
+https://lore.kernel.org/lkml/d99c8762b0fbbcb18ec4f4d104191364c0ea798c.1528117485.git.matti.vaittinen@fi.rohmeurope.com/
+
+clk portion was separated from that series and devm variants were
+proposed here
+https://lore.kernel.org/linux-clk/cover.1535630942.git.matti.vaittinen@fi.rohmeurope.com/
+
+Cleanup to other drivers was initiated in this series while waiting for
+MFD portions of bd718x7 to be applied. And now when MFD dependencies are in-tree
+the patch version (4) combined bd718x7 driver back to this series.
+
+Changelog (for this series) v6
+- Drop 'devm_of_clk_add_parent_hw_provider'. Change
+  'devm_of_clk_add_hw_provider' to look the parent device node for
+  provider information if device's own node does not contain
+  #clock-cells - property.
+- Add kerneldoc in own patch.
+- Remove NULL checks from devres match function for clkdev releasing
+- Clean styling issues from clkdev.c
+
+Changelog (for this series) v5
+- Split v4 patch 1. Place clkdev stuff to patch 1 and clk provider to patch 2
+- Remove devm_clk_release_clkdev from devres.txt
+- Added kerneldoc for managed provider registrations.
+- Cleaned styling issues.
+
+Changelog (for this series) v4
+- Add support for ROHM bd718x7 PMIC clock gate. Included in this patch
+  series because it depends on managed interfaces added in patch 1.
+
+Changelog (for this series) v3
+Address issues spotted by Krzysztof Kozlowski
+- Drop patch 3 for clk-s3c2410-dclk as this device can never be removed
+- Fix indentiation for clk-max77686
+- Rest  of the patches are unchanged.
+
+Changelog (for this series) v2
+Issue spotted by 0-Day test suite
+- Add a stub function 'devm_of_clk_add_parent_hw_provider' for no OF config.
+- patches 2-8 are unchanged.
+
+This patch series is based on clk-next
+
+---
+
+Matti Vaittinen (10):
+  clkdev: add managed clkdev lookup registration
+  clk: Add kerneldoc to managed of-provider interfaces
+  clk: of-provider: look at parent if registered device has no provider
+    info
+  clk: clk-max77686: Clean clkdev lookup leak and use devm
+  clk: clk-st: avoid clkdev lookup leak at remove
+  clk: clk-hi655x: Free of_provider at remove
+  clk: rk808: use managed version of of_provider registration
+  clk: clk-twl6040: Free of_provider at remove
+  clk: apcs-msm8916: simplify probe cleanup by using devm
+  clk: bd718x7: Initial support for ROHM bd71837/bd71847 PMIC clock
+
+ Documentation/driver-model/devres.txt |   1 +
+ drivers/clk/Kconfig                   |   7 ++
+ drivers/clk/Makefile                  |   1 +
+ drivers/clk/clk-bd718x7.c             | 131 ++++++++++++++++++++++++++++++++++
+ drivers/clk/clk-hi655x.c              |   4 +-
+ drivers/clk/clk-max77686.c            |  28 ++------
+ drivers/clk/clk-rk808.c               |  15 +---
+ drivers/clk/clk-twl6040.c             |   5 +-
+ drivers/clk/clk.c                     |  38 +++++++++-
+ drivers/clk/clkdev.c                  | 111 ++++++++++++++++++++++------
+ drivers/clk/qcom/apcs-msm8916.c       |   5 +-
+ drivers/clk/x86/clk-st.c              |   3 +-
+ include/linux/clkdev.h                |   4 ++
+ 13 files changed, 284 insertions(+), 69 deletions(-)
+ create mode 100644 drivers/clk/clk-bd718x7.c
+
+-- 
+2.14.3
 
 _______________________________________________
 linux-arm-kernel mailing list
