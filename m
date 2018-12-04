@@ -2,104 +2,104 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 2DCFEC04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:25 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 863AEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:36:07 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id EC7AC206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:32:24 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 5818B20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 14:36:06 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="kinc1nGm";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="CKZVg4ON";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=g.ncu.edu.tw header.i=@g.ncu.edu.tw header.b="bYQ9gw32"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org EC7AC206B7
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=g.ncu.edu.tw
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="YGcPoOQM"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 5818B20672
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=suse.cz
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=RQDKpm+psOTOzSA7pGc1ceqWUFKDa2/cr2yNvw8pOlg=; b=kinc1nGmmSEziG
-	TT7Pi3DnsLWhY8QUDSCd2yHkghW1PNbVMS7s5w5CBu5Nii31tBT8fYT4Rpq8jOJ8tUUQm9qx6RoK6
-	946US5bi6fd/8BrWx1Gk+1jimsnYJu+EZhJbEb5kwvV96DF5Z09EiCdRYFFcCY54A1WWBoALdqUpH
-	wKBpEzeeOKhrR6WKsUX63H3UoKF/JzQmPTrUlYgwF1ExnM0uRFAL1sBY0McxzA8gUE7T+G6JKYaCG
-	kqk6IIw0vUvzsAKlW/w7r91EuW5rpNYKjaJPLVS6RST9iZwxobCzQmqKgr7PqP6ot5bH0t7ZTzuOa
-	YWONfeDvOOeTyA3WSSXA==;
+	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:
+	Message-ID:From:References:To:Subject:Reply-To:Content-ID:Content-Description
+	:Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
+	List-Owner; bh=lIl9qMeWDl8JToUkCXQYqOoGRI/M/GkeFPTf1/oYYL4=; b=YGcPoOQMKl4b9p
+	hCYWUs4H+igh/unA9gpQUNIMqCVu+7pjp6MfSoXljDystltTW+mwcGL1ih+q+Jkj4Z4MIwd95AFiZ
+	Bf3y20eSNW24Qu0mXzBY2oTN+Pilo+sjeRZDh3pdraekhVjWPiuNA6QE/MkgvHE/XcYW5sUNq49lr
+	7PBKTdsL2g07h/lpEn+CbejA9yoVrdi+eW2yj93hWANjHtg7300DRnER2nNbsKILwyTy+4dftzOsN
+	HG8p6qHoEw7bmJnlHzE7yUPShrIc1TYH6m9Nv+HjK8MD3qCjEvdEBLDzJ5XAK3zeWEHsbHkJNmSdv
+	ohCp1e+iVOzPLQXS9EGw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUBkM-0008O7-NR; Tue, 04 Dec 2018 14:32:22 +0000
-Received: from casper.infradead.org ([2001:8b0:10b:1236::1])
+	id 1gUBnu-0001kb-KF; Tue, 04 Dec 2018 14:36:02 +0000
+Received: from mx2.suse.de ([195.135.220.15] helo=mx1.suse.de)
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBjY-0007NF-He
- for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 14:31:32 +0000
-DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=casper.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
- Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
- List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=; b=CKZVg4ON8i6gVjxUmtk+UOi2tX
- py7bVF7fwi7SJwNt2TzQMnBM7Dzt2e84zC8wdp9QfynfxzkxHek0JCa1HUdRFFgTay7ZlvAaX4TFD
- dUsIEjk4TnQc6iL38JpZNw2llEp2IKq87S27ypopBZcI2KMStyzQE41bIbgLj/i7JSd32/WYcTDbX
- wvyYtXKx0liPxj2YURfxzRmYsDV6+a8ze2p2WGsVKJbrVdi28wfxhsS3k5r48ny6LBiCJftJsBvcl
- U7Ciox2su5oang/hA+OPKBsKeljxAyPMQ4CDRSyUg6CHhcz0j8Eq+TXxqeIvHsxfG3ICPDmbIho20
- IUPUXnlA==;
-Received: from mail-pl1-x642.google.com ([2607:f8b0:4864:20::642])
- by casper.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUBUS-0002eQ-OF
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:15:58 +0000
-Received: by mail-pl1-x642.google.com with SMTP id y1so3555254plp.9
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 06:15:47 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=g.ncu.edu.tw; s=google;
- h=from:to:cc:subject:date:message-id:in-reply-to:references
- :mime-version:content-transfer-encoding;
- bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=;
- b=bYQ9gw32+zrc0bROpFbTjCjXOCC/NIP9j1GxOR+TY5jeqopAsek1xWhCGqmjtzIwmX
- 6jr2GG5TpkWwVSfGuHz2ewCuIsB0LMdCSbY3r7+RkmW8BhxnAbcV3RcTzoUSM2Ws8azp
- qeAHM0QSZS2IBk32Bp1C8MGBkTrSqrUhkVmzw=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:from:to:cc:subject:date:message-id:in-reply-to
- :references:mime-version:content-transfer-encoding;
- bh=HzGxbD6sosRISQ+eh8syC+Tz0nZncrfSJXVFQ0T2nG8=;
- b=YyxnyX2uNiH6tFkDlQD/W+AR+0NG1W7TLfDJFT3EdRfv031J+ntI25EsmmlOn5tctg
- FTnIHKDwtzNvIi9GGn2JS/CLk7axh2FAlNgWQmcfcHb9O8WLXo+x10cnLHyFyXGdzV0F
- uGtaND5foUfyrOdVEiKkSaeVaYHcxpCGHHDy0msD3hbGBToWZOtjxjD/vLPzTAAQNMWg
- /GGnMdEwaNkvRlmwSwCIUFW1XyGn9FBJdQz9i/mR0dayMMIXNR807wl0DU1vYYvU9dnK
- tS5zThHNMPIkMpMCybHqeyt7/iXAlosLO7eXMadfq8VJkJ0j9GAdKIJBvIt1iTuACx8o
- xJ2g==
-X-Gm-Message-State: AA+aEWbvQWs3Z4/invJd8WB3P783D7U2xjM00ZjeoxBc6WWprPhMoIfK
- pdqg5c1EQ1OUbeGKFiYP8M1wkQ==
-X-Google-Smtp-Source: AFSGD/XOHMF1t5neI3N7YV/WT7PHO2q3ESDR4HSoqspPkTaIuLFH5c1PesUQf4GIlp4lmKY98PB49w==
-X-Received: by 2002:a17:902:848d:: with SMTP id
- c13mr20356290plo.257.1543932946091; 
- Tue, 04 Dec 2018 06:15:46 -0800 (PST)
-Received: from starnight.local ([150.116.248.145])
- by smtp.gmail.com with ESMTPSA id n66sm36975863pfk.19.2018.12.04.06.15.43
- (version=TLS1_2 cipher=ECDHE-RSA-AES128-GCM-SHA256 bits=128/128);
- Tue, 04 Dec 2018 06:15:45 -0800 (PST)
-From: Jian-Hong Pan <starnight@g.ncu.edu.tw>
-To: =?UTF-8?q?Andreas=20F=C3=A4rber?= <afaerber@suse.de>,
- "David S . Miller" <davem@davemloft.net>
-Subject: [PATCH V4 6/6] net: lorawan: List LORAWAN in menuconfig
-Date: Tue,  4 Dec 2018 22:13:43 +0800
-Message-Id: <20181204141341.4353-7-starnight@g.ncu.edu.tw>
-X-Mailer: git-send-email 2.19.2
-In-Reply-To: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
-References: <CAC=mGzhs0smXzRxn1k9jDFsaLNAkpCd7rMs--E-SafQVTob7JQ@mail.gmail.com>
+ id 1gUBnq-0001jp-Hy
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 14:36:00 +0000
+X-Virus-Scanned: by amavisd-new at test-mx.suse.de
+Received: from relay1.suse.de (unknown [195.135.220.254])
+ by mx1.suse.de (Postfix) with ESMTP id ABAE9AD22;
+ Tue,  4 Dec 2018 14:35:43 +0000 (UTC)
+Subject: Re: [PATCH v2 0/3] iommu/io-pgtable-arm-v7s: Use DMA32 zone for page
+ tables
+To: Nicolas Boichat <drinkcat@chromium.org>,
+ Robin Murphy <robin.murphy@arm.com>, Christoph Lameter <cl@linux.com>,
+ Michal Hocko <mhocko@suse.com>, Matthias Brugger <matthias.bgg@gmail.com>,
+ hch@infradead.org, Matthew Wilcox <willy@infradead.org>
+References: <20181111090341.120786-1-drinkcat@chromium.org>
+ <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
+From: Vlastimil Babka <vbabka@suse.cz>
+Openpgp: preference=signencrypt
+Autocrypt: addr=vbabka@suse.cz; prefer-encrypt=mutual; keydata=
+ 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
+ cqmP8roqufIAj+Ohhzs=
+Message-ID: <b99dd00f-fe1c-1cac-8ee3-5b0c1af9a92e@suse.cz>
+Date: Tue, 4 Dec 2018 15:35:41 +0100
+User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.1
 MIME-Version: 1.0
+In-Reply-To: <CANMq1KDxmRcWhtaJbrLHqx6yPGkNaK7WNYYf+iFjH1e8XdrwRg@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_141556_824712_A3FF6EA1 
-X-CRM114-Status: GOOD (  10.02  )
+X-CRM114-CacheID: sfid-20181204_063558_890022_CAD4948A 
+X-CRM114-Status: GOOD (  20.93  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -111,56 +111,76 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: netdev@vger.kernel.org, Marcel Holtmann <marcel@holtmann.org>,
- linux-kernel@vger.kernel.org, Stefan Schmidt <stefan@datenfreihafen.org>,
- Dollar Chen <dollar.chen@wtmec.com>, Ken Yu <ken.yu@rakwireless.com>,
- linux-wpan@vger.kernel.org, Jian-Hong Pan <starnight@g.ncu.edu.tw>,
- linux-arm-kernel@lists.infradead.org
+Cc: Levin Alexander <Alexander.Levin@microsoft.com>,
+ Huaisheng Ye <yehs1@lenovo.com>, Tomasz Figa <tfiga@google.com>,
+ Joerg Roedel <joro@8bytes.org>, Hsin-Yi Wang <hsinyi@chromium.org>,
+ Will Deacon <will.deacon@arm.com>, lkml <linux-kernel@vger.kernel.org>,
+ Daniel Kurtz <djkurtz@chromium.org>, Pekka Enberg <penberg@kernel.org>,
+ linux-mm@kvack.org, iommu@lists.linux-foundation.org,
+ Mike Rapoport <rppt@linux.vnet.ibm.com>, Yong Wu <yong.wu@mediatek.com>,
+ David Rientjes <rientjes@google.com>, yingjoe.chen@mediatek.com,
+ Joonsoo Kim <iamjoonsoo.kim@lge.com>, Mel Gorman <mgorman@techsingularity.net>,
+ Andrew Morton <akpm@linux-foundation.org>,
+ linux-arm Mailing List <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-List LORAWAN and MACLORAWAN in menuconfig and make they can be built.
+On 12/4/18 10:37 AM, Nicolas Boichat wrote:
+> On Sun, Nov 11, 2018 at 5:04 PM Nicolas Boichat <drinkcat@chromium.org> wrote:
+>>
+>> This is a follow-up to the discussion in [1], to make sure that the page
+>> tables allocated by iommu/io-pgtable-arm-v7s are contained within 32-bit
+>> physical address space.
+>>
+>> [1] https://lists.linuxfoundation.org/pipermail/iommu/2018-November/030876.html
+> 
+> Hi everyone,
+> 
+> Let's try to summarize here.
+> 
+> First, we confirmed that this is a regression, and IOMMU errors happen
+> on 4.19 and linux-next/master on MT8173 (elm, Acer Chromebook R13).
+> The issue most likely starts from ad67f5a6545f ("arm64: replace
+> ZONE_DMA with ZONE_DMA32"), i.e. 4.15, and presumably breaks a number
+> of Mediatek platforms (and maybe others?).
+> 
+> We have a few options here:
+> 1. This series [2], that adds support for GFP_DMA32 slab caches,
+> _without_ adding kmalloc caches (since there are no users of
+> kmalloc(..., GFP_DMA32)). I think I've addressed all the comments on
+> the 3 patches, and AFAICT this solution works fine.
+> 2. genalloc. That works, but unless we preallocate 4MB for L2 tables
+> (which is wasteful as we usually only need a handful of L2 tables),
+> we'll need changes in the core (use GFP_ATOMIC) to allow allocating on
+> demand, and as it stands we'd have no way to shrink the allocation.
+> 3. page_frag [3]. That works fine, and the code is quite simple. One
+> drawback is that fragments in partially freed pages cannot be reused
+> (from limited experiments, I see that IOMMU L2 tables are rarely
+> freed, so it's unlikely a whole page would get freed). But given the
+> low number of L2 tables, maybe we can live with that.
+> 
+> I think 2 is out. Any preference between 1 and 3? I think 1 makes
+> better use of the memory, so that'd be my preference. But I'm probably
+> missing something.
 
-Signed-off-by: Jian-Hong Pan <starnight@g.ncu.edu.tw>
----
-V2:
-- Split the LoRaWAN class module patch in V1 into LoRaWAN socket and
-  LoRaWAN Soft MAC modules
+I would prefer 1 as well. IIRC you already confirmed that alignment
+requirements are not broken for custom kmem caches even in presence of
+SLUB debug options (and I would say it's a bug to be fixed if they
+weren't). I just asked (and didn't get a reply I think) about your
+ability to handle the GFP_ATOMIC allocation failures. They should be
+rare when only single page allocations are needed for the kmem cache.
+But in case they are not an option, then preallocating would be needed,
+thus probably option 2.
 
- net/Kconfig  | 2 ++
- net/Makefile | 2 ++
- 2 files changed, 4 insertions(+)
-
-diff --git a/net/Kconfig b/net/Kconfig
-index cf2e651ee31d..03b3ff306778 100644
---- a/net/Kconfig
-+++ b/net/Kconfig
-@@ -224,6 +224,8 @@ source "net/6lowpan/Kconfig"
- source "net/ieee802154/Kconfig"
- source "net/mac802154/Kconfig"
- source "net/lora/Kconfig"
-+source "net/lorawan/Kconfig"
-+source "net/maclorawan/Kconfig"
- source "net/sched/Kconfig"
- source "net/dcb/Kconfig"
- source "net/dns_resolver/Kconfig"
-diff --git a/net/Makefile b/net/Makefile
-index e80b84313851..9d5515965a8f 100644
---- a/net/Makefile
-+++ b/net/Makefile
-@@ -63,6 +63,8 @@ obj-$(CONFIG_6LOWPAN)		+= 6lowpan/
- obj-$(CONFIG_IEEE802154)	+= ieee802154/
- obj-$(CONFIG_MAC802154)		+= mac802154/
- obj-$(CONFIG_LORA)		+= lora/
-+obj-$(CONFIG_LORAWAN)		+= lorawan/
-+obj-$(CONFIG_MACLORAWAN)	+= maclorawan/
- 
- ifeq ($(CONFIG_NET),y)
- obj-$(CONFIG_SYSCTL)		+= sysctl_net.o
--- 
-2.19.2
+> [2] https://patchwork.kernel.org/cover/10677529/, 3 patches
+> [3] https://patchwork.codeaurora.org/patch/671639/
+> 
+> Thanks,
+> 
+> Nicolas
+> 
 
 
 _______________________________________________
