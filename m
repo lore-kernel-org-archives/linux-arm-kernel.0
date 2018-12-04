@@ -2,86 +2,63 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,USER_AGENT_MUTT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-4.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED,USER_AGENT_NEOMUTT autolearn=ham autolearn_force=no
+	version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 64379C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:46:45 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 37EEDC04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:49:15 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 2E591206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:46:45 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 0AC732081C
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 15:49:15 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="bznLxAnw";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nvidia.com header.i=@nvidia.com header.b="VVDutLTD"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 2E591206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nvidia.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="mz1rDTDu"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 0AC732081C
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:References:
-	Message-ID:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=ruPKj2jxDxhWB4tDgVIVAwBbsXPC31dxEIY/XiEtzDk=; b=bznLxAnw5sqUxZ
-	ybJ/7NuXnXm6OA3ZaSO3bztZnFfonXructQVMw299iDhgZBjvJgyePbu911TpNbCivjraOlqqFCDO
-	uf5IK/TKPo+EqB9+aV87ej1SWXQuUzwHUteAeF/eylgmAGp3jIBHWsqaiaEwwCcGlVxvmgBItdKzx
-	4/phLPc0HsqakScgOcRd+A7PLHh8i6dU8H7pU8fvecNL4eogmkINIye7itQgLA5rF4wYyIBjwOaGk
-	V0cNmTqMzx6MOkjaYi065Er8wAw5CoixYpJSRAiXzZ7EVxrcGjJ+9Zgbzsxy8Bx0dYRiPp5Wl9Lg3
-	HfjCiD3I4brdTOv0GE4g==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:Cc:
+	List-Subscribe:List-Help:List-Post:List-Archive:List-Unsubscribe:List-Id:
+	In-Reply-To:MIME-Version:References:Message-ID:Subject:To:From:Date:Reply-To:
+	Content-Transfer-Encoding:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=X07PqNJbScpS5ZJDIj7sV4fSuLB2eIBM+86NaAJrQ+o=; b=mz1rDTDuO05c5kkOPCSE6Eikq
+	zjzd7sO0Tr+GOL3m9mh8TtbxiqHVKVfZeIddXbLkxezPlGbyYK17ETISOWLAu/H45yH6AvENOMa2j
+	VInjTbyI/HKaJ+JbFXibq0U79MUKuF1PTsPx0kuwHYSDq/s3aytJHO75q20ujdXES4bhWfTauIEZt
+	4zMplzhk2FrSefhtwKegTCupHurUvjqVR9Z9r9SxQ5/41Q+6Co5n2VjiwHMyUAdpVcnqOL+NQEZ34
+	hakXeP8mN7TEGumBNWE1bxpkUbtfuzQU6uzUB8HFckq7/YmGLCQnbJvy6OasS1MRwUmohAlsb+aLm
+	WiaD+JENQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUCuI-0004IU-6K; Tue, 04 Dec 2018 15:46:42 +0000
-Received: from hqemgate16.nvidia.com ([216.228.121.65])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUCu7-000454-1G
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 15:46:39 +0000
-Received: from hqpgpgate101.nvidia.com (Not Verified[216.228.121.13]) by
- hqemgate16.nvidia.com (using TLS: TLSv1.2, DES-CBC3-SHA)
- id <B5c06a14e0000>; Tue, 04 Dec 2018 07:46:22 -0800
-Received: from hqmail.nvidia.com ([172.20.161.6])
- by hqpgpgate101.nvidia.com (PGP Universal service);
- Tue, 04 Dec 2018 07:46:20 -0800
-X-PGP-Universal: processed;
- by hqpgpgate101.nvidia.com on Tue, 04 Dec 2018 07:46:20 -0800
-Received: from tbergstrom-lnx.Nvidia.com (172.20.13.39) by
- HQMAIL101.nvidia.com (172.20.187.10) with Microsoft SMTP Server (TLS) id
- 15.0.1395.4; Tue, 4 Dec 2018 15:46:20 +0000
-Received: by tbergstrom-lnx.Nvidia.com (Postfix, from userid 1000)
- id 19BB9407B1; Tue,  4 Dec 2018 17:46:18 +0200 (EET)
-Date: Tue, 4 Dec 2018 17:46:18 +0200
-From: Peter De Schrijver <pdeschrijver@nvidia.com>
-To: Joseph Lo <josephl@nvidia.com>
-Subject: Re: [PATCH 08/19] clk: tegra: dfll: round down voltages based on
- alignment
-Message-ID: <20181204154618.GC26056@pdeschrijver-desktop.Nvidia.com>
-References: <20181204092548.3038-1-josephl@nvidia.com>
- <20181204092548.3038-9-josephl@nvidia.com>
+	id 1gUCwi-0006Ry-RW; Tue, 04 Dec 2018 15:49:12 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUCwf-0006H2-Ba
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 15:49:11 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 03ABA2074D; Tue,  4 Dec 2018 16:48:58 +0100 (CET)
+Received: from localhost (unknown [185.94.189.187])
+ by mail.bootlin.com (Postfix) with ESMTPSA id B12D420736;
+ Tue,  4 Dec 2018 16:48:47 +0100 (CET)
+Date: Tue, 4 Dec 2018 16:48:47 +0100
+From: Maxime Ripard <maxime.ripard@bootlin.com>
+To: Kishon Vijay Abraham I <kishon@ti.com>
+Subject: Re: [PATCH v2 4/9] phy: dphy: Add configuration helpers
+Message-ID: <20181204154847.f2cclpxa6a7v2ffx@flea>
+References: <cover.c2c2ae47383b9dbbdee6b69cafdd7391c06dde4f.1541516029.git-series.maxime.ripard@bootlin.com>
+ <4d44460c4ecbd47f4cbd9141c6bf2632b6c21e1e.1541516029.git-series.maxime.ripard@bootlin.com>
+ <20181119134357.743nskpkqqfkrjux@valkosipuli.retiisi.org.uk>
+ <20181121093353.p3gnj4ebel4h4ya4@flea>
+ <01829f2e-871e-cdea-afab-0ae1360464a4@ti.com>
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <20181204092548.3038-9-josephl@nvidia.com>
-X-NVConfidentiality: public
-User-Agent: Mutt/1.9.4 (2018-02-28)
-X-Originating-IP: [172.20.13.39]
-X-ClientProxiedBy: HQMAIL106.nvidia.com (172.18.146.12) To
- HQMAIL101.nvidia.com (172.20.187.10)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nvidia.com; s=n1;
- t=1543938382; bh=CAv7moa/rHrIfpLTeL8A5gqIXg6pCGZc3ORWQX9e0RQ=;
- h=X-PGP-Universal:Date:From:To:CC:Subject:Message-ID:References:
- MIME-Version:Content-Type:Content-Disposition:In-Reply-To:
- X-NVConfidentiality:User-Agent:X-Originating-IP:X-ClientProxiedBy;
- b=VVDutLTDKbyP+FJB51W8o1qDVzffXacHDPGiESNdjq7/02Y16cEzGne1/OTj/sKQn
- ojCuCc5989ygCiJvyhttBpBHLwDCs2CMRIFgjrkbzRztXOtDYEywfMI2PdNBhEgMvY
- w1EcCu0TfrwkRVPnq+aDwGgx799aXcvET1Jb2oLwuK4zNzf/gvUqBHE6QAYlQZMY9I
- N6eTGu0x2693q3PZOotM3pjbxoFp8aXDciLr90XOVPku4D7+awZuyh/3QCMd1/kN5+
- 84B0gj0+Ok83WhFZcBGOOPRLc1q5TYUw68NPRJbyuag8DTAv1XroN5OiT5Tr1jidvZ
- rDxJAjKcevUAg==
+In-Reply-To: <01829f2e-871e-cdea-afab-0ae1360464a4@ti.com>
+User-Agent: NeoMutt/20180716
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_074631_612482_D2F858EB 
-X-CRM114-Status: GOOD (  18.42  )
+X-CRM114-CacheID: sfid-20181204_074909_674984_2577C2E1 
+X-CRM114-Status: GOOD (  21.85  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -93,105 +70,123 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-tegra@vger.kernel.org, Thierry Reding <thierry.reding@gmail.com>,
- linux-clk@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
- Jonathan Hunter <jonathanh@nvidia.com>
-Content-Type: text/plain; charset="us-ascii"
-Content-Transfer-Encoding: 7bit
+Cc: Archit Taneja <architt@codeaurora.org>,
+ Krzysztof Witos <kwitos@cadence.com>, Rafal Ciepiela <rafalc@cadence.com>,
+ Andrzej Hajda <a.hajda@samsung.com>, linux-kernel@vger.kernel.org,
+ dri-devel@lists.freedesktop.org, Boris Brezillon <boris.brezillon@bootlin.com>,
+ Chen-Yu Tsai <wens@csie.org>, Sakari Ailus <sakari.ailus@iki.fi>,
+ Laurent Pinchart <laurent.pinchart@ideasonboard.com>,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org, linux-media@vger.kernel.org
+Content-Type: multipart/mixed; boundary="===============0979136024404541145=="
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 05:25:37PM +0800, Joseph Lo wrote:
-> When generating the OPP table, the voltages are round down with the
-> alignment from the regulator. The alignment should be applied for
-> voltages look up as well.
-> 
-> Based on the work of Penny Chiu <pchiu@nvidia.com>.
-> 
-> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> ---
->  drivers/clk/tegra/clk-dfll.c | 26 +++++++++++++++-----------
->  1 file changed, 15 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
-> index c294a2989f31..4a943c136d4d 100644
-> --- a/drivers/clk/tegra/clk-dfll.c
-> +++ b/drivers/clk/tegra/clk-dfll.c
-> @@ -804,17 +804,17 @@ static void dfll_init_out_if(struct tegra_dfll *td)
->  static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
->  {
->  	struct dev_pm_opp *opp;
-> -	int i, uv;
-> +	int i, align_volt;
->  
->  	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
->  	if (IS_ERR(opp))
->  		return PTR_ERR(opp);
->  
-> -	uv = dev_pm_opp_get_voltage(opp);
-> +	align_volt = dev_pm_opp_get_voltage(opp) / td->soc->alignment.step_uv;
->  	dev_pm_opp_put(opp);
->  
->  	for (i = td->lut_bottom; i < td->lut_size; i++) {
-> -		if (regulator_list_voltage(td->vdd_reg, td->lut[i]) == uv)
-> +		if ((td->lut_uv[i] / td->soc->alignment.step_uv) >= align_volt)
->  			return i;
->  	}
->  
-> @@ -1532,15 +1532,17 @@ static int dfll_init(struct tegra_dfll *td)
->   */
 
-These 2 functions are only valid for I2C mode. We should probably add a
-WARN_ON() in case they are called when PWM mode is used and return
--EINVAL.
+--===============0979136024404541145==
+Content-Type: multipart/signed; micalg=pgp-sha256;
+	protocol="application/pgp-signature"; boundary="5oliesnrm3ovw6vm"
+Content-Disposition: inline
 
->  static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
->  {
-> -	int i, n_voltages, reg_uV;
-> +	int i, n_voltages, reg_volt, align_volt;
->  
-> +	align_volt = uV / td->soc->alignment.step_uv;
->  	n_voltages = regulator_count_voltages(td->vdd_reg);
->  	for (i = 0; i < n_voltages; i++) {
-> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-> -		if (reg_uV < 0)
-> +		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
-> +				td->soc->alignment.step_uv;
-> +		if (reg_volt < 0)
->  			break;
->  
-> -		if (uV == reg_uV)
-> +		if (align_volt == reg_volt)
->  			return i;
->  	}
->  
-> @@ -1554,15 +1556,17 @@ static int find_vdd_map_entry_exact(struct tegra_dfll *td, int uV)
->   * */
->  static int find_vdd_map_entry_min(struct tegra_dfll *td, int uV)
->  {
-> -	int i, n_voltages, reg_uV;
-> +	int i, n_voltages, reg_volt, align_volt;
->  
-> +	align_volt = uV / td->soc->alignment.step_uv;
->  	n_voltages = regulator_count_voltages(td->vdd_reg);
->  	for (i = 0; i < n_voltages; i++) {
-> -		reg_uV = regulator_list_voltage(td->vdd_reg, i);
-> -		if (reg_uV < 0)
-> +		reg_volt = regulator_list_voltage(td->vdd_reg, i) /
-> +				td->soc->alignment.step_uv;
-> +		if (reg_volt < 0)
->  			break;
->  
-> -		if (uV <= reg_uV)
-> +		if (align_volt <= reg_volt)
->  			return i;
->  	}
->  
-> -- 
-> 2.19.2
-> 
+
+--5oliesnrm3ovw6vm
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+
+On Tue, Dec 04, 2018 at 11:28:37AM +0530, Kishon Vijay Abraham I wrote:
+> Hi Maxime,
+>=20
+> On 21/11/18 3:03 PM, Maxime Ripard wrote:
+> > Hi Sakari,
+> >=20
+> > Thanks for your review.
+> >=20
+> > On Mon, Nov 19, 2018 at 03:43:57PM +0200, Sakari Ailus wrote:
+> >>> +/*
+> >>> + * Minimum D-PHY timings based on MIPI D-PHY specification. Derived
+> >>> + * from the valid ranges specified in Section 6.9, Table 14, Page 41
+> >>> + * of the D-PHY specification (v2.1).
+> >>
+> >> I assume these values are compliant with the earlier spec releases.
+> >=20
+> > I have access to the versions 1.2 and 2.1 of the spec and as far as I
+> > can tell, they match here. I can't really say for other releases, but
+> > I wouldn't expect any changes (and it can always be adjusted later on
+> > if needed).
+> >=20
+> >>> + */
+> >>> +int phy_mipi_dphy_get_default_config(unsigned long pixel_clock,
+> >>
+> >> How about using the bus frequency instead of the pixel clock? Chances =
+are
+> >> that the caller already has that information, instead of calculating it
+> >> here?
+> >=20
+> > I went for the pixel clock since it's something that all drivers will
+> > have access too without any computation. The bus frequency can be
+> > available as well in v4l2, but won't be in DRM, and that would require
+> > for all drivers to duplicate that computation, which doesn't seem like
+> > a good choice.
+> >=20
+> >>> +				     unsigned int bpp,
+> >>> +				     unsigned int lanes,
+> >>> +				     struct phy_configure_opts_mipi_dphy *cfg)
+> >>> +{
+> >>> +	unsigned long hs_clk_rate;
+> >>> +	unsigned long ui;
+> >>> +
+> >>> +	if (!cfg)
+> >>> +		return -EINVAL;
+> >>> +
+> >>> +	hs_clk_rate =3D pixel_clock * bpp / lanes;
+> >>> +	ui =3D DIV_ROUND_UP(NSEC_PER_SEC, hs_clk_rate);
+> >>
+> >> Nanoseconds may not be precise enough for practical computations on th=
+ese
+> >> values. At 1 GHz, this ends up being precisely 1. At least Intel hardw=
+are
+> >> has some more precision, I presume others do, too. How about using
+> >> picoseconds instead?
+> >=20
+> > Sounds like a good idea.
+>=20
+> Would you be fixing this? Or this can be a later patch?
+
+I have fixed this locally, but I wanted to wait a bit for more
+feedback. I can send a new version if you prefer.
+
+Maxime
+
+--=20
+Maxime Ripard, Bootlin
+Embedded Linux and Kernel engineering
+https://bootlin.com
+
+--5oliesnrm3ovw6vm
+Content-Type: application/pgp-signature; name="signature.asc"
+
+-----BEGIN PGP SIGNATURE-----
+
+iHUEABYIAB0WIQRcEzekXsqa64kGDp7j7w1vZxhRxQUCXAah3wAKCRDj7w1vZxhR
+xQ0DAQCq/Z7HwPgo9Em4i2reOkIJK2X0mOhO3ckssP8Qk+5gIwD/QWh2B62EiAp7
+UcfddZ+Zj6+oKYSH+/U77jyhEjqyQA4=
+=H7cv
+-----END PGP SIGNATURE-----
+
+--5oliesnrm3ovw6vm--
+
+
+--===============0979136024404541145==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+Content-Disposition: inline
 
 _______________________________________________
 linux-arm-kernel mailing list
 linux-arm-kernel@lists.infradead.org
 http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+--===============0979136024404541145==--
+
