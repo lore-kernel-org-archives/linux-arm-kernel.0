@@ -2,85 +2,129 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=unavailable
-	autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
+	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 4E87CC04EB9
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:31:47 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 0FDA6C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:31:49 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 10DC920850
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:31:46 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id CAB2B20850
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 02:31:48 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="BFCxkqby";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="nfAZ6eGo"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 10DC920850
-Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=kylinos.cn
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="Zsb+LVIf";
+	dkim=fail reason="signature verification failed" (2048-bit key) header.d=infradead.org header.i=@infradead.org header.b="iBRg1DX4";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=nxp.com header.i=@nxp.com header.b="pAiS25Nf"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org CAB2B20850
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=nxp.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
-	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:In-Reply-To:References:
+	Message-ID:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=71HwBW5xYDw69QOd1BYhNmv60xWfFgL/iPb0st/fWQI=; b=BFCxkqbydZX2MY
-	qYzQuSGfCgcC4h/hqqBe2z43OxPMkqn6B7fTRMXlaQi/ZNOfo5kytMkuDxhsq5GDSkPZkpkmZ/T/z
-	kzQ0tJ8xCvgadcZloL5iDUFrxmCQpaGWI9H1v0wirB1TBPsBn5wzZWcI+dSo4vWQtoG1JCGiPfqi2
-	U2Py6uuwkmQa0HwzilP58qNE3G0alnncyUvIQ9twzh5QuOpFbh5DMUiK4vG4AIYPj9PdsJ/8AAcoX
-	3LDHqEdpcL6V+YBGKvW8w9/yftIgDiutaEtDm8nXYfw9ol/CWs07gi2lbNLxK8LBLupOXRwE40EAw
-	rpnkm0G/X6njLTkrYwyA==;
+	List-Owner; bh=YlsPFxLtMOhmxywuWQU4dMkqDdiWtn3dhL9DNIb08yc=; b=Zsb+LVIf3X5B8X
+	x5oSb+VTCVjmptl2mMxS1zxNMc5VgHGXAzfF4GTWJr3+FLTPmk5j8NQRJ+b8EgXd8xh7kWY4DnO0W
+	jdklJx9Pq8kDTpUW2jDHJsD5I0Jj2iankE4/PzldjWFmZjiJeunZp7hFnkdyZaniVMyQGRf9H3OJt
+	qVfDJ6x7ZJgekHoyr1MFZDxIv8vGKkuXLjkV1aLOlMMNRDmI62zUKmQx6hD0pmfpxcQJNBBykeQn5
+	6bnBUfVb5xyDvv8Id6bImFFX0Ys6q0QIetjh84FBS/fGAcgjXBt8pOxfU5jbQYd72xWKfQmP+XdUU
+	LDC1fzS3c7QelBXCOdxw==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU0Up-0002km-A1; Tue, 04 Dec 2018 02:31:35 +0000
+	id 1gU0V0-0002vJ-I1; Tue, 04 Dec 2018 02:31:46 +0000
 Received: from merlin.infradead.org ([2001:8b0:10b:1231::1])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU0Un-0002kS-7C
- for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 02:31:33 +0000
+ id 1gU0Up-0002kS-3x
+ for linux-arm-kernel@bombadil.infradead.org; Tue, 04 Dec 2018 02:31:35 +0000
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
- d=infradead.org; s=merlin.20170209; h=Content-Transfer-Encoding:MIME-Version:
- References:In-Reply-To:Message-Id:Date:Subject:Cc:To:From:Sender:Reply-To:
- Content-Type:Content-ID:Content-Description:Resent-Date:Resent-From:
+ d=infradead.org; s=merlin.20170209; h=MIME-Version:Content-Transfer-Encoding:
+ Content-Type:In-Reply-To:References:Message-ID:Date:Subject:CC:To:From:Sender
+ :Reply-To:Content-ID:Content-Description:Resent-Date:Resent-From:
  Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Id:List-Help:
  List-Unsubscribe:List-Subscribe:List-Post:List-Owner:List-Archive;
- bh=hqPi4zZGrK0dHbeiTKo26mEXEc8hmopkzqu1a+dOmKI=; b=nfAZ6eGoAqy2ZGW8jDeOocdict
- EQJEyUhNayjOVn6gI3GUHGKD93OSjBaUGssToC0Ze+FGaMumwNZuHoMZHmmyDbgulCdZf3013SuwU
- kGO7dPH6NGMw5Bqz0k4zC8OfW4zdhWdNzSRmD0qViZCr3DwZZziTy8H7mEfxm9KRzmn/tWQlSQAVR
- JZDrae8BQbvKK+TbzoQqVcvJNiaEBDYbuwNsZmxOmU7oBUcXF8fdT5uSBKg6E7d580cdYIThdUOI1
- Gc45BIb6th8ovSrKMWYBKyyEQGeg6ofQRtXh/n3Xk+UTBlqHgsw6FqANfO9t7gDifyOfry7Z+Bc10
- S4oYbvmQ==;
-Received: from smtpbg202.qq.com ([184.105.206.29])
+ bh=/y0uyFptNbUHRIVDSJhISjL/4/7kUDXxZNAepkrL0Cc=; b=iBRg1DX43tNF8lUolJlqRmNXqd
+ TUz/19NY/PpA1L4NerfsxQef4Dvy/3R8/T107HWiTpqwdH1O67gp1sliNYwEySwzQ1iib1B1HnvhT
+ MdECI3JYSY+ysqN8pO/nkv80koep+/N3oV9qyBE0Vqzkt4WQLrdf7ljB7xPWjWPMW/Xa9XXDsDbll
+ 8ySmE/kKIpn5NHtt0IiGyaW/o/MrqXnV9dwHFIobP8US5tBUauB8CWEVF4+7afTgkP6ni/Z4WGpWo
+ oy4Hy06EDqTCeDD1sctPuImLWPTUqiAdZnYliTZrLTlwYWbrxKljVmH8cKmtlFFV/dYjvUdUg0eCr
+ 4anVFXXg==;
+Received: from mail-eopbgr00049.outbound.protection.outlook.com ([40.107.0.49]
+ helo=EUR02-AM5-obe.outbound.protection.outlook.com)
  by merlin.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gTzl9-0004rU-PX
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 01:44:24 +0000
-X-QQ-mid: bizesmtp20t1543887825tsiu9oqv
-Received: from Macbook.pro (unknown [210.22.22.130])
- by esmtp6.qq.com (ESMTP) with 
- id ; Tue, 04 Dec 2018 09:43:44 +0800 (CST)
-X-QQ-SSF: 01400000002000F0FL51B00A0000000
-X-QQ-FEAT: l2be6KKOhXNUUTqoO7yT9bVKOQNTQSQGRoET4TqfIElbpwtVMhiG14lgaha6i
- KSe3yhMvuTTw/+U9xQVmX8qnT1wazmw68y6kMzvHJX/Yfnj0TZ3yCeQTY73U+3HUSXOJfCS
- 9oeqpYbqCWHF20YorK7yqwfjymAhRhrmP3LDkMJEBV+VgAS/qKopEGo1vsNvfemENvEFx/6
- qw/8JCjb8r+TiHmGJytcC6wtp9dKEE1NXMPZwpxtsgiCwkQ1rlYu2mMFluUjHvex/5Yp84m
- z1mklR4JToZYgTfJnoQ5YidmqcIbuNfQBSn94E4ZV8AHmV
-X-QQ-GoodBg: 2
-From: Jackie Liu <liuyun01@kylinos.cn>
-To: will.deacon@arm.com
-Subject: [PATCH v6 2/2] arm64: crypto: add NEON accelerated XOR implementation
-Date: Tue,  4 Dec 2018 09:43:23 +0800
-Message-Id: <20181204014323.1438-3-liuyun01@kylinos.cn>
-X-Mailer: git-send-email 2.19.1
-In-Reply-To: <20181204014323.1438-1-liuyun01@kylinos.cn>
-References: <20181204014323.1438-1-liuyun01@kylinos.cn>
+ id 1gTzuO-0004zv-5y
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 01:53:57 +0000
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nxp.com; s=selector1; 
+ h=From:Date:Subject:Message-ID:Content-Type:MIME-Version:X-MS-Exchange-SenderADCheck;
+ bh=/y0uyFptNbUHRIVDSJhISjL/4/7kUDXxZNAepkrL0Cc=;
+ b=pAiS25NfgseOstzPHYbEnb/8uCcLg1ZPy37DeJLTR2INcWbTjlJwKfJNDSVuBaz+9JtOjXE03nDmVAfP3jLCa+O46/KojsYwZrCOVhNkSee0CzXWdBZdpBQpULIAUIiYVL9Q+PyfprxSTWgwzKSILszUnlG55UdAmhGCSXCyxWc=
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com (52.134.126.21) by
+ AM0PR04MB4035.eurprd04.prod.outlook.com (52.134.125.17) with Microsoft SMTP
+ Server (version=TLS1_2, cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id
+ 15.20.1382.18; Tue, 4 Dec 2018 01:53:39 +0000
+Received: from AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927]) by AM0PR04MB4211.eurprd04.prod.outlook.com
+ ([fe80::31e3:2aa6:8d93:9927%2]) with mapi id 15.20.1382.020; Tue, 4 Dec 2018
+ 01:53:39 +0000
+From: Aisheng DONG <aisheng.dong@nxp.com>
+To: Stephen Boyd <sboyd@kernel.org>, "linux-clk@vger.kernel.org"
+ <linux-clk@vger.kernel.org>
+Subject: RE: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+Thread-Topic: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+Thread-Index: AQHUgaQ07UOrlEn65UOyxxVfjCE+w6VleWoQgAfyF4CAAHjrwA==
+Date: Tue, 4 Dec 2018 01:53:39 +0000
+Message-ID: <AM0PR04MB4211EC7E0BCF9AA0FCE57A2B80AF0@AM0PR04MB4211.eurprd04.prod.outlook.com>
+References: <1542809234-539-1-git-send-email-aisheng.dong@nxp.com>
+ <AM0PR04MB42110579601320F59219CB9E80D10@AM0PR04MB4211.eurprd04.prod.outlook.com>
+ <154386231357.88331.6991254616792618686@swboyd.mtv.corp.google.com>
+In-Reply-To: <154386231357.88331.6991254616792618686@swboyd.mtv.corp.google.com>
+Accept-Language: zh-CN, en-US
+Content-Language: en-US
+X-MS-Has-Attach: 
+X-MS-TNEF-Correlator: 
+authentication-results: spf=none (sender IP is )
+ smtp.mailfrom=aisheng.dong@nxp.com; 
+x-originating-ip: [101.93.238.110]
+x-ms-publictraffictype: Email
+x-microsoft-exchange-diagnostics: 1; AM0PR04MB4035;
+ 6:VS3doNxQyShffn4elUPBBXh3sEuDkLkNjMklaxBHqp37NeYNVczJItl5zjQ/6DUB484ymMpiC+rF4NiSTYNkGXt7fDIWpdIseFAukTZ7cf8TFdYAdV7zzbZ3Vxe5AygGWlXCnjyzeWNv50cfrYm3kZg40OjwIk9f6YB8/t7oSjd40MhR8pLbHzhRdwmbtGDvxImUHIAqOp0lxQUg5cld63HaWo203RXPZfH4M4xTGY0Bhudbn0qWkLoRGelwTK8XsCKnTxPwphzVMtiXVPlAHGUuRHOQw4rUEy+VHKFCNrf4iCBxzs/w5gVTzvtJXPQAD9vaxK7jXPvoFdaOu1roux4wYunB16Xhi16kK9j+TVcpTE7URfsTo7wU0FfPUBMnfxEsU5wRUZ/zpxgepuFf8onWxblHQoS+l94+kkxrqlJj+/IRp9p+WdYyYqpSmOhjjmYPDos/B8R2Ki4n/czD/g==;
+ 5:F7l0Fmr4a/ICIR1fWsG5/EB3YV5BS5ll/B8BmIRJoe8HqFnkn4I58E42Q98RXnL47b4ku5xBFZ1sW4YZYb/0jm2iIzUnghVlG18lLIVEJ+gB1sYoqCIt+qg/i6PesXWKYD+28blzOlm0FA3prnNMgJZA41TF1iMl7RmY3ZKpg3M=;
+ 7:J10A+Q/rEQ2JYTo9YBk4S3OpAwJ64sLfLK6QplfOhsS3EXWVWSGCQ5EoIf3I+pMeFtBdF4itPwWwvzIBSdBZxPOE2NqrlQiOfmGSzLrwIvSK+Khjh5xjDGHT2S5MU+GeE6H4IxNhUZSUM3I1trgeRQ==
+x-ms-exchange-antispam-srfa-diagnostics: SOS;
+x-ms-office365-filtering-correlation-id: 34433717-e420-4923-aae0-08d6598b5024
+x-ms-office365-filtering-ht: Tenant
+x-microsoft-antispam: BCL:0; PCL:0;
+ RULEID:(2390098)(7020095)(4652040)(8989299)(4534185)(4627221)(201703031133081)(201702281549075)(8990200)(5600074)(711020)(4618075)(2017052603328)(7153060)(7193020);
+ SRVR:AM0PR04MB4035; 
+x-ms-traffictypediagnostic: AM0PR04MB4035:
+x-microsoft-antispam-prvs: <AM0PR04MB40354CA60E7893CC2C72E38080AF0@AM0PR04MB4035.eurprd04.prod.outlook.com>
+x-ms-exchange-senderadcheck: 1
+x-exchange-antispam-report-cfa-test: BCL:0; PCL:0;
+ RULEID:(8211001083)(6040522)(2401047)(8121501046)(5005006)(10201501046)(3231455)(999002)(944501493)(52105112)(3002001)(93006095)(93001095)(6055026)(148016)(149066)(150057)(6041310)(20161123562045)(201703131423095)(201702281528075)(20161123555045)(201703061421075)(201703061406153)(20161123564045)(20161123558120)(20161123560045)(201708071742011)(7699051)(76991095);
+ SRVR:AM0PR04MB4035; BCL:0; PCL:0; RULEID:; SRVR:AM0PR04MB4035; 
+x-forefront-prvs: 0876988AF0
+x-forefront-antispam-report: SFV:NSPM;
+ SFS:(10009020)(136003)(396003)(366004)(346002)(39860400002)(376002)(199004)(189003)(69234005)(13464003)(5660300001)(8936002)(256004)(81166006)(81156014)(8676002)(97736004)(2906002)(6436002)(71200400001)(6246003)(71190400001)(229853002)(486006)(25786009)(11346002)(4001150100001)(68736007)(26005)(478600001)(186003)(102836004)(53546011)(6506007)(54906003)(316002)(55016002)(110136005)(4326008)(476003)(2501003)(7696005)(53936002)(9686003)(3846002)(6116002)(99286004)(86362001)(105586002)(106356001)(66066001)(33656002)(305945005)(7736002)(76176011)(446003)(74316002)(14454004)(32563001);
+ DIR:OUT; SFP:1101; SCL:1; SRVR:AM0PR04MB4035;
+ H:AM0PR04MB4211.eurprd04.prod.outlook.com; FPR:; SPF:None; LANG:en;
+ PTR:InfoNoRecords; A:1; MX:1; 
+received-spf: None (protection.outlook.com: nxp.com does not designate
+ permitted sender hosts)
+x-microsoft-antispam-message-info: AZ92WCsHois7SF9+94M9D2aBJonNvsGcSakeLARY9cCLC2MUh0I8JCPtnjBJef1oKIHt7tkAxKV3KoH+HE1QzhXpWuTkeuxbbRW9iIx8Fd5TpyJCM/T1ihXm5JhS9ZqUFx+Yn7eJR3iwj5QTfUF6yu1sQ9909F8zi/Pf7dO/FLrYbnslT1G0cKO4ibIKU4J4v9xknASEtolifxZQK2HtIC5Hu1ArMp92DV0ACLrP8SvayGnVi2nESnEay7jfb47JxY5NN5oycxnj/MCbErVPRK7zetlc1y2M0VCCLzl9B7a1vc3n7HeYvSqn0LsetOr4qhj8HggC22bd3FmBb4dA5kW65SIuvpvzv89vAsj2lSQ=
+spamdiagnosticoutput: 1:99
+spamdiagnosticmetadata: NSPM
 MIME-Version: 1.0
-X-QQ-SENDSIZE: 520
-Feedback-ID: bizesmtp:kylinos.cn:qybgforeign:qybgforeign2
-X-QQ-Bgrelay: 1
+X-OriginatorOrg: nxp.com
+X-MS-Exchange-CrossTenant-Network-Message-Id: 34433717-e420-4923-aae0-08d6598b5024
+X-MS-Exchange-CrossTenant-originalarrivaltime: 04 Dec 2018 01:53:39.8289 (UTC)
+X-MS-Exchange-CrossTenant-fromentityheader: Hosted
+X-MS-Exchange-CrossTenant-id: 686ea1d3-bc2b-4c6f-a92c-d99c5c301635
+X-MS-Exchange-Transport-CrossTenantHeadersStamped: AM0PR04MB4035
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181203_204424_055556_16AB5293 
-X-CRM114-Status: GOOD (  19.65  )
+X-CRM114-CacheID: sfid-20181203_205356_334220_7997D93C 
+X-CRM114-Status: GOOD (  15.01  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -92,338 +136,42 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: linux-block@vger.kernel.org, catalin.marinas@arm.com,
- Jackie Liu <liuyun01@kylinos.cn>, linux-arm-kernel@lists.infradead.org,
- ard.biesheuvel@linaro.org
+Cc: "mturquette@baylibre.com" <mturquette@baylibre.com>,
+ dl-linux-imx <linux-imx@nxp.com>,
+ "kernel@pengutronix.de" <kernel@pengutronix.de>,
+ Fabio Estevam <fabio.estevam@nxp.com>,
+ "shawnguo@kernel.org" <shawnguo@kernel.org>,
+ "linux-arm-kernel@lists.infradead.org" <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-This is a NEON acceleration method that can improve
-performance by approximately 20%. I got the following
-data from the centos 7.5 on Huawei's HISI1616 chip:
+> -----Original Message-----
+> From: Stephen Boyd [mailto:sboyd@kernel.org]
+> Sent: Tuesday, December 4, 2018 2:39 AM
+> To: linux-clk@vger.kernel.org; Aisheng DONG <aisheng.dong@nxp.com>
+> Cc: linux-arm-kernel@lists.infradead.org; mturquette@baylibre.com;
+> shawnguo@kernel.org; Fabio Estevam <fabio.estevam@nxp.com>; dl-linux-imx
+> <linux-imx@nxp.com>; kernel@pengutronix.de
+> Subject: RE: [PATCH V8 0/7] clk: imx: add imx8qxp clock support
+> 
+> Quoting Aisheng DONG (2018-11-28 09:18:47)
+> > Gently Ping...
+> >
+> 
+> FYI, when you ping the thread, it floats to the end of the queue for me, and
+> then I don't review it for some time. Sorry, this is how it mostly works. The
+> bigger topics come to the front queue and then I try to get to those sooner and
+> let the stuff churning as newest in the queue become lower priority because
+> "someone else is doing something". I do sweeps over the new stuff every day
+> or two to pick out the easy one liners and simple things because they may be
+> critical, etc.
 
-[ 93.837726] xor: measuring software checksum speed
-[ 93.874039]   8regs  : 7123.200 MB/sec
-[ 93.914038]   32regs : 7180.300 MB/sec
-[ 93.954043]   arm64_neon: 9856.000 MB/sec
-[ 93.954047] xor: using function: arm64_neon (9856.000 MB/sec)
+I fully understood. Thanks for your effort and help.
 
-I believe this code can bring some optimization for
-all arm64 platform. thanks for Ard Biesheuvel's suggestions.
-
-Signed-off-by: Jackie Liu <liuyun01@kylinos.cn>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/Kbuild |   1 -
- arch/arm64/include/asm/xor.h  |  73 +++++++++++++++++
- arch/arm64/lib/Makefile       |   6 ++
- arch/arm64/lib/xor-neon.c     | 184 ++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 263 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/xor.h
- create mode 100644 arch/arm64/lib/xor-neon.c
-
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index 6cd5d77..1877f29 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -27,4 +27,3 @@ generic-y += trace_clock.h
- generic-y += unaligned.h
- generic-y += user.h
- generic-y += vga.h
--generic-y += xor.h
-diff --git a/arch/arm64/include/asm/xor.h b/arch/arm64/include/asm/xor.h
-new file mode 100644
-index 0000000..856386a
---- /dev/null
-+++ b/arch/arm64/include/asm/xor.h
-@@ -0,0 +1,73 @@
-+/*
-+ * arch/arm64/include/asm/xor.h
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/hardirq.h>
-+#include <asm-generic/xor.h>
-+#include <asm/hwcap.h>
-+#include <asm/neon.h>
-+
-+#ifdef CONFIG_KERNEL_MODE_NEON
-+
-+extern struct xor_block_template const xor_block_inner_neon;
-+
-+static void
-+xor_neon_2(unsigned long bytes, unsigned long *p1, unsigned long *p2)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_2(bytes, p1, p2);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_3(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_3(bytes, p1, p2, p3);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_4(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_4(bytes, p1, p2, p3, p4);
-+	kernel_neon_end();
-+}
-+
-+static void
-+xor_neon_5(unsigned long bytes, unsigned long *p1, unsigned long *p2,
-+		unsigned long *p3, unsigned long *p4, unsigned long *p5)
-+{
-+	kernel_neon_begin();
-+	xor_block_inner_neon.do_5(bytes, p1, p2, p3, p4, p5);
-+	kernel_neon_end();
-+}
-+
-+static struct xor_block_template xor_block_arm64 = {
-+	.name   = "arm64_neon",
-+	.do_2   = xor_neon_2,
-+	.do_3   = xor_neon_3,
-+	.do_4   = xor_neon_4,
-+	.do_5	= xor_neon_5
-+};
-+#undef XOR_TRY_TEMPLATES
-+#define XOR_TRY_TEMPLATES           \
-+	do {        \
-+		xor_speed(&xor_block_8regs);    \
-+		xor_speed(&xor_block_32regs);    \
-+		if (cpu_has_neon()) { \
-+			xor_speed(&xor_block_arm64);\
-+		} \
-+	} while (0)
-+
-+#endif /* ! CONFIG_KERNEL_MODE_NEON */
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 69ff988..5540a16 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -5,6 +5,12 @@ lib-y		:= clear_user.o delay.o copy_from_user.o		\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
- 		   strchr.o strrchr.o tishift.o
- 
-+ifeq ($(CONFIG_KERNEL_MODE_NEON), y)
-+obj-$(CONFIG_XOR_BLOCKS)	+= xor-neon.o
-+CFLAGS_REMOVE_xor-neon.o	+= -mgeneral-regs-only
-+CFLAGS_xor-neon.o		+= -ffreestanding
-+endif
-+
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
- # in case of a PLT) as callee-saved, which allows for efficient runtime
-diff --git a/arch/arm64/lib/xor-neon.c b/arch/arm64/lib/xor-neon.c
-new file mode 100644
-index 0000000..131c60c2
---- /dev/null
-+++ b/arch/arm64/lib/xor-neon.c
-@@ -0,0 +1,184 @@
-+/*
-+ * arch/arm64/lib/xor-neon.c
-+ *
-+ * Authors: Jackie Liu <liuyun01@kylinos.cn>
-+ * Copyright (C) 2018,Tianjin KYLIN Information Technology Co., Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/raid/xor.h>
-+#include <linux/module.h>
-+#include <asm/neon-intrinsics.h>
-+
-+void xor_arm64_neon_2(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_3(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_4(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3, unsigned long *p4)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+	} while (--lines > 0);
-+}
-+
-+void xor_arm64_neon_5(unsigned long bytes, unsigned long *p1,
-+	unsigned long *p2, unsigned long *p3,
-+	unsigned long *p4, unsigned long *p5)
-+{
-+	uint64_t *dp1 = (uint64_t *)p1;
-+	uint64_t *dp2 = (uint64_t *)p2;
-+	uint64_t *dp3 = (uint64_t *)p3;
-+	uint64_t *dp4 = (uint64_t *)p4;
-+	uint64_t *dp5 = (uint64_t *)p5;
-+
-+	register uint64x2_t v0, v1, v2, v3;
-+	long lines = bytes / (sizeof(uint64x2_t) * 4);
-+
-+	do {
-+		/* p1 ^= p2 */
-+		v0 = veorq_u64(vld1q_u64(dp1 +  0), vld1q_u64(dp2 +  0));
-+		v1 = veorq_u64(vld1q_u64(dp1 +  2), vld1q_u64(dp2 +  2));
-+		v2 = veorq_u64(vld1q_u64(dp1 +  4), vld1q_u64(dp2 +  4));
-+		v3 = veorq_u64(vld1q_u64(dp1 +  6), vld1q_u64(dp2 +  6));
-+
-+		/* p1 ^= p3 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp3 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp3 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp3 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp3 +  6));
-+
-+		/* p1 ^= p4 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp4 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp4 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp4 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp4 +  6));
-+
-+		/* p1 ^= p5 */
-+		v0 = veorq_u64(v0, vld1q_u64(dp5 +  0));
-+		v1 = veorq_u64(v1, vld1q_u64(dp5 +  2));
-+		v2 = veorq_u64(v2, vld1q_u64(dp5 +  4));
-+		v3 = veorq_u64(v3, vld1q_u64(dp5 +  6));
-+
-+		/* store */
-+		vst1q_u64(dp1 +  0, v0);
-+		vst1q_u64(dp1 +  2, v1);
-+		vst1q_u64(dp1 +  4, v2);
-+		vst1q_u64(dp1 +  6, v3);
-+
-+		dp1 += 8;
-+		dp2 += 8;
-+		dp3 += 8;
-+		dp4 += 8;
-+		dp5 += 8;
-+	} while (--lines > 0);
-+}
-+
-+struct xor_block_template const xor_block_inner_neon = {
-+	.name	= "__inner_neon__",
-+	.do_2	= xor_arm64_neon_2,
-+	.do_3	= xor_arm64_neon_3,
-+	.do_4	= xor_arm64_neon_4,
-+	.do_5	= xor_arm64_neon_5,
-+};
-+EXPORT_SYMBOL(xor_block_inner_neon);
-+
-+MODULE_AUTHOR("Jackie Liu <liuyun01@kylinos.cn>");
-+MODULE_DESCRIPTION("ARMv8 XOR Extensions");
-+MODULE_LICENSE("GPL");
--- 
-2.7.4
-
-
-
+Regards
+Dong Aisheng
 
 _______________________________________________
 linux-arm-kernel mailing list
