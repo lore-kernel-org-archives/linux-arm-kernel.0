@@ -2,80 +2,63 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-2.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
-	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,MAILING_LIST_MULTI,SPF_PASS,
-	URIBL_BLOCKED autolearn=ham autolearn_force=no version=3.4.0
+X-Spam-Status: No, score=-10.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
+	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED,USER_AGENT_GIT autolearn=ham
+	autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id B5730C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:27:20 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id 126A2C04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:29:02 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 883BB206B7
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:27:20 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id D9421206B7
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 19:29:01 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="K6TqBfsN";
-	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="JLzKMTPA"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 883BB206B7
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="C7W1R5Rm"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org D9421206B7
+Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=bootlin.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:MIME-Version:References:In-Reply-To:
+	Message-Id:Date:Subject:To:From:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=6+UkaUWGHK5BLXdo9YAvvlxzaB5nnnqMM0f2k1caxIo=; b=K6TqBfsNULWjdO
-	LUmO0VjrWN9oGgYm7aqFcjOt6N0c9Z4SYBcWttub3eUuP6JTnhMnqOo7fr2hTatL36tp7cIztngBi
-	FpZRfV0K3u6LYW8tekEpCdxKdLu3h79FxyJwiRsduYW2pFroUtSOwdSRIo6DN7c1pz9r80AgNVh9W
-	iO/i8crc4+FL3sxoYkwJlO4TQCR2JLm+zFIqdzshDR8ka/kvRY3p1MrR62oqBtk/6dh5MMi18E+1e
-	x36pBWt8z3Tn+JwUn+7wojRGo/RdaPKZMvqI47ccSo5YYqVsoDfCOJZVwe+9tojqxe6V2hvOJ9FCN
-	3oVdS+v2oXf1wsKG0K8g==;
+	List-Owner; bh=4Dl5jSZ1s22maaDo+uBzgFYlgQk6DgjwEgb+hkAAP8Q=; b=C7W1R5Rmv4zxJy
+	gQAUWWphFoe+pOkNJZHOQUheTyRZmjQxAi+TYCeykgD7e6qjrEwbwiFeRmhiKabGdzYWsgpaNdmSw
+	tyQu88qmQ5DiRiJq1X2Fj7LikT1r441QSkpXdYuJjsm27627dxUhCNr1nW0Bn820zHEu+A4jeVkOI
+	mAeJp7V7+Z6/X2yuB55pzcqYL6ozuQ5GqQ8EMpgDOOkMpA42yAwCvzNlS2fzhKxz9b/zMTR6tV6/8
+	NhwZEHrOcgs+/hxr0nXZuPuI3xcZgqQ1OUhkNJGkKpQbSoOKJGkbE+Xi3cav9siaCmpiPvPaKx2WZ
+	3d6i2r1DoGrAKP45sNEA==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUGLk-0008Mn-NH; Tue, 04 Dec 2018 19:27:16 +0000
-Received: from mail-yw1-xc43.google.com ([2607:f8b0:4864:20::c43])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUGKQ-0006xf-5h
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:25:56 +0000
-Received: by mail-yw1-xc43.google.com with SMTP id d190so7449407ywd.12
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 11:25:43 -0800 (PST)
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
- h=mime-version:references:in-reply-to:from:date:message-id:subject:to
- :cc; bh=QOg6aNcJr1LQ7jAnnZQn6cnT30WyrQH2omgagch31qU=;
- b=JLzKMTPAxNKMl9OJ0JnfJxdS+jvQrSVktsCKY05zGofV9GRG158An8xO7Y0UoabwTB
- r7/WLg4ZzfmE9nvyGV8S75W7Qd8bwMwLNaSZjkbijleiy3rbXRZ9o7YC+his5iPEIVSh
- bV3QJyeWjCty/0yezB/FW5AYzASB9QL7GKCG8=
-X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
- d=1e100.net; s=20161025;
- h=x-gm-message-state:mime-version:references:in-reply-to:from:date
- :message-id:subject:to:cc;
- bh=QOg6aNcJr1LQ7jAnnZQn6cnT30WyrQH2omgagch31qU=;
- b=I38/2T9PtHx6GvnBB4uVdtG8qYhyzBtQZZEVphwdhtNCMzeQV4EHW25ypExYq9Cunb
- 1xwoc+7OWQtlQIBpqxRGQhxY/+HflK8Sc+EOoKl6W6+9c7XYMlLpS/u+MqkUoiUZgV/S
- 0kzlJK++LPClytLsg9L+bXSeBdPNNvL6gEbViMK0Mh4I1giavGm2PVASBW7QFGk+pLPy
- 4Mo0hNLD3ifjYsQuRdxONq0zpMgetRxnytOevXCwKvGgZt08l6g5xp39G1h4VlxxmgQG
- Nk/8YlpD1tZlp6HTjop4SKqjgaeQrygfBx2mYVmGuB1nZmQUsZR2tkmEvP6y2fIetvGI
- WqZA==
-X-Gm-Message-State: AA+aEWYUeR0T5payqeexAsFnnwXQ+XypzAckFlEmKZNnmDN1QMImsFKq
- KCRvMemAk8mKfaf/Gugw5ZopLsFKLkfPNuLc1j8IJJZc7+4=
-X-Google-Smtp-Source: AFSGD/UjJ6NCQDWd3O3Xf2OCzZtaZuSW+MEc2k2UdWTzt2JOjOUqklIBIx0TGuKyKLOCS1dUqf64PARvW45TkV301fA=
-X-Received: by 2002:a81:e40b:: with SMTP id r11mr21086209ywl.56.1543951542441; 
- Tue, 04 Dec 2018 11:25:42 -0800 (PST)
+	id 1gUGNO-0000Ld-Gg; Tue, 04 Dec 2018 19:28:58 +0000
+Received: from mail.bootlin.com ([62.4.15.54])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gUGNK-0000K5-Vl
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 19:28:56 +0000
+Received: by mail.bootlin.com (Postfix, from userid 110)
+ id 7D4392074D; Tue,  4 Dec 2018 20:28:45 +0100 (CET)
+Received: from localhost.localdomain (unknown [91.224.148.103])
+ by mail.bootlin.com (Postfix) with ESMTPSA id 855DC207B0;
+ Tue,  4 Dec 2018 20:28:34 +0100 (CET)
+From: Miquel Raynal <miquel.raynal@bootlin.com>
+To: Gregory Clement <gregory.clement@bootlin.com>,
+ Jason Cooper <jason@lakedaemon.net>, Andrew Lunn <andrew@lunn.ch>,
+ Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>,
+ Rob Herring <robh+dt@kernel.org>, Mark Rutland <mark.rutland@arm.com>,
+ Jens Axboe <axboe@kernel.dk>, Hans de Goede <hdegoede@redhat.com>
+Subject: [PATCH v3 2/7] ata: ahci: mvebu: remove stale comment
+Date: Tue,  4 Dec 2018 20:28:26 +0100
+Message-Id: <20181204192831.12440-3-miquel.raynal@bootlin.com>
+X-Mailer: git-send-email 2.19.1
+In-Reply-To: <20181204192831.12440-1-miquel.raynal@bootlin.com>
+References: <20181204192831.12440-1-miquel.raynal@bootlin.com>
 MIME-Version: 1.0
-References: <20181204191229.6851-1-anders.roxell@linaro.org>
- <20181204141908.76e7afa5@vmware.local.home>
- <20181204142142.4e2e2169@vmware.local.home>
-In-Reply-To: <20181204142142.4e2e2169@vmware.local.home>
-From: Anders Roxell <anders.roxell@linaro.org>
-Date: Tue, 4 Dec 2018 20:25:31 +0100
-Message-ID: <CADYN=9LNunVkSTzg1fri7Mu7mbu8gFPpgnFfCRQk4T61JXt1_A@mail.gmail.com>
-Subject: Re: [PATCH] tracing: add cond_resched to ftrace_replace_code()
-To: rostedt@goodmis.org
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_112554_496577_0E538C73 
-X-CRM114-Status: GOOD (  14.40  )
+X-CRM114-CacheID: sfid-20181204_112855_165448_B55BCD51 
+X-CRM114-Status: GOOD (  13.30  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,60 +70,57 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Kees Cook <keescook@chromium.org>, Arnd Bergmann <arnd@arndb.de>,
- Catalin Marinas <catalin.marinas@arm.com>, Will Deacon <will.deacon@arm.com>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>, mingo@redhat.com,
- Linux ARM <linux-arm-kernel@lists.infradead.org>
+Cc: devicetree@vger.kernel.org, linux-pm@vger.kernel.org,
+ Antoine Tenart <antoine.tenart@bootlin.com>,
+ Maxime Chevallier <maxime.chevallier@bootlin.com>,
+ Nadav Haklai <nadavh@marvell.com>, linux-ide@vger.kernel.org,
+ Thomas Petazzoni <thomas.petazzoni@bootlin.com>,
+ Miquel Raynal <miquel.raynal@bootlin.com>,
+ linux-arm-kernel@lists.infradead.org
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, 4 Dec 2018 at 20:21, Steven Rostedt <rostedt@goodmis.org> wrote:
->
-> On Tue, 4 Dec 2018 14:19:08 -0500
-> Steven Rostedt <rostedt@goodmis.org> wrote:
->
-> > > @@ -2435,6 +2438,13 @@ void __weak ftrace_replace_code(int enable)
-> > >                     /* Stop processing */
-> > >                     return;
-> > >             }
-> > > +           /*
-> > > +            * Some archs calls this function with interrupts or preemption
-> > > +            * disabled. Howeve, other archs don't and this can cause a
->
-> typo "However". But could you write it this way:
->
->         "However, for other archs that can preempt, this can cause an
->         tremendous unneeded latency."
->
+For Armada-38x (32-bit) SoCs, PM platform support has been added since:
+commit 32f9494c9dfd ("ARM: mvebu: prepare pm-board.c for the
+                      introduction of Armada 38x support")
+commit 3cbd6a6ca81c ("ARM: mvebu: Add standby support")
 
-I'll fix this and move it up (where I added it in the first place but
-moved it) =)
+For Armada 64-bit SoCs, like the A3700 also using this AHCI driver, PM
+platform support has always existed.
 
-Cheers,
-Anders
+There are even suspend/resume hooks in this driver since:
+commit d6ecf15814888 ("ata: ahci_mvebu: add suspend/resume support")
 
-> Thanks!
->
-> -- Steve
->
-> > > +            * tremendous unneeded latency.
-> > > +            */
-> >
-> > Actually, could you move the comment up where schedulable gets set?
-> >
-> > Thanks!
-> >
-> > -- Steve
-> >
-> > > +           if (schedulable)
-> > > +                   cond_resched();
-> > >     } while_for_each_ftrace_rec();
-> > >  }
-> > >
-> >
->
+Remove the stale comment at the end of this driver stating that all
+the above does not exist yet.
+
+Fixes: d6ecf15814888 ("ata: ahci_mvebu: add suspend/resume support")
+Signed-off-by: Miquel Raynal <miquel.raynal@bootlin.com>
+---
+ drivers/ata/ahci_mvebu.c | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/drivers/ata/ahci_mvebu.c b/drivers/ata/ahci_mvebu.c
+index f9cb51be38eb..128d6f22926d 100644
+--- a/drivers/ata/ahci_mvebu.c
++++ b/drivers/ata/ahci_mvebu.c
+@@ -197,11 +197,6 @@ static const struct of_device_id ahci_mvebu_of_match[] = {
+ };
+ MODULE_DEVICE_TABLE(of, ahci_mvebu_of_match);
+ 
+-/*
+- * We currently don't provide power management related operations,
+- * since there is no suspend/resume support at the platform level for
+- * Armada 38x for the moment.
+- */
+ static struct platform_driver ahci_mvebu_driver = {
+ 	.probe = ahci_mvebu_probe,
+ 	.remove = ata_platform_remove_one,
+-- 
+2.19.1
+
 
 _______________________________________________
 linux-arm-kernel mailing list
