@@ -2,103 +2,80 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-7.2 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SPF_PASS,USER_AGENT_MUTT autolearn=unavailable autolearn_force=no
-	version=3.4.0
+	SIGNED_OFF_BY,SPF_PASS autolearn=ham autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id DFEF0C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:14:03 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id B31FEC04EB8
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:18:22 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id B1E1720672
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:14:03 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id 74C8D20672
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 17:18:22 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="D1LAnI54"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org B1E1720672
-Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linux.ibm.com
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="CYcJCCR9";
+	dkim=fail reason="signature verification failed" (1024-bit key) header.d=linaro.org header.i=@linaro.org header.b="QfnSE5jT"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 74C8D20672
+Authentication-Results: mail.kernel.org; dmarc=fail (p=none dis=none) header.from=linaro.org
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
 	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
 	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:Message-Id:In-Reply-To:MIME-Version:
-	References:Subject:To:From:Date:Reply-To:Content-ID:Content-Description:
+	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
+	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
 	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=bjTcwv2k1K7/gKChoX88fbub+0hK9/UxjNqRufius3k=; b=D1LAnI54j47CBQ
-	1VhUJb+LQPXfMAGp/AZEITpin1A4Jn/2+y5GpmbvwSdVjSifVTl9li8Dwt9gthF1ucZY43CE5hHwV
-	DtQb7y5H4vzKK5yV0iO10RqcVWLrsWGwiD7KVxChbhpglRAhb/134QCcNSsfzzF90iqAWwCb7b8nn
-	uBgGC7bex+GMsV6GFnduj2vZhaFCzW3OzUo/1pd1hB7e6lDajY3S0nXuIEI/xEtmMEtgUHZgT6NmG
-	MSc+5TZZD8qDeTdN1C2dsb/wt/wpR4+Vhn75hkL5D8Hughlr45lIshsAOKXjS0gFasOxi3UWtEWdn
-	Ythj9dLYcvEkfBrfBQ+A==;
+	List-Owner; bh=Rc+bp+rot/iu9+uip64Hg3XEUj61r6ArxjJtqIW4dVY=; b=CYcJCCR9iymLv6
+	gEelaPw/dBfC5bv4o9coenf2gLdqvXPZzSRYWuWDkSobb81DvPkC6yD2wgecCjqaXOI3KLaqDR90y
+	RcQSCH3buTLnxJYqItmK464QXEf9nWKWrmMOk7SAeqGbBn2cTEt9rzWPGokFLs+OU9sXpbHaBMzj1
+	Q31lfCB3aqVr6N5kq6u3iggOWqVFWVpxosRkJvh92DSo4cAyEPEtBhulNTHCXXCMLLMgwNy1qfYhL
+	OJ8gJfHDFyj5mPLv+Qk6L3b5kmbl17vFzTLHCNdl9YxaD7Jx6nH3a56L5jW93pNSgsCZHsMrbKJoX
+	fTAGzJy9a4n45ZtipTrg==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gUEGp-0004Ae-4g; Tue, 04 Dec 2018 17:14:03 +0000
-Received: from mx0a-001b2d01.pphosted.com ([148.163.156.1])
+	id 1gUEKx-0006iq-1N; Tue, 04 Dec 2018 17:18:19 +0000
+Received: from mail-it1-x141.google.com ([2607:f8b0:4864:20::141])
  by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gUEGl-00047f-D0
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:14:01 +0000
-Received: from pps.filterd (m0098410.ppops.net [127.0.0.1])
- by mx0a-001b2d01.pphosted.com (8.16.0.22/8.16.0.22) with SMTP id
- wB4H9eoO008018
- for <linux-arm-kernel@lists.infradead.org>; Tue, 4 Dec 2018 12:13:45 -0500
-Received: from e06smtp03.uk.ibm.com (e06smtp03.uk.ibm.com [195.75.94.99])
- by mx0a-001b2d01.pphosted.com with ESMTP id 2p5uyc66n5-1
- (version=TLSv1.2 cipher=AES256-GCM-SHA384 bits=256 verify=NOT)
- for <linux-arm-kernel@lists.infradead.org>; Tue, 04 Dec 2018 12:13:44 -0500
-Received: from localhost
- by e06smtp03.uk.ibm.com with IBM ESMTP SMTP Gateway: Authorized Use Only!
- Violators will be prosecuted
- for <linux-arm-kernel@lists.infradead.org> from <rppt@linux.ibm.com>;
- Tue, 4 Dec 2018 17:13:41 -0000
-Received: from b06cxnps3074.portsmouth.uk.ibm.com (9.149.109.194)
- by e06smtp03.uk.ibm.com (192.168.101.133) with IBM ESMTP SMTP Gateway:
- Authorized Use Only! Violators will be prosecuted; 
- (version=TLSv1/SSLv3 cipher=AES256-GCM-SHA384 bits=256/256)
- Tue, 4 Dec 2018 17:13:33 -0000
-Received: from d06av23.portsmouth.uk.ibm.com (d06av23.portsmouth.uk.ibm.com
- [9.149.105.59])
- by b06cxnps3074.portsmouth.uk.ibm.com (8.14.9/8.14.9/NCO v10.0) with ESMTP id
- wB4HDWpW54395098
- (version=TLSv1/SSLv3 cipher=DHE-RSA-AES256-GCM-SHA384 bits=256 verify=FAIL);
- Tue, 4 Dec 2018 17:13:32 GMT
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 5F1D1A4051;
- Tue,  4 Dec 2018 17:13:32 +0000 (GMT)
-Received: from d06av23.portsmouth.uk.ibm.com (unknown [127.0.0.1])
- by IMSVA (Postfix) with ESMTP id 1CB2EA404D;
- Tue,  4 Dec 2018 17:13:30 +0000 (GMT)
-Received: from rapoport-lnx (unknown [9.148.206.196])
- by d06av23.portsmouth.uk.ibm.com (Postfix) with ESMTPS;
- Tue,  4 Dec 2018 17:13:29 +0000 (GMT)
-Date: Tue, 4 Dec 2018 19:13:28 +0200
-From: Mike Rapoport <rppt@linux.ibm.com>
-To: Michael Ellerman <mpe@ellerman.id.au>
-Subject: Re: [PATCH v2 1/6] powerpc: prefer memblock APIs returning virtual
- address
-References: <1543852035-26634-1-git-send-email-rppt@linux.ibm.com>
- <1543852035-26634-2-git-send-email-rppt@linux.ibm.com>
- <87woophasy.fsf@concordia.ellerman.id.au>
+ id 1gUEKu-0006SA-78
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 17:18:17 +0000
+Received: by mail-it1-x141.google.com with SMTP id h65so15618630ith.3
+ for <linux-arm-kernel@lists.infradead.org>;
+ Tue, 04 Dec 2018 09:18:05 -0800 (PST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=linaro.org; s=google;
+ h=mime-version:references:in-reply-to:from:date:message-id:subject:to
+ :cc; bh=lF6VDoK3e3izNfqqoHtafJuDqd2WvJPbzL8DwZfzL60=;
+ b=QfnSE5jTQANr5AIKuk/OATbVgeAeyRJxEh7piMuDR816Y7FxA7NfP7d3/XVaRAXxJG
+ JJAXreJNvmAqGspEZM5qT8LEj76RKDqCFgRQFB4DuTCrMddVpH6/k7x7yiNnA5ZU6Av7
+ JTBjHob96bO2oF65Zzb/eJFzq+YWFUAHQnPRg=
+X-Google-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed;
+ d=1e100.net; s=20161025;
+ h=x-gm-message-state:mime-version:references:in-reply-to:from:date
+ :message-id:subject:to:cc;
+ bh=lF6VDoK3e3izNfqqoHtafJuDqd2WvJPbzL8DwZfzL60=;
+ b=Co5GPATqYfJOCFToJif296vfMVXdxXVjxVMPApj/6Agdi7p9GGr9+MCK0fYOxqtj46
+ PRL5kW2Xp8paCbU8HaNl3NKdHrtPxeH2MvVq8UmhXPECpdEeOup7/PwPREBvLiufUG25
+ szitYuqjP7HTZC+B3IQjS2b+P3pPXFAx6r+XBPVQV/zEC8c4mr/jF/Rb9AThKPr/hC+w
+ evyKNse5F7WGzYAMgrl+laD12Cth6rd9ByCb8qLDdZIzvH9pULeBS5/D+xyYUqq+An6C
+ xY2jlUVn1npZd1ImEGZXWO4UjPzSLBZrkA1G93Mgt9K1eUeXioW7lKmXw5R9paPC42t/
+ CImw==
+X-Gm-Message-State: AA+aEWZZsBaiDwBTncCwgPAYuxRSwAzF3pfRBWR6UGF5qUoAvMxJiKKB
+ JR5cfH6uG2M+4CmsbamhYE/BwXpYA4f6s1EhYYMLTg==
+X-Google-Smtp-Source: AFSGD/WgbXiHSw1BchE/jS6TpfmTAt0rSjvgyVN4qZcckLOOYOVAWAYagBvFYw7d9XgDyY4rcIJaQPQZkCQQGWjCfks=
+X-Received: by 2002:a02:734b:: with SMTP id a11mr18007924jae.62.1543943884705; 
+ Tue, 04 Dec 2018 09:18:04 -0800 (PST)
 MIME-Version: 1.0
-Content-Disposition: inline
-In-Reply-To: <87woophasy.fsf@concordia.ellerman.id.au>
-User-Agent: Mutt/1.5.24 (2015-08-30)
-X-TM-AS-GCONF: 00
-x-cbid: 18120417-0012-0000-0000-000002D481B4
-X-IBM-AV-DETECTION: SAVI=unused REMOTE=unused XFE=unused
-x-cbparentid: 18120417-0013-0000-0000-00002109DF5B
-Message-Id: <20181204171327.GL26700@rapoport-lnx>
-X-Proofpoint-Virus-Version: vendor=fsecure engine=2.50.10434:, ,
- definitions=2018-12-04_07:, , signatures=0
-X-Proofpoint-Spam-Details: rule=outbound_notspam policy=outbound score=0
- priorityscore=1501
- malwarescore=0 suspectscore=0 phishscore=0 bulkscore=0 spamscore=0
- clxscore=1015 lowpriorityscore=0 mlxscore=0 impostorscore=0
- mlxlogscore=999 adultscore=0 classifier=spam adjust=0 reason=mlx
- scancount=1 engine=8.0.1-1810050000 definitions=main-1812040146
+References: <1543347887-21101-1-git-send-email-will.deacon@arm.com>
+ <1543347887-21101-5-git-send-email-will.deacon@arm.com>
+In-Reply-To: <1543347887-21101-5-git-send-email-will.deacon@arm.com>
+From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Date: Tue, 4 Dec 2018 18:17:53 +0100
+Message-ID: <CAKv+Gu8+GMkZFk88=x12F5h9yS49bDZMf=FCsOftbihGZjv1MQ@mail.gmail.com>
+Subject: Re: [PATCH 4/4] arm64: cmpxchg: Use "K" instead of "L" for ll/sc
+ immediate constraint
+To: Will Deacon <will.deacon@arm.com>
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_091359_906342_DB6BACB0 
-X-CRM114-Status: GOOD (  32.49  )
+X-CRM114-CacheID: sfid-20181204_091816_271227_8A2FA267 
+X-CRM114-Status: GOOD (  17.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -110,174 +87,51 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Michal Hocko <mhocko@suse.com>, linux-sh@vger.kernel.org,
- Benjamin Herrenschmidt <benh@kernel.crashing.org>, linux-mm@kvack.org,
- Rich Felker <dalias@libc.org>, Paul Mackerras <paulus@samba.org>,
- sparclinux@vger.kernel.org, Vincent Chen <deanbo422@gmail.com>,
- Jonas Bonn <jonas@southpole.se>, linux-c6x-dev@linux-c6x.org,
- Yoshinori Sato <ysato@users.sourceforge.jp>,
- Russell King <linux@armlinux.org.uk>, Mark Salter <msalter@redhat.com>,
- Arnd Bergmann <arnd@arndb.de>,
- Stefan Kristiansson <stefan.kristiansson@saunalahti.fi>,
- openrisc@lists.librecores.org, Greentime Hu <green.hu@gmail.com>,
- Stafford Horne <shorne@gmail.com>, Guan Xuetao <gxt@pku.edu.cn>,
- linux-arm-kernel@lists.infradead.org, Michal Simek <monstr@monstr.eu>,
- linux-kernel@vger.kernel.org, Andrew Morton <akpm@linux-foundation.org>,
- linuxppc-dev@lists.ozlabs.org, "David S. Miller" <davem@davemloft.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>,
+ linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
 Content-Type: text/plain; charset="us-ascii"
 Content-Transfer-Encoding: 7bit
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-On Tue, Dec 04, 2018 at 08:59:41PM +1100, Michael Ellerman wrote:
-> Hi Mike,
-> 
-> Thanks for trying to clean these up.
-> 
-> I think a few could be improved though ...
-> 
-> Mike Rapoport <rppt@linux.ibm.com> writes:
-> > diff --git a/arch/powerpc/kernel/paca.c b/arch/powerpc/kernel/paca.c
-> > index 913bfca..fa884ad 100644
-> > --- a/arch/powerpc/kernel/paca.c
-> > +++ b/arch/powerpc/kernel/paca.c
-> > @@ -42,17 +42,15 @@ static void *__init alloc_paca_data(unsigned long size, unsigned long align,
-> >  		nid = early_cpu_to_node(cpu);
-> >  	}
-> >  
-> > -	pa = memblock_alloc_base_nid(size, align, limit, nid, MEMBLOCK_NONE);
-> > -	if (!pa) {
-> > -		pa = memblock_alloc_base(size, align, limit);
-> > -		if (!pa)
-> > -			panic("cannot allocate paca data");
-> > -	}
-> > +	ptr = memblock_alloc_try_nid_raw(size, align, MEMBLOCK_LOW_LIMIT,
-> > +					 limit, nid);
-> > +	if (!ptr)
-> > +		panic("cannot allocate paca data");
->   
-> The old code doesn't zero, but two of the three callers of
-> alloc_paca_data() *do* zero the whole allocation, so I'd be happy if we
-> did it in here instead.
+On Tue, 27 Nov 2018 at 20:44, Will Deacon <will.deacon@arm.com> wrote:
+>
+> The "L" AArch64 machine constraint, which we use for the "old" value in
+> an LL/SC cmpxchg(), generates an immediate that is suitable for a 64-bit
+> logical instruction. However, for cmpxchg() operations on types smaller
+> than 64 bits, this constraint can result in an invalid instruction which
+> is correctly rejected by GAS, such as EOR W1, W1, #0xffffffff.
+>
+> Whilst we could special-case the constraint based on the cmpxchg size,
+> it's far easier to change the constraint to "K" and put up with using
+> a register for large 64-bit immediates. For out-of-line LL/SC atomics,
+> this is all moot anyway.
+>
+> Reported-by: Robin Murphy <robin.murphy@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-I looked at the callers and couldn't tell if zeroing memory in
-init_lppaca() would be ok.
-I'll remove the _raw here.
- 
-> That would mean we could use memblock_alloc_try_nid() avoiding the need
-> to panic() manually.
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Actual, my plan was to remove panic() from all memblock_alloc* and make all
-callers to check the returned value.
-I believe it's cleaner and also allows more meaningful panic messages. Not
-mentioning the reduction of memblock code.
- 
-> > diff --git a/arch/powerpc/kernel/setup_64.c b/arch/powerpc/kernel/setup_64.c
-> > index 236c115..d11ee7f 100644
-> > --- a/arch/powerpc/kernel/setup_64.c
-> > +++ b/arch/powerpc/kernel/setup_64.c
-> > @@ -634,19 +634,17 @@ __init u64 ppc64_bolted_size(void)
-> >  
-> >  static void *__init alloc_stack(unsigned long limit, int cpu)
-> >  {
-> > -	unsigned long pa;
-> > +	void *ptr;
-> >  
-> >  	BUILD_BUG_ON(STACK_INT_FRAME_SIZE % 16);
-> >  
-> > -	pa = memblock_alloc_base_nid(THREAD_SIZE, THREAD_SIZE, limit,
-> > -					early_cpu_to_node(cpu), MEMBLOCK_NONE);
-> > -	if (!pa) {
-> > -		pa = memblock_alloc_base(THREAD_SIZE, THREAD_SIZE, limit);
-> > -		if (!pa)
-> > -			panic("cannot allocate stacks");
-> > -	}
-> > +	ptr = memblock_alloc_try_nid_raw(THREAD_SIZE, THREAD_SIZE,
-> > +					 MEMBLOCK_LOW_LIMIT, limit,
-> > +					 early_cpu_to_node(cpu));
-> > +	if (!ptr)
-> > +		panic("cannot allocate stacks");
->  
-> Similarly here, several of the callers zero the stack, and I'd rather
-> all of them did.
-> 
-> So again we could use memblock_alloc_try_nid() here and remove the
-> memset()s from emergency_stack_init().
-
-Ok
- 
-> > diff --git a/arch/powerpc/mm/pgtable-radix.c b/arch/powerpc/mm/pgtable-radix.c
-> > index 9311560..415a1eb0 100644
-> > --- a/arch/powerpc/mm/pgtable-radix.c
-> > +++ b/arch/powerpc/mm/pgtable-radix.c
-> > @@ -51,24 +51,18 @@ static int native_register_process_table(unsigned long base, unsigned long pg_sz
-> >  static __ref void *early_alloc_pgtable(unsigned long size, int nid,
-> >  			unsigned long region_start, unsigned long region_end)
-> >  {
-> > -	unsigned long pa = 0;
-> > +	phys_addr_t min_addr = MEMBLOCK_LOW_LIMIT;
-> > +	phys_addr_t max_addr = MEMBLOCK_ALLOC_ANYWHERE;
-> >  	void *pt;
-> >  
-> > -	if (region_start || region_end) /* has region hint */
-> > -		pa = memblock_alloc_range(size, size, region_start, region_end,
-> > -						MEMBLOCK_NONE);
-> > -	else if (nid != -1) /* has node hint */
-> > -		pa = memblock_alloc_base_nid(size, size,
-> > -						MEMBLOCK_ALLOC_ANYWHERE,
-> > -						nid, MEMBLOCK_NONE);
-> > +	if (region_start)
-> > +		min_addr = region_start;
-> > +	if (region_end)
-> > +		max_addr = region_end;
-> >  
-> > -	if (!pa)
-> > -		pa = memblock_alloc_base(size, size, MEMBLOCK_ALLOC_ANYWHERE);
-> > -
-> > -	BUG_ON(!pa);
-> > -
-> > -	pt = __va(pa);
-> > -	memset(pt, 0, size);
-> > +	pt = memblock_alloc_try_nid_nopanic(size, size, min_addr, max_addr,
-> > +					    nid);
-> > +	BUG_ON(!pt);
-> 
-> I don't think there's any reason to BUG_ON() here rather than letting
-> memblock() call panic() for us. So this could also be memblock_alloc_try_nid().
-
-I'd prefer to panic here.
- 
-> > diff --git a/arch/powerpc/platforms/pasemi/iommu.c b/arch/powerpc/platforms/pasemi/iommu.c
-> > index f297152..f62930f 100644
-> > --- a/arch/powerpc/platforms/pasemi/iommu.c
-> > +++ b/arch/powerpc/platforms/pasemi/iommu.c
-> > @@ -208,7 +208,9 @@ static int __init iob_init(struct device_node *dn)
-> >  	pr_debug(" -> %s\n", __func__);
-> >  
-> >  	/* For 2G space, 8x64 pages (2^21 bytes) is max total l2 size */
-> > -	iob_l2_base = (u32 *)__va(memblock_alloc_base(1UL<<21, 1UL<<21, 0x80000000));
-> > +	iob_l2_base = memblock_alloc_try_nid_raw(1UL << 21, 1UL << 21,
-> > +					MEMBLOCK_LOW_LIMIT, 0x80000000,
-> > +					NUMA_NO_NODE);
-> 
-> This isn't equivalent is it?
-> 
-> memblock_alloc_base() panics on failure but memblock_alloc_try_nid_raw()
-> doesn't?
-
-Right, this should be either a memblock function that panic()'s or a call
-to panic() if the returned value is NULL.
-My preference is for the second variant :)
- 
-> Same comment for the other locations that do that conversion.
-> 
-> cheers
-> 
-
--- 
-Sincerely yours,
-Mike.
-
+> ---
+>  arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
+> index b53f70dd6e10..af7b99005453 100644
+> --- a/arch/arm64/include/asm/atomic_ll_sc.h
+> +++ b/arch/arm64/include/asm/atomic_ll_sc.h
+> @@ -276,7 +276,7 @@ __LL_SC_PREFIX(__cmpxchg_case_##name##sz(volatile void *ptr,                \
+>         "2:"                                                            \
+>         : [tmp] "=&r" (tmp), [oldval] "=&r" (oldval),                   \
+>           [v] "+Q" (*(u##sz *)ptr)                                      \
+> -       : [old] "Lr" (old), [new] "r" (new)                             \
+> +       : [old] "Kr" (old), [new] "r" (new)                             \
+>         : cl);                                                          \
+>                                                                         \
+>         return oldval;                                                  \
+> --
+> 2.1.4
+>
 
 _______________________________________________
 linux-arm-kernel mailing list
