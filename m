@@ -2,80 +2,75 @@ Return-Path: <SRS0=gVCq=ON=lists.infradead.org=linux-arm-kernel-bounces+infradea
 X-Spam-Checker-Version: SpamAssassin 3.4.0 (2014-02-07) on
 	aws-us-west-2-korg-lkml-1.web.codeaurora.org
 X-Spam-Level: 
-X-Spam-Status: No, score=-8.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
+X-Spam-Status: No, score=-5.7 required=3.0 tests=DKIMWL_WL_HIGH,DKIM_SIGNED,
 	DKIM_VALID,HEADER_FROM_DIFFERENT_DOMAINS,INCLUDES_PATCH,MAILING_LIST_MULTI,
-	SIGNED_OFF_BY,SPF_PASS,URIBL_BLOCKED autolearn=ham autolearn_force=no
-	version=3.4.0
+	SPF_PASS,URIBL_BLOCKED autolearn=unavailable autolearn_force=no version=3.4.0
 Received: from mail.kernel.org (mail.kernel.org [198.145.29.99])
-	by smtp.lore.kernel.org (Postfix) with ESMTP id 80135C04EB8
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:24:52 +0000 (UTC)
+	by smtp.lore.kernel.org (Postfix) with ESMTP id D0540C04EBF
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:31:19 +0000 (UTC)
 Received: from bombadil.infradead.org (bombadil.infradead.org [198.137.202.133])
 	(using TLSv1.2 with cipher ECDHE-RSA-AES256-GCM-SHA384 (256/256 bits))
 	(No client certificate requested)
-	by mail.kernel.org (Postfix) with ESMTPS id 50E3120851
-	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:24:52 +0000 (UTC)
+	by mail.kernel.org (Postfix) with ESMTPS id A274821527
+	for <infradead-linux-arm-kernel@archiver.kernel.org>; Tue,  4 Dec 2018 11:31:19 +0000 (UTC)
 Authentication-Results: mail.kernel.org;
-	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="gzm5zH4h";
-	dkim=fail reason="signature verification failed" (2048-bit key) header.d=nifty.com header.i=@nifty.com header.b="bDY/6r5o"
-DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org 50E3120851
+	dkim=pass (2048-bit key) header.d=lists.infradead.org header.i=@lists.infradead.org header.b="XLzohYsO"
+DMARC-Filter: OpenDMARC Filter v1.3.2 mail.kernel.org A274821527
 Authentication-Results: mail.kernel.org; dmarc=none (p=none dis=none) header.from=socionext.com
 Authentication-Results: mail.kernel.org; spf=none smtp.mailfrom=linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 DKIM-Signature: v=1; a=rsa-sha256; q=dns/txt; c=relaxed/relaxed;
-	d=lists.infradead.org; s=bombadil.20170209; h=Sender:
-	Content-Transfer-Encoding:Content-Type:Cc:List-Subscribe:List-Help:List-Post:
-	List-Archive:List-Unsubscribe:List-Id:To:Subject:Message-ID:Date:From:
-	In-Reply-To:References:MIME-Version:Reply-To:Content-ID:Content-Description:
-	Resent-Date:Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:
-	List-Owner; bh=iGWwVjntfLRvVmSWj4fVOVZuUujrtaJOVKpRk308gzY=; b=gzm5zH4hPzxN8n
-	rZ0icaoRmwE6k4jwsGT8LAicfGT77Vzs+nqg/8AmMKr1eOWyvlDfvjIHkL9gKbrcAqNaepWu0Gmns
-	QX3/Y12PcMzjXobSgKrXvgg+pkr6G+Bggswrbak0Y7j/kjV+u3+P2Bep+1LE/tipMVFmGbkWF0W6O
-	dWhRPGxYiQP36yVwzlhAtikGf8d2H+0me8sHRJIa0aXNCHjDJk3jN2FqLT9RwiNJPW/bd9I4NGphH
-	X1xK62dKDpm+/9sfT4ctif/N5T0HA9K8slUHhReU3Pvk0wZleSdxA+C5EZ0z8lg5tmhmMxvBSdsxM
-	s4VJcUPXfhrIMWxc4cCQ==;
+	d=lists.infradead.org; s=bombadil.20170209; h=Sender:Content-Type:
+	Content-Transfer-Encoding:Cc:List-Subscribe:List-Help:List-Post:List-Archive:
+	List-Unsubscribe:List-Id:In-Reply-To:MIME-Version:Date:Message-ID:From:
+	References:To:Subject:Reply-To:Content-ID:Content-Description:Resent-Date:
+	Resent-From:Resent-Sender:Resent-To:Resent-Cc:Resent-Message-ID:List-Owner;
+	 bh=F4iNusJx9inx31T3fE559FnNA5DayMB2ZEiKavxtl+4=; b=XLzohYsOhqBGaCPutZciFNVKo
+	5PwzYID6OVXXVKewqeDoab/o4nLAWv3Z27MQEcmNfmVLwZ5PmFZ2DMIjWoeYomhe+al23ATgnXCWN
+	tMWza+TCigIN/1hE0/5eMKvLSO+c6/wLkWE1kBwqTsgTv8VoJbFhfEeNCtxXay00uigUP5MAwI2PH
+	yOmxGOt1d0izTvWe1xmyNJYtlcK+os9R1Z6ka/Q3ppaJc7nNIc6oD51oyCw8oUekcKOQynd4qM9DR
+	zTEAQFjeODFyemhQIxd5TXNfSHKvABxZY0AEKE9Kho66qiSauWpNSZ95GAbThMvGGqFVIjMm7wDIl
+	6FNWV58MQ==;
 Received: from localhost ([127.0.0.1] helo=bombadil.infradead.org)
 	by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
-	id 1gU8oq-0003lz-Qe; Tue, 04 Dec 2018 11:24:48 +0000
-Received: from conssluserg-06.nifty.com ([210.131.2.91])
- by bombadil.infradead.org with esmtps (Exim 4.90_1 #2 (Red Hat Linux))
- id 1gU8on-0003as-M6
- for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:24:47 +0000
-Received: from mail-vs1-f52.google.com (mail-vs1-f52.google.com
- [209.85.217.52]) (authenticated)
- by conssluserg-06.nifty.com with ESMTP id wB4BOEJf013545
- for <linux-arm-kernel@lists.infradead.org>; Tue, 4 Dec 2018 20:24:15 +0900
-DKIM-Filter: OpenDKIM Filter v2.10.3 conssluserg-06.nifty.com wB4BOEJf013545
-DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=nifty.com;
- s=dec2015msa; t=1543922655;
- bh=FlpS0XJ3z9z0ek44Gl7gERWZOMn7xf3fsoCpTAa2s0M=;
- h=References:In-Reply-To:From:Date:Subject:To:Cc:From;
- b=bDY/6r5odPfRiVoJw4MrN9wl+3t+EDn8Xax/qxq7h1MVJIS+5bLlrucrtPAbAePJo
- dDJET3uiy0tNJl5XvWxUuf8zQecd6yEfDDA65hUfWEIMtOARm/upcgdAdcAeY68ArM
- 8kwrq6IJlGdMd8r+XzGLoxtA5xRFWMyskujrRcnAltZQ9isT9g4XbA29CaeXE7Fac5
- tyTBFO2SRKSeLWdKTLQMDOeMKTIYifFFBuwwyINe+0npcQjMjksoiQlOIlkY/aGrBI
- q/KbCJkoE8rtm9uXxx02Mfmt54gGj3jE6mBMu8U3xxl2QOkWYXSUkfZeoaAaVU0NgL
- RhiKjNhqlaHuw==
-X-Nifty-SrcIP: [209.85.217.52]
-Received: by mail-vs1-f52.google.com with SMTP id g68so9549200vsd.11
- for <linux-arm-kernel@lists.infradead.org>;
- Tue, 04 Dec 2018 03:24:15 -0800 (PST)
-X-Gm-Message-State: AA+aEWa+BEfsi/rTZjBfy//qQBAAomOeNVe3bMT85cIarFOlnhUiaTao
- /iOqFIkDL6jMPyJ2L/F10K2fMNozeyXf75YQD88=
-X-Google-Smtp-Source: AFSGD/VqyZrnTs2ct8snVogSYKalfHnqVVXxUVHGSn/iKlzkXmXur/pANgXaQDNsEI2sseGB0zWEAUtH73pJh6GFu5I=
-X-Received: by 2002:a67:f1d6:: with SMTP id v22mr8494079vsm.181.1543922654170; 
- Tue, 04 Dec 2018 03:24:14 -0800 (PST)
+	id 1gU8v0-0006tA-NJ; Tue, 04 Dec 2018 11:31:10 +0000
+Received: from mx.socionext.com ([202.248.49.38])
+ by bombadil.infradead.org with esmtp (Exim 4.90_1 #2 (Red Hat Linux))
+ id 1gU8uw-0006rd-Ua
+ for linux-arm-kernel@lists.infradead.org; Tue, 04 Dec 2018 11:31:08 +0000
+Received: from unknown (HELO iyokan-ex.css.socionext.com) ([172.31.9.54])
+ by mx.socionext.com with ESMTP; 04 Dec 2018 20:30:55 +0900
+Received: from mail.mfilter.local (m-filter-2 [10.213.24.62])
+ by iyokan-ex.css.socionext.com (Postfix) with ESMTP id 70D3460062;
+ Tue,  4 Dec 2018 20:30:55 +0900 (JST)
+Received: from 172.31.9.53 (172.31.9.53) by m-FILTER with ESMTP;
+ Tue, 4 Dec 2018 20:30:55 +0900
+Received: from yuzu.css.socionext.com (yuzu [172.31.8.45])
+ by iyokan.css.socionext.com (Postfix) with ESMTP id B8C3A4036C;
+ Tue,  4 Dec 2018 20:30:54 +0900 (JST)
+Received: from [127.0.0.1] (unknown [10.213.119.83])
+ by yuzu.css.socionext.com (Postfix) with ESMTP id 9156B120304;
+ Tue,  4 Dec 2018 20:30:54 +0900 (JST)
+Subject: Re: [PATCH 02/14] dt-bindings: soc: milbeaut: Add Milbeaut trampoline
+ description
+To: Rob Herring <robh+dt@kernel.org>
+References: <1542589274-13878-1-git-send-email-sugaya.taichi@socionext.com>
+ <1542589274-13878-3-git-send-email-sugaya.taichi@socionext.com>
+ <154337047410.88331.9696178601340675631@swboyd.mtv.corp.google.com>
+ <c746a3de-a9e3-9f25-ecb9-703ceb7e62d0@socionext.com>
+ <154356579701.88331.5043467509900444879@swboyd.mtv.corp.google.com>
+ <f5917f71-f15b-a92d-649c-e3f5f5f10698@socionext.com>
+ <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
+From: "Sugaya, Taichi" <sugaya.taichi@socionext.com>
+Message-ID: <90b00858-6e9e-8f7c-f6d4-b35e5daa6eee@socionext.com>
+Date: Tue, 4 Dec 2018 20:30:53 +0900
+User-Agent: Mozilla/5.0 (Windows NT 6.1; rv:60.0) Gecko/20100101
+ Thunderbird/60.3.2
 MIME-Version: 1.0
-References: <1542589336-13925-1-git-send-email-sugaya.taichi@socionext.com>
- <1542589336-13925-2-git-send-email-sugaya.taichi@socionext.com>
-In-Reply-To: <1542589336-13925-2-git-send-email-sugaya.taichi@socionext.com>
-From: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date: Tue, 4 Dec 2018 20:23:38 +0900
-X-Gmail-Original-Message-ID: <CAK7LNASnBobLm51VL=EVt+97-KBX3vEqXGjTH-L-q1Qn8_GUQA@mail.gmail.com>
-Message-ID: <CAK7LNASnBobLm51VL=EVt+97-KBX3vEqXGjTH-L-q1Qn8_GUQA@mail.gmail.com>
-Subject: Re: [PATCH 11/14] pinctrl: milbeaut: Add Milbeaut M10V pinctrl
-To: sugaya.taichi@socionext.com
+In-Reply-To: <CAL_Jsq+dnKht3TwCh1qB1H4pYFhQJmSN0nAayU+=PJLAvq0bbQ@mail.gmail.com>
+Content-Language: en-US
 X-CRM114-Version: 20100106-BlameMichelson ( TRE 0.8.0 (BSD) ) MR-646709E3 
-X-CRM114-CacheID: sfid-20181204_032445_930853_944CEFD6 
-X-CRM114-Status: GOOD (  17.15  )
+X-CRM114-CacheID: sfid-20181204_033107_247977_9D56C6F6 
+X-CRM114-Status: GOOD (  25.48  )
 X-BeenThere: linux-arm-kernel@lists.infradead.org
 X-Mailman-Version: 2.1.21
 Precedence: list
@@ -87,108 +82,108 @@ List-Post: <mailto:linux-arm-kernel@lists.infradead.org>
 List-Help: <mailto:linux-arm-kernel-request@lists.infradead.org?subject=help>
 List-Subscribe: <http://lists.infradead.org/mailman/listinfo/linux-arm-kernel>, 
  <mailto:linux-arm-kernel-request@lists.infradead.org?subject=subscribe>
-Cc: Mark Rutland <mark.rutland@arm.com>, DTML <devicetree@vger.kernel.org>,
+Cc: Mark Rutland <mark.rutland@arm.com>, devicetree@vger.kernel.org,
  Masami Hiramatsu <masami.hiramatsu@linaro.org>,
  Stephen Boyd <sboyd@kernel.org>,
  Greg Kroah-Hartman <gregkh@linuxfoundation.org>,
  Michael Turquette <mturquette@baylibre.com>,
  Daniel Lezcano <daniel.lezcano@linaro.org>,
- Linux Kernel Mailing List <linux-kernel@vger.kernel.org>,
+ "linux-kernel@vger.kernel.org" <linux-kernel@vger.kernel.org>,
  Russell King <linux@armlinux.org.uk>, Jassi Brar <jaswinder.singh@linaro.org>,
- Rob Herring <robh+dt@kernel.org>, linux-serial@vger.kernel.org,
+ "open list:SERIAL DRIVERS" <linux-serial@vger.kernel.org>,
  Jiri Slaby <jslaby@suse.com>, Thomas Gleixner <tglx@linutronix.de>,
  linux-clk <linux-clk@vger.kernel.org>,
- linux-arm-kernel <linux-arm-kernel@lists.infradead.org>
-Content-Type: text/plain; charset="us-ascii"
+ "moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE"
+ <linux-arm-kernel@lists.infradead.org>
 Content-Transfer-Encoding: 7bit
+Content-Type: text/plain; charset="us-ascii"; Format="flowed"
 Sender: "linux-arm-kernel" <linux-arm-kernel-bounces@lists.infradead.org>
 Errors-To: linux-arm-kernel-bounces+infradead-linux-arm-kernel=archiver.kernel.org@lists.infradead.org
 
-Hi Sugaya-san
+Hi
 
-On Mon, Nov 19, 2018 at 10:01 AM Sugaya Taichi
-<sugaya.taichi@socionext.com> wrote:
->
-> Add Milbeaut M10V pinctrl.
-> The M10V has the pins that can be used GPIOs or take multiple other
-> functions.
->
-> Signed-off-by: Sugaya Taichi <sugaya.taichi@socionext.com>
+On 2018/12/04 0:49, Rob Herring wrote:
+> On Mon, Dec 3, 2018 at 1:42 AM Sugaya, Taichi
+> <sugaya.taichi@socionext.com> wrote:
+>>
+>> Hi,
+>>
+>> On 2018/11/30 17:16, Stephen Boyd wrote:
+>>> Quoting Sugaya, Taichi (2018-11-29 04:24:51)
+>>>> On 2018/11/28 11:01, Stephen Boyd wrote:
+>>>>> Quoting Sugaya Taichi (2018-11-18 17:01:07)
+>>>>>>     create mode 100644 Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>>
+>>>>>> diff --git a/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>> new file mode 100644
+>>>>>> index 0000000..f5d906c
+>>>>>> --- /dev/null
+>>>>>> +++ b/Documentation/devicetree/bindings/soc/socionext/socionext,m10v.txt
+>>>>>> @@ -0,0 +1,12 @@
+>>>>>> +Socionext M10V SMP trampoline driver binding
+>>>>>> +
+>>>>>> +This is a driver to wait for sub-cores while boot process.
+>>>>>> +
+>>>>>> +- compatible: should be "socionext,smp-trampoline"
+>>>>>> +- reg: should be <0x4C000100 0x100>
+>>>>>> +
+>>>>>> +EXAMPLE
+>>>>>> +       trampoline: trampoline@0x4C000100 {
+>>>>> Drop the 0x part of unit addresses.
+>>>>
+>>>> Okay.
+>>>>
+>>>>
+>>>>>> +               compatible = "socionext,smp-trampoline";
+>>>>>> +               reg = <0x4C000100 0x100>;
+>>>>> Looks like a software construct, which we wouldn't want to put into DT
+>>>>> this way. DT doesn't describe drivers.
+>>>> We would like to use this node only getting the address of the
+>>>> trampoline area
+>>>> in which sub-cores wait.  (They have finished to go to this area in previous
+>>>> bootloader process.)
+>>>
+>>> Is this area part of memory, or a special SRAM? If it's part of memory,
+>>> I would expect this node to be under the reserved-memory node and
+>>> pointed to by some other node that uses this region. Could even be the
+>>> CPU nodes.
+>>
+>> Yes, 0x4C000100 is a part of memory under the reserved-memory node. So
+>> we would like to use the SRAM ( allocated 0x00000000 ) area instead.
+>> BTW, sorry, the trampoline address of this example is simply wrong.  We
+>> were going to use a part of the SRAM from the beginning.
+>>
+>>>
+>>>>
+>>>> So should we embed the constant value in source codes instead of getting
+>>>> from
+>>>> DT because the address is constant at the moment? Or is there other
+>>>> approach?
+>>>>
+>>>
+>>> If it's constant then that also works. Why does it need to come from DT
+>>> at all then?
+>>
+>> We think it is not good to embed constant value in driver codes and do
+>> not have another way...
+>> Are there better ways?
+> 
+> If this is just memory, can you use the standard spin-table binding in
+> the DT spec? There are some requirements like 64-bit values even on
+> 32-bit machines (though this gets violated).
 
+The spin-table seems to be used on only 64-bit arch. Have it ever worked 
+on 32-bit machine?
+And I would like not to use it because avoid violation.
 
-This patch was sent to:
-
-linux-clk@vger.kernel.org,
-devicetree@vger.kernel.org,
-linux-arm-kernel@lists.infradead.org,
-linux-kernel@vger.kernel.org,
-linux-serial@vger.kernel.org
-
-
-
-
-Unfortunately, the most important ML
-
-  linux-gpio@vger.kernel.org
-
-was not addressed.
-
-
-The pinctrl maintainer may not notice this patch.
-
-
-
-
-
-
-
-> diff --git a/drivers/pinctrl/pinctrl-m10v.c b/drivers/pinctrl/pinctrl-m10v.c
-> new file mode 100644
-> index 0000000..d4ca713
-> --- /dev/null
-> +++ b/drivers/pinctrl/pinctrl-m10v.c
-> @@ -0,0 +1,765 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +/*
-> + * Copyright (C) 2018 Socionext Ltd.
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Jassi Brar <jaswinder.singh@linaro.org>
-
-
-My company name is "Socionext Inc." instead of "Socionext Ltd."
-
-
-
-
-
-
-
-> +static struct platform_driver m10v_pinctrl_driver = {
-> +       .probe  = m10v_pinctrl_probe,
-> +       .driver = {
-> +               .name           = "m10v-pinctrl",
-> +               .of_match_table = m10v_pmatch,
-> +       },
-> +};
-> +
-> +static int __init m10v_pinctrl_init(void)
-> +{
-> +       return platform_driver_register(&m10v_pinctrl_driver);
-> +}
-> +arch_initcall(m10v_pinctrl_init);
-
-
-Can't it be builtin_platform_driver()?
-
-Which device requires this to be arch_initcall()?
-
-
-
+Thanks
+Sugaya Taichi
 
 
---
-Best Regards
-Masahiro Yamada
+> 
+> Rob
+> 
+
 
 _______________________________________________
 linux-arm-kernel mailing list
